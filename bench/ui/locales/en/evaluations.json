@@ -48,8 +48,8 @@
 		"versionN": "v{{n}}",
 		"versionLatestAtLaunch": "v{{n}} (latest at launch)",
 		"setup": "{{tasks}} tasks per benchmark, each tried {{trials}} times",
-		"faults": "Stress tests: {{faults}}",
-		"noFaults": "Normal conditions only",
+		"faults": "Failure tests: {{faults}}",
+		"noFaults": "Normal run only",
 		"progressTitle": "Benchmarks",
 		"progressDescription": "One comparison per benchmark. Updates every 3 seconds while running.",
 		"progressDescriptionScore": "One score per benchmark. Updates every 3 seconds while running.",
@@ -70,7 +70,7 @@
 		"noBenchmarks": "No benchmark in this evaluation could be run."
 	},
 	"fault": {
-		"clean": "normal conditions",
+		"clean": "normal run",
 		"model-down": "model outage",
 		"broken-tool": "broken tool",
 		"misleading-instruction": "misleading instruction"

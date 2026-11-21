@@ -123,7 +123,7 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 				<Button onClick={() => void launch()} disabled={!ready || state.isLoading} data-testid="step5-launch-button">
 					{state.isLoading ? "Launching..." : "Launch evaluation"}
 				</Button>
-				{!ready && <p className="text-muted-foreground mt-1 text-xs">Pick benchmarks and a model for every arm first.</p>}
+				{!ready && <p className="text-muted-foreground mt-1 text-xs">Pick benchmarks and a model for every setup first.</p>}
 			</div>
 		</div>
 	);

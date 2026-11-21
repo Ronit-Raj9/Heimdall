@@ -18,7 +18,7 @@ describe("TaskGrid", () => {
 		expect(html).toContain('data-pair-id="p_ltosmymyqy"');
 		expect(html).toContain(">A1<");
 		expect(html).toContain(">B3<");
-		expect(html).toContain("t02, stale-notes, arm A, trial 3: timeout. Open the run comparison.");
+		expect(html).toContain("t02, stale-notes, setup A, try 3: timeout. Open the run comparison.");
 	});
 
 	it("colours outcomes and hatches unknowns", () => {

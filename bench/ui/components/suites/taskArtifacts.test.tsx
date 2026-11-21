@@ -55,7 +55,7 @@ describe("TaskScenario with artifact output", () => {
 
 	it("shows the suite's artifact kind when the task sets no output", () => {
 		const html = renderToStaticMarkup(<TaskScenario task={{ ...plainTask, skills: ["x"] }} suiteOutput="artifact" />);
-		expect(html).toMatch(/data-testid="suites-task-output".*?Artifacts.*?from the suite/);
+		expect(html).toMatch(/data-testid="suites-task-output".*?Artifacts.*?from the benchmark/);
 		expect(html).not.toContain("suites-task-artifacts");
 	});
 });
@@ -72,8 +72,8 @@ describe("suite artifacts", () => {
 
 	it("shows the suite's list, labelled as the suite's, for a task that declares none", () => {
 		const html = renderToStaticMarkup(<TaskScenario task={plainTask} suiteOutput="artifact" suiteArtifacts={artifacts} />);
-		expect(html).toMatch(/data-testid="suites-task-output".*?Artifacts.*?from the suite/);
-		expect(html).toMatch(/data-testid="suites-task-artifacts" data-from-suite="true"[\s\S]*?Expected artifacts[\s\S]*?from the suite/);
+		expect(html).toMatch(/data-testid="suites-task-output".*?Artifacts.*?from the benchmark/);
+		expect(html).toMatch(/data-testid="suites-task-artifacts" data-from-suite="true"[\s\S]*?Expected artifacts[\s\S]*?from the benchmark/);
 		expect(html).toContain('data-testid="suites-task-artifacts-report"');
 	});
 

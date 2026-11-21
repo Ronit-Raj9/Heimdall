@@ -12,14 +12,14 @@
 		"time": "Wall time",
 		"output": "Final output",
 		"noOutput": "No final message",
-		"arm": "Arm {{arm}}",
+		"arm": "Setup {{arm}}",
 		"details": "Run details"
 	},
 	"launch": {
 		"pickTitle": "Pick a pair",
-		"pickSubtitle": "Choose a task to see its arms side by side.",
+		"pickSubtitle": "Choose a task to see its setups side by side.",
 		"newTitle": "Start a comparison",
-		"newSubtitle": "Run new arms instead of opening an existing pair."
+		"newSubtitle": "Run new setups instead of opening an existing pair."
 	},
 	"card": {
 		"open": "Set up",
@@ -29,7 +29,7 @@
 		"intro": "Each action starts a new experiment in the background."
 	},
 	"analysis": {
-		"intro": "Re-run analysis on sealed runs. Views refresh when a job ends.",
+		"intro": "Re-run analysis on saved runs. Views refresh when a job ends.",
 		"views": "Results",
 		"result": "Result",
 		"tools": "More tools"

@@ -42,7 +42,7 @@ export default function SuitesView() {
 				<EmptyState
 					icon={Boxes}
 					message={t("suites.empty")}
-					action={{ label: t("suites.addSuite"), to: "/suites/add" }}
+					action={{ label: t("suites.addSuite"), to: "/suites", search: { tab: "import" } }}
 					testId="suites-empty"
 				/>
 			) : (
@@ -73,7 +73,7 @@ export function AddBenchmarkMenu() {
 				<ChevronDown className="size-3.5 opacity-70 transition-transform group-open:rotate-180" aria-hidden="true" />
 			</summary>
 			<div className="bg-popover text-popover-foreground absolute right-0 z-20 mt-1 flex min-w-44 flex-col rounded-lg border p-1 shadow-md">
-				<Link to="/catalog" className={item} data-testid="suites-add-catalog">
+				<Link to="/suites" search={{ tab: "catalog" } as never} className={item} data-testid="suites-add-catalog">
 					{t("add.catalog")}
 				</Link>
 				<Link to="/suites/new" className={item} data-testid="suites-new-link">

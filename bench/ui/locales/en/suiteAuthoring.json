@@ -1,19 +1,19 @@
 {
 	"tab": "Edit",
 	"new": {
-		"title": "New suite",
+		"title": "New benchmark",
 		"subtitle": "Start from a template. You can add tasks, upload files and lint right after.",
-		"id": "Suite id",
+		"id": "Benchmark id",
 		"idHint": "Lowercase letters, digits, '.', '_' or '-'. It becomes the folder name.",
 		"template": "Template",
 		"image": "Existing toolchain image (optional)",
 		"imageHint": "Leave empty to build base/Dockerfile from the template.",
-		"create": "Create suite",
+		"create": "Create benchmark",
 		"creating": "Creating...",
-		"failed": "Could not create the suite",
+		"failed": "Could not create the benchmark",
 		"invalidId": "Use lowercase letters, digits, '.', '_' or '-', starting with a letter or digit.",
 		"scenario": "Comes with a complete sample task",
-		"notVisible": "The suite was written to benchmarks/, but this server reads suites from another folder (benchmarks_root). Ask your server owner to point it at the project's benchmarks/.",
+		"notVisible": "The benchmark was written to benchmarks/, but this server reads benchmarks from another folder (benchmarks_root). Ask your server owner to point it at the project's benchmarks/.",
 		"templates": {
 			"python-pytest": "Python repo tasks graded by hidden pytest files",
 			"node-test": "Node repo tasks graded by hidden node:test files",
@@ -33,7 +33,7 @@
 		}
 	},
 	"edit": {
-		"readOnly": "Only members can edit suites. Ask an admin of your organization for the member role.",
+		"readOnly": "Only members can edit benchmarks. Ask an admin of your organization for the member role.",
 		"files": "Files",
 		"noFiles": "No files yet.",
 		"pick": "Pick a file on the left to edit it, or add a task.",
@@ -50,7 +50,7 @@
 		"addFile": "Add file",
 		"uploadFile": "Upload file",
 		"uploadZip": "Upload zip into folder",
-		"uploadDir": "Folder inside the suite",
+		"uploadDir": "Folder inside the benchmark",
 		"uploading": "Uploading...",
 		"uploaded": "Uploaded {{count}} files",
 		"uploadError": "Upload failed",
@@ -66,10 +66,10 @@
 		"lintNow": "Check now",
 		"lintJob": "Lint (job)",
 		"lock": "Lock",
-		"lockConfirm": "Write suite.lock from the files as they are now?",
+		"lockConfirm": "Write the benchmark lock file from the files as they are now?",
 		"lintOk": "Lint passes: {{tasks}} tasks, no errors.",
 		"lintSummary": "{{errors}} errors, {{warnings}} warnings",
-		"loadErrorLint": "The suite does not load",
+		"loadErrorLint": "The benchmark does not load",
 		"lintUnavailable": "Lint unavailable"
 	}
 }

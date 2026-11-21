@@ -199,7 +199,7 @@ function CapabilityTable({ report }: { report: Report }) {
 			<TableHeader>
 				<TableRow>
 					<TableHead scope="col">Capability</TableHead>
-					{ab && <TableHead scope="col">Arm</TableHead>}
+					{ab && <TableHead scope="col">Setup</TableHead>}
 					{METRIC_HEADS.map((h) => (
 						<TableHead key={h} scope="col" className={h === "Score" ? undefined : "text-right"}>
 							{h}

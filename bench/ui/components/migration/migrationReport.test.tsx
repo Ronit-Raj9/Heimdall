@@ -28,7 +28,7 @@ describe("MigrationReportView", () => {
 
 	it("lists every stratum with its Holm family and the tasks needed", () => {
 		expect(html).toContain("Every stratum of this pair is one Holm family of");
-		expect(html).toContain("Condition: empty-test-run");
+		expect(html).toContain("Failure test: empty-test-run");
 		expect(html).toContain("Task kind: ");
 		expect(html).toMatch(/data-result="cannot_tell"/);
 	});

@@ -114,7 +114,7 @@ describe("scenario facts", () => {
 		expect(html).toMatch(/data-testid="suites-fact-grading".*?data-tone="warn".*?>Judged</);
 		expect(html).toMatch(/data-testid="suites-judged-note"/);
 		expect(html).toContain("a judge model decides whether each answer is correct");
-		expect(html).toContain("never ranked against, or compared with, a verified suite");
+		expect(html).toContain("never ranked against, or compared with, a verified benchmark");
 		expect(html).toMatch(/data-testid="suites-imported".*?recall-example@1/);
 	});
 

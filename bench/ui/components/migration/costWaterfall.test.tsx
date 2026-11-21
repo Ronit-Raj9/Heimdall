@@ -11,8 +11,8 @@ const render = (e: CostExplanation) => renderToStaticMarkup(<CostExplanationView
 describe("CostExplanationView", () => {
 	it("shows both arms, every part and the total of the recorded pilot", () => {
 		const html = render(COST_FIXTURE);
-		expect(html).toContain("Arm A: codex gpt-5.4-mini");
-		expect(html).toContain("Arm B: custom-python gpt-5.4-mini");
+		expect(html).toContain("Setup A: codex gpt-5.4-mini");
+		expect(html).toContain("Setup B: custom-python gpt-5.4-mini");
 		for (const id of ["price", "input_tokens", "output_tokens", "cache_read_share", "turns", "wasted_attempts"]) {
 			expect(html).toContain(`data-testid="cost-waterfall-run-part-${id}"`);
 		}
@@ -61,7 +61,7 @@ describe("CostExplanationView", () => {
 			per_success: { ...COST_FIXTURE.per_success, reason: "cost per verified success is undefined: arm A has 0 of 3 verified successes" },
 		};
 		const html = render(e);
-		expect(html).toContain("Cache read share of arm B dropped to 73.7% from 89.6% (A).");
+		expect(html).toContain("Cache read share of setup B dropped to 73.7% from 89.6% (A).");
 		expect(html).toContain("system prompt changed");
 		expect(html).toContain("Not applicable: cost per verified success is undefined");
 	});

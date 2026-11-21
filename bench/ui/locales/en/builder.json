@@ -6,7 +6,7 @@
 		"abHint": "Change one agent setting and test it against the baseline."
 	},
 	"sections": {
-		"what": "Suite and name",
+		"what": "Benchmark and name",
 		"agents": "Agents",
 		"agentsHint": "One agent compares models; several compare agents.",
 		"models": "Models",
@@ -16,7 +16,7 @@
 	},
 	"fields": {
 		"name": "Experiment name",
-		"suite": "Suite",
+		"suite": "Benchmark",
 		"suiteOption": "{{id}}@{{version}} ({{count}} tasks)",
 		"agentModel": "own model: {{model}}",
 		"addModel": "Add model",
@@ -27,10 +27,10 @@
 		"tasksAll": "All {{count}} tasks",
 		"trials": "Trials per task",
 		"adaptive": "Adaptive trials",
-		"adaptiveHint": "Stop a task early once every arm agrees on it. Trials becomes the maximum.",
+		"adaptiveHint": "Stop a task early once every setup agrees on it. Tries becomes the maximum.",
 		"adaptiveMin": "Minimum trials",
-		"probes": "Extra conditions (probes)",
-		"probesHint": "clean always runs. Each probe adds a condition with the same tasks.",
+		"probes": "Failure tests",
+		"probesHint": "The normal run always happens. Each failure test runs the same tasks again.",
 		"totalUsd": "Budget (USD)",
 		"concurrency": "Concurrency",
 		"seed": "Seed",
@@ -42,10 +42,10 @@
 	},
 	"preview": {
 		"title": "Matrix preview",
-		"description": "Arm A is the baseline for the verdict.",
-		"arms": "{{count}} arms",
-		"runs": "up to {{runs}} runs ({{arms}} arms x {{conditions}} conditions x {{tasks}} tasks x {{trials}} trials)",
-		"empty": "Pick at least one agent and fill in a model to see the arms."
+		"description": "Setup A is the baseline for the verdict.",
+		"arms": "{{count}} setups",
+		"runs": "up to {{runs}} runs ({{arms}} setups x {{conditions}} tests x {{tasks}} tasks x {{trials}} tries)",
+		"empty": "Pick at least one agent and fill in a model to see the setups."
 	},
 	"actions": {
 		"estimate": "Estimate cost",
@@ -66,13 +66,13 @@
 	},
 	"errors": {
 		"nameRequired": "Give the experiment a name.",
-		"suiteRequired": "Pick a suite.",
+		"suiteRequired": "Pick a benchmark.",
 		"agentRequired": "Pick at least one agent.",
 		"modelEmpty": "Type a model name, or pick a second agent.",
 		"modelDuplicate": "This model is already listed.",
-		"tooFewArms": "A comparison needs at least 2 arms: add a model or an agent.",
-		"tooManyArms": "At most 26 arms: remove some agents or models.",
-		"taskCountRange": "Pick between 1 and the number of tasks in the suite.",
+		"tooFewArms": "A comparison needs at least 2 setups: add a model or an agent.",
+		"tooManyArms": "At most 26 setups: remove some agents or models.",
+		"taskCountRange": "Pick between 1 and the number of tasks in the benchmark.",
 		"trialsRange": "Trials must be a whole number from 1 to 50.",
 		"adaptiveTrials": "Adaptive trials need at least 2 trials per task.",
 		"adaptiveMin": "Minimum must be at least 1 and below the trials.",
@@ -82,13 +82,13 @@
 	},
 	"steps": {
 		"what": "What to test",
-		"whatHint": "Pick a suite and give the comparison a name.",
+		"whatHint": "Pick a benchmark and give the comparison a name.",
 		"who": "Who competes",
 		"whoHint": "Every agent runs with every model.",
 		"size": "How much",
 		"sizeHint": "Tasks, trials and the most it may spend.",
 		"extras": "Extras",
-		"extrasHint": "Probes, adaptive trials, concurrency, seed and pool."
+		"extrasHint": "Failure tests, adaptive tries, concurrency, seed and pool."
 	},
 	"summary": {
 		"runs": "Max runs",

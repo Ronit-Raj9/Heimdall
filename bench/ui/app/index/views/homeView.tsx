@@ -1,12 +1,11 @@
 import { Pill, StatCard } from "@/components/home/homeBits";
-import { evaluationStats, homeStats, isSystemCheck, monthStart, newestEvaluations, splitExperiments, type ExperimentListItem } from "@/components/home/home.utils";
+import { evaluationStats, firstRunSeen, homeStats, markFirstRunSeen, isSystemCheck, monthStart, newestEvaluations, splitExperiments, type ExperimentListItem } from "@/components/home/home.utils";
 import { RecentEvaluations } from "@/components/home/recentEvaluations";
 import { RecentExperiments } from "@/components/home/recentExperiments";
 import { RunningExperiments } from "@/components/home/runningExperiments";
 import { SuitesPanel } from "@/components/home/suitesPanel";
 import { LoadError } from "@/components/runs/screenStates";
 import { EmptyState, suiteIdOf } from "@/components/shell";
-import { welcomeSeen } from "@/app/welcome/views/welcome.utils";
 import { Button } from "@/components/ui/button";
 import { formatValueNumber } from "@/components/valueCell.utils";
 import { getLocale } from "@/lib/i18n";
@@ -17,7 +16,7 @@ import { useListEvaluationsQuery } from "@/lib/store/apis/evaluationsApi";
 import "@/lib/types/homeI18n";
 import { cn } from "@/lib/utils";
 import { Link, Navigate } from "@tanstack/react-router";
-import { ArrowRight, Award, Bot, Boxes, CircleCheck, FlaskConical, GitCompare, Play, Wallet } from "lucide-react";
+import { ArrowRight, Award, Bot, Boxes, CircleCheck, FlaskConical, Play, Wallet } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -37,7 +36,7 @@ function greetingKey(now: Date): "morning" | "afternoon" | "evening" {
  * Home: a greeting with the one thing to do (evaluate your agent), four agent KPIs, the
  * experiments running now with live progress, the newest evaluations, the newest finished
  * comparisons and the suites. A fresh org gets one onboarding card that
- * leads to the setup wizard.
+ * leads to /evaluate, the one start path.
  */
 export default function HomeView() {
 	const { t } = useTranslation("home");
@@ -63,9 +62,10 @@ export default function HomeView() {
 	const tracks = useMemo(() => new Map((suites.data?.suites ?? []).map((suite) => [suite.id, suite.track as string | undefined])), [suites.data]);
 	const trackOf = (suite: string | undefined) => (suite ? tracks.get(suiteIdOf(suite)) : undefined);
 
-	// First sign-in to an org with no experiment: open the setup wizard once per browser.
-	if (empty && evaluations.length === 0 && session.signedIn && mayRun && !welcomeSeen()) {
-		return <Navigate to="/welcome" replace />;
+	// First sign-in to an org with nothing tested yet: open /evaluate, the one start path, once per browser.
+	if (empty && evaluations.length === 0 && session.signedIn && mayRun && !firstRunSeen()) {
+		markFirstRunSeen();
+		return <Navigate to={"/evaluate" as never} replace />;
 	}
 
 	const firstName = session.user?.name?.trim().split(/\s+/)[0];
@@ -85,12 +85,6 @@ export default function HomeView() {
 				</div>
 				{mayRun && (
 					<div className="flex shrink-0 flex-wrap gap-2">
-						<Button asChild variant="outline" dataTestId="home-cta-compare">
-							<Link to="/experiments/new">
-								<GitCompare aria-hidden="true" />
-								{t("cta.newExperiment")}
-							</Link>
-						</Button>
 						<Button asChild dataTestId="home-cta-run">
 							<Link to={"/evaluate" as never}>
 								<Play aria-hidden="true" />
@@ -198,7 +192,7 @@ export default function HomeView() {
 								<EmptyState
 									icon={FlaskConical}
 									message={t("recent.empty")}
-									action={mayRun ? { label: t("cta.newExperiment"), to: "/experiments/new" } : undefined}
+									action={mayRun ? { label: t("cta.run"), to: "/evaluate" } : undefined}
 									compact
 									className="m-3"
 									testId="home-recent-empty"
@@ -228,7 +222,7 @@ export default function HomeView() {
 						<EmptyState
 							icon={Boxes}
 							message={t("suites.empty")}
-							action={{ label: t("suites.browse"), to: "/catalog" }}
+							action={{ label: t("suites.browse"), to: "/suites", search: { tab: "catalog" } }}
 							compact
 							testId="home-suites-empty"
 						/>

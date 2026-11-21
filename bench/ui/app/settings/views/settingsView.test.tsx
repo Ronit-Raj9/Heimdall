@@ -22,7 +22,7 @@ import {
 } from "@/lib/testing/platformFixtures";
 import { errorQuery, loadingQuery, mutation, okQuery, render, tagOf } from "@/lib/testing/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import SettingsView, { settingsTab } from "./settingsView";
+import SettingsView, { settingsTab, settingsTabsFor } from "./settingsView";
 
 const api = vi.hoisted(() => ({ q: {} as Record<string, unknown>, m: {} as Record<string, Record<string, unknown>>, calls: [] as string[] }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
@@ -93,15 +93,21 @@ beforeEach(() => {
 });
 
 describe("SettingsView", () => {
-	it("explains local mode instead of showing team settings", () => {
-		const html = render(<SettingsView tab="members" onTabChange={() => undefined} />, LOCAL_SESSION);
+	it("shows the plumbing tabs in local mode, without team tabs", () => {
+		const html = render(<SettingsView tab="secrets" onTabChange={() => undefined} />, LOCAL_SESSION);
 		expect(html).toContain('data-testid="settings-local"');
 		expect(html).toContain("local mode");
-		expect(html).not.toContain("settings-tab-members");
-		expect(html).toContain('data-testid="settings-local-links"');
+		for (const tab of ["keys", "runners", "usage", "files", "jobs", "integrations", "operations", "secrets"]) expect(html).toContain(`data-testid="settings-tab-${tab}"`);
+		for (const tab of ["members", "tokens", "github", "audit", "org", "account", "admin"]) expect(html).not.toContain(`data-testid="settings-tab-${tab}"`);
+	});
+	it("lists Server admin only for server admins", () => {
+		const tabs = (session: Parameters<typeof settingsTabsFor>[0]) => settingsTabsFor(session);
+		expect(tabs(hostedSession())).not.toContain("admin");
+		expect(tabs({ ...hostedSession(), serverAdmin: true })).toContain("admin");
+		expect(tabs(hostedSession())[0]).toBe("keys");
 	});
 	it("keeps browsers from autofilling secret names and values", () => {
-		const html = render(<SettingsView tab="members" onTabChange={() => undefined} />, LOCAL_SESSION);
+		const html = render(<SettingsView tab="secrets" onTabChange={() => undefined} />, LOCAL_SESSION);
 		const value = tagOf(html, "secret-value") ?? "";
 		expect(value).toContain('autoComplete="new-password"');
 		expect(value).toContain('data-lpignore="true"');
@@ -113,17 +119,18 @@ describe("SettingsView", () => {
 	it("asks a visitor who is not signed in to sign in", () => {
 		expect(render(<SettingsView tab="members" onTabChange={() => undefined} />, demoSession())).toContain("settings-signed-out");
 	});
-	it("shows the six tabs and the organization in hosted mode", () => {
+	it("shows every tab and the organization in hosted mode", () => {
 		const html = render(<SettingsView tab="members" onTabChange={() => undefined} />, hostedSession());
-		for (const tab of ["members", "tokens", "runners", "audit", "org", "account"]) expect(html).toContain(`data-testid="settings-tab-${tab}"`);
-		expect(html).toContain("Who can use Acme Agents, access keys for scripts, and the machines that run your agents.");
+		for (const tab of ["keys", "runners", "usage", "files", "jobs", "integrations", "operations", "members", "tokens", "secrets", "github", "audit", "org", "account"]) expect(html).toContain(`data-testid="settings-tab-${tab}"`);
+		expect(html).toContain("API keys, workers and files for Acme Agents, and who can use it.");
 		expect(html).toContain('data-testid="settings-members"');
 	});
-	it("reads the tab from the URL, members by default", () => {
+	it("reads the tab from the URL, API keys by default, workers as the Workers tab", () => {
 		expect(settingsTab("audit")).toBe("audit");
 		expect(settingsTab("account")).toBe("account");
-		expect(settingsTab("nope")).toBe("members");
-		expect(settingsTab(null)).toBe("members");
+		expect(settingsTab("workers")).toBe("runners");
+		expect(settingsTab("nope")).toBe("keys");
+		expect(settingsTab(null)).toBe("keys");
 	});
 });
 

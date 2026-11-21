@@ -1,6 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import WelcomePage from "./page";
+import { welcomeRedirect } from "@/lib/routing/navRedirects";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// Agent-first nav (X09): Getting started is retired; /evaluate is the one place to start.
 export const Route = createFileRoute("/welcome")({
-	component: WelcomePage,
+	beforeLoad: () => {
+		throw redirect({ ...welcomeRedirect(), replace: true } as never);
+	},
 });

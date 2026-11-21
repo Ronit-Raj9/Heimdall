@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
 import { Fragment, isValidElement, type ComponentType, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { useEmbedded } from "./embedded";
 
 /** One step of the trail above the title. The last crumb is the current page and is not a link. */
 export interface Crumb {
@@ -36,6 +37,8 @@ export interface PageHeaderProps {
 export function PageHeader({ title, subtitle, actions, meta, breadcrumbs, icon, className, testId }: PageHeaderProps) {
 	const { t } = useTranslation("bench");
 	const iconNode = renderIcon(icon);
+	// Inside another page's tab the title is a section heading, not the page's h1.
+	const Heading = useEmbedded() ? "h2" : "h1";
 	return (
 		<header className={cn("mb-2 flex min-w-0 flex-col gap-2", className)} data-testid={testId ?? "page-header"}>
 			{breadcrumbs && breadcrumbs.length > 0 && (
@@ -84,7 +87,7 @@ export function PageHeader({ title, subtitle, actions, meta, breadcrumbs, icon, 
 				)}
 				<div className="flex min-w-0 flex-1 flex-col gap-1">
 					<div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-						<h1 className="text-foreground min-w-0 text-2xl font-semibold tracking-tight break-words">{title}</h1>
+						<Heading className={cn("text-foreground min-w-0 font-semibold tracking-tight break-words", Heading === "h1" ? "text-2xl" : "text-xl")}>{title}</Heading>
 						{meta && <div className="flex flex-wrap items-center gap-2">{meta}</div>}
 					</div>
 					{subtitle && <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">{subtitle}</p>}

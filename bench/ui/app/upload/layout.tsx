@@ -1,6 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import UploadPage from "./page";
+import { uploadRedirect } from "@/lib/routing/navRedirects";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// Agent-first nav (X09): zip upload is the Upload view of the Files tab in Settings.
 export const Route = createFileRoute("/upload")({
-	component: UploadPage,
+	beforeLoad: () => {
+		throw redirect({ ...uploadRedirect(), replace: true } as never);
+	},
 });

@@ -36,6 +36,7 @@ import type {
 	ModelProviderInfo,
 } from "@/lib/types/models";
 import { Link, useSearch } from "@tanstack/react-router";
+import { useEmbedded } from "@/components/shell/embedded";
 import { cn } from "@/lib/utils";
 import { KeyRound, Pencil, Plus, Sparkles, X } from "lucide-react";
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
@@ -121,6 +122,8 @@ export default function ModelsView() {
 	const { t: tu } = useTranslation("u11");
 	const session = useSession();
 	const search = useSearch({ strict: false });
+	const embedded = useEmbedded();
+	const Heading = embedded ? "h2" : "h1";
 	const models = useGetModelsQuery();
 	const isAdmin = canUse(session, "admin");
 	const canTest = canUse(session, "member");
@@ -146,7 +149,7 @@ export default function ModelsView() {
 		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-8 p-4 sm:p-6" data-testid="models-view">
 			<header className="flex flex-wrap items-start justify-between gap-4">
 				<div className="flex min-w-0 flex-col gap-1">
-					<h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
+					<Heading className={embedded ? "text-xl font-semibold tracking-tight" : "text-2xl font-semibold tracking-tight"}>{t("title")}</Heading>
 					<p className="text-muted-foreground text-sm">{tu("models.subtitle")}</p>
 					<p className="text-muted-foreground text-xs">
 						{t("secretsHint")}{" "}

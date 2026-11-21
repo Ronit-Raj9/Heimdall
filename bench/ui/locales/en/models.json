@@ -1,5 +1,5 @@
 {
-	"title": "Models & keys",
+	"title": "API keys",
 	"subtitle": "Your agents need an API key to talk to an AI model (OpenAI, Anthropic and others). Add a key here. It is stored encrypted and never shown again after you save it.",
 	"add": "Add an API key",
 	"addTitle": "Add an API key",

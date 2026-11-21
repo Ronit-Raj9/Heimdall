@@ -59,8 +59,8 @@ describe("JudgedNotice", () => {
 		const html = renderToStaticMarkup(<JudgedNotice testId="n" />);
 		expect(html).toContain('role="note"');
 		expect(html).toContain("Judged, not verified");
-		expect(html).toContain("pinned in suite.yaml");
-		expect(html).toContain("never ranked against, or compared with, a verified suite");
+		expect(html).toContain("pinned in the benchmark file");
+		expect(html).toContain("never ranked against, or compared with, a verified benchmark");
 	});
 
 	it("takes its own title and body", () => {

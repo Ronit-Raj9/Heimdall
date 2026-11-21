@@ -2,140 +2,98 @@ import {
 	Activity,
 	Award,
 	Bot,
-	BookOpen,
 	Boxes,
 	CalendarClock,
-	FileUp,
-	Sparkles,
-	FolderTree,
-	Gauge,
-	KeyRound,
-	LayoutGrid,
-	ListChecks,
-	Plug,
-	Scale,
-	Shield,
-	Wrench,
 	CirclePlay,
-	ClipboardCheck,
 	FlaskConical,
 	House,
-	Inbox,
 	ListOrdered,
 	PackageCheck,
 	Radio,
-	Server,
+	SearchX,
 	Settings,
-	ShieldCheck,
+	Zap,
 	type LucideIcon,
 } from "lucide-react";
 
-export type BenchNavGroupId = "start" | "benchmark" | "build" | "production" | "govern" | "operate";
+export type BenchNavGroupId = "home" | "agents" | "test" | "tasks" | "watch" | "release" | "settings";
 
 export interface BenchNavItem {
 	/** The entry's route. Object routes below it (an experiment, a run, a suite) keep it highlighted. */
 	to:
 		| "/"
-		| "/welcome"
+		| "/agents"
+		| "/leaderboard"
 		| "/evaluations"
 		| "/experiments"
+		| "/failure-tests"
 		| "/runs"
-		| "/leaderboard"
-		| "/agents"
 		| "/suites"
-		| "/canaries"
+		| "/why-agents-fail"
+		| "/scheduled-checks"
 		| "/live"
-		| "/inbox"
-		| "/review"
 		| "/releases"
-		| "/monitors"
-		| "/workers"
-		| "/settings"
-		| "/catalog"
-		| "/models"
-		| "/files"
-		| "/schedules"
-		| "/policies"
-		| "/jobs"
-		| "/integrations"
-		| "/operate"
-		| "/usage"
-		| "/upload"
-		| "/docs"
-		| "/admin";
+		| "/settings";
 	labelKey:
 		| "shell.nav.home"
-		| "shell.nav.welcome"
+		| "shell.nav.agents"
+		| "shell.nav.leaderboard"
 		| "shell.nav.evaluations"
 		| "shell.nav.experiments"
+		| "shell.nav.failureTests"
 		| "shell.nav.runs"
-		| "shell.nav.leaderboard"
-		| "shell.nav.agents"
 		| "shell.nav.suites"
-		| "shell.nav.canaries"
+		| "shell.nav.whyAgentsFail"
+		| "shell.nav.scheduledChecks"
 		| "shell.nav.live"
-		| "shell.nav.inbox"
-		| "shell.nav.review"
 		| "shell.nav.releases"
-		| "shell.nav.monitors"
-		| "shell.nav.workers"
-		| "shell.nav.settings"
-		| "shell.nav.catalog"
-		| "shell.nav.models"
-		| "shell.nav.files"
-		| "shell.nav.schedules"
-		| "shell.nav.policies"
-		| "shell.nav.jobs"
-		| "shell.nav.integrations"
-		| "shell.nav.operate"
-		| "shell.nav.usage"
-		| "shell.nav.upload"
-		| "shell.nav.docs"
-		| "shell.nav.admin";
+		| "shell.nav.settings";
 	icon: LucideIcon;
 	testId: string;
 	/**
-	 * Other paths that belong to this entry: pages that became one of its tabs and still answer
-	 * until their redirect lands, or pages reached from it (the quickstart from Home).
+	 * Other paths that belong to this entry: old pages that are now one of its tabs (they redirect
+	 * here) and pages reached from it (a job's page under Settings, the quickstart from Home).
 	 */
 	also?: readonly string[];
-	/** Hosted mode with a signed-in user only (the organization's settings). */
-	hostedOnly?: boolean;
-	/** Server admins only (HEIMDALL_SERVER_ADMINS; /auth/me server_admin). */
-	serverAdminOnly?: boolean;
 }
 
 export interface BenchNavGroup {
 	id: BenchNavGroupId;
-	labelKey:
-		| "shell.groups.start"
-		| "shell.groups.benchmark"
-		| "shell.groups.build"
-		| "shell.groups.production"
-		| "shell.groups.govern"
-		| "shell.groups.operate";
+	/** The group heading; none for the top group (Home), which sits above the headed groups. */
+	labelKey?:
+		| "shell.groups.agents"
+		| "shell.groups.test"
+		| "shell.groups.tasks"
+		| "shell.groups.watch"
+		| "shell.groups.release"
+		| "shell.groups.settings";
 	items: readonly BenchNavItem[];
 	/** Closed until the user opens it (or visits one of its pages). */
 	defaultClosed?: boolean;
 }
 
 /**
- * Left navigation, grouped around the objects a user thinks in (UI regroup contract). A feature
- * page is a tab of its object or an entry of its group, never a nav entry of its own. "New
- * experiment" is the header's primary action, not an entry.
+ * Left navigation, agent first: the agent is the first noun, each test a user runs on it has a
+ * visible entry, and models, keys and machines are inputs that live in Settings. One entry per
+ * object; features are tabs of their page. "Evaluate an agent" is the header's primary action,
+ * not an entry.
  */
 export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 	{
-		id: "start",
-		labelKey: "shell.groups.start",
+		id: "home",
+		items: [{ to: "/", labelKey: "shell.nav.home", icon: House, testId: "nav-link-home", also: ["/quickstart", "/welcome"] }],
+	},
+	{
+		id: "agents",
+		labelKey: "shell.groups.agents",
 		items: [
-			{ to: "/", labelKey: "shell.nav.home", icon: House, testId: "nav-link-home", also: ["/quickstart"] },
-			{ to: "/welcome", labelKey: "shell.nav.welcome", icon: Sparkles, testId: "nav-link-welcome" },
+			{ to: "/agents", labelKey: "shell.nav.agents", icon: Bot, testId: "nav-link-agents", also: ["/agents_"] },
+			{ to: "/leaderboard", labelKey: "shell.nav.leaderboard", icon: ListOrdered, testId: "nav-link-leaderboard", also: ["/trends"] },
 		],
 	},
 	{
-		id: "benchmark",
-		labelKey: "shell.groups.benchmark",
+		id: "test",
+		labelKey: "shell.groups.test",
 		items: [
 			{ to: "/evaluations", labelKey: "shell.nav.evaluations", icon: Award, testId: "nav-link-evaluations", also: ["/evaluate"] },
 			{
@@ -145,55 +103,40 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 				testId: "nav-link-experiments",
 				also: ["/verdict", "/matrix", "/migration", "/receipts"],
 			},
+			{ to: "/failure-tests", labelKey: "shell.nav.failureTests", icon: Zap, testId: "nav-link-failure-tests" },
 			{ to: "/runs", labelKey: "shell.nav.runs", icon: CirclePlay, testId: "nav-link-runs", also: ["/compare"] },
-			{ to: "/leaderboard", labelKey: "shell.nav.leaderboard", icon: ListOrdered, testId: "nav-link-leaderboard", also: ["/trends"] },
 		],
 	},
 	{
-		id: "build",
-		labelKey: "shell.groups.build",
-		items: [
-			{ to: "/agents", labelKey: "shell.nav.agents", icon: Bot, testId: "nav-link-agents", also: ["/agents_"] },
-			{ to: "/suites", labelKey: "shell.nav.suites", icon: Boxes, testId: "nav-link-suites", also: ["/imports", "/calibration"] },
-			{ to: "/catalog", labelKey: "shell.nav.catalog", icon: LayoutGrid, testId: "nav-link-catalog" },
-			{ to: "/models", labelKey: "shell.nav.models", icon: KeyRound, testId: "nav-link-models" },
-			{ to: "/files", labelKey: "shell.nav.files", icon: FolderTree, testId: "nav-link-files" },
-		],
+		id: "tasks",
+		labelKey: "shell.groups.tasks",
+		items: [{ to: "/suites", labelKey: "shell.nav.suites", icon: Boxes, testId: "nav-link-suites", also: ["/catalog", "/imports", "/calibration"] }],
 	},
 	{
-		id: "production",
-		labelKey: "shell.groups.production",
+		id: "watch",
+		labelKey: "shell.groups.watch",
 		items: [
-			{ to: "/canaries", labelKey: "shell.nav.canaries", icon: Activity, testId: "nav-link-canaries" },
+			{ to: "/why-agents-fail", labelKey: "shell.nav.whyAgentsFail", icon: SearchX, testId: "nav-link-why-agents-fail", also: ["/inbox", "/clusters", "/triage"] },
+			{ to: "/scheduled-checks", labelKey: "shell.nav.scheduledChecks", icon: CalendarClock, testId: "nav-link-scheduled-checks", also: ["/canaries", "/schedules"] },
 			{ to: "/live", labelKey: "shell.nav.live", icon: Radio, testId: "nav-link-live" },
-			{ to: "/inbox", labelKey: "shell.nav.inbox", icon: Inbox, testId: "nav-link-inbox", also: ["/clusters", "/triage"] },
-			{ to: "/schedules", labelKey: "shell.nav.schedules", icon: CalendarClock, testId: "nav-link-schedules" },
 		],
 	},
 	{
-		id: "govern",
-		labelKey: "shell.groups.govern",
-		items: [
-			{ to: "/review", labelKey: "shell.nav.review", icon: ClipboardCheck, testId: "nav-link-review" },
-			{ to: "/releases", labelKey: "shell.nav.releases", icon: PackageCheck, testId: "nav-link-releases" },
-			{ to: "/monitors", labelKey: "shell.nav.monitors", icon: ShieldCheck, testId: "nav-link-monitors" },
-			{ to: "/policies", labelKey: "shell.nav.policies", icon: Scale, testId: "nav-link-policies" },
-		],
+		id: "release",
+		labelKey: "shell.groups.release",
+		items: [{ to: "/releases", labelKey: "shell.nav.releases", icon: PackageCheck, testId: "nav-link-releases", also: ["/review", "/policies"] }],
 	},
 	{
-		id: "operate",
-		labelKey: "shell.groups.operate",
-		defaultClosed: true,
+		id: "settings",
+		labelKey: "shell.groups.settings",
 		items: [
-			{ to: "/workers", labelKey: "shell.nav.workers", icon: Server, testId: "nav-link-workers" },
-			{ to: "/settings", labelKey: "shell.nav.settings", icon: Settings, testId: "nav-link-settings", hostedOnly: true },
-			{ to: "/jobs", labelKey: "shell.nav.jobs", icon: ListChecks, testId: "nav-link-jobs" },
-			{ to: "/integrations", labelKey: "shell.nav.integrations", icon: Plug, testId: "nav-link-integrations" },
-			{ to: "/operate", labelKey: "shell.nav.operate", icon: Wrench, testId: "nav-link-operate" },
-			{ to: "/usage", labelKey: "shell.nav.usage", icon: Gauge, testId: "nav-link-usage" },
-			{ to: "/upload", labelKey: "shell.nav.upload", icon: FileUp, testId: "nav-link-upload" },
-			{ to: "/docs", labelKey: "shell.nav.docs", icon: BookOpen, testId: "nav-link-docs" },
-			{ to: "/admin", labelKey: "shell.nav.admin", icon: Shield, testId: "nav-link-admin", serverAdminOnly: true },
+			{
+				to: "/settings",
+				labelKey: "shell.nav.settings",
+				icon: Settings,
+				testId: "nav-link-settings",
+				also: ["/models", "/workers", "/usage", "/files", "/jobs", "/integrations", "/operate", "/admin", "/upload", "/monitors"],
+			},
 		],
 	},
 ];
@@ -225,7 +168,7 @@ export function isNavActive(item: BenchNavItem, pathname: string): boolean {
 	return underPath(path, item.to) || (item.also ?? []).some((base) => underPath(path, base));
 }
 
-/** The entry to highlight for a path, or null when none owns it (the jobs page, an auth page). */
+/** The entry to highlight for a path, or null when none owns it (an auth page, the docs). */
 export function activeNavItem(pathname: string): BenchNavItem | null {
 	return BENCH_NAV.find((item) => isNavActive(item, pathname)) ?? null;
 }

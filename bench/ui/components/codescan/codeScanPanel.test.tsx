@@ -106,7 +106,7 @@ describe("CodeScanPanel", () => {
 		expect(html).toContain("app/run.py:3");
 		expect(html).toContain('data-patch-line="9"');
 		expect(html).toContain("^ high shell-injection-python CWE-78");
-		expect(html).toContain("From the run&#x27;s sealed code scan evidence.");
+		expect(html).toContain("From the run&#x27;s saved code scan evidence.");
 		expect(html).toContain("bandit failed: timed out. Its findings are unknown.");
 		// Run text is inert: the markup in the snippet is escaped, never rendered.
 		expect(html).not.toContain("<script>");
@@ -131,7 +131,7 @@ describe("CodeScanPanel", () => {
 		let html = renderToStaticMarkup(<CodeScanPanel report={clean} patch={PATCH} arm="A" />);
 		expect(html).toContain("No findings");
 		expect(html).toContain('data-testid="codescan-A-empty"');
-		expect(html).toContain("Computed now from the run&#x27;s sealed diff");
+		expect(html).toContain("Computed now from the run&#x27;s saved diff");
 		expect(html).toContain("Experiment veto level high: not reached.");
 		const unscanned: CodeScanReport = { ...clean, scan: { ...clean.scan, scanned: false, reason: "no exported diff" } };
 		html = renderToStaticMarkup(<CodeScanPanel report={unscanned} arm="A" />);

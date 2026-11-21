@@ -8,7 +8,7 @@ import { AlertTriangle, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 /**
- * Add a suite: /suites/add (the old /imports). Import a public benchmark with the exact commands
+ * The Import tab of Benchmarks (/suites?tab=import; the old /imports and /suites/add). Import a public benchmark with the exact commands
  * of each importer the server links, or bring your own tasks and suite.
  */
 export default function AddSuiteView() {
@@ -20,7 +20,6 @@ export default function AddSuiteView() {
 			<PageHeader
 				title={t("suites.addFlow.title")}
 				subtitle={t("suites.addFlow.subtitle")}
-				breadcrumbs={[{ label: t("suites.title"), to: "/suites" }, { label: t("suites.addFlow.title") }]}
 				meta={<ModeBadge mode={data?.mode} isLoading={query.isLoading} isError={query.isError && !data} />}
 			/>
 			<Section title={t("imports.title")} description={t("imports.subtitle")} testId="imports-section">

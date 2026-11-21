@@ -1,7 +1,7 @@
 {
 	"title": "Grader accuracy check",
 	"intro": "Runs the AI grader on answers that people already labelled, and measures how often it agrees with them. Each answer costs a few model calls (one per vote, a repeat and two reworded prompts).",
-	"notJudged": "This benchmark is graded by automatic checks, not by an AI grader, so there is nothing to check here. To use an AI grader, set grading: judged and pick a judge model in suite.yaml.",
+	"notJudged": "This benchmark is graded by automatic checks, not by an AI grader, so there is nothing to check here. To use an AI grader, set grading: judged and pick a judge model in the benchmark file.",
 	"editSuite": "Open benchmark files",
 	"noLabels": "Add at least one labelled answer below (or add the expected and wrong answers) before running the check.",
 	"seedControls": "Also add the benchmark's expected and wrong answers as weak example labels",

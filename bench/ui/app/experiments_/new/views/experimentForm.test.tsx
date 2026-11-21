@@ -60,7 +60,7 @@ describe("ExperimentForm condition layers", () => {
 		};
 		const html = render(<ExperimentForm catalog={shared} defaults={defaultFormValues(shared, dateSeed(new Date("2026-11-18T06:00:00Z")))} onStarted={() => undefined} />);
 		const row = html.slice(html.indexOf('data-testid="experiment-condition-stale-notes"'));
-		expect(row.slice(0, row.indexOf("</label>"))).toContain("fixture stress test");
-		expect(row.slice(0, row.indexOf("</label>"))).not.toContain("gateway stress test");
+		expect(row.slice(0, row.indexOf("</label>"))).toContain("fixture failure test");
+		expect(row.slice(0, row.indexOf("</label>"))).not.toContain("gateway failure test");
 	});
 });

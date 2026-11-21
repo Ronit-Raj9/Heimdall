@@ -41,8 +41,8 @@ describe("U3 redirects", () => {
 		expect(clustersRedirect({ tab: "x" }).search.tab).toBe("clusters");
 	});
 
-	it("sends /imports to the Add a suite flow", () => {
-		expect(importsRedirect()).toEqual({ to: "/suites/add", search: {} });
+	it("sends /imports to the Import tab of Benchmarks", () => {
+		expect(importsRedirect()).toEqual({ to: "/suites", search: { tab: "import" } });
 	});
 
 	it("sends /calibration?suite=X to that suite's Calibration tab, and to the list without one", () => {

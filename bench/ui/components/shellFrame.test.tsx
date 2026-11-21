@@ -30,18 +30,24 @@ afterEach(() => {
 });
 
 describe("BenchSidebar", () => {
-	it("renders the six groups with toggles and labelled lists, Advanced closed", () => {
+	it("renders Home on top, then six headed groups with toggles and labelled lists, all open", () => {
 		at("/");
 		const html = render(<BenchSidebar />);
-		for (const group of ["start", "benchmark", "build", "production", "govern", "operate"]) {
+		expect(html).toContain('data-testid="nav-group-home"');
+		expect(html).not.toContain("nav-group-toggle-home");
+		for (const group of ["agents", "test", "tasks", "watch", "release", "settings"]) {
 			expect(html).toContain(`data-testid="nav-group-${group}"`);
 			const toggle = tagOf(html, `nav-group-toggle-${group}`) ?? "";
-			expect(toggle).toContain(group === "operate" ? 'aria-expanded="false"' : 'aria-expanded="true"');
+			expect(toggle).toContain('aria-expanded="true"');
 			expect(toggle).toContain(`aria-controls="nav-group-${group}"`);
 		}
-		expect(tagOf(html, "nav-group-toggle-operate")).toContain("Advanced");
+		expect(tagOf(html, "nav-group-toggle-test")).toContain("Test");
+		expect(tagOf(html, "nav-link-experiments")).toContain('title="Comparisons:');
+		expect(tagOf(html, "nav-link-failure-tests")).toContain('href="/failure-tests"');
+		expect(tagOf(html, "nav-link-why-agents-fail")).toContain('href="/why-agents-fail"');
 		expect(html).toContain('aria-label="Heimdall navigation"');
 		expect(html).not.toContain("nav-link-new-experiment");
+		expect(html).not.toContain("nav-link-welcome");
 		expect(html).not.toContain("nav-drawer");
 	});
 
@@ -63,16 +69,22 @@ describe("BenchSidebar", () => {
 		expect(html).toContain('aria-modal="true"');
 		expect(tagOf(html, "nav-drawer-close")).toContain('aria-label="Close navigation"');
 		// The drawer's lists have their own ids, so the page has no duplicate ids.
-		expect(html).toContain('id="drawer-group-benchmark"');
-		expect(html).toContain('id="nav-group-benchmark"');
+		expect(html).toContain('id="drawer-group-test"');
+		expect(html).toContain('id="nav-group-test"');
 	});
 
-	it("shows Settings only to a signed-in hosted user", () => {
+	it("shows the one Settings entry to every session, local and hosted", () => {
 		const has = (session: Parameters<typeof visibleNavGroups>[0]) =>
 			visibleNavGroups(session).some((group) => group.items.some((item) => item.to === "/settings"));
-		expect(has(LOCAL_SESSION)).toBe(false);
-		expect(has(demoSession())).toBe(false);
+		expect(has(LOCAL_SESSION)).toBe(true);
 		expect(has(hostedSession("viewer"))).toBe(true);
+	});
+
+	it("keeps an old route's page highlighted under its new owner", () => {
+		at("/models");
+		expect(tagOf(render(<BenchSidebar />), "nav-link-settings")).toContain('aria-current="page"');
+		at("/canaries");
+		expect(tagOf(render(<BenchSidebar />), "nav-link-scheduled-checks")).toContain('aria-current="page"');
 	});
 });
 
@@ -81,7 +93,7 @@ describe("BenchHeader", () => {
 		at("/");
 		const html = render(<BenchHeader onOpenNav={() => undefined} />);
 		expect(tagOf(html, "header-evaluate")).toContain('href="/evaluate"');
-		expect(html).toContain(">Evaluate<");
+		expect(html).toContain(">Evaluate an agent<");
 		expect(tagOf(html, "nav-menu-button")).toContain('aria-label="Open navigation"');
 		expect(tagOf(html, "nav-menu-button")).toContain('aria-expanded="false"');
 		expect(html).toMatch(/>(Live|Sample) data</);

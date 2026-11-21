@@ -27,7 +27,7 @@ describe("ExportMenu", () => {
 		expect(html).toContain('download="e_smoke.eee.jsonl"');
 		expect(html).toContain('href="/api/bench/experiments/e_smoke/export?format=jsonl"');
 		expect(html).toContain('href="/api/bench/experiments/e_smoke/export?format=csv"');
-		expect(html).toContain("6 sealed runs");
+		expect(html).toContain("6 saved runs");
 		expect(html).toContain("export otlp -exp e_smoke -to langfuse");
 		expect(html).not.toContain("allow_synthetic");
 	});

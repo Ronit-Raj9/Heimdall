@@ -1,6 +1,6 @@
 {
 	"tab": "Actions",
-	"intro": "Buy more evidence, add fault probes, or compare models. Each action writes a new experiment, freezes it and starts it as a background job.",
+	"intro": "Buy more evidence, add failure tests, or compare models. Each action writes a new experiment, freezes it and starts it as a background job.",
 	"job": {
 		"follow": "Follow the job",
 		"running": "Job {{status}}",
@@ -25,13 +25,13 @@
 	},
 	"probe": {
 		"title": "Fault test",
-		"description": "Re-run each arm under injected faults to see how it holds up.",
-		"none": "The suite declares no probes. Add probes to its suite.yaml, then come back.",
-		"loading": "Loading the suite's probes",
-		"pick": "Probes (none ticked means all)",
-		"trials": "Trials per condition",
-		"run": "Run probe sweep",
-		"confirm": "Start a probe sweep of {{expId}}? It spends model budget."
+		"description": "Re-run each setup with faults added to see how it holds up.",
+		"none": "The benchmark has no failure tests. Add them to the benchmark file, then come back.",
+		"loading": "Loading the benchmark's failure tests",
+		"pick": "Failure tests (none ticked means all)",
+		"trials": "Tries per failure test",
+		"run": "Run failure tests",
+		"confirm": "Run failure tests on {{expId}}? It spends model budget."
 	},
 	"migrate": {
 		"title": "Compare models",
@@ -39,17 +39,17 @@
 		"agent": "Agent",
 		"agentPlaceholder": "Pick an agent",
 		"noAgents": "No agents yet. Create one from a template first.",
-		"suite": "Suite (id@version)",
+		"suite": "Benchmark (id@version)",
 		"from": "Current model",
 		"to": "Candidate models (comma-separated)",
 		"trials": "Trials per task",
 		"budget": "Budget (USD, 0 for none)",
-		"missing": "Pick an agent and fill the suite, the current model and at least one candidate.",
+		"missing": "Pick an agent and fill the benchmark, the current model and at least one candidate.",
 		"run": "Compare",
 		"confirm": "Start a model comparison? It spends model budget."
 	},
 	"launch": {
 		"title": "Compare agents or models",
-		"description": "One agent across models on a suite."
+		"description": "One agent across models on a benchmark."
 	}
 }

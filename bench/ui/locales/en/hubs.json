@@ -1,0 +1,23 @@
+{
+	"suites": {
+		"label": "Benchmark views",
+		"mine": "My benchmarks",
+		"catalog": "Catalog",
+		"import": "Import"
+	},
+	"scheduled": {
+		"label": "Scheduled check views",
+		"drift": "Drift checks",
+		"schedules": "Schedules"
+	},
+	"releases": {
+		"label": "Release views",
+		"history": "Releases",
+		"review": "Needs review",
+		"rules": "Rules"
+	},
+	"quickRun": {
+		"link": "Quick single run (advanced)",
+		"hint": "One benchmark, one agent and one model, without a report card."
+	}
+}

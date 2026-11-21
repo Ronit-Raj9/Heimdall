@@ -1,7 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import AddSuitePage from "./page";
+import { importTabRedirect } from "@/lib/routing/navRedirects";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-// UI regroup (U3): the Add a suite flow (the old /imports, plus bring your own).
+// Agent-first nav (X09): adding a benchmark is the Import tab of Benchmarks.
 export const Route = createFileRoute("/suites_/add")({
-	component: AddSuitePage,
+	beforeLoad: () => {
+		throw redirect({ ...importTabRedirect(), replace: true } as never);
+	},
 });

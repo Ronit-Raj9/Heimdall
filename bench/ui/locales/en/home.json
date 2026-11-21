@@ -7,7 +7,7 @@
 	},
 	"subtitle": "Below: what is running now, what finished recently, and which benchmarks are ready to use.",
 	"cta": {
-		"run": "Evaluate your agent",
+		"run": "Evaluate an agent",
 		"newExperiment": "Compare two setups"
 	},
 	"kpi": {
@@ -80,7 +80,7 @@
 	"onboarding": {
 		"title": "Get your first result in about five minutes",
 		"body": "Pick your agent and a few benchmarks. Heimdall runs real tasks and gives your agent a report card.",
-		"open": "Start the guided setup",
+		"open": "Evaluate your agent",
 		"viewer": "Nothing has been tested yet. Ask a team member to run the first test."
 	},
 	"intro": "Heimdall tests your AI agent, not just its model, on real tasks and gives it a report card you can trust."

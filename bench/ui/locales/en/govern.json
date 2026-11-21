@@ -1,7 +1,7 @@
 {
 	"policies": {
 		"title": "Release rules",
-		"subtitle": "Release rules: conditions a new version must meet before it ships.",
+		"subtitle": "Release rules: checks a new version must pass before it ships.",
 		"new": "New rule set",
 		"empty": "No release rules yet. Start from the default rules, then adjust them.",
 		"createDefault": "Start from the default rules",
@@ -25,8 +25,8 @@
 		"removeCheck": "Remove rule",
 		"checkId": "Rule name",
 		"metric": "What to measure",
-		"condition": "Test conditions",
-		"conditionHint": "\"clean\" for normal conditions, \"all\" for every condition including stress tests, or one stress test name. Empty uses the main condition.",
+		"condition": "Which runs",
+		"conditionHint": "\"clean\" for the normal run, \"all\" for every run including failure tests, or one failure test name. Empty uses the main one.",
 		"kind": "Rule",
 		"kindNoRegression": "must not get worse",
 		"kindImproved": "must get better",
@@ -54,7 +54,7 @@
 	"releases": {
 		"actions": "Audit tools",
 		"verify": "Check the log has not been changed",
-		"verifyHint": "Recomputes the fingerprint of every record and evidence file. Use it before an audit.",
+		"verifyHint": "Recomputes the signature of every record and evidence file. Use it before an audit.",
 		"compliance": "Write compliance report",
 		"complianceHint": "Writes a report (.md and .json) into exports/compliance in the project folder.",
 		"pickRelease": "Release record",
