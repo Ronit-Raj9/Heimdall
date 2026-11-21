@@ -403,6 +403,9 @@ func validateTasksMine(ctx context.Context, env jobEnv, raw json.RawMessage) (an
 		// G04: the hosted full mine proves the cuts on a runner with the
 		// oracle and noop controls of the suite.admit bridge.
 		for _, a := range [][2]string{{"oracle", bridgeOracleAgent}, {"noop", bridgeNoopAgent}} {
+			if err := ensureControlAgent(env.ProjectRoot, a[1]); err != nil {
+				return nil, "", err
+			}
 			if err := validAgentFile(env.ProjectRoot, a[0], a[1]); err != nil {
 				return nil, "", invalid(fmt.Errorf("%v (hosted mining proves tasks with it)", err))
 			}

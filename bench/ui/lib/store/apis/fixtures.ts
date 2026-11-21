@@ -1,5 +1,7 @@
 // Fixture mode: with ?fixture=1 or VITE_BENCH_FIXTURE=1, RTK Query reads public/fixtures/*.json
 // instead of calling the server, so screens can be built with no bench server running.
+// Development only: a production build compiles it out (FIXTURES_COMPILED_IN) and ships no
+// fixtures folder, and the Go server never serves one (server/ui.go).
 // Everything here is pure so it can be tested without a browser.
 
 /** Prefix of every bench API route (DESIGN.md 16.7). */
@@ -111,7 +113,14 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 ];
 
 /** True when the URL has fixture=1 or the build sets VITE_BENCH_FIXTURE=1. */
-export function detectFixtureMode(search: string, envFlag: string | undefined): boolean {
+/**
+ * Whether this bundle can use fixture mode at all. vite.config.mts defines __BENCH_FIXTURES__:
+ * true on the dev server, false in a production build, which then never reads fixtures.
+ */
+export const FIXTURES_COMPILED_IN: boolean = typeof __BENCH_FIXTURES__ !== "undefined" && __BENCH_FIXTURES__;
+
+export function detectFixtureMode(search: string, envFlag: string | undefined, allowed: boolean = FIXTURES_COMPILED_IN): boolean {
+	if (!allowed) return false;
 	if (envFlag === "1") return true;
 	return new URLSearchParams(search).get("fixture") === "1";
 }

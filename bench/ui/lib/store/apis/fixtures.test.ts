@@ -35,6 +35,9 @@ describe("detectFixtureMode", () => {
 			expect(detectFixtureMode(c.search, c.env)).toBe(c.want);
 		});
 	}
+	it("is always off when fixtures are compiled out (production build)", () => {
+		expect(detectFixtureMode("?fixture=1", "1", false)).toBe(false);
+	});
 });
 
 describe("resolveFixture", () => {

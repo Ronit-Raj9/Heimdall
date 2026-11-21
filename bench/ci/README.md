@@ -4,7 +4,7 @@ Runs `bifrost-bench check` on a pull request and fails the build on a bad agent.
 
 | File | What |
 |---|---|
-| `check.sh` | The gate. `recorded` mode replays a sealed experiment from `testdata/recorded/` on a temp copy; `live` mode runs an experiment file against a running stack. Exits with `check`'s code |
+| `check.sh` | The gate. `recorded` mode replays a sealed experiment from the bundle you name (no default) on a temp copy; `live` mode runs an experiment file against a running stack. Exits with `check`'s code |
 | `action.yml` | Composite action: set up Go, build the binary (`GOWORK=off`), verify the bundle's seals, run `check.sh`, upload the report |
 | `ci.go`, `ci_test.go` | The seal guard: verifies every seal of the recorded bundle and proves a tampered run fails |
 
@@ -46,10 +46,10 @@ The report lands in `$RUNNER_TEMP/bench-check/report.md` (outside Actions: `${TM
 
 | Action input | Variable | Default |
 |---|---|---|
-| `mode` | `BENCH_CI_MODE` | `recorded` |
+| `mode` | `BENCH_CI_MODE` | none: required, `recorded` or `live` |
 | `experiment` | `BENCH_CI_EXPERIMENT` | none (live needs it) |
 | `exp-id` | `BENCH_CI_EXP_ID` | the only experiment in the bundle |
-| `bundle` | `BENCH_CI_BUNDLE` | `testdata/recorded` |
+| `bundle` | `BENCH_CI_BUNDLE` | none: recorded mode needs your own bundle folder |
 | `data-mode` | `BENCH_CI_DATA_MODE` | `recorded` |
 | `policy` | `BENCH_CI_POLICY` | `policies/default.yaml` when it exists and `check` has `-policy`; `none` turns it off |
 | `fail-on` | `BENCH_CI_FAIL_ON` | `regressed,invalid` |

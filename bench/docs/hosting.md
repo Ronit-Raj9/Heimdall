@@ -95,11 +95,11 @@ It is safe to run again; each step skips what is done. In order:
    generated password once. Sign in and change it under Settings, Account
    (`POST /api/bench/auth/password`). The change ends every other session of
    that user; the session that made it stays signed in.
-5. creates the public read-only `demo` organization and imports sealed runs
-   into it with `bifrost-bench org import` (seals are verified on the way
-   in). Default source: `testdata/recorded` from the checkout. For the full
-   set, copy a runs folder to the VM and pass `--demo-runs /path/to/runs`;
-   `--no-demo` skips the demo.
+5. imports nothing by default: a production install holds real data only.
+   Only with `--demo-runs /path/to/runs` (your own sealed runs, copied to the
+   VM) does it create a public read-only `demo` organization and import them
+   with `bifrost-bench org import` (seals are verified on the way in).
+   Heimdall's test bundle `testdata/recorded` is refused.
 6. starts Caddy, the server and Postgres, waits until all are healthy
 
 Create the owner with `--owner-email` (it runs `bifrost-bench user create`,

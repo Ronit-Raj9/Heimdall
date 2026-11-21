@@ -4,7 +4,7 @@
 #
 #   deploy/hosted/bootstrap.sh --domain heimdall.example.com --email ops@example.com \
 #       --owner-email you@example.com [--owner-name "Your Name"] [--owner-org "Acme"] \
-#       [--demo-runs DIR | --no-demo] [--demo-runner] [--no-build]
+#       [--demo-runs DIR] [--demo-runner] [--no-build]
 #
 # Steps:
 #   1. deploy/hosted/.env: created from .env.example with random database and
@@ -14,11 +14,13 @@
 #   3. start Postgres, apply database migrations (bifrost-bench db migrate)
 #   4. first owner account and its organization (bifrost-bench user
 #      create); the generated password is printed once
-#   5. demo organization, public read-only, with recorded runs imported
-#      (bifrost-bench org import); default source bench/testdata/recorded.
-#      With --owner-email, a demo that already exists gets that owner as a
-#      member (bifrost-bench org member add), so a rerun repairs a demo
-#      created without one
+#   5. only with --demo-runs DIR: a demo organization, public read-only, with
+#      your own sealed runs from DIR imported (bifrost-bench org import).
+#      Nothing is imported by default, and Heimdall's test bundle
+#      (bench/testdata/recorded) is refused: a production install holds
+#      real data only. With --owner-email, a demo that already exists gets
+#      that owner as a member (bifrost-bench org member add). --no-demo is
+#      accepted for older scripts and changes nothing
 #   6. start everything and wait for health; print the URL
 set -euo pipefail
 # shellcheck source=lib.sh
@@ -116,11 +118,16 @@ else
 	log "no --owner-email: create the first account later with deploy/hosted/bootstrap.sh --owner-email you@example.com"
 fi
 
-# 5. Demo organization.
-if [ -z "$no_demo" ]; then
-	demo_runs=${demo_runs:-$BENCH_DIR/testdata/recorded}
-	[ -d "$demo_runs" ] || die "demo runs folder $demo_runs does not exist (or pass --no-demo)"
+# 5. Demo organization: opt-in, from the operator's own sealed runs only.
+if [ -n "$no_demo" ] && [ -n "$demo_runs" ]; then
+	die "--no-demo and --demo-runs contradict each other"
+fi
+if [ -n "$demo_runs" ]; then
+	[ -d "$demo_runs" ] || die "demo runs folder $demo_runs does not exist"
 	demo_runs=$(cd "$demo_runs" && pwd)
+	case $demo_runs/ in
+	"$(cd "$BENCH_DIR" && pwd)/testdata/"*) die "$demo_runs is Heimdall's test data, not your runs; a hosted install never imports it" ;;
+	esac
 	if bench_has org; then
 		# The owner also owns the demo org, so they can create its runner token.
 		org_args=(org create -slug demo -name "Demo" -public-read)

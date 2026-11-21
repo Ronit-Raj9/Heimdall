@@ -179,3 +179,59 @@ func TestActionSkipsGoCacheWithPrebuiltBinary(t *testing.T) {
 		t.Fatalf("setup-go restores the module cache even with a prebuilt binary:\n%s", step)
 	}
 }
+
+// TestCheckScriptNoDefaults: check.sh has no default mode and no default
+// bundle, so a gate added without inputs fails with a usage error (64)
+// instead of re-checking Heimdall's own test bundle and passing.
+func TestCheckScriptNoDefaults(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("no bash")
+	}
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "fake-bench")
+	if err := os.WriteFile(bin, []byte("#!/usr/bin/env bash\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, tc := range map[string]struct {
+		args []string
+		want string
+	}{
+		"no mode":   {nil, "set the mode"},
+		"no bundle": {[]string{"recorded"}, "recorded mode needs BENCH_CI_BUNDLE"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cmd := exec.Command("bash", append([]string{"check.sh"}, tc.args...)...)
+			cmd.Env = append(os.Environ(), "BENCH_CI_BIN="+bin, "BENCH_CI_MODE=", "BENCH_CI_BUNDLE=",
+				"BENCH_CI_OUT="+filepath.Join(dir, "out", "report.md"), "GITHUB_ACTIONS=", "GITHUB_OUTPUT=", "GITHUB_STEP_SUMMARY=")
+			out, err := cmd.CombinedOutput()
+			ee, ok := err.(*exec.ExitError)
+			if !ok || ee.ExitCode() != 64 {
+				t.Fatalf("exit %v, want 64\n%s", err, out)
+			}
+			if !strings.Contains(string(out), tc.want) {
+				t.Fatalf("output lacks %q:\n%s", tc.want, out)
+			}
+		})
+	}
+}
+
+// TestActionHasNoDemoDefaults: the composite action requires mode and has
+// no default bundle (D4: the old default re-checked testdata/recorded).
+func TestActionHasNoDemoDefaults(t *testing.T) {
+	raw, err := os.ReadFile("action.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(raw)
+	if strings.Contains(s, "default: testdata/recorded") {
+		t.Fatal("action.yml still defaults to the recorded test bundle")
+	}
+	i := strings.Index(s, "  mode:\n")
+	j := strings.Index(s, "  experiment:\n")
+	if i < 0 || j < i || !strings.Contains(s[i:j], "required: true") || strings.Contains(s[i:j], "default:") {
+		t.Fatal("the mode input is not required or still has a default")
+	}
+	if !strings.Contains(s, "recorded mode needs the bundle input") {
+		t.Fatal("the action does not refuse recorded mode without a bundle")
+	}
+}

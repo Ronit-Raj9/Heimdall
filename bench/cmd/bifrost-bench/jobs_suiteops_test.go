@@ -45,7 +45,7 @@ func TestSuiteOpsValidate(t *testing.T) {
 		{"from commit bad github", local, validateTaskFromCommit, `{"suite":"core","id":"t1","base":"a","reference":"b","github":"../x"}`, false, "owner/name"},
 		{"from commit missing suite", local, validateTaskFromCommit, `{"suite":"nope","id":"t1","base":"a","reference":"b"}`, false, "nope"},
 		{"from commit suite escape", local, validateTaskFromCommit, `{"suite":"..","id":"t1","base":"a","reference":"b"}`, false, ""},
-		{"mine hosted real, no oracle agent", hosted, validateTasksMine, `{"suite":"core","github":"acme/app"}`, false, "oracle"},
+		{"mine hosted real, controls written on first use", hosted, validateTasksMine, `{"suite":"core","github":"acme/app"}`, true, ""},
 		{"mine hosted dry run", hosted, validateTasksMine, `{"suite":"core","github":"acme/app","dry_run":true}`, true, ""},
 		{"mine local", local, validateTasksMine, `{"suite":"core","limit":3}`, true, ""},
 		{"mine limit", local, validateTasksMine, `{"suite":"core","limit":500}`, false, "limit"},

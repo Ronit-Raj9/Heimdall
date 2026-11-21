@@ -2,10 +2,10 @@
 # Bifrost Bench pull-request gate: run `bifrost-bench check` and exit with its
 # code, so a pull request that makes an agent worse fails the build.
 #
-# Usage: ci/check.sh [recorded|live] [experiments/<file>.yaml]
+# Usage: ci/check.sh recorded|live [experiments/<file>.yaml]
 #
-# Modes:
-#   recorded (default)  Re-analyze a sealed experiment from a recorded bundle.
+# Modes (one is required; there is no default):
+#   recorded            Re-analyze a sealed experiment from a recorded bundle.
 #                       The bundle is copied to a temp runs root first, so the
 #                       checked-in files never change. Needs no Docker, no
 #                       gateway and no key.
@@ -14,7 +14,7 @@
 #                       provider key in the fault proxy.
 #
 # Inputs (environment). Relative paths resolve against the bench root.
-#   BENCH_CI_MODE            recorded | live (the first argument wins)
+#   BENCH_CI_MODE            recorded | live (the first argument wins); required
 #   BENCH_CI_BIN             bifrost-bench binary; built with `go build` when unset
 #   BENCH_CI_CONFIG          bench config (default deploy/bench.yaml)
 #   BENCH_CI_FAIL_ON         verdicts that fail the gate (default regressed,invalid)
@@ -27,7 +27,7 @@
 #   BENCH_CI_OUT             markdown report path (default
 #                            $RUNNER_TEMP/bench-check/report.md); check writes
 #                            report.json beside it
-#   BENCH_CI_BUNDLE          recorded: bundle root (default testdata/recorded)
+#   BENCH_CI_BUNDLE          recorded: bundle root; required (no default bundle)
 #   BENCH_CI_EXP_ID          recorded: experiment id (default: the only one in the bundle)
 #   BENCH_CI_DATA_MODE       recorded: recorded (default) | synthetic, the mode the
 #                            report is labelled with
@@ -50,7 +50,7 @@ readonly exit_usage=64
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 bench_dir=$(cd "${BENCH_CI_BENCH_DIR:-$script_dir/..}" && pwd)
 
-mode=${1:-${BENCH_CI_MODE:-recorded}}
+mode=${1:-${BENCH_CI_MODE:-}}
 config=${BENCH_CI_CONFIG:-deploy/bench.yaml}
 fail_on=${BENCH_CI_FAIL_ON:-regressed,invalid}
 policy=${BENCH_CI_POLICY:-}
@@ -119,6 +119,7 @@ put_output() {
 
 case $mode in
   recorded | live) ;;
+  "") usage_error "set the mode: recorded or live (argument 1 or BENCH_CI_MODE)" ;;
   *) usage_error "mode must be recorded or live, got \"$mode\"" ;;
 esac
 
@@ -198,7 +199,9 @@ if [ "${#policy_args[@]}" -gt 0 ]; then
 fi
 
 if [ "$mode" = "recorded" ]; then
-  bundle=$(bench_path "${BENCH_CI_BUNDLE:-testdata/recorded}")
+  [ -n "${BENCH_CI_BUNDLE:-}" ] ||
+    usage_error "recorded mode needs BENCH_CI_BUNDLE: the folder of your own sealed experiment (for example .heimdall/recorded)"
+  bundle=$(bench_path "$BENCH_CI_BUNDLE")
   [ -d "$bundle" ] || usage_error "bundle $bundle not found"
   exp_id=${BENCH_CI_EXP_ID:-}
   if [ -z "$exp_id" ]; then

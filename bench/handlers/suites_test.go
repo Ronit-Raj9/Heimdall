@@ -599,3 +599,21 @@ func TestRefuseBuiltinWrite(t *testing.T) {
 		t.Fatal("org suite write refused")
 	}
 }
+
+// TestSuitesHiddenExamples: WithHiddenSuites leaves the Acme practice
+// examples out of the list (and so out of evaluation packs) on a
+// production server; the other suites stay.
+func TestSuitesHiddenExamples(t *testing.T) {
+	f := &fakeSuites{ids: []string{"acme-orders", "my-bench"}, suites: map[string]*schemas.Suite{
+		"acme-orders": {ID: "acme-orders", Version: "1.0.0"},
+		"my-bench":    {ID: "my-bench", Version: "1.0.0"},
+	}}
+	h := NewSuitesHandler(testMode, f).WithHiddenSuites(func(id string) bool { return id == "acme-orders" })
+	list, err := h.ListSummaries(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].ID != "my-bench" {
+		t.Fatalf("list = %+v", list)
+	}
+}

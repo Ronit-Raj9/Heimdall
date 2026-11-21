@@ -65,13 +65,17 @@ type benchCatalogHandler struct {
 
 func init() {
 	RegisterOrgArea("benchcatalog", func(env OrgEnv, r *router.Router) {
-		h := &benchCatalogHandler{env: env, source: func() benchcatalog.Source {
-			return benchcatalog.Source{Root: benchcatalog.SourceRoot()}
-		}}
+		h := &benchCatalogHandler{env: env, source: func() benchcatalog.Source { return catalogSource(env) }}
 		r.GET(APIPrefix+"/benchmarks/catalog", env.R(h.list))
 		r.POST(APIPrefix+"/benchmarks/catalog/{id}/add", env.W(h.add))
 		r.POST(APIPrefix+"/benchmarks/catalog/{id}/dataset", env.U(h.dataset))
 	})
+}
+
+// catalogSource is the catalog an org sees. The Acme practice examples are
+// developer content: local development and tests only, never a hosted org.
+func catalogSource(env OrgEnv) benchcatalog.Source {
+	return benchcatalog.Source{Root: benchcatalog.SourceRoot(), Examples: benchcatalog.DevContent(env.Services.Hosted)}
 }
 
 func (h *benchCatalogHandler) project() string {

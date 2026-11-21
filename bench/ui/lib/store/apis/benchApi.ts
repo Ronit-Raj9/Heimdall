@@ -49,8 +49,12 @@ import { CSRF_HEADER, errorStatus, getAuthState, notifyUnauthorized, ORG_HEADER,
 /** Polling interval for experiment status when server-sent events are unavailable (DESIGN.md 16.7). */
 export const EXPERIMENT_POLL_MS = 2000;
 
-/** Decided once at load, so the flag survives in-app navigation that drops the query string. */
-export const IS_FIXTURE_MODE = detectFixtureMode(
+/**
+ * Decided once at load, so the flag survives in-app navigation that drops the query string.
+ * Always false in a production build: __BENCH_FIXTURES__ is the literal false there, so the
+ * fixture base query below is dead code the bundler drops.
+ */
+export const IS_FIXTURE_MODE = __BENCH_FIXTURES__ && detectFixtureMode(
 	typeof window === "undefined" ? "" : window.location.search,
 	import.meta.env.VITE_BENCH_FIXTURE,
 );

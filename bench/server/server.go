@@ -14,6 +14,7 @@ import (
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/auth"
+	"github.com/maximhq/bifrost/bench/benchcatalog"
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/packs"
@@ -182,6 +183,10 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	handlers.NewAuditHandler(mode, deps.Auditor, write).RegisterRoutes(r, common...)
 	handlers.NewReleasesHandler(mode, deps.Releases, write).RegisterRoutes(r, common...)
 	suitesHandler := handlers.NewSuitesHandler(mode, deps.Suites).WithHeldOutVisible(cfg.HeldOut.Visible).WarmCache()
+	if !benchcatalog.DevContent(cfg.Auth.IsHosted()) { // Acme practice examples: local development only
+		examples := benchcatalog.ExampleSuiteIDs(benchcatalog.SourceRoot())
+		suitesHandler.WithHiddenSuites(func(id string) bool { return examples[id] })
+	}
 	suitesHandler.RegisterRoutes(r, common...) // Suite health area: held_out.visible; WarmCache: suite list cache
 	var packSuites packs.SuiteLister           // nil without a suite loader: GET /evaluation-packs answers 503
 	if deps.Suites != nil {
@@ -189,7 +194,8 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	}
 	packs.NewHandler(mode, packSuites).RegisterRoutes(r, common...)                             // A03: GET /evaluation-packs (packs/handler.go)
 	handlers.NewSuiteHealthHandler(mode, deps.Suites, deps.Health).RegisterRoutes(r, common...) // Suite health area (handlers/suitehealth.go)
-	handlers.NewAgentsHandler(mode, deps.Agents, deps.Index).RegisterRoutes(r, common...)
+	// Scripted controls (oracle, noop) are hidden from users except in local development (benchcatalog.DevContent).
+	handlers.NewAgentsHandler(mode, deps.Agents, deps.Index).WithHiddenControls(!benchcatalog.DevContent(cfg.Auth.IsHosted())).RegisterRoutes(r, common...)
 	// Agent diff area: two versions of an agent config compared (handlers/agentdiff.go, docs/agent-diff.md).
 	handlers.NewAgentDiffHandler(mode, deps.Index, cfg.Root).RegisterRoutes(r, common...)
 	handlers.NewImportsHandler(mode).RegisterRoutes(r, common...) // UI area: importer catalog (handlers/imports.go)

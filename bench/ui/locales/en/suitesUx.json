@@ -12,6 +12,7 @@
 	"status": {
 		"ready": "Ready",
 		"needsAdmission": "{{ready}} of {{total}} tasks ready",
+		"notReady": "Not ready yet",
 		"needsLock": "Needs re-freezing",
 		"noTasks": "No tasks yet",
 		"error": "Could not load"

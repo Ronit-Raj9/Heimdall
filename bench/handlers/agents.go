@@ -38,12 +38,30 @@ type AgentsHandler struct {
 	mode   schemas.Mode
 	agents AgentSource
 	index  ReadIndex
+	// hideControls drops the scripted control agents (oracle, noop, toy,
+	// ...) from the list. They are not a user's agent; the admission checks
+	// still use them by path.
+	hideControls bool
 }
 
 // NewAgentsHandler creates the agents handler. agents and index may be nil;
 // without an index every sealed run count is null.
 func NewAgentsHandler(mode schemas.Mode, agents AgentSource, index ReadIndex) *AgentsHandler {
 	return &AgentsHandler{mode: mode, agents: agents, index: index}
+}
+
+// WithHiddenControls hides the scripted control agents from GET /agents
+// when hide is set (every production server; local development and tests
+// keep them, benchcatalog.DevContent).
+func (h *AgentsHandler) WithHiddenControls(hide bool) *AgentsHandler {
+	h.hideControls = hide
+	return h
+}
+
+// IsControlAgent reports whether c is a scripted control agent (adapter
+// scripted: oracle, noop, toy, refuse, ...), never a user's own agent.
+func IsControlAgent(c *schemas.AgentConfig) bool {
+	return c != nil && (c.Adapter == "scripted" || c.Scripted != nil)
 }
 
 // RegisterRoutes registers GET /agents.
@@ -68,6 +86,9 @@ func (h *AgentsHandler) getAgents(ctx *fasthttp.RequestCtx) {
 	counts := h.sealedRuns()
 	out := schemas.AgentList{Agents: make([]schemas.AgentSummary, 0, len(files))}
 	for _, f := range files {
+		if h.hideControls && IsControlAgent(f.Config) {
+			continue
+		}
 		out.Agents = append(out.Agents, summarizeAgent(f, counts))
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)

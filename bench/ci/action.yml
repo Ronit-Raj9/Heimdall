@@ -7,9 +7,8 @@ description: >
 
 inputs:
   mode:
-    description: "recorded (re-analyze a sealed bundle) or live (run an experiment against a running stack)"
-    required: false
-    default: recorded
+    description: "recorded (re-analyze a sealed bundle you checked in) or live (run an experiment against a running stack). Required: there is no default"
+    required: true
   experiment:
     description: "live: experiment file, relative to bench/ (e.g. experiments/codewins.reduced.yaml)"
     required: false
@@ -19,9 +18,9 @@ inputs:
     required: false
     default: ""
   bundle:
-    description: "recorded: bundle root, relative to the project folder (BENCH_CI_BENCH_DIR, else bench/)"
+    description: "recorded: your bundle root, relative to the project folder (BENCH_CI_BENCH_DIR, else bench/). Required in recorded mode: there is no default bundle"
     required: false
-    default: testdata/recorded
+    default: ""
   data-mode:
     description: "recorded: the mode the report is labelled with, recorded or synthetic (use synthetic for a scripted-model bundle)"
     required: false
@@ -74,11 +73,25 @@ runs:
       id: paths
       shell: bash
       env:
+        MODE: ${{ inputs.mode }}
         BUNDLE: ${{ inputs.bundle }}
       run: |
+        # No defaults: a gate that silently re-checks a bundle shipped with
+        # Heimdall would pass whatever the pull request changed.
+        case $MODE in
+          recorded | live) ;;
+          "") echo "::error title=Bifrost Bench gate::set the mode input to recorded or live"; exit 64 ;;
+          *) echo "::error title=Bifrost Bench gate::mode must be recorded or live, got \"$MODE\""; exit 64 ;;
+        esac
+        if [ "$MODE" = recorded ] && [ -z "$BUNDLE" ]; then
+          echo "::error title=Bifrost Bench gate::recorded mode needs the bundle input: the folder of your own sealed experiment (for example .heimdall/recorded)"
+          exit 64
+        fi
         bench=$(cd "$GITHUB_ACTION_PATH/.." && pwd)
         project=$(cd "${BENCH_CI_BENCH_DIR:-$bench}" && pwd)
+        bundle=""
         case $BUNDLE in
+          "") ;;
           /*) bundle=$BUNDLE ;;
           *) bundle="$project/$BUNDLE" ;;
         esac

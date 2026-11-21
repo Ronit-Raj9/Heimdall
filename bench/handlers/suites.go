@@ -100,6 +100,18 @@ type SuitesHandler struct {
 
 	// Suite health area: serve held-out tasks like public ones (suitehealth.go).
 	heldOutVisible bool
+
+	// hidden drops suites from the list: the Acme practice examples on a
+	// production server (WithHiddenSuites). nil hides nothing.
+	hidden func(id string) bool
+}
+
+// WithHiddenSuites leaves the suites hide reports out of GET /suites and of
+// everything built on ListSummaries (evaluation packs). The suites stay on
+// disk and loadable by id.
+func (h *SuitesHandler) WithHiddenSuites(hide func(id string) bool) *SuitesHandler {
+	h.hidden = hide
+	return h
 }
 
 // NewSuitesHandler creates the suites handler. suites may be nil.
@@ -141,6 +153,15 @@ func (h *SuitesHandler) ListSummaries(work context.Context) ([]schemas.SuiteSumm
 	ids, err := h.suites.SuiteIDs(work)
 	if err != nil {
 		return nil, err
+	}
+	if h.hidden != nil {
+		kept := ids[:0:0]
+		for _, id := range ids {
+			if !h.hidden(id) {
+				kept = append(kept, id)
+			}
+		}
+		ids = kept
 	}
 	out := schemas.SuiteList{Suites: make([]schemas.SuiteSummary, len(ids))}
 	origin, _ := h.suites.(suiteOrigin)

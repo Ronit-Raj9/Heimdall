@@ -93,6 +93,10 @@ var recipes = []recipe{
 // Source is where the catalog reads from.
 type Source struct {
 	Root string // server bench folder holding agents/, benchmarks/, examples/
+	// Examples lists the Acme practice example projects (examples/acme-*).
+	// Off by default: only local development and tests turn it on
+	// (DevContent); a hosted org is never offered them.
+	Examples bool
 }
 
 var (
@@ -196,8 +200,8 @@ func (s Source) List(project string) []Entry {
 		add(e)
 	}
 
-	// 3. Example projects.
-	if s.Root != "" {
+	// 3. Example projects: developer content only (Source.Examples).
+	if s.Root != "" && s.Examples {
 		dirs, _ := filepath.Glob(filepath.Join(s.Root, "examples", "acme-*"))
 		sort.Strings(dirs)
 		for _, d := range dirs {
@@ -215,7 +219,8 @@ func (s Source) List(project string) []Entry {
 			e.Installed = installed(e.Suites...)
 			add(e)
 		}
-
+	}
+	if s.Root != "" {
 		// 4. Other suites bundled with the server (coding-core, hd-* not named above).
 		for _, id := range subdirs(filepath.Join(s.Root, "benchmarks")) {
 			if seen["suite-"+id] || recipeSuite(id) {

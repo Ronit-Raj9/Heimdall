@@ -102,7 +102,8 @@ The workflow carries a commented-out `live` job that follows these rules: start 
 - id: gate
   uses: ./bench/ci
   with:
-    mode: recorded            # or live
+    mode: recorded            # required: recorded or live (no default)
+    bundle: testdata/recorded # recorded: required, your sealed bundle folder (this one is Heimdall's own test bundle)
     exp-id: e_smoke_sdoj      # recorded: which bundled experiment
     data-mode: synthetic      # recorded: label for a scripted-model bundle
     experiment: ""            # live: experiments/<file>.yaml
@@ -114,7 +115,9 @@ The workflow carries a commented-out `live` job that follows these rules: start 
 
 Outputs: `verdict`, `action`, `policy-decision`, `exit-code`, `report` (path on the runner). The report and `report.json` are uploaded as the `bench-check-report` artifact, and the report is appended to the job summary.
 
-Locally, from `bench/`: `BENCH_CI_EXP_ID=e_smoke_sdoj BENCH_CI_DATA_MODE=synthetic ci/check.sh recorded` for the synthetic smoke, or `BENCH_CI_EXP_ID=e_pilot_mixed_nc93 ci/check.sh recorded` for the real pilot. Without `BENCH_CI_EXP_ID` the wrapper exits 64, because the bundle holds two experiments. Every input is a `BENCH_CI_*` variable listed at the top of `check.sh`.
+The action has no default mode and no default bundle: without `mode`, or in recorded mode without `bundle`, it fails at once with exit 64 and says which input to set, so a gate can never pass by re-checking Heimdall's own test bundle.
+
+Locally, from `bench/`: `BENCH_CI_BUNDLE=testdata/recorded BENCH_CI_EXP_ID=e_smoke_sdoj BENCH_CI_DATA_MODE=synthetic ci/check.sh recorded` for the synthetic smoke, or `BENCH_CI_BUNDLE=testdata/recorded BENCH_CI_EXP_ID=e_pilot_mixed_nc93 ci/check.sh recorded` for the real pilot. Without `BENCH_CI_EXP_ID` the wrapper exits 64, because the bundle holds two experiments. Every input is a `BENCH_CI_*` variable listed at the top of `check.sh`.
 
 ## Sample job summary
 
