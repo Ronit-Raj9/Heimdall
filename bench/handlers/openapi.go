@@ -176,6 +176,7 @@ var APIRoutes = []RouteDoc{
 	{Method: "GET", Path: APIPrefix + "/clusters/{signature}", Tag: "analysis", Summary: "One failure cluster with its runs", Response: clusters.Detail{}, Query: ClusterQueryDocs},
 	// Index and trends area (handlers/trends.go).
 	TrendsRouteDoc,
+	SearchRouteDoc, // X23 cross-run trace search (search.go)
 	{Method: "POST", Path: APIPrefix + "/audit", Tag: "analysis", Summary: "Verdict for a published per-task table (JSON rows or CSV)",
 		Auth: AuthWrite, Request: schemas.AuditRequest{}, RequestAlso: []string{"text/csv"}, Response: schemas.Verdict{}},
 
