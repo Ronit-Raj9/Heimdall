@@ -4,7 +4,7 @@ import { getBenchErrorMessage, useCreateReleaseMutation, useGetVerdictQuery, use
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ReleaseForm } from "./releaseForm";
-import { verdictPolicyDecision } from "./releases.utils";
+import { releasableExperiments, verdictPolicyDecision } from "./releases.utils";
 
 /**
  * The "Release" panel: pick an experiment, see its verdict action and policy decision, and record a
@@ -13,7 +13,7 @@ import { verdictPolicyDecision } from "./releases.utils";
 export function ReleasePanel() {
 	const { t } = useTranslation("bench");
 	const list = useListExperimentsQuery();
-	const experiments = useMemo(() => sortExperimentsNewestFirst(list.data?.experiments ?? []), [list.data]);
+	const experiments = useMemo(() => releasableExperiments(sortExperimentsNewestFirst(list.data?.experiments ?? [])), [list.data]);
 	const [picked, setPicked] = useState<string>();
 	const expId = picked ?? experiments[0]?.exp_id;
 	const verdict = useGetVerdictQuery(expId ?? "", { skip: !expId });

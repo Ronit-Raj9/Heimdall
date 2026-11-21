@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/lib"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/store"
 )
 
 // TestOfflineModeNeverLive is the regression test for audit finding 7-B-03:
@@ -65,5 +69,44 @@ func TestOfflineStartsNoEvidenceMirror(t *testing.T) {
 	evidenceMu.Unlock()
 	if started {
 		t.Fatal("offline server started the evidence mirror")
+	}
+}
+
+// TestServeAnalyzeConcurrentSavesOnce is the regression test for live lane
+// l9: one experiment page load sends the verdict, diagnostics and cost
+// requests at once, and each saved its own copy of the same analysis into
+// the run folder. The serve analyzer serializes them, so every concurrent
+// request gets the one saved analysis.
+func TestServeAnalyzeConcurrentSavesOnce(t *testing.T) {
+	a, m := analysisFixture(t)
+	ix := store.NewIndex(a.store)
+	x := analyzerAdapter{a: a, ix: ix, locks: &sync.Map{}}
+	const n = 6
+	ids := make([]string, n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			an, err := x.Analyze(context.Background(), m.ExpID, "")
+			if err != nil {
+				t.Errorf("analyze: %v", err)
+				return
+			}
+			ids[i] = an.AnalysisID
+		}(i)
+	}
+	wg.Wait()
+	entries, err := os.ReadDir(filepath.Join(a.store.Root(), m.ExpID, "analysis"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("%d analyses saved by %d concurrent requests, want 1", len(entries), n)
+	}
+	for _, id := range ids {
+		if id != entries[0].Name() {
+			t.Fatalf("request got analysis %s, saved %s", id, entries[0].Name())
+		}
 	}
 }

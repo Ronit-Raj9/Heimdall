@@ -6,6 +6,7 @@ import {
 	chainLinks,
 	formatReleaseTime,
 	newestFirst,
+	releasableExperiments,
 	releaseBlockers,
 	releaseRequestFrom,
 	shortHash,
@@ -121,5 +122,18 @@ describe("verdictPolicyDecision", () => {
 		expect(verdictPolicyDecision({ policy: { decision: "maybe" } })).toBeUndefined();
 		expect(verdictPolicyDecision({})).toBeUndefined();
 		expect(verdictPolicyDecision(undefined)).toBeUndefined();
+	});
+});
+describe("releasableExperiments", () => {
+	it("keeps only finished experiments, in order, so a running one is never picked by default", () => {
+		const list = [
+			{ exp_id: "e_running", state: "running" as const },
+			{ exp_id: "e_done", state: "done" as const },
+			{ exp_id: "e_analyzing", state: "analyzing" as const },
+			{ exp_id: "e_failed", state: "failed" as const },
+			{ exp_id: "e_done2", state: "done" as const },
+		];
+		expect(releasableExperiments(list).map((e) => e.exp_id)).toEqual(["e_done", "e_done2"]);
+		expect(releasableExperiments([])).toEqual([]);
 	});
 });
