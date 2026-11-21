@@ -1,7 +1,7 @@
 {
 	"compare": {
 		"title": "Compare two git refs",
-		"description": "Run the same agent with its files (notes, skills, committed agent config) as they are at two branches, tags or commits. Hosted runs go to your org's runners.",
+		"description": "Run one agent at two branches, tags or commits on the same tasks.",
 		"agent": "Agent (base config)",
 		"agentPlaceholder": "Pick an agent",
 		"noAgents": "No agents yet. Create one on the Agents page first.",

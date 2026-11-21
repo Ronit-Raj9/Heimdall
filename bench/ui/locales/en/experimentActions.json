@@ -10,7 +10,7 @@
 	},
 	"extend": {
 		"title": "Extend",
-		"description": "Run a follow-up of this experiment. Its analysis is combined with this one under the pre-declared rule.",
+		"description": "Add trials or tasks to firm up an unclear result.",
 		"decision": "Current verdict: {{decision}}",
 		"sizing": "Suggested: about {{tasks}} more tasks to reach {{target}} pp.",
 		"already": "This experiment is itself a follow-up of {{expId}}. Extend the first experiment instead.",
@@ -24,8 +24,8 @@
 		"notInconclusive": "The verdict is not inconclusive: tick \"Extend anyway\" to run a follow-up regardless."
 	},
 	"probe": {
-		"title": "Probe sweep",
-		"description": "Re-run the same arms on the clean condition and the suite's fault probes, so the receipts tab shows how each arm holds up.",
+		"title": "Fault test",
+		"description": "Re-run each arm under injected faults to see how it holds up.",
 		"none": "The suite declares no probes. Add probes to its suite.yaml, then come back.",
 		"loading": "Loading the suite's probes",
 		"pick": "Probes (none ticked means all)",
@@ -35,7 +35,7 @@
 	},
 	"migrate": {
 		"title": "Compare models",
-		"description": "Run one agent on its current model and on one or more candidates over the same tasks. The migration report opens on the new experiment.",
+		"description": "Run one agent on its current model and on candidates, same tasks.",
 		"agent": "Agent",
 		"agentPlaceholder": "Pick an agent",
 		"noAgents": "No agents yet. Create one from a template first.",
@@ -50,6 +50,6 @@
 	},
 	"launch": {
 		"title": "Compare agents or models",
-		"description": "No pair picked? Start a new comparison: one agent across models on a suite."
+		"description": "One agent across models on a suite."
 	}
 }
