@@ -46,6 +46,14 @@ type TemplateParam struct {
 	Help        string `json:"help,omitempty"`
 	Placeholder string `json:"placeholder,omitempty"`
 	Required    bool   `json:"required"`
+	// Kind is how the form shows it (J3): text (default), secret (a
+	// Settings > Secrets name), bool ("true" or "false"), number, select
+	// (one of Options), multiline (KEY=VALUE lines). Default pre-fills it.
+	Kind    string   `json:"kind,omitempty"`
+	Options []string `json:"options,omitempty"`
+	Default string   `json:"default,omitempty"`
+	// Group puts advanced fields under a fold: "auth", "tools", "advanced".
+	Group string `json:"group,omitempty"`
 }
 
 // AgentTemplate is one entry of GET /agents/templates.
@@ -172,7 +180,7 @@ var agentTemplates = []AgentTemplate{
 	repoTemplate("mini-swe-agent", "mini-SWE-agent", TemplateCategoryCLI, "mini-swe-agent", "The 100-line SWE-agent loop with litellm, routed through Bifrost.", []string{"openai"}, "gpt-5.6-terra", false),
 	repoTemplate("opencode", "opencode", TemplateCategoryCLI, "opencode", "opencode CLI agent; runs on any provider Bifrost serves.", abAnyProvider, "claude-sonnet-4-5", true),
 	repoTemplate("gemini-cli", "Gemini CLI", TemplateCategoryCLI, "gemini-cli", "Google Gemini CLI, headless, routed through Bifrost.", []string{"gemini"}, "gemini-2.5-pro", false),
-	repoTemplate("langgraph", "LangGraph", TemplateCategoryFramework, "fw-langgraph", "A LangGraph coding agent (StateGraph + ToolNode).", abAnyProvider, "gpt-5.4-mini", true),
+	repoTemplate("langgraph", "LangGraph", TemplateCategoryFramework, "fw-langgraph", "Example: a LangGraph coding agent (StateGraph + ToolNode). To benchmark your own app, use Wrap my existing app.", abAnyProvider, "gpt-5.4-mini", true),
 	repoTemplate("crewai", "CrewAI", TemplateCategoryFramework, "fw-crewai", "A CrewAI coding crew with shell and file tools.", abAnyProvider, "gpt-5.4-mini", true),
 	repoTemplate("openai-agents", "OpenAI Agents SDK", TemplateCategoryFramework, "fw-openai-agents", "An OpenAI Agents SDK coding agent.", abAnyProvider, "gpt-5.4-mini", true),
 	repoTemplate("pydantic-ai", "Pydantic AI", TemplateCategoryFramework, "fw-pydantic-ai", "A Pydantic AI coding agent.", abAnyProvider, "gpt-5.4-mini", true),
@@ -188,31 +196,27 @@ var agentTemplates = []AgentTemplate{
 	{ID: "http-service", Name: "Agent server in the container", Category: TemplateCategoryStarter, Adapter: "command", Providers: abAnyProvider,
 		DefaultModel: "claude-sonnet-4-5", Builds: true, Params: []TemplateParam{}, source: "skeleton:http-service", multiEnv: true,
 		Description: "Your agent is a web server (FastAPI, LangGraph server): a launcher starts it and posts each task.", Docs: "docs/adding-an-agent.md"},
-	{ID: "http-url", Name: "Your HTTP endpoint", Category: TemplateCategoryBYO, Adapter: "remote_http", Providers: abAnyProvider,
+	{ID: "http-url", Name: "Connect your HTTP endpoint", Category: TemplateCategoryBYO, Adapter: "remote_http", Providers: abAnyProvider,
 		DefaultModel: "claude-sonnet-4-5", source: "inline", Docs: "docs/remote-execution.md",
-		Description: "A deployed agent the bench calls over HTTP with each task.",
-		Params: []TemplateParam{{Name: "url", Label: "Endpoint URL", Placeholder: "https://agent.example.com/v1/answer", Required: true,
-			Help: "The bench POSTs each task here and reads the answer."}}},
-	{ID: "a2a-card", Name: "A2A agent card", Category: TemplateCategoryBYO, Adapter: "a2a", Providers: abAnyProvider,
+		Description: "Your deployed agent. Heimdall posts each task to your URL and reads the answer.",
+		Params: connectHTTPParams},
+	{ID: "a2a-card", Name: "Connect your A2A agent", Category: TemplateCategoryBYO, Adapter: "a2a", Providers: abAnyProvider,
 		DefaultModel: "claude-sonnet-4-5", source: "inline", Docs: "docs/a2a-agents.md",
 		Description: "An A2A agent reached through Bifrost's agent gateway by its agent card.",
-		Params: []TemplateParam{{Name: "card_url", Label: "Agent card URL", Placeholder: "https://agent.example.com/.well-known/agent-card.json", Required: true,
-			Help: "The agent card URL as Bifrost reaches it."}}},
-	{ID: "openai-endpoint", Name: "OpenAI-compatible endpoint", Category: TemplateCategoryBYO, Adapter: "openai_agent", Providers: abAnyProvider,
+		Params: connectA2AParams},
+	{ID: "openai-endpoint", Name: "Connect your OpenAI-compatible endpoint", Category: TemplateCategoryBYO, Adapter: "openai_agent", Providers: abAnyProvider,
 		DefaultModel: "claude-sonnet-4-5", source: "inline", Docs: "docs/openai-agents.md",
-		Description: "Your agent behind an OpenAI-style chat/completions URL. The bench sends each task as a chat and runs the task's tools for it.",
-		Params: []TemplateParam{
-			{Name: "url", Label: "Base URL", Placeholder: "https://agent.example.com/v1", Required: true,
-				Help: "The bench posts to <base URL>/chat/completions (or give the full .../chat/completions or .../responses URL)."},
-			{Name: "model", Label: "Model name", Placeholder: "my-agent", Help: "Sent as the model field. Empty uses the model picked below."},
-			{Name: "api_key_secret", Label: "API key secret name", Placeholder: "MY_AGENT_API_KEY",
-				Help: "Name of a secret in Settings > Secrets, sent as a Bearer token. Leave empty if the endpoint needs no key."},
-		}},
+		Description: "Your agent behind an OpenAI-style chat/completions URL. Heimdall sends each task as a chat and runs the task's tools for it.",
+		Params: connectOpenAIParams},
+	{ID: "wrap-app", Name: "Wrap my existing app", Category: TemplateCategoryBYO, Adapter: "command", Providers: abAnyProvider,
+		DefaultModel: "claude-sonnet-4-5", source: "wrap", multiEnv: true, Docs: "docs/adding-an-agent.md",
+		Description: "Your LangGraph, CrewAI, OpenAI Agents SDK or custom app from a git repository or a Docker image. Heimdall starts it next to each task and posts the task to it.",
+		Params: wrapAppParams},
 	{ID: "docker-image", Name: "Your Docker image", Category: TemplateCategoryBYO, Adapter: "command", Providers: abAnyProvider,
 		DefaultModel: "claude-sonnet-4-5", source: "inline", multiEnv: true, Docs: "docs/adding-an-agent.md",
-		Description: "A prebuilt image that already holds your agent. Hosted runs need a digest-pinned image (@sha256:).",
+		Description: "A prebuilt image that runs your agent as a command. Hosted runs need a digest-pinned image (@sha256:) that a server admin approves.",
 		Params: []TemplateParam{
-			{Name: "image", Label: "Image", Placeholder: "ghcr.io/acme/agent@sha256:...", Required: true, Help: "Image reference; pin it by digest for hosted runs."},
+			{Name: "image", Label: "Image", Placeholder: "ghcr.io/your-org/agent@sha256:...", Required: true, Help: "Image reference; pin it by digest for hosted runs, then request approval on Settings > Workers."},
 			{Name: "command", Label: "Command", Placeholder: "my-agent --task-file {{instruction_file}}", Required: true,
 				Help: "Split on spaces. Use {{instruction_file}} or {{instruction}} for the task."},
 		}},
@@ -318,6 +322,11 @@ func renderAgentTemplate(t AgentTemplate, req AgentFromTemplateRequest) ([]rende
 			files = append(files, renderedFile{Rel: strings.TrimPrefix(f.Path, "agents/"), Data: f.Content})
 		}
 		doc = out[0].Content
+	case t.source == "wrap": // J4: wrap my existing app (agentconnect.go)
+		var err error
+		if doc, files, err = renderWrapApp(id, tag, req.Params); err != nil {
+			return nil, err
+		}
 	default:
 		var err error
 		if doc, err = inlineAgentYAML(t, id, req.Params); err != nil {
@@ -377,21 +386,36 @@ func inlineAgentYAML(t AgentTemplate, id string, params map[string]string) ([]by
 		if err != nil {
 			return nil, err
 		}
+		block, err := connectHTTPBlock(u, params)
+		if err != nil {
+			return nil, err
+		}
 		cfg["image"] = "bench/coding-core-base:1"
-		cfg["remote"] = map[string]any{"url": u, "timeout_s": 600}
+		cfg["remote"] = block
 	case "a2a-card":
 		u, err := httpURL("card_url")
 		if err != nil {
 			return nil, err
 		}
+		block, err := connectA2ABlock(u, params)
+		if err != nil {
+			return nil, err
+		}
 		cfg["image"] = "bench/coding-core-base:1"
-		cfg["a2a"] = map[string]any{"card_url": u, "timeout_s": 600}
+		cfg["a2a"] = block
 	case "openai-endpoint":
 		u, err := httpURL("url")
 		if err != nil {
 			return nil, err
 		}
-		block := map[string]any{"url": u, "timeout_s": 600}
+		timeout, err := connectTimeout(params)
+		if err != nil {
+			return nil, err
+		}
+		block := map[string]any{"url": u, "timeout_s": timeout}
+		if connectBool(params, "tools", true) == false {
+			block["tools"] = schemas.OpenAIToolsOff
+		}
 		if strings.HasSuffix(strings.TrimRight(u, "/"), "/responses") {
 			block["api"] = "responses"
 		}

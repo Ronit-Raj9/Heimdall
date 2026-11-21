@@ -4,7 +4,8 @@ package handlers
 // agent can run. GET /agents/{id}/compatibility checks the agent's
 // capabilities (its capabilities: list or its adapter's defaults) against
 // every benchmark the org sees, built-in library benchmarks included, with
-// compat.Check, the same rule the planner refuses arms with.
+// compat.Full: the planner's capability rule (compat.Check) plus the output
+// rules it applies per task to agents outside the workspace.
 
 import (
 	"fmt"
@@ -26,6 +27,9 @@ type BenchmarkCompatibility struct {
 	Requires []string `json:"requires"`
 	Missing  []string `json:"missing"`
 	Reason   string   `json:"reason"`
+	// Note says how many tasks the agent skips when it can run only some
+	// (an endpoint without tool access on a mixed benchmark). "" otherwise.
+	Note string `json:"note,omitempty"`
 }
 
 // AgentCompatibility is GET /agents/{id}/compatibility.
@@ -90,8 +94,8 @@ func (h *agentCompatHandler) get(ctx *fasthttp.RequestCtx) {
 			continue
 		}
 		row.Requires = suite.Requires(s).Strings()
-		ok, missing, reason := compat.Check(cfg, s)
-		row.OK, row.Reason = ok, reason
+		ok, missing, reason, note := compat.Full(cfg, s)
+		row.OK, row.Reason, row.Note = ok, reason, note
 		row.Missing = schemas.CapabilitySet(missing).Strings()
 		out.Benchmarks = append(out.Benchmarks, row)
 	}

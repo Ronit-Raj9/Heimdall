@@ -184,6 +184,8 @@ and waits up to `timeout_s` (default: the wall budget less 5 s). `session_id` is
 
 **Request signing.** With `remote.sign_env` naming a host environment variable (at least 16 characters), every request carries `X-Heimdall-Timestamp` and `X-Heimdall-Signature: sha256=<hex HMAC-SHA256 of "<timestamp>.<raw body>">`. The deployment recomputes the HMAC over the exact bytes it received, compares in constant time and refuses a timestamp more than a few minutes old. That proves the caller holds the secret; it does not hide the body, so keep TLS on the URL.
 
+**Org secrets and other headers.** On a hosted server the host environment is the server's, not the org's, so use `remote.auth_secret` and `remote.sign_secret` instead of `auth_env` and `sign_env`: they name secrets from Settings > Secrets, resolved per run like any `{{secret.NAME}}`. `remote.auth_header` sends the token in another header (for example `X-API-Key`, raw, without `Bearer`). With `tools: expose`, `remote.tool_allow` lists the only tool, MCP and external API ids the deployment is sent. The "Connect your HTTP endpoint" form on Agents > New agent writes all of these, and its "Test my endpoint" button (`POST /api/bench/agents/test-endpoint`) sends one sample task with the same body, auth and signature and shows the answer and a trace.
+
 **Secrets.** The bearer token, the run key, the tool token and the signing secret reach the launcher only through its environment (`BENCH_REMOTE_TOKEN`, `BENCH_REMOTE_RUN_KEY`, `BENCH_REMOTE_TOOLS_TOKEN`, `BENCH_REMOTE_SIGN_SECRET`), which `plan.json` redacts; they are never in argv or files, and the launcher never prints them.
 
 ### The answer

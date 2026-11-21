@@ -7,8 +7,9 @@ answer path. It is bench code: the container holds nothing of the agent's.
 Request: POST <BENCH_REMOTE_URL> with a JSON body
   {"instruction", "session_id", "session_index", "output", "files"?,
    "gateway"?, "tools"?}
-and "Authorization: Bearer <token>" when the agent config names auth_env.
-With sign_env set, "X-Heimdall-Timestamp: <unix seconds>" and
+and "Authorization: Bearer <token>" when the agent config names auth_env or
+auth_secret (with auth_header set, "<auth_header>: <token>" instead).
+With sign_env or sign_secret set, "X-Heimdall-Timestamp: <unix seconds>" and
 "X-Heimdall-Signature: sha256=<hex HMAC-SHA256 of '<timestamp>.<body>'>".
 
 Answer: a JSON object with a string "answer", or a text/plain body. The JSON
@@ -282,7 +283,10 @@ class Remote:
             self.addr = (host, int(p))
         self.headers = {"Accept": "application/json, text/plain"}
         token = os.environ.get("BENCH_REMOTE_TOKEN", "")
-        if token:
+        header = os.environ.get("BENCH_REMOTE_AUTH_HEADER", "")
+        if token and header:
+            self.headers[header] = token
+        elif token:
             self.headers["Authorization"] = "Bearer " + token
 
     def same_origin(self, other):
@@ -377,6 +381,8 @@ def main():
     payload = json.dumps(body).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     secret = os.environ.get("BENCH_REMOTE_SIGN_SECRET", "")
+    if secret and len(secret) < 16:
+        fail(2, "the signing secret is shorter than 16 characters")
     if secret:
         ts = str(int(time.time()))
         mac = hmac.new(secret.encode("utf-8"), ts.encode("ascii") + b"." + payload, hashlib.sha256).hexdigest()

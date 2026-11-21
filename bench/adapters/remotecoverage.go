@@ -21,7 +21,7 @@ import (
 //     response's inline files into the workspace.
 func remoteCoverageEnv(rc *schemas.RunContext, spec *schemas.RemoteAgent, env map[string]string) error {
 	if utils.RemoteToolsExposed(rc.Agent) && rc.RemoteTools != nil {
-		urls := utils.RemoteToolURLs(rc.RemoteTools)
+		urls := utils.AllowedRemoteTools(utils.RemoteToolURLs(rc.RemoteTools), spec.ToolAllow)
 		if len(urls) > 0 {
 			raw, err := json.Marshal(urls)
 			if err != nil {
@@ -31,7 +31,13 @@ func remoteCoverageEnv(rc *schemas.RunContext, spec *schemas.RemoteAgent, env ma
 			env["BENCH_REMOTE_TOOLS_TOKEN"] = rc.RemoteTools.Token
 		}
 	}
-	if spec.SignEnv != "" {
+	switch {
+	case spec.SignSecret != "": // J3: an org secret; the launcher refuses one under 16 characters
+		if !envNamePattern.MatchString(spec.SignSecret) {
+			return fmt.Errorf("remote.sign_secret %q is not a secret name", spec.SignSecret)
+		}
+		env["BENCH_REMOTE_SIGN_SECRET"] = "{{secret." + spec.SignSecret + "}}"
+	case spec.SignEnv != "":
 		if !envNamePattern.MatchString(spec.SignEnv) {
 			return fmt.Errorf("remote.sign_env %q is not an environment variable name", spec.SignEnv)
 		}

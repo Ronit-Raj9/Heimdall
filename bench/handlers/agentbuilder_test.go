@@ -55,6 +55,7 @@ func TestEveryTemplateRendersAndValidates(t *testing.T) {
 		"a2a-card":        {"card_url": "https://agent.example.com/.well-known/agent-card.json"},
 		"openai-endpoint": {"url": "https://agent.example.com/v1", "model": "my-agent", "api_key_secret": "MY_AGENT_KEY"},
 		"docker-image":    {"image": "ghcr.io/acme/agent:1", "command": "my-agent {{instruction_file}}"},
+		"wrap-app":        {"repo_url": "https://github.com/org/agent.git", "command": "python3 -m app"},
 	}
 	if len(agentTemplates) < 15 {
 		t.Fatalf("want at least 15 templates, got %d", len(agentTemplates))

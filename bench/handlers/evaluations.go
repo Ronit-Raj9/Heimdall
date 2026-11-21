@@ -32,7 +32,9 @@ import (
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/tenancy"
+	"github.com/maximhq/bifrost/bench/utils"
 	"github.com/valyala/fasthttp"
+	"gopkg.in/yaml.v3"
 )
 
 // Evaluation defaults and limits.
@@ -74,7 +76,8 @@ var evalCompat = func(a *schemas.AgentConfig, s *schemas.Suite) (bool, []schemas
 	if a == nil {
 		return true, nil, ""
 	}
-	return compat.Check(a, s)
+	ok, missing, reason, _ := compat.Full(a, s)
+	return ok, missing, reason
 }
 
 var evalArmIDRe = regexp.MustCompile(`^[A-Z][A-Za-z0-9]{0,15}$`)
@@ -343,7 +346,7 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 		return badf("name is longer than 120 characters")
 	}
 	if len(spec.Arms) == 0 {
-		return badf("arms is empty: pick an agent and a model")
+		return badf("arms is empty: pick an agent")
 	}
 	if spec.Mode == "" {
 		spec.Mode = schemas.EvaluationModeScore
@@ -375,7 +378,7 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 			return badf("the two arms have the same label %q", a.Label)
 		}
 		a.Model, a.Provider = strings.TrimSpace(a.Model), strings.TrimSpace(a.Provider)
-		if !quickModelRe.MatchString(a.Model) {
+		if a.Model != "" && !quickModelRe.MatchString(a.Model) {
 			return badf("arm %s: model %q is not a valid model name", a.Label, a.Model)
 		}
 		if a.Provider != "" && !quickNameRe.MatchString(a.Provider) {
@@ -389,12 +392,24 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 			return err
 		}
 		a.Agent = strings.TrimSuffix(strings.TrimPrefix(path, "agents/"), ".yaml")
-		if _, _, err := h.env.Services.Projects.Read(ctx, projectfs.AreaAgents, a.Agent+".yaml"); err != nil {
+		data, _, err := h.env.Services.Projects.Read(ctx, projectfs.AreaAgents, a.Agent+".yaml")
+		if err != nil {
 			if errors.Is(err, projectfs.ErrNotFound) {
 				return fmt.Errorf("%w: agent config %s does not exist: register your agent on the Agents page first", errQuickMissing, path)
 			}
 			return fmt.Errorf("read agent config %s: %w", path, err)
 		}
+		if a.Model == "" { // J2: blank means the agent's own model, for agents that have one
+			var cfg schemas.AgentConfig
+			if yaml.Unmarshal(data, &cfg) != nil || !utils.OwnsModel(&cfg) {
+				return badf("arm %s: pick a model: agent %s runs on the model you give it", a.Label, a.Agent)
+			}
+			a.Provider = ""
+		}
+	}
+	if len(spec.Arms) == 2 && spec.Arms[0].Agent == spec.Arms[1].Agent && spec.Arms[0].Version == spec.Arms[1].Version &&
+		spec.Arms[0].Model == spec.Arms[1].Model && spec.Arms[0].Provider == spec.Arms[1].Provider {
+		return badf("the two arms run the same agent, version and model: change one of them")
 	}
 	if spec.TasksPerBenchmark == 0 {
 		spec.TasksPerBenchmark = EvaluationDefaultTasks
@@ -538,6 +553,18 @@ func (h *evaluationsHandler) launchChild(work context.Context, ctx *fasthttp.Req
 		if len(ids) == 0 {
 			return skip("benchmark %s has no admitted task yet", suiteID)
 		}
+		why := ""
+		for _, a := range spec.Arms { // J5: only tasks every arm can produce the output of
+			if cfg := agents["agents/"+a.Agent+".yaml"]; cfg != nil {
+				var w string
+				if ids, w = compat.RunnableTasks(cfg, st, ids); why == "" {
+					why = w
+				}
+			}
+		}
+		if len(ids) == 0 {
+			return skip("agent cannot run benchmark %s: %s", suiteID, why)
+		}
 		tasks = schemas.TaskSelector{IDs: spreadPick(ids, spec.TasksPerBenchmark)}
 	}
 	// Benchmarks whose tasks bring their own image need the agent built on
@@ -642,6 +669,16 @@ func (h *evaluationsHandler) launchChild(work context.Context, ctx *fasthttp.Req
 	return child
 }
 
+// evalArmFor is armFor, or for a blank model (J2) an arm that sets no model
+// and is labelled with the agent's own model, so the report card shows it
+// as such and no cost is computed for a model the agent never called.
+func evalArmFor(provider, model string) schemas.ArmSpec {
+	if model == "" {
+		return schemas.ArmSpec{Label: utils.OwnModelLabel, Set: map[string]any{}}
+	}
+	return armFor(&QuickRunModel{Provider: provider, Model: model})
+}
+
 // appendEvalID adds the evaluation_id line marshalQuickFile cannot carry.
 func appendEvalID(body []byte, id string) ([]byte, error) {
 	if !evalstore.ValidID(id) {
@@ -657,7 +694,7 @@ func evalArms(spec schemas.EvaluationSpec) map[string]schemas.ArmSpec {
 	out := map[string]schemas.ArmSpec{}
 	base := spec.Arms[0].Agent
 	for _, a := range spec.Arms {
-		arm := armFor(&QuickRunModel{Provider: a.Provider, Model: a.Model})
+		arm := evalArmFor(a.Provider, a.Model)
 		agentLabel := a.Agent
 		if a.Version > 0 {
 			agentLabel += fmt.Sprintf(" v%d", a.Version)
