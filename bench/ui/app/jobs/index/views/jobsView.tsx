@@ -1,4 +1,6 @@
+import { JobLogPanel } from "@/components/jobs/jobLogPanel";
 import { useJobKindName } from "@/components/jobs/useJobKindName";
+import { PageHeader } from "@/components/shell";
 import { RoleGate } from "@/components/platform/accessNotes";
 import { ConfirmButton, JobStatusBadge } from "@/components/platform/badges";
 import { JobProgressBar } from "@/components/platform/jobsDrawer";
@@ -14,8 +16,8 @@ import { JOBS_POLL_MS, useCancelJobMutation } from "@/lib/store/apis/platformApi
 import type { Job, JobStatus } from "@/lib/types/bench";
 import { JOB_STATUSES } from "@/lib/types/jobs";
 import { Link } from "@tanstack/react-router";
-import { ListTodo, RotateCcw } from "lucide-react";
-import { useState } from "react";
+import { ListTodo, RotateCcw, SquareTerminal } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** Jobs shown per step of "Load older jobs". */
@@ -39,6 +41,7 @@ export default function JobsView() {
 	const [cancel, cancelState] = useCancelJobMutation();
 	const [retry, retryState] = useCreateJobMutation();
 	const [retried, setRetried] = useState<string | null>(null);
+	const [logId, setLogId] = useState<string | null>(null);
 	const filtered = kind !== "" || status !== "";
 	const kinds = [...new Set([...(list.data?.kinds ?? []), ...(kind ? [kind] : [])])].sort();
 	const actionError = cancelState.error ?? retryState.error;
@@ -53,11 +56,8 @@ export default function JobsView() {
 	};
 
 	return (
-		<section className="flex min-w-0 flex-col gap-5 p-6" data-testid="jobs-screen">
-			<header className="flex flex-col gap-1">
-				<h1 className="text-foreground">{t("title")}</h1>
-				<p className="text-muted-foreground max-w-3xl text-sm">{t("subtitle")}</p>
-			</header>
+		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6 p-4 sm:p-6" data-testid="jobs-screen">
+			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 
 			<div className="flex flex-wrap items-end gap-3" data-testid="jobs-filters">
 				<label className="flex flex-col gap-1 text-xs">
@@ -126,6 +126,8 @@ export default function JobsView() {
 				onCancel={(job) => void cancel(job.id)}
 				onRetry={(job) => void doRetry(job)}
 				busy={cancelState.isLoading || retryState.isLoading}
+				onOpenLog={(job) => setLogId(job.id)}
+				openLogId={logId}
 			/>
 
 			{list.data?.next && (
@@ -135,7 +137,31 @@ export default function JobsView() {
 					</Button>
 				</div>
 			)}
+			{logId && <JobLogDrawer jobId={logId} onClose={() => setLogId(null)} />}
 		</section>
+	);
+}
+
+/** The live log of one job in a panel that slides in from the right; Escape or the backdrop closes it. */
+export function JobLogDrawer({ jobId, onClose }: { jobId: string; onClose: () => void }) {
+	const { t } = useTranslation("jobs");
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [onClose]);
+	return (
+		<div className="fixed inset-0 z-50 flex justify-end" data-testid="jobs-log-drawer">
+			<button type="button" aria-label={t("panel.close")} className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
+			<aside
+				role="dialog"
+				aria-modal="true"
+				aria-label={t("drawer.title")}
+				className="bg-background animate-in slide-in-from-right relative flex h-full w-full max-w-xl flex-col overflow-y-auto border-l p-4 shadow-2xl sm:p-5"
+			>
+				<JobLogPanel jobId={jobId} onClose={onClose} />
+			</aside>
+		</div>
 	);
 }
 
@@ -149,9 +175,23 @@ export interface JobsTableProps {
 	onCancel: (job: Job) => void;
 	onRetry: (job: Job) => void;
 	busy: boolean;
+	onOpenLog?: (job: Job) => void;
+	openLogId?: string | null;
 }
 
-export function JobsTable({ jobs, isLoading, error, onRetryLoad, filtered, kindName, onCancel, onRetry, busy }: JobsTableProps) {
+export function JobsTable({
+	jobs,
+	isLoading,
+	error,
+	onRetryLoad,
+	filtered,
+	kindName,
+	onCancel,
+	onRetry,
+	busy,
+	onOpenLog,
+	openLogId,
+}: JobsTableProps) {
 	const { t } = useTranslation("jobs");
 	if (isLoading) return <BlockSkeleton rows={6} testId="jobs-loading" />;
 	if (error !== undefined) return <LoadError title={t("loadError")} error={error} onRetry={onRetryLoad} testId="jobs-error" />;
@@ -164,37 +204,58 @@ export function JobsTable({ jobs, isLoading, error, onRetryLoad, filtered, kindN
 	}
 	const locale = getLocale();
 	return (
-		<div className="overflow-x-auto rounded-lg border">
+		<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
 			<table className="w-full text-sm" data-testid="jobs-table">
-				<thead className="text-muted-foreground text-left text-xs">
+				<thead className="bg-muted/40 text-muted-foreground sticky top-0 text-left text-xs">
 					<tr className="border-b">
-						<th className="px-3 py-2 font-medium">{t("columns.kind")}</th>
-						<th className="px-3 py-2 font-medium">{t("columns.target")}</th>
-						<th className="px-3 py-2 font-medium">{t("columns.status")}</th>
-						<th className="px-3 py-2 font-medium">{t("columns.created")}</th>
-						<th className="px-3 py-2 text-right font-medium">{t("columns.actions")}</th>
+						<th className="px-4 py-2.5 font-medium">{t("columns.kind")}</th>
+						<th className="px-4 py-2.5 font-medium">{t("columns.target")}</th>
+						<th className="px-4 py-2.5 font-medium">{t("columns.status")}</th>
+						<th className="px-4 py-2.5 font-medium">{t("columns.created")}</th>
+						<th className="px-4 py-2.5 text-right font-medium">{t("columns.actions")}</th>
 					</tr>
 				</thead>
 				<tbody>
 					{jobs.map((job) => {
 						const active = isActiveJob(job);
 						return (
-							<tr key={job.id} className="hover:bg-accent/40 border-b last:border-b-0" data-testid={`jobs-row-${job.id}`}>
-								<td className="px-3 py-2">
+							<tr
+								key={job.id}
+								className={`hover:bg-accent/40 border-b transition-colors last:border-b-0 ${openLogId === job.id ? "bg-accent/50" : ""}`}
+								data-testid={`jobs-row-${job.id}`}
+							>
+								<td className="px-4 py-3">
 									<Link to="/jobs/$jobId" params={{ jobId: job.id }} className="text-foreground font-medium hover:underline">
 										{kindName(job.kind)}
 									</Link>
-									<div className="text-muted-foreground font-mono text-[11px]">{job.id}</div>
+									<div className="text-muted-foreground/80 max-w-48 truncate font-mono text-[11px]" title={job.id}>
+										{job.id}
+									</div>
 								</td>
-								<td className="text-muted-foreground max-w-56 truncate px-3 py-2 font-mono text-xs">{job.target || "-"}</td>
-								<td className="px-3 py-2">
-									<div className="flex flex-col gap-1">
+								<td className="text-muted-foreground max-w-56 truncate px-4 py-3 font-mono text-xs" title={job.target || undefined}>
+									{job.target || "-"}
+								</td>
+								<td className="px-4 py-3">
+									<div className="flex flex-col gap-1.5">
 										<JobStatusBadge status={job.status} />
 										{active && <JobProgressBar job={job} className="w-28" />}
 									</div>
 								</td>
-								<td className="text-muted-foreground px-3 py-2 text-xs whitespace-nowrap">{formatRelative(job.created_at, locale) ?? "-"}</td>
-								<td className="px-3 py-2 text-right">
+								<td className="text-muted-foreground px-4 py-3 text-xs whitespace-nowrap">{formatRelative(job.created_at, locale) ?? "-"}</td>
+								<td className="px-4 py-3 text-right">
+									<div className="flex items-center justify-end gap-1.5">
+									{onOpenLog && (
+										<Button
+											variant="ghost"
+											size="sm"
+											className="h-7 gap-1 px-2 text-xs"
+											onClick={() => onOpenLog(job)}
+											dataTestId={`jobs-log-${job.id}`}
+										>
+											<SquareTerminal className="size-3.5" aria-hidden="true" />
+											{t("drawer.open")}
+										</Button>
+									)}
 									<RoleGate min="member" fallback={null}>
 										{active && !job.cancel_requested ? (
 											<ConfirmButton
@@ -222,6 +283,7 @@ export function JobsTable({ jobs, isLoading, error, onRetryLoad, filtered, kindN
 											</Button>
 										) : null}
 									</RoleGate>
+									</div>
 								</td>
 							</tr>
 						);

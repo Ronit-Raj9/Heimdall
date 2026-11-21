@@ -1,6 +1,6 @@
 {
 	"title": "Server admin",
-	"subtitle": "Everyone on this server: users, organizations, quotas, custom images, usage and the runners doing the work.",
+	"subtitle": "Users, organizations, quotas and runners on this server.",
 	"notAdmin": "Only server admins can open this page. Add your email to HEIMDALL_SERVER_ADMINS on the server, restart it and sign in again.",
 	"localMode": "The server admin page is for hosted servers. A local bench has one organization and no quotas.",
 	"loadFailed": "Could not load: {{message}}",
@@ -25,7 +25,9 @@
 		"off": "Off: runs are leased normally.",
 		"turnOn": "Stop new runs",
 		"turnOff": "Resume runs",
-		"confirmOn": "Stop every organization from starting new runs? Runs in progress keep going."
+		"confirmOn": "Stop every organization from starting new runs? Runs in progress keep going.",
+		"badgeOn": "Runs paused",
+		"badgeOff": "Running"
 	},
 	"users": {
 		"empty": "No users yet. The first sign-up creates the owner.",
