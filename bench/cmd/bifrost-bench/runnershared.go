@@ -314,7 +314,11 @@ func mirrorTree(src, dst string) error {
 		case d.Type()&fs.ModeSymlink != 0:
 			return nil
 		case d.IsDir():
-			return os.MkdirAll(out, 0o755)
+			if err := os.MkdirAll(out, 0o755); err != nil {
+				return err
+			}
+			return os.Chmod(out, 0o755) // the runner's umask must not narrow it
+
 		case !d.Type().IsRegular():
 			return nil
 		}
@@ -323,6 +327,9 @@ func mirrorTree(src, dst string) error {
 			return err
 		}
 		if di, err := os.Stat(out); err == nil && di.Size() == si.Size() && di.ModTime().Equal(si.ModTime()) {
+			if di.Mode().Perm()&0o444 != 0o444 { // a mirror written before the mode fix
+				return os.Chmod(out, di.Mode().Perm()|0o444)
+			}
 			return nil
 		}
 		b, err := os.ReadFile(path)
@@ -330,7 +337,17 @@ func mirrorTree(src, dst string) error {
 			return err
 		}
 		tmp := out + ".mirror-tmp"
-		if err := os.WriteFile(tmp, b, si.Mode().Perm()); err != nil {
+		// Readable by everyone (task containers run as other users), and
+		// executable when the source is: explicit, so the umask cannot
+		// narrow it to owner-only (which made /srv/server.py unreadable).
+		mode := si.Mode().Perm() | 0o444
+		if si.Mode().Perm()&0o111 != 0 {
+			mode |= 0o111
+		}
+		if err := os.WriteFile(tmp, b, mode); err != nil {
+			return err
+		}
+		if err := os.Chmod(tmp, mode); err != nil {
 			return err
 		}
 		if err := os.Chtimes(tmp, si.ModTime(), si.ModTime()); err != nil {

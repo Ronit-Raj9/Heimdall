@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 )
 
@@ -18,7 +19,12 @@ func TestMirrorTreeCopiesUpdatesAndPrunes(t *testing.T) {
 	must(os.WriteFile(filepath.Join(src, "benchmarks", "s", "notes.md"), []byte("a"), 0o644))
 	must(os.MkdirAll(filepath.Join(src, ".heimdall"), 0o755))
 	must(os.WriteFile(filepath.Join(src, ".heimdall", "x"), []byte("skip"), 0o644))
+	old := syscall.Umask(0o077) // the runner container's umask must not make files owner-only
 	must(mirrorTree(src, dst))
+	syscall.Umask(old)
+	if fi, err := os.Stat(filepath.Join(dst, "benchmarks", "s", "notes.md")); err != nil || fi.Mode().Perm()&0o444 != 0o444 {
+		t.Fatalf("mirrored file not world-readable: %v %v", fi.Mode(), err)
+	}
 	if b, err := os.ReadFile(filepath.Join(dst, "benchmarks", "s", "notes.md")); err != nil || string(b) != "a" {
 		t.Fatalf("copy: %q %v", b, err)
 	}
