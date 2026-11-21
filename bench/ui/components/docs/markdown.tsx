@@ -15,6 +15,15 @@ export interface MarkdownProps {
 	testId?: string;
 }
 
+/**
+ * Internal design and planning notes (DESIGN, any *-design note, the spike log, the CLI and web
+ * parity checklist). The server neither lists nor serves them in-app (docs.Internal in
+ * bench/docs/embed.go), so a link to one renders as plain text instead of a dead link.
+ */
+export function isInternalDoc(name: string): boolean {
+	return name === "DESIGN" || name === "spike" || name === "CLI_WEB_PARITY" || name.endsWith("-design");
+}
+
 type Block =
 	| { kind: "heading"; level: number; text: string }
 	| { kind: "para"; text: string }
@@ -153,7 +162,9 @@ function renderInline(text: string, onDocLink: MarkdownProps["onDocLink"], keyBa
 			const label = lm?.[1] ?? tok;
 			const href = safeHref(lm?.[2] ?? "");
 			const doc = href ? /^(?:\.\/)?([\w.-]+)\.md(?:#([\w-]+))?$/.exec(href) : null;
-			if (doc && onDocLink) {
+			if (doc && isInternalDoc(doc[1])) {
+				out.push(label);
+			} else if (doc && onDocLink) {
 				out.push(
 					<a
 						key={key}

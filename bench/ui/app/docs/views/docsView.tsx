@@ -26,7 +26,6 @@ const PINNED = [
 	"web-integrations",
 	"web-sync",
 	"web-admin",
-	"CLI_WEB_PARITY",
 	"quickstart",
 	"adding-an-agent",
 	"bring-your-own",

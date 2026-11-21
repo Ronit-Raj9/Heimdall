@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Markdown, parseBlocks, parseCallout, safeHref, slugify } from "./markdown";
+import { isInternalDoc, Markdown, parseBlocks, parseCallout, safeHref, slugify } from "./markdown";
 
 describe("Markdown", () => {
 	it("parses the common blocks", () => {
@@ -22,6 +22,19 @@ describe("Markdown", () => {
 		expect(html).toContain('href="?doc=runners"');
 		expect(safeHref("data:text/html,x")).toBeNull();
 		expect(slugify("Hello `World`!")).toBe("hello-world");
+	});
+
+	it("renders links to internal design notes as plain text", () => {
+		const html = renderToStaticMarkup(
+			<Markdown source={"See [design](DESIGN.md), [plan](platform-design.md#x) and [runners](runners.md)."} onDocLink={() => undefined} />,
+		);
+		expect(html).not.toContain("?doc=DESIGN");
+		expect(html).not.toContain("?doc=platform-design");
+		expect(html).toContain("design");
+		expect(html).toContain('href="?doc=runners"');
+		expect(isInternalDoc("CLI_WEB_PARITY")).toBe(true);
+		expect(isInternalDoc("spike")).toBe(true);
+		expect(isInternalDoc("hosting")).toBe(false);
 	});
 
 	it("renders callouts and code blocks with a copy button", () => {

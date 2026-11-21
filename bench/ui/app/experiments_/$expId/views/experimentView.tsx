@@ -7,6 +7,7 @@ import { RunList } from "@/components/runs/runList";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { EntityLink } from "@/components/shell/entityLink";
+import { ShareButton } from "@/components/share/shareDialog";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { RouteTabs, type RouteTab } from "@/components/shell/routeTabs";
 import { StatusBadge } from "@/components/shell/statusBadge";
@@ -148,6 +149,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 				actions={
 					<div className="flex flex-wrap items-center gap-1.5" data-testid="experiment-actions">
 						<ExperimentRunActions status={st} />
+						<ShareButton kind="verdict" target={expId} />
 						<div className="bg-muted/40 flex items-center gap-0.5 rounded-lg border p-0.5">
 							<RegradeAction expId={expId} />
 							<Button variant="ghost" size="sm" asChild>

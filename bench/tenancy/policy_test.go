@@ -264,3 +264,45 @@ func TestStatusCodesAreHTTP(t *testing.T) {
 		t.Fatal("status mapping")
 	}
 }
+
+// TestShareLinkAccess pins lane X14: a share route admits anyone on GET,
+// resolves the org from the token, never writes, and refuses runners.
+func TestShareLinkAccess(t *testing.T) {
+	dir := shareDir{orgs: map[string]Org{"org_a": {ID: "org_a", Slug: "a", Name: "A"}}}
+	rule := shareLink()
+	o, eff, err := Resolve(context.Background(), dir, rule, auth.Anonymous(), "org_a.shr_0123456789abcdef0123.sig", "", "")
+	if err != nil || o == nil || o.ID != "org_a" || eff.OrgID != "org_a" || eff.Kind != auth.KindAnonymous || eff.Role != "" {
+		t.Fatalf("resolve %v %v %v", o, eff, err)
+	}
+	if err := Authorize(rule, "GET", eff, o); err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if err := Authorize(rule, "POST", eff, o); err == nil {
+		t.Fatal("share routes must refuse writes")
+	}
+	if err := Authorize(rule, "GET", &auth.Principal{Kind: auth.KindRunner, OrgID: "org_a"}, o); err == nil {
+		t.Fatal("runner on a share route")
+	}
+	user := &auth.Principal{Kind: auth.KindUser, UserID: "usr_x", OrgID: "org_b", Role: auth.RoleOwner}
+	if _, eff, err := Resolve(context.Background(), dir, rule, user, "org_a.x.y", "", ""); err != nil || eff.Kind != auth.KindAnonymous || eff.Role != "" {
+		t.Fatalf("signed-in caller must read as anonymous: %v %v", eff, err)
+	}
+	for _, tok := range []string{"", "nodot", "Bad-Org.x.y", "org_missing.x.y"} {
+		if _, _, err := Resolve(context.Background(), dir, rule, auth.Anonymous(), tok, "", ""); err == nil {
+			t.Errorf("token %q resolved", tok)
+		}
+	}
+}
+
+type shareDir struct{ orgs map[string]Org }
+
+func (d shareDir) OrgByID(_ context.Context, id string) (Org, error) {
+	if o, ok := d.orgs[id]; ok {
+		return o, nil
+	}
+	return Org{}, ErrOrgNotFound
+}
+func (d shareDir) OrgBySlug(context.Context, string) (Org, error) { return Org{}, ErrOrgNotFound }
+func (d shareDir) MemberRole(context.Context, string, string) (auth.Role, error) {
+	return "", ErrNotMember
+}

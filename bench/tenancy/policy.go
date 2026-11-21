@@ -41,6 +41,12 @@ const (
 	// AccessRunner admits only runner principals of the target org (the
 	// worker routes). Runners are refused on every other route.
 	AccessRunner
+	// AccessShare admits anyone, signed in or not, on GET and HEAD only:
+	// the org is the one the share token in the {token} path parameter
+	// names, and the caller acts in it as an anonymous reader with no role.
+	// The handler itself checks the token's signature, expiry and
+	// revocation (handlers/sharelinks.go, lane X14).
+	AccessShare
 )
 
 func (a Access) String() string {
@@ -55,6 +61,8 @@ func (a Access) String() string {
 		return "org"
 	case AccessRunner:
 		return "runner"
+	case AccessShare:
+		return "share"
 	}
 	return "deny"
 }
@@ -93,6 +101,7 @@ func userOnly() Rule                    { return Rule{Access: AccessUser} }
 func org(min auth.Role) Rule            { return Rule{Access: AccessOrg, Min: min} }
 func pathOrg(min auth.Role) Rule        { return Rule{Access: AccessOrg, Min: min, From: OrgFromPath} }
 func runner(audit bool) Rule            { return Rule{Access: AccessRunner, NoAudit: !audit} }
+func shareLink() Rule                   { return Rule{Access: AccessShare} }
 func deny(why string) Rule              { return Rule{Access: AccessDeny, Why: why} }
 func key(method, pattern string) string { return method + " " + pattern }
 
@@ -387,6 +396,17 @@ func Authorize(rule Rule, method string, p *auth.Principal, target *Org) error {
 		}
 		if target == nil || p.OrgID != target.ID {
 			return forbidden("runner token is scoped to another organization")
+		}
+		return nil
+	case AccessShare:
+		if !IsRead(method) {
+			return forbidden("share links are read-only")
+		}
+		if p.Kind == auth.KindRunner {
+			return forbidden("runner tokens may call only the worker routes")
+		}
+		if target == nil || p.OrgID != target.ID {
+			return notFound("this share link does not exist")
 		}
 		return nil
 	case AccessOrg:

@@ -31,6 +31,7 @@ import { ScreenReplay, useRunFrames } from "@/components/runs/screenReplay"; // 
 import { RunServiceLogs } from "@/components/services/serviceLogs"; // X2
 import { EmptyState } from "@/components/shell/emptyState";
 import { EntityLink } from "@/components/shell/entityLink";
+import { ShareButton } from "@/components/share/shareDialog";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { RouteTabs, type RouteTab } from "@/components/shell/routeTabs";
 import { Button } from "@/components/ui/button";
@@ -183,6 +184,7 @@ export default function RunView({ runId }: { runId: string }) {
         actions={
           <div className="flex items-center gap-2">
             <RunExportMenu runId={runId} sealed={Boolean(d.sealed)} />
+            <ShareButton kind="run_trace" target={runId} />
             {slot.pair_id ? (
               <Button variant="outline" size="sm" asChild>
                 <Link

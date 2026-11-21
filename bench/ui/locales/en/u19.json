@@ -20,9 +20,7 @@
 	"login": {
 		"title": "Welcome back",
 		"subtitle": "Sign in to test and review your agents.",
-		"orEmail": "or sign in with email",
-		"judgeTitle": "Judging?",
-		"judgeBody": "Use the judge account email and password from the submission notes."
+		"orEmail": "or sign in with email"
 	},
 	"signup": {
 		"orEmail": "or sign up with email"

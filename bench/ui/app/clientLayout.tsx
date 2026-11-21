@@ -2,6 +2,7 @@ import { BenchHeader } from "@/components/benchHeader";
 import { BenchSidebar } from "@/components/benchSidebar";
 import { DemoBanner } from "@/components/platform/accessNotes";
 import { AuthShell } from "@/components/platform/authShell";
+import { SharedFrame } from "@/components/share/sharedFrame";
 import { ConfirmProvider } from "@/components/platform/confirmDialog";
 import { SessionProvider } from "@/components/platform/sessionProvider";
 import { ThemeProvider } from "@/components/themeProvider";
@@ -44,6 +45,8 @@ function Frame({ children }: { children: React.ReactNode }) {
 	const session = useSession();
 	const location = useRouterState({ select: (state) => state.location });
 	switch (frameFor(session, location.pathname)) {
+		case "share":
+			return <SharedFrame>{children}</SharedFrame>;
 		case "auth":
 			return <AuthShell>{children}</AuthShell>;
 		case "login":

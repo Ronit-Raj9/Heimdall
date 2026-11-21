@@ -22,6 +22,7 @@ import { LeaderboardFilters } from "@/components/leaderboard/leaderboardFilters"
 import { LeaderboardFootnote } from "@/components/leaderboard/leaderboardFootnote";
 import { LeaderboardTable } from "@/components/leaderboard/leaderboardTable";
 import { Podium } from "@/components/leaderboard/podium";
+import { ShareButton, shareQuery } from "@/components/share/shareDialog";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { GRADE_SOURCE_MODES, GradeSourcePicker } from "@/components/review/gradeSourcePicker";
 import { ReviewedBadge } from "@/components/review/reviewedBadge";
@@ -57,12 +58,32 @@ export default function LeaderboardView() {
 	];
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="leaderboard-page">
-			<PageHeader title={t("leaderboard.title")} subtitle={t("leaderboard.pageSubtitle")} />
+			<PageHeader title={t("leaderboard.title")} subtitle={t("leaderboard.pageSubtitle")} actions={<LeaderboardShare />} />
 			<RouteTabs tabs={tabs} defaultTab={suiteParam ? "leaderboard" : "agents"} label={t("leaderboard.tabs.label")} testId="leaderboard-tabs">
 				{(active) => (active === "trends" ? <TrendsTab /> : active === "leaderboard" ? <LeaderboardTab /> : <AgentBoardTab />)}
 			</RouteTabs>
 		</section>
 	);
+}
+
+/**
+ * Share the board in view (lane X14): the Agents tab with its skill and model filters, or one
+ * benchmark's board with its filters. The held-out board and Trends are never shared.
+ */
+function LeaderboardShare() {
+	const [tab] = useQueryState("tab", parseAsString);
+	const [suite] = useQueryState("suite", parseAsString);
+	const [condition] = useQueryState("condition", parseAsString);
+	const [scope] = useQueryState("scope", parseAsString);
+	const [synthetic] = useQueryState("synthetic", parseAsString);
+	const [gradeSource] = useQueryState("grade_source", parseAsString);
+	const [split] = useQueryState("split", parseAsString);
+	const [capability] = useQueryState("capability", parseAsString);
+	const [model] = useQueryState("model", parseAsString);
+	const active = tab ?? (suite ? "leaderboard" : "agents");
+	if (active === "trends" || split) return null;
+	if (active === "agents") return <ShareButton kind="leaderboard" target="agents" query={shareQuery({ capability, model })} />;
+	return <ShareButton kind="leaderboard" target="models" query={shareQuery({ suite, condition, scope, synthetic, grade_source: gradeSource })} />;
 }
 
 /**

@@ -1,4 +1,5 @@
 import { ReportCard } from "@/components/reportcard/reportCard";
+import { ShareButton, shareQuery } from "@/components/share/shareDialog";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { useGetAgentReportCardQuery, useGetAgentVersionsQuery, type ReportCardResponse } from "@/lib/store/apis/evaluationsApi";
@@ -77,7 +78,10 @@ export default function ReportCardTab({ agentId }: { agentId: string }) {
 			) : report.isError || !report.data ? (
 				<LoadError title={t("reportCard.loadError")} error={report.error} onRetry={() => void report.refetch()} testId="agent-report-card-error" />
 			) : (
-				<ReportCard report={report.data} />
+				<ReportCard
+					report={report.data}
+					actions={<ShareButton kind="report_card" target={agentId} query={shareQuery({ version: version || undefined, model: model || undefined })} />}
+				/>
 			)}
 		</div>
 	);

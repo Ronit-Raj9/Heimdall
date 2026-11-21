@@ -78,6 +78,8 @@ describe("frameFor", () => {
 		expect(frameFor(LOCAL_SESSION, "/login")).toBe("auth");
 		expect(frameFor(signedOutSession(), "/verdict")).toBe("login");
 		expect(frameFor(signedOutSession(), "/invite/tok")).toBe("auth");
+		expect(frameFor(signedOutSession(), "/s/org_a.shr_1.sig")).toBe("share");
+		expect(frameFor({ ...signedOutSession(), status: "error" }, "/s/org_a.shr_1.sig")).toBe("share");
 		expect(frameFor(demoSession(), "/verdict")).toBe("app");
 		expect(frameFor(hostedSession("viewer"), "/settings")).toBe("app");
 	});

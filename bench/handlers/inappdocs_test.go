@@ -83,7 +83,6 @@ func TestInAppDocsListsWebGuides(t *testing.T) {
 		"web-integrations": "Integrations on the website",
 		"web-sync":         "Sync with the CLI",
 		"web-admin":        "Server admin on the website",
-		"CLI_WEB_PARITY":   "CLI and website parity",
 	}
 	ctx := &fasthttp.RequestCtx{}
 	listDocs(ctx, schemas.ModeLive)
@@ -112,6 +111,42 @@ func TestInAppDocsListsWebGuides(t *testing.T) {
 		}
 		if strings.ContainsAny(body.Markdown, "—–") {
 			t.Errorf("guide %s: contains an em or en dash", name)
+		}
+	}
+}
+
+// TestInAppDocsHideInternalNotes pins lane X14 (E11): internal design and
+// planning notes are neither listed nor served in-app, and no listed guide
+// mentions a judge login.
+func TestInAppDocsHideInternalNotes(t *testing.T) {
+	ctx := &fasthttp.RequestCtx{}
+	listDocs(ctx, schemas.ModeLive)
+	var out DocList
+	if err := json.Unmarshal(ctx.Response.Body(), &out); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range out.Docs {
+		if d.Name == "DESIGN" || d.Name == "spike" || d.Name == "CLI_WEB_PARITY" || strings.HasSuffix(d.Name, "-design") {
+			t.Errorf("internal note %s is listed", d.Name)
+		}
+	}
+	for _, name := range []string{"DESIGN", "spike", "CLI_WEB_PARITY", "platform-design", "adoption-design"} {
+		g := docCtx(name)
+		getDoc(g, schemas.ModeLive)
+		if g.Response.StatusCode() != fasthttp.StatusNotFound {
+			t.Errorf("internal note %s: status %d, want 404", name, g.Response.StatusCode())
+		}
+	}
+	for _, name := range []string{"web-quickstart", "hosting", "runners"} {
+		g := docCtx(name)
+		getDoc(g, schemas.ModeLive)
+		var body DocBody
+		if err := json.Unmarshal(g.Response.Body(), &body); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		low := strings.ToLower(body.Markdown)
+		if strings.Contains(low, "judge login") || strings.Contains(low, "judge account") {
+			t.Errorf("guide %s mentions a judge login", name)
 		}
 	}
 }
