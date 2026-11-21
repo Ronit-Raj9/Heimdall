@@ -5,6 +5,7 @@ package tenancy
 // admins add, change and delete them.
 func init() {
 	OrgPolicy[key("GET", api+"/models")] = org(viewer)
+	OrgPolicy[key("GET", api+"/models/providers")] = org(viewer) // A09: provider list for the key form
 	OrgPolicy[key("GET", api+"/models/keys")] = org(viewer)
 	OrgPolicy[key("POST", api+"/models/keys")] = org(admin)
 	OrgPolicy[key("GET", api+"/models/keys/{id}")] = org(viewer)
