@@ -160,9 +160,10 @@ func (s *snapshot) file(p string) (localFile, bool) {
 
 // appendOnlyLogs are the experiment-level files that only ever grow by whole
 // lines: seals.log and reviews.log (store), resumes.jsonl (run -resume with
-// allowed drift). A pass reads each once, up to its last complete line, and
+// allowed drift), controls.jsonl (pause, live settings, run cancel and
+// requeue; bench/runctl). A pass reads each once, up to its last complete line, and
 // the mirror accepts a new copy only when it starts with the mirrored bytes.
-var appendOnlyLogs = []string{sealsLogFile, reviewsLogFile, "resumes.jsonl"}
+var appendOnlyLogs = []string{sealsLogFile, reviewsLogFile, "resumes.jsonl", "controls.jsonl"} // controls.jsonl: run control log (bench/runctl)
 
 func isAppendOnlyLog(p string) bool {
 	for _, l := range appendOnlyLogs {

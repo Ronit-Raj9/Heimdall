@@ -101,9 +101,10 @@ const (
 
 // Run is one run as the diff reads it from the run index.
 type Run struct {
-	Slot   schemas.Slot
-	Run    schemas.Run
-	Sealed bool
+	Slot       schemas.Slot
+	Run        schemas.Run
+	Sealed     bool
+	Superseded bool // run control: requeued, never counts
 }
 
 // Source is the read side of the run folder: the store's index with its seal

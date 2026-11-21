@@ -51,6 +51,11 @@ type RunRecord struct {
 	// was written but the folder was not yet made read-only, so its seals.log
 	// entry may be missing. Store.Seal on it finishes the seal.
 	SealPending bool `json:"seal_pending,omitempty"`
+	// Superseded marks a sealed run an operator requeued (runctl): it stays
+	// on disk, sealed and verifiable, but it never counts and never uses one
+	// of the slot's attempts. Only aborted_infra and infra_error runs can be
+	// superseded, so a graded pass or fail is never replaced.
+	Superseded bool `json:"superseded,omitempty"`
 }
 
 // SealRecord is the content of seal.json. The run's seal hash is the sha256 of

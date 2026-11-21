@@ -66,4 +66,11 @@ type Evaluation struct {
 	Children  []EvaluationChild `json:"children"`
 	CreatedAt time.Time         `json:"created_at"`
 	CreatedBy string            `json:"created_by,omitempty"`
+	// RerunOf names the evaluation whose failures this one runs again (run
+	// control, "Rerun failures"). Such an evaluation is exploratory: its
+	// children never join the parent's verdicts, report card or a
+	// leaderboard.
+	RerunOf string `json:"rerun_of,omitempty"`
+	// Paused is true while every running child is paused (drain).
+	Paused bool `json:"paused,omitempty"`
 }

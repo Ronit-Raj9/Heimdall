@@ -68,6 +68,13 @@ func (h *ExperimentsHandler) RegisterRoutes(r *router.Router, middlewares ...lib
 	r.POST(p+"/{id}/cancel", lib.ChainMiddlewares(h.cancelExperiment, writeMW...))
 	r.POST(p+"/{id}/resume", lib.ChainMiddlewares(h.resumeExperiment, writeMW...))
 	r.POST(p+"/{id}/regrade", lib.ChainMiddlewares(h.regradeExperiment, writeMW...))
+	// Run control (runcontrol.go): pause, live controls, run cancel and requeue, rerun failures.
+	r.GET(p+"/{id}/controls", lib.ChainMiddlewares(h.getControls, middlewares...))
+	r.PATCH(p+"/{id}/controls", lib.ChainMiddlewares(h.patchControls, writeMW...))
+	r.POST(p+"/{id}/pause", lib.ChainMiddlewares(h.pauseExperiment, writeMW...))
+	r.POST(p+"/{id}/rerun-failures", lib.ChainMiddlewares(h.rerunFailures, writeMW...))
+	r.POST(p+"/{id}/runs/{run}/cancel", lib.ChainMiddlewares(h.cancelRun, writeMW...))
+	r.POST(p+"/{id}/runs/{run}/requeue", lib.ChainMiddlewares(h.requeueRun, writeMW...))
 }
 
 // Close ends every open event stream and subscription. The server calls it

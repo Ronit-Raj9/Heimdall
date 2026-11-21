@@ -143,7 +143,7 @@ func candidates(src Source, a *armRecord, condition string) []candidate {
 	for _, id := range ids {
 		runs := bySlot[id]
 		slices.SortStableFunc(runs, func(x, y Run) int { return cmp.Compare(x.Run.Attempt, y.Run.Attempt) })
-		counts := func(r Run) bool { return r.Sealed && r.Run.Outcome != schemas.OutcomeAbortedInfra }
+		counts := func(r Run) bool { return r.Sealed && r.Run.Outcome != schemas.OutcomeAbortedInfra && !r.Superseded }
 		pick := runs[len(runs)-1]
 		if i := slices.IndexFunc(runs, counts); i >= 0 {
 			pick = runs[i]

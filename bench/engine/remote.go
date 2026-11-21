@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/runctl"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/secrets"
 	"github.com/maximhq/bifrost/bench/utils"
@@ -834,7 +835,7 @@ func (c *Coordinator) checkSlot(ctx context.Context, l *remoteLease) string {
 		if !rec.Sealed {
 			return fmt.Sprintf("the slot has an unsealed run %s; it is settled before another run is accepted", rec.Run.RunID)
 		}
-		if rec.Run.Outcome != schemas.OutcomeAbortedInfra {
+		if rec.Run.Outcome != schemas.OutcomeAbortedInfra && !rec.Superseded {
 			return fmt.Sprintf("the slot already has a counted run %s", rec.Run.RunID)
 		}
 	}
@@ -1017,6 +1018,42 @@ func (c *Coordinator) loseLocked(l *remoteLease, why string) {
 	r.requeue(l.slot)
 }
 
+// revokeCancelled ends every remote lease of r whose slot an operator
+// cancelled (run control): the worker's next heartbeat finds the lease gone
+// and stops the run. The run never reaches the store, so it uses no attempt;
+// its cost can not be observed here and is charged at the estimate, like a
+// lost lease, and the slot is held out until requeued.
+func (c *Coordinator) revokeCancelled(r *schedRun, st *runctl.State) {
+	c.mu.Lock()
+	var revoked []*remoteLease
+	for _, l := range c.leases {
+		if l.r != r || l.closing {
+			continue
+		}
+		if _, ok := st.CancelledSlots[l.slot.SlotID]; !ok {
+			continue
+		}
+		c.endLocked(l, "revoked: an operator cancelled the run")
+		if w := c.workers[l.worker]; w != nil {
+			w.info.State = stateOf(w)
+		}
+		r.remoteOps.Add(1)
+		revoked = append(revoked, l)
+	}
+	c.mu.Unlock()
+	for _, l := range revoked {
+		c.remove(l.archive)
+		usd, known := r.charge(nil, l.est, "revoked lease "+l.id)
+		c.journalCharge(r, "revoked", l, "an operator cancelled the run", usd, known)
+		r.emit(Event{Kind: EventRunCancel, SlotID: l.slot.SlotID, Message: "the remote run was stopped: an operator cancelled it"})
+		r.releaseStoreLease(l.slot, l.owner)
+		r.release(l.est)
+		r.queue.finish()
+		r.holdOut(l.slot)
+		r.remoteOps.Done()
+	}
+}
+
 // endLocked removes a lease from the table and the worker's running list.
 // The caller holds mu.
 func (c *Coordinator) endLocked(l *remoteLease, why string) {
@@ -1157,6 +1194,11 @@ func (r *schedRun) leaseRemoteWhere(owner string, accept func(*schemas.Task) boo
 			r.queue.finish()
 			continue
 		}
+		if r.operatorCancelled(slot) { // run control: held out until an operator requeues it
+			r.queue.finish()
+			r.holdOut(slot)
+			continue
+		}
 		est, ok, wait := r.tryReserve()
 		if wait {
 			r.queue.giveBack(slot)
@@ -1251,7 +1293,7 @@ func (r *schedRun) attemptsLeft(ctx context.Context, slot *schemas.Slot) bool {
 	if err != nil {
 		return true
 	}
-	return len(recs)-countOwnerStopped(recs) < maxAttempts
+	return usedAttempts(recs) < r.maxAborted() // run control: superseded runs use no attempt either (runcontrol.go)
 }
 
 func (r *schedRun) releaseStoreLease(slot *schemas.Slot, owner string) {

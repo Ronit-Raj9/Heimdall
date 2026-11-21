@@ -1533,6 +1533,9 @@ func validateExperiment(e *schemas.Experiment, minArms int) error {
 	if e.Primary.Metric == "" {
 		errs = append(errs, errors.New("primary metric is empty"))
 	}
+	if err := e.ErrorPolicy.Validate(); err != nil { // run control: error policy overrides (schemas/errorpolicy.go)
+		errs = append(errs, err)
+	}
 	if minArms >= 2 && e.Matrix == nil && (e.Verdict.Policy == "" || e.Verdict.Policy == verdict.PolicyPairedSignFlip) {
 		// The paired sign-flip verdict compares arm A against arm B by id;
 		// other ids would run every slot and then fail to decide (audit 1-B-05).

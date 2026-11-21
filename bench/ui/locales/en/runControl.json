@@ -1,0 +1,95 @@
+{
+	"pause": "Pause",
+	"pauseHint": "Runs already going finish; no new run starts until you resume.",
+	"resume": "Resume",
+	"pausedBadge": "Paused",
+	"draining_one": "Pausing: {{count}} run still going",
+	"draining_other": "Pausing: {{count}} runs still going",
+	"pausedBy": "Paused by {{who}}",
+	"pauseError": "Could not pause",
+	"resumeError": "Could not resume",
+	"reason": "Reason (optional, kept in the change log)",
+	"panel": {
+		"title": "Run controls",
+		"intro": "Change how this comparison runs while it runs. Every change is kept in a tamper-evident change log.",
+		"concurrency": "Runs at once",
+		"concurrencyHint": "Frozen: {{value}}. 0 uses the frozen value.",
+		"cap": "Spend cap (USD)",
+		"capHint": "Frozen: {{value}}. 0 uses the frozen cap.",
+		"capNone": "none",
+		"models": "Hold models",
+		"modelsHint": "Runs of a held model wait; the others go on.",
+		"save": "Apply",
+		"saved": "Applied",
+		"saveError": "Could not apply",
+		"exploratory": "Exploratory rerun of {{parent}}: its result never counts toward the original comparison or any leaderboard.",
+		"cancelled": "Waiting for a requeue",
+		"superseded": "Requeued runs (kept, not counted)"
+	},
+	"policy": {
+		"title": "What happens when a run fails",
+		"class": "Failure",
+		"retry": "Retry",
+		"max": "Max runs",
+		"counts": "Counts",
+		"grade": "Score",
+		"yes": "yes",
+		"no": "no",
+		"classes": {
+			"aborted_infra": "Never reached the agent",
+			"stopped": "Stopped by you or a restart",
+			"lease_lost": "Worker lost the run",
+			"infra_error": "Platform error after the agent started",
+			"invalid_evaluator": "Grader could not decide",
+			"agent_failure": "Agent failed (fail, timeout, budget, crash, refusal)",
+			"integrity_violation": "Safety rule broken"
+		},
+		"retries": {
+			"auto": "automatic",
+			"on_resume": "on resume",
+			"manual": "by requeue",
+			"never": "never"
+		},
+		"grades": {
+			"not_graded": "none",
+			"unknown": "unknown",
+			"zero": "0",
+			"zero_veto": "0, blocks shipping"
+		}
+	},
+	"log": {
+		"title": "Change log",
+		"verified": "{{count}} changes, verified",
+		"broken": "The change log does not verify: {{problem}}",
+		"empty": "No changes yet.",
+		"actions": {
+			"pause": "paused",
+			"resume": "resumed",
+			"set": "changed settings",
+			"cancel_run": "cancelled a run",
+			"requeue_run": "requeued a run",
+			"supersede": "retried a run (error policy)"
+		},
+		"noReason": "no reason given"
+	},
+	"run": {
+		"cancel": "Cancel run",
+		"confirmCancel": "Cancel run {{id}}? It is not counted and uses no attempt. It waits for a requeue.",
+		"confirm": "Cancel run",
+		"keep": "Keep running",
+		"requeue": "Requeue",
+		"requeueHint": "Run this task again. This run is kept and marked as replaced; it is not counted and uses no attempt.",
+		"cancelError": "Could not cancel the run",
+		"requeueError": "Could not requeue the run",
+		"superseded": "Replaced by a requeue: not counted"
+	},
+	"rerun": {
+		"button": "Rerun failures",
+		"hint": "Runs the failed tasks again as a new, exploratory comparison. Its result never changes this one.",
+		"started": "Started {{id}}: {{tasks}} tasks",
+		"open": "Open",
+		"error": "Could not rerun failures",
+		"configChanged": "The agent setup changed since this comparison for {{arms}}.",
+		"evalStarted": "Started {{id}} with {{count}} benchmarks"
+	}
+}

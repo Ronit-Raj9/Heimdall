@@ -153,7 +153,7 @@ func (s agentDiffSource) Runs(expID string) []agentdiff.Run {
 	views := s.index.Runs(expID)
 	out := make([]agentdiff.Run, 0, len(views))
 	for _, rv := range views {
-		out = append(out, agentdiff.Run{Slot: rv.Slot, Run: rv.Run, Sealed: rv.Sealed})
+		out = append(out, agentdiff.Run{Slot: rv.Slot, Run: rv.Run, Sealed: rv.Sealed, Superseded: rv.Superseded})
 	}
 	return out
 }
