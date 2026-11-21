@@ -103,6 +103,11 @@ export function NewCanaryForm({ onCreated }: { onCreated?(name: string): void })
 				<Button size="sm" disabled={state.isLoading || !f.name || !f.suite || !f.targets} onClick={() => void submit()} data-testid="canary-new-submit">
 					{t("canary.create")}
 				</Button>
+				{!msg && (!f.name || !f.suite || !f.targets) && (
+					<span className="text-muted-foreground text-xs" data-testid="canary-new-missing">
+						{t("canary.missing")}
+					</span>
+				)}
 				{msg && <span data-testid="canary-new-msg">{msg}</span>}
 			</div>
 		</Section>

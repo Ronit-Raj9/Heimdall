@@ -75,7 +75,8 @@
 		"baselineConfirm": "Record a new baseline for this canary? It runs the canary once.",
 		"run": "Run look",
 		"delete": "Delete",
-		"deleteConfirm": "Delete the definition of canary {{name}}? Its looks and baselines stay."
+		"deleteConfirm": "Delete the definition of canary {{name}}? Its looks and baselines stay.",
+		"missing": "Fill in a name, a suite (id@version) and at least one model to watch (provider/model) to create the canary."
 	},
 	"noTickerAction": "Set up a canary instead"
 }
