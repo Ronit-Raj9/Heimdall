@@ -190,9 +190,9 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	handlers.NewAuditHandler(mode, deps.Auditor, write).RegisterRoutes(r, common...)
 	handlers.NewReleasesHandler(mode, deps.Releases, write).RegisterRoutes(r, common...)
 	suitesHandler := handlers.NewSuitesHandler(mode, deps.Suites).WithHeldOutVisible(cfg.HeldOut.Visible).WarmCache()
-	if !benchcatalog.DevContent(cfg.Auth.IsHosted()) { // Acme practice examples: local development only
+	if hosted := cfg.Auth.IsHosted(); !benchcatalog.DevContent(hosted) { // Acme practice examples: local development only; the practice suite: never in a hosted org
 		examples := benchcatalog.ExampleSuiteIDs(benchcatalog.SourceRoot())
-		suitesHandler.WithHiddenSuites(func(id string) bool { return examples[id] })
+		suitesHandler.WithHiddenSuites(func(id string) bool { return examples[id] || benchcatalog.HidePracticeSuite(hosted, id) })
 	}
 	suitesHandler.RegisterRoutes(r, common...) // Suite health area: held_out.visible; WarmCache: suite list cache
 	var packSuites packs.SuiteLister           // nil without a suite loader: GET /evaluation-packs answers 503

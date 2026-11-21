@@ -26,6 +26,7 @@ import (
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/agentversions"
 	"github.com/maximhq/bifrost/bench/auth"
+	"github.com/maximhq/bifrost/bench/benchcatalog"
 	"github.com/maximhq/bifrost/bench/compat"
 	"github.com/maximhq/bifrost/bench/evalstore"
 	"github.com/maximhq/bifrost/bench/faults"
@@ -557,7 +558,11 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 		if len(got) == 0 {
 			return badf("pack %q has no benchmark on this server", spec.Pack)
 		}
-		for _, b := range got {
+		ready := h.packReady(ctx, got, evalSplit(spec.Split))
+		if len(ready) == 0 {
+			return badf("pack %q has no benchmark with a ready task yet", spec.Pack)
+		}
+		for _, b := range ready {
 			if !contains(benches, b) {
 				benches = append(benches, b)
 			}
@@ -571,6 +576,28 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 	}
 	spec.Benchmarks = benches
 	return nil
+}
+
+// packReady keeps the pack benchmarks an evaluation can run: not the
+// practice suite on a hosted server (benchcatalog.HidePracticeSuite), and
+// with at least one ready task of the split (admittedTasks). A benchmark
+// that does not load stays: the launch skips it with the reason. Benchmarks
+// named one by one are never dropped here.
+func (h *evaluationsHandler) packReady(ctx context.Context, ids []string, split string) []string {
+	src := h.env.Services.Suites
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if benchcatalog.HidePracticeSuite(h.env.Services.Hosted, id) {
+			continue
+		}
+		if src != nil {
+			if st, err := src.LoadSuite(ctx, id); err == nil && st != nil && len(admittedTasks(st, split).IDs) == 0 {
+				continue
+			}
+		}
+		out = append(out, id)
+	}
+	return out
 }
 
 // latestVersion resolves "latest" for agent id at launch (N6): the current

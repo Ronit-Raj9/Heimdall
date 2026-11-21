@@ -97,6 +97,9 @@ type Source struct {
 	// Off by default: only local development and tests turn it on
 	// (DevContent); a hosted org is never offered them.
 	Examples bool
+	// Hosted hides the practice suite (HidePracticeSuite) from the bundled
+	// list: a hosted org holds its own benchmarks and the library only.
+	Hosted bool
 }
 
 var (
@@ -223,7 +226,7 @@ func (s Source) List(project string) []Entry {
 	if s.Root != "" {
 		// 4. Other suites bundled with the server (coding-core, hd-* not named above).
 		for _, id := range subdirs(filepath.Join(s.Root, "benchmarks")) {
-			if seen["suite-"+id] || recipeSuite(id) {
+			if seen["suite-"+id] || recipeSuite(id) || HidePracticeSuite(s.Hosted, id) {
 				continue
 			}
 			meta := readSuiteMeta(filepath.Join(s.Root, "benchmarks", id, "suite.yaml"))

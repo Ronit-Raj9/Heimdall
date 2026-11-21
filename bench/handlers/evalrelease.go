@@ -234,7 +234,7 @@ func (h *evalReleaseHandler) live(ctx *fasthttp.RequestCtx) {
 	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, liveVersion(work, h.env.Services.Releases, agent))
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, liveVersion(work, h.env.Services, agent))
 }
 
 // scheduleName is the schedule name of an evaluation's repeat.

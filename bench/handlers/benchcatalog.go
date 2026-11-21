@@ -73,9 +73,10 @@ func init() {
 }
 
 // catalogSource is the catalog an org sees. The Acme practice examples are
-// developer content: local development and tests only, never a hosted org.
+// developer content: local development and tests only, never a hosted org,
+// and a hosted org never sees the practice suite (coding-core) either.
 func catalogSource(env OrgEnv) benchcatalog.Source {
-	return benchcatalog.Source{Root: benchcatalog.SourceRoot(), Examples: benchcatalog.DevContent(env.Services.Hosted)}
+	return benchcatalog.Source{Root: benchcatalog.SourceRoot(), Examples: benchcatalog.DevContent(env.Services.Hosted), Hosted: env.Services.Hosted}
 }
 
 func (h *benchCatalogHandler) project() string {

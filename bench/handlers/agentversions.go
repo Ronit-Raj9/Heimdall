@@ -30,9 +30,12 @@ type AgentVersionList struct {
 	Agent    string              `json:"agent"`
 	Builtin  bool                `json:"builtin,omitempty"`
 	Versions []AgentVersionEntry `json:"versions"`
-	// Live is the version that holds the agent's saved config: the one the
-	// agent page runs and a pull request is compared with (0 when none).
-	Live int `json:"live,omitempty"`
+	// Live is the agent's live version (agentLiveVersion): the last
+	// released version, else the newest version holding the saved config.
+	// A pull request is compared with it (0 when none). LiveSource says
+	// which rule gave it (release or saved_config).
+	Live       int    `json:"live,omitempty"`
+	LiveSource string `json:"live_source,omitempty"`
 }
 
 // AgentVersionDoc is GET /agents/{id}/versions/{n}.
@@ -66,11 +69,12 @@ type agentVersionsHandler struct {
 	projects projectfs.Store
 	index    ReadIndex
 	library  string
+	releases ReleaseLog // the live version rule reads the release log first
 }
 
 func init() {
 	RegisterOrgArea("agentversions", func(env OrgEnv, r *router.Router) {
-		h := &agentVersionsHandler{mode: env.Mode, projects: env.Services.Projects, index: env.Services.Index, library: suite.LibraryDir()}
+		h := &agentVersionsHandler{mode: env.Mode, projects: env.Services.Projects, index: env.Services.Index, library: suite.LibraryDir(), releases: env.Services.Releases}
 		r.GET(APIPrefix+"/agents/{id}/versions", env.R(h.list))
 		r.GET(APIPrefix+"/agents/{id}/versions/{n}", env.R(h.get))
 		r.POST(APIPrefix+"/agents/{id}/versions", env.W(h.create))
@@ -249,11 +253,11 @@ func (h *agentVersionsHandler) list(ctx *fasthttp.RequestCtx) {
 	for _, v := range vs {
 		out.Versions = append(out.Versions, AgentVersionEntry{AgentVersion: v, Runs: counts[strings.TrimPrefix(v.AgentHash, "sha256:")]})
 	}
-	if out.Builtin {
-		out.Live = 1
-	} else if doc, _, ok := h.projectAgentFile(ctx, id); ok {
-		out.Live = agentversions.Live(vs, doc)
+	live := agentLiveVersion(ctx, h.releases, h.projects, h.library, id)
+	if live.Version == 0 && out.Builtin { // a built-in agent with no saved config of its own
+		live.Version, live.Source = 1, LiveFromSavedConfig
 	}
+	out.Live, out.LiveSource = live.Version, live.Source
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
 }
 

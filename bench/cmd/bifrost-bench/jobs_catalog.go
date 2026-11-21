@@ -94,7 +94,7 @@ func catalogImportParams(env jobEnv, raw json.RawMessage) (benchcatalog.ImportPa
 	if err := dec.Decode(&p); err != nil {
 		return p, "", "", fmt.Errorf("params: %v", err)
 	}
-	src := benchcatalog.Source{Root: benchcatalog.SourceRoot()}
+	src := benchcatalog.Source{Root: benchcatalog.SourceRoot(), Hosted: env.Hosted}
 	importer, from, err := src.Normalize(env.ProjectRoot, &p, env.Hosted)
 	return p, importer, from, err
 }

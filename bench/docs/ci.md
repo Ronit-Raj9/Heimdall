@@ -3,7 +3,7 @@
 Heimdall gates agent changes in CI. On every pull request (GitHub) or merge request (GitLab) it:
 
 1. registers the pull request's agent config as a new **version** of your agent on your hosted Heimdall (or takes the live config with a new image digest or preview endpoint);
-2. launches an **evaluation** in versions mode: the pull request's version against the **live version** (the agent's saved config), on the benchmark pack or benchmarks you pick, clean and under the faults you pick;
+2. launches an **evaluation** in versions mode: the pull request's version against the **live version** (the last released version; before any release, the version of the agent's saved config), on the benchmark pack or benchmarks you pick, clean and under the faults you pick;
 3. waits for it, fetches the **report card** and applies the **evaluation gate**;
 4. posts the report card summary as one pull-request comment (edited in place on later pushes) with a link to the full report card;
 5. sets a commit status ("Heimdall evaluation (agent)") and fails the job when the gate fails.
@@ -119,7 +119,7 @@ What it calls on your Heimdall (all with `Authorization: Bearer <org API token>`
 
 | Step | API |
 |---|---|
-| live version | `GET /api/bench/agents/{id}/versions` (`live`: the version holding the saved config) and `GET .../versions/{n}` |
+| live version | `GET /api/bench/agents/{id}/versions` (`live`: the last released version, else the version holding the saved config; `live_source` says which) and `GET .../versions/{n}` |
 | register the pull request's version | `POST /api/bench/agents/{id}/versions` with `{"yaml": "...", "note": "pull request #12 at abc123"}`. The agent's saved config does not change; a config equal to any existing version reuses it |
 | launch | `POST /api/bench/evaluations` (mode `versions`, arm A the live version, arm B the pull request) |
 | wait | `GET /api/bench/evaluations/{id}` every `-poll` |

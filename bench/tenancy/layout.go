@@ -39,7 +39,8 @@ const (
 	ReleasesDir    = "releases"
 )
 
-// DefaultSuite is the built-in suite every new hosted org starts with.
+// DefaultSuite is the practice suite a new hosted org starts with on a
+// development server only (HEIMDALL_DEV, cmd/bifrost-bench seedBenchmarks).
 const DefaultSuite = "coding-core"
 
 // orgIDPattern is what an org id may look like before it becomes a folder

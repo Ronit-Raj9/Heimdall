@@ -24,6 +24,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/adapters"
 	"github.com/maximhq/bifrost/bench/auth"
+	"github.com/maximhq/bifrost/bench/benchcatalog"
 	"github.com/maximhq/bifrost/bench/db"
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/lib"
@@ -73,9 +74,16 @@ func init() {
 	})
 }
 
-// seedBenchmarks is the benchmarks folder new orgs get the built-in suite
-// from: the server's own.
-func seedBenchmarks(cfg *lib.Config) string { return cfg.Path(cfg.BenchmarksRoot) }
+// seedBenchmarks is the benchmarks folder new orgs get the practice suite
+// (coding-core) from: the server's own, but only with HEIMDALL_DEV set
+// (tests and development servers). A production hosted org starts with no
+// benchmark of its own: it adds its own or uses the built-in library.
+func seedBenchmarks(cfg *lib.Config) string {
+	if !benchcatalog.DevFlag() {
+		return ""
+	}
+	return cfg.Path(cfg.BenchmarksRoot)
+}
 
 // hostedLayout is the folder layout of a hosted server.
 func hostedLayout(cfg *lib.Config) tenancy.Layout {
@@ -352,8 +360,8 @@ func dbErr(err error) error {
 	return err
 }
 
-// CreateOrg creates the org with its owner, then its folders with the
-// built-in coding-core suite copied from the server's benchmarks folder.
+// CreateOrg creates the org with its owner, then its folders (with the
+// practice suite only on a development server, seedBenchmarks).
 func (s *orgService) CreateOrg(ctx context.Context, slug, name, owner string) (handlers.OrgInfo, error) {
 	o, err := createOrg(ctx, s.env.db, s.env.layout, s.env.base.cfg, slug, name, owner, false)
 	if err != nil {

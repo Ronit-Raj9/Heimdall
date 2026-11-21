@@ -74,7 +74,7 @@ func parseCIEvaluate(args []string) (*ciEvalOptions, error) {
 	fs.StringVar(&o.config, "config", "", "the agent config file in this repository to register as the pull request's version (HEIMDALL_CONFIG)")
 	fs.StringVar(&o.image, "image", "", "an image the pull request built (ref, ideally ref@sha256:...): the live config with this image (HEIMDALL_IMAGE)")
 	fs.StringVar(&o.endpoint, "endpoint", "", "a preview deployment URL: the live config with this remote endpoint (HEIMDALL_ENDPOINT)")
-	fs.StringVar(&o.baseline, "baseline", "live", "version to compare with: live (the agent's saved config) or a version number (HEIMDALL_BASELINE)")
+	fs.StringVar(&o.baseline, "baseline", "live", "version to compare with: live (the last released version, else the version of the saved config) or a version number (HEIMDALL_BASELINE)")
 	fs.StringVar(&o.model, "model", "", "model for both versions; empty uses each version's own model (HEIMDALL_MODEL)")
 	fs.StringVar(&o.pack, "pack", "", "benchmark pack, e.g. coding (HEIMDALL_PACK)")
 	var benches, faults listFlag

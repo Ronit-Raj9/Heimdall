@@ -36,7 +36,7 @@ inputs:
     required: false
     default: ""
   baseline:
-    description: "evaluate: version to compare with, live (the agent's saved config) or a version number"
+    description: "evaluate: version to compare with, live (the last released version, else the version of the saved config) or a version number"
     required: false
     default: live
   model:

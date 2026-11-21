@@ -16,24 +16,65 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/agentversions"
+	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/reportcard"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 )
 
-// LiveVersion is GET /agents/{id}/live-version: the version of an agent
-// that the newest release put live. Version 0 means nothing was released.
+// LiveVersion is GET /agents/{id}/live-version: the agent's live version.
+// Version 0 means the agent has none yet (nothing released and no saved
+// version). Source says which rule gave it: "release" (the newest release
+// that names the agent and a version) or "saved_config" (nothing released
+// yet: the newest version whose config is the saved agents/<id>.yaml, or
+// v1 of a built-in library agent).
 type LiveVersion struct {
 	Agent        string    `json:"agent"`
 	Version      int       `json:"version"`
+	Source       string    `json:"source,omitempty"`
 	ReleaseID    string    `json:"release_id,omitempty"`
 	ReleasedAt   time.Time `json:"released_at,omitzero"`
 	Approver     string    `json:"approver,omitempty"`
 	EvaluationID string    `json:"evaluation_id,omitempty"`
 }
 
-// liveVersion reads the agent's live version from the release log: the
-// newest record that names the agent and a version.
-func liveVersion(ctx context.Context, rl ReleaseLog, agent string) LiveVersion {
+// Live version sources (LiveVersion.Source).
+const (
+	LiveFromRelease     = "release"
+	LiveFromSavedConfig = "saved_config"
+)
+
+// agentLiveVersion is the one live version rule (CI evaluate, release
+// gates, releases and GET /agents/{id}/versions all read it): the last
+// released version of agent, from the release log; when nothing was
+// released yet, the newest saved version whose config is the saved
+// agents/<id>.yaml (agentversions.Live), or v1 of a built-in library agent
+// the project has no file for. projects may be nil (no saved config to read).
+func agentLiveVersion(ctx context.Context, rl ReleaseLog, projects projectfs.Store, library, agent string) LiveVersion {
+	out := releasedVersion(ctx, rl, agent)
+	if out.Version > 0 || projects == nil || !agentversions.ValidID(agent) {
+		return out
+	}
+	doc, _, err := projects.Read(ctx, projectfs.AreaAgents, agent+".yaml")
+	if err != nil {
+		if errors.Is(err, projectfs.ErrNotFound) && agentversions.LibraryFile(library, agent) != "" {
+			out.Version, out.Source = 1, LiveFromSavedConfig
+		}
+		return out
+	}
+	vs, err := agentversions.List(projects.Root(), agent)
+	if err != nil {
+		return out
+	}
+	if v := agentversions.Live(vs, doc); v > 0 {
+		out.Version, out.Source = v, LiveFromSavedConfig
+	}
+	return out
+}
+
+// releasedVersion reads the agent's last released version from the release
+// log: the newest record that names the agent and a version.
+func releasedVersion(ctx context.Context, rl ReleaseLog, agent string) LiveVersion {
 	out := LiveVersion{Agent: agent}
 	if rl == nil {
 		return out
@@ -45,11 +86,16 @@ func liveVersion(ctx context.Context, rl ReleaseLog, agent string) LiveVersion {
 	for i := len(list.Releases) - 1; i >= 0; i-- {
 		r := list.Releases[i]
 		if r.AgentID == agent && r.Version > 0 {
-			out.Version, out.ReleaseID, out.ReleasedAt, out.Approver, out.EvaluationID = r.Version, r.ReleaseID, r.CreatedAt, r.Approver, r.EvaluationID
+			out.Version, out.Source, out.ReleaseID, out.ReleasedAt, out.Approver, out.EvaluationID = r.Version, LiveFromRelease, r.ReleaseID, r.CreatedAt, r.Approver, r.EvaluationID
 			return out
 		}
 	}
 	return out
+}
+
+// liveVersion is agentLiveVersion over an org's services.
+func liveVersion(ctx context.Context, s Services, agent string) LiveVersion {
+	return agentLiveVersion(ctx, s.Releases, s.Projects, suite.LibraryDir(), agent)
 }
 
 // evalResolution is who an evaluation judges and against what.
@@ -136,7 +182,7 @@ func (g gateEnv) resolve(ctx context.Context, ev *schemas.Evaluation, evals []*s
 	switch {
 	case ev.Spec.Mode == schemas.EvaluationModeVersions && len(arms) == 2:
 		agent, _ := reportcard.AgentRef(arms[1].Agent)
-		res.Live = liveVersion(ctx, s.Releases, agent)
+		res.Live = liveVersion(ctx, s, agent)
 		if want == 0 {
 			want = res.Live.Version
 		}
@@ -153,12 +199,12 @@ func (g gateEnv) resolve(ctx context.Context, ev *schemas.Evaluation, evals []*s
 		}
 	case len(arms) == 2 && ev.Spec.Mode != schemas.EvaluationModeScore:
 		pick(arms[1], arms[0])
-		res.Live = liveVersion(ctx, s.Releases, res.Agent)
+		res.Live = liveVersion(ctx, s, res.Agent)
 	default:
 		cand := arms[0]
 		res.Candidate, res.CandidateVersion = cand.Label, g.armVersion(cand)
 		res.Agent, _ = reportcard.AgentRef(cand.Agent)
-		res.Live = liveVersion(ctx, s.Releases, res.Agent)
+		res.Live = liveVersion(ctx, s, res.Agent)
 		if want == 0 {
 			want = res.Live.Version
 		}

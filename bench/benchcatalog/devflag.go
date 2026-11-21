@@ -3,6 +3,7 @@ package benchcatalog
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -16,14 +17,28 @@ const DevEnv = "HEIMDALL_DEV"
 // offered to users. A hosted server never offers them, whatever the flag:
 // a hosted org holds its own agents and benchmarks only.
 func DevContent(hosted bool) bool {
-	if hosted {
-		return false
-	}
+	return !hosted && DevFlag()
+}
+
+// DevFlag reports whether HEIMDALL_DEV is set, hosted or not. It keeps the
+// practice suite (PracticeSuites) available to hosted tests and development
+// servers; a production install never sets it.
+func DevFlag() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(DevEnv))) {
 	case "1", "true", "yes", "on":
 		return true
 	}
 	return false
+}
+
+// PracticeSuites are the bundled practice suites (coding-core): local
+// starters and test fixtures, never seeded into or listed for a hosted org
+// unless DevFlag is on.
+var PracticeSuites = []string{"coding-core"}
+
+// HidePracticeSuite reports whether a hosted org must not see suite id.
+func HidePracticeSuite(hosted bool, id string) bool {
+	return hosted && !DevFlag() && slices.Contains(PracticeSuites, id)
 }
 
 // ExampleSuiteIDs are the suite ids the Acme practice example projects

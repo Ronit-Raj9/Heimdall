@@ -150,8 +150,9 @@ func TestEvaluationCreatePackChildren(t *testing.T) {
 	if !evalstore.ValidID(ev.ID) || ev.Org != "org1" || ev.Status != schemas.EvaluationRunning {
 		t.Fatalf("evaluation %+v", ev)
 	}
-	// coding pack on this server: hd-harbor-tb2, hd-swe-ib-lcb, hd-swe-verified (sorted).
-	if len(ev.Children) != 3 {
+	// coding pack on this server: hd-harbor-tb2, hd-swe-ib-lcb, hd-swe-verified
+	// (sorted); hd-swe-ib-lcb has no ready task, so the pack drops it (X08).
+	if len(ev.Children) != 2 {
 		t.Fatalf("children %+v", ev.Children)
 	}
 	byBench := map[string]schemas.EvaluationChild{}
@@ -165,8 +166,15 @@ func TestEvaluationCreatePackChildren(t *testing.T) {
 	if c := byBench["hd-swe-verified"]; c.Status != schemas.EvaluationChildSkipped || !strings.Contains(c.Skipped, "needs gpu") {
 		t.Fatalf("incompatible child %+v", c)
 	}
-	if c := byBench["hd-swe-ib-lcb"]; c.Status != schemas.EvaluationChildSkipped || !strings.Contains(c.Skipped, "no admitted task") {
-		t.Fatalf("empty child %+v", c)
+	if c, ok := byBench["hd-swe-ib-lcb"]; ok {
+		t.Fatalf("pack kept a benchmark with no ready task: %+v", c)
+	}
+	// Named one by one, it stays as a skipped child with the reason.
+	r2, _ := evalServer(t, Services{Launcher: &evalLauncher{}, Suites: evalSuites(), OrgID: "org1"})
+	named := decodeEval(t, evalCall(r2, "POST", APIPrefix+"/evaluations",
+		`{"arms":[{"label":"A","agent":"scripted","model":"gpt-5.4-mini","provider":"openai"}],"benchmarks":["hd-swe-ib-lcb","hd-harbor-tb2"],"tasks_per_benchmark":4,"trials":1}`))
+	if len(named.Children) != 2 || named.Children[0].Status != schemas.EvaluationChildSkipped || !strings.Contains(named.Children[0].Skipped, "no admitted task") {
+		t.Fatalf("named empty benchmark %+v", named.Children)
 	}
 
 	exp := l.planned[tb.ExperimentID]
@@ -183,7 +191,7 @@ func TestEvaluationCreatePackChildren(t *testing.T) {
 	if got := strings.Join(exp.Conditions[0].Tasks.IDs, ","); got != "t01,t03,t06,t08" {
 		t.Fatalf("tasks %s", got)
 	}
-	if exp.Budget.TotalUSD != 3 {
+	if exp.Budget.TotalUSD != 4.5 { // budget_usd 9 over the two benchmarks the pack keeps
 		t.Fatalf("budget %+v", exp.Budget)
 	}
 	if len(l.started) != 1 || l.started[0] != tb.ExperimentID {
@@ -194,7 +202,7 @@ func TestEvaluationCreatePackChildren(t *testing.T) {
 	if err != nil || !strings.Contains(string(data), "evaluation_id: "+ev.ID) {
 		t.Fatalf("saved file %v:\n%s", err, data)
 	}
-	if saved, err := evalstore.Open(dir).Load(ev.ID); err != nil || len(saved.Children) != 3 {
+	if saved, err := evalstore.Open(dir).Load(ev.ID); err != nil || len(saved.Children) != 2 {
 		t.Fatalf("stored evaluation %v %+v", err, saved)
 	}
 }
