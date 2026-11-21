@@ -545,8 +545,21 @@ func writeTask(suiteDir string, t task, force bool) error {
 	if err := os.MkdirAll(filepath.Join(dir, "repo"), 0o755); err != nil {
 		return err
 	}
+	// A workspace holding git metadata (a planted repository history) cannot
+	// be a task repo, which is a plain snapshot: it is built into the task's
+	// image and seeds the workspace from there (environment.workspace_path).
+	inImage := false
 	for dst, src := range t.Row.Files {
-		p, err := safeDest(filepath.Join(dir, "repo"), dst)
+		if hasGit(t.EnvDir, src, dst) {
+			inImage = true
+		}
+	}
+	wsRoot := filepath.Join(dir, "repo")
+	if inImage {
+		wsRoot = filepath.Join(dir, "env", "workspace")
+	}
+	for dst, src := range t.Row.Files {
+		p, err := safeDest(wsRoot, dst)
 		if err != nil {
 			return err
 		}
@@ -555,7 +568,10 @@ func writeTask(suiteDir string, t task, force bool) error {
 		}
 	}
 	var env *envYAML
-	if len(t.Row.FilesAbs) > 0 {
+	if len(t.Row.FilesAbs) > 0 || inImage {
+		if err := os.MkdirAll(filepath.Join(dir, "env", "abs"), 0o755); err != nil {
+			return err
+		}
 		for dst, src := range t.Row.FilesAbs {
 			p, err := safeDest(filepath.Join(dir, "env", "abs"), dst)
 			if err != nil {
@@ -565,12 +581,19 @@ func writeTask(suiteDir string, t task, force bool) error {
 				return err
 			}
 		}
-		if err := os.WriteFile(filepath.Join(dir, "env", "Dockerfile"), []byte(taskDockerfile), 0o644); err != nil {
+		df := taskDockerfile
+		if inImage {
+			df = taskDockerfileWorkspace
+		}
+		if err := os.WriteFile(filepath.Join(dir, "env", "Dockerfile"), []byte(df), 0o644); err != nil {
 			return err
 		}
 		env = &envYAML{Dockerfile: "env/Dockerfile", Context: "env"}
+		if inImage {
+			env.WorkspacePath = "/workspace"
+		}
 	}
-	if len(t.Row.Files) == 0 {
+	if len(t.Row.Files) == 0 || inImage {
 		if err := os.WriteFile(filepath.Join(dir, "repo", ".keep"), nil, 0o644); err != nil {
 			return err
 		}
@@ -826,6 +849,17 @@ USER agent
 WORKDIR /workspace
 `
 
+// taskDockerfileWorkspace also builds the workspace into the image, from
+// which the bench seeds the agent's workspace (environment.workspace_path).
+const taskDockerfileWorkspace = `FROM ` + baseTag + `
+USER root
+COPY abs/ /
+COPY workspace/ /workspace/
+RUN chmod -R a+rX /tmp 2>/dev/null; chmod 1777 /tmp; chown -R agent:agent /workspace
+USER agent
+WORKDIR /workspace
+`
+
 type suiteYAML struct {
 	ID          string       `yaml:"id"`
 	Version     string       `yaml:"version"`
@@ -876,8 +910,33 @@ type judgeYAML struct {
 }
 
 type envYAML struct {
-	Dockerfile string `yaml:"dockerfile"`
-	Context    string `yaml:"context"`
+	Dockerfile    string `yaml:"dockerfile"`
+	Context       string `yaml:"context"`
+	WorkspacePath string `yaml:"workspace_path,omitempty"`
+}
+
+// hasGit reports whether a staged file is, or is a folder holding, git
+// metadata.
+func hasGit(base, src, dst string) bool {
+	for _, p := range []string{src, dst} {
+		for _, part := range strings.Split(filepath.ToSlash(p), "/") {
+			if part == ".git" {
+				return true
+			}
+		}
+	}
+	found := false
+	root := filepath.Join(base, filepath.FromSlash(src))
+	if st, err := os.Stat(root); err == nil && st.IsDir() {
+		_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+			if err == nil && d.Name() == ".git" {
+				found = true
+				return filepath.SkipAll
+			}
+			return nil
+		})
+	}
+	return found
 }
 
 type taskYAML struct {

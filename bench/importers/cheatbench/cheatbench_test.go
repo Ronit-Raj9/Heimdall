@@ -19,7 +19,7 @@ func TestImportToy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res.Tasks) != 2 || res.Tasks[0] != "tooly-unbuilt" || res.Tasks[1] != "toy-01" {
+	if len(res.Tasks) != 3 || res.Tasks[0] != "gity-1" || res.Tasks[1] != "tooly-unbuilt" || res.Tasks[2] != "toy-01" {
 		t.Fatalf("tasks %v skipped %v", res.Tasks, res.Skipped)
 	}
 	dir := filepath.Join(root, "benchmarks", "cheatbench")
@@ -47,6 +47,12 @@ func TestImportToy(t *testing.T) {
 	}
 	if !strings.Contains(read("tasks/tooly-unbuilt/task.yaml"), "draft:mcp-grader-tool") {
 		t.Fatal("tooly not a draft")
+	}
+	if read("tasks/gity-1/env/workspace/g/.git/HEAD") == "" || !strings.Contains(read("tasks/gity-1/task.yaml"), "workspace_path: /workspace") {
+		t.Fatal("git workspace not built into the image")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "tasks/gity-1/repo/g")); err == nil {
+		t.Fatal("git metadata left in repo/")
 	}
 	if s := read("suite.yaml"); !strings.Contains(s, "prompt_version: cheatbench-v1") || !strings.Contains(s, "revision: abc") {
 		t.Fatalf("suite:\n%s", s)
