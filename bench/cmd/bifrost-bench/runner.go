@@ -29,6 +29,7 @@ func init() {
 
 const runnerUsage = `usage:
   bifrost-bench runner start -server <url> -token-file <path> [-pool name] [-slots n] [-name name] [-labels a,b] [-spend-cap-usd x] [-config deploy/bench.yaml] [-debug]
+  bifrost-bench runner start -shared -server <url> -secret-file <path> [-runtime runc|runsc] [-slots n]
   bifrost-bench runner status -server <url> -token-file <path> [-name name]`
 
 func runRunner(args []string) int {
@@ -104,6 +105,9 @@ func (f *runnerFlags) labelList() []string {
 // proxy, docker): every leased experiment is planned again here and refused
 // when its manifest does not come out the same.
 func runRunnerStart(cmd string, args []string) int {
+	if hasSharedFlag(args) { // shared runner pool (runnershared.go)
+		return runSharedRunner(args)
+	}
 	f, err := parseRunnerFlags(cmd, args)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s: %v\n%s\n", cmd, err, runnerUsage)

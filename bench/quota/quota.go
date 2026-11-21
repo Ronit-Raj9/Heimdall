@@ -1,16 +1,19 @@
 // Package quota holds per-org run limits and the platform kill switch.
-// Phase 0 skeleton: the stub returns defaults and nil errors.
+// Open returns the database store (store.go); NewStub returns defaults and
+// nil errors (local mode and tests).
 package quota
 
 import "context"
 
 // Limits are one org's limits.
 type Limits struct {
-	MaxConcurrentRuns, MaxRunsPerDay int
-	MaxSpendUSDPerDay                float64
-	MaxImageBytes                    int64
-	AllowCustomImages, SharedPool    bool
-	Runtime                          string /*runc|runsc*/
+	MaxConcurrentRuns int     `json:"max_concurrent_runs"`
+	MaxRunsPerDay     int     `json:"max_runs_per_day"`
+	MaxSpendUSDPerDay float64 `json:"max_spend_usd_per_day"`
+	MaxImageBytes     int64   `json:"max_image_bytes"`
+	AllowCustomImages bool    `json:"allow_custom_images"` // the server admin approved custom images for this org
+	SharedPool        bool    `json:"shared_pool"`         // the org's runs may use the shared runner pool
+	Runtime           string  `json:"runtime"`             // runc | runsc (gVisor)
 }
 
 // Store reads and sets limits.
