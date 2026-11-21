@@ -43,7 +43,7 @@ func (g *Gateway) MintKey(ctx context.Context, rc *schemas.RunContext) (*schemas
 	if err != nil {
 		return nil, fmt.Errorf("mint key for run %s: %w", runID, err)
 	}
-	g.noteRunOrg(rc) // X03: the run's keys carry its organization (orglogs.go)
+	g.noteRunOrg(rc)                                                    // X03: the run's keys carry its organization (orglogs.go)
 	slot, keyID, err := g.acquireRunSlots(ctx, p, runID, teamSlots(rc)) // Multi-agent area: a team takes all its slots at once (teamslots.go)
 	if err != nil {
 		return nil, fmt.Errorf("mint key for run %s: %w", runID, err)

@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/tenancy"
-	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/valyala/fasthttp"
 )
 
