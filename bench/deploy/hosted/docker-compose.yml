@@ -51,8 +51,16 @@ networks:
   upstream:
     enable_ipv6: false
     labels: *labels
+  builder:
+    # shared-runner profile: the isolated BuildKit and the shared runner
+    # only. Not internal (base images are pulled), but no Heimdall service,
+    # database or gateway is on it.
+    enable_ipv6: false
+    labels: *labels
   evalnet:
     # Fixed name: the demo runner attaches agent containers to it by name.
+    # The shared runner does not use it: each org gets its own internal
+    # network, heimdall-evalnet-<org>, which only the gateway joins.
     name: ${HEIMDALL_EVAL_NETWORK:-heimdall-evalnet}
     internal: true
     enable_ipv6: false
@@ -72,6 +80,8 @@ volumes:
   bifrost-data:
     labels: *labels
   faultproxy-ledger:
+    labels: *labels
+  buildkit-state:
     labels: *labels
 
 services:
@@ -322,13 +332,33 @@ services:
     restart: unless-stopped
 
   # Profile shared-runner: the shared runner pool (web parity F3). Serves
-  # every org whose limits allow the shared pool, one worker loop per org,
-  # with only the server's built-in agents and suites (it replans every
-  # experiment with this checkout). Needs HEIMDALL_SHARED_RUNNER_SECRET on
-  # both sides and HEIMDALL_MASTER_KEY on the server.
+  # every org whose limits allow the shared pool, one worker loop per org.
+  # Needs HEIMDALL_SHARED_RUNNER_SECRET on both sides.
   #   docker compose ... --profile shared-runner up -d
-  # For gVisor, point DOCKER_HOST at a daemon whose default runtime is runsc
-  # and set HEIMDALL_SHARED_RUNTIME=runsc.
+  # Isolation between orgs (docs/hosting.md "Shared runner pool"):
+  #   - containers run under gVisor (runsc) when the host has it
+  #     (HEIMDALL_SHARED_RUNTIME=auto, the default), with a loud warning
+  #     when it does not;
+  #   - org Dockerfiles build only on buildkitd below (no host socket, own
+  #     network), loaded as org-<id>/<tag>; pulls only of approved images;
+  #   - each org's agents get their own internal network;
+  #   - no server data is mounted: each org's project is downloaded with
+  #     that org's own runner token, into HEIMDALL_RUNNER_DIR/projects/<org>.
+  buildkitd:
+    profiles: [shared-runner]
+    image: moby/buildkit:v0.35.0-rootless@sha256:5987568f92dafbfb679879de59c1cd8d26597f5f6635c314e166164e2615870c
+    labels: *labels
+    <<: *logging
+    # Rootless BuildKit: no Docker socket, no host paths, its own network.
+    # It needs an unconfined seccomp/apparmor profile for its user
+    # namespaces, but holds no privilege over the host daemon.
+    security_opt: ["seccomp=unconfined", "apparmor=unconfined", "systempaths=unconfined"]
+    command: ["--addr", "tcp://0.0.0.0:1234", "--oci-worker-no-process-sandbox"]
+    volumes:
+      - buildkit-state:/home/user/.local/share/buildkit
+    networks: [builder]
+    restart: unless-stopped
+
   shared-runner:
     profiles: [shared-runner]
     build:
@@ -354,11 +384,12 @@ services:
         unset HEIMDALL_SHARED_RUNNER_SECRET
         exec bifrost-bench runner start -shared -server http://heimdall:8090 -secret-file /tmp/shared.secret \
           -config "$$HEIMDALL_BENCH_DIR/deploy/bench.yaml" -name shared-runner \
-          -runtime "$$HEIMDALL_SHARED_RUNTIME" -slots "$$HEIMDALL_SHARED_SLOTS"
+          -runtime "$$HEIMDALL_SHARED_RUNTIME" -slots "$$HEIMDALL_SHARED_SLOTS" \
+          -projects-dir "$$HEIMDALL_SHARED_PROJECTS_MIRROR"
     environment:
       HOME: /tmp
       HEIMDALL_SHARED_RUNNER_SECRET: ${HEIMDALL_SHARED_RUNNER_SECRET:-}
-      HEIMDALL_SHARED_RUNTIME: ${HEIMDALL_SHARED_RUNTIME:-runc}
+      HEIMDALL_SHARED_RUNTIME: ${HEIMDALL_SHARED_RUNTIME:-auto}
       HEIMDALL_SHARED_SLOTS: ${HEIMDALL_SHARED_SLOTS:-1}
       HEIMDALL_BENCH_DIR: ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}
       BENCH_RUNS_ROOT: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}/runs
@@ -370,26 +401,29 @@ services:
       BENCH_NETWORKS_EVAL: ${HEIMDALL_EVAL_NETWORK:-heimdall-evalnet}
       BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
       BENCH_FAULTPROXY_TOKEN: ${BENCH_FAULTPROXY_TOKEN:-}
-      HEIMDALL_SHARED_PROJECTS_DIR: /var/lib/heimdall/runs/projects
       HEIMDALL_SHARED_PROJECTS_MIRROR: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}/projects
+      HEIMDALL_SHARED_BUILDKIT: ${HEIMDALL_SHARED_BUILDKIT:-tcp://buildkitd:1234}
+      HEIMDALL_SHARED_GATEWAY_CONTAINER: ${HEIMDALL_SHARED_GATEWAY_CONTAINER:-}
+      HEIMDALL_SHARED_PLATFORM_IMAGES: ${HEIMDALL_SHARED_PLATFORM_IMAGES:-}
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:ro
       - ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}:${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}
-      # Each org's project (catalog adds, uploads, web edits), read-only: the
-      # shared runner plans an org's runs from its own suites and agents.
-      - heimdall-data:/var/lib/heimdall:ro
+      # No heimdall-data mount: each org's project is downloaded with that
+      # org's own runner token (GET /api/bench/workers/project).
       # Built-in benchmark library (HEIMDALL_LIBRARY_DIR in .env), read-only at
       # its host path so runners hand task folders to the host's Docker
       # unchanged. Unset binds /dev/null over itself: no library, as before.
       - ${HEIMDALL_LIBRARY_DIR:-/dev/null}:${HEIMDALL_LIBRARY_DIR:-/dev/null}:ro
     tmpfs:
       - /tmp
-    networks: [edge, upstream]
+    networks: [edge, upstream, builder]
     depends_on:
       heimdall:
         condition: service_healthy
       bifrost:
         condition: service_healthy
+      buildkitd:
+        condition: service_started
     restart: unless-stopped

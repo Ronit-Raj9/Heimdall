@@ -109,10 +109,43 @@ func TestAssignments(t *testing.T) {
 	if err != nil || len(as.Assignments) != 1 || as.Assignments[0].OrgID != "org1" || as.Assignments[0].Pool != Pool {
 		t.Fatalf("%+v %v", as, err)
 	}
-	tok := as.Assignments[0].Token
+	if as.Assignments[0].TokenID != "" || m.n != 0 {
+		t.Fatal("assignments minted a token")
+	}
+	c1, err := s.ClaimToken(ctx, "org1", "runc")
+	if err != nil || c1.Token == "" || c1.OrgID != "org1" {
+		t.Fatalf("claim: %+v %v", c1, err)
+	}
 	as2, _ := s.Assignments(ctx, "runc")
-	if as2.Assignments[0].Token != tok || m.n != 1 {
-		t.Fatal("token should be reused, not minted again")
+	if as2.Assignments[0].TokenID != c1.TokenID {
+		t.Fatalf("assignment token id %q, want %q", as2.Assignments[0].TokenID, c1.TokenID)
+	}
+	c2, _ := s.ClaimToken(ctx, "org1", "")
+	live := 0
+	for _, tk := range m.tokens {
+		if tk.RevokedAt == nil {
+			live++
+			if tk.ID != c2.TokenID {
+				t.Fatal("old token still live")
+			}
+		}
+	}
+	if live != 1 {
+		t.Fatalf("%d live tokens, want 1", live)
+	}
+	if _, err := s.ClaimToken(ctx, "org3", ""); !errors.Is(err, ErrNotAssigned) {
+		t.Fatalf("claim for org off the pool: %v", err)
+	}
+	if _, err := s.ClaimToken(ctx, "org2", "runc"); !errors.Is(err, ErrNotAssigned) {
+		t.Fatalf("claim for org of another runtime: %v", err)
+	}
+	// A readable copy an older server kept is removed on claim.
+	if _, err := keys.Create(ctx, "org1", keystore.KindSecret, keystore.Put{Provider: TokenProvider, Label: TokenLabel, Value: "hmr_old"}, "t"); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = s.ClaimToken(ctx, "org1", "")
+	if left, _ := keys.List(ctx, "org1", keystore.KindSecret); len(left) != 0 {
+		t.Fatalf("legacy token copy kept: %+v", left)
 	}
 	if all, _ := s.Assignments(ctx, ""); len(all.Assignments) != 2 {
 		t.Fatalf("all runtimes: %+v", all)
@@ -121,5 +154,8 @@ func TestAssignments(t *testing.T) {
 	killed, _ := s.Assignments(ctx, "")
 	if !killed.KillSwitch || len(killed.Assignments) != 0 {
 		t.Fatalf("kill switch: %+v", killed)
+	}
+	if _, err := s.ClaimToken(ctx, "org1", ""); !errors.Is(err, ErrNotAssigned) {
+		t.Fatalf("claim with kill switch on: %v", err)
 	}
 }

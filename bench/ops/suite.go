@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -436,11 +435,10 @@ func EnsureImage(ctx context.Context, d utils.Docker, tag, dockerfile string, w 
 		return fmt.Errorf("image %s is missing and no Dockerfile builds it; build or pull it first", tag)
 	}
 	fmt.Fprintf(out(w), "building %s from %s\n", tag, dockerfile)
-	bin := d.Binary
-	if bin == "" {
-		bin = "docker"
-	}
-	cmd := exec.CommandContext(ctx, bin, "build", "-t", tag, "-f", dockerfile, filepath.Dir(dockerfile))
+	// Command applies a shared runner's policy: an org-written Dockerfile
+	// builds on the isolated builder under the org's namespace, never on
+	// the host daemon (utils/dockerpolicy.go).
+	cmd := d.Command(ctx, "build", "-t", tag, "-f", dockerfile, filepath.Dir(dockerfile))
 	cmd.Stdout, cmd.Stderr = os.Stderr, os.Stderr
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("docker build %s: %w", tag, err)

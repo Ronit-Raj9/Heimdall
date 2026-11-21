@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -187,7 +186,7 @@ func (e *dockerWorkspace) ExportArtifacts(ctx context.Context, rc *schemas.RunCo
 
 // runArtifactHelper runs the helper and reads its stream as it arrives.
 func (e *dockerWorkspace) runArtifactHelper(ctx context.Context, args []string, dir string, specs []schemas.ArtifactSpec) ([]schemas.ArtifactFile, error) {
-	cmd := exec.CommandContext(ctx, dockerBinary(e.cfg.Docker), args...)
+	cmd := e.cfg.Docker.Command(ctx, args...)
 	var errBuf strings.Builder
 	cmd.Stderr = &cappedWriter{w: &errBuf, limit: 4096}
 	stdout, err := cmd.StdoutPipe()

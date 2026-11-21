@@ -13,7 +13,8 @@ package handlers
 //   PUT  /api/bench/admin/quotas/{id}          server admin: set one org's limits
 //   GET  /api/bench/admin/killswitch           server admin
 //   POST /api/bench/admin/killswitch           server admin: {"on": true}
-//   GET  /api/bench/admin/pool/assignments     shared runner only (Bearer HEIMDALL_SHARED_RUNNER_SECRET)
+//   GET  /api/bench/admin/pool/assignments     shared runner only (Bearer HEIMDALL_SHARED_RUNNER_SECRET); no tokens
+//   POST /api/bench/admin/pool/assignments/{org}/token  shared runner only: one org's fresh runner token (revokes the old one)
 
 import (
 	"bytes"
@@ -106,6 +107,7 @@ func (h *SharedPoolHandler) RegisterRoutes(r *router.Router, mw ...lib.Middlewar
 	r.GET(a+"/quotas/{id}", c(h.serverAdmin(h.getQuota)))
 	r.PUT(a+"/quotas/{id}", c(h.serverAdmin(h.setQuota)))
 	r.GET(a+"/pool/assignments", c(h.assignments))
+	r.POST(a+"/pool/assignments/{org}/token", c(h.claimToken))
 }
 
 func (h *SharedPoolHandler) unavailable(ctx *fasthttp.RequestCtx) bool {
@@ -420,26 +422,45 @@ func (h *SharedPoolHandler) setKill(ctx *fasthttp.RequestCtx) {
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, body)
 }
 
-// assignments answers the shared runner. The policy is public: the handler
-// checks the shared runner secret itself and the answer is never cached.
-func (h *SharedPoolHandler) assignments(ctx *fasthttp.RequestCtx) {
+// poolCaller checks the shared runner secret and the pool service; false
+// when it already answered.
+func (h *SharedPoolHandler) poolCaller(ctx *fasthttp.RequestCtx) bool {
 	ctx.Response.Header.Set("Cache-Control", "no-store")
 	presented, _ := strings.CutPrefix(string(ctx.Request.Header.Peek("Authorization")), "Bearer ")
 	if err := sharedpool.CheckSecret(h.secret(), strings.TrimSpace(presented)); err != nil {
 		if errors.Is(err, sharedpool.ErrDisabled) {
 			lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable, err.Error())
-			return
+			return false
 		}
 		lib.SendError(ctx, h.mode, fasthttp.StatusUnauthorized, lib.ErrTypeUnauthorized, err.Error())
-		return
+		return false
 	}
 	if h.pool == nil {
 		lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable, sharedpool.ErrDisabled.Error())
-		return
+		return false
 	}
+	return true
+}
+
+// poolRuntime reads ?runtime= (runc, runsc or empty).
+func (h *SharedPoolHandler) poolRuntime(ctx *fasthttp.RequestCtx) (string, bool) {
 	runtime := string(ctx.QueryArgs().Peek("runtime"))
 	if runtime != "" && runtime != quota.RuntimeRunc && runtime != quota.RuntimeRunsc {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "runtime must be runc or runsc")
+		return "", false
+	}
+	return runtime, true
+}
+
+// assignments answers the shared runner. The policy is public: the handler
+// checks the shared runner secret itself and the answer is never cached.
+// It holds no runner token (claimToken hands those out one org at a time).
+func (h *SharedPoolHandler) assignments(ctx *fasthttp.RequestCtx) {
+	if !h.poolCaller(ctx) {
+		return
+	}
+	runtime, ok := h.poolRuntime(ctx)
+	if !ok {
 		return
 	}
 	work, cancel := workContext(ctx, readTimeout)
@@ -449,5 +470,34 @@ func (h *SharedPoolHandler) assignments(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable, "build assignments: "+err.Error())
 		return
 	}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+}
+
+// claimToken mints the one live shared pool runner token of an assigned
+// org, revoking its earlier one, and audits the claim in that org's log.
+func (h *SharedPoolHandler) claimToken(ctx *fasthttp.RequestCtx) {
+	if !h.poolCaller(ctx) {
+		return
+	}
+	runtime, ok := h.poolRuntime(ctx)
+	if !ok {
+		return
+	}
+	org, ok := idParam(ctx, h.mode, "org", "organization")
+	if !ok {
+		return
+	}
+	work, cancel := workContext(ctx, readTimeout)
+	defer cancel()
+	out, err := h.pool.ClaimToken(work, org, runtime)
+	switch {
+	case errors.Is(err, sharedpool.ErrNotAssigned):
+		lib.SendError(ctx, h.mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, err.Error())
+		return
+	case err != nil:
+		lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable, "claim runner token: "+err.Error())
+		return
+	}
+	h.record(ctx, org, "sharedpool.token.claim", "runner_token", out.TokenID, map[string]any{"pool": sharedpool.Pool, "runtime": runtime})
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
 }

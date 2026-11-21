@@ -340,13 +340,36 @@ server's checkout, so it runs only what the built-in templates reproduce.
 
 | Variable | Where | What |
 |---|---|---|
-| `HEIMDALL_SHARED_RUNNER_SECRET` | server and `shared-runner` | Secret the shared runner fetches its assignments with (`GET /api/bench/admin/pool/assignments`). Empty turns the shared pool off. Generate with `openssl rand -hex 32`. |
-| `HEIMDALL_MASTER_KEY` | server | Base64 32-byte key. The per-org shared pool runner tokens are kept in the keystore under it. |
+| `HEIMDALL_SHARED_RUNNER_SECRET` | server and `shared-runner` | Secret the shared runner fetches its assignments with (`GET /api/bench/admin/pool/assignments`, no tokens in the answer) and claims one runner token per org with (`POST /api/bench/admin/pool/assignments/{org}/token`; each claim revokes that org's earlier token and is audited in the org's log). Empty turns the shared pool off. Generate with `openssl rand -hex 32`. |
+| `HEIMDALL_MASTER_KEY` | server | Base64 32-byte key for the keystore (org provider keys). Shared pool runner tokens are no longer stored readable: the server keeps only their hashes. |
 | `HEIMDALL_SERVER_ADMINS` | server | Comma-separated emails of server admins: quotas, image approval, kill switch. |
-| `HEIMDALL_SHARED_RUNTIME` | `shared-runner` | `runc` (default) or `runsc`. One shared runner serves one runtime; a `runsc` runner needs a Docker daemon whose default runtime is gVisor (set `DOCKER_HOST`). |
+| `HEIMDALL_SHARED_RUNTIME` | `shared-runner` | `auto` (default): every container runs under gVisor (`--runtime runsc`) when the Docker host has a `runsc` runtime, serving every org; without it the runner logs a warning, uses runc and serves only orgs whose runtime is `runc`. `runsc` refuses to start without gVisor; `runc` forces runc. |
+| `HEIMDALL_SHARED_BUILDKIT` | `shared-runner` | Address of the isolated BuildKit (`tcp://buildkitd:1234`, the `buildkitd` service of the profile). Images from org-written Dockerfiles build only there, never on the host daemon, and load as `org-<org id>/<tag>`. Empty refuses them (built-in and approved images still run). |
+| `HEIMDALL_SHARED_PLATFORM_IMAGES` | `shared-runner` | Comma-separated images every org may pull (a trailing `/` or `:` is a prefix). Otherwise an org pulls only its approved, digest-pinned images. |
+| `HEIMDALL_SHARED_GATEWAY_CONTAINER` | `shared-runner` | The gateway container every org network joins. Empty finds the compose project's `bifrost` service. |
 | `HEIMDALL_SHARED_SLOTS` | `shared-runner` | Slots per organization, capped by its max concurrent runs. |
 
 Start it with `docker compose --profile shared-runner up -d`.
+
+Isolation between orgs on the shared host:
+
+- Each org's agents run on their own internal network,
+  `heimdall-evalnet-<org id>`, which only the gateway joins; one org's
+  containers cannot reach another's.
+- The shared runner mounts no server data. Each org's project (suites,
+  agents, experiments, policies; never `.git`, `.heimdall/` state or the
+  release log) is downloaded with that org's own runner token from
+  `GET /api/bench/workers/project` before every lease.
+- Org Dockerfiles build on the rootless `buildkitd` service (no Docker socket,
+  its own network). BuildKit there cannot see images on the host daemon, so an
+  org Dockerfile's `FROM` must name an image from a registry. Tags are
+  namespaced per org (`org-<org id>/...`); an org cannot use or overwrite
+  another org's images or a platform tag. After upgrading, remove images that
+  orgs built under global tags before this change (`docker image ls`).
+- Hosted CLI jobs (agent build and similar) do not run on the shared runner;
+  they run on an org's own workers.
+- Run one shared runner per runtime: a second one with the same secret claims
+  the same orgs' tokens and revokes the first one's.
 
 Guardrails (server admin, `/api/bench/admin/...`):
 

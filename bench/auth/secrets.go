@@ -23,8 +23,9 @@ const (
 	// against that org's stored hashes.
 	InboxTokenPrefix = "hmi_"
 
-	// SharedPoolAssignmentsPath is the one route the shared runner calls with
-	// the pool secret (handlers/sharedpool.go) instead of an account token.
+	// SharedPoolAssignmentsPath is the route the shared runner calls with
+	// the pool secret (handlers/sharedpool.go) instead of an account token;
+	// so is SharedPoolAssignmentsPath/{org}/token (IsSharedPoolPath).
 	SharedPoolAssignmentsPath = "/api/bench/admin/pool/assignments"
 
 	secretBytes     = 32
@@ -105,4 +106,19 @@ func ParseAPIToken(token string) (prefix string, ok bool) {
 		return "", false
 	}
 	return prefix, true
+}
+
+// IsSharedPoolPath reports whether path is one of the routes the shared
+// runner calls with the pool secret: the assignments list and
+// <assignments>/{org}/token. Both handlers check the secret themselves.
+func IsSharedPoolPath(path string) bool {
+	if path == SharedPoolAssignmentsPath {
+		return true
+	}
+	rest, ok := strings.CutPrefix(path, SharedPoolAssignmentsPath+"/")
+	if !ok {
+		return false
+	}
+	org, tail, ok := strings.Cut(rest, "/")
+	return ok && org != "" && tail == "token"
 }

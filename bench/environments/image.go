@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"sort"
 	"strings"
 
@@ -69,7 +68,7 @@ func BuildImage(ctx context.Context, d utils.Docker, b ImageBuild, out io.Writer
 	if err != nil {
 		return ImageInfo{}, err
 	}
-	cmd := exec.CommandContext(ctx, dockerBinary(d), args...)
+	cmd := d.Command(ctx, args...)
 	cmd.Env = buildEnv(os.Environ())
 	cmd.Stdout, cmd.Stderr = out, out
 	if err := cmd.Run(); err != nil {

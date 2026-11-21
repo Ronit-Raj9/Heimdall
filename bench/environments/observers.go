@@ -80,7 +80,7 @@ type observer struct {
 // ready line.
 func (e *dockerWorkspace) runObserver(ctx context.Context, name string, args []string, script string, removeOnFail bool) (*observer, error) {
 	o := &observer{d: e.cfg.Docker, logger: e.cfg.Logger, name: name, ready: make(chan struct{}), done: make(chan struct{}), keep: !removeOnFail}
-	o.cmd = exec.Command(dockerBinary(e.cfg.Docker), args...)
+	o.cmd = e.cfg.Docker.Command(context.Background(), args...)
 	o.cmd.Stdin = strings.NewReader(script)
 	o.cmd.Stderr = &o.stderr
 	stdout, err := o.cmd.StdoutPipe()
