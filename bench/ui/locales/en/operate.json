@@ -1,24 +1,24 @@
 {
 	"title": "Operations",
-	"subtitle": "Check this server, run GPU, voice and visual checks, and keep sealed evidence safe.",
+	"subtitle": "Server health, checks and evidence backups.",
 	"loading": "Loading what this server can run",
 	"loadError": "Could not load the operations status",
-	"hostedNote": "Hosted organizations run the doctor (suites, agents and runners) and the evidence jobs over their own runs. GPU, voice and visual checks and the simulator spread run on your runner (Settings > Runners), never on the server. Kubernetes operations stay with the server owner.",
+	"hostedNote": "GPU, voice and visual checks run on your runners, not on the server.",
 	"health": {
 		"title": "Health",
-		"description": "Preflight checks: docker, images, gateway, fault proxy, suites and agents.",
+		"description": "Docker, images, gateway, suites and agents.",
 		"doctor": "Run doctor",
 		"gpu": "GPU check",
 		"gpuSuite": "Suite to fit (optional)",
 		"k8s": "Kubernetes status",
 		"gpuMode": "GPU mode: {{mode}}",
 		"driver": "Driver: {{driver}}",
-		"hostedDescription": "Checks your suites and agents, which runners are online, their last heartbeat and the shared runner pool.",
+		"hostedDescription": "Your suites, agents and online runners.",
 		"runnersLink": "Open Workers"
 	},
 	"evidence": {
 		"title": "Evidence",
-		"description": "Copy sealed experiments to the mirror, verify them, archive idle ones, back up the database, restore.",
+		"description": "Mirror, verify, archive and restore sealed runs.",
 		"mirrorAt": "Mirror: {{location}}",
 		"noMirror": "No evidence mirror configured. Set storage.mirror_dir (a folder) or storage.s3 in the bench config, then restart the server.",
 		"exp": "Experiment id (empty = all)",
@@ -32,7 +32,7 @@
 		"restoreNeedsExp": "Restore needs an experiment id.",
 		"restoreConfirm": "Restore this experiment from the mirror into the runs folder?",
 		"backupConfirm": "Back up the database and sweep every experiment to the mirror?",
-		"hostedDescription": "Verify the seals of your experiments, download a zip backup of them, and archive or restore through the server's mirror.",
+		"hostedDescription": "Verify, back up and restore your sealed runs.",
 		"hostedNoMirror": "This server has no evidence mirror, so archive and restore are off. Verify and Back up still work: the backup is a zip you can download below.",
 		"hostedMirror": "The server mirror keeps a copy of your sealed experiments; archive and restore use it.",
 		"hostedBackupConfirm": "Write a zip of your sealed experiments (or the one named above) to your exports? You can download it below.",
@@ -71,7 +71,38 @@
 	},
 	"workers": {
 		"runnersTitle": "Add a runner",
-		"runnersBody": "Runners take experiment slots from this server. Create a runner token in Settings, then run the start command it shows once on the runner machine.",
-		"runnersLink": "Open runner tokens"
+		"runnersBody": "Create a runner token in Settings, then run its start command on the machine.",
+		"runnersLink": "Open runner tokens",
+		"cards": {
+			"label": "Runners",
+			"slots": "Slots",
+			"done": "Done",
+			"seen": "Last heartbeat",
+			"build": "Build {{version}}",
+			"running": "{{count}} running"
+		}
+	},
+	"tiles": {
+		"server": "Server",
+		"online": "Online",
+		"hosted": "Hosted, multi-organization",
+		"local": "Local bench on this machine",
+		"runners": "Runners",
+		"yourRunners": "Your runners",
+		"thisMachine": "This machine",
+		"runnersHosted": "Check heartbeats and slots in Workers",
+		"runnersLocal": "Runs execute in local containers",
+		"pool": "Shared pool",
+		"viaWorkers": "See Workers",
+		"gpuReady": "GPU ready",
+		"cpuOnly": "CPU only",
+		"poolLine": "Slots leased to runners",
+		"evidence": "Evidence",
+		"mirrored": "Mirrored",
+		"noMirror": "No mirror",
+		"backups_one": "{{count}} backup ready",
+		"backups_other": "{{count}} backups ready",
+		"mirrorKind": "Mirror: {{kind}}",
+		"noMirrorLine": "Set a mirror to archive and restore"
 	}
 }

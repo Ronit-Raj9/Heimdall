@@ -48,11 +48,11 @@ describe("JobView", () => {
 		expect(html).toContain('href="/verdict?exp=e_nightly"');
 	});
 
-	it("prints log sequence numbers in the opaque muted ink (6-B-08)", () => {
+	it("prints log sequence numbers in an opaque readable ink on the terminal (6-B-08)", () => {
 		const html = render(<JobView jobId="job_run" />, hostedSession("member"));
 		const seq = tagOf(html, "job-log-seq-2") ?? "";
-		expect(seq).toContain("text-muted-foreground");
-		expect(seq).not.toContain("text-muted-foreground/");
+		expect(seq).toContain("text-zinc-500");
+		expect(seq).not.toMatch(/text-zinc-500\//);
 	});
 	it("offers no cancel to viewers or demo visitors, and cancel in local mode", () => {
 		expect(render(<JobView jobId="job_run" />, hostedSession("viewer"))).not.toContain('data-testid="job-cancel"');

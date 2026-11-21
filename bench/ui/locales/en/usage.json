@@ -1,6 +1,6 @@
 {
 	"title": "Usage and spend",
-	"subtitle": "What your runs cost, from each sealed run's metrics, plus the month spend recorded on your provider keys.",
+	"subtitle": "Run cost, tokens and provider key spend.",
 	"from": "From",
 	"to": "To",
 	"groupBy": "Group by",
@@ -40,7 +40,8 @@
 		"add": "Add a key"
 	},
 	"chart": {
-		"summary": "Cost by {{group}}, {{count}} groups, total {{total}}"
+		"summary": "Cost by {{group}}, {{count}} groups, total {{total}}",
+		"title": "Cost"
 	},
 	"empty": "No sealed runs between {{from}} and {{to}}. Run an experiment, or widen the date range.",
 	"emptyAction": "Start a run",

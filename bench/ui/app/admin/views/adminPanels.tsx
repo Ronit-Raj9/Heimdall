@@ -37,7 +37,15 @@ function fmtBytes(n?: number): string {
 /** Loading, error (with retry) or nothing; panels render their data after it. */
 function useGate(state: { isLoading: boolean; error?: unknown; refetch: () => unknown }, testId: string, unavailable?: string) {
 	const { t } = useTranslation("admin");
-	if (state.isLoading) return <p className="text-muted-foreground text-sm">...</p>;
+	if (state.isLoading) {
+		return (
+			<div className="flex flex-col gap-2" data-testid={`${testId}-loading`}>
+				{[0, 1, 2, 3].map((i) => (
+					<div key={i} className="bg-muted h-10 animate-pulse rounded-lg" />
+				))}
+			</div>
+		);
+	}
 	if (state.error) {
 		const status = errorStatus(state.error);
 		if (unavailable && (status === 404 || status === 405 || status === 503)) {
@@ -74,14 +82,15 @@ export function AdminUsersPanel() {
 	};
 	return (
 		<div className="flex flex-col gap-3" data-testid="admin-users">
-			<Input placeholder={t("users.search")} value={filter} onChange={(e) => setFilter(e.target.value)} className="max-w-sm" />
+			<Input placeholder={t("users.search")} value={filter} onChange={(e) => setFilter(e.target.value)} className="w-full sm:max-w-sm" />
 			{state.error && <p className="text-destructive text-sm">{getBenchErrorMessage(state.error)}</p>}
+			<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
 			<Table>
 				<TableHeader>
 					<TableRow>
 						<TableHead>{t("users.email")}</TableHead>
 						<TableHead>{t("users.name")}</TableHead>
-						<TableHead>{t("users.orgs")}</TableHead>
+						<TableHead className="text-right">{t("users.orgs")}</TableHead>
 						<TableHead>{t("users.created")}</TableHead>
 						<TableHead>{t("users.status")}</TableHead>
 						<TableHead />
@@ -90,12 +99,17 @@ export function AdminUsersPanel() {
 				<TableBody>
 					{users.map((u) => (
 						<TableRow key={u.id} data-testid={`admin-user-${u.id}`}>
-							<TableCell>
-								{u.email} {u.server_admin && <Badge variant="secondary">{t("users.serverAdmin")}</Badge>}
+							<TableCell className="max-w-64">
+								<div className="flex min-w-0 items-center gap-2">
+									<span className="truncate font-medium" title={u.email}>
+										{u.email}
+									</span>
+									{u.server_admin && <Badge variant="secondary">{t("users.serverAdmin")}</Badge>}
+								</div>
 							</TableCell>
-							<TableCell>{u.name}</TableCell>
-							<TableCell className="tabular-nums">{u.orgs}</TableCell>
-							<TableCell>{fmtDate(u.created_at)}</TableCell>
+							<TableCell className="text-muted-foreground">{u.name}</TableCell>
+							<TableCell className="text-right tabular-nums">{u.orgs}</TableCell>
+							<TableCell className="text-muted-foreground text-xs whitespace-nowrap">{fmtDate(u.created_at)}</TableCell>
 							<TableCell>
 								<Badge variant={u.disabled ? "destructive" : "success"}>{u.disabled ? t("users.disabled") : t("users.active")}</Badge>
 							</TableCell>
@@ -108,6 +122,7 @@ export function AdminUsersPanel() {
 					))}
 				</TableBody>
 			</Table>
+			</div>
 		</div>
 	);
 }
@@ -124,12 +139,13 @@ export function AdminOrgsPanel() {
 	return (
 		<div className="flex flex-col gap-4" data-testid="admin-orgs">
 			{current && <QuotaEditor key={current.id} org={current} onClose={() => setEditing(null)} />}
+			<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
 			<Table>
 				<TableHeader>
 					<TableRow>
 						<TableHead>{t("orgs.slug")}</TableHead>
 						<TableHead>{t("orgs.name")}</TableHead>
-						<TableHead>{t("orgs.members")}</TableHead>
+						<TableHead className="text-right">{t("orgs.members")}</TableHead>
 						<TableHead>{t("orgs.quota")}</TableHead>
 						<TableHead />
 					</TableRow>
@@ -140,9 +156,9 @@ export function AdminOrgsPanel() {
 							<TableCell className="font-mono text-xs">
 								{o.slug} {o.public_read && <Badge variant="outline">{t("orgs.public")}</Badge>}
 							</TableCell>
-							<TableCell>{o.name}</TableCell>
-							<TableCell className="tabular-nums">{o.members}</TableCell>
-							<TableCell className="text-sm">
+							<TableCell className="font-medium">{o.name}</TableCell>
+							<TableCell className="text-right tabular-nums">{o.members}</TableCell>
+							<TableCell className="text-muted-foreground text-sm">
 								{o.quota &&
 									t("orgs.quotaSummary", {
 										concurrent: o.quota.max_concurrent_runs,
@@ -160,6 +176,7 @@ export function AdminOrgsPanel() {
 					))}
 				</TableBody>
 			</Table>
+			</div>
 		</div>
 	);
 }
@@ -274,6 +291,7 @@ export function AdminImagesPanel() {
 	return (
 		<div className="flex flex-col gap-3" data-testid="admin-images">
 			{state.error && <p className="text-destructive text-sm">{getBenchErrorMessage(state.error)}</p>}
+			<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
 			<Table>
 				<TableHeader>
 					<TableRow>
@@ -317,6 +335,7 @@ export function AdminImagesPanel() {
 					))}
 				</TableBody>
 			</Table>
+			</div>
 		</div>
 	);
 }
@@ -359,6 +378,7 @@ export function AdminUsagePanel() {
 					{rows.length === 0 ? (
 						<EmptyState compact message={t("usage.empty")} testId="admin-usage-empty" />
 					) : (
+						<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
 						<Table>
 							<TableHeader>
 								<TableRow>
@@ -377,6 +397,7 @@ export function AdminUsagePanel() {
 								))}
 							</TableBody>
 						</Table>
+						</div>
 					)}
 				</>
 			)}
@@ -398,6 +419,7 @@ export function AdminContainersPanel() {
 					{t("containers.refresh")}
 				</Button>
 			</div>
+			<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
 			<Table>
 				<TableHeader>
 					<TableRow>
@@ -428,6 +450,7 @@ export function AdminContainersPanel() {
 					))}
 				</TableBody>
 			</Table>
+			</div>
 		</div>
 	);
 }

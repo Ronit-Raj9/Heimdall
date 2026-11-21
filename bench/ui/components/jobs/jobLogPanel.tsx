@@ -49,11 +49,21 @@ export function JobLogPanel({ jobId, onClose, onFinished }: JobLogPanelProps) {
 	}, [data, onFinished]);
 
 	return (
-		<section className="border-border flex min-w-0 flex-col gap-3 rounded-lg border p-3" data-testid="job-log-panel" data-status={data?.status}>
-			<header className="flex flex-wrap items-center gap-2 text-sm">
-				<span className="text-foreground font-medium">{data ? kindName(data.kind) : t("panel.title")}</span>
-				{data && <JobStatusBadge status={data.status} />}
-				<span className="text-muted-foreground font-mono text-xs">{jobId}</span>
+		<section
+			className="bg-card flex min-w-0 flex-col gap-3 rounded-xl border p-4 shadow-sm"
+			data-testid="job-log-panel"
+			data-status={data?.status}
+		>
+			<header className="flex flex-wrap items-start gap-3">
+				<div className="flex min-w-0 flex-col gap-1">
+					<div className="flex flex-wrap items-center gap-2">
+						<span className="text-foreground text-base font-semibold tracking-tight">{data ? kindName(data.kind) : t("panel.title")}</span>
+						{data && <JobStatusBadge status={data.status} />}
+					</div>
+					<span className="text-muted-foreground/80 max-w-60 truncate font-mono text-[11px]" title={jobId}>
+						{jobId}
+					</span>
+				</div>
 				<div className="ml-auto flex items-center gap-1">
 					{data && active && !data.cancel_requested && (
 						<RoleGate min="member" fallback={null}>
@@ -91,9 +101,9 @@ export function JobLogPanel({ jobId, onClose, onFinished }: JobLogPanelProps) {
 			</header>
 			{data && <JobProgressBar job={data} />}
 			{data && <JobExperimentLink job={data} />}
-			{data?.status === "queued" && <p className="text-muted-foreground text-xs">{t("panel.queued")}</p>}
+			{data?.status === "queued" && <p className="text-muted-foreground text-sm">{t("panel.queued")}</p>}
 			{data?.status === "failed" && (
-				<p role="alert" className="text-chart-error-ink text-xs" data-testid="job-log-panel-error">
+				<p role="alert" className="border-chart-error/40 bg-chart-error/5 text-chart-error-ink rounded-lg border px-3 py-2 text-xs" data-testid="job-log-panel-error">
 					{t("panel.failed")} {data.error}
 				</p>
 			)}

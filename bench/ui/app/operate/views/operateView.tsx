@@ -1,7 +1,6 @@
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,9 +12,11 @@ import {
 } from "@/lib/store/apis/operateApi";
 import { useAppDispatch } from "@/lib/store/hooks";
 import type { OperateBackup, OperateStatus } from "@/lib/types/operate";
-import { Download, Info, Trash2 } from "lucide-react";
+import { Archive, Camera, Cpu, Download, HardDrive, Info, Server, ShieldCheck, Shuffle, Stethoscope, Trash2, Users } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { HealthTile, Panel } from "./uxBits";
 
 /** Drops empty strings so a job gets only the fields the user filled in. */
 function compact(o: Record<string, string | boolean | undefined>): Record<string, string | boolean> {
@@ -44,21 +45,77 @@ function Check({ label, checked, onChange, testId }: { label: string; checked: b
 	);
 }
 
-function Section({ title, description, children, testId }: { title: string; description: string; children: ReactNode; testId: string }) {
+function Section({
+	title,
+	description,
+	icon,
+	children,
+	testId,
+}: {
+	title: string;
+	description: string;
+	icon?: LucideIcon;
+	children: ReactNode;
+	testId: string;
+}) {
 	return (
-		<Card data-testid={testId}>
-			<CardHeader>
-				<CardTitle>{title}</CardTitle>
-				<CardDescription>{description}</CardDescription>
-			</CardHeader>
-			<CardContent className="flex flex-col gap-3">{children}</CardContent>
-		</Card>
+		<Panel title={title} description={description} icon={icon} testId={testId}>
+			<div className="flex flex-col gap-3">{children}</div>
+		</Panel>
+	);
+}
+
+/** Server, runners, evidence and backup status at a glance; exported for tests. */
+export function OperateTiles({ status, backupCount }: { status: OperateStatus; backupCount?: number }) {
+	const { t } = useTranslation("operate");
+	const hosted = status.hosted;
+	return (
+		<div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="operate-tiles">
+			<HealthTile
+				icon={Server}
+				title={t("tiles.server")}
+				tone="good"
+				status={t("tiles.online")}
+				line={hosted ? t("tiles.hosted") : t("tiles.local")}
+				testId="operate-tile-server"
+			/>
+			<HealthTile
+				icon={Users}
+				title={t("tiles.runners")}
+				tone={hosted ? "live" : "idle"}
+				status={hosted ? t("tiles.yourRunners") : t("tiles.thisMachine")}
+				line={hosted ? t("tiles.runnersHosted") : status.gpu_mode ? t("health.gpuMode", { mode: status.gpu_mode }) : t("tiles.runnersLocal")}
+				testId="operate-tile-runners"
+			/>
+			<HealthTile
+				icon={Cpu}
+				title={t("tiles.pool")}
+				tone={hosted ? "idle" : status.gpu_mode ? "good" : "idle"}
+				status={hosted ? t("tiles.viaWorkers") : status.gpu_mode ? t("tiles.gpuReady") : t("tiles.cpuOnly")}
+				line={status.driver ? t("health.driver", { driver: status.driver }) : t("tiles.poolLine")}
+				testId="operate-tile-pool"
+			/>
+			<HealthTile
+				icon={ShieldCheck}
+				title={t("tiles.evidence")}
+				tone={status.mirror ? "good" : "warn"}
+				status={status.mirror ? t("tiles.mirrored") : t("tiles.noMirror")}
+				line={
+					backupCount !== undefined
+						? t("tiles.backups", { count: backupCount })
+						: status.mirror
+							? t("tiles.mirrorKind", { kind: status.mirror })
+							: t("tiles.noMirrorLine")
+				}
+				testId="operate-tile-evidence"
+			/>
+		</div>
 	);
 }
 
 function Note({ children, testId }: { children: ReactNode; testId: string }) {
 	return (
-		<p role="note" className="bg-muted/50 text-muted-foreground flex items-start gap-2 rounded-sm border px-3 py-2 text-xs" data-testid={testId}>
+		<p role="note" className="bg-muted/50 text-muted-foreground flex items-start gap-2 rounded-lg border px-3 py-2 text-xs" data-testid={testId}>
 			<Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
 			<span>{children}</span>
 		</p>
@@ -77,22 +134,27 @@ export function BackupRows({ backups, onDelete }: { backups: OperateBackup[]; on
 	const { t } = useTranslation("operate");
 	if (backups.length === 0) {
 		return (
-			<p className="text-muted-foreground text-xs" data-testid="operate-backups-empty">
+			<p className="text-muted-foreground rounded-lg border border-dashed px-3 py-4 text-center text-sm" data-testid="operate-backups-empty">
 				{t("evidence.backupsEmpty")}
 			</p>
 		);
 	}
 	return (
-		<ul className="flex flex-col gap-1" data-testid="operate-backups">
+		<ul className="divide-border flex flex-col divide-y rounded-lg border" data-testid="operate-backups">
 			{backups.map((b) => (
-				<li key={b.name} className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-sm border px-2 py-1 text-xs">
-					<span className="min-w-0 truncate font-mono">{b.name}</span>
+				<li key={b.name} className="hover:bg-accent/40 flex min-w-0 flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm transition-colors">
+					<span className="flex min-w-0 items-center gap-2">
+						<Archive className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+						<span className="min-w-0 truncate font-mono text-xs" title={b.name}>
+							{b.name}
+						</span>
+					</span>
 					<span className="flex items-center gap-2">
-						<span className="text-muted-foreground">{formatBytes(b.size)}</span>
+						<span className="text-muted-foreground text-xs tabular-nums">{formatBytes(b.size)}</span>
 						<a
 							href={operateBackupUrl(b.name)}
 							download={b.name}
-							className="text-primary inline-flex items-center gap-1 underline-offset-4 hover:underline"
+							className="text-primary hover:bg-primary/10 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium"
 							data-testid={`operate-backup-download-${b.name}`}
 						>
 							<Download className="size-3.5" aria-hidden="true" />
@@ -116,7 +178,10 @@ function BackupsList() {
 	const [remove] = useDeleteOperateBackupMutation();
 	return (
 		<div className="flex flex-col gap-2" data-testid="operate-backups-section">
-			<p className="text-sm font-medium">{t("evidence.backupsTitle")}</p>
+			<p className="flex items-center gap-2 text-sm font-medium">
+				<HardDrive className="text-muted-foreground size-4" aria-hidden="true" />
+				{t("evidence.backupsTitle")}
+			</p>
 			{query.isError ? (
 				<p className="text-muted-foreground flex items-center gap-2 text-xs">
 					{t("evidence.backupsError")}
@@ -132,7 +197,17 @@ function BackupsList() {
 }
 
 /** The operate panels for a server status; exported for tests. */
-export function OperatePanels({ status, backups, onBackupDone }: { status: OperateStatus; backups?: ReactNode; onBackupDone?(): void }) {
+export function OperatePanels({
+	status,
+	backups,
+	backupCount,
+	onBackupDone,
+}: {
+	status: OperateStatus;
+	backups?: ReactNode;
+	backupCount?: number;
+	onBackupDone?(): void;
+}) {
 	const { t } = useTranslation("operate");
 	const hosted = status.hosted;
 	const [days, setDays] = useState("");
@@ -155,8 +230,10 @@ export function OperatePanels({ status, backups, onBackupDone }: { status: Opera
 	const showEvidence = evidenceKinds.some(has);
 
 	return (
-		<div className="grid min-w-0 gap-4 lg:grid-cols-2">
-			<Section title={t("health.title")} description={hosted ? t("health.hostedDescription") : t("health.description")} testId="operate-health">
+		<div className="flex min-w-0 flex-col gap-6">
+		<OperateTiles status={status} backupCount={backupCount} />
+		<div className="grid min-w-0 gap-6 lg:grid-cols-2">
+			<Section title={t("health.title")} description={hosted ? t("health.hostedDescription") : t("health.description")} icon={Stethoscope} testId="operate-health">
 				{(status.gpu_mode || status.driver) && (
 					<p className="text-muted-foreground text-xs">
 						{status.gpu_mode && t("health.gpuMode", { mode: status.gpu_mode })} {status.driver && t("health.driver", { driver: status.driver })}
@@ -166,7 +243,7 @@ export function OperatePanels({ status, backups, onBackupDone }: { status: Opera
 					{has("operate.doctor") && <JobRunButton kind="operate.doctor" label={t("health.doctor")} />}
 					{has("k8s.status") && <JobRunButton kind="k8s.status" label={t("health.k8s")} variant="outline" />}
 					{hosted && (
-						<a href="/workers" className="text-primary self-center text-sm font-medium underline-offset-4 hover:underline" data-testid="operate-workers-link">
+						<a href="/workers" className="text-primary hover:bg-primary/10 self-center rounded-md px-3 py-1.5 text-sm font-medium" data-testid="operate-workers-link">
 							{t("health.runnersLink")}
 						</a>
 					)}
@@ -183,6 +260,7 @@ export function OperatePanels({ status, backups, onBackupDone }: { status: Opera
 				<Section
 					title={t("evidence.title")}
 					description={hosted ? t("evidence.hostedDescription") : t("evidence.description")}
+					icon={ShieldCheck}
 					testId="operate-evidence"
 				>
 					{hosted ? (
@@ -257,7 +335,7 @@ export function OperatePanels({ status, backups, onBackupDone }: { status: Opera
 			)}
 
 			{(has("voice.check") || has("visual.compare")) && (
-				<Section title={t("suite.title")} description={t("suite.description")} testId="operate-suite">
+				<Section title={t("suite.title")} description={t("suite.description")} icon={ShieldCheck} testId="operate-suite">
 					<div className="grid gap-2 sm:grid-cols-2">
 						<Field label={t("suite.suite")} value={suite} onChange={setSuite} testId="operate-suite-id" />
 						<Field label={t("suite.task")} value={task} onChange={setTask} testId="operate-task-id" />
@@ -273,7 +351,7 @@ export function OperatePanels({ status, backups, onBackupDone }: { status: Opera
 			)}
 
 			{has("visual.capture") && (
-				<Section title={t("suite.captureTitle")} description={t("suite.captureDescription")} testId="operate-capture">
+				<Section title={t("suite.captureTitle")} description={t("suite.captureDescription")} icon={Camera} testId="operate-capture">
 					<div className="grid gap-2 sm:grid-cols-2">
 						<Field label={t("suite.browser")} value={browser} onChange={setBrowser} testId="operate-capture-browser" />
 						<Field label={t("suite.desktop")} value={desktop} onChange={setDesktop} testId="operate-capture-desktop" />
@@ -293,7 +371,7 @@ export function OperatePanels({ status, backups, onBackupDone }: { status: Opera
 			)}
 
 			{has("simulator.spread") && (
-				<Section title={t("simulator.title")} description={t("simulator.description")} testId="operate-simulator">
+				<Section title={t("simulator.title")} description={t("simulator.description")} icon={Shuffle} testId="operate-simulator">
 					<div className="grid gap-2 sm:grid-cols-2">
 						<Field label={t("simulator.a")} value={simA} onChange={setSimA} testId="operate-sim-a" />
 						<Field label={t("simulator.b")} value={simB} onChange={setSimB} testId="operate-sim-b" />
@@ -307,6 +385,7 @@ export function OperatePanels({ status, backups, onBackupDone }: { status: Opera
 				</Section>
 			)}
 		</div>
+		</div>
 	);
 }
 
@@ -316,8 +395,9 @@ export default function OperateView() {
 	const query = useGetOperateStatusQuery();
 	const dispatch = useAppDispatch();
 	const status = query.data;
+	const backupsQuery = useGetOperateBackupsQuery(undefined, { skip: !status?.hosted });
 	return (
-		<section className="flex min-w-0 flex-col gap-6 p-6" data-testid="operate-screen">
+		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6 p-4 sm:p-6" data-testid="operate-screen">
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 			{query.isLoading ? (
 				<BlockSkeleton rows={4} testId="operate-loading" />
@@ -329,6 +409,7 @@ export default function OperateView() {
 					<OperatePanels
 						status={status}
 						backups={status.hosted ? <BackupsList /> : undefined}
+						backupCount={status.hosted ? backupsQuery.data?.backups.length : undefined}
 						onBackupDone={() => dispatch(operateApi.util.invalidateTags(["OperateBackups"]))}
 					/>
 				</>

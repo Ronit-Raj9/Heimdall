@@ -8,6 +8,8 @@ import { useGetAdminUsageQuery, useGetUsageQuery } from "@/lib/store/apis/usageA
 import { useSession } from "@/lib/session/sessionContext";
 import type { AdminUsageReport, UsageBucket, UsageGroupBy, UsageReport } from "@/lib/types/usage";
 import { cn } from "@/lib/utils";
+import { Coins, Hash, KeyRound, PlayCircle } from "lucide-react";
+import { StatCard } from "@/app/operate/views/uxBits";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -46,7 +48,7 @@ export default function UsageView() {
 	const admin = useGetAdminUsageQuery(range, { skip: !platform });
 
 	return (
-		<div className="flex min-w-0 flex-col gap-5 p-4 sm:p-6" data-testid="usage-view">
+		<div className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6 p-4 sm:p-6" data-testid="usage-view">
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 			<div className="flex flex-wrap items-end gap-3" data-testid="usage-controls">
 				<label className="flex flex-col gap-1 text-xs">
@@ -116,7 +118,7 @@ function Segmented({
 	return (
 		<div className="flex flex-col gap-1 text-xs">
 			{label && <span className="text-muted-foreground">{label}</span>}
-			<div role="radiogroup" aria-label={label || undefined} className="border-border flex rounded-md border p-0.5" data-testid={testId}>
+			<div role="radiogroup" aria-label={label || undefined} className="border-border bg-muted/50 flex rounded-lg border p-0.5" data-testid={testId}>
 				{options.map((o) => (
 					<button
 						key={o.value}
@@ -125,8 +127,8 @@ function Segmented({
 						aria-checked={o.value === value}
 						onClick={() => onChange(o.value)}
 						className={cn(
-							"rounded px-2.5 py-1 text-xs transition-colors",
-							o.value === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+							"rounded-md px-3 py-1 text-xs font-medium transition-colors",
+							o.value === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
 						)}
 						data-testid={`${testId}-${o.value}`}
 					>
@@ -158,17 +160,26 @@ export function UsageBody({ data, loading, error, onRetry }: UsageBodyProps) {
 		);
 	}
 	if (loading || !data) {
-		return <div className="bg-muted h-48 animate-pulse rounded-lg" data-testid="usage-loading" />;
+		return (
+			<div className="flex flex-col gap-4" data-testid="usage-loading">
+				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+					{[0, 1, 2, 3].map((i) => (
+						<div key={i} className="bg-muted h-28 animate-pulse rounded-xl" />
+					))}
+				</div>
+				<div className="bg-muted h-60 animate-pulse rounded-xl" />
+			</div>
+		);
 	}
 	const group = t(`group.${data.group_by}`).toLowerCase();
 	const hasRuns = data.runs > 0;
 	return (
-		<div className="flex min-w-0 flex-col gap-5">
-			<div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="usage-totals">
-				<Stat label={t("totals.cost")} value={formatUSD(data.total_cost_usd)} testId="usage-total-cost" />
-				<Stat label={t("totals.tokens")} value={formatCount(data.total_tokens)} testId="usage-total-tokens" />
-				<Stat label={t("totals.runs")} value={formatCount(data.runs)} testId="usage-total-runs" />
-				<Stat label={t("totals.keys")} value={formatUSD(data.keys_month_spent_usd)} testId="usage-total-keys" />
+		<div className="flex min-w-0 flex-col gap-6">
+			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="usage-totals">
+				<StatCard label={t("totals.cost")} icon={Coins} value={formatUSD(data.total_cost_usd)} valueTestId="usage-total-cost" />
+				<StatCard label={t("totals.tokens")} icon={Hash} value={formatCount(data.total_tokens)} valueTestId="usage-total-tokens" />
+				<StatCard label={t("totals.runs")} icon={PlayCircle} value={formatCount(data.runs)} valueTestId="usage-total-runs" />
+				<StatCard label={t("totals.keys")} icon={KeyRound} value={formatUSD(data.keys_month_spent_usd)} valueTestId="usage-total-keys" />
 			</div>
 			{data.unknown_cost_runs > 0 && (
 				<p className="text-muted-foreground text-xs" data-testid="usage-unknown-note">
@@ -197,79 +208,95 @@ export function UsageBody({ data, loading, error, onRetry }: UsageBodyProps) {
 	);
 }
 
-function Stat({ label, value, testId }: { label: string; value: string; testId: string }) {
-	return (
-		<Card className="gap-1 py-3">
-			<CardContent className="px-4">
-				<div className="text-muted-foreground text-xs">{label}</div>
-				<div className="text-lg font-semibold tabular-nums" data-testid={testId}>
-					{value}
-				</div>
-			</CardContent>
-		</Card>
-	);
-}
-
-/** Bars of cost per bucket, hand-drawn in SVG like the trends chart (recharts renders nothing without a DOM). */
+/** Bars of cost per bucket in hand-drawn SVG, so it also renders server side (recharts needs a DOM to measure). */
 export function UsageChart({ buckets, group, total }: { buckets: UsageBucket[]; group: string; total: number }) {
 	const { t } = useTranslation("usage");
 	const titleId = useId();
+	const gradId = useId().replace(/:/g, "");
 	const shown = buckets.slice(0, CHART_MAX_BARS);
 	const max = Math.max(...shown.map((b) => b.cost_usd), 0);
 	const width = 720;
-	const height = 200;
-	const pad = { left: 56, right: 8, top: 8, bottom: 28 };
+	const height = 220;
+	const pad = { left: 60, right: 12, top: 12, bottom: 30 };
 	const plotW = width - pad.left - pad.right;
 	const plotH = height - pad.top - pad.bottom;
 	const slot = shown.length > 0 ? plotW / shown.length : plotW;
-	const barW = Math.max(2, Math.min(40, slot * 0.7));
+	const barW = Math.max(3, Math.min(36, slot * 0.64));
 	const labelEvery = Math.max(1, Math.ceil(shown.length / 8));
+	const ticks = [0, 0.25, 0.5, 0.75, 1];
 	return (
-		<figure className="min-w-0 overflow-x-auto" data-testid="usage-chart">
-			<svg role="img" aria-labelledby={titleId} viewBox={`0 0 ${width} ${height}`} className="h-auto w-full max-w-4xl min-w-[480px]">
-				<title id={titleId}>{t("chart.summary", { group, count: buckets.length, total: formatUSD(total) })}</title>
-				<g aria-hidden="true" className="text-muted-foreground" fontSize={11}>
-					<line x1={pad.left} x2={width - pad.right} y1={pad.top + plotH} y2={pad.top + plotH} stroke="currentColor" strokeOpacity={0.4} />
-					<text x={pad.left - 6} y={pad.top + 10} textAnchor="end" fill="currentColor">
-						{formatUSD(max)}
-					</text>
-					<text x={pad.left - 6} y={pad.top + plotH} textAnchor="end" fill="currentColor">
-						$0
-					</text>
-				</g>
-				{shown.map((b, i) => {
-					const h = max > 0 ? (b.cost_usd / max) * plotH : 0;
-					const x = pad.left + i * slot + (slot - barW) / 2;
-					return (
-						<g key={b.key}>
-							<rect
-								x={x}
-								y={pad.top + plotH - h}
-								width={barW}
-								height={Math.max(h, 0)}
-								rx={2}
-								fill="var(--color-chart-cat-1)"
-								data-testid={`usage-bar-${b.key}`}
-							>
-								<title>{`${b.label || b.key}: ${formatUSD(b.cost_usd)}`}</title>
-							</rect>
-							{i % labelEvery === 0 && (
-								<text
-									x={x + barW / 2}
-									y={height - 10}
-									textAnchor="middle"
-									fontSize={10}
-									className="text-muted-foreground"
-									fill="currentColor"
-									aria-hidden="true"
+		<figure className="bg-card min-w-0 rounded-xl border p-5" data-testid="usage-chart">
+			<figcaption className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+				<span className="text-foreground text-base font-semibold">{t("chart.title")}</span>
+				<span className="text-muted-foreground text-sm tabular-nums">{formatUSD(total)}</span>
+			</figcaption>
+			<div className="overflow-x-auto">
+				<svg role="img" aria-labelledby={titleId} viewBox={`0 0 ${width} ${height}`} className="h-auto w-full min-w-[480px]">
+					<title id={titleId}>{t("chart.summary", { group, count: buckets.length, total: formatUSD(total) })}</title>
+					<defs>
+						<linearGradient id={gradId} x1="0" x2="0" y1="0" y2="1">
+							<stop offset="0%" stopColor="var(--color-chart-cat-1)" stopOpacity={1} />
+							<stop offset="100%" stopColor="var(--color-chart-cat-1)" stopOpacity={0.55} />
+						</linearGradient>
+					</defs>
+					<g aria-hidden="true" className="text-muted-foreground" fontSize={11}>
+						{ticks.map((f) => {
+							const y = pad.top + plotH - f * plotH;
+							return (
+								<g key={f}>
+									<line
+										x1={pad.left}
+										x2={width - pad.right}
+										y1={y}
+										y2={y}
+										stroke="currentColor"
+										strokeOpacity={f === 0 ? 0.35 : 0.12}
+										strokeDasharray={f === 0 ? undefined : "3 4"}
+									/>
+									{(f === 0 || f === 0.5 || f === 1) && (
+										<text x={pad.left - 8} y={y + 4} textAnchor="end" fill="currentColor">
+											{f === 0 ? "$0" : formatUSD(max * f)}
+										</text>
+									)}
+								</g>
+							);
+						})}
+					</g>
+					{shown.map((b, i) => {
+						const h = max > 0 ? (b.cost_usd / max) * plotH : 0;
+						const x = pad.left + i * slot + (slot - barW) / 2;
+						return (
+							<g key={b.key} className="group">
+								<rect x={pad.left + i * slot} y={pad.top} width={slot} height={plotH} fill="currentColor" className="text-accent opacity-0 group-hover:opacity-60" />
+								<rect
+									x={x}
+									y={pad.top + plotH - h}
+									width={barW}
+									height={Math.max(h, 0)}
+									rx={Math.min(4, barW / 3)}
+									fill={`url(#${gradId})`}
+									data-testid={`usage-bar-${b.key}`}
 								>
-									{shortLabel(b.key)}
-								</text>
-							)}
-						</g>
-					);
-				})}
-			</svg>
+									<title>{`${b.label || b.key}: ${formatUSD(b.cost_usd)}`}</title>
+								</rect>
+								{i % labelEvery === 0 && (
+									<text
+										x={x + barW / 2}
+										y={height - 10}
+										textAnchor="middle"
+										fontSize={10}
+										className="text-muted-foreground"
+										fill="currentColor"
+										aria-hidden="true"
+									>
+										{shortLabel(b.key)}
+									</text>
+								)}
+							</g>
+						);
+					})}
+				</svg>
+			</div>
 		</figure>
 	);
 }
@@ -283,6 +310,7 @@ function UsageTable({ buckets, group, groupBy }: { buckets: UsageBucket[]; group
 	const { t } = useTranslation("usage");
 	const rows = groupBy === "day" ? [...buckets].reverse() : buckets;
 	return (
+		<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
 		<Table aria-label={t("table.label", { group })} data-testid="usage-table">
 			<TableHeader>
 				<TableRow>
@@ -316,15 +344,19 @@ function UsageTable({ buckets, group, groupBy }: { buckets: UsageBucket[]; group
 				))}
 			</TableBody>
 		</Table>
+		</div>
 	);
 }
 
 function KeysCard({ data }: { data: UsageReport }) {
 	const { t } = useTranslation("usage");
 	return (
-		<Card data-testid="usage-keys">
+		<Card className="rounded-xl" data-testid="usage-keys">
 			<CardHeader>
-				<CardTitle className="text-sm">{t("keys.title")}</CardTitle>
+				<CardTitle className="flex items-center gap-2 text-base">
+					<KeyRound className="text-muted-foreground size-4" aria-hidden="true" />
+					{t("keys.title")}
+				</CardTitle>
 			</CardHeader>
 			<CardContent>
 				{data.keys.length === 0 ? (
@@ -391,15 +423,16 @@ export function AdminUsageBody({ data, loading, error, onRetry }: AdminUsageBody
 	}
 	return (
 		<div className="flex min-w-0 flex-col gap-5" data-testid="admin-usage">
-			<div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-				<Stat label={t("totals.cost")} value={formatUSD(data.total_cost_usd)} testId="admin-usage-total-cost" />
-				<Stat label={t("totals.tokens")} value={formatCount(data.total_tokens)} testId="admin-usage-total-tokens" />
-				<Stat label={t("totals.runs")} value={formatCount(data.runs)} testId="admin-usage-total-runs" />
+			<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+				<StatCard label={t("totals.cost")} icon={Coins} value={formatUSD(data.total_cost_usd)} valueTestId="admin-usage-total-cost" />
+				<StatCard label={t("totals.tokens")} icon={Hash} value={formatCount(data.total_tokens)} valueTestId="admin-usage-total-tokens" />
+				<StatCard label={t("totals.runs")} icon={PlayCircle} value={formatCount(data.runs)} valueTestId="admin-usage-total-runs" />
 			</div>
-			<h2 className="text-sm font-semibold">{t("admin.title")}</h2>
+			<h2 className="text-base font-semibold">{t("admin.title")}</h2>
 			{data.orgs.length === 0 ? (
 				<EmptyState message={t("admin.empty")} testId="admin-usage-empty" />
 			) : (
+				<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
 				<Table data-testid="admin-usage-table">
 					<TableHeader>
 						<TableRow>
@@ -426,6 +459,7 @@ export function AdminUsageBody({ data, loading, error, onRetry }: AdminUsageBody
 						))}
 					</TableBody>
 				</Table>
+				</div>
 			)}
 		</div>
 	);

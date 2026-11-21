@@ -220,10 +220,10 @@ function JsonBlock({ title, value, testId }: { title: string; value: unknown; te
 }
 
 const LEVEL_CLASS: Record<string, string> = {
-	error: "text-chart-error-ink",
-	warn: "text-chart-warning-ink",
-	warning: "text-chart-warning-ink",
-	debug: "text-muted-foreground",
+	error: "text-red-400",
+	warn: "text-amber-300",
+	warning: "text-amber-300",
+	debug: "text-zinc-500",
 };
 
 /** A log line's time of day in the reader's locale, 24-hour, to the second. */
@@ -246,24 +246,34 @@ export function JobLogPanel({ log, active }: { log: JobLogState; active: boolean
 	}, [log.lines.length, follow]);
 
 	return (
-		<section className="flex min-w-0 flex-col gap-2" data-testid="job-log" data-transport={log.transport}>
-			<div className="flex items-center gap-3">
-				<h2 className="text-foreground text-[15px] font-semibold">{t("jobs.page.log")}</h2>
+		<section
+			className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-100 shadow-sm"
+			data-testid="job-log"
+			data-transport={log.transport}
+		>
+			<div className="flex items-center gap-3 border-b border-zinc-800 bg-zinc-900/80 px-3 py-2">
+				<span className="flex items-center gap-1.5" aria-hidden="true">
+					<span className="size-2.5 rounded-full bg-zinc-700" />
+					<span className="size-2.5 rounded-full bg-zinc-700" />
+					<span className="size-2.5 rounded-full bg-zinc-700" />
+				</span>
+				<h2 className="text-xs font-medium text-zinc-300">{t("jobs.page.log")}</h2>
 				<span
-					className={cn("flex items-center gap-1.5 text-xs font-medium", live ? "text-chart-success-ink" : "text-muted-foreground")}
+					className={cn("flex items-center gap-1.5 text-xs font-medium", live ? "text-emerald-400" : "text-zinc-500")}
 					data-testid={live ? "job-log-live" : "job-log-done"}
 				>
-					<span
-						className={cn("size-1.5 rounded-full", live ? "bg-chart-success animate-pulse" : "bg-muted-foreground/50")}
-						aria-hidden="true"
-					/>
+					<span className="relative inline-flex size-1.5" aria-hidden="true">
+						{live && <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-70" />}
+						<span className={cn("relative inline-flex size-1.5 rounded-full", live ? "bg-emerald-400" : "bg-zinc-600")} />
+					</span>
 					{live ? t("jobs.page.logLive") : t("jobs.page.logDone")}
 				</span>
+				<span className="ml-auto text-[11px] text-zinc-500 tabular-nums">{log.lines.length}</span>
 				{!follow && (
 					<Button
 						variant="ghost"
 						size="sm"
-						className="ml-auto h-7 gap-1 text-xs"
+						className="h-6 gap-1 px-2 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
 						onClick={() => setFollow(true)}
 						dataTestId="job-log-follow"
 					>
@@ -273,7 +283,7 @@ export function JobLogPanel({ log, active }: { log: JobLogState; active: boolean
 				)}
 			</div>
 			{log.dropped > 0 && (
-				<p className="text-muted-foreground text-xs" data-testid="job-log-dropped">
+				<p className="border-b border-zinc-800 px-3 py-1 text-xs text-zinc-500" data-testid="job-log-dropped">
 					{t("jobs.page.logDropped", { count: log.dropped })}
 				</p>
 			)}
@@ -283,13 +293,13 @@ export function JobLogPanel({ log, active }: { log: JobLogState; active: boolean
 					const el = event.currentTarget;
 					setFollow(el.scrollHeight - el.scrollTop - el.clientHeight < 24);
 				}}
-				className="bench-mono-block max-h-[min(60vh,32rem)] min-h-40 overflow-auto py-2"
+				className="max-h-[min(60vh,32rem)] min-h-40 overflow-auto py-2 font-mono text-xs leading-5"
 				role="log"
 				aria-live={live ? "polite" : "off"}
 				aria-label={t("jobs.page.log")}
 			>
 				{log.lines.length === 0 ? (
-					<p className="text-muted-foreground px-3 py-1" data-testid="job-log-empty">
+					<p className="px-3 py-1 text-zinc-500" data-testid="job-log-empty">
 						{t("jobs.page.logEmpty")}
 					</p>
 				) : (
@@ -297,21 +307,26 @@ export function JobLogPanel({ log, active }: { log: JobLogState; active: boolean
 						{log.lines.map((line) => (
 							<li
 								key={line.seq}
-								className="hover:bg-accent/50 grid grid-cols-[3.5rem_4.5rem_minmax(0,1fr)] gap-3 px-3"
+								className="grid grid-cols-[2.5rem_4.5rem_minmax(0,1fr)] gap-3 px-3 hover:bg-zinc-900"
 								data-testid={`job-log-line-${line.seq}`}
 							>
-								<span className="text-muted-foreground text-right tabular-nums select-none" data-testid={`job-log-seq-${line.seq}`}>
+								<span className="text-right text-zinc-500 tabular-nums select-none" data-testid={`job-log-seq-${line.seq}`}>
 									{line.seq}
 								</span>
-								<span className="text-muted-foreground tabular-nums select-none">{timeOf(line.at)}</span>
+								<span className="text-zinc-500 tabular-nums select-none">{timeOf(line.at)}</span>
 								<span className={cn("break-words whitespace-pre-wrap", LEVEL_CLASS[line.level])}>{line.line}</span>
 							</li>
 						))}
+						{live && (
+							<li className="px-3 pl-[8.5rem]" aria-hidden="true">
+								<span className="inline-block h-3.5 w-1.5 animate-pulse bg-zinc-400 align-middle" />
+							</li>
+						)}
 					</ol>
 				)}
 			</div>
 			{log.error !== undefined && log.lines.length === 0 && (
-				<p className="text-chart-error-ink text-xs" role="alert">
+				<p className="border-t border-zinc-800 px-3 py-2 text-xs text-red-400" role="alert">
 					{getBenchErrorMessage(log.error)}
 				</p>
 			)}

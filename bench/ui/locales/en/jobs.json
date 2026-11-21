@@ -1,6 +1,6 @@
 {
 	"title": "Jobs",
-	"subtitle": "Every long action runs here as a background job: imports, mining, calibration, exports, scans and runs. Open one to follow its live log.",
+	"subtitle": "Background work with live logs. Cancel or retry any job.",
 	"filters": {
 		"kind": "Kind",
 		"status": "Status",
@@ -49,5 +49,9 @@
 		"cancelled": "Cancelled.",
 		"startError": "Could not start the job",
 		"experiment": "Open experiment {{expId}}"
+	},
+	"drawer": {
+		"title": "Job log",
+		"open": "Log"
 	}
 }
