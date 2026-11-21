@@ -4,7 +4,8 @@ import type { ExperimentStatus } from "@/lib/types/bench";
 import { LOCAL_SESSION, REGRADE_JOB, demoSession, hostedSession } from "@/lib/testing/platformFixtures";
 import { mutation, render } from "@/lib/testing/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ExperimentRunActions, RegradeAction } from "./experimentActions";
+import { ExperimentRunActions, RegradeAction, regradeIdOf } from "./experimentActions";
+import { EMPTY_REGRADE_FORM, regradeFormProblem, regradeRequest } from "./regradeDialog";
 
 const api = vi.hoisted(() => ({
 	regrade: {} as Record<string, unknown>,
@@ -13,6 +14,7 @@ const api = vi.hoisted(() => ({
 	start: {} as Record<string, unknown>,
 	health: undefined as unknown,
 }));
+vi.mock("@/components/jobs/jobLogPanel", () => ({ JobLogPanel: ({ jobId }: { jobId: string }) => <div data-testid="job-log-panel">{jobId}</div> }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/platformApi")>()),
@@ -82,5 +84,41 @@ describe("RegradeAction", () => {
 		expect(render(<RegradeAction expId="e_nightly" />, hostedSession("viewer"))).toBe("");
 		api.regrade = { error: { status: 503, data: { error: { message: "regrade (job runner) is not available" } } } };
 		expect(render(<RegradeAction expId="e_nightly" />)).toContain("regrade (job runner) is not available");
+	});
+	it("opens the regate options dialog", () => {
+		const html = render(<RegradeAction expId="e_nightly" defaultOpen />, hostedSession("member"));
+		expect(html).toContain('data-testid="regrade-dialog"');
+		expect(html).toContain('data-testid="regrade-lock-current"');
+		expect(html).toContain('data-testid="regrade-note"');
+		expect(html).toContain('data-testid="regrade-id"');
+		expect(html).toContain("Regrade e_nightly");
+	});
+	it("shows the queued job's log and the verdict at the new grade source", () => {
+		api.regrade = { data: { ...REGRADE_JOB, mode: "live" }, originalArgs: { exp_id: "e_nightly" } };
+		const html = render(<RegradeAction expId="e_nightly" />, hostedSession("member"));
+		expect(html).toContain('data-testid="job-log-panel"');
+		expect(html).toContain('data-testid="regrade-open-verdict"');
+		expect(html).toContain("rg_42");
+		expect(regradeIdOf({ ...REGRADE_JOB, params: { exp_id: "e" } })).toBe("rg_42");
+	});
+});
+
+describe("regrade form", () => {
+	it("sends only the options set", () => {
+		expect(regradeRequest(EMPTY_REGRADE_FORM)).toEqual({});
+		expect(regradeRequest({ lockChoice: "frozen", suiteLock: " experiments/x/suite.lock ", note: " gates v2 ", id: "rg_v2" })).toEqual({
+			id: "rg_v2",
+			note: "gates v2",
+			suite_lock: "experiments/x/suite.lock",
+		});
+		expect(regradeRequest({ ...EMPTY_REGRADE_FORM, lockChoice: "current", suiteLock: "ignored" })).toEqual({});
+	});
+	it("names the first problem", () => {
+		expect(regradeFormProblem(EMPTY_REGRADE_FORM)).toBeNull();
+		expect(regradeFormProblem({ ...EMPTY_REGRADE_FORM, id: "original" })).toBe("reservedId");
+		expect(regradeFormProblem({ ...EMPTY_REGRADE_FORM, id: "-bad" })).toBe("badId");
+		expect(regradeFormProblem({ ...EMPTY_REGRADE_FORM, lockChoice: "frozen" })).toBe("needLock");
+		expect(regradeFormProblem({ ...EMPTY_REGRADE_FORM, lockChoice: "frozen", suiteLock: "../x.lock" })).toBe("badLock");
+		expect(regradeFormProblem({ ...EMPTY_REGRADE_FORM, note: "x".repeat(2001) })).toBe("longNote");
 	});
 });

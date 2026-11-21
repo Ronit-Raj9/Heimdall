@@ -1,13 +1,16 @@
+import { JobLogPanel } from "@/components/jobs/jobLogPanel";
 import { RoleGate } from "@/components/platform/accessNotes";
 import { ConfirmButton } from "@/components/platform/badges";
 import { ForbiddenNote, isRoleRefusal } from "@/components/platform/forbiddenNote";
+import { RegradeDialog } from "@/components/platform/regradeDialog";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage, useGetHealthQuery, useRegradeMutation, useStartExperimentMutation } from "@/lib/store/apis/benchApi";
 import { useCancelExperimentMutation, useResumeExperimentMutation } from "@/lib/store/apis/platformApi";
-import { launchAvailable, type ExperimentStatus, type Role } from "@/lib/types/bench";
+import { launchAvailable, type ExperimentStatus, type Job, type Role } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Play, RotateCcw } from "lucide-react";
+import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** A failed experiment action: the role refusal in hosted mode, the server's reason otherwise. */
@@ -87,45 +90,88 @@ export function ExperimentRunActions({ status }: { status: ExperimentStatus }) {
 }
 
 /**
- * Regrade an experiment's sealed runs as a job (POST /experiments/{id}/regrade). Shows the job it
- * started with a link to follow it; the original grades stay.
+ * Regrade an experiment's sealed runs as a job (POST /experiments/{id}/regrade). The button opens a
+ * dialog with the regate options (suite lock, note, regrade id); once queued, the job's live log
+ * shows here with a link to read the verdict at the new grade source. The original grades stay.
  */
-export function RegradeAction({ expId }: { expId: string }) {
+export function RegradeAction({ expId, defaultOpen = false }: { expId: string; defaultOpen?: boolean }) {
 	const { t } = useTranslation("platform");
 	const [regrade, state] = useRegradeMutation();
+	const [open, setOpen] = useState(defaultOpen);
+	const [showLog, setShowLog] = useState(true);
+	const close = useCallback(() => setOpen(false), []);
 	const job = state.data && state.originalArgs?.exp_id === expId ? state.data : null;
+	const regradeId = job ? regradeIdOf(job) : null;
 	return (
 		<RoleGate min="member" fallback={null}>
-			<div className="flex flex-wrap items-center justify-end gap-2" data-testid="regrade-action">
-				{job ? (
-					<span className="flex items-center gap-2 text-xs" role="status" data-testid="regrade-started">
-						<span className="text-muted-foreground">{t("experimentActions.started", { id: job.id })}</span>
-						<Link
-							to="/jobs/$jobId"
-							params={{ jobId: job.id }}
-							className="text-primary inline-flex items-center gap-1 font-medium underline-offset-4 hover:underline"
-							data-testid="regrade-open-job"
-						>
-							{t("experimentActions.openJob")}
-							<ArrowRight className="size-3" aria-hidden="true" />
-						</Link>
-					</span>
-				) : (
+			<div className="flex min-w-0 flex-col items-end gap-2" data-testid="regrade-action">
+				<div className="flex flex-wrap items-center justify-end gap-2">
+					{job && (
+						<span className="flex items-center gap-2 text-xs" role="status" data-testid="regrade-started">
+							<span className="text-muted-foreground">{t("experimentActions.started", { id: job.id })}</span>
+							<Link
+								to="/jobs/$jobId"
+								params={{ jobId: job.id }}
+								className="text-primary inline-flex items-center gap-1 font-medium underline-offset-4 hover:underline"
+								data-testid="regrade-open-job"
+							>
+								{t("experimentActions.openJob")}
+								<ArrowRight className="size-3" aria-hidden="true" />
+							</Link>
+						</span>
+					)}
 					<Button
 						variant="outline"
 						size="sm"
 						className="gap-1.5"
 						title={t("experimentActions.regradeHint")}
 						isLoading={state.isLoading}
-						onClick={() => void regrade({ exp_id: expId })}
+						onClick={() => setOpen(true)}
 						dataTestId="regrade-button"
 					>
 						<RotateCcw className="size-3.5" aria-hidden="true" />
-						{t("experimentActions.regrade")}
+						{job ? t("experimentActions.regradeDialog.again") : t("experimentActions.regrade")}
 					</Button>
-				)}
+				</div>
 				{state.error && <ActionError error={state.error} title={t("experimentActions.regradeError")} testId="regrade-error" />}
+				{job && showLog && (
+					<div className="w-full max-w-xl text-left" data-testid="regrade-log">
+						<JobLogPanel jobId={job.id} onClose={() => setShowLog(false)} />
+						{regradeId && job.status === "succeeded" && (
+							<Link
+								to="/experiments/$expId"
+								params={{ expId }}
+								search={{ tab: "verdict", grade: regradeId }}
+								className="text-primary mt-2 inline-flex items-center gap-1 text-xs font-medium underline-offset-4 hover:underline"
+								data-testid="regrade-open-verdict"
+							>
+								{t("experimentActions.regradeDialog.openVerdict", { id: regradeId })}
+								<ArrowRight className="size-3" aria-hidden="true" />
+							</Link>
+						)}
+					</div>
+				)}
+				{open && (
+					<RegradeDialog
+						expId={expId}
+						isLoading={state.isLoading}
+						onClose={close}
+						onSubmit={(body) => {
+							setShowLog(true);
+							void regrade({ exp_id: expId, ...body });
+							setOpen(false);
+						}}
+					/>
+				)}
 			</div>
 		</RoleGate>
 	);
+}
+
+/** The regrade id an experiment.regate job writes: its params' id (the server fills it in when queued), else its result's. */
+export function regradeIdOf(job: Job): string | null {
+	const fromParams = job.params?.id;
+	if (typeof fromParams === "string" && fromParams) return fromParams;
+	const result = job.result as { regrade_id?: unknown } | null | undefined;
+	return typeof result?.regrade_id === "string" && result.regrade_id ? result.regrade_id : null;
 }

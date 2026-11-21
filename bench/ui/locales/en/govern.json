@@ -58,7 +58,16 @@
 		"compliance": "Write compliance pack",
 		"complianceHint": "Writes compliance-<release>.md and .json into exports/compliance in the project folder.",
 		"pickRelease": "Release",
-		"noReleases": "Record a release first; then its compliance pack can be written here."
+		"noReleases": "Record a release first; then its compliance pack can be written here.",
+		"packs": {
+			"title": "Compliance packs",
+			"loading": "Loading compliance packs...",
+			"loadError": "Could not list compliance packs",
+			"retry": "Retry",
+			"empty": "No compliance pack yet. Pick a release above and press Write compliance pack.",
+			"markdown": "Download .md",
+			"json": "Download .json"
+		}
 	},
 	"monitors": {
 		"certifyTitle": "Certify a monitor",

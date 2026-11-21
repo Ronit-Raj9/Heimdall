@@ -57,3 +57,9 @@ export const MCP_FORMATS = ["", "codex_toml", "claude_json", "opencode_json", "g
  */
 export const scanSkillJob = (dir: string) => ({ kind: "scan.skill", params: { path: dir } });
 export const scanMCPJob = (config: string) => ({ kind: "scan.mcp", params: { path: config } });
+
+declare module "@/lib/i18n/resources" {
+	interface LaneResources {
+		agentops: typeof import("@/locales/en/agentops.json");
+	}
+}

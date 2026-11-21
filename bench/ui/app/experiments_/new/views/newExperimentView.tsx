@@ -1,3 +1,4 @@
+import { CatalogEmptyLinks } from "@/components/experiments/catalogEmptyLinks";
 import { ExperimentProgressCard } from "@/components/experiments/experimentProgress";
 import { RoleGate } from "@/components/platform/accessNotes";
 import { TERMINAL_STATES } from "@/components/experiments/experiments.utils";
@@ -58,7 +59,11 @@ export default function NewExperimentView() {
 					testId="new-experiment-catalog-error"
 				/>
 			) : catalog.data.suites.length === 0 || catalog.data.agents.length === 0 || !defaults ? (
-				<EmptyNote testId="new-experiment-catalog-empty">{t("experiments.new.catalogEmpty")}</EmptyNote>
+				<CatalogEmptyLinks
+					message={t("experiments.new.catalogEmpty")}
+					noSuites={catalog.data.suites.length === 0}
+					noAgents={catalog.data.agents.length === 0}
+				/>
 			) : (
 				// Hosted: starting experiments needs the member role; demo visitors see no form.
 				<RoleGate min="member">

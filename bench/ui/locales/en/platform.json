@@ -421,7 +421,30 @@
 		"openJob": "Open job",
 		"confirmCancel": "Cancel {{id}}? Runs in flight are sealed as cancelled; finished runs stay.",
 		"confirm": "Cancel run",
-		"keep": "Keep running"
+		"keep": "Keep running",
+		"regradeDialog": {
+			"title": "Regrade {{id}}",
+			"intro": "Recomputes the gates of every sealed run at the current gate versions, as a new regrade. Nothing runs again and the original grades stay.",
+			"lock": "Suite lock to check against",
+			"lockCurrent": "The suite's lock as it is now (default; refused if the tasks changed since the experiment was frozen)",
+			"lockFrozen": "The suite.lock file the experiment was frozen with (use when the suite's lock changed since)",
+			"lockPath": "Frozen suite.lock path in the project folder",
+			"note": "Note (optional)",
+			"notePlaceholder": "Why the gates are recomputed; every report that uses this regrade shows it",
+			"id": "Regrade id (optional)",
+			"idHint": "Default: a new rg_ id. Once the job succeeds, the verdict can read this id as its grade source.",
+			"cancel": "Cancel",
+			"submit": "Queue regrade",
+			"problems": {
+				"badId": "Use letters, digits, '.', '_' or '-' for the regrade id, starting with a letter or digit.",
+				"reservedId": "original and reviewed are reserved grade sources; pick another id.",
+				"needLock": "Give the path of the frozen suite.lock, relative to the project folder.",
+				"badLock": "The suite.lock path must be relative to the project folder.",
+				"longNote": "The note is longer than 2000 characters."
+			},
+			"openVerdict": "Read the verdict with regrade {{id}}",
+			"again": "Regrade again"
+		}
 	},
 	"errors": {
 		"unexpected": "Unexpected error."

@@ -51,7 +51,7 @@ func TestProject(t *testing.T) {
 	if !strings.Contains(string(byPath["README.md"].Data), "# acme-bench: Heimdall benchmark project") {
 		t.Error("README does not carry the project name")
 	}
-	for _, want := range []string{"/runs/", "/deploy/.env", "/deploy/bifrost-bench"} {
+	for _, want := range []string{"/runs/", "/deploy/.env", "/deploy/bifrost-bench", "/.heimdall-jobs/", "/.heimdall/"} {
 		if !strings.Contains(string(byPath[".gitignore"].Data), want+"\n") {
 			t.Errorf(".gitignore lacks %s", want)
 		}

@@ -24,7 +24,12 @@ export default function SuitesView() {
 				title={t("suites.title")}
 				subtitle={t("suites.subtitle")}
 				meta={<ModeBadge mode={data?.mode} isLoading={query.isLoading} isError={query.isError && !data} />}
-				actions={<AddSuiteButton />}
+				actions={
+					<div className="flex flex-wrap items-center gap-2">
+						<NewSuiteButton />
+						<AddSuiteButton />
+					</div>
+				}
 			/>
 			{data?.mode === "synthetic" && (
 				<p
@@ -53,6 +58,19 @@ export default function SuitesView() {
 				</div>
 			)}
 		</section>
+	);
+}
+
+/** The header's "New suite": write a suite from a template (/suites/new). */
+export function NewSuiteButton() {
+	const { t } = useTranslation("suiteAuthoring");
+	return (
+		<Button size="sm" variant="outline" asChild>
+			<Link to="/suites/new" data-testid="suites-new-link">
+				<Plus className="size-4" aria-hidden="true" />
+				{t("new.title")}
+			</Link>
+		</Button>
 	);
 }
 

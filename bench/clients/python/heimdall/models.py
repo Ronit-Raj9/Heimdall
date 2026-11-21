@@ -1721,6 +1721,18 @@ class CompliancePack(_CompliancePackRequired, total=False):
     warnings: List[str]
 
 
+class CompliancePackFile(TypedDict):
+    created_at: str
+    format: str
+    name: str
+    release_id: str
+    size: int
+
+
+class CompliancePackFiles(TypedDict):
+    packs: List[CompliancePackFile]
+
+
 class ComplianceRecordKeeping(TypedDict):
     articles: List[ComplianceMapping]
     external_anchor: bool
@@ -6748,6 +6760,10 @@ class CompliancePackResponse(CompliancePack):
     mode: Mode
 
 
+class CompliancePackFilesResponse(CompliancePackFiles):
+    mode: Mode
+
+
 class CreateSuiteResponseResponse(CreateSuiteResponse):
     mode: Mode
 
@@ -7391,6 +7407,8 @@ __all__ = [
     'ComplianceFunction',
     'ComplianceMapping',
     'CompliancePack',
+    'CompliancePackFile',
+    'CompliancePackFiles',
     'ComplianceRecordKeeping',
     'ComplianceRelease',
     'ComplianceTest',
@@ -7849,6 +7867,7 @@ __all__ = [
     'CodeScanReportResponse',
     'Comparison_livescoreResponse',
     'CompliancePackResponse',
+    'CompliancePackFilesResponse',
     'CreateSuiteResponseResponse',
     'CreateTaskResponseResponse',
     'DeliveryResponse',
