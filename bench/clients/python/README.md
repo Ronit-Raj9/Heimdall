@@ -18,6 +18,33 @@ decision, action, policy = c.check(started["exp_id"])
 print(status["mode"], decision, action, policy and policy["decision"])
 ```
 
+## Public API v1 (0.2.0)
+
+`heimdall.V1Client` speaks the versioned public API (`/api/v1`, `docs/api-v1.md`): agents and versions, compatibility, benchmarks, evaluations, estimates, report cards, the agent leaderboard, runs and trace export. On a hosted server pass an organization API token; its scope (`read`, `evaluate`, `admin`) must cover the calls (`evaluate` for `evaluate_and_wait`).
+
+```python
+import os
+from heimdall import V1Client
+
+hd = V1Client("https://heimdall.example.com", token=os.environ["HEIMDALL_TOKEN"], require_live=True)
+print(hd.compatibility("support-bot")["benchmarks"])
+est = hd.estimate_evaluation({"name": "nightly", "mode": "score", "pack": "support",
+                              "arms": [{"label": "A", "agent": "support-bot", "model": "gpt-5.1"}]})
+print(est["runs"], est["est_cost_usd"])
+
+result = hd.evaluate_and_wait({"name": "nightly", "mode": "score", "pack": "support",
+                               "arms": [{"label": "A", "agent": "support-bot", "model": "gpt-5.1"}]},
+                              timeout=4 * 3600, on_status=lambda ev: print(ev["status"]))
+card = result.report                        # heimdall.ReportCard (dataclasses)
+print(result.succeeded, card.score("A"))
+for b in card.benchmarks:
+    print(b.benchmark, b.arms["A"].score, b.arms["A"].ci_low, b.arms["A"].ci_high)
+
+open("trace.jsonl", "wb").write(hd.trace(hd.runs(limit=1)["runs"][0]["run_id"], format="jsonl").data)
+```
+
+`evaluate_and_wait` cancels the evaluation when it times out (`cancel_on_timeout=True`) and raises `HeimdallTimeout`; a failed or cancelled evaluation still returns, so check `result.succeeded`. `ReportCard` carries `arms`, `capabilities`, `benchmarks` (with the A/B `verdict` on two-arm evaluations), `reliability` per fault, `safety`, `overall` and `server_mode`.
+
 ## Mode on every response
 
 Every JSON method returns the server's object as a dict with a top-level `mode`: `live`, `recorded` or `synthetic`. Only `live` is a real measurement. Raw downloads (`run_patch`, `run_file`, `release_evidence`) return a `RawResponse` whose `mode` comes from the `X-Bench-Mode` header. `mode_of(response)` reads either. `Client(..., require_live=True)` raises `ModeError` on any answer that is not live, so a CI job cannot pass on a recorded demo.

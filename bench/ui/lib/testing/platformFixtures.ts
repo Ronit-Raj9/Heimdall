@@ -102,6 +102,7 @@ export const API_TOKENS: ApiTokenListResponse = {
 			name: "ci-release-gate",
 			prefix: "a1b2c3d4",
 			role: "member",
+			scopes: ["read", "evaluate"],
 			created_at: "2026-11-05T09:00:00Z",
 			last_used_at: "2026-11-18T05:00:00Z",
 			expires_at: "2027-02-03T09:00:00Z",

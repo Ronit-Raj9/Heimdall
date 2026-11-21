@@ -13,6 +13,28 @@ const [decision, action, policy] = result;
 if (result.blocked) process.exit(1);
 ```
 
+## Public API v1 (0.2.0)
+
+`V1Client` speaks the versioned public API (`/api/v1`, `docs/api-v1.md`): agents and versions, compatibility, benchmarks, evaluations, estimates, report cards, the agent leaderboard, runs and trace export. On a hosted server pass an organization API token whose scope (`read`, `evaluate`, `admin`) covers the calls; `evaluateAndWait` needs `evaluate`.
+
+```ts
+import { V1Client, armScore } from "@heimdall/bench-client";
+
+const hd = new V1Client("https://heimdall.example.com", { token: process.env.HEIMDALL_TOKEN, requireLive: true });
+const spec = { name: "nightly", mode: "score" as const, pack: "support", arms: [{ label: "A", agent: "support-bot", model: "gpt-5.1" }] };
+const estimate = await hd.estimateEvaluation(spec);
+console.log(estimate.runs, estimate.est_cost_usd);
+
+const { succeeded, report } = await hd.evaluateAndWait(spec, { timeoutMs: 4 * 3_600_000, onStatus: (ev) => console.log(ev.status) });
+console.log(succeeded, armScore(report, "A"));
+for (const b of report.benchmarks) console.log(b.benchmark, b.arms.A?.score, b.arms.A?.ci_low, b.arms.A?.ci_high);
+
+const { runs } = await hd.runs({ limit: 1 });
+if (runs[0]) console.log((await hd.trace(runs[0].run_id, "jsonl")).text());
+```
+
+`evaluateAndWait` cancels the evaluation when it times out (`cancelOnTimeout: false` keeps it) and rejects with `HeimdallTimeout`; a failed or cancelled evaluation still resolves, so check `succeeded`. Report cards come back normalized (`normalizeReportCard`): every list and per-arm metric is present.
+
 Every JSON response carries the server `mode` (`live`, `recorded` or `synthetic`); raw downloads (`runPatch`, `runFile`, `releaseEvidence`) resolve to a `RawResponse` whose `mode` comes from `X-Bench-Mode`. `{ requireLive: true }` rejects every answer that is not live with `ModeError`.
 
 Agent images can import `FaultSession` and wrap tool, memory, browser or retry

@@ -181,7 +181,7 @@
 		},
 		"tokens": {
 			"title": "Access tokens",
-			"description": "Access keys for scripts and CI pipelines. A token can do only what its role allows. Send it in the Authorization: Bearer header.",
+			"description": "Access keys for scripts, CI pipelines and the SDKs. A token can do only what its role and scope allow. Send it in the Authorization: Bearer header to the API at /api/v1.",
 			"name": "Name",
 			"namePlaceholder": "ci-release-gate",
 			"role": "Role",
@@ -214,7 +214,13 @@
 			"nameRequired": "Give the token a name.",
 			"usage": "Use it as a bearer token:",
 			"createTitle": "Create an access token",
-			"createDescription": "The token acts in {{org}} with the role you pick, never more than your own."
+			"createDescription": "The token acts in {{org}} with the role you pick, never more than your own. The scope narrows it further.",
+			"scope": "Scope",
+			"scopeOptions": {
+				"read": "Read only",
+				"evaluate": "Run evaluations",
+				"admin": "Full (role)"
+			}
 		},
 		"runners": {
 			"title": "Workers",

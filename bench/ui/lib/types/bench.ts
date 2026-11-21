@@ -3852,11 +3852,16 @@ export interface ApiToken {
 	/** hm_<prefix>: enough to recognise the token, not to use it. */
 	prefix: string;
 	role: Role;
+	/** What the token may do below its role (auth.Scopes); absent on tokens made before scopes, which the role alone limits. */
+	scopes?: ApiTokenScope[];
 	created_at: PlatformTime;
 	last_used_at?: PlatformTime;
 	expires_at?: PlatformTime;
 	revoked_at?: PlatformTime;
 }
+
+/** API token scopes, narrowest first: read, evaluate (read plus running evaluations), admin (everything the role allows). */
+export type ApiTokenScope = "read" | "evaluate" | "admin";
 
 /** GET /auth/tokens. */
 export interface ApiTokenList {
@@ -3868,6 +3873,7 @@ export interface ApiTokenRequest {
 	name: string;
 	role?: Role;
 	expires_in_days?: number;
+	scopes?: ApiTokenScope[];
 }
 
 /** POST /auth/tokens (auth.TokenCreated): the secret, shown once, and the token row. */

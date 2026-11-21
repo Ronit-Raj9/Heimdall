@@ -9,10 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { canUse, useSession } from "@/lib/session/sessionContext";
-import { BENCH_API_BASE } from "@/lib/store/apis/fixtures";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useCreateApiTokenMutation, useListApiTokensQuery, useRevokeApiTokenMutation } from "@/lib/store/apis/platformApi";
-import type { ApiToken, Role } from "@/lib/types/bench";
+import type { ApiToken, ApiTokenScope, Role } from "@/lib/types/bench";
 import { KeyRound } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
@@ -22,10 +21,24 @@ import { RoleSelect, SettingsSection, TableFrame, When, grantableRoles } from ".
 export const TOKEN_EXPIRY_DAYS = ["7", "30", "90", "365", "0"] as const;
 type ExpiryChoice = (typeof TOKEN_EXPIRY_DAYS)[number];
 
-/** The example request shown under a new token. */
-export function tokenUsage(origin: string, secret: string): string {
-	return `curl -H "Authorization: Bearer ${secret}" ${origin}${BENCH_API_BASE}/experiments`;
+/** Scope choices, narrowest first (auth.Scopes). */
+export const TOKEN_SCOPES: readonly ApiTokenScope[] = ["read", "evaluate", "admin"];
+
+/** The widest scope a token holds; tokens made before scopes act as admin, limited by role alone. */
+export function tokenScope(token: Pick<ApiToken, "scopes">): ApiTokenScope {
+	const held = token.scopes ?? [];
+	if (held.length === 0) return "admin";
+	for (const scope of [...TOKEN_SCOPES].reverse()) if (held.includes(scope)) return scope;
+	return "read";
 }
+
+/** The example request shown under a new token: the public API v1 (docs/api-v1.md). */
+export function tokenUsage(origin: string, secret: string): string {
+	return `curl -H "Authorization: Bearer ${secret}" ${origin}${PUBLIC_API_BASE}/evaluations`;
+}
+
+/** The public, versioned API every token works with (handlers/apiv1.go). */
+export const PUBLIC_API_BASE = "/api/v1";
 
 const STATE_VARIANT = { active: "success", revoked: "outline", expired: "warning" } as const;
 
@@ -63,6 +76,7 @@ export function ApiTokensTab() {
 									<TableHead>{t("settings.tokens.name")}</TableHead>
 									<TableHead>{t("settings.tokens.prefix")}</TableHead>
 									<TableHead>{t("settings.tokens.role")}</TableHead>
+									<TableHead>{t("settings.tokens.scope")}</TableHead>
 									<TableHead>{t("settings.tokens.createdAt")}</TableHead>
 									<TableHead>{t("settings.tokens.lastUsed")}</TableHead>
 									<TableHead>{t("settings.tokens.expires")}</TableHead>
@@ -79,6 +93,11 @@ export function ApiTokensTab() {
 											<TableCell className="text-muted-foreground font-mono text-xs">hm_{token.prefix}…</TableCell>
 											<TableCell>
 												<RoleBadge role={token.role} />
+											</TableCell>
+											<TableCell>
+												<Badge variant="outline" data-testid={`token-scope-${token.id}`}>
+													{t(`settings.tokens.scopeOptions.${tokenScope(token)}`)}
+												</Badge>
 											</TableCell>
 											<TableCell className="text-muted-foreground">
 												<When value={token.created_at} />
@@ -137,6 +156,7 @@ function CreateTokenSection() {
 	const [name, setName] = useState("");
 	const [role, setRole] = useState<Role>(roles.includes("member") ? "member" : (roles[0] ?? "viewer"));
 	const [expiry, setExpiry] = useState<ExpiryChoice>("90");
+	const [scope, setScope] = useState<ApiTokenScope>("evaluate");
 	const [touched, setTouched] = useState(false);
 	const [created, setCreated] = useState<{ name: string; secret: string } | null>(null);
 	const [create, createState] = useCreateApiTokenMutation();
@@ -148,7 +168,7 @@ function CreateTokenSection() {
 		if (!name.trim()) return;
 		const days = Number(expiry);
 		try {
-			const result = await create({ name: name.trim(), role, ...(days > 0 ? { expires_in_days: days } : {}) }).unwrap();
+			const result = await create({ name: name.trim(), role, scopes: [scope], ...(days > 0 ? { expires_in_days: days } : {}) }).unwrap();
 			setCreated({ name: result.api_token?.name ?? name.trim(), secret: result.token });
 			setName("");
 			setTouched(false);
@@ -180,7 +200,7 @@ function CreateTokenSection() {
 			testId="settings-tokens-create"
 		>
 			<form
-				className="bg-muted/30 grid gap-3 rounded-lg border p-4 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-end"
+				className="bg-muted/30 grid gap-3 rounded-lg border p-4 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] sm:items-end"
 				onSubmit={(event) => void onSubmit(event)}
 				noValidate
 				data-testid="token-form"
@@ -203,6 +223,21 @@ function CreateTokenSection() {
 				<div className="flex flex-col gap-1.5">
 					<span className="text-[13px] font-medium">{t("settings.tokens.role")}</span>
 					<RoleSelect value={role} onChange={setRole} roles={roles} label={t("settings.tokens.role")} testId="token-role" size="default" />
+				</div>
+				<div className="flex flex-col gap-1.5">
+					<span className="text-[13px] font-medium">{t("settings.tokens.scope")}</span>
+					<Select value={scope} onValueChange={(value) => setScope(value as ApiTokenScope)}>
+						<SelectTrigger className="min-w-32" aria-label={t("settings.tokens.scope")} data-testid="token-scope">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent position="popper">
+							{TOKEN_SCOPES.map((value) => (
+								<SelectItem key={value} value={value}>
+									{t(`settings.tokens.scopeOptions.${value}`)}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
 				</div>
 				<div className="flex flex-col gap-1.5">
 					<span className="text-[13px] font-medium">{t("settings.tokens.expiry")}</span>

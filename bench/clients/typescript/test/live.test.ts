@@ -6,7 +6,7 @@
 // recorded server refuses (no launcher), so nothing changes.
 import assert from "node:assert/strict";
 import { before, describe, it } from "node:test";
-import { Client, HeimdallError, ROUTES, modeOf } from "../src/index.ts";
+import { Client, HeimdallError, ROUTES, V1Client, V1_ROUTES, modeOf } from "../src/index.ts";
 
 const url = process.env.HEIMDALL_URL ?? "";
 const token = process.env.HEIMDALL_TOKEN || undefined;
@@ -28,6 +28,17 @@ describe("live server", { skip: url ? false : "HEIMDALL_URL not set" }, () => {
 		for (const [method, path] of ROUTES) {
 			assert.ok(doc.paths[path]?.[method.toLowerCase()], `client calls ${method} ${path}, which the server does not describe`);
 		}
+	});
+
+	it("describes every v1 client route in /api/v1/openapi.json", async () => {
+		const hd = new V1Client(url || "http://127.0.0.1:9", { token, timeoutMs: 60_000 });
+		const doc = await hd.openapi();
+		assert.match(doc.openapi, /^3\./);
+		for (const [method, path] of V1_ROUTES) {
+			assert.ok(doc.paths[path]?.[method.toLowerCase()], `v1 client calls ${method} ${path}, which the server does not describe`);
+		}
+		assert.equal((await hd.agents()).mode, mode);
+		assert.equal((await hd.evaluations()).mode, mode);
 	});
 
 	it("reads health, catalog, suites, agents, imports, workers", async () => {

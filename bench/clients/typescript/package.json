@@ -1,6 +1,6 @@
 {
 	"name": "@heimdall/bench-client",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Thin client for the Heimdall bench API: plan, run, wait and gate releases from code and CI",
 	"license": "Apache-2.0",
 	"type": "module",
@@ -21,7 +21,7 @@
 		"build": "tsc -p tsconfig.json --outDir dist --declaration --noEmit false",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"typecheck:test": "tsc -p tsconfig.test.json --noEmit",
-		"test": "node --experimental-strip-types --test test/client.test.ts test/live.test.ts test/events.test.ts",
+		"test": "node --experimental-strip-types --test test/client.test.ts test/v1.test.ts test/live.test.ts test/events.test.ts",
 		"sync-types": "node scripts/sync-types.mjs",
 		"check-types": "node scripts/sync-types.mjs --check"
 	}

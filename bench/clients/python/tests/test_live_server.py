@@ -14,7 +14,8 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from heimdall import ROUTES, Client, HeimdallError, mode_of  # noqa: E402
+from heimdall import ROUTES, Client, HeimdallError, V1Client, mode_of  # noqa: E402
+from heimdall.v1 import V1_ROUTES  # noqa: E402
 
 URL = os.environ.get("HEIMDALL_URL", "")
 TOKEN = os.environ.get("HEIMDALL_TOKEN") or None
@@ -40,6 +41,16 @@ class LiveServerTest(unittest.TestCase):
         for method, path in ROUTES:
             with self.subTest(route="%s %s" % (method, path)):
                 self.assertIn(method.lower(), doc["paths"].get(path, {}), "client calls a route the server does not describe")
+
+    def test_v1_openapi_lists_every_v1_client_route(self) -> None:
+        hd = V1Client(URL, token=TOKEN, timeout=60)
+        doc = hd.openapi()
+        self.assertTrue(doc["openapi"].startswith("3."))
+        for method, path in V1_ROUTES:
+            with self.subTest(route="%s %s" % (method, path)):
+                self.assertIn(method.lower(), doc["paths"].get(path, {}), "v1 client calls a route the server does not describe")
+        self.assertMode(hd.agents())
+        self.assertMode(hd.evaluations())
 
     def test_health_catalog_suites_agents(self) -> None:
         self.assertEqual(self.client.health()["status"], "ok")

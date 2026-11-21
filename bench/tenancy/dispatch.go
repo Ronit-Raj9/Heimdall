@@ -137,7 +137,7 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 
 	if pat, ok := d.platform.match(ctx, method, path); ok {
 		rule, _ := d.c.Policy.PlatformRule(method, pat)
-		o, eff, ok := d.authorize(ctx, rule, method, p, userString(ctx, OrgPathParam))
+		o, eff, ok := d.authorize(ctx, rule, method, pat, p, userString(ctx, OrgPathParam))
 		if !ok {
 			return
 		}
@@ -176,7 +176,7 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 	if rule.Access == AccessShare {
 		shareRef = userString(ctx, SharePathParam)
 	}
-	o, eff, ok := d.authorize(ctx, rule, method, p, shareRef)
+	o, eff, ok := d.authorize(ctx, rule, method, pat, p, shareRef)
 	if !ok {
 		return
 	}
@@ -230,12 +230,15 @@ func workContext() (context.Context, context.CancelFunc) {
 
 // authorize resolves the org and checks the rule, answering the request
 // itself when it is refused.
-func (d *Dispatcher) authorize(ctx *fasthttp.RequestCtx, rule Rule, method string, p *auth.Principal, pathRef string) (*Org, *auth.Principal, bool) {
+func (d *Dispatcher) authorize(ctx *fasthttp.RequestCtx, rule Rule, method, pattern string, p *auth.Principal, pathRef string) (*Org, *auth.Principal, bool) {
 	rctx, cancel := workContext()
 	defer cancel()
 	o, eff, err := Resolve(rctx, d.c.Dir, rule, p, pathRef, string(ctx.Request.Header.Peek(OrgHeader)), d.c.DemoSlug)
 	if err == nil {
 		err = Authorize(rule, method, eff, o)
+	}
+	if err == nil {
+		err = CheckScope(eff, method, pattern, rule) // API token scopes (scopes.go)
 	}
 	if err == nil {
 		return o, eff, true

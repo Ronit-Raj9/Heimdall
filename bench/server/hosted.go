@@ -107,6 +107,7 @@ func NewHosted(cfg *lib.Config, h Hosted) (*Server, error) {
 		lib.HostGuard(mode, hostedAllowedHosts(cfg)),
 		lib.CORS(cfg.Server.CORSOrigins),
 		h.Auth,
+		handlers.V1Alias(mode, h.Version, true), // Public API v1: rewritten before the dispatcher, so policy and token scopes apply (handlers/apiv1.go)
 	)
 	s.server = &fasthttp.Server{
 		Handler:               selfmetrics.Default.Middleware(s.handler), // N9: API latency for /metrics
