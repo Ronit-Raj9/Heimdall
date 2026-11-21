@@ -320,8 +320,17 @@ func mirrorTree(src, dst string) error {
 		if err != nil {
 			return err
 		}
-		if rel != "." && d.IsDir() && (d.Name() == ".git" || d.Name() == ".heimdall") {
-			return filepath.SkipDir
+		skip, dir := mirrorSkip(rel, d.IsDir())
+		if !skip && rel == ".heimdall" { // only enter it for agent version snapshots
+			if fi, err := os.Stat(filepath.Join(path, "agent-versions")); err != nil || !fi.IsDir() {
+				skip, dir = true, true
+			}
+		}
+		if skip {
+			if dir {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		seen[rel] = true
 		out := filepath.Join(dst, rel)
@@ -391,6 +400,31 @@ func mirrorTree(src, dst string) error {
 		_ = os.RemoveAll(p)
 	}
 	return nil
+}
+
+// mirrorSkip reports whether mirrorTree leaves rel out (dir: skip the whole
+// folder). .git and .heimdall are left out, except the frozen agent version
+// snapshots under .heimdall/agent-versions, which a pinned arm
+// (agents/<id>.yaml@v<N>) reads when the runner re-plans (A06).
+func mirrorSkip(rel string, isDir bool) (skip, dir bool) {
+	r := filepath.ToSlash(rel)
+	if r == "." {
+		return false, false
+	}
+	keep := filepath.ToSlash(schemas.AgentVersionsDir)
+	switch {
+	case r == ".heimdall" && isDir:
+		return false, false
+	case r == keep || strings.HasPrefix(r, keep+"/"):
+		return false, false
+	case strings.HasPrefix(r, ".heimdall/"):
+		return true, isDir
+	}
+	base := filepath.Base(rel)
+	if isDir && (base == ".git" || base == ".heimdall") {
+		return true, true
+	}
+	return false, false
 }
 
 // sharedEnsureImages builds the suite's missing images (base, services)

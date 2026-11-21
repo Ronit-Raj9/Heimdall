@@ -804,6 +804,7 @@ func (h *agentBuilder) fromTemplate(ctx *fasthttp.RequestCtx) {
 			return
 		}
 	}
+	snapshotAgentSave(work, h.projects, files[0].Rel, req.ID, files[0].Data, opts.Actor, "created from template "+t.ID) // A06: agent versions
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, out)
 }
 
@@ -894,6 +895,7 @@ func (h *agentBuilder) putConfig(ctx *fasthttp.RequestCtx) {
 		h.storeError(ctx, "write "+rel, err)
 		return
 	}
+	snapshotAgentSave(work, h.projects, id+".yaml", id, doc, abActor(ctx), "") // A06: agent versions
 	h.sendDoc(ctx, fasthttp.StatusOK, id, doc, e.SHA256)
 }
 

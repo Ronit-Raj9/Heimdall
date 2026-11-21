@@ -50,6 +50,15 @@ func CheckExperimentPathsWithLibrary(projectRoot, libraryRoot string, exp *schem
 		if filepath.IsAbs(p) || strings.HasPrefix(p, "/") || strings.Contains(p, `\`) {
 			return fmt.Errorf("%s %q: want a path relative to the organization's project", field, p)
 		}
+		if base, id, n, ok := schemas.ParseAgentVersionRef(p); ok && field != "policy" { // A06: a pinned agent version reads its frozen snapshot
+			if _, err := utils.ResolveInside(projectRoot, schemas.AgentVersionSnapshotPath(id, n)); err == nil {
+				return nil
+			}
+			p = base // a built-in library agent's only version, v1, is its library file
+			if n != 1 || libraryRoot == "" || !absentIn(projectRoot, p) {
+				return fmt.Errorf("%s: agent %s has no version %d in this project", field, id, n)
+			}
+		}
 		_, err := utils.ResolveInside(projectRoot, p)
 		if err != nil && libraryRoot != "" && field != "policy" && strings.HasPrefix(filepath.ToSlash(filepath.Clean(p)), "agents/") && absentIn(projectRoot, p) {
 			if _, lerr := utils.ResolveInside(libraryRoot, p); lerr == nil {
