@@ -158,6 +158,19 @@ export interface ReportMetrics {
 	steps?: number;
 	tool_calls?: number;
 	wall_s?: number;
+	/** Process scores against the task's reference tool path. Report only: never part of the score. */
+	process?: ReportProcess;
+}
+
+/** How the agent's tool calls compare with the task's reference path (reportcard.Metrics.process). */
+export interface ReportProcess {
+	runs: number;
+	/** Share 0..1 of runs whose tool path matched the reference. */
+	tool_match: number | null;
+	/** Median agent tool calls divided by reference tool calls; 1.0 is the same as the reference. */
+	step_ratio: number | null;
+	/** Median repeated identical calls per run. */
+	redundant_calls: number | null;
 }
 
 export interface ReportArm {

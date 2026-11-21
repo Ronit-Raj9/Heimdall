@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight, ListX } from "lucide-react";
 import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
-import { useMemo, type KeyboardEvent } from "react";
+import { useCallback, useMemo, type KeyboardEvent } from "react";
+import { TraceMatches, TraceSearchInput } from "./traceMatches";
 import { useTranslation } from "react-i18next";
 
 export const RUNS_PAGE = 50;
@@ -22,6 +23,7 @@ const parsers = {
 	arm: parseAsString,
 	agent: parseAsString,
 	q: parseAsString,
+	tq: parseAsString,
 	page: parseAsInteger,
 };
 
@@ -141,7 +143,9 @@ export function RunsTable() {
 	const active = Boolean(search.outcome || search.suite || search.arm || search.agent || search.q);
 	const page = Math.max(1, search.page ?? 1);
 	const facets = list.data?.facets;
-	const clear = () => void setSearch({ outcome: null, suite: null, arm: null, agent: null, q: null, page: null });
+	const clear = () => void setSearch({ outcome: null, suite: null, arm: null, agent: null, q: null, tq: null, page: null });
+	const setTraceQuery = useCallback((v: string) => void setSearch({ tq: v.trim() ? v : null }), [setSearch]);
+	const traceQuery = (search.tq ?? "").trim();
 	const outcomeLabel = (o: string) => tb(`runs.outcome.${o}`, { defaultValue: o });
 	const tokens = ([
 		search.outcome && { key: "outcome", label: `${tu("runs.outcome")}: ${outcomeLabel(search.outcome)}`, onRemove: () => void setSearch({ outcome: null, page: null }) },
@@ -169,6 +173,7 @@ export function RunsTable() {
 						label={tu("runs.searchLabel")}
 						testId="runs-search"
 					/>
+					<TraceSearchInput value={search.tq ?? ""} onChange={setTraceQuery} />
 					<FilterSelect
 						label={tu("runs.outcome")}
 						allLabel={tu("runs.all")}
@@ -202,6 +207,8 @@ export function RunsTable() {
 				</div>
 				<FilterTokens tokens={tokens} onClear={clear} testId="runs-tokens" />
 			</div>
+
+			{traceQuery && <TraceMatches query={traceQuery} agent={search.agent} outcome={search.outcome} suite={search.suite} />}
 
 			{list.isLoading ? (
 				<BlockSkeleton rows={8} testId="runs-loading" />
