@@ -27,7 +27,10 @@ releases
 checks
 datasets
 spike
-examples
+# Examples ship in the image for the catalog (L12), without their run data.
+examples/**/runs
+examples/**/releases
+examples/**/checks
 **/testdata
 # The UI stage typechecks the live scoring fixtures against these golden
 # files (see Dockerfile.server). (S1-fix)
