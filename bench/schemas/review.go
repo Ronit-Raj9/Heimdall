@@ -73,7 +73,7 @@ type Review struct {
 	ParentSeal      string         `json:"parent_seal"` // the run's seal hash when the review was written
 	Decision        ReviewDecision `json:"decision"`
 	Reason          string         `json:"reason"`   // plain text, required
-	Reviewer        string         `json:"reviewer"` // self-declared name; there is no authentication
+	Reviewer        string         `json:"reviewer"` // hosted: the signed-in user (email (user id)); local mode: self-declared name
 	CreatedAt       time.Time      `json:"created_at"`
 	SealedOutcome   Outcome        `json:"sealed_outcome"`       // the outcome the run was sealed with
 	PreviousOutcome Outcome        `json:"previous_outcome"`     // the outcome in effect before this review: the sealed one or the superseded review's

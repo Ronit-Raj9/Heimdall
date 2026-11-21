@@ -129,6 +129,17 @@ func (h *ReviewsHandler) postReview(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "parse review request: "+err.Error())
 		return
 	}
+	// The reviewer is the signed-in caller; a body value is accepted for
+	// compatibility and ignored outside local mode (audit P2/N8).
+	reviewer, ok, why := signedActor(ctx, req.Reviewer)
+	if !ok {
+		lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, why)
+		return
+	}
+	if isLocalCaller(ctx) && strings.TrimSpace(req.Reviewer) == "" {
+		reviewer = "" // local mode keeps "reviewer is required"
+	}
+	req.Reviewer = reviewer
 	if msg := reviewRequestProblem(&req); msg != "" {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, msg)
 		return

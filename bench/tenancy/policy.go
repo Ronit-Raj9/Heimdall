@@ -213,7 +213,7 @@ var OrgPolicy = map[string]Rule{
 	key("GET", api+"/clusters/{signature}"):   org(viewer),
 	key("GET", api+"/trends"):                 org(viewer),
 	key("POST", api+"/audit"):                 org(member),
-	key("POST", api+"/releases"):              org(member),
+	key("POST", api+"/releases"):              org(admin), // approving a release is owner/admin only (audit N8)
 	key("GET", api+"/releases"):               org(viewer),
 	key("GET", api+"/releases/{id}"):          org(viewer),
 	key("GET", api+"/releases/{id}/evidence"): org(viewer),
