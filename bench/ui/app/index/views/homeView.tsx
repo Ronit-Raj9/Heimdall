@@ -5,10 +5,14 @@ import { SuitesPanel } from "@/components/home/suitesPanel";
 import { splitExperiments, type ExperimentListItem } from "@/components/home/home.utils";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState, PageHeader } from "@/components/shell";
+import { welcomeSeen } from "@/app/welcome/views/welcome.utils";
+import { Button } from "@/components/ui/button";
+import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useGetSuitesQuery, useListExperimentsQuery } from "@/lib/store";
+import "@/lib/types/welcomeI18n";
 import { cn } from "@/lib/utils";
-import { Link } from "@tanstack/react-router";
-import { ArrowRight, Boxes, FlaskConical } from "lucide-react";
+import { Link, Navigate } from "@tanstack/react-router";
+import { ArrowRight, Boxes, FlaskConical, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -22,16 +26,25 @@ const LIST_POLL_MS = 30_000;
  */
 export default function HomeView() {
 	const { t } = useTranslation("bench");
+	const { t: tw } = useTranslation("welcome");
 	const list = useListExperimentsQuery(undefined, { pollingInterval: LIST_POLL_MS, skipPollingIfUnfocused: true });
 	const suites = useGetSuitesQuery();
 	const experiments = (list.data?.experiments ?? []) as ExperimentListItem[];
 	const { running, recent } = splitExperiments(experiments);
 	const empty = list.isSuccess && experiments.length === 0;
+	const session = useSession();
+	const mayRun = canUse(session, "member");
+
+	// First sign-in to an org with no experiment: open the setup wizard once per browser.
+	if (empty && session.signedIn && mayRun && !welcomeSeen()) {
+		return <Navigate to="/welcome" replace />;
+	}
 
 	return (
 		<section className="flex min-w-0 flex-col gap-8" data-testid="home-screen">
 			<PageHeader title={t("home.title")} subtitle={t("home.subtitle")} testId="home-header" />
 
+			{empty && mayRun && <WelcomeCard />}
 			{empty && <GetStartedCard />}
 
 			<HomeSection title={t("home.actions.title")} testId="home-section-actions">
@@ -71,7 +84,7 @@ export default function HomeView() {
 							<EmptyState
 								icon={FlaskConical}
 								message={t("home.recent.empty")}
-								action={{ label: t("home.getStarted.open"), to: "/quickstart" }}
+								action={mayRun ? { label: tw("home.recentRun"), to: "/welcome" } : { label: t("home.getStarted.open"), to: "/quickstart" }}
 								compact
 								className="m-3"
 								testId="home-recent-empty"
@@ -103,7 +116,7 @@ export default function HomeView() {
 						<EmptyState
 							icon={Boxes}
 							message={t("home.suites.empty")}
-							action={{ label: t("home.actions.addSuite"), to: "/imports" }}
+							action={{ label: tw("home.suitesCatalog"), to: "/catalog" }}
 							compact
 							className="m-3"
 							testId="home-suites-empty"
@@ -155,5 +168,29 @@ function HomeSection({
 			</div>
 			<div className={cn("min-w-0", framed && "bg-card overflow-hidden rounded-lg border shadow-(--shadow-card)")}>{children}</div>
 		</section>
+	);
+}
+/** Home's lead card on an empty org: one big button into the /welcome wizard. */
+function WelcomeCard() {
+	const { t } = useTranslation("welcome");
+	return (
+		<div
+			className="border-primary/30 from-primary/10 via-card to-card flex flex-col gap-4 rounded-xl border bg-gradient-to-br p-5 shadow-(--shadow-card) sm:flex-row sm:items-center md:p-6"
+			data-testid="home-welcome-card"
+		>
+			<span className="bg-primary text-primary-foreground flex size-11 shrink-0 items-center justify-center rounded-xl">
+				<Sparkles className="size-5" aria-hidden="true" />
+			</span>
+			<div className="flex min-w-0 flex-1 flex-col gap-1">
+				<h2 className="text-base font-semibold tracking-tight">{t("home.welcomeTitle")}</h2>
+				<p className="text-muted-foreground text-sm">{t("home.welcomeBody")}</p>
+			</div>
+			<Button asChild size="lg" className="shrink-0">
+				<Link to="/welcome" data-testid="home-welcome-open">
+					{t("home.welcomeOpen")}
+					<ArrowRight className="size-4" aria-hidden="true" />
+				</Link>
+			</Button>
+		</div>
 	);
 }

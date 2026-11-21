@@ -1,0 +1,105 @@
+{
+	"title": "Welcome to Heimdall",
+	"subtitle": "Four choices and one click: pick a suite, an agent and a model, then get a verdict you can trust.",
+	"skip": "Skip to Home",
+	"back": "Back",
+	"next": "Continue",
+	"startOver": "Start over",
+	"steps": {
+		"suite": "Suite",
+		"agent": "Agent",
+		"model": "Model",
+		"run": "Run",
+		"verdict": "Verdict"
+	},
+	"suite": {
+		"heading": "What should the agent work on?",
+		"help": "A suite is a fixed set of tasks with automatic tests. Start with coding-core if you are unsure.",
+		"recommended": "Recommended",
+		"tasks_one": "{{count}} task",
+		"tasks_other": "{{count}} tasks",
+		"empty": "This organization has no suites yet. Add one from the catalog in one click.",
+		"browseCatalog": "Browse the catalog",
+		"import": "Import from a benchmark",
+		"loadError": "Could not load the suites."
+	},
+	"agent": {
+		"heading": "Which agent should run?",
+		"help": "An agent is a coding CLI or loop plus its settings. The starter agents work out of the box.",
+		"defaultModel": "Default model: {{model}}",
+		"empty": "No agents yet. Create one from a template: Codex, Claude Code, mini-swe and more.",
+		"create": "Create agent from template",
+		"createAnother": "New from template",
+		"loadError": "Could not load the agents."
+	},
+	"model": {
+		"heading": "Which model should drive it?",
+		"help": "Pick a model you have a key for. No key yet? Add one and press Test, then come back.",
+		"addKey": "Add a model key",
+		"required": "Choose a model to continue."
+	},
+	"run": {
+		"heading": "Ready to run",
+		"help": "A small first run: a few tasks, one trial each. Most finish in a few minutes.",
+		"suite": "Suite",
+		"agent": "Agent",
+		"model": "Model",
+		"size": "Run size",
+		"tasks_one": "{{count}} task",
+		"tasks_other": "{{count}} tasks",
+		"trialNote": "1 trial per task",
+		"button": "Run benchmark",
+		"starting": "Starting...",
+		"noLauncher": "This server cannot start runs: no runner is online. Hosted runs use the shared pool; ask your server owner to enable it.",
+		"notFound": "This server does not offer one-click runs yet. Build the experiment step by step instead.",
+		"failed": "The run did not start: {{message}}",
+		"advanced": "Build the experiment step by step",
+		"readOnly": "Your role can look but not run. Ask an owner for member access."
+	},
+	"verdict": {
+		"heading": "Your benchmark",
+		"waiting": "Running. You can leave this page: the run continues and Home shows its progress.",
+		"analyzing": "All runs sealed. Computing the verdict...",
+		"failed": "The experiment ended without a verdict. Open it to see which runs failed and why.",
+		"loadError": "Could not load the experiment.",
+		"passRate": "{{num}} of {{den}} runs passed",
+		"headline": {
+			"improved": "Better than the baseline",
+			"regressed": "Worse than the baseline",
+			"inconclusive": "No clear difference yet",
+			"invalid": "The run had harness problems"
+		},
+		"explain": {
+			"improved": "The difference is larger than the noise. Safe to release.",
+			"regressed": "The difference is larger than the noise. Hold the release.",
+			"inconclusive": "Run more tasks or trials to tell the two apart.",
+			"invalid": "Fix the harness problems shown on the full results page, then run again."
+		},
+		"open": "Open full results",
+		"compare": "Compare another model",
+		"release": "Release",
+		"done": "Go to Home"
+	},
+	"home": {
+		"welcomeTitle": "New here? Get a verdict in five minutes.",
+		"welcomeBody": "The setup wizard walks you through suite, agent and model, then runs a small benchmark.",
+		"welcomeOpen": "Start the wizard",
+		"suitesCatalog": "Browse the catalog",
+		"recentRun": "Run your first benchmark"
+	},
+	"guest": {
+		"cta": "Sign in with GitHub to run your own benchmark",
+		"ctaPlain": "Sign in to run your own benchmark"
+	},
+	"docs": {
+		"title": "Docs",
+		"subtitle": "Every guide that ships with this server, readable here.",
+		"search": "Filter guides",
+		"empty": "No guide matches this filter.",
+		"none": "This server ships no guides.",
+		"pick": "Pick a guide on the left.",
+		"loadError": "Could not load the guides.",
+		"docError": "Could not load this guide.",
+		"start": "Start here"
+	}
+}

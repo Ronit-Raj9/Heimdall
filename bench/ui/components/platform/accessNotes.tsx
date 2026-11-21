@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { canUse, useSession } from "@/lib/session/sessionContext";
+import { githubStartUrl } from "@/lib/store/apis/platformApi";
+import "@/lib/types/welcomeI18n";
 import type { Role } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Eye, Lock } from "lucide-react";
+import { Eye, Github, Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { roleWords } from "./forbiddenNote";
@@ -13,6 +15,7 @@ export { ForbiddenNote, isRoleRefusal } from "./forbiddenNote";
 /** Top banner for anonymous visitors of a public-read organization. */
 export function DemoBanner() {
 	const { t } = useTranslation("platform");
+	const { t: tw } = useTranslation("welcome");
 	const session = useSession();
 	const href = useRouterState({ select: (state) => state.location.href });
 	if (!session.demo) return null;
@@ -30,11 +33,22 @@ export function DemoBanner() {
 			<span className="text-muted-foreground order-last min-w-0 basis-full text-[13px] sm:order-none sm:flex-1 sm:basis-0">
 				{t("demo.detail")}
 			</span>
-			<Button asChild variant="outline" size="sm" className="ml-auto h-7 sm:ml-0">
-				<Link to="/login" search={{ return_to: href }} data-testid="demo-banner-sign-in">
-					{t("demo.signIn")}
-				</Link>
-			</Button>
+			{/* L21 onboarding: the guest CTA leads with GitHub when the server offers it. */}
+			<span className="ml-auto flex flex-wrap items-center gap-2 sm:ml-0">
+				{session.github && (
+					<Button asChild size="sm" className="h-7">
+						<a href={githubStartUrl(href)} data-testid="demo-banner-github">
+							<Github className="size-3.5" aria-hidden="true" />
+							{tw("guest.cta")}
+						</a>
+					</Button>
+				)}
+				<Button asChild variant="outline" size="sm" className="h-7">
+					<Link to="/login" search={{ return_to: href }} data-testid="demo-banner-sign-in">
+						{t("demo.signIn")}
+					</Link>
+				</Button>
+			</span>
 		</div>
 	);
 }
