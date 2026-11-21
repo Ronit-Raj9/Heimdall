@@ -35,7 +35,7 @@ describe("WorkersView", () => {
 		query.result = { ...idle, isError: true, error: { status: 404, data: { error: { message: "route not found: /api/bench/workers" } } } };
 		const html = renderToStaticMarkup(<WorkersView />);
 		expect(html).toContain('data-testid="workers-off"');
-		expect(html).toContain("Extra worker machines are not turned on");
+		expect(html).toContain("Extra workers are not turned on");
 		expect(html).not.toContain('data-testid="workers-error"');
 		expect(html).not.toContain("mode-badge-offline");
 	});
@@ -61,6 +61,16 @@ describe("WorkersView", () => {
 		expect(html).toContain('data-testid="workers-table"');
 		expect(html).toContain('data-testid="workers-synthetic-banner"');
 		expect(html).toContain('data-testid="workers-row-w-gpu-1"');
+	});
+
+	it("titles a shared worker plainly and keeps its raw id to the hover title", () => {
+		const shared = { ...fixture.workers[0], id: "shared-runner-org_abc", host: "runner" };
+		query.result = { ...idle, data: { mode: "live", enabled: true, workers: [shared] } };
+		const html = renderToStaticMarkup(<WorkersView />);
+		expect(html).toContain(">Shared worker</p>");
+		expect(html).toContain('title="shared-runner-org_abc"');
+		expect(html).not.toContain(">shared-runner-org_abc<");
+		expect(html).toContain("Open worker tokens");
 	});
 
 	it("shows a skeleton while loading", () => {

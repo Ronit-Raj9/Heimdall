@@ -172,7 +172,7 @@ func (h *quickRunHandler) post(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	if s.Launcher == nil {
-		h.fail(ctx, fasthttp.StatusServiceUnavailable, "no experiment launcher on this server: hosted runs use the shared runner pool, ask your server owner to enable it")
+		h.fail(ctx, fasthttp.StatusServiceUnavailable, "no experiment launcher on this server: hosted runs use the shared worker, ask your server owner to enable it")
 		return
 	}
 	var req QuickRunRequest

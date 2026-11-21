@@ -2,6 +2,7 @@ import { ForbiddenNote, isRoleRefusal } from "@/components/platform/accessNotes"
 import { ConfirmButton, RunnerStatusBadge } from "@/components/platform/badges";
 import { CopyBlock, OneTimeSecret } from "@/components/platform/oneTimeSecret";
 import { isValidPool, runnerStartCommand } from "@/components/platform/platform.utils";
+import { isSharedWorker } from "@/components/workers/workersTable";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -81,10 +82,10 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 									</span>
 									<div className="flex min-w-0 flex-1 flex-col">
 										<span className="text-foreground truncate text-sm font-semibold" title={runner.name}>
-											{runner.name}
+											{isSharedWorker(runner.name, runner.pool) ? t("settings.runners.sharedTitle") : runner.name}
 										</span>
-										<span className="text-muted-foreground truncate font-mono text-xs" title={runner.host}>
-											{runner.host}
+										<span className="text-muted-foreground truncate text-xs" title={runner.host}>
+											{isSharedWorker(runner.name, runner.pool) ? t("settings.runners.sharedHint") : runner.host}
 										</span>
 									</div>
 									<RunnerStatusBadge state={runner.state} />

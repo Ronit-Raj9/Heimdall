@@ -14,7 +14,7 @@ describe("WorkersTable", () => {
 	const html = renderToStaticMarkup(<WorkersTable workers={list.workers} />);
 
 	it("is a labelled table with column headers", () => {
-		expect(html).toContain('aria-label="Worker machines"');
+		expect(html).toContain('aria-label="Workers"');
 		for (const head of [">Worker<", ">Host<", ">Build<", ">State<", ">Running<", ">Completed<", ">Last seen<"])
 			expect(html).toContain(head);
 		expect(html.match(/scope="col"/g)).toHaveLength(7);
@@ -45,7 +45,7 @@ describe("WorkersOff", () => {
 		const html = renderToStaticMarkup(<WorkersOff />);
 		expect(html).toContain('data-state="disabled"');
 		expect(html).not.toContain('role="alert"');
-		expect(html).toContain("Extra worker machines are not turned on");
+		expect(html).toContain("Extra workers are not turned on");
 		expect(html).toContain("BENCH_WORKER_TOKEN");
 		expect(html).toContain("bifrost-bench worker -server &lt;url&gt;");
 	});

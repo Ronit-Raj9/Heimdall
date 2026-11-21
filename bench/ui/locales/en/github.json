@@ -35,7 +35,7 @@
 		"refsLoading": "Loading branches",
 		"mode": "Mode",
 		"modeRecorded": "Replay (re-checks a saved comparison, needs no secrets)",
-		"modeLive": "Live (runs your agents on your own worker machine)",
+		"modeLive": "Live (runs your agents on your own worker)",
 		"baseAgent": "Agent settings file, like agents/my-agent.yaml",
 		"force": "Replace an existing workflow file",
 		"submit": "Open pull request",

@@ -11,7 +11,7 @@
 		"owner": "Owner",
 		"viewerHint": "Reads everything in the organization",
 		"memberHint": "Runs comparisons, reviews results and makes release records",
-		"adminHint": "Manages members, tokens and worker machines",
+		"adminHint": "Manages members, tokens and workers",
 		"ownerHint": "Renames, publishes or deletes the organization"
 	},
 	"time": {
@@ -126,7 +126,7 @@
 		"tabs": {
 			"members": "Members",
 			"tokens": "API tokens",
-			"runners": "Worker machines",
+			"runners": "Workers",
 			"audit": "Activity log",
 			"org": "Organization",
 			"account": "Account"
@@ -208,7 +208,7 @@
 			"createDescription": "The token acts in {{org}} with the role you pick, never more than your own."
 		},
 		"runners": {
-			"title": "Worker machines",
+			"title": "Workers",
 			"description": "Computers you own that actually run the agents for {{org}}. Each one only picks up work from comparisons that use its group.",
 			"name": "Machine",
 			"pool": "Group",
@@ -216,8 +216,8 @@
 			"version": "Version",
 			"lastSeen": "Last seen",
 			"registered": "Registered",
-			"empty": "No worker machine has connected yet. Create a worker token below, then start the worker with it.",
-			"loadError": "Could not load worker machines",
+			"empty": "No worker has connected yet. Create a worker token below, then start the worker with it.",
+			"loadError": "Could not load workers",
 			"statuses": {
 				"idle": "Idle",
 				"running": "Running",
@@ -230,7 +230,7 @@
 			"create": "Create worker token",
 			"createError": "Could not create the worker token",
 			"created": "Worker token for group {{pool}}",
-			"step1": "Save the token on the worker machine:",
+			"step1": "Save the token on the worker:",
 			"step2": "Start the worker:",
 			"installDoc": "Install guide for a fresh Linux box",
 			"tokensEmpty": "No worker tokens yet.",
@@ -257,11 +257,13 @@
 			},
 			"lastUsed": "Last used",
 			"installLine": "Or install on a fresh Linux box in one line:",
-			"adminOnly": "Worker machines and worker tokens are managed by admins.",
+			"adminOnly": "Workers and worker tokens are managed by admins.",
 			"remove": "Remove",
 			"confirmRemove": "Remove worker {{name}}? It stops getting work. It joins again if it still has a valid token.",
-			"removeError": "Could not remove the worker machine",
-			"actions": "Actions"
+			"removeError": "Could not remove the worker",
+			"actions": "Actions",
+			"sharedTitle": "Shared worker",
+			"sharedHint": "Shared worker (provided by this server)"
 		},
 		"audit": {
 			"title": "Activity log",
@@ -284,7 +286,7 @@
 			"actorTypes": {
 				"user": "User",
 				"token": "Token",
-				"runner": "Worker machine",
+				"runner": "Worker",
 				"system": "System"
 			},
 			"actionHint": "Exact action, for example member.role",

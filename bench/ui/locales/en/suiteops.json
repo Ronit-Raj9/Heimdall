@@ -8,8 +8,8 @@
 		"lock": "Freeze",
 		"admit": "Run readiness check",
 		"admitConfirm": "Run the readiness check on every task of {{suite}}? This builds images and tries a correct solution for each task.",
-		"hostedAdmit": "The readiness check runs a perfect reference agent and a do-nothing agent on each task, on a worker machine (Runners page). Ready tasks can be run right after.",
-		"hostedAdmitConfirm": "Run the readiness check on every task of {{suite}}? Each task runs on a worker machine in practice mode (no real model, free)."
+		"hostedAdmit": "The readiness check runs a perfect reference agent and a do-nothing agent on each task, on a worker (Workers page). Ready tasks can be run right after.",
+		"hostedAdmitConfirm": "Run the readiness check on every task of {{suite}}? Each task runs on a worker in practice mode (no real model, free)."
 	},
 	"health": {
 		"title": "Pause tasks",
@@ -52,7 +52,7 @@
 		"since": "Since (commit, tag or YYYY-MM-DD, optional)",
 		"limit": "Tasks to cut",
 		"dryRun": "Preview only (write nothing)",
-		"hostedDryRun": "A full search makes the tasks, runs the readiness check on a worker machine (Runners page), and keeps only the tasks that pass.",
+		"hostedDryRun": "A full search makes the tasks, runs the readiness check on a worker (Workers page), and keeps only the tasks that pass.",
 		"run": "Find tasks",
 		"preview": "Preview candidates",
 		"missing": "Pick a repository first."

@@ -16,6 +16,14 @@ function isWorkerState(value: string): value is WorkerState {
 	return value === "idle" || value === "running" || value === "lost";
 }
 
+/**
+ * A shared worker (run by this server for every organization) registers as shared-<host>-<org>
+ * in the "shared" group. Its raw id means nothing to a user, so the UI calls it "Shared worker".
+ */
+export function isSharedWorker(id: string, pool?: string): boolean {
+	return pool === "shared" || id.startsWith("shared-");
+}
+
 /** Idle, running or lost, with what it means. A state this UI does not know shows as sent. */
 export function WorkerStateBadge({ state, testId }: { state: string; testId?: string }) {
 	const { t } = useTranslation("bench");

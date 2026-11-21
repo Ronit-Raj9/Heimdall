@@ -82,7 +82,7 @@ func (h *RunnersHandler) admin(next fasthttp.RequestHandler) fasthttp.RequestHan
 			lib.SendError(ctx, h.mode, fasthttp.StatusUnauthorized, lib.ErrTypeUnauthorized, "sign in as an admin of the organization")
 			return
 		case p.OrgID == "" || !p.Can(auth.RoleAdmin):
-			lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, "runners and runner tokens need the admin role")
+			lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, "workers and worker tokens need the admin role")
 			return
 		}
 		ctx.SetUserValue(runnersOrgValue, p.OrgID)

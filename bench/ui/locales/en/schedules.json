@@ -5,8 +5,8 @@
 	"empty": "No schedules yet. Add one below: pick a comparison file, a time and a daily spending limit.",
 	"noTicker": "This server cannot start scheduled runs right now (it is offline). Schedules are saved and start once it is back.",
 	"noTickerLink": "Check the server status",
-	"hostedLimits": "Scheduled comparisons run on your worker machines. This organization uses {{count}} of {{max}} schedules; each can run at most once every {{min}} minutes.",
-	"hostedRunnersLink": "Worker machines",
+	"hostedLimits": "Scheduled comparisons run on your workers. This organization uses {{count}} of {{max}} schedules; each can run at most once every {{min}} minutes.",
+	"hostedRunnersLink": "Workers",
 	"table": {
 		"name": "Name",
 		"kind": "What runs",

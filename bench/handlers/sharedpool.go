@@ -111,7 +111,7 @@ func (h *SharedPoolHandler) RegisterRoutes(r *router.Router, mw ...lib.Middlewar
 func (h *SharedPoolHandler) unavailable(ctx *fasthttp.RequestCtx) bool {
 	if h.quota == nil {
 		lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable,
-			"quotas and the shared runner pool are part of the hosted platform (auth.mode: hosted)")
+			"quotas and the shared worker are part of the hosted platform (auth.mode: hosted)")
 		return true
 	}
 	return false
@@ -196,11 +196,11 @@ func (h *SharedPoolHandler) status(ctx *fasthttp.RequestCtx) {
 	case kill:
 		st.Message = "The server owner paused all new runs (kill switch). Running slots finish; new ones wait until it is lifted."
 	case !st.SharedPoolConfigured:
-		st.Message = "No shared runner on this server: start your own runner (Workers page) or ask your server owner to enable the shared pool."
+		st.Message = "No shared worker on this server: start your own worker (Workers page) or ask your server owner to enable the shared worker."
 	case !l.SharedPool:
-		st.Message = "Shared runners are off for your organization: ask your server owner to enable them, or start your own runner."
+		st.Message = "The shared worker is off for your organization: ask your server owner to enable it, or start your own worker."
 	default:
-		st.Message = "Your experiments run on the shared runner pool with the built-in agents and suites."
+		st.Message = "Your experiments run on the shared worker with the built-in agents and benchmarks."
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, st)
 }

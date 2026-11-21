@@ -128,7 +128,7 @@ func TestJobKindsValidateParamsAndConfinePaths(t *testing.T) {
 			t.Fatalf("%s: no hosted variant", kind)
 		}
 		_, err := spec.Run(ctx, jobEnv{Hosted: true, ProjectRoot: t.TempDir()}, &jobs.Job{ID: "j", Params: json.RawMessage(params)}, discardLogger{}, nil)
-		if err == nil || !strings.Contains(err.Error(), "No runner online") {
+		if err == nil || !strings.Contains(err.Error(), "No worker online") {
 			t.Fatalf("hosted %s ran without a runner: %v", kind, err)
 		}
 	}

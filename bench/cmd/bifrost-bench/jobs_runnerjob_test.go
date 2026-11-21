@@ -62,8 +62,8 @@ func TestRunnerJobNoRunnerFailsFast(t *testing.T) {
 	j := &jobs.Job{ID: "j1", Params: json.RawMessage(`{}`)}
 	start := time.Now()
 	_, err := spec.Run(context.Background(), jobEnv{Hosted: true, ProjectRoot: t.TempDir()}, j, discardLogger{}, nil)
-	if err == nil || !strings.Contains(err.Error(), "No runner online") || !strings.Contains(err.Error(), "Settings > Runners") ||
-		!strings.Contains(err.Error(), "Add a runner") {
+	if err == nil || !strings.Contains(err.Error(), "No worker online") || !strings.Contains(err.Error(), "Settings > Workers") ||
+		!strings.Contains(err.Error(), "Add a worker") {
 		t.Fatalf("no runner: %v", err)
 	}
 	if time.Since(start) > time.Second {
