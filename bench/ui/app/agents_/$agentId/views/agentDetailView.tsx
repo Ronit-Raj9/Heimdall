@@ -1,16 +1,22 @@
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Link, useParams } from "@tanstack/react-router";
-import { Cpu, ListChecks, Pencil, Play } from "lucide-react";
+import { useGetAgentCompatibilityQuery } from "@/lib/store/apis/evaluationsApi";
+import { Cpu, Gauge, GitCompare, ListChecks, Pencil, Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, CheckPill, adapterIcon, jobState, lastJobFor, useAdapterLabel } from "../../../agents/views/agentDisplay";
 import { useAgentJobs } from "../../../agents/views/agentJobs";
 import { useAgentSummary } from "./agentOps.shared";
 import ChecksTab from "./checksTab";
 import ConfigTab from "./configTab";
+import ReportCardTab from "./reportCardTab";
 import ToolsTab from "./toolsTab";
+import VersionsTab from "./versionsTab";
 
-/** One agent (/agents/$agentId?tab=): a header with Run, Check and Edit, then Config, Checks and Tools. */
+/**
+ * One agent (/agents/$agentId?tab=): a header with capabilities, Evaluate, Run, Check and Edit, then
+ * Config, Checks, Tools, Versions and Report card.
+ */
 export default function AgentDetailView() {
 	const { t } = useTranslation("agentBuilder");
 	const { t: tu } = useTranslation("agentsUx");
@@ -18,10 +24,14 @@ export default function AgentDetailView() {
 	const { agent } = useAgentSummary(agentId);
 	const jobs = useAgentJobs();
 	const adapterLabel = useAdapterLabel();
+	const compatibility = useGetAgentCompatibilityQuery(agentId);
+	const capabilities = compatibility.data?.capabilities ?? [];
 	const tabs: RouteTab[] = [
 		{ id: "config", label: t("detail.tabs.config") },
 		{ id: "checks", label: t("detail.tabs.checks") },
 		{ id: "tools", label: t("detail.tabs.tools") },
+		{ id: "versions", label: t("detail.tabs.versions") },
+		{ id: "report-card", label: t("detail.tabs.reportCard") },
 	];
 	const Icon = agent ? adapterIcon(agent.adapter) : null;
 	const state = agent ? (agent.error ? "broken" : jobState(lastJobFor(jobs, "agent.check", agent.path, agent.id))) : null;
@@ -47,6 +57,15 @@ export default function AgentDetailView() {
 									{agent.model}
 								</span>
 							)}
+							{capabilities.length > 0 && (
+								<span className="inline-flex flex-wrap items-center gap-1" data-testid="agent-detail-capabilities" aria-label={t("detail.capabilities")}>
+									{capabilities.map((cap) => (
+										<span key={cap} className="bg-muted/60 rounded-md border px-1.5 py-0.5 font-mono text-[11px]" data-testid={`agent-capability-${cap}`}>
+											{cap}
+										</span>
+									))}
+								</span>
+							)}
 						</span>
 					) : (
 						t("detail.subtitle", { id: agentId })
@@ -68,10 +87,22 @@ export default function AgentDetailView() {
 								{tu("actions.check")}
 							</Link>
 						</Button>
-						<Button asChild size="sm">
+						<Button asChild size="sm" variant="ghost">
+							<Link to={"/evaluate" as never} search={{ agent: agentId, mode: "versions" } as never} data-testid="agent-detail-compare-versions">
+								<GitCompare aria-hidden="true" />
+								{t("detail.compareVersions")}
+							</Link>
+						</Button>
+						<Button asChild size="sm" variant="outline">
 							<Link to="/experiments/new" search={{ agent: agentId } as never} data-testid="agent-detail-run">
 								<Play aria-hidden="true" />
 								{tu("actions.run")}
+							</Link>
+						</Button>
+						<Button asChild size="sm">
+							<Link to={"/evaluate" as never} search={{ agent: agentId } as never} data-testid="agent-detail-evaluate">
+								<Gauge aria-hidden="true" />
+								{t("detail.evaluate")}
 							</Link>
 						</Button>
 					</div>
@@ -83,6 +114,10 @@ export default function AgentDetailView() {
 						<ChecksTab agentId={agentId} />
 					) : active === "tools" ? (
 						<ToolsTab agentId={agentId} />
+					) : active === "versions" ? (
+						<VersionsTab agentId={agentId} />
+					) : active === "report-card" ? (
+						<ReportCardTab agentId={agentId} />
 					) : (
 						<ConfigTab agentId={agentId} />
 					)

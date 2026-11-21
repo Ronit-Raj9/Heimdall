@@ -40,9 +40,46 @@
 			"label": "Agent views",
 			"config": "Settings",
 			"checks": "Readiness",
-			"tools": "Tools"
+			"tools": "Tools",
+			"versions": "Versions",
+			"reportCard": "Report card"
 		},
+		"capabilities": "Capabilities",
+		"evaluate": "Evaluate",
+		"compareVersions": "Compare v1 vs v2",
 		"subtitle": "agents/{{id}}.yaml"
+	},
+	"versions": {
+		"title": "Versions",
+		"description": "Every save of this agent's settings is a version. Benchmark a version to compare it with another.",
+		"note": "Version note",
+		"notePlaceholder": "What changed (optional)",
+		"save": "Save as new version",
+		"saving": "Saving...",
+		"loadError": "Could not load versions",
+		"empty": "No versions yet. Save the settings or press Save as new version.",
+		"view": "View config",
+		"hide": "Hide config",
+		"configTitle": "Settings of v{{version}}",
+		"configError": "Could not load this version",
+		"diffTitle": "Changes from v{{previous}} to v{{version}}",
+		"first": "First version, nothing to compare with.",
+		"col": {
+			"version": "Version",
+			"date": "Date",
+			"author": "Author",
+			"note": "Note",
+			"runs": "Runs"
+		}
+	},
+	"reportCard": {
+		"version": "Version",
+		"latest": "Latest",
+		"model": "Model",
+		"anyModel": "Any model",
+		"empty": "No report card yet for this version and model. Run an evaluation to get one.",
+		"evaluate": "Evaluate this agent",
+		"loadError": "Could not load the report card"
 	},
 	"config": {
 		"form": "Form",

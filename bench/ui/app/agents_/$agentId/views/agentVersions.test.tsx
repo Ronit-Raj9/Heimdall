@@ -1,0 +1,116 @@
+import "@/lib/i18n";
+
+import type { AgentVersion, AgentVersionDetail, ReportCardResponse } from "@/lib/store/apis/evaluationsApi";
+import { agentReportCardRequest } from "@/lib/store/apis/evaluationsApi";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
+import { lineDiff } from "./lineDiff";
+import ReportCardTab, { catalogModels, isEmptyReport } from "./reportCardTab";
+import VersionsTab, { sortVersions } from "./versionsTab";
+
+const state = vi.hoisted(() => ({
+	versions: [] as AgentVersion[],
+	detail: {} as Record<number, AgentVersionDetail>,
+	report: undefined as ReportCardResponse | undefined,
+	reportError: undefined as unknown,
+}));
+
+vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
+	useGetAgentVersionsQuery: () => ({ data: { agent: "codex", versions: state.versions }, isLoading: false, isError: false }),
+	useGetAgentVersionQuery: (arg: { version: number } | symbol) =>
+		typeof arg === "object" ? { data: state.detail[arg.version], isLoading: false, isError: false } : { data: undefined },
+	useCreateAgentVersionMutation: () => [vi.fn(), { isLoading: false, isError: false }],
+	useGetAgentReportCardQuery: () => ({ data: state.report, error: state.reportError, isLoading: false, isError: Boolean(state.reportError) }),
+}));
+
+vi.mock("@/lib/store/apis/modelsApi", () => ({
+	useGetModelsQuery: () => ({ data: { providers: [{ models: [{ id: "gpt-x" }, { id: "claude-y" }] }, { models: [{ id: "gpt-x" }] }] } }),
+}));
+
+vi.mock("@tanstack/react-router", () => ({
+	Link: ({ to, search, children, ...rest }: { to: string; search?: Record<string, string>; children: React.ReactNode }) => (
+		<a href={search ? `${to}?${new URLSearchParams(search).toString()}` : to} {...rest}>
+			{children}
+		</a>
+	),
+}));
+
+const v = (version: number, note = ""): AgentVersion => ({
+	version,
+	hash: `h${version}`,
+	created_at: "2026-11-20T10:00:00Z",
+	created_by: "raj",
+	note,
+	runs: version * 3,
+});
+
+describe("agent versions tab", () => {
+	it("lists versions newest first with note, author and runs", () => {
+		state.versions = [v(1, "first"), v(2, "tighter prompt")];
+		const html = renderToStaticMarkup(<VersionsTab agentId="codex" />);
+		expect(html).toContain('data-testid="agent-versions-table"');
+		expect(html.indexOf("agent-version-v2")).toBeLessThan(html.indexOf("agent-version-v1"));
+		expect(html).toContain("tighter prompt");
+		expect(html).toContain("raj");
+		expect(html).toContain('data-testid="agent-version-view-v1"');
+		expect(html).toContain("Save as new version");
+	});
+
+	it("shows an empty note with no versions", () => {
+		state.versions = [];
+		const html = renderToStaticMarkup(<VersionsTab agentId="codex" />);
+		expect(html).toContain('data-testid="agent-versions-empty"');
+	});
+
+	it("sorts versions without mutating input", () => {
+		const input = [v(1), v(3), v(2)];
+		expect(sortVersions(input).map((x) => x.version)).toEqual([3, 2, 1]);
+		expect(input.map((x) => x.version)).toEqual([1, 3, 2]);
+	});
+});
+
+describe("lineDiff", () => {
+	it("is empty for identical text", () => {
+		expect(lineDiff("a\nb\n", "a\nb\n", { a: "v1", b: "v2" })).toBe("");
+	});
+	it("marks removed and added lines", () => {
+		const patch = lineDiff("id: x\nmodel: a\nsteps: 3\n", "id: x\nmodel: b\nsteps: 3\n", { a: "v1", b: "v2" });
+		expect(patch.split("\n")).toEqual(["--- v1", "+++ v2", " id: x", "-model: a", "+model: b", " steps: 3", ""]);
+	});
+});
+
+describe("report card tab", () => {
+	it("shows the evaluate call to action when there is no report card", () => {
+		state.report = undefined;
+		state.reportError = { status: 404, data: {} };
+		const html = renderToStaticMarkup(<ReportCardTab agentId="codex" />);
+		expect(html).toContain('data-testid="agent-report-card-empty"');
+		expect(html).toContain('href="/evaluate?agent=codex"');
+		expect(html).toContain("Evaluate this agent");
+	});
+
+	it("renders the report card with version and model pickers", () => {
+		state.versions = [v(1), v(2)];
+		state.reportError = undefined;
+		state.report = {
+			evaluation: "ev_1",
+			arms: [{ label: "A", agent: "codex", version: 2, model: "gpt-x" }],
+			capabilities: [{ capability: "terminal", benchmarks: ["hd-harbor-tb2"], arms: { A: { score: 0.41, ci_low: 0.3, ci_high: 0.52, runs: 30 } } }],
+			benchmarks: [],
+		};
+		const html = renderToStaticMarkup(<ReportCardTab agentId="codex" />);
+		expect(html).toContain('data-testid="report-card"');
+		expect(html).toContain('data-testid="report-card-cap-terminal"');
+		expect(html).toContain('value="2"');
+		expect(html).toContain('value="claude-y"');
+	});
+
+	it("helpers", () => {
+		expect(isEmptyReport({ evaluation: "", arms: [], capabilities: [], benchmarks: [] }, undefined)).toBe(true);
+		expect(isEmptyReport(undefined, { status: 500 })).toBe(false);
+		expect(catalogModels([{ models: [{ id: "b" }, { id: "a" }] }, { models: [{ id: "a" }] }])).toEqual(["a", "b"]);
+		expect(agentReportCardRequest({ agent: "my agent" })).toEqual({ url: "/agents/my%20agent/report-card" });
+		expect(agentReportCardRequest({ agent: "x", version: 2, model: "m" })).toEqual({ url: "/agents/x/report-card", params: { version: "2", model: "m" } });
+	});
+});
