@@ -415,6 +415,31 @@ starts, so teardown only ever removes what that run created) and image tags
 (`heimdall/server:smoke`), so it is safe beside production. Run it before
 upgrading production.
 
+### Settings reference
+
+The settings of `deploy/hosted/.env` beyond the site, database and key store,
+each with a one-line meaning (`.env.example` has the same list):
+
+| Variable | Meaning |
+|---|---|
+| `HEIMDALL_SHARED_RUNNER_SECRET` | Secret of the shared worker (assignments and per-org token claims); empty turns the shared worker off. |
+| `HEIMDALL_SHARED_RUNTIME` | Container runtime of the shared worker: `auto`, `runsc` or `runc`. |
+| `HEIMDALL_SHARED_SLOTS` | Runs at once per organization on the shared worker, capped by its own limit. |
+| `HEIMDALL_SHARED_BUILDKIT` | Address of the isolated BuildKit that builds images from org Dockerfiles. |
+| `HEIMDALL_SHARED_PLATFORM_IMAGES` | Images every organization may pull, comma-separated. |
+| `HEIMDALL_SHARED_GATEWAY_CONTAINER` | The model gateway container every org network joins; empty finds it by name. |
+| `HEIMDALL_MODAL_PYTHON` | Python with the `modal` package, for organizations whose runs go to Modal (shared worker). |
+| `HEIMDALL_PROVIDER_SLOTS` | Runs that may use one provider at once through the shared fault proxy and per organization key. |
+| `HEIMDALL_RUNNER_MIN_FREE_GB` | Free disk a runner keeps; below it the runner takes no new work and reports disk low. |
+| `HEIMDALL_METRICS_LISTEN` | Prometheus metrics address on the compose network; empty is off. Never publish it. |
+| `HEIMDALL_SERVER_ADMINS` | Comma-separated emails of server admins: quotas, image approval, kill switch. |
+| `HEIMDALL_API_RATE_LIMITS` | API rate limits per token and per organization (`cred_burst,cred_per_sec,org_burst,org_per_sec`, or `off`); empty is the default. |
+| `HEIMDALL_RUNNER_IMAGE` | Runner image Heimdall starts for an organization's own worker on Fly Machines or Kubernetes; empty is the published default. |
+| `HEIMDALL_BACKUP_PASSPHRASE_FILE` | Passphrase file kept away from the backups; `backup.sh` then writes an encrypted copy of `.env` beside each dump. |
+
+`HEIMDALL_DEV` turns on the practice suite and examples for tests and
+development; a production install never sets it.
+
 ## 11. Hardening checklist
 
 - [ ] SSH: keys only (`PasswordAuthentication no`, `PermitRootLogin no` in

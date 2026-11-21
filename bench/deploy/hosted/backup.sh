@@ -46,7 +46,7 @@ set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 dir=${HEIMDALL_BACKUP_DIR:-/var/backups/heimdall} db_only='' keep_days=14 env_dir=''
-passphrase_file=${HEIMDALL_BACKUP_PASSPHRASE_FILE:-}
+passphrase_file=${HEIMDALL_BACKUP_PASSPHRASE_FILE:-$(env_get HEIMDALL_BACKUP_PASSPHRASE_FILE)} # the environment, else deploy/hosted/.env
 while [ $# -gt 0 ]; do
 	case $1 in
 	--dir) dir=${2:?--dir needs a value}; shift 2 ;;

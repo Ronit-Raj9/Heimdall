@@ -179,6 +179,11 @@ services:
       # Prometheus metrics on the compose network only (docs/hosting.md,
       # Operating it); empty: off. Never publish this port.
       BENCH_SERVER_METRICS_LISTEN: ${HEIMDALL_METRICS_LISTEN:-}
+      # Per-token and per-org API rate limits (empty: the built-in defaults,
+      # "off": none), and the runner image Heimdall starts for an org's own
+      # worker on Fly Machines or Kubernetes (empty: the published default).
+      HEIMDALL_API_RATE_LIMITS: ${HEIMDALL_API_RATE_LIMITS:-}
+      HEIMDALL_RUNNER_IMAGE: ${HEIMDALL_RUNNER_IMAGE:-}
     volumes:
       - ./bench.hosted.yaml:/srv/heimdall/deploy/bench.yaml:ro
       - heimdall-data:/var/lib/heimdall
@@ -418,6 +423,8 @@ services:
       HEIMDALL_SHARED_GATEWAY_CONTAINER: ${HEIMDALL_SHARED_GATEWAY_CONTAINER:-}
       HEIMDALL_SHARED_PLATFORM_IMAGES: ${HEIMDALL_SHARED_PLATFORM_IMAGES:-}
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
+      # Python with the modal package, for organizations whose runs go to Modal.
+      HEIMDALL_MODAL_PYTHON: ${HEIMDALL_MODAL_PYTHON:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:ro
