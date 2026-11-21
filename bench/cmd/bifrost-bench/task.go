@@ -26,7 +26,8 @@ const taskUsage = `usage: bifrost-bench task init -suite <suite> -id <task> -rep
        bifrost-bench task admit [-config deploy/bench.yaml] <suite>/<task>
        bifrost-bench task from-trace -suite <suite> -id <task> -trace <file> [-kind qa|tool-use|mcp|memory] [-redact=false]
        bifrost-bench task mine [-limit 10] [-since <ref|date>] [-paths a,b] [-min-tests 1]   (same as tasks mine)
-       bifrost-bench task review <suite>/<task>`
+       bifrost-bench task review <suite>/<task>
+       bifrost-bench task import-rows -suite <suite> -file <rows.csv|rows.jsonl|tickets.json> [-format csv|jsonl|tickets] [-match exact] [-held-out] [-dry-run]`
 
 func runTask(args []string) int {
 	if len(args) == 0 {
@@ -46,6 +47,8 @@ func runTask(args []string) int {
 		return runTasksMine(args[1:])
 	case "review": // First workflow: mark a mined task's instruction reviewed (tasksmine.go)
 		return runTaskReview(args[1:])
+	case "import-rows": // X13: question-and-answer tasks from CSV, JSONL or tickets (taskimportrows.go)
+		return runTaskImportRows(args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown task subcommand %q\n%s\n", args[0], taskUsage)
 		return exitUsage
