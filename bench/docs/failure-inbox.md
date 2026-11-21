@@ -199,8 +199,12 @@ How it reads: `GET /api/logs` with `start_time`, `end_time`,
 session. Rows that share a `session_id` are one session; the newest row's
 input history and output message are its conversation. Rows with content
 logging turned off carry no messages and are skipped with a warning. Rows of
-the Responses API keep their input in another shape and only come through
-when it is in chat form.
+the Responses API (Codex CLI, the OpenAI Agents SDK) have no input history;
+their conversation is read from `responses_input_history` and
+`responses_output` instead: message items keep their role (developer reads
+as system), function and custom tool calls and their outputs become tool
+calls with results, reasoning items are dropped. Live scoring reads them the
+same way.
 
 ### OTLP folder
 

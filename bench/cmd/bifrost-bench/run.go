@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -154,13 +155,17 @@ func runRun(args []string) int {
 	resume := fs.String("resume", "", "resume an existing experiment id instead of planning a new one")
 	allowDrift := fs.Bool("allow-version-drift", false, "resume even when part versions or the price snapshot changed since the freeze; recorded in the experiment's resumes.jsonl")
 	concurrency := fs.Int("concurrency", 0, "override the experiment's concurrency")
+	totalUSD := fs.Float64("total-usd", 0, "with -resume: the spend cap for this resume in place of the frozen budget.total_usd (continues an experiment the cap stopped); recorded in the experiment's resumes.jsonl")
 	debug := fs.Bool("debug", false, "debug logging")
 	// Suite health area: -include-quarantined (suitehealth.go).
 	fs.BoolVar(&includeQuarantined, "include-quarantined", false, "let an explicit task list name a quarantined task")
 	pos, err := parseInterspersed(fs, args) // flags may follow the file (7-C-01)
 	if err != nil || len(pos) > 1 || (len(pos) != 1 && *resume == "") || (len(pos) == 1 && *resume != "") {
-		fmt.Fprintln(os.Stderr, "usage: bifrost-bench run [-config deploy/bench.yaml] [-concurrency n] experiments/<file>.yaml | -resume <exp_id> [-allow-version-drift]")
+		fmt.Fprintln(os.Stderr, "usage: bifrost-bench run [-config deploy/bench.yaml] [-concurrency n] experiments/<file>.yaml | -resume <exp_id> [-allow-version-drift] [-total-usd <usd>]")
 		return exitUsage
+	}
+	if err := checkResumeCap(*resume, *totalUSD); err != nil {
+		return fail("%v", err)
 	}
 	if *resume == "" { // 5-B-08: a bad experiment file fails before the gateway is set up
 		e, err := loadExperiment(firstArg(pos))
@@ -181,10 +186,17 @@ func runRun(args []string) int {
 	if m == nil {
 		return code
 	}
+	if *totalUSD > 0 {
+		if err := a.recordCapRaise(m, *totalUSD); err != nil {
+			return fail("resume %s: record the new spend cap: %v", m.ExpID, err)
+		}
+		a.logger.Warn("resuming with a new spend cap (-total-usd)", "experiment", m.ExpID,
+			"frozen_cap_usd", m.Experiment.Budget.TotalUSD, "cap_usd", *totalUSD)
+	}
 	// manifestFor has already frozen the experiment in the store, so the
 	// scheduler always runs in resume mode: it runs every slot without a
 	// counted sealed run.
-	if code := a.execute(ctx, m, *concurrency); code != exitOK {
+	if code := a.executeOpts(ctx, m, engine.RunOptions{Concurrency: *concurrency, TotalUSD: *totalUSD}); code != exitOK {
 		return code
 	}
 	an, report, err := a.analyze(context.WithoutCancel(ctx), m.ExpID, "")
@@ -254,6 +266,12 @@ func runContext(ctx context.Context) (context.Context, func()) {
 }
 
 func (a *app) execute(ctx context.Context, m *schemas.Manifest, concurrency int) int {
+	return a.executeOpts(ctx, m, engine.RunOptions{Concurrency: concurrency})
+}
+
+// executeOpts is execute with every scheduler option the CLI may set; Resume
+// and Events are always set here.
+func (a *app) executeOpts(ctx context.Context, m *schemas.Manifest, opts engine.RunOptions) int {
 	events := make(chan engine.Event, 256)
 	done := make(chan struct{})
 	go func() {
@@ -270,7 +288,8 @@ func (a *app) execute(ctx context.Context, m *schemas.Manifest, concurrency int)
 	sched := engine.NewScheduler(a.reg, a.cfg.Root, a.logger, janitor)
 	rctx, stopRun := runContext(ctx)
 	defer stopRun()
-	sum, err := sched.Run(rctx, m, engine.RunOptions{Resume: true, Concurrency: concurrency, Events: events})
+	opts.Resume, opts.Events = true, events
+	sum, err := sched.Run(rctx, m, opts)
 	close(events)
 	<-done
 	if sum != nil {
@@ -531,6 +550,11 @@ func (a *app) recordDrift(expID string, d versionDrift) error {
 		AllowDrift bool      `json:"allow_version_drift"`
 		versionDrift
 	}{ResumedAt: time.Now().UTC(), AllowDrift: true, versionDrift: d}
+	return a.appendResume(expID, rec)
+}
+
+// appendResume appends one JSON record to the experiment's resumes.jsonl.
+func (a *app) appendResume(expID string, rec any) error {
 	b, err := json.Marshal(rec)
 	if err != nil {
 		return err
@@ -546,6 +570,33 @@ func (a *app) recordDrift(expID string, d versionDrift) error {
 		return errors.Join(err, f.Close())
 	}
 	return f.Close()
+}
+
+// checkResumeCap validates run's -total-usd: only with -resume, and a
+// positive finite amount.
+func checkResumeCap(resume string, totalUSD float64) error {
+	if totalUSD == 0 {
+		return nil
+	}
+	if resume == "" {
+		return errors.New("-total-usd needs -resume <exp_id>: a new experiment takes its cap from budget.total_usd")
+	}
+	if !(totalUSD > 0) || math.IsInf(totalUSD, 0) {
+		return fmt.Errorf("-total-usd must be a positive amount, got %v", totalUSD)
+	}
+	return nil
+}
+
+// recordCapRaise appends a resume with a new spend cap to the experiment's
+// resumes.jsonl, so every later reader sees that runs after this point were
+// admitted under a cap other than the frozen one.
+func (a *app) recordCapRaise(m *schemas.Manifest, totalUSD float64) error {
+	rec := struct {
+		ResumedAt    time.Time `json:"resumed_at"`
+		FrozenCapUSD float64   `json:"frozen_total_usd"`
+		CapUSD       float64   `json:"total_usd"`
+	}{ResumedAt: time.Now().UTC(), FrozenCapUSD: m.Experiment.Budget.TotalUSD, CapUSD: totalUSD}
+	return a.appendResume(m.ExpID, rec)
 }
 
 // spendNote says what the summary's spent_usd is, so it is not read as a

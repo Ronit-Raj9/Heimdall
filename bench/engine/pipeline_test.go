@@ -346,6 +346,41 @@ func TestRunSlotFaultPlan(t *testing.T) {
 	}
 }
 
+// holdGateway is a fakeGateway that implements schemas.KeySlotHolder.
+type holdGateway struct{ *fakeGateway }
+
+func (g holdGateway) RevokeKeyHold(context.Context, *schemas.RunKey) (func(), error) {
+	if err := g.w.hit("revoke_hold"); err != nil {
+		return nil, err
+	}
+	return func() { _ = g.w.hit("slot_release") }, nil
+}
+
+// live-11: with a gateway that can hold slots, cleanup revokes the key with
+// its slots held, clears the slot's plan and only then frees the slot, so no
+// other run can claim the slot and arm a plan before the clear (seen live:
+// ClearPlan 409 on another bench process's claim, run sealed infra_error).
+func TestCleanupHoldsSlotUntilPlanCleared(t *testing.T) {
+	b, m, slot := pipelineFixture(t, "clean")
+	b.reg.Gateway = &holdingGateway{b.gw}
+	res, err := runOne(context.Background(), t, b, m, slot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, op := range b.w.seq {
+		if op == "revoke" || op == "revoke_hold" || op == "release_slots" || op == "fault_clear" {
+			got = append(got, op)
+		}
+	}
+	if want := "revoke_hold fault_clear release_slots"; strings.Join(got, " ") != want {
+		t.Fatalf("cleanup calls %v, want %s", got, want)
+	}
+	if res.Run.Outcome == schemas.OutcomeInfraError {
+		t.Fatalf("outcome %s", res.Run.Outcome)
+	}
+}
+
 // QC2-13-06: a no-paid run whose key revocation fails keeps its scripted
 // plan bound; clearing it would let the still-live key reach the upstream.
 func TestNoPaidKeepsPlanWhenRevokeFails(t *testing.T) {
@@ -535,28 +570,3 @@ func (g *holdingGateway) RevokeKeyHoldSlots(context.Context, *schemas.RunKey) er
 }
 
 func (g *holdingGateway) ReleaseKeySlots(*schemas.RunKey) { _ = g.w.hit("release_slots") }
-
-// live-11: with a gateway that can hold slots, cleanup revokes the key with
-// its slots held, clears the slot's plan and only then frees the slot, so no
-// other run can claim the slot and arm a plan before the clear (seen live:
-// ClearPlan 409 on another bench process's claim, run sealed infra_error).
-func TestCleanupHoldsSlotUntilPlanCleared(t *testing.T) {
-	b, m, slot := pipelineFixture(t, "clean")
-	b.reg.Gateway = &holdingGateway{b.gw}
-	res, err := runOne(context.Background(), t, b, m, slot)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var got []string
-	for _, op := range b.w.seq {
-		if op == "revoke" || op == "revoke_hold" || op == "release_slots" || op == "fault_clear" {
-			got = append(got, op)
-		}
-	}
-	if want := "revoke_hold fault_clear release_slots"; strings.Join(got, " ") != want {
-		t.Fatalf("cleanup calls %v, want %s", got, want)
-	}
-	if res.Run.Outcome == schemas.OutcomeInfraError {
-		t.Fatalf("outcome %s", res.Run.Outcome)
-	}
-}
