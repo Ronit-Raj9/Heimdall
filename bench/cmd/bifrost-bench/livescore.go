@@ -68,7 +68,11 @@ func livescoreFlags(name string) (*flag.FlagSet, *string) {
 // scorerFor builds the project's scorer: livescore/config.yaml with the
 // bench config's gateway as the default source, the failure inbox's store,
 // the webhook sender (its log beside the scores) and bench.yaml's alerts.
-func scorerFor(a *app) (*livescore.Scorer, error) {
+func scorerFor(a *app) (*livescore.Scorer, error) { return scorerWith(a, true) }
+
+// scorerWith builds the scorer; withJudge false leaves the judge out without
+// reading its key variable (the hosted pull adds the org's own key).
+func scorerWith(a *app, withJudge bool) (*livescore.Scorer, error) {
 	dir := a.cfg.Path(livescore.Dir)
 	cfg, err := livescore.LoadConfig(filepath.Join(dir, livescore.ConfigFile))
 	if err != nil {
@@ -77,7 +81,7 @@ func scorerFor(a *app) (*livescore.Scorer, error) {
 	s := &livescore.Scorer{Config: cfg, Store: livescore.NewStore(dir), Inbox: traceinbox.NewFileStore(a.cfg.Path(traceinbox.Dir)),
 		URL: a.cfg.Gateway.URL, TokenEnv: a.cfg.Gateway.AdminTokenEnv,
 		Notifier: alerts.NewSender(filepath.Join(dir, "deliveries.jsonl")), ExtraAlerts: a.cfg.Alerts}
-	if j := cfg.Judge; j != nil {
+	if j := cfg.Judge; j != nil && withJudge {
 		prompt := ""
 		if j.PromptFile != "" {
 			b, err := os.ReadFile(a.cfg.Path(j.PromptFile))

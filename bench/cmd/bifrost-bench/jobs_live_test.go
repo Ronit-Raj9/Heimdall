@@ -37,16 +37,6 @@ func TestLiveInitParamsCheck(t *testing.T) {
 	}
 }
 
-func TestLivePullsRefusedHosted(t *testing.T) {
-	env := jobEnv{Hosted: true}
-	if _, _, err := validateLivePull(t.Context(), env, nil); !errors.Is(err, jobs.ErrInvalidParams) {
-		t.Fatalf("livescore.pull hosted: %v", err)
-	}
-	if _, _, err := validateInboxPull(t.Context(), env, nil); !errors.Is(err, jobs.ErrInvalidParams) {
-		t.Fatalf("inbox.pull hosted: %v", err)
-	}
-}
-
 func TestLiveDecodeRefusesUnknownFields(t *testing.T) {
 	var p liveCompareParams
 	if err := liveDecode(json.RawMessage(`{"restrat":true}`), &p); !errors.Is(err, jobs.ErrInvalidParams) {

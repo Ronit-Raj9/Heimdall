@@ -35,3 +35,48 @@ declare module "@/lib/i18n/resources" {
 		liveinbox: typeof import("@/locales/en/liveinbox.json");
 	}
 }
+
+/** One thing to do before a pull works (handlers/liveinbox_pull.go PullStep). */
+export interface PullStep {
+	problem: string;
+	action: string;
+	/** "/settings?tab=secrets", "/models", "#live-setup" or "#inbox-source-setup". */
+	link?: string;
+	secret?: string;
+}
+
+/** A credential a pull reads, by name only. */
+export interface PullSecret {
+	name: string;
+	for: string;
+	set: boolean;
+}
+
+/** Whether one kind of pull can run now. */
+export interface PullCheck {
+	ready: boolean;
+	configured: boolean;
+	secrets: PullSecret[];
+	steps: PullStep[];
+	judge?: { key_ready: boolean; next?: string; link?: string };
+}
+
+/** GET /liveinbox/pull. */
+export interface PullReadiness {
+	hosted: boolean;
+	live: PullCheck;
+	inbox: PullCheck;
+}
+
+/** Params of the inbox.source job (cmd/bifrost-bench/jobs_inbox_source.go). */
+export interface InboxSourceParams {
+	name: string;
+	kind: "bifrost" | "langfuse" | "langsmith";
+	url?: string;
+	host?: string;
+	token_env?: string;
+	public_key_env?: string;
+	secret_key_env?: string;
+	api_key_env?: string;
+	project?: string;
+}

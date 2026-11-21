@@ -9,7 +9,7 @@
 			"compare": "Recompute comparison",
 			"restart": "Start a new comparison from now",
 			"restartConfirm": "Start a new comparison? Sessions before now are not tested again.",
-			"hostedPull": "Pulls read your gateway with a credential, so they run only on a local Heimdall. Run bifrost-bench livescore pull there, or push failures to the inbox webhook."
+			"judgeHosted": "Use the paid judge for this pull (your org's provider key)"
 		},
 		"setup": {
 			"title": "Set up live scoring",
@@ -29,7 +29,10 @@
 			"tokenEnvHint": "The name of a server environment variable, never the credential itself.",
 			"force": "Overwrite an existing livescore/config.yaml",
 			"submit": "Write config",
-			"incomplete": "Fill both values to continue."
+			"incomplete": "Fill both values to continue.",
+			"urlHintHosted": "Empty uses the gateway of the project config. On this server it must be a public https URL.",
+			"tokenEnvHosted": "Read credential secret name (optional)",
+			"tokenEnvHintHosted": "The name of an org secret in Settings > Secrets, never the credential itself."
 		}
 	},
 	"inbox": {
@@ -37,7 +40,7 @@
 			"label": "Pull now",
 			"since": "Window",
 			"sinceCursor": "Since last pull",
-			"hosted": "Pulls read your trace tools with a credential, so they run only on a local Heimdall."
+			"needsSetup": "Set up pulling"
 		},
 		"webhook": {
 			"title": "Push failures in",
@@ -56,6 +59,33 @@
 			"copy": "Copy",
 			"copied": "Copied",
 			"loadError": "Could not read the webhook setup"
+		},
+		"source": {
+			"title": "Pull failures from your tools",
+			"description": "Add a Bifrost, Langfuse or LangSmith source. This adds it to inbox/sources.yaml with a starter filter (errors).",
+			"kind": "Source",
+			"name": "Name",
+			"url": "Gateway URL",
+			"host": "API host",
+			"project": "Project id (optional, for links)",
+			"projectId": "Project id",
+			"tokenEnv": "Read credential secret name",
+			"publicKeyEnv": "Public key secret name",
+			"secretKeyEnv": "Secret key secret name",
+			"apiKeyEnv": "API key secret name",
+			"secretHint": "Give the names of server environment variables, never the values.",
+			"secretHintHosted": "Give the names of org secrets, never the values. Store the values in Settings > Secrets.",
+			"submit": "Add source",
+			"incomplete": "Fill the required fields to continue.",
+			"another": "Add another pull source"
+		}
+	},
+	"pull": {
+		"steps": {
+			"title": "Before you can pull",
+			"openSecrets": "Open Settings > Secrets",
+			"openModels": "Open Models & keys",
+			"openForm": "Open the setup form"
 		}
 	}
 }

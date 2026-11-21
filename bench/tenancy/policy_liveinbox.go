@@ -5,5 +5,6 @@ package tenancy
 // what to do instead (handlers/liveinbox_webhook.go).
 func init() {
 	OrgPolicy[key("GET", api+"/inbox/webhook")] = org(viewer)
+	OrgPolicy[key("GET", api+"/liveinbox/pull")] = org(viewer)
 	OrgPolicy[key("POST", api+"/inbox/ingest")] = deny("the inbox webhook is not served on the hosted server yet: push from a local Heimdall, or pull with bifrost-bench inbox pull and upload the project")
 }
