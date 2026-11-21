@@ -828,10 +828,16 @@ func (r *Runner) finish(j *Job, status Status, result []byte, msg string) {
 	if result != nil {
 		res = string(result)
 	}
-	if _, err := r.db.SQL().ExecContext(context.Background(), r.q(`UPDATE jobs SET status = ?, result = ?, error = ?, finished_at = ?,
+	now := r.now()
+	out, err := r.db.SQL().ExecContext(context.Background(), r.q(`UPDATE jobs SET status = ?, result = ?, error = ?, finished_at = ?,
 		lease_owner = NULL, lease_until = NULL WHERE id = ? AND lease_owner = ? AND attempt = ? AND status = ?`),
-		string(status), res, msg, r.now().UnixMilli(), j.ID, r.opts.Owner, j.Attempt, string(StatusRunning)); err != nil {
+		string(status), res, msg, now.UnixMilli(), j.ID, r.opts.Owner, j.Attempt, string(StatusRunning))
+	if err != nil {
 		r.opts.Logger.Error("job finish write failed", "job", j.ID, "error", err.Error())
+		return
+	}
+	if n, _ := out.RowsAffected(); n == 1 { // web parity L19 finish hooks (finishhook.go)
+		runFinishHooks(j, status, result, msg, now)
 	}
 }
 
