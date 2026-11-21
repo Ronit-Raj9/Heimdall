@@ -44,3 +44,29 @@ func TestMirrorTreeCopiesUpdatesAndPrunes(t *testing.T) {
 		t.Fatal("stale folder kept")
 	}
 }
+
+// Agent version snapshots are mirrored so a runner can re-plan a pinned arm;
+// the rest of .heimdall is not.
+func TestMirrorTreeKeepsAgentVersions(t *testing.T) {
+	src, dst := t.TempDir(), t.TempDir()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(os.MkdirAll(filepath.Join(src, ".heimdall", "agent-versions", "a"), 0o755))
+	must(os.MkdirAll(filepath.Join(src, ".heimdall", "versions"), 0o755))
+	must(os.WriteFile(filepath.Join(src, ".heimdall", "agent-versions", "a", "v1.yaml"), []byte("id: a"), 0o644))
+	must(os.WriteFile(filepath.Join(src, ".heimdall", "versions", "index.jsonl"), []byte("x"), 0o644))
+	must(os.WriteFile(filepath.Join(src, ".heimdall", "sync.json"), []byte("x"), 0o644))
+	must(mirrorTree(src, dst))
+	if b, err := os.ReadFile(filepath.Join(dst, ".heimdall", "agent-versions", "a", "v1.yaml")); err != nil || string(b) != "id: a" {
+		t.Fatalf("snapshot not mirrored: %q %v", b, err)
+	}
+	for _, gone := range []string{"versions", "sync.json"} {
+		if _, err := os.Stat(filepath.Join(dst, ".heimdall", gone)); !os.IsNotExist(err) {
+			t.Fatalf(".heimdall/%s mirrored", gone)
+		}
+	}
+}

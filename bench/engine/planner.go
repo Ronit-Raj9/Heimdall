@@ -635,6 +635,10 @@ func adapterFaultTeamErr(cfg *schemas.AgentConfig, suite *schemas.Suite, c condP
 // exactly what it did before.
 func (p *Planner) resolveArm(ctx context.Context, label, cfgPath string, set map[string]any, suite *schemas.Suite, conds []condPlan) (schemas.ArmManifest, error) {
 	var am schemas.ArmManifest
+	cfgPath, err := p.agentVersionPath(cfgPath) // A06: agents/<id>.yaml@v<N> reads the frozen snapshot (agentversion.go)
+	if err != nil {
+		return am, err
+	}
 	raw, err := os.ReadFile(p.abs(cfgPath))
 	if err != nil {
 		return am, fmt.Errorf("read agent config: %w", err)

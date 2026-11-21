@@ -1,0 +1,268 @@
+// Package agentversions keeps frozen snapshots of agent configs under the
+// project's .heimdall/agent-versions/<id>/ folder: v<N>.yaml per version and
+// versions.json as the index. A save whose config hash equals the latest
+// version's adds nothing. Built-in library agents get one synthetic,
+// read-only v1 (their library file).
+package agentversions
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sync"
+	"time"
+
+	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
+	"github.com/maximhq/bifrost/bench/utils"
+	"gopkg.in/yaml.v3"
+)
+
+// ErrNotFound is returned for an unknown agent or version.
+var ErrNotFound = errors.New("agent version not found")
+
+// LibraryActor is CreatedBy of a library agent's synthetic v1.
+const LibraryActor = "library"
+
+var idRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$`)
+
+// ValidID reports whether id is safe as a single path segment.
+func ValidID(id string) bool { return idRe.MatchString(id) }
+
+// ConfigHash is the planner's config hash of an agent YAML document with no
+// overrides: the document is resolved exactly as engine.ResolveAgentConfig
+// does (YAML tree round trip, schema-checked decode) and hashed with
+// utils.HashJSON, so it equals a manifest arm's config_hash for agents whose
+// image is not built per suite.
+func ConfigHash(doc []byte) (string, error) {
+	var tree map[string]any
+	if err := yaml.Unmarshal(doc, &tree); err != nil {
+		return "", fmt.Errorf("parse agent config: %w", err)
+	}
+	if tree == nil {
+		tree = map[string]any{}
+	}
+	out, err := yaml.Marshal(tree)
+	if err != nil {
+		return "", fmt.Errorf("encode agent config: %w", err)
+	}
+	var cfg schemas.AgentConfig
+	if err := suite.DecodeYAML(out, "effective agent config", suite.SchemaAgent, &cfg); err != nil {
+		return "", err
+	}
+	return utils.HashJSON(&cfg)
+}
+
+var (
+	locksMu sync.Mutex
+	locks   = map[string]*sync.Mutex{}
+)
+
+func lockFor(dir string) func() {
+	locksMu.Lock()
+	m, ok := locks[dir]
+	if !ok {
+		m = &sync.Mutex{}
+		locks[dir] = m
+	}
+	locksMu.Unlock()
+	m.Lock()
+	return m.Unlock
+}
+
+func agentDir(root, id string) string {
+	return filepath.Join(root, filepath.FromSlash(schemas.AgentVersionsDir), id)
+}
+
+// List returns the stored versions of agent id, oldest first. No folder is
+// an empty list.
+func List(root, id string) ([]schemas.AgentVersion, error) {
+	if !ValidID(id) {
+		return nil, fmt.Errorf("agent id %q is not valid", id)
+	}
+	return readIndex(agentDir(root, id))
+}
+
+func readIndex(dir string) ([]schemas.AgentVersion, error) {
+	b, err := os.ReadFile(filepath.Join(dir, "versions.json"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return []schemas.AgentVersion{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []schemas.AgentVersion
+	if err := json.Unmarshal(b, &out); err != nil {
+		return nil, fmt.Errorf("versions.json: %w", err)
+	}
+	if out == nil {
+		out = []schemas.AgentVersion{}
+	}
+	return out, nil
+}
+
+// Read returns the YAML of version n of agent id and its index entry.
+func Read(root, id string, n int) ([]byte, schemas.AgentVersion, error) {
+	vs, err := List(root, id)
+	if err != nil {
+		return nil, schemas.AgentVersion{}, err
+	}
+	for _, v := range vs {
+		if v.Version != n {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(schemas.AgentVersionSnapshotPath(id, n))))
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, v, ErrNotFound
+		}
+		return b, v, err
+	}
+	return nil, schemas.AgentVersion{}, ErrNotFound
+}
+
+// Source is one saved content of agents/<id>.yaml, as the Files API
+// history records it.
+type Source struct {
+	Doc         []byte
+	At          time.Time // zero: now
+	Actor, Note string
+	FileVersion string // Files API version id, "" when unknown
+	FileSHA256  string
+}
+
+// Snapshot freezes doc as the next version of agent id unless its config
+// hash equals the latest version's. It returns the version that now holds
+// doc and whether it was created.
+func Snapshot(root, id string, doc []byte, actor, note string) (schemas.AgentVersion, bool, error) {
+	return Record(root, id, []Source{{Doc: doc, Actor: actor, Note: note}})
+}
+
+// Record adds versions from the Files API history of agents/<id>.yaml,
+// oldest first; the last entry is the current content. An agent with no
+// versions yet is backfilled from the whole history (each change of config
+// hash is a version, a document that does not decode is skipped); otherwise
+// only the last entry is considered. A config hash equal to the latest
+// version's adds nothing. It returns the version that holds the last entry
+// and whether any version was created.
+func Record(root, id string, history []Source) (schemas.AgentVersion, bool, error) {
+	if !ValidID(id) {
+		return schemas.AgentVersion{}, false, fmt.Errorf("agent id %q is not valid", id)
+	}
+	if len(history) == 0 {
+		return schemas.AgentVersion{}, false, errors.New("nothing to record")
+	}
+	dir := agentDir(root, id)
+	defer lockFor(dir)()
+	vs, err := readIndex(dir)
+	if err != nil {
+		return schemas.AgentVersion{}, false, err
+	}
+	if len(vs) > 0 {
+		history = history[len(history)-1:]
+	}
+	// The current content must decode; older history entries may not.
+	lastHash, err := ConfigHash(history[len(history)-1].Doc)
+	if err != nil {
+		return schemas.AgentVersion{}, false, err
+	}
+	created := false
+	for i, src := range history {
+		hash := lastHash
+		if i < len(history)-1 {
+			if hash, err = ConfigHash(src.Doc); err != nil {
+				continue
+			}
+		}
+		if len(vs) > 0 && vs[len(vs)-1].Hash == hash {
+			continue
+		}
+		next := 1
+		if len(vs) > 0 {
+			next = vs[len(vs)-1].Version + 1
+		}
+		at := src.At.UTC()
+		if src.At.IsZero() {
+			at = time.Now().UTC()
+		}
+		note := src.Note
+		if len(note) > 200 {
+			note = note[:200]
+		}
+		v := schemas.AgentVersion{Version: next, Hash: hash, CreatedAt: at, CreatedBy: src.Actor, Note: note,
+			FileVersion: src.FileVersion, FileSHA256: src.FileSHA256}
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return v, created, err
+		}
+		if err := writeAtomic(filepath.Join(dir, fmt.Sprintf("v%d.yaml", next)), src.Doc); err != nil {
+			return v, created, err
+		}
+		vs, created = append(vs, v), true
+	}
+	if created {
+		b, err := json.MarshalIndent(vs, "", "  ")
+		if err != nil {
+			return vs[len(vs)-1], created, err
+		}
+		if err := writeAtomic(filepath.Join(dir, "versions.json"), append(b, '\n')); err != nil {
+			return vs[len(vs)-1], created, err
+		}
+	}
+	return vs[len(vs)-1], created, nil
+}
+
+func writeAtomic(path string, data []byte) error {
+	f, err := os.CreateTemp(filepath.Dir(path), ".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return nil
+}
+
+// LibraryFile returns the library agent file agents/<id>.yaml (or .yml)
+// under lib, or "" when there is none.
+func LibraryFile(lib, id string) string {
+	if lib == "" || !ValidID(id) {
+		return ""
+	}
+	for _, ext := range []string{".yaml", ".yml"} {
+		p := filepath.Join(lib, "agents", id+ext)
+		if fi, err := os.Stat(p); err == nil && fi.Mode().IsRegular() {
+			return p
+		}
+	}
+	return ""
+}
+
+// LibraryVersion returns the synthetic v1 of a library agent file.
+func LibraryVersion(path string) ([]byte, schemas.AgentVersion, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, schemas.AgentVersion{}, err
+	}
+	v := schemas.AgentVersion{Version: 1, CreatedBy: LibraryActor, Note: "built-in agent"}
+	if fi, err := os.Stat(path); err == nil {
+		v.CreatedAt = fi.ModTime().UTC()
+	}
+	if v.Hash, err = ConfigHash(b); err != nil {
+		v.Hash = utils.SHA256Bytes(b)
+	}
+	return b, v, nil
+}

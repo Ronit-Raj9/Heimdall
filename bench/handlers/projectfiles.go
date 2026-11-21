@@ -297,10 +297,18 @@ func (h *projectFilesHandler) put(ctx *fasthttp.RequestCtx) {
 		h.sendStoreError(ctx, rel, projectfs.ErrTooLarge)
 		return
 	}
-	entry, err := h.store.Write(ctx, a, rel, append([]byte(nil), body...), writeOpts(ctx))
+	opts := writeOpts(ctx)
+	entry, err := h.store.Write(ctx, a, rel, append([]byte(nil), body...), opts)
 	if err != nil {
 		h.sendStoreError(ctx, rel, err)
 		return
+	}
+	if a == projectfs.AreaAgents { // A06: agent versions
+		if id := agentIDFromAgentsFile(rel); id != "" {
+			work, cancel := workContext(ctx, readTimeout)
+			snapshotAgentSave(work, h.store, rel, id, body, opts.Actor, opts.Note)
+			cancel()
+		}
 	}
 	ctx.Response.Header.Set("ETag", strconv.Quote(entry.SHA256))
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, ProjectFileSaved{Area: string(a), Path: entry.Path, Entry: &entry})
