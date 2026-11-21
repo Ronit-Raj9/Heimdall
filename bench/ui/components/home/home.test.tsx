@@ -143,13 +143,14 @@ describe("RecentExperiments", () => {
 });
 
 describe("SuitesPanel", () => {
-	it("shows suites as tiles with a Ready or Not ready yet pill", () => {
+	it("shows benchmarks as rows by human name with a Ready or Not ready yet dot", () => {
 		const html = render(<SuitesPanel suites={suites} limit={20} />);
 		expect(html).toContain('href="/suites/coding-core"');
 		expect(tagOf(html, "home-suite-coding-core")).toContain('data-ready="ready"');
 		expect(tagOf(html, "home-suite-acme-payments")).toContain('data-ready="attention"');
 		expect(tagOf(html, "home-suite-acme-broken")).toContain('data-ready="failed"');
 		expect(html).toContain("4 tasks");
+		expect(html).toContain("Coding basics");
 		expect(html).toContain("Not ready yet");
 		expect(html).not.toContain("admitted");
 	});

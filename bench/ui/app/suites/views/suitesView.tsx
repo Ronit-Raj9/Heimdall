@@ -1,17 +1,15 @@
-import { ModeBadge } from "@/components/modeBadge";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState, PageHeader } from "@/components/shell";
 import { SuiteCards } from "@/components/suites/suiteCards";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { useGetSuitesQuery } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, Boxes, Plus } from "lucide-react";
+import { AlertTriangle, Boxes, ChevronDown, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 /**
- * The suites list: every pack in the project with its lock state and admission record, each card
- * a link to /suites/$suiteId. The old /suites?suite=X redirects to that suite's page.
+ * The benchmarks list: every pack in the project as one plain row, each a link to /suites/$suiteId. The old /suites?suite=X redirects to that suite's page.
  */
 export default function SuitesView() {
 	const { t } = useTranslation("bench");
@@ -24,13 +22,7 @@ export default function SuitesView() {
 			<PageHeader
 				title={t("suites.title")}
 				subtitle={tu("subtitle")}
-				meta={<ModeBadge mode={data?.mode} isLoading={query.isLoading} isError={query.isError && !data} />}
-				actions={
-					<div className="flex flex-wrap items-center gap-2">
-						<NewSuiteButton />
-						<AddSuiteButton />
-					</div>
-				}
+				actions={<AddBenchmarkMenu />}
 			/>
 			{data?.mode === "synthetic" && (
 				<p
@@ -62,28 +54,32 @@ export default function SuitesView() {
 	);
 }
 
-/** The header's "New suite": write a suite from a template (/suites/new). */
-export function NewSuiteButton() {
-	const { t } = useTranslation("suiteAuthoring");
+/** The header's one action: "Add benchmark", a small menu of From catalog and Create your own. */
+export function AddBenchmarkMenu() {
+	const { t } = useTranslation("suitesUx");
+	const item =
+		"hover:bg-accent focus-visible:bg-accent block rounded-md px-3 py-1.5 text-sm whitespace-nowrap outline-none";
 	return (
-		<Button size="sm" variant="ghost" asChild>
-			<Link to="/suites/new" data-testid="suites-new-link">
+		<details className="group relative" data-testid="suites-add-menu">
+			<summary
+				className={cn(
+					buttonVariants({ size: "sm" }),
+					"cursor-pointer list-none [&::-webkit-details-marker]:hidden",
+				)}
+				data-testid="suites-add-button"
+			>
 				<Plus className="size-4" aria-hidden="true" />
-				{t("new.title")}
-			</Link>
-		</Button>
-	);
-}
-
-/** The header's "Add a suite": the import and bring-your-own flow. */
-export function AddSuiteButton() {
-	const { t } = useTranslation("bench");
-	return (
-		<Button size="sm" asChild>
-			<Link to="/suites/add" data-testid="suites-add-link">
-				<Plus className="size-4" aria-hidden="true" />
-				{t("suites.addSuite")}
-			</Link>
-		</Button>
+				{t("add.button")}
+				<ChevronDown className="size-3.5 opacity-70 transition-transform group-open:rotate-180" aria-hidden="true" />
+			</summary>
+			<div className="bg-popover text-popover-foreground absolute right-0 z-20 mt-1 flex min-w-44 flex-col rounded-lg border p-1 shadow-md">
+				<Link to="/catalog" className={item} data-testid="suites-add-catalog">
+					{t("add.catalog")}
+				</Link>
+				<Link to="/suites/new" className={item} data-testid="suites-new-link">
+					{t("add.create")}
+				</Link>
+			</div>
+		</details>
 	);
 }

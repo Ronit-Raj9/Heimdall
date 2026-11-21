@@ -34,24 +34,29 @@ vi.mock("@tanstack/react-router", () => ({
 
 const list = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../public/fixtures/suites.json"), "utf8")) as SuiteList;
 const suite = (id: string) => list.suites.find((s) => s.id === id)!;
-const card = (html: string, id: string) => html.match(new RegExp(`data-testid="suites-card-${id}"[\\s\\S]*?</article>`))?.[0] ?? "";
+const card = (html: string, id: string) => html.match(new RegExp(`data-testid="suites-row-${id}"[\\s\\S]*?</li>`))?.[0] ?? "";
 
 describe("SuiteCards", () => {
 	const html = renderToStaticMarkup(<SuiteCards suites={list.suites} />);
 
-	it("links every card to its suite's page by a readable name", () => {
-		expect(html).toMatch(/href="\/suites\/coding-core"[^>]*data-testid="suites-card-coding-core-link"[^>]*>Coding core</);
+	it("links every row to its benchmark's page by a human name, with the id only in the hover title", () => {
+		expect(html).toMatch(/href="\/suites\/coding-core"[^>]*title="coding-core@[^"]*"[^>]*data-testid="suites-row-coding-core-link"[^>]*>Coding basics</);
+		expect(card(html, "coding-core")).toContain("Fix small Python projects so their hidden tests pass.");
+		expect(card(html, "coding-core")).not.toContain("font-mono");
+		expect(card(html, "acme-payments")).toMatch(/>Acme Payments</);
 	});
 
-	it("shows one status pill and the task count, and hides engineering detail", () => {
+	it("shows readiness as a dot and words, the task count and a quiet Run, and hides engineering detail", () => {
 		const core = card(html, "coding-core");
-		expect(core).toMatch(/data-testid="suites-card-coding-core-status" data-status="ready">.*Ready/);
+		expect(core).toMatch(/data-testid="suites-row-coding-core-status" data-status="ready">.*Ready/);
 		expect(core).toContain("4 tasks");
-		expect(core).toContain('data-testid="suites-card-coding-core-run"');
+		expect(core).toContain('data-testid="suites-row-coding-core-run"');
+		expect(core).toContain("md:group-hover:opacity-100");
 		const acme = card(html, "acme-payments");
-		expect(acme).toMatch(/data-status="needsAdmission">.*2 tasks not ready yet/);
+		expect(acme).toMatch(/data-status="needsAdmission">.*1 of 3 tasks ready/);
+		expect(acme).not.toContain("task init");
 		expect(card(html, "harbor-shell")).not.toContain("Reward file");
-		expect(card(html, "harbor-shell")).not.toContain("digest not pinned");
+		expect(card(html, "harbor-shell")).not.toContain("test.sh");
 		expect(core).not.toContain("probes");
 	});
 
@@ -61,6 +66,10 @@ describe("SuiteCards", () => {
 		expect(broken).toContain("Could not load");
 		expect(broken).toContain("verifier.tests: required field missing");
 		expect(broken).not.toContain("-run");
+	});
+
+	it("puts no colored icon tile on any row", () => {
+		expect(html).not.toContain("data-track=");
 	});
 });
 
@@ -109,9 +118,5 @@ describe("scenario facts", () => {
 		expect(html).toMatch(/data-testid="suites-imported".*?recall-example@1/);
 	});
 
-	it("puts a category icon on every card", () => {
-		const html = renderToStaticMarkup(<SuiteCards suites={list.suites} />);
-		expect(card(html, "coding-core")).toContain('data-track="coding"');
-		expect(card(html, "harbor-shell")).toContain('data-track="terminal"');
-	});
+
 });

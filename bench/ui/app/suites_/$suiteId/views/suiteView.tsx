@@ -1,4 +1,3 @@
-import { ModeBadge } from "@/components/modeBadge";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { GradingBadge } from "@/components/scenario/scenarioBadges";
 import { suiteGrading } from "@/components/scenario/scenario.utils";
@@ -10,8 +9,8 @@ import {
   type RouteTab,
 } from "@/components/shell";
 import { suiteVersionOf } from "@/components/shell/entityLink";
+import { suiteDisplayDescription } from "@/components/suites/suiteDisplay";
 import {
-  SuiteIconTile,
   SuiteStatusPill,
   suiteDisplayName,
 } from "@/components/suites/suiteIdentity";
@@ -60,7 +59,7 @@ export default function SuiteView({ suiteId }: { suiteId: string }) {
     null;
   const crumbs = [
     { label: t("suites.title"), to: "/suites" },
-    { label: suiteId },
+    { label: suiteDisplayName(suiteIdOf(suiteId)) },
   ];
 
   if (query.isLoading) {
@@ -161,18 +160,15 @@ function SuiteBody({
     >
       <PageHeader
         title={
-          <span className="flex min-w-0 items-center gap-4">
-            <SuiteIconTile suite={suite} size="lg" />
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">
-                {suiteDisplayName(suite.id)}
-              </span>
-              <span className="text-muted-foreground truncate font-mono text-xs font-normal">
-                {suite.id}
-                {suite.version && (
-                  <span className="opacity-70">@{suite.version}</span>
-                )}
-              </span>
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">
+              {suiteDisplayName(suite.id)}
+            </span>
+            <span className="text-muted-foreground truncate font-mono text-xs font-normal">
+              {suite.id}
+              {suite.version && (
+                <span className="opacity-70">@{suite.version}</span>
+              )}
             </span>
           </span>
         }
@@ -188,16 +184,15 @@ function SuiteBody({
                 skill: suiteSkill(suite) ?? tu("skillFallback"),
               })}
             </span>
-            {suite.description && (
+            {suiteDisplayDescription(suite) && (
               <span className="text-muted-foreground line-clamp-2 text-xs">
-                {suite.description}
+                {suiteDisplayDescription(suite)}
               </span>
             )}
           </span>
         }
         meta={
           <>
-            <ModeBadge mode={mode as never} />
             <SuiteStatusPill suite={suite} testId="suite-status" />
             {judged && <GradingBadge grading="judged" />}
           </>

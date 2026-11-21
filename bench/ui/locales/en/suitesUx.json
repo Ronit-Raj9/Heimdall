@@ -1,13 +1,17 @@
 {
 	"run": "Run",
+	"add": {
+		"button": "Add benchmark",
+		"catalog": "From catalog",
+		"create": "Create your own"
+	},
 	"runSuite": "Run {{suite}}",
 	"open": "Open {{suite}}",
 	"tasks_one": "{{count}} task",
 	"tasks_other": "{{count}} tasks",
 	"status": {
 		"ready": "Ready",
-		"needsAdmission_one": "{{count}} task not ready yet",
-		"needsAdmission_other": "{{count}} tasks not ready yet",
+		"needsAdmission": "{{ready}} of {{total}} tasks ready",
 		"needsLock": "Needs re-freezing",
 		"noTasks": "No tasks yet",
 		"error": "Could not load"

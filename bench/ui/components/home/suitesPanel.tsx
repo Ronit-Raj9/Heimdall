@@ -1,47 +1,52 @@
+import { suiteDisplay } from "@/components/suites/suiteDisplay";
 import type { SuiteSummary } from "@/lib/types/bench";
 import "@/lib/types/homeI18n";
+import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { Pill, TrackBadge } from "./homeBits";
 import { suiteReady } from "./home.utils";
 
-/** Suites as compact tiles: category icon, name, task count and a Ready or Needs attention pill. */
+const DOT: Record<"ready" | "attention" | "failed", string> = {
+	ready: "bg-chart-success",
+	attention: "bg-chart-warning",
+	failed: "bg-chart-error",
+};
+
+/** Benchmarks as a plain list: human name, task count and a small Ready or Not ready yet dot. */
 export function SuitesPanel({ suites, limit = 6 }: { suites: readonly SuiteSummary[]; limit?: number }) {
 	return (
-		<ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1" data-testid="home-suites-list">
+		<ul className="bg-card min-w-0 divide-y rounded-xl border" data-testid="home-suites-list">
 			{suites.slice(0, limit).map((suite) => (
-				<SuiteTile key={suite.id} suite={suite} />
+				<SuiteRow key={suite.id} suite={suite} />
 			))}
 		</ul>
 	);
 }
 
-function SuiteTile({ suite }: { suite: SuiteSummary }) {
+function SuiteRow({ suite }: { suite: SuiteSummary }) {
 	const { t } = useTranslation("home");
 	const ready = !suite.error && suiteReady(suite);
 	const state = suite.error ? "failed" : ready ? "ready" : "attention";
+	const { name, description } = suiteDisplay(suite);
 	return (
 		<li className="min-w-0" data-testid={`home-suite-${suite.id}`} data-ready={state}>
 			<Link
 				to="/suites/$suiteId"
 				params={{ suiteId: suite.id }}
-				className="bg-card hover:border-primary/30 focus-visible:ring-ring/60 flex h-full min-w-0 items-center gap-3 rounded-xl border p-3.5 shadow-(--shadow-card) transition-[box-shadow,border-color] hover:shadow-md focus-visible:ring-2 focus-visible:outline-none"
-				title={suite.description || suite.id}
+				className="hover:bg-muted/40 focus-visible:bg-muted/40 flex min-w-0 items-center gap-3 px-3.5 py-2.5 transition-colors focus-visible:outline-none"
+				title={description ? `${description} (${suite.id})` : suite.id}
 			>
-				<TrackBadge track={suite.track} />
-				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-					<span className="text-foreground truncate text-sm font-medium">{suite.id}</span>
-					<span className="text-muted-foreground truncate text-xs">
-						{suite.error ? t("suites.failed") : t("suites.tasks", { count: suite.task_count })}
-					</span>
-				</span>
-				<Pill
-					tone={state === "ready" ? "good" : state === "failed" ? "bad" : "warn"}
-					testId={`home-suite-state-${suite.id}`}
-					className="max-sm:px-1.5"
+				<span className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">{name}</span>
+				{!suite.error && (
+					<span className="text-muted-foreground shrink-0 text-xs tabular-nums">{t("suites.tasks", { count: suite.task_count })}</span>
+				)}
+				<span
+					className="text-muted-foreground inline-flex shrink-0 items-center gap-1.5 text-xs whitespace-nowrap"
+					data-testid={`home-suite-state-${suite.id}`}
 				>
-					{state === "ready" ? t("suites.ready") : t("suites.attention")}
-				</Pill>
+					<span className={cn("size-1.5 rounded-full", DOT[state])} aria-hidden="true" />
+					{state === "ready" ? t("suites.ready") : state === "failed" ? t("suites.failed") : t("suites.attention")}
+				</span>
 			</Link>
 		</li>
 	);
