@@ -1,0 +1,54 @@
+{
+	"releases": {
+		"subtitle": "Who shipped which agent, and on what evidence.",
+		"new": "New release",
+		"newTitle": "New release",
+		"newHint": "Pick an experiment, check its verdict, then record it.",
+		"close": "Close",
+		"more": "More actions",
+		"timeline": "Timeline",
+		"chainOk": "Chain verified",
+		"chainBroken": "Chain broken",
+		"linked": "Linked",
+		"unlinked": "Link broken",
+		"override": "Override",
+		"evidence": "Evidence",
+		"details": "Details",
+		"empty": "No releases yet. Record the first one.",
+		"policy": "Policy",
+		"noPolicy": "No policy",
+		"config": "Config",
+		"experiment": "Experiment",
+		"note": "Note",
+		"hash": "Hash",
+		"prevHash": "Previous hash",
+		"approvedBy": "Approved by {{name}}",
+		"tools": "Audit tools",
+		"packs": "Compliance packs"
+	},
+	"policies": {
+		"subtitle": "Rules a candidate must pass before it ships.",
+		"rulesTitle": "Rules",
+		"when": "When",
+		"then": "then",
+		"settings": "Settings",
+		"advanced": "Advanced",
+		"editing": "Editing"
+	},
+	"review": {
+		"subtitle": "Runs a person should look at before you trust the score.",
+		"all": "All",
+		"inbox": "Inbox"
+	},
+	"monitors": {
+		"subtitle": "How often each monitor catches attacks at a fixed false alarm rate.",
+		"catchRate": "Catch rate",
+		"noAttacks": "No attacks",
+		"labelled": "{{honest}} honest, {{attacks}} attacks",
+		"empty": "No monitor certified yet.",
+		"open": "Open",
+		"certifyNew": "Certify monitor",
+		"warnings_one": "{{count}} warning",
+		"warnings_other": "{{count}} warnings"
+	}
+}

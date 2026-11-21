@@ -1,7 +1,21 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { PolicyCheck, ReleasePolicy } from "@/lib/types/govern";
-import { Plus, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+	CheckCircle2,
+	CircleAlert,
+	DollarSign,
+	Gauge,
+	type LucideIcon,
+	Plus,
+	Repeat,
+	ShieldAlert,
+	SlidersHorizontal,
+	Timer,
+	Trash2,
+} from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** Metrics a check can test (docs/release-policy.md); the field also accepts any per-run metric. */
@@ -61,57 +75,83 @@ export interface PolicyFormProps {
 	disabled?: boolean;
 }
 
-/** Click-first editor of a release policy: name, description, on_unknown and a list of checks. */
+/** An icon per known metric, so each rule row reads at a glance. */
+export function metricIcon(metric: string): LucideIcon {
+	switch (metric) {
+		case "verified_success":
+			return CheckCircle2;
+		case "false_completion":
+			return CircleAlert;
+		case "integrity_violations":
+			return ShieldAlert;
+		case "retry_amplification":
+			return Repeat;
+		case "cost_per_verified_success":
+		case "cost_usd":
+			return DollarSign;
+		case "latency_s":
+			return Timer;
+		default:
+			return Gauge;
+	}
+}
+
+/** Click-first editor of a release policy: name, description, on_unknown and a list of rule rows. */
 export function PolicyForm({ value, onChange, disabled }: PolicyFormProps) {
 	const { t } = useTranslation("govern");
+	const { t: tu } = useTranslation("u14");
 	const setCheck = (i: number, c: PolicyCheck) => onChange({ ...value, checks: value.checks.map((x, j) => (j === i ? c : x)) });
 	return (
-		<fieldset className="flex flex-col gap-4" disabled={disabled} data-testid="policy-form">
-			<label className="flex flex-col gap-1 text-sm">
-				{t("policies.name")}
-				<Input value={value.name} onChange={(e) => onChange({ ...value, name: e.target.value })} data-testid="policy-name" />
-			</label>
-			<label className="flex flex-col gap-1 text-sm">
-				{t("policies.description")}
-				<Input value={value.description ?? ""} onChange={(e) => onChange({ ...value, description: e.target.value })} />
-			</label>
-			<label className="flex flex-col gap-1 text-sm">
-				{t("policies.onUnknown")}
-				<select
-					className={selectClass}
-					value={value.on_unknown ?? ""}
-					onChange={(e) => onChange({ ...value, on_unknown: e.target.value as ReleasePolicy["on_unknown"] })}
-				>
-					<option value="">{t("policies.onUnknownDefault")}</option>
-					<option value="block">{t("policies.onUnknownBlock")}</option>
-					<option value="warn">{t("policies.onUnknownWarn")}</option>
-				</select>
-			</label>
-			<div className="flex items-center justify-between">
-				<h3 className="text-sm font-medium">{t("policies.checksTitle")}</h3>
-				<Button
-					type="button"
-					size="sm"
-					variant="outline"
-					onClick={() => onChange({ ...value, checks: [...value.checks, emptyCheck(value.checks.length + 1)] })}
-					data-testid="policy-add-check"
-				>
-					<Plus className="size-4" aria-hidden="true" />
-					{t("policies.addCheck")}
-				</Button>
+		<fieldset className="flex flex-col gap-6" disabled={disabled} data-testid="policy-form">
+			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+				<label className="flex flex-col gap-1.5 text-sm font-medium">
+					{t("policies.name")}
+					<Input value={value.name} onChange={(e) => onChange({ ...value, name: e.target.value })} data-testid="policy-name" />
+				</label>
+				<label className="flex flex-col gap-1.5 text-sm font-medium">
+					{t("policies.onUnknown")}
+					<select
+						className={selectClass}
+						value={value.on_unknown ?? ""}
+						onChange={(e) => onChange({ ...value, on_unknown: e.target.value as ReleasePolicy["on_unknown"] })}
+					>
+						<option value="">{t("policies.onUnknownDefault")}</option>
+						<option value="block">{t("policies.onUnknownBlock")}</option>
+						<option value="warn">{t("policies.onUnknownWarn")}</option>
+					</select>
+				</label>
+				<label className="flex flex-col gap-1.5 text-sm font-medium sm:col-span-2">
+					{t("policies.description")}
+					<Input value={value.description ?? ""} onChange={(e) => onChange({ ...value, description: e.target.value })} />
+				</label>
 			</div>
-			{value.checks.length === 0 && <p className="text-muted-foreground text-xs">{t("policies.needCheck")}</p>}
-			<ol className="flex flex-col gap-3">
-				{value.checks.map((c, i) => (
-					<CheckRow
-						key={i}
-						index={i}
-						check={c}
-						onChange={(nc) => setCheck(i, nc)}
-						onRemove={() => onChange({ ...value, checks: value.checks.filter((_, j) => j !== i) })}
-					/>
-				))}
-			</ol>
+			<div className="flex flex-col gap-3">
+				<div className="flex items-center justify-between">
+					<h3 className="text-sm font-semibold">{tu("policies.rulesTitle")}</h3>
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						onClick={() => onChange({ ...value, checks: [...value.checks, emptyCheck(value.checks.length + 1)] })}
+						data-testid="policy-add-check"
+					>
+						<Plus className="size-4" aria-hidden="true" />
+						{t("policies.addCheck")}
+					</Button>
+				</div>
+				{value.checks.length === 0 && <p className="text-muted-foreground text-xs">{t("policies.needCheck")}</p>}
+				<ol className="flex flex-col gap-2">
+					{value.checks.map((c, i) => (
+						<CheckRow
+							key={i}
+							index={i}
+							check={c}
+							onChange={(nc) => setCheck(i, nc)}
+							onRemove={() => onChange({ ...value, checks: value.checks.filter((_, j) => j !== i) })}
+						/>
+					))}
+				</ol>
+			</div>
 			<datalist id="policy-metrics">
 				{POLICY_METRICS.map((m) => (
 					<option key={m} value={m} />
@@ -121,28 +161,39 @@ export function PolicyForm({ value, onChange, disabled }: PolicyFormProps) {
 	);
 }
 
+const chipSelect = "border-input bg-background h-8 rounded-md border px-2 text-xs";
+
 function CheckRow({ index, check, onChange, onRemove }: { index: number; check: PolicyCheck; onChange(c: PolicyCheck): void; onRemove(): void }) {
 	const { t } = useTranslation("govern");
+	const { t: tu } = useTranslation("u14");
+	const [advanced, setAdvanced] = useState(false);
 	const kind = checkKind(check);
 	const numeric = kind === "max" || kind === "min" || kind === "equals";
+	const warn = check.severity === "warn";
+	const Icon = metricIcon(check.metric);
 	return (
-		<li className="grid grid-cols-1 gap-2 rounded-sm border p-3 sm:grid-cols-2" data-testid={`policy-check-${index}`}>
-			<label className="flex flex-col gap-1 text-xs">
-				{t("policies.checkId")}
-				<Input value={check.id} onChange={(e) => onChange({ ...check, id: e.target.value })} />
-			</label>
-			<label className="flex flex-col gap-1 text-xs">
-				{t("policies.metric")}
-				<Input list="policy-metrics" value={check.metric} onChange={(e) => onChange({ ...check, metric: e.target.value })} />
-			</label>
-			<label className="flex flex-col gap-1 text-xs" title={t("policies.conditionHint")}>
-				{t("policies.condition")}
-				<Input value={check.condition ?? ""} onChange={(e) => onChange({ ...check, condition: e.target.value || undefined })} />
-			</label>
-			<label className="flex flex-col gap-1 text-xs">
-				{t("policies.kind")}
+		<li
+			className={cn(
+				"bg-card group flex flex-col gap-3 rounded-xl border border-l-4 p-3 transition hover:shadow-sm",
+				warn ? "border-l-chart-warning" : "border-l-chart-error",
+			)}
+			data-testid={`policy-check-${index}`}
+		>
+			<div className="flex flex-wrap items-center gap-2 text-xs">
+				<span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
+					<Icon className="size-4" aria-hidden="true" />
+				</span>
+				<span className="text-muted-foreground">{tu("policies.when")}</span>
+				<Input
+					list="policy-metrics"
+					aria-label={t("policies.metric")}
+					className="h-8 w-48 text-xs"
+					value={check.metric}
+					onChange={(e) => onChange({ ...check, metric: e.target.value })}
+				/>
 				<select
-					className={selectClass}
+					className={chipSelect}
+					aria-label={t("policies.kind")}
 					value={kind}
 					onChange={(e) => onChange(withKind(check, e.target.value as CheckKind))}
 					data-testid={`policy-check-kind-${index}`}
@@ -153,45 +204,80 @@ function CheckRow({ index, check, onChange, onRemove }: { index: number; check: 
 					<option value="min">{t("policies.kindMin")}</option>
 					<option value="equals">{t("policies.kindEquals")}</option>
 				</select>
-			</label>
-			{numeric && (
-				<label className="flex flex-col gap-1 text-xs">
-					{t("policies.threshold")}
+				{numeric && (
 					<Input
 						type="number"
 						step="any"
+						aria-label={t("policies.threshold")}
+						className="h-8 w-24 text-xs"
 						value={thresholdOf(check) ?? 0}
 						onChange={(e) => onChange({ ...check, [kind]: Number(e.target.value) })}
 						data-testid={`policy-check-threshold-${index}`}
 					/>
-				</label>
-			)}
-			<label className="flex flex-col gap-1 text-xs">
-				{t("policies.minN")}
-				<Input
-					type="number"
-					min={0}
-					value={check.min_n ?? ""}
-					onChange={(e) => onChange({ ...check, min_n: e.target.value === "" ? undefined : Number(e.target.value) })}
-				/>
-			</label>
-			<label className="flex flex-col gap-1 text-xs">
-				{t("policies.severity")}
+				)}
+				<span className="text-muted-foreground">{tu("policies.then")}</span>
 				<select
-					className={selectClass}
+					className={cn(chipSelect, warn ? "text-chart-warning-ink" : "text-chart-error-ink")}
+					aria-label={t("policies.severity")}
 					value={check.severity || "block"}
 					onChange={(e) => onChange({ ...check, severity: e.target.value === "warn" ? "warn" : undefined })}
 				>
 					<option value="block">{t("policies.severityBlock")}</option>
 					<option value="warn">{t("policies.severityWarn")}</option>
 				</select>
-			</label>
-			<div className="flex items-end justify-end sm:col-span-2">
-				<Button type="button" size="sm" variant="ghost" onClick={onRemove} data-testid={`policy-check-remove-${index}`}>
-					<Trash2 className="size-4" aria-hidden="true" />
-					{t("policies.removeCheck")}
-				</Button>
+				<span className="ml-auto flex items-center gap-1">
+					<Button
+						type="button"
+						size="sm"
+						variant="ghost"
+						className="h-8 px-2"
+						aria-expanded={advanced}
+						aria-label={tu("policies.advanced")}
+						title={tu("policies.advanced")}
+						onClick={() => setAdvanced((a) => !a)}
+					>
+						<SlidersHorizontal className="size-4" aria-hidden="true" />
+					</Button>
+					<Button
+						type="button"
+						size="sm"
+						variant="ghost"
+						className="text-muted-foreground hover:text-destructive h-8 px-2"
+						onClick={onRemove}
+						aria-label={t("policies.removeCheck")}
+						title={t("policies.removeCheck")}
+						data-testid={`policy-check-remove-${index}`}
+					>
+						<Trash2 className="size-4" aria-hidden="true" />
+					</Button>
+				</span>
 			</div>
+			{advanced && (
+				<div className="grid grid-cols-1 gap-3 border-t pt-3 sm:grid-cols-3">
+					<label className="text-muted-foreground flex flex-col gap-1 text-xs">
+						{t("policies.checkId")}
+						<Input className="h-8 text-xs" value={check.id} onChange={(e) => onChange({ ...check, id: e.target.value })} />
+					</label>
+					<label className="text-muted-foreground flex flex-col gap-1 text-xs" title={t("policies.conditionHint")}>
+						{t("policies.condition")}
+						<Input
+							className="h-8 text-xs"
+							value={check.condition ?? ""}
+							onChange={(e) => onChange({ ...check, condition: e.target.value || undefined })}
+						/>
+					</label>
+					<label className="text-muted-foreground flex flex-col gap-1 text-xs">
+						{t("policies.minN")}
+						<Input
+							className="h-8 text-xs"
+							type="number"
+							min={0}
+							value={check.min_n ?? ""}
+							onChange={(e) => onChange({ ...check, min_n: e.target.value === "" ? undefined : Number(e.target.value) })}
+						/>
+					</label>
+				</div>
+			)}
 		</li>
 	);
 }

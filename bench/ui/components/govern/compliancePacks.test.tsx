@@ -30,7 +30,7 @@ describe("CompliancePacks", () => {
 		expect(html).toContain('data-testid="compliance-packs-list"');
 		expect(html).toContain('href="/api/bench/compliance-packs/compliance-rel_2.md"');
 		expect(html).toContain('download="compliance-rel_2.json"');
-		expect(html).toContain("Download .md");
+		expect(html).toContain("Report .md");
 		expect(html.indexOf("rel_2")).toBeLessThan(html.indexOf("rel_1"));
 	});
 

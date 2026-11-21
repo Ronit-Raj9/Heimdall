@@ -25,13 +25,11 @@ export function ReviewRunPanel({ item }: { item: ReviewQueueItem }) {
 
 	return (
 		<div className="flex flex-col gap-4" data-testid="review-run-panel" data-run-id={item.run_id}>
-			<Card className="gap-4">
+			<Card className="gap-4 rounded-xl">
 				<CardHeader>
 					<div className="flex flex-wrap items-center justify-between gap-2">
-						<CardTitle className="text-sm">
-							<EntityLink kind="run" id={item.run_id} testId="review-run-link">
-								<span className="font-mono">{t("review.panel.title", { id: item.run_id })}</span>
-							</EntityLink>
+						<CardTitle className="min-w-0 truncate text-base" title={item.task}>
+							{item.task}
 						</CardTitle>
 						<Button variant="outline" size="sm" asChild>
 							<Link to="/runs" search={{ pair: item.pair_id, exp: item.exp_id }} data-testid="review-open-pair">
@@ -39,8 +37,13 @@ export function ReviewRunPanel({ item }: { item: ReviewQueueItem }) {
 							</Link>
 						</Button>
 					</div>
-					<CardDescription className="font-mono text-xs">
-						{item.task} / {item.arm} / {item.condition} / {item.trial}
+					<CardDescription className="flex flex-wrap items-center gap-2 text-xs">
+						<EntityLink kind="run" id={item.run_id} testId="review-run-link">
+							<span className="font-mono">{item.run_id}</span>
+						</EntityLink>
+						<span>
+							{item.arm} · {item.condition} · #{item.trial}
+						</span>
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
@@ -59,7 +62,7 @@ export function ReviewRunPanel({ item }: { item: ReviewQueueItem }) {
 				</CardContent>
 			</Card>
 
-			<Card className="gap-4">
+			<Card className="gap-4 rounded-xl">
 				<CardHeader>
 					<CardTitle>{t("review.timeline.title")}</CardTitle>
 					<CardDescription>{t("review.timeline.description")}</CardDescription>
@@ -69,7 +72,7 @@ export function ReviewRunPanel({ item }: { item: ReviewQueueItem }) {
 				</CardContent>
 			</Card>
 
-			<Card className="gap-4">
+			<Card className="gap-4 rounded-xl">
 				<CardHeader>
 					<CardTitle>{t("review.form.title")}</CardTitle>
 				</CardHeader>
