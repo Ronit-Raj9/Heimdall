@@ -1,16 +1,25 @@
 {
 	"pitch": {
 		"eyebrow": "Heimdall",
-		"title": "The release gate for AI agents",
-		"body": "Know if an agent change is safe to ship before your users find out.",
-		"run": { "title": "Run any agent on real benchmarks", "body": "Coding, browser, voice, tools and more, on tasks you can trust." },
-		"bifrost": { "title": "Every model call through Bifrost", "body": "One gateway for cost, faults and a full trace of each call." },
-		"sealed": { "title": "Verdicts you can trust", "body": "Sealed evidence behind every pass, fail and regression." },
+		"title": "Know if your AI agent change is safe to ship",
+		"body": "Heimdall tests the old and new version of your agent on the same tasks and tells you which is better, before your users find out.",
+		"run": {
+			"title": "Test any agent on real tasks",
+			"body": "Coding, browser, voice, tools and more, with tasks checked to be fair."
+		},
+		"bifrost": {
+			"title": "Every model call goes through Bifrost",
+			"body": "One gateway that records cost, can inject failures and keeps a full log of each call."
+		},
+		"sealed": {
+			"title": "Results you can trust",
+			"body": "Every pass, fail and slowdown is backed by saved, tamper-proof records."
+		},
 		"footer": "Built on Bifrost"
 	},
 	"login": {
 		"title": "Welcome back",
-		"subtitle": "Sign in to run and review your agents.",
+		"subtitle": "Sign in to test and review your agents.",
 		"orEmail": "or sign in with email",
 		"judgeTitle": "Judging?",
 		"judgeBody": "Use the judge account email and password from the submission notes."
@@ -19,28 +28,28 @@
 		"orEmail": "or sign up with email"
 	},
 	"banner": {
-		"detail": "Real results, read only."
+		"detail": "Real results. You can look but not change anything."
 	},
 	"quickstart": {
 		"title": "Get started",
-		"subtitle": "Four commands from your repo to a release verdict.",
+		"subtitle": "Four commands take you from your code to a clear answer: is the new agent better or worse?",
 		"step": "Step {{n}}",
 		"copy": "Copy command",
 		"copied": "Copied",
 		"steps": {
-			"init": "Detects your tests, agents and Docker, then writes .heimdall/.",
+			"init": "Looks at your project (tests, agents, Docker) and writes a .heimdall/ settings folder.",
 			"mine": "Turns past commits into tasks your agent must solve.",
-			"compare": "Runs both versions side by side and prints the verdict.",
+			"compare": "Runs the old and new agent side by side and says which is better.",
 			"ci": "Adds a GitHub check that comments on every pull request."
 		},
 		"costFree": "Free",
-		"costForecast": "Forecast first",
-		"minedTitle": "Mined tasks",
-		"minedSubtitle": "Review drafted instructions before you trust the results.",
+		"costForecast": "Shows the cost first",
+		"minedTitle": "Tasks made from your commits",
+		"minedSubtitle": "Check the written instructions before you trust the results.",
 		"needsReview_one": "{{count}} needs review",
 		"needsReview_other": "{{count}} need review",
 		"allReviewed": "All reviewed",
-		"minedCount": "{{mined}} of {{tasks}} mined",
+		"minedCount": "{{mined}} of {{tasks}} made from commits",
 		"showCommands": "Review commands"
 	}
 }

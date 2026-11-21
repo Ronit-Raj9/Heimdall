@@ -3091,15 +3091,15 @@
 	},
 	"workers": {
 		"title": "Workers",
-		"subtitle": "Other machines that lease slots from this server and upload sealed run folders.",
-		"synthetic": "Synthetic fixture data. These workers are examples for checking the screen.",
+		"subtitle": "The machines that actually run your agents. They pick up work from this server and send back saved results.",
+		"synthetic": "Example data only. These worker machines are samples to show how the screen looks.",
 		"loadError": "Could not load the workers.",
-		"offTitle": "Remote workers are not enabled",
-		"offBody": "The worker API is off unless the server starts with BENCH_WORKER_TOKEN set, so every run happens on this machine.",
+		"offTitle": "Extra worker machines are not turned on",
+		"offBody": "Every run happens on this machine. To use other machines too, the server must start with BENCH_WORKER_TOKEN set.",
 		"offHow": "To add a worker, set BENCH_WORKER_TOKEN on the server, then on the other machine (same project, same commit, its own stack):",
 		"offCommand": "Start a worker",
-		"empty": "The worker API is on, but no worker has registered yet.",
-		"label": "Remote workers",
+		"empty": "Extra worker machines are allowed, but none has connected yet.",
+		"label": "Worker machines",
 		"id": "Worker",
 		"host": "Host",
 		"version": "Build",
@@ -3113,9 +3113,9 @@
 			"idle": "Idle",
 			"running": "Running",
 			"lost": "Lost",
-			"idleHint": "Registered and waiting for a slot.",
-			"runningHint": "Holding at least one slot.",
-			"lostHint": "Stopped answering; its leases go back to the queue."
+			"idleHint": "Connected and waiting for work.",
+			"runningHint": "Running at least one task now.",
+			"lostHint": "Stopped answering; its work goes back to the queue for another machine."
 		}
 	},
 	"trends": {

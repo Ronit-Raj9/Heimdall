@@ -29,8 +29,8 @@ describe("JobsView", () => {
 		expect(html).toContain(`data-testid="jobs-cancel-${RUNNING_JOB.id}"`);
 		expect(html).toContain(`data-testid="jobs-retry-${FAILED_JOB.id}"`);
 		expect(html).not.toContain(`data-testid="jobs-retry-${RUNNING_JOB.id}"`);
-		expect(html).toContain("Export");
-		expect(html).toContain("Mine tasks");
+		expect(html).toContain("Download results of exp_1");
+		expect(html).toContain("Make tasks from past commits");
 	});
 
 	it("gives viewers no cancel or retry", () => {

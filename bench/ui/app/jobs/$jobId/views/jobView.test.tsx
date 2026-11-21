@@ -38,7 +38,7 @@ describe("JobView", () => {
 	it("shows a running job: kind, status, progress, live log and cancel", () => {
 		const html = render(<JobView jobId="job_run" />, hostedSession("member"));
 		expect(tagOf(html, "job-screen")).toContain('data-status="running"');
-		expect(html).toContain("Experiment run");
+		expect(html).toContain("Comparison run");
 		expect(html).toContain('data-testid="job-status-running"');
 		expect(html).toContain("30 of 48");
 		expect(html).toContain('data-testid="job-log-live"');
@@ -105,7 +105,7 @@ describe("job log", () => {
 	});
 	it("says when lines were dropped and when there are none yet", () => {
 		const html = render(<JobLogPanel log={{ ...liveLog, lines: [], dropped: 120 }} active />);
-		expect(html).toContain("120 earlier lines were dropped");
+		expect(html).toContain("120 earlier lines were hidden");
 		expect(html).toContain('data-testid="job-log-empty"');
 		expect(html).toContain('role="log"');
 	});
