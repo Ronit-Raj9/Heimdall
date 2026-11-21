@@ -285,3 +285,7 @@ func short(sha string) string {
 	}
 	return sha
 }
+
+// SuiteProblems is the suite-level part of StaticValidation (no task
+// checks), so a caller validating a few tasks runs it once.
+func SuiteProblems(s *schemas.Suite) []Problem { return lintSuite(s) }

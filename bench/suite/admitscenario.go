@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
@@ -191,7 +192,11 @@ func (a *admitter) controlImage(ctx context.Context) (string, error) {
 		return a.s.BaseImage.Tag, nil
 	}
 	if ens, ok := a.deps.Env.(TaskImageEnsurer); ok {
+		// Parallel admissions: tasks sharing an image key build it once,
+		// one at a time; distinct images still build concurrently.
+		unlock := lockImageKey(a.s.ID + "\x00" + taskImageKey(a.t))
 		tag, _, err := ens.EnsureTaskImage(ctx, a.s, a.t)
+		unlock()
 		if err != nil {
 			return "", fmt.Errorf("task image: %w", err)
 		}
@@ -414,4 +419,24 @@ func controlEnv(rc *schemas.RunContext) (map[string]string, error) {
 		env[utils.EnvMemoryDir] = utils.DefaultMemoryDir
 	}
 	return env, nil
+}
+
+// imageLocks serializes EnsureTaskImage per image key across concurrent
+// admissions in one process.
+var imageLocks sync.Map // key -> *sync.Mutex
+
+func lockImageKey(key string) func() {
+	m, _ := imageLocks.LoadOrStore(key, &sync.Mutex{})
+	mu := m.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
+}
+
+// taskImageKey names the image a task's environment builds or pulls: its
+// image tag when it names one, else its task folder.
+func taskImageKey(t *schemas.Task) string {
+	if t.Environment != nil && t.Environment.Image != "" {
+		return "image:" + t.Environment.Image
+	}
+	return "dir:" + t.Dir
 }

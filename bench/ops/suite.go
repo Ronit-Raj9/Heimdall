@@ -267,7 +267,13 @@ func SuiteAdmit(ctx context.Context, env AdmitEnv, ref, only string, w io.Writer
 	if err := EnsureImages(ctx, env.Config, env.Docker, s, w); err != nil {
 		return rep, err
 	}
-	lock, err := suite.LockWith(s, time.Now().UTC(), LockFingerprintOptions(ctx, env.Config, env.Docker, suite.LockPinsLocal(s.Lock)))
+	fpo := LockFingerprintOptions(ctx, env.Config, env.Docker, suite.LockPinsLocal(s.Lock))
+	var lock *schemas.SuiteLock
+	if only != "" { // one task: re-hash only it, other entries stay untouched
+		lock, _, err = suite.LockTasks(s, []string{only}, time.Now().UTC(), fpo)
+	} else {
+		lock, err = suite.LockWith(s, time.Now().UTC(), fpo)
+	}
 	if err != nil {
 		return rep, fmt.Errorf("lock: %w", err)
 	}
