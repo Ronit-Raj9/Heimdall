@@ -37,6 +37,12 @@ type Query struct {
 	// manifest's held_out_tasks); such runs never enter a trend, as the
 	// public leaderboard never counts them. Nil keeps every run.
 	HeldOut func(expID, task string) bool `json:"-"`
+	// Split is public (the default) or held_out. held_out charts only the
+	// held-out tasks' runs and needs HeldOutVisible (server config
+	// held_out.visible): improvement claims are read on held-out tasks
+	// (RESEARCH_R2 rec 3), but a server that hides them never serves them.
+	Split          string
+	HeldOutVisible bool `json:"-"`
 }
 
 // Normalize fills the defaults and checks the values.
@@ -50,6 +56,13 @@ func (q Query) Normalize() (Query, error) {
 	}
 	if q.Synthetic != SyntheticExclude && q.Synthetic != SyntheticInclude && q.Synthetic != SyntheticOnly {
 		return q, fmt.Errorf("%w: synthetic %q is not exclude, include or only", ErrBadQuery, q.Synthetic)
+	}
+	q.Split = strings.TrimSpace(q.Split)
+	if q.Split == schemas.SplitPublic {
+		q.Split = ""
+	}
+	if q.Split != "" && q.Split != schemas.SplitHeldOut {
+		return q, fmt.Errorf("%w: split %q is not public or held_out", ErrBadQuery, q.Split)
 	}
 	return q, nil
 }
@@ -65,8 +78,12 @@ func Build(r resultsindex.Reader, q Query, now time.Time) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	heldOutOnly := q.Split == schemas.SplitHeldOut
+	if heldOutOnly && (!q.HeldOutVisible || q.HeldOut == nil) {
+		return nil, fmt.Errorf("%w: held-out trends are not served (server config held_out.visible is false)", ErrBadQuery)
+	}
 	resp := &Response{
-		Suite: q.Suite, Agent: q.Agent, Metric: q.Metric, Condition: q.Condition, Synthetic: q.Synthetic, Alpha: Alpha,
+		Suite: q.Suite, Agent: q.Agent, Metric: q.Metric, Condition: q.Condition, Synthetic: q.Synthetic, Split: q.Split, Alpha: Alpha,
 		Metrics: slices.Clone(Metrics), Suites: []string{}, Agents: []string{}, Conditions: []string{}, Lineages: []Lineage{},
 		Rejected: len(r.Rejected()), IndexedAt: r.Status().UpdatedAt, GeneratedAt: now.UTC(),
 	}
@@ -81,7 +98,7 @@ func Build(r resultsindex.Reader, q Query, now time.Time) (*Response, error) {
 			resp.Invalid++
 			continue
 		}
-		if q.HeldOut != nil && q.HeldOut(row.Experiment, row.Task) {
+		if q.HeldOut != nil && q.HeldOut(row.Experiment, row.Task) != heldOutOnly {
 			continue
 		}
 		resp.Suites = appendUnique(resp.Suites, row.Suite)

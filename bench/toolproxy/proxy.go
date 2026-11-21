@@ -300,7 +300,7 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, rt Route, path
 			p.row.RequestBytes = int64(len(it.raw))
 			ft, hit := s.faults.decide(rt.Service, name, rt.Agent)
 			switch {
-			case hit && ft.Mode == FaultPoison:
+			case hit && (ft.Mode == FaultPoison || ft.Mode == FaultInflate): // inflate appends filler the way poison appends text
 				p.poison = &ft
 			case hit && IsQuietMode(ft.Mode): // Safety probes area (S1)
 				p.quiet = &ft
@@ -951,7 +951,7 @@ func (f flushWriter) Write(p []byte) (int, error) {
 // external answer. ok is false when the fault changed nothing.
 func rewriteHTTPAnswer(body []byte, contentType string, ft schemas.ToolFault) ([]byte, bool) {
 	switch {
-	case ft.Mode == FaultPoison:
+	case ft.Mode == FaultPoison || ft.Mode == FaultInflate:
 		return poisonHTTPBody(body, contentType, poisonText(ft)), true
 	case IsQuietMode(ft.Mode): // Safety probes area (S1)
 		return quietHTTPBody(body, ft)

@@ -411,6 +411,14 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 	if spec.BudgetUSD < 0 || spec.BudgetUSD > EvaluationMaxBudget {
 		return badf("budget_usd must be between 0 and %v", EvaluationMaxBudget)
 	}
+	if spec.Stream != nil {
+		if spec.Stream.FreshArm != "" {
+			return badf("stream.fresh_arm is chosen by the evaluation: in score mode the hidden repeat runs without memory")
+		}
+		if err := spec.Stream.Validate(nil); err != nil {
+			return badf("%v", err)
+		}
+	}
 	fs := []string{faults.Clean}
 	for _, f := range spec.Faults {
 		if f = strings.TrimSpace(f); f != "" && !contains(fs, f) {
@@ -572,6 +580,18 @@ func (h *evaluationsHandler) launchChild(work context.Context, ctx *fasthttp.Req
 		Verdict:     quickVerdict{Policy: "paired_signflip"},
 		Seed:        ev.CreatedAt.Unix(),
 		Concurrency: 2, ManifestMode: "agent_exposure",
+	}
+	f.Budget.Disclose = spec.DiscloseBudget
+	if spec.Stream != nil {
+		st := *spec.Stream
+		if len(spec.Arms) == 1 && st.Memory == schemas.StreamMemoryCarry {
+			for id := range f.Arms {
+				if id != spec.Arms[0].Label {
+					st.FreshArm = id // score mode: the hidden repeat is the no-memory control (forward transfer)
+				}
+			}
+		}
+		f.Stream = &st
 	}
 	var variantNotes []string
 	for _, a := range spec.Arms {

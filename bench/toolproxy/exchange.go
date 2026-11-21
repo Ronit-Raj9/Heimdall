@@ -102,7 +102,7 @@ func (x *exchange) answerMessage(it rpcItem, status int) (json.RawMessage, *pend
 		if np, ok := poisonResult(result, poisonText(*p.poison)); ok {
 			if nr, ok := replaceResult(raw, np); ok {
 				raw, result, rewritten = nr, np, true
-				p.row.Fault, p.row.Nonce = FaultPoison, p.poison.Nonce
+				p.row.Fault, p.row.Nonce = p.poison.Mode, p.poison.Nonce // poison or inflate
 			}
 		}
 	}

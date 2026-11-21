@@ -203,7 +203,7 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	}
 	openapi.RegisterRoutes(r, common...) // Clients area: API description (handlers/openapi.go, docs/clients.md)
 	// Index and trends area: GET /trends over the derived results index (handlers/trends.go, docs/trends.md).
-	handlers.NewTrendsHandler(mode, deps.Trends).RegisterRoutes(r, common...)
+	handlers.NewTrendsHandler(mode, deps.Trends).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...)
 	// Human review area: review queue and history, POST /reviews behind the write token (handlers/reviews.go, docs/human-review.md).
 	handlers.NewReviewsHandler(mode, deps.Reviews, write).RegisterRoutes(r, common...)
 	handlers.NewInboxHandler(mode, deps.Inbox, write).RegisterRoutes(r, common...)                                    // Failure inbox area (handlers/inbox.go, docs/failure-inbox.md)

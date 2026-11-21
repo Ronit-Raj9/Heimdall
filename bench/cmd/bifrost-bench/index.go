@@ -166,7 +166,9 @@ func (s trendSource) Trends(ctx context.Context, q trends.Query) (*trends.Respon
 	if err != nil {
 		return nil, err
 	}
-	q.HeldOut = s.heldOut(ctx)
+	// An unreadable manifest counts as held out for the public series (kept
+	// out) and as not held out for the held-out series (also kept out).
+	q.HeldOut = s.heldOut(ctx, q.Split != schemas.SplitHeldOut)
 	return trends.Build(snap, q, time.Now())
 }
 
@@ -174,7 +176,7 @@ func (s trendSource) Trends(ctx context.Context, q trends.Query) (*trends.Respon
 // out, loading each manifest once. A manifest that cannot be read keeps its
 // runs out of the trends: a held-out result must never leak into a public
 // view because of a read error.
-func (s trendSource) heldOut(ctx context.Context) func(expID, task string) bool {
+func (s trendSource) heldOut(ctx context.Context, unreadable bool) func(expID, task string) bool {
 	if s.manifests == nil {
 		return nil
 	}
@@ -186,7 +188,7 @@ func (s trendSource) heldOut(ctx context.Context) func(expID, task string) bool 
 			if err != nil {
 				s.logger.Warn("trends: manifest unreadable, its runs are left out", "experiment", expID, "error", err.Error())
 				cache[expID] = nil
-				return true
+				return unreadable
 			}
 			tasks = map[string]bool{}
 			for _, id := range m.HeldOutTasks {
@@ -194,7 +196,10 @@ func (s trendSource) heldOut(ctx context.Context) func(expID, task string) bool 
 			}
 			cache[expID] = tasks
 		}
-		return tasks == nil || tasks[task]
+		if tasks == nil {
+			return unreadable
+		}
+		return tasks[task]
 	}
 }
 

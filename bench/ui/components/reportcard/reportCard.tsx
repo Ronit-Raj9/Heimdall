@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { ArrowUpRight, Check, ChevronRight, Download, Equal, Link2 } from "lucide-react";
 import * as React from "react";
+import { hasLearning, hasPersistence, LearningTable, PersistenceTable } from "./learningSections";
 import {
 	armDescription,
 	benchmarkWinner,
@@ -66,6 +67,18 @@ export function ReportCard({ report: raw, className }: ReportCardProps) {
 			{report.reliability.length > 0 && (
 				<Section title="Reliability" description="Score when something goes wrong, and how far it drops from a clean run.">
 					<ReliabilityTable report={report} />
+				</Section>
+			)}
+
+			{hasLearning(report) && (
+				<Section title="Learning over time" description="Tasks run one after another with the agent's memory kept. Change is in percentage points.">
+					<LearningTable report={report} />
+				</Section>
+			)}
+
+			{hasPersistence(report) && (
+				<Section title="Persistence" description="Picking up after a crash, finishing when the budget runs out, and success per dollar.">
+					<PersistenceTable report={report} />
 				</Section>
 			)}
 

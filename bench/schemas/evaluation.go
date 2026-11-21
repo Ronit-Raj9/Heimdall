@@ -47,6 +47,12 @@ type EvaluationSpec struct {
 	Trials            int             `json:"trials"`              // repeats per task, default 2
 	Faults            []string        `json:"faults"`              // "clean" always; plus model-down, broken-tool, misleading-instruction
 	BudgetUSD         float64         `json:"budget_usd,omitempty"`
+	// Stream carries the agent's memory from task to task inside each
+	// benchmark (stream.go); in score mode the hidden repeat arm is the
+	// fresh control.
+	Stream *StreamSpec `json:"stream,omitempty"`
+	// DiscloseBudget tells the agent its budget and deadline.
+	DiscloseBudget bool `json:"disclose_budget,omitempty"`
 }
 
 // EvaluationChild is one benchmark of an evaluation and its experiment.

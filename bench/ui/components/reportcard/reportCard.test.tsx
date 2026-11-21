@@ -83,3 +83,41 @@ describe("ReportCard", () => {
 		expect(html).toContain('href="/experiments/exp_6"');
 	});
 });
+describe("learning and persistence sections", () => {
+	it("hides both sections without data", () => {
+		const html = renderToStaticMarkup(<ReportCard report={scoreReport} />);
+		expect(html).not.toContain("Learning over time");
+		expect(html).not.toContain("Persistence");
+	});
+
+	it("shows the learning curve and persistence numbers when present", () => {
+		const report = {
+			...scoreReport,
+			learning: [
+				{
+					benchmark: "coding-core",
+					arm: "A",
+					aulc: 0.62,
+					final_gain: 0.25,
+					bwt: -0.1,
+					fwt: 0.15,
+					episodes_to_threshold: 4,
+					threshold: 0.8,
+					curve: [
+						{ index: 1, success: 0.3, runs: 2 },
+						{ index: 2, success: 0.6, runs: 2 },
+						{ index: 3, success: 0.9, runs: 2 },
+					],
+					chains: 2,
+				},
+			],
+			persistence: [{ arm: "A", resumed_without_redo: { value: 0.5, runs: 4 }, graceful_finish: { value: 1, runs: 2 }, cost_normalized_success: { value: 4.2, runs: 6 } }],
+		};
+		const html = renderToStaticMarkup(<ReportCard report={report} />);
+		expect(html).toContain("Learning over time");
+		expect(html).toContain("learning-sparkline");
+		expect(html).toContain("Persistence");
+		expect(html).toContain("4.2 per $");
+		expect(html).not.toMatch(/—|–/);
+	});
+});

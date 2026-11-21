@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -272,6 +273,9 @@ func (s *Server) serveData(w http.ResponseWriter, r *http.Request) {
 	}
 	d := s.plans.beginModel(slot.name, kind, requestModel(p, r, kind, body)) // W9: the model lets a plan fail one target
 	e.Slot, e.RunID, e.Call, e.Stream = slot.name, d.RunID, d.Call, req.Stream
+	if d.Remaining >= 0 && d.Unpersisted == nil { // budget_squeeze grace call: the agent may read how much is left
+		sw.Header().Set(BudgetRemainingHeader, strconv.Itoa(d.Remaining))
+	}
 	switch {
 	case d.Unpersisted != nil: // QC2-13-02: fail closed when the slot's progress cannot survive a restart
 		s.logger.Error("fault plan state not persisted; refusing the request", "slot", slot.name, "err", d.Unpersisted)

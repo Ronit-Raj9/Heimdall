@@ -77,6 +77,8 @@ type ProbeApply struct {
 	Agent string `json:"agent,omitempty" yaml:"agent"`
 	// B1: a2a: the client-side stream fault the launcher applies (a2a.go).
 	A2A *A2AFault `json:"a2a,omitempty" yaml:"a2a"`
+	// process: when to SIGKILL the agent and resume it (stream.go).
+	Process *ProcessFault `json:"process,omitempty" yaml:"process,omitempty"`
 }
 
 // OverlaySpec copies From (relative to the task folder) to To (relative to the
@@ -107,9 +109,12 @@ type FaultPlan struct {
 	Call        int    `json:"call,omitempty" yaml:"call"`           // once: the failing call, 1-based
 	Status      int    `json:"status,omitempty" yaml:"status"`       // e.g. 503
 	RetryAfterS int    `json:"retry_after_s,omitempty" yaml:"retry_after_s"`
-	Model       string `json:"model,omitempty" yaml:"model,omitempty"` // W9: fail only requests for this model ("*" = all); a routed run's gateway probe sets its primary target when empty
-	Nonce       string `json:"nonce,omitempty" yaml:"-"`               // secret per run, set when armed, never from YAML
-	RunID       string `json:"run_id,omitempty" yaml:"-"`
+	// GraceCalls is how many model calls budget_squeeze still lets through
+	// after Call before it answers 402 (default 1).
+	GraceCalls int    `json:"grace_calls,omitempty" yaml:"grace_calls,omitempty"`
+	Model      string `json:"model,omitempty" yaml:"model,omitempty"` // W9: fail only requests for this model ("*" = all); a routed run's gateway probe sets its primary target when empty
+	Nonce      string `json:"nonce,omitempty" yaml:"-"`               // secret per run, set when armed, never from YAML
+	RunID      string `json:"run_id,omitempty" yaml:"-"`
 	// Scripted answers every call the plan does not fault from the proxy's
 	// scripted model, never the real upstream: a fault probe on a no-paid
 	// (smoke or scripted_upstream) run. Set by the bench, never from YAML.

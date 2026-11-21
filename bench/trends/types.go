@@ -54,22 +54,23 @@ const Alpha = 0.05
 // lineage per (agent config id, model), and one point per (experiment,
 // config hash) of that lineage, ordered by experiment date.
 type Response struct {
-	Suite       string    `json:"suite"`        // id@version filter, "" for every suite
-	Agent       string    `json:"agent"`        // agent config id filter, "" for every agent
-	Metric      string    `json:"metric"`       // metric charted as Point.Value
-	Condition   string    `json:"condition"`    // condition the points cover, clean by default
-	Synthetic   string    `json:"synthetic"`    // exclude | include | only
-	Alpha       float64   `json:"alpha"`        // significance level of the regression flag
-	Metrics     []string  `json:"metrics"`      // chartable metric ids, for the picker
-	Suites      []string  `json:"suites"`       // suites with indexed runs, for the picker
-	Agents      []string  `json:"agents"`       // agent config ids with indexed runs, for the picker
-	Conditions  []string  `json:"conditions"`   // conditions with indexed runs, for the picker
-	Lineages    []Lineage `json:"lineages"`     // ordered by agent then model
-	Points      int       `json:"points"`       // points over every lineage; the UI shows an empty state below 2
-	Rejected    int       `json:"rejected"`     // runs the index lists as rejected (seal failed); never charted
-	Invalid     int       `json:"invalid"`      // indexed runs of an experiment whose newest verdict is INVALID, or with evidence problems (e.g. a slot with two counted runs); never charted
-	IndexedAt   time.Time `json:"indexed_at"`   // when the index was last written
-	GeneratedAt time.Time `json:"generated_at"` // when this response was computed
+	Suite       string    `json:"suite"`           // id@version filter, "" for every suite
+	Agent       string    `json:"agent"`           // agent config id filter, "" for every agent
+	Metric      string    `json:"metric"`          // metric charted as Point.Value
+	Condition   string    `json:"condition"`       // condition the points cover, clean by default
+	Synthetic   string    `json:"synthetic"`       // exclude | include | only
+	Split       string    `json:"split,omitempty"` // held_out when the points are the held-out tasks' runs; empty for the public tasks
+	Alpha       float64   `json:"alpha"`           // significance level of the regression flag
+	Metrics     []string  `json:"metrics"`         // chartable metric ids, for the picker
+	Suites      []string  `json:"suites"`          // suites with indexed runs, for the picker
+	Agents      []string  `json:"agents"`          // agent config ids with indexed runs, for the picker
+	Conditions  []string  `json:"conditions"`      // conditions with indexed runs, for the picker
+	Lineages    []Lineage `json:"lineages"`        // ordered by agent then model
+	Points      int       `json:"points"`          // points over every lineage; the UI shows an empty state below 2
+	Rejected    int       `json:"rejected"`        // runs the index lists as rejected (seal failed); never charted
+	Invalid     int       `json:"invalid"`         // indexed runs of an experiment whose newest verdict is INVALID, or with evidence problems (e.g. a slot with two counted runs); never charted
+	IndexedAt   time.Time `json:"indexed_at"`      // when the index was last written
+	GeneratedAt time.Time `json:"generated_at"`    // when this response was computed
 }
 
 // Lineage is one agent config lineage: every config of one agent id and

@@ -48,17 +48,19 @@
           "additionalProperties": false,
           "required": ["mode"],
           "properties": {
-            "mode": {"enum": ["none", "persistent", "once", "stream_cut"], "description": "S1: stream_cut relays a streamed model answer up to its first tool-call delta and then cuts the stream (call, or every call from from_call)."},
+            "mode": {"enum": ["none", "persistent", "once", "stream_cut", "budget_squeeze"], "description": "S1: stream_cut relays a streamed model answer up to its first tool-call delta and then cuts the stream (call, or every call from from_call). budget_squeeze lets calls up to call through, then grace_calls more with an x-bench-budget-remaining-calls header, then answers status (402 by default) budget exhausted."},
             "from_call": {"type": "integer", "minimum": 1},
             "call": {"type": "integer", "minimum": 1},
             "status": {"type": "integer", "minimum": 100, "maximum": 599},
             "retry_after_s": {"type": "integer", "minimum": 0},
+            "grace_calls": {"type": "integer", "minimum": 0, "description": "budget_squeeze: model calls still let through after call (default 1)."},
             "model": {"type": "string", "minLength": 1, "description": "W9: fail only requests for this model; \"*\" fails every model. Empty: every model, or a routed run's primary target."}
           },
           "allOf": [
             {"if": {"properties": {"mode": {"const": "persistent"}}}, "then": {"required": ["from_call", "status"]}},
             {"if": {"properties": {"mode": {"const": "once"}}}, "then": {"required": ["call", "status"]}},
-            {"if": {"properties": {"mode": {"const": "stream_cut"}}}, "then": {"anyOf": [{"required": ["call"]}, {"required": ["from_call"]}]}}
+            {"if": {"properties": {"mode": {"const": "stream_cut"}}}, "then": {"anyOf": [{"required": ["call"]}, {"required": ["from_call"]}]}},
+            {"if": {"properties": {"mode": {"const": "budget_squeeze"}}}, "then": {"required": ["call"], "not": {"required": ["from_call"]}, "properties": {"status": {"enum": [402, 429]}}}}
           ]
         },
         "shim": {
@@ -79,7 +81,7 @@
           "required": ["mode"],
           "description": "Layer tool: the fault the per-run tool proxy injects. Mirrors schemas.ToolFault.",
           "properties": {
-            "mode": {"enum": ["error", "timeout", "poison", "describe_poison", "rug_pull", "shadow", "schema_poison", "plausible_wrong", "schema_drift", "lost_ack"], "description": "S1 safety modes: describe_poison, rug_pull, shadow and schema_poison rewrite tools/list answers; plausible_wrong and schema_drift rewrite a real result quietly; lost_ack forwards the call and withholds the answer (docs/tool-proxy.md)."},
+            "mode": {"enum": ["error", "timeout", "poison", "describe_poison", "rug_pull", "shadow", "schema_poison", "plausible_wrong", "schema_drift", "lost_ack", "inflate"], "description": "inflate appends tokens tokens of plausible filler to a real result (context pressure). S1 safety modes: describe_poison, rug_pull, shadow and schema_poison rewrite tools/list answers; plausible_wrong and schema_drift rewrite a real result quietly; lost_ack forwards the call and withholds the answer (docs/tool-proxy.md)."},
             "server": {"type": "string", "description": "Service id; absent matches every server."},
             "tool": {"type": "string", "description": "Tool name; absent matches every tool."},
             "from_call": {"type": "integer", "minimum": 1, "description": "rug_pull: listings stay clean until from_call - 1 tool calls on the server were answered."},
@@ -88,7 +90,8 @@
             "timeout_s": {"type": "integer", "minimum": 1},
             "text": {"type": "string", "description": "poison: appended to the real result; describe_poison, rug_pull, shadow: appended to the tool description; schema_poison: appended to every parameter description. {{nonce}} is replaced per run."},
             "patch": {"type": "object", "description": "plausible_wrong: JSON merge patch (RFC 7386) applied to the result object; schema_poison: merged into inputSchema.properties (parameters with poisoned descriptions or defaults)."},
-            "rename": {"type": "object", "additionalProperties": {"type": "string", "minLength": 1}, "description": "schema_drift: result field renames, old name to new name, at any depth."}
+            "rename": {"type": "object", "additionalProperties": {"type": "string", "minLength": 1}, "description": "schema_drift: result field renames, old name to new name, at any depth."},
+            "tokens": {"type": "integer", "minimum": 1, "maximum": 200000, "description": "inflate: tokens of filler appended to the result (about 4 characters each)."}
           },
           "allOf": [
             {"if": {"properties": {"mode": {"const": "poison"}}}, "then": {"required": ["text"]}},
@@ -96,7 +99,8 @@
             {"if": {"properties": {"mode": {"const": "rug_pull"}}}, "then": {"required": ["text", "from_call"], "properties": {"from_call": {"minimum": 2}}}},
             {"if": {"properties": {"mode": {"const": "schema_poison"}}}, "then": {"anyOf": [{"required": ["text"]}, {"required": ["patch"]}]}},
             {"if": {"properties": {"mode": {"const": "plausible_wrong"}}}, "then": {"required": ["patch"]}},
-            {"if": {"properties": {"mode": {"const": "schema_drift"}}}, "then": {"required": ["rename"]}}
+            {"if": {"properties": {"mode": {"const": "schema_drift"}}}, "then": {"required": ["rename"]}},
+            {"if": {"properties": {"mode": {"const": "inflate"}}}, "then": {"required": ["tokens"]}}
           ]
         },
         "adapter_fault": {
@@ -136,6 +140,17 @@
             "delay_ms": {"type": "integer", "minimum": 0, "maximum": 60000}
           }
         },
+        "process": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Layer process: SIGKILL the agent once at_model_call model calls went through the gateway or after_s seconds passed, whichever comes first, then resume it with the same workspace and memory and BENCH_RESUME=1.",
+          "properties": {
+            "at_model_call": {"type": "integer", "minimum": 1},
+            "after_s": {"type": "integer", "minimum": 1},
+            "session": {"type": "string", "minLength": 1, "description": "Session id of a multi-session task; the first session when absent."}
+          },
+          "anyOf": [{"required": ["at_model_call"]}, {"required": ["after_s"]}]
+        },
         "agent": {"type": "string", "minLength": 1, "description": "Team runs: target one member id or every member with this role; a gateway-layer plan binds to that member's own key slot, a tool fault matches only its calls (docs/multi-agent.md)."}
       }
     },
@@ -170,6 +185,10 @@
     {
       "if": {"required": ["layer"], "properties": {"layer": {"const": "a2a"}}},
       "then": {"properties": {"apply": {"required": ["a2a"]}}}
+    },
+    {
+      "if": {"required": ["layer"], "properties": {"layer": {"const": "process"}}},
+      "then": {"properties": {"apply": {"required": ["process"]}}}
     }
   ]
 }

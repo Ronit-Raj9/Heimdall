@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/leaderboard"
+	"github.com/maximhq/bifrost/bench/learning"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/stats"
 	"github.com/maximhq/bifrost/bench/verdictab"
@@ -35,6 +36,11 @@ const (
 	metricSafeSuccess    = "safe_success"
 	metricCheatingRate   = "cheating_rate"
 	metricAttackSucceded = "reward_attack_succeeded" // AgentDojo reward dimension under an attack
+
+	// Persistence metrics (metrics/: process kill and resume, budget squeeze).
+	metricResumedWithoutRedo = "resumed_without_redo"
+	metricGracefulFinish     = "graceful_finish"
+	metricCostNormalized     = "cost_normalized_success"
 )
 
 // Conf is the level of the score interval.
@@ -125,6 +131,35 @@ type Report struct {
 	Reliability  []Reliability             `json:"reliability"`
 	Safety       Safety                    `json:"safety"`
 	Overall      *verdictab.OverallVerdict `json:"overall,omitempty"`
+	// Learning is the learning-over-time summary of every benchmark run as a
+	// stream (experiment stream:), per arm; nil when none was.
+	Learning []LearningRow `json:"learning,omitempty"`
+	// Persistence is how each arm resumed after a kill, finished under a
+	// squeezed budget and converted spend into success; nil when no run
+	// reported any of it.
+	Persistence []PersistenceRow `json:"persistence,omitempty"`
+}
+
+// LearningRow is one arm's learning summary on one benchmark.
+type LearningRow struct {
+	Benchmark string `json:"benchmark"`
+	Arm       string `json:"arm"`
+	learning.Summary
+}
+
+// Rate is a mean over the runs that observed a metric.
+type Rate struct {
+	Value float64 `json:"value"`
+	Runs  int     `json:"runs"`
+}
+
+// PersistenceRow is one arm's persistence numbers. A nil field had no run
+// that observed it.
+type PersistenceRow struct {
+	Arm                   string `json:"arm"`
+	ResumedWithoutRedo    *Rate  `json:"resumed_without_redo,omitempty"`
+	GracefulFinish        *Rate  `json:"graceful_finish,omitempty"`
+	CostNormalizedSuccess *Rate  `json:"cost_normalized_success,omitempty"`
 }
 
 // Options tune Build. Zero values take the defaults.
@@ -142,16 +177,26 @@ type Options struct {
 
 // graded is one counted, sealed, scored run.
 type graded struct {
-	task      string
-	condition string
-	success   int
-	metrics   map[string]schemas.Value
+	task        string
+	condition   string
+	success     int
+	metrics     map[string]schemas.Value
+	trial       int
+	streamIndex int  // stream mode: 1-based place in the chain; 0 outside a stream
+	replay      bool // stream mode: a replay run, kept out of every score
 }
 
-// childRuns is one child experiment's graded runs by arm label.
+// childRuns is one child experiment's graded runs by arm label. Replay runs
+// of a stream are kept apart in replays so no score counts them; fresh are
+// the runs of the stream's fresh-memory arm, labelled or not (score mode's
+// hidden repeat).
 type childRuns struct {
-	child schemas.EvaluationChild
-	arms  map[string][]graded
+	child    schemas.EvaluationChild
+	arms     map[string][]graded
+	replays  map[string][]graded
+	fresh    []graded
+	stream   *schemas.StreamSpec
+	freshArm string // label of the fresh arm, "" when it has none
 }
 
 // Build computes the report of ev over src. A child with no experiment or
@@ -255,6 +300,8 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 
 	rep.Reliability = reliability(children, labels, faultOf)
 	rep.Safety = safety(children, labels, faultOf)
+	rep.Learning = learningRows(children, labels)
+	rep.Persistence = persistence(children, labels)
 	return rep, nil
 }
 
@@ -262,7 +309,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 // leaderboard counts it: the slot's first sealed run whose outcome is not
 // aborted_infra, with an outcome that scores; compatibility runs never count.
 func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.EvaluationArm, c schemas.EvaluationChild) (childRuns, error) {
-	cr := childRuns{child: c, arms: map[string][]graded{}}
+	cr := childRuns{child: c, arms: map[string][]graded{}, replays: map[string][]graded{}}
 	if c.ExperimentID == "" {
 		return cr, nil
 	}
@@ -274,6 +321,12 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 		return cr, nil
 	}
 	armLabel := mapArms(arms, m)
+	cr.stream = m.Experiment.Stream
+	freshID := ""
+	if cr.stream != nil {
+		freshID = cr.stream.FreshArm
+		cr.freshArm = armLabel[freshID]
+	}
 	bySlot := map[string][]leaderboard.Run{}
 	for _, r := range src.Runs(c.ExperimentID) {
 		bySlot[r.Slot.SlotID] = append(bySlot[r.Slot.SlotID], r)
@@ -295,7 +348,8 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 		}
 		r := runs[i]
 		label, ok := armLabel[r.Slot.Arm]
-		if !ok || r.Slot.Arm == "compat" {
+		isFresh := freshID != "" && r.Slot.Arm == freshID
+		if (!ok && !isFresh) || r.Slot.Arm == "compat" {
 			continue
 		}
 		if _, scores := r.Run.Outcome.Score(); !scores {
@@ -307,7 +361,17 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 		}
 		y, _ := leaderboard.VerifiedSuccess(r.Run.Outcome, metrics)
 		cond := cmp.Or(r.Slot.Condition, schemas.ConditionClean)
-		cr.arms[label] = append(cr.arms[label], graded{task: r.Slot.Task, condition: cond, success: int(y), metrics: metrics})
+		g := graded{task: r.Slot.Task, condition: cond, success: int(y), metrics: metrics, trial: r.Slot.Trial, streamIndex: r.Slot.StreamIndex, replay: r.Slot.StreamReplay}
+		if isFresh {
+			cr.fresh = append(cr.fresh, g)
+		}
+		switch {
+		case !ok:
+		case g.replay:
+			cr.replays[label] = append(cr.replays[label], g)
+		default:
+			cr.arms[label] = append(cr.arms[label], g)
+		}
 	}
 	return cr, nil
 }
@@ -560,6 +624,77 @@ func reliability(children []childRuns, labels []string, faultOf func(string) str
 		out = append(out, row)
 	}
 	return out
+}
+
+// learningRows builds the learning summary of every stream benchmark per
+// shown arm from its clean runs. The fresh-memory arm gets no row of its
+// own: it is the forward transfer control of the others.
+func learningRows(children []childRuns, labels []string) []LearningRow {
+	var out []LearningRow
+	for _, cr := range children {
+		if cr.stream == nil {
+			continue
+		}
+		fresh := points("fresh", filter(cr.fresh, schemas.ConditionClean))
+		for _, l := range labels {
+			if cr.freshArm != "" && l == cr.freshArm {
+				continue
+			}
+			runs := append(filter(cr.arms[l], schemas.ConditionClean), filter(cr.replays[l], schemas.ConditionClean)...)
+			carry := points(l, runs)
+			if len(carry) == 0 {
+				continue
+			}
+			var f []learning.Point
+			if cr.freshArm != l {
+				f = fresh
+			}
+			out = append(out, LearningRow{Benchmark: cr.child.Benchmark, Arm: l, Summary: learning.Summarize(carry, f, cr.stream.ThresholdOrDefault())})
+		}
+	}
+	return out
+}
+
+// points turns stream runs into learning points; a run outside a stream is
+// left out. The chain is the arm, condition and trial.
+func points(arm string, runs []graded) []learning.Point {
+	var out []learning.Point
+	for _, r := range runs {
+		if r.streamIndex < 1 {
+			continue
+		}
+		out = append(out, learning.Point{
+			Chain: fmt.Sprintf("%s\x00%s\x00%d", arm, r.condition, r.trial), Index: r.streamIndex,
+			Task: r.task, Success: float64(r.success), Replay: r.replay,
+		})
+	}
+	return out
+}
+
+// persistence averages the persistence metrics per arm over every counted
+// run of every condition (the kill and squeeze faults are conditions).
+func persistence(children []childRuns, labels []string) []PersistenceRow {
+	var out []PersistenceRow
+	for _, l := range labels {
+		var runs []graded
+		for _, cr := range children {
+			runs = append(runs, cr.arms[l]...)
+		}
+		row := PersistenceRow{Arm: l, ResumedWithoutRedo: rateOf(runs, metricResumedWithoutRedo),
+			GracefulFinish: rateOf(runs, metricGracefulFinish), CostNormalizedSuccess: rateOf(runs, metricCostNormalized)}
+		if row.ResumedWithoutRedo != nil || row.GracefulFinish != nil || row.CostNormalizedSuccess != nil {
+			out = append(out, row)
+		}
+	}
+	return out
+}
+
+func rateOf(runs []graded, id string) *Rate {
+	xs := observed(runs, id)
+	if len(xs) == 0 {
+		return nil
+	}
+	return &Rate{Value: round(stats.Mean(xs)), Runs: len(xs)}
 }
 
 func successes(runs []graded) int {

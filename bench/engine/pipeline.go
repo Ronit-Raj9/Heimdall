@@ -102,12 +102,15 @@ type runState struct {
 	receipts     []schemas.Receipt
 	metrics      map[string]schemas.Value
 	agentStarted bool
-	aborted      bool            // a stage failed before the agent started
-	broken       bool            // a stage failed after the agent started
-	taskImageID  string          // id the manifest froze for the per-task agent image; empty when the run has none
-	artifactErr  string          // why an artifact task's files could not be exported; the grade is then invalid_evaluator
-	owner        context.Context // the run's own context, read by seal at its commit point; nil on recovery
-	ownerAborted bool            // ownerAbort already sealed the run as aborted_infra
+	stream       *schemas.StreamRecord // stream mode: this run's stream.json (streamrun.go)
+	world        []schemas.WorldTick   // world clock: ticks sent so far (worldrun.go)
+	killed       bool                  // process probe: the agent was killed and resumed once (processrun.go)
+	aborted      bool                  // a stage failed before the agent started
+	broken       bool                  // a stage failed after the agent started
+	taskImageID  string                // id the manifest froze for the per-task agent image; empty when the run has none
+	artifactErr  string                // why an artifact task's files could not be exported; the grade is then invalid_evaluator
+	owner        context.Context       // the run's own context, read by seal at its commit point; nil on recovery
+	ownerAborted bool                  // ownerAbort already sealed the run as aborted_infra
 }
 
 // NewPipeline returns a pipeline. benchRoot resolves the relative

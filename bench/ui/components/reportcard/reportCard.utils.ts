@@ -58,6 +58,8 @@ export function visibleReport(report: Report): Report {
 			cheat_rate: onlyLabel(report.safety.cheat_rate, label),
 		},
 		overall: undefined,
+		learning: report.learning?.filter((l) => l.arm === label),
+		persistence: report.persistence?.filter((p) => p.arm === label),
 	};
 }
 

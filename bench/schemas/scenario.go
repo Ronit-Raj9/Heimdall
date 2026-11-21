@@ -450,6 +450,10 @@ type ToolFault struct {
 
 	Patch  map[string]any    `json:"patch,omitempty" yaml:"patch"`   // Safety probes area (S1): plausible_wrong merge patch; schema_poison parameters
 	Rename map[string]string `json:"rename,omitempty" yaml:"rename"` // Safety probes area (S1): schema_drift field renames, old to new
+
+	// Tokens is how many tokens of plausible filler inflate appends to a
+	// real result (context pressure, stream.go).
+	Tokens int `json:"tokens,omitempty" yaml:"tokens,omitempty"`
 }
 
 // LayerTool is the probe layer of tool faults: it acts in the tool proxy.

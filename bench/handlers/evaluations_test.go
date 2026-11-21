@@ -330,3 +330,29 @@ func TestSpreadPick(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestEvaluationStreamAndBudgetDisclosure(t *testing.T) {
+	l := &evalLauncher{}
+	r, _ := evalServer(t, Services{Launcher: l, Suites: evalSuites()})
+	ctx := evalCall(r, "POST", APIPrefix+"/evaluations",
+		`{"arms":[{"label":"A","agent":"scripted","model":"m1"}],"benchmarks":["longmemeval"],"stream":{"memory":"carry","replay":1},"disclose_budget":true}`)
+	if ctx.Response.StatusCode() != fasthttp.StatusAccepted {
+		t.Fatalf("status %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	ev := decodeEval(t, ctx)
+	exp := l.planned[ev.Children[0].ExperimentID]
+	if exp.Stream == nil || exp.Stream.Memory != "carry" || exp.Stream.Replay != 1 || exp.Stream.FreshArm != "B" {
+		t.Fatalf("stream %+v", exp.Stream)
+	}
+	if !exp.Budget.Disclose {
+		t.Fatalf("budget %+v", exp.Budget)
+	}
+	for _, body := range []string{
+		`{"arms":[{"agent":"scripted","model":"m"}],"benchmarks":["longmemeval"],"stream":{"memory":"keep"}}`,
+		`{"arms":[{"agent":"scripted","model":"m"}],"benchmarks":["longmemeval"],"stream":{"memory":"carry","fresh_arm":"B"}}`,
+	} {
+		if got := evalCall(r, "POST", APIPrefix+"/evaluations", body).Response.StatusCode(); got != fasthttp.StatusBadRequest {
+			t.Errorf("%s: status %d", body, got)
+		}
+	}
+}

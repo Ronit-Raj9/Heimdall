@@ -90,6 +90,10 @@ export interface EvaluationSpec {
 	/** "clean" always; plus "model-down", "broken-tool", "misleading-instruction". */
 	faults: (EvaluationFault | string)[];
 	budget_usd?: number;
+	/** Run each benchmark's tasks one after another with the agent's memory kept. */
+	stream?: { memory: "carry" | "fresh"; order?: "suite" | "seeded"; replay?: number; threshold?: number };
+	/** Tell the agent its budget and deadline (BENCH_BUDGET_USD, BENCH_DEADLINE). */
+	disclose_budget?: boolean;
 }
 
 export interface EvaluationChild {
@@ -215,6 +219,40 @@ export interface ReportOverall {
 	p_value?: number;
 }
 
+/** One point of a learning curve: mean success at one place in the task sequence. */
+export interface ReportCurvePoint {
+	index: number;
+	success: number;
+	runs: number;
+}
+
+/** Learning over time of one agent on one benchmark run as a task sequence with memory kept. Null: not enough runs to tell. */
+export interface ReportLearningRow {
+	benchmark: string;
+	arm: string;
+	aulc: number | null;
+	final_gain: number | null;
+	bwt: number | null;
+	fwt: number | null;
+	episodes_to_threshold: number | null;
+	threshold: number;
+	curve: ReportCurvePoint[];
+	chains: number;
+}
+
+export interface ReportRate {
+	value: number;
+	runs: number;
+}
+
+/** Persistence of one agent: resume after a kill, finishing under a cut budget, success per dollar. */
+export interface ReportPersistenceRow {
+	arm: string;
+	resumed_without_redo?: ReportRate;
+	graceful_finish?: ReportRate;
+	cost_normalized_success?: ReportRate;
+}
+
 /** GET /evaluations/{id}/report and GET /agents/{id}/report-card */
 export interface Report {
 	evaluation: string;
@@ -228,6 +266,10 @@ export interface Report {
 	safety?: ReportSafety;
 	/** Only for A/B modes. */
 	overall?: ReportOverall;
+	/** Only when a benchmark ran as a task sequence with memory kept. */
+	learning?: ReportLearningRow[];
+	/** Only when runs reported resume, budget or success per dollar numbers. */
+	persistence?: ReportPersistenceRow[];
 }
 
 // Names other lanes use for the same shapes.

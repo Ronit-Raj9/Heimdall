@@ -5,6 +5,9 @@ import "context"
 // Evidence is everything collected about one run. Evidence sources fill their
 // part during the collect stage; later stages read it.
 type Evidence struct {
+	// ProcessKill is set when a process probe killed the agent and the
+	// engine resumed it (stream.go).
+	ProcessKill  *ProcessKill          `json:"process_kill,omitempty"`
 	AdapterFault *AdapterFaultEvidence `json:"adapter_fault,omitempty"`
 	Contract     *RunEvidenceContract  `json:"evidence_contract,omitempty"`
 	Status       *EvidenceStatus       `json:"evidence_status,omitempty"`

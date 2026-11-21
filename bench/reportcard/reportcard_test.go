@@ -49,6 +49,8 @@ type fixRun struct {
 	outcome         schemas.Outcome
 	metrics         map[string]float64
 	attempt         int
+	stream          int  // stream index, 0 outside a stream
+	replay          bool // stream replay run
 }
 
 func newSource() *fakeSource {
@@ -68,6 +70,9 @@ func (f *fakeSource) add(exp, suite string, arms []string, runs []fixRun) {
 		}
 		trial := max(r.trial, 1)
 		slot := fmt.Sprintf("%s-%s-%s-%s-%d", exp, r.arm, r.task, cond, trial)
+		if r.replay {
+			slot += "-replay"
+		}
 		id := fmt.Sprintf("r_%s_%d", exp, i)
 		vals := map[string]schemas.Value{}
 		for k, v := range r.metrics {
@@ -76,7 +81,7 @@ func (f *fakeSource) add(exp, suite string, arms []string, runs []fixRun) {
 		b, _ := json.Marshal(vals)
 		f.files[id] = b
 		f.runs[exp] = append(f.runs[exp], leaderboard.Run{
-			Slot:   schemas.Slot{SlotID: slot, ExpID: exp, Suite: suite, Task: r.task, Arm: r.arm, Condition: cond, Trial: trial, Counted: true},
+			Slot:   schemas.Slot{SlotID: slot, ExpID: exp, Suite: suite, Task: r.task, Arm: r.arm, Condition: cond, Trial: trial, Counted: true, StreamIndex: r.stream, StreamReplay: r.replay},
 			Run:    schemas.Run{RunID: id, SlotID: slot, Outcome: r.outcome, Attempt: max(r.attempt, 1)},
 			Sealed: true,
 		})

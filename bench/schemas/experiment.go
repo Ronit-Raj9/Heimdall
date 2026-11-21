@@ -92,6 +92,12 @@ type Experiment struct {
 	// (schemas/evaluation.go); empty for every other experiment, so recorded
 	// manifests keep their hashes.
 	EvaluationID string `json:"evaluation_id,omitempty" yaml:"evaluation_id,omitempty"`
+
+	// Stream chains the runs of each arm, condition and trial over the
+	// condition's tasks and, with memory carry, hands each run the memory
+	// the previous one left (stream.go). nil keeps recorded manifests'
+	// hashes.
+	Stream *StreamSpec `json:"stream,omitempty" yaml:"stream,omitempty"`
 }
 
 // RunnerSpec picks the runners of a hosted organization that may run an
@@ -222,6 +228,10 @@ type CompatibilitySpec struct {
 type BudgetSpec struct {
 	TotalUSD   float64 `json:"total_usd" yaml:"total_usd"`
 	ReserveUSD float64 `json:"reserve_usd,omitempty" yaml:"reserve_usd"`
+	// Disclose tells the agent its budget: BENCH_BUDGET_USD (the per-run
+	// cap), BENCH_DEADLINE (RFC 3339) and BENCH_MAX_TOOL_CALLS when the
+	// arm sets them (stream.go). omitempty keeps recorded hashes.
+	Disclose bool `json:"disclose,omitempty" yaml:"disclose,omitempty"`
 }
 
 // VerdictSpec configures the verdict policy.

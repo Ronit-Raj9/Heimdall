@@ -106,7 +106,14 @@ func (e *dockerWorkspace) rebaseline(ctx context.Context, rc *schemas.RunContext
 // agent's memory path volumes: a multi-session task, or an agent that
 // declares memory. Other runs keep the exact container they always had.
 func memoryEnabled(rc *schemas.RunContext) bool {
-	return (rc.Task != nil && len(rc.Task.Sessions) > 0) || (rc.Agent != nil && rc.Agent.Memory != nil)
+	return (rc.Task != nil && len(rc.Task.Sessions) > 0) || (rc.Agent != nil && rc.Agent.Memory != nil) || streamCarry(rc)
+}
+
+// streamCarry reports whether the run is a slot of a stream chain whose
+// memory is carried from run to run (schemas/stream.go): it gets the memory
+// volumes even on a single-session task.
+func streamCarry(rc *schemas.RunContext) bool {
+	return rc.Slot != nil && rc.Slot.StreamIndex > 0 && rc.Experiment != nil && rc.Experiment.Stream.Carries(rc.Slot.Arm)
 }
 
 // memoryPaths returns the agent's memory paths, validated. It is pure.

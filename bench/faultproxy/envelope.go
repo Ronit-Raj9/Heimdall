@@ -24,11 +24,18 @@ const (
 // error row can be joined to exactly one ledger entry.
 func (s *Server) writeFault(w http.ResponseWriter, p ProviderSpec, d decision) {
 	msg := faultMessage(p.Format, d.Status)
+	if d.Budget {
+		msg = budgetExhaustedMessage
+	}
 	if d.Nonce != "" {
 		msg += " ref " + d.Nonce + " call " + strconv.Itoa(d.Call)
 	}
 	s.writeStatusError(w, p.Format, d.Status, "", msg, d.RetryAfterS)
 }
+
+// budgetExhaustedMessage is what a budget_squeeze plan answers once the
+// run's squeezed budget is spent.
+const budgetExhaustedMessage = "Budget exhausted: the remaining budget for this run is spent."
 
 // writeError writes a proxy-made error of category cat in the format's
 // envelope.
@@ -65,6 +72,9 @@ func (s *Server) writeStatusError(w http.ResponseWriter, format string, status i
 
 // faultMessage is the provider's usual text for an injected status.
 func faultMessage(format string, status int) string {
+	if status == http.StatusPaymentRequired { // budget_squeeze: the run's budget is spent
+		return budgetExhaustedMessage
+	}
 	switch format {
 	case FormatOpenAI:
 		switch {
@@ -103,6 +113,8 @@ func anthropicErrorType(status int, cat string) string {
 		return "overloaded_error"
 	case status == http.StatusTooManyRequests:
 		return "rate_limit_error"
+	case status == http.StatusPaymentRequired:
+		return "billing_error"
 	default:
 		return "api_error"
 	}
@@ -116,6 +128,8 @@ func openAIErrorType(status int, cat string) (string, any) {
 		return "invalid_request_error", nil
 	case status == http.StatusTooManyRequests:
 		return "requests", "rate_limit_exceeded"
+	case status == http.StatusPaymentRequired:
+		return "insufficient_quota", "insufficient_quota"
 	case status >= 500:
 		return "server_error", nil
 	default:
