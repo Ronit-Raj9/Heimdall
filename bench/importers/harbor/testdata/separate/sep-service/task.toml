@@ -1,0 +1,43 @@
+schema_version = "1.1"
+artifacts = [{ source = "/shared/x.json", service = "api" }]
+
+[task]
+name = "terminal-bench/sep-service"
+description = "Write a greeting file."
+keywords = ["files", "basics"]
+[[task.authors]]
+name = "Fixture Author"
+email = "fixture@example.com"
+
+[metadata]
+author_name = "Fixture Author"
+difficulty = "easy"
+category = "file-operations"
+tags = ["shell"]
+expert_time_estimate_min = 2.0
+
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+
+[verifier.environment]
+docker_image = "example/sep-service-verifier@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+[agent]
+timeout_sec = 300.0
+
+[environment]
+build_timeout_sec = 600.0
+docker_image = "example/hello-file:20251031"
+cpus = 1
+memory_mb = 2048
+gpus = 0
+allow_internet = true
+mcp_servers = []
+
+[verifier.env]
+
+[environment.env]
+GREETING_LANG = "en"
+
+[solution.env]
