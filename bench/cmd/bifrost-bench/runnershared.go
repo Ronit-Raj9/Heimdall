@@ -16,6 +16,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/maximhq/bifrost/bench/adapters"
+	"github.com/maximhq/bifrost/bench/ops"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/tenancy"
@@ -190,8 +191,9 @@ func runSharedRunner(args []string) int {
 				name = name[:128]
 			}
 			reg, root := sharedOrgProject(lctx, a, org)
+			plan := engine.NewPlanner(reg, root, a.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck()).Plan
 			w, err := engine.NewWorker(reg, engine.NewPipeline(reg, root, a.logger),
-				engine.NewPlanner(reg, root, a.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck()).Plan,
+				sharedEnsureImages(a, reg, root, plan),
 				engine.WorkerOptions{Server: f.server, Token: token, WorkerID: name, Host: host, Version: benchVersion,
 					Slots: slots, Logger: a.logger, Pool: sharedpool.Pool, Labels: []string{"shared", "runtime=" + f.runtime},
 					Jobs: newRunnerJobExecutor(a)}) // gap G05: hosted CLI jobs (runnerjob.go)
@@ -357,4 +359,34 @@ func mirrorTree(src, dst string) error {
 		_ = os.RemoveAll(p)
 	}
 	return nil
+}
+
+// sharedEnsureImages builds the suite's missing images (base, services)
+// before planning a leased experiment, as `suite admit` does locally: an org
+// that added a suite on the website has no other way to build them, and a
+// missing image would otherwise fail every run at prepare as a pull error.
+func sharedEnsureImages(a *app, reg *schemas.Registry, root string, plan engine.Replanner) engine.Replanner {
+	var mu sync.Mutex
+	built := map[string]bool{}
+	return func(ctx context.Context, e *schemas.Experiment) (*schemas.Manifest, error) {
+		if e != nil && e.Suite != "" {
+			mu.Lock()
+			done := built[e.Suite]
+			mu.Unlock()
+			if !done {
+				if s, err := engine.LoadSuite(ctx, reg, e.Suite); err == nil {
+					cfg := *a.cfg
+					cfg.Root = root
+					if err := ops.EnsureImages(ctx, &cfg, a.docker, s, io.Discard); err != nil {
+						a.logger.Warn("shared runner: build suite images", "suite", e.Suite, "error", err.Error())
+					} else {
+						mu.Lock()
+						built[e.Suite] = true
+						mu.Unlock()
+					}
+				}
+			}
+		}
+		return plan(ctx, e)
+	}
 }
