@@ -1,31 +1,48 @@
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { EmptyState } from "@/components/shell/emptyState";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { useSession } from "@/lib/session/sessionContext";
+import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { CheckCircle2, ChevronRight, Circle, CircleMinus, Loader2, XCircle } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { type AgentOpsTabProps, Field, OpsSection, useAgentId, useAgentSummary } from "./agentOps.shared";
+import { jobState, lastJobFor, type CheckState } from "../../../agents/views/agentDisplay";
+import { useAgentJobs } from "../../../agents/views/agentJobs";
+import { type AgentOpsTabProps, Field, useAgentId, useAgentSummary } from "./agentOps.shared";
 
 const DEFAULT_SUITE = "coding-core";
 
+type StepState = CheckState | "skipped";
+
 /**
- * The Checks tab of an agent: a free conformance check (agent.check), an image build
- * (agent.build; hosted builds run on a runner) and a version diff (agent.diff, local; hosted opens the Diff page).
- * Each button is a background job with a live log.
+ * The Checks tab of an agent as a readiness checklist: a free conformance check (agent.check), an
+ * image build (agent.build; hosted builds run on a runner) and a version diff (agent.diff, local;
+ * hosted opens the Diff page). Each row shows its last result; each button is a background job with a live log.
  */
 export function ChecksTab(props: AgentOpsTabProps = {}) {
 	const id = useAgentId(props);
 	const { agent, isLoading } = useAgentSummary(id);
 	const { t } = useTranslation("agentops");
+	const { t: tu } = useTranslation("agentsUx");
 	const session = useSession();
+	const jobs = useAgentJobs();
 	const hosted = session.authMode === "hosted";
 	const [suite, setSuite] = useState(DEFAULT_SUITE);
 	const [task, setTask] = useState("");
 	const [noBuild, setNoBuild] = useState(false);
 	const [buildSuite, setBuildSuite] = useState("");
 
-	if (isLoading) return <p className="text-muted-foreground p-4 text-sm">{t("checks.loading")}</p>;
+	if (isLoading) {
+		return (
+			<div className="flex flex-col gap-3" data-testid="agent-checks-loading">
+				{[0, 1, 2].map((i) => (
+					<Skeleton key={i} className="h-16 rounded-xl" />
+				))}
+			</div>
+		);
+	}
 	if (!agent) {
 		return (
 			<EmptyState
@@ -38,80 +55,166 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 	}
 	const checkParams = { agent: agent.path, suite: suite.trim(), ...(task.trim() ? { task: task.trim() } : {}), ...(noBuild ? { no_build: true } : {}) };
 	const buildParams = { agent: agent.path, ...(buildSuite.trim() ? { suite: buildSuite.trim() } : {}) };
+	const checkState: StepState = agent.error ? "broken" : jobState(lastJobFor(jobs, "agent.check", agent.path, agent.id));
+	const buildState: StepState = agent.dockerfile ? jobState(lastJobFor(jobs, "agent.build", agent.path, agent.id)) : "skipped";
+	const diffState: StepState = jobState(lastJobFor(jobs, "agent.diff", agent.path, agent.id));
 
 	return (
-		<div className="space-y-4" data-testid="agent-checks-tab">
-			<OpsSection
-				title={t("checks.check.title")}
-				hint={t("checks.check.hint")}
-				testId="agent-check-section"
-			>
-				<div className="grid gap-3 sm:grid-cols-3">
-					<Field label={t("checks.check.suite")}>
-						<Input value={suite} onChange={(e) => setSuite(e.target.value)} data-testid="agent-check-suite" />
-					</Field>
-					<Field label={t("checks.check.task")}>
-						<Input value={task} onChange={(e) => setTask(e.target.value)} data-testid="agent-check-task" />
-					</Field>
-					{!hosted && (
-						<label className="flex items-center gap-2 self-end pb-2 text-xs">
-							<input type="checkbox" checked={noBuild} onChange={(e) => setNoBuild(e.target.checked)} data-testid="agent-check-nobuild" />
-							{t("checks.check.noBuild")}
-						</label>
-					)}
-				</div>
-				{suite.trim() === "" ? (
-					<p className="text-destructive text-xs">{t("checks.check.needSuite", { suite: DEFAULT_SUITE })}</p>
-				) : (
-					<JobRunButton kind="agent.check" params={checkParams} label={t("checks.check.run")} />
-				)}
-			</OpsSection>
+		<div className="flex flex-col gap-4" data-testid="agent-checks-tab">
+			<div>
+				<h2 className="text-base font-semibold tracking-tight">{tu("checks.title")}</h2>
+				<p className="text-muted-foreground text-sm">{tu("checks.subtitle")}</p>
+			</div>
+			<ol className="bg-card divide-y rounded-xl border">
+				<CheckStep
+					n={1}
+					title={tu("checks.step.check")}
+					hint={tu("checks.hint.check")}
+					detail={t("checks.check.hint")}
+					state={checkState}
+					testId="agent-check-section"
+					action={
+						suite.trim() === "" ? (
+							<p className="text-destructive text-xs">{t("checks.check.needSuite", { suite: DEFAULT_SUITE })}</p>
+						) : (
+							<JobRunButton kind="agent.check" params={checkParams} label={t("checks.check.run")} />
+						)
+					}
+				>
+					<div className="grid gap-3 sm:grid-cols-3">
+						<Field label={t("checks.check.suite")}>
+							<Input value={suite} onChange={(e) => setSuite(e.target.value)} data-testid="agent-check-suite" />
+						</Field>
+						<Field label={t("checks.check.task")}>
+							<Input value={task} onChange={(e) => setTask(e.target.value)} data-testid="agent-check-task" />
+						</Field>
+						{!hosted && (
+							<label className="flex items-center gap-2 self-end pb-2 text-xs">
+								<input type="checkbox" checked={noBuild} onChange={(e) => setNoBuild(e.target.checked)} data-testid="agent-check-nobuild" />
+								{t("checks.check.noBuild")}
+							</label>
+						)}
+					</div>
+				</CheckStep>
 
-			<OpsSection
-				title={t("checks.build.title")}
-				hint={
-					agent.per_suite_build
-						? t("checks.build.hintPerSuite")
-						: agent.dockerfile
-							? t("checks.build.hintDockerfile", { image: agent.image, dockerfile: agent.dockerfile })
-							: t("checks.build.hintPrebuilt")
-				}
-				testId="agent-build-section"
-			>
-				{hosted && agent.dockerfile && (
-					<p className="text-muted-foreground text-xs" data-testid="agent-build-runner-note">
-						{t("checks.build.runnerNote")}
-					</p>
-				)}
-				{!agent.dockerfile ? (
-					<p className="text-muted-foreground text-xs">{t("checks.build.nothing")}</p>
-				) : (
-					<div className="flex flex-wrap items-end gap-3">
+				<CheckStep
+					n={2}
+					title={tu("checks.step.build")}
+					hint={agent.dockerfile ? tu("checks.hint.build") : tu("checks.hint.buildNone")}
+					detail={
+						agent.per_suite_build
+							? t("checks.build.hintPerSuite")
+							: agent.dockerfile
+								? t("checks.build.hintDockerfile", { image: agent.image, dockerfile: agent.dockerfile })
+								: t("checks.build.hintPrebuilt")
+					}
+					state={buildState}
+					testId="agent-build-section"
+					action={
+						agent.dockerfile && !(agent.per_suite_build && !buildSuite.trim()) ? (
+							<JobRunButton kind="agent.build" params={buildParams} label={t("checks.build.run")} variant="outline" />
+						) : agent.dockerfile ? (
+							<p className="text-destructive text-xs">{t("checks.build.needSuite")}</p>
+						) : null
+					}
+				>
+					{hosted && agent.dockerfile && (
+						<p className="text-muted-foreground text-xs" data-testid="agent-build-runner-note">
+							{t("checks.build.runnerNote")}
+						</p>
+					)}
+					{!agent.dockerfile ? (
+						<p className="text-muted-foreground text-xs">{t("checks.build.nothing")}</p>
+					) : (
 						<Field label={agent.per_suite_build ? t("checks.build.suiteRequired") : t("checks.build.suiteOptional")}>
 							<Input value={buildSuite} onChange={(e) => setBuildSuite(e.target.value)} data-testid="agent-build-suite" />
 						</Field>
-						{agent.per_suite_build && !buildSuite.trim() ? (
-							<p className="text-destructive pb-2 text-xs">{t("checks.build.needSuite")}</p>
-						) : (
-							<JobRunButton kind="agent.build" params={buildParams} label={t("checks.build.run")} variant="outline" />
-						)}
-					</div>
-				)}
-			</OpsSection>
+					)}
+				</CheckStep>
 
-			<OpsSection
-				title={t("checks.diff.title")}
-				hint={t("checks.diff.hint")}
-				testId="agent-diff-section"
-			>
-				<div className="flex flex-wrap items-center gap-3">
-					{!hosted && <JobRunButton kind="agent.diff" params={{ agent: agent.id }} label={t("checks.diff.run")} variant="outline" />}
-					<Link to="/agents" search={{ tab: "diff", agent: agent.id }} className="text-primary text-sm underline" data-testid="agent-diff-link">
-						{t("checks.diff.open")}
-					</Link>
-				</div>
-			</OpsSection>
+				<CheckStep
+					n={3}
+					title={tu("checks.step.diff")}
+					hint={tu("checks.hint.diff")}
+					detail={t("checks.diff.hint")}
+					state={diffState}
+					testId="agent-diff-section"
+					action={
+						<div className="flex flex-wrap items-center gap-3">
+							{!hosted && <JobRunButton kind="agent.diff" params={{ agent: agent.id }} label={t("checks.diff.run")} variant="outline" />}
+							<Link to="/agents" search={{ tab: "diff", agent: agent.id }} className="text-primary text-sm hover:underline" data-testid="agent-diff-link">
+								{t("checks.diff.open")}
+							</Link>
+						</div>
+					}
+				/>
+			</ol>
 		</div>
+	);
+}
+
+const ICON: Record<StepState, { icon: typeof Circle; cls: string }> = {
+	passed: { icon: CheckCircle2, cls: "text-emerald-600 dark:text-emerald-400" },
+	failed: { icon: XCircle, cls: "text-red-600 dark:text-red-400" },
+	broken: { icon: XCircle, cls: "text-red-600 dark:text-red-400" },
+	running: { icon: Loader2, cls: "text-sky-600 animate-spin dark:text-sky-400" },
+	never: { icon: Circle, cls: "text-muted-foreground/60" },
+	skipped: { icon: CircleMinus, cls: "text-muted-foreground/60" },
+};
+
+/** One row of the checklist: status icon, title and short hint, the action, and options on demand. */
+function CheckStep({
+	n,
+	title,
+	hint,
+	detail,
+	state,
+	action,
+	children,
+	testId,
+}: {
+	n: number;
+	title: string;
+	hint: string;
+	detail?: string;
+	state: StepState;
+	action?: ReactNode;
+	children?: ReactNode;
+	testId: string;
+}) {
+	const { t } = useTranslation("agentsUx");
+	const { icon: Icon, cls } = ICON[state];
+	return (
+		<li className="flex flex-col gap-3 p-5" data-testid={testId} data-state={state}>
+			<div className="flex flex-wrap items-start gap-4">
+				<Icon className={cn("mt-0.5 size-5 shrink-0", cls)} aria-hidden="true" />
+				<div className="flex min-w-0 flex-1 flex-col gap-0.5">
+					<h3 className="text-sm font-semibold">
+						<span className="text-muted-foreground mr-1.5 tabular-nums">{n}.</span>
+						{title}
+					</h3>
+					<p className="text-muted-foreground text-sm" title={detail}>
+						{hint}
+					</p>
+					<span className={cn("text-xs font-medium", cls.replace("animate-spin", ""))} data-testid={`${testId}-state`}>
+						{t(`checks.state.${state}`)}
+					</span>
+				</div>
+				{action && <div className="shrink-0">{action}</div>}
+			</div>
+			{children && (
+				<details className="group ml-9">
+					<summary className="text-muted-foreground hover:text-foreground flex w-fit cursor-pointer list-none items-center gap-1 text-xs">
+						<ChevronRight className="size-3.5 transition-transform group-open:rotate-90" aria-hidden="true" />
+						{t("checks.options")}
+					</summary>
+					<div className="mt-3 flex flex-col gap-3">
+						{detail && <p className="text-muted-foreground text-xs">{detail}</p>}
+						{children}
+					</div>
+				</details>
+			)}
+		</li>
 	);
 }
 
