@@ -844,6 +844,15 @@ func (r *Runner) finish(j *Job, status Status, result []byte, msg string) {
 // requeue hands a job this runner holds back to the queue (shutdown); the
 // next claim counts an attempt and resumes it.
 func (r *Runner) requeue(j *Job) {
+	// A job someone already asked to stop is finished as cancelled, not
+	// queued again: queued with a pending cancel it showed "Stopping" forever.
+	if res, err := r.db.SQL().ExecContext(context.Background(), r.q(`UPDATE jobs SET status = ?, lease_owner = NULL, lease_until = NULL,
+		finished_at = ?, error = ? WHERE id = ? AND lease_owner = ? AND attempt = ? AND status = ? AND cancel_requested = 1`),
+		string(StatusCancelled), r.now().UnixMilli(), "cancelled while the server restarted", j.ID, r.opts.Owner, j.Attempt, string(StatusRunning)); err == nil {
+		if n, _ := res.RowsAffected(); n == 1 {
+			return
+		}
+	}
 	if _, err := r.db.SQL().ExecContext(context.Background(), r.q(`UPDATE jobs SET status = ?, lease_owner = NULL, lease_until = NULL
 		WHERE id = ? AND lease_owner = ? AND attempt = ? AND status = ?`), string(StatusQueued), j.ID, r.opts.Owner, j.Attempt, string(StatusRunning)); err != nil {
 		r.opts.Logger.Error("job requeue failed; its lease expires instead", "job", j.ID, "error", err.Error())
