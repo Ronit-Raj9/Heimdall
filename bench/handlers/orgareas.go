@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"sort"
 	"sync"
 
@@ -29,6 +30,11 @@ type Services struct {
 	Suites   SuiteSource
 	Agents   AgentSource
 	Catalog  CatalogSource
+
+	// Reindex brings the org's read indexes (the in-memory experiment index
+	// and, hosted, the database results index) up to date after runs were
+	// added outside a job, such as a sealed-run upload. nil: nothing to do.
+	Reindex func(ctx context.Context) error
 }
 
 // OrgEnv is what an org area gets when it registers its routes.

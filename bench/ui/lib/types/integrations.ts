@@ -65,27 +65,6 @@ export interface CIWorkflowPreview {
 	workflow: string;
 }
 
-/** A repository from GET /github/repos (lane L07); read leniently. */
-export interface GithubRepo {
-	full_name: string;
-	default_branch?: string;
-}
-
-/** Body of POST /github/ci-install (lane L07 contract). */
-export interface CIInstallRequest {
-	owner: string;
-	repo: string;
-	mode: "recorded" | "live";
-	agent?: string;
-}
-
-export interface CIInstallResult {
-	pr_url?: string;
-	url?: string;
-	html_url?: string;
-	number?: number;
-}
-
 /** Params of the integrations.export job. */
 export interface IntegrationsExportParams {
 	format: IntegrationExportFormat;

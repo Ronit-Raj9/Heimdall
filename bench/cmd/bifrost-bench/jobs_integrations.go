@@ -15,6 +15,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/jobs"
+	"github.com/maximhq/bifrost/bench/schedule"
 	"github.com/maximhq/bifrost/bench/traceexport"
 	"github.com/maximhq/bifrost/bench/webhooks"
 )
@@ -228,6 +229,18 @@ func webhookEventFor(j jobs.Job, status jobs.Status, result []byte, msg string) 
 		}
 		return webhooks.NewEvent(webhooks.EventExperimentFinished, j.OrgID, d), true
 	}
+	// A schedule.fire job runs its experiment in this process (scheduleRunner,
+	// not an experiment.run job): its record names the experiment it ran.
+	if j.Kind == kindScheduleFire {
+		var rec schedule.Record
+		if json.Unmarshal(result, &rec) == nil && rec.Result != nil && rec.Result.ExpID != "" {
+			d := experimentFinishedData{ExpID: rec.Result.ExpID, JobID: j.ID, Status: string(status), Error: msg, FinishedAt: j.FinishedAt}
+			if len(result) <= 8<<10 {
+				d.Result = result
+			}
+			return webhooks.NewEvent(webhooks.EventExperimentFinished, j.OrgID, d), true
+		}
+	}
 	if status == jobs.StatusFailed {
 		return webhooks.NewEvent(webhooks.EventJobFailed, j.OrgID, jobFailedData{JobID: j.ID, Kind: j.Kind, Target: j.Target, Error: msg}), true
 	}
@@ -240,8 +253,14 @@ func dispatchJobWebhooks(j jobs.Job, status jobs.Status, result []byte, msg stri
 	if !ok {
 		return
 	}
+	deliverWebhookEvent(j.OrgID, ev)
+}
+
+// deliverWebhookEvent sends ev to the webhooks of org, when its services
+// were built in this process.
+func deliverWebhookEvent(org string, ev webhooks.Event) {
 	webhookOrgsMu.Lock()
-	o, ok := webhookOrgs[j.OrgID]
+	o, ok := webhookOrgs[org]
 	webhookOrgsMu.Unlock()
 	if !ok {
 		return
@@ -249,4 +268,21 @@ func dispatchJobWebhooks(j jobs.Job, status jobs.Status, result []byte, msg stri
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	webhooks.Dispatch(ctx, webhooks.Open(o.root), webhooks.Sender{AllowPrivate: !o.hosted}, ev)
+}
+
+// notifyInProcessFinished fires experiment.finished for an experiment the
+// launcher ran in this process with no job runner (serve without a
+// database): QuickRun, the builder and Start all land there, and no
+// experiment.run job ends to trigger the finish hook.
+func notifyInProcessFinished(org, expID string, result any, err error) {
+	d := experimentFinishedData{ExpID: expID, Status: string(jobs.StatusSucceeded)}
+	now := time.Now().UTC()
+	d.FinishedAt = &now
+	if err != nil {
+		d.Status, d.Error = string(jobs.StatusFailed), err.Error()
+	}
+	if b, merr := json.Marshal(result); merr == nil && result != nil && len(b) <= 8<<10 {
+		d.Result = b
+	}
+	deliverWebhookEvent(org, webhooks.NewEvent(webhooks.EventExperimentFinished, org, d))
 }

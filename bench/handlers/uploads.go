@@ -63,6 +63,9 @@ type UploadFilesReport struct {
 // UploadRunsReport is the answer of POST /uploads/runs.
 type UploadRunsReport struct {
 	tenancy.ImportReport
+	// IndexWarning is set when the import worked but refreshing the
+	// results index failed.
+	IndexWarning string `json:"index_warning,omitempty"`
 }
 
 var agentNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
@@ -332,18 +335,29 @@ func (h *uploadsHandler) postRuns(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "import: "+err.Error())
 		return
 	}
+	out := &UploadRunsReport{ImportReport: *rep}
 	if rep.Imported > 0 {
-		h.refreshIndex(ctx)
+		if err := h.refreshIndex(ctx); err != nil {
+			out.IndexWarning = "runs were imported but the results index could not be refreshed (" + err.Error() + "); they show after the next index sync or server restart"
+		}
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &UploadRunsReport{ImportReport: *rep})
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
 }
 
-// refreshIndex rebuilds the in-memory index when it can (local mode); the
-// hosted runtime rebuilds on the generation bump ImportRuns made.
-func (h *uploadsHandler) refreshIndex(ctx context.Context) {
-	if r, ok := h.svc.Index.(interface{ Rebuild(context.Context) error }); ok {
-		_ = r.Rebuild(context.WithoutCancel(ctx))
+// refreshIndex brings the org's indexes up to date so the imported
+// experiments show in Experiments, Leaderboard and Trends at once: the
+// Reindex service (in-memory index plus the database results index, as the
+// CLI org import does), else a Rebuild on the index when it has one. The
+// generation bump ImportRuns made still rebuilds other processes' runtimes.
+func (h *uploadsHandler) refreshIndex(ctx context.Context) error {
+	ctx = context.WithoutCancel(ctx)
+	if h.svc.Reindex != nil {
+		return h.svc.Reindex(ctx)
 	}
+	if r, ok := h.svc.Index.(interface{ Rebuild(context.Context) error }); ok {
+		return r.Rebuild(ctx)
+	}
+	return nil
 }
 
 // runsSource is the folder of tmp holding experiment folders: tmp itself, or
