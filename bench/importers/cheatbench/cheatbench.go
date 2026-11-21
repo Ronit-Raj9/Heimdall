@@ -621,13 +621,16 @@ EXPOSE 8000
 CMD ["python3", "/opt/heimdall_leaderboard.py"]
 `
 
-// writeMirrorImage writes services/<task>-mirror/ in the suite once per
+// writeMirrorImage writes mirrors/<task>-mirror/ in the suite once per
 // import (the capture is shared by every row: openmath's is 450 MB) and
 // returns its tag.
 func writeMirrorImage(suiteDir, tdir string, set dataset, name string, ms *mirrorSpec) (string, error) {
 	svcName := strings.ReplaceAll(name, "_", "-") + "-mirror"
 	tag := "bench/cheatbench-" + svcName + ":1"
-	dir := filepath.Join(suiteDir, "services", svcName)
+	// Not services/: the suite fingerprint covers that folder, and adding a
+	// mirror to an admitted suite would reset every admission. The image tag
+	// (in each task's compose.yaml) pins it instead.
+	dir := filepath.Join(suiteDir, "mirrors", svcName)
 	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err == nil {
 		return tag, nil
 	}
