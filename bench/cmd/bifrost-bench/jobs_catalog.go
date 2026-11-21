@@ -99,9 +99,10 @@ func catalogImportParams(env jobEnv, raw json.RawMessage) (benchcatalog.ImportPa
 	return p, importer, from, err
 }
 
-// seedStarterCatalog gives a new org the starter agents and suites once.
+// seedStarterCatalog gives a new hosted org the starter agents once (and
+// the practice suite only on a development server, benchcatalog.Seed).
 func seedStarterCatalog(p tenancy.OrgPaths) error {
-	src := benchcatalog.Source{Root: benchcatalog.SourceRoot()}
+	src := benchcatalog.Source{Root: benchcatalog.SourceRoot(), Hosted: true}
 	if _, err := src.Seed(p.ProjectRoot); err != nil {
 		return fmt.Errorf("seed starter catalog: %w", err)
 	}

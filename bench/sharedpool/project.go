@@ -43,7 +43,9 @@ var ErrProjectTooBig = errors.New("organization project is larger than the share
 // folder). .git and .heimdall are left out, except the frozen agent version
 // snapshots under .heimdall/agent-versions, which a pinned agent
 // (agents/<id>.yaml@v<N>) reads when the runner re-plans; so is the
-// top-level releases/ folder (the org's release log).
+// top-level releases/ folder (the org's release log). An improvement run's
+// improver configs (.heimdall/improve/<id>/improver-*.yaml) also go: the
+// improver experiment's base config is one, and the runner re-plans it.
 func ProjectSkip(rel string, isDir bool) (skip, dir bool) {
 	r := filepath.ToSlash(rel)
 	if r == "." {
@@ -55,6 +57,8 @@ func ProjectSkip(rel string, isDir bool) (skip, dir bool) {
 		return false, false
 	case r == keep || strings.HasPrefix(r, keep+"/"):
 		return false, false
+	case improverConfig(r, isDir):
+		return false, false
 	case strings.HasPrefix(r, ".heimdall/") || r == ".heimdall":
 		return true, isDir
 	case r == "releases" && isDir:
@@ -65,6 +69,27 @@ func ProjectSkip(rel string, isDir bool) (skip, dir bool) {
 		return true, true
 	}
 	return false, false
+}
+
+// improveDir holds the improver configs of improvement runs
+// (cmd/bifrost-bench improve.go Improve).
+const improveDir = ".heimdall/improve"
+
+// improverConfig reports whether rel is improveDir, one run's folder in it,
+// or an improver config in such a folder.
+func improverConfig(rel string, isDir bool) bool {
+	if rel == improveDir {
+		return isDir
+	}
+	rest, ok := strings.CutPrefix(rel, improveDir+"/")
+	if !ok || rest == "" {
+		return false
+	}
+	run, file, nested := strings.Cut(rest, "/")
+	if !nested {
+		return isDir && run != ""
+	}
+	return !isDir && !strings.Contains(file, "/") && strings.HasPrefix(file, "improver-") && strings.HasSuffix(file, ".yaml")
 }
 
 type projectFile struct {

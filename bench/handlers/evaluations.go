@@ -918,6 +918,18 @@ func SetEvaluationPoolResolver(f func(ctx context.Context, orgID, worker string)
 	evaluationPoolResolver.Store(f)
 }
 
+// EvaluationPool is the runner pool runs of org go to when they name
+// worker (a worker's name, "shared", or "" for the org's default): the
+// hosted resolver's answer, "" (the shared worker) without one. Improvement
+// runs on a hosted server route their experiments with it.
+func EvaluationPool(ctx context.Context, orgID, worker string) (string, error) {
+	f, _ := evaluationPoolResolver.Load().(func(context.Context, string, string) (string, error))
+	if f == nil || orgID == "" {
+		return "", nil
+	}
+	return f(ctx, orgID, worker)
+}
+
 // resolveEvaluationWorker replaces spec.Worker with the runner pool the
 // evaluation's experiments go to, so the saved evaluation records where it
 // ran. Without a resolver (local mode) a named worker is refused.

@@ -86,7 +86,8 @@ var StarterSuites = []string{"coding-core"}
 const SeedMarker = ".heimdall-catalog-seeded"
 
 // Seed copies the starter agents (with the image folders they build from)
-// and suites into project once. Missing sources are skipped: a server
+// and suites into project once; a hosted source leaves the practice suite
+// out unless HEIMDALL_DEV is set (HidePracticeSuite). Missing sources are skipped: a server
 // without them seeds what it has.
 func (s Source) Seed(project string) (*AddResult, error) {
 	if s.Root == "" || project == "" {
@@ -115,6 +116,9 @@ func (s Source) Seed(project string) (*AddResult, error) {
 		}
 	}
 	for _, id := range StarterSuites {
+		if HidePracticeSuite(s.Hosted, id) {
+			continue // no practice suite in a production hosted org
+		}
 		src := filepath.Join(s.Root, "benchmarks", id)
 		if !isDir(src) {
 			continue

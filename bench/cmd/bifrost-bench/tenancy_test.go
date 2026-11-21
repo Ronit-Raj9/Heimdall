@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/auth"
+	"github.com/maximhq/bifrost/bench/benchcatalog"
 	"github.com/maximhq/bifrost/bench/db"
 	"github.com/maximhq/bifrost/bench/db/dbtest"
 	"github.com/maximhq/bifrost/bench/handlers"
@@ -111,6 +113,16 @@ func newHostedFixture(t *testing.T) *hostedFixture { return newHostedFixtureWith
 // recording test launcher.
 func newHostedFixtureWith(t *testing.T, realLauncher bool) *hostedFixture {
 	t.Helper()
+	// The fixture makes many requests per credential in a tight loop; the
+	// per-credential API rate limit (X16) is tested on its own.
+	if _, set := os.LookupEnv(RateLimitsEnv); !set {
+		t.Setenv(RateLimitsEnv, "off")
+	}
+	// Hosted orgs of the fixture start with the practice suite, as on a
+	// development server; TestHostedOrgsGetNoPracticeSuite turns it off.
+	if _, set := os.LookupEnv(benchcatalog.DevEnv); !set {
+		t.Setenv(benchcatalog.DevEnv, "1")
+	}
 	ctx := context.Background()
 	dir := t.TempDir()
 	if code := runInit([]string{dir}); code != exitOK {
@@ -875,12 +887,39 @@ concurrency: 1
 	}
 }
 
-// TestHostedEveryOrgGetsTheSuite: an org made through the API has the
-// built-in suite at once; one made by signup gets it when its runtime is
-// first built; an org that deletes it does not get it back.
-func TestHostedEveryOrgGetsTheSuite(t *testing.T) {
+// TestHostedOrgsGetNoPracticeSuite (X08 no demo): on a production server
+// a new org, made through the API or by signup, gets no practice suite and
+// the suite list never shows it.
+func TestHostedOrgsGetNoPracticeSuite(t *testing.T) {
+	t.Setenv(benchcatalog.DevEnv, "")
 	f := newHostedFixture(t)
-	ctx := context.Background()
+	suiteOf := func(orgID string) string {
+		p, _ := f.env.layout.Paths(orgID)
+		return filepath.Join(p.BenchmarksRoot(), tenancy.DefaultSuite, "suite.yaml")
+	}
+	r := f.do("POST", "/api/bench/orgs", "mallory", nil, map[string]any{"slug": "mallory-co"})
+	if r.status != 201 {
+		t.Fatalf("create org: %d %s", r.status, trim(r.body))
+	}
+	if _, err := os.Stat(suiteOf(firstID(t, r.body))); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("API-created org got %s: %v", tenancy.DefaultSuite, err)
+	}
+	sue := hostedSignup(t, f, "sue@example.com", "Sue Co")
+	if r := f.do("GET", "/api/bench/suites", "sue", nil, nil); r.status != 200 || strings.Contains(r.body, `"`+tenancy.DefaultSuite+`"`) {
+		t.Fatalf("signup org suites: %d %s", r.status, trim(r.body))
+	}
+	if _, err := os.Stat(suiteOf(sue)); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("signup org got %s: %v", tenancy.DefaultSuite, err)
+	}
+}
+
+// TestHostedDevOrgsGetTheSuite: with HEIMDALL_DEV (tests, development
+// servers) an org made through the API has the practice suite at once; one
+// made by signup gets it when its runtime is first built; an org that
+// deletes it does not get it back.
+func TestHostedDevOrgsGetTheSuite(t *testing.T) {
+	t.Setenv(benchcatalog.DevEnv, "1")
+	f := newHostedFixture(t)
 	suiteOf := func(orgID string) string {
 		p, _ := f.env.layout.Paths(orgID)
 		return filepath.Join(p.BenchmarksRoot(), tenancy.DefaultSuite, "suite.yaml")
@@ -892,27 +931,7 @@ func TestHostedEveryOrgGetsTheSuite(t *testing.T) {
 	if _, err := os.Stat(suiteOf(firstID(t, r.body))); err != nil {
 		t.Fatalf("API-created org has no %s: %v", tenancy.DefaultSuite, err)
 	}
-
-	cfg := *f.env.base.cfg
-	cfg.Auth.Signup = lib.SignupOpen
-	authCfg, err := auth.ConfigFrom(&cfg, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	svc, err := auth.New(authCfg, auth.Deps{DB: f.d})
-	if err != nil {
-		t.Fatal(err)
-	}
-	u, _, err := svc.Signup(ctx, auth.SignupRequest{Email: "sue@example.com", Password: "correct horse battery staple 42", OrgName: "Sue Co"}, "127.0.0.9", "test", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	orgs, err := f.d.OrgsForUser(ctx, u.ID)
-	if err != nil || len(orgs) != 1 {
-		t.Fatalf("sue's orgs %+v %v", orgs, err)
-	}
-	sue := orgs[0].ID
-	f.as["sue"] = &auth.Principal{Kind: auth.KindUser, UserID: u.ID, OrgID: sue, Role: auth.RoleOwner}
+	sue := hostedSignup(t, f, "sue@example.com", "Sue Co")
 	r = f.do("GET", "/api/bench/suites", "sue", nil, nil)
 	if r.status != 200 || !strings.Contains(r.body, tenancy.DefaultSuite) {
 		t.Fatalf("signup org suites: %d %s", r.status, trim(r.body))
@@ -928,6 +947,34 @@ func TestHostedEveryOrgGetsTheSuite(t *testing.T) {
 	if r := f.do("GET", "/api/bench/suites", "sue", nil, nil); r.status != 200 || strings.Contains(r.body, tenancy.DefaultSuite) {
 		t.Fatalf("deleted suite came back: %d %s", r.status, trim(r.body))
 	}
+}
+
+// hostedSignup signs a user up with open signup and returns the new org's
+// id; the fixture then acts as that user under the email's local part.
+func hostedSignup(t *testing.T, f *hostedFixture, email, org string) string {
+	t.Helper()
+	cfg := *f.env.base.cfg
+	cfg.Auth.Signup = lib.SignupOpen
+	authCfg, err := auth.ConfigFrom(&cfg, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc, err := auth.New(authCfg, auth.Deps{DB: f.d})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	u, _, err := svc.Signup(ctx, auth.SignupRequest{Email: email, Password: "correct horse battery staple 42", OrgName: org}, "127.0.0.9", "test", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	orgs, err := f.d.OrgsForUser(ctx, u.ID)
+	if err != nil || len(orgs) != 1 {
+		t.Fatalf("%s's orgs %+v %v", email, orgs, err)
+	}
+	name, _, _ := strings.Cut(email, "@")
+	f.as[name] = &auth.Principal{Kind: auth.KindUser, UserID: u.ID, OrgID: orgs[0].ID, Role: auth.RoleOwner}
+	return orgs[0].ID
 }
 
 // TestHostedLeaveAndDemoFlag: members leave for themselves only, never as
@@ -1189,5 +1236,23 @@ func TestHostedOfflineLaunchesAndDetach(t *testing.T) {
 	h.mu.Unlock()
 	if left {
 		t.Fatal("evicted runtime's launcher still held by the hub")
+	}
+}
+
+// TestHostedImprovementsForAdmins (X26 on hosted): an org admin may start
+// an improvement run on a hosted server (the request reaches the handler,
+// which checks the spec, instead of a policy refusal or the offline answer);
+// a viewer may not; any member may stop one.
+func TestHostedImprovementsForAdmins(t *testing.T) {
+	f := newHostedFixtureWith(t, true)
+	if r := f.do("POST", "/api/bench/improvements", "vera", nil, map[string]any{}); r.status != 403 {
+		t.Fatalf("viewer create: %d %s", r.status, trim(r.body))
+	}
+	r := f.do("POST", "/api/bench/improvements", "alice", nil, map[string]any{"kind": "not-an-improvement"})
+	if r.status != 422 {
+		t.Fatalf("admin create reaches the spec check: %d %s", r.status, trim(r.body))
+	}
+	if r := f.do("POST", "/api/bench/improvements/imp_missing/stop", "alice", nil, nil); r.status == 403 {
+		t.Fatalf("member stop refused: %d %s", r.status, trim(r.body))
 	}
 }

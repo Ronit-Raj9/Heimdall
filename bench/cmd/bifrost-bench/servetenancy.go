@@ -213,6 +213,9 @@ func orgBuilder(env *hostedEnv) tenancy.Builder {
 		if orgLauncher != nil {
 			deps.Launcher, deps.Workers = orgLauncher(env, oa, ix)
 		}
+		if l, ok := deps.Launcher.(*launcher); ok { // improvement runs start on hosted too, through the org's launcher
+			deps.Improvements = serveHostedImprovements(oa, l)
+		}
 		applyServiceHooks(oa, &deps, org.ID, true) // web parity: deps.Services (servicehooks.go)
 		if deps.Services.Jobs == nil {
 			// Hosted jobs run on the platform hub; the org areas that queue
@@ -249,7 +252,7 @@ func orgBuilder(env *hostedEnv) tenancy.Builder {
 func hostedOrgFeatures(oa *app, deps *server.Deps) {
 	deps.Inbox = serveInbox(oa)
 	deps.Canaries = serveCanaries(oa, true)
-	deps.Improvements = serveImprovements(oa, true) // improvement runs: reads only on a hosted server
+	deps.Improvements = serveImprovements(oa, true) // improvement runs: reads only until the org's launcher is wired (serveHostedImprovements)
 	deps.Calibration = judgeSvc{a: oa}
 	deps.Export = serveExport{a: oa}
 	deps.Livescore = serveLivescore(oa, true)

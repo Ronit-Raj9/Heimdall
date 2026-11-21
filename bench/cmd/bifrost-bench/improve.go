@@ -30,6 +30,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/agentversions"
 	"github.com/maximhq/bifrost/bench/engine"
+	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/improve"
 	"github.com/maximhq/bifrost/bench/schedule"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -284,6 +285,10 @@ func newImproveRunner(a *app) *improve.Runner {
 // the planner, the scheduler and the run store.
 type improveExecutor struct {
 	a *app
+	// hosted runs every experiment through the org's hosted launcher (own
+	// keys, daily caps, the org's default worker, runs on runners only); nil
+	// runs them in this process (local serve and the CLI).
+	hosted *launcher
 }
 
 // Load implements improve.Executor: a pinned ref reads its snapshot; a
@@ -666,6 +671,9 @@ func improveExperiment(impID, phase string, round int, suiteRef string, seed int
 // execute plans, freezes and runs one experiment and returns its id and
 // spend, as the canary does.
 func (x improveExecutor) execute(ctx context.Context, exp *schemas.Experiment) (string, float64, error) {
+	if x.hosted != nil {
+		return x.hosted.runImprovementExperiment(ctx, exp)
+	}
 	a := x.a
 	m, err := a.newPlanner().PlanCanary(ctx, exp)
 	if err != nil {
@@ -697,6 +705,56 @@ type improveSource struct {
 // serveImprovements builds the API source; offline servers read only.
 func serveImprovements(a *app, offline bool) improveSource {
 	return improveSource{r: newImproveRunner(a), offline: offline, mu: &sync.Mutex{}}
+}
+
+// serveHostedImprovements is the source of a hosted org: improvement runs
+// may start (org admins, tenancy/policy_improve.go), and each of their
+// experiments goes through the org's launcher like any other org run.
+func serveHostedImprovements(a *app, l *launcher) improveSource {
+	r := newImproveRunner(a)
+	r.Exec = improveExecutor{a: a, hosted: l}
+	return improveSource{r: r, mu: &sync.Mutex{}}
+}
+
+// runImprovementExperiment plans, checks and runs one experiment of a
+// hosted improvement run and waits for it: the org's default worker routes
+// it, the daily caps and the own key rule (keyBudgetCheck) refuse it as
+// they refuse any start, and its slots run on runners only (remoteOnly).
+func (l *launcher) runImprovementExperiment(ctx context.Context, exp *schemas.Experiment) (string, float64, error) {
+	if exp.Runner == nil {
+		pool, err := handlers.EvaluationPool(ctx, l.org, "")
+		if err != nil {
+			return "", 0, fmt.Errorf("pick the worker for %s: %w", exp.Name, err)
+		}
+		if pool != "" {
+			exp.Runner = &schemas.RunnerSpec{Pool: pool}
+		}
+	}
+	m, err := l.a.newPlanner().PlanCanary(ctx, exp)
+	if err != nil {
+		return "", 0, fmt.Errorf("plan %s: %w", exp.Name, err)
+	}
+	if l.caps != nil {
+		if err := l.caps(ctx); err != nil {
+			return "", 0, err
+		}
+	}
+	if err := l.keyBudgetCheck(ctx, m); err != nil {
+		return "", 0, err
+	}
+	if err := l.a.store.CreateExperiment(ctx, m); err != nil {
+		return "", 0, fmt.Errorf("freeze %s: %w", m.ExpID, err)
+	}
+	defer refreshResultsIndex(context.WithoutCancel(ctx), l.a, m.ExpID)
+	run := l.liveRunFor(m.ExpID, "")
+	defer run.finish()
+	_, runErr := l.execute(ctx, m, run, nil, nil)
+	res := &schedule.Result{ExpID: m.ExpID}
+	scheduleRunner{a: l.a}.tally(ctx, res)
+	if runErr != nil {
+		return m.ExpID, res.CostUSD, fmt.Errorf("run %s: %w", m.ExpID, runErr)
+	}
+	return m.ExpID, res.CostUSD, nil
 }
 
 func (s improveSource) List(context.Context) (*improve.List, error) {

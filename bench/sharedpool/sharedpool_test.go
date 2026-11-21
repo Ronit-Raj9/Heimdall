@@ -181,3 +181,28 @@ func TestAssignments(t *testing.T) {
 		t.Fatalf("claim with kill switch on: %v", err)
 	}
 }
+
+// TestProjectSkip: the transfer keeps agent version snapshots and improver
+// configs, and leaves the rest of .heimdall, .git and releases out.
+func TestProjectSkip(t *testing.T) {
+	for _, c := range []struct {
+		rel       string
+		dir, skip bool
+	}{
+		{".heimdall", true, false},
+		{".heimdall/agent-versions/codex/v1.yaml", false, false},
+		{".heimdall/improve", true, false},
+		{".heimdall/improve/imp_1", true, false},
+		{".heimdall/improve/imp_1/improver-r01.yaml", false, false},
+		{".heimdall/improve/imp_1/notes.json", false, true},
+		{".heimdall/improve/imp_1/x/improver-r01.yaml", false, true},
+		{".heimdall/webhooks/hooks.json", false, true},
+		{"releases", true, true},
+		{"agents/codex.yaml", false, false},
+		{"sub/.git", true, true},
+	} {
+		if skip, _ := ProjectSkip(c.rel, c.dir); skip != c.skip {
+			t.Errorf("ProjectSkip(%q, dir %v) = %v, want %v", c.rel, c.dir, skip, c.skip)
+		}
+	}
+}
