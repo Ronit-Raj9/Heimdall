@@ -195,9 +195,14 @@ func (s *Sampler) Stop() *schemas.GPUSamplerSummary {
 	}
 	if s.cmd != nil && s.cmd.Process != nil {
 		_ = s.cmd.Process.Kill()
+		// The reader finishes before Wait closes its pipe (os/exec: Wait
+		// must not run before reads from StdoutPipe are done), so the last
+		// samples are not lost.
+		<-s.done
 		_ = s.cmd.Wait()
+	} else {
+		<-s.done
 	}
-	<-s.done
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.out != nil {

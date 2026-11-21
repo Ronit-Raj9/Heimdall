@@ -53,7 +53,7 @@ func (p *Planner) checkGPU(e *schemas.Experiment, suite *schemas.Suite, conds []
 		case len(t.Team) > 0 || armTeamOn(t, arms):
 			problems = append(problems, fmt.Sprintf("task %s needs a GPU and declares a team; GPU team runs are not supported", id))
 		case p.reg.GPUs == nil:
-			problems = append(problems, fmt.Sprintf("task %s needs a GPU but GPU tasks are off on this machine (gpu.mode: off, or no NVIDIA driver; bifrost-bench gpu check)", id))
+			problems = append(problems, fmt.Sprintf("task %s needs a GPU but no GPU pool was built on this machine (gpu.mode: off, no NVIDIA driver, or gpu.devices names a GPU this host lacks; the WARN log at startup and bifrost-bench gpu check say which)", id))
 		default:
 			if err := p.reg.GPUs.Fits(t.Resources.GPU); err != nil {
 				problems = append(problems, fmt.Sprintf("task %s %v", id, err))

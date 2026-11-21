@@ -73,7 +73,32 @@ func runGPU(args []string) int {
 		return fail("%v", err)
 	}
 	if a.cfg.GPU.Mode == lib.GPUModeOff {
-		fmt.Println("gpu.mode is off: GPU tasks are refused at plan time on this machine")
+		// gpu.mode off: every GPU task of the named suite is a problem, as
+		// plan refuses it; exit 4 when there is one (docs/gpu-tasks.md).
+		var problems []string
+		if *suiteRef != "" {
+			s, err := loadSuite(ctx, a.cfg.Path(a.cfg.BenchmarksRoot), *suiteRef)
+			if err != nil {
+				return fail("load suite %s: %v", *suiteRef, err)
+			}
+			for _, t := range s.Tasks {
+				if t.GPUCount() > 0 {
+					problems = append(problems, fmt.Sprintf("task %s needs a GPU but gpu.mode is off", t.ID))
+				}
+			}
+		}
+		if *asJSON {
+			b, _ := json.MarshalIndent(map[string]any{"mode": lib.GPUModeOff, "problems": problems}, "", "  ")
+			fmt.Println(string(b))
+		} else {
+			fmt.Println("gpu.mode is off: GPU tasks are refused at plan time on this machine")
+			for _, p := range problems {
+				fmt.Println("problem:", p)
+			}
+		}
+		if len(problems) > 0 {
+			return exitInfra
+		}
 		return exitOK
 	}
 	img := *image

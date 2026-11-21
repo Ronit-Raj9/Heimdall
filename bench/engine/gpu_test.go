@@ -44,7 +44,7 @@ func TestCheckGPURefusesWithTheReason(t *testing.T) {
 	}{
 		{without, nil, []string{"cpu"}, ""},
 		{with, nil, []string{"cpu", "small"}, ""},
-		{without, nil, []string{"small"}, "task small needs a GPU but GPU tasks are off on this machine"},
+		{without, nil, []string{"small"}, "task small needs a GPU but no GPU pool was built on this machine"},
 		{with, nil, []string{"big"}, "task big needs 1 GPU(s) with at least 16000 MiB each, but GPU 0 NVIDIA GeForce GTX 1650 has 4096 MiB"},
 		{with, nil, []string{"two"}, "task two needs 2 GPU(s), but this machine has 1 GPU(s)"},
 		{with, &schemas.Experiment{Environment: &schemas.EnvironmentChoice{Driver: "kubernetes"}}, []string{"small"}, "runs on the Docker driver only, not kubernetes"},
@@ -226,7 +226,7 @@ func TestRunGPUSlotHoldsOneGPUPerRun(t *testing.T) {
 func TestSchedulerRunsGPUSlotsOnGPUWorkers(t *testing.T) {
 	b := newBench(t)
 	b.suite.Tasks[0].Resources = &schemas.Resources{GPU: &schemas.GPURequest{Count: 1}}
-	if _, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), testExperiment()); err == nil || !strings.Contains(err.Error(), "task t01 needs a GPU but GPU tasks are off") {
+	if _, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), testExperiment()); err == nil || !strings.Contains(err.Error(), "task t01 needs a GPU but no GPU pool was built") {
 		t.Fatalf("plan without a GPU pool: %v", err)
 	}
 	pool := gtxPool(t)
