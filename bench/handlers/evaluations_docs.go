@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/maximhq/bifrost/bench/packs"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
 )
@@ -21,5 +22,11 @@ func init() {
 		RouteDoc{Method: "POST", Path: p + "/{id}/cancel", Tag: "evaluations",
 			Summary: "Cancel every experiment of the evaluation that still runs",
 			Auth:    AuthWrite, Status: fasthttp.StatusAccepted, Response: schemas.Evaluation{}},
+		RouteDoc{Method: "POST", Path: p + "/estimate", Tag: "evaluations",
+			Summary: "Estimate runs, cost and minutes of an evaluation spec before launching it; unknown prices stay unknown",
+			Auth:    AuthWrite, Request: EvalEstimateRequest{}, Response: EvalEstimate{}},
+		RouteDoc{Method: "GET", Path: APIPrefix + "/evaluation-packs", Tag: "evaluations",
+			Summary:  "Evaluation packs (coding, support, memory, ...) with the benchmarks of each present on this server and their ready task counts",
+			Response: []packs.PackView{}},
 	)
 }
