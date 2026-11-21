@@ -92,6 +92,13 @@ type PairRun struct {
 	// agent, or a proxy ledger showing the scripted model. It is independent
 	// of the server's mode, so a scripted pair on a live server says so.
 	Synthetic bool `json:"synthetic"`
+	// Provenance is this run's own model evidence (leaderboard.Provenance*):
+	// scripted, model, mixed, unobserved (no recorded model call) or
+	// unavailable (its ledger could not be read). Only model names a run a
+	// real model is recorded to have played (QC2-27-06).
+	Provenance string `json:"provenance"`
+	// ProvenanceNote says why provenance is unavailable; empty otherwise.
+	ProvenanceNote string `json:"provenance_note,omitempty"`
 }
 
 // AlignedStep is one aligned position: the event id of each arm at that step,
@@ -112,10 +119,13 @@ type FirstDivergence struct {
 
 // Pair is GET /pairs/{pair_id}.
 type Pair struct {
-	PairID          string           `json:"pair_id"`
-	ExpID           string           `json:"exp_id"`
-	Task            string           `json:"task"`
-	Suite           string           `json:"suite,omitempty"` // the experiment's suite id, so the task links to its evidence
+	PairID string `json:"pair_id"`
+	ExpID  string `json:"exp_id"`
+	Task   string `json:"task"`
+	Suite  string `json:"suite,omitempty"` // the experiment's suite id, so the task links to its evidence
+	// SuiteVersion is the suite version the experiment froze, so a task link
+	// names the exact revision its verifier ran (QC2-27-09).
+	SuiteVersion    string           `json:"suite_version,omitempty"`
 	Condition       string           `json:"condition"`
 	Trial           int              `json:"trial"`
 	Runs            []PairRun        `json:"runs"`
@@ -238,9 +248,12 @@ type ExperimentStatus struct {
 	AnalysisID   string          `json:"analysis_id,omitempty"`
 	// UI regroup (U2): the suite and arm ids from the manifest, and on the
 	// list only the decision of the newest analysis on disk.
-	Suite    string   `json:"suite,omitempty"`
-	Arms     []string `json:"arms,omitempty"`
-	Decision Decision `json:"decision,omitempty"`
+	Suite string `json:"suite,omitempty"`
+	// SuiteVersion is the suite version the manifest froze, so task links
+	// name the revision the evidence ran (QC2-27-09).
+	SuiteVersion string   `json:"suite_version,omitempty"`
+	Arms         []string `json:"arms,omitempty"`
+	Decision     Decision `json:"decision,omitempty"`
 }
 
 // ExperimentList is GET /experiments.

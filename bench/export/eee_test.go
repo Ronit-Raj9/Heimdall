@@ -116,6 +116,22 @@ func TestEEERefusesSynthetic(t *testing.T) {
 	}
 }
 
+// QC2-28-05: a scripted arm with no public run (a compatibility arm that
+// never ran) does not refuse an export whose every row is real, matching the
+// run table the UI reads.
+func TestEEESyntheticFollowsRunTable(t *testing.T) {
+	in := resultsFixture()
+	in.Synthetic["compat"] = true
+	for _, row := range RunTable(in) {
+		if row.Synthetic {
+			t.Fatalf("run table row %s synthetic", row.RunID)
+		}
+	}
+	if _, err := EEE(context.Background(), in, EEEOptions{}); err != nil {
+		t.Fatalf("all-real run table refused: %v", err)
+	}
+}
+
 func TestValidateEEERejectsBadRecords(t *testing.T) {
 	recs, err := EEE(context.Background(), resultsFixture(), EEEOptions{})
 	if err != nil {

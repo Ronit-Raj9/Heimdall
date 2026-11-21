@@ -11,6 +11,7 @@ const api = vi.hoisted(() => ({
 	cancel: {} as Record<string, unknown>,
 	resume: {} as Record<string, unknown>,
 	start: {} as Record<string, unknown>,
+	health: undefined as unknown,
 }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
@@ -22,6 +23,7 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useRegradeMutation: () => mutation(api.regrade),
 	useStartExperimentMutation: () => mutation(api.start),
+	useGetHealthQuery: () => ({ data: api.health }),
 }));
 
 const status = (state: ExperimentStatus["state"]) =>
@@ -31,6 +33,7 @@ beforeEach(() => {
 	api.regrade = {};
 	api.cancel = {};
 	api.resume = {};
+	api.health = undefined;
 });
 
 describe("ExperimentRunActions", () => {
@@ -38,6 +41,11 @@ describe("ExperimentRunActions", () => {
 		const html = render(<ExperimentRunActions status={status("created")} />, hostedSession("member"));
 		expect(html).toContain('data-testid="experiment-start"');
 		expect(html).not.toContain("experiment-resume");
+	});
+	it("hides Start on a server without a launcher, keeps Resume (QC2-27-03)", () => {
+		api.health = { mode: "live", launch: false };
+		expect(render(<ExperimentRunActions status={status("created")} />, LOCAL_SESSION)).toBe("");
+		expect(render(<ExperimentRunActions status={status("failed")} />, LOCAL_SESSION)).toContain("experiment-resume");
 	});
 	it("offers cancel while running and resume after a cancel or failure", () => {
 		expect(render(<ExperimentRunActions status={status("running")} />, hostedSession("member"))).toContain(

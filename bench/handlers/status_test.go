@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -110,5 +111,43 @@ func TestPlanConditions(t *testing.T) {
 	want := []schemas.PlanCondition{{Condition: "clean", Tasks: 2, Trials: 1, Slots: 4}}
 	if len(got) != 1 || got[0] != want[0] {
 		t.Fatalf("planConditions = %+v, want %+v", got, want)
+	}
+}
+
+// TestBuildStatusAdaptiveStoppedEarly: QC2-27-01. A task-rule adaptive plan
+// whose required trials agree never releases its optional trials. Once the
+// launcher stops, the experiment is done, not failed with slots left.
+func TestBuildStatusAdaptiveStoppedEarly(t *testing.T) {
+	m := &schemas.Manifest{ExpID: "e_ad", Adaptive: &schemas.AdaptivePlan{Rule: schemas.AdaptiveTask, Conditions: []string{"clean"},
+		Metric: "verified_success", Alpha: 0.05, Futility: schemas.FutilityCurtail, Min: 1, Max: 2}}
+	var runs []RunView
+	metrics := map[string]runMetricsRead{}
+	for _, task := range []string{"t1", "t2"} {
+		for _, arm := range []string{"A", "B"} {
+			for trial := 1; trial <= 2; trial++ {
+				sl := schemas.Slot{SlotID: fmt.Sprintf("s_%s_%s_%d", task, arm, trial), ExpID: "e_ad", Task: task, Arm: arm,
+					Condition: "clean", Trial: trial, Counted: true, Optional: trial > 1}
+				m.Slots = append(m.Slots, sl)
+				if trial == 1 {
+					id := "r_" + sl.SlotID
+					runs = append(runs, RunView{Slot: sl, Sealed: true, Run: schemas.Run{RunID: id, SlotID: sl.SlotID, ExpID: "e_ad", Attempt: 1, Outcome: schemas.OutcomePass}})
+					metrics[id] = runMetricsRead{found: true, values: map[string]schemas.Value{"verified_success": schemas.Observed(1, schemas.EvidenceOutcome)}}
+				}
+			}
+		}
+	}
+	skip := notRequiredSlots(m, runs, metrics)
+	if len(skip) != 4 {
+		t.Fatalf("not required %v, want the 4 optional trial-2 slots", skip)
+	}
+	st := BuildStatus(m, runs, StatusFacts{NotRequired: skip})
+	if st.State != schemas.ExperimentDone || st.Slots != (schemas.SlotProgress{Total: 4, Done: 4}) {
+		t.Fatalf("state %s slots %+v, want done 4/4", st.State, st.Slots)
+	}
+	if st := BuildStatus(m, runs, StatusFacts{}); st.State != schemas.ExperimentFailed {
+		t.Fatalf("without the replay the stop reads %s, the case this guards", st.State)
+	}
+	if notRequiredSlots(&schemas.Manifest{ExpID: "e_fixed"}, runs, metrics) != nil {
+		t.Fatal("fixed plan has no not-required slots")
 	}
 }

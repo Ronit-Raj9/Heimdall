@@ -114,7 +114,8 @@
 					"v": null
 				}
 			},
-			"synthetic": true
+			"synthetic": true,
+			"provenance": "scripted"
 		},
 		{
 			"arm": "B",
@@ -228,7 +229,8 @@
 					"v": null
 				}
 			},
-			"synthetic": true
+			"synthetic": true,
+			"provenance": "scripted"
 		}
 	],
 	"alignment": [
@@ -396,5 +398,7 @@
 	"first_divergence": {
 		"index": 6,
 		"note": "A edited src/dates.py after reading CLAUDE.md; B searched the code first. An observation, not a root cause."
-	}
+	},
+	"suite": "coding-core",
+	"suite_version": "1.0.0"
 }

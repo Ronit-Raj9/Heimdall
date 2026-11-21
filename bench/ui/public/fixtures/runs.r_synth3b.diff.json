@@ -1,0 +1,16 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"run_id": "r_synth3b",
+	"diff": {
+		"path": "workspace.diff",
+		"sha256": "sha256:ca5551842d8f0b62168b995a42c92f262cebc7e85155517cde7a783ce5687bcb",
+		"files": [
+			{
+				"path": "src/dates.py",
+				"status": "modified"
+			}
+		]
+	},
+	"patch": "diff --git a/src/dates.py b/src/dates.py\n--- a/src/dates.py\n+++ b/src/dates.py\n@@ -14,3 +14,6 @@\n def parse_date(text):\n+    if \"W\" in text:\n+        return datetime.strptime(text + \"-1\", \"%G-W%V-%u\")\n     return datetime.strptime(text, \"%Y-%m-%d\")\n"
+}

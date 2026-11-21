@@ -9,6 +9,7 @@ export const supportApi = benchApi.injectEndpoints({
 	endpoints: (builder) => ({
 		getExperimentSupport: builder.query<SupportSummaryResponse, string>({
 			query: (expId) => experimentSupportPath(expId),
+			providesTags: (_result, _error, expId) => [{ type: "BenchExperimentResult", id: expId }],
 		}),
 	}),
 });

@@ -22,6 +22,10 @@ type StatusFacts struct {
 	AnalysisID string // newest analysis, empty when none exists
 	// Cancelled: the experiment's newest run job was cancelled (Jobs area).
 	Cancelled bool
+	// NotRequired names the optional adaptive slots the frozen rule did not
+	// release (verdict.NotRequiredSlots). A slot named here with no run is
+	// left out of the progress: it is work the experiment will never do.
+	NotRequired map[string]bool
 }
 
 // BuildStatus derives an experiment's progress from its manifest and runs.
@@ -41,7 +45,7 @@ func BuildStatus(m *schemas.Manifest, runs []RunView, f StatusFacts) schemas.Exp
 	st := schemas.ExperimentStatus{
 		ExpID: m.ExpID, Name: m.Experiment.Name, ManifestHash: m.Hash, FrozenAt: m.CreatedAt,
 		SpentUSD: spentUSD(runs, f.Costs), AnalysisID: f.AnalysisID,
-		Suite: cmp.Or(m.SuiteID, m.Experiment.Suite), Arms: slices.Sorted(maps.Keys(m.Arms)), // UI regroup (U2)
+		Suite: cmp.Or(m.SuiteID, m.Experiment.Suite), SuiteVersion: m.SuiteVersion, Arms: slices.Sorted(maps.Keys(m.Arms)), // UI regroup (U2)
 	}
 	counted := countedRuns(runs)
 	unsealed := map[string]bool{}
@@ -55,8 +59,11 @@ func BuildStatus(m *schemas.Manifest, runs []RunView, f StatusFacts) schemas.Exp
 	}
 	var finished *time.Time
 	for _, s := range m.Slots {
-		st.Slots.Total++
 		rv, ok := counted[s.SlotID]
+		if !ok && !unsealed[s.SlotID] && f.NotRequired[s.SlotID] {
+			continue // adaptive: the frozen rule never released it (QC2-27-01)
+		}
+		st.Slots.Total++
 		switch {
 		case ok && failedOutcome(rv.Run.Outcome):
 			st.Slots.Failed++

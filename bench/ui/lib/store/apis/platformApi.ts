@@ -96,7 +96,7 @@ export const platformApi = benchApi.injectEndpoints({
 				} catch (failure) {
 					const status = errorStatus((failure as { error?: unknown })?.error);
 					// Only a hosted server answers /auth/me with 401, and only a server without the platform
-					// routes with 404. A transport error or a 5xx proves neither: the known mode is kept.
+					// routes with 404. A transport error or a 5xx proves neither: the known mode is kept, so a hosted tab keeps its CSRF value and org (QC2-28-07).
 					if (status === 401) setAuthState({ mode: "hosted" });
 					else if (status === 404) setAuthState({ mode: "local" });
 				}

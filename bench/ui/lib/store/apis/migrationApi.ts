@@ -14,28 +14,26 @@ import { benchApi } from "./benchApi";
  * docs/cost-explain.md), injected into the bench API so the shared endpoint list stays untouched.
  * Every route is a read over sealed runs; none takes the write token.
  */
-export const migrationApi = benchApi
-	.enhanceEndpoints({ addTagTypes: ["BenchMigration", "BenchCostExplain", "BenchPareto"] })
-	.injectEndpoints({
-		endpoints: (builder) => ({
-			getMigration: builder.query<MigrationResponse, MigrationParams>({
-				query: ({ expId, ...params }) => withParams(`${experimentPath(expId)}/migration`, params),
-				providesTags: (_result, _error, { expId }) => [{ type: "BenchMigration", id: expId }],
-			}),
-			getCostExplain: builder.query<CostExplainResponse, CostExplainParams>({
-				query: ({ expId, ...params }) => withParams(`${experimentPath(expId)}/cost-explain`, params),
-				providesTags: (_result, _error, { expId }) => [{ type: "BenchCostExplain", id: expId }],
-			}),
-			getExperimentPareto: builder.query<ParetoResponse, ExperimentParetoParams>({
-				query: ({ expId, ...params }) => withParams(`${experimentPath(expId)}/pareto`, params),
-				providesTags: (_result, _error, { expId }) => [{ type: "BenchPareto", id: expId }],
-			}),
-			getLeaderboardPareto: builder.query<ParetoResponse, LeaderboardParetoParams | void>({
-				query: (params) => withParams("/leaderboard/pareto", params ?? {}),
-				providesTags: [{ type: "BenchPareto", id: "BOARD" }],
-			}),
+export const migrationApi = benchApi.injectEndpoints({
+	endpoints: (builder) => ({
+		getMigration: builder.query<MigrationResponse, MigrationParams>({
+			query: ({ expId, ...params }) => withParams(`${experimentPath(expId)}/migration`, params),
+			providesTags: (_result, _error, { expId }) => [{ type: "BenchMigration", id: expId }],
 		}),
-	});
+		getCostExplain: builder.query<CostExplainResponse, CostExplainParams>({
+			query: ({ expId, ...params }) => withParams(`${experimentPath(expId)}/cost-explain`, params),
+			providesTags: (_result, _error, { expId }) => [{ type: "BenchCostExplain", id: expId }],
+		}),
+		getExperimentPareto: builder.query<ParetoResponse, ExperimentParetoParams>({
+			query: ({ expId, ...params }) => withParams(`${experimentPath(expId)}/pareto`, params),
+			providesTags: (_result, _error, { expId }) => [{ type: "BenchPareto", id: expId }],
+		}),
+		getLeaderboardPareto: builder.query<ParetoResponse, LeaderboardParetoParams | void>({
+			query: (params) => withParams("/leaderboard/pareto", params ?? {}),
+			providesTags: [{ type: "BenchPareto", id: "BOARD" }],
+		}),
+	}),
+});
 
 /** One experiment's path, with the id escaped as one path segment. */
 export function experimentPath(expId: string): string {

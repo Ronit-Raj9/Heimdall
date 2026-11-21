@@ -12,6 +12,7 @@
 		"test-crash"
 	],
 	"alpha": 0.05,
+	"grade_source": "original",
 	"synthetic": true,
 	"policy": "enterprise-default",
 	"from": {

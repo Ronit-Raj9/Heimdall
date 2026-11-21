@@ -150,7 +150,8 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 	return (
 		<>
 			<dt className="text-muted-foreground text-xs leading-5">{label}</dt>
-			<dd className="min-w-0">{children}</dd>
+			{/* Every value wraps anywhere, so a long unbroken approver or note never paints past the pane (QC2-29-07). */}
+			<dd className="min-w-0 wrap-anywhere">{children}</dd>
 		</>
 	);
 }

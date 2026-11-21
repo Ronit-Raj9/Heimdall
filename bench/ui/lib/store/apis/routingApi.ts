@@ -9,6 +9,7 @@ export const routingApi = benchApi.injectEndpoints({
 	endpoints: (builder) => ({
 		getExperimentRouting: builder.query<RoutingSummaryResponse, string>({
 			query: (expId) => experimentRoutingPath(expId),
+			providesTags: (_result, _error, expId) => [{ type: "BenchExperimentResult", id: expId }],
 		}),
 		getRunRouting: builder.query<RunRoutingResponse, string>({
 			query: (runId) => runRoutingPath(runId),

@@ -3,7 +3,7 @@ import { ModeBadge } from "@/components/modeBadge";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
 import { cn } from "@/lib/utils";
-import type { MigrationParams } from "@/lib/types/bench";
+import type { MigrationParams, MigrationResponse } from "@/lib/types/bench";
 import { useGetMigrationQuery } from "@/lib/store/apis/migrationApi";
 import { parseAsString, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
@@ -35,7 +35,11 @@ export function MigrationTab({ expId, arms }: { expId: string; arms: readonly st
 	const [alpha] = useQueryState("alpha", parseAsString);
 	const [gradeSource] = useQueryState("grade_source", parseAsString);
 	const report = useGetMigrationQuery(migrationParams(expId, { from, to, condition, alpha, grade_source: gradeSource }));
-	const fromArm = from ?? report.data?.from.arm ?? arms[0];
+	// Only the response to the current selection is shown: RTK keeps the previous one in data while a
+	// changed bookmark loads, and its settings would sit beside the new controls (QC2-27-07).
+	const current = report.currentData;
+	const pending = !current && !report.error;
+	const fromArm = from ?? current?.from.arm ?? arms[0];
 	const targets = arms.filter((arm) => arm !== fromArm);
 	const chosen = to ? to.split(",").filter((arm) => targets.includes(arm)) : targets;
 	const toggle = (arm: string) => {
@@ -77,26 +81,29 @@ export function MigrationTab({ expId, arms }: { expId: string; arms: readonly st
 						))}
 					</div>
 				</div>
-				{report.data && (
-					<span className="flex items-center gap-2">
-						<ModeBadge mode={report.data.mode} />
-						<GradeSourceTag source={gradeSource ?? undefined} testId="migration-source" />
-						{alpha && (
-							<span className="text-muted-foreground text-xs tabular-nums" data-testid="migration-alpha">
-								α = {alpha}
-							</span>
-						)}
-					</span>
-				)}
+				{current && <EffectiveSettings report={current} />}
 			</div>
-			{report.isLoading ? (
+			{pending ? (
 				<BlockSkeleton rows={6} testId="migration-report-loading" />
-			) : report.error || !report.data ? (
+			) : report.error || !current ? (
 				<LoadError title={t("migration.loadError")} error={report.error} onRetry={() => void report.refetch()} testId="migration-error" />
 			) : (
-				<MigrationReportView report={report.data} />
+				<MigrationReportView report={current} />
 			)}
 		</div>
+	);
+}
+
+/** The settings the rendered report was built with, read from the response, never from the URL. */
+export function EffectiveSettings({ report }: { report: MigrationResponse }) {
+	return (
+		<span className="flex items-center gap-2" data-testid="migration-effective">
+			<ModeBadge mode={report.mode} />
+			<GradeSourceTag source={report.grade_source || undefined} testId="migration-source" />
+			<span className="text-muted-foreground text-xs tabular-nums" data-testid="migration-alpha">
+				α = {report.alpha}
+			</span>
+		</span>
 	);
 }
 

@@ -91,39 +91,57 @@ func (h *PairsHandler) getPair(ctx *fasthttp.RequestCtx) {
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
 }
 
-// provenance fills the pair's suite and each arm's synthetic flag from the
-// experiment's manifest and the runs' proxy ledgers (leaderboard.SyntheticArms).
-// A pair whose manifest is not indexed keeps the defaults.
+// provenance fills the pair's frozen suite reference and each run's own
+// provenance. An arm whose config is scripted (or a smoke experiment) is
+// scripted by the board's rules (leaderboard.SyntheticArms, without the
+// ledger); any other run is classified from its own proxy ledger
+// (leaderboard.LedgerProvenance). A ledger that cannot be read or parsed
+// makes only that run's provenance unavailable, with a note: the rest of the
+// pair stays readable (QC2-27-05). A pair whose manifest is not indexed
+// keeps the defaults.
 func (h *PairsHandler) provenance(ctx context.Context, out *schemas.Pair) error {
 	m, ok := h.index.Manifest(out.ExpID)
 	if !ok || m == nil {
+		for i := range out.Runs {
+			out.Runs[i].Provenance = leaderboard.ProvenanceUnavailable
+			out.Runs[i].ProvenanceNote = "experiment manifest not indexed"
+		}
 		return nil
 	}
-	out.Suite = m.SuiteID
-	runs := make([]schemas.SealedRun, 0, len(out.Runs))
-	for _, pr := range out.Runs {
-		runs = append(runs, schemas.SealedRun{Slot: pr.Slot, Run: pr.Run})
-	}
-	// The ledger is read only to classify; it is never served (runFileTypes).
-	read := func(sr *schemas.SealedRun, name string) ([]byte, bool, error) {
-		data, err := h.index.RunFile(sr.Run.RunID, name)
-		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) || errors.Is(err, schemas.ErrNotFound) {
-				return nil, false, nil
-			}
-			return nil, false, err
-		}
-		return data, true, nil
-	}
-	synthetic, err := leaderboard.SyntheticArms(ctx, m, runs, read)
+	out.Suite, out.SuiteVersion = m.SuiteID, m.SuiteVersion
+	configured, err := leaderboard.SyntheticArms(ctx, m, nil, nil)
 	if err != nil {
 		return err
 	}
 	for i := range out.Runs {
-		out.Runs[i].Synthetic = synthetic[out.Runs[i].Arm]
+		pr := &out.Runs[i]
+		if configured[pr.Arm] {
+			pr.Synthetic, pr.Provenance = true, leaderboard.ProvenanceScripted
+			continue
+		}
+		// The ledger is read only to classify; it is never served (runFileTypes).
+		data, err := h.index.RunFile(pr.Run.RunID, proxyLedgerFile)
+		switch {
+		case errors.Is(err, fs.ErrNotExist) || errors.Is(err, schemas.ErrNotFound):
+			pr.Provenance = leaderboard.ProvenanceUnobserved
+			continue
+		case err != nil:
+			pr.Provenance, pr.ProvenanceNote = leaderboard.ProvenanceUnavailable, "proxy ledger unreadable: "+err.Error()
+			continue
+		}
+		prov, err := leaderboard.LedgerProvenance(data)
+		if err != nil {
+			pr.Provenance, pr.ProvenanceNote = leaderboard.ProvenanceUnavailable, "proxy ledger invalid: "+err.Error()
+			continue
+		}
+		pr.Provenance = prov
+		pr.Synthetic = prov == leaderboard.ProvenanceScripted || prov == leaderboard.ProvenanceMixed
 	}
 	return nil
 }
+
+// proxyLedgerFile is the run's proxy ledger, read only to classify.
+const proxyLedgerFile = "proxy.ledger.jsonl"
 
 // readMetrics reads a run's metrics.json (metric name -> value). A run whose
 // measure stage has not run yet has no metrics: an empty map, not zeros.

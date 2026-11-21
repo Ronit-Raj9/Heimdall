@@ -273,3 +273,26 @@ func copyTree(src, dst string) error {
 		return os.WriteFile(target, data, 0o644)
 	})
 }
+
+// TestDocsWorkedCommands: QC2-30-02 and QC2-30-03. The smoke demos pass
+// --allow-recorded (smoke verdicts are synthetic), and the live CI compare
+// shows the budget write-only still validates.
+func TestDocsWorkedCommands(t *testing.T) {
+	read := func(name string) string {
+		raw, err := os.ReadFile(filepath.Join("..", "docs", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+	for _, line := range strings.Split(read("clients.md"), "\n") {
+		if strings.Contains(line, "ci_gate") || strings.Contains(line, "ci-gate.ts") {
+			if strings.Contains(line, "experiments/smoke.yaml") && !strings.Contains(line, "--allow-recorded") {
+				t.Errorf("smoke gate command without --allow-recorded: %s", line)
+			}
+		}
+	}
+	if ci := read("ci.md"); !strings.Contains(ci, "--budget-usd <cap> --write-only") {
+		t.Error("docs/ci.md live compare omits --budget-usd")
+	}
+}

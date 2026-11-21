@@ -12,6 +12,7 @@ export const MIGRATION_FIXTURE: MigrationResponse = {
 	condition: "clean",
 	conditions: ["clean", "empty-test-run", "model-outage", "stale-notes", "test-crash"],
 	alpha: 0.05,
+	grade_source: "original",
 	synthetic: false,
 	policy: "enterprise-default",
 	from: {

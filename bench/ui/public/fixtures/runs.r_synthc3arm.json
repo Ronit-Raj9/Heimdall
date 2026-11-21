@@ -4,7 +4,7 @@
 	"slot": {
 		"slot_id": "s_synthc3arm",
 		"pair_id": "p_synth3arms",
-		"exp_id": "e_synthetic-codewins",
+		"exp_id": "e_synthetic-matrix",
 		"suite": "coding-core",
 		"task": "t02",
 		"task_version": "1.0.0",
@@ -18,7 +18,7 @@
 		"run_id": "r_synthc3arm",
 		"slot_id": "s_synthc3arm",
 		"pair_id": "p_synth3arms",
-		"exp_id": "e_synthetic-codewins",
+		"exp_id": "e_synthetic-matrix",
 		"attempt": 1,
 		"stage": "seal",
 		"manifest_hash": "sha256:52b5454d8f01de367a0a3baf9d55499ffab1b0b0343bd4585e4cc1c962fc9338",

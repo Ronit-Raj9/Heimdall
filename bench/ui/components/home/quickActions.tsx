@@ -1,6 +1,8 @@
 import { QUICKSTART_STEPS } from "@/components/quickstart/quickstart.utils";
 import { Button } from "@/components/ui/button";
 import { canUse, useSession } from "@/lib/session/sessionContext";
+import { useGetHealthQuery } from "@/lib/store/apis/benchApi";
+import { launchAvailable } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Bot, FlaskConical, PackagePlus, Rocket, type LucideIcon } from "lucide-react";
@@ -12,11 +14,13 @@ interface Action {
 	icon: LucideIcon;
 	/** Needs a member: a viewer or demo visitor cannot start experiments. */
 	write?: boolean;
+	/** Needs a launcher: offline serve cannot start experiments (QC2-27-03). */
+	launch?: boolean;
 }
 
 // "Add a suite" opens /imports, which becomes the Suites add flow (its redirect lands there).
 const ACTIONS: readonly Action[] = [
-	{ key: "newExperiment", to: "/experiments/new", icon: FlaskConical, write: true },
+	{ key: "newExperiment", to: "/experiments/new", icon: FlaskConical, write: true, launch: true },
 	{ key: "addSuite", to: "/imports", icon: PackagePlus },
 	{ key: "addAgent", to: "/agents", icon: Bot },
 	{ key: "getStarted", to: "/quickstart", icon: Rocket },
@@ -26,7 +30,10 @@ const ACTIONS: readonly Action[] = [
 export function QuickActions({ hide = [] }: { hide?: readonly Action["key"][] }) {
 	const { t } = useTranslation("bench");
 	const session = useSession();
-	const actions = ACTIONS.filter((action) => (!action.write || canUse(session, "member")) && !hide.includes(action.key));
+	const launch = launchAvailable(useGetHealthQuery().data);
+	const actions = ACTIONS.filter(
+		(action) => (!action.write || canUse(session, "member")) && (!action.launch || launch) && !hide.includes(action.key),
+	);
 	return (
 		<ul className="grid grid-cols-2 gap-2.5 xl:grid-cols-4" data-testid="home-actions">
 			{actions.map(({ key, to, icon: Icon }, index) => (
@@ -68,6 +75,7 @@ export function QuickActions({ hide = [] }: { hide?: readonly Action["key"][] })
 export function GetStartedCard() {
 	const { t } = useTranslation("bench");
 	const session = useSession();
+	const launch = launchAvailable(useGetHealthQuery().data);
 	return (
 		<section
 			className="border-primary/30 bg-primary/[0.04] flex flex-col gap-4 rounded-xl border p-5 md:flex-row md:items-center md:gap-8 md:p-6"
@@ -97,7 +105,7 @@ export function GetStartedCard() {
 						{t("home.getStarted.open")}
 					</Link>
 				</Button>
-				{canUse(session, "member") && (
+				{canUse(session, "member") && launch && (
 					<Button asChild variant="outline" dataTestId="home-get-started-new">
 						<Link to="/experiments/new">{t("home.getStarted.newExperiment")}</Link>
 					</Button>

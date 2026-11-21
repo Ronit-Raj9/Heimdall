@@ -1,8 +1,8 @@
 import { useExperimentId } from "@/components/experiments/useExperimentId";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EntityLink } from "@/components/shell/entityLink";
-import { useGetExperimentQuery, useGetGridQuery } from "@/lib/store/apis/benchApi";
-import type { GridRow } from "@/lib/types/bench";
+import { pairOpenable, useGetExperimentQuery, useGetGridQuery } from "@/lib/store/apis/benchApi";
+import { frozenSuiteRef, type GridRow } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { useTranslation } from "react-i18next";
@@ -46,7 +46,7 @@ export function PairPicker({ expParam, onPick }: PairPickerProps) {
 			) : !grid.data || grid.data.rows.length === 0 ? (
 				<EmptyNote testId="pair-picker-empty">{t("runs.picker.noRows")}</EmptyNote>
 			) : (
-				<PairTable rows={grid.data.rows} arms={grid.data.arms} suite={status.data?.suite} onPick={onPick} />
+				<PairTable rows={grid.data.rows} arms={grid.data.arms} suite={frozenSuiteRef(status.data?.suite, status.data?.suite_version)} onPick={onPick} />
 			)}
 		</Section>
 	);
@@ -126,7 +126,7 @@ function PairButton({
 		<button
 			type="button"
 			onClick={() => onPick(pair.pairId)}
-			disabled={!pair.hasRuns}
+			disabled={!pair.hasRuns || !pairOpenable(pair.pairId)}
 			title={label}
 			data-testid={`pair-picker-open-${pair.pairId}`}
 			className="hover:bg-accent focus-visible:ring-ring/50 inline-flex cursor-pointer items-center gap-1.5 rounded-sm border px-2 py-1 text-xs transition-colors focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"

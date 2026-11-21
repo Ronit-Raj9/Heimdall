@@ -69,18 +69,21 @@ type Query struct {
 
 // Report is the migration report (GET /api/bench/experiments/{id}/migration).
 type Report struct {
-	ExpID      string              `json:"exp_id"`
-	Suite      string              `json:"suite"`
-	Condition  string              `json:"condition"`  // the overall verdict's condition
-	Conditions []string            `json:"conditions"` // conditions with a graded run
-	Alpha      float64             `json:"alpha"`
-	Synthetic  bool                `json:"synthetic"`
-	Policy     string              `json:"policy"` // release policy name the recommendation follows, empty without one
-	From       ArmRef              `json:"from"`
-	Pairs      []Pair              `json:"pairs"`
-	Models     []ModelSummary      `json:"models"` // every arm of the report, from first
-	Pareto     *costexplain.Pareto `json:"pareto"`
-	Notes      []string            `json:"notes"`
+	ExpID      string   `json:"exp_id"`
+	Suite      string   `json:"suite"`
+	Condition  string   `json:"condition"`  // the overall verdict's condition
+	Conditions []string `json:"conditions"` // conditions with a graded run
+	Alpha      float64  `json:"alpha"`
+	// GradeSource is the grade the report read: original or reviewed. The
+	// UI shows the effective settings from here, never from its request.
+	GradeSource string              `json:"grade_source"`
+	Synthetic   bool                `json:"synthetic"`
+	Policy      string              `json:"policy"` // release policy name the recommendation follows, empty without one
+	From        ArmRef              `json:"from"`
+	Pairs       []Pair              `json:"pairs"`
+	Models      []ModelSummary      `json:"models"` // every arm of the report, from first
+	Pareto      *costexplain.Pareto `json:"pareto"`
+	Notes       []string            `json:"notes"`
 }
 
 // ArmRef names one arm.

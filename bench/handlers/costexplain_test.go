@@ -195,6 +195,9 @@ func TestMigrationRouteMatchesTheContract(t *testing.T) {
 		t.Errorf("query %+v source %s", src.lastMigration, src.lastSource)
 	}
 	checkKeys(t, "migration", out, loadKeys(t, "MigrationReport"), true)
+	if out["grade_source"] != schemas.GradeSourceOriginal || out["alpha"] != 0.1 {
+		t.Errorf("effective settings grade_source=%v alpha=%v (QC2-27-07)", out["grade_source"], out["alpha"])
+	}
 	checkNested(t, "migration", out, map[string]string{
 		"from": "MigrationArmRef", "pairs[]": "MigrationPair", "pairs[].from": "MigrationArmRef", "pairs[].overall": "MigrationVerdict",
 		"pairs[].strata[]": "MigrationVerdict", "pairs[].recommendation": "MigrationRecommendation", "pairs[].behaviour": "MigrationBehaviour",
@@ -219,6 +222,8 @@ func TestW6RouteErrors(t *testing.T) {
 		{"board pareto without an index", "/leaderboard/pareto", nil, 503},
 		{"migration unknown experiment", "/experiments/e_nope/migration?from=A", &fakeW6{}, 404},
 		{"migration bad alpha", "/experiments/e_test/migration?alpha=x", &fakeW6{}, 400},
+		{"migration zero alpha (QC2-27-07)", "/experiments/e_test/migration?alpha=0", &fakeW6{}, 400},
+		{"migration alpha of one", "/experiments/e_test/migration?alpha=1", &fakeW6{}, 400},
 		{"migration unknown model", "/experiments/e_test/migration?from=gpt-9", &fakeW6{}, 400},
 		{"migration without a source", "/experiments/e_test/migration", nil, 503},
 	}

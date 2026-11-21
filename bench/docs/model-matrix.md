@@ -49,7 +49,7 @@ A run enters when it is a counted, sealed run whose outcome scores (intention to
 
 ### Pairs and tiers
 
-Every pair of arms is compared by the exact sign-flip test on the per-task success rates of the tasks both ran (`stats.SignFlip`, as the verdict and the leaderboard use). The p values of all pairs are Holm-adjusted together, so three arms are a family of three tests and five arms of ten. A pair is significant only when its adjusted p is below alpha.
+Every pair of arms is compared by the sign-flip test on the per-task success rates of the tasks both ran (`stats.SignFlip`, as the verdict and the leaderboard use). Exact means full enumeration of the 2^n sign vectors, which `stats.SignFlip` does for up to 22 nonzero task differences; with 23 or more it estimates p by Monte Carlo (1,000,000 random sign vectors, `Exact=false` in the result), so a p near alpha on a large suite carries sampling error. The p values of all pairs are Holm-adjusted together, so three arms are a family of three tests and five arms of ten. A pair is significant only when its adjusted p is below alpha.
 
 Tiers come from the leader's pairs: tier 1 cannot be told apart from the leader, tier 2 is significantly behind it. Rank alone is never a claim that one arm beats another.
 

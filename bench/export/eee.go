@@ -130,9 +130,13 @@ func EEE(ctx context.Context, in EEEInput, opts EEEOptions) ([]EEERecord, error)
 	if !contains(eeeRelationships, rel) {
 		return nil, fmt.Errorf("export eee: relationship %q: want one of %s", rel, strings.Join(eeeRelationships, ", "))
 	}
+	// The synthetic policy reads the same rows the public run table exports
+	// (RunTable), so a manifest arm with no public run, such as a scripted
+	// compatibility arm that never ran, does not refuse an all-real export,
+	// and the UI can decide from the run table alone (QC2-28-05).
 	anySynthetic := false
-	for _, s := range in.Synthetic {
-		anySynthetic = anySynthetic || s
+	for _, row := range RunTable(EEEInput{Manifest: in.Manifest, Runs: in.Runs, Synthetic: in.Synthetic}) {
+		anySynthetic = anySynthetic || row.Synthetic
 	}
 	if in.Invalid {
 		return nil, ErrInvalid

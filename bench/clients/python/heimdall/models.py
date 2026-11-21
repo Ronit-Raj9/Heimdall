@@ -1999,6 +1999,7 @@ class ExperimentStatus(_ExperimentStatusRequired, total=False):
     finished_at: Optional[str]
     started_at: Optional[str]
     suite: str
+    suite_version: str
 
 
 class Explanation(TypedDict):
@@ -3357,14 +3358,20 @@ class _PairRequired(TypedDict):
 
 class Pair(_PairRequired, total=False):
     suite: str
+    suite_version: str
 
 
-class PairRun(TypedDict):
+class _PairRunRequired(TypedDict):
     arm: str
     metrics: Dict[str, Value]
+    provenance: str
     run: Run
     slot: Slot
     synthetic: bool
+
+
+class PairRun(_PairRunRequired, total=False):
+    provenance_note: str
 
 
 Pair_migration = TypedDict('Pair_migration', {'behaviour': "Behaviour", 'cost': "Optional[Explanation]", 'flipped': "List[FlippedTask]", 'from': "ArmRef_migration", 'overall': "Verdict_migration", 'recommendation': "Recommendation", 'strata': "List[Verdict_migration]", 'to': "ArmRef_migration"}, total=False)
@@ -3755,7 +3762,7 @@ class Report_agentdiff(TypedDict):
     synthetic: bool
 
 
-Report_migration = TypedDict('Report_migration', {'alpha': "float", 'condition': "str", 'conditions': "List[str]", 'exp_id': "str", 'from': "ArmRef_migration", 'models': "List[ModelSummary]", 'notes': "List[str]", 'pairs': "List[Pair_migration]", 'pareto': "Optional[Pareto]", 'policy': "str", 'suite': "str", 'synthetic': "bool"}, total=False)
+Report_migration = TypedDict('Report_migration', {'alpha': "float", 'condition': "str", 'conditions': "List[str]", 'exp_id': "str", 'from': "ArmRef_migration", 'grade_source': "str", 'models': "List[ModelSummary]", 'notes': "List[str]", 'pairs': "List[Pair_migration]", 'pareto': "Optional[Pareto]", 'policy': "str", 'suite': "str", 'synthetic': "bool"}, total=False)
 
 
 class Reported(TypedDict):

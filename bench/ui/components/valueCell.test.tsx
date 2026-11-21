@@ -64,6 +64,13 @@ describe("ValueCell", () => {
 		expect(html).toContain("no reason recorded");
 	});
 
+	it("makes an observed value's source reachable by keyboard and touch (QC2-29-08)", () => {
+		const html = render({ state: "observed", v: 0.5, evidence: "gateway" }, "rate");
+		expect(html).toMatch(/<span[^>]*data-state="observed"[^>]*tabindex="0"|<span[^>]*tabindex="0"[^>]*data-state="observed"/);
+		expect(html).toContain("cursor-help");
+		const bare = render({ state: "observed", v: 0.5 } as Value, "rate");
+		expect(bare).not.toContain("tabindex");
+	});
 	it("renders an observed zero as zero", () => {
 		const html = render({ state: "observed", v: 0 }, "count");
 		expect(html).toContain('data-state="observed"');

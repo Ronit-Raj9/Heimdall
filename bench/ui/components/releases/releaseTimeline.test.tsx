@@ -70,4 +70,12 @@ describe("ReleaseTimeline at narrow widths", () => {
 		expect(html).toMatch(/class="min-w-0 rounded-sm border/);
 		expect(html).toMatch(/class="min-w-0 font-mono text-xs break-all" data-testid="release-id-/);
 	});
+	it("wraps a long unbroken approver inside its value cell (QC2-29-07)", () => {
+		const long = { ...fixture.releases[0], approver: "W".repeat(200) };
+		const html = render([long], true);
+		const id = long.release_id;
+		const dd = html.match(new RegExp(`<dd class="([^"]*)"><span data-testid="release-approver-${id}"`));
+		expect(dd?.[1]).toContain("wrap-anywhere");
+		expect(dd?.[1]).toContain("min-w-0");
+	});
 });

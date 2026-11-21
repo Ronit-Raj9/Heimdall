@@ -1,6 +1,7 @@
 import { EntityLink } from "@/components/shell/entityLink";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getLocale } from "@/lib/i18n";
+import { pairOpenable } from "@/lib/store/apis/benchApi";
 import type { Grid, GridCell, GridRow } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Check, CircleHelp, ShieldAlert, X } from "lucide-react";
@@ -173,6 +174,24 @@ function OutcomeCell({
 				aria-label={label}
 				title={label}
 				data-testid={`verdict-grid-cell-missing-${row.task}-${row.condition}-${arm}-${trial}`}
+			>
+				<Icon className="size-3.5" aria-hidden="true" />
+			</span>
+		);
+	}
+
+	// Fixture mode: a pair without a fixture shows its outcome but does not open (QC2-29-04).
+	if (!pairOpenable(cell.pair_id)) {
+		return (
+			<span
+				aria-label={label}
+				title={label}
+				data-testid={`verdict-grid-cell-${cell.slot_id}`}
+				data-pair-id={cell.pair_id}
+				data-outcome={cell.outcome ?? "none"}
+				data-tone={tone}
+				data-openable="false"
+				className={cn("inline-flex size-7 items-center justify-center rounded-sm border", CELL_CLASS[tone])}
 			>
 				<Icon className="size-3.5" aria-hidden="true" />
 			</span>
