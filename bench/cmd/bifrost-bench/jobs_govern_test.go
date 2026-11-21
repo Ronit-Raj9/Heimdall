@@ -11,7 +11,7 @@ func TestMonitorCertifyArgs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "monitor certify -monitor monitors/guard.yaml -exp e_1 -exp e_2 -fpr 0.01 -parallel 2"
+	want := "monitor certify -config {{config}} -monitor monitors/guard.yaml -exp e_1 -exp e_2 -fpr 0.01 -parallel 2"
 	if got := strings.Join(argv, " "); got != want {
 		t.Fatalf("argv = %q, want %q", got, want)
 	}

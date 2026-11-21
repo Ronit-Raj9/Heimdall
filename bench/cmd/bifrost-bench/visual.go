@@ -112,6 +112,7 @@ func runVisualRender(args []string) int {
 
 func runVisualCapture(args []string) int {
 	fs := flag.NewFlagSet("visual capture", flag.ContinueOnError)
+	_ = fs.String("config", defaultConfig, "bench config (accepted so every web job passes one; capture reads none)")
 	out := fs.String("out", "", "png file to write")
 	desktop := fs.String("desktop", "", "desktop service container")
 	port := fs.Int("port", 8000, "desktop MCP port inside the container")

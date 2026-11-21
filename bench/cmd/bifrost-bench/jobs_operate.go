@@ -16,12 +16,15 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/evidencestore"
 	"github.com/maximhq/bifrost/bench/gpu"
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/quota"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/sharedpool"
 )
 
 // Operate job kinds.
@@ -153,7 +156,7 @@ func init() {
 		if err := operateCheckID("suite", p.Suite, true); err != nil {
 			return nil, err
 		}
-		return []string{"voice", "check", "-suite", p.Suite, "-json"}, nil
+		return []string{"voice", "check", "-config", cliConfig, "-suite", p.Suite, "-json"}, nil
 	}))
 	registerJobKind(operateCLI(kindVisualCompare, func(p operateParams) ([]string, error) {
 		if err := operateCheckID("suite", p.Suite, true); err != nil {
@@ -169,7 +172,7 @@ func init() {
 		if ext := strings.ToLower(filepath.Ext(img)); ext != ".png" && ext != ".jpg" && ext != ".jpeg" {
 			return nil, errors.New("image must be a .png or .jpg file")
 		}
-		return []string{"visual", "compare", "-image", img, "-json", p.Suite + "/" + p.Task}, nil
+		return []string{"visual", "compare", "-config", cliConfig, "-image", img, "-json", p.Suite + "/" + p.Task}, nil
 	}))
 	registerJobKind(operateCLI(kindVisualCapture, func(p operateParams) ([]string, error) {
 		if (p.Desktop == "") == (p.Browser == "") {
@@ -188,7 +191,7 @@ func init() {
 		if err := operateCheckID("out", name, true); err != nil || !strings.HasSuffix(strings.ToLower(name), ".png") {
 			return nil, errors.New("out must be a plain .png file name, for example capture.png")
 		}
-		args := []string{"visual", "capture", "-out", filepath.Join("uploads", "visual", name)}
+		args := []string{"visual", "capture", "-config", cliConfig, "-out", filepath.Join("uploads", "visual", name)}
 		if p.Desktop != "" {
 			args = append(args, "-desktop", p.Desktop)
 		} else {
@@ -212,14 +215,14 @@ func init() {
 		if err := operateCheckID("condition", p.Condition, false); err != nil {
 			return nil, err
 		}
-		args := []string{"simulator", "spread", "-a", p.A, "-b", p.B, "-json"}
+		args := []string{"simulator", "spread", "-config", cliConfig, "-a", p.A, "-b", p.B, "-json"}
 		if p.Condition != "" {
 			args = append(args, "-condition", p.Condition)
 		}
 		return args, nil
 	}))
 	registerJobKind(operateCLI(kindK8sStatus, func(p operateParams) ([]string, error) {
-		return []string{"k8s", "check"}, nil
+		return []string{"k8s", "check", "-config", cliConfig}, nil
 	}))
 	for _, sub := range []string{"verify", "mirror", "archive", "backup", "restore"} {
 		registerJobKind(evidenceJob(sub))
@@ -237,6 +240,7 @@ func runOperateDoctor(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Log
 		_, suiteRows := env.App.doctorSuites(ctx)
 		_, agentRows := loadDoctorAgents(env.App.cfg.Root)
 		checks = append(append(checks, suiteRows...), agentRows...)
+		checks = append(checks, hostedRunnerChecks(ctx, env, time.Now())...)
 	} else {
 		checks = env.App.doctor(ctx)
 	}
@@ -405,4 +409,80 @@ func runEvidenceVerb(ctx context.Context, cfg *lib.Config, logger schemas.Logger
 		return result, fmt.Errorf("evidence %s failed with exit code %s; the server log has the details", sub, strconv.Itoa(code))
 	}
 	return result, nil
+}
+
+// hostedRunnerChecks are the hosted doctor's runner rows (gap lane G09):
+// the org's online runners, the newest heartbeat, and the shared runner
+// pool. Every row that is not a pass says what to do next.
+func hostedRunnerChecks(ctx context.Context, env jobEnv, now time.Time) []schemas.DoctorCheck {
+	var workers []schemas.WorkerInfo
+	coordinated := false
+	if l, ok := env.Services.Launcher.(*launcher); ok && l.coord != nil {
+		workers, coordinated = l.coord.Workers(), true
+	}
+	return runnerDoctorRows(ctx, env, workers, coordinated, now)
+}
+
+func runnerDoctorRows(ctx context.Context, env jobEnv, workers []schemas.WorkerInfo, coordinated bool, now time.Time) []schemas.DoctorCheck {
+	var checks []schemas.DoctorCheck
+	own, shared := 0, 0
+	var last time.Time
+	for _, w := range workers {
+		if w.LastSeen.After(last) {
+			last = w.LastSeen
+		}
+		if w.State == schemas.WorkerLost {
+			continue
+		}
+		if w.Pool == sharedpool.Pool {
+			shared++
+		} else {
+			own++
+		}
+	}
+	switch {
+	case !coordinated:
+		checks = append(checks, schemas.DoctorCheck{ID: "runners.online", Status: schemas.DoctorFail,
+			Detail: "runner coordinator not available for this organization; ask the server owner to check the server log"})
+	case own+shared == 0:
+		checks = append(checks, schemas.DoctorCheck{ID: "runners.online", Status: schemas.DoctorWarn,
+			Detail: "no runner online: create a runner token on the Runners page and start a runner, or use the shared pool"})
+	default:
+		checks = append(checks, schemas.DoctorCheck{ID: "runners.online", Status: schemas.DoctorPass,
+			Detail: fmt.Sprintf("%d runner(s) online: %d of your own, %d shared", own+shared, own, shared)})
+	}
+	if coordinated {
+		hb := schemas.DoctorCheck{ID: "runners.heartbeat"}
+		switch age := now.Sub(last); {
+		case last.IsZero():
+			hb.Status, hb.Detail = schemas.DoctorSkip, "no runner has registered yet"
+		case age > 2*time.Minute:
+			hb.Status, hb.Detail = schemas.DoctorWarn, fmt.Sprintf("last heartbeat %s ago (%s): restart the runner if it should be online", age.Round(time.Second), last.UTC().Format(time.RFC3339))
+		default:
+			hb.Status, hb.Detail = schemas.DoctorPass, fmt.Sprintf("last heartbeat %s ago (%s)", age.Round(time.Second), last.UTC().Format(time.RFC3339))
+		}
+		checks = append(checks, hb)
+	}
+	sp := schemas.DoctorCheck{ID: "runners.shared"}
+	var limits quota.Limits
+	kill := false
+	if q := env.Services.Quota; q != nil {
+		if l, err := q.Get(ctx, env.OrgID); err == nil {
+			limits = l
+		}
+		kill, _ = q.KillSwitch(ctx)
+	}
+	switch {
+	case kill:
+		sp.Status, sp.Detail = schemas.DoctorWarn, "the server owner paused new runs (kill switch); running slots finish"
+	case sharedpool.Secret() == "":
+		sp.Status, sp.Detail = schemas.DoctorSkip, "no shared runner on this server: start your own runner (Runners page)"
+	case !limits.SharedPool:
+		sp.Status, sp.Detail = schemas.DoctorWarn, "shared runners are off for your organization: start your own runner, or ask the server owner to enable them"
+	case shared == 0:
+		sp.Status, sp.Detail = schemas.DoctorWarn, "shared pool enabled but no shared runner is online right now; runs wait until one connects"
+	default:
+		sp.Status, sp.Detail = schemas.DoctorPass, fmt.Sprintf("shared pool enabled, %d shared runner(s) online", shared)
+	}
+	return append(checks, sp)
 }

@@ -64,7 +64,9 @@ func TestOperateParamsValidation(t *testing.T) {
 	specs := map[string]jobKindSpec{}
 	jobKindsMu.Lock()
 	for _, s := range jobKinds {
-		specs[s.Kind] = s
+		if s.Local { // the hosted evidence variants are tested in jobs_evidencehosted_test.go
+			specs[s.Kind] = s
+		}
 	}
 	jobKindsMu.Unlock()
 	for _, k := range []string{kindOperateDoctor, kindGPUCheck, kindVoiceCheck, kindVisualCapture, kindVisualCompare,

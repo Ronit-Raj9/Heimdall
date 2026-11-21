@@ -3,7 +3,7 @@
 	"subtitle": "Check this server, run GPU, voice and visual checks, and keep sealed evidence safe.",
 	"loading": "Loading what this server can run",
 	"loadError": "Could not load the operations status",
-	"hostedNote": "Hosted organizations get the doctor checks of their own suites and agents. Server operations (evidence, GPU, Kubernetes) are run by the server owner.",
+	"hostedNote": "Hosted organizations run the doctor (suites, agents and runners) and the evidence jobs over their own runs. GPU and Kubernetes checks are run by the server owner.",
 	"health": {
 		"title": "Health",
 		"description": "Preflight checks: docker, images, gateway, fault proxy, suites and agents.",
@@ -12,7 +12,9 @@
 		"gpuSuite": "Suite to fit (optional)",
 		"k8s": "Kubernetes status",
 		"gpuMode": "GPU mode: {{mode}}",
-		"driver": "Driver: {{driver}}"
+		"driver": "Driver: {{driver}}",
+		"hostedDescription": "Checks your suites and agents, which runners are online, their last heartbeat and the shared runner pool.",
+		"runnersLink": "Open Workers"
 	},
 	"evidence": {
 		"title": "Evidence",
@@ -29,7 +31,19 @@
 		"restore": "Restore experiment",
 		"restoreNeedsExp": "Restore needs an experiment id.",
 		"restoreConfirm": "Restore this experiment from the mirror into the runs folder?",
-		"backupConfirm": "Back up the database and sweep every experiment to the mirror?"
+		"backupConfirm": "Back up the database and sweep every experiment to the mirror?",
+		"hostedDescription": "Verify the seals of your experiments, download a zip backup of them, and archive or restore through the server's mirror.",
+		"hostedNoMirror": "This server has no evidence mirror, so archive and restore are off. Verify and Back up still work: the backup is a zip you can download below.",
+		"hostedMirror": "The server mirror keeps a copy of your sealed experiments; archive and restore use it.",
+		"hostedBackupConfirm": "Write a zip of your sealed experiments (or the one named above) to your exports? You can download it below.",
+		"hostedRestoreConfirm": "Restore this experiment of your organization from the server mirror?",
+		"days": "Idle days before archiving (default 30)",
+		"backupsTitle": "Backups",
+		"backupsEmpty": "No backups yet. Press Back up to make one.",
+		"download": "Download",
+		"delete": "Delete",
+		"backupsError": "Could not list the backups.",
+		"retry": "Retry"
 	},
 	"suite": {
 		"title": "Suite checks",

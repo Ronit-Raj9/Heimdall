@@ -3799,6 +3799,16 @@ class ObserverStatus(_ObserverStatusRequired, total=False):
     session: int
 
 
+class OperateBackup(TypedDict):
+    mod_time: str
+    name: str
+    size: int
+
+
+class OperateBackupList(TypedDict):
+    backups: List[OperateBackup]
+
+
 class _OperateStatusRequired(TypedDict):
     hosted: bool
     kinds: List[str]
@@ -6914,6 +6924,10 @@ class MonitorCertificateResponse(MonitorCertificate):
     mode: Mode
 
 
+class OperateBackupListResponse(OperateBackupList):
+    mode: Mode
+
+
 class OperateStatusResponse(OperateStatus):
     mode: Mode
 
@@ -7561,6 +7575,8 @@ __all__ = [
     'MoreEvidence',
     'NoiseFloor',
     'ObserverStatus',
+    'OperateBackup',
+    'OperateBackupList',
     'OperateStatus',
     'OutcomeDiff',
     'OutcomeVariance',
@@ -7877,6 +7893,7 @@ __all__ = [
     'ModelsCatalogResponseResponse',
     'MonitorCertListResponse',
     'MonitorCertificateResponse',
+    'OperateBackupListResponse',
     'OperateStatusResponse',
     'PairResponse',
     'ParetoResponse',
