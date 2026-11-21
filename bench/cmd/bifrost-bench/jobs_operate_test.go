@@ -73,7 +73,8 @@ func TestOperateParamsValidation(t *testing.T) {
 		if !ok {
 			t.Fatalf("kind %s not registered", k)
 		}
-		if s.Hosted != (k == kindOperateDoctor) {
+		runnerKind := k == kindGPUCheck || k == kindVoiceCheck || k == kindVisualCapture || k == kindVisualCompare || k == kindSimulatorSpread // gap G05: hosted on a runner
+		if s.Hosted != (k == kindOperateDoctor || runnerKind) {
 			t.Errorf("%s: hosted=%v", k, s.Hosted)
 		}
 	}

@@ -57,14 +57,14 @@ describe("agent ops tabs", () => {
 		expect(html).toContain('value="coding-core"');
 	});
 
-	it("checks tab hides docker jobs in hosted mode", () => {
+	it("checks tab builds on a runner in hosted mode", () => {
 		state.agents = [codex];
 		state.hosted = true;
 		const html = renderToStaticMarkup(<ChecksTab agentId="codex" />);
 		expect(html).toContain('data-testid="job-run-agent.check"');
-		expect(html).not.toContain('data-testid="job-run-agent.build"');
+		expect(html).toContain('data-testid="job-run-agent.build"');
 		expect(html).not.toContain('data-testid="job-run-agent.diff"');
-		expect(html).toContain("Hosted servers do not build images");
+		expect(html).toContain('data-testid="agent-build-runner-note"');
 	});
 
 	it("checks tab points to New agent when the agent is missing", () => {

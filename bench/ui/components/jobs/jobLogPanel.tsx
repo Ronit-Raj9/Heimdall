@@ -90,6 +90,13 @@ export function JobLogPanel({ jobId, onClose, onFinished }: JobLogPanelProps) {
 					{t("panel.failed")} {data.error}
 				</p>
 			)}
+			{data?.status === "failed" && needsRunner(data.error) && (
+				<p className="text-xs" data-testid="job-log-panel-add-runner">
+					<Link to="/settings" search={{ tab: "runners" } as never} className="text-primary underline">
+						{t("panel.addRunner")}
+					</Link>
+				</p>
+			)}
 			{cancelState.error !== undefined && (
 				<p role="alert" className="text-chart-error-ink text-xs">
 					{t("actionError")}: {getBenchErrorMessage(cancelState.error)}
@@ -101,3 +108,8 @@ export function JobLogPanel({ jobId, onClose, onFinished }: JobLogPanelProps) {
 }
 
 export default JobLogPanel;
+
+/** needsRunner reports a job that failed because no runner was online (runner jobs, gap G05). */
+export function needsRunner(error?: string | null): boolean {
+	return !!error && /no runner online/i.test(error);
+}

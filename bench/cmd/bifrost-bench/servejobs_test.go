@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/db/dbtest"
@@ -115,10 +116,21 @@ func TestJobKindsValidateParamsAndConfinePaths(t *testing.T) {
 		t.Fatalf("local kinds %v", hub.runner.Kinds())
 	}
 	// Hosted: no kind that starts containers in the server process (rule 4);
-	// hosted agent.check and suite.admit are bridges that run on runners.
+	// hosted agent.check and suite.admit are bridges that run on runners, and
+	// agent.build, monitor.certify and scan.mcp are runner jobs (gap G05):
+	// without a runner they fail before anything runs.
 	hosted := newJobsHub(dbtest.Open(t), a.logger, true, true, "")
-	if k := hosted.runner.Kinds(); slices.Contains(k, "agent.build") || slices.Contains(k, "monitor.certify") || slices.Contains(k, "scan.mcp") {
-		t.Fatalf("hosted kinds %v", k)
+	_ = hosted
+	for kind, params := range map[string]string{"agent.build": `{"agent":"agents/x.yaml"}`,
+		"monitor.certify": `{"monitor":"m.yaml","exp_ids":["e1"]}`, "scan.mcp": `{"path":"x.yaml"}`} {
+		spec, ok := hostedSpec(kind)
+		if !ok {
+			t.Fatalf("%s: no hosted variant", kind)
+		}
+		_, err := spec.Run(ctx, jobEnv{Hosted: true, ProjectRoot: t.TempDir()}, &jobs.Job{ID: "j", Params: json.RawMessage(params)}, discardLogger{}, nil)
+		if err == nil || !strings.Contains(err.Error(), "No runner online") {
+			t.Fatalf("hosted %s ran without a runner: %v", kind, err)
+		}
 	}
 	// Offline: no experiment.run claims.
 	offline := newJobsHub(dbtest.Open(t), a.logger, false, false, "")

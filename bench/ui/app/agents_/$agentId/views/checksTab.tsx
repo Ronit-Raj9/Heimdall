@@ -10,7 +10,7 @@ const DEFAULT_SUITE = "coding-core";
 
 /**
  * The Checks tab of an agent: a free conformance check (agent.check), an image build
- * (agent.build, local only) and a version diff (agent.diff, local; hosted opens the Diff page).
+ * (agent.build; hosted builds run on a runner) and a version diff (agent.diff, local; hosted opens the Diff page).
  * Each button is a background job with a live log.
  */
 export function ChecksTab(props: AgentOpsTabProps = {}) {
@@ -76,11 +76,12 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 				}
 				testId="agent-build-section"
 			>
-				{hosted ? (
-					<p className="text-muted-foreground text-xs">
-						Hosted servers do not build images. Push your image to a registry, pin it with @sha256: in the agent config, and use Run check above.
+				{hosted && agent.dockerfile && (
+					<p className="text-muted-foreground text-xs" data-testid="agent-build-runner-note">
+						Hosted builds run on your runner (Settings &gt; Runners), never on the server. The image stays on that runner, which also runs this agent.
 					</p>
-				) : !agent.dockerfile ? (
+				)}
+				{!agent.dockerfile ? (
 					<p className="text-muted-foreground text-xs">Nothing to build. Add a build section in the Config tab to build here.</p>
 				) : (
 					<div className="flex flex-wrap items-end gap-3">
