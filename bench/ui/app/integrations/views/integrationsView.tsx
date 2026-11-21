@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/platform/confirmDialog";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Badge } from "@/components/ui/badge";
@@ -100,6 +101,7 @@ function ErrorNote({ message, testId }: { message: string; testId?: string }) {
 
 function WebhooksPanel() {
 	const { t } = useTranslation("integrations");
+	const confirm = useConfirm();
 	const { data, error, isLoading } = useListWebhooksQuery();
 	const [createHook, create] = useCreateWebhookMutation();
 	const [updateHook] = useUpdateWebhookMutation();
@@ -185,7 +187,7 @@ function WebhooksPanel() {
 						if ("error" in res) fail(res.error);
 					}}
 					onDelete={async (h) => {
-						if (!window.confirm(t("webhooks.deleteConfirm", { url: h.url }))) return;
+						if (!(await confirm(t("webhooks.deleteConfirm", { url: h.url })))) return;
 						const res = await deleteHook(h.id);
 						if ("error" in res) fail(res.error);
 					}}
@@ -267,6 +269,7 @@ export function exportParams(format: IntegrationExportFormat, expId: string, sui
 
 function ExportsPanel() {
 	const { t } = useTranslation("integrations");
+	const confirm = useConfirm();
 	const exps = useListExperimentsQuery();
 	const suites = useGetSuitesQuery();
 	const files = useListExportsQuery(undefined, { pollingInterval: 5000 });
@@ -353,7 +356,7 @@ function ExportsPanel() {
 					<ExportTable
 						exports={files.data?.exports ?? []}
 						onDelete={async (name) => {
-							if (!window.confirm(t("exports.deleteConfirm", { name }))) return;
+							if (!(await confirm(t("exports.deleteConfirm", { name })))) return;
 							const res = await deleteExport(name);
 							setMessage("error" in res ? apiErrorMessage(res.error, t("errors.generic")) : null);
 						}}

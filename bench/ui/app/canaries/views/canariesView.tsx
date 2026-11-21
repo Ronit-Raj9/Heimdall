@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/platform/confirmDialog";
 import { CanaryDetailBody } from "@/components/canaries/canaryDetail";
 import { CanaryList } from "@/components/canaries/canaryList";
 import { sortCanaries } from "@/components/canaries/canary.utils";
@@ -102,6 +103,7 @@ function CanaryPanel({ name }: { name: string }) {
 /** Baseline and look as background jobs (canary.baseline, canary.run) with a live log; delete the definition. */
 function CanaryActions({ name }: { name: string }) {
 	const { t } = useTranslation("schedules");
+	const confirm = useConfirm();
 	const [remove, removeState] = useDeleteCanaryMutation();
 	return (
 		<span className="flex flex-wrap items-center gap-2" data-testid="canary-actions">
@@ -111,8 +113,8 @@ function CanaryActions({ name }: { name: string }) {
 				size="sm"
 				variant="ghost"
 				disabled={removeState.isLoading}
-				onClick={() => {
-					if (window.confirm(t("canary.deleteConfirm", { name }))) void remove(name);
+				onClick={async () => {
+					if (await confirm(t("canary.deleteConfirm", { name }))) void remove(name);
 				}}
 				data-testid="canary-delete"
 			>

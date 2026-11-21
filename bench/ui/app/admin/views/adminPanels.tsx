@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/platform/confirmDialog";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,7 @@ function useGate(state: { isLoading: boolean; error?: unknown; refetch: () => un
 
 export function AdminUsersPanel() {
 	const { t } = useTranslation("admin");
+	const confirm = useConfirm();
 	const q = useListAdminUsersQuery();
 	const [setDisabled, state] = useSetUserDisabledMutation();
 	const [filter, setFilter] = useState("");
@@ -66,8 +68,8 @@ export function AdminUsersPanel() {
 		return !f || u.email.toLowerCase().includes(f) || u.name.toLowerCase().includes(f);
 	});
 	if ((q.data?.users ?? []).length === 0) return <EmptyState compact message={t("users.empty")} testId="admin-users-empty" />;
-	const toggle = (id: string, email: string, disabled: boolean) => {
-		if (!disabled && !window.confirm(t("users.confirmDisable", { email }))) return;
+	const toggle = async (id: string, email: string, disabled: boolean) => {
+		if (!disabled && !(await confirm(t("users.confirmDisable", { email })))) return;
 		void setDisabled({ id, disabled: !disabled });
 	};
 	return (
@@ -98,7 +100,7 @@ export function AdminUsersPanel() {
 								<Badge variant={u.disabled ? "destructive" : "success"}>{u.disabled ? t("users.disabled") : t("users.active")}</Badge>
 							</TableCell>
 							<TableCell className="text-right">
-								<Button size="sm" variant="outline" disabled={state.isLoading} onClick={() => toggle(u.id, u.email, u.disabled)}>
+								<Button size="sm" variant="outline" disabled={state.isLoading} onClick={() => void toggle(u.id, u.email, u.disabled)}>
 									{u.disabled ? t("users.enable") : t("users.disable")}
 								</Button>
 							</TableCell>

@@ -2,6 +2,7 @@ import { BenchHeader } from "@/components/benchHeader";
 import { BenchSidebar } from "@/components/benchSidebar";
 import { DemoBanner } from "@/components/platform/accessNotes";
 import { AuthShell } from "@/components/platform/authShell";
+import { ConfirmProvider } from "@/components/platform/confirmDialog";
 import { SessionProvider } from "@/components/platform/sessionProvider";
 import { ThemeProvider } from "@/components/themeProvider";
 import { activeNavItem } from "@/lib/constants/navigation";
@@ -24,7 +25,9 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 				<ReduxProvider>
 					<SessionProvider>
 						<NuqsAdapter>
-							<Frame>{children}</Frame>
+							<ConfirmProvider>
+								<Frame>{children}</Frame>
+							</ConfirmProvider>
 						</NuqsAdapter>
 					</SessionProvider>
 				</ReduxProvider>

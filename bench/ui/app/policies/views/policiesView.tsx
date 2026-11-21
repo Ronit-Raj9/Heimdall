@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/platform/confirmDialog";
 import { PolicyForm, starterPolicy } from "@/components/govern/policyForm";
 import { RoleGate, RoleNote } from "@/components/platform/accessNotes";
 import { LoadError } from "@/components/runs/screenStates";
@@ -152,6 +153,7 @@ interface PolicyEditorProps {
 /** Form or YAML editing of one policy. A file that does not parse opens on the YAML tab. */
 export function PolicyEditor({ isNew, file, initialYAML, initialPolicy, sha256, onSaved, onReload, onDeleted }: PolicyEditorProps) {
 	const { t } = useTranslation("govern");
+	const confirm = useConfirm();
 	const [mode, setMode] = useState<"form" | "yaml">(isNew || initialPolicy ? "form" : "yaml");
 	const [policy, setPolicy] = useState<ReleasePolicy>(initialPolicy ?? starterPolicy());
 	const [yaml, setYaml] = useState(initialYAML ?? "");
@@ -266,7 +268,7 @@ export function PolicyEditor({ isNew, file, initialYAML, initialPolicy, sha256, 
 							variant="ghost"
 							disabled={delState.isLoading}
 							onClick={async () => {
-								if (!window.confirm(t("policies.deleteConfirm", { file }))) return;
+								if (!(await confirm(t("policies.deleteConfirm", { file })))) return;
 								const res = await del(file);
 								if (!("error" in res)) onDeleted?.();
 							}}

@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/platform/confirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,6 +71,7 @@ export default function AdminView() {
 /** Totals and the platform kill switch. */
 export function AdminOverviewPanel() {
 	const { t } = useTranslation("admin");
+	const confirm = useConfirm();
 	const { data, error, isLoading, refetch } = useGetAdminOverviewQuery();
 	const [setKill, killState] = useSetKillSwitchMutation();
 	if (isLoading) return <p className="text-muted-foreground text-sm">...</p>;
@@ -83,8 +85,8 @@ export function AdminOverviewPanel() {
 			/>
 		);
 	}
-	const toggle = () => {
-		if (!data.kill_switch && !window.confirm(t("kill.confirmOn"))) return;
+	const toggle = async () => {
+		if (!data.kill_switch && !(await confirm(t("kill.confirmOn")))) return;
 		void setKill(!data.kill_switch);
 	};
 	return (
@@ -110,7 +112,7 @@ export function AdminOverviewPanel() {
 				<CardContent className="flex items-center gap-3">
 					<Button
 						variant={data.kill_switch ? "default" : "destructive"}
-						onClick={toggle}
+						onClick={() => void toggle()}
 						disabled={killState.isLoading}
 						data-testid="admin-kill-toggle"
 					>

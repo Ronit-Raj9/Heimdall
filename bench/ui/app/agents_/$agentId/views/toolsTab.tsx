@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/platform/confirmDialog";
 import { RoleGate } from "@/components/platform/accessNotes";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { EmptyState } from "@/components/shell/emptyState";
@@ -53,6 +54,7 @@ export function ToolsTab(props: AgentOpsTabProps = {}) {
 
 function SkillsSection({ id }: { id: string }) {
 	const { t } = useTranslation("agentops");
+	const confirm = useConfirm();
 	const { data, error, isLoading } = useGetAgentSkillsQuery(id);
 	const [upload, { isLoading: uploading }] = useUploadAgentSkillMutation();
 	const [remove] = useDeleteAgentSkillMutation();
@@ -84,7 +86,7 @@ function SkillsSection({ id }: { id: string }) {
 		}
 	};
 	const del = async (skill: string) => {
-		if (!window.confirm(t("tools.skills.confirmDelete", { name: skill }))) return;
+		if (!(await confirm(t("tools.skills.confirmDelete", { name: skill })))) return;
 		const res = await remove({ id, name: skill });
 		if ("error" in res && res.error) setMessage({ ok: false, text: getBenchErrorMessage(res.error) });
 	};

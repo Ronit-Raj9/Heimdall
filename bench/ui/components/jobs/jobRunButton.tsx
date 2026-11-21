@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/platform/confirmDialog";
 import { Button, type buttonVariants } from "@/components/ui/button";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
@@ -12,7 +13,7 @@ export interface JobRunButtonProps {
 	kind: string;
 	params?: object;
 	label: string;
-	/** When set, asked with window.confirm before the job is queued. */
+	/** When set, asked in the in-page confirm dialog before the job is queued. */
 	confirm?: string;
 	/** Called once the job finished (succeeded, failed or cancelled). */
 	onDone?(job: Job): void;
@@ -26,11 +27,12 @@ export interface JobRunButtonProps {
 export function JobRunButton({ kind, params, label, confirm, onDone, variant }: JobRunButtonProps) {
 	const { t } = useTranslation("jobs");
 	const session = useSession();
+	const askConfirm = useConfirm();
 	const [createJob, { isLoading, error, reset }] = useCreateJobMutation();
 	const [jobId, setJobId] = useState<string | null>(null);
 	const allowed = canUse(session, "member");
 	const run = async () => {
-		if (confirm && !window.confirm(confirm)) return;
+		if (confirm && !(await askConfirm(confirm))) return;
 		reset();
 		const res = await createJob({ kind, params });
 		if ("data" in res && res.data) setJobId(res.data.id);

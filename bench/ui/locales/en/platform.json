@@ -1,4 +1,9 @@
 {
+	"confirmDialog": {
+		"title": "Please confirm",
+		"ok": "Confirm",
+		"cancel": "Cancel"
+	},
 	"roles": {
 		"viewer": "Viewer",
 		"member": "Member",

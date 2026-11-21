@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/platform/confirmDialog";
 import { Button } from "@/components/ui/button";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
@@ -30,6 +31,7 @@ export interface FileEditorProps {
  */
 export function FileEditor({ area, path, onSaved, onDeleted, onClose }: FileEditorProps) {
 	const { t } = useTranslation(FILES_NS);
+	const confirm = useConfirm();
 	const session = useSession();
 	const canWrite = canUse(session, "member");
 	const file = useGetProjectFileQuery({ area, path });
@@ -65,7 +67,7 @@ export function FileEditor({ area, path, onSaved, onDeleted, onClose }: FileEdit
 	}
 
 	async function onDelete() {
-		if (typeof window !== "undefined" && !window.confirm(t("editor.deleteConfirm", { path }))) return;
+		if (!(await confirm(t("editor.deleteConfirm", { path })))) return;
 		try {
 			await remove({ area, path, ifMatch: sha }).unwrap();
 			onDeleted?.();

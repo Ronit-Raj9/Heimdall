@@ -1,3 +1,4 @@
+import { useConfirm } from "@/components/platform/confirmDialog";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Button } from "@/components/ui/button";
@@ -200,6 +201,7 @@ function FileList({ suiteId, selected, onSelect }: { suiteId: string; selected: 
 
 function FileEditor({ suiteId, path, onDeleted }: { suiteId: string; path: string; onDeleted(): void }) {
 	const { t } = useTranslation("suiteAuthoring");
+	const confirm = useConfirm();
 	const file = useGetSuiteFileQuery({ suite: suiteId, path });
 	const [put, putState] = usePutSuiteFileMutation();
 	const [del] = useDeleteSuiteFileMutation();
@@ -217,7 +219,7 @@ function FileEditor({ suiteId, path, onDeleted }: { suiteId: string; path: strin
 		if (!("error" in res)) setSaved(true);
 	};
 	const remove = async () => {
-		if (!window.confirm(t("edit.confirmDelete", { path }))) return;
+		if (!(await confirm(t("edit.confirmDelete", { path })))) return;
 		const res = await del({ suite: suiteId, path });
 		if (!("error" in res)) onDeleted();
 	};
