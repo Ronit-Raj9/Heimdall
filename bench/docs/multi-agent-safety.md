@@ -206,17 +206,24 @@ fed by `GET /api/bench/runs/{id}/agents` (`handlers/runagents.go`):
   replay, and the note that tier 3 is not offered;
 - the attribution coverage badge.
 
-## Importers: MARBLE (MultiAgentBench) not imported
+## Importers: MARBLE (MultiAgentBench)
 
-MARBLE (github.com/ulab-uiuc/MARBLE, MIT, checked 18 Nov 2026) ships 100
-coding and research tasks as JSONL (`multiagentbench/<scenario>/*.jsonl`:
-task text, agent profiles, relationships, coordinate mode). It has no
-hidden verifier: its coding and research scores come from an LLM judge
-(`evaluate_llm`, code quality, collaboration), and its paper shows judged
-coordination does not track task outcomes. An importer would produce tasks
-the bench could only grade with a pinned judge, the weakest grader it has,
-so it was skipped. The agent profiles and relationships would map onto
-`team:` members if a deterministic verifier is ever added.
+MARBLE (github.com/ulab-uiuc/MARBLE, MIT) is imported by
+`bifrost-bench import marble` (package `importers/marble`, details in
+[importers-marble.md](importers-marble.md)). Each upstream agent becomes a
+`team:` member, the relationship graph becomes the mailbox routes, and the
+scoring becomes a grader:
+
+- **Database tasks are verified.** PostgreSQL and a database tool run as
+  services, the anomaly is replayed before the agents start, and a hidden
+  verifier checks the named root causes against the task's labels with no
+  model. Four real database tasks were admitted with `suite admit` in Docker:
+  32 of 32 controls as expected (the reference passed 3 of 3 per task; the
+  empty control, the mutant, the exploit and both null controls failed).
+- **Research and coding tasks are judged.** Upstream scores them only with an
+  LLM judge, so they import into a judged suite and none is admitted until a
+  person writes a reference.
+- Minecraft and bargaining are refused with the reason.
 
 ## Measured on real Docker (18 Nov 2026)
 

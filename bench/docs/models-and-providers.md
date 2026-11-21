@@ -81,11 +81,12 @@ Open-weight models are first-class: the catalog marks them with `"open_weights":
 | Qwen (Qwen3, Qwen3-Coder) | Alibaba | custom OpenAI-compatible endpoint (Alibaba Cloud Model Studio) | `openrouter`, `fireworks`, `cerebras`, `nebius`, `huggingface` |
 | Llama | Meta | none (Meta does not run a public API for every model) | `groq`, `cerebras`, `fireworks`, `bedrock`, `openrouter`, `nebius`, `huggingface` |
 | gpt-oss | OpenAI (open weights) | none | `groq`, `cerebras`, `fireworks`, `openrouter` |
+| Inkling | Thinking Machines | none | `openrouter`, or your own `vllm` / `sgl` server from the Hugging Face weights |
 | Your own fine-tune | you | `vllm`, `sgl`, `ollama` on your machine | `baseten`, `sagemaker`, `huggingface` |
 
 Model ids are not invented here. The catalog lists only ids checked against each provider's public model list, and the picker also accepts any other id the provider serves. To see exactly what your key can call, test the key: the provider's own model list is saved with it.
 
-About "Inkling": we could not confirm a public model by that name, so it is not in the catalog. If your provider serves one, type its id in the picker.
+Inkling is the open-weight model family from Thinking Machines (weights on Hugging Face as `thinkingmachines/Inkling`). The catalog lists it under `openrouter` as `thinkingmachines/inkling` and `thinkingmachines/inkling-small`, marked open weights with family `inkling`; you can also serve the weights yourself through `vllm`, `sgl` or `huggingface`.
 
 ## Custom OpenAI-compatible endpoints
 
