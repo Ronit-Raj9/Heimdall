@@ -219,7 +219,7 @@
 				"lost": "Lost"
 			},
 			"tokensTitle": "Runner tokens",
-			"tokensDescription": "A runner token registers runners into one pool of this organization. Provider keys stay on the runner.",
+			"tokensDescription": "A runner token registers runners into one pool of this organization. Runners get the model keys and secrets each run needs from Models & keys and Secrets; without an org key they fall back to their own environment. No runner of your own? Runs use the shared runner when the server offers it.",
 			"poolLabel": "Pool",
 			"poolPlaceholder": "default",
 			"create": "Create runner token",

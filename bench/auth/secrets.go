@@ -23,6 +23,10 @@ const (
 	// against that org's stored hashes.
 	InboxTokenPrefix = "hmi_"
 
+	// SharedPoolAssignmentsPath is the one route the shared runner calls with
+	// the pool secret (handlers/sharedpool.go) instead of an account token.
+	SharedPoolAssignmentsPath = "/api/bench/admin/pool/assignments"
+
 	secretBytes     = 32
 	secretB64Len    = 43 // base64url, no padding, of 32 bytes
 	tokenLookupLen  = 8

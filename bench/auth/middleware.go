@@ -91,6 +91,11 @@ func (s *Service) Authenticate(ctx *fasthttp.RequestCtx) (*Principal, error) {
 			p   *Principal
 			err error
 		)
+		if string(ctx.Path()) == SharedPoolAssignmentsPath {
+			// The shared runner presents the pool secret, no account
+			// credential: the handler checks it in constant time.
+			return Anonymous(), nil
+		}
 		switch {
 		case strings.HasPrefix(raw, RunnerTokenPrefix):
 			p, err = verifyRunner(dctx, raw)
