@@ -30,15 +30,16 @@ afterEach(() => {
 });
 
 describe("BenchSidebar", () => {
-	it("renders the five groups with toggles and labelled lists", () => {
+	it("renders the six groups with toggles and labelled lists, Advanced closed", () => {
 		at("/");
 		const html = render(<BenchSidebar />);
-		for (const group of ["benchmark", "build", "production", "govern", "operate"]) {
+		for (const group of ["start", "benchmark", "build", "production", "govern", "operate"]) {
 			expect(html).toContain(`data-testid="nav-group-${group}"`);
 			const toggle = tagOf(html, `nav-group-toggle-${group}`) ?? "";
-			expect(toggle).toContain('aria-expanded="true"');
+			expect(toggle).toContain(group === "operate" ? 'aria-expanded="false"' : 'aria-expanded="true"');
 			expect(toggle).toContain(`aria-controls="nav-group-${group}"`);
 		}
+		expect(tagOf(html, "nav-group-toggle-operate")).toContain("Advanced");
 		expect(html).toContain('aria-label="Heimdall navigation"');
 		expect(html).not.toContain("nav-link-new-experiment");
 		expect(html).not.toContain("nav-drawer");
@@ -104,7 +105,8 @@ describe("BenchHeader", () => {
 	it("keeps the platform pieces in hosted mode", () => {
 		at("/");
 		const html = render(<BenchHeader />, hostedSession("admin"));
-		expect(html).toContain('data-testid="org-switcher"');
+		expect(render(<BenchSidebar />, hostedSession("admin"))).toContain('data-testid="org-switcher"');
+		expect(html).not.toContain('data-testid="org-switcher"');
 		expect(html).toContain('data-testid="user-menu-trigger"');
 		expect(html).toContain('data-testid="jobs-indicator"');
 	});

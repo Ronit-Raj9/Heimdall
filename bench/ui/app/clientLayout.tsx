@@ -76,8 +76,9 @@ function SessionError() {
 	);
 }
 
-// Same frame as ui/: page background behind the nav and header, content in a bordered card.
-// Below md the sidebar is a drawer the header's menu button opens.
+// Frame: the sidebar tone behind the nav and the slim top bar, the page in a soft grey panel
+// (white cards sit on it). Below md the sidebar is a drawer the header's menu button opens and
+// the panel runs edge to edge.
 function Shell({ children }: { children: React.ReactNode }) {
 	const { t } = useTranslation("bench");
 	const [navOpen, setNavOpen] = useState(false);
@@ -85,7 +86,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 	const closeNav = useCallback(() => setNavOpen(false), []);
 	useRouteChange();
 	return (
-		<div className="bg-background flex min-h-dvh flex-col md:h-dvh">
+		<div className="bg-sidebar flex min-h-dvh flex-col md:h-dvh">
 			{/* First in the tab order, before the demo banner and the navigation. */}
 			<a
 				href="#bench-main"
@@ -100,13 +101,13 @@ function Shell({ children }: { children: React.ReactNode }) {
 				<div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
 					<BenchHeader onOpenNav={openNav} navOpen={navOpen} />
 					<div
-						className="bg-card mx-0 min-h-0 min-w-0 flex-1 overflow-auto border-y shadow-(--shadow-card) md:mr-3 md:mb-3 md:rounded-xl md:border"
+						className="bg-background mx-0 min-h-0 min-w-0 flex-1 overflow-auto border-t [scrollbar-gutter:stable] md:mr-2 md:mb-2 md:rounded-xl md:border md:shadow-(--shadow-card)"
 						data-bench-content
 					>
 						<main
 							id="bench-main"
 							tabIndex={-1}
-							className="relative mx-auto flex min-h-0 w-full max-w-[1600px] flex-col px-4 py-6 outline-none md:px-8 lg:px-10 xl:px-12"
+							className="animate-in fade-in relative mx-auto flex min-h-0 w-full max-w-[1440px] flex-col px-4 py-6 outline-none duration-300 md:px-8 md:py-8 lg:px-10"
 							data-bench-main
 						>
 							{children}

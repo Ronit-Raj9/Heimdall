@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
-import { Fragment, type ReactNode } from "react";
+import { Fragment, isValidElement, type ComponentType, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 /** One step of the trail above the title. The last crumb is the current page and is not a link. */
@@ -22,6 +22,8 @@ export interface PageHeaderProps {
 	/** Badges beside the title (data mode, grading). */
 	meta?: ReactNode;
 	breadcrumbs?: Crumb[];
+	/** Optional icon before the title, in a soft tile: a lucide component or a rendered node. */
+	icon?: ComponentType<{ className?: string }> | ReactNode;
 	className?: string;
 	testId?: string;
 }
@@ -31,10 +33,11 @@ export interface PageHeaderProps {
  * subtitle and the page's actions. Pages use it instead of their own h1 block so every page
  * starts the same way.
  */
-export function PageHeader({ title, subtitle, actions, meta, breadcrumbs, className, testId }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, actions, meta, breadcrumbs, icon, className, testId }: PageHeaderProps) {
 	const { t } = useTranslation("bench");
+	const iconNode = renderIcon(icon);
 	return (
-		<header className={cn("flex min-w-0 flex-col gap-1.5", className)} data-testid={testId ?? "page-header"}>
+		<header className={cn("mb-2 flex min-w-0 flex-col gap-2", className)} data-testid={testId ?? "page-header"}>
 			{breadcrumbs && breadcrumbs.length > 0 && (
 				<nav aria-label={t("shell.breadcrumbs")} className="min-w-0">
 					<ol className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-1 text-xs">
@@ -69,12 +72,36 @@ export function PageHeader({ title, subtitle, actions, meta, breadcrumbs, classN
 					</ol>
 				</nav>
 			)}
-			<div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-				<h1 className="text-foreground min-w-0 text-xl font-semibold tracking-tight break-words">{title}</h1>
-				{meta && <div className="flex flex-wrap items-center gap-2">{meta}</div>}
+			<div className="flex min-w-0 flex-wrap items-start gap-x-4 gap-y-3">
+				{iconNode && (
+					<span
+						aria-hidden="true"
+						className="bg-primary/10 text-primary dark:bg-primary/15 mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl"
+						data-testid="page-header-icon"
+					>
+						{iconNode}
+					</span>
+				)}
+				<div className="flex min-w-0 flex-1 flex-col gap-1">
+					<div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+						<h1 className="text-foreground min-w-0 text-2xl font-semibold tracking-tight break-words">{title}</h1>
+						{meta && <div className="flex flex-wrap items-center gap-2">{meta}</div>}
+					</div>
+					{subtitle && <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">{subtitle}</p>}
+				</div>
 				{actions && <div className="flex flex-wrap items-center gap-2 sm:ml-auto">{actions}</div>}
 			</div>
-			{subtitle && <p className="text-muted-foreground max-w-3xl text-sm">{subtitle}</p>}
 		</header>
 	);
+}
+
+function renderIcon(icon: PageHeaderProps["icon"]): ReactNode {
+	if (icon === undefined || icon === null || icon === false) return null;
+	if (isValidElement(icon)) return icon;
+	// A component: lucide icons are forwardRef objects, plain icons are functions.
+	if (typeof icon === "function" || (typeof icon === "object" && "$$typeof" in (icon as object))) {
+		const Icon = icon as ComponentType<{ className?: string }>;
+		return <Icon className="size-5" />;
+	}
+	return icon as ReactNode;
 }

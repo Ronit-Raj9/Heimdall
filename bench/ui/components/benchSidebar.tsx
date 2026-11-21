@@ -1,5 +1,6 @@
 import { HeimdallMark } from "@/components/heimdallMark";
-import { BENCH_NAV_GROUPS, activeNavGroup, isNavActive, type BenchNavGroupId, type BenchNavItem } from "@/lib/constants/navigation";
+import { OrgSwitcher } from "@/components/platform/orgSwitcher";
+import { BENCH_NAV_GROUPS, DEFAULT_CLOSED_GROUPS, activeNavGroup, isNavActive, type BenchNavGroupId, type BenchNavItem } from "@/lib/constants/navigation";
 import { useSession, type SessionInfo } from "@/lib/session/sessionContext";
 import { cn } from "@/lib/utils";
 import { Link, useRouterState } from "@tanstack/react-router";
@@ -30,10 +31,12 @@ function writeCollapsed(value: boolean) {
 function readClosedGroups(): BenchNavGroupId[] {
 	try {
 		const raw = window.localStorage.getItem(GROUPS_KEY);
-		const parsed: unknown = raw ? JSON.parse(raw) : [];
+		// Nothing stored yet: the Advanced group starts closed.
+		if (raw === null) return [...DEFAULT_CLOSED_GROUPS];
+		const parsed: unknown = JSON.parse(raw);
 		return Array.isArray(parsed) ? parsed.filter((id): id is BenchNavGroupId => BENCH_NAV_GROUPS.some((group) => group.id === id)) : [];
 	} catch {
-		return [];
+		return [...DEFAULT_CLOSED_GROUPS];
 	}
 }
 
@@ -74,11 +77,17 @@ export function BenchSidebar({ drawerOpen = false, onDrawerClose }: BenchSidebar
 	const pathname = useRouterState({ select: (state) => state.location.pathname });
 	// null: follow the width (rail below xl). true or false: the user's choice.
 	const [collapsed, setCollapsed] = useState<boolean | null>(null);
-	const [closedGroups, setClosedGroups] = useState<BenchNavGroupId[]>([]);
+	const [closedGroups, setClosedGroups] = useState<BenchNavGroupId[]>(() => [...DEFAULT_CLOSED_GROUPS]);
 	useEffect(() => {
 		setCollapsed(readCollapsed());
 		setClosedGroups(readClosedGroups());
 	}, []);
+	// Arriving on a page of a closed group opens that group, so the current entry is always visible.
+	const currentGroup = activeNavGroup(pathname);
+	useEffect(() => {
+		if (!currentGroup) return;
+		setClosedGroups((prev) => (prev.includes(currentGroup) ? prev.filter((id) => id !== currentGroup) : prev));
+	}, [currentGroup]);
 	// Whether the width alone would show labels (xl and up), for the toggle's label and icon.
 	const [wide, setWide] = useState(true);
 	useEffect(() => {
@@ -111,7 +120,7 @@ export function BenchSidebar({ drawerOpen = false, onDrawerClose }: BenchSidebar
 		<>
 			<aside
 				className={cn(
-					"bg-sidebar hidden shrink-0 flex-col gap-3 px-2.5 py-3 md:flex md:min-h-0",
+					"bg-sidebar hidden shrink-0 flex-col gap-2 px-2.5 py-3 md:flex md:min-h-0",
 					"transition-[width] duration-200 ease-(--ease-out)",
 					form === "rail" && "md:w-[3.75rem]",
 					form === "auto" && "md:w-[3.75rem] xl:w-60",
@@ -121,6 +130,7 @@ export function BenchSidebar({ drawerOpen = false, onDrawerClose }: BenchSidebar
 				data-state={form === "auto" ? "auto" : form === "rail" ? "collapsed" : "expanded"}
 			>
 				<Brand form={form} />
+				<SidebarOrg form={form} />
 				<NavGroups form={form} pathname={pathname} closedGroups={closedGroups} onToggleGroup={toggleGroup} idPrefix="nav" />
 				<button
 					type="button"
@@ -162,20 +172,38 @@ function Brand({ form }: { form: NavForm }) {
 		<Link
 			to="/"
 			className={cn(
-				"focus-visible:ring-ring/60 flex items-center gap-2.5 rounded-lg px-1.5 pt-1 pb-2 focus-visible:ring-2 focus-visible:outline-none",
+				"focus-visible:ring-ring/60 flex h-10 items-center gap-2.5 rounded-lg px-1.5 focus-visible:ring-2 focus-visible:outline-none",
 				form === "rail" && "md:justify-center md:px-0",
 				form === "auto" && "md:justify-center md:px-0 xl:justify-start xl:px-1.5",
 			)}
 			data-testid="nav-brand"
 		>
-			<span className="bg-foreground text-background flex size-8 shrink-0 items-center justify-center rounded-lg">
+			<span className="from-primary to-primary/75 text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br shadow-sm">
 				<HeimdallMark className="size-5" />
 			</span>
-			<span className={cn("flex min-w-0 flex-col", labelClass)}>
-				<span className="text-foreground text-[15px] leading-5 font-semibold tracking-[-0.01em]">{t("app.name")}</span>
-				<span className="text-muted-foreground line-clamp-2 text-[11px] leading-snug">{t("app.tagline")}</span>
+			<span className={cn("text-foreground truncate text-base leading-5 font-semibold tracking-[-0.015em]", labelClass)} title={t("app.tagline")}>
+				{t("app.name")}
 			</span>
 		</Link>
+	);
+}
+
+/**
+ * The organization at the top of the sidebar (hosted mode only; OrgSwitcher renders nothing in
+ * local mode). The icon rail has no room for it, so it shows where labels show.
+ */
+function SidebarOrg({ form }: { form: NavForm }) {
+	return (
+		<div
+			className={cn(
+				"border-sidebar-border bg-card/60 min-w-0 rounded-lg border px-1 py-0.5 empty:hidden",
+				form === "rail" && "md:hidden",
+				form === "auto" && "md:hidden xl:block",
+			)}
+			data-testid="sidebar-org"
+		>
+			<OrgSwitcher />
+		</div>
 	);
 }
 
@@ -203,7 +231,7 @@ export function NavGroups({ form, pathname, closedGroups, onToggleGroup, idPrefi
 	const closedItemsClass = form === "full" ? "hidden" : form === "auto" ? "xl:hidden" : "";
 
 	return (
-		<nav aria-label={t("nav.label")} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto" data-testid={`${idPrefix}-groups`}>
+		<nav aria-label={t("nav.label")} className="-mx-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1 pt-1 [scrollbar-width:thin]" data-testid={`${idPrefix}-groups`}>
 			{groups.map((group) => {
 				const label = t(group.labelKey);
 				const closed = closedGroups.includes(group.id);
@@ -217,7 +245,7 @@ export function NavGroups({ form, pathname, closedGroups, onToggleGroup, idPrefi
 							aria-controls={listId}
 							title={t("shell.groupToggle", { group: label })}
 							className={cn(
-								"text-muted-foreground hover:text-foreground flex h-6 items-center gap-1 rounded-sm px-2.5 text-[11px] font-medium tracking-[0.06em] uppercase transition-colors",
+								"text-muted-foreground/80 hover:text-foreground flex h-6 items-center gap-1 rounded-sm px-2.5 text-[11px] font-semibold tracking-[0.05em] uppercase transition-colors",
 								"focus-visible:ring-ring/60 focus-visible:ring-2 focus-visible:outline-none",
 								headerClass,
 							)}
@@ -270,15 +298,14 @@ function NavLink({
 			aria-current={active ? "page" : undefined}
 			onClick={onNavigate}
 			className={cn(
-				"group text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground relative flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium whitespace-nowrap transition-colors duration-100",
+				"group text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground relative flex h-8 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-150",
 				"focus-visible:ring-ring/60 focus-visible:ring-2 focus-visible:outline-none",
 				form === "rail" && "md:justify-center md:px-0",
 				form === "auto" && "md:justify-center md:px-0 xl:justify-start xl:px-2.5",
-				active &&
-					"bg-sidebar-accent text-sidebar-accent-foreground before:bg-primary before:absolute before:top-1.5 before:bottom-1.5 before:-left-2.5 before:w-[3px] before:rounded-r-full",
+				active && "bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary dark:bg-primary/15 dark:hover:bg-primary/20",
 			)}
 		>
-			<Icon className="size-4 shrink-0 opacity-90" aria-hidden="true" />
+			<Icon className={cn("size-4 shrink-0", active ? "opacity-100" : "opacity-80 group-hover:opacity-100")} aria-hidden="true" />
 			<span className={labelClass}>{label}</span>
 		</Link>
 	);
@@ -349,7 +376,7 @@ function NavDrawer({
 	return (
 		<div className="fixed inset-0 z-50 md:hidden" data-testid="nav-drawer">
 			<div
-				className="bg-background/70 absolute inset-0 backdrop-blur-[2px]"
+				className="animate-in fade-in absolute inset-0 bg-black/40 backdrop-blur-[2px] duration-200"
 				aria-hidden="true"
 				onClick={onClose}
 				data-testid="nav-drawer-backdrop"
@@ -360,9 +387,9 @@ function NavDrawer({
 				aria-modal="true"
 				aria-label={t("nav.label")}
 				onKeyDown={trap}
-				className="bg-sidebar animate-in slide-in-from-left absolute inset-y-0 left-0 flex w-[17rem] max-w-[85vw] flex-col gap-3 border-r px-2.5 py-3 shadow-xl duration-200"
+				className="bg-sidebar animate-in slide-in-from-left absolute inset-y-0 left-0 flex w-[17rem] max-w-[85vw] flex-col gap-2 border-r px-2.5 py-3 shadow-2xl duration-200 ease-(--ease-out)"
 			>
-				<div className="flex items-start gap-1">
+				<div className="flex items-center gap-1">
 					<div className="min-w-0 flex-1" onClick={onClose}>
 						<Brand form="full" />
 					</div>
@@ -377,6 +404,7 @@ function NavDrawer({
 						<X className="size-4" aria-hidden="true" />
 					</button>
 				</div>
+				<SidebarOrg form="full" />
 				<NavGroups
 					form="full"
 					pathname={pathname}

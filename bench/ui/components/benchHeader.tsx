@@ -1,15 +1,15 @@
 import { HeimdallMark } from "@/components/heimdallMark";
 import { ModeBadge } from "@/components/modeBadge";
 import { JobsIndicator } from "@/components/platform/jobsDrawer";
-import { OrgSwitcher } from "@/components/platform/orgSwitcher";
 import { UserMenu } from "@/components/platform/userMenu";
 import { ThemeToggle } from "@/components/themeToggle";
 import { Button } from "@/components/ui/button";
+import { BENCH_NAV_GROUPS, activeNavItem } from "@/lib/constants/navigation";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { IS_FIXTURE_MODE, useGetHealthQuery } from "@/lib/store";
 import { launchAvailable } from "@/lib/types/bench";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Menu, Plus } from "lucide-react";
+import { ChevronRight, Menu, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export interface BenchHeaderProps {
@@ -19,10 +19,11 @@ export interface BenchHeaderProps {
 }
 
 /**
- * Header: the menu button and mark on a narrow screen, the organization (hosted mode), the data
- * mode the server reports, the New experiment action, jobs, the theme switch and the account
- * menu. In local mode the organization and account parts render nothing. A viewer or demo
- * visitor cannot start experiments, so the action is not offered to them.
+ * Slim top bar: the menu button and mark on a narrow screen, breadcrumbs (section, then page) on
+ * the left, and on the right the data mode, the New experiment action, jobs, the theme switch and
+ * the account menu. The organization lives at the top of the sidebar. In local mode the account
+ * part renders nothing. A viewer or demo visitor cannot start experiments, so the action is not
+ * offered to them.
  */
 export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
 	const { t } = useTranslation("bench");
@@ -33,7 +34,7 @@ export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
 	const canStart = canUse(session, "member") && pathname !== "/experiments/new" && launchAvailable(data);
 
 	return (
-		<header className="flex h-13 shrink-0 items-center gap-2 px-3 md:gap-2.5 md:px-4" data-testid="bench-header">
+		<header className="flex h-13 shrink-0 items-center gap-2 px-3 md:gap-2 md:px-4" data-testid="bench-header">
 			{onOpenNav && (
 				<button
 					type="button"
@@ -56,7 +57,7 @@ export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
 				<HeimdallMark className="size-4.5" />
 			</Link>
 			<div className="flex min-w-0 flex-1 items-center">
-				<OrgSwitcher />
+				<HeaderCrumbs pathname={pathname} />
 			</div>
 			{IS_FIXTURE_MODE && (
 				<span
@@ -66,7 +67,7 @@ export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
 					{t("mode.fixture")}
 				</span>
 			)}
-			<ModeBadge mode={data?.mode} isLoading={isLoading} isError={isError} size="lg" />
+			<ModeBadge mode={data?.mode} isLoading={isLoading} isError={isError} className="hidden sm:inline-flex" />
 			{canStart && (
 				<Button asChild size="sm" className="max-sm:size-8 max-sm:px-0" dataTestId="header-new-experiment">
 					<Link to="/experiments/new" aria-label={t("shell.newExperiment")} title={t("shell.newExperiment")}>
@@ -80,5 +81,48 @@ export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
 			<ThemeToggle />
 			<UserMenu />
 		</header>
+	);
+}
+/**
+ * Where the user is: the section, then the page (a link back to the page's list when deeper).
+ * Below sm only the page shows. Paths no entry owns (an auth page) show nothing.
+ */
+function HeaderCrumbs({ pathname }: { pathname: string }) {
+	const { t } = useTranslation("bench");
+	const item = activeNavItem(pathname);
+	if (!item) return null;
+	const group = BENCH_NAV_GROUPS.find((candidate) => candidate.items.includes(item));
+	const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+	const atEntry = path === item.to;
+	const Icon = item.icon;
+	return (
+		<nav aria-label={t("shell.breadcrumbs")} className="min-w-0" data-testid="header-breadcrumbs">
+			<ol className="flex min-w-0 items-center gap-1.5 text-sm">
+				{group && (
+					<>
+						<li className="text-muted-foreground hidden shrink-0 sm:block">{t(group.labelKey)}</li>
+						<li aria-hidden="true" className="text-muted-foreground/60 hidden sm:block">
+							<ChevronRight className="size-3.5" />
+						</li>
+					</>
+				)}
+				<li className="min-w-0">
+					{atEntry ? (
+						<span aria-current="page" className="text-foreground flex min-w-0 items-center gap-1.5 font-medium">
+							<Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+							<span className="truncate">{t(item.labelKey)}</span>
+						</span>
+					) : (
+						<Link
+							to={item.to as never}
+							className="text-foreground/90 hover:text-foreground flex min-w-0 items-center gap-1.5 rounded-sm font-medium transition-colors"
+						>
+							<Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+							<span className="truncate">{t(item.labelKey)}</span>
+						</Link>
+					)}
+				</li>
+			</ol>
+		</nav>
 	);
 }

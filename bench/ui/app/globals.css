@@ -103,9 +103,9 @@
 	/* Font size overrides - format: [size, { line-height: value }] */
 	--text-xs: 0.75rem;
 	--text-xs--line-height: 1rem;
-	--text-sm: 0.825rem;
+	--text-sm: 0.875rem;
 	--text-sm--line-height: 1.25rem;
-	--text-base: 0.95rem;
+	--text-base: 1rem;
 	--text-base--line-height: 1.5rem;
 	--text-lg: 1.125rem;
 	--text-lg--line-height: 1.75rem;
@@ -134,9 +134,11 @@
 	/* Heimdall palette. Neutrals carry a faint cool tint; colour is reserved for meaning: the
 	   status hues below (pass, fail, warning, info) and one accent for links, focus and the
 	   active place in the app. Text pairs clear WCAG AA (4.5:1) on card and background. */
-	--radius: 0.5rem;
+	--radius: 0.625rem;
 	--color-cream-100: oklch(0.98 0 0);
-	--background: oklch(0.968 0.003 264);
+	/* Page panel: a soft grey so white cards lift off it. The frame (sidebar, top bar) is one
+	   step darker. */
+	--background: oklch(0.982 0.002 264);
 	--foreground: oklch(0.2 0.012 264);
 	--card: oklch(1 0 0);
 	--card-foreground: oklch(0.2 0.012 264);
@@ -151,11 +153,12 @@
 	--accent: oklch(0.948 0.006 264);
 	--accent-foreground: oklch(0.2 0.012 264);
 	--destructive: oklch(0.56 0.2 27);
-	--border: oklch(0.912 0.005 264);
+	--border: oklch(0.92 0.004 264);
 	--input: oklch(0.885 0.006 264);
 	--ring: oklch(0.6 0.15 272);
 	/* Elevation: one hairline plus a soft drop, never a glow. */
-	--shadow-card: 0 1px 2px oklch(0.2 0.02 264 / 0.05), 0 0 0 1px oklch(0.2 0.02 264 / 0.02);
+	--shadow-card: 0 1px 2px oklch(0.2 0.02 264 / 0.04), 0 1px 3px oklch(0.2 0.02 264 / 0.03);
+	--shadow-hover: 0 4px 14px -4px oklch(0.2 0.02 264 / 0.1), 0 2px 4px oklch(0.2 0.02 264 / 0.04);
 	--shadow-pop: 0 8px 24px -6px oklch(0.2 0.02 264 / 0.16), 0 2px 6px oklch(0.2 0.02 264 / 0.06);
 	/* Chart color system. Semantic: status only. Sequential: one hue, stepped
 	   lightness, for ordered series (seq = teal, ord = indigo percentiles).
@@ -198,11 +201,11 @@
 	--chart-cat-6: oklch(0.45 0.09 155);
 	--chart-cat-other: oklch(0.78 0.012 200);
 	--chart-track: oklch(0.965 0.004 195);
-	--sidebar: oklch(0.968 0.003 264);
+	--sidebar: oklch(0.962 0.003 264);
 	--sidebar-foreground: oklch(0.2 0.012 264);
 	--sidebar-primary: oklch(0.5 0.17 272);
 	--sidebar-primary-foreground: oklch(0.99 0 0);
-	--sidebar-accent: oklch(0.925 0.007 264);
+	--sidebar-accent: oklch(0.93 0.006 264);
 	--sidebar-accent-foreground: oklch(0.18 0.012 264);
 	--sidebar-border: oklch(0.912 0.005 264);
 	--sidebar-ring: oklch(0.6 0.15 272);
@@ -211,11 +214,11 @@
 .dark {
 	color-scheme: dark;
 	--color-ink-900: oklch(0.141 0.005 285.823);
-	--background: oklch(0.135 0.006 264);
+	--background: oklch(0.155 0.006 264);
 	--foreground: oklch(0.955 0.004 264);
-	--card: oklch(0.168 0.007 264);
+	--card: oklch(0.19 0.007 264);
 	--card-foreground: oklch(0.955 0.004 264);
-	--popover: oklch(0.2 0.008 264);
+	--popover: oklch(0.215 0.008 264);
 	--popover-foreground: oklch(0.955 0.004 264);
 	--primary: oklch(0.77 0.115 275);
 	--primary-foreground: oklch(0.17 0.03 275);
@@ -230,6 +233,7 @@
 	--input: oklch(1 0 0 / 13%);
 	--ring: oklch(0.72 0.12 275);
 	--shadow-card: 0 1px 2px oklch(0 0 0 / 0.4), 0 0 0 1px oklch(1 0 0 / 0.02);
+	--shadow-hover: 0 6px 18px -6px oklch(0 0 0 / 0.55), 0 2px 4px oklch(0 0 0 / 0.3);
 	--shadow-pop: 0 12px 32px -8px oklch(0 0 0 / 0.6), 0 2px 8px oklch(0 0 0 / 0.35);
 	/* Same hues, lightness re-anchored: the teal ramp inverts so brightest is
 	   largest, and the two darkest categoricals lift. */
@@ -264,11 +268,11 @@
 	--chart-cat-6: oklch(0.64 0.09 155);
 	--chart-cat-other: oklch(0.55 0.015 220);
 	--chart-track: oklch(0.27 0.01 240);
-	--sidebar: oklch(0.135 0.006 264);
+	--sidebar: oklch(0.125 0.006 264);
 	--sidebar-foreground: oklch(0.955 0.004 264);
 	--sidebar-primary: oklch(0.77 0.115 275);
 	--sidebar-primary-foreground: oklch(0.17 0.03 275);
-	--sidebar-accent: oklch(0.215 0.009 264);
+	--sidebar-accent: oklch(0.2 0.009 264);
 	--sidebar-accent-foreground: oklch(0.98 0.003 264);
 	--sidebar-border: oklch(1 0 0 / 7%);
 	--sidebar-ring: oklch(0.72 0.12 275);
@@ -306,9 +310,15 @@
 	}
 	/* One visible focus treatment for anything focusable that has not styled its own. */
 	:where(a, button, [role="button"], [tabindex]:not([tabindex="-1"]), summary):focus-visible {
-		outline: 2px solid var(--ring);
+		outline: 2px solid color-mix(in oklch, var(--ring) 80%, transparent);
 		outline-offset: 2px;
-		border-radius: 4px;
+		border-radius: 6px;
+	}
+	/* Interactive surfaces ease their colour changes. Zero specificity: any utility wins. */
+	:where(a, button, [role="button"], summary, input, select, textarea) {
+		transition-property: color, background-color, border-color, box-shadow, opacity;
+		transition-duration: 150ms;
+		transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
 	}
 	a:where(:not([data-slot])) {
 		text-underline-offset: 3px;
@@ -337,10 +347,10 @@
 /* Page title: one size and weight on every screen. Unlayered so it wins over the per-page
    utility classes, which all ask for the same thing in a smaller size. */
 [data-bench-main] h1 {
-	font-size: 1.5rem;
-	line-height: 2rem;
+	font-size: 1.75rem;
+	line-height: 2.25rem;
 	font-weight: 650;
-	letter-spacing: -0.022em;
+	letter-spacing: -0.025em;
 	text-wrap: balance;
 }
 [data-bench-main] h2 {
@@ -443,4 +453,18 @@
 		transition-duration: 0.01ms !important;
 		scroll-behavior: auto !important;
 	}
+}
+
+/* Small screens: page titles step down so they never wrap into three lines. */
+@media (max-width: 40rem) {
+	[data-bench-main] h1 {
+		font-size: 1.5rem;
+		line-height: 2rem;
+	}
+}
+
+/* Thin, quiet scrollbars in the frame. */
+[data-bench-content] {
+	scrollbar-width: thin;
+	scrollbar-color: color-mix(in oklch, var(--muted-foreground) 30%, transparent) transparent;
 }
