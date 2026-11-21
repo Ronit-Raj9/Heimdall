@@ -79,6 +79,9 @@ func (h *ExperimentsHandler) resumeExperiment(ctx *fasthttp.RequestCtx) {
 	if !ok {
 		return
 	}
+	if h.resumePaused(ctx, m, runs) { // run control: a pause is lifted first; an active run needs nothing more (runcontrol.go)
+		return
+	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
 	if err := rc.Resume(withPrincipal(work, ctx), m.ExpID); err != nil {

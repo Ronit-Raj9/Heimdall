@@ -108,13 +108,13 @@ func countedRuns(runs []RunView) map[string]RunView {
 	for slotID, rs := range bySlot {
 		slices.SortStableFunc(rs, func(x, y RunView) int { return x.Run.Attempt - y.Run.Attempt })
 		i := slices.IndexFunc(rs, func(rv RunView) bool {
-			return rv.Sealed && rv.Run.Outcome != schemas.OutcomeAbortedInfra
+			return rv.Sealed && rv.Run.Outcome != schemas.OutcomeAbortedInfra && !rv.Superseded // run control: a requeued run never counts
 		})
 		if i >= 0 {
 			out[slotID] = rs[i]
 			continue
 		}
-		if last := rs[len(rs)-1]; last.Sealed && last.Run.Outcome == schemas.OutcomeAbortedInfra {
+		if last := rs[len(rs)-1]; last.Sealed && last.Run.Outcome == schemas.OutcomeAbortedInfra && !last.Superseded {
 			out[slotID] = last
 		}
 	}

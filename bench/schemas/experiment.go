@@ -92,7 +92,19 @@ type Experiment struct {
 	// (schemas/evaluation.go); empty for every other experiment, so recorded
 	// manifests keep their hashes.
 	EvaluationID string `json:"evaluation_id,omitempty" yaml:"evaluation_id,omitempty"`
+	// ErrorPolicy overrides the retry rules of the failure classes that allow
+	// it (errorpolicy.go); nil keeps the defaults, so recorded manifests keep
+	// their hashes. It is frozen in the manifest like every other field.
+	ErrorPolicy *ErrorPolicySpec `json:"error_policy,omitempty" yaml:"error_policy,omitempty"`
+	// RerunOf names the experiment whose failed tasks this one runs again
+	// ("Rerun failures"). Such an experiment is exploratory: it never joins
+	// the parent's verdict, a follow-up combination or a leaderboard.
+	RerunOf string `json:"rerun_of,omitempty" yaml:"rerun_of,omitempty"`
 }
+
+// Exploratory reports an experiment whose result decides nothing: a rerun
+// of another experiment's failures.
+func (e *Experiment) Exploratory() bool { return e != nil && e.RerunOf != "" }
 
 // RunnerSpec picks the runners of a hosted organization that may run an
 // experiment (Runners area). In hosted mode an experiment without a pool runs

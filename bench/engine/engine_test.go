@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/runctl"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"gopkg.in/yaml.v3"
 )
@@ -450,13 +451,17 @@ func (s *fakeStore) Seal(_ context.Context, run *schemas.Run) (*schemas.SealReco
 
 func (s *fakeStore) Verify(context.Context, string, string) error { return nil }
 
-func (s *fakeStore) SlotRuns(_ context.Context, _ string, slotID string) ([]schemas.RunRecord, error) {
+func (s *fakeStore) SlotRuns(_ context.Context, expID string, slotID string) ([]schemas.RunRecord, error) {
+	superseded, err := runctl.SupersededRuns(filepath.Join(s.root, expID)) // run control, as the FS store reads it
+	if err != nil {
+		return nil, err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var out []schemas.RunRecord
 	for _, id := range s.bySlot[slotID] {
 		r := s.runs[id]
-		out = append(out, schemas.RunRecord{Run: r.run, Dir: r.dir, Sealed: r.sealed,
+		out = append(out, schemas.RunRecord{Run: r.run, Dir: r.dir, Sealed: r.sealed, Superseded: r.sealed && superseded[id],
 			Transitions: append([]schemas.Transition(nil), r.trans...)})
 	}
 	return out, nil

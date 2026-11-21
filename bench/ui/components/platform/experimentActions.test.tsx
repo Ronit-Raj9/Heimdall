@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
 	resume: {} as Record<string, unknown>,
 	start: {} as Record<string, unknown>,
 	health: undefined as unknown,
+	controls: undefined as unknown,
 }));
 vi.mock("@/components/jobs/jobLogPanel", () => ({ JobLogPanel: ({ jobId }: { jobId: string }) => <div data-testid="job-log-panel">{jobId}</div> }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
@@ -20,6 +21,12 @@ vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/platformApi")>()),
 	useCancelExperimentMutation: () => mutation(api.cancel),
 	useResumeExperimentMutation: () => mutation(api.resume),
+}));
+vi.mock("@/lib/store/apis/runControlApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/runControlApi")>()),
+	useGetRunControlsQuery: () => ({ data: api.controls }),
+	usePauseExperimentMutation: () => mutation({}),
+	useUnpauseExperimentMutation: () => mutation({}),
 }));
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
@@ -36,9 +43,21 @@ beforeEach(() => {
 	api.cancel = {};
 	api.resume = {};
 	api.health = undefined;
+	api.controls = undefined;
 });
 
 describe("ExperimentRunActions", () => {
+	it("puts Pause beside Cancel while running, and Resume with a draining chip once paused", () => {
+		api.controls = { exp_id: "e_nightly", paused: false, in_flight: 0, state: { mode: "running", seq: 0 } };
+		const html = render(<ExperimentRunActions status={status("running")} />, hostedSession("member"));
+		expect(html).toContain('data-testid="experiment-pause"');
+		expect(html).toContain('data-testid="experiment-cancel"');
+		api.controls = { exp_id: "e_nightly", paused: true, in_flight: 2, state: { mode: "paused", paused_by: "ana", seq: 1 } };
+		const paused = render(<ExperimentRunActions status={status("running")} />, hostedSession("member"));
+		expect(paused).toContain('data-testid="experiment-unpause"');
+		expect(paused).toContain("Pausing: 2 runs still going");
+		expect(paused).not.toContain('data-testid="experiment-pause"');
+	});
 	it("offers Start again for a created experiment whose start failed (6-A-07)", () => {
 		const html = render(<ExperimentRunActions status={status("created")} />, hostedSession("member"));
 		expect(html).toContain('data-testid="experiment-start"');

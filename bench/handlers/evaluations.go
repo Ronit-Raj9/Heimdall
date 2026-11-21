@@ -64,6 +64,10 @@ func init() {
 		r.POST(p, env.W(h.create))
 		r.GET(p+"/{id}", env.R(h.get))
 		r.POST(p+"/{id}/cancel", env.W(h.cancel))
+		// Run control (evaluationcontrol.go): pause, resume, rerun failures.
+		r.POST(p+"/{id}/pause", env.W(h.pause))
+		r.POST(p+"/{id}/resume", env.W(h.resume))
+		r.POST(p+"/{id}/rerun-failures", env.W(h.rerunFailures))
 	})
 }
 

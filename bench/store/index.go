@@ -224,6 +224,8 @@ type RunEntry struct {
 	Dir      string       `json:"-"`
 	Sealed   bool         `json:"sealed"`
 	SealHash string       `json:"seal_hash,omitempty"`
+	// Superseded marks a run an operator requeued: it never counts.
+	Superseded bool `json:"superseded,omitempty"`
 }
 
 // Index is the in-memory read index the API serves from. Rebuild reads the
@@ -464,7 +466,7 @@ func (s *FSStore) indexExperiment(ctx context.Context, expID string) (*schemas.M
 			return nil, nil, fmt.Errorf("slot %s: %w", slots[i].SlotID, err)
 		}
 		for _, rec := range recs {
-			e := RunEntry{Slot: slots[i], Run: rec.Run, Dir: rec.Dir, Sealed: rec.Sealed}
+			e := RunEntry{Slot: slots[i], Run: rec.Run, Dir: rec.Dir, Sealed: rec.Sealed, Superseded: rec.Superseded}
 			if rec.Sealed {
 				seal, err := readSeal(rec.Dir)
 				if err != nil {
@@ -644,7 +646,7 @@ func countedRun(recs []schemas.RunRecord) (*schemas.RunRecord, []string) {
 	var counted []string
 	for i := range recs {
 		r := &recs[i]
-		if !r.Sealed || r.Run.Outcome == schemas.OutcomeAbortedInfra {
+		if !r.Sealed || r.Run.Outcome == schemas.OutcomeAbortedInfra || r.Superseded { // run control: a requeued run never counts
 			continue
 		}
 		counted = append(counted, r.Run.RunID)
@@ -656,7 +658,7 @@ func countedRun(recs []schemas.RunRecord) (*schemas.RunRecord, []string) {
 		return picked, counted
 	}
 	last := &recs[len(recs)-1]
-	if last.Sealed && last.Run.Outcome == schemas.OutcomeAbortedInfra {
+	if last.Sealed && last.Run.Outcome == schemas.OutcomeAbortedInfra && !last.Superseded {
 		return last, []string{last.Run.RunID}
 	}
 	return nil, nil

@@ -1319,6 +1319,8 @@ export interface RunDetail {
 	sealed: boolean;
 	/** Empty until the run is sealed. */
 	seal_hash: string;
+	/** Run control: requeued by an operator; kept, never counted. */
+	superseded?: boolean;
 	grade: Grade | null;
 	/** "original": the grade the run was sealed with. */
 	grade_source: string;

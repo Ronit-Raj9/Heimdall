@@ -358,7 +358,9 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 		}
 		runs := bySlot[s]
 		slices.SortStableFunc(runs, func(x, y leaderboard.Run) int { return cmp.Compare(x.Run.Attempt, y.Run.Attempt) })
-		i := slices.IndexFunc(runs, func(r leaderboard.Run) bool { return r.Sealed && r.Run.Outcome != schemas.OutcomeAbortedInfra })
+		i := slices.IndexFunc(runs, func(r leaderboard.Run) bool {
+			return r.Sealed && r.Run.Outcome != schemas.OutcomeAbortedInfra && !r.Superseded
+		})
 		if i < 0 {
 			continue
 		}

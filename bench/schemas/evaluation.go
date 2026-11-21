@@ -152,4 +152,11 @@ type Evaluation struct {
 	Schedule string `json:"schedule,omitempty"`
 	// GateResult is set once the evaluation is done and its spec has a gate.
 	GateResult *EvaluationGateResult `json:"gate_result,omitempty"`
+	// RerunOf names the evaluation whose failures this one runs again (run
+	// control, "Rerun failures"). Such an evaluation is exploratory: its
+	// children never join the parent's verdicts, report card or a
+	// leaderboard.
+	RerunOf string `json:"rerun_of,omitempty"`
+	// Paused is true while every running child is paused (drain).
+	Paused bool `json:"paused,omitempty"`
 }

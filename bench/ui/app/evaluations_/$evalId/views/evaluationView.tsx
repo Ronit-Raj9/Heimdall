@@ -1,3 +1,4 @@
+import { EvaluationRunActions } from "@/components/experiments/runControls"; // run control: pause, resume, rerun failures
 import { EvaluationStatusPill, ModeLabel } from "@/app/evaluations/views/evaluationWords";
 import { EVALUATION_POLL_MS, armAgentLabel, formatCreated, isActiveStatus, splitChildren } from "@/app/evaluations/views/evaluation.utils";
 import { useConfirm } from "@/components/platform/confirmDialog";
@@ -59,6 +60,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 				actions={
 					<div className="flex flex-wrap items-center gap-2">
 						<ShareButton kind="evaluation" target={evaluation.id} evaluationId={evaluation.id} />
+						<EvaluationRunActions evaluation={evaluation} />
 						{active ? <CancelButton id={evaluation.id} /> : <RepeatEvaluation evaluationId={evaluation.id} />}
 						<DeleteEvaluationAction id={evaluation.id} active={active} />
 					</div>

@@ -61,6 +61,8 @@ type Run struct {
 	Slot   schemas.Slot
 	Run    schemas.Run
 	Sealed bool
+	// Superseded marks a run an operator requeued: it never counts.
+	Superseded bool
 }
 
 // Source is the read side of the run folder. handlers.LeaderboardSource
@@ -266,7 +268,7 @@ func collect(ctx context.Context, src Source) ([]*record, error) {
 			return nil, fmt.Errorf("leaderboard: %w", err)
 		}
 		m, ok := src.Manifest(id)
-		if !ok || m == nil {
+		if !ok || m == nil || m.Experiment.Exploratory() { // run control: a rerun of failures is exploratory and never ranks
 			continue
 		}
 		exp := &expInfo{id: id, m: m, suite: m.SuiteID + "@" + m.SuiteVersion}
@@ -306,7 +308,7 @@ func collect(ctx context.Context, src Source) ([]*record, error) {
 func newRecord(exp *expInfo, runs []Run) *record {
 	slices.SortStableFunc(runs, func(x, y Run) int { return cmp.Compare(x.Run.Attempt, y.Run.Attempt) })
 	pick, sealed := runs[len(runs)-1], false
-	countedRun := func(r Run) bool { return r.Sealed && r.Run.Outcome != schemas.OutcomeAbortedInfra }
+	countedRun := func(r Run) bool { return r.Sealed && r.Run.Outcome != schemas.OutcomeAbortedInfra && !r.Superseded }
 	if i := slices.IndexFunc(runs, countedRun); i >= 0 {
 		pick, sealed = runs[i], true
 	} else if pick.Sealed {

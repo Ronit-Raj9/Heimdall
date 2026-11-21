@@ -23,6 +23,9 @@ type RunView struct {
 	Run      schemas.Run  `json:"run"`
 	Sealed   bool         `json:"sealed"`
 	SealHash string       `json:"seal_hash,omitempty"`
+	// Superseded marks a run an operator requeued (run control): kept and
+	// shown, never counted.
+	Superseded bool `json:"superseded,omitempty"`
 }
 
 // ReadIndex is the read side of the run folder. It is rebuilt from disk at

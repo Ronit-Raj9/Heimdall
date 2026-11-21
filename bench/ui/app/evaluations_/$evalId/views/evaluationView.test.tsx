@@ -26,6 +26,13 @@ vi.mock("@/components/releases/promoteEvaluation", () => ({
 
 vi.mock("@/lib/store/apis/dataOpsApi", () => ({ useDeleteEvaluationMutation: () => [() => ({ unwrap: () => Promise.resolve() }), {}] }));
 
+vi.mock("@/lib/store/apis/runControlApi", async (orig) => ({
+	...(await orig<object>()),
+	usePauseEvaluationMutation: vi.fn(() => [() => undefined, { isLoading: false }]),
+	useResumeEvaluationMutation: vi.fn(() => [() => undefined, { isLoading: false }]),
+	useRerunEvaluationFailuresMutation: vi.fn(() => [() => undefined, { isLoading: false }]),
+}));
+
 const { EvaluationBody } = await import("./evaluationView");
 
 const base: Evaluation = {

@@ -196,7 +196,7 @@ func (s leaderboardSource) Runs(expID string) []leaderboard.Run {
 	views := s.index.Runs(expID)
 	out := make([]leaderboard.Run, 0, len(views))
 	for _, rv := range views {
-		out = append(out, leaderboard.Run{Slot: rv.Slot, Run: rv.Run, Sealed: rv.Sealed})
+		out = append(out, leaderboard.Run{Slot: rv.Slot, Run: rv.Run, Sealed: rv.Sealed, Superseded: rv.Superseded})
 	}
 	return out
 }

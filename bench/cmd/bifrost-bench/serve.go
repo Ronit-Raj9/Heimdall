@@ -202,7 +202,7 @@ func (x indexAdapter) latestAnalysis(expID string) (*schemas.Analysis, error) {
 }
 
 func view(e store.RunEntry) handlers.RunView {
-	return handlers.RunView{Slot: e.Slot, Run: e.Run, Sealed: e.Sealed, SealHash: e.SealHash}
+	return handlers.RunView{Slot: e.Slot, Run: e.Run, Sealed: e.Sealed, SealHash: e.SealHash, Superseded: e.Superseded}
 }
 
 func views(es []store.RunEntry) []handlers.RunView {

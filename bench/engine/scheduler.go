@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/runctl"
 	"github.com/maximhq/bifrost/bench/schemas"
 	suitepkg "github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/utils"
@@ -72,6 +73,10 @@ type RunOptions struct {
 	// experiment the spend cap stopped. The manifest and its hash stay as
 	// frozen; the CLI records the new cap in the experiment's resumes.jsonl.
 	TotalUSD float64
+	// ControlPoll is how often the run controls (bench/runctl: pause, live
+	// concurrency and cap, paused models, run cancels) are read; default
+	// DefaultControlPoll.
+	ControlPoll time.Duration
 }
 
 // Spend bases of Summary.SpendBasis.
@@ -147,6 +152,15 @@ type schedRun struct {
 	// X7: the GPUs each GPU worker holds, by slot id (gpu.go).
 	gpuMu sync.Mutex
 	gpus  map[string]*schemas.GPUAssignment
+
+	// Run control (runcontrol.go).
+	ctl          atomic.Pointer[ctlState]
+	baseWorkers  int           // local workers the experiment asked for; the gate's limit with no live concurrency
+	capFromStart bool          // the run started with a cap, so a live cap may replace it
+	liveCapBits  atomic.Uint64 // float64 bits of the live spend cap; 0 none
+	cancelMu     sync.Mutex
+	cancels      map[string]context.CancelCauseFunc // in-flight local slots by id
+	heldOut      map[string]*schemas.Slot           // slots an operator cancelled, out of the queue; under mu
 }
 
 // NewScheduler returns a scheduler. janitor may be nil (tests, or a host
@@ -186,16 +200,36 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 	}
 	r.ctx = ctx
 	r.queue = newSlotQueue(initialSlots(m)) // W7 adaptive trials: optional slots wait for the rule (adaptive_sched.go)
-	detach := func() {}
-	if opts.Remote != nil {
-		detach = opts.Remote.attach(r)
-	}
 	workers := opts.Concurrency
 	if workers <= 0 {
 		workers = m.Experiment.Concurrency
 	}
 	if workers <= 0 {
 		workers = DefaultConcurrency
+	}
+	// Run control (runcontrol.go): the gate is set before any worker or
+	// remote lease takes a slot, and the poller keeps it current.
+	r.baseWorkers = workers
+	r.applyGate(r.controls())
+	stopPoll := make(chan struct{})
+	pollDone := make(chan struct{})
+	go func() {
+		defer close(pollDone)
+		r.pollControls(ctx, stopPoll)
+	}()
+	defer func() {
+		close(stopPoll)
+		<-pollDone
+	}()
+	if live := r.controls().Concurrency; live > workers {
+		workers = live
+	}
+	if !opts.RemoteOnly {
+		workers = max(workers, runctl.MaxConcurrency) // idle workers wait at the gate, so a live concurrency can rise past the first one
+	}
+	detach := func() {}
+	if opts.Remote != nil {
+		detach = opts.Remote.attach(r)
 	}
 	// X7: GPU slots go to GPU workers only, one per GPU of the pool, and
 	// never to a CPU worker (gpu.go). With remote workers attached, a CPU
@@ -222,11 +256,12 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 			go func() {
 				defer wg.Done()
 				for {
-					slot, ok := r.queue.nextWhere(ctx, isCPU, opts.Remote != nil && nGPU > 0) // X7: CPU slots only
+					slot, ok := r.queue.nextLocal(ctx, isCPU, opts.Remote != nil && nGPU > 0) // X7: CPU slots only; run control: under the live concurrency
 					if !ok {
 						return
 					}
 					r.process(ctx, slot)
+					r.queue.doneLocal()
 				}
 			}()
 		}
@@ -321,6 +356,14 @@ func (s *Scheduler) start(ctx context.Context, m *schemas.Manifest, opts RunOpti
 		s.sweep(ctx, m.ExpID, opts.StaleAfter)
 	}
 	r := &schedRun{s: s, m: m, suite: suite, opts: opts, sum: Summary{ExpID: m.ExpID, SpendBasis: spendBasis(m)}, freed: make(chan struct{})}
+	// Run control: the controls as they are now. A live spend cap set while
+	// the experiment was stopped applies from this start; the CLI's
+	// -total-usd, when given, wins over it.
+	st := r.loadControls()
+	if r.opts.TotalUSD <= 0 && st.TotalUSD > 0 {
+		r.opts.TotalUSD = st.TotalUSD
+	}
+	r.capFromStart = r.capUSD() > 0
 	if err := r.spentSoFar(ctx); err != nil {
 		return nil, err
 	}
@@ -467,6 +510,10 @@ func (r *schedRun) process(ctx context.Context, slot *schemas.Slot) {
 	if r.skipDone(slot, recs) {
 		return
 	}
+	if r.operatorCancelled(slot) { // run control: an operator cancelled this slot's run; it waits for a requeue
+		r.holdOut(slot)
+		return
+	}
 	est, ok := r.reserve(ctx)
 	if !ok {
 		r.count(func(s *Summary) { s.Pending++ })
@@ -502,7 +549,18 @@ func (r *schedRun) process(ctx context.Context, slot *schemas.Slot) {
 			r.s.logger.Warn("release lease", "slot", slot.SlotID, "error", err.Error())
 		}
 	}()
-	r.attempts(sctx, slot, hold)
+	// Run control: an operator's cancel of this run ends cctx with
+	// ErrRunCancelled, so the run seals aborted_infra and uses no attempt.
+	cctx, ccancel := context.WithCancelCause(sctx)
+	untrack := r.trackCancel(slot.SlotID, ccancel)
+	defer func() {
+		untrack()
+		ccancel(nil)
+	}()
+	r.attempts(cctx, slot, hold)
+	if sctx.Err() == nil && errors.Is(context.Cause(cctx), ErrRunCancelled) && r.operatorCancelled(slot) {
+		r.holdOut(slot)
+	}
 }
 
 // attempts settles the slot's earlier runs, then runs new attempts until one
@@ -513,9 +571,19 @@ func (r *schedRun) attempts(ctx context.Context, slot *schemas.Slot, hold *budge
 	if done {
 		return
 	}
-	budget := maxAttempts + r.stoppedRuns(ctx, slot) // Jobs area: a run its owner stopped (cancel, shutdown) uses no attempt (cancel.go)
-	ran := attempts > 0                              // the slot's reservation already paid for a recovered or earlier run
-	for attempts < budget && ctx.Err() == nil {
+	ran := attempts > 0 // the slot's reservation already paid for a recovered or earlier run
+	for ctx.Err() == nil {
+		// Jobs area and run control: runs their owner stopped (cancel,
+		// shutdown) and runs superseded by a requeue or the error policy use
+		// no attempt (cancel.go, runcontrol.go).
+		more, err := r.attemptsRemain(ctx, slot)
+		if err != nil {
+			r.slotError(slot, err)
+			return
+		}
+		if !more {
+			return
+		}
 		if r.capReached() { // every charge so far is recorded: a retry or a run after recovery never starts past the cap
 			r.count(func(s *Summary) { s.Pending++ })
 			return
@@ -534,6 +602,10 @@ func (r *schedRun) attempts(ctx context.Context, slot *schemas.Slot, hold *budge
 		if err != nil {
 			r.slotError(slot, err)
 			return
+		}
+		if res.Run.Outcome == schemas.OutcomeInfraError && ctx.Err() == nil && r.policyRetry(ctx, slot, res.Run) { // run control: error policy (schemas/errorpolicy.go)
+			r.count(func(s *Summary) { s.Retried++ })
+			continue // the superseded run used no attempt
 		}
 		if res.Run.Outcome != schemas.OutcomeAbortedInfra {
 			return
@@ -616,7 +688,7 @@ func (r *schedRun) settle(ctx context.Context, slot *schemas.Slot, est float64) 
 			return len(recs), true
 		}
 	}
-	return len(recs), len(recs)-countOwnerStopped(recs) >= maxAttempts // Jobs area: owner-stopped runs use no attempt (cancel.go)
+	return len(recs), usedAttempts(recs) >= r.maxAborted() // Jobs area and run control: owner-stopped and superseded runs use no attempt (cancel.go, runcontrol.go)
 }
 
 // skipDone reports, and counts as skipped, a slot that needs no new run: it
@@ -624,7 +696,7 @@ func (r *schedRun) settle(ctx context.Context, slot *schemas.Slot, est float64) 
 func (r *schedRun) skipDone(slot *schemas.Slot, recs []schemas.RunRecord) bool {
 	sealedAborts := 0
 	for _, rec := range recs {
-		if !rec.Sealed {
+		if !rec.Sealed || rec.Superseded { // run control: a superseded run neither counts nor uses an attempt
 			continue
 		}
 		if rec.Run.Outcome != schemas.OutcomeAbortedInfra {
@@ -636,7 +708,7 @@ func (r *schedRun) skipDone(slot *schemas.Slot, recs []schemas.RunRecord) bool {
 			sealedAborts++
 		}
 	}
-	if sealedAborts >= maxAttempts {
+	if sealedAborts >= r.maxAborted() {
 		r.count(func(s *Summary) { s.Skipped++ })
 		r.emit(Event{Kind: EventSlotSkipped, SlotID: slot.SlotID, Outcome: schemas.OutcomeAbortedInfra,
 			Message: "every allowed attempt aborted on infrastructure: before its agent started, or with no model call answered because the provider was unreachable"})
@@ -700,6 +772,9 @@ func (r *schedRun) failAccounting(err error) {
 // capUSD is the spend cap this scheduler call enforces: RunOptions.TotalUSD
 // when set, else the frozen budget.total_usd. 0 means no cap.
 func (r *schedRun) capUSD() float64 {
+	if c := r.liveCap(); c > 0 { // run control: a live cap replaces the one this run started with
+		return c
+	}
 	if r.opts.TotalUSD > 0 {
 		return r.opts.TotalUSD
 	}
@@ -1176,6 +1251,41 @@ type slotQueue struct {
 	pending []*schemas.Slot
 	remote  int           // slots out on remote leases
 	changed chan struct{} // closed and replaced whenever pending or remote changes
+
+	// Run control (runcontrol.go): held keeps pending slots back (pause,
+	// paused models); they stay queued and workers wait for them. limit
+	// caps the local workers running at once (nextLocal); 0 is no limit.
+	held  func(*schemas.Slot) bool
+	limit int
+	local int // local slots taken through nextLocal and not yet done
+}
+
+// setGate replaces the hold rule and the local limit and wakes every waiter.
+func (q *slotQueue) setGate(held func(*schemas.Slot) bool, limit int) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.held, q.limit = held, limit
+	q.notifyLocked()
+}
+
+// isHeldLocked reports a pending slot the gate keeps back. The caller holds
+// mu.
+func (q *slotQueue) isHeldLocked(s *schemas.Slot) bool {
+	return q.held != nil && q.held(s)
+}
+
+// nextLocal is nextWhere for a local CPU worker under the live concurrency
+// limit: it waits while limit workers already run. doneLocal ends the slot.
+func (q *slotQueue) nextLocal(ctx context.Context, match func(*schemas.Slot) bool, waitOthers bool) (*schemas.Slot, bool) {
+	return q.next0(ctx, match, waitOthers, true)
+}
+
+// doneLocal ends a slot nextLocal handed out.
+func (q *slotQueue) doneLocal() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.local--
+	q.notifyLocked()
 }
 
 func newSlotQueue(slots []schemas.Slot) *slotQueue {
@@ -1202,17 +1312,39 @@ func (q *slotQueue) next(ctx context.Context) (*schemas.Slot, bool) {
 // waitOthers is set, so a local worker stays until a remote worker has taken
 // the slots it cannot run.
 func (q *slotQueue) nextWhere(ctx context.Context, match func(*schemas.Slot) bool, waitOthers bool) (*schemas.Slot, bool) {
+	return q.next0(ctx, match, waitOthers, false)
+}
+
+// next0 is nextWhere; limited counts the slot against the local limit. A
+// slot the gate holds is never handed out, and while one is pending (of
+// this worker's kind) the worker waits instead of returning, so a paused
+// experiment keeps its workers until it resumes or ctx ends.
+func (q *slotQueue) next0(ctx context.Context, match func(*schemas.Slot) bool, waitOthers, limited bool) (*schemas.Slot, bool) {
 	for {
 		q.mu.Lock()
+		heldMine := false
+		atLimit := limited && q.limit > 0 && q.local >= q.limit
 		for i, slot := range q.pending {
-			if match == nil || match(slot) {
-				q.pending = append(q.pending[:i:i], q.pending[i+1:]...)
-				q.notifyLocked() // X7: a worker waiting on other slots re-checks
-				q.mu.Unlock()
-				return slot, true
+			if match != nil && !match(slot) {
+				continue
 			}
+			if q.isHeldLocked(slot) {
+				heldMine = true
+				continue
+			}
+			if atLimit {
+				heldMine = true
+				break
+			}
+			q.pending = append(q.pending[:i:i], q.pending[i+1:]...)
+			if limited {
+				q.local++
+			}
+			q.notifyLocked() // X7: a worker waiting on other slots re-checks
+			q.mu.Unlock()
+			return slot, true
 		}
-		if q.remote == 0 && (!waitOthers || len(q.pending) == 0) {
+		if !heldMine && q.remote == 0 && (!waitOthers || len(q.pending) == 0) {
 			q.mu.Unlock()
 			return nil, false
 		}
@@ -1258,7 +1390,7 @@ func (q *slotQueue) takeWhere(match func(*schemas.Slot) bool) (*schemas.Slot, bo
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	for i, slot := range q.pending {
-		if match == nil || match(slot) {
+		if (match == nil || match(slot)) && !q.isHeldLocked(slot) { // run control: a held slot goes to no remote worker either
 			q.pending = append(q.pending[:i:i], q.pending[i+1:]...)
 			q.remote++
 			q.notifyLocked()

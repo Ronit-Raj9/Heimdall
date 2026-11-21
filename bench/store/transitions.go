@@ -10,6 +10,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	"github.com/maximhq/bifrost/bench/runctl"
 	"sort"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -79,6 +81,10 @@ func (s *FSStore) loadSlotRuns(slot *schemas.Slot, withTransitions bool) ([]sche
 		}
 		return nil, fmt.Errorf("list runs: %w", err)
 	}
+	superseded, err := runctl.SupersededRuns(s.expDir(slot.ExpID)) // run control: requeued runs never count (bench/runctl)
+	if err != nil {
+		return nil, fmt.Errorf("read run controls: %w", err)
+	}
 	var out []schemas.RunRecord
 	for _, e := range entries {
 		if !e.IsDir() || validateID("run_id", e.Name()) != nil {
@@ -101,6 +107,7 @@ func (s *FSStore) loadSlotRuns(slot *schemas.Slot, withTransitions bool) ([]sche
 				return nil, fmt.Errorf("run %s: %w", e.Name(), err)
 			}
 		}
+		rec.Superseded = rec.Sealed && superseded[rec.Run.RunID]
 		if withTransitions {
 			if rec.Transitions, err = s.readTransitions(filepath.Join(dir, transitionsFile), e.Name()); err != nil {
 				return nil, fmt.Errorf("run %s: %w", e.Name(), err)

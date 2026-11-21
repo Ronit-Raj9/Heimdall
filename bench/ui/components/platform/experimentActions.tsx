@@ -1,3 +1,4 @@
+import { PauseControls } from "@/components/experiments/runControls";
 import { JobLogPanel } from "@/components/jobs/jobLogPanel";
 import { RoleGate } from "@/components/platform/accessNotes";
 import { ConfirmButton } from "@/components/platform/badges";
@@ -44,6 +45,7 @@ export function ExperimentRunActions({ status }: { status: ExperimentStatus }) {
 	return (
 		<RoleGate min="member">
 			<div className="flex flex-wrap items-center gap-2" data-testid="experiment-run-actions">
+				{running && <PauseControls expId={status.exp_id} />}
 				{running && (
 					<ConfirmButton
 						label={t("experimentActions.cancel")}

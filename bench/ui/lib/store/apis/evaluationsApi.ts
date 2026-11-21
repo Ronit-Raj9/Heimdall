@@ -174,6 +174,10 @@ export interface Evaluation {
 	schedule?: string;
 	/** Set once the evaluation is done and its spec has a gate. */
 	gate_result?: EvaluationGateResult;
+	/** Run control: the evaluation whose failures this one reruns (exploratory, never counted). */
+	rerun_of?: string;
+	/** Run control: every running benchmark is paused. */
+	paused?: boolean;
 }
 
 /** GET /evaluation-packs item. */
