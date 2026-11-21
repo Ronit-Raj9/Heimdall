@@ -11,6 +11,7 @@ export const EXPERIMENT_TABS = [
 	"receipts",
 	"integrity",
 	"export",
+	"actions", // web parity L14: follow-up actions (actionsTab.tsx)
 ] as const;
 
 export type ExperimentTabId = (typeof EXPERIMENT_TABS)[number];

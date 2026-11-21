@@ -25,6 +25,7 @@ import { GitCompareArrows, Hourglass, SearchX } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { ActionsTab } from "./actionsTab";
 import { CostTab } from "./costTab";
 import { EXPERIMENT_TABS, defaultExperimentTab, hiddenExperimentTabs, type ExperimentTabId } from "./experimentTabs";
 import { IntegrityTab } from "./integrityTab";
@@ -40,6 +41,7 @@ import { VerdictTab } from "./verdictTab";
  */
 export default function ExperimentView({ expId }: { expId: string }) {
 	const { t } = useTranslation("bench");
+	const { t: tActions } = useTranslation("experimentActions");
 	const [grade] = useQueryState("grade", parseAsString);
 	const [tabParam] = useQueryState("tab", parseAsString);
 	const status = useGetExperimentQuery(expId);
@@ -101,7 +103,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	const shownOnRequest = (id: ExperimentTabId) => id === "matrix" && tabParam === "matrix" && arms.length >= 2;
 	const tabs: RouteTab[] = EXPERIMENT_TABS.map((id) => ({
 		id,
-		label: t(`experiments.page.tabs.${id}`),
+		label: id === "actions" ? tActions("tab") : t(`experiments.page.tabs.${id}`),
 		hidden: hidden.has(id) && !shownOnRequest(id),
 		testId: `experiment-tab-${id}`,
 	}));
@@ -158,7 +160,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 					notStarted && active === "verdict" ? (
 						<EmptyState icon={Hourglass} message={t("experiments.page.notStarted")} testId="experiment-not-started" />
 					) : (
-						<ExperimentTab tab={active as ExperimentTabId} expId={expId} arms={arms} suite={st.suite} />
+						<ExperimentTab tab={active as ExperimentTabId} expId={expId} arms={arms} suite={st.suite} suiteVersion={st.suite_version} />
 					)
 				}
 			</RouteTabs>
@@ -166,7 +168,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	);
 }
 
-function ExperimentTab({ tab, expId, arms, suite }: { tab: ExperimentTabId; expId: string; arms: readonly string[]; suite?: string }) {
+function ExperimentTab({ tab, expId, arms, suite, suiteVersion }: { tab: ExperimentTabId; expId: string; arms: readonly string[]; suite?: string; suiteVersion?: string }) {
 	switch (tab) {
 		case "verdict":
 			return <VerdictTab expId={expId} />;
@@ -188,5 +190,7 @@ function ExperimentTab({ tab, expId, arms, suite }: { tab: ExperimentTabId; expI
 			return <IntegrityTab expId={expId} />;
 		case "export":
 			return <ExperimentExportMenu expId={expId} />;
+		case "actions":
+			return <ActionsTab expId={expId} suite={suite} suiteVersion={suiteVersion} />;
 	}
 }
