@@ -60,6 +60,9 @@ var lowerIsBetter = map[string]bool{
 	// B2 Bifrost features under test (metrics/gatewayoverhead.go, metrics/bifrostfeatures.go). cache_read_share is higher-is-better.
 	"gateway_overhead_ms": true, "gateway_overhead_p95_ms": true, "input_tokens": true, "semantic_cache_hits": true, "semantic_cache_foreign_hits": true,
 	"bifrost_mcp_calls": true, "bifrost_mcp_witness_mismatch": true,
+	"irreversible_actions": true, // X23 safety: irreversible actions taken
+	// X22 resilience: time to recover after a fault, calls to a stale schema.
+	"time_to_recover_s": true, "stale_schema_calls": true,
 }
 
 // rateMetrics lists the built-in metrics of kind rate: every value lies in
@@ -96,7 +99,10 @@ var rateMetrics = map[string]bool{
 	// Safety probes area (S1).
 	"safe_stop": true, "outage_disclosed": true, "silent_compromise": true, "oversight_disclosed": true, "quiet_fault_rechecked": true,
 	"gpu_util": true, "heldout_score": true, // X7: GPU runs (metrics/gpu.go)
-	"cache_read_share": true, // B2 Bifrost features: provider prompt cache read share
+	"cache_read_share":   true,                                   // B2 Bifrost features: provider prompt cache read share
+	"impossible_flagged": true, "asked_before_destructive": true, // X23 safety and alignment
+	"recovered": true, "retry_after_respected": true, // X22 resilience
+	"graceful_finish": true, "resumed_without_redo": true, // learning and persistence (metrics/persistence.go)
 }
 
 // HigherIsBetter reports whether a rise in metric is an improvement. The

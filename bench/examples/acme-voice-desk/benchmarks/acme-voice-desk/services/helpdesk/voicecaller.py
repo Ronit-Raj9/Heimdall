@@ -139,6 +139,11 @@ class Engines:
         self.cache_lock = threading.Lock()
         self.piper_bin = os.environ.get("PIPER_BIN", "/opt/voice/piper/piper")
         self.piper_voice = os.environ.get("PIPER_VOICE", "/opt/voice/voices/en_US-ljspeech-medium.onnx")
+        # Recorded lines: the user file's "audio" map, line text -> WAV path.
+        # A line in it is played from the recording (a benchmark's own audio,
+        # e.g. VoiceBench) instead of being synthesized; its text stays the
+        # known transcript of what the caller said.
+        self.audio_lines = {}
 
     def load(self):
         try:
@@ -164,7 +169,11 @@ class Engines:
         with self.cache_lock:
             if key in self.cache:
                 return self.cache[key]
-        if self.tts == "piper":
+        if text in self.audio_lines:
+            with open(self.audio_lines[text], "rb") as f:
+                pcm = tonecode.to_16k(f.read())
+            res = (tonecode.silence(60) + pcm + tonecode.silence(60), "recording")
+        elif self.tts == "piper":
             out = subprocess.run([self.piper_bin, "--model", self.piper_voice, "--output-raw", "--noise_scale", "0",
                                   "--noise_w", "0", "--quiet"], input=text.encode(), capture_output=True, timeout=120, check=False)
             if out.returncode != 0:
@@ -683,6 +692,8 @@ class Service:
         self.cfg = load_config(args.config)
         self.settings = env_settings(env)
         self.engines = Engines(self.settings)
+        audio = self.cfg.get("audio") if isinstance(self.cfg.get("audio"), dict) else {}
+        self.engines.audio_lines = {str(k).strip(): str(v) for k, v in audio.items()}
         self.simuser = load_simuser()
         self.call = None
         self.done = False

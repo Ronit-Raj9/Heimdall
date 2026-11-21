@@ -23,6 +23,18 @@ Environment (an agent config sets these from the run, agents/voice-*.yaml):
   VOICE_TTS_VOICE     e.g. alloy
   VOICE_SESSION       optional gateway session id (x-bf-session-id)
 
+Optional, for open-source local speech and non-helpdesk calls (the
+voice-local-cascade agent, VoiceBench suites):
+  VOICE_STT_ENGINE    gateway (default) or faster-whisper: transcribe in the
+                      container with faster-whisper (WHISPER_MODEL_DIR,
+                      WHISPER_THREADS); no transcription row in the gateway
+  VOICE_TTS_ENGINE    gateway (default) or piper: speak in the container with
+                      Piper (PIPER_BIN, PIPER_VOICE)
+  VOICE_MCP_SERVICE   the MCP service with the tools (default helpdesk);
+                      none for a call without tools
+  VOICE_SYSTEM        replaces the Acme support system prompt
+  VOICE_GREETING      replaces the Acme greeting
+
   python3 cascadedagent.py [--mode good|broken] [instruction text]
 """
 
@@ -105,6 +117,40 @@ class Gateway:
         return out["choices"][0]["message"]
 
 
+class LocalSpeech:
+    """Open-source speech engines inside the agent's container (no gateway call)."""
+
+    def __init__(self, env):
+        self.stt = (env.get("VOICE_STT_ENGINE") or "gateway").strip()
+        self.tts = (env.get("VOICE_TTS_ENGINE") or "gateway").strip()
+        if self.stt not in ("gateway", "faster-whisper") or self.tts not in ("gateway", "piper"):
+            raise SystemExit("cascadedagent: VOICE_STT_ENGINE gateway|faster-whisper, VOICE_TTS_ENGINE gateway|piper")
+        self.whisper = None
+        if self.stt == "faster-whisper":
+            from faster_whisper import WhisperModel  # type: ignore
+            self.whisper = WhisperModel(env.get("WHISPER_MODEL_DIR", "/opt/voice/whisper"), device="cpu",
+                                        compute_type="int8", cpu_threads=int(env.get("WHISPER_THREADS", "2")))
+        self.piper_bin = env.get("PIPER_BIN", "/opt/voice/piper/piper")
+        self.piper_voice = env.get("PIPER_VOICE", "/opt/voice/voices/en_US-ljspeech-medium.onnx")
+
+    def transcribe(self, pcm):
+        import numpy  # type: ignore
+        audio = numpy.frombuffer(bytes(pcm), dtype=numpy.int16).astype(numpy.float32) / 32768.0
+        segs, _ = self.whisper.transcribe(audio, language="en", beam_size=1, vad_filter=False,
+                                          condition_on_previous_text=False, temperature=0.0)
+        return " ".join(s.text.strip() for s in segs).strip()
+
+    def speak(self, text):
+        import subprocess
+        out = subprocess.run([self.piper_bin, "--model", self.piper_voice, "--output-raw", "--noise_scale", "0",
+                              "--noise_w", "0", "--quiet"], input=text.encode(), capture_output=True, timeout=300, check=False)
+        if out.returncode != 0:
+            raise RuntimeError("piper failed: " + out.stderr.decode("utf-8", "replace")[-300:])
+        with open(self.piper_voice + ".json", encoding="utf-8") as f:
+            rate = json.load(f)["audio"]["sample_rate"]
+        return tonecode.resample(out.stdout, rate, tonecode.SAMPLE_RATE)
+
+
 class MCP:
     def __init__(self, service):
         servers = json.loads(os.environ.get("BENCH_MCP_SERVERS") or "{}")
@@ -151,9 +197,12 @@ class Agent:
     def __init__(self, mode, instruction):
         self.mode = mode
         self.gw = Gateway(os.environ)
-        self.desk = MCP("helpdesk")
-        self.tools = self.desk.tools()
-        sys_text = SYSTEM + ("\n\nToday's brief:\n" + instruction if instruction else "")
+        self.local = LocalSpeech(os.environ)
+        service = (os.environ.get("VOICE_MCP_SERVICE") or "helpdesk").strip()
+        self.desk = None if service == "none" else MCP(service)
+        self.tools = self.desk.tools() if self.desk else []
+        self.greeting = os.environ.get("VOICE_GREETING") or GREETING
+        sys_text = (os.environ.get("VOICE_SYSTEM") or SYSTEM) + ("\n\nToday's brief:\n" + instruction if instruction else "")
         self.messages = [{"role": "system", "content": sys_text}]
         self.phone = voiceclient.VoiceCall(timeout=60)
         self.turn = 0
@@ -163,7 +212,7 @@ class Agent:
         print("cascadedagent:", *a, file=sys.stderr, flush=True)
 
     def speak(self, text):
-        pcm = self.gw.speak(text)
+        pcm = self.local.speak(text) if self.local.tts == "piper" else self.gw.speak(text)
         if self.mode == "broken":
             time.sleep(4.5)  # dead air before every answer
             self.phone.send_audio(pcm, realtime=False, barge_in=False)  # talks straight over the caller
@@ -195,8 +244,8 @@ class Agent:
         return "Sorry, I could not finish that. Let me pass you to a colleague."
 
     def run(self):
-        self.speak(GREETING)
-        self.messages.append({"role": "assistant", "content": GREETING})
+        self.speak(self.greeting)
+        self.messages.append({"role": "assistant", "content": self.greeting})
         while True:
             try:
                 pcm = self.phone.listen(end_silence_ms=700, max_wait_s=30)
@@ -208,7 +257,7 @@ class Agent:
                 self.speak(text)
                 continue
             try:
-                heard = self.gw.transcribe(pcm)
+                heard = self.local.transcribe(pcm) if self.local.whisper else self.gw.transcribe(pcm)
             except RuntimeError as e:
                 # Speech to text is down: never act on words the agent did not hear.
                 self.log("transcription failed:", e)

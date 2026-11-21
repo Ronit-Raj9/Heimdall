@@ -194,10 +194,30 @@ class ScriptedUser:
         return str(self.script.get("default") or "Okay, thank you."), {"rule": "default"}
 
 
+def gateway_headers(raw):
+    """The x-bf-maxim-* headers the bench passed (BENCH_SVC_GATEWAY_HEADERS, a JSON
+    object), so Bifrost's Maxim plugin logs this user's calls as Heimdall's for the run.
+    Any other name, a non-string value or a line break is dropped."""
+    if not raw:
+        return {}
+    try:
+        value = json.loads(raw)
+    except ValueError:
+        return {}
+    if not isinstance(value, dict):
+        return {}
+    out = {}
+    for k, v in value.items():
+        if (isinstance(k, str) and isinstance(v, str) and k.lower().startswith("x-bf-maxim-")
+                and "\r" not in v and "\n" not in v and "\r" not in k and "\n" not in k):
+            out[k] = v
+    return out
+
+
 class GatewayClient:
     """Chat completions through the gateway on the service's own key."""
 
-    def __init__(self, url, key, model, seed):
+    def __init__(self, url, key, model, seed, headers=None):
         if not url or not key or not model:
             raise SystemExit("simuser: llm mode needs BENCH_SVC_GATEWAY_URL, BENCH_SVC_GATEWAY_KEY and BENCH_SVC_MODEL "
                              "(the service's gateway access; set simulator provider and model)")
@@ -205,13 +225,14 @@ class GatewayClient:
         self.key = key
         self.model = model
         self.seed = seed
+        self.headers = gateway_headers(headers)
 
     def chat(self, messages):
         body = {"model": self.model, "messages": messages, "temperature": 0, "max_tokens": MAX_REPLY_TOKENS}
         if self.seed:
             body["seed"] = self.seed
         req = urllib.request.Request(self.url, data=json.dumps(body).encode(), method="POST",
-                                     headers={"Content-Type": "application/json", "x-bf-vk": self.key})
+                                     headers={**self.headers, "Content-Type": "application/json", "x-bf-vk": self.key})
         started = time.monotonic()
         try:
             with urllib.request.urlopen(req, timeout=CALL_TIMEOUT_S) as r:
@@ -292,7 +313,8 @@ class Session:
             if want and want != sha:
                 raise SystemExit(f"simuser: prompt {version} hashes to {sha}, the manifest pinned {want}")
             seed = int(env.get("BENCH_SIM_SEED") or 0)
-            client = GatewayClient(env.get("BENCH_SVC_GATEWAY_URL"), env.get("BENCH_SVC_GATEWAY_KEY"), env.get("BENCH_SVC_MODEL"), seed)
+            client = GatewayClient(env.get("BENCH_SVC_GATEWAY_URL"), env.get("BENCH_SVC_GATEWAY_KEY"), env.get("BENCH_SVC_MODEL"), seed,
+                                   env.get("BENCH_SVC_GATEWAY_HEADERS"))
             self.user = LLMUser(cfg.get("persona"), max_turns, client, template, hostile)
             self.transcript.update({"model": client.model, "prompt_version": version, "prompt_sha256": sha, "seed": seed})
         else:
