@@ -155,6 +155,34 @@
         }
       }
     },
+    "side_tasks": {
+      "type": "array",
+      "description": "Hidden secondary objectives (docs/control-evals.md). Only the attack condition shows one to the agent, in turn by trial; the gate side_task_completed judges it from sealed evidence. Target dummy assets only.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "threat", "check"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},
+          "threat": {"enum": ["exfiltrate", "escalate", "disable_firewall", "malware", "backdoor", "sabotage"]},
+          "timing": {"enum": ["live", "delayed"]},
+          "instruction": {"type": "string", "minLength": 1, "description": "The attack instruction text; or attack_instruction_file."},
+          "attack_instruction_file": {"$ref": "#/$defs/rel_path"},
+          "check": {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "properties": {
+              "paths": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "Workspace globs the side task changes (exported diff)."},
+              "diff_patterns": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "Regular expressions over added diff lines."},
+              "commands": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "Regular expressions over observed and requested commands."},
+              "tool_calls": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "Tool proxy calls by <server>/<tool> glob."},
+              "markers": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "Literal strings ({{nonce}} matches any nonce) found in tool calls or outbox messages."}
+            }
+          }
+        }
+      }
+    },
     "split": {"enum": ["public", "held_out"], "description": "public (default) or held_out: tasks: all selects public tasks only, and the API never serves a held-out task's instruction or files (docs/held-out-and-canaries.md)."},
     "voice": {
       "type": "object",

@@ -224,6 +224,9 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	if err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
+	if err := planAttack(suite, &e, conds); err != nil { // Control evaluations: side tasks under the attack condition (controlplan.go)
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
 	var tier *schemas.TierPlan
 	if conds, tier, err = w7Conditions(suite, &e, conds); err != nil { // W7 suite tier and trials policy (adaptive.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
@@ -271,6 +274,9 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	if m.Arms, err = p.resolveArms(ctx, &e, suite, conds); err != nil {
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	if err := addFramingArms(&e, m.Arms); err != nil { // Framing pairs: twin arms with a frozen preamble (controlplan.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	if err := checkFairness(&e, m.Arms, p.logger); err != nil { // Multi-agent area: equal-budget fairness (fairness.go)
@@ -1004,7 +1010,8 @@ func (p *Planner) runInputs(m *schemas.Manifest, suite *schemas.Suite, conds []c
 			Budgets  schemas.Budgets          `json:"budgets"`
 			Suite    string                   `json:"suite"`
 			Workdir  string                   `json:"workdir"`
-		}{Identity: identity, Budgets: arm.Config.Budgets, Suite: suite.Environment, Workdir: suite.Workdir})
+			Preamble string                   `json:"preamble,omitempty"` // a framing arm's preamble; absent elsewhere, so other hashes are unchanged
+		}{Identity: identity, Budgets: arm.Config.Budgets, Suite: suite.Environment, Workdir: suite.Workdir, Preamble: framingPreamble(arm)})
 		if err != nil {
 			return nil, fmt.Errorf("hash run input for slot %s: %w", slot.SlotID, err)
 		}
@@ -1585,6 +1592,9 @@ func validateExperiment(e *schemas.Experiment, minArms int) error {
 		errs = append(errs, errors.New("compatibility needs an agent, conditions and trials >= 1"))
 	}
 	errs = append(errs, aaErrors(e, conds)...)
+	if err := validateFramingPairs(e); err != nil { // Framing pairs (controlplan.go)
+		errs = append(errs, err)
+	}
 	if r := e.Realism; r != "" && r != schemas.RealismStandard && r != schemas.RealismNeutral { // Eval integrity area (S2): W-A realism check
 		errs = append(errs, fmt.Errorf("realism %q must be standard or neutral", r)) // Eval integrity area (S2)
 	} // Eval integrity area (S2)
@@ -1642,9 +1652,9 @@ func resolveConditions(suite *schemas.Suite, specs []schemas.ConditionSpec) ([]c
 				return nil, fmt.Errorf("condition %s: task %s is not loaded in suite %s", c.ID, t, suite.ID)
 			}
 		}
-		if c.ID != schemas.ConditionClean {
+		if c.ID != schemas.ConditionClean && c.ID != schemas.ConditionAttack {
 			if cp.probe = suite.ProbeByID(c.ID); cp.probe == nil {
-				return nil, fmt.Errorf("condition %s is neither clean nor a probe of suite %s", c.ID, suite.ID)
+				return nil, fmt.Errorf("condition %s is neither clean, attack nor a probe of suite %s", c.ID, suite.ID)
 			}
 		}
 		out = append(out, cp)

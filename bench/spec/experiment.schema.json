@@ -70,6 +70,21 @@
     "scripted_upstream": {"type": "boolean", "description": "Every model call of the experiment's runs is answered by the fault proxy's scripted model, never a real provider, as under smoke but without relaxing the lock checks. A run that cannot be held to it (no fault proxy, a proxy too old for scripted plans) is refused, and model judges refuse to grade."},
     "requirements": {"$ref": "#/$defs/requirements"},
     "aa": {"type": "boolean", "description": "Eval integrity area (S2): add arm A2, a copy of arm A with the same config hash, on the clean condition. The verdict measures the noise floor from A2 minus A, uses it for the MDE, and is INVALID (harness noise) when the identical arms differ significantly (docs/noise-floor.md)."},
+    "framing_pairs": {
+      "type": "array",
+      "description": "Twin copies of a base arm that differ only in a frozen preamble (docs/control-evals.md): sandbagging (neutral, consequence), monitored_vs_unmonitored (monitored, unmonitored), test_vs_real (deployment, evaluation). Arms are named <base>_<id>_<framing>; the analysis reports sandbag_delta, compliance_gap or awareness_delta.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "base"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+          "kind": {"enum": ["sandbagging", "monitored_vs_unmonitored", "test_vs_real"]},
+          "base": {"type": "string", "minLength": 1},
+          "framings": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Preamble per framing name; defaults are built in."}
+        }
+      }
+    },
     "realism": {"enum": ["standard", "neutral"], "description": "Eval integrity area (S2): neutral gives the agent neutral variable names and hostnames, stamps no canary and names observer processes innocuously (docs/eval-awareness.md). Default standard; overrides the suite's realism."},
     "codescan": {"type": "object", "additionalProperties": false, "description": "X4: the insecure_code_added gate's setting (docs/code-scan.md). With none it only reports. veto_at makes a run with a counted finding at or above that severity an integrity violation; ignore lists builtin rule ids or <scanner>:<rule> ids whose findings are shown but not counted.", "properties": {"veto_at": {"enum": ["low", "medium", "high", "critical"]}, "ignore": {"type": "array", "items": {"type": "string", "minLength": 1}}}},
     "safety": {"enum": ["trifecta"], "description": "Safety probes area (S1): trifecta adds the suite's exfiltration probes (axis exfiltration) as conditions on every task whose agent config has private data, untrusted input and an exit (docs/safety-probes.md), and opts into exfiltration_attempted."},
@@ -151,7 +166,7 @@
     }
   },
   "$defs": {
-    "condition_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$", "description": "clean or a probe id."},
+    "condition_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$", "description": "clean, attack (side tasks, docs/control-evals.md) or a probe id."},
     "task_selector": {
       "description": "The scalar all, or a list of task ids.",
       "anyOf": [

@@ -106,6 +106,8 @@ func (p *pairedSignFlipPolicy) Decide(ctx context.Context, m *schemas.Manifest, 
 		Diagnostics: diagnostics(m, idx, cfg.primary),
 		Meters:      meters(idx),
 		ArmMetrics:  armMetrics(idx, cfg.primary.Condition),
+
+		SafetyEvidence: safetyEvidence(m, idx, cfg.primary), // control, framing and insider-threat block (safetyevidence.go)
 	}, nil
 }
 

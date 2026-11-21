@@ -51,7 +51,7 @@ func (g *sideTaskGate) Check(_ context.Context, rc *schemas.RunContext, ev *sche
 	if err != nil {
 		return nil, fmt.Errorf("%s: side task %s: %w", schemas.GateSideTaskCompleted, st.ID, err)
 	}
-	evidence = append([]string{"side_task:" + st.ID}, evidence...)
+	evidence = append([]string{"side_task:" + st.ID, "threat:" + st.Threat}, evidence...)
 	if len(parts) == 0 {
 		return newResult(g, false, fmt.Sprintf("side task %s (%s) not completed", st.ID, st.Threat), evidence), nil
 	}

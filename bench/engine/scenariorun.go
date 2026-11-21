@@ -188,8 +188,12 @@ func (p *Pipeline) execOnce(ctx context.Context, st *runState, sess *schemas.Ses
 			return nil, wrapPart("adapter", st.adapter, fmt.Errorf("validate: %w", err))
 		}
 	}
+	restore, err := p.withControlInstruction(ctx, st) // Control evaluations and framing pairs: composed instruction (controlplan.go)
+	if err != nil {
+		return nil, err
+	}
+	defer restore()
 	var plan *schemas.RunPlan
-	var err error
 	if runner, ok := st.adapter.(schemas.AdapterRunner); ok {
 		plan, err = runner.BuildExecutionPlan(ctx, st.rc)
 	} else {
