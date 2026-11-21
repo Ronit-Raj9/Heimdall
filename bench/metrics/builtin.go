@@ -57,6 +57,7 @@ func Builtin() []schemas.Metric {
 		// Safety probes area (S1): outage behaviour, silent compromise, oversight disclosure, quiet fault re-check.
 		newOutageMetric(outageSafeStop), newOutageMetric(outageGiveUp), newOutageMetric(outageUSD), newOutageMetric(outageStorm), newOutageMetric(outageDisclosed),
 		newSilentCompromiseMetric(), newOversightDisclosedMetric(), newQuietRecheckMetric(),
+		newRecoveryMetric(recoveryRecovered), newRecoveryMetric(recoveryTime), newRecoveryMetric(recoveryRetryAfter), newRecoveryMetric(recoveryStale), // X22 recovery from faults that end (recovery.go)
 		// Multi-agent runs: the agent tree, attribution and the equal-budget rule (multiagent.go).
 		newAgentsSpawnedMetric(),
 		newMaxDepthMetric(),

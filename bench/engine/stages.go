@@ -111,7 +111,7 @@ func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 // plan is what keeps the run off every real provider, so a run that cannot
 // bind it is refused rather than run.
 func (p *Pipeline) bindFaultPlan(ctx context.Context, st *runState) error {
-	gatewayProbe := st.rc.Probe != nil && st.rc.Probe.Layer == schemas.LayerGateway && st.rc.Probe.Apply.Agent == "" // Multi-agent area: a member-targeted probe binds only its member's slot when it arms
+	gatewayProbe := st.rc.Probe != nil && armsGatewayAtStart(st.rc.Probe) && st.rc.Probe.Apply.Agent == "" // Multi-agent area: a member-targeted probe binds only its member's slot when it arms
 	mode := p.runFaultMode(st.rc)
 	if mode == faultModeScripted {
 		switch {
@@ -134,6 +134,25 @@ func (p *Pipeline) bindFaultPlan(ctx context.Context, st *runState) error {
 		return &partError{part: faultPart, err: fmt.Errorf("bind %s plan to key slot %s: %w", mode, st.rc.Key.KeySlot, err)}
 	}
 	return nil
+}
+
+// armsGatewayAtStart reports whether a probe binds its own gateway plan when
+// it arms: a gateway-layer probe, or a compound schedule (lane X22) whose
+// gateway step arms with the run. A later gateway step leaves the run's tag
+// plan bound until it fires.
+func armsGatewayAtStart(p *schemas.ProbeSpec) bool {
+	if p.Layer == schemas.LayerGateway {
+		return true
+	}
+	if p.Layer != schemas.LayerCompound {
+		return false
+	}
+	for _, s := range p.Apply.Faults {
+		if s.Layer == schemas.LayerGateway && s.AtS == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // directSlot refuses a key on a direct slot under scripted mode: a direct
@@ -624,6 +643,9 @@ func mergeReceipt(st *runState, later *schemas.Receipt) schemas.Receipt {
 		for k, v := range r.Steps {
 			out.Steps[k] = v
 		}
+	}
+	if later != nil {
+		out.Parts = later.Parts // X22: one receipt per step of a compound schedule
 	}
 	applies := map[schemas.ReceiptStep]bool{}
 	for _, s := range st.layer.Steps() {

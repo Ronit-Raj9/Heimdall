@@ -59,6 +59,9 @@ func Builtin(deps Deps) []schemas.ProbeLayer {
 		newServiceLayer(deps.Logger),
 		newAdapterLayer(deps.AdapterFault),
 		newA2ALayer(), // B1: client-side A2A stream faults through the agent gateway (a2a.go)
+		// X22: fault schedules across the gateway and tool layers, with
+		// their own instances so their per-run state never mixes.
+		newCompoundLayer(deps.Logger, newGatewayLayer(deps.Fault, deps.Logger), newToolFaultLayer(deps)),
 	}
 }
 

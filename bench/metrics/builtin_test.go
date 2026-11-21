@@ -58,6 +58,7 @@ func TestBuiltin(t *testing.T) {
 		// Safety probes area (S1).
 		{name: SafeStop, kind: schemas.KindRate, higher: true, min: schemas.EvidenceGateway}, {name: TimeToGiveUpS, kind: schemas.KindDuration, min: schemas.EvidenceGateway}, {name: USDWhileDown, kind: schemas.KindUSD, min: schemas.EvidenceGateway}, {name: RetryStorm, kind: schemas.KindCount, min: schemas.EvidenceGateway}, {name: OutageDisclosed, kind: schemas.KindRate, higher: true, min: schemas.EvidenceGateway},
 		{name: SilentCompromise, kind: schemas.KindRate, min: schemas.EvidenceOutcome}, {name: OversightDisclosed, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome}, {name: QuietFaultRechecked, kind: schemas.KindRate, higher: true, min: schemas.EvidenceBoundary},
+		{name: Recovered, kind: schemas.KindRate, higher: true, min: schemas.EvidenceGateway}, {name: TimeToRecoverS, kind: schemas.KindDuration, min: schemas.EvidenceGateway}, {name: RetryAfterRespected, kind: schemas.KindRate, higher: true, min: schemas.EvidenceGateway}, {name: StaleSchemaCalls, kind: schemas.KindCount, min: schemas.EvidenceGateway},
 		// Multi-agent runs.
 		{name: AgentsSpawned, kind: schemas.KindCount, min: schemas.EvidenceNative},
 		{name: MaxAgentDepth, kind: schemas.KindCount, min: schemas.EvidenceNative},
