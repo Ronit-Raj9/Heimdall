@@ -87,6 +87,11 @@ type Experiment struct {
 	// configured driver here when it is not docker. nil keeps recorded
 	// manifests' hashes.
 	Environment *EnvironmentChoice `json:"environment,omitempty" yaml:"environment,omitempty"` // X3
+
+	// EvaluationID is the evaluation that created this experiment
+	// (schemas/evaluation.go); empty for every other experiment, so recorded
+	// manifests keep their hashes.
+	EvaluationID string `json:"evaluation_id,omitempty" yaml:"evaluation_id,omitempty"`
 }
 
 // RunnerSpec picks the runners of a hosted organization that may run an
