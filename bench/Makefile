@@ -12,7 +12,7 @@ BIN     := bin/bifrost-bench
 COMPOSE := docker compose -f deploy/docker-compose.yml --env-file deploy/.env
 WITHENV := set -a; . deploy/.env; set +a;
 
-.PHONY: help build bin heimdall ui test test-integration images env up down clean-volumes admit doctor smoke serve demo clean hosted-image hosted-smoke
+.PHONY: help build bin heimdall ui test test-integration images env up down clean-volumes admit doctor smoke serve demo clean hosted-image hosted-smoke e2e-agentfirst
 
 help: ## Show targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -34,6 +34,9 @@ test: ## go vet and unit tests (no Docker, no network)
 
 test-integration: ## Tests that use real Docker
 	$(GOENV) $(GO) test -tags integration ./environments/ ./graders/ ./probes/ ./gateways/...
+
+e2e-agentfirst: ## Agent-first end-to-end test (planning half always; run half needs `make up`)
+	$(GOENV) $(GO) test -tags e2eagentfirst -run TestE2EAgentFirst -count=1 -timeout 45m -v ./cmd/bifrost-bench/
 
 images: build ## Build the UI and binary, then the task base image, the bench image and the agent images
 	docker build -t bench/coding-core-base:1 benchmarks/coding-core/base
