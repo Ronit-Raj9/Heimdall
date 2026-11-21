@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/secrets"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
@@ -408,6 +409,7 @@ func (c *Coordinator) Heartbeat(ctx context.Context, leaseID, workerID string) e
 		return fmt.Errorf("lease %s: heartbeat: %w", leaseID, err)
 	}
 	c.mu.Lock()
+	live := c.leases[l.id] == l && !l.closing
 	if c.leases[l.id] == l {
 		l.lastBeat = c.now()
 	}
@@ -417,10 +419,61 @@ func (c *Coordinator) Heartbeat(ctx context.Context, leaseID, workerID string) e
 		seen = w.scope
 	}
 	c.mu.Unlock()
+	if live {
+		c.publishLive(l, schemas.HeartbeatEventsFrom(ctx))
+	}
 	if c.hosted() && w != nil {
 		c.book(ctx, seen, c.infoOf(w), false)
 	}
 	return nil
+}
+
+// liveKinds are the event kinds a worker may forward: the pipeline's own
+// progress events. Seal, skip, budget and error events stay the
+// coordinator's, so a runner can never make the server count or charge a run.
+var liveKinds = map[string]bool{EventRunStarted: true, EventStage: true}
+
+// publishLive puts a slot lease's forwarded live events on the experiment's
+// event stream exactly as a local run emits them, with the lease's slot id.
+// They are display only: the uploaded, sealed run stays the record. At most
+// MaxHeartbeatEvents per call (the newest), messages cut and redacted, event
+// times clamped to now.
+func (c *Coordinator) publishLive(l *remoteLease, evs []schemas.WorkerEvent) {
+	if len(evs) > schemas.MaxHeartbeatEvents {
+		evs = evs[len(evs)-schemas.MaxHeartbeatEvents:]
+	}
+	now := c.now()
+	for _, e := range evs {
+		if !liveKinds[e.Kind] || (e.RunID != "" && !validWorkerID(e.RunID)) {
+			continue
+		}
+		if e.Kind == EventStage && !validLiveStage(e.Stage) {
+			continue
+		}
+		msg := e.Message
+		if len(msg) > schemas.MaxWorkerEventMessage {
+			msg = strings.ToValidUTF8(msg[:schemas.MaxWorkerEventMessage], "")
+		}
+		at := e.At
+		if at.IsZero() || at.After(now) {
+			at = now
+		}
+		l.r.emit(Event{Kind: e.Kind, SlotID: l.slot.SlotID, RunID: e.RunID, Stage: e.Stage, Message: secrets.Redact(msg), At: at})
+	}
+}
+
+// validLiveStage reports whether s is a short stage name (letters, digits,
+// '_' or '-').
+func validLiveStage(s schemas.Stage) bool {
+	if s == "" || len(s) > 32 {
+		return false
+	}
+	for _, r := range s {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_' || r == '-') {
+			return false
+		}
+	}
+	return true
 }
 
 // Upload appends one chunk of the lease's archive. offset must be the number

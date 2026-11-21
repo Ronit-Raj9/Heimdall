@@ -51,6 +51,9 @@ type WorkerOptions struct {
 	Version    string
 	Slots      int           // concurrent slots; default 1
 	PollEvery  time.Duration // wait between lease requests that found no work
+	// LiveEventEvery is how often buffered live run events are flushed
+	// between lease heartbeats (default DefaultLiveEventEvery).
+	LiveEventEvery time.Duration
 	ScratchDir string        // archives are built here; default the system temp folder
 	HTTP       *http.Client
 	Logger     schemas.Logger
@@ -130,6 +133,9 @@ func NewWorker(reg *schemas.Registry, runner SlotRunner, replan Replanner, opts 
 	}
 	if opts.PollEvery <= 0 {
 		opts.PollEvery = DefaultWorkerPoll
+	}
+	if opts.LiveEventEvery <= 0 {
+		opts.LiveEventEvery = DefaultLiveEventEvery
 	}
 	if opts.HTTP == nil {
 		opts.HTTP = &http.Client{Timeout: workerCallTimeout}
@@ -261,7 +267,8 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 	// preflight and image checks can take longer than the stale threshold on
 	// a loaded worker, and a lease that only starts beating at RunSlot is
 	// lost to the coordinator's sweep before the slot even runs.
-	sctx, stop := w.heartbeat(ctx, lease)
+	live := &liveBuffer{} // the run's live events, forwarded on the heartbeat
+	sctx, stop := w.heartbeat(ctx, lease, live)
 	defer stop()
 	exp, reason, permanent := w.admit(sctx, lease) // QC2-08-02: preparation stops when the lease is lost
 	if reason != "" {
@@ -277,6 +284,7 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		return nil
 	}
 	leaseSecrets, why := w.applyLeaseCredentials(sctx, lease) // F4 key delivery, G01 org secrets (remotecreds.go)
+	live.setSecrets(leaseSecrets)
 	if leaseSecrets == nil && exp.m.Gateway.Deferred() {
 		leaseSecrets = map[string]string{} // G01: a hosted org's run never reads this runner's own environment
 	}
@@ -317,7 +325,7 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		}
 		return nil
 	}
-	in := SlotInput{Manifest: runM, Suite: exp.suite, Slot: slot, Attempt: lease.Attempt, Secrets: leaseSecrets}
+	in := SlotInput{Manifest: runM, Suite: exp.suite, Slot: slot, Attempt: lease.Attempt, Secrets: leaseSecrets, Emit: live.add}
 	if len(lease.GPUs) > 0 { // QC2-10-09: the devices the coordinator reserved, not the pool's first fit
 		a, release, why := w.leasedGPUs(sctx, lease.GPUs)
 		if why != "" {
@@ -574,7 +582,11 @@ var (
 // returned context with an ErrLeaseLost cause on loss under the scheduler's
 // rules (leaseLoss): the coordinator says the lease is gone, or no heartbeat
 // succeeded for longer than the stale threshold.
-func (w *Worker) heartbeat(ctx context.Context, lease *schemas.WorkerLease) (context.Context, func()) {
+//
+// live, when not nil, holds the run's live events: each heartbeat carries
+// the buffered ones, and between heartbeats they are flushed every
+// LiveEventEvery when any wait.
+func (w *Worker) heartbeat(ctx context.Context, lease *schemas.WorkerLease, live *liveBuffer) (context.Context, func()) {
 	sctx, cancel := context.WithCancelCause(ctx)
 	every := time.Duration(lease.HeartbeatEveryMS) * time.Millisecond
 	if every <= 0 {
@@ -590,6 +602,8 @@ func (w *Worker) heartbeat(ctx context.Context, lease *schemas.WorkerLease) (con
 		defer close(done)
 		t := time.NewTicker(every)
 		defer t.Stop()
+		flush := time.NewTicker(min(w.opts.LiveEventEvery, every))
+		defer flush.Stop()
 		last := time.Now()
 		for {
 			select {
@@ -598,15 +612,23 @@ func (w *Worker) heartbeat(ctx context.Context, lease *schemas.WorkerLease) (con
 			case <-sctx.Done():
 				return
 			case <-t.C:
+			case <-flush.C:
+				if !live.pending() {
+					continue
+				}
 			}
+			evs := live.take()
 			err := w.call(sctx, http.MethodPost, workerAPI+"/leases/"+url.PathEscape(lease.LeaseID)+"/heartbeat",
-				schemas.WorkerHeartbeat{WorkerID: w.opts.WorkerID}, nil)
+				schemas.WorkerHeartbeat{WorkerID: w.opts.WorkerID, Events: evs}, nil)
 			if sctx.Err() != nil {
 				return
 			}
 			if err == nil {
 				last = time.Now()
 				continue
+			}
+			if !errors.Is(err, schemas.ErrLeaseGone) {
+				live.putBack(evs) // display only, but kept for the next beat while the lease may still be ours
 			}
 			mapped := err
 			switch {
