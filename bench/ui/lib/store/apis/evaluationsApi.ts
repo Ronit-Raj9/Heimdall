@@ -107,6 +107,10 @@ export interface Evaluation {
 	children: EvaluationChild[];
 	created_at: string;
 	created_by?: string;
+	/** Run control: the evaluation whose failures this one reruns (exploratory, never counted). */
+	rerun_of?: string;
+	/** Run control: every running benchmark is paused. */
+	paused?: boolean;
 }
 
 /** GET /evaluation-packs item. */

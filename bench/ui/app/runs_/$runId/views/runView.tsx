@@ -1,4 +1,5 @@
 import { RunCodeScanPanel } from "@/components/codescan/codeScanPanel"; // X4
+import { RunActions } from "@/components/experiments/runControls"; // run control: cancel or requeue one run
 import { compareSearch } from "@/components/experiments/legacyRoutes";
 import { HardwarePanel } from "@/components/gpu/hardwarePanel"; // X7
 import { RunReceiptPanel } from "@/components/receipts/runReceiptPanel";
@@ -181,7 +182,14 @@ export default function RunView({ runId }: { runId: string }) {
           </span>
         }
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <RunActions
+              expId={slot.exp_id}
+              runId={runId}
+              sealed={Boolean(d.sealed)}
+              outcome={d.run?.outcome}
+              superseded={d.superseded}
+            />
             <RunExportMenu runId={runId} sealed={Boolean(d.sealed)} />
             {slot.pair_id ? (
               <Button variant="outline" size="sm" asChild>

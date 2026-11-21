@@ -3,6 +3,7 @@ import { TERMINAL_STATES, systemExperiment } from "@/components/experiments/expe
 import { humanExperimentName } from "@/app/experiments/views/experimentBoard";
 import { ExperimentExportMenu } from "@/components/export/exportMenu"; // W10 export
 import { ExperimentRunActions, RegradeAction } from "@/components/platform/experimentActions";
+import { RunControlsPanel } from "@/components/experiments/runControls"; // run control
 import { RunList } from "@/components/runs/runList";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
@@ -177,6 +178,8 @@ export default function ExperimentView({ expId }: { expId: string }) {
 			)}
 
 			{live && <LiveProgress status={st} />}
+
+			{!notStarted && <RunControlsPanel expId={expId} state={st.state} />}
 
 			<RouteTabs tabs={tabs} defaultTab={defaultExperimentTab(arms.length)} label={t("experiments.page.tabsLabel")} testId="experiment-tabs">
 				{(active) =>

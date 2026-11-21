@@ -1,3 +1,4 @@
+import { EvaluationRunActions } from "@/components/experiments/runControls"; // run control: pause, resume, rerun failures
 import { EvaluationStatusPill, ModeLabel } from "@/app/evaluations/views/evaluationWords";
 import { EVALUATION_POLL_MS, armAgentLabel, formatCreated, isActiveStatus, splitChildren } from "@/app/evaluations/views/evaluation.utils";
 import { useConfirm } from "@/components/platform/confirmDialog";
@@ -52,7 +53,12 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 				subtitle={t("detail.subtitle")}
 				breadcrumbs={[{ label: t("detail.crumb"), to: "/evaluations" }, { label: spec.name || evaluation.id }]}
 				meta={<EvaluationStatusPill status={evaluation.status} testId="evaluation-status" />}
-				actions={active ? <CancelButton id={evaluation.id} /> : undefined}
+				actions={
+					<div className="flex flex-wrap items-center gap-2">
+						<EvaluationRunActions evaluation={evaluation} />
+						{active && <CancelButton id={evaluation.id} />}
+					</div>
+				}
 			/>
 			<section className="bg-card flex flex-col gap-4 rounded-xl border p-5" data-testid="evaluation-header">
 				<div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">

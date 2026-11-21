@@ -143,7 +143,7 @@ func (h *RunsHandler) getRun(ctx *fasthttp.RequestCtx) {
 	}
 	id := rv.Run.RunID
 	out := schemas.RunDetail{
-		Slot: rv.Slot, Run: rv.Run, Sealed: rv.Sealed, SealHash: rv.SealHash, GradeSource: GradeSourceOriginal,
+		Slot: rv.Slot, Run: rv.Run, Sealed: rv.Sealed, SealHash: rv.SealHash, Superseded: rv.Superseded, GradeSource: GradeSourceOriginal,
 		Gates: []schemas.GateResult{}, Receipts: []schemas.Receipt{},
 	}
 	if sv, isVerifier := h.index.(SealVerifier); isVerifier && rv.Sealed {
