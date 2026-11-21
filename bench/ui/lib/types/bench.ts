@@ -1625,6 +1625,8 @@ export interface RunListRow {
 	config_id: string;
 	started?: string;
 	sealed_at?: string;
+	/** The first part failure's error of a non-pass run; absent when it recorded none. Inert text. */
+	error?: string;
 	/** Optional run metrics; the list shows a dash when the server leaves them out. */
 	model?: string;
 	steps?: number;

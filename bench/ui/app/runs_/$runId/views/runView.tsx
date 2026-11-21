@@ -24,6 +24,7 @@ import {
   Section,
 } from "@/components/runs/screenStates";
 import { RunExportMenu } from "@/components/runs/runExportMenu";
+import { RunFailureCard } from "@/components/runs/runFailureCard";
 import { RunTraceView } from "@/components/runs/traceView";
 import { formatDuration } from "@/components/runs/traceView.utils";
 import { ScreenReplay, useRunFrames } from "@/components/runs/screenReplay"; // U08 screen replay
@@ -266,6 +267,7 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
   const { run, slot, grade } = detail;
   return (
     <div className="flex flex-col gap-8" data-testid="run-overview">
+      <RunFailureCard run={run} />
       <div className="flex flex-col gap-4" data-testid="run-summary">
         <div className="flex flex-wrap items-center gap-2">
           {detail.sealed ? (

@@ -44,6 +44,7 @@ type RunListRow struct {
 	ConfigID  string          `json:"config_id"`
 	Started   *time.Time      `json:"started,omitempty"`
 	SealedAt  *time.Time      `json:"sealed_at,omitempty"`
+	Error     string          `json:"error,omitempty"` // the first part failure's error of a non-pass run, cut to 600 bytes; empty when none
 }
 
 // RunListFacets are the distinct values of every filter across all runs, so
@@ -238,6 +239,17 @@ func runListRow(rv RunView, suites map[string]suiteFacts) RunListRow {
 	}
 	if t := rv.Run.Timing.Started; !t.IsZero() {
 		row.Started = &t
+	}
+	if rv.Run.Outcome != schemas.OutcomePass {
+		for _, f := range rv.Run.Failures {
+			if msg := strings.TrimSpace(f.Error); msg != "" {
+				if len(msg) > 600 {
+					msg = strings.ToValidUTF8(msg[:600], "")
+				}
+				row.Error = msg
+				break
+			}
+		}
 	}
 	if facts, ok := suites[rv.Slot.Suite]; ok {
 		row.Track = facts.track

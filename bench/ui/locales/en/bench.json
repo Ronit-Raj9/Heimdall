@@ -702,6 +702,39 @@
 		}
 	},
 	"runs": {
+		"failure": {
+			"title": {
+				"start": "The run could not start",
+				"agent": "The run crashed while the agent was working",
+				"grade": "The run crashed while grading",
+				"finish": "The run crashed while finishing up"
+			},
+			"failedAt": "Failed while {{stage}}",
+			"stage": {
+				"planned": "planning the run",
+				"leased": "waiting for a worker",
+				"prepare": "preparing the task's container",
+				"arm": "setting up the agent",
+				"run": "the agent was running",
+				"disarm": "stopping the agent",
+				"export": "exporting the agent's work",
+				"collect": "collecting the results",
+				"grade": "grading the result",
+				"gate": "checking the gates",
+				"measure": "measuring the run",
+				"receipt": "writing receipts",
+				"cleanup": "cleaning up",
+				"seal": "saving the run"
+			},
+			"copy": "Copy error message",
+			"showAll": "Show all",
+			"showLess": "Show less",
+			"hint": {
+				"permission": "A file in the task's container cannot be read. This is a setup problem with the benchmark, not your agent.",
+				"image": "The benchmark's container image is missing on the worker.",
+				"keySlot": "All model key slots were busy; it will retry."
+			}
+		},
 		"title": "Compare runs",
 		"subtitle": "The same task, run by Setup A and Setup B under the same conditions, side by side.",
 		"trace": {

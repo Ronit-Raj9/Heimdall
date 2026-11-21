@@ -15,6 +15,7 @@ import { ChevronLeft, ChevronRight, Gavel, GitCompareArrows, ListX } from "lucid
 import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { useTranslation } from "react-i18next";
 import { OutcomeBadge } from "./outcomeBadge";
+import { INFRA_OUTCOMES, shortReason } from "./runFailure.utils";
 import { BlockSkeleton, LoadError } from "./screenStates";
 
 /** A start time as month, day and time; the year is left out to keep the column narrow. */
@@ -228,7 +229,7 @@ export function RunTable({ rows, showExperiment = true }: { rows: readonly RunLi
 						</TableCell>
 						<TableCell>
 							{row.sealed ? (
-								<OutcomeBadge outcome={row.outcome} testId={`run-row-${row.run_id}-outcome`} />
+								<RowOutcome row={row} />
 							) : (
 								<span className="text-chart-info-ink text-xs">{t("runs.list.inFlight")}</span>
 							)}
@@ -273,6 +274,21 @@ export function RunTable({ rows, showExperiment = true }: { rows: readonly RunLi
 }
 
 /** The run list on a phone: one card per run with the same links, in place of the wide table. */
+/** The outcome badge; an infra error also shows its short reason, with the full first line as a tooltip. */
+export function RowOutcome({ row, testId = true }: { row: RunListRow; testId?: boolean }) {
+	const reason = INFRA_OUTCOMES.includes(row.outcome) ? shortReason(row.error, 80) : "";
+	const badge = <OutcomeBadge outcome={row.outcome} testId={testId ? `run-row-${row.run_id}-outcome` : undefined} />;
+	if (!reason) return badge;
+	return (
+		<span className="flex max-w-56 min-w-0 flex-col items-start gap-0.5" title={shortReason(row.error, 600)}>
+			{badge}
+			<span className="text-muted-foreground w-full truncate text-[11px]" data-testid={`run-row-${row.run_id}-reason`}>
+				{reason}
+			</span>
+		</span>
+	);
+}
+
 function RunCards({ rows, showExperiment }: { rows: readonly RunListRow[]; showExperiment: boolean }) {
 	const { t } = useTranslation("bench");
 	const locale = getLocale();
@@ -286,7 +302,7 @@ function RunCards({ rows, showExperiment }: { rows: readonly RunListRow[]; showE
 				>
 					<div className="flex items-center justify-between gap-2">
 						<EntityLink kind="run" id={row.run_id} />
-						{row.sealed ? <OutcomeBadge outcome={row.outcome} /> : <span className="text-chart-info-ink">{t("runs.list.inFlight")}</span>}
+						{row.sealed ? <RowOutcome row={row} testId={false} /> : <span className="text-chart-info-ink">{t("runs.list.inFlight")}</span>}
 					</div>
 					<div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
 						<span>
