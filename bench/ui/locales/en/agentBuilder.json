@@ -1,0 +1,77 @@
+{
+	"new": {
+		"title": "New agent",
+		"subtitle": "Pick a template, name it, choose a model. You can edit everything later.",
+		"back": "Agents",
+		"step1": "1. Pick a template",
+		"step2": "2. Name and model",
+		"categories": {
+			"cli": "Coding CLIs",
+			"framework": "Frameworks",
+			"starter": "Write your own",
+			"bring-your-own": "Bring your own"
+		},
+		"builds": "Builds an image",
+		"noBuild": "No build",
+		"selected": "Selected",
+		"name": "Agent name",
+		"nameHelp": "Lowercase letters, digits, '.', '_' or '-'. It becomes agents/<name>.yaml.",
+		"nameInvalid": "Use lowercase letters, digits, '.', '_' or '-', starting with a letter or digit.",
+		"model": "Model",
+		"modelHelp": "The model the agent runs on by default. Experiments can still override it.",
+		"onlyProviders": "This template runs only on: {{providers}}",
+		"notes": "Notes (optional)",
+		"notesPlaceholder": "What this agent is for. Saved as a comment at the top of its YAML.",
+		"preview": "Preview YAML",
+		"hidePreview": "Hide preview",
+		"create": "Create agent",
+		"creating": "Creating...",
+		"pickFirst": "Pick a template on the left to continue.",
+		"loadError": "Could not load agent templates",
+		"empty": "This server offers no agent templates.",
+		"willWrite": "Will write {{count}} files",
+		"docs": "Guide: {{docs}}"
+	},
+	"detail": {
+		"back": "Agents",
+		"tabs": {
+			"label": "Agent views",
+			"config": "Config",
+			"checks": "Checks",
+			"tools": "Tools"
+		},
+		"subtitle": "agents/{{id}}.yaml"
+	},
+	"config": {
+		"form": "Form",
+		"yaml": "YAML",
+		"loadError": "Could not load this agent's config",
+		"notFound": "No agents/{{id}}.yaml in this project yet.",
+		"createOne": "Create agent from template",
+		"invalidFile": "The YAML on disk does not validate, so the form is off. Fix it in the YAML view.",
+		"save": "Save",
+		"saving": "Saving...",
+		"saved": "Saved",
+		"validate": "Validate",
+		"valid": "Valid agent config",
+		"reset": "Discard changes",
+		"conflict": "Someone else changed this file. Reload to see their version, then apply your edit again.",
+		"reload": "Reload",
+		"fields": {
+			"adapter": "Adapter",
+			"image": "Image",
+			"model": "Model",
+			"provider": "Gateway provider",
+			"wall_s": "Wall clock limit (s)",
+			"cpus": "CPUs",
+			"mem_gb": "Memory (GB)",
+			"turns": "Turn limit (0 = none)",
+			"remote_url": "Endpoint URL",
+			"a2a_card_url": "Agent card URL",
+			"description": "Description",
+			"env": "Environment",
+			"envHelp": "One KEY=value per line. For the run's model key use the template variable shown here; never paste a real secret.",
+			"argv": "Command"
+		}
+	}
+}
