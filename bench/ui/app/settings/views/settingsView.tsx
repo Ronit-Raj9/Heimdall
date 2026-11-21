@@ -8,9 +8,11 @@ import { PasswordTab } from "@/components/settings/passwordTab";
 import { RunnersTab } from "@/components/settings/runnersTab";
 import { SecretsTab } from "@/components/settings/secretsTab";
 import { EmptyNote } from "@/components/runs/screenStates";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSession } from "@/lib/session/sessionContext";
 import { Building2, Github, KeyRound, LockKeyhole, ScrollText, Server, UserRound, Users } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
 export const SETTINGS_TABS = ["members", "tokens", "secrets", "runners", "github", "audit", "org", "account"] as const;
@@ -45,6 +47,15 @@ export default function SettingsView({ tab, onTabChange }: SettingsViewProps) {
 			<section className="flex flex-col gap-6" data-testid="settings-screen" data-mode="local">
 				<h1 className="text-foreground">{t("settings.localTitle")}</h1>
 				<EmptyNote testId="settings-local">{t("settings.localBody")}</EmptyNote>
+				<div className="flex flex-wrap gap-2" data-testid="settings-local-links">
+					<Button asChild size="sm" variant="outline">
+						<Link to="/models">{tSecrets("localModelsLink")}</Link>
+					</Button>
+					<Button asChild size="sm" variant="outline">
+						<Link to="/workers">{tSecrets("localWorkersLink")}</Link>
+					</Button>
+				</div>
+				<SecretsTab />
 			</section>
 		);
 	}
@@ -53,6 +64,13 @@ export default function SettingsView({ tab, onTabChange }: SettingsViewProps) {
 			<section className="flex flex-col gap-6" data-testid="settings-screen">
 				<h1 className="text-foreground">{t("settings.title")}</h1>
 				<EmptyNote testId="settings-signed-out">{t("settings.notSignedIn")}</EmptyNote>
+				<div>
+					<Button asChild size="sm" data-testid="settings-sign-in">
+						<Link to="/login" search={{ return_to: "/settings" }}>
+							{tSecrets("signIn")}
+						</Link>
+					</Button>
+				</div>
 			</section>
 		);
 	}

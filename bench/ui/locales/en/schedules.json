@@ -73,5 +73,6 @@
 		"run": "Run look",
 		"delete": "Delete",
 		"deleteConfirm": "Delete the definition of canary {{name}}? Its looks and baselines stay."
-	}
+	},
+	"noTickerAction": "Set up a canary instead"
 }

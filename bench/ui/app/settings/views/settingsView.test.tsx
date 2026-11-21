@@ -30,6 +30,15 @@ vi.mock("@/lib/store/apis/accountSafetyApi", async () => {
 	const { mutation: m } = await import("@/lib/testing/render");
 	return { useCreateResetLinkMutation: () => m({}) }; // L22 reset links
 });
+vi.mock("@/lib/store/apis/secretsApi", async () => {
+	const { mutation: m } = await import("@/lib/testing/render");
+	return {
+		useListSecretsQuery: () => ({ data: { secrets: [] }, isLoading: false }),
+		useCreateSecretMutation: () => m({}),
+		useRotateSecretMutation: () => m({}),
+		useDeleteSecretMutation: () => m({}),
+	}; // G15: local settings shows the secrets tab
+});
 vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => {
 	const real = await importOriginal<typeof import("@/lib/store/apis/platformApi")>();
 	const { mutation: m } = await import("@/lib/testing/render");
@@ -89,6 +98,7 @@ describe("SettingsView", () => {
 		expect(html).toContain('data-testid="settings-local"');
 		expect(html).toContain("local mode");
 		expect(html).not.toContain("settings-tab-members");
+		expect(html).toContain('data-testid="settings-local-links"');
 	});
 	it("asks a visitor who is not signed in to sign in", () => {
 		expect(render(<SettingsView tab="members" onTabChange={() => undefined} />, demoSession())).toContain("settings-signed-out");

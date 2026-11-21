@@ -1,3 +1,4 @@
+import { RoleGate } from "@/components/platform/accessNotes";
 import { EmptyState } from "@/components/shell/emptyState";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Button } from "@/components/ui/button";
@@ -116,6 +117,7 @@ export default function UploadView() {
 					/>
 				</label>
 			)}
+			<RoleGate min="member">
 			<DropZone file={file} onFile={pick} disabled={busy} />
 			<div className="flex gap-2">
 				<Button onClick={submit} disabled={!file || busy} isLoading={busy} dataTestId="upload-submit">
@@ -127,6 +129,7 @@ export default function UploadView() {
 					</Button>
 				)}
 			</div>
+			</RoleGate>
 			{error && (
 				<p role="alert" className="text-destructive text-sm" data-testid="upload-error">
 					{error}
@@ -190,7 +193,7 @@ export function UploadResultView({ result }: { result: UploadResult }) {
 function RunsResult({ report }: { report: UploadRunsReport }) {
 	const { t } = useTranslation("upload");
 	const exps = report.experiments ?? [];
-	if (exps.length === 0) return <EmptyState compact message={t("runs.empty")} testId="upload-runs-empty" />;
+	if (exps.length === 0) return <EmptyState compact message={t("runs.empty")} action={{ label: t("runs.openFiles"), to: "/files" }} testId="upload-runs-empty" />;
 	return (
 		<div className="flex flex-col gap-2" data-testid="upload-runs-result">
 			<p className="text-sm font-medium">{t("runs.summary", { imported: report.imported, skipped: report.skipped, refused: report.refused, runs: report.runs })}</p>

@@ -106,5 +106,8 @@
 		"live": "Connected",
 		"offline": "Not connected",
 		"refresh": "Refresh"
-	}
+	},
+	"localAction": "Open Operations",
+	"notAdminAction": "Back to Home",
+	"hostingGuide": "Read the hosting guide"
 }

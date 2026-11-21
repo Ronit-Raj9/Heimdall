@@ -16,7 +16,7 @@ import {
 	useUpdateModelKeyMutation,
 } from "@/lib/store/apis/modelsApi";
 import type { ModelKey, ModelKeyRequest, ModelKeyTestResult, ModelProviderInfo } from "@/lib/types/models";
-import { useSearch } from "@tanstack/react-router";
+import { Link, useSearch } from "@tanstack/react-router";
 import { KeyRound } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
@@ -61,6 +61,12 @@ export default function ModelsView() {
 				<div>
 					<h1 className="text-xl font-semibold">{t("title")}</h1>
 					<p className="text-muted-foreground max-w-2xl text-sm">{t("subtitle")}</p>
+					<p className="text-muted-foreground mt-1 text-xs">
+						{t("secretsHint")}{" "}
+						<Link to="/settings" search={{ tab: "secrets" } as never} className="underline" data-testid="models-secrets-link">
+							{t("secretsLink")}
+						</Link>
+					</p>
 				</div>
 				{isAdmin && models.data?.keys_ready && !form && (
 					<Button size="sm" onClick={() => setForm({ provider: "openai" })} data-testid="models-add">
@@ -74,7 +80,7 @@ export default function ModelsView() {
 			) : models.isError || !models.data ? (
 				<LoadError title={t("loadError")} error={models.error} onRetry={() => void models.refetch()} testId="models-error" />
 			) : !models.data.keys_ready ? (
-				<EmptyState icon={KeyRound} message={t("unavailable")} testId="models-unavailable" />
+				<EmptyState icon={KeyRound} message={t("unavailable")} action={{ label: t("unavailableAction"), to: "/docs", search: { doc: "hosting" } }} testId="models-unavailable" />
 			) : (
 				<>
 					{form && (
@@ -93,8 +99,8 @@ export default function ModelsView() {
 						!form && (
 							<EmptyState
 								icon={KeyRound}
-								message={t("empty")}
-								action={isAdmin ? { label: t("add"), onClick: () => setForm({ provider: "openai" }) } : undefined}
+								message={isAdmin ? t("empty") : t("emptyViewer")}
+								action={isAdmin ? { label: t("add"), onClick: () => setForm({ provider: "openai" }) } : { label: t("emptyViewerAction"), to: "/experiments" }}
 								testId="models-empty"
 							/>
 						)

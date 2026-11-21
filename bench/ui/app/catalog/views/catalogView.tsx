@@ -3,6 +3,7 @@ import { EmptyState } from "@/components/shell/emptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useAddCatalogEntryMutation, useGetBenchCatalogQuery } from "@/lib/store/apis/catalogApi";
 import type { CatalogAddResponse, CatalogEntry, CatalogKind } from "@/lib/types/catalog";
 import { Link } from "@tanstack/react-router";
@@ -57,9 +58,17 @@ export interface CatalogBodyProps {
 const FILTERS: CatalogFilter[] = ["all", "example", "bundled", "importer"];
 const FILTER_KEY = { all: "filterAll", example: "filterExample", bundled: "filterBundled", importer: "filterImporter" } as const;
 
+/** Where an installed entry lives: its suite page, else the agents or suites list. */
+export function installedHref(e: CatalogEntry): string {
+	const suite = e.suite_id ?? e.suites?.[0];
+	if (suite) return `/suites/${encodeURIComponent(suite)}`;
+	return (e.agents?.length ?? 0) > 0 ? "/agents" : "/suites";
+}
+
 /** The catalog screen without data fetching (tested directly). */
 export function CatalogBody(props: CatalogBodyProps) {
 	const { t } = useTranslation("catalog");
+	const canWrite = canUse(useSession(), "member");
 	const shown = filterEntries(props.entries, props.filter, props.query);
 	const res = props.lastAdded?.result;
 	return (
@@ -75,7 +84,10 @@ export function CatalogBody(props: CatalogBodyProps) {
 			</div>
 			{!props.sourceAvailable && (
 				<div className="border-chart-warning/60 rounded border p-3 text-sm" data-testid="catalog-no-source">
-					{t("noSource")}
+					{t("noSource")}{" "}
+					<a className="underline" href="/upload">
+						{t("noSourceAction")}
+					</a>
 				</div>
 			)}
 			<div className="flex flex-wrap items-center gap-2">
@@ -91,7 +103,7 @@ export function CatalogBody(props: CatalogBodyProps) {
 					</Button>
 				))}
 				<Input
-					className="ml-auto w-64"
+					className="w-full sm:ml-auto sm:w-64"
 					placeholder={t("search")}
 					value={props.query}
 					onChange={(ev) => props.onQuery(ev.target.value)}
@@ -199,17 +211,27 @@ export function CatalogBody(props: CatalogBodyProps) {
 							<div className="mt-auto flex items-center justify-between gap-2 pt-2">
 								<span className="text-muted-foreground text-xs">{e.track}</span>
 								{e.installed ? (
-									<Badge variant="success" data-testid={`catalog-installed-${e.id}`}>
-										{t("installed")}
-									</Badge>
-								) : !e.available ? (
-									<span className="text-muted-foreground text-xs" title={e.hint}>
-										{t("unavailable")}
+									<span className="flex items-center gap-2">
+										<Badge variant="success" data-testid={`catalog-installed-${e.id}`}>
+											{t("installed")}
+										</Badge>
+										<a className="text-xs underline" href={installedHref(e)} data-testid={`catalog-open-${e.id}`}>
+											{t("open")}
+										</a>
 									</span>
-								) : (
+								) : !e.available ? (
+									<span className="text-muted-foreground flex flex-col items-end text-right text-xs" title={e.hint} data-testid={`catalog-unavailable-${e.id}`}>
+										{t("unavailable")}
+										<a className="underline" href="/docs?doc=bring-your-own">
+											{t("unavailableAction")}
+										</a>
+									</span>
+								) : canWrite ? (
 									<Button size="sm" disabled={props.busyId === e.id} onClick={() => props.onAdd(e)} data-testid={`catalog-add-${e.id}`} title={e.hint}>
 										{props.busyId === e.id ? t("adding") : e.kind === "importer" ? t("import") : t("add")}
 									</Button>
+								) : (
+									<span className="text-muted-foreground text-xs">{t("memberOnly")}</span>
 								)}
 							</div>
 						</div>

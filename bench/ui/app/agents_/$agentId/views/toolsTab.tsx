@@ -1,3 +1,4 @@
+import { RoleGate } from "@/components/platform/accessNotes";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Badge } from "@/components/ui/badge";
@@ -114,9 +115,11 @@ function SkillsSection({ id }: { id: string }) {
 							{!s.valid && <Badge variant="destructive">no SKILL.md</Badge>}
 							<span className="ml-auto flex items-center gap-2">
 								<JobRunButton {...scanSkillJob(s.path)} label="Scan" variant="outline" />
-								<Button size="sm" variant="ghost" onClick={() => void del(s.name)} data-testid={`agent-skill-delete-${s.name}`}>
-									Delete
-								</Button>
+								<RoleGate min="member" fallback={null}>
+									<Button size="sm" variant="ghost" onClick={() => void del(s.name)} data-testid={`agent-skill-delete-${s.name}`}>
+										Delete
+									</Button>
+								</RoleGate>
 							</span>
 						</li>
 					))}
@@ -129,6 +132,7 @@ function SkillsSection({ id }: { id: string }) {
 			{data && data.skills.length > 0 && !data.installed && (
 				<p className="text-xs text-amber-600">The config does not list {data.dir} in skills.extra, so runs do not install these skills yet. Upload again or add it in the Config tab.</p>
 			)}
+			<RoleGate min="member">
 			<div className="flex flex-wrap items-end gap-3">
 				<Field label="Skill zip">
 					<input type="file" accept=".zip,application/zip" onChange={(e) => pick(e.target.files?.[0] ?? null)} data-testid="agent-skill-file" />
@@ -144,6 +148,7 @@ function SkillsSection({ id }: { id: string }) {
 					{uploading ? "Uploading..." : "Upload skill"}
 				</Button>
 			</div>
+			</RoleGate>
 			{file && problem && <p className="text-destructive text-xs">{problem}</p>}
 			{message && (
 				<p className={message.ok ? "text-xs text-green-700" : "text-destructive text-xs"} data-testid="agent-skill-message">
@@ -221,9 +226,11 @@ function MCPSection({ id }: { id: string }) {
 					</Field>
 					<ServerList data={data} />
 					<div className="flex flex-wrap items-center gap-3">
-						<Button disabled={!dirty || saving} onClick={() => void submit()} data-testid="agent-mcp-save">
-							{saving ? "Saving..." : "Save"}
-						</Button>
+						<RoleGate min="member">
+							<Button disabled={!dirty || saving} onClick={() => void submit()} data-testid="agent-mcp-save">
+								{saving ? "Saving..." : "Save"}
+							</Button>
+						</RoleGate>
 						{data && data.servers.length > 0 && !dirty && <JobRunButton {...scanMCPJob(data.servers_file)} label="Scan MCP servers" variant="outline" />}
 						{dirty && <span className="text-muted-foreground text-xs">Save before scanning.</span>}
 					</div>

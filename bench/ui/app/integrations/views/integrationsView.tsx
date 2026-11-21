@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useGetAgentsQuery, useGetSuitesQuery, useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import {
 	apiErrorMessage,
@@ -29,6 +30,7 @@ import type {
 	WebhookEventType,
 } from "@/lib/types/integrations";
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
 declare module "@/lib/i18n/resources" {
@@ -101,6 +103,9 @@ function ErrorNote({ message, testId }: { message: string; testId?: string }) {
 
 function WebhooksPanel() {
 	const { t } = useTranslation("integrations");
+	const session = useSession();
+	const isAdmin = canUse(session, "admin");
+	const canTest = canUse(session, "member");
 	const { data, error, isLoading } = useListWebhooksQuery();
 	const [createHook, create] = useCreateWebhookMutation();
 	const [updateHook] = useUpdateWebhookMutation();
@@ -128,7 +133,12 @@ function WebhooksPanel() {
 	return (
 		<Section title={t("webhooks.heading")} intro={t("webhooks.intro")}>
 			{data?.hosted && <p className="text-muted-foreground text-xs">{t("webhooks.hostedNote")}</p>}
-			<form
+			{!isAdmin && (
+				<p className="text-muted-foreground text-sm" data-testid="webhooks-admin-only">
+					{t("errors.adminOnly")}
+				</p>
+			)}
+			{isAdmin && <form
 				className="grid gap-2 sm:grid-cols-[2fr_1fr_auto]"
 				onSubmit={(e) => {
 					e.preventDefault();
@@ -159,7 +169,7 @@ function WebhooksPanel() {
 						</label>
 					))}
 				</fieldset>
-			</form>
+			</form>}
 			{secret && (
 				<div className="border-chart-warning/60 bg-chart-warning/10 flex flex-wrap items-center gap-2 rounded-md border p-3 text-sm" data-testid="webhook-secret">
 					<span>{t("webhooks.secretOnce")}</span>
@@ -176,6 +186,8 @@ function WebhooksPanel() {
 				<WebhookList
 					hooks={data?.webhooks ?? []}
 					tests={tests}
+					canEdit={isAdmin}
+					canTest={canTest}
 					onTest={async (id) => {
 						const res = await testHook(id);
 						if ("data" in res && res.data) setTests((cur) => ({ ...cur, [id]: res.data }));
@@ -202,12 +214,16 @@ export interface WebhookListProps {
 	onTest(id: string): void;
 	onToggle(h: Webhook): void;
 	onDelete(h: Webhook): void;
+	/** Admins toggle and delete; others only read. Default true. */
+	canEdit?: boolean;
+	/** Members send a test delivery. Default true. */
+	canTest?: boolean;
 }
 
 /** The org's webhooks with their last delivery and actions. */
-export function WebhookList({ hooks, tests = {}, onTest, onToggle, onDelete }: WebhookListProps) {
+export function WebhookList({ hooks, tests = {}, onTest, onToggle, onDelete, canEdit = true, canTest = true }: WebhookListProps) {
 	const { t } = useTranslation("integrations");
-	if (hooks.length === 0) return <EmptyState compact message={t("webhooks.empty")} testId="webhooks-empty" />;
+	if (hooks.length === 0) return <EmptyState compact message={canEdit ? t("webhooks.empty") : t("webhooks.emptyViewer")} testId="webhooks-empty" />;
 	return (
 		<ul className="divide-border flex flex-col divide-y" data-testid="webhook-list">
 			{hooks.map((h) => {
@@ -231,15 +247,21 @@ export function WebhookList({ hooks, tests = {}, onTest, onToggle, onDelete }: W
 							{h.description ? ` · ${h.description}` : ""}
 						</div>
 						<div className="flex flex-wrap gap-2">
-							<Button size="sm" variant="outline" onClick={() => onTest(h.id)} data-testid={`webhook-test-${h.id}`}>
-								{t("webhooks.test")}
-							</Button>
-							<Button size="sm" variant="outline" onClick={() => onToggle(h)}>
-								{h.enabled ? t("webhooks.disable") : t("webhooks.enable")}
-							</Button>
-							<Button size="sm" variant="ghost" onClick={() => onDelete(h)}>
-								{t("webhooks.delete")}
-							</Button>
+							{canTest && (
+								<Button size="sm" variant="outline" onClick={() => onTest(h.id)} data-testid={`webhook-test-${h.id}`}>
+									{t("webhooks.test")}
+								</Button>
+							)}
+							{canEdit && (
+								<Button size="sm" variant="outline" onClick={() => onToggle(h)}>
+									{h.enabled ? t("webhooks.disable") : t("webhooks.enable")}
+								</Button>
+							)}
+							{canEdit && (
+								<Button size="sm" variant="ghost" onClick={() => onDelete(h)}>
+									{t("webhooks.delete")}
+								</Button>
+							)}
 						</div>
 						{test && (
 							<p className={test.ok ? "text-chart-success-ink text-xs" : "text-chart-error-ink text-xs"} data-testid={`webhook-test-result-${h.id}`}>
@@ -268,6 +290,7 @@ export function exportParams(format: IntegrationExportFormat, expId: string, sui
 
 function ExportsPanel() {
 	const { t } = useTranslation("integrations");
+	const canWrite = canUse(useSession(), "member");
 	const exps = useListExperimentsQuery();
 	const suites = useGetSuitesQuery();
 	const files = useListExportsQuery(undefined, { pollingInterval: 5000 });
@@ -353,6 +376,7 @@ function ExportsPanel() {
 				) : (
 					<ExportTable
 						exports={files.data?.exports ?? []}
+						canDelete={canWrite}
 						onDelete={async (name) => {
 							if (!window.confirm(t("exports.deleteConfirm", { name }))) return;
 							const res = await deleteExport(name);
@@ -372,11 +396,12 @@ function formatBytes(n: number): string {
 }
 
 /** The export files with download links. */
-export function ExportTable({ exports, onDelete }: { exports: IntegrationExport[]; onDelete(name: string): void }) {
+export function ExportTable({ exports, onDelete, canDelete = true }: { exports: IntegrationExport[]; onDelete(name: string): void; canDelete?: boolean }) {
 	const { t } = useTranslation("integrations");
 	if (exports.length === 0) return <EmptyState compact message={t("exports.empty")} testId="exports-empty" />;
 	return (
-		<table className="w-full text-sm" data-testid="export-table">
+		<div className="overflow-x-auto">
+		<table className="w-full min-w-[32rem] text-sm" data-testid="export-table">
 			<thead className="text-muted-foreground text-left text-xs">
 				<tr>
 					<th className="py-1">{t("exports.name")}</th>
@@ -401,14 +426,17 @@ export function ExportTable({ exports, onDelete }: { exports: IntegrationExport[
 									{t("exports.download")}
 								</a>
 							</Button>
-							<Button size="sm" variant="ghost" onClick={() => onDelete(x.name)}>
-								{t("exports.delete")}
-							</Button>
+							{canDelete && (
+								<Button size="sm" variant="ghost" onClick={() => onDelete(x.name)}>
+									{t("exports.delete")}
+								</Button>
+							)}
 						</td>
 					</tr>
 				))}
 			</tbody>
 		</table>
+		</div>
 	);
 }
 
@@ -421,7 +449,10 @@ function prUrl(r: CIInstallResult | undefined): string | undefined {
 
 function CIPanel() {
 	const { t } = useTranslation("integrations");
-	const repos = useListGithubReposQuery();
+	const session = useSession();
+	const hosted = session.authMode === "hosted";
+	const isAdmin = canUse(session, "admin");
+	const repos = useListGithubReposQuery(undefined, { skip: !hosted });
 	const agents = useGetAgentsQuery();
 	const [mode, setMode] = useState<"recorded" | "live">("recorded");
 	const [agent, setAgent] = useState("");
@@ -429,7 +460,7 @@ function CIPanel() {
 	const [copied, setCopied] = useState(false);
 	const preview = useGetCIWorkflowQuery({ mode, agent: mode === "live" ? agent || undefined : undefined }, { skip: mode === "live" && !agent });
 	const [install, installState] = useInstallCIMutation();
-	const notConnected = Boolean(repos.error);
+	const notConnected = !hosted || Boolean(repos.error);
 	const ready = repo.includes("/") && (mode === "recorded" || agent);
 
 	const open = async () => {
@@ -440,7 +471,16 @@ function CIPanel() {
 	return (
 		<Section title={t("ci.heading")} intro={t("ci.intro")}>
 			{notConnected && (
-				<EmptyState compact message={t("ci.notConnected")} action={{ label: t("tabs.ci"), to: "/settings" }} testId="ci-not-connected" />
+				<EmptyState
+					compact
+					message={hosted ? t("ci.notConnected") : t("ci.localNote")}
+					action={
+						hosted
+							? { label: t("ci.connect"), to: "/settings", search: { tab: "github" } }
+							: { label: t("ci.readGuide"), to: "/docs", search: { doc: "ci" } }
+					}
+					testId="ci-not-connected"
+				/>
 			)}
 			<div className="grid gap-3 sm:grid-cols-3">
 				<label className="flex flex-col gap-1 text-sm">
@@ -477,9 +517,17 @@ function CIPanel() {
 			</div>
 			{!notConnected && repos.data && repos.data.length === 0 && <p className="text-muted-foreground text-sm">{t("ci.noRepos")}</p>}
 			<div className="flex flex-wrap items-center gap-2">
-				<Button disabled={!ready || notConnected || installState.isLoading} onClick={() => void open()} data-testid="ci-open-pr">
+				<Button disabled={!ready || notConnected || !isAdmin || installState.isLoading} onClick={() => void open()} data-testid="ci-open-pr">
 					{installState.isLoading ? t("ci.opening") : t("ci.open")}
 				</Button>
+				{hosted && !isAdmin && (
+					<span className="text-muted-foreground text-xs" data-testid="ci-admin-only">
+						{t("ci.adminOnly")}{" "}
+						<Link to="/docs" search={{ doc: "ci" } as never} className="underline">
+							{t("ci.readGuide")}
+						</Link>
+					</span>
+				)}
 				{installState.isSuccess && (
 					<span className="text-sm" data-testid="ci-pr-opened">
 						{t("ci.opened")}{" "}

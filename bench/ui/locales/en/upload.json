@@ -26,13 +26,14 @@
 	"failed": "Upload failed. Check the zip and try again.",
 	"runs": {
 		"summary": "{{imported}} imported, {{skipped}} skipped, {{refused}} refused ({{runs}} sealed runs)",
-		"empty": "The zip held no experiment folder.",
+		"empty": "The zip held no experiment folder. To upload agents or suites, pick the Project folder tab instead.",
 		"openExperiments": "Open experiments",
 		"status": {
 			"imported": "imported",
 			"skipped": "skipped",
 			"refused": "refused"
-		}
+		},
+		"openFiles": "Open project files"
 	},
 	"files": {
 		"summary": "{{written}} written, {{refused}} refused, {{skipped}} skipped",

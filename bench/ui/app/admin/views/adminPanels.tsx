@@ -40,7 +40,7 @@ function useGate(state: { isLoading: boolean; error?: unknown; refetch: () => un
 	if (state.error) {
 		const status = errorStatus(state.error);
 		if (unavailable && (status === 404 || status === 405 || status === 503)) {
-			return <EmptyState compact message={unavailable} testId={`${testId}-unavailable`} />;
+			return <EmptyState compact message={unavailable} action={{ label: t("hostingGuide"), to: "/docs", search: { doc: "hosting" } }} testId={`${testId}-unavailable`} />;
 		}
 		return (
 			<EmptyState

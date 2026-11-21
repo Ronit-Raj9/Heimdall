@@ -3,6 +3,7 @@ import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState, PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useCreateAgentFromTemplateMutation, useGetAgentTemplatesQuery } from "@/lib/store/apis/agentBuilderApi";
 import type { AgentTemplate, TemplateCategory } from "@/lib/types/agentBuilder";
@@ -27,6 +28,7 @@ export function defaultAgentName(t: AgentTemplate): string {
  */
 export default function NewAgentView() {
 	const { t } = useTranslation("agentBuilder");
+	const canWrite = canUse(useSession(), "member");
 	const navigate = useNavigate();
 	const query = useGetAgentTemplatesQuery();
 	const [templateId, setTemplateId] = useQueryState("template", parseAsString.withOptions({ history: "replace" }));
@@ -85,7 +87,7 @@ export default function NewAgentView() {
 			) : query.isError ? (
 				<LoadError title={t("new.loadError")} error={query.error} onRetry={() => void query.refetch()} testId="agents-new-error" />
 			) : templates.length === 0 ? (
-				<EmptyState icon={Bot} message={t("new.empty")} testId="agents-new-empty" />
+				<EmptyState icon={Bot} message={t("new.empty")} action={{ label: t("new.emptyAction"), to: "/upload" }} testId="agents-new-empty" />
 			) : (
 				<div className="grid min-w-0 grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]">
 					<div className="flex min-w-0 flex-col gap-5">
@@ -194,14 +196,19 @@ export default function NewAgentView() {
 										{getBenchErrorMessage(error)}
 									</p>
 								)}
-								<div className="flex flex-wrap gap-2">
+								{!canWrite && (
+									<p className="text-muted-foreground text-xs" data-testid="agents-new-role-note">
+										{t("new.memberOnly")}
+									</p>
+								)}
+								{canWrite && <div className="flex flex-wrap gap-2">
 									<Button type="submit" disabled={!nameOk || missingParam || createState.isLoading} data-testid="agent-create">
 										{createState.isLoading ? t("new.creating") : t("new.create")}
 									</Button>
 									<Button type="button" variant="outline" disabled={!nameOk || missingParam} onClick={() => void onPreview()}>
 										{preview !== null ? t("new.hidePreview") : t("new.preview")}
 									</Button>
-								</div>
+								</div>}
 								{preview !== null && (
 									<pre className="bg-muted max-h-96 overflow-auto rounded-md p-3 font-mono text-xs" data-testid="agent-preview">
 										{preview}

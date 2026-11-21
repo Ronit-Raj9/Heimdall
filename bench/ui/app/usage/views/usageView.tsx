@@ -92,9 +92,9 @@ export default function UsageView() {
 				)}
 			</div>
 			{platform ? (
-				<AdminUsageBody data={admin.data} loading={admin.isLoading} error={admin.error} />
+				<AdminUsageBody data={admin.data} loading={admin.isLoading} error={admin.error} onRetry={() => void admin.refetch()} />
 			) : (
-				<UsageBody data={org.data} loading={org.isLoading} error={org.error} />
+				<UsageBody data={org.data} loading={org.isLoading} error={org.error} onRetry={() => void org.refetch()} />
 			)}
 		</div>
 	);
@@ -142,13 +142,20 @@ export interface UsageBodyProps {
 	data?: UsageReport;
 	loading?: boolean;
 	error?: unknown;
+	onRetry?: () => void;
 }
 
 /** The org report: totals, chart, table and provider keys. Pure, so it renders in tests. */
-export function UsageBody({ data, loading, error }: UsageBodyProps) {
+export function UsageBody({ data, loading, error, onRetry }: UsageBodyProps) {
 	const { t } = useTranslation("usage");
 	if (error) {
-		return <EmptyState message={t("error", { message: getBenchErrorMessage(error) })} testId="usage-error" />;
+		return (
+			<EmptyState
+				message={t("error", { message: getBenchErrorMessage(error) })}
+				action={onRetry ? { label: t("retry"), onClick: onRetry } : undefined}
+				testId="usage-error"
+			/>
+		);
 	}
 	if (loading || !data) {
 		return <div className="bg-muted h-48 animate-pulse rounded-lg" data-testid="usage-loading" />;
@@ -363,14 +370,21 @@ export interface AdminUsageBodyProps {
 	data?: AdminUsageReport;
 	loading?: boolean;
 	error?: unknown;
+	onRetry?: () => void;
 }
 
 /** Platform usage per org (server admins). L23's admin page can embed it too. */
-export function AdminUsageBody({ data, loading, error }: AdminUsageBodyProps) {
+export function AdminUsageBody({ data, loading, error, onRetry }: AdminUsageBodyProps) {
 	const { t } = useTranslation("usage");
 	if (error) {
 		const msg = errorStatus(error) === 403 ? t("admin.forbidden") : t("error", { message: getBenchErrorMessage(error) });
-		return <EmptyState message={msg} testId="admin-usage-error" />;
+		return (
+			<EmptyState
+				message={msg}
+				action={errorStatus(error) !== 403 && onRetry ? { label: t("retry"), onClick: onRetry } : undefined}
+				testId="admin-usage-error"
+			/>
+		);
 	}
 	if (loading || !data) {
 		return <div className="bg-muted h-48 animate-pulse rounded-lg" data-testid="admin-usage-loading" />;

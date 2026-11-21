@@ -1,4 +1,6 @@
+import { RoleGate } from "@/components/platform/accessNotes";
 import { PageHeader } from "@/components/shell";
+import { canUse, useSession } from "@/lib/session/sessionContext";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,7 +98,10 @@ export function SchedulesBody({ data, busy, onSave }: SchedulesBodyProps) {
 		<div className="flex min-w-0 flex-col gap-6">
 			{!data.ticker && (
 				<p className="text-muted-foreground text-xs" data-testid="schedules-no-ticker">
-					{t("noTicker")}
+					{t("noTicker")}{" "}
+					<a href="/canaries" className="underline">
+						{t("noTickerAction")}
+					</a>
 				</p>
 			)}
 			<Section title={t("title")} testId="schedules-list">
@@ -111,7 +116,9 @@ export function SchedulesBody({ data, busy, onSave }: SchedulesBodyProps) {
 				)}
 			</Section>
 			<Section title={t("add.title")} testId="schedules-add">
-				<AddScheduleForm busy={busy} onAdd={(s) => saveWith({ schedules: [...(file.schedules ?? []), s] })} />
+				<RoleGate min="member">
+					<AddScheduleForm busy={busy} onAdd={(s) => saveWith({ schedules: [...(file.schedules ?? []), s] })} />
+				</RoleGate>
 			</Section>
 			<Section title={t("alerts.title")} description={t("alerts.description")} testId="schedules-alerts">
 				<AlertsEditor
@@ -128,6 +135,7 @@ export function SchedulesBody({ data, busy, onSave }: SchedulesBodyProps) {
 
 function ScheduleTable({ rows, onRemove, busy }: { rows: ScheduleRow[]; onRemove(name: string): void; busy: boolean }) {
 	const { t } = useTranslation("schedules");
+	const canWrite = canUse(useSession(), "member");
 	const [run, runState] = useRunScheduleMutation();
 	const [note, setNote] = useState<string | null>(null);
 	const runNow = async (name: string) => {
@@ -138,7 +146,8 @@ function ScheduleTable({ rows, onRemove, busy }: { rows: ScheduleRow[]; onRemove
 	};
 	return (
 		<div className="flex flex-col gap-2">
-			<table className="w-full text-sm" data-testid="schedules-table">
+			<div className="overflow-x-auto">
+			<table className="w-full min-w-[40rem] text-sm" data-testid="schedules-table">
 				<thead className="text-muted-foreground text-left text-xs">
 					<tr>
 						<th>{t("table.name")}</th>
@@ -174,10 +183,10 @@ function ScheduleTable({ rows, onRemove, busy }: { rows: ScheduleRow[]; onRemove
 								{r.max_usd_per_day ? ` / ${r.max_usd_per_day.toFixed(2)}` : ""}
 							</td>
 							<td className="flex gap-2 py-2">
-								<Button size="sm" variant="outline" disabled={runState.isLoading} onClick={() => void runNow(r.name)} data-testid={`schedule-run-${r.name}`}>
+								{canWrite && <Button size="sm" variant="outline" disabled={runState.isLoading} onClick={() => void runNow(r.name)} data-testid={`schedule-run-${r.name}`}>
 									{t("runNow")}
-								</Button>
-								{r.source === "web" ? (
+								</Button>}
+								{!canWrite ? null : r.source === "web" ? (
 									<Button size="sm" variant="ghost" disabled={busy} onClick={() => onRemove(r.name)} data-testid={`schedule-remove-${r.name}`}>
 										{t("remove")}
 									</Button>
@@ -189,6 +198,7 @@ function ScheduleTable({ rows, onRemove, busy }: { rows: ScheduleRow[]; onRemove
 					))}
 				</tbody>
 			</table>
+			</div>
 			{note && (
 				<p className="text-xs" data-testid="schedules-run-note">
 					{note}

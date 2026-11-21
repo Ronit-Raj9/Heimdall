@@ -32,7 +32,12 @@
 	"colTested": "Last tested",
 	"noBudget": "no limit",
 	"overBudget": "over budget",
-	"status": { "untested": "untested", "ok": "works", "invalid": "refused", "error": "error" },
+	"status": {
+		"untested": "untested",
+		"ok": "works",
+		"invalid": "refused",
+		"error": "error"
+	},
 	"defaultModel": "Default model: {{model}} ({{provider}})",
 	"noDefault": "No default model yet: add a key and press Test.",
 	"providersTitle": "Providers",
@@ -46,5 +51,10 @@
 		"noKey": "No key for this provider yet",
 		"addKey": "Add key",
 		"custom": "Type a model id"
-	}
+	},
+	"unavailableAction": "Read the hosting guide",
+	"emptyViewer": "No model keys yet. Ask an org admin to add one; meanwhile you can browse sealed experiments.",
+	"emptyViewerAction": "Open experiments",
+	"secretsHint": "Tool credentials (search APIs, MCP servers) live under secrets.",
+	"secretsLink": "Manage secrets"
 }

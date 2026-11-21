@@ -1,7 +1,11 @@
 {
 	"title": "Integrations",
 	"subtitle": "Send results to the tools you already use: CI on every pull request, trace and results exports, and webhooks when an experiment finishes.",
-	"tabs": { "ci": "CI", "exports": "Exports", "webhooks": "Webhooks" },
+	"tabs": {
+		"ci": "CI",
+		"exports": "Exports",
+		"webhooks": "Webhooks"
+	},
 	"ci": {
 		"heading": "Gate pull requests with Heimdall",
 		"intro": "Opens a pull request in your repository that adds .github/workflows/heimdall.yml. The workflow re-checks your agent on every pull request and comments the verdict. No secret is written into the file.",
@@ -19,7 +23,11 @@
 		"copy": "Copy",
 		"copied": "Copied",
 		"notConnected": "Connect GitHub first: Settings > GitHub. Until then you can copy the workflow below into your repository by hand.",
-		"noRepos": "GitHub is connected but no repository is visible. Check the access you granted, then reload."
+		"noRepos": "GitHub is connected but no repository is visible. Check the access you granted, then reload.",
+		"connect": "Connect GitHub",
+		"readGuide": "Read the CI guide",
+		"localNote": "Opening a pull request from here needs hosted mode with GitHub connected. In local mode, copy the workflow below into .github/workflows/heimdall.yml by hand.",
+		"adminOnly": "Opening the pull request needs the org admin role; you can still copy the workflow below."
 	},
 	"exports": {
 		"heading": "Export results and traces",
@@ -78,7 +86,8 @@
 		"lastOk": "last delivery OK",
 		"lastFail": "last delivery failed",
 		"never": "never delivered",
-		"deliveries": "Recent deliveries"
+		"deliveries": "Recent deliveries",
+		"emptyViewer": "No webhook yet. An org admin can add one here."
 	},
 	"errors": {
 		"load": "Could not load this section. Reload the page; if it keeps failing, check that the server is running.",

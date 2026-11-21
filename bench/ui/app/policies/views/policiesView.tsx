@@ -1,5 +1,7 @@
 import { PolicyForm, starterPolicy } from "@/components/govern/policyForm";
+import { RoleGate, RoleNote } from "@/components/platform/accessNotes";
 import { LoadError } from "@/components/runs/screenStates";
+import { canUse, useSession } from "@/lib/session/sessionContext";
 import { PageHeader } from "@/components/shell";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +29,7 @@ import { useTranslation } from "react-i18next";
 /** The release policy editor: every policies/*.yaml on the left, a form or YAML editor on the right. */
 export default function PoliciesView() {
 	const { t } = useTranslation("govern");
+	const canWrite = canUse(useSession(), "member");
 	const [file, setFile] = useQueryState("file", parseAsString);
 	const [creating, setCreating] = useState(false);
 	const list = useListPoliciesQuery();
@@ -43,10 +46,12 @@ export default function PoliciesView() {
 				title={t("policies.title")}
 				subtitle={t("policies.subtitle")}
 				actions={
-					<Button onClick={startNew} data-testid="policies-new">
-						<FilePlus2 className="size-4" aria-hidden="true" />
-						{t("policies.new")}
-					</Button>
+					<RoleGate min="member" fallback={null}>
+						<Button onClick={startNew} data-testid="policies-new">
+							<FilePlus2 className="size-4" aria-hidden="true" />
+							{t("policies.new")}
+						</Button>
+					</RoleGate>
 				}
 			/>
 			{list.isLoading ? (
@@ -57,7 +62,7 @@ export default function PoliciesView() {
 				<EmptyState
 					icon={ShieldCheck}
 					message={t("policies.empty")}
-					action={{ label: t("policies.createDefault"), onClick: startNew }}
+					action={canWrite ? { label: t("policies.createDefault"), onClick: startNew } : { label: t("policies.readGuide"), to: "/docs", search: { doc: "releases" } }}
 					testId="policies-empty"
 				/>
 			) : (
@@ -252,6 +257,8 @@ export function PolicyEditor({ isNew, file, initialYAML, initialPolicy, sha256, 
 				</p>
 			)}
 
+			<RoleNote min="member" />
+			<RoleGate min="member" fallback={null}>
 			<div className="flex flex-wrap justify-between gap-2">
 				<div>
 					{!isNew && file && (
@@ -282,6 +289,7 @@ export function PolicyEditor({ isNew, file, initialYAML, initialPolicy, sha256, 
 					</Button>
 				</div>
 			</div>
+			</RoleGate>
 		</div>
 	);
 }

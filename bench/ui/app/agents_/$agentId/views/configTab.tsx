@@ -1,3 +1,4 @@
+import { RoleGate, RoleNote } from "@/components/platform/accessNotes";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Button } from "@/components/ui/button";
@@ -220,10 +221,13 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 					)}
 				</div>
 			)}
+			<RoleNote min="member" />
 			<div className="flex flex-wrap gap-2">
+				<RoleGate min="member" fallback={null}>
 				<Button onClick={() => void onSave()} disabled={!dirty || saveState.isLoading} data-testid="config-save">
 					{saveState.isLoading ? t("config.saving") : t("config.save")}
 				</Button>
+				</RoleGate>
 				<Button variant="outline" onClick={() => void onValidate()} disabled={validateState.isLoading} data-testid="config-validate">
 					{t("config.validate")}
 				</Button>
