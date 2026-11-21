@@ -9,7 +9,7 @@ import { canUse, useSession } from "@/lib/session/sessionContext";
 import { IS_FIXTURE_MODE, useGetHealthQuery } from "@/lib/store";
 import { launchAvailable } from "@/lib/types/bench";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronRight, Menu, Plus } from "lucide-react";
+import { ChevronRight, CircleHelp, Menu, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export interface BenchHeaderProps {
@@ -20,7 +20,7 @@ export interface BenchHeaderProps {
 
 /**
  * Slim top bar: the menu button and mark on a narrow screen, breadcrumbs (section, then page) on
- * the left, and on the right the data mode, the New experiment action, jobs, the theme switch and
+ * the left, and on the right the data mode, the New experiment action, jobs, the help link (the glossary guide), the theme switch and
  * the account menu. The organization lives at the top of the sidebar. In local mode the account
  * part renders nothing. A viewer or demo visitor cannot start experiments, so the action is not
  * offered to them.
@@ -77,6 +77,16 @@ export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
 				</Button>
 			)}
 			<JobsIndicator />
+			<Link
+				to={"/docs" as never}
+				search={{ doc: "glossary" } as never}
+				aria-label={t("shell.help")}
+				title={t("shell.help")}
+				className="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring/60 flex size-8 shrink-0 items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
+				data-testid="header-help"
+			>
+				<CircleHelp className="size-4" aria-hidden="true" />
+			</Link>
 			<span aria-hidden="true" className="bg-border mx-0.5 hidden h-5 w-px sm:block" />
 			<ThemeToggle />
 			<UserMenu />

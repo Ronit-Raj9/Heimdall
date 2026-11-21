@@ -191,6 +191,11 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 /** Groups that start closed for a visitor who has not toggled any group yet. */
 export const DEFAULT_CLOSED_GROUPS: readonly BenchNavGroupId[] = BENCH_NAV_GROUPS.filter((group) => group.defaultClosed).map((group) => group.id);
 
+/** The i18n key of an entry's one-line plain description (bench shell.navHint.*), shown on hover. */
+export function navHintKey(item: BenchNavItem): `shell.navHint.${string}` {
+	return `shell.navHint.${item.labelKey.slice("shell.nav.".length)}`;
+}
+
 /** Every entry in order, for lookups. */
 export const BENCH_NAV: readonly BenchNavItem[] = BENCH_NAV_GROUPS.flatMap((group) => group.items);
 

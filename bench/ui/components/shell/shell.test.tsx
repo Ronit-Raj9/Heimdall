@@ -57,14 +57,14 @@ describe("StatusBadge", () => {
 	});
 	it("gives each decision its word and icon, never green for a regression", () => {
 		const regressed = render(<StatusBadge decision="regressed" />);
-		expect(regressed).toContain("Regressed");
+		expect(regressed).toContain("B is worse");
 		expect(regressed).toContain("text-chart-error-ink");
 		expect(regressed).not.toContain("chart-success");
 		expect(regressed).toContain("<svg");
 		expect(render(<StatusBadge decision="improved" />)).toContain("text-chart-success-ink");
 	});
 	it("shows an unknown value as a neutral badge and an empty decision as no verdict", () => {
-		expect(render(<StatusBadge decision="" />)).toContain("No verdict");
+		expect(render(<StatusBadge decision="" />)).toContain("No result yet");
 		expect(render(<StatusBadge state="paused" />)).toContain(">paused<");
 		expect(isDecision("improved")).toBe(true);
 		expect(isDecision("ship")).toBe(false);

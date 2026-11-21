@@ -16,6 +16,7 @@ export const START_DOC = "web-quickstart";
 /** Guides worth reading first, pinned to the top of the list in this order. */
 const PINNED = [
 	"web-quickstart",
+	"glossary",
 	"web-agents",
 	"web-suites",
 	"web-experiments",
