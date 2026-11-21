@@ -49,7 +49,7 @@ describe("SuiteCards", () => {
 		expect(core).toContain("4 tasks");
 		expect(core).toContain('data-testid="suites-card-coding-core-run"');
 		const acme = card(html, "acme-payments");
-		expect(acme).toMatch(/data-status="needsAdmission">.*2 tasks need admission/);
+		expect(acme).toMatch(/data-status="needsAdmission">.*2 tasks not ready yet/);
 		expect(card(html, "harbor-shell")).not.toContain("Reward file");
 		expect(card(html, "harbor-shell")).not.toContain("digest not pinned");
 		expect(core).not.toContain("probes");
@@ -58,7 +58,7 @@ describe("SuiteCards", () => {
 	it("shows a pack that failed to load with its error and no Run button", () => {
 		const broken = card(html, "acme-broken");
 		expect(broken).toContain('data-state="error"');
-		expect(broken).toContain("Failed to load");
+		expect(broken).toContain("Could not load");
 		expect(broken).toContain("verifier.tests: required field missing");
 		expect(broken).not.toContain("-run");
 	});

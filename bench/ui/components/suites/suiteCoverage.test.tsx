@@ -20,7 +20,7 @@ describe("CapabilityCoverage", () => {
 
 	it("says so when no task names a capability", () => {
 		const tasks = suite("coding-core").tasks.map((task) => ({ ...task, capabilities: [] }));
-		expect(renderToStaticMarkup(<CapabilityCoverage tasks={tasks} />)).toContain("No task in this suite names a capability.");
+		expect(renderToStaticMarkup(<CapabilityCoverage tasks={tasks} />)).toContain("No task in this benchmark names a skill.");
 	});
 });
 
@@ -39,6 +39,6 @@ describe("ProbeList", () => {
 		const families = [...html.matchAll(/data-testid="suites-probe-family-(\w+)"/g)].map((m) => m[1]);
 		expect(families).toEqual(["unavailable_model", "broken_tool", "misleading_instruction"]);
 		expect(html).toMatch(/data-testid="suites-probe-family-broken_tool"[\s\S]*?test-crash[\s\S]*?tool shim/);
-		expect(html).toContain("goal-preserving");
+		expect(html).toContain("still solvable");
 	});
 });

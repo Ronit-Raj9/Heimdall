@@ -23,14 +23,14 @@ describe("LockKindBadge", () => {
 	it("shows a fingerprinted lock in the good tone", () => {
 		const html = renderToStaticMarkup(<LockKindBadge kind="fingerprinted" testId="kind" />);
 		expect(html).toContain('data-tone="good"');
-		expect(html).toContain("Fingerprinted lock");
+		expect(html).toContain("Frozen with fingerprints");
 	});
 
 	it("shows a legacy lock with the hint to add fingerprints", () => {
 		const html = renderToStaticMarkup(<LockKindBadge kind="legacy" testId="kind" />);
 		expect(html).toContain('data-tone="warn"');
-		expect(html).toContain("Legacy lock");
-		expect(html).toContain("Evaluator settings are not bound; run suite lock to add fingerprints.");
+		expect(html).toContain("Frozen (older format)");
+		expect(html).toContain("Grader settings are not fingerprinted. Freeze again to add fingerprints.");
 	});
 
 	it("shows nothing for an unlocked suite", () => {
@@ -39,10 +39,10 @@ describe("LockKindBadge", () => {
 
 	it("sits beside the lock state in the suite facts", () => {
 		expect(renderToStaticMarkup(<SuiteFacts suite={suite("coding-core")} />)).toMatch(
-			/data-testid="suites-facts-lock-kind" data-tone="good">.*Fingerprinted lock/,
+			/data-testid="suites-facts-lock-kind" data-tone="good">.*Frozen with fingerprints/,
 		);
 		expect(renderToStaticMarkup(<SuiteFacts suite={{ ...suite("coding-core"), lock_kind: "legacy" }} />)).toMatch(
-			/data-testid="suites-facts-lock-kind" data-tone="warn">.*Legacy lock/,
+			/data-testid="suites-facts-lock-kind" data-tone="warn">.*Frozen \(older format\)/,
 		);
 		expect(renderToStaticMarkup(<SuiteFacts suite={suite("harbor-shell")} />)).not.toContain("suites-facts-lock-kind");
 	});
@@ -52,7 +52,7 @@ describe("FingerprintDriftNotice", () => {
 	it("lists each drift with its scope, id, part and fields", () => {
 		const html = renderToStaticMarkup(<FingerprintDriftNotice suite={suite("acme-payments")} />);
 		expect(html).toContain('role="alert"');
-		expect(html).toContain("Lock fingerprint drift");
+		expect(html).toContain("Files no longer match the frozen version");
 		expect(html).toMatch(/data-testid="suites-fingerprint-drift-suite-acme-payments-settings">suite acme-payments: settings \(verifier\)</);
 		expect(html).toMatch(/data-testid="suites-fingerprint-drift-task-p02-files">task p02: files</);
 	});

@@ -6,32 +6,42 @@
 	"tasks_other": "{{count}} tasks",
 	"status": {
 		"ready": "Ready",
-		"needsAdmission_one": "{{count}} task needs admission",
-		"needsAdmission_other": "{{count}} tasks need admission",
-		"needsLock": "Needs re-lock",
+		"needsAdmission_one": "{{count}} task not ready yet",
+		"needsAdmission_other": "{{count}} tasks not ready yet",
+		"needsLock": "Needs re-freezing",
 		"noTasks": "No tasks yet",
-		"error": "Failed to load"
+		"error": "Could not load"
 	},
 	"stats": {
 		"tasks": "Tasks",
-		"admitted": "Admitted",
-		"probes": "Probes",
-		"lastRun": "Runs recorded",
-		"never": "None yet"
+		"admitted": "Ready to use",
+		"probes": "Stress tests",
+		"lastRun": "Runs so far",
+		"never": "None yet",
+		"admittedValue": "{{ready}} of {{total}}",
+		"admittedHint": "Ready means Heimdall checked the task is fair: a correct solution passes and an agent that does nothing fails. Only ready tasks are used in tests.",
+		"tasksHint": "One task is one job the agent must do, checked automatically.",
+		"probesHint": "Harder versions of the tasks: a model outage, a trick instruction, a fake secret.",
+		"lastRunHint": "How many single attempts at a task have been recorded for this benchmark."
 	},
 	"tabs": {
 		"tasks": "Tasks",
 		"settings": "Settings",
 		"health": "Health",
-		"tiers": "Tiers",
-		"calibration": "Calibration",
-		"ops": "Admission & ops",
-		"edit": "Edit",
-		"export": "Import/Export"
+		"tiers": "Difficulty levels",
+		"calibration": "Grader accuracy",
+		"ops": "Readiness & tools",
+		"edit": "Edit files",
+		"export": "Import / Export"
 	},
 	"details": "Details",
-	"detailsHint": "Image, lock, verifier and probes",
+	"detailsHint": "Environment, grader, frozen version and stress tests",
 	"tasksTitle": "Tasks",
-	"tasksDescription": "Click a task to see its details and checks.",
-	"subtitle": "Benchmark packs you can run against any agent."
+	"tasksDescription": "Each row is one job the agent must do. Click a task to see what the agent is asked and how it is checked.",
+	"subtitle": "Each benchmark is a set of tasks. Pick one and press Run to test an agent.",
+	"pageSubtitle_one": "A set of {{count}} task that tests {{skill}}. Press Run to test an agent.",
+	"pageSubtitle_other": "A set of {{count}} tasks that test {{skill}}. Press Run to test an agent.",
+	"skillFallback": "an agent's skills",
+	"moreColumns": "More columns",
+	"fewerColumns": "Fewer columns"
 }
