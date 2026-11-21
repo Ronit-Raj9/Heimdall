@@ -129,7 +129,8 @@ func TestCanaryCreateAndDelete(t *testing.T) {
 
 func TestFireJobFor(t *testing.T) {
 	c := schedule.Schedule{Name: "canary-x", Experiment: "canaries/x.yaml"}
-	if k, p := FireJobFor(c, true); k != "canary.run" || !strings.Contains(string(p), `"x"`) {
+	// Hosted canary schedules fire through schedule.fire too (gap G14: lock, cap and alerts).
+	if k, p := FireJobFor(c, true); k != KindScheduleFire || !strings.Contains(string(p), `"canary-x"`) {
 		t.Fatalf("hosted canary: %s %s", k, p)
 	}
 	if k, _ := FireJobFor(c, false); k != KindScheduleFire {

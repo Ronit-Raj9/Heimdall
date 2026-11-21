@@ -55,7 +55,7 @@ func TestRunnerJobArgv(t *testing.T) {
 }
 
 func TestRunnerJobNoRunnerFailsFast(t *testing.T) {
-	spec, ok := hostedSpec("gpu.check")
+	spec, ok := runnerJobHostedSpec("gpu.check")
 	if !ok {
 		t.Fatal("gpu.check hosted variant missing")
 	}
@@ -164,7 +164,7 @@ func TestRunnerJobCollect(t *testing.T) {
 	_ = schemas.LeaseKindJob
 }
 
-func hostedSpec(kind string) (jobKindSpec, bool) {
+func runnerJobHostedSpec(kind string) (jobKindSpec, bool) {
 	jobKindsMu.Lock()
 	defer jobKindsMu.Unlock()
 	for _, k := range jobKinds {

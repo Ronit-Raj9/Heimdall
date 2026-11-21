@@ -463,7 +463,30 @@ func buildOpenAPI(registered map[string][]string, version string, mode schemas.M
 	g := newSchemaGen()
 	g.hosted = hosted
 	paths := map[string]map[string]any{}
-	for method, list := range registered {
+	// Walk methods and paths in a fixed order: the first type to claim a
+	// component name keeps it, so map order would make the document (and the
+	// generated clients) differ from run to run.
+	methods := make([]string, 0, len(registered))
+	for method := range registered {
+		methods = append(methods, method)
+	}
+	rank := map[string]int{"GET": 0, "POST": 1, "PUT": 2, "PATCH": 3, "DELETE": 4}
+	slices.SortFunc(methods, func(a, b string) int {
+		ra, oka := rank[a]
+		rb, okb := rank[b]
+		if !oka {
+			ra = 9
+		}
+		if !okb {
+			rb = 9
+		}
+		if ra != rb {
+			return ra - rb
+		}
+		return strings.Compare(a, b)
+	})
+	for _, method := range methods {
+		list := registered[method] // registration order, which is fixed
 		for _, p := range list {
 			if !strings.HasPrefix(p, "/api/") {
 				continue

@@ -123,7 +123,7 @@ func TestJobKindsValidateParamsAndConfinePaths(t *testing.T) {
 	_ = hosted
 	for kind, params := range map[string]string{"agent.build": `{"agent":"agents/x.yaml"}`,
 		"monitor.certify": `{"monitor":"m.yaml","exp_ids":["e1"]}`, "scan.mcp": `{"path":"x.yaml"}`} {
-		spec, ok := hostedSpec(kind)
+		spec, ok := runnerJobHostedSpec(kind)
 		if !ok {
 			t.Fatalf("%s: no hosted variant", kind)
 		}

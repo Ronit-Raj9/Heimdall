@@ -281,7 +281,7 @@ func TestCLIJobsUseServerConfig(t *testing.T) {
 		"export.run":        `{"format":"csv","exp_id":"exp_1"}`,
 	}
 	for kind, raw := range cases {
-		s := localSpec(t, kind)
+		s := evidenceLocalSpec(t, kind)
 		log := &opLog{}
 		if _, err := s.Run(context.Background(), env, &jobs.Job{Kind: kind, Params: json.RawMessage(raw)}, log, func(any) {}); err != nil {
 			t.Fatalf("%s: %v", kind, err)
@@ -293,7 +293,7 @@ func TestCLIJobsUseServerConfig(t *testing.T) {
 	}
 }
 
-func localSpec(t *testing.T, kind string) jobKindSpec {
+func evidenceLocalSpec(t *testing.T, kind string) jobKindSpec {
 	t.Helper()
 	jobKindsMu.Lock()
 	defer jobKindsMu.Unlock()

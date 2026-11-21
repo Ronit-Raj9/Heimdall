@@ -1005,7 +1005,7 @@ class Behaviour(TypedDict):
     retries_per_run: Change
 
 
-BenchCatalogAdd = TypedDict('BenchCatalogAdd', {'force': "bool", 'from': "str", 'ids': "List[str]", 'limit': "int", 'set': "Dict[str, str]", 'suite': "str"}, total=False)
+BenchCatalogAdd = TypedDict('BenchCatalogAdd', {'force': "bool", 'from': "str", 'ids': "List[str]", 'limit': "int", 'set': "Dict[str, str]", 'suite': "str", 'url': "str"}, total=False)
 
 
 class _BenchCatalogAddedRequired(TypedDict):
@@ -1016,6 +1016,9 @@ class _BenchCatalogAddedRequired(TypedDict):
 class BenchCatalogAdded(_BenchCatalogAddedRequired, total=False):
     job: Optional[Job]
     result: Optional[AddResult]
+
+
+BenchCatalogDataset = TypedDict('BenchCatalogDataset', {'entry': "str", 'from': "str", 'size': "int", 'zip': "bool"}, total=False)
 
 
 class BenchCatalogList(TypedDict):
@@ -2099,7 +2102,11 @@ class _EntryRequired(TypedDict):
 class Entry(_EntryRequired, total=False):
     agents: List[str]
     benchmarks: List[str]
+    data_note: str
+    dataset_path: str
     extra: Dict[str, str]
+    fetch_allowed: bool
+    fetch_url: str
     grading: str
     hint: str
     importer: str
@@ -2110,6 +2117,7 @@ class Entry(_EntryRequired, total=False):
     suites: List[str]
     tags: List[str]
     track: str
+    upload_expects: str
 
 
 class _Entry_projectfsRequired(TypedDict):
@@ -2909,6 +2917,7 @@ class _InboxWebhookInfoRequired(TypedDict):
 
 
 class InboxWebhookInfo(_InboxWebhookInfoRequired, total=False):
+    ingest_tokens: bool
     max_bytes: int
     next: str
     problem: str
@@ -3014,12 +3023,27 @@ class Job(_JobRequired, total=False):
     target: str
 
 
+class JobComplete(TypedDict, total=False):
+    error: str
+
+
 class _JobCreateRequired(TypedDict):
     kind: str
 
 
 class JobCreate(_JobCreateRequired, total=False):
     params: Any
+
+
+class _JobLeaseRequired(TypedDict):
+    argv: List[str]
+    job_id: str
+    job_kind: str
+
+
+class JobLease(_JobLeaseRequired, total=False):
+    collect: List[str]
+    files: str
 
 
 class _JobListRequired(TypedDict):
@@ -3200,6 +3224,7 @@ class _LeaseCredentialsRequired(TypedDict):
 
 class LeaseCredentials(_LeaseCredentialsRequired, total=False):
     exp_id: str
+    secrets: Dict[str, str]
 
 
 class _LineRequired(TypedDict):
@@ -4186,6 +4211,32 @@ class ProviderCredential(_ProviderCredentialRequired, total=False):
     models: List[str]
 
 
+class _PullCheckRequired(TypedDict):
+    configured: bool
+    ready: bool
+    secrets: List[PullSecret]
+    steps: List[PullStep]
+
+
+class PullCheck(_PullCheckRequired, total=False):
+    judge: Optional[PullJudge]
+
+
+class _PullJudgeRequired(TypedDict):
+    key_ready: bool
+
+
+class PullJudge(_PullJudgeRequired, total=False):
+    link: str
+    next: str
+
+
+class PullReadiness(TypedDict):
+    hosted: bool
+    inbox: PullCheck
+    live: PullCheck
+
+
 class _PullResultRequired(TypedDict):
     alerts: List[str]
     at: str
@@ -4208,6 +4259,19 @@ class PullResult(_PullResultRequired, total=False):
     pruned: int
     unchecked: int
     warnings: List[str]
+
+
+PullSecret = TypedDict('PullSecret', {'for': "str", 'name': "str", 'set': "bool"}, total=False)
+
+
+class _PullStepRequired(TypedDict):
+    action: str
+    problem: str
+
+
+class PullStep(_PullStepRequired, total=False):
+    link: str
+    secret: str
 
 
 class QuarantineRequest(TypedDict):
@@ -4827,6 +4891,7 @@ class RunEvidenceContract(_RunEvidenceContractRequired, total=False):
 
 class RunGatewayInfo(TypedDict, total=False):
     key_slot: str
+    org_key_id: str
     session_id: str
     virtual_key_id: str
 
@@ -5132,6 +5197,11 @@ class Schedule(_ScheduleRequired, total=False):
     timezone: str
 
 
+class ScheduleLimits(TypedDict):
+    max_schedules: int
+    min_interval_min: int
+
+
 class _ScheduleRowRequired(TypedDict):
     cron: str
     experiment: str
@@ -5171,7 +5241,7 @@ class SchedulesPut(TypedDict, total=False):
     yaml: str
 
 
-class SchedulesResponse(TypedDict):
+class _SchedulesResponseRequired(TypedDict):
     events: List[str]
     file: File
     hosted: bool
@@ -5180,6 +5250,10 @@ class SchedulesResponse(TypedDict):
     secrets: List[str]
     ticker: bool
     yaml: str
+
+
+class SchedulesResponse(_SchedulesResponseRequired, total=False):
+    limits: Optional[ScheduleLimits]
 
 
 class ScriptedSpec(TypedDict):
@@ -6121,12 +6195,16 @@ class UploadFilesReport(TypedDict):
     written: List[UploadedFile]
 
 
-class UploadRunsReport(TypedDict):
+class _UploadRunsReportRequired(TypedDict):
     experiments: List[ImportedExperiment]
     imported: int
     refused: int
     runs: int
     skipped: int
+
+
+class UploadRunsReport(_UploadRunsReportRequired, total=False):
+    index_warning: str
 
 
 class _UploadedFileRequired(TypedDict):
@@ -6580,10 +6658,15 @@ class _WorkerCompleteRequired(TypedDict):
 class WorkerComplete(_WorkerCompleteRequired, total=False):
     gateway: Optional[GatewayManifest]
     images: Optional[RunnerImages]
+    job: Optional[JobComplete]
 
 
-class WorkerHeartbeat(TypedDict):
+class _WorkerHeartbeatRequired(TypedDict):
     worker_id: str
+
+
+class WorkerHeartbeat(_WorkerHeartbeatRequired, total=False):
+    logs: List[str]
 
 
 class _WorkerInfoRequired(TypedDict):
@@ -6621,6 +6704,8 @@ class _WorkerLeaseRequired(TypedDict):
 
 class WorkerLease(_WorkerLeaseRequired, total=False):
     gpus: List[str]
+    job: Optional[JobLease]
+    kind: str
 
 
 class WorkerLeaseRequest(TypedDict):
@@ -6719,6 +6804,10 @@ class AwarenessReportResponse(AwarenessReport):
 
 
 class BenchCatalogAddedResponse(BenchCatalogAdded):
+    mode: Mode
+
+
+class BenchCatalogDatasetResponse(BenchCatalogDataset):
     mode: Mode
 
 
@@ -6985,6 +7074,10 @@ class ProjectFileVersionsResponse(ProjectFileVersions):
 
 
 class ProjectManifestResponse(ProjectManifest):
+    mode: Mode
+
+
+class PullReadinessResponse(PullReadiness):
     mode: Mode
 
 
@@ -7348,6 +7441,7 @@ __all__ = [
     'Behaviour',
     'BenchCatalogAdd',
     'BenchCatalogAdded',
+    'BenchCatalogDataset',
     'BenchCatalogList',
     'BiasAdjustedRate',
     'BifrostFeatures',
@@ -7527,7 +7621,9 @@ __all__ = [
     'IntegrationExportList',
     'InvitationInfo',
     'Job',
+    'JobComplete',
     'JobCreate',
+    'JobLease',
     'JobList',
     'JudgeAudit',
     'JudgeCalibrationPolicy',
@@ -7631,7 +7727,12 @@ __all__ = [
     'ProjectFileVersions',
     'ProjectManifest',
     'ProviderCredential',
+    'PullCheck',
+    'PullJudge',
+    'PullReadiness',
     'PullResult',
+    'PullSecret',
+    'PullStep',
     'QuarantineRequest',
     'QuarantineResult',
     'QuickRunModel',
@@ -7713,6 +7814,7 @@ __all__ = [
     'RunnerWhoami',
     'RunnersList',
     'Schedule',
+    'ScheduleLimits',
     'ScheduleRow',
     'ScheduleRunResponse',
     'ScheduleSpec',
@@ -7857,6 +7959,7 @@ __all__ = [
     'AuthInfoResponse',
     'AwarenessReportResponse',
     'BenchCatalogAddedResponse',
+    'BenchCatalogDatasetResponse',
     'BenchCatalogListResponse',
     'CIWorkflowPreviewResponse',
     'CalibrationItemResponse',
@@ -7924,6 +8027,7 @@ __all__ = [
     'ProjectFileSavedResponse',
     'ProjectFileVersionsResponse',
     'ProjectManifestResponse',
+    'PullReadinessResponse',
     'PullResultResponse',
     'QuarantineResultResponse',
     'QuickRunResponseResponse',
