@@ -7,6 +7,7 @@ import { useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { inboxApi } from "@/lib/store/apis/inboxApi";
 import {
+	liveinboxApi,
 	useCreateInboxTokenMutation,
 	useGetInboxTokensQuery,
 	useGetInboxWebhookQuery,
@@ -14,7 +15,8 @@ import {
 } from "@/lib/store/apis/liveinboxApi";
 import { roleAtLeast } from "@/lib/store/apis/session";
 import { useAppDispatch } from "@/lib/store/hooks";
-import type { InboxTokenCreated, InboxTokenList, InboxWebhookInfo } from "@/lib/types/liveinbox";
+import type { InboxSourceParams, InboxTokenCreated, InboxTokenList, InboxWebhookInfo, PullCheck } from "@/lib/types/liveinbox";
+import { PullSteps } from "@/components/inbox/pullSteps";
 import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -25,17 +27,140 @@ export function generateInboxToken(random: (a: Uint8Array) => Uint8Array = (a) =
 	return Array.from(random(new Uint8Array(32)), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** "Pull now" for the inbox: queues inbox.pull over every pull source of inbox/sources.yaml. */
-export function InboxPullButton({ hosted }: { hosted?: boolean }) {
+/** "Pull now" for the inbox: queues inbox.pull over every pull source of inbox/sources.yaml. Hosted and local alike; while a pull still needs a source or a secret it links to the setup below. */
+export function InboxPullButton({ check }: { check?: PullCheck }) {
 	const { t } = useTranslation("liveinbox");
-	if (hosted) {
+	if (check && !check.ready) {
 		return (
-			<p className="text-muted-foreground max-w-prose text-xs" data-testid="inbox-hosted-pull">
-				{t("inbox.pull.hosted")}
-			</p>
+			<a href="#inbox-source-setup" className="text-primary text-xs font-medium underline underline-offset-2" data-testid="inbox-pull-setup-link">
+				{t("inbox.pull.needsSetup")}
+			</a>
 		);
 	}
 	return <InboxPullControls />;
+}
+
+/** Builds inbox.source params from the form; null while a required field is empty. Exported for tests. */
+export function inboxSourceParams(v: InboxSourceParams): InboxSourceParams | null {
+	const p: InboxSourceParams = { name: v.name.trim(), kind: v.kind };
+	const set = (k: keyof InboxSourceParams) => {
+		const x = (v[k] ?? "").trim();
+		if (x) (p as unknown as Record<string, string>)[k] = x;
+	};
+	if (!p.name) return null;
+	if (v.kind === "bifrost") {
+		set("url");
+		set("token_env");
+		if (!p.url) return null;
+	} else if (v.kind === "langfuse") {
+		set("host");
+		set("public_key_env");
+		set("secret_key_env");
+		set("project");
+		if (!p.host || !p.public_key_env || !p.secret_key_env) return null;
+	} else {
+		set("host");
+		set("api_key_env");
+		set("project");
+		if (!p.host || !p.api_key_env || !p.project) return null;
+	}
+	return p;
+}
+
+const SOURCE_DEFAULTS: Record<InboxSourceParams["kind"], InboxSourceParams> = {
+	bifrost: { name: "gateway", kind: "bifrost", url: "", token_env: "BIFROST_ADMIN_TOKEN" },
+	langfuse: { name: "langfuse", kind: "langfuse", host: "https://cloud.langfuse.com", public_key_env: "LANGFUSE_PUBLIC_KEY", secret_key_env: "LANGFUSE_SECRET_KEY", project: "" },
+	langsmith: { name: "langsmith", kind: "langsmith", host: "https://api.smith.langchain.com", api_key_env: "LANGSMITH_API_KEY", project: "" },
+};
+
+/** The pull setup: what is missing (with links to Settings > Secrets) and a form that adds a source to inbox/sources.yaml. */
+export function InboxPullSetup({ check, hosted }: { check?: PullCheck; hosted?: boolean }) {
+	const { t } = useTranslation("liveinbox");
+	const dispatch = useAppDispatch();
+	const [v, setV] = useState<InboxSourceParams>(SOURCE_DEFAULTS.bifrost);
+	const ids = useId();
+	const params = inboxSourceParams(v);
+	const field = (key: keyof InboxSourceParams, label: string, placeholder?: string) => (
+		<label className="flex min-w-48 flex-1 flex-col gap-1 text-xs" htmlFor={`${ids}-${key}`}>
+			<span className="text-foreground font-medium">{label}</span>
+			<input
+				id={`${ids}-${key}`}
+				className="border-input bg-card dark:bg-input/20 h-8 rounded-md border px-2 text-xs shadow-xs outline-none"
+				value={(v[key] as string | undefined) ?? ""}
+				placeholder={placeholder}
+				onChange={(e) => setV({ ...v, [key]: e.target.value })}
+				data-testid={`inbox-source-${key}`}
+			/>
+		</label>
+	);
+	const secretHint = hosted ? t("inbox.source.secretHintHosted") : t("inbox.source.secretHint");
+	const form = (
+		<div className="flex flex-col gap-3 rounded-lg border p-4">
+			<label className="flex flex-col gap-1 text-xs" htmlFor={`${ids}-kind`}>
+				<span className="text-foreground font-medium">{t("inbox.source.kind")}</span>
+				<select
+					id={`${ids}-kind`}
+					className="border-input bg-card dark:bg-input/20 h-8 w-56 rounded-md border px-2 text-xs shadow-xs outline-none"
+					value={v.kind}
+					onChange={(e) => setV(SOURCE_DEFAULTS[e.target.value as InboxSourceParams["kind"]])}
+					data-testid="inbox-source-kind"
+				>
+					<option value="bifrost">Bifrost gateway</option>
+					<option value="langfuse">Langfuse</option>
+					<option value="langsmith">LangSmith</option>
+				</select>
+			</label>
+			<div className="flex flex-wrap gap-3">
+				{field("name", t("inbox.source.name"))}
+				{v.kind === "bifrost" ? field("url", t("inbox.source.url"), "https://gateway.example.com") : field("host", t("inbox.source.host"))}
+				{v.kind !== "bifrost" && field("project", v.kind === "langsmith" ? t("inbox.source.projectId") : t("inbox.source.project"))}
+			</div>
+			<div className="flex flex-wrap gap-3">
+				{v.kind === "bifrost" && field("token_env", t("inbox.source.tokenEnv"))}
+				{v.kind === "langfuse" && field("public_key_env", t("inbox.source.publicKeyEnv"))}
+				{v.kind === "langfuse" && field("secret_key_env", t("inbox.source.secretKeyEnv"))}
+				{v.kind === "langsmith" && field("api_key_env", t("inbox.source.apiKeyEnv"))}
+			</div>
+			<p className="text-muted-foreground text-xs">
+				{secretHint}{" "}
+				{hosted && (
+					<a href="/settings?tab=secrets" className="text-primary font-medium underline underline-offset-2">
+						{t("pull.steps.openSecrets")}
+					</a>
+				)}
+			</p>
+			<div className="flex flex-wrap items-center gap-3">
+				{params ? (
+					<JobRunButton
+						kind="inbox.source"
+						params={params}
+						label={t("inbox.source.submit")}
+						onDone={() => dispatch(liveinboxApi.util.invalidateTags([{ type: "BenchPullReady", id: "INFO" }]))}
+					/>
+				) : (
+					<span className="text-muted-foreground text-xs">{t("inbox.source.incomplete")}</span>
+				)}
+			</div>
+		</div>
+	);
+	const ready = Boolean(check?.ready);
+	return (
+		<div id="inbox-source-setup" className="scroll-mt-4">
+			<Section title={t("inbox.source.title")} description={t("inbox.source.description")} testId="inbox-source-setup">
+				<div className="flex flex-col gap-3">
+					<PullSteps check={check} testId="inbox-pull-steps" />
+					{ready ? (
+						<details>
+							<summary className="text-primary cursor-pointer text-xs font-medium">{t("inbox.source.another")}</summary>
+							<div className="mt-2">{form}</div>
+						</details>
+					) : (
+						form
+					)}
+				</div>
+			</Section>
+		</div>
+	);
 }
 
 function InboxPullControls() {

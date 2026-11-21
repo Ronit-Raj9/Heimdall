@@ -5,7 +5,9 @@ import { Input } from "@/components/ui/input";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
 import { livescoreApi } from "@/lib/store/apis/livescoreApi";
-import type { LiveInitParams, LiveSplit } from "@/lib/types/liveinbox";
+import type { LiveInitParams, LiveSplit, PullCheck } from "@/lib/types/liveinbox";
+import { liveinboxApi } from "@/lib/store/apis/liveinboxApi";
+import { PullSteps } from "@/components/inbox/pullSteps";
 import { JobLogPanel } from "@/components/jobs/jobLogPanel";
 import { useId, useState } from "react";
 import { useAppDispatch } from "@/lib/store/hooks";
@@ -14,18 +16,23 @@ import { useTranslation } from "react-i18next";
 /** Refreshes the Live status once a job has been queued (the job keeps running; the user can refresh again). */
 function useRefreshLive() {
 	const dispatch = useAppDispatch();
-	return () => dispatch(livescoreApi.util.invalidateTags([{ type: "BenchLive", id: "STATUS" }]));
+	return () => {
+		dispatch(livescoreApi.util.invalidateTags([{ type: "BenchLive", id: "STATUS" }]));
+		dispatch(liveinboxApi.util.invalidateTags([{ type: "BenchPullReady", id: "INFO" }]));
+	};
 }
 
 export interface LiveActionsProps {
-	/** True on the hosted server: pulls are refused there, so the pull button is replaced by a note. */
+	/** True on the hosted server: the pull runs there with org secrets and the org's own judge key. */
 	hosted?: boolean;
+	/** What a pull still needs (GET /liveinbox/pull); undefined while loading. */
+	check?: PullCheck;
 	/** True when live scoring is configured; the pull and compare buttons are offered only then. */
 	configured: boolean;
 }
 
 /** Pull and compare as background jobs (livescore.pull, livescore.compare). */
-export function LiveActions({ hosted, configured }: LiveActionsProps) {
+export function LiveActions({ hosted, configured, check }: LiveActionsProps) {
 	const { t } = useTranslation("liveinbox");
 	const refresh = useRefreshLive();
 	const [judge, setJudge] = useState(false);
@@ -34,17 +41,27 @@ export function LiveActions({ hosted, configured }: LiveActionsProps) {
 	return (
 		<Section title={t("live.actions.title")} description={t("live.actions.description")} testId="live-actions">
 			<div className="flex flex-wrap items-center gap-4">
-				{hosted ? (
-					<p className="text-muted-foreground max-w-prose text-xs" data-testid="live-hosted-pull">
-						{t("live.actions.hostedPull")}
-					</p>
+				{check && !check.ready ? (
+					<PullSteps check={check} testId="live-pull-steps" />
 				) : (
-					<span className="flex items-center gap-2">
+					<span className="flex flex-wrap items-center gap-2" data-testid="live-pull">
 						<JobRunButton kind="livescore.pull" params={{ judge }} label={t("live.actions.pull")} onDone={refresh} />
-						<label className="text-muted-foreground flex items-center gap-1 text-xs">
-							<input type="checkbox" checked={judge} onChange={(e) => setJudge(e.target.checked)} data-testid="live-judge" />
-							{t("live.actions.judge")}
-						</label>
+						{(!check || check.judge) && (
+							<label className="text-muted-foreground flex items-center gap-1 text-xs">
+								<input type="checkbox" checked={judge} onChange={(e) => setJudge(e.target.checked)} data-testid="live-judge" />
+								{hosted ? t("live.actions.judgeHosted") : t("live.actions.judge")}
+							</label>
+						)}
+						{judge && check?.judge && !check.judge.key_ready && (
+							<span className="text-xs" data-testid="live-judge-next">
+								{check.judge.next}{" "}
+								{check.judge.link && (
+									<a href={check.judge.link} className="text-primary font-medium underline underline-offset-2">
+										{t("pull.steps.openModels")}
+									</a>
+								)}
+							</span>
+						)}
 					</span>
 				)}
 				<span className="flex items-center gap-2">
@@ -87,7 +104,7 @@ export function liveInitParams(split: LiveSplit, v: Required<Omit<LiveInitParams
 const EMPTY = { url: "", token_env: "", baseline_key: "", candidate_key: "", tag_header: "x-bf-lh-agent-version", baseline_tag: "", candidate_tag: "" };
 
 /** The setup form: queues livescore.init, which writes livescore/config.yaml. */
-export function LiveSetup({ existing }: { existing?: boolean }) {
+export function LiveSetup({ existing, hosted }: { existing?: boolean; hosted?: boolean }) {
 	const { t } = useTranslation("liveinbox");
 	const refresh = useRefreshLive();
 	const [split, setSplit] = useState<LiveSplit>("keys");
@@ -145,8 +162,13 @@ export function LiveSetup({ existing }: { existing?: boolean }) {
 					</div>
 				)}
 				<div className="flex flex-wrap gap-3">
-					{field("url", t("live.setup.url"), t("live.setup.urlHint"), "http://localhost:8080")}
-					{field("token_env", t("live.setup.tokenEnv"), t("live.setup.tokenEnvHint"), "BIFROST_ADMIN_TOKEN")}
+					{field("url", t("live.setup.url"), hosted ? t("live.setup.urlHintHosted") : t("live.setup.urlHint"), hosted ? "https://gateway.example.com" : "http://localhost:8080")}
+					{field(
+						"token_env",
+						hosted ? t("live.setup.tokenEnvHosted") : t("live.setup.tokenEnv"),
+						hosted ? t("live.setup.tokenEnvHintHosted") : t("live.setup.tokenEnvHint"),
+						"BIFROST_ADMIN_TOKEN",
+					)}
 				</div>
 				<label className="text-muted-foreground flex items-center gap-1 text-xs">
 					<input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} data-testid="live-setup-force" />

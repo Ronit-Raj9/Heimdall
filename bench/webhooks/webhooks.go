@@ -333,6 +333,22 @@ func ValidateURL(raw string, allowPrivate bool) error {
 	return nil
 }
 
+// GuardedDialer returns a dialer that refuses, at connect time, every
+// loopback, private, link-local, multicast or unspecified address, so a
+// public name that resolves to an internal address is still refused.
+func GuardedDialer(timeout time.Duration) *net.Dialer {
+	return &net.Dialer{Timeout: timeout, Control: func(_, address string, _ syscall.RawConn) error {
+		host, _, err := net.SplitHostPort(address)
+		if err != nil {
+			return err
+		}
+		if ip := net.ParseIP(host); ip == nil || blockedIP(ip) {
+			return fmt.Errorf("refused to connect to private or local address %s", host)
+		}
+		return nil
+	}}
+}
+
 func blockedIP(ip net.IP) bool {
 	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
 		ip.IsUnspecified() || ip.IsMulticast() || ip.IsInterfaceLocalMulticast()
@@ -428,16 +444,7 @@ func (snd Sender) client() *http.Client {
 	}
 	d := &net.Dialer{Timeout: 5 * time.Second}
 	if !snd.AllowPrivate {
-		d.Control = func(_, address string, _ syscall.RawConn) error {
-			host, _, err := net.SplitHostPort(address)
-			if err != nil {
-				return err
-			}
-			if ip := net.ParseIP(host); ip == nil || blockedIP(ip) {
-				return fmt.Errorf("refused to connect to private or local address %s", host)
-			}
-			return nil
-		}
+		d = GuardedDialer(5 * time.Second)
 	}
 	tr := &http.Transport{DialContext: d.DialContext, TLSHandshakeTimeout: 5 * time.Second, ResponseHeaderTimeout: 10 * time.Second}
 	return &http.Client{Timeout: 10 * time.Second, Transport: tr,

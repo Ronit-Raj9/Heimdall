@@ -22,12 +22,11 @@ import (
 // terminal. Every kind calls the livescore and traceinbox packages in
 // process, the same code the CLI subcommands run.
 //
-// A pull reads a gateway or an observability tool with a credential from the
-// server's environment. The hosted coordinator never does that on behalf of
-// an org (one shared environment, outbound calls from the control plane), so
-// in hosted mode the pull kinds are refused at queue time with a message that
-// says what to do instead. Init and compare only touch the org's own files
-// and run in both modes.
+// A pull reads a gateway or an observability tool with a credential. Local
+// servers read the credential from their environment. The hosted server runs
+// the pull in process (it only makes HTTP calls) with the credential from an
+// org secret and the guardrails of jobs_live_hosted.go. Init and compare only
+// touch the org's own files and run in both modes.
 
 const (
 	jobLiveInit    = "livescore.init"
@@ -35,9 +34,6 @@ const (
 	jobLiveCompare = "livescore.compare"
 	jobInboxPull   = "inbox.pull"
 )
-
-// errHostedPull is the refusal of a pull kind on the hosted server.
-var errHostedPull = errors.New("a pull reads your gateway or trace tool with a credential, which the hosted server does not do: run `bifrost-bench livescore pull` or `bifrost-bench inbox pull` on a machine that can reach it, or push failures to the inbox webhook")
 
 func init() {
 	registerJobKind(jobKindSpec{Kind: jobLiveInit, Local: true, Hosted: true, Validate: validateLiveInit, Run: runLiveInit})
@@ -231,10 +227,7 @@ func runLiveInit(_ context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, _ 
 	return res, nil
 }
 
-func validateLivePull(_ context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
-	if env.Hosted {
-		return nil, "", fmt.Errorf("%w: %v", jobs.ErrInvalidParams, errHostedPull)
-	}
+func validateLivePull(ctx context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
 	var p livePullParams
 	if err := liveDecode(raw, &p); err != nil {
 		return nil, "", err
@@ -242,16 +235,21 @@ func validateLivePull(_ context.Context, env jobEnv, raw json.RawMessage) (any, 
 	if _, err := livescore.LoadConfig(liveConfigPath(env)); err != nil {
 		return nil, "", liveInvalid("%v", err)
 	}
+	if env.Hosted {
+		if err := validateLivePullHosted(ctx, env, p); err != nil {
+			return nil, "", err
+		}
+	}
 	return p, "livescore", nil
 }
 
 func runLivePull(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, _ func(any)) (any, error) {
-	if env.Hosted {
-		return nil, errHostedPull
-	}
 	var p livePullParams
 	if err := liveDecode(j.Params, &p); err != nil {
 		return nil, err
+	}
+	if env.Hosted {
+		return runLivePullHosted(ctx, env, p, log)
 	}
 	s, err := scorerFor(env.App)
 	if err != nil {
@@ -344,10 +342,7 @@ func runLiveCompare(_ context.Context, env jobEnv, j *jobs.Job, log jobs.Logger,
 	return c, nil
 }
 
-func validateInboxPull(_ context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
-	if env.Hosted {
-		return nil, "", fmt.Errorf("%w: %v", jobs.ErrInvalidParams, errHostedPull)
-	}
+func validateInboxPull(ctx context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
 	var p inboxPullParams
 	if err := liveDecode(raw, &p); err != nil {
 		return nil, "", err
@@ -371,23 +366,28 @@ func validateInboxPull(_ context.Context, env jobEnv, raw json.RawMessage) (any,
 	}
 	pullable := 0
 	for _, s := range cfg.Sources {
-		if s.Kind != traceinbox.KindWebhook {
+		if s.Kind != traceinbox.KindWebhook && (!env.Hosted || hostedPullable(s.Kind)) {
 			pullable++
 		}
 	}
 	if pullable == 0 {
-		return nil, "", liveInvalid("no source to pull: add a bifrost, langfuse or langsmith source to inbox/sources.yaml (docs/failure-inbox.md)")
+		return nil, "", liveInvalid("no source to pull: add a bifrost, langfuse or langsmith source with the Add a pull source form (inbox/sources.yaml)")
+	}
+	if env.Hosted {
+		if err := validateInboxPullHosted(ctx, env, p, cfg); err != nil {
+			return nil, "", err
+		}
 	}
 	return p, "inbox", nil
 }
 
 func runInboxPull(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, _ func(any)) (any, error) {
-	if env.Hosted {
-		return nil, errHostedPull
-	}
 	var p inboxPullParams
 	if err := liveDecode(j.Params, &p); err != nil {
 		return nil, err
+	}
+	if env.Hosted {
+		return runInboxPullHosted(ctx, env, p, log)
 	}
 	ib, err := inboxFor(env.App, false)
 	if err != nil {

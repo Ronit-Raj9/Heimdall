@@ -14,4 +14,5 @@ func init() {
 	PlatformPolicy[key("POST", api+"/inbox/tokens")] = org(admin)
 	PlatformPolicy[key("DELETE", api+"/inbox/tokens/{id}")] = org(admin)
 	PlatformPolicy[key("POST", api+"/orgs/{org}/inbox/ingest")] = public() // the handler checks the org's ingest token, rate limited per org
+	OrgPolicy[key("GET", api+"/liveinbox/pull")] = org(viewer)
 }

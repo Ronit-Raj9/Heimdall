@@ -1,11 +1,12 @@
-import type { InboxTokenCreated, InboxTokenList, InboxWebhookInfo } from "@/lib/types/liveinbox";
+import type { InboxTokenCreated, InboxTokenList, InboxWebhookInfo, PullReadiness } from "@/lib/types/liveinbox";
 import { benchApi } from "./benchApi";
 
 /**
  * Web parity lane L18: the inbox webhook setup read. Live and inbox jobs go through POST /jobs.
  * Gap G02: the hosted per-org ingest tokens (list for viewers, create and revoke for admins).
+ * Gap G03: pull readiness.
  */
-export const liveinboxApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchInboxWebhook", "BenchInboxTokens"] }).injectEndpoints({
+export const liveinboxApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchInboxWebhook", "BenchInboxTokens", "BenchPullReady"] }).injectEndpoints({
 	endpoints: (builder) => ({
 		getInboxWebhook: builder.query<InboxWebhookInfo, void>({
 			query: () => "/inbox/webhook",
@@ -23,7 +24,11 @@ export const liveinboxApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchInbo
 			query: (id) => ({ url: `/inbox/tokens/${encodeURIComponent(id)}`, method: "DELETE" }),
 			invalidatesTags: [{ type: "BenchInboxTokens", id: "LIST" }],
 		}),
+		getPullReadiness: builder.query<PullReadiness, void>({
+			query: () => "/liveinbox/pull",
+			providesTags: [{ type: "BenchPullReady", id: "INFO" }],
+		}),
 	}),
 });
 
-export const { useGetInboxWebhookQuery, useGetInboxTokensQuery, useCreateInboxTokenMutation, useRevokeInboxTokenMutation } = liveinboxApi;
+export const { useGetInboxWebhookQuery, useGetInboxTokensQuery, useCreateInboxTokenMutation, useRevokeInboxTokenMutation, useGetPullReadinessQuery } = liveinboxApi;

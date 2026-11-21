@@ -3,7 +3,7 @@ import { ModeBadge } from "@/components/modeBadge";
 import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
-import { useGetInboxWebhookQuery } from "@/lib/store/apis/liveinboxApi";
+import { useGetPullReadinessQuery } from "@/lib/store/apis/liveinboxApi";
 import { useGetLivescoreQuery, usePullLivescoreMutation } from "@/lib/store/apis/livescoreApi";
 import { LiveActions, LiveSetup } from "./liveActions";
 import { useTranslation } from "react-i18next";
@@ -16,9 +16,11 @@ export default function LiveView() {
 	const { t } = useTranslation("bench");
 	const status = useGetLivescoreQuery();
 	const data = status.data;
-	// The webhook setup read also says whether this is the hosted server, where pulls are refused.
-	const hosted = useGetInboxWebhookQuery().data?.hosted ?? false;
+	// The readiness read says whether this is the hosted server and what a pull still needs.
+	const ready = useGetPullReadinessQuery().data;
+	const hosted = ready?.hosted ?? false;
 	const configured = Boolean(data?.configured && !data.problem);
+	const needSetup = !configured || Boolean(ready?.live.steps.some((s) => s.link === "#live-setup"));
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="live-screen">
 			<PageHeader
@@ -32,8 +34,12 @@ export default function LiveView() {
 				<LoadError title={t("live.loadError")} error={status.error} onRetry={() => void status.refetch()} testId="live-error" />
 			) : (
 				<>
-					{data.mode === "live" && <LiveActions configured={configured} hosted={hosted} />}
-					{data.mode === "live" && !configured && <LiveSetup existing={Boolean(data.problem)} />}
+					{data.mode === "live" && <LiveActions configured={configured} hosted={hosted} check={ready?.live} />}
+					{data.mode === "live" && needSetup && (
+						<div id="live-setup" className="scroll-mt-4">
+							<LiveSetup existing={Boolean(data.problem) || configured} hosted={hosted} />
+						</div>
+					)}
 					<LiveBody status={data} actions={data.mode === "live" && !hosted ? <PullButton /> : undefined} />
 				</>
 			)}

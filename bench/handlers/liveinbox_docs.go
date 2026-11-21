@@ -22,4 +22,7 @@ func init() {
 			Summary: "Push one flagged trace (OTLP, Langfuse or chat JSON) into this org's inbox; the org's ingest token, a 1 MiB cap and a per-org rate limit guard it",
 			Status:  fasthttp.StatusCreated, Response: schemas.InboxIngestResult{}},
 	)
+	APIRoutes = append(APIRoutes, RouteDoc{Method: "GET", Path: APIPrefix + "/liveinbox/pull", Tag: "inbox",
+		Summary:  "Whether a live or inbox pull can run now: the credentials it reads (names only, set or not) and each missing step with its link",
+		Response: PullReadiness{}})
 }
