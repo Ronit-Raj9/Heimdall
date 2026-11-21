@@ -28,6 +28,10 @@ func TestApplyLintWaivers(t *testing.T) {
 			t.Errorf("%d %q: severity %s, want %s", i, p.Message, p.Severity, want[i])
 		}
 	}
+	if !SecretWaived(task, SecretFinding{Path: "solution/a.py", Line: 3, Kind: "high-entropy MIN_KEY value", Masked: "min_key=****"}) ||
+		SecretWaived(task, SecretFinding{Path: "solution/a.py", Line: 3, Kind: "OpenAI API key", Masked: "min_key=****"}) {
+		t.Error("SecretWaived")
+	}
 	task.Provenance = nil
 	if out := ApplyLintWaivers("/b/s", task, in); Errors(out) != len(in) {
 		t.Errorf("waived on a task that was not imported: %+v", out)

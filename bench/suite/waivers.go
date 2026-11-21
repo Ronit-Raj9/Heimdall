@@ -69,3 +69,19 @@ func waives(root string, t *schemas.Task, instr string, w schemas.LintWaiver, p 
 	}
 	return false
 }
+
+// SecretWaived reports whether a lint waiver of t covers the secret finding
+// f (path relative to the task folder): only a high-entropy identifier
+// finding, at the waiver's exact file, line and masked value, on an imported
+// task.
+func SecretWaived(t *schemas.Task, f SecretFinding) bool {
+	if t == nil || t.Provenance == nil || t.Provenance.ImportedFrom == "" || !strings.HasPrefix(f.Kind, "high-entropy ") {
+		return false
+	}
+	for _, w := range t.LintWaivers {
+		if w.Rule == schemas.LintRuleHighEntropy && w.Path == f.Path && w.Line == f.Line && w.Match == f.Masked {
+			return true
+		}
+	}
+	return false
+}

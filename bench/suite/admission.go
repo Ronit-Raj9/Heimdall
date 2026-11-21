@@ -410,12 +410,24 @@ func (a *admitter) instructionEdited() schemas.AdmissionCheck {
 // detail names file and line with the value masked.
 func (a *admitter) secretScan() schemas.AdmissionCheck {
 	c := schemas.AdmissionCheck{Name: "secret_scan", Want: wantNoSecrets}
-	findings, err := ScanSecrets(a.t.Dir)
+	all, err := ScanSecrets(a.t.Dir)
 	if err != nil {
 		return failed(c, err)
 	}
+	var findings []SecretFinding
+	waived := 0
+	for _, f := range all {
+		if SecretWaived(a.t, f) {
+			waived++
+			continue
+		}
+		findings = append(findings, f)
+	}
 	if len(findings) == 0 {
 		c.Got, c.Passed = wantNoSecrets, true
+		if waived > 0 {
+			c.Detail = fmt.Sprintf("%d high-entropy identifier finding(s) waived (task.yaml lint_waivers)", waived)
+		}
 		return c
 	}
 	c.Got = fmt.Sprintf("%d findings", len(findings))
