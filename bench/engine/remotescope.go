@@ -64,6 +64,7 @@ func (c *Coordinator) openTo(w *remoteWorker, r *schedRun) bool {
 // infoLocked copies a worker's list entry. The caller holds mu.
 func (c *Coordinator) infoLocked(w *remoteWorker) schemas.WorkerInfo {
 	info := w.info
+	info.Rejected = w.rejected // QC2-08-03: the operator sees how close a worker is to the lease stop
 	info.Running = append([]string{}, info.Running...)
 	sort.Strings(info.Running)
 	if info.Labels != nil {

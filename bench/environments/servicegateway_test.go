@@ -332,3 +332,34 @@ func TestPriceScriptedServiceNeedsWitness(t *testing.T) {
 		}
 	}
 }
+
+// TestProxiedGatewayServiceStaysOffEvalNetwork is QC2-09-05: a proxied
+// service with gateway access never joins the evaluation network the agent
+// runs on; it reaches the gateway through the run's forwarder on its hidden
+// network, and its gateway URL names that forwarder.
+func TestProxiedGatewayServiceStaysOffEvalNetwork(t *testing.T) {
+	docker, logPath := fakeDocker(t)
+	gw := &fakeSvcGateway{}
+	e := newDockerWorkspace(DockerWorkspaceConfig{Docker: docker, HelperImage: "helper:1", EvalNetwork: "bench-evalnet",
+		ServiceGateway: ServiceGatewayConfig{Gateway: gw, AgentURL: "http://bifrost:8080/v1"}})
+	yes := true
+	spec := schemas.ServiceSpec{ID: "summarizer", Role: schemas.ServiceRoleTool, Image: "s:1", Port: 9000, Proxy: &yes,
+		Gateway: &schemas.ServiceGateway{Provider: "openai", Model: "gpt-x", BudgetUSD: 0.5}}
+	rc := serviceRC(t, spec)
+	rc.Run.RunID = "r_gw7"
+	t.Cleanup(func() { e.revokeServiceKeys(context.Background(), "r_gw7") })
+	if u, err := e.serviceGatewayURL(spec); err != nil || u != "http://bench-gateway:9300/v1" {
+		t.Fatalf("gateway url %q %v", u, err)
+	}
+	if err := e.connectGatewayNetwork(t.Context(), rc, spec, serviceContainer("r_gw7", "summarizer")); err != nil {
+		t.Fatal(err)
+	}
+	all := calls(t, logPath)
+	if c := callWith(all, "network connect bench-evalnet", serviceContainer("r_gw7", "summarizer")); c != "" {
+		t.Fatalf("proxied service joined the evaluation network: %s", c)
+	}
+	if callWith(all, "create --name bench-gwf-r_gw7", "--network bench-evalnet", "BENCH_EGRESS_TARGET=bifrost:8080") == "" ||
+		callWith(all, "network connect --alias bench-gateway", hiddenNetwork("r_gw7")) == "" {
+		t.Fatalf("no gateway forwarder on the hidden network in:\n%s", strings.Join(all, "\n"))
+	}
+}

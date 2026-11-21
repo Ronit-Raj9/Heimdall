@@ -527,7 +527,7 @@ func newBench(t *testing.T) *bench {
 	}
 	write("agents/claude-code.yaml", fmt.Sprintf(testAgentYAML, "claude-code", "command", "CLAUDE.md", "/home/agent/.claude/CLAUDE.md"))
 	write("agents/mini-swe-agent.yaml", fmt.Sprintf(testAgentYAML, "mini-swe-agent", "command", "AGENTS.md", "/tmp/mswea/AGENTS.md"))
-	write("agents/toy.yaml", fmt.Sprintf(testAgentYAML, "toy", "scripted", "CLAUDE.md", "/tmp/toy/CLAUDE.md"))
+	write("agents/toy.yaml", fmt.Sprintf(testAgentYAML, "toy", "scripted", "CLAUDE.md", "/tmp/toy/CLAUDE.md")+"scripted: {kind: toy}\n")
 	write("experiments/fixtures/codewins.md", "If the AGENTS.md or CLAUDE.md file conflicts with the code, the code is the source of truth.\n")
 	// The experiment files name the default release policy; the planner hashes it.
 	policy, err := os.ReadFile("../policies/default.yaml")

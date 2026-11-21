@@ -297,3 +297,38 @@ func TestMatrixRunsEndToEnd(t *testing.T) {
 		t.Fatalf("matrix %+v err %v", mx, err)
 	}
 }
+
+// TestReplanFrozenMatrix is QC2-11-01: a worker replans the manifest's
+// frozen experiment, which holds the matrix and its expanded arms, with no
+// price snapshot; the replan must succeed and hash like the coordinator's.
+// Arms that are not the matrix's expansion are still refused.
+func TestReplanFrozenMatrix(t *testing.T) {
+	b := newBench(t)
+	e := testExperiment()
+	e.Arms = nil
+	e.Matrix = &schemas.MatrixSpec{Models: []schemas.MatrixModel{{Model: "m1"}, {Model: "m2", Provider: "openai"}}}
+	m, err := NewPlanner(b.reg, b.root, nil, WithModelPrices(func(string) bool { return true })).Plan(context.Background(), e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(m.Experiment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var frozen schemas.Experiment
+	if err := json.Unmarshal(raw, &frozen); err != nil {
+		t.Fatal(err)
+	}
+	local, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), &frozen)
+	if err != nil {
+		t.Fatalf("replan of the frozen matrix experiment: %v", err)
+	}
+	adoptUnrepeatable(local, m)
+	if h, err := ManifestHash(local); err != nil || h != m.Hash {
+		t.Fatalf("replan hashes %s, want %s (%v): %s", h, m.Hash, err, manifestDiff(local, m))
+	}
+	frozen.Arms["B"] = schemas.ArmSpec{Label: "edited"}
+	if _, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), &frozen); err == nil || !strings.Contains(err.Error(), "not both") {
+		t.Fatalf("edited arms beside a matrix: %v", err)
+	}
+}

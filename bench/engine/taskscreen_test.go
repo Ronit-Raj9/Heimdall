@@ -233,3 +233,32 @@ func TestFrozenReplanKeepsPreFreezeQuarantine(t *testing.T) {
 		t.Fatalf("frozen replan hash %s, frozen %s; differs in %s", h, frozen.Hash, manifestDiff(replan, frozen))
 	}
 }
+
+// TestFrozenReplanCleanCheckoutKeepsQuarantine is QC2-11-05: a worker with
+// the same suite lock but no quarantine sidecar must not add back a task the
+// coordinator's quarantine dropped before the freeze.
+func TestFrozenReplanCleanCheckoutKeepsQuarantine(t *testing.T) {
+	b := screenBench(t)
+	side := filepath.Join(b.suite.Root, schemas.SuiteHealthFileName)
+	data, err := json.Marshal(schemas.SuiteHealthFile{Quarantined: map[string]schemas.TaskQuarantine{"t02": {Reason: "flaky"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(side, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cond := schemas.ConditionSpec{ID: "clean", Tasks: schemas.TaskSelector{All: true}, Trials: 1}
+	frozen := b.plan(t, testExperiment(cond))
+	if err := os.Remove(side); err != nil { // the worker's clean checkout
+		t.Fatal(err)
+	}
+	e := frozen.Experiment
+	replan, err := NewPlanner(b.reg, b.root, nil, WithIgnoreQuarantine()).Plan(WithFrozenTasks(context.Background(), frozen), &e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	adoptUnrepeatable(replan, frozen)
+	if h, err := ManifestHash(replan); err != nil || h != frozen.Hash {
+		t.Fatalf("clean-checkout replan hash %s, frozen %s (%v); differs in %s", h, frozen.Hash, err, manifestDiff(replan, frozen))
+	}
+}

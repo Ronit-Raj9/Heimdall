@@ -91,7 +91,7 @@ func ValidateRouting(cfg *schemas.AgentConfig, gm *schemas.GatewayManifest) erro
 	if provider == "" {
 		bad("gateway.provider is required with gateway.routing")
 	}
-	errs = append(errs, routeShape(pol)...)
+	errs = append(errs, routeShape(pol, provider)...)
 	for _, t := range append(append([]schemas.RouteTarget{}, pol.Targets...), pol.Fallbacks...) {
 		if t.Model == "" {
 			bad("every target and fallback needs a model")
@@ -121,7 +121,9 @@ func ValidateRouting(cfg *schemas.AgentConfig, gm *schemas.GatewayManifest) erro
 }
 
 // routeShape checks the strategy's target and fallback counts and weights.
-func routeShape(pol *schemas.RoutingPolicy) []error {
+// provider is the arm's gateway provider, which a target without its own
+// provider routes to.
+func routeShape(pol *schemas.RoutingPolicy, provider string) []error {
 	var errs []error
 	bad := func(format string, args ...any) { errs = append(errs, fmt.Errorf(format, args...)) }
 	n, f := len(pol.Targets), len(pol.Fallbacks)
@@ -160,17 +162,23 @@ func routeShape(pol *schemas.RoutingPolicy) []error {
 			bad("target weights sum to %s; Bifrost needs 1", strconv.FormatFloat(total, 'g', -1, 64))
 		}
 	}
-	errs = append(errs, routeDuplicates("target", pol.Targets)...)
-	return append(errs, routeDuplicates("fallback", pol.Fallbacks)...)
+	errs = append(errs, routeDuplicates("target", pol.Targets, provider)...)
+	return append(errs, routeDuplicates("fallback", pol.Fallbacks, provider)...)
 }
 
 // routeDuplicates refuses a target listed twice (Bifrost refuses duplicate
 // rule targets; a repeated fallback would only retry the same target).
-func routeDuplicates(what string, ts []schemas.RouteTarget) []error {
+// Targets are compared as the gateway serializes them: an omitted provider
+// is the arm's provider (QC2-11-08).
+func routeDuplicates(what string, ts []schemas.RouteTarget, provider string) []error {
 	seen := map[string]bool{}
 	var errs []error
 	for _, t := range ts {
-		k := strings.ToLower(t.Provider + "|" + t.Model)
+		p := t.Provider
+		if p == "" {
+			p = provider
+		}
+		k := strings.ToLower(strings.TrimSpace(p) + "|" + strings.TrimSpace(t.Model))
 		if seen[k] {
 			errs = append(errs, fmt.Errorf("%s %s is listed twice", what, t.Model))
 		}

@@ -33,9 +33,9 @@ type frozenTasksKey struct{}
 
 // WithFrozenTasks marks ctx as a replan of the frozen manifest m (a remote
 // worker's admission check): with the quarantine screen off
-// (WithIgnoreQuarantine), a quarantined task that m does not use is still
-// dropped from `tasks: all`, since the coordinator dropped it before the
-// freeze, while one quarantined after the freeze stays (2-C-11).
+// (WithIgnoreQuarantine), `tasks: all` keeps only the tasks m uses, since
+// the coordinator dropped the rest before the freeze, whatever this
+// machine's own quarantine sidecar says (2-C-11, QC2-11-05).
 func WithFrozenTasks(ctx context.Context, m *schemas.Manifest) context.Context {
 	used := map[string]bool{}
 	for _, s := range m.Slots {
@@ -63,20 +63,18 @@ func frozenTasks(ctx context.Context) map[string]bool {
 func (p *Planner) screenTasks(ctx context.Context, suite *schemas.Suite, specs []schemas.ConditionSpec, conds []condPlan, warnOnly bool) ([]condPlan, error) {
 	var quarantined map[string]schemas.TaskQuarantine
 	frozen := frozenTasks(ctx)
-	if !p.ignoreQuarantine || frozen != nil {
+	if !p.ignoreQuarantine {
 		q, err := readQuarantine(suite.Root)
 		if err != nil {
 			return nil, err
 		}
 		quarantined = q
 	}
-	if p.ignoreQuarantine && frozen != nil { // a frozen replan: only tasks the freeze itself dropped stay out
-		for id := range quarantined {
-			if frozen[id] {
-				delete(quarantined, id)
-			}
-		}
-	}
+	// A frozen replan (QC2-11-05): `tasks: all` is rebuilt from the
+	// coordinator's frozen selection, so what its quarantine dropped stays
+	// out even when this machine has no sidecar, and a task quarantined here
+	// after the freeze stays in. The local sidecar plays no part.
+	replan := p.ignoreQuarantine && frozen != nil
 	out := make([]condPlan, len(conds))
 	for i, cp := range conds {
 		spec := specFor(specs, cp.id)
@@ -101,6 +99,9 @@ func (p *Planner) screenTasks(ctx context.Context, suite *schemas.Suite, specs [
 				continue
 			}
 			if taskSplit(suite.TaskByID(id)) != split {
+				continue
+			}
+			if replan && !frozen[id] {
 				continue
 			}
 			if isQ {

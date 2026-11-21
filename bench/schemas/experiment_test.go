@@ -76,3 +76,31 @@ func TestBudgetParityIncludesConfiguredAndEffectiveLimits(t *testing.T) {
 		t.Fatalf("declared parity = %+v", parity)
 	}
 }
+
+// TestTaskSelectorObjectFormIsStrict is QC2-11-09: the JSON object form of
+// a task selector refuses unknown keys and a contradictory or empty
+// selection, and still takes exactly one form.
+func TestTaskSelectorObjectFormIsStrict(t *testing.T) {
+	for _, bad := range []string{
+		`{"all": true, "ids": ["t01"]}`,
+		`{"ids": ["t01"], "idz": ["t02"]}`,
+		`{"all": false}`,
+		`{}`,
+	} {
+		var s TaskSelector
+		if err := json.Unmarshal([]byte(bad), &s); err == nil {
+			t.Errorf("%s accepted as %+v", bad, s)
+		}
+	}
+	for in, want := range map[string]TaskSelector{
+		`{"all": true}`:    {All: true},
+		`{"ids": ["t01"]}`: {IDs: []string{"t01"}},
+		`"all"`:            {All: true},
+		`["t01"]`:          {IDs: []string{"t01"}},
+	} {
+		var s TaskSelector
+		if err := json.Unmarshal([]byte(in), &s); err != nil || s.All != want.All || len(s.IDs) != len(want.IDs) {
+			t.Errorf("%s: %+v %v", in, s, err)
+		}
+	}
+}

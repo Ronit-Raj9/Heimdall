@@ -192,7 +192,7 @@ func TestCheckFrozenSuiteImages(t *testing.T) {
 	})
 	suite := &schemas.Suite{ID: "s", BaseImage: schemas.ImageSpec{Tag: "bench/base:1"},
 		Services: []schemas.ServiceSpec{{ID: "db", Image: "bench/db:1"}}}
-	task := &schemas.Task{ID: "t01", Services: []schemas.ServiceSpec{{ID: "mcp", Build: &schemas.ImageSpec{Tag: "bench/mcp:1"}}}}
+	task := &schemas.Task{ID: "t01", Services: []schemas.ServiceSpec{{ID: "mcp", Image: "bench/mcp:1"}}}
 	rc := func(images map[string]string) *schemas.RunContext {
 		return &schemas.RunContext{Manifest: &schemas.Manifest{ExpID: "e_1", SuiteImages: images}, Suite: suite, Task: task}
 	}

@@ -66,6 +66,27 @@ func (p *Planner) checkGPU(e *schemas.Experiment, suite *schemas.Suite, conds []
 	return fmt.Errorf("gpu: %s", strings.Join(problems, "; "))
 }
 
+// checkGPUScoped runs checkGPU on the combinations the plan schedules: the
+// main arms on the main conditions' tasks, and the compatibility arm on its
+// own conditions' tasks only, so a compatibility team never refuses a
+// main-arm GPU task it never runs (QC2-09-06).
+func (p *Planner) checkGPUScoped(e *schemas.Experiment, suite *schemas.Suite, conds, compat []condPlan, arms map[string]schemas.ArmManifest, compatArm *schemas.ArmManifest) error {
+	main := make([]schemas.ArmManifest, 0, len(arms))
+	for _, id := range sortedKeys(arms) {
+		main = append(main, arms[id])
+	}
+	if err := p.checkGPU(e, suite, conds, main...); err != nil {
+		return err
+	}
+	if compatArm == nil {
+		return nil
+	}
+	if err := p.checkGPU(e, suite, compat, *compatArm); err != nil {
+		return fmt.Errorf("compatibility: %w", err)
+	}
+	return nil
+}
+
 // armTeamOn reports whether any arm runs a team on task t.
 func armTeamOn(t *schemas.Task, arms []schemas.ArmManifest) bool {
 	for i := range arms {

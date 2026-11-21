@@ -5,6 +5,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // suiteImages records the local image id of every image a run of suite
@@ -68,12 +69,11 @@ func suiteImageTags(s *schemas.Suite, env schemas.Environment) map[string]string
 			tags[role] = tag
 		}
 	}
+	// QC2-09-04: a service's tag is the one its launch computes
+	// (utils.ServiceImage), so a locally built (compose) service is frozen
+	// under its content-derived tag, not a YAML tag the run never starts.
 	for _, sv := range s.Services {
-		tag := sv.Image
-		if sv.Build != nil && sv.Build.Tag != "" {
-			tag = sv.Build.Tag
-		}
-		if sv.ID != "" && tag != "" {
+		if tag := serviceImageTag(s, sv, s.Root, false); sv.ID != "" && tag != "" {
 			tags["service/"+sv.ID] = tag
 		}
 	}
@@ -81,17 +81,24 @@ func suiteImageTags(s *schemas.Suite, env schemas.Environment) map[string]string
 		if t == nil {
 			continue
 		}
+		network := t.Environment != nil && t.Environment.BuildNetwork
 		for _, sv := range t.Services {
-			tag := sv.Image
-			if sv.Build != nil && sv.Build.Tag != "" {
-				tag = sv.Build.Tag
-			}
-			if t.ID != "" && sv.ID != "" && tag != "" {
+			if tag := serviceImageTag(s, sv, t.Dir, network); t.ID != "" && sv.ID != "" && tag != "" {
 				tags[TaskServiceRole(t.ID, sv.ID)] = tag
 			}
 		}
 	}
 	return tags
+}
+
+// serviceImageTag is the tag a run starts for service sv, or "" when its
+// build cannot be resolved (the run then fails where it builds).
+func serviceImageTag(s *schemas.Suite, sv schemas.ServiceSpec, base string, network bool) string {
+	img, err := utils.ServiceImage(sv, base, s.ID, network)
+	if err != nil {
+		return ""
+	}
+	return img.Tag
 }
 
 // suiteUsesToolProxy reports whether any run of s starts the tool proxy: a

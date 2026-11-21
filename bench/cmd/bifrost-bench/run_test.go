@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"os"
 	"path/filepath"
@@ -191,5 +192,19 @@ func TestResumeVersionDrift(t *testing.T) {
 				t.Fatalf("resumes.jsonl = %s", b)
 			}
 		})
+	}
+}
+
+// TestRunContextMakesInterruptAnOwnerStop is QC2-06-05: an interrupt of a
+// CLI run must reach the scheduler as engine.ErrRunCancelled, so the
+// in-flight run seals as an owner-stopped aborted_infra that resume reruns.
+func TestRunContextMakesInterruptAnOwnerStop(t *testing.T) {
+	sig, interrupt := context.WithCancel(context.Background())
+	rctx, stop := runContext(sig)
+	defer stop()
+	interrupt()
+	<-rctx.Done()
+	if cause := context.Cause(rctx); !errors.Is(cause, engine.ErrRunCancelled) {
+		t.Fatalf("cause %v, want ErrRunCancelled", cause)
 	}
 }

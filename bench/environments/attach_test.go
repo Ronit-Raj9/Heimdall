@@ -1,8 +1,11 @@
 package environments
 
 import (
+	"errors"
 	"testing"
 	"time"
+
+	"github.com/maximhq/bifrost/bench/schemas"
 )
 
 // TestAttachNeverStartedIsInfraError reproduces audit 2-B-05: a failed
@@ -26,6 +29,19 @@ func TestAttachNeverStartedIsInfraError(t *testing.T) {
 			}
 		})
 	}
+	// QC2-09-02: the confirmed non-start is a pre-launch failure the
+	// pipeline retries, not a counted infra_error.
+	t.Run("never started is not launched", func(t *testing.T) {
+		t.Setenv("FAKE_AGENT_STATE", "0 created 0001-01-01T00:00:00Z")
+		_, err := e.attach(t.Context(), "c1", dir+"/out", dir+"/err", time.Minute)
+		if !errors.Is(err, schemas.ErrNotLaunched) {
+			t.Fatalf("err %v, want ErrNotLaunched", err)
+		}
+		t.Setenv("FAKE_AGENT_STATE", "0 running 2026-01-01T00:00:00Z")
+		if _, err := e.attach(t.Context(), "c1", dir+"/out", dir+"/err", time.Minute); errors.Is(err, schemas.ErrNotLaunched) {
+			t.Fatalf("a started container is marked not launched: %v", err)
+		}
+	})
 	t.Run("exited nonzero kept", func(t *testing.T) {
 		t.Setenv("FAKE_AGENT_STATE", "3 exited 2026-01-01T00:00:00Z")
 		res, err := e.attach(t.Context(), "c1", dir+"/out", dir+"/err", time.Minute)

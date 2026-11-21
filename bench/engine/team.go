@@ -310,6 +310,9 @@ func (p *Pipeline) runTeam(ctx context.Context, st *runState) error {
 	}
 	st.agentStarted = true
 	results, err := te.ExecTeam(ctx, rc, runs)
+	if results == nil && errors.Is(err, schemas.ErrNotLaunched) { // QC2-06-07: no member launched; a pre-start abort, retried like a single agent's (2-A-12)
+		p.unstart(ctx, st)
+	}
 	p.finishTeam(st, results)
 	if werr := p.writeJSON(ctx, st, schemas.TeamFile, teamRecord(team, rc.Key, results)); werr != nil {
 		err = errors.Join(err, werr)

@@ -2933,6 +2933,8 @@ export interface WorkerInfo {
 	/** Slot ids it holds. */
 	running: string[];
 	completed: number;
+	/** Rejected uploads since it last registered; at 3 it is leased nothing more until it registers again. */
+	rejected?: number;
 	last_seen: string;
 	/** X7: the GPUs the worker registered; only a worker with free GPUs is leased a GPU slot. */
 	gpus?: GPUInfo[];

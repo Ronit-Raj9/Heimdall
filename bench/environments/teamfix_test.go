@@ -1,6 +1,7 @@
 package environments
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -154,5 +155,22 @@ func TestDestroyForgetsCollector(t *testing.T) {
 		if _, ok := collectorTried.Load(id); ok {
 			t.Errorf("%s: collectorTried kept", id)
 		}
+	}
+}
+
+// TestExecTeamCreateFailureIsNotLaunched is QC2-06-07: a member whose
+// container cannot be created ends the team before any member is attached,
+// so the error says no agent launched and the pipeline may retry.
+func TestExecTeamCreateFailureIsNotLaunched(t *testing.T) {
+	docker, _ := fakeDocker(t, "create --name bench-r_1-m-w1")
+	e := newDockerWorkspace(DockerWorkspaceConfig{Docker: docker, HelperImage: "helper:1", EvalNetwork: "evalnet"})
+	rc := teamRC(t)
+	members := []schemas.MemberRun{
+		{Member: schemas.TeamMember{ID: "lead"}, Plan: &schemas.RunPlan{Image: "agent:1", Argv: []string{"run"}, Env: map[string]string{"PATH": "/usr/bin"}}},
+		{Member: schemas.TeamMember{ID: "w1"}, Plan: &schemas.RunPlan{Image: "agent:1", Argv: []string{"run"}, Env: map[string]string{"PATH": "/usr/bin"}}},
+	}
+	res, err := e.ExecTeam(t.Context(), rc, members)
+	if res != nil || !errors.Is(err, schemas.ErrNotLaunched) {
+		t.Fatalf("results %v err %v, want nil results and ErrNotLaunched", res, err)
 	}
 }

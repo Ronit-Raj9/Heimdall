@@ -237,7 +237,7 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 	// lost to the coordinator's sweep before the slot even runs.
 	sctx, stop := w.heartbeat(ctx, lease)
 	defer stop()
-	exp, reason, permanent := w.admit(ctx, lease)
+	exp, reason, permanent := w.admit(sctx, lease) // QC2-08-02: preparation stops when the lease is lost
 	if reason != "" {
 		w.logger.Warn("lease refused", "lease", lease.LeaseID, "experiment", lease.ExpID, "reason", reason)
 		stop()
@@ -253,7 +253,7 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 	// Tenancy area: a hosted manifest defers the gateway preflight to this
 	// runner; it runs before every slot and refuses the lease on a failure
 	// (remotegateway.go).
-	runM, runnerGW, why := w.runnerPreflight(ctx, exp.m)
+	runM, runnerGW, why := w.runnerPreflight(sctx, exp.m)
 	if why != "" {
 		w.logger.Warn("lease refused", "lease", lease.LeaseID, "experiment", lease.ExpID, "reason", why)
 		stop()
@@ -263,18 +263,22 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 	// Deploy area: a deferred manifest froze no image ids; the lock's image
 	// pins are checked again here and the ids this slot runs are recorded
 	// (remoteimages.go).
-	if why := w.checkSlotImages(ctx, exp); why != "" {
+	if why := w.checkSlotImages(sctx, exp); why != "" {
 		w.logger.Warn("lease refused", "lease", lease.LeaseID, "experiment", lease.ExpID, "reason", why)
 		stop()
 		w.release(ctx, lease, why, true, nil)
 		return nil
 	}
-	runnerImgs := w.runnerImages(ctx, exp, slot)
+	runnerImgs := w.runnerImages(sctx, exp, slot)
 	// Admission and the checks above can be slow; confirm the coordinator
 	// still holds this lease for us before any billable agent work starts,
 	// instead of finding out at the first timed heartbeat.
-	if why := w.confirmLease(sctx, lease); why != "" {
-		w.logger.Error("lease gone before the slot started; not running it", "lease", lease.LeaseID, "slot", slot.SlotID, "why", why)
+	if why, transient := w.confirmLease(sctx, lease); why != "" {
+		w.logger.Error("lease not confirmed before the slot started; not running it", "lease", lease.LeaseID, "slot", slot.SlotID, "why", why)
+		if transient { // the lease may still be ours: hand it back so the slot is requeued now, not at the stale sweep
+			stop()
+			w.release(ctx, lease, why, false, nil)
+		}
 		return nil
 	}
 	in := SlotInput{Manifest: runM, Suite: exp.suite, Slot: slot, Attempt: lease.Attempt}
@@ -453,56 +457,85 @@ func adoptUnrepeatable(local, remote *schemas.Manifest) {
 	if hostedImagesAdopted(remote) { // Deploy area: a hosted plan (no Docker) froze no image ids; the runner records its own per slot (remoteimages.go)
 		local.SuiteImages, local.TaskImages = nil, nil
 	}
+	hosted := hostedImagesAdopted(remote)
 	for id, am := range local.Arms {
 		if ra, ok := remote.Arms[id]; ok {
-			am.ImageID = ra.ImageID
-			if hostedImagesAdopted(remote) { // per-task image ids follow the hosted plan too (audit 8-B-06)
-				am.TaskImageIDs = ra.TaskImageIDs
-			}
-			for mid, rm := range ra.Members {
-				if lm, ok := am.Members[mid]; ok {
-					lm.ImageID = rm.ImageID
-					am.Members[mid] = lm
-				}
-			}
+			adoptArmImages(&am, &ra, hosted)
 			local.Arms[id] = am
 		}
 	}
 	if local.Compatibility != nil && remote.Compatibility != nil {
-		local.Compatibility.ImageID = remote.Compatibility.ImageID
-		if hostedImagesAdopted(remote) {
-			local.Compatibility.TaskImageIDs = remote.Compatibility.TaskImageIDs
-		}
+		adoptArmImages(local.Compatibility, remote.Compatibility, hosted) // QC2-09-01: the compatibility arm's members too
 	}
 	local.Hash = ""
 }
+
+// adoptArmImages copies the machine-local image ids of one arm, its team
+// members' included, from the coordinator's manifest. Every arm the runtime
+// can select goes through it, the compatibility arm too (QC2-09-01). The
+// per-task ids follow a hosted plan only (audit 8-B-06).
+func adoptArmImages(am, ra *schemas.ArmManifest, hosted bool) {
+	am.ImageID = ra.ImageID
+	if hosted {
+		am.TaskImageIDs = ra.TaskImageIDs
+	}
+	for mid, rm := range ra.Members {
+		if lm, ok := am.Members[mid]; ok {
+			lm.ImageID = rm.ImageID
+			am.Members[mid] = lm
+		}
+	}
+}
+
+// confirmLease asks the coordinator, with a synchronous heartbeat, whether
+// it still holds the lease for this worker. Only a positive answer lets the
+// slot run (QC2-08-02): an explicit refusal, a cancelled context, or a
+// coordinator that cannot be reached in confirmTries bounded calls all
+// return why the slot must not start. transient is true when the answer was
+// never received, so the caller hands the lease back instead of dropping it.
+func (w *Worker) confirmLease(sctx context.Context, lease *schemas.WorkerLease) (why string, transient bool) {
+	var last error
+	for try := range confirmTries {
+		if cause := context.Cause(sctx); cause != nil {
+			return cause.Error(), false
+		}
+		if try > 0 {
+			select {
+			case <-time.After(confirmBackoff):
+			case <-sctx.Done():
+				return context.Cause(sctx).Error(), false
+			}
+		}
+		cctx, cancel := context.WithTimeout(sctx, confirmTimeout)
+		err := w.call(cctx, http.MethodPost, workerAPI+"/leases/"+url.PathEscape(lease.LeaseID)+"/heartbeat",
+			schemas.WorkerHeartbeat{WorkerID: w.opts.WorkerID}, nil)
+		cancel()
+		switch {
+		case err == nil:
+			return "", false
+		case errors.Is(err, schemas.ErrLeaseGone), errors.Is(err, schemas.ErrWorkerUnknown):
+			return err.Error(), false
+		case context.Cause(sctx) != nil:
+			return context.Cause(sctx).Error(), false
+		}
+		last = err
+		w.logger.Warn("lease check before the slot failed; retrying", "lease", lease.LeaseID, "try", try+1, "error", err.Error())
+	}
+	return fmt.Sprintf("the coordinator could not confirm the lease before the slot started: %v", last), true
+}
+
+// confirmTries, confirmTimeout and confirmBackoff bound the lease check
+// before a slot starts; variables so a test can shorten them.
+var (
+	confirmTries   = 3
+	confirmTimeout = 15 * time.Second
+	confirmBackoff = time.Second
+)
 
 // heartbeat keeps the lease fresh until stop is called, and cancels the
 // returned context with an ErrLeaseLost cause on loss under the scheduler's
 // rules (leaseLoss): the coordinator says the lease is gone, or no heartbeat
 // succeeded for longer than the stale threshold.
-// confirmLease sends one synchronous heartbeat. It returns why the lease is
-// gone (the coordinator refused it, or the heartbeat loop already lost it),
-// or "" when the lease is ours or the coordinator could not be reached (the
-// heartbeat loop then decides).
-func (w *Worker) confirmLease(sctx context.Context, lease *schemas.WorkerLease) string {
-	if cause := context.Cause(sctx); cause != nil {
-		return cause.Error()
-	}
-	err := w.call(sctx, http.MethodPost, workerAPI+"/leases/"+url.PathEscape(lease.LeaseID)+"/heartbeat",
-		schemas.WorkerHeartbeat{WorkerID: w.opts.WorkerID}, nil)
-	switch {
-	case err == nil:
-		return ""
-	case errors.Is(err, schemas.ErrLeaseGone), errors.Is(err, schemas.ErrWorkerUnknown):
-		return err.Error()
-	case context.Cause(sctx) != nil:
-		return context.Cause(sctx).Error()
-	}
-	w.logger.Warn("lease check before the slot failed; the heartbeat loop retries", "lease", lease.LeaseID, "error", err.Error())
-	return ""
-}
-
 func (w *Worker) heartbeat(ctx context.Context, lease *schemas.WorkerLease) (context.Context, func()) {
 	sctx, cancel := context.WithCancelCause(ctx)
 	every := time.Duration(lease.HeartbeatEveryMS) * time.Millisecond

@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
@@ -47,18 +46,14 @@ func ResolveAgentConfig(doc []byte, set map[string]any) (schemas.AgentConfig, er
 	if err != nil {
 		return cfg, fmt.Errorf("encode agent config: %w", err)
 	}
-	if len(set) > 0 {
-		// The overrides can produce a value the agent schema refuses (an enum
-		// typo such as scripted.kind: nooop) that the Go types accept, so the
-		// overridden values are checked against the agent schema before freezing.
-		if err := suite.ValidateYAMLUnder(out, "effective agent config", suite.SchemaAgent, keys); err != nil {
-			return cfg, err
-		}
-	}
-	dec := yaml.NewDecoder(bytes.NewReader(out))
-	dec.KnownFields(true)
-	if err := dec.Decode(&cfg); err != nil {
-		return cfg, fmt.Errorf("decode agent config: %w", err)
+	// QC2-11-07: the complete effective config is checked against the agent
+	// schema, base file and overrides together. An override can make a
+	// value the Go types accept invalid (an enum typo such as scripted.kind:
+	// nooop), or change a discriminator so a block the schema then requires
+	// is missing (adapter: scripted without a scripted block); neither may
+	// freeze and fail only when a slot runs.
+	if err := suite.DecodeYAML(out, "effective agent config", suite.SchemaAgent, &cfg); err != nil {
+		return cfg, err
 	}
 	return cfg, nil
 }

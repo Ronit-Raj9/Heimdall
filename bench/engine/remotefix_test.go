@@ -163,3 +163,30 @@ func TestAttemptsLeftIgnoresOwnerStopped(t *testing.T) {
 		t.Fatal("retry after three chargeable aborts")
 	}
 }
+
+// TestRemoteSameBuildRestartClearsRejections is QC2-08-03: a worker stopped
+// by rejected uploads is leased again after a same-build re-registration
+// (its environment was fixed), and Workers shows the count until then.
+func TestRemoteSameBuildRestartClearsRejections(t *testing.T) {
+	rw := newRemoteWorld(t, testExperiment(), RemoteOptions{})
+	done := rw.attach(t)
+	defer done()
+	ctx := context.Background()
+	registerDirect(t, rw.c, "w1", BenchVersion)
+	rw.c.mu.Lock()
+	rw.c.workers["w1"].rejected = maxRejections
+	rw.c.mu.Unlock()
+	if ws := rw.c.Workers(); len(ws) != 1 || ws[0].Rejected != maxRejections {
+		t.Fatalf("workers %+v", ws)
+	}
+	if l, _ := rw.c.Lease(ctx, "w1"); l != nil {
+		t.Fatal("worker at the rejection limit was leased")
+	}
+	registerDirect(t, rw.c, "w1", BenchVersion)
+	if l, err := rw.c.Lease(ctx, "w1"); err != nil || l == nil {
+		t.Fatalf("no lease after a same-build re-registration: %+v %v", l, err)
+	}
+	if ws := rw.c.Workers(); ws[0].Rejected != 0 {
+		t.Fatalf("rejected %d after re-registration", ws[0].Rejected)
+	}
+}

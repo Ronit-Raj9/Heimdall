@@ -473,3 +473,32 @@ func TestVerifySealedRunRereadsStaleLog(t *testing.T) {
 		t.Fatalf("snapshot with another hash: err = %v, want ErrSealMismatch", err)
 	}
 }
+
+// TestSealRollsBackFailedLogAppend is QC2-06-04: a seal whose seals.log
+// append fails must not leave seal.json behind, or a successor sealed on the
+// old tail strands it. After the failure a second run seals, and the first
+// can still seal afterwards and verify.
+func TestSealRollsBackFailedLogAppend(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t, nil)
+	m := mustCreateExp(t, s, "e_rollback")
+	a := mustNewRun(t, s, m, "s_a1", "r_a", 1, schemas.OutcomePass)
+	b := mustNewRun(t, s, m, "s_b1", "r_b", 1, schemas.OutcomePass)
+	orig := appendSealLine
+	appendSealLine = func(*os.File, []byte) error { return errors.New("disk full") }
+	_, err := s.Seal(ctx, a)
+	appendSealLine = orig
+	if err == nil {
+		t.Fatal("seal with a failing log append succeeded")
+	}
+	if _, err := os.Stat(filepath.Join(s.runDir(a), "seal.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("seal.json left after failed append: %v", err)
+	}
+	mustSeal(t, s, b)
+	mustSeal(t, s, a)
+	for _, id := range []string{"r_a", "r_b"} {
+		if err := s.Verify(ctx, "e_rollback", id); err != nil {
+			t.Fatalf("verify %s: %v", id, err)
+		}
+	}
+}
