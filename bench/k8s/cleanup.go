@@ -66,3 +66,49 @@ func ClassifyCleanup(items []Namespace, in CleanupInput) []CleanupVerdict {
 	}
 	return out
 }
+
+// PoolAnchor is the anchor config map found in one pool namespace.
+type PoolAnchor struct {
+	Namespace string
+	Anchor    ConfigMap
+}
+
+// PoolVerdict is one pool anchor and whether cleanup removes it, with why.
+type PoolVerdict struct {
+	PoolAnchor
+	Remove bool
+	Reason string
+}
+
+// ClassifyPoolAnchors decides, in namespace pool mode, which anchors are
+// stale leases of this install. Only anchors carrying this install's owner
+// label are considered (a pool may be shared with another install); the
+// namespace itself is never a candidate. A run anchor is removed when its
+// run is dead, kept when it is live, and otherwise removed only when older
+// than the grace period; a check anchor likewise by age.
+func ClassifyPoolAnchors(items []PoolAnchor, in CleanupInput) []PoolVerdict {
+	var out []PoolVerdict
+	for _, a := range items {
+		l := a.Anchor.Metadata.Labels
+		if l[LabelBench] != "1" || in.Install == "" || l[LabelInstall] != in.Install {
+			continue
+		}
+		v := PoolVerdict{PoolAnchor: a}
+		run := anchorRun(a.Anchor)
+		created, err := time.Parse(time.RFC3339, a.Anchor.Metadata.CreationTimestamp)
+		switch {
+		case l[LabelRole] == RoleRun && in.Live[run]:
+			v.Reason = "run is live"
+		case l[LabelRole] == RoleRun && in.Dead[run]:
+			v.Remove, v.Reason = true, "run is no longer live"
+		case err != nil:
+			v.Reason = "age unknown"
+		case in.Now.Sub(created) > in.Grace:
+			v.Remove, v.Reason = true, "older than "+in.Grace.String()
+		default:
+			v.Reason = "younger than " + in.Grace.String() + " with no lease information"
+		}
+		out = append(out, v)
+	}
+	return out
+}

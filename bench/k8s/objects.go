@@ -85,6 +85,7 @@ type PodSpec struct {
 	ShareProcessNamespace         *bool               `json:"shareProcessNamespace,omitempty"`
 	AutomountServiceAccountToken  *bool               `json:"automountServiceAccountToken,omitempty"`
 	ServiceAccountName            string              `json:"serviceAccountName,omitempty"`
+	RuntimeClassName              string              `json:"runtimeClassName,omitempty"`
 	EnableServiceLinks            *bool               `json:"enableServiceLinks,omitempty"`
 	HostAliases                   []HostAlias         `json:"hostAliases,omitempty"`
 	DNSPolicy                     string              `json:"dnsPolicy,omitempty"`

@@ -2,8 +2,10 @@ package k8s
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"sort"
@@ -47,6 +49,9 @@ func (d *Driver) Check(ctx context.Context, images []string) []schemas.DoctorChe
 		add("api version", schemas.DoctorFail, "%s", why)
 	}
 	out = append(out, d.permissionRows(ctx)...)
+	if row, ok := d.runtimeClassRow(ctx); ok {
+		out = append(out, row)
+	}
 	gwOK := false
 	if d.cfg.GatewayURL == "" {
 		add("gateway", schemas.DoctorWarn, "kubernetes.gateway_url is not set: networked agents cannot run; scripted controls with no network can")
@@ -120,29 +125,71 @@ func (d *Driver) permissionRows(ctx context.Context) []schemas.DoctorCheck {
 	if ownServiceAccount(d.cfg.ServiceAccount) { // 2-D-05: created in every run namespace
 		needs = append(needs, need{"create", "", "serviceaccounts", ""})
 	}
-	ns := NamespaceFor(d.cfg.NamespacePrefix, "check")
+	scopes := []string{NamespaceFor(d.cfg.NamespacePrefix, "check")}
+	if d.poolMode() {
+		// Pool mode: no namespace create or delete; every namespaced verb,
+		// plus the reads and deletes a lease and its release use, in each
+		// pool namespace.
+		needs = append(needs[2:], need{"get", "", "configmaps", ""}, need{"delete", "", "pods", ""},
+			need{"delete", "", "secrets", ""}, need{"get", "", "secrets", ""}, need{"get", "networking.k8s.io", "networkpolicies", ""},
+			need{"delete", "networking.k8s.io", "networkpolicies", ""})
+		scopes = d.cfg.Namespaces
+	}
 	var denied []string
-	for _, n := range needs {
-		scope := ns
-		if n.resource == "namespaces" || n.resource == "nodes" {
-			scope = ""
-		}
-		ok, _, err := d.cfg.Client.CanI(ctx, n.verb, n.group, n.resource, n.sub, scope)
-		if err != nil {
-			return []schemas.DoctorCheck{{ID: "permissions", Status: schemas.DoctorWarn, Detail: "cannot ask the API server (SelfSubjectAccessReview): " + err.Error()}}
-		}
-		if !ok {
-			name := n.resource
-			if n.sub != "" {
-				name += "/" + n.sub
+	for _, ns := range scopes {
+		for _, n := range needs {
+			scope := ns
+			if n.resource == "namespaces" || n.resource == "nodes" {
+				scope = ""
 			}
-			denied = append(denied, n.verb+" "+name)
+			ok, _, err := d.cfg.Client.CanI(ctx, n.verb, n.group, n.resource, n.sub, scope)
+			if err != nil {
+				return []schemas.DoctorCheck{{ID: "permissions", Status: schemas.DoctorWarn, Detail: "cannot ask the API server (SelfSubjectAccessReview): " + err.Error()}}
+			}
+			if !ok {
+				name := n.resource
+				if n.sub != "" {
+					name += "/" + n.sub
+				}
+				if d.poolMode() && scope != "" {
+					name += " in " + ns
+				}
+				denied = append(denied, n.verb+" "+name)
+			}
 		}
 	}
 	if len(denied) > 0 {
 		return []schemas.DoctorCheck{{ID: "permissions", Status: schemas.DoctorFail, Detail: "denied: " + strings.Join(denied, ", ") + " (deploy/k8s/rbac.yaml lists what the driver needs)"}}
 	}
 	return []schemas.DoctorCheck{{ID: "permissions", Status: schemas.DoctorPass, Detail: fmt.Sprintf("all %d verbs the driver uses are allowed", len(needs))}}
+}
+
+// runtimeClassRow checks that kubernetes.runtime_class names a RuntimeClass
+// the cluster has; ok is false when none is configured.
+func (d *Driver) runtimeClassRow(ctx context.Context) (schemas.DoctorCheck, bool) {
+	name := d.cfg.RuntimeClass
+	if name == "" {
+		return schemas.DoctorCheck{}, false
+	}
+	row := schemas.DoctorCheck{ID: "runtime class"}
+	var rc struct {
+		Handler string `json:"handler"`
+	}
+	err := d.cfg.Client.Get(ctx, "/apis/node.k8s.io/v1/runtimeclasses/"+url.PathEscape(name), &rc)
+	var ae *APIError
+	switch {
+	case err == nil:
+		row.Status, row.Detail = schemas.DoctorPass, fmt.Sprintf("RuntimeClass %s exists (handler %s)", name, rc.Handler)
+	case IsNotFound(err):
+		row.Status = schemas.DoctorFail
+		row.Detail = fmt.Sprintf("kubernetes.runtime_class %q: the cluster has no such RuntimeClass, so every run pod would be refused; install the runtime (gVisor, Kata) and its RuntimeClass, or unset runtime_class", name)
+	case errors.As(err, &ae) && ae.Code == http.StatusForbidden:
+		row.Status = schemas.DoctorFail
+		row.Detail = fmt.Sprintf("kubernetes.runtime_class %q: forbidden to read RuntimeClass objects (grant get on runtimeclasses.node.k8s.io, deploy/k8s/rbac.yaml), so its existence is not shown: %v", name, err)
+	default:
+		row.Status, row.Detail = schemas.DoctorFail, fmt.Sprintf("kubernetes.runtime_class %q: cannot read it: %v", name, err)
+	}
+	return row, true
 }
 
 // imageRows reports, per image, whether every schedulable node has it.

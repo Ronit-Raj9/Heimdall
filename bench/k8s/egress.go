@@ -130,20 +130,40 @@ func (d *Driver) RunEgressProbe(ctx context.Context, policy bool, targets []prob
 	ns := NamespaceFor(d.cfg.NamespacePrefix, "check-"+id)
 	labels := map[string]string{LabelBench: "1", LabelRole: RoleCheck}
 	rep := &EgressReport{Namespace: ns, Policy: policy, Results: map[string]string{}}
-	if err := d.cfg.Client.Create(ctx, "/api/v1/namespaces", Namespace{APIVersion: "v1", Kind: "Namespace", Metadata: ObjectMeta{Name: ns, Labels: d.ownedLabels(maps.Clone(labels))}}, nil); err != nil {
-		return nil, fmt.Errorf("probe namespace: %w", err)
-	}
-	defer func() {
-		if err := d.cfg.Client.Delete(context.WithoutCancel(ctx), nsPath(ns)); err != nil {
-			d.cfg.Logger.Warn("remove egress probe namespace", "namespace", ns, "error", err.Error())
+	var owner []OwnerReference
+	if d.poolMode() {
+		// Pool mode: lease a pool namespace like a run does, and release it
+		// (anchor and probe objects, never the namespace) afterwards.
+		leaseID := "check-" + id
+		pns, o, err := d.leasePool(ctx, leaseID, labels, map[string]string{"run_id": leaseID, "driver_version": DriverVersion})
+		if err != nil {
+			return nil, fmt.Errorf("probe namespace: %w", err)
 		}
-	}()
-	if err := d.createServiceAccount(ctx, ns, labels, nil); err != nil {
+		ns, owner, rep.Namespace = pns, o, pns
+		defer func() {
+			rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), poolGoneTimeout)
+			defer cancel()
+			if err := d.releasePool(rctx, ns, "", owner[0].UID); err != nil {
+				d.cfg.Logger.Warn("release egress probe pool namespace", "namespace", ns, "error", err.Error())
+			}
+			d.forget(leaseID)
+		}()
+	} else {
+		if err := d.cfg.Client.Create(ctx, "/api/v1/namespaces", Namespace{APIVersion: "v1", Kind: "Namespace", Metadata: ObjectMeta{Name: ns, Labels: d.ownedLabels(maps.Clone(labels))}}, nil); err != nil {
+			return nil, fmt.Errorf("probe namespace: %w", err)
+		}
+		defer func() {
+			if err := d.cfg.Client.Delete(context.WithoutCancel(ctx), nsPath(ns)); err != nil {
+				d.cfg.Logger.Warn("remove egress probe namespace", "namespace", ns, "error", err.Error())
+			}
+		}()
+	}
+	if err := d.createServiceAccount(ctx, ns, labels, owner); err != nil {
 		return nil, fmt.Errorf("probe %w", err)
 	}
 	var hosts []HostAlias
 	if policy {
-		if err := d.cfg.Client.Create(ctx, netpolPath(ns), denyAllPolicy(labels, nil), nil); err != nil {
+		if err := d.cfg.Client.Create(ctx, netpolPath(ns), denyAllPolicy(labels, owner), nil); err != nil {
 			return nil, fmt.Errorf("probe deny-all policy: %w", err)
 		}
 		if d.cfg.GatewayURL != "" {
@@ -151,7 +171,7 @@ func (d *Driver) RunEgressProbe(ctx context.Context, policy bool, targets []prob
 			if err != nil {
 				return nil, err
 			}
-			if err := d.cfg.Client.Create(ctx, netpolPath(ns), gatewayPolicy(labels, nil, gw.namespace, gw.selector, gw.targetPort), nil); err != nil {
+			if err := d.cfg.Client.Create(ctx, netpolPath(ns), gatewayPolicy(labels, owner, gw.namespace, gw.selector, gw.targetPort), nil); err != nil {
 				return nil, fmt.Errorf("probe gateway policy: %w", err)
 			}
 			hosts = []HostAlias{{IP: gw.ip, Hostnames: []string{gw.host}}}
@@ -170,8 +190,8 @@ func (d *Driver) RunEgressProbe(ctx context.Context, policy bool, targets []prob
 		return nil, err
 	}
 	uid := int64(1000)
-	pod := Pod{APIVersion: "v1", Kind: "Pod", Metadata: ObjectMeta{Name: "egress-probe", Labels: labels},
-		Spec: PodSpec{RestartPolicy: "Never", AutomountServiceAccountToken: boolPtr(false), EnableServiceLinks: boolPtr(false),
+	pod := Pod{APIVersion: "v1", Kind: "Pod", Metadata: ObjectMeta{Name: probePodName, Labels: labels, OwnerReferences: owner},
+		Spec: PodSpec{RestartPolicy: "Never", RuntimeClassName: d.cfg.RuntimeClass, AutomountServiceAccountToken: boolPtr(false), EnableServiceLinks: boolPtr(false),
 			DNSPolicy: "None", DNSConfig: &PodDNSConfig{Nameservers: []string{"127.0.0.1"}}, HostAliases: hosts,
 			NodeSelector: d.cfg.NodeSelector, Tolerations: d.cfg.Tolerations, ServiceAccountName: d.cfg.ServiceAccount,
 			SecurityContext:               &PodSecurityContext{SeccompProfile: &SeccompProfile{Type: "RuntimeDefault"}},

@@ -73,6 +73,14 @@ type Config struct {
 	// every namespace the driver creates, so `k8s cleanup` of another
 	// install with the same namespace prefix never selects them (QC2-10-02).
 	Install string
+	// RuntimeClass is the RuntimeClass every run and probe pod names
+	// (kubernetes.runtime_class, e.g. gvisor or kata); empty uses the
+	// cluster default.
+	RuntimeClass string
+	// Namespaces is the namespace pool (kubernetes.namespaces). When set,
+	// the driver never creates or deletes a namespace: each run leases one
+	// of these (pool.go).
+	Namespaces []string
 	// Local is the Docker driver on the controller: image metadata (PATH,
 	// entrypoint, ids, digests) is read from the controller's daemon, where
 	// the images are built and from where they are loaded or pushed.
@@ -90,6 +98,9 @@ type Driver struct {
 	// attachDrain bounds the agent's attach stream after a wall expiry or
 	// an interrupt (2-D-06).
 	attachDrain time.Duration
+	// poolMu guards leases: run id to leased pool namespace (pool mode).
+	poolMu sync.Mutex
+	leases map[string]string
 }
 
 var _ environments.Driver = (*Driver)(nil)
@@ -192,11 +203,35 @@ type runRef struct {
 }
 
 func (d *Driver) ref(rc *schemas.RunContext) (runRef, error) {
+	r, err := d.ids(rc)
+	if err != nil || !d.poolMode() {
+		return r, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	ns, ok, err := d.poolNamespaceOf(ctx, r.runID)
+	if !ok {
+		if err != nil {
+			return r, fmt.Errorf("run %s: find its pool namespace: %w", r.runID, err)
+		}
+		return r, fmt.Errorf("run %s holds no namespace of kubernetes.namespaces", r.runID)
+	}
+	r.ns = ns
+	return r, nil
+}
+
+// ids is the run's ids, with its namespace in per-run-namespace mode (pool
+// mode leaves ns empty: the lease decides it).
+func (d *Driver) ids(rc *schemas.RunContext) (runRef, error) {
 	expID, runID, err := environments.RunIDs(rc)
 	if err != nil {
 		return runRef{}, err
 	}
-	return runRef{expID: expID, runID: runID, ns: NamespaceFor(d.cfg.NamespacePrefix, runID)}, nil
+	r := runRef{expID: expID, runID: runID}
+	if !d.poolMode() {
+		r.ns = NamespaceFor(d.cfg.NamespacePrefix, runID)
+	}
+	return r, nil
 }
 
 // Create implements schemas.Environment. It makes the run's namespace, the
@@ -210,7 +245,7 @@ func (d *Driver) Create(ctx context.Context, rc *schemas.RunContext) (*schemas.E
 	if err := environments.CheckFrozenDriver(rc, environments.DriverKubernetes); err != nil {
 		return nil, err
 	}
-	r, err := d.ref(rc)
+	r, err := d.ids(rc)
 	if err != nil {
 		return nil, err
 	}
@@ -249,12 +284,20 @@ func (d *Driver) Create(ctx context.Context, rc *schemas.RunContext) (*schemas.E
 		}
 		h.FileHashes[notesRel] = sum
 	}
-	if err := d.freshNamespace(ctx, r); err != nil {
-		return nil, fmt.Errorf("create workspace for run %s: %w", r.runID, err)
-	}
-	owner, err := d.createAnchor(ctx, r)
-	if err != nil {
-		return nil, fmt.Errorf("create workspace for run %s: %w", r.runID, err)
+	var owner []OwnerReference
+	if d.poolMode() {
+		ns, o, err := d.leasePool(ctx, r.runID, runLabels(r.runID, r.expID), anchorData(r))
+		if err != nil {
+			return nil, fmt.Errorf("create workspace for run %s: %w", r.runID, err)
+		}
+		r.ns, owner = ns, o
+	} else {
+		if err := d.freshNamespace(ctx, r); err != nil {
+			return nil, fmt.Errorf("create workspace for run %s: %w", r.runID, err)
+		}
+		if owner, err = d.createAnchor(ctx, r); err != nil {
+			return nil, fmt.Errorf("create workspace for run %s: %w", r.runID, err)
+		}
 	}
 	if err := d.createServiceAccount(ctx, r.ns, runLabels(r.runID, r.expID), owner); err != nil {
 		return nil, fmt.Errorf("create workspace for run %s: %w", r.runID, err)
@@ -362,7 +405,7 @@ func ownServiceAccount(name string) bool { return name != "" && name != "default
 // reference every other object of the run carries.
 func (d *Driver) createAnchor(ctx context.Context, r runRef) ([]OwnerReference, error) {
 	cm := ConfigMap{APIVersion: "v1", Kind: "ConfigMap", Metadata: ObjectMeta{Name: anchorName, Labels: runLabels(r.runID, r.expID)},
-		Data: map[string]string{"run_id": r.runID, "exp_id": r.expID, "driver_version": DriverVersion}}
+		Data: anchorData(r)}
 	var got ConfigMap
 	if err := d.cfg.Client.Create(ctx, corePath(r.ns, "configmaps"), cm, &got); err != nil {
 		return nil, fmt.Errorf("anchor: %w", err)
@@ -371,6 +414,10 @@ func (d *Driver) createAnchor(ctx context.Context, r runRef) ([]OwnerReference, 
 		return nil, errors.New("anchor: the API server returned no uid")
 	}
 	return []OwnerReference{{APIVersion: "v1", Kind: "ConfigMap", Name: anchorName, UID: got.Metadata.UID, BlockOwnerDeletion: boolPtr(false)}}, nil
+}
+
+func anchorData(r runRef) map[string]string {
+	return map[string]string{"run_id": r.runID, "exp_id": r.expID, "driver_version": DriverVersion}
 }
 
 // owner reads the anchor's owner reference again (Exec after a resume, or
@@ -512,7 +559,7 @@ func (d *Driver) podInput(ctx context.Context, rc *schemas.RunContext, r runRef,
 	in = podInput{RunID: r.runID, ExpID: r.expID, AgentImage: plan.Image, HelperImage: d.helperImage(rc), PullPolicy: d.cfg.ImagePullPolicy,
 		Workdir: wd, UID: uid, GID: gid, CPUs: plan.CPUs, MemGB: plan.MemGB, WallS: wall,
 		ProcWatch: d.cfg.ProcessWatch, FSWatch: d.cfg.WorkspaceWatch, IntervalMS: d.cfg.WatchIntervalMS,
-		ServiceAccount: d.cfg.ServiceAccount, NodeSelector: d.cfg.NodeSelector, Tolerations: d.cfg.Tolerations,
+		ServiceAccount: d.cfg.ServiceAccount, RuntimeClass: d.cfg.RuntimeClass, NodeSelector: d.cfg.NodeSelector, Tolerations: d.cfg.Tolerations,
 		Collector: d.cfg.EventsCollector && d.cfg.CollectorImage != "", CollectorImage: d.cfg.CollectorImage}
 	if in.HelperImage == "" {
 		return in, nil, errors.New("no helper image (images.helper)")
@@ -1270,13 +1317,31 @@ func refOK(ref string) bool {
 // anything else with it. Missing objects are fine, so it is idempotent and
 // works after a failed Create.
 func (d *Driver) Destroy(ctx context.Context, rc *schemas.RunContext) error {
-	r, err := d.ref(rc)
+	r, err := d.ids(rc)
 	if err != nil {
 		return err
 	}
+	var errs []error
+	if d.poolMode() {
+		// Pool mode never deletes a namespace: release the lease and wait,
+		// bounded, until the run's fixed-name objects are gone.
+		pctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), poolGoneTimeout+killGrace)
+		defer cancel()
+		if err := d.destroyPool(pctx, r.runID); err != nil {
+			errs = append(errs, err)
+		}
+		if stagedLayer(rc) || (rc.Handle != nil && rc.Handle.Volume != "") {
+			if err := d.removeStaging(pctx, r); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		if err := errors.Join(errs...); err != nil {
+			return fmt.Errorf("destroy run %s: %w", r.runID, err)
+		}
+		return nil
+	}
 	cctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), killGrace)
 	defer cancel()
-	var errs []error
 	// QC2-10-01: cleanup runs even when Create refused a namespace of the
 	// same name that belongs to someone else (or failed before creating
 	// one). Delete only a namespace that is provably this run's, and only
