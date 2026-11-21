@@ -60,6 +60,7 @@ COPY --from=build /out/bifrost-bench /usr/local/bin/bifrost-bench
 COPY benchmarks /srv/heimdall/benchmarks
 COPY agents /srv/heimdall/agents
 COPY experiments /srv/heimdall/experiments
+COPY examples /srv/heimdall/examples
 COPY deploy/pricing-snapshot.json /srv/heimdall/deploy/pricing-snapshot.json
 COPY deploy/hosted/bench.hosted.yaml /srv/heimdall/deploy/bench.yaml
 ENV HOME=/var/lib/heimdall \
