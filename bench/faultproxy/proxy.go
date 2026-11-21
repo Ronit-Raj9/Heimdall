@@ -70,7 +70,11 @@ type Config struct {
 	Getenv        func(string) string // os.Getenv when nil
 	LedgerPath    string
 	Slots         []SlotConfig
-	Logger        schemas.Logger
+	// SlotsPerProvider is how many slots each provider Slots names none for
+	// gets (<prefix>-slot-1..N); 0 means 4. Hosted stacks raise it so the
+	// shared proxy is not the platform's concurrency ceiling.
+	SlotsPerProvider int
+	Logger           schemas.Logger
 }
 
 // SlotConfig is one key slot of a provider in Bifrost. Bifrost key names are
@@ -140,7 +144,7 @@ func NewServer(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	slots, names, err := indexSlots(withDefaultSlots(cfg.Slots, table), table)
+	slots, names, err := indexSlots(withDefaultSlotsN(cfg.Slots, table, cfg.SlotsPerProvider), table)
 	if err != nil {
 		return nil, err
 	}
@@ -622,7 +626,16 @@ func resolveUpstreams(cfg Config, t *providerTable) (map[string]upstream, error)
 // withDefaultSlots adds <prefix>-slot-1..4 (auth = name) for every provider
 // cfg lists no slot for. Slots without a provider are anthropic's.
 func withDefaultSlots(cfg []SlotConfig, t *providerTable) []SlotConfig {
-	out := make([]SlotConfig, 0, len(cfg)+defaultSlotsPerProvider*len(t.order))
+	return withDefaultSlotsN(cfg, t, defaultSlotsPerProvider)
+}
+
+// withDefaultSlotsN is withDefaultSlots with n default slots per provider
+// (defaultSlotsPerProvider when n is not positive).
+func withDefaultSlotsN(cfg []SlotConfig, t *providerTable, n int) []SlotConfig {
+	if n <= 0 {
+		n = defaultSlotsPerProvider
+	}
+	out := make([]SlotConfig, 0, len(cfg)+n*len(t.order))
 	has := map[string]bool{}
 	for _, sc := range cfg {
 		if sc.Provider == "" {
@@ -635,7 +648,7 @@ func withDefaultSlots(cfg []SlotConfig, t *providerTable) []SlotConfig {
 		if has[name] || t.byName[name].OrgOnly {
 			continue
 		}
-		for _, sc := range DefaultSlots(t.byName[name]) {
+		for _, sc := range DefaultSlotsN(t.byName[name], n) {
 			out = append(out, sc)
 		}
 	}
@@ -645,8 +658,13 @@ func withDefaultSlots(cfg []SlotConfig, t *providerTable) []SlotConfig {
 // DefaultSlots returns the slots a provider gets when none are configured:
 // <slot_prefix>-slot-1..4, each with its name as the placeholder value.
 func DefaultSlots(p ProviderSpec) []SlotConfig {
-	out := make([]SlotConfig, 0, defaultSlotsPerProvider)
-	for i := 1; i <= defaultSlotsPerProvider; i++ {
+	return DefaultSlotsN(p, defaultSlotsPerProvider)
+}
+
+// DefaultSlotsN returns <slot_prefix>-slot-1..n of a provider.
+func DefaultSlotsN(p ProviderSpec, n int) []SlotConfig {
+	out := make([]SlotConfig, 0, n)
+	for i := 1; i <= n; i++ {
 		name := fmt.Sprintf("%s-slot-%d", p.slotPrefix(), i)
 		out = append(out, SlotConfig{Name: name, Auth: name, Provider: p.Name})
 	}

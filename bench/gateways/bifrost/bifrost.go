@@ -87,6 +87,9 @@ type Config struct {
 	Claims    SlotClaimer
 	ClaimTTL  time.Duration
 	ClaimWait time.Duration
+	// OrgSlotsPerProvider is how many runs of one organization may use one
+	// of its own provider keys at once; orgSlotsPerProvider when 0.
+	OrgSlotsPerProvider int
 }
 
 // ProviderSetup is one Bifrost provider and its key slots. In proxied mode

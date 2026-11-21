@@ -9,6 +9,7 @@
 # Steps:
 #   1. deploy/hosted/.env: created from .env.example with random database and
 #      gateway secrets (chmod 600); --domain and --email fill in the site.
+#      HEIMDALL_MASTER_KEY is generated when missing, never replaced.
 #   2. build the server image (and the runner image with --demo-runner);
 #      --no-build uses the images already there (HEIMDALL_IMAGE)
 #   3. start Postgres, apply database migrations (bifrost-bench db migrate)
@@ -57,6 +58,13 @@ if [ ! -f "$ENV_FILE" ]; then
 	for k in HEIMDALL_PG_PASSWORD BIFROST_SETUP_TOKEN BIFROST_PG_PASSWORD BENCH_FAULTPROXY_TOKEN; do
 		env_set "$k" "$(random_hex)"
 	done
+fi
+# The keystore master key (provider keys, org secrets). An env file made
+# before the key existed gets one too; an existing key is never replaced,
+# since that would make every stored key unreadable.
+if [ -z "$(env_get HEIMDALL_MASTER_KEY)" ]; then
+	log "generating HEIMDALL_MASTER_KEY (keep a copy in your secrets manager: backups leave it out)"
+	env_set HEIMDALL_MASTER_KEY "$(openssl rand -base64 32)"
 fi
 [ -n "$(env_get HEIMDALL_BENCH_DIR)" ] || env_set HEIMDALL_BENCH_DIR "$BENCH_DIR"
 [ -z "$domain" ] || env_set HEIMDALL_DOMAIN "$domain"

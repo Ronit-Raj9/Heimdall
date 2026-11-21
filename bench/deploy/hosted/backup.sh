@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Back up a hosted Heimdall (docs/hosting.md, Backups):
 #
-#   deploy/hosted/backup.sh [--dir /var/backups/heimdall] [--db-only] [--keep-days 14]
+#   deploy/hosted/backup.sh [--dir /var/backups/heimdall] [--db-only] [--keep-days 14] [--env-dir DIR]
 #
 #   --dir defaults to $HEIMDALL_BACKUP_DIR, else /var/backups/heimdall.
 #
@@ -25,8 +25,18 @@
 #   archives   are written with the server container paused (docker compose
 #              pause), so no run, seal or release is half-written into them;
 #              requests wait for the length of the tar and then continue.
-#   env file   a copy of deploy/hosted/.env (it holds the database password
-#              and the gateway secrets; the backup folder is chmod 700)
+#   env file   deploy/hosted/.env holds HEIMDALL_MASTER_KEY (it decrypts every
+#              stored provider key) and the database password, so it is never
+#              copied next to the database dump in plain text. With
+#              HEIMDALL_BACKUP_PASSPHRASE_FILE set (a file holding a
+#              passphrase, kept elsewhere) an encrypted copy is written:
+#              heimdall-env-<UTC time>.enc (openssl enc -aes-256-cbc -pbkdf2;
+#              decrypt with openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000
+#              -pass file:<passphrase file> -in <file>). With
+#              --env-dir DIR a plain copy goes to DIR, which must be another
+#              folder (another disk or a secrets vault mount). With neither,
+#              the env file is left out with a warning: keep it, or at least
+#              HEIMDALL_MASTER_KEY, in your secrets manager.
 #
 # Older backups than --keep-days (default 14) are deleted. Copy the folder
 # off the machine (rsync, restic, the provider's snapshots): a backup on the
@@ -35,12 +45,14 @@ set -euo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-dir=${HEIMDALL_BACKUP_DIR:-/var/backups/heimdall} db_only='' keep_days=14
+dir=${HEIMDALL_BACKUP_DIR:-/var/backups/heimdall} db_only='' keep_days=14 env_dir=''
+passphrase_file=${HEIMDALL_BACKUP_PASSPHRASE_FILE:-}
 while [ $# -gt 0 ]; do
 	case $1 in
 	--dir) dir=${2:?--dir needs a value}; shift 2 ;;
 	--db-only) db_only=1; shift ;;
 	--keep-days) keep_days=${2:?--keep-days needs a value}; shift 2 ;;
+	--env-dir) env_dir=${2:?--env-dir needs a value}; shift 2 ;;
 	-h | --help) header_help "${BASH_SOURCE[0]}"; exit 0 ;;
 	*) die "unknown argument: $1" ;;
 	esac
@@ -52,6 +64,15 @@ require_configured
 umask 077
 mkdir -p "$dir"
 chmod 700 "$dir"
+if [ -n "$env_dir" ]; then
+	mkdir -p "$env_dir"
+	chmod 700 "$env_dir"
+	[ "$(cd "$env_dir" && pwd -P)" != "$(cd "$dir" && pwd -P)" ] || die "--env-dir must be another folder than the backup folder: the env file holds the master key"
+fi
+if [ -n "$passphrase_file" ]; then
+	[ -s "$passphrase_file" ] || die "HEIMDALL_BACKUP_PASSPHRASE_FILE $passphrase_file is missing or empty"
+	need openssl
+fi
 ts=$(date -u +%Y%m%dT%H%M%SZ)
 # One backup at a time per folder: two overlapping runs would each pause and
 # unpause the server under the other's archive.
@@ -113,7 +134,20 @@ db_file=$dir/heimdall-db-$ts.dump
 log "dumping the database to $db_file"
 hc exec -T postgres pg_dump -U heimdall -d heimdall --format=custom --no-owner >"$db_file.part"
 mv "$db_file.part" "$db_file"
-cp "$ENV_FILE" "$dir/heimdall-env-$ts"
+# The env file holds the master key: never a plain copy beside the dump.
+if [ -n "$passphrase_file" ]; then
+	openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass "file:$passphrase_file" -in "$ENV_FILE" -out "$dir/heimdall-env-$ts.enc.part"
+	mv "$dir/heimdall-env-$ts.enc.part" "$dir/heimdall-env-$ts.enc"
+	log "env file encrypted to $dir/heimdall-env-$ts.enc"
+fi
+if [ -n "$env_dir" ]; then
+	cp "$ENV_FILE" "$env_dir/heimdall-env-$ts"
+	chmod 600 "$env_dir/heimdall-env-$ts"
+	log "env file copied to $env_dir (kept apart from the database dump)"
+fi
+if [ -z "$passphrase_file" ] && [ -z "$env_dir" ]; then
+	log "warning: $ENV_FILE (HEIMDALL_MASTER_KEY, database password) is not in this backup. Keep it in your secrets manager, or set HEIMDALL_BACKUP_PASSPHRASE_FILE for an encrypted copy or pass --env-dir for a copy in another folder. Without the master key, stored provider keys cannot be decrypted after a restore."
+fi
 
 mirror_rc=0
 if [ -z "$db_only" ]; then

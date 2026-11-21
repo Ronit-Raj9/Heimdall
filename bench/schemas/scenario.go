@@ -616,6 +616,9 @@ type WorkerInfo struct {
 	Labels  []string  `json:"labels,omitempty"`
 	TokenID string    `json:"token_id,omitempty"`
 	GPUs    []GPUInfo `json:"gpus,omitempty"` // X7: the GPUs the worker registered
+	// Disk is the free disk the worker last reported with a lease request
+	// (E6); Low means it takes no work until space is freed.
+	Disk *WorkerDisk `json:"disk,omitempty"`
 }
 
 // External API modes (ExternalAPI.Mode, Experiment.External). Live and record

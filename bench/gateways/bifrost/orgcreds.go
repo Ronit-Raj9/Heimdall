@@ -144,7 +144,7 @@ func (g *Gateway) applyOrgProvider(ctx context.Context, reg OrgSlotRegistrar, st
 			model = shared.Model
 		}
 	}
-	n := max(orgSlotsPerProvider, len(keys))
+	n := max(g.orgSlotsPer(), len(keys))
 	_, spec, custom := schemas.ResolveBifrostProvider(keys[0].Provider)
 	direct := spec.Route == schemas.RouteDirect
 	setup := ProviderSetup{Name: provider, Mode: ModeProxied, Model: model, Custom: custom}
@@ -336,4 +336,13 @@ func (g *Gateway) orgSlotProvider(slot string) (ProviderSetup, bool) {
 		}
 	}
 	return ProviderSetup{}, false
+}
+
+// orgSlotsPer is the configured slots per organization provider
+// (Config.OrgSlotsPerProvider), orgSlotsPerProvider when unset.
+func (g *Gateway) orgSlotsPer() int {
+	if g.cfg.OrgSlotsPerProvider > 0 {
+		return g.cfg.OrgSlotsPerProvider
+	}
+	return orgSlotsPerProvider
 }

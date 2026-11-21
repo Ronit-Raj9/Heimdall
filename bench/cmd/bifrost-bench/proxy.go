@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -27,7 +28,8 @@ func runProxy(args []string) int {
 	upstream := fs.String("upstream", envOr("BENCH_FAULTPROXY_UPSTREAM", defaultUpstream()), `"scripted" or the provider URL, e.g. https://api.anthropic.com`)
 	ledger := fs.String("ledger", envOr("BENCH_FAULTPROXY_LEDGER", "faultproxy.ledger.jsonl"), "ledger file path")
 	_ = fs.String("config", "", "bench config (accepted for compose; the proxy reads only its flags and environment)")
-	slots := fs.String("slots", "fp-slot-1,fp-slot-2,fp-slot-3,fp-slot-4", "comma-separated key slots; each slot's placeholder key value equals its name")
+	slots := fs.String("slots", envOr("BENCH_FAULTPROXY_SLOTS", ""), "comma-separated anthropic key slots; each slot's placeholder key value equals its name (empty: fp-slot-1..N, N from -slots-per-provider)")
+	perProvider := fs.Int("slots-per-provider", envInt("BENCH_FAULTPROXY_SLOTS_PER_PROVIDER", 4), "key slots of every provider no list names (<prefix>-slot-1..N): how many runs may use one provider at once; keep in step with gateway.slots_per_provider")
 	openaiSlots := fs.String("openai-slots", envOr("BENCH_FAULTPROXY_OPENAI_SLOTS", ""), "comma-separated key slots of the openai provider (empty: oa-slot-1..4); keep in step with gateway.openai_key_slots")
 	debug := fs.Bool("debug", false, "debug logging")
 	if err := fs.Parse(args); err != nil {
@@ -50,7 +52,11 @@ func runProxy(args []string) int {
 		}
 		cfg.Providers = list
 	}
+	if *perProvider < 1 || *perProvider > 256 {
+		return fail("-slots-per-provider must be 1 to 256, got %d", *perProvider)
+	}
 	cfg.Slots = proxySlots(*slots, *openaiSlots)
+	cfg.SlotsPerProvider = *perProvider
 	if *upstream != "scripted" && cfg.UpstreamKey == "" {
 		return fail("upstream %s needs ANTHROPIC_API_KEY in the environment", *upstream)
 	}
@@ -63,11 +69,23 @@ func runProxy(args []string) int {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	logger.Info("fault proxy listening on %s (control %s, upstream %s, %d slots)", *listen, *control, *upstream, len(cfg.Slots))
+	logger.Info("fault proxy listening on %s (control %s, upstream %s)", *listen, *control, *upstream)
+	for _, c := range srv.Concurrency() {
+		logger.Info("provider %s: %d slots (runs at once)", c.Provider, c.Slots)
+	}
 	if err := srv.ListenAndServe(ctx); err != nil && ctx.Err() == nil {
 		return fail("fault proxy: %v", err)
 	}
 	return exitOK
+}
+
+// envInt is the integer value of key, or def when it is empty or not a
+// number.
+func envInt(key string, def int) int {
+	if n, err := strconv.Atoi(strings.TrimSpace(os.Getenv(key))); err == nil {
+		return n
+	}
+	return def
 }
 
 // defaultUpstream is the real Anthropic API when a key is present, otherwise

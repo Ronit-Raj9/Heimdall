@@ -178,6 +178,8 @@ func runSharedRunner(args []string) int {
 	if prefix == "" {
 		prefix = "shared-" + host
 	}
+	hy := newRunnerHygiene(a) // E6: one sweep for every org's loop: they share this runner's store and Docker (runnerhygiene.go)
+	go hy.Run(ctx)
 	var wg sync.WaitGroup
 	start := func(org, token string, slots int) *sharedLoop {
 		lctx, cancel := context.WithCancel(ctx)
@@ -196,7 +198,8 @@ func runSharedRunner(args []string) int {
 				sharedEnsureImages(a, reg, root, plan),
 				engine.WorkerOptions{Server: f.server, Token: token, WorkerID: name, Host: host, Version: benchVersion,
 					Slots: slots, Logger: a.logger, Pool: sharedpool.Pool, Labels: []string{"shared", "runtime=" + f.runtime},
-					Jobs: newRunnerJobExecutor(a)}) // gap G05: hosted CLI jobs (runnerjob.go)
+					Jobs: newRunnerJobExecutor(a), // gap G05: hosted CLI jobs (runnerjob.go)
+					Disk: hy.DiskState, ImageUse: hy.NoteImages, KeepRunFolders: a.cfg.Runner.Disk.KeepRunFolders})
 			if err != nil {
 				a.logger.Error("shared runner: worker not started", "org", org, "error", err.Error())
 				return

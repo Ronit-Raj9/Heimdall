@@ -51,6 +51,17 @@ type WorkerRegistered struct {
 // WorkerLeaseRequest is the body of POST /api/bench/workers/lease.
 type WorkerLeaseRequest struct {
 	WorkerID string `json:"worker_id"`
+	// Disk is the runner's free disk on its run store (E6). With Low set the
+	// runner asks for no work: the coordinator records it and leases nothing.
+	Disk *WorkerDisk `json:"disk,omitempty"`
+}
+
+// WorkerDisk is a runner's free disk on its run store and the floor it keeps
+// (runner.disk.min_free_gb). Low is FreeBytes below MinFreeBytes.
+type WorkerDisk struct {
+	FreeBytes    int64 `json:"free_bytes"`
+	MinFreeBytes int64 `json:"min_free_bytes"`
+	Low          bool  `json:"low"`
 }
 
 // WorkerLease is one slot the coordinator leased to a worker. The worker

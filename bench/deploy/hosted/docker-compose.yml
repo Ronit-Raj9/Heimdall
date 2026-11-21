@@ -223,6 +223,9 @@ services:
       BENCH_FAULTPROXY_LISTEN: ":9100"
       BENCH_FAULTPROXY_CONTROL_LISTEN: "0.0.0.0:9101"
       BENCH_FAULTPROXY_LEDGER: /var/lib/heimdall/ledger.jsonl
+      # Runs that may use one provider at once through this proxy, shared by
+      # every runner here; runners set the same count (gateway slots).
+      BENCH_FAULTPROXY_SLOTS_PER_PROVIDER: ${HEIMDALL_PROVIDER_SLOTS:-32}
       # Provider keys live here only. Empty: the scripted model, no spend.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -302,6 +305,9 @@ services:
       BENCH_NETWORKS_EVAL: ${HEIMDALL_EVAL_NETWORK:-heimdall-evalnet}
       BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
       BENCH_FAULTPROXY_TOKEN: ${BENCH_FAULTPROXY_TOKEN:-}
+      BENCH_GATEWAY_SLOTS_PER_PROVIDER: ${HEIMDALL_PROVIDER_SLOTS:-32}
+      BENCH_GATEWAY_ORG_SLOTS_PER_PROVIDER: ${HEIMDALL_PROVIDER_SLOTS:-32}
+      BENCH_RUNNER_DISK_MIN_FREE_GB: ${HEIMDALL_RUNNER_MIN_FREE_GB:-10}
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -370,6 +376,9 @@ services:
       BENCH_NETWORKS_EVAL: ${HEIMDALL_EVAL_NETWORK:-heimdall-evalnet}
       BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
       BENCH_FAULTPROXY_TOKEN: ${BENCH_FAULTPROXY_TOKEN:-}
+      BENCH_GATEWAY_SLOTS_PER_PROVIDER: ${HEIMDALL_PROVIDER_SLOTS:-32}
+      BENCH_GATEWAY_ORG_SLOTS_PER_PROVIDER: ${HEIMDALL_PROVIDER_SLOTS:-32}
+      BENCH_RUNNER_DISK_MIN_FREE_GB: ${HEIMDALL_RUNNER_MIN_FREE_GB:-10}
       HEIMDALL_SHARED_PROJECTS_DIR: /var/lib/heimdall/runs/projects
       HEIMDALL_SHARED_PROJECTS_MIRROR: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}/projects
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
