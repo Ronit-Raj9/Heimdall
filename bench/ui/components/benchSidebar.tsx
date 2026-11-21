@@ -178,7 +178,7 @@ function Brand({ form }: { form: NavForm }) {
 			)}
 			data-testid="nav-brand"
 		>
-			<span className="from-primary to-primary/75 text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br shadow-sm">
+			<span className="bg-foreground text-background flex size-8 shrink-0 items-center justify-center rounded-lg">
 				<HeimdallMark className="size-5" />
 			</span>
 			<span className={cn("text-foreground truncate text-base leading-5 font-semibold tracking-[-0.015em]", labelClass)} title={t("app.tagline")}>

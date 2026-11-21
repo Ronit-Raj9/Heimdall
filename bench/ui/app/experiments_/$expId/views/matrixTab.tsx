@@ -1,5 +1,4 @@
 import { MatrixReport } from "@/components/matrix/matrixReport";
-import { ModeBadge } from "@/components/modeBadge";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
 import { useGetModelMatrixQuery } from "@/lib/store/apis/benchApi";
@@ -29,7 +28,6 @@ export function MatrixTab({ expId }: { expId: string }) {
 	return (
 		<div className="flex flex-col gap-6" data-testid="matrix-screen">
 			<div className="flex flex-wrap items-center gap-2">
-				<ModeBadge mode={matrix.data.mode} />
 				<GradeSourceTag source={matrix.data.grade_source} testId="matrix-source" />
 			</div>
 			<MatrixReport matrix={matrix.data} onCondition={(next) => void setCondition(next)} />

@@ -1,4 +1,3 @@
-import { ModeBadge } from "@/components/modeBadge";
 import { ReceiptFunnel } from "@/components/receipts/receiptFunnel";
 import { catalogProbeFor } from "@/components/receipts/receipts.utils";
 import { RunReceiptPanel } from "@/components/receipts/runReceiptPanel";
@@ -60,10 +59,6 @@ function ExperimentReceipts({ expId, suite }: { expId: string; suite?: string })
 
 	return (
 		<div className="flex flex-col gap-6">
-			<div className="flex flex-wrap items-center gap-3">
-				<ModeBadge mode={diagnostics.data.mode} />
-			</div>
-
 			<div className="flex flex-col gap-2">
 				<span className="text-muted-foreground text-xs font-medium" id="receipts-conditions-label">
 					{t("receipts.conditions")}

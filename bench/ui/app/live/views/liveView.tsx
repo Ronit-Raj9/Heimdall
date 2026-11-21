@@ -1,5 +1,4 @@
 import { LiveBody } from "@/components/livescore/livePanel";
-import { ModeBadge } from "@/components/modeBadge";
 import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
@@ -32,7 +31,6 @@ export default function LiveView() {
 			<PageHeader
 				title={t("live.title")}
 				subtitle={t("live.subtitle")}
-				meta={<ModeBadge mode={data?.mode} isLoading={status.isLoading} isError={status.isError && !data} />}
 			/>
 			{status.isLoading ? (
 				<BlockSkeleton rows={5} testId="live-loading" />

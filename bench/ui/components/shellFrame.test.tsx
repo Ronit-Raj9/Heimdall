@@ -83,6 +83,7 @@ describe("BenchHeader", () => {
 		expect(tagOf(html, "header-new-experiment")).toContain('href="/experiments/new"');
 		expect(tagOf(html, "nav-menu-button")).toContain('aria-label="Open navigation"');
 		expect(tagOf(html, "nav-menu-button")).toContain('aria-expanded="false"');
+		expect(html).toMatch(/>(Live|Sample) data</);
 	});
 
 	it("hides New experiment from viewers, demo visitors and the form itself", () => {

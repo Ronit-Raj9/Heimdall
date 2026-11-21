@@ -22,7 +22,7 @@ export interface PageHeaderProps {
 	/** Badges beside the title (data mode, grading). */
 	meta?: ReactNode;
 	breadcrumbs?: Crumb[];
-	/** Optional icon before the title, in a soft tile: a lucide component or a rendered node. */
+	/** Optional small muted icon before the title: a lucide component or a rendered node. */
 	icon?: ComponentType<{ className?: string }> | ReactNode;
 	className?: string;
 	testId?: string;
@@ -72,11 +72,11 @@ export function PageHeader({ title, subtitle, actions, meta, breadcrumbs, icon, 
 					</ol>
 				</nav>
 			)}
-			<div className="flex min-w-0 flex-wrap items-start gap-x-4 gap-y-3">
+			<div className="flex min-w-0 flex-wrap items-start gap-x-3 gap-y-3">
 				{iconNode && (
 					<span
 						aria-hidden="true"
-						className="bg-primary/10 text-primary dark:bg-primary/15 mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl"
+						className="text-muted-foreground mt-1.5 flex shrink-0 items-center"
 						data-testid="page-header-icon"
 					>
 						{iconNode}
@@ -101,7 +101,7 @@ function renderIcon(icon: PageHeaderProps["icon"]): ReactNode {
 	// A component: lucide icons are forwardRef objects, plain icons are functions.
 	if (typeof icon === "function" || (typeof icon === "object" && "$$typeof" in (icon as object))) {
 		const Icon = icon as ComponentType<{ className?: string }>;
-		return <Icon className="size-5" />;
+		return <Icon className="size-4" />;
 	}
 	return icon as ReactNode;
 }

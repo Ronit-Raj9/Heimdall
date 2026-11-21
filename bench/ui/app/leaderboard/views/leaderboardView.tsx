@@ -23,7 +23,6 @@ import { LeaderboardFootnote } from "@/components/leaderboard/leaderboardFootnot
 import { LeaderboardTable } from "@/components/leaderboard/leaderboardTable";
 import { Podium } from "@/components/leaderboard/podium";
 import { SuiteTabs } from "@/components/leaderboard/suiteTabs";
-import { ModeBadge } from "@/components/modeBadge";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { GRADE_SOURCE_MODES, GradeSourcePicker } from "@/components/review/gradeSourcePicker";
 import { ReviewedBadge } from "@/components/review/reviewedBadge";
@@ -127,7 +126,6 @@ export function LeaderboardTab() {
 				<p className="text-muted-foreground max-w-3xl text-sm" data-testid="leaderboard-explainer">
 					{t("leaderboard.subtitle")}
 				</p>
-				<ModeBadge mode={data?.mode} isLoading={board.isLoading} isError={board.isError && !data} />
 				{judged && <GradingBadge grading="judged" testId="leaderboard-judged-badge" />}
 				<ReviewedBadge
 					reviewed={data?.reviewed_runs}

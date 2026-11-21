@@ -1,4 +1,3 @@
-import { ModeBadge } from "@/components/modeBadge";
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
 import { EmptyState, EntityLink } from "@/components/shell";
 import { TriageBanner } from "@/components/triage/triageBanner";
@@ -93,7 +92,6 @@ function ExperimentTriage({ expId }: { expId: string }) {
 				title={t("triage.table.title")}
 				description={t("triage.table.description")}
 				testId="triage-table-section"
-				actions={<ModeBadge mode={triage.data.mode} />}
 			>
 				{!observed ? (
 					<EmptyState compact icon={SearchCheck} message={t("triage.empty")} testId="triage-empty" />

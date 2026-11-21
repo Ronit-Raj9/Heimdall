@@ -28,7 +28,7 @@ describe("InboxBody", () => {
 		expect(rows(html)).toEqual(["inc-3f9a1c2b7d10"]);
 		expect(html).toContain('data-testid="inbox-select-item"');
 		expect(html).toContain("2 new test tasks made from the inbox");
-		expect(html).toContain('data-testid="mode-badge-synthetic"');
+		expect(html).not.toContain('data-testid="mode-badge-synthetic"');
 		expect(html).toContain('data-testid="inbox-sources-table"');
 		expect(html).not.toContain('data-testid="inbox-ingest-off"');
 	});

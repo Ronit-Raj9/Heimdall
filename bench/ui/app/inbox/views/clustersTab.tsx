@@ -12,7 +12,6 @@ import {
 	parseExpList,
 	type ClusterQuery,
 } from "@/components/clusters/clusters.utils";
-import { ModeBadge } from "@/components/modeBadge";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { runLocations, type RunLocation } from "@/components/triage/triage.utils";
 import { Button } from "@/components/ui/button";
@@ -74,7 +73,6 @@ export default function ClustersTab() {
 		<section className="flex min-w-0 flex-col gap-6" data-testid="clusters-screen">
 			<div className="flex flex-wrap items-center gap-3">
 				<p className="text-muted-foreground max-w-3xl text-sm">{t("clusters.subtitle")}</p>
-				<ModeBadge mode={data?.mode} isLoading={list.isLoading} isError={list.isError && !data} />
 			</div>
 			<ClustersBanner />
 

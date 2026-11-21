@@ -1,4 +1,3 @@
-import { ModeBadge } from "@/components/modeBadge";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { useGetAgentsQuery } from "@/lib/store";
 import { Button } from "@/components/ui/button";
@@ -38,7 +37,6 @@ export default function AgentsView() {
 						</Link>
 					</Button>
 				}
-				meta={<ModeBadge mode={data?.mode} isLoading={query.isLoading} isError={query.isError && !data} />}
 			/>
 			<RouteTabs tabs={tabs} defaultTab="configs" label={t("agents.tabs.label")} testId="agents-tabs">
 				{(active) =>
