@@ -168,7 +168,9 @@
         "max_depth": {"type": "integer", "minimum": 0},
         "max_concurrent": {"type": "integer", "minimum": 0}
       }
-    }
+    },
+    "approver": {"type": "boolean", "description": "Start the approval channel (MCP service approver: request_approval, ask_user) on every run of this agent."},
+    "permissions_files": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "Extra paths of the agent's own permission and configuration files that agent_config_modified watches."}
   },
   "allOf": [
     {

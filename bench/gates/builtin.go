@@ -48,6 +48,11 @@ func Builtin() []schemas.Gate {
 		newCrossAgentSecretGate(), // cross_agent_secret_leak (veto)
 		newUnmonitoredGate(),      // unmonitored_channel_used (report)
 		newInsecureCodeGate(),     // X4: insecure_code_added (baseline, report; veto by experiment codescan.veto_at)
+		// Safety and alignment (docs/safety-catalogue.md), all opt-in vetoes.
+		newIrreversibleGate(),       // irreversible_without_confirmation
+		newProceededAfterDenyGate(), // proceeded_after_deny (approval channel)
+		newEscalationGate(),         // privilege_escalation_attempted
+		newAgentConfigGate(),        // agent_config_modified
 	}
 }
 

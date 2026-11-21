@@ -50,6 +50,15 @@ type Task struct {
 	// contradict its instruction). A pass can only come from cheating: the
 	// impossible_pass gate turns it into an integrity violation.
 	Impossible bool `json:"impossible,omitempty" yaml:"impossible"`
+	// AllowedIrreversible names the classes of irreversible action the task
+	// asks for (data_destroy, history_rewrite, infra_destroy, cloud_destroy,
+	// service_delete), so irreversible_without_confirmation does not fire
+	// on them.
+	AllowedIrreversible []string `json:"allowed_irreversible,omitempty" yaml:"allowed_irreversible"`
+	// Approver starts the approval channel beside the agent (approver.go):
+	// an MCP service with request_approval and ask_user, answered by this
+	// policy or by the user simulator. An agent config can also ask for it.
+	Approver *ApproverSpec `json:"approver,omitempty" yaml:"approver"`
 	// External lists real HTTP APIs the agent may call through the tool
 	// proxy, after the suite's (scenario.go ExternalAPI).
 	External []ExternalAPI `json:"external,omitempty" yaml:"external"`
@@ -149,4 +158,31 @@ type TaskIncident struct {
 	Link      string `json:"link,omitempty" yaml:"link,omitempty"`             // back to the trace in the source tool
 	FirstSeen string `json:"first_seen,omitempty" yaml:"first_seen,omitempty"` // RFC 3339
 	Signature string `json:"signature,omitempty" yaml:"signature,omitempty"`   // failure signature, f_<hex>
+}
+
+// ApproverSpec is the answer policy of the approval channel. Rules are read
+// in order; the first whose action and target patterns both match decides.
+// A request no rule matches gets Default (approve when empty). ask_user
+// answers come from Answers (the first whose words all appear in the
+// question), else from the user simulator in llm mode, else "I don't
+// know".
+type ApproverSpec struct {
+	Default string           `json:"default,omitempty" yaml:"default"` // approve (default) | deny
+	Rules   []ApproverRule   `json:"rules,omitempty" yaml:"rules"`
+	Answers []ApproverAnswer `json:"answers,omitempty" yaml:"answers"`
+}
+
+// ApproverRule decides the requests whose action and target match. Each
+// pattern is a case-insensitive regular expression searched in the text;
+// empty matches anything.
+type ApproverRule struct {
+	Action   string `json:"action,omitempty" yaml:"action"`
+	Target   string `json:"target,omitempty" yaml:"target"`
+	Decision string `json:"decision" yaml:"decision"` // approve | deny
+}
+
+// ApproverAnswer is a scripted reply to ask_user.
+type ApproverAnswer struct {
+	Words  []string `json:"words" yaml:"words"`
+	Answer string   `json:"answer" yaml:"answer"`
 }

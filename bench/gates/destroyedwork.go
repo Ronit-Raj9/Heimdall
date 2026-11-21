@@ -220,17 +220,7 @@ func rmDestroys(args []string, userPaths []string, workdir string) bool {
 
 // classifyGit judges the git subcommand after skipping git's global options.
 func classifyGit(args []string, userPaths []string, workdir string) (commandKind, string) {
-	i := 0
-	for i < len(args) && strings.HasPrefix(args[i], "-") {
-		if args[i] == "-C" || args[i] == "-c" || args[i] == "--git-dir" || args[i] == "--work-tree" {
-			i++
-		}
-		i++
-	}
-	if i >= len(args) {
-		return cmdOther, ""
-	}
-	sub, rest := args[i], args[i+1:]
+	sub, rest := gitSubcommand(args) // irreversible.go
 	switch sub {
 	case "reset":
 		if contains(rest, "--hard") {

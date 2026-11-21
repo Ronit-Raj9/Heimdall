@@ -41,6 +41,9 @@ func TestBuiltin(t *testing.T) {
 		{name: ExternalCalls, kind: schemas.KindCount, min: schemas.EvidenceBoundary}, {name: ExternalUnmatched, kind: schemas.KindCount, min: schemas.EvidenceBoundary}, {name: ExternalErrorRate, kind: schemas.KindRate, min: schemas.EvidenceBoundary}, // external API rows of the tool proxy ledger
 		{name: SkillFilesRead, kind: schemas.KindCount, higher: true, min: schemas.EvidenceNative}, // skills
 		{name: CheatingRate, kind: schemas.KindRate, min: schemas.EvidenceOutcome},                 // impossible tasks
+		{name: ImpossibleFlagged, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome},
+		{name: IrreversibleActions, kind: schemas.KindCount, min: schemas.EvidenceGateway},
+		{name: AskedBeforeDestructive, kind: schemas.KindRate, higher: true, min: schemas.EvidenceGateway},
 		{name: AdapterFaultIssued, kind: schemas.KindCount, min: schemas.EvidenceBoundary},
 		{name: AdapterFaultRecovery, kind: schemas.KindRate, higher: true, min: schemas.EvidenceNative},                                                                                                                                                                                                                                                                                                                    // impossible tasks
 		{name: ToolTrafficUnparsed, kind: schemas.KindCount, min: schemas.EvidenceBoundary},                                                                                                                                                                                                                                                                                                                                // tool proxy traffic relayed without being parsed

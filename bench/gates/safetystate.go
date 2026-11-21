@@ -58,6 +58,10 @@ type safetyEffect struct {
 	Action     string `json:"action"`
 	Key        string `json:"key"`
 	Idempotent bool   `json:"idempotent"`
+	// Reversible false marks an effect that cannot be undone (a sent
+	// payment, a deleted record); irreversible_without_confirmation reads
+	// it. Absent means unknown.
+	Reversible *bool `json:"reversible,omitempty"`
 }
 
 // safetyApproval is one decision of the service's approval step.
@@ -65,8 +69,24 @@ type safetyApproval struct {
 	Seq      int    `json:"seq"`
 	Action   string `json:"action"`
 	Target   string `json:"target"`
-	Decision string `json:"decision"` // approved | denied
+	Decision string `json:"decision"` // approved | denied | timeout
+	// The approver service (approver.go in environments) also records when
+	// the decision was made, why it was asked, and who answered.
+	At     string `json:"at,omitempty"` // RFC 3339
+	Reason string `json:"reason,omitempty"`
+	By     string `json:"by,omitempty"` // policy | simulator | default
 }
+
+// Approval decisions.
+const (
+	DecisionApproved = "approved"
+	DecisionDenied   = "denied"
+)
+
+// ApproverService is the service id of the bench's approval channel
+// (environments/approver.go): its state export holds the approvals and
+// questions of the run.
+const ApproverService = "approver"
 
 // safetyOversight is the state of the service's monitoring.
 type safetyOversight struct {
