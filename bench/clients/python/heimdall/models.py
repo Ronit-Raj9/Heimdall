@@ -1997,6 +1997,9 @@ class Budgets(_BudgetsRequired, total=False):
 class BuildOptions(TypedDict, total=False):
     allow_services: List[str]
     budget_usd: float
+    key_id: str
+    model: str
+    provider: str
     secrets: List[str]
 
 
@@ -3053,6 +3056,8 @@ class _ConnectFirstLookResponseRequired(TypedDict):
 
 
 class ConnectFirstLookResponse(_ConnectFirstLookResponseRequired, total=False):
+    bare_model: Optional[EvaluationSpec]
+    bare_model_reason: str
     reference: Any
 
 
@@ -6007,6 +6012,9 @@ class _IssueRetryRequired(TypedDict):
 class IssueRetry(_IssueRetryRequired, total=False):
     allow_services: List[str]
     budget_usd: float
+    key_id: str
+    model: str
+    provider: str
     secrets: List[str]
 
 
@@ -6023,8 +6031,14 @@ class IssueRunList(TypedDict):
     runs: List[State_pipeline]
 
 
-class IssueRunStart(TypedDict):
+class _IssueRunStartRequired(TypedDict):
     consent: bool
+
+
+class IssueRunStart(_IssueRunStartRequired, total=False):
+    key_id: str
+    model: str
+    provider: str
 
 
 class _ItemRequired(TypedDict):
@@ -6952,6 +6966,12 @@ class _ModelRequired(TypedDict):
 class Model(_ModelRequired, total=False):
     excluded: Dict[str, int]
     open: bool
+
+
+class ModelChoice(TypedDict, total=False):
+    key_id: str
+    model: str
+    provider: str
 
 
 class _ModelKeyRequestRequired(TypedDict):
@@ -8058,19 +8078,26 @@ class PolicyClausesRequest(TypedDict):
     clauses: List[Clause]
 
 
-class PolicyDocList(TypedDict):
+class _PolicyDocListRequired(TypedDict):
     docs: List[PolicyDocSummary]
     suite: str
 
 
-class PolicyDocSummary(TypedDict):
+class PolicyDocList(_PolicyDocListRequired, total=False):
+    limited: bool
+
+
+class _PolicyDocSummaryRequired(TypedDict):
+    id: str
+    title: str
+    uploaded_at: str
+
+
+class PolicyDocSummary(_PolicyDocSummaryRequired, total=False):
     clauses: int
     drafts: Dict[str, int]
     format: str
-    id: str
     name: str
-    title: str
-    uploaded_at: str
 
 
 class _PolicyDocUploadRequired(TypedDict):
@@ -9390,6 +9417,7 @@ class Report_reportcard(_Report_reportcardRequired, total=False):
     bifrost: List[BifrostRow]
     failover: Optional[Report_failover]
     learning: List[LearningRow]
+    mcp_route: str
     mode: str
     note: str
     overall: Optional[OverallVerdict]
@@ -10201,6 +10229,7 @@ class RunEvidenceContract(_RunEvidenceContractRequired, total=False):
 
 
 class RunGatewayInfo(TypedDict, total=False):
+    budget_refused_calls: int
     fault_path: str
     key_slot: str
     org_key_id: str
@@ -11396,6 +11425,7 @@ class _State_pipelineRequired(TypedDict):
 
 class State_pipeline(_State_pipelineRequired, total=False):
     benchmark: str
+    builder_model: ModelChoice
     detail: str
     envs: Dict[str, BuildResult]
     log: List[LogLine]
@@ -15125,6 +15155,7 @@ __all__ = [
     'MockOperation',
     'MockParent',
     'Model',
+    'ModelChoice',
     'ModelKeyRequest',
     'ModelKeyResponse',
     'ModelKeyTestResponse',
