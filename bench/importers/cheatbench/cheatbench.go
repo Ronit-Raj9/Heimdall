@@ -959,7 +959,7 @@ func writeTask(suiteDir string, t task, force bool) error {
 		}
 	}
 	var env *envYAML
-	if len(t.Row.FilesAbs) > 0 || inImage || t.Mirror != nil {
+	if len(t.Row.FilesAbs) > 0 || inImage || t.Mirror != nil || t.Review != nil {
 		if err := os.MkdirAll(filepath.Join(dir, "env", "abs"), 0o755); err != nil {
 			return err
 		}
@@ -975,6 +975,9 @@ func writeTask(suiteDir string, t task, force bool) error {
 		df, buildNet := taskDockerfile, false
 		if inImage {
 			df = taskDockerfileWorkspace
+		}
+		if t.Review != nil {
+			buildNet = true // the review service installs its client libraries (services build with the task's build_network)
 		}
 		if t.Leaderboard != "" {
 			df = strings.Replace(df, "USER agent\n", cairoInstall+"USER agent\n", 1)
