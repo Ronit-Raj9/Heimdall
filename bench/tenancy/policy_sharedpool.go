@@ -13,4 +13,5 @@ func init() {
 	PlatformPolicy[key("GET", api+"/admin/quotas/{id}")] = userOnly()
 	PlatformPolicy[key("PUT", api+"/admin/quotas/{id}")] = userOnly()
 	PlatformPolicy[key("GET", api+"/admin/pool/assignments")] = public()
+	PlatformPolicy[key("POST", api+"/admin/pool/assignments/{org}/token")] = public()
 }

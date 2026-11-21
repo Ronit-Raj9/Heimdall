@@ -142,7 +142,7 @@ func (e *dockerWorkspace) startNetWatch(ctx context.Context, rc *schemas.RunCont
 	watch = append(watch, "--network", "container:"+w.holder, "--user", "0", "--cap-drop", "ALL", "--cap-add", "NET_RAW",
 		"--security-opt", "no-new-privileges", "--read-only", "--pids-limit", "16", "--memory", "128m",
 		"--entrypoint", "python3", image, "-u", "-c", netwatchScript)
-	w.cmd = exec.Command(dockerBinary(e.cfg.Docker), watch...)
+	w.cmd = e.cfg.Docker.Command(context.Background(), watch...)
 	w.cmd.Stderr = &w.stderr
 	stdout, err := w.cmd.StdoutPipe()
 	if err != nil {

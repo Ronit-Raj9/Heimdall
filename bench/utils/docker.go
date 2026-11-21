@@ -35,6 +35,9 @@ type DockerResult struct {
 // Docker runs the docker CLI. The zero value uses "docker" from PATH.
 type Docker struct {
 	Binary string
+	// Policy confines the calls of a shared runner's org (dockerpolicy.go);
+	// nil changes nothing.
+	Policy *DockerPolicy
 }
 
 // Run executes `docker args...`. A non-zero exit is returned in ExitCode with a
@@ -47,7 +50,7 @@ func (d Docker) Run(ctx context.Context, args ...string) (*DockerResult, error) 
 // environment of the docker CLI, so a `-e NAME` flag copies a value that
 // must never appear on a command line (org secrets, G01).
 func (d Docker) RunEnv(ctx context.Context, env []string, args ...string) (*DockerResult, error) {
-	cmd := exec.CommandContext(ctx, d.bin(), args...)
+	cmd := d.command(ctx, args)
 	if len(env) > 0 {
 		cmd.Env = append(os.Environ(), env...)
 	}
@@ -91,8 +94,8 @@ func (d Docker) MustRunEnv(ctx context.Context, env []string, args ...string) (*
 // `docker to`. Both commands must exit 0; the error carries the stderr of the
 // one that failed.
 func (d Docker) Pipe(ctx context.Context, from, to []string) ([]byte, error) {
-	src := exec.CommandContext(ctx, d.bin(), from...)
-	dst := exec.CommandContext(ctx, d.bin(), to...)
+	src := d.command(ctx, from)
+	dst := d.command(ctx, to)
 	var srcErr, dstOut, dstErr bytes.Buffer
 	src.Stderr, dst.Stdout, dst.Stderr = &srcErr, &dstOut, &dstErr
 	r, err := src.StdoutPipe()

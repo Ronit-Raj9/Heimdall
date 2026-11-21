@@ -21,7 +21,9 @@ type spMinter struct{}
 func (spMinter) CreateToken(_ context.Context, org, _ string, req schemas.RunnerTokenCreate) (*schemas.RunnerTokenCreated, error) {
 	return &schemas.RunnerTokenCreated{Token: "hmr_x_" + org, Info: schemas.RunnerTokenView{ID: "rtk1", Pool: req.Pool}}, nil
 }
-func (spMinter) ListTokens(context.Context, string) ([]schemas.RunnerTokenView, error) { return nil, nil }
+func (spMinter) ListTokens(context.Context, string) ([]schemas.RunnerTokenView, error) {
+	return nil, nil
+}
 func (spMinter) RevokeToken(context.Context, string, string) (*schemas.RunnerTokenView, error) {
 	return nil, nil
 }
@@ -83,8 +85,20 @@ func TestSharedPoolRoutes(t *testing.T) {
 	}
 	code, body := spServe(t, h, nil, "GET", "/api/bench/admin/pool/assignments", "", "Bearer s3cret")
 	var as sharedpool.Assignments
-	if code != 200 || json.Unmarshal([]byte(body), &as) != nil || len(as.Assignments) != 1 || as.Assignments[0].Token != "hmr_x_org1" {
-		t.Fatalf("assignments: %d %s", code, body)
+	if code != 200 || json.Unmarshal([]byte(body), &as) != nil || len(as.Assignments) != 1 || strings.Contains(body, "hmr_") {
+		t.Fatalf("assignments (must hold no token): %d %s", code, body)
+	}
+	if code, _ := spServe(t, h, nil, "POST", "/api/bench/admin/pool/assignments/org1/token", "", "Bearer wrong"); code != 401 {
+		t.Fatalf("claim with bad secret: %d", code)
+	}
+	code, body = spServe(t, h, nil, "POST", "/api/bench/admin/pool/assignments/org1/token", "", "Bearer s3cret")
+	var claim sharedpool.ClaimedToken
+	if code != 200 || json.Unmarshal([]byte(body), &claim) != nil || claim.Token != "hmr_x_org1" || claim.OrgID != "org1" {
+		t.Fatalf("claim: %d %s", code, body)
+	}
+	_ = q.Set(context.Background(), "org9", quota.Limits{}, "t")
+	if code, _ := spServe(t, h, nil, "POST", "/api/bench/admin/pool/assignments/org9/token", "", "Bearer s3cret"); code != 404 {
+		t.Fatalf("claim for an org off the pool: %d", code)
 	}
 	_ = q.SetKillSwitch(context.Background(), true, "t")
 	_, body = spServe(t, h, nil, "GET", "/api/bench/admin/pool/assignments", "", "Bearer s3cret")

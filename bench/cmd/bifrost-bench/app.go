@@ -71,6 +71,10 @@ type app struct {
 type appOptions struct {
 	gateway bool // build the Bifrost gateway client and the fault proxy client
 	debug   bool
+	// Shared runner (runnershared.go): one app per served org, with that
+	// org's docker policy and its own eval network.
+	docker      *utils.Docker // nil: the plain docker CLI
+	evalNetwork string        // "": networks.eval from the config
 }
 
 // newApp loads the config and assembles the registry.
@@ -80,7 +84,13 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		return nil, err
 	}
 	logger := utils.NewStdLogger(os.Stderr, opts.debug)
+	if opts.evalNetwork != "" {
+		cfg.Networks.Eval = opts.evalNetwork
+	}
 	a := &app{cfg: cfg, logger: logger, docker: utils.Docker{}, library: suite.LibraryDir()} // built-in library (suite/library.go)
+	if opts.docker != nil {
+		a.docker = *opts.docker
+	}
 
 	st, err := store.NewFSStore(cfg.Path(cfg.RunsRoot), logger)
 	if err != nil {

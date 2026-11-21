@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -190,7 +189,7 @@ func (d Docker) ImageID(ctx context.Context, ref string) (string, bool, error) {
 // A non-zero exit is an error carrying the tail of the output.
 func (d Docker) Stream(ctx context.Context, args []string, out io.Writer) error {
 	tail := &tailBuffer{max: 2048}
-	cmd := exec.CommandContext(ctx, d.bin(), args...)
+	cmd := d.command(ctx, args)
 	cmd.Env = append(os.Environ(), "BUILDX_NO_DEFAULT_ATTESTATIONS=1")
 	w := io.MultiWriter(out, tail)
 	cmd.Stdout, cmd.Stderr = w, w

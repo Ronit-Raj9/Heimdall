@@ -110,22 +110,20 @@ func TestForOrgLibrary(t *testing.T) {
 }
 
 // The shared runner's per-org registry loads library suites, with and
-// without the org's mounted project.
+// without the org's downloaded project.
 func TestSharedOrgProjectLibrary(t *testing.T) {
 	libRoot, orgA, _ := libraryFixture(t)
 	projects := t.TempDir()
 	copyTree(t, orgA, filepath.Join(projects, "org_a"))
 	t.Setenv(suite.LibraryEnv, libRoot)
-	t.Setenv(sharedProjectsEnv, projects)
-	t.Setenv(sharedMirrorEnv, "")
 	a := &app{cfg: &lib.Config{Root: t.TempDir(), BenchmarksRoot: "benchmarks"}, logger: slog.New(slog.NewTextHandler(io.Discard, nil)), reg: &schemas.Registry{}}
 	for _, org := range []string{"org_a", "org_missing"} {
-		reg, _ := sharedOrgProject(context.Background(), a, org)
+		reg, _ := sharedOrgProject(a, filepath.Join(projects, org))
 		if _, err := engine.LoadSuite(context.Background(), reg, "mini"); err != nil {
 			t.Errorf("%s: runner loader misses the library suite: %v", org, err)
 		}
 	}
-	reg, _ := sharedOrgProject(context.Background(), a, "org_a")
+	reg, _ := sharedOrgProject(a, filepath.Join(projects, "org_a"))
 	if _, err := engine.LoadSuite(context.Background(), reg, "a-own"); err != nil {
 		t.Errorf("org_a own suite lost: %v", err)
 	}

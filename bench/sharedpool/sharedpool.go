@@ -1,10 +1,11 @@
 // Package sharedpool is the hosted platform's shared runner pool and its
 // guardrails (web parity lane L03, F3):
 //
-//   - every org with quota.Limits.SharedPool gets a runner token in pool
-//     "shared", minted on demand and kept in the org's keystore (Kind
-//     secret); the shared runner fetches the list of assignments with
-//     HEIMDALL_SHARED_RUNNER_SECRET and runs one worker loop per org;
+//   - every org with quota.Limits.SharedPool is assigned to the shared
+//     runner, which fetches the list (no tokens in it) with
+//     HEIMDALL_SHARED_RUNNER_SECRET, claims one runner token per org in pool
+//     "shared" (a claim revokes the org's earlier token; the server keeps
+//     only hashes), and runs one worker loop per org;
 //   - the shared runner runs only what its own project reproduces: the
 //     server's built-in templates. Custom Docker images need a request
 //     that a server admin approves; images must be pinned by digest
@@ -35,8 +36,8 @@ const (
 	// SecretEnv holds the secret the shared runner presents to fetch its
 	// assignments. Unset, the shared pool is off.
 	SecretEnv = "HEIMDALL_SHARED_RUNNER_SECRET"
-	// TokenLabel and TokenProvider mark the keystore secret that holds an
-	// org's shared pool runner token.
+	// TokenLabel and TokenProvider mark the keystore secret in which older
+	// servers kept an org's shared pool runner token (now removed on claim).
 	TokenLabel    = "shared-runner-token"
 	TokenProvider = "heimdall-shared-pool"
 	// TokenName is the runner token's name in the org's token list.
@@ -113,14 +114,16 @@ type Minter interface {
 	RevokeToken(ctx context.Context, orgID, id string) (*schemas.RunnerTokenView, error)
 }
 
-// Assignment is one org the shared runner serves.
+// Assignment is one org the shared runner serves. It carries no token: the
+// runner claims each org's token once (ClaimToken) and compares TokenID to
+// notice a revoked or rotated token (PROD2 P0 isolation (c)).
 type Assignment struct {
 	OrgID             string   `json:"org_id"`
 	Pool              string   `json:"pool"`
-	Token             string   `json:"token"`
+	TokenID           string   `json:"token_id,omitempty"` // the org's live shared pool token ("" before the first claim)
 	Runtime           string   `json:"runtime"`
 	MaxConcurrentRuns int      `json:"max_concurrent_runs"`
-	Images            []string `json:"images,omitempty"` // approved custom images
+	Images            []string `json:"images,omitempty"` // approved custom images (digest pinned); the runner pulls only these
 }
 
 // Assignments is the answer of GET /api/bench/admin/pool/assignments.
@@ -129,23 +132,60 @@ type Assignments struct {
 	Assignments []Assignment `json:"assignments"`
 }
 
+// ClaimedToken is the answer of POST /api/bench/admin/pool/assignments/{org}/token:
+// a fresh runner token for one org, shown once.
+type ClaimedToken struct {
+	OrgID   string `json:"org_id"`
+	TokenID string `json:"token_id"`
+	Token   string `json:"token"`
+}
+
+// ErrNotAssigned refuses a token claim for an org the shared pool does not serve.
+var ErrNotAssigned = errors.New("organization is not on the shared worker")
+
 // Service builds the shared runner's assignments.
 type Service struct {
 	Quota  quota.Store
-	Keys   keystore.Store
+	Keys   keystore.Store // optional: only to remove token copies older servers kept
 	Minter Minter
 	Images *ImageStore // nil: no custom images
 	// Orgs lists every org id.
 	Orgs func(ctx context.Context) ([]string, error)
 
-	mu sync.Mutex // one mint at a time
+	mu sync.Mutex // one claim at a time
+}
+
+// assigned returns the org's normalized limits and whether the shared pool
+// serves it for runtime ("" any).
+func (s *Service) assigned(ctx context.Context, org, runtime string) (quota.Limits, bool, error) {
+	l, err := s.Quota.Get(ctx, org)
+	if err != nil {
+		return l, false, err
+	}
+	l = quota.Normalize(l)
+	return l, l.SharedPool && (runtime == "" || l.Runtime == runtime), nil
+}
+
+// liveTokenID is the id of the org's unrevoked shared pool token ("" none).
+func (s *Service) liveTokenID(ctx context.Context, org string) (string, error) {
+	toks, err := s.Minter.ListTokens(ctx, org)
+	if err != nil {
+		return "", err
+	}
+	id := ""
+	for _, t := range toks {
+		if t.Pool == Pool && t.Name == TokenName && t.RevokedAt == nil {
+			id = t.ID
+		}
+	}
+	return id, nil
 }
 
 // Assignments lists the orgs the shared runner serves. runtime, when set,
 // keeps only orgs whose limits ask for it (one shared runner per runtime).
-// With the kill switch on, the list is empty.
+// With the kill switch on, the list is empty. No token is in the answer.
 func (s *Service) Assignments(ctx context.Context, runtime string) (*Assignments, error) {
-	if s.Quota == nil || s.Keys == nil || s.Minter == nil || s.Orgs == nil {
+	if s.Quota == nil || s.Minter == nil || s.Orgs == nil {
 		return nil, ErrDisabled
 	}
 	out := &Assignments{Assignments: []Assignment{}}
@@ -162,19 +202,18 @@ func (s *Service) Assignments(ctx context.Context, runtime string) (*Assignments
 		return nil, err
 	}
 	for _, org := range orgs {
-		l, err := s.Quota.Get(ctx, org)
+		l, ok, err := s.assigned(ctx, org, runtime)
 		if err != nil {
 			return nil, err
 		}
-		l = quota.Normalize(l)
-		if !l.SharedPool || (runtime != "" && l.Runtime != runtime) {
+		if !ok {
 			continue
 		}
-		tok, err := s.EnsureToken(ctx, org)
+		id, err := s.liveTokenID(ctx, org)
 		if err != nil {
 			return nil, fmt.Errorf("org %s: %w", org, err)
 		}
-		a := Assignment{OrgID: org, Pool: Pool, Token: tok, Runtime: l.Runtime, MaxConcurrentRuns: l.MaxConcurrentRuns}
+		a := Assignment{OrgID: org, Pool: Pool, TokenID: id, Runtime: l.Runtime, MaxConcurrentRuns: l.MaxConcurrentRuns}
 		if s.Images != nil && l.AllowCustomImages {
 			if a.Images, err = s.Images.Approved(ctx, org); err != nil {
 				return nil, err
@@ -185,41 +224,60 @@ func (s *Service) Assignments(ctx context.Context, runtime string) (*Assignments
 	return out, nil
 }
 
-// EnsureToken returns the org's shared pool runner token, minting one
-// (and revoking stale shared pool tokens) when the keystore has none.
-func (s *Service) EnsureToken(ctx context.Context, orgID string) (string, error) {
+// ClaimToken mints a fresh shared pool runner token for one assigned org
+// and revokes the org's earlier ones, so exactly one live token exists per
+// org and none is kept in readable form: the server stores only its hash.
+// A second claim (another holder of the pool secret, or a restarted
+// runner) revokes the first, which the serving runner notices through the
+// assignment's TokenID; every claim is audited by the caller.
+func (s *Service) ClaimToken(ctx context.Context, org, runtime string) (*ClaimedToken, error) {
+	if s.Quota == nil || s.Minter == nil {
+		return nil, ErrDisabled
+	}
+	if kill, err := s.Quota.KillSwitch(ctx); err != nil {
+		return nil, err
+	} else if kill {
+		return nil, ErrNotAssigned
+	}
+	if _, ok, err := s.assigned(ctx, org, runtime); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, ErrNotAssigned
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	keys, err := s.Keys.List(ctx, orgID, keystore.KindSecret)
+	old, err := s.Minter.ListTokens(ctx, org)
 	if err != nil {
-		return "", err
-	}
-	for _, k := range keys {
-		if k.Label == TokenLabel && k.Provider == TokenProvider {
-			if v, err := s.Keys.Reveal(ctx, orgID, k.ID); err == nil && v != "" {
-				return v, nil
-			}
-			_ = s.Keys.Delete(ctx, orgID, k.ID, Actor) // unreadable: replace it
-		}
-	}
-	old, err := s.Minter.ListTokens(ctx, orgID)
-	if err != nil {
-		return "", err
+		return nil, err
 	}
 	for _, t := range old {
 		if t.Pool == Pool && t.Name == TokenName && t.RevokedAt == nil {
-			if _, err := s.Minter.RevokeToken(ctx, orgID, t.ID); err != nil {
-				return "", err
+			if _, err := s.Minter.RevokeToken(ctx, org, t.ID); err != nil {
+				return nil, err
 			}
 		}
 	}
-	created, err := s.Minter.CreateToken(ctx, orgID, Actor, schemas.RunnerTokenCreate{Pool: Pool, Name: TokenName})
+	s.dropLegacyCopies(ctx, org)
+	created, err := s.Minter.CreateToken(ctx, org, Actor, schemas.RunnerTokenCreate{Pool: Pool, Name: TokenName})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	if _, err := s.Keys.Create(ctx, orgID, keystore.KindSecret, keystore.Put{Provider: TokenProvider, Label: TokenLabel, Value: created.Token}, Actor); err != nil {
-		_, _ = s.Minter.RevokeToken(ctx, orgID, created.Info.ID)
-		return "", err
+	return &ClaimedToken{OrgID: org, TokenID: created.Info.ID, Token: created.Token}, nil
+}
+
+// dropLegacyCopies deletes the readable token copies older servers kept in
+// the org's keystore.
+func (s *Service) dropLegacyCopies(ctx context.Context, org string) {
+	if s.Keys == nil {
+		return
 	}
-	return created.Token, nil
+	keys, err := s.Keys.List(ctx, org, keystore.KindSecret)
+	if err != nil {
+		return
+	}
+	for _, k := range keys {
+		if k.Label == TokenLabel && k.Provider == TokenProvider {
+			_ = s.Keys.Delete(ctx, org, k.ID, Actor)
+		}
+	}
 }
