@@ -122,3 +122,43 @@ func TestMapAndAttacks(t *testing.T) {
 		t.Fatalf("an attack probe was taken for misleading-instruction: %v %v", conds, skipped)
 	}
 }
+
+func TestCatalogNamesUnique(t *testing.T) {
+	seen := map[string]bool{}
+	for _, f := range Catalog {
+		if seen[f.ID] || f.Label == "" || f.Help == "" || f.Group == "" || strings.Contains(f.Help, "—") {
+			t.Fatalf("bad catalog entry %+v", f)
+		}
+		seen[f.ID] = true
+	}
+	if Names[0] != Clean || len(Names) != len(Catalog)+1 {
+		t.Fatalf("names %v", Names)
+	}
+}
+
+func TestConditionsResilience(t *testing.T) {
+	withProxy := &schemas.Suite{ID: "api", External: []schemas.ExternalAPI{{ID: "acme"}}}
+	drift := &schemas.ProbeSpec{ID: "search-v2", Layer: schemas.LayerTool, Apply: schemas.ProbeApply{Tool: &schemas.ToolFault{Mode: "input_drift"}}}
+	withProxy.Probes = []*schemas.ProbeSpec{drift}
+	all := []string{ModelBrownout, ModelSlow, ModelFlaky, ToolRateLimit, ToolSlow, ToolFlaky, ToolPartial, ToolAuthExpired, ToolRemoved, ToolInputDrift, ToolDuplicateEffect, CompoundBrownout}
+	conds, skipped := Conditions(all, withProxy)
+	want := []string{"clean", schemas.GenericProbeModelBrownout, schemas.GenericProbeModelSlow, schemas.GenericProbeModelFlaky,
+		schemas.GenericProbeToolRateLimit, schemas.GenericProbeToolSlow, schemas.GenericProbeToolFlaky, schemas.GenericProbeToolPartial,
+		schemas.GenericProbeToolRemoved, "search-v2", schemas.GenericProbeToolDuplicate, schemas.GenericProbeCompound}
+	if !slices.Equal(conds, want) {
+		t.Fatalf("conds %v\nwant  %v", conds, want)
+	}
+	if len(skipped) != 1 || skipped[0].Fault != ToolAuthExpired {
+		t.Fatalf("skipped %v", skipped)
+	}
+	for _, id := range want[1:] {
+		if p := withProxy.ProbeByID(id); p == nil {
+			t.Fatalf("probe %s does not resolve", id)
+		}
+	}
+	plain := &schemas.Suite{ID: "plain"}
+	conds, skipped = Conditions([]string{ToolRateLimit, CompoundBrownout, ModelBrownout}, plain)
+	if !slices.Equal(conds, []string{"clean", schemas.GenericProbeModelBrownout}) || len(skipped) != 2 {
+		t.Fatalf("plain: %v %v", conds, skipped)
+	}
+}

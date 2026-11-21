@@ -3,19 +3,33 @@ import type { EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
 import type { ModelKey } from "@/lib/types/models";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { groupModels, keyStateFor, modelOptionLabel, providerOfModel, type CatalogProvider } from "@/components/models/groupedModelPicker";
-import { Step4Setup, defaultEvaluationSpec, estimateFailed, estimateNotes, estimateText, specReady, toggleFault } from "./step4Setup";
+import {
+	Step4Setup,
+	defaultEvaluationSpec,
+	estimateFailed,
+	estimateNotes,
+	estimateText,
+	groupFaults,
+	powerText,
+	specReady,
+	toggleFault,
+} from "./step4Setup";
 
 const q = vi.hoisted(() => ({
 	models: {} as Record<string, unknown>,
 	estimate: {} as Record<string, unknown>,
 	estimateArgs: [] as unknown[],
+	faults: {} as Record<string, unknown>,
 }));
-vi.mock("@/lib/store/apis/modelsApi", () => ({ useGetModelsQuery: () => q.models }));
+vi.mock("@/lib/store/apis/modelsApi", () => ({
+	useGetModelsQuery: () => q.models,
+}));
 vi.mock("@/lib/store/apis/evaluationsApi", () => ({
 	useEstimateEvaluationQuery: (spec: unknown, opts: unknown) => {
 		q.estimateArgs.push([spec, opts]);
 		return q.estimate;
 	},
+	useGetBenchFaultsQuery: () => q.faults,
 }));
 vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
 	...(await orig<typeof import("@/lib/store/apis/benchApi")>()),
@@ -24,15 +38,33 @@ vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 const catalog: CatalogProvider[] = [
-	{ id: "openai", name: "OpenAI", needs_base_url: false, key_hint: "", models: [{ id: "gpt-4o-mini", purposes: ["agent"], rank: 1 }] },
+	{
+		id: "openai",
+		name: "OpenAI",
+		needs_base_url: false,
+		key_hint: "",
+		models: [{ id: "gpt-4o-mini", purposes: ["agent"], rank: 1 }],
+	},
 	{
 		id: "deepseek",
 		name: "DeepSeek",
 		needs_base_url: false,
 		key_hint: "",
 		models: [
-			{ id: "deepseek-chat", purposes: ["agent"], rank: 1, open_weights: true, family: "deepseek" },
-			{ id: "deepseek-reasoner", purposes: ["agent"], rank: 2, open_weights: true, family: "deepseek" },
+			{
+				id: "deepseek-chat",
+				purposes: ["agent"],
+				rank: 1,
+				open_weights: true,
+				family: "deepseek",
+			},
+			{
+				id: "deepseek-reasoner",
+				purposes: ["agent"],
+				rank: 2,
+				open_weights: true,
+				family: "deepseek",
+			},
 		],
 	},
 	{
@@ -40,7 +72,14 @@ const catalog: CatalogProvider[] = [
 		name: "Mistral",
 		needs_base_url: false,
 		key_hint: "",
-		models: [{ id: "devstral-medium-latest", purposes: ["agent"], rank: 1, family: "mistral" }],
+		models: [
+			{
+				id: "devstral-medium-latest",
+				purposes: ["agent"],
+				rank: 1,
+				family: "mistral",
+			},
+		],
 	},
 ];
 
@@ -62,15 +101,32 @@ const key = (over: Partial<Omit<ModelKey, "provider">> & { provider?: string }):
 
 const spec = (over: Partial<EvaluationSpec> = {}): EvaluationSpec => ({
 	...defaultEvaluationSpec(),
-	arms: [{ label: "A", agent: "codex", version: 2, model: "deepseek-chat", provider: "deepseek" }],
+	arms: [
+		{
+			label: "A",
+			agent: "codex",
+			version: 2,
+			model: "deepseek-chat",
+			provider: "deepseek",
+		},
+	],
 	benchmarks: ["hd-harbor-tb2"],
 	...over,
 });
 
 beforeEach(() => {
-	q.models = okQuery({ providers: catalog, keys: [key({}), key({ id: "k2", provider: "mistral", status: "invalid" })], keys_ready: true });
-	q.estimate = okQuery({ runs: 20, est_cost_usd: { low: 1.2, high: 3.4, known: true }, est_minutes: { low: 10, high: 25 } });
+	q.models = okQuery({
+		providers: catalog,
+		keys: [key({}), key({ id: "k2", provider: "mistral", status: "invalid" })],
+		keys_ready: true,
+	});
+	q.estimate = okQuery({
+		runs: 20,
+		est_cost_usd: { low: 1.2, high: 3.4, known: true },
+		est_minutes: { low: 10, high: 25 },
+	});
 	q.estimateArgs = [];
+	q.faults = { data: undefined, isLoading: true, isError: false };
 });
 
 describe("groupModels", () => {
@@ -115,7 +171,13 @@ describe("step 4 helpers", () => {
 	});
 
 	it("words the estimate, with unknown prices said plainly", () => {
-		expect(estimateText({ runs: 1, est_cost_usd: { low: 2, high: 2, known: true }, est_minutes: { low: 4, high: 4 } })).toEqual({
+		expect(
+			estimateText({
+				runs: 1,
+				est_cost_usd: { low: 2, high: 2, known: true },
+				est_minutes: { low: 4, high: 4 },
+			}),
+		).toEqual({
 			runs: "1 run",
 			cost: "$2.00",
 			minutes: "4 min",
@@ -151,7 +213,16 @@ describe("Step4Setup", () => {
 	it("warns with a keys link when the chosen provider has no working key", () => {
 		const html = render(
 			<Step4Setup
-				spec={spec({ arms: [{ label: "A", agent: "codex", model: "devstral-medium-latest", provider: "mistral" }] })}
+				spec={spec({
+					arms: [
+						{
+							label: "A",
+							agent: "codex",
+							model: "devstral-medium-latest",
+							provider: "mistral",
+						},
+					],
+				})}
 				onChange={() => undefined}
 			/>,
 		);
@@ -177,7 +248,12 @@ describe("Step4Setup", () => {
 			mode: "models",
 			benchmarks: [],
 			arms: [
-				{ label: "A", agent: "codex", model: "gpt-4o-mini", provider: "openai" },
+				{
+					label: "A",
+					agent: "codex",
+					model: "gpt-4o-mini",
+					provider: "openai",
+				},
 				{ label: "B", agent: "codex", model: "", provider: "" },
 			],
 		});
@@ -189,7 +265,11 @@ describe("Step4Setup", () => {
 	});
 
 	it("says price not known when the estimate has no price", () => {
-		q.estimate = okQuery({ runs: 6, est_cost_usd: { low: 0, high: 0, known: false }, est_minutes: { low: 3, high: 9 } });
+		q.estimate = okQuery({
+			runs: 6,
+			est_cost_usd: { low: 0, high: 0, known: false },
+			est_minutes: { low: 3, high: 9 },
+		});
 		expect(render(<Step4Setup spec={spec()} onChange={() => undefined} />)).toContain("price not known");
 	});
 
@@ -206,7 +286,12 @@ describe("Step4Setup", () => {
 					notes: ["no history for this benchmark yet"],
 					faults_skipped: [{ fault: "broken-tool", reason: "no tool layer" }],
 				},
-				{ benchmark: "voicebench", runs: 0, skipped: "agent codex cannot run benchmark voicebench: needs voice", notes: [] },
+				{
+					benchmark: "voicebench",
+					runs: 0,
+					skipped: "agent codex cannot run benchmark voicebench: needs voice",
+					notes: [],
+				},
 			],
 		});
 		const html = render(<Step4Setup spec={spec()} onChange={() => undefined} />);
@@ -222,13 +307,30 @@ describe("Step4Setup", () => {
 	});
 
 	it("shows the error text only on a real HTTP error", () => {
-		q.estimate = { data: undefined, error: { status: 500, data: {} }, isError: true, isFetching: false, isLoading: false };
+		q.estimate = {
+			data: undefined,
+			error: { status: 500, data: {} },
+			isError: true,
+			isFetching: false,
+			isLoading: false,
+		};
 		expect(render(<Step4Setup spec={spec()} onChange={() => undefined} />)).toContain("Could not estimate this evaluation right now.");
-		q.estimate = { data: undefined, error: { status: "PARSING_ERROR", error: "x" }, isError: true, isFetching: false, isLoading: false };
+		q.estimate = {
+			data: undefined,
+			error: { status: "PARSING_ERROR", error: "x" },
+			isError: true,
+			isFetching: false,
+			isLoading: false,
+		};
 		expect(render(<Step4Setup spec={spec()} onChange={() => undefined} />)).not.toContain("Could not estimate");
 		expect(estimateFailed({ status: 403 })).toBe(true);
 		expect(estimateFailed({ status: "FETCH_ERROR" })).toBe(false);
-		expect(estimateNotes({ per_benchmark: [{ benchmark: "a", notes: [] }], notes: null })).toEqual([]);
+		expect(
+			estimateNotes({
+				per_benchmark: [{ benchmark: "a", notes: [] }],
+				notes: null,
+			}),
+		).toEqual([]);
 	});
 
 	it("labels an agent's default model without an empty provider prefix", () => {
@@ -238,13 +340,95 @@ describe("Step4Setup", () => {
 		expect(modelOptionLabel("", "gpt-5.6-terra")).toBe("gpt-5.6-terra");
 		expect(modelOptionLabel("OpenAI", "gpt-5.6-terra")).toBe("OpenAI: gpt-5.6-terra");
 		const html = render(
-			<Step4Setup spec={spec({ arms: [{ label: "A", agent: "codex", model: "gpt-5.6-terra", provider: "" }] })} onChange={() => undefined} />,
+			<Step4Setup
+				spec={spec({
+					arms: [
+						{
+							label: "A",
+							agent: "codex",
+							model: "gpt-5.6-terra",
+							provider: "",
+						},
+					],
+				})}
+				onChange={() => undefined}
+			/>,
 		);
 		expect(html).not.toContain(": gpt-5.6-terra");
 		expect(html).toContain(">gpt-5.6-terra</option>");
 		const listed = render(
-			<Step4Setup spec={spec({ arms: [{ label: "A", agent: "codex", model: "gpt-4o-mini", provider: "" }] })} onChange={() => undefined} />,
+			<Step4Setup
+				spec={spec({
+					arms: [{ label: "A", agent: "codex", model: "gpt-4o-mini", provider: "" }],
+				})}
+				onChange={() => undefined}
+			/>,
 		);
 		expect(listed).toMatch(/<option value="openai\u0000gpt-4o-mini" selected=""/);
+	});
+
+	it("groups faults from the catalog and keeps the built-in three while loading", () => {
+		let html = render(<Step4Setup spec={spec()} onChange={() => undefined} />);
+		expect(html).toContain('data-testid="step4-fault-model-down"');
+		expect(html).toContain('data-testid="step4-fault-group-Tools"');
+		q.faults = okQuery([
+			{
+				id: "tool-rate-limit",
+				label: "Tool rate limit",
+				help: "Tools answer 429.",
+				layer: "tool",
+				group: "Tools",
+			},
+			{
+				id: "compound-brownout-rate-limit",
+				label: "Brownout and rate limit",
+				help: "Both.",
+				layer: "compound",
+				group: "Combined",
+			},
+			{
+				id: "model-slow",
+				label: "Slow model",
+				help: "Slow.",
+				layer: "model",
+				group: "Model",
+			},
+		]);
+		html = render(<Step4Setup spec={spec({ faults: ["clean", "tool-rate-limit"] })} onChange={() => undefined} />);
+		expect(html).not.toContain('data-testid="step4-fault-broken-tool"');
+		expect(html).toMatch(/data-testid="step4-fault-tool-rate-limit"><input type="checkbox" class="mt-1" checked=""/);
+		expect(html.indexOf("step4-fault-group-Model")).toBeLessThan(html.indexOf("step4-fault-group-Tools"));
+		expect(html.indexOf("step4-fault-group-Tools")).toBeLessThan(html.indexOf("step4-fault-group-Combined"));
+		expect(groupFaults([{ id: "clean", label: "", help: "", layer: "", group: "Model" }])).toEqual([]);
+	});
+
+	it("shows the power line and advice from the estimate", () => {
+		const power = {
+			per_benchmark: [{ benchmark: "hd-harbor-tb2", tasks: 8, decidable: true, mde_pp: 34.6 }],
+			overall: { tasks: 8, mde_pp: 34.6 },
+			sd_source: "assumed",
+			advice: "Add 70 tasks to detect a 10 point change overall.",
+		};
+		q.estimate = okQuery({
+			runs: 20,
+			est_cost_usd: { low: 1, high: 2, known: true },
+			est_minutes: { low: 1, high: 2 },
+			power,
+		});
+		const html = render(<Step4Setup spec={spec()} onChange={() => undefined} />);
+		expect(html).toContain("These settings can detect a change of about 35 points overall (35 per benchmark).");
+		expect(html).toContain("Add 70 tasks");
+		expect(
+			powerText({
+				power: {
+					...power,
+					per_benchmark: [{ benchmark: "x", tasks: 3, decidable: false, mde_pp: null }],
+				},
+			})?.line,
+		).toContain("too few tasks to decide per benchmark");
+		expect(powerText({ power: { ...power, overall: { tasks: 1, mde_pp: null } } })?.line).toBe(
+			"These settings have too few tasks to detect a change.",
+		);
+		expect(powerText({})).toBeUndefined();
 	});
 });

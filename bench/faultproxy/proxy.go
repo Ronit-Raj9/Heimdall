@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -107,6 +108,8 @@ type Server struct {
 	token     string
 	org       orgSlots    // F4: organization key slots (orgslots.go)
 	debug     *debugState // X20b: replay cassettes and breakpoints (debug.go)
+	// sleep holds a call of a slow plan (lane X22); tests replace it.
+	sleep func(context.Context, time.Duration) error
 }
 
 // upstream is how one provider is answered: the real API with a key, the
@@ -319,13 +322,21 @@ func (s *Server) serveData(w http.ResponseWriter, r *http.Request) {
 		return
 	case d.Scripted:
 		e.Action, e.Upstream = ActionPass, schemas.LedgerUpstreamScripted
+		out, ok := s.slowDown(sw, r, d, e)
+		if !ok {
+			break
+		}
 		upstreamStart := time.Now()
-		s.answerScripted(sw, r, p, kind, slot.name, body, e)
+		s.answerScripted(out, r, p, kind, slot.name, body, e)
 		e.UpstreamMS = float64(time.Since(upstreamStart).Microseconds()) / 1000
 	default:
 		e.Action = ActionPass
+		out, ok := s.slowDown(sw, r, d, e)
+		if !ok {
+			break
+		}
 		upstreamStart := time.Now()
-		s.answer(sw, r, p, kind, slot.name, body, e)
+		s.answer(out, r, p, kind, slot.name, body, e)
 		e.UpstreamMS = float64(time.Since(upstreamStart).Microseconds()) / 1000
 	}
 	e.Status = sw.status()
@@ -781,4 +792,71 @@ func (w *statusWriter) status() int {
 		return http.StatusOK
 	}
 	return w.code
+}
+
+// slowDown applies a slow plan's holds to one call (lane X22): DelayMS
+// before the request goes on, and a writer that waits FirstByteDelayMS
+// before the answer's first byte. The ledger line records both. ok is false
+// when the caller hung up during the first hold; nothing was sent.
+func (s *Server) slowDown(sw *statusWriter, r *http.Request, d decision, e *schemas.LedgerEntry) (http.ResponseWriter, bool) {
+	if d.DelayMS <= 0 && d.FirstByteDelayMS <= 0 {
+		return sw, true
+	}
+	sleep := s.sleep
+	if sleep == nil {
+		sleep = sleepCtx
+	}
+	e.DelayMS = d.DelayMS + d.FirstByteDelayMS
+	if d.DelayMS > 0 {
+		if err := sleep(r.Context(), time.Duration(d.DelayMS)*time.Millisecond); err != nil {
+			sw.code = 499 // client closed request
+			return sw, false
+		}
+	}
+	if d.FirstByteDelayMS <= 0 {
+		return sw, true
+	}
+	return &firstByteWriter{statusWriter: sw, ctx: r.Context(), wait: time.Duration(d.FirstByteDelayMS) * time.Millisecond, sleep: sleep}, true
+}
+
+// firstByteWriter holds the first header or body write of an answer.
+type firstByteWriter struct {
+	*statusWriter
+	ctx   context.Context
+	wait  time.Duration
+	sleep func(context.Context, time.Duration) error
+	once  sync.Once
+}
+
+func (w *firstByteWriter) hold() { w.once.Do(func() { _ = w.sleep(w.ctx, w.wait) }) }
+
+func (w *firstByteWriter) WriteHeader(code int) {
+	w.hold()
+	w.statusWriter.WriteHeader(code)
+}
+
+func (w *firstByteWriter) Write(b []byte) (int, error) {
+	w.hold()
+	return w.statusWriter.Write(b)
+}
+
+func (w *firstByteWriter) Flush() {
+	w.hold()
+	if f, ok := w.statusWriter.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (w *firstByteWriter) Unwrap() http.ResponseWriter { return w.statusWriter }
+
+// sleepCtx waits d or until ctx ends.
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

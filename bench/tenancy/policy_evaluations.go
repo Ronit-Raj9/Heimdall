@@ -9,6 +9,7 @@ func init() {
 	OrgPolicy[key("POST", api+"/evaluations/estimate")] = org(member)
 	OrgPolicy[key("POST", api+"/evaluations/{id}/cancel")] = org(member)
 	OrgPolicy[key("GET", api+"/evaluation-packs")] = org(viewer)
+	OrgPolicy[key("GET", api+"/faults")] = org(viewer) // X22: the fault catalog the evaluate wizard and Failure tests list
 }
 
 // Agent compatibility (agent-first lane A01): viewers read.

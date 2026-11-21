@@ -1,6 +1,8 @@
 package faultproxy
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,12 +29,19 @@ const (
 	// ModeStreamCut cuts a streamed answer after its first tool-call delta
 	// (streamcut.go; Safety probes area, S1).
 	ModeStreamCut = "stream_cut"
+	// ModeSlow holds the calls of its window (DelayMS before the upstream
+	// request, FirstByteDelayMS before the answer's first byte) and then
+	// answers them normally (lane X22).
+	ModeSlow = "slow"
+	// ModeFlaky fails each call of its window with probability FailProb,
+	// seeded by the plan's nonce so a run replays exactly (lane X22).
+	ModeFlaky = "flaky"
 )
 
 // PlanModes lists every plan mode this proxy honours, in the order /health
 // reports them. A caller that needs a mode checks for it there first: an
 // older proxy rejects a mode it does not know with 400.
-var PlanModes = []string{ModeNone, ModePersistent, ModeOnce, ModeScripted, ModeStreamCut, ModeReplay}
+var PlanModes = []string{ModeNone, ModePersistent, ModeOnce, ModeScripted, ModeStreamCut, ModeReplay, ModeSlow, ModeFlaky}
 
 // Request kinds recorded in the ledger. Only KindMessage is counted.
 const (
@@ -63,8 +72,11 @@ func ValidatePlan(p schemas.FaultPlan) error {
 	if err := validateDebugPlan(p); err != nil { // X20b debug runs (debug.go)
 		return err
 	}
-	if p.Model != "" && p.Mode != ModePersistent && p.Mode != ModeOnce { // W9: a model filter only narrows a fault
-		return fmt.Errorf("model %q needs mode persistent or once, got %q", p.Model, p.Mode)
+	if p.Model != "" && p.Mode != ModePersistent && p.Mode != ModeOnce && p.Mode != ModeSlow && p.Mode != ModeFlaky { // W9: a model filter only narrows a fault
+		return fmt.Errorf("model %q needs mode persistent, once, slow or flaky, got %q", p.Model, p.Mode)
+	}
+	if err := validateWindow(p); err != nil {
+		return err
 	}
 	switch p.Mode {
 	case "", ModeNone, ModeReplay:
@@ -90,11 +102,48 @@ func ValidatePlan(p schemas.FaultPlan) error {
 			return errors.New("stream_cut plan injects no status; status and retry_after_s must be unset")
 		}
 		return nil
+	case ModeSlow:
+		if p.DelayMS == 0 && p.FirstByteDelayMS == 0 {
+			return errors.New("slow plan needs delay_ms or first_byte_delay_ms")
+		}
+		if p.Status != 0 || p.RetryAfterS != 0 || p.Call != 0 {
+			return errors.New("slow plan injects no status; status, retry_after_s and call must be unset")
+		}
+		return nil
+	case ModeFlaky:
+		if !(p.FailProb > 0 && p.FailProb <= 1) {
+			return fmt.Errorf("flaky plan needs fail_prob in (0, 1], got %v", p.FailProb)
+		}
 	default:
-		return fmt.Errorf("mode must be none, persistent, once, scripted, stream_cut or replay, got %q", p.Mode)
+		return fmt.Errorf("mode must be none, persistent, once, scripted, stream_cut, replay, slow or flaky, got %q", p.Mode)
 	}
 	if p.Status < 400 || p.Status > 599 {
 		return fmt.Errorf("status must be 4xx or 5xx, got %d", p.Status)
+	}
+	return nil
+}
+
+// maxDelayMS caps the holds of a slow plan: ten minutes.
+const maxDelayMS = 600_000
+
+// validateWindow checks the recovery window and delay fields (lane X22):
+// none negative, delays capped, fail_prob only on flaky, and a window end
+// (calls, until_s) only on the modes that have a window.
+func validateWindow(p schemas.FaultPlan) error {
+	if p.Calls < 0 || p.UntilS < 0 || p.DelayMS < 0 || p.FirstByteDelayMS < 0 {
+		return errors.New("calls, until_s, delay_ms and first_byte_delay_ms must be >= 0")
+	}
+	if p.DelayMS > maxDelayMS || p.FirstByteDelayMS > maxDelayMS {
+		return fmt.Errorf("delay_ms and first_byte_delay_ms must be <= %d", maxDelayMS)
+	}
+	if p.FailProb != 0 && p.Mode != ModeFlaky {
+		return fmt.Errorf("fail_prob needs mode flaky, got %q", p.Mode)
+	}
+	if (p.DelayMS != 0 || p.FirstByteDelayMS != 0) && p.Mode != ModeSlow {
+		return fmt.Errorf("delay_ms and first_byte_delay_ms need mode slow, got %q", p.Mode)
+	}
+	if (p.Calls != 0 || p.UntilS != 0) && p.Mode != ModePersistent && p.Mode != ModeSlow && p.Mode != ModeFlaky {
+		return fmt.Errorf("calls and until_s end a persistent, slow or flaky window, got mode %q", p.Mode)
 	}
 	return nil
 }
@@ -121,6 +170,9 @@ type slotState struct {
 	toolServed bool // the scripted model already answered this run with a tool_use
 	modelCalls int  // W9: message calls for the plan's model, which number a model-filtered fault
 	audioCalls int  // X8 voice agents: audio requests of the slot (ledger call numbers of KindAudio lines)
+	// windowStart is when the plan's window first fired (lane X22): until_s
+	// counts from it. Zero until then.
+	windowStart time.Time
 }
 
 // decision is what the proxy does with one request.
@@ -133,6 +185,9 @@ type decision struct {
 	RetryAfterS int
 	Scripted    bool // the run is bound to ModeScripted: answer from the scripted model, never upstream
 	Cut         bool // ModeStreamCut takes this call: a streamed answer is cut after its first tool-call delta
+	// DelayMS and FirstByteDelayMS hold a call a slow plan takes (lane X22).
+	DelayMS          int
+	FirstByteDelayMS int
 	// Unpersisted is set when the slot's advanced counters could not be
 	// written to the plan file (QC2-13-02): the request is refused, since a
 	// restart would replay the call numbers and could fire a fault twice.
@@ -189,6 +244,8 @@ type persistedSlot struct {
 	ModelCalls int               `json:"model_calls,omitempty"`
 	AudioCalls int               `json:"audio_calls,omitempty"`
 	ToolServed bool              `json:"tool_served,omitempty"`
+	// WindowStart is when an until_s window opened (lane X22).
+	WindowStart *time.Time `json:"window_start,omitempty"`
 }
 
 // planFile is the plan file's current format. Older files are a bare map
@@ -209,7 +266,12 @@ func (t *planTable) persistLocked() error {
 	f := planFile{Version: planFileVersion, Slots: map[string]persistedSlot{}}
 	for name, cur := range t.slots {
 		if cur.hasPlan {
-			f.Slots[name] = persistedSlot{Plan: cur.plan, Calls: cur.calls, ModelCalls: cur.modelCalls, AudioCalls: cur.audioCalls, ToolServed: cur.toolServed}
+			ps := persistedSlot{Plan: cur.plan, Calls: cur.calls, ModelCalls: cur.modelCalls, AudioCalls: cur.audioCalls, ToolServed: cur.toolServed}
+			if !cur.windowStart.IsZero() {
+				ws := cur.windowStart
+				ps.WindowStart = &ws
+			}
+			f.Slots[name] = ps
 		}
 	}
 	if err := writePlans(t.path, f); err != nil {
@@ -292,7 +354,11 @@ func loadPlanTable(path string) (*planTable, error) {
 		if ps.Calls < 0 || ps.ModelCalls < 0 || ps.AudioCalls < 0 {
 			return nil, fmt.Errorf("fault plans %s: slot %s: negative call counter", path, slot)
 		}
-		t.slots[slot] = &slotState{plan: ps.Plan, hasPlan: true, calls: ps.Calls, modelCalls: ps.ModelCalls, audioCalls: ps.AudioCalls, toolServed: ps.ToolServed}
+		st := &slotState{plan: ps.Plan, hasPlan: true, calls: ps.Calls, modelCalls: ps.ModelCalls, audioCalls: ps.AudioCalls, toolServed: ps.ToolServed}
+		if ps.WindowStart != nil {
+			st.windowStart = *ps.WindowStart
+		}
+		t.slots[slot] = st
 	}
 	return t, nil
 }
@@ -326,7 +392,7 @@ func (t *planTable) beginModel(slot, kind, model string) decision {
 	st := t.state(slot)
 	before := *st
 	d := t.decideLocked(st, kind, model)
-	if st.hasPlan && (st.calls != before.calls || st.modelCalls != before.modelCalls || st.audioCalls != before.audioCalls) {
+	if st.hasPlan && (st.calls != before.calls || st.modelCalls != before.modelCalls || st.audioCalls != before.audioCalls || !st.windowStart.Equal(before.windowStart)) {
 		if err := t.persistLocked(); err != nil {
 			*st = before
 			return decision{RunID: d.RunID, Nonce: d.Nonce, Scripted: d.Scripted, Unpersisted: err}
@@ -345,9 +411,7 @@ func (t *planTable) decideLocked(st *slotState, kind, model string) decision {
 			return d
 		}
 		st.modelCalls++
-		if fires(st.plan, st.modelCalls) {
-			d.Inject, d.Status, d.RetryAfterS = true, st.plan.Status, st.plan.RetryAfterS
-		}
+		t.applyWindow(st, &d, st.modelCalls)
 		return d
 	}
 	if kind != KindMessage {
@@ -367,12 +431,49 @@ func (t *planTable) decideLocked(st *slotState, kind, model string) decision {
 		d.Cut = cuts(st.plan, n)
 		return d
 	}
-	if fires(st.plan, n) {
-		d.Inject = true
-		d.Status = st.plan.Status
-		d.RetryAfterS = st.plan.RetryAfterS
-	}
+	t.applyWindow(st, &d, n)
 	return d
+}
+
+// applyWindow decides call number n of the plan on st: inject, hold, or
+// pass. A window that ends (calls, until_s) lets later calls through, so the
+// model recovers (lane X22). Called with t.mu held.
+func (t *planTable) applyWindow(st *slotState, d *decision, n int) {
+	p := st.plan
+	if !fires(p, n) {
+		return
+	}
+	if p.UntilS > 0 {
+		now := t.now()
+		if st.windowStart.IsZero() {
+			st.windowStart = now
+		} else if now.Sub(st.windowStart) >= time.Duration(p.UntilS)*time.Second {
+			return
+		}
+	}
+	switch p.Mode {
+	case ModeSlow:
+		d.DelayMS, d.FirstByteDelayMS = p.DelayMS, p.FirstByteDelayMS
+		return
+	case ModeFlaky:
+		if !flakyFails(p.Nonce, n, p.FailProb) {
+			return
+		}
+	}
+	d.Inject, d.Status, d.RetryAfterS = true, p.Status, p.RetryAfterS
+}
+
+// flakyFails is the seeded coin of a flaky plan: the same nonce and call
+// number always give the same answer.
+func flakyFails(nonce string, call int, p float64) bool {
+	if p >= 1 {
+		return true
+	}
+	if p <= 0 {
+		return false
+	}
+	h := sha256.Sum256(fmt.Appendf(nil, "%s:%d", nonce, call))
+	return float64(binary.BigEndian.Uint64(h[:8])>>11)/float64(1<<53) < p
 }
 
 // takeToolTurn reports whether the scripted model should answer with a
@@ -405,8 +506,9 @@ func (t *planTable) state(slot string) *slotState {
 
 func fires(p schemas.FaultPlan, call int) bool {
 	switch p.Mode {
-	case ModePersistent:
-		return call >= p.FromCall
+	case ModePersistent, ModeSlow, ModeFlaky:
+		from := max(p.FromCall, 1)
+		return call >= from && (p.Calls == 0 || call < from+p.Calls)
 	case ModeOnce:
 		return call == p.Call
 	default:
@@ -426,7 +528,7 @@ func filtered(p schemas.FaultPlan) bool {
 // "scripted" answers every call a fault plan does not fault from the
 // scripted model (a probe on a no-paid run); a proxy without it refuses the
 // plan, so such a run fails closed.
-var PlanFields = []string{"model", "scripted", "replay", "hold"}
+var PlanFields = []string{"model", "scripted", "replay", "hold", "calls", "until_s", "delay_ms", "first_byte_delay_ms", "fail_prob"}
 
 // ModelAll is the plan model that fails every model, as an empty one does;
 // it lets a probe say so explicitly for a routed run, whose gateway probe

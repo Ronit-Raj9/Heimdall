@@ -36,6 +36,7 @@ var knownLayers = map[schemas.ProbeLayerName]bool{
 	schemas.LayerService:  true,
 	schemas.LayerAdapter:  true,
 	schemas.LayerA2A:      true, // B1: client-side A2A stream faults (probes/a2a.go)
+	schemas.LayerCompound: true, // X22: fault schedules across the gateway and tool layers (probes/compound.go)
 }
 
 // leakTerms are words an instruction must not contain: naming the hidden

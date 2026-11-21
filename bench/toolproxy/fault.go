@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 )
@@ -43,7 +44,15 @@ func IsListingMode(mode string) bool {
 // IsQuietMode reports whether a fault mode rewrites a real result that the
 // agent still gets as a success.
 func IsQuietMode(mode string) bool {
-	return mode == FaultPlausibleWrong || mode == FaultSchemaDrift
+	return mode == FaultPlausibleWrong || mode == FaultSchemaDrift || mode == FaultPartial
+}
+
+// rewritesListing reports whether a fault rewrites tools/list answers:
+// the listing modes, plus tool_removed (the tool leaves the listing) and
+// input_drift (the listing shows the new parameter names), which also take
+// calls.
+func rewritesListing(mode string) bool {
+	return IsListingMode(mode) || mode == FaultToolRemoved || mode == FaultInputDrift
 }
 
 // defaultTimeoutS is how long a timeout fault holds a call when the fault
@@ -65,13 +74,15 @@ type faultFile struct {
 	fault  *schemas.ToolFault
 	seen   int            // matching calls counted under the current fault
 	calls  map[string]int // rug_pull: tool calls per server under the current fault
+	state  faultState     // rate_limit and auth_expired progress under the current fault
+	now    func() time.Time
 	logger schemas.Logger
 }
 
 // newFaultFile returns a follower of path. An empty path means faults are
 // never injected.
 func newFaultFile(path string, logger schemas.Logger) *faultFile {
-	return &faultFile{path: path, logger: logger}
+	return &faultFile{path: path, logger: logger, now: time.Now}
 }
 
 // decide counts one call to tool on server, made on agent's route ("" when
@@ -99,10 +110,20 @@ func (f *faultFile) decide(server, tool, agent string) (schemas.ToolFault, bool)
 		}
 		return schemas.ToolFault{}, false
 	}
-	if (ft.Server != "" && ft.Server != server) || (ft.Tool != "" && ft.Tool != tool) {
+	if ft.Agent != "" && !targetsAgent(ft.Agent, agent) {
 		return schemas.ToolFault{}, false
 	}
-	if ft.Agent != "" && !targetsAgent(ft.Agent, agent) {
+	if isRefreshCall(&ft, server, tool) { // auth_expired: the agent renewed its token
+		f.state.refreshed = true
+		return schemas.ToolFault{}, false
+	}
+	if ft.Mode == FaultToolRemoved && ft.Tool == "" && (ft.Server == "" || ft.Server == server) { // the first tool called is the one that goes away
+		if f.state.bound == "" {
+			f.state.bound = tool
+		}
+		ft.Tool = f.state.bound
+	}
+	if (ft.Server != "" && ft.Server != server) || (ft.Tool != "" && ft.Tool != tool) {
 		return schemas.ToolFault{}, false
 	}
 	f.seen++
@@ -110,7 +131,17 @@ func (f *faultFile) decide(server, tool, agent string) (schemas.ToolFault, bool)
 	if f.seen < from || (ft.Calls > 0 && f.seen >= from+ft.Calls) {
 		return schemas.ToolFault{}, false
 	}
+	if !f.gate(&ft, f.clock()) {
+		return schemas.ToolFault{}, false
+	}
 	return ft, true
+}
+
+func (f *faultFile) clock() time.Time {
+	if f.now == nil {
+		return time.Now()
+	}
+	return f.now()
 }
 
 // targetsAgent reports whether agent is one of the comma-separated member
@@ -136,7 +167,7 @@ func (f *faultFile) listing(server, agent string) (schemas.ToolFault, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.reload()
-	if f.fault == nil || !IsListingMode(f.fault.Mode) {
+	if f.fault == nil || !rewritesListing(f.fault.Mode) {
 		return schemas.ToolFault{}, false
 	}
 	ft := *f.fault
@@ -148,6 +179,14 @@ func (f *faultFile) listing(server, agent string) (schemas.ToolFault, bool) {
 	}
 	if ft.Mode == FaultRugPull && f.calls[server] < ft.FromCall-1 {
 		return schemas.ToolFault{}, false
+	}
+	if ft.Mode == FaultToolRemoved {
+		if ft.Tool == "" {
+			ft.Tool = f.state.bound
+		}
+		if ft.Tool == "" || f.seen < ft.FromCall-1 { // the tool is listed until it is removed
+			return schemas.ToolFault{}, false
+		}
 	}
 	return ft, true
 }
@@ -170,7 +209,7 @@ func (f *faultFile) reload() {
 	if bytes.Equal(raw, f.raw) && (raw != nil) == (f.raw != nil) {
 		return
 	}
-	f.raw, f.fault, f.seen, f.calls = raw, nil, 0, nil
+	f.raw, f.fault, f.seen, f.calls, f.state = raw, nil, 0, nil, faultState{}
 	if len(bytes.TrimSpace(raw)) == 0 {
 		f.logger.Info("fault cleared")
 		return
@@ -195,13 +234,17 @@ func ParseFault(raw []byte) (*schemas.ToolFault, error) {
 	switch ft.Mode {
 	case FaultError, FaultTimeout, FaultPoison, FaultLostAck:
 	case FaultDescribePoison, FaultRugPull, FaultShadow, FaultSchemaPoison, FaultPlausibleWrong, FaultSchemaDrift:
+	case FaultRateLimit, FaultSlow, FaultFlaky, FaultPartial, FaultAuthExpired, FaultToolRemoved, FaultInputDrift, FaultDuplicateEffect:
 	default:
-		return nil, fmt.Errorf("fault mode %q is not error, timeout, poison, describe_poison, rug_pull, shadow, schema_poison, plausible_wrong, schema_drift or lost_ack", ft.Mode)
+		return nil, fmt.Errorf("fault mode %q is not error, timeout, poison, describe_poison, rug_pull, shadow, schema_poison, plausible_wrong, schema_drift, lost_ack, rate_limit, slow, flaky, partial, auth_expired, tool_removed, input_drift or duplicate_effect", ft.Mode)
 	}
 	if ft.FromCall < 0 || ft.Calls < 0 || ft.TimeoutS < 0 {
 		return nil, errors.New("fault from_call, calls and timeout_s must not be negative")
 	}
 	if err := checkModeFields(ft); err != nil {
+		return nil, err
+	}
+	if err := checkResilienceFields(ft); err != nil {
 		return nil, err
 	}
 	return &ft, nil

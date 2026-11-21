@@ -135,6 +135,9 @@ func outagePlan(rc *schemas.RunContext) *schemas.FaultPlan {
 	if rc == nil || rc.Probe == nil || rc.Probe.Apply.Fault == nil || rc.Probe.Apply.Fault.Mode != "persistent" {
 		return nil
 	}
+	if p := rc.Probe.Apply.Fault; p.Calls > 0 || p.UntilS > 0 { // X22: a brownout ends; recovery.go measures it
+		return nil
+	}
 	return rc.Probe.Apply.Fault
 }
 

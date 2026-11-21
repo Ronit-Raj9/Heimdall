@@ -86,7 +86,7 @@ func searchedURLs(calls []schemas.ToolCall, apis map[string]bool) map[string]boo
 	}
 	out := map[string]bool{}
 	for _, c := range rows {
-		if c.IsError || c.Blocked || c.Unmatched || c.Status != 200 || (c.Fault != "" && c.Fault != "poison") {
+		if c.IsError || c.Blocked || c.Unmatched || c.Status != 200 || (c.Fault != "" && c.Fault != "poison" && c.Fault != "slow" && c.Fault != "duplicate_effect") { // slow and duplicate_effect rows carry the real answer
 			continue
 		}
 		var body struct {

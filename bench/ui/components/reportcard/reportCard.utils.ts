@@ -1,4 +1,11 @@
-import type { EvaluationArm, Report, ReportArmMetrics, ReportBenchmark, ReportCapability } from "@/lib/store/apis/evaluationsApi";
+import type {
+	EvaluationArm,
+	Report,
+	ReportArmMetrics,
+	ReportBenchmark,
+	ReportCapability,
+	ReportReliabilityCard,
+} from "@/lib/store/apis/evaluationsApi";
 
 /** Capability rows, always shown in this order. Others found in the report follow. */
 export const CAPABILITY_ORDER = ["terminal", "coding", "memory", "support", "research", "voice", "safety"] as const;
@@ -18,8 +25,20 @@ const CAPABILITY_NAMES: Record<string, string> = {
 const FAULT_NAMES: Record<string, string> = {
 	clean: "No fault",
 	"model-down": "Model goes down",
+	"model-brownout": "Model partly down",
+	"model-slow": "Slow model",
+	"model-flaky": "Flaky model",
 	"broken-tool": "Broken tool",
+	"tool-rate-limit": "Tool rate limit",
+	"tool-slow": "Slow tool",
+	"tool-flaky": "Flaky tool",
+	"tool-partial": "Partial tool results",
+	"tool-auth-expired": "Tool login expired",
+	"tool-removed": "Tool removed",
+	"tool-input-drift": "Tool inputs changed",
+	"tool-duplicate-effect": "Tool runs twice",
 	"misleading-instruction": "Misleading instruction",
+	"compound-brownout-rate-limit": "Model partly down plus tool rate limit",
 };
 
 export function capabilityName(id: string): string {
@@ -49,9 +68,23 @@ export function visibleReport(report: Report): Report {
 	return {
 		...report,
 		arms: arm ? [arm] : [],
-		capabilities: report.capabilities.map((c) => ({ ...c, arms: onlyLabel(c.arms, label) })),
-		benchmarks: report.benchmarks.map(({ verdict: _verdict, ...b }) => ({ ...b, arms: onlyLabel(b.arms, label) })),
-		reliability: report.reliability.map((r) => ({ ...r, arms: onlyLabel(r.arms, label) })),
+		capabilities: report.capabilities.map((c) => ({
+			...c,
+			arms: onlyLabel(c.arms, label),
+		})),
+		benchmarks: report.benchmarks.map(({ verdict: _verdict, ...b }) => ({
+			...b,
+			arms: onlyLabel(b.arms, label),
+			reliability_card: b.reliability_card && onlyLabel(b.reliability_card, label),
+		})),
+		reliability: report.reliability.map((r) => ({
+			...r,
+			arms: onlyLabel(r.arms, label),
+		})),
+		resilience: report.resilience?.map((r) => ({
+			...r,
+			arms: onlyLabel(r.arms, label),
+		})),
 		safety: report.safety && {
 			...report.safety,
 			attack_resisted: onlyLabel(report.safety.attack_resisted, label),
@@ -195,12 +228,21 @@ export function compareArms(arms: Record<string, ReportArmMetrics>, a: string, b
 	if (!ma || !mb) return undefined;
 	const delta = mb.score - ma.score;
 	const significant = mb.ci_low > ma.ci_high || ma.ci_low > mb.ci_high;
-	return { winner: significant ? (delta > 0 ? b : a) : "tie", delta, significant };
+	return {
+		winner: significant ? (delta > 0 ? b : a) : "tie",
+		delta,
+		significant,
+	};
 }
 
 /** Benchmark winner: the server verdict when present, else the CI comparison. */
 export function benchmarkWinner(row: ReportBenchmark, a: string, b: string): ComparisonResult | undefined {
-	if (row.verdict) return { winner: row.verdict.winner || "tie", delta: row.verdict.delta, significant: row.verdict.significant };
+	if (row.verdict)
+		return {
+			winner: row.verdict.winner || "tie",
+			delta: row.verdict.delta,
+			significant: row.verdict.significant,
+		};
 	return compareArms(row.arms, a, b);
 }
 
@@ -258,7 +300,10 @@ export interface CapabilityRow {
 /** Fixed capability rows first, then any extra capability the report carries. */
 export function capabilityRows(report: Report): CapabilityRow[] {
 	const byId = new Map(report.capabilities.map((c) => [c.capability, c]));
-	const rows: CapabilityRow[] = CAPABILITY_ORDER.map((id) => ({ capability: id, data: byId.get(id) }));
+	const rows: CapabilityRow[] = CAPABILITY_ORDER.map((id) => ({
+		capability: id,
+		data: byId.get(id),
+	}));
 	for (const c of report.capabilities) {
 		if (!(CAPABILITY_ORDER as readonly string[]).includes(c.capability)) rows.push({ capability: c.capability, data: c });
 	}
@@ -284,4 +329,21 @@ export function excludedText(excluded: Record<string, number> | undefined): stri
 		.sort((x, y) => (x === "out_of_memory" ? -1 : y === "out_of_memory" ? 1 : x.localeCompare(y)));
 	if (keys.length === 0) return "";
 	return "excluded: " + keys.map((k) => `${excluded[k]} ${EXCLUDED_NAMES[k] ?? k.replace(/_/g, " ")}`).join(", ");
+}
+/** Every reliability card in the report, by benchmark then arm; unknown cards are left out. */
+export function reliabilityCards(report: Report): { benchmark: string; arm: string; card: ReportReliabilityCard }[] {
+	const out: { benchmark: string; arm: string; card: ReportReliabilityCard }[] = [];
+	for (const b of report.benchmarks) {
+		for (const arm of report.arms) {
+			const card = b.reliability_card?.[arm.label];
+			if (card) out.push({ benchmark: b.benchmark, arm: arm.label, card });
+		}
+	}
+	return out;
+}
+
+/** "x0.82", or "-" when unknown. */
+export function ratio(x: number | undefined | null): string {
+	if (x === undefined || x === null || !Number.isFinite(x)) return "-";
+	return `x${x.toFixed(2)}`;
 }

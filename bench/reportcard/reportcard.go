@@ -19,6 +19,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/maximhq/bifrost/bench/faults"
 	"github.com/maximhq/bifrost/bench/leaderboard"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/stats"
@@ -105,6 +106,9 @@ type Benchmark struct {
 	ExperimentID string                      `json:"experiment_id"`
 	Arms         map[string]Metrics          `json:"arms"`
 	Verdict      *verdictab.BenchmarkVerdict `json:"verdict,omitempty"`
+	// ReliabilityCard is each arm's repeatability on the clean runs; an arm
+	// with no clean runs has no entry.
+	ReliabilityCard map[string]*ReliabilityCard `json:"reliability_card"`
 }
 
 // FaultScore is one arm's score under a fault and its change from clean on
@@ -140,6 +144,7 @@ type Report struct {
 	Capabilities []Capability              `json:"capabilities"`
 	Benchmarks   []Benchmark               `json:"benchmarks"`
 	Reliability  []Reliability             `json:"reliability"`
+	Resilience   []Resilience              `json:"resilience"`
 	Safety       Safety                    `json:"safety"`
 	Alignment    *Alignment                `json:"alignment,omitempty"` // Safety and alignment section (alignment.go)
 	Overall      *verdictab.OverallVerdict `json:"overall,omitempty"`
@@ -217,7 +222,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	}
 	rep := &Report{
 		Evaluation: ev.ID, Status: ev.Status, Split: split, Mode: ev.Spec.Mode, Arms: []Arm{}, Capabilities: []Capability{}, Benchmarks: []Benchmark{},
-		Reliability: []Reliability{}, Safety: Safety{AttackResisted: map[string]float64{}, CheatRate: map[string]float64{}},
+		Reliability: []Reliability{}, Resilience: []Resilience{}, Safety: Safety{AttackResisted: map[string]float64{}, CheatRate: map[string]float64{}},
 	}
 	// Score mode is one arm scored on its own. Evaluations launched before
 	// one-arm experiments existed also ran a repeat of that arm; the report
@@ -262,11 +267,15 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	var verdictRow []int        // rep.Benchmarks index of each verdict
 	byCap := map[string][]int{} // capability -> indexes into rep.Benchmarks
 	for _, cr := range children {
-		b := Benchmark{Benchmark: cr.child.Benchmark, Capability: capOf(cr.child.Benchmark), ExperimentID: cr.child.ExperimentID, Arms: map[string]Metrics{}}
+		b := Benchmark{Benchmark: cr.child.Benchmark, Capability: capOf(cr.child.Benchmark), ExperimentID: cr.child.ExperimentID, Arms: map[string]Metrics{}, ReliabilityCard: map[string]*ReliabilityCard{}}
 		for _, l := range labels {
-			m := metricsOf(filter(cr.arms[l], schemas.ConditionClean))
+			clean := filter(cr.arms[l], schemas.ConditionClean)
+			m := metricsOf(clean)
 			m.Excluded = cr.excluded[l]
 			b.Arms[l] = m
+			if card := reliabilityCard(clean); card != nil {
+				b.ReliabilityCard[l] = card
+			}
 		}
 		if ab {
 			v := compare(filter(cr.arms[labels[0]], schemas.ConditionClean), filter(cr.arms[labels[1]], schemas.ConditionClean))
@@ -320,6 +329,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	}
 
 	rep.Reliability = reliability(children, labels, faultOf)
+	rep.Resilience = resilience(children, labels, faultOf)
 	rep.Safety = safety(children, labels, faultOf)
 	rep.Totals = totals(children, labels, faultOf)
 	rep.Alignment = alignment(children, labels)
@@ -843,10 +853,22 @@ func safety(children []childRuns, labels []string, faultOf func(childRuns, strin
 // runs count only in Safety.AttackResisted.
 const Attack = "attack"
 
+// FaultIDs are the evaluation fault ids the fault catalog ships besides
+// clean (bench/faults.Catalog). A condition id equal to one of them, or to
+// the bench's generic probe for it ("heimdall-" and the id), is that fault.
+var FaultIDs = func() []string {
+	out := make([]string, 0, len(faults.Catalog))
+	for _, f := range faults.Catalog {
+		out = append(out, f.ID)
+	}
+	return out
+}()
+
 // DefaultFault is the fault of a condition when no benchmark metadata is at
-// hand: only the fault names themselves and the generic probes every
-// benchmark shares (schemas.GenericProbeModelDown, GenericProbeBrokenTool).
-// It never guesses from a probe's name; anything else is not a fault.
+// hand: only the fault names themselves (FaultIDs, or a compound- id) and
+// the generic probes every benchmark shares ("heimdall-" and the fault id,
+// such as schemas.GenericProbeModelDown). It never guesses from a probe's
+// name; anything else is not a fault.
 func DefaultFault(condition string) string {
 	switch condition {
 	case FaultModelDown, schemas.GenericProbeModelDown:
@@ -855,6 +877,9 @@ func DefaultFault(condition string) string {
 		return FaultBrokenTool
 	case FaultMisleading:
 		return FaultMisleading
+	}
+	if bare := strings.TrimPrefix(condition, "heimdall-"); slices.Contains(FaultIDs, bare) || strings.HasPrefix(bare, "compound-") {
+		return bare
 	}
 	return ""
 }
