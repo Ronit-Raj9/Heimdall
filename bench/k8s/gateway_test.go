@@ -2,6 +2,8 @@ package k8s
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -92,5 +94,41 @@ func TestGatewayUpNeedsTokens(t *testing.T) {
 	}
 	if ns, err := GatewayNamespace("http://bifrost.heimdall-gw.svc:8080"); err != nil || ns != "heimdall-gw" {
 		t.Fatalf("namespace %q %v", ns, err)
+	}
+}
+
+// A second `k8s gateway up` with node ports: the API server refuses the
+// create of the existing NodePort Service with 422 (its node port is
+// "already allocated") instead of 409, and Apply must still patch it (live
+// finding on k3s v1.37.2). A create refused for a missing object stays an
+// error.
+func TestApplyPatchesAnExistingObjectWhoseCreateIsInvalid(t *testing.T) {
+	var patched []string
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost:
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			w.Write([]byte(`{"kind":"Status","reason":"Invalid","message":"spec.ports[1].nodePort: Invalid value: 30091: provided port is already allocated"}`))
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/services/faultproxy"):
+			w.Write([]byte(`{"kind":"Service","metadata":{"name":"faultproxy"}}`))
+		case r.Method == http.MethodGet:
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"kind":"Status","reason":"NotFound","message":"not found"}`))
+		case r.Method == http.MethodPatch:
+			patched = append(patched, r.URL.Path)
+			w.Write([]byte(`{}`))
+		}
+	}))
+	defer srv.Close()
+	c := testClient(t, srv)
+	svc := service("faultproxy", nil, []ServicePort{{Name: "control", Port: 9101, NodePort: 30091}}, true)
+	if err := c.Apply(t.Context(), corePath("gw", "services"), "faultproxy", svc); err != nil {
+		t.Fatalf("apply over an existing NodePort service: %v", err)
+	}
+	if len(patched) != 1 || !strings.HasSuffix(patched[0], "/services/faultproxy") {
+		t.Fatalf("patched %v", patched)
+	}
+	if err := c.Apply(t.Context(), corePath("gw", "services"), "other", service("other", nil, nil, true)); err == nil || !strings.Contains(err.Error(), "already allocated") {
+		t.Fatalf("a refused create of a missing object must stay an error: %v", err)
 	}
 }
