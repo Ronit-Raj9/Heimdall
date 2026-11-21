@@ -77,8 +77,8 @@ func (p *Planner) checkTaskTeams(arms map[string]schemas.ArmManifest, suite *sch
 					continue
 				}
 				if n := sc.KeySlots(cfg.Gateway.Provider); len(team) > n {
-					errs = append(errs, fmt.Errorf("arm %s, task %s: its team of %d members needs %d gateway key slots, the gateway has %d (gateway.key_slots) for provider %q; raise gateway.key_slots or leave the task out (docs/multi-agent.md)",
-						armID, id, len(team), len(team), n, cfg.Gateway.Provider))
+					errs = append(errs, fmt.Errorf("arm %s, task %s: its team of %d members needs %d gateway key slots, the gateway has %d (gateway.key_slots) for provider %q; %s or leave the task out (docs/multi-agent.md)",
+						armID, id, len(team), len(team), n, cfg.Gateway.Provider, raiseSlotsHint(cfg.Gateway.Provider)))
 				}
 			}
 		}
@@ -192,4 +192,14 @@ func refuseTaskMemberAgents(task *schemas.Task) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// raiseSlotsHint names the setting that adds key slots for provider: openai's
+// slots are gateway.openai_key_slots (and the fault proxy's --openai-slots),
+// not gateway.key_slots, which holds the default provider's.
+func raiseSlotsHint(provider string) string {
+	if provider == "openai" {
+		return "add slots to gateway.openai_key_slots and the same names to the fault proxy's --openai-slots"
+	}
+	return "raise gateway.key_slots"
 }
