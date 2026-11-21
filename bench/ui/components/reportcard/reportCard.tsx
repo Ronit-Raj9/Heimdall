@@ -14,6 +14,7 @@ import {
 	compactNumber,
 	compareArms,
 	type ComparisonResult,
+	costDisplay,
 	duration,
 	faultName,
 	headline,
@@ -22,8 +23,12 @@ import {
 	pct,
 	points,
 	reportFileName,
-	usd,
 } from "./reportCard.utils";
+
+function costText(m: ReportArmMetrics): string {
+	const c = costDisplay(m);
+	return c.known ? c.text : `${c.text} (${c.detail})`;
+}
 
 export interface ReportCardProps {
 	report: Report;
@@ -150,12 +155,26 @@ function MetricCells({ metrics }: { metrics?: ReportArmMetrics }) {
 				<ScoreCell metrics={metrics} />
 			</TableCell>
 			<TableCell className={num}>{metrics ? compactNumber(metrics.runs) : "-"}</TableCell>
-			<TableCell className={num}>{metrics ? usd(metrics.cost_usd) : "-"}</TableCell>
-			<TableCell className={num}>{metrics ? compactNumber(metrics.tokens) : "-"}</TableCell>
+			<TableCell className={num}>
+				<CostValue metrics={metrics} />
+			</TableCell>
+			<TableCell className={num}>{metrics && metrics.tokens != null ? compactNumber(metrics.tokens) : metrics?.runs ? "Not known" : "-"}</TableCell>
 			<TableCell className={num}>{metrics ? compactNumber(metrics.steps) : "-"}</TableCell>
 			<TableCell className={num}>{metrics ? compactNumber(metrics.tool_calls) : "-"}</TableCell>
 			<TableCell className={num}>{metrics ? duration(metrics.wall_s) : "-"}</TableCell>
 		</>
+	);
+}
+
+/** The cost of one arm: the sum, or "Not known" with the count of unpriced runs (reason in the tooltip). */
+export function CostValue({ metrics }: { metrics?: ReportArmMetrics }) {
+	const c = costDisplay(metrics);
+	if (c.known) return <>{c.text}</>;
+	return (
+		<span data-testid="cost-not-known" title={c.reason} className="inline-flex flex-col items-end leading-tight">
+			<span className="text-muted-foreground">{c.text}</span>
+			<span className="text-muted-foreground text-[11px]">{c.detail}</span>
+		</span>
 	);
 }
 
@@ -295,13 +314,22 @@ function BenchmarkRow({ report, row }: { report: Report; row: ReportBenchmark })
 						return (
 							<React.Fragment key={arm.label}>
 								<MetricPair label={`${prefix}runs`} value={m ? compactNumber(m.runs) : "-"} />
-								<MetricPair label={`${prefix}cost`} value={m ? usd(m.cost_usd) : "-"} />
-								<MetricPair label={`${prefix}tokens`} value={m ? compactNumber(m.tokens) : "-"} />
+								<MetricPair label={`${prefix}cost`} value={m ? costText(m) : "-"} />
+								<MetricPair label={`${prefix}tokens`} value={m && m.tokens != null ? compactNumber(m.tokens) : m?.runs ? "Not known" : "-"} />
 								<MetricPair label={`${prefix}time`} value={m ? duration(m.wall_s) : "-"} />
 							</React.Fragment>
 						);
 					})}
 				</dl>
+				{report.arms.map((arm) => {
+					const c = costDisplay(row.arms[arm.label]);
+					return c.known ? null : (
+						<p key={`cost-${arm.label}`} data-testid="cost-reason" className="text-muted-foreground text-xs">
+							{ab ? `${arm.label}: ` : ""}
+							{c.reason}
+						</p>
+					);
+				})}
 				{row.experiment_id && (
 					<Link
 						to="/experiments/$expId"

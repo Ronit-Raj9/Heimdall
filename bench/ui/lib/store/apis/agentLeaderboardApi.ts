@@ -6,20 +6,33 @@ export interface AgentCapabilityScore {
 	ci_low: number;
 	ci_high: number;
 	runs: number;
+	tasks?: number;
+	/** False below the minimum sample (min_runs over min_tasks): shown, never ranked. */
+	ranked?: boolean;
+	/** Why the score is not ranked. */
+	note?: string;
 	benchmarks?: string[];
 }
 
 /** One agent version on one model (GET /leaderboard/agents). */
 export interface AgentLeaderboardRow {
 	agent: string;
-	/** 0 when the config is not a saved version. */
+	/** The agent version, matched without the model and provider; 0 when no saved version matches. */
 	version: number;
 	model: string;
 	label: string;
 	config_hash?: string;
+	agent_hash?: string;
 	baseline: boolean;
+	/** Place by the filtered capability among rows with enough runs; absent otherwise. */
+	rank?: number;
 	capabilities: Record<string, AgentCapabilityScore>;
+	/** Null unless every run's cost is known. */
 	cost_usd: number | null;
+	/** Runs whose cost is known. */
+	cost_runs?: number;
+	/** Why the cost is not known. */
+	cost_note?: string;
 	runs?: number;
 	last_evaluation: string;
 	last_experiment?: string;
@@ -30,6 +43,9 @@ export interface AgentLeaderboardResponse {
 	models: string[];
 	capability: string;
 	model: string;
+	/** Runs and tasks a capability score needs before it is ranked. */
+	min_runs?: number;
+	min_tasks?: number;
 	rows: AgentLeaderboardRow[];
 	generated_at: string;
 }

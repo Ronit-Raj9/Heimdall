@@ -70,9 +70,12 @@ export type PackId = "coding" | "terminal" | "support" | "memory" | "research" |
 export interface EvaluationArm {
 	label: string;
 	agent: string;
+	/** The version that ran; set by the server at launch when the arm asked for the latest. */
 	version?: number;
 	model: string;
 	provider?: string;
+	/** True when the arm asked for the latest version and `version` is the one that was latest at launch. */
+	latest_at_launch?: boolean;
 }
 
 export interface EvaluationSpec {
@@ -125,7 +128,7 @@ export interface Range {
 export interface EstimateBenchmark {
 	benchmark: string;
 	runs?: number;
-	est_cost_usd?: Range & { known?: boolean };
+	est_cost_usd?: Range & { known?: boolean; reason?: string };
 	est_minutes?: Range & { known?: boolean };
 	skipped?: string;
 	notes?: string[] | null;
@@ -136,10 +139,12 @@ export interface EstimateBenchmark {
 /** POST /evaluations/estimate */
 export interface Estimate {
 	runs: number;
-	est_cost_usd: Range & { known: boolean };
+	est_cost_usd: Range & { known: boolean; reason?: string };
 	est_minutes: Range & { known?: boolean };
 	per_benchmark: EstimateBenchmark[];
 	notes?: string[] | null;
+	/** Arm models the price snapshot does not list: no cost is estimated for them. */
+	unpriced_models?: string[];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -153,8 +158,16 @@ export interface ReportMetrics {
 	ci_low: number;
 	ci_high: number;
 	runs: number;
-	cost_usd?: number;
-	tokens?: number;
+	tasks?: number;
+	/** Sum over the runs; null when any run's cost is not known (an unpriced model is never $0). */
+	cost_usd?: number | null;
+	/** Runs whose cost is known. */
+	cost_runs?: number;
+	/** Why the other runs' cost is not known. */
+	cost_note?: string;
+	/** Sum over the runs; null when any run's token count is not known. */
+	tokens?: number | null;
+	token_runs?: number;
 	steps?: number;
 	tool_calls?: number;
 	wall_s?: number;
@@ -164,6 +177,8 @@ export interface ReportArm {
 	label: string;
 	agent: string;
 	version?: number;
+	/** The evaluation asked for the latest version; `version` is the one that was latest at launch. */
+	latest_at_launch?: boolean;
 	model: string;
 }
 

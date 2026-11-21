@@ -46,6 +46,7 @@
 		"armModel": "Model",
 		"latestVersion": "latest",
 		"versionN": "v{{n}}",
+		"versionLatestAtLaunch": "v{{n}} (latest at launch)",
 		"setup": "{{tasks}} tasks per benchmark, each tried {{trials}} times",
 		"faults": "Stress tests: {{faults}}",
 		"noFaults": "Normal conditions only",

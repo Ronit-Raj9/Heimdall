@@ -119,6 +119,9 @@ describe("step 4 helpers", () => {
 		expect(estimateText({ runs: 40, est_cost_usd: { low: 0, high: 0, known: false }, est_minutes: { low: 10.4, high: 30 } }).cost).toBe(
 			"price not known",
 		);
+		expect(
+			estimateText({ runs: 40, est_cost_usd: { low: 0, high: 0, known: false, reason: "no price for gpt-x" }, est_minutes: { low: 1, high: 2 } }).cost,
+		).toBe("price not known (no price for gpt-x)");
 		expect(estimateText({ runs: 40, est_cost_usd: { low: 12, high: 40.6, known: true }, est_minutes: { low: 1, high: 2 } }).cost).toBe(
 			"$12 to $41",
 		);

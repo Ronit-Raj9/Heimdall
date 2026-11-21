@@ -59,7 +59,7 @@ function range(low: number, high: number, fmt: (n: number) => string): string {
 export function estimateText(e: Pick<EvaluationEstimate, "runs" | "est_cost_usd" | "est_minutes">): { runs: string; cost: string; minutes: string } {
 	const runs = Number(e.runs) || 0;
 	const c = e.est_cost_usd;
-	const cost = c?.known ? range(c.low, c.high, money) : "price not known";
+	const cost = c?.known ? range(c.low, c.high, money) : c?.reason ? `price not known (${c.reason})` : "price not known";
 	const m = e.est_minutes;
 	const minutesKnown = m && m.known !== false && (m.low > 0 || m.high > 0);
 	const minutes = minutesKnown ? `${range(m.low, m.high, (n) => String(Math.max(1, Math.round(n))))} min` : "time not known";

@@ -61,10 +61,30 @@ export function visibleReport(report: Report): Report {
 	};
 }
 
-/** "codex v2 on gpt-6.2-sol". */
+/** "codex v2 on gpt-6.2-sol", "codex v3 (latest at launch) on gpt-6.2-sol". */
 export function armDescription(arm: EvaluationArm): string {
-	const version = arm.version ? ` v${arm.version}` : "";
+	const version = arm.version ? ` v${arm.version}${arm.latest_at_launch ? " (latest at launch)" : ""}` : "";
 	return `${arm.agent}${version} on ${arm.model}`;
+}
+
+/** A cost column: the sum when every run's cost is known, otherwise "Not known" with how many runs lack a price and why. Never $0 for an unpriced model. */
+export interface CostDisplay {
+	text: string;
+	known: boolean;
+	/** "3 of 8 runs unpriced", empty when known. */
+	detail: string;
+	/** The full reason, for a tooltip or a detail line. */
+	reason: string;
+}
+
+export function costDisplay(m: Pick<ReportArmMetrics, "runs" | "cost_usd" | "cost_runs" | "cost_note"> | undefined): CostDisplay {
+	if (!m || !m.runs) return { text: "-", known: true, detail: "", reason: "" };
+	if (typeof m.cost_usd === "number" && Number.isFinite(m.cost_usd)) return { text: usd(m.cost_usd), known: true, detail: "", reason: "" };
+	const priced = m.cost_runs ?? 0;
+	const unpriced = Math.max(0, m.runs - priced);
+	const detail = `${unpriced} of ${m.runs} ${m.runs === 1 ? "run" : "runs"} unpriced`;
+	const why = m.cost_note ? `: ${m.cost_note}` : "";
+	return { text: "Not known", known: false, detail, reason: `Cost not known, ${detail}${why}` };
 }
 
 export function pct(x: number | undefined | null): string {

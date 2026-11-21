@@ -27,7 +27,14 @@ import {
 	useTestModelKeyMutation,
 	useUpdateModelKeyMutation,
 } from "@/lib/store/apis/modelsApi";
-import type { BifrostProviderSpec, ModelKey, ModelKeyRequest, ModelKeyTestResult, ModelProviderInfo } from "@/lib/types/models";
+import type {
+	BifrostProviderSpec,
+	ModelKey,
+	ModelKeyPrice,
+	ModelKeyRequest,
+	ModelKeyTestResult,
+	ModelProviderInfo,
+} from "@/lib/types/models";
 import { Link, useSearch } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { KeyRound, Pencil, Plus, Sparkles, X } from "lucide-react";
@@ -491,6 +498,15 @@ function KeyRow({ k, isAdmin, canTest, onEdit }: { k: ModelKey; isAdmin: boolean
 								})}
 					</span>
 				</div>
+				{k.price && (
+					<span className="text-muted-foreground text-xs tabular-nums" data-testid={`model-key-price-${k.id}`}>
+						{t("priceShown", {
+							input: formatUSD(k.price.input_per_mtok),
+							output: formatUSD(k.price.output_per_mtok),
+							cache: formatUSD(k.price.cache_per_mtok || k.price.input_per_mtok),
+						})}
+					</span>
+				)}
 				{k.budget_usd > 0 && (
 					<div
 						className="bg-muted h-1.5 overflow-hidden rounded-full"
@@ -576,7 +592,10 @@ export function keyRequestBody(f: {
 	modelsText: string;
 	budget: string;
 	value: string;
+	/** Price per 1M tokens as typed; all empty or zero sends no price (and clears a stored one). */
+	price?: { input: string; output: string; cache: string };
 }): ModelKeyRequest {
+	const price = keyPrice(f.price);
 	return {
 		provider: f.provider,
 		label: f.label.trim(),
@@ -584,7 +603,19 @@ export function keyRequestBody(f: {
 		models: parseModels(f.modelsText),
 		budget_usd: Number(f.budget) || 0,
 		...(f.value.trim() ? { value: f.value.trim() } : {}),
+		...(price ? { price } : {}),
 	};
+}
+
+/** The typed price fields as a key price, or undefined when none is a positive number. */
+export function keyPrice(p: { input: string; output: string; cache: string } | undefined): ModelKeyPrice | undefined {
+	if (!p) return undefined;
+	const num = (v: string) => {
+		const n = Number(v.trim());
+		return Number.isFinite(n) && n > 0 ? n : 0;
+	};
+	const out = { input_per_mtok: num(p.input), output_per_mtok: num(p.output), cache_per_mtok: num(p.cache) };
+	return out.input_per_mtok || out.output_per_mtok || out.cache_per_mtok ? out : undefined;
 }
 
 /**
@@ -630,6 +661,9 @@ function KeyForm({
 	const [baseUrl, setBaseUrl] = useState(editing?.base_url ?? "");
 	const [modelsText, setModelsText] = useState((editing?.models ?? []).join(", "));
 	const [budget, setBudget] = useState(String(editing?.budget_usd ?? 0));
+	const [priceInput, setPriceInput] = useState(editing?.price?.input_per_mtok ? String(editing.price.input_per_mtok) : "");
+	const [priceOutput, setPriceOutput] = useState(editing?.price?.output_per_mtok ? String(editing.price.output_per_mtok) : "");
+	const [priceCache, setPriceCache] = useState(editing?.price?.cache_per_mtok ? String(editing.price.cache_per_mtok) : "");
 	const [touched, setTouched] = useState(false);
 	const [create, createState] = useCreateModelKeyMutation();
 	const [update, updateState] = useUpdateModelKeyMutation();
@@ -663,6 +697,7 @@ function KeyForm({
 			modelsText,
 			budget,
 			value: effectiveValue,
+			price: { input: priceInput, output: priceOutput, cache: priceCache },
 		});
 		try {
 			if (editing) await update({ id: editing.id, body }).unwrap();
@@ -825,6 +860,36 @@ function KeyForm({
 				/>
 				<p className="text-muted-foreground text-xs">{t("budgetHint")}</p>
 			</div>
+			<fieldset className={field} data-testid="model-key-price">
+				<legend className={cn(lbl, "mb-1.5")}>{t("price")}</legend>
+				<div className="grid grid-cols-3 gap-2">
+					{(
+						[
+							["input", t("priceInput"), priceInput, setPriceInput],
+							["output", t("priceOutput"), priceOutput, setPriceOutput],
+							["cache", t("priceCache"), priceCache, setPriceCache],
+						] as const
+					).map(([name, label, v, set]) => (
+						<div key={name} className="flex min-w-0 flex-col gap-1">
+							<label className="text-muted-foreground text-xs" htmlFor={`${id}-price-${name}`}>
+								{label}
+							</label>
+							<Input
+								id={`${id}-price-${name}`}
+								type="number"
+								min={0}
+								step="any"
+								inputMode="decimal"
+								placeholder="0.00"
+								value={v}
+								onChange={(e) => set(e.target.value)}
+								data-testid={`model-key-price-${name}`}
+							/>
+						</div>
+					))}
+				</div>
+				<p className="text-muted-foreground text-xs">{t("priceHint")}</p>
+			</fieldset>
 			{error && (
 				<p role="alert" className="text-chart-error-ink text-xs" data-testid="model-key-error">
 					{getBenchErrorMessage(error)}

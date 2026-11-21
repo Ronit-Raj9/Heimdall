@@ -91,7 +91,7 @@ agent <id> cannot run benchmark <id>: needs <cap>
 
 ## Versions
 
-Every time you save an agent's config (in the app, through `PUT /api/bench/agents/<id>/config`, when you create one from a template, or when you edit `agents/<id>.yaml` through the API), Heimdall saves a numbered snapshot: `v1`, `v2` and so on. A save that changes nothing (same config fingerprint as the latest version) does not make a new version. Snapshots live in `.heimdall/agent-versions/<id>/v<N>.yaml` with an index file `versions.json`.
+Every time you save an agent's config (in the app, through `PUT /api/bench/agents/<id>/config`, when you create one from a template, or when you edit `agents/<id>.yaml` through the API), Heimdall saves a numbered snapshot: `v1`, `v2` and so on. A save that changes nothing (same config fingerprint as the latest version) does not make a new version. A version is the agent without its model and provider: an evaluation sets those per arm, so a change of the default model alone is no new version, and every run of a version on any model counts toward that version. An evaluation arm with no `version` is recorded at launch as the version that was latest then (`latest_at_launch: true`), and the report card and leaderboard show that exact version. Snapshots live in `.heimdall/agent-versions/<id>/v<N>.yaml` with an index file `versions.json`.
 
 Why it matters: a report card is always for one exact version, so a score never silently changes meaning when someone edits the agent later. To compare two versions, pick mode `versions` and set `version` on each arm. In a comparison file you can write `agent: agents/<id>.yaml@v<N>` and the planner uses that frozen snapshot. Built-in library agents are versioned the same way (read-only, `v1`).
 
@@ -147,8 +147,9 @@ Every number comes from the measurements Heimdall already records for each run (
 | `score` | Success rate: runs that passed the hidden checks (and every safety check) divided by counted runs. |
 | `ci_low`, `ci_high` | 95% interval for the score from a task-clustered bootstrap: tasks are resampled (each with all its trials), because repeated trials of one task are not independent evidence. With one task it falls back to the exact Clopper-Pearson interval over runs. With few tasks the interval is wide; that is the honest answer. |
 | `runs` | Counted runs for that arm. |
-| `cost_usd` | Sum of each run's cost, re-priced from the pinned price list using the token counts Bifrost recorded. Missing when any model's price is unknown. |
-| `tokens` | Sum of input and output tokens Bifrost recorded for the arm's model calls. |
+| `cost_usd` | Sum of each run's cost, priced from the pinned price list using the token counts Bifrost recorded. `null` (shown as "Not known", never $0) when any run's cost is unknown; `cost_runs` counts the runs whose cost is known and `cost_note` says why the others are not. A model the price list does not have (a custom endpoint) is priced from the price set on its key in Models & keys (input, output and cached input per 1M tokens). |
+| `tokens` | Sum of input and output tokens Bifrost recorded for the arm's model calls; `null` when any run's count is unknown (`token_runs` counts the known ones). |
+| `tasks` | Distinct tasks with a counted run. |
 | `steps` | Median agent steps per run. |
 | `tool_calls` | Median tool calls per run. |
 | `wall_s` | Median wall time per run, in seconds. |
@@ -244,7 +245,7 @@ Each child is an ordinary comparison, so every CLI command that reads comparison
 
 ## Agent leaderboard
 
-`GET /api/bench/leaderboard/agents?capability=&model=` lists agents (each agent, version and model is one row) with their scores per skill, ranked by the chosen skill (`capability=`); without one they are listed by name, since scores on different skills are never averaged into one number. Each row has cost and the last evaluation. Built-in agents (codex, claude-code, mini-swe-agent, opencode, gemini-cli) are marked as baselines, so you can see where your agent stands against well-known ones. In the app this is the "Agents" tab of `/leaderboard`, which opens by default.
+`GET /api/bench/leaderboard/agents?capability=&model=` lists agents (each agent, version and model is one row) with their scores per skill, ranked by the chosen skill (`capability=`); without one they are listed by name, since scores on different skills are never averaged into one number. Each row has cost and the last evaluation. Only your organization's real runs count (practice examples and practice-model runs never appear). A skill score is ranked only once it has at least 10 runs over 5 tasks (`min_runs`, `min_tasks`); smaller samples are shown with "not enough runs" and no rank. Its 95% range is the same task-clustered bootstrap as the report card. A row's cost is "not known" (with the count of unpriced runs) unless every run's cost is known. Built-in agents (codex, claude-code, mini-swe-agent, opencode, gemini-cli) are marked as baselines, so you can see where your agent stands against well-known ones. In the app this is the "Agents" tab of `/leaderboard`, which opens by default.
 
 ## Limits
 
