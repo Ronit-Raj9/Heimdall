@@ -506,6 +506,8 @@ the acme example), with the fix.
 - [`verifiers.md`](verifiers.md): the three result formats and the clean room.
 - [`adding-an-agent.md`](adding-an-agent.md): templates, the YAML, framework
   agents, every `agent check` row.
+- [`openai-agents.md`](openai-agents.md): benchmark an agent that is already
+  served as an OpenAI-compatible chat/completions or Responses endpoint.
 - [`examples/acme-node`](../examples/acme-node/README.md): a complete
   project with four Node tasks, a custom agent and Codex.
 - [`bring-your-own-design.md`](bring-your-own-design.md): the contract, with

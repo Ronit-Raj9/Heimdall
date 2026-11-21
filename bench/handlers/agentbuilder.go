@@ -111,6 +111,7 @@ type AgentConfigFields struct {
 	Env         map[string]string `json:"env,omitempty"`
 	RemoteURL   string            `json:"remote_url,omitempty"`
 	A2ACardURL  string            `json:"a2a_card_url,omitempty"`
+	OpenAIURL   string            `json:"openai_url,omitempty"` // A08: openai.url of an openai_agent
 	Description string            `json:"description,omitempty"`
 }
 
@@ -144,6 +145,8 @@ type AgentConfigValidateResponse struct {
 	YAML   string             `json:"yaml"`
 	Fields *AgentConfigFields `json:"fields,omitempty"`
 }
+
+var abSecretNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 var agentIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,62}$`)
 
@@ -195,6 +198,16 @@ var agentTemplates = []AgentTemplate{
 		Description: "An A2A agent reached through Bifrost's agent gateway by its agent card.",
 		Params: []TemplateParam{{Name: "card_url", Label: "Agent card URL", Placeholder: "https://agent.example.com/.well-known/agent-card.json", Required: true,
 			Help: "The agent card URL as Bifrost reaches it."}}},
+	{ID: "openai-endpoint", Name: "OpenAI-compatible endpoint", Category: TemplateCategoryBYO, Adapter: "openai_agent", Providers: abAnyProvider,
+		DefaultModel: "claude-sonnet-4-5", source: "inline", Docs: "docs/openai-agents.md",
+		Description: "Your agent behind an OpenAI-style chat/completions URL. The bench sends each task as a chat and runs the task's tools for it.",
+		Params: []TemplateParam{
+			{Name: "url", Label: "Base URL", Placeholder: "https://agent.example.com/v1", Required: true,
+				Help: "The bench posts to <base URL>/chat/completions (or give the full .../chat/completions or .../responses URL)."},
+			{Name: "model", Label: "Model name", Placeholder: "my-agent", Help: "Sent as the model field. Empty uses the model picked below."},
+			{Name: "api_key_secret", Label: "API key secret name", Placeholder: "MY_AGENT_API_KEY",
+				Help: "Name of a secret in Settings > Secrets, sent as a Bearer token. Leave empty if the endpoint needs no key."},
+		}},
 	{ID: "docker-image", Name: "Your Docker image", Category: TemplateCategoryBYO, Adapter: "command", Providers: abAnyProvider,
 		DefaultModel: "claude-sonnet-4-5", source: "inline", multiEnv: true, Docs: "docs/adding-an-agent.md",
 		Description: "A prebuilt image that already holds your agent. Hosted runs need a digest-pinned image (@sha256:).",
@@ -368,6 +381,29 @@ func inlineAgentYAML(t AgentTemplate, id string, params map[string]string) ([]by
 		}
 		cfg["image"] = "bench/coding-core-base:1"
 		cfg["a2a"] = map[string]any{"card_url": u, "timeout_s": 600}
+	case "openai-endpoint":
+		u, err := httpURL("url")
+		if err != nil {
+			return nil, err
+		}
+		block := map[string]any{"url": u, "timeout_s": 600}
+		if strings.HasSuffix(strings.TrimRight(u, "/"), "/responses") {
+			block["api"] = "responses"
+		}
+		if m := strings.TrimSpace(params["model"]); m != "" {
+			if len(m) > 256 || strings.ContainsAny(m, " \t\n\r\"'{}") {
+				return nil, fmt.Errorf("model %q has characters a model name cannot hold", m)
+			}
+			block["model"] = m
+		}
+		if k := strings.TrimSpace(params["api_key_secret"]); k != "" {
+			if !abSecretNameRe.MatchString(k) {
+				return nil, fmt.Errorf("api key secret name %q must be letters, digits and _ (a Settings > Secrets name)", k)
+			}
+			block["api_key_secret"] = k
+		}
+		cfg["image"] = "bench/coding-core-base:1"
+		cfg["openai"] = block
 	case "docker-image":
 		img, err := get("image")
 		if err != nil {
@@ -565,6 +601,9 @@ func abFieldsOf(cfg *schemas.AgentConfig, doc []byte) AgentConfigFields {
 	if cfg.A2A != nil {
 		f.A2ACardURL = cfg.A2A.CardURL
 	}
+	if cfg.OpenAI != nil {
+		f.OpenAIURL = cfg.OpenAI.URL
+	}
 	var n yaml.Node
 	if yaml.Unmarshal(doc, &n) == nil && len(n.Content) == 1 {
 		c := n.HeadComment
@@ -603,6 +642,9 @@ func abApplyFields(doc []byte, f AgentConfigFields) ([]byte, error) {
 		}
 		if f.A2ACardURL != "" {
 			abSetPath(root, f.A2ACardURL, "a2a", "card_url")
+		}
+		if f.OpenAIURL != "" {
+			abSetPath(root, f.OpenAIURL, "openai", "url")
 		}
 		if f.Env != nil {
 			env := abMapGet(root, "env")

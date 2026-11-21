@@ -12,6 +12,8 @@ bifrost-bench agent check agents/mybot.yaml -suite coding-core
 
 `agent check` runs one real task through the normal pipeline with the fault proxy answering every model call from its scripted model, so it costs nothing, and prints a PASS, WARN or FAIL row for each thing an agent must get right, with a one-line fix. When every row passes, put the agent in an experiment (`experiments/<name>.yaml`, arm `agent: agents/mybot.yaml`) and run it on a real model.
 
+Already serving your agent as an OpenAI-compatible chat/completions or Responses endpoint? Skip the image: `docs/openai-agents.md` (adapter `openai_agent`) benchmarks it by URL.
+
 `docs/harness-matrix.md` lists the agent configs that ship (Claude Code, Codex, OpenCode, Gemini CLI, mini-swe-agent, `custom-python`, and seven framework agents in `agents/fw-*.yaml`) and how far each has been tested; only Codex and `custom-python` have run on a real model. `docs/bring-your-own-design.md` is the contract these commands implement.
 
 ## The three templates
