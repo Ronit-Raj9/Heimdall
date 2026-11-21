@@ -1625,6 +1625,10 @@ export interface RunListRow {
 	config_id: string;
 	started?: string;
 	sealed_at?: string;
+	/** Optional run metrics; the list shows a dash when the server leaves them out. */
+	model?: string;
+	steps?: number;
+	tokens?: number;
 }
 
 /** The distinct values of each run list filter, across every run. */
