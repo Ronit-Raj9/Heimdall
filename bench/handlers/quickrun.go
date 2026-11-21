@@ -191,6 +191,18 @@ func (h *quickRunHandler) post(ctx *fasthttp.RequestCtx) {
 		h.fail(ctx, statusOf(err), err.Error())
 		return
 	}
+	if s.Keys != nil { // G10: a model whose org keys are all over budget is refused before anything is written
+		var provs, ids []string
+		for _, m := range []*QuickRunModel{req.Model, req.CompareModel} {
+			if m != nil {
+				provs, ids = append(provs, m.Provider), append(ids, m.KeyID)
+			}
+		}
+		if err := KeyBudgetRefusal(work, s.Keys, quickOrgID(ctx, s.OrgID), provs, ids); err != nil {
+			h.fail(ctx, fasthttp.StatusConflict, err.Error())
+			return
+		}
+	}
 	exp, _, err := DecodeExperiment("application/yaml", data)
 	if err != nil {
 		h.fail(ctx, fasthttp.StatusInternalServerError, "QuickRun built an unreadable experiment: "+err.Error())
@@ -486,4 +498,15 @@ func emptyYAML(n *yaml.Node) bool {
 		return len(n.Content) == 0
 	}
 	return false
+}
+
+// quickOrgID is the org whose keys a QuickRun uses.
+func quickOrgID(ctx *fasthttp.RequestCtx, orgID string) string {
+	if orgID != "" {
+		return orgID
+	}
+	if p := auth.PrincipalFrom(ctx); p != nil && p.OrgID != "" {
+		return p.OrgID
+	}
+	return auth.LocalOrgID
 }

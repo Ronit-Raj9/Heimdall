@@ -112,6 +112,10 @@ type RunKey struct {
 	// Members are a team run's per-member keys on the same slot
 	// (TeamGateway); empty for every other run.
 	Members []MemberKey `json:"members,omitempty"`
+	// OrgKeyID is the id of the organization's model key (keystore) that
+	// serves the run when the run uses organization key slots; empty for the
+	// runner's own keys. The server charges the run's cost to that key.
+	OrgKeyID string `json:"org_key_id,omitempty"`
 }
 
 // RequestLog is the gateway's record of one run.

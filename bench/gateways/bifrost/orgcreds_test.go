@@ -62,3 +62,72 @@ func TestApplyOrgCredentialsNeedsFaultProxy(t *testing.T) {
 		t.Fatal("empty org accepted")
 	}
 }
+
+// fakeOrgRegistrar records RegisterOrgSlots; the other claim calls are not
+// used by ApplyOrgCredentials.
+type fakeOrgRegistrar struct {
+	SlotClaimer
+	got []OrgSlot
+}
+
+func (f *fakeOrgRegistrar) RegisterOrgSlots(_ context.Context, slots []OrgSlot) error {
+	f.got = append([]OrgSlot(nil), slots...)
+	return nil
+}
+
+// TestApplyOrgCredentialsRoundRobin checks G10: every key of a provider is
+// delivered, the org slots alternate between them, each slot knows its key
+// id, and successive runs start their slot search on the next slot.
+func TestApplyOrgCredentialsRoundRobin(t *testing.T) {
+	reg := &fakeOrgRegistrar{}
+	g, err := New(Config{URL: "http://bifrost", SetupToken: "t", FaultProxyURL: "http://fp:9100", Claims: reg,
+		Providers: []ProviderSetup{{Name: "anthropic", Model: "m", Slots: []Slot{{Name: "s1", Value: "s1"}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The provider's org slots are already in Bifrost (same count and model),
+	// so the call only re-registers keys at the fault proxy.
+	known := ProviderSetup{Name: "anthropic", Mode: ModeProxied, Model: "m"}
+	for i := 1; i <= orgSlotsPerProvider; i++ {
+		n := OrgSlotName("org_a", "anthropic", i)
+		known.Slots = append(known.Slots, Slot{Name: n, Value: n})
+	}
+	g.orgs().byOrg["org_a"] = map[string]ProviderSetup{"anthropic": known}
+
+	creds := []ProviderCredential{
+		{KeyID: "key_1", Provider: "anthropic", Value: "sk-one"},
+		{KeyID: "key_2", Provider: "anthropic", Value: "sk-two"},
+		{KeyID: "key_dup", Provider: "anthropic", Value: "sk-one"}, // same value: not a second key
+	}
+	if err := g.ApplyOrgCredentials(context.Background(), "org_a", creds); err != nil {
+		t.Fatal(err)
+	}
+	if len(reg.got) != orgSlotsPerProvider {
+		t.Fatalf("registered %d slots", len(reg.got))
+	}
+	want := []string{"sk-one", "sk-two", "sk-one", "sk-two"}
+	for i, s := range reg.got {
+		if s.Key != want[i] {
+			t.Fatalf("slot %d key %q, want %q", i+1, s.Key, want[i])
+		}
+	}
+	if id := g.orgSlotKeyID(OrgSlotName("org_a", "anthropic", 2)); id != "key_2" {
+		t.Fatalf("slot 2 key id %q", id)
+	}
+	if id := g.orgSlotKeyID("s1"); id != "" {
+		t.Fatalf("shared slot key id %q", id)
+	}
+	g.BindExperimentOrg("exp_1", "org_a")
+	rc := &schemas.RunContext{Run: &schemas.Run{RunID: "r_abc", ExpID: "exp_1"}, Agent: &schemas.AgentConfig{Gateway: schemas.GatewayPolicy{Provider: "anthropic"}}}
+	first := map[string]bool{}
+	for i := 0; i < orgSlotsPerProvider; i++ {
+		p, _, err := g.runProvider(rc)
+		if err != nil || len(p.Slots) != orgSlotsPerProvider {
+			t.Fatalf("run %d: %+v %v", i, p, err)
+		}
+		first[p.Slots[0].Name] = true
+	}
+	if len(first) != orgSlotsPerProvider {
+		t.Fatalf("runs did not rotate over the slots: %v", first)
+	}
+}

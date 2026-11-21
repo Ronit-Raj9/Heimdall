@@ -59,7 +59,12 @@ func testRequest(ctx context.Context, k *keystore.Key, value string) (*http.Requ
 		}
 	case "sarvam":
 		// Sarvam has no list call; language identification of one word is
-		// its smallest authenticated request.
+		// its smallest authenticated request: POST https://api.sarvam.ai/text-lid
+		// with the api-subscription-key header (docs.sarvam.ai, API
+		// reference "Identify Language", checked 21 Nov 2026). Its REST
+		// endpoints sit at the root, not under the OpenAI-style /v1 that a
+		// pasted chat base URL carries, so that suffix is dropped.
+		base = strings.TrimSuffix(base, "/v1")
 		req, err = http.NewRequestWithContext(ctx, http.MethodPost, base+"/text-lid", strings.NewReader(`{"input":"hello"}`))
 		if err == nil {
 			req.Header.Set("api-subscription-key", value)
@@ -112,6 +117,14 @@ func testProviderKey(ctx context.Context, hosted bool, k *keystore.Key, value st
 		if m := providerMessage(body); m != "" {
 			res.Message += ". Provider said: " + m
 		}
+	case k.Provider == "sarvam" && resp.StatusCode >= 400 && sarvamAuthError(body):
+		// Sarvam names a bad key in the error code (invalid_api_key_error,
+		// authentication_error) whatever the HTTP status.
+		res.Status = keystore.StatusInvalid
+		res.Message = fmt.Sprintf("Sarvam AI refused the key (HTTP %d): check the subscription key at dashboard.sarvam.ai", resp.StatusCode)
+		if m := providerMessage(body); m != "" {
+			res.Message += ". Provider said: " + m
+		}
 	case resp.StatusCode == http.StatusBadRequest && k.Provider == "gemini" && strings.Contains(string(body), "API_KEY_INVALID"):
 		res.Status = keystore.StatusInvalid
 		res.Message = "Google refused the key: API key not valid"
@@ -143,6 +156,20 @@ func shortNetError(err error) string {
 }
 
 // providerMessage pulls a short error message out of a provider's JSON.
+// sarvamAuthError reports whether a Sarvam error body ({"error":{"code":...}})
+// names an authentication failure.
+func sarvamAuthError(body []byte) bool {
+	var v struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &v) != nil {
+		return false
+	}
+	return v.Error.Code == "invalid_api_key_error" || v.Error.Code == "authentication_error"
+}
+
 func providerMessage(body []byte) string {
 	var v struct {
 		Error   json.RawMessage `json:"error"`

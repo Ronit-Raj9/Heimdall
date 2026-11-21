@@ -45,8 +45,10 @@ var orgIDSafe = regexp.MustCompile(`[^a-z0-9]+`)
 // orgCreds is the gateway's organization key state.
 type orgCreds struct {
 	mu     sync.Mutex
-	byOrg  map[string]map[string]ProviderSetup // org -> provider -> its org slots
-	expOrg map[string]string                   // experiment id -> org
+	byOrg   map[string]map[string]ProviderSetup // org -> provider -> its org slots
+	expOrg  map[string]string                   // experiment id -> org
+	slotKey map[string]string                   // org slot name -> keystore key id behind it (G10 budgets)
+	next    map[string]int                      // org+provider -> round robin start of the next run's slot search
 }
 
 var orgInitMu sync.Mutex
@@ -57,7 +59,8 @@ func (g *Gateway) orgs() *orgCreds {
 	orgInitMu.Lock()
 	defer orgInitMu.Unlock()
 	if g.orgSt == nil {
-		g.orgSt = &orgCreds{byOrg: map[string]map[string]ProviderSetup{}, expOrg: map[string]string{}}
+		g.orgSt = &orgCreds{byOrg: map[string]map[string]ProviderSetup{}, expOrg: map[string]string{},
+			slotKey: map[string]string{}, next: map[string]int{}}
 	}
 	return g.orgSt
 }
@@ -79,8 +82,10 @@ func OrgSlotName(orgID, provider string, n int) string {
 }
 
 // ApplyOrgCredentials registers the organization's keys: placeholder slots
-// in Bifrost, the real keys at the fault proxy. One key per provider is used
-// (the first given). It is idempotent and cheap to call per lease.
+// in Bifrost, the real keys at the fault proxy. Every key of a provider is
+// used: the provider gets max(orgSlotsPerProvider, keys) slots and slot n is
+// backed by key (n-1) mod keys, so concurrent runs spread over the keys
+// round robin (G10). It is idempotent and cheap to call per lease.
 func (g *Gateway) ApplyOrgCredentials(ctx context.Context, orgID string, creds []ProviderCredential) error {
 	if strings.TrimSpace(orgID) == "" || orgIDSafe.ReplaceAllString(strings.ToLower(orgID), "") == "" {
 		return errors.New("org credentials: empty organization id")
@@ -92,17 +97,20 @@ func (g *Gateway) ApplyOrgCredentials(ctx context.Context, orgID string, creds [
 	if !ok || g.cfg.Claims == nil || g.cfg.FaultProxyURL == "" {
 		return errors.New("org credentials need the fault proxy control API on this runner (BENCH_FAULTPROXY_CONTROL_URL and its token)")
 	}
-	byProvider := map[string]ProviderCredential{}
+	byProvider := map[string][]ProviderCredential{}
 	order := []string{}
+	seen := map[string]bool{}
 	for _, c := range creds {
 		p := bifrostProvider(c.Provider)
-		if p == "" || strings.TrimSpace(c.Value) == "" {
+		v := strings.TrimSpace(c.Value)
+		if p == "" || v == "" || seen[p+"\x00"+v] {
 			continue
 		}
-		if _, dup := byProvider[p]; !dup {
-			byProvider[p] = c
+		seen[p+"\x00"+v] = true
+		if _, ok := byProvider[p]; !ok {
 			order = append(order, p)
 		}
+		byProvider[p] = append(byProvider[p], c)
 	}
 	st := g.orgs()
 	var errs []error
@@ -117,31 +125,41 @@ func (g *Gateway) ApplyOrgCredentials(ctx context.Context, orgID string, creds [
 	return nil
 }
 
-func (g *Gateway) applyOrgProvider(ctx context.Context, reg OrgSlotRegistrar, st *orgCreds, orgID, provider string, c ProviderCredential) error {
+func (g *Gateway) applyOrgProvider(ctx context.Context, reg OrgSlotRegistrar, st *orgCreds, orgID, provider string, keys []ProviderCredential) error {
 	model := ""
-	if len(c.Models) > 0 {
-		model = c.Models[0]
-	} else if shared, ok := g.provider(provider); ok {
-		model = shared.Model
+	for _, c := range keys {
+		if len(c.Models) > 0 {
+			model = c.Models[0]
+			break
+		}
 	}
+	if model == "" {
+		if shared, ok := g.provider(provider); ok {
+			model = shared.Model
+		}
+	}
+	n := max(orgSlotsPerProvider, len(keys))
 	setup := ProviderSetup{Name: provider, Mode: ModeProxied, Model: model}
-	fp := make([]OrgSlot, 0, orgSlotsPerProvider)
-	for i := 1; i <= orgSlotsPerProvider; i++ {
+	fp := make([]OrgSlot, 0, n)
+	keyOf := make(map[string]string, n)
+	for i := 1; i <= n; i++ {
 		name := OrgSlotName(orgID, provider, i)
+		c := keys[(i-1)%len(keys)]
 		setup.Slots = append(setup.Slots, Slot{Name: name, Value: name})
 		fp = append(fp, OrgSlot{Name: name, Provider: provider, Auth: name, Key: c.Value, BaseURL: c.BaseURL})
+		keyOf[name] = c.KeyID
 	}
 	// The fault proxy first: a slot Bifrost could route to must never reach
-	// the proxy unknown. Registering again is harmless and survives a proxy
-	// restart.
+	// the proxy unknown. Registering again is harmless, survives a proxy
+	// restart, and swaps in a changed key set.
 	if err := reg.RegisterOrgSlots(ctx, fp); err != nil {
 		return fmt.Errorf("register keys at the fault proxy: %w", err)
 	}
 	st.mu.Lock()
-	_, known := st.byOrg[orgID][provider]
+	prev, known := st.byOrg[orgID][provider]
 	st.mu.Unlock()
-	if !known {
-		if _, shared := g.provider(provider); !shared {
+	if !known || len(prev.Slots) != len(setup.Slots) || prev.Model != setup.Model {
+		if _, shared := g.provider(provider); !shared && !known {
 			if err := g.ensureProvider(ctx, setup); err != nil {
 				return err
 			}
@@ -155,9 +173,24 @@ func (g *Gateway) applyOrgProvider(ctx context.Context, reg OrgSlotRegistrar, st
 		st.byOrg[orgID] = map[string]ProviderSetup{}
 	}
 	st.byOrg[orgID][provider] = setup
+	for name, id := range keyOf {
+		st.slotKey[name] = id
+	}
 	st.mu.Unlock()
-	g.logger.Info("organization provider keys registered", "org", orgID, "provider", provider, "slots", len(setup.Slots))
+	g.logger.Info("organization provider keys registered", "org", orgID, "provider", provider, "keys", len(keys), "slots", len(setup.Slots))
 	return nil
+}
+
+// orgSlotKeyID is the keystore id of the organization key behind slot, ""
+// for a shared slot.
+func (g *Gateway) orgSlotKeyID(slot string) string {
+	if !strings.HasPrefix(slot, "org_") {
+		return ""
+	}
+	st := g.orgs()
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	return st.slotKey[slot]
 }
 
 // upsertOrgSlots creates or updates the organization's placeholder slots in
@@ -211,8 +244,21 @@ func (g *Gateway) orgProvider(rc *schemas.RunContext, name string) (ProviderSetu
 	if !ok {
 		return ProviderSetup{}, false
 	}
-	p, ok := st.byOrg[org][bifrostProvider(name)]
-	return p, ok
+	prov := bifrostProvider(name)
+	p, ok := st.byOrg[org][prov]
+	if !ok || len(p.Slots) < 2 {
+		return p, ok
+	}
+	// G10 round robin: each run starts its free-slot search one slot later,
+	// so sequential runs also spread over the organization's keys.
+	rr := org + "\x00" + prov
+	start := st.next[rr] % len(p.Slots)
+	st.next[rr] = start + 1
+	rot := make([]Slot, 0, len(p.Slots))
+	rot = append(rot, p.Slots[start:]...)
+	rot = append(rot, p.Slots[:start]...)
+	p.Slots = rot
+	return p, true
 }
 
 // orgSlotProvider returns the organization provider that owns slot.

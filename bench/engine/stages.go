@@ -87,6 +87,7 @@ func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 	st.rc.Key = key
 	st.rc.Run.Gateway.VirtualKeyID = key.ID
 	st.rc.Run.Gateway.KeySlot = key.KeySlot
+	st.rc.Run.Gateway.OrgKeyID = key.OrgKeyID // G10: budget accounting per organization key
 	if err := p.bindFaultPlan(ctx, st); err != nil {
 		return err
 	}

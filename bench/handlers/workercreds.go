@@ -126,23 +126,12 @@ func (h *leaseCredsHandler) get(ctx *fasthttp.RequestCtx) {
 	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	keys, err := h.keys.List(work, h.orgID, keystore.KindProvider)
+	creds, err := UsableProviderCredentials(work, h.keys, h.orgID) // G10: every usable key under budget, all of a provider's keys
 	if err != nil {
 		lib.SendError(ctx, h.mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "list the organization's model keys failed")
 		return
 	}
 	out := schemas.LeaseCredentials{OrgID: h.orgID, LeaseID: leaseID, ExpID: holder.ExpID,
-		Credentials: []schemas.ProviderCredential{}, IssuedAt: h.now().UTC()}
-	for _, k := range keys {
-		if k.Kind != "" && k.Kind != keystore.KindProvider || !usableKey(k) || k.Provider == "" {
-			continue
-		}
-		v, err := h.keys.Reveal(work, h.orgID, k.ID)
-		if err != nil || v == "" {
-			continue // a key that can not be decrypted is skipped, never echoed
-		}
-		out.Credentials = append(out.Credentials, schemas.ProviderCredential{KeyID: k.ID, Provider: k.Provider,
-			BaseURL: k.BaseURL, Models: k.Models, Value: v})
-	}
+		Credentials: creds, IssuedAt: h.now().UTC()}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
 }
