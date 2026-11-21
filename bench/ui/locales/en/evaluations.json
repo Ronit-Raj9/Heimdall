@@ -1,0 +1,77 @@
+{
+	"list": {
+		"title": "Evaluations",
+		"subtitle": "Each evaluation tests your agent on many benchmarks at once and ends with one report card.",
+		"loadError": "Could not load the evaluations",
+		"empty": "No evaluations yet. Start one to test your agent on several benchmarks at once.",
+		"new": "Evaluate your agent",
+		"col": {
+			"name": "Name",
+			"agents": "Agent",
+			"mode": "What it tests",
+			"benchmarks": "Benchmarks",
+			"status": "Status",
+			"created": "Started",
+			"open": "Open"
+		},
+		"openOne": "Open",
+		"benchmarkCount_one": "{{count}} benchmark",
+		"benchmarkCount_other": "{{count}} benchmarks"
+	},
+	"mode": {
+		"score": "Score one agent",
+		"versions": "Compare two versions of one agent",
+		"models": "Compare two models",
+		"opponent": "Compare against a baseline agent",
+		"unknown": "Evaluation ({{mode}})"
+	},
+	"status": {
+		"queued": "Waiting to start",
+		"created": "Waiting to start",
+		"running": "Running",
+		"analyzing": "Working out the result",
+		"done": "Finished",
+		"failed": "Failed",
+		"cancelled": "Cancelled",
+		"skipped": "Skipped",
+		"unknown": "{{status}}"
+	},
+	"detail": {
+		"subtitle": "Progress on every benchmark in this evaluation. The report card appears when all of them finish.",
+		"crumb": "Evaluations",
+		"loadError": "Could not load evaluation {{id}}",
+		"armTitle": "Setup {{label}}",
+		"armAgent": "Agent",
+		"armVersion": "Version",
+		"armModel": "Model",
+		"latestVersion": "latest",
+		"versionN": "v{{n}}",
+		"setup": "{{tasks}} tasks per benchmark, each tried {{trials}} times",
+		"faults": "Stress tests: {{faults}}",
+		"noFaults": "Normal conditions only",
+		"progressTitle": "Benchmarks",
+		"progressDescription": "One comparison per benchmark. Updates every 3 seconds while running.",
+		"progressDescriptionScore": "One score per benchmark. Updates every 3 seconds while running.",
+		"runs": "{{done}} of {{total}} runs done",
+		"runsUnknown": "Runs not counted yet",
+		"openComparison": "Open comparison",
+		"openResults": "Open results",
+		"watchRuns": "Watch runs live",
+		"skippedTitle": "Skipped benchmarks",
+		"skippedDescription": "These benchmarks were not run, and why.",
+		"cancel": "Cancel evaluation",
+		"cancelConfirm": "Stop every benchmark in this evaluation that is still running? Finished results are kept.",
+		"cancelConfirmTitle": "Cancel this evaluation?",
+		"cancelConfirmOk": "Cancel evaluation",
+		"cancelKeep": "Keep running",
+		"cancelError": "Could not cancel: {{error}}",
+		"reportWaiting": "The report card appears here when every benchmark has finished.",
+		"noBenchmarks": "No benchmark in this evaluation could be run."
+	},
+	"fault": {
+		"clean": "normal conditions",
+		"model-down": "model outage",
+		"broken-tool": "broken tool",
+		"misleading-instruction": "misleading instruction"
+	}
+}

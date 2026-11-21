@@ -1,2 +1,2 @@
 export { ReportCard, type ReportCardProps } from "./reportCard";
-export * from "./reportCard.utils";
+export * from "./reportCard.utils";export { EvaluationReportCard } from "./evaluationReportCard";
