@@ -932,6 +932,7 @@ const DECISION_STYLE: Record<Decision, string> = {
   regressed: "border-chart-error/50 bg-chart-error/10 text-chart-error-ink",
   inconclusive: "border-chart-info/40 bg-chart-info/10 text-chart-info-ink",
   invalid: "border-chart-warning/50 bg-chart-warning/10 text-chart-warning-ink",
+  score: "border-border bg-muted/50 text-foreground",
 };
 
 function VerdictStep({
@@ -1047,6 +1048,7 @@ const DECISION_ICON: Record<Decision, typeof Trophy> = {
   regressed: CircleAlert,
   inconclusive: BarChart3,
   invalid: CircleAlert,
+  score: BarChart3,
 };
 
 /** The clear verdict: headline, one-line meaning, A vs B bars; the full statistics on demand. */

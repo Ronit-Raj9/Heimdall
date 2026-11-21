@@ -73,13 +73,15 @@
 			"improved": "B is better",
 			"regressed": "B is worse",
 			"inconclusive": "No clear winner yet",
-			"invalid": "Test was broken"
+			"invalid": "Test was broken",
+			"score": "Here is your score"
 		},
 		"explain": {
 			"improved": "Setup B solved clearly more tasks than setup A, more than chance would explain.",
 			"regressed": "Setup B solved clearly fewer tasks than setup A. Hold off on releasing it.",
 			"inconclusive": "Not enough evidence to tell the two apart. Run more tasks.",
-			"invalid": "Something went wrong while measuring, not the agent's fault. Fix it and run again."
+			"invalid": "Something went wrong while measuring, not the agent's fault. Fix it and run again.",
+			"score": "The share of tasks your setup solved, with a 95% range."
 		},
 		"open": "See full results",
 		"compare": "Try another model",
@@ -90,7 +92,8 @@
 			"improved": "Heimdall ran the same tasks with setup A (the baseline) and setup B (the candidate). B solved more of them, and the gap is bigger than the random ups and downs you would see if you ran the same setup twice. That makes it safe to say B is the better version.",
 			"regressed": "Heimdall ran the same tasks with setup A (the baseline) and setup B (the candidate). B solved fewer of them, and the gap is bigger than random ups and downs. Releasing B would likely make things worse.",
 			"inconclusive": "Heimdall ran the same tasks with setup A (the baseline) and setup B (the candidate). Any difference is small enough that it could just be luck. This does not mean they are equal: it means a few tasks are not enough to tell. Run more tasks or more tries per task.",
-			"invalid": "Some runs broke for reasons that have nothing to do with the agent, for example the workspace failed to start or the grader gave an unreliable answer. Heimdall refuses to give a result from broken measurements. The full results page shows which runs broke and why."
+			"invalid": "Some runs broke for reasons that have nothing to do with the agent, for example the workspace failed to start or the grader gave an unreliable answer. Heimdall refuses to give a result from broken measurements. The full results page shows which runs broke and why.",
+			"score": "Heimdall ran your setup on the tasks and graded each run. The score is the share it solved; the range shows how much it could move on other tasks like these. Nothing was compared, so there is no better or worse."
 		}
 	},
 	"home": {

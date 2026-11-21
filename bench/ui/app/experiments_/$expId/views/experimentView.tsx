@@ -107,7 +107,8 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	const shownOnRequest = (id: ExperimentTabId) => id === "matrix" && tabParam === "matrix" && arms.length >= 2;
 	const tabs: RouteTab[] = EXPERIMENT_TABS.map((id) => ({
 		id,
-		label: id === "actions" ? tActions("tab") : tPage(`tabs.${id}`),
+		// One setup is scored on its own, so its result tab reads "Score", not a comparison.
+		label: id === "actions" ? tActions("tab") : id === "verdict" && arms.length === 1 ? tPage("tabs.verdictScore") : tPage(`tabs.${id}`),
 		hidden: hidden.has(id) && !shownOnRequest(id),
 		testId: `experiment-tab-${id}`,
 	}));

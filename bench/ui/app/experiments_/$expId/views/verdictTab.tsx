@@ -12,7 +12,8 @@ import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
 import { NaiveScoreboard } from "@/components/verdict/naiveScoreboard";
 import { PolicyScorecard } from "@/components/verdict/policyScorecard";
 import { TaskGrid } from "@/components/verdict/taskGrid";
-import { armOrder } from "@/components/verdict/verdict.utils";
+import { ScoreSummary } from "@/components/verdict/scoreSummary";
+import { armOrder, isScoreVerdict } from "@/components/verdict/verdict.utils";
 import { GuardList, VerdictCard } from "@/components/verdict/verdictCard";
 import { VerdictSummary } from "@/components/verdict/verdictSummary";
 import { getBenchErrorMessage, useGetCatalogQuery, useGetDiagnosticsQuery, useGetGridQuery, useGetVerdictQuery } from "@/lib/store";
@@ -80,6 +81,8 @@ export function VerdictTab({ expId }: { expId: string }) {
 
 	const payload = verdict.data;
 	const arms = armOrder(payload);
+	// One setup: a score with a range, no comparison, so the A against B blocks (guards, statistics, changes) do not apply.
+	const scored = isScoreVerdict(payload.verdict);
 	const source = payload.grade_source;
 	// A judged suite carries a calibration block; its sealed grades are a judge's, not a verifier's.
 	const judged = Boolean(payload.judge_calibration);
@@ -142,24 +145,35 @@ export function VerdictTab({ expId }: { expId: string }) {
 				</p>
 			)}
 
-			<VerdictSummary
-				verdict={payload.verdict}
-				arms={arms}
-				naive={payload.naive}
-				armMetrics={diagnostics.data?.arm_metrics}
-				onNext={onNext}
-			/>
+			{isScoreVerdict(payload.verdict) ? (
+				<ScoreSummary
+					verdict={payload.verdict}
+					naive={payload.naive}
+					armMetrics={diagnostics.data?.arm_metrics}
+					onCompare={() => void navigate({ to: "/evaluate" })}
+				/>
+			) : (
+				<VerdictSummary
+					verdict={payload.verdict}
+					arms={arms}
+					naive={payload.naive}
+					armMetrics={diagnostics.data?.arm_metrics}
+					onNext={onNext}
+				/>
+			)}
 
 			<div className="flex flex-col gap-3">
-				<Disclosure
-					title={tPage("sections.guards")}
-					description={tPage("sectionHints.guards")}
-					icon={Shield}
-					meta={guardMeta(payload.verdict.guards)}
-					testId="verdict-guards-section"
-				>
-					<GuardList guards={payload.verdict.guards} />
-				</Disclosure>
+				{!scored && (
+					<Disclosure
+						title={tPage("sections.guards")}
+						description={tPage("sectionHints.guards")}
+						icon={Shield}
+						meta={guardMeta(payload.verdict.guards)}
+						testId="verdict-guards-section"
+					>
+						<GuardList guards={payload.verdict.guards} />
+					</Disclosure>
+				)}
 
 				<Disclosure title={tPage("sections.gates")}
 					description={tPage("sectionHints.gates")} icon={ListChecks} action={tag("verdict-gates-source", true)} testId="verdict-gates">
@@ -181,21 +195,25 @@ export function VerdictTab({ expId }: { expId: string }) {
 					{diagnosticsBody("meters")}
 				</Disclosure>
 
-				<Disclosure title={tPage("sections.statistics")}
-					description={tPage("sectionHints.statistics")} icon={Sigma} action={tag("verdict-card-source")} testId="verdict-statistics">
-					<VerdictCard verdict={payload.verdict} metricLabel={metrics[payload.verdict.primary.metric]?.label} showGuards={false} />
-				</Disclosure>
+				{!scored && (
+					<Disclosure title={tPage("sections.statistics")}
+						description={tPage("sectionHints.statistics")} icon={Sigma} action={tag("verdict-card-source")} testId="verdict-statistics">
+						<VerdictCard verdict={payload.verdict} metricLabel={metrics[payload.verdict.primary.metric]?.label} showGuards={false} />
+					</Disclosure>
+				)}
 
-				<Disclosure title={tPage("sections.changes")}
-					description={tPage("sectionHints.changes")} icon={GitCompare} testId="verdict-config-diff">
-					<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-						<ConfigDiff changes={payload.config_diff} armLabels={arms.length === 2 ? { a: arms[0], b: arms[1] } : undefined} />
-						<div className="flex flex-col gap-2">
-							<div className="flex justify-end">{tag("verdict-naive-source")}</div>
-							<NaiveScoreboard naive={payload.naive} arms={arms} />
+				{!scored && (
+					<Disclosure title={tPage("sections.changes")}
+						description={tPage("sectionHints.changes")} icon={GitCompare} testId="verdict-config-diff">
+						<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+							<ConfigDiff changes={payload.config_diff} armLabels={arms.length === 2 ? { a: arms[0], b: arms[1] } : undefined} />
+							<div className="flex flex-col gap-2">
+								<div className="flex justify-end">{tag("verdict-naive-source")}</div>
+								<NaiveScoreboard naive={payload.naive} arms={arms} />
+							</div>
 						</div>
-					</div>
-				</Disclosure>
+					</Disclosure>
+				)}
 
 				<Disclosure title={tPage("sections.policy")}
 					description={tPage("sectionHints.policy")} icon={Scale} action={tag("verdict-policy-source")} testId="verdict-policy">

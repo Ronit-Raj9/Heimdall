@@ -173,7 +173,8 @@ func TestEvaluationCreatePackChildren(t *testing.T) {
 	if exp.EvaluationID != ev.ID || exp.Suite != "hd-harbor-tb2@1.0.0" || exp.Base != "agents/scripted.yaml" {
 		t.Fatalf("experiment %+v", exp)
 	}
-	if len(exp.Arms) != 2 || exp.Arms["A"].Set["model"] != "gpt-5.4-mini" || exp.Arms["B"].Set["env.HEIMDALL_QUICKRUN_ARM"] != "B" {
+	// Score mode is one arm scored on its own: no hidden repeat arm.
+	if len(exp.Arms) != 1 || exp.Arms["A"].Set["model"] != "gpt-5.4-mini" || strings.Contains(exp.Arms["A"].Label, "repeat") {
 		t.Fatalf("arms %+v", exp.Arms)
 	}
 	if len(exp.Conditions) != 2 || exp.Conditions[0].ID != "clean" || exp.Conditions[1].ID != "stale-notes" {
@@ -328,5 +329,63 @@ func TestSpreadPick(t *testing.T) {
 	}
 	if got := len(spreadPick(ids, 10)); got != 6 {
 		t.Fatal(got)
+	}
+}
+
+// The estimate counts exactly the runs the launch plans, in score mode (one
+// arm, no hidden repeat) and with two arms.
+func TestEvaluationEstimateMatchesLaunchedRuns(t *testing.T) {
+	old := evalCompat
+	evalCompat = func(*schemas.AgentConfig, *schemas.Suite) (bool, []schemas.Capability, string) { return true, nil, "" }
+	defer func() { evalCompat = old }()
+	for name, arms := range map[string]string{
+		"score":  `[{"label":"A","agent":"scripted","model":"gpt-5.4-mini","provider":"openai"}]`,
+		"models": `[{"label":"A","agent":"scripted","model":"gpt-5.4-mini","provider":"openai"},{"label":"B","agent":"scripted","model":"gpt-5.4","provider":"openai"}]`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			l := &evalLauncher{}
+			r, _ := evalServer(t, Services{Launcher: l, Suites: evalSuites(), OrgID: "org1"})
+			body := `{"arms":` + arms + `,"benchmarks":["hd-harbor-tb2","longmemeval"],"tasks_per_benchmark":4,"trials":2,"faults":["misleading-instruction"]}`
+			ctx := evalCall(r, "POST", APIPrefix+"/evaluations", body)
+			if ctx.Response.StatusCode() != fasthttp.StatusAccepted {
+				t.Fatalf("status %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+			}
+			ev := decodeEval(t, ctx)
+			launched := map[string]int{}
+			total := 0
+			for _, c := range ev.Children {
+				exp := l.planned[c.ExperimentID]
+				if exp == nil {
+					t.Fatalf("child %+v not planned", c)
+				}
+				for _, a := range exp.Arms {
+					if strings.Contains(a.Label, "repeat") {
+						t.Fatalf("hidden repeat arm %+v", a)
+					}
+				}
+				n := 0
+				for _, cond := range exp.Conditions {
+					n += len(cond.Tasks.IDs) * cond.Trials * len(exp.Arms)
+				}
+				launched[c.Benchmark] = n
+				total += n
+			}
+			ctx = evalCall(r, "POST", APIPrefix+"/evaluations/estimate", body)
+			if ctx.Response.StatusCode() != fasthttp.StatusOK {
+				t.Fatalf("estimate status %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+			}
+			var est EvalEstimate
+			if err := json.Unmarshal(ctx.Response.Body(), &est); err != nil {
+				t.Fatal(err)
+			}
+			if est.Runs != total || total == 0 {
+				t.Fatalf("estimate %d runs, launch plans %d", est.Runs, total)
+			}
+			for _, b := range est.PerBenchmark {
+				if b.Runs != launched[b.Benchmark] {
+					t.Fatalf("%s: estimate %d runs, launch plans %d", b.Benchmark, b.Runs, launched[b.Benchmark])
+				}
+			}
+		})
 	}
 }

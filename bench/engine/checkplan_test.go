@@ -153,11 +153,11 @@ func TestPlanCheck(t *testing.T) {
 			t.Errorf("spec %+v planned", spec)
 		}
 	}
-	// An experiment still needs two arms.
+	// An experiment needs at least one arm; one arm is scored on its own.
 	e := testExperiment()
-	delete(e.Arms, "B")
+	e.Arms = map[string]schemas.ArmSpec{}
 	if _, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), e); err == nil || !strings.Contains(err.Error(), "need at least 2 arms") {
-		t.Fatalf("one-arm experiment: %v", err)
+		t.Fatalf("no-arm experiment: %v", err)
 	}
 }
 

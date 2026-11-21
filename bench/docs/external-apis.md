@@ -114,9 +114,9 @@ so a changed cassette is a changed task.
 1. Set the credential in the shell that runs the bench:
    `export FX_API_KEY=...`.
 2. Copy a smoke experiment and add `external: record`, then plan and run it.
-   An experiment needs at least two arms: keep the oracle arm for the
-   reference's calls next to a noop arm (which makes no calls), or use a real
-   agent as an arm to capture what agents ask. Every arm that calls the API
+   One arm is enough (it is scored on its own): keep the oracle arm for the
+   reference's calls, add a noop arm (which makes no calls) for a
+   comparison, or use a real agent as an arm to capture what agents ask. Every arm that calls the API
    records its own cassette.
 3. Each run folder holds `external/<id>.cassette.jsonl`, written by the proxy
    with the credential redacted, and sealed with the run. Run folders sit at

@@ -111,7 +111,10 @@ func TestEvaluationTaskImageVariant(t *testing.T) {
 		t.Fatalf("arm agent changed: %+v", ev.Spec.Arms)
 	}
 	exp := l.planned[c.ExperimentID]
-	for _, id := range []string{"A", "B"} {
+	if len(exp.Arms) != 1 {
+		t.Fatalf("score mode plans one arm, got %+v", exp.Arms)
+	}
+	for _, id := range []string{"A"} {
 		if exp.Arms[id].Set["build.base_arg"] != taskImageBaseArg {
 			t.Fatalf("arm %s set %+v", id, exp.Arms[id].Set)
 		}
@@ -142,7 +145,7 @@ func TestEstimateTaskImageVariant(t *testing.T) {
 		t.Fatal(err)
 	}
 	be := est.PerBenchmark[0]
-	if be.Skipped != "" || be.Runs != 2 || src.lastExp.Arms["A"].Set["build.base_arg"] != taskImageBaseArg || src.lastExp.Arms["B"].Set["build.base_arg"] != taskImageBaseArg {
+	if be.Skipped != "" || be.Runs != 2 || src.lastExp.Arms["A"].Set["build.base_arg"] != taskImageBaseArg || len(src.lastExp.Arms) != 1 {
 		t.Fatalf("estimate %+v exp %+v", be, src.lastExp)
 	}
 	req = &EvalEstimateRequest{Arms: []EvalEstimateArm{{Agent: "svc", Model: "gpt-x"}}, Benchmarks: []string{"hd-harbor-tb2"}}

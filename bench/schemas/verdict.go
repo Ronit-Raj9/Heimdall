@@ -15,6 +15,9 @@ const (
 	DecisionRegressed    Decision = "regressed"
 	DecisionInconclusive Decision = "inconclusive"
 	DecisionInvalid      Decision = "invalid"
+	// DecisionScore is a one-arm experiment's result: one setup scored on
+	// its own, with no comparison and so no release verdict (Verdict.Score).
+	DecisionScore Decision = "score"
 )
 
 // Action is the single action a verdict ends in (DESIGN.md 9.4).
@@ -152,6 +155,29 @@ type Verdict struct {
 	// Fairness is set when the experiment declared a fairness rule (agents.go).
 	Fairness *FairnessReport `json:"fairness,omitempty"`
 	Variance *VarianceCard   `json:"variance,omitempty"` // Eval integrity area (S2): the noise floor behind the MDE
+	// Score is set, and Decision is score (or invalid), when the experiment
+	// has one arm: the primary metric of that arm with an interval, and no
+	// effect, guards or MDE.
+	Score *Score `json:"score,omitempty"`
+}
+
+// Score is the primary endpoint of a one-arm experiment's only arm: the mean
+// over observed counted runs with a task-clustered interval, and the bounds
+// that set every unknown run at its lowest and highest possible value.
+type Score struct {
+	Arm       string      `json:"arm"`
+	Label     string      `json:"label,omitempty"`
+	Condition string      `json:"condition"`
+	Metric    string      `json:"metric"`
+	Mean      *float64    `json:"mean,omitempty"`     // over observed runs; nil when no run is observed
+	Interval  *[2]float64 `json:"interval,omitempty"` // Conf interval of Mean; nil when it cannot be computed
+	Conf      float64     `json:"conf"`
+	Method    string      `json:"method"`         // how Interval was computed
+	Low       *float64    `json:"low,omitempty"`  // every unknown run at its lowest possible value
+	High      *float64    `json:"high,omitempty"` // every unknown run at its highest possible value
+	Tasks     int         `json:"tasks"`          // tasks with at least one counted run
+	Runs      int         `json:"runs"`           // counted runs, unknowns included
+	Observed  int         `json:"observed"`       // runs with an observed value
 }
 
 // Variance sources (Eval integrity area, S2).

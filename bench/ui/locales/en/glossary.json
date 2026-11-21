@@ -16,6 +16,7 @@
 		"verdict": { "term": "verdict", "label": "Result", "tip": "What the comparison concluded: B is better, B is worse, no clear winner yet, or the test was broken." },
 		"inconclusive": { "term": "INCONCLUSIVE", "label": "No clear winner yet", "tip": "Not enough evidence; run more tasks." },
 		"invalid": { "term": "INVALID", "label": "Test was broken", "tip": "Something went wrong while measuring (not the agent's fault). Fix and re-check." },
+		"score": { "term": "score", "label": "Scored", "tip": "One setup scored on its own, with a 95% range. Nothing was compared, so there is no better or worse." },
 		"improved": { "term": "improved", "label": "B is better", "tip": "Setup B solved more tasks than Setup A, and the difference is clear." },
 		"regressed": { "term": "regressed", "label": "B is worse", "tip": "Setup B solved fewer tasks than Setup A, and the difference is clear." },
 		"run": { "term": "run", "label": "Run", "tip": "One attempt by one agent at one task." },

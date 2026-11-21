@@ -462,9 +462,9 @@ func runHostedAgentCheck(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.
 	return rep, nil
 }
 
-// checkExperiment is the hosted agent check: the agent in both arms on one
-// task (all tasks when task is empty), clean condition, one trial, every model call scripted. Two arms
-// because the planner's experiment mode needs a baseline and a candidate.
+// checkExperiment is the hosted agent check: the agent as one arm on one
+// task (all tasks when task is empty), clean condition, one trial, every
+// model call scripted. One arm is scored on its own, so nothing runs twice.
 func checkExperiment(agent, suite, task string) *schemas.Experiment {
 	tasks := schemas.TaskSelector{All: true}
 	if task != "" {
@@ -476,7 +476,6 @@ func checkExperiment(agent, suite, task string) *schemas.Experiment {
 		Base:  agent,
 		Arms: map[string]schemas.ArmSpec{
 			"A": {Label: "check"},
-			"B": {Label: "check (repeat)", Set: map[string]any{"env.HEIMDALL_CHECK_ARM": "B"}}, // the planner refuses identical arms
 		},
 		Primary:          schemas.Endpoint{Condition: schemas.ConditionClean, Metric: "verified_success"},
 		Guards:           []schemas.GuardSpec{{Rule: "no_new_integrity_violation"}},

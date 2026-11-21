@@ -127,10 +127,15 @@ type planMode struct {
 	minArms       int
 	lockWarnOnly  bool
 	skipUpstreams bool
+	// single allows a one-arm experiment (a single setup scored on its own,
+	// with no A against B verdict) next to the minArms comparison
+	// (validateSingleArm).
+	single bool
 }
 
-// experimentMode is how Plan plans an experiment.
-var experimentMode = planMode{minArms: 2}
+// experimentMode is how Plan plans an experiment: two or more arms compared,
+// or one arm scored on its own.
+var experimentMode = planMode{minArms: 2, single: true}
 
 // condPlan is one condition resolved against the suite.
 type condPlan struct {
@@ -202,7 +207,14 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 			return nil, fmt.Errorf("plan %s: %w", exp.Name, err)
 		}
 	}
-	if err := validateExperiment(exp, mode.minArms); err != nil {
+	minArms := mode.minArms
+	if mode.single && len(exp.Arms) == 1 && exp.Matrix == nil {
+		if err := validateSingleArm(exp); err != nil {
+			return nil, fmt.Errorf("plan %s: %w", exp.Name, err)
+		}
+		minArms = 1
+	}
+	if err := validateExperiment(exp, minArms); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", exp.Name, err)
 	}
 	e := *exp
@@ -1494,6 +1506,27 @@ func cleanRel(rel string) (string, error) {
 		return "", fmt.Errorf("path %q leaves its root", rel)
 	}
 	return c, nil
+}
+
+// validateSingleArm checks what a one-arm experiment cannot ask for: it
+// scores one setup on its own (verdict.SingleArm), so there is no second arm
+// to compare against. A no_regression guard and an adaptive trials rule
+// compare two arms, an A/A copy is a comparison too, and a verdict policy
+// other than the default would expect arms it does not have.
+func validateSingleArm(e *schemas.Experiment) error {
+	var errs []error
+	if p := e.Verdict.Policy; p != "" && p != verdict.PolicyPairedSignFlip {
+		errs = append(errs, fmt.Errorf("a one-arm experiment is scored on its own; verdict policy %q needs more arms", p))
+	}
+	for _, g := range e.Guards {
+		if g.Rule == GuardNoRegression {
+			errs = append(errs, fmt.Errorf("guard %s compares two arms; a one-arm experiment has one", g.Rule))
+		}
+	}
+	if e.AA {
+		errs = append(errs, errors.New("aa: true compares a copy against arm A; a one-arm experiment is scored on its own"))
+	}
+	return errors.Join(errs...)
 }
 
 // validateExperiment checks the shape of an experiment before any I/O.

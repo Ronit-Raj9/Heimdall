@@ -13,6 +13,7 @@
 	},
 	"tabs": {
 		"verdict": "Result",
+		"verdictScore": "Score",
 		"runs": "Runs",
 		"matrix": "Setups",
 		"cost": "Cost",
@@ -31,6 +32,17 @@
 			"regressedNoEffect": "B ({{arm}}) is worse",
 			"inconclusive": "No clear winner yet",
 			"invalid": "Test was broken: fix it and re-check"
+		},
+		"score": {
+			"title": "Score",
+			"hint": "One setup scored on its own. There is no second setup, so there is no better or worse here; run a comparison to get one.",
+			"interval": "95% range: {{lo}} to {{hi}}",
+			"noInterval": "Range not known: too few tasks with graded runs",
+			"bounds": "If the {{count}} ungraded runs had all failed or all passed: {{lo}} to {{hi}}",
+			"runs": "{{observed}} of {{runs}} runs graded, over {{tasks}} tasks",
+			"unknown": "not known",
+			"invalidHint": "Some runs broke for reasons that have nothing to do with the agent, so the score is not trusted. Fix it and run again.",
+			"compare": "Compare with another setup"
 		},
 		"passRate": "Share of tasks solved",
 		"passCount": "{{num}} of {{den}} tasks solved",

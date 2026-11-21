@@ -872,7 +872,8 @@ export interface Experiment {
 // verdict.go: verdict and analysis (DESIGN.md 9.3, 9.4, 9.6)
 // ---------------------------------------------------------------------------------------------
 
-export type Decision = "improved" | "regressed" | "inconclusive" | "invalid";
+/** score: a one-setup experiment, scored on its own with no comparison (Verdict.score). */
+export type Decision = "improved" | "regressed" | "inconclusive" | "invalid" | "score";
 
 export type Action = "ship" | "hold" | "no_decision" | "fix_harness";
 
@@ -954,6 +955,29 @@ export interface Verdict {
 	frozen_at: string;
 	/** Eval integrity area (S2): the noise floor behind the MDE. Absent on analyses written before it. */
 	variance?: VarianceCard;
+	/** Set (and decision is score or invalid) when the experiment has one setup: its score with an interval, no comparison. */
+	score?: Score;
+}
+
+/** schemas.Score: the primary metric of a one-setup experiment's only arm. Rates are fractions (0.62 = 62%). */
+export interface Score {
+	arm: string;
+	label?: string;
+	condition: string;
+	metric: string;
+	/** Over observed runs; absent when none was observed. */
+	mean?: number;
+	/** conf interval of mean; absent when it cannot be computed. */
+	interval?: [number, number];
+	conf: number;
+	method: string;
+	/** Every unknown run at its lowest possible value. */
+	low?: number;
+	/** Every unknown run at its highest possible value. */
+	high?: number;
+	tasks: number;
+	runs: number;
+	observed: number;
 }
 
 /** fail makes the experiment INVALID; unknown is never a pass and holds an IMPROVED verdict; warn changes nothing unless declared as a guard. */

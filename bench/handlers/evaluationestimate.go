@@ -362,7 +362,7 @@ func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSour
 			continue
 		}
 		for id := range exp.Arms {
-			if id == evalArmIDs[i] || (len(req.Arms) == 1 && id == "B") {
+			if id == evalArmIDs[i] {
 				exp.Arms[id] = withSet(exp.Arms[id], set)
 			}
 		}
@@ -395,9 +395,9 @@ func evalAdmittedTasks(st *schemas.Suite) []string {
 // evalArmIDs names the spec arms A, B.
 var evalArmIDs = []string{"A", "B"}
 
-// evalExperiment is the experiment an evaluation would launch on st. One
-// arm gets a twin B (as QuickRun does) because the planner needs two arms;
-// the estimate reads only the spec's arms.
+// evalExperiment is the experiment an evaluation would launch on st: one
+// arm per spec arm, so a single setup is one arm scored on its own and the
+// estimate counts exactly the runs the launch plans.
 func evalExperiment(st *schemas.Suite, req *EvalEstimateRequest, tasks, conds []string) *schemas.Experiment {
 	arms := map[string]schemas.ArmSpec{}
 	base := ""
@@ -415,16 +415,6 @@ func evalExperiment(st *schemas.Suite, req *EvalEstimateRequest, tasks, conds []
 			arm.Label = a.Label
 		}
 		arms[evalArmIDs[i]] = arm
-	}
-	if len(req.Arms) == 1 {
-		twin := arms["A"]
-		set := map[string]any{}
-		for k, v := range twin.Set {
-			set[k] = v
-		}
-		set["env.HEIMDALL_QUICKRUN_ARM"] = "B"
-		twin.Set, twin.Label = set, twin.Label+" (repeat)"
-		arms["B"] = twin
 	}
 	cs := make([]schemas.ConditionSpec, 0, len(conds))
 	for _, c := range conds {

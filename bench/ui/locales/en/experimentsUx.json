@@ -27,7 +27,8 @@
 		"regressed": "B is worse",
 		"inconclusive": "No clear winner yet",
 		"invalid": "Test was broken",
-		"pending": "Waiting for result"
+		"pending": "Waiting for result",
+		"score": "Scored"
 	},
 	"col": {
 		"experiment": "Comparison",

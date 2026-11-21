@@ -1,4 +1,4 @@
-import type { Decision, ExperimentStatus, GridRow, GuardStatus, Outcome, Ratio, Value, Verdict, VerdictPayload } from "@/lib/types/bench";
+import type { Decision, ExperimentStatus, GridRow, GuardStatus, Outcome, Ratio, Score, Value, Verdict, VerdictPayload } from "@/lib/types/bench";
 
 // Pure helpers for the verdict screen, so the formatting and ordering rules are tested without
 // rendering. Numbers follow the UI locale; callers pass getLocale().
@@ -11,6 +11,7 @@ export const DECISION_TONE = {
 	regressed: "bad",
 	inconclusive: "warn",
 	invalid: "neutral",
+	score: "neutral",
 } as const satisfies Record<Decision, Tone>;
 
 export const GUARD_TONE = {
@@ -212,4 +213,29 @@ export function boundsDiffer(effect: { d_bar: number; lower_bound?: { d_bar: num
 	const hi = effect.upper_bound?.d_bar;
 	if (lo === undefined || hi === undefined) return false;
 	return Math.abs(lo - effect.d_bar) > 1e-9 || Math.abs(hi - effect.d_bar) > 1e-9;
+}
+/** Rate metrics read as a share of runs (mirrors verdict.RateMetric): a score prints as a percentage. */
+const RATE_METRICS = new Set(["verified_success", "false_completion", "claim_precision"]);
+
+export function isRateMetric(metric: string): boolean {
+	return RATE_METRICS.has(metric);
+}
+
+/** A one-setup score in its metric's unit: "62.5%" for a rate, "0.031 USD" for spend, "41 s" for time. */
+export function formatScoreValue(metric: string, value: number, locale: string): string {
+	if (isRateMetric(metric)) return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(value * 100)}%`;
+	const unit = metricUnit(metric);
+	const n = new Intl.NumberFormat(locale, { maximumFractionDigits: unit === "USD" ? 4 : 3 }).format(value);
+	return unit ? `${n} ${unit}` : n;
+}
+
+/** The score with every ungraded run failed and passed, or null when every run was graded or the bounds are unknown. */
+export function scoreBounds(score: Score): [number, number] | null {
+	if (score.observed >= score.runs || score.low === undefined || score.high === undefined) return null;
+	return [score.low, score.high];
+}
+
+/** True when the verdict is a one-setup score (no comparison). */
+export function isScoreVerdict(verdict: Verdict): verdict is Verdict & { score: Score } {
+	return verdict.score !== undefined && verdict.score !== null;
 }

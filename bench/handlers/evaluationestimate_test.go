@@ -53,9 +53,9 @@ func TestEstimateEvaluationKnown(t *testing.T) {
 	if est.Runs != 12+4 || !est.EstCostUSD.Known || est.EstCostUSD.Low != 2 || est.EstCostUSD.High != 6 {
 		t.Fatalf("totals %+v", est)
 	}
-	// The experiment the forecast saw: one arm plus a twin, first N sorted admitted tasks.
+	// The experiment the forecast saw: the one arm only (no hidden repeat), first N sorted admitted tasks.
 	exp := src.lastExp
-	if exp.Suite != "plain@2" || len(exp.Arms) != 2 || exp.Arms["A"].Set["model"] != "gpt-x" || exp.Base != "agents/codex.yaml" {
+	if exp.Suite != "plain@2" || len(exp.Arms) != 1 || exp.Arms["A"].Set["model"] != "gpt-x" || exp.Base != "agents/codex.yaml" {
 		t.Fatalf("experiment %+v", exp)
 	}
 }

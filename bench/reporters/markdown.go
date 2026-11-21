@@ -53,9 +53,13 @@ func (r *markdownReporter) Write(ctx context.Context, a *schemas.Analysis, m *sc
 	writeExternal(bw, m) // External APIs area: live or record runs are labelled not repeatable (external.go)
 	writeSplit(bw, m)    // Suite health area: held-out experiments state their split (split.go)
 	writeSupport(bw, m)  // W3 customer support: the simulated user's label (support.go)
-	writePrimary(bw, &a.Verdict)
-	writeNoiseFloor(bw, &a.Verdict) // Eval integrity area (S2): the variance card behind the MDE
-	writeGuards(bw, a.Verdict.Guards)
+	if a.Verdict.Score != nil {
+		writeScore(bw, &a.Verdict) // one-arm experiment: a score with an interval, no comparison (score.go)
+	} else {
+		writePrimary(bw, &a.Verdict)
+		writeNoiseFloor(bw, &a.Verdict) // Eval integrity area (S2): the variance card behind the MDE
+		writeGuards(bw, a.Verdict.Guards)
+	}
 	writeInvalid(bw, a.Verdict.InvalidReasons)
 	writeInstruments(bw, a.Verdict.Instruments, m, arms)
 	writeRouting(bw, m)                   // W9 routing policy under test: arms by policy difference (routing.go)
