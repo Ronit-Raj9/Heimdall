@@ -26,12 +26,19 @@ export function LoadError({ title, error, onRetry, testId, className }: LoadErro
 		<div
 			role="alert"
 			data-testid={testId}
-			className={cn("border-chart-error/40 bg-chart-error/5 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm", className)}
+			className={cn(
+				"border-chart-error/30 bg-chart-error/5 flex flex-wrap items-start gap-3 rounded-xl border px-4 py-3.5 text-sm sm:flex-nowrap",
+				className,
+			)}
 		>
-			<AlertTriangle className="text-chart-error-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
+			<span className="bg-chart-error/10 flex size-7 shrink-0 items-center justify-center rounded-full">
+				<AlertTriangle className="text-chart-error-ink size-3.5" aria-hidden="true" />
+			</span>
 			<div className="flex min-w-0 flex-1 flex-col gap-1">
 				<p className="text-foreground font-medium">{title}</p>
-				<p className="text-muted-foreground break-words">{getBenchErrorMessage(error)}</p>
+				<p className="text-muted-foreground line-clamp-3 break-words" title={getBenchErrorMessage(error)}>
+					{getBenchErrorMessage(error)}
+				</p>
 			</div>
 			{onRetry && (
 				<Button variant="outline" size="sm" onClick={onRetry} dataTestId={`${testId}-retry`}>
@@ -48,7 +55,7 @@ export function EmptyNote({ children, testId, className }: { children: React.Rea
 		<p
 			data-testid={testId}
 			className={cn(
-				"text-muted-foreground bg-muted/30 rounded-lg border border-dashed px-4 py-8 text-center text-sm text-pretty",
+				"text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border/80 px-6 py-10 text-center text-sm text-pretty",
 				className,
 			)}
 		>
@@ -61,9 +68,9 @@ export function EmptyNote({ children, testId, className }: { children: React.Rea
 export function BlockSkeleton({ rows = 3, testId, className }: { rows?: number; testId: string; className?: string }) {
 	const { t } = useTranslation("bench");
 	return (
-		<div className={cn("flex flex-col gap-2", className)} data-testid={testId} aria-busy="true" aria-label={t("runs.state.loading")}>
+		<div className={cn("flex flex-col gap-2.5", className)} data-testid={testId} aria-busy="true" aria-label={t("runs.state.loading")}>
 			{Array.from({ length: rows }, (_, i) => (
-				<Skeleton key={`skeleton-${i}`} className="h-9 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.12) }} />
+				<Skeleton key={`skeleton-${i}`} className="h-10 w-full rounded-lg" style={{ opacity: Math.max(0.4, 1 - i * 0.12) }} />
 			))}
 		</div>
 	);
@@ -89,8 +96,8 @@ export function Section({
 		<section className={cn("flex flex-col gap-3", className)} data-testid={testId}>
 			<div className="flex flex-wrap items-end justify-between gap-2">
 				<div className="flex flex-col gap-0.5">
-					<h2 className="text-foreground text-[15px] font-semibold tracking-tight">{title}</h2>
-					{description && <p className="text-muted-foreground max-w-prose text-xs leading-relaxed">{description}</p>}
+					<h2 className="text-foreground text-base font-semibold tracking-tight">{title}</h2>
+					{description && <p className="text-muted-foreground line-clamp-2 max-w-prose text-sm">{description}</p>}
 				</div>
 				{actions}
 			</div>
