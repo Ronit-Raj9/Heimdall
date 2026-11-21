@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { type EvaluationArm, type EvaluationSpec, useCreateEvaluationMutation } from "@/lib/store/apis/evaluationsApi";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { FAULTS, specReady } from "./step4Setup";
 
@@ -40,6 +40,13 @@ export function summaryLines(spec: EvaluationSpec): string[] {
 export function parseBudget(text: string): number | undefined {
 	const n = Number(text);
 	return text.trim() !== "" && Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+/** The app page that fixes a launch error (the server's error.link), if any. */
+export function errorLink(error: unknown): string | undefined {
+	const data = (error as { data?: { error?: { link?: string } | string } } | undefined)?.data;
+	const link = typeof data?.error === "object" ? data.error.link : undefined;
+	return link?.startsWith("/") ? link : undefined;
 }
 
 function errorMessage(error: unknown): string {
@@ -101,6 +108,14 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 			{state.error ? (
 				<p className="text-chart-error-ink text-sm" role="alert" data-testid="step5-error">
 					{errorMessage(state.error)}
+					{errorLink(state.error) === "/models" ? (
+						<>
+							{" "}
+							<Link to="/models" className="underline underline-offset-2" data-testid="step5-error-link">
+								Add a model key
+							</Link>
+						</>
+					) : null}
 				</p>
 			) : null}
 

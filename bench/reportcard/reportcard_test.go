@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"strings"
 	"testing"
 	"time"
 
@@ -336,5 +337,46 @@ func TestBuildScoreModeHidesRepeatArm(t *testing.T) {
 		if _, ok := c.Arms["B"]; ok {
 			t.Fatalf("capability shows B: %+v", c)
 		}
+	}
+}
+
+// TestBuildLeavesOutPracticeRuns covers X01: an arm whose runs the scripted
+// practice model answered (labelled practice in run.json, or a smoke
+// experiment) never reaches the scores or the verdict, and the report says
+// how many runs it left out.
+func TestBuildLeavesOutPracticeRuns(t *testing.T) {
+	src := newSource()
+	var runs []fixRun
+	for _, task := range []string{"t1", "t2", "t3", "t4", "t5", "t6"} {
+		runs = append(runs, pass("a", task, 1, nil), pass("b", task, 1, nil))
+	}
+	src.add("exp_p", "hd-harbor-tb2", []string{"a", "b"}, runs)
+	for i := range src.runs["exp_p"] {
+		if src.runs["exp_p"][i].Slot.Arm == "b" && src.runs["exp_p"][i].Slot.Task == "t3" {
+			src.runs["exp_p"][i].Run.Practice = true // one practice run makes the arm practice
+		}
+	}
+	rep, err := Build(context.Background(), src, abEval(schemas.EvaluationChild{Benchmark: "hd-harbor-tb2", ExperimentID: "exp_p"}), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := rep.Benchmarks[0]
+	if b.Arms["A"].Runs != 6 || b.Arms["B"].Runs != 0 {
+		t.Fatalf("runs A %d B %d, want 6 and 0", b.Arms["A"].Runs, b.Arms["B"].Runs)
+	}
+	if rep.PracticeRuns != 6 || !strings.Contains(rep.Note, "6 practice runs were left out") {
+		t.Fatalf("practice %d note %q", rep.PracticeRuns, rep.Note)
+	}
+	if b.Verdict == nil || b.Verdict.Winner != "unclear" || b.Verdict.RunsB != 0 {
+		t.Fatalf("verdict over practice runs: %+v", b.Verdict)
+	}
+
+	src.manifests["exp_p"].Experiment.Smoke = true
+	rep, err = Build(context.Background(), src, abEval(schemas.EvaluationChild{Benchmark: "hd-harbor-tb2", ExperimentID: "exp_p"}), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Benchmarks[0].Arms["A"].Runs != 0 || rep.PracticeRuns != 12 {
+		t.Fatalf("smoke experiment counted: A %d practice %d", rep.Benchmarks[0].Arms["A"].Runs, rep.PracticeRuns)
 	}
 }

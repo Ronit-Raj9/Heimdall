@@ -283,7 +283,7 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		w.release(ctx, lease, "the leased slot is not the manifest's slot "+lease.Slot.SlotID, true, nil)
 		return nil
 	}
-	leaseSecrets, why := w.applyLeaseCredentials(sctx, lease) // F4 key delivery, G01 org secrets (remotecreds.go)
+	leaseSecrets, why := w.applyLeaseCredentials(sctx, lease, exp.m.Gateway.Deferred()) // F4 key delivery, G01 org secrets (remotecreds.go)
 	live.setSecrets(leaseSecrets)
 	if leaseSecrets == nil && exp.m.Gateway.Deferred() {
 		leaseSecrets = map[string]string{} // G01: a hosted org's run never reads this runner's own environment

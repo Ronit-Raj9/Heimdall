@@ -233,3 +233,23 @@ func TestHolmAcrossBenchmarks(t *testing.T) {
 		t.Errorf("overall wins %v, want B=1 after Holm", o.Wins)
 	}
 }
+
+// TestComparePracticeNeverCounts covers X01: practice runs (the scripted
+// model) are dropped before anything is computed.
+func TestComparePracticeNeverCounts(t *testing.T) {
+	var a, b []TaskOutcome
+	for _, task := range []string{"t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8"} {
+		a = append(a, TaskOutcome{TaskID: task, Trial: 1, Success: false})
+		b = append(b, TaskOutcome{TaskID: task, Trial: 1, Success: true, Score: 1, Practice: true})
+	}
+	v := Compare(a, b)
+	if v.RunsB != 0 || v.Winner != WinnerUnclear || v.Tasks != 0 {
+		t.Fatalf("practice runs counted: %+v", v)
+	}
+	for i := range b {
+		b[i].Practice = false
+	}
+	if v := Compare(a, b); v.Winner != WinnerB {
+		t.Fatalf("real runs: winner %s", v.Winner)
+	}
+}

@@ -268,6 +268,13 @@ func (g *Gateway) runProvider(rc *schemas.RunContext) (ProviderSetup, string, er
 	}
 	p, ok := g.orgProvider(rc, name) // F4: the experiment's organization keys (orgcreds.go)
 	if !ok {
+		// X01: an experiment bound to an organization never falls back to
+		// this runner's own provider keys. Only a run whose every call the
+		// fault proxy answers from the scripted model (a practice run, no
+		// paid traffic) may use the shared slots.
+		if org, bound := g.boundOrg(rc); bound && !noModelSpend(rc) {
+			return ProviderSetup{}, "", fmt.Errorf("%w: organization %s has no usable %s key on this runner; add a working %s key on Models & keys", ErrNoOrgKey, org, name, name)
+		}
 		p, ok = g.provider(name)
 	}
 	if !ok {
@@ -278,6 +285,26 @@ func (g *Gateway) runProvider(rc *schemas.RunContext) (ProviderSetup, string, er
 		model = rc.Agent.Model
 	}
 	return p, model, nil
+}
+
+// noModelSpend reports whether a run can never cost a provider anything: its
+// experiment is answered by the scripted model only (smoke or
+// scripted_upstream), its agent is a scripted control that makes no model
+// call (every scripted kind but toy and mcploop), or it is a deployed agent
+// whose model traffic is external. Such a run may use
+// the shared slots of an organization-bound experiment (X01).
+func noModelSpend(rc *schemas.RunContext) bool {
+	if rc.Experiment.NoPaidTraffic() || (rc.Manifest != nil && rc.Manifest.Experiment.NoPaidTraffic()) {
+		return true
+	}
+	a := rc.Agent
+	if a != nil && a.Remote != nil && a.Remote.ModelTraffic != "gateway" && len(a.Team) == 0 {
+		return true // a deployed agent whose model calls never pass this gateway
+	}
+	if a == nil || a.Adapter != "scripted" || a.Scripted == nil {
+		return false
+	}
+	return a.Scripted.Kind != "toy" && a.Scripted.Kind != "mcploop" && len(a.Team) == 0
 }
 
 func (g *Gateway) providerNames() string {

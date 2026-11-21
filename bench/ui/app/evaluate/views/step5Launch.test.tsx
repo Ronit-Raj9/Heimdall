@@ -69,4 +69,14 @@ describe("Step5Launch", () => {
 		expect(tagOf(html, "step5-launch-button")).toContain('disabled=""');
 		expect(html).toContain("agent codex cannot run benchmark x: needs gpu");
 	});
+
+	it("links to Models & keys when the org has no key for the model's provider", () => {
+		q.create = mutation({
+			error: { status: 409, data: { error: { message: "this organization has no working openai key", type: "conflict", link: "/models" } } },
+		});
+		const html = render(<Step5Launch spec={spec()} onChange={() => undefined} />);
+		expect(html).toContain("this organization has no working openai key");
+		expect(tagOf(html, "step5-error-link")).toContain('href="/models"');
+		expect(html).toContain("Add a model key");
+	});
 });

@@ -249,6 +249,13 @@ type fakeGateway struct {
 	hygiene *schemas.GatewayHygiene
 }
 
+// ApplyOrgCredentials and BindExperimentOrg make the fake an
+// OrgCredentialGateway (X01: hosted leases need one); the fake never routes.
+func (g *fakeGateway) ApplyOrgCredentials(context.Context, string, []schemas.ProviderCredential) error {
+	return nil
+}
+func (g *fakeGateway) BindExperimentOrg(string, string) {}
+
 func (g *fakeGateway) Preflight(context.Context) (*schemas.GatewayManifest, error) {
 	if err := g.w.hit("preflight"); err != nil {
 		return nil, err

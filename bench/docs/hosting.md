@@ -156,9 +156,19 @@ sudo bash install.sh --server https://heimdall.example.com --token-file ./runner
 ```
 
 It installs `bifrost-bench runner start` as the `heimdall-runner` systemd
-service with its own Bifrost gateway stack. Provider keys go only in that
-machine's `deploy/.env`. Details, flags, upgrades and troubleshooting:
-`deploy/runner/README.md`.
+service with its own Bifrost gateway stack. Details, flags, upgrades and
+troubleshooting: `deploy/runner/README.md`.
+
+Model keys: every organization's runs use only that organization's own keys
+from Models & keys, which the server hands to the runner per lease. There is
+no fallback to the server's or a runner's own provider keys, and no silent
+fallback to the scripted practice model. Evaluations, QuickRun, experiments
+and schedules are refused before launch (HTTP 409, with a link to `/models`)
+when the organization has no working key for a model's provider, and with 503
+when the key store cannot be read. A runner refuses a hosted lease whose keys
+it cannot fetch. Practice runs (smoke or `scripted_upstream` experiments,
+scripted controls) are labelled `practice` in `run.json` and are left out of
+report cards, leaderboards and verdicts.
 
 ## 7. Backups
 
@@ -311,8 +321,8 @@ upgrading production.
       Sessions expire after `session_ttl_h`; `bifrost-bench user
       set-password` (password recovery) ends every session of that user.
 - [ ] Backups scheduled, copied off the machine, and a restore tried once.
-- [ ] Provider keys only on runners, never in this `.env` (the demo runner's
-      optional key excepted, spend-limited).
+- [ ] No provider keys in this `.env` or on shared runners: organizations add
+      their own on Models & keys.
 - [ ] Upgrade regularly; base images are pinned by digest and move with the
       repository.
 
@@ -353,7 +363,9 @@ Guardrails (server admin, `/api/bench/admin/...`):
 - Per-org limits: `GET/PUT /admin/quotas/{org_id}` (concurrent runs, runs per
   day, spend per day, image size, shared pool on or off, custom images,
   runtime `runc` or `runsc`). With the shared runner secret set, the shared
-  pool is on for orgs that have no row.
+  pool is on for orgs that have no row. Runs per day and spend per day are 0
+  (off) by default; once set, they are checked when a run starts and at every
+  lease, over the org's sealed runs and their known spend that UTC day.
 - Custom images: members request one with `POST /api/bench/images`. It must be
   pinned by digest (`name@sha256:<64 hex>`) and fit the org's image size
   limit. A server admin approves it with `POST /admin/images/{id}/approve`.

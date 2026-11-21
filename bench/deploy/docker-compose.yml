@@ -88,8 +88,11 @@ services:
       # below when used; empty keeps the built-in table.
       BENCH_FAULTPROXY_PROVIDERS: ${BENCH_FAULTPROXY_PROVIDERS:-}
       # Real provider keys. Only the proxy sees them. A provider with an
-      # empty key answers from the scripted model (anthropic, openai) or with
-      # a 503 "no key configured" (every other provider).
+      # empty key answers with a 503 "no key configured". Set
+      # BENCH_FAULTPROXY_SCRIPTED_FALLBACK=1 for local development only: then
+      # anthropic and openai answer from the scripted model instead, and those
+      # runs are labelled practice and kept off report cards and leaderboards.
+      BENCH_FAULTPROXY_SCRIPTED_FALLBACK: ${BENCH_FAULTPROXY_SCRIPTED_FALLBACK:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}

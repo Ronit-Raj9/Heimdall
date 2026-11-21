@@ -8,8 +8,8 @@ import "context"
 // Limits are one org's limits.
 type Limits struct {
 	MaxConcurrentRuns int     `json:"max_concurrent_runs"`
-	MaxRunsPerDay     int     `json:"max_runs_per_day"`
-	MaxSpendUSDPerDay float64 `json:"max_spend_usd_per_day"`
+	MaxRunsPerDay     int     `json:"max_runs_per_day"`      // 0: no cap; enforced at launch and at every lease
+	MaxSpendUSDPerDay float64 `json:"max_spend_usd_per_day"` // 0: no cap; enforced at launch and at every lease
 	MaxImageBytes     int64   `json:"max_image_bytes"`
 	AllowCustomImages bool    `json:"allow_custom_images"` // the server admin approved custom images for this org
 	SharedPool        bool    `json:"shared_pool"`         // the org's runs may use the shared runner pool
@@ -25,8 +25,11 @@ type Store interface {
 	SetKillSwitch(ctx context.Context, on bool, actor string) error
 }
 
-// DefaultLimits are the limits of an org with no row.
-var DefaultLimits = Limits{MaxConcurrentRuns: 2, MaxRunsPerDay: 50, MaxSpendUSDPerDay: 10,
+// DefaultLimits are the limits of an org with no row. The daily run and
+// spend caps are off (0) by default: they are enforced when a server admin
+// sets them (X01: the shared worker is uncapped for now). Runs are paid for
+// with the organization's own model keys.
+var DefaultLimits = Limits{MaxConcurrentRuns: 2, MaxRunsPerDay: 0, MaxSpendUSDPerDay: 0,
 	MaxImageBytes: 2 << 30, Runtime: "runc"}
 
 // NewStub returns the Phase 0 stub store.

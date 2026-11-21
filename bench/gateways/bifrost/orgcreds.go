@@ -277,7 +277,9 @@ func (g *Gateway) upsertOrgSlots(ctx context.Context, p ProviderSetup) error {
 }
 
 // BindExperimentOrg routes the experiment's run keys to the organization's
-// slots for every provider the organization registered.
+// slots for every provider the organization registered. A bound experiment
+// never uses the shared slots for a provider the organization has no key for
+// (X01); binding with no keys registered refuses every paid run.
 func (g *Gateway) BindExperimentOrg(expID, orgID string) {
 	if expID == "" || orgID == "" {
 		return
@@ -286,6 +288,23 @@ func (g *Gateway) BindExperimentOrg(expID, orgID string) {
 	st.mu.Lock()
 	st.expOrg[expID] = orgID
 	st.mu.Unlock()
+}
+
+// ErrNoOrgKey marks a mint refused because the run's organization has no
+// usable key for the run's provider (X01: no fallback to the runner's keys).
+var ErrNoOrgKey = errors.New("no organization model key")
+
+// boundOrg returns the organization the run's experiment is bound to
+// (BindExperimentOrg), if any.
+func (g *Gateway) boundOrg(rc *schemas.RunContext) (string, bool) {
+	if rc == nil || rc.Run == nil || rc.Run.ExpID == "" {
+		return "", false
+	}
+	st := g.orgs()
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	org, ok := st.expOrg[rc.Run.ExpID]
+	return org, ok
 }
 
 // orgProvider returns the organization slots a run of rc uses for provider

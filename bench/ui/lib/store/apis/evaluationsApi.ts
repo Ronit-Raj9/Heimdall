@@ -228,6 +228,10 @@ export interface Report {
 	safety?: ReportSafety;
 	/** Only for A/B modes. */
 	overall?: ReportOverall;
+	/** Runs left out because the scripted practice model answered them. */
+	practice_runs?: number;
+	/** Why runs were left out, when practice_runs is not zero. */
+	note?: string;
 }
 
 // Names other lanes use for the same shapes.

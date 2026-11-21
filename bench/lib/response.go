@@ -39,6 +39,9 @@ type ErrorBody struct {
 type ErrorField struct {
 	Message string `json:"message"`
 	Type    string `json:"type"`
+	// Link is an app path that fixes the error (X01: "/models" to add a
+	// model key); empty for most errors.
+	Link string `json:"link,omitempty"`
 }
 
 // SendJSON writes payload as JSON with status and merges a top-level "mode"
@@ -88,6 +91,17 @@ func SendError(ctx *fasthttp.RequestCtx, mode schemas.Mode, status int, errType,
 	// encoding/json cannot fail on this fixed struct of strings, and keeping
 	// the error path free of sonic keeps it usable when sonic itself failed.
 	body, err := json.Marshal(ErrorBody{Mode: mode, Error: ErrorField{Message: message, Type: errType}})
+	if err != nil {
+		ctx.Error("internal error", fasthttp.StatusInternalServerError)
+		return
+	}
+	writeJSON(ctx, mode, status, body)
+}
+
+// SendErrorLink is SendError with a link to the app page that fixes the
+// error (ErrorField.Link).
+func SendErrorLink(ctx *fasthttp.RequestCtx, mode schemas.Mode, status int, errType, message, link string) {
+	body, err := json.Marshal(ErrorBody{Mode: mode, Error: ErrorField{Message: message, Type: errType, Link: link}})
 	if err != nil {
 		ctx.Error("internal error", fasthttp.StatusInternalServerError)
 		return

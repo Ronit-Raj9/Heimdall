@@ -26,8 +26,20 @@ func TestDefaultProvidersValid(t *testing.T) {
 			scripted[p.Name] = true
 		}
 	}
+	if len(scripted) != 0 {
+		t.Errorf("scripted providers = %v, want none by default (X01)", scripted)
+	}
+	clear(scripted)
+	for _, p := range withScriptedFallback(specs) {
+		if p.scriptable() {
+			scripted[p.Name] = true
+		}
+	}
 	if len(scripted) != 2 || !scripted["anthropic"] || !scripted["openai"] {
-		t.Errorf("scripted providers = %v, want anthropic and openai", scripted)
+		t.Errorf("scripted providers with the fallback = %v, want anthropic and openai", scripted)
+	}
+	if specs[0].Scripted {
+		t.Error("withScriptedFallback changed its input")
 	}
 	specs[0].Name = "changed"
 	if DefaultProviders()[0].Name != "anthropic" {

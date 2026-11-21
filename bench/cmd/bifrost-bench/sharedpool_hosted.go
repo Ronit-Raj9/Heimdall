@@ -9,6 +9,7 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/keystore"
@@ -94,6 +95,9 @@ func sharedPoolService(env *hostedEnv, q quota.Store, images *sharedpool.ImageSt
 type gatedWorkers struct {
 	handlers.WorkerAPI
 	q quota.Store
+	// caps refuses new leases once the org reached a daily cap (X01); nil:
+	// no cap check.
+	caps func(ctx context.Context) error
 }
 
 // OrgID keeps the hosted worker API's runner token authentication.
@@ -108,18 +112,37 @@ func (g gatedWorkers) Lease(ctx context.Context, workerID string) (*schemas.Work
 	if on, err := g.q.KillSwitch(ctx); err == nil && on {
 		return nil, nil // no lease for now; the runner polls again
 	}
+	if g.caps != nil && g.caps(ctx) != nil {
+		return nil, nil // X01: the org reached a daily cap; leases resume tomorrow or when the cap is raised
+	}
 	return g.WorkerAPI.Lease(ctx, workerID)
 }
 
-// gateWorkers wraps api with the kill switch gate.
-func gateWorkers(api handlers.WorkerAPI, q quota.Store) handlers.WorkerAPI {
+// gateWorkers wraps api with the kill switch gate and the org's daily caps
+// (caps may be nil).
+func gateWorkers(api handlers.WorkerAPI, q quota.Store, caps func(context.Context) error) handlers.WorkerAPI {
 	if api == nil || q == nil {
 		return api
 	}
 	if _, hosted := api.(handlers.HostedWorkerAPI); !hosted {
 		return api // the gate must not drop the runner token authentication
 	}
-	return gatedWorkers{WorkerAPI: api, q: q}
+	return gatedWorkers{WorkerAPI: api, q: q, caps: caps}
+}
+
+// dailyCaps is the org's daily cap check over its run index: today's sealed
+// runs and spend against quota max_runs_per_day and max_spend_usd_per_day.
+// Both caps are 0 (off) unless a server admin sets them. A quota read error
+// leaves the caps unchecked: the caps are a spend guard, not a key check.
+func dailyCaps(q quota.Store, orgID string, index handlers.ReadIndex, now func() time.Time) func(context.Context) error {
+	return func(ctx context.Context) error {
+		l, err := q.Get(ctx, orgID)
+		if err != nil || (l.MaxRunsPerDay <= 0 && l.MaxSpendUSDPerDay <= 0) {
+			return nil
+		}
+		runs, spent := handlers.UsageToday(index, now())
+		return handlers.DailyCapRefusal(l.MaxRunsPerDay, l.MaxSpendUSDPerDay, runs, spent)
+	}
 }
 
 func init() {
@@ -142,7 +165,15 @@ func init() {
 	if prev := orgLauncher; prev != nil {
 		orgLauncher = func(env *hostedEnv, oa *app, ix *store.Index) (handlers.Launcher, handlers.WorkerAPI) {
 			l, api := prev(env, oa, ix)
-			return l, gateWorkers(api, quotaOf(env))
+			q := quotaOf(env)
+			var caps func(context.Context) error
+			if ix != nil {
+				caps = dailyCaps(q, oa.orgID, indexAdapter{ix: ix, root: oa.store.Root()}, time.Now)
+			}
+			if ll, ok := l.(*launcher); ok && caps != nil {
+				ll.caps = caps
+			}
+			return l, gateWorkers(api, q, caps)
 		}
 	}
 	serviceHooks = append(serviceHooks, func(a *app, s *handlers.Services) {

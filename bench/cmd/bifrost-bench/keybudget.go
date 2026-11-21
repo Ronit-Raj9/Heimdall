@@ -64,13 +64,26 @@ func (l *lazyKeyStore) ready() bool {
 }
 
 // keyBudgetCheck refuses a manifest whose provider has organization keys
-// but every one of them is over its budget.
+// but every one of them is over its budget, and fails closed when the key
+// store cannot be read. A hosted launcher (remoteOnly) also refuses a
+// provider the organization has no usable key for, and refuses everything
+// when the server has no key store (X01: org runs never use the server's or
+// a runner's own provider keys).
 func (l *launcher) keyBudgetCheck(ctx context.Context, m *schemas.Manifest) error {
-	keys := launcherKeys(l)
-	if keys == nil || m == nil {
+	if m == nil {
 		return nil
 	}
-	return handlers.KeyBudgetRefusal(ctx, keys, l.org, handlers.ManifestProviders(m), nil)
+	var src handlers.KeySource
+	if keys := launcherKeys(l); keys != nil {
+		src = keys
+	}
+	if !l.remoteOnly {
+		if src == nil {
+			return nil
+		}
+		return handlers.KeyBudgetRefusal(ctx, src, l.org, handlers.ManifestProviders(m), nil)
+	}
+	return handlers.ModelKeyRefusal(ctx, src, l.org, handlers.PaidManifestProviders(m), nil, true)
 }
 
 // applyLocalOrgKeys hands the organization's usable keys to this process's
