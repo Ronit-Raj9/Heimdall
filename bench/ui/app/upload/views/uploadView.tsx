@@ -193,7 +193,7 @@ function RunsResult({ report }: { report: UploadRunsReport }) {
 	if (exps.length === 0) return <EmptyState compact message={t("runs.empty")} testId="upload-runs-empty" />;
 	return (
 		<div className="flex flex-col gap-2" data-testid="upload-runs-result">
-			<p className="text-sm font-medium">{t("runs.summary", report)}</p>
+			<p className="text-sm font-medium">{t("runs.summary", { imported: report.imported, skipped: report.skipped, refused: report.refused, runs: report.runs })}</p>
 			<ul className="divide-border rounded-md border text-sm">
 				{exps.map((e) => (
 					<li key={e.exp_id} className="flex flex-wrap items-baseline gap-2 px-3 py-2" data-testid={`upload-exp-${e.exp_id}`}>
