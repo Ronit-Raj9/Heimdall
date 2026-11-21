@@ -96,7 +96,7 @@ describe("sources and empty state", () => {
 	});
 
 	it("says when no source is configured", () => {
-		expect(renderToStaticMarkup(<InboxSourcesTable sources={[]} />)).toContain("inbox/sources.yaml");
+		expect(renderToStaticMarkup(<InboxSourcesTable sources={[]} />)).toContain("heimdall inbox pull");
 	});
 
 	it("explains how items get in", () => {
