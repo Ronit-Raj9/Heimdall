@@ -1,0 +1,61 @@
+{
+	"live": {
+		"actions": {
+			"title": "Run from here",
+			"description": "Set up, pull and compare as background jobs. Each one opens a live log.",
+			"pull": "Pull now",
+			"pullConfirm": "Read the gateway's logs once now?",
+			"judge": "Use the paid judge for this pull",
+			"compare": "Recompute comparison",
+			"restart": "Start a new comparison from now",
+			"restartConfirm": "Start a new comparison? Sessions before now are not tested again.",
+			"hostedPull": "Pulls read your gateway with a credential, so they run only on a local Heimdall. Run bifrost-bench livescore pull there, or push failures to the inbox webhook."
+		},
+		"setup": {
+			"title": "Set up live scoring",
+			"description": "Tell Heimdall how to tell the version in production from the new one. This writes livescore/config.yaml.",
+			"split": "How are the two versions told apart?",
+			"keys": "Virtual keys",
+			"tag": "A request header",
+			"later": "Decide later (writes a template to edit)",
+			"baselineKey": "Baseline virtual key",
+			"candidateKey": "Candidate virtual key",
+			"tagHeader": "Header name",
+			"baselineTag": "Baseline value",
+			"candidateTag": "Candidate value",
+			"url": "Gateway URL (optional)",
+			"urlHint": "Empty uses the gateway of the server config.",
+			"tokenEnv": "Read credential variable (optional)",
+			"tokenEnvHint": "The name of a server environment variable, never the credential itself.",
+			"force": "Overwrite an existing livescore/config.yaml",
+			"submit": "Write config",
+			"incomplete": "Fill both values to continue."
+		}
+	},
+	"inbox": {
+		"pull": {
+			"label": "Pull now",
+			"since": "Window",
+			"sinceCursor": "Since last pull",
+			"hosted": "Pulls read your trace tools with a credential, so they run only on a local Heimdall."
+		},
+		"webhook": {
+			"title": "Push failures in",
+			"description": "Any tool can push one flagged session to this URL with the webhook token.",
+			"url": "Ingest URL",
+			"on": "Webhook on",
+			"off": "Webhook off",
+			"tokenEnv": "Token variable",
+			"tokenSet": "set on the server",
+			"tokenMissing": "not set on the server",
+			"next": "Next step",
+			"example": "Example",
+			"snippet": "Add to inbox/sources.yaml",
+			"generate": "Generate token",
+			"generated": "Set this on the server, then restart it. It is shown only here, in your browser, and is never sent to Heimdall.",
+			"copy": "Copy",
+			"copied": "Copied",
+			"loadError": "Could not read the webhook setup"
+		}
+	}
+}

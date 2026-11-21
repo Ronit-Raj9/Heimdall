@@ -11,6 +11,8 @@ import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { useId, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import ClustersTab from "./clustersTab";
+import { InboxPullButton, InboxWebhook } from "./inboxConnect";
+import { useGetInboxWebhookQuery } from "@/lib/store/apis/liveinboxApi";
 import { InboxItemPanel } from "./inboxItemPanel";
 import TriageTab from "./triageTab";
 
@@ -52,12 +54,14 @@ export function InboxTab() {
 	const [itemId, setItemId] = useQueryState("item", parseAsString);
 	const list = useGetInboxQuery({ state: filter === INBOX_ALL ? undefined : filter, source: source ?? undefined });
 	const data = list.data;
+	const hosted = useGetInboxWebhookQuery().data?.hosted ?? false;
 
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="inbox-screen">
 			<div className="flex flex-wrap items-center gap-3">
 				<p className="text-muted-foreground max-w-3xl text-sm">{t("inbox.subtitle")}</p>
 				<ModeBadge mode={data?.mode} isLoading={list.isLoading} isError={list.isError && !data} />
+				{data?.mode === "live" && <InboxPullButton hosted={hosted} />}
 			</div>
 			{list.isLoading ? (
 				<BlockSkeleton rows={6} testId="inbox-loading" />
@@ -77,6 +81,7 @@ export function InboxTab() {
 					}
 				/>
 			)}
+			{data?.mode === "live" && <InboxWebhook />}
 		</section>
 	);
 }

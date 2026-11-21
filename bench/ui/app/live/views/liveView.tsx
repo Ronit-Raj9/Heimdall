@@ -3,7 +3,9 @@ import { ModeBadge } from "@/components/modeBadge";
 import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
+import { useGetInboxWebhookQuery } from "@/lib/store/apis/liveinboxApi";
 import { useGetLivescoreQuery, usePullLivescoreMutation } from "@/lib/store/apis/livescoreApi";
+import { LiveActions, LiveSetup } from "./liveActions";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -14,6 +16,9 @@ export default function LiveView() {
 	const { t } = useTranslation("bench");
 	const status = useGetLivescoreQuery();
 	const data = status.data;
+	// The webhook setup read also says whether this is the hosted server, where pulls are refused.
+	const hosted = useGetInboxWebhookQuery().data?.hosted ?? false;
+	const configured = Boolean(data?.configured && !data.problem);
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="live-screen">
 			<PageHeader
@@ -26,7 +31,11 @@ export default function LiveView() {
 			) : status.error || !data ? (
 				<LoadError title={t("live.loadError")} error={status.error} onRetry={() => void status.refetch()} testId="live-error" />
 			) : (
-				<LiveBody status={data} actions={data.mode === "live" ? <PullButton /> : undefined} />
+				<>
+					{data.mode === "live" && <LiveActions configured={configured} hosted={hosted} />}
+					{data.mode === "live" && !configured && <LiveSetup existing={Boolean(data.problem)} />}
+					<LiveBody status={data} actions={data.mode === "live" && !hosted ? <PullButton /> : undefined} />
+				</>
 			)}
 		</section>
 	);
