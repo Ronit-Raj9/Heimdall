@@ -399,7 +399,7 @@ func (g *Gateway) fenceSlot(slot string) {
 	delete(g.claims.claimed, slot)
 	delete(g.claims.until, slot)
 	vk := g.inUse[slot]
-	if vk == "" || strings.HasPrefix(vk, reservedPrefix) {
+	if vk == "" || strings.HasPrefix(vk, reservedPrefix) || strings.HasPrefix(vk, drainingPrefix) { // a draining slot's key is already revoked
 		g.mu.Unlock()
 		return
 	}

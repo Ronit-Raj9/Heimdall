@@ -149,7 +149,7 @@ func (g *Gateway) createTeam(ctx context.Context, name string, usd float64) (str
 // are already gone count as revoked. The team is deleted only once every
 // member key is gone.
 func (g *Gateway) revokeMembers(ctx context.Context, key *schemas.RunKey, teamID string) error {
-	if err := g.revokeMemberKeys(ctx, key); err != nil {
+	if err := g.revokeMemberKeys(ctx, key, ""); err != nil {
 		return err
 	}
 	if teamID != "" {
@@ -160,7 +160,7 @@ func (g *Gateway) revokeMembers(ctx context.Context, key *schemas.RunKey, teamID
 
 // revokeMemberKeys deletes every member key of a run key except the lead's,
 // attempting each one and joining the errors.
-func (g *Gateway) revokeMemberKeys(ctx context.Context, key *schemas.RunKey) error {
+func (g *Gateway) revokeMemberKeys(ctx context.Context, key *schemas.RunKey, hold string) error {
 	var errs []error
 	for _, m := range key.Members {
 		if m.ID == "" || m.ID == key.ID {
@@ -170,7 +170,7 @@ func (g *Gateway) revokeMemberKeys(ctx context.Context, key *schemas.RunKey) err
 			errs = append(errs, fmt.Errorf("revoke member key %s (%s): %w", m.ID, m.Name, err))
 			continue
 		}
-		g.forget(m.ID)
+		g.forgetHold(m.ID, hold)
 		g.mu.Lock()
 		delete(g.memberOf, m.ID)
 		g.mu.Unlock()

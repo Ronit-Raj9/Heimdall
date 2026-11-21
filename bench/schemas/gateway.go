@@ -25,6 +25,21 @@ type Gateway interface {
 	FetchRequests(ctx context.Context, key *RunKey, expect FetchExpectation) (*RequestLog, error)
 }
 
+// SlotHoldingRevoker is an optional Gateway extension for cleanup. A plain
+// RevokeKey frees the key's slots at once, so another run (of this process or
+// of another bench process) can take a slot and arm its own fault plan before
+// the revoking run has cleared its plan: the clear then fails with 409 on
+// another owner's claim, or silently wipes the new run's plan inside one
+// process. RevokeKeyHoldSlots revokes like RevokeKey but keeps the key's
+// slots and their claims held until ReleaseKeySlots, which the engine calls
+// after it cleared the slots' plans.
+type SlotHoldingRevoker interface {
+	RevokeKeyHoldSlots(ctx context.Context, key *RunKey) error
+	// ReleaseKeySlots frees the slots RevokeKeyHoldSlots kept. Safe to call
+	// more than once, and after a revocation that failed.
+	ReleaseKeySlots(key *RunKey)
+}
+
 // FetchExpectation tells FetchRequests what a complete set looks like.
 type FetchExpectation struct {
 	LedgerEntries []LedgerEntry // every row must match exactly one entry and vice versa
