@@ -104,6 +104,9 @@ type upstream struct {
 	base      string
 	key       string
 	sarvamKey string // the provider's sarvam_audio key (sarvam.go); never logged
+	// trimV1: base is an OpenAI-style base (".../v1", ".../api/paas/v4")
+	// that replaces the /v1 of the request path (organization slots, A09).
+	trimV1 bool
 }
 
 // slotRef is a slot and the provider it belongs to.
@@ -328,7 +331,7 @@ func (s *Server) answerCut(sw *statusWriter, r *http.Request, p ProviderSpec, ki
 // answer passes one request on: to the real upstream, the scripted model, or
 // a 503 when the provider has neither.
 func (s *Server) answer(w http.ResponseWriter, r *http.Request, p ProviderSpec, kind, slot string, body []byte, e *schemas.LedgerEntry) {
-	up := s.orgUpstream(slot, p, s.upstreams[p.Name]) // F4: an organization slot's own key (orgslots.go)
+	up := s.orgUpstream(slot, p, s.upstreams[p.Name])                                       // F4: an organization slot's own key (orgslots.go)
 	if s.sarvamRoute(p, r, kind, body) && (up.sarvamKey != "" || up.mode != modeScripted) { // Sarvam AI audio (sarvam.go); keyless and scripted stays scripted
 		s.serveSarvam(w, r, p, up, body, e)
 		return
@@ -422,7 +425,11 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, p ProviderSpec,
 			q.Del(a.Query)
 		}
 	}
-	target := up.base + r.URL.EscapedPath()
+	reqPath := r.URL.EscapedPath()
+	if up.trimV1 && strings.HasPrefix(reqPath, "/v1/") {
+		reqPath = reqPath[len("/v1"):]
+	}
+	target := up.base + reqPath
 	out, err := http.NewRequestWithContext(r.Context(), r.Method, target, bytes.NewReader(body))
 	if err != nil {
 		e.UpstreamError = "build request: " + redactURLError(err)
@@ -580,6 +587,8 @@ func resolveUpstreams(cfg Config, t *providerTable) (map[string]upstream, error)
 			up.sarvamKey = strings.TrimSpace(getenv(p.SarvamAudio.keyEnv()))
 		}
 		switch {
+		case up.base == "": // PerSlotBase: only organization slots bring a host
+			up.mode = modeUnconfigured
 		case up.key != "" || p.Keyless:
 			up.mode = modeReal
 		case p.scriptable():
@@ -623,7 +632,7 @@ func withDefaultSlots(cfg []SlotConfig, t *providerTable) []SlotConfig {
 		out = append(out, sc)
 	}
 	for _, name := range t.order {
-		if has[name] {
+		if has[name] || t.byName[name].OrgOnly {
 			continue
 		}
 		for _, sc := range DefaultSlots(t.byName[name]) {

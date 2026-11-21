@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/keystore"
+	"github.com/maximhq/bifrost/bench/schemas"
 )
 
 // maxTestBody caps how much of a provider's answer the test call reads.
@@ -23,18 +24,27 @@ const maxTestBody = 4 << 20
 // testRequest builds the cheapest authenticated call that proves a key
 // works: a list-models call where the provider has one (no tokens billed).
 func testRequest(ctx context.Context, k *keystore.Key, value string) (*http.Request, error) {
+	_, spec, _ := schemas.ResolveBifrostProvider(k.Provider)
 	base := k.BaseURL
-	if base == "" {
+	if base == "" || k.Provider == "github-copilot" {
 		for _, p := range modelProviders() {
 			if p.ID == k.Provider {
 				base = p.DefaultBaseURL
 			}
+		}
+		if base == "" || k.Provider == "github-copilot" {
+			base = spec.TestBaseURL // A09: every Bifrost provider
 		}
 	}
 	if base == "" {
 		return nil, errors.New("this key has no base URL; edit it and add one")
 	}
 	base = strings.TrimRight(base, "/")
+	// A structured credential (Cloudflare token and account) keeps its key
+	// under api_key; a plain value is the key itself.
+	if f := schemas.CredentialFields(spec, value); len(spec.Fields) > 0 {
+		value = f["api_key"]
+	}
 	get := func(path string) (*http.Request, error) {
 		return http.NewRequestWithContext(ctx, http.MethodGet, base+path, nil)
 	}
@@ -70,15 +80,49 @@ func testRequest(ctx context.Context, k *keystore.Key, value string) (*http.Requ
 			req.Header.Set("api-subscription-key", value)
 			req.Header.Set("Content-Type", "application/json")
 		}
-	default: // openai, groq, openai-compatible
-		if req, err = get("/models"); err == nil {
-			req.Header.Set("Authorization", "Bearer "+value)
-		}
+	default: // openai, groq, openai-compatible, custom and every other Bifrost provider (A09)
+		req, err = catalogTestRequest(ctx, spec, base, value)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("bad base URL %q: %v", base, err)
 	}
 	req.Header.Set("Accept", "application/json")
+	return req, nil
+}
+
+// catalogTestRequest builds a provider's test call from its catalog entry:
+// GET {base}/models with a Bearer key unless the entry says otherwise. A
+// keyless server with no key gets no auth header.
+func catalogTestRequest(ctx context.Context, spec schemas.BifrostProviderSpec, base, value string) (*http.Request, error) {
+	t := spec.Test
+	method, path := t.Method, t.Path
+	if method == "" {
+		method = http.MethodGet
+	}
+	if path == "" {
+		path = "/models"
+	}
+	var body io.Reader
+	if t.Body != "" {
+		body = strings.NewReader(t.Body)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, base+path, body)
+	if err != nil {
+		return nil, err
+	}
+	if t.Body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	header, prefix := t.Header, t.Prefix
+	if header == "" {
+		header = "Authorization"
+	}
+	if header == "Authorization" && prefix == "" {
+		prefix = "Bearer "
+	}
+	if value != "" {
+		req.Header.Set(header, prefix+value)
+	}
 	return req, nil
 }
 
@@ -88,6 +132,18 @@ func testRequest(ctx context.Context, k *keystore.Key, value string) (*http.Requ
 func testProviderKey(ctx context.Context, hosted bool, k *keystore.Key, value string) ModelKeyTestResult {
 	start := time.Now()
 	res := ModelKeyTestResult{Status: keystore.StatusError}
+	_, spec, _ := schemas.ResolveBifrostProvider(k.Provider)
+	if err := schemas.CheckCredential(spec, value, k.BaseURL); err != nil {
+		res.Status, res.Message = keystore.StatusInvalid, err.Error()
+		return res
+	}
+	if spec.Test.None {
+		// AWS SigV4 and Google OAuth credentials need a signed call; the
+		// fields are complete, and Bifrost checks the key on the first run.
+		res.Status = keystore.StatusUntested
+		res.Message = spec.Name + " keys cannot be checked with a plain call; the fields are complete and Bifrost checks the key on the first run"
+		return res
+	}
 	req, err := testRequest(ctx, k, value)
 	if err != nil {
 		res.Message = err.Error()

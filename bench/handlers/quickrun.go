@@ -312,15 +312,29 @@ func checkModel(field string, m *QuickRunModel) error {
 	if !quickModelRe.MatchString(m.Model) {
 		return badf("%s.model %q is not a valid model name", field, m.Model)
 	}
-	if m.Provider != "" && !quickProviders[m.Provider] {
+	if m.Provider != "" && !quickProviders[m.Provider] && !bifrostProviderOK(m.Provider) {
 		return badf("%s.provider %q is not supported", field, m.Provider)
 	}
 	return nil
 }
 
+// bifrostProviderOK reports whether p is a built-in Bifrost provider (lane
+// A09). A custom provider name is not taken here: an unknown name is more
+// likely a typo than a custom endpoint, which agents name as
+// "<custom>/<model>" once the org has its key.
+func bifrostProviderOK(p string) bool {
+	_, known := schemas.LookupBifrostProvider(p)
+	return known
+}
+
 // armFor is the arm of one model: the model override and, for a named
 // provider, the gateway provider.
 func armFor(m *QuickRunModel) schemas.ArmSpec {
+	if m.Provider == "" { // A09: "<provider>/<model>" names its Bifrost provider
+		if p, model := schemas.SplitProviderModel(m.Model); p != "" {
+			m = &QuickRunModel{Provider: p, Model: model, KeyID: m.KeyID}
+		}
+	}
 	set := map[string]any{"model": m.Model}
 	label := m.Model
 	if m.Provider != "" && m.Provider != "openai-compatible" {

@@ -9,10 +9,10 @@ import "time"
 // a run folder.
 type ProviderCredential struct {
 	KeyID    string   `json:"key_id"`
-	Provider string   `json:"provider"`           // openai, anthropic, gemini, openrouter, groq, sarvam, openai-compatible
-	BaseURL  string   `json:"base_url,omitempty"` // openai-compatible endpoints only
+	Provider string   `json:"provider"`           // any Bifrost provider (schemas.BifrostProviders), openai-compatible, or a custom OpenAI-compatible name
+	BaseURL  string   `json:"base_url,omitempty"` // custom and openai-compatible endpoints, Azure endpoint, Databricks workspace, self-hosted server
 	Models   []string `json:"models,omitempty"`   // the models the key may serve; empty = any
-	Value    string   `json:"value"`
+	Value    string   `json:"value"`              // the key, or for AWS, Vertex and Cloudflare a JSON object of the provider's fields
 }
 
 // LeaseCredentials is the answer of GET /api/bench/workers/leases/{lease_id}/credentials.

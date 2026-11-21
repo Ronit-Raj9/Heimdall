@@ -97,7 +97,7 @@ func (s *Server) orgUpstream(slot string, p ProviderSpec, up upstream) upstream 
 		out.base = p.BaseURL
 	}
 	if e.base != "" {
-		out.base = e.base
+		out.base, out.trimV1 = e.base, true
 	}
 	return out
 }
@@ -114,8 +114,12 @@ func (s *Server) validOrgSlot(sl OrgSlot) (OrgSlot, error) {
 	if _, ok := s.providers.byName[sl.Provider]; !ok {
 		return sl, fmt.Errorf("slot %q names unknown provider %q", sl.Name, sl.Provider)
 	}
-	if sl.Auth == "" || strings.TrimSpace(sl.Key) == "" {
+	spec := s.providers.byName[sl.Provider]
+	if sl.Auth == "" || (strings.TrimSpace(sl.Key) == "" && !spec.Keyless) {
 		return sl, fmt.Errorf("slot %q needs an auth placeholder and a key", sl.Name)
+	}
+	if spec.PerSlotBase && spec.BaseURL == "" && sl.BaseURL == "" {
+		return sl, fmt.Errorf("slot %q: provider %s needs a base URL", sl.Name, sl.Provider)
 	}
 	if _, clash := s.slots[sl.Auth]; clash {
 		return sl, fmt.Errorf("slot %q reuses a configured slot's auth value", sl.Name)
@@ -128,10 +132,11 @@ func (s *Server) validOrgSlot(sl OrgSlot) (OrgSlot, error) {
 		if !strings.HasPrefix(base, "https://") {
 			return sl, fmt.Errorf("slot %q: base url must be https", sl.Name)
 		}
-		// Keys are saved with the OpenAI-style base (".../v1", what the key
-		// test calls) while agent requests already carry /v1/...: drop it so
-		// the upstream is not .../v1/v1/chat/completions.
-		sl.BaseURL = strings.TrimSuffix(base, "/v1")
+		// Keys are saved with the OpenAI-style base (".../v1", or a base
+		// like ".../api/paas/v4"; what the key test calls) while agent
+		// requests carry /v1/...: the base replaces that /v1 (trimV1), so
+		// the upstream is never .../v1/v1/chat/completions.
+		sl.BaseURL = base
 	}
 	sl.Key = strings.TrimSpace(sl.Key)
 	return sl, nil
