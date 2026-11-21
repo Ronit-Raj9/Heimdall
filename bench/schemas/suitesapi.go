@@ -243,10 +243,14 @@ type AgentSummary struct {
 	NotesUserFile    string        `json:"notes_user_file"`
 	Budgets          Budgets       `json:"budgets"`
 	Gateway          GatewayPolicy `json:"gateway"`
-	EnvNames         []string      `json:"env_names"`       // sorted; values are never served
-	FilePaths        []string      `json:"file_paths"`      // container paths the adapter writes, sorted
-	SealedRuns       *int          `json:"sealed_runs"`     // sealed runs of this config id; null without a run index
-	Error            string        `json:"error,omitempty"` // why the config failed to decode
+	EnvNames         []string      `json:"env_names"`   // sorted; values are never served
+	FilePaths        []string      `json:"file_paths"`  // container paths the adapter writes, sorted
+	SealedRuns       *int          `json:"sealed_runs"` // sealed runs of this config id; null without a run index
+	// Capabilities is what the agent can do: its own capabilities: list, else
+	// the defaults of its adapter (EffectiveCapabilities). Empty when the
+	// config failed to decode.
+	Capabilities CapabilitySet `json:"capabilities,omitempty"`
+	Error        string        `json:"error,omitempty"` // why the config failed to decode
 	// ReportsEvents says how the agent reports its own steps when its config
 	// shows it: "native" for the generic_jsonl parser. Empty means not
 	// known from the config; agent check shows what a run actually reported

@@ -17,13 +17,15 @@ export type AgentWithCaps = AgentSummary & { capabilities?: Capability[] | null;
 
 /**
  * The agent's capabilities: the config's own list when the server sends one, else the defaults by
- * adapter from the contract (CLI coding agents shell+tools+mcp, remote agents tools+sessions, ...).
+ * adapter, the same as the server's (CLI coding agents shell+tools+mcp+sessions, remote agents
+ * tools+sessions, ...). GET /agents sends the effective list, so the fallback only covers an
+ * older server.
  */
 export function agentCapabilities(a: AgentWithCaps): Capability[] {
 	if (a.capabilities && a.capabilities.length) return a.capabilities;
 	const adapter = (a.adapter || "").toLowerCase();
 	const id = a.id.toLowerCase();
-	if (CLI_CODING.has(id) || id.startsWith("aider")) return ["shell", "tools", "mcp"];
+	if (CLI_CODING.has(id) || id.startsWith("aider")) return ["shell", "tools", "mcp", "sessions"];
 	if (["remote_http", "a2a", "openai_agent"].includes(adapter)) return ["tools", "sessions"];
 	if (adapter.includes("voice") || id.includes("voice")) return ["voice", "sessions"];
 	if (adapter.includes("computer") || id.includes("computer-use")) return ["desktop", "browser", "shell"];

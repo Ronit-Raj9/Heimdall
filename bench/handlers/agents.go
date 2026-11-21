@@ -102,6 +102,7 @@ func summarizeAgent(f AgentConfigFile, counts map[string]int) schemas.AgentSumma
 	}
 	c := f.Config
 	out.ID, out.Adapter, out.Image, out.Model, out.Parser = c.ID, c.Adapter, c.Image, c.Model, c.Parser
+	out.Capabilities = schemas.EffectiveCapabilities(c)
 	out.NotesProjectFile, out.NotesUserFile = c.Notes.ProjectFile, c.Notes.UserFile
 	out.Budgets = c.Budgets
 	out.Gateway = c.Gateway

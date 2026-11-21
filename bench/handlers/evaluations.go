@@ -516,12 +516,15 @@ func (h *evaluationsHandler) launchChild(work context.Context, ctx *fasthttp.Req
 		}
 	}
 	for _, a := range spec.Arms {
-		if r := evalCompat(agents["agents/"+a.Agent+".yaml"], st); !r.OK {
-			reason := r.Reason
+		ag := agents["agents/"+a.Agent+".yaml"]
+		if ag == nil || st == nil {
+			continue // nothing to check here; the planner refuses an unknown agent or suite
+		}
+		if ok, missing, reason := evalCompat(ag, st); !ok {
 			if reason == "" {
-				reason = "needs " + strings.Join(r.Missing, ", ")
+				reason = compat.Reason(a.Agent, suiteID, missing)
 			}
-			return skip("agent %s cannot run benchmark %s: %s", a.Agent, suiteID, reason)
+			return skip("%s", reason)
 		}
 	}
 	tasks := schemas.TaskSelector{All: true}

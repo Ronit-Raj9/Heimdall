@@ -41,7 +41,7 @@ func (c *adapterFaultController) Arm(ctx context.Context, rc *schemas.RunContext
 	if err != nil {
 		return err
 	}
-	if rc.Probe == nil || rc.Probe.Apply.AdapterFault == nil || rc.Agent == nil || rc.Agent.Capabilities == nil {
+	if rc.Probe == nil || rc.Probe.Apply.AdapterFault == nil || rc.Agent == nil || rc.Agent.AdapterCaps == nil {
 		return fmt.Errorf("adapter fault configuration missing")
 	}
 	wall := rc.Agent.Budgets.WallS
@@ -52,7 +52,7 @@ func (c *adapterFaultController) Arm(ctx context.Context, rc *schemas.RunContext
 	if err := utils.ValidateAdapterFault(rule, wall*1000); err != nil {
 		return err
 	}
-	if err := utils.ValidateAdapterFaultHooks(rc.Agent.Capabilities.FaultHooks, rule); err != nil {
+	if err := utils.ValidateAdapterFaultHooks(rc.Agent.AdapterCaps.FaultHooks, rule); err != nil {
 		return err
 	}
 	token, err := hookToken()
@@ -67,7 +67,7 @@ func (c *adapterFaultController) Arm(ctx context.Context, rc *schemas.RunContext
 	if err != nil {
 		return err
 	}
-	cfg := schemas.AdapterFaultConfig{RunID: id, Token: token, AdminToken: admin, Nonce: nonce, Rule: rule, Hooks: rc.Agent.Capabilities.FaultHooks, WallMS: wall * 1000, Sessions: []string{"default"}}
+	cfg := schemas.AdapterFaultConfig{RunID: id, Token: token, AdminToken: admin, Nonce: nonce, Rule: rule, Hooks: rc.Agent.AdapterCaps.FaultHooks, WallMS: wall * 1000, Sessions: []string{"default"}}
 	if rc.Task != nil && len(rc.Task.Sessions) > 0 {
 		cfg.Sessions = nil
 		for _, s := range rc.Task.Sessions {

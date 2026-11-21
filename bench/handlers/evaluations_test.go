@@ -132,11 +132,11 @@ func decodeEval(t *testing.T, ctx *fasthttp.RequestCtx) *schemas.Evaluation {
 
 func TestEvaluationCreatePackChildren(t *testing.T) {
 	old := evalCompat
-	evalCompat = func(_ *schemas.AgentConfig, s *schemas.Suite) compat.Result {
+	evalCompat = func(a *schemas.AgentConfig, s *schemas.Suite) (bool, []schemas.Capability, string) {
 		if s != nil && s.ID == "hd-swe-verified" {
-			return compat.Result{Missing: []string{"gpu"}}
+			return false, []schemas.Capability{"gpu"}, ""
 		}
-		return compat.Result{OK: true}
+		return true, nil, ""
 	}
 	defer func() { evalCompat = old }()
 

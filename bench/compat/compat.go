@@ -1,19 +1,40 @@
-// Package compat checks whether an agent can run a benchmark. This is a
-// minimal version for lane A02; lane A01 owns the package and replaces it
-// with the capability check of contract section 1.
+// Package compat answers whether an agent can run a benchmark: the agent's
+// capabilities (its capabilities: list or the defaults of its adapter)
+// against what the benchmark needs (suite.Requires). The planner, the
+// compatibility API and evaluations all use Check, so they never disagree.
 package compat
 
-import "github.com/maximhq/bifrost/bench/schemas"
+import (
+	"fmt"
+	"strings"
 
-// Result is the answer for one agent and one benchmark.
-type Result struct {
-	OK       bool     `json:"ok"`
-	Requires []string `json:"requires"`
-	Missing  []string `json:"missing"`
-	Reason   string   `json:"reason"`
+	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
+)
+
+// Check reports whether agent can run benchmark s. missing lists the
+// capabilities s needs that agent lacks, and reason says so in one plain
+// sentence ("" when ok). A nil agent or suite is not ok.
+func Check(agent *schemas.AgentConfig, s *schemas.Suite) (ok bool, missing []schemas.Capability, reason string) {
+	if agent == nil {
+		return false, nil, "no agent config"
+	}
+	if s == nil {
+		return false, nil, "no benchmark"
+	}
+	missing = schemas.EffectiveCapabilities(agent).Missing(suite.Requires(s))
+	if len(missing) == 0 {
+		return true, nil, ""
+	}
+	return false, missing, Reason(agent.ID, s.ID, missing)
 }
 
-// Check reports whether agent can run suite s. The stub accepts every pair.
-func Check(agent *schemas.AgentConfig, s *schemas.Suite) Result {
-	return Result{OK: true, Requires: []string{}, Missing: []string{}}
+// Reason is the planner's refusal text: "agent <id> cannot run benchmark
+// <id>: needs <cap>[, <cap>]".
+func Reason(agentID, suiteID string, missing []schemas.Capability) string {
+	names := make([]string, 0, len(missing))
+	for _, c := range missing {
+		names = append(names, string(c))
+	}
+	return fmt.Sprintf("agent %s cannot run benchmark %s: needs %s", agentID, suiteID, strings.Join(names, ", "))
 }

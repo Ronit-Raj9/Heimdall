@@ -20,6 +20,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/adapters"
 	"github.com/maximhq/bifrost/bench/codescan"
+	"github.com/maximhq/bifrost/bench/compat"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/simuser"
 	suitepkg "github.com/maximhq/bifrost/bench/suite"
@@ -316,6 +317,16 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	}
 	if err := p.checkScenario(suite, conds, compat, m.Arms, m.Compatibility); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	// A01: an agent that lacks a capability the benchmark needs is refused,
+	// after the scenario checks so their more specific reasons come first.
+	if err := checkAgentCaps(suite, m.Arms); err != nil {
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	if m.Compatibility != nil {
+		if err := checkAgentCaps(suite, map[string]schemas.ArmManifest{CompatArm: *m.Compatibility}); err != nil {
+			return nil, fmt.Errorf("plan %s: compatibility: %w", e.ID, err)
+		}
 	}
 	if err := checkTeamCombos(&e, suite, m.Arms, conds, m.Compatibility, compat); err != nil { // Multi-agent area: unsupported team combinations refused before freezing (taskteam.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
@@ -754,7 +765,7 @@ func (p *Planner) armIdentity(cfg *schemas.AgentConfig, hash string) schemas.Can
 	identity := schemas.CanonicalArmIdentity{
 		AgentConfigID: cfg.ID, AgentConfigHash: hash, AgentVersion: cfg.AgentVersion,
 		ImageDigest: cfg.ImageDigest, ModelRequested: cfg.Model, GatewayProvider: cfg.Gateway.Provider,
-		GatewayPolicy: cfg.Gateway, Budgets: cfg.Budgets, Capabilities: cfg.Capabilities,
+		GatewayPolicy: cfg.Gateway, Budgets: cfg.Budgets, Capabilities: cfg.AdapterCaps,
 	}
 	if adapter, ok := findPart(p.reg.Adapters, cfg.Adapter); ok {
 		identity.AdapterVersion = adapter.GetVersion()
@@ -808,6 +819,24 @@ func effectiveBudgetSnapshot(cfg *schemas.AgentConfig, suite *schemas.Suite, con
 	return schemas.BudgetSnapshot{Configured: cfg.Budgets, Effective: effective, Source: sources}
 }
 
+// checkAgentCaps refuses the plan when an arm's agent lacks a capability
+// the benchmark needs (compat.Check), arms in sorted order so the error is
+// stable: "agent <id> cannot run benchmark <id>: needs <cap>".
+func checkAgentCaps(suite *schemas.Suite, arms map[string]schemas.ArmManifest) error {
+	ids := make([]string, 0, len(arms))
+	for id := range arms {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		cfg := arms[id].Config
+		if ok, _, reason := compat.Check(&cfg, suite); !ok {
+			return errors.New(reason)
+		}
+	}
+	return nil
+}
+
 func checkCapabilities(req *schemas.CapabilityRequirements, arms map[string]schemas.ArmManifest) (map[string][]string, error) {
 	gaps := map[string][]string{}
 	if req == nil {
@@ -815,12 +844,12 @@ func checkCapabilities(req *schemas.CapabilityRequirements, arms map[string]sche
 	}
 	for armID, arm := range arms {
 		for _, name := range req.Required {
-			if !capabilitySupported(arm.Config.Capabilities, name) {
+			if !capabilitySupported(arm.Config.AdapterCaps, name) {
 				return nil, fmt.Errorf("arm %s lacks required capability %q", armID, name)
 			}
 		}
 		for _, name := range req.Optional {
-			if !capabilitySupported(arm.Config.Capabilities, name) {
+			if !capabilitySupported(arm.Config.AdapterCaps, name) {
 				gaps[armID] = append(gaps[armID], name)
 			}
 		}

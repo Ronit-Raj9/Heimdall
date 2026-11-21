@@ -169,7 +169,7 @@
         "set": {
           "type": "object",
           "description": "Dotted agent config paths to any value, e.g. notes.user_file or model.",
-          "patternProperties": {"^(id|adapter|image|build|argv|env|files|model|notes|parser|agent_version|image_digest|capabilities|budgets|gateway|scripted|mcp|skills|memory|remote|a2a|openai|team|topology|limits)(\\..+)?$": true},
+          "patternProperties": {"^(id|adapter|image|build|argv|env|files|model|notes|parser|agent_version|image_digest|capabilities|adapter_capabilities|budgets|gateway|scripted|mcp|skills|memory|remote|a2a|openai|team|topology|limits)(\\..+)?$": true},
           "additionalProperties": false
         }
       }

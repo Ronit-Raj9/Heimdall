@@ -227,7 +227,7 @@ func (p *Pipeline) export(ctx context.Context, st *runState) error {
 func (p *Pipeline) collect(ctx context.Context, st *runState) error {
 	var errs []error
 	st.ev.Contract = &schemas.RunEvidenceContract{Required: []string{"gateway_requests"}, Quality: schemas.EvidenceQualityUnknown}
-	if st.rc.Agent != nil && st.rc.Agent.Capabilities != nil && st.rc.Agent.Capabilities.SupportsToolEvents {
+	if st.rc.Agent != nil && st.rc.Agent.AdapterCaps != nil && st.rc.Agent.AdapterCaps.SupportsToolEvents {
 		st.ev.Contract.Required = append(st.ev.Contract.Required, "tool_execution")
 	}
 	if st.rc.Probe != nil && st.rc.Probe.Layer == schemas.LayerAdapter {

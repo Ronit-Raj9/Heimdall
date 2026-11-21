@@ -2629,6 +2629,8 @@ export interface AgentSummary {
 	file_paths: string[];
 	/** Sealed runs of this config id in any experiment; null without a run index. */
 	sealed_runs: number | null;
+	/** Effective capabilities (shell, tools, mcp, sessions, ...): the config's own list or its adapter defaults. */
+	capabilities?: string[];
 	error?: string;
 	/** How the agent reports its own steps when its config shows it ("native" for the generic_jsonl parser); absent when not known from the config. */
 	reports_events?: "native";
