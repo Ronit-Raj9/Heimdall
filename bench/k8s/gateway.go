@@ -49,6 +49,10 @@ type GatewayOptions struct {
 	BifrostNodePort int    // 0 keeps the Service ClusterIP
 	ControlNodePort int
 	PullPolicy      string
+	// KeySlots is gateway.key_slots: the fault proxy must serve every slot
+	// the bench claims when it mints a run key, or each claim is refused
+	// with "unknown slot". Empty keeps the proxy's own default.
+	KeySlots []string
 }
 
 // GatewayNamespace is the namespace kubernetes.gateway_url names.
@@ -223,6 +227,10 @@ func tokenEnv(name string) EnvVar {
 // faultProxyDeployment runs `bifrost-bench proxy` with no provider key.
 func faultProxyDeployment(o GatewayOptions, labels map[string]string) Deployment {
 	l := appLabels(labels, gwFaultProxy)
+	args := []string{"proxy", "--config", "/etc/bench/bench.yaml"}
+	if len(o.KeySlots) > 0 {
+		args = append(args, "--slots", strings.Join(o.KeySlots, ","))
+	}
 	var dep Deployment
 	dep.APIVersion, dep.Kind = "apps/v1", "Deployment"
 	dep.Metadata = ObjectMeta{Name: gwFaultProxy, Labels: l}
@@ -233,7 +241,7 @@ func faultProxyDeployment(o GatewayOptions, labels map[string]string) Deployment
 		AutomountServiceAccountToken: boolPtr(false), EnableServiceLinks: boolPtr(false),
 		SecurityContext: &PodSecurityContext{RunAsNonRoot: boolPtr(true), SeccompProfile: &SeccompProfile{Type: "RuntimeDefault"}},
 		Containers: []Container{{Name: gwFaultProxy, Image: o.FaultProxyImage, ImagePullPolicy: o.PullPolicy,
-			Args: []string{"proxy", "--config", "/etc/bench/bench.yaml"},
+			Args: args,
 			Env: []EnvVar{tokenEnv("BENCH_FAULTPROXY_TOKEN"), {Name: "BENCH_FAULTPROXY_LISTEN", Value: fmt.Sprintf(":%d", proxyPort)},
 				{Name: "BENCH_FAULTPROXY_CONTROL_LISTEN", Value: fmt.Sprintf("0.0.0.0:%d", controlPort)},
 				{Name: "BENCH_FAULTPROXY_LEDGER", Value: "/var/lib/bench/ledger/ledger.jsonl"}},

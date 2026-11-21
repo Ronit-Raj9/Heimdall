@@ -72,6 +72,14 @@ func TestFaultProxyGetsNoProviderKey(t *testing.T) {
 	if strings.Join(c.Args, " ") != "proxy --config /etc/bench/bench.yaml" || *c.SecurityContext.ReadOnlyRootFilesystem != true {
 		t.Fatalf("proxy container: %+v", c)
 	}
+	// The proxy serves every slot of gateway.key_slots (live finding: with
+	// eight slots in bench.yaml and the proxy's default four, every mint was
+	// refused with "unknown slot fp-slot-5").
+	slots := []string{"fp-slot-1", "fp-slot-2", "fp-slot-3", "fp-slot-4", "fp-slot-5", "fp-slot-6", "fp-slot-7", "fp-slot-8"}
+	c = faultProxyDeployment(GatewayOptions{FaultProxyImage: "x", KeySlots: slots}, nil).Spec.Template.Spec.Containers[0]
+	if strings.Join(c.Args, " ") != "proxy --config /etc/bench/bench.yaml --slots "+strings.Join(slots, ",") {
+		t.Fatalf("proxy args with key slots: %v", c.Args)
+	}
 	b := bifrostDeployment("maximhq/bifrost:v2.5.1@sha256:abc", "IfNotPresent", nil)
 	if b.Spec.Template.Spec.Containers[0].Image != "maximhq/bifrost:v2.5.1@sha256:abc" || b.Spec.Template.Spec.InitContainers[0].Image != "maximhq/bifrost:v2.5.1@sha256:abc" {
 		t.Fatal("bifrost image")
