@@ -10,8 +10,7 @@ package main
 // /project/export.zip and writes only the files whose hash differs. Push
 // sends each changed file with PUT /project/files/{area}/{path} (If-Match on
 // the server's hash, so a file someone edited on the web is not silently
-// overwritten); files over the 1 MiB per-file limit go up as one zip per area
-// through POST /uploads/project.
+// overwritten); files over the 1 MiB per-file limit are skipped and listed
 
 import (
 	"archive/zip"
@@ -25,7 +24,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -335,7 +333,7 @@ func runPush(args []string) int {
 	return exitOK
 }
 
-type syncStats struct{ put, deleted, unchanged, conflicts, zipped int }
+type syncStats struct{ put, deleted, unchanged, conflicts, skipped int }
 
 func pushProject(ctx context.Context, o *syncOpts, out io.Writer) (syncStats, error) {
 	var st syncStats
@@ -355,7 +353,6 @@ func pushProject(ctx context.Context, o *syncOpts, out io.Writer) (syncStats, er
 		return st, err
 	}
 	base := loadSyncBase(o.dir, c.base)
-	big := map[string][]handlers.ManifestFile{} // area -> files over the PUT limit
 	for _, k := range sortedKeys(local) {
 		lf := local[k]
 		rf, onServer := remote[k]
@@ -369,8 +366,9 @@ func pushProject(ctx context.Context, o *syncOpts, out io.Writer) (syncStats, er
 			continue
 		}
 		if lf.Size > projectfs.MaxFileBytes {
-			big[lf.Area] = append(big[lf.Area], lf)
-			fmt.Fprintf(out, "zip  %s\n", k)
+			// The server keeps project files up to MaxFileBytes each.
+			fmt.Fprintf(out, "skip %s (%d bytes, over the server's %d byte per-file limit)\n", k, lf.Size, projectfs.MaxFileBytes)
+			st.skipped++
 			continue
 		}
 		fmt.Fprintf(out, "put  %s\n", k)
@@ -404,19 +402,6 @@ func pushProject(ctx context.Context, o *syncOpts, out io.Writer) (syncStats, er
 		}
 		resp.Body.Close()
 		st.put++
-	}
-	for _, a := range handlers.ProjectAreas {
-		files := big[string(a)]
-		if len(files) == 0 {
-			continue
-		}
-		st.zipped += len(files)
-		if o.dryRun {
-			continue
-		}
-		if err := c.uploadZip(ctx, o.dir, string(a), files); err != nil {
-			return st, err
-		}
 	}
 	if o.del {
 		for _, k := range sortedKeys(remote) {
@@ -466,62 +451,10 @@ func pushProject(ctx context.Context, o *syncOpts, out io.Writer) (syncStats, er
 			_ = saveSyncBase(o.dir, c.base, after)
 		}
 	}
-	fmt.Fprintf(out, "%s %d file(s), %d via zip, deleted %d, %d unchanged\n", verb, st.put, st.zipped, st.deleted, st.unchanged)
+	fmt.Fprintf(out, "%s %d file(s), skipped %d over the size limit, deleted %d, %d unchanged\n", verb, st.put, st.skipped, st.deleted, st.unchanged)
 	return st, nil
 }
 
-// uploadZip sends files (area-relative) as one zip to POST /uploads/project.
-// The zip holds area-relative paths; area and dir go both as query and form
-// fields.
-func (c *syncClient) uploadZip(ctx context.Context, dir, area string, files []handlers.ManifestFile) error {
-	var zbuf bytes.Buffer
-	zw := zip.NewWriter(&zbuf)
-	for _, f := range files {
-		w, err := zw.Create(f.Path)
-		if err != nil {
-			return err
-		}
-		src, err := os.Open(filepath.Join(dir, area, filepath.FromSlash(f.Path)))
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(w, src)
-		src.Close()
-		if err != nil {
-			return err
-		}
-	}
-	if err := zw.Close(); err != nil {
-		return err
-	}
-	if zbuf.Len() > projectfs.MaxZipBytes {
-		return fmt.Errorf("%s: large files total %d bytes, over the %d byte upload limit; split them", area, zbuf.Len(), projectfs.MaxZipBytes)
-	}
-	var body bytes.Buffer
-	mw := multipart.NewWriter(&body)
-	_ = mw.WriteField("area", area)
-	_ = mw.WriteField("dir", "")
-	fw, err := mw.CreateFormFile("file", area+".zip")
-	if err != nil {
-		return err
-	}
-	if _, err := fw.Write(zbuf.Bytes()); err != nil {
-		return err
-	}
-	if err := mw.Close(); err != nil {
-		return err
-	}
-	p := "/uploads/project?area=" + url.QueryEscape(area)
-	resp, err := c.do(ctx, http.MethodPost, p, &body, map[string]string{"Content-Type": mw.FormDataContentType()})
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode/100 != 2 {
-		return apiError("POST", p, resp)
-	}
-	return nil
-}
 
 func runPull(args []string) int {
 	o, code := syncFlags("pull", args)

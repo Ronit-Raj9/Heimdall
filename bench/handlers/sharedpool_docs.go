@@ -17,8 +17,6 @@ func init() {
 		RouteDoc{Method: "POST", Path: APIPrefix + "/admin/images/{id}/reject", Tag: tag, Summary: "Reject an image request (server admin)", Request: ImageDecisionBody{}, OptionalBody: true, Response: sharedpool.ImageRequest{}},
 		RouteDoc{Method: "GET", Path: APIPrefix + "/admin/quotas/{id}", Tag: tag, Summary: "One organization's limits (server admin)", Response: OrgQuota{}},
 		RouteDoc{Method: "PUT", Path: APIPrefix + "/admin/quotas/{id}", Tag: tag, Summary: "Set one organization's limits: runs, spend, image size, custom images, shared pool, runtime runc or runsc (server admin)", Request: OrgQuota{}.Limits, Response: OrgQuota{}},
-		RouteDoc{Method: "GET", Path: APIPrefix + "/admin/killswitch", Tag: tag, Summary: "The platform kill switch (server admin)", Response: KillSwitchBody{}},
-		RouteDoc{Method: "POST", Path: APIPrefix + "/admin/killswitch", Tag: tag, Summary: "Turn the kill switch on or off: on blocks new runner leases (server admin)", Request: KillSwitchBody{}, Response: KillSwitchBody{}},
 		RouteDoc{Method: "GET", Path: APIPrefix + "/admin/pool/assignments", Tag: tag, Summary: "The shared runner's assignments (Authorization: Bearer HEIMDALL_SHARED_RUNNER_SECRET)", Auth: "shared runner secret", Response: sharedpool.Assignments{}},
 	)
 }

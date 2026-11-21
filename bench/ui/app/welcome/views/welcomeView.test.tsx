@@ -18,6 +18,7 @@ const q = vi.hoisted(() => ({
 
 const ok = (data: unknown) => ({ data, error: undefined, isLoading: false, isFetching: false, isSuccess: true, refetch: () => undefined });
 
+vi.mock("@/components/models/modelPicker", async () => await import("@/lib/testing/modelPickerStub"));
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<object>()),
 	useGetSuitesQuery: () => q.suites,

@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -119,7 +120,13 @@ func (h *projectFilesHandler) pathParams(ctx *fasthttp.RequestCtx) (projectfs.Ar
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, areaError(rawArea))
 		return "", "", false
 	}
-	rel, _ := ctx.UserValue("path").(string)
+	raw, _ := ctx.UserValue("path").(string)
+	// fasthttp/router matches the raw path, so the catch-all is still escaped.
+	rel, err := url.PathUnescape(raw)
+	if err != nil {
+		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, fmt.Sprintf("path %q is not valid URL encoding", raw))
+		return "", "", false
+	}
 	return a, strings.TrimPrefix(rel, "/"), true
 }
 

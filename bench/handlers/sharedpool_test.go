@@ -75,8 +75,8 @@ func TestSharedPoolRoutes(t *testing.T) {
 	if code, body := spServe(t, h, viewer, "GET", "/api/bench/images", "", ""); code != 200 || !strings.Contains(body, "pending") {
 		t.Fatalf("list: %d %s", code, body)
 	}
-	if code, _ := spServe(t, h, member, "POST", "/api/bench/admin/killswitch", `{"on":true}`, ""); code != 403 {
-		t.Fatalf("non admin kill switch: %d", code)
+	if code, _ := spServe(t, h, member, "POST", "/api/bench/admin/images/x/approve", `{}`, ""); code != 403 {
+		t.Fatalf("non admin approve: %d", code)
 	}
 	if code, _ := spServe(t, h, nil, "GET", "/api/bench/admin/pool/assignments", "", "Bearer wrong"); code != 401 {
 		t.Fatalf("bad secret: %d", code)

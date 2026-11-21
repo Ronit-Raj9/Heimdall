@@ -55,5 +55,5 @@ export const MCP_FORMATS = ["", "codex_toml", "claude_json", "opencode_json", "g
  * Job params of the scan kinds (lane L02's cliJob arg builders): the path is relative to the
  * project folder. Kept in one place so a contract change is a one-line fix.
  */
-export const scanSkillJob = (dir: string) => ({ kind: "scan.skill", params: { dir } });
-export const scanMCPJob = (config: string) => ({ kind: "scan.mcp", params: { config } });
+export const scanSkillJob = (dir: string) => ({ kind: "scan.skill", params: { path: dir } });
+export const scanMCPJob = (config: string) => ({ kind: "scan.mcp", params: { path: config } });

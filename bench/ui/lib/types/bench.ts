@@ -3616,6 +3616,10 @@ export interface AuthConfig {
 	github: boolean;
 	/** An empty install: the first sign-up creates the owner account and its organization. */
 	bootstrap?: boolean;
+	/** Sign-up needs an hCaptcha token (HEIMDALL_CAPTCHA_SECRET is set). */
+	captcha?: boolean;
+	/** hCaptcha site key for the sign-up widget. */
+	captcha_site_key?: string;
 }
 
 /** POST /auth/login. */

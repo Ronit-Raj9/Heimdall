@@ -429,7 +429,7 @@ func (h *quickRunHandler) build(ctx context.Context, req *QuickRunRequest) ([]by
 	if _, _, err := s.Projects.Read(ctx, projectfs.Area("policies"), strings.TrimPrefix(quickRunPolicy, "policies/")); err == nil {
 		f.Policy = quickRunPolicy
 	}
-	body, err := yaml.Marshal(f)
+	body, err := marshalQuickFile(f)
 	if err != nil {
 		return nil, "", fmt.Errorf("encode experiment: %w", err)
 	}
@@ -444,4 +444,46 @@ func randHex(n int) string {
 		return "0000"
 	}
 	return hex.EncodeToString(b)
+}
+
+// marshalQuickFile encodes f and drops empty values (blank strings, nulls,
+// empty maps and lists): the schema's yaml tags have no omitempty and the
+// strict validator refuses an empty arm agent or guard metric.
+func marshalQuickFile(f quickFile) ([]byte, error) {
+	var doc yaml.Node
+	if err := doc.Encode(f); err != nil {
+		return nil, err
+	}
+	pruneEmptyYAML(&doc)
+	return yaml.Marshal(&doc)
+}
+
+func pruneEmptyYAML(n *yaml.Node) {
+	switch n.Kind {
+	case yaml.MappingNode:
+		kept := n.Content[:0]
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			v := n.Content[i+1]
+			pruneEmptyYAML(v)
+			if emptyYAML(v) {
+				continue
+			}
+			kept = append(kept, n.Content[i], v)
+		}
+		n.Content = kept
+	case yaml.SequenceNode, yaml.DocumentNode:
+		for _, c := range n.Content {
+			pruneEmptyYAML(c)
+		}
+	}
+}
+
+func emptyYAML(n *yaml.Node) bool {
+	switch n.Kind {
+	case yaml.ScalarNode:
+		return n.Tag == "!!null" || (n.Tag == "!!str" && n.Value == "")
+	case yaml.MappingNode, yaml.SequenceNode:
+		return len(n.Content) == 0
+	}
+	return false
 }

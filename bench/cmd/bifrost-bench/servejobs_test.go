@@ -114,9 +114,10 @@ func TestJobKindsValidateParamsAndConfinePaths(t *testing.T) {
 	if !slices.Contains(hub.runner.Kinds(), kindAgentCheck) || slices.Contains(hub.runner.Kinds(), kindExperimentRun) {
 		t.Fatalf("local kinds %v", hub.runner.Kinds())
 	}
-	// Hosted: no kind that starts containers from the project (rule 4).
+	// Hosted: no kind that starts containers in the server process (rule 4);
+	// hosted agent.check and suite.admit are bridges that run on runners.
 	hosted := newJobsHub(dbtest.Open(t), a.logger, true, true, "")
-	if k := hosted.runner.Kinds(); slices.Contains(k, kindAgentCheck) || slices.Contains(k, kindSuiteAdmit) {
+	if k := hosted.runner.Kinds(); slices.Contains(k, "agent.build") || slices.Contains(k, "monitor.certify") || slices.Contains(k, "scan.mcp") {
 		t.Fatalf("hosted kinds %v", k)
 	}
 	// Offline: no experiment.run claims.

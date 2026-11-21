@@ -12,7 +12,5 @@ func init() {
 	PlatformPolicy[key("POST", api+"/admin/images/{id}/reject")] = userOnly()
 	PlatformPolicy[key("GET", api+"/admin/quotas/{id}")] = userOnly()
 	PlatformPolicy[key("PUT", api+"/admin/quotas/{id}")] = userOnly()
-	PlatformPolicy[key("GET", api+"/admin/killswitch")] = userOnly()
-	PlatformPolicy[key("POST", api+"/admin/killswitch")] = userOnly()
 	PlatformPolicy[key("GET", api+"/admin/pool/assignments")] = public()
 }

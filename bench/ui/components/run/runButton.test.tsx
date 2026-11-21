@@ -6,6 +6,7 @@ import { buildQuickRunRequest, QuickRunDialog, quickRunError } from "./quickRunD
 import { RunButton } from "./runButton";
 
 const api = vi.hoisted(() => ({ run: [] as unknown as readonly unknown[] }));
+vi.mock("@/components/models/modelPicker", async () => await import("@/lib/testing/modelPickerStub"));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),

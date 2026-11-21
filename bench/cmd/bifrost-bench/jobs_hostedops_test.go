@@ -198,7 +198,7 @@ func TestBridgeKindsHostedOnly(t *testing.T) {
 	defer jobKindsMu.Unlock()
 	for _, k := range jobKinds {
 		if want[k.Kind] && k.Hosted {
-			if k.Local {
+			if k.Local && k.Kind != kindCanaryRun { // canary.run joins L17's local variant
 				t.Errorf("%s bridge must not be local", k.Kind)
 			}
 			delete(want, k.Kind)

@@ -358,7 +358,7 @@ func (h *agentOpsHandler) ensureSkillsExtra(ctx context.Context, ps projectfs.St
 		return err
 	}
 	want := "agents/" + skillsDir(ref.ID)
-	out, changed, err := editAgentYAML(data, func(root *yaml.Node) bool {
+	out, changed, err := agentOpsEditYAML(data, func(root *yaml.Node) bool {
 		skills := mappingChild(root, "skills", true)
 		extra := mappingChild(skills, "extra", false)
 		if extra == nil {
@@ -505,7 +505,7 @@ func (h *agentOpsHandler) putMCP(ctx *fasthttp.RequestCtx) {
 		h.fsError(ctx, "read "+ref.Project, err)
 		return
 	}
-	out, changed, err := editAgentYAML(data, func(root *yaml.Node) bool {
+	out, changed, err := agentOpsEditYAML(data, func(root *yaml.Node) bool {
 		cur := mappingChild(root, "mcp", false)
 		if req.Format == "" && req.MountPath == "" {
 			if cur == nil {
@@ -555,7 +555,7 @@ func (h *agentOpsHandler) putMCP(ctx *fasthttp.RequestCtx) {
 
 // editAgentYAML decodes an agent config as a node tree, applies f to its
 // top mapping and encodes it again when f reports a change.
-func editAgentYAML(data []byte, f func(root *yaml.Node) bool) ([]byte, bool, error) {
+func agentOpsEditYAML(data []byte, f func(root *yaml.Node) bool) ([]byte, bool, error) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return nil, false, fmt.Errorf("parse YAML: %v", err)

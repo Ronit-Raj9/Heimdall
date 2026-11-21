@@ -19,9 +19,9 @@ import (
 
 // adminQuotaStore returns the platform quota store the admin routes edit and
 // whether it keeps its writes. The shared pool area (L03) owns the real
-// Postgres store; until it sets this hook the admin page edits the stub and
-// says so (persisted false).
-var adminQuotaStore = func(env *hostedEnv) (quota.Store, bool) { return quota.NewStub(), false }
+// Postgres store (quotaOf); without a database the admin page edits the stub
+// and says so (persisted false).
+var adminQuotaStore = func(env *hostedEnv) (quota.Store, bool) { return quotaOf(env), env.db != nil }
 
 // maxAdminUsers caps the users list.
 const maxAdminUsers = 5000

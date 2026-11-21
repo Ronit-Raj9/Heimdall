@@ -50,7 +50,7 @@ func agentOpsRouter(t *testing.T) (*router.Router, string) {
 	if err := os.MkdirAll(filepath.Join(root, "agents"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cfg := "# my agent\nid: codex\nadapter: command\nimage: bench/codex:1\n"
+	cfg := "# my agent\nid: codex\nadapter: command\nimage: bench/codex:1\nargv: [\"codex\", \"exec\"]\n"
 	if err := os.WriteFile(filepath.Join(root, "agents", "codex.yaml"), []byte(cfg), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func doAgentOps(r *router.Router, method, uri, ctype string, body []byte) (int, 
 	return ctx.Response.StatusCode(), out
 }
 
-func makeZip(t *testing.T, files map[string]string) []byte {
+func agentOpsZip(t *testing.T, files map[string]string) []byte {
 	t.Helper()
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
@@ -105,17 +105,17 @@ func TestAgentSkillsUploadListDelete(t *testing.T) {
 	if code, _ := doAgentOps(r, "POST", base+"?name=review", "application/zip", []byte("not a zip")); code != 415 {
 		t.Fatalf("non-zip: %d, want 415", code)
 	}
-	if code, _ := doAgentOps(r, "POST", base+"?name=../x", "application/zip", makeZip(t, map[string]string{"SKILL.md": "x"})); code != 400 {
+	if code, _ := doAgentOps(r, "POST", base+"?name=../x", "application/zip", agentOpsZip(t, map[string]string{"SKILL.md": "x"})); code != 400 {
 		t.Fatalf("bad name: %d, want 400", code)
 	}
-	if code, _ := doAgentOps(r, "POST", base+"?name=empty", "application/zip", makeZip(t, map[string]string{"README.md": "x"})); code != 400 {
+	if code, _ := doAgentOps(r, "POST", base+"?name=empty", "application/zip", agentOpsZip(t, map[string]string{"README.md": "x"})); code != 400 {
 		t.Fatalf("no SKILL.md: %d, want 400", code)
 	}
 	if _, err := os.Stat(filepath.Join(root, "agents", "codex", "skills", "empty")); !os.IsNotExist(err) {
 		t.Fatalf("rejected skill was kept: %v", err)
 	}
 	// One top folder is hoisted.
-	z := makeZip(t, map[string]string{"review/SKILL.md": "---\nname: review\n---\n", "review/scripts/run.sh": "echo hi\n"})
+	z := agentOpsZip(t, map[string]string{"review/SKILL.md": "---\nname: review\n---\n", "review/scripts/run.sh": "echo hi\n"})
 	code, body := doAgentOps(r, "POST", base+"?name=review", "application/zip", z)
 	if code != 201 {
 		t.Fatalf("upload: %d %v", code, body)

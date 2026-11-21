@@ -4,3 +4,5 @@ auth_mode
 signup?
 github
 bootstrap?
+captcha?
+captcha_site_key?

@@ -105,8 +105,6 @@ func (h *SharedPoolHandler) RegisterRoutes(r *router.Router, mw ...lib.Middlewar
 	r.POST(a+"/images/{id}/reject", c(h.serverAdmin(h.decide(false))))
 	r.GET(a+"/quotas/{id}", c(h.serverAdmin(h.getQuota)))
 	r.PUT(a+"/quotas/{id}", c(h.serverAdmin(h.setQuota)))
-	r.GET(a+"/killswitch", c(h.serverAdmin(h.getKill)))
-	r.POST(a+"/killswitch", c(h.serverAdmin(h.setKill)))
 	r.GET(a+"/pool/assignments", c(h.assignments))
 }
 

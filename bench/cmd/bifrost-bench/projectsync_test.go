@@ -1,13 +1,10 @@
 package main
 
 import (
-	"archive/zip"
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"net"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,7 +19,7 @@ import (
 )
 
 // syncServer serves the real GET /project/manifest (L26) plus minimal
-// stand-ins for the L01 file routes and export zip and the L24 project upload.
+// the real project file, export and upload routes.
 func syncServer(t *testing.T, root, token string) string {
 	t.Helper()
 	// The Phase 0 store stub refuses a missing area folder; L01 fixes that.
@@ -40,73 +37,6 @@ func syncServer(t *testing.T, root, token string) string {
 	for _, a := range handlers.OrgAreas() {
 		a(env, r)
 	}
-	opts := func(ctx *fasthttp.RequestCtx) projectfs.WriteOpts {
-		return projectfs.WriteOpts{IfMatch: string(ctx.Request.Header.Peek("If-Match"))}
-	}
-	// fasthttp/router matches the raw path, so the catch-all is still escaped.
-	rel := func(ctx *fasthttp.RequestCtx) string {
-		p, _ := url.PathUnescape(ctx.UserValue("path").(string))
-		return p
-	}
-	status := func(ctx *fasthttp.RequestCtx, err error) {
-		switch {
-		case errors.Is(err, projectfs.ErrConflict):
-			ctx.SetStatusCode(409)
-		case errors.Is(err, projectfs.ErrNotFound):
-			ctx.SetStatusCode(404)
-		case err != nil:
-			ctx.SetStatusCode(400)
-			ctx.SetBodyString(err.Error())
-		}
-	}
-	r.PUT(handlers.APIPrefix+"/project/files/{area}/{path:*}", write(func(ctx *fasthttp.RequestCtx) {
-		_, err := st.Write(ctx, projectfs.Area(ctx.UserValue("area").(string)), rel(ctx), ctx.PostBody(), opts(ctx))
-		status(ctx, err)
-	}))
-	r.DELETE(handlers.APIPrefix+"/project/files/{area}/{path:*}", write(func(ctx *fasthttp.RequestCtx) {
-		status(ctx, st.Delete(ctx, projectfs.Area(ctx.UserValue("area").(string)), rel(ctx), opts(ctx)))
-	}))
-	r.POST(handlers.APIPrefix+"/uploads/project", write(func(ctx *fasthttp.RequestCtx) {
-		fh, err := ctx.FormFile("file")
-		if err != nil {
-			status(ctx, err)
-			return
-		}
-		f, _ := fh.Open()
-		defer f.Close()
-		zr, err := zip.NewReader(f, fh.Size)
-		if err != nil {
-			status(ctx, err)
-			return
-		}
-		area := string(ctx.QueryArgs().Peek("area"))
-		for _, zf := range zr.File {
-			full, err := st.Resolve(projectfs.Area(area), zf.Name)
-			if err != nil {
-				status(ctx, err)
-				return
-			}
-			rc, _ := zf.Open()
-			data, _ := io.ReadAll(rc)
-			rc.Close()
-			_ = os.MkdirAll(filepath.Dir(full), 0o755)
-			_ = os.WriteFile(full, data, 0o644)
-		}
-	}))
-	r.GET(handlers.APIPrefix+"/project/export.zip", func(ctx *fasthttp.RequestCtx) {
-		var buf bytes.Buffer
-		zw := zip.NewWriter(&buf)
-		m, _ := handlers.BuildProjectManifest(context.Background(), st, handlers.ProjectAreas)
-		for _, f := range m.Files {
-			full, _ := st.Resolve(projectfs.Area(f.Area), f.Path)
-			data, _ := os.ReadFile(full)
-			w, _ := zw.Create(f.Area + "/" + f.Path)
-			_, _ = w.Write(data)
-		}
-		_ = zw.Close()
-		ctx.SetContentType("application/zip")
-		ctx.SetBody(buf.Bytes())
-	})
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -136,8 +66,8 @@ func TestPushPullRoundTrip(t *testing.T) {
 	base := syncServer(t, srvRoot, token)
 	big := strings.Repeat("x", projectfs.MaxFileBytes+10)
 	writeTree(t, src, map[string]string{
-		"agents/a.yaml":                      "name: a\n",
-		"benchmarks/core/tasks/t1/task.yaml": "id: t1\n",
+		"agents/a.txt":                      "name: a\n",
+		"benchmarks/core/tasks/t1/notes.md": "id: t1\n",
 		"benchmarks/core/data.bin":           big,
 		"policies/p.yaml":                    "rules: []\n",
 		"uploads/my file.txt":                "hello",
@@ -150,11 +80,11 @@ func TestPushPullRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("push: %v\n%s", err, out.String())
 	}
-	if st.put != 4 || st.zipped != 1 {
+	if st.put != 4 || st.skipped != 1 {
 		t.Fatalf("push stats %+v\n%s", st, out.String())
 	}
-	// Second push: nothing changed.
-	if st, err = pushProject(ctx, o, io.Discard); err != nil || st.unchanged != 5 || st.put != 0 {
+	// Second push: nothing changed (the oversize file is skipped again).
+	if st, err = pushProject(ctx, o, io.Discard); err != nil || st.unchanged != 4 || st.skipped != 1 || st.put != 0 {
 		t.Fatalf("second push %+v %v", st, err)
 	}
 	if _, err := pullProject(ctx, &syncOpts{server: base, dir: dst}, &out); err != nil {
@@ -162,7 +92,8 @@ func TestPushPullRoundTrip(t *testing.T) {
 	}
 	a, _ := localManifest(src)
 	b, _ := localManifest(dst)
-	if len(a) != 5 || len(a) != len(b) {
+	delete(a, "benchmarks/core/data.bin") // over the per-file limit: never pushed
+	if len(a) != 4 || len(a) != len(b) {
 		t.Fatalf("trees differ: %d vs %d", len(a), len(b))
 	}
 	for k, f := range a {
@@ -186,8 +117,8 @@ func TestPushPullRoundTrip(t *testing.T) {
 func TestPushConflictAndAuth(t *testing.T) {
 	srvRoot, src := t.TempDir(), t.TempDir()
 	base := syncServer(t, srvRoot, "tok")
-	writeTree(t, srvRoot, map[string]string{"agents/a.yaml": "server edit\n"})
-	writeTree(t, src, map[string]string{"agents/a.yaml": "local edit\n", "agents/new.yaml": "new\n"})
+	writeTree(t, srvRoot, map[string]string{"agents/a.txt": "server edit\n"})
+	writeTree(t, src, map[string]string{"agents/a.txt": "local edit\n", "agents/new.txt": "new\n"})
 	ctx := context.Background()
 	// Bad token: clear 401 error.
 	if _, err := pushProject(ctx, &syncOpts{server: base, token: "nope", dir: src}, io.Discard); err == nil || !strings.Contains(err.Error(), "401") {
@@ -197,7 +128,7 @@ func TestPushConflictAndAuth(t *testing.T) {
 	if err != nil || st.conflicts != 1 || st.put != 1 {
 		t.Fatalf("conflict push %+v %v", st, err)
 	}
-	if got, _ := os.ReadFile(filepath.Join(srvRoot, "agents", "a.yaml")); string(got) != "server edit\n" {
+	if got, _ := os.ReadFile(filepath.Join(srvRoot, "agents", "a.txt")); string(got) != "server edit\n" {
 		t.Fatal("conflicting push overwrote the server file")
 	}
 	if st, err = pushProject(ctx, &syncOpts{server: base, token: "tok", dir: src, force: true}, io.Discard); err != nil || st.put != 1 || st.unchanged != 1 {

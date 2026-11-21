@@ -22,14 +22,18 @@ vi.mock("@/lib/store/apis/agentopsApi", () => ({
 	usePutAgentMCPMutation: () => [vi.fn(), { isLoading: false }],
 }));
 
-vi.mock("@/lib/store/apis/benchApi", () => ({
+vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useGetAgentsQuery: () => ({ data: { agents: state.agents }, isLoading: false }),
 	getBenchErrorMessage: () => "error",
 }));
 
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => [vi.fn(), { isLoading: false }] }));
 vi.mock("@/components/platform/useJobLog", () => ({ useJobLog: () => ({ lines: [] }) }));
-vi.mock("@/lib/session/sessionContext", () => ({ useSession: () => ({ authMode: state.hosted ? "hosted" : "local" }) }));
+vi.mock("@/lib/session/sessionContext", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/session/sessionContext")>()),
+	useSession: () => ({ authMode: state.hosted ? "hosted" : "local" }),
+}));
 
 vi.mock("@tanstack/react-router", () => ({
 	useParams: () => ({}),

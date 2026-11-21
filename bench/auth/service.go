@@ -600,7 +600,7 @@ type Me struct {
 	// CSRF is the value cookie-authenticated writes send in X-Heimdall-CSRF.
 	CSRF string `json:"csrf,omitempty"`
 	// ServerAdmin is true for a user listed in HEIMDALL_SERVER_ADMINS (serveradmin.go).
-	ServerAdmin bool `json:"server_admin"`
+	ServerAdmin bool `json:"server_admin,omitempty"`
 }
 
 // LocalMe is GET /auth/me in local mode.
