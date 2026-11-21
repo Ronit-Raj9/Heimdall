@@ -41,6 +41,8 @@ type Bridge struct {
 	exited  chan struct{}
 	exitErr error
 	readErr error // why the only stdout reader stopped, if it failed
+
+	eofGrace time.Duration // stdoutEOFGrace when the bridge started
 }
 
 // StartBridge starts the stdio server argv and returns a bridge serving its
@@ -68,7 +70,7 @@ func StartBridge(ctx context.Context, argv []string, path string, logger schemas
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start %s: %w", argv[0], err)
 	}
-	b := &Bridge{path: path, logger: logger, cmd: cmd, stdin: stdin, waiters: map[string]chan json.RawMessage{}, exited: make(chan struct{})}
+	b := &Bridge{path: path, logger: logger, cmd: cmd, stdin: stdin, waiters: map[string]chan json.RawMessage{}, exited: make(chan struct{}), eofGrace: stdoutEOFGrace}
 	go b.readLoop(stdout)
 	go func() {
 		err := cmd.Wait()
@@ -273,7 +275,7 @@ func (b *Bridge) readLoop(stdout io.Reader) {
 		select {
 		case <-b.exited:
 			return
-		case <-time.After(stdoutEOFGrace):
+		case <-time.After(b.eofGrace):
 		}
 		err = errors.New("stdout closed while the server kept running")
 	}

@@ -292,6 +292,7 @@ func TestCreateNeedsFrozenPolicy(t *testing.T) {
 			if tt.hash != "" {
 				a.Policy = &schemas.PolicyResult{PolicyName: "team", PolicyHash: tt.hash, Decision: schemas.PolicyAllow}
 			}
+			f.digest(a)
 			if err := f.st.WriteAnalysis(context.Background(), a, nil); err != nil {
 				t.Fatal(err)
 			}
