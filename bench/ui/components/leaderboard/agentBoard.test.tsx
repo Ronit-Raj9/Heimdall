@@ -47,6 +47,21 @@ describe("agent board", () => {
 		expect(html).toContain('role="link"');
 	});
 
+	it("labels a simulated-customer row and keys it apart from the scripted row", () => {
+		const sim: AgentLeaderboardRow = {
+			...rows[0],
+			baseline: false,
+			capabilities: { support: { score: 0.5, ci_low: 0.2, ci_high: 0.8, runs: 8 } },
+			customer: "simulated customer",
+			simulator: "anthropic/claude-sim@v2",
+		};
+		const html = renderToStaticMarkup(<AgentBoardTable rows={[rows[0], sim]} capabilities={["support", "coding"]} onOpen={() => undefined} />);
+		expect(html.match(/data-testid="agent-board-simulated-customer"/g)?.length).toBe(1);
+		expect(html).toContain(">simulated customer<");
+		expect(html).toContain("anthropic/claude-sim@v2");
+		expect(html).toContain("50%");
+	});
+
 	it("shows the clear button only when filtered", () => {
 		const base = { capabilities: ["coding"], models: ["m"], onCapability: () => undefined, onModel: () => undefined };
 		const off = renderToStaticMarkup(<AgentBoardToolbar {...base} capability={ALL} model={ALL} />);

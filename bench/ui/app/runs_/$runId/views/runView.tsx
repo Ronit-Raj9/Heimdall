@@ -150,7 +150,14 @@ export default function RunView({ runId }: { runId: string }) {
         meta={
           <>
             {d.sealed ? (
-              <OutcomeBadge outcome={run.outcome} testId="run-outcome" />
+              <>
+                <OutcomeBadge outcome={run.outcome} testId="run-outcome" />
+                {run.agent.oom_killed && run.outcome === "infra_error" && (
+                  <span className="text-muted-foreground text-xs" data-testid="run-excluded-oom">
+                    {t("runs.excludedOutOfMemory", { defaultValue: "excluded: out of memory" })}
+                  </span>
+                )}
+              </>
             ) : (
               <span className="text-chart-info-ink text-xs">
                 {t("runs.list.inFlight")}

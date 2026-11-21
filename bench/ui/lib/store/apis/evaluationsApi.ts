@@ -90,6 +90,13 @@ export interface EvaluationSpec {
 	/** "clean" always; plus "model-down", "broken-tool", "misleading-instruction". */
 	faults: (EvaluationFault | string)[];
 	budget_usd?: number;
+	/** Omitted or "public"; "held_out" is an explicit held-out evaluation. */
+	split?: "public" | "held_out";
+}
+
+export interface EvaluationSkippedTask {
+	task: string;
+	reason: string;
 }
 
 export interface EvaluationChild {
@@ -97,6 +104,10 @@ export interface EvaluationChild {
 	experiment_id: string;
 	status: string;
 	skipped?: string;
+	/** Tasks left out of this benchmark alone (quarantined); the rest runs. */
+	skipped_tasks?: EvaluationSkippedTask[];
+	/** Condition id to fault (or "attack"), fixed at launch. */
+	fault_of?: Record<string, string>;
 }
 
 export interface Evaluation {
@@ -158,6 +169,8 @@ export interface ReportMetrics {
 	steps?: number;
 	tool_calls?: number;
 	wall_s?: number;
+	/** Runs left out of the score by reason: out_of_memory, infra_error, invalid_evaluator, unknown. */
+	excluded?: Record<string, number>;
 }
 
 export interface ReportArm {
@@ -219,6 +232,8 @@ export interface ReportOverall {
 export interface Report {
 	evaluation: string;
 	status?: string;
+	/** public, or held_out for a held-out evaluation. */
+	split?: "public" | "held_out" | string;
 	/** The evaluation's mode. "score" shows one arm and never an A/B verdict. */
 	mode?: EvaluationMode | string;
 	arms: ReportArm[];

@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/faults"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/reportcard"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -121,6 +122,7 @@ func (h *reportCardHandler) options(ctx context.Context) reportcard.Options {
 		return reportcard.Options{}
 	}
 	cache := map[string]string{}
+	faultMaps := map[string]map[string]string{}
 	return reportcard.Options{CapabilityOf: func(benchmark string) string {
 		if c, ok := cache[benchmark]; ok {
 			return c
@@ -132,6 +134,25 @@ func (h *reportCardHandler) options(ctx context.Context) reportcard.Options {
 		c := reportcard.CapabilityFor(benchmark, track)
 		cache[benchmark] = c
 		return c
+	}, FaultOf: func(benchmark, condition string) string {
+		// An evaluation launched before children carried their fault map:
+		// read the benchmark's fault and probe metadata, the same choice
+		// faults.Conditions made at launch, never the condition's name.
+		id, _, _ := strings.Cut(benchmark, "@")
+		m, ok := faultMaps[id]
+		if !ok {
+			if s, err := suites.LoadSuite(ctx, id); err == nil && s != nil {
+				m = faults.Map(faults.Names, s)
+			}
+			faultMaps[id] = m
+		}
+		if m == nil {
+			return reportcard.DefaultFault(condition)
+		}
+		if f := m[condition]; f != faults.Clean {
+			return f
+		}
+		return ""
 	}}
 }
 

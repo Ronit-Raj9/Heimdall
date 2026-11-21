@@ -95,6 +95,12 @@ type Query struct {
 	// Split is public (default) or held_out: the board counts runs of that
 	// split's tasks only (split.go).
 	Split string
+
+	// Customer is scripted (default) or simulated: a simulated board ranks
+	// only runs whose customer a pinned model played, of the simulator pin
+	// Simulator when set (simuser.go).
+	Customer  string
+	Simulator string
 }
 
 // Normalize fills the defaults and checks every field. Its error wraps
@@ -105,6 +111,8 @@ func (q Query) Normalize() (Query, error) {
 	q.Synthetic = cmp.Or(strings.TrimSpace(q.Synthetic), SyntheticExclude)
 	q.GradeSource = cmp.Or(strings.TrimSpace(q.GradeSource), GradeSourceOriginal)
 	q.Suite = strings.TrimSpace(q.Suite)
+	q.Customer = strings.TrimSpace(q.Customer) // empty is scripted
+	q.Simulator = strings.TrimSpace(q.Simulator)
 	if q.Alpha == 0 {
 		q.Alpha = DefaultAlpha
 	}
@@ -118,6 +126,8 @@ func (q Query) Normalize() (Query, error) {
 		return q, fmt.Errorf("%w: condition %q is not a condition id", ErrBadQuery, q.Condition)
 	case q.Scope != ScopeAll && q.Scope != ScopeCommon:
 		return q, fmt.Errorf("%w: scope %q is not all or common", ErrBadQuery, q.Scope)
+	case q.Customer != "" && q.Customer != CustomerScripted && q.Customer != CustomerSimulated:
+		return q, fmt.Errorf("%w: customer %q is not scripted or simulated", ErrBadQuery, q.Customer)
 	case q.Synthetic != SyntheticExclude && q.Synthetic != SyntheticOnly:
 		return q, fmt.Errorf("%w: synthetic %q is not exclude or only", ErrBadQuery, q.Synthetic)
 	case q.GradeSource != GradeSourceOriginal && q.GradeSource != GradeSourceLatest && q.GradeSource != GradeSourceReviewed:
@@ -159,7 +169,7 @@ func Build(ctx context.Context, src Source, q Query) (*schemas.Leaderboard, erro
 	}
 	kept := make([]*record, 0, len(recs))
 	for _, r := range recs {
-		if synthetic[r.key()] == (q.Synthetic == SyntheticOnly) && inSplit(r, q.Split) { // Suite health area: held-out board is separate (split.go)
+		if synthetic[r.key()] == (q.Synthetic == SyntheticOnly) && inSplit(r, q.Split) && onCustomerBoard(r, q) { // Suite health area: held-out board is separate (split.go)
 			kept = append(kept, r)
 		}
 	}
@@ -185,7 +195,7 @@ func Build(ctx context.Context, src Source, q Query) (*schemas.Leaderboard, erro
 	}
 	lb.GradeSources = gradeSourceList(inSuite, q.Condition)
 	lb.ReviewedRuns, lb.ReviewChangedRuns = reviewCounts(inSuite, q.Condition) // human review (review.go)
-	graded, excluded, err := grade(ctx, src, inSuite)
+	graded, excluded, err := grade(ctx, src, inSuite, q.Customer == CustomerSimulated)
 	if err != nil {
 		return nil, err
 	}
@@ -202,6 +212,9 @@ func Build(ctx context.Context, src Source, q Query) (*schemas.Leaderboard, erro
 		for i := range lb.Entries {
 			lb.Entries[i].Synthetic = true
 		}
+	}
+	if q.Customer == CustomerSimulated {
+		lb.Customer, lb.Simulator = CustomerSimulated, q.Simulator
 	}
 	return lb, nil
 }

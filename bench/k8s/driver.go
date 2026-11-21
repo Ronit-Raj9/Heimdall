@@ -1133,7 +1133,7 @@ func (d *Driver) attach(ctx context.Context, rc *schemas.RunContext, r runRef, p
 	}
 	mu.Unlock()
 	res.Ended = time.Now().UTC()
-	code, early, werr := d.waitExit(actx, r, uid)
+	code, oom, early, werr := d.waitExit(actx, r, uid)
 	if early {
 		d.cfg.Logger.Warn("agent output stream ended before the agent did; later output may be missing", "run", r.runID)
 		res.Truncated = true
@@ -1158,26 +1158,30 @@ func (d *Driver) attach(ctx context.Context, rc *schemas.RunContext, r runRef, p
 	if werr != nil {
 		return res, werr
 	}
-	res.ExitCode = code
+	res.ExitCode, res.OOMKilled = code, oom
+	if oom {
+		d.cfg.Logger.Warn("agent container ended by the out-of-memory killer", "run", r.runID, "exit_code", code)
+	}
 	return res, nil
 }
 
 // waitExit waits for the agent container to terminate after its streams
-// ended and returns its exit code. The streams end when the process does,
+// ended and returns its exit code and whether the kubelet reported it
+// OOMKilled (oomKilled). The streams end when the process does,
 // and the kubelet reports it within a second or two; a container still
 // running after streamGrace means the attach connection broke (early): it
 // is waited for until exitTimeout, then killed.
-func (d *Driver) waitExit(ctx context.Context, r runRef, uid int64) (int, bool, error) {
+func (d *Driver) waitExit(ctx context.Context, r runRef, uid int64) (int, bool, bool, error) {
 	start := time.Now()
 	early, killed := false, false
 	for {
 		p, err := d.getPod(ctx, r)
 		if err != nil && !isTransient(err) {
-			return -1, early, fmt.Errorf("read agent exit code: %w", err)
+			return -1, false, early, fmt.Errorf("read agent exit code: %w", err)
 		}
 		if err == nil {
 			if cs := containerStatus(p, ctrAgent, false); cs != nil && cs.State.Terminated != nil {
-				return cs.State.Terminated.ExitCode, early, nil
+				return cs.State.Terminated.ExitCode, oomKilled(cs.State), early, nil
 			}
 		}
 		waited := time.Since(start)
@@ -1189,12 +1193,19 @@ func (d *Driver) waitExit(ctx context.Context, r runRef, uid int64) (int, bool, 
 			killed = true
 		}
 		if waited > exitTimeout+killGrace {
-			return -1, early, errors.New("the agent container did not end after its output stream did, nor after it was killed")
+			return -1, false, early, errors.New("the agent container did not end after its output stream did, nor after it was killed")
 		}
 		if err := sleepCtx(ctx, pollEvery); err != nil {
-			return -1, early, err
+			return -1, false, early, err
 		}
 	}
+}
+
+// oomKilled reports whether a terminated container was ended by the
+// out-of-memory killer: the kubelet's reason OOMKilled, read from the
+// container cgroup's memory events by the runtime.
+func oomKilled(st ContainerState) bool {
+	return st.Terminated != nil && st.Terminated.Reason == "OOMKilled"
 }
 
 // killScript kills every process of the agent's uid in the pod's shared PID

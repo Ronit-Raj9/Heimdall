@@ -144,9 +144,11 @@ func TestBuildABReport(t *testing.T) {
 	})
 
 	ev := abEval(
-		schemas.EvaluationChild{Benchmark: "hd-harbor-tb2", ExperimentID: "exp_tb2", Status: "done"},
+		schemas.EvaluationChild{Benchmark: "hd-harbor-tb2", ExperimentID: "exp_tb2", Status: "done",
+			FaultOf: map[string]string{"clean": "clean", "outage-model-down": FaultModelDown}},
 		schemas.EvaluationChild{Benchmark: "hd-swe-ib-lcb", ExperimentID: "exp_ib", Status: "done"},
-		schemas.EvaluationChild{Benchmark: "agentdojo-banking", ExperimentID: "exp_adj", Status: "done"},
+		schemas.EvaluationChild{Benchmark: "agentdojo-banking", ExperimentID: "exp_adj", Status: "done",
+			FaultOf: map[string]string{"clean": "clean", "important_instructions-it1": Attack}},
 		schemas.EvaluationChild{Benchmark: "voicebench", Skipped: "agent codex cannot run benchmark voicebench: needs voice"},
 	)
 	rep, err := Build(context.Background(), src, ev, Options{})
@@ -287,7 +289,9 @@ func TestSelectForAgent(t *testing.T) {
 }
 
 func TestDefaults(t *testing.T) {
-	for cond, want := range map[string]string{"clean": "", "model-down": FaultModelDown, "outage-full": FaultModelDown, "broken-tool": FaultBrokenTool, "misleading-instruction": FaultMisleading, "stale-notes": FaultMisleading, "important_instructions": ""} {
+	// No name guessing: only the fault names and the shared generic probes.
+	for cond, want := range map[string]string{"clean": "", "model-down": FaultModelDown, schemas.GenericProbeModelDown: FaultModelDown, schemas.GenericProbeBrokenTool: FaultBrokenTool,
+		"outage-full": "", "broken-tool": FaultBrokenTool, "misleading-instruction": FaultMisleading, "stale-notes": "", "test-crash": "", "prompt-injection": "", "important_instructions": ""} {
 		if got := DefaultFault(cond); got != want {
 			t.Errorf("fault %q = %q, want %q", cond, got, want)
 		}
@@ -336,5 +340,83 @@ func TestBuildScoreModeHidesRepeatArm(t *testing.T) {
 		if _, ok := c.Arms["B"]; ok {
 			t.Fatalf("capability shows B: %+v", c)
 		}
+	}
+}
+
+// TestFaultMapAndExclusions checks the report card reads each condition's
+// fault from the child's launch-time map (probe ids that match no fault name,
+// like test-crash, still land on their fault), counts only attack probes in
+// attack resisted, and shows the runs left out of the score by reason, out of
+// memory included.
+func TestFaultMapAndExclusions(t *testing.T) {
+	src := newSource()
+	oom := func(task string) fixRun { return fixRun{arm: "A", task: task, outcome: schemas.OutcomeInfraError} }
+	src.add("exp_cc", "coding-core", []string{"A", "B"}, []fixRun{
+		pass("A", "t1", 1, nil), fail("A", "t2", 1, nil),
+		pass("B", "t1", 1, nil), pass("B", "t2", 1, nil),
+		{arm: "A", task: "t1", cond: "test-crash", outcome: schemas.OutcomeFail},
+		{arm: "A", task: "t1", cond: "memory-trap", outcome: schemas.OutcomePass},
+		{arm: "A", task: "t1", cond: "prompt-injection", outcome: schemas.OutcomePass, metrics: map[string]float64{metricSafeSuccess: 1}},
+		{arm: "A", task: "t2", cond: "secret-canary", outcome: schemas.OutcomeFail, metrics: map[string]float64{metricSafeSuccess: 0}},
+		oom("t3"), oom("t4"),
+		{arm: "A", task: "t5", outcome: schemas.OutcomeInvalidEvaluator},
+	})
+	// t3 and t4 died to the out-of-memory killer.
+	for i := range src.runs["exp_cc"] {
+		if r := &src.runs["exp_cc"][i]; r.Run.Outcome == schemas.OutcomeInfraError {
+			r.Run.Agent.OOMKilled = true
+		}
+	}
+	ev := &schemas.Evaluation{ID: "ev_2", Status: StatusDone, Spec: schemas.EvaluationSpec{Mode: "score", Split: schemas.SplitHeldOut,
+		Arms: []schemas.EvaluationArm{{Label: "A", Agent: "codex", Model: "m1"}}},
+		Children: []schemas.EvaluationChild{{Benchmark: "coding-core", ExperimentID: "exp_cc", Status: "done",
+			FaultOf: map[string]string{"clean": "clean", "test-crash": FaultBrokenTool, "memory-trap": FaultMisleading,
+				"prompt-injection": Attack, "secret-canary": Attack}}}}
+	rep, err := Build(context.Background(), src, ev, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Split != schemas.SplitHeldOut {
+		t.Fatalf("split %q", rep.Split)
+	}
+	got := map[string]FaultScore{}
+	for _, r := range rep.Reliability {
+		got[r.Fault] = r.Arms["A"]
+	}
+	if len(got) != 2 || got[FaultBrokenTool].Runs != 1 || got[FaultBrokenTool].Score != 0 || got[FaultMisleading].Score != 1 {
+		t.Fatalf("reliability %+v", rep.Reliability)
+	}
+	if rep.Safety.AttackResisted["A"] != 0.5 {
+		t.Fatalf("attack resisted %+v", rep.Safety.AttackResisted)
+	}
+	a := rep.Benchmarks[0].Arms["A"]
+	if a.Runs != 2 || a.Excluded[schemas.ExcludedOutOfMemory] != 2 || a.Excluded[string(schemas.OutcomeInvalidEvaluator)] != 1 {
+		t.Fatalf("benchmark arm %+v", a)
+	}
+	if c := rep.Capabilities[0].Arms["A"]; c.Excluded[schemas.ExcludedOutOfMemory] != 2 {
+		t.Fatalf("capability arm %+v", c)
+	}
+
+	// Without a child map the options' metadata lookup decides; with
+	// neither, an unknown probe id is no fault (never guessed).
+	ev.Children[0].FaultOf = nil
+	rep, err = Build(context.Background(), src, ev, Options{FaultOf: func(b, c string) string {
+		if b == "coding-core" && c == "test-crash" {
+			return FaultBrokenTool
+		}
+		return ""
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Reliability) != 1 || rep.Reliability[0].Fault != FaultBrokenTool || len(rep.Safety.AttackResisted) != 0 {
+		t.Fatalf("options fault map: %+v %+v", rep.Reliability, rep.Safety)
+	}
+	rep, err = Build(context.Background(), src, ev, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Reliability) != 0 {
+		t.Fatalf("guessed a fault: %+v", rep.Reliability)
 	}
 }

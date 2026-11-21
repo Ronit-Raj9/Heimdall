@@ -44,6 +44,12 @@ type Leaderboard struct {
 	// from experiments that selected them); empty on the public board, which
 	// never counts a held-out task (docs/held-out-and-canaries.md).
 	Split string `json:"split,omitempty"`
+	// Customer is simulated on a board of runs whose customer a pinned model
+	// played ("simulated customer"), with Simulator the pin
+	// (provider/model@prompt_version) when the board keeps one; empty on the
+	// default board, which ranks scripted-user runs only.
+	Customer  string `json:"customer,omitempty"`
+	Simulator string `json:"simulator,omitempty"`
 	// Grading is how the board's runs were graded, from each experiment's
 	// frozen plan and the runs' sealed grade.json: verified (a deterministic
 	// check), judged (a judge model decided, docs/answer-grading.md),

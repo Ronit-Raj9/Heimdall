@@ -13,7 +13,9 @@
 //     when the benchmark routes tool calls through the tool proxy, else
 //     skipped.
 //   - "misleading-instruction" is the suite's misleading_instruction probe
-//     (stale notes and the like) when it has one, else skipped.
+//     (stale notes and the like) when it has one, else skipped. An attack
+//     probe (axis safety, or a hostile tool result) is never taken for it:
+//     a prompt injection is an attack, scored under safety, not a fault.
 //
 // It is pure: it reads the loaded suite and writes nothing.
 package faults
@@ -73,7 +75,7 @@ func Conditions(names []string, s *schemas.Suite) (conds []string, skipped []Ski
 				skipped = append(skipped, Skip{Fault: name, Reason: reason})
 			}
 		case MisleadingInstruction:
-			if id := pick(s, schemas.FamilyMisleadingInstruction, "stale-notes", schemas.LayerFixture); id != "" {
+			if id := misleading(s); id != "" {
 				add(id)
 			} else {
 				skipped = append(skipped, Skip{Fault: name, Reason: fmt.Sprintf("benchmark %s has no misleading or stale notes probe", suiteID(s))})
@@ -126,6 +128,70 @@ func brokenTool(s *schemas.Suite) (string, string) {
 		return schemas.GenericProbeBrokenTool, ""
 	}
 	return "", fmt.Sprintf("benchmark %s has no broken-tool probe and no tool service or external API behind the tool proxy, so there is no tool call to break", suiteID(s))
+}
+
+// misleading is the suite's misleading-instruction probe that is not an
+// attack: stale-notes first, then a fixture probe, then the first in suite
+// order; "" when it has none.
+func misleading(s *schemas.Suite) string {
+	if s == nil {
+		return ""
+	}
+	cp := *s
+	cp.Probes = nil
+	for _, p := range s.Probes {
+		if !IsAttack(p) {
+			cp.Probes = append(cp.Probes, p)
+		}
+	}
+	return pick(&cp, schemas.FamilyMisleadingInstruction, "stale-notes", schemas.LayerFixture)
+}
+
+// Attack marks a condition that is an attack probe in Map: its runs count
+// only in the safety section (attack resisted), never as a fault.
+const Attack = "attack"
+
+// axisSafety is the probe axis of attacks (prompt injection, secret
+// canaries, protected paths, destructive bait).
+const axisSafety = "safety"
+
+// IsAttack reports whether probe p is an attack: a safety-axis probe or an
+// attack delivered through a tool result.
+func IsAttack(p *schemas.ProbeSpec) bool {
+	if p == nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(p.Axis), axisSafety) || p.PS2Family == schemas.FamilyHostileTool
+}
+
+// Map is the fault of each condition an evaluation asking for names can run
+// on s, read from the same probe choice as Conditions: clean maps to Clean,
+// each fault's condition id to its fault name, and every attack probe of s
+// to Attack. A condition missing from the map is neither.
+func Map(names []string, s *schemas.Suite) map[string]string {
+	out := map[string]string{schemas.ConditionClean: Clean}
+	if s != nil {
+		for _, p := range s.Probes {
+			if IsAttack(p) {
+				out[p.ID] = Attack
+			}
+		}
+	}
+	for _, raw := range names {
+		var id string
+		switch name := strings.TrimSpace(raw); name {
+		case ModelDown:
+			id = modelDown(s)
+		case BrokenTool:
+			id, _ = brokenTool(s)
+		case MisleadingInstruction:
+			id = misleading(s)
+		}
+		if id != "" {
+			out[id] = strings.TrimSpace(raw)
+		}
+	}
+	return out
 }
 
 // pick is the suite's probe of family, preferring id, then layer, then the

@@ -201,8 +201,9 @@ type ConditionSpec struct {
 	ID     string       `json:"id" yaml:"id"` // "clean" or a probe id
 	Tasks  TaskSelector `json:"tasks" yaml:"tasks"`
 	Trials int          `json:"trials" yaml:"trials"`
-	// Split picks which tasks `tasks: all` means: public (default) or
-	// held_out. An explicit id list is taken as written, whatever the split.
+	// Split picks which tasks the condition may run: public (default) or
+	// held_out. It filters `tasks: all` and an explicit id list alike, so a
+	// held-out task runs only in a condition that asks for split held_out.
 	Split string `json:"split,omitempty" yaml:"split"`
 }
 

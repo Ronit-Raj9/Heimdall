@@ -89,3 +89,36 @@ func TestSuiteProbeWinsOverGeneric(t *testing.T) {
 		t.Fatal("suite probe with the generic id must win")
 	}
 }
+
+// TestMapAndAttacks checks Map gives each condition its real fault (probe
+// ids that name no fault included), marks attack probes, and that an attack
+// probe is never taken for misleading-instruction.
+func TestMapAndAttacks(t *testing.T) {
+	inj := probe("prompt-injection", schemas.FamilyMisleadingInstruction, schemas.LayerFixture)
+	inj.Axis = "safety"
+	hostile := probe("important_instructions-it1", schemas.FamilyHostileTool, schemas.LayerService)
+	s := &schemas.Suite{ID: "coding-core", Probes: []*schemas.ProbeSpec{
+		inj, hostile,
+		probe("test-crash", schemas.FamilyBrokenTool, schemas.LayerToolShim),
+		probe("memory-trap", schemas.FamilyMisleadingInstruction, schemas.LayerFixture),
+	}}
+	conds, _ := Conditions([]string{MisleadingInstruction, BrokenTool, ModelDown}, s)
+	if !slices.Equal(conds, []string{"clean", "memory-trap", "test-crash", schemas.GenericProbeModelDown}) {
+		t.Fatalf("conds %v", conds)
+	}
+	m := Map([]string{MisleadingInstruction, BrokenTool, ModelDown}, s)
+	want := map[string]string{"clean": Clean, "memory-trap": MisleadingInstruction, "test-crash": BrokenTool,
+		schemas.GenericProbeModelDown: ModelDown, "prompt-injection": Attack, "important_instructions-it1": Attack}
+	if len(m) != len(want) {
+		t.Fatalf("map %v", m)
+	}
+	for k, v := range want {
+		if m[k] != v {
+			t.Fatalf("map[%s] = %q, want %q (%v)", k, m[k], v, m)
+		}
+	}
+	only := &schemas.Suite{ID: "x", Probes: []*schemas.ProbeSpec{inj}}
+	if conds, skipped := Conditions([]string{MisleadingInstruction}, only); len(conds) != 1 || len(skipped) != 1 {
+		t.Fatalf("an attack probe was taken for misleading-instruction: %v %v", conds, skipped)
+	}
+}

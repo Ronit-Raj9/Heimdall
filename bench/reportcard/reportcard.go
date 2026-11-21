@@ -73,6 +73,10 @@ type Metrics struct {
 	Steps     float64 `json:"steps"`
 	ToolCalls float64 `json:"tool_calls"`
 	WallS     float64 `json:"wall_s"`
+	// Excluded counts the runs left out of Score by reason: out_of_memory
+	// (the out-of-memory killer ended the agent), infra_error,
+	// invalid_evaluator, unknown. They are never the agent's failures.
+	Excluded map[string]int `json:"excluded,omitempty"`
 }
 
 // Capability is the rollup of every benchmark of one capability.
@@ -118,6 +122,7 @@ type Safety struct {
 type Report struct {
 	Evaluation   string                    `json:"evaluation"`
 	Status       string                    `json:"status,omitempty"`
+	Split        string                    `json:"split"`          // public, or held_out for a held-out evaluation
 	Mode         string                    `json:"mode,omitempty"` // the evaluation's mode; "score" has one arm and no verdict
 	Arms         []Arm                     `json:"arms"`
 	Capabilities []Capability              `json:"capabilities"`
@@ -132,10 +137,13 @@ type Options struct {
 	// CapabilityOf names the capability of a benchmark (suite id). nil uses
 	// DefaultCapability.
 	CapabilityOf func(benchmark string) string
-	// FaultOf maps an experiment condition id to an evaluation fault, "" for
-	// a condition that is not a fault (an attack probe, say). nil uses
+	// FaultOf maps a benchmark's experiment condition id to its evaluation
+	// fault (model-down, broken-tool, misleading-instruction), Attack for an
+	// attack probe, "" for clean or anything else. It is read from the
+	// benchmark's fault and probe metadata, never guessed from the id. A
+	// child's own FaultOf, fixed at launch, wins over it. nil uses
 	// DefaultFault.
-	FaultOf func(condition string) string
+	FaultOf func(benchmark, condition string) string
 	// Arms keeps only these arm labels; empty keeps every arm.
 	Arms []string
 }
@@ -148,10 +156,12 @@ type graded struct {
 	metrics   map[string]schemas.Value
 }
 
-// childRuns is one child experiment's graded runs by arm label.
+// childRuns is one child experiment's graded runs by arm label, and the
+// clean runs excluded from the score by arm label and reason.
 type childRuns struct {
-	child schemas.EvaluationChild
-	arms  map[string][]graded
+	child    schemas.EvaluationChild
+	arms     map[string][]graded
+	excluded map[string]map[string]int
 }
 
 // Build computes the report of ev over src. A child with no experiment or
@@ -164,12 +174,29 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	if capOf == nil {
 		capOf = DefaultCapability
 	}
-	faultOf := opt.FaultOf
-	if faultOf == nil {
-		faultOf = DefaultFault
+	fallback := opt.FaultOf
+	if fallback == nil {
+		fallback = func(_, c string) string { return DefaultFault(c) }
+	}
+	faultOf := func(cr childRuns, condition string) string {
+		if condition == schemas.ConditionClean {
+			return ""
+		}
+		if cr.child.FaultOf != nil {
+			f := cr.child.FaultOf[condition]
+			if f == schemas.ConditionClean {
+				return ""
+			}
+			return f
+		}
+		return fallback(cr.child.Benchmark, condition)
+	}
+	split := ev.Spec.Split
+	if split == "" {
+		split = schemas.SplitPublic
 	}
 	rep := &Report{
-		Evaluation: ev.ID, Status: ev.Status, Mode: ev.Spec.Mode, Arms: []Arm{}, Capabilities: []Capability{}, Benchmarks: []Benchmark{},
+		Evaluation: ev.ID, Status: ev.Status, Split: split, Mode: ev.Spec.Mode, Arms: []Arm{}, Capabilities: []Capability{}, Benchmarks: []Benchmark{},
 		Reliability: []Reliability{}, Safety: Safety{AttackResisted: map[string]float64{}, CheatRate: map[string]float64{}},
 	}
 	// Score mode runs a hidden repeat of the one arm (to satisfy the
@@ -209,7 +236,9 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	for _, cr := range children {
 		b := Benchmark{Benchmark: cr.child.Benchmark, Capability: capOf(cr.child.Benchmark), ExperimentID: cr.child.ExperimentID, Arms: map[string]Metrics{}}
 		for _, l := range labels {
-			b.Arms[l] = metricsOf(filter(cr.arms[l], schemas.ConditionClean))
+			m := metricsOf(filter(cr.arms[l], schemas.ConditionClean))
+			m.Excluded = cr.excluded[l]
+			b.Arms[l] = m
 		}
 		if ab {
 			v := compare(filter(cr.arms[labels[0]], schemas.ConditionClean), filter(cr.arms[labels[1]], schemas.ConditionClean))
@@ -262,7 +291,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 // leaderboard counts it: the slot's first sealed run whose outcome is not
 // aborted_infra, with an outcome that scores; compatibility runs never count.
 func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.EvaluationArm, c schemas.EvaluationChild) (childRuns, error) {
-	cr := childRuns{child: c, arms: map[string][]graded{}}
+	cr := childRuns{child: c, arms: map[string][]graded{}, excluded: map[string]map[string]int{}}
 	if c.ExperimentID == "" {
 		return cr, nil
 	}
@@ -299,6 +328,12 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 			continue
 		}
 		if _, scores := r.Run.Outcome.Score(); !scores {
+			if why := schemas.ExcludedReason(&r.Run); why != "" && cmp.Or(r.Slot.Condition, schemas.ConditionClean) == schemas.ConditionClean {
+				if cr.excluded[label] == nil {
+					cr.excluded[label] = map[string]int{}
+				}
+				cr.excluded[label][why]++
+			}
 			continue
 		}
 		metrics, err := readMetrics(src, r.Run.RunID)
@@ -442,6 +477,14 @@ func rollup(parts []Metrics, cs []cluster) Metrics {
 		out.ToolCalls += p.ToolCalls * w
 		out.WallS += p.WallS * w
 	}
+	for _, p := range parts {
+		for k, n := range p.Excluded {
+			if out.Excluded == nil {
+				out.Excluded = map[string]int{}
+			}
+			out.Excluded[k] += n
+		}
+	}
 	if out.Runs == 0 {
 		return out
 	}
@@ -501,7 +544,7 @@ func relabelOverall(o verdictab.OverallVerdict, la, lb string) verdictab.Overall
 
 // reliability scores each fault per arm, pooled over the benchmarks that ran
 // it, with the drop from the same arm's clean score on those benchmarks.
-func reliability(children []childRuns, labels []string, faultOf func(string) string) []Reliability {
+func reliability(children []childRuns, labels []string, faultOf func(childRuns, string) string) []Reliability {
 	type acc struct{ fs, fn, cs, cn int }
 	byFault := map[string]map[string]*acc{}
 	benches := map[string][]string{}
@@ -511,8 +554,8 @@ func reliability(children []childRuns, labels []string, faultOf func(string) str
 			clean := filter(cr.arms[l], schemas.ConditionClean)
 			cs := successes(clean)
 			for _, r := range cr.arms[l] {
-				f := faultOf(r.condition)
-				if f == "" || r.condition == schemas.ConditionClean {
+				f := faultOf(cr, r.condition)
+				if f == "" || f == Attack || r.condition == schemas.ConditionClean {
 					continue
 				}
 				if byFault[f] == nil {
@@ -571,21 +614,21 @@ func successes(runs []graded) int {
 }
 
 // safety computes attack resisted and cheat rate per arm. Attack resisted
-// reads the AgentDojo attack dimension on attacked runs (a non-clean
-// condition that is not an evaluation fault); a benchmark whose runs lack
-// the dimension falls back to safe_success on those runs. Cheat rate is the
+// reads the attack dimension on attacked runs: only a condition the
+// benchmark's probe metadata marks as an attack (prompt injection and the
+// like, FaultOf gives Attack) counts, never a fault or an unknown condition;
+// runs that lack the dimension fall back to safe_success. Cheat rate is the
 // mean of the observed cheating_rate values (impossible tasks only).
-func safety(children []childRuns, labels []string, faultOf func(string) string) Safety {
+func safety(children []childRuns, labels []string, faultOf func(childRuns, string) string) Safety {
 	s := Safety{AttackResisted: map[string]float64{}, CheatRate: map[string]float64{}}
 	for _, l := range labels {
 		var resisted, cheat []float64
 		for _, cr := range children {
-			adj := isAgentDojo(cr.child.Benchmark)
 			for _, r := range cr.arms[l] {
 				if v, ok := r.metrics[metricCheatingRate].Float(); ok {
 					cheat = append(cheat, v)
 				}
-				if !adj || r.condition == schemas.ConditionClean || faultOf(r.condition) != "" {
+				if r.condition == schemas.ConditionClean || faultOf(cr, r.condition) != Attack {
 					continue
 				}
 				if v, ok := r.metrics[metricAttackSucceded].Float(); ok {
@@ -605,21 +648,21 @@ func safety(children []childRuns, labels []string, faultOf func(string) string) 
 	return s
 }
 
-func isAgentDojo(benchmark string) bool { return strings.HasPrefix(benchmark, "agentdojo") }
+// Attack is what FaultOf returns for an attack probe (faults.Attack): its
+// runs count only in Safety.AttackResisted.
+const Attack = "attack"
 
-// DefaultFault maps a condition id to an evaluation fault by name: the
-// fault's own id, or a condition id naming an outage, a tool fault or a
-// misleading or stale instruction. Anything else is not a fault.
+// DefaultFault is the fault of a condition when no benchmark metadata is at
+// hand: only the fault names themselves and the generic probes every
+// benchmark shares (schemas.GenericProbeModelDown, GenericProbeBrokenTool).
+// It never guesses from a probe's name; anything else is not a fault.
 func DefaultFault(condition string) string {
-	c := strings.ToLower(condition)
-	switch {
-	case c == "" || c == schemas.ConditionClean:
-		return ""
-	case c == FaultModelDown || strings.Contains(c, "model-down") || strings.Contains(c, "model_down") || strings.Contains(c, "outage"):
+	switch condition {
+	case FaultModelDown, schemas.GenericProbeModelDown:
 		return FaultModelDown
-	case c == FaultBrokenTool || strings.Contains(c, "broken-tool") || strings.Contains(c, "broken_tool") || strings.Contains(c, "tool-error") || strings.Contains(c, "tool_error") || strings.Contains(c, "toolfault"):
+	case FaultBrokenTool, schemas.GenericProbeBrokenTool:
 		return FaultBrokenTool
-	case c == FaultMisleading || strings.Contains(c, "mislead") || strings.Contains(c, "stale"):
+	case FaultMisleading:
 		return FaultMisleading
 	}
 	return ""

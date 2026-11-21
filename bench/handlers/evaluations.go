@@ -396,6 +396,9 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 			return fmt.Errorf("read agent config %s: %w", path, err)
 		}
 	}
+	if err := h.normalizeSplit(spec); err != nil {
+		return err
+	}
 	if spec.TasksPerBenchmark == 0 {
 		spec.TasksPerBenchmark = EvaluationDefaultTasks
 	}
@@ -533,12 +536,20 @@ func (h *evaluationsHandler) launchChild(work context.Context, ctx *fasthttp.Req
 		}
 	}
 	tasks := schemas.TaskSelector{All: true}
+	split := evalSplit(spec.Split)
 	if st != nil {
-		ids := admittedTasks(st)
-		if len(ids) == 0 {
+		pick := admittedTasks(st, split)
+		child.SkippedTasks = pick.Skipped
+		if len(pick.IDs) == 0 {
+			if len(pick.Skipped) > 0 {
+				return skip("benchmark %s has no %s task left to run: every admitted task is quarantined", suiteID, splitWords(split))
+			}
+			if split == schemas.SplitHeldOut {
+				return skip("benchmark %s has no admitted task in its held-out split", suiteID)
+			}
 			return skip("benchmark %s has no admitted task yet", suiteID)
 		}
-		tasks = schemas.TaskSelector{IDs: spreadPick(ids, spec.TasksPerBenchmark)}
+		tasks = schemas.TaskSelector{IDs: spreadPick(pick.IDs, spec.TasksPerBenchmark)}
 	}
 	// Benchmarks whose tasks bring their own image need the agent built on
 	// each task image: derive that variant per arm, or skip.
@@ -555,8 +566,13 @@ func (h *evaluationsHandler) launchChild(work context.Context, ctx *fasthttp.Req
 		condIDs = append([]string{schemas.ConditionClean}, condIDs...)
 	}
 	conds := make([]quickCondition, 0, len(condIDs))
+	faultOf := faults.Map(spec.Faults, st)
+	child.FaultOf = map[string]string{}
 	for _, id := range condIDs {
-		conds = append(conds, quickCondition{ID: id, Tasks: tasks, Trials: spec.Trials})
+		conds = append(conds, quickCondition{ID: id, Tasks: tasks, Trials: spec.Trials, Split: spec.Split})
+		if f, ok := faultOf[id]; ok {
+			child.FaultOf[id] = f
+		}
 	}
 
 	slug := strings.NewReplacer(".", "-", "_", "-").Replace(suiteID)
@@ -687,20 +703,90 @@ func evalArms(spec schemas.EvaluationSpec) map[string]schemas.ArmSpec {
 	return out
 }
 
-// admittedTasks is the suite's admitted task ids, sorted (the planner
-// refuses a draft task in a locked suite).
-func admittedTasks(st *schemas.Suite) []string {
+// normalizeSplit keeps spec.Split empty for a public evaluation and
+// held_out for an explicit held-out one; anything else is refused.
+func (h *evaluationsHandler) normalizeSplit(spec *schemas.EvaluationSpec) error {
+	switch spec.Split = strings.TrimSpace(spec.Split); spec.Split {
+	case "", schemas.SplitPublic:
+		spec.Split = ""
+	case schemas.SplitHeldOut:
+	default:
+		return badf("split must be %s or %s", schemas.SplitPublic, schemas.SplitHeldOut)
+	}
+	return nil
+}
+
+// taskPick is what an evaluation may run on a suite: the admitted task ids
+// of the evaluation's split that are not quarantined, sorted, and the
+// quarantined ones left out, each with its reason.
+type taskPick struct {
+	IDs     []string
+	Skipped []schemas.EvaluationSkippedTask
+}
+
+// admittedTasks picks the tasks an evaluation may run on st: admitted (the
+// planner refuses a draft task in a locked suite; every task of an unlocked
+// suite), of the given split only (a held-out task never runs in a public
+// evaluation), and not quarantined. A quarantined task is left out alone
+// with its reason, so one flaky task never skips the whole benchmark.
+func admittedTasks(st *schemas.Suite, split string) taskPick {
+	var q map[string]schemas.TaskQuarantine
+	if st.Root != "" {
+		q, _ = readQuarantineFile(st.Root) // an unreadable sidecar: the planner refuses with the reason
+	}
+	var pick taskPick
 	ids := append([]string(nil), st.TaskIDs...)
-	if st.Lock != nil {
-		ids = ids[:0]
+	if len(ids) == 0 {
 		for _, t := range st.Tasks {
-			if summarizeTask(st, t, nil).Admitted {
-				ids = append(ids, t.ID)
-			}
+			ids = append(ids, t.ID)
 		}
 	}
 	sort.Strings(ids)
-	return ids
+	for _, id := range ids {
+		t := st.TaskByID(id) // nil when only the ids are loaded: public, and the planner screens it again
+		if st.Lock != nil && (t == nil || !summarizeTask(st, t, nil).Admitted) {
+			continue
+		}
+		if taskSplitOf(t) != split {
+			continue
+		}
+		if r, ok := q[id]; ok {
+			reason := strings.TrimSpace(r.Reason)
+			if reason == "" {
+				reason = "quarantined"
+			} else {
+				reason = "quarantined: " + reason
+			}
+			pick.Skipped = append(pick.Skipped, schemas.EvaluationSkippedTask{Task: id, Reason: reason})
+			continue
+		}
+		pick.IDs = append(pick.IDs, id)
+	}
+	return pick
+}
+
+// evalSplit is the spec's split, public when unset.
+func evalSplit(s string) string {
+	if s == schemas.SplitHeldOut {
+		return schemas.SplitHeldOut
+	}
+	return schemas.SplitPublic
+}
+
+// splitWords names a split in plain words.
+func splitWords(split string) string {
+	if split == schemas.SplitHeldOut {
+		return "held-out"
+	}
+	return "public"
+}
+
+// taskSplitOf is a task's split, public when unset.
+func taskSplitOf(t *schemas.Task) string {
+	if t == nil || strings.TrimSpace(t.Split) == "" {
+		return schemas.SplitPublic
+	}
+	return t.Split
 }
 
 // spreadPick takes n ids spread evenly over the sorted list, so the tasks

@@ -238,6 +238,15 @@ export function AgentBoardTable({ rows, capabilities, onOpen }: AgentBoardTableP
 										{t("baseline")}
 									</Badge>
 								)}
+								{row.customer && (
+									<Badge
+										variant="neutral"
+										title={t("simulatedCustomerHint", { simulator: row.simulator ?? "" })}
+										data-testid="agent-board-simulated-customer"
+									>
+										{t("simulatedCustomer")}
+									</Badge>
+								)}
 							</div>
 						</TableCell>
 						<TableCell className="font-mono text-xs">{row.version > 0 ? `v${row.version}` : t("noVersion")}</TableCell>

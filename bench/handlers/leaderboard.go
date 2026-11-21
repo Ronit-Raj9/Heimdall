@@ -116,7 +116,9 @@ func (h *LeaderboardHandler) getLeaderboard(ctx *fasthttp.RequestCtx) {
 		Scope:       string(args.Peek("scope")),
 		Synthetic:   string(args.Peek("synthetic")),
 		GradeSource: string(args.Peek("grade_source")),
-		Split:       string(args.Peek("split")), // Suite health area: held-out board (leaderboard/split.go)
+		Split:       string(args.Peek("split")),     // Suite health area: held-out board (leaderboard/split.go)
+		Customer:    string(args.Peek("customer")),  // simulated: the board of model-played customers (leaderboard/simuser.go)
+		Simulator:   string(args.Peek("simulator")), // that board's simulator pin
 		K:           k,
 		Now:         h.now(),
 	}

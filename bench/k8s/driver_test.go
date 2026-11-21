@@ -755,3 +755,27 @@ func TestDriverStagesProbeFiles(t *testing.T) {
 		t.Fatalf("release order: %v", f.execs)
 	}
 }
+
+// TestOOMKilledReason checks the kubelet's OOMKilled reason marks an
+// out-of-memory exit and nothing else does.
+func TestOOMKilledReason(t *testing.T) {
+	var st ContainerState
+	if oomKilled(st) {
+		t.Fatal("a running container is not out of memory")
+	}
+	st.Terminated = &struct {
+		ExitCode   int    `json:"exitCode"`
+		Signal     int    `json:"signal,omitempty"`
+		Reason     string `json:"reason,omitempty"`
+		Message    string `json:"message,omitempty"`
+		StartedAt  string `json:"startedAt,omitempty"`
+		FinishedAt string `json:"finishedAt,omitempty"`
+	}{ExitCode: 137, Reason: "OOMKilled"}
+	if !oomKilled(st) {
+		t.Fatal("OOMKilled not detected")
+	}
+	st.Terminated.Reason = "Error"
+	if oomKilled(st) {
+		t.Fatal("exit 137 with reason Error taken for out of memory")
+	}
+}

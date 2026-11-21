@@ -83,9 +83,17 @@ func ExtendExperiment(parent *schemas.Manifest, s *schemas.Suite, kind string, n
 	var conds []schemas.ConditionSpec
 	switch kind {
 	case ExtendTasks:
+		// New tasks come from the parent's split only, so a public
+		// experiment never grows into held-out tasks.
+		split := schemas.SplitPublic
+		for _, c := range pe.Conditions {
+			if c.ID == pe.Primary.Condition && c.Split != "" {
+				split = c.Split
+			}
+		}
 		var pool []string
 		for _, t := range s.TaskIDs {
-			if !used[t] {
+			if !used[t] && taskSplit(s.TaskByID(t)) == split {
 				pool = append(pool, t)
 			}
 		}
@@ -107,7 +115,6 @@ func ExtendExperiment(parent *schemas.Manifest, s *schemas.Suite, kind string, n
 				continue
 			}
 			c.Tasks = schemas.TaskSelector{IDs: fresh}
-			c.Split = ""
 			conds = append(conds, c)
 		}
 	case ExtendTrials:
@@ -120,7 +127,6 @@ func ExtendExperiment(parent *schemas.Manifest, s *schemas.Suite, kind string, n
 			sort.Strings(tasks)
 			c.Tasks = schemas.TaskSelector{IDs: tasks}
 			c.Trials = n
-			c.Split = ""
 			conds = append(conds, c)
 		}
 	default:

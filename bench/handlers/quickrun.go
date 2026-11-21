@@ -146,6 +146,7 @@ type quickCondition struct {
 	ID     string               `yaml:"id"`
 	Tasks  schemas.TaskSelector `yaml:"tasks"`
 	Trials int                  `yaml:"trials"`
+	Split  string               `yaml:"split,omitempty"`
 }
 
 type quickVerdict struct {
