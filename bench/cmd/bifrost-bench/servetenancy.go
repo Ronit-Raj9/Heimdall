@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/maximhq/bifrost/bench/adapters"
 	"github.com/maximhq/bifrost/bench/auth"
@@ -68,8 +67,7 @@ var orgLauncher func(env *hostedEnv, oa *app, ix *store.Index) (handlers.Launche
 
 func init() {
 	hostedAreas = append(hostedAreas, func(env *hostedEnv) (server.RouteRegistrar, error) {
-		return handlers.NewOrgsHandler(env.base.cfg.Server.Mode, &orgService{env: env}, env.audit).
-			WithDemo(strings.TrimSpace(env.base.cfg.Demo.Org)), nil
+		return handlers.NewOrgsHandler(env.base.cfg.Server.Mode, &orgService{env: env}, env.audit), nil
 	})
 }
 
@@ -163,8 +161,7 @@ func newHostedServer(env *hostedEnv) (*server.Server, error) {
 		mw = auth.Middleware(env.authCfg, env.auth)
 	}
 	return server.NewHosted(env.base.cfg, server.Hosted{
-		Auth: mw, Directory: env.dir, Registry: env.registry, Audit: env.audit,
-		DemoSlug: strings.TrimSpace(env.base.cfg.Demo.Org), Platform: areas,
+		Auth: mw, Directory: env.dir, Registry: env.registry, Audit: env.audit, Platform: areas,
 		Ready: readyChecks(env.base), UI: builtUI(), Logger: env.base.logger, Version: benchVersion,
 		ClientIP: clientIPOf(env.auth),
 	})

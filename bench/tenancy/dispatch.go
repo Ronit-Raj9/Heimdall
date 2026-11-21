@@ -71,8 +71,6 @@ type DispatcherConfig struct {
 	Policy   *Policy
 	Dir      Directory
 	Registry *Registry
-	// DemoSlug is the public read-only org anonymous callers land in.
-	DemoSlug string
 	// Platform serves the platform routes; PlatformRoutes lists them
 	// (router.List()).
 	Platform       fasthttp.RequestHandler
@@ -190,7 +188,7 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 	lib.SetStreamGuard(ctx, func() bool {
 		gctx, cancel := workContext()
 		defer cancel()
-		ro, reff, err := Resolve(gctx, d.c.Dir, rule, p, "", headerRef, d.c.DemoSlug)
+		ro, reff, err := Resolve(gctx, d.c.Dir, rule, p, "", headerRef)
 		if err == nil {
 			err = Authorize(rule, method, reff, ro)
 		}
@@ -214,7 +212,7 @@ func workContext() (context.Context, context.CancelFunc) {
 func (d *Dispatcher) authorize(ctx *fasthttp.RequestCtx, rule Rule, method string, p *auth.Principal, pathRef string) (*Org, *auth.Principal, bool) {
 	rctx, cancel := workContext()
 	defer cancel()
-	o, eff, err := Resolve(rctx, d.c.Dir, rule, p, pathRef, string(ctx.Request.Header.Peek(OrgHeader)), d.c.DemoSlug)
+	o, eff, err := Resolve(rctx, d.c.Dir, rule, p, pathRef, string(ctx.Request.Header.Peek(OrgHeader)))
 	if err == nil {
 		err = Authorize(rule, method, eff, o)
 	}

@@ -104,14 +104,6 @@ export const platformApi = benchApi.injectEndpoints({
 				}
 			},
 		}),
-		// One anonymous read of an org route: it answers only when the server serves a public demo
-		// to visitors who are not signed in. Its own cache entry, so data read while signed in never
-		// passes for a demo after the session ends.
-		probeDemo: builder.query<boolean, void>({
-			query: () => "/experiments",
-			transformResponse: () => true,
-			keepUnusedDataFor: 0,
-		}),
 		// What the sign-in page offers (sign-up policy, GitHub); answered to anyone.
 		getAuthConfig: builder.query<AuthConfigResponse, void>({
 			query: () => "/auth/config",
@@ -278,7 +270,6 @@ export const platformApi = benchApi.injectEndpoints({
 export const {
 	useGetMeQuery,
 	useGetAuthConfigQuery,
-	useProbeDemoQuery,
 	useLoginMutation,
 	useSignupMutation,
 	useLogoutMutation,

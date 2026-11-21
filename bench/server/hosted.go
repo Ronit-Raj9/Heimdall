@@ -47,8 +47,6 @@ type Hosted struct {
 	Registry  *tenancy.Registry
 	Audit     tenancy.AuditSink
 	Policy    *tenancy.Policy // nil: tenancy.DefaultPolicy()
-	// DemoSlug is the public read-only org anonymous visitors see.
-	DemoSlug string
 	// Platform are the areas served directly: auth (P2), orgs and members
 	// (P3), jobs (P4), runners (P5), tokens (P2) ...
 	Platform []RouteRegistrar
@@ -90,7 +88,7 @@ func NewHosted(cfg *lib.Config, h Hosted) (*Server, error) {
 		fallback = ui.Handler
 	}
 	disp, err := tenancy.NewDispatcher(tenancy.DispatcherConfig{
-		Mode: mode, Policy: h.Policy, Dir: h.Directory, Registry: h.Registry, DemoSlug: h.DemoSlug,
+		Mode: mode, Policy: h.Policy, Dir: h.Directory, Registry: h.Registry,
 		Platform: platform.Handler, PlatformRoutes: platform.List(), OrgRoutes: OrgRoutes(cfg),
 		Fallback: fallback, Audit: h.Audit, Logger: logger, ClientIP: h.ClientIP,
 	})

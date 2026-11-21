@@ -4,7 +4,7 @@
 #
 #   deploy/hosted/bootstrap.sh --domain heimdall.example.com --email ops@example.com \
 #       --owner-email you@example.com [--owner-name "Your Name"] [--owner-org "Acme"] \
-#       [--demo-runs DIR | --no-demo] [--demo-runner] [--no-build]
+#       [--demo-runner] [--no-build]
 #
 # Steps:
 #   1. deploy/hosted/.env: created from .env.example with random database and
@@ -14,11 +14,9 @@
 #   3. start Postgres, apply database migrations (bifrost-bench db migrate)
 #   4. first owner account and its organization (bifrost-bench user
 #      create); the generated password is printed once
-#   5. demo organization, public read-only, with recorded runs imported
-#      (bifrost-bench org import); default source bench/testdata/recorded.
-#      With --owner-email, a demo that already exists gets that owner as a
-#      member (bifrost-bench org member add), so a rerun repairs a demo
-#      created without one
+#   5. no demo organization: a hosted install requires sign-in for every
+#      organization and has no public demo (--demo-runs and --no-demo are
+#      still accepted and ignored, so older commands keep working)
 #   6. start everything and wait for health; print the URL
 set -euo pipefail
 # shellcheck source=lib.sh
@@ -29,7 +27,7 @@ usage() {
 	exit "${1:-0}"
 }
 
-domain='' email='' owner_email='' owner_name='' owner_org='' demo_runs='' no_demo='' demo_runner='' build=1
+domain='' email='' owner_email='' owner_name='' owner_org='' demo_flag='' demo_runner='' build=1
 while [ $# -gt 0 ]; do
 	case $1 in
 	--domain) domain=${2:?--domain needs a value}; shift 2 ;;
@@ -37,8 +35,8 @@ while [ $# -gt 0 ]; do
 	--owner-email) owner_email=${2:?--owner-email needs a value}; shift 2 ;;
 	--owner-name) owner_name=${2:?--owner-name needs a value}; shift 2 ;;
 	--owner-org) owner_org=${2:?--owner-org needs a value}; shift 2 ;;
-	--demo-runs) demo_runs=${2:?--demo-runs needs a directory}; shift 2 ;;
-	--no-demo) no_demo=1; shift ;;
+	--demo-runs) : "${2:?--demo-runs needs a directory}"; demo_flag=1; shift 2 ;; # retired, ignored
+	--no-demo) shift ;;                                                         # retired: there is never a demo
 	--demo-runner) demo_runner=1; shift ;;
 	--no-build) build=''; shift ;;
 	-h | --help) usage 0 ;;
@@ -116,43 +114,11 @@ else
 	log "no --owner-email: create the first account later with deploy/hosted/bootstrap.sh --owner-email you@example.com"
 fi
 
-# 5. Demo organization.
-if [ -z "$no_demo" ]; then
-	demo_runs=${demo_runs:-$BENCH_DIR/testdata/recorded}
-	[ -d "$demo_runs" ] || die "demo runs folder $demo_runs does not exist (or pass --no-demo)"
-	demo_runs=$(cd "$demo_runs" && pwd)
-	if bench_has org; then
-		# The owner also owns the demo org, so they can create its runner token.
-		org_args=(org create -slug demo -name "Demo" -public-read)
-		[ -z "$owner_email" ] || org_args+=(-owner "$owner_email")
-		if out=$(bench -- "${org_args[@]}" 2>&1); then
-			log "demo organization created"
-		elif printf '%s' "$out" | grep -qi 'exist'; then
-			log "demo organization exists"
-			# org create adds the owner only to an org it creates. A demo made
-			# by an earlier run without --owner-email has no admin, so grant the
-			# owner membership here (idempotent: an existing member is kept).
-			if [ -n "$owner_email" ]; then
-				if out=$(bench -- org member add -org demo -email "$owner_email" -role owner 2>&1); then
-					log "$owner_email is an owner of the demo organization"
-				elif printf '%s' "$out" | grep -qi 'already'; then
-					log "$owner_email is already a member of the demo organization"
-				elif printf '%s' "$out" | grep -qi 'unknown org command'; then
-					log "warning: this build has no 'org member add'; $owner_email may not administer the demo organization (docs/hosting.md, Bootstrap)"
-				else
-					printf '%s\n' "$out" >&2
-					die "adding $owner_email to the demo organization failed"
-				fi
-			fi
-		else
-			printf '%s\n' "$out" >&2
-			die "creating the demo organization failed"
-		fi
-		log "importing sealed runs from $demo_runs into the demo organization (seals are verified)"
-		bench -v "$demo_runs:/import:ro" -- org import -org demo -from /import
-	else
-		log "this build has no 'org' command; demo organization skipped"
-	fi
+# 5. No demo organization. Hosted installs require sign-in everywhere; an
+# organization left over from an older bootstrap is ignored by the server
+# (anonymous visitors never reach it) and can be deleted by its owner.
+if [ -n "$demo_flag" ]; then
+	log "--demo-runs is ignored: hosted installs have no public demo organization"
 fi
 
 # 6. Everything up. The demo runner joins only once its token is set.
@@ -165,5 +131,5 @@ public_url=${HEIMDALL_PUBLIC_URL:-$(env_get HEIMDALL_PUBLIC_URL)}
 log "Heimdall is up: ${public_url:-https://$domain}/"
 log "status: docker compose -f $COMPOSE_FILE --env-file $ENV_FILE ps   logs: ... logs -f heimdall caddy"
 if [ -n "$demo_runner" ] && [ -z "$(env_get HEIMDALL_DEMO_RUNNER_TOKEN)" ]; then
-	log "demo runner: create a runner token for org 'demo', pool 'demo', set HEIMDALL_DEMO_RUNNER_TOKEN in $ENV_FILE, then run this script again with --demo-runner"
+	log "demo runner: create a runner token for one of your organizations, pool 'demo', set HEIMDALL_DEMO_RUNNER_TOKEN in $ENV_FILE, then run this script again with --demo-runner"
 fi

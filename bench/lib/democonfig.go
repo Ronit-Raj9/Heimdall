@@ -3,11 +3,13 @@ package lib
 // DemoConfig is the demo section (Tenancy area, docs/platform-design.md):
 //
 //	demo:
-//	  org: demo   # slug of the public read-only organization, empty for none
+//	  org: demo
 //
-// Anonymous visitors of a hosted server land in this organization when it
-// exists and has public_read set; they can read it and nothing else. Empty
-// (the default) means anonymous visitors see nothing but the sign-in page.
+// Retired: it is still parsed so older config files load, but it has no
+// effect. A hosted install requires sign-in for every organization and for
+// the benchmark library; anonymous visitors see only the sign-in page, and
+// an organization named here is neither resolved for them nor flagged as a
+// demo (tenancy.Resolve).
 type DemoConfig struct {
 	Org string `yaml:"org" json:"org,omitempty"`
 }

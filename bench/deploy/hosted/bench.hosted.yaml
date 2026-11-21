@@ -65,10 +65,8 @@ storage:
     access_key_env: HEIMDALL_S3_ACCESS_KEY
     secret_key_env: HEIMDALL_S3_SECRET_KEY
 
-# The public read-only organization the demo runs are imported into. Empty
-# for none.
-demo:
-  org: demo
+# No demo section: hosted installs require sign-in for every organization
+# and have no public demo (the server ignores a demo block if one is left).
 
 # The hosted server runs no agent: runners do (docs/hosting.md, "Runners").
 # These sections are kept for commands run inside the server container that

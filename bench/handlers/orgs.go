@@ -33,9 +33,6 @@ type OrgInfo struct {
 	CreatedAt  time.Time `json:"created_at"`
 	// Role is the caller's role in the org, empty for a public reader.
 	Role string `json:"role,omitempty"`
-	// Demo marks the server's public read-only demo organization (demo.org
-	// with public_read), so the UI can show its banner without probing.
-	Demo bool `json:"demo,omitempty"`
 }
 
 // OrgList is GET /orgs.
@@ -129,19 +126,6 @@ type OrgsHandler struct {
 	mode  schemas.Mode
 	orgs  OrgService
 	audit tenancy.AuditSink
-	demo  string // slug of the public demo org (demo.org); empty for none
-}
-
-// WithDemo names the public demo org's slug, flagged as demo in answers.
-func (h *OrgsHandler) WithDemo(slug string) *OrgsHandler {
-	h.demo = slug
-	return h
-}
-
-// mark flags the demo org.
-func (h *OrgsHandler) mark(o OrgInfo) OrgInfo {
-	o.Demo = h.demo != "" && o.Slug == h.demo && o.PublicRead
-	return o
 }
 
 // NewOrgsHandler creates the org handler; orgs nil answers 503.
@@ -170,7 +154,7 @@ var OrgRouteDocs = []RouteDoc{
 	{Method: "POST", Path: APIPrefix + "/orgs", Tag: "orgs", Summary: "Create an organization; the caller becomes its owner", Request: CreateOrgRequest{}, Status: fasthttp.StatusCreated, Response: OrgInfo{}},
 	{Method: "GET", Path: APIPrefix + "/orgs/{org}", Tag: "orgs", Summary: "One organization", Response: OrgInfo{}},
 	{Method: "POST", Path: APIPrefix + "/orgs/{org}/rename", Tag: "orgs", Summary: "Rename an organization (admin)", Request: RenameOrgRequest{}, Response: OrgInfo{}},
-	{Method: "POST", Path: APIPrefix + "/orgs/{org}/public-read", Tag: "orgs", Summary: "Let anonymous visitors read the organization (owner)", Request: PublicReadRequest{}, Response: OrgInfo{}},
+	{Method: "POST", Path: APIPrefix + "/orgs/{org}/public-read", Tag: "orgs", Summary: "Let signed-in users who are not members read the organization (owner); anonymous visitors never can", Request: PublicReadRequest{}, Response: OrgInfo{}},
 	{Method: "GET", Path: APIPrefix + "/orgs/{org}/audit", Tag: "orgs", Summary: "Audit log, newest first (admin)", Response: AuditList{}},
 	{Method: "POST", Path: APIPrefix + "/orgs/{org}/leave", Tag: "orgs", Summary: "Leave an organization (any member, for themselves; never the last owner)", Status: fasthttp.StatusNoContent},
 	{Method: "GET", Path: APIPrefix + "/orgs/{org}/members", Tag: "orgs", Summary: "Members and roles (admin)", Response: MemberList{}},
@@ -214,9 +198,6 @@ func (h *OrgsHandler) listOrgs(ctx *fasthttp.RequestCtx) {
 	if out == nil {
 		out = []OrgInfo{}
 	}
-	for i := range out {
-		out[i] = h.mark(out[i])
-	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, OrgList{Orgs: out})
 }
 
@@ -257,7 +238,7 @@ func (h *OrgsHandler) createOrg(ctx *fasthttp.RequestCtx) {
 	}
 	o.Role = string(auth.RoleOwner)
 	h.write(ctx, o.ID, "org.create", "org", o.ID, map[string]any{"slug": o.Slug, "name": o.Name})
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, h.mark(o))
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, o)
 }
 
 // getOrg handles GET /orgs/{org}.
@@ -274,7 +255,6 @@ func (h *OrgsHandler) getOrg(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	info.Role = string(auth.PrincipalFrom(ctx).Role)
-	info = h.mark(info)
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, info)
 }
 
@@ -301,7 +281,6 @@ func (h *OrgsHandler) renameOrg(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	info.Role = string(auth.PrincipalFrom(ctx).Role)
-	info = h.mark(info)
 	h.write(ctx, o.ID, "org.rename", "org", o.ID, map[string]any{"from": o.Name, "to": name})
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, info)
 }
@@ -324,7 +303,6 @@ func (h *OrgsHandler) setPublicRead(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	info.Role = string(auth.PrincipalFrom(ctx).Role)
-	info = h.mark(info)
 	h.write(ctx, o.ID, "org.public_read", "org", o.ID, map[string]any{"public_read": req.PublicRead})
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, info)
 }

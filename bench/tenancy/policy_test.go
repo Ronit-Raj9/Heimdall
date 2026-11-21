@@ -179,14 +179,16 @@ func TestResolve(t *testing.T) {
 		{"token header naming own org", org(viewer), tok, "", "acme", "org_a", auth.RoleMember, 0},
 		{"runner own org", runner(true), run, "", "", "org_b", "", 0},
 		{"runner header to other org", runner(true), run, "", "acme", "", "", 404},
-		{"anonymous demo by default", org(viewer), auth.Anonymous(), "", "", "org_d", "", 0},
+		{"anonymous gets no default org", org(viewer), auth.Anonymous(), "", "", "", "", 401},
+		{"anonymous public_read org", org(viewer), auth.Anonymous(), "", "demo", "", "", 401},
+		{"anonymous public_read org by path", pathOrg(viewer), auth.Anonymous(), "demo", "", "", "", 401},
 		{"anonymous private org", org(viewer), auth.Anonymous(), "", "acme", "", "", 401},
 		{"anonymous unknown org", org(viewer), auth.Anonymous(), "", "zzz", "", "", 401},
 		{"no org rule", signedIn(), u, "", "beta", "", auth.RoleAdmin, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			o, eff, err := Resolve(context.Background(), dir, tt.rule, tt.p, tt.path, tt.header, "demo")
+			o, eff, err := Resolve(context.Background(), dir, tt.rule, tt.p, tt.path, tt.header)
 			if tt.wantStatus != 0 {
 				if got := status(err); got != tt.wantStatus {
 					t.Fatalf("status %d, want %d (%v)", got, tt.wantStatus, err)
