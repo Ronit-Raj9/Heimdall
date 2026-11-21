@@ -5,6 +5,7 @@ import {
 	Boxes,
 	CalendarClock,
 	FileUp,
+	Sparkles,
 	FolderTree,
 	Gauge,
 	KeyRound,
@@ -28,12 +29,13 @@ import {
 	type LucideIcon,
 } from "lucide-react";
 
-export type BenchNavGroupId = "benchmark" | "build" | "production" | "govern" | "operate";
+export type BenchNavGroupId = "start" | "benchmark" | "build" | "production" | "govern" | "operate";
 
 export interface BenchNavItem {
 	/** The entry's route. Object routes below it (an experiment, a run, a suite) keep it highlighted. */
 	to:
 		| "/"
+		| "/welcome"
 		| "/experiments"
 		| "/runs"
 		| "/leaderboard"
@@ -61,6 +63,7 @@ export interface BenchNavItem {
 		| "/admin";
 	labelKey:
 		| "shell.nav.home"
+		| "shell.nav.welcome"
 		| "shell.nav.experiments"
 		| "shell.nav.runs"
 		| "shell.nav.leaderboard"
@@ -101,8 +104,10 @@ export interface BenchNavItem {
 
 export interface BenchNavGroup {
 	id: BenchNavGroupId;
-	labelKey: "shell.groups.benchmark" | "shell.groups.build" | "shell.groups.production" | "shell.groups.govern" | "shell.groups.operate";
+	labelKey: "shell.groups.start" | "shell.groups.benchmark" | "shell.groups.build" | "shell.groups.production" | "shell.groups.govern" | "shell.groups.operate";
 	items: readonly BenchNavItem[];
+	/** Closed until the user opens it (or visits one of its pages). */
+	defaultClosed?: boolean;
 }
 
 /**
@@ -112,10 +117,17 @@ export interface BenchNavGroup {
  */
 export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 	{
+		id: "start",
+		labelKey: "shell.groups.start",
+		items: [
+			{ to: "/", labelKey: "shell.nav.home", icon: House, testId: "nav-link-home", also: ["/quickstart"] },
+			{ to: "/welcome", labelKey: "shell.nav.welcome", icon: Sparkles, testId: "nav-link-welcome" },
+		],
+	},
+	{
 		id: "benchmark",
 		labelKey: "shell.groups.benchmark",
 		items: [
-			{ to: "/", labelKey: "shell.nav.home", icon: House, testId: "nav-link-home", also: ["/quickstart"] },
 			{
 				to: "/experiments",
 				labelKey: "shell.nav.experiments",
@@ -161,6 +173,7 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 	{
 		id: "operate",
 		labelKey: "shell.groups.operate",
+		defaultClosed: true,
 		items: [
 			{ to: "/workers", labelKey: "shell.nav.workers", icon: Server, testId: "nav-link-workers" },
 			{ to: "/settings", labelKey: "shell.nav.settings", icon: Settings, testId: "nav-link-settings", hostedOnly: true },
@@ -174,6 +187,9 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 		],
 	},
 ];
+
+/** Groups that start closed for a visitor who has not toggled any group yet. */
+export const DEFAULT_CLOSED_GROUPS: readonly BenchNavGroupId[] = BENCH_NAV_GROUPS.filter((group) => group.defaultClosed).map((group) => group.id);
 
 /** Every entry in order, for lookups. */
 export const BENCH_NAV: readonly BenchNavItem[] = BENCH_NAV_GROUPS.flatMap((group) => group.items);

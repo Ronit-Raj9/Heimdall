@@ -3964,14 +3964,16 @@
 		"closeMenu": "Close navigation",
 		"groupToggle": "Show or hide {{group}}",
 		"groups": {
+			"start": "Start",
 			"benchmark": "Benchmark",
 			"build": "Build",
 			"production": "Production",
 			"govern": "Govern",
-			"operate": "Operate"
+			"operate": "Advanced"
 		},
 		"nav": {
 			"home": "Home",
+			"welcome": "Welcome",
 			"experiments": "Experiments",
 			"runs": "Runs",
 			"leaderboard": "Leaderboard",

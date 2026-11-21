@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { BENCH_NAV, BENCH_NAV_GROUPS, activeNavGroup, activeNavItem } from "./navigation";
+import { BENCH_NAV, BENCH_NAV_GROUPS, DEFAULT_CLOSED_GROUPS, activeNavGroup, activeNavItem } from "./navigation";
 
 describe("navigation", () => {
-	it("has the five groups of the information architecture, in order", () => {
-		expect(BENCH_NAV_GROUPS.map((group) => group.id)).toEqual(["benchmark", "build", "production", "govern", "operate"]);
+	it("has the six groups of the information architecture, in order, with Advanced closed by default", () => {
+		expect(BENCH_NAV_GROUPS.map((group) => group.id)).toEqual(["start", "benchmark", "build", "production", "govern", "operate"]);
+		expect(DEFAULT_CLOSED_GROUPS).toEqual(["operate"]);
 		expect(BENCH_NAV.map((item) => item.to)).toEqual([
 			"/",
+			"/welcome",
 			"/experiments",
 			"/runs",
 			"/leaderboard",
@@ -42,6 +44,7 @@ describe("navigation", () => {
 	it("highlights the object's entry on nested routes", () => {
 		const cases: [string, string | null][] = [
 			["/", "/"],
+			["/welcome", "/welcome"],
 			["/quickstart", "/"],
 			["/experiments", "/experiments"],
 			["/experiments/e_1", "/experiments"],
@@ -65,6 +68,7 @@ describe("navigation", () => {
 	});
 
 	it("names the group of the current entry", () => {
+		expect(activeNavGroup("/")).toBe("start");
 		expect(activeNavGroup("/inbox")).toBe("production");
 		expect(activeNavGroup("/workers")).toBe("operate");
 		expect(activeNavGroup("/jobs/j_1")).toBe("operate");
