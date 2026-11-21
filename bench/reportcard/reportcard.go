@@ -54,25 +54,36 @@ const (
 type Arm struct {
 	Label   string `json:"label"`
 	Agent   string `json:"agent"`
-	Version int    `json:"version,omitempty"`
-	Model   string `json:"model"`
+	Version int    `json:"version,omitempty"` // the version that ran; 0 for an evaluation from before versions were recorded
+	// LatestAtLaunch: the evaluation asked for the latest version and
+	// Version is the one that was latest when it was created.
+	LatestAtLaunch bool   `json:"latest_at_launch,omitempty"`
+	Model          string `json:"model"`
 }
 
 // Metrics is one arm's numbers on one benchmark, capability or condition.
-// Score is the verified success rate over graded runs with its exact
-// (Clopper-Pearson) interval. CostUSD and Tokens are sums over the runs;
-// Steps, ToolCalls and WallS are medians per run, as the leaderboard shows
-// them (a capability rollup weights each benchmark's median by its runs).
+// Score is the verified success rate over graded runs with its
+// task-clustered bootstrap interval. CostUSD and Tokens are sums over the
+// runs, nil when any run's value is not known (an unpriced model, a run
+// whose usage was not recorded): a partial sum would read as the full cost,
+// so CostRuns and TokenRuns count the runs that were known and CostNote says
+// why the rest were not. Steps, ToolCalls and WallS are medians per run, as
+// the leaderboard shows them (a capability rollup weights each benchmark's
+// median by its runs).
 type Metrics struct {
-	Score     float64 `json:"score"`
-	CILow     float64 `json:"ci_low"`
-	CIHigh    float64 `json:"ci_high"`
-	Runs      int     `json:"runs"`
-	CostUSD   float64 `json:"cost_usd"`
-	Tokens    float64 `json:"tokens"`
-	Steps     float64 `json:"steps"`
-	ToolCalls float64 `json:"tool_calls"`
-	WallS     float64 `json:"wall_s"`
+	Score     float64  `json:"score"`
+	CILow     float64  `json:"ci_low"`
+	CIHigh    float64  `json:"ci_high"`
+	Runs      int      `json:"runs"`
+	Tasks     int      `json:"tasks"`
+	CostUSD   *float64 `json:"cost_usd"`
+	CostRuns  int      `json:"cost_runs"`           // runs whose cost is known
+	CostNote  string   `json:"cost_note,omitempty"` // why the other runs' cost is not known
+	Tokens    *float64 `json:"tokens"`
+	TokenRuns int      `json:"token_runs"` // runs whose token count is known
+	Steps     float64  `json:"steps"`
+	ToolCalls float64  `json:"tool_calls"`
+	WallS     float64  `json:"wall_s"`
 }
 
 // Capability is the rollup of every benchmark of one capability.
@@ -185,7 +196,11 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 		if len(opt.Arms) > 0 && !slices.Contains(opt.Arms, a.Label) {
 			continue
 		}
-		rep.Arms = append(rep.Arms, Arm{Label: a.Label, Agent: a.Agent, Version: a.Version, Model: a.Model})
+		id, v := AgentRef(a.Agent)
+		if a.Version != 0 {
+			v = a.Version
+		}
+		rep.Arms = append(rep.Arms, Arm{Label: a.Label, Agent: id, Version: v, LatestAtLaunch: a.LatestAtLaunch && a.Version > 0, Model: a.Model})
 		labels = append(labels, a.Label)
 	}
 
@@ -374,8 +389,8 @@ func filter(runs []graded, condition string) []graded {
 }
 
 // metricsOf aggregates runs: success rate with its interval, sums of cost
-// and tokens, medians of steps, tool calls and wall time over the runs that
-// observed them.
+// and tokens (nil unless every run knows them), medians of steps, tool
+// calls and wall time over the runs that observed them.
 func metricsOf(runs []graded) Metrics {
 	m := Metrics{Runs: len(runs)}
 	if len(runs) == 0 {
@@ -386,10 +401,20 @@ func metricsOf(runs []graded) Metrics {
 		succ += r.success
 	}
 	m.Score = round(float64(succ) / float64(len(runs)))
-	lo, hi := taskCI(clustersOf(runs, ""))
+	cs := clustersOf(runs, "")
+	m.Tasks = len(cs)
+	lo, hi := taskCI(cs)
 	m.CILow, m.CIHigh = round(lo), round(hi)
-	m.CostUSD = round(sum(runs, metricCostUSD))
-	m.Tokens = sum(runs, metricTokens)
+	var cost, tokens float64
+	cost, m.CostRuns, m.CostNote = sumKnown(runs, metricCostUSD)
+	if m.CostRuns == len(runs) {
+		cost = round(cost)
+		m.CostUSD, m.CostNote = &cost, ""
+	}
+	tokens, m.TokenRuns, _ = sumKnown(runs, metricTokens)
+	if m.TokenRuns == len(runs) {
+		m.Tokens = &tokens
+	}
 	m.Steps = median(runs, metricSteps)
 	m.ToolCalls = median(runs, metricToolCalls)
 	m.WallS = round(median(runs, metricWallTime))
@@ -406,12 +431,31 @@ func observed(runs []graded, id string) []float64 {
 	return xs
 }
 
-func sum(runs []graded, id string) float64 {
-	t := 0.0
-	for _, x := range observed(runs, id) {
-		t += x
+// sumKnown sums metric id over the runs that observed it and counts them.
+// note is the most common reason among the runs that did not (ties: the
+// first in sort order), "not recorded" for a run with no value at all.
+func sumKnown(runs []graded, id string) (total float64, known int, note string) {
+	reasons := map[string]int{}
+	for _, r := range runs {
+		v, found := r.metrics[id]
+		if x, ok := v.Float(); ok {
+			total += x
+			known++
+			continue
+		}
+		reason := strings.TrimSpace(v.Reason)
+		if !found || reason == "" {
+			reason = "not recorded"
+		}
+		reasons[reason]++
 	}
-	return t
+	best := 0
+	for reason, n := range reasons {
+		if n > best || (n == best && reason < note) {
+			note, best = reason, n
+		}
+	}
+	return total, known, note
 }
 
 func median(runs []graded, id string) float64 {
@@ -423,21 +467,38 @@ func median(runs []graded, id string) float64 {
 }
 
 // rollup pools benchmark rows: successes and runs add up (so the score is
-// weighted by runs), cost and tokens add up, medians are averaged weighted
-// by runs. The interval is the task-clustered bootstrap over cs, every task
-// of every benchmark in the capability.
+// weighted by runs), cost and tokens add up (nil when any row's is not
+// known), medians are averaged weighted by runs. The interval is the
+// task-clustered bootstrap over cs, every task of every benchmark in the
+// capability.
 func rollup(parts []Metrics, cs []cluster) Metrics {
 	var out Metrics
 	succ := 0.0
+	cost, tokens := 0.0, 0.0
+	costKnown, tokensKnown := true, true
 	for _, p := range parts {
 		if p.Runs == 0 {
 			continue
 		}
 		w := float64(p.Runs)
 		out.Runs += p.Runs
+		out.Tasks += p.Tasks
 		succ += p.Score * w
-		out.CostUSD += p.CostUSD
-		out.Tokens += p.Tokens
+		if p.CostUSD != nil {
+			cost += *p.CostUSD
+		} else {
+			costKnown = false
+		}
+		if p.Tokens != nil {
+			tokens += *p.Tokens
+		} else {
+			tokensKnown = false
+		}
+		out.CostRuns += p.CostRuns
+		out.TokenRuns += p.TokenRuns
+		if out.CostNote == "" {
+			out.CostNote = p.CostNote
+		}
 		out.Steps += p.Steps * w
 		out.ToolCalls += p.ToolCalls * w
 		out.WallS += p.WallS * w
@@ -449,7 +510,13 @@ func rollup(parts []Metrics, cs []cluster) Metrics {
 	out.Score = round(succ / n)
 	lo, hi := taskCI(cs)
 	out.CILow, out.CIHigh = round(lo), round(hi)
-	out.CostUSD = round(out.CostUSD)
+	if costKnown {
+		cost = round(cost)
+		out.CostUSD = &cost
+	}
+	if tokensKnown {
+		out.Tokens = &tokens
+	}
 	out.Steps, out.ToolCalls, out.WallS = round(out.Steps/n), round(out.ToolCalls/n), round(out.WallS/n)
 	return out
 }

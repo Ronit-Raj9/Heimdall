@@ -87,8 +87,9 @@ func TestCatalogOpenWeightFamilies(t *testing.T) {
 	}
 }
 
-// The xcodebest proxy models are listed but never priced, and never become
-// the default for a key that has not reported them.
+// The xcodebest proxy models are listed and priced (gpt-6.2-sol and
+// gpt-6.2-astra added to the snapshot 2026-11-22), and never become the
+// default for a key that has not reported them.
 func TestCatalogProxyModelsUnpriced(t *testing.T) {
 	var compat ModelProviderInfo
 	for _, p := range modelProviders() {
@@ -108,8 +109,8 @@ func TestCatalogProxyModelsUnpriced(t *testing.T) {
 	}
 	prices := loadRepoPrices(t)
 	for _, id := range []string{"gpt-6.2-sol", "gpt-6.2-astra"} {
-		if _, ok := prices.Models[id]; ok {
-			t.Errorf("%s must stay unpriced", id)
+		if _, ok := prices.Models[id]; !ok {
+			t.Errorf("%s has no price in the snapshot", id)
 		}
 	}
 	keys := []ModelKeyView{{ID: "c", Provider: "openai-compatible", Status: "ok", Models: []string{}}}

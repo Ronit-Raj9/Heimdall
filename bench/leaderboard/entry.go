@@ -124,8 +124,10 @@ func newEntry(hash string, all, scoped []gradedRun, k int) *entryCalc {
 	}
 	e.Experiments = experimentsNewestFirst(recs)
 	e.Tasks, e.Runs, e.Passes.Den = len(tally), len(scoped), len(scoped)
+	e.TaskPasses = make(map[string]schemas.Ratio, len(tally))
 	for task, t := range tally {
 		c.rates[task] = float64(t.succ) / float64(t.n)
+		e.TaskPasses[task] = schemas.Ratio{Num: t.succ, Den: t.n}
 	}
 	if k == 0 {
 		k = defaultK(scoped)

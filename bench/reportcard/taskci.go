@@ -85,3 +85,24 @@ func quantile(xs []float64, q float64) float64 {
 	f := pos - float64(i)
 	return xs[i] + f*(xs[i+1]-xs[i])
 }
+
+// TaskTally is one task's verified successes over its counted runs. Key
+// names the task; callers pooling benchmarks prefix it with the benchmark so
+// the same task id in two benchmarks stays two tasks.
+type TaskTally struct {
+	Key        string
+	Succ, Runs int
+}
+
+// TaskInterval is the report card's score interval over tallies: the
+// task-clustered percentile bootstrap at level Conf (Clopper-Pearson over
+// runs with fewer than two tasks). The agent leaderboard uses it so both
+// pages show the same interval for the same runs.
+func TaskInterval(ts []TaskTally) (lo, hi float64) {
+	cs := make([]cluster, 0, len(ts))
+	for _, t := range ts {
+		cs = append(cs, cluster{key: t.Key, succ: t.Succ, runs: t.Runs})
+	}
+	slices.SortFunc(cs, func(a, b cluster) int { return cmp.Compare(a.key, b.key) })
+	return taskCI(cs)
+}

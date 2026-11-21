@@ -330,3 +330,37 @@ func TestSpreadPick(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+// TestEvaluationRecordsLatestVersion (N6): an arm without a version is
+// recorded as the version that was latest at launch, and still runs the
+// current file (not a pinned snapshot); an explicit version stays pinned.
+func TestEvaluationRecordsLatestVersion(t *testing.T) {
+	l := &evalLauncher{}
+	r, dir := evalServer(t, Services{Launcher: l, Suites: evalSuites()})
+	doc := "id: real\nadapter: scripted\nimage: bench/coding-core-base:1\nscripted:\n  kind: exploit\nmodel: m0\nbudgets:\n  wall_s: 900\n  cpus: 1\n  mem_gb: 1\ngateway:\n  provider: anthropic\n"
+	writeFiles(t, dir, map[string]string{"agents/real.yaml": doc})
+	ctx := evalCall(r, "POST", APIPrefix+"/evaluations",
+		`{"mode":"opponent","arms":[{"label":"A","agent":"real","model":"m1"},{"label":"B","agent":"scripted","version":2,"model":"m2"}],"benchmarks":["longmemeval"]}`)
+	if ctx.Response.StatusCode() != fasthttp.StatusAccepted {
+		t.Fatalf("status %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	ev := decodeEval(t, ctx)
+	a, b := ev.Spec.Arms[0], ev.Spec.Arms[1]
+	if a.Version != 1 || !a.LatestAtLaunch || b.Version != 2 || b.LatestAtLaunch {
+		t.Fatalf("arms %+v %+v, want A v1 latest at launch, B pinned v2", a, b)
+	}
+	exp := l.planned[ev.Children[0].ExperimentID]
+	if exp.Arms["A"].Agent != "" && exp.Arms["A"].Agent != "agents/real.yaml" || !strings.Contains(exp.Arms["A"].Label, "real v1") {
+		t.Fatalf("arm A %+v, want the current file labelled v1", exp.Arms["A"])
+	}
+	if exp.Arms["B"].Agent != "agents/scripted.yaml@v2" {
+		t.Fatalf("arm B %+v", exp.Arms["B"])
+	}
+	// A model-only edit is the same version.
+	writeFiles(t, dir, map[string]string{"agents/real.yaml": strings.Replace(doc, "model: m0", "model: m9", 1)})
+	ctx = evalCall(r, "POST", APIPrefix+"/evaluations",
+		`{"mode":"score","arms":[{"label":"A","agent":"real","model":"m1"}],"benchmarks":["longmemeval"]}`)
+	if ev := decodeEval(t, ctx); ev.Spec.Arms[0].Version != 1 {
+		t.Fatalf("after a model-only edit: %+v", ev.Spec.Arms[0])
+	}
+}

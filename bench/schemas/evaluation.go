@@ -29,11 +29,17 @@ const EvaluationChildSkipped = "skipped"
 
 // EvaluationArm is one agent (at a version) on one model.
 type EvaluationArm struct {
-	Label    string `json:"label"`
-	Agent    string `json:"agent"`
-	Version  int    `json:"version,omitempty"`
-	Model    string `json:"model"`
+	Label   string `json:"label"`
+	Agent   string `json:"agent"`
+	Version int    `json:"version,omitempty"`
+	Model   string `json:"model"`
+	// Provider is the gateway provider the model is served through.
 	Provider string `json:"provider,omitempty"`
+	// LatestAtLaunch is set by the server when the arm asked for the
+	// latest version: Version is then the version that was latest when the
+	// evaluation was created, recorded so the report card and the agent
+	// leaderboard name the exact version that ran.
+	LatestAtLaunch bool `json:"latest_at_launch,omitempty"`
 }
 
 // EvaluationSpec is the body of POST /api/bench/evaluations.

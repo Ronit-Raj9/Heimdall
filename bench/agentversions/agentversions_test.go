@@ -107,3 +107,64 @@ func TestRecordBackfillsFromHistory(t *testing.T) {
 		t.Fatalf("%+v %v", v, created)
 	}
 }
+
+// TestAgentHashIgnoresArmAxes (N6): a run of a version on any model and
+// provider, and the hidden repeat arm, hash as the version's snapshot; a
+// change to the agent itself does not.
+func TestAgentHashIgnoresArmAxes(t *testing.T) {
+	base, err := DocAgentHash([]byte(agentDoc))
+	if err != nil || base == "" {
+		t.Fatalf("doc agent hash: %q %v", base, err)
+	}
+	cfg, err := decodeConfig([]byte(agentDoc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Model, cfg.Gateway.Provider = "gpt-5.4-mini", "openai"
+	cfg.Env = map[string]string{RepeatArmEnv: "B"}
+	if h, _ := AgentHash(cfg); h != base {
+		t.Errorf("arm with model, provider and repeat marker = %s, want %s", h, base)
+	}
+	cfg.Budgets.WallS = 60
+	if h, _ := AgentHash(cfg); h == base {
+		t.Error("a budget change kept the agent hash")
+	}
+
+	root := t.TempDir()
+	v1, _, err := Snapshot(root, "exploit", []byte(agentDoc), "", "")
+	if err != nil || v1.AgentHash != base {
+		t.Fatalf("v1 = %+v %v", v1, err)
+	}
+	// A new default model alone is no new version.
+	other := strings.Replace(agentDoc, "claude-sonnet-4-5", "claude-opus-4-1", 1)
+	if v, created, _ := Snapshot(root, "exploit", []byte(other), "", ""); created || v.Version != 1 {
+		t.Fatalf("model-only change made %+v (created %v)", v, created)
+	}
+	changed := strings.Replace(agentDoc, "wall_s: 900", "wall_s: 600", 1)
+	v2, _, _ := Snapshot(root, "exploit", []byte(changed), "", "")
+	if got := VersionOf(root, "", "exploit", base); got != 1 {
+		t.Errorf("VersionOf(v1 hash) = %d", got)
+	}
+	if got := VersionOf(root, "", "exploit", "sha256:"+strings.TrimPrefix(v2.AgentHash, "sha256:")); got != 2 {
+		t.Errorf("VersionOf(v2 hash) = %d", got)
+	}
+	if got := VersionOf(root, "", "exploit", "nope"); got != 0 {
+		t.Errorf("VersionOf(unknown) = %d", got)
+	}
+	// An index written before agent hashes is filled from the snapshots.
+	idx := filepath.Join(root, ".heimdall", "agent-versions", "exploit", "versions.json")
+	if err := os.WriteFile(idx, []byte(`[{"version":1,"hash":"x"},{"version":2,"hash":"y"}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := VersionOf(root, "", "exploit", base); got != 1 {
+		t.Errorf("old index VersionOf = %d", got)
+	}
+	// A built-in library agent the project does not version is v1.
+	lib := t.TempDir()
+	os.MkdirAll(filepath.Join(lib, "agents"), 0o755)
+	os.WriteFile(filepath.Join(lib, "agents", "builtin.yaml"), []byte(strings.Replace(agentDoc, "id: exploit", "id: builtin", 1)), 0o644)
+	bh, _ := DocAgentHash([]byte(strings.Replace(agentDoc, "id: exploit", "id: builtin", 1)))
+	if got := VersionOf(root, lib, "builtin", bh); got != 1 {
+		t.Errorf("library VersionOf = %d", got)
+	}
+}

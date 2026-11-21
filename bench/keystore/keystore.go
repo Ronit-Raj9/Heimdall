@@ -42,13 +42,39 @@ type Key struct {
 	BudgetUSD, MonthSpentUSD                           float64
 	CreatedAt, UpdatedAt                               time.Time
 	LastTestedAt                                       *time.Time
+	// Price is what the org pays per million tokens on this key, used to
+	// cost runs of a model the pinned price snapshot does not list (a
+	// custom endpoint). nil: no price set.
+	Price *Price
 }
+
+// Price is a key's price per million tokens. Cache is the price of a
+// cached input token (read or write); 0 prices cached tokens at the input
+// price (CacheRate), so a key without a cache price never undercounts.
+type Price struct {
+	InputPerMTok  float64 `json:"input_per_mtok"`
+	OutputPerMTok float64 `json:"output_per_mtok"`
+	CachePerMTok  float64 `json:"cache_per_mtok"`
+}
+
+// CacheRate is the price of a cached token: CachePerMTok, or the input
+// price when no cache price is set.
+func (p Price) CacheRate() float64 {
+	if p.CachePerMTok > 0 {
+		return p.CachePerMTok
+	}
+	return p.InputPerMTok
+}
+
+// MaxPricePerMTok bounds each price field (USD per million tokens).
+const MaxPricePerMTok = 10_000
 
 // Put is a create or update request.
 type Put struct {
 	Provider, Label, BaseURL, Value string
 	Models                          []string
 	BudgetUSD                       float64
+	Price                           *Price // nil: no price (on Update too: the price is replaced, not kept)
 } // Value plaintext; "" on Update keeps it
 
 // Store is the key store.

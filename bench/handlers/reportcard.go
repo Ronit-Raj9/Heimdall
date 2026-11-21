@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/leaderboard"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/reportcard"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -135,6 +136,17 @@ func (h *reportCardHandler) options(ctx context.Context) reportcard.Options {
 	}}
 }
 
+// source is the run index as a leaderboard source, with the org's key
+// prices costing runs of models the price snapshot does not list (N2).
+func (h *reportCardHandler) source(ctx *fasthttp.RequestCtx, work context.Context) leaderboard.Source {
+	s := h.env.Services
+	var keys KeyLister
+	if s.Keys != nil {
+		keys = s.Keys
+	}
+	return PricedLeaderboardSource(s.Index, KeyPriceLookup(work, keys, quickOrgID(ctx, s.OrgID)))
+}
+
 func (h *reportCardHandler) ready(ctx *fasthttp.RequestCtx) bool {
 	switch {
 	case h.env.Services.Index == nil:
@@ -160,7 +172,7 @@ func (h *reportCardHandler) getReport(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.env.Mode, "evaluation", err)
 		return
 	}
-	rep, err := reportcard.Build(work, LeaderboardSource(h.env.Services.Index), ev, h.options(work))
+	rep, err := reportcard.Build(work, h.source(ctx, work), ev, h.options(work))
 	if err != nil {
 		sendDepError(ctx, h.env.Mode, "report card", err)
 		return
@@ -200,7 +212,7 @@ func (h *reportCardHandler) getAgentReportCard(ctx *fasthttp.RequestCtx) {
 	if ev != nil {
 		opt := h.options(work)
 		opt.Arms = labels
-		if out.Report, err = reportcard.Build(work, LeaderboardSource(h.env.Services.Index), ev, opt); err != nil {
+		if out.Report, err = reportcard.Build(work, h.source(ctx, work), ev, opt); err != nil {
 			sendDepError(ctx, h.env.Mode, "report card", err)
 			return
 		}

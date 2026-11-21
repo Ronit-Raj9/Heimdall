@@ -173,7 +173,9 @@ func (h *agentVersionsHandler) builtin(ctx *fasthttp.RequestCtx, id string) stri
 	return agentversions.LibraryFile(h.library, id)
 }
 
-// runsByHash counts runs per agent config hash over every experiment.
+// runsByHash counts runs per agent hash (agentversions.AgentHash: the
+// version identity, which leaves out the model and provider an evaluation
+// sets per arm) over every experiment.
 func (h *agentVersionsHandler) runsByHash() map[string]int {
 	counts := map[string]int{}
 	if h.index == nil {
@@ -181,13 +183,18 @@ func (h *agentVersionsHandler) runsByHash() map[string]int {
 	}
 	for _, exp := range h.index.Experiments() {
 		m, _ := h.index.Manifest(exp)
-		for _, rv := range h.index.Runs(exp) {
-			hash := rv.Run.Agent.ConfigHash
-			if hash == "" && m != nil {
-				hash = m.Arms[rv.Slot.Arm].ConfigHash
+		if m == nil {
+			continue
+		}
+		armHash := map[string]string{}
+		for id, arm := range m.Arms {
+			if ah, err := agentversions.AgentHash(arm.Config); err == nil {
+				armHash[id] = strings.TrimPrefix(ah, "sha256:")
 			}
-			if hash != "" {
-				counts[hash]++
+		}
+		for _, rv := range h.index.Runs(exp) {
+			if ah := armHash[rv.Slot.Arm]; ah != "" {
+				counts[ah]++
 			}
 		}
 	}
@@ -229,7 +236,7 @@ func (h *agentVersionsHandler) list(ctx *fasthttp.RequestCtx) {
 	}
 	counts := h.runsByHash()
 	for _, v := range vs {
-		out.Versions = append(out.Versions, AgentVersionEntry{AgentVersion: v, Runs: counts[v.Hash]})
+		out.Versions = append(out.Versions, AgentVersionEntry{AgentVersion: v, Runs: counts[strings.TrimPrefix(v.AgentHash, "sha256:")]})
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
 }

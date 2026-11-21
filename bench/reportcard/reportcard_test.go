@@ -168,7 +168,7 @@ func TestBuildABReport(t *testing.T) {
 	if !(a.CILow <= a.Score && a.Score <= a.CIHigh) || bb.CIHigh != 1 || bb.CILow <= 0.5 {
 		t.Fatalf("intervals A %+v B %+v", a, bb)
 	}
-	if bb.CostUSD != 3.2 || bb.Tokens != 3200 || bb.Steps != 20 || bb.ToolCalls != 8 || bb.WallS != 90 {
+	if deref(bb.CostUSD) != 3.2 || deref(bb.Tokens) != 3200 || bb.CostRuns != 16 || bb.Tasks != 8 || bb.Steps != 20 || bb.ToolCalls != 8 || bb.WallS != 90 {
 		t.Fatalf("B columns %+v", bb)
 	}
 	if b.Verdict == nil || b.Verdict.Winner != "B" || !b.Verdict.Significant || b.Verdict.Delta <= 0 {
@@ -336,5 +336,56 @@ func TestBuildScoreModeHidesRepeatArm(t *testing.T) {
 		if _, ok := c.Arms["B"]; ok {
 			t.Fatalf("capability shows B: %+v", c)
 		}
+	}
+}
+
+func deref(p *float64) float64 {
+	if p == nil {
+		return -1
+	}
+	return *p
+}
+
+// TestCostNeverZeroWhenUnpriced (N2): a run whose cost is unknown (an
+// unpriced model) makes the benchmark's and the capability's cost not
+// known, with the count of priced runs and the reason, never a partial sum
+// or $0.00.
+func TestCostNeverZeroWhenUnpriced(t *testing.T) {
+	src := newSource()
+	src.add("exp_1", "hd-harbor-tb2", []string{"A", "B"}, []fixRun{
+		pass("A", "t1", 1, map[string]float64{metricCostUSD: 0.5, metricTokens: 10}),
+		pass("A", "t2", 1, nil),
+		fail("A", "t3", 1, nil),
+		pass("B", "t1", 1, map[string]float64{metricCostUSD: 0.5, metricTokens: 10}),
+	})
+	unpriced, _ := json.Marshal(map[string]schemas.Value{
+		metricCostUSD: schemas.Unknown("1 of 1 cost rows unpriced", schemas.EvidenceGateway),
+		metricTokens:  schemas.Observed(20, schemas.EvidenceGateway),
+	})
+	src.files["r_exp_1_1"], src.files["r_exp_1_2"] = unpriced, unpriced
+	ev := abEval(schemas.EvaluationChild{Benchmark: "hd-harbor-tb2", ExperimentID: "exp_1", Status: "done"})
+	rep, err := Build(context.Background(), src, ev, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := rep.Benchmarks[0].Arms["A"]
+	if a.CostUSD != nil || a.CostRuns != 1 || a.Runs != 3 || a.CostNote != "1 of 1 cost rows unpriced" {
+		t.Fatalf("A cost = %v runs %d/%d note %q, want not known, 1 of 3 priced", a.CostUSD, a.CostRuns, a.Runs, a.CostNote)
+	}
+	if deref(a.Tokens) != 50 || a.TokenRuns != 3 {
+		t.Fatalf("A tokens = %v (%d runs)", a.Tokens, a.TokenRuns)
+	}
+	if b := rep.Benchmarks[0].Arms["B"]; deref(b.CostUSD) != 0.5 || b.CostNote != "" {
+		t.Fatalf("B cost = %v note %q", b.CostUSD, b.CostNote)
+	}
+	c := rep.Capabilities[0].Arms["A"]
+	if c.CostUSD != nil || c.CostRuns != 1 || c.CostNote == "" {
+		t.Fatalf("capability cost = %v runs %d note %q", c.CostUSD, c.CostRuns, c.CostNote)
+	}
+	raw, _ := json.Marshal(a)
+	var back map[string]any
+	_ = json.Unmarshal(raw, &back)
+	if v, ok := back["cost_usd"]; !ok || v != nil {
+		t.Fatalf("cost_usd JSON = %v, want null", v)
 	}
 }
