@@ -11,32 +11,32 @@
 		"openLog": "Show log",
 		"check": {
 			"title": "Re-check verdict",
-			"description": "Analyze the sealed runs again and save a new verdict, with the release policy the experiment froze.",
+			"description": "Re-analyze sealed runs and save a fresh verdict.",
 			"button": "Run check"
 		},
 		"codescan": {
 			"title": "Code scan",
-			"description": "Security findings on the lines each run's agent added, with the experiment's veto level.",
+			"description": "Security findings in the code each agent added.",
 			"button": "Scan code"
 		},
 		"awareness": {
 			"title": "Eval awareness",
-			"description": "Heuristic scan of the agents' own words for remarks that they are being tested. Report only, never a gate.",
+			"description": "Spot agents remarking that they are being tested.",
 			"button": "Scan for awareness"
 		},
 		"blame": {
 			"title": "Blame",
-			"description": "Which agent of each multi-agent run caused its failure (tier 1, from the sealed gates). Tier 2 replay is below.",
+			"description": "Find which agent caused each multi-agent failure.",
 			"button": "Compute blame"
 		},
 		"clusters": {
 			"title": "Failure clusters",
-			"description": "Refresh the run index and group failed runs across experiments by cause.",
+			"description": "Group failed runs across experiments by cause.",
 			"button": "Rebuild clusters"
 		},
 		"index": {
 			"title": "Results index",
-			"description": "Rebuild the derived index behind trends, search and the leaderboard. Verdicts never read it.",
+			"description": "Rebuild the index behind trends, search and leaderboard.",
 			"button": "Rebuild index"
 		}
 	},
@@ -68,7 +68,7 @@
 	},
 	"audit": {
 		"title": "Audit a published table",
-		"description": "Upload a per-task CSV with columns task,a_pass,a_n,b_pass,b_n (for example a paper's results) to get the same paired verdict.",
+		"description": "Paste a per-task CSV (task,a_pass,a_n,b_pass,b_n) for a paired verdict.",
 		"file": "CSV file",
 		"paste": "Or paste the table",
 		"placeholder": "task,a_pass,a_n,b_pass,b_n\nt01,1,3,2,3",

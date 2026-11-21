@@ -1,35 +1,34 @@
+import { ActionCard } from "@/components/experiments/compareActionCard";
 import { CompareRefsForm } from "@/components/experiments/compareRefsForm";
 import { MigrateForm } from "@/components/experiments/migrateForm";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { GitBranch, GitCompareArrows } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 /**
  * The compare page without a pair: start a new agent x models comparison (web parity L14), or
- * compare one agent at two git refs (gap lane G07).
+ * compare one agent at two git refs (gap lane G07). Each is a compact card; its form opens on demand.
  */
 export function CompareLaunch() {
-	const { t } = useTranslation("experimentActions");
-	const { t: tRefs } = useTranslation("refCompare");
-	return (
-		<div className="flex flex-col gap-4">
-			<Card className="shadow-none" data-testid="compare-launch">
-				<CardHeader>
-					<CardTitle>{t("launch.title")}</CardTitle>
-					<CardDescription>{t("launch.description")}</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<MigrateForm testId="compare-launch-form" />
-				</CardContent>
-			</Card>
-			<Card className="shadow-none" data-testid="compare-launch-refs">
-				<CardHeader>
-					<CardTitle>{tRefs("compare.title")}</CardTitle>
-					<CardDescription>{tRefs("compare.description")}</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<CompareRefsForm testId="compare-launch-refs-form" />
-				</CardContent>
-			</Card>
-		</div>
-	);
+  const { t } = useTranslation("experimentActions");
+  const { t: tRefs } = useTranslation("refCompare");
+  return (
+    <div className="grid items-start gap-3 lg:grid-cols-2">
+      <ActionCard
+        icon={GitCompareArrows}
+        title={t("launch.title")}
+        description={t("launch.description")}
+        testId="compare-launch"
+      >
+        <MigrateForm testId="compare-launch-form" />
+      </ActionCard>
+      <ActionCard
+        icon={GitBranch}
+        title={tRefs("compare.title")}
+        description={tRefs("compare.description")}
+        testId="compare-launch-refs"
+      >
+        <CompareRefsForm testId="compare-launch-refs-form" />
+      </ActionCard>
+    </div>
+  );
 }
