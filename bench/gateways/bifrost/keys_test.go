@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 )
@@ -177,5 +178,61 @@ func TestMintKeyByProvider(t *testing.T) {
 	gm.Agent.Gateway.Provider = "gemini"
 	if _, err := g.MintKey(ctx, gm); err == nil || !strings.Contains(err.Error(), "not the gateway provider") {
 		t.Errorf("unconfigured provider: %v", err)
+	}
+}
+
+// TestRevokeKeyHoldKeepsSlotUntilRelease: a key revoked with RevokeKeyHold
+// leaves its slot reserved until release, so no other run can mint on it
+// while the run's cleanup still has to clear the slot's fault plan (live
+// lane l1: freed at revocation, another bench process claimed the slot and
+// the plan clear was refused with 409, sealing a finished run infra_error).
+func TestRevokeKeyHoldKeepsSlotUntilRelease(t *testing.T) {
+	f := newFakeBifrost(t)
+	g := newTestGateway(t, f)
+	ctx := context.Background()
+	if err := g.Setup(ctx); err != nil {
+		t.Fatalf("Setup: %v", err)
+	}
+	k1, err := g.MintKey(ctx, runContext("r_run00001", testModel))
+	if err != nil {
+		t.Fatalf("mint 1: %v", err)
+	}
+	if _, err := g.MintKey(ctx, runContext("r_run00002", testModel)); err != nil {
+		t.Fatalf("mint 2: %v", err)
+	}
+	release, err := g.RevokeKeyHold(ctx, k1)
+	if err != nil {
+		t.Fatalf("revoke hold: %v", err)
+	}
+	if _, ok := g.minted[k1.ID]; ok {
+		t.Error("held key still recorded as minted")
+	}
+	if g.inUse[k1.KeySlot] != reservedPrefix+k1.Name {
+		t.Fatalf("slot not held for the run: %v", g.inUse)
+	}
+	// A mint while the slot is held waits for it (like a team reservation)
+	// rather than taking it.
+	short, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
+	_, err = g.MintKey(short, runContext("r_run00003", testModel))
+	cancel()
+	if err == nil || !strings.Contains(err.Error(), "wait for") {
+		t.Fatalf("mint while the slot is held: err = %v", err)
+	}
+	release()
+	release() // safe twice
+	k3, err := g.MintKey(ctx, runContext("r_run00003", testModel))
+	if err != nil {
+		t.Fatalf("mint after release: %v", err)
+	}
+	if k3.KeySlot != k1.KeySlot {
+		t.Errorf("released slot not reused: %s", k3.KeySlot)
+	}
+	// A release of the old run never frees the slot the new run holds.
+	release()
+	if g.inUse[k3.KeySlot] != k3.ID {
+		t.Errorf("late release freed the new run's slot: %v", g.inUse)
+	}
+	if rel, err := g.RevokeKeyHold(ctx, nil); err != nil || rel == nil {
+		t.Errorf("revoke hold nil: %v", err)
 	}
 }

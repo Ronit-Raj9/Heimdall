@@ -575,7 +575,21 @@ func (p *Pipeline) cleanup(ctx context.Context, st *runState) error {
 	errs = append(errs, p.cleanupA2A(ctx, st)) // B1: the run's agent gateway registrations (a2a.go)
 	revoked := true
 	if st.rc.Key != nil && p.reg.Gateway != nil {
-		if err := p.reg.Gateway.RevokeKey(ctx, st.rc.Key); err != nil {
+		// Live lane l1: the key slot stays reserved until its plan is
+		// cleared below. Freed at revocation, another run (of this process
+		// or another bench process) could take the slot and bind its plan
+		// first; the clear then wiped that run's plan, or was refused with
+		// 409 and sealed this finished run infra_error.
+		var err error
+		if h, ok := p.reg.Gateway.(schemas.KeySlotHolder); ok {
+			var release func()
+			if release, err = h.RevokeKeyHold(ctx, st.rc.Key); err == nil {
+				defer release()
+			}
+		} else {
+			err = p.reg.Gateway.RevokeKey(ctx, st.rc.Key)
+		}
+		if err != nil {
 			revoked = false
 			errs = append(errs, wrapPart("gateway", p.reg.Gateway, fmt.Errorf("revoke key: %w", err)))
 		}

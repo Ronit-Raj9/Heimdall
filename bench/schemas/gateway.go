@@ -25,6 +25,16 @@ type Gateway interface {
 	FetchRequests(ctx context.Context, key *RunKey, expect FetchExpectation) (*RequestLog, error)
 }
 
+// KeySlotHolder is a Gateway that can revoke a run key while keeping the
+// key's slot reserved, in this process and at the fault proxy, until release
+// is called. The run's cleanup clears the slot's fault plan in between, so no
+// other run can take the slot and bind its own plan before the clear (which
+// would wipe that run's plan, or be refused and fail a finished run). release
+// is never nil when err is nil and is safe to call more than once.
+type KeySlotHolder interface {
+	RevokeKeyHold(ctx context.Context, key *RunKey) (release func(), err error)
+}
+
 // FetchExpectation tells FetchRequests what a complete set looks like.
 type FetchExpectation struct {
 	LedgerEntries []LedgerEntry // every row must match exactly one entry and vice versa

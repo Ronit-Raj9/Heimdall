@@ -346,6 +346,55 @@ func TestRunSlotFaultPlan(t *testing.T) {
 	}
 }
 
+// holdGateway is a fakeGateway that implements schemas.KeySlotHolder.
+type holdGateway struct{ *fakeGateway }
+
+func (g holdGateway) RevokeKeyHold(context.Context, *schemas.RunKey) (func(), error) {
+	if err := g.w.hit("revoke_hold"); err != nil {
+		return nil, err
+	}
+	return func() { _ = g.w.hit("slot_release") }, nil
+}
+
+// TestCleanupHoldsSlotUntilPlanCleared: with a gateway that can hold the key
+// slot, cleanup revokes the key, clears the slot's plan, and only then frees
+// the slot (live lane l1: freed at revocation, another bench process claimed
+// the slot before the clear, which was refused with 409 and sealed a
+// finished run infra_error; in one process the clear would wipe the next
+// run's plan).
+func TestCleanupHoldsSlotUntilPlanCleared(t *testing.T) {
+	b, m, slot := pipelineFixture(t, "clean")
+	b.reg.Gateway = holdGateway{b.gw}
+	res, err := runOne(context.Background(), t, b, m, slot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, op := range b.w.seq {
+		if op == "mint" || op == "revoke" || op == "revoke_hold" || op == "slot_release" || strings.HasPrefix(op, "fault_") {
+			got = append(got, op)
+		}
+	}
+	if want := "mint fault_set revoke_hold fault_clear slot_release"; strings.Join(got, " ") != want {
+		t.Fatalf("calls %v, want %s", got, want)
+	}
+	if res.Run.Outcome != schemas.OutcomePass {
+		t.Fatalf("outcome %s", res.Run.Outcome)
+	}
+	// A failed hold revocation frees nothing it did not hold and keeps a
+	// no-paid run's scripted plan bound, as with RevokeKey.
+	b2, m2, slot2 := pipelineFixture(t, "clean")
+	b2.reg.Gateway = holdGateway{b2.gw}
+	m2.Experiment.ScriptedUpstream = true
+	b2.w.fail["revoke_hold"] = true
+	if _, err := runOne(context.Background(), t, b2, m2, slot2); err != nil {
+		t.Fatal(err)
+	}
+	if b2.w.count("fault_clear") != 0 || b2.w.count("slot_release") != 0 {
+		t.Fatalf("fault_clear %d, slot_release %d after a failed hold revocation", b2.w.count("fault_clear"), b2.w.count("slot_release"))
+	}
+}
+
 // QC2-13-06: a no-paid run whose key revocation fails keeps its scripted
 // plan bound; clearing it would let the still-live key reach the upstream.
 func TestNoPaidKeepsPlanWhenRevokeFails(t *testing.T) {

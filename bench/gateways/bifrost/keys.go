@@ -99,6 +99,27 @@ func (g *Gateway) MintKey(ctx context.Context, rc *schemas.RunContext) (*schemas
 // revoked. The slot is released only when this process minted the key, so a
 // stale RunKey can never free a slot another run holds.
 func (g *Gateway) RevokeKey(ctx context.Context, key *schemas.RunKey) error {
+	return g.revokeKey(ctx, key, false)
+}
+
+// RevokeKeyHold implements schemas.KeySlotHolder: RevokeKey, except that the
+// key's slot stays reserved for the run (reservedPrefix + run name, claim at
+// the fault proxy kept and renewed) until release, so the caller can clear
+// the slot's fault plan first. release frees it like any unused reservation.
+func (g *Gateway) RevokeKeyHold(ctx context.Context, key *schemas.RunKey) (func(), error) {
+	if key == nil || key.ID == "" {
+		return func() {}, nil
+	}
+	name := key.Name
+	release := func() { g.releaseReserved(name) }
+	if err := g.revokeKey(ctx, key, true); err != nil {
+		release()
+		return nil, err
+	}
+	return release, nil
+}
+
+func (g *Gateway) revokeKey(ctx context.Context, key *schemas.RunKey, hold bool) error {
 	if key == nil || key.ID == "" {
 		return nil
 	}
@@ -122,7 +143,11 @@ func (g *Gateway) RevokeKey(ctx context.Context, key *schemas.RunKey) error {
 	if keyErr != nil {
 		errs = append(errs, fmt.Errorf("revoke virtual key %s (%s): %w", key.ID, key.Name, keyErr))
 	} else {
-		g.forget(key.ID)
+		if hold {
+			g.forgetHold(key.ID, key.Name)
+		} else {
+			g.forget(key.ID)
+		}
 		g.logger.Info("virtual key revoked", "virtual_key_id", key.ID, "name", key.Name, "key_slot", key.KeySlot)
 	}
 	if teamID != "" && membersErr == nil && keyErr == nil { // a team goes once the keys in it are gone
@@ -299,6 +324,22 @@ func (g *Gateway) forget(vkID string) {
 	}
 	g.mu.Unlock()
 	g.releaseClaims(drop)
+}
+
+// forgetHold drops a minted key like forget but keeps its slot reserved
+// for runName (and the slot's claim at the fault proxy) until
+// releaseReserved(runName). A reserved holder is never fenced as a live key.
+func (g *Gateway) forgetHold(vkID, runName string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	rec, ok := g.minted[vkID]
+	if !ok {
+		return
+	}
+	delete(g.minted, vkID)
+	if g.inUse[rec.slot] == vkID {
+		g.inUse[rec.slot] = reservedPrefix + runName
+	}
 }
 
 // createVirtualKey makes sure the slot's provider key serves model, then
