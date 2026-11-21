@@ -135,6 +135,55 @@ func TestSchedulerSpendCap(t *testing.T) {
 	}
 }
 
+// TestSchedulerResumeRaisedCap: an experiment the spend cap stopped resumes
+// under a higher cap given at resume time (RunOptions.TotalUSD, the CLI's
+// run -resume -total-usd) and runs only what the new cap admits; the frozen
+// manifest and its hash are untouched (live lane l1 test 10: before, resume
+// re-applied the frozen cap and ran nothing, with no way to continue).
+func TestSchedulerResumeRaisedCap(t *testing.T) {
+	b := newBench(t)
+	b.w.cost = 0.6
+	e := testExperiment()
+	e.Budget.TotalUSD = 1.0
+	m := b.plan(t, e)
+	hash := m.Hash
+	ctx := context.Background()
+	sum, err := NewScheduler(b.reg, b.root, nil, nil).Run(ctx, m, RunOptions{Concurrency: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.Sealed != 2 || !sum.BudgetStopped {
+		t.Fatalf("first run %+v", sum)
+	}
+	events := make(chan Event, 256)
+	raised, err := NewScheduler(b.reg, b.root, nil, nil).Run(ctx, m, RunOptions{Resume: true, Concurrency: 1, TotalUSD: 1.5, Events: events})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if raised.Skipped != 2 || raised.Sealed != 1 || raised.Pending != 1 || !raised.BudgetStopped || b.w.count("exec") != 3 {
+		t.Fatalf("raised cap 1.5 should admit exactly one more run: %+v, exec %d", raised, b.w.count("exec"))
+	}
+	var stopMsg string
+	for len(events) > 0 {
+		if ev := <-events; ev.Kind == EventBudgetStop {
+			stopMsg = ev.Message
+		}
+	}
+	if !strings.Contains(stopMsg, "spend cap 1.50 USD") || !strings.Contains(stopMsg, "-total-usd") {
+		t.Fatalf("budget_stop event should name the raised cap and how to raise it: %q", stopMsg)
+	}
+	done, err := NewScheduler(b.reg, b.root, nil, nil).Run(ctx, m, RunOptions{Resume: true, Concurrency: 1, TotalUSD: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if done.Sealed != 1 || done.Skipped != 3 || done.BudgetStopped || b.w.count("exec") != 4 {
+		t.Fatalf("cap 10 should finish the last slot: %+v", done)
+	}
+	if m.Hash != hash || m.Experiment.Budget.TotalUSD != 1.0 {
+		t.Fatalf("manifest changed: hash %s (was %s), total_usd %v", m.Hash, hash, m.Experiment.Budget.TotalUSD)
+	}
+}
+
 func TestSchedulerRetries(t *testing.T) {
 	b := newBench(t)
 	b.w.fail["create"] = true

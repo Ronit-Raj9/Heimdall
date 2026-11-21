@@ -67,6 +67,11 @@ type RunOptions struct {
 	// sets it, since strangers' agents never run on the hosted server. It
 	// needs Remote. (Runners area, docs/runners.md)
 	RemoteOnly bool
+	// TotalUSD, when > 0, replaces the frozen budget.total_usd for this
+	// scheduler call only: `run -resume <id> -total-usd <usd>` continues an
+	// experiment the spend cap stopped. The manifest and its hash stay as
+	// frozen; the CLI records the new cap in the experiment's resumes.jsonl.
+	TotalUSD float64
 }
 
 // Spend bases of Summary.SpendBasis.
@@ -249,10 +254,10 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 	r.mu.Unlock()
 	r.adaptiveSummary(&out) // W7
 	if stopped {
-		r.s.logger.Warn("spend cap stopped leasing", "experiment", m.ExpID, "cap_usd", m.Experiment.Budget.TotalUSD,
+		r.s.logger.Warn("spend cap stopped leasing", "experiment", m.ExpID, "cap_usd", r.capUSD(),
 			"spent_usd", out.SpentUSD, "pending", out.Pending, "unknown_cost_runs", out.UnknownCostRuns)
-		r.emit(Event{Kind: EventBudgetStop, Message: fmt.Sprintf("spend cap %.2f USD reached at %.4f USD; %d slots not leased; %d runs had an unknown cost, counted at the per-run estimate",
-			m.Experiment.Budget.TotalUSD, out.SpentUSD, out.Pending, out.UnknownCostRuns)})
+		r.emit(Event{Kind: EventBudgetStop, Message: fmt.Sprintf("spend cap %.2f USD reached at %.4f USD; %d slots not leased; %d runs had an unknown cost, counted at the per-run estimate; raise the cap with run -resume %s -total-usd <usd>",
+			r.capUSD(), out.SpentUSD, out.Pending, out.UnknownCostRuns, m.ExpID)})
 	}
 	r.emit(Event{Kind: EventDone, Message: fmt.Sprintf("sealed %d, skipped %d, pending %d", out.Sealed, out.Skipped, out.Pending)})
 	r.mu.Lock()
@@ -555,7 +560,7 @@ func (r *schedRun) releaseHold(h *budgetHold) {
 // retries never share one run's reservation and pass the cap together
 // (QC2-07-05). It reports false when the cap or ctx refuses a new one.
 func (r *schedRun) reserveAgain(ctx context.Context, h *budgetHold) bool {
-	if r.m.Experiment.Budget.TotalUSD <= 0 {
+	if r.capUSD() <= 0 {
 		return true
 	}
 	r.releaseHold(h)
@@ -692,12 +697,21 @@ func (r *schedRun) failAccounting(err error) {
 	}
 }
 
+// capUSD is the spend cap this scheduler call enforces: RunOptions.TotalUSD
+// when set, else the frozen budget.total_usd. 0 means no cap.
+func (r *schedRun) capUSD() float64 {
+	if r.opts.TotalUSD > 0 {
+		return r.opts.TotalUSD
+	}
+	return r.m.Experiment.Budget.TotalUSD
+}
+
 // checkCapLocked stops leasing as soon as recorded spend reaches the cap, so
 // queued slots no worker can take (a GPU slot with no GPU worker) are
 // counted pending and never keep Run waiting (QC2-07-04). The caller holds
 // mu.
 func (r *schedRun) checkCapLocked() {
-	if limit := r.m.Experiment.Budget.TotalUSD; limit > 0 && !r.stopped && r.sum.SpentUSD >= limit {
+	if limit := r.capUSD(); limit > 0 && !r.stopped && r.sum.SpentUSD >= limit {
 		r.stopLocked()
 	}
 }
@@ -711,7 +725,7 @@ func (r *schedRun) checkCapLocked() {
 // cap is passed by at most the last admitted run's error against its
 // estimate.
 func (r *schedRun) reserve(ctx context.Context) (float64, bool) {
-	if r.m.Experiment.Budget.TotalUSD <= 0 {
+	if r.capUSD() <= 0 {
 		return 0, true
 	}
 	for {
@@ -735,7 +749,7 @@ func (r *schedRun) reserve(ctx context.Context) (float64, bool) {
 // where reserve would wait for an in-flight slot, it reports wait and the
 // request is answered with no work for now.
 func (r *schedRun) tryReserve() (est float64, ok, wait bool) {
-	if r.m.Experiment.Budget.TotalUSD <= 0 {
+	if r.capUSD() <= 0 {
 		return 0, true, false
 	}
 	r.mu.Lock()
@@ -747,7 +761,7 @@ func (r *schedRun) tryReserve() (est float64, ok, wait bool) {
 // cap stop for good; below it reserve when nothing is in flight or the spend
 // plus every in-flight reservation is below the cap; else report wait.
 func (r *schedRun) reserveLocked() (est float64, ok, wait bool) {
-	limit := r.m.Experiment.Budget.TotalUSD
+	limit := r.capUSD()
 	if !r.stopped && r.sum.SpentUSD >= limit {
 		r.stopLocked()
 	}
@@ -768,7 +782,7 @@ func (r *schedRun) reserveLocked() (est float64, ok, wait bool) {
 // is checked before every new attempt on a slot that already holds a
 // reservation, since that reservation was sized for one run, not a retry.
 func (r *schedRun) capReached() bool {
-	limit := r.m.Experiment.Budget.TotalUSD
+	limit := r.capUSD()
 	if limit <= 0 {
 		return false
 	}
@@ -820,7 +834,7 @@ func (r *schedRun) charge(cost *schemas.Value, est float64, why string) (float64
 // release returns a reservation once the slot's last attempt is recorded and
 // wakes every worker waiting in reserve.
 func (r *schedRun) release(est float64) {
-	if r.m.Experiment.Budget.TotalUSD <= 0 {
+	if r.capUSD() <= 0 {
 		return
 	}
 	r.mu.Lock()
@@ -846,7 +860,7 @@ func (r *schedRun) estimateLocked() float64 {
 	if (r.observed && r.maxCost > 0) || reserve > 0 {
 		return max(r.maxCost, reserve)
 	}
-	return max(r.m.Experiment.Budget.TotalUSD-r.sum.SpentUSD, 0)
+	return max(r.capUSD()-r.sum.SpentUSD, 0)
 }
 
 // observeLocked adds an observed run cost. The caller holds mu, or owns r
