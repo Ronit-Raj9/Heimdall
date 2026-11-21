@@ -38,6 +38,6 @@ examples/**/checks
 **/*_test.go
 
 # Docs and VCS.
-docs
+# docs/ holds the in-app guides embedded by docs/embed.go (served at /docs).
 .git
 **/.DS_Store
