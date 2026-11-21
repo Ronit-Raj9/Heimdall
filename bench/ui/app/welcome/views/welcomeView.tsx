@@ -118,6 +118,7 @@ export default function WelcomeView() {
 					</Button>
 				</div>
 				<Stepper current={step} onPick={go} done={{ suite: Boolean(suite), agent: Boolean(agent), model: Boolean(model?.model), run: Boolean(exp) }} />
+				<StepHelp current={step} />
 			</header>
 
 			<div key={step} className="animate-in fade-in slide-in-from-bottom-1 duration-200">
@@ -235,6 +236,7 @@ function Stepper({ current, onPick, done }: { current: WizardStep; onPick(s: Wiz
 								i > at && "text-muted-foreground border-dashed",
 							)}
 							data-testid={`welcome-stepper-${s}`}
+							title={t(`stepHelp.${s}`)}
 						>
 							{isDone && i !== at ? <Check className="size-3.5" aria-hidden="true" /> : <Icon className="size-3.5" aria-hidden="true" />}
 							<span>
@@ -246,6 +248,16 @@ function Stepper({ current, onPick, done }: { current: WizardStep; onPick(s: Wiz
 				);
 			})}
 		</ol>
+	);
+}
+
+/** One plain line under the stepper: what the current step is for. */
+function StepHelp({ current }: { current: WizardStep }) {
+	const { t } = useTranslation("welcome");
+	return (
+		<p className="text-muted-foreground text-sm" data-testid="welcome-step-help">
+			{t(`stepHelp.${current}`)}
+		</p>
 	);
 }
 
@@ -592,6 +604,13 @@ function VerdictHero({ decision, naive, children }: { decision: Decision; naive:
 					<ArmBars naive={naive} winner={winner} />
 				</div>
 			</div>
+			<details className="group rounded-xl border" data-testid="welcome-verdict-meaning">
+				<summary className="hover:bg-accent/40 flex cursor-pointer list-none items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium">
+					{t("verdict.meaningTitle")}
+					<ChevronDown className="text-muted-foreground ml-auto size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+				</summary>
+				<p className="text-muted-foreground border-t p-4 text-sm leading-relaxed">{t(`verdict.meaning.${decision}`)}</p>
+			</details>
 			<details className="group rounded-xl border">
 				<summary className="hover:bg-accent/40 flex cursor-pointer list-none items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium">
 					<BarChart3 className="text-muted-foreground size-4" aria-hidden="true" />

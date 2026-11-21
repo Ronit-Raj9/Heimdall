@@ -119,3 +119,24 @@ export function homeStats(
 		spendMonth,
 	};
 }
+
+/** Experiments Heimdall starts on its own to check a task or an agent ("admit-<suite>", "check-<agent>"). */
+export function isSystemCheck(exp: Pick<ExperimentStatus, "name" | "exp_id">): boolean {
+	return /^(admit|check)-/.test(exp.name ?? "") || /^e_(admit|check)_/.test(exp.exp_id);
+}
+
+/**
+ * A name a person can read: the experiment's own name with dashes and underscores as spaces,
+ * "Readiness check: <target>" for system checks, and never the raw id when a suite is known.
+ */
+export function humanExperimentName(
+	exp: Pick<ExperimentStatus, "name" | "exp_id" | "suite">,
+	labels: { check: string; untitled: string },
+): string {
+	const name = (exp.name ?? "").trim();
+	const system = /^(admit|check)-(.+)$/.exec(name);
+	if (system) return `${labels.check}: ${system[2]}`;
+	if (/^e_(admit|check)_/.test(exp.exp_id)) return labels.check;
+	if (name) return name.replace(/[-_]+/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+	return labels.untitled;
+}

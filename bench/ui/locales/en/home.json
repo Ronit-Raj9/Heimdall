@@ -5,55 +5,63 @@
 		"evening": "Good evening",
 		"named": "{{greeting}}, {{name}}"
 	},
-	"subtitle": "Your benchmarks at a glance.",
+	"subtitle": "Below: what is running now, what finished recently, and which benchmarks are ready to use.",
 	"cta": {
-		"run": "Run a benchmark",
-		"newExperiment": "New experiment"
+		"run": "Test an agent",
+		"newExperiment": "Compare two setups"
 	},
 	"kpi": {
-		"experiments": "Experiments",
+		"experiments": "Comparisons",
 		"experimentsHint_one": "{{count}} running",
 		"experimentsHint_other": "{{count}} running",
 		"runsWeek": "Runs this week",
-		"runsWeekHint": "Last 7 days",
-		"passRate": "Pass rate",
-		"passRateHint": "{{pass}} of {{total}} runs passed",
-		"passRateNone": "No graded runs yet",
-		"spend": "Spend this month",
+		"runsWeekHint": "Attempts in the last 7 days",
+		"passRate": "Tasks solved",
+		"passRateHint": "{{pass}} of {{total}} runs solved their task",
+		"passRateNone": "No scored runs yet",
+		"spend": "Spent this month",
 		"spendHint": "Since {{date}}"
 	},
 	"running": {
 		"title": "Running now",
 		"empty": "Nothing is running right now.",
-		"progress": "{{done}} of {{total}} runs",
+		"progress": "{{done}} of {{total}} runs done",
 		"watch": "Watch live",
-		"waiting": "Waiting for the first event",
-		"loadError": "Lost the live feed. Retrying.",
-		"spent": "{{amount}} spent"
+		"waiting": "Getting started, no updates yet",
+		"loadError": "Lost the live updates. Trying again.",
+		"spent": "{{amount}} spent",
+		"spentLabel": "spent so far",
+		"plain_one": "{{done}} of {{total}} run done",
+		"plain_other": "{{done}} of {{total}} runs done",
+		"plainSuite_one": "Testing on {{suite}} · {{done}} of {{total}} run done",
+		"plainSuite_other": "Testing on {{suite}} · {{done}} of {{total}} runs done",
+		"checkName": "Readiness check",
+		"untitled": "Untitled comparison"
 	},
 	"recent": {
-		"title": "Recent experiments",
-		"viewAll": "View all",
-		"empty": "No finished experiments yet.",
-		"pending": "No verdict",
-		"unavailable": "Unavailable",
+		"title": "Recent comparisons",
+		"viewAll": "See all",
+		"empty": "No finished comparisons yet.",
+		"pending": "No result yet",
+		"unavailable": "Result not available",
 		"notStarted": "Not started"
 	},
 	"suites": {
-		"title": "Suites",
-		"viewAll": "View all",
-		"empty": "No suites yet. Add one from the catalog.",
+		"title": "Benchmarks",
+		"viewAll": "See all",
+		"empty": "No benchmarks yet. Add one from the catalog.",
 		"browse": "Browse the catalog",
 		"tasks_one": "{{count}} task",
 		"tasks_other": "{{count}} tasks",
 		"ready": "Ready",
-		"attention": "Needs attention",
+		"attention": "Not ready yet",
 		"failed": "Failed to load"
 	},
 	"onboarding": {
-		"title": "Get your first verdict in five minutes",
-		"body": "Pick a suite, an agent and a model. We run a small benchmark and tell you what changed.",
-		"open": "Start the wizard",
-		"viewer": "No experiments yet. Ask a member to run the first benchmark."
-	}
+		"title": "Get your first result in about five minutes",
+		"body": "Pick a benchmark, an agent and an AI model. Heimdall runs a few tasks and tells you how the agent did.",
+		"open": "Start the guided setup",
+		"viewer": "Nothing has been tested yet. Ask a team member to run the first test."
+	},
+	"intro": "Heimdall tests AI agents on real tasks and tells you, with evidence, whether a new version is better."
 }

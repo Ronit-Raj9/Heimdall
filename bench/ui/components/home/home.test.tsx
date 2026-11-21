@@ -5,7 +5,7 @@ import { errorQuery, loadingQuery, okQuery, render, tagOf } from "@/lib/testing/
 import fs from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { byNewest, homeStats, mergeEvents, splitExperiments, suiteAdmission, suiteReady } from "./home.utils";
+import { byNewest, homeStats, humanExperimentName, isSystemCheck, mergeEvents, splitExperiments, suiteAdmission, suiteReady } from "./home.utils";
 import { RecentExperiments } from "./recentExperiments";
 import { RunningCardBody, RunningExperiments } from "./runningExperiments";
 import { SuitesPanel } from "./suitesPanel";
@@ -95,13 +95,13 @@ describe("RunningCardBody", () => {
 		expect(html).toContain('href="/experiments/e_synthetic-nightly"');
 		expect(tagOf(html, "home-running-watch-e_synthetic-nightly")).toContain('href="/experiments/e_synthetic-nightly"');
 		expect(html).toContain("animate-ping");
-		expect(html).toContain("Run sealed");
+		expect(html).toContain("Saved");
 		expect(html).toContain('href="/runs/r_synthetic-nightly-a-t2-1"');
 	});
 	it("waits for the first event, and says when it cannot follow", () => {
-		expect(render(<RunningCardBody status={events.status} events={[]} />)).toContain("Waiting for the first event");
+		expect(render(<RunningCardBody status={events.status} events={[]} />)).toContain("Getting started, no updates yet");
 		expect(render(<RunningCardBody status={events.status} events={[]} error={{ status: 500 }} />)).toContain(
-			"Lost the live feed. Retrying.",
+			"Lost the live updates. Trying again.",
 		);
 	});
 	it("says nothing is running when the list is empty", () => {
@@ -133,7 +133,7 @@ describe("RecentExperiments", () => {
 	it("says the verdict is unavailable when its request failed", () => {
 		api.verdict = errorQuery(500, "analysis failed");
 		const html = render(<RecentExperiments experiments={[experiments[0]]} />);
-		expect(html).toContain("Unavailable");
+		expect(html).toContain("Result not available");
 		expect(html).toContain('title="analysis failed"');
 	});
 	it("shows a placeholder while the verdict loads", () => {
@@ -143,14 +143,26 @@ describe("RecentExperiments", () => {
 });
 
 describe("SuitesPanel", () => {
-	it("shows suites as tiles with a Ready or Needs attention pill", () => {
+	it("shows suites as tiles with a Ready or Not ready yet pill", () => {
 		const html = render(<SuitesPanel suites={suites} limit={20} />);
 		expect(html).toContain('href="/suites/coding-core"');
 		expect(tagOf(html, "home-suite-coding-core")).toContain('data-ready="ready"');
 		expect(tagOf(html, "home-suite-acme-payments")).toContain('data-ready="attention"');
 		expect(tagOf(html, "home-suite-acme-broken")).toContain('data-ready="failed"');
 		expect(html).toContain("4 tasks");
-		expect(html).toContain("Needs attention");
+		expect(html).toContain("Not ready yet");
 		expect(html).not.toContain("admitted");
+	});
+});
+
+describe("humanExperimentName", () => {
+	const labels = { check: "Readiness check", untitled: "Untitled comparison" };
+	it("labels system checks and spaces out internal names", () => {
+		expect(isSystemCheck({ name: "admit-coding-core", exp_id: "e_x" })).toBe(true);
+		expect(isSystemCheck({ name: "nightly", exp_id: "e_admit_acme_5e8q" })).toBe(true);
+		expect(isSystemCheck({ name: "nightly", exp_id: "e_nightly" })).toBe(false);
+		expect(humanExperimentName({ name: "admit-coding-core", exp_id: "e_x" }, labels)).toBe("Readiness check: coding-core");
+		expect(humanExperimentName({ name: "codex-vs-claude_nightly", exp_id: "e_x" }, labels)).toBe("Codex vs claude nightly");
+		expect(humanExperimentName({ name: "", exp_id: "e_x" }, labels)).toBe("Untitled comparison");
 	});
 });

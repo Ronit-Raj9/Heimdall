@@ -1,5 +1,5 @@
 import { Pill, StatCard } from "@/components/home/homeBits";
-import { homeStats, monthStart, splitExperiments, type ExperimentListItem } from "@/components/home/home.utils";
+import { homeStats, isSystemCheck, monthStart, splitExperiments, type ExperimentListItem } from "@/components/home/home.utils";
 import { RecentExperiments } from "@/components/home/recentExperiments";
 import { RunningExperiments } from "@/components/home/runningExperiments";
 import { SuitesPanel } from "@/components/home/suitesPanel";
@@ -43,7 +43,10 @@ export default function HomeView() {
 	const runs = useListRunsQuery({ limit: RUNS_PAGE }, { pollingInterval: LIST_POLL_MS, skipPollingIfUnfocused: true });
 	const launch = launchAvailable(useGetHealthQuery().data);
 	const experiments = (list.data?.experiments ?? []) as ExperimentListItem[];
-	const { running, recent } = splitExperiments(experiments);
+	const split = splitExperiments(experiments);
+	// Readiness checks Heimdall starts on its own stay out of "Running now"; Recent labels them.
+	const running = split.running.filter((exp) => !isSystemCheck(exp));
+	const recent = split.recent;
 	const empty = list.isSuccess && experiments.length === 0;
 	const session = useSession();
 	const mayRun = canUse(session, "member");
@@ -69,6 +72,9 @@ export default function HomeView() {
 					<h1 className="text-foreground text-2xl font-semibold tracking-tight sm:text-3xl" data-testid="home-greeting">
 						{firstName ? t("greeting.named", { greeting, name: firstName }) : greeting}
 					</h1>
+					<p className="text-foreground/80 max-w-2xl text-sm" data-testid="home-intro">
+						{t("intro")}
+					</p>
 					<p className="text-muted-foreground text-sm">{t("subtitle")}</p>
 				</div>
 				{mayRun && (

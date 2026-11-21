@@ -1,31 +1,31 @@
 {
 	"title": "Welcome to Heimdall",
-	"subtitle": "Pick a suite, an agent and a model. Get a verdict in minutes.",
-	"skip": "Skip to Home",
+	"subtitle": "Heimdall tests an AI agent on real tasks and tells you how it did. Five short steps, a result in minutes.",
+	"skip": "Skip, go to Home",
 	"back": "Back",
 	"next": "Continue",
 	"startOver": "Start over",
 	"steps": {
-		"suite": "Suite",
-		"agent": "Agent",
-		"model": "Model",
-		"run": "Run",
-		"verdict": "Verdict"
+		"suite": "Pick what to test",
+		"agent": "Pick your agent",
+		"model": "Pick the AI model",
+		"run": "Start",
+		"verdict": "Result"
 	},
 	"suite": {
 		"heading": "What should the agent work on?",
-		"help": "Each suite is a set of tasks with automatic checks.",
+		"help": "Each benchmark is a set of tasks. Every task is checked automatically.",
 		"recommended": "Recommended",
 		"tasks_one": "{{count}} task",
 		"tasks_other": "{{count}} tasks",
-		"empty": "This organization has no suites yet. Add one from the catalog in one click.",
+		"empty": "There are no benchmarks yet. Add one from the catalog in one click.",
 		"browseCatalog": "Browse the catalog",
-		"import": "Import from a benchmark",
-		"loadError": "Could not load the suites."
+		"import": "Import from a public benchmark",
+		"loadError": "Could not load the benchmarks."
 	},
 	"agent": {
-		"heading": "Which agent should run?",
-		"help": "The starter agents work out of the box.",
+		"heading": "Which agent should try the tasks?",
+		"help": "The starter agents work right away, no setup needed.",
 		"defaultModel": "Default model: {{model}}",
 		"empty": "No agents yet. Create one from a template: Codex, Claude Code, mini-swe and more.",
 		"create": "Create agent from template",
@@ -33,63 +33,70 @@
 		"loadError": "Could not load the agents."
 	},
 	"model": {
-		"heading": "Which model should drive it?",
-		"help": "Pick a provider with a ready key, then a model.",
+		"heading": "Which AI model should the agent use?",
+		"help": "Pick a provider that has a working key, then pick a model.",
 		"addKey": "Add a model key",
 		"required": "Choose a model to continue."
 	},
 	"run": {
-		"heading": "Ready to run",
-		"help": "A small first run. Most finish in a few minutes.",
-		"suite": "Suite",
+		"heading": "Ready to start",
+		"help": "A small first test. Most finish in a few minutes.",
+		"suite": "Benchmark",
 		"agent": "Agent",
 		"model": "Model",
-		"size": "Run size",
+		"size": "How many tasks",
 		"tasks_one": "{{count}} task",
 		"tasks_other": "{{count}} tasks",
-		"trialNote": "1 trial per task",
-		"button": "Run benchmark",
+		"trialNote": "Each task is tried once",
+		"button": "Start the test",
 		"starting": "Starting...",
-		"noLauncher": "This server cannot start runs: no runner is online. Hosted runs use the shared pool; ask your server owner to enable it.",
-		"notFound": "This server does not offer one-click runs yet. Build the experiment step by step instead.",
-		"failed": "The run did not start: {{message}}",
-		"advanced": "Build the experiment step by step",
-		"readOnly": "Your role can look but not run. Ask an owner for member access."
+		"noLauncher": "This server cannot start tests right now: no worker machine is online. Ask the server owner to turn on the shared workers.",
+		"notFound": "This server cannot start a test in one click yet. Set it up step by step instead.",
+		"failed": "The test did not start: {{message}}",
+		"advanced": "Set it up step by step",
+		"readOnly": "Your role can view results but not start tests. Ask an owner for member access."
 	},
 	"verdict": {
-		"heading": "Your benchmark",
-		"waiting": "Running. You can leave this page: the run continues and Home shows its progress.",
-		"analyzing": "All runs sealed. Computing the verdict...",
-		"failed": "The experiment ended without a verdict. Open it to see which runs failed and why.",
-		"loadError": "Could not load the experiment.",
-		"passRate": "{{num}} of {{den}} runs passed",
+		"heading": "Your result",
+		"waiting": "Running. You can leave this page: the test keeps going and Home shows its progress.",
+		"analyzing": "All runs are saved. Working out the result...",
+		"failed": "The test stopped before it could give a result. Open it to see which runs failed and why.",
+		"loadError": "Could not load the test.",
+		"passRate": "{{num}} of {{den}} runs solved the task",
 		"headline": {
-			"improved": "Better than the baseline",
-			"regressed": "Worse than the baseline",
-			"inconclusive": "No clear difference yet",
-			"invalid": "The run had harness problems"
+			"improved": "B is better",
+			"regressed": "B is worse",
+			"inconclusive": "No clear winner yet",
+			"invalid": "Test was broken"
 		},
 		"explain": {
-			"improved": "The difference is larger than the noise. Safe to release.",
-			"regressed": "The difference is larger than the noise. Hold the release.",
-			"inconclusive": "Run more tasks or trials to tell the two apart.",
-			"invalid": "Fix the harness problems shown on the full results page, then run again."
+			"improved": "Setup B solved clearly more tasks than setup A, more than chance would explain.",
+			"regressed": "Setup B solved clearly fewer tasks than setup A. Hold off on releasing it.",
+			"inconclusive": "Not enough evidence to tell the two apart. Run more tasks.",
+			"invalid": "Something went wrong while measuring, not the agent's fault. Fix it and run again."
 		},
-		"open": "Open full results",
-		"compare": "Compare another model",
-		"release": "Release",
-		"done": "Go to Home"
+		"open": "See full results",
+		"compare": "Try another model",
+		"release": "Record a release",
+		"done": "Go to Home",
+		"meaningTitle": "What does this mean?",
+		"meaning": {
+			"improved": "Heimdall ran the same tasks with setup A (the baseline) and setup B (the candidate). B solved more of them, and the gap is bigger than the random ups and downs you would see if you ran the same setup twice. That makes it safe to say B is the better version.",
+			"regressed": "Heimdall ran the same tasks with setup A (the baseline) and setup B (the candidate). B solved fewer of them, and the gap is bigger than random ups and downs. Releasing B would likely make things worse.",
+			"inconclusive": "Heimdall ran the same tasks with setup A (the baseline) and setup B (the candidate). Any difference is small enough that it could just be luck. This does not mean they are equal: it means a few tasks are not enough to tell. Run more tasks or more tries per task.",
+			"invalid": "Some runs broke for reasons that have nothing to do with the agent, for example the workspace failed to start or the grader gave an unreliable answer. Heimdall refuses to give a result from broken measurements. The full results page shows which runs broke and why."
+		}
 	},
 	"home": {
-		"welcomeTitle": "New here? Get a verdict in five minutes.",
-		"welcomeBody": "The setup wizard walks you through suite, agent and model, then runs a small benchmark.",
-		"welcomeOpen": "Start the wizard",
+		"welcomeTitle": "New here? Get a result in about five minutes.",
+		"welcomeBody": "The guided setup walks you through benchmark, agent and model, then runs a small test.",
+		"welcomeOpen": "Start the guided setup",
 		"suitesCatalog": "Browse the catalog",
-		"recentRun": "Run your first benchmark"
+		"recentRun": "Run your first test"
 	},
 	"guest": {
-		"cta": "Sign in with GitHub to run your own benchmark",
-		"ctaPlain": "Sign in to run your own benchmark"
+		"cta": "Sign in with GitHub to run your own test",
+		"ctaPlain": "Sign in to run your own test"
 	},
 	"docs": {
 		"title": "Docs",
@@ -102,5 +109,12 @@
 		"docError": "Could not load this guide.",
 		"start": "Start here",
 		"onThisPage": "On this page"
+	},
+	"stepHelp": {
+		"suite": "Choose a benchmark: a set of tasks with automatic checks.",
+		"agent": "Choose the agent program that will try the tasks.",
+		"model": "Choose the AI model the agent thinks with.",
+		"run": "Check your choices and start the test.",
+		"verdict": "See how many tasks were solved and what it means."
 	}
 }
