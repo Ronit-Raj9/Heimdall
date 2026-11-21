@@ -24,6 +24,7 @@ import { BookOpen, Server, ServerCog } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsSection, TableFrame, When } from "./settingsBits";
+import { WorkerPlatformsSection } from "./workerPlatformsSection";
 
 /** Where the start command reads the token from: its -token-file, or the default path. */
 export function tokenFileOf(command: string): string {
@@ -134,6 +135,7 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 						</p>
 					))}
 			</SettingsSection>
+			<WorkerPlatformsSection />
 			<SettingsSection title={tu("settings.startCommand")} description={tu("settings.startCommandHint")} testId="runner-start">
 				<CopyBlock
 					value={runnerStartCommand(typeof window === "undefined" ? "" : window.location.origin, list[0]?.pool ?? "default")}
