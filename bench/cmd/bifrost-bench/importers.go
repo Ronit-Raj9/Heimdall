@@ -14,5 +14,6 @@ import (
 	_ "github.com/maximhq/bifrost/bench/importers/mcpmark"
 	_ "github.com/maximhq/bifrost/bench/importers/swebench"
 	_ "github.com/maximhq/bifrost/bench/importers/tau2"
+	_ "github.com/maximhq/bifrost/bench/importers/toolbenchx" // L10: ToolBench-X
 	_ "github.com/maximhq/bifrost/bench/importers/voicebench" // B5: VoiceBench spoken questions
 )

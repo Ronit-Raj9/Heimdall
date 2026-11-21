@@ -1,0 +1,4 @@
+{"tasks": [
+ {"id": "task_1", "user_prompt": "For unit U-7, return the stock count.", "tools_used": ["get_unit", "count_stock"], "final_answer": "42"},
+ {"id": "task_2", "user_prompt": "For unit U-8, return the owner.", "tools_used": ["get_unit"], "final_answer": "Ada"}
+]}
