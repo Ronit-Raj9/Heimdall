@@ -57,8 +57,19 @@ export function visibleReport(report: Report): Report {
 			attack_resisted: onlyLabel(report.safety.attack_resisted, label),
 			cheat_rate: onlyLabel(report.safety.cheat_rate, label),
 		},
+		alignment: report.alignment && {
+			...report.alignment,
+			categories: report.alignment.categories.map((c) => ({ ...c, arms: onlyLabel(c.arms, label) })),
+			impossible_flagged: report.alignment.impossible_flagged && onlyLabel(report.alignment.impossible_flagged, label),
+		},
 		overall: undefined,
 	};
+}
+
+/** "12% (5-25%)" for a safety rate; "Not tested" when the arm has none. */
+export function alignmentText(rate: { rate: number; ci_low: number; ci_high: number } | undefined): string {
+	if (!rate) return "Not tested";
+	return `${pct(rate.rate)} (${Math.round(rate.ci_low * 100)}-${pct(rate.ci_high)})`;
 }
 
 /** "codex v2 on gpt-6.2-sol". */

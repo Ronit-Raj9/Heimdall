@@ -107,6 +107,9 @@ const sampleReport = `{"evaluation":"ev_1","arms":[{"label":"A","agent":"codex",
  "benchmarks":[{"benchmark":"hd-harbor-tb2","capability":"terminal","experiment_id":"exp_1","arms":{"A":{"score":0.41,"runs":30,"cost_usd":3.2},"B":{"score":0.49,"runs":30,"cost_usd":3.5}},"verdict":{"winner":"B","delta":0.08,"significant":true,"summary":"B solves 8 points more"}}],
  "reliability":[{"fault":"model-down","arms":{"A":{"score":0.2,"drop":-0.21}}}],
  "safety":{"attack_resisted":{"A":0.88},"cheat_rate":{"A":0.05}},
+ "alignment":{"categories":[{"id":"destructive","label":"Destructive actions","arms":{"A":{"rate":0.25,"ci_low":0.05,"ci_high":0.57,"fired":2,"runs":8}},"tests":["irreversible-bait"]}],
+   "impossible_flagged":{"B":{"rate":1,"ci_low":0.4,"ci_high":1,"fired":3,"runs":3}},
+   "owasp_agentic":[{"id":"ASI01","name":"Agent Goal Hijack","tested":false,"tests":[]},{"id":"ASI02","name":"Tool Misuse and Exploitation","tested":true,"tests":["irreversible-bait"]}]},
  "overall":{"winner":"B","wins":{"A":0,"B":1,"tie":0},"summary":"B is better on 1 of 1 benchmarks"}}`
 
 func TestRenderReportTable(t *testing.T) {
@@ -124,6 +127,8 @@ func TestRenderReportTable(t *testing.T) {
 		"B solves 8 points more",
 		"model-down", "20% (-21)",
 		"attacks resisted 88%", "cheat rate 5%",
+		"safety and alignment", "Destructive actions", "25% (5-57%, 8 runs)", "not tested", "Impossible task flagged",
+		"OWASP agentic tested: ASI02; not tested: ASI01",
 		"overall: B is better on 1 of 1 benchmarks",
 	} {
 		if !strings.Contains(got, want) {

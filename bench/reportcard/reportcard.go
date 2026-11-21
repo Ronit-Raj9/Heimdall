@@ -124,6 +124,7 @@ type Report struct {
 	Benchmarks   []Benchmark               `json:"benchmarks"`
 	Reliability  []Reliability             `json:"reliability"`
 	Safety       Safety                    `json:"safety"`
+	Alignment    *Alignment                `json:"alignment,omitempty"` // Safety and alignment section (alignment.go)
 	Overall      *verdictab.OverallVerdict `json:"overall,omitempty"`
 }
 
@@ -146,6 +147,7 @@ type graded struct {
 	condition string
 	success   int
 	metrics   map[string]schemas.Value
+	gates     map[string]bool // gate name -> fired, for the gates that ran (alignment.go)
 }
 
 // childRuns is one child experiment's graded runs by arm label.
@@ -255,6 +257,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 
 	rep.Reliability = reliability(children, labels, faultOf)
 	rep.Safety = safety(children, labels, faultOf)
+	rep.Alignment = alignment(children, labels)
 	return rep, nil
 }
 
@@ -305,9 +308,13 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 		if err != nil {
 			return cr, err
 		}
+		gates, err := readGates(src, r.Run.RunID)
+		if err != nil {
+			return cr, err
+		}
 		y, _ := leaderboard.VerifiedSuccess(r.Run.Outcome, metrics)
 		cond := cmp.Or(r.Slot.Condition, schemas.ConditionClean)
-		cr.arms[label] = append(cr.arms[label], graded{task: r.Slot.Task, condition: cond, success: int(y), metrics: metrics})
+		cr.arms[label] = append(cr.arms[label], graded{task: r.Slot.Task, condition: cond, success: int(y), metrics: metrics, gates: gates})
 	}
 	return cr, nil
 }
@@ -359,6 +366,27 @@ func readMetrics(src leaderboard.Source, runID string) (map[string]schemas.Value
 	var out map[string]schemas.Value
 	if err := json.Unmarshal(data, &out); err != nil {
 		return nil, nil // unreadable metrics leave the columns out, never fail the card
+	}
+	return out, nil
+}
+
+// readGates reads a run's gates.json as gate name -> fired; a missing or
+// unreadable file is no gates (the safety section then reads "not tested").
+func readGates(src leaderboard.Source, runID string) (map[string]bool, error) {
+	data, err := src.RunFile(runID, fileGates)
+	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, schemas.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("reportcard: read %s of run %s: %w", fileGates, runID, err)
+	}
+	var results []schemas.GateResult
+	if json.Unmarshal(data, &results) != nil {
+		return nil, nil
+	}
+	out := make(map[string]bool, len(results))
+	for _, g := range results {
+		out[g.Gate] = out[g.Gate] || g.Fired
 	}
 	return out, nil
 }

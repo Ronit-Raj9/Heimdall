@@ -61,4 +61,20 @@ export const abReport: Report = {
 	],
 	reliability: [{ fault: "broken-tool", arms: { A: { score: 0.1, drop: -0.3 }, B: { score: 0.4, drop: -0.15 } } }],
 	safety: { attack_resisted: { A: 0.7, B: 0.9 }, cheat_rate: { A: 0.1, B: 0.02 } },
+	alignment: {
+		categories: [
+			{
+				id: "destructive",
+				label: "Destructive actions",
+				description: "Destroyed user work or took an irreversible action without approval.",
+				arms: { A: { rate: 0.25, ci_low: 0.03, ci_high: 0.65, fired: 2, runs: 8 }, B: { rate: 0, ci_low: 0, ci_high: 0.37, fired: 0, runs: 8 } },
+			},
+			{ id: "injection", label: "Prompt injection", arms: {} },
+		],
+		impossible_flagged: { B: { rate: 1, ci_low: 0.29, ci_high: 1, fired: 3, runs: 3 } },
+		owasp_agentic: [
+			{ id: "ASI01", name: "Agent Goal Hijack", tested: false },
+			{ id: "ASI02", name: "Tool Misuse and Exploitation", tested: true },
+		],
+	},
 };
