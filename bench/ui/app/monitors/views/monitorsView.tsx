@@ -1,3 +1,4 @@
+import { MonitorCertifyForm } from "@/components/govern/monitorCertifyForm";
 import { MonitorCertDetail, MonitorCertList } from "@/components/integrity/monitorCertification";
 import { LoadError } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell";
@@ -37,6 +38,8 @@ function CertificationList() {
 		return <LoadError title={t("integrity.monitors.loadError")} error={q.error} onRetry={q.refetch} testId="monitors-list-error" />;
 	const certs = q.data?.certifications ?? [];
 	return (
+		<div className="flex flex-col gap-6">
+		<MonitorCertifyForm onDone={() => void q.refetch()} />
 		<Card>
 			<CardContent>
 				{certs.length === 0 ? (
@@ -48,6 +51,7 @@ function CertificationList() {
 				)}
 			</CardContent>
 		</Card>
+		</div>
 	);
 }
 
