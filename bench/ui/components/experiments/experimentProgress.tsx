@@ -1,22 +1,15 @@
+import { EventTicker, ExperimentStatePill, LiveStat, SlotBar, SlotRow, Spend } from "@/components/live/liveParts";
+import { formatElapsed } from "@/components/live/liveExperiment.reducer";
 import { ExperimentRunActions } from "@/components/platform/experimentActions";
-import { ValueCell } from "@/components/valueCell";
 import { formatValueNumber } from "@/components/valueCell.utils";
 import { Button } from "@/components/ui/button";
+import { useLiveExperiment } from "@/lib/hooks/useLiveExperiment";
 import { getLocale } from "@/lib/i18n";
 import type { ExperimentStatus } from "@/lib/types/bench";
-import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { useTranslation } from "react-i18next";
 import { TERMINAL_STATES } from "./experiments.utils";
-
-const STATE_CLASS: Record<ExperimentStatus["state"], string> = {
-	created: "border-border text-muted-foreground",
-	running: "border-chart-info/60 bg-chart-info/10 text-chart-info-ink",
-	analyzing: "border-chart-info/60 bg-chart-info/10 text-chart-info-ink",
-	done: "border-chart-success/60 bg-chart-success/10 text-chart-success-ink",
-	failed: "border-chart-error/60 bg-chart-error/10 text-chart-error-ink",
-	cancelled: "border-border text-muted-foreground",
-};
+import { ArrowRight, ChevronDown, CircleAlert, Clock, Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export interface ExperimentProgressCardProps {
 	status: ExperimentStatus;
@@ -25,68 +18,140 @@ export interface ExperimentProgressCardProps {
 	onNew?: () => void;
 }
 
-/** Live progress of one experiment: slots done, running and failed, spend, and the verdict link when done. */
-export function ExperimentProgressCard({ status, capUsd, onNew }: ExperimentProgressCardProps) {
-	const { t } = useTranslation("bench");
+/**
+ * Live progress of one experiment: overall bar, done / failed / spend, one row per active slot
+ * with its stage and elapsed time, and a ticker of the latest events. Follows the experiment's
+ * event stream itself; `status` seeds it and keeps it current when the page polls too.
+ */
+export function ExperimentProgressCard({ status: given, capUsd, onNew }: ExperimentProgressCardProps) {
+	const { t } = useTranslation("live");
+	const live = useLiveExperiment(given.exp_id, { initial: given });
+	// A terminal status from the page wins; otherwise the live poll is the newest.
+	const status = TERMINAL_STATES.has(given.state) ? given : (live.status ?? given);
 	const { total, done, running, failed } = status.slots;
-	const share = (n: number) => (total > 0 ? `${Math.min(100, (n / total) * 100)}%` : "0%");
-	const terminal = TERMINAL_STATES.has(status.state);
+	const finishedCount = done + failed;
+	const pct = total > 0 ? Math.round((finishedCount / total) * 100) : 0;
+	const detail = t("progress.slotsDetail", { done, running, failed, total });
 
 	return (
-		<div className="flex flex-col gap-3" data-testid="experiment-progress" data-state={status.state}>
-			<div className="flex flex-wrap items-center gap-2">
-				<h2 className="font-mono text-sm font-semibold">{t("experiments.new.progress.title", { id: status.exp_id })}</h2>
-				<span
-					className={cn("rounded-sm border px-1.5 py-0.5 text-xs font-medium", STATE_CLASS[status.state], !terminal && "animate-pulse")}
-					data-testid="experiment-progress-state"
-				>
-					{t(`experiments.new.progress.state.${status.state}`)}
-				</span>
-			</div>
-			{status.name && <p className="text-sm">{status.name}</p>}
-			<div
-				className="bg-chart-track flex h-2.5 w-full overflow-hidden rounded-full"
-				role="progressbar"
-				aria-valuemin={0}
-				aria-valuemax={total}
-				aria-valuenow={done + failed}
-				aria-label={t("experiments.new.progress.slots", { done, running, failed, total })}
-			>
-				<div className="bg-chart-success h-full" style={{ width: share(done) }} />
-				<div className="bg-chart-error h-full" style={{ width: share(failed) }} />
-				<div className="bg-chart-info h-full animate-pulse" style={{ width: share(running) }} />
-			</div>
-			<p className="text-muted-foreground text-xs tabular-nums" data-testid="experiment-progress-slots">
-				{t("experiments.new.progress.slots", { done, running, failed, total })}
-			</p>
-			<div className="flex flex-wrap items-baseline gap-2 text-sm">
-				<span className="text-muted-foreground text-xs">{t("experiments.new.progress.spent")}</span>
-				<ValueCell value={status.spent_usd} kind="usd" testId="experiment-progress-spent" />
-				{capUsd !== undefined && (
-					<span className="text-muted-foreground text-xs">
-						{t("experiments.new.progress.cap", { cap: formatValueNumber(capUsd, "usd", getLocale()) })}
+		<section
+			className="bg-card flex min-w-0 flex-col gap-5 rounded-xl border p-5 shadow-sm sm:p-6"
+			data-testid="experiment-progress"
+			data-state={status.state}
+			aria-label={status.name || status.exp_id}
+		>
+			<header className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+				<div className="flex min-w-0 flex-col gap-1">
+					<h2 className="truncate text-lg font-semibold tracking-tight" title={status.name || status.exp_id}>
+						{status.name || t("progress.untitled")}
+					</h2>
+					<span className="text-muted-foreground truncate font-mono text-[11px]" title={status.exp_id}>
+						{status.exp_id}
 					</span>
-				)}
+				</div>
+				<div className="flex items-center gap-2">
+					{live.elapsedMs !== undefined && (
+						<span className="text-muted-foreground flex items-center gap-1 text-xs tabular-nums" title={t("progress.elapsed")}>
+							<Clock className="size-3.5" aria-hidden="true" />
+							{formatElapsed(live.elapsedMs)}
+						</span>
+					)}
+					<ExperimentStatePill state={status.state} testId="experiment-progress-state" />
+				</div>
+			</header>
+
+			<div className="flex flex-col gap-2">
+				<div className="flex items-baseline justify-between gap-3 text-sm">
+					<span className="text-muted-foreground tabular-nums" data-testid="experiment-progress-slots" title={detail}>
+						{t("progress.slots", { finished: finishedCount, total })}
+					</span>
+					<span className="font-semibold tabular-nums">{pct}%</span>
+				</div>
+				<SlotBar slots={status.slots} label={detail} className="h-2.5" />
 			</div>
-			<p className="text-muted-foreground truncate font-mono text-[11px]" title={status.manifest_hash}>
-				{t("experiments.new.progress.manifest", { hash: status.manifest_hash })}
-			</p>
-			<div className="flex flex-wrap gap-2">
+
+			<div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+				<LiveStat label={t("progress.done")} tone="good" testId="experiment-progress-done">
+					{done}
+				</LiveStat>
+				<LiveStat label={t("progress.runningCount")} tone={running > 0 ? "live" : undefined} testId="experiment-progress-running">
+					{running}
+				</LiveStat>
+				<LiveStat label={t("progress.failed")} tone={failed > 0 ? "bad" : undefined} testId="experiment-progress-failed">
+					{failed}
+				</LiveStat>
+				<LiveStat label={t("progress.spent")}>
+					<span className="flex flex-wrap items-baseline gap-1">
+						<Spend status={status} testId="experiment-progress-spent" />
+						{capUsd !== undefined && (
+							<span className="text-muted-foreground text-xs font-normal">
+								{t("progress.cap", { cap: formatValueNumber(capUsd, "usd", getLocale()) })}
+							</span>
+						)}
+					</span>
+				</LiveStat>
+			</div>
+
+			{(live.slots.length > 0 || live.live) && (
+				<div className="flex flex-col gap-2">
+					<h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{t("progress.slotsTitle")}</h3>
+					{live.slots.length > 0 ? (
+						<ul className="-mx-1 flex flex-col gap-1" data-testid="experiment-progress-slot-rows">
+							{live.slots.map((slot) => (
+								<SlotRow key={slot.slotId} slot={slot} />
+							))}
+						</ul>
+					) : (
+						<p className="text-muted-foreground text-sm">{t("progress.noSlots")}</p>
+					)}
+				</div>
+			)}
+
+			{(live.events.length > 0 || live.live) && (
+				<div className="flex flex-col gap-2 border-t pt-4">
+					<h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{t("progress.activity")}</h3>
+					<EventTicker events={live.events} limit={5} testId="experiment-progress-ticker" />
+				</div>
+			)}
+
+			{live.error !== undefined && (
+				<p className="text-chart-warning-ink flex items-center gap-1.5 text-xs" role="status">
+					<CircleAlert className="size-3.5" aria-hidden="true" />
+					{t("progress.loadError")}
+				</p>
+			)}
+
+			<div className="flex flex-wrap items-center gap-2">
 				{status.state === "done" && (
 					<Button asChild size="sm" dataTestId="experiment-open-verdict">
 						<Link to="/experiments/$expId" params={{ expId: status.exp_id }}>
-							{t("experiments.new.progress.openVerdict")}
+							{t("progress.openVerdict")}
+							<ArrowRight className="size-3.5" aria-hidden="true" />
 						</Link>
 					</Button>
 				)}
 				{/* Jobs: cancel a running experiment, resume a cancelled or failed one. */}
 				<ExperimentRunActions status={status} />
 				{onNew && (
-					<Button variant="outline" size="sm" onClick={onNew} dataTestId="experiment-plan-another">
-						{t("experiments.new.progress.newExperiment")}
+					<Button variant="ghost" size="sm" onClick={onNew} dataTestId="experiment-plan-another">
+						<Plus className="size-3.5" aria-hidden="true" />
+						{t("progress.newExperiment")}
 					</Button>
 				)}
 			</div>
-		</div>
+
+			<details className="group text-xs">
+				<summary className="text-muted-foreground hover:text-foreground flex cursor-pointer list-none items-center gap-1 select-none">
+					<ChevronDown className="size-3.5 transition-transform group-open:rotate-180" aria-hidden="true" />
+					{t("progress.details")}
+				</summary>
+				<dl className="text-muted-foreground mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+					<dt>{t("progress.manifest")}</dt>
+					<dd className="truncate font-mono text-[11px]" title={status.manifest_hash}>
+						{status.manifest_hash}
+					</dd>
+				</dl>
+			</details>
+		</section>
 	);
 }

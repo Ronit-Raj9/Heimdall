@@ -1,0 +1,71 @@
+{
+	"state": {
+		"created": "Queued",
+		"running": "Running",
+		"analyzing": "Analyzing",
+		"done": "Done",
+		"failed": "Failed",
+		"cancelled": "Cancelled"
+	},
+	"slot": {
+		"running": "Running",
+		"done": "Done",
+		"failed": "Failed",
+		"skipped": "Skipped",
+		"starting": "Starting"
+	},
+	"stage": {
+		"planned": "Planned",
+		"leased": "Leased",
+		"prepare": "Preparing",
+		"arm": "Arming",
+		"run": "Agent running",
+		"disarm": "Disarming",
+		"export": "Exporting",
+		"collect": "Collecting",
+		"grade": "Grading",
+		"gate": "Checking",
+		"measure": "Measuring",
+		"receipt": "Receipt",
+		"cleanup": "Cleaning up",
+		"seal": "Sealed"
+	},
+	"event": {
+		"slot_started": "Slot started",
+		"run_started": "Run started",
+		"stage": "{{stage}}",
+		"slot_sealed": "Slot finished",
+		"run_sealed": "Run finished",
+		"run_recovered": "Run recovered",
+		"slot_skipped": "Slot skipped",
+		"lease_held": "Waiting for a lease",
+		"budget_stop": "Stopped at the spend cap",
+		"experiment_done": "Experiment finished",
+		"cancelled": "Cancelled",
+		"error": "Error",
+		"end": "Stream ended"
+	},
+	"progress": {
+		"slots": "{{finished}} of {{total}} slots",
+		"slotsDetail": "{{done}} done, {{running}} running, {{failed}} failed, of {{total}} slots",
+		"done": "Done",
+		"runningCount": "Running",
+		"failed": "Failed",
+		"spent": "Spent",
+		"cap": "of {{cap}}",
+		"elapsed": "Elapsed",
+		"activity": "Live activity",
+		"slotsTitle": "Slots",
+		"noSlots": "Waiting for the first slot to start.",
+		"noEvents": "No activity yet.",
+		"loadError": "Live updates paused. Retrying.",
+		"details": "Details",
+		"manifest": "Manifest",
+		"expId": "Experiment id",
+		"openVerdict": "Open verdict",
+		"newExperiment": "Plan another",
+		"slotFallback": "Slot {{id}}",
+		"untitled": "Untitled experiment",
+		"open": "Open"
+	}
+}
