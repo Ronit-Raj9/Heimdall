@@ -130,7 +130,9 @@ var APIRoutes = []RouteDoc{
 	{Method: "GET", Path: APIPrefix + "/runs", Tag: "runs", Summary: "Every run across experiments, newest first, with filters, paging and the values each filter can take", Response: RunList{}, Query: []QueryDoc{
 		{Name: "exp", Description: "Experiment id"}, {Name: "suite", Description: "Suite id"}, {Name: "arm", Description: "Arm id"},
 		{Name: "task", Description: "Task id"}, {Name: "condition", Description: "clean or a probe id"}, {Name: "outcome", Description: "Run outcome"},
-		{Name: "track", Description: "Suite track"}, {Name: "limit", Description: "Page size; default 100, at most 500"}, {Name: "offset", Description: "Rows to skip"},
+		{Name: "track", Description: "Suite track"}, {Name: "agent", Description: "Agent config id"}, {Name: "benchmark", Description: "Suite id with or without its version"},
+		{Name: "fault", Description: "Fault name (model-down, broken-tool, misleading-instruction, ...) or clean"}, {Name: "model", Description: "Arm model"},
+		{Name: "limit", Description: "Page size; default 100, at most 500"}, {Name: "offset", Description: "Rows to skip"},
 	}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}", Tag: "runs", Summary: "One run with seal, grade, metrics, gates and receipts", Response: schemas.RunDetail{}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/events", Tag: "runs", Summary: "Canonical event log of a run", Response: schemas.RunEvents{}},

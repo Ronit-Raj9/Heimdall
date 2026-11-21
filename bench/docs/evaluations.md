@@ -22,7 +22,7 @@ What you choose:
 | `tasks_per_benchmark` | How many tasks to take from each benchmark. Only ready (admitted) tasks are used, chosen to be different from each other. At least 6 are needed before any A/B gap can be called real; 8 leaves room for the correction across benchmarks. | 8 |
 | `trials` | How many times each task is repeated per arm. | 2 |
 | `faults` | Fault conditions to add. Normal conditions (`clean`) are always included. | `["clean"]` |
-| `budget_usd` | A spending cap for the whole evaluation. | none |
+| `budget_usd` | A spending cap for the whole evaluation, split evenly over its benchmarks. | $5 per benchmark when not set |
 
 Status of an evaluation is one of `queued`, `running`, `done`, `failed` or `cancelled`. While it runs, its status is worked out live from its children (one child per benchmark, each with its own comparison id and status). A benchmark that could not run is still listed, with a `skipped` reason, so you always see what was left out and why.
 
@@ -116,7 +116,11 @@ Faults cost runs: each fault adds as many runs as the normal condition.
 
 ## How many runs, and the estimate
 
-Runs per benchmark = arms x tasks x trials x conditions. For example, 2 arms, 8 tasks, 2 trials, clean plus `model-down` is 2 x 8 x 2 x 2 = 64 runs per benchmark.
+Runs per benchmark = arms x tasks x trials x conditions, where tasks is the smaller of `tasks_per_benchmark` and the benchmark's ready tasks. For example, 2 arms, 8 tasks, 2 trials, clean plus `model-down` is 2 x 8 x 2 x 2 = 64 runs per benchmark.
+
+In `score` mode the one setup is also launched a second time as a hidden repeat (the comparison planner needs two setups; the report card ignores the repeat). Until that repeat is removed, a score evaluation runs 2 x tasks x trials x conditions per benchmark, twice what the arms alone suggest, and the repeat spends from the same benchmark budget.
+
+The estimate forecasts exactly the tasks the launch will pick (the same spread over the ready tasks). When there is no sealed history for a setup the time is "not known" rather than zero.
 
 In `score` mode there is exactly one arm, and nothing else runs: 1 arm, 8 tasks, 2 trials, clean plus `model-down` is 1 x 8 x 2 x 2 = 32 runs per benchmark. The estimate counts the same runs the launch plans, so the cost and time you approve are the ones you pay for. (Evaluations created before one-arm runs existed also ran a hidden repeat of the arm; the report card ignores it and the leaderboards leave it out.)
 

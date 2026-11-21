@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RunListRow } from "@/lib/types/bench";
-import { agentOptions, formatDuration, orderRuns, runAgent, runDuration, runsRequest } from "./runsTable";
+import { agentOptions, agentVersionLabel, formatDuration, orderRuns, runAgent, runDuration, runsRequest } from "./runsTable";
 
 const row = (id: string, sealed: boolean, task = "t", arm = "a", config_id = ""): RunListRow =>
 	({ run_id: id, sealed, task, arm, config_id, suite: "s@1", outcome: "pass" }) as RunListRow;
@@ -24,6 +24,17 @@ describe("runsTable utils", () => {
 	});
 	it("builds the request from filters and page", () => {
 		expect(runsRequest({ outcome: "pass", suite: null, arm: "x" }, 3)).toEqual({ limit: 50, outcome: "pass", arm: "x", offset: 100 });
+	});
+	it("sends the agent and fault filters to the server", () => {
+		expect(runsRequest({ agent: "codex", fault: "model-down" }, 2)).toEqual({ limit: 50, agent: "codex", fault: "model-down", offset: 50 });
+	});
+	it("offers agents the server saw on other pages", () => {
+		expect(agentOptions([], [], ["claude-code", "codex"])).toEqual(["claude-code", "codex"]);
+	});
+	it("labels the agent version", () => {
+		expect(agentVersionLabel({ version: 2, agent_version: "1.4.0" })).toBe("v2");
+		expect(agentVersionLabel({ agent_version: "1.4.0" })).toBe("1.4.0");
+		expect(agentVersionLabel({})).toBe("");
 	});
 	it("formats durations", () => {
 		expect(runDuration({ started: "2026-01-01T00:00:00Z", sealed_at: "2026-01-01T00:01:05Z" })).toBe(65);

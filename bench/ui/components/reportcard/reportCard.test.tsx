@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ReportCard } from "./reportCard";
 import { abReport, scoreReport } from "./reportCard.fixtures";
-import { armDescription, capabilityRows, compareArms, costDisplay, duration, excludedText, headline, overallScore, points } from "./reportCard.utils";
+import { armDescription, armNames, capabilityRows, compareArms, costDisplay, duration, excludedText, headline, overallScore, points } from "./reportCard.utils";
 
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({ to, params, children, ...rest }: { to: string; params?: Record<string, string>; children: React.ReactNode }) => (
@@ -17,18 +17,27 @@ describe("report card utils", () => {
 		// (0.4*30 + 0.6*10) / 40 = 0.45
 		expect(overallScore(scoreReport, "A")).toBeCloseTo(0.45);
 		expect(headline(scoreReport).title).toBe("Your agent solves 45% overall");
+		expect(headline({ ...scoreReport, mode: "score" }).title).toBe("Your agent scores 45% overall");
 	});
 
 	it("counts A/B wins from verdicts and CI overlap", () => {
 		const h = headline(abReport);
-		expect(h.title).toBe("B is better on 3 of 6 benchmarks");
-		expect(h.detail).toBe("Overall B wins; worse on 1, tied on 2.");
+		expect(h.title).toBe("codex v2 is better on 3 of 6 benchmarks");
+		expect(h.detail).toBe("Overall codex v2 wins; worse on 1, tied on 2.");
 	});
 
 	it("prefers the server overall verdict", () => {
 		const h = headline({ ...abReport, overall: { winner: "A", wins: { A: 4, B: 1, tie: 1 }, summary: "A is better on 4 of 6" } });
-		expect(h.title).toBe("A is better on 4 of 6 benchmarks");
+		expect(h.title).toBe("codex v1 is better on 4 of 6 benchmarks");
 		expect(h.detail).toBe("A is better on 4 of 6");
+	});
+
+	it("names arms by agent, version, then model", () => {
+		const arm = (label: string, agent: string, version?: number, model = "m") => ({ label, agent, version, model });
+		expect(armNames(arm("A", "codex"), arm("B", "claude-code"))).toEqual(["codex", "claude-code"]);
+		expect(armNames(arm("A", "codex", 1), arm("B", "codex", 2))).toEqual(["codex v1", "codex v2"]);
+		expect(armNames(arm("A", "codex", undefined, "m1"), arm("B", "codex", undefined, "m2"))).toEqual(["codex on m1", "codex on m2"]);
+		expect(armNames(arm("A", "codex"), arm("B", "codex"))).toEqual(["codex on m (A)", "codex on m (B)"]);
 	});
 
 	it("calls overlapping intervals a tie", () => {
@@ -93,13 +102,13 @@ describe("ReportCard", () => {
 
 	it("renders A/B deltas with a text winner marker", () => {
 		const html = renderToStaticMarkup(<ReportCard report={abReport} />);
-		expect(html).toContain("B is better on 3 of 6 benchmarks");
+		expect(html).toContain("codex v2 is better on 3 of 6 benchmarks");
 		expect(html).toContain("Change (B vs A)");
 		expect(html).toContain("+30 pts");
-		expect(html).toContain("B better");
-		expect(html).toContain("A better");
+		expect(html).toContain("codex v2 better");
+		expect(html).toContain("codex v1 better");
 		expect(html).toContain("No clear winner");
-		expect(html).toContain("B solves 30 points more");
+		expect(html).toContain("codex v2 solves 30 points more");
 		expect(html).toContain("A drop");
 		expect(html).toContain('href="/experiments/exp_6"');
 	});

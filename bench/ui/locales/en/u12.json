@@ -17,8 +17,10 @@
 			"agent": "Agent",
 			"outcome": "Result",
 			"steps": "Steps",
+			"toolCalls": "Tool calls",
 			"tokens": "Tokens",
 			"cost": "Cost",
+			"fault": "Fault",
 			"duration": "Duration",
 			"when": "When"
 		},
@@ -30,7 +32,15 @@
 		"showing": "{{first}}-{{last}} of {{total}}",
 		"prev": "Previous",
 		"next": "Next",
-		"justNow": "just now"
+		"justNow": "just now",
+		"fault": "Fault",
+		"faultNone": "None",
+		"faultName": {
+			"clean": "None",
+			"model-down": "Model down",
+			"broken-tool": "Broken tool",
+			"misleading-instruction": "Misleading instruction"
+		}
 	},
 	"board": {
 		"podium": "Top agents",

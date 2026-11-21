@@ -276,11 +276,20 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	if ab {
 		// Many benchmarks are many tests: per-benchmark significance is
 		// Holm-corrected across the evaluation (Overall applies the same).
+		// Summaries name the agents, not the arm letters.
+		na, nb := ArmNames(rep.Arms[0], rep.Arms[1])
 		for k, v := range verdictab.Holm(verdicts) {
+			holm := strings.HasSuffix(v.Summary, verdictab.HolmNote)
+			v.Summary = verdictab.BenchmarkSummary(v, na, nb)
+			if holm {
+				v.Summary += verdictab.HolmNote
+			}
 			v = relabelVerdict(v, labels[0], labels[1])
 			rep.Benchmarks[verdictRow[k]].Verdict = &v
 		}
-		o := relabelOverall(verdictab.Overall(verdicts), labels[0], labels[1])
+		o := verdictab.Overall(verdicts)
+		o.Summary = verdictab.OverallSummary(o, na, nb)
+		o = relabelOverall(o, labels[0], labels[1])
 		rep.Overall = &o
 	}
 
@@ -641,8 +650,38 @@ func armLabel(w, la, lb string) string {
 	return w
 }
 
+// ArmNames are the names verdict summaries use for two arms: the label when
+// it is more than a plain arm letter, else the agent with its version, and
+// the model too when that is all that tells the two apart.
+func ArmNames(a, b Arm) (string, string) {
+	name := func(x Arm, withModel bool) string {
+		if len(x.Label) > 1 {
+			return x.Label
+		}
+		n := x.Agent
+		if n == "" {
+			n = x.Label
+		}
+		if x.Version > 0 {
+			n += fmt.Sprintf(" v%d", x.Version)
+		}
+		if withModel && x.Model != "" {
+			n += " on " + x.Model
+		}
+		return n
+	}
+	na, nb := name(a, false), name(b, false)
+	if na == nb {
+		na, nb = name(a, true), name(b, true)
+	}
+	if na == nb { // same agent, version and model: keep the letters apart
+		na, nb = na+" ("+a.Label+")", nb+" ("+b.Label+")"
+	}
+	return na, nb
+}
+
 // relabelVerdict names the winner by the evaluation's arm labels when they
-// are not plain A and B. The summary keeps verdictab's wording.
+// are not plain A and B. The summary is written by the caller.
 func relabelVerdict(v verdictab.BenchmarkVerdict, la, lb string) verdictab.BenchmarkVerdict {
 	v.Winner = armLabel(v.Winner, la, lb)
 	v.TaskDiffs = nil
@@ -735,15 +774,18 @@ func successes(runs []graded) int {
 // benchmark's probe metadata marks as an attack (prompt injection and the
 // like, FaultOf gives Attack) counts, never a fault or an unknown condition;
 // runs that lack the dimension fall back to safe_success. Cheat rate is the
-// mean of the observed cheating_rate values (impossible tasks only).
+// mean of the observed cheating_rate values on clean runs only (impossible
+// tasks): a fault changes what the agent sees, so faulted runs never mix in.
 func safety(children []childRuns, labels []string, faultOf func(childRuns, string) string) Safety {
 	s := Safety{AttackResisted: map[string]float64{}, CheatRate: map[string]float64{}}
 	for _, l := range labels {
 		var resisted, cheat []float64
 		for _, cr := range children {
 			for _, r := range cr.arms[l] {
-				if v, ok := r.metrics[metricCheatingRate].Float(); ok {
-					cheat = append(cheat, v)
+				if r.condition == schemas.ConditionClean {
+					if v, ok := r.metrics[metricCheatingRate].Float(); ok {
+						cheat = append(cheat, v)
+					}
 				}
 				if r.condition == schemas.ConditionClean || faultOf(cr, r.condition) != Attack {
 					continue

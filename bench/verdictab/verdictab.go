@@ -187,10 +187,13 @@ func Holm(vs []BenchmarkVerdict) []BenchmarkVerdict {
 			lo, hi = *v.CILow, *v.CIHigh
 		}
 		v.Winner = tieOrUnclear(v.Tasks, ok, lo, hi)
-		v.Summary = benchmarkSummary(*v) + " (not significant once corrected for testing many benchmarks)"
+		v.Summary = benchmarkSummary(*v) + HolmNote
 	}
 	return out
 }
+
+// HolmNote ends the summary of a verdict that Holm's correction took back.
+const HolmNote = " (not significant once corrected for testing many benchmarks)"
 
 // holm is Holm's step-down adjustment of p, in input order, capped at 1 and
 // monotone. A NaN p is taken as 1.
@@ -331,14 +334,26 @@ func points(d float64) string {
 	return fmt.Sprintf("%.0f points", p)
 }
 
-func benchmarkSummary(v BenchmarkVerdict) string {
+func benchmarkSummary(v BenchmarkVerdict) string { return BenchmarkSummary(v, WinnerA, WinnerB) }
+
+// BenchmarkSummary is v's plain sentence with the arms called nameA and
+// nameB (agent names on the report card). A verdict whose winner was already
+// relabelled is read by its delta; the Holm note is not added here.
+func BenchmarkSummary(v BenchmarkVerdict, nameA, nameB string) string {
+	name := map[string]string{WinnerA: nameA, WinnerB: nameB}
 	switch v.Winner {
-	case WinnerB:
-		return fmt.Sprintf("B solves %s more than A over %d tasks, and the gap is real (p = %.3f).", points(v.Delta), v.Tasks, *v.PValue)
-	case WinnerA:
-		return fmt.Sprintf("A solves %s more than B over %d tasks, and the gap is real (p = %.3f).", points(v.Delta), v.Tasks, *v.PValue)
+	case WinnerB, WinnerA:
+		win, lose := nameA, nameB
+		if v.Winner == WinnerB {
+			win, lose = nameB, nameA
+		}
+		p := 0.0
+		if v.PValue != nil {
+			p = *v.PValue
+		}
+		return fmt.Sprintf("%s solves %s more than %s over %d tasks, and the gap is real (p = %.3f).", win, points(v.Delta), lose, v.Tasks, p)
 	case WinnerTie:
-		return fmt.Sprintf("A and B do about the same over %d tasks: any gap is under %s.", v.Tasks, points(TieMargin))
+		return fmt.Sprintf("%s and %s do about the same over %d tasks: any gap is under %s.", nameA, nameB, v.Tasks, points(TieMargin))
 	}
 	if v.Tasks < MinTasks {
 		return fmt.Sprintf("Only %d tasks in common; at least %d are needed before any gap can be called real.", v.Tasks, MinTasks)
@@ -350,16 +365,28 @@ func benchmarkSummary(v BenchmarkVerdict) string {
 	if v.Delta < 0 {
 		lead = WinnerA
 	}
-	return fmt.Sprintf("%s is ahead by %s over %d tasks, but that could be chance. More tasks or trials would settle it.", lead, points(v.Delta), v.Tasks)
+	return fmt.Sprintf("%s is ahead by %s over %d tasks, but that could be chance. More tasks or trials would settle it.", name[lead], points(v.Delta), v.Tasks)
 }
 
-func overallSummary(o OverallVerdict) string {
-	counts := winsText(o)
+func overallSummary(o OverallVerdict) string { return OverallSummary(o, WinnerA, WinnerB) }
+
+// OverallSummary is o's plain sentence with the arms called nameA and nameB.
+// o's Winner and Wins must still use the keys A and B.
+func OverallSummary(o OverallVerdict, nameA, nameB string) string {
+	counts := winsText(o, nameB)
 	switch o.Winner {
 	case WinnerB, WinnerA:
-		return fmt.Sprintf("%s is better overall by %s per task across %d tasks (p = %.3f). %s", o.Winner, points(o.Delta), o.Tasks, *o.PValue, counts)
+		win := nameA
+		if o.Winner == WinnerB {
+			win = nameB
+		}
+		p := 0.0
+		if o.PValue != nil {
+			p = *o.PValue
+		}
+		return fmt.Sprintf("%s is better overall by %s per task across %d tasks (p = %.3f). %s", win, points(o.Delta), o.Tasks, p, counts)
 	case WinnerTie:
-		return fmt.Sprintf("A and B are about the same overall across %d tasks. %s", o.Tasks, counts)
+		return fmt.Sprintf("%s and %s are about the same overall across %d tasks. %s", nameA, nameB, o.Tasks, counts)
 	}
 	if o.Tasks < MinTasks {
 		return fmt.Sprintf("Too little evidence for an overall verdict: only %d tasks in common. %s", o.Tasks, counts)
@@ -367,9 +394,10 @@ func overallSummary(o OverallVerdict) string {
 	return fmt.Sprintf("Unclear overall: the pooled gap of %s per task across %d tasks could be chance. %s", points(o.Delta), o.Tasks, counts)
 }
 
-// winsText reads the win counts from B's side, as the report card does.
-func winsText(o OverallVerdict) string {
-	s := fmt.Sprintf("B is better on %d of %d benchmarks, worse on %d", o.Wins[WinnerB], o.Benchmarks, o.Wins[WinnerA])
+// winsText reads the win counts from B's side (called nameB), as the report
+// card does.
+func winsText(o OverallVerdict, nameB string) string {
+	s := fmt.Sprintf("%s is better on %d of %d benchmarks, worse on %d", nameB, o.Wins[WinnerB], o.Benchmarks, o.Wins[WinnerA])
 	var rest []string
 	if t := o.Wins[WinnerTie]; t > 0 {
 		rest = append(rest, fmt.Sprintf("tied on %d", t))

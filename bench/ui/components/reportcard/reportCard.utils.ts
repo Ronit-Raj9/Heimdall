@@ -87,6 +87,33 @@ export function costDisplay(m: Pick<ReportArmMetrics, "runs" | "cost_usd" | "cos
 	return { text: "Not known", known: false, detail, reason: `Cost not known, ${detail}${why}` };
 }
 
+/**
+ * The names verdict text uses for two arms, as the server's summaries do: the label when it is more
+ * than an arm letter, else the agent with its version, plus the model when that is all that differs.
+ */
+export function armNames(a: EvaluationArm, b: EvaluationArm): [string, string] {
+	const name = (x: EvaluationArm, withModel: boolean) => {
+		if (x.label.length > 1) return x.label;
+		let n = x.agent || x.label;
+		if (x.version) n += ` v${x.version}`;
+		if (withModel && x.model) n += ` on ${x.model}`;
+		return n;
+	};
+	let na = name(a, false);
+	let nb = name(b, false);
+	if (na === nb) [na, nb] = [name(a, true), name(b, true)];
+	if (na === nb) [na, nb] = [`${na} (${a.label})`, `${nb} (${b.label})`];
+	return [na, nb];
+}
+
+/** The display name of arm label in an A/B report; the label itself when it is not an arm. */
+export function armName(report: Report, label: string): string {
+	const [a, b] = report.arms;
+	if (!a || !b) return label;
+	const [na, nb] = armNames(a, b);
+	return label === a.label ? na : label === b.label ? nb : label;
+}
+
 export function pct(x: number | undefined | null): string {
 	if (x === undefined || x === null || !Number.isFinite(x)) return "-";
 	return `${Math.round(x * 100)}%`;
@@ -179,7 +206,12 @@ export function headline(report: Report): Headline {
 		const arm = report.arms[0];
 		const score = arm ? overallScore(report, arm.label) : undefined;
 		return {
-			title: score === undefined ? "No results yet" : `Your agent solves ${pct(score)} overall`,
+			title:
+				score === undefined
+					? "No results yet"
+					: report.mode === "score"
+						? `Your agent scores ${pct(score)} overall`
+						: `Your agent solves ${pct(score)} overall`,
 			detail: `${arm ? armDescription(arm) + ", " : ""}${total} ${benchWord}, ${runs.toLocaleString("en-US")} runs`,
 		};
 	}
@@ -194,15 +226,16 @@ export function headline(report: Report): Headline {
 	let winner = report.overall?.winner;
 	if (!winner) winner = wins[b.label] > wins[a.label] ? b.label : wins[a.label] > wins[b.label] ? a.label : "tie";
 	const loser = winner === a.label ? b.label : a.label;
+	const name = armName(report, winner);
 	const title =
 		winner === "tie"
 			? `No clear winner across ${total} ${benchWord}`
-			: `${winner} is better on ${counted[winner] ?? 0} of ${total} ${benchWord}`;
+			: `${name} is better on ${counted[winner] ?? 0} of ${total} ${benchWord}`;
 	const verdict =
 		report.overall?.summary ||
 		(winner === "tie"
-			? "Neither arm is clearly better overall."
-			: `Overall ${winner} wins; worse on ${counted[loser] ?? 0}, tied on ${counted.tie ?? 0}.`);
+			? "Neither agent is clearly better overall."
+			: `Overall ${name} wins; worse on ${counted[loser] ?? 0}, tied on ${counted.tie ?? 0}.`);
 	return { title, detail: verdict };
 }
 

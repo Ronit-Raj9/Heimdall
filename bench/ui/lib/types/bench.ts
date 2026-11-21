@@ -1657,10 +1657,17 @@ export interface RunListRow {
 	error?: string;
 	/** Why a sealed run is left out of scores: out_of_memory, infra_error, invalid_evaluator, unknown. */
 	excluded?: string;
-	/** Optional run metrics; the list shows a dash when the server leaves them out. */
+	/** Run metrics from metrics.json; absent until observed, and the list shows a dash. */
 	model?: string;
 	steps?: number;
+	tool_calls?: number;
 	tokens?: number;
+	/** The agent's own version string, when it declares one. */
+	agent_version?: string;
+	/** The registered agent version (v1, v2) whose config matches; absent when none. */
+	version?: number;
+	/** The fault injected in this run (model-down, broken-tool, misleading-instruction, ...); absent for a clean run. */
+	fault?: string;
 }
 
 /** The distinct values of each run list filter, across every run. */
@@ -1672,6 +1679,11 @@ export interface RunListFacets {
 	conditions: string[];
 	outcomes: string[];
 	tracks: string[];
+	/** Agent names (config ids) seen across every run. */
+	agents: string[];
+	/** Fault names seen across every run; "clean" for runs without one. */
+	faults: string[];
+	models: string[];
 }
 
 /** GET /runs: one page, newest first; total counts every run that matched. */
@@ -1692,6 +1704,13 @@ export interface RunListParams {
 	condition?: string;
 	outcome?: string;
 	track?: string;
+	/** Agent config id; matched on the server across every page. */
+	agent?: string;
+	/** Suite id with or without its version. */
+	benchmark?: string;
+	/** Fault name, or "clean". */
+	fault?: string;
+	model?: string;
 	limit?: number;
 	offset?: number;
 }

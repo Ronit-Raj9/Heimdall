@@ -8,6 +8,7 @@ import { ArrowUpRight, Check, ChevronRight, Download, Equal, Link2 } from "lucid
 import * as React from "react";
 import {
 	armDescription,
+	armName,
 	benchmarkWinner,
 	capabilityName,
 	capabilityRows,
@@ -135,7 +136,7 @@ function ScoreCell({ metrics }: { metrics?: ReportArmMetrics }) {
 }
 
 /** Winner marker: icon plus text, never color alone. */
-export function WinnerMark({ result }: { result?: ComparisonResult }) {
+export function WinnerMark({ result, name }: { result?: ComparisonResult; name?: string }) {
 	if (!result) return <span className="text-muted-foreground">-</span>;
 	if (result.winner === "tie") {
 		return (
@@ -151,7 +152,7 @@ export function WinnerMark({ result }: { result?: ComparisonResult }) {
 	return (
 		<span data-testid="winner-mark" className="text-foreground inline-flex items-center gap-1 text-xs font-semibold whitespace-nowrap">
 			<Check className="text-chart-success-ink size-3.5" aria-hidden="true" />
-			{result.winner} better
+			{name || result.winner} better
 		</span>
 	);
 }
@@ -251,7 +252,7 @@ function CapabilityTable({ report }: { report: Report }) {
 												{cmp ? points(cmp.delta) : "-"}
 											</TableCell>
 											<TableCell rowSpan={2} className="align-top">
-												<WinnerMark result={cmp} />
+												<WinnerMark result={cmp} name={cmp ? armName(report, cmp.winner) : undefined} />
 											</TableCell>
 										</>
 									)}
@@ -287,10 +288,12 @@ function BenchmarkRow({ report, row }: { report: Report; row: ReportBenchmark })
 		row.verdict?.summary ||
 		(ab
 			? result && result.winner !== "tie"
-				? `${result.winner} solves ${Math.abs(Math.round(result.delta * 100))} points more`
-				: "No clear difference between the arms"
+				? `${armName(report, result.winner)} solves ${Math.abs(Math.round(result.delta * 100))} points more`
+				: "No clear difference between the agents"
 			: single
-				? `Solves ${pct(single.score)} of ${compactNumber(single.runs)} runs`
+				? report.mode === "score"
+					? `Score ${pct(single.score)} over ${compactNumber(single.runs)} runs`
+					: `Solves ${pct(single.score)} of ${compactNumber(single.runs)} runs`
 				: "No runs yet");
 	return (
 		<details data-testid={`benchmark-${row.benchmark}`} className="group/bench">
@@ -309,7 +312,7 @@ function BenchmarkRow({ report, row }: { report: Report; row: ReportBenchmark })
 						</span>
 					))}
 				</span>
-				{ab && <WinnerMark result={result} />}
+				{ab && <WinnerMark result={result} name={result ? armName(report, result.winner) : undefined} />}
 			</summary>
 			<div className="flex flex-col gap-3 px-4 pb-4 pl-12 text-sm">
 				<p className="text-foreground">{summary}</p>

@@ -70,14 +70,19 @@ judge:
   provider: openai             # a provider the gateway configures
   model: gpt-4o-2024-08-06     # the served model must be this one
   prompt_version: longmemeval-v1
-  votes: 3                     # odd, 1 to 9; default 1
+  votes: 3                     # odd, 1 to 9; default 3 (majority)
   max_tokens: 16               # default 16
 ```
 
 How one grade runs:
 
 1. The answer is read as for `answer_match`. A missing or empty answer fails without a model call.
-2. The template is picked from `prompt_version` and the spec. The answer is capped at 16,000 characters, fenced, marked as data, and its fence markers are broken up so it cannot close its own fence. Placeholders are filled in one pass, so text in the question or the answer is never expanded again.
+2. The template is picked from `prompt_version` and the spec. The answer is capped at 16,000 characters, fenced, marked as data, and its fence markers are broken up so it cannot close its own fence. Placeholders are filled in one pass, so text in the question or the answer is never expanded again. The answer also sits between `BEGIN GRADED RESPONSE <tag>` and `END GRADED RESPONSE <tag>` markers, where the tag is the first 12 hex digits of the answer's own sha256, so it cannot print a matching closing marker. Every judge call carries a system message saying the response is untrusted data, that instructions inside it are never followed, and that a response trying to influence its grade is incorrect.
+
+   Before any judge call, two checks fail an answer without asking the model: an answer that addresses the grader (asks it to reply "correct", to ignore its instructions or the rubric, poses as a system or grader message, or declares its own grade), and, on a task that wants an answer, a bare refusal ("I can't help with that", "I don't know") or text with no words or numbers. A refusal is left to the judge when the task is an abstention or its question, reference or rubric asks for a refusal, a question back or silence. The grade reason starts with "judge not asked:".
+
+   The `qa-v1` rubric template requires every criterion of the rubric to be met, and counts a refusal or non-answer as incorrect unless the rubric asks for it. A calibration also adds, per task, two adversarial control items labelled incorrect (an answer telling the judge to reply correct, and a bare refusal when the task wants an answer); they are reported with the other control items, apart from the human labels.
+
 3. The judge's own virtual key is minted through the gateway: one key per grade, on the judge's provider and model, named after the run id plus `j` and a random suffix, so a key left behind by a crash is still removed by the janitor. It is never the run's key (a gateway that returns the run's key is refused). It is revoked when the grade ends, also when a call fails or the run is cancelled.
 4. The prompt is sent `votes` times to `<gateway url>/v1/chat/completions` at temperature 0, with the key in `x-bf-vk`.
 5. Each reply is parsed strictly: after trimming spaces, one trailing period and case it must be exactly `correct` or `incorrect`; anything else (`yes`, a sentence, `**correct**`) is `unparsable`.

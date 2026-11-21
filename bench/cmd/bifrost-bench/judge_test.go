@@ -62,7 +62,7 @@ func fakeChat() *httptest.Server {
 			Messages []struct{ Content string } `json:"messages"`
 		}
 		_ = json.Unmarshal(raw, &body)
-		p := body.Messages[0].Content
+		p := body.Messages[len(body.Messages)-1].Content
 		resp := p[strings.LastIndex(p, "<<<"):]
 		verdict := "incorrect"
 		if strings.Contains(resp, "Max") {
@@ -202,7 +202,7 @@ func TestJudgeCalibrationLoop(t *testing.T) {
 	}
 	th := calibration.Thresholds(nil, "")
 	rec, err := calibrateSuite(ctx, nil, s, calibrateOptions{thresh: th, judgeCfg: cfg}, strings.NewReader(""), &out)
-	if err != nil || rec != nil || gw.minted != 0 || !strings.Contains(out.String(), "not run") || !strings.Contains(out.String(), "forecast: 16 judge calls") {
+	if err != nil || rec != nil || gw.minted != 0 || !strings.Contains(out.String(), "not run") || !strings.Contains(out.String(), "forecast: 24 judge calls") {
 		t.Fatalf("unconsented calibration: rec %v err %v minted %d\n%s", rec, err, gw.minted, out.String())
 	}
 	out.Reset()
@@ -211,8 +211,9 @@ func TestJudgeCalibrationLoop(t *testing.T) {
 		t.Fatalf("calibration: %v minted %d\n%s", err, gw.minted, out.String())
 	}
 	// Two human items: "Your dog is Max." correct (judge agrees), "It is Rex."
-	// labelled correct by bo (judge says incorrect); seeds Max and Rex agree.
-	if rec.HumanLabels != 2 || rec.SeedItems != 2 || rec.Human.TP != 1 || rec.Human.FN != 1 || rec.Seed.TP != 1 || rec.Seed.TN != 1 {
+	// labelled correct by bo (judge says incorrect); seeds Max and Rex agree,
+	// and so do the two adversarial controls (injection, refusal: incorrect).
+	if rec.HumanLabels != 2 || rec.SeedItems != 4 || rec.Human.TP != 1 || rec.Human.FN != 1 || rec.Seed.TP != 1 || rec.Seed.TN != 3 {
 		t.Fatalf("record %+v human %+v", rec, rec.Human)
 	}
 	recs, err := calibration.ReadRecords(s.Root)

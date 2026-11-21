@@ -9,8 +9,13 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/agentversions"
+	"github.com/maximhq/bifrost/bench/faults"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/metrics"
+	"github.com/maximhq/bifrost/bench/reportcard"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/valyala/fasthttp"
 )
 
@@ -22,7 +27,8 @@ const (
 
 // RunListRow is one run of GET /runs: its slot, outcome and timing, with the
 // suite's track and the task's output kind so the UI can pick the right view.
-// Cost is read from metrics.json for the rows of the page only.
+// Cost, steps, tool calls and tokens are read from metrics.json for the rows
+// of the page only; each is absent while the run has no observed value.
 type RunListRow struct {
 	RunID     string          `json:"run_id"`
 	ExpID     string          `json:"exp_id"`
@@ -40,8 +46,15 @@ type RunListRow struct {
 	Sealed    bool            `json:"sealed"`
 	Outcome   schemas.Outcome `json:"outcome"`
 	Y         schemas.Value   `json:"y"`
-	CostUSD   *schemas.Value  `json:"cost_usd,omitempty"` // absent for a run with no metrics.json yet
+	CostUSD   *schemas.Value  `json:"cost_usd,omitempty"`   // absent for a run with no metrics.json yet
+	Steps     *float64        `json:"steps,omitempty"`      // metrics.json steps; absent when not observed
+	ToolCalls *float64        `json:"tool_calls,omitempty"` // metrics.json tool_calls; absent when not observed
+	Tokens    *float64        `json:"tokens,omitempty"`     // metrics.json tokens; absent when not observed
 	ConfigID  string          `json:"config_id"`
+	Model     string          `json:"model,omitempty"`         // the arm's model from the experiment manifest
+	AgentVer  string          `json:"agent_version,omitempty"` // the agent's own version string, when it declares one
+	Version   int             `json:"version,omitempty"`       // the registered agent version (v1, v2) whose config hash matches; 0 when none
+	Fault     string          `json:"fault,omitempty"`         // the fault injected in this run (model-down, broken-tool, misleading-instruction or the probe family); empty for a clean run
 	Started   *time.Time      `json:"started,omitempty"`
 	SealedAt  *time.Time      `json:"sealed_at,omitempty"`
 	Error     string          `json:"error,omitempty"` // the first part failure's error of a non-pass run, cut to 600 bytes; empty when none
@@ -60,6 +73,9 @@ type RunListFacets struct {
 	Conditions  []string `json:"conditions"`
 	Outcomes    []string `json:"outcomes"`
 	Tracks      []string `json:"tracks"`
+	Agents      []string `json:"agents"`
+	Faults      []string `json:"faults"`
+	Models      []string `json:"models"`
 }
 
 // RunList is GET /runs: one page of runs, newest first, the number that
@@ -77,6 +93,7 @@ type RunListHandler struct {
 	mode   schemas.Mode
 	index  ReadIndex
 	suites SuiteSource
+	root   string // bench root: registered agent versions; "" leaves Version 0
 }
 
 // NewRunListHandler creates the run list handler. index may be nil (503);
@@ -85,29 +102,53 @@ func NewRunListHandler(mode schemas.Mode, index ReadIndex, suites SuiteSource) *
 	return &RunListHandler{mode: mode, index: index, suites: suites}
 }
 
+// WithRoot sets the bench root, so rows name the registered agent version
+// (.heimdall/agent-versions) whose config hash matches the run's.
+func (h *RunListHandler) WithRoot(root string) *RunListHandler {
+	h.root = root
+	return h
+}
+
 // RegisterRoutes registers GET /runs.
 func (h *RunListHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middleware) {
 	r.GET(APIPrefix+"/runs", lib.ChainMiddlewares(h.listRuns, middlewares...))
 }
 
 // runListFilter is the query of GET /runs. An empty field matches anything.
+// agent matches the run's agent config id (the arm id for a run with none),
+// benchmark the suite id with or without its version, and fault the row's
+// fault name ("clean" for a run without one).
 type runListFilter struct {
 	exp, suite, arm, task, condition, outcome, track string
+	agent, benchmark, fault, model                   string
 }
 
 func (f runListFilter) match(row RunListRow) bool {
 	for _, c := range [][2]string{
 		{f.exp, row.ExpID}, {f.suite, row.Suite}, {f.arm, row.Arm}, {f.task, row.Task},
 		{f.condition, row.Condition}, {f.outcome, string(row.Outcome)}, {f.track, row.Track},
+		{f.agent, rowAgent(row)}, {f.model, row.Model},
 	} {
 		if c[0] != "" && c[0] != c[1] {
 			return false
 		}
 	}
+	if f.benchmark != "" {
+		id, _, _ := strings.Cut(row.Suite, "@")
+		if f.benchmark != row.Suite && f.benchmark != id {
+			return false
+		}
+	}
+	if f.fault != "" && f.fault != cmp.Or(row.Fault, faults.Clean) {
+		return false
+	}
 	return true
 }
 
-// listRuns handles GET /api/bench/runs?exp=&suite=&arm=&task=&condition=&outcome=&track=&limit=&offset=.
+// rowAgent is the agent a run used: its config id, else its arm id.
+func rowAgent(row RunListRow) string { return cmp.Or(row.ConfigID, row.Arm) }
+
+// listRuns handles GET /api/bench/runs?exp=&suite=&benchmark=&arm=&agent=&model=&task=&condition=&fault=&outcome=&track=&limit=&offset=.
 // Every run of every experiment the index holds, attempts included, newest
 // start first. A filter value that is not a valid id is a 400; limit is
 // capped at runListMaxLimit.
@@ -121,9 +162,10 @@ func (h *RunListHandler) listRuns(ctx *fasthttp.RequestCtx) {
 	for name, dst := range map[string]*string{
 		"exp": &f.exp, "suite": &f.suite, "arm": &f.arm, "task": &f.task,
 		"condition": &f.condition, "outcome": &f.outcome, "track": &f.track,
+		"agent": &f.agent, "benchmark": &f.benchmark, "fault": &f.fault, "model": &f.model,
 	} {
 		v := strings.TrimSpace(string(args.Peek(name)))
-		if v != "" && !validID(v) {
+		if v != "" && !validID(v) && !(name == "model" && validModelFilter(v)) {
 			lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, name+" is not a valid id")
 			return
 		}
@@ -145,9 +187,12 @@ func (h *RunListHandler) listRuns(ctx *fasthttp.RequestCtx) {
 
 	var all []RunListRow
 	views := map[string]RunView{}
+	versions := newVersionIndex(h.root, suite.LibraryDir())
 	for _, expID := range h.index.Experiments() {
+		m, _ := h.index.Manifest(expID)
 		for _, rv := range h.index.Runs(expID) {
 			row := runListRow(rv, suiteInfo)
+			armFacts(&row, rv, m, versions)
 			all = append(all, row)
 			views[row.RunID] = rv
 		}
@@ -170,13 +215,74 @@ func (h *RunListHandler) listRuns(ctx *fasthttp.RequestCtx) {
 	for _, row := range out.Runs {
 		page = append(page, views[row.RunID])
 	}
-	costs := runCosts(h.index, page)
+	read := runMetrics(h.index, page)
+	costs := costsOf(page, read)
 	for i := range out.Runs {
-		if c, found := costs[out.Runs[i].RunID]; found {
-			out.Runs[i].CostUSD = &c
+		r := &out.Runs[i]
+		if c, found := costs[r.RunID]; found {
+			r.CostUSD = &c
+		}
+		if mr := read[r.RunID]; mr.found {
+			r.Steps = observed(mr.values, metrics.Steps)
+			r.ToolCalls = observed(mr.values, metrics.ToolCalls)
+			r.Tokens = observed(mr.values, metrics.Tokens)
 		}
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+}
+
+// observed is metric name's value when observed, else nil.
+func observed(values map[string]schemas.Value, name string) *float64 {
+	v, ok := values[name]
+	if !ok {
+		return nil
+	}
+	f, ok := v.Float()
+	if !ok || !v.IsObserved() {
+		return nil
+	}
+	return &f
+}
+
+// validModelFilter accepts a model name as the model filter: provider
+// prefixes and colons are allowed, nothing that could escape a path.
+func validModelFilter(v string) bool {
+	if len(v) > 200 {
+		return false
+	}
+	for _, r := range v {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case strings.ContainsRune("._-/:@", r):
+		default:
+			return false
+		}
+	}
+	return !strings.Contains(v, "..")
+}
+
+// armFacts fills the model, agent version and registered version of row
+// from its run and the experiment manifest (m may be nil).
+func armFacts(row *RunListRow, rv RunView, m *schemas.Manifest, versions *versionIndex) {
+	row.AgentVer = rv.Run.Agent.AgentVersion
+	var agentHash string
+	if m != nil {
+		if arm, ok := m.Arms[rv.Slot.Arm]; ok {
+			row.Model = arm.Config.Model
+			row.AgentVer = cmp.Or(row.AgentVer, arm.Config.AgentVersion)
+			if row.ConfigID == "" {
+				row.ConfigID = arm.Config.ID
+			}
+			// Versions are matched by agent hash (the config without its
+			// model and provider), as the agent leaderboard does.
+			if ah, err := agentversions.AgentHash(arm.Config); err == nil {
+				agentHash = strings.TrimPrefix(ah, "sha256:")
+			}
+		}
+	}
+	if versions != nil {
+		row.Version = versions.lookup(row.ConfigID, agentHash)
+	}
 }
 
 // intArg reads a non-negative integer query argument, def when absent.
@@ -200,6 +306,7 @@ type suiteFacts struct {
 	output  string
 	grading string
 	tasks   map[string]string // task id -> output kind, only for tasks that set their own
+	probes  map[string]string // probe id -> fault name (runFault)
 }
 
 // runListSuiteBudget is how long the runs list waits for one suite.
@@ -225,7 +332,12 @@ func (h *RunListHandler) suiteInfo(ctx context.Context) map[string]suiteFacts {
 		if err != nil || s == nil {
 			continue
 		}
-		facts := suiteFacts{track: cmp.Or(s.Track, schemas.TrackCoding), output: "diff", grading: cmp.Or(s.Grading, "verified"), tasks: map[string]string{}}
+		facts := suiteFacts{track: cmp.Or(s.Track, schemas.TrackCoding), output: "diff", grading: cmp.Or(s.Grading, "verified"), tasks: map[string]string{}, probes: map[string]string{}}
+		for _, p := range s.Probes {
+			if name := familyFault(p.PS2Family); name != "" {
+				facts.probes[p.ID] = name
+			}
+		}
 		if s.Output != nil && s.Output.Kind != "" {
 			facts.output = s.Output.Kind
 		}
@@ -264,7 +376,9 @@ func runListRow(rv RunView, suites map[string]suiteFacts) RunListRow {
 			}
 		}
 	}
-	if facts, ok := suites[rv.Slot.Suite]; ok {
+	facts, ok := suites[rv.Slot.Suite]
+	row.Fault = runFault(rv.Slot.Condition, facts.probes)
+	if ok {
 		row.Track = facts.track
 		row.Grading = facts.grading
 		row.Output = cmp.Or(facts.tasks[rv.Slot.Task], facts.output)
@@ -272,14 +386,51 @@ func runListRow(rv RunView, suites map[string]suiteFacts) RunListRow {
 	return row
 }
 
+// familyFault is the evaluation fault name of a probe family: the three
+// evaluation faults by their names, any other family with dashes.
+func familyFault(f schemas.PS2Family) string {
+	switch f {
+	case "":
+		return ""
+	case schemas.FamilyUnavailableModel:
+		return faults.ModelDown
+	case schemas.FamilyBrokenTool:
+		return faults.BrokenTool
+	case schemas.FamilyMisleadingInstruction:
+		return faults.MisleadingInstruction
+	}
+	return strings.ReplaceAll(string(f), "_", "-")
+}
+
+// runFault is the fault a condition injected: "" for clean, the generic
+// probes and the suite's probes by their family, else a fault named in the
+// condition id, else the condition id itself.
+func runFault(condition string, probes map[string]string) string {
+	switch condition {
+	case "", schemas.ConditionClean:
+		return ""
+	case schemas.GenericProbeModelDown:
+		return faults.ModelDown
+	case schemas.GenericProbeBrokenTool:
+		return faults.BrokenTool
+	}
+	if name := probes[condition]; name != "" {
+		return name
+	}
+	if name := reportcard.DefaultFault(condition); name != "" {
+		return name
+	}
+	return condition
+}
+
 // runListFacets collects the distinct, sorted filter values of rows.
 func runListFacets(rows []RunListRow) RunListFacets {
-	sets := make([]map[string]bool, 7)
+	sets := make([]map[string]bool, 10)
 	for i := range sets {
 		sets[i] = map[string]bool{}
 	}
 	for _, r := range rows {
-		for i, v := range []string{r.ExpID, r.Suite, r.Arm, r.Task, r.Condition, string(r.Outcome), r.Track} {
+		for i, v := range []string{r.ExpID, r.Suite, r.Arm, r.Task, r.Condition, string(r.Outcome), r.Track, r.ConfigID, cmp.Or(r.Fault, faults.Clean), r.Model} {
 			if v != "" {
 				sets[i][v] = true
 			}
@@ -296,6 +447,7 @@ func runListFacets(rows []RunListRow) RunListFacets {
 	return RunListFacets{
 		Experiments: sorted(sets[0]), Suites: sorted(sets[1]), Arms: sorted(sets[2]), Tasks: sorted(sets[3]),
 		Conditions: sorted(sets[4]), Outcomes: sorted(sets[5]), Tracks: sorted(sets[6]),
+		Agents: sorted(sets[7]), Faults: sorted(sets[8]), Models: sorted(sets[9]),
 	}
 }
 

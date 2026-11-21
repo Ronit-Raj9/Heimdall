@@ -3,11 +3,15 @@ package handlers
 import (
 	"encoding/json"
 	"net"
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/agentversions"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
@@ -164,5 +168,95 @@ func TestExperimentListCarriesSuiteArmsAndDecision(t *testing.T) {
 	st := out.Experiments[0]
 	if st.Suite != "coding-core@1.0.0" || !slices.Equal(st.Arms, []string{"A", "B"}) || st.Decision != schemas.DecisionImproved {
 		t.Errorf("status = suite %q arms %v decision %q", st.Suite, st.Arms, st.Decision)
+	}
+}
+
+// TestRunListMetricsModelVersionAndFault: the row carries steps, tool calls,
+// tokens, model, agent version and fault from existing run data, and the
+// agent, benchmark and fault filters run on the server before paging.
+func TestRunListMetricsModelVersionAndFault(t *testing.T) {
+	idx := runListIndex()
+	root := t.TempDir()
+	m := idx.manifests[testExp]
+	m.Arms = map[string]schemas.ArmManifest{
+		"A": {Config: schemas.AgentConfig{ID: "cfg-A", Model: "gpt-x", AgentVersion: "1.2.0"}, ConfigHash: "sha256:aaa"},
+		"B": {Config: schemas.AgentConfig{ID: "cfg-B", Model: "claude-y"}, ConfigHash: "sha256:bbb"},
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".heimdall", "agent-versions", "cfg-B"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Versions match by agent hash (the config without model and provider).
+	ah, err := agentversions.AgentHash(m.Arms["B"].Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".heimdall", "agent-versions", "cfg-B", "versions.json"), []byte(`[{"version":3,"hash":"bbb","agent_hash":"`+strings.TrimPrefix(ah, "sha256:")+`"}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for i := range idx.runs {
+		rv := &idx.runs[i]
+		if rv.Slot.Arm == "B" {
+			idx.files[rv.Run.RunID][FileMetrics] = []byte(`{"cost_usd":{"state":"observed","v":0.25},"steps":{"state":"observed","v":12},"tool_calls":{"state":"observed","v":7},"tokens":{"state":"observed","v":3400}}`)
+		} else {
+			idx.files[rv.Run.RunID][FileMetrics] = []byte(`{"steps":{"state":"unknown","v":null,"reason":"no trace"}}`)
+		}
+		if rv.Slot.Task == "t02" {
+			rv.Slot.Condition = "model-outage"
+		}
+	}
+	suites := runListSuites()
+	suites.suites["coding-core"].Probes = []*schemas.ProbeSpec{{ID: "model-outage", PS2Family: schemas.FamilyUnavailableModel}}
+
+	r := router.New()
+	NewRunListHandler(testMode, idx, suites).WithRoot(root).RegisterRoutes(r)
+	ln := fasthttputil.NewInmemoryListener()
+	srv := &fasthttp.Server{Handler: r.Handler}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Shutdown() })
+	c := &testClient{client: &fasthttp.Client{Dial: func(string) (net.Conn, error) { return ln.Dial() }}}
+
+	out := getRunList(t, c, "")
+	byID := map[string]RunListRow{}
+	for _, row := range out.Runs {
+		byID[row.RunID] = row
+	}
+	b := byID["r_t02_B"]
+	if b.Steps == nil || *b.Steps != 12 || b.ToolCalls == nil || *b.ToolCalls != 7 || b.Tokens == nil || *b.Tokens != 3400 {
+		t.Errorf("r_t02_B metrics = steps %v tool calls %v tokens %v", b.Steps, b.ToolCalls, b.Tokens)
+	}
+	if b.Model != "claude-y" || b.Version != 3 || b.Fault != "model-down" {
+		t.Errorf("r_t02_B = model %q version %d fault %q", b.Model, b.Version, b.Fault)
+	}
+	a := byID["r_t01_A"]
+	if a.Steps != nil || a.Tokens != nil || a.Model != "gpt-x" || a.AgentVer != "1.2.0" || a.Version != 0 || a.Fault != "" {
+		t.Errorf("r_t01_A = %+v, want no unobserved metric, its model and agent version, no fault", a)
+	}
+	if f := out.Facets; !slices.Equal(f.Agents, []string{"cfg-A", "cfg-B"}) || !slices.Equal(f.Faults, []string{"clean", "model-down"}) || !slices.Equal(f.Models, []string{"claude-y", "gpt-x"}) {
+		t.Errorf("facets = %+v", f)
+	}
+	cases := []struct {
+		query string
+		want  []string
+	}{
+		{"?agent=cfg-B", []string{"r_t02_B", "r_t01_B"}},
+		{"?agent=cfg-B&limit=1&offset=1", []string{"r_t01_B"}},
+		{"?fault=model-down", []string{"r_t02_B", "r_t02_A"}},
+		{"?fault=clean&agent=cfg-A", []string{"r_t01_A"}},
+		{"?benchmark=coding-core&agent=cfg-A&fault=model-down", []string{"r_t02_A"}},
+		{"?benchmark=other", nil},
+		{"?model=claude-y&fault=clean", []string{"r_t01_B"}},
+	}
+	for _, tc := range cases {
+		got := getRunList(t, c, tc.query)
+		var ids []string
+		for _, row := range got.Runs {
+			ids = append(ids, row.RunID)
+		}
+		if !slices.Equal(ids, tc.want) {
+			t.Errorf("%s = %v, want %v", tc.query, ids, tc.want)
+		}
+	}
+	if got := getRunList(t, c, "?agent=cfg-B&limit=1"); got.Total != 2 {
+		t.Errorf("agent filter total = %d, want 2 across pages", got.Total)
 	}
 }

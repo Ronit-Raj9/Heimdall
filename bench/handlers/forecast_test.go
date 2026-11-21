@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,10 +23,33 @@ type fakeForecast struct {
 	matrixErr   error
 	lastQuery   leaderboard.MatrixQuery
 	lastExp     *schemas.Experiment
+	exps        []*schemas.Experiment // every experiment asked, in call order
+	mu          sync.Mutex            // the evaluation estimate asks for benchmarks side by side
+}
+
+// expFor is the last experiment asked for suite ref (id@version).
+func (f *fakeForecast) expFor(suite string) *schemas.Experiment {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := len(f.exps) - 1; i >= 0; i-- {
+		if f.exps[i].Suite == suite {
+			return f.exps[i]
+		}
+	}
+	return nil
+}
+
+func (f *fakeForecast) calls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.exps)
 }
 
 func (f *fakeForecast) Estimate(_ context.Context, exp *schemas.Experiment) (*schemas.Forecast, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.lastExp = exp
+	f.exps = append(f.exps, exp)
 	if f.estimateErr != nil {
 		return nil, f.estimateErr
 	}

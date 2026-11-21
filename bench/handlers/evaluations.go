@@ -756,16 +756,11 @@ func admittedTasks(st *schemas.Suite, split string) taskPick {
 		q, _ = readQuarantineFile(st.Root) // an unreadable sidecar: the planner refuses with the reason
 	}
 	var pick taskPick
-	ids := append([]string(nil), st.TaskIDs...)
-	if len(ids) == 0 {
-		for _, t := range st.Tasks {
-			ids = append(ids, t.ID)
-		}
-	}
+	ids := suiteTaskIDs(st)
 	sort.Strings(ids)
 	for _, id := range ids {
-		t := st.TaskByID(id) // nil when only the ids are loaded: public, and the planner screens it again
-		if st.Lock != nil && (t == nil || !summarizeTask(st, t, nil).Admitted) {
+		t := st.TaskByID(id) // nil when only the ids are loaded (a suite head): public, and the planner screens it again
+		if st.Lock != nil && !lockAdmits(st, id) {
 			continue
 		}
 		if taskSplitOf(t) != split {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 )
@@ -53,9 +54,9 @@ func TestEstimateEvaluationKnown(t *testing.T) {
 	if est.Runs != 12+4 || !est.EstCostUSD.Known || est.EstCostUSD.Low != 2 || est.EstCostUSD.High != 6 {
 		t.Fatalf("totals %+v", est)
 	}
-	// The experiment the forecast saw: the one arm only (no hidden repeat), first N sorted admitted tasks.
-	exp := src.lastExp
-	if exp.Suite != "plain@2" || len(exp.Arms) != 1 || exp.Arms["A"].Set["model"] != "gpt-x" || exp.Base != "agents/codex.yaml" {
+	// The experiment the forecast saw: the one arm only (no hidden repeat).
+	exp := src.expFor("plain@2")
+	if exp == nil || exp.Suite != "plain@2" || len(exp.Arms) != 1 || exp.Arms["A"].Set["model"] != "gpt-x" || exp.Base != "agents/codex.yaml" {
 		t.Fatalf("experiment %+v", exp)
 	}
 }
@@ -100,5 +101,78 @@ func TestEstimateEvaluationBadRequest(t *testing.T) {
 		if _, err := EstimateEvaluation(context.Background(), estimateSuites(), nil, req); !errors.Is(err, errQuickBad) {
 			t.Fatalf("%+v: got %v, want bad request", req, err)
 		}
+	}
+}
+
+// TestEstimateForecastsTheTasksTheLaunchRuns: the estimate and the launch
+// share one picker, spread over the admitted tasks, admission read from the
+// lock alone.
+func TestEstimateForecastsTheTasksTheLaunchRuns(t *testing.T) {
+	admitted := func() schemas.TaskLock {
+		return schemas.TaskLock{Status: schemas.TaskAdmitted, Admission: &schemas.AdmissionRecord{Admitted: true}}
+	}
+	st := &schemas.Suite{ID: "wide", Version: "1", TaskIDs: []string{"t1", "t2", "t3", "t4", "t5"},
+		Tasks: []*schemas.Task{{ID: "t1"}, {ID: "t2"}, {ID: "t3"}, {ID: "t4"}, {ID: "t5"}},
+		Lock:  &schemas.SuiteLock{Tasks: map[string]schemas.TaskLock{"t1": admitted(), "t2": admitted(), "t3": {Status: schemas.TaskAdmitted}, "t4": admitted(), "t5": admitted()}}}
+	want := evalPickTasks(st, schemas.SplitPublic, 2)
+	if !slices.Equal(want, []string{"t1", "t4"}) {
+		t.Fatalf("pick = %v, want spread over admitted t1 t2 t4 t5", want)
+	}
+	// A suite head (no Tasks) picks the same.
+	head := *st
+	head.Tasks = nil
+	if got := evalPickTasks(&head, schemas.SplitPublic, 2); !slices.Equal(got, want) {
+		t.Fatalf("head pick = %v, want %v", got, want)
+	}
+	src := &fakeForecast{}
+	suites := &fakeSuites{ids: []string{"wide"}, suites: map[string]*schemas.Suite{"wide": st}}
+	if _, err := EstimateEvaluation(context.Background(), suites, src, &EvalEstimateRequest{Arms: []EvalEstimateArm{{Agent: "codex", Model: "gpt-x"}}, Benchmarks: []string{"wide"}, TasksPerBenchmark: 2}); err != nil {
+		t.Fatal(err)
+	}
+	exp := src.expFor("wide@1")
+	if exp == nil || len(exp.Conditions) == 0 || !slices.Equal(exp.Conditions[0].Tasks.IDs, want) {
+		t.Fatalf("forecast tasks = %+v, want %v", exp, want)
+	}
+}
+
+// TestEstimateForecastCache: the same estimate twice asks the forecast once;
+// another agent config or another model asks again; errors are not cached.
+func TestEstimateForecastCache(t *testing.T) {
+	src := &fakeForecast{}
+	cache := newForecastCache()
+	req := func(model string) *EvalEstimateRequest {
+		return &EvalEstimateRequest{Arms: []EvalEstimateArm{{Agent: "codex", Model: model}}, Benchmarks: []string{"coding-core", "plain"}}
+	}
+	agents := map[string]*schemas.AgentConfig{"agents/codex.yaml": {ID: "codex", Adapter: "command"}}
+	for i := 0; i < 3; i++ {
+		if _, err := estimateEvaluation(context.Background(), estimateSuites(), src, req("gpt-x"), agents, "/org", cache); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := src.calls(); n != 2 {
+		t.Fatalf("forecast calls = %d, want 2 (one per benchmark, then cached)", n)
+	}
+	_, _ = estimateEvaluation(context.Background(), estimateSuites(), src, req("gpt-y"), agents, "/org", cache)
+	if n := src.calls(); n != 4 {
+		t.Fatalf("calls after a new model = %d, want 4", n)
+	}
+	agents["agents/codex.yaml"] = &schemas.AgentConfig{ID: "codex", Adapter: "command", Model: "changed"}
+	_, _ = estimateEvaluation(context.Background(), estimateSuites(), src, req("gpt-x"), agents, "/org", cache)
+	if n := src.calls(); n != 6 {
+		t.Fatalf("calls after an agent config change = %d, want 6", n)
+	}
+	// Expired entries are asked again.
+	cache.now = func() time.Time { return time.Now().Add(forecastCacheTTL + time.Second) }
+	_, _ = estimateEvaluation(context.Background(), estimateSuites(), src, req("gpt-x"), agents, "/org", cache)
+	if n := src.calls(); n != 8 {
+		t.Fatalf("calls after expiry = %d, want 8", n)
+	}
+	bad := &fakeForecast{estimateErr: errors.Join(ErrPlanRefused, errors.New("no lock"))}
+	errCache := newForecastCache()
+	for i := 0; i < 2; i++ {
+		_, _ = estimateEvaluation(context.Background(), estimateSuites(), bad, req("gpt-x"), agents, "/org", errCache)
+	}
+	if n := bad.calls(); n != 4 {
+		t.Fatalf("refused forecast calls = %d, want 4 (errors never cached)", n)
 	}
 }
