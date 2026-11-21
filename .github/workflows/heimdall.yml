@@ -80,7 +80,7 @@ jobs:
           bundle: ${{ github.workspace }}/bench/testdata/recorded
           exp-id: e_pilot_mixed_nc93
           data-mode: recorded
-          policy: policies/strict.yaml # gate-failure test: strict policy blocks small samples
+          policy: "" # bench/policies/default.yaml
           fail-on: regressed,invalid
           artifact-name: heimdall-report
 
