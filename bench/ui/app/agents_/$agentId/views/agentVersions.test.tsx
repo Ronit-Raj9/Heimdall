@@ -24,12 +24,43 @@ vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 	useGetAgentReportCardQuery: () => ({ data: state.report, error: state.reportError, isLoading: false, isError: Boolean(state.reportError) }),
 }));
 
+vi.mock("@/lib/store/apis/failurePatternsApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/failurePatternsApi")>()),
+	useGetEvaluationFailurePatternsQuery: () => ({
+		data: {
+			evaluation: "ev_1",
+			groups: [
+				{
+					key: "A",
+					label: "A",
+					agent: "codex",
+					version: 2,
+					models: ["gpt-x"],
+					runs: 10,
+					failed: 4,
+					experiments: ["e1"],
+					last_at: "",
+					patterns: [
+						{ pattern: "pattern_loop", label: "Loop", description: "same call repeated", count: 3, observed: 10, unknown: 0, examples: [{ run_id: "r1", exp_id: "e1", benchmark: "hd-harbor-tb2", task: "t1", outcome: "fail" }] },
+						{ pattern: "pattern_ignored_error", label: "Ignored error", description: "", count: 0, observed: 10, unknown: 0, examples: [] },
+					],
+				},
+			],
+		},
+	}),
+}));
+
+vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
+	useGetClustersQuery: () => ({ data: { clusters: [] } }),
+}));
+
 vi.mock("@/lib/store/apis/modelsApi", () => ({
 	useGetModelsQuery: () => ({ data: { providers: [{ models: [{ id: "gpt-x" }, { id: "claude-y" }] }, { models: [{ id: "gpt-x" }] }] } }),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
-	Link: ({ to, search, children, ...rest }: { to: string; search?: Record<string, string>; children: React.ReactNode }) => (
+	Link: ({ to, search, params: _params, children, ...rest }: { to: string; search?: Record<string, string>; params?: unknown; children: React.ReactNode }) => (
 		<a href={search ? `${to}?${new URLSearchParams(search).toString()}` : to} {...rest}>
 			{children}
 		</a>
@@ -105,6 +136,12 @@ describe("report card tab", () => {
 		expect(html).toContain('data-testid="capability-terminal"');
 		expect(html).toContain('value="2"');
 		expect(html).toContain('value="claude-y"');
+		// Where it failed: the patterns seen, with example runs; unseen patterns are left out.
+		expect(html).toContain('data-testid="report-failures"');
+		expect(html).toContain("Loops");
+		expect(html).toContain("3 of 10 runs");
+		expect(html).toContain('data-testid="failure-example-r1"');
+		expect(html).not.toContain('data-testid="pattern-pattern_ignored_error"');
 	});
 
 	it("helpers", () => {

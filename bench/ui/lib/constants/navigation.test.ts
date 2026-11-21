@@ -12,6 +12,8 @@ describe("navigation", () => {
 			"/experiments",
 			"/runs",
 			"/leaderboard",
+			"/why-agents-fail",
+			"/failure-tests",
 			"/agents",
 			"/suites",
 			"/catalog",

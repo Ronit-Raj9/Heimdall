@@ -1,5 +1,6 @@
 import { useGetEvaluationReportQuery } from "@/lib/store/apis/evaluationsApi";
 import { ReportCard } from "./reportCard";
+import { ReportFailures } from "./reportFailures";
 
 /** Fetches GET /evaluations/{id}/report and shows it as a report card. */
 export function EvaluationReportCard({ evaluationId }: { evaluationId: string }) {
@@ -21,7 +22,12 @@ export function EvaluationReportCard({ evaluationId }: { evaluationId: string })
 			</p>
 		);
 	}
-	return <ReportCard report={report.data} />;
+	return (
+		<div className="flex min-w-0 flex-col gap-8">
+			<ReportCard report={report.data} />
+			<ReportFailures report={report.data} />
+		</div>
+	);
 }
 
 export default EvaluationReportCard;

@@ -66,6 +66,22 @@ export interface AgentConfigFields {
 	remote_url?: string;
 	a2a_card_url?: string;
 	description?: string;
+	/** Instructions, memory, retries and limits, capabilities. Absent from an older server. */
+	behavior?: AgentBehaviorFields;
+}
+
+/** The Setup form's behavior fields; each maps to one key of the agent YAML (empty removes it). */
+export interface AgentBehaviorFields {
+	notes_project_file: string;
+	notes_user_file: string;
+	notes_user_path: string;
+	memory_paths: string[];
+	max_retries: number;
+	max_tool_calls: number;
+	provider_retries: number;
+	fallbacks: string[];
+	/** Empty uses the defaults of the agent's kind. */
+	capabilities: string[];
 }
 
 export interface AgentConfigDoc {

@@ -1,4 +1,5 @@
 import { ReportCard } from "@/components/reportcard/reportCard";
+import { ReportFailures } from "@/components/reportcard/reportFailures";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { useGetAgentReportCardQuery, useGetAgentVersionsQuery, type ReportCardResponse } from "@/lib/store/apis/evaluationsApi";
@@ -77,7 +78,10 @@ export default function ReportCardTab({ agentId }: { agentId: string }) {
 			) : report.isError || !report.data ? (
 				<LoadError title={t("reportCard.loadError")} error={report.error} onRetry={() => void report.refetch()} testId="agent-report-card-error" />
 			) : (
-				<ReportCard report={report.data} />
+				<>
+					<ReportCard report={report.data} />
+					<ReportFailures report={report.data} agent={agentId} />
+				</>
 			)}
 		</div>
 	);

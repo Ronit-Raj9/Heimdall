@@ -26,6 +26,13 @@ const TEST_DOUBLE_TEXT = /\b(test[ -]?double|stub agent|fake agent|mock agent|de
 
 type TestAgentFields = Pick<AgentSummary, "id" | "scripted_kind" | "adapter"> & { description?: string; notes?: string };
 
+/** Agents every new org starts with, shown for comparison under "Baseline agents". */
+export const BASELINE_AGENT_IDS: ReadonlySet<string> = new Set(["codex", "claude-code", "mini-swe-agent", "opencode", "gemini-cli", "fw-plain-openai", "custom-python"]);
+
+export function isBaselineAgent(agent: Pick<AgentSummary, "id">): boolean {
+	return BASELINE_AGENT_IDS.has(agent.id);
+}
+
 export function isTestAgent(agent: TestAgentFields): boolean {
 	if (agent.scripted_kind || agent.adapter === "scripted") return true;
 	if (TEST_IDS.has(agent.id) || agent.id.startsWith("live-")) return true;

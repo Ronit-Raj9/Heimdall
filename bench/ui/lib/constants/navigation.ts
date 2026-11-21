@@ -4,6 +4,7 @@ import {
 	Bot,
 	BookOpen,
 	Boxes,
+	Bug,
 	CalendarClock,
 	FileUp,
 	Sparkles,
@@ -26,6 +27,7 @@ import {
 	Radio,
 	Server,
 	Settings,
+	ShieldAlert,
 	ShieldCheck,
 	type LucideIcon,
 } from "lucide-react";
@@ -41,6 +43,8 @@ export interface BenchNavItem {
 		| "/experiments"
 		| "/runs"
 		| "/leaderboard"
+		| "/why-agents-fail"
+		| "/failure-tests"
 		| "/agents"
 		| "/suites"
 		| "/canaries"
@@ -70,6 +74,8 @@ export interface BenchNavItem {
 		| "shell.nav.experiments"
 		| "shell.nav.runs"
 		| "shell.nav.leaderboard"
+		| "shell.nav.whyAgentsFail"
+		| "shell.nav.failureTests"
 		| "shell.nav.agents"
 		| "shell.nav.suites"
 		| "shell.nav.canaries"
@@ -147,6 +153,8 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 			},
 			{ to: "/runs", labelKey: "shell.nav.runs", icon: CirclePlay, testId: "nav-link-runs", also: ["/compare"] },
 			{ to: "/leaderboard", labelKey: "shell.nav.leaderboard", icon: ListOrdered, testId: "nav-link-leaderboard", also: ["/trends"] },
+			{ to: "/why-agents-fail", labelKey: "shell.nav.whyAgentsFail", icon: Bug, testId: "nav-link-why-agents-fail" },
+			{ to: "/failure-tests", labelKey: "shell.nav.failureTests", icon: ShieldAlert, testId: "nav-link-failure-tests" },
 		],
 	},
 	{

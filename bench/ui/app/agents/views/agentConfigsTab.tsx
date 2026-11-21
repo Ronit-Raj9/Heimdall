@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import type { AgentSummary, AgentsResponse, Job } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, Bot, ChevronRight, Cpu, FlaskConical, Info, Play } from "lucide-react";
+import { AlertTriangle, Bot, Cpu, Gauge, Info } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
-import { AgentAvatar, CheckPill, adapterIcon, isTestAgent, jobState, lastJobFor, useAdapterLabel } from "./agentDisplay";
+import "@/lib/types/agentFirstI18n";
+import { AgentAvatar, CheckPill, adapterIcon, isBaselineAgent, isTestAgent, jobState, lastJobFor, useAdapterLabel } from "./agentDisplay";
 import { useAgentJobs } from "./agentJobs";
 /** What the agents tabs read of GET /agents. */
 export interface AgentsQuery {
@@ -29,10 +30,17 @@ export function pickAgent(agents: readonly AgentSummary[], wanted: string | null
 	return agents.find((agent) => agentKey(agent) === wanted) ?? agents.find((agent) => !agent.error) ?? agents[0] ?? null;
 }
 
-/** Configs tab: every agent as a card; scripted test agents fold into a group at the bottom. */
+/** The agents list split: the org's own agents, the seeded baselines, and test doubles (never shown). */
+export function splitAgents(agents: readonly AgentSummary[]): { yours: AgentSummary[]; baselines: AgentSummary[]; tests: AgentSummary[] } {
+	const tests = agents.filter((agent) => isTestAgent(agent));
+	const real = agents.filter((agent) => !isTestAgent(agent));
+	return { yours: real.filter((a) => !isBaselineAgent(a)), baselines: real.filter((a) => isBaselineAgent(a)), tests };
+}
+
+/** Configs tab: "Your agents" first, then "Baseline agents" for comparison. Test agents are hidden. */
 export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 	const { t } = useTranslation("bench");
-	const { t: tu } = useTranslation("agentsUx");
+	const { t: ta } = useTranslation("agentFirst");
 	const [wanted] = useQueryState("agent", parseAsString);
 	const jobs = useAgentJobs();
 	const data = query.data;
@@ -42,8 +50,7 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 	}
 	if (data.agents.length === 0) return <EmptyState icon={Bot} message={t("agents.empty")} testId="agents-empty" />;
 	const missing = wanted !== null && !data.agents.some((agent) => agentKey(agent) === wanted);
-	const real = data.agents.filter((agent) => !isTestAgent(agent));
-	const tests = data.agents.filter((agent) => isTestAgent(agent));
+	const { yours, baselines } = splitAgents(data.agents);
 	return (
 		<div className={cn("flex min-w-0 flex-col gap-6", query.isFetching && "opacity-60")}>
 			{missing && (
@@ -62,26 +69,41 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 					{t("agents.synthetic")}
 				</p>
 			)}
-			<ul aria-label={t("agents.label")} className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="agents-list">
-				{real.map((agent) => (
-					<AgentListCard key={agent.path} agent={agent} jobs={jobs} selected={wanted === agentKey(agent)} />
-				))}
-			</ul>
-			{tests.length > 0 && (
-				<details className="group rounded-xl border" data-testid="agents-test-group">
-					<summary className="hover:bg-muted/50 flex cursor-pointer list-none items-center gap-2 rounded-xl px-5 py-3 text-sm font-medium">
-						<ChevronRight className="text-muted-foreground size-4 transition-transform group-open:rotate-90" aria-hidden="true" />
-						<FlaskConical className="text-muted-foreground size-4" aria-hidden="true" />
-						{tu("list.testAgents")}
-						<span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs tabular-nums">{tests.length}</span>
-						<span className="text-muted-foreground ml-2 hidden truncate text-xs font-normal sm:inline">{tu("list.testAgentsHint")}</span>
-					</summary>
-					<ul className="grid min-w-0 grid-cols-1 gap-4 p-5 pt-2 sm:grid-cols-2 xl:grid-cols-3">
-						{tests.map((agent) => (
+			<section className="flex min-w-0 flex-col gap-3" data-testid="agents-yours" aria-labelledby="agents-yours-title">
+				<h2 id="agents-yours-title" className="text-base font-semibold tracking-tight">
+					{ta("list.yours")}
+				</h2>
+				{yours.length === 0 ? (
+					<div className="text-muted-foreground flex flex-wrap items-center gap-3 rounded-xl border border-dashed px-5 py-4 text-sm" data-testid="agents-yours-empty">
+						<span>{ta("list.yoursEmpty")}</span>
+						<Button asChild size="sm">
+							<Link to="/agents/new" data-testid="agents-yours-add">
+								{ta("list.add")}
+							</Link>
+						</Button>
+					</div>
+				) : (
+					<ul aria-label={t("agents.label")} className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="agents-list">
+						{yours.map((agent) => (
 							<AgentListCard key={agent.path} agent={agent} jobs={jobs} selected={wanted === agentKey(agent)} />
 						))}
 					</ul>
-				</details>
+				)}
+			</section>
+			{baselines.length > 0 && (
+				<section className="flex min-w-0 flex-col gap-3" data-testid="agents-baselines" aria-labelledby="agents-baselines-title">
+					<div className="flex flex-col gap-0.5">
+						<h2 id="agents-baselines-title" className="text-base font-semibold tracking-tight">
+							{ta("list.baselines")}
+						</h2>
+						<p className="text-muted-foreground text-sm">{ta("list.baselinesHint")}</p>
+					</div>
+					<ul className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="agents-baseline-list">
+						{baselines.map((agent) => (
+							<AgentListCard key={agent.path} agent={agent} jobs={jobs} selected={wanted === agentKey(agent)} />
+						))}
+					</ul>
+				</section>
 			)}
 		</div>
 	);
@@ -90,6 +112,7 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 /** One agent: avatar, name, friendly adapter, default model, last check and a Run button. */
 function AgentListCard({ agent, jobs, selected }: { agent: AgentSummary; jobs?: readonly Job[]; selected: boolean }) {
 	const { t } = useTranslation("agentsUx");
+	const { t: ta } = useTranslation("agentFirst");
 	const adapterLabel = useAdapterLabel();
 	const key = agentKey(agent);
 	const name = agent.id || agent.path.replace(/^.*\//, "").replace(/\.ya?ml$/, "");
@@ -141,9 +164,9 @@ function AgentListCard({ agent, jobs, selected }: { agent: AgentSummary; jobs?: 
 				</span>
 				{!agent.error && (
 					<Button asChild size="sm" variant="outline" className="relative z-10">
-						<Link to="/experiments/new" search={{ agent: key } as never} data-testid={`${testId}-run`}>
-							<Play aria-hidden="true" />
-							{t("actions.run")}
+						<Link to={"/evaluate" as never} search={{ agent: key } as never} data-testid={`${testId}-run`}>
+							<Gauge aria-hidden="true" />
+							{ta("list.evaluate")}
 						</Link>
 					</Button>
 				)}

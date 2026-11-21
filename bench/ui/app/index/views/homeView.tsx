@@ -1,6 +1,7 @@
 import { Pill, StatCard } from "@/components/home/homeBits";
 import { evaluationStats, homeStats, isSystemCheck, monthStart, newestEvaluations, splitExperiments, type ExperimentListItem } from "@/components/home/home.utils";
 import { RecentEvaluations } from "@/components/home/recentEvaluations";
+import { YourAgents } from "@/components/home/yourAgents";
 import { RecentExperiments } from "@/components/home/recentExperiments";
 import { RunningExperiments } from "@/components/home/runningExperiments";
 import { SuitesPanel } from "@/components/home/suitesPanel";
@@ -11,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { formatValueNumber } from "@/components/valueCell.utils";
 import { getLocale } from "@/lib/i18n";
 import { canUse, useSession } from "@/lib/session/sessionContext";
-import { useGetSuitesQuery, useListExperimentsQuery } from "@/lib/store";
+import { useGetAgentsQuery, useGetSuitesQuery, useListExperimentsQuery } from "@/lib/store";
+import "@/lib/types/agentFirstI18n";
 import { useListRunsQuery } from "@/lib/store/apis/benchApi";
 import { useListEvaluationsQuery } from "@/lib/store/apis/evaluationsApi";
 import "@/lib/types/homeI18n";
@@ -41,7 +43,9 @@ function greetingKey(now: Date): "morning" | "afternoon" | "evening" {
  */
 export default function HomeView() {
 	const { t } = useTranslation("home");
+	const { t: ta } = useTranslation("agentFirst");
 	const locale = getLocale();
+	const agents = useGetAgentsQuery();
 	const list = useListExperimentsQuery(undefined, { pollingInterval: LIST_POLL_MS, skipPollingIfUnfocused: true });
 	const suites = useGetSuitesQuery();
 	const runs = useListRunsQuery({ limit: RUNS_PAGE }, { pollingInterval: LIST_POLL_MS, skipPollingIfUnfocused: true });
@@ -137,6 +141,19 @@ export default function HomeView() {
 					testId="home-kpi-spend"
 				/>
 			</div>
+
+			{!agents.isError && (
+				<HomeSection title={ta("home.title")} testId="home-section-agents" link={{ to: "/agents", label: ta("home.viewAll") }}>
+					{agents.isLoading ? (
+						<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="home-agents-loading" aria-hidden="true">
+							<div className="bg-muted h-44 animate-pulse rounded-xl" />
+							<div className="bg-muted hidden h-44 animate-pulse rounded-xl md:block" />
+						</div>
+					) : (
+						<YourAgents agents={agents.data?.agents ?? []} evaluations={evaluations} mayRun={mayRun} />
+					)}
+				</HomeSection>
+			)}
 
 			{!empty && (
 				<HomeSection

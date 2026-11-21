@@ -1664,6 +1664,8 @@ export interface RunListParams {
 	condition?: string;
 	outcome?: string;
 	track?: string;
+	/** The run's agent config id. */
+	agent?: string;
 	limit?: number;
 	offset?: number;
 }
