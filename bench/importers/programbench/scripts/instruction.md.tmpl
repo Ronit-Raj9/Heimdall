@@ -1,0 +1,28 @@
+# Rebuild `{{REPO}}` from its binary
+
+This is a reverse-engineering benchmark (ProgramBench). You are given a compiled binary and its documentation. Write a new, original codebase from scratch that produces an executable with identical behavior.
+
+The executable is at `./executable` in the workspace root (`/workspace`), next to the program's bundled documentation. Implementation language of the original: {{LANG}}. You do NOT have access to the internet, and no project-specific dependencies are pre-installed.
+
+## Your task
+
+Implement the source code that builds an executable with exactly the same behavior as the original.
+
+- Leave a `./compile.sh` in the workspace root that produces an executable `./executable` in the workspace root. It must be executable and must build from the source you wrote, offline. If it fails on a fresh copy of your workspace, the task has failed.
+- Keep build artifacts (including the executable) out of git with `.gitignore`, and commit your changes.
+
+Grading runs your `compile.sh` with no network, then runs hidden tests against the `./executable` it produced. The score is the fraction of hidden tests that pass; the task counts as resolved only when all pass.
+
+## Rules (upstream ProgramBench rules; breaking them is a disqualification)
+
+1. **No source code.** The only sources of truth are the executable and its bundled documentation. Do not obtain the project's source code from anywhere (repositories, forks, package registries, source tarballs, package-manager caches, web search), even if you recognize the program.
+2. **No wrapping or reusing the original binary.** Your solution must not depend on `./executable` or any other prebuilt version of the same tool at runtime: no wrapper scripts that delegate to it, no copying or `chmod` of the provided binary in `compile.sh`, no shelling out to an installed copy of the tool, no re-linking prebuilt object files.
+3. **No binary analysis of the provided executable.** Learn its behavior only through its normal interface (flags, stdin/stdout, files). Do not decompile or disassemble `./executable` and do not run strace, ltrace or similar on it. Analysing binaries you build yourself is fine.
+
+Allowed: running the executable with any inputs, flags and arguments, and reading the bundled documentation.
+
+## Recommended workflow
+
+1. Read all documentation files.
+2. Exercise the executable extensively to understand its behavior. For a TUI, tmux/libtmux is installed to help you inspect it.
+3. Write the source code, build it with `./compile.sh`, and compare your executable's behavior against the original.
