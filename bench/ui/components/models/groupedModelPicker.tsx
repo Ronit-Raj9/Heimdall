@@ -93,6 +93,18 @@ export interface GroupedModelPickerProps {
 	testId?: string;
 }
 
+/** The provider of the first group that lists model (one with a working key first), or "". */
+export function providerOfModel(groups: readonly Pick<ModelGroup, "provider" | "keyState" | "models">[], model: string): string {
+	if (!model) return "";
+	const carrying = groups.filter((g) => g.models.some((m) => m.id === model));
+	return (carrying.find((g) => g.keyState === "ok") ?? carrying[0])?.provider ?? "";
+}
+
+/** The label of a picked model the list does not carry: "Provider: model", or the model id alone. */
+export function modelOptionLabel(providerName: string, model: string): string {
+	return providerName ? `${providerName}: ${model}` : model;
+}
+
 export function GroupedModelPicker({ value, onChange, disabled, testId }: GroupedModelPickerProps) {
 	const id = useId();
 	const tid = testId ?? "grouped-model-picker";
@@ -103,8 +115,9 @@ export function GroupedModelPicker({ value, onChange, disabled, testId }: Groupe
 	const [query, setQuery] = useState("");
 	const [typing, setTyping] = useState<string | null>(null);
 	const groups = groupModels(catalog, keys, query);
-	const provider = value?.provider ?? "";
 	const model = value?.model ?? "";
+	// A model given without its provider (an agent's default model) takes the catalog provider that lists it.
+	const provider = value?.provider || providerOfModel(groupModels(catalog, keys), model);
 	const listed = groups.some((g) => g.provider === provider && g.models.some((m) => m.id === model));
 	const pickedItem = groupModels(catalog, keys)
 		.find((g) => g.provider === provider)
@@ -157,9 +170,7 @@ export function GroupedModelPicker({ value, onChange, disabled, testId }: Groupe
 						{loaded ? "Choose a model" : "Loading models..."}
 					</option>
 					{model !== "" && !listed && !customFor && (
-						<option value={selected}>
-							{providerName}: {model}
-						</option>
+						<option value={selected}>{modelOptionLabel(providerName, model)}</option>
 					)}
 					{groups.map((g) => (
 						<optgroup

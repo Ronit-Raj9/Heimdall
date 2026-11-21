@@ -52,11 +52,73 @@ function range(low: number, high: number, fmt: (n: number) => string): string {
 	return low === high ? fmt(low) : `${fmt(low)} to ${fmt(high)}`;
 }
 
-/** The estimate as three short phrases: runs, cost (or "price not known") and minutes. */
+/**
+ * The estimate as three short phrases: runs, cost (or "price not known") and minutes (or "time not
+ * known"). Tolerates missing ranges, so a partial answer still reads.
+ */
 export function estimateText(e: Pick<EvaluationEstimate, "runs" | "est_cost_usd" | "est_minutes">): { runs: string; cost: string; minutes: string } {
-	const cost = e.est_cost_usd.known ? range(e.est_cost_usd.low, e.est_cost_usd.high, money) : "price not known";
-	const minutes = `${range(e.est_minutes.low, e.est_minutes.high, (n) => String(Math.round(n)))} min`;
-	return { runs: `${e.runs} ${e.runs === 1 ? "run" : "runs"}`, cost, minutes };
+	const runs = Number(e.runs) || 0;
+	const c = e.est_cost_usd;
+	const cost = c?.known ? range(c.low, c.high, money) : "price not known";
+	const m = e.est_minutes;
+	const minutesKnown = m && m.known !== false && (m.low > 0 || m.high > 0);
+	const minutes = minutesKnown ? `${range(m.low, m.high, (n) => String(Math.max(1, Math.round(n))))} min` : "time not known";
+	return { runs: `${runs} ${runs === 1 ? "run" : "runs"}`, cost, minutes };
+}
+
+export interface EstimateNote {
+	benchmark: string;
+	skipped?: string;
+	notes: string[];
+}
+
+/** Per-benchmark skips and notes in plain words, plus the estimate's own notes under "". Empty ones are left out. */
+export function estimateNotes(e: Pick<EvaluationEstimate, "per_benchmark" | "notes">): EstimateNote[] {
+	const out: EstimateNote[] = [];
+	const general = (e.notes ?? []).filter(Boolean);
+	if (general.length) out.push({ benchmark: "", notes: general });
+	for (const b of e.per_benchmark ?? []) {
+		const notes = [...(b.notes ?? []), ...(b.faults_skipped ?? []).map((f) => `${f.fault} is skipped: ${f.reason}`)].filter(Boolean);
+		if (b.skipped || notes.length) out.push({ benchmark: b.benchmark, skipped: b.skipped || undefined, notes });
+	}
+	return out;
+}
+
+/** Whether a failed estimate is a real HTTP error (a status code), not a missing answer. */
+export function estimateFailed(error: unknown): boolean {
+	return Boolean(error && typeof error === "object" && "status" in error && typeof (error as { status: unknown }).status === "number");
+}
+
+/** The estimate result: runs, cost and time, then the per-benchmark notes collapsed. */
+export function EstimateSummary({ estimate, updating }: { estimate: EvaluationEstimate; updating?: boolean }) {
+	const est = estimateText(estimate);
+	const notes = estimateNotes(estimate);
+	const skipped = notes.filter((n) => n.skipped).length;
+	return (
+		<div className="flex flex-col gap-2">
+			<span>
+				About <strong data-testid="step4-est-runs">{est.runs}</strong>, <strong data-testid="step4-est-cost">{est.cost}</strong>,{" "}
+				<strong data-testid="step4-est-minutes">{est.minutes}</strong>.
+				{updating && <span className="text-muted-foreground"> Updating...</span>}
+			</span>
+			{notes.length > 0 && (
+				<details data-testid="step4-est-notes">
+					<summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs select-none">
+						Details{skipped > 0 ? ` (${skipped} ${skipped === 1 ? "benchmark" : "benchmarks"} skipped)` : ""}
+					</summary>
+					<ul className="mt-1.5 flex flex-col gap-1.5 text-xs">
+						{notes.map((n) => (
+							<li key={n.benchmark || "_all"} data-testid={`step4-est-note-${n.benchmark || "all"}`}>
+								{n.benchmark && <span className="font-medium">{n.benchmark}: </span>}
+								{n.skipped && <span>skipped, {n.skipped}. </span>}
+								{n.notes.length > 0 && <span className="text-muted-foreground">{n.notes.join(". ")}</span>}
+							</li>
+						))}
+					</ul>
+				</details>
+			)}
+		</div>
+	);
 }
 
 const chip = "rounded-md border px-3 py-1 text-sm";
@@ -108,7 +170,6 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 	const estimate = useEstimateEvaluationQuery(spec, { skip: !ready });
 	const setArm = (i: number, provider: string, model: string) =>
 		onChange({ ...spec, arms: spec.arms.map((a, j) => (j === i ? { ...a, provider, model } : a)) });
-	const est = estimate.data ? estimateText(estimate.data) : null;
 
 	return (
 		<div className="flex flex-col gap-6" data-testid="step4-setup">
@@ -171,16 +232,14 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 			<section className="bg-muted/40 rounded-md border p-3 text-sm" data-testid="step4-estimate" aria-live="polite">
 				{!ready ? (
 					<span className="text-muted-foreground">Pick benchmarks and a model to see an estimate.</span>
-				) : estimate.isError ? (
+				) : estimate.isError && estimateFailed(estimate.error) ? (
 					<span className="text-muted-foreground">Could not estimate this evaluation right now.</span>
-				) : !est ? (
-					<span className="text-muted-foreground">Estimating...</span>
+				) : estimate.data ? (
+					<EstimateSummary estimate={estimate.data} updating={estimate.isFetching} />
+				) : estimate.isError ? (
+					<span className="text-muted-foreground">No estimate yet.</span>
 				) : (
-					<span>
-						About <strong data-testid="step4-est-runs">{est.runs}</strong>, <strong data-testid="step4-est-cost">{est.cost}</strong>,{" "}
-						<strong data-testid="step4-est-minutes">{est.minutes}</strong>.
-						{estimate.isFetching && <span className="text-muted-foreground"> Updating...</span>}
-					</span>
+					<span className="text-muted-foreground">Estimating...</span>
 				)}
 			</section>
 		</div>

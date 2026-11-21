@@ -3,7 +3,16 @@ import "@/lib/i18n";
 import type { AgentCompatibility, EvaluationPack } from "@/lib/store/apis/evaluationsApi";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Step3BenchmarksView, benchmarkCapability, groupBenchmarks, incompatibleReason, packSelection } from "./step3Benchmarks";
+import {
+	Step3BenchmarksView,
+	benchmarkCapability,
+	compatFor,
+	compatibilityMap,
+	groupBenchmarks,
+	incompatibleReason,
+	keepRunnable,
+	packSelection,
+} from "./step3Benchmarks";
 
 const s = (id: string, admitted_count: number, extra: Record<string, unknown> = {}) =>
 	({ id, description: "", admitted_count, environment: "docker", ...extra }) as never;
@@ -116,5 +125,34 @@ describe("Step3BenchmarksView", () => {
 		const summary = html.match(/data-testid="step3-summary"[\s\S]*?<\/div>/)?.[0] ?? "";
 		expect(summary).toContain("2 benchmarks");
 		expect(summary).toContain("580 ready tasks");
+	});
+});
+describe("compatibility matching", () => {
+	it("matches rows by id without a version pin and tolerates other row shapes", () => {
+		const raw = {
+			agent: "codex",
+			capabilities: ["shell"],
+			benchmarks: [
+				{ id: "voicebench@1.0.0", ok: false, requires: ["voice"], missing: ["voice"], reason: "" },
+				{ benchmark: "kernelbench-l2", missing: ["gpu"], requires: null, reason: "" },
+			],
+		} as unknown as AgentCompatibility;
+		const map = compatibilityMap(raw);
+		expect(incompatibleReason(compatFor(map, "voicebench"))).toBe("Needs voice");
+		expect(incompatibleReason(compatFor(map, "kernelbench-l2"))).toBe("Needs gpu");
+		const html = renderToStaticMarkup(<Step3BenchmarksView suites={suites} packs={packs} compatibility={raw} selected={[]} onChange={() => {}} />);
+		expect(block(html, "step3-benchmark-voicebench")).toContain('data-disabled="true"');
+		expect(block(html, "step3-benchmark-voicebench")).toMatch(/<input[^>]*disabled=""/);
+	});
+
+	it("waits for the answer before rows can be picked", () => {
+		const html = renderToStaticMarkup(<Step3BenchmarksView suites={suites} packs={packs} selected={[]} onChange={() => {}} checking />);
+		expect(block(html, "step3-benchmark-voicebench")).toContain('data-disabled="true"');
+		expect(block(html, "step3-benchmark-hd-harbor-tb2")).toContain("Checking whether your agent can run it");
+	});
+
+	it("drops picked benchmarks the agent cannot run", () => {
+		expect(keepRunnable(["hd-harbor-tb2", "voicebench", "acme-orders"], compat)).toEqual(["hd-harbor-tb2", "acme-orders"]);
+		expect(keepRunnable(["voicebench"], undefined)).toEqual(["voicebench"]);
 	});
 });

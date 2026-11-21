@@ -540,6 +540,16 @@ func (h *evaluationsHandler) launchChild(work context.Context, ctx *fasthttp.Req
 		}
 		tasks = schemas.TaskSelector{IDs: spreadPick(ids, spec.TasksPerBenchmark)}
 	}
+	// Benchmarks whose tasks bring their own image need the agent built on
+	// each task image: derive that variant per arm, or skip.
+	variants := map[string]taskImageVariant{}
+	for _, a := range spec.Arms {
+		v := deriveTaskImageAgent(agents["agents/"+a.Agent+".yaml"], st, tasks.IDs, agents, s.Projects.Root())
+		if v.Skip != "" {
+			return skip("%s", v.Skip)
+		}
+		variants[a.Label] = v
+	}
 	condIDs, fskips := faults.Conditions(spec.Faults, st)
 	if len(condIDs) == 0 || condIDs[0] != schemas.ConditionClean {
 		condIDs = append([]string{schemas.ConditionClean}, condIDs...)
@@ -563,6 +573,19 @@ func (h *evaluationsHandler) launchChild(work context.Context, ctx *fasthttp.Req
 		Seed:        ev.CreatedAt.Unix(),
 		Concurrency: 2, ManifestMode: "agent_exposure",
 	}
+	var variantNotes []string
+	for _, a := range spec.Arms {
+		v := variants[a.Label]
+		if v.Set == nil {
+			continue
+		}
+		for id := range f.Arms {
+			if id == a.Label || (len(spec.Arms) == 1 && id != a.Label) {
+				f.Arms[id] = withSet(f.Arms[id], v.Set)
+			}
+		}
+		variantNotes = append(variantNotes, "arm "+a.Label+": "+v.Note)
+	}
 	if _, _, err := s.Projects.Read(work, projectfs.AreaPolicies, strings.TrimPrefix(quickRunPolicy, "policies/")); err == nil {
 		f.Policy = quickRunPolicy
 	}
@@ -580,6 +603,9 @@ func (h *evaluationsHandler) launchChild(work context.Context, ctx *fasthttp.Req
 	head := fmt.Sprintf("# Evaluation %s: benchmark %s, %d task(s) x %d trial(s).\n", ev.ID, suiteRef, len(tasks.IDs), spec.Trials)
 	if len(notes) > 0 {
 		head += "# Faults skipped: " + strings.Join(notes, "; ") + "\n"
+	}
+	for _, n := range variantNotes {
+		head += "# Task images: " + n + "\n"
 	}
 	data := append([]byte(head), body...)
 	exp, _, err := DecodeExperiment("application/yaml", data)

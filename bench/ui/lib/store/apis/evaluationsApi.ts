@@ -126,8 +126,10 @@ export interface EstimateBenchmark {
 	benchmark: string;
 	runs?: number;
 	est_cost_usd?: Range & { known?: boolean };
-	est_minutes?: Range;
+	est_minutes?: Range & { known?: boolean };
 	skipped?: string;
+	notes?: string[] | null;
+	faults_skipped?: { fault: string; reason: string }[] | null;
 	[key: string]: unknown;
 }
 
@@ -135,8 +137,9 @@ export interface EstimateBenchmark {
 export interface Estimate {
 	runs: number;
 	est_cost_usd: Range & { known: boolean };
-	est_minutes: Range;
+	est_minutes: Range & { known?: boolean };
 	per_benchmark: EstimateBenchmark[];
+	notes?: string[] | null;
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -2,8 +2,8 @@ import { okQuery, render, tagOf } from "@/lib/testing/render";
 import type { EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
 import type { ModelKey } from "@/lib/types/models";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { groupModels, keyStateFor, type CatalogProvider } from "@/components/models/groupedModelPicker";
-import { Step4Setup, defaultEvaluationSpec, estimateText, specReady, toggleFault } from "./step4Setup";
+import { groupModels, keyStateFor, modelOptionLabel, providerOfModel, type CatalogProvider } from "@/components/models/groupedModelPicker";
+import { Step4Setup, defaultEvaluationSpec, estimateFailed, estimateNotes, estimateText, specReady, toggleFault } from "./step4Setup";
 
 const q = vi.hoisted(() => ({
 	models: {} as Record<string, unknown>,
@@ -173,5 +173,60 @@ describe("Step4Setup", () => {
 	it("says price not known when the estimate has no price", () => {
 		q.estimate = okQuery({ runs: 6, est_cost_usd: { low: 0, high: 0, known: false }, est_minutes: { low: 3, high: 9 } });
 		expect(render(<Step4Setup spec={spec()} onChange={() => undefined} />)).toContain("price not known");
+	});
+
+	it("shows an estimate with unknown price and time, and per-benchmark notes collapsed", () => {
+		q.estimate = okQuery({
+			runs: 32,
+			est_cost_usd: { low: 0, high: 0, known: false },
+			est_minutes: { low: 0, high: 0, known: false },
+			notes: ["model gpt-5.6-terra has no official price in the price snapshot, so its cost is unknown"],
+			per_benchmark: [
+				{
+					benchmark: "hd-harbor-tb2",
+					runs: 32,
+					notes: ["no history for this benchmark yet"],
+					faults_skipped: [{ fault: "broken-tool", reason: "no tool layer" }],
+				},
+				{ benchmark: "voicebench", runs: 0, skipped: "agent codex cannot run benchmark voicebench: needs voice", notes: [] },
+			],
+		});
+		const html = render(<Step4Setup spec={spec()} onChange={() => undefined} />);
+		expect(html).not.toContain("Could not estimate");
+		expect(html).toContain("32 runs");
+		expect(html).toContain("price not known");
+		expect(html).toContain("time not known");
+		expect(html).toMatch(/<details data-testid="step4-est-notes"(?![^>]*open)/);
+		expect(html).toContain("1 benchmark skipped");
+		expect(html).toContain("skipped, agent codex cannot run benchmark voicebench: needs voice");
+		expect(html).toContain("broken-tool is skipped: no tool layer");
+		expect(html).toContain("no official price");
+	});
+
+	it("shows the error text only on a real HTTP error", () => {
+		q.estimate = { data: undefined, error: { status: 500, data: {} }, isError: true, isFetching: false, isLoading: false };
+		expect(render(<Step4Setup spec={spec()} onChange={() => undefined} />)).toContain("Could not estimate this evaluation right now.");
+		q.estimate = { data: undefined, error: { status: "PARSING_ERROR", error: "x" }, isError: true, isFetching: false, isLoading: false };
+		expect(render(<Step4Setup spec={spec()} onChange={() => undefined} />)).not.toContain("Could not estimate");
+		expect(estimateFailed({ status: 403 })).toBe(true);
+		expect(estimateFailed({ status: "FETCH_ERROR" })).toBe(false);
+		expect(estimateNotes({ per_benchmark: [{ benchmark: "a", notes: [] }], notes: null })).toEqual([]);
+	});
+
+	it("labels an agent's default model without an empty provider prefix", () => {
+		const groups = groupModels(catalog, []);
+		expect(providerOfModel(groups, "deepseek-chat")).toBe("deepseek");
+		expect(providerOfModel(groups, "gpt-5.6-terra")).toBe("");
+		expect(modelOptionLabel("", "gpt-5.6-terra")).toBe("gpt-5.6-terra");
+		expect(modelOptionLabel("OpenAI", "gpt-5.6-terra")).toBe("OpenAI: gpt-5.6-terra");
+		const html = render(
+			<Step4Setup spec={spec({ arms: [{ label: "A", agent: "codex", model: "gpt-5.6-terra", provider: "" }] })} onChange={() => undefined} />,
+		);
+		expect(html).not.toContain(": gpt-5.6-terra");
+		expect(html).toContain(">gpt-5.6-terra</option>");
+		const listed = render(
+			<Step4Setup spec={spec({ arms: [{ label: "A", agent: "codex", model: "gpt-4o-mini", provider: "" }] })} onChange={() => undefined} />,
+		);
+		expect(listed).toMatch(/<option value="openai\u0000gpt-4o-mini" selected=""/);
 	});
 });

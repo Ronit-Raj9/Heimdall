@@ -134,7 +134,14 @@ func (h *evalEstimateHandler) post(ctx *fasthttp.RequestCtx) {
 	if h.forecast != nil {
 		src = h.forecast()
 	}
-	est, err := EstimateEvaluation(work, h.env.Services.Suites, src, &req)
+	agents := (&evaluationsHandler{env: h.env}).agentConfigs(work)
+	root := ""
+	if p := h.env.Services.Projects; p != nil {
+		root = p.Root()
+	} else if h.env.Cfg != nil {
+		root = h.env.Cfg.Root
+	}
+	est, err := EstimateEvaluationWith(work, h.env.Services.Suites, src, &req, agents, root)
 	if err != nil {
 		if errors.Is(err, errQuickBad) {
 			lib.SendError(ctx, h.env.Mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, err.Error())
@@ -150,6 +157,14 @@ func (h *evalEstimateHandler) post(ctx *fasthttp.RequestCtx) {
 // each through src. A nil src gives runs and unknown costs. A bad request
 // wraps errQuickBad.
 func EstimateEvaluation(ctx context.Context, suites SuiteSource, src ForecastSource, req *EvalEstimateRequest) (*EvalEstimate, error) {
+	return EstimateEvaluationWith(ctx, suites, src, req, nil, "")
+}
+
+// EstimateEvaluationWith is EstimateEvaluation with the org's agent configs
+// (by path, agents/<id>.yaml) and the bench root, so a benchmark whose tasks
+// bring their own image is estimated with the task-image variant of each
+// agent the evaluation would launch, or skipped as it would be.
+func EstimateEvaluationWith(ctx context.Context, suites SuiteSource, src ForecastSource, req *EvalEstimateRequest, agents map[string]*schemas.AgentConfig, root string) (*EvalEstimate, error) {
 	if err := normalizeEvalRequest(req); err != nil {
 		return nil, err
 	}
@@ -180,7 +195,7 @@ func EstimateEvaluation(ctx context.Context, suites SuiteSource, src ForecastSou
 	}
 	allKnown, timeKnown, ran := true, true, false
 	for _, id := range ids {
-		be := estimateBenchmark(ctx, suites, src, req, id)
+		be := estimateBenchmark(ctx, suites, src, req, id, agents, root)
 		if be.Skipped == "" {
 			ran = true
 			if len(unpriced) > 0 {
@@ -302,7 +317,7 @@ func evalBenchmarks(ctx context.Context, suites SuiteSource, req *EvalEstimateRe
 
 // estimateBenchmark estimates one benchmark. Problems become Skipped or
 // notes, never an error.
-func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSource, req *EvalEstimateRequest, id string) EvalBenchmarkEstimate {
+func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSource, req *EvalEstimateRequest, id string, agents map[string]*schemas.AgentConfig, root string) EvalBenchmarkEstimate {
 	be := EvalBenchmarkEstimate{Benchmark: id, Conditions: []string{}, FaultsSkip: []faults.Skip{}, Notes: []string{}}
 	suiteID, _, _ := strings.Cut(id, "@")
 	st, err := suites.LoadSuite(ctx, suiteID)
@@ -318,6 +333,19 @@ func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSour
 	if len(tasks) > req.TasksPerBenchmark {
 		tasks = tasks[:req.TasksPerBenchmark]
 	}
+	sets := make([]map[string]any, len(req.Arms))
+	for i, a := range req.Arms {
+		path, _ := normalizeAgent(a.Agent)
+		v := deriveTaskImageAgent(agents[path], st, tasks, agents, root)
+		if v.Skip != "" {
+			be.Skipped = v.Skip
+			return be
+		}
+		if v.Set != nil {
+			sets[i] = v.Set
+			be.Notes = append(be.Notes, v.Note)
+		}
+	}
 	conds, skipped := faults.Conditions(req.Faults, st)
 	be.Tasks, be.Conditions = len(tasks), conds
 	if skipped != nil {
@@ -329,6 +357,16 @@ func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSour
 		return be
 	}
 	exp := evalExperiment(st, req, tasks, conds)
+	for i, set := range sets {
+		if set == nil {
+			continue
+		}
+		for id := range exp.Arms {
+			if id == evalArmIDs[i] || (len(req.Arms) == 1 && id == "B") {
+				exp.Arms[id] = withSet(exp.Arms[id], set)
+			}
+		}
+	}
 	f, err := src.Estimate(ctx, exp)
 	if err != nil {
 		be.Notes = append(be.Notes, "no forecast: "+err.Error())

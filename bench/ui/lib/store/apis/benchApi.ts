@@ -135,12 +135,23 @@ export function prepareBenchHeaders(headers: Headers, type: "query" | "mutation"
 	return headers;
 }
 
+/**
+ * A request that writes (any method but GET or HEAD) carries the write credentials even when it is
+ * declared as a query: POST /evaluations/estimate is a query so a form can show it live, but the
+ * server checks it as a write (CSRF in hosted mode, the write token locally).
+ */
+export function writeType(type: "query" | "mutation", arg: unknown): "query" | "mutation" {
+	if (type === "mutation") return type;
+	const method = arg && typeof arg === "object" && "method" in arg ? String((arg as { method?: unknown }).method ?? "GET") : "GET";
+	return method.toUpperCase() === "GET" || method.toUpperCase() === "HEAD" ? "query" : "mutation";
+}
+
 type BenchBaseQuery = BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError>;
 
 const fetchBenchQuery: BenchBaseQuery = fetchBaseQuery({
 	baseUrl: BENCH_API_BASE,
 	credentials: "include",
-	prepareHeaders: (headers, { type }) => prepareBenchHeaders(headers, type),
+	prepareHeaders: (headers, { type, arg }) => prepareBenchHeaders(headers, writeType(type, arg)),
 });
 
 // A hosted 401 outside /auth/* means the session ended: the session provider sends the visitor to

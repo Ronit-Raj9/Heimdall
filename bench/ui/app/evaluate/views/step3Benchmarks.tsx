@@ -10,6 +10,7 @@ import {
 import type { SuiteSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { ChevronRight } from "lucide-react";
+import { useEffect } from "react";
 import { useEvaluateDraft } from "./evaluateDraft";
 
 // Lane A12: wizard step 3, "Benchmarks". Pick a pack or any set of single benchmarks. Benchmarks the
@@ -97,11 +98,42 @@ export function benchmarkCapability(suite: Pick<SuiteRow, "id" | "track">): Benc
 	return (suite.track && TRACK_CAPABILITY[suite.track]) || "other";
 }
 
+/** The key a benchmark id is matched on: no "@version" pin, lower case. */
+export function benchmarkKey(id: string): string {
+	return id.split("@")[0].trim().toLowerCase();
+}
+
+type RawCompatRow = Partial<BenchmarkCompatibility> & { benchmark?: string; suite?: string; suite_id?: string };
+
+/**
+ * GET /agents/{id}/compatibility rows keyed by benchmarkKey. Tolerates the row shapes servers have
+ * answered with (id, benchmark, suite or suite_id; ok missing; null lists), so a row the agent cannot
+ * run is never read as unknown, which would leave it selectable.
+ */
+export function compatibilityMap(compatibility: AgentCompatibility | undefined): Map<string, BenchmarkCompatibility> {
+	const out = new Map<string, BenchmarkCompatibility>();
+	const rows = (compatibility?.benchmarks ?? []) as RawCompatRow[];
+	for (const r of Array.isArray(rows) ? rows : []) {
+		const id = r.id ?? r.benchmark ?? r.suite ?? r.suite_id;
+		if (!id) continue;
+		const missing = Array.isArray(r.missing) ? r.missing : [];
+		const reason = r.reason ?? "";
+		const ok = typeof r.ok === "boolean" ? r.ok : missing.length === 0 && !reason;
+		out.set(benchmarkKey(id), { id, ok, requires: Array.isArray(r.requires) ? r.requires : [], missing, reason });
+	}
+	return out;
+}
+
+/** The compatibility row of benchmark id, matched on benchmarkKey. */
+export function compatFor(compat: Map<string, BenchmarkCompatibility>, id: string): BenchmarkCompatibility | undefined {
+	return compat.get(benchmarkKey(id));
+}
+
 /** Why a benchmark is greyed out, or "" when the agent can run it (unknown compatibility = runnable). */
 export function incompatibleReason(c: BenchmarkCompatibility | undefined): string {
 	if (!c || c.ok) return "";
 	if (c.reason) return c.reason;
-	return c.missing.length ? `Needs ${c.missing.join(", ")}` : "This agent cannot run it";
+	return c.missing?.length ? `Needs ${c.missing.join(", ")}` : "This agent cannot run it";
 }
 
 export interface BenchmarkGroup {
@@ -126,10 +158,16 @@ export function groupBenchmarks(suites: readonly SuiteRow[]): { groups: Benchmar
 	return { groups, practice: sections.practice };
 }
 
+/** selected without the benchmarks compatibility says the agent cannot run. */
+export function keepRunnable(selected: readonly string[], compatibility: AgentCompatibility | undefined): string[] {
+	const compat = compatibilityMap(compatibility);
+	return selected.filter((id) => !incompatibleReason(compatFor(compat, id)));
+}
+
 /** Pack members present in the suite list and runnable by the agent. */
 export function packSelection(pack: EvaluationPack, suites: readonly SuiteRow[], compat: Map<string, BenchmarkCompatibility>): string[] {
 	const present = new Set(suites.map((s) => s.id));
-	return pack.benchmarks.filter((id) => present.has(id) && !incompatibleReason(compat.get(id)));
+	return pack.benchmarks.filter((id) => present.has(id) && !incompatibleReason(compatFor(compat, id)));
 }
 
 function plural(n: number, word: string): string {
@@ -144,11 +182,13 @@ export interface Step3BenchmarksViewProps {
 	pack?: string;
 	onChange: (patch: Partial<EvaluateDraftBenchmarks>) => void;
 	loading?: boolean;
+	/** The agent's compatibility is still loading: rows wait instead of reading as runnable. */
+	checking?: boolean;
 }
 
 /** Pure view: packs, grouped multi-select and the selected count. Data comes in through props. */
-export function Step3BenchmarksView({ suites, packs, compatibility, selected, pack, onChange, loading }: Step3BenchmarksViewProps) {
-	const compat = new Map((compatibility?.benchmarks ?? []).map((b) => [b.id, b]));
+export function Step3BenchmarksView({ suites, packs, compatibility, selected, pack, onChange, loading, checking }: Step3BenchmarksViewProps) {
+	const compat = compatibilityMap(compatibility);
 	const ready = new Map(suites.map((s) => [s.id, s.admitted_count ?? 0]));
 	const chosen = new Set(selected);
 	const { groups, practice } = groupBenchmarks(suites);
@@ -163,14 +203,14 @@ export function Step3BenchmarksView({ suites, packs, compatibility, selected, pa
 	};
 
 	const readyTasks = selected.reduce((n, id) => n + (ready.get(id) ?? 0), 0);
-	const skipped = selected.filter((id) => incompatibleReason(compat.get(id))).length;
+	const skipped = selected.filter((id) => incompatibleReason(compatFor(compat, id))).length;
 
 	const row = (s: SuiteRow) => {
-		const reason = incompatibleReason(compat.get(s.id));
-		const disabled = Boolean(reason);
+		const reason = incompatibleReason(compatFor(compat, s.id));
+		const disabled = Boolean(reason) || Boolean(checking);
 		const on = chosen.has(s.id) && !disabled;
 		const n = s.admitted_count ?? 0;
-		const note = reason || (isGpuBenchmark(s.id) ? "Needs a GPU worker" : "");
+		const note = reason || (checking ? "Checking whether your agent can run it..." : "") || (isGpuBenchmark(s.id) ? "Needs a GPU worker" : "");
 		return (
 			<li key={s.id}>
 				<label
@@ -222,7 +262,7 @@ export function Step3BenchmarksView({ suites, packs, compatibility, selected, pa
 									type="button"
 									aria-pressed={active}
 									data-testid={`step3-pack-${p.id}`}
-									disabled={runnable.length === 0}
+									disabled={runnable.length === 0 || Boolean(checking)}
 									onClick={() => choosePack(p)}
 									className={cn(
 										"rounded-md border px-3 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",
@@ -303,15 +343,26 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({ draft, 
 	const suites = useGetSuitesQuery();
 	const packs = useGetEvaluationPacksQuery();
 	const compat = useGetAgentCompatibilityQuery(draft.agent, { skip: !draft.agent });
+	// currentData, not data: data keeps the previous agent's answer while the new one loads.
+	const compatibility = compat.currentData;
+	const checking = Boolean(draft.agent) && !compatibility && !compat.isError;
+	// Benchmarks picked before the answer came (or for another agent) that this agent cannot run
+	// leave the selection, so the launch never carries them.
+	const runnable = keepRunnable(draft.benchmarks, compatibility);
+	useEffect(() => {
+		if (runnable.length !== draft.benchmarks.length) onChange({ benchmarks: runnable });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [compatibility, draft.benchmarks.join(",")]);
 	return (
 		<Step3BenchmarksView
 			suites={suites.data?.suites ?? []}
 			packs={packs.data ?? []}
-			compatibility={compat.data}
+			compatibility={compatibility}
 			selected={draft.benchmarks}
 			pack={draft.pack}
 			onChange={onChange}
 			loading={suites.isLoading || packs.isLoading}
+			checking={checking}
 		/>
 	);
 }

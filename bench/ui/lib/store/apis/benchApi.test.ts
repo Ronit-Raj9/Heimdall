@@ -5,6 +5,7 @@ import {
 	normalizeCatalog,
 	normalizeWorkers,
 	prepareBenchHeaders,
+	writeType,
 	readWriteToken,
 	saveWriteToken,
 } from "./benchApi";
@@ -143,5 +144,13 @@ describe("normalizeCatalog", () => {
 		expect(out.parts).toEqual({});
 		expect(out.suites[0]).toMatchObject({ id: "s", tasks: [], probes: ["p"] });
 		expect(out.mode).toBe("live");
+	});
+});
+describe("writeType", () => {
+	it("sends write credentials on a POST declared as a query (the live estimate)", () => {
+		expect(writeType("query", { url: "/evaluations/estimate", method: "POST", body: {} })).toBe("mutation");
+		expect(writeType("query", "/suites")).toBe("query");
+		expect(writeType("query", { url: "/suites" })).toBe("query");
+		expect(writeType("mutation", "/x")).toBe("mutation");
 	});
 });
