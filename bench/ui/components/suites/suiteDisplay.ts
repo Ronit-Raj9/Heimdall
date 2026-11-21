@@ -7,6 +7,7 @@ import type { SuiteSummary } from "@/lib/types/bench";
 export interface SuiteDisplay {
 	name: string;
 	description: string;
+	category?: string;
 }
 
 const SUITE_DISPLAY: Record<string, SuiteDisplay> = {
@@ -25,13 +26,102 @@ const SUITE_DISPLAY: Record<string, SuiteDisplay> = {
 		description: "Coding puzzles whose tests are rigged; passing means the agent cheated.",
 	},
 	longmemeval: { name: "LongMemEval", description: "Answer questions about long chat histories from many sessions." },
+	"longmemeval-oracle": {
+		name: "LongMemEval Oracle",
+		category: "memory",
+		description: "Answer questions about long chat histories from many sessions.",
+	},
 	locomo: { name: "LoCoMo", description: "Remember facts across very long conversations." },
 	tau2: { name: "tau2-bench", description: "Help customers over chat while following company policy and tools." },
 	agentdojo: { name: "AgentDojo", description: "Do real tool tasks while resisting prompt injection attacks." },
+	"agentdojo-banking": {
+		name: "AgentDojo: Banking",
+		category: "safety",
+		description: "Do real tasks with tools while ignoring hidden attack instructions.",
+	},
+	"agentdojo-slack": {
+		name: "AgentDojo: Slack",
+		category: "safety",
+		description: "Do real tasks with tools while ignoring hidden attack instructions.",
+	},
+	"agentdojo-travel": {
+		name: "AgentDojo: Travel",
+		category: "safety",
+		description: "Do real tasks with tools while ignoring hidden attack instructions.",
+	},
+	"agentdojo-workspace": {
+		name: "AgentDojo: Workspace",
+		category: "safety",
+		description: "Do real tasks with tools while ignoring hidden attack instructions.",
+	},
 	mcpmark: { name: "MCPMark", description: "Get real jobs done through MCP tool servers." },
-	marble: { name: "MARBLE", description: "Several agents work together on shared tasks." },
+	marble: { name: "MARBLE: Database", category: "team", description: "Several agents work together on one shared task." },
+	"marble-coding": { name: "MARBLE: Coding", category: "team", description: "Several agents work together on one shared task." },
+	"marble-research": { name: "MARBLE: Research", category: "team", description: "Several agents work together on one shared task." },
 	"browsecomp-plus": { name: "BrowseComp-Plus", description: "Hard research questions answered by searching a fixed web corpus." },
+	"browsecomp-plus-0": {
+		name: "BrowseComp-Plus · Part 1",
+		category: "research",
+		description: "Find hard-to-locate facts by searching a fixed web collection.",
+	},
+	"browsecomp-plus-1": {
+		name: "BrowseComp-Plus · Part 2",
+		category: "research",
+		description: "Find hard-to-locate facts by searching a fixed web collection.",
+	},
+	"browsecomp-plus-2": {
+		name: "BrowseComp-Plus · Part 3",
+		category: "research",
+		description: "Find hard-to-locate facts by searching a fixed web collection.",
+	},
+	"browsecomp-plus-3": {
+		name: "BrowseComp-Plus · Part 4",
+		category: "research",
+		description: "Find hard-to-locate facts by searching a fixed web collection.",
+	},
+	"browsecomp-plus-4": {
+		name: "BrowseComp-Plus · Part 5",
+		category: "research",
+		description: "Find hard-to-locate facts by searching a fixed web collection.",
+	},
+	"browsecomp-plus-5": {
+		name: "BrowseComp-Plus · Part 6",
+		category: "research",
+		description: "Find hard-to-locate facts by searching a fixed web collection.",
+	},
+	"browsecomp-plus-judged-0": {
+		name: "BrowseComp-Plus Open · Part 1",
+		category: "research",
+		description: "Find hard-to-locate facts by searching a fixed web collection.",
+	},
+	"browsecomp-plus-judged-1": {
+		name: "BrowseComp-Plus Open · Part 2",
+		category: "research",
+		description: "Find hard-to-locate facts by searching a fixed web collection.",
+	},
+	"browsecomp-plus-judged-2": {
+		name: "BrowseComp-Plus Open · Part 3",
+		category: "research",
+		description: "Find hard-to-locate facts by searching a fixed web collection.",
+	},
+	"browsecomp-plus-judged-3": {
+		name: "BrowseComp-Plus Open · Part 4",
+		category: "research",
+		description: "Find hard-to-locate facts by searching a fixed web collection.",
+	},
+	"browsecomp-plus-judged-4": {
+		name: "BrowseComp-Plus Open · Part 5",
+		category: "research",
+		description: "Find hard-to-locate facts by searching a fixed web collection.",
+	},
+	"browsecomp-plus-judged-5": {
+		name: "BrowseComp-Plus Open · Part 6",
+		category: "research",
+		description: "Find hard-to-locate facts by searching a fixed web collection.",
+	},
 	kernelbench: { name: "KernelBench", description: "Write fast GPU kernels; needs a GPU worker." },
+	"kernelbench-l2": { name: "KernelBench Level 2", category: "coding", description: "Write fast GPU kernels; needs a GPU worker." },
+	"kernelbench-l3": { name: "KernelBench Level 3", category: "coding", description: "Write fast GPU kernels; needs a GPU worker." },
 	voicebench: { name: "VoiceBench", description: "Spoken questions answered by a voice agent." },
 	"acme-orders": { name: "Node.js bug fixing", description: "Find and fix bugs in a small Node.js order service." },
 	"acme-stack": { name: "App with database", description: "Change a web app and its database without breaking either." },
@@ -113,13 +203,34 @@ const LIBRARY_ORDER = [
 	"hd-swe-ib-lcb",
 	"tau2",
 	"agentdojo",
+	"agentdojo-banking",
+	"agentdojo-slack",
+	"agentdojo-travel",
+	"agentdojo-workspace",
 	"mcpmark",
 	"browsecomp-plus",
+	"browsecomp-plus-0",
+	"browsecomp-plus-1",
+	"browsecomp-plus-2",
+	"browsecomp-plus-3",
+	"browsecomp-plus-4",
+	"browsecomp-plus-5",
+	"browsecomp-plus-judged-0",
+	"browsecomp-plus-judged-1",
+	"browsecomp-plus-judged-2",
+	"browsecomp-plus-judged-3",
+	"browsecomp-plus-judged-4",
+	"browsecomp-plus-judged-5",
 	"longmemeval",
+	"longmemeval-oracle",
 	"locomo",
 	"marble",
+	"marble-coding",
+	"marble-research",
 	"voicebench",
 	"kernelbench",
+	"kernelbench-l2",
+	"kernelbench-l3",
 ];
 
 /** Every id the built-in library ships (catalog "Built in" badges use the server flag first). */
