@@ -11,6 +11,7 @@ vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/platformApi")>()),
 	useGetInvitationQuery: () => api.invite,
 	useSignupMutation: () => mutation(api.signup),
+	useGetAuthConfigQuery: () => ({ data: undefined }), // L22: no captcha in these tests
 }));
 
 beforeEach(() => {

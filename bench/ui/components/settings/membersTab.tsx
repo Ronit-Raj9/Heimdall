@@ -6,7 +6,11 @@ import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenSta
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatRelative } from "@/components/platform/platform.utils";
+import { getLocale } from "@/lib/i18n";
 import { canUse, useSession } from "@/lib/session/sessionContext";
+import { useCreateResetLinkMutation } from "@/lib/store/apis/accountSafetyApi";
+import type { ResetLink } from "@/lib/types/accountSafety";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
 	useCreateInvitationMutation,
@@ -50,6 +54,17 @@ export function MembersTab({ org }: { org: OrgSummary }) {
 	const [updateMember, updateState] = useUpdateMemberMutation();
 	const [removeMember, removeState] = useRemoveMemberMutation();
 	const isAdmin = canUse(session, "admin");
+	const isOwner = session.role === "owner";
+	const { t: ts } = useTranslation("accountSafety");
+	const [createResetLink, resetState] = useCreateResetLinkMutation();
+	const [resetLink, setResetLink] = useState<ResetLink | null>(null);
+	const onResetLink = async (userId: string) => {
+		try {
+			setResetLink(await createResetLink({ orgId: org.id, userId }).unwrap());
+		} catch {
+			// resetState.error renders the failure.
+		}
+	};
 
 	const list = members.data?.members ?? [];
 	return (
@@ -59,6 +74,19 @@ export function MembersTab({ org }: { org: OrgSummary }) {
 				description={t("settings.members.description", { org: org.name })}
 				testId="settings-members-list"
 			>
+				{resetLink && (
+					<OneTimeSecret
+						title={ts("resetLink.created", { email: resetLink.email })}
+						secret={resetLink.url}
+						secretLabel={ts("resetLink.link")}
+						onDone={() => setResetLink(null)}
+						testId="reset-link-created"
+					>
+						<p className="text-muted-foreground text-xs">
+							{ts("resetLink.hint", { email: resetLink.email, when: formatRelative(resetLink.expires_at, getLocale()) })}
+						</p>
+					</OneTimeSecret>
+				)}
 				{members.isLoading ? (
 					<BlockSkeleton rows={4} testId="members-loading" />
 				) : members.isError || !members.data ? (
@@ -90,6 +118,9 @@ export function MembersTab({ org }: { org: OrgSummary }) {
 										isSelf={member.user_id === session.user?.id}
 										isAdmin={isAdmin}
 										callerRole={session.role}
+										canReset={isOwner && member.user_id !== session.user?.id}
+										onResetLink={() => void onResetLink(member.user_id)}
+										resetBusy={resetState.isLoading && resetState.originalArgs?.userId === member.user_id}
 										onRole={(role) => void updateMember({ orgId: org.id, userId: member.user_id, role })}
 										onRemove={() => void removeMember({ orgId: org.id, userId: member.user_id })}
 										busy={
@@ -107,6 +138,9 @@ export function MembersTab({ org }: { org: OrgSummary }) {
 				)}
 				{removeState.error && (
 					<WriteError error={removeState.error} title={t("settings.members.removeError")} testId="members-remove-error" />
+				)}
+				{resetState.error && !resetLink && (
+					<WriteError error={resetState.error} title={ts("resetLink.error")} testId="members-reset-error" />
 				)}
 			</SettingsSection>
 
@@ -126,6 +160,9 @@ function MemberRow({
 	onRole,
 	onRemove,
 	busy,
+	canReset = false,
+	onResetLink,
+	resetBusy = false,
 }: {
 	member: Member;
 	org: OrgSummary;
@@ -135,8 +172,12 @@ function MemberRow({
 	onRole: (role: Role) => void;
 	onRemove: () => void;
 	busy: boolean;
+	canReset?: boolean;
+	onResetLink?: () => void;
+	resetBusy?: boolean;
 }) {
 	const { t } = useTranslation("platform");
+	const { t: ts } = useTranslation("accountSafety");
 	// The caller manages a member only when it holds at least the member's role; never itself here.
 	const manageable = isAdmin && !isSelf && mayManage(callerRole, member.role);
 	return (
@@ -173,6 +214,18 @@ function MemberRow({
 			</TableCell>
 			{isAdmin && (
 				<TableCell className="text-right">
+					<div className="inline-flex items-center gap-2">
+					{canReset && onResetLink && (
+						<ConfirmButton
+							label={ts("resetLink.button")}
+							question={ts("resetLink.question", { email: member.email })}
+							confirmLabel={ts("resetLink.confirm")}
+							cancelLabel={ts("resetLink.cancel")}
+							onConfirm={onResetLink}
+							isLoading={resetBusy}
+							testId={`member-reset-${member.user_id}`}
+						/>
+					)}
 					{manageable && (
 						<ConfirmButton
 							label={t("settings.members.remove")}
@@ -184,6 +237,7 @@ function MemberRow({
 							testId={`member-remove-${member.user_id}`}
 						/>
 					)}
+					</div>
 				</TableCell>
 			)}
 		</TableRow>
