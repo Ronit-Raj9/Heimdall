@@ -177,6 +177,13 @@ var APIRoutes = []RouteDoc{
 	// Index and trends area (handlers/trends.go).
 	TrendsRouteDoc,
 	SearchRouteDoc, // X23 cross-run trace search (search.go)
+	// X23 Maxim integration (maxim.go).
+	{Method: "GET", Path: APIPrefix + "/integrations/maxim", Tag: "integrations", Summary: "The org's Maxim connection: workspace, log repository, automatic sending, push counts (never the key)", Response: MaximConnection{}},
+	{Method: "PUT", Path: APIPrefix + "/integrations/maxim", Tag: "integrations", Summary: "Save the Maxim connection; an empty api_key keeps the stored key", Auth: AuthWrite, Request: MaximConnectionPut{}, Response: MaximConnection{}},
+	{Method: "DELETE", Path: APIPrefix + "/integrations/maxim", Tag: "integrations", Summary: "Disconnect Maxim and delete the stored key", Auth: AuthWrite, Response: MaximConnection{}},
+	{Method: "POST", Path: APIPrefix + "/integrations/maxim/test", Tag: "integrations", Summary: "Check the stored key, workspace and log repository with Maxim", Auth: AuthWrite, Response: MaximTestResult{}},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/maxim", Tag: "runs", Summary: "A run's Maxim push status and its Open in Maxim link", Response: RunMaxim{}},
+	{Method: "POST", Path: APIPrefix + "/runs/{id}/maxim/push", Tag: "runs", Summary: "Send a sealed run's trace to the org's Maxim log repository now", Auth: AuthWrite, Response: RunMaxim{}},
 	{Method: "POST", Path: APIPrefix + "/audit", Tag: "analysis", Summary: "Verdict for a published per-task table (JSON rows or CSV)",
 		Auth: AuthWrite, Request: schemas.AuditRequest{}, RequestAlso: []string{"text/csv"}, Response: schemas.Verdict{}},
 

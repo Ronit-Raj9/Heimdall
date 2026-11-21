@@ -110,7 +110,7 @@ func Presets() map[string]Preset {
 			},
 			Map:        mapMaxim,
 			Source:     []string{"https://www.getmaxim.ai/docs/tracing/opentelemetry/ingesting-via-otlp"},
-			Checked:    presetChecked,
+			Checked:    presetChecked, // session keys (maxim-session-id) re-read 2026-11-22 from the same page
 			Unverified: []string{"MAXIM_LOG_REPO_ID as the variable for the repository id is the preset's choice"},
 		},
 		"phoenix": {
@@ -374,7 +374,9 @@ func mapBraintrust(td *traceexport.TracesData) {
 func mapDatadog(*traceexport.TracesData) {}
 
 // mapMaxim writes maxim.metadata on the root: the trace name, the run facts
-// as trace tags and verified success as a trace metric.
+// as trace tags, verified success as a trace metric, and the experiment as
+// the Maxim session (maxim-session-id, with its name), so every run of one
+// experiment opens together in the log repository.
 func mapMaxim(td *traceexport.TracesData) {
 	eachSpan(td, func(sp *traceexport.Span) {
 		if spanRole(sp) != "run" {
@@ -382,6 +384,11 @@ func mapMaxim(td *traceexport.TracesData) {
 		}
 		facts := rootFacts(sp)
 		meta := map[string]any{"maxim-trace-name": sp.Name, "maxim-trace-tags": facts}
+		if exp := facts["experiment"]; exp != "" {
+			meta["maxim-session-id"] = "heimdall-" + exp
+			meta["maxim-session-name"] = "Heimdall " + exp
+			meta["maxim-session-tags"] = map[string]string{"experiment": exp, "source": "heimdall"}
+		}
 		if v, ok := traceexport.Attr(sp.Attributes, "heimdall.verified_success"); ok && v.BoolValue != nil {
 			x := 0.0
 			if *v.BoolValue {
