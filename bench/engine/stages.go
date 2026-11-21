@@ -124,6 +124,15 @@ func (p *Pipeline) bindFaultPlan(ctx context.Context, st *runState) error {
 			return &partError{part: faultPart, err: err}
 		}
 	}
+	if d := debugSpec(st.rc); d != nil { // X20b debug runs: replay, fork, breakpoints (debugrun.go)
+		if p.reg.Fault == nil {
+			return &partError{part: faultPart, err: errors.New("debug runs need the fault proxy")}
+		}
+		if err := directSlot(st.rc.Key); err != nil {
+			return &partError{part: faultPart, err: err}
+		}
+		return p.bindDebugPlan(ctx, st, d, mode)
+	}
 	if p.reg.Fault == nil || gatewayProbe {
 		// A gateway-layer probe on a no-paid run binds its own plan, with
 		// Scripted set, when it arms (probes/gateway.go).

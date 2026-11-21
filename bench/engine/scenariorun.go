@@ -254,7 +254,9 @@ func (p *Pipeline) execOnce(ctx context.Context, st *runState, sess *schemas.Ses
 			st.rc.FaultSessions = append(st.rc.FaultSessions, sessionID)
 		}
 	}
-	res, err := st.env.Exec(ctx, st.rc, plan)
+	ectx, stopClock := p.debugClock(ctx, st) // X20b: the wall clock stops while a breakpoint holds a call (debugrun.go)
+	res, err := st.env.Exec(ectx, st.rc, plan)
+	stopClock()
 	exited := p.now().UTC()
 	run.Timing.AgentExited = &exited
 	if res != nil {

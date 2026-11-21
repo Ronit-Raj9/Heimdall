@@ -356,6 +356,7 @@ func (p *Pipeline) begin(ctx context.Context, in SlotInput) (*runState, error) {
 			ParserVersion: p.parserVersion(cfg.Parser)},
 		Gateway: schemas.RunGatewayInfo{SessionID: runID},
 	}
+	run.Debug = runDebugOf(in.Manifest) // X20b: a debug run's link to its source run (debugrun.go)
 	run.Hardware = gpu.Hardware(in.GPU) // X7: the GPUs this run holds, sealed in run.json; nil for a task without a GPU request
 	dir, err := p.reg.Store.NewRun(ctx, slot, run)
 	if err != nil {

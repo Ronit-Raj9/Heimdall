@@ -31,6 +31,10 @@ type Services struct {
 	Agents   AgentSource
 	Catalog  CatalogSource
 
+	// Holds reads and releases the breakpoints of a run (X20b, rundebug.go);
+	// nil when this server cannot reach the fault proxy its runs use.
+	Holds schemas.HoldController
+
 	// Reindex brings the org's read indexes (the in-memory experiment index
 	// and, hosted, the database results index) up to date after runs were
 	// added outside a job, such as a sealed-run upload. nil: nothing to do.
