@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -573,5 +574,156 @@ func TestSecondStopWaitsForHandBack(t *testing.T) {
 	r.Stop(ctx) // the owner's synchronous stop before closing the database
 	if st := status(t, r, "org_a", j.ID).Status; st != StatusQueued {
 		t.Fatalf("second Stop returned before the hand-back: %s", st)
+	}
+}
+
+// TestRecoverHonoursCancelAfterScan is audit qc2-18-01: a cancel accepted
+// between Recover's scan and its requeue settles the job as cancelled, and
+// a queued row carrying a cancel request is never claimed.
+func TestRecoverHonoursCancelAfterScan(t *testing.T) {
+	d := dbtest.Open(t)
+	ctx := context.Background()
+	r := New(d, fastOptions("dead"))
+	r.Register("k", func(context.Context, *Job, Logger, func(any)) (any, error) { return nil, nil })
+	j, _ := r.Enqueue(ctx, NewJob{OrgID: "org_a", Kind: "k"})
+	if c, err := r.claim(ctx); err != nil || c == nil {
+		t.Fatalf("claim: %v", err)
+	}
+	expire(t, d, j.ID)
+	afterRecoverScan = func() {
+		if _, err := r.Cancel(ctx, "org_a", j.ID); err != nil {
+			t.Errorf("cancel: %v", err)
+		}
+	}
+	t.Cleanup(func() { afterRecoverScan = nil })
+	res, err := r.Recover(ctx)
+	afterRecoverScan = nil
+	if err != nil || res.Cancelled != 1 || res.Requeued != 0 {
+		t.Fatalf("recover: %v %+v", err, res)
+	}
+	if x := status(t, r, "org_a", j.ID); x.Status != StatusCancelled {
+		t.Fatalf("status %s", x.Status)
+	}
+	stray, _ := r.Enqueue(ctx, NewJob{OrgID: "org_a", Kind: "k"})
+	if _, err := d.SQL().ExecContext(ctx, d.Rebind(`UPDATE jobs SET cancel_requested = 1 WHERE id = ?`), stray.ID); err != nil {
+		t.Fatal(err)
+	}
+	if c, err := r.claim(ctx); err != nil || c != nil {
+		t.Fatalf("claimed a cancel-requested job: %v %+v", err, c)
+	}
+}
+
+// TestStaleAttemptCannotFinishReclaim is audit qc2-18-02: once a job is
+// requeued and reclaimed by the same runner, the old attempt can neither
+// renew, write progress for, nor finalize the new claim.
+func TestStaleAttemptCannotFinishReclaim(t *testing.T) {
+	d := dbtest.Open(t)
+	ctx := context.Background()
+	r := New(d, fastOptions("same"))
+	r.Register("k", func(context.Context, *Job, Logger, func(any)) (any, error) { return nil, nil })
+	j, _ := r.Enqueue(ctx, NewJob{OrgID: "org_a", Kind: "k"})
+	first, err := r.claim(ctx)
+	if err != nil || first == nil {
+		t.Fatalf("claim: %v", err)
+	}
+	expire(t, d, j.ID)
+	if res, err := r.Recover(ctx); err != nil || res.Requeued != 1 {
+		t.Fatalf("recover: %v %+v", err, res)
+	}
+	second, err := r.claim(ctx)
+	if err != nil || second == nil || second.Attempt != 2 {
+		t.Fatalf("reclaim: %v %+v", err, second)
+	}
+	if claimKey(first) == claimKey(second) {
+		t.Fatal("two claims share one cancellation key")
+	}
+	r.finish(first, StatusSucceeded, nil, "")
+	if x := status(t, r, "org_a", j.ID); x.Status != StatusRunning || x.Attempt != 2 {
+		t.Fatalf("stale attempt finalized the reclaim: %+v", x)
+	}
+	r.finish(second, StatusSucceeded, nil, "")
+	if x := status(t, r, "org_a", j.ID); x.Status != StatusSucceeded {
+		t.Fatalf("current attempt not recorded: %+v", x)
+	}
+}
+
+// TestLogSeqAllocatedByDatabase is audit qc2-18-05: two writers for one job
+// that started from the same highest seq (recovery and the resumed handler)
+// both keep their line.
+func TestLogSeqAllocatedByDatabase(t *testing.T) {
+	d := dbtest.Open(t)
+	ctx := context.Background()
+	r := New(d, fastOptions("a"))
+	r.Register("k", func(context.Context, *Job, Logger, func(any)) (any, error) { return nil, nil })
+	j, _ := r.Enqueue(ctx, NewJob{OrgID: "org_a", Kind: "k"})
+	a, b := r.newLogger(j), r.newLogger(j)
+	a.Printf("resuming")
+	r.systemLog(ctx, j.ID, "warn", "lease expired")
+	b.Printf("second writer")
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for n := 0; n < 10; n++ {
+				r.newLogger(j).Printf("line %d", n)
+			}
+		}()
+	}
+	wg.Wait()
+	logs, err := r.Logs(ctx, "org_a", j.ID, 0, 0)
+	if err != nil || len(logs.Lines) != 43 {
+		t.Fatalf("logs: %v, %d lines", err, len(logs.Lines))
+	}
+}
+
+// TestCancelConflictIsErrConflict is audit qc2-18-06: a row that moves
+// between Cancel's two updates answers the retryable ErrConflict (HTTP 409),
+// not a plain error (HTTP 500).
+func TestCancelConflictIsErrConflict(t *testing.T) {
+	d := dbtest.Open(t)
+	ctx := context.Background()
+	r := New(d, fastOptions("a"))
+	r.Register("k", func(context.Context, *Job, Logger, func(any)) (any, error) { return nil, nil })
+	j, _ := r.Create(ctx, NewJob{OrgID: "org_a", Kind: "k"})
+	if _, err := d.SQL().ExecContext(ctx, d.Rebind(`UPDATE jobs SET status = ? WHERE id = ?`), string(StatusRunning), j.ID); err != nil {
+		t.Fatal(err)
+	}
+	cancelBetweenUpdates = func(tx *sql.Tx) {
+		if _, err := tx.ExecContext(ctx, d.Rebind(`UPDATE jobs SET status = ? WHERE id = ?`), string(StatusQueued), j.ID); err != nil {
+			t.Error(err)
+		}
+	}
+	t.Cleanup(func() { cancelBetweenUpdates = nil })
+	if _, err := r.Cancel(ctx, "org_a", j.ID); !errors.Is(err, ErrConflict) {
+		t.Fatalf("cancel conflict = %v, want ErrConflict", err)
+	}
+}
+
+// TestClaimGateSkipsOrgsWithoutCapacity is audit qc2-18-03: a gated kind is
+// claimed only for organizations its gate lists, so jobs of organizations
+// without capacity stay queued and an eligible one is claimed past them.
+func TestClaimGateSkipsOrgsWithoutCapacity(t *testing.T) {
+	d := dbtest.Open(t)
+	ctx := context.Background()
+	r := New(d, fastOptions("a"))
+	var mu sync.Mutex
+	eligible := []string{}
+	r.Register("exp", func(context.Context, *Job, Logger, func(any)) (any, error) { return nil, nil },
+		WithLimit(1, 1), WithClaimGate(func() []string { mu.Lock(); defer mu.Unlock(); return append([]string(nil), eligible...) }))
+	waiting, _ := r.Enqueue(ctx, NewJob{OrgID: "org_wait", Kind: "exp"})
+	ready, _ := r.Enqueue(ctx, NewJob{OrgID: "org_ready", Kind: "exp"})
+	if c, err := r.claim(ctx); err != nil || c != nil {
+		t.Fatalf("claimed with no eligible org: %v %+v", err, c)
+	}
+	mu.Lock()
+	eligible = []string{"org_ready"}
+	mu.Unlock()
+	c, err := r.claim(ctx)
+	if err != nil || c == nil || c.ID != ready.ID {
+		t.Fatalf("eligible org not claimed past the waiting one: %v %+v", err, c)
+	}
+	if x := status(t, r, "org_wait", waiting.ID); x.Status != StatusQueued {
+		t.Fatalf("waiting org's job %s", x.Status)
 	}
 }

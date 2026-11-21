@@ -355,7 +355,7 @@ func (m *Mirror) SweepWith(ctx context.Context, orgs []Org, opts MirrorOptions) 
 		if err := ctx.Err(); err != nil {
 			return out, err
 		}
-		if err := m.recover(org); err != nil {
+		if err := m.recover(ctx, org); err != nil {
 			m.logger().Warn("evidence: interrupted archive or restore not recovered", "org_id", org.ID, "error", err.Error())
 		}
 		ids, err := org.Store.ListExperiments(ctx)

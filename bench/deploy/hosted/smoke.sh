@@ -71,14 +71,23 @@ for p in "$https_port" "$http_port"; do
 done
 # Teardown deletes the project's volumes, so it is armed only for a project
 # that has nothing yet: a retained smoke project or any other stack under
-# this name is never touched.
+# this name is never touched. The name is claimed first (a lock folder held
+# until exit), so two invocations given the same SMOKE_PROJECT cannot both
+# pass the empty check, and an inventory command that fails is treated as
+# "not empty": a Docker error never authorizes the teardown.
+claim=${TMPDIR:-/tmp}/heimdall-smoke-$HEIMDALL_PROJECT.lock
+mkdir "$claim" 2>/dev/null || die "compose project $HEIMDALL_PROJECT is claimed by another smoke run ($claim); pick another SMOKE_PROJECT"
+trap 'rmdir "$claim" 2>/dev/null || true' EXIT
 label=com.docker.compose.project=$HEIMDALL_PROJECT
-if [ -n "$(docker ps -aq --filter "label=$label")" ] ||
-	[ -n "$(docker volume ls -q --filter "label=$label")" ] ||
-	[ -n "$(docker network ls -q --filter "label=$label")" ] ||
-	docker network inspect "$HEIMDALL_PROJECT-evalnet" >/dev/null 2>&1; then
-	die "compose project $HEIMDALL_PROJECT already has containers, volumes or networks; pick another SMOKE_PROJECT (a --keep project is removed with the command it printed)"
-fi
+inventory() {
+	local out
+	out=$("$@") || die "docker inventory failed ($*); refusing to arm the teardown for $HEIMDALL_PROJECT"
+	[ -z "$out" ] || die "compose project $HEIMDALL_PROJECT already has containers, volumes or networks; pick another SMOKE_PROJECT (a --keep project is removed with the command it printed)"
+}
+inventory docker ps -aq --filter "label=$label"
+inventory docker volume ls -q --filter "label=$label"
+inventory docker network ls -q --filter "label=$label"
+inventory docker network ls -q --filter "name=^$HEIMDALL_PROJECT-evalnet\$"
 
 work=$(mktemp -d)
 # No provider key ever reaches this stack's fault proxy, whatever the
@@ -87,6 +96,19 @@ export ANTHROPIC_API_KEY='' OPENAI_API_KEY=''
 export HEIMDALL_ENV_FILE=$work/smoke.env
 ENV_FILE=$HEIMDALL_ENV_FILE
 export HEIMDALL_EVAL_NETWORK=$HEIMDALL_PROJECT-evalnet
+# The smoke tags go in the process environment too: compose prefers the
+# shell's HEIMDALL_IMAGE to the env file, so a caller's exported production
+# tag would otherwise be rebuilt by `hc build`. A smoke tag naming a
+# production image is refused.
+smoke_image=${SMOKE_IMAGE:-heimdall/server:smoke}
+smoke_runner_image=${SMOKE_RUNNER_IMAGE:-heimdall/runner:smoke}
+for pair in "$smoke_image|${HEIMDALL_IMAGE:-}|heimdall/server:local" "$smoke_runner_image|${HEIMDALL_RUNNER_IMAGE:-}|heimdall/runner:local"; do
+	IFS='|' read -r want prod def <<<"$pair"
+	if [ "$want" = "$def" ] || { [ -n "$prod" ] && [ "$want" = "$prod" ]; }; then
+		die "smoke image $want is a production image tag; set SMOKE_IMAGE / SMOKE_RUNNER_IMAGE to a smoke-only tag"
+	fi
+done
+export HEIMDALL_IMAGE=$smoke_image HEIMDALL_RUNNER_IMAGE=$smoke_runner_image
 cat >"$HEIMDALL_ENV_FILE" <<EOF
 HEIMDALL_DOMAIN=$domain
 HEIMDALL_PUBLIC_URL=$origin
@@ -97,8 +119,8 @@ HEIMDALL_HTTP_PUBLISH=127.0.0.1:$http_port
 HEIMDALL_HTTPS_PUBLISH=127.0.0.1:$https_port
 HEIMDALL_EVAL_NETWORK=$HEIMDALL_EVAL_NETWORK
 HEIMDALL_BENCH_DIR=$BENCH_DIR
-HEIMDALL_IMAGE=${SMOKE_IMAGE:-heimdall/server:smoke}
-HEIMDALL_RUNNER_IMAGE=${SMOKE_RUNNER_IMAGE:-heimdall/runner:smoke}
+HEIMDALL_IMAGE=$HEIMDALL_IMAGE
+HEIMDALL_RUNNER_IMAGE=$HEIMDALL_RUNNER_IMAGE
 EOF
 chmod 600 "$HEIMDALL_ENV_FILE"
 if [ -n "$s3" ]; then
@@ -148,12 +170,13 @@ teardown() {
 		if [ -n "$runner_dir" ]; then
 			# Run folders written by uid 10001 (sealed ones read-only) are
 			# removed from inside, as root of a throwaway container.
-			docker run --rm --user 0:0 -v "$runner_dir:$runner_dir" --entrypoint /bin/sh "${SMOKE_IMAGE:-heimdall/server:smoke}" \
+			docker run --rm --user 0:0 -v "$runner_dir:$runner_dir" --entrypoint /bin/sh "$smoke_image" \
 				-c "rm -rf '$runner_dir'" >/dev/null 2>&1 || true
 		fi
 		hc down -v --remove-orphans >/dev/null 2>&1 || true
 		rm -rf "$work" || log "could not remove $work"
 	fi
+	rmdir "$claim" 2>/dev/null || true
 	exit "$rc"
 }
 trap teardown EXIT

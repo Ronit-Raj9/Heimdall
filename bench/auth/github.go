@@ -142,7 +142,7 @@ func (s *Service) GitHubCallback(ctx *fasthttp.RequestCtx, replace string) (*New
 		s.record(AuditEvent{ActorType: "anonymous", Action: "auth.login_failed", IP: ip, Details: map[string]any{"method": "github"}})
 		return nil, "", errForbidden("GitHub sign-in failed")
 	}
-	u, sess, err := s.githubSignIn(dctx, id, ip, string(ctx.Request.Header.UserAgent()), replace)
+	u, sess, signup, err := s.githubSignIn(dctx, id, ip, string(ctx.Request.Header.UserAgent()), replace)
 	if err != nil {
 		if e, ok := AsError(err); ok && e.Status < 500 {
 			s.record(AuditEvent{ActorType: "anonymous", Action: "auth.login_failed", TargetType: "email", TargetID: clip(id.Email, 254), IP: ip,
@@ -150,15 +150,41 @@ func (s *Service) GitHubCallback(ctx *fasthttp.RequestCtx, replace string) (*New
 		}
 		return nil, "", err
 	}
+	if signup != nil {
+		// The same committed events as a password signup.
+		details := map[string]any{"method": "github", "github_login": id.Login}
+		if signup.org != nil {
+			details["org_created"] = signup.org.ID
+		}
+		s.record(userEvent(u, sess.OrgID, "auth.signup", ip, details))
+		if inv := signup.inv; inv != nil {
+			s.record(AuditEvent{OrgID: inv.OrgID, ActorType: "user", ActorID: u.ID, Action: "auth.invite_accept", TargetType: "invitation", TargetID: inv.ID, IP: ip,
+				Details: map[string]any{"role": string(inv.Role), "method": "github"}})
+			// Signup consumed the invitation, so its acceptance page (the
+			// usual return target of an invitee who chose GitHub) would only
+			// report it used: land in the organization instead.
+			if strings.HasPrefix(returnTo, "/invite/") {
+				returnTo = "/"
+			}
+		}
+	}
 	s.record(userEvent(u, sess.OrgID, "auth.login", ip, map[string]any{"method": "github", "github_login": id.Login}))
 	return sess, returnTo, nil
 }
 
+// githubSignup is what githubCreate made: the accepted invitation, or the
+// organization created for the new account.
+type githubSignup struct {
+	inv *Invitation
+	org *Org
+}
+
 // githubSignIn maps a GitHub identity to a user and opens a session.
-func (s *Service) githubSignIn(ctx context.Context, id *GitHubIdentity, ip, ua, replace string) (*User, *NewSession, error) {
+func (s *Service) githubSignIn(ctx context.Context, id *GitHubIdentity, ip, ua, replace string) (*User, *NewSession, *githubSignup, error) {
 	var (
 		u                      *User
 		sess                   *NewSession
+		signup                 *githubSignup
 		linked, linkedPassword bool
 	)
 	err := s.st.d.Tx(ctx, func(tx *sql.Tx) error {
@@ -193,7 +219,7 @@ func (s *Service) githubSignIn(ctx context.Context, id *GitHubIdentity, ip, ua, 
 			}
 		}
 		if errors.Is(err, db.ErrNotFound) {
-			u, err = s.githubCreate(ctx, tx, id)
+			u, signup, err = s.githubCreate(ctx, tx, id)
 		}
 		if err != nil {
 			return err
@@ -209,35 +235,41 @@ func (s *Service) githubSignIn(ctx context.Context, id *GitHubIdentity, ip, ua, 
 		if len(orgs) > 0 {
 			orgID = orgs[0].ID
 		}
+		if signup != nil && signup.inv != nil {
+			orgID = signup.inv.OrgID
+		}
 		sess, err = s.createSession(ctx, tx, u.ID, orgID, replace, ip, ua)
 		return err
 	})
 	if err == nil && linked {
 		s.record(userEvent(u, sess.OrgID, "auth.github_link", ip, map[string]any{"password_retired": linkedPassword, "sessions_ended": true}))
 	}
-	return u, sess, err
+	if err != nil {
+		signup = nil
+	}
+	return u, sess, signup, err
 }
 
 // githubCreate creates an account for a GitHub identity under the signup
 // policy: bootstrap and open get an org of their own; otherwise a pending
 // invitation for the verified email is required and accepted.
-func (s *Service) githubCreate(ctx context.Context, tx *sql.Tx, id *GitHubIdentity) (*User, error) {
+func (s *Service) githubCreate(ctx context.Context, tx *sql.Tx, id *GitHubIdentity) (*User, *githubSignup, error) {
 	if s.cfg.Signup == SignupClosed {
-		return nil, ErrSignupNotAllowed
+		return nil, nil, ErrSignupNotAllowed
 	}
 	if err := s.st.lockAccounts(ctx, tx); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	n, err := s.st.countUsers(ctx, tx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	inv, err := s.st.pendingInviteForEmail(ctx, tx, id.Email)
 	if err != nil && !errors.Is(err, db.ErrNotFound) {
-		return nil, err
+		return nil, nil, err
 	}
 	if inv == nil && n > 0 && s.cfg.Signup != SignupOpen {
-		return nil, ErrSignupNotAllowed
+		return nil, nil, ErrSignupNotAllowed
 	}
 	name := id.Name
 	if name == "" {
@@ -245,22 +277,22 @@ func (s *Service) githubCreate(ctx context.Context, tx *sql.Tx, id *GitHubIdenti
 	}
 	u, err := s.st.insertUser(ctx, tx, id.Email, name, "", id.ID)
 	if errors.Is(err, db.ErrConflict) {
-		return nil, ErrSignupFailed
+		return nil, nil, ErrSignupFailed
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if inv != nil {
 		if ok, err := s.st.markInviteAccepted(ctx, tx, inv.ID); err != nil || !ok {
-			return nil, ErrInvalidInvitation
+			return nil, nil, ErrInvalidInvitation
 		}
-		return u, s.st.grantMembership(ctx, tx, inv.OrgID, u.ID, inv.Role)
+		return u, &githubSignup{inv: inv}, s.st.grantMembership(ctx, tx, inv.OrgID, u.ID, inv.Role)
 	}
 	o, err := s.st.insertOrg(ctx, tx, orgNameFor("", name, id.Email))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return u, s.st.grantMembership(ctx, tx, o.ID, u.ID, RoleOwner)
+	return u, &githubSignup{org: o}, s.st.grantMembership(ctx, tx, o.ID, u.ID, RoleOwner)
 }
 
 // githubIdentity exchanges the code and reads the user and emails.

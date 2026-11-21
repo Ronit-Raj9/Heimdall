@@ -45,9 +45,32 @@ function Frame({ children }: { children: React.ReactNode }) {
 			return <AuthShell>{children}</AuthShell>;
 		case "login":
 			return <Navigate to="/login" search={{ return_to: location.href }} replace />;
+		case "error":
+			return <SessionError />;
 		default:
 			return <Shell>{children}</Shell>;
 	}
+}
+
+// /auth/me failed before any answer (a transport error, a 5xx): the server's mode is unknown, so
+// neither local nor hosted controls are shown, only a retry.
+function SessionError() {
+	const { t } = useTranslation("platform");
+	return (
+		<div className="bg-background flex min-h-dvh items-center justify-center px-4" data-testid="session-error">
+			<div role="alert" className="flex max-w-sm flex-col items-center gap-3 text-center">
+				<p className="text-sm">{t("session.discoveryError")}</p>
+				<button
+					type="button"
+					className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 text-sm"
+					onClick={() => window.location.reload()}
+					data-testid="session-retry"
+				>
+					{t("session.retry")}
+				</button>
+			</div>
+		</div>
+	);
 }
 
 // Same frame as ui/: page background behind the nav and header, content in a bordered card.

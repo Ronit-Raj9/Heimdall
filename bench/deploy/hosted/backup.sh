@@ -53,20 +53,56 @@ umask 077
 mkdir -p "$dir"
 chmod 700 "$dir"
 ts=$(date -u +%Y%m%dT%H%M%SZ)
+# One backup at a time per folder: two overlapping runs would each pause and
+# unpause the server under the other's archive.
+if command -v flock >/dev/null 2>&1; then
+	exec 9>"$dir/.backup.lock"
+	flock -n 9 || die "another backup is running on $dir"
+fi
 paused=''
-# A failed step leaves no half-written file behind and no paused server.
+# A failed step leaves no half-written file behind, and a server this run
+# paused is unpaused again. `paused` is set only once our pause succeeded,
+# so a refused pause, or a server some operator had already paused, is never
+# unpaused by the backup.
 trap '[ -z "$paused" ] || hc unpause heimdall >/dev/null 2>&1 || true; rm -f "$dir"/heimdall-*-"$ts"*.part' EXIT
+
+# seal_check is run in a one-off container while the server is paused. A
+# pause can freeze the server between writing a run's seal.json and
+# appending it to the experiment's seals.log; such a half-published seal
+# would make the restored chain fail verification. It exits 75 when a sealed
+# run is missing from its seals.log, and archive_volume then lets the server
+# finish the seal and tries again.
+# shellcheck disable=SC2016 # expanded by the container's shell
+seal_check='cd /var/lib/heimdall && [ ! -d runs ] || find runs -path "*/slots/*/runs/*/seal.json" | while IFS= read -r f; do r=${f%/seal.json}; id=${r##*/}; e=${r%/runs/*}; e=${e%/slots/*}; grep -q "^$id " "$e/seals.log" 2>/dev/null || { echo "half-published seal: $f" >&2; exit 75; }; done'
+# A root that does not exist yet (a fresh install with no organization has
+# no runs/projects) is archived as an empty folder instead of failing tar.
+# shellcheck disable=SC2016 # expanded by the container's shell
+tar_script='cd /var/lib/heimdall && for p in "$@"; do [ -e "$p" ] || mkdir -p "$p"; done && tar -cf - "$@"'
 
 # archive_volume FILE PATH... writes a tar.gz of PATHs (relative to
 # /var/lib/heimdall) from a one-off container on the same volume while the
 # server is paused: a plain tar of the live volume can pair a seals.log with
 # run folders from a different moment, which the seal check then rejects.
 archive_volume() {
-	local out=$1
+	local out=$1 tries=0 rc
 	shift
-	paused=1
-	hc pause heimdall >/dev/null
-	hc run --rm --no-deps -T --entrypoint tar heimdall -C /var/lib/heimdall -cf - "$@" | gzip -c >"$out.part"
+	if [ -n "$(hc ps -q --status paused heimdall 2>/dev/null)" ]; then
+		die "the heimdall server is already paused (maintenance?); unpause it before the backup, which pauses it itself"
+	fi
+	while :; do
+		hc pause heimdall >/dev/null
+		paused=1
+		rc=0
+		hc run --rm --no-deps -T --entrypoint sh heimdall -c "$seal_check" >&2 || rc=$?
+		[ "$rc" -eq 75 ] || break
+		hc unpause heimdall >/dev/null
+		paused=''
+		tries=$((tries + 1))
+		[ "$tries" -lt 10 ] || die "a seal stayed half-published across $tries pauses; not archiving an inconsistent seal chain"
+		sleep "${HEIMDALL_BACKUP_RETRY_SLEEP:-1}"
+	done
+	[ "$rc" -eq 0 ] || die "seal check failed (exit $rc)"
+	hc run --rm --no-deps -T --entrypoint sh heimdall -c "$tar_script" sh "$@" | gzip -c >"$out.part"
 	hc unpause heimdall >/dev/null
 	paused=''
 	mv "$out.part" "$out"
@@ -79,6 +115,7 @@ hc exec -T postgres pg_dump -U heimdall -d heimdall --format=custom --no-owner >
 mv "$db_file.part" "$db_file"
 cp "$ENV_FILE" "$dir/heimdall-env-$ts"
 
+mirror_rc=0
 if [ -z "$db_only" ]; then
 	# Same precedence as compose: the shell's value, then the env file's.
 	s3_bucket=${HEIMDALL_S3_BUCKET:-$(env_get HEIMDALL_S3_BUCKET)}
@@ -91,7 +128,10 @@ if [ -z "$db_only" ]; then
 		# The dump is written to the container's tmpfs and removed once
 		# uploaded; exit 4 means the database part or an experiment failed.
 		# shellcheck disable=SC2016 # expanded by the container's shell
-		hc exec -T heimdall sh -c 'd=$(mktemp -d) && rc=0 && bifrost-bench evidence backup -out "$d" || rc=$?; rm -rf "$d"; exit $rc'
+		# A failed mirror pass (one refused experiment is enough) must not
+		# skip the project archive below, which the mirror never holds: the
+		# failure is remembered and returned once the archive is written.
+		hc exec -T heimdall sh -c 'd=$(mktemp -d) && rc=0 && bifrost-bench evidence backup -out "$d" || rc=$?; rm -rf "$d"; exit $rc' || mirror_rc=$?
 		pr_file=$dir/heimdall-projects-$ts.tar.gz
 		log "archiving the project folders (runs/projects, releases) to $pr_file, server paused"
 		archive_volume "$pr_file" runs/projects releases
@@ -103,4 +143,7 @@ if [ -z "$db_only" ]; then
 fi
 
 find "$dir" -maxdepth 1 -type f -name 'heimdall-*' -mtime +"$keep_days" -print -delete | sed 's/^/[heimdall] removed old backup /' >&2
+if [ "$mirror_rc" -ne 0 ]; then
+	die "backup incomplete: the S3 evidence backup failed (exit $mirror_rc); the database dump and project archive in $dir were written"
+fi
 log "backup done: $(du -sh "$dir" | cut -f1) in $dir"

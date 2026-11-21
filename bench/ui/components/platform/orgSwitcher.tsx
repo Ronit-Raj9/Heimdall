@@ -25,9 +25,12 @@ export function OrgSwitcher() {
 	const pathname = useRouterState({ select: (state) => state.location.pathname });
 	const [switchOrg, state] = useSwitchOrgMutation();
 	const org = session.org;
-	if (session.authMode !== "hosted" || !org) return null;
+	if (session.authMode !== "hosted") return null;
+	// Signed in with memberships but no current org (the current one was just left): requests
+	// resolve no org until one is chosen, so the picker is offered instead of nothing.
+	if (!org && !(session.signedIn && session.orgs.length > 0)) return null;
 
-	const square = (
+	const square = org && (
 		<span
 			aria-hidden="true"
 			className="bg-primary/12 text-primary flex size-6 shrink-0 items-center justify-center rounded-md text-[11px] font-semibold"
@@ -37,7 +40,7 @@ export function OrgSwitcher() {
 	);
 
 	// A demo visitor and a member of one organization see its name, nothing to pick.
-	if (!session.signedIn || session.orgs.length <= 1) {
+	if (org && (!session.signedIn || session.orgs.length <= 1)) {
 		return (
 			<div className="flex min-w-0 items-center gap-2 px-1" data-testid="org-current">
 				{square}
@@ -52,7 +55,7 @@ export function OrgSwitcher() {
 	}
 
 	const onChange = async (orgId: string) => {
-		if (orgId === org.id) return;
+		if (orgId === org?.id) return;
 		try {
 			await switchOrg({ org: orgId }).unwrap();
 			void navigate({ href: pathname });
@@ -63,7 +66,7 @@ export function OrgSwitcher() {
 
 	return (
 		<div className="flex min-w-0 items-center gap-2">
-			<Select value={org.id} onValueChange={(value) => void onChange(value)} disabled={state.isLoading}>
+			<Select value={org?.id} onValueChange={(value) => void onChange(value)} disabled={state.isLoading}>
 				<SelectTrigger
 					size="sm"
 					className="hover:bg-accent h-8 max-w-64 min-w-0 gap-2 border-transparent bg-transparent px-1.5 shadow-none dark:bg-transparent"
@@ -71,7 +74,7 @@ export function OrgSwitcher() {
 					data-testid="org-switcher"
 				>
 					{square}
-					<span className="truncate text-sm font-medium">{org.name}</span>
+					<span className="truncate text-sm font-medium">{org ? org.name : t("header.pickOrg")}</span>
 					{state.isLoading && <Loader2 className="size-3.5 animate-spin" aria-label={t("header.switching")} />}
 				</SelectTrigger>
 				<SelectContent position="popper" align="start" className="w-72">

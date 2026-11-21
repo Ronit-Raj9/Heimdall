@@ -58,6 +58,7 @@ vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => {
 		useRemoveRunnerMutation: w("removeRunner"),
 		useRenameOrgMutation: w("rename"),
 		useSetPublicReadMutation: w("publicRead"),
+		useSwitchOrgMutation: w("switchOrg"),
 		useChangePasswordMutation: w("changePassword"),
 	};
 });

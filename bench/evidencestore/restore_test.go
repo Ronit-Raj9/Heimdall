@@ -182,7 +182,7 @@ func TestRecoverInterruptedArchive(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(leftover, "slots"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := mir.recover(org); err != nil {
+	if err := mir.recover(context.Background(), org); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(leftover); !errors.Is(err, fs.ErrNotExist) {
@@ -243,7 +243,7 @@ func TestRecoverKeepsBothWhenUnclear(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(f.dir(), stubFile), []byte("{"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := mir.recover(org); err != nil {
+	if err := mir.recover(context.Background(), org); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(trashed, manifestFile)); err != nil {

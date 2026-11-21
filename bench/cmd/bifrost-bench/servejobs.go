@@ -70,6 +70,7 @@ type launcher struct {
 
 // liveRun is one running experiment's event fan-out.
 type liveRun struct {
+	job  string // the run job feeding it; "" until a job is bound (guarded by launcher.mu)
 	mu   sync.Mutex
 	seq  int
 	subs map[chan schemas.LiveEvent]bool
@@ -159,7 +160,7 @@ func (l *launcher) Start(ctx context.Context, expID string) error {
 		return err
 	}
 	params, _ := json.Marshal(expRunParams{ExpID: expID})
-	_, err := l.jobs.Enqueue(ctx, jobs.NewJob{OrgID: l.org, Kind: kindExperimentRun, Params: params, CreatedBy: actorOf(ctx)})
+	j, err := l.jobs.Enqueue(ctx, jobs.NewJob{OrgID: l.org, Kind: kindExperimentRun, Params: params, CreatedBy: actorOf(ctx)})
 	if errors.Is(err, jobs.ErrConflict) {
 		return fmt.Errorf("experiment %s already has a queued or running job (a run or a regrade): %w", expID, schemas.ErrExists)
 	}
@@ -167,7 +168,7 @@ func (l *launcher) Start(ctx context.Context, expID string) error {
 		return err
 	}
 	l.invalidateStates()
-	l.liveRunFor(expID) // subscribers may follow before the job is claimed
+	l.liveRunFor(expID, j.ID) // subscribers may follow before the job is claimed
 	return nil
 }
 
@@ -204,16 +205,21 @@ func (l *launcher) Cancel(ctx context.Context, expID string) error {
 	}
 	l.invalidateStates()
 	if c.Status == jobs.StatusCancelled { // cancelled before it started: no handler closes the fan-out
-		l.finishLive(expID)
+		l.finishLive(expID, c.ID)
 	}
 	return nil
 }
 
 // finishLive closes the experiment's fan-out, if it has one: its job ended
-// without a handler that would (cancelled while queued).
-func (l *launcher) finishLive(expID string) {
+// without a handler that would (cancelled while queued). jobID names that
+// job: a fan-out already bound to another (the next run job, started after
+// this one was cancelled) is left open. "" closes whatever is open.
+func (l *launcher) finishLive(expID, jobID string) {
 	l.mu.Lock()
 	r, ok := l.active[expID]
+	if ok && jobID != "" && r.job != "" && r.job != jobID {
+		ok = false
+	}
 	l.mu.Unlock()
 	if ok {
 		r.finish()
@@ -243,15 +249,20 @@ func (l *launcher) startInProcess(ctx context.Context, expID string) error {
 	return nil
 }
 
-// liveRunFor returns the experiment's open fan-out, opening a new one when
-// there is none or the last one finished.
-func (l *launcher) liveRunFor(expID string) *liveRun {
+// liveRunFor returns the experiment's open fan-out for job jobID, opening a
+// new one when there is none, the last one finished, or the open one is
+// bound to another job. An unbound fan-out is bound to jobID; jobID "" takes
+// whatever is open.
+func (l *launcher) liveRunFor(expID, jobID string) *liveRun {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if r, ok := l.active[expID]; ok && !r.isDone() {
+	if r, ok := l.active[expID]; ok && !r.isDone() && (jobID == "" || r.job == "" || r.job == jobID) {
+		if r.job == "" {
+			r.job = jobID
+		}
 		return r
 	}
-	r := &liveRun{subs: map[chan schemas.LiveEvent]bool{}}
+	r := &liveRun{job: jobID, subs: map[chan schemas.LiveEvent]bool{}}
 	l.active[expID] = r
 	return r
 }
@@ -296,7 +307,7 @@ func (l *launcher) runJob(ctx context.Context, j *jobs.Job, log jobs.Logger, pro
 	} else {
 		log.Printf("running experiment %s: %d slots", m.ExpID, len(m.Slots))
 	}
-	run := l.liveRunFor(m.ExpID)
+	run := l.liveRunFor(m.ExpID, j.ID)
 	defer run.finish()
 	return l.execute(ctx, m, run, log, progress)
 }
@@ -402,7 +413,7 @@ func (l *launcher) Events(expID string) (<-chan schemas.LiveEvent, func()) {
 	l.mu.Unlock()
 	if (!ok || run.isDone()) && l.Active(expID) {
 		// A queued or resumed job: open the fan-out its handler will use.
-		run, ok = l.liveRunFor(expID), true
+		run, ok = l.liveRunFor(expID, ""), true
 	}
 	ch := make(chan schemas.LiveEvent, 64)
 	if !ok {
@@ -502,7 +513,7 @@ func (l *launcher) Busy() bool {
 			busy = true
 			continue
 		}
-		l.finishLive(id)
+		l.finishLive(id, "")
 	}
 	return busy
 }
@@ -560,7 +571,7 @@ type jobsHub struct {
 
 	mu    sync.Mutex
 	orgs  map[string]*launcher
-	build func(ctx context.Context, orgID string) (release func(), err error) // hosted: acquire the org's runtime
+	build func(ctx context.Context, orgID string) (value any, release func(), err error) // hosted: acquire the org's runtime and its bound launcher
 }
 
 func newJobsHub(d *db.DB, logger schemas.Logger, hosted, launches bool, configPath string) *jobsHub {
@@ -604,16 +615,24 @@ func (h *jobsHub) remove(l *launcher) {
 // hosted mode; release ends the hold on that runtime.
 func (h *jobsHub) launcherFor(ctx context.Context, orgID string) (*launcher, func(), error) {
 	release := func() {}
+	var bound *launcher
 	if h.build != nil {
-		rel, err := h.build(ctx, orgID)
+		v, rel, err := h.build(ctx, orgID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("organization %s: %w", orgID, err)
 		}
 		release = rel
+		bound, _ = v.(*launcher)
 	}
-	h.mu.Lock()
-	l, ok := h.orgs[orgID]
-	h.mu.Unlock()
+	// The launcher of the runtime this job holds, so the job and the
+	// requests of that runtime share one launcher and index (audit
+	// qc2-17-03); the hub lookup serves local mode.
+	l, ok := bound, bound != nil
+	if !ok {
+		h.mu.Lock()
+		l, ok = h.orgs[orgID]
+		h.mu.Unlock()
+	}
 	if !ok {
 		release()
 		return nil, nil, fmt.Errorf("%w: organization %s has no launcher on this server (offline?)", jobs.ErrInvalidParams, orgID)
@@ -713,13 +732,17 @@ func (h *jobsHub) registerKinds() {
 
 // registerExperimentRun registers experiment.run.
 func (h *jobsHub) registerExperimentRun() {
-	limit := jobs.WithLimit(0, 0)
+	opts := []jobs.KindOption{jobs.Internal(), jobs.WithMaxAttempts(expRunMaxAttempts), jobs.WithLimit(0, 0), jobs.WithCancelHook(h.expRunCancelled)}
 	if h.hosted {
-		limit = jobs.WithLimit(hostedExpLimit, hostedExpPerOrg)
+		// A hosted experiment only waits in its scheduler until a runner
+		// takes its slots, so it is claimed only for an organization with a
+		// live runner: experiments of organizations without one stay queued
+		// and never hold the experiment workers an eligible one needs.
+		opts = append(opts, jobs.WithLimit(hostedExpLimit, hostedExpPerOrg), jobs.WithClaimGate(h.orgsWithRunners))
 	}
 	h.runner.Register(kindExperimentRun, h.withLauncher(func(ctx context.Context, l *launcher, j *jobs.Job, log jobs.Logger, progress func(any)) (any, error) {
 		return l.runJob(ctx, j, log, progress)
-	}), jobs.Internal(), jobs.WithMaxAttempts(expRunMaxAttempts), limit, jobs.WithCancelHook(h.expRunCancelled), jobs.WithValidator(h.validator(
+	}), append(opts, jobs.WithValidator(h.validator(
 		func(ctx context.Context, l *launcher, raw json.RawMessage) (any, string, error) {
 			var p expRunParams
 			if err := strictParams(raw, &p); err != nil {
@@ -732,7 +755,31 @@ func (h *jobsHub) registerExperimentRun() {
 				return nil, "", invalid(errors.New("hosted experiments run on runners; this server has no runner coordinator"))
 			}
 			return p, expTarget(p.ExpID), nil
-		})))
+		})))...)
+}
+
+// orgsWithRunners lists the organizations whose launcher has a runner
+// coordinator with at least one registered runner that is not lost.
+func (h *jobsHub) orgsWithRunners() []string {
+	h.mu.Lock()
+	ls := make([]*launcher, 0, len(h.orgs))
+	for _, l := range h.orgs {
+		ls = append(ls, l)
+	}
+	h.mu.Unlock()
+	var out []string
+	for _, l := range ls {
+		if l.coord == nil {
+			continue
+		}
+		for _, w := range l.coord.Workers() {
+			if w.State != schemas.WorkerLost {
+				out = append(out, l.org)
+				break
+			}
+		}
+	}
+	return out
 }
 
 // expRunCancelled closes the live fan-out of an experiment whose run job
@@ -747,7 +794,7 @@ func (h *jobsHub) expRunCancelled(j *jobs.Job) {
 	h.mu.Unlock()
 	if ok {
 		l.invalidateStates()
-		l.finishLive(p.ExpID)
+		l.finishLive(p.ExpID, j.ID)
 	}
 }
 
@@ -1047,13 +1094,16 @@ func hostedHub(env *hostedEnv) *jobsHub {
 	// leases for runners and launches nothing itself, so offline changes
 	// nothing here, as the startup warning says (audit 8-C-03, 4-B-11).
 	h := newJobsHub(env.db, env.base.logger, true, true, "")
-	h.build = func(ctx context.Context, orgID string) (func(), error) {
+	h.build = func(ctx context.Context, orgID string) (any, func(), error) {
 		org, err := env.dir.OrgByID(ctx, orgID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		_, release, err := env.registry.Acquire(ctx, org)
-		return release, err
+		rt, release, err := env.registry.Acquire(ctx, org)
+		if err != nil {
+			return nil, nil, err
+		}
+		return rt.Value, release, nil
 	}
 	actual, loaded := hostedHubs.LoadOrStore(env, h)
 	if loaded {

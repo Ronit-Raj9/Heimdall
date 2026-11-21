@@ -95,8 +95,10 @@ export const platformApi = benchApi.injectEndpoints({
 					if (before && org && before !== org) dispatch(benchApi.util.resetApiState());
 				} catch (failure) {
 					const status = errorStatus((failure as { error?: unknown })?.error);
-					// Only a hosted server answers /auth/me with 401; anything else leaves local mode on.
-					setAuthState({ mode: status === 401 ? "hosted" : "local" });
+					// Only a hosted server answers /auth/me with 401, and only a server without the platform
+					// routes with 404. A transport error or a 5xx proves neither: the known mode is kept.
+					if (status === 401) setAuthState({ mode: "hosted" });
+					else if (status === 404) setAuthState({ mode: "local" });
 				}
 			},
 		}),

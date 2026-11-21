@@ -324,6 +324,14 @@ func (s *store) memberships(ctx context.Context, q querier, userID string) ([]Or
 // grantMembership adds userID to orgID with role, or raises an existing
 // membership to role. It never lowers a role.
 func (s *store) grantMembership(ctx context.Context, q querier, orgID, userID string, role Role) error {
+	// The org row lock is the one membership management takes (db.lockOrg),
+	// so a role change or removal committed meanwhile is seen here rather
+	// than overwritten from a stale read (a promotion to owner lowered back
+	// to the invited role).
+	var locked string
+	if err := s.row(ctx, q, `SELECT id FROM orgs WHERE id = ?`+s.d.ForUpdate(), orgID).Scan(&locked); err != nil {
+		return notFound(err)
+	}
 	cur, err := s.membershipRole(ctx, q, orgID, userID)
 	switch {
 	case errors.Is(err, db.ErrNotFound):
@@ -334,7 +342,8 @@ func (s *store) grantMembership(ctx context.Context, q querier, orgID, userID st
 	case cur.AtLeast(role):
 		return nil
 	}
-	_, err = s.exec(ctx, q, `UPDATE memberships SET role = ? WHERE org_id = ? AND user_id = ?`, string(role), orgID, userID)
+	// Raised only from the role read under the lock.
+	_, err = s.exec(ctx, q, `UPDATE memberships SET role = ? WHERE org_id = ? AND user_id = ? AND role = ?`, string(role), orgID, userID, string(cur))
 	return err
 }
 

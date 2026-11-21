@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
+	"slices"
 	"testing"
 	"time"
 
@@ -147,5 +149,43 @@ func TestCalibrationRoutesRefuse(t *testing.T) {
 	none := newCalibrationClient(t, schemas.ModeLive, nil)
 	if got := none.do(t, "GET", APIPrefix+"/suites/qa/calibration", nil, nil).StatusCode(); got != fasthttp.StatusServiceUnavailable {
 		t.Fatalf("no source = %d, want 503", got)
+	}
+}
+
+// TestCalibrationLabelsHideHeldOut is audit qc2-17-01: unless held-out tasks
+// are visible, the labels route leaves out labels of held-out tasks, whose
+// rows carry answers marked correct or wrong.
+func TestCalibrationLabelsHideHeldOut(t *testing.T) {
+	src := newFakeCalibration(t)
+	if _, err := src.AddCalibrationLabel(context.Background(), "qa", &schemas.CalibrationLabelRequest{Task: "secret", Answer: "42", Label: "correct", Labeller: "ana"}); err != nil {
+		t.Fatal(err)
+	}
+	suite := *src.suite
+	suite.Tasks = []*schemas.Task{{ID: "q1", Split: schemas.SplitPublic}, {ID: "secret", Split: schemas.SplitHeldOut}}
+	suites := &fakeSuites{ids: []string{"qa"}, suites: map[string]*schemas.Suite{"qa": &suite}}
+	get := func(visible bool) []string {
+		r := router.New()
+		NewCalibrationHandler(schemas.ModeLive, src, lib.RequireWriteToken(schemas.ModeLive, testToken)).WithHeldOut(suites, visible).RegisterRoutes(r)
+		ctx := &fasthttp.RequestCtx{}
+		ctx.Request.Header.SetMethod("GET")
+		ctx.Request.SetRequestURI(APIPrefix + "/suites/qa/calibration/labels")
+		r.Handler(ctx)
+		var l schemas.CalibrationLabels
+		if err := json.Unmarshal(ctx.Response.Body(), &l); err != nil {
+			t.Fatalf("%d %s: %v", ctx.Response.StatusCode(), ctx.Response.Body(), err)
+		}
+		var tasks []string
+		for _, it := range l.Items {
+			tasks = append(tasks, it.Task)
+		}
+		return tasks
+	}
+	for _, task := range get(false) {
+		if task == "secret" {
+			t.Fatal("held-out task's label served")
+		}
+	}
+	if got := get(true); !slices.Contains(got, "secret") {
+		t.Fatalf("held_out.visible labels = %v", got)
 	}
 }

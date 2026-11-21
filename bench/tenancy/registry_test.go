@@ -236,3 +236,43 @@ func TestRegistryRebuildsOnNewGeneration(t *testing.T) {
 		t.Fatalf("busy runtime rebuilt: %d", b.builds.Load())
 	}
 }
+
+// TestAutoEvictionRevalidatesSelection is audit qc2-17-03: an entry chosen
+// for idle eviction but acquired (or used) before the eviction runs is kept,
+// so one org never ends up with two live runtimes.
+func TestAutoEvictionRevalidatesSelection(t *testing.T) {
+	b := &countingBuilder{}
+	r := newTestRegistry(t, b, Options{IdleTTL: time.Hour})
+	ctx := context.Background()
+	rt, release, err := r.Acquire(ctx, Org{ID: "org_a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	release()
+	cands := r.idle(func(*entry) bool { return true })
+	if len(cands) != 1 {
+		t.Fatalf("idle candidates = %d", len(cands))
+	}
+	// A job acquires the org after the sweep selected it.
+	held, releaseHeld, err := r.Acquire(ctx, Org{ID: "org_a"})
+	if err != nil || held != rt {
+		t.Fatalf("acquire: %v", err)
+	}
+	r.evictIdle(cands[0])
+	if got := r.Cached(); len(got) != 1 || b.closes.Load() != 0 {
+		t.Fatalf("held runtime evicted: cached %v, closes %d", got, b.closes.Load())
+	}
+	releaseHeld()
+	// Released but used since the selection: still kept.
+	r.evictIdle(cands[0])
+	if got := r.Cached(); len(got) != 1 {
+		t.Fatalf("runtime used since selection evicted: %v", got)
+	}
+	// A fresh selection evicts it.
+	for _, c := range r.idle(func(*entry) bool { return true }) {
+		r.evictIdle(c)
+	}
+	if got := r.Cached(); len(got) != 0 || b.closes.Load() != 1 {
+		t.Fatalf("fresh idle selection: cached %v, closes %d", got, b.closes.Load())
+	}
+}

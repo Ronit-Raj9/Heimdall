@@ -315,9 +315,17 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, ip, ua, replace s
 		s.record(AuditEvent{ActorType: "anonymous", Action: "auth.login_rate_limited", TargetType: "ip", TargetID: clip(ip, 64), IP: ip})
 		return nil, nil, errRateLimited(wait)
 	}
-	if ok, wait := s.loginEmail.Allow(email); !ok {
-		s.record(AuditEvent{ActorType: "anonymous", Action: "auth.login_rate_limited", TargetType: "email", TargetID: clip(email, 254), IP: ip})
-		return nil, nil, errRateLimited(wait)
+	// Every account's email passed validEmail when it was created, so an
+	// address that fails it can not log in. It is refused before the
+	// per-email limiter, which would otherwise keep an attacker-sized key per
+	// request; the IP limit above still applies, and the same argon2id work
+	// is burned below.
+	validAddr := validEmail(email)
+	if validAddr {
+		if ok, wait := s.loginEmail.Allow(email); !ok {
+			s.record(AuditEvent{ActorType: "anonymous", Action: "auth.login_rate_limited", TargetType: "email", TargetID: clip(email, 254), IP: ip})
+			return nil, nil, errRateLimited(wait)
+		}
 	}
 	s.maybePurge(ctx)
 	fail := func(u *User) (*User, *NewSession, error) {
@@ -328,7 +336,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, ip, ua, replace s
 		s.record(ev)
 		return nil, nil, ErrInvalidCredentials
 	}
-	if email == "" || req.Password == "" || len(req.Password) > MaxPasswordBytes {
+	if !validAddr || req.Password == "" || len(req.Password) > MaxPasswordBytes {
 		s.hasher.BurnVerify(clip(req.Password, MaxPasswordBytes))
 		return fail(nil)
 	}

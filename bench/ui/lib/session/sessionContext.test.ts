@@ -9,7 +9,19 @@ describe("sessionFromMe", () => {
 	it("is local mode for auth_mode local and for a server without /auth/me (404)", () => {
 		expect(sessionFromMe({ me: ME_LOCAL, meLoading: false })).toEqual(LOCAL_SESSION);
 		expect(sessionFromMe({ meError: { status: 404, data: {} }, meLoading: false })).toEqual(LOCAL_SESSION);
-		expect(sessionFromMe({ meError: { status: "FETCH_ERROR", error: "x" }, meLoading: false }).authMode).toBe("local");
+	});
+
+	// Audit qc2-16-05: a transport error or a 5xx before any answer is not proof of local mode.
+	it("offers a retry, never local controls, when /auth/me fails with neither 401 nor 404", () => {
+		for (const meError of [{ status: "FETCH_ERROR", error: "x" }, { status: 502, data: {} }]) {
+			const s = sessionFromMe({ meError, meLoading: false });
+			expect(s).toMatchObject({ status: "error", authMode: "hosted", signedIn: false });
+			expect(canUse(s, "viewer")).toBe(false);
+			expect(usesWriteToken(s)).toBe(false);
+			expect(frameFor(s, "/verdict")).toBe("error");
+		}
+		// Once hosted is known, a failed reload keeps the last answer.
+		expect(sessionFromMe({ me: ME_OWNER, meError: { status: 503, data: {} }, meLoading: false })).toMatchObject({ status: "ready", signedIn: true });
 	});
 
 	it("reads a signed-in user: current org, role, every org for the switcher", () => {

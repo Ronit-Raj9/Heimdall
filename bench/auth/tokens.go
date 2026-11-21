@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -102,6 +103,16 @@ func (s *Service) RevokeToken(ctx context.Context, p *Principal, id, ip string) 
 	}
 	s.record(principalEvent(p, "auth.token_revoke", "api_token", id, ip, nil))
 	return nil
+}
+
+// RevokeMemberTokensTx revokes, inside tx, every API token userID created in
+// orgID. Removing a member calls it in the removal's transaction: a token
+// that only stopped while the membership was absent would come back, up to
+// the new role, when the same user is invited again.
+func RevokeMemberTokensTx(ctx context.Context, d *db.DB, tx *sql.Tx, orgID, userID string) error {
+	_, err := tx.ExecContext(ctx, d.Rebind(`UPDATE api_tokens SET revoked_at = ? WHERE org_id = ? AND user_id = ? AND revoked_at IS NULL`),
+		db.Now(), orgID, userID)
+	return err
 }
 
 // tokenPrincipal verifies an hm_ token. Unknown, malformed, revoked and

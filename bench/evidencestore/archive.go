@@ -333,7 +333,7 @@ func (m *Mirror) ApplyRetention(ctx context.Context, org Org, opts RetentionOpti
 	if opts.Days <= 0 {
 		return nil, nil
 	}
-	if err := m.recover(org); err != nil {
+	if err := m.recover(ctx, org); err != nil {
 		m.logger().Warn("evidence: interrupted archive or restore not recovered", "org_id", org.ID, "error", err.Error())
 	}
 	ids, err := org.Store.ListExperiments(ctx)
