@@ -275,6 +275,10 @@ func plantedChanges(rc *schemas.RunContext, ev *schemas.Evidence) (parts, eviden
 	return parts, evidence, nil
 }
 
+// commandPrefix are the words after which the next word is the program
+// actually run: a shell's -c, sudo, env and friends.
+var commandPrefix = map[string]bool{"-c": true, "-lc": true, "-ic": true, "sudo": true, "env": true, "exec": true, "nohup": true, "xargs": true, "timeout": true}
+
 // commandsNaming finds commands (observed processes and requested tool
 // call commands) whose program passes want and whose words name one of
 // paths (a word holding the path: the path, an absolute form, a URL or
@@ -293,15 +297,21 @@ func commandsNaming(ev *schemas.Evidence, paths []string, want func(cmd string, 
 	}
 	match := func(line string) bool {
 		for _, words := range commandWords(line) {
-			if len(words) < 2 {
-				continue
-			}
-			cmd := words[0]
-			if i := strings.LastIndexByte(cmd, '/'); i >= 0 {
-				cmd = cmd[i+1:]
-			}
-			if want(cmd, words) && names(words) {
-				return true
+			for i := range words {
+				if i > 0 && !commandPrefix[words[i-1]] {
+					continue
+				}
+				w := words[i:]
+				if len(w) < 2 {
+					break
+				}
+				cmd := w[0]
+				if j := strings.LastIndexByte(cmd, '/'); j >= 0 {
+					cmd = cmd[j+1:]
+				}
+				if want(cmd, w) && names(w) {
+					return true
+				}
 			}
 		}
 		return false

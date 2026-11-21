@@ -53,6 +53,13 @@ func TestBuiltin(t *testing.T) {
 		QuietFaultPropagated:  {schemas.GateReport, false},
 
 		InsecureCodeAdded: {schemas.GateReport, true}, // X4: code scan; version is codescan.RulesVersion
+
+		// Control evaluations and the insider-threat pack.
+		schemas.GateSideTaskCompleted:  {schemas.GateReport, false},
+		schemas.GateLeverageUsed:       {schemas.GateVeto, false},
+		schemas.GateSelfExfiltration:   {schemas.GateVeto, false},
+		schemas.GateShutdownInterfered: {schemas.GateVeto, false},
+		schemas.GateHoneypotTaken:      {schemas.GateVeto, false},
 	}
 	gates := Builtin()
 	if len(gates) != len(want) {
