@@ -14,6 +14,7 @@ const q = vi.hoisted(() => ({
 	exp: {} as Record<string, unknown>,
 	verdict: {} as Record<string, unknown>,
 	health: {} as Record<string, unknown>,
+	models: {} as Record<string, unknown>,
 }));
 
 const ok = (data: unknown) => ({ data, error: undefined, isLoading: false, isFetching: false, isSuccess: true, refetch: () => undefined });
@@ -27,11 +28,9 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	useGetVerdictQuery: () => q.verdict,
 	useGetHealthQuery: () => q.health,
 }));
+vi.mock("@/lib/store/apis/modelsApi", () => ({ useGetModelsQuery: () => q.models }));
 vi.mock("@/lib/store/apis/welcomeApi", () => ({
 	useWelcomeQuickRunMutation: () => [() => Promise.resolve({}), { isLoading: false, error: undefined, reset: () => undefined }],
-}));
-vi.mock("@/components/experiments/experimentProgress", () => ({
-	ExperimentProgressCard: ({ status }: { status: { state: string } }) => <div data-testid="experiment-progress" data-state={status.state} />,
 }));
 vi.mock("@/components/verdict/verdictCard", () => ({ VerdictCard: () => <div data-testid="verdict-card" /> }));
 vi.mock("@tanstack/react-router", () => ({
@@ -61,6 +60,7 @@ beforeEach(() => {
 	q.exp = ok(undefined);
 	q.verdict = ok(undefined);
 	q.health = ok({ launch: true });
+	q.models = ok({ providers: [], keys: [] });
 });
 
 describe("WelcomeView", () => {
@@ -70,6 +70,15 @@ describe("WelcomeView", () => {
 		expect(html.indexOf("welcome-suite-coding-core")).toBeLessThan(html.indexOf("welcome-suite-acme-web"));
 		expect(html).toMatch(/data-testid="welcome-suite-coding-core" data-selected="true"/);
 		expect(html).toContain("Recommended");
+		expect(html).toContain("Ready");
+		expect(html).toContain('data-testid="welcome-catalog-tile"');
+	});
+
+	it("shows the run summary with a cost estimate", () => {
+		q.models = ok({ providers: [{ id: "openai", name: "OpenAI", models: [] }], keys: [] });
+		const html = view("?suite=coding-core&agent=claude-code&step=model");
+		expect(html).toContain('data-testid="welcome-provider-openai"');
+		expect(html).toContain("No key");
 	});
 
 	it("offers the catalog when the org has no suite", () => {
@@ -98,6 +107,8 @@ describe("WelcomeView", () => {
 		expect(html).toContain('data-testid="welcome-step-verdict"');
 		expect(html).toContain('data-state="running"');
 		expect(html).not.toContain("welcome-verdict-headline");
+		expect(html).toContain('data-testid="welcome-live-slots"');
+		expect(html).toContain("1 running now, 1 finished");
 
 		q.exp = ok({ exp_id: "e_1", state: "done", slots: { total: 5, done: 5, running: 0, failed: 0 } });
 		q.verdict = ok({ exp_id: "e_1", verdict: { decision: "improved" }, naive: { A: { num: 2, den: 5, unknown: 0 }, B: { num: 4, den: 5, unknown: 0 } } });
@@ -105,6 +116,8 @@ describe("WelcomeView", () => {
 		expect(html).toContain("Better than the baseline");
 		expect(html).toContain("4 of 5 runs passed");
 		expect(html).toContain("Compare another model");
+		expect(html).toContain('data-testid="welcome-arm-bars"');
+		expect(html).toContain("80%");
 		expect(html).toContain('href="/experiments/$expId"');
 	});
 });

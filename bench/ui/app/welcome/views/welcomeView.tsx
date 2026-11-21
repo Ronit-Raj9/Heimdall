@@ -1,5 +1,4 @@
 import { TERMINAL_STATES } from "@/components/experiments/experiments.utils";
-import { ExperimentProgressCard } from "@/components/experiments/experimentProgress";
 import { ModelPicker, type ModelRef } from "@/components/models/modelPicker";
 import { RunButton } from "@/components/run/runButton";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
@@ -14,12 +13,17 @@ import { launchAvailable, type AgentSummary, type Decision, type SuiteSummary } 
 import "@/lib/types/welcomeI18n";
 import { cn } from "@/lib/utils";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Bot, Boxes, Check, CircleAlert, Cpu, Github, Loader2, Play, Sparkles, Trophy } from "lucide-react";
+import { ArrowLeft, ArrowRight, BarChart3, Bot, Boxes, Check, ChevronDown, CircleAlert, Clock, Cpu, Github, Loader2, PartyPopper, Play, Sparkles, Trophy, Wallet } from "lucide-react";
 import { parseAsInteger, parseAsString, useQueryState } from "nuqs";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { AgentTile, ArmBars, CATEGORY_ICON, CatalogTile, CategoryChips, IconTile, LiveProgress, ModelQuickPick, Monogram, ProviderMark, SuiteTile } from "./welcomeParts";
 import {
 	asStep,
+	categoryOf,
+	roughCostUsd,
+	SUITE_CATEGORIES,
+	type SuiteCategory,
 	clampTasks,
 	DEFAULT_TASKS,
 	defaultAgent,
@@ -30,7 +34,6 @@ import {
 	RUN_SIZES,
 	sortAgents,
 	sortSuites,
-	STARTER_SUITE,
 	WIZARD_STEPS,
 	type WizardStep,
 } from "./welcome.utils";
@@ -132,18 +135,7 @@ export default function WelcomeView() {
 								testId="welcome-suites-empty"
 							/>
 						) : (
-							<>
-								<ChoiceGrid>
-									{sortSuites(suites.data?.suites ?? []).map((s) => (
-										<SuiteChoice key={s.id} suite={s} selected={s.id === suite} onPick={() => void setSuite(s.id)} />
-									))}
-								</ChoiceGrid>
-								<p className="text-muted-foreground text-xs">
-									<Link to="/catalog" className="text-primary underline underline-offset-2">
-										{t("suite.browseCatalog")}
-									</Link>
-								</p>
-							</>
+							<SuitePicker suites={suites.data?.suites ?? []} value={suite} onPick={(id) => void setSuite(id)} />
 						)}
 						<NavRow onNext={suite ? () => go("agent") : undefined} />
 					</StepCard>
@@ -161,7 +153,7 @@ export default function WelcomeView() {
 							<>
 								<ChoiceGrid>
 									{sortAgents(agents.data?.agents ?? []).map((a) => (
-										<AgentChoice key={a.id} agent={a} selected={a.id === agent} onPick={() => void setAgent(a.id)} />
+										<AgentTile key={a.id} agent={a} selected={a.id === agent} onPick={() => void setAgent(a.id)} />
 									))}
 								</ChoiceGrid>
 								<p className="text-muted-foreground text-xs">
@@ -177,7 +169,8 @@ export default function WelcomeView() {
 
 				{step === "model" && (
 					<StepCard icon={Cpu} title={t("model.heading")} help={t("model.help")} testId="welcome-step-model">
-						<div className="bg-muted/40 flex flex-col gap-3 rounded-lg border p-4">
+						<ModelQuickPick value={model} onChange={setModel} />
+						<div className="bg-muted/40 flex flex-col gap-3 rounded-xl border p-4">
 							<ModelPicker value={model} onChange={setModel} purpose="agent" testId="welcome-model-picker" />
 							{agentObj?.model && <p className="text-muted-foreground text-xs">{t("agent.defaultModel", { model: agentObj.model })}</p>}
 						</div>
@@ -273,61 +266,31 @@ function StepCard({ icon: Icon, title, help, testId, children }: { icon: typeof 
 
 function ChoiceGrid({ children }: { children: ReactNode }) {
 	return (
-		<div role="radiogroup" className="grid max-h-[26rem] gap-2.5 overflow-y-auto p-0.5 sm:grid-cols-2">
+		<div role="radiogroup" className="grid max-h-[32rem] gap-3 overflow-y-auto p-1 sm:grid-cols-2 lg:grid-cols-3">
 			{children}
 		</div>
 	);
 }
 
-function Choice({ selected, onPick, testId, children }: { selected: boolean; onPick(): void; testId: string; children: ReactNode }) {
+/** Suite tiles with category filter chips and a catalog tile at the end. */
+function SuitePicker({ suites, value, onPick }: { suites: SuiteSummary[]; value: string | null; onPick(id: string): void }) {
+	const [cat, setCat] = useState<SuiteCategory | null>(null);
+	const sorted = useMemo(() => sortSuites(suites), [suites]);
+	const present = useMemo(() => {
+		const have = new Set(sorted.map((s) => categoryOf(s)));
+		return SUITE_CATEGORIES.filter((c) => have.has(c));
+	}, [sorted]);
+	const shown = cat ? sorted.filter((s) => categoryOf(s) === cat) : sorted;
 	return (
-		<button
-			type="button"
-			role="radio"
-			aria-checked={selected}
-			onClick={onPick}
-			className={cn(
-				"group relative flex min-w-0 flex-col gap-1 rounded-lg border p-3.5 text-left transition-all",
-				"hover:border-primary/50 hover:bg-accent/40 focus-visible:ring-ring/60 focus-visible:ring-2 focus-visible:outline-none",
-				selected && "border-primary bg-primary/5 ring-primary/30 ring-2",
-			)}
-			data-testid={testId}
-			data-selected={selected}
-		>
-			{selected && (
-				<span className="bg-primary text-primary-foreground absolute top-2.5 right-2.5 flex size-5 items-center justify-center rounded-full">
-					<Check className="size-3" aria-hidden="true" />
-				</span>
-			)}
-			{children}
-		</button>
-	);
-}
-
-function SuiteChoice({ suite, selected, onPick }: { suite: SuiteSummary; selected: boolean; onPick(): void }) {
-	const { t } = useTranslation("welcome");
-	return (
-		<Choice selected={selected} onPick={onPick} testId={`welcome-suite-${suite.id}`}>
-			<span className="flex items-center gap-2 pr-6">
-				<span className="truncate font-mono text-sm font-semibold">{suite.id}</span>
-				{suite.id === STARTER_SUITE && (
-					<span className="bg-chart-success/15 text-chart-success-ink rounded px-1.5 text-[10px] font-semibold uppercase">{t("suite.recommended")}</span>
-				)}
-			</span>
-			{suite.description && <span className="text-muted-foreground line-clamp-2 text-xs">{suite.description}</span>}
-			<span className="text-muted-foreground mt-auto pt-1 text-[11px] tabular-nums">{t("suite.tasks", { count: suite.task_count })}</span>
-		</Choice>
-	);
-}
-
-function AgentChoice({ agent, selected, onPick }: { agent: AgentSummary; selected: boolean; onPick(): void }) {
-	const { t } = useTranslation("welcome");
-	return (
-		<Choice selected={selected} onPick={onPick} testId={`welcome-agent-${agent.id}`}>
-			<span className="truncate pr-6 font-mono text-sm font-semibold">{agent.id}</span>
-			<span className="text-muted-foreground text-xs">{agent.adapter}</span>
-			{agent.model && <span className="text-muted-foreground mt-auto pt-1 text-[11px]">{t("agent.defaultModel", { model: agent.model })}</span>}
-		</Choice>
+		<>
+			<CategoryChips present={present} value={cat} onChange={setCat} />
+			<ChoiceGrid>
+				{shown.map((s) => (
+					<SuiteTile key={s.id} suite={s} selected={s.id === value} onPick={() => onPick(s.id)} />
+				))}
+				<CatalogTile />
+			</ChoiceGrid>
+		</>
 	);
 }
 
@@ -362,6 +325,7 @@ function RunStep(props: {
 	onStarted(expId: string): void;
 }) {
 	const { t } = useTranslation("welcome");
+	const { t: tz } = useTranslation("wizard");
 	const session = useSession();
 	const launch = launchAvailable(useGetHealthQuery().data);
 	const [quickRun, { isLoading, error, reset }] = useWelcomeQuickRunMutation();
@@ -376,40 +340,61 @@ function RunStep(props: {
 	const status = errorStatusOf(error);
 	return (
 		<StepCard icon={Play} title={t("run.heading")} help={t("run.help")} testId="welcome-step-run">
-			<dl className="grid gap-2 rounded-lg border p-4 text-sm sm:grid-cols-[8rem_1fr]">
-				<dt className="text-muted-foreground">{t("run.suite")}</dt>
-				<dd className="font-mono" data-testid="welcome-summary-suite">
-					{props.suiteId}
-				</dd>
-				<dt className="text-muted-foreground">{t("run.agent")}</dt>
-				<dd className="font-mono" data-testid="welcome-summary-agent">
-					{props.agentId}
-				</dd>
-				<dt className="text-muted-foreground">{t("run.model")}</dt>
-				<dd className="font-mono" data-testid="welcome-summary-model">
-					{props.model.provider}/{props.model.model}
-				</dd>
-				<dt className="text-muted-foreground">{t("run.size")}</dt>
-				<dd className="flex flex-wrap items-center gap-2">
-					{RUN_SIZES.map((n) => {
-						const max = props.suite?.task_count ?? 0;
-						const disabled = max > 0 && n > max && n !== RUN_SIZES[0];
-						return (
-							<Button
-								key={n}
-								size="sm"
-								variant={props.tasks === n ? "default" : "outline"}
-								disabled={disabled}
-								onClick={() => props.onTasks(n)}
-								data-testid={`welcome-size-${n}`}
-							>
-								{t("run.tasks", { count: n })}
-							</Button>
-						);
-					})}
-					<span className="text-muted-foreground text-xs">{t("run.trialNote")}</span>
-				</dd>
-			</dl>
+			<div className="overflow-hidden rounded-xl border" data-testid="welcome-summary">
+				<div className="grid divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+					<SummaryCell label={t("run.suite")} testId="welcome-summary-suite" value={props.suiteId}>
+						<IconTile icon={CATEGORY_ICON[props.suite ? categoryOf(props.suite) : "coding"]} className="bg-primary/10 text-primary" size="sm" />
+					</SummaryCell>
+					<SummaryCell label={t("run.agent")} testId="welcome-summary-agent" value={props.agentId}>
+						<Monogram name={props.agentId} className="size-7 rounded-lg text-[10px]" />
+					</SummaryCell>
+					<SummaryCell label={t("run.model")} testId="welcome-summary-model" value={`${props.model.provider}/${props.model.model}`}>
+						<ProviderMark provider={props.model.provider} />
+					</SummaryCell>
+				</div>
+				<div className="bg-muted/30 flex flex-col gap-3 border-t p-4">
+					<div className="flex flex-wrap items-center gap-2">
+						<span className="text-muted-foreground mr-1 text-sm">{t("run.size")}</span>
+						{RUN_SIZES.map((n) => {
+							const max = props.suite?.task_count ?? 0;
+							const disabled = max > 0 && n > max && n !== RUN_SIZES[0];
+							return (
+								<Button
+									key={n}
+									size="sm"
+									variant={props.tasks === n ? "default" : "outline"}
+									className="rounded-full"
+									disabled={disabled}
+									onClick={() => props.onTasks(n)}
+									data-testid={`welcome-size-${n}`}
+								>
+									{t("run.tasks", { count: n })}
+								</Button>
+							);
+						})}
+						<span className="text-muted-foreground text-xs">{t("run.trialNote")}</span>
+					</div>
+					<div className="grid gap-3 sm:grid-cols-2">
+						<div className="flex items-center gap-3" data-testid="welcome-cost">
+							<IconTile icon={Wallet} className="bg-chart-success/10 text-chart-success-ink" />
+							<div className="flex flex-col">
+								<span className="text-muted-foreground text-xs">{tz("cost")}</span>
+								<span className="text-base font-semibold tabular-nums">{tz("costValue", { cost: roughCostUsd(props.model.model, props.tasks).toFixed(2) })}</span>
+								<span className="text-muted-foreground text-[11px]">
+									{tz("runs", { count: props.tasks * 2 })}. {tz("costNote")}
+								</span>
+							</div>
+						</div>
+						<div className="flex items-center gap-3">
+							<IconTile icon={Clock} className="bg-chart-info/10 text-chart-info-ink" />
+							<div className="flex flex-col">
+								<span className="text-muted-foreground text-xs">{tz("time")}</span>
+								<span className="text-base font-semibold">{tz("timeValue")}</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
 
 			{!mayRun ? (
 				<GuestNote />
@@ -433,12 +418,26 @@ function RunStep(props: {
 					<ArrowLeft className="size-4" aria-hidden="true" />
 					{t("back")}
 				</Button>
-				<Button size="lg" className="ml-auto min-w-44" disabled={!mayRun || !launch || isLoading} onClick={() => void run()} data-testid="welcome-run">
+				<Button size="lg" className="ml-auto h-12 min-w-52 rounded-xl text-base shadow-md transition-transform hover:scale-[1.02] active:scale-[0.98]" disabled={!mayRun || !launch || isLoading} onClick={() => void run()} data-testid="welcome-run">
 					{isLoading ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
 					{isLoading ? t("run.starting") : t("run.button")}
 				</Button>
 			</div>
 		</StepCard>
+	);
+}
+
+function SummaryCell({ label, value, testId, children }: { label: string; value: string; testId: string; children: ReactNode }) {
+	return (
+		<div className="flex min-w-0 items-center gap-3 p-4">
+			{children}
+			<div className="flex min-w-0 flex-col">
+				<span className="text-muted-foreground text-xs">{label}</span>
+				<span className="truncate font-mono text-sm font-medium" title={value} data-testid={testId}>
+					{value}
+				</span>
+			</div>
+		</div>
 	);
 }
 
@@ -513,8 +512,8 @@ function VerdictStep({ expId, suite, agent, onRestart }: { expId: string; suite?
 				<BlockSkeleton rows={2} testId="welcome-progress-loading" />
 			) : status.error ? (
 				<LoadError title={t("verdict.loadError")} error={status.error} onRetry={status.refetch} testId="welcome-progress-error" />
-			) : status.data ? (
-				<ExperimentProgressCard status={status.data} />
+			) : status.data && state !== "done" ? (
+				<LiveProgress status={status.data} />
 			) : null}
 
 			{state === "analyzing" && (
@@ -534,22 +533,9 @@ function VerdictStep({ expId, suite, agent, onRestart }: { expId: string; suite?
 				) : verdict.error ? (
 					<LoadError title={t("verdict.loadError")} error={verdict.error} onRetry={verdict.refetch} testId="welcome-verdict-error" />
 				) : verdict.data ? (
-					<div className="animate-in fade-in zoom-in-95 flex flex-col gap-4 duration-300" data-testid="welcome-verdict">
-						<div className={cn("flex flex-col gap-1 rounded-xl border p-4", DECISION_STYLE[verdict.data.verdict.decision])}>
-							<p className="text-lg font-semibold" data-testid="welcome-verdict-headline">
-								{t(`verdict.headline.${verdict.data.verdict.decision}`)}
-							</p>
-							<p className="text-foreground/80 text-sm">{t(`verdict.explain.${verdict.data.verdict.decision}`)}</p>
-							<ul className="text-foreground/80 mt-1 flex flex-wrap gap-x-4 text-xs tabular-nums">
-								{Object.entries(verdict.data.naive ?? {}).map(([arm, r]) => (
-									<li key={arm}>
-										<span className="font-mono">{arm}</span>: {t("verdict.passRate", { num: r.num, den: r.den })}
-									</li>
-								))}
-							</ul>
-						</div>
+					<VerdictHero decision={verdict.data.verdict.decision} naive={verdict.data.naive ?? {}}>
 						<VerdictCard verdict={verdict.data.verdict} />
-					</div>
+					</VerdictHero>
 				) : null)}
 
 			<div className="flex flex-wrap items-center gap-2 border-t pt-4">
@@ -576,6 +562,62 @@ function VerdictStep({ expId, suite, agent, onRestart }: { expId: string; suite?
 				</div>
 			</div>
 		</StepCard>
+	);
+}
+
+const DECISION_ICON: Record<Decision, typeof Trophy> = { improved: PartyPopper, regressed: CircleAlert, inconclusive: BarChart3, invalid: CircleAlert };
+
+/** The clear verdict: headline, one-line meaning, A vs B bars; the full statistics on demand. */
+function VerdictHero({ decision, naive, children }: { decision: Decision; naive: Record<string, { num: number; den: number }>; children: ReactNode }) {
+	const { t } = useTranslation("welcome");
+	const { t: tz } = useTranslation("wizard");
+	const Icon = DECISION_ICON[decision] ?? Trophy;
+	const winner = decision === "improved" ? "B" : decision === "regressed" ? "A" : undefined;
+	return (
+		<div className="animate-in fade-in zoom-in-95 flex flex-col gap-4 duration-500" data-testid="welcome-verdict">
+			<div className={cn("relative flex flex-col gap-4 overflow-hidden rounded-2xl border p-5 md:p-6", DECISION_STYLE[decision])}>
+				{decision === "improved" && <Confetti />}
+				<div className="relative flex items-start gap-4">
+					<span className="bg-background/70 flex size-12 shrink-0 items-center justify-center rounded-2xl shadow-sm">
+						<Icon className={cn("size-6", decision === "improved" && "animate-bounce")} aria-hidden="true" />
+					</span>
+					<div className="flex min-w-0 flex-col gap-1">
+						<p className="text-xl font-semibold tracking-tight md:text-2xl" data-testid="welcome-verdict-headline">
+							{t(`verdict.headline.${decision}`)}
+						</p>
+						<p className="text-foreground/80 text-sm">{t(`verdict.explain.${decision}`)}</p>
+					</div>
+				</div>
+				<div className="relative">
+					<ArmBars naive={naive} winner={winner} />
+				</div>
+			</div>
+			<details className="group rounded-xl border">
+				<summary className="hover:bg-accent/40 flex cursor-pointer list-none items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium">
+					<BarChart3 className="text-muted-foreground size-4" aria-hidden="true" />
+					{tz("verdictDetails")}
+					<ChevronDown className="text-muted-foreground ml-auto size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+				</summary>
+				<div className="border-t p-4">{children}</div>
+			</details>
+		</div>
+	);
+}
+
+const CONFETTI = ["bg-chart-success", "bg-chart-info", "bg-chart-warning", "bg-primary", "bg-pink-500"];
+
+/** A few drifting dots behind an improved verdict; decorative and motion-safe. */
+function Confetti() {
+	return (
+		<div className="pointer-events-none absolute inset-0 motion-reduce:hidden" aria-hidden="true">
+			{Array.from({ length: 14 }, (_, i) => (
+				<span
+					key={i}
+					className={cn("animate-in fade-in slide-in-from-top-8 absolute size-1.5 rounded-full opacity-70 duration-1000", CONFETTI[i % CONFETTI.length])}
+					style={{ left: `${(i * 37) % 100}%`, top: `${(i * 23) % 70}%`, animationDelay: `${i * 60}ms` }}
+				/>
+			))}
+		</div>
 	);
 }
 
