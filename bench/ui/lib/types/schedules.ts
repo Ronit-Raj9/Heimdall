@@ -62,6 +62,8 @@ export interface SchedulesResponse {
 	secrets: string[];
 	hosted: boolean;
 	ticker: boolean;
+	/** Hosted guardrails: at most max_schedules per org, each firing at most every min_interval_min minutes. */
+	limits?: { max_schedules: number; min_interval_min: number };
 }
 
 export interface TestAlertRequest {

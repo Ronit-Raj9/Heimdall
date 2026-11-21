@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schedule"
@@ -133,5 +134,52 @@ func TestFireJobFor(t *testing.T) {
 	}
 	if k, _ := FireJobFor(c, false); k != KindScheduleFire {
 		t.Fatalf("local: %s", k)
+	}
+}
+
+func TestSchedulesHostedGuardrails(t *testing.T) {
+	h, _ := schedEnv(t)
+	h.env.Services.Hosted = true
+	ctx := schedCall(h.put, `{"file":{"schedules":[{"name":"often","experiment":"experiments/n.yaml","cron":"*/5 * * * *"}]}}`, "")
+	if ctx.Response.StatusCode() != 422 || !strings.Contains(string(ctx.Response.Body()), "15 minutes") {
+		t.Fatalf("min interval not refused: %d %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	ctx = schedCall(h.put, `{"file":{"schedules":[{"name":"q","experiment":"experiments/n.yaml","cron":"*/15 * * * *"}]}}`, "")
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("15 minute schedule refused: %d %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	var resp SchedulesResponse
+	if err := json.Unmarshal(ctx.Response.Body(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.Limits == nil || resp.Limits.MinIntervalMin != 15 || resp.Limits.MaxSchedules != HostedMaxSchedules {
+		t.Fatalf("limits %+v", resp.Limits)
+	}
+	var many []string
+	for i := 0; i <= HostedMaxSchedules; i++ {
+		many = append(many, `{"name":"s`+strings.Repeat("x", i+1)+`","experiment":"experiments/n.yaml","cron":"0 6 * * *"}`)
+	}
+	ctx = schedCall(h.put, `{"file":{"schedules":[`+strings.Join(many, ",")+`]}}`, "")
+	if ctx.Response.StatusCode() != 422 {
+		t.Fatalf("max count not refused: %d", ctx.Response.StatusCode())
+	}
+	// Local servers keep the old freedom.
+	h.env.Services.Hosted = false
+	ctx = schedCall(h.put, `{"file":{"schedules":[{"name":"often","experiment":"experiments/n.yaml","cron":"*/5 * * * *"}]}}`, "")
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("local refused: %d %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+}
+
+func TestMinCronInterval(t *testing.T) {
+	now := time.Date(2026, 11, 21, 0, 0, 0, 0, time.UTC)
+	for spec, want := range map[string]time.Duration{"*/15 * * * *": 15 * time.Minute, "0 6 * * *": 24 * time.Hour, "0,10 * * * *": 10 * time.Minute} {
+		got, err := MinCronInterval(spec, time.UTC, now, 0)
+		if err != nil || got != want {
+			t.Errorf("%s: %v %v, want %v", spec, got, err, want)
+		}
+	}
+	if err := CheckHostedSchedule(schedule.Schedule{Name: "j", Job: "inbox-pull", Cron: "0 6 * * *"}, now); err == nil {
+		t.Error("job schedule allowed hosted")
 	}
 }

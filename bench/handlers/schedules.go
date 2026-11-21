@@ -6,8 +6,11 @@ package handlers
 // file-level alerts plus schedules). Alerts never hold a URL or a secret:
 // url_env and secret_env name either an org secret (keystore Kind secret,
 // matched by label) or, on a local server only, an environment variable.
-// The server ticker (cmd/bifrost-bench/schedules_ticker.go) enqueues a
-// schedule.fire job at each cron time.
+// The server ticker (cmd/bifrost-bench/jobs_canary.go) enqueues a
+// schedule.fire job at each cron time. A hosted server fires them too: the
+// job plans and starts the experiment through the org launcher, so it runs
+// on runners (cmd/bifrost-bench/schedules_hosted.go), under the hosted
+// guardrails of schedules_hosted.go.
 
 import (
 	"context"
@@ -144,14 +147,15 @@ type ScheduleRow struct {
 
 // SchedulesResponse is GET /schedules.
 type SchedulesResponse struct {
-	Mode      schemas.Mode    `json:"mode"`
-	File      schedule.File   `json:"file"`
-	YAML      string          `json:"yaml"`
-	Rows      []ScheduleRow   `json:"rows"`
-	Events    []string        `json:"events"`
-	Secrets   []string        `json:"secrets"` // org secret labels usable as url_env / secret_env
-	Hosted    bool            `json:"hosted"`
-	Ticker    bool            `json:"ticker"` // schedule.fire can run on this server
+	Mode    schemas.Mode    `json:"mode"`
+	File    schedule.File   `json:"file"`
+	YAML    string          `json:"yaml"`
+	Rows    []ScheduleRow   `json:"rows"`
+	Events  []string        `json:"events"`
+	Secrets []string        `json:"secrets"` // org secret labels usable as url_env / secret_env
+	Hosted  bool            `json:"hosted"`
+	Ticker  bool            `json:"ticker"`           // schedule.fire can run on this server
+	Limits  *ScheduleLimits `json:"limits,omitempty"` // hosted guardrails
 }
 
 // SchedulesPut is PUT /schedules: the whole file, as JSON or YAML text.
@@ -201,6 +205,10 @@ func (h *schedulesHandler) get(ctx *fasthttp.RequestCtx) {
 	if resp.File.Schedules == nil {
 		resp.File.Schedules = []schedule.Schedule{}
 	}
+	if resp.Hosted {
+		l := HostedScheduleLimits()
+		resp.Limits = &l
+	}
 	full := &schedule.File{Alerts: f.Alerts, Schedules: slices.Clone(f.Schedules)}
 	if ScheduleExtras != nil {
 		ScheduleExtras(root, full)
@@ -226,6 +234,10 @@ func (h *schedulesHandler) get(ctx *fasthttp.RequestCtx) {
 		row.SpentUSD, _ = schedule.SpentToday(ScheduleStateDir(root), s, now)
 		if err := s.Validate(root, ScheduleExperimentLoader); err != nil {
 			row.Problem = err.Error()
+		} else if resp.Hosted {
+			if err := CheckHostedSchedule(s, now); err != nil {
+				row.Problem = err.Error()
+			}
 		}
 		resp.Rows = append(resp.Rows, row)
 	}
@@ -291,6 +303,16 @@ func (h *schedulesHandler) put(ctx *fasthttp.RequestCtx) {
 	if err := f.Validate(h.root(), ScheduleExperimentLoader); err != nil {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, err.Error())
 		return
+	}
+	if h.env.Services.Hosted {
+		full := &schedule.File{Alerts: f.Alerts, Schedules: slices.Clone(f.Schedules)}
+		if ScheduleExtras != nil {
+			ScheduleExtras(h.root(), full)
+		}
+		if err := CheckHostedSchedules(full, time.Now()); err != nil {
+			lib.SendError(ctx, h.env.Mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, err.Error())
+			return
+		}
 	}
 	for _, s := range f.Schedules {
 		if strings.HasPrefix(s.Name, "canary-") {
@@ -362,10 +384,16 @@ func (h *schedulesHandler) runNow(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, "schedule "+name+" not found")
 		return
 	}
+	if h.env.Services.Hosted {
+		if err := CheckHostedSchedule(s, time.Now()); err != nil {
+			lib.SendError(ctx, h.env.Mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, err.Error())
+			return
+		}
+	}
 	kind, params := FireJobFor(s, h.env.Services.Hosted)
 	if !slices.Contains(h.env.Services.Jobs.Kinds(), kind) {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable,
-			"this server cannot run "+kind+" jobs: hosted servers run canaries on runners and run no scheduled experiments; ask your server owner")
+			"this server cannot run "+kind+" jobs: start serve without -offline, or ask your server owner")
 		return
 	}
 	p := auth.PrincipalFrom(ctx)
@@ -381,14 +409,11 @@ func (h *schedulesHandler) runNow(ctx *fasthttp.RequestCtx) {
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusAccepted, ScheduleRunResponse{JobID: j.ID, Kind: kind})
 }
 
-// FireJobFor is the job a schedule trigger queues: schedule.fire locally;
-// on a hosted server a canary schedule queues canary.run (the hosted canary
-// bridge) and anything else still names schedule.fire (refused there).
-func FireJobFor(s schedule.Schedule, hosted bool) (string, json.RawMessage) {
-	if hosted && s.Job == "" && IsCanaryExperiment(s.Experiment) {
-		b, _ := json.Marshal(map[string]string{"name": CanaryName(s.Experiment)})
-		return "canary.run", b
-	}
+// FireJobFor is the job a schedule trigger queues: schedule.fire, local and
+// hosted. The hosted schedule.fire runs canaries and experiments on runners
+// through the org launcher, under the same overlap lock, daily cap and
+// alerts as local.
+func FireJobFor(s schedule.Schedule, _ bool) (string, json.RawMessage) {
 	b, _ := json.Marshal(map[string]string{"name": s.Name})
 	return KindScheduleFire, b
 }

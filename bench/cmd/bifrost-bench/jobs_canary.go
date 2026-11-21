@@ -121,7 +121,7 @@ func init() {
 		},
 	})
 
-	registerJobKind(jobKindSpec{
+	registerOrMergeJobKind(jobKindSpec{
 		Kind: kindScheduleFire, Local: true,
 		Validate: func(ctx context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
 			var p scheduleFireParams
@@ -142,7 +142,7 @@ func init() {
 			if err := j.DecodeParams(&p); err != nil {
 				return nil, err
 			}
-			rec, err := fireWebSchedule(ctx, env, p.Name)
+			rec, err := fireWebScheduleWith(ctx, env, p.Name, log)
 			if err != nil {
 				return nil, err
 			}
@@ -248,10 +248,12 @@ func webScheduleFile(root string) (*schedule.File, error) {
 	return f, nil
 }
 
-// fireWebSchedule runs one web schedule through a schedule daemon over the
-// web file: the same overlap lock, daily cap ledger and alerts as the CLI
-// daemon, with alert names resolved to org secrets.
-func fireWebSchedule(ctx context.Context, env jobEnv, name string) (schedule.Record, error) {
+// fireWebScheduleWith runs one web schedule through a schedule daemon over
+// the web file: the same overlap lock, daily cap ledger and alerts as the
+// CLI daemon, with alert names resolved to org secrets. On a hosted server
+// the experiment runs on runners through the org launcher
+// (schedules_hosted.go) and the org's daily spend quota applies.
+func fireWebScheduleWith(ctx context.Context, env jobEnv, name string, log jobs.Logger) (schedule.Record, error) {
 	f, err := webScheduleFile(env.ProjectRoot)
 	if err != nil {
 		return schedule.Record{}, err
@@ -263,15 +265,31 @@ func fireWebSchedule(ctx context.Context, env jobEnv, name string) (schedule.Rec
 	if err := s.Validate(env.ProjectRoot, loadScheduled); err != nil {
 		return schedule.Record{}, err
 	}
+	if env.App == nil {
+		return schedule.Record{}, errors.New("no organization app")
+	}
 	state := handlers.ScheduleStateDir(env.ProjectRoot)
+	var runner schedule.Runner = scheduleRunner{a: env.App}
+	if env.Hosted {
+		if env.Services.Launcher == nil {
+			return schedule.Record{}, errors.New("this organization has no launcher, so its schedules can not run on runners; ask your server owner to enable runners")
+		}
+		if err := handlers.CheckHostedSchedule(s, time.Now()); err != nil {
+			return schedule.Record{}, err
+		}
+		if err := orgSpendCapErr(ctx, env, f, time.Now()); err != nil {
+			return schedule.Record{}, err
+		}
+		runner = hostedScheduleRunner{env: env, l: env.Services.Launcher, log: log}
+	}
 	opts := schedule.Options{
 		Root: env.ProjectRoot, StateDir: state,
-		Runner:   scheduleRunner{a: env.App},
+		Runner:   runner,
 		Notifier: handlers.NewAlertSender(ctx, env.Services, state, false),
 		Load:     loadScheduled,
 		Logger:   env.App.logger,
 	}
-	if env.App != nil && env.App.cfg != nil {
+	if env.App.cfg != nil && !env.Hosted { // server-wide receivers are not shared across hosted orgs
 		opts.ExtraAlerts = env.App.cfg.Alerts
 	}
 	d, err := schedule.New(&schedule.File{Alerts: f.Alerts, Schedules: []schedule.Schedule{s}}, opts)
@@ -286,10 +304,12 @@ var tickEvery = 30 * time.Second
 
 var tickers sync.Map // org id -> struct{}
 
-// startScheduleTicker starts the org's ticker once, when the services carry
-// the job runner (the org's router build, not a job's env).
+// startScheduleTicker starts the local org's ticker once, when the services
+// carry the job runner (the org's router build, not a job's env). A hosted
+// org's ticker belongs to its runtime (startHostedScheduleTicker, called
+// from orgBuilder) so it stops when the runtime is evicted.
 func startScheduleTicker(a *app, s *handlers.Services) {
-	if s.Jobs == nil || a == nil || a.cfg == nil {
+	if s.Jobs == nil || a == nil || a.cfg == nil || s.Hosted {
 		return
 	}
 	org := s.OrgID
@@ -350,6 +370,12 @@ func (t *scheduleTicker) tick(ctx context.Context, now time.Time) []string {
 		next := c.Next(from.In(loc))
 		if next.IsZero() || next.After(now) {
 			continue
+		}
+		if t.hosted {
+			if err := handlers.CheckHostedSchedule(s, now); err != nil {
+				t.warnOnce(s.Name, "schedule not queued", err)
+				continue
+			}
 		}
 		kind, params := handlers.FireJobFor(s, t.hosted)
 		if _, err := t.jobs.Create(ctx, jobs.NewJob{OrgID: t.org, Kind: kind, Params: params, CreatedBy: "system"}); err != nil {

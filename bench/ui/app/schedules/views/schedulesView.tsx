@@ -96,7 +96,18 @@ export function SchedulesBody({ data, busy, onSave }: SchedulesBodyProps) {
 		<div className="flex min-w-0 flex-col gap-6">
 			{!data.ticker && (
 				<p className="text-muted-foreground text-xs" data-testid="schedules-no-ticker">
-					{t("noTicker")}
+					{t("noTicker")}{" "}
+					<a className="underline" href="/operate">
+						{t("noTickerLink")}
+					</a>
+				</p>
+			)}
+			{data.hosted && data.limits && (
+				<p className="text-muted-foreground text-xs" data-testid="schedules-hosted-limits">
+					{t("hostedLimits", { max: data.limits.max_schedules, min: data.limits.min_interval_min, count: data.rows.length })}{" "}
+					<a className="underline" href="/workers">
+						{t("hostedRunnersLink")}
+					</a>
 				</p>
 			)}
 			<Section title={t("title")} testId="schedules-list">
