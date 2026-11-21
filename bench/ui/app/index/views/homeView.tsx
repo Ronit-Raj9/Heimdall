@@ -11,12 +11,11 @@ import { formatValueNumber } from "@/components/valueCell.utils";
 import { getLocale } from "@/lib/i18n";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useGetSuitesQuery, useListExperimentsQuery } from "@/lib/store";
-import { useGetHealthQuery, useListRunsQuery } from "@/lib/store/apis/benchApi";
-import { launchAvailable } from "@/lib/types/bench";
+import { useListRunsQuery } from "@/lib/store/apis/benchApi";
 import "@/lib/types/homeI18n";
 import { cn } from "@/lib/utils";
 import { Link, Navigate } from "@tanstack/react-router";
-import { ArrowRight, Boxes, CircleCheck, FlaskConical, Play, Plus, Rocket, Sparkles, Wallet } from "lucide-react";
+import { ArrowRight, Boxes, CircleCheck, FlaskConical, Play, Rocket, Wallet } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -41,7 +40,6 @@ export default function HomeView() {
 	const list = useListExperimentsQuery(undefined, { pollingInterval: LIST_POLL_MS, skipPollingIfUnfocused: true });
 	const suites = useGetSuitesQuery();
 	const runs = useListRunsQuery({ limit: RUNS_PAGE }, { pollingInterval: LIST_POLL_MS, skipPollingIfUnfocused: true });
-	const launch = launchAvailable(useGetHealthQuery().data);
 	const experiments = (list.data?.experiments ?? []) as ExperimentListItem[];
 	const split = splitExperiments(experiments);
 	// Readiness checks Heimdall starts on its own stay out of "Running now"; Recent labels them.
@@ -72,21 +70,12 @@ export default function HomeView() {
 					<h1 className="text-foreground text-2xl font-semibold tracking-tight sm:text-3xl" data-testid="home-greeting">
 						{firstName ? t("greeting.named", { greeting, name: firstName }) : greeting}
 					</h1>
-					<p className="text-foreground/80 max-w-2xl text-sm" data-testid="home-intro">
+					<p className="text-muted-foreground max-w-2xl text-sm" data-testid="home-intro">
 						{t("intro")}
 					</p>
-					<p className="text-muted-foreground text-sm">{t("subtitle")}</p>
 				</div>
 				{mayRun && (
 					<div className="flex shrink-0 flex-wrap gap-2">
-						{launch && (
-							<Button asChild variant="outline" dataTestId="home-cta-new">
-								<Link to="/experiments/new">
-									<Plus aria-hidden="true" />
-									{t("cta.newExperiment")}
-								</Link>
-							</Button>
-						)}
 						<Button asChild dataTestId="home-cta-run">
 							<Link to="/welcome">
 								<Play aria-hidden="true" />
@@ -273,18 +262,15 @@ function OnboardingCard({ mayRun }: { mayRun: boolean }) {
 	const { t } = useTranslation("home");
 	return (
 		<div
-			className="border-primary/25 from-primary/10 via-card to-card flex flex-col gap-5 rounded-2xl border bg-gradient-to-br p-6 shadow-(--shadow-card) sm:flex-row sm:items-center md:p-8"
+			className="bg-card flex flex-col gap-5 rounded-xl border p-6 sm:flex-row sm:items-center"
 			data-testid="home-welcome-card"
 		>
-			<span className="bg-primary text-primary-foreground flex size-12 shrink-0 items-center justify-center rounded-2xl shadow-sm">
-				<Sparkles className="size-6" aria-hidden="true" />
-			</span>
 			<div className="flex min-w-0 flex-1 flex-col gap-1.5">
 				<h2 className="text-lg font-semibold tracking-tight">{t("onboarding.title")}</h2>
 				<p className="text-muted-foreground max-w-xl text-sm">{mayRun ? t("onboarding.body") : t("onboarding.viewer")}</p>
 			</div>
 			{mayRun && (
-				<Button asChild size="lg" className="shrink-0">
+				<Button asChild className="shrink-0">
 					<Link to="/welcome" data-testid="home-welcome-open">
 						{t("onboarding.open")}
 						<ArrowRight className="size-4" aria-hidden="true" />

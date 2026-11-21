@@ -61,13 +61,13 @@ export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
 			</div>
 			{IS_FIXTURE_MODE && (
 				<span
-					className="text-muted-foreground border-border hidden rounded-md border border-dashed px-2 py-0.5 font-mono text-[11px] sm:inline"
+					className="text-muted-foreground hidden text-xs sm:inline"
 					data-testid="bench-header-fixture"
 				>
 					{t("mode.fixture")}
 				</span>
 			)}
-			<ModeBadge mode={data?.mode} isLoading={isLoading} isError={isError} className="hidden sm:inline-flex" />
+			<ModeBadge variant="dot" mode={data?.mode} isLoading={isLoading} isError={isError} className="hidden sm:inline-flex" />
 			{canStart && (
 				<Button asChild size="sm" className="max-sm:size-8 max-sm:px-0" dataTestId="header-new-experiment">
 					<Link to="/experiments/new" aria-label={t("shell.newExperiment")} title={t("shell.newExperiment")}>

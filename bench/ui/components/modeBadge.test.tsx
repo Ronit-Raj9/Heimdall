@@ -26,4 +26,11 @@ describe("ModeBadge", () => {
 	it("loading", () => {
 		expect(renderToStaticMarkup(<ModeBadge mode={undefined} isLoading />)).toContain('data-testid="mode-badge-loading"');
 	});
+
+	it("dot variant reads Live data or Sample data", () => {
+		expect(renderToStaticMarkup(<ModeBadge variant="dot" mode="live" />)).toContain(">Live data<");
+		expect(renderToStaticMarkup(<ModeBadge variant="dot" mode="recorded" />)).toContain(">Sample data<");
+		expect(renderToStaticMarkup(<ModeBadge variant="dot" mode="synthetic" />)).toContain(">Sample data<");
+		expect(renderToStaticMarkup(<ModeBadge variant="dot" mode={undefined} isError />)).toContain('data-testid="mode-badge-offline"');
+	});
 });

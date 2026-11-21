@@ -138,7 +138,6 @@ export default function ExperimentView({ expId }: { expId: string }) {
 				}
 				subtitle={
 					<span className="flex flex-col gap-1">
-						{!system && <span className="text-muted-foreground text-sm">{tPage("header.subtitle")}</span>}
 						<span className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid="experiment-facts">
 							{st.suite && <EntityLink kind="suite" id={st.suite} />}
 							{arms.length > 0 && !system && <span>{t("experiments.page.arms", { arms: arms.join(" vs "), count: arms.length })}</span>}
@@ -197,8 +196,8 @@ export default function ExperimentView({ expId }: { expId: string }) {
 function SuiteGlyph({ suite }: { suite?: string }) {
 	const Icon = suiteIcon(suite);
 	return (
-		<span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg" aria-hidden="true">
-			<Icon className="size-5" />
+		<span className="text-muted-foreground flex shrink-0 items-center" aria-hidden="true">
+			<Icon className="size-4" />
 		</span>
 	);
 }

@@ -1,4 +1,3 @@
-import { ModeBadge } from "@/components/modeBadge";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { TREND_METRICS, TREND_SYNTHETIC } from "@/components/trends/trends.utils";
 import { TrendsBoard } from "@/components/trends/trendsBoard";
@@ -54,7 +53,6 @@ export default function TrendsTab() {
 				<p className="text-muted-foreground max-w-3xl text-sm" data-testid="trends-explainer">
 					{t("trends.subtitle")}
 				</p>
-				<ModeBadge mode={data?.mode} isLoading={trends.isLoading} isError={trends.isError && !data} />
 			</div>
 
 			<TrendsFilters

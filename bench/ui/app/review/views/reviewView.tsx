@@ -1,4 +1,3 @@
-import { ModeBadge } from "@/components/modeBadge";
 import { filterQueue, isReviewReason } from "@/components/review/review.utils";
 import { ReviewQueueTable } from "@/components/review/reviewQueueTable";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
@@ -138,7 +137,6 @@ export function QueueBody({
 						<h2 className="text-sm font-semibold">{t("review.queue.title")}</h2>
 						<span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs tabular-nums">{items.length}</span>
 					</div>
-					<ModeBadge mode={data.mode} />
 				</div>
 				<ReasonFilter reasons={reasons} value={reason} onChange={onReason} counts={countReasons(data)} total={(data.items ?? []).length} />
 				<div className="flex flex-col gap-4">

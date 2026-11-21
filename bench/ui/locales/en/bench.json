@@ -314,7 +314,10 @@
 		"loading": "Checking the bench server",
 		"offline": "NO SERVER",
 		"offlineHint": "The bench API at /api/bench did not answer.",
-		"fixture": "Fixture files"
+		"fixture": "Fixture files",
+		"liveData": "Live data",
+		"sampleData": "Sample data",
+		"offlineData": "No server"
 	},
 	"theme": {
 		"toggle": "Toggle theme"

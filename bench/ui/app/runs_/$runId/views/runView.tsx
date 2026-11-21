@@ -1,7 +1,6 @@
 import { RunCodeScanPanel } from "@/components/codescan/codeScanPanel"; // X4
 import { compareSearch } from "@/components/experiments/legacyRoutes";
 import { HardwarePanel } from "@/components/gpu/hardwarePanel"; // X7
-import { ModeBadge } from "@/components/modeBadge";
 import { RunReceiptPanel } from "@/components/receipts/runReceiptPanel";
 import { RunReviewsBlock } from "@/components/review/runReviewsBlock";
 import { RunGatewayPolicy } from "@/components/routing/gatewayPolicyCard"; // W9 routing policy under test
@@ -156,7 +155,6 @@ export default function RunView({ runId }: { runId: string }) {
                 {t("runs.list.inFlight")}
               </span>
             )}
-            <ModeBadge mode={d.mode} />
           </>
         }
         subtitle={

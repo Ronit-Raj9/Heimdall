@@ -88,7 +88,7 @@ describe("ClustersTab", () => {
 		expect(state.listArgs[0]).toEqual({ agent: "codex-default", exp: "e_1,e_2", min: 2, synthetic: "include" });
 		expect(html).toContain('data-testid="clusters-table"');
 		expect(html).toContain("12 failures in 30 checked runs");
-		expect(html).toContain('data-testid="mode-badge-synthetic"');
+		expect(html).not.toContain('data-testid="mode-badge-synthetic"');
 		expect(html).not.toContain('data-testid="cluster-panel"');
 	});
 

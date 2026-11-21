@@ -15,7 +15,7 @@ describe("QueueBody", () => {
 		expect(html).toContain('data-testid="review-queue-row-r_pww2l7yame"');
 		expect(html).toContain('data-testid="review-reason-filter"');
 		expect(html).toContain('data-testid="review-select-run"');
-		expect(html).toContain('data-testid="mode-badge-synthetic"');
+		expect(html).not.toContain('data-testid="mode-badge-synthetic"');
 	});
 
 	it("filters by reason on the client", () => {

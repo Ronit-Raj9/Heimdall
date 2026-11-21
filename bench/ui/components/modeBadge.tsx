@@ -30,14 +30,18 @@ export interface ModeBadgeProps {
 	/** The server did not answer, so the mode is not known. */
 	isError?: boolean;
 	className?: string;
-	/** "lg" for the app header, where the mode must be seen first. */
+	/** "lg" for a large badge. */
 	size?: "default" | "lg";
+	/** "dot" for the top bar: a small dot and "Live data" or "Sample data", no badge chrome. */
+	variant?: "badge" | "dot";
 }
 
 /** LIVE, RECORDED or SYNTHETIC, from the `mode` every bench response carries (DESIGN.md 16.7). */
-export function ModeBadge({ mode, isLoading = false, isError = false, className, size = "default" }: ModeBadgeProps) {
+export function ModeBadge({ mode, isLoading = false, isError = false, className, size = "default", variant = "badge" }: ModeBadgeProps) {
 	const { t } = useTranslation("bench");
 	const lg = size === "lg";
+
+	if (variant === "dot") return <ModeDot mode={mode} isLoading={isLoading} isError={isError} className={className} />;
 
 	if (isLoading) {
 		return (
@@ -72,5 +76,33 @@ export function ModeBadge({ mode, isLoading = false, isError = false, className,
 			<span aria-hidden="true" className={cn("inline-block size-1.5 shrink-0", MODE_DOT[mode])} />
 			<span>{t(`mode.${mode}`)}</span>
 		</Badge>
+	);
+}
+
+/** The top bar's quiet form: one dot and a plain label. Recorded and synthetic both read as sample data. */
+function ModeDot({ mode, isLoading, isError, className }: Pick<ModeBadgeProps, "mode" | "isLoading" | "isError" | "className">) {
+	const { t } = useTranslation("bench");
+	if (isLoading) {
+		return <Skeleton className={cn("h-4 w-20", className)} aria-label={t("mode.loading")} data-testid="mode-badge-loading" />;
+	}
+	const offline = !mode || isError;
+	const label = offline ? t("mode.offlineData") : mode === "live" ? t("mode.liveData") : t("mode.sampleData");
+	const hint = offline ? t("mode.offlineHint") : t(MODE_HINT_KEY[mode]);
+	return (
+		<span
+			className={cn("text-muted-foreground items-center gap-1.5 text-xs", className)}
+			title={hint}
+			data-mode={offline ? undefined : mode}
+			data-testid={offline ? "mode-badge-offline" : `mode-badge-${mode}`}
+		>
+			<span
+				aria-hidden="true"
+				className={cn(
+					"inline-block size-1.5 shrink-0 rounded-full",
+					offline ? "bg-chart-error" : mode === "live" ? "bg-chart-success" : "bg-muted-foreground/60",
+				)}
+			/>
+			<span>{label}</span>
+		</span>
 	);
 }

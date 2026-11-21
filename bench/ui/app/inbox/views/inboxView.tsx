@@ -2,7 +2,6 @@ import { INBOX_ALL, INBOX_FILTERS, filterInboxItems, inboxCount, type InboxFilte
 import { InboxEmpty, InboxIngestOffNote, InboxSourcesTable } from "@/components/inbox/inboxSources";
 import { InboxStateFilter } from "@/components/inbox/inboxStateFilter";
 import { InboxTable } from "@/components/inbox/inboxTable";
-import { ModeBadge } from "@/components/modeBadge";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { useGetInboxQuery } from "@/lib/store/apis/inboxApi";
@@ -64,7 +63,6 @@ export function InboxTab() {
 		<section className="flex min-w-0 flex-col gap-6" data-testid="inbox-screen">
 			<div className="flex flex-wrap items-center gap-3">
 				<p className="text-muted-foreground max-w-3xl text-sm">{t("inbox.subtitle")}</p>
-				<ModeBadge mode={data?.mode} isLoading={list.isLoading} isError={list.isError && !data} />
 				{data?.mode === "live" && <InboxPullButton check={ready?.inbox} />}
 			</div>
 			{list.isLoading ? (
@@ -138,7 +136,6 @@ export function InboxBody({ data, filter, onFilter, source, onSource, itemId, on
 								<span className="text-muted-foreground text-xs" data-testid="inbox-regression-tasks">
 									{t("inbox.regressionTasks", { count: data.regression_tasks ?? 0 })}
 								</span>
-								<ModeBadge mode={data.mode} />
 							</div>
 						}
 					>

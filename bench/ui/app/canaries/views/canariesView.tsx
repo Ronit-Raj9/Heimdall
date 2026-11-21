@@ -2,7 +2,6 @@ import { useConfirm } from "@/components/platform/confirmDialog";
 import { CanaryDetailBody } from "@/components/canaries/canaryDetail";
 import { CanaryList } from "@/components/canaries/canaryList";
 import { sortCanaries } from "@/components/canaries/canary.utils";
-import { ModeBadge } from "@/components/modeBadge";
 import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
 import { FeatureHero } from "@/components/inbox/featureHero";
@@ -37,7 +36,6 @@ export default function CanariesView() {
 			<PageHeader
 				title={t("canaries.title")}
 				subtitle={t("canaries.subtitle")}
-				meta={<ModeBadge mode={data?.mode} isLoading={list.isLoading} isError={list.isError && !data} />}
 				actions={
 					hasAny && !formOpen ? (
 						<Button size="sm" onClick={() => setFormOpen(true)} data-testid="canary-new-open">
