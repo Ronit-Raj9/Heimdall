@@ -115,6 +115,9 @@ func TestRunListFiltersAndPaging(t *testing.T) {
 		{"?exp=e_other", nil},
 		{"?track=qa&condition=clean&limit=1&offset=1", []string{"r_t02_A"}},
 		{"?track=coding", nil},
+		{"?agent=cfg-B", []string{"r_t02_B", "r_t01_B"}},
+		{"?agent=cfg-B&outcome=fail", nil},
+		{"?agent=nobody", nil},
 	}
 	for _, tc := range cases {
 		out := getRunList(t, c, tc.query)

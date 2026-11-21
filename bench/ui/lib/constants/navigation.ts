@@ -3,6 +3,7 @@ import {
 	Award,
 	Bot,
 	Boxes,
+	Bug,
 	CalendarClock,
 	CirclePlay,
 	FlaskConical,

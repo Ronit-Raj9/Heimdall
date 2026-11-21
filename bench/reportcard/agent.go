@@ -71,3 +71,10 @@ func SelectForAgent(evals []schemas.Evaluation, agent string, version int, model
 		return e.Status == StatusRunning && slices.ContainsFunc(e.Children, func(c schemas.EvaluationChild) bool { return c.ExperimentID != "" })
 	})
 }
+
+// MapArms maps a child experiment's arm ids to the evaluation's arm labels,
+// the same way the report card reads the child (readChild). Callers skip the
+// "compat" arm themselves.
+func MapArms(arms []schemas.EvaluationArm, m *schemas.Manifest) map[string]string {
+	return mapArms(arms, m)
+}

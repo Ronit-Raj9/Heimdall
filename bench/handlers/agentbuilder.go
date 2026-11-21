@@ -121,6 +121,24 @@ type AgentConfigFields struct {
 	A2ACardURL  string            `json:"a2a_card_url,omitempty"`
 	OpenAIURL   string            `json:"openai_url,omitempty"` // A08: openai.url of an openai_agent
 	Description string            `json:"description,omitempty"`
+	// Behavior is what makes two agents on the same model differ: their
+	// instructions, memory, retries and limits, and capabilities. Nil (an
+	// older client) leaves those keys of the file alone.
+	Behavior *AgentBehaviorFields `json:"behavior,omitempty"`
+}
+
+// AgentBehaviorFields are the Setup form's behavior fields (lane X11). Each
+// maps to one key of the agent YAML; an empty value removes the key.
+type AgentBehaviorFields struct {
+	NotesProjectFile string   `json:"notes_project_file"` // notes.project_file: the instructions file in the repo
+	NotesUserFile    string   `json:"notes_user_file"`    // notes.user_file: a host file installed as user instructions
+	NotesUserPath    string   `json:"notes_user_path"`    // notes.user_path: where notes.user_file is installed
+	MemoryPaths      []string `json:"memory_paths"`       // memory.paths: paths kept between sessions
+	MaxRetries       int      `json:"max_retries"`        // budgets.max_retries
+	MaxToolCalls     int      `json:"max_tool_calls"`     // budgets.max_tool_calls
+	ProviderRetries  int      `json:"provider_retries"`   // gateway.max_retries: model provider retries
+	Fallbacks        []string `json:"fallbacks"`          // gateway.fallbacks: models tried when the model fails
+	Capabilities     []string `json:"capabilities"`       // capabilities: empty uses the adapter's defaults
 }
 
 // AgentConfigDoc is GET/PUT /agents/{id}/config.
@@ -633,6 +651,7 @@ func abFieldsOf(cfg *schemas.AgentConfig, doc []byte) AgentConfigFields {
 	if cfg.OpenAI != nil {
 		f.OpenAIURL = cfg.OpenAI.URL
 	}
+	f.Behavior = abBehaviorOf(cfg)
 	var n yaml.Node
 	if yaml.Unmarshal(doc, &n) == nil && len(n.Content) == 1 {
 		c := n.HeadComment
@@ -699,8 +718,100 @@ func abApplyFields(doc []byte, f AgentConfigFields) ([]byte, error) {
 				}
 			}
 		}
+		if f.Behavior != nil {
+			abApplyBehavior(root, *f.Behavior)
+		}
 		root.HeadComment = strings.TrimSpace(f.Description)
 	})
+}
+
+// abBehaviorOf reads the behavior fields of a decoded config. Lists are
+// never nil so the form always gets arrays.
+func abBehaviorOf(cfg *schemas.AgentConfig) *AgentBehaviorFields {
+	b := &AgentBehaviorFields{
+		NotesProjectFile: cfg.Notes.ProjectFile, NotesUserFile: cfg.Notes.UserFile, NotesUserPath: cfg.Notes.UserPath,
+		MemoryPaths: []string{}, MaxRetries: cfg.Budgets.MaxRetries, MaxToolCalls: cfg.Budgets.MaxToolCalls,
+		ProviderRetries: cfg.Gateway.MaxRetries, Fallbacks: append([]string{}, cfg.Gateway.Fallbacks...), Capabilities: []string{},
+	}
+	if cfg.Memory != nil {
+		b.MemoryPaths = append(b.MemoryPaths, cfg.Memory.Paths...)
+	}
+	for _, c := range cfg.Capabilities {
+		b.Capabilities = append(b.Capabilities, string(c))
+	}
+	return b
+}
+
+// abApplyBehavior writes the behavior fields onto the YAML root. Mappings
+// left empty (notes, memory) are removed so the file stays tidy.
+func abApplyBehavior(root *yaml.Node, b AgentBehaviorFields) {
+	abSetPath(root, strings.TrimSpace(b.NotesProjectFile), "notes", "project_file")
+	abSetPath(root, strings.TrimSpace(b.NotesUserFile), "notes", "user_file")
+	abSetPath(root, strings.TrimSpace(b.NotesUserPath), "notes", "user_path")
+	abSetList(root, b.MemoryPaths, "memory", "paths")
+	abSetNumber(root, float64(b.MaxRetries), "budgets", "max_retries")
+	abSetNumber(root, float64(b.MaxToolCalls), "budgets", "max_tool_calls")
+	abSetNumber(root, float64(b.ProviderRetries), "gateway", "max_retries")
+	abSetList(root, b.Fallbacks, "gateway", "fallbacks")
+	abSetList(root, b.Capabilities, "capabilities")
+	for _, k := range []string{"notes", "memory"} {
+		if n := abMapGet(root, k); n != nil && n.Kind == yaml.MappingNode && len(n.Content) == 0 {
+			abSetPath(root, "", k)
+		}
+	}
+}
+
+// abSetList sets a flow list of strings at keys, creating mappings on the
+// way. Blank items are dropped; an empty list removes the key.
+func abSetList(m *yaml.Node, values []string, keys ...string) {
+	var items []*yaml.Node
+	for _, v := range values {
+		if v = strings.TrimSpace(v); v != "" {
+			items = append(items, &yaml.Node{Kind: yaml.ScalarNode, Value: v})
+		}
+	}
+	if len(items) == 0 {
+		abRemovePath(m, keys...)
+		return
+	}
+	parent := m
+	for _, k := range keys[:len(keys)-1] {
+		child := abMapGet(parent, k)
+		if child == nil {
+			child = &yaml.Node{Kind: yaml.MappingNode}
+			parent.Content = append(parent.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: k}, child)
+		}
+		if child.Kind != yaml.MappingNode {
+			return
+		}
+		parent = child
+	}
+	seq := &yaml.Node{Kind: yaml.SequenceNode, Style: yaml.FlowStyle, Content: items}
+	last := keys[len(keys)-1]
+	for i := 0; i+1 < len(parent.Content); i += 2 {
+		if parent.Content[i].Value == last {
+			parent.Content[i+1] = seq
+			return
+		}
+	}
+	parent.Content = append(parent.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: last}, seq)
+}
+
+// abRemovePath removes the key at keys whatever its kind.
+func abRemovePath(m *yaml.Node, keys ...string) {
+	parent := m
+	for _, k := range keys[:len(keys)-1] {
+		if parent = abMapGet(parent, k); parent == nil || parent.Kind != yaml.MappingNode {
+			return
+		}
+	}
+	last := keys[len(keys)-1]
+	for i := 0; i+1 < len(parent.Content); i += 2 {
+		if parent.Content[i].Value == last {
+			parent.Content = append(parent.Content[:i], parent.Content[i+2:]...)
+			return
+		}
+	}
 }
 
 // agentBuilder serves the routes.

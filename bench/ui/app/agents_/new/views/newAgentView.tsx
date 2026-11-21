@@ -16,7 +16,8 @@ import { useEffect, useMemo, useState } from "react";
 import { defaultParams, EndpointTestPanel, missingParams, ParamFields, picksOwnModel, testable } from "./connectForm";
 import { useTranslation } from "react-i18next";
 
-const CATEGORIES: TemplateCategory[] = ["cli", "framework", "starter", "bring-your-own"];
+// "Bring your own" first: the gallery is for the user's own agent; the others are examples.
+export const CATEGORIES: TemplateCategory[] = ["bring-your-own", "starter", "framework", "cli"];
 const CATEGORY_ICON: Record<TemplateCategory, LucideIcon> = {
 	cli: SquareTerminal,
 	framework: Layers,

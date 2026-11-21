@@ -296,6 +296,24 @@ export function agentReportCardRequest({ agent, version, model }: AgentReportCar
 	return Object.keys(params).length > 0 ? { url, params } : { url };
 }
 
+/** A report card with nothing in it: what an agent with no evaluation gets. */
+export function emptyReport(): Report {
+	return { evaluation: "", arms: [], capabilities: [], benchmarks: [], reliability: [] };
+}
+
+/**
+ * GET /agents/{id}/report-card answers {agent, version, model, report}, with report null when no
+ * evaluation ran the agent. Both that wrapper and a bare report become a Report; no report is an
+ * empty one (evaluation "").
+ */
+export function unwrapAgentReportCard(body: unknown): Report {
+	if (body && typeof body === "object" && "report" in body) {
+		const report = (body as { report?: Report | null }).report;
+		return report ?? emptyReport();
+	}
+	return (body as Report | null) ?? emptyReport();
+}
+
 /** The list answers either a bare array or {evaluations: [...]}; both become an array. */
 export function normalizeEvaluationList(raw: unknown): Evaluation[] {
 	if (Array.isArray(raw)) return raw as Evaluation[];
@@ -380,6 +398,7 @@ export const evaluationsApi = benchApi
 			}),
 			getAgentReportCard: builder.query<Report, { agent: string; version?: number; model?: string }>({
 				query: (params) => agentReportCardRequest(params),
+				transformResponse: (body: unknown) => unwrapAgentReportCard(body),
 				providesTags: (_r, _e, { agent }) => [{ type: "Evaluations", id: `card/${agent}` }],
 			}),
 		}),

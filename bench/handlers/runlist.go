@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
-	"github.com/maximhq/bifrost/bench/agentversions"
 	"github.com/maximhq/bifrost/bench/faults"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/metrics"
@@ -275,9 +274,7 @@ func armFacts(row *RunListRow, rv RunView, m *schemas.Manifest, versions *versio
 			}
 			// Versions are matched by agent hash (the config without its
 			// model and provider), as the agent leaderboard does.
-			if ah, err := agentversions.AgentHash(arm.Config); err == nil {
-				agentHash = strings.TrimPrefix(ah, "sha256:")
-			}
+			agentHash = armAgentHash(arm.Config)
 		}
 	}
 	if versions != nil {

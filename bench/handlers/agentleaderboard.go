@@ -245,12 +245,23 @@ func (h *LeaderboardHandler) entryAgentHash(e schemas.LeaderboardEntry) string {
 			if arm.ConfigHash != e.ConfigHash {
 				continue
 			}
-			if ah, err := agentversions.AgentHash(arm.Config); err == nil {
-				return strings.TrimPrefix(ah, "sha256:")
+			if ah := armAgentHash(arm.Config); ah != "" {
+				return ah
 			}
 		}
 	}
 	return ""
+}
+
+// armAgentHash is the agent hash of an arm's config without its "sha256:"
+// prefix, the key agent versions are matched by; "" when it cannot be
+// computed.
+func armAgentHash(cfg schemas.AgentConfig) string {
+	ah, err := agentversions.AgentHash(cfg)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimPrefix(ah, "sha256:")
 }
 
 // capabilityNote says why a capability score is not ranked, "" when it is.

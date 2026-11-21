@@ -1,0 +1,191 @@
+{
+	"detail": {
+		"tabs": {
+			"reportCard": "Report card",
+			"versions": "Versions",
+			"runs": "Runs",
+			"setup": "Setup",
+			"tools": "Tools",
+			"checks": "Readiness check"
+		},
+		"noVersion": "No saved version",
+		"noVersionHint": "Save a version in the Versions tab to compare changes over time.",
+		"more": "More actions",
+		"menu": {
+			"compareVersions": "Compare two versions",
+			"failureTest": "Run a failure test",
+			"whyFail": "See why it fails",
+			"check": "Readiness check",
+			"custom": "Custom comparison"
+		}
+	},
+	"runs": {
+		"loadError": "Could not load this agent's runs",
+		"empty": "This agent has no runs yet. Evaluate it to see how it does on each task.",
+		"evaluate": "Evaluate this agent",
+		"summary_one": "{{count}} run, newest first",
+		"summary_other": "{{count}} runs, newest first",
+		"failedOnly": "Only runs that did not pass",
+		"col": {
+			"when": "Started",
+			"benchmark": "Benchmark",
+			"task": "Task",
+			"outcome": "Result",
+			"cost": "Cost",
+			"why": "Why it failed"
+		},
+		"noneFailed": "Every run on this page passed.",
+		"prev": "Previous",
+		"next": "Next",
+		"page": "Page {{page}} of {{pages}}"
+	},
+	"setup": {
+		"instructions": "Instructions",
+		"instructionsHint": "What the agent is told to do: its prompt and notes files.",
+		"description": "What this agent does",
+		"notesProjectFile": "Instructions file in the repository",
+		"notesProjectFileHelp": "For example AGENTS.md. The agent reads it from the task's workspace.",
+		"notesUserFile": "Prompt file",
+		"notesUserFileHelp": "A file from your project installed as the agent's own instructions.",
+		"notesUserPath": "Where the prompt file goes",
+		"notesUserPathHelp": "The path inside the agent's container, outside the workspace.",
+		"model": "Model",
+		"modelHint": "The AI model the agent calls, and what it falls back to.",
+		"fallbacks": "Fallback models",
+		"fallbacksHelp": "Models tried in order when the main model fails. Separate them with commas.",
+		"tools": "Tools and MCP",
+		"toolsHint": "The tools, skills and MCP servers the agent can use.",
+		"toolsBody": "Add skills and connect MCP servers in the Tools tab.",
+		"openTools": "Open Tools",
+		"memory": "Memory",
+		"memoryHint": "What the agent keeps between sessions.",
+		"memoryPaths": "Paths kept between sessions",
+		"memoryHelp": "One path per line. Leave empty when the agent starts fresh each time.",
+		"limits": "Retries and limits",
+		"limitsHint": "How hard the agent tries before it gives up. Empty or 0 means no limit.",
+		"maxRetries": "Max retries per task",
+		"maxToolCalls": "Max tool calls per task",
+		"providerRetries": "Model provider retries",
+		"capabilities": "Capabilities",
+		"capabilitiesHint": "What the agent can do. Benchmarks that need more are greyed out.",
+		"capability": {
+			"shell": "Runs commands",
+			"tools": "Calls tools",
+			"mcp": "Uses MCP servers",
+			"sessions": "Keeps state across sessions",
+			"browser": "Uses a web browser",
+			"desktop": "Uses a desktop",
+			"voice": "Talks on calls",
+			"gpu": "Needs a GPU"
+		},
+		"capabilitiesHelp": "None ticked: Heimdall uses the defaults for this kind of agent.",
+		"howItRuns": "How it runs",
+		"howItRunsHint": "Container image, CPU, memory, start command and environment"
+	},
+	"list": {
+		"yours": "Your agents",
+		"yoursEmpty": "You have not added an agent yet. Connect your own agent to evaluate it.",
+		"add": "Add your agent",
+		"baselines": "Baseline agents",
+		"baselinesHint": "Well-known agents to compare yours against.",
+		"evaluate": "Evaluate"
+	},
+	"home": {
+		"title": "Your agents",
+		"viewAll": "All agents",
+		"empty": "Add your agent to see its scores, cost and how it copes with faults here.",
+		"add": "Add your agent",
+		"notEvaluated": "Not evaluated yet.",
+		"scores": "Score per capability",
+		"costPerSolved": "Cost per solved task",
+		"unknown": "unknown",
+		"faultDrop": "Drop under faults",
+		"notTested": "not tested",
+		"drop": "-{{points}} pts ({{fault}})",
+		"lastEvaluation": "Last evaluation {{when}}",
+		"evaluate": "Evaluate"
+	},
+	"failures": {
+		"title": "Where it failed",
+		"description": "How often the agent looped, claimed done without checking or ignored an error, with example runs.",
+		"noPatterns_one": "No failure pattern seen in {{count}} run.",
+		"noPatterns_other": "No failure pattern seen in {{count}} runs.",
+		"pattern": {
+			"pattern_loop": "Loops",
+			"pattern_unverified_finish": "Said done without checking",
+			"pattern_ignored_error": "Ignored an error",
+			"false_completion": "Said done but failed"
+		},
+		"ofRuns": "{{count}} of {{total}} runs",
+		"clusterRuns_one": "{{count}} run",
+		"clusterRuns_other": "{{count}} runs",
+		"topGroups": "Most common failures",
+		"more": "See every failure"
+	},
+	"picker": {
+		"agent": "Agent",
+		"choose": "Choose an agent"
+	},
+	"why": {
+		"title": "Why agents fail",
+		"subtitle": "Where each version of your agent breaks: loops, saying done too early, ignored errors. Every number links to example runs.",
+		"tabs": {
+			"label": "Failure views",
+			"patterns": "Failure patterns",
+			"groups": "Failure groups"
+		},
+		"unsaved": "Unsaved config",
+		"runFailureTest": "Run a failure test",
+		"pick": "Choose an agent to see its failure patterns per version.",
+		"loadError": "Could not load the failure patterns",
+		"empty": "No finished runs for {{agent}} yet. Evaluate it first.",
+		"evaluate": "Evaluate",
+		"pattern": "Pattern",
+		"groupMeta": "{{runs}} runs, {{failed}} not passed · {{models}} · last run {{when}}"
+	},
+	"ft": {
+		"title": "Failure tests",
+		"subtitle": "Break the model, a tool or the instructions on purpose and see how far your agent's score drops.",
+		"newTitle": "New failure test",
+		"newHint": "Pick an agent, the faults and the benchmarks. Heimdall runs each task once clean and once per fault.",
+		"version": "Version",
+		"currentConfig": "Current setup",
+		"model": "Model",
+		"faults": "Faults",
+		"faultHint": {
+			"model-down": "The model API returns errors part way through the task.",
+			"broken-tool": "A tool the agent relies on fails or returns garbage.",
+			"misleading-instruction": "The instructions file says something wrong."
+		},
+		"cleanNote": "A clean run of every task is always included, so the drop has something to compare with.",
+		"benchmarks": "Benchmarks",
+		"noBenchmarks": "No benchmarks yet.",
+		"addBenchmark": "Add a benchmark",
+		"tasks": "Tasks per benchmark",
+		"trials": "Repeats per task",
+		"need": {
+			"agent": "Choose an agent.",
+			"model": "Choose a model.",
+			"benchmarks": "Choose at least one benchmark.",
+			"faults": "Choose at least one fault."
+		},
+		"estimate": "{{runs}} runs, about {{cost}}",
+		"costUnknown": "cost unknown",
+		"estimating": "Estimating...",
+		"launch": "Run failure test",
+		"launching": "Starting...",
+		"pastTitle": "Past failure tests",
+		"pastHint": "Score under each fault and the drop from a clean run.",
+		"pastError": "Could not load past failure tests",
+		"pastEmpty": "No failure tests yet.",
+		"status": {
+			"queued": "Waiting",
+			"running": "Running",
+			"done": "Finished",
+			"failed": "Failed",
+			"cancelled": "Cancelled"
+		},
+		"running": "Still running. Results show here when it finishes.",
+		"noResults": "No fault results in this evaluation."
+	}
+}
