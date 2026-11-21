@@ -11,7 +11,8 @@ package swebench
 // pytest.ini and tox.ini to the base commit (as upstream's eval script checks
 // the test files out before applying the test patch, and so that no file the
 // agent planted can rewrite test results), applies the test patch, runs
-// cmd.sh with the instance's environment active and has grade.py write
+// cmd.sh with the instance's environment active (and, on a copy, the copy
+// first on PYTHONPATH) and has grade.py write
 // /grader/out/junit.xml. It exits 0 once the report is written: the report,
 // not the test command's exit code, carries the result. Only a broken
 // verifier exits non-zero.
@@ -71,6 +72,13 @@ fi
 
 if [ -f /opt/miniconda3/bin/activate ]; then
 	. /opt/miniconda3/bin/activate testbed > /dev/null 2>&1 || . /opt/miniconda3/bin/activate > /dev/null 2>&1
+fi
+# The copy, not the read-only workspace, is the code under test: the image
+# installs the repository in development mode from the workspace path, so
+# without this a test module inside the package is imported from there (old
+# test files, ImportPathMismatchError against the copy's conftest.py).
+if [ "$W" != "$SRC" ]; then
+	export PYTHONPATH="$W${PYTHONPATH:+:$PYTHONPATH}"
 fi
 bash "$G/cmd.sh" > /tmp/bench-test.log 2>&1
 code=$?
