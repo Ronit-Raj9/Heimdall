@@ -48,6 +48,10 @@ func (s *Server) ControlHandler() http.Handler {
 	mux.HandleFunc("POST /claims/release", s.handleRelease)
 	mux.HandleFunc("GET /claims", s.handleClaims)
 	mux.HandleFunc("PUT /orgslots", s.handleOrgSlots) // F4 key delivery (orgslots.go)
+	// X20b debug runs (debug.go): replay cassettes and breakpoints.
+	mux.HandleFunc("PUT /cassettes/{slot}", s.handlePutCassette)
+	mux.HandleFunc("GET /holds", s.handleHolds)
+	mux.HandleFunc("POST /holds/{slot}/release", s.handleHoldRelease)
 	return mux
 }
 
@@ -63,6 +67,10 @@ func (s *Server) handleSetPlan(w http.ResponseWriter, r *http.Request) {
 		s.controlError(w, http.StatusBadRequest, "decode plan: "+err.Error())
 		return
 	}
+	if p.Mode == ModeReplay && !s.debug.hasCassette(slot) { // X20b: the recording comes first (PUT /cassettes)
+		s.controlError(w, http.StatusBadRequest, fmt.Sprintf("replay plan on slot %s needs a cassette; load one first", slot))
+		return
+	}
 	held, err := s.plans.setOwned(slot, r.Header.Get(OwnerHeader), p) // F1: a slot another owner claimed keeps its plan
 	if err != nil {
 		s.controlError(w, http.StatusBadRequest, err.Error())
@@ -72,6 +80,7 @@ func (s *Server) handleSetPlan(w http.ResponseWriter, r *http.Request) {
 		s.planRefused(w, "set", slot, held)
 		return
 	}
+	s.debug.reset(slot, p.RunID, p.Mode == ModeReplay) // X20b: a new plan starts the slot's debug progress over
 	s.logger.Info("fault plan set", "slot", slot, "run_id", p.RunID, "mode", p.Mode,
 		"from_call", p.FromCall, "call", p.Call, "status", p.Status)
 	w.WriteHeader(http.StatusNoContent)
@@ -91,6 +100,7 @@ func (s *Server) handleClearPlan(w http.ResponseWriter, r *http.Request) {
 		s.planRefused(w, "clear", slot, held)
 		return
 	}
+	s.debug.reset(slot, "", false) // X20b
 	s.logger.Info("fault plan cleared", "slot", slot)
 	w.WriteHeader(http.StatusNoContent)
 }

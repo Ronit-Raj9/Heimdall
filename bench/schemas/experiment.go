@@ -92,6 +92,11 @@ type Experiment struct {
 	// (schemas/evaluation.go); empty for every other experiment, so recorded
 	// manifests keep their hashes.
 	EvaluationID string `json:"evaluation_id,omitempty" yaml:"evaluation_id,omitempty"`
+
+	// Debug makes this a debug run of one recorded run: replay, fork or
+	// breakpoints (debug.go). Its slots are never counted. nil keeps
+	// recorded manifests' hashes.
+	Debug *DebugSpec `json:"debug,omitempty" yaml:"debug,omitempty"`
 }
 
 // RunnerSpec picks the runners of a hosted organization that may run an

@@ -114,6 +114,12 @@ type FaultPlan struct {
 	// scripted model, never the real upstream: a fault probe on a no-paid
 	// (smoke or scripted_upstream) run. Set by the bench, never from YAML.
 	Scripted bool `json:"scripted,omitempty" yaml:"-"`
+
+	// Replay answers calls from the slot's cassette (mode replay, debug.go);
+	// Hold holds matching requests until the operator releases them. Both
+	// are set by the bench for a debug run, never from YAML.
+	Replay *ReplayPlan  `json:"replay,omitempty" yaml:"-"`
+	Hold   *Breakpoints `json:"hold,omitempty" yaml:"-"`
 }
 
 // FaultController is the bench's handle on the fault proxy's control API. The
@@ -164,6 +170,16 @@ type LedgerEntry struct {
 	At            time.Time `json:"at"`
 	PrevHash      string    `json:"prev_hash"`
 	Hash          string    `json:"hash"`
+
+	// Debug runs (debug.go): Replay labels a call of a replay plan (hit,
+	// divergence, edited, exhausted) and ReplayExpected is the recorded
+	// request hash a divergent request missed; HeldMS is the time a
+	// breakpoint held the request and Operator the release action. All
+	// omitempty, so the hashes of older lines are unchanged.
+	Replay         string  `json:"replay,omitempty"`
+	ReplayExpected string  `json:"replay_expected,omitempty"`
+	HeldMS         float64 `json:"held_ms,omitempty"`
+	Operator       string  `json:"operator,omitempty"`
 }
 
 // Ledger upstream values (LedgerEntry.Upstream).
