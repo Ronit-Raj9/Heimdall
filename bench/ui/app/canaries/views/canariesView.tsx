@@ -5,7 +5,10 @@ import { ModeBadge } from "@/components/modeBadge";
 import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
-import { useGetCanariesQuery, useGetCanaryQuery, useRunCanaryMutation } from "@/lib/store/apis/canaryApi";
+import { JobRunButton } from "@/components/jobs/jobRunButton";
+import { useGetCanariesQuery, useGetCanaryQuery } from "@/lib/store/apis/canaryApi";
+import { useDeleteCanaryMutation } from "@/lib/store/apis/schedulesApi";
+import { NewCanaryForm } from "./newCanaryForm";
 import type { CanaryListResponse } from "@/lib/types/bench";
 import { parseAsString, useQueryState } from "nuqs";
 import type { ReactNode } from "react";
@@ -42,6 +45,7 @@ export default function CanariesView() {
 					panel={open ? <CanaryPanel key={open} name={open} /> : null}
 				/>
 			)}
+			<NewCanaryForm onCreated={(n) => void setName(n)} />
 		</section>
 	);
 }
@@ -92,24 +96,28 @@ function CanaryPanel({ name }: { name: string }) {
 			/>
 		);
 	}
-	return <CanaryDetailBody detail={detail.data} actions={<RunButton name={name} />} />;
+	return <CanaryDetailBody detail={detail.data} actions={<CanaryActions name={name} />} />;
 }
 
-/** POST /canaries/{name}/run with the write token; the look runs in the background. */
-function RunButton({ name }: { name: string }) {
-	const { t } = useTranslation("bench");
-	const [run, state] = useRunCanaryMutation();
+/** Baseline and look as background jobs (canary.baseline, canary.run) with a live log; delete the definition. */
+function CanaryActions({ name }: { name: string }) {
+	const { t } = useTranslation("schedules");
+	const [remove, removeState] = useDeleteCanaryMutation();
 	return (
-		<span className="flex items-center gap-2">
-			<Button size="sm" variant="outline" disabled={state.isLoading} onClick={() => void run(name)} data-testid="canary-run">
-				{t("canaries.run")}
+		<span className="flex flex-wrap items-center gap-2" data-testid="canary-actions">
+			<JobRunButton kind="canary.baseline" params={{ name }} label={t("canary.baseline")} confirm={t("canary.baselineConfirm")} variant="outline" />
+			<JobRunButton kind="canary.run" params={{ name }} label={t("canary.run")} variant="outline" />
+			<Button
+				size="sm"
+				variant="ghost"
+				disabled={removeState.isLoading}
+				onClick={() => {
+					if (window.confirm(t("canary.deleteConfirm", { name }))) void remove(name);
+				}}
+				data-testid="canary-delete"
+			>
+				{t("canary.delete")}
 			</Button>
-			{state.isSuccess && <span className="text-muted-foreground text-xs">{t("canaries.runStarted")}</span>}
-			{state.isError && (
-				<span className="text-chart-error-ink text-xs" data-testid="canary-run-error">
-					{t("canaries.runError")}
-				</span>
-			)}
 		</span>
 	);
 }
