@@ -139,3 +139,14 @@ func (m *memStore) AddSpend(ctx context.Context, orgID, id string, usd float64) 
 	e.key.MonthSpentUSD += usd
 	return nil
 }
+
+func (m *memStore) SetModelsAvailable(ctx context.Context, orgID, id string, models []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	e, err := m.get(orgID, id)
+	if err != nil {
+		return err
+	}
+	e.key.ModelsAvailable = normalizeAvailable(models)
+	return nil
+}

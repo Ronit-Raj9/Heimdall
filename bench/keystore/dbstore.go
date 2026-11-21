@@ -28,7 +28,7 @@ func newDBStore(d *db.DB, master []byte) (Store, error) {
 }
 
 const keyCols = `id, org_id, kind, provider, label, base_url, last4, status, created_by, models,
-	budget_usd, month_spent_usd, spend_month, created_at, updated_at, last_tested_at`
+	budget_usd, month_spent_usd, spend_month, created_at, updated_at, last_tested_at, models_available`
 
 type scanner interface{ Scan(dest ...any) error }
 
@@ -36,16 +36,20 @@ func scanKey(s scanner) (*Key, error) {
 	var (
 		k                   Key
 		kind, models, month string
+		available           string
 		created, updated    int64
 		tested              sql.NullInt64
 	)
 	if err := s.Scan(&k.ID, &k.OrgID, &kind, &k.Provider, &k.Label, &k.BaseURL, &k.Last4, &k.Status, &k.CreatedBy,
-		&models, &k.BudgetUSD, &k.MonthSpentUSD, &month, &created, &updated, &tested); err != nil {
+		&models, &k.BudgetUSD, &k.MonthSpentUSD, &month, &created, &updated, &tested, &available); err != nil {
 		return nil, err
 	}
 	k.Kind = Kind(kind)
 	if err := json.Unmarshal([]byte(models), &k.Models); err != nil || k.Models == nil {
 		k.Models = []string{}
+	}
+	if err := json.Unmarshal([]byte(available), &k.ModelsAvailable); err != nil || k.ModelsAvailable == nil {
+		k.ModelsAvailable = []string{}
 	}
 	if month != spendMonth(time.Now()) {
 		k.MonthSpentUSD = 0 // a new month starts from zero
@@ -185,6 +189,20 @@ func (s *dbStore) AddSpend(ctx context.Context, orgID, id string, usd float64) e
 	res, err := s.d.Exec(ctx, `UPDATE model_keys SET
 		month_spent_usd = CASE WHEN spend_month = ? THEN month_spent_usd + ? ELSE ? END,
 		spend_month = ? WHERE org_id = ? AND id = ?`, month, usd, usd, month, orgID, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// SetModelsAvailable stores the model ids a key's provider listed (sorted,
+// deduplicated, at most MaxModelsAvailable).
+func (s *dbStore) SetModelsAvailable(ctx context.Context, orgID, id string, models []string) error {
+	b, _ := json.Marshal(normalizeAvailable(models))
+	res, err := s.d.Exec(ctx, `UPDATE model_keys SET models_available = ? WHERE org_id = ? AND id = ?`, string(b), orgID, id)
 	if err != nil {
 		return err
 	}

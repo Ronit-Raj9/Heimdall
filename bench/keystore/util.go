@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -168,4 +169,24 @@ func open(master []byte, orgID, id, sealed string) (string, error) {
 		return "", fmt.Errorf("keystore: cannot decrypt key %s (was the master key changed?)", id)
 	}
 	return string(pt), nil
+}
+
+// normalizeAvailable sorts and deduplicates listed model ids, drops empty
+// ones and keeps at most MaxModelsAvailable.
+func normalizeAvailable(models []string) []string {
+	out := make([]string, 0, len(models))
+	seen := map[string]bool{}
+	for _, m := range models {
+		m = strings.TrimSpace(m)
+		if m == "" || seen[m] {
+			continue
+		}
+		seen[m] = true
+		out = append(out, m)
+	}
+	sort.Strings(out)
+	if len(out) > MaxModelsAvailable {
+		out = out[:MaxModelsAvailable]
+	}
+	return out
 }

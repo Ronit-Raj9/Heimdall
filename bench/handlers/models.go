@@ -33,20 +33,23 @@ func init() {
 
 // ModelKeyView is a provider key as the API shows it: never the value.
 type ModelKeyView struct {
-	ID            string     `json:"id"`
-	Provider      string     `json:"provider"`
-	Label         string     `json:"label"`
-	BaseURL       string     `json:"base_url,omitempty"`
-	Last4         string     `json:"last4"`
-	Status        string     `json:"status"`
-	Models        []string   `json:"models"`
-	BudgetUSD     float64    `json:"budget_usd"`
-	MonthSpentUSD float64    `json:"month_spent_usd"`
-	OverBudget    bool       `json:"over_budget"`
-	CreatedBy     string     `json:"created_by,omitempty"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-	LastTestedAt  *time.Time `json:"last_tested_at,omitempty"`
+	ID       string   `json:"id"`
+	Provider string   `json:"provider"`
+	Label    string   `json:"label"`
+	BaseURL  string   `json:"base_url,omitempty"`
+	Last4    string   `json:"last4"`
+	Status   string   `json:"status"`
+	Models   []string `json:"models"`
+	// ModelsAvailable lists the model ids the provider reported at the
+	// key's last successful test (sorted, at most 200).
+	ModelsAvailable []string   `json:"models_available"`
+	BudgetUSD       float64    `json:"budget_usd"`
+	MonthSpentUSD   float64    `json:"month_spent_usd"`
+	OverBudget      bool       `json:"over_budget"`
+	CreatedBy       string     `json:"created_by,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	LastTestedAt    *time.Time `json:"last_tested_at,omitempty"`
 }
 
 // ModelKeyRequest creates or updates a provider key. On update an empty
@@ -113,8 +116,12 @@ func keyView(k keystore.Key) ModelKeyView {
 	if models == nil {
 		models = []string{}
 	}
+	avail := k.ModelsAvailable
+	if avail == nil {
+		avail = []string{}
+	}
 	return ModelKeyView{ID: k.ID, Provider: k.Provider, Label: k.Label, BaseURL: k.BaseURL, Last4: k.Last4, Status: k.Status,
-		Models: models, BudgetUSD: k.BudgetUSD, MonthSpentUSD: k.MonthSpentUSD, OverBudget: k.BudgetUSD > 0 && k.MonthSpentUSD >= k.BudgetUSD,
+		Models: models, ModelsAvailable: avail, BudgetUSD: k.BudgetUSD, MonthSpentUSD: k.MonthSpentUSD, OverBudget: k.BudgetUSD > 0 && k.MonthSpentUSD >= k.BudgetUSD,
 		CreatedBy: k.CreatedBy, CreatedAt: k.CreatedAt, UpdatedAt: k.UpdatedAt, LastTestedAt: k.LastTestedAt}
 }
 
@@ -303,6 +310,11 @@ func (h *modelsHandler) testKey(ctx *fasthttp.RequestCtx) {
 	if err := s.SetStatus(ctx, org, id, res.Status, time.Now()); err != nil {
 		h.keyError(ctx, err)
 		return
+	}
+	if as, ok := s.(keystore.AvailableSetter); ok && res.OK && len(res.Models) > 0 {
+		// Remember what the provider listed so the model picker can offer it.
+		// A failure here does not fail the test.
+		_ = as.SetModelsAvailable(ctx, org, id, res.Models)
 	}
 	if k2, err := s.Get(ctx, org, id); err == nil {
 		k = k2

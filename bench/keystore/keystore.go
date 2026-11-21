@@ -38,6 +38,7 @@ type Key struct {
 	Kind                                               Kind
 	Provider, Label, BaseURL, Last4, Status, CreatedBy string
 	Models                                             []string
+	ModelsAvailable                                    []string // model ids the provider listed at the last successful test
 	BudgetUSD, MonthSpentUSD                           float64
 	CreatedAt, UpdatedAt                               time.Time
 	LastTestedAt                                       *time.Time
@@ -61,6 +62,16 @@ type Store interface {
 	SetStatus(ctx context.Context, orgID, id, status string, at time.Time) error
 	AddSpend(ctx context.Context, orgID, id string, usd float64) error
 }
+
+// AvailableSetter is implemented by stores that remember the model ids a
+// key's provider listed at its last successful test. It is separate from
+// Store so existing Store implementations keep compiling.
+type AvailableSetter interface {
+	SetModelsAvailable(ctx context.Context, orgID, id string, models []string) error
+}
+
+// MaxModelsAvailable caps how many listed model ids a key keeps.
+const MaxModelsAvailable = 200
 
 // Errors.
 var (
