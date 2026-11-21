@@ -3,7 +3,10 @@
 	"subtitle": "Run experiments and drift canaries on a timetable with a daily spend cap, and get a webhook when something regresses.",
 	"loadError": "Could not load the schedules.",
 	"empty": "No schedules yet. Add one below: pick an experiment file, a cron time and a daily cap.",
-	"noTicker": "This server cannot run scheduled experiments (offline or hosted). Schedules are saved but only canaries on runners fire here.",
+	"noTicker": "This server cannot run scheduled jobs right now (it runs offline). Schedules are saved and fire once the job runner is on.",
+	"noTickerLink": "Check the server status",
+	"hostedLimits": "Scheduled experiments run on your runners. This organization uses {{count}} of {{max}} schedules; each fires at most every {{min}} minutes.",
+	"hostedRunnersLink": "Runners",
 	"table": {
 		"name": "Name",
 		"kind": "Runs",

@@ -52,6 +52,19 @@ describe("SchedulesBody", () => {
 		expect(html).toContain('data-testid="schedules-empty"');
 		expect(html).toContain('data-testid="alerts-no-secrets"');
 		expect(html).toContain('data-testid="schedules-no-ticker"');
+		expect(html).toContain('href="/operate"');
+	});
+
+	it("shows the hosted guardrails with a runners link and real next, last and spend", () => {
+		const rows = [{ ...DATA.rows[0], last: { at: "2026-11-21T06:00:00Z", started: "2026-11-21T06:00:00Z", finished: "2026-11-21T06:10:00Z", schedule: "nightly", status: "ok", spent_today_usd: 1.5 } }];
+		const html = render({ ...DATA, rows, hosted: true, ticker: true, limits: { max_schedules: 20, min_interval_min: 15 } });
+		expect(html).toContain('data-testid="schedules-hosted-limits"');
+		expect(html).toContain("1 of 20 schedules");
+		expect(html).toContain("every 15 minutes");
+		expect(html).toContain('href="/workers"');
+		expect(html).not.toContain('data-testid="schedules-no-ticker"');
+		expect(html).toContain("1.50 / 5.00");
+		expect(html).toContain(">ok<");
 	});
 });
 

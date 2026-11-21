@@ -202,8 +202,10 @@ func orgBuilder(env *hostedEnv) tenancy.Builder {
 			deps.Launcher, deps.Workers = orgLauncher(env, oa, ix)
 		}
 		applyServiceHooks(oa, &deps, org.ID, true) // web parity: deps.Services (servicehooks.go)
+		stopTicker := startHostedScheduleTicker(oa, deps.Services) // G14: stops with the runtime
 		r := server.NewOrgRouter(oa.cfg, org.ID, deps)
 		rt := &tenancy.OrgRuntime{Handler: r.Handler, Routes: r.Routes, Close: func() error {
+			stopTicker()
 			r.Close()
 			// The jobs hub keeps the launcher (and its index) of this
 			// runtime only while the runtime lives (4-B-12).
