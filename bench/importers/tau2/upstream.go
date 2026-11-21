@@ -307,3 +307,49 @@ func readJSON(path string, v any) error {
 	}
 	return json.Unmarshal(b, v)
 }
+
+// exported is one domain (and language pack) as `tau2svc.py export` writes
+// it from the upstream package: the tasks upstream builds (the localized
+// regional tasks of a tau-i18n language pack, or banking_knowledge's task
+// files), the policy the agent gets (localized, or with the retrieval
+// variant's prompt), and the database-changing tools.
+type exported struct {
+	Format        string            `json:"format"`
+	Domain        string            `json:"domain"`
+	Language      string            `json:"language"`
+	Retrieval     *string           `json:"retrieval"`
+	Subset        string            `json:"subset"`
+	Policy        string            `json:"policy"`
+	MutatingTools []string          `json:"mutating_tools"`
+	Tasks         []json.RawMessage `json:"tasks"`
+}
+
+// exportFile is the export of domain in language under dir.
+func exportFile(dir, language, domain string) string {
+	return filepath.Join(dir, language+"-"+domain+".json")
+}
+
+// readExport reads and checks one export file.
+func readExport(dir, language, domain string) (*exported, []upTask, error) {
+	path := exportFile(dir, language, domain)
+	var e exported
+	if err := readJSON(path, &e); err != nil {
+		return nil, nil, fmt.Errorf("read export %s (write it with `tau2svc.py export --domain %s --language %s --out %s` in the service image; docs/importing-tau2.md): %w", path, domain, language, path, err)
+	}
+	if e.Format != "tau2-bench-export/1" || e.Domain != domain {
+		return nil, nil, fmt.Errorf("export %s: format %q domain %q, want tau2-bench-export/1 and %s", path, e.Format, e.Domain, domain)
+	}
+	out := make([]upTask, 0, len(e.Tasks))
+	for i, r := range e.Tasks {
+		var t upTask
+		if err := json.Unmarshal(r, &t); err != nil {
+			return nil, nil, fmt.Errorf("export %s task %d: %w", path, i, err)
+		}
+		if t.ID == "" {
+			return nil, nil, fmt.Errorf("export %s task %d has no id", path, i)
+		}
+		t.Raw = r
+		out = append(out, t)
+	}
+	return &e, out, nil
+}

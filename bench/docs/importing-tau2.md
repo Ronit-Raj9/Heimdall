@@ -58,7 +58,7 @@ clone's commit into the service image.
 
 | Setting (`-set k=v`) | Default | Meaning |
 |---|---|---|
-| `domains` | `airline,retail` | Domains to import. Only these two are supported. |
+| `domains` | `airline,retail` | Domains to import: `airline`, `retail`, `banking_knowledge` (needs an export, below). |
 | `task_set` | `published` | `published`: the task subsets of the released text benchmark, with the English pack's reviewed tasks. `all`: every task in the domain's `tasks.json`. |
 | `nl_assertions` | `skip` | `skip` leaves out tasks whose score needs a judge model. `unscored` imports them and scores only the database; their natural-language assertions are listed in the verifier's details, never scored. |
 | `noop_tasks` | `skip` | `include` also imports tasks whose correct outcome is "change nothing, say nothing in particular". Their empty control passes, so admission refuses them. |
@@ -77,8 +77,63 @@ At commit `c06b07d` the default import writes 27 airline and 31 retail tasks.
 | Needs a judge model (`nl_assertions=skip`) | 0 | 16 | 40 |
 
 Telecom is not supported: its tasks need the user to run tools on their own
-phone, which the scripted user cannot do. `banking_knowledge` needs a
-retrieval index and judged answers. `intake` and `mock` are not imported.
+phone, which the scripted user cannot do. `intake` and `mock` are not
+imported. `banking_knowledge` (tau3) and the tau-i18n language packs are
+imported from an export, below.
+
+## tau3 banking_knowledge and tau-i18n (export files)
+
+Two task sets are built by upstream code rather than read from a file, so the
+importer reads them from an export that `tau2svc.py export` writes inside the
+service image (the upstream package at the pinned commit, plus `rank-bm25`):
+
+```sh
+D=datasets/tau2-bench; mkdir -m 777 $D/.bench-export
+docker run --rm -v $PWD/$D/data:/d:ro -e TAU2_DATA_DIR=/d -v $PWD/$D/.bench-export:/out \
+  -v $PWD/bench/importers/tau2/image/tau2svc.py:/s.py:ro --entrypoint sh <tau2 service image> -c '
+  pip install -q rank-bm25
+  python /s.py export --domain banking_knowledge --retrieval bm25 --out /out/en-banking_knowledge.json
+  for l in en es pt hi zh ko; do for d in airline retail; do
+    python /s.py export --domain $d --language $l --out /out/$l-$d.json; done; done'
+bifrost-bench import tau2 -from $D -suite tau3-banking -set domains=banking_knowledge \
+  -set user_tool_tasks=draft -set nl_assertions=unscored -set noop_tasks=include
+for l in en es pt hi zh ko; do
+  bifrost-bench import tau2 -from $D -suite tau-i18n -set domains=airline,retail -set language=$l \
+    -set nl_assertions=unscored -set noop_tasks=include
+done
+```
+
+An export file `<language>-<domain>.json` holds the tasks as upstream builds
+them, the policy the agent gets, and the domain's database-changing tools.
+`-set export_dir=` points elsewhere than `<from>/.bench-export`.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `language` | unset | tau-i18n text-v1 language pack: `en`, `es`, `pt`, `hi`, `zh`, `ko`. Task ids get the language as a prefix (`es-airline-0_es_identity`) and the tag `lang-<language>`. Only `task_set=published`. |
+| `retrieval` | `bm25` | banking_knowledge retrieval variant: `bm25`, `grep_only`, `no_knowledge` (the offline ones; upstream's default `alltools` needs an embedding API). |
+| `user_tool_tasks` | `skip` | `draft` imports tasks whose expected actions include the customer's own tool calls, tagged `draft-user-tools`. No bench user simulator calls tools, so admission refuses them. |
+| `export_dir` | `<from>/.bench-export` | Where the export files are. |
+
+**tau-i18n.** `load_language(<lang>, <domain>, mode="text")` gives the
+text-v1 binding: 50 airline and 50 retail tasks per language, on the pack's
+regional database (localized names, addresses, currencies) with the
+localized policy. The service and the verifier build the same environment
+from the scenario's `language`. The English pack binds the whole registry,
+so `language=en` keeps text-v1's `airline_50` and `retail_50` subsets. The
+scripted customer speaks the localized scenario text but its fixed phrases
+("Yes, I confirm") are English; upstream's persona pragmatics are not
+played. `user=llm` uses upstream's English user guidelines, not the pack's.
+
+**tau3 banking_knowledge** (upstream 1.0.1+, `banking_knowledge_97`). The
+retrieval backend runs in the service process: the variant's tools
+(`KB_search` over BM25 for `bm25`) sit beside the banking tools, and the
+policy includes the variant's prompt. The scenario carries the read-log
+allowlist upstream's runner derives from the expected actions (the
+discoverable tools they call), so service and verifier hash the same
+database. 88 tasks are DB-graded, 9 ACTION-graded (every expected action
+must appear among the agent's calls, by name and compared arguments, as
+upstream's ActionEvaluator); 49 need the customer to call tools (drafts);
+one also has an NL assertion, which is not scored (no judge call is made).
 
 ## What a task is
 
