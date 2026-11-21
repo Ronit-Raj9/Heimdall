@@ -149,17 +149,21 @@ func TestSuitesListServesHeadAndCachedOnDeadline(t *testing.T) {
 		t.Fatalf("head entry: %v", s)
 	}
 
-	// Let the loads finish at a new stamp, then wait for the full entry.
+	// Let the loads finish at a new stamp, then wait until every suite's full
+	// entry is cached at m2 with no refresh in flight. Waiting on the served
+	// versions alone is not enough: a load held at m1 can land after the gate
+	// opens, so the list shows full m1 entries while the m2 refresh still runs
+	// (and loads again after the count below is taken).
 	src.set("m2", nil)
 	close(held) // frees the cache's load slots
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	var full map[string]any
 	for {
 		body := decodeBody(t, c.do(t, "GET", APIPrefix+"/suites", nil, nil))
 		full = suiteByID(t, body, id)
 		done := true
 		for _, x := range src.ids {
-			done = done && suiteByID(t, body, x)["version"] != "9.9.9"
+			done = done && suiteByID(t, body, x)["version"] != "9.9.9" && settledAt(src.dir+"/"+x, "m2")
 		}
 		if done {
 			break
@@ -178,16 +182,29 @@ func TestSuitesListServesHeadAndCachedOnDeadline(t *testing.T) {
 		t.Errorf("cached list loaded again: %d -> %d", loads, src.loads.Load())
 	}
 
-	// Changed pack whose reload is held: the cached entry, not an error.
+	// Changed pack whose reload is held: the cached entry, not an error, and
+	// without waiting on the held load. The budget is long here so a list that
+	// waited for the reload would take at least that long, far past the bound
+	// below even on a slow machine; a timing threshold near the budget flaked.
 	held3 := make(chan struct{})
 	t.Cleanup(func() { close(held3) })
 	src.set("m3", held3)
+	suiteListBudget = 20 * time.Second
 	start = time.Now()
 	s = suiteByID(t, decodeBody(t, c.do(t, "GET", APIPrefix+"/suites", nil, nil)), id)
 	if s["error"] != nil || s["version"] != want || s["tasks"] == nil {
 		t.Fatalf("stale entry: %v", s)
 	}
-	if took := time.Since(start); took > 150*time.Millisecond {
+	if took := time.Since(start); took > suiteListBudget/2 {
 		t.Errorf("stale entry waited %s", took)
 	}
+}
+
+// settledAt reports whether the process cache holds a full summary of dir at
+// stamp with no refresh in flight.
+func settledAt(dir, stamp string) bool {
+	suiteSummaries.mu.Lock()
+	defer suiteSummaries.mu.Unlock()
+	slot := suiteSummaries.slots[dir]
+	return slot != nil && slot.have && slot.stamp == stamp && slot.loading == nil
 }
