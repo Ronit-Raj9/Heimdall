@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -174,11 +175,21 @@ func cassetteKey(method, path, query, bodySHA string) string {
 
 // cassetteWriter appends entries to a record-mode cassette, one line each,
 // fsynced, so a run that dies keeps what it recorded.
+//
+// The first failed write is sticky: the writer refuses every later entry,
+// moves the cassette aside to path+FailedCassetteSuffix (a rename needs no
+// free space) so no exporter or recorder can take the incomplete file for a
+// complete capture, and Close returns the error.
 type cassetteWriter struct {
-	mu   sync.Mutex
-	path string
-	f    *os.File
+	mu     sync.Mutex
+	path   string
+	f      *os.File
+	failed error
 }
+
+// FailedCassetteSuffix is appended to a record cassette's path when one of
+// its writes failed.
+const FailedCassetteSuffix = ".failed"
 
 // openCassetteWriter creates the cassette file (empty) and its folder, or
 // opens an existing one for append, so the environment kernel always finds
@@ -202,13 +213,33 @@ func (w *cassetteWriter) Append(e CassetteEntry) error {
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if w.failed != nil {
+		return w.failed
+	}
 	if _, err := w.f.Write(append(line, '\n')); err != nil {
-		return fmt.Errorf("write cassette %s: %w", w.path, err)
+		return w.fail(fmt.Errorf("write cassette %s: %w", w.path, err))
 	}
 	if err := w.f.Sync(); err != nil {
-		return fmt.Errorf("sync cassette %s: %w", w.path, err)
+		return w.fail(fmt.Errorf("sync cassette %s: %w", w.path, err))
 	}
 	return nil
+}
+
+// fail records the sticky error and moves the incomplete cassette aside.
+// The caller holds w.mu.
+func (w *cassetteWriter) fail(err error) error {
+	w.failed = fmt.Errorf("cassette recording failed, the capture is incomplete: %w", err)
+	if rerr := os.Rename(w.path, w.path+FailedCassetteSuffix); rerr != nil {
+		w.failed = errors.Join(w.failed, fmt.Errorf("move incomplete cassette aside: %w", rerr))
+	}
+	return w.failed
+}
+
+// Err returns the sticky recording error, or nil.
+func (w *cassetteWriter) Err() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.failed
 }
 
 // Close closes the file.
@@ -216,9 +247,9 @@ func (w *cassetteWriter) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if err := w.f.Close(); err != nil {
-		return fmt.Errorf("close cassette %s: %w", w.path, err)
+		return errors.Join(w.failed, fmt.Errorf("close cassette %s: %w", w.path, err))
 	}
-	return nil
+	return w.failed
 }
 
 func sha256Hex(b []byte) string {

@@ -333,3 +333,71 @@ func TestCheckPyMatchesAnswerMatch(t *testing.T) {
 		}
 	}
 }
+
+// TestHarborAdmissionNeedsCurrentBytes covers QC2-23-05: a task edited since
+// its suite lock is not exported as admitted, and its lock hashes are not
+// attached to bytes they do not describe.
+func TestHarborAdmissionNeedsCurrentBytes(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "benchmarks")
+	if err := os.CopyFS(filepath.Join(root, "coding-core"), os.DirFS(filepath.Join("..", "benchmarks", "coding-core"))); err != nil {
+		t.Fatal(err)
+	}
+	load := func() *schemas.Suite {
+		t.Helper()
+		s, err := suite.Builtin(root)[0].Load(context.Background(), "coding-core")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	_, res, err := PlanHarbor(load(), HarborOptions{IncludeHidden: true, RequireAdmitted: true, Tasks: []string{"t01"}})
+	if err != nil || len(res.Tasks) != 1 {
+		t.Fatalf("unchanged admitted task: %+v %v", res, err)
+	}
+	s := load()
+	var t01 *schemas.Task
+	for _, tk := range s.Tasks {
+		if tk.ID == "t01" {
+			t01 = tk
+		}
+	}
+	instr := filepath.Join(t01.Dir, filepath.FromSlash(t01.Instruction))
+	if err := os.Chmod(instr, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(instr, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = f.WriteString("\nA harmless extra sentence.\n")
+	_ = f.Close()
+	_, res, err = PlanHarbor(load(), HarborOptions{IncludeHidden: true, RequireAdmitted: true, Tasks: []string{"t01"}})
+	if err != nil || len(res.Tasks) != 0 || len(res.Skipped) != 1 || !strings.Contains(res.Skipped[0].Reason, "changed since the suite lock") {
+		t.Fatalf("edited task under admitted-only: %+v %v", res, err)
+	}
+	trees, _, err := PlanHarbor(load(), HarborOptions{IncludeHidden: true, Tasks: []string{"t01"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	toml := string(trees["t01"]["task.toml"].data)
+	if !strings.Contains(toml, `heimdall_lock_status = "changed_since_lock"`) || strings.Contains(toml, "heimdall_instruction_sha256") {
+		t.Fatalf("draft export claims the lock:\n%s", toml)
+	}
+}
+
+// TestHarborKeepsGPURequirement covers QC2-23-06: a GPU task's export asks
+// Harbor for its GPUs and keeps the memory floor it cannot express.
+func TestHarborKeepsGPURequirement(t *testing.T) {
+	s, err := suite.Builtin(filepath.Join("..", "examples", "acme-gpu", "benchmarks"))[0].Load(context.Background(), "acme-gpu")
+	if err != nil {
+		t.Fatal(err)
+	}
+	trees, res, err := PlanHarbor(s, HarborOptions{IncludeHidden: true, Tasks: []string{"fix-slow-loop"}})
+	if err != nil || len(res.Tasks) != 1 {
+		t.Fatalf("export: %+v %v", res, err)
+	}
+	toml := string(trees["fix-slow-loop"]["task.toml"].data)
+	if !strings.Contains(toml, "\ngpus = 1\n") || !strings.Contains(toml, `heimdall_gpu_min_vram_mb = "2048"`) {
+		t.Fatalf("GPU requirement lost:\n%s", toml)
+	}
+}

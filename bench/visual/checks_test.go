@@ -296,3 +296,17 @@ func TestHeatmap(t *testing.T) {
 		t.Fatal("size mismatch heatmap")
 	}
 }
+
+// TestFindRegionNarrowSearchOffGrid covers QC2-24-05: a search area that
+// fits the crop at full size but holds no position of the reduced grid is
+// scanned at full size, not refused.
+func TestFindRegionNarrowSearchOffGrid(t *testing.T) {
+	m := NewImage(24, 16, [3]uint8{0, 0, 0})
+	crop := NewImage(16, 8, [3]uint8{0, 0, 0})
+	for _, origin := range []Pt{{0, 0}, {1, 1}, {3, 5}} {
+		b, _, err := FindRegion(m, crop, Rect{origin.X, origin.Y, 16, 8}, nil, nil, 0)
+		if err != nil || b.Diff != 0 || b.X != origin.X || b.Y != origin.Y {
+			t.Fatalf("origin %v: %+v %v", origin, b, err)
+		}
+	}
+}

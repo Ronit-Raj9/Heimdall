@@ -128,7 +128,19 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 			want[id] = true
 		}
 	}
+	spec := memtask.SuiteSpec{
+		ID: opts.SuiteID, Version: mo.Version, Grading: mo.Grading,
+		Description: "LoCoMo (locomo10) imported as multi-session memory tasks. Licensed CC BY-NC 4.0: non-commercial use only.",
+		Judge:       memtask.PlaceholderJudge(promptVersion),
+		Imported: schemas.ImportRecord{Importer: Name, Benchmark: "locomo10", Source: sourceURL, Revision: mo.Revision,
+			License: license, At: im.now()},
+	}
 	suiteDir := opts.SuiteDir()
+	// Refuse an incompatible suite before any task folder is written or
+	// replaced, so a refused import leaves the existing tasks untouched.
+	if err := memtask.CheckSuite(suiteDir, spec); err != nil {
+		return nil, err
+	}
 	res := &importers.Result{Suite: opts.SuiteID, SuiteDir: suiteDir}
 	found := map[string]bool{}
 	tokens := 0
@@ -173,13 +185,6 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	}
 	if len(res.Tasks) == 0 {
 		return res, nil
-	}
-	spec := memtask.SuiteSpec{
-		ID: opts.SuiteID, Version: mo.Version, Grading: mo.Grading,
-		Description: "LoCoMo (locomo10) imported as multi-session memory tasks. Licensed CC BY-NC 4.0: non-commercial use only.",
-		Judge:       memtask.PlaceholderJudge(promptVersion),
-		Imported: schemas.ImportRecord{Importer: Name, Benchmark: "locomo10", Source: sourceURL, Revision: mo.Revision,
-			License: license, At: im.now()},
 	}
 	if err := memtask.WriteSuite(suiteDir, spec, res.Tasks); err != nil {
 		return nil, err

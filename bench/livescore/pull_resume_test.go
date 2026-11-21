@@ -47,6 +47,29 @@ func TestListRowsSkipsScoredBeforeCap(t *testing.T) {
 	}
 }
 
+// QC2-26-02: rows the selector rejects (same model name, other provider)
+// do not count toward the cap, so the eligible row after them is reached.
+func TestListRowsDropsRejectedBeforeCap(t *testing.T) {
+	at := time.Date(2026, 11, 18, 6, 0, 0, 0, time.UTC)
+	rows := make([]Row, MaxRowsPerPull+1)
+	for i := range rows {
+		rows[i] = Row{ID: fmt.Sprintf("r%05d", i), Timestamp: at, Status: "success", Provider: "other", Model: "m1"}
+	}
+	rows[MaxRowsPerPull].Provider = "openai"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		off, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+		lim, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		off = min(off, len(rows))
+		_ = json.NewEncoder(w).Encode(map[string]any{"logs": rows[off:min(off+lim, len(rows))]})
+	}))
+	t.Cleanup(srv.Close)
+	v := &Version{Name: "v1", Models: []string{"openai/m1"}}
+	got, trunc, err := newClient(srv.URL, "", nil).listRows(context.Background(), v, at.Add(-time.Minute), at.Add(time.Minute), nil)
+	if err != nil || trunc || len(got) != 1 || got[0].ID != rows[MaxRowsPerPull].ID {
+		t.Fatalf("%d rows, truncated %v, err %v; want only the eligible row", len(got), trunc, err)
+	}
+}
+
 // Regression for 8-F-04: a pull that appended its sessions but never saved
 // its state must not make the next pull append the same sessions again.
 func TestPullAfterLostCheckpointAppendsNoDuplicates(t *testing.T) {

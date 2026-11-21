@@ -211,3 +211,22 @@ func TestImportRealData(t *testing.T) {
 		})
 	}
 }
+
+// A refused extension (other grading) must leave existing tasks untouched,
+// even under -force.
+func TestRefusedImportKeepsExistingTask(t *testing.T) {
+	root, _ := runImport(t, map[string]string{"grading": "match"}, []string{"conv-fx1"}, 0)
+	answer := filepath.Join(root, "benchmarks", "loc", "tasks", "conv-fx1-q005", "solution", "answer.txt")
+	if err := os.WriteFile(answer, []byte("sentinel\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	im := &importer{now: fixedNow}
+	_, err := im.Import(context.Background(), importers.Options{BenchRoot: root, From: "testdata", SuiteID: "loc",
+		IDs: []string{"conv-fx1"}, Force: true, Extra: map[string]string{"grading": "judged"}})
+	if err == nil || !strings.Contains(err.Error(), "new suite id") {
+		t.Fatalf("judged into a match suite: err = %v", err)
+	}
+	if b, _ := os.ReadFile(answer); string(b) != "sentinel\n" {
+		t.Fatalf("refused import rewrote the task: %q", b)
+	}
+}

@@ -408,12 +408,25 @@ func ReturnedURLs(calls []schemas.ToolCall, apis map[string]bool) map[string]boo
 	out := map[string]bool{}
 	mediated := false
 	for _, c := range calls {
-		if isMCPSearch(c) {
-			mediated = true
-			if delivered(c) {
-				for _, text := range mcpTexts(c.Result) {
-					addResultURLs(out, text)
-				}
+		// An MCP call that failed before the tool ran (an error answer, a
+		// fault that never forwarded it) made no upstream call, so it must
+		// not hide the run's direct search results (QC2-26-05). One the tool
+		// carried out stands in for its upstream rows even when its answer
+		// was lost.
+		if !isMCPSearch(c) || (c.IsError && c.Fault != "lost_ack") {
+			continue
+		}
+		mediated = true
+		if delivered(c) {
+			texts, ok := mcpTexts(c.Result)
+			if !ok {
+				// Clipped by the ledger: read the tool's own (once escaped)
+				// "url" keys from the prefix (QC2-26-04).
+				addEscapedURLs(out, c.Result)
+				continue
+			}
+			for _, text := range texts {
+				addResultURLs(out, text)
 			}
 		}
 	}
@@ -443,8 +456,22 @@ func delivered(c schemas.ToolCall) bool {
 	return !c.IsError && !c.Undelivered && (c.Fault == "" || c.Fault == "poison")
 }
 
-// mcpTexts returns the text items of an MCP tools/call result.
-func mcpTexts(result string) []string {
+// escapedURLRE finds "url" keys of a JSON text item inside a clipped MCP
+// result, where the item's quotes are escaped once.
+var escapedURLRE = regexp.MustCompile(`\\"url\\"\s*:\s*\\"([^"\\]*)\\"`)
+
+// addEscapedURLs adds the url keys of the text items of a clipped MCP result.
+func addEscapedURLs(out map[string]bool, result string) {
+	for _, m := range escapedURLRE.FindAllStringSubmatch(result, -1) {
+		if u := NormalizeURL(m[1]); u != "" {
+			out[u] = true
+		}
+	}
+}
+
+// mcpTexts returns the text items of an MCP tools/call result, and false
+// when the result does not parse (the ledger clipped it).
+func mcpTexts(result string) ([]string, bool) {
 	var r struct {
 		Content []struct {
 			Type string `json:"type"`
@@ -452,8 +479,7 @@ func mcpTexts(result string) []string {
 		} `json:"content"`
 	}
 	if json.Unmarshal([]byte(result), &r) != nil {
-		// A clipped result: its escaped text cannot be read reliably.
-		return nil
+		return nil, false
 	}
 	var out []string
 	for _, c := range r.Content {
@@ -461,7 +487,7 @@ func mcpTexts(result string) []string {
 			out = append(out, c.Text)
 		}
 	}
-	return out
+	return out, true
 }
 
 // addResultURLs adds the results[].url (a search) or url (a fetched page)

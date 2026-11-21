@@ -856,3 +856,28 @@ func TestProxyBatchFaultOverParseCap(t *testing.T) {
 		}
 	}
 }
+
+// TestProxyBatchFaultUndecodableSSE proves a synthetic fault answer is not
+// mixed as plain text into an event stream relayed under a coding the proxy
+// cannot decode, and the faulted call's row says undelivered (QC2-14-04).
+func TestProxyBatchFaultUndecodableSSE(t *testing.T) {
+	encoded := []byte{0x1b, 0x00, 0x7f, 0x42}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Content-Encoding", "br")
+		_, _ = w.Write(encoded)
+	}))
+	defer upstream.Close()
+	tp := newTestProxy(t, upstream.URL, ProtocolMCP)
+	tp.setFault(t, `{"mode":"error","tool":"fail","nonce":"n_b"}`)
+	_, _, body := rawPost(t, tp.front.URL+"/s/fs/mcp", strings.NewReader("["+callBody(1, "echo", "x")+","+callBody(2, "fail", "")+"]"), -1,
+		map[string]string{"Content-Type": "application/json", "Accept-Encoding": "br"})
+	if !bytes.Equal(body, encoded) {
+		t.Fatalf("relayed %q, want the encoded stream unchanged", body)
+	}
+	for _, r := range tp.waitRows(t, 2) {
+		if r.Fault == FaultError && !r.Undelivered {
+			t.Fatalf("faulted row reports delivery: %+v", r)
+		}
+	}
+}

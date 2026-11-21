@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -319,6 +320,39 @@ func scopeRank(scope string) int {
 // content (scenarioParts) is folded into the hash whose change level it
 // shares, and only when present, so a task without it hashes as it always
 // did.
+// TaskLockDrift says which locked hashes of task t no longer match its
+// files ("" when all match, or when the lock holds no entry for t). An
+// exporter checks it before attaching a lock's admission to current bytes.
+func TaskLockDrift(s *schemas.Suite, t *schemas.Task) (string, error) {
+	if s.Lock == nil {
+		return "", nil
+	}
+	prev, ok := s.Lock.Tasks[t.ID]
+	if !ok {
+		return "", nil
+	}
+	cur, err := lockTask(s, t)
+	if err != nil {
+		return "", err
+	}
+	var changed []string
+	for _, f := range []struct{ name, a, b string }{
+		{"instruction", prev.InstructionSHA256, cur.InstructionSHA256},
+		{"repo", prev.RepoTreeSHA256, cur.RepoTreeSHA256},
+		{"verifier", prev.VerifierSHA256, cur.VerifierSHA256},
+		{"controls", prev.ControlsSHA256, cur.ControlsSHA256},
+		{"fixtures", prev.FixturesSHA256, cur.FixturesSHA256},
+	} {
+		if f.a != f.b {
+			changed = append(changed, f.name)
+		}
+	}
+	if prev.Version != cur.Version {
+		changed = append(changed, "version")
+	}
+	return strings.Join(changed, ", "), nil
+}
+
 func lockTask(s *schemas.Suite, t *schemas.Task) (schemas.TaskLock, error) {
 	fail := func(what string, err error) (schemas.TaskLock, error) {
 		return schemas.TaskLock{}, fmt.Errorf("lock task %s: %s: %w", t.ID, what, err)

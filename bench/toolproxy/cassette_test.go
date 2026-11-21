@@ -141,3 +141,30 @@ func TestCassetteWriter(t *testing.T) {
 		t.Fatal("missing cassette loaded")
 	}
 }
+
+// A failed write is sticky: later entries are refused, the incomplete
+// cassette is moved aside so nothing exports it, and Close fails.
+func TestCassetteWriterFailureIsSticky(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "external", "acme.cassette.jsonl")
+	w, err := openCassetteWriter(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = w.f.Close() // the next write fails as a full disk would
+	e := NewCassetteEntry("GET", "/rates", "", nil, 200, http.Header{}, []byte("{}"))
+	if err := w.Append(e); err == nil {
+		t.Fatal("append to a broken cassette succeeded")
+	}
+	if err := w.Append(e); err == nil || !strings.Contains(err.Error(), "incomplete") {
+		t.Fatalf("second append: %v", err)
+	}
+	if _, err := os.Stat(p); !os.IsNotExist(err) {
+		t.Fatalf("incomplete cassette still at its export path: %v", err)
+	}
+	if _, err := os.Stat(p + FailedCassetteSuffix); err != nil {
+		t.Fatalf("incomplete cassette not moved aside: %v", err)
+	}
+	if err := w.Close(); err == nil {
+		t.Fatal("Close hid the recording failure")
+	}
+}

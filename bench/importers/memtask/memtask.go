@@ -292,27 +292,50 @@ type SuiteSpec struct {
 	Imported    schemas.ImportRecord
 }
 
+// CheckSuite refuses an existing suite at suiteDir that WriteSuite would
+// refuse to extend with s. Importers call it before writing any task folder,
+// so a refused import leaves every existing task untouched.
+func CheckSuite(suiteDir string, s SuiteSpec) error {
+	_, err := checkSuite(suiteDir, s)
+	return err
+}
+
+func suiteGrader(s SuiteSpec) (grader, grading string) {
+	if s.Grading == GradingMatch {
+		return "answer_match", ""
+	}
+	return "judge", schemas.GradingJudged
+}
+
+// checkSuite returns the existing suite (nil when there is none) after
+// checking that s may extend it.
+func checkSuite(suiteDir string, s SuiteSpec) (*existingSuite, error) {
+	grader, grading := suiteGrader(s)
+	prev, err := readSuite(filepath.Join(suiteDir, suiteFile))
+	if err != nil || prev == nil {
+		return nil, err
+	}
+	switch {
+	case prev.Grader != grader || prev.Grading != grading:
+		return nil, fmt.Errorf("suite %s exists with grader %s and grading %q; import into a new suite id to grade with %s", s.ID, prev.Grader, prev.Grading, grader)
+	case prev.Imported == nil || prev.Imported.Importer != s.Imported.Importer:
+		return nil, fmt.Errorf("suite %s exists and was not written by the %s importer", s.ID, s.Imported.Importer)
+	}
+	return prev, nil
+}
+
 // WriteSuite writes suiteDir/suite.yaml and base/Dockerfile. An existing
 // suite is extended: its task list keeps its order and gains taskIDs it
 // lacks. Extending a suite of another grading, grader or importer is
 // refused, since judged and verified tasks never share a suite.
 func WriteSuite(suiteDir string, s SuiteSpec, taskIDs []string) error {
-	grader, grading := "judge", schemas.GradingJudged
-	if s.Grading == GradingMatch {
-		grader, grading = "answer_match", ""
-	}
+	grader, grading := suiteGrader(s)
 	ids := append([]string(nil), taskIDs...)
-	prev, err := readSuite(filepath.Join(suiteDir, suiteFile))
+	prev, err := checkSuite(suiteDir, s)
 	if err != nil {
 		return err
 	}
 	if prev != nil {
-		switch {
-		case prev.Grader != grader || prev.Grading != grading:
-			return fmt.Errorf("suite %s exists with grader %s and grading %q; import into a new suite id to grade with %s", s.ID, prev.Grader, prev.Grading, grader)
-		case prev.Imported == nil || prev.Imported.Importer != s.Imported.Importer:
-			return fmt.Errorf("suite %s exists and was not written by the %s importer", s.ID, s.Imported.Importer)
-		}
 		ids = mergeIDs(prev.Tasks, taskIDs)
 		if prev.Judge != nil && s.Judge != nil {
 			s.Judge = prev.Judge // keep a judge the user already pinned

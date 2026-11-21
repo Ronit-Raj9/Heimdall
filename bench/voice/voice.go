@@ -139,8 +139,8 @@ func CallerService(suite *schemas.Suite, t *schemas.Task) (schemas.ServiceSpec, 
 // CheckTask refuses a voice task that cannot run: an unknown transport, a
 // caller that is not a role user service, a caller that is proxied or hidden
 // (the agent dials it directly; the tool proxy does not carry WebSocket
-// audio), or a caller without the timeline and transcript exports the
-// metrics and the verifier read.
+// audio), a caller without the timeline and transcript exports the metrics
+// and the verifier read, or more than one session (one call per run).
 func CheckTask(suite *schemas.Suite, t *schemas.Task) error {
 	spec := Effective(t.Voice)
 	if spec == nil {
@@ -160,6 +160,11 @@ func CheckTask(suite *schemas.Suite, t *schemas.Task) error {
 	}
 	if spec.DeadAirMS < 500 || spec.DeadAirMS > 60000 {
 		errs = append(errs, fmt.Errorf("voice dead_air_ms %d: want 500 to 60000", spec.DeadAirMS))
+	}
+	if len(t.Sessions) > 1 {
+		// The caller service starts once per run and takes one call
+		// (heimdall-voice/1); a second session's call would be refused.
+		errs = append(errs, fmt.Errorf("voice task has %d sessions: the caller takes one call per run, so a voice task has at most one session", len(t.Sessions)))
 	}
 	s, ok := CallerService(suite, t)
 	switch {

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -374,6 +375,33 @@ func importNotes(id string, t *upstreamTask, p *taskPlan, up upstream) string {
 	}
 	b.WriteString("- The reference control embeds `solution/` and runs `solve.sh`; the empty control does nothing; the exploit control plants a fake reward.\n")
 	return b.String()
+}
+
+// checkExistingSuite refuses to extend a suite.yaml in dir that another
+// importer or a person wrote, or that a Harbor import of another benchmark
+// wrote: extending it would change how its existing tasks are graded and
+// relabel their provenance.
+func checkExistingSuite(dir, id string, up upstream) error {
+	b, err := os.ReadFile(filepath.Join(dir, "suite.yaml"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("harbor: read existing suite %s: %w", id, err)
+	}
+	s := &schemas.Suite{}
+	if err := yaml.Unmarshal(b, s); err != nil {
+		return fmt.Errorf("harbor: read existing suite %s: %w", id, err)
+	}
+	switch {
+	case s.Imported == nil || s.Imported.Importer != Name:
+		return fmt.Errorf("harbor: suite %s exists and was not written by the %s importer; import into a new suite id", id, Name)
+	case s.Grader != "verifier_command":
+		return fmt.Errorf("harbor: suite %s exists with grader %s; import into a new suite id", id, s.Grader)
+	case s.Imported.Benchmark != up.Benchmark:
+		return fmt.Errorf("harbor: suite %s holds %s tasks, not %s; import into a new suite id", id, s.Imported.Benchmark, up.Benchmark)
+	}
+	return nil
 }
 
 // writeSuite writes suite.yaml, or extends the one already there with the

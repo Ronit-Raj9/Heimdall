@@ -840,7 +840,13 @@ func (e *dockerWorkspace) copyLedger(ctx context.Context, runID, dir string) err
 	out := filepath.Join(dir, ToolsFile)
 	cctx, cancel := context.WithTimeout(ctx, exportTimeout)
 	defer cancel()
-	e.copyLedgerStatus(cctx, runID, dir)
+	if err := e.copyLedgerStatus(cctx, runID, dir); err != nil {
+		// Without a status, collection would take the ledger for a legacy
+		// proxy's complete record; leave no ledger, so tool evidence is
+		// unknown.
+		_ = os.Remove(out)
+		return fmt.Errorf("mark tool ledger status incomplete: %w", err)
+	}
 	n, problem, err := e.exportPath(cctx, toolProxyContainer(runID), toolProxyLedger, out, maxLedgerBytes)
 	if err != nil {
 		return err
@@ -855,31 +861,43 @@ func (e *dockerWorkspace) copyLedger(ctx context.Context, runID, dir string) err
 	return nil
 }
 
+// writeLedgerStatusFailure replaces the status copy with one that marks the
+// ledger incomplete: the proxy always keeps a status file, so one that could
+// not be copied is a failed collection, never a legacy proxy, and evidence
+// collection must not accept the ledger's rows as the whole call set.
+func writeLedgerStatusFailure(out, problem string, err error) error {
+	why := problem
+	if err != nil {
+		why = err.Error()
+	}
+	b, _ := json.Marshal(schemas.ToolLedgerStatus{Error: "ledger status not copied: " + why})
+	return os.WriteFile(out, b, 0o644)
+}
+
 // ledgerDrainWait bounds how long copyLedgerStatus waits for in-flight calls.
 var ledgerDrainWait = 5 * time.Second
 
 // copyLedgerStatus copies the proxy's ledger status into the run folder,
-// retrying while it reports calls in flight. A proxy too old to write one
-// leaves no file and the ledger is read as before.
-func (e *dockerWorkspace) copyLedgerStatus(ctx context.Context, runID, dir string) {
+// retrying while it reports calls in flight. A status that cannot be copied
+// is replaced by one marking the ledger incomplete (writeLedgerStatusFailure).
+func (e *dockerWorkspace) copyLedgerStatus(ctx context.Context, runID, dir string) error {
 	out := filepath.Join(dir, schemas.ToolLedgerStatusFile)
 	src := path.Join(path.Dir(toolProxyLedger), schemas.ToolLedgerStatusFile)
 	deadline := time.Now().Add(ledgerDrainWait)
 	for {
 		_, problem, err := e.exportPath(ctx, toolProxyContainer(runID), src, out, 1<<20)
 		if err != nil || problem != "" {
-			_ = os.Remove(out)
 			e.cfg.Logger.Warn("tool ledger status not copied", "run", runID, "problem", problem, "error", err)
-			return
+			return writeLedgerStatusFailure(out, problem, err)
 		}
 		var st schemas.ToolLedgerStatus
 		raw, rerr := os.ReadFile(out)
 		if rerr != nil || json.Unmarshal(raw, &st) != nil || st.InFlight == 0 || !time.Now().Before(deadline) {
-			return
+			return nil
 		}
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case <-time.After(200 * time.Millisecond):
 		}
 	}

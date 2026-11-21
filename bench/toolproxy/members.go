@@ -28,7 +28,14 @@ func (s *Server) memberRoute(w http.ResponseWriter, r *http.Request) (string, bo
 		http.Error(w, "not found: unknown member route", http.StatusNotFound)
 		return "", false
 	}
+	// Keep the tail's original spelling: the external route validates the
+	// escaped path (encoded slashes, dots, percent signs), so the member
+	// prefix must come off without decoding what follows it.
+	escaped := r.URL.EscapedPath()
 	r.URL.Path, r.URL.RawPath = "/"+tail, ""
+	if escTail, ok := strings.CutPrefix(escaped, "/m/"+token+"/"); ok && escTail != tail {
+		r.URL.RawPath = "/" + escTail
+	}
 	r.Header.Set(MemberHeader, agent)
 	return agent, true
 }

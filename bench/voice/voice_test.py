@@ -165,6 +165,78 @@ class ProtocolTest(unittest.TestCase):
         with self.assertRaises(voiceclient.Hangup):
             phone.listen(end_silence_ms=700, max_wait_s=1)
 
+    def test_listen_splits_on_arrival_gap(self):
+        # QC2-24-01: the protocol sends no frames between utterances, so two
+        # queued utterances 1.5 s apart differ only in arrival times.
+        phone = voiceclient.VoiceCall.__new__(voiceclient.VoiceCall)
+        phone.lock = threading.Condition()
+        phone.ended, phone.end_reason = False, ""
+        t = time.monotonic() - 10
+        first = tonecode.frames(tonecode.encode("opening line", tail_ms=60))
+        second = tonecode.frames(tonecode.encode("reprompt line", tail_ms=60))
+        phone.frames = [(t + i * 0.02, f) for i, f in enumerate(first)]
+        t2 = t + len(first) * 0.02 + 1.5
+        phone.frames += [(t2 + i * 0.02, f) for i, f in enumerate(second)]
+        self.assertEqual(tonecode.decode(phone.listen(end_silence_ms=700, max_wait_s=1)), "opening line")
+        phone.ended, phone.end_reason = True, "caller_done"
+        self.assertEqual(tonecode.decode(phone.listen(end_silence_ms=700, max_wait_s=1)), "reprompt line")
+
+    def test_interrupt_waits_for_committed_reply(self):
+        # QC2-24-06: while the caller's answer is being made (text, then
+        # synthesis), the interrupt probe must not start a second line whose
+        # frames interleave with the answer's.
+        import voicecaller
+        from types import SimpleNamespace
+
+        async def run():
+            loop = asyncio.get_running_loop()
+            reply_started = asyncio.Event()
+            release = threading.Event()
+            sends = []
+            call = voicecaller.Call.__new__(voicecaller.Call)
+            call.probe = {"id": "interrupt", "turn": 2, "after_ms": 700, "line": "interrupt line"}
+            call.s = {"reply_delay_ms": 0, "keep_audio": False, "max_call_s": 60}
+            call.ended = asyncio.Event()
+            call.speak_task, call.barge, call.barges = None, None, 0
+            call.agent_speaking = call.caller_speaking = call.stop_after_speaking = False
+            call.agent_hung_up, call.answering = False, False
+            call.agent_utt, call.utt_start = 2, 0
+            call.caller_turn = call.caller_seq = 0
+            call.now = lambda: 1000
+            call.log = lambda *args, **kwargs: None
+            call.play_due = call.check_utterance_end = lambda: None
+            call.respond_text = lambda *args: ("reply line", False)
+            call.transcript = {"events": []}
+            call.session = SimpleNamespace(lock=threading.Lock(), persist=lambda: None)
+
+            def speak(line):
+                if line == "reply line":
+                    loop.call_soon_threadsafe(reply_started.set)
+                    release.wait(2)
+                sample = b"\x01\x10" if line == "reply line" else b"\x02\x10"
+                return sample * (320 * 3), "fixture"
+
+            async def send(data):
+                sends.append(data[0])
+
+            call.engines = SimpleNamespace(speak=speak)
+            call.conn = SimpleNamespace(send_binary=send)
+            call.pending_reply = asyncio.create_task(call.reply(1, "prior utterance", "fixture"))
+            reply = call.pending_reply
+            await asyncio.wait_for(reply_started.wait(), 2)
+            call.agent_speaking = True  # the agent keeps talking during synthesis
+            ticker = asyncio.create_task(call.ticker())
+            await asyncio.sleep(0.1)  # several ticks while the answer is pending
+            release.set()
+            await asyncio.wait_for(reply, 2)
+            call.ended.set()
+            await ticker
+            return sends, call.speak_task
+
+        sends, speak_task = asyncio.run(run())
+        self.assertIsNone(speak_task, "an interrupt started while the answer was pending")
+        self.assertEqual(sends, [1, 1, 1])
+
     def test_tone_code(self):
         pcm = tonecode.encode("Order B-3001: 45.00", lead_ms=77, tail_ms=200)
         self.assertEqual(tonecode.decode(pcm), "Order B-3001: 45.00")

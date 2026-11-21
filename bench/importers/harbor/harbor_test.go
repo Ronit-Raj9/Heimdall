@@ -394,3 +394,41 @@ func TestSkillRoots(t *testing.T) {
 		t.Errorf("roots = %s", got)
 	}
 }
+
+// A suite another importer wrote is refused before any task is staged, so
+// its grader, provenance and tasks stay as they were.
+func TestImportRefusesForeignSuite(t *testing.T) {
+	root := t.TempDir()
+	from, err := filepath.Abs(filepath.Join("testdata", "tb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(root, "benchmarks", "native-like")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	orig := "id: native-like\nversion: \"1\"\ngrader: answer_match\ntasks: [fx-count-1]\nimported:\n  importer: longmemeval\n  benchmark: longmemeval-cleaned@oracle\n"
+	if err := os.WriteFile(filepath.Join(dir, "suite.yaml"), []byte(orig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	im := &importer{now: func() time.Time { return fixedNow }}
+	_, err = im.Import(context.Background(), importers.Options{BenchRoot: root, From: from, SuiteID: "native-like", IDs: []string{"hello-file"}})
+	if err == nil || !strings.Contains(err.Error(), "not written by the harbor importer") {
+		t.Fatalf("err = %v", err)
+	}
+	if got := readFile(t, filepath.Join(dir, "suite.yaml")); got != orig {
+		t.Fatalf("suite.yaml changed:\n%s", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "tasks", "hello-file")); !os.IsNotExist(err) {
+		t.Fatalf("task staged into a refused suite: %v", err)
+	}
+	// A Harbor suite of another benchmark is refused as well.
+	if _, err := im.Import(context.Background(), importers.Options{BenchRoot: root, From: from, SuiteID: "tb", IDs: []string{"hello-file"}}); err != nil {
+		t.Fatal(err)
+	}
+	_, err = im.Import(context.Background(), importers.Options{BenchRoot: root, From: from, SuiteID: "tb", IDs: []string{"pip-check"},
+		Extra: map[string]string{"benchmark": "other@1"}})
+	if err == nil || !strings.Contains(err.Error(), "not other@1") {
+		t.Fatalf("other benchmark: err = %v", err)
+	}
+}

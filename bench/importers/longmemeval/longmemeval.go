@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -126,7 +127,19 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	if err != nil {
 		return nil, err
 	}
+	spec := memtask.SuiteSpec{
+		ID: opts.SuiteID, Version: mo.Version, Grading: mo.Grading,
+		Description: fmt.Sprintf("LongMemEval (%s variant) imported as multi-session memory tasks.", variant),
+		Judge:       memtask.PlaceholderJudge(promptVersion),
+		Imported: schemas.ImportRecord{Importer: Name, Benchmark: "longmemeval-cleaned@" + variant, Source: sourceURL,
+			Revision: mo.Revision, License: license, At: im.now()},
+	}
 	suiteDir := opts.SuiteDir()
+	// Refuse an incompatible suite before any task folder is written or
+	// replaced, so a refused import leaves the existing tasks untouched.
+	if err := memtask.CheckSuite(suiteDir, spec); err != nil {
+		return nil, err
+	}
 	res := &importers.Result{Suite: opts.SuiteID, SuiteDir: suiteDir}
 	seen := map[string]string{}
 	tokens := 0
@@ -158,13 +171,6 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	}
 	if len(res.Tasks) == 0 {
 		return res, nil
-	}
-	spec := memtask.SuiteSpec{
-		ID: opts.SuiteID, Version: mo.Version, Grading: mo.Grading,
-		Description: fmt.Sprintf("LongMemEval (%s variant) imported as multi-session memory tasks.", variant),
-		Judge:       memtask.PlaceholderJudge(promptVersion),
-		Imported: schemas.ImportRecord{Importer: Name, Benchmark: "longmemeval-cleaned@" + variant, Source: sourceURL,
-			Revision: mo.Revision, License: license, At: im.now()},
 	}
 	if err := memtask.WriteSuite(suiteDir, spec, res.Tasks); err != nil {
 		return nil, err
@@ -229,8 +235,16 @@ func readEntries(ctx context.Context, file string, ids []string, limit int) ([]e
 		}
 		out = append(out, e)
 		if limit > 0 && len(out) >= limit {
-			break
+			return out, nil // a deliberate early stop: the rest is never read
 		}
+	}
+	// The whole array was scanned: require its closing bracket and nothing
+	// after it, so a truncated download is never imported as complete.
+	if tok, err := dec.Token(); err != nil || tok != json.Delim(']') {
+		return nil, fmt.Errorf("parse %s: the JSON array of questions is truncated or malformed", file)
+	}
+	if _, err := dec.Token(); err != io.EOF {
+		return nil, fmt.Errorf("parse %s: unexpected data after the JSON array of questions", file)
 	}
 	return out, nil
 }

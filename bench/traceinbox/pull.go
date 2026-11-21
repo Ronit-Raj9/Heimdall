@@ -352,8 +352,8 @@ func (ib *Inbox) take(s *Source, fl Flagged) (takeResult, error) {
 			it.Updated = now
 			return items, nil
 		}
-		if len(items) >= MaxItems {
-			return nil, fmt.Errorf("the inbox holds %d items, the cap; reject or accept old items first", len(items))
+		if n := OpenItems(items); n >= MaxItems {
+			return nil, fmt.Errorf("the inbox holds %d open items, the cap; reject or accept old items first", n)
 		}
 		// The session and preview are written before the item that lists
 		// them, so a failed write leaves no item that cannot become a task.

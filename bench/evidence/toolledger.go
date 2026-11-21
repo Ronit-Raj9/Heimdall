@@ -89,6 +89,35 @@ func (s *toolLedgerSource) Collect(_ context.Context, rc *schemas.RunContext, ev
 	return nil
 }
 
+// ReadRunToolLedger reads the tool ledger a run folder holds with the same
+// completeness rule Collect applies. It returns nil calls (unknown) when
+// the folder has no ledger or the ledger is incomplete, and the reason in
+// the second value for an incomplete one; an empty, non-nil list is a
+// complete ledger of a run that made no call. Regrading uses it so a
+// recomputed gate never trusts rows collection refused.
+func ReadRunToolLedger(dir string) ([]schemas.ToolCall, string, error) {
+	f, err := os.Open(filepath.Join(dir, toolsFile))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, "", nil
+	}
+	if err != nil {
+		return nil, "", fmt.Errorf("read tool ledger: %w", err)
+	}
+	defer f.Close()
+	calls, bad, err := ParseToolLedger(io.LimitReader(f, toolLedgerMax))
+	if err != nil {
+		return nil, "", fmt.Errorf("read tool ledger: %w", err)
+	}
+	why := ledgerIncomplete(dir, calls, bad)
+	if n, _ := io.Copy(io.Discard, io.LimitReader(f, 1)); n > 0 {
+		why = fmt.Sprintf("tool ledger exceeds the %d byte read cap", toolLedgerMax)
+	}
+	if why != "" {
+		return nil, why, nil
+	}
+	return calls, "", nil
+}
+
 // errToolLedgerIncomplete is a ledger that is present but misses rows.
 var errToolLedgerIncomplete = errors.New("tool ledger incomplete")
 

@@ -188,7 +188,7 @@ func TestFaultFileListing(t *testing.T) {
 		t.Fatal(err)
 	}
 	f := newFaultFile(path, schemas.NoopLogger{})
-	if _, ok := f.listing("fs"); ok {
+	if _, ok := f.listing("fs", ""); ok {
 		t.Fatal("rug pull before any call")
 	}
 	for i := 0; i < 2; i++ {
@@ -197,10 +197,10 @@ func TestFaultFileListing(t *testing.T) {
 		}
 		f.decide("kb", "echo", "") // another server's calls do not count
 	}
-	if _, ok := f.listing("kb"); ok {
+	if _, ok := f.listing("kb", ""); ok {
 		t.Fatal("rug pull on another server")
 	}
-	if ft, ok := f.listing("fs"); !ok || ft.Mode != FaultRugPull {
+	if ft, ok := f.listing("fs", ""); !ok || ft.Mode != FaultRugPull {
 		t.Fatalf("rug pull after 2 calls: %v %+v", ok, ft)
 	}
 }
@@ -234,5 +234,32 @@ func TestFaultFileAgentTarget(t *testing.T) {
 	}
 	if !targetsAgent("a, b", "b") || targetsAgent("a,b", "") || targetsAgent("ab", "a") {
 		t.Fatal("targetsAgent")
+	}
+}
+
+// TestFaultFileListingAgentTarget checks a listing fault aimed at a team
+// member rewrites only that member's listing, and only the member's calls
+// advance a rug pull (QC2-14-10).
+func TestFaultFileListingAgentTarget(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "fault.json")
+	if err := os.WriteFile(path, []byte(`{"mode":"rug_pull","server":"fs","from_call":2,"text":"x","agent":"worker-a"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := newFaultFile(path, schemas.NoopLogger{})
+	for i := 0; i < 3; i++ {
+		f.decide("fs", "echo", "worker-b") // another member's calls do not count
+	}
+	if _, ok := f.listing("fs", "worker-a"); ok {
+		t.Fatal("other members' calls advanced the target's rug pull")
+	}
+	f.decide("fs", "echo", "worker-a")
+	if _, ok := f.listing("fs", "worker-a"); !ok {
+		t.Fatal("rug pull not applied to its target")
+	}
+	if _, ok := f.listing("fs", "worker-b"); ok {
+		t.Fatal("rug pull rewrote another member's listing")
+	}
+	if _, ok := f.listing("fs", ""); ok {
+		t.Fatal("rug pull rewrote the lead's listing")
 	}
 }

@@ -56,6 +56,11 @@ func fakeStdioServer() {
 			// A response line over the bridge's limit; the server stays up.
 			fmt.Fprintf(w, `{"jsonrpc":"2.0","id":%s,"result":{"text":"%s"}}`+"\n", m.ID, strings.Repeat("z", maxStdioLine))
 			w.Flush()
+		case "closeout":
+			// Close stdout and stay up: the bridge can read nothing more.
+			_ = os.Stdout.Close()
+		case "silent":
+			// Never answered.
 		case "":
 			// The bridge's answer to roots/list: it must be a refusal.
 			if strings.Contains(sc.Text(), `"srv-1"`) && strings.Contains(sc.Text(), `"error"`) {
@@ -203,5 +208,62 @@ func TestProxyInFrontOfBridge(t *testing.T) {
 	rows := tp.callRows(t)
 	if len(rows) != 1 || rows[0].Tool != "read_file" || rows[0].IsError || rows[0].Status != 200 {
 		t.Fatalf("rows = %+v", rows)
+	}
+}
+
+// TestBridgeStdoutClosed checks a server that closes stdout but keeps
+// running is stopped, its pending call fails and health turns unhealthy
+// (QC2-14-07).
+func TestBridgeStdoutClosed(t *testing.T) {
+	old := stdoutEOFGrace
+	stdoutEOFGrace = 100 * time.Millisecond
+	t.Cleanup(func() { stdoutEOFGrace = old })
+	b, srv := startTestBridge(t)
+	done := make(chan string, 1)
+	go func() {
+		_, _, body := post(t, srv.URL, "/mcp", `{"jsonrpc":"2.0","id":6,"method":"closeout"}`, nil)
+		done <- body
+	}()
+	select {
+	case body := <-done:
+		if !strings.Contains(body, "stdio server exited") {
+			t.Fatalf("body %q", body)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("call hung after the server closed stdout")
+	}
+	<-b.Exited()
+	if err := b.ExitErr(); err == nil || !strings.Contains(err.Error(), "stdout closed") {
+		t.Fatalf("exit error %v", err)
+	}
+}
+
+// TestBridgeCancelReleasesBatch checks a cancelled batch releases every id
+// it registered, not only the one being awaited (QC2-14-06).
+func TestBridgeCancelReleasesBatch(t *testing.T) {
+	b, srv := startTestBridge(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, srv.URL+"/mcp",
+		strings.NewReader(`[{"jsonrpc":"2.0","id":7,"method":"silent"},{"jsonrpc":"2.0","id":8,"method":"silent"}]`))
+	if resp, err := http.DefaultClient.Do(req); err == nil {
+		resp.Body.Close()
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		b.mu.Lock()
+		n := len(b.waiters)
+		b.mu.Unlock()
+		if n == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d ids still reserved after the batch was cancelled", n)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	_, _, body := post(t, srv.URL, "/mcp", callBody(8, "echo", "again"), nil)
+	if strings.Contains(body, "already in flight") || !strings.Contains(body, "echo") {
+		t.Fatalf("reused id refused: %s", body)
 	}
 }

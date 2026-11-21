@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 	"gopkg.in/yaml.v3"
 )
 
@@ -228,6 +229,20 @@ func planTask(s *schemas.Suite, t *schemas.Task, opts HarborOptions) (harborTree
 	if s.Lock != nil {
 		status = string(s.Lock.Tasks[t.ID].Status)
 	}
+	if status != "" {
+		// The lock's status and hashes speak only for the bytes it hashed:
+		// a task edited since is exported as a draft, without them.
+		drift, err := suite.TaskLockDrift(s, t)
+		if err != nil {
+			return nil, nil, "", fmt.Errorf("check suite lock: %w", err)
+		}
+		if drift != "" {
+			if opts.RequireAdmitted {
+				return nil, nil, fmt.Sprintf("changed since the suite lock (%s); lock and admit it again to export it here", drift), nil
+			}
+			status = lockStatusChanged
+		}
+	}
 	if opts.RequireAdmitted && status != string(schemas.TaskAdmitted) {
 		return nil, nil, fmt.Sprintf("not admitted in the suite lock (status %q); only admitted tasks are exported here", status), nil
 	}
@@ -235,6 +250,13 @@ func planTask(s *schemas.Suite, t *schemas.Task, opts HarborOptions) (harborTree
 		return nil, nil, "the suite has no verifier command", nil
 	}
 	task := &HarborTask{ID: t.ID, Folder: t.ID, Name: taskName(s, t), Shape: shape, Withheld: opts.Withhold && !opts.IncludeHidden}
+	if n := t.GPUCount(); n > 0 {
+		note := fmt.Sprintf("needs %d GPU(s): task.toml asks Harbor for them (environment gpus)", n)
+		if v := t.Resources.GPU.MinVRAMMB; v > 0 {
+			note += fmt.Sprintf("; Harbor has no per-GPU memory field, so the %d MiB floor is only in [metadata] heimdall_gpu_min_vram_mb", v)
+		}
+		task.Notes = append(task.Notes, note)
+	}
 	tree := harborTree{}
 	instr, err := os.ReadFile(filepath.Join(t.Dir, filepath.FromSlash(t.Instruction)))
 	if err != nil {
@@ -283,6 +305,10 @@ const withheldTestSh = `#!/bin/bash
 echo "verifier withheld from this export; no reward written" >&2
 exit 3
 `
+
+// lockStatusChanged is the heimdall_lock_status of a task whose files no
+// longer match its suite lock entry; the lock's hashes are then omitted.
+const lockStatusChanged = "changed_since_lock"
 
 // skipError is a reason a task cannot be exported, found while planning.
 type skipError struct{ reason string }

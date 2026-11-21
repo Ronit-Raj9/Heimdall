@@ -1,7 +1,6 @@
 package toolproxy
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -39,10 +38,25 @@ func (x *exchange) lostAckHold() int {
 // with a timeout error, holds, and answers the agent with plain JSON. The
 // streamable HTTP transport lets a server answer a POST with either form.
 func (s *Server) relayLostAck(w http.ResponseWriter, r *http.Request, resp *http.Response, x *exchange, synthetic []json.RawMessage, batch bool) {
-	raw, err := readUpTo(resp.Body, s.parseCap)
-	if err == nil {
-		if enc := contentEncoding(resp.Header); enc != "" {
-			raw, err = decodeBody(raw, enc, s.parseCap)
+	var raw []byte
+	var items []rpcItem
+	var err error
+	if isEventStream(resp.Header) {
+		// A stream can stay open after the answers arrive (idle events):
+		// it is read only until every call has its response, so the hold
+		// starts then, not at the stream's end.
+		raw, items, err = s.readLostAckStream(resp, x)
+	} else {
+		raw, err = readUpTo(resp.Body, s.parseCap)
+		if err == nil {
+			if enc := contentEncoding(resp.Header); enc != "" {
+				raw, err = decodeBody(raw, enc, s.parseCap)
+			}
+		}
+		if err == nil {
+			if its, _, ok := parseRPC(raw); ok {
+				items = its
+			}
 		}
 	}
 	if err != nil {
@@ -52,12 +66,6 @@ func (s *Server) relayLostAck(w http.ResponseWriter, r *http.Request, resp *http
 		w.WriteHeader(http.StatusBadGateway)
 		x.commitAll(true)
 		return
-	}
-	var items []rpcItem
-	if isEventStream(resp.Header) {
-		items = sseItems(raw, int(s.parseCap))
-	} else if its, _, ok := parseRPC(raw); ok {
-		items = its
 	}
 	var out []json.RawMessage
 	for _, it := range items {
@@ -110,26 +118,52 @@ func (s *Server) relayLostAck(w http.ResponseWriter, r *http.Request, resp *http
 	x.commitAll(werr != nil)
 }
 
-// sseItems returns the JSON-RPC messages of a whole event stream body.
-func sseItems(body []byte, limit int) []rpcItem {
-	rd := newSSEReader(bytes.NewReader(body), limit)
-	var items []rpcItem
-	for {
-		ev, big, err := rd.next()
-		if !big {
-			if data, ok := ev.data(); ok {
-				if its, _, ok := parseRPC(data); ok {
-					items = append(items, its...)
-				}
-			}
-		} else if rerr := rd.rest(func([]byte) {}); rerr != nil {
-			break
-		}
+// readLostAckStream reads an event stream answer event by event until every
+// call of x that expects a response has one, the stream ends, or the parse
+// cap is reached, and returns the bytes read (decoded) and the JSON-RPC
+// messages they carry. A stream over the cap is an error, as a body is.
+func (s *Server) readLostAckStream(resp *http.Response, x *exchange) ([]byte, []rpcItem, error) {
+	var src io.Reader = resp.Body
+	if enc := contentEncoding(resp.Header); enc != "" {
+		d, err := decodeReader(resp.Body, enc)
 		if err != nil {
-			break
+			return nil, nil, err
+		}
+		src = d
+	}
+	waiting := map[string]bool{}
+	for _, p := range x.order {
+		if p.key != "" && !p.noReply {
+			waiting[p.key] = true
 		}
 	}
-	return items
+	rd := newSSEReader(src, int(s.parseCap))
+	var raw []byte
+	var items []rpcItem
+	for len(waiting) > 0 {
+		ev, big, err := rd.next()
+		if big {
+			return raw, items, errTooLarge
+		}
+		raw = append(raw, ev.bytes()...)
+		if int64(len(raw)) > s.parseCap {
+			return raw, items, errTooLarge
+		}
+		if data, ok := ev.data(); ok {
+			if its, _, ok := parseRPC(data); ok {
+				for _, it := range its {
+					if it.msg.Method == "" {
+						delete(waiting, idKey(it.msg.ID))
+					}
+				}
+				items = append(items, its...)
+			}
+		}
+		if err != nil {
+			break // the stream ended; missing answers are handled by the caller
+		}
+	}
+	return raw, items, nil
 }
 
 // lostAckHTTP is lost_ack on a plain HTTP tool route: the server's answer is

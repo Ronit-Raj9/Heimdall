@@ -214,6 +214,11 @@ func computeVoiceCost(_ *schemas.RunContext, ev *schemas.Evidence, a *voice.Anal
 		return schemas.Unknown("the call has no length", schemas.EvidenceGateway)
 	}
 	if len(ev.Cost) == 0 {
+		if log := ev.Requests; log != nil && log.Complete && len(log.Requests) == 0 {
+			// As cost_usd: a witnessed complete log with no request is a
+			// call that spent nothing.
+			return schemas.Observed(0, schemas.EvidenceGateway)
+		}
 		return schemas.Unknown(noCostReason(ev.Requests), schemas.EvidenceGateway)
 	}
 	total := 0.0

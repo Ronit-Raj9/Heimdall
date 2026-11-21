@@ -168,12 +168,62 @@ func (st *Store) appendSessions(recs []SessionRecord) error {
 		buf.Write(b)
 		buf.WriteByte('\n')
 	}
-	f, err := os.OpenFile(filepath.Join(st.dir, SessionsFile), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	path := filepath.Join(st.dir, SessionsFile)
+	if err := repairTail(path); err != nil {
+		return fmt.Errorf("repair scored sessions: %w", err)
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
 	_, werr := f.Write(buf.Bytes())
+	if werr == nil {
+		werr = f.Sync()
+	}
 	return errors.Join(werr, f.Close())
+}
+
+// repairTail cuts a partial last line (no trailing newline) off the file at
+// path, so the next append starts on a line boundary instead of merging its
+// first record into the damaged one. The caller holds the store lock; the
+// partial record belongs to a pull that never saved its state, so its rows
+// are scored again.
+func repairTail(path string) error {
+	f, err := os.OpenFile(path, os.O_RDWR, 0)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil || fi.Size() == 0 {
+		return err
+	}
+	size := fi.Size()
+	last := make([]byte, 1)
+	if _, err := f.ReadAt(last, size-1); err != nil {
+		return err
+	}
+	if last[0] == '\n' {
+		return nil
+	}
+	// Find the last newline, reading backwards in chunks.
+	const chunk = 64 << 10
+	end := size
+	for end > 0 {
+		start := max(end-chunk, 0)
+		b := make([]byte, end-start)
+		if _, err := f.ReadAt(b, start); err != nil && !errors.Is(err, io.EOF) {
+			return err
+		}
+		if i := bytes.LastIndexByte(b, '\n'); i >= 0 {
+			return errors.Join(f.Truncate(start+int64(i)+1), f.Sync())
+		}
+		end = start
+	}
+	return errors.Join(f.Truncate(0), f.Sync())
 }
 
 // prune rewrites sessions.jsonl without sessions that ended before cut and

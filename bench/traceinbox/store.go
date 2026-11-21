@@ -166,8 +166,9 @@ func (st *FileStore) Update(fn func(items []Item) ([]Item, error)) error {
 	if err != nil {
 		return err
 	}
-	if len(out) > MaxItems {
-		return fmt.Errorf("the inbox holds %d items, over the %d cap; reject or accept old items first", len(out), MaxItems)
+	out = pruneResolved(out, maxStoredItems)
+	if n := OpenItems(out); n > MaxItems || len(out) > maxStoredItems {
+		return fmt.Errorf("the inbox holds %d open items, over the %d cap; reject or accept old items first", n, MaxItems)
 	}
 	var buf bytes.Buffer
 	for i := range out {
