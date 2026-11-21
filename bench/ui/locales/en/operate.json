@@ -1,0 +1,63 @@
+{
+	"title": "Operations",
+	"subtitle": "Check this server, run GPU, voice and visual checks, and keep sealed evidence safe.",
+	"loading": "Loading what this server can run",
+	"loadError": "Could not load the operations status",
+	"hostedNote": "Hosted organizations get the doctor checks of their own suites and agents. Server operations (evidence, GPU, Kubernetes) are run by the server owner.",
+	"health": {
+		"title": "Health",
+		"description": "Preflight checks: docker, images, gateway, fault proxy, suites and agents.",
+		"doctor": "Run doctor",
+		"gpu": "GPU check",
+		"gpuSuite": "Suite to fit (optional)",
+		"k8s": "Kubernetes status",
+		"gpuMode": "GPU mode: {{mode}}",
+		"driver": "Driver: {{driver}}"
+	},
+	"evidence": {
+		"title": "Evidence",
+		"description": "Copy sealed experiments to the mirror, verify them, archive idle ones, back up the database, restore.",
+		"mirrorAt": "Mirror: {{location}}",
+		"noMirror": "No evidence mirror configured. Set storage.mirror_dir (a folder) or storage.s3 in the bench config, then restart the server.",
+		"exp": "Experiment id (empty = all)",
+		"deep": "Deep (download and hash every object)",
+		"dryRun": "Archive dry run (report only)",
+		"verify": "Verify",
+		"mirror": "Mirror now",
+		"archive": "Archive idle",
+		"backup": "Back up",
+		"restore": "Restore experiment",
+		"restoreNeedsExp": "Restore needs an experiment id.",
+		"restoreConfirm": "Restore this experiment from the mirror into the runs folder?",
+		"backupConfirm": "Back up the database and sweep every experiment to the mirror?"
+	},
+	"suite": {
+		"title": "Suite checks",
+		"description": "Voice task images and visual references of a suite.",
+		"suite": "Suite id",
+		"task": "Task id",
+		"image": "Image path in the project, for example uploads/shot.png",
+		"voice": "Voice check",
+		"compare": "Visual compare",
+		"captureTitle": "Visual capture",
+		"captureDescription": "Screenshot a running browser or desktop container into uploads/visual/.",
+		"browser": "Browser container",
+		"desktop": "Desktop container (instead of browser)",
+		"url": "Page URL (browser only)",
+		"out": "File name, for example capture.png",
+		"capture": "Capture"
+	},
+	"simulator": {
+		"title": "Simulator spread",
+		"description": "How much a simulated-user model changes scores: the same experiment run with two simulator models.",
+		"a": "Experiment with the reference simulator",
+		"b": "Same experiment, other simulator",
+		"condition": "Condition (default clean)",
+		"run": "Compare"
+	},
+	"workers": {
+		"runnersTitle": "Add a runner",
+		"runnersBody": "Runners take experiment slots from this server. Create a runner token in Settings, then run the start command it shows once on the runner machine.",
+		"runnersLink": "Open runner tokens"
+	}
+}
