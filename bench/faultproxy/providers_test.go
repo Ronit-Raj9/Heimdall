@@ -173,8 +173,11 @@ func TestLoadProviders(t *testing.T) {
 		}},
 		{"json wrapped", "p.json", `{"providers":[{"name":"vllm","base_url":"http://vllm:8000","keyless":true,"auth":{"header":"Authorization","prefix":"Bearer "},"format":"openai","message":["POST /v1/chat/completions"]}]}`,
 			true, func(t *testing.T, specs []ProviderSpec) {
-				if specs[len(specs)-1].Name != "vllm" || !specs[len(specs)-1].Keyless {
-					t.Errorf("vllm entry %+v", specs[len(specs)-1])
+				// vllm is a built-in (A09 catalog): the file entry replaces it.
+				for _, p := range specs {
+					if p.Name == "vllm" && (!p.Keyless || p.BaseURL != "http://vllm:8000" || p.OrgOnly) {
+						t.Errorf("vllm entry %+v", p)
+					}
 				}
 			}},
 		{"invalid entry", "bad.yaml", "- name: x\n  base_url: nope\n", false, nil},

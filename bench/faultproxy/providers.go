@@ -9,6 +9,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/maximhq/bifrost/bench/schemas"
 	"gopkg.in/yaml.v3"
 )
 
@@ -52,6 +53,13 @@ type ProviderSpec struct {
 	// SarvamAudio sends the audio requests for Sarvam models to Sarvam AI
 	// (sarvam.go); nil: none.
 	SarvamAudio *SarvamAudio `json:"sarvam_audio,omitempty" yaml:"sarvam_audio"`
+	// PerSlotBase: the provider has no fixed API host (Azure endpoint,
+	// self-hosted vLLM or SGLang); each organization slot brings its base
+	// URL, and BaseURL may be empty (lane A09).
+	PerSlotBase bool `json:"per_slot_base,omitempty" yaml:"per_slot_base"`
+	// OrgOnly: no default shared slots; the provider serves organization
+	// keys (PUT /orgslots) unless the config lists slots for it (lane A09).
+	OrgOnly bool `json:"org_only,omitempty" yaml:"org_only"`
 }
 
 // Auth is where a provider carries its key: a header with an optional
@@ -87,7 +95,7 @@ func DefaultProviders() []ProviderSpec {
 			Message: paths, Models: []string{"GET /v1/models", "GET /v1/models/*"},
 		}
 	}
-	return []ProviderSpec{
+	out := []ProviderSpec{
 		{
 			Name: ProviderAnthropic, BaseURL: "https://api.anthropic.com", KeyEnv: "ANTHROPIC_API_KEY",
 			Auth: AuthXAPIKey, Format: FormatAnthropic, SlotPrefix: "fp", Scripted: true,
@@ -128,6 +136,31 @@ func DefaultProviders() []ProviderSpec {
 			return p
 		}(),
 	}
+	return append(out, catalogProviders(out)...)
+}
+
+// catalogProviders are the other proxied providers of Bifrost core
+// (schemas.BifrostProviders, lane A09) that the built-in list above does
+// not name. They serve organization keys only (OrgOnly) so a default proxy
+// keeps its slot set; a provider table file can give them shared slots.
+// Direct providers (Bedrock, Vertex, SageMaker, Databricks, GitHub
+// Copilot) sign their own requests and never pass the proxy.
+func catalogProviders(have []ProviderSpec) []ProviderSpec {
+	seen := map[string]bool{}
+	for _, p := range have {
+		seen[p.Name] = true
+	}
+	var out []ProviderSpec
+	for _, c := range schemas.BifrostProviders() {
+		if c.Route != schemas.RouteProxied || seen[c.ID] {
+			continue
+		}
+		p := ProviderSpec{Name: c.ID, BaseURL: c.BaseURL, KeyEnv: c.KeyEnv, Keyless: c.Keyless, Format: c.Format,
+			Auth: Auth{Header: c.AuthHeader, Prefix: c.AuthPrefix, Query: c.AuthQuery}, Message: append([]string{}, c.Message...),
+			Models: append([]string{}, c.Models...), Audio: append([]string{}, c.Audio...), PerSlotBase: c.BaseURL == "", OrgOnly: true}
+		out = append(out, p)
+	}
+	return out
 }
 
 // LoadProviders reads a provider table file (YAML or JSON, a list of
@@ -181,8 +214,10 @@ func (p ProviderSpec) Validate() error {
 	if p.Name == "" {
 		errs = append(errs, errors.New("name is required"))
 	}
-	if _, err := parseBaseURL(p.BaseURL); err != nil {
-		errs = append(errs, err)
+	if p.BaseURL != "" || !p.PerSlotBase {
+		if _, err := parseBaseURL(p.BaseURL); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	switch p.Format {
 	case FormatAnthropic, FormatOpenAI, FormatGemini:

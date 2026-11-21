@@ -9,6 +9,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/evidence"
 	"github.com/maximhq/bifrost/bench/keystore"
+	"github.com/maximhq/bifrost/bench/schemas"
 )
 
 // bifrostCoreProviders are the providers section 5 of the agent-first
@@ -28,7 +29,10 @@ func TestCatalogListsEveryBifrostProvider(t *testing.T) {
 		if p.KeyHint == "" || p.Name == "" || p.BifrostProvider == "" || p.Models == nil {
 			t.Errorf("provider %s incomplete: %+v", p.ID, p)
 		}
-		if !keystore.KnownProvider(p.ID) {
+		// A built-in provider holds a key by name; a vendor reached through a
+		// custom base URL holds one as a custom provider (its default base URL
+		// is filled in when the key is added without one).
+		if !keystore.KnownProvider(p.ID) && !(p.CustomBaseURL && schemas.ValidCustomProviderID(p.ID) && p.DefaultBaseURL != "") {
 			t.Errorf("provider %s cannot hold a key", p.ID)
 		}
 		if p.CustomBaseURL && p.BifrostProvider != "openai" {
@@ -153,5 +157,41 @@ func TestPricingSnapshotSources(t *testing.T) {
 		if _, ok := file.ModelSources[id]; !ok {
 			t.Errorf("no priced, sourced row for %s", id)
 		}
+	}
+}
+
+// The /models catalog and the Bifrost provider table (schemas/bifrostproviders.go)
+// must agree: a catalog provider is a Bifrost core provider (reached natively),
+// the generic openai-compatible id, or a vendor served as a custom
+// OpenAI-compatible provider with its public endpoint. And every provider the
+// key store accepts by name is in the catalog, so the keys page can offer it.
+func TestCatalogAgreesWithBifrostProviders(t *testing.T) {
+	inCatalog := map[string]bool{}
+	for _, p := range modelProviders() {
+		inCatalog[p.ID] = true
+		_, builtin := schemas.LookupBifrostProvider(p.ID)
+		switch {
+		case p.ID == schemas.CustomProviderID:
+		case builtin:
+			if p.CustomBaseURL {
+				t.Errorf("%s is a Bifrost core provider but the catalog reaches it through a custom base URL", p.ID)
+			}
+		default:
+			if !schemas.ValidCustomProviderID(p.ID) || !p.CustomBaseURL || p.DefaultBaseURL == "" {
+				t.Errorf("%s is not a Bifrost provider, so it must be a custom OpenAI-compatible vendor with a default base URL: %+v", p.ID, p)
+			}
+			if got := catalogDefaultBaseURL(p.ID); got != p.DefaultBaseURL {
+				t.Errorf("%s: a key without a base URL gets %q, want %q", p.ID, got, p.DefaultBaseURL)
+			}
+		}
+	}
+	var missing []string
+	for _, id := range schemas.BifrostProviderIDs() {
+		if !inCatalog[id] {
+			missing = append(missing, id)
+		}
+	}
+	if len(missing) > 0 {
+		t.Errorf("Bifrost providers missing from the /models catalog: %v", missing)
 	}
 }

@@ -241,6 +241,11 @@ func renderAgentTemplate(t AgentTemplate, req AgentFromTemplateRequest) ([]rende
 	if req.Model != nil {
 		if req.Model.Provider != "" {
 			p, ok := abProviderNames[req.Model.Provider]
+			if !ok { // A09: any Bifrost provider or custom OpenAI-compatible name
+				if name, _, custom := schemas.ResolveBifrostProvider(req.Model.Provider); !custom || schemas.ValidCustomProviderID(name) {
+					p, ok = name, true
+				}
+			}
 			if !ok {
 				return nil, fmt.Errorf("unknown provider %q", req.Model.Provider)
 			}

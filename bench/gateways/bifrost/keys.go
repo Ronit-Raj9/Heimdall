@@ -449,7 +449,7 @@ func (g *Gateway) ensureSlotModel(ctx context.Context, p ProviderSetup, slot Slo
 	}
 	sort.Strings(current)
 	models := mergeModels(current, model)
-	if p.Mode == ModeDirect {
+	if p.Mode == ModeDirect && p.KeyEnv != "" { // an org direct slot carries its own credential (A09)
 		if slot.Value = strings.TrimSpace(g.cfg.Getenv(p.KeyEnv)); slot.Value == "" {
 			return fmt.Errorf("direct provider %s: %s is not set", p.Name, p.KeyEnv)
 		}

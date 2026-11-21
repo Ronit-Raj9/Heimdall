@@ -1,6 +1,9 @@
 package handlers
 
-import "github.com/maximhq/bifrost/bench/keystore"
+import (
+	"github.com/maximhq/bifrost/bench/keystore"
+	"github.com/maximhq/bifrost/bench/schemas"
+)
 
 // ModelOption is one suggested model of a provider. The list is a starting
 // point: the picker also accepts any model id the provider serves.
@@ -53,6 +56,24 @@ func modelVoice(id, purpose string, rank int) ModelOption {
 // model a working key can call. BifrostProvider defaults to the entry id.
 func modelProviders() []ModelProviderInfo {
 	ps := catalogProviders()
+	// Every Bifrost provider (schemas/bifrostproviders.go) is offered, even
+	// one the curated list has no models for yet: the picker accepts any
+	// model id the provider serves.
+	have := map[string]bool{}
+	for _, p := range ps {
+		have[p.ID] = true
+	}
+	for _, id := range schemas.BifrostProviderIDs() {
+		if have[id] {
+			continue
+		}
+		spec, _ := schemas.LookupBifrostProvider(id)
+		hint := "Type any model id this provider serves"
+		if spec.Docs != "" {
+			hint = "Create a key at " + spec.Docs
+		}
+		ps = append(ps, ModelProviderInfo{ID: id, Name: spec.Name, DefaultBaseURL: spec.TestBaseURL, NeedsBaseURL: spec.NeedsBaseURL, KeyHint: hint})
+	}
 	for i := range ps {
 		if ps[i].BifrostProvider == "" {
 			ps[i].BifrostProvider = ps[i].ID

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/maximhq/bifrost/bench/schemas"
 )
 
 // Key statuses: set to untested on create and whenever the value changes,
@@ -24,13 +26,11 @@ const (
 	StatusError    = "error"
 )
 
-// Providers are the provider ids a provider key may name.
-var Providers = []string{"openai", "anthropic", "gemini", "openrouter", "groq", "sarvam", "openai-compatible",
-	// Every other provider in the /models catalog (Bifrost core providers and
-	// OpenAI-compatible vendors reached through a custom base URL).
-	"vertex", "azure", "bedrock", "sagemaker", "mistral", "deepseek", "minimax", "zai", "moonshot", "xiaomi", "qwen",
-	"fireworks", "cerebras", "xai", "cohere", "perplexity", "nebius", "huggingface", "parasail", "baseten", "databricks",
-	"cloudflare", "replicate", "byteplus", "github-copilot", "ollama", "vllm", "sgl", "elevenlabs"}
+// Providers are the provider ids a provider key may name: every provider
+// Bifrost core serves (schemas.BifrostProviders) plus the generic
+// openai-compatible id. A custom OpenAI-compatible provider may also take
+// any other lowercase slug (schemas.ValidCustomProviderID) with a base URL.
+var Providers = append(schemas.BifrostProviderIDs(), schemas.CustomProviderID)
 
 // Limits on stored fields.
 const (
@@ -42,7 +42,8 @@ const (
 	MaxBudgetUSD  = 1_000_000
 )
 
-// KnownProvider reports whether p is one of Providers.
+// KnownProvider reports whether p is one of Providers (built-in, not a
+// custom slug).
 func KnownProvider(p string) bool {
 	for _, q := range Providers {
 		if p == q {
@@ -50,6 +51,16 @@ func KnownProvider(p string) bool {
 		}
 	}
 	return false
+}
+
+// keylessProvider reports whether a provider key may have no value (a
+// self-hosted Ollama, vLLM or SGLang server).
+func keylessProvider(k Kind, p string) bool {
+	if k != KindProvider {
+		return false
+	}
+	spec, ok := schemas.LookupBifrostProvider(p)
+	return ok && spec.Keyless
 }
 
 // normalize trims and validates a Put. create requires a value.
@@ -61,14 +72,19 @@ func normalize(k Kind, in Put, create bool) (Put, error) {
 	in.Label = strings.TrimSpace(in.Label)
 	in.BaseURL = strings.TrimRight(strings.TrimSpace(in.BaseURL), "/")
 	in.Value = strings.TrimSpace(in.Value)
-	if create && in.Value == "" {
+	if create && in.Value == "" && !keylessProvider(k, in.Provider) {
 		return in, fmt.Errorf("%w: the key value is required", ErrInvalid)
 	}
 	if len(in.Value) > MaxValueBytes {
 		return in, fmt.Errorf("%w: the key value is longer than %d bytes", ErrInvalid, MaxValueBytes)
 	}
 	if k == KindProvider && !KnownProvider(in.Provider) {
-		return in, fmt.Errorf("%w: provider must be one of %s", ErrInvalid, strings.Join(Providers, ", "))
+		if !schemas.ValidCustomProviderID(in.Provider) {
+			return in, fmt.Errorf("%w: provider must be one of %s, or a custom name (lowercase letters, digits, dashes) with a base URL", ErrInvalid, strings.Join(Providers, ", "))
+		}
+		if in.BaseURL == "" {
+			return in, fmt.Errorf("%w: custom provider %s needs a base URL (an OpenAI-compatible endpoint ending in /v1)", ErrInvalid, in.Provider)
+		}
 	}
 	if k == KindSecret && in.Provider == "" && in.Label == "" {
 		return in, fmt.Errorf("%w: a secret needs a name", ErrInvalid)
@@ -87,6 +103,18 @@ func normalize(k Kind, in Put, create bool) (Put, error) {
 	}
 	if k == KindProvider && in.Provider == "openai-compatible" && in.BaseURL == "" {
 		return in, fmt.Errorf("%w: an OpenAI-compatible key needs a base URL", ErrInvalid)
+	}
+	if k == KindProvider && in.Provider != schemas.CustomProviderID {
+		if _, spec, _ := schemas.ResolveBifrostProvider(in.Provider); spec.NeedsBaseURL && in.BaseURL == "" {
+			return in, fmt.Errorf("%w: %s needs a base URL", ErrInvalid, spec.Name)
+		} else if create || in.Value != "" {
+			// Structured credentials (AWS, Vertex, Cloudflare) are a JSON
+			// object of the provider's fields; check them now so a run never
+			// fails on a half-filled key. Messages never echo the value.
+			if err := schemas.CheckCredential(spec, in.Value, in.BaseURL); err != nil {
+				return in, fmt.Errorf("%w: %v", ErrInvalid, err)
+			}
+		}
 	}
 	if in.BudgetUSD < 0 || in.BudgetUSD > MaxBudgetUSD || in.BudgetUSD != in.BudgetUSD {
 		return in, fmt.Errorf("%w: budget must be between 0 (no limit) and %d USD", ErrInvalid, MaxBudgetUSD)

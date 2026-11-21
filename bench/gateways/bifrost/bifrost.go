@@ -99,6 +99,9 @@ type ProviderSetup struct {
 	Slots  []Slot
 	Model  string // model every slot serves at setup; MintKey adds the run's model
 	KeyEnv string // direct only: environment variable with the real key
+	// Custom: an OpenAI-compatible custom provider (lane A09); Bifrost
+	// creates it with custom_provider_config base_provider_type openai.
+	Custom bool
 }
 
 // Slot is one provider key in Bifrost. Value is the placeholder credential
@@ -106,6 +109,10 @@ type ProviderSetup struct {
 type Slot struct {
 	Name  string
 	Value string
+	// Extra is the provider-specific key config block written with the key
+	// (azure_key_config, bedrock_key_config, ...; lane A09). It may hold
+	// secrets of a direct provider: never logged.
+	Extra map[string]any
 }
 
 // Gateway is the Bifrost client. It is safe for concurrent use.
@@ -387,7 +394,7 @@ func (g *Gateway) ensureProvider(ctx context.Context, p ProviderSetup) error {
 // allow_private_network); a direct provider keeps Bifrost's default base URL
 // (an empty base_url).
 func (g *Gateway) providerBody(p ProviderSetup) map[string]any {
-	return map[string]any{
+	body := map[string]any{
 		"network_config": map[string]any{
 			"base_url":                           g.baseURL(p),
 			"allow_private_network":              p.Mode == ModeProxied,
@@ -402,6 +409,10 @@ func (g *Gateway) providerBody(p ProviderSetup) map[string]any {
 		},
 		"store_raw_request_response": true,
 	}
+	if p.Custom {
+		body["custom_provider_config"] = map[string]any{"base_provider_type": "openai", "is_key_less": false}
+	}
+	return body
 }
 
 func (g *Gateway) providerMatches(p ProviderSetup, cur providerConfig) bool {
@@ -430,6 +441,9 @@ func (g *Gateway) baseURL(p ProviderSetup) string {
 // key already served.
 func (g *Gateway) upsertKey(ctx context.Context, provider string, s Slot, id string, models []string) (string, []string, error) {
 	body := map[string]any{"name": s.Name, "value": s.Value, "models": models, "weight": 1, "enabled": true}
+	for k, v := range s.Extra { // A09: provider key config block
+		body[k] = v
+	}
 	var out providerKey
 	if id == "" {
 		err := g.call(ctx, http.MethodPost, providerPath(provider)+"/keys", body, &out)

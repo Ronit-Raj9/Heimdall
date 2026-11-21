@@ -156,3 +156,48 @@ func TestCiphertextBoundToMasterKey(t *testing.T) {
 		t.Fatalf("short master: %v", err)
 	}
 }
+
+// TestStoreProviderShapes checks keys for every Bifrost provider shape
+// (lane A09): structured AWS, Vertex and Cloudflare values, base URLs for
+// Azure, Databricks and self-hosted servers, keyless vLLM, and custom
+// OpenAI-compatible names.
+func TestStoreProviderShapes(t *testing.T) {
+	ctx := context.Background()
+	for name, s := range stores(t) {
+		t.Run(name, func(t *testing.T) { checkProviderShapes(ctx, t, s) })
+	}
+}
+
+func checkProviderShapes(ctx context.Context, t *testing.T, s keystore.Store) {
+	good := []keystore.Put{
+		{Provider: "deepseek", Value: "sk-ds-1"},
+		{Provider: "bedrock", Value: `{"access_key":"AKIA1","secret_key":"s","region":"us-east-1"}`},
+		{Provider: "vertex", Value: `{"project_id":"p","region":"global","auth_credentials":"{}"}`},
+		{Provider: "cloudflare", Value: `{"api_key":"t","account_id":"a"}`},
+		{Provider: "azure", Value: "az", BaseURL: "https://r.openai.azure.com"},
+		{Provider: "databricks", Value: "dapi", BaseURL: "https://w.cloud.databricks.com"},
+		{Provider: "vllm", BaseURL: "https://vllm.example.com/v1"},
+		{Provider: "zhipu", Value: "zk", BaseURL: "https://open.bigmodel.cn/api/paas/v4"},
+	}
+	for i, p := range good {
+		if _, err := s.Create(ctx, "o", keystore.KindProvider, p, ""); err != nil {
+			t.Errorf("good %d (%s): %v", i, p.Provider, err)
+		}
+	}
+	bad := []keystore.Put{
+		{Provider: "bedrock", Value: `{"region":"us-east-1"}`},
+		{Provider: "vertex", Value: `{"project_id":"p"}`},
+		{Provider: "cloudflare", Value: "token-only"},
+		{Provider: "azure", Value: "az"},
+		{Provider: "vllm"},
+		{Provider: "zhipu", Value: "zk"},
+		{Provider: "Bad Name", Value: "x", BaseURL: "https://x.example.com/v1"},
+	}
+	for i, p := range bad {
+		if _, err := s.Create(ctx, "o", keystore.KindProvider, p, ""); !errors.Is(err, keystore.ErrInvalid) {
+			t.Errorf("bad %d (%s): err = %v, want ErrInvalid", i, p.Provider, err)
+		} else if strings.Contains(err.Error(), "us-east-1") || strings.Contains(err.Error(), "token-only") {
+			t.Errorf("bad %d: message echoes the value: %v", i, err)
+		}
+	}
+}

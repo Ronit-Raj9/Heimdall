@@ -15,6 +15,7 @@ import (
 	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/keystore"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
 )
 
@@ -238,7 +239,27 @@ func (h *modelsHandler) decode(ctx *fasthttp.RequestCtx) (keystore.Put, bool) {
 			return keystore.Put{}, false
 		}
 	}
+	if req.BaseURL == "" {
+		req.BaseURL = catalogDefaultBaseURL(req.Provider)
+	}
 	return keystore.Put{Provider: req.Provider, Label: req.Label, BaseURL: req.BaseURL, Value: req.Value, Models: req.Models, BudgetUSD: req.BudgetUSD}, true
+}
+
+// catalogDefaultBaseURL is the catalog's endpoint for a vendor served as a
+// custom OpenAI-compatible provider (Z.ai, Moonshot, Xiaomi, Qwen): those are
+// not Bifrost core providers, so the key store needs a base URL, and a key
+// added without one uses the vendor's public endpoint. "" for every other
+// provider.
+func catalogDefaultBaseURL(provider string) string {
+	if _, builtin := schemas.LookupBifrostProvider(provider); builtin {
+		return ""
+	}
+	for _, p := range catalogProviders() {
+		if p.ID == provider && p.CustomBaseURL {
+			return p.DefaultBaseURL
+		}
+	}
+	return ""
 }
 
 func (h *modelsHandler) create(ctx *fasthttp.RequestCtx) {

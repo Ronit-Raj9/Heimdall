@@ -44,7 +44,7 @@ var orgIDSafe = regexp.MustCompile(`[^a-z0-9]+`)
 
 // orgCreds is the gateway's organization key state.
 type orgCreds struct {
-	mu     sync.Mutex
+	mu      sync.Mutex
 	byOrg   map[string]map[string]ProviderSetup // org -> provider -> its org slots
 	expOrg  map[string]string                   // experiment id -> org
 	slotKey map[string]string                   // org slot name -> keystore key id behind it (G10 budgets)
@@ -65,15 +65,12 @@ func (g *Gateway) orgs() *orgCreds {
 	return g.orgSt
 }
 
-// bifrostProvider maps a key store provider id to the Bifrost provider name.
+// bifrostProvider maps a key store provider id to the Bifrost provider name
+// (schemas.ResolveBifrostProvider: openai-compatible is openai, google is
+// gemini, a custom slug stays itself).
 func bifrostProvider(p string) string {
-	switch p = strings.ToLower(strings.TrimSpace(p)); p {
-	case "openai-compatible":
-		return "openai"
-	case "google":
-		return "gemini"
-	}
-	return p
+	name, _, _ := schemas.ResolveBifrostProvider(p)
+	return name
 }
 
 // OrgSlotName is the Bifrost key name of an organization slot.
@@ -93,24 +90,33 @@ func (g *Gateway) ApplyOrgCredentials(ctx context.Context, orgID string, creds [
 	if len(creds) == 0 {
 		return nil
 	}
-	reg, ok := g.cfg.Claims.(OrgSlotRegistrar)
-	if !ok || g.cfg.Claims == nil || g.cfg.FaultProxyURL == "" {
-		return errors.New("org credentials need the fault proxy control API on this runner (BENCH_FAULTPROXY_CONTROL_URL and its token)")
-	}
+	reg, _ := g.cfg.Claims.(OrgSlotRegistrar)
 	byProvider := map[string][]ProviderCredential{}
 	order := []string{}
 	seen := map[string]bool{}
 	for _, c := range creds {
-		p := bifrostProvider(c.Provider)
+		p, spec, _ := schemas.ResolveBifrostProvider(c.Provider)
 		v := strings.TrimSpace(c.Value)
-		if p == "" || v == "" || seen[p+"\x00"+v] {
+		// A keyless self-hosted server (ollama, vllm, sgl) may have no key;
+		// it is told apart by its base URL.
+		id := p + "\x00" + v + "\x00" + c.BaseURL
+		if p == "" || (v == "" && !spec.Keyless) || seen[id] {
 			continue
 		}
-		seen[p+"\x00"+v] = true
+		seen[id] = true
 		if _, ok := byProvider[p]; !ok {
 			order = append(order, p)
 		}
 		byProvider[p] = append(byProvider[p], c)
+	}
+	needProxy := false
+	for _, p := range order {
+		if _, spec, _ := schemas.ResolveBifrostProvider(byProvider[p][0].Provider); spec.Route != schemas.RouteDirect {
+			needProxy = true
+		}
+	}
+	if needProxy && (reg == nil || g.cfg.Claims == nil || g.cfg.FaultProxyURL == "") {
+		return errors.New("org credentials need the fault proxy control API on this runner (BENCH_FAULTPROXY_CONTROL_URL and its token)")
 	}
 	st := g.orgs()
 	var errs []error
@@ -139,21 +145,32 @@ func (g *Gateway) applyOrgProvider(ctx context.Context, reg OrgSlotRegistrar, st
 		}
 	}
 	n := max(orgSlotsPerProvider, len(keys))
-	setup := ProviderSetup{Name: provider, Mode: ModeProxied, Model: model}
+	_, spec, custom := schemas.ResolveBifrostProvider(keys[0].Provider)
+	direct := spec.Route == schemas.RouteDirect
+	setup := ProviderSetup{Name: provider, Mode: ModeProxied, Model: model, Custom: custom}
+	if direct {
+		setup.Mode = ModeDirect
+	}
 	fp := make([]OrgSlot, 0, n)
 	keyOf := make(map[string]string, n)
 	for i := 1; i <= n; i++ {
 		name := OrgSlotName(orgID, provider, i)
 		c := keys[(i-1)%len(keys)]
-		setup.Slots = append(setup.Slots, Slot{Name: name, Value: name})
-		fp = append(fp, OrgSlot{Name: name, Provider: provider, Auth: name, Key: c.Value, BaseURL: c.BaseURL})
+		slot, fpSlot := orgSlotFor(spec, name, provider, c, g.cfg.FaultProxyURL, direct)
+		setup.Slots = append(setup.Slots, slot)
+		if !direct {
+			fp = append(fp, fpSlot)
+		}
 		keyOf[name] = c.KeyID
 	}
 	// The fault proxy first: a slot Bifrost could route to must never reach
 	// the proxy unknown. Registering again is harmless, survives a proxy
-	// restart, and swaps in a changed key set.
-	if err := reg.RegisterOrgSlots(ctx, fp); err != nil {
-		return fmt.Errorf("register keys at the fault proxy: %w", err)
+	// restart, and swaps in a changed key set. A direct provider (AWS,
+	// Google OAuth, token exchange) never passes the proxy.
+	if len(fp) > 0 {
+		if err := reg.RegisterOrgSlots(ctx, fp); err != nil {
+			return fmt.Errorf("register keys at the fault proxy: %w", err)
+		}
 	}
 	st.mu.Lock()
 	prev, known := st.byOrg[orgID][provider]
@@ -179,6 +196,46 @@ func (g *Gateway) applyOrgProvider(ctx context.Context, reg OrgSlotRegistrar, st
 	st.mu.Unlock()
 	g.logger.Info("organization provider keys registered", "org", orgID, "provider", provider, "keys", len(keys), "slots", len(setup.Slots))
 	return nil
+}
+
+// orgSlotFor builds one organization slot for Bifrost and, for a proxied
+// provider, its fault proxy registration (lane A09).
+//
+// Proxied: Bifrost's key value is the slot name (a placeholder) and its key
+// config points at the fault proxy where the provider reads its endpoint
+// from the key (azure); the proxy gets the real key and the real base URL
+// (the key's own base URL: custom, azure endpoint, self-hosted server).
+// Non-secret key config (cloudflare account_id) goes to Bifrost as is.
+//
+// Direct: Bifrost gets the real credential and key config (AWS keys and
+// region, Vertex service account, Databricks workspace and token, Copilot
+// token), because these providers sign requests a proxy cannot rewrite.
+func orgSlotFor(spec schemas.BifrostProviderSpec, name, provider string, c ProviderCredential, faultProxyURL string, direct bool) (Slot, OrgSlot) {
+	fields := schemas.CredentialFields(spec, c.Value)
+	if direct {
+		block, cfg, value := schemas.BifrostKeyConfig(spec, fields, c.BaseURL, "")
+		s := Slot{Name: name, Value: value}
+		if block != "" {
+			s.Extra = map[string]any{block: cfg}
+		}
+		return s, OrgSlot{}
+	}
+	block, cfg, key := schemas.BifrostKeyConfig(spec, fields, c.BaseURL, faultProxyURL)
+	s := Slot{Name: name, Value: name}
+	if block != "" {
+		s.Extra = map[string]any{block: cfg}
+	}
+	return s, OrgSlot{Name: name, Provider: proxyProvider(provider, spec), Auth: name, Key: key, BaseURL: c.BaseURL}
+}
+
+// proxyProvider is the fault proxy provider entry a slot uses: a custom
+// OpenAI-compatible provider rides the openai entry (same paths and auth)
+// with its own base URL.
+func proxyProvider(provider string, spec schemas.BifrostProviderSpec) string {
+	if spec.Custom {
+		return "openai"
+	}
+	return provider
 }
 
 // orgSlotKeyID is the keystore id of the organization key behind slot, ""
