@@ -340,6 +340,10 @@ type AgentSkills struct {
 	Enabled *bool    `json:"enabled,omitempty" yaml:"enabled"` // default true
 	Dir     string   `json:"dir,omitempty" yaml:"dir"`         // container folder the agent reads skills from; empty uses the adapter's native folder
 	Extra   []string `json:"extra,omitempty" yaml:"extra"`     // skill folders relative to the bench root, installed for every task
+	// Set picks one of the task's alternative skill sets instead of its
+	// skills folder: the task folder skill-sets/<Set>. A task without that
+	// folder installs no task skills. Empty uses the task's skills folder.
+	Set string `json:"set,omitempty" yaml:"set"`
 }
 
 // AgentMemory names the container paths that hold the agent's own memory.
