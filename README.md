@@ -1,30 +1,42 @@
-# Heimdall: agent benchmarking for your own agents, built on Bifrost
+# Heimdall: a report card for your AI agent
 
-Heimdall tests a team's own AI agent and tells them whether a change (a new model, prompt, tool or gateway rule) made it better, worse, or whether it is too early to tell.
-It runs the agent on the same tasks many times, clean and under injected failures, with every model call going through Bifrost, and turns that record into a verdict with the evidence one click away.
-Its library holds 1,000+ ready tasks across 30+ real open-source benchmarks, and a team can add tasks cut from its own repositories.
+Heimdall is an agent benchmarking platform. You connect the agent you actually ship, run it on real tasks, break it on purpose, and get a report card you can trust: a score with a range, cost per solved task, how it holds up under failures, and why it failed. Every model call an agent makes goes through the [Bifrost](https://github.com/maximhq/bifrost) gateway, which Heimdall uses to control, break and measure that traffic.
 
 **Live site: https://20-70-160-61.sslip.io**
 
-> **Hackathon submission (PS2, agent benchmarking).** Heimdall lives in [`bench/`](bench/) of this fork of [Bifrost](https://github.com/maximhq/bifrost) (Apache-2.0), with its own Bifrost plugin in [`plugins/heimdall/`](plugins/heimdall/). In Norse myth Heimdall guards Bifrost, the bridge to Asgard: nothing crosses without passing him. Everything after the "Upstream Bifrost README" divider below is upstream Bifrost's own README, unchanged.
+Built by Ronit Raj for the Geek Room x Maxim hackathon, Problem Statement 2 (agent benchmarking platform).
 
-## Try it as a judge
+Others score a model's answers. Heimdall tests the whole agent, breaks it, and tests the tests first.
 
-No install and no CLI. Everything happens in the browser, in an organization of your own.
+## What it does
 
-1. **Sign up:** open https://20-70-160-61.sslip.io, press **Create one** under "No account yet?", and enter an email and a password (or press **Continue with GitHub**). You get your own organization with you as owner.
-2. **Add a model key** under **Settings, API keys**: paste a key for the provider you want to test with and press **Test**. Runs use only your organization's own keys.
-3. **Connect your agent** on **Agents**: pick a built-in agent (Codex, Claude Code, mini-swe-agent and others) or connect your own endpoint, and choose its model.
-4. **Evaluate** from the agent's page: pick benchmarks or a pack and, if you like, faults (the model goes down, a tool breaks, a misleading instruction). The estimate shows runs, cost and time before you launch.
-5. **Read the report card** when it finishes: score per capability with its interval, cost, how the agent holds up under each fault, and every run one click away. **Share** gives a read-only link.
+| | |
+|---|---|
+| **Connect any agent** | An HTTP endpoint, an OpenAI-compatible endpoint, a repository, a Docker image, a CLI coding agent (Codex, Claude Code, OpenCode, Gemini CLI, mini-swe-agent), an A2A agent, a framework agent (LangGraph, CrewAI, OpenAI Agents SDK and others) or a voice agent. Paste it; Heimdall detects the type, verifies it and gives a first report card. |
+| **A library of tested benchmarks** | 1,100+ ready tasks across 57 benchmarks (SWE-bench Verified, SWE-rebench, Terminal-Bench, tau2, BFCL, AgentDojo, WebArena-Pro, LongMemEval, GAIA and more). A task is ready only after its official solution passes and empty, wrong and cheating answers fail. |
+| **Benchmarks from your own work** | Turn fixed GitHub issues, production traces, a policy document, an OpenAPI spec, rows or a folder into a private benchmark. Nothing joins until you accept it. |
+| **Break it on purpose** | 15+ faults (model outage, rate limits, slow or flaky provider, broken tools, schema drift, expired login, process kill, tight budget) and an adaptive red team. Every successful attack becomes a regression test. |
+| **One report card per version** | Score with a confidence interval, cost per solved task, reliability, resilience per fault, safety, and the failure patterns behind the score. Version against version on the same tasks, with a verdict: better, worse, or too early to tell. |
+| **Ship with a gate, then keep watching** | Release gates, checks on pull requests (GitHub, GitLab), scheduled checks, live monitors and alerts to Slack, Teams, PagerDuty and email. |
+| **More than chat** | Desktop and browser agents with video recordings, voice agents, memory over long tasks, multi-agent teams, GPU tasks, and a self-improvement test that keeps a change only when it is really better on tasks the agent never saw. |
 
-A finished, shared report card: `TODO: shared report card link` (filled in before submission).
+## Try it in the browser
 
-Guides ship inside the app under **Docs**; the same files are in [`bench/docs/`](bench/docs/web-quickstart.md). Every CLI command and its website button: [`bench/docs/CLI_WEB_PARITY.md`](bench/docs/CLI_WEB_PARITY.md).
+No install. Everything happens on the live site, in an organization of your own.
+
+1. **Sign up.** Open https://20-70-160-61.sslip.io and press **Continue with GitHub**, or create an account with an email and a password. You get your own organization with you as owner.
+2. **Add a model key.** **Settings, API keys**: paste a key for the provider you want to test with and press **Test**. Runs use only your organization's own keys, stored encrypted.
+3. **Connect your agent.** Press **Evaluate an agent**, then paste an endpoint URL, a curl command, a repository, an image or a platform id and press **Detect**. Or pick a built-in agent under **My agents**.
+4. **Pick benchmarks.** Choose from **Benchmarks**, pick a preset (Quick look, Standard, Thorough) and, if you like, faults. The estimate shows runs, cost and time before you launch, and your spending limit is enforced.
+5. **Read the report card.** Score with its range, cost, how the agent held up under each fault, and every run one click away. **Share** gives a read-only link.
+
+Other pages worth opening: **Comparisons** (version against version), **Failure tests**, **Why agents fail**, **Improvements**, **Releases**, **Test my MCP server**, and **Settings, Integrations** (the Bifrost features your organization uses).
+
+Guides ship inside the app under **Docs**; the same files are in [`bench/docs/`](bench/docs/web-quickstart.md).
 
 ## How Heimdall uses Bifrost
 
-Bifrost is not a side dependency here: every model call an agent makes during an evaluation crosses Bifrost, and Heimdall uses Bifrost's own features to control, break and measure that traffic.
+Bifrost is not a side dependency: every model call an agent makes during an evaluation crosses Bifrost, and Heimdall uses Bifrost's own features to control, break and measure that traffic.
 
 ```mermaid
 flowchart LR
@@ -51,22 +63,34 @@ flowchart LR
     GC -- "routing export" --> RX[Bifrost routing rules]
 ```
 
-- **Per-run virtual keys.** Each run gets its own Bifrost governance virtual key, minted before the run and revoked after it, so every call is attributed to exactly one run and no run can use another's key ([`bench/gateways/bifrost/keys.go`](bench/gateways/bifrost/keys.go)).
-- **Governance budgets.** The evaluation budget becomes a hard Bifrost budget (and rate limit) on the evaluation's keys. When Bifrost refuses a call for budget, the evaluation shows "stopped by Bifrost budget" instead of a vague failure.
-- **The heimdall Bifrost plugin** ([`plugins/heimdall/`](plugins/heimdall/)): a real Bifrost plugin, loaded like the built-in ones and off unless enabled. It reads the run id, evaluation id, organization, arm and fault plan from request headers, injects the planned model faults inside Bifrost (error status codes, 429 with Retry-After, timeouts and latency, seeded flaky failures, outage windows) and tags every response and log row with Heimdall's ids. It can also send per-call usage records (provider, model, tokens, cost, latency, cache hit, fallback used, fault applied) back to Heimdall. The separate fault proxy ([`bench/faultproxy/`](bench/faultproxy/)) stays as the fallback when the plugin is not loaded.
-- **Fallbacks failover test.** The "Provider failover" option configures Bifrost fallbacks for the agent's model, takes the primary provider down, and reports whether failover worked, the extra latency, the cost change and task success with and without the outage.
-- **Cache on vs off.** The "Bifrost cache on vs off" option runs two arms that differ only in Bifrost's semantic cache plugin and reports cache hit rate, latency and cost saved, and any change in quality.
-- **MCP gateway.** A task's MCP tool servers can be routed through Bifrost's MCP gateway so tool calls appear in Bifrost's logs next to model calls, granted per virtual key.
-- **Logs.** Heimdall reads Bifrost's logs for every run: the "Through Bifrost" panel on the run page lists provider and model used, fallbacks triggered, cache hits, faults applied, tokens, cost and latency per call.
-- **Routing export.** A routing policy that won an experiment can be exported as Bifrost routing rules, so the tested setting is what goes to production.
+- **One virtual key per run.** Each run gets its own Bifrost governance virtual key, minted before the run and revoked after it, so every call belongs to exactly one run ([`bench/gateways/bifrost/keys.go`](bench/gateways/bifrost/keys.go)).
+- **Budgets enforced by Bifrost.** The evaluation's spending limit becomes a hard Bifrost budget. When Bifrost refuses a call for budget, the evaluation says "stopped by Bifrost budget".
+- **The Heimdall Bifrost plugin** ([`plugins/heimdall/`](plugins/heimdall/)). A real Bifrost plugin. Its `PreLLMHook` injects the planned model faults inside the gateway (error codes, 429 with Retry-After, timeouts, latency, seeded flaky failures, outage windows); its `PostLLMHook` tags every call and log row with the run and evaluation ids; it can send per-call usage (provider, model, tokens, cost, latency, cache hit, fallback, fault) back to Heimdall. The live site's gateway runs a Bifrost build with this plugin. The fault proxy ([`bench/faultproxy/`](bench/faultproxy/)) is the fallback when the plugin is not loaded.
+- **Failover as a test.** "Provider failover" sets Bifrost fallbacks for the agent's model, takes the primary down on purpose, and reports whether failover worked, the extra latency, the cost change and task success with and without it.
+- **Cache as a test.** "Bifrost cache on vs off" runs two setups that differ only in Bifrost's semantic cache and reports hit rate, latency and cost saved, and any change in quality.
+- **MCP gateway.** A task's MCP tool servers can go through Bifrost's MCP gateway, so tool calls appear in Bifrost's logs next to model calls.
+- **Logs joined to runs.** The "Through Bifrost" panel on every run lists provider and model, fallbacks, cache hits, faults, tokens, cost and latency per call.
+- **Model switch and routing export.** Run one agent on 2 to 6 models through Bifrost, compare quality, cost and speed, then "Apply to my Bifrost" writes the winning routing rules to your own gateway.
 
-The evaluation page and **Settings, Integrations** show which of these Bifrost features an organization uses. Every touchpoint, with file paths and sequence diagrams: [`bench/docs/bifrost-integration.md`](bench/docs/bifrost-integration.md). What each Bifrost feature does under test: [`bench/docs/bifrost-features.md`](bench/docs/bifrost-features.md).
+Every touchpoint with file paths and sequence diagrams: [`bench/docs/bifrost-integration.md`](bench/docs/bifrost-integration.md). What each Bifrost feature does under test: [`bench/docs/bifrost-features.md`](bench/docs/bifrost-features.md).
 
-The stock Bifrost image has no heimdall plugin, so the default stack leaves it out; a custom Bifrost build with the plugin is opt-in ([`bench/docs/hosting.md`](bench/docs/hosting.md), "Custom Bifrost build with the Heimdall plugin").
+## Run it yourself
 
-## Run it yourself with Docker Compose
+### Local developer stack
 
-The hosted stack (Caddy, the Heimdall server with the UI embedded, Postgres, Bifrost) is in [`bench/deploy/hosted/`](bench/deploy/hosted/):
+Needs Go, Node.js and Docker. From the repository root:
+
+```sh
+make bench-up       # build images and start the gateway stack (Bifrost, fault proxy)
+make bench-smoke    # a no-key run end to end through real Bifrost
+make bench-serve    # web UI and API
+```
+
+`make bench-test` runs `go vet` and the unit tests with no Docker and no network. Start with [`bench/README.md`](bench/README.md) and [`bench/docs/quickstart.md`](bench/docs/quickstart.md).
+
+### Hosted stack with Docker Compose
+
+The hosted stack (Caddy with HTTPS, the Heimdall server with the UI embedded, Postgres, Bifrost, the fault proxy, an image registry and a shared worker) is in [`bench/deploy/hosted/`](bench/deploy/hosted/):
 
 ```sh
 cd bench
@@ -74,321 +98,72 @@ deploy/hosted/bootstrap.sh --domain heimdall.example.com --email ops@example.com
     --owner-email you@example.com --owner-name "Your Name"
 ```
 
-`bootstrap.sh` creates `deploy/hosted/.env` with random secrets, builds the server image, migrates the database, creates the first owner and starts the stack; it is safe to run again. Full guide: [`bench/docs/hosting.md`](bench/docs/hosting.md).
+`bootstrap.sh` creates `deploy/hosted/.env` with random secrets, builds the server image, migrates the database, creates the first owner and starts the stack; it is safe to run again. Later updates: `deploy/hosted/upgrade.sh` (backs up, drains running evaluations, rebuilds, restarts). The shared worker runs agents under gVisor: `sudo sh deploy/hosted/install-gvisor.sh` once per host. Full guide, every setting: [`bench/docs/hosting.md`](bench/docs/hosting.md).
 
-For a local developer stack instead: `make bench-up` (gateway stack), `make bench-smoke` (a no-key run end to end through real Bifrost) and `make bench-serve` (web UI and API), from the repo root.
+### Bifrost with the Heimdall plugin
+
+The stock Bifrost image has no Heimdall plugin, so it is an opt-in build from this repository:
+
+```sh
+cd bench/deploy/hosted
+docker compose -f docker-compose.yml -f docker-compose.bifrost-plugin.yml \
+    --profile shared-runner up -d --build bifrost
+```
+
+It builds [`bench/deploy/bifrost/Dockerfile.plugin`](bench/deploy/bifrost/Dockerfile.plugin) and mounts [`config.plugin.json`](bench/deploy/bifrost/config.plugin.json). To check the plugin against a real gateway build with a mock provider: `HTTP=1 bench/deploy/bifrost/e2e/run.sh` (call 1 is rate limited inside Bifrost and never reaches the provider; call 2 passes through).
+
+## Use it from a terminal, CI or your editor
+
+The same binary is the server and the command line tool (`bifrost-bench`, also built as `heimdall`). The site serves ready builds under **Downloads**.
+
+```sh
+heimdall login -url https://20-70-160-61.sslip.io   # sign this machine in (approve in the browser)
+heimdall connect https://my-agent.example.com      # connect an agent and run a first look
+heimdall eval run ...                              # evaluate over many benchmarks
+heimdall add ./my-benchmark-folder                 # add a benchmark from a file, folder, URL or Harbor id
+heimdall ci evaluate                               # pull-request gate
+```
+
+- Commands and their website buttons: [`bench/docs/CLI_WEB_PARITY.md`](bench/docs/CLI_WEB_PARITY.md) and [`bench/docs/connect-cli.md`](bench/docs/connect-cli.md).
+- API v1 with OpenAPI, and the Python and TypeScript clients ([`bench/clients/`](bench/clients/)): [`bench/docs/api-v1.md`](bench/docs/api-v1.md), [`bench/docs/clients.md`](bench/docs/clients.md).
+- MCP server for Cursor, Claude Code and other editors: [`bench/docs/mcp-server.md`](bench/docs/mcp-server.md).
+- Checks on pull requests: [`bench/docs/ci.md`](bench/docs/ci.md).
+
+## Guides
+
+| Topic | Guide |
+|---|---|
+| Connect an agent | [`adding-an-agent.md`](bench/docs/adding-an-agent.md), [`frameworks.md`](bench/docs/frameworks.md), [`pull-agents.md`](bench/docs/pull-agents.md), [`voice-agents.md`](bench/docs/voice-agents.md) |
+| Evaluations and the report card | [`evaluations.md`](bench/docs/evaluations.md), [`leaderboard.md`](bench/docs/leaderboard.md), [`releases.md`](bench/docs/releases.md) |
+| Add or build a benchmark | [`add-benchmark.md`](bench/docs/add-benchmark.md), [`tasks-from-your-repo.md`](bench/docs/tasks-from-your-repo.md), [`tasks-from-traces.md`](bench/docs/tasks-from-traces.md), [`tasks-from-api.md`](bench/docs/tasks-from-api.md) |
+| Faults, red team and safety | [`red-team.md`](bench/docs/red-team.md), [`safety-probes.md`](bench/docs/safety-probes.md), [`adapter-faults.md`](bench/docs/adapter-faults.md) |
+| Self-improvement and learning | [`improvement-runs.md`](bench/docs/improvement-runs.md), [`learning-over-time.md`](bench/docs/learning-over-time.md) |
+| Desktop, browser and voice | [`computer-use.md`](bench/docs/computer-use.md), [`browser-tasks.md`](bench/docs/browser-tasks.md), [`recordings.md`](bench/docs/recordings.md), [`voice-realtime.md`](bench/docs/voice-realtime.md) |
+| Grading you can trust | [`verifiers.md`](bench/docs/verifiers.md), [`judge-calibration.md`](bench/docs/judge-calibration.md), [`evidence-integrity.md`](bench/docs/evidence-integrity.md), [`held-out-and-canaries.md`](bench/docs/held-out-and-canaries.md) |
+| Your own compute and GPUs | [`runners.md`](bench/docs/runners.md), [`remote-execution.md`](bench/docs/remote-execution.md), [`gpu-tasks.md`](bench/docs/gpu-tasks.md), [`open-models.md`](bench/docs/open-models.md) |
+| Monitoring and alerts | [`live-monitors.md`](bench/docs/live-monitors.md), [`schedules-and-alerts.md`](bench/docs/schedules-and-alerts.md), [`notifications.md`](bench/docs/notifications.md) |
 
 ## Where the code lives
 
 | Path | What |
 |---|---|
-| [`bench/`](bench/) | Heimdall: server, worker, runners, graders, statistics, web UI ([`bench/ui/`](bench/ui/)) and docs ([`bench/docs/`](bench/docs/)). Start with [`bench/README.md`](bench/README.md). |
+| [`bench/`](bench/) | Heimdall: server, workers, runners, graders, statistics, importers, the web UI ([`bench/ui/`](bench/ui/)) and docs ([`bench/docs/`](bench/docs/)). |
 | [`bench/gateways/bifrost/`](bench/gateways/bifrost/) | Heimdall's Bifrost client: virtual keys, budgets, logs, routing, MCP. |
-| [`plugins/heimdall/`](plugins/heimdall/) | The heimdall Bifrost plugin: fault injection, tagging, usage export. |
-| [`bench/faultproxy/`](bench/faultproxy/), [`bench/toolproxy/`](bench/toolproxy/) | Fault proxy for model calls (fallback to the plugin) and the tool proxy for tool faults. |
-| [`bench/deploy/`](bench/deploy/) | Local and hosted Docker Compose stacks, Bifrost config. |
-| `core/`, `transports/`, `plugins/`, `framework/`, `ui/` | Upstream Bifrost. |
+| [`plugins/heimdall/`](plugins/heimdall/) | The Heimdall Bifrost plugin: fault injection, tagging, usage export. |
+| [`bench/faultproxy/`](bench/faultproxy/), [`bench/toolproxy/`](bench/toolproxy/) | Fault proxy for model calls and the tool proxy for tool faults. |
+| [`bench/issuebench/`](bench/issuebench/) | GitHub issues to benchmark tasks: scan, build the environment, validate, emit. |
+| [`bench/deploy/`](bench/deploy/) | Local and hosted Docker Compose stacks, Bifrost config, the plugin image. |
+| `core/`, `transports/`, `framework/`, `ui/`, other `plugins/` | Bifrost itself (see Credits). |
 
 ## Tests and CI
 
-- `make bench-test`: `go vet` and unit tests for Heimdall, no Docker and no network. `make bench-test-integration` runs the tests that use real Docker.
-- The heimdall plugin has its own Go module with unit tests: `cd plugins/heimdall && go test ./...`.
-- [`.github/workflows/bench-check.yml`](.github/workflows/bench-check.yml) runs Heimdall's release gate on every pull request that touches an agent, experiment, policy, benchmark or bench code: it replays a sealed, checked-in experiment with no Docker, gateway, provider key or secret, and fails the build on a blocking verdict ([`bench/docs/ci.md`](bench/docs/ci.md)).
+- `make bench-test`: `go vet` and unit tests for Heimdall. `make bench-test-integration` runs the tests that need real Docker.
+- Web UI: `cd bench/ui && npx vitest run` and `npx tsc --noEmit`.
+- The Heimdall plugin is its own Go module: `cd plugins/heimdall && go test ./...` (add `HEIMDALL_E2E=1` for the test against a real Bifrost core client).
+- [`.github/workflows/bench-check.yml`](.github/workflows/bench-check.yml) runs Heimdall's release gate on pull requests: it replays a sealed, checked-in experiment with no Docker, gateway or provider key, and fails the build on a blocking verdict.
 
-## History
+## Credits and license
 
-Heimdall development started on 14 Nov 2026. Earlier commits in this repository are upstream Bifrost's own history.
+Heimdall is built by [Ronit Raj](https://github.com/Ronit-Raj9). This repository is a fork of [Bifrost](https://github.com/maximhq/bifrost), the AI gateway by Maxim AI: the gateway code under `core/`, `transports/`, `framework/`, `ui/` and the built-in plugins is theirs, and its own documentation is in the [upstream README](https://github.com/maximhq/bifrost#readme). Heimdall's code is under `bench/` and `plugins/heimdall/`. Heimdall development started on 14 Nov 2026; earlier commits in this repository are Bifrost's own history.
 
----
-
-<!-- Upstream Bifrost README below this line, unchanged. -->
-
-**Upstream Bifrost README**
-
-# Bifrost AI Gateway
-
-
-<a href="https://trendshift.io/repositories/14529?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-14529" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/14529" alt="maximhq%2Fbifrost | Trendshift" width="250" height="55"/></a>
-
-[![Discord badge](https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/exN5KAydbU)
-[![codecov](https://codecov.io/gh/maximhq/bifrost/branch/main/graph/badge.svg)](https://codecov.io/gh/maximhq/bifrost)
-![Docker Pulls](https://img.shields.io/docker/pulls/maximhq/bifrost)
-[<img src="https://run.pstmn.io/button.svg" alt="Run In Postman" style="width: 95px; height: 21px;">](https://app.getpostman.com/run-collection/31642484-2ba0e658-4dcd-49f4-845a-0c7ed745b916?action=collection%2Ffork&source=rip_markdown&collection-url=entityId%3D31642484-2ba0e658-4dcd-49f4-845a-0c7ed745b916%26entityType%3Dcollection%26workspaceId%3D63e853c8-9aec-477f-909c-7f02f543150e)
-[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/bifrost)](https://artifacthub.io/packages/search?repo=bifrost)
-[![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://app.codspeed.io/maximhq/bifrost?utm_source=badge)
-[![License](https://img.shields.io/github/license/maximhq/bifrost)](LICENSE)
-
-## The fastest way to build AI applications that never go down
-
-Bifrost is a high-performance AI gateway that unifies access to 23+ providers (OpenAI, Anthropic, AWS Bedrock, Google Vertex, and more) through a single OpenAI-compatible API. Deploy in seconds with zero configuration and get automatic failover, load balancing, semantic caching, and enterprise-grade features.
-
-## Quick Start
-
-![Get started](./docs/media/getting-started.png)
-
-**Go from zero to production-ready AI gateway in under a minute.**
-
-**Step 1:** Start Bifrost Gateway
-
-```bash
-# Install and run locally
-npx -y @maximhq/bifrost
-
-# Or use Docker
-docker run -p 8080:8080 maximhq/bifrost
-```
-
-**Step 2:** Configure via Web UI
-
-```bash
-# Open the built-in web interface
-open http://localhost:8080
-```
-
-**Step 3:** Make your first API call
-
-```bash
-curl -X POST http://localhost:8080/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "openai/gpt-4o-mini",
-    "messages": [{"role": "user", "content": "Hello, Bifrost!"}]
-  }'
-```
-
-**That's it!** Your AI gateway is running with a web interface for visual configuration, real-time monitoring, and analytics.
-
-**Complete Setup Guides:**
-
-- [Gateway Setup](https://docs.getbifrost.ai/quickstart/gateway/setting-up) - HTTP API deployment
-- [Go SDK Setup](https://docs.getbifrost.ai/quickstart/go-sdk/setting-up) - Direct integration
-
----
-
-## Enterprise Deployments
-
-Bifrost supports enterprise-grade, private deployments for teams running production AI systems at scale.
-In addition to private networking, custom security controls, and governance, enterprise deployments unlock advanced capabilities including adaptive load balancing, clustering, guardrails, MCP gateway, and other features designed for enterprise-grade scale and reliability.
-
-<img src=".github/assets/features.png" alt="Book a Demo" width="100%" style="margin-top:5px;"/>
-
-
-<div align="center" style="display: flex; flex-direction: column;">
-  <a href="https://calendly.com/maximai/bifrost-demo">
-    <img src=".github/assets/book-demo-button.png" alt="Book a Demo" width="170" style="margin-top:5px;"/>
-  </a>
-  <div>
-  <a href="https://www.getmaxim.ai/bifrost/enterprise" target="_blank" rel="noopener noreferrer">Explore enterprise capabilities</a>
-  </div>
-</div>
-
----
-
-## Key Features
-
-### Core Infrastructure
-
-- **[Unified Interface](https://docs.getbifrost.ai/providers/supported-providers/overview)** - Single OpenAI-compatible API for all providers
-- **[Multi-Provider Support](https://docs.getbifrost.ai/quickstart/gateway/provider-configuration)** - OpenAI, Anthropic, AWS Bedrock, Google Vertex, Azure, Cerebras, Cohere, Mistral, Ollama, Groq, and more
-- **[Automatic Fallbacks](https://docs.getbifrost.ai/features/retries-and-fallbacks)** - Seamless failover between providers and models with zero downtime
-- **[Load Balancing](https://docs.getbifrost.ai/features/retries-and-fallbacks)** - Intelligent request distribution across multiple API keys and providers
-
-### Advanced Features
-
-- **[Model Context Protocol (MCP)](https://docs.getbifrost.ai/mcp/overview)** - Enable AI models to use external tools (filesystem, web search, databases)
-- **[Semantic Caching](https://docs.getbifrost.ai/features/semantic-caching)** - Intelligent response caching based on semantic similarity to reduce costs and latency
-- **[Multimodal Support](https://docs.getbifrost.ai/quickstart/gateway/streaming)** - Support for text, images, audio, and streaming, all behind a common interface.
-- **[Custom Plugins](https://docs.getbifrost.ai/enterprise/custom-plugins)** - Extensible middleware architecture for analytics, monitoring, and custom logic
-- **[Governance](https://docs.getbifrost.ai/features/governance/virtual-keys)** - Usage tracking, rate limiting, and fine-grained access control
-
-### Enterprise & Security
-
-- **[Budget Management](https://docs.getbifrost.ai/features/governance/budget-and-limits)** - Hierarchical cost control with virtual keys, teams, and customer budgets
-- **[User Provisioning (OIDC)](https://docs.getbifrost.ai/enterprise/user-provisioning)** - OAuth 2.0 / OIDC login with background directory sync for teams, roles, and business units
-- **[Observability](https://docs.getbifrost.ai/features/observability/default)** - Native Prometheus metrics, distributed tracing, and comprehensive logging
-- **[Secrets Management](https://docs.getbifrost.ai/deployment-guides/config-json#environment-variable-references)** - Secure API key management with environment variables and deployment secrets
-
-### Developer Experience
-
-- **[Zero-Config Startup](https://docs.getbifrost.ai/quickstart/gateway/setting-up)** - Start immediately with dynamic provider configuration
-- **[Drop-in Replacement](https://docs.getbifrost.ai/features/drop-in-replacement)** - Replace OpenAI/Anthropic/GenAI APIs with one line of code
-- **[SDK Integrations](https://docs.getbifrost.ai/integrations/what-is-an-integration)** - Native support for popular AI SDKs with zero code changes
-- **[Configuration Flexibility](https://docs.getbifrost.ai/quickstart/gateway/provider-configuration)** - Web UI, API-driven, or file-based configuration options
-
----
-
-## Repository Structure
-
-Bifrost uses a modular architecture for maximum flexibility:
-
-```text
-bifrost/
-├── npx/                 # NPX script for easy installation
-├── core/                # Core functionality and shared components
-│   ├── providers/       # Provider-specific implementations (OpenAI, Anthropic, etc.)
-│   ├── schemas/         # Interfaces and structs used throughout Bifrost
-│   └── bifrost.go       # Main Bifrost implementation
-├── framework/           # Framework components for data persistence
-│   ├── configstore/     # Configuration storage backends
-│   ├── logstore/        # Request logging storage backends
-│   └── vectorstore/     # Vector storages
-├── transports/          # HTTP gateway and other interface layers
-│   └── bifrost-http/    # HTTP transport implementation
-├── ui/                  # Web interface for HTTP gateway
-├── plugins/             # Extensible plugin system
-│   ├── governance/      # Budget management and access control
-│   ├── jsonparser/      # JSON parsing and manipulation utilities
-│   ├── logging/         # Request logging and analytics
-│   ├── maxim/           # Maxim's observability integration
-│   ├── mocker/          # Mock responses for testing and development
-│   ├── semanticcache/   # Intelligent response caching
-│   └── telemetry/       # Monitoring and observability
-├── docs/                # Documentation and guides
-└── tests/               # Comprehensive test suites
-```
-
----
-
-## Getting Started Options
-
-Choose the deployment method that fits your needs:
-
-### 1. Gateway (HTTP API)
-
-**Best for:** Language-agnostic integration, microservices, and production deployments
-
-```bash
-# NPX - Get started in 30 seconds
-npx -y @maximhq/bifrost
-
-# Docker - Production ready
-docker run -p 8080:8080 -v $(pwd)/data:/app/data maximhq/bifrost
-```
-
-**Features:** Web UI, real-time monitoring, multi-provider management, zero-config startup
-
-**Learn More:** [Gateway Setup Guide](https://docs.getbifrost.ai/quickstart/gateway/setting-up)
-
-### 2. Go SDK
-
-**Best for:** Direct Go integration with maximum performance and control
-
-```bash
-go get github.com/maximhq/bifrost/core
-```
-
-**Features:** Native Go APIs, embedded deployment, custom middleware integration
-
-**Learn More:** [Go SDK Guide](https://docs.getbifrost.ai/quickstart/go-sdk/setting-up)
-
-### 3. Drop-in Replacement
-
-**Best for:** Migrating existing applications with zero code changes
-
-```diff
-# OpenAI SDK
-- base_url = "https://api.openai.com"
-+ base_url = "http://localhost:8080/openai"
-
-# Anthropic SDK
-- base_url = "https://api.anthropic.com"
-+ base_url = "http://localhost:8080/anthropic"
-
-# Google GenAI SDK
-- api_endpoint = "https://generativelanguage.googleapis.com"
-+ api_endpoint = "http://localhost:8080/genai"
-```
-
-**Learn More:** [Integration Guides](https://docs.getbifrost.ai/integrations/what-is-an-integration)
-
----
-
-## Performance
-
-Bifrost adds virtually zero overhead to your AI requests. In sustained 5,000 RPS benchmarks, the gateway added only **11 µs** of overhead per request.
-
-| Metric | t3.medium | t3.xlarge | Improvement |
-|--------|-----------|-----------|-------------|
-| Added latency (Bifrost overhead) | 59 µs | **11 µs** | **-81%** |
-| Success rate @ 5k RPS | 100% | 100% | No failed requests |
-| Avg. queue wait time | 47 µs | **1.67 µs** | **-96%** |
-| Avg. request latency (incl. provider) | 2.12 s | **1.61 s** | **-24%** |
-
-**Key Performance Highlights:**
-
-- **Perfect Success Rate** - 100% request success rate even at 5k RPS
-- **Minimal Overhead** - Less than 15 µs additional latency per request
-- **Efficient Queuing** - Sub-microsecond average wait times
-- **Fast Key Selection** - ~10 ns to pick weighted API keys
-
-**Complete Benchmarks:** [Performance Analysis](https://docs.getbifrost.ai/benchmarking/getting-started)
-
----
-
-## Documentation
-
-**Complete Documentation:** [https://docs.getbifrost.ai](https://docs.getbifrost.ai)
-
-### Quick Start
-
-- [Gateway Setup](https://docs.getbifrost.ai/quickstart/gateway/setting-up) - HTTP API deployment in 30 seconds
-- [Go SDK Setup](https://docs.getbifrost.ai/quickstart/go-sdk/setting-up) - Direct Go integration
-- [Provider Configuration](https://docs.getbifrost.ai/quickstart/gateway/provider-configuration) - Multi-provider setup
-
-### Features
-
-- [Multi-Provider Support](https://docs.getbifrost.ai/providers/supported-providers/overview) - Single API for all providers
-- [MCP Integration](https://docs.getbifrost.ai/mcp/overview) - External tool calling
-- [Semantic Caching](https://docs.getbifrost.ai/features/semantic-caching) - Intelligent response caching
-- [Fallbacks & Load Balancing](https://docs.getbifrost.ai/features/retries-and-fallbacks) - Reliability features
-- [Budget Management](https://docs.getbifrost.ai/features/governance/budget-and-limits) - Cost control and governance
-
-### Integrations
-
-- [OpenAI SDK](https://docs.getbifrost.ai/integrations/openai-sdk/overview) - Drop-in OpenAI replacement
-- [Anthropic SDK](https://docs.getbifrost.ai/integrations/anthropic-sdk/overview) - Drop-in Anthropic replacement
-- [AWS Bedrock SDK](https://docs.getbifrost.ai/integrations/bedrock-sdk/overview) - AWS Bedrock integration
-- [Google GenAI SDK](https://docs.getbifrost.ai/integrations/genai-sdk/overview) - Drop-in GenAI replacement
-- [LiteLLM SDK](https://docs.getbifrost.ai/integrations/litellm-sdk) - LiteLLM integration
-- [LangChain SDK](https://docs.getbifrost.ai/integrations/langchain-sdk) - LangChain integration
-
-### Enterprise
-
-- [Custom Plugins](https://docs.getbifrost.ai/enterprise/custom-plugins) - Extend functionality
-- [Clustering](https://docs.getbifrost.ai/enterprise/clustering) - Multi-node deployment
-- [Secrets Management](https://docs.getbifrost.ai/deployment-guides/config-json#environment-variable-references) - Secure key management
-- [Production Deployment](https://docs.getbifrost.ai/deployment-guides/k8s) - Scaling and monitoring
-
----
-
-## Need Help?
-
-**[Join our Discord](https://discord.gg/exN5KAydbU)** for community support and discussions.
-
-Get help with:
-
-- Quick setup assistance and troubleshooting
-- Best practices and configuration tips
-- Community discussions and support
-- Real-time help with integrations
-
----
-
-## Contributing
-
-We welcome contributions of all kinds! See our [Contributing Guide](https://docs.getbifrost.ai/contributing/setting-up-repo) for:
-
-- Setting up the development environment
-- Code conventions and best practices
-- How to submit pull requests
-- Building and testing locally
-
-For development requirements and build instructions, see our [Development Setup Guide](https://docs.getbifrost.ai/contributing/setting-up-repo#development-environment-setup).
-
----
-
-## License
-
-This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
-
-Built with ❤️ by [Maxim](https://github.com/maximhq)
+Apache-2.0, see [LICENSE](LICENSE).
