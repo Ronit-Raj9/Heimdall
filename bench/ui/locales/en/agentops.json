@@ -4,32 +4,32 @@
 		"noAgent": "No agent \"{{id}}\" in this project. Create it first.",
 		"newAgent": "New agent",
 		"check": {
-			"title": "Conformance check",
-			"hint": "Runs the agent on one task against a scripted model through the fault proxy. Free: no model key is used. Any FAIL row means the agent will not run reliably in experiments.",
-			"suite": "Suite",
-			"task": "Task (optional, default: the suite's first)",
-			"noBuild": "Skip the image build",
-			"needSuite": "Name a suite to check against, for example {{suite}}.",
-			"run": "Run check"
+			"title": "Quick test run",
+			"hint": "Runs the agent on one task with a practice model (no real model, free) and some injected faults. No API key is used. Any row marked FAIL means the agent will not run reliably in tests.",
+			"suite": "Benchmark",
+			"task": "Task (optional, defaults to the benchmark's first)",
+			"noBuild": "Skip preparing the container",
+			"needSuite": "Name a benchmark to test against, for example {{suite}}.",
+			"run": "Run test"
 		},
 		"build": {
-			"title": "Build image",
-			"hintPerSuite": "This agent builds one image per suite (build.base_arg): name the suite.",
+			"title": "Prepare container",
+			"hintPerSuite": "This agent needs one container per benchmark: name the benchmark.",
 			"hintDockerfile": "Builds {{image}} from {{dockerfile}}.",
-			"hintPrebuilt": "This agent has no build.dockerfile: it uses a prebuilt image.",
-			"hosted": "Hosted servers do not build images. Push your image to a registry, pin it with @sha256: in the agent config, and use Run check above.",
-			"nothing": "Nothing to build. Add a build section in the Config tab to build here.",
-			"suiteRequired": "Suite (required)",
-			"suiteOptional": "Suite (optional)",
-			"needSuite": "Name the suite this image is built for.",
-			"run": "Build image",
-			"runnerNote": "Hosted builds run on your runner (Settings > Runners), never on the server. The image stays on that runner, which also runs this agent."
+			"hintPrebuilt": "This agent uses a ready-made container image. Nothing to prepare.",
+			"hosted": "Hosted servers do not prepare containers. Push your image to a registry, pin it with @sha256: in the agent settings, and use Run test above.",
+			"nothing": "Nothing to prepare. Add a build section in the Settings tab to prepare a container here.",
+			"suiteRequired": "Benchmark (required)",
+			"suiteOptional": "Benchmark (optional)",
+			"needSuite": "Name the benchmark this container is for.",
+			"run": "Prepare container",
+			"runnerNote": "On hosted servers the container is prepared on your worker machine (Settings > Worker machines), never on the server. It stays on that machine, which also runs this agent."
 		},
 		"diff": {
 			"title": "Compare versions",
-			"hint": "What changed between this agent's two newest config versions and which tasks flipped, over sealed runs.",
-			"run": "Diff newest two versions",
-			"open": "Open the Diff page"
+			"hint": "What changed between this agent's two newest versions, and which tasks it now solves or fails, using saved runs.",
+			"run": "Compare the newest two versions",
+			"open": "Open the comparison page"
 		}
 	},
 	"tools": {
@@ -37,7 +37,7 @@
 		"agents": "Agents",
 		"skills": {
 			"title": "Skills",
-			"hint": "A skill is a folder holding SKILL.md. Uploads land in {{dir}}/ and the agent config's skills.extra lists that folder. Scan a skill before you trust it: the admission scan looks for exfiltration, hidden instructions and risky install steps.",
+			"hint": "A skill is a folder with a SKILL.md file that teaches the agent how to do something. Uploads are saved in {{dir}}/. Scan a skill before you trust it: the scan looks for data theft, hidden instructions and risky install steps.",
 			"loading": "Loading skills...",
 			"size": "{{files}} files, {{kib}} KiB",
 			"noSkillMd": "no SKILL.md",
@@ -45,7 +45,7 @@
 			"delete": "Delete",
 			"confirmDelete": "Delete skill {{name}}? Its files are removed from the project.",
 			"empty": "No skills yet. Upload a zipped skill folder below.",
-			"notInstalled": "The config does not list {{dir}} in skills.extra, so runs do not install these skills yet. Upload again or add it in the Config tab.",
+			"notInstalled": "The agent settings do not include {{dir}} yet, so runs do not install these skills. Upload again or add it in the Settings tab.",
 			"zip": "Skill zip",
 			"name": "Skill name",
 			"replace": "Replace if it exists",
@@ -58,7 +58,7 @@
 		},
 		"mcp": {
 			"title": "MCP tools",
-			"hint": "How the agent is told about MCP servers (the config format and where it is written in the container), and the MCP servers this agent is meant to use. Tasks still declare the servers a run starts; list them here to scan them before use.",
+			"hint": "MCP servers give the agent extra tools. Choose how the agent is told about them and list the ones it should use, so you can scan them first. Tasks still decide which servers a run starts.",
 			"loading": "Loading MCP settings...",
 			"format": "Config format",
 			"adapterDefault": "adapter default",
@@ -69,8 +69,8 @@
 			"saved": "Saved.",
 			"scan": "Scan MCP servers",
 			"saveFirst": "Save before scanning.",
-			"pinned": "pinned",
-			"unpinned": "unpinned"
+			"pinned": "version pinned",
+			"unpinned": "version not pinned"
 		}
 	}
 }

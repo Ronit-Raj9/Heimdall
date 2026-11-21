@@ -47,7 +47,7 @@ describe("ModelsView", () => {
 		const html = render(<ModelsView />);
 		expect(html).toContain('data-testid="model-key-key_1"');
 		expect(html).toContain("...abcd");
-		expect(html).toContain("works");
+		expect(html).toContain("Works");
 		expect(html).toContain("over budget");
 		expect(html).toContain("gpt-4o-mini");
 		expect(html).toContain('data-testid="model-key-test-key_1"');
@@ -57,7 +57,7 @@ describe("ModelsView", () => {
 		api.q = { models: okQuery({ ...CATALOG, keys: [], default: undefined }) };
 		const html = render(<ModelsView />);
 		expect(html).toContain('data-testid="models-empty"');
-		expect(html).toContain("Add a model key");
+		expect(html).toContain("Add an API key");
 	});
 
 	it("says what to configure when the key store is off", () => {

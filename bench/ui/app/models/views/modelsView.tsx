@@ -178,6 +178,13 @@ export default function ModelsView() {
 						) : (
 							<span className="text-muted-foreground text-sm">{t("noDefault")}</span>
 						)}
+						<span
+							className="text-muted-foreground ml-auto text-xs underline decoration-dotted underline-offset-4"
+							title={t("priceHintTitle")}
+							data-testid="models-price-hint"
+						>
+							{t("priceHint")}
+						</span>
 					</div>
 					{keys.length === 0 && (
 						<EmptyState

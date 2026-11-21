@@ -31,17 +31,17 @@ describe("AgentConfigsTab", () => {
 	it("shows agents as cards with a friendly adapter, model chip, check status and Run", () => {
 		const html = render();
 		expect(html).toContain('data-testid="agents-row-codex"');
-		expect(html).toContain("CLI agent");
+		expect(html).toContain("Runs as a command-line program");
 		expect(html).toContain("gpt-5");
 		expect(html).toContain('data-testid="agents-row-codex-status"');
-		expect(html).toContain("Check passed");
+		expect(html).toContain("Works");
 		expect(html).toContain('data-testid="agents-row-codex-run"');
 	});
 
 	it("folds scripted agents into a Test agents group", () => {
 		const html = render();
 		expect(html).toContain('data-testid="agents-test-group"');
-		expect(html).toContain("Test agents");
+		expect(html).toContain("Reference agents (used for checks)");
 		const group = html.slice(html.indexOf('data-testid="agents-test-group"'));
 		expect(group).toContain('data-testid="agents-row-oracle"');
 		expect(isTestAgent({ id: "toy", scripted_kind: "", adapter: "command" })).toBe(true);

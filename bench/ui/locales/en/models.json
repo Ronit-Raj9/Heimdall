@@ -1,8 +1,8 @@
 {
 	"title": "Models & keys",
-	"subtitle": "Provider keys your agents, judges and simulated users call. Keys are encrypted on the server and never shown again after you save them.",
-	"add": "Add a model key",
-	"addTitle": "Add a provider key",
+	"subtitle": "Your agents need an API key to talk to an AI model (OpenAI, Anthropic and others). Add a key here. It is stored encrypted and never shown again after you save it.",
+	"add": "Add an API key",
+	"addTitle": "Add an API key",
 	"editTitle": "Edit key",
 	"provider": "Provider",
 	"label": "Label",
@@ -13,8 +13,8 @@
 	"baseUrl": "Base URL",
 	"baseUrlOptional": "Optional: override the provider's default endpoint",
 	"models": "Allowed models",
-	"modelsHint": "Comma separated. Empty allows any model.",
-	"budget": "Monthly budget (USD)",
+	"modelsHint": "Comma separated. Leave empty to allow any model from this provider.",
+	"budget": "Monthly spending limit (USD)",
 	"budgetHint": "0 means no limit.",
 	"save": "Save key",
 	"saving": "Saving...",
@@ -24,9 +24,9 @@
 	"confirmDelete": "Delete key {{label}}? Runs that use it will fail.",
 	"test": "Test",
 	"testing": "Testing...",
-	"empty": "No model keys yet. Add one to run agents against a real model.",
+	"empty": "No API keys yet. Add one so your agents can use a real AI model. Without a key you can still use practice mode (no real model, free).",
 	"loadError": "Could not load models",
-	"unavailable": "The key store is not configured on this server. Ask the server owner to set HEIMDALL_MASTER_KEY and restart.",
+	"unavailable": "This server cannot store API keys yet. Ask the server owner to set HEIMDALL_MASTER_KEY and restart.",
 	"colKey": "Key",
 	"colStatus": "Status",
 	"colSpend": "Spend this month",
@@ -34,13 +34,13 @@
 	"noBudget": "no limit",
 	"overBudget": "over budget",
 	"status": {
-		"untested": "untested",
-		"ok": "works",
-		"invalid": "refused",
-		"error": "error"
+		"untested": "Not tested yet",
+		"ok": "Works",
+		"invalid": "Problem: the provider refused this key",
+		"error": "Problem: could not reach the provider"
 	},
 	"defaultModel": "Default model: {{model}} ({{provider}})",
-	"noDefault": "No default model yet: add a key and press Test.",
+	"noDefault": "No default model yet. Add a key and press Test.",
 	"providersTitle": "Providers",
 	"valueRequired": "Paste the API key.",
 	"baseUrlRequired": "This provider needs a base URL.",
@@ -51,11 +51,13 @@
 		"anyKey": "Any key for this provider",
 		"noKey": "No key for this provider yet",
 		"addKey": "Add key",
-		"custom": "Type a model id"
+		"custom": "Type a model name"
 	},
 	"unavailableAction": "Read the hosting guide",
-	"emptyViewer": "No model keys yet. Ask an org admin to add one; meanwhile you can browse sealed experiments.",
+	"emptyViewer": "No API keys yet. Ask an org admin to add one. Meanwhile you can browse finished comparisons.",
 	"emptyViewerAction": "Open experiments",
-	"secretsHint": "Tool credentials (search APIs, MCP servers) live under secrets.",
-	"secretsLink": "Manage secrets"
+	"secretsHint": "Passwords and API keys your agent's tools need (for example a web search key) live under Secrets.",
+	"secretsLink": "Manage secrets",
+	"priceHint": "Price per 1M tokens: not set (costs will show as unknown)",
+	"priceHintTitle": "Heimdall works out cost from the model's price per 1 million tokens. When no price is set for a model, its cost shows as unknown, not as zero."
 }

@@ -98,7 +98,7 @@ describe("agent ops tabs", () => {
 		expect(html).toContain("review");
 		expect(html).toContain('data-testid="job-run-scan.skill"');
 		expect(html).toContain('data-testid="agent-mcp-server-list"');
-		expect(html).toContain("files (pinned)");
+		expect(html).toContain("files (version pinned)");
 		expect(html).toContain('data-testid="job-run-scan.mcp"');
 	});
 
