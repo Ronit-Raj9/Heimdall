@@ -12,7 +12,7 @@ describe("Quickstart step cards", () => {
 		for (const key of ["init", "mine", "compare", "ci"]) expect(html).toContain(`data-testid="quickstart-step-${key}"`);
 		expect(html).toContain("heimdall tasks mine -limit 10");
 		expect(html).toContain("Step 4");
-		expect(html).toContain("Forecast first");
+		expect(html).toContain("Shows the cost first");
 	});
 
 	it("shows an empty state, then the suites whose mined tasks need review", () => {

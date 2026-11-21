@@ -1,49 +1,49 @@
 {
 	"title": "Integrations",
-	"subtitle": "Connect Heimdall to CI, trace tools and webhooks.",
+	"subtitle": "Connect Heimdall to the tools you already use: GitHub, chat alerts and other analysis tools.",
 	"tabs": {
-		"ci": "CI",
-		"exports": "Exports",
-		"webhooks": "Webhooks"
+		"ci": "Pull request checks",
+		"exports": "Download results",
+		"webhooks": "Notifications"
 	},
 	"ci": {
-		"heading": "Gate pull requests with Heimdall",
-		"intro": "Adds a workflow that re-checks your agent on every pull request and comments the verdict.",
-		"mode": "Mode",
-		"modeRecorded": "Recorded (re-check a sealed experiment, no runner needed)",
-		"modeLive": "Live (fresh baseline vs candidate on a self-hosted runner)",
-		"agent": "Agent both arms start from",
+		"heading": "Check every pull request automatically",
+		"intro": "Adds a GitHub workflow that tests your agent on every pull request and comments whether it got better or worse.",
+		"mode": "How to check",
+		"modeRecorded": "Use saved results (re-check a finished comparison, no worker machine needed)",
+		"modeLive": "Run fresh (old vs new agent, on your own worker machine)",
+		"agent": "Agent both setups start from",
 		"pickAgent": "Pick an agent",
-		"installInSettings": "GitHub is connected. Pick the repository, base branch and mode in Settings > GitHub to open the install pull request.",
+		"installInSettings": "GitHub is connected. Pick the repository, branch and how to check in Settings > GitHub to open the setup pull request.",
 		"openSettings": "Open Settings > GitHub",
 		"connect": "Connect GitHub",
 		"manual": "GitHub sign-in is not set up on this server. Copy the workflow below into .github/workflows/heimdall.yml in your repository by hand.",
 		"preview": "Workflow preview",
 		"copy": "Copy",
 		"copied": "Copied",
-		"notConnected": "Connect GitHub in Settings > GitHub to open the install pull request from there. Until then you can copy the workflow below into your repository by hand."
+		"notConnected": "Connect GitHub in Settings > GitHub to open the setup pull request from there. Until then you can copy the workflow below into your repository by hand."
 	},
 	"exports": {
-		"heading": "Export results and traces",
-		"intro": "Runs in the background. The file appears below when ready.",
+		"heading": "Download results for other tools",
+		"intro": "Makes a file you can open in other tools. It is prepared in the background and appears below when ready.",
 		"format": "Format",
 		"formats": {
-			"otlp": "OTLP traces (Langfuse, LangSmith, Phoenix, Jaeger, any OpenTelemetry backend)",
-			"eee": "Every Eval Ever records",
-			"csv": "Run table (CSV)",
-			"jsonl": "Run table (JSON lines)",
-			"harbor": "Harbor task folders (suite, verifiers withheld)"
+			"otlp": "Step-by-step traces for tracing tools (Langfuse, LangSmith, Phoenix, Jaeger, any OpenTelemetry tool)",
+			"eee": "Every Eval Ever records (shared results format)",
+			"csv": "Table of runs (CSV, for spreadsheets)",
+			"jsonl": "Table of runs (JSON lines)",
+			"harbor": "Harbor task folders (benchmark tasks, hidden checks left out)"
 		},
-		"experiment": "Experiment",
-		"pickExperiment": "Pick an experiment",
-		"suite": "Suite",
-		"pickSuite": "Pick a suite",
-		"payloads": "Include tool arguments and results (redacted and capped)",
-		"allowSynthetic": "Allow synthetic results (labelled)",
-		"run": "Export",
-		"noExperiments": "No experiment yet. Run one first, then export it here.",
-		"files": "Export files",
-		"empty": "No export yet. Pick a format and an experiment above, then press Export.",
+		"experiment": "Comparison",
+		"pickExperiment": "Pick a comparison",
+		"suite": "Benchmark",
+		"pickSuite": "Pick a benchmark",
+		"payloads": "Include what the agent sent to and got back from its tools (private values hidden, size limited)",
+		"allowSynthetic": "Allow practice-mode results (marked as practice)",
+		"run": "Make file",
+		"noExperiments": "No comparison yet. Run one first, then download it here.",
+		"files": "Files ready",
+		"empty": "No files yet. Pick a format and a comparison above, then press Make file.",
 		"download": "Download",
 		"delete": "Delete",
 		"deleteConfirm": "Delete export {{name}}?",
@@ -52,22 +52,22 @@
 		"created": "Created"
 	},
 	"webhooks": {
-		"heading": "Webhooks",
-		"intro": "Each URL gets a signed JSON event.",
+		"heading": "Get a message when a test finishes",
+		"intro": "Heimdall sends a signed message to each web address you add, for example a Slack or team chat hook.",
 		"hostedNote": "This server delivers only to public https URLs.",
-		"url": "Payload URL",
+		"url": "Web address to send to",
 		"urlPlaceholder": "https://example.com/hooks/heimdall",
 		"description": "Description (optional)",
-		"events": "Events",
+		"events": "When to send",
 		"eventNames": {
-			"experiment.finished": "Experiment finished",
-			"job.failed": "Background job failed"
+			"experiment.finished": "A comparison finished",
+			"job.failed": "A background job failed"
 		},
-		"add": "Add webhook",
+		"add": "Add web address",
 		"adding": "Adding...",
-		"secretOnce": "Signing secret, shown once. Store it now:",
+		"secretOnce": "Secret for checking messages are really from Heimdall. Shown once, store it now:",
 		"dismiss": "I stored it",
-		"empty": "No webhook yet. Add one to get a POST when an experiment finishes.",
+		"empty": "Nothing set up yet. Add a web address to get a message when a comparison finishes.",
 		"test": "Send test",
 		"testOk": "Test delivered (HTTP {{code}})",
 		"testFail": "Test failed: {{error}}",
@@ -86,25 +86,25 @@
 	},
 	"errors": {
 		"load": "Could not load this section. Reload the page; if it keeps failing, check that the server is running.",
-		"adminOnly": "Changing webhooks needs the admin role. Ask an org admin.",
+		"adminOnly": "Changing notifications needs the admin role. Ask an admin of your organization.",
 		"generic": "Something went wrong. Try again."
 	},
 	"cards": {
 		"webhooks": {
-			"desc": "Get a signed POST when an experiment finishes.",
+			"desc": "Get a message when a test finishes.",
 			"none": "Not set up",
 			"count_one": "{{count}} active",
 			"count_other": "{{count}} active",
 			"failing": "Delivery failing"
 		},
 		"exports": {
-			"desc": "Send traces and results to your tools.",
+			"desc": "Download results for other tools.",
 			"none": "No exports yet",
 			"count_one": "{{count}} file",
 			"count_other": "{{count}} files"
 		},
 		"ci": {
-			"desc": "Check your agent on every pull request.",
+			"desc": "Check every pull request automatically.",
 			"connected": "GitHub connected",
 			"notConnected": "Not connected",
 			"manual": "Manual setup"

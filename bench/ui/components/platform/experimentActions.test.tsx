@@ -91,7 +91,7 @@ describe("RegradeAction", () => {
 		expect(html).toContain('data-testid="regrade-lock-current"');
 		expect(html).toContain('data-testid="regrade-note"');
 		expect(html).toContain('data-testid="regrade-id"');
-		expect(html).toContain("Regrade e_nightly");
+		expect(html).toContain("Re-score e_nightly");
 	});
 	it("shows the queued job's log and the verdict at the new grade source", () => {
 		api.regrade = { data: { ...REGRADE_JOB, mode: "live" }, originalArgs: { exp_id: "e_nightly" } };

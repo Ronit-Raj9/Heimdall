@@ -32,7 +32,7 @@ beforeEach(() => {
 describe("JobLogPanel", () => {
 	it("streams the log of a running job with cancel", () => {
 		const html = render(<JobLogPanel jobId={RUNNING_JOB.id} onClose={() => {}} />, hostedSession("member"));
-		expect(html).toContain("Mine tasks");
+		expect(html).toContain("Make tasks from past commits");
 		expect(html).toContain("mining 300 commits");
 		expect(html).toContain('data-testid="job-log-panel-cancel"');
 		expect(html).toContain('data-testid="job-log-panel-close"');

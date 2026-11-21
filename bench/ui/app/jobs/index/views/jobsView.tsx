@@ -226,13 +226,13 @@ export function JobsTable({
 							>
 								<td className="px-4 py-3">
 									<Link to="/jobs/$jobId" params={{ jobId: job.id }} className="text-foreground font-medium hover:underline">
-										{kindName(job.kind)}
+										{job.target ? t("jobOf", { kind: kindName(job.kind), target: job.target }) : kindName(job.kind)}
 									</Link>
-									<div className="text-muted-foreground/80 max-w-48 truncate font-mono text-[11px]" title={job.id}>
+									<div className="text-muted-foreground/60 max-w-48 truncate font-mono text-[10px]" title={job.id}>
 										{job.id}
 									</div>
 								</td>
-								<td className="text-muted-foreground max-w-56 truncate px-4 py-3 font-mono text-xs" title={job.target || undefined}>
+								<td className="text-muted-foreground max-w-56 truncate px-4 py-3 text-xs" title={job.target || undefined}>
 									{job.target || "-"}
 								</td>
 								<td className="px-4 py-3">

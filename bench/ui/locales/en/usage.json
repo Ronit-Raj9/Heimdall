@@ -1,6 +1,6 @@
 {
 	"title": "Usage and spend",
-	"subtitle": "Run cost, tokens and provider key spend.",
+	"subtitle": "How much your runs cost, how many tokens they used and how much each provider key has spent.",
 	"from": "From",
 	"to": "To",
 	"groupBy": "Group by",
@@ -8,7 +8,7 @@
 		"day": "Day",
 		"model": "Model",
 		"agent": "Agent",
-		"key": "Key"
+		"key": "Provider key"
 	},
 	"scope": {
 		"org": "This organization",
@@ -17,16 +17,16 @@
 	"totals": {
 		"cost": "Run cost",
 		"tokens": "Tokens",
-		"runs": "Sealed runs",
-		"keys": "Key spend this month",
-		"unknown": "{{count}} run(s) without a measured cost are left out of the cost total."
+		"runs": "Finished runs",
+		"keys": "Provider key spend this month",
+		"unknown": "{{count}} run(s) have no known cost (the model has no price) and are left out of the total."
 	},
 	"table": {
 		"group": "Group",
 		"cost": "Cost (USD)",
 		"tokens": "Tokens",
 		"runs": "Runs",
-		"unknown": "Cost unknown",
+		"unknown": "Cost not known",
 		"label": "Usage by {{group}}"
 	},
 	"keys": {
@@ -35,15 +35,15 @@
 		"provider": "Provider",
 		"budget": "Monthly budget",
 		"spent": "Spent this month",
-		"noBudget": "none",
-		"empty": "No provider keys yet. Add one on Models & keys so runs can use your own account.",
+		"noBudget": "No limit",
+		"empty": "No provider keys yet. Add one on Models & keys so runs use your own model account.",
 		"add": "Add a key"
 	},
 	"chart": {
 		"summary": "Cost by {{group}}, {{count}} groups, total {{total}}",
 		"title": "Cost"
 	},
-	"empty": "No sealed runs between {{from}} and {{to}}. Run an experiment, or widen the date range.",
+	"empty": "No finished runs between {{from}} and {{to}}. Run a comparison, or pick a wider date range.",
 	"emptyAction": "Start a run",
 	"error": "Could not load usage: {{message}}",
 	"admin": {

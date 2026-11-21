@@ -1,57 +1,58 @@
 {
 	"title": "Jobs",
-	"subtitle": "Background work with live logs. Cancel or retry any job.",
+	"subtitle": "Work Heimdall does in the background, like checks, imports and downloads. Watch the log, stop a job or try it again.",
 	"filters": {
-		"kind": "Kind",
+		"kind": "Type of job",
 		"status": "Status",
-		"anyKind": "All kinds",
+		"anyKind": "All types",
 		"anyStatus": "All statuses",
 		"clear": "Clear filters"
 	},
 	"columns": {
-		"kind": "Kind",
-		"target": "Target",
+		"kind": "Job",
+		"target": "Works on",
 		"status": "Status",
-		"created": "Created",
+		"created": "Started",
 		"actions": "Actions"
 	},
-	"empty": "No jobs yet. Buttons such as Import, Mine tasks, Calibrate judge and Export start a job, and it shows up here.",
+	"empty": "No jobs yet. Buttons like Import, Make tasks, Check grader and Download start a job, and it shows up here.",
 	"emptyFiltered": "No job matches these filters.",
 	"emptyAction": "Browse the catalog",
 	"loadError": "Could not load jobs",
 	"loadMore": "Load older jobs",
 	"cancel": "Cancel",
-	"confirmCancel": "Stop this job? A running command gets SIGTERM, then SIGKILL after 10 seconds.",
+	"confirmCancel": "Stop this job? It gets a few seconds to finish cleanly, then it is stopped.",
 	"confirm": "Stop job",
 	"keep": "Keep running",
 	"retry": "Retry",
-	"retryTitle": "Queue a new job with the same kind and parameters",
-	"retried": "Queued a new job:",
+	"retryTitle": "Start this job again with the same settings",
+	"retried": "Started a new job:",
 	"openNew": "open it",
 	"actionError": "That did not work",
 	"kinds": {
-		"import_run": "Benchmark import",
-		"tasks_mine": "Mine tasks",
-		"calibrate_run": "Judge calibration",
-		"export_run": "Export",
+		"import_run": "Import benchmark",
+		"tasks_mine": "Make tasks from past commits",
+		"calibrate_run": "Grader accuracy check",
+		"export_run": "Download results",
 		"scan_skill": "Skill scan",
-		"scan_mcp": "MCP scan"
+		"scan_mcp": "MCP server scan"
 	},
 	"panel": {
 		"title": "Job log",
 		"open": "Open job page",
 		"close": "Close",
 		"cancel": "Cancel",
-		"queued": "Queued. It starts when a worker is free.",
+		"queued": "Waiting to start. It begins when a worker machine is free.",
 		"failed": "The job failed:",
-		"addRunner": "Open Settings > Runners to add a runner or check the shared runner",
-		"succeeded": "Done.",
+		"addRunner": "Open Settings > Runners to add a worker machine or check the shared worker",
+		"succeeded": "Finished.",
 		"cancelled": "Cancelled.",
 		"startError": "Could not start the job",
-		"experiment": "Open experiment {{expId}}"
+		"experiment": "Open comparison {{expId}}"
 	},
 	"drawer": {
 		"title": "Job log",
 		"open": "Log"
-	}
+	},
+	"jobOf": "{{kind}} of {{target}}"
 }

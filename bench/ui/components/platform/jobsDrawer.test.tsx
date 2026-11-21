@@ -59,20 +59,20 @@ describe("JobsDrawer", () => {
 		expect(html).toContain('aria-modal="true"');
 		const running = html.slice(html.indexOf('data-testid="jobs-drawer-running"'), html.indexOf('data-testid="jobs-drawer-recent"'));
 		expect(running).toContain('href="/jobs/job_synth0001"');
-		expect(running).toContain("Experiment run");
+		expect(running).toContain("Comparison run");
 		expect(running).toContain('data-testid="job-progress-job_synth0001"');
 		const recent = html.slice(html.indexOf('data-testid="jobs-drawer-recent"'));
-		expect(recent).toContain("Suite lint");
+		expect(recent).toContain("Benchmark check");
 		expect(recent).toContain('data-testid="job-status-failed"');
 		expect(recent).toContain("refused the connection");
-		expect(html).toContain("Running and recent work in Acme Agents.");
+		expect(html).toContain("Background work in Acme Agents that is running now or finished recently.");
 	});
 
 	it("says when nothing runs and when nothing finished", () => {
 		const html = render(<JobsDrawer jobs={[]} isLoading={false} onRetry={() => undefined} onClose={() => undefined} />);
 		expect(html).toContain("Nothing is running.");
 		expect(html).toContain("No finished jobs yet.");
-		expect(html).toContain("Running and recent work on this server.");
+		expect(html).toContain("Background work on this server that is running now or finished recently.");
 	});
 
 	it("shows loading and errors", () => {

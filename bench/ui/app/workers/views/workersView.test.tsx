@@ -35,7 +35,7 @@ describe("WorkersView", () => {
 		query.result = { ...idle, isError: true, error: { status: 404, data: { error: { message: "route not found: /api/bench/workers" } } } };
 		const html = renderToStaticMarkup(<WorkersView />);
 		expect(html).toContain('data-testid="workers-off"');
-		expect(html).toContain("Remote workers are not enabled");
+		expect(html).toContain("Extra worker machines are not turned on");
 		expect(html).not.toContain('data-testid="workers-error"');
 		expect(html).not.toContain("mode-badge-offline");
 	});

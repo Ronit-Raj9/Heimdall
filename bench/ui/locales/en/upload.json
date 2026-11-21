@@ -1,15 +1,15 @@
 {
 	"title": "Upload",
-	"subtitle": "Bring your work from your machine as a zip.",
+	"subtitle": "Bring work from your computer into Heimdall as a zip file. Pick what kind of zip it is.",
 	"tabs": {
-		"runs": "Sealed runs",
+		"runs": "Saved results",
 		"project": "Project folder",
 		"agent": "Agent folder"
 	},
 	"help": {
-		"runs": "Each experiment's seals are checked. Anything that does not verify is refused.",
-		"project": "Files under agents/, benchmarks/, experiments/ and policies/ are written. Old versions are kept.",
-		"agent": "Lands in agents/<name>/. Leave the name empty to use the zip's folder name."
+		"runs": "Results of comparisons you ran on your own computer. Heimdall checks they were not changed after the run; anything that fails this check is refused.",
+		"project": "Your agents, benchmarks, comparisons and release rules (folders agents/, benchmarks/, experiments/, policies/). Files are added; old versions are kept.",
+		"agent": "One agent's folder. It is saved in agents/<name>/. Leave the name empty to use the zip's folder name."
 	},
 	"drop": {
 		"prompt": "Drop a .zip here",
@@ -26,11 +26,11 @@
 	"clear": "Clear",
 	"failed": "Upload failed. Check the zip and try again.",
 	"runs": {
-		"summary": "{{imported}} imported, {{skipped}} skipped, {{refused}} refused ({{runs}} sealed runs)",
-		"empty": "The zip held no experiment folder. To upload agents or suites, pick the Project folder tab instead.",
-		"openExperiments": "Open experiments",
+		"summary": "{{imported}} added, {{skipped}} skipped, {{refused}} refused ({{runs}} saved runs)",
+		"empty": "The zip had no comparison folder. To upload agents or benchmarks, pick the Project folder tab instead.",
+		"openExperiments": "Open comparisons",
 		"status": {
-			"imported": "Imported",
+			"imported": "Added",
 			"skipped": "Skipped",
 			"refused": "Refused"
 		},
@@ -38,23 +38,23 @@
 		"runCount": "{{count}} runs"
 	},
 	"files": {
-		"summary": "{{written}} written, {{refused}} refused, {{skipped}} skipped",
-		"written": "Written",
+		"summary": "{{written}} saved, {{refused}} refused, {{skipped}} skipped",
+		"written": "Saved",
 		"refused": "Refused",
 		"skipped": "Skipped",
 		"openFiles": "Open files"
 	},
 	"cards": {
-		"runs": "Verified runs from your machine",
-		"project": "Agents, suites and policies",
+		"runs": "Results you ran on your own computer",
+		"project": "Agents, benchmarks and release rules",
 		"agent": "One agent folder"
 	},
 	"result": "Result",
 	"stats": {
-		"imported": "Imported",
+		"imported": "Added",
 		"skipped": "Skipped",
 		"refused": "Refused",
 		"runs": "Runs",
-		"written": "Written"
+		"written": "Saved"
 	}
 }

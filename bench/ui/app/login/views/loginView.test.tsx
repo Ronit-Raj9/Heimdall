@@ -57,7 +57,7 @@ describe("LoginView", () => {
 	it("tells a local-mode visitor there is nothing to sign in to", () => {
 		const html = render(<LoginView />, LOCAL_SESSION);
 		expect(html).toContain('data-testid="login-local"');
-		expect(html).toContain("local mode");
+		expect(html).toContain("on your own machine");
 		expect(html).not.toContain("login-form");
 	});
 });

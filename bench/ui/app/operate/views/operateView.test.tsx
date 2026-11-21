@@ -28,7 +28,7 @@ describe("OperatePanels", () => {
 		expect(html).toContain("/srv/mirror");
 		// Restore waits for an experiment id.
 		expect(html).not.toContain('data-testid="job-run-evidence.restore"');
-		expect(html).toContain("Restore needs an experiment id.");
+		expect(html).toContain("To restore, enter a comparison id.");
 	});
 
 	it("says how to configure a mirror instead of offering evidence buttons", () => {
@@ -65,7 +65,7 @@ describe("OperatePanels", () => {
 		};
 		const html = renderToStaticMarkup(<OperatePanels status={hosted} />);
 		expect(html).toContain('data-testid="job-run-evidence.archive"');
-		expect(html).toContain("Restore needs an experiment id.");
+		expect(html).toContain("To restore, enter a comparison id.");
 		expect(html).not.toContain("s3://");
 	});
 

@@ -27,7 +27,7 @@ describe("upload view", () => {
 		);
 		expect(html).toContain('data-testid="upload-exp-e_ok"');
 		expect(html).toContain("seal mismatch");
-		expect(html).toContain("1 imported, 0 skipped, 1 refused (4 sealed runs)");
+		expect(html).toContain("1 added, 0 skipped, 1 refused (4 saved runs)");
 	});
 
 	it("lists refused project files", () => {

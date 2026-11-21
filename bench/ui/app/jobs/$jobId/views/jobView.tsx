@@ -96,7 +96,7 @@ export function JobDetail({ job, log }: { job: Job; log: JobLogState }) {
 					<CopyId value={job.id} className="max-w-64" testId="job-id" />
 				</div>
 				<div className="flex flex-wrap items-center gap-3">
-					<h1 className="text-foreground">{kindLabel(job.kind)}</h1>
+					<h1 className="text-foreground">{job.target ? `${kindLabel(job.kind)} of ${job.target}` : kindLabel(job.kind)}</h1>
 					<JobStatusBadge status={job.status} />
 					{job.cancel_requested && activeJob && (
 						<span className="text-chart-warning-ink text-xs font-medium" data-testid="job-cancel-requested">
