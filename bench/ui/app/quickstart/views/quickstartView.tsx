@@ -1,27 +1,30 @@
-import { QuickstartBody } from "@/components/quickstart/quickstartPanel";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell";
 import { useGetSuitesQuery } from "@/lib/store";
+import "@/lib/types/u19I18n";
 import { useTranslation } from "react-i18next";
+import { MinedTasks, QuickstartSteps } from "./quickstartCards";
 
-/** Get started: /quickstart, linked from Home. The four commands, and the mined tasks whose instructions still need review. */
+/** Get started: /quickstart, linked from Home. The four commands as step cards, then the mined tasks that need review. */
 export default function QuickstartView() {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("u19");
 	const { data, error, isLoading, refetch } = useGetSuitesQuery();
 	return (
-		<section className="mx-auto flex w-full max-w-5xl min-w-0 flex-col gap-6" data-testid="quickstart-view">
+		<section className="mx-auto flex w-full max-w-5xl min-w-0 flex-col gap-8" data-testid="quickstart-view">
 			<PageHeader
-				title={t("home.quickstart.title")}
-				subtitle={t("home.quickstart.subtitle")}
-				breadcrumbs={[{ label: t("home.title"), to: "/" }, { label: t("home.quickstart.title") }]}
+				title={tu("quickstart.title")}
+				subtitle={tu("quickstart.subtitle")}
+				breadcrumbs={[{ label: t("home.title"), to: "/" }, { label: tu("quickstart.title") }]}
 				testId="quickstart-header"
 			/>
+			<QuickstartSteps />
 			{isLoading ? (
 				<BlockSkeleton testId="quickstart-loading" />
 			) : error ? (
 				<LoadError title={t("quickstart.loadError")} error={error} onRetry={refetch} testId="quickstart-error" />
 			) : (
-				<QuickstartBody suites={data?.suites ?? []} />
+				<MinedTasks suites={data?.suites ?? []} />
 			)}
 		</section>
 	);

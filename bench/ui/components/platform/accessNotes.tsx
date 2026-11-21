@@ -1,54 +1,56 @@
 import { Button } from "@/components/ui/button";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { githubStartUrl } from "@/lib/store/apis/platformApi";
+import "@/lib/types/u19I18n";
 import "@/lib/types/welcomeI18n";
 import type { Role } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Eye, Github, Lock } from "lucide-react";
+import { ArrowRight, Eye, Github, Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { roleWords } from "./forbiddenNote";
 
 export { ForbiddenNote, isRoleRefusal } from "./forbiddenNote";
 
-/** Top banner for anonymous visitors of a public-read organization. */
+/** Slim top banner for anonymous visitors of a public-read organization: what this is, and one way in. */
 export function DemoBanner() {
 	const { t } = useTranslation("platform");
 	const { t: tw } = useTranslation("welcome");
+	const { t: tu } = useTranslation("u19");
 	const session = useSession();
 	const href = useRouterState({ select: (state) => state.location.href });
 	if (!session.demo) return null;
 	return (
 		<div
 			role="note"
-			className="border-chart-info/40 bg-chart-info/10 text-foreground flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2 text-sm md:px-5"
+			className="bg-primary/[0.06] text-foreground border-primary/15 flex min-h-10 items-center gap-3 border-b px-4 py-1.5 text-[13px] md:px-5"
 			data-testid="demo-banner"
 		>
-			<span className="text-chart-info-ink flex items-center gap-2 font-semibold">
-				<Eye className="size-4 shrink-0" aria-hidden="true" />
-				{t("demo.banner")}
+			<span className="bg-primary/10 text-primary flex size-6 shrink-0 items-center justify-center rounded-full">
+				<Eye className="size-3.5" aria-hidden="true" />
 			</span>
-			{/* U1 shell: on a narrow screen the detail takes its own line under the title and the button. */}
-			<span className="text-muted-foreground order-last min-w-0 basis-full text-[13px] sm:order-none sm:flex-1 sm:basis-0">
-				{t("demo.detail")}
+			<span className="min-w-0 flex-1 truncate">
+				<span className="font-medium">{t("demo.banner")}</span>
+				<span className="text-muted-foreground hidden sm:inline"> · {tu("banner.detail")}</span>
 			</span>
-			{/* L21 onboarding: the guest CTA leads with GitHub when the server offers it. */}
-			<span className="ml-auto flex flex-wrap items-center gap-2 sm:ml-0">
-				{session.github && (
-					<Button asChild size="sm" className="h-7">
-						<a href={githubStartUrl(href)} data-testid="demo-banner-github">
-							<Github className="size-3.5" aria-hidden="true" />
-							{tw("guest.cta")}
-						</a>
-					</Button>
-				)}
-				<Button asChild variant="outline" size="sm" className="h-7">
+			{/* L21 onboarding: the one guest CTA leads with GitHub when the server offers it. */}
+			{session.github ? (
+				<Button asChild size="sm" className="h-7 shrink-0 rounded-full px-3">
+					<a href={githubStartUrl(href)} data-testid="demo-banner-github" title={tw("guest.cta")}>
+						<Github className="size-3.5" aria-hidden="true" />
+						<span className="hidden sm:inline">{tw("guest.cta")}</span>
+						<span className="sm:hidden">{t("demo.signIn")}</span>
+					</a>
+				</Button>
+			) : (
+				<Button asChild size="sm" className="h-7 shrink-0 rounded-full px-3">
 					<Link to="/login" search={{ return_to: href }} data-testid="demo-banner-sign-in">
 						{t("demo.signIn")}
+						<ArrowRight className="size-3.5" aria-hidden="true" />
 					</Link>
 				</Button>
-			</span>
+			)}
 		</div>
 	);
 }

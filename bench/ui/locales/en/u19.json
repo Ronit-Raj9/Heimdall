@@ -1,0 +1,46 @@
+{
+	"pitch": {
+		"eyebrow": "Heimdall",
+		"title": "The release gate for AI agents",
+		"body": "Know if an agent change is safe to ship before your users find out.",
+		"run": { "title": "Run any agent on real benchmarks", "body": "Coding, browser, voice, tools and more, on tasks you can trust." },
+		"bifrost": { "title": "Every model call through Bifrost", "body": "One gateway for cost, faults and a full trace of each call." },
+		"sealed": { "title": "Verdicts you can trust", "body": "Sealed evidence behind every pass, fail and regression." },
+		"footer": "Built on Bifrost"
+	},
+	"login": {
+		"title": "Welcome back",
+		"subtitle": "Sign in to run and review your agents.",
+		"orEmail": "or sign in with email",
+		"judgeTitle": "Judging?",
+		"judgeBody": "Use the judge account email and password from the submission notes."
+	},
+	"signup": {
+		"orEmail": "or sign up with email"
+	},
+	"banner": {
+		"detail": "Real results, read only."
+	},
+	"quickstart": {
+		"title": "Get started",
+		"subtitle": "Four commands from your repo to a release verdict.",
+		"step": "Step {{n}}",
+		"copy": "Copy command",
+		"copied": "Copied",
+		"steps": {
+			"init": "Detects your tests, agents and Docker, then writes .heimdall/.",
+			"mine": "Turns past commits into tasks your agent must solve.",
+			"compare": "Runs both versions side by side and prints the verdict.",
+			"ci": "Adds a GitHub check that comments on every pull request."
+		},
+		"costFree": "Free",
+		"costForecast": "Forecast first",
+		"minedTitle": "Mined tasks",
+		"minedSubtitle": "Review drafted instructions before you trust the results.",
+		"needsReview_one": "{{count}} needs review",
+		"needsReview_other": "{{count}} need review",
+		"allReviewed": "All reviewed",
+		"minedCount": "{{mined}} of {{tasks}} mined",
+		"showCommands": "Review commands"
+	}
+}
