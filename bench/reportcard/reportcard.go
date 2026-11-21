@@ -36,6 +36,10 @@ const (
 	metricSafeSuccess    = "safe_success"
 	metricCheatingRate   = "cheating_rate"
 	metricAttackSucceded = "reward_attack_succeeded" // AgentDojo reward dimension under an attack
+	// Report-only process metrics (graders/process.go).
+	metricProcessMatch     = "process_tool_match"
+	metricProcessRatio     = "process_step_ratio"
+	metricProcessRedundant = "process_redundant_calls"
 )
 
 // Conf is the level of the score interval.
@@ -90,6 +94,21 @@ type Metrics struct {
 	// (the out-of-memory killer ended the agent), infra_error,
 	// invalid_evaluator, unknown. They are never the agent's failures.
 	Excluded map[string]int `json:"excluded,omitempty"`
+	// Process holds the report-only process scores of the runs whose task
+	// names a reference tool path; nil when none does. It never feeds Score.
+	Process *Process `json:"process,omitempty"`
+}
+
+// Process is one arm's process scores: ToolMatch is the share of runs whose
+// tool path matched the reference, StepRatio the median of tool calls over
+// the reference's, RedundantCalls the median of repeated identical calls.
+// Runs counts the runs with a tool path score; a field no run observed is
+// null.
+type Process struct {
+	Runs           int      `json:"runs"`
+	ToolMatch      *float64 `json:"tool_match"`
+	StepRatio      *float64 `json:"step_ratio"`
+	RedundantCalls *float64 `json:"redundant_calls"`
 }
 
 // Capability is the rollup of every benchmark of one capability.
@@ -554,7 +573,71 @@ func metricsOf(runs []graded) Metrics {
 	m.Steps = median(runs, metricSteps)
 	m.ToolCalls = median(runs, metricToolCalls)
 	m.WallS = round(median(runs, metricWallTime))
+	m.Process = processOf(runs)
 	return m
+}
+
+// processOf aggregates the process metrics of runs; nil when no run has a
+// tool path score.
+func processOf(runs []graded) *Process {
+	matches := observed(runs, metricProcessMatch)
+	if len(matches) == 0 {
+		return nil
+	}
+	p := &Process{Runs: len(matches)}
+	t := 0.0
+	for _, x := range matches {
+		t += x
+	}
+	v := round(t / float64(len(matches)))
+	p.ToolMatch = &v
+	if len(observed(runs, metricProcessRatio)) > 0 {
+		r := round(median(runs, metricProcessRatio))
+		p.StepRatio = &r
+	}
+	if len(observed(runs, metricProcessRedundant)) > 0 {
+		r := round(median(runs, metricProcessRedundant))
+		p.RedundantCalls = &r
+	}
+	return p
+}
+
+// rollupProcess weights each part's process scores by its scored runs.
+func rollupProcess(parts []Metrics) *Process {
+	var out *Process
+	type acc struct{ sum, w float64 }
+	var match, ratio, red acc
+	add := func(a *acc, v *float64, w float64) {
+		if v != nil {
+			a.sum += *v * w
+			a.w += w
+		}
+	}
+	for _, p := range parts {
+		if p.Process == nil || p.Process.Runs == 0 {
+			continue
+		}
+		if out == nil {
+			out = &Process{}
+		}
+		w := float64(p.Process.Runs)
+		out.Runs += p.Process.Runs
+		add(&match, p.Process.ToolMatch, w)
+		add(&ratio, p.Process.StepRatio, w)
+		add(&red, p.Process.RedundantCalls, w)
+	}
+	if out == nil {
+		return nil
+	}
+	get := func(a acc) *float64 {
+		if a.w == 0 {
+			return nil
+		}
+		v := round(a.sum / a.w)
+		return &v
+	}
+	out.ToolMatch, out.StepRatio, out.RedundantCalls = get(match), get(ratio), get(red)
+	return out
 }
 
 func observed(runs []graded, id string) []float64 {
@@ -662,6 +745,7 @@ func rollup(parts []Metrics, cs []cluster) Metrics {
 		out.Tokens = &tokens
 	}
 	out.Steps, out.ToolCalls, out.WallS = round(out.Steps/n), round(out.ToolCalls/n), round(out.WallS/n)
+	out.Process = rollupProcess(parts)
 	return out
 }
 

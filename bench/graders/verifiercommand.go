@@ -75,7 +75,8 @@ func (g *verifierCommand) VerifierNetwork() string { return verifierNetwork }
 // image is verified in its verifier_image or task image; in snapshot mode the
 // verifier runs on the frozen agent container instead, with the run's own
 // workspace (applyScenario). Exported service state and the answer are
-// mounted at /grader/state and /grader/answer.txt when the run has them. A diff that does not
+// mounted at /grader/state and /grader/answer.txt, and the trajectory
+// (steps.jsonl, tools.jsonl) under /grader/trajectory, when the run has them. A diff that does not
 // apply, a timeout, or a missing, oversized or unparseable result file are
 // fails: the reference solution passed this verifier at admission. Only a
 // broken required-test list (junit) makes the evaluator invalid; any other

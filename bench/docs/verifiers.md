@@ -21,8 +21,39 @@ Each grade runs in containers created for that grade only and removed before it 
 | network | none |
 | limits | all capabilities dropped, no new privileges, read-only root filesystem, 2 CPUs, 2 GiB memory, 512 processes |
 | `timeout_s` | default 300; the container is killed when it expires |
+| `/grader/trajectory/steps.jsonl`, `/grader/trajectory/tools.jsonl` | the run's step timeline and tool proxy ledger, read-only, when the run has them, so a verifier can score the path as well as the end state (return `dimensions` in a reward file) |
 
 Anything the command prints goes to a 64 KiB buffer kept only for the debug log. Grading never depends on it.
+
+## Process scores (report only)
+
+A task can name the tool path a good run takes. The process metrics compare
+each run's tool calls with it and are shown beside the score, never inside
+it: they do not change `verified_success`, a gate or a verdict.
+
+```yaml
+process:
+  match: strict              # strict (same calls, same order), unordered, subset (no call outside the path), superset (every path call made)
+  expected_tools:
+    - name: lookup_order
+      args: {order_id: A-2001}  # optional; compared as a subset unless args_match: exact
+    - name: refund_order
+  # or: reference: reference.tools.jsonl  (a tools.jsonl copied from a good run, relative to the task folder)
+  reference_steps: 4         # optional; default the length of the path
+  max_steps_ratio: 1.5       # optional; flags a run with more calls than this multiple
+```
+
+| Metric | What it is |
+|---|---|
+| `process_tool_match` | 1 when the run's tool calls match the path under `match`, else 0 |
+| `process_step_ratio` | the run's tool calls over the reference's (1 is the same, 2 twice as many) |
+| `process_redundant_calls` | calls repeating an earlier call's name and arguments |
+
+The run's calls come from the tool proxy ledger (names and arguments) or,
+without one, from the tool calls the model requested through the gateway
+(names only: arguments are not compared and `process_redundant_calls` is
+unknown). A run with no observed tool calls is unknown, never a mismatch.
+The report card shows them per benchmark as "Process (report only)".
 
 ## The three result formats
 

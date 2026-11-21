@@ -146,6 +146,7 @@ func (g *visualGrader) judge(ctx context.Context, rc *schemas.RunContext, spec *
 		return nil, nil, errors.New("gateway returned the run's own key for the vision judge")
 	}
 	defer (&judge{cfg: jc}).revoke(ctx, key)
+	ctx = utils.WithMaximHeaders(ctx, utils.MaximHeaders(rc, utils.MaximRoleVisualJudge))
 	votes := max(j.Votes, 1)
 	var usd float64
 	priced, unpriced := true, ""
@@ -265,6 +266,9 @@ func (g *visualGrader) visionCall(ctx context.Context, key *schemas.RunKey, j *s
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(virtualKeyHeader, key.Value)
+	for _, h := range utils.MaximHeadersFrom(ctx) { // X23: tagged as Heimdall's own call for Bifrost's Maxim plugin
+		req.Header.Set(h[0], h[1])
+	}
 	client := jc.HTTP
 	if client == nil {
 		client = &http.Client{Timeout: judgeHTTPTimeout}

@@ -68,6 +68,7 @@ import {
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { RUN_TABS, hiddenRunTabs, type RunTabId } from "./runTabs";
+import { MaximRunButton } from "./maximRunButton";
 
 /**
  * /runs/$runId: one run. The header names its experiment, task, arm and outcome; the tabs hold
@@ -205,6 +206,7 @@ export default function RunView({ runId }: { runId: string }) {
             />
             <RunExportMenu runId={runId} sealed={Boolean(d.sealed)} />
             <ShareButton kind="run_trace" target={runId} />
+            <MaximRunButton runId={runId} sealed={Boolean(d.sealed)} />
             {slot.pair_id ? (
               <Button variant="outline" size="sm" asChild>
                 <Link

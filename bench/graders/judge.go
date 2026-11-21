@@ -276,6 +276,7 @@ func (g *judge) vote(ctx context.Context, rc *schemas.RunContext, spec schemas.J
 		return nil, errors.New("gateway returned the run's own key for the judge")
 	}
 	defer g.revoke(ctx, key)
+	ctx = utils.WithMaximHeaders(ctx, utils.MaximHeaders(rc, utils.MaximRoleJudge))
 	rec := &schemas.JudgeRecord{Model: spec.Model, PromptVersion: spec.PromptVersion, PriceRef: g.cfg.PriceRef}
 	var usd float64
 	priced, unpriced := true, ""
@@ -373,6 +374,9 @@ func (g *judge) call(ctx context.Context, key *schemas.RunKey, spec schemas.Judg
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(virtualKeyHeader, key.Value)
+	for _, h := range utils.MaximHeadersFrom(ctx) { // X23: tagged as Heimdall's own call for Bifrost's Maxim plugin
+		req.Header.Set(h[0], h[1])
+	}
 	resp, err := g.cfg.HTTP.Do(req)
 	if err != nil {
 		return "", nil, "", fmt.Errorf("call gateway: %w", err)

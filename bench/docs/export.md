@@ -113,7 +113,7 @@ Output: one record per line on stdout, one file for a one-arm experiment, or `<e
 | `langsmith` | `https://api.smith.langchain.com/otel/v1/traces` | `x-api-key` (`LANGSMITH_API_KEY`), optional `Langsmith-Project` (`LANGSMITH_PROJECT`) | protobuf | `langsmith.span.kind` (llm, tool, chain), `langsmith.trace.session_id`, `langsmith.metadata.*` |
 | `braintrust` | `https://api.braintrust.dev/otel/v1/traces` | `Authorization: Bearer` (`BRAINTRUST_API_KEY`), `x-bt-parent: project_id:<id>` (`BRAINTRUST_PROJECT_ID`) | protobuf | `braintrust.span_attributes.type` (task, score), `braintrust.metadata.*`; model and tool spans map from `gen_ai.operation.name` as Braintrust documents |
 | `datadog` | none: pass `-endpoint` (per Datadog site) | `dd-api-key` (`DD_API_KEY`), `dd-otlp-source: llmobs`, `DD-LLMObs-Enabled: true` | protobuf | resource `dd_llmobs_enabled=true`; the GenAI attributes already written |
-| `maxim` | `https://api.getmaxim.ai/v1/otel` | `x-maxim-api-key` (`MAXIM_API_KEY`), `x-maxim-repo-id` (`MAXIM_LOG_REPO_ID`) | JSON | root `maxim.metadata`: trace name, run facts as trace tags, verified success as a trace metric |
+| `maxim` | `https://api.getmaxim.ai/v1/otel` | `x-maxim-api-key` (`MAXIM_API_KEY`), `x-maxim-repo-id` (`MAXIM_LOG_REPO_ID`) | JSON | root `maxim.metadata`: trace name, run facts as trace tags, verified success as a trace metric, the experiment as the session (`maxim-session-id: heimdall-<exp>`) |
 | `phoenix` | `http://localhost:6006/v1/traces` | optional `Authorization: Bearer` (`PHOENIX_API_KEY`) | protobuf | resource `openinference.project.name=heimdall`; `openinference.span.kind` (LLM, TOOL, AGENT, CHAIN, EVALUATOR, GUARDRAIL), `llm.model_name`, `llm.provider`, `llm.token_count.{prompt,completion,total}`, `tool.name`, `session.id` |
 | `jaeger` | `http://localhost:4318/v1/traces` | none | JSON | none |
 
@@ -124,6 +124,30 @@ Verified from the documents: every URL path, header name and fixed header value 
 - the variable names `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` (the Langfuse page names only the Basic auth string), `LANGSMITH_PROJECT` and `MAXIM_LOG_REPO_ID` are the presets' choices;
 - whether LangSmith, Braintrust (traces) and Phoenix accept OTLP/JSON: not stated, so those presets send protobuf, the OpenTelemetry exporters' default;
 - the Datadog intake host, which the page fills in per site by script.
+
+## Maxim connection (Integrations page)
+
+An org can connect Maxim once instead of using the CLI preset: Integrations,
+Maxim, with an API key (kept encrypted in the key store, never shown again,
+only its last four characters), the workspace id and the log repository id.
+`Test connection` reads `GET /v1/log-repositories?workspaceId=&id=`. With
+"Send finished runs automatically" on, every run that seals is sent through
+the `maxim` preset above (no tool payloads, only their hashes and sizes);
+a held-out task's run is never sent. Each run page then has "Open in Maxim"
+(or "Send to Maxim" for a run sent before the connection, or one that
+failed). The link template defaults to
+`https://app.getmaxim.ai/workspace/{workspace_id}/log-repository/{repo_id}/logs?traceId={trace_id}`:
+Maxim does not document its web app's trace URL, so the template can be
+changed. API: `GET|PUT|DELETE /integrations/maxim`,
+`POST /integrations/maxim/test`, `GET /runs/{id}/maxim`,
+`POST /runs/{id}/maxim/push`.
+
+Heimdall's own model calls through Bifrost (the judge, the visual judge and
+the model-played user) carry `x-bf-maxim-session-id: heimdall-<exp>`, a
+generation name and `x-bf-maxim-heimdall-run`, `-experiment`, `-task`,
+`-arm` and `-role` tags, which Bifrost's Maxim plugin turns into tags
+(https://docs.getbifrost.ai/features/observability/maxim). A gateway
+without the plugin ignores them.
 
 ## Inspect logs: not written
 

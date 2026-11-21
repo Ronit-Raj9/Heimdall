@@ -46,6 +46,10 @@ const (
 	EnvServiceGatewayKey = "BENCH_SVC_GATEWAY_KEY"
 	EnvServiceModel      = "BENCH_SVC_MODEL"
 	EnvServiceBudgetUSD  = "BENCH_SVC_BUDGET_USD"
+	// EnvServiceGatewayHeaders is a JSON object of x-bf-maxim-* headers the
+	// service adds to its gateway calls (X23, utils.MaximHeaders), so a
+	// simulated user's calls are logged as Heimdall's for the run.
+	EnvServiceGatewayHeaders = "BENCH_SVC_GATEWAY_HEADERS"
 	// ServiceGatewayExport is the export id of a service's gateway rows.
 	ServiceGatewayExport = "_gateway.json"
 )
@@ -178,11 +182,18 @@ func (e *dockerWorkspace) mintServiceKey(ctx context.Context, rc *schemas.RunCon
 
 // serviceGatewayEnvFile writes the service's gateway variables to an env
 // file and returns its path; the caller removes it.
-func serviceGatewayEnvFile(agentURL string, g *schemas.ServiceGateway, key *schemas.RunKey) (string, error) {
+func serviceGatewayEnvFile(agentURL string, g *schemas.ServiceGateway, key *schemas.RunKey, headers map[string]string) (string, error) {
 	lines := []string{
 		EnvServiceGatewayURL + "=" + strings.TrimRight(agentURL, "/"),
 		EnvServiceGatewayKey + "=" + key.Value,
 		EnvServiceModel + "=" + g.Provider + "/" + g.Model,
+	}
+	if len(headers) > 0 {
+		b, err := json.Marshal(headers)
+		if err != nil {
+			return "", fmt.Errorf("encode service gateway headers: %w", err)
+		}
+		lines = append(lines, EnvServiceGatewayHeaders+"="+string(b))
 	}
 	if g.BudgetUSD > 0 {
 		lines = append(lines, fmt.Sprintf("%s=%g", EnvServiceBudgetUSD, g.BudgetUSD))
@@ -206,7 +217,7 @@ func (e *dockerWorkspace) prepareServiceGateway(ctx context.Context, rc *schemas
 	if err != nil {
 		return nil, func() {}, err
 	}
-	f, err := serviceGatewayEnvFile(gwURL, g, key)
+	f, err := serviceGatewayEnvFile(gwURL, g, key, utils.MaximHeaders(rc, utils.MaximRoleSimUser))
 	if err != nil {
 		return nil, func() {}, err
 	}

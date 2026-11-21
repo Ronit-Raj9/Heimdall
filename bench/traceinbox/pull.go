@@ -20,15 +20,16 @@ import (
 // session errored, so a thumbs-down and an error on the same request stay
 // apart.
 const (
-	FlagScore    = "score"
-	FlagFeedback = "feedback"
-	FlagLevel    = "level_error"
-	FlagTag      = "tag"
-	FlagError    = "error"
-	FlagRetries  = "retries"
-	FlagFallback = "fallback"
-	FlagBudget   = "budget"
-	FlagPushed   = "pushed"
+	FlagScore     = "score"
+	FlagFeedback  = "feedback"
+	FlagLevel     = "level_error"
+	FlagTag       = "tag"
+	FlagError     = "error"
+	FlagRetries   = "retries"
+	FlagFallback  = "fallback"
+	FlagBudget    = "budget"
+	FlagPushed    = "pushed"
+	FlagEvaluator = "evaluator" // maxim: an online evaluator failed the trace
 )
 
 // Flagged is one session a source flagged, before redaction.
@@ -130,6 +131,8 @@ func (ib *Inbox) fetcher(kind string) (Fetcher, error) {
 		return &bifrostFetcher{c: c, getenv: ib.getenv}, nil
 	case KindOTLPDir:
 		return &otlpDirFetcher{}, nil
+	case KindMaxim:
+		return &maximFetcher{c: c, getenv: ib.getenv}, nil
 	}
 	return nil, fmt.Errorf("source kind %s cannot be pulled", kind)
 }

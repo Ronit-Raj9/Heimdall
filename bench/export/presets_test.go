@@ -221,6 +221,9 @@ func TestMaximMetadataIsJSON(t *testing.T) {
 	if meta["maxim-trace-name"] == "" || meta["maxim-trace-tags"] == nil {
 		t.Fatalf("meta = %v", meta)
 	}
+	if exp := attrStr(root.Attributes, "heimdall.experiment"); exp != "" && meta["maxim-session-id"] != "heimdall-"+exp {
+		t.Fatalf("session id = %v for experiment %s", meta["maxim-session-id"], exp)
+	}
 }
 
 // bodyAttrKeys returns every span attribute key in a collector body, read

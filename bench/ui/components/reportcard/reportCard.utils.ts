@@ -5,6 +5,7 @@ import type {
 	ReportBenchmark,
 	ReportCapability,
 	ReportReliabilityCard,
+	ReportProcess,
 } from "@/lib/store/apis/evaluationsApi";
 
 /** Capability rows, always shown in this order. Others found in the report follow. */
@@ -347,3 +348,20 @@ export function ratio(x: number | undefined | null): string {
 	if (x === undefined || x === null || !Number.isFinite(x)) return "-";
 	return `x${x.toFixed(2)}`;
 }
+/** True when any arm on the row has process scores from at least one run. */
+export function hasProcess(arms: Record<string, { process?: ReportProcess } | undefined>): boolean {
+	return Object.values(arms).some((m) => (m?.process?.runs ?? 0) > 0);
+}
+
+/** "Path match 75% · Steps 1.4x ref · Repeats 0"; parts with no value are left out. */
+export function formatProcess(p: ReportProcess | undefined): string {
+	if (!p || p.runs <= 0) return "-";
+	const parts: string[] = [];
+	if (p.tool_match !== null && Number.isFinite(p.tool_match)) parts.push(`Path match ${pct(p.tool_match)}`);
+	if (p.step_ratio !== null && Number.isFinite(p.step_ratio)) parts.push(`Steps ${p.step_ratio.toFixed(1)}x ref`);
+	if (p.redundant_calls !== null && Number.isFinite(p.redundant_calls)) parts.push(`Repeats ${Math.round(p.redundant_calls * 10) / 10}`);
+	return parts.length ? parts.join(" \u00b7 ") : "-";
+}
+
+export const PROCESS_NOTE =
+	"Process scores compare the agent's tool calls with the task's reference path. They are report only and never change the score.";

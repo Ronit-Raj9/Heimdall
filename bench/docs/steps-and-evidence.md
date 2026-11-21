@@ -715,3 +715,16 @@ kept). A run without process records is judged on its other evidence only.
   its self-report (events as agent-reported rows, usage in `reported_tokens`
   and `reported_cost_usd` only); `evidence.json` summarizes which channels
   were active under `remote` (docs/remote-execution.md).
+
+## Search inside traces
+
+`GET /api/bench/search` (the "Search inside traces" box on Runs) finds
+sealed runs across experiments by the text of their steps, tool calls (name,
+arguments and result), final answer, fired gate reasons and grade reason.
+All words must match within one run; `"quoted phrases"` match as written;
+`tool:NAME` requires a call of that tool; `agent:`, `version:`,
+`benchmark:` and `outcome:` filter exactly, as do the same query
+parameters. Each hit carries up to five passages with the matched spans.
+The index is derived (`resultsindex/search.go`): built in memory from the
+sealed run files, one document per run, cached by seal hash, and never read
+by a verdict. Held-out tasks are not searched.

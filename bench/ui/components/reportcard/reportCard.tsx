@@ -21,6 +21,9 @@ import {
 	duration,
 	excludedText,
 	faultName,
+	formatProcess,
+	hasProcess,
+	PROCESS_NOTE,
 	headline,
 	isAB,
 	visibleReport,
@@ -388,6 +391,20 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 						</p>
 					);
 				})}
+				{hasProcess(row.arms) && (
+					<div className="flex flex-col gap-1 text-xs" data-testid={`benchmark-process-${row.benchmark}`}>
+						<span className="text-muted-foreground font-medium" title={PROCESS_NOTE}>
+							Process (report only)
+						</span>
+						{report.arms.map((arm) => (
+							<span key={arm.label} className="text-foreground tabular-nums">
+								{ab && <span className="text-muted-foreground mr-1">{arm.label}</span>}
+								{formatProcess(row.arms[arm.label]?.process)}
+							</span>
+						))}
+						<span className="text-muted-foreground">{PROCESS_NOTE}</span>
+					</div>
+				)}
 				{row.experiment_id && !readOnly && (
 					<Link
 						to="/experiments/$expId"

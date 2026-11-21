@@ -74,7 +74,13 @@ type gradeInputs struct {
 	// artifactsDir is <run folder>/artifacts, mounted read-only at
 	// /grader/artifacts.
 	artifactsDir string
-	root         bool // the task runs as root (environment.user root): so does its verifier
+	// trajectorySteps and trajectoryTools are the run's step timeline
+	// (steps.jsonl) and tool proxy ledger (tools.jsonl), mounted read-only
+	// at /grader/trajectory/, so a verifier can score the path as well as
+	// the end state.
+	trajectorySteps string
+	trajectoryTools string
+	root            bool // the task runs as root (environment.user root): so does its verifier
 	// gpuArgs pass the run's GPUs to the verifier container (X7, gpu.go):
 	// the preparation step never gets them.
 	gpuArgs []string
@@ -510,6 +516,14 @@ func (j *gradeJob) volumes() []string {
 // diff, so the snapshot reaches it through the run folder.
 const snapshotRefFile = "snapshot.ref"
 
+// GraderTrajectoryDir is where a verifier finds the run's trajectory:
+// steps.jsonl (the step timeline) and tools.jsonl (the tool proxy ledger),
+// each mounted read-only when the run folder holds it.
+const GraderTrajectoryDir = "/grader/trajectory"
+
+// trajectoryToolsFile is the tool proxy ledger in the run folder.
+const trajectoryToolsFile = "tools.jsonl"
+
 var snapshotRefRe = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 
 // applyScenario adds a scenario task's inputs to a grade: in snapshot mode
@@ -517,8 +531,8 @@ var snapshotRefRe = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 // volume replace the clean-room build; a task with its own image is
 // verified in its verifier_image, else its task image, and when the image
 // seeds the workspace the pristine copy comes from it too; the exported
-// service state, answer and artifact files are mounted when the run folder
-// holds them. A plain task is left as it was.
+// service state, answer, artifact and trajectory files are mounted when the
+// run folder holds them. A plain task is left as it was.
 func applyScenario(rc *schemas.RunContext, in *gradeInputs) error {
 	in.root = utils.TaskRunsAsRoot(rc.Task)
 	if img, ok, err := utils.TaskImage(rc.Suite.ID, rc.Task); err != nil {
@@ -561,7 +575,13 @@ func applyScenario(rc *schemas.RunContext, in *gradeInputs) error {
 	if st, err := os.Lstat(filepath.Join(rc.Dir, utils.ArtifactsDir)); err == nil && st.IsDir() {
 		in.artifactsDir = filepath.Join(rc.Dir, utils.ArtifactsDir)
 	}
-	for _, p := range []*string{&in.stateDir, &in.answerFile, &in.artifactsDir} {
+	if st, err := os.Lstat(filepath.Join(rc.Dir, schemas.StepsFile)); err == nil && st.Mode().IsRegular() {
+		in.trajectorySteps = filepath.Join(rc.Dir, schemas.StepsFile)
+	}
+	if st, err := os.Lstat(filepath.Join(rc.Dir, trajectoryToolsFile)); err == nil && st.Mode().IsRegular() {
+		in.trajectoryTools = filepath.Join(rc.Dir, trajectoryToolsFile)
+	}
+	for _, p := range []*string{&in.stateDir, &in.answerFile, &in.artifactsDir, &in.trajectorySteps, &in.trajectoryTools} {
 		if *p == "" {
 			continue
 		}
@@ -613,7 +633,7 @@ func verifierIdentity(root bool) []string {
 }
 
 // scenarioMounts are the verifier's read-only mounts of the run's exported
-// state, answer and artifact files. It is pure.
+// state, answer, artifact and trajectory files. It is pure.
 func scenarioMounts(in *gradeInputs) []string {
 	var args []string
 	if in.stateDir != "" {
@@ -624,6 +644,12 @@ func scenarioMounts(in *gradeInputs) []string {
 	}
 	if in.artifactsDir != "" {
 		args = append(args, "-v", in.artifactsDir+":"+utils.GraderArtifactsDir+":ro")
+	}
+	if in.trajectorySteps != "" {
+		args = append(args, "-v", in.trajectorySteps+":"+GraderTrajectoryDir+"/"+schemas.StepsFile+":ro")
+	}
+	if in.trajectoryTools != "" {
+		args = append(args, "-v", in.trajectoryTools+":"+GraderTrajectoryDir+"/"+trajectoryToolsFile+":ro")
 	}
 	return args
 }

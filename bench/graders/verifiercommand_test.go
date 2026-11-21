@@ -439,3 +439,47 @@ func TestVerifierCommandArtifactInputs(t *testing.T) {
 		t.Fatalf("mounts %v, want %v", got, want)
 	}
 }
+
+// TestVerifierCommandTrajectoryInputs: the run's step timeline and tool
+// ledger reach the verifier read-only under /grader/trajectory; a folder of
+// that name is not mounted.
+func TestVerifierCommandTrajectoryInputs(t *testing.T) {
+	taskDir, err := filepath.Abs("testdata/task")
+	if err != nil {
+		t.Fatal(err)
+	}
+	task := &schemas.Task{Dir: taskDir, RepoDir: "repo", Verifier: schemas.TaskVerifier{Tests: "verifier/tests"}}
+	suite := &schemas.Suite{Version: "1.0.0", BaseImage: schemas.ImageSpec{Tag: "py:1"},
+		Verifier: schemas.SuiteVerifier{Result: "exit_code", Command: []string{"sh", "/grader/tests/test.sh"}}}
+	diff := &schemas.Diff{Path: filepath.Join("testdata", "patches", "pass.diff")}
+	t.Run("both files", func(t *testing.T) {
+		dir := t.TempDir()
+		for _, f := range []string{"steps.jsonl", "tools.jsonl"} {
+			if err := os.WriteFile(filepath.Join(dir, f), []byte("{}\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		in, _, err := newVerifierCommand(HiddenTestsConfig{}).inputs(&schemas.RunContext{Task: task, Suite: suite, Dir: dir}, diff)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := []string{"-v", filepath.Join(dir, "steps.jsonl") + ":/grader/trajectory/steps.jsonl:ro",
+			"-v", filepath.Join(dir, "tools.jsonl") + ":/grader/trajectory/tools.jsonl:ro"}
+		if got := scenarioMounts(in); !reflect.DeepEqual(got, want) {
+			t.Fatalf("mounts %v, want %v", got, want)
+		}
+	})
+	t.Run("not regular files", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(dir, "steps.jsonl"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		in, _, err := newVerifierCommand(HiddenTestsConfig{}).inputs(&schemas.RunContext{Task: task, Suite: suite, Dir: dir}, diff)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := scenarioMounts(in); len(got) != 0 {
+			t.Fatalf("mounts %v, want none", got)
+		}
+	})
+}

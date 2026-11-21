@@ -540,3 +540,32 @@ func TestArmNames(t *testing.T) {
 		}
 	}
 }
+
+func TestProcessScores(t *testing.T) {
+	obs := func(v float64) schemas.Value { return schemas.Observed(v, schemas.EvidenceGateway) }
+	runs := []graded{
+		{metrics: map[string]schemas.Value{metricProcessMatch: obs(1), metricProcessRatio: obs(1), metricProcessRedundant: obs(0)}},
+		{metrics: map[string]schemas.Value{metricProcessMatch: obs(0), metricProcessRatio: obs(2), metricProcessRedundant: obs(2)}},
+		{metrics: map[string]schemas.Value{metricProcessMatch: obs(1), metricProcessRatio: obs(1.5)}},
+		{metrics: map[string]schemas.Value{metricSteps: obs(3)}}, // no reference path
+	}
+	p := processOf(runs)
+	if p == nil || p.Runs != 3 || *p.ToolMatch != 0.6667 || *p.StepRatio != 1.5 || *p.RedundantCalls != 1 {
+		t.Fatalf("process %+v", p)
+	}
+	if processOf(runs[3:]) != nil {
+		t.Fatal("process without scored runs")
+	}
+	m := metricsOf(runs)
+	if m.Score != 0 || m.Process == nil {
+		t.Fatalf("metrics %+v", m)
+	}
+	one := 1.0
+	r := rollupProcess([]Metrics{{Runs: 3, Process: p}, {Runs: 1, Process: &Process{Runs: 1, ToolMatch: &one}}, {Runs: 2}})
+	if r == nil || r.Runs != 4 || *r.ToolMatch != 0.75 || *r.StepRatio != 1.5 {
+		t.Fatalf("rollup %+v", r)
+	}
+	if rollupProcess([]Metrics{{Runs: 2}}) != nil {
+		t.Fatal("rollup without process")
+	}
+}

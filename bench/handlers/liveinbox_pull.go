@@ -382,6 +382,10 @@ func InboxPullCheck(ctx context.Context, s Services, cfg *lib.Config) PullCheck 
 			n++
 			pc.url(&c, src.Host, what, PullLinkInboxSource)
 			pc.secret(&c, src.APIKeyEnv, what)
+		case traceinbox.KindMaxim: // X23
+			n++
+			pc.url(&c, firstNonEmptyStr(src.Host, traceinbox.DefaultMaximHost), what, PullLinkInboxSource)
+			pc.secret(&c, src.APIKeyEnv, what)
 		case traceinbox.KindOTLPDir:
 			if !pc.hosted {
 				n++
@@ -390,7 +394,7 @@ func InboxPullCheck(ctx context.Context, s Services, cfg *lib.Config) PullCheck 
 	}
 	if n == 0 {
 		c.Steps = append(c.Steps, PullStep{Problem: "no source to pull in inbox/sources.yaml",
-			Action: "Add a Bifrost, Langfuse or LangSmith source", Link: PullLinkInboxSource})
+			Action: "Add a Bifrost, Langfuse, LangSmith or Maxim source", Link: PullLinkInboxSource})
 		return c
 	}
 	c.Configured = true

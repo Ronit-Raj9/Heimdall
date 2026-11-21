@@ -146,7 +146,7 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		}),
 		Graders:       append([]schemas.Grader{graders.NewJudge(graders.JudgeConfig{Gateway: gw, URL: cfg.Gateway.URL, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref(), Logger: logger})}, graders.Builtin(graders.HiddenTestsConfig{Image: helper, Logger: logger, Docker: a.docker})...), // Memory and answers: the wired judge, ahead of Builtin's unwired one
 		Gates:         gates.Builtin(),
-		Metrics:       metrics.Builtin(),
+		Metrics:       append(metrics.Builtin(), graders.ProcessMetrics()...), // X23: report-only trajectory metrics (graders/process.go)
 		Policies:      verdict.Builtin(),
 		Reporters:     reporters.Builtin(),
 		Gateway:       gw,

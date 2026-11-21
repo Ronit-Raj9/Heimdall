@@ -107,7 +107,8 @@ type Filters struct {
 	Feedback   *FeedbackFilter `yaml:"feedback,omitempty"`    // langfuse, langsmith: negative user feedback
 	LevelError bool            `yaml:"level_error,omitempty"` // langfuse: an observation at level ERROR
 	Tags       []string        `yaml:"tags,omitempty"`        // langfuse: traces carrying any of these tags
-	Errors     bool            `yaml:"errors,omitempty"`      // langsmith, bifrost, otlp_dir: errored runs, requests or spans
+	Errors     bool            `yaml:"errors,omitempty"`      // langsmith, bifrost, otlp_dir, maxim: errored runs, requests, spans or traces
+	Evaluators []string        `yaml:"evaluators,omitempty"`  // maxim: traces an online evaluator of these names failed
 	MinRetries int             `yaml:"min_retries,omitempty"` // bifrost: requests retried at least this often
 	Fallbacks  bool            `yaml:"fallbacks,omitempty"`   // bifrost: requests served by a fallback
 	Budget     bool            `yaml:"budget,omitempty"`      // bifrost: requests refused by a budget
@@ -256,10 +257,11 @@ func (s *Source) Validate() error {
 		KindBifrost:   {"url", "ui_url", "token_env", "virtual_keys", "errors", "min_retries", "fallbacks", "budget"},
 		KindOTLPDir:   {"path", "pattern", "errors"},
 		KindWebhook:   {"token_env", "rate_per_minute", "max_bytes"},
+		KindMaxim:     {"host", "api_key_env", "workspace", "project", "errors", "evaluators"},
 	}
 	ok, known := allowed[s.Kind]
 	if !known {
-		return wrap("kind %q: want langfuse, langsmith, bifrost, otlp_dir or webhook", s.Kind)
+		return wrap("kind %q: want langfuse, langsmith, bifrost, otlp_dir, maxim or webhook", s.Kind)
 	}
 	for _, f := range used {
 		if !slices.Contains(ok, f) {
@@ -303,6 +305,18 @@ func (s *Source) Validate() error {
 		}
 		if fb := s.Filters.Feedback; fb != nil && fb.Below == nil {
 			return wrap("langsmith feedback needs below (feedback scores are numeric)")
+		}
+	case KindMaxim:
+		if s.APIKeyEnv == "" || s.Workspace == "" || s.Project == "" {
+			return wrap("a maxim source needs api_key_env, workspace (the workspace id) and project (the log repository id)")
+		}
+		if !s.Filters.Errors && len(s.Filters.Evaluators) == 0 {
+			return wrap("no filter: set errors or evaluators")
+		}
+		for _, e := range s.Filters.Evaluators {
+			if strings.TrimSpace(e) == "" {
+				return wrap("an evaluator name is empty")
+			}
 		}
 	case KindBifrost:
 		if !s.Filters.Errors && s.Filters.MinRetries <= 0 && !s.Filters.Fallbacks && !s.Filters.Budget {
@@ -363,6 +377,7 @@ func (s *Source) usedFields() []string {
 	add("min_retries", f.MinRetries != 0)
 	add("fallbacks", f.Fallbacks)
 	add("budget", f.Budget)
+	add("evaluators", len(f.Evaluators) > 0)
 	return out
 }
 
@@ -429,6 +444,10 @@ func defaultLink(s *Source) string {
 		return "{host}/project/{project}/traces/{trace_id}"
 	case KindBifrost:
 		return "{ui_url}/workspace/logs?selected_log={row_id}"
+	case KindMaxim:
+		// Maxim does not document its web app's trace URL; this is the same
+		// best guess as the Maxim connection's default (maxim package).
+		return "https://app.getmaxim.ai/workspace/{workspace}/log-repository/{project}/logs?traceId={trace_id}"
 	}
 	return ""
 }

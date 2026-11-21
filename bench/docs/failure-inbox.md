@@ -118,7 +118,7 @@ after `Retry-After` (at most 60 seconds) or a doubling wait.
 `link` is a URL template back to the original trace. `{host}`, `{project}`,
 `{trace_id}`, `{url}` and `{ui_url}` are replaced. Defaults: Langfuse
 `{host}/project/{project}/traces/{trace_id}`, Bifrost
-`{ui_url}/workspace/logs?selected_log=<row id>`, LangSmith none (its UI path
+`{ui_url}/workspace/logs?selected_log=<row id>`, Maxim the log repository page, LangSmith none (its UI path
 needs your organization id; set `link`).
 
 ### Langfuse
@@ -175,6 +175,32 @@ LangSmith inputs and outputs are free JSON shaped by the framework that
 traced them; the conversion reads the common shapes (OpenAI-style messages,
 LangChain message objects, `input`, `question` or `query` strings) and is
 best effort. Self-hosted LangSmith needs v0.16 or later for these endpoints.
+
+### Maxim
+
+```yaml
+- name: prod-maxim
+  kind: maxim
+  host: https://api.getmaxim.ai              # optional, the default
+  api_key_env: MAXIM_API_KEY                 # x-maxim-api-key header
+  workspace: <workspace id>
+  project: <log repository id>
+  filters:
+    errors: true                             # traces Maxim marks as errors
+    evaluators: ["Task Success"]             # traces an online evaluator of this name failed
+```
+
+How it reads: `POST /v1/log-repositories/logs/search` (type `trace`, a
+`timestamp` window, `traceFilters` with `isError = true` or
+`evaluatorFilters` with `<name> is fail`, page paging of 50), then each trace
+through `GET /v1/log-repositories/logs/traces?id=`. The first generation's
+messages (or the trace input) are the request, each tool span is a call with
+its result or error, the trace output is the final answer, and a failed
+evaluator's reasoning is kept as the flag reason. The default `link` is
+`https://app.getmaxim.ai/workspace/{workspace}/log-repository/{project}/logs?traceId={trace_id}`;
+Maxim does not document its web app's trace URL, so set `link` if yours
+differs. No real Maxim has been called yet; the tests use a local fake of
+these endpoints.
 
 ### Bifrost gateway
 
