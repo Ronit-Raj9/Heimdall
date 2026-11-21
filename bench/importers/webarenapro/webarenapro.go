@@ -355,7 +355,9 @@ func writeTask(dir string, c candidate, set settings) (bool, error) {
 	if set.judgeModel != "off" && why != "" {
 		runtime.Gateway = &schemas.ServiceGateway{Provider: set.judgeProv, Model: set.judgeModel}
 	}
-	services := []schemas.ServiceSpec{runtime}
+	// Sites first: services start in order and the runtime's ready check
+	// waits for them.
+	var services []schemas.ServiceSpec
 	for _, s := range sites {
 		img := ep.Images[s]
 		if img == "" {
@@ -364,6 +366,7 @@ func writeTask(dir string, c candidate, set settings) (bool, error) {
 		services = append(services, schemas.ServiceSpec{ID: s, Role: "data", Hidden: true, Image: img,
 			Env: map[string]string{"WP_EVAL_TOKEN": token}})
 	}
+	services = append(services, runtime)
 
 	tags := []string{"split:" + c.split}
 	for _, s := range sites {
