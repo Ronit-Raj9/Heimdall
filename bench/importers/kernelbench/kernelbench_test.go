@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -25,7 +26,11 @@ func TestEstimateInputBytes(t *testing.T) {
 		{"N = 2048 * 2\ndef get_inputs():\n    A = torch.rand(N, N)\n    B = torch.rand(N, N)\n    return [A, B]\n", 2 * 4096 * 4096 * 4, ""},
 		{"b = 16\nh = w = 8\ndef get_inputs():\n    return [torch.randn(b, 3, h, w)]\ndef get_init_inputs():\n    return []\n", 16 * 3 * 8 * 8 * 4, ""},
 		{"n = 2 ** 10\ndef get_inputs():\n    return [torch.randint(0, 10, (n,))]\n", 1024 * 4, ""},
-		{"s = (4000,)\ndef get_inputs():\n    return [torch.rand(128, *s)]\n", 0, "size"},
+		{"s = (4000,)\ndef get_inputs():\n    return [torch.rand(128, *s)]\n", 128 * 4000 * 4, ""},
+		{"b = 2\ns = (b * 3, 5)\ndef get_inputs():\n    return [torch.rand(b, *s)]\n", 2 * 6 * 5 * 4, ""},
+		{"depth, height, width = 4, 8, 2 * 8\ndef get_inputs():\n    return [torch.rand(2, depth, height, width)]\n", 2 * 4 * 8 * 16 * 4, ""},
+		{"a, b = 4, n\ndef get_inputs():\n    return [torch.rand(a)]\n", 0, "unknown name a"},
+		{"def get_inputs():\n    return [torch.rand(128, *shape)]\n", 0, "not a known tuple constant"},
 		{"def get_inputs():\n    return [torch.rand(n)]\n", 0, "unknown name n"},
 		{"def get_inputs():\n    return [torch.rand(4) for _ in range(3)]\n", 0, "loops"},
 		{"x = 3\n", 0, "no module-level def get_inputs"},
@@ -69,14 +74,14 @@ func TestImportFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Join(res.Tasks, ",") != "l1-001-square-matrix-multiplication,l1-050-conv-standard-2d" {
+	if strings.Join(res.Tasks, ",") != "l1-001-square-matrix-multiplication,l1-050-conv-standard-2d,l1-089-cumsum" {
 		t.Errorf("tasks %v", res.Tasks)
 	}
 	reasons := map[string]string{}
 	for _, s := range res.Skipped {
 		reasons[s.ID] = s.Reason
 	}
-	if !strings.Contains(reasons["19_ReLU"], "over max_input_mb 256") || !strings.Contains(reasons["89_cumsum"], "not known without running it") {
+	if !strings.Contains(reasons["19_ReLU"], "over max_input_mb 256") || len(res.Skipped) != 1 {
 		t.Errorf("skips %+v", res.Skipped)
 	}
 	dir := filepath.Join(root, "benchmarks", "kb1")
@@ -129,8 +134,18 @@ func TestImportFixtures(t *testing.T) {
 }
 
 func TestSettings(t *testing.T) {
-	if _, err := parseSettings(map[string]string{"level": "2"}); err == nil {
-		t.Error("level 2 accepted")
+	for _, lv := range []string{"2", "3"} {
+		if s, err := parseSettings(map[string]string{"level": lv}); err != nil || strconv.Itoa(s.level) != lv {
+			t.Errorf("level %s: %+v %v", lv, s, err)
+		}
+	}
+	for _, lv := range []string{"4", "0", "x"} {
+		if _, err := parseSettings(map[string]string{"level": lv}); err == nil {
+			t.Errorf("level %s accepted", lv)
+		}
+	}
+	if s, _ := parseSettings(nil); s.level != 1 {
+		t.Errorf("default level %d, want 1", s.level)
 	}
 	if _, err := parseSettings(map[string]string{"nope": "1"}); err == nil {
 		t.Error("unknown setting accepted")
@@ -148,5 +163,27 @@ func TestSettings(t *testing.T) {
 	b, _ := os.ReadFile(filepath.Join(root, "benchmarks", "kb2", "tasks", res.Tasks[0], "instruction.md"))
 	if !strings.Contains(string(b), "at least 1.5 times as fast") {
 		t.Errorf("instruction: %s", b)
+	}
+}
+
+func TestReadProblemsLevel(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "KernelBench", "level2")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := "import torch\nclass Model(torch.nn.Module):\n    pass\nN = 4\ndef get_inputs():\n    return [torch.rand(N, N)]\ndef get_init_inputs():\n    return []\n"
+	if err := os.WriteFile(filepath.Join(dir, "7_Conv_ReLU.py"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	probs, err := readProblems(root, 2)
+	if err != nil || len(probs) != 1 || probs[0].level != 2 || probs[0].num != 7 {
+		t.Fatalf("%+v %v", probs, err)
+	}
+	if id := taskID(probs[0]); id != "l2-007-conv-relu" {
+		t.Errorf("task id %s", id)
+	}
+	if _, err := readProblems(root, 1); err == nil {
+		t.Error("level 1 read from a clone with only level2")
 	}
 }

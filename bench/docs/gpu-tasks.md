@@ -362,8 +362,14 @@ softmax through its ATen op).
 ## Importer: KernelBench
 
 `bifrost-bench import kernelbench -from <clone of KernelBench> -suite <id>
-[-ids 1,9,12,50,88] [-set max_input_mb=256] [-set speedup_target=0] [-set
+[-ids 1,9,12,50,88] [-set level=1] [-set max_input_mb=256] [-set speedup_target=0] [-set
 image=<tag>] [-set min_vram_mb=2048]`.
+
+`-set level` picks the upstream folder: 1 (100 single-operator problems,
+the default), 2 (100 fused-operator problems) or 3 (50 full architectures);
+task ids are `l<level>-<nnn>-<name>`, and one suite holds one level. Level
+4 (20 problems that load Hugging Face transformers models) is refused: it
+needs the transformers package and weights downloaded from the network.
 
 Verified on 18 Nov 2026 from the primary source,
 <https://github.com/ScalingIntelligence/KernelBench> at commit 423217d9
@@ -391,10 +397,13 @@ fast_1, and the unchanged reference can then not be admitted.
 estimates `get_inputs()` statically (module-level integer constants and
 `torch.rand`-like calls; anything else is unknown) and skips, with the
 reason, every problem over `max_input_mb` (default 256) or of unknown size.
-On the 100 level-1 problems at commit 423217d9 that imports 28, skips 59
-over 256 MiB of input and 13 whose sizes it cannot know without running
-them (they build inputs from a shape tuple, `torch.rand(batch_size,
-*input_shape)`). A larger card takes `-set max_input_mb=...`. The filter
+The estimate also reads unpacking assignments (`depth, height, width = 24,
+48, 48`) and tuple constants unpacked with `*` (`torch.rand(batch_size,
+*input_shape)`). At commit 423217d9 with the default 256 MiB that imports
+28 of 100 level-1, 79 of 100 level-2 and 41 of 50 level-3 problems; with
+`-set max_input_mb=16384` it imports 96, 97 and 49, and the rest are skipped
+with the reason (inputs built in a loop or from another tensor's shape, a
+name it cannot evaluate, or one level-2 problem whose inputs are over 16 GiB). A larger card takes `-set max_input_mb=...`. The filter
 reads inputs only: outputs and intermediates are not knowable without
 running the model, so admission is the real check.
 `9_Tall_skinny_matrix_multiplication_` has 8 MiB of input and a 32768 x 32768 output (4 GiB); its

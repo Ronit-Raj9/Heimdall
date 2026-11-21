@@ -202,6 +202,20 @@ corpus is fictional, so it covers no real GAIA question; the fixture's one
 web question is about that fictional coast and its cassette was recorded
 from the stand-in.
 
+**Importing them for live runs (`-set web=live`).** Instead of refusing a
+web question with no cassette, the importer can write it with the websearch
+tool and the Tavily route over an empty cassette, tagged `live-web`, and an
+instruction that says searches reach the web only when the run is set up for
+it. By default (replay, and always at admission) every search answers "not
+recorded", so such a task is the question with no web; an experiment with
+`external: live` sends the searches to Tavily with the bench's
+`TAVILY_API_KEY` (docs/external-apis.md). Live runs are not repeatable, and
+reports and the leaderboard label them. Admission checks only the answer
+controls (the reference is GAIA's answer), so an admitted `live-web` task
+says the grading is sound, not that an agent can answer it without the web.
+On the real validation split (revision 682dd723, imported 21 Nov 2026) the
+web rule marks 123 of 165 questions; with `web=live` all 165 import.
+
 **How many would run.** We could not count on the real split (gated). The
 paper's Figure 3 reports that annotators used web browsing on 355 of 466
 questions (76%); applied to the 165 validation questions, that is about 125
@@ -247,6 +261,16 @@ bifrost-bench import browsecomp-plus -from datasets/browsecomp-plus/queries-0000
 share one corpus, so a suite is imported in one go: importing the same
 selection again changes nothing (`-force` rewrites it byte for byte), and a
 different selection into an existing suite is refused.
+
+**The full set.** All 830 queries in one suite took 13 GB of memory in the
+importer and were killed on a 15 GB host (21 Nov 2026), and the corpus
+service would index about 67,700 pages at every run start. Import one suite
+per upstream shard instead (`tojsonl.py` on one parquet file each, about 138
+queries and 11,000 pages, 3.3 to 4.1 GB peak in the importer): at revision
+144cff8e that is 703 queries in `match` mode and 127 judged, across six
+suites of each. Upstream's corpus has docids that share a URL and one
+`chrome-extension://` URL; the importer gives every page its own http(s)
+URL (`bcp-docid=<docid>` added to a shared one).
 
 ### Answers stay obfuscated
 

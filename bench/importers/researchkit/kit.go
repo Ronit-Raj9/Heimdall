@@ -114,7 +114,7 @@ type External struct {
 	AuthEnv    string            `yaml:"auth_env,omitempty"`
 	AuthHeader string            `yaml:"auth_header,omitempty"`
 	AuthScheme string            `yaml:"auth_scheme,omitempty"`
-	Mode       string            `yaml:"mode"`
+	Mode       string            `yaml:"mode,omitempty"`
 	Cassette   string            `yaml:"cassette"`
 	MaxCalls   int               `yaml:"max_calls"`
 	MaxBytes   int64             `yaml:"max_bytes"`

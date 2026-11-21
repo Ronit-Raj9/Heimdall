@@ -67,8 +67,8 @@ type importer struct{}
 func (im *importer) Info() importers.Info {
 	return importers.Info{
 		Name:       Format,
-		Benchmarks: []string{"KernelBench level 1 (100 single-operator problems)"},
-		Source:     "git clone " + source + " (checked at " + revision[:8] + "); -from is the clone or its KernelBench/level1 folder",
+		Benchmarks: []string{"KernelBench level 1 (100 single-operator problems)", "level 2 (100 fused-operator problems, -set level=2)", "level 3 (50 full architectures, -set level=3); level 4 (Hugging Face models) refused"},
+		Source:     "git clone " + source + " (checked at " + revision[:8] + "); -from is the clone or its KernelBench/level<n> folder",
 		License:    license,
 		Track:      schemas.TrackMLEngineering,
 		Grading:    schemas.GradingVerified,
@@ -86,10 +86,11 @@ type settings struct {
 	maxInputMB    float64
 	minVRAMMB     int
 	speedupTarget float64
+	level         int // 1 to 3; level 4 is refused
 }
 
 func parseSettings(extra map[string]string) (settings, error) {
-	s := settings{image: defaultImage, maxInputMB: defaultMaxInputMB, minVRAMMB: defaultMinVRAMMB}
+	s := settings{image: defaultImage, maxInputMB: defaultMaxInputMB, minVRAMMB: defaultMinVRAMMB, level: 1}
 	for k, v := range extra {
 		switch k {
 		case "image":
@@ -116,8 +117,13 @@ func parseSettings(extra map[string]string) (settings, error) {
 			}
 			s.speedupTarget = f
 		case "level":
-			if v != "1" {
-				return s, fmt.Errorf("-set level=%s: only level 1 is imported (levels 2 to 4 fuse several operators and need more GPU memory than this importer was checked with)", v)
+			switch v {
+			case "1", "2", "3":
+				s.level = int(v[0] - '0')
+			case "4":
+				return s, errors.New("-set level=4: level 4 is refused: its problems load Hugging Face transformers models, which need the transformers package and model weights downloaded from the network, and runs have no network")
+			default:
+				return s, fmt.Errorf("-set level=%s: want 1, 2 or 3 (level 4 is refused)", v)
 			}
 		default:
 			return s, fmt.Errorf("unknown setting %q (image, max_input_mb, min_vram_mb, speedup_target, level)", k)
@@ -129,6 +135,7 @@ func parseSettings(extra map[string]string) (settings, error) {
 // problem is one upstream file.
 type problem struct {
 	num    int
+	level  int
 	name   string // file name without .py
 	file   string
 	source []byte
@@ -148,7 +155,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	if err != nil {
 		return nil, err
 	}
-	probs, err := readProblems(opts.From)
+	probs, err := readProblems(opts.From, set.level)
 	if err != nil {
 		return nil, err
 	}
@@ -219,15 +226,16 @@ func skipSummary(skips []importers.Skip) string {
 	return fmt.Sprintf("%d problems skipped, first %s: %s", len(skips), skips[0].ID, skips[0].Reason)
 }
 
-// readProblems lists the level-1 files of a clone, or of the level1 folder
-// itself, in problem order.
-func readProblems(from string) ([]problem, error) {
+// readProblems lists the files of one level of a clone, or of the
+// level<n> folder itself, in problem order.
+func readProblems(from string, level int) ([]problem, error) {
+	lv := fmt.Sprintf("level%d", level)
 	if from == "" {
-		return nil, errors.New("-from is required: a clone of " + source + " or its KernelBench/level1 folder")
+		return nil, errors.New("-from is required: a clone of " + source + " or its KernelBench/" + lv + " folder")
 	}
 	dir := from
-	if st, err := os.Stat(filepath.Join(from, "KernelBench", "level1")); err == nil && st.IsDir() {
-		dir = filepath.Join(from, "KernelBench", "level1")
+	if st, err := os.Stat(filepath.Join(from, "KernelBench", lv)); err == nil && st.IsDir() {
+		dir = filepath.Join(from, "KernelBench", lv)
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -247,7 +255,7 @@ func readProblems(from string) ([]problem, error) {
 			continue
 		}
 		n, _ := strconv.Atoi(m[1])
-		out = append(out, problem{num: n, name: strings.TrimSuffix(e.Name(), ".py"), file: e.Name(), source: b})
+		out = append(out, problem{num: n, level: level, name: strings.TrimSuffix(e.Name(), ".py"), file: e.Name(), source: b})
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("%s holds no <n>_<Name>.py problem files", dir)
@@ -272,11 +280,11 @@ func checkProblem(src []byte) string {
 
 var nonID = regexp.MustCompile(`[^a-z0-9]+`)
 
-// taskID is l1-<nnn>-<slug of the name>, at most 64 characters.
+// taskID is l<level>-<nnn>-<slug of the name>, at most 64 characters.
 func taskID(p problem) string {
 	name := strings.TrimPrefix(p.name, strconv.Itoa(p.num)+"_")
 	slug := strings.Trim(nonID.ReplaceAllString(strings.ToLower(name), "-"), "-")
-	id := fmt.Sprintf("l1-%03d-%s", p.num, slug)
+	id := fmt.Sprintf("l%d-%03d-%s", p.level, p.num, slug)
 	if len(id) > 64 {
 		id = strings.TrimRight(id[:64], "-")
 	}
@@ -303,14 +311,59 @@ var (
 	funcRe    = regexp.MustCompile(`(?m)^def get_inputs\(\):\s*$`)
 	nextDefRe = regexp.MustCompile(`(?m)^(def |class |[A-Za-z_][A-Za-z0-9_]*\s*=)`)
 	idNameRe  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	// tupleAssignRe matches an unpacking assignment of names, such as
+	// `depth, height, width = 24, 48, 48`.
+	tupleAssignRe = regexp.MustCompile(`(?m)^([A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)+)\s*,?\s*=\s*([^#\n=]+?)\s*(?:#.*)?$`)
 )
+
+// tupleItems returns the items of a tuple literal of integer expressions,
+// with or without its parentheses, such as `(32768,)` or `24, 48`.
+func tupleItems(expr string, env map[string]int64) ([]int64, bool) {
+	e := strings.TrimSpace(expr)
+	if strings.HasPrefix(e, "(") {
+		if inner, ok := callArgs(e[1:]); ok && len(inner) == len(e)-2 {
+			e = inner
+		}
+	}
+	if !strings.Contains(e, ",") {
+		return nil, false
+	}
+	var out []int64
+	for _, it := range splitTop(e) {
+		if strings.TrimSpace(it) == "" {
+			continue
+		}
+		v, err := evalInt(it, env)
+		if err != nil {
+			return nil, false
+		}
+		out = append(out, v)
+	}
+	return out, len(out) > 0
+}
 
 // EstimateInputBytes returns the float32 bytes get_inputs() allocates, or
 // why it cannot tell. It is pure.
 func EstimateInputBytes(src []byte) (int64, string) {
 	s := string(src)
 	env := map[string]int64{}
+	tuples := map[string][]int64{}
+	for _, m := range tupleAssignRe.FindAllStringSubmatch(s, -1) {
+		names := splitTop(m[1])
+		vals, ok := tupleItems(m[2], env)
+		if !ok || len(vals) != len(names) {
+			continue
+		}
+		for i, n := range names {
+			env[strings.TrimSpace(n)] = vals[i]
+		}
+	}
 	for _, m := range constRe.FindAllStringSubmatch(s, -1) {
+		// A tuple constant (input_shape = (32768,)) is unpacked with *name.
+		if vals, ok := tupleItems(m[2], env); ok && !strings.Contains(m[2], "=") {
+			tuples[m[1]] = vals
+			continue
+		}
 		// A chained assignment (height = width = 256) names every target.
 		parts := strings.Split(m[2], "=")
 		if strings.Contains(m[2], "==") {
@@ -366,8 +419,22 @@ func EstimateInputBytes(src []byte) (int64, string) {
 		if len(dims) == 1 && strings.HasPrefix(strings.TrimSpace(dims[0]), "(") {
 			dims = splitTop(strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(dims[0]), "("), ")"))
 		}
-		n := int64(1)
+		var expanded []string
 		for _, d := range dims {
+			if t := strings.TrimSpace(d); strings.HasPrefix(t, "*") {
+				vals, ok := tuples[strings.TrimSpace(t[1:])]
+				if !ok {
+					return 0, fmt.Sprintf("size %q: not a known tuple constant", t)
+				}
+				for _, v := range vals {
+					expanded = append(expanded, strconv.FormatInt(v, 10))
+				}
+				continue
+			}
+			expanded = append(expanded, d)
+		}
+		n := int64(1)
+		for _, d := range expanded {
 			if strings.TrimSpace(d) == "" {
 				continue
 			}
@@ -641,7 +708,7 @@ echo '{"reward": 1}' > reward.json
 
 func instruction(p problem, set settings) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "KernelBench level 1, problem %d (%s).\n\n", p.num, strings.TrimPrefix(p.name, strconv.Itoa(p.num)+"_"))
+	fmt.Fprintf(&b, "KernelBench level %d, problem %d (%s).\n\n", p.level, p.num, strings.TrimPrefix(p.name, strconv.Itoa(p.num)+"_"))
 	b.WriteString("`problem.py` holds a PyTorch model, `Model`, with `get_inputs()` (the\n")
 	b.WriteString("arguments of its forward call) and `get_init_inputs()` (the arguments of\n")
 	b.WriteString("its constructor). Write `ModelNew` in `solution.py`: the same\n")
@@ -726,7 +793,7 @@ func writeTask(dir, id string, p problem, set settings, inputBytes int64) error 
 	files := map[string][]byte{
 		"repo/problem.py":           p.source,
 		"repo/solution.py":          []byte(starter),
-		"repo/README.md":            []byte(fmt.Sprintf("# KernelBench level 1: %s\n\n- `problem.py`: the reference model, from %s (%s), unchanged.\n- `solution.py`: write `ModelNew` here.\n\nThe container has PyTorch on CUDA and Triton; no network.\n", p.name, source, p.file)),
+		"repo/README.md":            []byte(fmt.Sprintf("# KernelBench level %d: %s\n\n- `problem.py`: the reference model, from %s (%s), unchanged.\n- `solution.py`: write `ModelNew` here.\n\nThe container has PyTorch on CUDA and Triton; no network.\n", p.level, p.name, source, p.file)),
 		"instruction.md":            []byte(instruction(p, set)),
 		"verifier/tests/problem.py": p.source,
 		"verifier/tests/kb.json":    []byte(fmt.Sprintf("{\"tolerance\": 0.01, \"correct_trials\": 5, \"calls\": %d, \"speedup_target\": %g}\n", calls(inputBytes), set.speedupTarget)),
@@ -745,8 +812,8 @@ func writeTask(dir, id string, p problem, set settings, inputBytes int64) error 
 	}
 	doc := taskDoc{
 		ID: id, Version: "1.0.0",
-		Title:       fmt.Sprintf("KernelBench level 1 #%d: a faster %s", p.num, strings.TrimPrefix(p.name, strconv.Itoa(p.num)+"_")),
-		Project:     "kernelbench-level1",
+		Title:       fmt.Sprintf("KernelBench level %d #%d: a faster %s", p.level, p.num, strings.TrimPrefix(p.name, strconv.Itoa(p.num)+"_")),
+		Project:     fmt.Sprintf("kernelbench-level%d", p.level),
 		Kind:        string(schemas.TaskPerformance),
 		Instruction: "instruction.md",
 		RepoDir:     "repo",
@@ -756,10 +823,10 @@ func writeTask(dir, id string, p problem, set settings, inputBytes int64) error 
 		Controls: controlsDoc{Reference: "solution/patch.diff", Empty: "controls/empty.diff",
 			Mutants: []string{"controls/mutant-skew.diff"}, Exploit: "controls/exploit.sh"},
 		Timeouts:     schemas.TaskTimeouts{AgentS: defaultAgentS},
-		Tags:         []string{"kernelbench", "level1"},
+		Tags:         []string{"kernelbench", fmt.Sprintf("level%d", p.level)},
 		Capabilities: []string{"gpu_kernels", "performance", "gpu"},
 		Provenance: provenanceDoc{Source: source, License: license,
-			ImportedFrom: fmt.Sprintf("kernelbench@%s KernelBench/level1/%s", revision[:8], p.file),
+			ImportedFrom: fmt.Sprintf("kernelbench@%s KernelBench/level%d/%s", revision[:8], p.level, p.file),
 			CreatedBy:    "bifrost-bench import " + Format},
 	}
 	out, err := yaml.Marshal(doc)
@@ -848,7 +915,7 @@ func writeSuite(dir, id string, tasks []string, set settings) error {
 	sort.Strings(all)
 	doc := suiteDoc{
 		ID: id, Version: "1.0.0",
-		Description: "KernelBench level 1: rewrite a PyTorch model as a faster ModelNew with custom GPU kernels; correct within atol = rtol = 1e-2, speedup measured in the clean room.",
+		Description: "KernelBench level " + strconv.Itoa(set.level) + ": rewrite a PyTorch model as a faster ModelNew with custom GPU kernels; correct within atol = rtol = 1e-2, speedup measured in the clean room.",
 		Track:       schemas.TrackMLEngineering,
 		Environment: "docker_workspace",
 		Grader:      "verifier_command",
@@ -858,7 +925,7 @@ func writeSuite(dir, id string, tasks []string, set settings) error {
 			ResultPath: "/grader/out/reward.json", PassThreshold: 1, Restore: []string{"problem.py"}, TimeoutS: defaultVerifyS},
 		Tasks:  all,
 		Probes: []string{},
-		Imported: schemas.ImportRecord{Importer: Format, Benchmark: "kernelbench level1", Source: source, Revision: revision,
+		Imported: schemas.ImportRecord{Importer: Format, Benchmark: "kernelbench level" + strconv.Itoa(set.level), Source: source, Revision: revision,
 			License: license, At: time.Now().UTC().Truncate(time.Second)},
 	}
 	out, err := yaml.Marshal(doc)

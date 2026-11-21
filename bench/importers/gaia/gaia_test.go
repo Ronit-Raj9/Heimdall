@@ -61,7 +61,7 @@ func TestImportFixture(t *testing.T) {
 			t.Errorf("skip reason of %s = %q, want it to mention %q", id, reasons[id], part)
 		}
 	}
-	if !strings.Contains(res.Notes[0], "3 of 7 questions considered need the live web; 1 of them had a cassette and were imported, 2 were refused. 3 offline questions imported.") {
+	if !strings.Contains(res.Notes[0], "3 of 7 questions considered need the live web; 1 of them had a cassette and were imported, 0 were imported for live web runs (-set web=live), 2 were refused. 3 offline questions imported.") {
 		t.Errorf("note %q", res.Notes[0])
 	}
 	dir := filepath.Join(root, "benchmarks", "gaia-fx")
@@ -351,4 +351,54 @@ func treeHash(t *testing.T, root string) string {
 		h.Write(b)
 	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+func TestWebLiveImportsWebQuestions(t *testing.T) {
+	root := t.TempDir()
+	res := runImport(t, root, map[string]string{setWeb: webLive, setRevision: "fixture"}, false)
+	imported := map[string]bool{}
+	for _, id := range res.Tasks {
+		imported[id] = true
+	}
+	for _, id := range []string{webTask, "00000000-0000-4000-8000-000000000004", "00000000-0000-4000-8000-000000000007"} {
+		if !imported[id] {
+			t.Errorf("web question %s not imported with web=live; skipped %+v", id, res.Skipped)
+		}
+	}
+	if imported["00000000-0000-4000-8000-000000000006"] {
+		t.Error("withheld answer imported")
+	}
+	if !strings.Contains(res.Notes[0], "0 of them had a cassette and were imported, 3 were imported for live web runs") {
+		t.Errorf("note %q", res.Notes[0])
+	}
+	dir := filepath.Join(root, "benchmarks", "gaia-fx", "tasks", webTask)
+	if b, err := os.ReadFile(filepath.Join(dir, "cassettes", "tavily.cassette.jsonl")); err != nil || len(b) != 0 {
+		t.Errorf("cassette %q %v, want an empty file", b, err)
+	}
+	ty, err := os.ReadFile(filepath.Join(dir, "task.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"live-web", "websearch", "cassette: cassettes/tavily.cassette.jsonl"} {
+		if !strings.Contains(string(ty), want) {
+			t.Errorf("task.yaml lacks %q", want)
+		}
+	}
+	if strings.Contains(string(ty), "mode: replay") {
+		t.Error("task.yaml pins replay; an experiment could not opt into live")
+	}
+	in, err := os.ReadFile(filepath.Join(dir, "instruction.md"))
+	if err != nil || !strings.Contains(string(in), "Whether they reach the live web depends on how the run is set up") {
+		t.Errorf("instruction %v", err)
+	}
+	s, err := suite.Builtin(filepath.Join(root, "benchmarks"))[0].Load(context.Background(), "gaia-fx")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if problems := suite.Lint(s); suite.Errors(problems) > 0 {
+		t.Errorf("lint errors: %+v", problems)
+	}
+	if _, err := parseSettings(map[string]string{setWeb: "sometimes"}); err == nil {
+		t.Error("web=sometimes accepted")
+	}
 }
