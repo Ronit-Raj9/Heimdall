@@ -424,7 +424,11 @@ func (h *quickRunHandler) build(ctx context.Context, req *QuickRunRequest) ([]by
 	if req.CompareModel != nil {
 		armB = armFor(req.CompareModel)
 	} else {
+		// One model: B repeats A as a noise-floor run. The planner refuses arms
+		// with the same config hash, so B carries a marker env var the agent
+		// ignores; everything that matters (model, provider, prompt) is equal.
 		armB.Label += " (repeat)"
+		armB.Set["env.HEIMDALL_QUICKRUN_ARM"] = "B"
 	}
 	f := quickFile{
 		Name: name, Suite: suite, Base: agent,

@@ -9,6 +9,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -81,13 +82,16 @@ func Open(d *db.DB, master []byte) (Store, error) {
 	return newDBStore(d, master)
 }
 
-// MasterKey reads HEIMDALL_MASTER_KEY (base64, 32 bytes); without it, local
+// MasterKey reads HEIMDALL_MASTER_KEY (32 bytes, base64 or hex); without it, local
 // mode uses ~/.bifrost-bench/master.key, created on first use.
 func MasterKey() ([]byte, error) {
 	if v := strings.TrimSpace(os.Getenv(MasterKeyEnv)); v != "" {
+		if k, err := hex.DecodeString(v); err == nil && len(k) == 32 { // openssl rand -hex 32
+			return k, nil
+		}
 		k, err := base64.StdEncoding.DecodeString(v)
 		if err != nil || len(k) != 32 {
-			return nil, fmt.Errorf("%w: %s must be base64 of 32 bytes", ErrNoMasterKey, MasterKeyEnv)
+			return nil, fmt.Errorf("%w: %s must be 32 random bytes, base64 (openssl rand -base64 32) or hex (openssl rand -hex 32)", ErrNoMasterKey, MasterKeyEnv)
 		}
 		return k, nil
 	}
