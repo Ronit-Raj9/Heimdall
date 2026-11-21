@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/adapters"
+	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/codescan"
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/environments"
@@ -152,6 +153,8 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 	}
 	a.reg.Graders = withGrader(a.reg.Graders, graders.NewVisual(graders.VisualConfig{Inner: graders.HiddenTestsConfig{Image: helper, Logger: logger, Docker: a.docker}, Judge: graders.JudgeConfig{Gateway: gw, URL: cfg.Gateway.URL, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref(), Logger: logger}, Logger: logger})) // X1 vision grading: the wired visual grader replaces Builtin's unwired one (visual.go)
 	a.reg.GPUs = gpuAllocator(ctx, cfg, logger)                                                                                                                                                                                                                                                                                            // X7: this machine's GPU pool, nil without a usable GPU (gpu.go)
+	// G01: runs resolve org secrets from the key store; only local mode falls back to the environment (secrets_service.go).
+	a.reg.Secrets = orgSecretSource{keys: sharedKeyStore(a), orgID: auth.LocalOrgID, envFallback: !cfg.Auth.IsHosted()}
 	return a, nil
 }
 
@@ -202,6 +205,9 @@ func (a *app) newPlanner() *engine.Planner {
 	}
 	if a.deferGateway {
 		opts = append(opts, engine.WithGatewayDeferredToRunner()) // Tenancy area: a hosted server has no gateway; runners preflight theirs (servetenancy.go)
+	}
+	if a.reg.Secrets != nil {
+		opts = append(opts, engine.WithSecretCheck(a.reg.Secrets)) // G01: a missing org secret is a plan error (engine/secrets.go)
 	}
 	return engine.NewPlanner(a.reg, a.cfg.Root, a.logger, opts...)
 }

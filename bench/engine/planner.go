@@ -112,6 +112,7 @@ type Planner struct {
 	guard        func(*schemas.Experiment) error // Tenancy area: hosted orgs confine experiment paths to the org's project (experimentguard.go)
 	deferGateway bool                            // Tenancy area: a hosted server records the gateway preflight as the runners' (experimentguard.go)
 	skipGPU      bool                            // X7: a remote worker's replan skips the GPU check (gpu.go)
+	secrets      schemas.SecretSource            // G01: org secrets the plan's runs name must resolve (secrets.go)
 
 }
 
@@ -370,6 +371,9 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	}
 	m.ArmOrder = drawArmOrder(e.Seed, suite.TaskIDs, conds, pairArms(m))
 	m.Slots = buildSlots(m, suite, conds, compat)
+	if err := p.checkSecrets(ctx, m, suite); err != nil { // G01: org secrets (secrets.go)
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
 	m.Tier = tier
 	if m.Adaptive, err = planAdaptive(&e, m, conds, p.logger); err != nil { // W7 adaptive trials: optional slots of the maximum design (adaptive.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)

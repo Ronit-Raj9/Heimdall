@@ -201,6 +201,9 @@ func (p *Pipeline) execOnce(ctx context.Context, st *runState, sess *schemas.Ses
 	if plan == nil {
 		return nil, wrapPart("adapter", st.adapter, errors.New("plan returned no plan"))
 	}
+	if err := expandPlanSecrets(st.rc, plan); err != nil { // G01: agent env {{secret.NAME}} (secrets.go)
+		return nil, err
+	}
 	env, err := scenarioEnv(st.rc)
 	if err != nil {
 		return nil, err

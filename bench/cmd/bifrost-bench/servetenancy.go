@@ -268,6 +268,7 @@ func (a *app) forOrg(org tenancy.Org, p tenancy.OrgPaths) (*app, error) {
 	oa.planGuard = func(e *schemas.Experiment) error { return tenancy.CheckExperimentPaths(project, e) }
 	oa.planConfine = project
 	oa.deferGateway = true // the hosted server opens no gateway: manifests record gateway.deferred_to_runner
+	reg.Secrets = orgSecretSource{keys: sharedKeyStore(oa), orgID: org.ID} // G01: the org's own secrets, never the server's environment
 	return oa, nil
 }
 

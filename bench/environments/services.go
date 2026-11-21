@@ -634,11 +634,11 @@ func (e *dockerWorkspace) startToolProxy(ctx context.Context, rc *schemas.RunCon
 		"--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only", "--tmpfs", "/tmp:size=64m",
 		"--pids-limit", "256", "--memory", "512m", "--log-driver", "json-file", "--log-opt", "max-size=1m",
 		"-v", ledger+":/ledger", "-v", cfgVol+":"+toolProxyCfg)
-	args = append(args, externalProxyEnv(ext)...) // External APIs area: credential names only, values from the bench's environment
+	args = append(args, externalProxyEnv(ext)...) // External APIs area: credential names only, values from the CLI's environment (org secrets, G01)
 	args = append(args, "--entrypoint", "bifrost-bench", image,
 		"toolproxy", "-listen", ":"+strconv.Itoa(ToolProxyPort), "-routes", toolProxyCfg+"/routes.json",
 		"-fault", toolProxyCfg+"/fault.json", "-ledger", toolProxyLedger)
-	if _, err := e.cfg.Docker.MustRun(ctx, args...); err != nil {
+	if _, err := e.cfg.Docker.MustRunEnv(ctx, externalProxySecretEnv(rc, ext), args...); err != nil { // G01: org secrets reach the CLI's env only
 		return fmt.Errorf("create tool proxy: %w", err)
 	}
 	if upstreams { // the proxied services sit on the hidden network only

@@ -169,5 +169,17 @@ func RunSecrets(rc *schemas.RunContext) []string {
 	if rc.FaultRuntime != nil {
 		add(rc.FaultRuntime.Token)
 	}
+	for _, n := range sortedKeysStr(rc.Secrets) { // G01: org secret values are scrubbed wherever they were rendered
+		add(rc.Secrets[n])
+	}
 	return out
+}
+
+func sortedKeysStr(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
