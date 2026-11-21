@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 	"path/filepath"
 	"strings"
 	"time"
@@ -19,12 +20,23 @@ import (
 
 // Admission parameters, matching tools/checktask.sh.
 const (
-	referenceRuns     = 3
 	exploitScriptPath = "/tmp/bench/exploit.sh"
 	exploitWallS      = 120
 	exploitUser       = "1000"
 	destroyTimeout    = 2 * time.Minute
 )
+
+// referenceRuns is how many times admission grades the reference
+// solution. HEIMDALL_ADMIT_REFERENCE_RUNS (1-3) lowers it for a quick
+// first pass; the record keeps the count used.
+var referenceRuns = admitReferenceRuns()
+
+func admitReferenceRuns() int {
+	if n, err := strconv.Atoi(os.Getenv("HEIMDALL_ADMIT_REFERENCE_RUNS")); err == nil && n >= 1 && n <= 3 {
+		return n
+	}
+	return 3
+}
 
 // Admission check outcomes, used as AdmissionCheck.Want and Got.
 const (
