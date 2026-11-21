@@ -122,8 +122,8 @@ func TaskID(domain, upstream string) string {
 // (comma list, default all), revision.
 func (im *importer) Import(ctx context.Context, opts importers.Options) (*importers.Result, error) {
 	for k := range opts.Extra {
-		if k != "domains" && k != "revision" {
-			return nil, fmt.Errorf("enterpriseops: unknown setting %q (domains, revision)", k)
+		if k != "domains" && k != "revision" && k != "references" {
+			return nil, fmt.Errorf("enterpriseops: unknown setting %q (domains, revision, references)", k)
 		}
 	}
 	files, err := filepath.Glob(filepath.Join(opts.From, "jsonl", "*.jsonl"))
@@ -173,7 +173,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 				}
 				_ = os.RemoveAll(dir)
 			}
-			svcs, err := im.writeTask(opts.From, dir, id, r)
+			svcs, err := im.writeTask(opts.From, opts.Extra["references"], dir, id, r)
 			if err != nil {
 				_ = os.RemoveAll(dir)
 				res.Skipped = append(res.Skipped, importers.Skip{ID: id, Reason: err.Error()})
@@ -239,7 +239,7 @@ func readRows(path string) ([]row, error) {
 }
 
 // writeTask writes one task folder and returns the service ids it uses.
-func (im *importer) writeTask(from, dir, id string, r row) ([]string, error) {
+func (im *importer) writeTask(from, refs, dir, id string, r row) ([]string, error) {
 	var gyms []gym
 	if err := json.Unmarshal([]byte(r.Gyms), &gyms); err != nil {
 		return nil, fmt.Errorf("gym_servers_config: %w", err)
@@ -330,6 +330,14 @@ func (im *importer) writeTask(from, dir, id string, r row) ([]string, error) {
 	files["controls/empty.sh"] = "#!/bin/sh\n# Empty control: no tool call, the database stays as seeded.\nexit 0\n"
 	files["controls/exploit.sh"] = "#!/bin/sh\n# Exploit control (must fail): claims success without any tool call.\necho 'All requested changes are done.'\nexit 0\n"
 	files["controls/reference.sh"] = "#!/bin/sh\n# Reference control. EnterpriseOps-Gym ships no reference solutions, so this\n# task has none until one is written: a script that solves the task through\n# the MCP endpoint(s) in $BENCH_MCP_SERVERS. Admission fails until then.\necho 'no reference solution for " + r.TaskID + "; write controls/reference.sh' >&2\nexit 1\n"
+	if refs != "" {
+		b, err := os.ReadFile(filepath.Join(refs, id+".sh"))
+		if err == nil {
+			files["controls/reference.sh"] = string(b)
+		} else if !os.IsNotExist(err) {
+			return nil, err
+		}
+	}
 	files["task.yaml"] = taskYAML(id, r, svcYAML.String())
 	return svcs, writeFiles(dir, files)
 }

@@ -47,7 +47,21 @@ def extract(result):
     return d
 
 
+def coerce(actual, expected):
+    """Upstream compares with Python ==, so an expected "1" never equals the
+    integer 1 the SQL runner returns (144 checks in 43 tasks carry numbers as
+    strings). A numeric string is compared as a number when the actual value
+    is a number; nothing else changes."""
+    if isinstance(expected, str) and isinstance(actual, (int, float)) and not isinstance(actual, bool):
+        try:
+            return float(expected) if "." in expected else int(expected)
+        except ValueError:
+            return expected
+    return expected
+
+
 def compare(actual, expected, kind):
+    expected = coerce(actual, expected)
     try:
         if kind == "equals":
             return actual == expected

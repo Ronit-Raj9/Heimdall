@@ -14,7 +14,7 @@ import (
 func TestImport(t *testing.T) {
 	root := t.TempDir()
 	im := &importer{now: func() time.Time { return time.Unix(0, 0) }}
-	res, err := im.Import(context.Background(), importers.Options{BenchRoot: root, From: "testdata/ds", SuiteID: "enterpriseops-gym"})
+	res, err := im.Import(context.Background(), importers.Options{BenchRoot: root, From: "testdata/ds", SuiteID: "enterpriseops-gym", Extra: map[string]string{"references": "testdata/refs"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,6 +32,10 @@ func TestImport(t *testing.T) {
 		if !strings.Contains(string(y), want) {
 			t.Errorf("task.yaml lacks %q:\n%s", want, y)
 		}
+	}
+	ref, _ := os.ReadFile(filepath.Join(hy, "controls/reference.sh"))
+	if !strings.Contains(string(ref), "hand reference") {
+		t.Errorf("reference not taken from references: %s", ref)
 	}
 	ins, _ := os.ReadFile(filepath.Join(hy, "instruction.md"))
 	if !strings.Contains(string(ins), "Turn POP on.") || !strings.Contains(string(ins), "Ann") {

@@ -44,7 +44,10 @@ done
 bifrost-bench suite lock enterpriseops-gym
 ```
 
-Settings: `domains` (comma list), `revision`. Task ids are
+Settings: `domains` (comma list), `revision`, `references` (folder of
+`<task id>.sh` reference controls; `bench/importers/enterpriseops/references`
+holds nine written by hand from the tasks' checks, one or two per domain,
+checked end to end). Task ids are
 `eog-<domain>-<upstream id without task_>`.
 
 ## What a task looks like
@@ -60,7 +63,9 @@ Settings: `domains` (comma list), `revision`. Task ids are
 - Export `checks`: `bench_front.py export` runs the task's SQL checks on the
   final database and prints the raw results.
 - Verifier `runverify.py` (offline, `python:3.12-slim`): upstream's value
-  extraction and comparison; reward 1 when all checks pass, the check pass
+  extraction and comparison, except that a numeric string expected value
+  (144 checks in 43 tasks, which upstream's `==` can never match) is compared
+  as a number; reward 1 when all checks pass, the check pass
   rate as dimension `verifier_pass_rate`. No export: no reward (undecided).
 - Instruction: a line naming the servers, upstream's system prompt (the
   domain policy), the user info when upstream gives one, then the user prompt.

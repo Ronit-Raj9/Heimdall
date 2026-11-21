@@ -80,7 +80,8 @@ def seed():
         sql = f.read()
     body = json.dumps({"database_id": DB, "name": "bench", "description": "task seed", "sql_content": sql}).encode()
     out = json.loads(up_request("POST", "/api/seed-database", body).read())
-    if not out.get("success"):
+    # Most servers answer {"success": true}; the drive server {"status": "success"}.
+    if not (out.get("success") is True or out.get("status") == "success"):
         raise SystemExit("seed failed: %s" % out)
 
 
