@@ -90,6 +90,7 @@ type Coordinator struct {
 	exps    []*schedRun // attached experiments, in attach order
 	leases  map[string]*remoteLease
 	ended   map[string]string // lease id -> why it ended; a late call for it is refused with this
+	rj      runnerJobs        // runner jobs (gap G05, remotejobs.go)
 }
 
 // remoteWorker is one registered worker.
@@ -287,6 +288,10 @@ func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.Work
 		c.mu.Unlock()
 		return nil, nil
 	}
+	if jl := c.leaseJobLocked(w); jl != nil { // runner jobs first: a user waits on them (remotejobs.go)
+		c.mu.Unlock()
+		return jl, nil
+	}
 	var exps []*schedRun
 	for _, r := range c.exps {
 		if _, refused := w.refused[r.m.ExpID]; !refused && c.openTo(w, r) {
@@ -381,6 +386,9 @@ func (c *Coordinator) Heartbeat(ctx context.Context, leaseID, workerID string) e
 	if err != nil {
 		return err
 	}
+	if handled, err := c.jobHeartbeat(ctx, leaseID, workerID, scope); handled {
+		return err
+	}
 	c.mu.Lock()
 	l, err := c.leaseLocked(leaseID, workerID, scope)
 	c.mu.Unlock()
@@ -427,6 +435,9 @@ func (c *Coordinator) Upload(ctx context.Context, leaseID, workerID string, offs
 	}
 	if len(data) > c.opts.ChunkBytes {
 		return 0, fmt.Errorf("chunk of %d bytes is larger than %d: %w", len(data), c.opts.ChunkBytes, schemas.ErrUploadTooLarge)
+	}
+	if handled, n, err := c.jobUpload(leaseID, workerID, scope, offset, data); handled {
+		return n, err
 	}
 	c.mu.Lock()
 	l, err := c.leaseLocked(leaseID, workerID, scope)
@@ -489,6 +500,9 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 	scope, err := c.callScope(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if handled, out, err := c.jobComplete(leaseID, scope, req); handled {
+		return out, err
 	}
 	c.mu.Lock()
 	l, err := c.leaseLocked(leaseID, req.WorkerID, scope)
@@ -562,6 +576,9 @@ func (c *Coordinator) Release(ctx context.Context, leaseID string, req *schemas.
 	}
 	scope, err := c.callScope(ctx)
 	if err != nil {
+		return err
+	}
+	if handled, err := c.jobRelease(leaseID, scope, req); handled {
 		return err
 	}
 	c.mu.Lock()

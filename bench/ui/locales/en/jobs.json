@@ -44,6 +44,7 @@
 		"cancel": "Cancel",
 		"queued": "Queued. It starts when a worker is free.",
 		"failed": "The job failed:",
+		"addRunner": "Open Settings > Runners to add a runner or check the shared runner",
 		"succeeded": "Done.",
 		"cancelled": "Cancelled.",
 		"startError": "Could not start the job",

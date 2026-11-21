@@ -12,7 +12,7 @@ import { useId, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import ClustersTab from "./clustersTab";
 import { InboxPullButton, InboxPullSetup, InboxWebhook } from "./inboxConnect";
-import { useGetPullReadinessQuery } from "@/lib/store/apis/liveinboxApi";
+import { useGetInboxWebhookQuery, useGetPullReadinessQuery } from "@/lib/store/apis/liveinboxApi";
 import { InboxItemPanel } from "./inboxItemPanel";
 import TriageTab from "./triageTab";
 
@@ -55,6 +55,7 @@ export function InboxTab() {
 	const list = useGetInboxQuery({ state: filter === INBOX_ALL ? undefined : filter, source: source ?? undefined });
 	const data = list.data;
 	const ready = useGetPullReadinessQuery().data;
+	const hosted = useGetInboxWebhookQuery().data?.hosted ?? false;
 
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="inbox-screen">

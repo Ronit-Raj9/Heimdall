@@ -61,6 +61,9 @@ type WorkerOptions struct {
 	Labels      []string
 	SpendCapUSD float64
 	SpendFile   string
+	// Jobs runs runner job leases (gap G05, remotejobs.go); nil refuses
+	// them, and the coordinator then offers this worker no job again.
+	Jobs JobExecutor
 }
 
 // Worker is the remote side of remote execution: it registers with a
@@ -232,6 +235,9 @@ func (w *Worker) loop(ctx context.Context, stop context.CancelCauseFunc) {
 			if ctx.Err() == nil {
 				w.logger.Warn("lease request failed", "error", err.Error())
 			}
+		case lease.LeaseID != "" && lease.Kind == schemas.LeaseKindJob:
+			w.workJob(ctx, &lease)
+			continue
 		case lease.LeaseID != "":
 			// An accepted run goes straight on to the next lease; anything
 			// else (a refusal, a rejection, a failed run) waits a poll

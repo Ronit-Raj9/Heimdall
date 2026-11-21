@@ -71,11 +71,43 @@ type WorkerLease struct {
 	// GPUs are the worker's devices (UUIDs) the coordinator set aside for
 	// this lease; the worker runs the slot on exactly these (QC2-10-09).
 	GPUs []string `json:"gpus,omitempty"`
+	// Kind is LeaseKindJob for a runner job lease (Job set, no slot);
+	// empty for a slot lease. A runner that does not run jobs releases a
+	// job lease with Refuse set.
+	Kind string    `json:"kind,omitempty"`
+	Job  *JobLease `json:"job,omitempty"`
+}
+
+// LeaseKindJob marks a runner job lease (WorkerLease.Kind).
+const LeaseKindJob = "job"
+
+// JobLease is one hosted CLI job a runner runs (runner jobs, gap G05): the
+// runner unpacks Files (a zip of the project subset the job needs) into a
+// scratch project, runs `bifrost-bench <Argv>` there with -config pointing
+// at a runner-local config, streams its log lines back on heartbeats, and
+// uploads a zip holding result.json and every file under the Collect paths
+// the job wrote.
+type JobLease struct {
+	JobID   string   `json:"job_id"`
+	JobKind string   `json:"job_kind"`
+	Argv    []string `json:"argv"`
+	Files   []byte   `json:"files,omitempty"`   // zip of the project snapshot
+	Collect []string `json:"collect,omitempty"` // project-relative folders or files to bring back
+}
+
+// JobComplete is the job part of a complete call: the job's error, empty
+// when it succeeded. The result and the collected files are in the
+// uploaded archive.
+type JobComplete struct {
+	Error string `json:"error,omitempty"`
 }
 
 // WorkerHeartbeat is the body of POST /api/bench/workers/leases/{id}/heartbeat.
 type WorkerHeartbeat struct {
 	WorkerID string `json:"worker_id"`
+	// Logs are new log lines of a runner job lease (already redacted by
+	// the runner); empty for slot leases.
+	Logs []string `json:"logs,omitempty"`
 }
 
 // WorkerUploadState is the answer to one upload chunk: how many bytes of the
@@ -106,6 +138,8 @@ type WorkerComplete struct {
 	// coordinator records them in remote/worker.json (Deploy area,
 	// engine/remoteimages.go).
 	Images *RunnerImages `json:"images,omitempty"`
+	// Job completes a runner job lease (runner jobs, gap G05).
+	Job *JobComplete `json:"job,omitempty"`
 }
 
 // RunnerImages are the local image ids a runner resolved for one run of a
@@ -203,3 +237,24 @@ var (
 	// (Runners area). The handler answers 403.
 	ErrWorkerScope = errors.New("outside the runner token's scope")
 )
+
+type heartbeatLogsKey struct{}
+
+// WithHeartbeatLogs returns ctx carrying the log lines a heartbeat brought
+// (runner job leases); the worker routes set it so the WorkerAPI keeps its
+// signature.
+func WithHeartbeatLogs(ctx context.Context, lines []string) context.Context {
+	if len(lines) == 0 {
+		return ctx
+	}
+	return context.WithValue(ctx, heartbeatLogsKey{}, lines)
+}
+
+// HeartbeatLogsFrom returns the heartbeat log lines on ctx, if any.
+func HeartbeatLogsFrom(ctx context.Context) []string {
+	if ctx == nil {
+		return nil
+	}
+	l, _ := ctx.Value(heartbeatLogsKey{}).([]string)
+	return l
+}

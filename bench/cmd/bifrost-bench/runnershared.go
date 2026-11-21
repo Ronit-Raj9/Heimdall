@@ -186,7 +186,8 @@ func runSharedRunner(args []string) int {
 			w, err := engine.NewWorker(a.reg, engine.NewPipeline(a.reg, a.cfg.Root, a.logger),
 				engine.NewPlanner(a.reg, a.cfg.Root, a.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck()).Plan,
 				engine.WorkerOptions{Server: f.server, Token: token, WorkerID: name, Host: host, Version: benchVersion,
-					Slots: slots, Logger: a.logger, Pool: sharedpool.Pool, Labels: []string{"shared", "runtime=" + f.runtime}})
+					Slots: slots, Logger: a.logger, Pool: sharedpool.Pool, Labels: []string{"shared", "runtime=" + f.runtime},
+					Jobs: newRunnerJobExecutor(a)}) // gap G05: hosted CLI jobs (runnerjob.go)
 			if err != nil {
 				a.logger.Error("shared runner: worker not started", "org", org, "error", err.Error())
 				return

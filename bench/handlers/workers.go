@@ -20,6 +20,10 @@ import (
 // extracts, verifies and seals a whole run folder.
 const workerCallTimeout = 5 * time.Minute
 
+// maxHeartbeatLogs bounds the log lines one heartbeat of a runner job lease
+// may carry; older lines past it are dropped.
+const maxHeartbeatLogs = 2000
+
 // WorkerAPI is the remote worker coordinator (engine.Coordinator) as the
 // worker routes use it. A nil WorkerAPI means worker mode is off.
 type WorkerAPI interface {
@@ -268,8 +272,12 @@ func (h *WorkersHandler) heartbeat(ctx *fasthttp.RequestCtx) {
 	if !h.decode(ctx, &req) {
 		return
 	}
+	if len(req.Logs) > maxHeartbeatLogs {
+		req.Logs = req.Logs[len(req.Logs)-maxHeartbeatLogs:]
+	}
 	work, cancel := h.work(ctx, readTimeout)
 	defer cancel()
+	work = schemas.WithHeartbeatLogs(work, req.Logs) // runner jobs (gap G05): log lines of a job lease
 	if err := h.api.Heartbeat(work, leaseID, req.WorkerID); err != nil {
 		h.sendErr(ctx, "heartbeat", err)
 		return

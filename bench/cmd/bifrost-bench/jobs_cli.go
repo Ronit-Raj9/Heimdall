@@ -21,7 +21,7 @@ func init() {
 	registerJobKind(cliJob("import.run", true, true, importRunArgs))
 	registerJobKind(cliJob("tasks.mine", true, false, tasksMineArgs))
 	registerJobKind(cliJob("export.run", true, true, exportRunArgs))
-	registerJobKind(cliJob("scan.skill", true, true, scanSkillArgs))
+	registerJobKind(cliJob("scan.skill", true, false, scanSkillArgs)) // hosted variant: jobs_runnerjob.go (static in process, dynamic on a runner)
 	registerJobKind(cliJob("scan.mcp", true, false, scanMCPArgs))
 }
 
@@ -282,7 +282,8 @@ func exportRunArgs(raw json.RawMessage) ([]string, error) {
 // dynamic scan starts a container).
 func scanSkillArgs(raw json.RawMessage) ([]string, error) {
 	var p struct {
-		Path string `json:"path"`
+		Path    string `json:"path"`
+		Dynamic bool   `json:"dynamic,omitempty"` // run setup scripts in a sandbox container
 	}
 	if err := decodeParams(raw, &p); err != nil {
 		return nil, err
@@ -291,7 +292,11 @@ func scanSkillArgs(raw json.RawMessage) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []string{"skill", "scan", "-config", cliConfig, "-json", path}, nil
+	argv := []string{"skill", "scan", "-config", cliConfig, "-json"}
+	if p.Dynamic {
+		argv = append(argv, "-dynamic")
+	}
+	return append(argv, path), nil
 }
 
 // scanMCPArgs: {path} -> mcp scan <service config> -json (runs the server in

@@ -38,6 +38,9 @@ type jobKindSpec struct {
 	Opts          []jobs.KindOption
 	Validate      func(ctx context.Context, env jobEnv, raw json.RawMessage) (normalized any, target string, err error)
 	Run           func(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, progress func(any)) (any, error)
+	// Args is the argv builder of a cliJob kind (nil otherwise); runner
+	// job variants reuse it (gap G05, jobs_runnerjob.go).
+	Args cliArgs
 }
 
 var (
@@ -146,7 +149,7 @@ var cliExecutable = os.Executable
 // stdout line that is a JSON object becomes the job's result.
 func cliJob(kind string, local, hosted bool, args cliArgs) jobKindSpec {
 	return jobKindSpec{
-		Kind: kind, Local: local, Hosted: hosted,
+		Kind: kind, Local: local, Hosted: hosted, Args: args,
 		Validate: func(ctx context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
 			if _, err := args(raw); err != nil {
 				return nil, "", fmt.Errorf("%w: %v", jobs.ErrInvalidParams, err)

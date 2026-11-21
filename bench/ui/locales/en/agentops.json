@@ -22,7 +22,8 @@
 			"suiteRequired": "Suite (required)",
 			"suiteOptional": "Suite (optional)",
 			"needSuite": "Name the suite this image is built for.",
-			"run": "Build image"
+			"run": "Build image",
+			"runnerNote": "Hosted builds run on your runner (Settings > Runners), never on the server. The image stays on that runner, which also runs this agent."
 		},
 		"diff": {
 			"title": "Compare versions",

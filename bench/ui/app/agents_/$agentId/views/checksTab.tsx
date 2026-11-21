@@ -11,7 +11,7 @@ const DEFAULT_SUITE = "coding-core";
 
 /**
  * The Checks tab of an agent: a free conformance check (agent.check), an image build
- * (agent.build, local only) and a version diff (agent.diff, local; hosted opens the Diff page).
+ * (agent.build; hosted builds run on a runner) and a version diff (agent.diff, local; hosted opens the Diff page).
  * Each button is a background job with a live log.
  */
 export function ChecksTab(props: AgentOpsTabProps = {}) {
@@ -78,11 +78,12 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 				}
 				testId="agent-build-section"
 			>
-				{hosted ? (
-					<p className="text-muted-foreground text-xs">
-						{t("checks.build.hosted")}
+				{hosted && agent.dockerfile && (
+					<p className="text-muted-foreground text-xs" data-testid="agent-build-runner-note">
+						{t("checks.build.runnerNote")}
 					</p>
-				) : !agent.dockerfile ? (
+				)}
+				{!agent.dockerfile ? (
 					<p className="text-muted-foreground text-xs">{t("checks.build.nothing")}</p>
 				) : (
 					<div className="flex flex-wrap items-end gap-3">

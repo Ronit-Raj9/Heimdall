@@ -3,7 +3,7 @@
 	"subtitle": "Check this server, run GPU, voice and visual checks, and keep sealed evidence safe.",
 	"loading": "Loading what this server can run",
 	"loadError": "Could not load the operations status",
-	"hostedNote": "Hosted organizations run the doctor (suites, agents and runners) and the evidence jobs over their own runs. GPU and Kubernetes checks are run by the server owner.",
+	"hostedNote": "Hosted organizations run the doctor (suites, agents and runners) and the evidence jobs over their own runs. GPU, voice and visual checks and the simulator spread run on your runner (Settings > Runners), never on the server. Kubernetes operations stay with the server owner.",
 	"health": {
 		"title": "Health",
 		"description": "Preflight checks: docker, images, gateway, fault proxy, suites and agents.",
