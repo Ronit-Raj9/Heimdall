@@ -37,7 +37,12 @@ func (m *tokensMetric) Descriptor() schemas.MetricDescriptor {
 
 // Compute implements schemas.Metric. One row without usage makes the total
 // unknown: the buckets are summed only when every one of them was recorded,
-// so a partial sum is never shown as the run's total.
+// so a partial sum is never shown as the run's total. An error row without
+// usage counts as zero, as in input_tokens (inputSplit), the cost metric and
+// the usage completeness tally: a refused or failed request records no
+// usage, and an injected fault is billed as zero. Before, one injected 503
+// or stream cut made every faulted run's tokens unknown while its
+// input_tokens stayed observed (live lane l1, e_live_l1_faults_0qm3).
 func (m *tokensMetric) Compute(_ context.Context, _ *schemas.RunContext, ev *schemas.Evidence) (schemas.Value, error) {
 	ev = orEmpty(ev)
 	if v, bad := requestLogProblem(ev.Requests); bad {
@@ -45,6 +50,9 @@ func (m *tokensMetric) Compute(_ context.Context, _ *schemas.RunContext, ev *sch
 	}
 	var sum int64
 	for _, r := range messageRows(ev.Requests.Requests) {
+		if r.Status == "error" && r.Tokens == nil {
+			continue
+		}
 		if r.Tokens == nil {
 			return schemas.Unknown(fmt.Sprintf("message request %s has no usage", r.ID), schemas.EvidenceGateway), nil
 		}

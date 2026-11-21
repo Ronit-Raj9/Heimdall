@@ -35,6 +35,24 @@ func TestTokens(t *testing.T) {
 		{name: "no requests", ev: &schemas.Evidence{Requests: completeLog()}, want: schemas.Observed(0, gw)},
 		{name: "one row without usage", ev: &schemas.Evidence{Requests: completeLog(okMsg("a"), withTokens("b", nil))}, want: schemas.Unknown("message request b has no usage", gw)},
 		{
+			// Live lane l1: an injected 503 or a cut stream is an error row with
+			// no usage; it counts as zero, as in input_tokens and the cost metric.
+			name: "error row without usage counts as zero",
+			ev: &schemas.Evidence{Requests: completeLog(
+				withTokens("a", tok(100, 2000, 300, 40)),
+				schemas.GatewayRequest{ID: "e", Kind: "message", Status: "error"},
+			)},
+			want: schemas.Observed(2440, gw),
+		},
+		{
+			name: "error row with usage is summed",
+			ev: &schemas.Evidence{Requests: completeLog(
+				withTokens("a", tok(1, 2, 3, 4)),
+				schemas.GatewayRequest{ID: "e", Kind: "message", Status: "error", Tokens: tok(5, 0, 0, 0)},
+			)},
+			want: schemas.Observed(15, gw),
+		},
+		{
 			name: "incomplete log",
 			ev:   &schemas.Evidence{Requests: &schemas.RequestLog{Requests: []schemas.GatewayRequest{okMsg("a")}}},
 			want: schemas.Unknown(reasonIncomplete, gw),
