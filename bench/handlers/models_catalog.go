@@ -66,7 +66,9 @@ func modelProviders() []ModelProviderInfo {
 
 // defaultModel is the cheapest suggested chat model a usable key can call:
 // keys that tested ok come first, untested next; invalid or over-budget keys
-// never count. A key with its own model list offers its first model.
+// never count. A key with its own model list offers its first model. A key
+// that tested ok and reported the models it serves (models_available) beats
+// any static suggestion: its pick is a model the provider really serves.
 func defaultModel(keys []ModelKeyView) *ModelRefView {
 	providers := map[string]ModelProviderInfo{}
 	for _, p := range modelProviders() {
@@ -97,6 +99,11 @@ func defaultModel(keys []ModelKeyView) *ModelRefView {
 			consider(k.Models[0], rank)
 			continue
 		}
+		if k.Status == keystore.StatusOK && len(k.ModelsAvailable) > 0 {
+			model, rank := reportedModel(providers[k.Provider], k.ModelsAvailable)
+			consider(model, rank-reportedBonus)
+			continue
+		}
 		for _, o := range providers[k.Provider].Models {
 			if hasPurpose(o, "agent") {
 				consider(o.ID, o.Rank)
@@ -104,6 +111,34 @@ func defaultModel(keys []ModelKeyView) *ModelRefView {
 		}
 	}
 	return best
+}
+
+// reportedBonus puts a model a working key reported ahead of every static suggestion.
+const reportedBonus = 1 << 20
+
+// preferredReported is picked first when a key reports it.
+const preferredReported = "gpt-6.2-sol"
+
+// reportedModel picks from the models a key reported: the preferred model when
+// present, else the cheapest suggested agent model it serves, else the first.
+func reportedModel(p ModelProviderInfo, avail []string) (string, int) {
+	have := map[string]bool{}
+	for _, m := range avail {
+		have[m] = true
+	}
+	if have[preferredReported] {
+		return preferredReported, 0
+	}
+	best, bestRank := "", 1<<30
+	for _, o := range p.Models {
+		if hasPurpose(o, "agent") && have[o.ID] && o.Rank < bestRank {
+			best, bestRank = o.ID, o.Rank
+		}
+	}
+	if best != "" {
+		return best, bestRank
+	}
+	return avail[0], 500
 }
 
 func hasPurpose(o ModelOption, p string) bool {
