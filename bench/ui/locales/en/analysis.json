@@ -1,0 +1,83 @@
+{
+	"tab": "Analysis",
+	"intro": "Run the analysis commands on this experiment's sealed runs. Each button starts a background job with a live log; the views below refresh when it ends.",
+	"jobs": {
+		"title": "Analysis jobs",
+		"running": "Running",
+		"queued": "Queued",
+		"succeeded": "Done",
+		"failed": "Failed",
+		"cancelled": "Cancelled",
+		"openLog": "Show log",
+		"check": {
+			"title": "Re-check verdict",
+			"description": "Analyze the sealed runs again and save a new verdict, with the release policy the experiment froze.",
+			"button": "Run check"
+		},
+		"codescan": {
+			"title": "Code scan",
+			"description": "Security findings on the lines each run's agent added, with the experiment's veto level.",
+			"button": "Scan code"
+		},
+		"awareness": {
+			"title": "Eval awareness",
+			"description": "Heuristic scan of the agents' own words for remarks that they are being tested. Report only, never a gate.",
+			"button": "Scan for awareness"
+		},
+		"blame": {
+			"title": "Blame",
+			"description": "Which agent of each multi-agent run caused its failure (tier 1, from the sealed gates). Replays stay a CLI step.",
+			"button": "Compute blame"
+		},
+		"clusters": {
+			"title": "Failure clusters",
+			"description": "Refresh the run index and group failed runs across experiments by cause.",
+			"button": "Rebuild clusters"
+		},
+		"index": {
+			"title": "Results index",
+			"description": "Rebuild the derived index behind trends, search and the leaderboard. Verdicts never read it.",
+			"button": "Rebuild index"
+		}
+	},
+	"result": {
+		"check": "Verdict {{decision}}, action {{action}}",
+		"checkPolicy": "release policy {{policy}}",
+		"codescan": "{{findings}} counted findings over {{scanned}} of {{runs}} runs; {{vetoed}} would be vetoed",
+		"blame": "{{runs}} runs: {{failed}} failed, {{blamed}} pinned on one agent",
+		"clusters": "{{clusters}} clusters from {{failures}} failures in {{runs}} runs",
+		"index": "Index rebuilt",
+		"awareness": "Awareness report refreshed"
+	},
+	"views": {
+		"verdict": "Current verdict",
+		"verdictNone": "No verdict yet. Run a check once the experiment has sealed runs.",
+		"awareness": "Eval awareness",
+		"awarenessNone": "No awareness report yet. Start a scan above.",
+		"awarenessArm": "Arm {{arm}}: {{withSignals}} of {{scanned}} scanned runs with signals ({{signals}} signals)",
+		"clusters": "Failure clusters in this experiment",
+		"clustersNone": "No failure clusters for this experiment.",
+		"clustersAll": "Open all clusters",
+		"loadError": "Could not load: {{error}}"
+	},
+	"links": {
+		"title": "Cost",
+		"costExplain": "Why one arm cost more (cost explain)",
+		"pareto": "Cost against verified success (pareto)",
+		"leaderboardPareto": "Leaderboard pareto across experiments"
+	},
+	"audit": {
+		"title": "Audit a published table",
+		"description": "Upload a per-task CSV with columns task,a_pass,a_n,b_pass,b_n (for example a paper's results) to get the same paired verdict.",
+		"file": "CSV file",
+		"paste": "Or paste the table",
+		"placeholder": "task,a_pass,a_n,b_pass,b_n\nt01,1,3,2,3",
+		"submit": "Audit table",
+		"empty": "Choose a CSV file or paste a table first.",
+		"tooLarge": "The table is larger than 1 MiB. Trim it or run `bifrost-bench audit` locally.",
+		"result": "Verdict {{decision}}, action {{action}}",
+		"effect": "Effect {{effect}} pp over {{tasks}} tasks",
+		"mde": "Minimal detectable effect {{mde}} pp",
+		"error": "Audit failed: {{error}}"
+	}
+}
