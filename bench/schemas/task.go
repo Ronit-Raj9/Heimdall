@@ -75,6 +75,11 @@ type Task struct {
 	// reads the task.
 	Compose string `json:"compose,omitempty" yaml:"compose"`
 
+	// Process is the reference tool path the report-only process metrics
+	// compare a run with (process.go, graders/process.go). Nil for a task
+	// without one.
+	Process *ProcessSpec `json:"process,omitempty" yaml:"process"`
+
 	Dir string `json:"-" yaml:"-"` // absolute task folder
 }
 
