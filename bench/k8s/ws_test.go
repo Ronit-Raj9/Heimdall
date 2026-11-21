@@ -103,6 +103,13 @@ func acceptWS(w http.ResponseWriter, r *http.Request, protos []string) (*fakeStr
 		http.Error(w, `{"kind":"Status","reason":"BadRequest","message":"no upgrade"}`, http.StatusBadRequest)
 		return nil, false
 	}
+	// Kubernetes 1.37 (k3s v1.37.2) answers an upgrade that carries
+	// Accept: application/json with 406 Not Acceptable (live finding: every
+	// workspace seed failed); 1.35 accepted it. The fake is as strict.
+	if a := r.Header.Get("Accept"); a != "" && !strings.Contains(a, "*/*") {
+		http.Error(w, `{"kind":"Status","reason":"NotAcceptable","message":"406: Not Acceptable"}`, http.StatusNotAcceptable)
+		return nil, false
+	}
 	hj, ok := w.(http.Hijacker)
 	if !ok {
 		http.Error(w, "no hijack", 500)
