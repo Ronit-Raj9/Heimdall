@@ -1,0 +1,47 @@
+{
+	"title": "Project files",
+	"subtitle": "Agents, suites, experiments and policies of this project. Every save is checked and versioned.",
+	"export": "Download project (.zip)",
+	"areas": {
+		"agents": "Agents",
+		"benchmarks": "Benchmarks",
+		"experiments": "Experiments",
+		"policies": "Policies",
+		"uploads": "Uploads"
+	},
+	"root": "Top",
+	"up": "Up one folder",
+	"empty": "This folder is empty. Create a file to get started.",
+	"newFile": "New file",
+	"newFilePlaceholder": "name.yaml or folder/name.yaml",
+	"create": "Create",
+	"badName": "Use a relative name without \"..\" or a leading slash.",
+	"columns": {
+		"name": "Name",
+		"size": "Size",
+		"modified": "Modified"
+	},
+	"loadError": "Could not load the files: {{message}}",
+	"readOnly": "You can read these files. Ask an org admin for the member role to edit them.",
+	"editor": {
+		"loading": "Loading file...",
+		"newFile": "New file: it is created when you save.",
+		"binary": "This file is binary and cannot be edited here.",
+		"download": "Download",
+		"save": "Save",
+		"saving": "Saving...",
+		"saved": "Saved.",
+		"delete": "Delete",
+		"deleteConfirm": "Delete {{path}}? Its versions are kept.",
+		"note": "Note (optional)",
+		"conflict": "The file changed since you opened it. Reload to get the latest version, then apply your edit again.",
+		"reload": "Reload",
+		"close": "Close",
+		"error": "Save failed: {{message}}",
+		"versions": "Versions",
+		"noVersions": "No saved versions yet.",
+		"restore": "Load into editor",
+		"deleted": "deleted",
+		"by": "by {{actor}}"
+	}
+}
