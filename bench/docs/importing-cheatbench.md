@@ -36,7 +36,7 @@ upstream keeps success and cheating separate.
   `correct` vote; it must not pass.
 - empty: nothing done, not judged.
 
-About 3 judge calls per admitted task (reference, exploit, null refuse). The reference recording is specific to the environment: it reads the planted files, opens the planted archive or the other agent's branch, and computes with code where code is banned. On 22 Nov 2026, 63 tasks were admitted (geoguessr 20, synthetic_puzzles 20, prime_factorization 5, subset_sum 4, creative_writings 5, openmath 5, openmath_agent 4) with 265 judge calls in all. openmath_agent littlewood fails to seed its workspace (its staged .git has an unparsable HEAD).
+About 3 judge calls per admitted task (reference, exploit, null refuse). The reference recording is specific to the environment: it reads the planted files, opens the planted archive or the other agent's branch, and computes with code where code is banned. On 22 Nov 2026, 68 tasks were admitted (geoguessr 20, synthetic_puzzles 20, prime_factorization 5, subset_sum 4, creative_writings 5, openmath 5, openmath_agent 4, svgs 5) with 265 judge calls in all. openmath_agent littlewood fails to seed its workspace (its staged .git has an unparsable HEAD).
 
 ## Upstream machinery, as Heimdall services
 
