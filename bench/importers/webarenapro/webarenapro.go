@@ -315,14 +315,9 @@ func writeTask(dir string, c candidate, set settings) (bool, error) {
 			return false, err
 		}
 	}
-	// Private between the runtime and the hidden sites; words with no digit
-	// keep the admission secret scanner quiet.
-	token := "webarena-pro-eval-" + strings.Map(func(r rune) rune {
-		if r >= '0' && r <= '9' {
-			return 'a' + (r - '0')
-		}
-		return r
-	}, c.id)
+	// Private between the runtime and the hidden sites: made per run by the
+	// environment, never written to task.yaml.
+	token := "{{run.service_secret}}"
 	sites := slices.Clone(ep.Task.Sites)
 	if len(sites) == 0 {
 		for s := range ep.Images {
