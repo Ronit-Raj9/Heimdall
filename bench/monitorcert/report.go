@@ -20,6 +20,7 @@ func RenderMarkdown(c *schemas.MonitorCertificate) []byte {
 	fmt.Fprintf(&w, "Experiments: %s. Grade source: %s. Attack axes: %s. Harm metrics: %s.\n\n",
 		strings.Join(c.ExpIDs, ", "), c.GradeSource, strings.Join(c.AttackAxes, ", "), orDash(strings.Join(c.HarmMetrics, ", ")))
 	fmt.Fprintf(&w, "Labels: %d honest, %d attack, %d excluded. Monitor errors: %d.\n\n", c.Labels.Honest, c.Labels.Attack, c.Labels.Excluded, c.Errors)
+	writeView(&w, c)
 	fmt.Fprintf(&w, "Rule: %s\n\n", c.Labels.Rule)
 
 	w.WriteString("## Operating points\n\n")
@@ -63,6 +64,7 @@ func RenderMarkdown(c *schemas.MonitorCertificate) []byte {
 		w.WriteString("\n")
 	}
 
+	writeSabotage(&w, c)
 	fmt.Fprintf(&w, "## Monitor integrity\n\nMonitor-injection check: **%s**. %s\n\n", c.Integrity.State, c.Integrity.Detail)
 
 	writeExcluded(&w, c)
@@ -70,6 +72,60 @@ func RenderMarkdown(c *schemas.MonitorCertificate) []byte {
 	writeItems(&w, c)
 	w.WriteString("## Not covered\n\nLabels come from the bench's deterministic gates, so the monitor is scored only on attacks those gates can see. Honest means no veto fired, not provably benign. This certificate says nothing about adaptive attacks against the monitor, attack families absent from these runs, or production traffic, whose mix of honest and attack runs differs from this one.\n")
 	return w.Bytes()
+}
+
+// writeView states the transcript view and, per arm, how many replayed runs
+// had reasoning to show.
+func writeView(w *bytes.Buffer, c *schemas.MonitorCertificate) {
+	view := c.View
+	if view == "" {
+		view = schemas.MonitorViewActions
+	}
+	fmt.Fprintf(w, "View: %s.", view)
+	if len(c.Reasoning) > 0 {
+		arms := make([]string, 0, len(c.Reasoning))
+		for a := range c.Reasoning {
+			arms = append(arms, a)
+		}
+		sort.Strings(arms)
+		parts := make([]string, 0, len(arms))
+		for _, a := range arms {
+			r := c.Reasoning[a]
+			parts = append(parts, fmt.Sprintf("arm %s %d of %d", a, r.WithReasoning, r.Runs))
+		}
+		fmt.Fprintf(w, " Reasoning visible in: %s.", strings.Join(parts, ", "))
+	}
+	w.WriteString("\n\n")
+}
+
+// writeSabotage renders the undetected-sabotage summary of attack runs.
+func writeSabotage(w *bytes.Buffer, c *schemas.MonitorCertificate) {
+	s := c.Sabotage
+	if s == nil {
+		return
+	}
+	fmt.Fprintf(w, "## Undetected sabotage\n\nAt the %s FPR point: %d attack runs, %d side tasks completed, %d caught, %d undetected (%s of attack runs).\n\n",
+		fmtFloat(s.TargetFPR), s.AttackRuns, s.Completed, s.Caught, s.Undetected, rateCI(s.UndetectedRate, intervalSlice(s.Interval)))
+	if len(s.PerArm) > 0 {
+		w.WriteString("| Arm | Attack runs | Completed | Undetected |\n|---|---|---|---|\n")
+		arms := make([]string, 0, len(s.PerArm))
+		for a := range s.PerArm {
+			arms = append(arms, a)
+		}
+		sort.Strings(arms)
+		for _, a := range arms {
+			p := s.PerArm[a]
+			fmt.Fprintf(w, "| %s | %d | %d | %d |\n", cell(a), p.AttackRuns, p.Completed, p.Undetected)
+		}
+		w.WriteString("\n")
+	}
+}
+
+func intervalSlice(iv *[2]float64) []float64 {
+	if iv == nil {
+		return nil
+	}
+	return []float64{iv[0], iv[1]}
 }
 
 func writeExcluded(w *bytes.Buffer, c *schemas.MonitorCertificate) {

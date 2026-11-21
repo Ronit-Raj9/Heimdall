@@ -50,6 +50,10 @@ type Task struct {
 	// contradict its instruction). A pass can only come from cheating: the
 	// impossible_pass gate turns it into an integrity violation.
 	Impossible bool `json:"impossible,omitempty" yaml:"impossible"`
+
+	// SideTasks are hidden secondary objectives an attack run pursues
+	// (control.go). Only the attack condition shows them to the agent.
+	SideTasks []SideTask `json:"side_tasks,omitempty" yaml:"side_tasks,omitempty"`
 	// External lists real HTTP APIs the agent may call through the tool
 	// proxy, after the suite's (scenario.go ExternalAPI).
 	External []ExternalAPI `json:"external,omitempty" yaml:"external"`

@@ -17,17 +17,20 @@ import (
 	"unicode/utf8"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // Run folder files the transcript builder reads. It opens them read-only
 // and never writes into a run folder.
 const (
-	planFile     = "plan.json"
-	gatewayFile  = "gateway.requests.jsonl"
-	toolsFile    = "tools.jsonl"
-	eventsFile   = "events.jsonl"
-	instructBase = "instruction.md"
-	maxLineBytes = 64 << 20 // a gateway row with raw request and response can be large
+	planFile       = "plan.json"
+	gatewayFile    = "gateway.requests.jsonl"
+	toolsFile      = "tools.jsonl"
+	eventsFile     = "events.jsonl"
+	streamFile     = "agent.stream.jsonl"
+	instructBase   = "instruction.md"
+	maxLineBytes   = 64 << 20 // a gateway row with raw request and response can be large
+	maxStreamBytes = 128 << 20
 )
 
 // Limits bound what one transcript carries, so a long run cannot make a
@@ -57,8 +60,29 @@ type Transcript struct {
 	InstructionTruncated bool
 	Actions              []schemas.MonitorAction
 	FinalMessage         string
-	Omitted              int  // actions dropped from the middle
-	Truncated            bool // any content cut or any action dropped
+	Omitted              int    // actions dropped from the middle
+	Truncated            bool   // any content cut or any action dropped
+	View                 string // actions, cot or hybrid
+	reasoningSeen        bool
+}
+
+// ReasoningRecorded reports whether the run recorded any reasoning,
+// whatever the view kept.
+func (t *Transcript) ReasoningRecorded() bool { return t.reasoningSeen }
+
+// keepInView reports whether a view shows an action: actions drops every
+// reasoning action (the transcript as it was before reasoning was recorded),
+// cot keeps only reasoning (the request still carries the final message),
+// hybrid keeps everything.
+func keepInView(view string, a schemas.MonitorAction) bool {
+	switch view {
+	case schemas.MonitorViewCoT:
+		return a.Kind == schemas.MonitorActionReasoning
+	case schemas.MonitorViewHybrid:
+		return true
+	default:
+		return a.Kind != schemas.MonitorActionReasoning
+	}
 }
 
 // nonceRE matches the bench's receipt nonces. A nonce shows a probe was
@@ -79,6 +103,17 @@ const nonceRedacted = "[redacted]"
 // not already show. Fault, retry, gate, grade and integrity events are
 // never read. The final message is the run's claim text.
 func BuildTranscript(dir string, run *schemas.Run, lim Limits) (*Transcript, error) {
+	return BuildTranscriptView(dir, run, lim, schemas.MonitorViewActions)
+}
+
+// BuildTranscriptView is BuildTranscript for one monitor view
+// (schemas.MonitorView*). Reasoning comes from the gateway rows' output
+// side, else from the agent's own stream; the view filter runs before the
+// limits, so a view's action budget is spent on what it shows.
+func BuildTranscriptView(dir string, run *schemas.Run, lim Limits, view string) (*Transcript, error) {
+	if view == "" {
+		view = schemas.MonitorViewActions
+	}
 	if lim.MaxActions < 2 {
 		lim = DefaultLimits()
 	}
@@ -90,20 +125,23 @@ func BuildTranscript(dir string, run *schemas.Run, lim Limits) (*Transcript, err
 	if err != nil {
 		return nil, err
 	}
-	steps := []func(string) error{b.readGateway, b.readToolLedger, b.readSteps, b.readEvents}
+	steps := []func(string) error{b.readGateway, b.readToolLedger, b.readSteps, b.readEvents, b.readStreamReasoning}
 	for _, step := range steps {
 		if err := step(dir); err != nil {
 			return nil, err
 		}
 	}
-	t := &Transcript{}
-	t.Instruction, t.InstructionTruncated = clip(redact(ins), lim.MaxInstruction)
+	t := &Transcript{View: view}
+	for _, ta := range b.actions {
+		t.reasoningSeen = t.reasoningSeen || ta.a.Kind == schemas.MonitorActionReasoning
+	}
+	t.Instruction, t.InstructionTruncated = clip(redact(schemas.StripAttack(ins)), lim.MaxInstruction)
 	if run != nil && run.Claim != nil {
 		var cut bool
 		t.FinalMessage, cut = clip(redact(run.Claim.Text), lim.MaxFinalMessage)
 		t.Truncated = t.Truncated || cut
 	}
-	t.Actions, t.Omitted = b.finish(lim)
+	t.Actions, t.Omitted = b.finish(lim, view)
 	t.Truncated = t.Truncated || t.Omitted > 0 || t.InstructionTruncated
 	for _, a := range t.Actions {
 		t.Truncated = t.Truncated || a.Truncated
@@ -118,6 +156,9 @@ func (t *Transcript) Requests(mode string) []schemas.MonitorRequest {
 		Version: schemas.MonitorProtocolVersion, Mode: mode,
 		Instruction: t.Instruction, InstructionTruncated: t.InstructionTruncated,
 		FinalMessage: t.FinalMessage, OmittedActions: t.Omitted,
+	}
+	if t.View == schemas.MonitorViewCoT || t.View == schemas.MonitorViewHybrid { // the actions view keeps the request bytes it had before views
+		base.View = t.View
 	}
 	if mode != schemas.MonitorModeAction {
 		base.Actions = append([]schemas.MonitorAction(nil), t.Actions...)
@@ -140,6 +181,7 @@ type builder struct {
 	actions      []timedAction
 	seen         map[string]bool // tool call ids already shown
 	gatewayCalls int
+	reasoning    int // reasoning actions read from the gateway rows
 }
 
 type timedAction struct {
@@ -154,7 +196,7 @@ func (b *builder) add(ts time.Time, a schemas.MonitorAction) {
 
 // finish sorts the actions by time (arrival order on ties), clips each and
 // drops the middle of an overlong run.
-func (b *builder) finish(lim Limits) ([]schemas.MonitorAction, int) {
+func (b *builder) finish(lim Limits, view string) ([]schemas.MonitorAction, int) {
 	sort.SliceStable(b.actions, func(i, j int) bool {
 		if !b.actions[i].ts.Equal(b.actions[j].ts) {
 			return b.actions[i].ts.Before(b.actions[j].ts)
@@ -162,9 +204,12 @@ func (b *builder) finish(lim Limits) ([]schemas.MonitorAction, int) {
 		return b.actions[i].seq < b.actions[j].seq
 	})
 	all := make([]schemas.MonitorAction, 0, len(b.actions))
-	for i, ta := range b.actions {
+	for _, ta := range b.actions {
+		if !keepInView(view, ta.a) {
+			continue
+		}
 		a := ta.a
-		a.Index = i
+		a.Index = len(all)
 		a.Name = redact(a.Name)
 		a.Content, a.Truncated = clip(redact(a.Content), lim.MaxActionBytes)
 		all = append(all, a)
@@ -212,6 +257,17 @@ func (b *builder) readGateway(dir string) error {
 			return
 		}
 		ts := r.Timestamp.Add(time.Duration(r.LatencyMS * float64(time.Millisecond)))
+		var raw struct {
+			Raw json.RawMessage `json:"raw"`
+		}
+		if json.Unmarshal(line, &raw) == nil {
+			for _, t := range utils.GatewayOutputTexts(raw.Raw) {
+				if t.Source == utils.AwareSourceReasoning {
+					b.reasoning++
+					b.add(ts, schemas.MonitorAction{Kind: schemas.MonitorActionReasoning, Source: schemas.StepSourceGateway, Content: t.Text})
+				}
+			}
+		}
 		if r.Raw != nil && r.Raw.OutputMessage != nil {
 			if text := messageText(r.Raw.OutputMessage.Content); strings.TrimSpace(text) != "" {
 				b.add(ts, schemas.MonitorAction{Kind: schemas.MonitorActionMessage, Source: schemas.StepSourceGateway, Content: text})
@@ -301,6 +357,38 @@ func (b *builder) readEvents(dir string) error {
 		}
 		b.addCall(e.TS, e.ToolCallID, e.ToolName, e.Target, string(e.Source))
 	})
+}
+
+// readStreamReasoning adds the reasoning of the agent's own stream (Claude
+// Code thinking blocks, Codex reasoning items) when the gateway rows held
+// none, the same extraction the awareness scan uses. The stream carries no
+// per-line time the builder trusts, so these actions sort at the agent's
+// start in stream order.
+func (b *builder) readStreamReasoning(dir string) error {
+	if b.reasoning > 0 {
+		return nil
+	}
+	p := filepath.Join(dir, streamFile)
+	fi, err := os.Stat(p)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("stat %s: %w", streamFile, err)
+	}
+	if fi.Size() > maxStreamBytes {
+		return nil // too large to read whole; the run shows no stream reasoning
+	}
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", streamFile, err)
+	}
+	for _, t := range utils.AgentStreamTexts(data) {
+		if t.Source == utils.AwareSourceReasoning {
+			b.add(b.agentStarted, schemas.MonitorAction{Kind: schemas.MonitorActionReasoning, Source: string(schemas.SourceAgentStream), Content: t.Text})
+		}
+	}
+	return nil
 }
 
 func (b *builder) beforeAgent(ts time.Time) bool {

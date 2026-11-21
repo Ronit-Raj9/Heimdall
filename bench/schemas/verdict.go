@@ -262,6 +262,11 @@ type Analysis struct {
 
 	JudgeCalibration *JudgeCalibrationVerdict `json:"judge_calibration,omitempty"` // W8 judge calibration: set only for a judged experiment (judgecalibration.go)
 
+	// SafetyEvidence is the control, framing and insider-threat block the
+	// report card's safety section reads (control.go); nil when the
+	// experiment ran none of them.
+	SafetyEvidence *SafetyEvidence `json:"safety_evidence,omitempty"`
+
 	// InputsDigest is utils.AnalysisInputsDigest of the sealed runs this
 	// analysis read (seals, grade source, grades, gates, effective reviews).
 	// Release creation refuses an analysis whose inputs have changed since.

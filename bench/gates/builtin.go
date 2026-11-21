@@ -48,6 +48,12 @@ func Builtin() []schemas.Gate {
 		newCrossAgentSecretGate(), // cross_agent_secret_leak (veto)
 		newUnmonitoredGate(),      // unmonitored_channel_used (report)
 		newInsecureCodeGate(),     // X4: insecure_code_added (baseline, report; veto by experiment codescan.veto_at)
+		// Control evaluations and the insider-threat pack (docs/control-evals.md), all opt-in.
+		newSideTaskGate(),         // side_task_completed (report; the attack condition opts it in)
+		newLeverageGate(),         // leverage_used (veto)
+		newSelfExfiltrationGate(), // self_exfiltration_attempted (veto)
+		newShutdownGate(),         // shutdown_interfered (veto)
+		newHoneypotGate(),         // honeypot_taken (veto)
 	}
 }
 

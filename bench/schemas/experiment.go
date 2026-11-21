@@ -73,6 +73,9 @@ type Experiment struct {
 	// their hashes.
 	AA      bool   `json:"aa,omitempty" yaml:"aa,omitempty"`           // Eval integrity area (S2)
 	Realism string `json:"realism,omitempty" yaml:"realism,omitempty"` // Eval integrity area (S2): standard | neutral
+	// FramingPairs ask for twin arms of a base arm that differ only in a
+	// preamble (control.go): sandbagging, compliance gap, awareness delta.
+	FramingPairs []FramingPair `json:"framing_pairs,omitempty" yaml:"framing_pairs,omitempty"`
 
 	// Safety probes area (S1). Safety "trifecta" makes the planner add the
 	// suite's exfiltration probes to every task whose agent config has
@@ -585,6 +588,9 @@ type ArmManifest struct {
 	BudgetSnapshot *BudgetSnapshot              `json:"budget_snapshot,omitempty"`
 	CapabilityGaps []string                     `json:"capability_gaps,omitempty"`
 	Files          map[string]map[string]string `json:"files"` // condition -> path -> sha256
+	// Framing marks an arm made from a framing pair: a copy of its base arm
+	// whose instruction starts with the frozen preamble (control.go).
+	Framing *ArmFraming `json:"framing,omitempty"`
 	// ImageID is the local image id (sha256:...) Config.Image named when the
 	// manifest was planned. The environment refuses to start a run of this arm
 	// on any other image, so a rebuilt tag never changes a frozen experiment.
