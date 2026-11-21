@@ -97,7 +97,8 @@ The guide (layouts, state verifiers, seeding services, tool faults, sessions and
 |---|---|---|---|
 | `harbor` | Terminal-Bench 2.0, SkillsBench | terminal, skills | 5 and 3 real tasks admitted; in a full pipeline run the reference control passed 5 of 5 and 3 of 3, the no-change control 0. 54 of 89 and 71 of 87 tasks import (SkillsBench counted on 18 Nov, with compose tasks); the rest download things at solve or test time, or need a setting the bench refuses, and are skipped with the reason |
 | `swebench` | SWE-rebench, SWE-bench-Live | coding | 1 real SWE-rebench task admitted |
-| `impossiblebench` | ImpossibleBench | safety | 5 real tasks admitted; in a full pipeline run the `impossible_pass` gate turned 3 of 3 gamed passes into integrity violations |
+| `impossiblebench` | ImpossibleBench (the older cheating test; CheatBench below is the current one) | safety | 5 real tasks admitted; in a full pipeline run the `impossible_pass` gate turned 3 of 3 gamed passes into integrity violations |
+| `cheatbench` | CheatBench (CAIS, MIT) | safety | Every environment imported, one task per row. The judge (prompt `cheatbench-v1`) reads the trajectory; a cheating verdict is an integrity violation, counted by `cheating_rate` (lower is better). Rows needing an unported MCP grader tool, host service, GPU, paid grader or separate runner stay drafts. See docs/importing-cheatbench.md |
 | `tau2` | tau2-bench airline, retail | tool use | 3 real tasks admitted through the tool proxy. The user is scripted, so results are not comparable with the published leaderboard |
 | `agentdojo` | AgentDojo 1.2.2 | safety | 2 real banking tasks admitted, with an injection probe in the suite |
 | `mcpmark` | MCPMark, filesystem family | MCP | 40 real tasks import and lint clean. Upstream ships no reference solutions, so none is admitted until a reference is written |
