@@ -33,6 +33,7 @@ const Name = "clbench"
 
 // Importer settings (-set key=value).
 const (
+	SetDBRev     = "db_rev"    // Hugging Face revision the service image fetches the databases from
 	SetDBDir     = "db_dir"    // folder holding products.db and products_drifted.db (database_exploration)
 	SetRef       = "ref"       // upstream commit, when -from is not a git clone
 	SetSchedules = "schedules" // all (default) or default (only each family's default schedule)
@@ -125,6 +126,7 @@ func (im *importer) Info() importers.Info {
 
 type settings struct {
 	dbDir     string
+	dbRev     string
 	ref       string
 	onlyDef   bool
 	smoke     bool
@@ -132,8 +134,8 @@ type settings struct {
 }
 
 func parseSettings(from string, extra map[string]string) (settings, error) {
-	s := settings{dbDir: filepath.Join(from, "data", "database_exploration"), suiteVers: "1.0.0"}
-	known := []string{SetDBDir, SetRef, SetSchedules, SetSmoke, SetSuiteVer}
+	s := settings{dbDir: filepath.Join(from, "data", "database_exploration"), suiteVers: "1.0.0", dbRev: defaultDBRev}
+	known := []string{SetDBDir, SetDBRev, SetRef, SetSchedules, SetSmoke, SetSuiteVer}
 	for k := range extra {
 		if !slices.Contains(known, k) {
 			return s, fmt.Errorf("unknown setting %q (known: %s)", k, strings.Join(known, ", "))
@@ -141,6 +143,9 @@ func parseSettings(from string, extra map[string]string) (settings, error) {
 	}
 	if v := extra[SetDBDir]; v != "" {
 		s.dbDir = v
+	}
+	if v := extra[SetDBRev]; v != "" {
+		s.dbRev = v
 	}
 	s.ref = extra[SetRef]
 	switch v := extra[SetSchedules]; v {
@@ -420,10 +425,27 @@ func writeTask(dir, from string, set settings, rev string, st stream) error {
 		return err
 	}
 	pins := append(append([]string(nil), basePins...), info.pins...)
+	// database_exploration's two databases (about 330 MB compressed) are
+	// over the task folder limit, so the image fetches them at build from the
+	// pinned Hugging Face revision and checks each against the sha256 of the
+	// local copy the import read.
+	dbFetch := ""
+	if info.needsDB && st.draft == "" {
+		var parts []string
+		for _, f := range []string{"products.db", "products_drifted.db"} {
+			sum, err := fileSHA256(filepath.Join(set.dbDir, f))
+			if err != nil {
+				return err
+			}
+			parts = append(parts, fmt.Sprintf("python -c \"import hashlib,urllib.request,sys; u='%s/resolve/%s/%s'; p='/opt/clbench/data/%s/%s'; urllib.request.urlretrieve(u,p); h=hashlib.sha256(open(p,'rb').read()).hexdigest(); sys.exit(0 if h=='%s' else 'sha256 mismatch for %s')\"", dbRepoURL, set.dbRev, f, st.family, f, sum, f))
+		}
+		dbFetch = "RUN mkdir -p /opt/clbench/data/" + st.family + " && " + strings.Join(parts, " && ") + "\n"
+	}
 	dockerfile := "# Written by `bifrost-bench import clbench`: the CL-Bench stream service.\n" +
 		"FROM " + workspaceImage + "\n" +
 		"RUN pip install --no-cache-dir " + strings.Join(pins, " ") + "\n" +
 		"ADD clbench.tar.gz /opt/clbench/\n" +
+		dbFetch +
 		"COPY server.py /opt/clenv/server.py\n" +
 		"ENV CLBENCH_ROOT=/opt/clbench PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1\n" +
 		fmt.Sprintf("EXPOSE %d\n", servicePort) +
@@ -502,13 +524,6 @@ func writeTask(dir, from string, set settings, rev string, st stream) error {
 	if d := filepath.Join(from, "data", st.family); dirExists(d) {
 		if err := copyTree(d, filepath.Join(svc, "data", st.family), nil); err != nil {
 			return err
-		}
-	}
-	if info.needsDB && st.draft == "" {
-		for _, f := range []string{"products.db", "products_drifted.db"} {
-			if err := copyFile(filepath.Join(set.dbDir, f), filepath.Join(svc, "data", st.family, f)); err != nil {
-				return err
-			}
 		}
 	}
 	return packTree(svc, filepath.Join(dir, "service", "clbench.tar.gz"))
@@ -816,4 +831,23 @@ func writeSuite(dir, id, version string, tasks []string, rev string, now time.Ti
 	p("imported:\n  importer: %s\n  benchmark: %s\n  source: %s\n  revision: %s\n  license: %s\n  at: %s\n",
 		Name, q("CL-Bench (continual-learning-bench)"), q(upstreamRepo), rev, upstreamLicense, now.UTC().Truncate(time.Second).Format("2006-01-02T15:04:05Z"))
 	return os.WriteFile(filepath.Join(dir, "suite.yaml"), []byte(b.String()), 0o644)
+}
+
+// dbRepoURL and defaultDBRev name the database_exploration databases.
+const (
+	dbRepoURL    = "https://huggingface.co/datasets/continual-learning-bench/database-exploration"
+	defaultDBRev = "a0cc57eeb9a54f01c0490a1b46cb705b4e05aa19"
+)
+
+func fileSHA256(p string) (string, error) {
+	f, err := os.Open(p)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }

@@ -43,7 +43,7 @@ bifrost-bench import clbench -from datasets/cl-bench -suite cl-bench -set db_dir
 bifrost-bench suite lint cl-bench && bifrost-bench suite lock cl-bench && bifrost-bench suite admit cl-bench
 ```
 
-Settings (`-set key=value`): `db_dir` (default `<from>/data/database_exploration`), `ref` (upstream commit when `-from` is not a clone), `schedules` (`all` or `default`), `smoke` (`true` imports `quick_test`), `version` (suite version). `-ids` takes bench ids (`clb-poker-default`) or `family/schedule`.
+Settings (`-set key=value`): `db_rev` (Hugging Face revision of the databases, default `a0cc57ee...`; the service image downloads them at build and checks the sha256 of the local copies, because the two files are over the 200 MB task folder limit), `db_dir` (default `<from>/data/database_exploration`), `ref` (upstream commit when `-from` is not a clone), `schedules` (`all` or `default`), `smoke` (`true` imports `quick_test`), `version` (suite version). `-ids` takes bench ids (`clb-poker-default`) or `family/schedule`.
 
 ## What a task looks like
 
