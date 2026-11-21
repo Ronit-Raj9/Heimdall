@@ -2,6 +2,8 @@
 
 Teams drive Heimdall from code and CI through the same HTTP API the UI uses. This guide covers the machine-readable description of that API and the two thin clients over it. Everything client-side lives in `bench/clients/` and can be removed by deleting that folder; the only Go additions are `handlers/openapi.go`, its test and one registration line in `server/server.go`.
 
+For the public, versioned API (`/api/v1`, its token scopes and deprecation policy) and the SDKs' `V1Client` (0.2.0), see `docs/api-v1.md`; for the MCP server, `docs/mcp-server.md`. This guide covers the internal `/api/bench` clients.
+
 | Piece | Where | What |
 |---|---|---|
 | API description | `GET /api/bench/openapi.json` | OpenAPI 3.1, built from the routes the server actually registered |
