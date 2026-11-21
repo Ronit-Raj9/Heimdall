@@ -82,7 +82,11 @@ func newLauncher(a *app, ix *store.Index) *launcher {
 }
 
 func (l *launcher) Plan(ctx context.Context, exp *schemas.Experiment) (*schemas.Manifest, error) {
-	return l.a.newPlanner().Plan(ctx, exp)
+	m, err := l.a.newPlanner().Plan(ctx, exp)
+	if err == nil {
+		err = l.keyBudgetCheck(ctx, m) // G10: a provider with only over-budget keys (keybudget.go)
+	}
+	return m, err
 }
 
 func (l *launcher) Create(ctx context.Context, m *schemas.Manifest) error {
@@ -153,6 +157,11 @@ func (l *launcher) invalidateStates() {
 // Start queues the experiment's run job (or, with no job runner, runs it in
 // this process). An experiment whose run job is queued or running is refused.
 func (l *launcher) Start(ctx context.Context, expID string) error {
+	if m, err := l.a.store.LoadManifest(ctx, expID); err == nil {
+		if err := l.keyBudgetCheck(ctx, m); err != nil { // G10 (keybudget.go)
+			return err
+		}
+	}
 	if l.jobs == nil {
 		return l.startInProcess(ctx, expID)
 	}
@@ -341,9 +350,11 @@ func (l *launcher) execute(ctx context.Context, m *schemas.Manifest, run *liveRu
 				log.Printf("sealed %s (slot %s): %s", ev.RunID, ev.SlotID, ev.Outcome)
 				_ = l.rebuild(context.WithoutCancel(ctx))
 				evidenceOnSeal(l.org, m.ExpID) // Evidence storage area (P6), wired by Tenancy: mirror the sealed run now (evidence.go)
+				l.chargeKeySpend(ctx, m, ev.RunID, log) // G10: the run's cost to its model key (keybudget.go)
 			case engine.EventRunRecovered:
 				log.Warnf("sealed interrupted run %s (slot %s): %s", ev.RunID, ev.SlotID, ev.Outcome)
 				evidenceOnSeal(l.org, m.ExpID) // Evidence storage area (P6), wired by Tenancy (evidence.go)
+				l.chargeKeySpend(ctx, m, ev.RunID, log) // G10 (keybudget.go)
 			case engine.EventSlotSkipped:
 				prog.Skipped++
 			case engine.EventError:
@@ -367,6 +378,7 @@ func (l *launcher) execute(ctx context.Context, m *schemas.Manifest, run *liveRu
 	rctx, stopRun := engine.CancelContext(ctx)
 	defer stopRun()
 
+	l.applyLocalOrgKeys(ctx, m, log) // G10: local serve delivers Models page keys to its gateway (keybudget.go)
 	janitor := engine.NewJanitor(l.a.reg.Gateway, l.a.docker, l.a.logger)
 	sched := engine.NewScheduler(l.a.reg, l.a.cfg.Root, l.a.logger, janitor)
 	sum, err := sched.Run(rctx, m, engine.RunOptions{Resume: true, Events: events, Remote: l.coord, RemoteOnly: l.remoteOnly})

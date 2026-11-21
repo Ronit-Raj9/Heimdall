@@ -407,7 +407,8 @@ func (g *Gateway) createVirtualKey(ctx context.Context, runID string, p Provider
 	if vk.ID == "" || vk.Value == "" {
 		return nil, errors.New("create virtual key: bifrost returned no id or value")
 	}
-	key := &schemas.RunKey{ID: vk.ID, Name: vk.Name, Value: vk.Value, KeySlot: slot.Name, Provider: p.Name, Model: model}
+	key := &schemas.RunKey{ID: vk.ID, Name: vk.Name, Value: vk.Value, KeySlot: slot.Name, Provider: p.Name, Model: model,
+		OrgKeyID: g.orgSlotKeyID(slot.Name)} // G10: the organization key behind an org slot, for its budget
 	if p.Mode == ModeProxied {
 		key.SlotAuth = slot.Value // a placeholder; a direct slot's value is the real key and stays in Bifrost
 	}

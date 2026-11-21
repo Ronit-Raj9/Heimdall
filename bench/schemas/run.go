@@ -134,6 +134,7 @@ type RunAgentInfo struct {
 type RunGatewayInfo struct {
 	VirtualKeyID string `json:"virtual_key_id,omitempty"`
 	KeySlot      string `json:"key_slot,omitempty"`
+	OrgKeyID     string `json:"org_key_id,omitempty"` // the organization model key that served the run (budget accounting)
 	SessionID    string `json:"session_id,omitempty"`
 }
 
