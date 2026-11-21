@@ -91,30 +91,34 @@ func ReadOnlyClient(base *http.Client) *http.Client {
 // detail row. Only numbers, flags and ids survive measuring; the transcript
 // is dropped with the row.
 type Row struct {
-	ID             string            `json:"id"`
-	Timestamp      time.Time         `json:"timestamp"`
-	Status         string            `json:"status"`
-	Object         string            `json:"object"`
-	Provider       string            `json:"provider"`
-	Model          string            `json:"model"`
-	Retries        int               `json:"number_of_retries"`
-	FallbackIndex  int               `json:"fallback_index"`
-	Latency        *float64          `json:"latency"`
-	Cost           *float64          `json:"cost"`
-	StopReason     *string           `json:"stop_reason"`
-	SessionID      *string           `json:"session_id"`
-	VirtualKeyID   *string           `json:"virtual_key_id"`
-	TeamID         *string           `json:"team_id"`
-	CustomerID     *string           `json:"customer_id"`
-	UserID         *string           `json:"user_id"`
-	Metadata       map[string]any    `json:"metadata"`
-	TokenUsage     *rowTokens        `json:"token_usage"`
-	ErrorDetails   *rowError         `json:"error_details"`
-	InputHistory   []json.RawMessage `json:"input_history"`
-	OutputMessage  json.RawMessage   `json:"output_message"`
-	ContentHidden  bool              `json:"content_hidden"`
-	ContentSummary string            `json:"content_summary"`
-	detail         bool
+	ID            string            `json:"id"`
+	Timestamp     time.Time         `json:"timestamp"`
+	Status        string            `json:"status"`
+	Object        string            `json:"object"`
+	Provider      string            `json:"provider"`
+	Model         string            `json:"model"`
+	Retries       int               `json:"number_of_retries"`
+	FallbackIndex int               `json:"fallback_index"`
+	Latency       *float64          `json:"latency"`
+	Cost          *float64          `json:"cost"`
+	StopReason    *string           `json:"stop_reason"`
+	SessionID     *string           `json:"session_id"`
+	VirtualKeyID  *string           `json:"virtual_key_id"`
+	TeamID        *string           `json:"team_id"`
+	CustomerID    *string           `json:"customer_id"`
+	UserID        *string           `json:"user_id"`
+	Metadata      map[string]any    `json:"metadata"`
+	TokenUsage    *rowTokens        `json:"token_usage"`
+	ErrorDetails  *rowError         `json:"error_details"`
+	InputHistory  []json.RawMessage `json:"input_history"`
+	OutputMessage json.RawMessage   `json:"output_message"`
+	// A Responses API row keeps its conversation here instead
+	// (traceimport.ResponsesToChat).
+	ResponsesInputHistory []json.RawMessage `json:"responses_input_history"`
+	ResponsesOutput       []json.RawMessage `json:"responses_output"`
+	ContentHidden         bool              `json:"content_hidden"`
+	ContentSummary        string            `json:"content_summary"`
+	detail                bool
 }
 
 type rowTokens struct {
@@ -400,13 +404,19 @@ func (c *client) detail(ctx context.Context, id string) (*Row, error) {
 func transcriptOf(id string, rows []Row) *traceimport.Session {
 	for i := len(rows) - 1; i >= 0; i-- {
 		r := &rows[i]
-		if r.ContentHidden || (len(r.InputHistory) == 0 && (len(r.OutputMessage) == 0 || string(r.OutputMessage) == "null")) {
+		if r.ContentHidden {
 			continue
 		}
 		msgs := make([]json.RawMessage, 0, len(r.InputHistory)+1)
 		msgs = append(msgs, r.InputHistory...)
 		if len(r.OutputMessage) > 0 && string(r.OutputMessage) != "null" {
 			msgs = append(msgs, r.OutputMessage)
+		}
+		if len(msgs) == 0 {
+			msgs = traceimport.ResponsesToChat(r.ResponsesInputHistory, r.ResponsesOutput)
+		}
+		if len(msgs) == 0 {
+			continue
 		}
 		conv := map[string]any{"id": id, "model": r.Provider + "/" + r.Model, "messages": msgs}
 		if r.Status == statusError {

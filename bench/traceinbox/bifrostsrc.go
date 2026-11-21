@@ -63,6 +63,10 @@ type bifrostRow struct {
 	OutputMessage  json.RawMessage   `json:"output_message"`
 	ContentSummary string            `json:"content_summary"`
 	ErrorDetails   *bifrostError     `json:"error_details"`
+	// A Responses API row keeps its conversation here instead
+	// (traceimport.ResponsesToChat).
+	ResponsesInputHistory []json.RawMessage `json:"responses_input_history"`
+	ResponsesOutput       []json.RawMessage `json:"responses_output"`
 }
 
 type bifrostError struct {
@@ -296,6 +300,9 @@ func bifrostSession(traceID string, r *bifrostRow) (*traceimport.Session, error)
 	msgs = append(msgs, r.InputHistory...)
 	if len(r.OutputMessage) > 0 && string(r.OutputMessage) != "null" {
 		msgs = append(msgs, r.OutputMessage)
+	}
+	if len(msgs) == 0 {
+		msgs = traceimport.ResponsesToChat(r.ResponsesInputHistory, r.ResponsesOutput)
 	}
 	if len(msgs) == 0 && r.ContentSummary != "" {
 		b, _ := json.Marshal(map[string]string{"role": "user", "content": r.ContentSummary})
