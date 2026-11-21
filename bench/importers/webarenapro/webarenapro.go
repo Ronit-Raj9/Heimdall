@@ -350,7 +350,9 @@ func writeTask(dir string, c candidate, set settings) (bool, error) {
 		Export: []schemas.StateExport{{ID: "result.json", MaxBytes: 64 << 20, Argv: []string{"/bin/sh", "-c",
 			judgeEnv + fmt.Sprintf("webarena-pro-harbor finalize --timeout %d >&2; cat /webarena-evidence/result.json", finalizeTimeout)}}},
 	}
-	if set.judgeModel != "off" {
+	// Tasks decided wholly by answer_match never reach the judge tier, so
+	// they need no gateway (and run where none is wired).
+	if set.judgeModel != "off" && why != "" {
 		runtime.Gateway = &schemas.ServiceGateway{Provider: set.judgeProv, Model: set.judgeModel}
 	}
 	services := []schemas.ServiceSpec{runtime}

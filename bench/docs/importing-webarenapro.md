@@ -30,8 +30,8 @@ Settings: `split` (dev or test; default both), `judge_model` (default `gpt-6.2-s
 | `environment/browser/episode.json` | `seed/episode.json`, copied to `/opt/webarena/episode.json` |
 | `[[verifier.collect]] webarena-pro-harbor finalize` | the `webarena` service's export `result.json` (finalize, then `cat /webarena-evidence/result.json`) |
 | `tests/verify.py` | `verifier/tests/verify.py` (same checks), reward = the runtime's partial-credit reward, pass at 1 |
-| judge env (`OPENAI_BASE_URL`, `WEBARENAPRO_LLM_JUDGE_MODEL`) | service gateway (`gateway:` on `webarena`), mapped from `BENCH_SVC_GATEWAY_*` |
-| `WP_EVAL_TOKEN` | a fixed per-task value derived from the task (both services) |
+| judge env (`OPENAI_BASE_URL`, `WEBARENAPRO_LLM_JUDGE_MODEL`) | service gateway (`gateway:` on `webarena`), mapped from `BENCH_SVC_GATEWAY_*`; left out on tasks decided wholly by answer_match, which never reach the judge |
+| `WP_EVAL_TOKEN` | `{{run.service_secret}}`: one secret per run, shared by its services, never in task.yaml |
 
 Each run starts its own app containers from the pinned images, so every task begins from the image's seeded state: the per-task reset is the fresh container. The runtime grades with its tiered rubric: tier 0 `answer_match`/`backend_state` decide alone; other nodes fall through to the llm_judge tier, which needs the gateway.
 
