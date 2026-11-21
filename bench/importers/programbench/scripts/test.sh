@@ -23,8 +23,10 @@ pip install -q pytest-timeout==2.4.0 pytest-xdist==3.8.0 pytest-rerunfailures==1
 mkdir -p /logs/verifier/pb
 echo 0 > /logs/verifier/reward.txt
 cd /workspace || exit 0
-if [ -s /tests/clean_hashes.txt ]; then
-	find /workspace -type f -exec sha256sum {} + 2>/dev/null | grep -F -f /tests/clean_hashes.txt | cut -c67- | while IFS= read -r f; do rm -f "$f"; done
+# Only full 64-hex lines count: an empty pattern would match every file.
+grep -E '^[0-9a-f]{64}$' /tests/clean_hashes.txt > /tmp/pb-clean-hashes 2>/dev/null
+if [ -s /tmp/pb-clean-hashes ]; then
+	find /workspace -type f -exec sha256sum {} + 2>/dev/null | awk 'NR==FNR{h[$1]=1;next} ($1 in h){print substr($0,67)}' /tmp/pb-clean-hashes - | while IFS= read -r f; do rm -f "$f"; done
 fi
 rm -f ./executable
 if [ ! -d .git ]; then

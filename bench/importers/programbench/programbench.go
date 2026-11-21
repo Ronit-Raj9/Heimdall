@@ -302,7 +302,7 @@ gpus = 0
 		"tests/test.sh":          testScript,
 		"tests/grade.py":         gradeScript,
 		"tests/tests.json":       string(tj),
-		"tests/clean_hashes.txt": strings.Join(t.EvalCleanHashes, "\n") + "\n",
+		"tests/clean_hashes.txt": hashLines(t.EvalCleanHashes),
 		"tests/UPSTREAM.md": fmt.Sprintf("ProgramBench task %s: %s at %s (%s). Hidden test branches from %s; %d active branches.\n",
 			name, t.Repository, t.Commit, t.Language, testsRepo, len(active)),
 	}
@@ -398,4 +398,12 @@ func headRevision(repo string) string {
 		}
 	}
 	return ""
+}
+
+// hashLines is one sha256 per line, or an empty file when there are none.
+func hashLines(hs []string) string {
+	if len(hs) == 0 {
+		return ""
+	}
+	return strings.Join(hs, "\n") + "\n"
 }
