@@ -97,6 +97,49 @@ export interface EvaluationSpec {
 	budget_usd?: number;
 	/** Omitted or "public"; "held_out" is an explicit held-out evaluation. */
 	split?: "public" | "held_out";
+	/** Checked automatically when the evaluation finishes. */
+	gate?: EvaluationGate;
+}
+
+/** What an evaluation must show to pass. Scores are fractions (0 to 1). */
+export interface EvaluationGate {
+	/** The version compared with; 0 or absent: the agent's live version (the last one released). */
+	baseline_version?: number;
+	/** Lowest score per capability ("all" is every benchmark pooled). */
+	min_score?: Record<string, number>;
+	/** Largest score drop from the baseline on any capability (0.05 is 5 points). */
+	max_regression?: number;
+}
+
+export type GateState = "pass" | "fail" | "no_baseline";
+
+export interface GateCheck {
+	capability: string;
+	rule: "min_score" | "max_regression" | string;
+	threshold: number;
+	observed: number;
+	baseline?: number;
+	pass: boolean;
+	summary: string;
+}
+
+export interface GateBaseline {
+	agent: string;
+	version?: number;
+	arm?: string;
+	evaluation_id?: string;
+	live: boolean;
+}
+
+export interface EvaluationGateResult {
+	state: GateState | string;
+	agent: string;
+	candidate: string;
+	candidate_version?: number;
+	baseline?: GateBaseline;
+	checks: GateCheck[];
+	summary: string;
+	decided_at: string;
 }
 
 export interface EvaluationSkippedTask {
@@ -123,6 +166,10 @@ export interface Evaluation {
 	children: EvaluationChild[];
 	created_at: string;
 	created_by?: string;
+	/** The schedule that started this evaluation, if any. */
+	schedule?: string;
+	/** Set once the evaluation is done and its spec has a gate. */
+	gate_result?: EvaluationGateResult;
 }
 
 /** GET /evaluation-packs item. */
@@ -264,6 +311,24 @@ export interface Report {
 	practice_runs?: number;
 	/** Why runs were left out, when practice_runs is not zero. */
 	note?: string;
+	/** Per arm label, over every benchmark. */
+	totals?: Record<string, ReportTotals>;
+}
+
+/** One arm's numbers over the whole evaluation; absent fields are unknown. */
+export interface ReportTotals {
+	score: number;
+	ci_low: number;
+	ci_high: number;
+	runs: number;
+	solved: number;
+	/** Clean cost; null when any clean run's cost is not known (never a partial sum). */
+	cost_usd: number | null;
+	cost_runs?: number;
+	cost_per_solved_usd?: number;
+	false_completion?: number;
+	fault_survival?: number;
+	fault_runs?: number;
 }
 
 // Names other lanes use for the same shapes.

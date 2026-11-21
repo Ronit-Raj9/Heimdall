@@ -34,93 +34,106 @@ type packFile struct {
 // evidence_sha256 or hash yet: release.json is the record before the pack
 // was hashed.
 func packFiles(runsRoot string, rec *schemas.ReleaseRecord, ev *evidence) ([]packFile, error) {
-	expDir := filepath.Join(runsRoot, rec.ExpID)
 	recJSON, err := json.MarshalIndent(rec, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("encode release.json: %w", err)
 	}
-	runs := append([]schemas.SealedRun(nil), ev.runs...)
-	sort.Slice(runs, func(i, j int) bool { return runs[i].Run.RunID < runs[j].Run.RunID })
 	files := []packFile{
-		{"README.txt", []byte(readme(rec, len(runs), ev.policyJSON != nil))},
+		{"README.txt", []byte(readme(rec, len(ev.runs), ev.policyJSON != nil))},
 		{"release.json", append(recJSON, '\n')},
 	}
 	usedNames := map[string]bool{"README.txt": true, "release.json": true}
+	if err := packExperiment(runsRoot, rec.ExpID, ev, "", &files, usedNames); err != nil {
+		return nil, err
+	}
+	return files, nil
+}
+
+// packExperiment appends one experiment's evidence to files, every name
+// under prefix ("" for a release of one experiment, experiments/<exp_id>/
+// for a release of an evaluation).
+func packExperiment(runsRoot, expID string, ev *evidence, prefix string, out *[]packFile, usedNames map[string]bool) error {
+	expDir := filepath.Join(runsRoot, expID)
+	runs := append([]schemas.SealedRun(nil), ev.runs...)
+	sort.Slice(runs, func(i, j int) bool { return runs[i].Run.RunID < runs[j].Run.RunID })
+	files := *out
+	defer func() { *out = files }()
+	put := func(name string, data []byte) error {
+		name = prefix + name
+		if usedNames[name] {
+			return fmt.Errorf("duplicate pack file %s", name)
+		}
+		usedNames[name] = true
+		files = append(files, packFile{name, data})
+		return nil
+	}
 	add := func(name, src string, required bool) error {
 		b, err := os.ReadFile(src)
 		if errors.Is(err, fs.ErrNotExist) && !required {
 			return nil
 		}
 		if err != nil {
-			return fmt.Errorf("read %s: %w", name, err)
+			return fmt.Errorf("read %s: %w", prefix+name, err)
 		}
-		if usedNames[name] {
-			return fmt.Errorf("duplicate pack file %s", name)
-		}
-		usedNames[name] = true
-		files = append(files, packFile{name, b})
-		return nil
+		return put(name, b)
 	}
 	if err := add("manifest.json", filepath.Join(expDir, manifestFile), true); err != nil {
-		return nil, err
+		return err
 	}
 	if err := add("analysis/verdict.json", filepath.Join(ev.analysisDir, verdictFile), true); err != nil {
-		return nil, err
+		return err
 	}
 	if err := add("analysis/report.md", filepath.Join(ev.analysisDir, reportFile), false); err != nil {
-		return nil, err
+		return err
 	}
 	if ev.policyJSON != nil {
-		files = append(files, packFile{"analysis/policy.json", ev.policyJSON})
+		if err := put("analysis/policy.json", ev.policyJSON); err != nil {
+			return err
+		}
 	}
 	if err := add("seals.log", filepath.Join(expDir, sealsLogFile), true); err != nil {
-		return nil, err
+		return err
 	}
 	// The chain documents come from the same seals.log bytes the pack holds:
 	// a second read of the live log could include a seal appended meanwhile
 	// that the packed log lacks (QC2-22-04).
 	chain, err := chainSeals(expDir, files[len(files)-1].data, runs)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, f := range chain {
-		if usedNames[f.name] {
-			return nil, fmt.Errorf("duplicate pack file %s", f.name)
+		if err := put(f.name, f.data); err != nil {
+			return err
 		}
-		usedNames[f.name] = true
-		files = append(files, f)
 	}
 	for _, run := range runs {
 		id := run.Run.RunID
 		sealPath := filepath.Join(run.Dir, "seal.json")
 		sealBytes, err := os.ReadFile(sealPath)
 		if err != nil {
-			return nil, fmt.Errorf("read runs/%s/seal.json: %w", id, err)
+			return fmt.Errorf("read runs/%s/seal.json: %w", id, err)
 		}
 		if run.SealHash != "" {
 			got := utils.SHA256Bytes(sealBytes)
 			want := strings.TrimPrefix(run.SealHash, "sha256:")
 			if got != want {
-				return nil, fmt.Errorf("runs/%s/seal.json hashes to %s, run records %s: %w", id, got, run.SealHash, schemas.ErrSealMismatch)
+				return fmt.Errorf("runs/%s/seal.json hashes to %s, run records %s: %w", id, got, run.SealHash, schemas.ErrSealMismatch)
 			}
 		}
-		sealName := "runs/" + id + "/seal.json"
-		if usedNames[sealName] {
-			return nil, fmt.Errorf("duplicate pack file %s", sealName)
+		if err := put("runs/"+id+"/seal.json", sealBytes); err != nil {
+			return err
 		}
-		usedNames[sealName] = true
-		files = append(files, packFile{sealName, sealBytes})
 		var seal schemas.SealRecord
 		if err := json.Unmarshal(sealBytes, &seal); err != nil {
-			return nil, fmt.Errorf("parse runs/%s/seal.json: %w", id, err)
+			return fmt.Errorf("parse runs/%s/seal.json: %w", id, err)
 		}
 		if seal.RunID != "" && seal.RunID != id {
-			return nil, fmt.Errorf("runs/%s/seal.json names run %q", id, seal.RunID)
+			return fmt.Errorf("runs/%s/seal.json names run %q", id, seal.RunID)
 		}
 		paths := make([]string, 0, len(seal.Files))
 		for name := range seal.Files {
 			if err := validateSealedRunPath(name); err != nil {
-				return nil, fmt.Errorf("runs/%s/seal.json file %q: %w", id, name, err)
+				return fmt.Errorf("runs/%s/seal.json file %q: %w", id, name, err)
 			}
 			paths = append(paths, name)
 		}
@@ -129,34 +142,32 @@ func packFiles(runsRoot string, rec *schemas.ReleaseRecord, ev *evidence) ([]pac
 			packName := "runs/" + id + "/" + name
 			data, err := os.ReadFile(filepath.Join(run.Dir, filepath.FromSlash(name)))
 			if err != nil {
-				return nil, fmt.Errorf("read %s: %w", packName, err)
+				return fmt.Errorf("read %s: %w", prefix+packName, err)
 			}
 			if got, want := utils.SHA256Bytes(data), seal.Files[name]; got != want {
-				return nil, fmt.Errorf("%s hashes to %s, seal lists %s: %w", packName, got, want, schemas.ErrSealMismatch)
+				return fmt.Errorf("%s hashes to %s, seal lists %s: %w", prefix+packName, got, want, schemas.ErrSealMismatch)
 			}
-			if usedNames[packName] {
-				return nil, fmt.Errorf("duplicate pack file %s", packName)
+			if err := put(packName, data); err != nil {
+				return err
 			}
-			usedNames[packName] = true
-			files = append(files, packFile{packName, data})
 		}
 		if run.GradeSource != "" && run.GradeSource != schemas.GradeSourceOriginal {
 			src := filepath.Join(expDir, "regrades", run.GradeSource, "runs", id, "grade.json")
 			if err := add("runs/"+id+"/regrade.grade.json", src, false); err != nil {
-				return nil, err
+				return err
 			}
 			src = filepath.Join(expDir, "regrades", run.GradeSource, "runs", id, "regate.json")
 			if err := add("runs/"+id+"/regrade.regate.json", src, false); err != nil {
-				return nil, err
+				return err
 			}
 		}
 		if run.Review != nil { // human review the outcome came from (docs/human-review.md)
 			if err := add("runs/"+id+"/review.json", filepath.Join(expDir, "reviews", run.Review.ReviewID, "review.json"), true); err != nil {
-				return nil, err
+				return err
 			}
 		}
 	}
-	return files, nil
+	return nil
 }
 
 // chainSeals returns chain/<run_id>.seal.json for every seals.log link that

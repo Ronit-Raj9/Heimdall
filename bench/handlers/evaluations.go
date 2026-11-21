@@ -211,12 +211,16 @@ func terminalEvaluation(s string) bool {
 	return s == schemas.EvaluationDone || s == schemas.EvaluationFailed || s == schemas.EvaluationCancelled
 }
 
+// evalRefreshChildren turns off reading child state from the run index;
+// tests whose fixture index has unfinished slots turn it off.
+var evalRefreshChildren = true
+
 // refresh reads each child's live state from the run index and derives the
 // evaluation's status; a changed status is saved.
 func (h *evaluationsHandler) refresh(ev *schemas.Evaluation) {
 	s := h.env.Services
 	changed := false
-	if s.Index != nil {
+	if s.Index != nil && evalRefreshChildren {
 		eh := &ExperimentsHandler{mode: h.env.Mode, index: s.Index, launcher: s.Launcher}
 		for i := range ev.Children {
 			c := &ev.Children[i]
@@ -236,9 +240,28 @@ func (h *evaluationsHandler) refresh(ev *schemas.Evaluation) {
 	if next := evaluationStatus(ev); next != ev.Status {
 		ev.Status, changed = next, true
 	}
+	if h.decideGate(ev) {
+		changed = true
+	}
 	if changed {
 		_ = h.store().Save(ev) // a failed save only delays the stored status
 	}
+}
+
+// decideGate judges the gate of an evaluation that just finished (lane X12,
+// evalgate.go), once.
+func (h *evaluationsHandler) decideGate(ev *schemas.Evaluation) bool {
+	if ev.Spec.Gate == nil || ev.GateResult != nil || ev.Status != schemas.EvaluationDone {
+		return false
+	}
+	evals, _ := h.store().List()
+	ctx, cancel := context.WithTimeout(context.Background(), readTimeout)
+	defer cancel()
+	now := h.now
+	if now == nil {
+		now = time.Now
+	}
+	return gateEnv{env: h.env, root: h.root(), now: now}.decideGate(ctx, ev, evals)
 }
 
 // evaluationStatus is the evaluation's state from its children. Cancelled
@@ -322,27 +345,67 @@ func (h *evaluationsHandler) create(ctx *fasthttp.RequestCtx) {
 			who = actor.UserID
 		}
 	}
+	ev, err := h.launch(work, withPrincipal(work, ctx), func(id string) { tenancy.SetCreated(ctx, id) }, spec, who, "")
+	if err != nil {
+		h.fail(ctx, fasthttp.StatusInternalServerError, err.Error())
+		return
+	}
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusAccepted, ev)
+}
+
+// launch saves a new evaluation of a normalized spec and starts one
+// experiment per benchmark. start is the context experiments start under
+// (it carries the caller's principal); created is told each new experiment.
+func (h *evaluationsHandler) launch(work, start context.Context, created func(string), spec schemas.EvaluationSpec, who, scheduleName string) (*schemas.Evaluation, error) {
+	s := h.env.Services
 	now := h.now().UTC()
 	ev := &schemas.Evaluation{
 		ID:  "ev_" + now.Format("20060102_150405") + "_" + randHex(3),
 		Org: s.OrgID, Spec: spec, Status: schemas.EvaluationQueued,
-		Children: []schemas.EvaluationChild{}, CreatedAt: now, CreatedBy: who,
+		Children: []schemas.EvaluationChild{}, CreatedAt: now, CreatedBy: who, Schedule: scheduleName,
 	}
 	if err := h.store().Save(ev); err != nil {
-		h.fail(ctx, fasthttp.StatusInternalServerError, "save evaluation: "+err.Error())
-		return
+		return nil, fmt.Errorf("save evaluation: %w", err)
 	}
 	agents := h.agentConfigs(work)
 	budget := childBudget(spec)
 	for _, b := range spec.Benchmarks {
-		ev.Children = append(ev.Children, h.launchChild(work, ctx, ev, b, agents, budget, who))
+		ev.Children = append(ev.Children, h.launchChild(work, start, created, ev, b, agents, budget, who))
 	}
 	ev.Status = evaluationStatus(&schemas.Evaluation{Status: schemas.EvaluationRunning, Children: ev.Children})
 	if err := h.store().Save(ev); err != nil {
-		h.fail(ctx, fasthttp.StatusInternalServerError, "save evaluation: "+err.Error())
-		return
+		return nil, fmt.Errorf("save evaluation: %w", err)
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusAccepted, ev)
+	return ev, nil
+}
+
+// LaunchEvaluation starts an evaluation of spec for the org of env, as POST
+// /evaluations does, without a request: a schedule repeats evaluations with
+// it. who is recorded as the creator and scheduleName on the evaluation.
+func LaunchEvaluation(ctx context.Context, env OrgEnv, spec schemas.EvaluationSpec, who, scheduleName string) (*schemas.Evaluation, error) {
+	h := &evaluationsHandler{env: env, now: time.Now}
+	s := env.Services
+	if s.Projects == nil {
+		return nil, errors.New("the project file store is not available on this server: an evaluation needs it to save its experiment files")
+	}
+	if s.Launcher == nil {
+		return nil, errors.New("no experiment launcher on this server: hosted runs use the shared worker, ask your server owner to enable it")
+	}
+	work, cancel := context.WithTimeout(ctx, evaluationLaunchTimeout)
+	defer cancel()
+	if err := h.normalize(work, &spec); err != nil {
+		return nil, err
+	}
+	if s.Keys != nil {
+		var provs, ids []string
+		for _, a := range spec.Arms {
+			provs, ids = append(provs, a.Provider), append(ids, "")
+		}
+		if err := KeyBudgetRefusal(work, s.Keys, s.OrgID, provs, ids); err != nil {
+			return nil, err
+		}
+	}
+	return h.launch(work, ctx, nil, spec, who, scheduleName)
 }
 
 // normalize validates spec, fills defaults and resolves the pack into the
@@ -444,6 +507,9 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 	if spec.BudgetUSD < 0 || spec.BudgetUSD > EvaluationMaxBudget {
 		return badf("budget_usd must be between 0 and %v", EvaluationMaxBudget)
 	}
+	if err := normalizeGate(spec); err != nil {
+		return err
+	}
 	fs := []string{faults.Clean}
 	for _, f := range spec.Faults {
 		if f = strings.TrimSpace(f); f != "" && !contains(fs, f) {
@@ -506,6 +572,34 @@ func (h *evaluationsHandler) latestVersion(ctx context.Context, id string, doc [
 	return v.Version
 }
 
+var gateCapRe = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
+
+// normalizeGate checks the gate settings; a gate with no rule is dropped.
+func normalizeGate(spec *schemas.EvaluationSpec) error {
+	g := spec.Gate
+	if g == nil {
+		return nil
+	}
+	if g.BaselineVersion < 0 {
+		return badf("gate: baseline_version must be 0 (the live version) or more")
+	}
+	if g.MaxRegression < 0 || g.MaxRegression > 1 {
+		return badf("gate: max_regression must be between 0 and 1 (0.05 is 5 points)")
+	}
+	for c, v := range g.MinScore {
+		if !gateCapRe.MatchString(c) {
+			return badf("gate: %q is not a capability name", c)
+		}
+		if v < 0 || v > 1 {
+			return badf("gate: min_score for %s must be between 0 and 1", c)
+		}
+	}
+	if len(g.MinScore) == 0 && g.MaxRegression == 0 {
+		spec.Gate = nil
+	}
+	return nil
+}
+
 func contains(list []string, s string) bool {
 	for _, x := range list {
 		if x == s {
@@ -546,7 +640,7 @@ func (h *evaluationsHandler) agentConfigs(ctx context.Context) map[string]*schem
 // launchChild builds, saves, plans, creates and starts the experiment of one
 // benchmark. Every problem becomes a skipped child; it never fails the
 // evaluation as a whole.
-func (h *evaluationsHandler) launchChild(work context.Context, ctx *fasthttp.RequestCtx, ev *schemas.Evaluation, bench string, agents map[string]*schemas.AgentConfig, budget float64, who string) schemas.EvaluationChild {
+func (h *evaluationsHandler) launchChild(work context.Context, start context.Context, created func(string), ev *schemas.Evaluation, bench string, agents map[string]*schemas.AgentConfig, budget float64, who string) schemas.EvaluationChild {
 	s := h.env.Services
 	child := schemas.EvaluationChild{Benchmark: bench}
 	skip := func(format string, a ...any) schemas.EvaluationChild {
@@ -696,9 +790,11 @@ func (h *evaluationsHandler) launchChild(work context.Context, ctx *fasthttp.Req
 	if err := s.Launcher.Create(work, m); err != nil {
 		return skip("create experiment %s: %v", m.ExpID, err)
 	}
-	tenancy.SetCreated(ctx, m.ExpID)
+	if created != nil {
+		created(m.ExpID)
+	}
 	child.ExperimentID, child.Status = m.ExpID, string(schemas.ExperimentCreatedState)
-	if err := s.Launcher.Start(withPrincipal(work, ctx), m.ExpID); err != nil {
+	if err := s.Launcher.Start(start, m.ExpID); err != nil {
 		child.Status, child.Skipped = string(schemas.ExperimentFailed), "start experiment (it was created; start it from its page): "+err.Error()
 		return child
 	}

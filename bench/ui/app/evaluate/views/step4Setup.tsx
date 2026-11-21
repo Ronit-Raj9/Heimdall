@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
+import { GateSettings } from "@/components/releases/gateSettings";
 import { type EvaluationEstimate, type EvaluationSpec, useEstimateEvaluationQuery } from "@/lib/store/apis/evaluationsApi";
 import { armHasModel, useOwnModelAgents } from "./ownModel";
 
@@ -261,6 +262,14 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 					</label>
 				))}
 			</section>
+
+			<GateSettings
+				gate={spec.gate}
+				onChange={(gate) => {
+					const { gate: _old, ...rest } = spec;
+					onChange(gate ? { ...rest, gate } : rest);
+				}}
+			/>
 
 			<section className="bg-muted/40 rounded-md border p-3 text-sm" data-testid="step4-estimate" aria-live="polite">
 				{!ready ? (

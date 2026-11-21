@@ -3,7 +3,7 @@
 		"subtitle": "Release records: who approved which agent version, based on which test results. The log is tamper-evident.",
 		"new": "Record a release",
 		"newTitle": "Record a release",
-		"newHint": "Pick a comparison, check its result, then record who approved the release.",
+		"newHint": "Pick a finished comparison of two versions of your agent, check its result, then record who approved the new version.",
 		"close": "Close",
 		"more": "More actions",
 		"timeline": "History",
@@ -30,7 +30,19 @@
 		"overrideHint": "Someone approved this release even though the result or the release rules said not to. Their reason is shown below.",
 		"shipped": "Released",
 		"held": "Not released",
-		"recordId": "Record id"
+		"recordId": "Record id",
+		"replaces": "{{name}} replaces {{prev}}",
+		"first": "{{name}} is the first release",
+		"evaluation": "Evaluation",
+		"benchmarks": "Benchmarks",
+		"gate": "Gate",
+		"ev": {
+			"overall": "All benchmarks",
+			"costPerSolved": "Cost per solved task",
+			"falseCompletion": "False completion",
+			"faultSurvival": "Solved under faults",
+			"noBaseline": "No earlier version to compare with."
+		}
 	},
 	"policies": {
 		"subtitle": "Release rules: checks a new version must pass before it ships.",
@@ -83,5 +95,39 @@
 		"catchRateHint": "Share of bad runs the monitor flagged, while flagging at most the stated share of good runs by mistake.",
 		"falseAlarm": "at {{fpr}} false alarms",
 		"back": "All monitors"
+	},
+	"promote": {
+		"title": "Promote this version",
+		"button": "Promote this version",
+		"liveNow": "Live now: {{name}}",
+		"nothingLive": "No version of {{agent}} has been released yet.",
+		"approver": "Approved by",
+		"approverPlaceholder": "your name or email",
+		"note": "Note (optional)",
+		"override": "Release anyway, with a reason",
+		"overrideReason": "Why release despite this?",
+		"submit": "Release {{name}}",
+		"covers_one": "Covers {{count}} benchmark.",
+		"covers_other": "Covers all {{count}} benchmarks.",
+		"done": "{{name}} is now the live version.",
+		"viewReleases": "See releases",
+		"gateTitle": "Release gate",
+		"gate": {
+			"pass": "Passed",
+			"fail": "Failed",
+			"no_baseline": "No baseline"
+		},
+		"compared": "compared with {{name}}",
+		"comparedLive": "compared with the live version {{name}}",
+		"repeat": {
+			"nightly": "Repeat nightly",
+			"weekly": "Repeat weekly"
+		},
+		"repeatDone": {
+			"nightly": "Runs again every night at 02:00.",
+			"weekly": "Runs again every Monday at 02:00."
+		},
+		"viewSchedules": "Schedules",
+		"verdictButton": "Promote this version"
 	}
 }

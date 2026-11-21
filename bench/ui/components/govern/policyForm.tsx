@@ -30,6 +30,25 @@ export const POLICY_METRICS = [
 	"latency_s",
 ];
 
+/**
+ * Test conditions a rule can read, as the dropdown offers them: normal runs, every condition, or one
+ * PS2 fault. The values are the condition ids an evaluation's experiments use (bench/faults); a
+ * benchmark with its own probe for a fault names that probe instead, kept as "custom".
+ */
+export const POLICY_CONDITIONS = [
+	{ value: "", key: "conditionMain" },
+	{ value: "clean", key: "conditionClean" },
+	{ value: "all", key: "conditionAll" },
+	{ value: "heimdall-model-down", key: "conditionModelDown" },
+	{ value: "heimdall-broken-tool", key: "conditionBrokenTool" },
+	{ value: "stale-notes", key: "conditionMisleading" },
+] as const;
+
+/** Whether a condition id is one the dropdown names (else it is shown as a custom one). */
+export function isListedCondition(c: string | undefined): boolean {
+	return POLICY_CONDITIONS.some((o) => o.value === (c ?? ""));
+}
+
 export type CheckKind = "no_regression" | "improved" | "max" | "min" | "equals";
 
 export function checkKind(c: PolicyCheck): CheckKind {
@@ -229,6 +248,21 @@ function CheckRow({ index, check, onChange, onRemove }: { index: number; check: 
 						data-testid={`policy-check-threshold-${index}`}
 					/>
 				)}
+				<select
+					className={chipSelect}
+					aria-label={t("policies.condition")}
+					title={t("policies.conditionHint")}
+					value={check.condition ?? ""}
+					onChange={(e) => onChange({ ...check, condition: e.target.value || undefined })}
+					data-testid={`policy-check-condition-${index}`}
+				>
+					{POLICY_CONDITIONS.map((o) => (
+						<option key={o.key} value={o.value}>
+							{t(`policies.${o.key}` as never)}
+						</option>
+					))}
+					{!isListedCondition(check.condition) && <option value={check.condition}>{t("policies.conditionCustom", { id: check.condition })}</option>}
+				</select>
 				<span className="text-muted-foreground">{tu("policies.then")}</span>
 				<select
 					className={cn(chipSelect, warn ? "text-chart-warning-ink" : "text-chart-error-ink")}
@@ -270,18 +304,10 @@ function CheckRow({ index, check, onChange, onRemove }: { index: number; check: 
 				{checkSentence(check, tu)}
 			</p>
 			{advanced && (
-				<div className="grid grid-cols-1 gap-3 border-t pt-3 sm:grid-cols-3">
+				<div className="grid grid-cols-1 gap-3 border-t pt-3 sm:grid-cols-2">
 					<label className="text-muted-foreground flex flex-col gap-1 text-xs">
 						{t("policies.checkId")}
 						<Input className="h-8 text-xs" value={check.id} onChange={(e) => onChange({ ...check, id: e.target.value })} />
-					</label>
-					<label className="text-muted-foreground flex flex-col gap-1 text-xs" title={t("policies.conditionHint")}>
-						{t("policies.condition")}
-						<Input
-							className="h-8 text-xs"
-							value={check.condition ?? ""}
-							onChange={(e) => onChange({ ...check, condition: e.target.value || undefined })}
-						/>
 					</label>
 					<label className="text-muted-foreground flex flex-col gap-1 text-xs">
 						{t("policies.minN")}

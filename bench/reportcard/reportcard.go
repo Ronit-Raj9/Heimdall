@@ -144,8 +144,9 @@ type Report struct {
 	Overall      *verdictab.OverallVerdict `json:"overall,omitempty"`
 	// PracticeRuns counts the runs left out because the scripted practice
 	// model answered them (X01); Note explains it when it is not zero.
-	PracticeRuns int    `json:"practice_runs,omitempty"`
-	Note         string `json:"note,omitempty"`
+	PracticeRuns int               `json:"practice_runs,omitempty"`
+	Note         string            `json:"note,omitempty"`
+	Totals       map[string]Totals `json:"totals,omitempty"` // per arm label, over every benchmark
 }
 
 // Options tune Build. Zero values take the defaults.
@@ -318,6 +319,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 
 	rep.Reliability = reliability(children, labels, faultOf)
 	rep.Safety = safety(children, labels, faultOf)
+	rep.Totals = totals(children, labels, faultOf)
 	return rep, nil
 }
 

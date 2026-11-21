@@ -12,6 +12,8 @@ import {
 	useTestAlertMutation,
 } from "@/lib/store/apis/schedulesApi";
 import type { AlertConfig, Schedule, ScheduleRow, SchedulesFile, SchedulesResponse } from "@/lib/types/schedules";
+import { useListEvaluationsQuery } from "@/lib/store/apis/evaluationsApi";
+import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -223,9 +225,9 @@ function ScheduleTable({ rows, onRemove, busy }: { rows: ScheduleRow[]; onRemove
 									<div className="truncate font-medium" title={r.name}>
 										{r.name}
 									</div>
-									<div className="text-muted-foreground truncate text-xs" title={r.job || r.experiment}>
-										{r.kind}
-										{r.job || r.experiment ? ` · ${r.job || r.experiment}` : ""}
+									<div className="text-muted-foreground truncate text-xs" title={r.job || r.evaluation || r.experiment}>
+										{t(`kind.${r.kind}` as never, { defaultValue: r.kind })}
+										{r.job || r.evaluation || r.experiment ? ` · ${r.job || r.evaluation || r.experiment}` : ""}
 									</div>
 								</td>
 								<td className="px-4 py-3 whitespace-nowrap">
@@ -292,9 +294,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function AddScheduleForm({ busy, onAdd }: { busy: boolean; onAdd(s: Schedule): void }) {
 	const { t } = useTranslation("schedules");
 	const { t: u } = useTranslation("ux13");
-	const [s, setS] = useState({ name: "", experiment: "", cron: "0 6 * * *", timezone: "", max: "" });
-	const set = (k: keyof typeof s) => (e: React.ChangeEvent<HTMLInputElement>) => setS({ ...s, [k]: e.target.value });
-	const ok = s.name && s.experiment && s.cron;
+	const evaluations = useListEvaluationsQuery();
+	const [what, setWhat] = useState<"evaluation" | "experiment">("evaluation");
+	const [s, setS] = useState({ name: "", experiment: "", evaluation: "", cron: "0 6 * * *", timezone: "", max: "" });
+	const set = (k: keyof typeof s) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setS({ ...s, [k]: e.target.value });
+	const target = what === "evaluation" ? s.evaluation : s.experiment;
+	const ok = s.name && target && s.cron && (what === "experiment" || Number(s.max) > 0);
 	return (
 		<form
 			className="flex flex-col"
@@ -304,7 +309,7 @@ function AddScheduleForm({ busy, onAdd }: { busy: boolean; onAdd(s: Schedule): v
 				const max = Number(s.max);
 				onAdd({
 					name: s.name.trim(),
-					experiment: s.experiment.trim(),
+					...(what === "evaluation" ? { evaluation: s.evaluation.trim() } : { experiment: s.experiment.trim() }),
 					cron: s.cron.trim(),
 					...(s.timezone ? { timezone: s.timezone.trim() } : {}),
 					...(max > 0 ? { max_usd_per_day: max } : {}),
@@ -313,14 +318,48 @@ function AddScheduleForm({ busy, onAdd }: { busy: boolean; onAdd(s: Schedule): v
 			data-testid="schedule-add-form"
 		>
 			<Step n={1} title={u("schedules.stepWhat")}>
+				<div className="bg-muted inline-flex w-fit rounded-lg p-1 text-xs" role="tablist">
+					{(["evaluation", "experiment"] as const).map((k) => (
+						<button
+							key={k}
+							type="button"
+							role="tab"
+							aria-selected={what === k}
+							className={cn("rounded-md px-3 py-1 font-medium", what === k ? "bg-background shadow-sm" : "text-muted-foreground")}
+							onClick={() => setWhat(k)}
+							data-testid={`schedule-add-what-${k}`}
+						>
+							{t(k === "evaluation" ? "add.whatEvaluation" : "add.whatExperiment")}
+						</button>
+					))}
+				</div>
 				<div className="grid gap-3 sm:grid-cols-2">
 					<Field label={t("add.name")}>
 						<Input value={s.name} onChange={set("name")} placeholder={t("add.namePlaceholder")} data-testid="schedule-add-name" />
 					</Field>
-					<Field label={t("add.experiment")}>
-						<Input value={s.experiment} onChange={set("experiment")} placeholder={t("add.experimentPlaceholder")} data-testid="schedule-add-experiment" />
-					</Field>
+					{what === "evaluation" ? (
+						<Field label={t("add.evaluation")}>
+							<select
+								className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+								value={s.evaluation}
+								onChange={set("evaluation")}
+								data-testid="schedule-add-evaluation"
+							>
+								<option value="">{t("add.evaluationPlaceholder")}</option>
+								{(evaluations.data ?? []).map((ev) => (
+									<option key={ev.id} value={ev.id}>
+										{ev.spec.name || ev.id}
+									</option>
+								))}
+							</select>
+						</Field>
+					) : (
+						<Field label={t("add.experiment")}>
+							<Input value={s.experiment} onChange={set("experiment")} placeholder={t("add.experimentPlaceholder")} data-testid="schedule-add-experiment" />
+						</Field>
+					)}
 				</div>
+				{what === "evaluation" && <p className="text-muted-foreground text-xs">{t("add.evaluationHint")}</p>}
 			</Step>
 			<Step n={2} title={u("schedules.stepWhen")}>
 				<div className="grid gap-3 sm:grid-cols-2">

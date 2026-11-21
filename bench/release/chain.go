@@ -24,7 +24,7 @@ const (
 // it with fsync. The lock spans the pack because release.json inside it
 // carries prev_hash. A broken chain refuses: appending to it would bury the
 // break under a valid-looking tail.
-func (l *Log) appendRelease(rec *schemas.ReleaseRecord, ev *evidence) error {
+func (l *Log) appendRelease(rec *schemas.ReleaseRecord, pack packer) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if err := os.MkdirAll(l.d.Root, dirPerm); err != nil {
@@ -58,7 +58,7 @@ func (l *Log) appendRelease(rec *schemas.ReleaseRecord, ev *evidence) error {
 	if err != nil {
 		return err
 	}
-	if err := l.writeEvidence(rec, ev, dir); err != nil {
+	if err := l.writeEvidence(rec, pack, dir); err != nil {
 		return errors.Join(err, os.RemoveAll(dir))
 	}
 	if err := appendRecord(f, rec); err != nil {
@@ -87,20 +87,24 @@ func (l *Log) newReleaseDir(rec *schemas.ReleaseRecord) (string, error) {
 	return "", errors.New("create release: no free release id")
 }
 
+// packer lists the files of a record's evidence pack. It runs under the
+// log lock, after the record has its id and prev_hash.
+type packer func(rec *schemas.ReleaseRecord) ([]packFile, error)
+
 // writeEvidence builds the pack, writes it atomically and records its hash.
-func (l *Log) writeEvidence(rec *schemas.ReleaseRecord, ev *evidence, dir string) error {
-	files, err := packFiles(l.d.Store.Root(), rec, ev)
+func (l *Log) writeEvidence(rec *schemas.ReleaseRecord, pack packer, dir string) error {
+	files, err := pack(rec)
 	if err != nil {
 		return fmt.Errorf("create release: evidence pack: %w", err)
 	}
-	pack, err := buildPack(files)
+	zipped, err := buildPack(files)
 	if err != nil {
 		return fmt.Errorf("create release: evidence pack: %w", err)
 	}
-	if err := writeFileAtomic(filepath.Join(dir, EvidenceFile), pack); err != nil {
+	if err := writeFileAtomic(filepath.Join(dir, EvidenceFile), zipped); err != nil {
 		return fmt.Errorf("create release: write evidence pack: %w", err)
 	}
-	rec.EvidenceSHA256 = utils.SHA256Bytes(pack)
+	rec.EvidenceSHA256 = utils.SHA256Bytes(zipped)
 	return nil
 }
 

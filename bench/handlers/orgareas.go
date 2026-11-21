@@ -31,6 +31,11 @@ type Services struct {
 	Agents   AgentSource
 	Catalog  CatalogSource
 
+	// Releases is the org's release log and Analyzer writes an experiment's
+	// analysis; releases from an evaluation use both. nil: not available.
+	Releases ReleaseLog
+	Analyzer Analyzer
+
 	// Reindex brings the org's read indexes (the in-memory experiment index
 	// and, hosted, the database results index) up to date after runs were
 	// added outside a job, such as a sealed-run upload. nil: nothing to do.

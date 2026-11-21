@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -111,7 +112,7 @@ func checkPackFiles(t *testing.T, f *fixture, rec *schemas.ReleaseRecord, files 
 		t.Errorf("release.json carries evidence_sha256 %q hash %q, want both empty", inPack.EvidenceSHA256, inPack.Hash)
 	}
 	inPack.EvidenceSHA256, inPack.Hash = rec.EvidenceSHA256, rec.Hash
-	if inPack != *rec {
+	if !reflect.DeepEqual(inPack, *rec) {
 		t.Errorf("release.json = %+v\nwant %+v", inPack, *rec)
 	}
 	expDir := filepath.Join(f.runsRoot, testExp)

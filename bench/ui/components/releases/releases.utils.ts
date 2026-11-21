@@ -5,8 +5,9 @@ import type { Action, ExperimentStatus, ReleasePolicyDecision, ReleaseRecord } f
  * server for its verdict, and the server analyzes on demand and saves that analysis into the running
  * experiment's folder (a partial, usually invalid, verdict).
  */
-export function releasableExperiments<T extends Pick<ExperimentStatus, "state">>(experiments: readonly T[]): T[] {
-	return experiments.filter((e) => e.state === "done");
+export function releasableExperiments<T extends Pick<ExperimentStatus, "state"> & { arms?: string[] }>(experiments: readonly T[]): T[] {
+	// Only finished comparisons of two versions: a one-arm run has no candidate to release.
+	return experiments.filter((e) => e.state === "done" && (e.arms === undefined || e.arms.length >= 2));
 }
 
 /** Records newest first. The API returns log order, oldest first; equal times keep the later log line first. */

@@ -18,8 +18,8 @@ import { GuardList, VerdictCard } from "@/components/verdict/verdictCard";
 import { VerdictSummary } from "@/components/verdict/verdictSummary";
 import { getBenchErrorMessage, useGetCatalogQuery, useGetDiagnosticsQuery, useGetGridQuery, useGetVerdictQuery } from "@/lib/store";
 import type { Action, MetricDescriptor } from "@/lib/types/bench";
-import { Activity, Gauge, GitCompare, ListChecks, Scale, Shield, Sigma, Table2 } from "lucide-react";
-import { useNavigate } from "@tanstack/react-router";
+import { Activity, Gauge, GitCompare, ListChecks, Rocket, Scale, Shield, Sigma, Table2 } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { parseAsString, useQueryState } from "nuqs";
 import { useCallback, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -34,6 +34,7 @@ import { VerdictHeaderStrip } from "./verdictHeaderStrip";
 export function VerdictTab({ expId }: { expId: string }) {
 	const { t } = useTranslation("bench");
 	const { t: tPage } = useTranslation("experimentPage");
+	const { t: tRel } = useTranslation("u14");
 	const navigate = useNavigate();
 	const [grade, setGrade] = useQueryState("grade", parseAsString);
 	const [, setTab] = useQueryState("tab", parseAsString);
@@ -143,6 +144,20 @@ export function VerdictTab({ expId }: { expId: string }) {
 						{t("verdict.source.backToOriginal")}
 					</Button>
 				</p>
+			)}
+
+			{arms.length === 2 && (
+				<div className="flex justify-end">
+					<Link
+						to="/releases"
+						search={{ exp: payload.exp_id } as never}
+						className="text-primary inline-flex items-center gap-1.5 text-sm font-medium hover:underline"
+						data-testid="verdict-promote"
+					>
+						<Rocket className="size-4" aria-hidden="true" />
+						{tRel("promote.verdictButton")}
+					</Link>
+				</div>
 			)}
 
 			{isScoreVerdict(payload.verdict) ? (

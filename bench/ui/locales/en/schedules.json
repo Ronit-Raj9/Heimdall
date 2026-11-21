@@ -21,12 +21,23 @@
 	"runNow": "Run now",
 	"queued": "Started (job {{id}}). Follow it in the jobs panel.",
 	"remove": "Remove",
+	"kind": {
+		"experiment": "comparison",
+		"evaluation": "evaluation",
+		"canary": "drift monitor",
+		"job": "job"
+	},
 	"add": {
 		"title": "Add a schedule",
 		"name": "Name",
 		"namePlaceholder": "nightly-core",
 		"experiment": "Comparison file",
 		"experimentPlaceholder": "experiments/nightly.yaml",
+		"whatEvaluation": "Repeat an evaluation",
+		"whatExperiment": "Run a comparison file",
+		"evaluation": "Evaluation",
+		"evaluationPlaceholder": "Pick an evaluation",
+		"evaluationHint": "Each run starts a new evaluation with the same agent, benchmarks and gate. It needs a daily spending limit; an evaluation without its own budget gets the limit as its budget.",
 		"cron": "When (cron: minute hour day month weekday)",
 		"timezone": "Timezone",
 		"timezonePlaceholder": "UTC",

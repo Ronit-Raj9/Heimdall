@@ -42,6 +42,8 @@ func baseServices(a *app, deps *server.Deps, orgID string, hosted bool) handlers
 		Suites:   deps.Suites,
 		Agents:   deps.Agents,
 		Catalog:  deps.Catalog,
+		Releases: deps.Releases,
+		Analyzer: deps.Analyzer,
 	}
 	if ps, err := projectfs.Open(a.cfg.Root); err == nil {
 		s.Projects = ps

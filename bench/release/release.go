@@ -169,6 +169,12 @@ func (l *Log) Create(ctx context.Context, req *schemas.ReleaseRequest) (*schemas
 	if err != nil {
 		return nil, err
 	}
+	if req.Evaluation != nil {
+		return l.createEvaluation(ctx, r, req.Evaluation)
+	}
+	if r.EvaluationID != "" {
+		return nil, &RefusedError{Reason: "a release of an evaluation is made from its report card (POST /evaluations/{id}/release)"}
+	}
 	m, err := l.d.Store.LoadManifest(ctx, r.ExpID)
 	if err != nil {
 		return nil, fmt.Errorf("create release: %w", err)
@@ -177,24 +183,8 @@ func (l *Log) Create(ctx context.Context, req *schemas.ReleaseRequest) (*schemas
 	if err != nil {
 		return nil, err
 	}
-	if cv, ok := l.d.Store.(ChainVerifier); ok {
-		if err := cv.VerifyChain(m.ExpID); err != nil {
-			if errors.Is(err, schemas.ErrSealMismatch) {
-				return nil, &RefusedError{Reason: fmt.Sprintf("seals.log chain of %s does not verify: %v", m.ExpID, err), Err: schemas.ErrSealMismatch}
-			}
-			return nil, fmt.Errorf("create release: verify seal chain of %s: %w", m.ExpID, err)
-		}
-	}
-	for _, run := range ev.runs {
-		if len(run.Problems) > 0 {
-			return nil, &RefusedError{Reason: fmt.Sprintf("run %s: %s", run.Run.RunID, strings.Join(run.Problems, "; ")), Err: schemas.ErrSealMismatch}
-		}
-		if err := l.d.Store.Verify(ctx, m.ExpID, run.Run.RunID); err != nil {
-			if errors.Is(err, schemas.ErrSealMismatch) {
-				return nil, &RefusedError{Reason: fmt.Sprintf("seal of run %s does not verify: %v", run.Run.RunID, err), Err: schemas.ErrSealMismatch}
-			}
-			return nil, fmt.Errorf("create release: verify run %s: %w", run.Run.RunID, err)
-		}
+	if err := l.verifyEvidence(ctx, m, ev); err != nil {
+		return nil, err
 	}
 	// The release rule runs after the integrity checks, so a damaged run
 	// is refused as such and never reported as a changed snapshot.
@@ -205,11 +195,39 @@ func (l *Log) Create(ctx context.Context, req *schemas.ReleaseRequest) (*schemas
 	if err != nil {
 		return nil, err
 	}
-	if err := l.appendRelease(rec, ev); err != nil {
+	if err := l.appendRelease(rec, func(rec *schemas.ReleaseRecord) ([]packFile, error) {
+		return packFiles(l.d.Store.Root(), rec, ev)
+	}); err != nil {
 		return nil, err
 	}
 	l.d.Logger.Info("release recorded", "release_id", rec.ReleaseID, "exp_id", rec.ExpID, "approver", rec.Approver, "override", rec.Override != "")
 	return rec, nil
+}
+
+// verifyEvidence checks every counted run's seal, and the experiment's
+// seals.log chain when the store can check it. A mismatch, or a run the
+// store loaded with an evidence problem, refuses whatever an override says.
+func (l *Log) verifyEvidence(ctx context.Context, m *schemas.Manifest, ev *evidence) error {
+	if cv, ok := l.d.Store.(ChainVerifier); ok {
+		if err := cv.VerifyChain(m.ExpID); err != nil {
+			if errors.Is(err, schemas.ErrSealMismatch) {
+				return &RefusedError{Reason: fmt.Sprintf("seals.log chain of %s does not verify: %v", m.ExpID, err), Err: schemas.ErrSealMismatch}
+			}
+			return fmt.Errorf("create release: verify seal chain of %s: %w", m.ExpID, err)
+		}
+	}
+	for _, run := range ev.runs {
+		if len(run.Problems) > 0 {
+			return &RefusedError{Reason: fmt.Sprintf("run %s: %s", run.Run.RunID, strings.Join(run.Problems, "; ")), Err: schemas.ErrSealMismatch}
+		}
+		if err := l.d.Store.Verify(ctx, m.ExpID, run.Run.RunID); err != nil {
+			if errors.Is(err, schemas.ErrSealMismatch) {
+				return &RefusedError{Reason: fmt.Sprintf("seal of run %s does not verify: %v", run.Run.RunID, err), Err: schemas.ErrSealMismatch}
+			}
+			return fmt.Errorf("create release: verify run %s: %w", run.Run.RunID, err)
+		}
+	}
+	return nil
 }
 
 // List returns every record in log order, oldest first, and whether the
@@ -334,8 +352,14 @@ func normalize(req *schemas.ReleaseRequest) (schemas.ReleaseRequest, error) {
 		Approver:   strings.TrimSpace(req.Approver),
 		Note:       strings.TrimSpace(req.Note),
 		Override:   strings.TrimSpace(req.Override),
+
+		EvaluationID: strings.TrimSpace(req.EvaluationID),
 	}
-	if !idPattern.MatchString(r.ExpID) {
+	if req.Evaluation != nil || r.EvaluationID != "" {
+		if !idPattern.MatchString(r.EvaluationID) {
+			return r, fmt.Errorf("create release: invalid evaluation_id %q", r.EvaluationID)
+		}
+	} else if !idPattern.MatchString(r.ExpID) {
 		return r, fmt.Errorf("create release: invalid exp_id %q", r.ExpID)
 	}
 	if r.AnalysisID != "" && !idPattern.MatchString(r.AnalysisID) {
@@ -480,6 +504,21 @@ func frozenPolicySkipped(m *schemas.Manifest, p *schemas.PolicyResult) string {
 // override marker always means something. Integrity problems are never
 // overridable.
 func checkRelease(m *schemas.Manifest, ev *evidence, override string) error {
+	if err := checkIntegrity(m, ev); err != nil {
+		return err
+	}
+	a := ev.analysis
+	var blocked []string
+	if a.Verdict.Action != schemas.ActionShip {
+		blocked = append(blocked, fmt.Sprintf("verdict action is %s, not ship", a.Verdict.Action))
+	}
+	blocked = append(blocked, policyBlocks(m, ev)...)
+	return checkOverride(blocked, override, "action is ship and the policy does not block")
+}
+
+// checkIntegrity refuses an analysis that does not match the frozen
+// manifest or today's sealed runs. Never overridable.
+func checkIntegrity(m *schemas.Manifest, ev *evidence) error {
 	a := ev.analysis
 	if err := utils.VerifyManifestHash(m); err != nil {
 		return &RefusedError{Reason: err.Error(), Err: schemas.ErrSealMismatch}
@@ -506,21 +545,31 @@ func checkRelease(m *schemas.Manifest, ev *evidence, override string) error {
 	if d != a.InputsDigest {
 		return &RefusedError{Reason: fmt.Sprintf("the sealed runs, grades or reviews of %s changed after analysis %s (inputs %s, now %s); run a fresh analysis and release that", m.ExpID, a.AnalysisID, a.InputsDigest, d)}
 	}
+	return nil
+}
+
+// policyBlocks is why the release policy blocks: a block decision, or an
+// analysis that did not evaluate the frozen policy.
+func policyBlocks(m *schemas.Manifest, ev *evidence) []string {
 	var blocked []string
-	if a.Verdict.Action != schemas.ActionShip {
-		blocked = append(blocked, fmt.Sprintf("verdict action is %s, not ship", a.Verdict.Action))
-	}
 	if ev.policy != nil && ev.policy.Decision == schemas.PolicyBlock {
 		blocked = append(blocked, fmt.Sprintf("policy %s decision is block", ev.policy.PolicyName))
 	}
 	if reason := frozenPolicySkipped(m, ev.policy); reason != "" {
 		blocked = append(blocked, reason)
 	}
+	return blocked
+}
+
+// checkOverride applies the override rule: blocked needs a reason, and a
+// reason with nothing to override is refused so a red override marker
+// always means something. clear says why nothing blocks.
+func checkOverride(blocked []string, override, clear string) error {
 	switch {
 	case len(blocked) > 0 && override == "":
 		return &RefusedError{Reason: strings.Join(blocked, "; ") + "; give an override reason to release anyway"}
 	case len(blocked) == 0 && override != "":
-		return &RefusedError{Reason: "override given but nothing to override: action is ship and the policy does not block"}
+		return &RefusedError{Reason: "override given but nothing to override: " + clear}
 	}
 	return nil
 }

@@ -2,6 +2,7 @@ import { EvaluationStatusPill, ModeLabel } from "@/app/evaluations/views/evaluat
 import { EVALUATION_POLL_MS, armAgentLabel, formatCreated, isActiveStatus, splitChildren } from "@/app/evaluations/views/evaluation.utils";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { EvaluationReportCard } from "@/components/reportcard/evaluationReportCard";
+import { GateResultCard, PromoteEvaluation, RepeatEvaluation } from "@/components/releases/promoteEvaluation";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Button } from "@/components/ui/button";
@@ -52,7 +53,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 				subtitle={t("detail.subtitle")}
 				breadcrumbs={[{ label: t("detail.crumb"), to: "/evaluations" }, { label: spec.name || evaluation.id }]}
 				meta={<EvaluationStatusPill status={evaluation.status} testId="evaluation-status" />}
-				actions={active ? <CancelButton id={evaluation.id} /> : undefined}
+				actions={active ? <CancelButton id={evaluation.id} /> : <RepeatEvaluation evaluationId={evaluation.id} />}
 			/>
 			<section className="bg-card flex flex-col gap-4 rounded-xl border p-5" data-testid="evaluation-header">
 				<div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
@@ -101,7 +102,11 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 				</Section>
 			)}
 			{evaluation.status === "done" ? (
-				<EvaluationReportCard evaluationId={evaluation.id} />
+				<>
+					{evaluation.gate_result && <GateResultCard gate={evaluation.gate_result} />}
+					<EvaluationReportCard evaluationId={evaluation.id} />
+					{(spec.mode === "versions" || spec.mode === "score") && <PromoteEvaluation evaluationId={evaluation.id} />}
+				</>
 			) : (
 				active && (
 					<p className="text-muted-foreground text-sm" data-testid="evaluation-report-waiting">

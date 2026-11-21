@@ -124,7 +124,7 @@ func checkScheduleShape(f *schedule.File) error {
 		if c.Job == "" {
 			c.Job = schedule.JobInboxPull
 		}
-		c.Experiment, c.Policy, c.MaxUSDPerDay = "", "", 0
+		c.Experiment, c.Evaluation, c.Policy, c.MaxUSDPerDay = "", "", "", 0
 		if err := c.Validate("", nil); err != nil {
 			errs = append(errs, err)
 		}
@@ -137,7 +137,7 @@ type schedulesHandler struct{ env OrgEnv }
 // ScheduleRow is one schedule as the UI lists it.
 type ScheduleRow struct {
 	schedule.Schedule
-	Kind     string           `json:"kind"`              // experiment, canary or job
+	Kind     string           `json:"kind"`              // experiment, evaluation, canary or job
 	Source   string           `json:"source"`            // web (editable) or canary (from canaries/*.yaml)
 	Next     string           `json:"next,omitempty"`    // next fire, RFC 3339
 	Last     *schedule.Record `json:"last,omitempty"`    // last trigger
@@ -260,6 +260,8 @@ func scheduleKind(s schedule.Schedule) string {
 	switch {
 	case s.Job != "":
 		return "job"
+	case s.Evaluation != "":
+		return "evaluation"
 	case IsCanaryExperiment(s.Experiment):
 		return "canary"
 	default:
