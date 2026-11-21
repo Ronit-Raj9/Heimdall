@@ -1,7 +1,7 @@
 import "@/lib/i18n";
 
 import ExperimentListView from "@/app/experiments/views/experimentListView";
-import { NewSuiteButton } from "@/app/suites/views/suitesView";
+import { AddBenchmarkMenu } from "@/app/suites/views/suitesView";
 import { demoSession, hostedSession } from "@/lib/testing/platformFixtures";
 import { render } from "@/lib/testing/render";
 import { describe, expect, it, vi } from "vitest";
@@ -11,10 +11,12 @@ vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/route
 vi.mock("@/app/experiments/views/experimentBoard", () => ({ ExperimentBoard: () => <div data-testid="experiment-list" /> }));
 
 describe("create links", () => {
-	it("suites list has New suite linking to /suites/new", () => {
-		const html = render(<NewSuiteButton />);
+	it("benchmarks list has one Add benchmark menu: from catalog or create your own", () => {
+		const html = render(<AddBenchmarkMenu />);
+		expect(html).toContain("Add benchmark");
+		expect(html).toContain('href="/catalog"');
 		expect(html).toContain('href="/suites/new"');
-		expect(html).toContain("New suite");
+		expect(html).toContain("Create your own");
 	});
 
 	it("experiments list has New experiment for members only", () => {
