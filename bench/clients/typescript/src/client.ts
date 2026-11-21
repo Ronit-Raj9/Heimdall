@@ -213,6 +213,8 @@ export class Client {
 	/** Mode of the last answer, from X-Bench-Mode. */
 	lastMode: string | undefined;
 	private readonly fetchImpl: typeof fetch;
+	/** API path prefix; the v1 client (v1.ts) serves the same transport under /api/v1. */
+	protected readonly apiPrefix: string = API_PREFIX;
 
 	constructor(baseUrl: string, options: ClientOptions = {}) {
 		this.baseUrl = baseUrl.replace(/\/+$/, "");
@@ -338,17 +340,17 @@ export class Client {
 
 	// Transport
 
-	private async get<T>(path: string, query?: Query, deadline?: number): Promise<T> {
+	protected async get<T>(path: string, query?: Query, deadline?: number): Promise<T> {
 		const res = await this.request("GET", path, query, undefined, deadline);
 		return this.json<T>(res, "GET", path);
 	}
 
-	private async post<T>(path: string, payload: unknown): Promise<T> {
+	protected async post<T>(path: string, payload: unknown): Promise<T> {
 		const res = await this.request("POST", path, undefined, payload);
 		return this.json<T>(res, "POST", path);
 	}
 
-	private async raw(path: string, query?: Query): Promise<RawResponse> {
+	protected async raw(path: string, query?: Query): Promise<RawResponse> {
 		const res = await this.request("GET", path, query);
 		const mode = res.headers.get(MODE_HEADER) ?? "";
 		this.checkMode(mode, "GET", path);
@@ -383,7 +385,7 @@ export class Client {
 	 * ms), when given, also caps every attempt and the waits between them.
 	 */
 	private async request(method: "GET" | "POST", path: string, query?: Query, payload?: unknown, deadline?: number): Promise<Answer> {
-		let url = this.baseUrl + API_PREFIX + path;
+		let url = this.baseUrl + this.apiPrefix + path;
 		const params = new URLSearchParams();
 		for (const [k, v] of Object.entries(query ?? {})) {
 			if (v !== undefined && v !== null && v !== "") params.set(k, String(v));

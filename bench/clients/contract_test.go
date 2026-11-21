@@ -78,7 +78,7 @@ func TestClientsAgainstRecordedServer(t *testing.T) {
 			sync = append(sync, "--check")
 		}
 		run(t, "typescript", nil, node, sync...)
-		run(t, "typescript", env, node, "--experimental-strip-types", "--test", "test/client.test.ts", "test/live.test.ts")
+		run(t, "typescript", env, node, "--experimental-strip-types", "--test", "test/client.test.ts", "test/v1.test.ts", "test/live.test.ts")
 		gate(t, env, node, "--experimental-strip-types", filepath.Join("examples", "ci-gate.ts"))
 		tsc := filepath.Join("..", "ui", "node_modules", ".bin", "tsc")
 		if _, err := os.Stat(tsc); err != nil {
