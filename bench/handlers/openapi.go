@@ -23,6 +23,7 @@ import (
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/livescore" // X6 live scoring
 	"github.com/maximhq/bifrost/bench/migration" // W6 migration report
+	"github.com/maximhq/bifrost/bench/runctl"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/tenancy"
 	"github.com/maximhq/bifrost/bench/traceinbox"
@@ -98,6 +99,19 @@ var APIRoutes = []RouteDoc{
 		Auth: AuthWrite, Status: fasthttp.StatusAccepted, Response: schemas.ExperimentStatus{}},
 	{Method: "POST", Path: APIPrefix + "/experiments/{id}/regrade", Tag: "analysis", Summary: "Queue an experiment.regate job: recompute the gates of the sealed runs as a new regrade (id in the job's params); nothing runs again",
 		Auth: AuthWrite, Request: RegradeRequest{}, OptionalBody: true, Status: fasthttp.StatusAccepted, Response: jobs.Job{}},
+	// Run control (handlers/runcontrol.go): pause (drain), live controls with a hash-chained log, run cancel and requeue, rerun failures.
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/controls", Tag: "experiments", Summary: "Run controls: paused or running, live concurrency, spend cap and paused models, the error policy table and the verified change log",
+		Response: RunControls{}},
+	{Method: "PATCH", Path: APIPrefix + "/experiments/{id}/controls", Tag: "experiments", Summary: "Change live concurrency, spend cap or paused models of an experiment; the scheduler applies it from the next lease; logged in controls.jsonl",
+		Auth: AuthWrite, Request: runctl.Patch{}, Response: RunControls{}},
+	{Method: "POST", Path: APIPrefix + "/experiments/{id}/pause", Tag: "experiments", Summary: "Pause a running experiment: in-flight runs finish, no new run starts until resume; 409 when it is not running",
+		Auth: AuthWrite, Request: RunControlRequest{}, OptionalBody: true, Status: fasthttp.StatusAccepted, Response: RunControls{}},
+	{Method: "POST", Path: APIPrefix + "/experiments/{id}/rerun-failures", Tag: "experiments", Summary: "Create and start an exploratory experiment that runs the failed tasks again; it never joins this experiment's verdict or a leaderboard",
+		Auth: AuthWrite, Request: RerunFailuresRequest{}, OptionalBody: true, Status: fasthttp.StatusAccepted, Response: RerunFailuresResult{}},
+	{Method: "POST", Path: APIPrefix + "/experiments/{id}/runs/{run}/cancel", Tag: "experiments", Summary: "Cancel one in-flight run: sealed aborted_infra, never counted, no attempt used; its slot waits for a requeue",
+		Auth: AuthWrite, Request: RunControlRequest{}, OptionalBody: true, Status: fasthttp.StatusAccepted, Response: RunControls{}},
+	{Method: "POST", Path: APIPrefix + "/experiments/{id}/runs/{run}/requeue", Tag: "experiments", Summary: "Run a slot again: only its newest run, only when aborted_infra, infra_error or cancelled; the old run is kept, marked superseded, and uses no attempt",
+		Auth: AuthWrite, Request: RunControlRequest{}, OptionalBody: true, Status: fasthttp.StatusAccepted, Response: RunControls{}},
 	{Method: "GET", Path: APIPrefix + "/experiments/{id}/triage", Tag: "analysis", Summary: "Runs grouped by failure pattern per arm", Response: schemas.Triage{}},
 	{Method: "POST", Path: APIPrefix + "/estimate", Tag: "experiments", Summary: "Forecast an experiment's cost and time from sealed history; nothing is frozen, a refused plan comes back with fit unknown and 200",
 		Auth: AuthWrite, Request: schemas.Experiment{}, RequestAlso: experimentMediaTypes, Response: schemas.Forecast{}}, // Forecast and matrix area (forecast.go)
