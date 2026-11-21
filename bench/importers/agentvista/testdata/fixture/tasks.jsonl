@@ -1,0 +1,3 @@
+{"id": "av-000", "problem": "Invented: how many red squares are in the picture?", "answer": "3", "domain": "academics", "subdomain": "Mathematical and Algorithmic Computation", "images": ["av-000-1.png"], "shard": "x"}
+{"id": "av-001", "problem": "Invented: in which city was this photo taken?", "answer": "Lisbon", "domain": "geography", "subdomain": "Visual Location Identification", "images": ["av-001-1.png", "av-001-2.png"], "shard": "x"}
+{"id": "av-002", "problem": "Invented: image missing", "answer": "x", "domain": "culture", "subdomain": "Cultural Knowledge and History", "images": ["av-002-1.png"], "shard": "x"}
