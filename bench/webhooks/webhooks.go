@@ -41,7 +41,7 @@ import (
 
 // Event types a hook can subscribe to.
 const (
-	EventExperimentFinished = "experiment.finished" // an experiment run job ended (succeeded, failed or cancelled)
+	EventExperimentFinished = "experiment.finished" // an experiment ended (succeeded, failed or cancelled): its run job, a schedule.fire job, or an in-process run
 	EventJobFailed          = "job.failed"          // any other background job failed
 	EventPing               = "ping"                // the Test button; always delivered to the hook tested
 )

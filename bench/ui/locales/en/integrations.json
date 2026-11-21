@@ -5,21 +5,19 @@
 	"ci": {
 		"heading": "Gate pull requests with Heimdall",
 		"intro": "Opens a pull request in your repository that adds .github/workflows/heimdall.yml. The workflow re-checks your agent on every pull request and comments the verdict. No secret is written into the file.",
-		"repo": "Repository",
-		"pickRepo": "Pick a repository",
 		"mode": "Mode",
 		"modeRecorded": "Recorded (re-check a sealed experiment, no runner needed)",
 		"modeLive": "Live (fresh baseline vs candidate on a self-hosted runner)",
 		"agent": "Agent both arms start from",
 		"pickAgent": "Pick an agent",
-		"open": "Open pull request",
-		"opening": "Opening...",
-		"opened": "Pull request opened:",
+		"installInSettings": "GitHub is connected. Pick the repository, base branch and mode in Settings > GitHub to open the install pull request.",
+		"openSettings": "Open Settings > GitHub",
+		"connect": "Connect GitHub",
+		"manual": "GitHub sign-in is not set up on this server. Copy the workflow below into .github/workflows/heimdall.yml in your repository by hand.",
 		"preview": "Workflow preview",
 		"copy": "Copy",
 		"copied": "Copied",
-		"notConnected": "Connect GitHub first: Settings > GitHub. Until then you can copy the workflow below into your repository by hand.",
-		"noRepos": "GitHub is connected but no repository is visible. Check the access you granted, then reload."
+		"notConnected": "Connect GitHub in Settings > GitHub to open the install pull request from there. Until then you can copy the workflow below into your repository by hand."
 	},
 	"exports": {
 		"heading": "Export results and traces",

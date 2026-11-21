@@ -12,15 +12,14 @@ import {
 	useDeleteExportMutation,
 	useDeleteWebhookMutation,
 	useGetCIWorkflowQuery,
-	useInstallCIMutation,
 	useListExportsQuery,
-	useListGithubReposQuery,
 	useListWebhooksQuery,
 	useTestWebhookMutation,
 	useUpdateWebhookMutation,
 } from "@/lib/store/apis/integrationsApi";
+import { useGetGithubStatusQuery } from "@/lib/store/apis/githubApi";
+import type { GithubStatus } from "@/lib/types/github";
 import type {
-	CIInstallResult,
 	IntegrationExport,
 	IntegrationExportFormat,
 	IntegrationsExportParams,
@@ -41,7 +40,7 @@ const FORMATS: IntegrationExportFormat[] = ["otlp", "eee", "csv", "jsonl", "harb
 const EVENTS: WebhookEventType[] = ["experiment.finished", "job.failed"];
 const selectClass = "border-input bg-background h-9 w-full rounded-md border px-2 text-sm";
 
-/** Integrations (web parity L19): CI install PR, exports with download, experiment-finished webhooks. */
+/** Integrations (web parity L19): CI workflow (install PR via Settings > GitHub), exports with download, experiment-finished webhooks. */
 export default function IntegrationsView() {
 	const { t } = useTranslation("integrations");
 	return (
@@ -415,45 +414,43 @@ export function ExportTable({ exports, onDelete }: { exports: IntegrationExport[
 // ----------------------------------------------------------------------------------------------
 // CI
 
-function prUrl(r: CIInstallResult | undefined): string | undefined {
-	return r?.pr_url ?? r?.html_url ?? r?.url;
+/** Where the one CI-install flow lives: Settings > GitHub (POST /github/ci-install, lane L07). */
+export const GITHUB_SETTINGS_SEARCH = { tab: "github" } as const;
+
+/** The CI tab's next step from the GitHub connection status: install from Settings, connect first, or copy by hand. */
+export function ciNextStep(st: GithubStatus | undefined, failed: boolean): "install" | "connect" | "manual" {
+	if (failed || !st || !st.configured) return "manual";
+	return st.connected ? "install" : "connect";
+}
+
+export function CIInstallLink({ step }: { step: "install" | "connect" | "manual" }) {
+	const { t } = useTranslation("integrations");
+	if (step === "manual") {
+		return <p className="text-muted-foreground text-sm" data-testid="ci-manual">{t("ci.manual")}</p>;
+	}
+	return (
+		<EmptyState
+			compact
+			message={step === "install" ? t("ci.installInSettings") : t("ci.notConnected")}
+			action={{ label: step === "install" ? t("ci.openSettings") : t("ci.connect"), to: "/settings", search: GITHUB_SETTINGS_SEARCH }}
+			testId={step === "install" ? "ci-install-link" : "ci-not-connected"}
+		/>
+	);
 }
 
 function CIPanel() {
 	const { t } = useTranslation("integrations");
-	const repos = useListGithubReposQuery();
+	const status = useGetGithubStatusQuery();
 	const agents = useGetAgentsQuery();
 	const [mode, setMode] = useState<"recorded" | "live">("recorded");
 	const [agent, setAgent] = useState("");
-	const [repo, setRepo] = useState("");
 	const [copied, setCopied] = useState(false);
 	const preview = useGetCIWorkflowQuery({ mode, agent: mode === "live" ? agent || undefined : undefined }, { skip: mode === "live" && !agent });
-	const [install, installState] = useInstallCIMutation();
-	const notConnected = Boolean(repos.error);
-	const ready = repo.includes("/") && (mode === "recorded" || agent);
-
-	const open = async () => {
-		const [owner, name] = repo.split("/", 2);
-		await install({ owner, repo: name, mode, agent: mode === "live" ? agent : undefined });
-	};
 
 	return (
 		<Section title={t("ci.heading")} intro={t("ci.intro")}>
-			{notConnected && (
-				<EmptyState compact message={t("ci.notConnected")} action={{ label: t("tabs.ci"), to: "/settings" }} testId="ci-not-connected" />
-			)}
+			{!status.isLoading && <CIInstallLink step={ciNextStep(status.data, status.isError)} />}
 			<div className="grid gap-3 sm:grid-cols-3">
-				<label className="flex flex-col gap-1 text-sm">
-					{t("ci.repo")}
-					<select className={selectClass} value={repo} disabled={notConnected} onChange={(e) => setRepo(e.target.value)} data-testid="ci-repo">
-						<option value="">{t("ci.pickRepo")}</option>
-						{(repos.data ?? []).map((r) => (
-							<option key={r.full_name} value={r.full_name}>
-								{r.full_name}
-							</option>
-						))}
-					</select>
-				</label>
 				<label className="flex flex-col gap-1 text-sm">
 					{t("ci.mode")}
 					<select className={selectClass} value={mode} onChange={(e) => setMode(e.target.value as "recorded" | "live")} data-testid="ci-mode">
@@ -474,25 +471,6 @@ function CIPanel() {
 						</select>
 					</label>
 				)}
-			</div>
-			{!notConnected && repos.data && repos.data.length === 0 && <p className="text-muted-foreground text-sm">{t("ci.noRepos")}</p>}
-			<div className="flex flex-wrap items-center gap-2">
-				<Button disabled={!ready || notConnected || installState.isLoading} onClick={() => void open()} data-testid="ci-open-pr">
-					{installState.isLoading ? t("ci.opening") : t("ci.open")}
-				</Button>
-				{installState.isSuccess && (
-					<span className="text-sm" data-testid="ci-pr-opened">
-						{t("ci.opened")}{" "}
-						{prUrl(installState.data) ? (
-							<a className="underline" href={prUrl(installState.data)} target="_blank" rel="noreferrer">
-								{prUrl(installState.data)}
-							</a>
-						) : (
-							repo
-						)}
-					</span>
-				)}
-				{installState.isError && <ErrorNote message={apiErrorMessage(installState.error, t("errors.generic"))} />}
 			</div>
 			{preview.data && (
 				<div className="flex flex-col gap-1">

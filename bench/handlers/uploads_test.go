@@ -3,7 +3,9 @@ package handlers
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -227,5 +229,38 @@ func TestUploadRunsRejectsBadSeal(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(h.storeRoot, "e_smoke_sdoj")); !os.IsNotExist(err) {
 		t.Fatal("tampered experiment kept in the store")
+	}
+}
+
+// Gap G13: a hosted import must refresh the org's indexes (the CLI org
+// import's db.SyncOrg) so the experiments show at once.
+func TestUploadRunsReindexes(t *testing.T) {
+	h, _ := newUploads(t)
+	calls := 0
+	h.svc.Reindex = func(context.Context) error { calls++; return nil }
+	ctx := uploadCtx(recordedZip(t, nil), "")
+	h.postRuns(ctx)
+	if ctx.Response.StatusCode() != 200 || calls != 1 {
+		t.Fatalf("status %d, reindex calls %d: %s", ctx.Response.StatusCode(), calls, ctx.Response.Body())
+	}
+	// A second upload of the same experiments imports nothing: no reindex.
+	ctx = uploadCtx(recordedZip(t, nil), "")
+	h.postRuns(ctx)
+	if calls != 1 {
+		t.Fatalf("reindex on a no-op import: %d calls", calls)
+	}
+}
+
+func TestUploadRunsReindexFailureWarns(t *testing.T) {
+	h, _ := newUploads(t)
+	h.svc.Reindex = func(context.Context) error { return errors.New("db down") }
+	ctx := uploadCtx(recordedZip(t, nil), "")
+	h.postRuns(ctx)
+	var rep UploadRunsReport
+	if err := json.Unmarshal(ctx.Response.Body(), &rep); err != nil {
+		t.Fatal(err)
+	}
+	if ctx.Response.StatusCode() != 200 || rep.Imported == 0 || !strings.Contains(rep.IndexWarning, "db down") {
+		t.Fatalf("status %d report %+v", ctx.Response.StatusCode(), rep)
 	}
 }

@@ -243,8 +243,9 @@ func (l *launcher) startInProcess(ctx context.Context, expID string) error {
 	l.active[expID] = run
 	l.mu.Unlock()
 	go func() {
-		_, _ = l.execute(context.Background(), m, run, nil, nil)
+		res, err := l.execute(context.Background(), m, run, nil, nil)
 		run.finish()
+		notifyInProcessFinished(l.org, expID, res, err) // gap G13: experiment.finished webhooks with no job runner
 	}()
 	return nil
 }

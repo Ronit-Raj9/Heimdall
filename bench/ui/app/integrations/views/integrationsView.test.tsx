@@ -1,10 +1,9 @@
 import "@/lib/i18n";
 
-import { parseRepos } from "@/lib/store/apis/integrationsApi";
 import type { Webhook } from "@/lib/types/integrations";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { ExportTable, WebhookList, exportParams } from "./integrationsView";
+import { CIInstallLink, ExportTable, WebhookList, ciNextStep, exportParams } from "./integrationsView";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
@@ -50,11 +49,15 @@ describe("integrations view", () => {
 		expect(exportParams("harbor", "e1", "s1", false, false)).toEqual({ format: "harbor", suite: "s1" });
 	});
 
-	it("reads GitHub repos in either shape", () => {
-		expect(parseRepos([{ full_name: "a/b" }, { owner: { login: "c" }, name: "d" }, { name: "x" }])).toEqual([
-			{ full_name: "a/b", default_branch: undefined },
-			{ full_name: "c/d", default_branch: undefined },
-		]);
-		expect(parseRepos({ repos: [{ owner: "e", name: "f", default_branch: "main" }] })).toEqual([{ full_name: "e/f", default_branch: "main" }]);
+	it("sends CI install to the one Settings > GitHub flow", () => {
+		expect(ciNextStep(undefined, true)).toBe("manual");
+		expect(ciNextStep({ configured: false, connected: false }, false)).toBe("manual");
+		expect(ciNextStep({ configured: true, connected: false }, false)).toBe("connect");
+		expect(ciNextStep({ configured: true, connected: true, login: "me" }, false)).toBe("install");
+		const install = renderToStaticMarkup(<CIInstallLink step="install" />);
+		expect(install).toContain("ci-install-link");
+		expect(install).toContain("Open Settings &gt; GitHub");
+		expect(renderToStaticMarkup(<CIInstallLink step="connect" />)).toContain("ci-not-connected");
+		expect(renderToStaticMarkup(<CIInstallLink step="manual" />)).toContain("by hand");
 	});
 });
