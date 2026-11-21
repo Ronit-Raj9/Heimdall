@@ -100,6 +100,16 @@ describe("SettingsView", () => {
 		expect(html).not.toContain("settings-tab-members");
 		expect(html).toContain('data-testid="settings-local-links"');
 	});
+	it("keeps browsers from autofilling secret names and values", () => {
+		const html = render(<SettingsView tab="members" onTabChange={() => undefined} />, LOCAL_SESSION);
+		const value = tagOf(html, "secret-value") ?? "";
+		expect(value).toContain('autoComplete="new-password"');
+		expect(value).toContain('data-lpignore="true"');
+		expect(value).toContain('data-1p-ignore="true"');
+		const name = tagOf(html, "secret-name") ?? "";
+		expect(name).toContain('autoComplete="off"');
+		expect(name).toContain('name="heimdall-secret-name"');
+	});
 	it("asks a visitor who is not signed in to sign in", () => {
 		expect(render(<SettingsView tab="members" onTabChange={() => undefined} />, demoSession())).toContain("settings-signed-out");
 	});

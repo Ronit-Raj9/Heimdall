@@ -1,0 +1,24 @@
+{
+	"models": {
+		"subtitle": "Provider keys your agents and judges call.",
+		"addKey": "Add key",
+		"keysCount_one": "{{count}} key",
+		"keysCount_other": "{{count}} keys",
+		"noKeys": "No keys yet",
+		"spent": "{{spent}} of {{budget}}",
+		"spentNoLimit": "{{spent}} this month",
+		"defaultLabel": "Default model",
+		"close": "Close",
+		"anyModel": "Any model",
+		"actions": "Key actions"
+	},
+	"settings": {
+		"nav": "Settings sections",
+		"online": "Online",
+		"offline": "Offline",
+		"startCommand": "Start a runner",
+		"startCommandHint": "Run this on any machine that holds a runner token.",
+		"lastSeen": "Seen",
+		"version": "v{{version}}"
+	}
+}
