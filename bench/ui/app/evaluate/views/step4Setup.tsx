@@ -7,7 +7,7 @@ import { type EvaluationEstimate, type EvaluationSpec, useEstimateEvaluationQuer
  * the wizard state; this step only reads and writes the spec it is given).
  */
 
-export const TASK_CHOICES = [3, 5, 10, 20] as const;
+export const TASK_CHOICES = [3, 5, 8, 10, 20] as const;
 export const TRIAL_CHOICES = [1, 2, 3, 5] as const;
 
 export const FAULTS: readonly { id: string; label: string; help: string }[] = [
@@ -27,7 +27,7 @@ export function defaultEvaluationSpec(): EvaluationSpec {
 		mode: "score",
 		arms: [{ label: "A", agent: "", model: "" }],
 		benchmarks: [],
-		tasks_per_benchmark: 5,
+		tasks_per_benchmark: 8,
 		trials: 2,
 		faults: ["clean"],
 	};

@@ -204,6 +204,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	// Benchmarks: clean condition only.
 	ab := len(labels) == 2 && !score
 	var verdicts []verdictab.BenchmarkVerdict
+	var verdictRow []int        // rep.Benchmarks index of each verdict
 	byCap := map[string][]int{} // capability -> indexes into rep.Benchmarks
 	for _, cr := range children {
 		b := Benchmark{Benchmark: cr.child.Benchmark, Capability: capOf(cr.child.Benchmark), ExperimentID: cr.child.ExperimentID, Arms: map[string]Metrics{}}
@@ -213,13 +214,18 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 		if ab {
 			v := compare(filter(cr.arms[labels[0]], schemas.ConditionClean), filter(cr.arms[labels[1]], schemas.ConditionClean))
 			verdicts = append(verdicts, v)
-			v = relabelVerdict(v, labels[0], labels[1])
-			b.Verdict = &v
+			verdictRow = append(verdictRow, len(rep.Benchmarks))
 		}
 		byCap[b.Capability] = append(byCap[b.Capability], len(rep.Benchmarks))
 		rep.Benchmarks = append(rep.Benchmarks, b)
 	}
 	if ab {
+		// Many benchmarks are many tests: per-benchmark significance is
+		// Holm-corrected across the evaluation (Overall applies the same).
+		for k, v := range verdictab.Holm(verdicts) {
+			v = relabelVerdict(v, labels[0], labels[1])
+			rep.Benchmarks[verdictRow[k]].Verdict = &v
+		}
 		o := relabelOverall(verdictab.Overall(verdicts), labels[0], labels[1])
 		rep.Overall = &o
 	}
@@ -237,10 +243,12 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 		}
 		for _, l := range labels {
 			parts := make([]Metrics, 0, len(byCap[c]))
+			var cs []cluster
 			for _, i := range byCap[c] {
 				parts = append(parts, rep.Benchmarks[i].Arms[l])
+				cs = append(cs, clustersOf(filter(children[i].arms[l], schemas.ConditionClean), rep.Benchmarks[i].Benchmark+"\x00")...)
 			}
-			row.Arms[l] = rollup(parts)
+			row.Arms[l] = rollup(parts, cs)
 		}
 		rep.Capabilities = append(rep.Capabilities, row)
 	}
@@ -378,7 +386,7 @@ func metricsOf(runs []graded) Metrics {
 		succ += r.success
 	}
 	m.Score = round(float64(succ) / float64(len(runs)))
-	lo, hi := stats.ClopperPearson(succ, len(runs), Conf)
+	lo, hi := taskCI(clustersOf(runs, ""))
 	m.CILow, m.CIHigh = round(lo), round(hi)
 	m.CostUSD = round(sum(runs, metricCostUSD))
 	m.Tokens = sum(runs, metricTokens)
@@ -416,8 +424,9 @@ func median(runs []graded, id string) float64 {
 
 // rollup pools benchmark rows: successes and runs add up (so the score is
 // weighted by runs), cost and tokens add up, medians are averaged weighted
-// by runs.
-func rollup(parts []Metrics) Metrics {
+// by runs. The interval is the task-clustered bootstrap over cs, every task
+// of every benchmark in the capability.
+func rollup(parts []Metrics, cs []cluster) Metrics {
 	var out Metrics
 	succ := 0.0
 	for _, p := range parts {
@@ -437,9 +446,8 @@ func rollup(parts []Metrics) Metrics {
 		return out
 	}
 	n := float64(out.Runs)
-	s := int(math.Round(succ))
 	out.Score = round(succ / n)
-	lo, hi := stats.ClopperPearson(s, out.Runs, Conf)
+	lo, hi := taskCI(cs)
 	out.CILow, out.CIHigh = round(lo), round(hi)
 	out.CostUSD = round(out.CostUSD)
 	out.Steps, out.ToolCalls, out.WallS = round(out.Steps/n), round(out.ToolCalls/n), round(out.WallS/n)

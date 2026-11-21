@@ -43,7 +43,7 @@ type EvaluationSpec struct {
 	Arms              []EvaluationArm `json:"arms"`       // 1 arm for score, 2 for A/B
 	Benchmarks        []string        `json:"benchmarks"` // suite ids; or Pack
 	Pack              string          `json:"pack,omitempty"`
-	TasksPerBenchmark int             `json:"tasks_per_benchmark"` // default 5, admitted tasks only
+	TasksPerBenchmark int             `json:"tasks_per_benchmark"` // default 8 (the fewest that can reach significance after Holm over a few benchmarks), admitted tasks only
 	Trials            int             `json:"trials"`              // repeats per task, default 2
 	Faults            []string        `json:"faults"`              // "clean" always; plus model-down, broken-tool, misleading-instruction
 	BudgetUSD         float64         `json:"budget_usd,omitempty"`

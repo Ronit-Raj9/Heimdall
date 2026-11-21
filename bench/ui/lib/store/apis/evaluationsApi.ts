@@ -168,6 +168,8 @@ export interface ReportVerdict {
 	significant: boolean;
 	summary: string;
 	p_value?: number;
+	/** p_value after Holm across the evaluation's benchmarks; significant is read from this. */
+	p_value_holm?: number;
 	ci_low?: number;
 	ci_high?: number;
 	tasks?: number;

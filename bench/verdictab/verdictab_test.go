@@ -200,3 +200,36 @@ func TestSummariesHaveNoEmDash(t *testing.T) {
 		}
 	}
 }
+
+// Many benchmarks are many tests: two benchmarks each just under Alpha on
+// their own (6 tasks, p = 0.03125) are not significant after Holm, while a
+// benchmark with a clear gap over 10 tasks still is.
+func TestHolmAcrossBenchmarks(t *testing.T) {
+	thin1 := Compare(arm(6, 1, always(false)), arm(6, 1, always(true)))
+	thin2 := Compare(arm(6, 1, always(false)), arm(6, 1, always(true)))
+	clear := Compare(arm(10, 1, always(false)), arm(10, 1, always(true)))
+	if !thin1.Significant || thin1.Winner != WinnerB || !clear.Significant {
+		t.Fatalf("raw verdicts %+v %+v", thin1, clear)
+	}
+	adj := Holm([]BenchmarkVerdict{thin1, thin2, clear})
+	for i, v := range adj[:2] {
+		if v.Significant || v.Winner == WinnerB || v.PValueHolm == nil || *v.PValueHolm < Alpha {
+			t.Errorf("thin %d after Holm %+v", i, v)
+		}
+	}
+	if !adj[2].Significant || adj[2].Winner != WinnerB || *adj[2].PValueHolm >= Alpha {
+		t.Errorf("clear after Holm %+v (p_holm %v)", adj[2], *adj[2].PValueHolm)
+	}
+	if !thin1.Significant {
+		t.Error("Holm changed its input")
+	}
+	// One benchmark: unchanged.
+	if one := Holm([]BenchmarkVerdict{thin1}); !one[0].Significant || *one[0].PValueHolm != *thin1.PValue {
+		t.Errorf("single %+v", one[0])
+	}
+	// The overall tally counts wins after Holm.
+	o := Overall([]BenchmarkVerdict{thin1, thin2, clear})
+	if o.Wins[WinnerB] != 1 {
+		t.Errorf("overall wins %v, want B=1 after Holm", o.Wins)
+	}
+}

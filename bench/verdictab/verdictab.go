@@ -12,8 +12,10 @@
 package verdictab
 
 import (
+	"cmp"
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -59,6 +61,7 @@ type BenchmarkVerdict struct {
 	Significant bool      `json:"significant"`
 	Summary     string    `json:"summary"`
 	PValue      *float64  `json:"p_value,omitempty"`
+	PValueHolm  *float64  `json:"p_value_holm,omitempty"` // PValue after Holm across the evaluation's benchmarks (set by Holm)
 	CILow       *float64  `json:"ci_low,omitempty"`
 	CIHigh      *float64  `json:"ci_high,omitempty"`
 	Tasks       int       `json:"tasks"`      // tasks both arms ran
@@ -139,8 +142,68 @@ func Compare(a, b []TaskOutcome) BenchmarkVerdict {
 	return out
 }
 
-// Overall pools benchmark verdicts into one.
+// Holm adjusts the benchmark verdicts of one evaluation for testing many
+// benchmarks at once: each p-value gets Holm's step-down adjustment across
+// the benchmarks that have one, Significant is read from the adjusted value,
+// and a winner whose adjusted p-value is no longer below Alpha becomes "tie"
+// or "unclear" by the same rule Compare uses. The input is not changed. With
+// one benchmark nothing changes.
+func Holm(vs []BenchmarkVerdict) []BenchmarkVerdict {
+	out := slices.Clone(vs)
+	var idx []int
+	var ps []float64
+	for i, v := range out {
+		if v.PValue != nil {
+			idx = append(idx, i)
+			ps = append(ps, *v.PValue)
+		}
+	}
+	adj := holm(ps)
+	for k, i := range idx {
+		p := adj[k]
+		v := &out[i]
+		v.PValueHolm = &p
+		if p < Alpha || !v.Significant {
+			continue
+		}
+		v.Significant = false
+		lo, hi, ok := 0.0, 0.0, v.CILow != nil && v.CIHigh != nil
+		if ok {
+			lo, hi = *v.CILow, *v.CIHigh
+		}
+		v.Winner = tieOrUnclear(v.Tasks, ok, lo, hi)
+		v.Summary = benchmarkSummary(*v) + " (not significant once corrected for testing many benchmarks)"
+	}
+	return out
+}
+
+// holm is Holm's step-down adjustment of p, in input order, capped at 1 and
+// monotone. A NaN p is taken as 1.
+func holm(p []float64) []float64 {
+	m := len(p)
+	order := make([]int, m)
+	clean := make([]float64, m)
+	for i, v := range p {
+		order[i], clean[i] = i, v
+		if math.IsNaN(v) {
+			clean[i] = 1
+		}
+	}
+	slices.SortStableFunc(order, func(a, b int) int { return cmp.Compare(clean[a], clean[b]) })
+	out := make([]float64, m)
+	running := 0.0
+	for rank, i := range order {
+		running = math.Max(running, math.Min(1, float64(m-rank)*clean[i]))
+		out[i] = running
+	}
+	return out
+}
+
+// Overall pools benchmark verdicts into one. Wins count the benchmark
+// winners after Holm, so the tally never shows more significant wins than
+// the correction allows; pass verdicts from Compare (Holm is applied here).
 func Overall(vs []BenchmarkVerdict) OverallVerdict {
+	vs = Holm(vs)
 	out := OverallVerdict{Winner: WinnerUnclear, Wins: map[string]int{WinnerA: 0, WinnerB: 0, WinnerTie: 0, WinnerUnclear: 0}, Benchmarks: len(vs)}
 	var diffs []float64
 	for _, v := range vs {

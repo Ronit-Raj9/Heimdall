@@ -19,7 +19,7 @@ What you choose:
 | `arms` | The setups. One arm for `score`, two for the A/B modes. Each arm has a `label` (A, B), an `agent`, an optional `version`, a `model` and an optional `provider`. | none |
 | `benchmarks` | Benchmark ids to run. You can give a `pack` instead, or both (the pack's benchmarks are added). | none |
 | `pack` | A ready-made group of benchmarks for one skill (see below). | none |
-| `tasks_per_benchmark` | How many tasks to take from each benchmark. Only ready (admitted) tasks are used, chosen to be different from each other. | 5 |
+| `tasks_per_benchmark` | How many tasks to take from each benchmark. Only ready (admitted) tasks are used, chosen to be different from each other. At least 6 are needed before any A/B gap can be called real; 8 leaves room for the correction across benchmarks. | 8 |
 | `trials` | How many times each task is repeated per arm. | 2 |
 | `faults` | Fault conditions to add. Normal conditions (`clean`) are always included. | `["clean"]` |
 | `budget_usd` | A spending cap for the whole evaluation. | none |
@@ -116,7 +116,7 @@ Faults cost runs: each fault adds as many runs as the normal condition.
 
 ## How many runs, and the estimate
 
-Runs per benchmark = arms x tasks x trials x conditions. For example, 2 arms, 5 tasks, 2 trials, clean plus `model-down` is 2 x 5 x 2 x 2 = 40 runs per benchmark.
+Runs per benchmark = arms x tasks x trials x conditions. For example, 2 arms, 8 tasks, 2 trials, clean plus `model-down` is 2 x 8 x 2 x 2 = 64 runs per benchmark.
 
 Before you launch, `POST /api/bench/evaluations/estimate` (same body as creating one) returns the number of runs, a cost range and a time range, overall and per benchmark. The cost comes from the pinned price list. If any model in the evaluation has no known price, the answer says `"known": false` and the cost is not guessed. See [Pricing](models-and-providers.md#pricing-unknown-stays-unknown).
 
@@ -145,7 +145,7 @@ Every number comes from the measurements Heimdall already records for each run (
 | Field | How it is computed |
 |---|---|
 | `score` | Success rate: runs that passed the hidden checks (and every safety check) divided by counted runs. |
-| `ci_low`, `ci_high` | 95% interval for the score, from the existing interval helper in `stats/` (Clopper-Pearson exact interval on passes out of runs). With few runs the interval is wide; that is the honest answer. |
+| `ci_low`, `ci_high` | 95% interval for the score from a task-clustered bootstrap: tasks are resampled (each with all its trials), because repeated trials of one task are not independent evidence. With one task it falls back to the exact Clopper-Pearson interval over runs. With few tasks the interval is wide; that is the honest answer. |
 | `runs` | Counted runs for that arm. |
 | `cost_usd` | Sum of each run's cost, re-priced from the pinned price list using the token counts Bifrost recorded. Missing when any model's price is unknown. |
 | `tokens` | Sum of input and output tokens Bifrost recorded for the arm's model calls. |
@@ -163,9 +163,10 @@ For `versions`, `models` and `opponent` modes, each benchmark gets a verdict fro
 - Both arms run the **same tasks**, so the test is **paired by task**: for each task, the difference between B's and A's success rate over its trials.
 - The test is an exact **paired sign-flip test** at alpha 0.05. Tasks with no difference stay in the count and cannot move the result.
 - `significant: true` only when the test says the difference is real. Then `winner` is the arm with the higher score and `delta` is B's score minus A's (0.08 = 8 points).
-- Otherwise the result is **no clear winner yet** (`winner` is `tie`, `significant: false`). That usually means too few tasks: 5 tasks can only show a very large difference. Add tasks or trials.
+- Otherwise the result is **no clear winner yet** (`winner` is `tie`, `significant: false`). That usually means too few tasks: with fewer than 6 tasks no difference can ever be called real, and 8 tasks can only show a large one. Add tasks or trials.
+- An evaluation tests many benchmarks at once, so each benchmark's p-value is corrected for that (Holm's method across the evaluation's benchmarks, shown as `p_value_holm`). A benchmark is `significant` only after the correction; a gap that was just under 0.05 on its own can become "no clear winner yet".
 - If something broke the measurement (for example a gate that makes the comparison invalid, or too many infrastructure failures), the benchmark has no winner and its summary says the test was broken. It does not count as a win for either side.
-- **Overall** counts benchmarks: `wins` per arm (significant only) plus ties. The summary reads like "B is better on 3 of 6 benchmarks, worse on 1". Heimdall does not average scores across different benchmarks into one number, because a point on one benchmark is not worth the same as a point on another.
+- **Overall** counts benchmarks: `wins` per arm (significant after the correction only) plus ties. The summary reads like "B is better on 3 of 6 benchmarks, worse on 1". Heimdall does not average scores across different benchmarks into one number, because a point on one benchmark is not worth the same as a point on another.
 
 In `score` mode there is one arm, so there are no verdicts, only the numbers.
 
@@ -200,7 +201,7 @@ cat > ev.json <<'EOF'
     {"label": "B", "agent": "codex", "version": 2, "model": "gpt-6.2-sol"}
   ],
   "pack": "coding",
-  "tasks_per_benchmark": 5,
+  "tasks_per_benchmark": 8,
   "trials": 2,
   "faults": ["clean", "model-down"],
   "budget_usd": 20
@@ -243,11 +244,11 @@ Each child is an ordinary comparison, so every CLI command that reads comparison
 
 ## Agent leaderboard
 
-`GET /api/bench/leaderboard/agents?capability=&model=` ranks agents (each agent, version and model is one row) by their report card scores per skill, with cost and the last evaluation. Built-in agents (codex, claude-code, mini-swe-agent, opencode, gemini-cli) are marked as baselines, so you can see where your agent stands against well-known ones. In the app this is the "Agents" tab of `/leaderboard`, which opens by default.
+`GET /api/bench/leaderboard/agents?capability=&model=` lists agents (each agent, version and model is one row) with their scores per skill, ranked by the chosen skill (`capability=`); without one they are listed by name, since scores on different skills are never averaged into one number. Each row has cost and the last evaluation. Built-in agents (codex, claude-code, mini-swe-agent, opencode, gemini-cli) are marked as baselines, so you can see where your agent stands against well-known ones. In the app this is the "Agents" tab of `/leaderboard`, which opens by default.
 
 ## Limits
 
-- Five tasks per benchmark is enough to spot a big gap, not a small one. Most A/B results on five tasks will be "no clear winner yet". That is correct, not a bug.
+- Eight tasks per benchmark (the default) is enough to spot a big gap, not a small one. Most A/B results on few tasks will be "no clear winner yet". That is correct, not a bug.
 - A pack only includes benchmarks that are present and ready in your library or organization.
 - `misleading-instruction` only runs where the benchmark has that stress test.
 - Cost is only shown when every model's price is known.

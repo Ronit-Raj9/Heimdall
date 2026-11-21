@@ -37,7 +37,7 @@ import (
 
 // Evaluation defaults and limits.
 const (
-	EvaluationDefaultTasks  = 5
+	EvaluationDefaultTasks  = 8
 	EvaluationDefaultTrials = 2
 	EvaluationMaxTasks      = 50
 	EvaluationMaxTrials     = 10

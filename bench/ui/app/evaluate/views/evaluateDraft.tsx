@@ -32,7 +32,7 @@ export interface EvaluateDraft {
 	stashedArms?: EvaluationArm[];
 }
 
-export const DEFAULT_TASKS_PER_BENCHMARK = 5;
+export const DEFAULT_TASKS_PER_BENCHMARK = 8;
 export const DEFAULT_TRIALS = 2;
 
 export const EMPTY_DRAFT: EvaluateDraft = {

@@ -38,7 +38,7 @@ func TestEvalRunFlagsScore(t *testing.T) {
 	if a.Label != "A" || a.Agent != "codex" || a.Version != 2 || a.Model != "gpt-5" {
 		t.Fatalf("arm %+v", a)
 	}
-	if s.TasksPerBenchmark != 5 || s.Trials != 2 || s.Pack != "coding" {
+	if s.TasksPerBenchmark != 8 || s.Trials != 2 || s.Pack != "coding" {
 		t.Fatalf("defaults %+v", s)
 	}
 	if strings.Join(s.Faults, ",") != "clean,model-down,broken-tool" {
@@ -199,7 +199,7 @@ func TestEvalLocalRoundTrip(t *testing.T) {
 	}
 	var est evalEstimate
 	_ = json.Unmarshal(out.Bytes(), &est)
-	if est.Runs != 2*5*2*1*2 {
+	if est.Runs != 2*8*2*1*2 { // 2 benchmarks, 8 tasks (default), 2 trials, 1 arm, clean + model-down
 		t.Fatalf("runs %d", est.Runs)
 	}
 }

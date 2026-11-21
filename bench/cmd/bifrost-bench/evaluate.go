@@ -3,7 +3,7 @@ package main
 // A20 CLI parity for evaluations (agent-first contract, section 3 and 4).
 //
 //	bifrost-bench eval run --agent codex[@vN] [--vs agent@vM | --vs-model M] --model M
-//	    --pack coding | --benchmarks a,b [--tasks 5] [--trials 2]
+//	    --pack coding | --benchmarks a,b [--tasks 8] [--trials 2]
 //	    [--faults model-down,broken-tool] [--estimate] [--json]
 //	bifrost-bench eval list
 //	bifrost-bench eval show <id>
@@ -41,7 +41,7 @@ import (
 const evalUsage = `usage: bifrost-bench eval <run|list|show|report|cancel> ...
 
   eval run --agent codex[@vN] --model M (--pack coding | --benchmarks a,b)
-           [--vs agent@vM | --vs-model M2] [--tasks 5] [--trials 2]
+           [--vs agent@vM | --vs-model M2] [--tasks 8] [--trials 2]
            [--faults model-down,broken-tool,misleading-instruction] [--name N]
            [--budget USD] [--estimate] [--json]
       start an evaluation (or only print its estimate with --estimate)
@@ -128,7 +128,7 @@ func parseEvalFlags(sub string, args []string) (*evalOpts, error) {
 		fs.StringVar(&o.provider, "provider", "", "provider of the model (optional)")
 		fs.StringVar(&o.pack, "pack", "", "benchmark pack: coding, terminal, support, memory, research, voice, safety, all-compatible")
 		fs.StringVar(&o.benchmarks, "benchmarks", "", "comma separated benchmark ids")
-		fs.IntVar(&o.tasks, "tasks", 5, "tasks per benchmark")
+		fs.IntVar(&o.tasks, "tasks", 8, "tasks per benchmark (at least 6 before an A/B gap can be significant)")
 		fs.IntVar(&o.trials, "trials", 2, "repeats per task")
 		fs.StringVar(&o.faults, "faults", "", "faults besides clean: model-down, broken-tool, misleading-instruction")
 		fs.StringVar(&o.name, "name", "", "evaluation name")

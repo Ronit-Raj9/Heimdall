@@ -27,7 +27,7 @@ import (
 
 // Evaluation estimate defaults and limits.
 const (
-	EvalDefaultTasks  = 5
+	EvalDefaultTasks  = 8
 	EvalDefaultTrials = 2
 	EvalMaxTasks      = 100
 	EvalMaxTrials     = 20

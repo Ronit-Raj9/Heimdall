@@ -130,7 +130,7 @@ describe("Step4Setup", () => {
 		const html = render(<Step4Setup spec={spec({ faults: ["clean", "broken-tool"] })} onChange={() => undefined} />);
 		expect(html).toContain("deepseek-chat  [open]");
 		expect(html).toContain('data-testid="step4-model-A-open"');
-		expect(tagOf(html, "step4-tasks-5")).toContain('aria-checked="true"');
+		expect(tagOf(html, "step4-tasks-8")).toContain('aria-checked="true"');
 		expect(tagOf(html, "step4-trials-2")).toContain('aria-checked="true"');
 		expect(html).toMatch(/data-testid="step4-fault-broken-tool"><input type="checkbox" class="mt-1" checked=""/);
 		expect(html).not.toMatch(/data-testid="step4-fault-model-down"><input type="checkbox" class="mt-1" checked=""/);

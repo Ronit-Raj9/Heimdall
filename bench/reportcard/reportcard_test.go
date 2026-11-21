@@ -107,7 +107,7 @@ func TestBuildABReport(t *testing.T) {
 		return map[string]float64{metricCostUSD: c, metricTokens: tok, metricSteps: steps, metricToolCalls: tools, metricWallTime: wall}
 	}
 	var tb2 []fixRun
-	tasks := []string{"t1", "t2", "t3", "t4", "t5", "t6"}
+	tasks := []string{"t1", "t2", "t3", "t4", "t5", "t6", "t10", "t11"} // 8: enough to stay significant after Holm over 3 benchmarks
 	for _, task := range tasks {
 		for trial := 1; trial <= 2; trial++ {
 			tb2 = append(tb2, fail("a", task, trial, cost(0.1, 100, 10, 5, 60)))
@@ -161,14 +161,14 @@ func TestBuildABReport(t *testing.T) {
 		t.Fatalf("row %+v", b)
 	}
 	a, bb := b.Arms["A"], b.Arms["B"]
-	// A: 12 fails + t8 retry pass = 13 runs, 1 success.
-	if a.Runs != 13 || a.Score != round(1.0/13) || bb.Runs != 12 || bb.Score != 1 {
+	// A: 16 fails + t8 retry pass = 17 runs, 1 success.
+	if a.Runs != 17 || a.Score != round(1.0/17) || bb.Runs != 16 || bb.Score != 1 {
 		t.Fatalf("scores A %+v B %+v", a, bb)
 	}
 	if !(a.CILow <= a.Score && a.Score <= a.CIHigh) || bb.CIHigh != 1 || bb.CILow <= 0.5 {
 		t.Fatalf("intervals A %+v B %+v", a, bb)
 	}
-	if bb.CostUSD != 2.4 || bb.Tokens != 2400 || bb.Steps != 20 || bb.ToolCalls != 8 || bb.WallS != 90 {
+	if bb.CostUSD != 3.2 || bb.Tokens != 3200 || bb.Steps != 20 || bb.ToolCalls != 8 || bb.WallS != 90 {
 		t.Fatalf("B columns %+v", bb)
 	}
 	if b.Verdict == nil || b.Verdict.Winner != "B" || !b.Verdict.Significant || b.Verdict.Delta <= 0 {
@@ -194,7 +194,7 @@ func TestBuildABReport(t *testing.T) {
 		t.Fatalf("reliability %+v", rep.Reliability)
 	}
 	r := rep.Reliability[0]
-	if r.Arms["A"].Score != 0 || r.Arms["A"].Drop != round(-1.0/13) || r.Arms["B"].Score != 0.5 || r.Arms["B"].Drop != -0.5 {
+	if r.Arms["A"].Score != 0 || r.Arms["A"].Drop != round(-1.0/17) || r.Arms["B"].Score != 0.5 || r.Arms["B"].Drop != -0.5 {
 		t.Fatalf("reliability arms %+v", r.Arms)
 	}
 

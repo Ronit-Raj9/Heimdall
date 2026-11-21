@@ -25,7 +25,7 @@ describe("summaryLines", () => {
 		expect(summaryLines(spec({ faults: ["clean", "model-down", "broken-tool"], budget_usd: 25 }))).toEqual([
 			"Score codex v2 on openai/gpt-4o-mini.",
 			"Run 2 benchmarks: hd-harbor-tb2, tau2.",
-			"Use 5 tasks from each benchmark and try each task 2 times.",
+			"Use 8 tasks from each benchmark and try each task 2 times.",
 			"Run clean, then again with: model down, broken tool.",
 			"Stop when spending reaches $25.",
 		]);

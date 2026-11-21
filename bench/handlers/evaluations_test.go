@@ -15,6 +15,7 @@ import (
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/verdictab"
 	"github.com/valyala/fasthttp"
 )
 
@@ -198,6 +199,14 @@ func TestEvaluationCreatePackChildren(t *testing.T) {
 	}
 }
 
+// The default task count must let a per-benchmark verdict reach
+// significance at all: the sign-flip test needs verdictab.MinTasks paired tasks.
+func TestEvaluationDefaultTasksCanBeSignificant(t *testing.T) {
+	if EvaluationDefaultTasks < verdictab.MinTasks || EvalDefaultTasks < verdictab.MinTasks {
+		t.Fatalf("default tasks %d / estimate %d below verdictab.MinTasks %d", EvaluationDefaultTasks, EvalDefaultTasks, verdictab.MinTasks)
+	}
+}
+
 func TestEvaluationABArmsAndVersions(t *testing.T) {
 	l := &evalLauncher{}
 	r, _ := evalServer(t, Services{Launcher: l, Suites: evalSuites()})
@@ -207,14 +216,14 @@ func TestEvaluationABArmsAndVersions(t *testing.T) {
 		t.Fatalf("status %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
 	}
 	ev := decodeEval(t, ctx)
-	if ev.Spec.TasksPerBenchmark != 5 || ev.Spec.Trials != 2 || strings.Join(ev.Spec.Faults, ",") != "clean" {
+	if ev.Spec.TasksPerBenchmark != EvaluationDefaultTasks || ev.Spec.Trials != 2 || strings.Join(ev.Spec.Faults, ",") != "clean" {
 		t.Fatalf("defaults %+v", ev.Spec)
 	}
 	exp := l.planned[ev.Children[0].ExperimentID]
 	if exp.Arms["A"].Agent != "agents/scripted.yaml@v2" || exp.Arms["B"].Agent != "agents/other.yaml" || exp.Arms["B"].Set["gateway.provider"] != "openrouter" {
 		t.Fatalf("arms %+v", exp.Arms)
 	}
-	if exp.Conditions[0].Trials != 2 || len(exp.Conditions[0].Tasks.IDs) != 5 {
+	if exp.Conditions[0].Trials != 2 || len(exp.Conditions[0].Tasks.IDs) != EvaluationDefaultTasks {
 		t.Fatalf("conditions %+v", exp.Conditions)
 	}
 }
