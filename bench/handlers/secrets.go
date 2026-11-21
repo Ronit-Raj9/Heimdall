@@ -111,6 +111,9 @@ func (h *secretsHandler) list(ctx *fasthttp.RequestCtx) {
 	}
 	out := SecretList{Secrets: make([]Secret, 0, len(keys))}
 	for _, k := range keys {
+		if systemSecret(k) {
+			continue // the server's own credentials (shared runner token) are not the org's to rotate or delete
+		}
 		out.Secrets = append(out.Secrets, secretView(k))
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
@@ -181,7 +184,7 @@ func (h *secretsHandler) create(ctx *fasthttp.RequestCtx) {
 func (h *secretsHandler) secretByID(ctx *fasthttp.RequestCtx, ks keystore.Store, org string) *keystore.Key {
 	id, _ := ctx.UserValue("id").(string)
 	k, err := ks.Get(ctx, org, id)
-	if err != nil || k == nil || k.Kind != keystore.KindSecret {
+	if err != nil || k == nil || k.Kind != keystore.KindSecret || systemSecret(*k) {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, "secret not found: "+id)
 		return nil
 	}
@@ -245,3 +248,6 @@ func (h *secretsHandler) storeError(ctx *fasthttp.RequestCtx, err error) {
 	}
 }
 
+// systemSecret reports a secret the server keeps for itself in the org's
+// keystore (created by "heimdall:...", e.g. the shared runner's token).
+func systemSecret(k keystore.Key) bool { return strings.HasPrefix(k.CreatedBy, "heimdall:") }
