@@ -26,6 +26,10 @@ import SettingsView, { settingsTab } from "./settingsView";
 
 const api = vi.hoisted(() => ({ q: {} as Record<string, unknown>, m: {} as Record<string, Record<string, unknown>>, calls: [] as string[] }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+vi.mock("@/lib/store/apis/accountSafetyApi", async () => {
+	const { mutation: m } = await import("@/lib/testing/render");
+	return { useCreateResetLinkMutation: () => m({}) }; // L22 reset links
+});
 vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => {
 	const real = await importOriginal<typeof import("@/lib/store/apis/platformApi")>();
 	const { mutation: m } = await import("@/lib/testing/render");

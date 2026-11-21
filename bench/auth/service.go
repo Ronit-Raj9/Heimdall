@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -68,6 +69,10 @@ type Service struct {
 	logger schemas.Logger
 
 	loginIP, loginEmail, signupIP, signupEmail, probeIP *Limiter
+	// signupAll and captcha are the account-safety guards (L22, reset.go,
+	// captcha.go): a global self-serve signup cap and optional hCaptcha.
+	signupAll *Limiter
+	captcha   *captchaConfig
 
 	purgeMu   sync.Mutex
 	lastPurge time.Time
@@ -126,6 +131,8 @@ func New(cfg Config, deps Deps) (*Service, error) {
 	s.signupIP = NewLimiter(SignupPerIP, now)
 	s.signupEmail = NewLimiter(SignupPerEmail, now)
 	s.probeIP = NewLimiter(TokenPerIP, now)
+	s.signupAll = NewLimiter(SignupGlobalFromEnv(os.Getenv), now)
+	s.captcha = envCaptcha()
 	return s, nil
 }
 
@@ -424,6 +431,9 @@ type SignupRequest struct {
 	OrgName string `json:"org_name,omitempty"`
 	// Invitation is an invitation token; the user joins that organization.
 	Invitation string `json:"invitation,omitempty"`
+	// Captcha is the hCaptcha response token, required on self-serve
+	// signup when HEIMDALL_CAPTCHA_SECRET is set (captcha.go).
+	Captcha string `json:"captcha,omitempty"`
 }
 
 // Signup creates an account under the signup policy:
@@ -450,6 +460,17 @@ func (s *Service) Signup(ctx context.Context, req SignupRequest, ip, ua, replace
 	}
 	if ok, wait := s.signupEmail.Allow(email); !ok {
 		return deny(errRateLimited(wait))
+	}
+	if req.Invitation == "" && s.cfg.Signup != SignupClosed {
+		if ok, wait := s.signupAll.Allow("all"); !ok {
+			return deny(errRateLimited(wait))
+		}
+		if err := s.verifyCaptcha(ctx, req.Captcha, ip); err != nil {
+			if e, ok := AsError(err); ok {
+				return deny(e)
+			}
+			return nil, nil, err
+		}
 	}
 	if err := CheckPasswordPolicy(req.Password, email); err != nil {
 		return deny(errBadRequest("%s", err.Error()))
@@ -734,11 +755,20 @@ type AuthInfo struct {
 	// Bootstrap is true on an empty install: the first signup creates the
 	// owner account and its organization.
 	Bootstrap bool `json:"bootstrap,omitempty"`
+	// CaptchaSiteKey is set when signup needs an hCaptcha response: the
+	// page renders the widget with it.
+	CaptchaSiteKey string `json:"captcha_site_key,omitempty"`
+	// Captcha is true when signup needs a captcha (even without a site key
+	// configured, so the page can explain the failure).
+	Captcha bool `json:"captcha,omitempty"`
 }
 
 // Info describes the sign-in options.
 func (s *Service) Info(ctx context.Context) AuthInfo {
 	info := AuthInfo{AuthMode: "hosted", Signup: string(s.cfg.Signup), GitHub: s.cfg.GitHub != nil}
+	if s.captcha != nil {
+		info.Captcha, info.CaptchaSiteKey = true, s.captcha.siteKey
+	}
 	if s.cfg.Signup != SignupClosed {
 		if n, err := s.st.countUsers(ctx, s.st.d.SQL()); err == nil && n == 0 {
 			info.Bootstrap = true

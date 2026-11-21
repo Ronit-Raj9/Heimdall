@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -122,4 +124,24 @@ func (l *Limiter) evictLocked(now time.Time) {
 			delete(l.buckets, k)
 		}
 	}
+}
+
+// SignupGlobal caps web signups across every IP (account-farming from many
+// addresses). Invitation signups are not counted. HEIMDALL_SIGNUP_PER_HOUR
+// overrides the hourly rate (0 or unset keeps the default); see
+// SignupGlobalFromEnv.
+var SignupGlobal = RateLimit{Burst: 20, Every: 3 * time.Minute}
+
+// SignupPerHourEnv tunes SignupGlobal: the number of new self-serve
+// accounts allowed per hour, also the burst.
+const SignupPerHourEnv = "HEIMDALL_SIGNUP_PER_HOUR"
+
+// SignupGlobalFromEnv returns SignupGlobal, or the shape that admits n
+// signups per hour when SignupPerHourEnv holds a positive integer n.
+func SignupGlobalFromEnv(getenv func(string) string) RateLimit {
+	n, err := strconv.Atoi(strings.TrimSpace(getenv(SignupPerHourEnv)))
+	if err != nil || n <= 0 {
+		return SignupGlobal
+	}
+	return RateLimit{Burst: n, Every: time.Hour / time.Duration(n)}
 }

@@ -1,5 +1,6 @@
 import { AuthError, AuthField, AuthHeading, GithubButton } from "@/components/platform/authForm";
 import { RoleBadge } from "@/components/platform/badges";
+import { HCaptcha, useCaptchaConfig } from "@/components/platform/hcaptcha";
 import { looksLikeEmail } from "@/components/platform/platform.utils";
 import { BlockSkeleton } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,10 @@ export default function SignupView({ invitation }: { invitation?: string }) {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [touched, setTouched] = useState(false);
+	// Account safety (L22): hCaptcha on self-serve sign-up when the server asks for it.
+	const captcha = useCaptchaConfig();
+	const { t: tCaptcha } = useTranslation("accountSafety");
+	const [captchaToken, setCaptchaToken] = useState("");
 	const [signup, state] = useSignupMutation();
 	// An invitation fixes the email: the account must be the one invited.
 	const invitedEmail = invite.data?.email;
@@ -62,12 +67,18 @@ export default function SignupView({ invitation }: { invitation?: string }) {
 	const address = invitedEmail ?? email;
 	const emailError = touched && !looksLikeEmail(address) ? t("settings.invite.invalidEmail") : undefined;
 	const passwordShort = touched && password.length < MIN_PASSWORD;
+	const needCaptcha = captcha.captcha && !invitation;
 	const onSubmit = async (event: FormEvent) => {
 		event.preventDefault();
 		setTouched(true);
 		if (!looksLikeEmail(address) || password.length < MIN_PASSWORD) return;
+		if (needCaptcha && !captchaToken) return;
 		try {
-			await signup({ email: address.trim(), password, name: name.trim() || undefined, invitation }).unwrap();
+			const body = Object.assign(
+				{ email: address.trim(), password, name: name.trim() || undefined, invitation },
+				needCaptcha ? { captcha: captchaToken } : {},
+			);
+			await signup(body).unwrap();
 			window.location.assign("/");
 		} catch {
 			// state.error renders the failure.
@@ -121,6 +132,12 @@ export default function SignupView({ invitation }: { invitation?: string }) {
 					error={passwordShort ? t("auth.passwordHint") : undefined}
 					testId="signup-password"
 				/>
+				{needCaptcha && <HCaptcha siteKey={captcha.captcha_site_key} onToken={setCaptchaToken} testId="signup-captcha" />}
+				{needCaptcha && touched && !captchaToken && (
+					<p role="alert" className="text-chart-error-ink text-xs" data-testid="signup-captcha-required">
+						{tCaptcha("captcha.required")}
+					</p>
+				)}
 				{state.error && <AuthError title={t("auth.signup.error")} message={getBenchErrorMessage(state.error)} testId="signup-error" />}
 				<Button type="submit" size="lg" className="mt-1 h-10 w-full" isLoading={state.isLoading} dataTestId="signup-submit">
 					{t("auth.signup.submit")}

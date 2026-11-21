@@ -118,5 +118,5 @@ export function safeReturnTo(raw: unknown): string {
 
 /** Paths that render without the app shell and never redirect to the login page. */
 export function isAuthPage(pathname: string): boolean {
-	return pathname === "/login" || pathname === "/signup" || pathname.startsWith("/invite/");
+	return pathname === "/login" || pathname === "/signup" || pathname === "/reset-password" || pathname.startsWith("/invite/");
 }
