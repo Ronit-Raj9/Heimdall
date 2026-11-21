@@ -1,0 +1,110 @@
+{
+	"title": "Server admin",
+	"subtitle": "Everyone on this server: users, organizations, quotas, custom images, usage and the runners doing the work.",
+	"notAdmin": "Only server admins can open this page. Add your email to HEIMDALL_SERVER_ADMINS on the server, restart it and sign in again.",
+	"localMode": "The server admin page is for hosted servers. A local bench has one organization and no quotas.",
+	"loadFailed": "Could not load: {{message}}",
+	"retry": "Retry",
+	"tabs": {
+		"overview": "Overview",
+		"users": "Users",
+		"orgs": "Organizations",
+		"images": "Custom images",
+		"usage": "Usage",
+		"containers": "Running containers"
+	},
+	"overview": {
+		"users": "Users",
+		"orgs": "Organizations",
+		"slots": "Runs in progress",
+		"stubQuota": "Quotas are not saved: this server uses the in-memory quota store, so edits are lost on restart. Enable the Postgres quota store (shared pool) to keep them."
+	},
+	"kill": {
+		"title": "Kill switch",
+		"on": "On: runners lease no new runs. Runs already started finish.",
+		"off": "Off: runs are leased normally.",
+		"turnOn": "Stop new runs",
+		"turnOff": "Resume runs",
+		"confirmOn": "Stop every organization from starting new runs? Runs in progress keep going."
+	},
+	"users": {
+		"empty": "No users yet. The first sign-up creates the owner.",
+		"email": "Email",
+		"name": "Name",
+		"orgs": "Orgs",
+		"created": "Joined",
+		"status": "Status",
+		"active": "Active",
+		"disabled": "Disabled",
+		"serverAdmin": "Server admin",
+		"disable": "Disable",
+		"enable": "Enable",
+		"confirmDisable": "Disable {{email}}? They are signed out and can not sign in until enabled again.",
+		"search": "Filter by email or name"
+	},
+	"orgs": {
+		"empty": "No organizations yet. Each sign-up creates one.",
+		"slug": "Slug",
+		"name": "Name",
+		"members": "Members",
+		"public": "Public",
+		"quota": "Quota",
+		"edit": "Edit quota",
+		"quotaSummary": "{{concurrent}} at once, {{perDay}} a day, ${{spend}} a day"
+	},
+	"quota": {
+		"title": "Quota for {{org}}",
+		"maxConcurrent": "Runs at once",
+		"maxPerDay": "Runs per day",
+		"maxSpend": "Spend per day (USD)",
+		"maxImage": "Largest image (GiB)",
+		"allowCustom": "Allow custom images (each needs approval)",
+		"sharedPool": "Use the shared runner pool",
+		"runtime": "Container runtime",
+		"runc": "runc (default)",
+		"runsc": "runsc (gVisor sandbox)",
+		"save": "Save quota",
+		"reset": "Use defaults",
+		"cancel": "Cancel",
+		"saved": "Quota saved.",
+		"zeroHint": "0 means none allowed."
+	},
+	"images": {
+		"empty": "No custom image requests. Orgs ask for one from their settings when their quota allows custom images.",
+		"unavailable": "Image approval is not available on this server yet (the shared pool area is not enabled).",
+		"ref": "Image",
+		"org": "Organization",
+		"size": "Size",
+		"status": "Status",
+		"requested": "Requested",
+		"approve": "Approve",
+		"reject": "Reject",
+		"rejectReason": "Why is this image rejected? (shown to the org)",
+		"pending": "Pending",
+		"approved": "Approved",
+		"rejected": "Rejected"
+	},
+	"usage": {
+		"unavailable": "Platform usage is not available on this server yet.",
+		"empty": "No usage recorded in this period.",
+		"from": "From",
+		"to": "To",
+		"total": "Total spend",
+		"runs": "Runs",
+		"org": "Organization",
+		"cost": "Spend (USD)"
+	},
+	"containers": {
+		"empty": "No runners registered. Hosted runs need the shared runner pool or a runner per organization.",
+		"org": "Organization",
+		"runner": "Runner",
+		"pool": "Pool",
+		"host": "Host",
+		"state": "State",
+		"slots": "Slots in use",
+		"seen": "Last seen",
+		"live": "Connected",
+		"offline": "Not connected",
+		"refresh": "Refresh"
+	}
+}
