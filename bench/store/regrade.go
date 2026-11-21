@@ -425,3 +425,95 @@ func verifyGateRegrade(r *GateRegrade, sealHash string) error {
 	}
 	return nil
 }
+
+// CommitLegacyRegate publishes the coverage record of a regate written
+// before regrade.json carried one (audit qc2-01-02). Such a regrade is
+// refused as a grade source because an interrupted batch of that writer
+// looks the same. It is committed only when the batch is provably whole and
+// authentic: every counted run sealed before the regate was created has a
+// regate.json whose parent_seal is the run's seal and whose content hash
+// verifies, and every regate.json in the folder belongs to such a run.
+// Anything else (a missing result, a damaged one, a result for a run the
+// experiment does not count) refuses and leaves the regrade untouched. A
+// regrade that already has its record, or is not a regate, is refused too.
+func (s *FSStore) CommitLegacyRegate(ctx context.Context, expID, regradeID string) (*RegradeInfo, error) {
+	if err := validateID("exp_id", expID); err != nil {
+		return nil, fmt.Errorf("commit legacy regate: %w", err)
+	}
+	if err := validateID("regrade_id", regradeID); err != nil {
+		return nil, fmt.Errorf("commit legacy regate: %w", err)
+	}
+	dir := filepath.Join(s.expDir(expID), regradesDir, regradeID)
+	var info RegradeInfo
+	found, err := readOptionalJSON(filepath.Join(dir, regradeFile), &info)
+	if err != nil {
+		return nil, fmt.Errorf("commit legacy regate %s: %w", regradeID, err)
+	}
+	switch {
+	case !found:
+		return nil, fmt.Errorf("commit legacy regate %s: %w", regradeID, schemas.ErrNotFound)
+	case len(info.GateVersions) == 0:
+		return nil, fmt.Errorf("commit legacy regate %s: not a regate (no gate versions)", regradeID)
+	case len(info.Runs) > 0:
+		return nil, fmt.Errorf("commit legacy regate %s: already has its coverage record: %w", regradeID, schemas.ErrExists)
+	case info.CreatedAt.IsZero():
+		return nil, fmt.Errorf("commit legacy regate %s: regrade.json has no created_at, so the runs it had to cover are unknown", regradeID)
+	}
+	runs, err := s.SealedRuns(ctx, expID, GradeSourceOriginal)
+	if err != nil {
+		return nil, fmt.Errorf("commit legacy regate %s: %w", regradeID, err)
+	}
+	counted := map[string]string{}
+	var cover []string
+	for _, sr := range runs {
+		if sr.Run.RunID == "" {
+			continue
+		}
+		if len(sr.Problems) > 0 {
+			return nil, fmt.Errorf("commit legacy regate %s: run %s: %s", regradeID, sr.Run.RunID, strings.Join(sr.Problems, "; "))
+		}
+		counted[sr.Run.RunID] = sr.SealHash
+		seal, err := readSeal(sr.Dir)
+		if err != nil {
+			return nil, fmt.Errorf("commit legacy regate %s: %w", regradeID, err)
+		}
+		var r GateRegrade
+		ok, err := readOptionalJSON(filepath.Join(dir, runsDir, sr.Run.RunID, regateFile), &r)
+		if err != nil {
+			return nil, fmt.Errorf("commit legacy regate %s: run %s: %w", regradeID, sr.Run.RunID, err)
+		}
+		if !ok {
+			if seal.SealedAt.Before(info.CreatedAt) {
+				return nil, fmt.Errorf("commit legacy regate %s: run %s was sealed before the regate but has no result, so the batch is incomplete: %w", regradeID, sr.Run.RunID, schemas.ErrSealMismatch)
+			}
+			continue // sealed after the regate: keeps its sealed gates
+		}
+		if err := verifyGateRegrade(&r, sr.SealHash); err != nil {
+			return nil, fmt.Errorf("commit legacy regate %s: run %s: %w", regradeID, sr.Run.RunID, err)
+		}
+		cover = append(cover, sr.Run.RunID)
+	}
+	entries, err := os.ReadDir(filepath.Join(dir, runsDir))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("commit legacy regate %s: %w", regradeID, err)
+	}
+	for _, e := range entries {
+		if _, ok := counted[e.Name()]; !ok {
+			return nil, fmt.Errorf("commit legacy regate %s: result for %s, which is not a counted sealed run: %w", regradeID, e.Name(), schemas.ErrSealMismatch)
+		}
+	}
+	if len(cover) == 0 {
+		return nil, fmt.Errorf("commit legacy regate %s: no result to commit", regradeID)
+	}
+	slices.Sort(cover)
+	info.Runs = cover
+	b, err := marshalIndent(&info)
+	if err != nil {
+		return nil, fmt.Errorf("commit legacy regate %s: %w", regradeID, err)
+	}
+	if err := writeFileAtomic(filepath.Join(dir, regradeFile), b); err != nil {
+		return nil, fmt.Errorf("commit legacy regate %s: %w", regradeID, err)
+	}
+	s.logger.Info("legacy regate committed", "exp_id", expID, "regrade_id", regradeID, "runs", len(cover))
+	return &info, nil
+}

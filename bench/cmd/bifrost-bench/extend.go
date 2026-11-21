@@ -92,11 +92,7 @@ func runExtend(args []string) int {
 	}
 	fmt.Printf("wrote %s: follow-up of %s (%s, %d)\n", path, *expID, kind, n)
 	if me := an.Verdict.MoreEvidence; me != nil {
-		cost := "unknown"
-		if me.CostUSD != nil {
-			cost = fmt.Sprintf("about %.2f USD", *me.CostUSD)
-		}
-		fmt.Printf("sizing: to detect %.1f pp the verdict needs about %d more tasks, %s (%s)\n", me.TargetPP, me.Tasks, cost, me.CostBasis)
+		fmt.Printf("sizing: %s\n", sizingText(me))
 	}
 	fmt.Printf("combination rule: %s\n", e.Extends.Rule)
 	for _, note := range notes {
@@ -217,14 +213,17 @@ func runExtendStatus(args []string) int {
 	// instrument cannot help a combined decision.
 	problems := append(verdict.ExtensionStageProblems(pa), verdict.ExtensionStageProblems(ca)...)
 	// Audit 1-B-03: the pre-declared alpha pays for one follow-up only.
-	siblings, err := a.followUps(ctx, parent)
+	bound, err := a.boundFollowUp(ctx, parent)
 	if err != nil {
 		return fail("%v", err)
 	}
-	if bound := verdict.AuthorizedFollowUp(parent, siblings); bound != child.ExpID {
+	if bound != child.ExpID {
 		problems = append(problems, fmt.Sprintf("%s is not the follow-up bound to %s (the first planned one is %s): only one follow-up may join the pre-declared combination", child.ExpID, parent.ExpID, bound))
 	}
 	verdict.HoldExtension(res, problems)
+	// Audit qc2-03-03: a stage on release hold never lets the combination
+	// report IMPROVED or exit 0.
+	verdict.HoldImprovement(res, append(verdict.ExtensionStageHolds(pa), verdict.ExtensionStageHolds(ca)...))
 	if *asJSON {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
@@ -243,6 +242,26 @@ func runExtendStatus(args []string) int {
 		return 3
 	}
 	return exitOK
+}
+
+// boundFollowUp is the follow-up the parent's combination alpha is bound to:
+// the persisted binding (written when the first child was frozen), else the
+// first planned child among the stored ones, which is then bound for good.
+// Persisting it means archiving the bound child never hands its alpha to a
+// sibling (audit qc2-03-01).
+func (a *app) boundFollowUp(ctx context.Context, parent *schemas.Manifest) (string, error) {
+	if id, ok, err := a.store.FollowUp(parent.ExpID, parent.Hash); err != nil || ok {
+		return id, err
+	}
+	siblings, err := a.followUps(ctx, parent)
+	if err != nil {
+		return "", err
+	}
+	first := verdict.AuthorizedFollowUp(parent, siblings)
+	if first == "" {
+		return "", nil
+	}
+	return a.store.BindFollowUp(parent.ExpID, parent.Hash, first)
 }
 
 // followUps loads every stored experiment that extends parent.

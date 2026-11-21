@@ -182,6 +182,7 @@ func TestEvidencePackRegate(t *testing.T) {
 	a := &schemas.Analysis{AnalysisID: "a_rg", ExpID: testExp, GradeSource: "rg_x", CreatedAt: time.Date(2026, 11, 14, 11, 0, 0, 0, time.UTC),
 		Verdict: schemas.Verdict{Decision: schemas.DecisionImproved, Action: schemas.ActionShip, ManifestHash: f.m.Hash,
 			Effect: &schemas.Effect{ArmA: "A", ArmB: "B"}}}
+	f.digest(a)
 	if err := f.st.WriteAnalysis(ctx, a, nil); err != nil {
 		t.Fatalf("WriteAnalysis: %v", err)
 	}
@@ -228,6 +229,7 @@ func TestEvidencePackReview(t *testing.T) {
 	a := &schemas.Analysis{AnalysisID: "a_rv", ExpID: testExp, GradeSource: schemas.GradeSourceReviewed, CreatedAt: time.Date(2026, 11, 14, 11, 0, 0, 0, time.UTC),
 		Verdict: schemas.Verdict{Decision: schemas.DecisionImproved, Action: schemas.ActionShip, ManifestHash: f.m.Hash,
 			Effect: &schemas.Effect{ArmA: "A", ArmB: "B"}}}
+	f.digest(a)
 	if err := f.st.WriteAnalysis(ctx, a, nil); err != nil {
 		t.Fatalf("WriteAnalysis: %v", err)
 	}
@@ -323,6 +325,7 @@ func TestCreateRefusesChangedReviewSnapshot(t *testing.T) {
 	a := &schemas.Analysis{AnalysisID: "a_rv", ExpID: testExp, GradeSource: schemas.GradeSourceReviewed, CreatedAt: time.Date(2026, 11, 14, 11, 0, 0, 0, time.UTC),
 		Verdict: schemas.Verdict{Decision: schemas.DecisionImproved, Action: schemas.ActionShip, ManifestHash: f.m.Hash,
 			Effect: &schemas.Effect{ArmA: "A", ArmB: "B"}}, InputsDigest: digest}
+	f.digest(a)
 	if err := f.st.WriteAnalysis(ctx, a, nil); err != nil {
 		t.Fatalf("WriteAnalysis: %v", err)
 	}
@@ -399,5 +402,23 @@ func TestEvidencePackCarriesSupersededSeals(t *testing.T) {
 	}
 	if !strings.Contains(string(files["README.txt"]), "chain/<run_id>.seal.json") {
 		t.Fatal("README does not describe chain seals")
+	}
+}
+
+// Audit qc2-01-03: an analysis saved before inputs_digest existed has no
+// snapshot to tie its action to today's reviews, so it is never released.
+func TestCreateRefusesLegacyAnalysisWithoutDigest(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t, schemas.ActionShip, "")
+	a := &schemas.Analysis{AnalysisID: "a_legacy", ExpID: testExp, GradeSource: schemas.GradeSourceReviewed, CreatedAt: time.Date(2026, 11, 14, 11, 0, 0, 0, time.UTC),
+		Verdict: schemas.Verdict{Decision: schemas.DecisionImproved, Action: schemas.ActionShip, ManifestHash: f.m.Hash,
+			Effect: &schemas.Effect{ArmA: "A", ArmB: "B"}}}
+	if err := f.st.WriteAnalysis(ctx, a, nil); err != nil {
+		t.Fatalf("WriteAnalysis: %v", err)
+	}
+	_, err := f.log.Create(ctx, &schemas.ReleaseRequest{ExpID: testExp, AnalysisID: "a_legacy", Approver: "ana"})
+	var refused *RefusedError
+	if !errors.As(err, &refused) || !strings.Contains(refused.Reason, "no inputs_digest") {
+		t.Fatalf("err = %v, want a refusal naming the missing snapshot", err)
 	}
 }

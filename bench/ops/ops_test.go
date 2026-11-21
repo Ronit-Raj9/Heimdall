@@ -157,7 +157,11 @@ func TestCheckEvaluatorRefusesEditedTask(t *testing.T) {
 func TestCheckSuiteDriftIgnoresAdmission(t *testing.T) {
 	task := schemas.TaskLock{Version: "1", InstructionSHA256: "i", RepoTreeSHA256: "r", VerifierSHA256: "v",
 		ControlsSHA256: "c", FixturesSHA256: "f", Status: schemas.TaskAdmitted}
-	frozen := schemas.SuiteLock{Tasks: map[string]schemas.TaskLock{"t01": task}}
+	fp := func() *schemas.LockFingerprints {
+		return &schemas.LockFingerprints{Version: 1, Suite: schemas.Fingerprint{Settings: "ss", Files: "sf"},
+			Tasks: map[string]schemas.Fingerprint{"t01": {Settings: "ts", Files: "tf"}}}
+	}
+	frozen := schemas.SuiteLock{Tasks: map[string]schemas.TaskLock{"t01": task}, Fingerprints: fp()}
 	raw, err := json.Marshal(frozen)
 	if err != nil {
 		t.Fatal(err)
@@ -169,15 +173,42 @@ func TestCheckSuiteDriftIgnoresAdmission(t *testing.T) {
 	now := task
 	now.Status = schemas.TaskQuarantined
 	now.Admission = &schemas.AdmissionRecord{Admitted: true, Fingerprint: "sha256:x"}
-	s := &schemas.Suite{ID: "s", LockHash: "sha256:new", Lock: &schemas.SuiteLock{Tasks: map[string]schemas.TaskLock{"t01": now}}}
+	s := &schemas.Suite{ID: "s", LockHash: "sha256:new", Lock: &schemas.SuiteLock{Tasks: map[string]schemas.TaskLock{"t01": now}, Fingerprints: fp()}}
 	m := &schemas.Manifest{SuiteLockHash: utils.SHA256Bytes(raw),
 		Slots: []schemas.Slot{{SlotID: "s_1", Task: "t01", Condition: schemas.ConditionClean}}}
 	if err := CheckSuiteDrift(m, s, p); err != nil {
 		t.Fatalf("admission-only change refused: %v", err)
 	}
+	// Audit qc2-01-01: a re-lock after an evaluator settings edit (a
+	// protected list) keeps the legacy entry equal; the fingerprints differ.
+	s.Lock.Fingerprints.Tasks["t01"] = schemas.Fingerprint{Settings: "ts2", Files: "tf"}
+	if err := CheckSuiteDrift(m, s, p); err == nil || !strings.Contains(err.Error(), "task t01 evaluator settings") {
+		t.Fatalf("changed task settings accepted: %v", err)
+	}
+	s.Lock.Fingerprints = fp()
+	s.Lock.Fingerprints.Suite.Files = "sf2"
+	if err := CheckSuiteDrift(m, s, p); err == nil || !strings.Contains(err.Error(), "evaluator settings or files") {
+		t.Fatalf("changed suite files accepted: %v", err)
+	}
+	s.Lock.Fingerprints = fp()
 	now.VerifierSHA256 = "v2"
 	s.Lock.Tasks["t01"] = now
 	if err := CheckSuiteDrift(m, s, p); err == nil || !strings.Contains(err.Error(), "task t01 changed") {
 		t.Fatalf("changed verifier accepted: %v", err)
+	}
+	// A legacy frozen lock pinned no settings, so a re-locked suite is
+	// refused.
+	legacy := frozen
+	legacy.Fingerprints = nil
+	if raw, err = json.Marshal(legacy); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m.SuiteLockHash = utils.SHA256Bytes(raw)
+	s.Lock.Tasks["t01"] = task
+	if err := CheckSuiteDrift(m, s, p); err == nil || !strings.Contains(err.Error(), "records no fingerprints") {
+		t.Fatalf("legacy frozen lock accepted: %v", err)
 	}
 }

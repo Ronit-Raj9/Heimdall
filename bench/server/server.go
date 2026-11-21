@@ -170,7 +170,7 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	// Held-out tasks: a held-out task's run content needs held_out.visible too.
 	handlers.NewRunsHandler(mode, deps.Index).WithSuites(deps.Suites).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...)
 	handlers.NewRunListHandler(mode, deps.Index, deps.Suites).RegisterRoutes(r, common...) // UI regroup (U2): GET /runs (handlers/runlist.go)
-	handlers.NewPairsHandler(mode, deps.Index).RegisterRoutes(r, common...)
+	handlers.NewPairsHandler(mode, deps.Index).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...)
 	handlers.NewTriageHandler(mode, deps.Index, deps.Catalog).RegisterRoutes(r, common...)
 	// U3: the held-out board needs held_out.visible, as held-out task detail does.
 	handlers.NewLeaderboardHandler(mode, deps.Index).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...)

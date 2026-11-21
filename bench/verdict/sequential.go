@@ -165,7 +165,7 @@ func slotValues(m *schemas.Manifest, runs []schemas.SealedRun, metric string, se
 		if !r.Slot.Counted || r.Run.RunID == "" {
 			continue
 		}
-		v := slotValue{run: true, settled: true, val: metricValue(r, metric)}
+		v := slotValue{run: true, settled: true, val: decisionValue(metricValue(r, metric))}
 		if x, ok := v.val.Float(); ok && finite(x) {
 			v.x, v.observed = x, true
 		}

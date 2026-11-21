@@ -564,3 +564,51 @@ func TestSealedRunsReportsDamagedSupersededAttempt(t *testing.T) {
 		t.Fatalf("other slot problems %v", got[1].Problems)
 	}
 }
+
+// Audit qc2-01-06: a damaged sealed attempt whose retry has not sealed yet
+// still reaches analysis, on an unknown stand-in for the slot.
+func TestSealedRunsReportsDamagedAttemptOfUnfinishedSlot(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t, nil)
+	m := mustCreateExp(t, s, "e_test")
+	aborted := mustNewRun(t, s, m, "s_a1", "r_a1_1", 1, schemas.OutcomeAbortedInfra)
+	mustSeal(t, s, aborted)
+	mustNewRun(t, s, m, "s_a1", "r_a1_2", 2, schemas.OutcomeUnknown)
+	got, err := s.SealedRuns(ctx, "e_test", "original")
+	if err != nil {
+		t.Fatalf("SealedRuns: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("healthy unfinished slot: got %+v, want none", got)
+	}
+	dir := s.runDir(aborted)
+	makeWritable(t, dir)
+	writeTampered(t, filepath.Join(dir, "notes.txt"), []byte("x"))
+	if got, err = s.SealedRuns(ctx, "e_test", "original"); err != nil {
+		t.Fatalf("SealedRuns: %v", err)
+	}
+	if len(got) != 1 || got[0].Slot.SlotID != "s_a1" || got[0].Run.RunID != "" || got[0].Run.Outcome != schemas.OutcomeUnknown {
+		t.Fatalf("got %+v, want one unknown stand-in for s_a1", got)
+	}
+	if p := got[0].Problems; len(p) != 1 || !strings.Contains(p[0], "r_a1_1") {
+		t.Fatalf("problems %v, want the damaged attempt r_a1_1", p)
+	}
+}
+
+// Audit qc2-02-05: every sealed attempt SealedRuns does not count reaches
+// the harness checks, marked uncounted.
+func TestHarnessAttemptsListsSupersededAttempts(t *testing.T) {
+	s, _ := indexFixture(t)
+	got, err := s.HarnessAttempts(context.Background(), "e_test")
+	if err != nil {
+		t.Fatalf("HarnessAttempts: %v", err)
+	}
+	if len(got) != 2 || got[0].Run.RunID != "r_a1_1" || got[1].Run.RunID != "r_c1" {
+		t.Fatalf("got %+v, want superseded r_a1_1 and compatibility run r_c1", got)
+	}
+	for _, r := range got {
+		if r.Slot.Counted || len(r.Problems) != 0 {
+			t.Fatalf("run %s counted %v problems %v, want uncounted and verified", r.Run.RunID, r.Slot.Counted, r.Problems)
+		}
+	}
+}

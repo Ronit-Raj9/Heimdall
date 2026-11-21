@@ -3,6 +3,7 @@ package verdict
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"sort"
 
@@ -109,6 +110,9 @@ func sameComparison(parent, child *schemas.Manifest, pc, cc settings, kind strin
 	if parent.SuiteID != child.SuiteID {
 		return fmt.Errorf("suites differ: %s and %s", parent.SuiteID, child.SuiteID)
 	}
+	if err := sameEvaluator(parent, child); err != nil {
+		return err
+	}
 	if pc.alpha != cc.alpha {
 		return fmt.Errorf("verdict alpha differs: %v and %v", pc.alpha, cc.alpha)
 	}
@@ -128,6 +132,29 @@ func sameComparison(parent, child *schemas.Manifest, pc, cc settings, kind strin
 		}
 	}
 	return nil
+}
+
+// sameEvaluator checks that both stages were graded by the same frozen
+// evaluator (audit qc2-03-05): the same suite version, the same scenario
+// inputs (suite services, judge, verifier mode), and the same suite lock, or
+// at least the same lock fingerprints (every evaluator setting and file).
+// Equal task ids under a re-locked probe or verifier are not the same
+// comparison. `extend -tasks` draws fresh tasks from the parent's own lock,
+// so an ordinary follow-up passes.
+func sameEvaluator(parent, child *schemas.Manifest) error {
+	if parent.SuiteVersion != child.SuiteVersion {
+		return fmt.Errorf("suite versions differ: %s and %s: not the same evaluator", parent.SuiteVersion, child.SuiteVersion)
+	}
+	if !maps.Equal(parent.Scenario, child.Scenario) {
+		return fmt.Errorf("scenario inputs (suite services, judge, verifier mode) differ between %s and %s: not the same evaluator", parent.ExpID, child.ExpID)
+	}
+	if parent.SuiteLockHash == child.SuiteLockHash {
+		return nil
+	}
+	if parent.FingerprintHash != "" && parent.FingerprintHash == child.FingerprintHash {
+		return nil
+	}
+	return fmt.Errorf("suite lock differs between %s (%s) and %s (%s) and the lock fingerprints do not show the same evaluator settings: a probe or verifier may have changed, so the stages cannot combine", parent.ExpID, parent.SuiteLockHash, child.ExpID, child.SuiteLockHash)
 }
 
 // slotTasks are the tasks of m's counted slots on condition.
@@ -179,6 +206,44 @@ func ExtensionStageProblems(an *schemas.Analysis) []string {
 		}
 	}
 	return out
+}
+
+// ExtensionStageHolds lists why a stage's own analysis holds a release
+// (audit qc2-03-03): a failed guard (a hold-only one such as timeout_parity
+// included), regressed integrity, a hold action, or a release policy that
+// blocks. A stage on hold cannot let the combination ship, so these withhold
+// a combined IMPROVED (HoldImprovement); a combined REGRESSED stands.
+func ExtensionStageHolds(an *schemas.Analysis) []string {
+	if an == nil {
+		return []string{"stage has no analysis"}
+	}
+	var out []string
+	for _, g := range an.Verdict.Guards {
+		if g.Status == schemas.GuardFail {
+			out = append(out, fmt.Sprintf("stage %s guard %s failed", an.ExpID, g.Spec.Rule))
+		}
+	}
+	if an.Verdict.Integrity == schemas.IntegrityRegressed {
+		out = append(out, fmt.Sprintf("stage %s integrity regressed", an.ExpID))
+	}
+	if an.Verdict.Action == schemas.ActionHold && len(out) == 0 && an.Verdict.Decision != schemas.DecisionRegressed {
+		out = append(out, fmt.Sprintf("stage %s action is hold", an.ExpID))
+	}
+	if p := an.Policy; p != nil && p.Decision == schemas.PolicyBlock {
+		out = append(out, fmt.Sprintf("stage %s release policy %s blocks", an.ExpID, p.PolicyName))
+	}
+	return out
+}
+
+// HoldImprovement makes a combined IMPROVED INCONCLUSIVE when a stage is on
+// hold, with the holds as reasons; any other decision is kept.
+func HoldImprovement(res *schemas.ExtensionResult, holds []string) {
+	if res == nil || len(holds) == 0 || res.Decision != schemas.DecisionImproved {
+		return
+	}
+	res.Reasons = append(res.Reasons, "combined improved withheld: a stage is on release hold")
+	res.Reasons = append(res.Reasons, holds...)
+	res.Decision = schemas.DecisionInconclusive
 }
 
 // HoldExtension makes a directional combined decision INCONCLUSIVE when any

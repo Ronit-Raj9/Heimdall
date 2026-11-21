@@ -29,9 +29,11 @@ func runRegate(args []string) int {
 	exp := fs.String("exp", "", "experiment id whose sealed runs are regated")
 	id := fs.String("id", "", "regrade id to write (default: a new rg_ id)")
 	note := fs.String("note", "", "why the gates are recomputed; every report that uses this regrade shows it")
+	commitLegacy := fs.Bool("commit-legacy", false, "commit regate -id written before regrade.json carried a coverage record: every counted run sealed before it must have an authentic result; nothing is recomputed")
 	frozenLock := fs.String("suite-lock", "", "the suite.lock the experiment was frozen with, needed when the suite's lock changed since; every task and probe entry the experiment uses must still match")
 	if err := fs.Parse(args); err != nil || *exp == "" || fs.NArg() != 0 {
 		fmt.Fprintln(os.Stderr, "usage: bifrost-bench regate [-config deploy/bench.yaml] -exp <exp_id> [-id <regrade_id>] [-note text] [-suite-lock frozen/suite.lock]")
+		fmt.Fprintln(os.Stderr, "       bifrost-bench regate [-config deploy/bench.yaml] -exp <exp_id> -id <regrade_id> -commit-legacy")
 		fmt.Fprintln(os.Stderr, "then: bifrost-bench check -exp <exp_id> -grade-source <regrade_id>")
 		return exitUsage
 	}
@@ -40,6 +42,17 @@ func runRegate(args []string) int {
 	a, err := newApp(ctx, *config, appOptions{})
 	if err != nil {
 		return fail("%v", err)
+	}
+	if *commitLegacy {
+		if *id == "" {
+			return fail("regate -commit-legacy needs -id <regrade_id>")
+		}
+		info, err := a.store.CommitLegacyRegate(ctx, *exp, *id)
+		if err != nil {
+			return fail("regate %s: %v", *exp, err)
+		}
+		fmt.Printf("regrade %s committed: %d run(s) covered\nanalyze with: bifrost-bench check -exp %s -grade-source %s\n", *id, len(info.Runs), *exp, *id)
+		return exitOK
 	}
 	regradeID := *id
 	if regradeID == "" {

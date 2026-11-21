@@ -256,8 +256,13 @@ func (ix *Index) fingerprint(expID string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil))[:16], nil
 }
 
-// analyses reads every analysis of an experiment. A folder whose
-// verdict.json is missing or unreadable is skipped with a warning.
+// analyses reads every analysis of an experiment. A folder without
+// verdict.json is an incomplete write from before analyses were staged and is
+// skipped. A published verdict.json that cannot be read or decoded might
+// have said INVALID, so, as the board's store.LatestAnalysis fails closed on
+// it, it enters as the newest analysis with decision INVALID and the
+// experiment's runs leave trends until it is analysed again (audit
+// qc2-05-10).
 func (ix *Index) analyses(expID string) ([]AnalysisRow, error) {
 	base := filepath.Join(ix.st.Root(), expID, analysisDir)
 	entries, err := os.ReadDir(base)
@@ -268,6 +273,7 @@ func (ix *Index) analyses(expID string) ([]AnalysisRow, error) {
 		return nil, err
 	}
 	var out []AnalysisRow
+	var unreadable []string
 	for _, e := range entries {
 		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
 			continue // a dot folder is an analysis still being staged (store.WriteAnalysis)
@@ -285,11 +291,16 @@ func (ix *Index) analyses(expID string) ([]AnalysisRow, error) {
 			} `json:"policy"`
 		}
 		b, err := os.ReadFile(filepath.Join(base, e.Name(), verdictFile))
+		if errors.Is(err, fs.ErrNotExist) {
+			ix.logger.Warn("results index: incomplete analysis skipped", "exp_id", expID, "analysis", e.Name())
+			continue
+		}
 		if err == nil {
 			err = json.Unmarshal(b, &a)
 		}
 		if err != nil {
-			ix.logger.Warn("results index: analysis skipped", "exp_id", expID, "analysis", e.Name(), "error", err.Error())
+			ix.logger.Warn("results index: analysis unreadable, experiment treated as INVALID", "exp_id", expID, "analysis", e.Name(), "error", err.Error())
+			unreadable = append(unreadable, e.Name())
 			continue
 		}
 		row := AnalysisRow{Experiment: expID, AnalysisID: cmp.Or(a.AnalysisID, e.Name()), Decision: a.Verdict.Decision,
@@ -298,6 +309,17 @@ func (ix *Index) analyses(expID string) ([]AnalysisRow, error) {
 			row.Policy = a.Policy.Decision
 		}
 		out = append(out, row)
+	}
+	if len(unreadable) > 0 {
+		newest := time.Time{}
+		for _, r := range out {
+			if r.CreatedAt.After(newest) {
+				newest = r.CreatedAt
+			}
+		}
+		slices.Sort(unreadable)
+		out = append(out, AnalysisRow{Experiment: expID, AnalysisID: unreadable[len(unreadable)-1],
+			Decision: string(schemas.DecisionInvalid), Action: string(schemas.ActionFixHarness), CreatedAt: newest.Add(time.Nanosecond)})
 	}
 	return out, nil
 }

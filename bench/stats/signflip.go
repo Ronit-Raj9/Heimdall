@@ -1,6 +1,7 @@
 package stats
 
 import (
+	"context"
 	"math"
 	"math/rand/v2"
 )
@@ -50,17 +51,28 @@ type SignFlipResult struct {
 // all-zero input gives P=1. Any NaN or infinite difference gives P=NaN, which
 // never passes a p < alpha check.
 func SignFlip(d []float64) SignFlipResult {
+	res, _ := SignFlipCtx(context.Background(), d)
+	return res
+}
+
+// SignFlipCtx is SignFlip that stops when ctx ends, returning ctx's cause:
+// a request computing many tests (a leaderboard's all-pair family) never runs
+// past its deadline (audit qc2-05-09). The result is identical otherwise.
+func SignFlipCtx(ctx context.Context, d []float64) (SignFlipResult, error) {
 	res := SignFlipResult{P: 1, Exact: true}
+	if err := ctx.Err(); err != nil {
+		return res, context.Cause(ctx)
+	}
 	maxAbs := 0.0
 	for _, v := range d {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
 			res.P = math.NaN()
-			return res
+			return res, nil
 		}
 		maxAbs = math.Max(maxAbs, math.Abs(v))
 	}
 	if maxAbs == 0 {
-		return res
+		return res, nil
 	}
 	nonzero := make([]float64, 0, len(d))
 	observed, scale := 0.0, 0.0
@@ -81,16 +93,17 @@ func SignFlip(d []float64) SignFlipResult {
 	threshold := math.Abs(observed) - tieRelTol*scale
 	if threshold <= 0 {
 		// Every sign vector is at least as extreme as a zero sum.
-		return res
+		return res, nil
 	}
+	var err error
 	if len(nonzero) <= ExactMaxNonzero {
-		res.P = exactSignFlip(nonzero, threshold)
-		return res
+		res.P, err = exactSignFlip(ctx, nonzero, threshold)
+		return res, err
 	}
 	res.Exact = false
 	res.Draws = MonteCarloDraws
-	res.P = monteCarloSignFlip(nonzero, threshold, MonteCarloDraws)
-	return res
+	res.P, err = monteCarloSignFlip(ctx, nonzero, threshold, MonteCarloDraws)
+	return res, err
 }
 
 // MinPossibleP is the smallest p-value SignFlip can return with nNonzero
@@ -106,19 +119,22 @@ func MinPossibleP(nNonzero int) float64 {
 // exactSignFlip enumerates all 2^n sign vectors of x by splitting x in two
 // halves, so each partial sum adds at most 11 terms (small rounding error) and
 // the total work is one addition per vector.
-func exactSignFlip(x []float64, threshold float64) float64 {
+func exactSignFlip(ctx context.Context, x []float64, threshold float64) (float64, error) {
 	half := len(x) / 2
 	left := signedSums(x[:half])
 	right := signedSums(x[half:])
 	var hits uint64
-	for _, a := range left {
+	for i, a := range left {
+		if i%256 == 0 && ctx.Err() != nil {
+			return math.NaN(), context.Cause(ctx)
+		}
 		for _, b := range right {
 			if math.Abs(a+b) >= threshold {
 				hits++
 			}
 		}
 	}
-	return float64(hits) / float64(uint64(1)<<len(x))
+	return float64(hits) / float64(uint64(1)<<len(x)), nil
 }
 
 // signedSums returns sum_i s_i*x_i for every sign vector s, indexed by the
@@ -141,11 +157,14 @@ func signedSums(x []float64) []float64 {
 
 // monteCarloSignFlip estimates the sign-flip p-value from random sign
 // vectors, one random bit per difference.
-func monteCarloSignFlip(x []float64, threshold float64, draws int) float64 {
+func monteCarloSignFlip(ctx context.Context, x []float64, threshold float64, draws int) (float64, error) {
 	r := rand.New(rand.NewPCG(mcSeedHi, mcSeedLo))
 	sign := [2]float64{1, -1} // indexed by the random bit, so the loop has no branch to mispredict
 	hits := 0
-	for range draws {
+	for n := range draws {
+		if n%4096 == 0 && ctx.Err() != nil {
+			return math.NaN(), context.Cause(ctx)
+		}
 		s := 0.0
 		var bits uint64
 		for i, v := range x {
@@ -159,5 +178,5 @@ func monteCarloSignFlip(x []float64, threshold float64, draws int) float64 {
 			hits++
 		}
 	}
-	return float64(hits+1) / float64(draws+1)
+	return float64(hits+1) / float64(draws+1), nil
 }

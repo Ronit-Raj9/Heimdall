@@ -17,7 +17,9 @@ import (
 
 	"github.com/maximhq/bifrost/bench/compliance"
 	"github.com/maximhq/bifrost/bench/engine"
+	"github.com/maximhq/bifrost/bench/release"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 const complianceUsage = `usage: bifrost-bench compliance report -exp <id> [-exp <id>...] [-analysis <id>] [-o dir] [-format md|json|both] [-config deploy/bench.yaml]
@@ -86,9 +88,41 @@ func (a *app) compliancePack(ctx context.Context, exps []string, analysisID stri
 		if err != nil {
 			return nil, err
 		}
+		if rel != nil {
+			if err := releaseSnapshot(rel, ex); err != nil {
+				return nil, err
+			}
+		}
 		in.Experiments = append(in.Experiments, ex)
 	}
 	return compliance.Build(in)
+}
+
+// releaseSnapshot refuses a release-linked compliance pack whose live inputs
+// are not the evidence the release recorded: the counted runs' seals must
+// hash to the release's seals digest, and the runs, grades and reviews to the
+// analysis's inputs digest. Otherwise the pack would describe a later
+// snapshot beside the earlier approval (audit qc2-01-04); the release's own
+// evidence ZIP remains the record of what was signed off.
+func releaseSnapshot(rel *schemas.ReleaseRecord, ex compliance.ExperimentInput) error {
+	hashes := make([]string, 0, len(ex.Runs))
+	for _, r := range ex.Runs {
+		hashes = append(hashes, r.SealHash)
+	}
+	if got := release.SealsDigest(hashes); got != rel.SealsDigest {
+		return fmt.Errorf("release %s recorded seals digest %s, the live runs of %s give %s: the store changed since the release, so a compliance pack from it would describe other evidence; use the release's evidence ZIP", rel.ReleaseID, rel.SealsDigest, rel.ExpID, got)
+	}
+	if ex.Analysis == nil || ex.Analysis.InputsDigest == "" {
+		return fmt.Errorf("release %s: analysis %s has no inputs digest, so its live inputs cannot be matched to the release; use the release's evidence ZIP", rel.ReleaseID, rel.AnalysisID)
+	}
+	d, err := utils.AnalysisInputsDigest(ex.Runs)
+	if err != nil {
+		return fmt.Errorf("release %s: digest inputs: %w", rel.ReleaseID, err)
+	}
+	if d != ex.Analysis.InputsDigest {
+		return fmt.Errorf("release %s: the runs, grades or reviews of %s changed after analysis %s (inputs %s, now %s); a compliance pack from the live store would describe other evidence; use the release's evidence ZIP", rel.ReleaseID, rel.ExpID, rel.AnalysisID, ex.Analysis.InputsDigest, d)
+	}
+	return nil
 }
 
 // complianceInput loads one experiment's evidence: its manifest, the

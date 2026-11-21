@@ -19,8 +19,19 @@ import (
 // PairsHandler serves matched runs: the arms of one (task, condition, trial)
 // side by side, aligned, with the first observed divergence.
 type PairsHandler struct {
-	mode  schemas.Mode
-	index ReadIndex
+	mode           schemas.Mode
+	index          ReadIndex
+	heldOutVisible bool // server config held_out.visible (WithHeldOutVisible)
+}
+
+// WithHeldOutVisible sets whether a pair of a held-out task is served in
+// full (server config held_out.visible). The default, false, serves only the
+// documented metadata of such a pair: slot and run ids and outcomes, with no
+// metrics and no alignment, and never reads its metrics or events (audit
+// qc2-05-07).
+func (h *PairsHandler) WithHeldOutVisible(visible bool) *PairsHandler {
+	h.heldOutVisible = visible
+	return h
 }
 
 // NewPairsHandler creates the pairs handler. index may be nil.
@@ -62,6 +73,15 @@ func (h *PairsHandler) getPair(ctx *fasthttp.RequestCtx) {
 	out := schemas.Pair{
 		PairID: id, ExpID: first.ExpID, Task: first.Task, Condition: first.Condition, Trial: first.Trial,
 		Runs: make([]schemas.PairRun, 0, len(views)), Alignment: []schemas.AlignedStep{},
+	}
+	if !h.heldOutVisible && heldOutRun(h.index, &views[0]) {
+		for _, rv := range views {
+			r := rv.Run
+			meta := schemas.Run{RunID: r.RunID, SlotID: r.SlotID, PairID: r.PairID, ExpID: r.ExpID, Attempt: r.Attempt, Outcome: r.Outcome}
+			out.Runs = append(out.Runs, schemas.PairRun{Arm: rv.Slot.Arm, Slot: rv.Slot, Run: meta, Metrics: map[string]schemas.Value{}})
+		}
+		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+		return
 	}
 	for _, rv := range views {
 		metrics, err := readMetrics(h.index, rv.Run.RunID)

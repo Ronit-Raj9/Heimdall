@@ -127,6 +127,29 @@ func ExtendExperiment(parent *schemas.Manifest, s *schemas.Suite, kind string, n
 		return nil, nil, fmt.Errorf("extend: kind %q: want tasks or trials", kind)
 	}
 	e.Conditions = conds
+	// The copied task rule may name conditions the follow-up does not
+	// repeat; planning rejects an unknown adaptive condition, so the list
+	// keeps only the retained ones, and a rule left with none becomes a
+	// fixed design (audit qc2-03-02).
+	if t := e.Trials; t != nil && len(t.Conditions) > 0 {
+		var ids []string
+		for _, id := range t.Conditions {
+			for _, c := range conds {
+				if c.ID == id {
+					ids = append(ids, id)
+					break
+				}
+			}
+		}
+		if len(ids) == 0 {
+			e.Trials = nil
+			notes = append(notes, "no condition of the parent's adaptive trials rule is repeated, so the follow-up runs every planned trial")
+		} else if len(ids) < len(t.Conditions) {
+			cp := *t
+			cp.Conditions = ids
+			e.Trials = &cp
+		}
+	}
 	if rule == schemas.ExtensionExploratory {
 		notes = append(notes, fmt.Sprintf("%s pre-declared no combination rule (trials.extension): the follow-up decides on its own, and the pooled analysis with %s is exploratory", parent.ExpID, parent.ExpID))
 	}

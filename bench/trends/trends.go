@@ -154,8 +154,13 @@ func lineages(rows []resultsindex.RunRow, newest map[string]resultsindex.Analysi
 			if i == 0 {
 				pr.p.Regression = Regression{Status: StatusFirst, Reason: "first point of this lineage"}
 			} else {
-				pr.p.ConfigChanged = pr.p.ConfigHash != prs[i-1].p.ConfigHash
-				pr.p.Regression = compareSameSuite(prs[:i], pr)
+				// The config label reads the same reference point the
+				// comparison used, never an intervening point of another
+				// suite or lock (audit qc2-05-06); with no reference it is
+				// false and the regression says it cannot tell.
+				var ref *pointRuns
+				pr.p.Regression, ref = compareSameSuite(prs[:i], pr)
+				pr.p.ConfigChanged = ref != nil && pr.p.ConfigHash != ref.p.ConfigHash
 			}
 			lr.l.Synthetic = lr.l.Synthetic || pr.p.Synthetic
 			lr.l.Points = append(lr.l.Points, pr.p)
@@ -171,16 +176,17 @@ func lineages(rows []resultsindex.RunRow, newest map[string]resultsindex.Analysi
 // same suite (id@version) and suite lock. Task IDs are only paired within
 // one locked suite: two suites, two versions of one suite, or a relocked
 // suite can reuse an ID such as t01 for different tasks.
-func compareSameSuite(earlier []*pointRuns, pr *pointRuns) Regression {
+// It also returns that reference point, nil when there is none.
+func compareSameSuite(earlier []*pointRuns, pr *pointRuns) (Regression, *pointRuns) {
 	for j := len(earlier) - 1; j >= 0; j-- {
 		if earlier[j].p.Suite == pr.p.Suite && earlier[j].lock == pr.lock {
 			reg := Compare(earlier[j].rates, pr.rates)
 			reg.Against = earlier[j].p.Experiment
-			return reg
+			return reg, earlier[j]
 		}
 	}
 	return Regression{Status: StatusCannotTell,
-		Reason: fmt.Sprintf("no earlier point of suite %s with the same suite lock in this lineage; tasks of other suites are not paired", pr.p.Suite)}
+		Reason: fmt.Sprintf("no earlier point of suite %s with the same suite lock in this lineage; tasks of other suites are not paired", pr.p.Suite)}, nil
 }
 
 // computePoint fills a point's numbers from its runs and its experiment's

@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -273,27 +274,10 @@ func (a *app) analyzeOpt(ctx context.Context, expID, gradeSource, policyOverride
 	if err != nil {
 		return nil, nil, fmt.Errorf("load sealed runs: %w", err)
 	}
-	policy, err := engine.FindVerdictPolicy(a.reg, m.Experiment.Verdict.Policy)
+	an, err := a.releaseVerdict(ctx, m, runs, policyOverride)
 	if err != nil {
 		return nil, nil, err
 	}
-	an, err := policy.Decide(ctx, m, runs)
-	if err != nil {
-		return nil, nil, fmt.Errorf("decide: %w", err)
-	}
-	if err := a.store.VerifyChain(expID); err != nil {
-		if !errors.Is(err, schemas.ErrSealMismatch) {
-			return nil, nil, fmt.Errorf("verify seal chain: %w", err)
-		}
-		verdict.Invalidate(an, "evidence: seals.log chain does not verify: "+err.Error())
-	}
-	// The manifest read here is the frozen one only when it still matches its
-	// hash; an edited manifest.json would otherwise re-decide unchanged sealed
-	// runs under new settings (audit 1-A-02).
-	if err := utils.VerifyManifestHash(m); err != nil {
-		verdict.Invalidate(an, "evidence: "+err.Error())
-	}
-	a.judgeCalibration(ctx, m, an, runs, policyOverride) // W8 judge calibration: judge_calibration instrument of judged experiments (judge.go)
 	an.AnalysisID = utils.NewID("a", 8)
 	an.Mode = a.cfg.Server.Mode
 	// A declared smoke experiment is never a finding, whatever the server mode.
@@ -304,7 +288,7 @@ func (a *app) analyzeOpt(ctx context.Context, expID, gradeSource, policyOverride
 	if an.InputsDigest, err = utils.AnalysisInputsDigest(runs); err != nil {
 		return nil, nil, fmt.Errorf("digest analysis inputs: %w", err)
 	}
-	if an.Policy, err = a.releasePolicy(m, an, verdict.CompleteSlots(m, runs), policyOverride); err != nil {
+	if an.Policy, err = a.releasePolicy(m, an, verdict.DecisionRuns(m, runs), policyOverride); err != nil {
 		return nil, nil, err
 	}
 	var md strings.Builder
@@ -335,6 +319,42 @@ func (a *app) analyzeOpt(ctx context.Context, expID, gradeSource, policyOverride
 		return nil, nil, fmt.Errorf("save analysis: %w", err)
 	}
 	return an, []byte(report), nil
+}
+
+// releaseVerdict is the release verdict of m over its counted runs, with no
+// side effect: the verdict policy's decision over the counted runs plus every
+// other sealed attempt (for the harness-level egress check, audit
+// qc2-02-05), then the seal chain, the frozen manifest's hash and the judge
+// calibration instrument. analyze saves it; migration reads its validity and
+// caps, so the two surfaces can never disagree on whether the evidence
+// decides (audits qc2-05-02, qc2-05-08).
+func (a *app) releaseVerdict(ctx context.Context, m *schemas.Manifest, runs []schemas.SealedRun, policyOverride string) (*schemas.Analysis, error) {
+	vp, err := engine.FindVerdictPolicy(a.reg, m.Experiment.Verdict.Policy)
+	if err != nil {
+		return nil, err
+	}
+	harness, err := a.store.HarnessAttempts(ctx, m.ExpID)
+	if err != nil {
+		return nil, fmt.Errorf("load harness attempts: %w", err)
+	}
+	an, err := vp.Decide(ctx, m, append(slices.Clip(runs), harness...))
+	if err != nil {
+		return nil, fmt.Errorf("decide: %w", err)
+	}
+	if err := a.store.VerifyChain(m.ExpID); err != nil {
+		if !errors.Is(err, schemas.ErrSealMismatch) {
+			return nil, fmt.Errorf("verify seal chain: %w", err)
+		}
+		verdict.Invalidate(an, "evidence: seals.log chain does not verify: "+err.Error())
+	}
+	// The manifest read here is the frozen one only when it still matches its
+	// hash; an edited manifest.json would otherwise re-decide unchanged sealed
+	// runs under new settings (audit 1-A-02).
+	if err := utils.VerifyManifestHash(m); err != nil {
+		verdict.Invalidate(an, "evidence: "+err.Error())
+	}
+	a.judgeCalibration(ctx, m, an, runs, policyOverride) // W8 judge calibration: judge_calibration instrument of judged experiments (judge.go)
+	return an, nil
 }
 
 // releasePolicy evaluates the release policy over the analysis: the override

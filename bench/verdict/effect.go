@@ -172,13 +172,26 @@ func metricValue(r schemas.SealedRun, metric string) schemas.Value {
 	return schemas.ReconcileOutcomeMetric(metric, v, r.Run.Outcome)
 }
 
-// decisionValue is v as decision arithmetic may use it. A value whose only
-// source is the agent's own report is not witnessed evidence, so it is
-// unknown for an effect, and with no bounds (unless a rate) the effect can
-// never be IMPROVED or REGRESSED on it (extensions-design.md rule 2).
+// decisionValue is v as decision arithmetic may use it. A value that rests
+// on the agent's own account is not witnessed evidence, so it is unknown for
+// an effect, and with no bounds (unless a rate) the effect can never be
+// IMPROVED or REGRESSED on it (extensions-design.md rule 2). That covers the
+// agent's report (agent_reported), the agent's native stream (agent_stream),
+// and any partial value whose evidence is not the gateway: a count that mixes
+// witnessed and native events, or a native record (audit qc2-02-02). Such
+// values stay in the descriptive metrics. Graded coverage, the A/A check and
+// the adaptive rule read the same values, so they never count as graded.
 func decisionValue(v schemas.Value) schemas.Value {
-	if v.IsObserved() && v.Source == schemas.EvidenceSourceAgentReported {
+	if !v.IsObserved() {
+		return v
+	}
+	switch {
+	case v.Source == schemas.EvidenceSourceAgentReported:
 		return schemas.Unknown("agent-reported value cannot decide a verdict", v.Evidence)
+	case v.Source == schemas.EvidenceSourceAgentStream:
+		return schemas.Unknown("value from the agent's own stream cannot decide a verdict", v.Evidence)
+	case v.EvidenceLevel == schemas.EvidencePartial && v.Evidence != schemas.EvidenceGateway:
+		return schemas.Unknown("partly unwitnessed value cannot decide a verdict", v.Evidence)
 	}
 	return v
 }

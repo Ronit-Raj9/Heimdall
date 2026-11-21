@@ -29,7 +29,7 @@ func (ev *evaluator) rule(c schemas.PolicyCheck, base schemas.PolicyCheckResult,
 	}
 	obsN, unknownN, recorded, level := 0, 0, false, schemas.EvidenceLevel("")
 	for _, r := range armRuns {
-		v, ok := r.Metrics[c.Metric]
+		v, ok := runMetric(r, c.Metric)
 		recorded = recorded || ok
 		if x, ok := v.Float(); ok && finite(x) {
 			if obsN == 0 {
@@ -140,7 +140,7 @@ func (ev *evaluator) unboundedUnknowns(metric, condition, arm string) []string {
 	var ids []string
 	for _, a := range []string{BaselineArm, arm} {
 		for _, r := range ev.selectRuns(condition, a) {
-			v, ok := r.Metrics[metric]
+			v, ok := runMetric(r, metric)
 			if !ok || (!v.IsObserved() && v.State != schemas.ValueNotApplicable && v.Bounds == nil) {
 				ids = append(ids, r.Run.RunID)
 			}

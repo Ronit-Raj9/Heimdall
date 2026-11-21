@@ -29,7 +29,11 @@ func CompleteSlots(m *schemas.Manifest, runs []schemas.SealedRun) []schemas.Seal
 	}
 	have := make(map[string]bool, len(runs))
 	for _, r := range runs {
-		have[r.Slot.SlotID] = true
+		// An uncounted attempt (a superseded retry handed over for the
+		// harness checks) never fills its slot.
+		if r.Slot.Counted {
+			have[r.Slot.SlotID] = true
+		}
 	}
 	var missing []schemas.SealedRun
 	notRequired := NotRequiredSlots(m, runs) // W7 adaptive trials: optional slots the frozen rule never released (sequential.go)
@@ -52,6 +56,16 @@ func CompleteSlots(m *schemas.Manifest, runs []schemas.SealedRun) []schemas.Seal
 	}
 	out := make([]schemas.SealedRun, 0, len(runs)+len(missing))
 	return append(append(out, runs...), missing...)
+}
+
+// DecisionRuns is the population the verdict analyses: runs without the
+// counted runs the frozen adaptive rule did not release (AdaptiveRuns), then
+// every missing required slot added as an unknown (CompleteSlots). The
+// release policy is handed exactly this list, so a policy rule never reads a
+// run the verdict left out (audit qc2-02-06). Uncounted attempts in runs are
+// kept for callers that filter on Slot.Counted.
+func DecisionRuns(m *schemas.Manifest, runs []schemas.SealedRun) []schemas.SealedRun {
+	return CompleteSlots(m, AdaptiveRuns(m, runs))
 }
 
 // Invalidate makes an analysis INVALID for reasons found outside the policy,

@@ -16,9 +16,11 @@ import (
 // condition with its own effective metric); the
 // other gates look at every counted run, and egress at every run, counted or
 // not, because a successful outbound connection means the harness itself
-// leaked.
-func instrumentGates(m *schemas.Manifest, cfg settings, idx runIndex, runs []schemas.SealedRun) []string {
-	reasons := evidenceReasons(runs)
+// leaked. Evidence problems and egress read executed, every run supplied
+// (uncounted and superseded attempts, and counted runs the adaptive rule left
+// out of the statistics), not only the analysed population.
+func instrumentGates(m *schemas.Manifest, cfg settings, idx runIndex, runs, executed []schemas.SealedRun) []string {
+	reasons := evidenceReasons(executed)
 	for _, ep := range decisionEndpoints(cfg) {
 		got := coverageReasons(idx, ep.Condition, ep.Metric)
 		if ep.Metric != cfg.primary.Metric {
@@ -28,7 +30,7 @@ func instrumentGates(m *schemas.Manifest, cfg settings, idx runIndex, runs []sch
 		}
 		reasons = append(reasons, got...)
 	}
-	reasons = append(reasons, egressReasons(runs)...)
+	reasons = append(reasons, egressReasons(executed)...)
 	reasons = append(reasons, invalidateGateReasons(idx)...)
 	reasons = append(reasons, trialReasons(idx)...)
 	reasons = append(reasons, versionReasons(idx)...)
@@ -66,9 +68,23 @@ func decisionEndpoints(cfg settings) []schemas.Endpoint {
 // comparison untrustworthy because the missing runs could be anything. An arm
 // with no runs at all has no coverage to compute and is reported as such.
 func coverageReasons(idx runIndex, condition, metric string) []string {
+	return armCoverageReasons(idx, condition, metric, ArmBaseline, ArmCandidate)
+}
+
+// PairCoverageReasons is the graded coverage check for one comparison of
+// arms a and b on one endpoint, over the population the verdict analyses
+// (DecisionRuns: a required slot without a run counts as unobserved). A
+// surface that compares arms other than A and B, such as a migration report,
+// checks its own pair here instead of inheriting the A/B check (audit
+// qc2-05-01).
+func PairCoverageReasons(m *schemas.Manifest, runs []schemas.SealedRun, condition, metric, a, b string) []string {
+	return armCoverageReasons(newRunIndex(DecisionRuns(m, runs)), condition, metric, a, b)
+}
+
+func armCoverageReasons(idx runIndex, condition, metric, armA, armB string) []string {
 	var reasons []string
 	cov := map[string]float64{}
-	for _, arm := range []string{ArmBaseline, ArmCandidate} {
+	for _, arm := range []string{armA, armB} {
 		runs := idx.armRuns(condition, arm)
 		if len(runs) == 0 {
 			reasons = append(reasons, fmt.Sprintf("arm %s has no counted runs on %s", arm, condition))
@@ -76,7 +92,7 @@ func coverageReasons(idx runIndex, condition, metric string) []string {
 		}
 		observed := 0
 		for _, r := range runs {
-			if metricValue(r, metric).IsObserved() {
+			if decisionValue(metricValue(r, metric)).IsObserved() {
 				observed++
 			}
 		}
@@ -87,12 +103,12 @@ func coverageReasons(idx runIndex, condition, metric string) []string {
 				c, observed, len(runs), arm, condition, minCoverage))
 		}
 	}
-	a, okA := cov[ArmBaseline]
-	b, okB := cov[ArmCandidate]
+	a, okA := cov[armA]
+	b, okB := cov[armB]
 	if okA && okB {
 		if gap := 100 * math.Abs(a-b); gap > maxCoverageGapPP+zeroTolerance {
 			reasons = append(reasons, fmt.Sprintf("graded coverage gap %.1f pp between arm %s (%.3f) and arm %s (%.3f) on %s is above %.0f pp",
-				gap, ArmBaseline, a, ArmCandidate, b, condition, maxCoverageGapPP))
+				gap, armA, a, armB, b, condition, maxCoverageGapPP))
 		}
 	}
 	return reasons
@@ -118,10 +134,18 @@ func egressReasons(runs []schemas.SealedRun) []string {
 // invalidateGateReasons fires when any other invalidate gate fired in more
 // than 5% of an arm's counted runs. A few isolated fires are tolerated; a
 // systematic one (served model, fallback, cache hit) is an instrument fault.
+// The denominator is the runs that actually executed: a slot placeholder
+// never reached the harness, so no gate applied to it, and counting it would
+// dilute a real failure rate below the limit (audit qc2-02-03).
 func invalidateGateReasons(idx runIndex) []string {
 	var reasons []string
 	for _, arm := range armsIn(idx, "") {
-		runs := idx.armRuns("", arm)
+		var runs []schemas.SealedRun
+		for _, r := range idx.armRuns("", arm) {
+			if r.Run.RunID != "" {
+				runs = append(runs, r)
+			}
+		}
 		fired := map[string]int{}
 		for _, r := range runs {
 			seen := map[string]bool{}

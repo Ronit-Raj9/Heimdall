@@ -287,48 +287,78 @@ func verifyCanonicalFile(dir string, run *schemas.Run) error {
 // formed, names a run once, matches the sha256 of that run's seal.json, and
 // each seal's prev_seal is the hash on the line before. It also checks that
 // no sealed run of the experiment is missing from the log.
+//
+// The log and the run folders are read at different instants without the
+// sealing lock, so a seal that lands in between shows as a sealed run the
+// earlier log snapshot lacks. That case is retried from a fresh read, and
+// only a run still missing from a log read after its folder was seen fails
+// (audit qc2-01-05).
 func (s *FSStore) VerifyChain(expID string) error {
 	if err := validateID("exp_id", expID); err != nil {
 		return fmt.Errorf("verify chain: %w", err)
 	}
+	var err error
+	for range chainRetries {
+		var raced bool
+		if raced, err = s.verifyChainOnce(expID); !raced {
+			return err
+		}
+	}
+	return err
+}
+
+// afterChainLogRead is a test hook run between the seals.log read and the
+// folder sweep of one VerifyChain pass; nil outside tests.
+var afterChainLogRead func(expID string)
+
+// chainRetries bounds VerifyChain's rereads when seals keep landing.
+const chainRetries = 5
+
+// verifyChainOnce is one VerifyChain pass. raced reports that the only
+// problem was a sealed run missing from the log snapshot which a fresh read
+// of the log now lists: a concurrent seal, worth another pass.
+func (s *FSStore) verifyChainOnce(expID string) (raced bool, _ error) {
 	b, err := os.ReadFile(filepath.Join(s.expDir(expID), sealsLogFile))
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("verify chain %s: %w", expID, err)
+		return false, fmt.Errorf("verify chain %s: %w", expID, err)
+	}
+	if afterChainLogRead != nil {
+		afterChainLogRead(expID)
 	}
 	entries, bad := parseSealsLog(b)
 	if len(bad) > 0 {
-		return fmt.Errorf("verify chain %s: seals.log line %d malformed: %w", expID, bad[0], schemas.ErrSealMismatch)
+		return false, fmt.Errorf("verify chain %s: seals.log line %d malformed: %w", expID, bad[0], schemas.ErrSealMismatch)
 	}
 	dirs, err := s.runDirsOf(expID)
 	if err != nil {
-		return fmt.Errorf("verify chain %s: %w", expID, err)
+		return false, fmt.Errorf("verify chain %s: %w", expID, err)
 	}
 	prev := ""
 	seen := make(map[string]bool, len(entries))
 	for i, e := range entries {
 		if seen[e.RunID] {
-			return fmt.Errorf("verify chain %s: line %d: run %s sealed twice: %w", expID, i+1, e.RunID, schemas.ErrSealMismatch)
+			return false, fmt.Errorf("verify chain %s: line %d: run %s sealed twice: %w", expID, i+1, e.RunID, schemas.ErrSealMismatch)
 		}
 		seen[e.RunID] = true
 		var dir string
 		switch found := dirs[e.RunID]; len(found) {
 		case 0:
-			return fmt.Errorf("verify chain %s: line %d: run %s has no run folder: %w", expID, i+1, e.RunID, schemas.ErrSealMismatch)
+			return false, fmt.Errorf("verify chain %s: line %d: run %s has no run folder: %w", expID, i+1, e.RunID, schemas.ErrSealMismatch)
 		case 1:
 			dir = found[0]
 		default:
-			return fmt.Errorf("verify chain %s: line %d: run %s found in %d slots: %w", expID, i+1, e.RunID, len(found), schemas.ErrSealMismatch)
+			return false, fmt.Errorf("verify chain %s: line %d: run %s found in %d slots: %w", expID, i+1, e.RunID, len(found), schemas.ErrSealMismatch)
 		}
 		rec, err := readSeal(dir)
 		if err != nil {
-			return fmt.Errorf("verify chain %s: line %d: %w", expID, i+1, err)
+			return false, fmt.Errorf("verify chain %s: line %d: %w", expID, i+1, err)
 		}
 		if rec.Hash != e.Hash {
-			return fmt.Errorf("verify chain %s: line %d: seal.json of run %s hashes to %s, log says %s: %w",
+			return false, fmt.Errorf("verify chain %s: line %d: seal.json of run %s hashes to %s, log says %s: %w",
 				expID, i+1, e.RunID, rec.Hash, e.Hash, schemas.ErrSealMismatch)
 		}
 		if rec.PrevSeal != prev {
-			return fmt.Errorf("verify chain %s: line %d: run %s prev_seal %q, want %q: %w",
+			return false, fmt.Errorf("verify chain %s: line %d: run %s prev_seal %q, want %q: %w",
 				expID, i+1, e.RunID, rec.PrevSeal, prev, schemas.ErrSealMismatch)
 		}
 		prev = e.Hash
@@ -340,14 +370,17 @@ func (s *FSStore) VerifyChain(expID string) error {
 		for _, dir := range dirs[runID] {
 			sealed, err := isSealed(dir)
 			if err != nil {
-				return fmt.Errorf("verify chain %s: %w", expID, err)
+				return false, fmt.Errorf("verify chain %s: %w", expID, err)
 			}
 			if sealed {
-				return fmt.Errorf("verify chain %s: sealed run %s missing from seals.log: %w", expID, runID, schemas.ErrSealMismatch)
+				if rec, err := readSeal(dir); err == nil && loggedNow(dir, runID, rec.Hash) {
+					return true, fmt.Errorf("verify chain %s: sealed run %s missing from seals.log: %w", expID, runID, schemas.ErrSealMismatch)
+				}
+				return false, fmt.Errorf("verify chain %s: sealed run %s missing from seals.log: %w", expID, runID, schemas.ErrSealMismatch)
 			}
 		}
 	}
-	return nil
+	return false, nil
 }
 
 // runDirsOf lists every run folder of an experiment in one pass, run id ->

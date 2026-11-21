@@ -11,7 +11,7 @@ GET /api/bench/experiments/{id}/compliance            # JSON attachment
 GET /api/bench/experiments/{id}/compliance?format=md  # Markdown attachment
 ```
 
-`compliance report` writes `compliance-<exp>.md` and `.json`. With several experiments the pack covers all of them and the file is named after all ids. `-analysis` picks the analysis of a single experiment; the default is the newest analysis on disk, and an experiment with none is analysed first (as the verdict route does). `release export -compliance` writes `compliance-<release_id>.md` and `.json` beside `-o` (or in the current directory), reports the analysis the release was recorded on and carries the release record: its hash, seals digest, approver and any override.
+`compliance report` writes `compliance-<exp>.md` and `.json`. With several experiments the pack covers all of them and the file is named after all ids. `-analysis` picks the analysis of a single experiment; the default is the newest analysis on disk, and an experiment with none is analysed first (as the verdict route does). `release export -compliance` writes `compliance-<release_id>.md` and `.json` beside `-o` (or in the current directory), reports the analysis the release was recorded on and carries the release record: its hash, seals digest, approver and any override. It is built from the live store only while that store still holds the release's evidence: the counted runs' seals must match the release's seals digest and the runs, grades and reviews the analysis's inputs digest. After a later review, regrade or run it refuses, and the release's evidence ZIP stays the record of what was approved.
 
 The verdict page links the Markdown and JSON downloads.
 

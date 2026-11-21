@@ -190,9 +190,13 @@ func Build(ctx context.Context, src Source, q Query) (*schemas.Leaderboard, erro
 		return nil, err
 	}
 	lb.Excluded = exclusions(excluded, q.Condition)
-	lb.Grading, lb.Judges = boardGrading(ctx, src, graded, q.Condition)
 	calcs, common := buildEntries(graded, q)
-	rank(calcs, q.Alpha)
+	// Grading provenance reads the same runs the entries score: on the
+	// common scope only the common tasks (audit qc2-05-11).
+	lb.Grading, lb.Judges = boardGrading(ctx, src, scopedPool(graded, q, common), q.Condition)
+	if err := rank(ctx, calcs, q.Alpha); err != nil {
+		return nil, err
+	}
 	lb.Entries, lb.CommonTasks = toEntries(calcs), common
 	if q.Synthetic == SyntheticOnly {
 		for i := range lb.Entries {
@@ -400,4 +404,18 @@ func compareTrueFirst(x, y bool) int {
 	default:
 		return 1
 	}
+}
+
+// scopedPool is p restricted to the runs the entries score on q.Condition:
+// the common tasks on the common scope, everything otherwise.
+func scopedPool(p pool, q Query, common []string) pool {
+	if q.Scope != ScopeCommon {
+		return p
+	}
+	out := pool{}
+	for h, byCond := range p {
+		runs := slices.DeleteFunc(slices.Clone(byCond[q.Condition]), func(r gradedRun) bool { return !slices.Contains(common, r.rec.slot.Task) })
+		out[h] = map[string][]gradedRun{q.Condition: runs}
+	}
+	return out
 }

@@ -383,3 +383,15 @@ func near(a, b float64) bool {
 	d := a - b
 	return d < 1e-9 && d > -1e-9
 }
+
+// Audit qc2-02-08: a legacy infra_error run that kept an observed
+// verified_success is not a verified success for a policy threshold either;
+// its success is unknown, as the verdict reads it.
+func TestCostPerSuccessReconcilesLegacyInfraError(t *testing.T) {
+	runs := costRuns(schemas.ConditionClean, "B", repeatValue(obs(1), 2), []schemas.Value{obs(1), obs(1)})
+	runs[1].Run.Outcome = schemas.OutcomeInfraError
+	r := Evaluate(single(schemas.PolicyCheck{ID: "c", Metric: MetricCostPerVerifiedSuccess, Max: ptr(3)}), "h", testManifest(), nil, runs).Checks[0]
+	if r.Status != schemas.PolicyUnknown || !strings.Contains(r.Reason, "verified_success unknown in 1 of 2 runs") {
+		t.Fatalf("check %+v, want unknown success for the infra_error run", r)
+	}
+}

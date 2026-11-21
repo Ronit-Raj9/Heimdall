@@ -144,3 +144,26 @@ func TestBoardGradingProvenance(t *testing.T) {
 		t.Fatalf("board without grade evidence graded %q", lb.Grading)
 	}
 }
+
+// Audit qc2-05-11: on the common scope the grading label reads only the
+// common tasks; a judged task outside them labels nothing.
+func TestCommonScopeGradingProvenance(t *testing.T) {
+	f := newFake()
+	f.exp("e", "s@1", 0, map[string]schemas.ArmManifest{"A": arm("a", "h", "command"), "B": arm("b", "h2", "command")})
+	for _, a := range []string{"A", "B"} {
+		r := f.pass("e", "t1", a, "clean", 1, 0.1)
+		f.files[r][fileGrade] = []byte(`{"passed":true}`)
+	}
+	j := f.pass("e", "t2", "A", "clean", 1, 0.1)
+	f.files[j][fileGrade] = []byte(`{"passed":true,"judged":true,"judge":{"model":"judge-m"}}`)
+	lb, err := Build(context.Background(), f, Query{Scope: ScopeCommon})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lb.Grading != GradingVerified || len(lb.Judges) != 0 {
+		t.Fatalf("common-scope grading %q judges %v, want verified", lb.Grading, lb.Judges)
+	}
+	if lb, _ = Build(context.Background(), f, Query{}); lb.Grading != GradingMixed {
+		t.Fatalf("all-task grading %q, want mixed", lb.Grading)
+	}
+}

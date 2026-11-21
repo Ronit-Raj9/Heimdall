@@ -18,6 +18,7 @@ import (
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/stats"
 	"github.com/maximhq/bifrost/bench/taskhealth"
+	"github.com/maximhq/bifrost/bench/verdict"
 )
 
 // Per-run metrics the report reads.
@@ -53,7 +54,14 @@ type Input struct {
 	// (instrument gates, evidence problems). Any withholds every
 	// directional recommendation: the evidence cannot decide.
 	Invalid []string
+	// Vetoes are caps of the release verdict that leave it undecided
+	// whatever the statistics say (an uncalibrated judge). Any withholds
+	// every directional recommendation, as Invalid does.
+	Vetoes []string
 }
+
+// HeldOutNote says the report reads the public split only.
+const HeldOutNote = "Held-out runs are left out: every section of this report reads the public split only, as the model matrix does."
 
 // Build writes the migration report. It is pure apart from reading run
 // files through in.Read.
@@ -73,6 +81,13 @@ func Build(ctx context.Context, in Input, q Query) (*Report, error) {
 	if err != nil {
 		return nil, err
 	}
+	// One split for every section: the pair verdicts, strata, cost,
+	// flipped tasks and the model summary all read the public runs, the
+	// matrix's default, so the report never shows two samples as one and
+	// never lists held-out runs (audit qc2-05-03).
+	all := in.Runs
+	pub, heldOut := publicRuns(m, in.Runs)
+	in.Runs = pub
 	g := newGraded(m, in.Runs)
 	synthetic := false
 	arms := []string{pairs[0][0]}
@@ -93,6 +108,9 @@ func Build(ctx context.Context, in Input, q Query) (*Report, error) {
 	if in.Policy != nil {
 		rep.Policy = in.Policy.Name
 	}
+	if heldOut {
+		rep.Notes = append(rep.Notes, HeldOutNote)
+	}
 	for _, p := range pairs {
 		f, t := m.Arms[p[0]], m.Arms[p[1]]
 		switch {
@@ -109,11 +127,13 @@ func Build(ctx context.Context, in Input, q Query) (*Report, error) {
 	if err != nil {
 		return nil, err
 	}
-	explanations := map[string]*costexplain.Explanation{}
+	// Keyed by the ordered pair: two old arms of the same model compared
+	// with one new arm each keep their own cost (audit qc2-05-05).
+	explanations := map[[2]string]*costexplain.Explanation{}
 	for _, p := range pairs {
 		e := costexplain.ExplainLoaded(m, costexplain.Query{A: p[0], B: p[1], Condition: q.Condition}, loaded[p[0]], loaded[p[1]], in.Prices)
 		e.Conditions, e.Synthetic = g.conditions, in.Synthetic[p[0]] || in.Synthetic[p[1]]
-		explanations[p[1]] = e
+		explanations[p] = e
 	}
 	cl, err := clusterReport(ctx, m, in.Runs, in.Read)
 	if err != nil {
@@ -126,24 +146,47 @@ func Build(ctx context.Context, in Input, q Query) (*Report, error) {
 	}
 	adjust(overall, q.Alpha)
 	for i, p := range pairs {
-		pair := Pair{From: armRef(m, p[0]), To: armRef(m, p[1]), Overall: overall[i], Cost: explanations[p[1]]}
+		pair := Pair{From: armRef(m, p[0]), To: armRef(m, p[1]), Overall: overall[i], Cost: explanations[p]}
 		pair.Strata = strata(g, p[0], p[1], q.Condition, in.Tasks)
 		adjust(pair.Strata, q.Alpha)
-		pair.Behaviour = behaviour(g, m, p[0], p[1], explanations[p[1]], cl)
+		pair.Behaviour = behaviour(g, m, p[0], p[1], explanations[p], cl)
 		pair.Flipped = flipped(g, p[0], p[1])
 		var pr *schemas.PolicyResult
 		if in.Policy != nil {
 			pr = evaluatePolicy(in.Policy, in.PolicyHash, in.PolicyFrozen, m, in.Runs, p[0], p[1])
 		}
-		pair.Recommendation = recommend(pair, pr, synthetic, in.Invalid)
+		// The release verdict checks coverage on A and B only; this pair
+		// is checked on its own arms over the frozen required slots, held
+		// out ones included, so a missing slot is never dropped (audit
+		// qc2-05-01).
+		invalid := append(slices.Clip(in.Invalid), verdict.PairCoverageReasons(m, all, q.Condition, verdict.MetricVerifiedSuccess, p[0], p[1])...)
+		pair.Recommendation = recommend(pair, pr, synthetic, invalid, in.Vetoes)
 		rep.Pairs = append(rep.Pairs, pair)
 	}
-	mx, err := leaderboard.Matrix(m, in.Runs, synthetic, leaderboard.MatrixQuery{Condition: q.Condition, Alpha: q.Alpha})
+	// The embedded matrix honours the same evidence eligibility as the
+	// recommendation: an INVALID release verdict ranks nothing (audit
+	// qc2-05-04).
+	mx, err := leaderboard.Matrix(m, in.Runs, synthetic, leaderboard.MatrixQuery{Condition: q.Condition, Alpha: q.Alpha, Invalid: len(in.Invalid) > 0})
 	if err != nil {
 		return nil, err
 	}
 	rep.Pareto, rep.Models = models(mx, m, arms, explanations, q)
 	return rep, nil
+}
+
+// publicRuns drops the runs of the manifest's held-out tasks and reports
+// whether any was dropped.
+func publicRuns(m *schemas.Manifest, runs []schemas.SealedRun) ([]schemas.SealedRun, bool) {
+	if len(m.HeldOutTasks) == 0 {
+		return runs, false
+	}
+	out := make([]schemas.SealedRun, 0, len(runs))
+	for _, r := range runs {
+		if !slices.Contains(m.HeldOutTasks, r.Slot.Task) {
+			out = append(out, r)
+		}
+	}
+	return out, len(out) != len(runs)
 }
 
 // resolvePairs turns From and To into (old arm, new arm) pairs. A value is
@@ -703,7 +746,7 @@ func evaluatePolicy(p *schemas.Policy, hash string, frozen bool, m *schemas.Mani
 // overall, no significant loss in any stratum and a policy that does not
 // block; do not migrate needs a significant loss or a failed blocking
 // check; everything else is not enough evidence.
-func recommend(p Pair, pr *schemas.PolicyResult, synthetic bool, invalid []string) Recommendation {
+func recommend(p Pair, pr *schemas.PolicyResult, synthetic bool, invalid, vetoes []string) Recommendation {
 	r := Recommendation{Policy: pr, Caveats: []string{TunedPromptNote}}
 	var worseStrata []string
 	for _, s := range p.Strata {
@@ -727,6 +770,8 @@ func recommend(p Pair, pr *schemas.PolicyResult, synthetic bool, invalid []strin
 		r.Action, r.Reason = ActionNotEnough, "synthetic experiment: its numbers are not findings"
 	case len(invalid) > 0:
 		r.Action, r.Reason = ActionNotEnough, "the release verdict is INVALID, so the evidence cannot decide a migration; fix the harness first: "+strings.Join(invalid, "; ")
+	case len(vetoes) > 0:
+		r.Action, r.Reason = ActionNotEnough, "the release verdict cannot decide, so neither can a migration: "+strings.Join(vetoes, "; ")
 	case p.Overall.Result == ResultWorse:
 		r.Action, r.Reason = ActionDoNotMigrate, "overall on "+p.Overall.Condition+": "+p.Overall.Reason
 	case len(worseStrata) > 0:
@@ -763,7 +808,7 @@ func recommend(p Pair, pr *schemas.PolicyResult, synthetic bool, invalid []strin
 
 // models is the per-arm summary and the Pareto plane from the matrix rows
 // of the overall condition.
-func models(mx *schemas.ModelMatrix, m *schemas.Manifest, arms []string, ex map[string]*costexplain.Explanation, q Query) (*costexplain.Pareto, []ModelSummary) {
+func models(mx *schemas.ModelMatrix, m *schemas.Manifest, arms []string, ex map[[2]string]*costexplain.Explanation, q Query) (*costexplain.Pareto, []ModelSummary) {
 	rows := []schemas.MatrixRow{}
 	for _, r := range mx.Rows {
 		if slices.Contains(arms, r.Arm) {

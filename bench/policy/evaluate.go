@@ -169,7 +169,7 @@ func (ev *evaluator) mean(c schemas.PolicyCheck, base schemas.PolicyCheckResult,
 	var level schemas.EvidenceLevel
 	recorded := false
 	for _, r := range runs {
-		v, ok := r.Metrics[c.Metric]
+		v, ok := runMetric(r, c.Metric)
 		if !ok {
 			unknownIDs = append(unknownIDs, r.Run.RunID)
 			continue
@@ -285,13 +285,13 @@ func (ev *evaluator) costPerSuccess(c schemas.PolicyCheck, base schemas.PolicyCh
 	var costUnknown, succUnknown, spentNoSuccess []string
 	succ := 0
 	for _, r := range runs {
-		x, costOK := r.Metrics[metricCostUSD].Float()
+		x, costOK := metricFloat(r, metricCostUSD)
 		if costOK && finite(x) {
 			cost += x
 		} else {
 			costUnknown = append(costUnknown, r.Run.RunID)
 		}
-		s, ok := r.Metrics[metricVerifiedSuccess].Float()
+		s, ok := metricFloat(r, metricVerifiedSuccess)
 		switch {
 		case !ok:
 			succUnknown = append(succUnknown, r.Run.RunID)
@@ -543,4 +543,23 @@ func shortHash(h string) string {
 // finite reports whether x is neither NaN nor infinite.
 func finite(x float64) bool {
 	return !math.IsNaN(x) && !math.IsInf(x, 0)
+}
+
+// runMetric is r's value for metric as every decision consumer reads it: an
+// outcome-scored metric of a run whose final outcome does not score (a
+// legacy infra_error that kept an observed verified_success) is unknown, as
+// the verdict reads it, without touching the sealed artifacts (audit
+// qc2-02-08). ok is false when the run never recorded the metric.
+func runMetric(r schemas.SealedRun, metric string) (schemas.Value, bool) {
+	v, ok := r.Metrics[metric]
+	if !ok {
+		return v, false
+	}
+	return schemas.ReconcileOutcomeMetric(metric, v, r.Run.Outcome), true
+}
+
+// metricFloat is runMetric's value as a number, when it has one.
+func metricFloat(r schemas.SealedRun, metric string) (float64, bool) {
+	v, _ := runMetric(r, metric)
+	return v.Float()
 }

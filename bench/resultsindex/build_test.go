@@ -344,3 +344,34 @@ func TestStagedAnalysisSkipped(t *testing.T) {
 		t.Fatalf("analyses %d, want the staged one skipped", st.Analyses)
 	}
 }
+
+// TestUnreadableVerdictIsNewestInvalid is the regression test for audit
+// qc2-05-10: a published verdict.json that cannot be decoded enters as the
+// newest analysis, INVALID, instead of letting an older verdict classify the
+// experiment.
+func TestUnreadableVerdictIsNewestInvalid(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t, "e_bad", false)
+	f.seal("s_t1_a", schemas.OutcomePass, 0.1)
+	f.analysis("a_old", schemas.DecisionImproved, "")
+	dir := filepath.Join(f.st.Root(), "e_bad", "analysis", "a_zz")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "verdict.json"), []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ix := New(f.st, nil)
+	if _, err := ix.Rebuild(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var newest AnalysisRow
+	for _, a := range rows(t, ix).Analyses("e_bad") {
+		if a.CreatedAt.After(newest.CreatedAt) {
+			newest = a
+		}
+	}
+	if newest.AnalysisID != "a_zz" || newest.Decision != string(schemas.DecisionInvalid) {
+		t.Fatalf("newest analysis %+v, want a_zz INVALID", newest)
+	}
+}

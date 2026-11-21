@@ -76,11 +76,22 @@ func noiseFloor(cfg settings, idx runIndex, hasAA bool) (*schemas.VarianceCard, 
 	// Audit 1-B-10: the filled bounds count missing A2 slots as tasks, so a
 	// small A/A arm with no sealed observation can pass. Coverage is read
 	// from counted sealed observations only.
+	// Audit qc2-02-04: the same coverage holds for arm A, the other side of
+	// the comparison, and the tasks observed in both arms must cover the
+	// tasks the A/A arm ran, or a pass rests on a few matched pairs.
 	if check.Status == schemas.InstrumentPass {
-		if obs, n := observedRuns(idx.armRuns(clean, ArmAA), metric); n == 0 || float64(obs) < minCoverage*float64(n) || eff.NTasks == 0 {
+		for _, arm := range []string{ArmAA, ArmBaseline} {
+			if obs, n := observedRuns(idx.armRuns(clean, arm), metric); n == 0 || float64(obs) < minCoverage*float64(n) || eff.NTasks == 0 {
+				check.Status = schemas.InstrumentUnknown
+				check.Detail = fmt.Sprintf("arm %s has an observed %s on %d of %d counted runs on %s (%d tasks observed in both arms %s and %s), below %.2f coverage, so harness noise was not measured",
+					arm, metric, obs, n, clean, eff.NTasks, ArmBaseline, ArmAA, minCoverage)
+				return card, check
+			}
+		}
+		if tasks := len(idx.cells(clean, ArmAA, metric)); float64(eff.NTasks) < minCoverage*float64(tasks) {
 			check.Status = schemas.InstrumentUnknown
-			check.Detail = fmt.Sprintf("arm %s has an observed %s on %d of %d counted runs on %s (%d tasks observed beside arm %s), below %.2f coverage, so harness noise was not measured",
-				ArmAA, metric, obs, n, clean, eff.NTasks, ArmBaseline, minCoverage)
+			check.Detail = fmt.Sprintf("only %d of %d tasks of arm %s have an observed %s in arm %s too, below %.2f, so harness noise was not measured",
+				eff.NTasks, tasks, ArmAA, metric, ArmBaseline, minCoverage)
 		}
 	}
 	return card, check
@@ -89,7 +100,7 @@ func noiseFloor(cfg settings, idx runIndex, hasAA bool) (*schemas.VarianceCard, 
 // observedRuns counts the runs with an observed metric value, and all runs.
 func observedRuns(runs []schemas.SealedRun, metric string) (observed, n int) {
 	for _, r := range runs {
-		if metricValue(r, metric).IsObserved() {
+		if decisionValue(metricValue(r, metric)).IsObserved() {
 			observed++
 		}
 	}

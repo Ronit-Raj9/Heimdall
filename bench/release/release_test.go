@@ -116,8 +116,22 @@ func (f *fixture) writeAnalysis(id string, at time.Time, action schemas.Action, 
 	if policy != "" {
 		a.Policy = &schemas.PolicyResult{PolicyName: "team", PolicyHash: "sha256:pol", Decision: policy}
 	}
+	f.digest(a)
 	if err := f.st.WriteAnalysis(context.Background(), a, map[string][]byte{"report.md": []byte("# report\n")}); err != nil {
 		f.t.Fatalf("WriteAnalysis: %v", err)
+	}
+}
+
+// digest sets the analysis's inputs digest from the runs of its grade
+// source as they are now, as analyze does.
+func (f *fixture) digest(a *schemas.Analysis) {
+	f.t.Helper()
+	runs, err := f.st.SealedRuns(context.Background(), testExp, a.GradeSource)
+	if err != nil {
+		f.t.Fatalf("SealedRuns: %v", err)
+	}
+	if a.InputsDigest, err = utils.AnalysisInputsDigest(runs); err != nil {
+		f.t.Fatal(err)
 	}
 }
 
