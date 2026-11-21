@@ -30,6 +30,9 @@ type AgentVersionList struct {
 	Agent    string              `json:"agent"`
 	Builtin  bool                `json:"builtin,omitempty"`
 	Versions []AgentVersionEntry `json:"versions"`
+	// Live is the version that holds the agent's saved config: the one the
+	// agent page runs and a pull request is compared with (0 when none).
+	Live int `json:"live,omitempty"`
 }
 
 // AgentVersionDoc is GET /agents/{id}/versions/{n}.
@@ -42,7 +45,15 @@ type AgentVersionDoc struct {
 // AgentVersionCreate is the body of POST /agents/{id}/versions.
 type AgentVersionCreate struct {
 	Note string `json:"note"`
+	// YAML, when set, registers this agent config as a version without
+	// changing the agent's saved config (a pull request's candidate, sent by
+	// `bifrost-bench ci evaluate`). A config equal to any existing version
+	// reuses that version.
+	YAML string `json:"yaml,omitempty"`
 }
+
+// agentVersionYAMLMax caps a registered config.
+const agentVersionYAMLMax = 256 << 10
 
 // AgentVersionCreated is POST /agents/{id}/versions.
 type AgentVersionCreated struct {
@@ -231,6 +242,11 @@ func (h *agentVersionsHandler) list(ctx *fasthttp.RequestCtx) {
 	for _, v := range vs {
 		out.Versions = append(out.Versions, AgentVersionEntry{AgentVersion: v, Runs: counts[v.Hash]})
 	}
+	if out.Builtin {
+		out.Live = 1
+	} else if doc, _, ok := h.projectAgentFile(ctx, id); ok {
+		out.Live = agentversions.Live(vs, doc)
+	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
 }
 
@@ -289,9 +305,20 @@ func (h *agentVersionsHandler) create(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, "agent "+id+" not found")
 		return
 	}
-	v, created, err := agentversions.Record(h.projects.Root(), id, agentFileHistory(context.Background(), h.projects, rel, doc, abActor(ctx), req.Note))
+	var v schemas.AgentVersion
+	var created bool
+	var err error
+	if req.YAML != "" {
+		v, created, err = h.register(id, rel, doc, req, abActor(ctx))
+	} else {
+		v, created, err = agentversions.Record(h.projects.Root(), id, agentFileHistory(context.Background(), h.projects, rel, doc, abActor(ctx), req.Note))
+	}
 	if err != nil {
-		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "agents/"+id+".yaml: "+err.Error())
+		what := "agents/" + id + ".yaml"
+		if req.YAML != "" {
+			what = "the registered config"
+		}
+		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, what+": "+err.Error())
 		return
 	}
 	status := fasthttp.StatusOK
@@ -299,4 +326,20 @@ func (h *agentVersionsHandler) create(ctx *fasthttp.RequestCtx) {
 		status = fasthttp.StatusCreated
 	}
 	lib.SendJSON(ctx, h.mode, status, AgentVersionCreated{AgentVersion: v, Created: created})
+}
+
+// register adds req.YAML as a version of agent id, leaving agents/<id>.yaml
+// as it is. An agent with no versions yet first gets its saved config's
+// history, so the live version exists before the candidate.
+func (h *agentVersionsHandler) register(id, rel string, current []byte, req AgentVersionCreate, actor string) (schemas.AgentVersion, bool, error) {
+	if len(req.YAML) > agentVersionYAMLMax {
+		return schemas.AgentVersion{}, false, fmt.Errorf("config is larger than %d KiB", agentVersionYAMLMax>>10)
+	}
+	root := h.projects.Root()
+	if vs, err := agentversions.List(root, id); err == nil && len(vs) == 0 {
+		if _, _, err := agentversions.Record(root, id, agentFileHistory(context.Background(), h.projects, rel, current, "", "")); err != nil {
+			return schemas.AgentVersion{}, false, fmt.Errorf("saved config: %w", err)
+		}
+	}
+	return agentversions.Register(root, id, []byte(req.YAML), actor, req.Note)
 }
