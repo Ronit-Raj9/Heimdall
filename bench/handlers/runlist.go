@@ -90,12 +90,14 @@ func (h *RunListHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Mid
 // runListFilter is the query of GET /runs. An empty field matches anything.
 type runListFilter struct {
 	exp, suite, arm, task, condition, outcome, track string
+	agent                                            string // the run's agent config id (the agent page's Runs tab)
 }
 
 func (f runListFilter) match(row RunListRow) bool {
 	for _, c := range [][2]string{
 		{f.exp, row.ExpID}, {f.suite, row.Suite}, {f.arm, row.Arm}, {f.task, row.Task},
 		{f.condition, row.Condition}, {f.outcome, string(row.Outcome)}, {f.track, row.Track},
+		{f.agent, row.ConfigID},
 	} {
 		if c[0] != "" && c[0] != c[1] {
 			return false
@@ -104,7 +106,7 @@ func (f runListFilter) match(row RunListRow) bool {
 	return true
 }
 
-// listRuns handles GET /api/bench/runs?exp=&suite=&arm=&task=&condition=&outcome=&track=&limit=&offset=.
+// listRuns handles GET /api/bench/runs?exp=&suite=&arm=&task=&condition=&outcome=&track=&agent=&limit=&offset=.
 // Every run of every experiment the index holds, attempts included, newest
 // start first. A filter value that is not a valid id is a 400; limit is
 // capped at runListMaxLimit.
@@ -118,6 +120,7 @@ func (h *RunListHandler) listRuns(ctx *fasthttp.RequestCtx) {
 	for name, dst := range map[string]*string{
 		"exp": &f.exp, "suite": &f.suite, "arm": &f.arm, "task": &f.task,
 		"condition": &f.condition, "outcome": &f.outcome, "track": &f.track,
+		"agent": &f.agent,
 	} {
 		v := strings.TrimSpace(string(args.Peek(name)))
 		if v != "" && !validID(v) {

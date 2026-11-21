@@ -131,6 +131,7 @@ var APIRoutes = []RouteDoc{
 		{Name: "exp", Description: "Experiment id"}, {Name: "suite", Description: "Suite id"}, {Name: "arm", Description: "Arm id"},
 		{Name: "task", Description: "Task id"}, {Name: "condition", Description: "clean or a probe id"}, {Name: "outcome", Description: "Run outcome"},
 		{Name: "track", Description: "Suite track"}, {Name: "limit", Description: "Page size; default 100, at most 500"}, {Name: "offset", Description: "Rows to skip"},
+		{Name: "agent", Description: "Agent config id"},
 	}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}", Tag: "runs", Summary: "One run with seal, grade, metrics, gates and receipts", Response: schemas.RunDetail{}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/events", Tag: "runs", Summary: "Canonical event log of a run", Response: schemas.RunEvents{}},
