@@ -20,7 +20,6 @@ import (
 func init() {
 	registerJobKind(cliJob("import.run", true, true, importRunArgs))
 	registerJobKind(cliJob("tasks.mine", true, false, tasksMineArgs))
-	registerJobKind(cliJob("calibrate.run", true, false, calibrateRunArgs))
 	registerJobKind(cliJob("export.run", true, true, exportRunArgs))
 	registerJobKind(cliJob("scan.skill", true, true, scanSkillArgs))
 	registerJobKind(cliJob("scan.mcp", true, false, scanMCPArgs))
@@ -196,7 +195,8 @@ func tasksMineArgs(raw json.RawMessage) ([]string, error) {
 
 // calibrateRunArgs: {suite, yes, seed_controls?, from_reviews_exps?} ->
 // judge calibrate <suite> -yes ... Judge calls cost money, so yes must be
-// true: the UI asks first.
+// true: the UI asks first. The calibrate.run job kind is now in process in
+// both modes (jobs_cli_calibrate.go, G06); this stays the CLI arg contract.
 func calibrateRunArgs(raw json.RawMessage) ([]string, error) {
 	var p struct {
 		Suite        string   `json:"suite"`

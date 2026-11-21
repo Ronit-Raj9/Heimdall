@@ -239,6 +239,12 @@ type calibrateOptions struct {
 	yes      bool
 	thresh   schemas.JudgeCalibrationThresholds
 	judgeCfg func() (graders.JudgeConfig, error) // the wired judge, built only after consent
+
+	// G06 web calibrate (jobs_cli_calibrate.go). All optional.
+	sample       int                                    // judge at most this many items, human labels first; 0 = all
+	judge        *schemas.JudgeSpec                     // provider and model to calibrate instead of the suite's pinned ones
+	forecastOnly bool                                   // print the forecast and stop: no call, no consent needed
+	checkPlan    func(plan *graders.CalibrationPlan) error // refuses a plan before anything is spent (caps, key budget)
 }
 
 // calibrateSuite forecasts, asks, runs the judge on the suite's labels and
@@ -257,7 +263,27 @@ func calibrateSuite(ctx context.Context, a *app, s *schemas.Suite, opts calibrat
 	if a != nil && a.prices != nil {
 		price = graders.PricesFrom(a.prices.Lookup)
 	}
-	plan, err := graders.PlanCalibration(s, append(append([]calibration.Labelled{}, human...), seed...), price)
+	if opts.sample > 0 && len(human)+len(seed) > opts.sample {
+		if len(human) >= opts.sample {
+			human, seed = human[:opts.sample], nil
+		} else {
+			seed = seed[:opts.sample-len(human)]
+		}
+		fmt.Fprintf(out, "sample: %d item(s) (human labels first)\n", opts.sample)
+	}
+	planSuite := s
+	if opts.judge != nil && s.Judge != nil {
+		cp, j := *s, *s.Judge
+		if opts.judge.Provider != "" {
+			j.Provider = opts.judge.Provider
+		}
+		if opts.judge.Model != "" {
+			j.Model = opts.judge.Model
+		}
+		cp.Judge = &j
+		planSuite = &cp
+	}
+	plan, err := graders.PlanCalibration(planSuite, append(append([]calibration.Labelled{}, human...), seed...), price)
 	if err != nil {
 		return nil, err
 	}
@@ -278,6 +304,15 @@ func calibrateSuite(ctx context.Context, a *app, s *schemas.Suite, opts calibrat
 		plan.Calls, strings.Join(calibration.Perturbations, " and "), plan.InputTokens, plan.OutTokens, cost)
 	if len(plan.Items) == 0 {
 		return nil, errors.New("no item can be judged")
+	}
+	if opts.checkPlan != nil {
+		if err := opts.checkPlan(plan); err != nil {
+			return nil, err
+		}
+	}
+	if opts.forecastOnly {
+		fmt.Fprintln(out, "estimate only: no judge call made")
+		return nil, nil
 	}
 	if !opts.yes {
 		if !judgeInteractive(in) {
