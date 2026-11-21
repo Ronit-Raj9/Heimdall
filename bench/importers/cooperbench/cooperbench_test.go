@@ -37,11 +37,11 @@ func TestImportFixture(t *testing.T) {
 		}
 	}
 	ref, _ := os.ReadFile(filepath.Join(dir, "solution/reference.sh"))
-	if !strings.Contains(string(ref), "base64 -d") || !strings.Contains(string(ref), "!= agent1") {
+	if !strings.Contains(string(ref), "base64 -d") || !strings.Contains(string(ref), "= agent2 ]") {
 		t.Error("reference must apply combined.patch, lead only")
 	}
 	mut, _ := os.ReadFile(filepath.Join(dir, "controls/mutant-one-feature.sh"))
-	if strings.Contains(string(mut), "!= agent1") == false {
+	if strings.Contains(string(mut), "= agent2 ]") == false {
 		t.Error("mutant must hold feature 1 only")
 	}
 	if _, err := im.Import(context.Background(), importers.Options{BenchRoot: root, From: "testdata", SuiteID: "cb", IDs: []string{"nope"}}); err != nil {

@@ -60,7 +60,7 @@ Settings: `subset` (default `all`), `revision`, `version`, `agent_s`
 | `both_passed` | reward 1, pass threshold 1; dimensions `feature1_passed`, `feature2_passed`, test counts, `patch_bytes` |
 
 Controls: the reference applies `combined.patch` (alone at admission; in a
-team oracle run only `agent1` applies it), the empty control changes
+team oracle run `agent2` skips it, any other member or a lone run applies it), the empty control changes
 nothing, and the mutant applies only the first feature's gold patch, so the
 second feature's tests fail.
 

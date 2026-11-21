@@ -19,7 +19,10 @@ SPEC = json.load(open(os.path.join(G, "spec.json")))
 BASE = SPEC["base_commit"]
 ENV = dict(os.environ, GIT_CONFIG_NOSYSTEM="1", HOME=os.environ.get("HOME") or "/tmp",
            PIP_NO_INDEX="1", PIP_DISABLE_PIP_VERSION_CHECK="1", CARGO_NET_OFFLINE="true",
-           GOFLAGS="-mod=mod", GOPROXY="off", UV_OFFLINE="1", CI="1")
+           GOFLAGS="-mod=mod", GOPROXY="off", UV_OFFLINE="1", CI="1",
+           # The workspace belongs to uid 1000 and the verifier runs as root:
+           # upstream runner.sh calls plain git, so trust every folder.
+           GIT_CONFIG_COUNT="1", GIT_CONFIG_KEY_0="safe.directory", GIT_CONFIG_VALUE_0="*")
 LOG = []
 
 

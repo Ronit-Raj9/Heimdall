@@ -394,7 +394,7 @@ func applyScript(comment, patch string, leadOnly bool) string {
 	var b strings.Builder
 	b.WriteString("#!/bin/sh\n# " + comment + "\n# Written by `bifrost-bench import cooperbench` (docs/importing-cooperbench.md).\nset -e\n")
 	if leadOnly {
-		b.WriteString("if [ -n \"${HEIMDALL_AGENT_ID:-}\" ] && [ \"${HEIMDALL_AGENT_ID}\" != agent1 ]; then exit 0; fi\n")
+		b.WriteString("if [ \"${HEIMDALL_AGENT_ID:-}\" = agent2 ]; then exit 0; fi\n")
 	}
 	// The patch is base64: upstream code such as cache_key = ... would
 	// otherwise trip the admission secret scanner (suite/secrets.go).
