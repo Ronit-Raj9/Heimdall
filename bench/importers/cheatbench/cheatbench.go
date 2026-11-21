@@ -214,6 +214,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 						continue
 					}
 					res.Skipped = append(res.Skipped, importers.Skip{ID: up, Reason: err.Error()})
+					_ = os.RemoveAll(filepath.Join(suiteDir, "tasks", id)) // no half-written task folder
 					delete(seen, id)
 					continue
 				}
