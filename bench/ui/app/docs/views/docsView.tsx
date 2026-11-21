@@ -11,10 +11,28 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** The guide opened when the page has none selected. */
-export const START_DOC = "quickstart";
+export const START_DOC = "web-quickstart";
 
 /** Guides worth reading first, pinned to the top of the list in this order. */
-const PINNED = ["quickstart", "adding-an-agent", "bring-your-own", "frameworks", "hosting", "runners"];
+const PINNED = [
+	"web-quickstart",
+	"web-agents",
+	"web-suites",
+	"web-experiments",
+	"web-analysis",
+	"web-keys-secrets",
+	"web-runners",
+	"web-integrations",
+	"web-sync",
+	"web-admin",
+	"CLI_WEB_PARITY",
+	"quickstart",
+	"adding-an-agent",
+	"bring-your-own",
+	"frameworks",
+	"hosting",
+	"runners",
+];
 
 /** /docs: every guide in bench/docs, served by GET /docs and rendered in place. ?doc=<name> selects one. */
 export default function DocsView() {

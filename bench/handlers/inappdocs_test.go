@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -64,6 +65,53 @@ func TestInAppDocsRejectsTraversal(t *testing.T) {
 		getDoc(ctx, schemas.ModeLive)
 		if got := ctx.Response.StatusCode(); got != want {
 			t.Errorf("%q: status %d, want %d", name, got, want)
+		}
+	}
+}
+
+// TestInAppDocsListsWebGuides pins the website user guides (gap lane G16):
+// each is embedded, listed with its heading as the title, and readable.
+func TestInAppDocsListsWebGuides(t *testing.T) {
+	want := map[string]string{
+		"web-quickstart":   "Quickstart on the website",
+		"web-agents":       "Agents on the website",
+		"web-suites":       "Suites on the website",
+		"web-experiments":  "Experiments on the website",
+		"web-analysis":     "Analysis and governance on the website",
+		"web-keys-secrets": "Secrets and keys on the website",
+		"web-runners":      "Runners on the website",
+		"web-integrations": "Integrations on the website",
+		"web-sync":         "Sync with the CLI",
+		"web-admin":        "Server admin on the website",
+		"CLI_WEB_PARITY":   "CLI and website parity",
+	}
+	ctx := &fasthttp.RequestCtx{}
+	listDocs(ctx, schemas.ModeLive)
+	var out DocList
+	if err := json.Unmarshal(ctx.Response.Body(), &out); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, d := range out.Docs {
+		got[d.Name] = d.Title
+	}
+	for name, title := range want {
+		if got[name] != title {
+			t.Errorf("guide %s: title %q, want %q", name, got[name], title)
+			continue
+		}
+		g := docCtx(name)
+		getDoc(g, schemas.ModeLive)
+		if g.Response.StatusCode() != 200 {
+			t.Errorf("guide %s: status %d", name, g.Response.StatusCode())
+			continue
+		}
+		var body DocBody
+		if err := json.Unmarshal(g.Response.Body(), &body); err != nil || body.Markdown == "" {
+			t.Errorf("guide %s: empty body (%v)", name, err)
+		}
+		if strings.ContainsAny(body.Markdown, "—–") {
+			t.Errorf("guide %s: contains an em or en dash", name)
 		}
 	}
 }

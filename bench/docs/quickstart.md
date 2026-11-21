@@ -1,5 +1,8 @@
 # Quick start: will this change break my coding agent?
 
+Prefer the browser? [web-quickstart.md](web-quickstart.md) does the same from
+the website, no CLI. Every command's website location: [CLI_WEB_PARITY.md](CLI_WEB_PARITY.md).
+
 Four commands, run from inside your own git repository, take you from
 nothing to a verdict on a change to your coding agent (its notes file, its
 skills, its prompt, its model) measured on tasks cut from your own history:
