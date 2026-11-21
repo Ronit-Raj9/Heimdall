@@ -54,8 +54,8 @@ type QuickRunModel struct {
 }
 
 // QuickRunRequest is the body of POST /quickrun. Every field but model has a
-// default. CompareModel, when set, becomes arm B; otherwise arm B repeats arm
-// A (an A/A run: the verdict then measures the noise floor of one model).
+// default. CompareModel, when set, becomes arm B; otherwise the run is one
+// arm scored on its own (a score with an interval, no A against B verdict).
 type QuickRunRequest struct {
 	Suite        string         `json:"suite,omitempty"`
 	Agent        string         `json:"agent,omitempty"`
@@ -456,23 +456,19 @@ func (h *quickRunHandler) build(ctx context.Context, req *QuickRunRequest) ([]by
 
 	now := h.now().UTC()
 	name := "quick-" + now.Format("20060102-150405") + "-" + randHex(2)
-	armB := armFor(req.Model)
+	// One model is one arm scored on its own; a compare model adds arm B and
+	// an A against B verdict.
+	arms := map[string]schemas.ArmSpec{"A": armFor(req.Model)}
 	if req.CompareModel != nil {
-		armB = armFor(req.CompareModel)
-	} else {
-		// One model: B repeats A as a noise-floor run. The planner refuses arms
-		// with the same config hash, so B carries a marker env var the agent
-		// ignores; everything that matters (model, provider, prompt) is equal.
-		armB.Label += " (repeat)"
-		armB.Set["env.HEIMDALL_QUICKRUN_ARM"] = "B"
+		arms["B"] = armFor(req.CompareModel)
 	}
 	f := quickFile{
 		Name: name, Suite: suite, Base: agent,
-		Arms:         map[string]schemas.ArmSpec{"A": armFor(req.Model), "B": armB},
+		Arms:         arms,
 		Primary:      schemas.Endpoint{Condition: schemas.ConditionClean, Metric: "verified_success"},
 		Guards:       []schemas.GuardSpec{{Rule: "no_new_integrity_violation"}},
 		Conditions:   []quickCondition{{ID: schemas.ConditionClean, Tasks: tasks, Trials: req.Trials}},
-		Budget:       schemas.BudgetSpec{TotalUSD: req.BudgetUSD, ReserveUSD: quickReserve(req.BudgetUSD, 2*req.Tasks*req.Trials)},
+		Budget:       schemas.BudgetSpec{TotalUSD: req.BudgetUSD, ReserveUSD: quickReserve(req.BudgetUSD, len(arms)*req.Tasks*req.Trials)},
 		Verdict:      quickVerdict{Policy: "paired_signflip"},
 		Seed:         now.Unix(),
 		Concurrency:  2,

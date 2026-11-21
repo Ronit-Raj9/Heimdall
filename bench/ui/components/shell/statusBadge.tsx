@@ -1,6 +1,6 @@
 import type { Decision, ExperimentState } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { Ban, CircleCheck, CircleHelp, CircleX, type LucideIcon } from "lucide-react";
+import { Ban, CircleCheck, CircleHelp, CircleX, Gauge, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 // Same status tokens as the verdict card and the experiment progress card (globals.css), so a
@@ -19,6 +19,7 @@ const DECISION_CLASS = {
 	regressed: "border-chart-error/50 bg-chart-error/10 text-chart-error-ink",
 	inconclusive: "border-chart-warning/60 bg-chart-warning/10 text-chart-warning-ink",
 	invalid: "border-border bg-muted text-muted-foreground",
+	score: "border-chart-info/50 bg-chart-info/10 text-chart-info-ink",
 } as const satisfies Record<Decision, string>;
 
 // The decision's shape, so it reads without colour (as on the verdict card).
@@ -27,6 +28,7 @@ const DECISION_ICON = {
 	regressed: CircleX,
 	inconclusive: CircleHelp,
 	invalid: Ban,
+	score: Gauge,
 } as const satisfies Record<Decision, LucideIcon>;
 
 const LIVE_STATES: ReadonlySet<ExperimentState> = new Set(["running", "analyzing"]);
@@ -36,9 +38,9 @@ export type StatusBadgeProps = {
 	testId?: string;
 } & ({ state: ExperimentState | string; decision?: never } | { decision: Decision | string; state?: never });
 
-/** True for the four verdict decisions the server sends. */
+/** True for the verdict decisions the server sends (score: a one-setup experiment, scored on its own). */
 export function isDecision(value: string | undefined | null): value is Decision {
-	return value === "improved" || value === "regressed" || value === "inconclusive" || value === "invalid";
+	return value === "improved" || value === "regressed" || value === "inconclusive" || value === "invalid" || value === "score";
 }
 
 /** True for the experiment states the server sends. */

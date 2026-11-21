@@ -71,8 +71,14 @@ func TestQuickRunEndToEnd(t *testing.T) {
 	if got := exp.Conditions[0].Tasks.IDs; strings.Join(got, ",") != "t01,t02,t03" {
 		t.Fatalf("tasks %v", got)
 	}
-	if exp.Arms["A"].Set["model"] != "gpt-5.4-mini" || exp.Arms["B"].Set["gateway.provider"] != "openai" {
+	// One model is one arm scored on its own: no hidden repeat arm B.
+	if len(exp.Arms) != 1 || exp.Arms["A"].Set["model"] != "gpt-5.4-mini" || exp.Arms["A"].Set["gateway.provider"] != "openai" {
 		t.Fatalf("arms %+v", exp.Arms)
+	}
+	for _, a := range exp.Arms {
+		if _, ok := a.Set["env.HEIMDALL_QUICKRUN_ARM"]; ok {
+			t.Fatalf("hidden repeat marker on arm %+v", a)
+		}
 	}
 }
 

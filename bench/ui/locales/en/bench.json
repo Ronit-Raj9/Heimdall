@@ -20,7 +20,8 @@
 				"improved": "differs (harness noise)",
 				"regressed": "differs (harness noise)",
 				"inconclusive": "no difference",
-				"invalid": "invalid"
+				"invalid": "invalid",
+				"score": "not compared"
 			},
 			"noAA": "No A/A arm ran, so the MDE rests on an assumed SD. Set aa: true in the experiment to measure the noise floor.",
 			"harnessNoise": "Two identical arms differed significantly: the harness, not the agent, moved the number. The verdict is invalid.",
@@ -516,7 +517,8 @@
 				"improved": "IMPROVED",
 				"regressed": "REGRESSED",
 				"inconclusive": "INCONCLUSIVE",
-				"invalid": "INVALID"
+				"invalid": "INVALID",
+				"score": "SCORED"
 			},
 			"releaseEffect": "Release effect",
 			"pp": "{{value}} pp",
@@ -4003,7 +4005,8 @@
 				"improved": "B is better",
 				"regressed": "B is worse",
 				"inconclusive": "No clear winner yet",
-				"invalid": "Test was broken"
+				"invalid": "Test was broken",
+				"score": "Scored"
 			}
 		},
 		"newExperiment": "New experiment",

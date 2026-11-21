@@ -277,7 +277,12 @@ func TestPlanRejects(t *testing.T) {
 		{"identical arms", func(_ *bench, e *schemas.Experiment) {
 			e.Arms["B"] = schemas.ArmSpec{Label: "same", Set: map[string]any{"model": "claude-test"}}
 		}, "same config hash"},
-		{"one arm", func(_ *bench, e *schemas.Experiment) { delete(e.Arms, "B") }, "at least 2 arms"},
+		{"no arms", func(_ *bench, e *schemas.Experiment) { e.Arms = map[string]schemas.ArmSpec{} }, "at least 2 arms"},
+		{"one arm with a no_regression guard", func(_ *bench, e *schemas.Experiment) {
+			delete(e.Arms, "B")
+			e.Guards = []schemas.GuardSpec{{Condition: schemas.ConditionClean, Rule: GuardNoRegression}}
+		}, "compares two arms"},
+		{"one arm with aa", func(_ *bench, e *schemas.Experiment) { delete(e.Arms, "B"); e.AA = true }, "scored on its own"},
 		{"reserved arm id", func(_ *bench, e *schemas.Experiment) { e.Arms[CompatArm] = schemas.ArmSpec{} }, "reserved"},
 		{"experiment id with a hyphen", func(_ *bench, e *schemas.Experiment) { e.ID = "e_code-wins" }, "must match"},
 		{"no lock", func(b *bench, _ *schemas.Experiment) { b.suite.Lock = nil }, "has no lock"},

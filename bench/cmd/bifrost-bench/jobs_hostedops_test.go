@@ -140,9 +140,14 @@ func TestBridgeExperimentsArePlannable(t *testing.T) {
 		if _, ok := e.Arms["A"]; !ok {
 			t.Errorf("%s: no arm A", e.Name)
 		}
-		if _, ok := e.Arms["B"]; !ok {
-			t.Errorf("%s: no arm B", e.Name)
-		}
+	}
+	// The admission compares oracle (A) and noop (B); the agent check is
+	// one arm scored on its own, with no hidden repeat.
+	if e := admitExperiment(hostedSuiteAdmitParams{Suite: "coding-core", Oracle: bridgeOracleAgent, Noop: bridgeNoopAgent}); len(e.Arms) != 2 {
+		t.Errorf("admit arms %v", e.Arms)
+	}
+	if e := checkExperiment("agents/my-agent.yaml", "coding-core", "t01"); len(e.Arms) != 1 {
+		t.Errorf("check arms %v, want one", e.Arms)
 	}
 	if e := checkExperiment("agents/my-agent.yaml", "coding-core", "t01"); e.Name != "check-my-agent" || len(e.Conditions[0].Tasks.IDs) != 1 {
 		t.Fatalf("check experiment %+v", e)

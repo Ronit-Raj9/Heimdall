@@ -100,7 +100,7 @@ const TONE: Record<Tone, string> = {
 
 /** Verdict words and color for a decision. Unknown values read as pending. Pure. */
 export function verdictTone(decision: string | undefined): {
-	key: "improved" | "regressed" | "inconclusive" | "invalid" | "pending";
+	key: "improved" | "regressed" | "inconclusive" | "invalid" | "score" | "pending";
 	tone: Tone;
 } {
 	switch (decision) {
@@ -112,6 +112,8 @@ export function verdictTone(decision: string | undefined): {
 			return { key: "inconclusive", tone: "grey" };
 		case "invalid":
 			return { key: "invalid", tone: "amber" };
+		case "score":
+			return { key: "score", tone: "blue" };
 		default:
 			return { key: "pending", tone: "grey" };
 	}

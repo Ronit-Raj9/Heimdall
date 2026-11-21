@@ -14,7 +14,7 @@
     "base": {"type": "string", "minLength": 1, "description": "Agent config path every arm starts from."},
     "arms": {
       "type": "object",
-      "minProperties": 2,
+      "minProperties": 1,
       "patternProperties": {"^[A-Za-z0-9][A-Za-z0-9_-]*$": {"$ref": "#/$defs/arm"}},
       "additionalProperties": false
     },

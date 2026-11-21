@@ -8,8 +8,10 @@ and the experiment page.
 
 The **Run** button (welcome wizard, Home, experiment pages) opens **Quick
 run**: suite, agent, model and run size. It fills in whatever is missing and
-starts in one call. Without a second model, arm B repeats arm A and the
-verdict shows the noise floor. **Start run**.
+starts in one call. Without a second model it runs one arm and the
+experiment page shows its score with a 95% interval (no A against B
+verdict). With a second model it runs arm B too and gives a verdict.
+**Start run**.
 
 ## Builder
 

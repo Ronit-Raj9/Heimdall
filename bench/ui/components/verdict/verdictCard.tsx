@@ -4,7 +4,7 @@ import { getLocale } from "@/lib/i18n";
 import type { Action, Decision, Effect, GuardResult, Verdict } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import type { TFunction } from "i18next";
-import { Ban, CircleCheck, CircleHelp, CircleX, type LucideIcon } from "lucide-react";
+import { Ban, CircleCheck, CircleHelp, CircleX, Gauge, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { MethodHint } from "./methodHint";
@@ -39,6 +39,7 @@ const DECISION_ICON = {
 	regressed: CircleX,
 	inconclusive: CircleHelp,
 	invalid: Ban,
+	score: Gauge,
 } as const satisfies Record<Decision, LucideIcon>;
 
 // Hero surface per tone: a faint wash of the status hue behind the decision and the action.

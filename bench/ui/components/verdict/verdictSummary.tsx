@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { getLocale } from "@/lib/i18n";
 import type { Action, Decision, Ratio, Value, Verdict } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { ArrowRight, Ban, CircleCheck, CircleHelp, CircleX, type LucideIcon } from "lucide-react";
+import { ArrowRight, Ban, CircleCheck, CircleHelp, CircleX, Gauge, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { DECISION_TONE, formatPp, metricUnit, formatSignedEffect, type Tone } from "./verdict.utils";
 
@@ -12,6 +12,7 @@ const ICON = {
 	regressed: CircleX,
 	inconclusive: CircleHelp,
 	invalid: Ban,
+	score: Gauge,
 } as const satisfies Record<Decision, LucideIcon>;
 
 const SURFACE = {
@@ -160,6 +161,8 @@ export function headline(verdict: Verdict, a: string | undefined, b: string | un
 			return t("summary.headline.inconclusive");
 		case "invalid":
 			return t("summary.headline.invalid");
+		case "score":
+			return t("summary.score.title");
 	}
 	return a ?? "";
 }

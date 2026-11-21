@@ -85,6 +85,9 @@ func (p *pairedSignFlipPolicy) Decide(ctx context.Context, m *schemas.Manifest, 
 	if m == nil {
 		return nil, errors.New("decide: nil manifest")
 	}
+	if arm := SingleArm(m); arm != "" {
+		return decideSingleAnalysis(m, runs, arm), nil
+	}
 	arms := manifestArms(m)
 	if !arms[ArmBaseline] || !arms[ArmCandidate] {
 		return nil, fmt.Errorf("decide experiment %s: manifest needs arms %s and %s", m.ExpID, ArmBaseline, ArmCandidate)

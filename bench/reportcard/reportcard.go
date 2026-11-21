@@ -178,9 +178,9 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 		Evaluation: ev.ID, Status: ev.Status, Mode: ev.Spec.Mode, Arms: []Arm{}, Capabilities: []Capability{}, Benchmarks: []Benchmark{},
 		Reliability: []Reliability{}, Safety: Safety{AttackResisted: map[string]float64{}, CheatRate: map[string]float64{}},
 	}
-	// Score mode runs a hidden repeat of the one arm (to satisfy the
-	// planner's two-arm rule); the report shows only the arm asked for and
-	// never an A/B verdict.
+	// Score mode is one arm scored on its own. Evaluations launched before
+	// one-arm experiments existed also ran a repeat of that arm; the report
+	// shows only the arm asked for and never an A/B verdict.
 	specArms := ev.Spec.Arms
 	score := ev.Spec.Mode == schemas.EvaluationModeScore
 	if score && len(specArms) > 1 {

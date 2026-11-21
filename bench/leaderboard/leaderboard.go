@@ -288,7 +288,8 @@ func collect(ctx context.Context, src Source) ([]*record, error) {
 }
 
 // newRecord builds a slot's record from its runs, or nil when the slot's arm
-// resolves to no config hash.
+// resolves to no config hash or is a legacy score-mode repeat
+// (schemas.LegacyRepeatArm).
 func newRecord(exp *expInfo, runs []Run) *record {
 	slices.SortStableFunc(runs, func(x, y Run) int { return cmp.Compare(x.Run.Attempt, y.Run.Attempt) })
 	pick, sealed := runs[len(runs)-1], false
@@ -303,6 +304,9 @@ func newRecord(exp *expInfo, runs []Run) *record {
 		if countedRun(r) {
 			counted++
 		}
+	}
+	if schemas.LegacyRepeatArm(exp.m, pick.Slot.Arm) {
+		return nil // the hidden score-mode copy of another arm, which is already on the board
 	}
 	rec := &record{exp: exp, slot: pick.Slot, run: pick.Run, sealed: sealed, counted: counted}
 	if pick.Slot.Arm == "compat" && exp.m.Compatibility != nil {

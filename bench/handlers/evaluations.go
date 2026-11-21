@@ -574,7 +574,7 @@ func (h *evaluationsHandler) launchChild(work context.Context, ctx *fasthttp.Req
 		Primary:     schemas.Endpoint{Condition: schemas.ConditionClean, Metric: "verified_success"},
 		Guards:      []schemas.GuardSpec{{Rule: "no_new_integrity_violation"}},
 		Conditions:  conds,
-		Budget:      schemas.BudgetSpec{TotalUSD: budget, ReserveUSD: quickReserve(budget, 2*len(tasks.IDs)*spec.Trials*len(conds))},
+		Budget:      schemas.BudgetSpec{TotalUSD: budget, ReserveUSD: quickReserve(budget, len(spec.Arms)*len(tasks.IDs)*spec.Trials*len(conds))},
 		Verdict:     quickVerdict{Policy: "paired_signflip"},
 		Seed:        ev.CreatedAt.Unix(),
 		Concurrency: 2, ManifestMode: "agent_exposure",
@@ -585,10 +585,8 @@ func (h *evaluationsHandler) launchChild(work context.Context, ctx *fasthttp.Req
 		if v.Set == nil {
 			continue
 		}
-		for id := range f.Arms {
-			if id == a.Label || (len(spec.Arms) == 1 && id != a.Label) {
-				f.Arms[id] = withSet(f.Arms[id], v.Set)
-			}
+		if arm, ok := f.Arms[a.Label]; ok {
+			f.Arms[a.Label] = withSet(arm, v.Set)
 		}
 		variantNotes = append(variantNotes, "arm "+a.Label+": "+v.Note)
 	}
@@ -656,9 +654,9 @@ func appendEvalID(body []byte, id string) ([]byte, error) {
 	return append(body, []byte("evaluation_id: "+id+"\n")...), nil
 }
 
-// evalArms turns the spec's arms into experiment arms. Score mode runs one
-// arm twice (A and a marked repeat B) because the planner wants two arms
-// with different config hashes; the repeat measures the noise floor.
+// evalArms turns the spec's arms into experiment arms, one per spec arm.
+// Score mode is one arm scored on its own (no hidden second run): the
+// planner plans it and the verdict gives a score with an interval.
 func evalArms(spec schemas.EvaluationSpec) map[string]schemas.ArmSpec {
 	out := map[string]schemas.ArmSpec{}
 	base := spec.Arms[0].Agent
@@ -676,19 +674,6 @@ func evalArms(spec schemas.EvaluationSpec) map[string]schemas.ArmSpec {
 			}
 		}
 		out[a.Label] = arm
-	}
-	if len(spec.Arms) == 1 {
-		a := out[spec.Arms[0].Label]
-		rep := schemas.ArmSpec{Label: a.Label + " (repeat)", Agent: a.Agent, Set: map[string]any{}}
-		for k, v := range a.Set {
-			rep.Set[k] = v
-		}
-		rep.Set["env.HEIMDALL_QUICKRUN_ARM"] = "B"
-		id := "B"
-		if spec.Arms[0].Label == "B" {
-			id = "A"
-		}
-		out[id] = rep
 	}
 	return out
 }

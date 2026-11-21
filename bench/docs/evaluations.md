@@ -118,6 +118,8 @@ Faults cost runs: each fault adds as many runs as the normal condition.
 
 Runs per benchmark = arms x tasks x trials x conditions. For example, 2 arms, 8 tasks, 2 trials, clean plus `model-down` is 2 x 8 x 2 x 2 = 64 runs per benchmark.
 
+In `score` mode there is exactly one arm, and nothing else runs: 1 arm, 8 tasks, 2 trials, clean plus `model-down` is 1 x 8 x 2 x 2 = 32 runs per benchmark. The estimate counts the same runs the launch plans, so the cost and time you approve are the ones you pay for. (Evaluations created before one-arm runs existed also ran a hidden repeat of the arm; the report card ignores it and the leaderboards leave it out.)
+
 Before you launch, `POST /api/bench/evaluations/estimate` (same body as creating one) returns the number of runs, a cost range and a time range, overall and per benchmark. The cost comes from the pinned price list. If any model in the evaluation has no known price, the answer says `"known": false` and the cost is not guessed. See [Pricing](models-and-providers.md#pricing-unknown-stays-unknown).
 
 ## The report card
@@ -168,7 +170,7 @@ For `versions`, `models` and `opponent` modes, each benchmark gets a verdict fro
 - If something broke the measurement (for example a gate that makes the comparison invalid, or too many infrastructure failures), the benchmark has no winner and its summary says the test was broken. It does not count as a win for either side.
 - **Overall** counts benchmarks: `wins` per arm (significant after the correction only) plus ties. The summary reads like "B is better on 3 of 6 benchmarks, worse on 1". Heimdall does not average scores across different benchmarks into one number, because a point on one benchmark is not worth the same as a point on another.
 
-In `score` mode there is one arm, so there are no verdicts, only the numbers.
+In `score` mode there is one arm, so there are no verdicts, only the numbers: each benchmark's experiment page shows the score with its 95% interval instead of an A against B comparison.
 
 ## Example: from the command line, through the API
 
