@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CatalogEmptyLinks } from "./catalogEmptyLinks";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
-vi.mock("@/components/experiments/experimentList", () => ({ ExperimentList: () => <div data-testid="experiment-list" /> }));
+vi.mock("@/app/experiments/views/experimentBoard", () => ({ ExperimentBoard: () => <div data-testid="experiment-list" /> }));
 
 describe("create links", () => {
 	it("suites list has New suite linking to /suites/new", () => {

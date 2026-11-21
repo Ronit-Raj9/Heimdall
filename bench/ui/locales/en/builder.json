@@ -8,9 +8,9 @@
 	"sections": {
 		"what": "Suite and name",
 		"agents": "Agents",
-		"agentsHint": "Pick one agent to compare models on it, or several to compare agents.",
+		"agentsHint": "One agent compares models; several compare agents.",
 		"models": "Models",
-		"modelsHint": "Every agent runs with every model. Leave empty to use each agent's own model.",
+		"modelsHint": "Leave empty to use each agent's own model.",
 		"size": "Run size",
 		"limits": "Budget and limits"
 	},
@@ -37,11 +37,12 @@
 		"runnerPool": "Runner pool",
 		"token": "Write token",
 		"tokenHint": "Local mode: plan, estimate and run are writes. The token stays in this tab.",
-		"tokenPlaceholder": "paste the serve write token"
+		"tokenPlaceholder": "paste the serve write token",
+		"tasks": "Tasks"
 	},
 	"preview": {
 		"title": "Matrix preview",
-		"description": "The arms the planner will create, in order. Arm A is the baseline of the paired verdict.",
+		"description": "Arm A is the baseline for the verdict.",
 		"arms": "{{count}} arms",
 		"runs": "up to {{runs}} runs ({{arms}} arms x {{conditions}} conditions x {{tasks}} tasks x {{trials}} trials)",
 		"empty": "Pick at least one agent and fill in a model to see the arms."
@@ -78,5 +79,19 @@
 		"budgetPositive": "Set a budget above 0.",
 		"concurrencyRange": "Concurrency must be from 1 to 64.",
 		"seedInt": "The seed is a whole number, 0 or more."
+	},
+	"steps": {
+		"what": "What to test",
+		"whatHint": "Pick a suite and give the comparison a name.",
+		"who": "Who competes",
+		"whoHint": "Every agent runs with every model.",
+		"size": "How much",
+		"sizeHint": "Tasks, trials and the most it may spend.",
+		"extras": "Extras",
+		"extrasHint": "Probes, adaptive trials, concurrency, seed and pool."
+	},
+	"summary": {
+		"runs": "Max runs",
+		"budget": "Budget cap"
 	}
 }
