@@ -153,6 +153,11 @@ export function suiteDisplayName(id: string): string {
 	return SUITE_DISPLAY[id]?.name ?? titleCase(id);
 }
 
+/** The curated capability group ("memory", "safety", ...) when the id has one; undefined otherwise. */
+export function suiteDisplayCategory(id: string): string | undefined {
+	return SUITE_DISPLAY[id]?.category;
+}
+
 /**
  * The first sentence of a pack's own description with the jargon taken out: parenthetical text,
  * file names, tool-ish tokens (name@version, snake_case, paths). Cut at about 90 characters.
