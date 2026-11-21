@@ -21,6 +21,8 @@ import { LeaderboardSyntheticBanner } from "@/components/leaderboard/leaderboard
 import { LeaderboardFilters } from "@/components/leaderboard/leaderboardFilters";
 import { LeaderboardFootnote } from "@/components/leaderboard/leaderboardFootnote";
 import { LeaderboardTable } from "@/components/leaderboard/leaderboardTable";
+import { Podium } from "@/components/leaderboard/podium";
+import { SuiteTabs } from "@/components/leaderboard/suiteTabs";
 import { ModeBadge } from "@/components/modeBadge";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { GRADE_SOURCE_MODES, GradeSourcePicker } from "@/components/review/gradeSourcePicker";
@@ -34,7 +36,7 @@ import { useGetLeaderboardQuery, useGetSuitesQuery } from "@/lib/store";
 import type { LeaderboardParams, LeaderboardResponse } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LeaderboardParetoPanel } from "@/components/migration/migrationReport"; // W6 cost against verified success
 import TrendsTab from "./trendsTab";
@@ -50,7 +52,7 @@ export default function LeaderboardView() {
 		{ id: "trends", label: t("leaderboard.tabs.trends") },
 	];
 	return (
-		<section className="flex min-w-0 flex-col gap-6" data-testid="leaderboard-page">
+		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="leaderboard-page">
 			<PageHeader title={t("leaderboard.title")} subtitle={t("leaderboard.pageSubtitle")} />
 			<RouteTabs tabs={tabs} defaultTab="leaderboard" label={t("leaderboard.tabs.label")} testId="leaderboard-tabs">
 				{(active) => (active === "trends" ? <TrendsTab /> : <LeaderboardTab />)}
@@ -134,6 +136,7 @@ export function LeaderboardTab() {
 					testId="leaderboard-reviewed-badge"
 				/>
 			</div>
+			<SuiteTabs groups={trackGroups} track={track} onTrack={onTrack} disabled={board.isLoading} />
 			{showBanner && <LeaderboardSyntheticBanner />}
 			{data?.split === "held_out" && <LeaderboardHeldOutBanner />}
 			{judged && (
@@ -200,6 +203,8 @@ export function LeaderboardTab() {
 
 function Board({ data, isFetching, onShowSynthetic }: { data: LeaderboardResponse; isFetching: boolean; onShowSynthetic: () => void }) {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("u12");
+	const [compact, setCompact] = useState(true);
 	const [sortKey, setSortKey] = useQueryState("sort", parseAsString);
 	const [sortDir, setSortDir] = useQueryState("dir", parseAsStringLiteral(SORT_DIRS));
 
@@ -217,21 +222,27 @@ function Board({ data, isFetching, onShowSynthetic }: { data: LeaderboardRespons
 
 	return (
 		<div className={cn("flex min-w-0 flex-col gap-6 transition-opacity", isFetching && "opacity-60")} aria-busy={isFetching}>
+			{entries.length > 0 && <Podium entries={entries} />}
 			<Section
 				title={t("leaderboard.table.title")}
 				description={t("leaderboard.table.description")}
 				testId="leaderboard-ranking"
 				actions={
 					entries.length > 0 && (
-						<CopyMarkdownButton build={() => leaderboardMarkdown(data, rows, faults, getLocale())} disabled={isFetching} />
+						<div className="flex items-center gap-2">
+							<Button variant="ghost" size="sm" onClick={() => setCompact((c) => !c)} dataTestId="leaderboard-columns-toggle">
+								{compact ? tu("board.more") : tu("board.less")}
+							</Button>
+							<CopyMarkdownButton build={() => leaderboardMarkdown(data, rows, faults, getLocale())} disabled={isFetching} />
+						</div>
 					)
 				}
 			>
 				{entries.length === 0 ? (
 					<EmptyBoard data={data} onShowSynthetic={onShowSynthetic} />
 				) : (
-					<div className="min-w-0 rounded-sm border">
-						<LeaderboardTable rows={rows} faults={faults} sort={sort} onSort={onSort} alpha={data.alpha} />
+					<div className="bg-card min-w-0 overflow-hidden rounded-xl border">
+						<LeaderboardTable rows={rows} faults={faults} sort={sort} onSort={onSort} alpha={data.alpha} compact={compact} />
 					</div>
 				)}
 			</Section>

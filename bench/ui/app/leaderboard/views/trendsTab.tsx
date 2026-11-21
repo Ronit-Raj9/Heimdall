@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
  */
 export default function TrendsTab() {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("u12");
 	const [suite, setSuite] = useQueryState("suite", parseAsString);
 	const [agent, setAgent] = useQueryState("agent", parseAsString);
 	const [metric, setMetric] = useQueryState("metric", parseAsStringLiteral(TREND_METRICS));
@@ -86,7 +87,14 @@ export default function TrendsTab() {
 					)}
 				</div>
 			) : (
-				<div className={cn("transition-opacity", trends.isFetching && "opacity-60")} aria-busy={trends.isFetching}>
+				<div
+					className={cn("bg-card flex min-w-0 flex-col gap-4 rounded-xl border p-5 transition-opacity", trends.isFetching && "opacity-60")}
+					aria-busy={trends.isFetching}
+				>
+					<header className="flex flex-col gap-0.5">
+						<h2 className="text-base font-semibold tracking-tight">{tu("trends.title")}</h2>
+						<p className="text-muted-foreground text-sm">{tu("trends.subtitle")}</p>
+					</header>
 					<TrendsBoard data={data} onIncludeSynthetic={() => void setSynthetic("include")} />
 				</div>
 			)}

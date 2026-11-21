@@ -19,17 +19,23 @@ export interface LeaderboardTableProps {
 	onSort: (key: SortKey) => void;
 	/** Significance level of the tiers, for the tier group labels. */
 	alpha: number;
+	/** Fewer columns: tier, extra metrics and experiments are left out. */
+	compact?: boolean;
 }
+
+/** The metric columns a compact table keeps. */
+export const COMPACT_METRICS = ["cost_per_success", "tokens"] as const;
 
 /**
  * One row per agent configuration. Rank and tier come from the server; a column click sorts on the
  * client and the rank keeps its meaning. In rank order, tier groups are marked with a divider row.
  */
-export function LeaderboardTable({ rows, faults, sort, onSort, alpha }: LeaderboardTableProps) {
+export function LeaderboardTable({ rows, faults, sort, onSort, alpha, compact = false }: LeaderboardTableProps) {
 	const { t } = useTranslation("bench");
 	const locale = getLocale();
 	const groupStarts = sort.key === "rank" ? tierGroupStarts(rows) : new Map<number, 1 | 2>();
-	const columnCount = 5 + METRIC_COLUMNS.length + faults.length + 2;
+	const metricColumns = compact ? METRIC_COLUMNS.filter((c) => (COMPACT_METRICS as readonly string[]).includes(c.id)) : METRIC_COLUMNS;
+	const columnCount = (compact ? 3 : 5) + metricColumns.length + faults.length + (compact ? 1 : 2);
 	const head = (key: SortKey, label: string, hint?: string, align: "left" | "right" = "right") => (
 		<SortableHead key={key} sortKey={key} label={label} hint={hint} sort={sort} onSort={onSort} align={align} />
 	);
@@ -39,11 +45,11 @@ export function LeaderboardTable({ rows, faults, sort, onSort, alpha }: Leaderbo
 			<TableHeader>
 				<TableRow className="hover:bg-transparent">
 					{head("rank", t("leaderboard.table.rank"), undefined, "left")}
-					<TableHead>{t("leaderboard.table.tier")}</TableHead>
+					{!compact && <TableHead>{t("leaderboard.table.tier")}</TableHead>}
 					{head("agent", t("leaderboard.table.agent"), undefined, "left")}
 					{head("success", t("leaderboard.table.success"), t("leaderboard.table.successHint"), "left")}
 					{head("reliability", t("leaderboard.table.reliability"), t("leaderboard.table.reliabilityHint"))}
-					{METRIC_COLUMNS.map((column) => head(column.id, t(`leaderboard.table.${column.id}`), t(`leaderboard.table.${column.id}Hint`)))}
+					{metricColumns.map((column) => head(column.id, t(`leaderboard.table.${column.id}`), t(`leaderboard.table.${column.id}Hint`)))}
 					{faults.map((fault) =>
 						head(
 							`${RESILIENCE_PREFIX}${fault}`,
@@ -52,7 +58,7 @@ export function LeaderboardTable({ rows, faults, sort, onSort, alpha }: Leaderbo
 						),
 					)}
 					{head("tasks", t("leaderboard.table.tasks"), t("leaderboard.table.tasksHint"))}
-					<TableHead>{t("leaderboard.table.experiments")}</TableHead>
+					{!compact && <TableHead>{t("leaderboard.table.experiments")}</TableHead>}
 				</TableRow>
 			</TableHeader>
 			<TableBody>
@@ -88,9 +94,11 @@ export function LeaderboardTable({ rows, faults, sort, onSort, alpha }: Leaderbo
 								>
 									{entry.rank}
 								</TableCell>
-								<TableCell className="align-top">
-									<TierBadge entry={entry} />
-								</TableCell>
+								{!compact && (
+									<TableCell className="align-top">
+										<TierBadge entry={entry} />
+									</TableCell>
+								)}
 								<TableCell className="align-top">
 									<AgentCell entry={entry} />
 								</TableCell>
@@ -100,7 +108,7 @@ export function LeaderboardTable({ rows, faults, sort, onSort, alpha }: Leaderbo
 								<TableCell className="text-right align-top">
 									<ReliabilityCell entry={entry} />
 								</TableCell>
-								{METRIC_COLUMNS.map((column) => (
+								{metricColumns.map((column) => (
 									<TableCell key={column.id} className="text-right align-top" data-testid={`leaderboard-metric-${entry.rank}-${column.id}`}>
 										<ValueCell value={entry.metrics?.[column.id]} kind={column.kind} />
 									</TableCell>
@@ -117,9 +125,11 @@ export function LeaderboardTable({ rows, faults, sort, onSort, alpha }: Leaderbo
 								<TableCell className="text-right align-top tabular-nums" data-testid={`leaderboard-tasks-${entry.rank}`}>
 									{t("leaderboard.cell.tasksRuns", { tasks: formatCount(entry.tasks, locale), runs: formatCount(entry.runs, locale) })}
 								</TableCell>
-								<TableCell className="align-top">
-									<ExperimentLinks entry={entry} />
-								</TableCell>
+								{!compact && (
+									<TableCell className="align-top">
+										<ExperimentLinks entry={entry} />
+									</TableCell>
+								)}
 							</TableRow>
 						</Fragment>
 					);
