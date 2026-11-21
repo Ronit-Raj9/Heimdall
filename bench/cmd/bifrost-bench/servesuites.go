@@ -98,6 +98,9 @@ func suiteIDsIn(root string) ([]string, error) {
 // LoadSuite loads one pack by id.
 func (s serveSuites) LoadSuite(ctx context.Context, id string) (*schemas.Suite, error) {
 	if s.library != "" {
+		if dir, lib := suite.PickSuiteDir(s.root, s.library, id); lib {
+			return s.loadLibraryCached(ctx, dir, id) // read-only and large: cached per stamp (servesuitecache.go)
+		}
 		return suite.Layered(s.root, s.library)[0].Load(ctx, id)
 	}
 	return loadSuite(ctx, s.root, id)

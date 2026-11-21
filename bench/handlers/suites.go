@@ -12,6 +12,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/fasthttp/router"
@@ -126,19 +127,38 @@ func (h *SuitesHandler) getSuites(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.mode, "list suites", err)
 		return
 	}
-	out := schemas.SuiteList{Suites: make([]schemas.SuiteSummary, 0, len(ids))}
+	out := schemas.SuiteList{Suites: make([]schemas.SuiteSummary, len(ids))}
 	origin, _ := h.suites.(suiteOrigin)
-	for _, id := range ids {
-		var sum schemas.SuiteSummary
-		if s, err := h.suites.LoadSuite(work, id); err != nil {
-			sum = brokenSuite(id, err)
-		} else {
-			sum = h.summarize(work, s)
+	if _, cached := h.suites.(suiteStamper); !cached {
+		// No cache side: load each pack in the request, as before.
+		for i, id := range ids {
+			if s, err := h.suites.LoadSuite(work, id); err != nil {
+				out.Suites[i] = brokenSuite(id, err)
+			} else {
+				out.Suites[i] = h.summarize(work, s)
+			}
 		}
+	} else {
+		// Every pack has its own budget (suitecache.go); the waits run side
+		// by side and the loads behind them are bounded by the cache.
+		var wg sync.WaitGroup
+		for i, id := range ids {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				sum, ok := h.cachedSummary(id, suiteListBudget)
+				if !ok {
+					sum = headSummary(h.suites, id)
+				}
+				out.Suites[i] = sum
+			}()
+		}
+		wg.Wait()
+	}
+	for i, id := range ids {
 		if origin != nil && origin.SuiteBuiltin(id) {
-			sum.Builtin, sum.Source = true, "library"
+			out.Suites[i].Builtin, out.Suites[i].Source = true, "library"
 		}
-		out.Suites = append(out.Suites, sum)
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
 }
@@ -182,13 +202,40 @@ func (h *SuitesHandler) getSuiteTask(ctx *fasthttp.RequestCtx) {
 	if h.refuseHeldOut(ctx, id, t) { // Suite health area: held-out tasks are not served (suitehealth.go)
 		return
 	}
-	sum := h.summarize(work, s)
+	sum, ok := h.cachedSummary(id, suiteListBudget)
+	if !ok || !hasTask(sum, taskID) {
+		// No cached summary: this task's entry without lock drift, so a large
+		// pack is never rehashed per request (suitecache.go).
+		sum = h.taskOnlySummary(s, t)
+	}
 	detail, err := taskDetail(s, t, sum)
 	if err != nil {
 		sendDepError(ctx, h.mode, "task "+id+"/"+taskID, err)
 		return
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, detail)
+}
+
+// hasTask reports that sum lists task id.
+func hasTask(sum schemas.SuiteSummary, id string) bool {
+	for _, st := range sum.Tasks {
+		if st.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+// taskOnlySummary is the summary of suite s holding task t alone, without
+// lock drift: what the task detail needs when no full summary is cached.
+func (h *SuitesHandler) taskOnlySummary(s *schemas.Suite, t *schemas.Task) schemas.SuiteSummary {
+	out := schemas.SuiteSummary{ID: s.ID, Version: s.Version, VerifierResult: verifierResult(s.Verifier)}
+	out.Tasks = []schemas.SuiteTask{summarizeTask(s, t, nil)}
+	one := *s // shallow copy: the loaded suite may be shared (library cache)
+	one.Tasks = []*schemas.Task{t}
+	scenarioSummary(&one, &out)
+	h.healthSummary(&one, &out)
+	return out
 }
 
 // summarize builds a loaded suite's summary: lock state, drift, probes and

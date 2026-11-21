@@ -199,6 +199,9 @@ type suiteFacts struct {
 	tasks   map[string]string // task id -> output kind, only for tasks that set their own
 }
 
+// runListSuiteBudget is how long the runs list waits for one suite.
+const runListSuiteBudget = 2 * time.Second
+
 // suiteInfo loads every suite once per request. A suite that fails to load
 // is left out: its rows carry no track or output, and the list still answers.
 func (h *RunListHandler) suiteInfo(ctx context.Context) map[string]suiteFacts {
@@ -211,7 +214,11 @@ func (h *RunListHandler) suiteInfo(ctx context.Context) map[string]suiteFacts {
 		return out
 	}
 	for _, id := range ids {
-		s, err := h.suites.LoadSuite(ctx, id)
+		// A pack still loading (a large library pack after start, cached by
+		// the source) is left out rather than holding the whole list.
+		one, cancel := context.WithTimeout(ctx, runListSuiteBudget)
+		s, err := h.suites.LoadSuite(one, id)
+		cancel()
 		if err != nil || s == nil {
 			continue
 		}
