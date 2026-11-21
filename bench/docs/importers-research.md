@@ -262,6 +262,16 @@ share one corpus, so a suite is imported in one go: importing the same
 selection again changes nothing (`-force` rewrites it byte for byte), and a
 different selection into an existing suite is refused.
 
+**The full set.** All 830 queries in one suite took 13 GB of memory in the
+importer and were killed on a 15 GB host (21 Nov 2026), and the corpus
+service would index about 67,700 pages at every run start. Import one suite
+per upstream shard instead (`tojsonl.py` on one parquet file each, about 138
+queries and 11,000 pages, 3.3 to 4.1 GB peak in the importer): at revision
+144cff8e that is 703 queries in `match` mode and 127 judged, across six
+suites of each. Upstream's corpus has docids that share a URL and one
+`chrome-extension://` URL; the importer gives every page its own http(s)
+URL (`bcp-docid=<docid>` added to a shared one).
+
 ### Answers stay obfuscated
 
 The importer decrypts the question, the answer and the pages in memory (the
