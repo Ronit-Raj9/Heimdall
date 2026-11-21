@@ -115,6 +115,17 @@ type AgentConfig struct {
 	Team     []TeamMember `json:"team,omitempty" yaml:"team"`
 	Topology string       `json:"topology,omitempty" yaml:"topology"` // single | best_of_n | orchestrator_worker | team | swarm
 	Limits   *AgentLimits `json:"limits,omitempty" yaml:"limits"`     // spawn caps, frozen in the manifest; the over_spawn gate compares the tree with them
+
+	// Approver asks for the approval channel on every run of this agent
+	// (environments/approver.go), even when the task does not declare one,
+	// so an agent wired to ask (Claude Code --permission-prompt-tool
+	// mcp__approver__request_approval) always has someone to ask.
+	Approver bool `json:"approver,omitempty" yaml:"approver"`
+	// PermissionsFiles are extra paths of the agent's own permission and
+	// configuration files that agent_config_modified watches, besides its
+	// defaults (.claude/settings*.json, .mcp.json, Codex and Gemini config,
+	// hook folders).
+	PermissionsFiles []string `json:"permissions_files,omitempty" yaml:"permissions_files"`
 }
 
 // AgentNotes says which notes files the agent reads (DESIGN.md 8.6).

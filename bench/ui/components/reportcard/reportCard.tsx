@@ -1,12 +1,14 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { EvaluationArm, Report, ReportArmMetrics, ReportBenchmark } from "@/lib/store/apis/evaluationsApi";
+import type { EvaluationArm, Report, ReportAlignmentRate, ReportArmMetrics, ReportBenchmark } from "@/lib/store/apis/evaluationsApi";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { ArrowUpRight, Check, ChevronRight, Download, Equal, Link2 } from "lucide-react";
 import * as React from "react";
 import {
+	alignmentText,
 	armDescription,
 	armName,
 	benchmarkWinner,
@@ -93,6 +95,15 @@ export function ReportCard({ report: raw, className, actions, readOnly = false }
 			{report.safety && (Object.keys(report.safety.attack_resisted).length > 0 || Object.keys(report.safety.cheat_rate).length > 0) && (
 				<Section title="Safety" description="Attacks resisted (higher is better) and cheat rate (lower is better).">
 					<SafetyTable report={report} />
+				</Section>
+			)}
+
+			{report.alignment && report.alignment.categories.length > 0 && (
+				<Section
+					title="Safety and alignment"
+					description="Share of tested runs where the agent did the unsafe thing (lower is better), with the 95% confidence range. Not tested means no run in this evaluation checked it."
+				>
+					<AlignmentSection report={report} />
 				</Section>
 			)}
 		</article>
@@ -459,6 +470,88 @@ function SafetyTable({ report }: { report: Report }) {
 				</TableRow>
 			</TableBody>
 		</Table>
+	);
+}
+
+function AlignmentCell({ rate }: { rate?: ReportAlignmentRate }) {
+	if (!rate) return <span className="text-muted-foreground">Not tested</span>;
+	return (
+		<span className="flex flex-col items-end">
+			<span>{alignmentText(rate)}</span>
+			<span className="text-muted-foreground text-xs">
+				{rate.fired} of {rate.runs} runs
+			</span>
+		</span>
+	);
+}
+
+function AlignmentSection({ report }: { report: Report }) {
+	const alignment = report.alignment!;
+	const flagged = alignment.impossible_flagged ?? {};
+	const coverage = alignment.owasp_agentic ?? [];
+	const tested = coverage.filter((c) => c.tested).length;
+	return (
+		<div className="flex flex-col gap-4">
+			<Table data-testid="report-alignment" aria-label="Safety and alignment">
+				<TableHeader>
+					<TableRow>
+						<TableHead scope="col">Category</TableHead>
+						{report.arms.map((arm) => (
+							<TableHead key={arm.label} scope="col" className="text-right">
+								{isAB(report) ? arm.label : "Your agent"}
+							</TableHead>
+						))}
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					{alignment.categories.map((c) => (
+						<TableRow key={c.id} data-testid={`alignment-${c.id}`}>
+							<TableHead scope="row" className="font-medium whitespace-normal">
+								<span className="block">{c.label}</span>
+								{c.description && <span className="text-muted-foreground block text-xs font-normal">{c.description}</span>}
+							</TableHead>
+							{report.arms.map((arm) => (
+								<TableCell key={arm.label} className="text-right tabular-nums">
+									<AlignmentCell rate={c.arms[arm.label]} />
+								</TableCell>
+							))}
+						</TableRow>
+					))}
+					{Object.keys(flagged).length > 0 && (
+						<TableRow data-testid="alignment-impossible-flagged">
+							<TableHead scope="row" className="font-medium whitespace-normal">
+								<span className="block">Impossible tasks flagged</span>
+								<span className="text-muted-foreground block text-xs font-normal">
+									Said the tests and the instruction conflict instead of faking a pass (higher is better).
+								</span>
+							</TableHead>
+							{report.arms.map((arm) => (
+								<TableCell key={arm.label} className="text-right tabular-nums">
+									<AlignmentCell rate={flagged[arm.label]} />
+								</TableCell>
+							))}
+						</TableRow>
+					)}
+				</TableBody>
+			</Table>
+			{coverage.length > 0 && (
+				<div data-testid="alignment-owasp" className="flex flex-col gap-2">
+					<p className="text-muted-foreground text-xs">
+						OWASP Top 10 for Agentic Applications: {tested} of {coverage.length} risks tested in this evaluation.
+					</p>
+					<ul className="flex flex-wrap gap-1.5">
+						{coverage.map((c) => (
+							<li key={c.id}>
+								<Badge variant={c.tested ? "success" : "neutral"} title={`${c.name}: ${c.tested ? "tested" : "not tested"}`}>
+									{c.id} {c.name}
+									<span className="sr-only">{c.tested ? ", tested" : ", not tested"}</span>
+								</Badge>
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
+		</div>
 	);
 }
 

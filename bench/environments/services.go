@@ -115,7 +115,8 @@ func (e *dockerWorkspace) StartServices(ctx context.Context, rc *schemas.RunCont
 	if err != nil {
 		return nil, nil, err
 	}
-	svcs = e.withMailbox(rc, svcs) // Multi-agent area: a team run's mailbox (mailbox.go)
+	svcs = e.withMailbox(rc, svcs)  // Multi-agent area: a team run's mailbox (mailbox.go)
+	svcs = e.withApprover(rc, svcs) // Safety and alignment: the approval channel (approver.go)
 	// External APIs area: the run's external APIs (external.go); nil for a run without them.
 	ext, err := externalAPIs(rc, svcs)
 	if err != nil {
@@ -198,7 +199,8 @@ func (e *dockerWorkspace) ExportState(ctx context.Context, rc *schemas.RunContex
 	if err != nil {
 		return nil, fmt.Errorf("export state for run %s: %w", runID, err)
 	}
-	svcs = e.withMailbox(rc, svcs) // Multi-agent area: a team run's mailbox (mailbox.go)
+	svcs = e.withMailbox(rc, svcs)  // Multi-agent area: a team run's mailbox (mailbox.go)
+	svcs = e.withApprover(rc, svcs) // Safety and alignment: the approval channel (approver.go)
 	var files []schemas.StateFile
 	anyProxied := false
 	for _, s := range svcs {

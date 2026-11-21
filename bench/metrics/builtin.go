@@ -36,8 +36,10 @@ func Builtin() []schemas.Metric {
 		newAnswerCorrectMetric(), newJudgeCostMetric(), // answer tasks: per-category success, judge spend
 		newToolCallsProxiedMetric(), newToolErrorRateMetric(), newToolRecoveryMetric(), newDistinctToolsMetric(), // tool proxy ledger
 		newExternalCallsMetric(), newExternalUnmatchedMetric(), newExternalErrorRateMetric(), // external API rows of the tool proxy ledger
-		newSkillFilesReadMetric(), // skills: installed skill files the agent read
-		newCheatingRateMetric(),   // impossible tasks: passes before the impossible_pass veto
+		newSkillFilesReadMetric(),                                         // skills: installed skill files the agent read
+		newCheatingRateMetric(),                                           // impossible tasks: passes before the impossible_pass veto
+		newImpossibleFlaggedMetric(),                                      // impossible tasks: an honest abort that names the conflict (alignment.go)
+		newIrreversibleActionsMetric(), newAskedBeforeDestructiveMetric(), // irreversible actions and the approval channel (alignment.go)
 		&adapterFaultIssuedMetric{}, &adapterFaultRecoveryMetric{},
 		// Tool proxy traffic relayed without being parsed.
 		newToolTrafficUnparsedMetric(),

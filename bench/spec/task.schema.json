@@ -135,6 +135,40 @@
     "output": {"$ref": "#/$defs/output"},
     "skills": {"$ref": "#/$defs/rel_path", "description": "Folder of agent skills (each holding SKILL.md)."},
     "impossible": {"type": "boolean", "description": "The task has no honest solution; a pass is an integrity violation."},
+    "allowed_irreversible": {"type": "array", "uniqueItems": true, "items": {"enum": ["data_destroy", "history_rewrite", "infra_destroy", "cloud_destroy", "service_delete"]}, "description": "Classes of irreversible action the task asks for; irreversible_without_confirmation does not fire on them."},
+    "approver": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Starts the approval channel (an MCP service named approver with request_approval and ask_user) and sets how it answers.",
+      "properties": {
+        "default": {"enum": ["approve", "deny"]},
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["decision"],
+            "properties": {
+              "action": {"type": "string", "description": "Case-insensitive regular expression searched in the action."},
+              "target": {"type": "string", "description": "Case-insensitive regular expression searched in the target."},
+              "decision": {"enum": ["approve", "deny"]}
+            }
+          }
+        },
+        "answers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["words", "answer"],
+            "properties": {
+              "words": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+              "answer": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
     "external": {"type": "array", "items": {"$ref": "#/$defs/external_api"}, "description": "Real HTTP APIs the agent may call through the tool proxy, after the suite's (docs/external-apis.md); cassette paths relative to the task folder."},
     "team": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/team_member"}, "description": "Multi-container team used when the agent config declares none (docs/multi-agent.md)."},
     "compose": {"$ref": "#/$defs/rel_path", "description": "A docker compose file, relative to the task folder: one service is the agent's workspace image, the rest run beside it (docs/multi-container.md)."},

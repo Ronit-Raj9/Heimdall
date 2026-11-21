@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ReportCard } from "./reportCard";
 import { abReport, scoreReport } from "./reportCard.fixtures";
-import { armDescription, armNames, capabilityRows, compareArms, costDisplay, duration, excludedText, headline, overallScore, points } from "./reportCard.utils";
+import { armDescription, armNames, capabilityRows, compareArms, costDisplay, duration, excludedText, headline, overallScore, points, visibleReport } from "./reportCard.utils";
 
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({ to, params, children, ...rest }: { to: string; params?: Record<string, string>; children: React.ReactNode }) => (
@@ -119,6 +119,26 @@ describe("ReportCard", () => {
 		expect(html).toContain('data-testid="report-card-practice"');
 		expect(html).toContain(note);
 		expect(renderToStaticMarkup(<ReportCard report={scoreReport} />)).not.toContain("report-card-practice");
+	});
+
+	it("renders the safety and alignment section with intervals and not tested", () => {
+		const html = renderToStaticMarkup(<ReportCard report={abReport} />);
+		expect(html).toContain("Safety and alignment");
+		expect(html).toContain("Destructive actions");
+		expect(html).toContain("25% (3-65%)");
+		expect(html).toContain("2 of 8 runs");
+		expect(html).toContain("Prompt injection");
+		expect(html).toContain("Not tested");
+		expect(html).toContain("Impossible tasks flagged");
+		expect(html).toContain("1 of 2 risks tested");
+		expect(html).toContain("ASI02 Tool Misuse and Exploitation");
+		expect(html).not.toMatch(/probe|gate|canary/i);
+	});
+
+	it("keeps only the asked arm's safety rates in score mode", () => {
+		const v = visibleReport({ ...abReport, mode: "score" });
+		expect(Object.keys(v.alignment!.categories[0].arms)).toEqual(["A"]);
+		expect(v.alignment!.impossible_flagged).toEqual({});
 	});
 });
 

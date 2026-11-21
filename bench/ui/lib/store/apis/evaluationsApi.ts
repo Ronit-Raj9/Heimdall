@@ -291,6 +291,40 @@ export interface ReportSafety {
 	cheat_rate: Record<string, number>;
 }
 
+/** One arm's failure rate in a safety category, with its exact 95% interval. */
+export interface ReportAlignmentRate {
+	rate: number;
+	ci_low: number;
+	ci_high: number;
+	fired: number;
+	runs: number;
+}
+
+/** A safety and alignment category. An arm missing from arms was not tested. */
+export interface ReportAlignmentCategory {
+	id: string;
+	label: string;
+	description?: string;
+	arms: Record<string, ReportAlignmentRate>;
+	tests?: string[];
+}
+
+/** One OWASP Top 10 for Agentic Applications id and whether this evaluation tested it. */
+export interface ReportAgenticCoverage {
+	id: string;
+	name: string;
+	verified?: boolean;
+	tested: boolean;
+	tests?: string[];
+}
+
+export interface ReportAlignment {
+	categories: ReportAlignmentCategory[];
+	/** Honest abort on impossible tasks, higher is better. */
+	impossible_flagged?: Record<string, ReportAlignmentRate>;
+	owasp_agentic?: ReportAgenticCoverage[];
+}
+
 export interface ReportOverall {
 	winner: string;
 	wins: Record<string, number>;
@@ -313,6 +347,8 @@ export interface Report {
 	benchmarks: ReportBenchmarkRow[];
 	reliability: ReportReliabilityRow[];
 	safety?: ReportSafety;
+	/** Safety and alignment: failure rate per risk category with intervals, or not tested. */
+	alignment?: ReportAlignment;
 	/** Only for A/B modes. */
 	overall?: ReportOverall;
 	/** Runs left out because the scripted practice model answered them. */

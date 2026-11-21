@@ -35,6 +35,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/faults"
 	"github.com/maximhq/bifrost/bench/packs"
+	"github.com/maximhq/bifrost/bench/reportcard"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -446,7 +447,8 @@ type evalReport struct {
 		AttackResisted map[string]float64 `json:"attack_resisted"`
 		CheatRate      map[string]float64 `json:"cheat_rate"`
 	} `json:"safety,omitempty"`
-	Overall *struct {
+	Alignment *reportcard.Alignment `json:"alignment,omitempty"`
+	Overall   *struct {
 		Winner  string         `json:"winner"`
 		Wins    map[string]int `json:"wins"`
 		Summary string         `json:"summary"`
@@ -454,6 +456,15 @@ type evalReport struct {
 }
 
 // ---- rendering ----
+
+// alignmentCell is one arm's safety rate, or "not tested".
+func alignmentCell(arms map[string]reportcard.AlignmentRate, label string) string {
+	r, ok := arms[label]
+	if !ok {
+		return "not tested"
+	}
+	return fmt.Sprintf("%.0f%% (%.0f-%.0f%%, %d runs)", r.Rate*100, r.CILow*100, r.CIHigh*100, r.Runs)
+}
 
 func renderEstimate(w io.Writer, e *evalEstimate) {
 	fmt.Fprintf(w, "runs:    %d\n", e.Runs)
@@ -632,6 +643,36 @@ func renderReport(w io.Writer, r *evalReport) {
 				fmt.Fprintf(w, "  %s: %s\n", l, strings.Join(parts, ", "))
 			}
 		}
+	}
+
+	if r.Alignment != nil && len(r.Alignment.Categories) > 0 {
+		fmt.Fprintln(w, "\nsafety and alignment (share of tested runs that failed, 95% interval):")
+		tw = tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
+		head(tw, "CATEGORY")
+		for _, c := range r.Alignment.Categories {
+			row := []string{c.Label}
+			for _, l := range labels {
+				row = append(row, alignmentCell(c.Arms, l))
+			}
+			fmt.Fprintln(tw, strings.Join(row, "\t"))
+		}
+		if len(r.Alignment.ImpossibleFlagged) > 0 {
+			row := []string{"Impossible task flagged (higher is better)"}
+			for _, l := range labels {
+				row = append(row, alignmentCell(r.Alignment.ImpossibleFlagged, l))
+			}
+			fmt.Fprintln(tw, strings.Join(row, "\t"))
+		}
+		tw.Flush()
+		var tested, untested []string
+		for _, c := range r.Alignment.OWASPAgentic {
+			if c.Tested {
+				tested = append(tested, c.ID)
+			} else {
+				untested = append(untested, c.ID)
+			}
+		}
+		fmt.Fprintf(w, "OWASP agentic tested: %s; not tested: %s\n", listOrNone(tested), listOrNone(untested))
 	}
 
 	if r.Overall != nil && r.Overall.Summary != "" {

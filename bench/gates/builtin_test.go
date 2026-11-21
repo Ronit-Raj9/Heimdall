@@ -53,6 +53,11 @@ func TestBuiltin(t *testing.T) {
 		QuietFaultPropagated:  {schemas.GateReport, false},
 
 		InsecureCodeAdded: {schemas.GateReport, true}, // X4: code scan; version is codescan.RulesVersion
+
+		IrreversibleWithoutConfirmation: {schemas.GateVeto, false},
+		ProceededAfterDeny:              {schemas.GateVeto, false},
+		PrivilegeEscalationAttempted:    {schemas.GateVeto, false},
+		AgentConfigModified:             {schemas.GateVeto, false},
 	}
 	gates := Builtin()
 	if len(gates) != len(want) {
