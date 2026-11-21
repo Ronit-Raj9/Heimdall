@@ -25,6 +25,7 @@ package cheatbench
 import (
 	"bufio"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -105,6 +106,7 @@ type row struct {
 	FilesAbs map[string]string `json:"files_abs"`
 	Vars     map[string]any    `json:"vars"`
 	Meta     json.RawMessage   `json:"meta"`
+	raw      json.RawMessage
 }
 
 // Import implements importers.Importer.
@@ -208,6 +210,13 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 				t := task{ID: id, Upstream: name, Variant: set.variant, Row: r, Instruction: instr,
 					Rubric: rubric(string(schema), r), Draft: reason, EnvDir: set.envDir, TimeoutS: ut.TimeoutS,
 					Revision: revision}
+				if reason == "" && ut.Grader.Kind == yaml.ScalarNode && ut.Grader.Value != "" {
+					g, err := readGrader(root, tdir, ut.Grader.Value)
+					if err != nil {
+						return nil, err
+					}
+					t.Grader = g
+				}
 				if err := writeTask(suiteDir, t, opts.Force); err != nil {
 					if errors.Is(err, fs.ErrExist) {
 						res.Skipped = append(res.Skipped, importers.Skip{ID: up, Reason: "task folder exists (use -force to replace it)"})
@@ -287,6 +296,11 @@ func readUpstreamTask(dir string) (*upstreamTask, error) {
 	return &ut, nil
 }
 
+// mcpPorted are the tasks whose grader.py tool runs as an MCP service
+// (svc/heimdall_grader.py): its make_tool needs only the row, not the
+// agent's workspace or an episode service.
+var mcpPorted = map[string]bool{"prime_factorization": true, "subset_sum": true}
+
 // draftReason is why the task's rows cannot run here, empty when they can.
 func draftReason(name string, ut *upstreamTask, dir string) string {
 	exists := func(rel string) bool { _, err := os.Stat(filepath.Join(dir, rel)); return err == nil }
@@ -299,6 +313,8 @@ func draftReason(name string, ut *upstreamTask, dir string) string {
 		return "harbor-runner: SWE-bench Pro instances run through upstream's separate Harbor workflow (harbor-datasets images); not ported"
 	case ut.Grader.Kind == yaml.MappingNode:
 		return "paid-grader: the staged grader calls an upstream LLM grader model we hold no key for"
+	case ut.Grader.Kind == yaml.ScalarNode && ut.Grader.Value != "" && mcpPorted[name]:
+		return ""
 	case ut.Grader.Kind == yaml.ScalarNode && ut.Grader.Value != "":
 		return "mcp-grader-tool: needs the agent-callable MCP tool of " + ut.Grader.Value + " hosted by upstream's agent adapter; not ported"
 	case ut.Service.Kind != 0:
@@ -364,6 +380,7 @@ func readRows(path string) ([]row, error) {
 		if err := json.Unmarshal([]byte(line), &r); err != nil {
 			return nil, fmt.Errorf("%s line %d: %w", path, n, err)
 		}
+		r.raw = json.RawMessage(append([]byte(nil), line...))
 		if r.ID == "" {
 			return nil, fmt.Errorf("%s line %d: row has no id", path, n)
 		}
@@ -462,6 +479,14 @@ type task struct {
 	EnvDir                string
 	TimeoutS              int
 	Revision              string
+	Grader                *graderSvc
+}
+
+// graderSvc is an upstream grader tool served as the task's MCP service.
+type graderSvc struct {
+	Server string // SERVER_NAME of grader.py: the service id
+	Source string // grader.py
+	Core   string // the upstream checkout (core/agents/runner_support.py, core/grader_guard.py)
 }
 
 // copyFile copies one staged file, refusing a source outside base.
@@ -598,7 +623,119 @@ func writeTask(suiteDir string, t task, force bool) error {
 			return err
 		}
 	}
-	return writeCommon(dir, t.ID, t.Upstream, t.Variant, t.Row.ID, t.Instruction, t.Rubric, t.Draft, t.TimeoutS, t.Revision, env)
+	var svcs []serviceYAML
+	if t.Grader != nil {
+		sv, err := writeGraderService(dir, t)
+		if err != nil {
+			return err
+		}
+		svcs = append(svcs, sv)
+	}
+	return writeCommon(dir, t.ID, t.Upstream, t.Variant, t.Row.ID, t.Instruction, t.Rubric, t.Draft, t.TimeoutS, t.Revision, env, svcs...)
+}
+
+var serverNameRe = regexp.MustCompile(`(?m)^SERVER_NAME\s*=\s*["']([A-Za-z0-9_-]+)["']`)
+
+func readGrader(root, tdir, rel string) (*graderSvc, error) {
+	b, err := os.ReadFile(filepath.Join(tdir, rel))
+	if err != nil {
+		return nil, fmt.Errorf("grader %s: %w", rel, err)
+	}
+	m := serverNameRe.FindSubmatch(b)
+	name := "grader"
+	if m != nil {
+		name = string(m[1])
+	}
+	return &graderSvc{Server: name, Source: string(b), Core: root}, nil
+}
+
+//go:embed svc/heimdall_grader.py
+var graderFront string
+
+// writeGraderService writes svc/: the image of the task's grader MCP
+// service (upstream's grader.py, runner_support.py and grader_guard.py
+// verbatim, the full row, the staged workspace) and returns its spec.
+func writeGraderService(dir string, t task) (serviceYAML, error) {
+	svc := filepath.Join(dir, "svc")
+	for _, f := range [][2]string{{"core/agents/runner_support.py", "heimdall/runner_support.py"}, {"core/grader_guard.py", "heimdall/grader_guard.py"}} {
+		if err := copyFile(t.Grader.Core, f[0], filepath.Join(svc, f[1])); err != nil {
+			return serviceYAML{}, err
+		}
+	}
+	rowJSON, err := json.Marshal(t.Row.raw)
+	if err != nil {
+		return serviceYAML{}, err
+	}
+	files := map[string]string{
+		"heimdall/heimdall_grader.py": graderFront,
+		"task/grader.py":              t.Grader.Source,
+		"task/row.json":               string(rowJSON),
+		"Dockerfile":                  graderDockerfile,
+	}
+	for rel, body := range files {
+		p := filepath.Join(svc, rel)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return serviceYAML{}, err
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			return serviceYAML{}, err
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(svc, "workspace"), 0o755); err != nil {
+		return serviceYAML{}, err
+	}
+	for dst, src := range t.Row.Files {
+		p, err := safeDest(filepath.Join(svc, "workspace"), dst)
+		if err != nil {
+			return serviceYAML{}, err
+		}
+		if err := copyFile(t.EnvDir, src, p); err != nil {
+			return serviceYAML{}, err
+		}
+	}
+	return serviceYAML{
+		ID: t.Grader.Server, Role: "mcp", Port: 8000,
+		Build: &imageBuildYAML{Dockerfile: "svc/Dockerfile", Tag: "bench/cheatbench-svc-" + t.ID + ":1"},
+		Ready: &readyYAML{HTTP: "/healthz", TimeoutS: 60},
+		MCP:   &mcpYAML{Transport: "http", Path: "/mcp"},
+	}, nil
+}
+
+const graderDockerfile = `# CheatBench grader tool service: upstream grader.py served by upstream's
+# own MCP server code (heimdall/runner_support.py, verbatim).
+FROM ` + baseTag + `
+USER root
+COPY heimdall/ /opt/heimdall/
+COPY task/ /opt/task/
+COPY workspace/ /workspace/
+RUN chmod -R a+rX,go-w /opt/heimdall /opt/task && chown -R agent:agent /workspace
+USER agent
+EXPOSE 8000
+CMD ["python3", "/opt/heimdall/heimdall_grader.py"]
+`
+
+type serviceYAML struct {
+	ID    string          `yaml:"id"`
+	Role  string          `yaml:"role"`
+	Build *imageBuildYAML `yaml:"build,omitempty"`
+	Port  int             `yaml:"port"`
+	Ready *readyYAML      `yaml:"ready,omitempty"`
+	MCP   *mcpYAML        `yaml:"mcp,omitempty"`
+}
+
+type imageBuildYAML struct {
+	Dockerfile string `yaml:"dockerfile"`
+	Tag        string `yaml:"tag"`
+}
+
+type readyYAML struct {
+	HTTP     string `yaml:"http"`
+	TimeoutS int    `yaml:"timeout_s"`
+}
+
+type mcpYAML struct {
+	Transport string `yaml:"transport"`
+	Path      string `yaml:"path"`
 }
 
 // writePlaceholder writes the one draft task of an environment with no
@@ -618,7 +755,7 @@ func writePlaceholder(suiteDir, id, name string, ut *upstreamTask, schema, why, 
 	return writeCommon(dir, id, name, "", "", instr, rubric(schema, row{}), why, ut.TimeoutS, revision, nil)
 }
 
-func writeCommon(dir, id, upstream, variant, rowID, instr, rub, draft string, timeoutS int, revision string, env *envYAML) error {
+func writeCommon(dir, id, upstream, variant, rowID, instr, rub, draft string, timeoutS int, revision string, env *envYAML, svcs ...serviceYAML) error {
 	if timeoutS <= 0 {
 		timeoutS = 3600
 	}
@@ -658,7 +795,7 @@ func writeCommon(dir, id, upstream, variant, rowID, instr, rub, draft string, ti
 		Controls: controlsYAML{Reference: "solution/answer.txt", Empty: "controls/empty.txt", Mutants: []string{},
 			Exploit: "controls/exploit.sh"},
 		Timeouts: timeoutsYAML{AgentS: timeoutS}, Tags: tags, Capabilities: []string{"honesty", "safety"},
-		Impossible: true, Environment: env,
+		Impossible: true, Environment: env, Services: svcs,
 		Provenance: provenanceYAML{Source: src, License: license, ImportedFrom: Name},
 	}
 	tb, err := yaml.Marshal(ty)
@@ -956,6 +1093,7 @@ type taskYAML struct {
 	Capabilities []string         `yaml:"capabilities,flow"`
 	Impossible   bool             `yaml:"impossible"`
 	Environment  *envYAML         `yaml:"environment,omitempty"`
+	Services     []serviceYAML    `yaml:"services,omitempty"`
 	Provenance   provenanceYAML   `yaml:"provenance"`
 }
 
