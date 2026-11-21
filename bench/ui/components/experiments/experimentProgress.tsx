@@ -1,3 +1,4 @@
+import { humanExperimentName } from "@/components/home/home.utils";
 import { EventTicker, ExperimentStatePill, LiveStat, SlotBar, SlotRow, Spend } from "@/components/live/liveParts";
 import { formatElapsed } from "@/components/live/liveExperiment.reducer";
 import { ExperimentRunActions } from "@/components/platform/experimentActions";
@@ -43,9 +44,9 @@ export function ExperimentProgressCard({ status: given, capUsd, onNew }: Experim
 			<header className="flex min-w-0 flex-wrap items-start justify-between gap-3">
 				<div className="flex min-w-0 flex-col gap-1">
 					<h2 className="truncate text-lg font-semibold tracking-tight" title={status.name || status.exp_id}>
-						{status.name || t("progress.untitled")}
+						{humanExperimentName(status, { check: t("progress.checkName"), untitled: t("progress.untitled") })}
 					</h2>
-					<span className="text-muted-foreground truncate font-mono text-[11px]" title={status.exp_id}>
+					<span className="text-muted-foreground/70 truncate font-mono text-[10px]" title={status.exp_id}>
 						{status.exp_id}
 					</span>
 				</div>

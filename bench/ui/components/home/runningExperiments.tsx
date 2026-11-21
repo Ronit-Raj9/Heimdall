@@ -9,10 +9,12 @@ import { Link } from "@tanstack/react-router";
 import { Activity, ArrowRight, CircleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { LiveDot, TrackBadge } from "./homeBits";
-import { slotShares } from "./home.utils";
+import { humanExperimentName, slotShares } from "./home.utils";
 import { useExperimentEvents } from "./useExperimentEvents";
 
 const KNOWN_EVENTS = new Set(["slot_started", "stage", "slot_sealed", "budget_stop", "experiment_done", "error", "end"]);
+/** Stage ids the live feed sends, as plain words (live.json stage.*). */
+const KNOWN_STAGES = new Set(["planned", "leased", "prepare", "arm", "run", "disarm", "export", "collect", "grade", "gate", "measure", "receipt", "cleanup", "seal"]);
 
 /** Live progress of each running experiment, one card per experiment. */
 export function RunningExperiments({
@@ -76,7 +78,8 @@ export function RunningCardBody({
 	const sealed = done + failed;
 	const percent = total > 0 ? Math.round((sealed / total) * 100) : 0;
 	const last = events.length > 0 ? events[events.length - 1] : undefined;
-	const title = status.name || status.exp_id;
+	const title = humanExperimentName(status, { check: t("running.checkName"), untitled: t("running.untitled") });
+	const suiteName = status.suite ? suiteIdOf(status.suite) : undefined;
 	const live = status.state === "running" || status.state === "analyzing";
 
 	return (
@@ -97,7 +100,11 @@ export function RunningCardBody({
 					>
 						{title}
 					</Link>
-					{status.suite && <span className="text-muted-foreground truncate text-xs">{suiteIdOf(status.suite)}</span>}
+					<span className="text-muted-foreground truncate text-xs" data-testid={`home-running-plain-${status.exp_id}`}>
+						{suiteName
+							? t("running.plainSuite", { suite: suiteName, done: sealed, total, count: total })
+							: t("running.plain", { done: sealed, total, count: total })}
+					</span>
 				</div>
 				<span
 					className="bg-chart-info/12 text-chart-info-ink inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium"
@@ -156,7 +163,7 @@ export function RunningCardBody({
 			<div className="mt-auto flex items-center justify-between gap-3 text-xs">
 				<span className="text-muted-foreground flex items-baseline gap-1 tabular-nums">
 					<ValueCell value={status.spent_usd} kind="usd" className="text-foreground font-medium" />
-					<span>{tb("home.running.spent").toLowerCase()}</span>
+					<span>{t("running.spentLabel")}</span>
 				</span>
 				<Link
 					to="/experiments/$expId"
@@ -174,10 +181,12 @@ export function RunningCardBody({
 
 function LastEvent({ event, locale }: { event: LiveEvent; locale: string }) {
 	const { t } = useTranslation("bench");
+	const { t: tl } = useTranslation("live");
 	const kind = KNOWN_EVENTS.has(event.kind) ? event.kind : null;
+	const stage = event.stage && KNOWN_STAGES.has(event.stage) ? tl(`stage.${event.stage}` as never) : (event.stage ?? "");
 	const label = kind
 		? t(`home.running.event.${kind as "slot_started" | "stage" | "slot_sealed" | "budget_stop" | "experiment_done" | "error" | "end"}`, {
-				stage: event.stage ?? "",
+				stage,
 			})
 		: event.kind;
 	const text = `${label}${event.message ? `: ${event.message}` : ""}`;

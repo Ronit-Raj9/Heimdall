@@ -4009,79 +4009,79 @@
 	},
 	"home": {
 		"title": "Home",
-		"subtitle": "What is running, what finished and what is ready to benchmark on this server.",
+		"subtitle": "What is running, what finished and which benchmarks are ready on this server.",
 		"actions": {
 			"title": "Quick actions",
-			"newExperiment": "New experiment",
-			"newExperimentHint": "Compare two agent versions on a suite.",
-			"addSuite": "Add a suite",
-			"addSuiteHint": "Import tasks from a benchmark or your own repository.",
+			"newExperiment": "Compare two setups",
+			"newExperimentHint": "Run two agent versions on the same benchmark and see which is better.",
+			"addSuite": "Add a benchmark",
+			"addSuiteHint": "Bring in tasks from a public benchmark or your own code.",
 			"addAgent": "Add an agent",
-			"addAgentHint": "Point a config at an agent CLI and a model.",
+			"addAgentHint": "Tell Heimdall which agent program and AI model to use.",
 			"getStarted": "Get started",
-			"getStartedHint": "Four commands from your own repository."
+			"getStartedHint": "Four commands, run from your own code folder."
 		},
 		"running": {
 			"title": "Running now",
 			"empty": "Nothing is running.",
-			"slots": "{{done}} of {{total}} slots sealed",
-			"slotsDetail": "{{done}} done, {{running}} running, {{failed}} failed, {{total}} total",
+			"slots": "{{done}} of {{total}} runs done",
+			"slotsDetail": "{{done}} solved, {{running}} running, {{failed}} failed, {{total}} total",
 			"spent": "Spent",
-			"last": "Last event",
-			"noEvents": "Waiting for the first event.",
+			"last": "Latest update",
+			"noEvents": "No updates yet.",
 			"event": {
-				"slot_started": "Slot started",
-				"stage": "Stage {{stage}}",
-				"slot_sealed": "Run sealed",
-				"budget_stop": "Stopped at the spend cap",
-				"experiment_done": "Experiment done",
-				"error": "Error",
-				"end": "Stream ended"
+				"slot_started": "Setting up the workspace",
+				"stage": "{{stage}}",
+				"slot_sealed": "Saved",
+				"budget_stop": "Stopped: spending limit reached",
+				"experiment_done": "Finished",
+				"error": "Something went wrong",
+				"end": "No more live updates"
 			},
 			"open": "Open",
-			"loadError": "Could not follow this experiment."
+			"loadError": "Could not follow this comparison."
 		},
 		"recent": {
-			"title": "Recent experiments",
-			"viewAll": "All experiments",
-			"empty": "No experiments yet.",
+			"title": "Recent comparisons",
+			"viewAll": "All comparisons",
+			"empty": "No comparisons yet.",
 			"col": {
-				"experiment": "Experiment",
-				"suite": "Suite",
+				"experiment": "Comparison",
+				"suite": "Benchmark",
 				"state": "Status",
-				"verdict": "Verdict",
+				"verdict": "Result",
 				"started": "Started",
 				"cost": "Cost"
 			},
 			"notStarted": "Not started",
-			"loadError": "Could not load the experiments.",
-			"verdictError": "Unavailable"
+			"loadError": "Could not load the comparisons.",
+			"verdictError": "Result not available"
 		},
 		"suites": {
-			"title": "Suites",
-			"viewAll": "All suites",
-			"empty": "No suites under the benchmarks root yet.",
+			"title": "Benchmarks",
+			"viewAll": "All benchmarks",
+			"empty": "No benchmarks found yet.",
 			"tasks_one": "{{count}} task",
 			"tasks_other": "{{count}} tasks",
-			"admitted": "{{admitted}} of {{total}} admitted",
+			"admitted": "{{admitted}} of {{total}} tasks ready",
 			"lock": {
-				"locked": "Locked",
-				"stale": "Lock stale",
-				"unlocked": "Not locked",
-				"unknown": "Lock unknown"
+				"locked": "Frozen",
+				"stale": "Changed since frozen",
+				"unlocked": "Not frozen",
+				"unknown": "Freeze state unknown"
 			},
 			"error": "Failed to load",
-			"loadError": "Could not load the suites."
+			"loadError": "Could not load the benchmarks."
 		},
 		"getStarted": {
-			"title": "Run your first benchmark",
-			"body": "No experiment has run here yet: set up a project, mine tasks, then compare two versions.",
+			"title": "Run your first test",
+			"body": "Nothing has been tested here yet. Set up a project, collect tasks, then compare two versions of your agent.",
 			"open": "Get started",
-			"newExperiment": "New experiment"
+			"newExperiment": "Compare two setups"
 		},
 		"quickstart": {
 			"title": "Get started",
-			"subtitle": "Four commands from inside your own git repository tell you whether a change breaks your coding agent."
+			"subtitle": "Four commands, run inside your own git project, tell you whether a change makes your coding agent worse."
 		}
 	}
 }

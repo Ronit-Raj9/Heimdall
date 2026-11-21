@@ -155,7 +155,7 @@ export function SlotRow({ slot, compact }: { slot: LiveSlotView; compact?: boole
 				</span>
 				{(slot.arm || (!compact && slot.message)) && (
 					<span className="text-muted-foreground truncate text-xs" title={slot.message}>
-						{slot.arm && <span className="text-foreground/80 font-mono">{slot.arm}</span>}
+						{slot.arm && <span className="text-foreground/80">{t("progress.setup", { arm: slot.arm })}</span>}
 						{slot.arm && !compact && slot.message ? " · " : ""}
 						{!compact && slot.message}
 					</span>

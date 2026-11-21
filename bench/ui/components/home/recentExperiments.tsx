@@ -7,7 +7,7 @@ import { Link } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { TrackBadge } from "./homeBits";
-import type { ExperimentListItem } from "./home.utils";
+import { humanExperimentName, type ExperimentListItem } from "./home.utils";
 
 /** The newest experiments that are not running: suite icon, name, verdict and when it started. */
 export function RecentExperiments({
@@ -46,7 +46,7 @@ function RecentRow({ exp, trackOf }: { exp: ExperimentListItem; trackOf?: (suite
 			>
 				<TrackBadge track={trackOf?.(suite)} />
 				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-					<span className="text-foreground truncate text-sm font-medium">{exp.name || exp.exp_id}</span>
+					<span className="text-foreground truncate text-sm font-medium">{humanExperimentName(exp, { check: t("running.checkName"), untitled: t("running.untitled") })}</span>
 					<span className="text-muted-foreground truncate text-xs" data-testid={`home-recent-suite-${exp.exp_id}`}>
 						{suite ? suiteIdOf(suite) : "-"}
 						<span className="sm:hidden">

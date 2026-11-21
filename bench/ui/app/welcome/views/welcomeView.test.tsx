@@ -113,9 +113,9 @@ describe("WelcomeView", () => {
 		q.exp = ok({ exp_id: "e_1", state: "done", slots: { total: 5, done: 5, running: 0, failed: 0 } });
 		q.verdict = ok({ exp_id: "e_1", verdict: { decision: "improved" }, naive: { A: { num: 2, den: 5, unknown: 0 }, B: { num: 4, den: 5, unknown: 0 } } });
 		html = view("?suite=coding-core&agent=claude-code&exp=e_1");
-		expect(html).toContain("Better than the baseline");
-		expect(html).toContain("4 of 5 runs passed");
-		expect(html).toContain("Compare another model");
+		expect(html).toContain("B is better");
+		expect(html).toContain("4 of 5 runs solved the task");
+		expect(html).toContain("Try another model");
 		expect(html).toContain('data-testid="welcome-arm-bars"');
 		expect(html).toContain("80%");
 		expect(html).toContain('href="/experiments/$expId"');
