@@ -202,6 +202,7 @@ var OrgPolicy = map[string]Rule{
 	key("GET", api+"/runs/{id}/artifacts/{artifact}/{name}"): org(viewer),
 	key("GET", api+"/runs/{id}/otlp"):                        org(viewer),
 	key("GET", api+"/runs/{id}/steps"):                       org(viewer),
+	key("GET", api+"/runs/{id}/trace"):                       org(viewer),
 	key("GET", api+"/runs/{id}/remote"):                      org(viewer),
 	key("GET", api+"/runs/{id}/a2a"):                         org(viewer), // B1: the agent gateway witness of an a2a run
 	key("GET", api+"/runs/{id}/reviews"):                     org(viewer),

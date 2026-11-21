@@ -144,6 +144,8 @@ var APIRoutes = []RouteDoc{
 
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/otlp", Tag: "runs", Summary: "A sealed run as an OpenTelemetry trace (OTLP/JSON download); ?payloads=true adds redacted, capped tool payloads",
 		Query: []QueryDoc{{Name: "payloads", Description: "true to include tool arguments and results, redacted and capped"}}, Raw: "application/json"},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/trace", Tag: "runs", Summary: "Download one run's trace: step timeline and events as JSON, the steps as JSONL, or the sealed-run OTLP export",
+		Query: []QueryDoc{{Name: "format", Description: "json (default), jsonl or otlp"}}, Raw: "application/json"},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/steps", Tag: "runs", Summary: "Unified agent step timeline of a run with its observer status; available false for runs recorded before it", Response: RunSteps{}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/agents", Tag: "runs", Summary: "Agents of a multi-agent run: tree, per-agent cost and lanes, handoffs with payloads, and the blame; available false for a single-agent run", Response: RunAgents{}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/remote", Tag: "runs", Summary: "Remote agent channel summary of a run: what is trusted, agent-reported or unknown; available false for other agents", Response: RunRemote{}},          // Remote coverage
