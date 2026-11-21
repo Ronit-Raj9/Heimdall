@@ -105,12 +105,15 @@ function HeaderCrumbs({ pathname }: { pathname: string }) {
 	const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
 	const atEntry = path === item.to;
 	const Icon = item.icon;
+	// The section crumb: skipped for Home (no heading) and where it would repeat the page (Settings).
+	const groupLabel = group?.labelKey ? t(group.labelKey) : null;
+	const showGroup = groupLabel !== null && groupLabel !== t(item.labelKey);
 	return (
 		<nav aria-label={t("shell.breadcrumbs")} className="min-w-0" data-testid="header-breadcrumbs">
 			<ol className="flex min-w-0 items-center gap-1.5 text-sm">
-				{group && (
+				{showGroup && (
 					<>
-						<li className="text-muted-foreground hidden shrink-0 sm:block">{t(group.labelKey)}</li>
+						<li className="text-muted-foreground hidden shrink-0 sm:block">{groupLabel}</li>
 						<li aria-hidden="true" className="text-muted-foreground/60 hidden sm:block">
 							<ChevronRight className="size-3.5" />
 						</li>

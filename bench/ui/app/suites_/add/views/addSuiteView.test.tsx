@@ -38,11 +38,11 @@ describe("AddSuiteView", () => {
 		expect(html).toContain('data-testid="imports-synthetic-banner"');
 	});
 
-	it("offers bring your own beside the importers, under Suites", () => {
+	it("offers bring your own beside the importers, as the Import tab of Benchmarks (no breadcrumb)", () => {
 		query.result = { ...idle, data: fixture };
 		const html = renderToStaticMarkup(<AddSuiteView />);
 		expect(html).toContain('data-testid="suites-add-your-own"');
-		expect(html).toContain('href="/suites"');
+		expect(html).not.toContain("<nav aria-label=\"Breadcrumb\"");
 	});
 
 	it("shows a failure as an error", () => {

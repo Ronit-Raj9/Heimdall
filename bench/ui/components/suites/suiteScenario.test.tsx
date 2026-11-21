@@ -82,6 +82,6 @@ describe("TaskScenario", () => {
 
 	it("names the suite's output when the task sets none", () => {
 		const html = render({ ...task("support-desk", "d02"), output: undefined }, "state");
-		expect(html).toMatch(/data-testid="suites-task-output".*?State.*?from the suite/);
+		expect(html).toMatch(/data-testid="suites-task-output".*?State.*?from the benchmark/);
 	});
 });

@@ -2,50 +2,39 @@ import { describe, expect, it } from "vitest";
 import { BENCH_NAV, BENCH_NAV_GROUPS, DEFAULT_CLOSED_GROUPS, activeNavGroup, activeNavItem } from "./navigation";
 
 describe("navigation", () => {
-	it("has the six groups of the information architecture, in order, with Advanced closed by default", () => {
-		expect(BENCH_NAV_GROUPS.map((group) => group.id)).toEqual(["start", "benchmark", "build", "production", "govern", "operate"]);
-		expect(DEFAULT_CLOSED_GROUPS).toEqual(["operate"]);
+	it("is agent first: Home, then Agents, Test, Tasks, Watch, Release and one Settings entry", () => {
+		expect(BENCH_NAV_GROUPS.map((group) => group.id)).toEqual(["home", "agents", "test", "tasks", "watch", "release", "settings"]);
+		expect(BENCH_NAV_GROUPS[0].labelKey).toBeUndefined();
+		expect(DEFAULT_CLOSED_GROUPS).toEqual([]);
 		expect(BENCH_NAV.map((item) => item.to)).toEqual([
 			"/",
-			"/welcome",
+			"/agents",
+			"/leaderboard",
 			"/evaluations",
 			"/experiments",
+			"/failure-tests",
 			"/runs",
-			"/leaderboard",
-			"/agents",
 			"/suites",
-			"/catalog",
-			"/models",
-			"/files",
-			"/canaries",
+			"/why-agents-fail",
+			"/scheduled-checks",
 			"/live",
-			"/inbox",
-			"/schedules",
-			"/review",
 			"/releases",
-			"/monitors",
-			"/policies",
-			"/workers",
 			"/settings",
-			"/jobs",
-			"/integrations",
-			"/operate",
-			"/usage",
-			"/upload",
-			"/docs",
-			"/admin",
 		]);
+		expect(BENCH_NAV_GROUPS.find((group) => group.id === "settings")?.items).toHaveLength(1);
 	});
 
-	it("never lists New experiment or the quickstart as entries", () => {
-		expect(BENCH_NAV.some((item) => item.to.startsWith("/experiments/new"))).toBe(false);
-		expect(BENCH_NAV.some((item) => (item.to as string) === "/quickstart")).toBe(false);
+	it("never lists a start path other than /evaluate, nor the retired pages", () => {
+		const routes = BENCH_NAV.map((item) => item.to as string);
+		for (const gone of ["/welcome", "/quickstart", "/experiments/new", "/catalog", "/canaries", "/schedules", "/review", "/policies", "/models", "/workers", "/jobs", "/docs", "/admin"]) {
+			expect(routes).not.toContain(gone);
+		}
 	});
 
-	it("highlights the object's entry on nested routes", () => {
+	it("highlights the owning entry on nested routes and on old routes that became tabs", () => {
 		const cases: [string, string | null][] = [
 			["/", "/"],
-			["/welcome", "/welcome"],
+			["/welcome", "/"],
 			["/quickstart", "/"],
 			["/evaluations", "/evaluations"],
 			["/evaluations/ev_1", "/evaluations"],
@@ -55,26 +44,40 @@ describe("navigation", () => {
 			["/experiments/e_1/", "/experiments"],
 			["/experiments/new", "/experiments"],
 			["/verdict", "/experiments"],
+			["/failure-tests", "/failure-tests"],
 			["/runs/r_1", "/runs"],
 			["/compare", "/runs"],
 			["/agents/diff", "/agents"],
 			["/agents_/diff", "/agents"],
 			["/suites/coding-core", "/suites"],
+			["/catalog", "/suites"],
 			["/imports", "/suites"],
 			["/trends", "/leaderboard"],
-			["/clusters", "/inbox"],
-			["/triage", "/inbox"],
+			["/why-agents-fail", "/why-agents-fail"],
+			["/clusters", "/why-agents-fail"],
+			["/triage", "/why-agents-fail"],
+			["/canaries", "/scheduled-checks"],
+			["/schedules", "/scheduled-checks"],
+			["/review", "/releases"],
+			["/policies", "/releases"],
 			["/settings", "/settings"],
-			["/jobs/j_1", "/jobs"],
+			["/models", "/settings"],
+			["/workers", "/settings"],
+			["/jobs/j_1", "/settings"],
+			["/admin", "/settings"],
+			["/docs", null],
 			["/runsx", null],
 		];
 		for (const [path, want] of cases) expect(activeNavItem(path)?.to ?? null, path).toBe(want);
 	});
 
 	it("names the group of the current entry", () => {
-		expect(activeNavGroup("/")).toBe("start");
-		expect(activeNavGroup("/inbox")).toBe("production");
-		expect(activeNavGroup("/workers")).toBe("operate");
-		expect(activeNavGroup("/jobs/j_1")).toBe("operate");
+		expect(activeNavGroup("/")).toBe("home");
+		expect(activeNavGroup("/agents/a1")).toBe("agents");
+		expect(activeNavGroup("/experiments")).toBe("test");
+		expect(activeNavGroup("/catalog")).toBe("tasks");
+		expect(activeNavGroup("/live")).toBe("watch");
+		expect(activeNavGroup("/policies")).toBe("release");
+		expect(activeNavGroup("/jobs/j_1")).toBe("settings");
 	});
 });

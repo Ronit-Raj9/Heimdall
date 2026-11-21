@@ -24,7 +24,7 @@ describe("LeaderboardFootnote", () => {
 		expect(html).toContain('href="/experiments/e_synthetic-flaky"');
 		expect(html).toContain("Scope all: each entry is measured over its own tasks");
 		expect(html).toContain("Rank alone does not prove one agent beats another.");
-		expect(html).toContain("Resilience columns appear on the clean board only");
+		expect(html).toContain("Resilience columns appear on the normal run board only");
 		expect(html).toContain("Sorted by verified_success; tiers at alpha 0.05.");
 	});
 

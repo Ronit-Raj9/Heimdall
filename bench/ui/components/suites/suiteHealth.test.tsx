@@ -129,7 +129,7 @@ describe("SuiteHealthSummary", () => {
 		expect(html).toMatch(/data-testid="suites-health-quarantined".*?>1</);
 		expect(html).toMatch(/data-testid="suites-health-canary".*?>set</);
 		expect(html).toMatch(/data-testid="suites-health-count-flaky_verifier" data-tone="bad">.*Unreliable grader: 1/);
-		expect(html).toContain("from 74 sealed runs across 4 experiments");
+		expect(html).toContain("from 74 saved runs across 4 experiments");
 		expect(html).toContain("easy at or above a 80% pass rate, hard at or below 20%");
 		expect(html).toContain("Synthetic runs count toward infra and verifier checks only");
 	});
@@ -219,6 +219,6 @@ describe("TaskHealthBlock", () => {
 
 	it("says why health is unavailable, and that a task has no runs yet", () => {
 		expect(block("p02", noStore)).toContain("The server has no run store");
-		expect(block("p99")).toContain("No sealed run of this task was found");
+		expect(block("p99")).toContain("No saved run of this task was found");
 	});
 });

@@ -21,10 +21,10 @@ export function adminTab(value: string | null | undefined): AdminTab {
 }
 
 /** Server admin page: only server admins (HEIMDALL_SERVER_ADMINS) reach the panels. */
-export default function AdminView() {
+export default function AdminView({ param = "tab" }: { /** Search parameter of the panel tab; "section" inside Settings, whose own tab is ?tab=. */ param?: string } = {}) {
 	const { t } = useTranslation("admin");
 	const session = useSession();
-	const [tabParam, setTab] = useQueryState("tab", parseAsString);
+	const [tabParam, setTab] = useQueryState(param, parseAsString);
 	const tab = adminTab(tabParam);
 
 	if (session.authMode === "local") {

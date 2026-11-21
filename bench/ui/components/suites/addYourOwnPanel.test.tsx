@@ -14,7 +14,7 @@ describe("AddYourOwnPanel", () => {
 		const html = renderToStaticMarkup(<AddYourOwnPanel />);
 		for (const tab of ADD_TABS) expect(html).toContain(`data-testid="suites-add-tab-${tab}"`);
 		expect(html).toContain(">Task from a commit<");
-		expect(html).toContain(">New suite in another language<");
+		expect(html).toContain(">New benchmark in another language<");
 		expect(html).toContain(">Your own agent<");
 		expect(html).toContain("Hidden tests, reference solutions and controls never appear in this UI.");
 	});

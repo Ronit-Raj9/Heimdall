@@ -168,7 +168,7 @@ function CapabilityTable({ report }: { report: Report }) {
 			<TableHeader>
 				<TableRow>
 					<TableHead scope="col">Capability</TableHead>
-					{ab && <TableHead scope="col">Arm</TableHead>}
+					{ab && <TableHead scope="col">Setup</TableHead>}
 					{METRIC_HEADS.map((h) => (
 						<TableHead key={h} scope="col" className={h === "Score" ? undefined : "text-right"}>
 							{h}
@@ -258,7 +258,7 @@ function BenchmarkRow({ report, row }: { report: Report; row: ReportBenchmark })
 		(ab
 			? result && result.winner !== "tie"
 				? `${result.winner} solves ${Math.abs(Math.round(result.delta * 100))} points more`
-				: "No clear difference between the arms"
+				: "No clear difference between the setups"
 			: single
 				? `Solves ${pct(single.score)} of ${compactNumber(single.runs)} runs`
 				: "No runs yet");

@@ -16,7 +16,7 @@
 		"description": "A paused task is left out of new tests. Past results do not change. Restore puts it back.",
 		"flaky": "Pause tasks with an unreliable grader",
 		"flakyConfirm": "Pause every task of {{suite}} whose grader gave different answers for the same work?",
-		"empty": "This suite has no tasks yet. Cut one from a commit below.",
+		"empty": "This benchmark has no tasks yet. Cut one from a commit below.",
 		"task": "Task",
 		"state": "State",
 		"active": "In use",

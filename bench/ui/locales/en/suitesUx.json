@@ -19,7 +19,7 @@
 	"stats": {
 		"tasks": "Tasks",
 		"admitted": "Ready to use",
-		"probes": "Stress tests",
+		"probes": "Failure tests",
 		"lastRun": "Runs so far",
 		"never": "None yet",
 		"admittedValue": "{{ready}} of {{total}}",
@@ -39,7 +39,7 @@
 		"export": "Import / Export"
 	},
 	"details": "Details",
-	"detailsHint": "Environment, grader, frozen version and stress tests",
+	"detailsHint": "Environment, grader, frozen version and failure tests",
 	"tasksTitle": "Tasks",
 	"tasksDescription": "Each row is one job the agent must do. Click a task to see what the agent is asked and how it is checked.",
 	"subtitle": "Each benchmark is a set of tasks. Pick one and press Run to test an agent.",

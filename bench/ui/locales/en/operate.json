@@ -66,7 +66,7 @@
 		"description": "Some tasks use an AI that plays the user. This shows how much scores change when you swap that AI: give the same comparison run with two different ones.",
 		"a": "Comparison with the usual simulated user",
 		"b": "Same comparison, other simulated user",
-		"condition": "Conditions (default: normal)",
+		"condition": "Failure test (default: normal run)",
 		"run": "Compare"
 	},
 	"workers": {

@@ -166,3 +166,23 @@ export function evaluationStats(evaluations: readonly Pick<Evaluation, "status" 
 export function newestEvaluations<T extends Pick<Evaluation, "created_at">>(evaluations: readonly T[], limit = 5): T[] {
 	return [...evaluations].sort((a, b) => (at(b.created_at) || 0) - (at(a.created_at) || 0)).slice(0, limit);
 }
+
+/** Set once Home has sent a first-time visitor to /evaluate, so Home shows itself from then on. */
+export const FIRST_RUN_KEY = "heimdall.first-run.evaluate";
+
+/** Whether this browser was already sent to /evaluate on a fresh org. Blocked storage counts as seen. */
+export function firstRunSeen(): boolean {
+	try {
+		return window.localStorage.getItem(FIRST_RUN_KEY) === "1";
+	} catch {
+		return true;
+	}
+}
+
+export function markFirstRunSeen(): void {
+	try {
+		window.localStorage.setItem(FIRST_RUN_KEY, "1");
+	} catch {
+		// Private window or blocked storage: Home stays where it is next time, nothing breaks.
+	}
+}

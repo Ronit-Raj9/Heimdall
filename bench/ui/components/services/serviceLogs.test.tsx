@@ -75,7 +75,7 @@ describe("ServiceTable", () => {
 	it("waits for the seal before offering a log", () => {
 		const html = renderToStaticMarkup(<ServiceTable report={{ ...REPORT, sealed: false }} arm="A" />);
 		expect(html).not.toContain("service-log-toggle-db");
-		expect(html).toContain("served once the run is sealed");
+		expect(html).toContain("served once the run is saved");
 	});
 
 	it("says when no service ran", () => {

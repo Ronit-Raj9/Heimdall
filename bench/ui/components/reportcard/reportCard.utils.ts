@@ -181,7 +181,7 @@ export function headline(report: Report): Headline {
 	const verdict =
 		report.overall?.summary ||
 		(winner === "tie"
-			? "Neither arm is clearly better overall."
+			? "Neither setup is clearly better overall."
 			: `Overall ${winner} wins; worse on ${counted[loser] ?? 0}, tied on ${counted.tie ?? 0}.`);
 	return { title, detail: verdict };
 }

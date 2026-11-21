@@ -1,11 +1,12 @@
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import "@/lib/types/evaluateI18n";
+import "@/lib/types/hubsI18n";
+import { QuickRunDialog } from "@/components/run/quickRunDialog";
 import { cn } from "@/lib/utils";
-import { Link } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { parseAsInteger, parseAsString, useQueryState } from "nuqs";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { draftToSpec, EvaluateDraftProvider, learnStepReady, specToPatch, useEvaluateDraft, type EvaluateDraft } from "./evaluateDraft";
 import { asEvaluateStep, EVALUATE_STEPS, type EvaluateStep } from "./evaluate.utils";
@@ -79,9 +80,12 @@ function Stepper({ step, reach, onGo }: { step: EvaluateStep; reach: EvaluateSte
 
 function EvaluateWizard() {
 	const { t } = useTranslation("evaluate");
+	const { t: tHubs } = useTranslation("hubs");
 	const { draft, update, reset } = useEvaluateDraft();
 	const [stepRaw, setStepRaw] = useQueryState("step", parseAsInteger);
 	const [agentParam, setAgentParam] = useQueryState("agent", parseAsString);
+	const [suiteParam, setSuiteParam] = useQueryState("suite", parseAsString);
+	const [quickRun, setQuickRun] = useState(false);
 
 	// Back from /agents/new?return=/evaluate: the new agent arrives as ?agent=<id>.
 	useEffect(() => {
@@ -90,6 +94,13 @@ function EvaluateWizard() {
 			void setAgentParam(null);
 		}
 	}, [agentParam, draft.agent, update, setAgentParam]);
+
+	// From a benchmark's Run button: /evaluate?suite=<id> adds that benchmark to the picks.
+	useEffect(() => {
+		if (!suiteParam) return;
+		if (!draft.benchmarks.includes(suiteParam)) update({ benchmarks: [...draft.benchmarks, suiteParam], pack: null });
+		void setSuiteParam(null);
+	}, [suiteParam, draft.benchmarks, update, setSuiteParam]);
 
 	const reach = maxReachable(draft);
 	const wanted = asEvaluateStep(stepRaw);
@@ -106,12 +117,19 @@ function EvaluateWizard() {
 						<Button variant="ghost" size="sm" onClick={() => (reset(), go(1))} data-testid="evaluate-reset">
 							{t("startOver")}
 						</Button>
-						<Button asChild variant="link" size="sm">
-							<Link to="/welcome">{t("oldWizard")}</Link>
+						<Button
+							variant="link"
+							size="sm"
+							onClick={() => setQuickRun(true)}
+							title={tHubs("quickRun.hint")}
+							data-testid="evaluate-quick-run"
+						>
+							{tHubs("quickRun.link")}
 						</Button>
 					</div>
 				}
 			/>
+			{quickRun && <QuickRunDialog onClose={() => setQuickRun(false)} />}
 			<Stepper step={step} reach={reach} onGo={go} />
 			<p className="text-muted-foreground text-xs">{t("stepOf", { n: step })}</p>
 

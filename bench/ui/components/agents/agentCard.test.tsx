@@ -15,7 +15,7 @@ describe("AgentCard", () => {
 		const html = renderToStaticMarkup(<AgentCard agent={agent("acme-langgraph")} />);
 		expect(html).toContain(">BENCH_API_KEY<");
 		expect(html).toContain(">/opt/bench/launch.sh<");
-		expect(html).toContain("per suite, on SUITE_BASE");
+		expect(html).toContain("per benchmark, on SUITE_BASE");
 		expect(html).toContain("gateway only");
 		expect(html).toMatch(/data-testid="agents-card-acme-langgraph-runs"[\s\S]*?>12</);
 	});

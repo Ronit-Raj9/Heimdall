@@ -49,7 +49,7 @@ describe("EvaluationBody", () => {
 		expect(html).toContain('data-testid="evaluation-arm-A"');
 		expect(html).toContain("openai/gpt-x");
 		expect(html).toContain("v2");
-		expect(html).toContain("Stress tests: model outage");
+		expect(html).toContain("Failure tests: model outage");
 		expect(html).toContain("7 of 20 runs done");
 		expect(html).toContain('href="/experiments/e1"');
 		expect(html).toContain('href="/experiments/e1?tab=runs"');

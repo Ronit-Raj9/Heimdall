@@ -31,7 +31,7 @@ function writeCollapsed(value: boolean) {
 function readClosedGroups(): BenchNavGroupId[] {
 	try {
 		const raw = window.localStorage.getItem(GROUPS_KEY);
-		// Nothing stored yet: the Advanced group starts closed.
+		// Nothing stored yet: the groups marked defaultClosed start closed.
 		if (raw === null) return [...DEFAULT_CLOSED_GROUPS];
 		const parsed: unknown = JSON.parse(raw);
 		return Array.isArray(parsed) ? parsed.filter((id): id is BenchNavGroupId => BENCH_NAV_GROUPS.some((group) => group.id === id)) : [];
@@ -48,12 +48,9 @@ function writeClosedGroups(ids: readonly BenchNavGroupId[]) {
 	}
 }
 
-/** The groups and entries this session may see: Settings only for a signed-in hosted user. */
-export function visibleNavGroups(session: SessionInfo) {
-	const hosted = session.authMode === "hosted" && session.signedIn;
-	return BENCH_NAV_GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => (!item.hostedOnly || hosted) && (!item.serverAdminOnly || session.serverAdmin === true)) })).filter(
-		(group) => group.items.length > 0,
-	);
+/** The groups and entries this session may see. Every entry is open to everyone; pages gate their own panels. */
+export function visibleNavGroups(_session: SessionInfo) {
+	return BENCH_NAV_GROUPS.filter((group) => group.items.length > 0);
 }
 
 /**
@@ -69,7 +66,7 @@ export interface BenchSidebarProps {
 }
 
 /**
- * Left navigation in five collapsible groups. From md it is a sidebar (an icon rail up to xl,
+ * Left navigation: Home, then six collapsible groups. From md it is a sidebar (an icon rail up to xl,
  * labels from xl, either pinned by the toggle); below md it is a drawer over the page.
  */
 export function BenchSidebar({ drawerOpen = false, onDrawerClose }: BenchSidebarProps) {
@@ -233,11 +230,12 @@ export function NavGroups({ form, pathname, closedGroups, onToggleGroup, idPrefi
 	return (
 		<nav aria-label={t("nav.label")} className="-mx-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1 pt-1 [scrollbar-width:thin]" data-testid={`${idPrefix}-groups`}>
 			{groups.map((group) => {
-				const label = t(group.labelKey);
-				const closed = closedGroups.includes(group.id);
+				const label = group.labelKey ? t(group.labelKey) : null;
+				const closed = label !== null && closedGroups.includes(group.id);
 				const listId = `${idPrefix}-group-${group.id}`;
 				return (
 					<div key={group.id} className="flex flex-col gap-0.5" data-testid={`nav-group-${group.id}`} data-closed={closed || undefined}>
+						{label !== null && (
 						<button
 							type="button"
 							onClick={() => onToggleGroup(group.id)}
@@ -258,8 +256,9 @@ export function NavGroups({ form, pathname, closedGroups, onToggleGroup, idPrefi
 								aria-hidden="true"
 							/>
 						</button>
-						<span aria-hidden="true" className={hairlineClass} />
-						<ul id={listId} aria-label={label} className={cn("flex flex-col gap-0.5", closed && closedItemsClass)}>
+						)}
+						{label !== null && <span aria-hidden="true" className={hairlineClass} />}
+						<ul id={listId} aria-label={label ?? undefined} className={cn("flex flex-col gap-0.5", closed && closedItemsClass)}>
 							{group.items.map((item) => (
 								<li key={item.to}>
 									<NavLink item={item} active={isNavActive(item, pathname)} form={form} labelClass={labelClass} onNavigate={onNavigate} />

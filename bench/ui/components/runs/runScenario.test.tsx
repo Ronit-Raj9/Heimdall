@@ -198,7 +198,7 @@ describe("AnswerBlock", () => {
 describe("StateFiles and ServicesList", () => {
 	it("lists exported state with size and hash, and a failed export's error", () => {
 		const html = renderToStaticMarkup(<StateFiles files={toolRun.state!} arm="A" />);
-		expect(html).toContain('aria-label="Exported state of arm A"');
+		expect(html).toContain('aria-label="Exported state of setup A"');
 		expect(html).toMatch(/data-testid="run-state-crm-tickets"[\s\S]*4.2 KB[\s\S]*55555555…5555/);
 		expect(html).toContain("export failed: export larger than 16 MiB");
 	});

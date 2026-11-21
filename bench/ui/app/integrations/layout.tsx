@@ -1,6 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import IntegrationsPage from "./page";
+import { settingsRedirect } from "@/lib/routing/navRedirects";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// Agent-first nav (X09): integrations are a tab of Settings.
 export const Route = createFileRoute("/integrations")({
-	component: IntegrationsPage,
+	beforeLoad: ({ search }) => {
+		throw redirect({ ...settingsRedirect("integrations", search as Record<string, unknown>), replace: true } as never);
+	},
 });

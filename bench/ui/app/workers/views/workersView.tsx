@@ -113,7 +113,7 @@ export function RunnerCard({ worker }: { worker: WorkerInfo }) {
 	);
 }
 
-export default function WorkersView() {
+export default function WorkersView({ tokensLink = true }: { /** The pointer to worker tokens; off where tokens do not exist (local mode). */ tokensLink?: boolean } = {}) {
 	const { t } = useTranslation("bench");
 	const query = useGetWorkersQuery();
 	const data = query.data;
@@ -135,7 +135,7 @@ export default function WorkersView() {
 					{t("workers.synthetic")}
 				</p>
 			)}
-			<AddRunnerCard />
+			{tokensLink && <AddRunnerCard />}
 			{query.isLoading ? (
 				<BlockSkeleton rows={4} testId="workers-loading" />
 			) : off ? (

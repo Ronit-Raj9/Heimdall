@@ -68,7 +68,8 @@ export default function FilesView() {
 		const d = next.dir ?? dir;
 		if (d) s.dir = d;
 		if (next.path) s.path = next.path;
-		void navigate({ to: "/files", search: s });
+		// Stays on the page it is shown in (/settings?tab=files), keeping that page's tab.
+		void navigate({ to: ".", search: ((prev: Record<string, unknown>) => (typeof prev.tab === "string" ? { tab: prev.tab, ...s } : s)) as never });
 	};
 
 	const openEntry = (e: ProjectEntry) => (e.dir ? go({ dir: e.path }) : go({ path: e.path }));

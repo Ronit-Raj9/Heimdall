@@ -70,6 +70,6 @@ describe("ReceiptFunnel", () => {
 		const html = renderToStaticMarkup(<ReceiptFunnel layer={null} arms={["A", "B"]} ratios={FIXTURE_RATIOS} />);
 		expect(stepState(html, "fired")).toBe("not_applicable");
 		expect(stepState(html, "visible")).toBe("applicable");
-		expect(html).toContain("No arm recorded this step");
+		expect(html).toContain("No setup recorded this step");
 	});
 });

@@ -49,9 +49,9 @@ export function triageRedirect(search: RouteSearch): RedirectTarget {
 	return asTab("/inbox", "triage", search);
 }
 
-/** /imports is the Add a suite flow under Suites. */
+/** /imports is the Import tab of Benchmarks (agent-first nav, X09). */
 export function importsRedirect(): RedirectTarget {
-	return { to: "/suites/add", search: {} };
+	return { to: "/suites", search: { tab: "import" } };
 }
 
 /** /calibration?suite=X is the Calibration tab of /suites/X; with no suite, the suites list. */

@@ -1,6 +1,6 @@
 {
 	"tab": "Analysis",
-	"intro": "Run the analysis commands on this experiment's sealed runs. Each button starts a background job with a live log; the views below refresh when it ends.",
+	"intro": "Run the analysis commands on this experiment's saved runs. Each button starts a background job with a live log; the views below refresh when it ends.",
 	"jobs": {
 		"title": "Analysis jobs",
 		"running": "Running",
@@ -11,7 +11,7 @@
 		"openLog": "Show log",
 		"check": {
 			"title": "Re-check verdict",
-			"description": "Re-analyze sealed runs and save a fresh verdict.",
+			"description": "Re-analyze saved runs and save a fresh verdict.",
 			"button": "Run check"
 		},
 		"codescan": {
@@ -51,10 +51,10 @@
 	},
 	"views": {
 		"verdict": "Current verdict",
-		"verdictNone": "No verdict yet. Run a check once the experiment has sealed runs.",
+		"verdictNone": "No verdict yet. Run a check once the experiment has saved runs.",
 		"awareness": "Eval awareness",
 		"awarenessNone": "No awareness report yet. Start a scan above.",
-		"awarenessArm": "Arm {{arm}}: {{withSignals}} of {{scanned}} scanned runs with signals ({{signals}} signals)",
+		"awarenessArm": "Setup {{arm}}: {{withSignals}} of {{scanned}} scanned runs with signals ({{signals}} signals)",
 		"clusters": "Failure clusters in this experiment",
 		"clustersNone": "No failure clusters for this experiment.",
 		"clustersAll": "Open all clusters",
@@ -62,7 +62,7 @@
 	},
 	"links": {
 		"title": "Cost",
-		"costExplain": "Why one arm cost more (cost explain)",
+		"costExplain": "Why one setup cost more (cost explain)",
 		"pareto": "Cost against verified success (pareto)",
 		"leaderboardPareto": "Leaderboard pareto across experiments"
 	},

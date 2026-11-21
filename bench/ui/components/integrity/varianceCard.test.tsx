@@ -37,7 +37,7 @@ describe("VarianceCard", () => {
 	});
 	it("says no A/A arm ran when the SD is assumed", () => {
 		const html = render(verdictWith({ variance: variance({}) }));
-		expect(html).toContain("No A/A arm ran");
+		expect(html).toContain("No A/A setup ran");
 		expect(html).toContain("assumed");
 		expect(html).not.toContain('data-testid="variance-aa-tasks"');
 	});
@@ -58,7 +58,7 @@ describe("VarianceCard", () => {
 			}),
 		);
 		expect(html).toContain('data-source="measured_aa"');
-		expect(html).toContain("measured from the A/A arm");
+		expect(html).toContain("measured from the A/A setup");
 		expect(html).toContain("0.12");
 		expect(html).toContain("no difference");
 		expect(html).toContain('data-testid="variance-band-aa"');

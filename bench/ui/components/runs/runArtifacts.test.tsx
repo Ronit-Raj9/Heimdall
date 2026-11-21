@@ -58,7 +58,7 @@ describe("ArtifactFiles", () => {
 	it("lists id, name, size and short hash, with a download link for each exported file", () => {
 		const html = render();
 		expect(html).toContain('data-testid="run-artifacts-A"');
-		expect(html).toContain('aria-label="Artifacts of arm A"');
+		expect(html).toContain('aria-label="Artifacts of setup A"');
 		expect(html).toMatch(/<th[^>]*scope="col"/);
 		const row = html.match(/data-testid="run-artifact-report-report.csv"[\s\S]*?<\/tr>/)?.[0] ?? "";
 		expect(row).toContain('data-exported="true"');
@@ -97,7 +97,7 @@ describe("ArtifactFiles", () => {
 	it("offers no link before the run is sealed, or when its folder no longer matches the seal", () => {
 		const unsealed = render({ sealed: false });
 		expect(unsealed).not.toContain("<a ");
-		expect(unsealed).toContain("downloadable once the run is sealed");
+		expect(unsealed).toContain("downloadable once the run is saved");
 		const mismatch = render({ sealError: "file artifacts/report/report.csv changed" });
 		expect(mismatch).not.toContain("<a ");
 		expect(mismatch).toContain("not served: the run folder does not match its seal");

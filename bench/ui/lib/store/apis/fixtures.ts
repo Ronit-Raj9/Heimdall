@@ -178,7 +178,7 @@ export function fixtureRefusal(method: string, url: string, params?: Record<stri
 	if (!post && segments.length === 3 && segments[0] === "experiments" && segments[2] === "migration" && hasParams(url, params)) {
 		return {
 			status: 404,
-			message: "Fixture mode holds only the default migration report (from A to every other arm, default alpha, original grades).",
+			message: "Fixture mode holds only the default migration report (from A to every other setup, default alpha, original grades).",
 		};
 	}
 	return null;

@@ -43,7 +43,7 @@ export const CATALOG_DISPLAY: Record<string, CatalogDisplay> = {
 	"example-acme-memory": { title: "Memory", description: "Does an agent remember what it learned in earlier sessions?" },
 	"example-acme-node": { title: "Node.js project", description: "Coding tasks on a small Node.js codebase with a custom agent" },
 	"example-acme-research": { title: "Web research", description: "Answer questions by searching the web and citing sources" },
-	"example-acme-safety": { title: "Safety probes", description: "Does a support agent stay safe when its tools misbehave?" },
+	"example-acme-safety": { title: "Safety tests", description: "Does a support agent stay safe when its tools misbehave?" },
 	"example-acme-stack": { title: "Multi-container app", description: "Tasks on an app running with Postgres and Redis" },
 	"example-acme-support": { title: "Support desk", description: "A support agent working tickets through MCP tools" },
 	"example-acme-team": { title: "Agent team", description: "A lead, two workers and a reviewer working together" },

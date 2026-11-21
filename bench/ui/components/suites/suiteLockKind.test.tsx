@@ -23,14 +23,14 @@ describe("LockKindBadge", () => {
 	it("shows a fingerprinted lock in the good tone", () => {
 		const html = renderToStaticMarkup(<LockKindBadge kind="fingerprinted" testId="kind" />);
 		expect(html).toContain('data-tone="good"');
-		expect(html).toContain("Frozen with fingerprints");
+		expect(html).toContain("Frozen with signatures");
 	});
 
 	it("shows a legacy lock with the hint to add fingerprints", () => {
 		const html = renderToStaticMarkup(<LockKindBadge kind="legacy" testId="kind" />);
 		expect(html).toContain('data-tone="warn"');
 		expect(html).toContain("Frozen (older format)");
-		expect(html).toContain("Grader settings are not fingerprinted. Freeze again to add fingerprints.");
+		expect(html).toContain("Grader settings are not signed. Freeze again to add signatures.");
 	});
 
 	it("shows nothing for an unlocked suite", () => {
@@ -39,7 +39,7 @@ describe("LockKindBadge", () => {
 
 	it("sits beside the lock state in the suite facts", () => {
 		expect(renderToStaticMarkup(<SuiteFacts suite={suite("coding-core")} />)).toMatch(
-			/data-testid="suites-facts-lock-kind" data-tone="good">.*Frozen with fingerprints/,
+			/data-testid="suites-facts-lock-kind" data-tone="good">.*Frozen with signatures/,
 		);
 		expect(renderToStaticMarkup(<SuiteFacts suite={{ ...suite("coding-core"), lock_kind: "legacy" }} />)).toMatch(
 			/data-testid="suites-facts-lock-kind" data-tone="warn">.*Frozen \(older format\)/,

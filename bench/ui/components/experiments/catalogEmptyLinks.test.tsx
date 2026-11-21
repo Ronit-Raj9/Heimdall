@@ -14,7 +14,7 @@ describe("create links", () => {
 	it("benchmarks list has one Add benchmark menu: from catalog or create your own", () => {
 		const html = render(<AddBenchmarkMenu />);
 		expect(html).toContain("Add benchmark");
-		expect(html).toContain('href="/catalog"');
+		expect(html).toContain('href="/suites?tab=catalog"');
 		expect(html).toContain('href="/suites/new"');
 		expect(html).toContain("Create your own");
 	});

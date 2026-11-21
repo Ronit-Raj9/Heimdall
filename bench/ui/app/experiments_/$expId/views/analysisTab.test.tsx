@@ -34,7 +34,7 @@ describe("AnalysisTab", () => {
 		const html = render(<AnalysisTab expId="e_x" />);
 		for (const spec of ANALYSIS_JOBS) expect(html).toContain(`data-testid="job-run-${spec.kind}"`);
 		expect(html).toContain("Verdict improved, action ship");
-		expect(html).toContain("Arm A: 1 of 4 scanned runs with signals (2 signals)");
+		expect(html).toContain("Setup A: 1 of 4 scanned runs with signals (2 signals)");
 		expect(html).toContain("sig_timeout");
 		expect(html).toContain('data-testid="analysis-link-cost-explain"');
 		expect(html).toContain('data-testid="analysis-link-pareto"');
