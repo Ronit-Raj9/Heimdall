@@ -235,13 +235,21 @@ func scanRunSecrets(dir string) error {
 }
 
 // agentOutput reports whether path holds the agent's own output in run
-// folder dir: the workspace diff, exported artifacts and exported state.
+// folder dir: the workspace diff, exported artifacts and exported state, and
+// the agent's stdout stream and stderr (its own or a team member's). The
+// stream carries the code the model wrote, where `def f(token: str)` is
+// ordinary source, not a key-value secret; the run key is removed from it
+// by exact value before it is written.
 func agentOutput(dir, path string) bool {
 	rel, err := filepath.Rel(dir, path)
 	if err != nil {
 		return false
 	}
 	rel = filepath.ToSlash(rel)
+	switch filepath.Base(rel) {
+	case "agent.stream.jsonl", "agent.stderr.txt":
+		return true
+	}
 	return rel == "workspace.diff" || strings.HasPrefix(rel, "artifacts/") || strings.HasPrefix(rel, "state/")
 }
 

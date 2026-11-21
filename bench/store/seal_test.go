@@ -142,6 +142,10 @@ func TestSealScansAgentOutputForCredentialsOnly(t *testing.T) {
 		{name: "diff with a canary-looking key of the wrong shape", file: "workspace.diff", body: "+K=sk-team-canary-" + utils.NewNonce() + "x\n", sealed: false},
 		{name: "artifact with private key", file: "artifacts/id_rsa", body: "-----BEGIN RSA PRIVATE KEY-----\n", sealed: false},
 		{name: "bench file with password assignment", file: "events.jsonl", body: "password = \"x\"\n", sealed: false},
+		// Live pilot e_pilot_sol_7yol: the model wrote `def _parse_event(token: str)`.
+		{name: "agent stream with typed token parameter", file: "agent.stream.jsonl", body: `{"text":"def _parse_event(token: str) -> dict:"}` + "\n", sealed: true},
+		{name: "member stderr with password field", file: "members/w/agent.stderr.txt", body: "password: hunter2\n", sealed: true},
+		{name: "agent stream with sk- key", file: "agent.stream.jsonl", body: `{"text":"OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz0123456789"}` + "\n", sealed: false},
 	}
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
