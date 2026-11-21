@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -44,7 +45,7 @@ func TestStreamSSE(t *testing.T) {
 	var buf bytes.Buffer
 	w := bufio.NewWriter(&buf)
 	cancelled := false
-	streamSSE(w, testMode, ch, func() { cancelled = true }, make(chan struct{}))
+	streamSSE(w, testMode, ch, func() { cancelled = true }, make(chan struct{}), func() bool { return true })
 	out := buf.String()
 	for _, want := range []string{"retry: 2000\n\n", "id: 7\ndata: {\"mode\":\"recorded\",\"seq\":7,\"kind\":\"stage\"", "event: end\ndata: {\"mode\":\"recorded\""} {
 		if !strings.Contains(out, want) {
@@ -72,5 +73,39 @@ func TestEventsEndpointServesSSE(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("no slot_started data line in %q", lines)
+	}
+}
+
+// TestStreamsEndWhenAccessRevoked is audit qc2-17-04: an open event or job
+// log stream stops sending once the request's stream guard refuses.
+func TestStreamsEndWhenAccessRevoked(t *testing.T) {
+	ch := make(chan schemas.LiveEvent, 2)
+	ch <- schemas.LiveEvent{Seq: 1, Kind: "stage", RunID: "r_secret"}
+	var buf bytes.Buffer
+	w := bufio.NewWriter(&buf)
+	done := make(chan struct{})
+	go func() {
+		streamSSE(w, testMode, ch, nil, make(chan struct{}), func() bool { return false })
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("event stream kept running after access was revoked")
+	}
+	if strings.Contains(buf.String(), "r_secret") {
+		t.Fatalf("event sent after access was revoked:\n%s", buf.String())
+	}
+	page := &jobs.LogPage{JobID: "j_1", Status: jobs.StatusRunning}
+	buf.Reset()
+	jdone := make(chan struct{})
+	go func() {
+		streamJobLogs(bufio.NewWriter(&buf), testMode, nil, "org_a", "j_1", page, make(chan struct{}), func() bool { return false })
+		close(jdone)
+	}()
+	select {
+	case <-jdone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("job log stream kept running after access was revoked")
 	}
 }

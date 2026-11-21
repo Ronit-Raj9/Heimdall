@@ -650,3 +650,25 @@ func TestExperimentRunnerHash(t *testing.T) {
 		t.Fatalf("planned pool %q", m.Experiment.RunnerPool())
 	}
 }
+
+// TestHostedSameNameOtherTokenRefused is audit qc2-17-05: a registration
+// under a name another runner token already holds is not a restart, so it
+// is refused and the first runner keeps its registration.
+func TestHostedSameNameOtherTokenRefused(t *testing.T) {
+	hub := NewRemoteHub(RemoteOptions{})
+	a := newHostedOrg(t, hub, "org_a")
+	reg := &schemas.WorkerRegister{WorkerID: "w-shared", Slots: 1}
+	if _, err := a.c.Register(scoped(tokADefault), reg); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.c.Register(scoped(tokAGPU), &schemas.WorkerRegister{WorkerID: "w-shared", Slots: 1}); !errors.Is(err, schemas.ErrWorkerScope) {
+		t.Fatalf("same name, other token = %v, want ErrWorkerScope", err)
+	}
+	ws := a.c.Workers()
+	if len(ws) != 1 || ws[0].TokenID != "rtk_a1" {
+		t.Fatalf("workers after refused takeover = %+v", ws)
+	}
+	if _, err := a.c.Register(scoped(tokADefault), reg); err != nil {
+		t.Fatalf("restart under the same token: %v", err)
+	}
+}

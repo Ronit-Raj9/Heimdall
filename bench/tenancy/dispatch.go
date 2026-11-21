@@ -183,6 +183,19 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 	defer release()
 	SetOrg(ctx, o)
 	auth.SetPrincipal(ctx, eff)
+	// A stream opened by this request re-authorizes the original caller
+	// while it lasts (membership removed, org made private): the check here
+	// ran once, at the start.
+	headerRef := string(ctx.Request.Header.Peek(OrgHeader))
+	lib.SetStreamGuard(ctx, func() bool {
+		gctx, cancel := workContext()
+		defer cancel()
+		ro, reff, err := Resolve(gctx, d.c.Dir, rule, p, "", headerRef, d.c.DemoSlug)
+		if err == nil {
+			err = Authorize(rule, method, reff, ro)
+		}
+		return err == nil && ro != nil && ro.ID == o.ID
+	})
 	rt.Handler(ctx)
 	if !IsRead(method) && !rule.NoAudit && ctx.Response.StatusCode() < 400 {
 		d.audit(ctx, o.ID, method, pat)

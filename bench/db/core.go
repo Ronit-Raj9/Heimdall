@@ -420,10 +420,15 @@ type MemberCheck func(actor, target string) error
 // that run inside its transaction. ActorID names the acting user for
 // Check (empty for none). Audit, when set, builds the row from the role the
 // member held before; it commits with the change or not at all.
+//
+// After, when set, runs inside the transaction once the change is made, so
+// state tied to the membership (a removed member's API tokens) changes with
+// it or not at all.
 type MemberChange struct {
 	ActorID string
 	Check   MemberCheck
 	Audit   func(from string) *AuditEntry
+	After   func(ctx context.Context, tx *sql.Tx) error
 }
 
 // memberAudit appends c's audit row inside tx.
@@ -514,6 +519,11 @@ func (d *DB) RemoveMemberChecked(ctx context.Context, orgID, userID string, c Me
 		res, err := tx.ExecContext(ctx, d.Rebind(`DELETE FROM memberships WHERE org_id = ? AND user_id = ?`), orgID, userID)
 		if err := expectOne(res, err); err != nil {
 			return err
+		}
+		if c.After != nil {
+			if err := c.After(ctx, tx); err != nil {
+				return err
+			}
 		}
 		return d.memberAudit(ctx, tx, c, from)
 	})

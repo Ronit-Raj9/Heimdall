@@ -49,7 +49,8 @@
 		"viaToken": "API token",
 		"settings": "Settings",
 		"signOut": "Sign out",
-		"signIn": "Sign in"
+		"signIn": "Sign in",
+		"pickOrg": "Choose an organization"
 	},
 	"auth": {
 		"brandLine": "Every agent change gets a verdict you can defend.",
@@ -424,5 +425,9 @@
 	},
 	"errors": {
 		"unexpected": "Unexpected error."
+	},
+	"session": {
+		"discoveryError": "Could not reach the server to check your session.",
+		"retry": "Retry"
 	}
 }

@@ -33,16 +33,11 @@ type jobLogger struct {
 	job string
 
 	mu      sync.Mutex
-	seq     int64
 	partial bytes.Buffer
 }
 
 func (r *Runner) newLogger(j *Job) *jobLogger {
-	seq, err := r.lastLogSeq(context.Background(), j.ID)
-	if err != nil {
-		r.opts.Logger.Warn("read job log seq", "job", j.ID, "error", err.Error())
-	}
-	return &jobLogger{r: r, job: j.ID, seq: seq}
+	return &jobLogger{r: r, job: j.ID}
 }
 
 func (l *jobLogger) Printf(format string, args ...any) {
@@ -92,8 +87,7 @@ func (l *jobLogger) line(level, s string) {
 	s = clipLine(strings.TrimRight(s, "\r\n"), l.r.opts.MaxLineBytes)
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.seq++
-	if err := l.r.appendLog(context.Background(), l.job, l.seq, l.r.now(), level, s,
+	if _, err := l.r.appendLog(context.Background(), l.job, l.r.now(), level, s,
 		int64(l.r.opts.LogHead), int64(l.r.opts.LogTail)); err != nil {
 		l.r.opts.Logger.Warn("job log write failed", "job", l.job, "error", err.Error())
 	}

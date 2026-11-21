@@ -15,6 +15,10 @@ import (
 // and returns that folder and the log of docker invocations. The docker
 // stub prints a container id for `ps -aq` when existing is true, a fake
 // dump for pg_dump, archive bytes for tar -cf and an evidence line for help.
+// Environment knobs let a test fail single steps: STUB_LS_RC (inventory ls
+// commands), STUB_PAUSE_RC, STUB_PAUSED (server already paused),
+// STUB_EVIDENCE_RC and STUB_SEAL_HALF (the seal check reports a
+// half-published seal that many times before passing).
 func stubDocker(t *testing.T, existing bool) (bin, logPath string) {
 	t.Helper()
 	bin = t.TempDir()
@@ -26,7 +30,13 @@ func stubDocker(t *testing.T, existing bool) (bin, logPath string) {
 	script := `#!/usr/bin/env bash
 printf '%s\n' "$*" >>` + logPath + `
 case " $* " in
-*" ps -aq "*) ` + ps + ` ;;
+*" ps -aq "*) [ -z "${STUB_LS_RC:-}" ] || exit "$STUB_LS_RC"; ` + ps + ` ;;
+*" ls -q "*) [ -z "${STUB_LS_RC:-}" ] || exit "$STUB_LS_RC" ;;
+*" --status paused "*) [ -z "${STUB_PAUSED:-}" ] || echo 0123456789ab ;;
+*" unpause heimdall "*) ;;
+*" pause heimdall "*) exit "${STUB_PAUSE_RC:-0}" ;;
+*" evidence backup "*) exit "${STUB_EVIDENCE_RC:-0}" ;;
+*"seals.log"*) n=$(cat ` + logPath + `.seal 2>/dev/null || echo 0); if [ "$n" -lt "${STUB_SEAL_HALF:-0}" ]; then echo $((n + 1)) >` + logPath + `.seal; exit 75; fi ;;
 *" network inspect "*) exit 1 ;;
 *" pg_dump "*) echo dump ;;
 *" tar "*"-cf"*) echo archive ;;
@@ -124,7 +134,7 @@ func TestBackupS3ArchivesProjects(t *testing.T) {
 	if !strings.Contains(string(calls), "evidence backup") {
 		t.Fatalf("no evidence backup:\n%s", calls)
 	}
-	if !strings.Contains(string(calls), "-cf - runs/projects releases") {
+	if !strings.Contains(string(calls), "sh runs/projects releases") {
 		t.Fatalf("project folders not archived:\n%s", calls)
 	}
 	m, _ := filepath.Glob(filepath.Join(dir, "heimdall-projects-*.tar.gz"))
@@ -145,7 +155,7 @@ func TestBackupArchivePausesServer(t *testing.T) {
 	}
 	b, _ := os.ReadFile(logPath)
 	calls := string(b)
-	pause, tar, unpause := strings.Index(calls, " pause heimdall"), strings.Index(calls, "-cf - runs releases"), strings.Index(calls, " unpause heimdall")
+	pause, tar, unpause := strings.Index(calls, " pause heimdall"), strings.Index(calls, "sh runs releases"), strings.Index(calls, " unpause heimdall")
 	if pause < 0 || tar < 0 || unpause < 0 || !(pause < tar && tar < unpause) {
 		t.Fatalf("want pause, tar, unpause in order:\n%s", calls)
 	}
@@ -155,5 +165,128 @@ func TestBackupArchivePausesServer(t *testing.T) {
 	m, _ := filepath.Glob(filepath.Join(dir, "heimdall-evidence-*.tar.gz"))
 	if len(m) != 1 {
 		t.Fatalf("evidence archive = %v", m)
+	}
+}
+
+func runBackup(t *testing.T, extraEnv string, knobs ...string) (dir, calls, out string, err error) {
+	t.Helper()
+	bin, logPath := stubDocker(t, false)
+	dir = t.TempDir()
+	env := backupEnv(t, extraEnv)
+	out, err = runScript(t, bin, append([]string{"HEIMDALL_ENV_FILE=" + env, "HEIMDALL_PROJECT=qc2-backup", "HEIMDALL_BACKUP_RETRY_SLEEP=0"}, knobs...), "hosted/backup.sh", "--dir", dir)
+	b, _ := os.ReadFile(logPath)
+	return dir, string(b), out, err
+}
+
+// TestBackupRefusedPauseNeverUnpauses is audit qc2-19-05: a pause the backup
+// did not acquire is never undone by it, and an already paused server is
+// left alone.
+func TestBackupRefusedPauseNeverUnpauses(t *testing.T) {
+	_, calls, out, err := runBackup(t, "", "STUB_PAUSE_RC=17")
+	if err == nil || strings.Contains(calls, " unpause heimdall") {
+		t.Fatalf("refused pause: err %v, calls:\n%s\n%s", err, calls, out)
+	}
+	_, calls, out, err = runBackup(t, "", "STUB_PAUSED=1")
+	if err == nil || !strings.Contains(out, "already paused") || strings.Contains(calls, "pause heimdall") {
+		t.Fatalf("already paused: err %v, calls:\n%s\n%s", err, calls, out)
+	}
+}
+
+// TestBackupRetriesHalfPublishedSeal is audit qc2-19-01: a pause that froze
+// a seal between seal.json and seals.log is released and retried, and the
+// archive is only taken once the check passes.
+func TestBackupRetriesHalfPublishedSeal(t *testing.T) {
+	dir, calls, out, err := runBackup(t, "", "STUB_SEAL_HALF=2")
+	if err != nil {
+		t.Fatalf("backup.sh: %v\n%s", err, out)
+	}
+	if n := strings.Count(calls, " pause heimdall"); n != 3 {
+		t.Fatalf("pauses = %d, want 3 (two retries):\n%s", n, calls)
+	}
+	if strings.LastIndex(calls, "seals.log") > strings.Index(calls, "sh runs releases") {
+		t.Fatalf("archive taken before a passing seal check:\n%s", calls)
+	}
+	if m, _ := filepath.Glob(filepath.Join(dir, "heimdall-evidence-*.tar.gz")); len(m) != 1 {
+		t.Fatalf("evidence archive = %v", m)
+	}
+	_, _, out, err = runBackup(t, "", "STUB_SEAL_HALF=99")
+	if err == nil || !strings.Contains(out, "half-published") {
+		t.Fatalf("persistent half seal: err %v\n%s", err, out)
+	}
+}
+
+// TestBackupMirrorFailureStillArchivesProjects is audit qc2-19-03: a failed
+// S3 sweep still archives the project folders, then fails the backup.
+func TestBackupMirrorFailureStillArchivesProjects(t *testing.T) {
+	dir, calls, out, err := runBackup(t, "HEIMDALL_S3_BUCKET=qc2-bucket\n", "STUB_EVIDENCE_RC=4")
+	if err == nil || !strings.Contains(out, "backup incomplete") {
+		t.Fatalf("mirror failure: err %v\n%s", err, out)
+	}
+	if !strings.Contains(calls, "sh runs/projects releases") {
+		t.Fatalf("project folders not archived:\n%s", calls)
+	}
+	if m, _ := filepath.Glob(filepath.Join(dir, "heimdall-projects-*.tar.gz")); len(m) != 1 {
+		t.Fatalf("projects archive = %v", m)
+	}
+}
+
+// TestBackupArchivesMissingRoots is audit qc2-19-07: a root that does not
+// exist yet (no organization, so no runs/projects) is created empty in the
+// archive container instead of failing tar.
+func TestBackupArchivesMissingRoots(t *testing.T) {
+	b, err := os.ReadFile("hosted/backup.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `[ -e "$p" ] || mkdir -p "$p"`) {
+		t.Fatal("backup.sh tars archive roots without creating missing ones")
+	}
+	root := t.TempDir()
+	cmd := exec.Command("sh", "-c", `cd "$1" && shift && for p in "$@"; do [ -e "$p" ] || mkdir -p "$p"; done && tar -cf - "$@" >/dev/null`, "sh", root, "runs/projects", "releases")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("tar of missing roots: %v\n%s", err, out)
+	}
+}
+
+// TestSmokeInventoryFailureRefuses is audit qc2-19-04: a Docker inventory
+// error never counts as an empty project, and an explicit name is claimed
+// so a second smoke run on it is refused.
+func TestSmokeInventoryFailureRefuses(t *testing.T) {
+	bin, logPath := stubDocker(t, false)
+	tmp := t.TempDir()
+	env := []string{"TMPDIR=" + tmp, "SMOKE_PROJECT=qc2-inventory", "SMOKE_HTTPS_PORT=47993", "SMOKE_HTTP_PORT=47994"}
+	out, err := runScript(t, bin, append(env, "STUB_LS_RC=1"), "hosted/smoke.sh", "--no-build")
+	if err == nil || !strings.Contains(out, "inventory failed") {
+		t.Fatalf("inventory failure: err %v\n%s", err, out)
+	}
+	calls, _ := os.ReadFile(logPath)
+	if strings.Contains(string(calls), " down") || strings.Contains(string(calls), " up ") {
+		t.Fatalf("smoke.sh went on after a failed inventory:\n%s", calls)
+	}
+	if err := os.Mkdir(filepath.Join(tmp, "heimdall-smoke-qc2-inventory.lock"), 0o700); err != nil {
+		t.Fatalf("claim not released on exit: %v", err)
+	}
+	out, err = runScript(t, bin, env, "hosted/smoke.sh", "--no-build")
+	if err == nil || !strings.Contains(out, "claimed by another smoke run") {
+		t.Fatalf("claimed project: err %v\n%s", err, out)
+	}
+}
+
+// TestSmokeOverridesCallerImage is audit qc2-19-06: smoke exports its own
+// image tags, so a caller's exported production tag is never rebuilt, and a
+// smoke tag naming a production image is refused.
+func TestSmokeOverridesCallerImage(t *testing.T) {
+	bin, _ := stubDocker(t, false)
+	env := []string{"TMPDIR=" + t.TempDir(), "SMOKE_PROJECT=qc2-image", "SMOKE_HTTPS_PORT=47995", "SMOKE_HTTP_PORT=47996", "HEIMDALL_IMAGE=heimdall/server:prod"}
+	out, err := runScript(t, bin, append(env, "SMOKE_IMAGE=heimdall/server:prod"), "hosted/smoke.sh", "--no-build")
+	if err == nil || !strings.Contains(out, "production image tag") {
+		t.Fatalf("production smoke tag: err %v\n%s", err, out)
+	}
+	b, err := os.ReadFile("hosted/smoke.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "export HEIMDALL_IMAGE=$smoke_image HEIMDALL_RUNNER_IMAGE=$smoke_runner_image") {
+		t.Fatal("smoke.sh does not export its image tags over the caller's")
 	}
 }

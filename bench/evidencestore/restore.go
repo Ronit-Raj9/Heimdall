@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/store"
@@ -389,9 +390,16 @@ func trashPath(root, expID string) (string, error) {
 	return p, nil
 }
 
+// recoverLockWait bounds how long recovery waits for one experiment's lock.
+// A lock held that long belongs to a live archive or restore, which owns
+// its own staging and trash; recovery skips that experiment until the next
+// sweep instead of stalling the sweep (and service shutdown) behind it.
+var recoverLockWait = 2 * time.Second
+
 // recover runs recoverExp for every experiment with leftovers in the trash
-// or staging folder, each under its experiment lock.
-func (m *Mirror) recover(org Org) error {
+// or staging folder, each under its experiment lock. It stops when ctx ends
+// and skips an experiment whose lock stays held (see recoverLockWait).
+func (m *Mirror) recover(ctx context.Context, org Org) error {
 	ids := map[string]bool{}
 	for _, sub := range []string{"trash", "staging"} {
 		entries, err := os.ReadDir(filepath.Join(org.root(), stateDir, sub))
@@ -406,8 +414,20 @@ func (m *Mirror) recover(org Org) error {
 	}
 	var errs []error
 	for expID := range ids {
-		unlock, err := m.lockExp(context.Background(), org, expID)
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(errs, err)...)
+		}
+		lctx, cancel := context.WithTimeout(ctx, recoverLockWait)
+		unlock, err := m.lockExp(lctx, org, expID)
+		cancel()
 		if err != nil {
+			if ctx.Err() != nil {
+				return errors.Join(append(errs, err)...)
+			}
+			if errors.Is(err, context.DeadlineExceeded) {
+				m.logger().Info("evidence: recovery skipped, experiment busy", "org_id", org.ID, "exp_id", expID)
+				continue
+			}
 			errs = append(errs, err)
 			continue
 		}

@@ -226,7 +226,7 @@ func TestBusyIgnoresStaleFanOut(t *testing.T) {
 	hub := newJobsHub(dbtest.Open(t), a.logger, false, true, "")
 	l := newLauncher(a, nil)
 	hub.add(l)
-	r := l.liveRunFor("e_demo") // a fan-out with no job behind it
+	r := l.liveRunFor("e_demo", "") // a fan-out with no job behind it
 	if l.Busy() {
 		t.Fatal("fan-out without an active job counted as busy")
 	}
@@ -240,5 +240,30 @@ func TestBusyIgnoresStaleFanOut(t *testing.T) {
 func TestHostedHubLimitsExperimentWorkers(t *testing.T) {
 	if hostedExpLimit >= hostedWorkers || hostedExpPerOrg > hostedExpLimit || hostedExpPerOrg < 1 {
 		t.Fatalf("hosted sizing %d workers, %d experiments, %d per org", hostedWorkers, hostedExpLimit, hostedExpPerOrg)
+	}
+}
+
+// TestStaleCancelHookKeepsNextJobFanOut is audit qc2-18-04: the cancel hook
+// of a job cancelled while queued closes only that job's fan-out, never the
+// one the next run job of the same experiment already uses.
+func TestStaleCancelHookKeepsNextJobFanOut(t *testing.T) {
+	a, _ := jobsProject(t)
+	l := newLauncher(a, nil)
+	old := l.liveRunFor("e_demo", "j_old")
+	old.finish() // the old job's row is already terminal
+	next := l.liveRunFor("e_demo", "j_next")
+	if next == old {
+		t.Fatal("next job reused a finished fan-out")
+	}
+	l.finishLive("e_demo", "j_old") // the delayed hook of the cancelled job
+	if next.isDone() {
+		t.Fatal("stale cancel hook closed the next job's fan-out")
+	}
+	if l.liveRunFor("e_demo", "j_next") != next {
+		t.Fatal("handler of the next job got a different fan-out")
+	}
+	l.finishLive("e_demo", "j_next")
+	if !next.isDone() {
+		t.Fatal("own cancel hook did not close the fan-out")
 	}
 }

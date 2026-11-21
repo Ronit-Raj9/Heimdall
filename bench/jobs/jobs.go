@@ -332,6 +332,13 @@ func (s *Store) LatestByTarget(ctx context.Context, orgID, kind string) (map[str
 	return out, rows.Err()
 }
 
+// cancelBetweenUpdates and afterRecoverScan are test hooks: nil outside
+// tests, they let a test move a row between two steps of Cancel or Recover.
+var (
+	cancelBetweenUpdates func(*sql.Tx)
+	afterRecoverScan     func()
+)
+
 // Cancel requests cancellation. A queued job is cancelled at once; a running
 // job's handler sees its context cancelled at the runner's next poll. A job
 // that already ended answers ErrFinished.
@@ -351,6 +358,9 @@ func (s *Store) Cancel(ctx context.Context, orgID, id string) (*Job, error) {
 			return err
 		} else if n == 1 {
 			return nil
+		}
+		if cancelBetweenUpdates != nil {
+			cancelBetweenUpdates(tx)
 		}
 		res, err = tx.ExecContext(ctx, s.q(`UPDATE jobs SET cancel_requested = 1 WHERE org_id = ? AND id = ? AND status = ?`),
 			orgID, id, string(StatusRunning))
@@ -373,7 +383,7 @@ func (s *Store) Cancel(ctx context.Context, orgID, id string) (*Job, error) {
 		if Status(status) == StatusQueued || Status(status) == StatusRunning {
 			// The row moved between the two updates (claimed, then requeued);
 			// report a conflict rather than an acknowledged no-op.
-			return fmt.Errorf("job %s changed state during cancel; retry", id)
+			return fmt.Errorf("%w: job %s changed state during cancel; retry", ErrConflict, id)
 		}
 		return fmt.Errorf("%w: %s is %s", ErrFinished, id, status)
 	})
@@ -423,28 +433,34 @@ func (s *Store) Logs(ctx context.Context, orgID, id string, since int64, limit i
 	return page, nil
 }
 
-// appendLog writes one line with the next seq and drops the oldest line of
-// the tail window once the job has more than head+tail lines, so the first
-// head lines and the newest tail lines are kept.
-func (s *Store) appendLog(ctx context.Context, jobID string, seq int64, at time.Time, level, line string, head, tail int64) error {
-	return s.db.Tx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, s.q(`INSERT INTO job_logs (job_id, seq, at, level, line) VALUES (?, ?, ?, ?, ?)`),
-			jobID, seq, at.UnixMilli(), level, line); err != nil {
-			return err
-		}
-		if seq > head+tail {
-			if _, err := tx.ExecContext(ctx, s.q(`DELETE FROM job_logs WHERE job_id = ? AND seq > ? AND seq <= ?`),
-				jobID, head, seq-tail); err != nil {
+// appendLog writes one line with the job's next seq and drops the oldest
+// line of the tail window once the job has more than head+tail lines, so the
+// first head lines and the newest tail lines are kept. The seq is allocated
+// in the database, in the inserting transaction: a resumed handler and the
+// recovery that requeued it may write at the same moment, and two writers
+// that each counted their own seq would collide on (job_id, seq). A
+// collision of two such transactions is retried with a fresh seq.
+func (s *Store) appendLog(ctx context.Context, jobID string, at time.Time, level, line string, head, tail int64) (int64, error) {
+	for try := 0; ; try++ {
+		var seq int64
+		err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+			if err := tx.QueryRowContext(ctx, s.q(`SELECT COALESCE(MAX(seq), 0) + 1 FROM job_logs WHERE job_id = ?`), jobID).Scan(&seq); err != nil {
 				return err
 			}
+			if _, err := tx.ExecContext(ctx, s.q(`INSERT INTO job_logs (job_id, seq, at, level, line) VALUES (?, ?, ?, ?, ?)`),
+				jobID, seq, at.UnixMilli(), level, line); err != nil {
+				return err
+			}
+			if seq > head+tail {
+				if _, err := tx.ExecContext(ctx, s.q(`DELETE FROM job_logs WHERE job_id = ? AND seq > ? AND seq <= ?`),
+					jobID, head, seq-tail); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err == nil || !db.IsUnique(err) || try >= 8 {
+			return seq, err
 		}
-		return nil
-	})
-}
-
-// lastLogSeq returns the job's highest log seq, 0 for none.
-func (s *Store) lastLogSeq(ctx context.Context, jobID string) (int64, error) {
-	var n int64
-	err := s.db.SQL().QueryRowContext(ctx, s.q(`SELECT COALESCE(MAX(seq), 0) FROM job_logs WHERE job_id = ?`), jobID).Scan(&n)
-	return n, err
+	}
 }

@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -210,6 +211,7 @@ func orgBuilder(env *hostedEnv) tenancy.Builder {
 		if ar, ok := deps.Launcher.(interface{ Busy() bool }); ok {
 			rt.Busy = ar.Busy
 		}
+		rt.Value = deps.Launcher
 		return rt, nil
 	}
 }
@@ -447,7 +449,11 @@ func (s *orgService) SetMemberRole(ctx context.Context, orgID, userID string, ro
 }
 
 func (s *orgService) RemoveMember(ctx context.Context, orgID, userID string, g handlers.MemberGuard) (auth.Role, error) {
-	from, err := s.env.db.RemoveMemberChecked(ctx, orgID, userID, memberChange(g))
+	c := memberChange(g)
+	c.After = func(ctx context.Context, tx *sql.Tx) error {
+		return auth.RevokeMemberTokensTx(ctx, s.env.db, tx, orgID, userID)
+	}
+	from, err := s.env.db.RemoveMemberChecked(ctx, orgID, userID, c)
 	return auth.Role(from), dbErr(err)
 }
 

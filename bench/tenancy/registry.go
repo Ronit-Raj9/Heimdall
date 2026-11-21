@@ -53,6 +53,10 @@ type OrgRuntime struct {
 	// Close releases the runtime. Called once, after the last request using
 	// the runtime has finished.
 	Close func() error
+	// Value is builder-defined state bound to this runtime (the hosted job
+	// launcher). Whoever holds the runtime uses this value, never a lookup by
+	// org ID that could find a newer runtime's.
+	Value any
 }
 
 // Builder builds the runtime of one org. It is called at most once per org
@@ -317,8 +321,8 @@ func (r *Registry) Sweep() {
 		return
 	}
 	now := r.opts.Now()
-	for _, id := range r.idle(func(e *entry) bool { return now.Sub(e.lastUsed) > r.opts.IdleTTL }) {
-		r.Evict(id)
+	for _, c := range r.idle(func(e *entry) bool { return now.Sub(e.lastUsed) > r.opts.IdleTTL }) {
+		r.evictIdle(c)
 	}
 }
 
@@ -330,18 +334,48 @@ func (r *Registry) evictOverflow() {
 	if over <= 0 {
 		return
 	}
-	ids := r.idle(func(*entry) bool { return true })
-	for i := 0; i < over && i < len(ids); i++ {
-		r.Evict(ids[i])
+	cs := r.idle(func(*entry) bool { return true })
+	for i := 0; i < over && i < len(cs); i++ {
+		r.evictIdle(cs[i])
+	}
+}
+
+// idleEntry is an eviction candidate: the exact entry seen idle and when it
+// was last used at that moment.
+type idleEntry struct {
+	id       string
+	e        *entry
+	lastUsed time.Time
+}
+
+// evictIdle evicts c only if it is still the cached entry of its org, still
+// unheld and not used since it was selected. A request or job that acquired
+// it after the selection keeps it: evicting a held runtime would let the next
+// request build a second runtime (and launcher) for the same org.
+func (r *Registry) evictIdle(c idleEntry) {
+	r.mu.Lock()
+	e, ok := r.entries[c.id]
+	if !ok || e != c.e || e.refs > 0 || !e.lastUsed.Equal(c.lastUsed) {
+		r.mu.Unlock()
+		return
+	}
+	delete(r.entries, c.id)
+	e.evicted = true
+	shouldClose := !e.closed && e.rt != nil
+	if shouldClose {
+		e.closed = true
+	}
+	r.mu.Unlock()
+	if shouldClose {
+		closeRuntime(e.rt)
 	}
 }
 
 // idle lists ready, unheld, not busy entries matching keep, least recently
 // used first.
-func (r *Registry) idle(keep func(*entry) bool) []string {
+func (r *Registry) idle(keep func(*entry) bool) []idleEntry {
 	type cand struct {
-		id string
-		at time.Time
+		idleEntry
 		rt *OrgRuntime
 	}
 	r.mu.Lock()
@@ -355,16 +389,16 @@ func (r *Registry) idle(keep func(*entry) bool) []string {
 		if e.refs > 0 || e.rt == nil || !keep(e) {
 			continue
 		}
-		cs = append(cs, cand{id, e.lastUsed, e.rt})
+		cs = append(cs, cand{idleEntry{id, e, e.lastUsed}, e.rt})
 	}
 	r.mu.Unlock()
-	sort.Slice(cs, func(i, j int) bool { return cs[i].at.Before(cs[j].at) })
-	out := make([]string, 0, len(cs))
+	sort.Slice(cs, func(i, j int) bool { return cs[i].lastUsed.Before(cs[j].lastUsed) })
+	out := make([]idleEntry, 0, len(cs))
 	for _, c := range cs {
 		if c.rt.Busy != nil && c.rt.Busy() {
 			continue
 		}
-		out = append(out, c.id)
+		out = append(out, c.idleEntry)
 	}
 	return out
 }

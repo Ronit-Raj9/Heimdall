@@ -245,3 +245,37 @@ func TestGitHubDisabled(t *testing.T) {
 		t.Fatalf("start without app = %v", err)
 	}
 }
+
+// TestGitHubInviteSignupAuditAndReturn covers audit qc2-16-07 and qc2-16-03:
+// a GitHub signup that consumes an invitation records auth.signup and
+// auth.invite_accept like a password signup, and does not send the browser
+// back to the now-used invitation page.
+func TestGitHubInviteSignupAuditAndReturn(t *testing.T) {
+	f := newFakeGitHub(t)
+	e := newTestEnv(t, SignupInvite)
+	withGitHub(e, f)
+	_, ownerSess := e.signup(t, "owner@example.com")
+	p := e.principal(t, ownerSess)
+	inv, err := e.svc.CreateInvitation(bg, p, p.OrgID, "grace@example.com", RoleMember, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	signups := e.auditCount(t, "auth.signup")
+	f.add("g1", fakeGHUser{ID: 303, Login: "grace", Emails: primary("grace@example.com", true)})
+	sess, back, err := ghFlow(t, e, "g1", "/invite/"+inv.Token, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back != "/" {
+		t.Fatalf("return_to after consuming the invitation = %q", back)
+	}
+	if sp := e.principal(t, sess); sp.OrgID != p.OrgID || sp.Role != RoleMember {
+		t.Fatalf("invited GitHub user = %+v", sp)
+	}
+	if got := e.auditCount(t, "auth.signup"); got != signups+1 {
+		t.Fatalf("auth.signup rows %d, want %d", got, signups+1)
+	}
+	if got := e.auditCount(t, "auth.invite_accept"); got != 1 {
+		t.Fatalf("auth.invite_accept rows %d, want 1", got)
+	}
+}

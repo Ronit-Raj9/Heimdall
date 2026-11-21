@@ -304,9 +304,9 @@ func (h *ExperimentsHandler) streamEvents(ctx *fasthttp.RequestCtx, expID string
 	ctx.Response.Header.Set("Cache-Control", "no-store")
 	ctx.Response.Header.Set("X-Accel-Buffering", "no")
 	ctx.Response.Header.Set(lib.ModeHeader, string(h.mode))
-	mode, stop := h.mode, h.recorder.stop
+	mode, stop, allowed := h.mode, h.recorder.stop, lib.StreamGuardOf(ctx)
 	ctx.SetBodyStreamWriter(func(w *bufio.Writer) {
-		streamSSE(w, mode, ch, cancel, stop)
+		streamSSE(w, mode, ch, cancel, stop, allowed)
 	})
 }
 

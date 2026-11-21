@@ -137,9 +137,10 @@ func (r *eventRecorder) logOf(expID string) *expEventLog {
 }
 
 // streamSSE writes live events as server-sent events until the channel
-// closes, the client goes away (a failed flush) or the server stops. It runs
-// after the handler returned, so it must not touch the request context.
-func streamSSE(w *bufio.Writer, mode schemas.Mode, ch <-chan schemas.LiveEvent, cancel func(), stop <-chan struct{}) {
+// closes, the client goes away (a failed flush), the server stops or allowed
+// (the request's stream guard) no longer lets the caller read. It runs after
+// the handler returned, so it must not touch the request context.
+func streamSSE(w *bufio.Writer, mode schemas.Mode, ch <-chan schemas.LiveEvent, cancel func(), stop <-chan struct{}, allowed func() bool) {
 	if cancel != nil {
 		defer cancel()
 	}
@@ -159,6 +160,9 @@ func streamSSE(w *bufio.Writer, mode schemas.Mode, ch <-chan schemas.LiveEvent, 
 				}
 				return
 			}
+			if !allowed() {
+				return
+			}
 			data, err := sseData(ev, mode)
 			if err != nil {
 				continue
@@ -167,7 +171,7 @@ func streamSSE(w *bufio.Writer, mode schemas.Mode, ch <-chan schemas.LiveEvent, 
 				return
 			}
 		case <-keepAlive.C:
-			if !writeSSE(w, ": keep-alive\n\n") {
+			if !allowed() || !writeSSE(w, ": keep-alive\n\n") {
 				return
 			}
 		case <-stop:

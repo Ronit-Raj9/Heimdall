@@ -33,6 +33,18 @@ describe("OrgSwitcher", () => {
 	it("shows a demo visitor no organization picker", () => {
 		expect(render(<OrgSwitcher />, demoSession())).not.toContain("org-switcher");
 	});
+	// Audit qc2-17-02: after leaving the current org the session has memberships but no current
+	// org; the picker is offered, and the remaining membership is not shown as the current one.
+	for (const orgs of [[ME_OWNER.orgs[1]], ME_OWNER.orgs]) {
+		it(`offers the picker with ${orgs.length} membership(s) and no current org`, () => {
+			const s = sessionFromMe({ me: { ...ME_OWNER, orgs, current_org: undefined, role: undefined }, meLoading: false });
+			expect(s.org).toBeUndefined();
+			const html = render(<OrgSwitcher />, s);
+			expect(html).toContain('data-testid="org-switcher"');
+			expect(html).toContain("Choose an organization");
+			expect(html).not.toContain('data-testid="org-current"');
+		});
+	}
 });
 
 describe("UserMenu", () => {

@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -429,3 +430,34 @@ func TestMemberCheckUnderLock(t *testing.T) {
 }
 
 var errDenied = errors.New("denied")
+
+// TestRemoveMemberAfterInTx is audit qc2-16-04: MemberChange.After runs in
+// the removal's transaction, and its failure keeps the membership.
+func TestRemoveMemberAfterInTx(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, d *db.DB) {
+		ctx := context.Background()
+		own, _ := d.CreateUser(ctx, db.User{Email: "own@x.io"})
+		tgt, _ := d.CreateUser(ctx, db.User{Email: "tgt@x.io"})
+		o, err := d.CreateOrg(ctx, db.NewOrg{Slug: "after", OwnerID: own.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = d.AddMember(ctx, o.ID, tgt.ID, db.RoleMember)
+		fail := db.MemberChange{After: func(context.Context, *sql.Tx) error { return errDenied }}
+		if _, err := d.RemoveMemberChecked(ctx, o.ID, tgt.ID, fail); !errors.Is(err, errDenied) {
+			t.Fatalf("remove with failing After: %v", err)
+		}
+		ran := false
+		ok := db.MemberChange{After: func(ctx context.Context, tx *sql.Tx) error {
+			var n int
+			if err := tx.QueryRowContext(ctx, d.Rebind(`SELECT COUNT(*) FROM memberships WHERE org_id = ? AND user_id = ?`), o.ID, tgt.ID).Scan(&n); err != nil {
+				return err
+			}
+			ran = n == 0
+			return nil
+		}}
+		if _, err := d.RemoveMemberChecked(ctx, o.ID, tgt.ID, ok); err != nil || !ran {
+			t.Fatalf("remove: %v, After saw removal %v", err, ran)
+		}
+	})
+}

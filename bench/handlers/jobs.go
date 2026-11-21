@@ -288,15 +288,16 @@ func (h *JobsHandler) logs(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Cache-Control", "no-store")
 	ctx.Response.Header.Set("X-Accel-Buffering", "no")
 	ctx.Response.Header.Set(lib.ModeHeader, string(h.mode))
-	api, mode, stop := h.api, h.mode, h.stop
+	api, mode, stop, allowed := h.api, h.mode, h.stop, lib.StreamGuardOf(ctx)
 	ctx.SetBodyStreamWriter(func(w *bufio.Writer) {
-		streamJobLogs(w, mode, api, org, id, page, stop)
+		streamJobLogs(w, mode, api, org, id, page, stop, allowed)
 	})
 }
 
 // streamJobLogs writes log lines as SSE until the job ended and its last
-// line went out, the client left, the server stops, or the stream is old.
-func streamJobLogs(w *bufio.Writer, mode schemas.Mode, api JobsAPI, org, id string, page *jobs.LogPage, stop <-chan struct{}) {
+// line went out, the client left, the server stops, the stream is old, or
+// allowed (the request's stream guard) no longer lets the caller read.
+func streamJobLogs(w *bufio.Writer, mode schemas.Mode, api JobsAPI, org, id string, page *jobs.LogPage, stop <-chan struct{}, allowed func() bool) {
 	if !writeSSE(w, "retry: "+strconv.Itoa(sseRetryMillis)+"\n\n") {
 		return
 	}
@@ -334,6 +335,9 @@ func streamJobLogs(w *bufio.Writer, mode schemas.Mode, api JobsAPI, org, id stri
 			}
 			continue
 		case <-poll.C:
+		}
+		if !allowed() {
+			return
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), readTimeout)
 		next, err := api.Logs(ctx, org, id, page.Next, 0)

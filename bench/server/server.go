@@ -203,7 +203,7 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	// W7 adaptive trials and suite tiers: the trials and tier panel (handlers/adaptive.go, docs/adaptive-trials.md).
 	handlers.NewAdaptiveHandler(mode, deps.Index, deps.Analyzer).RegisterRoutes(r, common...)
 	// W8 judge calibration: calibration card and labels (handlers/calibration.go, docs/judge-calibration.md).
-	handlers.NewCalibrationHandler(mode, deps.Calibration, write).RegisterRoutes(r, common...)
+	handlers.NewCalibrationHandler(mode, deps.Calibration, write).WithHeldOut(deps.Suites, cfg.HeldOut.Visible).RegisterRoutes(r, common...)
 	// W5 drift canary: GET /canaries, GET /canaries/{name}, POST /canaries/{name}/run (handlers/canary.go, docs/drift-canary.md).
 	handlers.NewCanaryHandler(mode, deps.Canaries, write).RegisterRoutes(r, common...)
 	// W6 migration report, cost explanation and Pareto planes (handlers/migration.go, handlers/costexplain.go, docs/model-migration.md, docs/cost-explain.md).

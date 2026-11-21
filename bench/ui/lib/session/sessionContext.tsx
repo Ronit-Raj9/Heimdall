@@ -1,13 +1,16 @@
 // The session every screen reads: local or hosted, who is signed in, in which organization, with
 // which role. The default is local mode, so screens rendered without the provider (tests, the
 // standalone bench before the platform) behave exactly as before.
-import { getAuthState, isAuthPage, isUnauthorized, roleAtLeast } from "@/lib/store/apis/session";
+import { errorStatus, getAuthState, isAuthPage, isUnauthorized, roleAtLeast } from "@/lib/store/apis/session";
 import type { AuthConfig, AuthMe, AuthMode, OrgSummary, PlatformUser, PrincipalKind, Role } from "@/lib/types/bench";
 import { createContext, useContext } from "react";
 
 export interface SessionInfo {
-	/** loading until /auth/me answers; local mode never waits. */
-	status: "loading" | "ready";
+	/**
+	 * loading until /auth/me answers; local mode never waits. error: /auth/me failed with neither a
+	 * 401 nor a 404 before any answer, so the mode is unknown and the app offers a retry.
+	 */
+	status: "loading" | "ready" | "error";
 	authMode: AuthMode;
 	kind: PrincipalKind;
 	user?: PlatformUser;
@@ -69,7 +72,10 @@ export function sessionFromMe({ me, meError, meLoading, config, demoReadable = f
 		const kind = me.kind ?? "anonymous";
 		const signedIn = kind === "user" || kind === "token";
 		const orgs: OrgSummary[] = (me.orgs ?? []).map((org) => ({ ...org }));
-		const org = orgs.find((candidate) => candidate.id === me.current_org) ?? (orgs.length === 1 ? orgs[0] : undefined);
+		// Only the server's current org is the request scope. A membership the session has not
+		// selected (after leaving the current org) is offered by the switcher, never shown as if
+		// requests already acted in it: they resolve no org until one is chosen.
+		const org = orgs.find((candidate) => candidate.id === me.current_org) ?? (kind === "token" && orgs.length === 1 ? orgs[0] : undefined);
 		return {
 			status: "ready",
 			authMode: "hosted",
@@ -89,8 +95,11 @@ export function sessionFromMe({ me, meError, meLoading, config, demoReadable = f
 			? { ...LOCAL_SESSION, status: "loading", authMode: "hosted", kind: "anonymous", role: undefined }
 			: { ...LOCAL_SESSION, status: "loading" };
 	}
-	// 404 (no platform routes) or any other failure: local mode, today's behaviour.
-	return { ...LOCAL_SESSION };
+	// 404 (no platform routes): local mode, today's behaviour. Any other failure (a transport error,
+	// a 5xx) proves nothing about the mode: a hosted server would still want its session and CSRF
+	// headers, so no local controls are offered, only a retry.
+	if (meError === undefined || errorStatus(meError) === 404) return { ...LOCAL_SESSION };
+	return { ...LOCAL_SESSION, status: "error", authMode: "hosted", kind: "anonymous", role: undefined };
 }
 
 /**
@@ -124,7 +133,8 @@ export function useSession(): SessionInfo {
  * What the app frame shows for a path: the auth pages without the shell, the login page for a
  * hosted visitor who is neither signed in nor reading a public demo, else the app shell.
  */
-export function frameFor(session: SessionInfo, pathname: string): "auth" | "login" | "app" {
+export function frameFor(session: SessionInfo, pathname: string): "auth" | "login" | "app" | "error" {
+	if (session.status === "error") return "error";
 	if (isAuthPage(pathname)) return "auth";
 	if (session.authMode === "hosted" && session.status === "ready" && !session.signedIn && !session.demo) return "login";
 	return "app";

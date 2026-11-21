@@ -6,7 +6,7 @@ import { CopyId } from "@/components/ui/copyId";
 import { Input } from "@/components/ui/input";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { useGetOrgQuery, useLeaveOrgMutation, useRenameOrgMutation, useSetPublicReadMutation } from "@/lib/store/apis/platformApi";
+import { useGetOrgQuery, useLeaveOrgMutation, useRenameOrgMutation, useSetPublicReadMutation, useSwitchOrgMutation } from "@/lib/store/apis/platformApi";
 import type { OrgInfo, OrgSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Check, Eye, EyeOff, TriangleAlert } from "lucide-react";
@@ -57,6 +57,7 @@ function OrgSettings({ info }: { info: OrgInfo }) {
 	const [rename, renameState] = useRenameOrgMutation();
 	const [setPublic, publicState] = useSetPublicReadMutation();
 	const [leave, leaveState] = useLeaveOrgMutation();
+	const [switchOrg] = useSwitchOrgMutation();
 	const [saved, setSaved] = useState(false);
 
 	const onRename = async (event: FormEvent) => {
@@ -73,6 +74,10 @@ function OrgSettings({ info }: { info: OrgInfo }) {
 		if (!session.user) return;
 		try {
 			await leave({ orgId: info.id }).unwrap();
+			// The session still points at the org just left, so requests would resolve no org: make
+			// a remaining membership current first. With none left the user lands on an empty app.
+			const next = session.orgs.find((candidate) => candidate.id !== info.id);
+			if (next) await switchOrg({ org: next.id }).unwrap().catch(() => undefined);
 			window.location.assign("/");
 		} catch {
 			// leaveState.error renders the failure.

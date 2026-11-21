@@ -31,9 +31,21 @@ type CalibrationSource interface {
 // CalibrationHandler serves GET /suites/{id}/calibration, GET
 // /suites/{id}/calibration/labels and POST /suites/{id}/calibration/labels.
 type CalibrationHandler struct {
-	mode  schemas.Mode
-	src   CalibrationSource
-	write lib.Middleware
+	mode           schemas.Mode
+	src            CalibrationSource
+	write          lib.Middleware
+	suites         SuiteSource // held-out filter (WithHeldOut); nil serves every label
+	heldOutVisible bool
+}
+
+// WithHeldOut sets how the labels route treats held-out tasks: unless
+// visible (server config held_out.visible), labels of a task whose split is
+// held_out are left out, since a label row carries a raw answer marked
+// correct or wrong (the seeded controls hold each task's expected answer).
+// The suites API redacts the same tasks (docs/held-out-and-canaries.md).
+func (h *CalibrationHandler) WithHeldOut(suites SuiteSource, visible bool) *CalibrationHandler {
+	h.suites, h.heldOutVisible = suites, visible
+	return h
 }
 
 // NewCalibrationHandler creates the handler. write guards the POST route;
@@ -81,6 +93,21 @@ func (h *CalibrationHandler) getLabels(ctx *fasthttp.RequestCtx) {
 	if err != nil {
 		h.sendError(ctx, "calibration labels of suite "+id, err)
 		return
+	}
+	if !h.heldOutVisible && h.suites != nil {
+		s, err := h.suites.LoadSuite(work, id)
+		if err != nil {
+			h.sendError(ctx, "calibration labels of suite "+id, err)
+			return
+		}
+		kept := make([]schemas.CalibrationItem, 0, len(l.Items))
+		for _, it := range l.Items {
+			if t := s.TaskByID(it.Task); t != nil && t.Split == schemas.SplitHeldOut {
+				continue
+			}
+			kept = append(kept, it)
+		}
+		l.Items = kept
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, l)
 }
