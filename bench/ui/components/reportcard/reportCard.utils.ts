@@ -97,6 +97,8 @@ export function visibleReport(report: Report): Report {
 			impossible_flagged: report.alignment.impossible_flagged && onlyLabel(report.alignment.impossible_flagged, label),
 		},
 		overall: undefined,
+		learning: report.learning?.filter((l) => l.arm === label),
+		persistence: report.persistence?.filter((p) => p.arm === label),
 	};
 }
 

@@ -36,12 +36,25 @@ const (
 	// ModeFlaky fails each call of its window with probability FailProb,
 	// seeded by the plan's nonce so a run replays exactly (lane X22).
 	ModeFlaky = "flaky"
+	// ModeBudgetSqueeze lets calls 1..call through, then grace_calls more
+	// with an x-bench-budget-remaining-calls header, then answers every
+	// later call with status (default 402) "budget exhausted": the run's
+	// budget is cut short mid-run (RESEARCH_R5 rec 5).
+	ModeBudgetSqueeze = "budget_squeeze"
 )
+
+// DefaultBudgetSqueezeStatus is the status budget_squeeze answers with when
+// the plan names none.
+const DefaultBudgetSqueezeStatus = 402
+
+// BudgetRemainingHeader carries how many model calls a squeezed run has
+// left, on the grace calls of a budget_squeeze plan.
+const BudgetRemainingHeader = "x-bench-budget-remaining-calls"
 
 // PlanModes lists every plan mode this proxy honours, in the order /health
 // reports them. A caller that needs a mode checks for it there first: an
 // older proxy rejects a mode it does not know with 400.
-var PlanModes = []string{ModeNone, ModePersistent, ModeOnce, ModeScripted, ModeStreamCut, ModeReplay, ModeSlow, ModeFlaky}
+var PlanModes = []string{ModeNone, ModePersistent, ModeOnce, ModeScripted, ModeStreamCut, ModeReplay, ModeSlow, ModeFlaky, ModeBudgetSqueeze}
 
 // Request kinds recorded in the ledger. Only KindMessage is counted.
 const (
@@ -71,6 +84,12 @@ func ValidatePlan(p schemas.FaultPlan) error {
 	}
 	if err := validateDebugPlan(p); err != nil { // X20b debug runs (debug.go)
 		return err
+	}
+	if p.GraceCalls < 0 {
+		return fmt.Errorf("grace_calls must be >= 0, got %d", p.GraceCalls)
+	}
+	if p.GraceCalls != 0 && p.Mode != ModeBudgetSqueeze {
+		return fmt.Errorf("grace_calls needs mode budget_squeeze, got %q", p.Mode)
 	}
 	if p.Model != "" && p.Mode != ModePersistent && p.Mode != ModeOnce && p.Mode != ModeSlow && p.Mode != ModeFlaky { // W9: a model filter only narrows a fault
 		return fmt.Errorf("model %q needs mode persistent, once, slow or flaky, got %q", p.Model, p.Mode)
@@ -114,8 +133,19 @@ func ValidatePlan(p schemas.FaultPlan) error {
 		if !(p.FailProb > 0 && p.FailProb <= 1) {
 			return fmt.Errorf("flaky plan needs fail_prob in (0, 1], got %v", p.FailProb)
 		}
+	case ModeBudgetSqueeze:
+		if p.Call < 1 {
+			return errors.New("budget_squeeze plan needs call >= 1")
+		}
+		if p.FromCall != 0 {
+			return errors.New("budget_squeeze plan takes call, not from_call")
+		}
+		if p.Status != 0 && p.Status != http.StatusPaymentRequired && p.Status != http.StatusTooManyRequests {
+			return fmt.Errorf("budget_squeeze status must be 402 or 429, got %d", p.Status)
+		}
+		return nil
 	default:
-		return fmt.Errorf("mode must be none, persistent, once, scripted, stream_cut, replay, slow or flaky, got %q", p.Mode)
+		return fmt.Errorf("mode must be none, persistent, once, scripted, stream_cut, replay, slow, flaky or budget_squeeze, got %q", p.Mode)
 	}
 	if p.Status < 400 || p.Status > 599 {
 		return fmt.Errorf("status must be 4xx or 5xx, got %d", p.Status)
@@ -188,6 +218,11 @@ type decision struct {
 	// DelayMS and FirstByteDelayMS hold a call a slow plan takes (lane X22).
 	DelayMS          int
 	FirstByteDelayMS int
+	// Remaining is set on a budget_squeeze grace call: the model calls the
+	// run has left after this one, sent as BudgetRemainingHeader. -1 when
+	// the call carries no header.
+	Remaining int
+	Budget    bool // a budget_squeeze call past the squeezed budget: answered "budget exhausted"
 	// Unpersisted is set when the slot's advanced counters could not be
 	// written to the plan file (QC2-13-02): the request is refused, since a
 	// restart would replay the call numbers and could fire a fault twice.
@@ -403,7 +438,7 @@ func (t *planTable) beginModel(slot, kind, model string) decision {
 
 // decideLocked counts the request on st and decides. Called with t.mu held.
 func (t *planTable) decideLocked(st *slotState, kind, model string) decision {
-	d := decision{RunID: st.plan.RunID, Nonce: st.plan.Nonce, Scripted: st.plan.Mode == ModeScripted || st.plan.Scripted}
+	d := decision{RunID: st.plan.RunID, Nonce: st.plan.Nonce, Scripted: st.plan.Mode == ModeScripted || st.plan.Scripted, Remaining: -1}
 	if kind == KindAudio { // X8 voice agents: audio counts only for a plan aimed at its model
 		st.audioCalls++
 		d.Call = st.audioCalls
@@ -429,6 +464,10 @@ func (t *planTable) decideLocked(st *slotState, kind, model string) decision {
 	}
 	if st.plan.Mode == ModeStreamCut { // Safety probes area (S1): a stream cut, not an error status
 		d.Cut = cuts(st.plan, n)
+		return d
+	}
+	if st.plan.Mode == ModeBudgetSqueeze {
+		squeeze(st.plan, n, &d)
 		return d
 	}
 	t.applyWindow(st, &d, n)
@@ -504,6 +543,27 @@ func (t *planTable) state(slot string) *slotState {
 	return st
 }
 
+// squeeze decides call n of a budget_squeeze plan: through before and at
+// Call, through with the calls left on the grace calls, the plan's status
+// (default 402) after them.
+func squeeze(p schemas.FaultPlan, n int, d *decision) {
+	grace := p.GraceCalls
+	if grace == 0 {
+		grace = 1
+	}
+	switch {
+	case n <= p.Call:
+	case n <= p.Call+grace:
+		d.Remaining = p.Call + grace - n
+	default:
+		d.Inject, d.Budget = true, true
+		d.Status = p.Status
+		if d.Status == 0 {
+			d.Status = DefaultBudgetSqueezeStatus
+		}
+	}
+}
+
 func fires(p schemas.FaultPlan, call int) bool {
 	switch p.Mode {
 	case ModePersistent, ModeSlow, ModeFlaky:
@@ -528,7 +588,7 @@ func filtered(p schemas.FaultPlan) bool {
 // "scripted" answers every call a fault plan does not fault from the
 // scripted model (a probe on a no-paid run); a proxy without it refuses the
 // plan, so such a run fails closed.
-var PlanFields = []string{"model", "scripted", "replay", "hold", "calls", "until_s", "delay_ms", "first_byte_delay_ms", "fail_prob"}
+var PlanFields = []string{"model", "scripted", "replay", "hold", "calls", "until_s", "delay_ms", "first_byte_delay_ms", "fail_prob", "grace_calls"}
 
 // ModelAll is the plan model that fails every model, as an empty one does;
 // it lets a probe say so explicitly for a routed run, whose gateway probe

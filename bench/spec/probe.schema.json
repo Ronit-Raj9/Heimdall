@@ -48,11 +48,12 @@
           "additionalProperties": false,
           "required": ["mode"],
           "properties": {
-            "mode": {"enum": ["none", "persistent", "once", "stream_cut", "slow", "flaky"], "description": "S1: stream_cut relays a streamed model answer up to its first tool-call delta and then cuts the stream (call, or every call from from_call). X22: slow holds calls (delay_ms, first_byte_delay_ms) and answers them; flaky fails each call with fail_prob, seeded per run. persistent with calls or until_s is a brownout that ends."},
+            "mode": {"enum": ["none", "persistent", "once", "stream_cut", "slow", "flaky", "budget_squeeze"], "description": "S1: stream_cut relays a streamed model answer up to its first tool-call delta and then cuts the stream (call, or every call from from_call). X22: slow holds calls (delay_ms, first_byte_delay_ms) and answers them; flaky fails each call with fail_prob, seeded per run. persistent with calls or until_s is a brownout that ends."},
             "from_call": {"type": "integer", "minimum": 1},
             "call": {"type": "integer", "minimum": 1},
             "status": {"type": "integer", "minimum": 100, "maximum": 599},
             "retry_after_s": {"type": "integer", "minimum": 0},
+            "grace_calls": {"type": "integer", "minimum": 0, "description": "budget_squeeze: model calls still let through after call (default 1)."},
             "model": {"type": "string", "minLength": 1, "description": "W9: fail only requests for this model; \"*\" fails every model. Empty: every model, or a routed run's primary target."},
             "calls": {"type": "integer", "minimum": 1, "description": "X22: the window lasts this many calls from from_call, then the model recovers."},
             "until_s": {"type": "integer", "minimum": 1, "description": "X22: the window ends this many seconds after its first fired call."},
@@ -65,7 +66,8 @@
             {"if": {"properties": {"mode": {"const": "once"}}}, "then": {"required": ["call", "status"]}},
             {"if": {"properties": {"mode": {"const": "stream_cut"}}}, "then": {"anyOf": [{"required": ["call"]}, {"required": ["from_call"]}]}},
             {"if": {"properties": {"mode": {"const": "slow"}}}, "then": {"anyOf": [{"required": ["delay_ms"]}, {"required": ["first_byte_delay_ms"]}]}},
-            {"if": {"properties": {"mode": {"const": "flaky"}}}, "then": {"required": ["fail_prob", "status"]}}
+            {"if": {"properties": {"mode": {"const": "flaky"}}}, "then": {"required": ["fail_prob", "status"]}},
+            {"if": {"properties": {"mode": {"const": "budget_squeeze"}}}, "then": {"required": ["call"], "not": {"required": ["from_call"]}, "properties": {"status": {"enum": [402, 429]}}}}
           ]
         },
         "shim": {
@@ -86,7 +88,7 @@
           "required": ["mode"],
           "description": "Layer tool: the fault the per-run tool proxy injects. Mirrors schemas.ToolFault.",
           "properties": {
-            "mode": {"enum": ["error", "timeout", "poison", "describe_poison", "rug_pull", "shadow", "schema_poison", "plausible_wrong", "schema_drift", "lost_ack", "rate_limit", "slow", "flaky", "partial", "auth_expired", "tool_removed", "input_drift", "duplicate_effect"], "description": "S1 safety modes: describe_poison, rug_pull, shadow and schema_poison rewrite tools/list answers; plausible_wrong and schema_drift rewrite a real result quietly; lost_ack forwards the call and withholds the answer (docs/tool-proxy.md). X22 resilience modes: rate_limit, slow, flaky, partial, auth_expired, tool_removed, input_drift, duplicate_effect."},
+            "mode": {"enum": ["error", "timeout", "poison", "describe_poison", "rug_pull", "shadow", "schema_poison", "plausible_wrong", "schema_drift", "lost_ack", "inflate", "rate_limit", "slow", "flaky", "partial", "auth_expired", "tool_removed", "input_drift", "duplicate_effect"], "description": "S1 safety modes: describe_poison, rug_pull, shadow and schema_poison rewrite tools/list answers; plausible_wrong and schema_drift rewrite a real result quietly; lost_ack forwards the call and withholds the answer (docs/tool-proxy.md). X22 resilience modes: rate_limit, slow, flaky, partial, auth_expired, tool_removed, input_drift, duplicate_effect."},
             "server": {"type": "string", "description": "Service id; absent matches every server."},
             "tool": {"type": "string", "description": "Tool name; absent matches every tool."},
             "from_call": {"type": "integer", "minimum": 1, "description": "rug_pull: listings stay clean until from_call - 1 tool calls on the server were answered."},
@@ -103,7 +105,8 @@
             "prob": {"type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "flaky: failure chance per call, seeded per run."},
             "keep": {"type": "integer", "minimum": 1, "description": "partial: array items kept in the result."},
             "refresh": {"type": "string", "minLength": 1, "description": "auth_expired: the tool whose call renews the token."},
-            "version": {"type": "string", "minLength": 1, "description": "input_drift: the API version named in validation errors."}
+            "version": {"type": "string", "minLength": 1, "description": "input_drift: the API version named in validation errors."},
+            "tokens": {"type": "integer", "minimum": 1, "maximum": 200000, "description": "inflate: tokens of filler appended to the result (about 4 characters each)."}
           },
           "allOf": [
             {"if": {"properties": {"mode": {"const": "poison"}}}, "then": {"required": ["text"]}},
@@ -117,7 +120,8 @@
             {"if": {"properties": {"mode": {"const": "partial"}}}, "then": {"required": ["keep"]}},
             {"if": {"properties": {"mode": {"const": "auth_expired"}}}, "then": {"required": ["refresh"]}},
             {"if": {"properties": {"mode": {"const": "tool_removed"}}}, "then": {"required": ["tool"]}},
-            {"if": {"properties": {"mode": {"const": "input_drift"}}}, "then": {"required": ["tool", "rename"]}}
+            {"if": {"properties": {"mode": {"const": "input_drift"}}}, "then": {"required": ["tool", "rename"]}},
+            {"if": {"properties": {"mode": {"const": "inflate"}}}, "then": {"required": ["tokens"]}}
           ]
         },
         "faults": {
@@ -177,6 +181,17 @@
             "delay_ms": {"type": "integer", "minimum": 0, "maximum": 60000}
           }
         },
+        "process": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Layer process: SIGKILL the agent once at_model_call model calls went through the gateway or after_s seconds passed, whichever comes first, then resume it with the same workspace and memory and BENCH_RESUME=1.",
+          "properties": {
+            "at_model_call": {"type": "integer", "minimum": 1},
+            "after_s": {"type": "integer", "minimum": 1},
+            "session": {"type": "string", "minLength": 1, "description": "Session id of a multi-session task; the first session when absent."}
+          },
+          "anyOf": [{"required": ["at_model_call"]}, {"required": ["after_s"]}]
+        },
         "agent": {"type": "string", "minLength": 1, "description": "Team runs: target one member id or every member with this role; a gateway-layer plan binds to that member's own key slot, a tool fault matches only its calls (docs/multi-agent.md)."}
       }
     },
@@ -215,6 +230,10 @@
     {
       "if": {"required": ["layer"], "properties": {"layer": {"const": "a2a"}}},
       "then": {"properties": {"apply": {"required": ["a2a"]}}}
+    },
+    {
+      "if": {"required": ["layer"], "properties": {"layer": {"const": "process"}}},
+      "then": {"properties": {"apply": {"required": ["process"]}}}
     }
   ]
 }

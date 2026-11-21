@@ -75,6 +75,7 @@ func Builtin() []schemas.Metric {
 		newDelegationLoopsMetric(),
 		newAttributionCoverageMetric(),
 		newBudgetExceededMetric(),
+		newGracefulFinishMetric(), newCostNormalizedSuccessMetric(), newResumedWithoutRedoMetric(), // budget squeeze and crash-resume (persistence.go)
 		newEvalAwarenessMetric(), // Eval integrity area (S2): heuristic eval awareness phrase count, report only
 		// Multi-agent probes (M2): wrong-majority conformity and reviewer catch, report only.
 		newConformityFlipMetric(),

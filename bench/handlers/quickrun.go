@@ -140,6 +140,7 @@ type quickFile struct {
 	Concurrency  int                        `yaml:"concurrency"`
 	ManifestMode string                     `yaml:"manifest_mode"`
 	Policy       string                     `yaml:"policy,omitempty"`
+	Stream       *schemas.StreamSpec        `yaml:"stream,omitempty"` // evaluations: memory carried task to task (schemas/stream.go)
 }
 
 type quickCondition struct {

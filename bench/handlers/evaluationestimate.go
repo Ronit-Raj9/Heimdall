@@ -62,6 +62,24 @@ type EvalEstimateRequest struct {
 	Trials            int               `json:"trials"`
 	Faults            []string          `json:"faults"`
 	BudgetUSD         float64           `json:"budget_usd,omitempty"`
+	// Stream is the evaluation's stream block (memory from task to task).
+	// In score mode with memory carried the launch adds a no-memory control
+	// arm, and replay runs go at the end of every chain: both are counted.
+	Stream *schemas.StreamSpec `json:"stream,omitempty"`
+}
+
+// streamControl reports whether the launch adds the no-memory control arm
+// (evalStreamControl).
+func (r *EvalEstimateRequest) streamControl() bool {
+	return len(r.Arms) == 1 && r.Stream != nil && r.Stream.Memory == schemas.StreamMemoryCarry
+}
+
+// armCount is the experiment arms one benchmark runs, the control included.
+func (r *EvalEstimateRequest) armCount() int {
+	if r.streamControl() {
+		return len(r.Arms) + 1
+	}
+	return len(r.Arms)
 }
 
 // EvalCostRange is a cost range in USD. Known false means at least one part
@@ -398,6 +416,14 @@ func normalizeEvalRequest(req *EvalEstimateRequest) error {
 	if req.Trials < 1 || req.Trials > EvalMaxTrials {
 		return badf("trials must be between 1 and %d", EvalMaxTrials)
 	}
+	if req.Stream != nil {
+		if req.Stream.FreshArm != "" {
+			return badf("stream.fresh_arm is chosen by the evaluation: in score mode a no-memory control of the agent is added")
+		}
+		if err := req.Stream.Validate(nil); err != nil {
+			return badf("%v", err)
+		}
+	}
 	if req.BudgetUSD < 0 {
 		return badf("budget_usd must not be negative")
 	}
@@ -509,7 +535,11 @@ func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSour
 	if skipped != nil {
 		be.FaultsSkip = skipped
 	}
-	be.Runs = len(req.Arms) * len(tasks) * len(conds) * req.Trials
+	chains := req.armCount() * len(conds) * req.Trials
+	be.Runs = chains * len(tasks)
+	if req.Stream != nil && req.Stream.Replay > 0 { // stream replay: more runs at the end of every chain (engine/streamplan.go)
+		be.Runs += chains * min(req.Stream.Replay, len(tasks))
+	}
 	if src == nil {
 		be.Notes = append(be.Notes, "no forecast on this server")
 		return be
@@ -530,7 +560,7 @@ func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSour
 		be.Notes = append(be.Notes, "no forecast: "+err.Error())
 		return be
 	}
-	applyForecast(&be, f, len(req.Arms))
+	applyForecast(&be, f, req.armCount())
 	return be
 }
 
@@ -545,7 +575,8 @@ var evalArmIDs = []string{"A", "B"}
 
 // evalExperiment is the experiment an evaluation would launch on st: one
 // arm per spec arm, so a single setup is one arm scored on its own and the
-// estimate counts exactly the runs the launch plans.
+// estimate counts exactly the runs the launch plans; a score-mode stream
+// with memory carried adds its no-memory control as arm B.
 func evalExperiment(st *schemas.Suite, req *EvalEstimateRequest, tasks, conds []string) *schemas.Experiment {
 	arms := map[string]schemas.ArmSpec{}
 	base := ""
@@ -564,6 +595,15 @@ func evalExperiment(st *schemas.Suite, req *EvalEstimateRequest, tasks, conds []
 		}
 		arms[evalArmIDs[i]] = arm
 	}
+	var stream *schemas.StreamSpec
+	if req.Stream != nil {
+		st := *req.Stream
+		if req.streamControl() {
+			arms[evalArmIDs[1]] = streamControlArm(arms[evalArmIDs[0]])
+			st.FreshArm = evalArmIDs[1]
+		}
+		stream = &st
+	}
 	cs := make([]schemas.ConditionSpec, 0, len(conds))
 	for _, c := range conds {
 		cs = append(cs, schemas.ConditionSpec{ID: c, Tasks: schemas.TaskSelector{IDs: append([]string(nil), tasks...)}, Trials: req.Trials})
@@ -581,6 +621,7 @@ func evalExperiment(st *schemas.Suite, req *EvalEstimateRequest, tasks, conds []
 		Verdict:      schemas.VerdictSpec{Policy: "paired_signflip"},
 		Concurrency:  2,
 		ManifestMode: "agent_exposure",
+		Stream:       stream,
 	}
 }
 

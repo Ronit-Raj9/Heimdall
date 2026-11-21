@@ -82,6 +82,8 @@ type ProbeApply struct {
 	// stay in the step's own fault (from_call, calls). At most one step per
 	// layer. Only a probe of layer compound reads it.
 	Faults []FaultStep `json:"faults,omitempty" yaml:"faults"`
+	// process: when to SIGKILL the agent and resume it (stream.go).
+	Process *ProcessFault `json:"process,omitempty" yaml:"process,omitempty"`
 }
 
 // LayerCompound is the probe layer that arms a schedule of other layers'
@@ -125,7 +127,10 @@ type FaultPlan struct {
 	Call        int    `json:"call,omitempty" yaml:"call"`           // once: the failing call, 1-based
 	Status      int    `json:"status,omitempty" yaml:"status"`       // e.g. 503
 	RetryAfterS int    `json:"retry_after_s,omitempty" yaml:"retry_after_s"`
-	Model       string `json:"model,omitempty" yaml:"model,omitempty"` // W9: fail only requests for this model ("*" = all); a routed run's gateway probe sets its primary target when empty
+	// GraceCalls is how many model calls budget_squeeze still lets through
+	// after Call before it answers 402 (default 1).
+	GraceCalls int    `json:"grace_calls,omitempty" yaml:"grace_calls,omitempty"`
+	Model      string `json:"model,omitempty" yaml:"model,omitempty"` // W9: fail only requests for this model ("*" = all); a routed run's gateway probe sets its primary target when empty
 	// Recovery windows (lane X22). Calls ends a persistent or flaky fault
 	// after that many calls from FromCall; UntilS ends it that many seconds
 	// after its first fired call, so the model comes back and recovery is

@@ -194,6 +194,9 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 	if opts.RemoteOnly && opts.Remote == nil { // Runners area
 		return nil, errors.New("scheduler: remote only needs a coordinator")
 	}
+	if opts.RemoteOnly && m != nil && m.Experiment.Stream != nil { // stream mode: chains run in order on local workers
+		return nil, errors.New("scheduler: a stream experiment runs on local workers; remote only is refused")
+	}
 	r, err := s.start(ctx, m, opts)
 	if err != nil {
 		return nil, err
@@ -262,6 +265,7 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 					}
 					r.process(ctx, slot)
 					r.queue.doneLocal()
+					r.queue.markDone(slot.SlotID) // stream mode: the chain's next slot may start
 				}
 			}()
 		}
@@ -275,6 +279,7 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 						return
 					}
 					r.runGPUSlot(ctx, slot)
+					r.queue.markDone(slot.SlotID) // stream mode
 				}
 			}()
 		}
@@ -1258,6 +1263,11 @@ type slotQueue struct {
 	held  func(*schemas.Slot) bool
 	limit int
 	local int // local slots taken through nextLocal and not yet done
+	// Stream mode (streamplan.go): a slot whose StreamPrev is not done
+	// waits. done holds the slots a local worker finished; inflight counts
+	// the slots local workers hold.
+	done     map[string]bool
+	inflight int
 }
 
 // setGate replaces the hold rule and the local limit and wakes every waiter.
@@ -1291,7 +1301,7 @@ func (q *slotQueue) doneLocal() {
 func newSlotQueue(slots []schemas.Slot) *slotQueue {
 	sorted := append([]schemas.Slot(nil), slots...)
 	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].OrderIndex < sorted[j].OrderIndex })
-	q := &slotQueue{changed: make(chan struct{}), pending: make([]*schemas.Slot, 0, len(sorted))}
+	q := &slotQueue{changed: make(chan struct{}), pending: make([]*schemas.Slot, 0, len(sorted)), done: map[string]bool{}}
 	for i := range sorted {
 		q.pending = append(q.pending, &sorted[i])
 	}
@@ -1320,9 +1330,20 @@ func (q *slotQueue) nextWhere(ctx context.Context, match func(*schemas.Slot) boo
 // this worker's kind) the worker waits instead of returning, so a paused
 // experiment keeps its workers until it resumes or ctx ends.
 func (q *slotQueue) next0(ctx context.Context, match func(*schemas.Slot) bool, waitOthers, limited bool) (*schemas.Slot, bool) {
+	take := func(i int, slot *schemas.Slot) (*schemas.Slot, bool) {
+		q.pending = append(q.pending[:i:i], q.pending[i+1:]...)
+		if limited {
+			q.local++
+		}
+		q.inflight++
+		q.notifyLocked() // X7: a worker waiting on other slots re-checks
+		q.mu.Unlock()
+		return slot, true
+	}
 	for {
 		q.mu.Lock()
 		heldMine := false
+		blocked := 0
 		atLimit := limited && q.limit > 0 && q.local >= q.limit
 		for i, slot := range q.pending {
 			if match != nil && !match(slot) {
@@ -1332,19 +1353,28 @@ func (q *slotQueue) next0(ctx context.Context, match func(*schemas.Slot) bool, w
 				heldMine = true
 				continue
 			}
+			if q.waitsLocked(slot) { // stream mode: the chain's previous slot is still running
+				blocked++
+				continue
+			}
 			if atLimit {
 				heldMine = true
 				break
 			}
-			q.pending = append(q.pending[:i:i], q.pending[i+1:]...)
-			if limited {
-				q.local++
-			}
-			q.notifyLocked() // X7: a worker waiting on other slots re-checks
-			q.mu.Unlock()
-			return slot, true
+			return take(i, slot)
 		}
-		if !heldMine && q.remote == 0 && (!waitOthers || len(q.pending) == 0) {
+		if blocked > 0 && !atLimit && q.inflight == 0 && q.remote == 0 {
+			// Nothing running can unblock them (their previous slot never
+			// reached this queue): release the first, so a chain never
+			// hangs the run.
+			for i, slot := range q.pending {
+				if (match == nil || match(slot)) && !q.isHeldLocked(slot) && q.waitsLocked(slot) {
+					q.done[slot.StreamPrev] = true
+					return take(i, slot)
+				}
+			}
+		}
+		if !heldMine && blocked == 0 && q.remote == 0 && (!waitOthers || len(q.pending) == 0) {
 			q.mu.Unlock()
 			return nil, false
 		}
@@ -1390,6 +1420,9 @@ func (q *slotQueue) takeWhere(match func(*schemas.Slot) bool) (*schemas.Slot, bo
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	for i, slot := range q.pending {
+		if slot.StreamIndex > 0 { // stream mode: chains run on local workers only, in order
+			continue
+		}
 		if (match == nil || match(slot)) && !q.isHeldLocked(slot) { // run control: a held slot goes to no remote worker either
 			q.pending = append(q.pending[:i:i], q.pending[i+1:]...)
 			q.remote++
@@ -1429,6 +1462,24 @@ func (q *slotQueue) finish() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.remote--
+	q.notifyLocked()
+}
+
+// waitsLocked reports whether slot is a stream slot whose previous slot of
+// the chain has not finished on this queue yet. Called with q.mu held.
+func (q *slotQueue) waitsLocked(slot *schemas.Slot) bool {
+	return slot.StreamPrev != "" && !q.done[slot.StreamPrev]
+}
+
+// markDone ends a slot a local worker took from next or nextWhere, sealed
+// or not: the next slot of its chain may start.
+func (q *slotQueue) markDone(slotID string) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.done[slotID] = true
+	if q.inflight > 0 {
+		q.inflight--
+	}
 	q.notifyLocked()
 }
 

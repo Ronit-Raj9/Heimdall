@@ -18,6 +18,12 @@ type Slot struct {
 	OrderIndex   int    `json:"order_index"`
 	Counted      bool   `json:"counted"`            // false for compatibility runs; they never enter the verdict
 	Optional     bool   `json:"optional,omitempty"` // W7 adaptive trials: runs only when the frozen rule releases it (trials.go)
+	// Stream mode (stream.go): the 1-based place of the slot in its chain,
+	// the slot that runs before it, and whether it is a replay run. Zero
+	// for every slot of an experiment without a stream.
+	StreamIndex  int    `json:"stream_index,omitempty"`
+	StreamPrev   string `json:"stream_prev,omitempty"`
+	StreamReplay bool   `json:"stream_replay,omitempty"`
 }
 
 // Stage is one step of the slot pipeline (DESIGN.md 8.2). This list is the

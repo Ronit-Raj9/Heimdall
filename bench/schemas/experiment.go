@@ -108,6 +108,12 @@ type Experiment struct {
 	// breakpoints (debug.go). Its slots are never counted. nil keeps
 	// recorded manifests' hashes.
 	Debug *DebugSpec `json:"debug,omitempty" yaml:"debug,omitempty"`
+
+	// Stream chains the runs of each arm, condition and trial over the
+	// condition's tasks and, with memory carry, hands each run the memory
+	// the previous one left (stream.go). nil keeps recorded manifests'
+	// hashes.
+	Stream *StreamSpec `json:"stream,omitempty" yaml:"stream,omitempty"`
 }
 
 // Exploratory reports an experiment whose result decides nothing: a rerun
@@ -243,6 +249,10 @@ type CompatibilitySpec struct {
 type BudgetSpec struct {
 	TotalUSD   float64 `json:"total_usd" yaml:"total_usd"`
 	ReserveUSD float64 `json:"reserve_usd,omitempty" yaml:"reserve_usd"`
+	// Disclose tells the agent its budget: BENCH_BUDGET_USD (the per-run
+	// cap), BENCH_DEADLINE (RFC 3339) and BENCH_MAX_TOOL_CALLS when the
+	// arm sets them (stream.go). omitempty keeps recorded hashes.
+	Disclose bool `json:"disclose,omitempty" yaml:"disclose,omitempty"`
 }
 
 // VerdictSpec configures the verdict policy.

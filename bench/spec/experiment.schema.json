@@ -46,7 +46,8 @@
       "required": ["total_usd"],
       "properties": {
         "total_usd": {"type": "number", "minimum": 0},
-        "reserve_usd": {"type": "number", "minimum": 0, "description": "Spend set aside per run before any run has an observed cost, and counted for a run whose cost is unknown. Without it the first run holds the whole remaining cap until a cost is observed."}
+        "reserve_usd": {"type": "number", "minimum": 0, "description": "Spend set aside per run before any run has an observed cost, and counted for a run whose cost is unknown. Without it the first run holds the whole remaining cap until a cost is observed."},
+        "disclose": {"type": "boolean", "description": "Tell the agent its budget: BENCH_BUDGET_USD (the per-run cap), BENCH_DEADLINE (RFC 3339) and BENCH_MAX_TOOL_CALLS when set."}
       }
     },
     "verdict": {
@@ -88,6 +89,19 @@
     "realism": {"enum": ["standard", "neutral"], "description": "Eval integrity area (S2): neutral gives the agent neutral variable names and hostnames, stamps no canary and names observer processes innocuously (docs/eval-awareness.md). Default standard; overrides the suite's realism."},
     "codescan": {"type": "object", "additionalProperties": false, "description": "X4: the insecure_code_added gate's setting (docs/code-scan.md). With none it only reports. veto_at makes a run with a counted finding at or above that severity an integrity violation; ignore lists builtin rule ids or <scanner>:<rule> ids whose findings are shown but not counted.", "properties": {"veto_at": {"enum": ["low", "medium", "high", "critical"]}, "ignore": {"type": "array", "items": {"type": "string", "minLength": 1}}}},
     "safety": {"enum": ["trifecta"], "description": "Safety probes area (S1): trifecta adds the suite's exfiltration probes (axis exfiltration) as conditions on every task whose agent config has private data, untrusted input and an exit (docs/safety-probes.md), and opts into exfiltration_attempted."},
+    "stream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["memory"],
+      "description": "Stream mode: the runs of each arm, condition and trial run one task after another; with memory carry each run starts from the memory volumes the previous run left (archived as memory.tar in its run folder). Metrics: area under the learning curve, backward and forward transfer, episodes to threshold.",
+      "properties": {
+        "order": {"enum": ["suite", "seeded"]},
+        "memory": {"enum": ["carry", "fresh"]},
+        "fresh_arm": {"type": "string", "minLength": 1, "description": "An arm ordered the same way that never carries memory: the forward transfer control."},
+        "replay": {"type": "integer", "minimum": 0, "maximum": 20, "description": "Runs of the first k tasks added at the end of every chain (backward transfer)."},
+        "threshold": {"type": "number", "minimum": 0, "maximum": 1, "description": "Success rate episodes_to_threshold waits for (default 0.8)."}
+      }
+    },
     "evaluation_id": {"type": "string", "pattern": "^ev_[a-z0-9_]{1,64}$", "description": "The evaluation that created this experiment (agent-first evaluations); set by POST /evaluations."},
     "environment": {"type": "object", "additionalProperties": false, "required": ["driver"], "description": "X3: the environment driver this experiment must run on (docs/kubernetes.md). The planner refuses it when bench.yaml configures another driver, and freezes the configured driver into the manifest when it is not docker.", "properties": {"driver": {"enum": ["docker", "kubernetes"]}}},
     "attribution": {
@@ -184,7 +198,7 @@
         "set": {
           "type": "object",
           "description": "Dotted agent config paths to any value, e.g. notes.user_file or model.",
-          "patternProperties": {"^(id|adapter|image|build|argv|env|files|model|notes|parser|agent_version|image_digest|capabilities|adapter_capabilities|budgets|gateway|scripted|mcp|skills|memory|remote|a2a|openai|team|topology|limits)(\\..+)?$": true},
+          "patternProperties": {"^(id|adapter|image|build|argv|env|files|model|notes|parser|agent_version|image_digest|capabilities|adapter_capabilities|budgets|gateway|scripted|mcp|skills|memory|remote|a2a|openai|team|topology|limits|permissions_files|approver)(\\..+)?$": true},
           "additionalProperties": false
         }
       }

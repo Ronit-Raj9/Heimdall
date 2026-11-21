@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -308,6 +309,9 @@ func (s *Server) serveData(w http.ResponseWriter, r *http.Request) {
 			}
 			body = nb
 		}
+	}
+	if d.Remaining >= 0 && d.Unpersisted == nil { // budget_squeeze grace call: the agent may read how much is left
+		sw.Header().Set(BudgetRemainingHeader, strconv.Itoa(d.Remaining))
 	}
 	switch {
 	case d.Unpersisted != nil: // QC2-13-02: fail closed when the slot's progress cannot survive a restart

@@ -82,6 +82,8 @@ func TestTrendsRoute(t *testing.T) {
 		{"filters", &fakeTrends{snap: trendSnapshot()}, "?suite=core@1&agent=codex&metric=cost_per_success&condition=clean&synthetic=include", 200},
 		{"bad metric", &fakeTrends{snap: trendSnapshot()}, "?metric=score", 400},
 		{"bad synthetic", &fakeTrends{snap: trendSnapshot()}, "?synthetic=maybe", 400},
+		{"held out hidden", &fakeTrends{snap: trendSnapshot()}, "?split=held_out", 404},
+		{"bad split", &fakeTrends{snap: trendSnapshot()}, "?split=sealed", 400},
 		{"source fails", &fakeTrends{err: errors.New("disk on fire")}, "", 500},
 		{"no source", nil, "", 503},
 	}
@@ -123,5 +125,21 @@ func TestTrendsMatchContract(t *testing.T) {
 	}
 	if reg := objectsAt(t, body, "lineages[].regression")[0]; reg["status"] != trends.StatusRegressed {
 		t.Fatalf("lineage regression = %v", reg)
+	}
+}
+
+// With held_out.visible the split reaches the source with the visibility
+// flag, so trends.Build can chart the held-out tasks' runs.
+func TestTrendsHeldOutVisible(t *testing.T) {
+	src := &fakeTrends{snap: trendSnapshot()}
+	h := NewTrendsHandler(testMode, src).WithHeldOutVisible(true)
+	r := router.New()
+	h.RegisterRoutes(r, lib.BodyLimit(testMode, lib.MaxBodyBytes))
+	var ctx fasthttp.RequestCtx
+	ctx.Request.Header.SetMethod(fasthttp.MethodGet)
+	ctx.Request.SetRequestURI(APIPrefix + "/trends?split=held_out")
+	r.Handler(&ctx)
+	if src.got.Split != "held_out" || !src.got.HeldOutVisible {
+		t.Fatalf("query %+v", src.got)
 	}
 }

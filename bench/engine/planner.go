@@ -258,6 +258,9 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	if conds, compat, err = p.screenAll(ctx, suite, &e, conds, compat, mode.lockWarnOnly); err != nil { // Suite health area: split and quarantine (taskscreen.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
+	if err := checkStream(&e, suite, conds); err != nil { // stream mode (streamplan.go)
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
 	all := append(append([]condPlan(nil), conds...), compat...)
 	if err := p.checkLock(suite, e.Name, mode.lockWarnOnly || e.Smoke, all); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
@@ -408,6 +411,7 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	}
 	m.ArmOrder = drawArmOrder(e.Seed, suite.TaskIDs, conds, pairArms(m))
 	m.Slots = buildSlots(m, suite, conds, compat)
+	m.Slots = planStream(m, conds, m.Slots)               // stream mode: chains and replay runs (streamplan.go)
 	if err := p.checkSecrets(ctx, m, suite); err != nil { // G01: org secrets (secrets.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}

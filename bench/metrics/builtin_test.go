@@ -77,6 +77,7 @@ func TestBuiltin(t *testing.T) {
 		{name: DelegationLoops, kind: schemas.KindCount, min: schemas.EvidenceNative},
 		{name: AttributionCoverage, kind: schemas.KindRate, higher: true, min: schemas.EvidenceNative},
 		{name: BudgetExceeded, kind: schemas.KindRate, min: schemas.EvidenceGateway},
+		{name: GracefulFinish, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome}, {name: CostNormalizedSuccess, kind: schemas.KindCount, higher: true, min: schemas.EvidenceGateway}, {name: ResumedWithoutRedo, kind: schemas.KindRate, higher: true, min: schemas.EvidenceGateway}, // persistence.go
 		{name: EvalAwarenessSignals, kind: schemas.KindCount, min: schemas.EvidenceNative},        // Eval integrity area (S2)
 		{name: ConformityFlip, kind: schemas.KindRate, min: schemas.EvidenceOutcome},              // Multi-agent probes (M2)
 		{name: ReviewerCatch, kind: schemas.KindRate, higher: true, min: schemas.EvidenceGateway}, // Multi-agent probes (M2)

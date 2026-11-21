@@ -34,3 +34,28 @@ func TestBuildDropsLegacyRepeatArm(t *testing.T) {
 		t.Fatalf("entries %v, want both", got)
 	}
 }
+
+// A score-mode stream with memory carried runs a visible "(no memory)"
+// control of its one arm for forward transfer; the board leaves it out.
+func TestBuildDropsStreamControlArm(t *testing.T) {
+	f := newFake()
+	m := f.exp("e_stream", "s@1", 0, map[string]schemas.ArmManifest{
+		"A":       arm("codex on m", "h_a", "command"),
+		"control": arm("codex on m (no memory)", "h_ctl", "command"),
+	})
+	m.Experiment.Stream = &schemas.StreamSpec{Memory: schemas.StreamMemoryCarry, FreshArm: "control"}
+	for _, task := range []string{"t1", "t2"} {
+		f.pass("e_stream", task, "A", "clean", 1, 0.1)
+		f.pass("e_stream", task, "control", "clean", 1, 0.1)
+	}
+	lb := buildOrFail(t, f, Query{Now: t0})
+	if got := entryHashes(lb); !slices.Equal(got, []string{"h_a"}) {
+		t.Fatalf("entries %v, want only h_a", got)
+	}
+	// Without memory carried the fresh arm is an ordinary arm.
+	m.Experiment.Stream.Memory = schemas.StreamMemoryFresh
+	lb = buildOrFail(t, f, Query{Now: t0})
+	if got := entryHashes(lb); len(got) != 2 {
+		t.Fatalf("entries %v, want both", got)
+	}
+}

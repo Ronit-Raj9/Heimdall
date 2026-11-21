@@ -13,7 +13,7 @@ import (
 
 func TestBuiltin(t *testing.T) {
 	layers := Builtin(Deps{HelperImage: "helper:1"})
-	want := []schemas.ProbeLayerName{schemas.LayerFixture, schemas.LayerToolShim, schemas.LayerGateway, schemas.LayerTool, schemas.LayerService, schemas.LayerAdapter, schemas.LayerA2A} // B1: a2a layer last
+	want := []schemas.ProbeLayerName{schemas.LayerFixture, schemas.LayerToolShim, schemas.LayerGateway, schemas.LayerTool, schemas.LayerService, schemas.LayerAdapter, schemas.LayerProcess, schemas.LayerA2A, schemas.LayerCompound} // B1: a2a layer, then X22 compound schedules
 	if len(layers) != len(want) {
 		t.Fatalf("got %d layers, want %d", len(layers), len(want))
 	}

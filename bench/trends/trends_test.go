@@ -327,3 +327,33 @@ func TestConfigChangedReadsComparisonReference(t *testing.T) {
 		t.Fatal("point B has no reference, so its config label must be false")
 	}
 }
+
+// split=held_out charts only the held-out tasks' runs, and only when the
+// server config makes them visible (RESEARCH_R2 rec 3).
+func TestBuildHeldOutSplit(t *testing.T) {
+	held := func(expID, task string) bool { return expID == "e_1" }
+	if _, err := Build(fixtureIndex(), Query{HeldOut: held, Split: "held_out"}, time.Now()); !errors.Is(err, ErrBadQuery) {
+		t.Fatalf("hidden held-out split: err %v, want ErrBadQuery", err)
+	}
+	if _, err := Build(fixtureIndex(), Query{Split: "nope"}, time.Now()); !errors.Is(err, ErrBadQuery) {
+		t.Fatalf("unknown split: err %v", err)
+	}
+	r, err := Build(fixtureIndex(), Query{HeldOut: held, Split: "held_out", HeldOutVisible: true}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Split != "held_out" || r.Points == 0 {
+		t.Fatalf("split %q points %d", r.Split, r.Points)
+	}
+	for _, l := range r.Lineages {
+		for _, p := range l.Points {
+			if p.Experiment != "e_1" {
+				t.Fatalf("held-out series has %s", p.Experiment)
+			}
+		}
+	}
+	pub, err := Build(fixtureIndex(), Query{HeldOut: held, Split: "public", HeldOutVisible: true}, time.Now())
+	if err != nil || pub.Split != "" {
+		t.Fatalf("public: %v %q", err, pub.Split)
+	}
+}

@@ -28,5 +28,8 @@ func init() {
 		RouteDoc{Method: "GET", Path: APIPrefix + "/evaluation-packs", Tag: "evaluations",
 			Summary:  "Evaluation packs (coding, support, memory, ...) with the benchmarks of each present on this server and their ready task counts",
 			Response: []packs.PackView{}},
+		RouteDoc{Method: "GET", Path: APIPrefix + "/faults", Tag: "evaluations",
+			Summary:  "Every fault an evaluation can ask for (bench/faults.Catalog), with its plain name, help and group",
+			Response: FaultCatalog{}},
 	)
 }

@@ -479,6 +479,10 @@ type ToolFault struct {
 	Keep        int     `json:"keep,omitempty" yaml:"keep"`                   // partial: array items kept in the result
 	Refresh     string  `json:"refresh,omitempty" yaml:"refresh"`             // auth_expired: the tool whose call renews the token
 	Version     string  `json:"version,omitempty" yaml:"version"`             // input_drift: the new API version named in errors
+
+	// Tokens is how many tokens of plausible filler inflate appends to a
+	// real result (context pressure, stream.go).
+	Tokens int `json:"tokens,omitempty" yaml:"tokens,omitempty"`
 }
 
 // LayerTool is the probe layer of tool faults: it acts in the tool proxy.

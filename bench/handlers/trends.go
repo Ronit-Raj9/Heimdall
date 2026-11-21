@@ -21,8 +21,17 @@ type TrendSource interface {
 // TrendsHandler serves time series per agent config lineage
 // (docs/trends.md).
 type TrendsHandler struct {
-	mode schemas.Mode
-	src  TrendSource
+	mode           schemas.Mode
+	src            TrendSource
+	heldOutVisible bool
+}
+
+// WithHeldOutVisible sets whether split=held_out is served (server config
+// held_out.visible). The public series never counts a held-out run either
+// way.
+func (h *TrendsHandler) WithHeldOutVisible(visible bool) *TrendsHandler {
+	h.heldOutVisible = visible
+	return h
 }
 
 // NewTrendsHandler creates the trends handler. src may be nil; the route
@@ -52,6 +61,12 @@ func (h *TrendsHandler) getTrends(ctx *fasthttp.RequestCtx) {
 		Metric:    string(args.Peek("metric")),
 		Condition: string(args.Peek("condition")),
 		Synthetic: string(args.Peek("synthetic")),
+		Split:     string(args.Peek("split")),
+		// HeldOutVisible gates split=held_out (RESEARCH_R2 rec 3).
+		HeldOutVisible: h.heldOutVisible,
+	}
+	if refuseHeldOutBoard(ctx, h.mode, h.heldOutVisible, q.Split) {
+		return
 	}
 	if _, err := q.Normalize(); err != nil {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, err.Error())
@@ -83,5 +98,6 @@ var TrendsRouteDoc = RouteDoc{
 		{Name: "metric", Description: "verified_success (default), cost_per_success, tokens, wall_time_s or false_completion"},
 		{Name: "condition", Description: "Condition; default clean"},
 		{Name: "synthetic", Description: "exclude (default), include or only"},
+		{Name: "split", Description: "public (default) or held_out: the held-out tasks' runs only, served when the server config sets held_out.visible"},
 	},
 }

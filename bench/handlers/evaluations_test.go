@@ -423,3 +423,46 @@ func TestEvaluationRecordsLatestVersion(t *testing.T) {
 		t.Fatalf("after a model-only edit: %+v", ev.Spec.Arms[0])
 	}
 }
+
+func TestEvaluationStreamAndBudgetDisclosure(t *testing.T) {
+	l := &evalLauncher{}
+	r, _ := evalServer(t, Services{Launcher: l, Suites: evalSuites()})
+	ctx := evalCall(r, "POST", APIPrefix+"/evaluations",
+		`{"arms":[{"label":"A","agent":"scripted","model":"m1"}],"benchmarks":["longmemeval"],"stream":{"memory":"carry","replay":1},"disclose_budget":true}`)
+	if ctx.Response.StatusCode() != fasthttp.StatusAccepted {
+		t.Fatalf("status %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	ev := decodeEval(t, ctx)
+	exp := l.planned[ev.Children[0].ExperimentID]
+	if exp.Stream == nil || exp.Stream.Memory != "carry" || exp.Stream.Replay != 1 || exp.Stream.FreshArm != evalControlArm {
+		t.Fatalf("stream %+v", exp.Stream)
+	}
+	// Score mode with memory carried adds a visible no-memory control of the
+	// one agent, told apart only by its marker env var.
+	ctl, ok := exp.Arms[evalControlArm]
+	if len(exp.Arms) != 2 || !ok || !strings.HasSuffix(ctl.Label, schemas.StreamControlSuffix) || ctl.Set["env."+schemas.StreamControlEnv] != "1" ||
+		ctl.Label != exp.Arms["A"].Label+schemas.StreamControlSuffix {
+		t.Fatalf("control arm %+v of %+v", ctl, exp.Arms)
+	}
+	// The estimate counts the control and the replay runs.
+	est := evalCall(r, "POST", APIPrefix+"/evaluations/estimate",
+		`{"arms":[{"label":"A","agent":"scripted","model":"m1"}],"benchmarks":["longmemeval"],"tasks_per_benchmark":4,"trials":2,"stream":{"memory":"carry","replay":1}}`)
+	var e EvalEstimate
+	if err := json.Unmarshal(est.Response.Body(), &e); err != nil || len(e.PerBenchmark) != 1 {
+		t.Fatalf("estimate %s %v", est.Response.Body(), err)
+	}
+	if b := e.PerBenchmark[0]; b.Skipped != "" || b.Runs != 2*1*2*(b.Tasks+1) {
+		t.Fatalf("estimate runs %d for %d tasks (%s), want two arms with one replay per chain", b.Runs, b.Tasks, b.Skipped)
+	}
+	if !exp.Budget.Disclose {
+		t.Fatalf("budget %+v", exp.Budget)
+	}
+	for _, body := range []string{
+		`{"arms":[{"agent":"scripted","model":"m"}],"benchmarks":["longmemeval"],"stream":{"memory":"keep"}}`,
+		`{"arms":[{"agent":"scripted","model":"m"}],"benchmarks":["longmemeval"],"stream":{"memory":"carry","fresh_arm":"B"}}`,
+	} {
+		if got := evalCall(r, "POST", APIPrefix+"/evaluations", body).Response.StatusCode(); got != fasthttp.StatusBadRequest {
+			t.Errorf("%s: status %d", body, got)
+		}
+	}
+}

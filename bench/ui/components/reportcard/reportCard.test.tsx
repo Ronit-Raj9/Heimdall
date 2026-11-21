@@ -215,6 +215,53 @@ describe("ReportCard", () => {
 	});
 });
 
+describe("learning and persistence sections", () => {
+	it("hides both sections without data", () => {
+		const html = renderToStaticMarkup(<ReportCard report={scoreReport} />);
+		expect(html).not.toContain("Learning over time");
+		expect(html).not.toContain("Persistence");
+	});
+
+	it("shows the learning curve and persistence numbers when present", () => {
+		const report = {
+			...scoreReport,
+			learning: [
+				{
+					benchmark: "coding-core",
+					arm: "A",
+					aulc: 0.62,
+					final_gain: 0.25,
+					bwt: -0.1,
+					fwt: 0.15,
+					episodes_to_threshold: 4,
+					threshold: 0.8,
+					curve: [
+						{ index: 1, success: 0.3, runs: 2 },
+						{ index: 2, success: 0.6, runs: 2 },
+						{ index: 3, success: 0.9, runs: 2 },
+					],
+					chains: 2,
+				},
+			],
+			persistence: [{ arm: "A", resumed_without_redo: { value: 0.5, runs: 4 }, graceful_finish: { value: 1, runs: 2 }, cost_normalized_success: { value: 4.2, runs: 6 } }],
+		};
+		const html = renderToStaticMarkup(<ReportCard report={report} />);
+		expect(html).toContain("Learning over time");
+		expect(html).toContain("learning-sparkline");
+		expect(html).toContain("Persistence");
+		expect(html).toContain("4.2 per $");
+		expect(html).not.toMatch(/—|–/);
+	});
+
+	it("names the no-memory control the gain from memory compares with", () => {
+		const row = { benchmark: "coding-core", arm: "A", aulc: 0.6, final_gain: 0.2, bwt: 0, fwt: 0.1, episodes_to_threshold: null, threshold: 0.8, curve: [], chains: 1 };
+		const html = renderToStaticMarkup(<ReportCard report={{ ...scoreReport, learning: [{ ...row, control: "codex v2 on m (no memory)" }] }} />);
+		expect(html).toContain('data-testid="learning-control"');
+		expect(html).toContain("codex v2 on m (no memory)");
+		expect(renderToStaticMarkup(<ReportCard report={{ ...scoreReport, learning: [row] }} />)).not.toContain("learning-control");
+	});
+});
+
 describe("unpriced cost (N2)", () => {
 	it("never shows $0 for an unpriced model: not known, with the count and reason", () => {
 		const c = costDisplay({ runs: 8, cost_usd: null, cost_runs: 5, cost_note: "1 of 1 cost rows unpriced" });

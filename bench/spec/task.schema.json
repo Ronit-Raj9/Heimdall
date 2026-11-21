@@ -171,6 +171,17 @@
     },
     "external": {"type": "array", "items": {"$ref": "#/$defs/external_api"}, "description": "Real HTTP APIs the agent may call through the tool proxy, after the suite's (docs/external-apis.md); cassette paths relative to the task folder."},
     "team": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/team_member"}, "description": "Multi-container team used when the agent config declares none (docs/multi-agent.md)."},
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_date", "session_gap"],
+      "description": "World clock: session n runs at start_date + (n-1) x session_gap (BENCH_DATE), and before each later session the engine POSTs /_world/tick to the task's services with the date and the events of the session that just ended.",
+      "properties": {
+        "start_date": {"type": "string", "minLength": 10},
+        "session_gap": {"type": "string", "minLength": 2, "description": "e.g. 7d, 36h, 90m or any Go duration."},
+        "events": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["after_session", "service", "action"], "properties": {"after_session": {"type": "integer", "minimum": 1}, "service": {"type": "string", "minLength": 1}, "action": {"type": "string", "minLength": 1}}}}
+      }
+    },
     "compose": {"$ref": "#/$defs/rel_path", "description": "A docker compose file, relative to the task folder: one service is the agent's workspace image, the rest run beside it (docs/multi-container.md)."},
     "resources": {
       "type": "object",

@@ -55,7 +55,8 @@ const RepeatArmEnv = "HEIMDALL_QUICKRUN_ARM"
 
 // AgentHash is the version identity of a resolved agent config: its
 // config hash with the axes an evaluation sets per arm left out (model and
-// gateway provider), the repeat arm's marker env var dropped, and, for an
+// gateway provider), the repeat arm's and the stream control arm's marker
+// env vars dropped, and, for an
 // agent whose image is built per suite, the resolved image tag dropped (its
 // build section stays). A run of a version on any model, and the version's
 // own snapshot, hash the same.
@@ -65,10 +66,12 @@ func AgentHash(cfg schemas.AgentConfig) (string, error) {
 	if cfg.Build != nil {
 		cfg.Image = ""
 	}
-	if _, ok := cfg.Env[RepeatArmEnv]; ok {
+	_, repeat := cfg.Env[RepeatArmEnv]
+	_, control := cfg.Env[schemas.StreamControlEnv]
+	if repeat || control {
 		env := make(map[string]string, len(cfg.Env))
 		for k, v := range cfg.Env {
-			if k != RepeatArmEnv {
+			if k != RepeatArmEnv && k != schemas.StreamControlEnv {
 				env[k] = v
 			}
 		}

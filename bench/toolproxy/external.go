@@ -210,7 +210,7 @@ func (s *Server) serveExternal(w http.ResponseWriter, r *http.Request, rest, age
 		s.externalDuplicate(r, x, path, body)
 	}
 	var poison *schemas.ToolFault
-	if hit && (ft.Mode == FaultPoison || IsQuietMode(ft.Mode)) { // lost_ack is not applied to external routes (S1)
+	if hit && (ft.Mode == FaultPoison || ft.Mode == FaultInflate || IsQuietMode(ft.Mode)) { // lost_ack is not applied to external routes (S1)
 		poison = &ft
 	}
 	if x.tape != nil {

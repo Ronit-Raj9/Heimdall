@@ -18,7 +18,7 @@ type FaultCatalog struct {
 
 func init() {
 	RegisterOrgArea("faultcatalog", func(env OrgEnv, r *router.Router) {
-		r.GET(APIPrefix+"/faults", env.W(func(ctx *fasthttp.RequestCtx) {
+		r.GET(APIPrefix+"/faults", env.R(func(ctx *fasthttp.RequestCtx) {
 			lib.SendJSON(ctx, env.Mode, fasthttp.StatusOK, FaultCatalog{Faults: faults.Catalog})
 		}))
 	})

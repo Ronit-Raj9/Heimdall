@@ -93,6 +93,11 @@ type Task struct {
 	// without one.
 	Process *ProcessSpec `json:"process,omitempty" yaml:"process"`
 
+	// World makes time pass between sessions (stream.go): BENCH_DATE per
+	// session and a tick to the services before each later session. Nil
+	// for every task without one.
+	World *WorldSpec `json:"world,omitempty" yaml:"world,omitempty"`
+
 	Dir string `json:"-" yaml:"-"` // absolute task folder
 }
 

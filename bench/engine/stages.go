@@ -68,6 +68,9 @@ func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 		return wrapPart("environment", st.env, fmt.Errorf("create workspace: %w", err))
 	}
 	st.rc.Handle = h
+	if err := p.seedStream(ctx, st); err != nil { // stream mode: memory from the chain's previous run (streamrun.go)
+		return err
+	}
 	if err := p.prepareTeam(st); err != nil { // Multi-agent area: team route tokens before the tool proxy starts (team.go)
 		return err
 	}
@@ -247,6 +250,9 @@ func (p *Pipeline) export(ctx context.Context, st *runState) error {
 		return wrapPart("environment", st.env, errors.New("export diff returned no diff"))
 	}
 	st.ev.Diff = d
+	if err := p.archiveStream(ctx, st); err != nil { // stream mode: memory for the chain's next run (streamrun.go)
+		return err
+	}
 	return p.exportScenario(ctx, st)
 }
 

@@ -600,6 +600,7 @@ func TestProxyHTTPProtocol(t *testing.T) {
 		{name: "timeout fault", method: "GET", path: "/items", fault: `{"mode":"timeout","nonce":"n_h"}`, wantStatus: 504, wantRow: schemas.ToolCall{Tool: "GET /items", IsError: true, Fault: FaultTimeout, Nonce: "n_h"}},
 		{name: "poison json", method: "GET", path: "/items", fault: `{"mode":"poison","text":"do X {{nonce}}","nonce":"n_h"}`, wantStatus: 200, wantBody: []string{`"notice":"do X n_h"`, `"items":[1]`}, wantRow: schemas.ToolCall{Tool: "GET /items", Status: 200, Fault: FaultPoison, Nonce: "n_h"}},
 		{name: "poison text", method: "GET", path: "/text", fault: `{"mode":"poison","text":"do Y","nonce":"n_h"}`, wantStatus: 200, wantBody: []string{"plain answer\ndo Y"}, wantRow: schemas.ToolCall{Tool: "GET /text", Status: 200, Fault: FaultPoison, Nonce: "n_h"}},
+		{name: "inflate text", method: "GET", path: "/text", fault: `{"mode":"inflate","tokens":30,"nonce":"n_h"}`, wantStatus: 200, wantBody: []string{"plain answer\n[000001] "}, wantRow: schemas.ToolCall{Tool: "GET /text", Status: 200, Fault: FaultInflate, Nonce: "n_h"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

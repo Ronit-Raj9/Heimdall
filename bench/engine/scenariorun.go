@@ -121,6 +121,9 @@ func (p *Pipeline) runSessions(ctx context.Context, st *runState) error {
 	truncated := false
 	for i := range sessions {
 		sess := &sessions[i]
+		if err := p.worldTick(ctx, st, orig, i); err != nil { // world clock: time passes before a later session (worldrun.go)
+			return err
+		}
 		if err := se.BeginSession(ctx, rc, i); err != nil {
 			return wrapPart("environment", st.env, fmt.Errorf("begin session %s: %w", sess.ID, err))
 		}
@@ -212,6 +215,9 @@ func (p *Pipeline) execOnce(ctx context.Context, st *runState, sess *schemas.Ses
 	if err != nil {
 		return nil, err
 	}
+	for k, v := range budgetEnv(st.rc, plan, p.now()) { // budget disclosure (streamrun.go)
+		env[k] = v
+	}
 	if len(env) > 0 {
 		if plan.Env == nil {
 			plan.Env = map[string]string{}
@@ -258,8 +264,8 @@ func (p *Pipeline) execOnce(ctx context.Context, st *runState, sess *schemas.Ses
 			st.rc.FaultSessions = append(st.rc.FaultSessions, sessionID)
 		}
 	}
-	ectx, stopClock := p.debugClock(ctx, st) // X20b: the wall clock stops while a breakpoint holds a call (debugrun.go)
-	res, err := st.env.Exec(ectx, st.rc, plan)
+	ectx, stopClock := p.debugClock(ctx, st)      // X20b: the wall clock stops while a breakpoint holds a call (debugrun.go)
+	res, err := p.execAgent(ectx, st, plan, sess) // process probe: kill and resume (processrun.go)
 	stopClock()
 	exited := p.now().UTC()
 	run.Timing.AgentExited = &exited
@@ -313,11 +319,21 @@ func scenarioEnv(rc *schemas.RunContext) (map[string]string, error) {
 	if utils.OutputKind(rc.Suite, rc.Task) == schemas.OutputAnswer {
 		env[utils.EnvAnswerPath] = utils.AnswerContainerPath(rc.Suite, rc.Task)
 	}
+	if streamCarries(rc) { // stream mode: the memory folder the next task of the chain starts from (streamrun.go)
+		env[utils.EnvMemoryDir] = utils.DefaultMemoryDir
+	}
 	if rc.Session != nil {
 		env[utils.EnvSessionID] = rc.Session.ID
 		env[utils.EnvSessionIndex] = strconv.Itoa(rc.SessionIndex + 1)
 		env[utils.EnvSessionCount] = strconv.Itoa(len(rc.Task.Sessions))
 		env[utils.EnvMemoryDir] = utils.DefaultMemoryDir
+		if w := rc.Task.World; w != nil { // world clock: the session's date (worldrun.go)
+			date, err := w.SessionDate(rc.SessionIndex)
+			if err != nil {
+				return nil, fmt.Errorf("world clock: %w", err)
+			}
+			env[schemas.EnvDate] = date
+		}
 	}
 	return env, nil
 }

@@ -35,6 +35,7 @@ var knownLayers = map[schemas.ProbeLayerName]bool{
 	schemas.LayerTool:     true,
 	schemas.LayerService:  true,
 	schemas.LayerAdapter:  true,
+	schemas.LayerProcess:  true, // crash-resume (probes/process.go)
 	schemas.LayerA2A:      true, // B1: client-side A2A stream faults (probes/a2a.go)
 	schemas.LayerCompound: true, // X22: fault schedules across the gateway and tool layers (probes/compound.go)
 }
@@ -124,7 +125,8 @@ func LintTask(s *schemas.Suite, t *schemas.Task) []Problem {
 	}
 	out = append(out, lintInstruction(root, t)...)
 	out = append(out, lintScenarioTask(s, t)...)
-	out = append(out, lintGPUTask(s, t)...) // X7: GPU requests (gpu.go)
+	out = append(out, lintGPUTask(s, t)...)   // X7: GPU requests (gpu.go)
+	out = append(out, lintWorldTask(s, t)...) // world clock (world.go)
 	output := utils.OutputKind(s, t)
 
 	testsDir := filepath.Join(t.Dir, filepath.FromSlash(t.Verifier.Tests))

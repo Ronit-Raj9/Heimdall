@@ -62,6 +62,12 @@ type EvaluationSpec struct {
 	// "" is the org's default worker, "shared" the shared worker. The saved
 	// evaluation holds the resolved pool ("" for the shared worker).
 	Worker string `json:"worker,omitempty"`
+	// Stream carries the agent's memory from task to task inside each
+	// benchmark (stream.go); in score mode the hidden repeat arm is the
+	// fresh control.
+	Stream *StreamSpec `json:"stream,omitempty"`
+	// DiscloseBudget tells the agent its budget and deadline.
+	DiscloseBudget bool `json:"disclose_budget,omitempty"`
 }
 
 // EvaluationGate is what an evaluation must show to pass. Scores are

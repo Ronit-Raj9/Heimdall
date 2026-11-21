@@ -519,6 +519,14 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 	if err := normalizeGate(spec); err != nil {
 		return err
 	}
+	if spec.Stream != nil {
+		if spec.Stream.FreshArm != "" {
+			return badf("stream.fresh_arm is chosen by the evaluation: in score mode a no-memory control of the agent is added")
+		}
+		if err := spec.Stream.Validate(nil); err != nil {
+			return badf("%v", err)
+		}
+	}
 	fs := []string{faults.Clean}
 	for _, f := range spec.Faults {
 		if f = strings.TrimSpace(f); f != "" && !contains(fs, f) {
@@ -737,11 +745,12 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 		Primary:     schemas.Endpoint{Condition: schemas.ConditionClean, Metric: "verified_success"},
 		Guards:      []schemas.GuardSpec{{Rule: "no_new_integrity_violation"}},
 		Conditions:  conds,
-		Budget:      schemas.BudgetSpec{TotalUSD: budget, ReserveUSD: quickReserve(budget, len(spec.Arms)*len(tasks.IDs)*spec.Trials*len(conds))},
+		Budget:      schemas.BudgetSpec{TotalUSD: budget, ReserveUSD: quickReserve(budget, evalArmCount(spec)*len(tasks.IDs)*spec.Trials*len(conds))},
 		Verdict:     quickVerdict{Policy: "paired_signflip"},
 		Seed:        ev.CreatedAt.Unix(),
 		Concurrency: 2, ManifestMode: "agent_exposure",
 	}
+	f.Budget.Disclose = spec.DiscloseBudget
 	var variantNotes []string
 	for _, a := range spec.Arms {
 		v := variants[a.Label]
@@ -752,6 +761,18 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 			f.Arms[a.Label] = withSet(arm, v.Set)
 		}
 		variantNotes = append(variantNotes, "arm "+a.Label+": "+v.Note)
+	}
+	if spec.Stream != nil {
+		st := *spec.Stream
+		if evalStreamControl(spec) {
+			// Score mode with memory carried: a visible "<agent> (no memory)"
+			// control runs the same tasks in the same order with empty memory,
+			// for forward transfer. It is counted in the estimate and kept off
+			// every leaderboard (schemas.StreamControlArm).
+			f.Arms[evalControlArm] = streamControlArm(f.Arms[spec.Arms[0].Label])
+			st.FreshArm = evalControlArm
+		}
+		f.Stream = &st
 	}
 	if _, _, err := s.Projects.Read(work, projectfs.AreaPolicies, strings.TrimPrefix(quickRunPolicy, "policies/")); err == nil {
 		f.Policy = quickRunPolicy
@@ -830,6 +851,33 @@ func appendEvalID(body []byte, id string) ([]byte, error) {
 		return nil, fmt.Errorf("bad evaluation id %q", id)
 	}
 	return append(body, []byte("evaluation_id: "+id+"\n")...), nil
+}
+
+// evalControlArm is the arm id of a score-mode stream's no-memory control.
+const evalControlArm = "control"
+
+// evalStreamControl reports whether the evaluation adds a no-memory control
+// arm: score mode (one arm) with memory carried from task to task.
+func evalStreamControl(spec schemas.EvaluationSpec) bool {
+	return len(spec.Arms) == 1 && spec.Stream != nil && spec.Stream.Memory == schemas.StreamMemoryCarry
+}
+
+// evalArmCount is the experiment arms one benchmark of spec runs: one per
+// spec arm, plus the no-memory control when there is one.
+func evalArmCount(spec schemas.EvaluationSpec) int {
+	if evalStreamControl(spec) {
+		return len(spec.Arms) + 1
+	}
+	return len(spec.Arms)
+}
+
+// streamControlArm is base without memory: the same agent and model,
+// labelled "<base label> (no memory)", told apart by the control marker env
+// var so the planner sees two configs while the version stays one.
+func streamControlArm(base schemas.ArmSpec) schemas.ArmSpec {
+	ctl := withSet(base, map[string]any{"env." + schemas.StreamControlEnv: "1"})
+	ctl.Label = base.Label + schemas.StreamControlSuffix
+	return ctl
 }
 
 // evaluationPoolResolver resolves the worker an evaluation runs on (hosted

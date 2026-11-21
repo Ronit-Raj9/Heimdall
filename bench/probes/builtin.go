@@ -58,7 +58,8 @@ func Builtin(deps Deps) []schemas.ProbeLayer {
 		// condition data planted in services (Tool safety)
 		newServiceLayer(deps.Logger),
 		newAdapterLayer(deps.AdapterFault),
-		newA2ALayer(), // B1: client-side A2A stream faults through the agent gateway (a2a.go)
+		newProcessLayer(), // crash-resume: the engine kills and resumes the agent (process.go)
+		newA2ALayer(),     // B1: client-side A2A stream faults through the agent gateway (a2a.go)
 		// X22: fault schedules across the gateway and tool layers, with
 		// their own instances so their per-run state never mixes.
 		newCompoundLayer(deps.Logger, newGatewayLayer(deps.Fault, deps.Logger), newToolFaultLayer(deps)),
