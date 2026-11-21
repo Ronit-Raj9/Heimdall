@@ -171,6 +171,9 @@ describe("ApiTokensTab", () => {
 		expect(html).not.toContain(API_TOKEN_CREATED.token);
 		expect(tagOf(html, "token-row-tok_old")).toContain('data-state="revoked"');
 		expect(html).toContain('data-testid="token-revoke-tok_ci"');
+		expect(tagOf(html, "token-scope-tok_ci")).toBeTruthy();
+		expect(html).toContain("Run evaluations");
+		expect(html).toContain('data-testid="token-scope"');
 		expect(html).not.toContain("token-revoke-tok_old");
 		expect(html).toContain('data-testid="token-form"');
 	});

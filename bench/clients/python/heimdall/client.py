@@ -153,6 +153,8 @@ class Client:
     retried.
     """
 
+    api_prefix = API_PREFIX  # heimdall.v1 serves the same transport under /api/v1
+
     def __init__(
         self,
         base_url: str,
@@ -404,7 +406,7 @@ class Client:
     ) -> Tuple[int, bytes, Mapping[str, str]]:
         """Send one request. ``deadline`` (time.monotonic seconds), when
         given, caps every attempt's timeout and the waits between them."""
-        url = self.base_url + API_PREFIX + path
+        url = self.base_url + self.api_prefix + path
         q = {k: v for k, v in (query or {}).items() if v is not None and v != ""}
         if q:
             url += "?" + urllib.parse.urlencode(q)

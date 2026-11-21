@@ -23,6 +23,9 @@ type TokenCreateRequest struct {
 	Role Role `json:"role,omitempty"`
 	// ExpiresInDays makes the token expire; 0 never expires.
 	ExpiresInDays int `json:"expires_in_days,omitempty"`
+	// Scopes narrow the token below its role: read, evaluate, admin
+	// (scopes.go). Empty means admin: everything the role allows.
+	Scopes []string `json:"scopes,omitempty"`
 }
 
 // TokenCreated is the answer to a token creation: the secret appears here
@@ -61,12 +64,19 @@ func (s *Service) CreateToken(ctx context.Context, p *Principal, req TokenCreate
 	if req.ExpiresInDays < 0 || req.ExpiresInDays > int(MaxTokenLifetime/(24*time.Hour)) {
 		return nil, errBadRequest("expires_in_days must be between 0 (never) and 3650")
 	}
+	scopes, ok := NormalizeScopes(req.Scopes)
+	if !ok {
+		return nil, errBadRequest("scopes must be read, evaluate or admin")
+	}
+	if len(scopes) == 0 {
+		scopes = []string{ScopeAdmin}
+	}
 	raw, prefix, err := NewAPIToken()
 	if err != nil {
 		return nil, err
 	}
 	now := s.now().UTC()
-	t := APIToken{ID: db.NewID("tok"), OrgID: p.OrgID, UserID: p.UserID, Name: name, Prefix: prefix, Role: role,
+	t := APIToken{ID: db.NewID("tok"), OrgID: p.OrgID, UserID: p.UserID, Name: name, Prefix: prefix, Role: role, Scopes: scopes,
 		CreatedAt: time.UnixMilli(now.UnixMilli()).UTC()}
 	if req.ExpiresInDays > 0 {
 		exp := time.UnixMilli(now.Add(time.Duration(req.ExpiresInDays) * 24 * time.Hour).UnixMilli()).UTC()
@@ -75,7 +85,7 @@ func (s *Service) CreateToken(ctx context.Context, p *Principal, req TokenCreate
 	if err := s.st.insertToken(ctx, s.st.d.SQL(), &t, HashSecret(raw)); err != nil {
 		return nil, fmt.Errorf("create token: %w", err)
 	}
-	s.record(principalEvent(p, "auth.token_create", "api_token", t.ID, ip, map[string]any{"name": name, "role": string(role), "prefix": prefix}))
+	s.record(principalEvent(p, "auth.token_create", "api_token", t.ID, ip, map[string]any{"name": name, "role": string(role), "prefix": prefix, "scopes": JoinScopes(scopes)}))
 	return &TokenCreated{Token: raw, APIToken: t}, nil
 }
 
@@ -137,7 +147,7 @@ func (s *Service) tokenPrincipal(ctx context.Context, raw string) (*Principal, e
 		return nil, ErrInvalidToken
 	}
 	role := t.Role
-	p := &Principal{Kind: KindToken, TokenID: t.ID, OrgID: t.OrgID, UserID: t.UserID}
+	p := &Principal{Kind: KindToken, TokenID: t.ID, OrgID: t.OrgID, UserID: t.UserID, Scopes: t.Scopes}
 	if t.UserID != "" {
 		u, err := s.st.userByID(ctx, s.st.d.SQL(), t.UserID)
 		if errors.Is(err, db.ErrNotFound) {

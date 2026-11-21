@@ -107,6 +107,10 @@ type Principal struct {
 	Email string `json:"email,omitempty"`
 	// Pool is the runner pool a runner token is scoped to (runners area).
 	Pool string `json:"pool,omitempty"`
+	// Scopes narrow an API token below its role (read, evaluate, admin;
+	// scopes.go). Empty for every other principal and for tokens made
+	// before scopes existed, which their role alone limits.
+	Scopes []string `json:"scopes,omitempty"`
 
 	// sessionID is the sha256 (hex) of the session cookie, set only for
 	// session principals; logout and switch-org use it.

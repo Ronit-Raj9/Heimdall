@@ -146,6 +146,7 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 		lib.HostGuard(mode, cfg.Server.AllowedHosts),
 		lib.CORS(cfg.Server.CORSOrigins),
 		auth.Middleware(auth.Config{ServerMode: mode}, nil), // Auth area (P2): every local request carries the local-org owner principal (docs/auth.md)
+		handlers.V1Alias(mode, deps.Version, false),         // Public API v1: /api/v1 rewritten onto its bench routes (handlers/apiv1.go, docs/api-v1.md)
 	)
 	s.server = &fasthttp.Server{
 		Handler:               s.handler,

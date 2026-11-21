@@ -420,13 +420,14 @@ type APIToken struct {
 	Name       string     `json:"name"`
 	Prefix     string     `json:"prefix"`
 	Role       Role       `json:"role"`
+	Scopes     []string   `json:"scopes,omitempty"` // read, evaluate, admin; empty: the role alone limits it
 	CreatedAt  time.Time  `json:"created_at"`
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
 	RevokedAt  *time.Time `json:"revoked_at,omitempty"`
 }
 
-const tokenCols = `id, org_id, COALESCE(user_id, ''), name, prefix, role, created_at, last_used_at, expires_at, revoked_at`
+const tokenCols = `id, org_id, COALESCE(user_id, ''), name, prefix, role, COALESCE(scopes, ''), created_at, last_used_at, expires_at, revoked_at`
 
 func optTime(v sql.NullInt64) *time.Time {
 	if !v.Valid {
@@ -438,13 +439,13 @@ func optTime(v sql.NullInt64) *time.Time {
 
 func scanToken(r interface{ Scan(...any) error }) (*APIToken, error) {
 	var t APIToken
-	var role string
+	var role, scopes string
 	var created int64
 	var used, exp, rev sql.NullInt64
-	if err := r.Scan(&t.ID, &t.OrgID, &t.UserID, &t.Name, &t.Prefix, &role, &created, &used, &exp, &rev); err != nil {
+	if err := r.Scan(&t.ID, &t.OrgID, &t.UserID, &t.Name, &t.Prefix, &role, &scopes, &created, &used, &exp, &rev); err != nil {
 		return nil, notFound(err)
 	}
-	t.Role, t.CreatedAt = Role(role), db.Time(created)
+	t.Role, t.Scopes, t.CreatedAt = Role(role), SplitScopes(scopes), db.Time(created)
 	t.LastUsedAt, t.ExpiresAt, t.RevokedAt = optTime(used), optTime(exp), optTime(rev)
 	return &t, nil
 }
@@ -458,8 +459,8 @@ func (s *store) insertToken(ctx context.Context, q querier, t *APIToken, hash st
 	if t.ExpiresAt != nil {
 		exp = db.NullMillis(*t.ExpiresAt)
 	}
-	_, err := s.exec(ctx, q, `INSERT INTO api_tokens (id, org_id, user_id, name, prefix, hash, role, created_at, expires_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, t.ID, t.OrgID, user, t.Name, t.Prefix, hash, string(t.Role), t.CreatedAt.UnixMilli(), exp)
+	_, err := s.exec(ctx, q, `INSERT INTO api_tokens (id, org_id, user_id, name, prefix, hash, role, scopes, created_at, expires_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, t.ID, t.OrgID, user, t.Name, t.Prefix, hash, string(t.Role), JoinScopes(t.Scopes), t.CreatedAt.UnixMilli(), exp)
 	return err
 }
 
@@ -468,13 +469,13 @@ func (s *store) tokenByHash(ctx context.Context, q querier, hash string) (*APITo
 	var stored string
 	r := s.row(ctx, q, `SELECT `+tokenCols+`, hash FROM api_tokens WHERE hash = ?`, hash)
 	var t APIToken
-	var role string
+	var role, scopes string
 	var created int64
 	var used, exp, rev sql.NullInt64
-	if err := r.Scan(&t.ID, &t.OrgID, &t.UserID, &t.Name, &t.Prefix, &role, &created, &used, &exp, &rev, &stored); err != nil {
+	if err := r.Scan(&t.ID, &t.OrgID, &t.UserID, &t.Name, &t.Prefix, &role, &scopes, &created, &used, &exp, &rev, &stored); err != nil {
 		return nil, "", notFound(err)
 	}
-	t.Role, t.CreatedAt = Role(role), db.Time(created)
+	t.Role, t.Scopes, t.CreatedAt = Role(role), SplitScopes(scopes), db.Time(created)
 	t.LastUsedAt, t.ExpiresAt, t.RevokedAt = optTime(used), optTime(exp), optTime(rev)
 	return &t, stored, nil
 }
