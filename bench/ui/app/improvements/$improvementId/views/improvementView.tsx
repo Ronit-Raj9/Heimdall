@@ -1,0 +1,52 @@
+import { PageHeader } from "@/components/shell";
+import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
+import { useConfirm } from "@/components/platform/confirmDialog";
+import { Button } from "@/components/ui/button";
+import { StatusPill } from "@/components/ui/statusPill";
+import { ImprovementDetailBody } from "@/components/improvements/improvementDetail";
+import { statusTone } from "@/components/improvements/improve.utils";
+import { useApproveImprovementRoundMutation, useGetImprovementQuery, useStopImprovementMutation } from "@/lib/store/apis/improveApi";
+import { useTranslation } from "react-i18next";
+
+/** /improvements/$improvementId: the improvement report, polled while the run is live. */
+export default function ImprovementView({ id }: { id: string }) {
+	const { t } = useTranslation("improve");
+	const confirm = useConfirm();
+	const q = useGetImprovementQuery(id, { pollingInterval: 5_000 });
+	const [approve, approveState] = useApproveImprovementRoundMutation();
+	const [stop, stopState] = useStopImprovementMutation();
+	const d = q.data;
+	const live = d && (d.status === "running" || d.status === "awaiting_approval" || d.status === "planned");
+	return (
+		<section className="flex min-w-0 flex-col gap-6" data-testid="improvement-screen">
+			<PageHeader
+				title={d?.name ?? id}
+				subtitle={d ? `${d.agent} on ${d.suite}` : undefined}
+				breadcrumbs={[{ label: t("detail.back"), to: "/improvements" }]}
+				meta={d && <StatusPill tone={statusTone(d.status)} pulse={d.running}>{t(`status.${d.status}`)}</StatusPill>}
+				actions={
+					live ? (
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={stopState.isLoading}
+							onClick={async () => {
+								if (await confirm(t("detail.stopConfirm"))) void stop(id);
+							}}
+							data-testid="improvement-stop"
+						>
+							{t("detail.stop")}
+						</Button>
+					) : undefined
+				}
+			/>
+			{q.isLoading ? (
+				<BlockSkeleton rows={6} testId="improvement-loading" />
+			) : q.error || !d ? (
+				<LoadError title={t("detail.loadError")} error={q.error} onRetry={() => void q.refetch()} testId="improvement-error" />
+			) : (
+				<ImprovementDetailBody data={d} approving={approveState.isLoading} onApprove={(round, reason) => void approve({ id, round, reason })} />
+			)}
+		</section>
+	);
+}

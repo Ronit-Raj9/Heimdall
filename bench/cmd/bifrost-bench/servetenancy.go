@@ -241,6 +241,7 @@ func orgBuilder(env *hostedEnv) tenancy.Builder {
 func hostedOrgFeatures(oa *app, deps *server.Deps) {
 	deps.Inbox = serveInbox(oa)
 	deps.Canaries = serveCanaries(oa, true)
+	deps.Improvements = serveImprovements(oa, true) // improvement runs: reads only on a hosted server
 	deps.Calibration = judgeSvc{a: oa}
 	deps.Export = serveExport{a: oa}
 	deps.Livescore = serveLivescore(oa, true)

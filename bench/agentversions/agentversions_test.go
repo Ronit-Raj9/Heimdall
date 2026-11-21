@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/maximhq/bifrost/bench/schemas"
 )
 
 const agentDoc = `id: exploit
@@ -166,5 +168,28 @@ func TestAgentHashIgnoresArmAxes(t *testing.T) {
 	bh, _ := DocAgentHash([]byte(strings.Replace(agentDoc, "id: exploit", "id: builtin", 1)))
 	if got := VersionOf(root, lib, "builtin", bh); got != 1 {
 		t.Errorf("library VersionOf = %d", got)
+	}
+}
+
+func TestDeriveRecordsLineage(t *testing.T) {
+	root := t.TempDir()
+	if _, _, err := Snapshot(root, "exploit", []byte(agentDoc), "ana", ""); err != nil {
+		t.Fatal(err)
+	}
+	cand := strings.Replace(agentDoc, "kind: exploit", "kind: exploit\nfiles:\n  /home/agent/AGENTS.md: be careful", 1)
+	lin := schemas.AgentVersion{Parent: 1, Author: schemas.AuthorAgent, Improvement: "imp_x", Round: 1, BundleHash: "b1", CreatedBy: "improver"}
+	v, created, err := Derive(root, "exploit", []byte(cand), lin)
+	if err != nil || !created || v.Version != 2 || v.Parent != 1 || v.Author != schemas.AuthorAgent || v.Round != 1 || v.BundleHash != "b1" {
+		t.Fatalf("derive: %+v %v %v", v, created, err)
+	}
+	// The same doc again returns the first lineage; the parent's doc returns v1.
+	if again, created, err := Derive(root, "exploit", []byte(cand), schemas.AgentVersion{Parent: 1, Round: 2}); err != nil || created || again.Round != 1 {
+		t.Fatalf("again: %+v %v %v", again, created, err)
+	}
+	if p, created, err := Derive(root, "exploit", []byte(agentDoc), lin); err != nil || created || p.Version != 1 {
+		t.Fatalf("parent doc: %+v %v %v", p, created, err)
+	}
+	if _, _, err := Derive(root, "exploit", []byte(strings.Replace(cand, "wall_s: 900", "wall_s: 901", 1)), schemas.AgentVersion{Parent: 9}); err == nil {
+		t.Fatal("unknown parent accepted")
 	}
 }

@@ -1,0 +1,133 @@
+{
+	"title": "Improvements",
+	"subtitle": "Your agent rewrites its own prompt, notes and skills over rounds. Each change is kept only when it wins on tasks the agent never saw.",
+	"loadError": "Could not load improvement runs",
+	"empty": {
+		"title": "No improvement runs yet",
+		"message": "Start one from the command line with a spec that names your agent, a benchmark and the files the agent may change.",
+		"cli": "bifrost-bench improve create -f improvements/my-agent.yaml -run"
+	},
+	"list": {
+		"name": "Run",
+		"agent": "Agent",
+		"status": "Status",
+		"rounds": "Rounds",
+		"commits": "Kept",
+		"gain": "Held-out gain",
+		"spend": "Spend",
+		"roundsValue": "{{done}} of {{total}}"
+	},
+	"status": {
+		"planned": "Ready",
+		"running": "Running",
+		"awaiting_approval": "Needs approval",
+		"done": "Done",
+		"stopped": "Stopped",
+		"failed": "Failed"
+	},
+	"verdict": {
+		"supported": "Improvement supported",
+		"not_supported": "Not supported",
+		"inconclusive": "Inconclusive",
+		"no_change": "No change kept",
+		"pending": "Still running"
+	},
+	"split": {
+		"dev": "Practice tasks",
+		"audit": "Gate tasks",
+		"sealed": "Held-out tasks"
+	},
+	"detail": {
+		"back": "Improvements",
+		"loadError": "Could not load this improvement run",
+		"verdictTitle": "Verdict",
+		"sealedGain": "Held-out gain",
+		"devGain": "Practice gain",
+		"gap": "Practice minus held-out",
+		"kept": "Versions kept",
+		"rejected": "Rejected",
+		"spend": "Total spend",
+		"gainPerUsd": "Gain per dollar",
+		"splits": "{{dev}} practice, {{audit}} gate and {{sealed}} held-out tasks; gate looks {{looks}} of {{max}}",
+		"stop": "Stop",
+		"stopConfirm": "Stop this improvement run? The current version stays as it is.",
+		"error": "Last error: {{error}}"
+	},
+	"curve": {
+		"title": "Learning curve",
+		"description": "The kept version after each round on each task set, against what version 0 reaches with the same spend.",
+		"round": "Round {{n}}",
+		"band": "Version 0 with the same spend",
+		"null": "Edits made without feedback",
+		"summary": "Scores after each of {{count}} rounds on practice, gate and held-out tasks.",
+		"event": {
+			"base": "Start",
+			"committed": "Kept",
+			"rejected": "Rejected",
+			"tripped": "Paused",
+			"pending": "In progress",
+			"control": "Control"
+		}
+	},
+	"lineage": {
+		"title": "Version lineage",
+		"description": "Every version the agent wrote, rejected ones included. Entries are hash-chained, so a rewrite shows.",
+		"chainOk": "Chain verifies",
+		"chainBroken": "Chain broken: {{error}}",
+		"author": {
+			"human": "you",
+			"agent": "the agent"
+		},
+		"by": "written by {{author}}",
+		"from": "from {{parent}}"
+	},
+	"integrity": {
+		"title": "Integrity",
+		"description": "Checks on what the agent wrote and on how it behaved. Any hit pauses the run for your approval.",
+		"clean": "No hits",
+		"overridden": "Approved by a person",
+		"vetoes": "Flagged runs {{a}} to {{b}}",
+		"impossible": "Impossible tasks passed: {{n}}",
+		"gate": {
+			"improver_answer_key": "Copied answers",
+			"improver_canary": "Benchmark marker",
+			"improver_frozen_field": "Changed a locked setting",
+			"improver_eval_cue": "Mentions the benchmark",
+			"improver_monitor_parity": "Stopped logging",
+			"improver_spend": "Spent near its cap",
+			"improver_run_flag": "Network or oversight flag",
+			"improver_bad_output": "Unreadable output"
+		}
+	},
+	"round": {
+		"title": "Rounds",
+		"heading": "Round {{n}}",
+		"decision": {
+			"committed": "Kept",
+			"rejected": "Rejected",
+			"pending": "In progress"
+		},
+		"candidate": "{{parent}} to {{candidate}}",
+		"practice": "Practice: {{a}} to {{b}}",
+		"gate": "Gate: {{a}} to {{b}}, evidence {{e}} of {{threshold}} needed",
+		"heldOut": "Held-out after the round: {{v}}",
+		"diff": "What the agent changed",
+		"noDiff": "No change",
+		"approve": "Approve and continue",
+		"approveReason": "Why is this safe to continue?",
+		"approveSubmit": "Approve",
+		"approvedBy": "Approved by {{by}}: {{reason}}",
+		"cost": "Spend {{v}}"
+	},
+	"cost": {
+		"title": "Spend",
+		"description": "Every dollar the run spent, by phase.",
+		"baseline": "Version 0 scoring",
+		"improver": "Agent rewriting itself",
+		"screen": "Practice checks",
+		"audit": "Gate checks",
+		"sealed": "Held-out scoring",
+		"controls": "Comparison runs",
+		"cap": "Cap per round for rewriting: {{v}}"
+	}
+}

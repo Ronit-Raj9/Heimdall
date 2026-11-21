@@ -14,6 +14,7 @@ import {
 	SearchX,
 	Settings,
 	Zap,
+	TrendingUp,
 	type LucideIcon,
 } from "lucide-react";
 
@@ -25,6 +26,7 @@ export interface BenchNavItem {
 		| "/"
 		| "/agents"
 		| "/leaderboard"
+		| "/improvements"
 		| "/evaluations"
 		| "/experiments"
 		| "/failure-tests"
@@ -39,6 +41,7 @@ export interface BenchNavItem {
 		| "shell.nav.home"
 		| "shell.nav.agents"
 		| "shell.nav.leaderboard"
+		| "shell.nav.improvements"
 		| "shell.nav.evaluations"
 		| "shell.nav.experiments"
 		| "shell.nav.failureTests"
@@ -90,6 +93,7 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 		items: [
 			{ to: "/agents", labelKey: "shell.nav.agents", icon: Bot, testId: "nav-link-agents", also: ["/agents_"] },
 			{ to: "/leaderboard", labelKey: "shell.nav.leaderboard", icon: ListOrdered, testId: "nav-link-leaderboard", also: ["/trends"] },
+			{ to: "/improvements", labelKey: "shell.nav.improvements", icon: TrendingUp, testId: "nav-link-improvements" },
 		],
 	},
 	{
