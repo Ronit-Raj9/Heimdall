@@ -123,6 +123,11 @@ func (r hostedScheduleRunner) Run(ctx context.Context, s schedule.Schedule) (*sc
 		return nil, err
 	}
 	a := r.env.App
+	if s.Evaluation != "" {
+		svc := r.env.Services
+		svc.Launcher = r.l
+		return runEvaluationSchedule(ctx, a, &svc, s) // X12 scheduled re-evaluations (schedule_eval.go)
+	}
 	if isCanarySchedule(a, s) {
 		return r.runCanary(ctx, s)
 	}

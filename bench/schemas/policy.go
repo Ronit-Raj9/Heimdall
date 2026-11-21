@@ -98,6 +98,76 @@ type ReleaseRecord struct {
 	CreatedAt      time.Time      `json:"created_at"`
 	PrevHash       string         `json:"prev_hash"`
 	Hash           string         `json:"hash"`
+
+	// Agent version fields: which version of which agent this release puts
+	// live and which version it replaces (0: none was live). Empty on a
+	// record written before agent versions existed.
+	AgentID         string `json:"agent_id,omitempty"`
+	Version         int    `json:"version,omitempty"`
+	ReplacesVersion int    `json:"replaces_version,omitempty"`
+	// EvaluationID is set when the release covers a whole evaluation (every
+	// benchmark it ran); ExpID and AnalysisID then name its first child and
+	// Children lists them all.
+	EvaluationID string          `json:"evaluation_id,omitempty"`
+	Children     []ReleaseChild  `json:"children,omitempty"`
+	Summary      *ReleaseSummary `json:"summary,omitempty"`
+	Gate         string          `json:"gate,omitempty"` // the evaluation's gate state at release time: pass, fail, no_baseline
+}
+
+// ReleaseChild is one benchmark of a release that covers an evaluation.
+type ReleaseChild struct {
+	Benchmark      string         `json:"benchmark"`
+	ExpID          string         `json:"exp_id"`
+	AnalysisID     string         `json:"analysis_id"`
+	Decision       Decision       `json:"decision"`
+	Action         Action         `json:"action"`
+	PolicyName     string         `json:"policy_name,omitempty"`
+	PolicyDecision PolicyDecision `json:"policy_decision,omitempty"`
+	ManifestHash   string         `json:"manifest_hash"`
+	SealsDigest    string         `json:"seals_digest"`
+	Runs           int            `json:"runs"`
+}
+
+// ReleaseSide is one agent version's numbers in a release summary. Score
+// is the verified success rate over clean runs with its 95% interval.
+// CostPerSolved, FalseCompletion and FaultSurvival are nil when unknown.
+type ReleaseSide struct {
+	Label           string   `json:"label"` // the evaluation arm
+	Agent           string   `json:"agent"`
+	Version         int      `json:"version,omitempty"`
+	Model           string   `json:"model,omitempty"`
+	EvaluationID    string   `json:"evaluation_id,omitempty"`
+	Score           float64  `json:"score"`
+	CILow           float64  `json:"ci_low"`
+	CIHigh          float64  `json:"ci_high"`
+	Runs            int      `json:"runs"`
+	CostPerSolved   *float64 `json:"cost_per_solved_usd,omitempty"`
+	FalseCompletion *float64 `json:"false_completion,omitempty"` // share of failed runs the agent claimed as solved
+	FaultSurvival   *float64 `json:"fault_survival,omitempty"`   // success rate on runs with a fault injected
+}
+
+// ReleaseCapabilityScore is one capability's score, before and after.
+type ReleaseCapabilityScore struct {
+	Capability string   `json:"capability"`
+	Candidate  ScoreCI  `json:"candidate"`
+	Baseline   *ScoreCI `json:"baseline,omitempty"`
+}
+
+// ScoreCI is a score with its interval and run count.
+type ScoreCI struct {
+	Score  float64 `json:"score"`
+	CILow  float64 `json:"ci_low"`
+	CIHigh float64 `json:"ci_high"`
+	Runs   int     `json:"runs"`
+}
+
+// ReleaseSummary is the before and after of a release: the candidate (the
+// version released) and the baseline (the version it replaces).
+type ReleaseSummary struct {
+	Candidate    ReleaseSide              `json:"candidate"`
+	Baseline     *ReleaseSide             `json:"baseline,omitempty"`
+	Capabilities []ReleaseCapabilityScore `json:"capabilities,omitempty"`
+	Note         string                   `json:"note,omitempty"` // e.g. the baseline is not the live version
 }
 
 // ReleaseRequest is POST /releases.
@@ -107,6 +177,34 @@ type ReleaseRequest struct {
 	Approver   string `json:"approver"`
 	Note       string `json:"note,omitempty"`
 	Override   string `json:"override,omitempty"` // required to release against a block
+
+	// EvaluationID asks for a release of a whole evaluation: POST
+	// /evaluations/{id}/release fills it and Evaluation, never the body of
+	// POST /releases.
+	EvaluationID string             `json:"evaluation_id,omitempty"`
+	Evaluation   *ReleaseEvaluation `json:"-"`
+}
+
+// ReleaseEvaluation is what the server resolved for a release of an
+// evaluation: the agent version, the version it replaces, the children and
+// the numbers. It is never read from a request body.
+type ReleaseEvaluation struct {
+	EvaluationID    string
+	AgentID         string
+	Version         int
+	ReplacesVersion int
+	CandidateArm    string // the evaluation arm label released, also the experiment arm id
+	Children        []ReleaseChildRef
+	Decision        Decision
+	Blocked         []string // reasons from the evaluation as a whole (gate, overall verdict)
+	Gate            string
+	Summary         *ReleaseSummary
+}
+
+// ReleaseChildRef names one child experiment of a release of an evaluation.
+type ReleaseChildRef struct {
+	Benchmark string
+	ExpID     string
 }
 
 // ReleaseList is GET /releases.

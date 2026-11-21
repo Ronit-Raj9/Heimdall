@@ -269,7 +269,8 @@ func fireWebScheduleWith(ctx context.Context, env jobEnv, name string, log jobs.
 		return schedule.Record{}, errors.New("no organization app")
 	}
 	state := handlers.ScheduleStateDir(env.ProjectRoot)
-	var runner schedule.Runner = scheduleRunner{a: env.App}
+	svc := env.Services
+	var runner schedule.Runner = scheduleRunner{a: env.App, svc: &svc}
 	if env.Hosted {
 		if env.Services.Launcher == nil {
 			return schedule.Record{}, errors.New("this organization has no launcher, so its schedules can not run on workers; ask your server owner to enable the shared worker")

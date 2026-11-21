@@ -53,15 +53,18 @@ type Clock interface {
 // with an error when the experiment was frozen but did not finish, so the
 // spend it made still counts against the day.
 type Result struct {
-	ExpID      string  `json:"exp_id,omitempty"`
-	AnalysisID string  `json:"analysis_id,omitempty"`
-	Decision   string  `json:"decision,omitempty"` // verdict decision
-	Action     string  `json:"action,omitempty"`   // verdict action
-	Policy     string  `json:"policy,omitempty"`   // release policy decision; "" with no policy
-	CostUSD    float64 `json:"cost_usd"`           // spend of this run, unknown costs counted at the engine's estimate
-	Runs       int     `json:"runs"`               // sealed counted runs
-	RunErrors  int     `json:"run_errors"`         // runs that ended infra_error or aborted_infra
-	Summary    string  `json:"summary,omitempty"`
+	ExpID string `json:"exp_id,omitempty"`
+	// EvaluationID is the evaluation an evaluation schedule started. It
+	// runs on after the trigger ends; its gate is judged when it finishes.
+	EvaluationID string  `json:"evaluation_id,omitempty"`
+	AnalysisID   string  `json:"analysis_id,omitempty"`
+	Decision     string  `json:"decision,omitempty"` // verdict decision
+	Action       string  `json:"action,omitempty"`   // verdict action
+	Policy       string  `json:"policy,omitempty"`   // release policy decision; "" with no policy
+	CostUSD      float64 `json:"cost_usd"`           // spend of this run, unknown costs counted at the engine's estimate
+	Runs         int     `json:"runs"`               // sealed counted runs
+	RunErrors    int     `json:"run_errors"`         // runs that ended infra_error or aborted_infra
+	Summary      string  `json:"summary,omitempty"`
 }
 
 // Runner plans, runs and checks one schedule's experiment.
@@ -385,6 +388,9 @@ func (d *Daemon) approve(s Schedule, day string) (*Approval, string) {
 	}
 	if math.IsNaN(s.MaxUSDPerDay) || math.IsInf(s.MaxUSDPerDay, 0) || s.MaxUSDPerDay < 0 { // QC2-15-09
 		return nil, fmt.Sprintf("max_usd_per_day %v is not a finite, non-negative number", s.MaxUSDPerDay)
+	}
+	if s.Evaluation != "" {
+		return d.approveEvaluation(s, day)
 	}
 	exp, err := d.o.Load(Resolve(d.o.Root, s.Experiment))
 	if err != nil {

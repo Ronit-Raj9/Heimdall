@@ -37,6 +37,7 @@ type File struct {
 type Schedule struct {
 	Name         string          `json:"name" yaml:"name"`
 	Experiment   string          `json:"experiment" yaml:"experiment"`                               // experiment file, relative to the project root
+	Evaluation   string          `json:"evaluation,omitempty" yaml:"evaluation,omitempty"`           // an evaluation to repeat: a saved evaluation id (ev_...) or a spec file; in place of experiment
 	Cron         string          `json:"cron" yaml:"cron"`                                           // 5-field cron expression
 	Timezone     string          `json:"timezone,omitempty" yaml:"timezone,omitempty"`               // IANA name the cron and the spend day use; empty is the host's local zone
 	Policy       string          `json:"policy,omitempty" yaml:"policy,omitempty"`                   // release policy file overriding the experiment's, relative to the project root
@@ -274,10 +275,13 @@ func (s Schedule) Validate(root string, load ExperimentLoader) error {
 		if !slices.Contains(Jobs, s.Job) {
 			return wrap("job %q: want one of %s", s.Job, strings.Join(Jobs, ", "))
 		}
-		if s.Experiment != "" || s.Policy != "" || s.MaxUSDPerDay != 0 {
-			return wrap("a job schedule takes no experiment, policy or max_usd_per_day")
+		if s.Experiment != "" || s.Evaluation != "" || s.Policy != "" || s.MaxUSDPerDay != 0 {
+			return wrap("a job schedule takes no experiment, evaluation, policy or max_usd_per_day")
 		}
 		return nil
+	}
+	if s.Evaluation != "" {
+		return s.validateEvaluation(root)
 	}
 	if s.Policy != "" {
 		if _, err := os.Stat(Resolve(root, s.Policy)); err != nil {

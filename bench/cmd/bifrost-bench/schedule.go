@@ -16,6 +16,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/alerts"
 	"github.com/maximhq/bifrost/bench/engine"
+	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schedule"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -414,7 +415,8 @@ func printScheduleRecord(w io.Writer, rec schedule.Record) {
 // analyse it with the schedule's policy override, and update the results
 // index.
 type scheduleRunner struct {
-	a *app
+	a   *app
+	svc *handlers.Services // the org's services; evaluation schedules need its launcher
 }
 
 // Run implements schedule.Runner. After the freeze a failure still returns
@@ -425,6 +427,9 @@ func (r scheduleRunner) Run(ctx context.Context, s schedule.Schedule) (*schedule
 	}
 	if s.Job != "" {
 		return runScheduleJob(ctx, r.a, s) // built-in jobs, e.g. the failure inbox's inbox-pull (inbox.go)
+	}
+	if s.Evaluation != "" {
+		return runEvaluationSchedule(ctx, r.a, r.svc, s) // X12 scheduled re-evaluations (schedule_eval.go)
 	}
 	if isCanarySchedule(r.a, s) {
 		return runCanarySchedule(ctx, r.a, s) // W5 drift canary: a canary look and its confirmation (canary.go)

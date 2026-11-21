@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -259,7 +260,7 @@ func checkRecord(t *testing.T, f *fixture, rec *schemas.ReleaseRecord, req *sche
 		t.Errorf("evidence sha %s, record %s", sum, rec.EvidenceSHA256)
 	}
 	stored, err := f.log.Get(context.Background(), rec.ReleaseID)
-	if err != nil || *stored != *rec {
+	if err != nil || !reflect.DeepEqual(*stored, *rec) {
 		t.Errorf("Get = %+v, %v; want %+v", stored, err, rec)
 	}
 }

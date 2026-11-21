@@ -47,6 +47,60 @@ type EvaluationSpec struct {
 	Trials            int             `json:"trials"`              // repeats per task, default 2
 	Faults            []string        `json:"faults"`              // "clean" always; plus model-down, broken-tool, misleading-instruction
 	BudgetUSD         float64         `json:"budget_usd,omitempty"`
+	Gate              *EvaluationGate `json:"gate,omitempty"` // checked automatically when the evaluation finishes
+}
+
+// EvaluationGate is what an evaluation must show to pass. Scores are
+// verified success rates (0 to 1) over clean runs, per capability.
+type EvaluationGate struct {
+	// BaselineVersion is the agent version the candidate is compared with;
+	// 0 is the agent's live version (the last one released).
+	BaselineVersion int `json:"baseline_version,omitempty"`
+	// MinScore is the lowest score the candidate may have per capability.
+	MinScore map[string]float64 `json:"min_score,omitempty"`
+	// MaxRegression is the largest score drop from the baseline allowed on
+	// any capability, as a fraction (0.05 is 5 points). 0 is no check.
+	MaxRegression float64 `json:"max_regression,omitempty"`
+}
+
+// Gate states.
+const (
+	GatePass       = "pass"
+	GateFail       = "fail"
+	GateNoBaseline = "no_baseline" // a regression limit is set but no baseline run exists to compare with
+)
+
+// GateCheck is one rule of a gate and its outcome.
+type GateCheck struct {
+	Capability string   `json:"capability"`
+	Rule       string   `json:"rule"` // min_score | max_regression
+	Threshold  float64  `json:"threshold"`
+	Observed   float64  `json:"observed"`
+	Baseline   *float64 `json:"baseline,omitempty"`
+	Pass       bool     `json:"pass"`
+	Summary    string   `json:"summary"`
+}
+
+// GateBaseline names what the candidate was compared with.
+type GateBaseline struct {
+	Agent        string `json:"agent"`
+	Version      int    `json:"version,omitempty"`
+	Arm          string `json:"arm,omitempty"`           // the arm of this evaluation, when the baseline ran in it
+	EvaluationID string `json:"evaluation_id,omitempty"` // the evaluation the baseline numbers come from
+	Live         bool   `json:"live"`                    // the baseline is the agent's live version
+}
+
+// EvaluationGateResult is the gate's decision, written once when the
+// evaluation finishes.
+type EvaluationGateResult struct {
+	State            string        `json:"state"` // pass | fail | no_baseline
+	Agent            string        `json:"agent"`
+	Candidate        string        `json:"candidate"` // the arm label judged
+	CandidateVersion int           `json:"candidate_version,omitempty"`
+	Baseline         *GateBaseline `json:"baseline,omitempty"`
+	Checks           []GateCheck   `json:"checks"`
+	Summary          string        `json:"summary"`
+	DecidedAt        time.Time     `json:"decided_at"`
 }
 
 // EvaluationChild is one benchmark of an evaluation and its experiment.
@@ -66,4 +120,8 @@ type Evaluation struct {
 	Children  []EvaluationChild `json:"children"`
 	CreatedAt time.Time         `json:"created_at"`
 	CreatedBy string            `json:"created_by,omitempty"`
+	// Schedule names the schedule that started this evaluation, if any.
+	Schedule string `json:"schedule,omitempty"`
+	// GateResult is set once the evaluation is done and its spec has a gate.
+	GateResult *EvaluationGateResult `json:"gate_result,omitempty"`
 }
