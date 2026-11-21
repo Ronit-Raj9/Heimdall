@@ -1,0 +1,91 @@
+{
+	"title": "Your workers",
+	"subtitle": "Run your agents on compute you own: a cloud sandbox, your Kubernetes cluster or your own VM. Each worker shows up here with its health and capacity.",
+	"connect": "Connect a worker",
+	"cancel": "Cancel",
+	"empty": "No worker of your own yet. Evaluations run on the shared worker until you connect one.",
+	"loadError": "Could not load your workers",
+	"default": {
+		"label": "New evaluations run on",
+		"shared": "Shared worker",
+		"hint": "An evaluation can still pick another worker when you launch it.",
+		"saved": "Saved",
+		"badge": "Default"
+	},
+	"status": {
+		"ready": "Ready",
+		"starting": "Starting",
+		"waiting": "Waiting",
+		"offline": "Offline",
+		"stopped": "Stopped",
+		"error": "Needs attention"
+	},
+	"card": {
+		"platform": "Platform",
+		"capacity": "Capacity",
+		"slots": "{{used}} of {{total}} runs at once",
+		"seen": "Last seen",
+		"checked": "Checked {{when}}",
+		"never": "Not yet",
+		"version": "Version {{version}}"
+	},
+	"actions": {
+		"check": "Check",
+		"start": "Start",
+		"stop": "Stop",
+		"remove": "Remove",
+		"confirmRemove": "Remove {{name}}? Heimdall stops it, and its token stops working.",
+		"makeDefault": "Use for new evaluations",
+		"install": "Show install command",
+		"working": "Working..."
+	},
+	"form": {
+		"title": "Connect a worker",
+		"platform": "Where it runs",
+		"name": "Name",
+		"nameHint": "Letters, digits, '.', '_' or '-'. Evaluations pick the worker by this name.",
+		"submit": "Connect",
+		"submitting": "Connecting...",
+		"startNow": "Start it now",
+		"done": "Done",
+		"secretHint": "Kept encrypted. Heimdall only uses it to start and stop this worker.",
+		"vmHint": "Heimdall gives you one command. Run it on an Ubuntu or Debian machine with Docker and at least 20 GB free; the worker installs itself as a service and connects.",
+		"installTitle": "Run this on your VM",
+		"installHint": "It holds this worker's token: copy it now, keep it private. Admins can show it again from the worker's card.",
+		"connected": "{{name}} is connected.",
+		"startHint": "Start it to put it to work. It installs itself on first start, which takes a few minutes."
+	},
+	"runloop": {
+		"secret": "Runloop API key",
+		"size": "Size",
+		"blueprint": "Blueprint (optional)",
+		"blueprintHint": "A blueprint with Docker preinstalled starts faster.",
+		"hours": "Keep alive (hours, up to 48)"
+	},
+	"fly": {
+		"secret": "Fly token",
+		"secretHint": "fly tokens create deploy -a <app>",
+		"app": "Fly app",
+		"appHint": "An app you created for workers: fly apps create <name>",
+		"region": "Region (optional)",
+		"cpus": "CPUs",
+		"memory": "Memory (MB)",
+		"cpuKind": "CPU kind",
+		"image": "Image (optional)"
+	},
+	"kubernetes": {
+		"namespace": "Namespace",
+		"manifest": "Apply this first",
+		"manifestHint": "It creates a narrow account for Heimdall in the namespace and lets the worker change only its own run namespaces.",
+		"manifestLink": "Download the manifest",
+		"mode": "Credential",
+		"kubeconfig": "Kubeconfig",
+		"token": "Service account token",
+		"kubeconfigHint": "Inline certificates and tokens only. A kubeconfig that runs a login plugin is refused.",
+		"server": "API server",
+		"ca": "Certificate authority (PEM)",
+		"saToken": "Token",
+		"image": "Worker image",
+		"imageHint": "An image with bifrost-bench and your project. Leave empty to use the server's image."
+	}
+}

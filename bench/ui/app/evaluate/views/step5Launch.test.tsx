@@ -7,6 +7,10 @@ import { Step5Launch, parseBudget, summaryLines } from "./step5Launch";
 const q = vi.hoisted(() => ({ create: [] as unknown as readonly [unknown, Record<string, unknown>] }));
 vi.mock("@/lib/store/apis/evaluationsApi", () => ({ useCreateEvaluationMutation: () => q.create }));
 vi.mock("@/lib/store/apis/modelsApi", () => ({ useGetModelsQuery: () => ({}) }));
+vi.mock("@/lib/store/apis/workerConnectionsApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/workerConnectionsApi")>()),
+	useListWorkerConnectionsQuery: () => ({}),
+}));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 const spec = (over: Partial<EvaluationSpec> = {}): EvaluationSpec => ({

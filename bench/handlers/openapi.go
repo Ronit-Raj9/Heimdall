@@ -278,6 +278,18 @@ var APIRoutes = []RouteDoc{
 	{Method: "GET", Path: APIPrefix + "/runners/install.sh", Tag: "runners", Summary: "Runner install script for a fresh Ubuntu or Debian box (deploy/runner/install.sh)",
 		Raw: "text/x-shellscript"},
 
+	// Bring your own worker (handlers/workerconns.go, package byoworker): workers an org connects on Runloop, Fly Machines, its Kubernetes cluster or its own VM.
+	{Method: "GET", Path: APIPrefix + "/workers/connections", Tag: "workers", Summary: "Connected workers with health, capacity, platform and last seen; the default worker", Response: schemas.WorkerConnectionsList{}},
+	{Method: "POST", Path: APIPrefix + "/workers/connections", Tag: "workers", Summary: "Connect a worker; a VM's answer carries its one-line install command (shown once)", Auth: AuthWrite, Request: schemas.WorkerConnectionCreate{}, Status: fasthttp.StatusCreated, Response: schemas.WorkerConnectionCreated{}},
+	{Method: "GET", Path: APIPrefix + "/workers/connections/{id}", Tag: "workers", Summary: "One connected worker", Response: schemas.WorkerConnection{}},
+	{Method: "POST", Path: APIPrefix + "/workers/connections/{id}/check", Tag: "workers", Summary: "Check the worker's platform credential and refresh its state", Auth: AuthWrite, Response: schemas.WorkerConnection{}},
+	{Method: "POST", Path: APIPrefix + "/workers/connections/{id}/start", Tag: "workers", Summary: "Start the worker on its platform", Auth: AuthWrite, Response: schemas.WorkerConnection{}},
+	{Method: "POST", Path: APIPrefix + "/workers/connections/{id}/stop", Tag: "workers", Summary: "Stop and remove the worker's box on its platform", Auth: AuthWrite, Response: schemas.WorkerConnection{}},
+	{Method: "POST", Path: APIPrefix + "/workers/connections/{id}/remove", Tag: "workers", Summary: "Disconnect the worker: stop it, revoke its token, delete its stored credential", Auth: AuthWrite, Response: schemas.WorkerConnection{}},
+	{Method: "POST", Path: APIPrefix + "/workers/connections/{id}/install-command", Tag: "workers", Summary: "Show a VM worker's one-line install command again", Auth: AuthWrite, Response: schemas.WorkerInstallCommand{}},
+	{Method: "PUT", Path: APIPrefix + "/workers/default", Tag: "workers", Summary: "The worker new evaluations run on when they name none (empty: the shared worker)", Auth: AuthWrite, Request: schemas.WorkerDefault{}, Response: schemas.WorkerDefault{}},
+	{Method: "GET", Path: APIPrefix + "/workers/kubernetes-manifest", Tag: "workers", Summary: "RBAC to apply before connecting a Kubernetes cluster (?namespace=)", Raw: "application/yaml"},
+
 	// Jobs area (P4, handlers/jobs.go, docs/platform-design.md): background jobs of the caller's org.
 	{Method: "GET", Path: APIPrefix + "/jobs", Tag: "jobs", Summary: "Jobs of the org, newest first, and the kinds POST /jobs accepts", Response: JobList{}, Query: []QueryDoc{
 		{Name: "kind", Description: "Only this kind"}, {Name: "status", Description: "queued, running, succeeded, failed or cancelled"},

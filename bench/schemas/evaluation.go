@@ -47,6 +47,10 @@ type EvaluationSpec struct {
 	Trials            int             `json:"trials"`              // repeats per task, default 2
 	Faults            []string        `json:"faults"`              // "clean" always; plus model-down, broken-tool, misleading-instruction
 	BudgetUSD         float64         `json:"budget_usd,omitempty"`
+	// Worker is the connected worker (its pool) the evaluation runs on;
+	// "" is the org's default worker, "shared" the shared worker. The saved
+	// evaluation holds the resolved pool ("" for the shared worker).
+	Worker string `json:"worker,omitempty"`
 }
 
 // EvaluationChild is one benchmark of an evaluation and its experiment.

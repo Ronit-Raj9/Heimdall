@@ -193,6 +193,13 @@ func FromKubeconfig(paths []string, contextName string) (*Client, error) {
 			}
 		}
 	}
+	return merged.client(contextName, dirs)
+}
+
+// client builds the client of contextName (the current context when empty)
+// of a merged kubeconfig. dirs resolves relative file paths per entry; nil
+// means the kubeconfig came from memory and may name no file at all.
+func (merged kubeconfig) client(contextName string, dirs map[string]string) (*Client, error) {
 	name := contextName
 	if name == "" {
 		name = merged.CurrentContext
@@ -225,6 +232,11 @@ func FromKubeconfig(paths []string, contextName string) (*Client, error) {
 		return nil, fmt.Errorf("context %q names cluster %q, which the kubeconfig does not define", name, ctxe.Cluster)
 	}
 	cluster := merged.Clusters[cl].Cluster
+	if dirs == nil {
+		if err := merged.noFiles(cl, us); err != nil {
+			return nil, fmt.Errorf("context %q: %w", name, err)
+		}
+	}
 	cdir := dirs["cluster/"+ctxe.Cluster]
 	tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12, ServerName: cluster.TLSServerName}
 	if cluster.InsecureSkipTLSVerify {
@@ -275,6 +287,66 @@ func FromKubeconfig(paths []string, contextName string) (*Client, error) {
 	}
 	if err := c.init(tlsCfg, cluster.ProxyURL); err != nil {
 		return nil, fmt.Errorf("context %q: %w", name, err)
+	}
+	return c, nil
+}
+
+// noFiles refuses a kubeconfig held in memory (one an organization
+// uploaded) that points at files: the server must never read its own files
+// on behalf of someone else's kubeconfig.
+func (merged kubeconfig) noFiles(cl, us int) error {
+	c := merged.Clusters[cl].Cluster
+	if c.CertificateAuthority != "" {
+		return errors.New("certificate-authority names a file; inline it as certificate-authority-data")
+	}
+	if c.ProxyURL != "" {
+		return errors.New("proxy-url is not accepted in an uploaded kubeconfig")
+	}
+	if us >= 0 {
+		u := merged.Users[us].User
+		if u.ClientCertificate != "" || u.ClientKey != "" {
+			return errors.New("client-certificate or client-key names a file; inline them as client-certificate-data and client-key-data")
+		}
+		if u.TokenFile != "" {
+			return errors.New("tokenFile names a file; inline the token")
+		}
+	}
+	return nil
+}
+
+// FromKubeconfigData builds a client from one kubeconfig held in memory (an
+// uploaded file). Every certificate and token must be inline: a kubeconfig
+// that names a file, runs an exec plugin or skips TLS verification is
+// refused. contextName "" means the file's current context.
+func FromKubeconfigData(raw []byte, contextName string) (*Client, error) {
+	var kc kubeconfig
+	if err := yaml.Unmarshal(raw, &kc); err != nil {
+		return nil, fmt.Errorf("parse kubeconfig: %w", err)
+	}
+	if len(kc.Contexts) == 0 || len(kc.Clusters) == 0 {
+		return nil, errors.New("the kubeconfig defines no context or no cluster")
+	}
+	return kc.client(contextName, nil)
+}
+
+// FromToken builds a client for a service account token: server is the API
+// server (https), caPEM its certificate authority (empty: the system
+// roots), namespace the account's namespace.
+func FromToken(server string, caPEM []byte, token, namespace string) (*Client, error) {
+	if strings.TrimSpace(token) == "" {
+		return nil, errors.New("no service account token")
+	}
+	tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12}
+	if len(caPEM) > 0 {
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(caPEM) {
+			return nil, errors.New("the certificate authority holds no PEM certificate")
+		}
+		tlsCfg.RootCAs = pool
+	}
+	c := &Client{Server: server, Context: "service-account", Namespace: namespace, token: strings.TrimSpace(token)}
+	if err := c.init(tlsCfg, ""); err != nil {
+		return nil, err
 	}
 	return c, nil
 }

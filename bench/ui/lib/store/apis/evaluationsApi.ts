@@ -90,6 +90,8 @@ export interface EvaluationSpec {
 	/** "clean" always; plus "model-down", "broken-tool", "misleading-instruction". */
 	faults: (EvaluationFault | string)[];
 	budget_usd?: number;
+	/** The connected worker (its pool) the evaluation runs on; unset is the org's default worker, "shared" the shared worker. */
+	worker?: string;
 }
 
 export interface EvaluationChild {

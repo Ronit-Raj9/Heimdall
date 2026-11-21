@@ -135,6 +135,8 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	s.closers = append(s.closers, jobsHandler.Close)
 	handlers.NewAuthHandler(mode, nil).RegisterRoutes(r, common...)         // Auth area (P2): local mode answers GET /auth/config and /auth/me (local principal); hosted-only routes 404 (handlers/auth.go)
 	handlers.NewRunnersHandler(mode, nil, nil).RegisterRoutes(r, common...) // Runners area (P5): runner admin is hosted only; local mode answers 503 (handlers/runners.go)
+	// Bring your own worker: hosted only; local mode answers 503 (handlers/workerconns.go).
+	handlers.NewWorkerConnsHandler(mode, nil, handlers.WorkerConnErrors{}, nil).RegisterRoutes(r, common...)
 	if deps.UI != nil {
 		NewUIHandler(mode, deps.UI).RegisterRoutes(r)
 	}

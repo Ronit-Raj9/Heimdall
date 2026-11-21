@@ -163,6 +163,18 @@ var PlatformPolicy = map[string]Rule{
 	key("POST", api+"/runners/tokens"):             org(admin),
 	key("POST", api+"/runners/tokens/{id}/revoke"): org(admin),
 	key("GET", api+"/runners/install.sh"):          public(),
+
+	// Bring your own worker (handlers/workerconns.go): members read, admins write.
+	key("GET", api+"/workers/connections"):                       org(viewer),
+	key("POST", api+"/workers/connections"):                      org(admin),
+	key("GET", api+"/workers/connections/{id}"):                  org(viewer),
+	key("POST", api+"/workers/connections/{id}/check"):           org(admin),
+	key("POST", api+"/workers/connections/{id}/start"):           org(admin),
+	key("POST", api+"/workers/connections/{id}/stop"):            org(admin),
+	key("POST", api+"/workers/connections/{id}/remove"):          org(admin),
+	key("POST", api+"/workers/connections/{id}/install-command"): org(admin),
+	key("PUT", api+"/workers/default"):                           org(admin),
+	key("GET", api+"/workers/kubernetes-manifest"):               org(viewer),
 }
 
 // OrgPolicy covers the org-scoped bench API: the routes every org's router

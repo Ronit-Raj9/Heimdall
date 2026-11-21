@@ -1,6 +1,39 @@
 #!/usr/bin/env bash
 # Heimdall runner installer for a fresh Ubuntu or Debian box.
 #
+# One line, with the runner token of a worker (Workers page, "Your own VM"):
+#
+#   curl -fsSL https://heimdall.example.com/api/bench/runners/install.sh | sudo HEIMDALL_RUNNER_TOKEN=hmr_... sh
+#
+# Piped into a shell, the script cannot run from standard input (later steps
+# read it), so the POSIX block below downloads it again to a file and runs
+# that copy with bash. The hosted server fills in the three defaults below
+# when it serves the script.
+HEIMDALL_DEFAULT_SERVER=""
+HEIMDALL_DEFAULT_REPO=""
+HEIMDALL_DEFAULT_REF=""
+if [ -z "${BASH_VERSION:-}" ] || [ ! -f "${0:-}" ] || [ -n "${HEIMDALL_INSTALL_REFETCH:-}" ]; then
+  if [ -n "${HEIMDALL_INSTALL_SELF:-}" ]; then
+    echo "error: the downloaded installer could not start with bash" >&2
+    exit 1
+  fi
+  _h_server=${HEIMDALL_SERVER:-$HEIMDALL_DEFAULT_SERVER}
+  if [ -z "$_h_server" ]; then
+    echo "error: set HEIMDALL_SERVER=https://<your Heimdall server> (or download install.sh from your server)" >&2
+    exit 1
+  fi
+  command -v bash >/dev/null 2>&1 || { echo "error: bash is required (apt-get install -y bash)" >&2; exit 1; }
+  command -v curl >/dev/null 2>&1 || { echo "error: curl is required (apt-get install -y curl ca-certificates)" >&2; exit 1; }
+  _h_tmp=$(mktemp /tmp/heimdall-install.XXXXXX) || exit 1
+  if ! curl -fsSL --proto '=https,http' "${_h_server%/}/api/bench/runners/install.sh" -o "$_h_tmp"; then
+    rm -f "$_h_tmp"
+    echo "error: could not download ${_h_server%/}/api/bench/runners/install.sh" >&2
+    exit 1
+  fi
+  HEIMDALL_SERVER=${_h_server%/} HEIMDALL_INSTALL_SELF=$_h_tmp HEIMDALL_INSTALL_REFETCH="" exec bash "$_h_tmp" "$@"
+  exit 1
+fi
+#
 # A runner is `bifrost-bench runner start`: it leases slots from a hosted
 # Heimdall server over HTTPS, plans each experiment again with its own copy of
 # the project (suites, agents, deploy/bench.yaml at the server's commit), runs
@@ -60,16 +93,21 @@ readonly FALLBACK_IMAGES=(
 
 # ---------------------------------------------------------------- options
 
-SERVER=""
+# Every option may also come from the environment (the one-line install and
+# the platform drivers of package byoworker set these).
+SERVER="${HEIMDALL_SERVER:-$HEIMDALL_DEFAULT_SERVER}"
 TOKEN_FILE=""
 TOKEN_STDIN=0
-POOL="default"
-SLOTS="1"
-RUNNER_NAME=""
-LABELS=""
+POOL="${HEIMDALL_POOL:-default}"
+SLOTS="${HEIMDALL_SLOTS:-1}"
+RUNNER_NAME="${HEIMDALL_RUNNER_NAME:-}"
+LABELS="${HEIMDALL_LABELS:-}"
 SPEND_CAP=""
-REF="main"
-REPO="https://github.com/maximhq/bifrost.git"
+REF="${HEIMDALL_REF:-${HEIMDALL_DEFAULT_REF:-main}}"
+REPO="${HEIMDALL_REPO:-${HEIMDALL_DEFAULT_REPO:-https://github.com/maximhq/bifrost.git}}"
+FOREGROUND=0
+INSTALL_DOCKER=0
+MIN_DISK_GB="20"
 RELEASE_URL=""
 RELEASE_SHA256=""
 PREFIX="/opt/heimdall-runner"
@@ -97,6 +135,8 @@ Required:
   --token-stdin          Read the runner token from standard input instead.
                          On an upgrade both may be left out: the installed
                          token is kept.
+                         HEIMDALL_RUNNER_TOKEN in the environment works too
+                         (the one-line install).
 
 Runner:
   --pool NAME            Runner pool (default: default)
@@ -123,6 +163,13 @@ Layout and steps:
   --user NAME            System user the runner runs as (default: heimdall-runner)
   --skip-images          Do not build the task, bench and agent images
   --skip-stack           Do not start the local gateway stack
+  --min-disk-gb N        Free disk the install needs, in GB (default: 20)
+  --foreground           No systemd (a cloud sandbox or a container VM): run
+                         the runner as this script's last step, in the
+                         foreground, instead of installing a service
+  --install-docker       Install git, curl and Docker (get.docker.com) when
+                         they are missing, and start dockerd when no daemon
+                         runs
   --force                Continue on an OS that is not Debian or Ubuntu
   --dry-run              Print every command instead of running it; changes
                          nothing and needs neither root nor Docker
@@ -213,6 +260,10 @@ cleanup() {
   if [ -n "$WORK_TMP" ] && [ -d "$WORK_TMP" ]; then
     rm -rf "$WORK_TMP"
   fi
+  # The copy the one-line install downloaded.
+  case ${HEIMDALL_INSTALL_SELF:-} in
+    /tmp/heimdall-install.*) rm -f "$HEIMDALL_INSTALL_SELF" ;;
+  esac
 }
 trap cleanup EXIT
 
@@ -245,7 +296,7 @@ parse_args() {
     esac
     case $opt in
       --server | --token-file | --pool | --slots | --name | --labels | --spend-cap-usd | \
-        --ref | --repo | --release-url | --sha256 | --prefix | --user)
+        --ref | --repo | --release-url | --sha256 | --prefix | --user | --min-disk-gb)
         if [ "$inline" -eq 0 ]; then
           [ $# -ge 2 ] || die "$opt needs a value (see --help)"
           val=$2
@@ -267,14 +318,17 @@ parse_args() {
           --sha256) RELEASE_SHA256=$val ;;
           --prefix) PREFIX=$val ;;
           --user) RUN_USER=$val ;;
+          --min-disk-gb) MIN_DISK_GB=$val ;;
         esac
         ;;
       --token)
         die "never pass the token on the command line; use --token-file PATH or --token-stdin"
         ;;
-      --token-stdin | --skip-images | --skip-stack | --dry-run | --force | --debug)
+      --token-stdin | --skip-images | --skip-stack | --dry-run | --force | --debug | --foreground | --install-docker)
         [ "$inline" -eq 0 ] || die "$opt takes no value"
         case $opt in
+          --foreground) FOREGROUND=1 ;;
+          --install-docker) INSTALL_DOCKER=1 ;;
           --token-stdin) TOKEN_STDIN=1 ;;
           --skip-images) SKIP_IMAGES=1 ;;
           --skip-stack) SKIP_STACK=1 ;;
@@ -351,6 +405,7 @@ validate_args() {
   [[ $GO_VERSION =~ ^[0-9]{1,2}\.[0-9]{1,3}(\.[0-9]{1,3})?$ ]] || die "HEIMDALL_GO_VERSION must look like 1.26.5"
   [[ $RUN_USER =~ $USER_RE ]] || die "--user must be a lowercase system user name"
   [ "$RUN_USER" != "root" ] || die "--user must not be root"
+  [[ $MIN_DISK_GB =~ ^[0-9]{1,5}$ ]] || die "--min-disk-gb must be a whole number of GB"
 
   SRC_DIR="${PREFIX}/src"
   BENCH_DIR="${SRC_DIR}/bench"
@@ -370,6 +425,9 @@ read_token() {
     [ -f "$TOKEN_FILE" ] || die "token file ${TOKEN_FILE} does not exist or is not a file"
     [ -r "$TOKEN_FILE" ] || die "token file ${TOKEN_FILE} is not readable"
     IFS= read -r t <"$TOKEN_FILE" || true
+  elif [ "$TOKEN_STDIN" -eq 0 ] && [ -n "${HEIMDALL_RUNNER_TOKEN:-}" ]; then
+    t=$HEIMDALL_RUNNER_TOKEN
+    unset HEIMDALL_RUNNER_TOKEN # no child process inherits it
   elif [ "$TOKEN_STDIN" -eq 1 ]; then
     if [ -t 0 ]; then
       printf 'Runner token (input hidden): ' >&2
@@ -477,9 +535,12 @@ check_tools() {
     command -v "$t" >/dev/null 2>&1 || missing+=("$t")
   done
   if ! is_dry; then
-    for t in systemctl useradd usermod getent install; do
+    for t in useradd usermod getent install; do
       command -v "$t" >/dev/null 2>&1 || missing+=("$t")
     done
+    if [ "$FOREGROUND" -eq 0 ]; then
+      command -v systemctl >/dev/null 2>&1 || missing+=(systemctl)
+    fi
   fi
   if [ ${#missing[@]} -gt 0 ]; then
     if is_dry; then
@@ -488,9 +549,108 @@ check_tools() {
       die "missing tools: ${missing[*]}; install them with: apt-get install -y git curl openssl ca-certificates"
     fi
   fi
-  if ! is_dry && [ ! -d /run/systemd/system ]; then
-    die "systemd is not running on this box; the runner is installed as a systemd service"
+  if ! is_dry && [ "$FOREGROUND" -eq 0 ] && [ ! -d /run/systemd/system ]; then
+    die "systemd is not running on this box; the runner is installed as a systemd service (or pass --foreground to run it in the foreground)"
   fi
+}
+
+# install_prereqs installs what a bare sandbox image lacks (--install-docker):
+# the base tools with apt, Docker with Docker's own script, and a dockerd
+# started by hand where no init system runs one.
+install_prereqs() {
+  local missing=() t i
+  [ "$INSTALL_DOCKER" -eq 1 ] || return 0
+  for t in git curl openssl tar sha256sum runuser flock; do
+    command -v "$t" >/dev/null 2>&1 || missing+=("$t")
+  done
+  if [ ${#missing[@]} -gt 0 ]; then
+    command -v apt-get >/dev/null 2>&1 || die "missing tools: ${missing[*]}, and no apt-get to install them"
+    log "Installing base tools (${missing[*]})"
+    run env DEBIAN_FRONTEND=noninteractive apt-get update -qq
+    run env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git curl openssl ca-certificates tar coreutils util-linux passwd
+  fi
+  if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+    log "Installing Docker (https://get.docker.com)"
+    if is_dry; then
+      print_cmd curl -fsSL https://get.docker.com -o '<tmp>/get-docker.sh'
+      print_cmd sh '<tmp>/get-docker.sh'
+    else
+      curl -fsSL https://get.docker.com -o "${WORK_TMP}/get-docker.sh"
+      sh "${WORK_TMP}/get-docker.sh"
+    fi
+  fi
+  if ! is_dry && ! docker info >/dev/null 2>&1 && command -v dockerd >/dev/null 2>&1; then
+    if [ -d /run/systemd/system ]; then
+      run systemctl enable --now docker
+    else
+      log "Starting dockerd (no init system runs it here)"
+      nohup dockerd >/var/log/heimdall-dockerd.log 2>&1 &
+      for i in $(seq 1 60); do
+        docker info >/dev/null 2>&1 && break
+        sleep 1
+      done
+    fi
+  fi
+}
+
+# free_gb prints the free space, in whole GB, of the file system holding
+# path (its nearest existing parent).
+free_gb() {
+  local p=$1
+  while [ ! -e "$p" ] && [ "$p" != "/" ]; do
+    p=$(dirname "$p")
+  done
+  df -Pk "$p" 2>/dev/null | awk 'NR == 2 {print int($4 / 1048576)}'
+}
+
+# check_disk refuses a box without room for the project, the Go build and
+# the agent images: --min-disk-gb free under the install root and under
+# Docker's data root.
+check_disk() {
+  local root docker_root free where
+  root=$PREFIX
+  docker_root=$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || true)
+  [ -n "$docker_root" ] || docker_root=/var/lib/docker
+  for where in "$root" "$docker_root"; do
+    free=$(free_gb "$where")
+    if [ -z "$free" ]; then
+      warn "cannot read the free disk space at ${where}"
+      continue
+    fi
+    if [ "$free" -lt "$MIN_DISK_GB" ]; then
+      if is_dry || [ "$FORCE" -eq 1 ]; then
+        warn "only ${free} GB free at ${where}; the images need ${MIN_DISK_GB} GB"
+      else
+        die "only ${free} GB free at ${where}; the task and agent images need ${MIN_DISK_GB} GB (free some space, or pass --min-disk-gb N)"
+      fi
+    else
+      log "Disk: ${free} GB free at ${where} (need ${MIN_DISK_GB} GB)"
+    fi
+  done
+}
+
+# run_foreground runs the runner as the last step (--foreground): it is the
+# box's main process, so the platform restarts or stops the box with it.
+run_foreground() {
+  local -a args
+  args=(runner start -server "$SERVER" -token-file "$TOKEN_PATH" -pool "$POOL" -slots "$SLOTS" -name "$RUNNER_NAME" -config "$CONFIG_PATH")
+  if [ -n "$LABELS" ]; then
+    args+=(-labels "$LABELS")
+  fi
+  if [ -n "$SPEND_CAP" ]; then
+    args+=(-spend-cap-usd "$SPEND_CAP")
+  fi
+  if [ "$DEBUG" -eq 1 ]; then
+    args+=(-debug)
+  fi
+  log "Starting the runner in the foreground (${RUNNER_NAME}, pool ${POOL})"
+  if is_dry; then
+    run_in "$BENCH_DIR" runuser -u "$RUN_USER" -- env HOME="$HOME_DIR" "$BIN_PATH" "${args[@]}"
+    return 0
+  fi
+  cleanup
+  cd "$BENCH_DIR"
+  exec runuser -u "$RUN_USER" -- env HOME="$HOME_DIR" "$BIN_PATH" "${args[@]}"
 }
 
 # ---------------------------------------------------------------- steps
@@ -971,15 +1131,23 @@ main() {
   check_os
   check_root
   detect_arch
+  lock_install
+  install_prereqs
   check_tools
   check_docker
-  lock_install
+  check_disk
   stop_running_service
   create_user
   checkout_source
   get_binary
   ensure_env
   write_token
+  if [ "$FOREGROUND" -eq 1 ]; then
+    build_images
+    start_stack
+    run_foreground
+    return 0
+  fi
   write_unit
   build_images
   start_stack

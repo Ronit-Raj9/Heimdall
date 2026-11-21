@@ -28,6 +28,8 @@ export interface EvaluateDraft {
 	trials: number;
 	faults: string[];
 	budgetUsd: number | null;
+	/** The worker the evaluation runs on; "" is the org's default worker. */
+	worker?: string;
 	/** Arms dropped by a mode change (for example arm B in "score"), so going back restores their models. */
 	stashedArms?: EvaluationArm[];
 }
@@ -100,6 +102,7 @@ export function draftToSpec(d: EvaluateDraft): EvaluationSpec {
 		trials: d.trials,
 		faults,
 		...(d.budgetUsd != null ? { budget_usd: d.budgetUsd } : {}),
+		...(d.worker ? { worker: d.worker } : {}),
 	};
 }
 
@@ -113,6 +116,7 @@ export function specToPatch(spec: EvaluationSpec): Partial<EvaluateDraft> {
 		trials: spec.trials,
 		faults: spec.faults,
 		budgetUsd: spec.budget_usd ?? null,
+		worker: spec.worker ?? "",
 	};
 }
 

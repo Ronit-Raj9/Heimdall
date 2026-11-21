@@ -116,7 +116,8 @@ func init() {
 	hostedAreas = append(hostedAreas, func(env *hostedEnv) (server.RouteRegistrar, error) {
 		rs := runnersOf(env)
 		return handlers.NewRunnersHandler(env.base.cfg.Server.Mode, rs.svc, runnerAudit(env)).
-			WithInstallScript(runnerdeploy.InstallScript), nil
+			WithInstallScript(runnerdeploy.InstallScript).
+			WithInstallDefaults(env.base.cfg.Auth.PublicURL, os.Getenv(runnerRepoEnv), buildRevision()), nil
 	})
 	if orgLauncher == nil {
 		orgLauncher = hostedOrgLauncher
