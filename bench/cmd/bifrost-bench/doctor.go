@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/engine"
+	"github.com/maximhq/bifrost/bench/environments"
 	"github.com/maximhq/bifrost/bench/faultproxy"
 	"github.com/maximhq/bifrost/bench/gateways/bifrost"
 	"github.com/maximhq/bifrost/bench/ops"
@@ -76,6 +77,7 @@ func (a *app) doctor(ctx context.Context) []schemas.DoctorCheck {
 			}
 		}
 	}
+	out = append(out, a.toolProxyBinaryCheck(ctx))
 	out = append(out, needRows...)
 	out = append(out, agentRows...)
 	if res, err := a.docker.Run(ctx, "network", "inspect", "--format", "{{.Internal}}", a.cfg.Networks.Eval); err != nil || res.ExitCode != 0 {
@@ -282,6 +284,39 @@ func helperToolsResult(img string, missing []string) (schemas.DoctorStatus, stri
 		return schemas.DoctorFail, utils.HelperLacks(img, missing...)
 	}
 	return schemas.DoctorPass, strings.Join(bifrost.HelperSelfTestTools, ", ") + " present"
+}
+
+// toolProxyBinaryCheck runs `bifrost-bench version` in the tool proxy image
+// (images.toolproxy, default bench/bifrost-bench:dev), with no network. The
+// image copies bin/bifrost-bench from the host, so a binary built without
+// CGO_ENABLED=0 is linked against glibc and cannot start on the image's
+// Alpine base ("exec /usr/local/bin/bifrost-bench: no such file or
+// directory"). Then every tool proxy and agent event collector exits at
+// start and runs fail or lose a channel; image inspect alone cannot see it.
+// A missing image is left to the image rows.
+func (a *app) toolProxyBinaryCheck(ctx context.Context) schemas.DoctorCheck {
+	img := a.cfg.Images.ToolProxy
+	if img == "" {
+		img = environments.DefaultToolProxyImage
+	}
+	row := schemas.DoctorCheck{ID: "tool proxy binary"}
+	if res, err := a.docker.Run(ctx, "image", "inspect", "--format", "{{.Id}}", img); err != nil || res.ExitCode != 0 {
+		row.Status, row.Detail = schemas.DoctorWarn, img+" missing; run make -C bench images"
+		return row
+	}
+	res, err := a.docker.Run(ctx, "run", "--rm", "--network", "none", "--entrypoint", "bifrost-bench", img, "version")
+	if err != nil {
+		row.Status, row.Detail = schemas.DoctorFail, "cannot run "+img+": "+err.Error()
+		return row
+	}
+	if res.ExitCode != 0 {
+		msg := strings.TrimSpace(string(res.Stderr) + " " + string(res.Stdout))
+		row.Status = schemas.DoctorFail
+		row.Detail = fmt.Sprintf("bifrost-bench in %s exited %d: %s; rebuild it static: make -C bench bin, then docker build -t %s bench", img, res.ExitCode, msg, img)
+		return row
+	}
+	row.Status, row.Detail = schemas.DoctorPass, img+" runs bifrost-bench "+strings.TrimSpace(string(res.Stdout))
+	return row
 }
 
 // faultProxyChecks checks the fault proxy's control API and then, with the

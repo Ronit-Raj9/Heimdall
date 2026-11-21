@@ -89,6 +89,11 @@ type GatewayConfig struct {
 	AdminTokenEnv string   `yaml:"admin_token_env" json:"admin_token_env"`
 	Provider      string   `yaml:"provider" json:"provider"`
 	KeySlots      []string `yaml:"key_slots" json:"key_slots"`
+	// OpenAIKeySlots are the openai provider's key slots (default
+	// oa-slot-1..4). A team of N members on an openai model holds N of them
+	// at once, so a 5-member team needs 5 here and the same names in the
+	// fault proxy's --openai-slots.
+	OpenAIKeySlots []string `yaml:"openai_key_slots" json:"openai_key_slots,omitempty"`
 	// PublicURL is the gateway as a remote agent on another machine reaches
 	// it (a reverse tunnel or a published address the operator sets up).
 	// When set, a remote_http agent with model_traffic gateway is sent this

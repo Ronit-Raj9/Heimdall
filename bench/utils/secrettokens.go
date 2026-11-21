@@ -45,6 +45,26 @@ var liveSKKey = regexp.MustCompile(`\bsk-[A-Za-z0-9_\-]{32,}`)
 // 43 and 42 characters, so liveSKKey alone refused to seal every such run.)
 var benchCanaryKey = regexp.MustCompile(`^sk-[a-z0-9-]*canary-nonce_[0-9a-z]{24}$`)
 
+// HasLiveAPICredentials is HasLiveCredentials without private keys: the
+// formats that open an account outside the sandbox by themselves (provider
+// and Bifrost keys, AWS key ids, GitHub and Slack tokens). A PEM private key
+// opens nothing on its own, and an agent writes one whenever the task asks
+// for a key pair or a TLS certificate (terminal-bench's
+// openssl-selfsigned-cert), so the seal accepts it in the agent's output.
+func HasLiveAPICredentials(s string) bool {
+	for _, re := range liveCredentialPatterns[1:] {
+		if re.MatchString(s) {
+			return true
+		}
+	}
+	for _, key := range liveSKKey.FindAllString(s, -1) {
+		if !benchCanaryKey.MatchString(key) {
+			return true
+		}
+	}
+	return false
+}
+
 // HasLiveCredentials reports whether s contains a credential in a format
 // that works (liveCredentialPatterns, or liveSKKey other than a bench canary).
 func HasLiveCredentials(s string) bool {

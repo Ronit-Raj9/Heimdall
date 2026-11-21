@@ -363,13 +363,19 @@ model calls. A team run takes all N slots at once or none and waits while
 fewer are free; the planner refuses a team larger than the gateway's slots.
 
 To add slots to a stack, add names to `gateway.key_slots` in
-`deploy/bench.yaml` (for example `fp-slot-5` to `fp-slot-8`; with several
-providers, to that provider's `slots`) and restart the fault proxy and the
-bench server. The fault proxy reads the same file (`proxy --config`) and
-accepts a slot whose placeholder key equals its name; the bench's gateway
-`Setup` creates the matching provider key in Bifrost for every listed slot
-at start. Keep `concurrency` times the largest team at or under the number
-of slots, or runs wait for slots.
+`deploy/bench.yaml` (for example `fp-slot-5` to `fp-slot-8`) and the same
+names to the fault proxy's `--slots` flag in `deploy/docker-compose.yml`,
+then restart the fault proxy and the bench server. Those are the default
+provider's (anthropic's) slots. The openai provider has its own,
+`oa-slot-1` to `oa-slot-4` by default: list them in
+`gateway.openai_key_slots` and pass the same names to the proxy's
+`--openai-slots` (or `BENCH_FAULTPROXY_OPENAI_SLOTS`); a 5-member team on an
+openai model needs at least 5. The proxy reads only its flags and
+environment, not `deploy/bench.yaml`, and accepts a slot whose placeholder
+key equals its name; the bench's gateway `Setup` creates the matching
+provider key in Bifrost for every listed slot at start. Keep `concurrency`
+times the largest team at or under the number of slots, or runs wait for
+slots.
 
 ## Controls and tests
 

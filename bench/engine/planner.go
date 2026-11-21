@@ -330,6 +330,9 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	m.SuiteImages = p.suiteImages(ctx, suite) // Lock fingerprints: frozen suite image ids (suiteimages.go)
+	if err := snapshotOwnImageAgents(suite, conds, compat, m); err != nil {
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
 	if err := p.taskAgentImages(ctx, suite, conds, compat, m); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}

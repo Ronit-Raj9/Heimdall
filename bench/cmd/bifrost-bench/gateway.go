@@ -60,9 +60,14 @@ func providerSetups(cfg *lib.Config) []bifrost.ProviderSetup {
 	for _, s := range cfg.Gateway.KeySlots {
 		anth = append(anth, bifrost.Slot{Name: s, Value: s})
 	}
-	oa := make([]bifrost.Slot, 0, 4)
-	for i := 1; i <= 4; i++ {
-		n := fmt.Sprintf("oa-slot-%d", i)
+	oaNames := cfg.Gateway.OpenAIKeySlots // must match the fault proxy's --openai-slots
+	if len(oaNames) == 0 {
+		for i := 1; i <= 4; i++ {
+			oaNames = append(oaNames, fmt.Sprintf("oa-slot-%d", i))
+		}
+	}
+	oa := make([]bifrost.Slot, 0, len(oaNames))
+	for _, n := range oaNames {
 		oa = append(oa, bifrost.Slot{Name: n, Value: n})
 	}
 	return []bifrost.ProviderSetup{

@@ -221,8 +221,11 @@ func scanRunSecrets(dir string) error {
 		if agentOutput(dir, path) {
 			// The agent's own work is sealed byte for byte so it can be
 			// regraded; code like `password = "x"` is not a leak, so only
-			// real credential formats stop the seal here.
-			if utils.HasLiveCredentials(string(b)) {
+			// real credential formats stop the seal here. A private key the
+			// agent generated (a task that asks for a key pair or a
+			// certificate) is its work, not a leak: before, such a run
+			// could never seal (live run e_live_l10_tb2_m7r2).
+			if utils.HasLiveAPICredentials(string(b)) {
 				return fmt.Errorf("credential in agent output %s: %w", filepath.Base(path), schemas.ErrSealMismatch)
 			}
 			continue

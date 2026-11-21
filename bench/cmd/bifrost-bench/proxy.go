@@ -28,6 +28,7 @@ func runProxy(args []string) int {
 	ledger := fs.String("ledger", envOr("BENCH_FAULTPROXY_LEDGER", "faultproxy.ledger.jsonl"), "ledger file path")
 	_ = fs.String("config", "", "bench config (accepted for compose; the proxy reads only its flags and environment)")
 	slots := fs.String("slots", "fp-slot-1,fp-slot-2,fp-slot-3,fp-slot-4", "comma-separated key slots; each slot's placeholder key value equals its name")
+	openaiSlots := fs.String("openai-slots", envOr("BENCH_FAULTPROXY_OPENAI_SLOTS", ""), "comma-separated key slots of the openai provider (empty: oa-slot-1..4); keep in step with gateway.openai_key_slots")
 	debug := fs.Bool("debug", false, "debug logging")
 	if err := fs.Parse(args); err != nil {
 		return exitUsage
@@ -49,11 +50,7 @@ func runProxy(args []string) int {
 		}
 		cfg.Providers = list
 	}
-	for _, s := range strings.Split(*slots, ",") {
-		if s = strings.TrimSpace(s); s != "" {
-			cfg.Slots = append(cfg.Slots, faultproxy.SlotConfig{Name: s, Auth: s})
-		}
-	}
+	cfg.Slots = proxySlots(*slots, *openaiSlots)
 	if *upstream != "scripted" && cfg.UpstreamKey == "" {
 		return fail("upstream %s needs ANTHROPIC_API_KEY in the environment", *upstream)
 	}
@@ -80,4 +77,22 @@ func defaultUpstream() string {
 		return "https://api.anthropic.com"
 	}
 	return "scripted"
+}
+
+// proxySlots turns the --slots (anthropic) and --openai-slots lists into the
+// proxy's slot table. An empty openai list leaves openai on its default
+// oa-slot-1..4 (faultproxy.DefaultSlots); a non-empty one replaces them.
+func proxySlots(anthropic, openai string) []faultproxy.SlotConfig {
+	var out []faultproxy.SlotConfig
+	for _, s := range strings.Split(anthropic, ",") {
+		if s = strings.TrimSpace(s); s != "" {
+			out = append(out, faultproxy.SlotConfig{Name: s, Auth: s})
+		}
+	}
+	for _, s := range strings.Split(openai, ",") {
+		if s = strings.TrimSpace(s); s != "" {
+			out = append(out, faultproxy.SlotConfig{Name: s, Auth: s, Provider: faultproxy.ProviderOpenAI})
+		}
+	}
+	return out
 }

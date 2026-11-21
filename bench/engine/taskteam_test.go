@@ -251,3 +251,15 @@ func TestPlanChecksCompatibilityTaskTeams(t *testing.T) {
 		t.Fatalf("plan err %v, want the compatibility task-team refusal", err)
 	}
 }
+
+// TestRaiseSlotsHint: openai's key slots are not gateway.key_slots (that list
+// is the default provider's), so a team refused on openai names the setting
+// that adds openai slots (seen live with a 5-member MARBLE team on 21 Nov 2026).
+func TestRaiseSlotsHint(t *testing.T) {
+	if got := raiseSlotsHint("openai"); !strings.Contains(got, "gateway.openai_key_slots") || !strings.Contains(got, "--openai-slots") {
+		t.Fatalf("openai hint %q", got)
+	}
+	if got := raiseSlotsHint("anthropic"); got != "raise gateway.key_slots" {
+		t.Fatalf("anthropic hint %q", got)
+	}
+}

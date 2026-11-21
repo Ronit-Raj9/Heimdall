@@ -140,7 +140,12 @@ func TestSealScansAgentOutputForCredentialsOnly(t *testing.T) {
 		{name: "state with a leaked bench canary", file: "state/mailbox/messages.jsonl", body: `{"body":"key sk-bench-canary-` + utils.NewNonce() + `"}` + "\n", sealed: true},
 		{name: "diff with a canary and a real key", file: "workspace.diff", body: "+K=sk-team-canary-" + utils.NewNonce() + "\n+OPENAI_API_KEY = \"sk-proj-abcdefghijklmnopqrstuvwxyz0123456789\"\n", sealed: false},
 		{name: "diff with a canary-looking key of the wrong shape", file: "workspace.diff", body: "+K=sk-team-canary-" + utils.NewNonce() + "x\n", sealed: false},
-		{name: "artifact with private key", file: "artifacts/id_rsa", body: "-----BEGIN RSA PRIVATE KEY-----\n", sealed: false},
+		// Live run e_live_l10_tb2_m7r2 (terminal-bench openssl-selfsigned-cert):
+		// the task asks the agent for a key and a certificate, so its diff
+		// holds a private key it generated; that run must seal.
+		{name: "artifact with private key", file: "artifacts/id_rsa", body: "-----BEGIN RSA PRIVATE KEY-----\n", sealed: true},
+		{name: "diff with a generated private key", file: "workspace.diff", body: "+++ b/ssl/server.key\n+-----BEGIN PRIVATE KEY-----\n+MIIEvQ\n+-----END PRIVATE KEY-----\n", sealed: true},
+		{name: "diff with a private key and an AWS key id", file: "workspace.diff", body: "+-----BEGIN PRIVATE KEY-----\n+AKIAABCDEFGHIJKLMNOP\n", sealed: false},
 		{name: "bench file with password assignment", file: "events.jsonl", body: "password = \"x\"\n", sealed: false},
 		// Live pilot e_pilot_sol_7yol: the model wrote `def _parse_event(token: str)`.
 		{name: "agent stream with typed token parameter", file: "agent.stream.jsonl", body: `{"text":"def _parse_event(token: str) -> dict:"}` + "\n", sealed: true},
