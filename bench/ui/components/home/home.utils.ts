@@ -1,4 +1,4 @@
-import type { ExperimentStatus, LiveEvent, SuiteSummary } from "@/lib/types/bench";
+import type { ExperimentStatus, LiveEvent, RunListRow, SuiteSummary } from "@/lib/types/bench";
 
 /** Experiments whose slots are still being run or analyzed. */
 export const LIVE_STATES: ReadonlySet<ExperimentStatus["state"]> = new Set(["running", "analyzing"]);
@@ -63,4 +63,59 @@ export function suiteAdmission(suite: SuiteSummary): {
 	const tone =
 		suite.lock_state === "locked" && admitted === total && total > 0 ? "good" : suite.lock_state === "stale" ? "warn" : "neutral";
 	return { admitted, total, share, tone };
+}
+/** A suite reads as Ready when it loaded, is locked and every task is admitted; anything else needs attention. */
+export function suiteReady(suite: SuiteSummary): boolean {
+	return suiteAdmission(suite).tone === "good";
+}
+
+const DAY_MS = 86_400_000;
+
+function at(value: string | undefined | null): number {
+	const ms = value ? Date.parse(value) : Number.NaN;
+	return Number.isFinite(ms) ? ms : Number.NaN;
+}
+
+/** First day of the month `now` falls in, local time. */
+export function monthStart(now: Date): Date {
+	return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+export interface HomeStats {
+	experiments: number;
+	running: number;
+	/** Runs started in the last seven days, from the newest page of the run list. */
+	runsWeek: number;
+	/** Counted, sealed runs and how many of them passed. */
+	graded: number;
+	passed: number;
+	/** Share of graded runs that passed, or null with none graded. */
+	passRate: number | null;
+	/** Spend of the experiments started (or frozen) this month, in USD. */
+	spendMonth: number;
+}
+
+/** Home's KPI row, read from the experiment list and the newest page of runs. */
+export function homeStats(
+	experiments: readonly ExperimentStatus[],
+	runs: readonly RunListRow[],
+	now: Date = new Date(),
+): HomeStats {
+	const weekAgo = now.getTime() - 7 * DAY_MS;
+	const month = monthStart(now).getTime();
+	const runsWeek = runs.filter((run) => at(run.started ?? run.sealed_at) >= weekAgo).length;
+	const graded = runs.filter((run) => run.sealed && run.counted);
+	const passed = graded.filter((run) => run.outcome === "pass").length;
+	const spendMonth = experiments
+		.filter((exp) => at(exp.started_at ?? exp.frozen_at) >= month)
+		.reduce((sum, exp) => sum + (typeof exp.spent_usd?.v === "number" ? exp.spent_usd.v : 0), 0);
+	return {
+		experiments: experiments.length,
+		running: experiments.filter((exp) => LIVE_STATES.has(exp.state)).length,
+		runsWeek,
+		graded: graded.length,
+		passed,
+		passRate: graded.length > 0 ? passed / graded.length : null,
+		spendMonth,
+	};
 }

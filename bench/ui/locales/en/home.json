@@ -1,0 +1,59 @@
+{
+	"greeting": {
+		"morning": "Good morning",
+		"afternoon": "Good afternoon",
+		"evening": "Good evening",
+		"named": "{{greeting}}, {{name}}"
+	},
+	"subtitle": "Your benchmarks at a glance.",
+	"cta": {
+		"run": "Run a benchmark",
+		"newExperiment": "New experiment"
+	},
+	"kpi": {
+		"experiments": "Experiments",
+		"experimentsHint_one": "{{count}} running",
+		"experimentsHint_other": "{{count}} running",
+		"runsWeek": "Runs this week",
+		"runsWeekHint": "Last 7 days",
+		"passRate": "Pass rate",
+		"passRateHint": "{{pass}} of {{total}} runs passed",
+		"passRateNone": "No graded runs yet",
+		"spend": "Spend this month",
+		"spendHint": "Since {{date}}"
+	},
+	"running": {
+		"title": "Running now",
+		"empty": "Nothing is running right now.",
+		"progress": "{{done}} of {{total}} runs",
+		"watch": "Watch live",
+		"waiting": "Waiting for the first event",
+		"loadError": "Lost the live feed. Retrying.",
+		"spent": "{{amount}} spent"
+	},
+	"recent": {
+		"title": "Recent experiments",
+		"viewAll": "View all",
+		"empty": "No finished experiments yet.",
+		"pending": "No verdict",
+		"unavailable": "Unavailable",
+		"notStarted": "Not started"
+	},
+	"suites": {
+		"title": "Suites",
+		"viewAll": "View all",
+		"empty": "No suites yet. Add one from the catalog.",
+		"browse": "Browse the catalog",
+		"tasks_one": "{{count}} task",
+		"tasks_other": "{{count}} tasks",
+		"ready": "Ready",
+		"attention": "Needs attention",
+		"failed": "Failed to load"
+	},
+	"onboarding": {
+		"title": "Get your first verdict in five minutes",
+		"body": "Pick a suite, an agent and a model. We run a small benchmark and tell you what changed.",
+		"open": "Start the wizard",
+		"viewer": "No experiments yet. Ask a member to run the first benchmark."
+	}
+}
