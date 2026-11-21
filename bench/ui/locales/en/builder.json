@@ -1,0 +1,82 @@
+{
+	"mode": {
+		"label": "Builder",
+		"matrix": "Compare agents and models",
+		"ab": "A/B config change",
+		"abHint": "Change one agent setting and test it against the baseline."
+	},
+	"sections": {
+		"what": "Suite and name",
+		"agents": "Agents",
+		"agentsHint": "Pick one agent to compare models on it, or several to compare agents.",
+		"models": "Models",
+		"modelsHint": "Every agent runs with every model. Leave empty to use each agent's own model.",
+		"size": "Run size",
+		"limits": "Budget and limits"
+	},
+	"fields": {
+		"name": "Experiment name",
+		"suite": "Suite",
+		"suiteOption": "{{id}}@{{version}} ({{count}} tasks)",
+		"agentModel": "own model: {{model}}",
+		"addModel": "Add model",
+		"removeModel": "Remove model {{n}}",
+		"allowUnpriced": "Allow models without a price (cost per success will be unknown)",
+		"tasksFirst": "First",
+		"tasksFirstSuffix": "tasks of {{count}}",
+		"tasksAll": "All {{count}} tasks",
+		"trials": "Trials per task",
+		"adaptive": "Adaptive trials",
+		"adaptiveHint": "Stop a task early once every arm agrees on it. Trials becomes the maximum.",
+		"adaptiveMin": "Minimum trials",
+		"probes": "Extra conditions (probes)",
+		"probesHint": "clean always runs. Each probe adds a condition with the same tasks.",
+		"totalUsd": "Budget (USD)",
+		"concurrency": "Concurrency",
+		"seed": "Seed",
+		"runnerPool": "Runner pool",
+		"token": "Write token",
+		"tokenHint": "Local mode: plan, estimate and run are writes. The token stays in this tab.",
+		"tokenPlaceholder": "paste the serve write token"
+	},
+	"preview": {
+		"title": "Matrix preview",
+		"description": "The arms the planner will create, in order. Arm A is the baseline of the paired verdict.",
+		"arms": "{{count}} arms",
+		"runs": "up to {{runs}} runs ({{arms}} arms x {{conditions}} conditions x {{tasks}} tasks x {{trials}} trials)",
+		"empty": "Pick at least one agent and fill in a model to see the arms."
+	},
+	"actions": {
+		"estimate": "Estimate cost",
+		"plan": "Plan",
+		"run": "Run experiment",
+		"needsToken": "Enter the write token to estimate, plan and run.",
+		"needsPlan": "Plan the experiment first: the plan checks it and shows its power.",
+		"planStale": "The form changed after planning. Plan again before running.",
+		"blocked": "The plan has errors. Fix them and plan again.",
+		"invalid": "Fix the highlighted fields first.",
+		"planError": "Planning failed",
+		"estimateError": "Estimate failed",
+		"createError": "Could not create the experiment",
+		"startError": "Experiment {{id}} was created but did not start. Use Start on its page to try again."
+	},
+	"estimate": {
+		"title": "Estimate"
+	},
+	"errors": {
+		"nameRequired": "Give the experiment a name.",
+		"suiteRequired": "Pick a suite.",
+		"agentRequired": "Pick at least one agent.",
+		"modelEmpty": "Type a model name, or pick a second agent.",
+		"modelDuplicate": "This model is already listed.",
+		"tooFewArms": "A comparison needs at least 2 arms: add a model or an agent.",
+		"tooManyArms": "At most 26 arms: remove some agents or models.",
+		"taskCountRange": "Pick between 1 and the number of tasks in the suite.",
+		"trialsRange": "Trials must be a whole number from 1 to 50.",
+		"adaptiveTrials": "Adaptive trials need at least 2 trials per task.",
+		"adaptiveMin": "Minimum must be at least 1 and below the trials.",
+		"budgetPositive": "Set a budget above 0.",
+		"concurrencyRange": "Concurrency must be from 1 to 64.",
+		"seedInt": "The seed is a whole number, 0 or more."
+	}
+}
