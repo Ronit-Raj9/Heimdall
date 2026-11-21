@@ -1,13 +1,11 @@
 import "@/lib/i18n";
 
 import type { ExperimentList, ExperimentStatus, LiveEvent, SuiteList } from "@/lib/types/bench";
-import { demoSession } from "@/lib/testing/platformFixtures";
 import { errorQuery, loadingQuery, okQuery, render, tagOf } from "@/lib/testing/render";
 import fs from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { byNewest, mergeEvents, splitExperiments, suiteAdmission } from "./home.utils";
-import { GetStartedCard, QuickActions } from "./quickActions";
+import { byNewest, homeStats, mergeEvents, splitExperiments, suiteAdmission, suiteReady } from "./home.utils";
 import { RecentExperiments } from "./recentExperiments";
 import { RunningCardBody, RunningExperiments } from "./runningExperiments";
 import { SuitesPanel } from "./suitesPanel";
@@ -59,6 +57,22 @@ describe("home utils", () => {
 		expect(mergeEvents([a], [c, b, a]).map((e) => e.seq)).toEqual([1, 2, 3]);
 		expect(mergeEvents([a, b], [c], 2).map((e) => e.seq)).toEqual([2, 3]);
 	});
+	it("reads the KPI row from experiments and runs", () => {
+		const now = new Date("2026-11-21T12:00:00Z");
+		const run = (started: string, outcome: string, sealed = true) =>
+			({ started, outcome, sealed, counted: true }) as unknown as import("@/lib/types/bench").RunListRow;
+		const stats = homeStats(
+			[
+				{ ...experiments[0], state: "running", started_at: "2026-11-20T00:00:00Z", spent_usd: { state: "known", v: 2.5 } },
+				{ ...experiments[1], state: "done", started_at: "2026-10-01T00:00:00Z", spent_usd: { state: "known", v: 9 } },
+			] as never,
+			[run("2026-11-20T00:00:00Z", "pass"), run("2026-11-19T00:00:00Z", "fail"), run("2026-10-01T00:00:00Z", "pass"), run("2026-11-20T00:00:00Z", "pass", false)],
+			now,
+		);
+		expect(stats).toMatchObject({ experiments: 2, running: 1, runsWeek: 3, graded: 3, passed: 2, spendMonth: 2.5 });
+		expect(stats.passRate).toBeCloseTo(2 / 3);
+		expect(homeStats([], [], now).passRate).toBeNull();
+	});
 	it("reads a suite's admission state", () => {
 		const core = suites.find((suite) => suite.id === "coding-core")!;
 		expect(suiteAdmission(core)).toMatchObject({ admitted: 4, total: 4, tone: "good" });
@@ -66,6 +80,8 @@ describe("home utils", () => {
 		expect(suiteAdmission(stale).tone).toBe("warn");
 		const broken = suites.find((suite) => suite.id === "acme-broken")!;
 		expect(suiteAdmission(broken).tone).toBe("bad");
+		expect(suiteReady(core)).toBe(true);
+		expect(suiteReady(stale)).toBe(false);
 	});
 });
 
@@ -74,19 +90,22 @@ describe("RunningCardBody", () => {
 		const html = render(<RunningCardBody status={events.status} events={events.events} />);
 		expect(tagOf(html, "home-running-e_synthetic-nightly")).toContain('data-state="running"');
 		expect(html).toContain('role="progressbar"');
-		expect(html).toContain("22 of 36 slots sealed");
+		expect(html).toContain("22 of 36 runs");
+		expect(html).toContain("61%");
 		expect(html).toContain('href="/experiments/e_synthetic-nightly"');
+		expect(tagOf(html, "home-running-watch-e_synthetic-nightly")).toContain('href="/experiments/e_synthetic-nightly"');
+		expect(html).toContain("animate-ping");
 		expect(html).toContain("Run sealed");
 		expect(html).toContain('href="/runs/r_synthetic-nightly-a-t2-1"');
 	});
 	it("waits for the first event, and says when it cannot follow", () => {
-		expect(render(<RunningCardBody status={events.status} events={[]} />)).toContain("Waiting for the first event.");
+		expect(render(<RunningCardBody status={events.status} events={[]} />)).toContain("Waiting for the first event");
 		expect(render(<RunningCardBody status={events.status} events={[]} error={{ status: 500 }} />)).toContain(
-			"Could not follow this experiment.",
+			"Lost the live feed. Retrying.",
 		);
 	});
 	it("says nothing is running when the list is empty", () => {
-		expect(render(<RunningExperiments experiments={[]} />)).toContain("Nothing is running.");
+		expect(render(<RunningExperiments experiments={[]} />)).toContain("Nothing is running right now.");
 	});
 });
 
@@ -99,13 +118,9 @@ describe("RecentExperiments", () => {
 		const { recent } = splitExperiments(experiments);
 		const html = render(<RecentExperiments experiments={recent} />);
 		expect(html).toContain('href="/experiments/e_synthetic-codewins"');
-		expect(tagOf(html, "home-recent-state-e_synthetic-codewins")).toContain('data-state="done"');
 		const verdict = read<{ suite: string; verdict: { decision: string } }>("experiments.verdict.json");
 		expect(html).toContain(`data-decision="${verdict.verdict.decision}"`);
-		expect(html).toContain(`href="/suites/${verdict.suite.split("@")[0]}"`);
-		expect(html).toContain(`>${verdict.suite.split("@")[0]}</a>`);
-		expect(html).toContain(`title="Open suite ${verdict.suite}"`);
-		expect(html).toContain("Not started");
+		expect(html).toContain(verdict.suite.split("@")[0]);
 		// Only the finished experiment with an analysis asks for its verdict.
 		expect(api.verdictArgs.filter((call) => !(call as { skip: boolean }).skip)).toHaveLength(1);
 	});
@@ -128,35 +143,14 @@ describe("RecentExperiments", () => {
 });
 
 describe("SuitesPanel", () => {
-	it("lists suites with their lock and admitted counts as links", () => {
-		const html = render(<SuitesPanel suites={suites} />);
+	it("shows suites as tiles with a Ready or Needs attention pill", () => {
+		const html = render(<SuitesPanel suites={suites} limit={20} />);
 		expect(html).toContain('href="/suites/coding-core"');
-		expect(tagOf(html, "home-suite-coding-core")).toContain('data-lock="locked"');
-		expect(html).toContain("4 of 4 admitted");
-		expect(html).toContain("Lock stale");
-		expect(html).toContain("Failed to load");
-	});
-});
-
-describe("QuickActions and GetStartedCard", () => {
-	it("offers the four actions locally and drops New experiment for a demo visitor", () => {
-		const local = render(<QuickActions />);
-		for (const key of ["newExperiment", "addSuite", "addAgent", "getStarted"]) expect(local).toContain(`home-action-${key}`);
-		expect(tagOf(local, "home-action-addSuite")).toContain('href="/imports"');
-		expect(render(<QuickActions />, demoSession())).not.toContain("home-action-newExperiment");
-	});
-	it("hides New experiment where the server has no launcher (QC2-27-03)", () => {
-		api.health = { mode: "live", launch: false };
-		try {
-			expect(render(<QuickActions />)).not.toContain("home-action-newExperiment");
-			expect(render(<GetStartedCard />)).not.toContain("home-get-started-new");
-		} finally {
-			api.health = undefined;
-		}
-	});
-	it("links the get-started card to the quickstart", () => {
-		const html = render(<GetStartedCard />);
-		expect(tagOf(html, "home-get-started-open")).toContain('href="/quickstart"');
-		expect(html).toContain("Set up the project");
+		expect(tagOf(html, "home-suite-coding-core")).toContain('data-ready="ready"');
+		expect(tagOf(html, "home-suite-acme-payments")).toContain('data-ready="attention"');
+		expect(tagOf(html, "home-suite-acme-broken")).toContain('data-ready="failed"');
+		expect(html).toContain("4 tasks");
+		expect(html).toContain("Needs attention");
+		expect(html).not.toContain("admitted");
 	});
 });

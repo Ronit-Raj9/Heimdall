@@ -2,7 +2,6 @@
 // with ?since= so each poll carries only new events plus the current status. Polling slows down
 // while the tab is hidden and stops once the experiment reaches a terminal state.
 import { TERMINAL_STATES } from "@/components/experiments/experiments.utils";
-import { EXPERIMENT_POLL_MS } from "@/lib/store/apis/benchApi";
 import { homeApi } from "@/lib/store/apis/homeApi";
 import { useAppDispatch } from "@/lib/store/hooks";
 import type { ExperimentStatus, LiveEvent } from "@/lib/types/bench";
@@ -11,6 +10,8 @@ import { mergeEvents } from "./home.utils";
 
 /** Poll interval while the tab is hidden. */
 const HIDDEN_POLL_MS = 15_000;
+/** Poll interval while the tab is visible: the experiment progress endpoint every 3 s. */
+export const LIVE_POLL_MS = 3_000;
 
 export interface ExperimentEventsState {
 	status: ExperimentStatus;
@@ -49,7 +50,7 @@ export function useExperimentEvents(initial: ExperimentStatus, onFinished?: () =
 				setState((prev) => ({ ...prev, error: result.error }));
 			}
 			const hidden = typeof document !== "undefined" && document.visibilityState === "hidden";
-			timer = window.setTimeout(() => void poll(), hidden ? HIDDEN_POLL_MS : EXPERIMENT_POLL_MS);
+			timer = window.setTimeout(() => void poll(), hidden ? HIDDEN_POLL_MS : LIVE_POLL_MS);
 		};
 		void poll();
 		return () => {

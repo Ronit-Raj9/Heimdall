@@ -1,110 +1,172 @@
 import { formatRelative, formatWhen } from "@/components/platform/platform.utils";
-import { EntityLink, StatusBadge } from "@/components/shell";
+import { suiteIdOf } from "@/components/shell";
 import { ValueCell } from "@/components/valueCell";
 import { getLocale } from "@/lib/i18n";
 import type { ExperimentStatus, LiveEvent } from "@/lib/types/bench";
+import "@/lib/types/homeI18n";
 import { cn } from "@/lib/utils";
-import { CircleAlert } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Activity, ArrowRight, CircleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { LiveDot, TrackBadge } from "./homeBits";
 import { slotShares } from "./home.utils";
 import { useExperimentEvents } from "./useExperimentEvents";
 
 const KNOWN_EVENTS = new Set(["slot_started", "stage", "slot_sealed", "budget_stop", "experiment_done", "error", "end"]);
 
 /** Live progress of each running experiment, one card per experiment. */
-export function RunningExperiments({ experiments, onFinished }: { experiments: readonly ExperimentStatus[]; onFinished?: () => void }) {
-	const { t } = useTranslation("bench");
+export function RunningExperiments({
+	experiments,
+	onFinished,
+	trackOf,
+}: {
+	experiments: readonly ExperimentStatus[];
+	onFinished?: () => void;
+	/** The track of a suite id, for the card's category icon. */
+	trackOf?: (suite: string | undefined) => string | undefined;
+}) {
+	const { t } = useTranslation("home");
 	if (experiments.length === 0) {
 		return (
-			<p className="text-muted-foreground rounded-lg border border-dashed px-4 py-3 text-sm" data-testid="home-running-empty">
-				{t("home.running.empty")}
-			</p>
+			<div
+				className="text-muted-foreground flex items-center gap-3 rounded-xl border border-dashed px-5 py-4 text-sm"
+				data-testid="home-running-empty"
+			>
+				<span className="bg-muted flex size-8 items-center justify-center rounded-full">
+					<Activity className="size-4" aria-hidden="true" />
+				</span>
+				{t("running.empty")}
+			</div>
 		);
 	}
 	return (
-		<ul className="grid gap-3 lg:grid-cols-2" data-testid="home-running-list">
+		<ul className="grid gap-4 md:grid-cols-2" data-testid="home-running-list">
 			{experiments.map((exp) => (
 				<li key={exp.exp_id} className="min-w-0">
-					<RunningCard initial={exp} onFinished={onFinished} />
+					<RunningCard initial={exp} onFinished={onFinished} track={trackOf?.(exp.suite)} />
 				</li>
 			))}
 		</ul>
 	);
 }
 
-/** One running experiment: state, the slot bar, spend, and the newest event, polled live. */
-export function RunningCard({ initial, onFinished }: { initial: ExperimentStatus; onFinished?: () => void }) {
+/** One running experiment, polled live every few seconds. */
+export function RunningCard({ initial, onFinished, track }: { initial: ExperimentStatus; onFinished?: () => void; track?: string }) {
 	const { status, events, error } = useExperimentEvents(initial, onFinished);
-	return <RunningCardBody status={status} events={events} error={error} />;
+	return <RunningCardBody status={status} events={events} error={error} track={track} />;
 }
 
-export function RunningCardBody({ status, events, error }: { status: ExperimentStatus; events: readonly LiveEvent[]; error?: unknown }) {
-	const { t } = useTranslation("bench");
+/** The card itself: name, live dot, progress bar with counts and spend, and the newest event. */
+export function RunningCardBody({
+	status,
+	events,
+	error,
+	track,
+}: {
+	status: ExperimentStatus;
+	events: readonly LiveEvent[];
+	error?: unknown;
+	track?: string;
+}) {
+	const { t } = useTranslation("home");
+	const { t: tb } = useTranslation("bench");
 	const locale = getLocale();
 	const { total, done, running, failed } = status.slots;
 	const shares = slotShares(status.slots);
+	const sealed = done + failed;
+	const percent = total > 0 ? Math.round((sealed / total) * 100) : 0;
 	const last = events.length > 0 ? events[events.length - 1] : undefined;
+	const title = status.name || status.exp_id;
+	const live = status.state === "running" || status.state === "analyzing";
 
 	return (
 		<article
-			className="bg-card flex h-full min-w-0 flex-col gap-3 rounded-lg border p-4 shadow-(--shadow-card)"
+			className="bg-card group flex h-full min-w-0 flex-col gap-4 rounded-xl border p-5 shadow-(--shadow-card) transition-shadow hover:shadow-md"
 			data-testid={`home-running-${status.exp_id}`}
 			data-state={status.state}
-			aria-label={status.name || status.exp_id}
+			aria-label={title}
 		>
-			<div className="flex min-w-0 items-start gap-2">
+			<div className="flex min-w-0 items-start gap-3">
+				<TrackBadge track={track} />
 				<div className="flex min-w-0 flex-1 flex-col gap-0.5">
-					<EntityLink kind="experiment" id={status.exp_id} className="truncate text-sm font-medium no-underline">
-						{status.name || status.exp_id}
-					</EntityLink>
-					{status.name && (
-						<span className="text-muted-foreground truncate font-mono text-[11px]" title={status.exp_id}>
-							{status.exp_id}
-						</span>
-					)}
+					<Link
+						to="/experiments/$expId"
+						params={{ expId: status.exp_id }}
+						className="text-foreground focus-visible:ring-ring/60 truncate rounded-sm text-base font-semibold tracking-tight hover:underline focus-visible:ring-2 focus-visible:outline-none"
+						title={status.exp_id}
+					>
+						{title}
+					</Link>
+					{status.suite && <span className="text-muted-foreground truncate text-xs">{suiteIdOf(status.suite)}</span>}
 				</div>
-				<StatusBadge state={status.state} testId={`home-running-state-${status.exp_id}`} />
+				<span
+					className="bg-chart-info/12 text-chart-info-ink inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium"
+					data-testid={`home-running-state-${status.exp_id}`}
+					data-state={status.state}
+				>
+					{live && <LiveDot className="size-1.5" />}
+					{tb(`shell.status.state.${status.state}` as never)}
+				</span>
 			</div>
-			<div className="flex flex-col gap-1.5">
+
+			<div className="flex flex-col gap-2">
+				<div className="flex items-baseline justify-between gap-3">
+					<span className="text-foreground text-2xl font-semibold tracking-tight tabular-nums">{percent}%</span>
+					<span className="text-muted-foreground text-xs tabular-nums" data-testid={`home-running-slots-${status.exp_id}`}>
+						{t("running.progress", { done: sealed, total })}
+					</span>
+				</div>
 				<div
 					className="bg-chart-track flex h-2 w-full overflow-hidden rounded-full"
 					role="progressbar"
 					aria-valuemin={0}
 					aria-valuemax={total}
-					aria-valuenow={done + failed}
-					aria-label={t("home.running.slotsDetail", { done, running, failed, total })}
+					aria-valuenow={sealed}
+					aria-label={tb("home.running.slotsDetail", { done, running, failed, total })}
 				>
-					<div className="bg-chart-success h-full transition-[width] duration-500" style={{ width: shares.done }} />
-					<div className="bg-chart-error h-full transition-[width] duration-500" style={{ width: shares.failed }} />
+					<div className="bg-chart-success h-full transition-[width] duration-700 ease-out" style={{ width: shares.done }} />
+					<div className="bg-chart-error h-full transition-[width] duration-700 ease-out" style={{ width: shares.failed }} />
 					<div
-						className="bg-chart-info h-full animate-pulse transition-[width] duration-500 motion-reduce:animate-none"
+						className="bg-chart-info h-full animate-pulse transition-[width] duration-700 ease-out motion-reduce:animate-none"
 						style={{ width: shares.running }}
 					/>
 				</div>
-				<div className="text-muted-foreground flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs tabular-nums">
-					<span data-testid={`home-running-slots-${status.exp_id}`} title={t("home.running.slotsDetail", { done, running, failed, total })}>
-						{t("home.running.slots", { done: done + failed, total })}
-					</span>
-					<span className="flex items-baseline gap-1.5">
-						{t("home.running.spent")}
-						<ValueCell value={status.spent_usd} kind="usd" className="text-foreground" />
-					</span>
-				</div>
 			</div>
+
 			<div
-				className="border-border/70 mt-auto flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 border-t pt-2.5 text-xs"
+				className="bg-muted/50 flex min-h-9 min-w-0 items-center gap-2 rounded-lg px-3 py-2 text-xs"
 				data-testid={`home-running-last-${status.exp_id}`}
+				aria-live="polite"
 			>
 				{error && !last ? (
-					<span className="text-chart-error-ink flex items-center gap-1.5">
-						<CircleAlert className="size-3.5" aria-hidden="true" />
-						{t("home.running.loadError")}
+					<span className="text-chart-error-ink flex min-w-0 items-center gap-1.5">
+						<CircleAlert className="size-3.5 shrink-0" aria-hidden="true" />
+						<span className="truncate">{t("running.loadError")}</span>
 					</span>
 				) : last ? (
 					<LastEvent event={last} locale={locale} />
 				) : (
-					<span className="text-muted-foreground">{t("home.running.noEvents")}</span>
+					<span className="text-muted-foreground flex items-center gap-2">
+						<LiveDot className="size-1.5" />
+						{t("running.waiting")}
+					</span>
 				)}
+			</div>
+
+			<div className="mt-auto flex items-center justify-between gap-3 text-xs">
+				<span className="text-muted-foreground flex items-baseline gap-1 tabular-nums">
+					<ValueCell value={status.spent_usd} kind="usd" className="text-foreground font-medium" />
+					<span>{tb("home.running.spent").toLowerCase()}</span>
+				</span>
+				<Link
+					to="/experiments/$expId"
+					params={{ expId: status.exp_id }}
+					className="text-primary focus-visible:ring-ring/60 inline-flex items-center gap-1 rounded-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
+					data-testid={`home-running-watch-${status.exp_id}`}
+				>
+					{t("running.watch")}
+					<ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
+				</Link>
 			</div>
 		</article>
 	);
@@ -118,15 +180,19 @@ function LastEvent({ event, locale }: { event: LiveEvent; locale: string }) {
 				stage: event.stage ?? "",
 			})
 		: event.kind;
+	const text = `${label}${event.message ? `: ${event.message}` : ""}`;
 	return (
 		<>
-			<span className="text-muted-foreground shrink-0">{t("home.running.last")}</span>
-			<span className={cn("min-w-0", event.kind === "error" ? "text-chart-error-ink" : "text-foreground")}>
-				{label}
-				{event.message ? `: ${event.message}` : ""}
+			<span className={cn("size-1.5 shrink-0 rounded-full", event.kind === "error" ? "bg-chart-error" : "bg-chart-info")} aria-hidden="true" />
+			<span className={cn("min-w-0 truncate", event.kind === "error" ? "text-chart-error-ink" : "text-foreground")} title={text}>
+				{event.run_id ? (
+					<Link to="/runs/$runId" params={{ runId: event.run_id }} className="hover:underline">
+						{text}
+					</Link>
+				) : (
+					text
+				)}
 			</span>
-			{event.run_id && <EntityLink kind="run" id={event.run_id} short={14} className="shrink-0 text-[11px]" />}
-			{event.outcome && <span className="text-muted-foreground shrink-0">{event.outcome}</span>}
 			<time
 				className="text-muted-foreground ml-auto shrink-0 tabular-nums"
 				dateTime={event.at}
