@@ -60,6 +60,13 @@ var V1Routes = []V1Route{
 	v1("GET", "/agents/{id}/compatibility", "/agents/{id}/compatibility"),
 	v1("GET", "/agents/{id}/report-card", "/agents/{id}/report-card"),
 
+	v1("GET", "/connect/failures", "/connect/failures"),
+	v1("POST", "/connect/detect", "/connect/detect"),
+	v1("POST", "/connect/agents", "/connect/agents"),
+	v1("POST", "/connect/verify", "/connect/verify"),
+	v1("GET", "/connect/verify/{id}", "/connect/verify/{id}"),
+	v1("POST", "/connect/first-look", "/connect/first-look"),
+
 	v1("GET", "/benchmarks", "/suites"),
 	v1("GET", "/benchmarks/catalog", "/benchmarks/catalog"),
 	v1("GET", "/benchmarks/packs", "/evaluation-packs"),

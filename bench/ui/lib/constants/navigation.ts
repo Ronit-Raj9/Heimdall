@@ -91,7 +91,7 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 		id: "agents",
 		labelKey: "shell.groups.agents",
 		items: [
-			{ to: "/agents", labelKey: "shell.nav.agents", icon: Bot, testId: "nav-link-agents", also: ["/agents_"] },
+			{ to: "/agents", labelKey: "shell.nav.agents", icon: Bot, testId: "nav-link-agents", also: ["/agents_", "/connect"] },
 			{ to: "/leaderboard", labelKey: "shell.nav.leaderboard", icon: ListOrdered, testId: "nav-link-leaderboard", also: ["/trends"] },
 			{ to: "/improvements", labelKey: "shell.nav.improvements", icon: TrendingUp, testId: "nav-link-improvements" },
 		],

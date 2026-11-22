@@ -119,6 +119,8 @@ export interface EvaluationSpec {
 	stream?: { memory: "carry" | "fresh"; order?: "suite" | "seeded"; replay?: number; threshold?: number };
 	/** Tell the agent its budget and deadline (BENCH_BUDGET_USD, BENCH_DEADLINE). */
 	disclose_budget?: boolean;
+	/** first_look (lane Z01): 1 benchmark, 5 tasks, 1 trial, 5 at a time; too small for a verdict. */
+	preset?: "first_look";
 }
 
 /** What an evaluation must show to pass. Scores are fractions (0 to 1). */

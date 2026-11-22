@@ -68,7 +68,14 @@ type EvaluationSpec struct {
 	Stream *StreamSpec `json:"stream,omitempty"`
 	// DiscloseBudget tells the agent its budget and deadline.
 	DiscloseBudget bool `json:"disclose_budget,omitempty"`
+	// Preset is a named evaluation size. first_look (lane Z01, the Connect
+	// box): one benchmark, 5 tasks, 1 trial, clean only, score mode,
+	// concurrency 5; its report card says it is too small for a verdict.
+	Preset string `json:"preset,omitempty"`
 }
+
+// EvaluationPresetFirstLook is the first-look preset (EvaluationSpec.Preset).
+const EvaluationPresetFirstLook = "first_look"
 
 // EvaluationGate is what an evaluation must show to pass. Scores are
 // verified success rates (0 to 1) over clean runs, per capability.
