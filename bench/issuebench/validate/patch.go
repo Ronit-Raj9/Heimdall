@@ -133,6 +133,9 @@ func hunkAblations(patch string, limit int) []string {
 		if files[drop.file].Created || files[drop.file].Deleted {
 			continue // a half created or half deleted file does not apply
 		}
+		if docPath(files[drop.file].Path) {
+			continue // a fix without its changelog line is still the fix
+		}
 		var b strings.Builder
 		for fi, f := range files {
 			var kept []string
@@ -155,6 +158,26 @@ func hunkAblations(patch string, limit int) []string {
 		}
 	}
 	return out
+}
+
+// docPath says whether a patched file is documentation (a changelog, a
+// README, docs/): leaving its hunk out of the fix is no near miss, and the
+// readiness check refused every task whose fix had a changelog entry.
+func docPath(p string) bool {
+	p = strings.ToLower(strings.TrimPrefix(p, "./"))
+	base := p[strings.LastIndex(p, "/")+1:]
+	switch {
+	case strings.HasPrefix(p, "docs/") || strings.HasPrefix(p, "doc/") || strings.Contains(p, "/docs/"):
+		return true
+	case strings.HasSuffix(base, ".md") || strings.HasSuffix(base, ".rst") || (strings.HasSuffix(base, ".txt") && !strings.HasPrefix(base, "requirements")) || strings.HasSuffix(base, ".adoc"):
+		return true
+	}
+	for _, n := range []string{"changelog", "changes", "history", "news", "authors", "contributors", "readme"} {
+		if strings.HasPrefix(base, n) {
+			return true
+		}
+	}
+	return false
 }
 
 // addedLines are the "+" lines of a patch, without the plus sign.
