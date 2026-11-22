@@ -388,7 +388,11 @@ func estimateEvaluation(ctx context.Context, suites SuiteSource, src ForecastSou
 }
 
 func normalizeEvalRequest(req *EvalEstimateRequest) error {
-	if len(req.Arms) == 0 || len(req.Arms) > EvalMaxArms {
+	if req.Mode == schemas.EvaluationModeModelSwitch { // Z21: up to EvaluationModelSwitchMaxArms models
+		if len(req.Arms) < 2 || len(req.Arms) > schemas.EvaluationModelSwitchMaxArms {
+			return badf("arms: mode model_switch takes 2 to %d models, got %d", schemas.EvaluationModelSwitchMaxArms, len(req.Arms))
+		}
+	} else if len(req.Arms) == 0 || len(req.Arms) > EvalMaxArms {
 		return badf("arms: need 1 or %d arms, got %d", EvalMaxArms, len(req.Arms))
 	}
 	for i := range req.Arms {

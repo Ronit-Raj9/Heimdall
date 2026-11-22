@@ -4,7 +4,7 @@ import type { Evaluation, EvaluationArm, EvaluationChild } from "@/lib/store/api
 /** How often a running evaluation (and its running benchmarks) is polled. */
 export const EVALUATION_POLL_MS = 3000;
 
-const KNOWN_MODES = ["score", "versions", "models", "opponent"] as const;
+const KNOWN_MODES = ["score", "versions", "models", "opponent", "model_switch"] as const;
 const KNOWN_STATUSES = ["queued", "created", "running", "analyzing", "done", "failed", "cancelled", "skipped"] as const;
 
 /** The i18n key (evaluations namespace) of a mode in plain words. */

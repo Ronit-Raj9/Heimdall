@@ -242,6 +242,8 @@ func modeName(m string) string {
 		return "Model vs model"
 	case schemas.EvaluationModeOpponent:
 		return "Vs a baseline agent"
+	case schemas.EvaluationModeModelSwitch:
+		return "Models for one agent"
 	}
 	return m
 }
