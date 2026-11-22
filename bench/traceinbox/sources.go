@@ -96,8 +96,12 @@ type Source struct {
 	// Suite suggested for items from this source.
 	Suite string `yaml:"suite,omitempty"`
 	// MaxPerPull caps the sessions one pull fetches (default 200).
-	MaxPerPull int     `yaml:"max_per_pull,omitempty"`
-	Filters    Filters `yaml:"filters,omitempty"`
+	MaxPerPull int `yaml:"max_per_pull,omitempty"`
+	// GoldenPerDay caps the passing sessions (webhook pushes with passed:
+	// true) kept each day as golden candidates; unset is DefaultGoldenPerDay,
+	// 0 keeps none.
+	GoldenPerDay *int    `yaml:"golden_per_day,omitempty"`
+	Filters      Filters `yaml:"filters,omitempty"`
 }
 
 // Filters say which sessions are flagged. Each source reads the ones its
@@ -189,6 +193,21 @@ func LoadConfig(path string) (*Config, error) {
 	return c, nil
 }
 
+// DefaultGoldenPerDay is the daily golden sample of a source that sets none.
+const DefaultGoldenPerDay = 5
+
+// MaxGoldenPerDay is the largest daily golden sample a source may set.
+const MaxGoldenPerDay = 500
+
+// GoldenLimit is how many passing sessions of this source become golden
+// candidates each day.
+func (s *Source) GoldenLimit() int {
+	if s.GoldenPerDay == nil {
+		return DefaultGoldenPerDay
+	}
+	return *s.GoldenPerDay
+}
+
 // Find returns the source named name.
 func (c *Config) Find(name string) (*Source, bool) {
 	for i := range c.Sources {
@@ -247,6 +266,9 @@ func (s *Source) Validate() error {
 			return wrap("%s %q is not an environment variable name; secrets are named by variable, never written here", field, v)
 		}
 	}
+	if g := s.GoldenPerDay; g != nil && (*g < 0 || *g > MaxGoldenPerDay) {
+		return wrap("golden_per_day %d: want 0 to %d", *g, MaxGoldenPerDay)
+	}
 	if s.MaxPerPull < 0 || s.MaxPerPull > 5000 {
 		return wrap("max_per_pull %d: want 1 to 5000", s.MaxPerPull)
 	}
@@ -256,7 +278,7 @@ func (s *Source) Validate() error {
 		KindLangSmith: {"host", "api_key_env", "project", "workspace", "feedback", "errors"},
 		KindBifrost:   {"url", "ui_url", "token_env", "virtual_keys", "errors", "min_retries", "fallbacks", "budget"},
 		KindOTLPDir:   {"path", "pattern", "errors"},
-		KindWebhook:   {"token_env", "rate_per_minute", "max_bytes"},
+		KindWebhook:   {"token_env", "rate_per_minute", "max_bytes", "golden_per_day"},
 		KindMaxim:     {"host", "api_key_env", "workspace", "project", "errors", "evaluators"},
 	}
 	ok, known := allowed[s.Kind]
@@ -368,6 +390,7 @@ func (s *Source) usedFields() []string {
 	add("pattern", s.Pattern != "")
 	add("rate_per_minute", s.RatePerMinute != 0)
 	add("max_bytes", s.MaxBytes != 0)
+	add("golden_per_day", s.GoldenPerDay != nil)
 	f := s.Filters
 	add("scores", len(f.Scores) > 0)
 	add("feedback", f.Feedback != nil)

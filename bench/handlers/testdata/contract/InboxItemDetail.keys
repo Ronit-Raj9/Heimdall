@@ -2,3 +2,4 @@
 # Failure inbox (handlers/inbox.go, traceinbox, docs/failure-inbox.md). Change with bench.ts.
 item
 preview
+session?

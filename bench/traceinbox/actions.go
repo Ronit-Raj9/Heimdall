@@ -137,6 +137,13 @@ type AcceptOptions struct {
 	Kind   string // qa, tool-use, mcp or memory; empty takes the suite's template
 	TaskID string // empty: the item id
 	Force  bool   // replace an existing task folder
+	// Guide writes the task finished from "what should have happened";
+	// nil writes the EDIT ME draft.
+	Guide *traceimport.Guide
+	// SwitchGrader lets a guided tool-use or mcp accept move the suite to
+	// grader checks; Judge pins the reply judge with the switch.
+	SwitchGrader bool
+	Judge        *scaffold.JudgeConfig
 }
 
 // AcceptResult is what Accept wrote.
@@ -187,15 +194,25 @@ func (ib *Inbox) Accept(ctx context.Context, id string, opts AcceptOptions) (*Ac
 	if err != nil {
 		return nil, fmt.Errorf("suite %s: %w", opts.Suite, err)
 	}
+	switched, err := guidedGrader(suitePath, suiteBefore, opts)
+	if err != nil {
+		return nil, err
+	}
+	restoreSuite := func() error {
+		if !switched {
+			return nil
+		}
+		return os.WriteFile(suitePath, suiteBefore, 0o644)
+	}
 	src := traceimport.Source{File: "inbox item " + it.ID, SHA256: hex.EncodeToString(sum[:]), Format: sess.Format, Redacted: traceimport.Report(it.Redacted)}
 	if src.Redacted == nil {
 		src.Redacted = traceimport.Report{}
 	}
 	res, err := traceimport.WriteDraft(traceimport.DraftOptions{
-		SuiteDir: suiteDir, ID: taskID, Kind: opts.Kind, Force: opts.Force, Session: sess, Source: src, Replay: true,
+		SuiteDir: suiteDir, ID: taskID, Kind: opts.Kind, Force: opts.Force, Session: sess, Source: src, Replay: true, Guide: opts.Guide,
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(err, restoreSuite())
 	}
 	incident := schemas.TaskIncident{ID: it.ID, Source: it.Source, TraceID: it.TraceID, Link: it.Link,
 		FirstSeen: it.FirstSeen.UTC().Format(time.RFC3339), Signature: it.Signature}
@@ -203,10 +220,15 @@ func (ib *Inbox) Accept(ctx context.Context, id string, opts AcceptOptions) (*Ac
 	// leaves no registered draft behind (a retry then needs no -force).
 	rollback := func() error {
 		rmErr := os.RemoveAll(res.Dir)
-		if res.SuiteEdited {
+		if res.SuiteEdited || switched {
 			rmErr = errors.Join(rmErr, os.WriteFile(suitePath, suiteBefore, 0o644))
 		}
 		return rmErr
+	}
+	if opts.Guide != nil && (res.Template == traceimport.KindToolUse || res.Template == traceimport.KindMCP) && !switched {
+		if g := suiteGrader(suitePath); g != scaffold.ChecksGrader {
+			return nil, errors.Join(fmt.Errorf("%w: benchmark %s uses grader %s; a guided %s task is graded by its checks.yaml, so switch the benchmark to grader checks (switch_grader)", ErrConflict, opts.Suite, g, res.Template), rollback())
+		}
 	}
 	if err := markIncident(filepath.Join(res.Dir, "task.yaml"), incident); err != nil {
 		return nil, errors.Join(fmt.Errorf("mark the draft as an incident: %w", err), rollback())
@@ -382,4 +404,62 @@ func (ib *Inbox) transition(id, event, verb, detail string, change func(*Item)) 
 	}
 	_ = ib.Store.Log(LogEvent{At: now, Event: event, Item: id, Detail: detail})
 	return &out, nil
+}
+
+// guidedSuite is what a guided accept reads from suite.yaml.
+type guidedSuite struct {
+	Grader  string                `yaml:"grader"`
+	Grading string                `yaml:"grading"`
+	Judge   *scaffold.JudgeConfig `yaml:"judge"`
+}
+
+func suiteGrader(path string) string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	var s guidedSuite
+	_ = yaml.Unmarshal(raw, &s)
+	return s.Grader
+}
+
+// guidedGrader prepares the suite of a guided tool-use or mcp accept: such
+// a task is graded by its checks.yaml, so the suite must use grader checks
+// (switched with SwitchGrader), and a reply rubric needs a pinned judge. It
+// reports whether it rewrote suite.yaml.
+func guidedGrader(suitePath string, raw []byte, opts AcceptOptions) (bool, error) {
+	g := opts.Guide
+	if g == nil {
+		return false, nil
+	}
+	kind := opts.Kind
+	if kind == "" {
+		kind = scaffold.DetectTemplate(raw)
+	}
+	if kind != traceimport.KindToolUse && kind != traceimport.KindMCP {
+		return false, nil
+	}
+	var s guidedSuite
+	if err := yaml.Unmarshal(raw, &s); err != nil {
+		return false, fmt.Errorf("suite.yaml: %w", err)
+	}
+	judged := s.Grading == "judged" && s.Judge != nil && s.Judge.Provider != "" && s.Judge.Model != ""
+	if strings.TrimSpace(g.ReplyRubric) != "" && !judged && opts.Judge == nil {
+		return false, errors.New("a reply rubric is judged by a model: pin a judge (provider and model) or leave the rubric out")
+	}
+	if s.Grader == scaffold.ChecksGrader && opts.Judge == nil {
+		return false, nil
+	}
+	if !opts.SwitchGrader {
+		return false, fmt.Errorf("%w: benchmark %s uses grader %s; a guided %s task is graded by its checks.yaml, so switch the benchmark to grader checks (switch_grader). Its other tasks keep their verifier and need their readiness checks again",
+			ErrConflict, opts.Suite, s.Grader, kind)
+	}
+	next, err := scaffold.SetChecksGrader(raw, opts.Judge)
+	if err != nil {
+		return false, err
+	}
+	if err := os.WriteFile(suitePath, next, 0o644); err != nil {
+		return false, err
+	}
+	return true, nil
 }

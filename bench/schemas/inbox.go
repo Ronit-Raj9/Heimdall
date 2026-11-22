@@ -29,6 +29,9 @@ type InboxItem struct {
 	Tools          []string            `json:"tools,omitempty"`
 	Model          string              `json:"model,omitempty"`
 	Outcome        string              `json:"outcome"`
+	// Golden: a passing session sampled to become a regression golden; its
+	// accept form starts from "the recorded session was right".
+	Golden         bool                `json:"golden,omitempty"`
 	Redacted       map[string]int      `json:"redacted,omitempty"` // values scrubbed, by kind; never the values
 	Task           *InboxTaskLink      `json:"task,omitempty"`
 	Recurrences    int                 `json:"recurrences,omitempty"` // occurrences seen after the item was accepted
@@ -104,6 +107,26 @@ type InboxList struct {
 type InboxItemDetail struct {
 	Item    InboxItem `json:"item"`
 	Preview string    `json:"preview"` // redacted transcript preview, plain text
+	// Session is what the accept form shows to say what should have
+	// happened: the redacted requests, tool calls and final answer.
+	Session *InboxSession `json:"session,omitempty"`
+}
+
+// InboxSession is the redacted session of an item, for the accept form.
+type InboxSession struct {
+	Requests    []string           `json:"requests"`
+	Calls       []InboxSessionCall `json:"calls"`
+	FinalAnswer string             `json:"final_answer,omitempty"`
+}
+
+// InboxSessionCall is one recorded tool call: its arguments as JSON text,
+// and its result cut short.
+type InboxSessionCall struct {
+	Seq     int    `json:"seq"`
+	Tool    string `json:"tool"`
+	Args    string `json:"args"`
+	Result  string `json:"result,omitempty"`
+	IsError bool   `json:"is_error"`
 }
 
 // InboxAcceptRequest is POST /inbox/{id}/accept.
@@ -111,6 +134,76 @@ type InboxAcceptRequest struct {
 	Suite  string `json:"suite"`
 	Kind   string `json:"kind,omitempty"`
 	TaskID string `json:"task_id,omitempty"`
+	// Guide is the "what should have happened" form: with it the task is
+	// written finished, ready for its readiness check, instead of as a
+	// draft with EDIT ME markers.
+	Guide *InboxGuide `json:"guide,omitempty"`
+	// SwitchGrader moves the benchmark to grader checks, which a guided
+	// tool-use or mcp task needs; its other tasks keep their verifier.
+	SwitchGrader bool `json:"switch_grader,omitempty"`
+	// Judge pins the reply judge a guide's reply rubric needs.
+	Judge *InboxJudge `json:"judge,omitempty"`
+}
+
+// InboxGuide says what should have happened in a recorded session.
+type InboxGuide struct {
+	// Instruction replaces the first user request; empty keeps it as sent.
+	Instruction string `json:"instruction,omitempty"`
+	// KeepTurns adds the user's later messages to the instruction, in order.
+	KeepTurns bool `json:"keep_turns,omitempty"`
+	// UseRecorded: the recorded answer or tool calls were right (a golden).
+	UseRecorded bool `json:"use_recorded,omitempty"`
+	// qa and memory: the right answer (one fact per entry) and its match
+	// (exact, contains_all, regex, numeric, choice); wrong answers that must
+	// fail, and whether the recorded answer is one.
+	Answers       []string `json:"answers,omitempty"`
+	Match         string   `json:"match,omitempty"`
+	WrongAnswers  []string `json:"wrong_answers,omitempty"`
+	RecordedWrong bool     `json:"recorded_wrong,omitempty"`
+	// tool-use and mcp: the calls a correct agent makes, the calls it must
+	// never make, whether the calls must happen in order, and a judged
+	// rubric for the final reply.
+	Calls       []InboxGuideCall `json:"calls,omitempty"`
+	Forbidden   []InboxGuideCall `json:"forbidden,omitempty"`
+	Ordered     bool             `json:"ordered,omitempty"`
+	ReplyRubric string           `json:"reply_rubric,omitempty"`
+}
+
+// InboxGuideCall is one tool call of a guide; Args must be a subset of the
+// call's arguments.
+type InboxGuideCall struct {
+	Tool string         `json:"tool"`
+	Args map[string]any `json:"args,omitempty"`
+}
+
+// InboxJudge pins the judge of a reply rubric.
+type InboxJudge struct {
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+}
+
+// InboxBulkAcceptRequest is POST /inbox/accept: several items accepted into
+// one benchmark with one shared guide (for example one reply rubric, or
+// "the recorded sessions were right" for goldens).
+type InboxBulkAcceptRequest struct {
+	IDs          []string    `json:"ids"`
+	Suite        string      `json:"suite"`
+	Kind         string      `json:"kind,omitempty"`
+	Guide        *InboxGuide `json:"guide,omitempty"`
+	SwitchGrader bool        `json:"switch_grader,omitempty"`
+	Judge        *InboxJudge `json:"judge,omitempty"`
+}
+
+// InboxBulkAcceptResult answers a bulk accept: each item accepted or why not.
+type InboxBulkAcceptResult struct {
+	Accepted []InboxAcceptResult `json:"accepted"`
+	Failed   []InboxBulkFailure  `json:"failed"`
+}
+
+// InboxBulkFailure is one item a bulk accept could not accept.
+type InboxBulkFailure struct {
+	ID    string `json:"id"`
+	Error string `json:"error"`
 }
 
 // InboxRejectRequest is POST /inbox/{id}/reject.
@@ -130,6 +223,8 @@ type InboxDraft struct {
 	Dir      string   `json:"dir"`
 	Template string   `json:"template"`
 	EditMe   []string `json:"edit_me"`
+	// Finished: a guided accept wrote every file; only the readiness check is left.
+	Finished bool     `json:"finished"`
 	Next     []string `json:"next"`
 	Warnings []string `json:"warnings,omitempty"`
 }
@@ -150,4 +245,7 @@ type InboxIngestResult struct {
 	ItemID      string `json:"item_id"`
 	Created     bool   `json:"created"`
 	Occurrences int    `json:"occurrences"`
+	// Skipped counts passing sessions not kept because the source's daily
+	// golden sample (golden_per_day) was full.
+	Skipped int `json:"skipped,omitempty"`
 }

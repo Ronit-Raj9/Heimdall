@@ -4185,6 +4185,8 @@ export interface InboxItem {
 	tools?: string[];
 	model?: string;
 	outcome: InboxOutcome;
+	/** A passing session sampled as a regression golden; its accept starts from "the recorded session was right". */
+	golden?: boolean;
 	/** Values removed before storage, counted by kind. Never the values. */
 	redacted?: Record<string, number>;
 	/** Set once accepted. */
@@ -4235,6 +4237,24 @@ export interface InboxItemDetail {
 	item: InboxItem;
 	/** Plain text to show as is. Never rendered as HTML. */
 	preview: string;
+	/** The redacted requests, tool calls and final answer, for the "what should have happened" form. */
+	session?: InboxSession;
+}
+
+/** One recorded tool call: arguments as JSON text, result cut short. */
+export interface InboxSessionCall {
+	seq: number;
+	tool: string;
+	args: string;
+	result?: string;
+	is_error: boolean;
+}
+
+/** The redacted session of an item, for the accept form. */
+export interface InboxSession {
+	requests: string[];
+	calls: InboxSessionCall[];
+	final_answer?: string;
 }
 
 /** The draft task an accept wrote. It still needs a person to finish, validate and admit it. */
@@ -4245,6 +4265,8 @@ export interface InboxDraft {
 	template: string;
 	/** Files with EDIT ME markers, relative to dir. */
 	edit_me: string[];
+	/** A guided accept wrote every file; only the readiness check is left. */
+	finished: boolean;
 	/** Next steps, in order. */
 	next: string[];
 	warnings?: string[];
@@ -4266,6 +4288,8 @@ export interface InboxIngestResult {
 	item_id: string;
 	created: boolean;
 	occurrences: number;
+	/** Passing sessions not kept: the source's daily golden sample was full. */
+	skipped?: number;
 }
 
 /** GET /inbox query. An absent or empty param is left out. */
@@ -4279,6 +4303,62 @@ export interface InboxAcceptRequest {
 	suite: string;
 	kind?: InboxTaskKind;
 	task_id?: string;
+	/** "What should have happened": with it the task is written finished, not as an EDIT ME draft. */
+	guide?: InboxGuide;
+	/** Move the benchmark to grader checks (a guided tool-use or mcp task needs it). */
+	switch_grader?: boolean;
+	/** Pins the judge a reply rubric needs. */
+	judge?: InboxJudge;
+}
+
+/** One tool call of a guide; args must be a subset of the call's arguments. */
+export interface InboxGuideCall {
+	tool: string;
+	args?: Record<string, unknown>;
+}
+
+/** What should have happened in a recorded session. */
+export interface InboxGuide {
+	/** Replaces the first user request; empty keeps it as sent. */
+	instruction?: string;
+	/** Adds the user's later messages to the instruction, in order. */
+	keep_turns?: boolean;
+	/** The recorded answer or tool calls were right (a golden). */
+	use_recorded?: boolean;
+	/** qa and memory: the right answer, one fact per entry. */
+	answers?: string[];
+	match?: "exact" | "contains_all" | "regex" | "numeric" | "choice";
+	wrong_answers?: string[];
+	recorded_wrong?: boolean;
+	/** tool-use and mcp: calls a correct agent makes, in order when ordered. */
+	calls?: InboxGuideCall[];
+	/** Calls it must never make. */
+	forbidden?: InboxGuideCall[];
+	ordered?: boolean;
+	/** Judged rubric for the final reply. */
+	reply_rubric?: string;
+}
+
+/** The judge of a reply rubric. */
+export interface InboxJudge {
+	provider: string;
+	model: string;
+}
+
+/** POST /inbox/accept body: several items into one benchmark with one shared guide. */
+export interface InboxBulkAcceptRequest {
+	ids: string[];
+	suite: string;
+	kind?: InboxTaskKind;
+	guide?: InboxGuide;
+	switch_grader?: boolean;
+	judge?: InboxJudge;
+}
+
+/** POST /inbox/accept answer: each item accepted, or why not. */
+export interface InboxBulkAcceptResult {
+	accepted: InboxAcceptResult[];
+	failed: { id: string; error: string }[];
 }
 
 /** POST /inbox/{id}/reject body. With duplicate_of the item becomes a duplicate. */

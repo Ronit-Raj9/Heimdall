@@ -8,8 +8,11 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
+	"unicode/utf8"
 
+	"github.com/maximhq/bifrost/bench/scaffold"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/traceimport"
 )
@@ -100,7 +103,31 @@ func (s *Service) Item(ctx context.Context, id string) (*schemas.InboxItemDetail
 	if err != nil {
 		return nil, err
 	}
-	return &schemas.InboxItemDetail{Item: *it, Preview: string(preview)}, nil
+	d := &schemas.InboxItemDetail{Item: *it, Preview: string(preview)}
+	if sess, err := s.Inbox.Store.Session(id); err == nil && sess != nil {
+		d.Session = SessionSummary(sess)
+	}
+	return d, nil
+}
+
+// SessionSummary is the accept form's view of a stored (redacted) session.
+func SessionSummary(sess *traceimport.Session) *schemas.InboxSession {
+	out := &schemas.InboxSession{Requests: sess.Requests(), Calls: []schemas.InboxSessionCall{}, FinalAnswer: capText(strings.TrimSpace(sess.FinalAnswer), 4000)}
+	if out.Requests == nil {
+		out.Requests = []string{}
+	}
+	for i, c := range sess.ToolCalls {
+		if i == 100 {
+			break
+		}
+		args := string(c.Arguments)
+		if args == "" {
+			args = "{}"
+		}
+		out.Calls = append(out.Calls, schemas.InboxSessionCall{Seq: c.Seq, Tool: c.Name, Args: args,
+			Result: oneLine(firstNonEmpty(c.Error, c.Result), 300), IsError: c.IsError})
+	}
+	return out
 }
 
 // Accept answers POST /inbox/{id}/accept.
@@ -108,7 +135,11 @@ func (s *Service) Accept(ctx context.Context, id string, req schemas.InboxAccept
 	if req.Suite == "" {
 		return nil, fmt.Errorf("%w: suite is required", ErrInvalid)
 	}
-	res, err := s.Inbox.Accept(ctx, id, AcceptOptions{Suite: req.Suite, Kind: req.Kind, TaskID: req.TaskID})
+	opts := AcceptOptions{Suite: req.Suite, Kind: req.Kind, TaskID: req.TaskID, Guide: GuideFrom(req.Guide), SwitchGrader: req.SwitchGrader}
+	if req.Judge != nil {
+		opts.Judge = &scaffold.JudgeConfig{Provider: strings.TrimSpace(req.Judge.Provider), Model: strings.TrimSpace(req.Judge.Model)}
+	}
+	res, err := s.Inbox.Accept(ctx, id, opts)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) || errors.Is(err, ErrConflict) {
 			return nil, err
@@ -116,11 +147,67 @@ func (s *Service) Accept(ctx context.Context, id string, req schemas.InboxAccept
 		return nil, fmt.Errorf("%w: %v", ErrInvalid, err)
 	}
 	d := schemas.InboxDraft{Task: res.Task, Dir: res.Item.Task.Dir, Template: res.Draft.Template, EditMe: res.Draft.EditMe,
-		Next: AcceptSteps(res, s.Inbox.ProjectRoot), Warnings: res.Draft.Warnings}
+		Finished: opts.Guide != nil && traceimport.GuidedDone(res.Draft), Next: AcceptSteps(res, s.Inbox.ProjectRoot), Warnings: res.Draft.Warnings}
 	if d.EditMe == nil {
 		d.EditMe = []string{}
 	}
 	return &schemas.InboxAcceptResult{Item: res.Item, Draft: d}, nil
+}
+
+// GuideFrom converts the accept form's guide; nil stays nil.
+func GuideFrom(g *schemas.InboxGuide) *traceimport.Guide {
+	if g == nil {
+		return nil
+	}
+	calls := func(l []schemas.InboxGuideCall) []traceimport.GuideCall {
+		var out []traceimport.GuideCall
+		for _, c := range l {
+			out = append(out, traceimport.GuideCall{Tool: c.Tool, Args: c.Args})
+		}
+		return out
+	}
+	return &traceimport.Guide{Instruction: g.Instruction, KeepTurns: g.KeepTurns, UseRecorded: g.UseRecorded,
+		Answers: slices.Clone(g.Answers), Match: g.Match, WrongAnswers: slices.Clone(g.WrongAnswers), RecordedWrong: g.RecordedWrong,
+		Calls: calls(g.Calls), Forbidden: calls(g.Forbidden), Ordered: g.Ordered, ReplyRubric: g.ReplyRubric}
+}
+
+// MaxBulkAccept caps the items one bulk accept takes.
+const MaxBulkAccept = 100
+
+// BulkAccept answers POST /inbox/accept: each item accepted into one suite
+// with the shared guide, task ids from the item ids. One item failing does
+// not stop the others.
+func (s *Service) BulkAccept(ctx context.Context, req schemas.InboxBulkAcceptRequest) (*schemas.InboxBulkAcceptResult, error) {
+	if req.Suite == "" {
+		return nil, fmt.Errorf("%w: suite is required", ErrInvalid)
+	}
+	if len(req.IDs) == 0 || len(req.IDs) > MaxBulkAccept {
+		return nil, fmt.Errorf("%w: ids: 1 to %d items", ErrInvalid, MaxBulkAccept)
+	}
+	out := &schemas.InboxBulkAcceptResult{Accepted: []schemas.InboxAcceptResult{}, Failed: []schemas.InboxBulkFailure{}}
+	seen := map[string]bool{}
+	for _, id := range req.IDs {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		if ctx.Err() != nil {
+			out.Failed = append(out.Failed, schemas.InboxBulkFailure{ID: id, Error: "stopped: " + ctx.Err().Error()})
+			continue
+		}
+		var g *schemas.InboxGuide
+		if req.Guide != nil {
+			cp := *req.Guide
+			g = &cp
+		}
+		res, err := s.Accept(ctx, id, schemas.InboxAcceptRequest{Suite: req.Suite, Kind: req.Kind, Guide: g, SwitchGrader: req.SwitchGrader, Judge: req.Judge})
+		if err != nil {
+			out.Failed = append(out.Failed, schemas.InboxBulkFailure{ID: id, Error: err.Error()})
+			continue
+		}
+		out.Accepted = append(out.Accepted, *res)
+	}
+	return out, nil
 }
 
 // AcceptSteps are the steps a person takes after an accept, with paths
@@ -184,7 +271,7 @@ func PushBody(ctx context.Context, ib *Inbox, src *Source, body []byte) (*schema
 	if err != nil {
 		return nil, classify(err)
 	}
-	return &schemas.InboxIngestResult{ItemID: res.ItemID, Created: res.Created, Occurrences: res.Occurrences}, nil
+	return &schemas.InboxIngestResult{ItemID: res.ItemID, Created: res.Created, Occurrences: res.Occurrences, Skipped: res.Skipped}, nil
 }
 
 // classify marks an error that is not a missing item or a state conflict as
@@ -198,3 +285,14 @@ func classify(err error) error {
 
 // now is exported for the handler's rate limiter.
 func (s *Service) Now() time.Time { return s.Inbox.now() }
+
+// capText cuts s to at most n bytes on a rune boundary.
+func capText(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n]
+}

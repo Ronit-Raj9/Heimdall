@@ -22,6 +22,7 @@ type InboxSource interface {
 	List(ctx context.Context, state, source string) (*schemas.InboxList, error)
 	Item(ctx context.Context, id string) (*schemas.InboxItemDetail, error)
 	Accept(ctx context.Context, id string, req schemas.InboxAcceptRequest) (*schemas.InboxAcceptResult, error)
+	BulkAccept(ctx context.Context, req schemas.InboxBulkAcceptRequest) (*schemas.InboxBulkAcceptResult, error)
 	Reject(ctx context.Context, id string, req schemas.InboxRejectRequest) (*schemas.InboxActionResult, error)
 	Snooze(ctx context.Context, id string, req schemas.InboxSnoozeRequest) (*schemas.InboxActionResult, error)
 	Ingest(ctx context.Context, body []byte) (*schemas.InboxIngestResult, error)
@@ -54,6 +55,7 @@ func (h *InboxHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middl
 	r.GET(APIPrefix+"/inbox", lib.ChainMiddlewares(h.getList, middlewares...))
 	r.GET(APIPrefix+"/inbox/{id}", lib.ChainMiddlewares(h.getItem, middlewares...))
 	r.POST(APIPrefix+"/inbox/{id}/accept", lib.ChainMiddlewares(h.postAccept, writeMW...))
+	r.POST(APIPrefix+"/inbox/accept", lib.ChainMiddlewares(h.postBulkAccept, writeMW...))
 	r.POST(APIPrefix+"/inbox/{id}/reject", lib.ChainMiddlewares(h.postReject, writeMW...))
 	r.POST(APIPrefix+"/inbox/{id}/snooze", lib.ChainMiddlewares(h.postSnooze, writeMW...))
 	r.POST(APIPrefix+"/inbox/ingest", lib.ChainMiddlewares(h.postIngest, middlewares...))
@@ -114,6 +116,37 @@ func (h *InboxHandler) postAccept(ctx *fasthttp.RequestCtx) {
 	res, err := h.inbox.Accept(work, id, req)
 	if err != nil {
 		h.sendErr(ctx, "accept "+id, err)
+		return
+	}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, res)
+}
+
+// postBulkAccept handles POST /api/bench/inbox/accept: several items into
+// one suite with one shared guide; each item is accepted or listed as
+// failed with its reason.
+func (h *InboxHandler) postBulkAccept(ctx *fasthttp.RequestCtx) {
+	if h.inbox == nil {
+		sendUnavailable(ctx, h.mode, "the failure inbox")
+		return
+	}
+	if !h.liveOnly(ctx) {
+		return
+	}
+	var req schemas.InboxBulkAcceptRequest
+	if !h.decode(ctx, &req) {
+		return
+	}
+	for _, id := range req.IDs {
+		if !traceinbox.ValidItemID(id) {
+			lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "ids: "+id+" is not an inbox item id")
+			return
+		}
+	}
+	work, cancel := workContext(ctx, analyzeTimeout)
+	defer cancel()
+	res, err := h.inbox.BulkAccept(work, req)
+	if err != nil {
+		h.sendErr(ctx, "bulk accept", err)
 		return
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, res)
