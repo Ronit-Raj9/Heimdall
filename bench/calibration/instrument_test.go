@@ -314,3 +314,22 @@ func TestStatus(t *testing.T) {
 		t.Fatalf("verified suite %+v", st)
 	}
 }
+
+// H08: a label an annotation queue resolves (source human_review, as
+// handlers/annotation.go writes it) counts as a human label in the status.
+func TestStatusCountsQueueLabels(t *testing.T) {
+	root := t.TempDir()
+	s := &schemas.Suite{ID: "qa", Root: root, Grading: schemas.GradingJudged, Judge: &schemas.JudgeSpec{Provider: "openai", Model: "judge-model", PromptVersion: "qa-v1"}}
+	it, err := NewItem(schemas.CalibrationLabelRequest{Task: "t1", Answer: "Max", Label: "Correct", Labeller: "ana@example.com", Note: "decided in annotation queue q", Ref: "queue/q1/i1"},
+		schemas.CalibrationSourceReview, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Append(root, []schemas.CalibrationItem{it}); err != nil {
+		t.Fatal(err)
+	}
+	st, err := Status(s, &StatusJudge{ID: JudgeID{Provider: "openai", Model: "judge-model", Votes: 1}, PromptVersion: "qa-v1"}, Thresholds(nil, ""), now)
+	if err != nil || st.Labels != 1 || st.HumanLabels != 1 || st.SeedItems != 0 {
+		t.Fatalf("status %+v %v", st, err)
+	}
+}

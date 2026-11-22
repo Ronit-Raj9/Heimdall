@@ -304,7 +304,10 @@ func runImagesLogin(args []string) int {
 
 // runnerPrefetch is the runner's engine.WorkerOptions.Prefetch: once per
 // suite lock, pull the images it pins by digest that this machine lacks.
-func runnerPrefetch(logger schemas.Logger) func(context.Context, *schemas.Suite) {
+// docker is the worker's own: a shared runner passes the org's policy
+// docker, so the pulls and tags stay inside that org's namespace and an
+// image the policy refuses is not retried on every experiment.
+func runnerPrefetch(logger schemas.Logger, docker utils.Docker) func(context.Context, *schemas.Suite) {
 	var done sync.Map
 	return func(ctx context.Context, s *schemas.Suite) {
 		wants := imagepin.LockedImages(s)
@@ -318,8 +321,8 @@ func runnerPrefetch(logger schemas.Logger) func(context.Context, *schemas.Suite)
 		ctx, cancel := context.WithTimeout(ctx, 2*time.Hour)
 		defer cancel()
 		start := time.Now()
-		res := imagepin.Prefetch(ctx, utils.Docker{}, nil, wants, 2, nil)
-		pulled, failed := 0, 0
+		res := imagepin.Prefetch(ctx, docker, nil, wants, 2, nil)
+		pulled, failed, refused := 0, 0, 0
 		var firstErr error
 		for _, r := range res {
 			switch r.State {
@@ -327,13 +330,18 @@ func runnerPrefetch(logger schemas.Logger) func(context.Context, *schemas.Suite)
 				pulled++
 			case imagepin.PrefetchFailed:
 				failed++
+				if strings.Contains(r.Error, utils.ErrPolicy.Error()) {
+					refused++
+				}
 				if firstErr == nil {
 					firstErr = errors.New(r.Error)
 				}
 			}
 		}
+		if failed > refused {
+			done.Delete(key) // the next experiment of this suite tries again (a policy refusal would only be refused again)
+		}
 		if failed > 0 {
-			done.Delete(key) // the next experiment of this suite tries again
 			logger.Warn("image prefetch: some pinned images could not be pulled", "suite", s.ID, "failed", failed, "error", firstErr.Error())
 		}
 		if pulled > 0 || failed > 0 {
