@@ -43,7 +43,8 @@ describe("SuiteCards", () => {
 		expect(html).toMatch(/href="\/suites\/coding-core"[^>]*title="coding-core@[^"]*"[^>]*data-testid="suites-row-coding-core-link"[^>]*>Coding basics</);
 		expect(card(html, "coding-core")).toContain("Fix small Python projects so their hidden tests pass.");
 		expect(card(html, "coding-core")).not.toContain("font-mono");
-		expect(card(html, "acme-payments")).toMatch(/>Acme Payments</);
+		// C1.name: a benchmark the team added with no curated name reads as its id, as typed.
+		expect(card(html, "acme-payments")).toMatch(/>acme-payments</);
 	});
 
 	it("shows readiness as a dot and words, the task count and a quiet Run, and hides engineering detail", () => {

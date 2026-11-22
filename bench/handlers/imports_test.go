@@ -329,3 +329,23 @@ func TestSuitesArtifactSummary(t *testing.T) {
 		}
 	}
 }
+
+// J12.draft: a hosted readiness run stages a draft as benchmark draft-<set> for a while; the list
+// (and every picker built on it) leaves it out, while a team benchmark named draft-... stays.
+func TestSuitesListHidesStagingDrafts(t *testing.T) {
+	suites := scenarioSuites(t)
+	for _, id := range []string{"draft-20261122-150634-a4b821", "draft-notes"} {
+		s := *suites.suites["plain"]
+		s.ID = id
+		suites.ids = append(suites.ids, id)
+		suites.suites[id] = &s
+	}
+	c := newSuitesClient(t, suites, fakeAgents{}, testIndex())
+	resp := c.do(t, "GET", APIPrefix+"/suites", nil, nil)
+	if strings.Contains(string(resp.Body()), "draft-20261122-150634-a4b821") {
+		t.Errorf("GET /suites lists the staged draft: %s", resp.Body())
+	}
+	body := decodeBody(t, resp)
+	suiteByID(t, body, "draft-notes")
+	suiteByID(t, body, "plain")
+}

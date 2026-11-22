@@ -58,5 +58,29 @@
 	},
 	"builtIn": "Built in",
 	"builtinReadOnly": "Built-in benchmark, read-only",
-	"builtinReadOnlyHint": "Shared by every organization on this server. Run it as it is; editing, re-importing, admitting and deleting are turned off."
+	"builtinReadOnlyHint": "Shared by every organization on this server. Run it as it is; editing, re-importing, admitting and deleting are turned off.",
+	"filter": {
+		"search": "Search benchmarks",
+		"category": "Category",
+		"all": "All",
+		"source": "Source",
+		"sourceAll": "All",
+		"sourceBuiltin": "Built in",
+		"sourceTeam": "Added by your team",
+		"noMatch": "No benchmarks match. Clear the search or filters.",
+		"clear": "Clear search and filters",
+		"categories": {
+			"terminal": "Terminal",
+			"coding": "Coding",
+			"support": "Support and tools",
+			"research": "Research",
+			"memory": "Memory",
+			"safety": "Safety",
+			"team": "Team of agents",
+			"voice": "Voice",
+			"other": "Other"
+		}
+	},
+	"builtinMakeOwn": "To build, edit or review tasks, make your own benchmark.",
+	"builtinMakeOwnLink": "Add a benchmark"
 }

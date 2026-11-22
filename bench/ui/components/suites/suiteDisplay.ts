@@ -13,27 +13,65 @@ export interface SuiteDisplay {
 const SUITE_DISPLAY: Record<string, SuiteDisplay> = {
 	"coding-core": { name: "Coding basics", description: "Fix small Python projects so their hidden tests pass." },
 	// Built-in library (suite/library.go): full real benchmarks every org can run.
-	"hd-harbor-tb2": { name: "Terminal-Bench 2", description: "Hard command-line tasks in a real Linux shell." },
-	"hd-harbor-skills": { name: "SkillsBench", description: "Tasks that need the agent to find and use the right skill." },
-	"hd-swe-verified": { name: "SWE-bench Verified", description: "Fix real GitHub issues in popular Python projects." },
-	"hd-swe-rebench": { name: "SWE-rebench", description: "Fresh real GitHub issues the models have not seen in training." },
+	"hd-harbor-tb2": { name: "Terminal-Bench 2", category: "terminal", description: "Hard command-line tasks in a real Linux shell." },
+	"hd-harbor-skills": {
+		name: "SkillsBench",
+		category: "terminal",
+		description: "Tasks that need the agent to find and use the right skill.",
+	},
+	// Library ids the benchmark catalog names (benchcatalog/catalog.go recipes, docs/importing-*.md).
+	"hd-harbor-bfcl": {
+		name: "BFCL function calling",
+		category: "support",
+		description: "Call the right functions with the right arguments, as in the Berkeley leaderboard.",
+	},
+	"hd-harbor-tb41": { name: "Terminal-Bench 4.1", category: "terminal", description: "Hard command-line tasks in a real Linux shell." },
+	"hd-harbor-tb41-cpu": {
+		name: "Terminal-Bench 4.1 (CPU)",
+		category: "terminal",
+		description: "Hard command-line tasks in a real Linux shell, without a GPU.",
+	},
+	"hd-harbor-algotune": {
+		name: "AlgoTune",
+		category: "coding",
+		description: "Make slow Python code run faster without changing its answers.",
+	},
+	"hd-harbor-spider2-dbt": { name: "Spider 2.0-DBT", category: "coding", description: "Build and fix data models in real dbt projects." },
+	lhtb2: {
+		name: "Long-Horizon Terminal-Bench 2.0",
+		category: "terminal",
+		description: "Long command-line jobs that take many steps in a real Linux shell.",
+	},
+	"cheatbench-swe": {
+		name: "CheatBench SWE",
+		category: "safety",
+		description: "Hard coding tasks that check whether the agent cheats to pass.",
+	},
+	"hd-swe-verified": { name: "SWE-bench Verified", category: "coding", description: "Fix real GitHub issues in popular Python projects." },
+	"hd-swe-rebench": {
+		name: "SWE-rebench",
+		category: "coding",
+		description: "Fresh real GitHub issues the models have not seen in training.",
+	},
 	"hd-swe-ib-swe": {
 		name: "ImpossibleBench SWE",
+		category: "safety",
 		description: "GitHub issues whose tests are rigged; passing means the agent cheated.",
 	},
 	"hd-swe-ib-lcb": {
 		name: "ImpossibleBench LiveCodeBench",
+		category: "safety",
 		description: "Coding puzzles whose tests are rigged; passing means the agent cheated.",
 	},
-	longmemeval: { name: "LongMemEval", description: "Answer questions about long chat histories from many sessions." },
+	longmemeval: { name: "LongMemEval", category: "memory", description: "Answer questions about long chat histories from many sessions." },
 	"longmemeval-oracle": {
 		name: "LongMemEval Oracle",
 		category: "memory",
 		description: "Answer questions about long chat histories from many sessions.",
 	},
-	locomo: { name: "LoCoMo", description: "Remember facts across very long conversations." },
-	tau2: { name: "tau2-bench", description: "Help customers over chat while following company policy and tools." },
-	agentdojo: { name: "AgentDojo", description: "Do real tool tasks while resisting prompt injection attacks." },
+	locomo: { name: "LoCoMo", category: "memory", description: "Remember facts across very long conversations." },
+	tau2: { name: "tau2-bench", category: "support", description: "Help customers over chat while following company policy and tools." },
+	agentdojo: { name: "AgentDojo", category: "safety", description: "Do real tool tasks while resisting prompt injection attacks." },
 	"agentdojo-banking": {
 		name: "AgentDojo: Banking",
 		category: "safety",
@@ -54,11 +92,15 @@ const SUITE_DISPLAY: Record<string, SuiteDisplay> = {
 		category: "safety",
 		description: "Do real tasks with tools while ignoring hidden attack instructions.",
 	},
-	mcpmark: { name: "MCPMark", description: "Get real jobs done through MCP tool servers." },
+	mcpmark: { name: "MCPMark", category: "support", description: "Get real jobs done through MCP tool servers." },
 	marble: { name: "MARBLE: Database", category: "team", description: "Several agents work together on one shared task." },
 	"marble-coding": { name: "MARBLE: Coding", category: "team", description: "Several agents work together on one shared task." },
 	"marble-research": { name: "MARBLE: Research", category: "team", description: "Several agents work together on one shared task." },
-	"browsecomp-plus": { name: "BrowseComp-Plus", description: "Hard research questions answered by searching a fixed web corpus." },
+	"browsecomp-plus": {
+		name: "BrowseComp-Plus",
+		category: "research",
+		description: "Hard research questions answered by searching a fixed web corpus.",
+	},
 	"browsecomp-plus-0": {
 		name: "BrowseComp-Plus · Part 1",
 		category: "research",
@@ -122,7 +164,7 @@ const SUITE_DISPLAY: Record<string, SuiteDisplay> = {
 	kernelbench: { name: "KernelBench", description: "Write fast GPU kernels; needs a GPU worker." },
 	"kernelbench-l2": { name: "KernelBench Level 2", category: "coding", description: "Write fast GPU kernels; needs a GPU worker." },
 	"kernelbench-l3": { name: "KernelBench Level 3", category: "coding", description: "Write fast GPU kernels; needs a GPU worker." },
-	voicebench: { name: "VoiceBench", description: "Spoken questions answered by a voice agent." },
+	voicebench: { name: "VoiceBench", category: "voice", description: "Spoken questions answered by a voice agent." },
 	"acme-orders": { name: "Node.js bug fixing", description: "Find and fix bugs in a small Node.js order service." },
 	"acme-stack": { name: "App with database", description: "Change a web app and its database without breaking either." },
 	"acme-memory": { name: "Memory across sessions", description: "Remember what a user said earlier and use it later." },
@@ -148,9 +190,16 @@ function titleCase(id: string): string {
 	return words.length ? words.join(" ") : id;
 }
 
-/** "acme-orders" reads as "Node.js bug fixing"; an unknown "my-pack" as "My Pack". */
-export function suiteDisplayName(id: string): string {
-	return SUITE_DISPLAY[id]?.name ?? titleCase(id);
+/**
+ * "acme-orders" reads as "Node.js bug fixing". Without a curated name, a benchmark the team added
+ * (its summary given, not built in) shows its id exactly as typed ("zz-test-own"); only a built-in
+ * id, or an id with no summary, is title-cased ("my-pack" reads as "My Pack").
+ */
+export function suiteDisplayName(id: string, summary?: Pick<SuiteSummary, "builtin" | "source">): string {
+	const curated = SUITE_DISPLAY[id]?.name;
+	if (curated) return curated;
+	if (summary && !isBuiltinSuite(summary)) return id;
+	return titleCase(id);
 }
 
 /** The curated capability group ("memory", "safety", ...) when the id has one; undefined otherwise. */
@@ -194,8 +243,8 @@ export function suiteDisplayDescription(suite: Pick<SuiteSummary, "id" | "descri
 }
 
 /** "Coding basics" plus its tooltip id, for places that want both. */
-export function suiteDisplay(suite: Pick<SuiteSummary, "id" | "description">): SuiteDisplay {
-	return { name: suiteDisplayName(suite.id), description: suiteDisplayDescription(suite) };
+export function suiteDisplay(suite: Pick<SuiteSummary, "id" | "description" | "builtin" | "source">): SuiteDisplay {
+	return { name: suiteDisplayName(suite.id, suite), description: suiteDisplayDescription(suite) };
 }
 
 // Built-in library order (most wanted first); library ids not listed sort after, by name.
@@ -275,7 +324,7 @@ export function suiteSections<T extends SectionFields>(suites: readonly T[]): Su
 		else if (isPracticeSuite(s.id)) out.practice.push(s);
 		else out.org.push(s);
 	}
-	const byName = (a: T, b: T) => suiteDisplayName(a.id).localeCompare(suiteDisplayName(b.id)) || a.id.localeCompare(b.id);
+	const byName = (a: T, b: T) => suiteDisplayName(a.id, a).localeCompare(suiteDisplayName(b.id, b)) || a.id.localeCompare(b.id);
 	out.builtin.sort((a, b) => libraryRank(a.id) - libraryRank(b.id) || byName(a, b));
 	out.org.sort(byName);
 	out.practice.sort((a, b) => Number(b.id === "coding-core") - Number(a.id === "coding-core") || byName(a, b));
