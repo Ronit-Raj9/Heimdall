@@ -3,7 +3,19 @@ import "@/lib/i18n";
 import type { AgentTemplate, EndpointTestResult } from "@/lib/types/agentBuilder";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { defaultParams, detectFramework, EndpointTestPanel, missingParams, picksOwnModel, testable } from "./connectForm";
+import {
+	DEFAULT_PULL_OPTIONS,
+	defaultParams,
+	detectFramework,
+	EndpointTestPanel,
+	missingParams,
+	picksOwnModel,
+	pullAgentYAML,
+	PULL_TEMPLATE,
+	PullOptionsFields,
+	testable,
+	withPullTemplate,
+} from "./connectForm";
 
 vi.mock("@/lib/store/apis/benchApi", () => ({ getBenchErrorMessage: () => "boom" }));
 vi.mock("@/lib/store/apis/agentBuilderApi", () => ({ useTestEndpointMutation: () => [vi.fn(), { isLoading: false }] }));
@@ -83,5 +95,33 @@ describe("EndpointTestPanel", () => {
 		expect(html).toContain("answered 401");
 		expect(renderToStaticMarkup(<EndpointTestPanel error={{ status: 500 }} loading={false} />)).toContain("boom");
 		expect(renderToStaticMarkup(<EndpointTestPanel loading />)).toContain("Sending a sample task");
+	});
+});
+
+describe("pull mode", () => {
+	it("adds the pull option once and hides the model picker", () => {
+		expect(withPullTemplate([http]).map((x) => x.id)).toEqual(["http-url", "pull"]);
+		expect(withPullTemplate([http, PULL_TEMPLATE])).toHaveLength(2);
+		expect(picksOwnModel(PULL_TEMPLATE, {})).toBe(true);
+		expect(testable(PULL_TEMPLATE)).toBe(false);
+	});
+
+	it("writes the pull YAML", () => {
+		expect(pullAgentYAML("bot", DEFAULT_PULL_OPTIONS)).toBe(
+			"id: bot\nadapter: pull\nimage: bench/coding-core-base:1\nbudgets:\n  wall_s: 900\n  cpus: 1\n  mem_gb: 2\npull:\n  name: bot\n",
+		);
+		const y = pullAgentYAML("bot", { benchDrives: true, history: "server", repo: true }, "line one");
+		expect(y.startsWith("# line one\n")).toBe(true);
+		expect(y).toContain("pull:\n  name: bot\n  repo: tarball\n  conversation:\n    driver: bench\n    history: server\n");
+	});
+
+	it("renders the options, the history choice only when Heimdall drives", () => {
+		const off = renderToStaticMarkup(<PullOptionsFields value={DEFAULT_PULL_OPTIONS} onChange={() => {}} />);
+		expect(off).toContain("Heimdall drives the chat");
+		expect(off).toContain("Coding tasks: send the repository, take a patch back");
+		expect(off).not.toContain("pull-history");
+		const on = renderToStaticMarkup(<PullOptionsFields value={{ ...DEFAULT_PULL_OPTIONS, benchDrives: true }} onChange={() => {}} />);
+		expect(on).toContain("Send the whole chat each turn");
+		expect(on).toContain("Agent keeps its own history");
 	});
 });

@@ -101,6 +101,10 @@ func (s *Service) Authenticate(ctx *fasthttp.RequestCtx) (*Principal, error) {
 			p, err = verifyRunner(dctx, raw)
 		case strings.HasPrefix(raw, APITokenPrefix):
 			p, err = s.tokenPrincipal(dctx, raw)
+		case strings.HasPrefix(raw, PullRunTokenPrefix):
+			// Y11: a run's pull token is no account credential either: the
+			// pull run routes verify its signature themselves.
+			return Anonymous(), nil
 		case strings.HasPrefix(raw, InboxTokenPrefix):
 			// An inbox ingest token is no account credential: anonymous,
 			// and never a fallback to the session cookie (gap G02).

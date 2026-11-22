@@ -54,6 +54,9 @@ type A2AAgent struct {
 	// sends Bifrost its own member key (runtime auth), so every model call
 	// and every delegation it makes is on a key only it holds.
 	Team []A2AMember `json:"team,omitempty" yaml:"team"`
+	// Conversation has the bench drive chat tasks turn by turn (lane Y11):
+	// every user message goes to the same A2A context.
+	Conversation *ConversationSpec `json:"conversation,omitempty" yaml:"conversation"`
 }
 
 // A2AMember is one delegate of an A2A team.

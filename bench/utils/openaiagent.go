@@ -38,7 +38,7 @@ func CheckOpenAIAgent(o *schemas.OpenAIAgent) error {
 	if o.MaxTurns < 0 || o.TimeoutS < 0 {
 		return fmt.Errorf("openai.max_turns and openai.timeout_s cannot be negative")
 	}
-	return nil
+	return CheckConversation(o.Conversation, "openai") // Y11
 }
 
 // OpenAIEndpoint is the URL the launcher posts to: the configured URL when

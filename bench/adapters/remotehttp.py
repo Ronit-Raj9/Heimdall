@@ -12,6 +12,20 @@ auth_secret (with auth_header set, "<auth_header>: <token>" instead).
 With sign_env or sign_secret set, "X-Heimdall-Timestamp: <unix seconds>" and
 "X-Heimdall-Signature: sha256=<hex HMAC-SHA256 of '<timestamp>.<body>'>".
 
+Conversation (lane Y11, BENCH_CONV_USERS set): the bench drives a chat
+task. Each message of the simulated customer is one request, with
+"output": "conversation" and "conversation": {"turn", "message", "history",
+"messages"? (the whole chat so far, OpenAI roles, with history client)};
+the session_id is the conversation's. The "answer" is the agent's reply to
+the customer. The agent needs no respond_to_user tool.
+
+Repo in, patch out (BENCH_REPO=tarball, diff tasks): the request carries
+"repo": {"url", "format": "tar.gz", "sha256", "bytes", "expires_at",
+"files"}: a signed link to the workspace that expires with the run. The
+answer carries "patch", a unified diff, which is checked (size, paths) and
+applied to the workspace; the bench then grades the change like any
+agent's.
+
 Answer: a JSON object with a string "answer", or a text/plain body. The JSON
 object may also carry what the agent reports about itself (agent-reported,
 never trusted): "usage" {input_tokens, output_tokens, total_tokens, model,
@@ -348,6 +362,99 @@ def poll(remote, resp, raw, deadline, report):
             return resp, raw
 
 
+def sign_headers(payload):
+    headers = {"Content-Type": "application/json"}
+    secret = os.environ.get("BENCH_REMOTE_SIGN_SECRET", "")
+    if secret and len(secret) < 16:
+        fail(2, "the signing secret is shorter than 16 characters")
+    if secret:
+        ts = str(int(time.time()))
+        mac = hmac.new(secret.encode("utf-8"), ts.encode("ascii") + b"." + payload, hashlib.sha256).hexdigest()
+        headers["X-Heimdall-Timestamp"] = ts
+        headers["X-Heimdall-Signature"] = "sha256=" + mac
+    return headers, bool(secret)
+
+
+def exchange(remote, body, deadline, report):
+    """Posts one request body to the agent (following a 202) and returns
+    (doc, raw, content_type) of a 2xx answer that did not report failure."""
+    payload = json.dumps(body).encode("utf-8")
+    headers, signed = sign_headers(payload)
+    path = (remote.url.path or "/") + ("?" + remote.url.query if remote.url.query else "")
+    started = time.time()
+    emit({"type": "request", "session_id": body["session_id"], "session_index": body["session_index"],
+          "files": len(body.get("files", {})), "tools": len(body.get("tools", {})), "signed": signed,
+          "turn": (body.get("conversation") or {}).get("turn", 0), "repo": bool(body.get("repo"))})
+    resp, raw = remote.do("POST", path, payload, headers, max(1.0, deadline - time.time()))
+    if resp.status == 202:
+        resp, raw = poll(remote, resp, raw, deadline, report)
+    emit({"type": "response", "status": resp.status, "bytes": len(raw),
+          "latency_ms": int((time.time() - started) * 1000)})
+    if resp.status // 100 != 2:
+        fail(1, "the agent answered HTTP %d: %s" % (resp.status, clean(raw[:500].decode("utf-8", "replace"), 500)))
+    content_type = resp.getheader("Content-Type", "application/json").lower()
+    doc = None if content_type.startswith("text/plain") else parse_json(raw)
+    if isinstance(doc, dict) and str(doc.get("status", "completed")).lower() == "failed":
+        fail(1, "the agent reported its run failed: %s" % clean(str(doc.get("error", "")), 500))
+    return doc, raw, content_type
+
+
+def take_report(doc, report):
+    """Folds what the agent reports about itself into report (agent-reported)."""
+    if not isinstance(doc, dict):
+        return
+    usage = usage_of(doc.get("usage"))
+    if usage:
+        total = report.setdefault("usage", {})
+        for k, v in usage.items():
+            total[k] = total.get(k, 0) + v if isinstance(v, (int, float)) and k != "model" else v
+    for k in ("version", "build"):
+        if clean(doc.get(k)):
+            report[k] = clean(doc.get(k))
+    pass_events(doc.get("events"), report)
+
+
+def conv_helpers():
+    """heimdall_conv (adapters/heimdall_conv.py), beside this launcher."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import heimdall_conv  # noqa: E402
+    return heimdall_conv
+
+
+def offer_repo(body, report):
+    """Repo in: packs the workspace, stores it on Heimdall's pull endpoint and
+    adds the signed, expiring link to the request."""
+    hc = conv_helpers()
+    root = os.environ.get("BENCH_REPO_DIR", "/workspace")
+    try:
+        data, files = hc.workspace_tarball(root, skip=[os.path.abspath(os.environ.get("BENCH_ANSWER_PATH", ""))])
+        server = hc.Server(os.environ["BENCH_PULL_URL"], os.environ.get("BENCH_PULL_TOKEN", ""), os.environ.get("BENCH_PULL_CONNECT", ""))
+        info = server.publish_repo(data)
+    except (ValueError, OSError, KeyError) as e:
+        fail(1, "could not offer the repository: %s" % clean(str(e), 500))
+    body["repo"] = {"url": info["url"], "format": "tar.gz", "sha256": info.get("sha256", ""), "bytes": info.get("bytes", len(data)),
+                    "expires_at": info.get("expires_at", ""), "files": files}
+    report["repo"] = {"bytes": len(data), "files": files}
+
+
+def take_patch(doc, report):
+    """Patch out: applies the agent's unified diff to the workspace."""
+    hc = conv_helpers()
+    patch = doc.get("patch") if isinstance(doc, dict) else None
+    if patch is None or patch == "":
+        report.setdefault("notes", []).append("the agent returned no patch")
+        return
+    try:
+        touched = hc.apply_patch(os.environ.get("BENCH_REPO_DIR", "/workspace"), patch)
+    except ValueError as e:
+        # A patch that is unsafe or does not apply is the agent's result: the
+        # workspace stays as it was and the grader sees no change.
+        report["patch"] = {"applied": False, "error": clean(str(e), 500)}
+        emit({"type": "note", "message": "patch refused: " + clean(str(e), 500)})
+        return
+    report["patch"] = {"applied": True, "files": len(touched), "bytes": len(patch.encode("utf-8"))}
+
+
 def main():
     remote = Remote(os.environ["BENCH_REMOTE_URL"])
     timeout = float(os.environ.get("BENCH_REMOTE_TIMEOUT_S", "600"))
@@ -363,7 +470,8 @@ def main():
         "output": output,
     }
     files_root = os.environ.get("BENCH_REMOTE_FILES_DIR", "")
-    if files_root and os.path.isdir(files_root):
+    repo_mode = os.environ.get("BENCH_REPO") == "tarball"
+    if files_root and os.path.isdir(files_root) and not repo_mode:
         files = workspace_files(files_root, os.path.abspath(answer_path))
         if files is None:
             emit({"type": "note", "message": "workspace files left out: more than %d files or %d bytes" % (MAX_FILES, MAX_FILES_BYTES)})
@@ -378,46 +486,48 @@ def main():
     if os.environ.get("BENCH_REMOTE_TOOLS"):
         tools, token = json.loads(os.environ["BENCH_REMOTE_TOOLS"]), os.environ.get("BENCH_REMOTE_TOOLS_TOKEN", "")
         body["tools"] = {k: dict(v, token=token) for k, v in sorted(tools.items())}
-    payload = json.dumps(body).encode("utf-8")
-    headers = {"Content-Type": "application/json"}
-    secret = os.environ.get("BENCH_REMOTE_SIGN_SECRET", "")
-    if secret and len(secret) < 16:
-        fail(2, "the signing secret is shorter than 16 characters")
-    if secret:
-        ts = str(int(time.time()))
-        mac = hmac.new(secret.encode("utf-8"), ts.encode("ascii") + b"." + payload, hashlib.sha256).hexdigest()
-        headers["X-Heimdall-Timestamp"] = ts
-        headers["X-Heimdall-Signature"] = "sha256=" + mac
-    path = (remote.url.path or "/") + ("?" + remote.url.query if remote.url.query else "")
-    started = time.time()
-    emit({"type": "request", "session_id": body["session_id"], "session_index": body["session_index"],
-          "files": len(body.get("files", {})), "tools": len(body.get("tools", {})), "signed": bool(secret)})
-    resp, raw = remote.do("POST", path, payload, headers, timeout)
     report = {}
-    if resp.status == 202:
-        resp, raw = poll(remote, resp, raw, deadline, report)
-    emit({"type": "response", "status": resp.status, "bytes": len(raw),
-          "latency_ms": int((time.time() - started) * 1000)})
-    if resp.status // 100 != 2:
-        fail(1, "the agent answered HTTP %d: %s" % (resp.status, clean(raw[:500].decode("utf-8", "replace"), 500)))
-    content_type = resp.getheader("Content-Type", "application/json").lower()
-    doc = None if content_type.startswith("text/plain") else parse_json(raw)
-    if isinstance(doc, dict) and str(doc.get("status", "completed")).lower() == "failed":
-        fail(1, "the agent reported its run failed: %s" % clean(str(doc.get("error", "")), 500))
-    answer = answer_of(doc, raw, content_type, output == "answer")
+    if repo_mode:
+        offer_repo(body, report)
+    last_doc = None
+    if os.environ.get("BENCH_CONV_USERS"):
+        # Y11: the bench drives the conversation. Each user message is one
+        # request; the agent's "answer" is its reply to the customer.
+        hc = conv_helpers()
+        history = os.environ.get("BENCH_CONV_HISTORY", "client")
+        body["output"] = "conversation"
+
+        def agent_turn(user_text, messages, turn):
+            nonlocal last_doc
+            req = dict(body)
+            req["conversation"] = {"turn": turn, "message": user_text, "history": history}
+            if history == "client":
+                req["conversation"]["messages"] = messages
+            doc, raw, ctype = exchange(remote, req, deadline, report)
+            take_report(doc, report)
+            last_doc = doc
+            return answer_of(doc, raw, ctype, True)
+
+        try:
+            summary, answer, _ = hc.drive(agent_turn, emit, deadline)
+        except hc.ConversationError as e:
+            fail(1, str(e))
+        report["conversation"] = {k: summary[k] for k in ("agent_turns", "ended_by", "user_server")}
+        if output != "answer":
+            answer = None
+        doc = last_doc
+    else:
+        doc, raw, content_type = exchange(remote, body, deadline, report)
+        answer = answer_of(doc, raw, content_type, output == "answer")
+        take_report(doc, report)
     if isinstance(doc, dict):
-        usage = usage_of(doc.get("usage"))
-        if usage:
-            report["usage"] = usage
-        for k in ("version", "build"):
-            if clean(doc.get(k)):
-                report[k] = clean(doc.get(k))
-        pass_events(doc.get("events"), report)
         if doc.get("artifacts") is not None:
             if os.environ.get("BENCH_REMOTE_ARTIFACTS") == "inline" and files_root:
                 write_artifacts(doc["artifacts"], files_root, report)
             else:
                 report.setdefault("notes", []).append("artifacts sent without remote.artifacts inline; ignored")
+    if repo_mode:
+        take_patch(doc, report)
     if report:
         report["type"] = "remote_report"
         emit(report)

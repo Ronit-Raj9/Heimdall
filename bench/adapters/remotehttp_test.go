@@ -109,7 +109,7 @@ func TestRemoteHTTPPlanErrors(t *testing.T) {
 		want   string
 	}{
 		{"no remote", func(rc *schemas.RunContext) { rc.Agent.Remote = nil }, "no remote block"},
-		{"diff task", func(rc *schemas.RunContext) { rc.Task.Output = nil }, "cannot produce a diff output"},
+		{"diff task", func(rc *schemas.RunContext) { rc.Task.Output = nil }, "a coding task needs remote.repo tarball"},
 		{"state task", func(rc *schemas.RunContext) { rc.Task.Output.Kind = schemas.OutputState }, "needs remote.tools expose"},
 		{"bad url", func(rc *schemas.RunContext) { rc.Agent.Remote.URL = "ftp://x" }, "want http(s)"},
 		{"user info", func(rc *schemas.RunContext) { rc.Agent.Remote.URL = "https://u:p@x/" }, "no user info"},

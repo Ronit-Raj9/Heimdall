@@ -182,7 +182,7 @@ func DefaultCapabilities(cfg *AgentConfig) CapabilitySet {
 	switch cfg.Adapter {
 	case "scripted":
 		set = append(set, AllCapabilities...)
-	case "remote_http", "a2a", "openai_agent":
+	case "remote_http", "a2a", "openai_agent", "pull":
 		set = CapabilitySet{CapTools, CapSessions}
 	default:
 		switch {

@@ -5,7 +5,8 @@
 		"remote_http": "Runs as a web service (HTTP)",
 		"a2a": "Talks over the agent-to-agent protocol (A2A)",
 		"scripted": "Practice agent (no real model, free)",
-		"other": "Custom setup"
+		"other": "Custom setup",
+		"pull": "Runs in your code"
 	},
 	"status": {
 		"passed": "Works",

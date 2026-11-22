@@ -27,6 +27,8 @@ var evaluateRoutes = map[string]bool{
 	key("POST", APIPrefix+"/experiments/{id}/cancel"): true,
 	key("POST", APIPrefix+"/experiments/{id}/resume"): true,
 	key("POST", APIPrefix+"/agents/{id}/versions"):    true,
+	key("POST", APIPrefix+"/pull/next"):               true, // Y11: a CI token serves its pull agent
+	key("POST", APIPrefix+"/pull/turns/{id}/answer"):  true,
 }
 
 // RequiredScope is the token scope a request on pattern needs: admin for a

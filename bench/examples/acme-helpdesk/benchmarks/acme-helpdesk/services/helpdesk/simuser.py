@@ -321,14 +321,23 @@ class Session:
             raise SystemExit(f"simuser: mode {mode!r} is not scripted or llm")
         self.persist()
 
-    def respond(self, args):
-        """Run one respond_to_user call; returns (text, is_error)."""
+    def respond(self, args, meta=None):
+        """Run one respond_to_user call; returns (text, is_error). meta is the
+        call's _meta: the bench's conversation driver sends heimdall
+        {driver: bench, greeting?}, recorded as the transcript's driver and
+        the event's origin (labels only; the verifier grades the events)."""
         msg = args.get("message") if isinstance(args, dict) else None
         if not isinstance(msg, str) or not msg.strip():
             return "respond_to_user needs a non-empty string argument message", True
+        hd = meta.get("heimdall") if isinstance(meta, dict) else None
+        hd = hd if isinstance(hd, dict) else {}
         with self.lock:
             t = self.transcript
             ev = {"seq": len(t["events"]) + 1, "role": "agent", "content": msg}
+            if hd.get("driver") == "bench":
+                t["driver"] = "bench"
+                if hd.get("greeting") is True and not t["events"]:
+                    ev["origin"] = "bench_greeting"
             if t["ended_by"] is not None:
                 ev["after_end"] = True
                 t["events"].append(ev)
@@ -388,7 +397,7 @@ def handle_rpc(session, msg):
     if method == "tools/call":
         if params.get("name") != RESPOND_TOOL["name"]:
             return rpc_error(rid, -32602, f"unknown tool: {params.get('name')}")
-        text, is_error = session.respond(params.get("arguments") or {})
+        text, is_error = session.respond(params.get("arguments") or {}, params.get("_meta"))
         return rpc_result(rid, {"content": [{"type": "text", "text": text}], "isError": is_error})
     return rpc_error(rid, -32601, f"method {method} not found")
 

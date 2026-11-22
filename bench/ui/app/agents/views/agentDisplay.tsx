@@ -1,6 +1,6 @@
 import type { AgentSummary, Job } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { Bot, Code2, FlaskConical, Globe, Network, SquareTerminal, type LucideIcon } from "lucide-react";
+import { Bot, Code2, FlaskConical, Globe, Network, PlugZap, SquareTerminal, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -39,7 +39,7 @@ export function isTestAgent(agent: TestAgentFields): boolean {
 	return TEST_DOUBLE_TEXT.test(`${agent.description ?? ""} ${agent.notes ?? ""}`);
 }
 
-const KNOWN_ADAPTERS = ["command", "remote_http", "a2a", "scripted"] as const;
+const KNOWN_ADAPTERS = ["command", "remote_http", "a2a", "pull", "scripted"] as const;
 
 /** The adapter key the agentsUx catalog labels ("CLI agent", "HTTP endpoint"). */
 export function adapterKey(adapter: string): (typeof KNOWN_ADAPTERS)[number] | "other" {
@@ -59,6 +59,8 @@ export function adapterIcon(adapter: string): LucideIcon {
 			return Globe;
 		case "a2a":
 			return Network;
+		case "pull":
+			return PlugZap;
 		case "scripted":
 			return FlaskConical;
 		default:

@@ -20,6 +20,11 @@ usage as tokens), one tool_call and tool_result per tool call and a final
 claim. Diagnostics go to stderr. The Authorization header carries
 BENCH_OPENAI_API_KEY when set; it is never printed.
 
+Conversation (lane Y11, BENCH_CONV_USERS set): the bench drives a chat task.
+The instruction becomes the system message, each simulated customer message
+a user message and each final assistant text the reply sent to the customer
+(heimdall_conv.drive); respond_to_user is never offered.
+
 The connection to the endpoint goes to BENCH_REMOTE_CONNECT (the run's egress
 forwarder) when set; the Host header and the TLS server name stay the URL's.
 """
@@ -291,6 +296,12 @@ def run_tool_calls(tools, calls, parent):
 
 def chat_loop(ep, model, history, system, instruction, tools, max_turns, deadline):
     messages = ([{"role": "system", "content": system}] if system else []) + history + [{"role": "user", "content": instruction}]
+    return chat_until_text(ep, model, messages, tools, max_turns, deadline)
+
+
+def chat_until_text(ep, model, messages, tools, max_turns, deadline):
+    """Runs requests and tool calls on messages (extended in place) until the
+    endpoint answers without a tool call; returns (text, requests)."""
     defs = [{"type": "function", "function": {"name": n, "description": d, "parameters": s}}
             for n, (_, _, _, d, s) in sorted(tools.items())]
     for turn in range(1, max_turns + 1):
@@ -307,6 +318,7 @@ def chat_loop(ep, model, history, system, instruction, tools, max_turns, deadlin
         calls = [c for c in (msg.get("tool_calls") or []) if isinstance(c, dict)]
         resp = event("model_response", parent_event_id=req, summary=clean(text), tokens=tokens_of(doc.get("usage")))
         if not calls:
+            messages.append({"role": "assistant", "content": text})
             return text, turn
         messages.append({"role": "assistant", "content": msg.get("content"), "tool_calls": calls})
         parsed = []
@@ -322,6 +334,11 @@ def chat_loop(ep, model, history, system, instruction, tools, max_turns, deadlin
 
 def responses_loop(ep, model, history, system, instruction, tools, max_turns, deadline):
     items = history + [{"role": "user", "content": instruction}]
+    return responses_until_text(ep, model, items, system, tools, max_turns, deadline)
+
+
+def responses_until_text(ep, model, items, system, tools, max_turns, deadline):
+    """The Responses API form of chat_until_text (items extended in place)."""
     defs = [{"type": "function", "name": n, "description": d, "parameters": s}
             for n, (_, _, _, d, s) in sorted(tools.items())]
     for turn in range(1, max_turns + 1):
@@ -341,6 +358,7 @@ def responses_loop(ep, model, history, system, instruction, tools, max_turns, de
         calls = [o for o in output if o.get("type") == "function_call"]
         resp = event("model_response", parent_event_id=req, summary=clean(text), tokens=tokens_of(doc.get("usage")))
         if not calls:
+            items.append({"role": "assistant", "content": text})
             return text, turn
         items.extend(output)
         parsed = [(str(c.get("call_id") or c.get("id") or "call_%d_%d" % (turn, i)), str(c.get("name", "")), c.get("arguments", "{}"))
@@ -350,6 +368,40 @@ def responses_loop(ep, model, history, system, instruction, tools, max_turns, de
         if time.time() >= deadline:
             fail(1, "timed out after %d turns" % turn)
     fail(1, "no final answer after %d turns (openai.max_turns)" % max_turns)
+
+
+CONV_NOTE = ("You are in a live chat with the customer: every reply you write is sent to the customer as it is, "
+             "and the customer's answer comes back as the next user message. Talk to the customer directly; "
+             "there is no respond_to_user tool.")
+
+
+def converse(ep, model, system, instruction, tools, max_turns, deadline):
+    """Y11: the bench drives the conversation (heimdall_conv.drive). The task
+    instruction is the system message; each customer message is a user
+    message; tool calls run between them as usual."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import heimdall_conv  # noqa: E402
+    full = "\n\n".join(p for p in (system, instruction, CONV_NOTE) if p)
+    responses = os.environ.get("BENCH_OPENAI_API") == "responses"
+    msgs = [] if responses else [{"role": "system", "content": full}]
+    requests = [0]
+
+    def agent_turn(user_text, _messages, turn):
+        if turn == 1:
+            msgs.append({"role": "assistant", "content": _messages[0]["content"]})
+        msgs.append({"role": "user", "content": user_text})
+        if responses:
+            text, n = responses_until_text(ep, model, msgs, full, tools, max_turns, deadline)
+        else:
+            text, n = chat_until_text(ep, model, msgs, tools, max_turns, deadline)
+        requests[0] += n
+        return text
+
+    try:
+        summary, last, _ = heimdall_conv.drive(agent_turn, lambda ev: print(json.dumps(ev, sort_keys=True), flush=True), deadline)
+    except heimdall_conv.ConversationError as e:
+        fail(1, str(e))
+    return last, requests[0], summary
 
 
 def read_history(path):
@@ -389,10 +441,26 @@ def main():
     history_path = os.environ.get("BENCH_OPENAI_HISTORY", "")
     history = read_history(history_path)
     tools = load_tools() if os.environ.get("BENCH_MCP_SERVERS") else {}
+    conversation = bool(os.environ.get("BENCH_CONV_USERS"))
+    if conversation:  # the bench speaks to the customer; the endpoint never gets the tool
+        tools = {n: t for n, t in tools.items() if t[2] != "respond_to_user"}
     max_turns = max(1, int(os.environ.get("BENCH_OPENAI_MAX_TURNS", "20") or "20"))
     model = os.environ.get("BENCH_OPENAI_MODEL", "")
     log("api %s, %d tools, %d earlier turns, session %s" % (os.environ.get("BENCH_OPENAI_API", "chat"), len(tools), len(history),
                                                             clean(os.environ.get("BENCH_OPENAI_SESSION_ID", ""), 64)))
+    if conversation:
+        answer, turns, summary = converse(ep, model, system, instruction, tools, max_turns, deadline)
+        answer = answer or ""
+        event("claim", claim={"made": False, "text": clean(answer, 1000)},
+              summary="conversation ended by %s after %d agent turns (%d requests)" % (summary["ended_by"], summary["agent_turns"], turns))
+        if os.environ.get("BENCH_OPENAI_OUTPUT", "answer") == "answer":
+            answer_path = os.environ.get("BENCH_ANSWER_PATH", "answer.txt")
+            if os.path.dirname(answer_path):
+                os.makedirs(os.path.dirname(answer_path), exist_ok=True)
+            with open(answer_path, "w", encoding="utf-8") as f:
+                f.write(answer)
+        log("conversation done: %d agent turns, ended by %s" % (summary["agent_turns"], summary["ended_by"]))
+        return
     loop = responses_loop if os.environ.get("BENCH_OPENAI_API") == "responses" else chat_loop
     answer, turns = loop(ep, model, history, system, instruction, tools, max_turns, deadline)
     answer = answer or ""

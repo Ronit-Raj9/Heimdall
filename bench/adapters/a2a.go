@@ -119,6 +119,13 @@ func (a *a2aAdapter) Plan(_ context.Context, rc *schemas.RunContext) (*schemas.R
 	plan.Argv = []string{"python3", "-I", a2aLauncherFile}
 	plan.Env = env
 	plan.Files = map[string]string{a2aLauncherFile: a2aLauncherSource, InstructionFile: instruction}
+	on, err := conversationEnv(rc, spec.Conversation, plan, env) // Y11: the bench drives chat tasks
+	if err != nil {
+		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+	}
+	if on {
+		env["BENCH_CONV_HISTORY"] = schemas.ConversationHistoryServer // the A2A context holds the chat
+	}
 	return plan, nil
 }
 
@@ -157,7 +164,11 @@ func a2aEnv(rc *schemas.RunContext, spec *schemas.A2AAgent, gateway string, wall
 		env["BENCH_A2A_TEAM"] = string(raw)
 	}
 	if utils.RemoteToolsExposed(rc.Agent) && rc.RemoteTools != nil {
-		if urls := utils.RemoteToolURLs(rc.RemoteTools); len(urls) > 0 {
+		urls := utils.RemoteToolURLs(rc.RemoteTools)
+		if spec.Conversation.BenchDriven() { // Y11: the bench speaks to the customer, not the agent
+			urls = utils.DropServices(urls, utils.UserOnlyServices(rc.Services))
+		}
+		if len(urls) > 0 {
 			raw, err := json.Marshal(urls)
 			if err != nil {
 				return nil, fmt.Errorf("encode remote tools: %w", err)

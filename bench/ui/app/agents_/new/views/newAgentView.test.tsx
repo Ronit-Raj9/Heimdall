@@ -46,8 +46,9 @@ vi.mock("@/lib/store/apis/agentBuilderApi", () => ({
 	useGetAgentTemplatesQuery: () => ({ isLoading: false, isError: false, data: { templates }, refetch: () => undefined }),
 	useCreateAgentFromTemplateMutation: () => [vi.fn(), { isLoading: false }],
 	useTestEndpointMutation: () => [vi.fn(), { isLoading: false, reset: () => undefined }],
+	usePutAgentConfigMutation: () => [vi.fn(), { isLoading: false }],
 }));
-vi.mock("@/lib/store/apis/benchApi", () => ({ getBenchErrorMessage: () => "err" }));
+vi.mock("@/lib/store/apis/benchApi", () => ({ getBenchErrorMessage: () => "err", useGetAgentsQuery: () => ({ data: { agents: [{ id: "taken" }] } }) }));
 vi.mock("@/lib/session/sessionContext", () => ({ canUse: () => true, useSession: () => ({}) }));
 vi.mock("@/components/models/modelPicker", () => ({ ModelPicker: () => <div data-testid="model-picker" /> }));
 vi.mock("@tanstack/react-router", () => ({
@@ -91,6 +92,15 @@ describe("NewAgentView", () => {
 		expect(html).toContain('data-testid="framework-hint"');
 		expect(html).toContain('data-testid="model-picker"');
 		expect(html).not.toContain('data-testid="endpoint-test-button"');
+	});
+
+	it("offers pull mode with its options and no model picker", () => {
+		expect(render()).toContain('data-testid="template-pull"');
+		const html = render("?template=pull");
+		expect(html).toContain('data-testid="pull-fields"');
+		expect(html).toContain('data-testid="agent-own-model"');
+		expect(html).not.toContain('data-testid="endpoint-test"');
+		expect(html).toContain("Runs in your code");
 	});
 
 	it("pre-fills a valid name", () => {

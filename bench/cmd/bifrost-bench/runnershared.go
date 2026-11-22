@@ -586,6 +586,7 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 		name = name[:128]
 	}
 	reg, planRoot := sharedOrgProject(oa, root)
+	reg = withPullOrg(reg, oa, planRoot, org) // Y11: pull agents' run tokens name the org
 	labels := []string{"shared", "runtime=" + h.runtime}
 	if claim.Platform != nil { // X19a: the org's own sandbox platform runs its runs
 		pr, err := sandboxRegistry(ctx, oa, reg, claim.Platform)

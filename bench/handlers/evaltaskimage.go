@@ -32,7 +32,7 @@ const taskImageBaseArg = "BASE_IMAGE"
 const taskImageSkipReason = "this benchmark runs inside each task's own environment; register a container agent"
 
 // remoteAdapters run outside any container the bench builds.
-var remoteAdapters = map[string]bool{"remote_http": true, "a2a": true, "openai_agent": true}
+var remoteAdapters = map[string]bool{"remote_http": true, "a2a": true, "openai_agent": true, "pull": true}
 
 // taskImageVariant is how one arm's agent runs on a benchmark whose tasks
 // bring their own image.

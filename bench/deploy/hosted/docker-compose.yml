@@ -187,6 +187,7 @@ services:
       HEIMDALL_SERVER_ADMINS: ${HEIMDALL_SERVER_ADMINS:-}
       HEIMDALL_MASTER_KEY: ${HEIMDALL_MASTER_KEY:-}
       HEIMDALL_SHARED_RUNNER_SECRET: ${HEIMDALL_SHARED_RUNNER_SECRET:-}
+      HEIMDALL_PULL_SIGNING_KEY: ${HEIMDALL_PULL_SIGNING_KEY:-} # pull-mode agents (docs/pull-agents.md)
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
       # Prometheus metrics on the compose network only (docs/hosting.md,
       # Operating it); empty: off. Never publish this port.
@@ -393,6 +394,8 @@ services:
     environment:
       HOME: /tmp
       HEIMDALL_SHARED_RUNNER_SECRET: ${HEIMDALL_SHARED_RUNNER_SECRET:-}
+      HEIMDALL_PULL_SIGNING_KEY: ${HEIMDALL_PULL_SIGNING_KEY:-} # pull-mode agents: the same key as the server
+      BENCH_PULL_URL: ${HEIMDALL_PUBLIC_URL:-https://${HEIMDALL_DOMAIN}} # where a pull run's launcher reaches the server
       HEIMDALL_SHARED_RUNTIME: ${HEIMDALL_SHARED_RUNTIME:-auto}
       HEIMDALL_SHARED_SLOTS: ${HEIMDALL_SHARED_SLOTS:-1}
       HEIMDALL_BENCH_DIR: ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}

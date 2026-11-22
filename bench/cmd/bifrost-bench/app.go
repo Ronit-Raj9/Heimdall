@@ -138,6 +138,7 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		Adapters: adapters.Builtin(adapters.CommandConfig{
 			GatewayAgentURL: cfg.Gateway.AgentURL, EvalNetwork: cfg.Networks.Eval, BenchRoot: cfg.Root,
 			GatewayPublicURL: cfg.Gateway.PublicURL, // Remote coverage: the gateway as a remote agent reaches it
+			PullURL:          cfg.PullRunURL(),      // Y11 pull-mode agents (adapters/pull.go)
 		}),
 		Parsers:     parsers,
 		ProbeLayers: probes.Builtin(probes.Deps{Docker: a.docker, HelperImage: helper, Fault: fault, AdapterFault: adapterFaults, Logger: logger}),

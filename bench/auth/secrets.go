@@ -22,6 +22,10 @@ const (
 	// request goes on anonymous and the ingest handler checks the token
 	// against that org's stored hashes.
 	InboxTokenPrefix = "hmi_"
+	// PullRunTokenPrefix starts a run's pull token (bench/pullagent, lane
+	// Y11), signed by the bench for one run of a pull agent; the pull run
+	// routes check it, the middleware makes no principal of it.
+	PullRunTokenPrefix = "hpr1."
 
 	// SharedPoolAssignmentsPath is the route the shared runner calls with
 	// the pool secret (handlers/sharedpool.go) instead of an account token;

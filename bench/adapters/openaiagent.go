@@ -134,6 +134,9 @@ func (a *openaiAgentAdapter) Plan(ctx context.Context, rc *schemas.RunContext) (
 	}
 	plan.Argv = []string{"python3", "-I", openaiLauncherFile}
 	plan.Egress = []string{target}
+	if _, err := conversationEnv(rc, spec.Conversation, plan, plan.Env); err != nil { // Y11: the bench drives chat tasks
+		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+	}
 	return plan, nil
 }
 

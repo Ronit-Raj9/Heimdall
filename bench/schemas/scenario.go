@@ -388,6 +388,12 @@ type RemoteAgent struct {
 	AuthHeader string   `json:"auth_header,omitempty" yaml:"auth_header"`
 	SignSecret string   `json:"sign_secret,omitempty" yaml:"sign_secret"`
 	ToolAllow  []string `json:"tool_allow,omitempty" yaml:"tool_allow"`
+
+	// Lane Y11 (schemas/conversation.go). Conversation has the bench drive
+	// chat tasks turn by turn; Repo tarball lets the deployment run coding
+	// tasks (repo in, patch out).
+	Conversation *ConversationSpec `json:"conversation,omitempty" yaml:"conversation"`
+	Repo         string            `json:"repo,omitempty" yaml:"repo"` // tarball | none (default)
 }
 
 // ToolCall is one tool invocation recorded by the per-run tool proxy

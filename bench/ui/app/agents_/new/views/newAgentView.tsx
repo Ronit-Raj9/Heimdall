@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { useCreateAgentFromTemplateMutation, useGetAgentTemplatesQuery, useTestEndpointMutation } from "@/lib/store/apis/agentBuilderApi";
+import { useCreateAgentFromTemplateMutation, useGetAgentTemplatesQuery, usePutAgentConfigMutation, useTestEndpointMutation } from "@/lib/store/apis/agentBuilderApi";
+import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import type { AgentTemplate, TemplateCategory } from "@/lib/types/agentBuilder";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
@@ -13,7 +14,19 @@ import { Bot, Check, ChevronRight, Code2, Hammer, Layers, Plug, SquareTerminal, 
 import { AgentAvatar, useAdapterLabel } from "../../../agents/views/agentDisplay";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useMemo, useState } from "react";
-import { defaultParams, EndpointTestPanel, missingParams, ParamFields, picksOwnModel, testable } from "./connectForm";
+import {
+	DEFAULT_PULL_OPTIONS,
+	defaultParams,
+	EndpointTestPanel,
+	missingParams,
+	ParamFields,
+	picksOwnModel,
+	pullAgentYAML,
+	PullOptionsFields,
+	testable,
+	withPullTemplate,
+	type PullOptions,
+} from "./connectForm";
 import { useTranslation } from "react-i18next";
 
 // "Bring your own" first: the gallery is for the user's own agent; the others are examples.
@@ -45,7 +58,7 @@ export default function NewAgentView() {
 	const [templateId, setTemplateId] = useQueryState("template", parseAsString.withOptions({ history: "replace" }));
 	// ?return=/evaluate: the /evaluate wizard sent the user here and gets the new agent back.
 	const [returnTo] = useQueryState("return", parseAsString);
-	const templates = useMemo(() => query.data?.templates ?? [], [query.data]);
+	const templates = useMemo(() => withPullTemplate(query.data?.templates ?? []), [query.data]);
 	const tpl = templates.find((x) => x.id === templateId) ?? null;
 
 	const [name, setName] = useState("");
@@ -56,6 +69,12 @@ export default function NewAgentView() {
 	const [create, createState] = useCreateAgentFromTemplateMutation();
 	const [dryRun, dryRunState] = useCreateAgentFromTemplateMutation();
 	const [testEndpoint, testState] = useTestEndpointMutation();
+	// Pull mode has no server template: the form writes the agent's YAML through the config route.
+	const isPull = tpl?.adapter === "pull";
+	const [pullOpts, setPullOpts] = useState<PullOptions>(DEFAULT_PULL_OPTIONS);
+	const [putConfig, putState] = usePutAgentConfigMutation();
+	const agents = useGetAgentsQuery(undefined, { skip: !isPull });
+	const nameTaken = isPull && !!agents.data?.agents.some((a) => a.id === name);
 
 	// Picking a template pre-fills the rest, so Create is the only other click.
 	useEffect(() => {
@@ -63,13 +82,14 @@ export default function NewAgentView() {
 		setName(defaultAgentName(tpl));
 		setModel({ provider: (tpl.providers[0] ?? "openai") as ProviderId, model: tpl.default_model });
 		setParams(defaultParams(tpl));
+		setPullOpts(DEFAULT_PULL_OPTIONS);
 		setPreview(null);
 		testState.reset();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [tpl]);
 
 	const nameOk = ID_RE.test(name);
-	const missingParam = tpl ? missingParams(tpl, params).length > 0 : true;
+	const missingParam = tpl ? missingParams(tpl, params).length > 0 || nameTaken : true;
 	const ownModel = tpl ? picksOwnModel(tpl, params) : false;
 	const body = tpl
 		? {
@@ -83,7 +103,7 @@ export default function NewAgentView() {
 
 	const onCreate = async () => {
 		if (!body) return;
-		const res = await create(body);
+		const res = isPull ? await putConfig({ id: name, yaml: pullAgentYAML(name, pullOpts, notes) }) : await create(body);
 		if ("data" in res && res.data) {
 			if (returnTo === "/evaluate") void navigate({ to: "/evaluate", search: { agent: res.data.id } as never });
 			else void navigate({ to: "/agents/$agentId", params: { agentId: res.data.id } });
@@ -92,13 +112,14 @@ export default function NewAgentView() {
 	const onPreview = async () => {
 		if (preview !== null) return setPreview(null);
 		if (!body) return;
+		if (isPull) return setPreview(pullAgentYAML(name, pullOpts, notes));
 		const res = await dryRun({ ...body, dry_run: true });
 		if ("data" in res && res.data) setPreview(res.data.yaml);
 	};
 	const onTest = () => {
 		if (body) void testEndpoint({ template: body });
 	};
-	const error = createState.error ?? dryRunState.error;
+	const error = createState.error ?? putState.error ?? dryRunState.error;
 
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="agents-new-screen">
@@ -197,11 +218,11 @@ export default function NewAgentView() {
 									<Input
 										value={name}
 										onChange={(e) => setName(e.target.value.toLowerCase())}
-										aria-invalid={!nameOk}
+										aria-invalid={!nameOk || nameTaken}
 										data-testid="agent-name"
 									/>
-									<span className={cn("text-xs", nameOk ? "text-muted-foreground" : "text-destructive")}>
-										{nameOk ? t("new.nameHelp") : t("new.nameInvalid")}
+									<span className={cn("text-xs", nameOk && !nameTaken ? "text-muted-foreground" : "text-destructive")}>
+										{!nameOk ? t("new.nameInvalid") : nameTaken ? t("pull.form.nameTaken") : t("new.nameHelp")}
 									</span>
 								</label>
 								{ownModel ? (
@@ -223,6 +244,7 @@ export default function NewAgentView() {
 										</span>
 									</div>
 								)}
+								{isPull && <PullOptionsFields value={pullOpts} onChange={setPullOpts} />}
 								{tpl.params.length > 0 && <ParamFields tpl={tpl} params={params} onChange={setParams} />}
 								{testable(tpl) && canWrite && (
 									<div className="flex flex-col gap-2" data-testid="endpoint-test">
@@ -268,8 +290,8 @@ export default function NewAgentView() {
 									</div>
 								</details>
 								{canWrite && (
-									<Button type="submit" className="w-full" disabled={!nameOk || missingParam || createState.isLoading} data-testid="agent-create">
-										{createState.isLoading ? t("new.creating") : t("new.create")}
+									<Button type="submit" className="w-full" disabled={!nameOk || missingParam || createState.isLoading || putState.isLoading} data-testid="agent-create">
+										{createState.isLoading || putState.isLoading ? t("new.creating") : t("new.create")}
 									</Button>
 								)}
 								{preview !== null && (

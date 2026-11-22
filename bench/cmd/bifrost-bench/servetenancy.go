@@ -279,6 +279,7 @@ func (a *app) forOrg(org tenancy.Org, p tenancy.OrgPaths) (*app, error) {
 	reg.Adapters = adapters.Builtin(adapters.CommandConfig{
 		GatewayAgentURL: cfg.Gateway.AgentURL, EvalNetwork: cfg.Networks.Eval, BenchRoot: p.ProjectRoot,
 		GatewayPublicURL: cfg.Gateway.PublicURL,
+		OrgID:            org.ID, PullURL: cfg.PullRunURL(), // Y11 pull-mode agents
 	})
 	reg.Store = st
 	oa := &app{cfg: &cfg, logger: a.logger, docker: a.docker, reg: &reg, store: st, upstreams: a.upstreams, prices: a.prices,

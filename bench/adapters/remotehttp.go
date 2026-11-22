@@ -154,6 +154,17 @@ func (a *remoteHTTPAdapter) Plan(_ context.Context, rc *schemas.RunContext) (*sc
 	plan.Env = env
 	plan.Files = map[string]string{remoteLauncherFile: remoteLauncherSource, InstructionFile: instruction}
 	plan.Egress = []string{target}
+	// Y11: the bench drives a chat task turn by turn, and a coding task
+	// gets the workspace as a signed tarball link and returns a patch.
+	if _, err := conversationEnv(rc, spec.Conversation, plan, env); err != nil {
+		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+	}
+	if kind == schemas.OutputDiff {
+		if err := repoEnv(a.cfg, rc, plan, env, rc.Agent.ID); err != nil {
+			return nil, fmt.Errorf("plan run %s: remote.repo tarball: %w", rc.Run.RunID, err)
+		}
+		withConvHelper(plan)
+	}
 	return plan, nil
 }
 

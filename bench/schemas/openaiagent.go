@@ -38,4 +38,6 @@ type OpenAIAgent struct {
 	// System is an optional system message sent first.
 	System   string `json:"system,omitempty" yaml:"system"`
 	TimeoutS int    `json:"timeout_s,omitempty" yaml:"timeout_s"`
+	// Conversation has the bench drive chat tasks turn by turn (lane Y11).
+	Conversation *ConversationSpec `json:"conversation,omitempty" yaml:"conversation"`
 }

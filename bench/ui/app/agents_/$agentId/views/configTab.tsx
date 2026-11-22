@@ -13,6 +13,7 @@ import { Link } from "@tanstack/react-router";
 import { CheckCircle2, ChevronRight, FileCode2, Wrench } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { PullServePanel } from "./pullServePanel";
 
 /** "KEY=value" lines to an env map; blank lines and lines without "=" are skipped. */
 export function parseEnv(text: string): Record<string, string> {
@@ -187,6 +188,7 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 
 	return (
 		<div className="flex min-w-0 flex-col gap-4" data-testid="config-tab">
+			{doc.fields.adapter === "pull" && <PullServePanel agentId={doc.id} yaml={doc.yaml} />}
 			<div className="flex flex-wrap items-center gap-2">
 				<div role="tablist" className="bg-muted inline-flex rounded-lg p-0.5">
 					{(["form", "yaml"] as const).map((v) => (
