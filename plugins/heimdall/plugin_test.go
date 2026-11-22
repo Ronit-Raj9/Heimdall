@@ -251,3 +251,31 @@ func TestValidate(t *testing.T) {
 		t.Fatal("Init must reject a bad plan")
 	}
 }
+
+// The HTTP transport runs PreLLMHook on a child of the request context, so the
+// fault decision must still reach HTTPTransportResponseHeadersHook on the
+// parent (seen on a real bifrost-http build: ids came back, the fault header
+// and Retry-After did not).
+func TestFaultHeadersReachParentContext(t *testing.T) {
+	p := mustInit(t, Config{Enabled: true, Plans: map[string]Plan{"rl": {Mode: ModeRateLimit, RetryAfterS: 7, Calls: 1}}})
+	parent := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	if _, err := p.HTTPTransportPreHook(parent, &schemas.HTTPRequest{Headers: hdr("r-http", "rl")}); err != nil {
+		t.Fatal(err)
+	}
+	child := schemas.NewBifrostContext(parent, schemas.NoDeadline)
+	_, sc, err := p.PreLLMHook(child, chatReq("gpt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status(sc) != 429 {
+		t.Fatalf("status %d, want 429", status(sc))
+	}
+	meta := schemas.AcquireHTTPResponseMetadata()
+	defer schemas.ReleaseHTTPResponseMetadata(meta)
+	if err := p.HTTPTransportResponseHeadersHook(parent, nil, meta); err != nil {
+		t.Fatal(err)
+	}
+	if meta.Header(HeaderFaultApplied) != ModeRateLimit || meta.Header("Retry-After") != "7" || meta.Header(HeaderRunID) != "r-http" {
+		t.Fatalf("headers fault=%q retry=%q run=%q", meta.Header(HeaderFaultApplied), meta.Header("Retry-After"), meta.Header(HeaderRunID))
+	}
+}

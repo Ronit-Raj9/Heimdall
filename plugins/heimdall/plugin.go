@@ -83,6 +83,7 @@ func (p *Plugin) HTTPTransportPreHook(ctx *schemas.BifrostContext, req *schemas.
 		return nil, nil
 	}
 	if info := infoFromHeaders(req.Headers, p.config.AllowInlinePlans); info != nil {
+		ctx.SetValue(ContextKeyFaultSlot, &faultSlot{})
 		ctx.SetValue(ContextKeyInfo, info)
 		tagContext(ctx, info, "")
 	}
@@ -114,7 +115,11 @@ func (p *Plugin) HTTPTransportResponseHeadersHook(ctx *schemas.BifrostContext, _
 	if info.Arm != "" {
 		resp.SetHeader(HeaderArm, info.Arm)
 	}
-	if d, ok := ctx.Value(ContextKeyFault).(*Decision); ok && d != nil && d.Faulted() {
+	d, _ := ctx.Value(ContextKeyFault).(*Decision)
+	if slot, ok := ctx.Value(ContextKeyFaultSlot).(*faultSlot); ok && slot != nil && (d == nil || !d.Faulted()) {
+		d = slot.get()
+	}
+	if d != nil && d.Faulted() {
 		resp.SetHeader(HeaderFaultApplied, d.Mode)
 		if d.RetryAfterS > 0 {
 			resp.SetHeader("Retry-After", strconv.Itoa(d.RetryAfterS))
@@ -168,6 +173,9 @@ func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostReq
 		return req, nil, nil
 	}
 	ctx.SetValue(ContextKeyFault, &d)
+	if slot, ok := ctx.Value(ContextKeyFaultSlot).(*faultSlot); ok && slot != nil {
+		slot.set(&d)
+	}
 	tagContext(ctx, info, d.Mode)
 	if d.Delay > 0 && !p.sleep(ctx, d.Delay) {
 		return req, nil, nil // caller went away; let core report the cancel
