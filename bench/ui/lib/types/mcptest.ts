@@ -113,6 +113,8 @@ export interface McpDraftResponse {
 	files: string[];
 	scores: McpScores;
 	reference_agents: string[];
+	/** Reference agents whose default provider has a usable model key of the org, in order (N113). */
+	reference_agents_keyed?: string[];
 	next: string;
 }
 

@@ -105,7 +105,7 @@ export function PlatformImportCard({ returnTo }: { returnTo?: string | null }) {
 		if (!p || !nameOk) return;
 		const res = await create(importRequest(p, name, agentId, inputs, secrets, false));
 		if ("data" in res && res.data) {
-			if (returnTo === "/evaluate") void navigate({ to: "/evaluate", search: { agent: res.data.id } as never });
+			if (returnTo === "/evaluate") void navigate({ to: "/evaluate", search: { agent: res.data.id, keep: "1" } as never });
 			else void navigate({ to: "/agents/$agentId", params: { agentId: res.data.id } });
 		}
 	};

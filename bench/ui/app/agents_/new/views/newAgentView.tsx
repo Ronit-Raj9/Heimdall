@@ -135,7 +135,7 @@ export default function NewAgentView() {
 		if (!body) return;
 		const res = isPull ? await putConfig({ id: name, yaml: pullAgentYAML(name, pullOpts, notes), create_only: true }) : await create(body);
 		if ("data" in res && res.data) {
-			if (returnTo === "/evaluate") void navigate({ to: "/evaluate", search: { agent: res.data.id } as never });
+			if (returnTo === "/evaluate") void navigate({ to: "/evaluate", search: { agent: res.data.id, keep: "1" } as never });
 			else void navigate({ to: "/agents/$agentId", params: { agentId: res.data.id } });
 		}
 	};

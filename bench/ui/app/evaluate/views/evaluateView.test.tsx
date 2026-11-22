@@ -5,7 +5,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { applyPatch, armsFor, draftToSpec, EMPTY_DRAFT, learnStepReady, type EvaluateDraft } from "./evaluateDraft";
 import { agentCapabilities, splitAgents, type AgentWithCaps } from "./evaluate.utils";
-import EvaluateView, { maxReachable, stepReady } from "./evaluateView";
+import EvaluateView, { LinkNotice, maxReachable, planLink, stepReady, stepWriteBack } from "./evaluateView";
+import { EvaluateDraftProvider } from "./evaluateDraft";
+import { Step1Agent } from "./step1Agent";
 
 const est = vi.hoisted(() => ({ current: { isLoading: true, isFetching: true, data: undefined } as Record<string, unknown> }));
 const agent = (id: string, extra: Partial<AgentWithCaps> = {}) =>
@@ -206,5 +208,130 @@ describe("EvaluateView", () => {
 		const ok = render("?step=4", ready);
 		expect(ok).not.toMatch(/data-testid="evaluate-next"[^>]*disabled=""/);
 		expect(ok).not.toContain("Nothing can run");
+	});
+});
+describe("deep links (N154, N112, N86, N85)", () => {
+	const listed = [
+		agent("zz-test-loop", { model: "gpt-5.4-mini" }),
+		agent("claude-code", { model: "claude-sonnet-4-5" }),
+		agent("codex", { model: "gpt-5.6-terra" }),
+	];
+	const stored = applyPatch(EMPTY_DRAFT, {
+		agent: "zz-test-loop",
+		arms: [{ label: "A", agent: "zz-test-loop", model: "gpt-5.4-mini" }],
+		benchmarks: ["hd-harbor-skills"],
+	});
+	const link = (p: Partial<Parameters<typeof planLink>[0]>) => ({ agent: null, mode: null, suite: null, opponent: null, keep: null, ...p });
+
+	it("starts a new draft in versions mode and puts the stored one aside", () => {
+		const plan = planLink(link({ agent: "zz-test-loop", mode: "versions" }), stored, listed, null);
+		if (plan.kind !== "replace") throw new Error(`plan ${plan.kind}`);
+		expect(plan.draft.mode).toBe("versions");
+		expect(plan.draft.benchmarks).toEqual([]);
+		expect(plan.putAside).toBe(stored); // Go back to my draft restores exactly this
+		expect(plan.step).toBe(2);
+		expect(plan.badMode).toBeUndefined();
+	});
+
+	it("gives a linked agent its own model and only the linked benchmark", () => {
+		const plan = planLink(link({ agent: "claude-code", suite: "zz-test-mcp" }), stored, listed, null);
+		if (plan.kind !== "replace") throw new Error(`plan ${plan.kind}`);
+		expect(plan.draft.arms).toEqual([{ label: "A", agent: "claude-code", model: "claude-sonnet-4-5" }]);
+		expect(plan.draft.benchmarks).toEqual(["zz-test-mcp"]);
+		expect(plan.step).toBe(3);
+	});
+
+	it("keep=1 (back from Register your agent) patches only the agent", () => {
+		const plan = planLink(link({ agent: "codex", keep: "1" }), stored, listed, null);
+		if (plan.kind !== "patch") throw new Error(`plan ${plan.kind}`);
+		const d = applyPatch(stored, plan.patch);
+		expect(d.agent).toBe("codex");
+		expect(d.benchmarks).toEqual(["hd-harbor-skills"]);
+		expect(d.arms[0].model).toBe("gpt-5.6-terra");
+	});
+
+	it("waits for the agents list, then reports an unknown agent and leaves the draft alone", () => {
+		expect(planLink(link({ agent: "zz-no-such-agent" }), stored, undefined, null).kind).toBe("wait");
+		expect(planLink(link({ agent: "zz-no-such-agent" }), stored, listed, null)).toEqual({ kind: "missing", id: "zz-no-such-agent" });
+		expect(planLink(link({}), stored, listed, null).kind).toBe("none");
+	});
+
+	it("says which agent is missing on step 1 and keeps Next off", () => {
+		const html = renderToStaticMarkup(
+			<EvaluateDraftProvider initial={{ ...EMPTY_DRAFT }}>
+				<Step1Agent missingAgent="zz-no-such-agent" />
+			</EvaluateDraftProvider>,
+		);
+		expect(html).toContain('data-testid="evaluate-agent-missing"');
+		expect(html).toContain("No agent is called zz-no-such-agent. Pick one below, or register it.");
+		const d = applyPatch(EMPTY_DRAFT, { agent: "codex", arms: [{ label: "A", agent: "codex", model: "gpt-x" }] });
+		expect(stepReady(1, d, new Set(), null, { missingAgent: "zz-no-such-agent" })).toBe(false);
+		expect(stepReady(1, applyPatch(EMPTY_DRAFT, { agent: "zz-no-such-agent" }), new Set(), null, { known: new Set(["codex"]) })).toBe(
+			false,
+		);
+		expect(render("", { agent: "zz-no-such-agent" })).toMatch(/data-testid="evaluate-next"[^>]*disabled=""/);
+	});
+
+	it("shows the put-aside note with Go back to my draft and the unknown mode", () => {
+		const html = renderToStaticMarkup(<LinkNotice putAside badMode="duel" onBack={() => undefined} />);
+		expect(html).toContain("Started a new evaluation from the link. Your earlier draft was put aside.");
+		expect(html).toContain('data-testid="evaluate-link-back"');
+		expect(html).toContain("Go back to my draft");
+		expect(html).toContain("The link asked for an unknown comparison (duel), so this starts with Its score.");
+	});
+
+	it("writes the shown step back to ?step= once settled (N85)", () => {
+		expect(stepWriteBack(5, 1, true)).toBeNull();
+		expect(stepWriteBack(5, 3, true)).toBe(3);
+		expect(stepWriteBack(5, 1, false)).toBeUndefined();
+		expect(stepWriteBack(4, 4, true)).toBeUndefined();
+		expect(stepWriteBack(null, 1, true)).toBeUndefined();
+		// After the write-back the URL has no step: a ready draft no longer jumps ahead by itself.
+		expect(render("", { agent: "codex", arms: [{ label: "A", agent: "codex", model: "gpt-x" }] })).toContain(
+			'data-testid="evaluate-step-1"',
+		);
+	});
+
+	it("keeps ?agent=codex&suite=hd-harbor-bfcl&step=4 on step 4", () => {
+		const plan = planLink(link({ agent: "codex", suite: "hd-harbor-bfcl" }), EMPTY_DRAFT, listed, 4);
+		if (plan.kind !== "replace") throw new Error(`plan ${plan.kind}`);
+		expect(plan.step).toBeNull(); // the explicit step stays
+		expect(plan.putAside).toBeNull();
+		const reach = maxReachable(plan.draft);
+		expect(reach).toBeGreaterThanOrEqual(4);
+		expect(stepWriteBack(4, Math.min(4, reach) as 4, true)).toBeUndefined();
+	});
+});
+
+describe("step gates (N89, N95)", () => {
+	it("blocks step 4 while failover is on without a fallback and says why", () => {
+		const ready = {
+			agent: "codex",
+			arms: [{ label: "A", agent: "codex", model: "gpt-x", provider: "openai" }],
+			benchmarks: ["hd-harbor-bfcl"],
+			failover: { enabled: true, fallbacks: [] },
+		};
+		expect(stepReady(4, applyPatch(withAgent(), ready))).toBe(false);
+		est.current = {
+			isLoading: false,
+			isFetching: false,
+			isError: false,
+			data: { runs: 4, est_cost_usd: { low: 0, high: 0, known: true }, est_minutes: { low: 1, high: 2 }, per_benchmark: [] },
+		};
+		const html = render("?step=4", ready as Partial<EvaluateDraft>);
+		expect(html).toMatch(/data-testid="evaluate-next"[^>]*disabled=""/);
+		expect(html).toMatch(/data-testid="evaluate-next-hint"[^>]*>Pick a fallback model\./);
+	});
+
+	it("blocks Latest against the latest version in versions mode", () => {
+		const d = applyPatch(withAgent(), { mode: "versions", compareVersion: 2 });
+		expect(stepReady(2, d, new Set(), null, { latest: 2 })).toBe(false);
+		expect(stepReady(2, applyPatch(d, { compareVersion: 1 }), new Set(), null, { latest: 2 })).toBe(true);
+		const html = render("?step=2", { agent: "codex", mode: "versions", compareVersion: 2, arms: d.arms });
+		expect(html).toContain('data-testid="evaluate-step-2"');
+		expect(html).toMatch(/data-testid="evaluate-next"[^>]*disabled=""/);
+		expect(html).toContain("Pick a different version than the one in step 1.");
+		expect(html).toContain("v2 (0 runs) (Setup A)");
+		expect(html).toContain("codex latest (v2)");
 	});
 });

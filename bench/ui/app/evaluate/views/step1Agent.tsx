@@ -7,8 +7,9 @@ import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { Bot, Check, Plug, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { armsFor, useEvaluateDraft } from "./evaluateDraft";
-import { agentCapabilities, REGISTER_RETURN, splitAgents, type AgentWithCaps } from "./evaluate.utils";
+import { agentPickPatch, useEvaluateDraft } from "./evaluateDraft";
+import { agentCapabilities, latestVersion, REGISTER_RETURN, splitAgents, type AgentWithCaps } from "./evaluate.utils";
+import "./gw09I18n";
 
 export function CapabilityChips({ caps }: { caps: Capability[] }) {
 	const { t } = useTranslation("evaluate");
@@ -70,16 +71,26 @@ export function VersionPicker({
 	onChange,
 	label,
 	testId,
+	disabledVersion,
+	disabledSuffix,
+	countHint,
 }: {
 	agent: string;
 	value: number | null;
 	onChange(v: number | null): void;
 	label?: string;
 	testId?: string;
+	/** A version that cannot be picked (step 2: Setup A's), shown with `disabledSuffix`. */
+	disabledVersion?: number | null;
+	disabledSuffix?: string;
+	/** Say how many versions there are and which is the latest (step 1). */
+	countHint?: boolean;
 }) {
 	const { t } = useTranslation("evaluate");
+	const { t: tg } = useTranslation("gw09");
 	const q = useGetAgentVersionsQuery(agent);
 	const versions = [...(q.data?.versions ?? [])].sort((a, b) => b.version - a.version);
+	const latest = latestVersion(versions);
 	return (
 		<label className="flex flex-col gap-1.5 text-sm">
 			<span className="font-medium">{label ?? t("agent.version")}</span>
@@ -92,34 +103,38 @@ export function VersionPicker({
 			>
 				<option value="">{t("agent.latest")}</option>
 				{versions.map((v) => (
-					<option key={v.version} value={v.version}>
+					<option key={v.version} value={v.version} disabled={disabledVersion === v.version}>
 						{v.runs != null ? t("agent.versionRuns", { n: v.version, runs: v.runs }) : t("agent.versionOption", { n: v.version })}
+						{disabledVersion === v.version ? disabledSuffix : ""}
 					</option>
 				))}
 			</select>
 			{!q.isLoading && versions.length === 0 && <span className="text-muted-foreground text-xs">{t("agent.noVersions")}</span>}
+			{countHint && versions.length >= 2 && latest !== undefined && (
+				<span className="text-muted-foreground text-xs" data-testid="evaluate-versions-hint">
+					{tg("agent.versionsHint", { n: versions.length, max: latest })}
+				</span>
+			)}
 		</label>
 	);
 }
 
-/** Step 1: pick the agent under test (org or built-in), or register one, and its version. */
-export function Step1Agent() {
+/**
+ * Step 1: pick the agent under test (org or built-in), or register one, and its version. `missingAgent` is an agent
+ * a link named that this organization does not have (N86); `onPicked` runs on every card click.
+ */
+export function Step1Agent({ missingAgent, onPicked }: { missingAgent?: string | null; onPicked?(): void } = {}) {
 	const { t } = useTranslation("evaluate");
+	const { t: tg } = useTranslation("gw09");
 	const { draft, update } = useEvaluateDraft();
 	const q = useGetAgentsQuery();
 	const all = (q.data?.agents ?? []) as AgentWithCaps[];
 	const { own, builtin } = splitAgents(all);
 
 	const pick = (a: AgentWithCaps) => {
+		onPicked?.();
 		if (a.id === draft.agent) return;
-		const next = { ...draft, agent: a.id, version: null, compareVersion: null, arms: [] };
-		update({
-			agent: a.id,
-			version: null,
-			compareVersion: null,
-			opponent: draft.opponent === a.id ? null : draft.opponent,
-			arms: armsFor(next, a.model),
-		});
+		update(agentPickPatch(draft, a));
 	};
 
 	const grid = (list: AgentWithCaps[]) => (
@@ -136,6 +151,22 @@ export function Step1Agent() {
 				<h2 className="text-lg font-semibold">{t("agent.heading")}</h2>
 				<p className="text-muted-foreground text-sm">{t("agent.hint")}</p>
 			</div>
+
+			{missingAgent && (
+				<div
+					role="status"
+					className="border-chart-warning/40 bg-chart-warning/10 flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2 text-sm"
+					data-testid="evaluate-agent-missing"
+				>
+					<span>{tg("agent.notFound", { id: missingAgent })}</span>
+					<Button asChild variant="outline" size="sm">
+						<Link to="/agents/new" search={{ return: REGISTER_RETURN } as never} data-testid="evaluate-agent-missing-register">
+							<Plus />
+							{t("agent.register")}
+						</Link>
+					</Button>
+				</div>
+			)}
 
 			{q.isLoading ? (
 				<p className="text-muted-foreground text-sm" data-testid="evaluate-agents-loading">
@@ -160,6 +191,24 @@ export function Step1Agent() {
 								</Link>
 							</Button>
 						</div>
+						{draft.agent && (
+							<div
+								className="border-primary/30 bg-primary/5 flex flex-wrap items-end gap-4 rounded-xl border p-3"
+								data-testid="evaluate-selected-agent"
+							>
+								<span className="flex items-center gap-2 pb-2 text-sm font-medium">
+									<Check className="text-primary size-4" aria-hidden />
+									{tg("agent.selected", { agent: draft.agent })}
+								</span>
+								<VersionPicker
+									agent={draft.agent}
+									value={draft.version}
+									onChange={(v) => update({ version: v })}
+									label={tg("agent.versionOf", { agent: draft.agent })}
+									countHint
+								/>
+							</div>
+						)}
 						{own.length ? (
 							grid(own)
 						) : (
@@ -171,6 +220,9 @@ export function Step1Agent() {
 					<section className="flex flex-col gap-3">
 						<h3 className="text-sm font-semibold">{t("agent.builtin")}</h3>
 						{builtin.length ? grid(builtin) : <p className="text-muted-foreground text-sm">{t("agent.empty")}</p>}
+						<p className="text-muted-foreground text-xs" data-testid="evaluate-test-agents-hidden">
+							{tg("agent.testAgentsHidden")}
+						</p>
 					</section>
 				</>
 			)}
@@ -193,11 +245,7 @@ export function Step1Agent() {
 				</Button>
 			</section>
 
-			{draft.agent ? (
-				<VersionPicker agent={draft.agent} value={draft.version} onChange={(v) => update({ version: v })} />
-			) : (
-				<p className="text-muted-foreground text-sm">{t("agent.pickFirst")}</p>
-			)}
+			{!draft.agent && <p className="text-muted-foreground text-sm">{t("agent.pickFirst")}</p>}
 		</div>
 	);
 }

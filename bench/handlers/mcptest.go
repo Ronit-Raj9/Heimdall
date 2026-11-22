@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,12 +19,14 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/agents"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/mcptest"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/webhooks"
 	"github.com/valyala/fasthttp"
+	"gopkg.in/yaml.v3"
 )
 
 // MCP server mode routes.
@@ -72,7 +75,11 @@ type MCPServerDraftResponse struct {
 	// ReferenceAgents are built-in agents that speak MCP natively; the
 	// evaluation of a drafted benchmark runs them as its arms.
 	ReferenceAgents []string `json:"reference_agents"`
-	Next            string   `json:"next"`
+	// ReferenceAgentsKeyed are the reference agents whose default provider
+	// has a usable model key of the organization, in the same order (N113);
+	// ReferenceAgents lists them first.
+	ReferenceAgentsKeyed []string `json:"reference_agents_keyed,omitempty"`
+	Next                 string   `json:"next"`
 }
 
 // MCPServerReport answers GET /mcp-servers/benchmarks/{id}/report.
@@ -84,6 +91,49 @@ type MCPServerReport struct {
 
 // MCPReferenceAgents are the built-in agents with native MCP client support.
 var MCPReferenceAgents = []string{"claude-code", "codex", "opencode"}
+
+// referenceAgentProvider returns the default provider of a reference agent:
+// the gateway provider of agents/<id>.yaml in the org's project files, else
+// of the shipped config; "" when neither names one.
+func referenceAgentProvider(projects projectfs.Store) func(ctx context.Context, id string) string {
+	return func(ctx context.Context, id string) string {
+		var doc []byte
+		if projects != nil {
+			if b, _, err := projects.Read(ctx, projectfs.AreaAgents, id+".yaml"); err == nil {
+				doc = b
+			}
+		}
+		if doc == nil {
+			b, err := fs.ReadFile(agents.Files, id+".yaml")
+			if err != nil {
+				return ""
+			}
+			doc = b
+		}
+		var cfg schemas.AgentConfig
+		if yaml.Unmarshal(doc, &cfg) != nil {
+			return ""
+		}
+		return strings.TrimSpace(cfg.Gateway.Provider)
+	}
+}
+
+// referenceAgentsKeyed orders MCPReferenceAgents so the agents whose default
+// provider has a usable model key of the org come first (N113), and returns
+// those keyed agents alone in the same order. With require false (a local
+// server, which may use its own keys) every agent counts as keyed.
+func referenceAgentsKeyed(ctx context.Context, keys KeySource, orgID string, require bool, providerOf func(context.Context, string) string) (ordered, keyed []string) {
+	var rest []string
+	for _, id := range MCPReferenceAgents {
+		p := providerOf(ctx, id)
+		if (p != "" || !require) && ModelKeyRefusal(ctx, keys, orgID, []string{p}, nil, require) == nil {
+			keyed = append(keyed, id)
+		} else {
+			rest = append(rest, id)
+		}
+	}
+	return append(append([]string{}, keyed...), rest...), keyed
+}
 
 type mcpTestArea struct {
 	env OrgEnv
@@ -261,7 +311,14 @@ func (h *mcpTestArea) draft(ctx *fasthttp.RequestCtx) {
 	if len(res.NoReference) > 0 {
 		next = "Put working arguments into the reference of the tasks without one, run the readiness check, review each task, then evaluate it with the reference agents."
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusCreated, &MCPServerDraftResponse{DraftResult: res, Scores: rep.Scores, ReferenceAgents: MCPReferenceAgents, Next: next})
+	s := h.env.Services
+	var keys KeySource
+	if s.Keys != nil {
+		keys = s.Keys
+	}
+	refs, keyed := referenceAgentsKeyed(ctx, keys, quickOrgID(ctx, s.OrgID), s.Hosted, referenceAgentProvider(projects))
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusCreated, &MCPServerDraftResponse{DraftResult: res, Scores: rep.Scores,
+		ReferenceAgents: refs, ReferenceAgentsKeyed: keyed, Next: next})
 }
 
 // report handles GET /mcp-servers/benchmarks/{id}/report[?experiment=].
