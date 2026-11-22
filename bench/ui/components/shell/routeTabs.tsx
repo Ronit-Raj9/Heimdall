@@ -9,18 +9,23 @@ export interface RouteTab {
 	label: ReactNode;
 	/** A tab that does not apply to this object: left out of the strip, never shown empty. */
 	hidden?: boolean;
+	/**
+	 * A hidden tab that still opens when the URL names it (a menu links to it). It is never the
+	 * default; while it is active the strip shows it at its end so the user sees where they are.
+	 */
+	addressable?: boolean;
 	/** A count or mark after the label. */
 	badge?: ReactNode;
 	testId?: string;
 }
 
 /**
- * The tab to show: the requested one when it is a visible tab, else the default when that is
- * visible, else the first visible tab. Null when every tab is hidden.
+ * The tab to show: the requested one when it is a visible or an addressable tab, else the default
+ * when that is visible, else the first visible tab. Null when every tab is hidden.
  */
 export function resolveTab(tabs: readonly RouteTab[], requested: string | null | undefined, defaultTab?: string): string | null {
 	const visible = tabs.filter((tab) => !tab.hidden);
-	if (requested && visible.some((tab) => tab.id === requested)) return requested;
+	if (requested && tabs.some((tab) => tab.id === requested && (!tab.hidden || tab.addressable))) return requested;
 	if (defaultTab && visible.some((tab) => tab.id === defaultTab)) return defaultTab;
 	return visible[0]?.id ?? null;
 }
@@ -60,7 +65,8 @@ export interface RouteTabsProps {
 export function RouteTabs({ tabs, defaultTab, param, label, children, className, testId }: RouteTabsProps) {
 	const [active, select] = useRouteTab(tabs, { defaultTab, param });
 	if (active === null) return null;
-	const visible = tabs.filter((tab) => !tab.hidden);
+	// An active addressable tab goes at the end of the strip; it leaves when another tab is chosen.
+	const visible = [...tabs.filter((tab) => !tab.hidden), ...tabs.filter((tab) => tab.hidden && tab.addressable && tab.id === active)];
 	return (
 		<TabsPrimitive.Root
 			value={active}
