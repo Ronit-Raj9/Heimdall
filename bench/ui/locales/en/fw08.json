@@ -1,0 +1,23 @@
+{
+	"paused": "Paused",
+	"budget": "Budget {{amount}}",
+	"childReason": "{{benchmark}}: {{reason}}",
+	"list": {
+		"search": "Search evaluations",
+		"searchPlaceholder": "Name, id, agent or benchmark",
+		"status": "Status",
+		"statusAll": "All statuses",
+		"mode": "What it tests",
+		"modeAll": "All kinds",
+		"sort": "Sort",
+		"sorts": {
+			"newest": "Newest first",
+			"oldest": "Oldest first",
+			"name": "Name",
+			"spend": "Most spent"
+		},
+		"noMatch": "No evaluations match. Clear the search or filters.",
+		"clear": "Clear",
+		"shown": "{{shown}} of {{total}}"
+	}
+}

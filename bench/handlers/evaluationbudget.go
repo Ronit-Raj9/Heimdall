@@ -181,7 +181,9 @@ func runsPast(runs int, total, capUSD float64) int {
 
 // budgetFacts records a child's cap, spend and the runs the cap stopped
 // from its live status; it reports whether anything changed. The cap is
-// the child's own (raised in place by raiseBudget), else its manifest's.
+// the child's own (raised in place by raiseBudget), else its manifest's,
+// and the live spend cap of its run controls when that one is larger (a cap
+// raised on the comparison page, PATCH /experiments/{id}/controls).
 // A child is budget stopped when it ended with runs never started while its
 // spend reached the cap less one average run: the scheduler leases a slot
 // only while spend plus its reservation stays under the cap.
@@ -190,6 +192,9 @@ func (h *evaluationsHandler) budgetFacts(c *schemas.EvaluationChild, m *schemas.
 	capUSD := c.BudgetUSD
 	if capUSD <= 0 && m != nil {
 		capUSD = m.Experiment.Budget.TotalUSD
+	}
+	if live := h.liveCap(c.ExperimentID); live > capUSD {
+		capUSD = live
 	}
 	c.BudgetUSD = capUSD
 	spent, _ := st.SpentUSD.Float()
@@ -206,6 +211,22 @@ func (h *evaluationsHandler) budgetFacts(c *schemas.EvaluationChild, m *schemas.
 		c.NotStarted = notStarted
 	}
 	return before.BudgetUSD != c.BudgetUSD || before.SpentUSD != c.SpentUSD || before.BudgetStopped != c.BudgetStopped || before.NotStarted != c.NotStarted
+}
+
+// liveCap is the spend cap set in the experiment's run controls, 0 when
+// none is set or the server has no run controls.
+func (h *evaluationsHandler) liveCap(expID string) float64 {
+	op, ok := h.env.Services.Launcher.(RunOperator)
+	if !ok || op == nil || expID == "" {
+		return 0
+	}
+	work, cancel := workContext(nil, readTimeout)
+	defer cancel()
+	st, _, err := op.Controls(work, expID)
+	if (err != nil && !errors.Is(err, runctl.ErrBrokenLog)) || st == nil {
+		return 0
+	}
+	return cents(st.TotalUSD)
 }
 
 // raiseBudget handles POST /evaluations/{id}/raise-budget: every benchmark

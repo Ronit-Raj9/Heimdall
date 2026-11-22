@@ -43,3 +43,39 @@ describe("EvaluationTable", () => {
 		expect(render(<EvaluationTable evaluations={[]} />)).toContain('data-testid="evaluations-empty"');
 	});
 });
+describe("EvaluationTable toolbar (J6.list)", () => {
+	const make = (id: string, name: string, status: Evaluation["status"], created: string, bench: string) =>
+		({ ...ev, id, spec: { ...ev.spec, name, benchmarks: [bench] }, status, created_at: created }) as Evaluation;
+	const list = [
+		make("ev_a", "codex score", "done", "2026-11-01T00:00:00Z", "bfcl"),
+		make("ev_b", "codex score", "failed", "2026-11-02T00:00:00Z", "tau2"),
+	];
+
+	it("shows the toolbar and the benchmarks under each name", () => {
+		const html = render(<EvaluationTable evaluations={list} />);
+		expect(html).toContain('data-testid="evaluations-search"');
+		expect(html).toContain('data-testid="evaluations-status-filter"');
+		expect(html).toContain('data-testid="evaluations-sort"');
+		expect(html).toMatch(/data-testid="evaluation-benchmarks-ev_a"[^>]*>bfcl</);
+	});
+
+	it("searches by benchmark and filters by status", () => {
+		const base = { q: "", status: "all", mode: "all", sort: "newest" } as const;
+		const searched = render(<EvaluationTable evaluations={list} filters={{ ...base, q: "tau2" }} />);
+		expect(searched).toContain('data-testid="evaluation-row-ev_b"');
+		expect(searched).not.toContain('data-testid="evaluation-row-ev_a"');
+		const failed = render(<EvaluationTable evaluations={list} filters={{ ...base, status: "failed" }} />);
+		expect(failed).toContain('data-testid="evaluation-row-ev_b"');
+		expect(failed).not.toContain('data-testid="evaluation-row-ev_a"');
+	});
+
+	it("sorts oldest first", () => {
+		const html = render(<EvaluationTable evaluations={list} filters={{ q: "", status: "all", mode: "all", sort: "oldest" }} />);
+		expect(html.indexOf("evaluation-row-ev_a")).toBeLessThan(html.indexOf("evaluation-row-ev_b"));
+	});
+
+	it("says so when nothing matches", () => {
+		const html = render(<EvaluationTable evaluations={list} filters={{ q: "nothing", status: "all", mode: "all", sort: "newest" }} />);
+		expect(html).toContain("No evaluations match. Clear the search or filters.");
+	});
+});

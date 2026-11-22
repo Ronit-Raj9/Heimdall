@@ -87,8 +87,17 @@ describe("EvaluationBody", () => {
 	});
 
 	it("shows the gate result, Promote this version and Repeat on a finished evaluation", () => {
-		const gate_result = { state: "fail", agent: "codex", candidate: "B", checks: [], summary: "Gate failed", decided_at: "2026-11-20T11:00:00Z" };
-		const html = render(<EvaluationBody evaluation={{ ...base, status: "done", gate_result, children: [{ ...base.children[0], status: "done" }] }} />);
+		const gate_result = {
+			state: "fail",
+			agent: "codex",
+			candidate: "B",
+			checks: [],
+			summary: "Gate failed",
+			decided_at: "2026-11-20T11:00:00Z",
+		};
+		const html = render(
+			<EvaluationBody evaluation={{ ...base, status: "done", gate_result, children: [{ ...base.children[0], status: "done" }] }} />,
+		);
 		expect(html).toContain('data-testid="gate-mock"');
 		expect(html).toContain('data-testid="promote-mock"');
 		expect(html).toContain('data-testid="repeat-mock"');
@@ -110,7 +119,9 @@ describe("EvaluationBody delete (X16)", () => {
 		expect(running).toContain("Cancel the evaluation or wait for it to finish before deleting it.");
 		const done = render(<EvaluationBody evaluation={{ ...base, status: "done" }} />, hostedSession("admin"));
 		expect(tagOf(done, "evaluation-delete")).not.toContain('disabled=""');
-		expect(render(<EvaluationBody evaluation={{ ...base, status: "done" }} />, hostedSession("viewer"))).not.toContain('data-testid="evaluation-delete"');
+		expect(render(<EvaluationBody evaluation={{ ...base, status: "done" }} />, hostedSession("viewer"))).not.toContain(
+			'data-testid="evaluation-delete"',
+		);
 	});
 });
 
@@ -122,7 +133,15 @@ describe("EvaluationBody budget (G4-01)", () => {
 					...base,
 					status: "done",
 					children: [
-						{ benchmark: "hd-harbor-tb2", experiment_id: "e1", status: "failed", budget_usd: 5, spent_usd: 4.6, budget_stopped: true, not_started: 13 },
+						{
+							benchmark: "hd-harbor-tb2",
+							experiment_id: "e1",
+							status: "failed",
+							budget_usd: 5,
+							spent_usd: 4.6,
+							budget_stopped: true,
+							not_started: 13,
+						},
 						{ benchmark: "tau2", experiment_id: "e2", status: "done", budget_usd: 5, spent_usd: 2.1 },
 					],
 				}}
@@ -138,5 +157,61 @@ describe("EvaluationBody budget (G4-01)", () => {
 	it("shows no raise panel when nothing was stopped", () => {
 		const html = render(<EvaluationBody evaluation={base} />);
 		expect(html).not.toContain('data-testid="evaluation-budget-stopped"');
+	});
+});
+
+describe("EvaluationBody (F08)", () => {
+	it("lists each benchmark's reason in the empty note when none ran (D5.ui)", () => {
+		const html = render(
+			<EvaluationBody
+				evaluation={{
+					...base,
+					status: "failed",
+					children: [
+						{
+							benchmark: "hd-harbor-bfcl",
+							experiment_id: "",
+							status: "skipped",
+							skipped: "plan experiment: the paired_signflip verdict needs arms A (baseline) and B (candidate); arm B is missing",
+						},
+					],
+				}}
+			/>,
+		);
+		expect(html).toContain("No benchmark in this evaluation could be run.");
+		expect(html).toContain(
+			"hd-harbor-bfcl: plan experiment: the paired_signflip verdict needs arms A (baseline) and B (candidate); arm B is missing",
+		);
+		expect(html).not.toContain('data-testid="evaluation-skipped"');
+	});
+
+	it("puts skipped benchmarks above the Bifrost section", () => {
+		const html = render(<EvaluationBody evaluation={base} />);
+		expect(html.indexOf('data-testid="evaluation-skipped"')).toBeGreaterThan(-1);
+		expect(html.indexOf('data-testid="evaluation-skipped"')).toBeLessThan(html.indexOf('data-testid="evaluation-report-waiting"'));
+	});
+
+	it("shows Paused and Resume while a running evaluation is paused (A8.pause)", async () => {
+		const { hostedSession } = await import("@/lib/testing/platformFixtures");
+		const html = render(<EvaluationBody evaluation={{ ...base, paused: true }} />, hostedSession("member"));
+		expect(html).toMatch(
+			/data-testid="evaluation-status"[^>]*data-status="paused"|data-status="paused"[^>]*data-testid="evaluation-status"/,
+		);
+		expect(html).toContain(">Paused<");
+		expect(html).toContain('data-testid="evaluation-unpause"');
+		expect(html).not.toContain('data-testid="evaluation-pause"');
+	});
+
+	it("shows the sum of the benchmarks' caps as the budget (D7.result)", () => {
+		const html = render(
+			<EvaluationBody
+				evaluation={{
+					...base,
+					spec: { ...base.spec, budget_usd: 1 },
+					children: [{ benchmark: "hd-harbor-tb2", experiment_id: "e1", status: "running", budget_usd: 1.1 }],
+				}}
+			/>,
+		);
+		expect(html).toContain("Budget $1.10");
 	});
 });

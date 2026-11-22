@@ -3,7 +3,13 @@ import type { Evaluation } from "@/lib/store/apis/evaluationsApi";
 import { normalizeEvaluationList } from "@/lib/store/apis/evaluationsApi";
 import {
 	benchmarkCount,
+	childReasons,
+	displayStatus,
 	evaluationAgents,
+	evaluationBenchmarks,
+	evaluationBudget,
+	filterEvaluations,
+	parseEvaluationFilters,
 	isActiveStatus,
 	modeKey,
 	sortNewestFirst,
@@ -87,5 +93,88 @@ describe("evaluation utils", () => {
 		expect(normalizeEvaluationList([ev()]).length).toBe(1);
 		expect(normalizeEvaluationList({ evaluations: [ev()] }).length).toBe(1);
 		expect(normalizeEvaluationList(null)).toEqual([]);
+	});
+});
+describe("evaluation utils (F08)", () => {
+	it("gives each child that did not run its reason, skipped first, else its status", () => {
+		expect(
+			childReasons([
+				{ benchmark: "bfcl", experiment_id: "", status: "skipped", skipped: "plan experiment: arm B is missing" },
+				{ benchmark: "tau2", experiment_id: "e2", status: "failed" },
+				{ benchmark: "x", experiment_id: "", status: "skipped" },
+			]),
+		).toEqual([
+			{ benchmark: "bfcl", reason: "plan experiment: arm B is missing" },
+			{ benchmark: "tau2", reason: "failed" },
+			{ benchmark: "x", reason: "skipped" },
+		]);
+	});
+
+	it("shows paused only for a running evaluation", () => {
+		expect(displayStatus(ev({ status: "running", paused: true }))).toBe("paused");
+		expect(displayStatus(ev({ status: "running" }))).toBe("running");
+		expect(displayStatus(ev({ status: "done", paused: true }))).toBe("done");
+	});
+
+	it("sums the children's caps for the budget, else the spec's", () => {
+		expect(
+			evaluationBudget(
+				ev({
+					spec: { ...ev().spec, budget_usd: 1 },
+					children: [
+						{ benchmark: "a", experiment_id: "e1", status: "running", budget_usd: 1.1 },
+						{ benchmark: "b", experiment_id: "", status: "skipped", budget_usd: 9 },
+					],
+				}),
+			),
+		).toBeCloseTo(1.1);
+		expect(evaluationBudget(ev({ spec: { ...ev().spec, budget_usd: 3 } }))).toBe(3);
+		expect(evaluationBudget(ev())).toBe(0);
+	});
+
+	it("lists the benchmarks from the children, else the spec", () => {
+		expect(evaluationBenchmarks(ev())).toEqual(["a", "b", "c"]);
+		expect(evaluationBenchmarks(ev({ children: [{ benchmark: "z", experiment_id: "e", status: "done" }] }))).toEqual(["z"]);
+	});
+
+	it("parses the URL filters and drops unknown values", () => {
+		expect(parseEvaluationFilters({ q: " bfcl ", status: "done", mode: "score", sort: "spend" })).toEqual({
+			q: "bfcl",
+			status: "done",
+			mode: "score",
+			sort: "spend",
+		});
+		expect(parseEvaluationFilters({ status: "weird", sort: 3 })).toEqual({ q: "", status: "all", mode: "all", sort: "newest" });
+	});
+
+	it("searches name, id, agent and benchmark, filters status and mode, sorts", () => {
+		const list = [
+			ev({
+				id: "ev_a",
+				spec: { ...ev().spec, name: "Codex nightly", mode: "score" },
+				status: "done",
+				created_at: "2026-11-01T00:00:00Z",
+				children: [{ benchmark: "bfcl", experiment_id: "e", status: "done", spent_usd: 2 }],
+			}),
+			ev({
+				id: "ev_b",
+				spec: { ...ev().spec, name: "alpha", arms: [{ label: "A", agent: "claude", model: "m" }] },
+				status: "running",
+				created_at: "2026-11-03T00:00:00Z",
+				children: [{ benchmark: "tau2", experiment_id: "e", status: "running", spent_usd: 5 }],
+			}),
+			ev({ id: "ev_c", spec: { ...ev().spec, name: "beta" }, status: "queued", created_at: "2026-11-02T00:00:00Z" }),
+		];
+		const f = parseEvaluationFilters({});
+		expect(filterEvaluations(list, f).map((e) => e.id)).toEqual(["ev_b", "ev_c", "ev_a"]);
+		expect(filterEvaluations(list, { ...f, sort: "oldest" }).map((e) => e.id)).toEqual(["ev_a", "ev_c", "ev_b"]);
+		expect(filterEvaluations(list, { ...f, sort: "name" }).map((e) => e.id)).toEqual(["ev_b", "ev_c", "ev_a"]);
+		expect(filterEvaluations(list, { ...f, sort: "spend" }).map((e) => e.id)).toEqual(["ev_b", "ev_a", "ev_c"]);
+		expect(filterEvaluations(list, { ...f, q: "BFCL" }).map((e) => e.id)).toEqual(["ev_a"]);
+		expect(filterEvaluations(list, { ...f, q: "claude" }).map((e) => e.id)).toEqual(["ev_b"]);
+		expect(filterEvaluations(list, { ...f, q: "ev_c" }).map((e) => e.id)).toEqual(["ev_c"]);
+		expect(filterEvaluations(list, { ...f, status: "running" }).map((e) => e.id)).toEqual(["ev_b", "ev_c"]);
+		expect(filterEvaluations(list, { ...f, status: "done" }).map((e) => e.id)).toEqual(["ev_a"]);
+		expect(filterEvaluations(list, { ...f, mode: "score" }).map((e) => e.id)).toEqual(["ev_a"]);
 	});
 });

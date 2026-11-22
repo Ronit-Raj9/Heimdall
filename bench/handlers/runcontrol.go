@@ -73,6 +73,12 @@ type RunControls struct {
 	// Exploratory is true for a rerun of failures: its result decides
 	// nothing and never joins the parent's verdict or a leaderboard.
 	Exploratory bool `json:"exploratory"`
+	// PausedByName is the display name (name, else email) of the user in
+	// state.paused_by, when the server knows its members (hosted).
+	PausedByName string `json:"paused_by_name,omitempty"`
+	// ActorNames maps each log actor that is a member of the organization
+	// to its display name (name, else email). Actors not in it stay ids.
+	ActorNames map[string]string `json:"actor_names,omitempty"`
 }
 
 // RunControlRequest is the body of pause, resume, cancel and requeue.
@@ -170,6 +176,7 @@ func (h *ExperimentsHandler) controlsView(ctx context.Context, op RunOperator, m
 			out.InFlight++
 		}
 	}
+	nameControls(ctx, out) // J6.log-user: names next to the user ids (runcontrolnames.go)
 	return out, nil
 }
 
@@ -197,7 +204,7 @@ func (h *ExperimentsHandler) getControls(ctx *fasthttp.RequestCtx) {
 	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	out, err := h.controlsView(work, op, m, runs)
+	out, err := h.controlsView(withPrincipal(work, ctx), op, m, runs)
 	if err != nil {
 		sendControlError(ctx, h.mode, "read controls of "+m.ExpID, err)
 		return
@@ -230,7 +237,7 @@ func (h *ExperimentsHandler) patchControls(ctx *fasthttp.RequestCtx) {
 		sendControlError(ctx, h.mode, "change controls of "+m.ExpID, err)
 		return
 	}
-	out, err := h.controlsView(work, op, m, runs)
+	out, err := h.controlsView(withPrincipal(work, ctx), op, m, runs)
 	if err != nil {
 		sendControlError(ctx, h.mode, "read controls of "+m.ExpID, err)
 		return
@@ -263,7 +270,7 @@ func (h *ExperimentsHandler) pauseExperiment(ctx *fasthttp.RequestCtx) {
 		sendControlError(ctx, h.mode, "pause experiment "+m.ExpID, err)
 		return
 	}
-	out, err := h.controlsView(work, op, m, runs)
+	out, err := h.controlsView(withPrincipal(work, ctx), op, m, runs)
 	if err != nil {
 		sendControlError(ctx, h.mode, "read controls of "+m.ExpID, err)
 		return
@@ -315,7 +322,7 @@ func (h *ExperimentsHandler) cancelRun(ctx *fasthttp.RequestCtx) {
 		sendControlError(ctx, h.mode, "cancel run "+rv.Run.RunID, err)
 		return
 	}
-	out, err := h.controlsView(work, op, m, runs)
+	out, err := h.controlsView(withPrincipal(work, ctx), op, m, runs)
 	if err != nil {
 		sendControlError(ctx, h.mode, "read controls of "+m.ExpID, err)
 		return
@@ -361,7 +368,7 @@ func (h *ExperimentsHandler) requeueRun(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	h.recorder.follow(m.ExpID)
-	out, err := h.controlsView(work, op, m, h.index.Runs(m.ExpID))
+	out, err := h.controlsView(withPrincipal(work, ctx), op, m, h.index.Runs(m.ExpID))
 	if err != nil {
 		sendControlError(ctx, h.mode, "read controls of "+m.ExpID, err)
 		return
