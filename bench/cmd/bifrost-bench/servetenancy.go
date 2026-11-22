@@ -94,6 +94,7 @@ func hostedLayout(cfg *lib.Config) tenancy.Layout {
 
 // serveHosted serves the hosted platform until ctx ends.
 func serveHosted(ctx context.Context, a *app, offline bool) int {
+	go logPublicDNS(ctx, a.logger)
 	if offline {
 		a.logger.Warn("-offline changes nothing in hosted mode: the hosted server runs no agent and opens no gateway; runners do")
 	}

@@ -83,15 +83,18 @@ func GuardControl(_, address string, _ syscall.RawConn) error {
 		return err
 	}
 	if ip := net.ParseIP(host); ip == nil || BlockedIP(ip) {
-		return fmt.Errorf("%w %s", ErrBlockedAddress, host)
+		// The address stays out of the text (fix wave 2, N104): it would tell
+		// a member what an internal name resolves to.
+		return ErrBlockedAddress
 	}
 	return nil
 }
 
 // GuardedDialer returns a dialer that refuses every non-public address at
-// connect time.
+// connect time and resolves names only through the public DNS servers
+// (PublicResolver), so a compose service name does not resolve at all.
 func GuardedDialer(timeout time.Duration) *net.Dialer {
-	return &net.Dialer{Timeout: timeout, KeepAlive: 30 * time.Second, Control: GuardControl}
+	return &net.Dialer{Timeout: timeout, KeepAlive: 30 * time.Second, Control: GuardControl, Resolver: PublicResolver()}
 }
 
 // GuardedTransport is an HTTP transport for organization-supplied URLs: the
@@ -141,7 +144,7 @@ func CheckPublicHost(host string) error {
 	}
 	if ip := net.ParseIP(h); ip != nil {
 		if BlockedIP(ip) {
-			return fmt.Errorf("%w %s", ErrBlockedAddress, h)
+			return ErrBlockedAddress
 		}
 		return nil
 	}

@@ -108,8 +108,12 @@ type Candidate struct {
 	Auth     *schemas.RemoteAuth    `json:"auth,omitempty"`
 	// NonceFound is true when the probe found the check code at the answer
 	// path: the mapping is proven for one request.
-	NonceFound bool       `json:"nonce_found"`
-	Questions  []Question `json:"questions,omitempty"`
+	NonceFound bool `json:"nonce_found"`
+	// Proven is true when a test request came back with the check code at
+	// the answer path: only then is the candidate known to work. A
+	// candidate that never answered is not proven (fix wave 2, N105).
+	Proven    bool       `json:"proven"`
+	Questions []Question `json:"questions,omitempty"`
 	// Capabilities are hints for the benchmark pick (tools, sessions).
 	Capabilities []string `json:"capabilities,omitempty"`
 	// Command is a command to copy (heimdall serve for a pull object or a
