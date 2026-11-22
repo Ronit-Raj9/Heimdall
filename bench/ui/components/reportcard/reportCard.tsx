@@ -42,7 +42,7 @@ import {
 	reportFileName,
 	reliabilityCards,
 } from "./reportCard.utils";
-import { ReliabilityCards, ResilienceCard } from "./reliabilityCards";
+import { ReliabilityCards, ResilienceCard, StoreDroppedFaults } from "./reliabilityCards";
 import { ReportFilterBar, ReportSlices } from "./reportSlices";
 import { FailoverSection } from "@/components/evaluations/failoverSettings";
 import { hasRedTeam, RedTeamSection } from "./redTeamSection";
@@ -132,6 +132,8 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 					<ResilienceCard report={report} />
 				</Section>
 			)}
+
+			{(report.resilience?.length ?? 0) === 0 && <StoreDroppedFaults evaluationId={report.evaluation} />}
 
 			{report.failover && <FailoverSection report={report.failover} />}
 

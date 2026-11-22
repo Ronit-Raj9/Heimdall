@@ -43,6 +43,22 @@ describe("ScoreSummary", () => {
 		expect(render("score", { ...score, interval: undefined })).toContain("Range not known");
 		expect(render("invalid")).toContain("score is not trusted");
 	});
+	it("says why a cost is missing and blames the price only for an unpriced model", () => {
+		const verdict = verdictWith({ decision: "score", action: "no_decision", effect: undefined, score });
+		if (!isScoreVerdict(verdict)) throw new Error("not a score verdict");
+		const withCost = (reason: string) =>
+			renderToStaticMarkup(
+				<ScoreSummary
+					verdict={verdict}
+					naive={{ A: { num: 10, den: 16, unknown: 1 } }}
+					armMetrics={{ A: { cost_usd: { state: "unknown", v: null, reason } } }}
+				/>,
+			);
+		const lost = withCost("telemetry_incomplete");
+		expect(lost).toContain("Not known: telemetry_incomplete");
+		expect(lost).not.toContain("no price set");
+		expect(withCost("unpriced_model")).toContain("Not known: this model has no price set");
+	});
 });
 
 describe("score helpers", () => {

@@ -20,6 +20,8 @@ vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 }));
 
 const { ResilienceCard } = await import("./reliabilityCards");
+const { ReportCard } = await import("./reportCard");
+const { scoreReport } = await import("./reportCard.fixtures");
 
 const inStore = (node: ReactNode) => renderToStaticMarkup(<ReduxProvider>{node}</ReduxProvider>);
 
@@ -79,5 +81,24 @@ describe("ResilienceCard dropped faults", () => {
 		const html = inStore(<ResilienceCard report={report} />);
 		expect(html).not.toContain("Faults that did not run");
 		expect(html).toContain('data-testid="resilience-model-down-A"');
+	});
+});
+
+describe("ReportCard dropped faults", () => {
+	it("lists the faults that did not run even with no resilience rows", () => {
+		fx.evaluation = {
+			id: scoreReport.evaluation,
+			children: [
+				{
+					benchmark: "hd-harbor-bfcl",
+					experiment_id: "e1",
+					status: "done",
+					faults_skipped: [{ fault: "broken-tool", reason: "the benchmark has no tools" }],
+				},
+			],
+		};
+		const html = inStore(<ReportCard report={{ ...scoreReport, resilience: [] }} readOnly />);
+		expect(html).not.toContain(">Resilience<");
+		expect(html).toContain("Broken tool on hd-harbor-bfcl: the benchmark has no tools");
 	});
 });

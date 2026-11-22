@@ -164,15 +164,21 @@ function DegradationBar({ m }: { m: ReportResilienceArm }) {
  * Under it, the chosen faults that did not apply to a benchmark and so have no row.
  */
 export function ResilienceCard({ report }: { report: Report }) {
-	// The dropped faults read the evaluation from the store; a card drawn without one (a static
-	// render) shows the resilience rows alone.
-	const store = useContext(ReactReduxContext);
 	return (
 		<div className="flex flex-col gap-3">
 			<ResilienceRows report={report} />
-			{store && <DroppedFaults evaluationId={report.evaluation} />}
+			<StoreDroppedFaults evaluationId={report.evaluation} />
 		</div>
 	);
+}
+
+/**
+ * The dropped faults read the evaluation from the store; a card drawn without one (a static
+ * render) shows nothing here.
+ */
+export function StoreDroppedFaults({ evaluationId }: { evaluationId: string }) {
+	const store = useContext(ReactReduxContext);
+	return store ? <DroppedFaults evaluationId={evaluationId} /> : null;
 }
 
 function ResilienceRows({ report }: { report: Report }) {
