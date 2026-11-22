@@ -65,6 +65,18 @@ var V1Routes = []V1Route{
 	v1("GET", "/benchmarks/packs", "/evaluation-packs"),
 	v1("GET", "/benchmarks/{id}/tasks/{task}", "/suites/{id}/tasks/{task}"),
 
+	// Add benchmark (lane Z20): the CLI `heimdall add` and the MCP tools.
+	v1("POST", "/onboard/upload", "/onboard/upload"),
+	v1("POST", "/onboard/detect", "/onboard/detect"),
+	v1("POST", "/onboard/inspect", "/onboard/inspect"),
+	v1("GET", "/onboard/drafts", "/onboard/drafts"),
+	v1("POST", "/onboard/drafts", "/onboard/drafts"),
+	v1("GET", "/onboard/drafts/{set}", "/onboard/drafts/{set}"),
+	v1("DELETE", "/onboard/drafts/{set}", "/onboard/drafts/{set}"),
+	v1("PATCH", "/onboard/drafts/{set}/tasks/{task}", "/onboard/drafts/{set}/tasks/{task}"),
+	v1("POST", "/onboard/drafts/{set}/ready", "/onboard/drafts/{set}/ready"),
+	v1("POST", "/onboard/drafts/{set}/publish", "/onboard/drafts/{set}/publish"),
+
 	v1("GET", "/evaluations", "/evaluations"),
 	v1("POST", "/evaluations", "/evaluations"),
 	v1("POST", "/evaluations/estimate", "/evaluations/estimate"),

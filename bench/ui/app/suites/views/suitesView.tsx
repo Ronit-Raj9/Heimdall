@@ -73,6 +73,9 @@ export function AddBenchmarkMenu() {
 				<ChevronDown className="size-3.5 opacity-70 transition-transform group-open:rotate-180" aria-hidden="true" />
 			</summary>
 			<div className="bg-popover text-popover-foreground absolute right-0 z-20 mt-1 flex min-w-44 flex-col rounded-lg border p-1 shadow-md">
+				<Link to="/suites/add" className={item} data-testid="suites-add-anything">
+					{t("add.anything")}
+				</Link>
 				<Link to="/suites" search={{ tab: "catalog" } as never} className={item} data-testid="suites-add-catalog">
 					{t("add.catalog")}
 				</Link>
