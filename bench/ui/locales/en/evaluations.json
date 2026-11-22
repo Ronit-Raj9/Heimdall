@@ -12,8 +12,11 @@
 			"benchmarks": "Benchmarks",
 			"status": "Status",
 			"created": "Started",
-			"open": "Open"
+			"open": "Open",
+			"result": "Result",
+			"spend": "Spend"
 		},
+		"sortResult": "Best result",
 		"openOne": "Open",
 		"benchmarkCount_one": "{{count}} benchmark",
 		"benchmarkCount_other": "{{count}} benchmarks"
@@ -24,6 +27,7 @@
 		"models": "Compare two models",
 		"opponent": "Compare against a baseline agent",
 		"model_switch": "Compare models for one agent",
+		"failureTest": "Failure test",
 		"unknown": "Evaluation ({{mode}})"
 	},
 	"status": {
@@ -52,9 +56,13 @@
 		"faults": "Failure tests: {{faults}}",
 		"noFaults": "Normal run only",
 		"progressTitle": "Benchmarks",
-		"progressDescription": "One comparison per benchmark. Updates every 3 seconds while running.",
-		"progressDescriptionScore": "One score per benchmark. Updates every 3 seconds while running.",
+		"progressDescription": "One comparison per benchmark.",
+		"progressDescriptionScore": "One score per benchmark.",
+		"liveNote": "Updates every 3 seconds.",
 		"runs": "{{done}} of {{total}} runs done",
+		"runsWithFailed_one": "{{done}} of {{total}} runs scored, {{count}} could not run (infrastructure error)",
+		"runsWithFailed_other": "{{done}} of {{total}} runs scored, {{count}} could not run (infrastructure error)",
+		"runsRunning": ", {{running}} running",
 		"runsUnknown": "Runs not counted yet",
 		"openComparison": "Open comparison",
 		"openResults": "Open results",

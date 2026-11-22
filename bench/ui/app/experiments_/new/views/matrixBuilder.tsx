@@ -9,7 +9,7 @@ import { LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSession, usesWriteToken } from "@/lib/session/sessionContext";
 import {
 	useCreateExperimentMutation,
@@ -29,24 +29,30 @@ import {
 	catalogAgent,
 	guessProvider,
 	matrixPreview,
+	readyIds,
+	someNotReady,
 	toMatrixExperiment,
 	validateBuilder,
 	type BuilderAgentIds,
+	type ReadyTasks,
 	type BuilderErrorKey,
 	type BuilderValues,
 } from "./matrixBuilderSchema";
+import { SuiteMenuItems } from "./suiteOptions";
 
 export interface MatrixBuilderProps {
 	catalog: Catalog;
 	defaults: BuilderValues;
 	/** The agent ids My agents lists (GET /agents split by splitAgents); absent lists every catalog agent. */
 	agentGroups?: BuilderAgentIds;
+	/** Ready tasks per benchmark (GET /suites): task counts and the tasks sent use only these (N42). */
+	ready?: ReadyTasks;
 	/** Called once the experiment is created and started (or created with a failed start), with its id and cap. */
 	onStarted: (expId: string, capUsd: number) => void;
 }
 
 /** The no-YAML builder: agents x models x suite, adaptive toggle, preview, estimate, plan and run. */
-export function MatrixBuilder({ catalog, defaults, agentGroups, onStarted }: MatrixBuilderProps) {
+export function MatrixBuilder({ catalog, defaults, agentGroups, ready, onStarted }: MatrixBuilderProps) {
 	const { t } = useTranslation("builder");
 	const { t: tf } = useTranslation("fw11");
 	const [v, setV] = useState<BuilderValues>(defaults);
@@ -68,10 +74,12 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, onStarted }: Mat
 	const [start, startState] = useStartExperimentMutation();
 
 	const suite = catalog.suites.find((s) => suiteRef(s) === v.suite);
-	const errors = useMemo(() => validateBuilder(v, suite), [v, suite]);
+	const errors = useMemo(() => validateBuilder(v, suite, ready), [v, suite, ready]);
 	const valid = Object.keys(errors).length === 0;
 	const shown = touched ? errors : {};
-	const preview = useMemo(() => matrixPreview(v, suite), [v, suite]);
+	const preview = useMemo(() => matrixPreview(v, suite, ready), [v, suite, ready]);
+	const runnable = readyIds(suite, ready).length;
+	const partlyReady = someNotReady(suite, ready);
 	const [extrasOpen, setExtrasOpen] = useState(false);
 	// A field error inside the collapsed Extras opens it, so the message is never hidden.
 	const extrasError = Boolean(shown.adaptiveMin || shown.concurrency || shown.seed);
@@ -105,7 +113,10 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, onStarted }: Mat
 		);
 	};
 	const needsToken = tokenBox && !token.trim();
-	const stale = planned !== null && builderPlanIsStale(planned.experiment, v, catalog);
+	const stale = planned !== null && builderPlanIsStale(planned.experiment, v, catalog, ready);
+	const estimateFresh = estimated !== null && !builderPlanIsStale(estimated, v, catalog, ready);
+	// N43: after a Plan or Estimate press on an invalid form, how many fields to fix, next to the buttons.
+	const invalidCount = touched ? Object.keys(errors).length : 0;
 	const busy = createState.isLoading || startState.isLoading;
 	const blockReason = needsToken
 		? t("actions.needsToken")
@@ -121,8 +132,16 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, onStarted }: Mat
 
 	const experimentOrNull = (): Experiment | null => {
 		setTouched(true);
+		if (!valid && typeof document !== "undefined") {
+			// Bring the first field error into view once it renders (N43).
+			setTimeout(() => {
+				document
+					.querySelector('[data-testid="matrix-builder"] [data-testid^="builder-error-"]')
+					?.scrollIntoView({ block: "center", behavior: "smooth" });
+			}, 0);
+		}
 		if (!valid || needsToken) return null;
-		return toMatrixExperiment(v, catalog);
+		return toMatrixExperiment(v, catalog, ready);
 	};
 
 	const onEstimate = async () => {
@@ -197,7 +216,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, onStarted }: Mat
 											...prev,
 											suite: next,
 											probes: [],
-											taskCount: Math.min(prev.taskCount, Math.max(1, s?.tasks.length ?? 1)),
+											taskCount: Math.min(prev.taskCount, Math.max(1, readyIds(s, ready).length)),
 										}));
 									}}
 								>
@@ -205,15 +224,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, onStarted }: Mat
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										{catalog.suites.map((s) => (
-											<SelectItem key={suiteRef(s)} value={suiteRef(s)} data-testid={`builder-suite-option-${s.id}`}>
-												{t("fields.suiteOption", {
-													id: s.id,
-													version: s.version,
-													count: s.tasks.length,
-												})}
-											</SelectItem>
-										))}
+										<SuiteMenuItems catalog={catalog} ready={ready} testIdPrefix="builder-suite-option" />
 									</SelectContent>
 								</Select>
 							)}
@@ -314,7 +325,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, onStarted }: Mat
 									<Input
 										type="number"
 										min={1}
-										max={suite?.tasks.length}
+										max={runnable}
 										className="h-8 w-20"
 										disabled={v.taskScope !== "first"}
 										value={Number.isNaN(v.taskCount) ? "" : v.taskCount}
@@ -322,9 +333,9 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, onStarted }: Mat
 										data-testid="builder-task-count"
 									/>
 									<span className="text-muted-foreground text-xs">
-										{t("fields.tasksFirstSuffix", {
-											count: suite?.tasks.length ?? 0,
-										})}
+										{partlyReady
+											? t("fields.tasksFirstSuffixReady", { count: runnable })
+											: t("fields.tasksFirstSuffix", { count: runnable })}
 									</span>
 								</label>
 								<label className="flex items-center gap-2">
@@ -335,7 +346,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, onStarted }: Mat
 										onChange={() => set("taskScope", "all")}
 										data-testid="builder-tasks-all"
 									/>
-									{t("fields.tasksAll", { count: suite?.tasks.length ?? 0 })}
+									{partlyReady ? t("fields.tasksAllReady", { count: runnable }) : t("fields.tasksAll", { count: runnable })}
 								</label>
 								{shown.taskCount && <ErrorText code={shown.taskCount} />}
 							</div>
@@ -573,6 +584,11 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, onStarted }: Mat
 								{t("actions.run")}
 							</Button>
 						</div>
+						{invalidCount > 0 && (
+							<p role="alert" className="text-chart-error-ink text-xs" data-testid="builder-invalid">
+								{t("actions.fixFields", { count: invalidCount })}
+							</p>
+						)}
 						{blockReason && (
 							<p className={cn("text-xs", stale ? "text-chart-warning-ink" : "text-muted-foreground")} data-testid="builder-blocked-reason">
 								{blockReason}
@@ -583,7 +599,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, onStarted }: Mat
 						)}
 						{estimated && estimateState.data && !estimateState.isLoading && (
 							<section
-								className={cn("flex flex-col gap-2 border-t pt-3", builderPlanIsStale(estimated, v, catalog) && "opacity-60")}
+								className={cn("flex flex-col gap-2 border-t pt-3", !estimateFresh && "opacity-60")}
 								data-testid="builder-estimate-result"
 							>
 								<h3 className="text-sm font-semibold">{t("estimate.title")}</h3>
@@ -594,7 +610,13 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, onStarted }: Mat
 							<LoadError title={t("actions.planError")} error={planState.error} testId="builder-plan-error" />
 						)}
 						{actionError && <LoadError title={actionError.title} error={actionError.error} testId="builder-action-error" />}
-						{planned && <PlanResult plan={planned.plan} className={cn(stale && "opacity-60")} />}
+						{planned && (
+							<PlanResult
+								plan={planned.plan}
+								estimateShown={estimateFresh && Boolean(estimateState.data) && !estimateState.isLoading}
+								className={cn(stale && "opacity-60")}
+							/>
+						)}
 					</CardContent>
 				</Card>
 			</aside>

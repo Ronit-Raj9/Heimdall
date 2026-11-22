@@ -102,3 +102,40 @@ describe("ReportCard dropped faults", () => {
 		expect(html).toContain("Broken tool on hd-harbor-bfcl: the benchmark has no tools");
 	});
 });
+describe("ResilienceCard range (N58)", () => {
+	const noRange = (changed: number | undefined) =>
+		({
+			...report,
+			resilience: [
+				{
+					fault: "model-down",
+					arms: {
+						A: {
+							tasks: 9,
+							degradation_ratio: 1,
+							degradation_ratio_low: null,
+							degradation_ratio_high: null,
+							recovery_rate: 1,
+							cost_inflation: null,
+							time_to_recover_s: null,
+							retry_after_respected: null,
+							...(changed === undefined ? {} : { changed_tasks: changed }),
+						},
+					},
+				},
+			],
+		}) as unknown as Report;
+
+	it("says why there is no range when no task changed", () => {
+		fx.evaluation = { id: "ev_d10", children: [] };
+		const html = inStore(<ResilienceCard report={noRange(0)} />);
+		expect(html).toContain("the fault changed no task&#x27;s result in 9 tasks, too few runs for a range");
+		expect(html).not.toContain("x1.00 to x1.00");
+	});
+
+	it("says nothing for a missing range of an older report", () => {
+		fx.evaluation = { id: "ev_d10", children: [] };
+		expect(inStore(<ResilienceCard report={noRange(undefined)} />)).not.toContain("too few runs for a range");
+		expect(inStore(<ResilienceCard report={report} />)).toContain("(x0.00 to x1.00)");
+	});
+});

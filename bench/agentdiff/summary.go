@@ -21,8 +21,9 @@ var groupNames = map[string]string{
 func Summarize(r *Report) string {
 	o := r.Outcome
 	var parts []string
+	passA, passB := passText(o.PassRateA, o.PassRateB, o.CommonTasks)
 	parts = append(parts, fmt.Sprintf("On %d common task%s of %s under %s, B passes %s and A passes %s.",
-		o.CommonTasks, plural(o.CommonTasks), r.Suite, r.Condition, rate(o.PassRateB, o.CommonTasks), rate(o.PassRateA, o.CommonTasks)))
+		o.CommonTasks, plural(o.CommonTasks), r.Suite, r.Condition, passB, passA))
 	parts = append(parts, flipsText(o))
 	parts = append(parts, testText(o.Test))
 	parts = append(parts, configText(r.Config))
@@ -101,14 +102,25 @@ func costText(ms []MetricDelta) string {
 	return ""
 }
 
-// rate writes a mean per-task pass rate as tasks, or as a percentage when
-// trials make it fractional.
-func rate(r float64, n int) string {
-	passed := r * float64(n)
-	if whole := math.Round(passed); abs(passed-whole) < 1e-9 {
-		return fmt.Sprintf("%d", int(whole))
+// passText writes both sides' mean per-task pass rates in one unit: task
+// counts with the percent ("3 of 5 tasks (60%)") when both are whole numbers
+// of tasks, else percents for both, with A's side saying once that trials are
+// averaged ("40% of the tasks (averaged over trials)"). Mixing a bare count on
+// one side with a percent on the other read as "B passes 50% and A passes 2".
+func passText(rA, rB float64, n int) (a, b string) {
+	kA, wholeA := wholeTasks(rA, n)
+	kB, wholeB := wholeTasks(rB, n)
+	if wholeA && wholeB {
+		return fmt.Sprintf("%d of %d task%s (%.0f%%)", kA, n, plural(n), rA*100), fmt.Sprintf("%d of %d task%s (%.0f%%)", kB, n, plural(n), rB*100)
 	}
-	return fmt.Sprintf("%.0f%%", r*100)
+	return fmt.Sprintf("%.0f%% of the tasks (averaged over trials)", rA*100), fmt.Sprintf("%.0f%%", rB*100)
+}
+
+// wholeTasks is r*n as a task count when it is a whole number.
+func wholeTasks(r float64, n int) (int, bool) {
+	passed := r * float64(n)
+	whole := math.Round(passed)
+	return int(whole), abs(passed-whole) < 1e-9
 }
 
 func plural(n int) string {

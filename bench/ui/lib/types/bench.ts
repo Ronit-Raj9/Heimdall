@@ -3736,6 +3736,9 @@ export interface AgentDiffVersionInfo {
 	/** Sealed runs, not yet seal-verified. */
 	sealed_runs: number;
 	latest_at: string;
+	version?: number;
+	model?: string;
+	system?: boolean;
 }
 
 /** GET /agents/diff/versions: every config hash the run folder knows. */

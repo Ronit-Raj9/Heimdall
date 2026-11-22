@@ -23,3 +23,26 @@ describe("VerdictPromote (J7.promote)", () => {
 		expect(render(<VerdictPromote expId="e1" arms={["A"]} />)).not.toContain("verdict-promote");
 	});
 });
+describe("VerdictPromote follows what differs between the setups (N165)", () => {
+	it("offers the model, not a promote, on a model-only comparison", () => {
+		const html = render(<VerdictPromote expId="e1" arms={["A", "B"]} armsDiffer="model" decision="inconclusive" modelB="gpt-6-luna" />);
+		expect(html).not.toContain('data-testid="verdict-promote"');
+		expect(html).toContain("Use model gpt-6-luna");
+		expect(tagOf(html, "verdict-use-model") ?? "").toContain("tab=migration");
+	});
+	it("shows nothing on an A/A check", () => {
+		const html = render(<VerdictPromote expId="e1" arms={["A", "B"]} armsDiffer="none" decision="inconclusive" />);
+		expect(html).not.toContain("verdict-promote");
+		expect(html).not.toContain("verdict-use-model");
+	});
+	it("promotes a winning agent version with no exception line", () => {
+		const html = render(<VerdictPromote expId="e1" arms={["A", "B"]} armsDiffer="agent" decision="improved" />);
+		expect(html).toContain('data-testid="verdict-promote"');
+		expect(html).not.toContain("verdict-promote-exception");
+	});
+	it("warns that promoting without a clear winner is an exception", () => {
+		const html = render(<VerdictPromote expId="e1" arms={["A", "B"]} armsDiffer="agent" decision="inconclusive" />);
+		expect(html).toContain('data-testid="verdict-promote"');
+		expect(html).toContain("No clear winner yet. Promoting now records the release as an exception to your release rules.");
+	});
+});

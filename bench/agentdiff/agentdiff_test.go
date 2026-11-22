@@ -200,7 +200,7 @@ func TestDiffFlips(t *testing.T) {
 	if r.Config.Identical || r.Config.Groups[0].ID != GroupModel {
 		t.Fatalf("config %+v", r.Config)
 	}
-	for _, s := range []string{"B passes 2 and A passes 2", "1 task flipped to pass and 1 flipped to fail (net +0)", "Cannot tell", "model"} {
+	for _, s := range []string{"B passes 2 of 4 tasks (50%) and A passes 2 of 4 tasks (50%)", "1 task flipped to pass and 1 flipped to fail (net +0)", "Cannot tell", "model"} {
 		if !strings.Contains(r.Summary, s) {
 			t.Errorf("summary %q lacks %q", r.Summary, s)
 		}

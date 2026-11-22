@@ -1,0 +1,14 @@
+{
+	"ft": {
+		"pickAgentFirst": "Pick an agent to see which benchmarks it can run.",
+		"estimateLine": "About {{runs}}, {{cost}}, {{minutes}}.",
+		"updating": "Updating...",
+		"estimateFailed": "Could not estimate this test right now.",
+		"toSeeCost": "To see the cost: {{need}}"
+	},
+	"suite": {
+		"probesHint": "Plus model faults (outage, brownout, flaky) that work on every benchmark.",
+		"counting": "Counting...",
+		"healthLoading": "Working out task health..."
+	}
+}

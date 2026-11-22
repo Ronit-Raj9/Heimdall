@@ -1,8 +1,10 @@
 import { LoadError } from "@/components/runs/screenStates";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useGetAwarenessQuery, useListMonitorCertificationsQuery } from "@/lib/store/apis/integrityApi";
+import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { AwarenessPanel } from "./awarenessPanel";
+import "./gw06I18n";
 import { certificationsFor } from "./integrity.utils";
 import { MonitorCertList } from "./monitorCertification";
 
@@ -40,12 +42,26 @@ export function ExperimentMonitorsSection({ expId }: { expId: string }) {
 		return <LoadError title={t("integrity.monitors.loadError")} error={q.error} onRetry={q.refetch} testId="monitors-error" />;
 	}
 	const certs = certificationsFor(q.data?.certifications ?? [], expId);
-	if (certs.length === 0) {
-		return (
-			<p className="text-muted-foreground font-mono text-xs" data-testid="monitors-none">
-				{t("integrity.monitors.none", { exp: expId })}
-			</p>
-		);
-	}
-	return <MonitorCertList certs={certs} testId="verdict-monitor-certs" />;
+	return (
+		<div className="flex flex-col gap-2">
+			{certs.length === 0 ? (
+				<p className="text-muted-foreground font-mono text-xs" data-testid="monitors-none">
+					{t("integrity.monitors.none", { exp: expId })}
+				</p>
+			) : (
+				<MonitorCertList certs={certs} testId="verdict-monitor-certs" />
+			)}
+			<AllMonitorsLink />
+		</div>
+	);
+}
+
+/** The link to every safety monitor (/monitors), which no menu leads to (N77). */
+function AllMonitorsLink() {
+	const { t } = useTranslation("gw06");
+	return (
+		<Link to="/monitors" className="text-primary w-fit text-xs font-medium hover:underline" data-testid="monitors-all-link">
+			{t("integrity.allMonitors")}
+		</Link>
+	);
 }

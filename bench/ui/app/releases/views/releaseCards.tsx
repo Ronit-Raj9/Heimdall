@@ -54,16 +54,20 @@ export function ReleaseCards({ releases, chainOk }: { releases: ReleaseRecord[];
 
 function ReleaseCard({ record, linked }: { record: ReleaseRecord; linked: boolean }) {
 	const { t } = useTranslation("u14");
+	const { t: tg } = useTranslation("gw06");
 	const [open, setOpen] = useState(false);
 	const id = record.release_id;
 	const ship = record.action === "ship";
+	// A record exists only because someone released, so the main badge always reads Released (N171).
+	// The result's advice is a second badge: the override when there is one, else the advice when it was not ship.
+	const advice = resultWords(record.action, tg as (key: string) => string);
 	const agent = releaseTitle(record, t as never);
 	return (
 		<li className="relative" data-testid={`release-entry-${id}`}>
 			<span
 				className={cn(
 					"bg-background absolute top-5 -left-6 flex size-3.5 items-center justify-center rounded-full border-2",
-					record.override ? "border-chart-error" : ship ? "border-chart-success" : "border-chart-warning",
+					record.override ? "border-chart-error" : "border-chart-success",
 				)}
 				aria-hidden="true"
 			/>
@@ -84,24 +88,32 @@ function ReleaseCard({ record, linked }: { record: ReleaseRecord; linked: boolea
 					</div>
 					<div className="flex flex-wrap items-center gap-1.5">
 						<span
-							className={cn(
-								"inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-								ship ? "bg-chart-success/15 text-chart-success-ink" : "bg-chart-warning/15 text-chart-warning-ink",
-							)}
+							className="bg-chart-success/15 text-chart-success-ink inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
 							title={record.decision || record.action}
 							data-testid={`release-action-${id}`}
 						>
-							{ship ? <Rocket className="size-3" aria-hidden="true" /> : <TriangleAlert className="size-3" aria-hidden="true" />}
-							{ship ? t("releases.shipped") : t("releases.held")}
+							<Rocket className="size-3" aria-hidden="true" />
+							{t("releases.shipped")}
 						</span>
-						{record.override && (
+						{record.override ? (
 							<span
 								className="bg-destructive/10 text-chart-error-ink inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-								title={t("releases.overrideHint")}
+								title={tg("releases.overrideTitle", { action: advice, approver: record.approver, override: record.override })}
 								data-testid={`release-override-tag-${id}`}
 							>
 								{t("releases.override")}
 							</span>
+						) : (
+							!ship && (
+								<span
+									className="bg-chart-warning/15 text-chart-warning-ink inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+									title={record.decision || record.action}
+									data-testid={`release-advice-${id}`}
+								>
+									<TriangleAlert className="size-3" aria-hidden="true" />
+									{tg("releases.resultSaid", { action: advice })}
+								</span>
+							)
 						)}
 					</div>
 				</div>
@@ -230,6 +242,11 @@ function ReleaseCard({ record, linked }: { record: ReleaseRecord; linked: boolea
 			</div>
 		</li>
 	);
+}
+
+/** The result's advice in plain words ("hold", "no decision"); an unknown value as written. */
+function resultWords(action: string, tg: (key: string) => string): string {
+	return ["ship", "hold", "no_decision", "fix_harness"].includes(action) ? tg(`releases.action.${action}`) : action;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {

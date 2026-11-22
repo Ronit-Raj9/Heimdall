@@ -1,7 +1,7 @@
 import "@/lib/i18n";
 
 import type { Estimate, Evaluation } from "@/lib/store/apis/evaluationsApi";
-import { render } from "@/lib/testing/render";
+import { render, tagOf } from "@/lib/testing/render";
 import type { AgentSummary } from "@/lib/types/bench";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { describe, expect, it, vi } from "vitest";
@@ -33,6 +33,26 @@ const fx = vi.hoisted(() => {
 		agents: { agents: [{ id: "codex", model: "gpt-5.6-terra", gateway: { provider: "openai" } }] } as unknown,
 		suites: { suites: [{ id: "hd-harbor-bfcl", description: "" }] } as unknown,
 		evaluations: [] as unknown[],
+		// GET /faults: the 15 catalog faults (faults/faults.go Catalog), in four groups.
+		faults: [
+			["model-down", "Model down", "Model"],
+			["model-brownout", "Model brownout", "Model"],
+			["model-slow", "Slow model", "Model"],
+			["model-flaky", "Flaky model", "Model"],
+			["broken-tool", "Broken tool", "Tools"],
+			["tool-rate-limit", "Rate limit", "Tools"],
+			["tool-slow", "Slow tool", "Tools"],
+			["tool-flaky", "Flaky tool", "Tools"],
+			["tool-partial", "Partial results", "Tools"],
+			["tool-auth-expired", "Expired login", "Tools"],
+			["tool-removed", "Tool removed", "Tools"],
+			["tool-input-drift", "API version change", "Tools"],
+			["tool-duplicate-effect", "Duplicate action", "Tools"],
+			["misleading-instruction", "Misleading instructions", "Instructions"],
+			["compound-brownout-rate-limit", "Brownout, then rate limit", "Combined"],
+		].map(([id, label, group]) => ({ id, label, help: `${label} help`, layer: "model", group })),
+		compat: undefined as unknown,
+		estimate: undefined as unknown,
 	};
 });
 
@@ -52,7 +72,9 @@ vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 	...((await importOriginal()) as Record<string, unknown>),
 	useListEvaluationsQuery: () => fx.ok(fx.evaluations),
 	useGetAgentVersionsQuery: () => fx.ok({ agent: "codex", versions: [] }),
-	useEstimateEvaluationQuery: () => fx.loading(),
+	useEstimateEvaluationQuery: () => fx.estimate ?? fx.loading(),
+	useGetBenchFaultsQuery: () => fx.ok(fx.faults),
+	useGetAgentCompatibilityQuery: () => fx.compat ?? { data: undefined, currentData: undefined, isError: false, isLoading: false },
 	useGetEvaluationReportQuery: () => fx.loading(),
 	useCreateEvaluationMutation: () => [() => undefined, { isLoading: false, isError: false }],
 }));
@@ -61,6 +83,7 @@ const {
 	default: FailureTestsView,
 	PastTest,
 	SkippedFaultsNote,
+	FailureTestEstimate,
 	failureTestSpec,
 	formProblem,
 	pickAgentForm,
@@ -179,5 +202,94 @@ describe("faults that do not apply", () => {
 		const html = render(<PastTest ev={ev} />);
 		expect(html).toContain("2 faults did not apply");
 		expect(render(<PastTest ev={{ ...ev, children: [] }} />)).not.toContain("did not apply");
+	});
+});
+
+describe("failure test faults from the catalog (N123)", () => {
+	it("lists the 15 catalog faults in four groups with the three PS2 faults ticked", () => {
+		const html = view();
+		const boxes = html.match(/data-testid="ft-fault-(?!group-)[a-z-]+"/g) ?? [];
+		expect(boxes).toHaveLength(15);
+		for (const g of ["Model", "Tools", "Instructions", "Combined"]) expect(html).toContain(`data-testid="ft-fault-group-${g}"`);
+		for (const id of ["model-down", "broken-tool", "misleading-instruction"]) expect(tagOf(html, `ft-fault-${id}`)).toContain('checked=""');
+		expect(tagOf(html, "ft-fault-model-flaky")).not.toContain("checked");
+		expect(html).toContain("Flaky model help");
+	});
+	it("sends any ticked catalog fault, clean first, without repeats", () => {
+		expect(failureTestSpec({ ...form, model: "m", faults: ["model-flaky", "clean", "model-flaky", "tool-slow"] }).faults).toEqual([
+			"clean",
+			"model-flaky",
+			"tool-slow",
+		]);
+	});
+});
+
+describe("failure test benchmarks (N124)", () => {
+	it("greys out a benchmark the chosen agent cannot run, with the reason", () => {
+		fx.suites = {
+			suites: [
+				{ id: "hd-harbor-bfcl", description: "", admitted_count: 10, builtin: true, source: "library", track: "terminal" },
+				{ id: "longmemeval-s", description: "", admitted_count: 20, builtin: true, source: "library", track: "memory" },
+			],
+		};
+		const answer = {
+			agent: "zz-test-loop",
+			benchmarks: [{ id: "longmemeval-s", ok: false, requires: [], missing: ["sessions"], reason: "needs sessions" }],
+		};
+		fx.compat = { data: answer, currentData: answer, isError: false, isLoading: false };
+		const html = view("?agent=codex");
+		expect(html).toMatch(/data-testid="ft-benchmark-longmemeval-s" data-disabled="true"/);
+		expect(html).toContain("needs sessions");
+		expect(html).not.toMatch(/data-testid="ft-benchmark-hd-harbor-bfcl" data-disabled/);
+		fx.compat = undefined;
+	});
+	it("asks for an agent first when none is chosen", () => {
+		expect(view()).toContain("Pick an agent to see which benchmarks it can run.");
+	});
+});
+
+describe("failure test estimate (N125)", () => {
+	it("says what is missing before it can show the cost", () => {
+		expect(view("?agent=codex")).toContain("To see the cost: Choose at least one benchmark.");
+	});
+	it("shows runs, cost and minutes for a complete form, updating, the budget line and a plain line on failure", () => {
+		const estimate = {
+			runs: 12,
+			est_cost_usd: { low: 0.4, high: 0.9, known: true },
+			est_minutes: { low: 5, high: 9, known: true },
+			per_benchmark: [],
+			budget: {
+				budget_usd: 2,
+				per_benchmark_usd: 2,
+				default: false,
+				default_per_benchmark_usd: 5,
+				suggested_usd: 2,
+				max_usd: 50,
+				fit: "fits",
+				runs_skipped_low: 0,
+				runs_skipped_high: 0,
+			},
+		} as unknown as Estimate;
+		const html = render(
+			<FailureTestEstimate problem={null} estimate={{ data: estimate, isFetching: false, isError: false }} pending={false} budgetTyped />,
+		);
+		expect(html).toContain("About 12 runs, $0.40 to $0.90, 5 to 9 min.");
+		expect(html).toContain('data-testid="ft-budget-line"');
+		expect(html).not.toContain("Updating...");
+		expect(
+			render(
+				<FailureTestEstimate problem={null} estimate={{ data: estimate, isFetching: false, isError: false }} pending budgetTyped={false} />,
+			),
+		).toContain("Updating...");
+		const failed = render(
+			<FailureTestEstimate
+				problem={null}
+				estimate={{ data: undefined, isFetching: false, isError: true, error: { status: 500, data: { error: { message: "boom" } } } }}
+				pending={false}
+				budgetTyped={false}
+			/>,
+		);
+		expect(failed).toContain("Could not estimate this test right now.");
+		expect(failed).toMatch(/title="[^"]+"/);
 	});
 });

@@ -105,7 +105,7 @@
 		"unknown": "unknown",
 		"faultDrop": "Drop under faults",
 		"notTested": "not tested",
-		"drop": "-{{points}} pts ({{fault}})",
+		"drop": "{{points}} ({{fault}})",
 		"lastEvaluation": "Last evaluation {{when}}",
 		"evaluate": "Evaluate"
 	},
@@ -180,7 +180,7 @@
 		"launch": "Run failure test",
 		"launching": "Starting...",
 		"pastTitle": "Past failure tests",
-		"pastHint": "Score under each fault and the drop from a clean run.",
+		"pastHint": "Score under each fault and the change from a clean run.",
 		"pastError": "Could not load past failure tests",
 		"pastEmpty": "No failure tests yet.",
 		"status": {

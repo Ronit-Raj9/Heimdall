@@ -12,6 +12,7 @@ import { DiffSummary, VersionCards } from "@/components/agentdiff/diffSummary";
 import { GateChanges, MetricDeltasTable } from "@/components/agentdiff/metricDeltas";
 import { TaskFlipsTable } from "@/components/agentdiff/taskFlipsTable";
 import { VersionPicker } from "@/components/agentdiff/versionPicker";
+import "@/components/agentdiff/gw03I18n";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { useGetAgentDiffQuery, useGetAgentDiffVersionsQuery } from "@/lib/store/apis/agentDiffApi";
 import type { AgentDiffResponse } from "@/lib/types/bench";
@@ -29,6 +30,7 @@ const searchParsers = {
 	condition: parseAsString,
 	agent: parseAsString,
 	synthetic: parseAsStringLiteral(SYNTHETIC_VALUES),
+	system: parseAsString,
 };
 
 /**
@@ -40,6 +42,7 @@ const searchParsers = {
  */
 export default function AgentDiffTab() {
 	const { t } = useTranslation("bench");
+	const { t: tg } = useTranslation("gw03");
 	const [search, setSearch] = useQueryStates(searchParsers);
 	const versionsQuery = useGetAgentDiffVersionsQuery();
 	const versions = useMemo(() => versionsQuery.data?.versions ?? [], [versionsQuery.data]);
@@ -83,12 +86,14 @@ export default function AgentDiffTab() {
 				onSwap={() => void setSearch({ a: shownB || null, b: shownA || null, agent: null })}
 				onScope={({ suite, condition }) => void setSearch({ suite: suite || null, condition: condition || null })}
 				onSynthetic={(on) => void setSearch({ synthetic: on ? SYNTHETIC_ON : null })}
+				showSystem={search.system === "1"}
+				onShowSystem={(on) => void setSearch({ system: on ? "1" : null })}
 				disabled={versionsQuery.isLoading}
 			/>
 			{suggested && (
 				<p className="text-muted-foreground flex items-start gap-2 text-xs" role="note" data-testid="agentdiff-suggested-note">
 					<Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-					{t("agentDiff.picker.suggested", { agent: suggested.agent_id, version: versionLabel(suggested) })}
+					{t("agentDiff.picker.suggested", { agent: suggested.agent_id, version: versionLabel(suggested, tg("diffPicker.unsaved")) })}
 				</p>
 			)}
 			{agentMode && (

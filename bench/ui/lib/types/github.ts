@@ -7,6 +7,8 @@ export interface GithubStatus {
 	connected_by?: string;
 	connected_at?: string;
 	hint?: string;
+	/** A hosted server: a project has no git history of its own, so refs come from a GitHub repository (fix wave 2, N67). */
+	hosted?: boolean;
 }
 
 export interface GithubRepo {

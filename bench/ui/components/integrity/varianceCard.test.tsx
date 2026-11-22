@@ -88,3 +88,11 @@ describe("VarianceCard", () => {
 		expect(outside).toContain('data-inside="false"');
 	});
 });
+describe("VarianceCard never claims an A/A measurement it does not have (N68)", () => {
+	it("draws no source badge on an old analysis whose SD was not assumed", () => {
+		const html = render(verdictWith({ variance: undefined, mde_assumed_sd: false, sd: 0, mde: 0 }));
+		expect(html).not.toContain("measured from the A/A setup");
+		expect(html).not.toContain('data-testid="variance-source"');
+		expect(html).not.toContain('data-source="measured_aa"');
+	});
+});

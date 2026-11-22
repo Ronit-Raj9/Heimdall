@@ -36,6 +36,12 @@
 		},
 		"experiment": "Comparison",
 		"pickExperiment": "Pick a comparison",
+		"groups": {
+			"evaluations": "Evaluations",
+			"comparisons": "Comparisons",
+			"other": "Checks, practice and debug runs"
+		},
+		"showHidden": "Also show checks, practice runs and debug runs ({{count}})",
 		"suite": "Benchmark",
 		"pickSuite": "Pick a benchmark",
 		"payloads": "Include what the agent sent to and got back from its tools (private values hidden, size limited)",

@@ -1,6 +1,8 @@
 import { CompliancePackLinks } from "@/components/integrity/compliancePack";
 import { AwarenessSection, ExperimentMonitorsSection } from "@/components/integrity/integritySections";
+import "@/components/integrity/gw06I18n";
 import { VarianceCard } from "@/components/integrity/varianceCard";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BlockSkeleton } from "@/components/runs/screenStates";
 import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
 import { armOrder } from "@/components/verdict/verdict.utils";
@@ -28,7 +30,7 @@ export function IntegrityTab({ expId }: { expId: string }) {
 								testId="integrity-source"
 							/>
 						</div>
-						<VarianceCard verdict={verdict.data.verdict} />
+						{verdict.data.verdict.decision === "score" ? <OneSetupNoiseNote /> : <VarianceCard verdict={verdict.data.verdict} />}
 					</div>
 				)
 			)}
@@ -44,5 +46,22 @@ export function IntegrityTab({ expId }: { expId: string }) {
 				</Section>
 			</div>
 		</div>
+	);
+}
+
+/**
+ * In place of the noise floor card on a one-setup score run (N68): the noise floor is about the
+ * difference between two setups, so there is nothing to measure it against.
+ */
+function OneSetupNoiseNote() {
+	const { t } = useTranslation("gw06");
+	return (
+		<Card className="gap-2" data-testid="variance-one-setup">
+			<CardHeader>
+				<CardTitle>{t("integrity.noiseFloorTitle")}</CardTitle>
+				<CardDescription>{t("integrity.noiseFloorOneSetup")}</CardDescription>
+			</CardHeader>
+			<CardContent />
+		</Card>
 	);
 }

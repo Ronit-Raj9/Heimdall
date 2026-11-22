@@ -40,7 +40,7 @@ describe("PlanResult", () => {
 		expect(html).not.toContain('data-testid="plan-no-issues"');
 	});
 
-	it("shows sizes, estimates and the MDE with the assumed-SD note", () => {
+	it("shows sizes and the MDE with the assumed-SD note", () => {
 		const html = renderToStaticMarkup(<PlanResult plan={BASE} />);
 		expect(planBlocksStart(BASE)).toBe(false);
 		expect(html).toContain('data-blocked="false"');
@@ -50,8 +50,6 @@ describe("PlanResult", () => {
 		expect(html).toContain(">62.4 pp<");
 		expect(html).toContain('data-testid="plan-mde-assumed-sd"');
 		expect(html).toContain("Uses an assumed SD of 0.3");
-		expect(html).toContain(">1h<");
-		expect(html).toContain(">$17.50<");
 		expect(html).toContain('data-testid="plan-condition-stale-notes"');
 	});
 
@@ -61,11 +59,17 @@ describe("PlanResult", () => {
 		expect(html).toContain("SD 0.21, measured");
 	});
 
-	it("renders an unknown estimate as unknown, never zero", () => {
+	// N41: the plan never knows time or cost, so it points at the Estimate instead of printing unknowns.
+	it("prints no time or cost row and points at the Estimate", () => {
 		const html = renderToStaticMarkup(
 			<PlanResult plan={{ ...BASE, est_usd: { state: "unknown", v: null, reason: "no_price_snapshot" } }} />,
 		);
-		expect(html).toContain('data-testid="plan-est-cost-value"');
-		expect(html).toContain("Unknown: no_price_snapshot.");
+		expect(html).not.toContain('data-testid="plan-est-time"');
+		expect(html).not.toContain('data-testid="plan-est-cost"');
+		expect(html).not.toContain("Estimated cost");
+		expect(html).not.toContain("no_price_snapshot");
+		expect(html).toContain('data-testid="plan-time-cost"');
+		expect(html).toContain("Time and cost: press Estimate cost.");
+		expect(renderToStaticMarkup(<PlanResult plan={BASE} estimateShown />)).toContain("Time and cost: see the Estimate.");
 	});
 });

@@ -14,6 +14,7 @@ import {
 	sortGroups,
 	suggestBaseline,
 	versionLabel,
+	countSystemVersions,
 	visibleTasks,
 	type AgentDiffSearch,
 } from "./agentDiff.utils";
@@ -179,5 +180,23 @@ describe("formatting", () => {
 	it("wraps a file diff for the run diff renderer", () => {
 		expect(fileDiffAsRunDiff({ path: "CLAUDE.md", diff: "+x\n" })).toMatchObject({ patch: "+x\n", diff: { path: "CLAUDE.md", files: [] } });
 		expect(fileDiffAsRunDiff({ path: "a" }).patch).toBe("");
+	});
+});
+
+describe("version picker rows (N159)", () => {
+	const saved = { ...version(HASH_OLD, "codex", "2026-11-13T09:00:00Z", "gpt-5.5"), version: 1, model: "gpt-5.5" };
+	const unsaved = { ...version(HASH_NEW, "codex", "2026-11-14T10:00:00Z", "gpt-6-luna"), model: "gpt-6-luna" };
+	const oracle = { ...version(HASH_OTHER, "oracle", "2026-11-15T09:00:00Z", "right answer, try 1"), system: true };
+
+	it("leaves system checks out unless asked, and lists saved versions before unsaved setups", () => {
+		const groups = groupVersionsByAgent([saved, unsaved, oracle]);
+		expect(groups.map((g) => g.agent)).toEqual(["codex"]);
+		expect(groups[0].versions.map((v) => v.config_hash)).toEqual([HASH_OLD, HASH_NEW]);
+		expect(groupVersionsByAgent([saved, unsaved, oracle], { showSystem: true }).map((g) => g.agent)).toEqual(["codex", "oracle"]);
+		expect(countSystemVersions([saved, unsaved, oracle])).toBe(1);
+	});
+	it("names the saved version and model, or says the setup was not saved", () => {
+		expect(versionLabel(saved, "Unsaved setup")).toBe("v1 · gpt-5.5 · 895fa846…3758");
+		expect(versionLabel(unsaved, "Unsaved setup")).toBe("Unsaved setup · gpt-6-luna · 67cd7a06…30cd");
 	});
 });

@@ -12,7 +12,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/maximhq/bifrost/bench/attribution"
 	"github.com/maximhq/bifrost/bench/clusters"
@@ -156,6 +158,30 @@ type checkRunResult struct {
 	Decision    string `json:"decision"`
 	Action      string `json:"action"`
 	Policy      string `json:"policy,omitempty"` // the release policy's decision, when one applies
+	// PolicyFile names the release rule set by its file, without .yaml or
+	// .yml, as Releases > Rules lists it; the name inside the file can
+	// differ (a copied template keeps its own name).
+	PolicyFile string `json:"policy_file,omitempty"`
+}
+
+// releasePolicyFile is the file name of the rule set releasePolicy
+// evaluates for m with no override: the one the experiment froze, else the
+// server's default policy.
+func (a *app) releasePolicyFile(m *schemas.Manifest) string {
+	if m.Experiment.Policy != "" {
+		return policyFileName(m.Experiment.Policy)
+	}
+	return policyFileName(a.defaultPolicy)
+}
+
+// policyFileName is the rule set name Releases > Rules shows for a policy
+// path: its base name without a .yaml or .yml extension.
+func policyFileName(path string) string {
+	if path == "" {
+		return ""
+	}
+	base := filepath.Base(path)
+	return strings.TrimSuffix(strings.TrimSuffix(base, ".yaml"), ".yml")
 }
 
 // checkRunJob re-analyzes a frozen experiment and saves a new analysis, the
@@ -171,10 +197,15 @@ func checkRunJob(ctx context.Context, l *launcher, p analysisParams, log jobs.Lo
 		Decision: string(an.Verdict.Decision), Action: string(an.Verdict.Action)}
 	if an.Policy != nil {
 		res.Policy = string(an.Policy.Decision)
+		if m, err := l.a.store.LoadManifest(ctx, p.ExpID); err == nil {
+			res.PolicyFile = l.a.releasePolicyFile(m)
+		}
 	}
 	log.Printf("verdict: %s, action: %s", res.Decision, res.Action)
 	if res.Policy != "" {
-		log.Printf("release policy %s: %s", an.Policy.PolicyName, res.Policy)
+		log.Printf("release rule set %s (%s): %s", orDash(res.PolicyFile), an.Policy.PolicyName, res.Policy)
+	} else if an.Verdict.Decision == schemas.DecisionScore {
+		log.Printf("one setup scored: no release decision, so no release rule set applies")
 	}
 	log.Printf("saved analysis %s", res.AnalysisID)
 	return res, nil
@@ -272,11 +303,12 @@ func awarenessRunJob(ctx context.Context, l *launcher, p analysisParams, log job
 
 // blameRunResult is blame.run's result.
 type blameRunResult struct {
-	ExpID   string `json:"exp_id"`
-	Runs    int    `json:"runs"`    // blame.json written
-	Failed  int    `json:"failed"`  // of those, failed runs
-	Blamed  int    `json:"blamed"`  // of those, failures pinned on one agent
-	Skipped int    `json:"skipped"` // runs whose seal did not verify
+	ExpID     string `json:"exp_id"`
+	Runs      int    `json:"runs"`       // blame.json written
+	Failed    int    `json:"failed"`     // of those, failed runs that were scored
+	NotScored int    `json:"not_scored"` // of those, runs with no score (infrastructure or grader problem), not counted in Failed
+	Blamed    int    `json:"blamed"`     // of those, failures pinned on one agent
+	Skipped   int    `json:"skipped"`    // runs whose seal did not verify
 }
 
 // blameRunJob computes the tier-1 blame of every sealed run and writes
@@ -310,7 +342,11 @@ func blameRunJob(ctx context.Context, l *launcher, p analysisParams, log jobs.Lo
 			return nil, fmt.Errorf("blame %s: %w", sr.Run.RunID, err)
 		}
 		res.Runs++
-		if b.Failed {
+		if _, scored := sr.Run.Outcome.Score(); !scored {
+			// An infra_error or invalid_evaluator run is unknown, not a
+			// failure of the agent (N62).
+			res.NotScored++
+		} else if b.Failed {
 			res.Failed++
 			if b.AgentID != "" {
 				res.Blamed++
@@ -321,7 +357,7 @@ func blameRunJob(ctx context.Context, l *launcher, p analysisParams, log jobs.Lo
 	if p.RunID != "" && res.Runs+res.Skipped == 0 {
 		return nil, fmt.Errorf("%w: run %s is not a sealed run of %s", jobs.ErrNotFound, p.RunID, p.ExpID)
 	}
-	log.Printf("blame written for %d runs: %d failed, %d pinned on one agent (tier 1; run blame.replay for tier 2)", res.Runs, res.Failed, res.Blamed)
+	log.Printf("blame written for %d runs: %d failed, %d not scored (infrastructure or grader problem), %d pinned on one agent (tier 1; run blame.replay for tier 2)", res.Runs, res.Failed, res.NotScored, res.Blamed)
 	return res, nil
 }
 

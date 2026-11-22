@@ -21,14 +21,14 @@
 	"stats": {
 		"tasks": "Tasks",
 		"admitted": "Ready to use",
-		"probes": "Failure tests",
+		"probes": "Its own failure tests",
 		"lastRun": "Runs so far",
 		"never": "None yet",
 		"admittedValue": "{{ready}} of {{total}}",
 		"admittedHint": "Ready means Heimdall checked the task is fair: a correct solution passes and an agent that does nothing fails. Only ready tasks are used in tests.",
 		"tasksHint": "One task is one job the agent must do, checked automatically.",
 		"probesHint": "Harder versions of the tasks: a model outage, a trick instruction, a fake secret.",
-		"lastRunHint": "How many single attempts at a task have been recorded for this benchmark."
+		"lastRunHint": "How many single attempts at a task have been recorded for this benchmark, clean or under a fault."
 	},
 	"tabs": {
 		"tasks": "Tasks",

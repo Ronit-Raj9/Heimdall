@@ -140,19 +140,46 @@ export function suggestBaseline(versions: readonly AgentDiffVersionInfo[], b: st
 	return sameAgent[at + 1] ?? null;
 }
 
-/** Versions grouped by agent id (sorted), each group newest first. */
-export function groupVersionsByAgent(versions: readonly AgentDiffVersionInfo[]): { agent: string; versions: AgentDiffVersionInfo[] }[] {
+/**
+ * Versions grouped by agent id (sorted). In each group saved versions come first, then setups that
+ * were never saved, each part newest first. System checks (oracle, noop, readiness check runs) are
+ * left out unless showSystem.
+ */
+export function groupVersionsByAgent(
+	versions: readonly AgentDiffVersionInfo[],
+	opts: { showSystem?: boolean } = {},
+): { agent: string; versions: AgentDiffVersionInfo[] }[] {
 	const byAgent = new Map<string, AgentDiffVersionInfo[]>();
 	for (const version of versions) {
+		if (version.system && !opts.showSystem) continue;
 		const list = byAgent.get(version.agent_id) ?? [];
 		list.push(version);
 		byAgent.set(version.agent_id, list);
 	}
-	return [...byAgent.entries()].sort(([x], [y]) => x.localeCompare(y)).map(([agent, list]) => ({ agent, versions: newestFirst(list) }));
+	return [...byAgent.entries()]
+		.sort(([x], [y]) => x.localeCompare(y))
+		.map(([agent, list]) => {
+			const ordered = newestFirst(list);
+			return { agent, versions: [...ordered.filter((v) => v.version), ...ordered.filter((v) => !v.version)] };
+		});
 }
 
-/** Picker text of a version: its label (or agent id when unlabelled), the short hash and the agent id. */
-export function versionLabel(version: Pick<AgentDiffVersionInfo, "config_hash" | "agent_id" | "label">): string {
+/** How many versions are system checks, hidden from the picker by default. */
+export function countSystemVersions(versions: readonly AgentDiffVersionInfo[]): number {
+	return versions.filter((v) => v.system).length;
+}
+
+/**
+ * Picker text of a version. A saved version reads "v<n> · <model> · <hash>"; a setup the server
+ * knows was never saved reads "<unsaved> · <model> · <hash>" when the caller passes the word. Rows
+ * from an older server keep the old text: label (or agent id), short hash and agent id.
+ */
+export function versionLabel(
+	version: Pick<AgentDiffVersionInfo, "config_hash" | "agent_id" | "label" | "version" | "model">,
+	unsaved?: string,
+): string {
+	if (version.version) return [`v${version.version}`, version.model, shortHash(version.config_hash)].filter(Boolean).join(" · ");
+	if (unsaved && version.model) return [unsaved, version.model, shortHash(version.config_hash)].join(" · ");
 	const parts = [version.label || version.agent_id, shortHash(version.config_hash)];
 	if (version.label) parts.push(version.agent_id);
 	return parts.join(" · ");

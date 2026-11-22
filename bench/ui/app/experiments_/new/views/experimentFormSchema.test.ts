@@ -43,8 +43,12 @@ const CATALOG: Catalog = {
 };
 
 function valid(): ExperimentFormValues {
+	const d = defaultFormValues(CATALOG, 20261114);
 	return {
-		...defaultFormValues(CATALOG, 20261114),
+		...d,
+		// The design's example runs clean and stale-notes, with stale-notes as the main test.
+		primaryCondition: "stale-notes",
+		conditions: d.conditions.map((c) => (c.condition === "stale-notes" ? { ...c, enabled: true, trials: 3 } : c)),
 		name: "code-wins sentence",
 		armBLabel: "code-wins sentence",
 		overridePath: "notes.user_file",
@@ -59,18 +63,61 @@ function issues(values: ExperimentFormValues): Record<string, string> {
 }
 
 describe("defaultFormValues", () => {
-	it("starts from the catalog: first suite and agent, clean and the first probe on, verified success primary", () => {
+	// N39: a fault is a choice the user makes, so only the normal run is on and it is the main test.
+	it("starts from the catalog: first suite and agent, only clean on and primary, verified success", () => {
 		const d = defaultFormValues(CATALOG, 7);
 		expect(d.suite).toBe("coding-core@1.0.0");
 		expect(d.base).toBe("agents/claude-code.yaml");
-		expect(d.primaryCondition).toBe("stale-notes");
+		expect(d.primaryCondition).toBe("clean");
 		expect(d.primaryMetric).toBe("verified_success");
 		expect(d.conditions.map((c) => [c.condition, c.enabled, c.trials])).toEqual([
 			["clean", true, 3],
-			["stale-notes", true, 3],
+			["stale-notes", false, 1],
 			["model-outage", false, 1],
 		]);
 		expect(d.seed).toBe(7);
+	});
+
+	it("starts on My agents' first agent and the benchmark with the most ready tasks (N39)", () => {
+		const catalog: Catalog = {
+			...CATALOG,
+			suites: [
+				{ id: "acme-desktop", version: "1.0.0", tasks: ["file-inbox", "calendar"], probes: ["model-outage"] },
+				...CATALOG.suites,
+				{ id: "hd-harbor-bfcl", version: "2.0.0", tasks: ["b1", "b2", "b3"], probes: [] },
+			],
+			agents: [
+				{ id: "acme-agent", path: "agents/acme-agent.yaml", adapter: "command", model: "claude-sonnet-4-5" },
+				...CATALOG.agents,
+				{ id: "codex", path: "agents/codex.yaml", adapter: "command", model: "gpt-5.4-mini" },
+			],
+		};
+		const ready = new Map([
+			["acme-desktop@1.0.0", { ids: ["calendar"], total: 2 }],
+			["coding-core@1.0.0", { ids: ["t01", "t02", "t03", "t04"], total: 4 }],
+			["hd-harbor-bfcl@2.0.0", { ids: ["b1", "b2", "b3"], total: 3 }],
+		]);
+		const d = defaultFormValues(catalog, 7, { shownAgents: ["codex", "claude-code"], ready });
+		expect(d.suite).toBe("hd-harbor-bfcl@2.0.0");
+		expect(d.base).toBe("agents/codex.yaml");
+		expect(d.primaryCondition).toBe("clean");
+		expect(d.conditions.filter((c) => c.enabled).map((c) => c.condition)).toEqual(["clean"]);
+		expect(defaultFormValues(catalog, 7, { agent: "claude-code", shownAgents: ["codex", "claude-code"], ready }).base).toBe(
+			"agents/claude-code.yaml",
+		);
+	});
+});
+
+// N42: "all tasks" on a benchmark with draft tasks sends only the ready ids, so the planner never refuses.
+describe("toExperiment with ready tasks", () => {
+	it("sends the ready ids for all tasks when some tasks are not ready", () => {
+		const values = { ...valid(), suite: "s@1", primaryCondition: "clean", conditions: [{ condition: "clean", enabled: true, allTasks: true, taskIds: [], trials: 1 }] };
+		const ready = new Map([["s@1", { ids: ["a", "c"], total: 3 }]]);
+		expect(toExperiment(values, ready).conditions).toEqual([{ id: "clean", tasks: { ids: ["a", "c"] }, trials: 1 }]);
+		expect(toExperiment(values, new Map([["s@1", { ids: ["a", "b", "c"], total: 3 }]])).conditions[0].tasks).toEqual({ all: true });
+		expect(toExperiment(values).conditions[0].tasks).toEqual({ all: true });
+		const planned = toExperiment(experimentFormSchema.parse(values), ready);
+		expect(planIsStale(planned, values, ready)).toBe(false);
 	});
 });
 

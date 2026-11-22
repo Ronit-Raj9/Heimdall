@@ -333,8 +333,13 @@ func (a *app) analyzeOpt(ctx context.Context, expID, gradeSource, policyOverride
 	if an.InputsDigest, err = utils.AnalysisInputsDigest(runs); err != nil {
 		return nil, nil, fmt.Errorf("digest analysis inputs: %w", err)
 	}
-	if an.Policy, err = a.releasePolicy(m, an, verdict.DecisionRuns(m, runs), policyOverride); err != nil {
-		return nil, nil, err
+	// A one-setup score run has no candidate to release, so no release
+	// policy applies: its checks would all target a setup B that does not
+	// exist and block (N61). Stored analyses keep their old result.
+	if an.Verdict.Decision != schemas.DecisionScore {
+		if an.Policy, err = a.releasePolicy(m, an, verdict.DecisionRuns(m, runs), policyOverride); err != nil {
+			return nil, nil, err
+		}
 	}
 	var md strings.Builder
 	for _, r := range a.reg.Reporters {

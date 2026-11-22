@@ -1,3 +1,5 @@
+import "@/app/experiments_/new/views/builderI18n";
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatValueNumber } from "@/components/valueCell.utils";
 import { TONE_CLASS } from "@/components/verdict/verdict.utils";
@@ -11,14 +13,21 @@ import { FIT_TONE, forecastFit, forecastRangeView } from "./estimate.utils";
 /**
  * POST /estimate beside the plan: total agent cost, agent time and wall clock as planning ranges,
  * the budget fit with its reason, where the numbers come from, and the same per arm. A range the
- * server cannot estimate says why instead of showing a number.
+ * server cannot estimate says why instead of showing a number. A cost that is unknown because nothing
+ * like it has run says so plainly and names the budget that caps it (N41); no bound is made up.
  */
 export function EstimateBox({ forecast, className }: { forecast: Forecast; className?: string }) {
 	const { t } = useTranslation("bench");
+	const { t: tb } = useTranslation("builder");
 	const locale = getLocale();
 	const fit = forecastFit(forecast.fit);
 	const arms = forecast.arms ?? [];
 	const notes = forecast.notes ?? [];
+	const costUnknown = forecastRangeView(forecast.cost_usd, "usd", locale).kind === "unknown";
+	// An arm with no history at all (basis none) is why the total cost cannot be estimated.
+	const noHistory = costUnknown && arms.some((arm) => arm.basis === "none");
+	// A time upper bound comes from the agents' time limits (budgets.wall_s), never from history.
+	const timeBound = (high: string) => tb("estimate.timeLimitBound", { high });
 
 	return (
 		<div className={cn("flex flex-col gap-3", className)} data-testid="estimate-box" data-fit={fit}>
@@ -40,13 +49,18 @@ export function EstimateBox({ forecast, className }: { forecast: Forecast; class
 
 			<dl className="grid grid-cols-1 gap-2">
 				<Stat label={t("experiments.new.estimate.cost")} testId="estimate-cost">
-					<RangeText range={forecast.cost_usd} kind="usd" testId="estimate-cost-value" />
+					<RangeText
+						range={forecast.cost_usd}
+						kind="usd"
+						testId="estimate-cost-value"
+						unknownText={noHistory ? tb("estimate.costNoHistory") : undefined}
+					/>
 				</Stat>
 				<Stat label={t("experiments.new.estimate.agentTime")} testId="estimate-agent-time">
-					<RangeText range={forecast.agent_time_s} kind="duration" testId="estimate-agent-time-value" />
+					<RangeText range={forecast.agent_time_s} kind="duration" testId="estimate-agent-time-value" boundText={timeBound} />
 				</Stat>
 				<Stat label={t("experiments.new.estimate.wallClock")} testId="estimate-wall-clock">
-					<RangeText range={forecast.wall_clock_s} kind="duration" testId="estimate-wall-clock-value" />
+					<RangeText range={forecast.wall_clock_s} kind="duration" testId="estimate-wall-clock-value" boundText={timeBound} />
 					{forecast.concurrency > 0 && (
 						<span className="text-muted-foreground mt-0.5 block text-xs font-normal">
 							{t("experiments.new.estimate.wallClockHint", { concurrency: forecast.concurrency })}
@@ -90,13 +104,25 @@ export function EstimateBox({ forecast, className }: { forecast: Forecast; class
 									<TableCell className="px-2 text-right align-top tabular-nums">{arm.runs}</TableCell>
 									<TableCell className="text-muted-foreground px-2 align-top whitespace-normal">{arm.basis_text}</TableCell>
 									<TableCell className="px-2 text-right align-top whitespace-normal">
-										<RangeText range={arm.cost_usd} kind="usd" testId={`estimate-arm-cost-${arm.arm}`} />
+										<RangeText
+											range={arm.cost_usd}
+											kind="usd"
+											testId={`estimate-arm-cost-${arm.arm}`}
+											unknownText={arm.basis === "none" ? tb("estimate.costNoHistoryShort") : undefined}
+											title={arm.basis === "none" ? tb("estimate.costNoHistory") : undefined}
+										/>
 									</TableCell>
 								</TableRow>
 							))}
 						</TableBody>
 					</Table>
 				</div>
+			)}
+
+			{noHistory && forecast.budget_usd > 0 && (
+				<p className="text-xs" data-testid="estimate-budget-cap">
+					{tb("estimate.budgetCap", { budget: formatValueNumber(forecast.budget_usd, "usd", locale) })}
+				</p>
 			)}
 
 			{forecast.judge && (
@@ -123,7 +149,9 @@ export function EstimateBox({ forecast, className }: { forecast: Forecast; class
 			)}
 			{forecast.price_ref && (
 				<p className="text-muted-foreground text-[11px]" data-testid="estimate-price-ref">
-					{t("experiments.new.estimate.priceRef", { ref: forecast.price_ref })}
+					{costUnknown
+						? tb("estimate.priceRefNoHistory", { ref: forecast.price_ref })
+						: tb("estimate.priceRef", { ref: forecast.price_ref })}
 				</p>
 			)}
 		</div>
@@ -143,17 +171,42 @@ function rangeString(range: ForecastRange | null | undefined, kind: ValueKind, l
 	}
 }
 
-function RangeText({ range, kind, testId }: { range: ForecastRange | null | undefined; kind: ValueKind; testId: string }) {
+/**
+ * One range. unknownText replaces the server's reason when the range is unknown; boundText words an
+ * upper bound ("at most ... (from each agent's time limit)").
+ */
+function RangeText({
+	range,
+	kind,
+	testId,
+	unknownText,
+	boundText,
+	title,
+}: {
+	range: ForecastRange | null | undefined;
+	kind: ValueKind;
+	testId: string;
+	unknownText?: string;
+	boundText?: (high: string) => string;
+	title?: string;
+}) {
 	const { t } = useTranslation("bench");
 	const locale = getLocale();
 	const view = forecastRangeView(range, kind, locale);
+	const text =
+		view.kind === "unknown" && unknownText
+			? unknownText
+			: view.kind === "upper_bound" && boundText
+				? boundText(view.high)
+				: rangeString(range, kind, locale, t);
 	return (
 		<span
 			className={cn("tabular-nums", view.kind === "unknown" && "text-muted-foreground font-normal italic")}
 			data-testid={testId}
 			data-kind={view.kind}
+			title={view.kind === "unknown" ? title : undefined}
 		>
-			{rangeString(range, kind, locale, t)}
+			{text}
 		</span>
 	);
 }

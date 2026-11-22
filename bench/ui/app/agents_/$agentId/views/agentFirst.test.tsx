@@ -24,8 +24,8 @@ const report = (over: Partial<Report> = {}): Report => ({
 		{ benchmark: "b2", capability: "support", experiment_id: "e2", arms: { A: { score: 0.25, ci_low: 0, ci_high: 1, runs: 4, cost_usd: 0.1 } } },
 	],
 	reliability: [
-		{ fault: "broken-tool", arms: { A: { score: 0.3, drop: 0.2 } } },
-		{ fault: "model-down", arms: { A: { score: 0.1, drop: 0.4 } } },
+		{ fault: "broken-tool", arms: { A: { score: 0.3, drop: -0.2 } } },
+		{ fault: "model-down", arms: { A: { score: 0.1, drop: -0.4 } } },
 	],
 	...over,
 });
@@ -119,8 +119,9 @@ describe("home agent cards", () => {
 		expect(s.capabilities).toEqual([{ id: "support", score: 0.5 }]);
 		// cost (0.2*10 + 0.1*4 = 2.4) over solved runs (0.5*10 + 0.25*4 = 6)
 		expect(s.costPerSolved).toBeCloseTo(0.4);
-		expect(s.worstDrop).toEqual({ fault: "model-down", drop: 0.4 });
-		expect(agentCardStats(undefined)).toEqual({ capabilities: [], costPerSolved: null, worstDrop: null });
+		// drop is the change from clean: negative means the fault hurt (fix wave 2, N126).
+		expect(s.worstDrop).toEqual({ fault: "model-down", drop: -0.4 });
+		expect(agentCardStats(undefined)).toEqual({ capabilities: [], costPerSolved: null, worstDrop: null, faultsTested: false });
 		const unpriced = report({ benchmarks: [{ benchmark: "b1", capability: "support", experiment_id: "e1", arms: { A: { score: 0.5, ci_low: 0, ci_high: 1, runs: 2, cost_usd: 0 } } }] });
 		expect(agentCardStats(unpriced).costPerSolved).toBeNull();
 	});
@@ -161,11 +162,11 @@ describe("failure patterns", () => {
 describe("failure tests", () => {
 	const form: FailureTestForm = { agent: "support-bot", version: 2, provider: "openai", model: "gpt-x", benchmarks: ["b1"], faults: ["broken-tool", "model-down"], tasks: 3, trials: 1 };
 
-	it("launches one score arm with a clean baseline plus the chosen faults in fixed order", () => {
+	it("launches one score arm with a clean baseline plus the chosen faults in the order picked", () => {
 		const spec = failureTestSpec(form);
 		expect(spec.mode).toBe("score");
 		expect(spec.arms).toEqual([{ label: "A", agent: "support-bot", version: 2, model: "gpt-x", provider: "openai" }]);
-		expect(spec.faults).toEqual(["clean", "model-down", "broken-tool"]);
+		expect(spec.faults).toEqual(["clean", "broken-tool", "model-down"]);
 		expect(spec.name).toBe("Failure test: support-bot v2");
 		expect(failureTestSpec({ ...form, version: 0, provider: "" }).arms[0]).toEqual({ label: "A", agent: "support-bot", model: "gpt-x" });
 	});

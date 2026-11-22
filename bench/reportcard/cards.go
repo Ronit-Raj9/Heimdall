@@ -57,6 +57,11 @@ type ResilienceArm struct {
 	TimeToRecoverS      *float64 `json:"time_to_recover_s"`
 	RecoveredShare      *float64 `json:"recovered_share"`
 	RetryAfterRespected *float64 `json:"retry_after_respected"`
+	// ChangedTasks counts the paired tasks whose fault success rate differs
+	// from the clean one. With none, a task bootstrap has nothing to
+	// resample, so the degradation range is left out (nil) rather than shown
+	// as a zero-width range.
+	ChangedTasks int `json:"changed_tasks"`
 }
 
 // Resilience is one fault's scorecard across arms.
@@ -214,11 +219,15 @@ func resilienceArm(clean, fault map[string]*taskSide) (ResilienceArm, bool) {
 	slices.Sort(tasks)
 	var cRate, fRate, cCost, fCost, ttr, rec, rar []float64
 	both := 0.0
+	changed := 0
 	for _, tk := range tasks {
 		c, fs := clean[tk], fault[tk]
 		cr := float64(c.succ) / float64(c.runs)
 		fr := float64(fs.succ) / float64(fs.runs)
 		cRate, fRate = append(cRate, cr), append(fRate, fr)
+		if fr != cr {
+			changed++
+		}
 		both += cr * fr
 		if c.costN == c.runs && fs.costN == fs.runs {
 			cCost = append(cCost, c.cost/float64(c.runs))
@@ -230,19 +239,20 @@ func resilienceArm(clean, fault map[string]*taskSide) (ResilienceArm, bool) {
 	}
 	sumC, sumF := total(cRate), total(fRate)
 	n := float64(len(tasks))
-	a := ResilienceArm{Tasks: len(tasks), SuccessClean: round(sumC / n), SuccessFault: round(sumF / n)}
+	a := ResilienceArm{Tasks: len(tasks), SuccessClean: round(sumC / n), SuccessFault: round(sumF / n), ChangedTasks: changed}
 	if sumC > 0 {
 		// Within a task, trials are exchangeable, so P(fault pass and clean
 		// pass) is c_i*f_i; conditioning on clean success weights by c_i.
 		a.RecoveryRate = ptr(both / sumC)
 		a.DegradationRatio = ptr(sumF / sumC)
-		if lo, hi, ok := stats.BootstrapRatio(fRate, cRate, 0xdead); ok {
+		// No changed task, or a range of zero width: the runs cannot give one.
+		if lo, hi, ok := stats.BootstrapRatio(fRate, cRate, 0xdead); ok && changed > 0 && lo != hi {
 			a.DegradationLow, a.DegradationHigh = ptr(lo), ptr(hi)
 		}
 	}
 	if sc := total(cCost); len(cCost) > 0 && sc > 0 {
 		a.CostInflation = ptr(total(fCost) / sc)
-		if lo, hi, ok := stats.BootstrapRatio(fCost, cCost, 0xc057); ok {
+		if lo, hi, ok := stats.BootstrapRatio(fCost, cCost, 0xc057); ok && lo != hi {
 			a.CostInflationLow, a.CostInflationHigh = ptr(lo), ptr(hi)
 		}
 	}

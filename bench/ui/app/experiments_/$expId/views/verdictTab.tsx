@@ -17,7 +17,8 @@ import { armOrder, isScoreVerdict } from "@/components/verdict/verdict.utils";
 import { GuardList, VerdictCard } from "@/components/verdict/verdictCard";
 import { VerdictSummary } from "@/components/verdict/verdictSummary";
 import { getBenchErrorMessage, useGetCatalogQuery, useGetDiagnosticsQuery, useGetGridQuery, useGetVerdictQuery } from "@/lib/store";
-import type { Action, MetricDescriptor } from "@/lib/types/bench";
+import { useGetExperimentQuery } from "@/lib/store/apis/benchApi";
+import type { Action, ExperimentStatus, MetricDescriptor } from "@/lib/types/bench";
 import { Activity, Gauge, GitCompare, ListChecks, Rocket, Scale, Shield, Sigma, Table2 } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { parseAsString, useQueryState } from "nuqs";
@@ -25,14 +26,61 @@ import { useCallback, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { VerdictHeaderStrip } from "./verdictHeaderStrip";
 
+/** What the two setups of a comparison differ in (fix wave 2, lane G04's `arms_differ`); an older server leaves it out. */
+export type ArmsDiffer = "model" | "none" | "agent";
+
+/** The experiment status fields the promote control reads; G04 adds them to ExperimentStatus. */
+type PromoteStatus = ExperimentStatus & {
+	arms_differ?: ArmsDiffer;
+	setups?: { arm: string; agent: string; agent_file: string; model: string }[];
+};
+
 /**
  * "Promote this version" on the Result tab: a button to the release form for two arms; a one-arm
  * run of an evaluation is promoted from the evaluation (one release covers all its benchmarks).
+ * What it offers follows what differs between the two setups (N165): a model-only comparison
+ * offers the model instead, an A/A check offers nothing, and an agent change without a clear
+ * winner says that promoting is an exception to the release rules.
  */
-export function VerdictPromote({ expId, arms, evaluationId }: { expId: string; arms: readonly string[]; evaluationId?: string }) {
+export function VerdictPromote({
+	expId,
+	arms,
+	evaluationId,
+	armsDiffer,
+	decision,
+	modelB,
+}: {
+	expId: string;
+	arms: readonly string[];
+	evaluationId?: string;
+	armsDiffer?: ArmsDiffer;
+	/** The verdict's decision; "improved" means B wins. */
+	decision?: string;
+	/** Setup B's model, for "Use model ..." on a model-only comparison. */
+	modelB?: string;
+}) {
 	const { t } = useTranslation("u14");
 	const toEvaluation = arms.length === 1 && Boolean(evaluationId);
 	if (arms.length !== 2 && !toEvaluation) return null;
+	if (!toEvaluation && armsDiffer === "none") return null;
+	if (!toEvaluation && armsDiffer === "model") {
+		return (
+			<div className="flex justify-end">
+				<Button size="sm" variant="outline" asChild>
+					<Link
+						to="/experiments/$expId"
+						params={{ expId }}
+						search={{ tab: "migration" } as never}
+						title={t("promote.useModelHint")}
+						data-testid="verdict-use-model"
+					>
+						{modelB ? t("promote.useModel", { model: modelB }) : t("promote.useModelUnknown")}
+					</Link>
+				</Button>
+			</div>
+		);
+	}
+	const exception = !toEvaluation && armsDiffer === "agent" && decision !== "improved";
 	const label = (
 		<>
 			<Rocket className="size-4" aria-hidden="true" />
@@ -40,7 +88,7 @@ export function VerdictPromote({ expId, arms, evaluationId }: { expId: string; a
 		</>
 	);
 	return (
-		<div className="flex justify-end">
+		<div className="flex flex-col items-end gap-1">
 			<Button size="sm" asChild>
 				{toEvaluation ? (
 					<Link to="/evaluations/$evalId" params={{ evalId: evaluationId! }} data-testid="verdict-promote">
@@ -52,7 +100,39 @@ export function VerdictPromote({ expId, arms, evaluationId }: { expId: string; a
 					</Link>
 				)}
 			</Button>
+			{exception && (
+				<p className="text-muted-foreground max-w-md text-right text-xs" data-testid="verdict-promote-exception">
+					{t("promote.exception")}
+				</p>
+			)}
 		</div>
+	);
+}
+
+/** VerdictPromote with what the setups differ in, read from the experiment status. */
+function ExperimentVerdictPromote({
+	expId,
+	arms,
+	evaluationId,
+	decision,
+}: {
+	expId: string;
+	arms: readonly string[];
+	evaluationId?: string;
+	decision: string;
+}) {
+	const experiment = useGetExperimentQuery(expId);
+	const status = experiment.data as PromoteStatus | undefined;
+	const modelB = status?.setups?.find((s) => s.arm === arms[1])?.model || undefined;
+	return (
+		<VerdictPromote
+			expId={expId}
+			arms={arms}
+			evaluationId={evaluationId}
+			armsDiffer={status?.arms_differ}
+			decision={decision}
+			modelB={modelB}
+		/>
 	);
 }
 
@@ -179,7 +259,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 				</p>
 			)}
 
-			<VerdictPromote expId={payload.exp_id} arms={arms} evaluationId={evaluationId} />
+			<ExperimentVerdictPromote expId={payload.exp_id} arms={arms} evaluationId={evaluationId} decision={payload.verdict.decision} />
 
 			{isScoreVerdict(payload.verdict) ? (
 				<ScoreSummary

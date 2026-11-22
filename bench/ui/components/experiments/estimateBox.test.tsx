@@ -99,15 +99,40 @@ describe("EstimateBox", () => {
 	it("shows the reason of an unknown range, or the default words, and never $0", () => {
 		const html = render({
 			...BASE,
-			cost_usd: unknown("arm B has no history and no per-run budget"),
+			cost_usd: unknown("no price for model x"),
 			wall_clock_s: unknown(),
-			arms: [{ ...ARM_A, basis: "none", cost_usd: { kind: "history", low: 1, median: null, high: 2 } }],
+			arms: [{ ...ARM_A, cost_usd: { kind: "history", low: 1, median: null, high: 2 } }],
 			fit: "unknown",
 		});
-		expect(piece(html, "estimate-cost-value")).toBe("arm B has no history and no per-run budget");
+		expect(piece(html, "estimate-cost-value")).toBe("no price for model x");
 		expect(piece(html, "estimate-wall-clock-value")).toBe("no history, cannot estimate");
 		expect(piece(html, "estimate-arm-cost-A")).toBe("no history, cannot estimate");
 		expect(html).not.toContain("$0");
+	});
+
+	// N41: with no history the cost says so plainly and names the budget that caps it; no made-up bound.
+	it("explains an unknown cost with no history and says the budget caps it", () => {
+		const html = render({
+			...BASE,
+			cost_usd: unknown("arm B has no history and no per-run budget"),
+			agent_time_s: upper(9000),
+			wall_clock_s: upper(2250),
+			arms: [{ ...ARM_A, basis: "none", basis_text: "no history", cost_usd: unknown("no history") }],
+			fit: "unknown",
+			price_ref: "bifrost-datasheet-2026-11-14-openai",
+		});
+		expect(piece(html, "estimate-cost-value")).toBe(
+			"Not known yet: nothing like this has run on this benchmark, so there is no history to estimate from.",
+		);
+		expect(piece(html, "estimate-arm-cost-A")).toBe("Not known yet (no history)");
+		expect(piece(html, "estimate-budget-cap")).toBe("The budget of $20.00 stops the comparison when it is spent.");
+		expect(piece(html, "estimate-agent-time-value")).toBe("at most 2.5h (from each agent&#x27;s time limit)");
+		expect(piece(html, "estimate-wall-clock-value")).toBe("at most 37.5m (from each agent&#x27;s time limit)");
+		expect(piece(html, "estimate-price-ref")).toBe(
+			"Model prices come from bifrost-datasheet-2026-11-14-openai. They are used once there is history to price.",
+		);
+		expect(html).not.toContain("Prices checked against");
+		expect(html).not.toContain("no history, cannot estimate");
 	});
 
 	it("labels every fit and tones it", () => {
@@ -144,7 +169,7 @@ describe("EstimateBox", () => {
 		expect(html).toContain("Judge, separate from the agent cost: 48 runs, $0.12 to $0.31 (median $0.19).");
 		expect(html).toContain("30 past judge records");
 		expect(html).toContain("planner refused: arms A and B have the same config hash");
-		expect(html).toContain("Prices checked against prices-2026-11-01.");
+		expect(html).toContain("Model prices come from prices-2026-11-01.");
 	});
 
 	it("renders the fixture with a budget-bound arm", () => {

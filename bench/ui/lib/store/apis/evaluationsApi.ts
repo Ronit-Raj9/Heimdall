@@ -288,6 +288,24 @@ export interface Evaluation {
 	rerun_of?: string;
 	/** Run control: every running benchmark is paused. */
 	paused?: boolean;
+	result?: EvaluationResult;
+}
+
+/** One arm of a stored evaluation result: its clean score and runs over every benchmark. */
+export interface EvaluationArmResult {
+	label: string;
+	agent: string;
+	version: number;
+	model: string;
+	score: number;
+	runs: number;
+}
+
+/** The headline numbers stored once an evaluation finished (N161); cost_usd is missing when any arm's spend is unknown. */
+export interface EvaluationResult {
+	arms: EvaluationArmResult[];
+	cost_usd?: number;
+	at: string;
 }
 
 /** GET /evaluation-packs item. */
@@ -537,6 +555,8 @@ export interface ReportResilienceArm {
 	time_to_recover_s: number | null;
 	recovered_share: number | null;
 	retry_after_respected: number | null;
+	/** Paired tasks whose result changed under the fault; with none there is no range. Missing on older reports. */
+	changed_tasks?: number;
 }
 
 export interface ReportResilienceRow {
@@ -548,7 +568,8 @@ export interface ReportResilienceRow {
 export interface ReportReliabilityRow {
 	fault: string;
 	benchmarks?: string[];
-	arms: Record<string, { score: number; drop: number; runs?: number }>;
+	/** drop is the change from clean on the same tasks (negative: the fault hurt); unpaired counts fault runs left out. */
+	arms: Record<string, { score: number; drop: number; runs?: number; unpaired?: number }>;
 }
 
 export interface ReportSafety {

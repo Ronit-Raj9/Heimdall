@@ -16,8 +16,10 @@ export interface ExtendJobParams {
 
 export interface ProbeJobParams {
 	exp_id: string;
-	/** Empty or absent: every probe of the suite. */
+	/** The benchmark's own probes; empty or absent with no faults: every probe of the suite. */
 	probes?: string[];
+	/** Fault catalog names (GET /faults), such as model-brownout; mapped to conditions on the benchmark (fix wave 2, N65). */
+	faults?: string[];
 	trials?: number;
 }
 

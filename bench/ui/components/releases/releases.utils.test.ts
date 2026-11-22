@@ -9,6 +9,7 @@ import {
 	quickRunCount,
 	releasableExperiments,
 	releaseBlockers,
+	releaseDisabledReason,
 	releaseRequestFrom,
 	shortHash,
 	verdictPolicyDecision,
@@ -155,5 +156,46 @@ describe("releasableExperiments", () => {
 		expect(releasableExperiments(list).map((e) => e.exp_id)).toEqual(["e_real"]);
 		expect(releasableExperiments(list, { quick: true }).map((e) => e.exp_id)).toEqual(["e_quick", "e_real"]);
 		expect(quickRunCount(list)).toBe(1);
+	});
+});
+describe("releasableExperiments: agent version comparisons only (N170, N29)", () => {
+	it("leaves out model-only and A/A comparisons and debug runs, and keeps lists from older servers", () => {
+		const done = "done" as const;
+		const list = [
+			{ exp_id: "e_model", name: "codex: two models", state: done, arms: ["A", "B"], arms_differ: "model" as const },
+			{ exp_id: "e_aa", name: "codex twice", state: done, arms: ["A", "B"], arms_differ: "none" as const },
+			{ exp_id: "e_agent", name: "codex v2 vs v1", state: done, arms: ["A", "B"], arms_differ: "agent" as const },
+			{ exp_id: "e_old", name: "older server", state: done, arms: ["A", "B"] },
+			{ exp_id: "e_dbg", name: "debug copy", state: done, arms: ["A", "B"], arms_differ: "agent" as const, debug: "replay" },
+			{ exp_id: "e_replay_r_abc123", name: "replay of a run", state: done, arms: ["A", "B"] },
+		];
+		expect(releasableExperiments(list).map((e) => e.exp_id)).toEqual(["e_agent", "e_old"]);
+	});
+});
+
+describe("releaseDisabledReason (N170)", () => {
+	const base = {
+		expId: "e_x",
+		verdictLoading: false,
+		verdictError: undefined,
+		verdictLoaded: true,
+		action: "ship" as const,
+		policy: undefined,
+	};
+	it("says the first thing that keeps the button off", () => {
+		expect(releaseDisabledReason({ ...base, expId: undefined, values: EMPTY_RELEASE_FORM })).toEqual({ key: "pick" });
+		expect(releaseDisabledReason({ ...base, verdictLoading: true, verdictLoaded: false, values: EMPTY_RELEASE_FORM })).toEqual({
+			key: "loading",
+		});
+		expect(releaseDisabledReason({ ...base, verdictLoaded: false, verdictError: "boom", values: EMPTY_RELEASE_FORM })).toEqual({
+			key: "error",
+			error: "boom",
+		});
+		expect(releaseDisabledReason({ ...base, values: EMPTY_RELEASE_FORM })).toEqual({ key: "approver" });
+		const named = { ...EMPTY_RELEASE_FORM, approver: "ana" };
+		expect(releaseDisabledReason({ ...base, action: "hold", values: named })).toEqual({ key: "blocked" });
+		expect(releaseDisabledReason({ ...base, policy: "block", values: { ...named, override: true } })).toEqual({ key: "reason" });
+		expect(releaseDisabledReason({ ...base, values: named })).toBeNull();
+		expect(releaseDisabledReason({ ...base, action: "hold", values: { ...named, override: true, overrideReason: "hotfix" } })).toBeNull();
 	});
 });
