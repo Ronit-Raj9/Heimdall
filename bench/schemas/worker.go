@@ -87,6 +87,10 @@ type WorkerLease struct {
 	// job lease with Refuse set.
 	Kind string    `json:"kind,omitempty"`
 	Job  *JobLease `json:"job,omitempty"`
+	// Traceparent is the W3C trace context of the lease span when the
+	// server traces (lane Z14, bench/telemetry); the worker's spans and its
+	// calls for this lease join it. Empty with tracing off.
+	Traceparent string `json:"traceparent,omitempty"`
 }
 
 // LeaseKindJob marks a runner job lease (WorkerLease.Kind).

@@ -2,6 +2,7 @@ import { BenchHeader } from "@/components/benchHeader";
 import { BenchSidebar } from "@/components/benchSidebar";
 import { AuthShell } from "@/components/platform/authShell";
 import { SharedFrame } from "@/components/share/sharedFrame";
+import { StatusFrame } from "@/components/status/statusFrame";
 import { ConfirmProvider } from "@/components/platform/confirmDialog";
 import { SessionProvider } from "@/components/platform/sessionProvider";
 import { ThemeProvider } from "@/components/themeProvider";
@@ -46,6 +47,8 @@ function Frame({ children }: { children: React.ReactNode }) {
 	switch (frameFor(session, location.pathname)) {
 		case "share":
 			return <SharedFrame>{children}</SharedFrame>;
+		case "status":
+			return <StatusFrame>{children}</StatusFrame>;
 		case "auth":
 			return <AuthShell>{children}</AuthShell>;
 		case "login":

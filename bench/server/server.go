@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/maximhq/bifrost/bench/selfmetrics"
+	"github.com/maximhq/bifrost/bench/statuspage"
+	"github.com/maximhq/bifrost/bench/telemetry"
 	"io/fs"
 	"net"
 	"os"
@@ -88,6 +90,9 @@ type Deps struct {
 	// Web parity: per-org services for the areas registered with
 	// handlers.RegisterOrgArea (handlers/orgareas.go); any field may be nil.
 	Services handlers.Services
+	// Lane Z14: the public status page, GET /status in local mode (hosted
+	// mode serves it as a platform area); nil answers 503 (handlers/statuspage.go).
+	StatusPage *statuspage.Service
 }
 
 // Server is the bench HTTP server.
@@ -145,6 +150,8 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	// Bring your own worker: hosted only; local mode answers 503 (handlers/workerconns.go).
 	handlers.NewWorkerConnsHandler(mode, nil, handlers.WorkerConnErrors{}, nil).RegisterRoutes(r, common...)
 	handlers.NewWorkerTargetHandler(mode, nil, nil).RegisterRoutes(r, common...) // where runs go: hosted only; local mode answers 503 (handlers/workertarget.go)
+	// Lane Z14: the public status page (handlers/statuspage.go).
+	handlers.NewStatusPageHandler(mode, deps.StatusPage).RegisterRoutes(r, common...)
 	if deps.UI != nil {
 		NewUIHandler(mode, deps.UI).RegisterRoutes(r)
 	}
@@ -159,7 +166,7 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 		handlers.V1Alias(mode, deps.Version, false),         // Public API v1: /api/v1 rewritten onto its bench routes (handlers/apiv1.go, docs/api-v1.md)
 	)
 	s.server = &fasthttp.Server{
-		Handler:               selfmetrics.Default.Middleware(s.handler), // N9: API latency for /metrics
+		Handler:               selfmetrics.Default.Middleware(telemetry.Middleware(s.handler)), // N9: API latency for /metrics; Z14: a server span per request
 		Name:                  "bifrost-bench",
 		MaxRequestBodySize:    lib.MaxUploadBytes, // per-route limits: lib.BodyLimit in common/upload middlewares
 		ErrorHandler:          lib.RequestErrorHandler(mode, lib.MaxUploadBytes),

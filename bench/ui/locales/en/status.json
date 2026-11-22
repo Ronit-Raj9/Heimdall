@@ -1,0 +1,51 @@
+{
+	"page": {
+		"title": "Heimdall status",
+		"heading": "Platform status",
+		"loading": "Checking every component...",
+		"error": "The status could not be loaded. The platform may be down or unreachable from here.",
+		"retry": "Try again",
+		"checkedAt": "Checked {{time}}",
+		"refreshNote": "Refreshes every 30 seconds.",
+		"version": "Version {{version}}",
+		"backToApp": "Open Heimdall"
+	},
+	"overall": {
+		"operational": "All systems operational",
+		"maintenance": "Planned maintenance in progress",
+		"degraded": "Some parts are slower than usual",
+		"partial_outage": "Some parts are not working",
+		"major_outage": "Major outage",
+		"unknown": "Some parts could not be checked"
+	},
+	"level": {
+		"operational": "Operational",
+		"maintenance": "Maintenance",
+		"degraded": "Degraded",
+		"partial_outage": "Partial outage",
+		"major_outage": "Major outage",
+		"unknown": "No data"
+	},
+	"sections": {
+		"components": "Components",
+		"incidents": "Current incidents",
+		"scheduled": "Planned maintenance",
+		"recent": "Resolved in the last 14 days",
+		"noIncidents": "No incidents right now.",
+		"noRecent": "Nothing resolved in the last 14 days."
+	},
+	"incident": {
+		"status": {
+			"investigating": "Investigating",
+			"identified": "Identified",
+			"monitoring": "Monitoring",
+			"resolved": "Resolved",
+			"scheduled": "Scheduled"
+		},
+		"affects": "Affects: {{components}}",
+		"wholePlatform": "Affects the whole platform",
+		"started": "Started {{time}}",
+		"scheduledFor": "Starts {{time}}",
+		"resolved": "Resolved {{time}}"
+	}
+}

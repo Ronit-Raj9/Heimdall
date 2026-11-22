@@ -126,6 +126,7 @@ var PlatformPolicy = map[string]Rule{
 	key("GET", api+"/health"): public(),
 	key("GET", "/healthz"):    public(),
 	key("GET", "/readyz"):     public(),
+	key("GET", api+"/status"): public(), // lane Z14: the public status page (handlers/statuspage.go)
 	key("GET", api+"/doctor"): deny("preflight checks describe the hosting server, not an org"),
 
 	// Auth (P2): the handlers check credentials themselves.

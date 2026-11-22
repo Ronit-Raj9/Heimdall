@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/telemetry"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
@@ -289,6 +290,8 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 	// preflight and image checks can take longer than the stale threshold on
 	// a loaded worker, and a lease that only starts beating at RunSlot is
 	// lost to the coordinator's sweep before the slot even runs.
+	ctx, slotSpan := workerSlotSpan(ctx, lease) // lane Z14: joins the lease's trace (remotetelemetry.go)
+	defer slotSpan.End()
 	live := &liveBuffer{} // the run's live events, forwarded on the heartbeat
 	sctx, stop := w.heartbeat(ctx, lease, live)
 	defer stop()
@@ -366,7 +369,12 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		}
 		w.opts.ImageUse(ids...)
 	}
-	res, err := w.runner.RunSlot(sctx, in)
+	runCtx, runSpan := telemetry.Start(sctx, "run") // lane Z14
+	res, err := w.runner.RunSlot(runCtx, in)
+	if res != nil && res.Run != nil {
+		runSpan.SetAttrs(telemetry.String("heimdall.run", res.Run.RunID), telemetry.String("heimdall.outcome", string(res.Run.Outcome)))
+	}
+	runSpan.End()
 	if res != nil {
 		res.RunnerGateway = runnerGW  // Tenancy area: uploaded with the run
 		res.RunnerImages = runnerImgs // Deploy area: uploaded with the run
@@ -393,7 +401,12 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		w.release(ctx, lease, why, false, cost)
 		return nil
 	}
-	out, err := w.uploadTo(sctx, ctx, lease, res)
+	upCtx, upSpan := telemetry.Start(sctx, "upload") // lane Z14
+	out, err := w.uploadTo(upCtx, telemetry.ContextWithSpan(ctx, upSpan), lease, res)
+	if err != nil {
+		upSpan.SetError(err.Error())
+	}
+	upSpan.End()
 	if err != nil {
 		w.logger.Error("upload failed", "lease", lease.LeaseID, "run", res.Run.RunID, "error", err.Error())
 		if !errors.Is(err, schemas.ErrLeaseGone) {
@@ -815,6 +828,7 @@ func (w *Worker) do(ctx context.Context, method, path, contentType string, body 
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+w.opts.Token)
+	telemetry.Inject(ctx, req.Header) // lane Z14: the server's request span joins the lease's trace
 	if body != nil {
 		req.Header.Set("Content-Type", contentType)
 	}

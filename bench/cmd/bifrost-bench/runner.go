@@ -106,6 +106,8 @@ func (f *runnerFlags) labelList() []string {
 // proxy, docker): every leased experiment is planned again here and refused
 // when its manifest does not come out the same.
 func runRunnerStart(cmd string, args []string) int {
+	// Lane Z14: OTLP spans when OTEL_* names an endpoint (telemetry.go).
+	startTelemetry("heimdall-runner")
 	if hasSharedFlag(args) { // shared runner pool (runnershared.go)
 		return runSharedRunner(args)
 	}

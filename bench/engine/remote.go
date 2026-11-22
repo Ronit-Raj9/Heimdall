@@ -94,6 +94,7 @@ type Coordinator struct {
 	ended   map[string]string // lease id -> why it ended; a late call for it is refused with this
 	rj      runnerJobs        // runner jobs (gap G05, remotejobs.go)
 	runs    map[string]int    // uploaded runs by result: accepted (by outcome) or rejected; /metrics (remotedisk.go)
+	tel     coordTel          // lane Z14: experiment spans and start latency (remotetelemetry.go)
 }
 
 // remoteWorker is one registered worker.
@@ -119,6 +120,9 @@ type remoteLease struct {
 	received          int64
 	uploading         bool // a chunk is being written
 	closing           bool // complete or release in progress; the sweep leaves it alone
+
+	// lane Z14: the lease span (remotetelemetry.go)
+	tel leaseTel
 }
 
 // NewCoordinator returns a coordinator over reg's store. The token must be
@@ -353,6 +357,7 @@ func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.Work
 			r.endRemote(l, true)
 			return nil, fmt.Errorf("lease %s: reservation not journaled: %w", id, err)
 		}
+		c.telLeased(r, l) // lane Z14 (remotetelemetry.go)
 		r.emit(Event{Kind: EventStage, SlotID: slot.SlotID, Stage: schemas.StageLeased,
 			Message: fmt.Sprintf("leased to remote worker %s (attempt %d)", workerID, attempt)})
 		return c.leaseView(l), nil
@@ -552,6 +557,7 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 	if req == nil {
 		return nil, fmt.Errorf("%w: empty body", schemas.ErrWorkerRequest)
 	}
+	began := time.Now() // lane Z14: heimdall_remote_complete_seconds
 	scope, err := c.callScope(ctx)
 	if err != nil {
 		return nil, err
@@ -577,6 +583,7 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 	out := &schemas.WorkerResult{LeaseID: leaseID, RunID: req.RunID, Accepted: reason == ""}
 	c.mu.Lock()
 	w := c.workers[l.worker]
+	l.telComplete(began, reason) // lane Z14 (remotetelemetry.go)
 	c.endLocked(l, "completed")
 	if reason != "" {
 		out.Reason = reason
@@ -715,6 +722,7 @@ func (c *Coordinator) Sweep(now time.Time) {
 // ended on its context) is ended: its store lease released, its slot counted
 // pending, and a later upload for it refused.
 func (c *Coordinator) attach(r *schedRun) func() {
+	c.telAttach(r) // lane Z14: the experiment span (remotetelemetry.go)
 	c.mu.Lock()
 	c.exps = append(c.exps, r)
 	c.mu.Unlock()
@@ -735,6 +743,7 @@ func (c *Coordinator) attach(r *schedRun) func() {
 	return func() {
 		close(stop)
 		<-done
+		defer c.telDetach(r) // lane Z14
 		c.mu.Lock()
 		for i, x := range c.exps {
 			if x == r {
@@ -1059,6 +1068,7 @@ func (c *Coordinator) revokeCancelled(r *schedRun, st *runctl.State) {
 // endLocked removes a lease from the table and the worker's running list.
 // The caller holds mu.
 func (c *Coordinator) endLocked(l *remoteLease, why string) {
+	c.telEnded(l, why) // lane Z14 (remotetelemetry.go)
 	delete(c.leases, l.id)
 	c.ended[l.id] = why
 	w := c.workers[l.worker]
@@ -1088,7 +1098,7 @@ func (c *Coordinator) leaseView(l *remoteLease) *schemas.WorkerLease {
 	return &schemas.WorkerLease{LeaseID: l.id, WorkerID: l.worker, ExpID: m.ExpID, Slot: *l.slot, Attempt: l.attempt,
 		ManifestHash: m.Hash, SuiteLockHash: m.SuiteLockHash, Parts: copyStrings(m.Parts), BenchVersion: m.BenchVersion,
 		HeartbeatEveryMS: l.r.opts.HeartbeatEvery.Milliseconds(), StaleAfterMS: l.r.opts.StaleAfter.Milliseconds(),
-		GPUs: append([]string(nil), l.gpuIDs...)}
+		GPUs: append([]string(nil), l.gpuIDs...), Traceparent: l.tel.span.Traceparent()}
 }
 
 // refusedLate records a call for a lease that is gone, most often an upload

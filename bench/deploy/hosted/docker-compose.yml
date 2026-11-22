@@ -95,6 +95,13 @@ volumes:
   # a host folder (on the data disk) instead.
   registry-data:
     labels: *labels
+  # Profile monitoring (lane Z14).
+  prometheus-data:
+    labels: *labels
+  grafana-data:
+    labels: *labels
+  tempo-data:
+    labels: *labels
 
 services:
   caddy:
@@ -191,6 +198,15 @@ services:
       # Prometheus metrics on the compose network only (docs/hosting.md,
       # Operating it); empty: off. Never publish this port.
       BENCH_SERVER_METRICS_LISTEN: ${HEIMDALL_METRICS_LISTEN:-}
+      # Lane Z14 (docs/monitoring.md): platform traces to an OTLP/HTTP
+      # endpoint (profile monitoring: http://otel-collector:4318; empty:
+      # off), the public status page's incident file (edited with
+      # `bifrost-bench status incident ...`) and its extra HTTP probes.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${HEIMDALL_OTEL_ENDPOINT:-}
+      OTEL_SERVICE_NAME: heimdall-server
+      OTEL_TRACES_SAMPLER: ${HEIMDALL_OTEL_SAMPLER:-parentbased_always_on}
+      HEIMDALL_STATUS_FILE: /var/lib/heimdall/status/incidents.json
+      HEIMDALL_STATUS_PROBES: ${HEIMDALL_STATUS_PROBES:-}
       # Per-token and per-org API rate limits (empty: the built-in defaults,
       # "off": none), and the runner image Heimdall starts for an org's own
       # worker on Fly Machines or Kubernetes (empty: the published default).
@@ -416,6 +432,9 @@ services:
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
       # Python with the modal package, for organizations whose runs go to Modal.
       HEIMDALL_MODAL_PYTHON: ${HEIMDALL_MODAL_PYTHON:-}
+      # Lane Z14: the runner's spans join each evaluation's trace.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${HEIMDALL_OTEL_ENDPOINT:-}
+      OTEL_SERVICE_NAME: heimdall-shared-runner
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:ro
@@ -438,4 +457,76 @@ services:
         condition: service_started
       registry:
         condition: service_started
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Profile monitoring (lane Z14, docs/monitoring.md): Prometheus with the
+  # alert and SLO rules, Grafana with the platform dashboard, an
+  # OpenTelemetry Collector (tail sampling) and Tempo for traces.
+  #   HEIMDALL_METRICS_LISTEN=0.0.0.0:9090 and
+  #   HEIMDALL_OTEL_ENDPOINT=http://otel-collector:4318 in .env, then
+  #   docker compose ... --profile monitoring up -d
+  # Nothing here is published to the internet: Grafana listens on the
+  # host's loopback only (ssh -L 3000:127.0.0.1:3000 to read it).
+  otel-collector:
+    profiles: [monitoring]
+    image: otel/opentelemetry-collector-contrib:0.135.0@sha256:89107a3a8f4636a396927edf7025bb9614b8da2d92f4cc3f43109e8d115736e2
+    labels: *labels
+    <<: [*hardening, *logging]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./monitoring/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    # edge: the shared runner; gatewaylogs: Bifrost's OTel plugin;
+    # backend: the server, Tempo and Prometheus.
+    networks: [backend, edge, gatewaylogs]
+    restart: unless-stopped
+
+  tempo:
+    profiles: [monitoring]
+    image: grafana/tempo:2.8.2@sha256:0ef775495967cd5d7a6b2e146b6ea695d624803c8db8349fb8ce4164f719f9b7
+    labels: *labels
+    <<: [*hardening, *logging]
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./monitoring/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    networks: [backend]
+    restart: unless-stopped
+
+  prometheus:
+    profiles: [monitoring]
+    image: prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996
+    labels: *labels
+    <<: [*hardening, *logging]
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=${HEIMDALL_PROMETHEUS_RETENTION:-30d}"]
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./monitoring/slo-rules.yml:/etc/prometheus/slo-rules.yml:ro
+      - prometheus-data:/prometheus
+    networks: [backend]
+    restart: unless-stopped
+
+  grafana:
+    profiles: [monitoring]
+    image: grafana/grafana:12.1.1@sha256:a1701c2180249361737a99a01bc770db39381640e4d631825d38ff4535efa47d
+    labels: *labels
+    <<: [*hardening, *logging]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${HEIMDALL_GRAFANA_PASSWORD:-}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    tmpfs:
+      - /tmp
+    ports:
+      - "127.0.0.1:${HEIMDALL_GRAFANA_PORT:-3000}:3000"
+    networks: [backend, edge]
+    depends_on:
+      - prometheus
+      - tempo
     restart: unless-stopped
