@@ -3079,7 +3079,7 @@
 			"browser": "Browser",
 			"computer_use": "Computer use",
 			"artifact": "Artifacts",
-			"support": "Customer support",
+			"support": "Support and tool use",
 			"codingHint": "Edit a repository; hidden tests decide.",
 			"terminalHint": "Work in a whole container; its state is checked afterwards.",
 			"tool_useHint": "Call tools against a service; the final state is checked.",

@@ -1,8 +1,23 @@
+import "@/lib/i18n";
+
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ReportCard } from "./reportCard";
 import { abReport, scoreReport } from "./reportCard.fixtures";
-import { armDescription, armNames, capabilityRows, compareArms, costDisplay, duration, excludedText, headline, overallScore, points, visibleReport } from "./reportCard.utils";
+import {
+	armDescription,
+	armNames,
+	capabilityName,
+	capabilityRows,
+	compareArms,
+	costDisplay,
+	duration,
+	excludedText,
+	headline,
+	overallScore,
+	points,
+	visibleReport,
+} from "./reportCard.utils";
 
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({ to, params, children, ...rest }: { to: string; params?: Record<string, string>; children: React.ReactNode }) => (
@@ -24,6 +39,19 @@ describe("report card utils", () => {
 		const h = headline(abReport);
 		expect(h.title).toBe("codex v2 is better on 3 of 6 benchmarks");
 		expect(h.detail).toBe("Overall codex v2 wins; worse on 1, tied on 2.");
+	});
+
+	it("uses the tie wording when the server winner is unclear (D8)", () => {
+		for (const winner of ["unclear", "", "nobody"]) {
+			const h = headline({ ...abReport, overall: { winner, wins: { A: 0, B: 0, tie: 1 }, summary: "" } });
+			expect(h.title).toBe("No clear winner across 6 benchmarks");
+			expect(h.title).not.toContain("unclear");
+			expect(h.detail).toBe("Neither agent is clearly better overall.");
+		}
+	});
+
+	it("names the support capability for tool use too (A4.cap)", () => {
+		expect(capabilityName("support")).toBe("Support and tool use");
 	});
 
 	it("prefers the server overall verdict", () => {
@@ -65,7 +93,9 @@ describe("report card utils", () => {
 
 describe("excluded runs", () => {
 	it("names out of memory first in plain words", () => {
-		expect(excludedText({ infra_error: 1, out_of_memory: 2, invalid_evaluator: 0 })).toBe("excluded: 2 out of memory, 1 infrastructure error");
+		expect(excludedText({ infra_error: 1, out_of_memory: 2, invalid_evaluator: 0 })).toBe(
+			"excluded: 2 out of memory, 1 infrastructure error",
+		);
 		expect(excludedText(undefined)).toBe("");
 		expect(excludedText({ unknown: 0 })).toBe("");
 	});
@@ -76,7 +106,10 @@ describe("excluded runs", () => {
 		const report = {
 			...scoreReport,
 			split: "held_out",
-			benchmarks: [{ ...bench, arms: { ...bench.arms, [label]: { ...bench.arms[label], excluded: { out_of_memory: 3 } } } }, ...scoreReport.benchmarks.slice(1)],
+			benchmarks: [
+				{ ...bench, arms: { ...bench.arms, [label]: { ...bench.arms[label], excluded: { out_of_memory: 3 } } } },
+				...scoreReport.benchmarks.slice(1),
+			],
 		};
 		const html = renderToStaticMarkup(<ReportCard report={report} />);
 		expect(html).toContain("Excluded: 3 out of memory. Not counted in the score.");
@@ -250,7 +283,14 @@ describe("learning and persistence sections", () => {
 					chains: 2,
 				},
 			],
-			persistence: [{ arm: "A", resumed_without_redo: { value: 0.5, runs: 4 }, graceful_finish: { value: 1, runs: 2 }, cost_normalized_success: { value: 4.2, runs: 6 } }],
+			persistence: [
+				{
+					arm: "A",
+					resumed_without_redo: { value: 0.5, runs: 4 },
+					graceful_finish: { value: 1, runs: 2 },
+					cost_normalized_success: { value: 4.2, runs: 6 },
+				},
+			],
 		};
 		const html = renderToStaticMarkup(<ReportCard report={report} />);
 		expect(html).toContain("Learning over time");
@@ -261,8 +301,21 @@ describe("learning and persistence sections", () => {
 	});
 
 	it("names the no-memory control the gain from memory compares with", () => {
-		const row = { benchmark: "coding-core", arm: "A", aulc: 0.6, final_gain: 0.2, bwt: 0, fwt: 0.1, episodes_to_threshold: null, threshold: 0.8, curve: [], chains: 1 };
-		const html = renderToStaticMarkup(<ReportCard report={{ ...scoreReport, learning: [{ ...row, control: "codex v2 on m (no memory)" }] }} />);
+		const row = {
+			benchmark: "coding-core",
+			arm: "A",
+			aulc: 0.6,
+			final_gain: 0.2,
+			bwt: 0,
+			fwt: 0.1,
+			episodes_to_threshold: null,
+			threshold: 0.8,
+			curve: [],
+			chains: 1,
+		};
+		const html = renderToStaticMarkup(
+			<ReportCard report={{ ...scoreReport, learning: [{ ...row, control: "codex v2 on m (no memory)" }] }} />,
+		);
 		expect(html).toContain('data-testid="learning-control"');
 		expect(html).toContain("codex v2 on m (no memory)");
 		expect(renderToStaticMarkup(<ReportCard report={{ ...scoreReport, learning: [row] }} />)).not.toContain("learning-control");
@@ -279,7 +332,13 @@ describe("unpriced cost (N2)", () => {
 	});
 
 	it("renders Not known in the card, never $0.00", () => {
-		const unpriced = { ...scoreReport.benchmarks[0].arms.A, cost_usd: null, cost_runs: 0, cost_note: "no price for model gpt-x", tokens: null };
+		const unpriced = {
+			...scoreReport.benchmarks[0].arms.A,
+			cost_usd: null,
+			cost_runs: 0,
+			cost_note: "no price for model gpt-x",
+			tokens: null,
+		};
 		const report = {
 			...scoreReport,
 			capabilities: [{ ...scoreReport.capabilities[0], arms: { A: unpriced } }],
@@ -293,7 +352,31 @@ describe("unpriced cost (N2)", () => {
 	});
 
 	it("names the version that was latest at launch", () => {
-		expect(armDescription({ label: "A", agent: "codex", version: 3, latest_at_launch: true, model: "m" })).toBe("codex v3 (latest at launch) on m");
+		expect(armDescription({ label: "A", agent: "codex", version: 3, latest_at_launch: true, model: "m" })).toBe(
+			"codex v3 (latest at launch) on m",
+		);
 		expect(armDescription({ label: "A", agent: "codex", version: 3, model: "m" })).toBe("codex v3 on m");
+	});
+});
+
+describe("report exports (A11)", () => {
+	it("offers HTML, Markdown, PDF and the reproduce kit next to JSON", () => {
+		const html = renderToStaticMarkup(<ReportCard report={abReport} />);
+		expect(html).toContain('data-testid="report-download-json"');
+		expect(html).toContain('/evaluations/ev_ab1/report/export?format=html"');
+		expect(html).toContain('/evaluations/ev_ab1/report/export?format=md"');
+		expect(html).toContain('/evaluations/ev_ab1/reproduce"');
+		expect(html).toContain('data-testid="report-download-pdf"');
+		expect(html).toContain("Download HTML");
+		expect(html).toContain("Download Markdown");
+		expect(html).toContain("Save as PDF");
+		expect(html).toContain("Download reproduce kit");
+	});
+
+	it("hides the server exports when the report has no evaluation id", () => {
+		const html = renderToStaticMarkup(<ReportCard report={{ ...abReport, evaluation: "" }} />);
+		expect(html).toContain('data-testid="report-download-json"');
+		expect(html).not.toContain("report/export");
+		expect(html).not.toContain('data-testid="report-download-pdf"');
 	});
 });

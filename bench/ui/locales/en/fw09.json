@@ -1,0 +1,12 @@
+{
+	"export": {
+		"html": "Download HTML",
+		"markdown": "Download Markdown",
+		"pdf": "Save as PDF",
+		"pdfFailed": "Could not open the print view. Download HTML and print it from your browser.",
+		"reproduce": "Download reproduce kit"
+	},
+	"release": {
+		"sameVersion": "{{name}}, compared with an earlier evaluation of the same version"
+	}
+}

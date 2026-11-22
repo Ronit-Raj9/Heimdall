@@ -1223,6 +1223,7 @@ func DefaultFault(condition string) string {
 var knownCapability = map[string]string{
 	"hd-harbor-tb2":    "terminal",
 	"hd-harbor-skills": "terminal",
+	"hd-harbor-bfcl":   "support", // function calling is tool use
 	"hd-swe-verified":  "coding",
 	"hd-swe-rebench":   "coding",
 	"hd-swe-ib-lcb":    "safety",

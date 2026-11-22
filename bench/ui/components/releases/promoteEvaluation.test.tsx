@@ -13,6 +13,7 @@ vi.mock("@/lib/store/apis/evalReleaseApi", () => ({
 }));
 
 const { GateResultCard, PromoteEvaluation, RepeatEvaluation, previewTitle } = await import("./promoteEvaluation");
+const { releaseTitle } = await import("./releaseEvidence");
 
 const preview: EvaluationReleasePreview = {
 	evaluation: "ev_1",
@@ -58,6 +59,15 @@ describe("PromoteEvaluation", () => {
 		const t = (k: string, o?: Record<string, unknown>) => `${k}:${o?.name}`;
 		expect(previewTitle({ ...preview, replaces_version: 0 }, t)).toBe("releases.first:codex v4");
 	});
+
+	it("does not say a version replaces itself (A4.gate)", () => {
+		const t = (k: string, o?: Record<string, unknown>) => `${k}:${o?.name}`;
+		const same = { agent_id: "codex", version: 1, replaces_version: 0, compared_version: 1, agent_config_id: "", arm: "A" };
+		expect(releaseTitle(same, t)).toBe("codex v1, compared with an earlier evaluation of the same version");
+		expect(releaseTitle({ ...same, replaces_version: 1 }, t)).toBe("codex v1, compared with an earlier evaluation of the same version");
+		expect(releaseTitle({ ...same, version: 2, replaces_version: 1 }, t)).toBe("releases.replaces:codex v2");
+		expect(releaseTitle({ ...same, compared_version: undefined }, t)).toBe("releases.first:codex v1");
+	});
 });
 
 describe("GateResultCard and RepeatEvaluation", () => {
@@ -95,7 +105,17 @@ describe("GateResultCard and RepeatEvaluation", () => {
 					agent: "codex",
 					candidate: "B",
 					baseline: { agent: "codex", version: 3, live: true },
-					checks: [{ capability: "terminal", rule: "max_regression", threshold: 0.05, observed: 0.3, baseline: 0.5, pass: false, summary: "terminal fell from 50% to 30%" }],
+					checks: [
+						{
+							capability: "terminal",
+							rule: "max_regression",
+							threshold: 0.05,
+							observed: 0.3,
+							baseline: 0.5,
+							pass: false,
+							summary: "terminal fell from 50% to 30%",
+						},
+					],
 					summary: "Gate failed: terminal fell from 50% to 30%",
 					decided_at: "2026-11-20T11:00:00Z",
 				}}
