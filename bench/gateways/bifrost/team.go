@@ -49,7 +49,7 @@ func (g *Gateway) MintMemberKeys(ctx context.Context, rc *schemas.RunContext, ru
 	}
 	teamID := ""
 	if rc.Agent != nil && rc.Agent.Budgets.USD > 0 {
-		if teamID, err = g.createTeam(ctx, runID+memberKeySep+"team", rc.Agent.Budgets.USD); err != nil {
+		if teamID, err = g.createTeam(ctx, runID+memberKeySep+"team", rc.Agent.Budgets.USD, g.runEvalCustomer(rc)); err != nil {
 			return nil, fmt.Errorf("mint member keys for run %s: %w", runID, err)
 		}
 	}
@@ -129,8 +129,11 @@ func (g *Gateway) mintMember(ctx context.Context, runID string, p ProviderSetup,
 }
 
 // createTeam creates a Bifrost team with one budget and returns its id.
-func (g *Gateway) createTeam(ctx context.Context, name string, usd float64) (string, error) {
+func (g *Gateway) createTeam(ctx context.Context, name string, usd float64, customerID string) (string, error) {
 	body := map[string]any{"name": name, "budgets": []map[string]any{{"max_limit": usd, "reset_duration": budgetReset}}}
+	if customerID != "" { // C06: the team sits under the evaluation budget (evalbudget.go)
+		body["customer_id"] = customerID
+	}
 	var out struct {
 		Team struct {
 			ID string `json:"id"`
