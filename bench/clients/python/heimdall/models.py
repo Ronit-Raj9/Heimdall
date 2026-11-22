@@ -6005,6 +6005,18 @@ class Issue(_IssueRequired, total=False):
     field: str
 
 
+class _IssueReadinessRequired(TypedDict):
+    default_model: bool
+    gateway: bool
+    github: bool
+    hosted: bool
+    worker_online: bool
+
+
+class IssueReadiness(_IssueReadinessRequired, total=False):
+    message: str
+
+
 class _IssueRetryRequired(TypedDict):
     fix: str
 
@@ -6050,8 +6062,10 @@ class _ItemRequired(TypedDict):
 class Item(_ItemRequired, total=False):
     fix: str
     instruction: str
+    job_id: str
     options: BuildOptions
     reason: str
+    stage: str
     validation: Optional[Validation]
 
 
@@ -6125,6 +6139,7 @@ class _JobLeaseRequired(TypedDict):
 class JobLease(_JobLeaseRequired, total=False):
     collect: List[str]
     files: str
+    secrets: Dict[str, str]
 
 
 class _JobListRequired(TypedDict):
@@ -13233,6 +13248,7 @@ class _WorkerRegisterRequired(TypedDict):
 
 class WorkerRegister(_WorkerRegisterRequired, total=False):
     capabilities: Optional[WorkerCapabilities]
+    job_kinds: List[str]
     labels: List[str]
     pool: str
 
@@ -13813,6 +13829,10 @@ class InventoryResponse(Inventory):
 
 
 class InvitationInfoResponse(InvitationInfo):
+    mode: Mode
+
+
+class IssueReadinessResponse(IssueReadiness):
     mode: Mode
 
 
@@ -15071,6 +15091,7 @@ __all__ = [
     'Inventory',
     'InvitationInfo',
     'Issue',
+    'IssueReadiness',
     'IssueRetry',
     'IssueRunCreate',
     'IssueRunList',
@@ -15843,6 +15864,7 @@ __all__ = [
     'IntegrationExportListResponse',
     'InventoryResponse',
     'InvitationInfoResponse',
+    'IssueReadinessResponse',
     'IssueRunListResponse',
     'JobResponse',
     'JobListResponse',

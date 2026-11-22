@@ -15,11 +15,15 @@ func init() {
 }
 
 // Issues to benchmark (lane G06).
+// IssueReadiness is issuebench.Readiness under its own OpenAPI name, so it
+// does not take the name Readiness from the trace readiness schema.
+type IssueReadiness issuebench.Readiness
+
 func init() {
 	p := issueBenchPrefix
 	APIRoutes = append(APIRoutes,
 		RouteDoc{Method: "GET", Path: issueBenchReadinessPath, Tag: "benchmarks", Summary: "Whether issues can be built and tested on this site now: a worker online that takes issuebench.work (always true locally), GitHub connected, a model gateway, a default model, and the first missing piece in plain words",
-			Response: issuebench.Readiness{}},
+			Response: IssueReadiness{}},
 		RouteDoc{Method: "GET", Path: p, Tag: "benchmarks", Summary: "Issue runs of this org, newest first, without their logs", Response: IssueRunList{}},
 		RouteDoc{Method: "POST", Path: p, Tag: "benchmarks", Summary: "Scan a connected GitHub repository for merged pull requests that close an issue and save the result as a new run (free, no model calls): candidates and the selection funnel",
 			Auth: AuthWrite, Request: IssueRunCreate{}, Status: fasthttp.StatusCreated, Response: pipeline.State{}},
