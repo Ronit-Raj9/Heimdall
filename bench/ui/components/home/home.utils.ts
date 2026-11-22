@@ -1,5 +1,7 @@
 import type { ExperimentStatus, LiveEvent, RunListRow, SuiteSummary } from "@/lib/types/bench";
 import type { Evaluation } from "@/lib/store/apis/evaluationsApi";
+import { isHiddenByDefault } from "@/components/experiments/experiments.utils";
+import { suiteReadiness } from "@/components/suites/suiteIdentity";
 
 /** Experiments whose slots are still being run or analyzed. */
 export const LIVE_STATES: ReadonlySet<ExperimentStatus["state"]> = new Set(["running", "analyzing"]);
@@ -35,6 +37,55 @@ export function splitExperiments<T extends ExperimentStatus>(experiments: readon
 	};
 }
 
+/** Evaluations still queued or running: the ones the Evaluations tile counts as in progress. */
+export function isActiveEvaluation(ev: Pick<Evaluation, "status">): boolean {
+	return ev.status === "queued" || ev.status === "running";
+}
+
+/** Home's "Running now": what is in progress, cut to `limit`, and how many more there are. */
+export interface RunningNow<E, X> {
+	evaluations: E[];
+	comparisons: X[];
+	/** Everything in progress, shown or not; the section badge. */
+	total: number;
+	/** In progress but cut off by the limit. */
+	more: number;
+}
+
+/**
+ * Home's "Running now": every active evaluation (queued or running, newest first), then the running
+ * comparisons a person started that belong to no evaluation (an evaluation's benchmarks show through
+ * the evaluation). Readiness checks and practice runs stay out. The cut to `limit` comes after the
+ * filtering, so the list and the Evaluations tile agree.
+ */
+export function runningNow<E extends Pick<Evaluation, "status" | "created_at">, X extends ExperimentStatus>(
+	evaluations: readonly E[],
+	experiments: readonly X[],
+	limit = RUNNING_LIMIT,
+): RunningNow<E, X> {
+	const active = newestEvaluations(evaluations.filter(isActiveEvaluation), Number.POSITIVE_INFINITY);
+	const comparisons = byNewest(experiments).filter((exp) => LIVE_STATES.has(exp.state) && !exp.evaluation_id && !isHiddenByDefault(exp));
+	const total = active.length + comparisons.length;
+	const shownEvaluations = active.slice(0, limit);
+	const shownComparisons = comparisons.slice(0, Math.max(0, limit - shownEvaluations.length));
+	return {
+		evaluations: shownEvaluations,
+		comparisons: shownComparisons,
+		total,
+		more: total - shownEvaluations.length - shownComparisons.length,
+	};
+}
+
+/**
+ * Home's "Recent comparisons": the newest finished experiments that compare two setups. Readiness
+ * checks, practice runs and the single-setup benchmarks of an evaluation stay out.
+ */
+export function recentComparisons<T extends ExperimentStatus>(experiments: readonly T[], limit = RECENT_LIMIT): T[] {
+	return byNewest(experiments)
+		.filter((exp) => !LIVE_STATES.has(exp.state) && !isHiddenByDefault(exp))
+		.slice(0, limit);
+}
+
 /** Appends events after the newest seq seen, in order, keeping the last `keep`. */
 export function mergeEvents(current: readonly LiveEvent[], incoming: readonly LiveEvent[], keep = EVENTS_KEEP): LiveEvent[] {
 	const last = current.length > 0 ? current[current.length - 1].seq : -1;
@@ -65,6 +116,18 @@ export function suiteAdmission(suite: SuiteSummary): {
 		suite.lock_state === "locked" && admitted === total && total > 0 ? "good" : suite.lock_state === "stale" ? "warn" : "neutral";
 	return { admitted, total, share, tone };
 }
+/**
+ * A suite's readiness in the same words as the Benchmarks page (suiteReadiness): "Ready", "24 of 89
+ * tasks ready" while only some are admitted, and "Not ready yet" only when none is.
+ */
+export function suiteHomeState(suite: SuiteSummary): {
+	state: "ready" | "attention" | "failed";
+	readiness: ReturnType<typeof suiteReadiness>;
+} {
+	const readiness = suiteReadiness(suite);
+	return { state: readiness === "error" ? "failed" : readiness === "ready" ? "ready" : "attention", readiness };
+}
+
 /** A suite reads as Ready when it loaded, is locked and every task is admitted; anything else needs attention. */
 export function suiteReady(suite: SuiteSummary): boolean {
 	return suiteAdmission(suite).tone === "good";
@@ -97,11 +160,7 @@ export interface HomeStats {
 }
 
 /** Home's KPI row, read from the experiment list and the newest page of runs. */
-export function homeStats(
-	experiments: readonly ExperimentStatus[],
-	runs: readonly RunListRow[],
-	now: Date = new Date(),
-): HomeStats {
+export function homeStats(experiments: readonly ExperimentStatus[], runs: readonly RunListRow[], now: Date = new Date()): HomeStats {
 	const weekAgo = now.getTime() - 7 * DAY_MS;
 	const month = monthStart(now).getTime();
 	const runsWeek = runs.filter((run) => at(run.started ?? run.sealed_at) >= weekAgo).length;

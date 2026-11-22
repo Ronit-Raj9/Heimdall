@@ -151,3 +151,17 @@ func TestBuildStatusAdaptiveStoppedEarly(t *testing.T) {
 		t.Fatal("fixed plan has no not-required slots")
 	}
 }
+
+// An experiment an evaluation created says so, so the lists can tell its
+// single benchmark runs from comparisons a person started (D1.text).
+func TestBuildStatusEvaluationID(t *testing.T) {
+	idx := testIndex()
+	m := *idx.manifests[testExp]
+	if st := BuildStatus(&m, nil, StatusFacts{}); st.EvaluationID != "" {
+		t.Fatalf("evaluation_id %q on a plain experiment", st.EvaluationID)
+	}
+	m.Experiment.EvaluationID = "ev_20261122_142833_4eaebd"
+	if st := BuildStatus(&m, nil, StatusFacts{}); st.EvaluationID != "ev_20261122_142833_4eaebd" {
+		t.Fatalf("evaluation_id %q, want the manifest's evaluation", st.EvaluationID)
+	}
+}

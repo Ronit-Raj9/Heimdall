@@ -256,6 +256,10 @@ type ExperimentStatus struct {
 	SuiteVersion string   `json:"suite_version,omitempty"`
 	Arms         []string `json:"arms,omitempty"`
 	Decision     Decision `json:"decision,omitempty"`
+	// EvaluationID is the evaluation that created the experiment, empty for
+	// one a person started, so lists can tell an evaluation's benchmarks
+	// from comparisons.
+	EvaluationID string `json:"evaluation_id,omitempty"`
 }
 
 // ExperimentList is GET /experiments.

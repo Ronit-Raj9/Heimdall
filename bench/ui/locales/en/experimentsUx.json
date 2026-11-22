@@ -1,5 +1,6 @@
 {
-	"subtitle": "A comparison runs two setups (A and B) on the same tasks and tells you which one is better. Newest first.",
+	"subtitle": "A comparison runs two setups (A and B) on the same tasks and tells you which one is better. The single benchmarks of an evaluation are on its evaluation page.",
+	"newComparison": "New comparison",
 	"quickRun": "Quick run on {{suite}}",
 	"armsVs": "{{arms}} on {{suite}}",
 	"noSuite": "an unknown benchmark",
@@ -46,8 +47,8 @@
 		"agent": "Agent check for {{name}}",
 		"drift": "Drift monitor: {{name}}",
 		"tag": "automatic check",
-		"toggle": "Show system checks ({{count}})",
-		"toggleHint": "Automatic checks Heimdall runs by itself: benchmark readiness checks, agent checks and drift monitors. They are not comparisons you started.",
-		"hidden": "({{count}} system checks hidden)"
+		"toggle": "Also show readiness checks, practice runs and single benchmarks of evaluations ({{count}})",
+		"toggleHint": "Automatic checks Heimdall runs by itself (benchmark readiness checks, agent checks and drift monitors), runs on the practice benchmarks, and the one-setup benchmarks of an evaluation. None of them compares two setups.",
+		"hidden": "({{count}} hidden: checks, practice runs and single benchmarks of evaluations)"
 	}
 }
