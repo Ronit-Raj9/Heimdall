@@ -89,6 +89,19 @@ func TestEvalRunFlagsAB(t *testing.T) {
 	if s.Mode != schemas.EvaluationModeModels || s.Arms[1].Model != "m2" || s.Arms[1].Agent != "mine" || s.Arms[1].Version != 3 {
 		t.Fatalf("models: %+v", s)
 	}
+	s = mustSpec(t, "--agent", "mine@v2", "--model", "m1", "--provider", "openai", "--mode", "model_switch", "--models", "anthropic/claude-x,m3", "--pack", "coding")
+	if s.Mode != schemas.EvaluationModeModelSwitch || len(s.Arms) != 3 {
+		t.Fatalf("model_switch: %+v", s)
+	}
+	if a := s.Arms[0]; a.Label != "current" || a.Model != "m1" || a.Provider != "openai" || a.Version != 2 {
+		t.Fatalf("model_switch arm 1: %+v", a)
+	}
+	if b := s.Arms[1]; b.Label != "model-2" || b.Provider != "anthropic" || b.Model != "claude-x" || b.Agent != "mine" || b.Version != 2 {
+		t.Fatalf("model_switch arm 2: %+v", b)
+	}
+	if c := s.Arms[2]; c.Label != "model-3" || c.Provider != "" || c.Model != "m3" {
+		t.Fatalf("model_switch arm 3: %+v", c)
+	}
 }
 
 func TestEvalRunFlagsErrors(t *testing.T) {
@@ -103,6 +116,13 @@ func TestEvalRunFlagsErrors(t *testing.T) {
 		{"--agent", "a@v1", "--vs", "a@v1", "--model", "m", "--pack", "coding"},
 		{"--agent", "a", "--model", "m", "--vs-model", "m", "--pack", "coding"},
 		{"--agent", "a", "--model", "m", "--pack", "coding", "--tasks", "0"},
+		{"--agent", "a", "--model", "m", "--pack", "coding", "--mode", "model_switch"},
+		{"--agent", "a", "--model", "m", "--pack", "coding", "--models", "x"},
+		{"--agent", "a", "--model", "m", "--pack", "coding", "--mode", "models", "--models", "x"},
+		{"--agent", "a", "--model", "m", "--pack", "coding", "--mode", "model_switch", "--models", "m"},
+		{"--agent", "a", "--model", "m", "--pack", "coding", "--mode", "model_switch", "--models", "x,x"},
+		{"--agent", "a", "--model", "m", "--pack", "coding", "--mode", "model_switch", "--models", "x", "--vs-model", "y"},
+		{"--agent", "a", "--model", "m", "--pack", "coding", "--mode", "model_switch", "--models", "b,c,d,e,f,g"},
 	}
 	for _, args := range bad {
 		o, err := parseEvalFlags("run", args)

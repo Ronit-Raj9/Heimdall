@@ -35,7 +35,7 @@ means `/experiments/<id>`; its tabs are named in the table.
 | `db migrate` / `status` / `backup` | Operate > Operations, Evidence, **Back up** | partial | migrate and status run at server start; operator shell task |
 | `doctor` | Operate > Operations, Health, **Run doctor** (job `operate.doctor`) | web | |
 | `estimate` | Experiments > New experiment, **Estimate** | web | |
-| `eval run` | **Evaluate your agent** (`/evaluate`) wizard, **Launch**; estimate shows live in step 4 | web | `--agent codex@v2 [--vs agent@vM \| --vs-model M] --model M --pack coding \| --benchmarks a,b --tasks 5 --trials 2 --faults model-down,broken-tool [--estimate]`; with `-server` (or `HEIMDALL_SERVER`) it calls `POST /api/bench/evaluations`; local mode only records the evaluation, launching needs a server |
+| `eval run` | **Evaluate your agent** (`/evaluate`) wizard, **Launch**; estimate shows live in step 4 | web | `--agent codex@v2 [--vs agent@vM \| --vs-model M \| --mode model_switch --models M2,M3] --model M --pack coding \| --benchmarks a,b --tasks 5 --trials 2 --faults model-down,broken-tool [--estimate]`; with `-server` (or `HEIMDALL_SERVER`) it calls `POST /api/bench/evaluations`; local mode only records the evaluation, launching needs a server |
 | `eval list` / `show` / `cancel` | Evaluations (`/evaluations`), evaluation page (`/evaluations/<id>`), **Cancel** | web | |
 | `eval report` | Evaluation page (`/evaluations/<id>`), report card; agent page, **Report card** tab | web | prints a capability table, one row per benchmark with the A/B verdict, faults and safety; `--json` gives the API shape. Local mode reads a saved `<id>.report.json` only |
 | `eventcollector` | none | CLI only | internal per-run process the engine starts; not a user action |

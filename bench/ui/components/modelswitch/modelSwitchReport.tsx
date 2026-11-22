@@ -4,6 +4,7 @@ import { costText, formatShare, observed } from "@/components/migration/pareto.u
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { ApplyPanel } from "./applyPanel";
+import { LatencyChart } from "./latencyChart";
 import { getLocale } from "@/lib/i18n";
 import { useGetModelSwitchConfigQuery, useGetModelSwitchQuery, type ModelSwitchReport, type SwitchGroup } from "@/lib/store/apis/modelSwitchApi";
 import type { Value } from "@/lib/types/bench";
@@ -101,6 +102,11 @@ function Report({ report }: { report: ModelSwitchReport }) {
 			<Section title={t("report.costChart")} description={report.pareto.note} testId="model-switch-pareto">
 				<ParetoChart pareto={report.pareto} testId="model-switch-pareto-chart" />
 			</Section>
+			{report.latency_pareto && report.latency_pareto.points.length > 0 && (
+				<Section title={t("report.latencyChart")} testId="model-switch-latency">
+					<LatencyChart pareto={report.latency_pareto} />
+				</Section>
+			)}
 			<Groups title={t("report.perBenchmark")} groups={report.benchmarks} testId="model-switch-benchmarks" share={share} />
 			<Groups title={t("report.perSegment")} description={t("report.segmentsDescription")} groups={report.segments} testId="model-switch-segments" share={share} empty={t("report.noSegments")} />
 			{report.missing.length > 0 && <TextList title={t("report.missing")} items={report.missing} testId="model-switch-missing" />}

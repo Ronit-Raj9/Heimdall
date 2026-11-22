@@ -3,6 +3,7 @@ package main
 // A20 CLI parity for evaluations (agent-first contract, section 3 and 4).
 //
 //	bifrost-bench eval run --agent codex[@vN] [--vs agent@vM | --vs-model M] --model M
+//	    [--mode model_switch --models M2,M3]
 //	    --pack coding | --benchmarks a,b [--tasks 8] [--trials 2]
 //	    [--faults model-down,broken-tool] [--estimate] [--json]
 //	bifrost-bench eval list
@@ -43,6 +44,7 @@ const evalUsage = `usage: bifrost-bench eval <run|list|show|report|cancel> ...
 
   eval run --agent codex[@vN] --model M (--pack coding | --benchmarks a,b)
            [--vs agent@vM | --vs-model M2] [--tasks 8] [--trials 2]
+           [--mode model_switch --models M2,M3]
            [--faults model-down,broken-tool,misleading-instruction] [--name N]
            [--budget USD] [--mcp-route direct|bifrost|bifrost_code_mode]
            [--estimate] [--json]
@@ -84,6 +86,7 @@ type evalOpts struct {
 	estimate bool
 
 	agent, vs, vsModel, model, provider string
+	mode, models                        string
 	pack, benchmarks, faults, name      string
 	mcpRoute                            string
 	tasks, trials                       int
@@ -129,6 +132,8 @@ func parseEvalFlags(sub string, args []string) (*evalOpts, error) {
 		fs.StringVar(&o.vsModel, "vs-model", "", "second arm: the same agent with this model")
 		fs.StringVar(&o.model, "model", "", "model for the agent (any model Bifrost routes)")
 		fs.StringVar(&o.provider, "provider", "", "provider of the model (optional)")
+		fs.StringVar(&o.mode, "mode", "", "evaluation mode; model_switch runs the agent on --model plus every --models entry for the model switch report")
+		fs.StringVar(&o.models, "models", "", "model_switch: comma separated models besides --model (provider/model or a model name)")
 		fs.StringVar(&o.pack, "pack", "", "benchmark pack: coding, terminal, support, memory, research, voice, safety, all-compatible")
 		fs.StringVar(&o.benchmarks, "benchmarks", "", "comma separated benchmark ids")
 		fs.IntVar(&o.tasks, "tasks", 8, "tasks per benchmark (at least 6 before an A/B gap can be significant)")
@@ -195,6 +200,17 @@ func buildEvalSpec(o *evalOpts) (*schemas.EvaluationSpec, error) {
 	if o.vs != "" && o.vsModel != "" {
 		return nil, errors.New("use --vs or --vs-model, not both")
 	}
+	switch o.mode {
+	case "", schemas.EvaluationModeModelSwitch:
+	default:
+		return nil, fmt.Errorf("--mode %q: only model_switch is set by flag; other modes follow from --vs and --vs-model", o.mode)
+	}
+	if o.models != "" && o.mode != schemas.EvaluationModeModelSwitch {
+		return nil, errors.New("--models needs --mode model_switch")
+	}
+	if o.mode == schemas.EvaluationModeModelSwitch && (o.vs != "" || o.vsModel != "") {
+		return nil, errors.New("--mode model_switch takes --models, not --vs or --vs-model")
+	}
 	benches := splitList(o.benchmarks)
 	if o.pack == "" && len(benches) == 0 {
 		return nil, errors.New("pick benchmarks: --pack <name> or --benchmarks a,b")
@@ -229,6 +245,10 @@ func buildEvalSpec(o *evalOpts) (*schemas.EvaluationSpec, error) {
 			spec.Mode = schemas.EvaluationModeVersions
 		}
 		spec.Arms = append(spec.Arms, schemas.EvaluationArm{Label: "B", Agent: bid, Version: bver, Model: o.model, Provider: o.provider})
+	case o.mode == schemas.EvaluationModeModelSwitch:
+		if err := modelSwitchArms(spec, a, splitList(o.models)); err != nil {
+			return nil, err
+		}
 	case o.vsModel != "":
 		if o.vsModel == o.model {
 			return nil, errors.New("--vs-model is the same as --model")
@@ -257,6 +277,36 @@ func buildEvalSpec(o *evalOpts) (*schemas.EvaluationSpec, error) {
 		spec.Name = defaultEvalName(spec)
 	}
 	return spec, nil
+}
+
+// modelSwitchArms adds one arm per extra model to a model_switch spec. The
+// labels match the web form (current, model-2, ...). "provider/model"
+// sets the arm's provider; a bare name keeps the provider empty.
+func modelSwitchArms(spec *schemas.EvaluationSpec, a schemas.EvaluationArm, extra []string) error {
+	spec.Mode = schemas.EvaluationModeModelSwitch
+	a.Label = "current"
+	spec.Arms = []schemas.EvaluationArm{a}
+	if len(extra) == 0 {
+		return errors.New("--mode model_switch needs --models: at least one model besides --model")
+	}
+	if 1+len(extra) > schemas.EvaluationModelSwitchMaxArms {
+		return fmt.Errorf("--mode model_switch takes at most %d models in all, got %d", schemas.EvaluationModelSwitchMaxArms, 1+len(extra))
+	}
+	seen := map[string]bool{a.Provider + "/" + a.Model: true}
+	for i, m := range extra {
+		b := a
+		b.Label = fmt.Sprintf("model-%d", i+2)
+		b.Provider, b.Model = "", m
+		if p, rest, ok := strings.Cut(m, "/"); ok && p != "" && rest != "" {
+			b.Provider, b.Model = p, rest
+		}
+		if seen[b.Provider+"/"+b.Model] || (b.Model == a.Model && b.Provider == "") {
+			return fmt.Errorf("--models lists %s twice or the same as --model", m)
+		}
+		seen[b.Provider+"/"+b.Model] = true
+		spec.Arms = append(spec.Arms, b)
+	}
+	return nil
 }
 
 func evalHas(xs []string, s string) bool {

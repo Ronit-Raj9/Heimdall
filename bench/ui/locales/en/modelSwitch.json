@@ -126,7 +126,20 @@
 			"done": "{{action}} {{rule}} at priority {{priority}}",
 			"failed": "{{rule}} failed: {{error}}",
 			"stale": "Left in place: {{rules}}",
-			"error": "Could not apply: {{message}}"
+			"error": "Could not apply: {{message}}",
+			"secretLoadError": "Could not load the org secrets. Add one in Settings, Secrets.",
+			"scope": "Where the rules apply",
+			"scopes": {
+				"virtual_key": "One virtual key",
+				"team": "One team",
+				"customer": "One customer",
+				"global": "Every request on the gateway (global)"
+			},
+			"scopeId": {
+				"virtual_key": "Virtual key id",
+				"team": "Team id",
+				"customer": "Customer id"
+			}
 		}
 	}
 }
