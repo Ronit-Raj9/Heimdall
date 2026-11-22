@@ -505,6 +505,9 @@ func (a *admitter) grade(ctx context.Context, rc *schemas.RunContext, diff *sche
 	check.Got = gradeOutcome(g)
 	check.Passed = check.Got == check.Want
 	check.Detail = joinDetail(detail, gradeSummary(g))
+	if why := referenceMissedChecks(a.deps.Grader.GetName(), check.Name, g); why != "" { // declarative checks (checkslint.go)
+		check.Passed, check.Detail = false, joinDetail(check.Detail, why)
+	}
 	a.deps.Logger.Info("admission check", "task", a.t.ID, "check", check.Name, "want", check.Want, "got", check.Got)
 	return check
 }
