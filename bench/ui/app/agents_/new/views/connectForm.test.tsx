@@ -36,6 +36,7 @@ describe("connect form helpers", () => {
 		expect(picksOwnModel({ ...http, adapter: "a2a" }, {})).toBe(true);
 		expect(picksOwnModel({ ...http, adapter: "openai_agent" }, {})).toBe(false);
 		expect(testable(http) && testable({ ...http, adapter: "openai_agent" }) && !testable(wrap)).toBe(true);
+		expect(testable({ ...http, adapter: "a2a" })).toBe(true); // Y03: A2A agents are tested straight from their card
 	});
 
 	it("needs a repository or an image to wrap an app", () => {

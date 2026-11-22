@@ -58,7 +58,10 @@ func (h *RunnersHandler) WithInstallScript(script []byte) *RunnersHandler {
 // HEIMDALL_DEFAULT_* lines) with this server's address, the repository and
 // the commit runners must run, so the one-line install
 // (curl .../install.sh | sudo HEIMDALL_RUNNER_TOKEN=... sh) needs nothing
-// else. A value that is not plainly safe in a shell assignment is left out.
+// else. With the commit set, the script downloads the project bundle and the
+// CLI binary of that commit from this server (/downloads/bench-<commit>.tar.gz,
+// /downloads/bifrost-bench-linux-<arch>); the repository is used only when
+// the install asks for a git clone (--repo or --source git). A value that is not plainly safe in a shell assignment is left out.
 // Call it after WithInstallScript.
 func (h *RunnersHandler) WithInstallDefaults(server, repo, ref string) *RunnersHandler {
 	h.install = InstallScriptWithDefaults(h.install, server, repo, ref)

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/publicingress"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
@@ -102,5 +103,43 @@ func TestPublishedPort(t *testing.T) {
 	}
 	if _, err := publishedPort("", "127.0.0.1"); err == nil {
 		t.Fatal("empty output accepted")
+	}
+}
+
+// TestStartRemoteToolsIngress is Y03 (G1 P0-1): behind the worker's public
+// ingress the gate publishes no host port, joins the ingress network, is
+// probed by name and registered for live-run routing; an internet agent on a
+// worker without published tools is refused.
+func TestStartRemoteToolsIngress(t *testing.T) {
+	docker, logPath := gateDocker(t)
+	var probed string
+	old := remoteGateReady
+	remoteGateReady = func(_ context.Context, addr string, _ time.Duration) error { probed = addr; return nil }
+	t.Cleanup(func() { remoteGateReady = old })
+	e := newDockerWorkspace(DockerWorkspaceConfig{Docker: docker, RemoteToolsPublicURL: "https://h.example.com/rt", RemoteToolsIngressNetwork: "heimdall-rtgate"})
+	rc := serviceRC(t)
+	rc.Agent = &schemas.AgentConfig{Budgets: schemas.Budgets{WallS: 60}, Remote: &schemas.RemoteAgent{URL: "https://agent.acme.com/run", Tools: schemas.RemoteToolsExpose}}
+	handles := []schemas.ServiceHandle{{Spec: schemas.ServiceSpec{ID: "notes", Role: schemas.ServiceRoleMCP}, URL: toolProxyURL("notes")}}
+	if err := e.startRemoteTools(context.Background(), rc, "e_1", "r_9", handles); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { publicingress.Default.Drop("r_9") })
+	if rc.RemoteTools.BaseURL != "https://h.example.com/rt" || probed != "bench-rt-r_9:9201" {
+		t.Fatalf("base %q probed %q", rc.RemoteTools.BaseURL, probed)
+	}
+	raw, _ := os.ReadFile(logPath)
+	log := string(raw)
+	if strings.Contains(log, "-p ") || strings.Contains(log, "port bench-rt") || !strings.Contains(log, "network connect heimdall-rtgate bench-rt-r_9") {
+		t.Fatalf("docker calls:\n%s", log)
+	}
+	if publicingress.Default.Live() == 0 {
+		t.Fatal("the gate was not registered with the public ingress")
+	}
+
+	bare := newDockerWorkspace(DockerWorkspaceConfig{Docker: docker})
+	rc2 := serviceRC(t)
+	rc2.Agent = rc.Agent
+	if err := bare.startRemoteTools(context.Background(), rc2, "e_1", "r_10", handles); err == nil || !strings.Contains(err.Error(), "remote_tools.public_url") {
+		t.Fatalf("unpublished worker: %v", err)
 	}
 }

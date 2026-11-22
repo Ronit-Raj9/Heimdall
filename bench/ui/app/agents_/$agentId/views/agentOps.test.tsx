@@ -67,6 +67,9 @@ describe("agent ops tabs", () => {
 		expect(html).toContain('data-testid="job-run-agent.build"');
 		expect(html).not.toContain('data-testid="job-run-agent.diff"');
 		expect(html).toContain('data-testid="agent-build-runner-note"');
+		// Y03: hosted agents can try one real task on their worker.
+		expect(html).toContain('data-testid="agent-check-try-real-hint"');
+		expect(html.split('data-testid="job-run-agent.check"').length - 1).toBe(2);
 	});
 
 	it("checks tab points to New agent when the agent is missing", () => {

@@ -33,6 +33,7 @@ func runProxy(args []string) int {
 	slots := fs.String("slots", envOr("BENCH_FAULTPROXY_SLOTS", ""), "comma-separated anthropic key slots; each slot's placeholder key value equals its name (empty: fp-slot-1..N, N from -slots-per-provider)")
 	perProvider := fs.Int("slots-per-provider", envInt("BENCH_FAULTPROXY_SLOTS_PER_PROVIDER", lib.DefaultSlotsPerProvider), "key slots of every provider no list names (<prefix>-slot-1..N): how many runs may use one provider at once; keep in step with gateway.slots_per_provider")
 	openaiSlots := fs.String("openai-slots", envOr("BENCH_FAULTPROXY_OPENAI_SLOTS", ""), "comma-separated key slots of the openai provider (empty: oa-slot-1..N); keep in step with gateway.openai_key_slots")
+	publicOnly := fs.Bool("public-only", envBool("BENCH_FAULTPROXY_PUBLIC_ONLY"), "dial organization key base URLs only at public addresses, checked at connect time (the shared hosted stack)")
 	debug := fs.Bool("debug", false, "debug logging")
 	if err := fs.Parse(args); err != nil {
 		return exitUsage
@@ -48,6 +49,7 @@ func runProxy(args []string) int {
 		Logger:        logger,
 
 		ScriptedFallback: *scriptedFallback,
+		PublicOnly:       *publicOnly,
 	}
 	if file := os.Getenv("BENCH_FAULTPROXY_PROVIDERS"); file != "" { // X8: the provider table file the compose files pass (faultproxy.LoadProviders)
 		list, err := faultproxy.LoadProviders(file)

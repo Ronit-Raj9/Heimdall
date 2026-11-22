@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // Response body caps: API answers are small; file downloads have their own.
@@ -19,8 +21,52 @@ const (
 )
 
 // defaultHTTPClient has no overall timeout: every call carries a context
-// with its own deadline (a command may run for minutes).
-var defaultHTTPClient = &http.Client{Transport: http.DefaultTransport}
+// with its own deadline (a command may run for minutes). Its transport
+// refuses, at connect time, every private, loopback, link-local, metadata
+// and other non-public address (G3 B6): the endpoint and every URL a
+// platform answers with (Daytona's toolbox proxy) are org-supplied, and the
+// server and the shared worker sit on compose networks with internal
+// services. Tests that talk to a local fake set AllowPrivateEndpoints.
+var defaultHTTPClient = &http.Client{Transport: guardedTransport{}}
+
+// AllowPrivateEndpoints lets platform clients built without their own HTTP
+// client reach private and loopback addresses and plain http endpoints.
+// Only tests and a single-user local install set it; hosted servers and the
+// shared worker never do.
+var AllowPrivateEndpoints = false
+
+// guardedTransport picks the guarded or the plain transport per request, so
+// AllowPrivateEndpoints takes effect without rebuilding clients.
+type guardedTransport struct{}
+
+var publicTransport = utils.GuardedTransport()
+
+func (guardedTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	if AllowPrivateEndpoints {
+		return http.DefaultTransport.RoundTrip(r)
+	}
+	if r.URL.Scheme != "https" {
+		return nil, fmt.Errorf("only https platform URLs are allowed, not %s", r.URL.Scheme)
+	}
+	return publicTransport.RoundTrip(r)
+}
+
+// checkEndpoint refuses an org-supplied endpoint that names an internal
+// host or is not https, unless AllowPrivateEndpoints. A bare domain (E2B)
+// or a name (the Modal environment) is checked as a host when it looks like
+// one; anything with a scheme is checked as a URL.
+func checkEndpoint(title, endpoint string) error {
+	endpoint = strings.TrimSpace(endpoint)
+	if endpoint == "" || AllowPrivateEndpoints {
+		return nil
+	}
+	if strings.Contains(endpoint, "://") {
+		if err := utils.CheckPublicURL(endpoint, false); err != nil {
+			return fmt.Errorf("%s: the endpoint is refused: %v", title, err)
+		}
+	}
+	return nil
+}
 
 // apiClient is the small JSON-over-HTTP client every platform uses. It
 // never puts its secrets in an error: each error string has them replaced.
@@ -32,17 +78,20 @@ type apiClient struct {
 	title   string            // "Daytona", for error messages
 }
 
-// HTTPError is a non-2xx answer.
+// HTTPError is a non-2xx answer. Body holds at most maxErrorBody bytes of
+// the answer for code that parses it; Error never includes it (G3 B6: an
+// org-supplied endpoint must not turn the server into a reader of internal
+// answers), only the status and its standard text.
 type HTTPError struct {
 	Status int
 	Body   string
 }
 
 func (e *HTTPError) Error() string {
-	if e.Body == "" {
-		return fmt.Sprintf("HTTP %d", e.Status)
+	if t := http.StatusText(e.Status); t != "" {
+		return fmt.Sprintf("HTTP %d %s", e.Status, t)
 	}
-	return fmt.Sprintf("HTTP %d: %s", e.Status, e.Body)
+	return fmt.Sprintf("HTTP %d", e.Status)
 }
 
 // statusOf returns the HTTP status of err, or 0.

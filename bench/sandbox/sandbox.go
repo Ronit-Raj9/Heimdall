@@ -185,6 +185,9 @@ func New(name string, c Credentials) (Platform, error) {
 	if r.info.EndpointRequired && strings.TrimSpace(c.Endpoint) == "" {
 		return nil, fmt.Errorf("%s: %s is required", r.info.Title, strings.ToLower(r.info.EndpointLabel))
 	}
+	if err := checkEndpoint(r.info.Title, c.Endpoint); err != nil { // G3 B6
+		return nil, err
+	}
 	return r.factory(c)
 }
 

@@ -129,6 +129,7 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		ProcessWatch: cfg.Observers.ProcessOn(), WorkspaceWatch: cfg.Observers.WorkspaceOn(), WatchIntervalMS: cfg.Observers.IntervalMS,
 		EventsCollector:   cfg.Events.CollectorOn(),                                                // Agent events area
 		RemoteToolsListen: cfg.RemoteTools.Listen, RemoteToolsPublicURL: cfg.RemoteTools.PublicURL, // Remote coverage
+		RemoteToolsIngressNetwork: cfg.RemoteTools.IngressNetwork, GatewayPublicURL: cfg.Gateway.PublicURL, GatewayAgentURL: cfg.Gateway.AgentURL, // Y03: public ingress and reachability refusals
 		ServiceGateway: environments.ServiceGatewayConfig{Gateway: gw, AgentURL: cfg.Gateway.AgentURL, Fault: fault, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref()}, // W3 customer support: a service's own gateway key (servicegateway.go)
 	}
 	a.dockerCfg = dockerCfg

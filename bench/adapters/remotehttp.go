@@ -150,6 +150,11 @@ func (a *remoteHTTPAdapter) Plan(_ context.Context, rc *schemas.RunContext) (*sc
 	if err != nil {
 		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
 	}
+	if traffic == RemoteTrafficGateway && a.cfg.GatewayPublicURL == "" && utils.PublicEndpoint(spec.URL) {
+		// Y03: the planner refuses this too (utils.RemoteReachRefusals); a
+		// worker configured differently from the planner stops here.
+		return nil, fmt.Errorf("plan run %s: %s", rc.Run.RunID, utils.RefuseGatewayUnreachable)
+	}
 	plan.Argv = []string{"python3", "-I", remoteLauncherFile}
 	plan.Env = env
 	plan.Files = map[string]string{remoteLauncherFile: remoteLauncherSource, InstructionFile: instruction}

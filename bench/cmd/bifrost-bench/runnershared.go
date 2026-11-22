@@ -459,6 +459,7 @@ func runSharedRunner(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
+	utils.EgressPublicOnly = true // G3 B6: org-supplied agent and API addresses must be public here
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	// The base app plans nothing for an org; it holds the host-level docker
@@ -508,6 +509,7 @@ func runSharedRunner(args []string) int {
 	}
 	h.hygiene = newRunnerHygiene(a, f.projectsDir) // E6: one sweep for every org's loop: they share this runner's store and Docker (runnerhygiene.go)
 	go h.hygiene.Run(ctx)
+	startPublicIngress(ctx, a) // Y03: /gw and /rt for live runs, behind Caddy (runneringress.go)
 	var wg sync.WaitGroup
 	start := func(as sharedpool.Assignment, slots int) *sharedLoop {
 		lctx, cancel := context.WithCancel(ctx)
@@ -586,6 +588,11 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 		name = name[:128]
 	}
 	reg, planRoot := sharedOrgProject(oa, root)
+	if rel, ok := reg.Gateway.(interface {
+		ReleaseOrgCredentials(context.Context, string) error
+	}); ok { // G3 B7: free the org's fault proxy slots when its claim ends
+		defer func() { _ = rel.ReleaseOrgCredentials(context.WithoutCancel(ctx), org) }()
+	}
 	labels := []string{"shared", "runtime=" + h.runtime}
 	if claim.Platform != nil { // X19a: the org's own sandbox platform runs its runs
 		pr, err := sandboxRegistry(ctx, oa, reg, claim.Platform)

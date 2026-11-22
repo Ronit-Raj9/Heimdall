@@ -44,6 +44,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // Event types a hook can subscribe to.
@@ -401,12 +403,16 @@ func ValidateURL(raw string, allowPrivate bool) error {
 	if ip := net.ParseIP(host); ip != nil && blockedIP(ip) {
 		return fmt.Errorf("%w: this server does not deliver to private or local addresses", ErrInvalid)
 	}
+	if err := utils.CheckPublicHost(host); err != nil { // G3 B6: compose service names and internal suffixes
+		return fmt.Errorf("%w: this server only delivers to public host names (%v)", ErrInvalid, err)
+	}
 	return nil
 }
 
 // GuardedDialer returns a dialer that refuses, at connect time, every
 // loopback, private, link-local, multicast or unspecified address, so a
-// public name that resolves to an internal address is still refused.
+// public name that resolves to an internal address is still refused
+// (the ranges are utils.BlockedIP's).
 func GuardedDialer(timeout time.Duration) *net.Dialer {
 	return &net.Dialer{Timeout: timeout, Control: func(_, address string, _ syscall.RawConn) error {
 		host, _, err := net.SplitHostPort(address)
@@ -420,10 +426,9 @@ func GuardedDialer(timeout time.Duration) *net.Dialer {
 	}}
 }
 
-func blockedIP(ip net.IP) bool {
-	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
-		ip.IsUnspecified() || ip.IsMulticast() || ip.IsInterfaceLocalMulticast()
-}
+// blockedIP is utils.BlockedIP: also carrier-grade NAT, NAT64 and the other
+// special-use ranges (G3 B6).
+func blockedIP(ip net.IP) bool { return utils.BlockedIP(ip) }
 
 // redactURL drops userinfo and the query (which may carry a token) from a URL shown in the UI.
 func redactURL(raw string) string {

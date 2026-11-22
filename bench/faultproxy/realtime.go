@@ -86,7 +86,7 @@ func (s *Server) relayWebSocket(w http.ResponseWriter, r *http.Request, p Provid
 	if up.key != "" {
 		p.Auth.apply(out, up.key)
 	}
-	upConn, err := dialUpstream(r.Context(), base)
+	upConn, err := dialUpstream(r.Context(), base, up.orgBase && s.cfg.PublicOnly) // G3 B6
 	if err != nil {
 		e.UpstreamError = redactURLError(err)
 		s.writeError(w, p.Format, http.StatusBadGateway, errUpstream, utils.ProxyUnreachable)
@@ -152,7 +152,8 @@ func (s *Server) relayWebSocket(w http.ResponseWriter, r *http.Request, p Provid
 }
 
 // dialUpstream connects to the upstream host, with TLS for https.
-func dialUpstream(ctx context.Context, base *url.URL) (net.Conn, error) {
+// guarded checks every address at connect time (Config.PublicOnly).
+func dialUpstream(ctx context.Context, base *url.URL, guarded bool) (net.Conn, error) {
 	host := base.Host
 	if base.Port() == "" {
 		if base.Scheme == "https" {
@@ -162,6 +163,9 @@ func dialUpstream(ctx context.Context, base *url.URL) (net.Conn, error) {
 		}
 	}
 	d := &net.Dialer{Timeout: realtimeDialTimeout}
+	if guarded {
+		d = utils.GuardedDialer(realtimeDialTimeout)
+	}
 	if base.Scheme == "https" {
 		return (&tls.Dialer{NetDialer: d, Config: &tls.Config{ServerName: base.Hostname(), MinVersion: tls.VersionTLS12}}).DialContext(ctx, "tcp", host)
 	}

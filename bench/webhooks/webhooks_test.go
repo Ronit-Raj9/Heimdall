@@ -217,3 +217,23 @@ func TestBackoff(t *testing.T) {
 		}
 	}
 }
+
+// G3 B6: compose service names, internal suffixes and the extra special-use
+// ranges are refused on hosted servers, at validation and at connect time.
+func TestValidateURLRefusesInternalHosts(t *testing.T) {
+	for _, u := range []string{"https://bifrost:8080/hook", "https://registry/v2", "https://x.internal/h",
+		"https://100.64.0.9/h", "https://[fd00:ec2::254]/h", "https://169.254.169.254/latest"} {
+		if err := ValidateURL(u, false); err == nil {
+			t.Errorf("%s: accepted", u)
+		}
+	}
+	if err := ValidateURL("https://hooks.example.com/heimdall", false); err != nil {
+		t.Fatalf("public: %v", err)
+	}
+	if err := ValidateURL("http://bifrost:8080/hook", true); err != nil {
+		t.Fatalf("local server: %v", err)
+	}
+	if err := GuardedDialer(time.Second).Control("tcp", "100.64.0.9:443", nil); err == nil {
+		t.Fatal("dialer let carrier-grade NAT through")
+	}
+}

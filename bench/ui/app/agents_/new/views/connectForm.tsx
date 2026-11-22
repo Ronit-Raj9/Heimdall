@@ -34,7 +34,7 @@ export function picksOwnModel(tpl: AgentTemplate, params: Params): boolean {
 
 /** Whether the template's agent can be tested by sending one sample task. */
 export function testable(tpl: AgentTemplate): boolean {
-	return tpl.adapter === "remote_http" || tpl.adapter === "openai_agent";
+	return tpl.adapter === "remote_http" || tpl.adapter === "openai_agent" || tpl.adapter === "a2a";
 }
 
 /** Required params still empty. "Wrap my existing app" also needs a repository or an image. */

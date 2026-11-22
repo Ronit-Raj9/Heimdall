@@ -92,6 +92,14 @@ type DockerWorkspaceConfig struct {
 	// (remote_tools.listen, remote_tools.public_url; remotetools.go).
 	RemoteToolsListen    string
 	RemoteToolsPublicURL string
+	// RemoteToolsIngressNetwork is remote_tools.ingress_network: gates join
+	// it and are reached by name through the worker's public ingress instead
+	// of a host port. GatewayPublicURL and GatewayAgentURL are
+	// gateway.public_url and gateway.agent_url, for the reachability
+	// refusals (Refusals in driver.go, utils.RemoteReachRefusals).
+	RemoteToolsIngressNetwork string
+	GatewayPublicURL          string
+	GatewayAgentURL           string
 
 	// Agent events area: the per-run agent event collector, the events file
 	// and the OpenTelemetry variables (eventcollector.go).

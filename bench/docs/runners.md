@@ -307,6 +307,14 @@ Platform APIs, all plain HTTP from Go except Modal:
 | E2B | team API key (`X-API-Key`) | `https://api.e2b.app`: template v3 + build `fromImage` (cached per image), `POST /v2/sandboxes`, `DELETE /sandboxes/{id}`; envd on `sandbox.e2b.app` for `process.Process/Start` (Connect streaming) and `/files`. Endpoint field: a self-hosted domain. |
 | Modal | API token `ak-...:as-...` | Modal has no public REST sandbox API. The runner runs `sandbox/modal_helper.py` with the official `modal` Python package (`HEIMDALL_MODAL_PYTHON`, default `python3`) per call; the token reaches it only as `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET`, with an empty `MODAL_CONFIG_PATH` so no local profile is used. Sandboxes run under the app `heimdall-sandboxes`. Endpoint field: an optional Modal environment name. |
 
+Endpoint fields are organization input, so the hosted server and the shared
+worker call platforms only over https and only at public addresses, checked
+when each connection opens (a public name that resolves to a private,
+loopback, link-local, carrier-grade NAT or cloud metadata address is
+refused). A platform's error answer is reported by status only, never with
+its body. An organization's own worker (`bifrost-bench runner`) runs inside
+the organization's network and may use a private or plain http endpoint.
+
 Real-platform tests are behind a build tag and skip without a token:
 `go test -tags integration -run TestReal ./sandbox/` with `MODAL_TOKEN_ID` /
 `MODAL_TOKEN_SECRET`, `DAYTONA_API_KEY` or `E2B_API_KEY`. Each creates one

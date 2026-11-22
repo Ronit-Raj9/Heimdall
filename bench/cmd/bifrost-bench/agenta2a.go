@@ -19,7 +19,7 @@ func a2aRows(in *checkInput) []checkRow {
 	row := checkRow{ID: rowA2A, Title: "a2a agent: agent gateway witness"}
 	a := in.ev.A2A
 	if a == nil {
-		return []checkRow{row.set(checkFail, "evidence.json has no agent gateway witness", "check that Bifrost's agent gateway is on (client.a2a_external_client_url) and reaches the agent's card (client.a2a_private_allowlist for a private address)")}
+		return []checkRow{row.set(checkFail, "evidence.json has no agent gateway witness", "use Test my endpoint on the agent to see whether the agent itself answers; if it does, the worker's gateway did not reach it: the agent's card must be on a public address (hosted), and a self-hosted gateway needs client.a2a_external_client_url (shipped in deploy/bifrost/config.json) and client.a2a_private_allowlist for a private address")}
 	}
 	detail := fmt.Sprintf("registration %s; %d operation(s), %d stream event(s), %d task(s) in the agent log; %d LLM or MCP row(s) linked by agent_correlation_id; strength %s",
 		a.Entry, len(a.Operations), a.StreamEvents, len(a.TaskStates), len(a.Linked), a.Strength)

@@ -76,8 +76,13 @@ hc() {
 	fi
 	local bench_dir
 	bench_dir=${HEIMDALL_BENCH_DIR:-$(env_get HEIMDALL_BENCH_DIR)}
+	# The deployed commit: the worker install script downloads the CLI and
+	# project bundle for exactly this commit from the server (/downloads).
+	local commit=${HEIMDALL_BUILD_COMMIT:-}
+	[ -n "$commit" ] || commit=$(git -C "$BENCH_DIR" rev-parse HEAD 2>/dev/null || true)
 	HEIMDALL_BENCH_DIR=${bench_dir:-$BENCH_DIR} \
 		HEIMDALL_DOCKER_GID=${HEIMDALL_DOCKER_GID:-$(docker_gid)} \
+		HEIMDALL_BUILD_COMMIT=$commit \
 		docker compose "${args[@]}" "$@"
 }
 

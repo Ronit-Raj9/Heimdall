@@ -298,6 +298,8 @@ on, which is every organization without its own quota row.
 | `HEIMDALL_REGISTRY_DIR` | `registry` | Host folder for the registry's images, e.g. on the data disk. Empty: the `registry-data` Docker volume. |
 | `HEIMDALL_SHARED_PLATFORM_IMAGES` | `shared-runner` | Comma-separated images every org may pull (a trailing `/` or `:` is a prefix). Otherwise an org pulls only its approved, digest-pinned images. Org Dockerfiles take those without a registry host (and `bench/...`) from the private registry. |
 | `HEIMDALL_SHARED_GATEWAY_CONTAINER` | `shared-runner` | The gateway container every org network joins. Empty finds the compose project's `bifrost` service. |
+| `HEIMDALL_GATEWAY_PUBLIC_URL`, `HEIMDALL_TOOLS_PUBLIC_URL` | server and `shared-runner` | Where deployed agents (HTTP, OpenAI-compatible, A2A) and cloud sandboxes (Modal, Daytona, E2B) reach the shared worker's model gateway and live runs' tool gates. Default `https://$HEIMDALL_DOMAIN/gw` and `https://$HEIMDALL_DOMAIN/rt`: Caddy forwards both to the worker's public ingress, which answers only for live runs, with the run's own key or token, rate limited per run (docs/remote-execution.md, "Published through the server"). Leave them at the default. |
+| `HEIMDALL_RTGATE_NETWORK` | `shared-runner` | Internal network the worker reaches its runs' tool gates on (default `heimdall-rtgate`). |
 | `HEIMDALL_SHARED_SLOTS` | `shared-runner` | Slots per organization, capped by its max concurrent runs. |
 
 2. Build the task and agent images the built-in benchmarks use, e.g.

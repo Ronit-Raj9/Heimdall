@@ -88,14 +88,18 @@ func StartExternalEgress(ctx context.Context, d Docker, rc *schemas.RunContext, 
 			e.Stop(context.WithoutCancel(ctx))
 			return nil, fmt.Errorf("external egress %s: %w", id, err)
 		}
+		if err := checkEgressHost(target); err != nil { // G3 B6: shared worker
+			e.Stop(context.WithoutCancel(ctx))
+			return nil, fmt.Errorf("external egress %s: %w", id, err)
+		}
 		name := ExternalEgressName(rc.Run.RunID, id)
 		e.names = append(e.names, name)
 		steps := [][]string{
 			append(append([]string{"network", "create"}, labels...), name),
-			append(append([]string{"create", "--name", name}, labels...),
+			append(append(append(append([]string{"create", "--name", name}, labels...),
 				"--user", "65534", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only",
-				"--pids-limit", "64", "--memory", "64m", "--network", name, "-e", "BENCH_EGRESS_TARGET="+target,
-				"--entrypoint", "python3", image, "-I", "-c", remoteForwarder),
+				"--pids-limit", "64", "--memory", "64m", "--network", name, "-e", "BENCH_EGRESS_TARGET="+target),
+				egressGuardArgs()...), "--entrypoint", "python3", image, "-I", "-c", remoteForwarder),
 			{"network", "connect", network, name},
 			{"start", name},
 		}

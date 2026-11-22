@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // Kubernetes area (X3): the environment driver seam (docs/kubernetes.md).
@@ -72,8 +73,18 @@ func NewDockerDriver(cfg DockerWorkspaceConfig) Driver {
 func (d *dockerDriver) Driver() string { return DriverDocker }
 
 // Refusals implements Driver. The Docker driver runs every slot the
-// environment itself accepts.
-func (d *dockerDriver) Refusals(DriverSlot) []string { return nil }
+// environment itself accepts, except a deployed endpoint's when this worker
+// does not publish the gateway or tools that endpoint would need
+// (utils.RemoteReachRefusals).
+func (d *dockerDriver) Refusals(s DriverSlot) []string {
+	// Y03: a deployed endpoint that would be sent addresses it cannot reach.
+	return utils.RemoteReachRefusals(s.Agent, d.reach())
+}
+
+// reach is where this worker publishes a run's gateway and tool gate.
+func (e *dockerWorkspace) reach() utils.Reach {
+	return utils.Reach{GatewayPublicURL: e.cfg.GatewayPublicURL, ToolsPublicURL: e.cfg.RemoteToolsPublicURL, ToolsListen: e.cfg.RemoteToolsListen}
+}
 
 // Create implements schemas.Environment: a run whose experiment was frozen
 // for another driver is refused before anything is created.

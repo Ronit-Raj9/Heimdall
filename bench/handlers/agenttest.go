@@ -85,7 +85,7 @@ func init() {
 	})
 	APIRoutes = append(APIRoutes,
 		RouteDoc{Method: "POST", Path: APIPrefix + "/agents/test-endpoint", Tag: "agents",
-			Summary: "Send one sample task to an HTTP or OpenAI-compatible endpoint agent (saved, or the new-agent form) and return its answer and a trace",
+			Summary: "Send one sample task to an HTTP, OpenAI-compatible or A2A endpoint agent (saved, or the new-agent form) and return its answer and a trace",
 			Request: EndpointTestRequest{}, Response: EndpointTestResult{}},
 	)
 }
@@ -202,8 +202,7 @@ func (h *agentTestHandler) run(ctx context.Context, cfg *schemas.AgentConfig) *E
 	case cfg.Remote != nil && (cfg.Adapter == "remote_http" || cfg.Adapter == ""):
 		return h.runRemote(ctx, cfg.Remote, res, step, fail, start)
 	case utils.IsA2A(cfg):
-		res.Adapter = "a2a"
-		return fail("an A2A agent is reached through Bifrost's agent gateway, so this test cannot call it directly: run Check on the agent's page instead")
+		return h.runA2A(ctx, cfg.A2A, res, step, fail, start) // Y03: straight to the agent's card and JSON-RPC endpoint (agenttest_a2a.go)
 	}
 	return fail("this agent is not an HTTP or OpenAI-compatible endpoint: Heimdall starts it in a container, so run Check on the agent's page instead")
 }

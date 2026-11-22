@@ -8,7 +8,8 @@
     "enforce_auth_on_inference": true,
     "mcp_disable_auto_tool_inject": true,
     "allow_direct_keys": false,
-    "log_retention_days": 30
+    "log_retention_days": 30,
+    "a2a_external_client_url": "http://bifrost:8080"
   },
   "framework": {
     "pricing": {

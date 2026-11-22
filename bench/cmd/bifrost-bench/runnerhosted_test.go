@@ -213,3 +213,24 @@ func TestHostedRunnersEndToEnd(t *testing.T) {
 		t.Fatalf("install script: %d", r.status)
 	}
 }
+
+// TestInstallRevisionFromEnv: a server built without version control
+// information installs runners at HEIMDALL_BUILD_COMMIT, a plain commit id
+// only.
+func TestInstallRevisionFromEnv(t *testing.T) {
+	if buildRevision() != "" {
+		t.Skip("this test binary carries its own revision")
+	}
+	for v, want := range map[string]string{
+		"":                  "",
+		"0123ABCdef":        "0123abcdef",
+		"main":              "",
+		"abc12":             "",
+		"0123abc; rm -rf /": "",
+	} {
+		t.Setenv(installCommitEnv, v)
+		if got := installRevision(); got != want {
+			t.Fatalf("installRevision(%q) = %q, want %q", v, got, want)
+		}
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"github.com/maximhq/bifrost/bench/selfmetrics"
 	"os"
 	"runtime/debug"
+	"strings"
 	"sync"
 
 	"github.com/maximhq/bifrost/bench/auth"
@@ -25,9 +26,31 @@ import (
 )
 
 // runnerRepoEnv names the git repository runners clone (install.sh --repo),
-// shown in the install command of a new runner token; unset, the install
-// script's default.
+// shown in the install command of a new runner token. Set, runners clone it
+// instead of downloading the project from this server; unset (the default),
+// the install script downloads /downloads/bench-<commit>.tar.gz and the
+// binary from this server.
 const runnerRepoEnv = "HEIMDALL_RUNNER_REPO"
+
+// installCommitEnv names the commit a server built without version control
+// information runs (the hosted image builds from a tree with no .git). The
+// runner install script downloads /downloads/bench-<commit>.tar.gz and the
+// CLI binary of that commit from this server.
+const installCommitEnv = "HEIMDALL_BUILD_COMMIT"
+
+// installRevision is the commit runners install (install.sh --ref): the
+// build's own revision, else HEIMDALL_BUILD_COMMIT when it is a plain
+// commit id, else empty.
+func installRevision() string {
+	if rev := buildRevision(); rev != "" {
+		return rev
+	}
+	v := strings.ToLower(strings.TrimSpace(os.Getenv(installCommitEnv)))
+	if len(v) < 7 || len(v) > 40 || strings.Trim(v, "0123456789abcdef") != "" {
+		return ""
+	}
+	return v
+}
 
 // buildRevision is the git commit this binary was built from, when the
 // build recorded it: a runner must run the same commit (install.sh --ref).
@@ -68,7 +91,7 @@ func runnersOf(env *hostedEnv) *hostedRunners {
 		return v.(*hostedRunners)
 	}
 	svc := runners.New(env.db, runners.Options{PublicURL: env.base.cfg.Auth.PublicURL, Logger: env.base.logger,
-		Repo: os.Getenv(runnerRepoEnv), Ref: buildRevision()})
+		Repo: os.Getenv(runnerRepoEnv), Ref: installRevision()})
 	hub := engine.NewRemoteHub(engine.RemoteOptions{Logger: env.base.logger, Book: svc})
 	svc.SetLive(hub)
 	v, loaded := runnerEnvs.LoadOrStore(env, &hostedRunners{hub: hub, svc: svc})
@@ -119,7 +142,7 @@ func init() {
 		rs := runnersOf(env)
 		return handlers.NewRunnersHandler(env.base.cfg.Server.Mode, rs.svc, runnerAudit(env)).
 			WithInstallScript(runnerdeploy.InstallScript).
-			WithInstallDefaults(env.base.cfg.Auth.PublicURL, os.Getenv(runnerRepoEnv), buildRevision()), nil
+			WithInstallDefaults(env.base.cfg.Auth.PublicURL, os.Getenv(runnerRepoEnv), installRevision()), nil
 	})
 	if orgLauncher == nil {
 		orgLauncher = hostedOrgLauncher

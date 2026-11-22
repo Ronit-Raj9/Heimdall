@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 // F4 key delivery (lane L05): organization key slots. A hosted runner
@@ -27,14 +29,29 @@ type OrgSlot struct {
 	BaseURL  string `json:"base_url,omitempty"` // https endpoint of an openai-compatible provider
 }
 
-// OrgSlotsRequest is the body of PUT /orgslots.
+// OrgSlotsRequest is the body of PUT /orgslots. Replace lists name
+// prefixes ("org_<org>_<provider>_") the request replaces whole: a slot
+// already registered under one of them and missing from Slots is dropped,
+// so a key set that shrank or a rotated key leaves nothing behind (G3 B7).
 type OrgSlotsRequest struct {
-	Slots []OrgSlot `json:"slots"`
+	Slots   []OrgSlot `json:"slots"`
+	Replace []string  `json:"replace,omitempty"`
+}
+
+// OrgSlotsRelease is the body of DELETE /orgslots: every slot whose name
+// starts with one of Prefixes ("org_<org>_") is dropped with its key.
+type OrgSlotsRelease struct {
+	Prefixes []string `json:"prefixes"`
 }
 
 const (
 	maxOrgSlotsBody = 256 << 10
 	maxOrgSlots     = 4096
+	// orgSlotTTL is how long a slot stays registered with no registration
+	// and no call through it. Runners register per lease and every model
+	// call refreshes it, so only the slots of an organization no runner
+	// serves any more expire (G3 B7). A slot with a live claim never does.
+	orgSlotTTL = 6 * time.Hour
 )
 
 type orgSlotEntry struct {
@@ -42,6 +59,7 @@ type orgSlotEntry struct {
 	auth string
 	key  string
 	base string
+	seen atomic.Int64 // unix seconds of the last registration or call
 }
 
 // orgSlots holds the registered organization slots; the zero value is ready.
@@ -58,17 +76,57 @@ func (o *orgSlots) lookupAuth(auth string) (slotRef, bool) {
 	if !ok {
 		return slotRef{}, false
 	}
-	return o.byName[name].ref, true
+	e := o.byName[name]
+	e.seen.Store(time.Now().Unix()) // a call keeps a slot in use registered
+	return e.ref, true
 }
 
-func (o *orgSlots) entry(name string) (orgSlotEntry, bool) {
+// dropLocked removes one slot. Called with o.mu held for writing.
+func (o *orgSlots) dropLocked(name string) {
+	if e, ok := o.byName[name]; ok {
+		delete(o.byAuth, e.auth)
+		delete(o.byName, name)
+	}
+}
+
+// validOrgPrefix accepts a release or replace prefix: an organization slot
+// name prefix of at least one organization id character ("org_x").
+func validOrgPrefix(p string) bool {
+	return strings.HasPrefix(p, "org_") && len(p) > len("org_") && len(p) <= 128
+}
+
+// expireOrgSlots drops slots unseen for orgSlotTTL that no live claim
+// holds. Called with s.org.mu held for writing.
+func (s *Server) expireOrgSlots(now time.Time) int {
+	cut := now.Add(-orgSlotTTL).Unix()
+	n := 0
+	for name, e := range s.org.byName {
+		if e.seen.Load() > cut || s.slotClaimed(name) {
+			continue
+		}
+		s.org.dropLocked(name)
+		n++
+	}
+	return n
+}
+
+// slotClaimed reports whether a live claim holds slot.
+func (s *Server) slotClaimed(slot string) bool {
+	if s.plans == nil {
+		return false
+	}
+	s.plans.mu.Lock()
+	defer s.plans.mu.Unlock()
+	return s.plans.liveClaim(slot) != nil
+}
+
+// entry returns a registered slot. Entries are replaced, never changed in
+// place (only seen moves), so the caller may read its fields unlocked.
+func (o *orgSlots) entry(name string) (*orgSlotEntry, bool) {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
 	e, ok := o.byName[name]
-	if !ok {
-		return orgSlotEntry{}, false
-	}
-	return *e, true
+	return e, ok
 }
 
 // knownSlot reports whether name is a configured or registered slot.
@@ -97,7 +155,7 @@ func (s *Server) orgUpstream(slot string, p ProviderSpec, up upstream) upstream 
 		out.base = p.BaseURL
 	}
 	if e.base != "" {
-		out.base, out.trimV1 = e.base, true
+		out.base, out.trimV1, out.orgBase = e.base, true, true
 	}
 	return out
 }
@@ -174,6 +232,13 @@ func (s *Server) handleOrgSlots(w http.ResponseWriter, r *http.Request) {
 		seen[c.Name], seen["auth:"+c.Auth] = true, true
 		clean = append(clean, c)
 	}
+	for _, p := range req.Replace {
+		if !validOrgPrefix(p) {
+			s.controlError(w, http.StatusBadRequest, fmt.Sprintf("replace prefix %q: want org_<org>_...", p))
+			return
+		}
+	}
+	now := time.Now()
 	s.org.mu.Lock()
 	if s.org.byName == nil {
 		s.org.byName, s.org.byAuth = map[string]*orgSlotEntry{}, map[string]string{}
@@ -185,32 +250,125 @@ func (s *Server) handleOrgSlots(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if len(s.org.byName)+len(clean) > maxOrgSlots {
+	expired := s.expireOrgSlots(now)
+	// The cap counts unique slots: re-registering names already held adds
+	// nothing, and the names a replace prefix drops are freed first.
+	dropped := map[string]bool{}
+	for name := range s.org.byName {
+		if !seen[name] && hasAnyPrefix(name, req.Replace) && !s.slotClaimed(name) { // a claimed slot serves a run: it expires later
+			dropped[name] = true
+		}
+	}
+	added := 0
+	for _, c := range clean {
+		if _, ok := s.org.byName[c.Name]; !ok {
+			added++
+		}
+	}
+	if len(s.org.byName)-len(dropped)+added > maxOrgSlots {
 		s.org.mu.Unlock()
 		s.controlError(w, http.StatusRequestEntityTooLarge, "too many organization slots")
 		return
+	}
+	for name := range dropped {
+		s.org.dropLocked(name)
 	}
 	for _, c := range clean {
 		if old, ok := s.org.byName[c.Name]; ok {
 			delete(s.org.byAuth, old.auth)
 		}
-		s.org.byName[c.Name] = &orgSlotEntry{ref: slotRef{name: c.Name, provider: c.Provider}, auth: c.Auth, key: c.Key, base: c.BaseURL}
+		e := &orgSlotEntry{ref: slotRef{name: c.Name, provider: c.Provider}, auth: c.Auth, key: c.Key, base: c.BaseURL}
+		e.seen.Store(now.Unix())
+		s.org.byName[c.Name] = e
 		s.org.byAuth[c.Auth] = c.Name
 	}
+	total := len(s.org.byName)
 	s.org.mu.Unlock()
-	s.logger.Info("organization key slots registered", "slots", len(clean))
+	s.logger.Info("organization key slots registered", "slots", len(clean), "replaced", len(dropped), "expired", expired, "total", total)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func hasAnyPrefix(name string, prefixes []string) bool {
+	for _, p := range prefixes {
+		if strings.HasPrefix(name, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// handleOrgSlotsRelease handles DELETE /orgslots: drop every slot under the
+// given prefixes, with its key (G3 B7). A runner calls it when it stops
+// serving an organization; slots already gone are not an error. A slot a
+// live claim holds stays until the claim ends and the slot expires
+// (orgSlotTTL), so a run in flight never loses its key.
+func (s *Server) handleOrgSlotsRelease(w http.ResponseWriter, r *http.Request) {
+	if !s.authorized(w, r) {
+		return
+	}
+	var req OrgSlotsRelease
+	dec := json.NewDecoder(io.LimitReader(r.Body, maxOrgSlotsBody))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		s.controlError(w, http.StatusBadRequest, "parse organization slot release: "+err.Error())
+		return
+	}
+	if len(req.Prefixes) == 0 {
+		s.controlError(w, http.StatusBadRequest, "prefixes is empty")
+		return
+	}
+	for _, p := range req.Prefixes {
+		if !validOrgPrefix(p) {
+			s.controlError(w, http.StatusBadRequest, fmt.Sprintf("prefix %q: want org_<org>_...", p))
+			return
+		}
+	}
+	s.org.mu.Lock()
+	n, kept := 0, 0
+	for name := range s.org.byName {
+		if !hasAnyPrefix(name, req.Prefixes) {
+			continue
+		}
+		if s.slotClaimed(name) { // a run still holds it; it expires once the claim does
+			kept++
+			continue
+		}
+		s.org.dropLocked(name)
+		n++
+	}
+	s.org.mu.Unlock()
+	s.logger.Info("organization key slots released", "slots", n, "kept_claimed", kept)
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // RegisterOrgSlots registers organization key slots at the proxy
 // (PUT /orgslots). The keys travel only in the request body.
 func (c *Client) RegisterOrgSlots(ctx context.Context, slots []OrgSlot) error {
-	body, err := json.Marshal(OrgSlotsRequest{Slots: slots})
+	return c.ReplaceOrgSlots(ctx, slots, nil)
+}
+
+// ReplaceOrgSlots registers slots and drops every other slot under the
+// replace prefixes (PUT /orgslots with replace).
+func (c *Client) ReplaceOrgSlots(ctx context.Context, slots []OrgSlot, replace []string) error {
+	body, err := json.Marshal(OrgSlotsRequest{Slots: slots, Replace: replace})
 	if err != nil {
 		return err
 	}
 	if err := c.do(ctx, http.MethodPut, "/orgslots", body, nil); err != nil {
 		return fmt.Errorf("register organization slots: %w", err)
+	}
+	return nil
+}
+
+// ReleaseOrgSlots drops every organization slot under prefixes at the proxy
+// (DELETE /orgslots).
+func (c *Client) ReleaseOrgSlots(ctx context.Context, prefixes []string) error {
+	body, err := json.Marshal(OrgSlotsRelease{Prefixes: prefixes})
+	if err != nil {
+		return err
+	}
+	if err := c.do(ctx, http.MethodDelete, "/orgslots", body, nil); err != nil {
+		return fmt.Errorf("release organization slots: %w", err)
 	}
 	return nil
 }

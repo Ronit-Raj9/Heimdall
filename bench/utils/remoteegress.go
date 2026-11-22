@@ -36,10 +36,41 @@ const (
 
 // remoteForwarder is the forwarder's program, run with python3 -I -c. It
 // takes its one destination from BENCH_EGRESS_TARGET and connects nowhere
-// else.
-const remoteForwarder = `import os, socket, threading
+// else. With BENCH_EGRESS_PUBLIC_ONLY=1 (the shared worker, G3 B6) it
+// resolves the destination on every connection and connects only to an
+// address that is public: never loopback, private, link-local (the metadata
+// address), carrier-grade NAT, unique local, NAT64 or reserved. The check is
+// on the address it connects to, so a name that rebinds to an internal
+// address between connections is still refused.
+const remoteForwarder = `import os, socket, threading, ipaddress
 host, port = os.environ["BENCH_EGRESS_TARGET"].rsplit(":", 1)
 host = host.strip("[]")
+public_only = os.environ.get("BENCH_EGRESS_PUBLIC_ONLY") == "1"
+extra = [ipaddress.ip_network(n) for n in ("100.64.0.0/10", "64:ff9b::/96", "64:ff9b:1::/48", "0.0.0.0/8", "240.0.0.0/4")]
+def public(ip):
+    a = ipaddress.ip_address(ip.split("%", 1)[0])
+    if a.version == 6 and a.ipv4_mapped is not None:
+        a = a.ipv4_mapped
+    if not a.is_global or a.is_multicast:
+        return False
+    return not any(a in n for n in extra if n.version == a.version)
+def connect():
+    if not public_only:
+        return socket.create_connection((host, int(port)), timeout=30)
+    last = OSError("no address for %s" % host)
+    for fam, typ, proto, _, addr in socket.getaddrinfo(host, int(port), type=socket.SOCK_STREAM):
+        if not public(addr[0]):
+            last = OSError("refused to connect to private or local address %s" % addr[0])
+            continue
+        s = socket.socket(fam, typ, proto)
+        s.settimeout(30)
+        try:
+            s.connect(addr)
+            return s
+        except OSError as e:
+            s.close()
+            last = e
+    raise last
 srv = socket.create_server(("0.0.0.0", 9300))
 def pipe(a, b):
     try:
@@ -58,7 +89,7 @@ def pipe(a, b):
                 pass
 def serve(c):
     try:
-        u = socket.create_connection((host, int(port)), timeout=30)
+        u = connect()
         u.settimeout(None)
     except OSError as e:
         print("connect to %s:%s failed: %s" % (host, port, e), flush=True)
@@ -71,6 +102,40 @@ while True:
     c, _ = srv.accept()
     threading.Thread(target=serve, args=(c,), daemon=True).start()
 `
+
+// EgressPublicOnly makes every per-run egress forwarder (remote agents and
+// external APIs) connect only to public addresses, checked by the
+// forwarder at connect time, and refuses a destination host that is a
+// literal non-public address, localhost or a single-label name (a compose
+// service) before it starts. The shared worker sets it (G3 B6): its
+// destinations are org-supplied, and the host it runs on has internal
+// services. An organization's own worker leaves it off, so an agent in the
+// organization's own network stays reachable.
+var EgressPublicOnly = false
+
+// egressGuardArgs are the forwarder's extra docker create arguments, and
+// checkEgressHost refuses a destination the guard would refuse anyway, with
+// a clear reason, before anything starts.
+func egressGuardArgs() []string {
+	if !EgressPublicOnly {
+		return nil
+	}
+	return []string{"-e", "BENCH_EGRESS_PUBLIC_ONLY=1"}
+}
+
+func checkEgressHost(target string) error {
+	if !EgressPublicOnly {
+		return nil
+	}
+	host, _, err := net.SplitHostPort(target)
+	if err != nil {
+		return err
+	}
+	if err := CheckPublicHost(host); err != nil {
+		return fmt.Errorf("destination %s is not reachable from the shared worker: %v (use your own worker for agents on a private network)", target, err)
+	}
+	return nil
+}
 
 // TCPForwarderProgram is remoteForwarder for other one-destination
 // forwarders: run with python3 -I -c, it listens on RemoteEgressPort and
@@ -137,6 +202,9 @@ func StartRemoteEgress(ctx context.Context, d Docker, rc *schemas.RunContext, pl
 	if err := checkHostPort(target); err != nil {
 		return nil, fmt.Errorf("remote egress: %w", err)
 	}
+	if err := checkEgressHost(target); err != nil {
+		return nil, fmt.Errorf("remote egress: %w", err)
+	}
 	if network == "" || network == "none" || network == "host" || network == "bridge" {
 		return nil, fmt.Errorf("remote egress: agent network %q cannot be joined", network)
 	}
@@ -147,10 +215,10 @@ func StartRemoteEgress(ctx context.Context, d Docker, rc *schemas.RunContext, pl
 	labels := LabelArgs(rc.Run.ExpID, rc.Run.RunID)
 	steps := [][]string{
 		append(append([]string{"network", "create"}, labels...), e.name),
-		append(append([]string{"create", "--name", e.name}, labels...),
+		append(append(append(append([]string{"create", "--name", e.name}, labels...),
 			"--user", "65534", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only",
-			"--pids-limit", "64", "--memory", "64m", "--network", e.name, "-e", "BENCH_EGRESS_TARGET="+target,
-			"--entrypoint", "python3", plan.Image, "-I", "-c", remoteForwarder),
+			"--pids-limit", "64", "--memory", "64m", "--network", e.name, "-e", "BENCH_EGRESS_TARGET="+target),
+			egressGuardArgs()...), "--entrypoint", "python3", plan.Image, "-I", "-c", remoteForwarder),
 		{"network", "connect", network, e.name},
 		{"start", e.name},
 	}

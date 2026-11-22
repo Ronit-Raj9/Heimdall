@@ -8,7 +8,9 @@
 # Piped into a shell, the script cannot run from standard input (later steps
 # read it), so the POSIX block below downloads it again to a file and runs
 # that copy with bash. The hosted server fills in the three defaults below
-# when it serves the script.
+# when it serves the script: its address, a git repository (only used with
+# --source git) and the commit it runs, whose CLI binary and project bundle
+# it serves under /downloads.
 HEIMDALL_DEFAULT_SERVER=""
 HEIMDALL_DEFAULT_REPO=""
 HEIMDALL_DEFAULT_REF=""
@@ -40,11 +42,14 @@ fi
 # the agent containers in the local Docker through a local Bifrost gateway
 # stack, and uploads the sealed run folders.
 #
-# This script installs, in order: a system user, the project at a git ref, the
-# bench binary (built from source, or a prebuilt release tarball), deploy/.env,
-# the runner token, a systemd unit, the agent and task images, and the local
-# gateway stack (deploy/docker-compose.yml). Running it again with a new --ref
-# is the upgrade. See README.md next to this file.
+# This script installs, in order: a system user, the project at the server's
+# commit (by default the bundle the server serves at
+# /downloads/bench-<commit>.tar.gz; a git clone with --repo or --source git),
+# the bench binary (by default /downloads/bifrost-bench-linux-<arch> from the
+# server; built from source in git mode, or a prebuilt release tarball),
+# deploy/.env, the runner token, a systemd unit, the agent and task images,
+# and the local gateway stack (deploy/docker-compose.yml). Running it again
+# with a new --ref is the upgrade. See README.md next to this file.
 #
 # Usage (as root):
 #   bash install.sh --server https://heimdall.example.com --token-file ./runner-token
@@ -74,6 +79,7 @@ readonly TOKEN_RE='^hmr_[a-z0-9]{8}_[A-Za-z0-9_-]{20,128}$'
 readonly SERVER_RE='^(https?)://([A-Za-z0-9.-]+)(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?$'
 readonly USER_RE='^[a-z_][a-z0-9_-]{0,31}$'
 readonly REF_RE='^[A-Za-z0-9._/-]{1,128}$'
+readonly COMMIT_RE='^[0-9a-f]{7,40}$'
 readonly SHA_RE='^[0-9a-f]{64}$'
 readonly CAP_RE='^[0-9]{1,7}(\.[0-9]{1,4})?$'
 
@@ -103,8 +109,16 @@ SLOTS="${HEIMDALL_SLOTS:-1}"
 RUNNER_NAME="${HEIMDALL_RUNNER_NAME:-}"
 LABELS="${HEIMDALL_LABELS:-}"
 SPEND_CAP=""
-REF="${HEIMDALL_REF:-${HEIMDALL_DEFAULT_REF:-main}}"
+REF="${HEIMDALL_REF:-${HEIMDALL_DEFAULT_REF:-}}"
 REPO="${HEIMDALL_REPO:-${HEIMDALL_DEFAULT_REPO:-https://github.com/maximhq/bifrost.git}}"
+# SOURCE is where the project and binary come from: server (the bundle and
+# binary the Heimdall server serves under /downloads, the default) or git (a
+# clone of REPO, the binary built from source). Naming a repository
+# (--repo or HEIMDALL_REPO) means git.
+SOURCE="${HEIMDALL_SOURCE:-}"
+if [ -z "$SOURCE" ] && [ -n "${HEIMDALL_REPO:-}" ]; then
+  SOURCE=git
+fi
 FOREGROUND=0
 INSTALL_DOCKER=0
 MIN_DISK_GB="20"
@@ -147,11 +161,19 @@ Runner:
   --debug                Run the runner with debug logging
 
 Source and binary:
-  --ref REF              Git branch, tag or commit to install (default: main).
-                         Must be the commit the hosted server runs.
-  --repo URL             Git repository that holds bench/
-                         (default: https://github.com/maximhq/bifrost.git;
-                         pass the fork that contains bench/)
+  --source server|git    Where the project and the binary come from.
+                         server (default): the Heimdall server's own
+                         downloads at its commit,
+                         <server>/downloads/bench-<commit>.tar.gz and
+                         <server>/downloads/bifrost-bench-linux-<arch>, each
+                         checked against its .sha256. git: clone --repo at
+                         --ref and build the binary from source.
+  --ref REF              The commit the hosted server runs (the server's own
+                         install script fills it in). In git mode also a
+                         branch or tag (default there: main).
+  --repo URL             Git repository that holds bench/; implies
+                         --source git (default repository:
+                         https://github.com/maximhq/bifrost.git)
   --release-url URL      Download a prebuilt tarball holding bin/bifrost-bench
                          instead of building from source. {arch} in the URL
                          becomes amd64 or arm64, e.g.
@@ -296,7 +318,7 @@ parse_args() {
     esac
     case $opt in
       --server | --token-file | --pool | --slots | --name | --labels | --spend-cap-usd | \
-        --ref | --repo | --release-url | --sha256 | --prefix | --user | --min-disk-gb)
+        --ref | --repo | --source | --release-url | --sha256 | --prefix | --user | --min-disk-gb)
         if [ "$inline" -eq 0 ]; then
           [ $# -ge 2 ] || die "$opt needs a value (see --help)"
           val=$2
@@ -313,7 +335,11 @@ parse_args() {
           --labels) LABELS=$val ;;
           --spend-cap-usd) SPEND_CAP=$val ;;
           --ref) REF=$val ;;
-          --repo) REPO=$val ;;
+          --repo)
+            REPO=$val
+            [ -n "$SOURCE" ] || SOURCE=git
+            ;;
+          --source) SOURCE=$val ;;
           --release-url) RELEASE_URL=$val ;;
           --sha256) RELEASE_SHA256=$val ;;
           --prefix) PREFIX=$val ;;
@@ -378,6 +404,17 @@ validate_args() {
     [[ $SPEND_CAP =~ $CAP_RE ]] || die "--spend-cap-usd must be a number such as 25 or 12.50"
   fi
 
+  case ${SOURCE:-server} in
+    server | git) SOURCE=${SOURCE:-server} ;;
+    *) die "--source must be server or git" ;;
+  esac
+  if [ "$SOURCE" = "server" ]; then
+    [ -n "$REF" ] || die "the server did not say which commit it runs, so there is no bundle to download; pass --ref <the server's commit>, or --repo <git URL> to clone instead"
+    REF=$(printf '%s' "$REF" | tr 'A-F' 'a-f')
+    [[ $REF =~ $COMMIT_RE ]] || die "--ref ${REF} is not a commit; server downloads are named by commit (7 to 40 hex characters). For a branch or tag pass --repo <git URL> to clone instead"
+  else
+    REF=${REF:-main}
+  fi
   [[ $REF =~ $REF_RE ]] && [[ $REF != -* ]] && [[ $REF != *..* ]] || die "--ref must be a branch, tag or commit (letters, digits and . _ / - only)"
   [[ $REPO =~ ^(https://|ssh://|git@)[A-Za-z0-9._~:/@+-]+$ ]] || die "--repo must be an https://, ssh:// or git@ URL"
 
@@ -531,9 +568,12 @@ check_docker() {
 
 check_tools() {
   local missing=() t
-  for t in git curl openssl tar sha256sum runuser flock sed awk sort; do
+  for t in curl openssl tar gzip sha256sum runuser flock sed awk sort; do
     command -v "$t" >/dev/null 2>&1 || missing+=("$t")
   done
+  if [ "$SOURCE" = "git" ]; then
+    command -v git >/dev/null 2>&1 || missing+=(git)
+  fi
   if ! is_dry; then
     for t in useradd usermod getent install; do
       command -v "$t" >/dev/null 2>&1 || missing+=("$t")
@@ -742,6 +782,141 @@ checkout_source() {
     die "${REPO} at ${REF} has no bench/cmd/bifrost-bench; pass --repo with the repository that holds bench/"
 }
 
+# server_curl downloads from the Heimdall server: https only, except the
+# plain http that validate_args allows for a loopback tunnel.
+server_curl() {
+  local proto='=https'
+  case $SERVER in http://*) proto='=https,http' ;; esac
+  curl --proto "$proto" --tlsv1.2 -fsSL --retry 3 "$@"
+}
+
+# server_download fetches <server>/downloads/<name> to path and checks it
+# against <name>.sha256 from the same place. The server's .sha256 file holds
+# the hex digest, optionally followed by a file name. Every failure says
+# which download is missing and how to install without it.
+server_download() {
+  local name=$1 path=$2 url sha
+  url="${SERVER}/downloads/${name}"
+  if ! server_curl -o "$path" "$url"; then
+    die "the server has no download ${url} (commit ${REF}). Ask its operator to publish the downloads for the commit it runs, or install from git instead: --repo <git URL that holds bench/> --ref ${REF}"
+  fi
+  sha=$(server_curl "${url}.sha256" | awk 'NR == 1 { print tolower($1) }') ||
+    die "could not download ${url}.sha256; not installing an unchecked file"
+  [[ $sha =~ $SHA_RE ]] || die "${url}.sha256 does not hold a sha256 digest; not installing ${name}"
+  printf '%s  %s\n' "$sha" "$path" | sha256sum -c --quiet - ||
+    die "sha256 of ${name} does not match ${url}.sha256; not installing it"
+}
+
+# bundle_prefix prints the folder inside the bundle that holds the bench
+# tree: "bench/" when the bundle has a top-level bench folder, else "". It
+# refuses absolute names and names with a .. part.
+bundle_prefix() {
+  local tgz=$1 names
+  names=$(tar -tzf "$tgz") || die "the project bundle is not a gzip tarball"
+  if printf '%s\n' "$names" | grep -Eq '^/|(^|/)\.\.(/|$)'; then
+    die "the project bundle holds an absolute path or a .. path; not installing it"
+  fi
+  if printf '%s\n' "$names" | grep -Eqx '(\./)?bench/deploy/bench\.yaml'; then
+    printf 'bench/'
+  elif printf '%s\n' "$names" | grep -Eqx '(\./)?deploy/bench\.yaml'; then
+    printf ''
+  else
+    die "the project bundle has no deploy/bench.yaml (neither at its top nor under bench/); not installing it"
+  fi
+}
+
+# Files of an installed project that belong to this box, not to the bundle:
+# provider keys and tokens, the binary, sealed runs, releases and agent
+# version snapshots. An upgrade carries them into the new tree.
+readonly KEEP_PATHS=(deploy/.env bin runs releases .heimdall)
+
+# fetch_bundle installs the project from the server's bundle of commit REF:
+# downloaded and checked into a temporary folder, extracted as the runner
+# user next to the source folder, the box's own files carried over, then
+# swapped in with two renames. A bundle already installed for REF is kept.
+fetch_bundle() {
+  local tgz stage old prefix p marker="${SRC_DIR}/.heimdall-bundle"
+  log "Project bundle ${SERVER}/downloads/bench-${REF}.tar.gz into ${SRC_DIR}"
+  if is_dry; then
+    print_cmd curl --proto '=https' --tlsv1.2 -fsSL --retry 3 -o "<tmp>/bench-${REF}.tar.gz" "${SERVER}/downloads/bench-${REF}.tar.gz"
+    print_cmd curl --proto '=https' --tlsv1.2 -fsSL --retry 3 "${SERVER}/downloads/bench-${REF}.tar.gz.sha256"
+    print_cmd sha256sum -c "<<< <published sha256>  <tmp>/bench-${REF}.tar.gz"
+    print_cmd tar -C "${SRC_DIR}.incoming/bench" --no-same-owner --no-same-permissions -xzf "<tmp>/bench-${REF}.tar.gz"
+    note "keeping this box's ${KEEP_PATHS[*]} (under bench/) across the swap"
+    print_cmd mv "${SRC_DIR}.incoming" "$SRC_DIR"
+    return 0
+  fi
+  if [ -f "$marker" ] && [ "$(cat "$marker" 2>/dev/null)" = "$REF" ] && [ -f "${BENCH_DIR}/deploy/bench.yaml" ]; then
+    note "bundle for ${REF} already installed"
+    return 0
+  fi
+  tgz="${WORK_TMP}/bench-${REF}.tar.gz"
+  server_download "bench-${REF}.tar.gz" "$tgz"
+  prefix=$(bundle_prefix "$tgz")
+  chmod 0644 "$tgz"
+  stage="${SRC_DIR}.incoming"
+  old="${SRC_DIR}.old"
+  rm -rf "$stage" "$old"
+  install -d -m 0755 -o "$RUN_USER" -g "$RUN_GROUP" "$stage" "${stage}/bench"
+  # A bundle with a top-level bench/ folder extracts into the source folder,
+  # one without into its bench/ folder. Extracted as the runner user, so
+  # nothing in it can land outside what that user may write.
+  if [ -n "$prefix" ]; then
+    as_user tar -C "$stage" --no-same-owner --no-same-permissions -xzf "$tgz" || die "could not extract the project bundle"
+  else
+    as_user tar -C "${stage}/bench" --no-same-owner --no-same-permissions -xzf "$tgz" || die "could not extract the project bundle"
+  fi
+  [ -f "${stage}/bench/deploy/bench.yaml" ] || die "the extracted project bundle has no deploy/bench.yaml"
+  if [ -d "$SRC_DIR" ]; then
+    for p in "${KEEP_PATHS[@]}"; do
+      if [ -e "${BENCH_DIR}/${p}" ] || [ -L "${BENCH_DIR}/${p}" ]; then
+        rm -rf "${stage}/bench/${p}"
+        install -d -m 0755 -o "$RUN_USER" -g "$RUN_GROUP" "$(dirname "${stage}/bench/${p}")"
+        mv "${BENCH_DIR}/${p}" "${stage}/bench/${p}"
+      fi
+    done
+    mv "$SRC_DIR" "$old"
+  fi
+  mv "$stage" "$SRC_DIR"
+  rm -rf "$old"
+  printf '%s\n' "$REF" >"$marker"
+  chown "$RUN_USER:$RUN_GROUP" "$marker"
+  note "installed the bundle of ${REF}"
+}
+
+# fetch_server_binary installs <server>/downloads/bifrost-bench-linux-<arch>,
+# checked against its .sha256.
+fetch_server_binary() {
+  local name="bifrost-bench-linux-${ARCH}" tmp
+  log "Downloading the runner binary: ${SERVER}/downloads/${name}"
+  if is_dry; then
+    print_cmd curl --proto '=https' --tlsv1.2 -fsSL --retry 3 -o "<tmp>/${name}" "${SERVER}/downloads/${name}"
+    print_cmd curl --proto '=https' --tlsv1.2 -fsSL --retry 3 "${SERVER}/downloads/${name}.sha256"
+    print_cmd sha256sum -c "<<< <published sha256>  <tmp>/${name}"
+    print_cmd install -m 0755 -o "$RUN_USER" -g "$RUN_GROUP" "<tmp>/${name}" "${BIN_PATH}.new"
+    print_cmd mv -f "${BIN_PATH}.new" "$BIN_PATH"
+    return 0
+  fi
+  tmp="${WORK_TMP}/${name}"
+  server_download "$name" "$tmp"
+  as_user install -d -m 0755 "${BENCH_DIR}/bin"
+  install -m 0755 -o "$RUN_USER" -g "$RUN_GROUP" "$tmp" "${BIN_PATH}.new"
+  mv -f "${BIN_PATH}.new" "$BIN_PATH"
+}
+
+# get_source installs the project at REF: the server's bundle, or a git
+# clone in git mode.
+get_source() {
+  if [ "$SOURCE" = "git" ]; then
+    checkout_source
+  else
+    if [ -d "${SRC_DIR}/.git" ]; then
+      note "${SRC_DIR} is a git clone from an earlier install; the server's bundle replaces it (pass --repo to keep cloning)"
+    fi
+    fetch_bundle
+  fi
+}
+
 # go_ok reports whether $1 is a Go toolchain of at least version $2.
 go_ok() {
   local v
@@ -873,6 +1048,8 @@ fetch_release() {
 get_binary() {
   if [ -n "$RELEASE_URL" ]; then
     fetch_release
+  elif [ "$SOURCE" = "server" ]; then
+    fetch_server_binary
   else
     build_binary
   fi
@@ -1099,7 +1276,7 @@ next_steps() {
   fi
   cat <<EOF
 
-Heimdall runner ${RUNNER_NAME} ${done_word} (pool ${POOL}, ${SLOTS} slot(s), ref ${REF}).
+Heimdall runner ${RUNNER_NAME} ${done_word} (pool ${POOL}, ${SLOTS} slot(s), ref ${REF}, from ${SOURCE}).
 
 Provider keys
   Real model calls need provider keys. They go ONLY in this file on this box:
@@ -1117,7 +1294,9 @@ Day to day
   sudo journalctl -u ${SERVICE} -f
   cd ${BENCH_DIR} && sudo -u ${RUN_USER} ${BIN_PATH} runner status -server ${SERVER} -token-file ${TOKEN_PATH} -name ${RUNNER_NAME}
 
-Upgrade: run this installer again with the same flags and the server's new --ref.
+Upgrade: run this installer again with the same flags. Downloaded from the
+server, it installs the commit the server runs now; with --ref, pass the
+server's new commit.
 EOF
 }
 
@@ -1138,7 +1317,7 @@ main() {
   check_disk
   stop_running_service
   create_user
-  checkout_source
+  get_source
   get_binary
   ensure_env
   write_token

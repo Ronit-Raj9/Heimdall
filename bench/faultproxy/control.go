@@ -47,7 +47,8 @@ func (s *Server) ControlHandler() http.Handler {
 	mux.HandleFunc("POST /claims/renew", s.handleRenew)
 	mux.HandleFunc("POST /claims/release", s.handleRelease)
 	mux.HandleFunc("GET /claims", s.handleClaims)
-	mux.HandleFunc("PUT /orgslots", s.handleOrgSlots) // F4 key delivery (orgslots.go)
+	mux.HandleFunc("PUT /orgslots", s.handleOrgSlots)           // F4 key delivery (orgslots.go)
+	mux.HandleFunc("DELETE /orgslots", s.handleOrgSlotsRelease) // G3 B7: free a served-out organization's slots
 	// X20b debug runs (debug.go): replay cassettes and breakpoints.
 	mux.HandleFunc("PUT /cassettes/{slot}", s.handlePutCassette)
 	mux.HandleFunc("GET /holds", s.handleHolds)

@@ -14,20 +14,33 @@ a systemd service.
 - Ubuntu or Debian (others only with `--force`), amd64 or arm64, systemd.
 - Docker Engine with the compose plugin. The script does not install Docker:
   `curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh`.
-- `git`, `curl`, `openssl`: `sudo apt-get install -y git curl openssl ca-certificates`.
+- `curl`, `openssl`, `tar` (and `git` only for a git install):
+  `sudo apt-get install -y git curl openssl ca-certificates`.
 - A runner token. An org admin creates it in Settings > Runners (or the admin
   API). It looks like `hmr_<8 characters>_<secret>`, is scoped to one org and
   one pool, and is shown once.
-- The git ref the hosted server runs (`--ref`). A runner on another commit
-  refuses every slot, since its own plan does not match the server's.
+- The commit the hosted server runs (`--ref`). The script your server serves
+  at `/api/bench/runners/install.sh` already carries it. A runner on another
+  commit refuses every slot, since its own plan does not match the server's.
 
 ## Install
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/<owner>/<repo>/<ref>/bench/deploy/runner/install.sh
+curl -fsSLo install.sh https://heimdall.example.com/api/bench/runners/install.sh
 sudo bash install.sh --dry-run --server https://heimdall.example.com --token-file ./runner-token   # preview
-sudo bash install.sh --server https://heimdall.example.com --token-file ./runner-token --ref <ref> --repo https://github.com/<owner>/<repo>.git
+sudo bash install.sh --server https://heimdall.example.com --token-file ./runner-token
 ```
+
+By default everything comes from the Heimdall server itself, at the commit
+it runs: the project bundle `GET /downloads/bench-<commit>.tar.gz` and the
+CLI binary `GET /downloads/bifrost-bench-linux-<amd64|arm64>`, each checked
+against the `.sha256` file next to it before anything is installed. No git
+repository and no Go toolchain are needed. If the server has no download for
+its commit the script stops and says so.
+
+To clone a repository and build from source instead (the way older installs
+worked), name the repository: `--repo https://github.com/<owner>/<repo>.git
+--ref <the server's commit>` (or `--source git`).
 
 Pass the token with `--token-file PATH` or `--token-stdin` (pasted at a
 hidden prompt, or piped). There is no flag that takes the token itself. With
@@ -35,11 +48,13 @@ hidden prompt, or piped). There is no flag that takes the token itself. With
 leave no stdin for the token. Delete your copy of the token file afterwards.
 
 What it does, in order: checks the OS, root, Docker, `docker compose` and the
-tools; creates the system user (in group `docker`); clones `--repo` at
-`--ref` into `<prefix>/src`; builds `bin/bifrost-bench` with
-`CGO_ENABLED=0 GOWORK=off go build` (installing Go into `<prefix>/go` only
-when no new enough Go is found; the checksum is verified) or downloads it
-with `--release-url`; creates `deploy/.env` with random gateway tokens like
+tools; creates the system user (in group `docker`); downloads and checks
+the server's project bundle into `<prefix>/src/bench` and its binary into
+`bin/bifrost-bench` (in git mode: clones `--repo` at `--ref` into
+`<prefix>/src` and builds `bin/bifrost-bench` with
+`CGO_ENABLED=0 GOWORK=off go build`, installing Go into `<prefix>/go` only
+when no new enough Go is found; the checksum is verified), or downloads the
+binary with `--release-url`; creates `deploy/.env` with random gateway tokens like
 `make env`; writes the token to `/etc/heimdall-runner/token`; writes
 `/etc/systemd/system/heimdall-runner.service`; builds the images of the
 Makefile's `images` target (not the web UI, which a runner does not need);
@@ -64,8 +79,9 @@ line is evaluated.
 | `--labels a,b` | none | Comma-separated labels. |
 | `--spend-cap-usd X` | none | Local spend cap for this runner. |
 | `--debug` | off | Runner debug logging. |
-| `--ref REF` | `main` | Branch, tag or commit to install; must be the server's. |
-| `--repo URL` | `https://github.com/maximhq/bifrost.git` | Repository holding `bench/`. The default is a placeholder: pass the repository the hosted server was built from. A private repository needs an SSH deploy key in `<prefix>/home/.ssh`. |
+| `--source server\|git` | `server` | `server`: the project bundle and binary from the server's `/downloads` at its commit. `git`: clone `--repo` and build from source. |
+| `--ref REF` | the server's commit | Commit to install; must be the server's. In git mode also a branch or tag (default there `main`). |
+| `--repo URL` | `https://github.com/maximhq/bifrost.git` | Repository holding `bench/`; passing it means `--source git`. Pass the repository the hosted server was built from. A private repository needs an SSH deploy key in `<prefix>/home/.ssh`. |
 | `--release-url URL` | build from source | Prebuilt tarball containing `bin/bifrost-bench`; `{arch}` becomes `amd64` or `arm64`, e.g. `https://github.com/<owner>/<repo>/releases/download/<version>/heimdall-runner-linux-{arch}.tar.gz`. Use the release that matches `--ref`. |
 | `--sha256 HEX` | none | Expected sha256 of that tarball. Without it the download is checked by TLS only. |
 | `--prefix DIR` | `/opt/heimdall-runner` | Install root: `src/` (the project), `home/` (the user's home, Go caches), `go/` (Go, when installed). |
@@ -97,9 +113,12 @@ sudo systemctl restart heimdall-runner
 
 ## Upgrade
 
-Run the installer again with the same flags and the server's new `--ref`
-(the token may be left out). It stops the service, fetches and checks out the
-ref, rebuilds the binary and the images, brings the stack up again, rewrites
+Run the installer again with the same flags (the token may be left out). A
+copy downloaded from the server again installs the commit the server runs
+now; with `--ref`, pass the server's new commit. It stops the service,
+downloads the new bundle and binary (in git mode: fetches and checks out the
+ref and rebuilds the binary), carries `deploy/.env`, `bin/`, `runs/`,
+`releases/` and `.heimdall/` over to the new tree, rebuilds the images, brings the stack up again, rewrites
 the unit and restarts the service. `deploy/.env` is kept as it is; the script
 warns when `.env.example` gained keys that `.env` lacks. Slots that were
 running when the service stopped are lost and go back to the server's queue

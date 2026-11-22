@@ -10,7 +10,9 @@
 			"task": "Task (optional, defaults to the benchmark's first)",
 			"noBuild": "Skip preparing the container",
 			"needSuite": "Name a benchmark to test against, for example {{suite}}.",
-			"run": "Run test"
+			"run": "Run test",
+			"tryReal": "Try one real task",
+			"tryRealHint": "Runs one task on your worker with real model calls on your own key, exactly as an evaluation would. Use it for HTTP, OpenAI-compatible and A2A endpoints, which the practice model cannot test. It costs one task's model calls."
 		},
 		"build": {
 			"title": "Prepare container",

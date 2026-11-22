@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/engine"
+	"github.com/maximhq/bifrost/bench/sandbox"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
 )
@@ -118,6 +119,11 @@ func runRunnerStart(cmd string, args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
+	// An org's own worker runs inside the org's network: a self-hosted
+	// sandbox platform there may sit at a private or plain http address. The
+	// public-only guard (G3 B6) protects the hosted server and the shared
+	// worker, which never take this path.
+	sandbox.AllowPrivateEndpoints = true
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	a, err := newApp(ctx, f.config, appOptions{gateway: true, debug: f.debug})
@@ -131,6 +137,7 @@ func runRunnerStart(cmd string, args []string) int {
 	a.reg = withLibrary(a.reg, a.cfg.Path(a.cfg.BenchmarksRoot)) // built-in library suites (suite/library.go), e.g. the demo runner
 	hy := newRunnerHygiene(a)                                    // E6: janitor, image GC, build cache prune, free disk floor (runnerhygiene.go)
 	go hy.Run(ctx)
+	startPublicIngress(ctx, a) // Y03: an org's own worker may publish /gw and /rt behind its own proxy (runneringress.go)
 	w, err := engine.NewWorker(a.reg, engine.NewPipeline(a.reg, a.cfg.Root, a.logger),
 		engine.NewPlanner(a.reg, a.cfg.Root, a.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck(), engine.WithAgentLibrary(suite.LibraryDir())).Plan, // Suite health area: a replan reproduces a frozen manifest (engine/taskscreen.go); X7: no GPU check, the coordinator leases GPU slots by the GPUs a runner registers
 		engine.WorkerOptions{Server: f.server, Token: token, WorkerID: f.name, Host: host, Version: benchVersion,

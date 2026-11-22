@@ -36,6 +36,8 @@ ssh -N -L 8090:127.0.0.1:8090 coordinator-host &     # see "Reaching the coordin
 bifrost-bench worker -server http://127.0.0.1:8090 -token-file ~/.bench-worker-token -slots 2
 ```
 
+A worker of a hosted server is installed with the server's own script instead (`deploy/runner/README.md`): `curl -fsSLo install.sh https://<server>/api/bench/runners/install.sh && sudo bash install.sh --server https://<server> --token-file ./runner-token`. It downloads the project bundle and the CLI binary of the commit the server runs from the server itself (`GET /downloads/bench-<commit>.tar.gz` and `GET /downloads/bifrost-bench-linux-<arch>`, each checked against its `.sha256`), so no git repository has to be reachable. `--repo URL` clones and builds from source instead.
+
 `-slots` is how many slots the worker runs at once (default 1), `-id` names the worker (default a random id), `-config` is the worker's own bench config. The worker refuses a token file that others can read. Runs are sealed in the worker's own runs folder first, then uploaded.
 
 ### Reaching the coordinator
@@ -192,6 +194,8 @@ and waits up to `timeout_s` (default: the wall budget less 5 s). `session_id` is
 
 The answer is a JSON object with a string `answer` (another JSON value is written as JSON), or a `text/plain` body; it is written to the task's answer path. For a `state` or `artifact` task the `answer` field is optional. A non-2xx status, an answer task without an answer, `"status": "failed"`, or a timeout ends the session as the agent's failure.
 
+An endpoint that is down is not the agent's failure. A connection that cannot be opened (refused, DNS, TLS, 20 second connect timeout), one closed before any response byte, and a `502`, `503` or `504` answer are retried 3 times, 2, 4 and 8 seconds apart (`BENCH_REMOTE_RETRIES`, `BENCH_REMOTE_BACKOFF_S` on the launcher). When every attempt fails that way, the launcher prints an `endpoint_unreachable` line and exits 75, and the run is sealed as `aborted_infra` with an `agent endpoint` failure: never scored, and the slot gets a new run (three attempts in all). The OpenAI-compatible launcher does the same on every turn; when earlier turns were answered the run is `infra_error` instead (still never scored). Any other status, including `500`, is the agent's answer.
+
 The JSON object may also carry what the deployment says about itself. All of it is agent-reported: shown, never trusted, never deciding an outcome.
 
 ```json
@@ -229,6 +233,16 @@ With `tools: expose` and a task that has proxied services or external APIs, the 
 - Every call lands in `tools.jsonl` exactly like a local agent's. `remote_tools.json` in the run folder records where the gate was published and until when, never the token. `Destroy` removes the gate and its network with the run.
 
 The gate needs the tool proxy image rebuilt from this tree (`images.toolproxy`, default `bench/bifrost-bench:dev`). `bifrost-bench doctor` shows a `remote tools` row: where a gate would be published, and a warning when that is beyond loopback.
+
+### Published through the server (hosted)
+
+On the hosted stack nothing above is needed for the shared worker. Caddy forwards `https://<domain>/gw/...` and `https://<domain>/rt/...` to the shared worker's public ingress (`remote_tools.ingress_listen`, `bench/publicingress`), and compose sets `gateway.public_url` to `https://<domain>/gw` and `remote_tools.public_url` to `https://<domain>/rt` from `HEIMDALL_DOMAIN`. The ingress answers only for live runs on that worker:
+
+- `/gw/<path>` reaches the gateway only on its model and MCP routes (`/v1/`, `/openai/`, `/anthropic/`, `/genai/`, `/bedrock/`, `/cohere/`, `/litellm/`, `/langchain/`, `/pydanticai/`, `/mcp`) and only with the virtual key of a live run (`Authorization: Bearer`, `x-api-key`, `x-bf-vk`, `x-goog-api-key` or `?key=`). The admin API, metrics and the A2A agent gateway are never published. The key is dropped from the ingress when the run ends and Bifrost revokes it.
+- `/rt/r/<run id>/...` reaches that run's tool gate only with the run's tool token, while the run is live. Gates then publish no host port: they join the `heimdall-rtgate` network (`remote_tools.ingress_network`) and the worker reaches them by name.
+- Each run may make 600 requests a minute (burst 120), gateway and tools together; an address that fails authentication 30 times in a minute is refused for the rest of that minute. Bodies are capped at 32 MiB. A refused call never says whether the key, run or token exists.
+
+The planner refuses a run whose deployed agent is on the internet and needs what its worker does not publish (`model_traffic: gateway` without `gateway.public_url`, `tools: expose` without `remote_tools.public_url`), with that reason, instead of running it and scoring 0. Endpoints on private or compose addresses share the worker's networks and are not refused. An organization's own worker can publish the same way: set `remote_tools.ingress_listen` and both public URLs, and put its own TLS proxy in front.
 
 ### Two machines: what the operator does
 

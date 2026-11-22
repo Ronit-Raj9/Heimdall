@@ -91,6 +91,7 @@ func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 		return &partError{part: "gateway", err: fmt.Errorf("gateway model mismatch before execution: expected %s, got %s", st.rc.Agent.Model, key.Model)}
 	}
 	st.rc.Key = key
+	publishKey(st.rc) // Y03: the worker's public ingress serves the gateway to this key while the run is live (publicingress.go)
 	st.rc.Run.Gateway.VirtualKeyID = key.ID
 	st.rc.Run.Gateway.KeySlot = key.KeySlot
 	st.rc.Run.Gateway.OrgKeyID = key.OrgKeyID // G10: budget accounting per organization key
@@ -611,6 +612,7 @@ func (p *Pipeline) cleanup(ctx context.Context, st *runState) error {
 		}
 	}
 	errs = append(errs, p.cleanupA2A(ctx, st)) // B1: the run's agent gateway registrations (a2a.go)
+	unpublishRun(st.rc)                        // Y03: nothing of the run stays reachable through the public ingress
 	revoked := true
 	if st.rc.Key != nil && p.reg.Gateway != nil {
 		revoke := p.reg.Gateway.RevokeKey
