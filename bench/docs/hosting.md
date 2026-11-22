@@ -499,6 +499,7 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_SHARED_PLATFORM_IMAGES` | Images every organization may pull, comma-separated. |
 | `HEIMDALL_SHARED_GATEWAY_CONTAINER` | The model gateway container every org network joins; empty finds it by name. |
 | `HEIMDALL_MODAL_PYTHON` | Python with the `modal` package, for organizations whose runs go to Modal (shared worker). |
+| `HEIMDALL_SANDBOX_GPU` | Modal GPU type a shared runner declares for GPU tasks of organizations whose default worker is Modal (default `L4`; `docs/open-models.md`). |
 | `HEIMDALL_PROVIDER_SLOTS` | Runs that may use one provider at once through the shared fault proxy and per organization key. |
 | `HEIMDALL_RUNNER_MIN_FREE_GB` | Free disk a runner keeps; below it the runner takes no new work and reports disk low. |
 | `HEIMDALL_METRICS_LISTEN` | Prometheus metrics address on the compose network; empty is off. Never publish it. |

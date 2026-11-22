@@ -103,6 +103,11 @@ type DriverConfig struct {
 	Logger      schemas.Logger
 	// PollEvery is how often the driver asks whether the agent ended.
 	PollEvery time.Duration
+	// GPUType is the platform GPU a GPU task's sandbox gets (Z05, gpu.go):
+	// a Modal GPU name such as L4 or H100. "" picks the type of the GPUs
+	// the run holds, else the cheapest type with the memory the task asks
+	// for. Platforms that are not GPUCapable refuse GPU tasks.
+	GPUType string
 }
 
 // Driver runs each run in one sandbox of the organization's platform. It
@@ -214,6 +219,7 @@ const (
 	RefuseNeutral         = "realism neutral is not supported (the neutral view renames Docker objects)"
 	RefuseProbeLayer      = "fault layer %s is not supported in a cloud sandbox (gateway faults are)"
 	RefuseGPU             = "GPU tasks are not supported (no GPU is requested from the platform)"
+	RefuseGPUFit          = "GPU task cannot be placed: %s"
 	RefuseCompose         = "compose tasks are not supported (their services run as Docker containers)"
 )
 
@@ -242,8 +248,14 @@ func (d *Driver) Refusals(s environments.DriverSlot) []string {
 		if len(t.Sessions) > 0 {
 			add(RefuseSessions)
 		}
-		if t.GPUCount() > 0 {
-			add(RefuseGPU)
+		if n := t.GPUCount(); n > 0 {
+			if gc, ok := d.cfg.Platform.(GPUCapable); !ok {
+				add(RefuseGPU)
+			} else if n > MaxGPUsPerSandbox {
+				add(fmt.Sprintf(RefuseGPUFit, fmt.Sprintf("the task asks for %d GPUs and one sandbox takes at most %d", n, MaxGPUsPerSandbox)))
+			} else if _, err := gpuTypeFor(gc.GPUTypes(), d.cfg.GPUType, nil, t.Resources.GPU); err != nil {
+				add(fmt.Sprintf(RefuseGPUFit, err.Error()))
+			}
 		}
 		if t.Compose != "" {
 			add(RefuseCompose)
@@ -373,6 +385,7 @@ type record struct {
 	BaselineRef   string   `json:"baseline_ref,omitempty"`
 	Destroyed     bool     `json:"destroyed,omitempty"`
 	Notes         []string `json:"notes,omitempty"`
+	GPU           string   `json:"gpu,omitempty"` // Z05: the platform GPU request, e.g. L4 or H100:2
 }
 
 func (d *Driver) writeRecord(rc *schemas.RunContext, rec *record) {
@@ -468,6 +481,18 @@ func (d *Driver) Exec(ctx context.Context, rc *schemas.RunContext, plan *schemas
 	}
 	spec := Spec{Name: sandboxName(r.runID), Image: remote, Labels: d.labels(r), CPUs: plan.CPUs, MemGB: plan.MemGB,
 		Lifetime: wallOf(plan) + setupWindow}
+	if n := rc.Task.GPUCount(); n > 0 { // Z05: GPU placement (gpu.go)
+		gc, ok := d.cfg.Platform.(GPUCapable)
+		if !ok {
+			return fail(errors.New(RefuseGPU))
+		}
+		gt, err := gpuTypeFor(gc.GPUTypes(), d.cfg.GPUType, rc.GPU, rc.Task.Resources.GPU)
+		if err != nil {
+			return fail(fmt.Errorf(RefuseGPUFit, err.Error()))
+		}
+		spec.GPU = gpuSpec(gt, n)
+		rec.GPU = spec.GPU
+	}
 	switch n := plan.Network; n {
 	case "none":
 		spec.Egress = Egress{BlockAll: true}

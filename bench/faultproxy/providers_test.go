@@ -15,7 +15,7 @@ func TestDefaultProvidersValid(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"anthropic", "openai", "gemini", "groq", "mistral", "xai", "openrouter", "fireworks", "deepseek", "cerebras", "perplexity", "ollama"} {
+	for _, name := range []string{"anthropic", "openai", "gemini", "groq", "mistral", "xai", "openrouter", "fireworks", "deepseek", "cerebras", "perplexity", "ollama", "vllm", "sgl"} {
 		if _, ok := tbl.byName[name]; !ok {
 			t.Errorf("built-in table lacks %s", name)
 		}
@@ -230,5 +230,29 @@ func TestDefaultSlots(t *testing.T) {
 		len(byProvider["groq"]) != 24 || byProvider["groq"][0] != "groq-slot-1" ||
 		byProvider["gemini"][0] != "gm-slot-1" {
 		t.Errorf("slots = %v", byProvider)
+	}
+}
+
+// TestSelfHostedOpenModels: vLLM and SGLang sit next to Ollama as keyless
+// built-ins whose default in-network host an organization slot's https base
+// URL replaces (Z05), and they carry the Anthropic messages route vLLM and
+// SGLang serve.
+func TestSelfHostedOpenModels(t *testing.T) {
+	tbl, err := indexProviders(DefaultProviders())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, base := range map[string]string{"vllm": "http://vllm:8000", "sgl": "http://sglang:30000"} {
+		p := tbl.byName[name]
+		if !p.Keyless || !p.PerSlotBase || p.OrgOnly || p.BaseURL != base || p.Format != FormatOpenAI {
+			t.Errorf("%s = %+v, want keyless, per-slot base, shared slots, base %s", name, p, base)
+		}
+		has := false
+		for _, m := range p.Message {
+			has = has || m == "POST /v1/messages"
+		}
+		if !has {
+			t.Errorf("%s has no /v1/messages route: %v", name, p.Message)
+		}
 	}
 }

@@ -28,7 +28,7 @@ var workerConns sync.Map // *hostedEnv -> *byoworker.Service
 // workerDrivers are the platform drivers bring-your-own-worker offers.
 // Lane X19a adds Modal, Daytona and E2B here.
 func workerDrivers() byoworker.Registry {
-	return byoworker.NewRegistry(byoworker.Runloop{}, byoworker.Fly{}, byoworker.Kubernetes{})
+	return byoworker.NewRegistry(byoworker.Runloop{}, byoworker.Fly{}, byoworker.Kubernetes{}, byoworker.RunPod{})
 }
 
 // workerConnsOf returns env's worker connections service, or nil.

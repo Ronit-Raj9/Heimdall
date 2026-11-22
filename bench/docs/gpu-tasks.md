@@ -501,8 +501,11 @@ as an unchanged model should.
   partitions and NVLink all differ, and a speedup measured here does not
   carry over. Hardware parity keeps a comparison on one model; it does not
   make numbers from two models comparable.
-- Cloud GPUs come later, with the hosted sandbox drivers; the Kubernetes
-  driver refuses GPU tasks for now (`docs/kubernetes.md` owns that driver).
+- Cloud GPUs: an organization whose default worker is Modal runs GPU tasks
+  in Modal GPU sandboxes (one GPU type per runner, `HEIMDALL_SANDBOX_GPU`,
+  default `L4`; see `docs/open-models.md`), and a RunPod worker is a GPU
+  pod. The host-side sampler is off there. The Kubernetes driver refuses
+  GPU tasks for now (`docs/kubernetes.md` owns that driver).
 - Only whole GPUs: no MIG, no fractional sharing, no time slicing. One run
   per GPU is a rule, not a measurement of contention.
 - The GPU pool belongs to one bench process. Two bench processes on one
@@ -519,8 +522,9 @@ as an unchanged model should.
   GPU (nothing else can use it meanwhile), but its GPU time and memory are
   not sampled or reported: they are the bench's cost of grading, not the
   agent's.
-- Planning a GPU experiment needs a GPU on the coordinator itself; remote
-  GPU workers alone are not enough yet.
+- The hosted server plans GPU experiments from the GPUs the org's workers
+  declare (registered remote GPU workers, a Modal default worker); a local
+  coordinator still needs a GPU of its own to plan one.
 - No GPU team runs and no GPU tasks on the Kubernetes driver.
 - The child-process timing protocol raises the bar for cheating; it is not
   a sandbox inside the sandbox (see above).

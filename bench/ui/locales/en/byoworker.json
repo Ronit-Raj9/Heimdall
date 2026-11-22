@@ -73,6 +73,16 @@
 		"cpuKind": "CPU kind",
 		"image": "Image (optional)"
 	},
+	"runpod": {
+		"secret": "RunPod API key",
+		"gpuType": "GPU (optional)",
+		"gpuTypeHint": "A RunPod GPU id, for example NVIDIA L4 (default) or NVIDIA H100 PCIe.",
+		"gpuCount": "GPUs (1 to 8)",
+		"cloudType": "Cloud",
+		"image": "Image (optional)",
+		"imageHint": "Needs a working Docker for the agent containers; the default CUDA image installs it if the pod allows.",
+		"disk": "Disk (GB)"
+	},
 	"kubernetes": {
 		"namespace": "Namespace",
 		"manifest": "Apply this first",

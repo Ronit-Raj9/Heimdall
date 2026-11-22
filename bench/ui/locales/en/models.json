@@ -113,5 +113,31 @@
 		"none": "No provider in this server's list serves it yet.",
 		"custom": "Or add a custom OpenAI-compatible endpoint from {{maker}}.",
 		"hasKey": "you have a key"
+	},
+	"serve": {
+		"title": "Serve an open model on your Modal account",
+		"subtitle": "Pick an open model, an engine and a GPU. Heimdall runs it on your own Modal account with scale to zero, adds it as your vLLM or SGLang key once it answers, and stops it when its evaluation ends or its time limit passes. Modal bills your account for the GPU time.",
+		"model": "Model",
+		"engine": "Engine",
+		"gpu": "GPU (price per hour on Modal)",
+		"hours": "Time limit (hours)",
+		"evaluation": "Evaluation id (optional)",
+		"evaluationHint": "Stops when this evaluation ends",
+		"start": "Start serving",
+		"cost": "At most ${{max}} of GPU time over the time limit; nothing is billed while idle.",
+		"recommended": "cheapest fit",
+		"gated": "needs your Hugging Face token as the secret HF_TOKEN",
+		"empty": "No open model served yet. Connect Modal under Workers first.",
+		"useAs": "Use it in an agent as",
+		"forEvaluation": "For evaluation {{id}}",
+		"maxCost": "at most ${{max}}",
+		"stop": "Stop",
+		"states": {
+			"starting": "starting",
+			"ready": "ready",
+			"stopping": "stopping",
+			"stopped": "stopped",
+			"failed": "failed"
+		}
 	}
 }

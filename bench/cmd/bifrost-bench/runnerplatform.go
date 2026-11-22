@@ -11,9 +11,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/environments"
+	"github.com/maximhq/bifrost/bench/gpu"
 	"github.com/maximhq/bifrost/bench/k8s"
 	"github.com/maximhq/bifrost/bench/sandbox"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -57,14 +60,49 @@ func sandboxRegistry(ctx context.Context, a *app, reg *schemas.Registry, pa *sha
 		Platform: p, Local: environments.NewDockerDriver(a.dockerCfg),
 		AgentGatewayURL: a.cfg.Gateway.AgentURL, PublicGatewayURL: a.cfg.Gateway.PublicURL,
 		HelperImage: a.cfg.Images.Helper, Install: k8s.InstallID(a.cfg.Root), Docker: a.docker, Logger: a.logger,
+		GPUType: strings.TrimSpace(os.Getenv(sandbox.GPUEnv)),
 	})
 	if err != nil {
 		return nil, err
 	}
 	out := *reg
 	out.Environments = []schemas.Environment{d}
+	pool, err := sandboxGPUPool(p, os.Getenv(sandbox.GPUEnv))
+	if err != nil {
+		return nil, err
+	}
+	if pool != nil { // Z05: the runner registers the platform's GPUs, so the coordinator leases it GPU slots
+		out.GPUs = pool
+	}
 	if reg.Gateway != nil {
 		out.Gateway = sandbox.WrapGateway(reg.Gateway, d)
 	}
 	return &out, nil
+}
+
+// sandboxGPUPool is the GPU pool a runner on a GPU-capable platform
+// declares (Z05, sandbox/gpu.go): virtual devices of one GPU type, the
+// operator's HEIMDALL_SANDBOX_GPU or sandbox.DefaultModalGPU. The sampler
+// is off: no nvidia-smi on this machine sees the platform's cards. Nil for
+// a platform without GPU sandboxes.
+func sandboxGPUPool(p sandbox.Platform, want string) (schemas.GPUAllocator, error) {
+	gc, ok := p.(sandbox.GPUCapable)
+	if !ok {
+		return nil, nil
+	}
+	want = strings.TrimSpace(want)
+	if want == "" {
+		want = sandbox.DefaultModalGPU
+	}
+	var t *sandbox.GPUType
+	for _, g := range gc.GPUTypes() {
+		if strings.EqualFold(g.Name, want) {
+			g := g
+			t = &g
+		}
+	}
+	if t == nil {
+		return nil, fmt.Errorf("%s=%s is not a GPU %s offers (one of %s)", sandbox.GPUEnv, want, p.Name(), strings.Join(sandbox.ModalGPUNames(), ", "))
+	}
+	return gpu.NewPool(schemas.GPUModeCDI, sandbox.DeclaredGPUs(p.Name(), *t), -1, "")
 }

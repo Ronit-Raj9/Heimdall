@@ -6,8 +6,8 @@ on stdin, one JSON answer on stdout:
 
     {"op": "check"}                                              -> {"ok": true}
     {"op": "create", "name", "image", "env", "tags", "cpu",
-     "memory_mb", "timeout_s", "block_network", "allow_hosts",
-     "allow_cidrs"}                                              -> {"sandbox_id"}
+     "memory_mb", "gpu", "timeout_s", "block_network",
+     "allow_hosts", "allow_cidrs"}                                              -> {"sandbox_id"}
     {"op": "exec", "sandbox_id", "argv", "env", "cwd",
      "timeout_s"}                                                -> {"exit_code", "output" (base64)}
     {"op": "upload", "sandbox_id", "path", "data" (base64)}      -> {}
@@ -63,6 +63,8 @@ def main():
                 kw["cpu"] = float(req["cpu"])
             if req.get("memory_mb"):
                 kw["memory"] = int(req["memory_mb"])
+            if req.get("gpu"):
+                kw["gpu"] = str(req["gpu"])
             hosts, cidrs = req.get("allow_hosts") or [], req.get("allow_cidrs") or []
             if req.get("block_network") or (not hosts and not cidrs):
                 kw["block_network"] = True
