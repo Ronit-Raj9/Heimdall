@@ -4,7 +4,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TONE_CLASS } from "@/components/verdict/verdict.utils";
 import type { AwarenessReport } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
+import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import "./gw06I18n";
 import { splitOnPhrase } from "./integrity.utils";
 
 export interface AwarenessPanelProps {
@@ -27,7 +29,6 @@ export function AwarenessPanel({ report, arms, className }: AwarenessPanelProps)
 			.filter((a) => !arms.includes(a))
 			.sort(),
 	];
-	const notScanned = report.not_scanned?.length ?? 0;
 
 	return (
 		<div className={cn("flex flex-col gap-4", className)} data-testid="awareness-panel">
@@ -70,11 +71,7 @@ export function AwarenessPanel({ report, arms, className }: AwarenessPanelProps)
 					})}
 				</TableBody>
 			</Table>
-			{notScanned > 0 && (
-				<p className="text-muted-foreground text-xs" data-testid="awareness-not-scanned">
-					{t("integrity.awareness.notScanned", { count: notScanned })}
-				</p>
-			)}
+			<NotScannedList runs={report.not_scanned ?? []} />
 			<section className="flex flex-col gap-2">
 				<h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{t("integrity.awareness.examples")}</h3>
 				{report.examples.length === 0 ? (
@@ -90,6 +87,37 @@ export function AwarenessPanel({ report, arms, className }: AwarenessPanelProps)
 				)}
 			</section>
 		</div>
+	);
+}
+
+/**
+ * The runs the awareness scan could not read (N62, N68): a disclosure with the count, then each run
+ * as a link with the reason the server gave (no gateway log, no agent text, ...).
+ */
+export function NotScannedList({ runs, className }: { runs: readonly { run_id: string; reason: string }[]; className?: string }) {
+	const { t } = useTranslation("gw06");
+	if (runs.length === 0) return null;
+	return (
+		<details className={cn("text-xs", className)} data-testid="awareness-not-scanned">
+			<summary className="text-muted-foreground hover:text-foreground cursor-pointer select-none">
+				{t("integrity.notScanned", { count: runs.length })}
+			</summary>
+			<ul className="mt-2 flex flex-col gap-1" data-testid="awareness-not-scanned-list">
+				{runs.map((r) => (
+					<li key={r.run_id} className="flex flex-wrap items-baseline gap-x-2">
+						<Link
+							to="/runs/$runId"
+							params={{ runId: r.run_id }}
+							className="text-primary font-mono hover:underline"
+							title={t("integrity.notScannedRun", { runId: r.run_id })}
+						>
+							{r.run_id}
+						</Link>
+						<span className="text-muted-foreground">{r.reason}</span>
+					</li>
+				))}
+			</ul>
+		</details>
 	);
 }
 

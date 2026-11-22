@@ -36,6 +36,16 @@ export function JobLogPanel({ jobId, onClose, onFinished }: JobLogPanelProps) {
 	useEffect(() => {
 		setRowDone(Boolean(job.data && !isActiveJob(job.data)));
 	}, [job.data]);
+	// When the log ends while the row still says running, ask for the row at once instead of
+	// waiting for the next poll, so the badge does not read "Running" under a finished log (N63).
+	const refetchedOnEnd = useRef(false);
+	const { refetch } = job;
+	useEffect(() => {
+		if (!refetchedOnEnd.current && refetchOnLogEnd(log.ended, job.data)) {
+			refetchedOnEnd.current = true;
+			void refetch();
+		}
+	}, [log.ended, job.data, refetch]);
 	const [cancel, cancelState] = useCancelJobMutation();
 	const data = job.data;
 	const active = data ? isActiveJob(data) : true;
@@ -122,6 +132,11 @@ export function JobLogPanel({ jobId, onClose, onFinished }: JobLogPanelProps) {
 			<LogLines log={log} active={active} />
 		</section>
 	);
+}
+
+/** Whether the job row should be asked for again: the log stream ended but the row is still queued or running. */
+export function refetchOnLogEnd(logEnded: boolean, job: Job | undefined): boolean {
+	return logEnded && job !== undefined && isActiveJob(job);
 }
 
 /** Exp id a job result names (bridge jobs on runners report exp_id), or null. */

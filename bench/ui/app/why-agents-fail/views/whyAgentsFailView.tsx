@@ -140,6 +140,18 @@ export function groupName(g: Pick<FailurePatternGroup, "version" | "label">, uns
 	return g.version > 0 ? `v${g.version}` : `${unsaved} ${g.label.replace(/^unsaved config /, "")}`;
 }
 
+/** The page header link to the failures pulled from Maxim (/maxim), which no menu leads to (N77). */
+export function MaximFailuresLink() {
+	const { t } = useTranslation("gw06");
+	return (
+		<Button variant="outline" size="sm" asChild>
+			<Link to="/maxim" data-testid="why-maxim-link">
+				{t("why.maxim")}
+			</Link>
+		</Button>
+	);
+}
+
 /**
  * Why agents fail (/why-agents-fail?agent=&tab=): per agent version, how often it loops, claims
  * done without checking, or ignores an error, with example runs; and the failure groups across
@@ -153,7 +165,7 @@ export default function WhyAgentsFailView() {
 	];
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="why-agents-fail-screen">
-			<PageHeader title={t("why.title")} subtitle={t("why.subtitle")} />
+			<PageHeader title={t("why.title")} subtitle={t("why.subtitle")} actions={<MaximFailuresLink />} />
 			<RouteTabs tabs={tabs} defaultTab="patterns" label={t("why.tabs.label")} testId="why-tabs">
 				{(active) => (active === "groups" ? <ClustersTab /> : <PatternsTab />)}
 			</RouteTabs>

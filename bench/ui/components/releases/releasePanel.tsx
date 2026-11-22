@@ -14,6 +14,7 @@ import { quickRunCount, releasableExperiments, verdictPolicyDecision } from "./r
 export function ReleasePanel({ initialExpId }: { initialExpId?: string } = {}) {
 	const { t } = useTranslation("bench");
 	const { t: tf } = useTranslation("fw10");
+	const { t: tu } = useTranslation("u14");
 	const list = useListExperimentsQuery();
 	// Quick runs (generated names) stay out unless asked for; a quick run opened from its page stays listed.
 	const [showQuick, setShowQuick] = useState(false);
@@ -45,7 +46,7 @@ export function ReleasePanel({ initialExpId }: { initialExpId?: string } = {}) {
 				)}
 				{!list.isLoading && experiments.length === 0 && !list.isError && (
 					<p className="text-muted-foreground mb-3 text-sm" data-testid="release-no-experiments">
-						{t("releases.panel.noExperiments")}
+						{tu("releases.disabled.noneListed")}
 					</p>
 				)}
 				{quick > 0 && (

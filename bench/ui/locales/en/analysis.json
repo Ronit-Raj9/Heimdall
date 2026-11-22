@@ -27,7 +27,8 @@
 		"blame": {
 			"title": "Blame",
 			"description": "Find which agent caused each multi-agent failure.",
-			"button": "Compute blame"
+			"button": "Compute blame",
+			"single": "Each setup here runs one agent, so there is no blame to split. Blame is for team runs."
 		},
 		"clusters": {
 			"title": "Failure clusters",
@@ -42,9 +43,29 @@
 	},
 	"result": {
 		"check": "Verdict {{decision}}, action {{action}}",
-		"checkPolicy": "release policy {{policy}}",
+		"verdict": {
+			"score": "Score saved. This comparison has one setup, so there is no release decision.",
+			"improved": "B is better than A.",
+			"regressed": "B is worse than A.",
+			"inconclusive": "No clear difference between A and B yet.",
+			"invalid": "The test was broken, so there is no verdict."
+		},
+		"action": {
+			"ship": "Ready to release.",
+			"hold": "Hold the release.",
+			"no_decision": "",
+			"fix_harness": "Fix the test setup first."
+		},
+		"checkPolicy": "Rule set {{file}}: {{decision}}.",
+		"checkPolicyUnnamed": "Release rules: {{decision}}.",
+		"policyDecision": {
+			"allow": "allows release",
+			"warn": "allows release with warnings",
+			"block": "blocks release"
+		},
 		"codescan": "{{findings}} counted findings over {{scanned}} of {{runs}} runs; {{vetoed}} would be vetoed",
 		"blame": "{{runs}} runs: {{failed}} failed, {{blamed}} pinned on one agent",
+		"blameNotScored": "{{runs}} runs: {{failed}} failed, {{notScored}} not scored, {{blamed}} pinned on one agent",
 		"clusters": "{{clusters}} clusters from {{failures}} failures in {{runs}} runs",
 		"index": "Index rebuilt",
 		"awareness": "Awareness report refreshed"
@@ -55,6 +76,8 @@
 		"awareness": "Eval awareness",
 		"awarenessNone": "No awareness report yet. Start a scan above.",
 		"awarenessArm": "Setup {{arm}}: {{withSignals}} of {{scanned}} scanned runs with signals ({{signals}} signals)",
+		"awarenessNotScanned_one": "{{count}} run not scanned",
+		"awarenessNotScanned_other": "{{count}} runs not scanned",
 		"clusters": "Failure clusters in this experiment",
 		"clustersNone": "No failure clusters for this experiment.",
 		"clustersAll": "Open all clusters",

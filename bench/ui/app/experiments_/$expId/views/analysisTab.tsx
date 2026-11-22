@@ -3,11 +3,12 @@ import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { Button } from "@/components/ui/button";
 import { ActionCard } from "@/components/experiments/compareActionCard";
 import { AUDIT_MAX_BYTES, useAuditTableMutation } from "@/lib/store/apis/analysisApi";
-import { getBenchErrorMessage, useGetClustersQuery, useGetVerdictQuery } from "@/lib/store/apis/benchApi";
+import { getBenchErrorMessage, useGetClustersQuery, useGetExperimentQuery, useGetVerdictQuery } from "@/lib/store/apis/benchApi";
+import { NotScannedList } from "@/components/integrity/awarenessPanel";
 import { useGetAwarenessQuery } from "@/lib/store/apis/integrityApi";
 import { useGetJobQuery } from "@/lib/store/apis/platformApi";
 import type { AnalysisJobKind, AnalysisView, BlameRunResult, CheckRunResult, ClustersRebuildResult, CodeScanRunResult } from "@/lib/types/analysis";
-import type { Job, JobStatus } from "@/lib/types/bench";
+import type { ExperimentStatus, Job, JobStatus } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
 import { ArrowUpRight, Coins, Database, Eye, FileSpreadsheet, Gavel, Network, ScanSearch, ShieldCheck, type LucideIcon } from "lucide-react";
 import type { TFunction } from "i18next";
@@ -87,14 +88,8 @@ export function summarizeAnalysisResult(t: TFunction<"analysis">, spec: Analysis
 	if (job.status !== "succeeded") return "";
 	const r = (job.result ?? {}) as unknown;
 	switch (spec.key) {
-		case "check": {
-			const c = r as CheckRunResult;
-			const base = t("result.check", {
-				decision: c.decision ?? "?",
-				action: c.action ?? "?",
-			});
-			return c.policy ? `${base}; ${t("result.checkPolicy", { policy: c.policy })}` : base;
-		}
+		case "check":
+			return checkSummary(t, r as CheckRunResult);
 		case "codescan": {
 			const c = r as CodeScanRunResult;
 			return t("result.codescan", {
@@ -105,12 +100,10 @@ export function summarizeAnalysisResult(t: TFunction<"analysis">, spec: Analysis
 			});
 		}
 		case "blame": {
+			// Runs that were not scored (infrastructure or grader problem) are counted apart from failed runs (N62).
 			const b = r as BlameRunResult;
-			return t("result.blame", {
-				runs: b.runs ?? 0,
-				failed: b.failed ?? 0,
-				blamed: b.blamed ?? 0,
-			});
+			const counts = { runs: b.runs ?? 0, failed: b.failed ?? 0, blamed: b.blamed ?? 0, notScored: b.not_scored ?? 0 };
+			return counts.notScored > 0 ? t("result.blameNotScored", counts) : t("result.blame", counts);
 		}
 		case "clusters": {
 			const c = r as ClustersRebuildResult;
@@ -125,6 +118,35 @@ export function summarizeAnalysisResult(t: TFunction<"analysis">, spec: Analysis
 		case "awareness":
 			return t("result.awareness");
 	}
+}
+
+const VERDICT_WORDS = ["score", "improved", "regressed", "inconclusive", "invalid"] as const;
+const ACTION_WORDS = ["ship", "hold", "fix_harness"] as const;
+const POLICY_WORDS = ["allow", "warn", "block"] as const;
+
+/** One known value in words, or the value as written (never "?"). */
+function wordsFor<T extends string>(known: readonly T[], value: string | undefined, say: (v: T) => string): string {
+	if (!value) return "";
+	return (known as readonly string[]).includes(value) ? say(value as T) : value;
+}
+
+/**
+ * A verdict in plain words (N61): what the result says, what to do, and what the release rule set
+ * decided, named by its file as Releases > Rules lists it. A score run has one setup and no release
+ * decision, so only its sentence is said.
+ */
+export function checkSummary(t: TFunction<"analysis">, c: Pick<CheckRunResult, "decision" | "action" | "policy" | "policy_file">): string {
+	const parts = [wordsFor(VERDICT_WORDS, c.decision, (d) => t(`result.verdict.${d}`))];
+	if (c.decision !== "score") {
+		// no_decision adds nothing: the verdict sentence already says there is no clear answer.
+		if (c.action !== "no_decision") parts.push(wordsFor(ACTION_WORDS, c.action, (a) => t(`result.action.${a}`)));
+		if (c.policy) {
+			const decision = wordsFor(POLICY_WORDS, c.policy, (p) => t(`result.policyDecision.${p}`));
+			// Results saved before the rule set file was recorded name no file.
+			parts.push(c.policy_file ? t("result.checkPolicy", { file: c.policy_file, decision }) : t("result.checkPolicyUnnamed", { decision }));
+		}
+	}
+	return parts.filter(Boolean).join(" ");
 }
 
 /** The tab strip label, translated from the analysis namespace. */
@@ -142,6 +164,10 @@ export function AnalysisTab({ expId }: { expId: string }) {
 	const verdict = useGetVerdictQuery(expId);
 	const awareness = useGetAwarenessQuery(expId);
 	const clusters = useGetClustersQuery({ exp: expId });
+	// multi_agent comes from the experiment status (fix wave 2, lane G04): blame splits a team run's failure between its agents.
+	const experiment = useGetExperimentQuery(expId);
+	const singleAgent = (experiment.data as (ExperimentStatus & { multi_agent?: boolean }) | undefined)?.multi_agent !== true;
+	const notScanned = awareness.data?.not_scanned ?? [];
 	const refresh = (views: AnalysisView[]) => {
 		if (views.includes("verdict")) void verdict.refetch();
 		if (views.includes("awareness")) void awareness.refetch();
@@ -159,10 +185,7 @@ export function AnalysisTab({ expId }: { expId: string }) {
 					<ViewCard icon={Gavel} title={t("views.verdict")} testId="analysis-verdict">
 						{verdict.data ? (
 							<span className="text-foreground text-base font-semibold" data-testid="analysis-verdict-decision">
-								{t("result.check", {
-									decision: verdict.data.verdict.decision,
-									action: verdict.data.verdict.action,
-								})}
+								{checkSummary(t, { decision: verdict.data.verdict.decision, action: verdict.data.verdict.action })}
 							</span>
 						) : verdict.isFetching ? (
 							<span className="bg-muted block h-5 w-40 animate-pulse rounded" />
@@ -211,6 +234,12 @@ export function AnalysisTab({ expId }: { expId: string }) {
 											</span>
 										</div>
 									))}
+								{notScanned.length > 0 && (
+									<span className="text-muted-foreground text-xs" data-testid="analysis-awareness-not-scanned">
+										{t("views.awarenessNotScanned", { count: notScanned.length })}
+									</span>
+								)}
+								<NotScannedList runs={notScanned} />
 								<span className="text-muted-foreground line-clamp-2 text-xs">{awareness.data.label}</span>
 							</div>
 						) : (
@@ -260,7 +289,13 @@ export function AnalysisTab({ expId }: { expId: string }) {
 				<h2 className="text-base font-semibold tracking-tight">{t("jobs.title")}</h2>
 				<div className="grid items-start gap-3 lg:grid-cols-2">
 					{ANALYSIS_JOBS.map((spec) => (
-						<AnalysisJobCard key={spec.kind} spec={spec} expId={expId} onFinished={() => refresh(spec.refreshes)} />
+						<AnalysisJobCard
+							key={spec.kind}
+							spec={spec}
+							expId={expId}
+							unavailable={spec.key === "blame" && singleAgent ? t("jobs.blame.single") : undefined}
+							onFinished={() => refresh(spec.refreshes)}
+						/>
 					))}
 				</div>
 			</section>
@@ -352,7 +387,18 @@ function ClusterBars({ clusters }: { clusters: readonly { signature: string; cou
 }
 
 /** One job button with its status and result summary; tells the tab once the job ends. */
-function AnalysisJobCard({ spec, expId, onFinished }: { spec: AnalysisJobSpec; expId: string; onFinished(): void }) {
+function AnalysisJobCard({
+	spec,
+	expId,
+	unavailable,
+	onFinished,
+}: {
+	spec: AnalysisJobSpec;
+	expId: string;
+	/** When set, the job does not apply to this experiment: the button is disabled and this says why. */
+	unavailable?: string;
+	onFinished(): void;
+}) {
 	const { t } = useTranslation("analysis");
 	const [jobId, setJobId] = useState<string | null>(null);
 	const job = useGetJobQuery(jobId ?? "", {
@@ -399,6 +445,7 @@ function AnalysisJobCard({ spec, expId, onFinished }: { spec: AnalysisJobSpec; e
 			params={analysisJobParams(spec, expId)}
 			label={t(`jobs.${spec.key}.button`)}
 			variant="outline"
+			disabled={Boolean(unavailable)}
 			onDone={(j) => setJobId(j.id)}
 		/>
 	);
@@ -408,7 +455,15 @@ function AnalysisJobCard({ spec, expId, onFinished }: { spec: AnalysisJobSpec; e
 			icon={JOB_ICONS[spec.key]}
 			title={t(`jobs.${spec.key}.title`)}
 			description={t(`jobs.${spec.key}.description`)}
-			status={statusPill}
+			status={
+				unavailable ? (
+					<span className="text-muted-foreground mt-1 text-xs" data-testid={`analysis-job-${spec.key}-unavailable`}>
+						{unavailable}
+					</span>
+				) : (
+					statusPill
+				)
+			}
 			action={button}
 			testId={`analysis-job-${spec.key}`}
 		>

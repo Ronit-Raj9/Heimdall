@@ -4,7 +4,7 @@ import type { JobLogState } from "@/components/platform/useJobLog";
 import { FAILED_JOB, RUNNING_JOB, hostedSession } from "@/lib/testing/platformFixtures";
 import { mutation, okQuery, render } from "@/lib/testing/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { JobLogPanel } from "./jobLogPanel";
+import { JobLogPanel, refetchOnLogEnd } from "./jobLogPanel";
 
 const api = vi.hoisted(() => ({ job: {} as unknown }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
@@ -62,5 +62,14 @@ describe("JobLogPanel", () => {
 	it("offers no runner link for other failures", () => {
 		api.job = okQuery({ ...FAILED_JOB, mode: "live", error: "exit 1" });
 		expect(render(<JobLogPanel jobId={FAILED_JOB.id} />, hostedSession("member"))).not.toContain("job-log-panel-add-runner");
+	});
+});
+
+describe("refetchOnLogEnd (N63)", () => {
+	it("asks for the job row once when the log ended while the row still says running", () => {
+		expect(refetchOnLogEnd(true, RUNNING_JOB)).toBe(true);
+		expect(refetchOnLogEnd(false, RUNNING_JOB)).toBe(false);
+		expect(refetchOnLogEnd(true, FAILED_JOB)).toBe(false);
+		expect(refetchOnLogEnd(true, undefined)).toBe(false);
 	});
 });

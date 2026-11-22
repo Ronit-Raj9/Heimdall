@@ -2,8 +2,10 @@ import "@/lib/i18n";
 
 import type { AwarenessReport } from "@/lib/types/bench";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
-import { AwarenessPanel } from "./awarenessPanel";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+import { AwarenessPanel, NotScannedList } from "./awarenessPanel";
 
 const report: AwarenessReport = {
 	exp_id: "e_x",
@@ -44,5 +46,29 @@ describe("AwarenessPanel", () => {
 		expect(html).toContain('data-testid="awareness-no-examples"');
 		expect(html).toContain("unverbalized");
 		expect(html).not.toContain("awareness-not-scanned");
+	});
+});
+describe("Unscanned runs are listed (N62, N68)", () => {
+	it("lists each run that could not be scanned with a link and its reason", () => {
+		const html = renderToStaticMarkup(
+			<NotScannedList
+				runs={[
+					{ run_id: "r_infra", reason: "no gateway log" },
+					{ run_id: "r_quiet", reason: "no agent text" },
+				]}
+			/>,
+		);
+		expect(html).toContain("2 runs could not be scanned");
+		expect(html).toContain('href="/runs/r_infra"');
+		expect(html).toContain('href="/runs/r_quiet"');
+		expect(html).toContain("no gateway log");
+		expect(html).toContain("no agent text");
+	});
+	it("renders nothing when every run was scanned", () => {
+		expect(renderToStaticMarkup(<NotScannedList runs={[]} />)).toBe("");
+	});
+	it("puts the list under the awareness table", () => {
+		const html = renderToStaticMarkup(<AwarenessPanel report={report} arms={["A", "B"]} />);
+		expect(html).toContain('href="/runs/r_2"');
 	});
 });

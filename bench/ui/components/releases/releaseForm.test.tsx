@@ -150,3 +150,26 @@ describe("ExperimentOption", () => {
 		expect(check).toContain("Readiness check for acme-safety");
 	});
 });
+describe("ReleaseForm says why the button is off (N170)", () => {
+	const form = (props: Partial<Parameters<typeof ReleaseForm>[0]>) =>
+		renderToStaticMarkup(
+			<ReleaseForm experiments={[experiment]} expId="e_synth_notes" onExpChange={() => {}} onSubmit={() => {}} {...props} />,
+		);
+	it("while the result loads", () => {
+		const html = form({ verdictLoading: true });
+		expect(html).toContain('data-testid="release-disabled-reason"');
+		expect(html).toContain("Loading the comparison&#x27;s result...");
+	});
+	it("when nobody approves yet", () => {
+		const html = form({ verdict: { analysisId: "a_1", decision: "improved", action: "ship" } });
+		expect(html).toContain("Write who approves this release.");
+	});
+	it("when the result says not to release", () => {
+		const html = form({ verdict: { analysisId: "a_1", decision: "inconclusive", action: "hold" }, initialValues: { approver: "ana" } });
+		expect(html).toContain("Tick Release anyway and give a reason to continue.");
+	});
+	it("not at all when the button is on", () => {
+		const html = form({ verdict: { analysisId: "a_1", decision: "improved", action: "ship" }, initialValues: { approver: "ana" } });
+		expect(html).not.toContain("release-disabled-reason");
+	});
+});
