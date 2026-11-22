@@ -5,14 +5,17 @@ import { agentReportCardRequest } from "@/lib/store/apis/evaluationsApi";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { lineDiff } from "./lineDiff";
-import ReportCardTab, { catalogModels, isEmptyReport } from "./reportCardTab";
+import ReportCardTab, { isEmptyReport, modelOptions } from "./reportCardTab";
 import VersionsTab, { sortVersions } from "./versionsTab";
 
 const state = vi.hoisted(() => ({
 	versions: [] as AgentVersion[],
 	detail: {} as Record<number, AgentVersionDetail>,
-	report: undefined as ReportCardResponse | undefined,
+	report: undefined as (ReportCardResponse & { models?: string[] }) | undefined,
 	reportError: undefined as unknown,
+	reportArgs: [] as unknown[],
+	search: {} as Record<string, unknown>,
+	navigated: [] as unknown[],
 }));
 
 vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
@@ -21,7 +24,10 @@ vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 	useGetAgentVersionQuery: (arg: { version: number } | symbol) =>
 		typeof arg === "object" ? { data: state.detail[arg.version], isLoading: false, isError: false } : { data: undefined },
 	useCreateAgentVersionMutation: () => [vi.fn(), { isLoading: false, isError: false }],
-	useGetAgentReportCardQuery: () => ({ data: state.report, error: state.reportError, isLoading: false, isError: Boolean(state.reportError) }),
+	useGetAgentReportCardQuery: (arg: unknown) => {
+		state.reportArgs.push(arg);
+		return { data: state.report, error: state.reportError, isLoading: false, isError: Boolean(state.reportError) };
+	},
 }));
 
 vi.mock("@/lib/store/apis/failurePatternsApi", async (importOriginal) => ({
@@ -60,6 +66,8 @@ vi.mock("@/lib/store/apis/modelsApi", () => ({
 }));
 
 vi.mock("@tanstack/react-router", () => ({
+	useSearch: () => state.search,
+	useNavigate: () => (opts: unknown) => state.navigated.push(opts),
 	Link: ({ to, search, params: _params, children, ...rest }: { to: string; search?: Record<string, string>; params?: unknown; children: React.ReactNode }) => (
 		<a href={search ? `${to}?${new URLSearchParams(search).toString()}` : to} {...rest}>
 			{children}
@@ -130,12 +138,15 @@ describe("report card tab", () => {
 			capabilities: [{ capability: "terminal", benchmarks: ["hd-harbor-tb2"], arms: { A: { score: 0.41, ci_low: 0.3, ci_high: 0.52, runs: 30 } } }],
 			benchmarks: [],
 			reliability: [],
+			models: ["gpt-x"],
 		};
 		const html = renderToStaticMarkup(<ReportCardTab agentId="codex" />);
 		expect(html).toContain('data-testid="report-card"');
+		expect(html).toContain('value="gpt-x"');
 		expect(html).toContain('data-testid="capability-terminal"');
 		expect(html).toContain('value="2"');
-		expect(html).toContain('value="claude-y"');
+		// The Model filter lists only the models this agent's evaluations used (N34).
+		expect(html).not.toContain('value="claude-y"');
 		// Where it failed: the patterns seen, with example runs; unseen patterns are left out.
 		expect(html).toContain('data-testid="report-failures"');
 		expect(html).toContain("Loops");
@@ -147,8 +158,37 @@ describe("report card tab", () => {
 	it("helpers", () => {
 		expect(isEmptyReport({ evaluation: "", arms: [], capabilities: [], benchmarks: [], reliability: [] }, undefined)).toBe(true);
 		expect(isEmptyReport(undefined, { status: 500 })).toBe(false);
-		expect(catalogModels([{ models: [{ id: "b" }, { id: "a" }] }, { models: [{ id: "a" }] }])).toEqual(["a", "b"]);
+		expect(modelOptions(["b", "a"], "")).toEqual(["b", "a"]);
+		expect(modelOptions(["a"], "gpt-6-luna")).toEqual(["gpt-6-luna", "a"]);
+		expect(modelOptions(undefined, "a")).toEqual(["a"]);
 		expect(agentReportCardRequest({ agent: "my agent" })).toEqual({ url: "/agents/my%20agent/report-card" });
 		expect(agentReportCardRequest({ agent: "x", version: 2, model: "m" })).toEqual({ url: "/agents/x/report-card", params: { version: "2", model: "m" } });
+	});
+
+	it("reads version and model from the address and names its selects (N54, N55)", () => {
+		state.versions = [v(1), v(2)];
+		state.reportError = undefined;
+		state.reportArgs = [];
+		state.search = { tab: "report-card", version: "1", model: "gpt-6-luna" };
+		state.report = { evaluation: "ev_1", arms: [], capabilities: [], benchmarks: [], reliability: [], models: ["gpt-x"] };
+		const html = renderToStaticMarkup(<ReportCardTab agentId="codex" />);
+		expect(state.reportArgs).toContainEqual({ agent: "codex", version: 1, model: "gpt-6-luna" });
+		// A model from the link that the list lacks is still shown, and selected.
+		expect(html).toMatch(/<option value="gpt-6-luna" selected="">gpt-6-luna<\/option>/);
+		expect(html).toMatch(/<option value="1" selected="">v1/);
+		expect(html).toContain('aria-label="Version"');
+		expect(html).toContain('aria-label="Model"');
+		expect(html).not.toContain('data-testid="agent-report-card-version-missing"');
+		state.search = {};
+	});
+
+	it("says when the version in the address does not exist", () => {
+		state.versions = [v(1), v(2)];
+		state.reportArgs = [];
+		state.search = { version: "9" };
+		const html = renderToStaticMarkup(<ReportCardTab agentId="codex" />);
+		expect(html).toContain("Version 9 of this agent was not found. Showing the latest version.");
+		expect(state.reportArgs).toContainEqual({ agent: "codex", version: undefined, model: undefined });
+		state.search = {};
 	});
 });

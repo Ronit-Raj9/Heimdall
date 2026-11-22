@@ -4,10 +4,9 @@ import { ShareButton, shareQuery } from "@/components/share/shareDialog";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { useGetAgentReportCardQuery, useGetAgentVersionsQuery, type ReportCardResponse } from "@/lib/store/apis/evaluationsApi";
-import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
-import { Link } from "@tanstack/react-router";
+import "@/components/agents/gw17I18n";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { Gauge } from "lucide-react";
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** True when the server had no completed evaluation for this agent, version and model. */
@@ -17,21 +16,43 @@ export function isEmptyReport(report: ReportCardResponse | undefined, error: unk
 	return !report.evaluation || ((report.capabilities ?? []).length === 0 && (report.benchmarks ?? []).length === 0);
 }
 
-/** Model ids the catalog lists, once each, sorted. */
-export function catalogModels(providers: Array<{ models: Array<{ id: string }> }> | undefined): string[] {
-	return [...new Set((providers ?? []).flatMap((p) => p.models.map((m) => m.id)))].sort();
+/**
+ * The Model filter's choices: the models this agent's evaluations used (the server's `models`), with the selected
+ * model first when the list lacks it (a link can name a model the list does not have yet).
+ */
+export function modelOptions(models: readonly string[] | undefined, selected: string): string[] {
+	const list = [...(models ?? [])];
+	return selected && !list.includes(selected) ? [selected, ...list] : list;
 }
 
-/** The Report card tab: pick a version and a model, see the latest report card for that pair. */
+/**
+ * The Report card tab: pick a version and a model, see the latest report card for that pair. Both live in the
+ * address (?version=&model=), so a link from the leaderboard opens on its row and a pick can be shared.
+ */
 export default function ReportCardTab({ agentId }: { agentId: string }) {
 	const { t } = useTranslation("agentBuilder");
-	const [version, setVersion] = useState(0);
-	const [model, setModel] = useState("");
+	const { t: tg } = useTranslation("gw17");
+	const search = useSearch({ strict: false }) as { version?: unknown; model?: unknown };
+	const navigate = useNavigate();
 	const versions = useGetAgentVersionsQuery(agentId);
-	const models = useGetModelsQuery();
-	const report = useGetAgentReportCardQuery({ agent: agentId, version: version || undefined, model: model || undefined });
 	const versionList = [...(versions.data?.versions ?? [])].sort((x, y) => y.version - x.version);
-	const modelList = catalogModels(models.data?.providers);
+	const urlVersion = /^v?[0-9]+$/.test(String(search.version ?? "")) ? Number(String(search.version).replace(/^v/, "")) : 0;
+	// A version the agent does not have shows the latest, with a note, once the versions are known.
+	const versionMissing = urlVersion > 0 && versions.data !== undefined && !versionList.some((v) => v.version === urlVersion);
+	const version = versionMissing ? 0 : urlVersion;
+	const model = typeof search.model === "string" ? search.model : "";
+	const setFilter = (next: { version?: number; model?: string }) =>
+		void navigate({
+			to: ".",
+			search: ((prev: Record<string, unknown>) => ({
+				...prev,
+				version: (next.version ?? version) || undefined,
+				model: (next.model ?? model) || undefined,
+			})) as never,
+			replace: true,
+		});
+	const report = useGetAgentReportCardQuery({ agent: agentId, version: version || undefined, model: model || undefined });
+	const modelList = modelOptions(report.data?.models, model);
 	const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
 	const empty = isEmptyReport(report.data, report.error);
 
@@ -40,7 +61,13 @@ export default function ReportCardTab({ agentId }: { agentId: string }) {
 			<div className="flex flex-wrap items-end gap-3">
 				<label className="flex flex-col gap-1 text-xs font-medium">
 					{t("reportCard.version")}
-					<select className={selectClass} value={version} onChange={(e) => setVersion(Number(e.target.value))} data-testid="agent-report-card-version">
+					<select
+						className={selectClass}
+						value={version}
+						onChange={(e) => setFilter({ version: Number(e.target.value) })}
+						aria-label={t("reportCard.version")}
+						data-testid="agent-report-card-version"
+					>
 						<option value={0}>{t("reportCard.latest")}</option>
 						{versionList.map((v) => (
 							<option key={v.version} value={v.version}>
@@ -52,7 +79,14 @@ export default function ReportCardTab({ agentId }: { agentId: string }) {
 				</label>
 				<label className="flex flex-col gap-1 text-xs font-medium">
 					{t("reportCard.model")}
-					<select className={selectClass} value={model} onChange={(e) => setModel(e.target.value)} data-testid="agent-report-card-model">
+					<select
+						className={selectClass}
+						value={model}
+						onChange={(e) => setFilter({ model: e.target.value })}
+						disabled={modelList.length === 0}
+						aria-label={t("reportCard.model")}
+						data-testid="agent-report-card-model"
+					>
 						<option value="">{t("reportCard.anyModel")}</option>
 						{modelList.map((id) => (
 							<option key={id} value={id}>
@@ -62,6 +96,11 @@ export default function ReportCardTab({ agentId }: { agentId: string }) {
 					</select>
 				</label>
 			</div>
+			{versionMissing && (
+				<p className="text-muted-foreground text-xs" data-testid="agent-report-card-version-missing">
+					{tg("reportCard.versionMissing", { version: urlVersion })}
+				</p>
+			)}
 			{report.isLoading ? (
 				<BlockSkeleton rows={6} testId="agent-report-card-loading" />
 			) : empty ? (

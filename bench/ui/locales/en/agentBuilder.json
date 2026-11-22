@@ -15,7 +15,7 @@
 		"noBuild": "Ready to run",
 		"selected": "Selected",
 		"name": "Agent name",
-		"nameHelp": "Lowercase letters, digits, '.', '_' or '-'. Saved as agents/<name>.yaml.",
+		"nameHelp": "Lowercase letters, digits, '.', '_' or '-', up to 63 characters. Saved as agents/{{name}}.yaml.",
 		"nameInvalid": "Use lowercase letters, digits, '.', '_' or '-', starting with a letter or digit.",
 		"nameExists": "An agent named {{name}} already exists. Pick another name.",
 		"model": "Model",

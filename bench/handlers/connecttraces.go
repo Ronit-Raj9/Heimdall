@@ -13,7 +13,10 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/url"
 	"strings"
 	"sync"
@@ -236,7 +239,7 @@ func (h *connectTracesHandler) infer(ctx *fasthttp.RequestCtx) {
 	}
 	d, err := agentinfer.InferFromOTLP(body, string(ctx.Request.Header.ContentType()))
 	if err != nil {
-		lib.SendError(ctx, h.env.Mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "not an OTLP trace export: "+err.Error())
+		lib.SendError(ctx, h.env.Mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, otlpFileError(body, err))
 		return
 	}
 	y, req := draftOutputs(d)
@@ -294,7 +297,7 @@ func acceptOTLP(ctx *fasthttp.RequestCtx, mode schemas.Mode, st agentinfer.Store
 	ct := string(ctx.Request.Header.ContentType())
 	spans, err := agentevents.DecodeSpans(ctx.PostBody(), ct)
 	if err != nil {
-		lib.SendError(ctx, mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "not an OTLP trace export: "+err.Error())
+		lib.SendError(ctx, mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, otlpFileError(ctx.PostBody(), err))
 		return
 	}
 	if len(spans) > 0 {
@@ -422,4 +425,46 @@ func (h *OTLPIngestHandler) gate(orgID string) *traceinbox.Gate {
 		h.gates[orgID] = g
 	}
 	return g
+}
+
+// otlpFileErrorHint ends every otlpFileError sentence.
+const otlpFileErrorHint = " Export your traces as OTLP JSON, for example with the OpenTelemetry Collector file exporter, and upload that file."
+
+// otlpFileError is the one plain sentence shown for a body that is not an
+// OTLP trace export: broken JSON (with the line and column of the first
+// problem), JSON without resourceSpans, or a body neither encoding reads.
+// The decoder's own text never reaches the user.
+func otlpFileError(body []byte, err error) string {
+	var syn *json.SyntaxError
+	var typ *json.UnmarshalTypeError
+	switch {
+	case errors.As(err, &syn):
+		msg := "This file is not an OTLP trace export: it is not valid JSON."
+		if line, col, ok := otlpLineCol(body, syn.Offset); ok {
+			msg += fmt.Sprintf(" The first problem is at line %d, column %d.", line, col)
+		}
+		return msg + otlpFileErrorHint
+	case errors.Is(err, io.ErrUnexpectedEOF), errors.Is(err, io.EOF):
+		return "This file is not an OTLP trace export: it is not valid JSON (it ends too early)." + otlpFileErrorHint
+	case errors.Is(err, agentevents.ErrNoResourceSpans), errors.As(err, &typ):
+		return "This file is valid JSON but has no resourceSpans, so it is not an OTLP trace export." + otlpFileErrorHint
+	}
+	return "This file could not be read as an OTLP trace export (JSON or protobuf)." + otlpFileErrorHint
+}
+
+// otlpLineCol turns a json.SyntaxError offset (bytes read, the bad byte
+// included) into a 1-based line and column.
+func otlpLineCol(body []byte, offset int64) (line, col int, ok bool) {
+	if offset < 1 || offset > int64(len(body)) {
+		return 0, 0, false
+	}
+	line, col = 1, 1
+	for _, b := range body[:offset-1] {
+		if b == '\n' {
+			line, col = line+1, 1
+		} else {
+			col++
+		}
+	}
+	return line, col, true
 }

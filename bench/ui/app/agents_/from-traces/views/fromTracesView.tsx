@@ -160,6 +160,15 @@ function EndpointSection({ info }: { info: TraceConnectInfo }) {
 	);
 }
 
+/** The server's one plain sentence about a file that is not a trace export, shown as is. */
+export function TraceFileError({ error }: { error: string }) {
+	return (
+		<p className="text-destructive text-xs" data-testid="from-traces-file-error">
+			{error}
+		</p>
+	);
+}
+
 function WaitingSection({ canWrite, onInferred }: { canWrite: boolean; onInferred: (r: TraceInferResult) => void }) {
 	const { t } = useTranslation("connectTraces");
 	const [infer, inferState] = useInferFromTraceFileMutation();
@@ -195,11 +204,7 @@ function WaitingSection({ canWrite, onInferred }: { canWrite: boolean; onInferre
 						/>
 					</label>
 				)}
-				{error && (
-					<p className="text-destructive text-xs" data-testid="from-traces-file-error">
-						{t("waiting.fileError", { error })}
-					</p>
-				)}
+				{error && <TraceFileError error={error} />}
 			</div>
 		</Section>
 	);

@@ -74,9 +74,21 @@ func (h *agentDeleteHandler) delete(ctx *fasthttp.RequestCtx) {
 	}
 
 	opts := projectfs.WriteOpts{Actor: actor(ctx), Note: "delete agent " + id}
-	if err := ps.Delete(work, projectfs.AreaAgents, rel, opts); err != nil {
-		h.fsError(ctx, "delete agents/"+rel, err)
+	if what, err := deleteAgentFiles(work, ps, id, rel, opts); err != nil {
+		h.fsError(ctx, what, err)
 		return
+	}
+	ctx.SetStatusCode(fasthttp.StatusNoContent)
+}
+
+// deleteAgentFiles removes agent id's settings file (agents-area path rel),
+// its image folder and its skills and tools folder. Saved versions and runs
+// stay. On failure it returns what failed ("delete agents/<path>") with the
+// store error. DELETE /agents/{id} and the rename of POST /agents/{id}/copy
+// both use it.
+func deleteAgentFiles(work context.Context, ps projectfs.Store, id, rel string, opts projectfs.WriteOpts) (string, error) {
+	if err := ps.Delete(work, projectfs.AreaAgents, rel, opts); err != nil {
+		return "delete agents/" + rel, err
 	}
 	// The image folder and the skills and tools folder belong to this agent
 	// only. "images" and "skills" are never an agent's own folder name.
@@ -86,11 +98,10 @@ func (h *agentDeleteHandler) delete(ctx *fasthttp.RequestCtx) {
 	}
 	for _, dir := range dirs {
 		if err := ps.Delete(work, projectfs.AreaAgents, dir, opts); err != nil && !errors.Is(err, projectfs.ErrNotFound) {
-			h.fsError(ctx, "delete agents/"+dir, err)
-			return
+			return "delete agents/" + dir, err
 		}
 	}
-	ctx.SetStatusCode(fasthttp.StatusNoContent)
+	return "", nil
 }
 
 // agentDeleteFile is the agents-area path of agent id's settings file in the
