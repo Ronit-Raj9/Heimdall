@@ -60,7 +60,7 @@ Built for PS2 (agent benchmarking platform) of the Geek Room Global AI Hackathon
 | Agent steps, observers, agent events | Real-Docker integration tests (observer catch rates measured; events file and collector channels); framework spans in the scripted smokes | - |
 | Evaluation awareness, compliance pack, monitor certification, skill and MCP admission scan | Unit tests, plus real-Docker tests of the neutral view and the monitor sandbox | - |
 | Remote workers and deployed agents (`remote_http`) | Two processes on one machine | - |
-| Hosted platform (accounts, organizations, runners, evidence mirror) | `deploy/hosted/smoke.sh` on localhost: sign-up, an organization, a demo runner and a scripted two-slot experiment end to end | - |
+| Hosted platform (accounts, organizations, runners, evidence mirror) | `deploy/hosted/smoke.sh` on localhost: TLS, headers and internal ports, sign-up, an organization, recorded runs imported and anonymous reads refused, the evidence mirror with --s3 | - |
 
 ## Bring your own agent and tasks
 
