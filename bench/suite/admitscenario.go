@@ -249,6 +249,13 @@ func (a *admitter) runControl(ctx context.Context, c control, image string) (che
 	plan := &schemas.RunPlan{Image: image, Argv: c.argv, Env: env, Files: c.files, Workdir: a.s.Workdir,
 		WallS: exploitWallS, CPUs: 1, MemGB: 1, Network: "none", User: exploitUser}
 	a.gpuControlBudget(plan) // X7: a GPU task's controls train on the GPU (gpu.go)
+	// The reference runs in the agent's place, so it may take as long as the
+	// agent may (timeouts.agent_s): a long-horizon reference (Vending Bench's
+	// scripted operator plays a simulated year in about 2 h) cannot fit the
+	// short budget of the other controls.
+	if strings.HasPrefix(c.name, "reference_") && a.t.Timeouts.AgentS > plan.WallS {
+		plan.WallS = a.t.Timeouts.AgentS
+	}
 	res, err := a.deps.Env.Exec(ctx, rc, plan)
 	if err != nil {
 		return failed(check, fmt.Errorf("run %s: %w", c.name, err))

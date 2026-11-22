@@ -1,0 +1,1 @@
+{"id": "default", "display_name": "Default", "description": "Sales.", "stages": [{"label": "One", "schedule": {"num_instances": 2}}]}
