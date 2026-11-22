@@ -171,6 +171,7 @@ func ibwServerRequest(mode string) issuebench.WorkRequest {
 	}
 	if mode == issuebench.WorkModeValidate {
 		r.Env = &issuebench.EnvSpec{Dockerfile: "FROM python:3.12"}
+		r.Provider, r.Model, r.MaxUSD = "", "", 0 // W07 sends the key id only
 	}
 	return r
 }
