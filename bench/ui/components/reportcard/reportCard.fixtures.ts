@@ -78,3 +78,22 @@ export const abReport: Report = {
 		],
 	},
 };
+/** The A/B report with task segments by tier and region, narrowed to region = eu. */
+export const slicedReport: Report = {
+	...abReport,
+	evaluation: "ev_sliced",
+	where: { region: "eu" },
+	slices: [
+		{
+			key: "tier",
+			values: [
+				{ value: "enterprise", tasks: 12, arms: { A: m(0.5, 0.35, 0.65), B: m(0.7, 0.55, 0.82) }, delta: 0.2 },
+				{ value: "free", tasks: 9, arms: { A: m(0.3, 0.15, 0.48), B: m(0.25, 0.1, 0.44) }, delta: -0.05 },
+				{ value: "trial", tasks: 2, small: true, arms: { A: m(0.1, 0, 0.6), B: m(0.0, 0, 0.5) }, delta: -0.1 },
+			],
+			worst: { A: "free", B: "free" },
+			other: 3,
+		},
+		{ key: "region", values: [{ value: "eu", tasks: 23, arms: { A: m(0.4, 0.3, 0.5), B: m(0.5, 0.4, 0.6) }, delta: 0.1 }], worst: { A: "eu", B: "eu" } },
+	],
+};

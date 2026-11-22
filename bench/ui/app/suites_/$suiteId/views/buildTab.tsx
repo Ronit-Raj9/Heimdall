@@ -3,28 +3,28 @@ import { Section } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { ReadinessResults, readinessReport } from "@/components/suites/admissionResults";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { canUse, useSession } from "@/lib/session/sessionContext";
-import { benchApi, getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { useImportSuiteRowsMutation, useSetSuiteGraderMutation, useSetTaskSplitMutation } from "@/lib/store/apis/suiteBuildApi";
+import { benchApi } from "@/lib/store/apis/benchApi";
+import { useSetSuiteGraderMutation, useSetTaskSplitMutation } from "@/lib/store/apis/suiteBuildApi";
 import { useAppDispatch } from "@/lib/store/hooks";
 import type { Job, SuiteSummary, SuiteTask } from "@/lib/types/bench";
-import type { AnswerGrader, AnswerMatch, RowFormat, RowImportResult } from "@/lib/types/suiteBuild";
+import type { AnswerGrader } from "@/lib/types/suiteBuild";
 import { SUITE_OPS_KINDS } from "@/lib/types/suiteops";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { FileSpreadsheet, GitCommitHorizontal, Inbox, MessageSquareText } from "lucide-react";
-import { useCallback, useMemo, useState, type ChangeEvent } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FromCommitSection } from "./opsTab";
+import { ErrorLine, Field, JudgeFields, RowsImportForm, selectClass, type T } from "./rowMapper";
+
+export { formatOfFile, RowPreview } from "./rowMapper";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
 		suiteBuild: typeof import("@/locales/en/suiteBuild.json");
 	}
 }
-
-type T = ReturnType<typeof useTranslation<"suiteBuild">>["t"];
 
 /** The grader a suite uses, in the four words the website shows. */
 export type GraderChoice = "tests" | "state" | "exact" | "judge";
@@ -38,27 +38,6 @@ export function graderChoice(suite: Pick<SuiteSummary, "grader" | "output">): Gr
 
 /** A question-and-answer suite: its tasks are graded on the answer, so rows and tickets fit it. */
 export const isAnswerSuite = (suite: Pick<SuiteSummary, "output">) => suite.output === "answer";
-
-const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-	return (
-		<label className="flex min-w-0 flex-col gap-1 text-sm">
-			<span className="text-muted-foreground">{label}</span>
-			{children}
-			{hint && <span className="text-muted-foreground text-xs">{hint}</span>}
-		</label>
-	);
-}
-
-function ErrorLine({ error, testId }: { error: unknown; testId: string }) {
-	if (!error) return null;
-	return (
-		<p role="alert" className="text-chart-error-ink text-xs" data-testid={testId}>
-			{getBenchErrorMessage(error as never)}
-		</p>
-	);
-}
 
 /**
  * Build tab of a team's own benchmark (lane X13): choose the grader (and pin the judge), add
@@ -139,24 +118,18 @@ export function GraderSection({ suite, writable, t }: { suite: SuiteSummary; wri
 					))}
 				</div>
 				{answer && choice === "judge" && (
-					<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3" data-testid="suite-build-judge">
-						<Field label={t("grader.provider")}>
-							<Input value={provider} placeholder="openai" disabled={!writable} onChange={(e) => setProvider(e.target.value)} data-testid="suite-build-judge-provider" />
-						</Field>
-						<Field label={t("grader.model")}>
-							<Input value={model} placeholder="gpt-4.1-mini" disabled={!writable} onChange={(e) => setModel(e.target.value)} data-testid="suite-build-judge-model" />
-						</Field>
-						<Field label={t("grader.votes")} hint={t("grader.votesHint")}>
-							<select className={selectClass} value={votes} disabled={!writable} onChange={(e) => setVotes(Number(e.target.value))}>
-								{[1, 3, 5].map((n) => (
-									<option key={n} value={n}>
-										{n}
-									</option>
-								))}
-							</select>
-						</Field>
-						<p className="text-muted-foreground text-xs sm:col-span-3">{t("grader.pinHint")}</p>
-					</div>
+					<JudgeFields
+						provider={provider}
+						model={model}
+						votes={votes}
+						disabled={!writable}
+						onChange={(p) => {
+							if (p.provider !== undefined) setProvider(p.provider);
+							if (p.model !== undefined) setModel(p.model);
+							if (p.votes !== undefined) setVotes(p.votes);
+						}}
+						t={t}
+					/>
 				)}
 				{answer && writable && (
 					<div className="flex flex-wrap items-center gap-3">
@@ -240,163 +213,9 @@ function AddTasksSection({ suite, writable, hosted, t }: { suite: SuiteSummary; 
 	);
 }
 
-/** CSV or JSONL from the file's name; null when the name says neither. */
-export function formatOfFile(name: string): "csv" | "jsonl" | null {
-	const n = name.toLowerCase();
-	if (n.endsWith(".csv") || n.endsWith(".tsv")) return "csv";
-	if (n.endsWith(".jsonl") || n.endsWith(".ndjson") || n.endsWith(".json")) return "jsonl";
-	return null;
-}
-
 function RowsImport({ suite, writable, format, t }: { suite: SuiteSummary; writable: boolean; format: "rows" | "tickets"; t: T }) {
-	const tickets = format === "tickets";
-	const [data, setData] = useState("");
-	const [fileFormat, setFileFormat] = useState<"csv" | "jsonl">("csv");
-	const [source, setSource] = useState("");
-	const [match, setMatch] = useState<AnswerMatch>("exact");
-	const [heldOut, setHeldOut] = useState(false);
-	const [preview, setPreview] = useState<RowImportResult | null>(null);
-	const [done, setDone] = useState<RowImportResult | null>(null);
-	const [run, state] = useImportSuiteRowsMutation();
-	const exact = suite.grader === "answer_match";
-	const fmt: RowFormat = tickets ? "tickets" : fileFormat;
-	const body = { suite: suite.id, format: fmt, data, held_out: heldOut, ...(exact && !tickets ? { match } : {}), ...(source ? { source } : {}) };
-	const reset = () => {
-		setPreview(null);
-		setDone(null);
-	};
-	const onFile = (e: ChangeEvent<HTMLInputElement>) => {
-		const file = e.target.files?.[0];
-		if (!file) return;
-		const f = formatOfFile(file.name);
-		if (f && !tickets) setFileFormat(f);
-		setSource(file.name);
-		reset();
-		void file.text().then(setData);
-	};
-	const doPreview = async () => {
-		setDone(null);
-		const res = await run({ ...body, dry_run: true });
-		if ("data" in res && res.data) setPreview(res.data);
-	};
-	const doImport = async () => {
-		const res = await run({ ...body, dry_run: false });
-		if ("data" in res && res.data) {
-			setDone(res.data);
-			setPreview(null);
-			setData("");
-		}
-	};
 	if (!writable) return <p className="text-muted-foreground text-sm">{t("viewerNote")}</p>;
-	return (
-		<div className="flex min-w-0 flex-col gap-3" data-testid={`suite-build-${format}`}>
-			<p className="text-muted-foreground max-w-3xl text-xs">{tickets ? t("rows.ticketsHelp") : t("rows.help")}</p>
-			{tickets && exact && (
-				<p role="note" className="border-chart-warning/50 bg-chart-warning/10 rounded-md border px-3 py-2 text-xs" data-testid="suite-build-tickets-exact">
-					{t("rows.ticketsNeedJudge")}
-				</p>
-			)}
-			<div className="flex flex-wrap items-end gap-3">
-				<Field label={t("rows.file")}>
-					<input type="file" accept={tickets ? ".json,.jsonl,.txt" : ".csv,.jsonl,.ndjson,.json"} onChange={onFile} className="text-sm" data-testid={`suite-build-${format}-file`} />
-				</Field>
-				{!tickets && (
-					<Field label={t("rows.format")}>
-						<select className={selectClass} value={fileFormat} onChange={(e) => (setFileFormat(e.target.value as "csv" | "jsonl"), reset())}>
-							<option value="csv">CSV</option>
-							<option value="jsonl">JSON Lines</option>
-						</select>
-					</Field>
-				)}
-				{exact && !tickets && (
-					<Field label={t("rows.match")}>
-						<select className={selectClass} value={match} onChange={(e) => (setMatch(e.target.value as AnswerMatch), reset())} data-testid="suite-build-rows-match">
-							{(["exact", "contains_all", "numeric", "regex", "choice"] as const).map((m) => (
-								<option key={m} value={m}>
-									{t(`rows.matchMode.${m}`)}
-								</option>
-							))}
-						</select>
-					</Field>
-				)}
-			</div>
-			<textarea
-				className="border-input bg-background min-h-40 w-full rounded-md border p-2 font-mono text-xs"
-				value={data}
-				placeholder={tickets ? t("rows.ticketsPlaceholder") : fileFormat === "csv" ? t("rows.csvPlaceholder") : t("rows.jsonlPlaceholder")}
-				aria-label={t("rows.paste")}
-				onChange={(e) => (setData(e.target.value), reset())}
-				data-testid={`suite-build-${format}-data`}
-			/>
-			<label className="flex items-center gap-2 text-sm">
-				<input type="checkbox" checked={heldOut} onChange={(e) => (setHeldOut(e.target.checked), reset())} data-testid={`suite-build-${format}-held-out`} />
-				{t("rows.heldOut")}
-			</label>
-			<div className="flex flex-wrap gap-2">
-				<Button variant="outline" disabled={!data.trim() || state.isLoading} onClick={() => void doPreview()} dataTestId={`suite-build-${format}-preview`}>
-					{t("rows.preview")}
-				</Button>
-				<Button disabled={!preview || preview.tasks.length === 0 || state.isLoading} isLoading={state.isLoading} onClick={() => void doImport()} dataTestId={`suite-build-${format}-import`}>
-					{preview ? t("rows.import", { count: preview.tasks.length }) : t("rows.importIdle")}
-				</Button>
-			</div>
-			<ErrorLine error={state.error} testId={`suite-build-${format}-error`} />
-			{preview && <RowPreview result={preview} t={t} />}
-			{done && (
-				<div role="status" className="border-primary/40 bg-primary/5 flex flex-col gap-1 rounded-md border px-3 py-2 text-sm" data-testid={`suite-build-${format}-done`}>
-					<p className="font-medium">{t("rows.done", { count: done.tasks.length })}</p>
-					<p className="text-muted-foreground text-xs">{done.next}</p>
-					{done.problems.length > 0 && <ProblemList problems={done.problems} t={t} />}
-				</div>
-			)}
-		</div>
-	);
-}
-
-export function RowPreview({ result, t }: { result: RowImportResult; t: T }) {
-	return (
-		<div className="flex min-w-0 flex-col gap-2" data-testid="suite-build-preview">
-			<p className="text-sm">{t("rows.previewSummary", { ok: result.tasks.length, bad: result.problems.length })}</p>
-			{result.tasks.length > 0 && (
-				<div className="max-h-80 overflow-auto rounded-md border">
-					<table className="w-full text-left text-xs">
-						<thead className="bg-muted/50 text-muted-foreground sticky top-0">
-							<tr>
-								<th className="px-2 py-1.5 font-medium">{t("rows.col.line")}</th>
-								<th className="px-2 py-1.5 font-medium">{t("rows.col.task")}</th>
-								<th className="px-2 py-1.5 font-medium">{t("rows.col.question")}</th>
-								<th className="px-2 py-1.5 font-medium">{result.grader === "judge" ? t("rows.col.rubric") : t("rows.col.answer")}</th>
-							</tr>
-						</thead>
-						<tbody className="divide-border divide-y">
-							{result.tasks.map((r) => (
-								<tr key={r.id} data-testid={`suite-build-preview-${r.id}`}>
-									<td className="text-muted-foreground px-2 py-1 tabular-nums">{r.line}</td>
-									<td className="px-2 py-1 font-mono">
-										{r.id}
-										{r.held_out && <span className="text-muted-foreground ml-1 font-sans">({t("private.heldOut")})</span>}
-									</td>
-									<td className="px-2 py-1">{r.question}</td>
-									<td className="px-2 py-1">{r.check}</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
-			)}
-			{result.problems.length > 0 && <ProblemList problems={result.problems} t={t} />}
-		</div>
-	);
-}
-
-function ProblemList({ problems, t }: { problems: RowImportResult["problems"]; t: T }) {
-	return (
-		<ul className="text-chart-warning-ink flex flex-col gap-0.5 text-xs" data-testid="suite-build-problems">
-			{problems.map((p, i) => (
-				<li key={`${p.line}-${i}`}>{t("rows.problem", { line: p.line, message: p.message })}</li>
-			))}
-		</ul>
-	);
+	return <RowsImportForm suiteId={suite.id} exact={suite.grader === "answer_match"} format={format} t={t} />;
 }
 
 // Held-out tasks

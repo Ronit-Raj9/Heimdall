@@ -129,6 +129,16 @@ export interface EvaluationGate {
 	min_score?: Record<string, number>;
 	/** Largest score drop from the baseline on any capability (0.05 is 5 points). */
 	max_regression?: number;
+	/** Rules for one task segment (tasks whose metadata key has value); checks name it "key=value". */
+	slices?: EvaluationGateSlice[];
+}
+
+/** A gate rule on one segment: lowest score and/or largest drop from the baseline, as fractions. */
+export interface EvaluationGateSlice {
+	key: string;
+	value: string;
+	min_score?: number;
+	max_regression?: number;
 }
 
 export type GateState = "pass" | "fail" | "no_baseline";
@@ -490,6 +500,43 @@ export interface Report {
 	learning?: ReportLearningRow[];
 	/** Only when runs reported resume, budget or success per dollar numbers. */
 	persistence?: ReportPersistenceRow[];
+	/** Scores per task segment (tasks grouped by one metadata key). */
+	slices?: ReportSlice[];
+	/** The metadata filter this report was narrowed to (?where=key:value). */
+	where?: Record<string, string>;
+}
+
+/** One metadata key and its values, each with per arm scores over the tasks with that value. */
+export interface ReportSlice {
+	key: string;
+	values: ReportSliceValue[];
+	/** Per arm label, the value with the lowest score (small values never count). */
+	worst: Record<string, string>;
+	/** Values not listed. */
+	other?: number;
+}
+
+export interface ReportSliceValue {
+	value: string;
+	tasks: number;
+	/** Fewer than 3 tasks: shown but never ranked. */
+	small?: boolean;
+	arms: Record<string, ReportMetrics>;
+	/** A/B only: second arm score minus first, as a fraction. */
+	delta?: number;
+}
+
+/** The report request; where narrows the whole report to tasks with that metadata. */
+export type EvaluationReportArg = string | { id: string; where?: Record<string, string> };
+
+/** URL for GET /evaluations/{id}/report with one where=key:value param per filter entry. */
+export function evaluationReportUrl(arg: EvaluationReportArg): string {
+	const { id, where } = typeof arg === "string" ? { id: arg, where: undefined } : arg;
+	const base = `/evaluations/${encodeURIComponent(id)}/report`;
+	const qs = Object.entries(where ?? {})
+		.map(([k, v]) => `where=${encodeURIComponent(`${k}:${v}`)}`)
+		.join("&");
+	return qs ? `${base}?${qs}` : base;
 }
 
 /** One arm's numbers over the whole evaluation; absent fields are unknown. */
@@ -655,9 +702,9 @@ export const evaluationsApi = benchApi
 				transformResponse: (body: { faults?: FaultCatalogItem[] | null } | FaultCatalogItem[] | null) =>
 					Array.isArray(body) ? body : (body?.faults ?? []),
 			}),
-			getEvaluationReport: builder.query<Report, string>({
-				query: (id) => `/evaluations/${enc(id)}/report`,
-				providesTags: (_r, _e, id) => [{ type: "Evaluations", id: `${id}/report` }],
+			getEvaluationReport: builder.query<Report, EvaluationReportArg>({
+				query: (arg) => evaluationReportUrl(arg),
+				providesTags: (_r, _e, arg) => [{ type: "Evaluations", id: `${typeof arg === "string" ? arg : arg.id}/report` }],
 			}),
 			getAgentReportCard: builder.query<Report, { agent: string; version?: number; model?: string }>({
 				query: (params) => agentReportCardRequest(params),

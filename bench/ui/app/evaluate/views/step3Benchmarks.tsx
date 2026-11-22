@@ -9,8 +9,9 @@ import {
 } from "@/lib/store/apis/evaluationsApi";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useEvaluateDraft } from "./evaluateDraft";
+import { OwnTasksCard } from "./ownTasks";
 
 // Lane A12: wizard step 3, "Benchmarks". Pick a pack or any set of single benchmarks. Benchmarks the
 // chosen agent cannot run are greyed out with the reason from /agents/{id}/compatibility.
@@ -192,10 +193,12 @@ export interface Step3BenchmarksViewProps {
 	loading?: boolean;
 	/** The agent's compatibility is still loading: rows wait instead of reading as runnable. */
 	checking?: boolean;
+	/** The "Your own tasks" card, shown first (the container passes it; the pure view stays data-free). */
+	ownTasks?: ReactNode;
 }
 
 /** Pure view: packs, grouped multi-select and the selected count. Data comes in through props. */
-export function Step3BenchmarksView({ suites, packs, compatibility, selected, pack, onChange, loading, checking }: Step3BenchmarksViewProps) {
+export function Step3BenchmarksView({ suites, packs, compatibility, selected, pack, onChange, loading, checking, ownTasks }: Step3BenchmarksViewProps) {
 	const compat = compatibilityMap(compatibility);
 	const ready = new Map(suites.map((s) => [s.id, s.admitted_count ?? 0]));
 	const chosen = new Set(selected);
@@ -256,6 +259,7 @@ export function Step3BenchmarksView({ suites, packs, compatibility, selected, pa
 
 	return (
 		<div className="flex flex-col gap-6" data-testid="step3-benchmarks">
+			{ownTasks}
 			<section>
 				<h3 className="mb-2 text-sm font-medium">Start from a pack</h3>
 				{packs.length === 0 ? (
@@ -365,6 +369,7 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({ draft, 
 			onChange={onChange}
 			loading={suites.isLoading || packs.isLoading}
 			checking={checking}
+			ownTasks={<OwnTasksCard onAdd={(id) => onChange({ benchmarks: draft.benchmarks.includes(id) ? draft.benchmarks : [...draft.benchmarks, id], pack: undefined })} />}
 		/>
 	);
 }
