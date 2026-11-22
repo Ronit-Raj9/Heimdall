@@ -1,3 +1,4 @@
+import { FromIssues } from "@/components/issuebench/fromIssues";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { Section } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
@@ -13,7 +14,7 @@ import type { AnswerGrader, AnswerMatch, RowFormat, RowImportResult } from "@/li
 import { SUITE_OPS_KINDS } from "@/lib/types/suiteops";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { FileSpreadsheet, GitCommitHorizontal, Inbox, MessageSquareText } from "lucide-react";
+import { CircleDot, FileSpreadsheet, GitCommitHorizontal, Inbox, MessageSquareText } from "lucide-react";
 import { useCallback, useMemo, useState, type ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { FromCommitSection } from "./opsTab";
@@ -183,13 +184,13 @@ export function GraderSection({ suite, writable, t }: { suite: SuiteSummary; wri
 
 // Add tasks
 
-type Source = "rows" | "tickets" | "commit" | "traces";
+type Source = "rows" | "tickets" | "commit" | "issues" | "traces";
 
-const SOURCE_ICONS = { rows: FileSpreadsheet, tickets: MessageSquareText, commit: GitCommitHorizontal, traces: Inbox } as const;
+const SOURCE_ICONS = { rows: FileSpreadsheet, tickets: MessageSquareText, commit: GitCommitHorizontal, issues: CircleDot, traces: Inbox } as const;
 
 export function sourcesFor(suite: Pick<SuiteSummary, "output">): Source[] {
 	if (isAnswerSuite(suite)) return ["rows", "tickets", "traces"];
-	if (!suite.output || suite.output === "diff") return ["commit", "traces"];
+	if (!suite.output || suite.output === "diff") return ["commit", "issues", "traces"];
 	return ["traces"];
 }
 
@@ -227,6 +228,7 @@ function AddTasksSection({ suite, writable, hosted, t }: { suite: SuiteSummary; 
 				{source === "rows" && <RowsImport suite={suite} writable={writable} format="rows" t={t} />}
 				{source === "tickets" && <RowsImport suite={suite} writable={writable} format="tickets" t={t} />}
 				{source === "commit" && (writable ? <FromCommitSection suite={suite} hosted={hosted} t={tops} /> : <p className="text-muted-foreground text-sm">{t("viewerNote")}</p>)}
+				{source === "issues" && (hosted ? <FromIssues writable={writable} /> : <p className="text-muted-foreground text-sm">{t("add.issuesHosted")}</p>)}
 				{source === "traces" && (
 					<div className="flex flex-col items-start gap-2 text-sm" data-testid="suite-build-traces">
 						<p className="text-muted-foreground max-w-2xl">{t("add.traces")}</p>
