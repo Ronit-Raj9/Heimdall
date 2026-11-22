@@ -1,3 +1,4 @@
+import { PlatformFields, suggestedPlatformSecrets } from "@/components/connect/platformFields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +43,12 @@ export function importRequest(
 }
 
 /** What is still missing before the platform can be read. */
-export function missingImportFields(p: AgentPlatform, agentId: string, inputs: Record<string, string>, secrets: Record<string, string>): string[] {
+export function missingImportFields(
+	p: AgentPlatform,
+	agentId: string,
+	inputs: Record<string, string>,
+	secrets: Record<string, string>,
+): string[] {
 	const out: string[] = [];
 	if (!agentId.trim()) out.push(p.id_label);
 	for (const i of p.inputs ?? []) if (i.required && !inputs[i.name]?.trim()) out.push(i.label);
@@ -77,7 +83,7 @@ export function PlatformImportCard({ returnTo }: { returnTo?: string | null }) {
 	useEffect(() => {
 		if (!p) return;
 		setInputs({});
-		setSecrets(Object.fromEntries(p.secrets.filter((s) => s.required).map((s) => [s.role, s.suggested])));
+		setSecrets(suggestedPlatformSecrets(p));
 		setFound(null);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [p?.id]);
@@ -115,7 +121,14 @@ export function PlatformImportCard({ returnTo }: { returnTo?: string | null }) {
 					<h3 className="text-sm font-semibold">{t("title")}</h3>
 					<p className="text-muted-foreground text-xs">{t("subtitle")}</p>
 				</div>
-				<Button type="button" variant="outline" size="sm" onClick={() => setOpen(!open)} aria-expanded={open} data-testid="platform-import-toggle">
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					onClick={() => setOpen(!open)}
+					aria-expanded={open}
+					data-testid="platform-import-toggle"
+				>
 					{open ? t("close") : t("open")}
 				</Button>
 			</div>
@@ -152,61 +165,25 @@ export function PlatformImportCard({ returnTo }: { returnTo?: string | null }) {
 								void onRead();
 							}}
 						>
-							<div className="text-muted-foreground flex flex-col gap-1 text-xs md:col-span-2">
-								<span className="flex items-center gap-2">
-									<Badge variant="neutral">{t(`kind.${p.kind}`)}</Badge>
-									<span>{p.help}</span>
-								</span>
-								<span>
-									{t("imports", { list: p.imports.join(", ") })}.{" "}
-									<a className="underline" href={p.docs} target="_blank" rel="noreferrer">
-										{t("docs")}
-									</a>
-								</span>
-							</div>
-							<label className="flex flex-col gap-1 text-sm md:col-span-2">
-								<span className="font-medium">{p.id_label}</span>
-								<Input value={agentId} placeholder={p.id_placeholder} onChange={(e) => setAgentId(e.target.value)} data-testid="platform-agent-id" />
-							</label>
-							{(p.inputs ?? []).map((i) => (
-								<label key={i.name} className="flex flex-col gap-1 text-sm">
-									<span className="font-medium">
-										{i.label}
-										{i.required && <span aria-hidden="true"> *</span>}
-									</span>
-									<Input
-										value={inputs[i.name] ?? ""}
-										placeholder={i.placeholder}
-										onChange={(e) => setInputs({ ...inputs, [i.name]: e.target.value })}
-										data-testid={`platform-input-${i.name}`}
-									/>
-									{i.help && <span className="text-muted-foreground text-xs">{i.help}</span>}
-								</label>
-							))}
-							{p.secrets.map((s) => (
-								<label key={s.role} className="flex flex-col gap-1 text-sm">
-									<span className="font-medium">
-										{s.label}
-										{s.required && <span aria-hidden="true"> *</span>}
-									</span>
-									<Input
-										value={secrets[s.role] ?? ""}
-										placeholder={s.suggested}
-										list="platform-import-secrets"
-										onChange={(e) => setSecrets({ ...secrets, [s.role]: e.target.value.toUpperCase() })}
-										data-testid={`platform-secret-${s.role}`}
-									/>
-									<span className="text-muted-foreground text-xs">{s.help ?? t("secretHelp")}</span>
-								</label>
-							))}
-							<datalist id="platform-import-secrets">
-								{secretNames.map((n) => (
-									<option key={n} value={n} />
-								))}
-							</datalist>
+							<PlatformFields
+								platform={p}
+								agentId={agentId}
+								onAgentId={setAgentId}
+								inputs={inputs}
+								onInputs={setInputs}
+								secrets={secrets}
+								onSecrets={setSecrets}
+								secretNames={secretNames}
+								listId="platform-import-secrets"
+							/>
 							<label className="flex flex-col gap-1 text-sm md:col-span-2">
 								<span className="font-medium">{t("name")}</span>
-								<Input value={name} placeholder={importedAgentName(p.id, agentId)} onChange={(e) => setName(e.target.value.toLowerCase())} data-testid="platform-agent-name" />
+								<Input
+									value={name}
+									placeholder={importedAgentName(p.id, agentId)}
+									onChange={(e) => setName(e.target.value.toLowerCase())}
+									data-testid="platform-agent-name"
+								/>
 								<span className="text-muted-foreground text-xs">{t("nameHelp")}</span>
 							</label>
 							{error && (
@@ -286,7 +263,10 @@ export function ImportFound({ res, platform }: { res: AgentImportResponse; platf
 						<ChevronRight className="size-3.5" aria-hidden="true" />
 						{t("found.prompt")}
 					</summary>
-					<pre className="bg-muted mt-2 max-h-48 overflow-auto rounded-md p-3 text-xs whitespace-pre-wrap" data-testid="platform-import-prompt">
+					<pre
+						className="bg-muted mt-2 max-h-48 overflow-auto rounded-md p-3 text-xs whitespace-pre-wrap"
+						data-testid="platform-import-prompt"
+					>
 						{d.prompt}
 					</pre>
 				</details>

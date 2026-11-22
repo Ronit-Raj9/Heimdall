@@ -1,3 +1,4 @@
+import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { EmptyNote, Section } from "@/components/runs/screenStates";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,6 +18,12 @@ import {
 	sparkPoints,
 } from "./live.utils";
 import type { LiveComparison, LiveSessionRecord, LiveSignalDef, LiveStatus, LiveVersionView } from "./livescore.types";
+import "./fw15I18n";
+
+/** The job kind that compares two live versions; with simulate it runs on made-up sessions. */
+export const LIVE_COMPARE_KIND = "livescore.compare";
+/** Made-up streams the simulated try compares (the job accepts 1 to 2000). */
+export const LIVE_SIMULATE_STREAMS = 200;
 
 /** Colors of the versions' lines, in order; tokens of the shared chart palette. */
 const LINE_CLASSES = ["stroke-chart-cat-1", "stroke-chart-cat-2", "stroke-chart-cat-3", "stroke-chart-cat-4", "stroke-chart-cat-5"];
@@ -46,9 +53,12 @@ export function LiveBody({ status, actions }: LiveBodyProps) {
 	const { t } = useTranslation("bench");
 	if (!status.configured || status.problem) {
 		return (
-			<EmptyNote testId="live-unconfigured">
-				{status.problem ? t("live.problem", { problem: status.problem }) : t("live.unconfigured")}
-			</EmptyNote>
+			<div className="flex min-w-0 flex-col gap-4">
+				<EmptyNote testId="live-unconfigured">
+					{status.problem ? t("live.problem", { problem: status.problem }) : t("live.unconfigured")}
+				</EmptyNote>
+				<SimulatedTry />
+			</div>
 		);
 	}
 	return (
@@ -67,6 +77,25 @@ export function LiveBody({ status, actions }: LiveBodyProps) {
 			)}
 			<SeriesSection versions={status.versions} signals={status.signals} />
 			<WorstSection worst={status.worst} />
+		</div>
+	);
+}
+
+/**
+ * J15.setup: before real keys exist, the comparison can still be tried on made-up sessions (the
+ * livescore.compare job with simulate). Nothing reaches the agents or the gateway.
+ */
+export function SimulatedTry() {
+	const { t } = useTranslation("fw15");
+	return (
+		<div className="flex min-w-0 flex-col gap-2 rounded-xl border p-4" data-testid="live-simulate">
+			<p className="text-muted-foreground text-xs">{t("liveSimulate.note")}</p>
+			<JobRunButton
+				kind={LIVE_COMPARE_KIND}
+				params={{ simulate: LIVE_SIMULATE_STREAMS }}
+				label={t("liveSimulate.action")}
+				variant="outline"
+			/>
 		</div>
 	);
 }

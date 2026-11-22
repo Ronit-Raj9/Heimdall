@@ -1,9 +1,18 @@
 import "@/lib/i18n";
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { LIVE_STATUS_FIXTURE } from "./live.fixtures";
 import { CompareSection, LiveBody, WorstSection } from "./livePanel";
+
+// The job button needs the store; its props are what this file checks.
+vi.mock("@/components/jobs/jobRunButton", () => ({
+	JobRunButton: ({ kind, params, label }: { kind: string; params?: object; label: string }) => (
+		<button type="button" data-testid={`job-run-${kind}`} data-params={JSON.stringify(params ?? {})}>
+			{label}
+		</button>
+	),
+}));
 
 const signalRows = (html: string) => [...html.matchAll(/data-testid="live-signal-([^"]+)"/g)].map((m) => m[1]);
 
@@ -70,5 +79,18 @@ describe("LiveBody", () => {
 			/>,
 		);
 		expect(broken).toContain("Live quality scoring is off: parse livescore/config.yaml: unknown key");
+	});
+
+	it("offers a simulated try of live scoring before it is set up (J15.setup)", () => {
+		const html = renderToStaticMarkup(
+			<LiveBody status={{ ...LIVE_STATUS_FIXTURE, configured: false, problem: undefined, compare: undefined }} />,
+		);
+		expect(html).toContain('data-testid="live-simulate"');
+		expect(html).toContain('data-testid="job-run-livescore.compare"');
+		expect(html).toContain(`data-params="${JSON.stringify({ simulate: 200 }).replace(/"/g, "&quot;")}"`);
+		expect(html).toContain("Try with simulated traffic");
+		expect(html).toContain("Nothing is sent to your agents.");
+		const configured = renderToStaticMarkup(<LiveBody status={LIVE_STATUS_FIXTURE} />);
+		expect(configured).not.toContain('data-testid="live-simulate"');
 	});
 });

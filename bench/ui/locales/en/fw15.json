@@ -1,0 +1,6 @@
+{
+	"liveSimulate": {
+		"action": "Try with simulated traffic",
+		"note": "Shows how live scoring reads results, on made-up sessions. Nothing is sent to your agents."
+	}
+}

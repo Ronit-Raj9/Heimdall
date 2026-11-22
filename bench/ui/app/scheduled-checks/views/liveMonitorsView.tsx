@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import {
 	useCreateLiveMonitorMutation,
 	useGetLiveMonitorQuery,
@@ -13,6 +14,7 @@ import {
 	type MonitorIncident,
 	type MonitorRow,
 } from "@/lib/store/apis/liveMonitorsApi";
+import type { AgentSummary } from "@/lib/types/bench";
 import "@/lib/types/liveMonitorsI18n";
 import { Link } from "@tanstack/react-router";
 import { parseAsString, useQueryState } from "nuqs";
@@ -68,11 +70,7 @@ export default function LiveMonitorsView() {
 			) : list.error || !data ? (
 				<LoadError title={t("loadError")} error={list.error} onRetry={() => void list.refetch()} testId="live-monitors-error" />
 			) : data.monitors.length === 0 ? (
-				!showForm && (
-					<EmptyNote testId="live-monitors-empty">
-						<strong>{t("emptyTitle")}</strong> {t("emptyMessage")}
-					</EmptyNote>
-				)
+				!showForm && <LiveMonitorsEmpty />
 			) : (
 				<>
 					<MonitorTable rows={data.monitors} selected={open} onSelect={(id) => void setMonitor(id)} />
@@ -83,7 +81,15 @@ export default function LiveMonitorsView() {
 	);
 }
 
-export function MonitorTable({ rows, selected, onSelect }: { rows: MonitorRow[]; selected: string | null; onSelect: (id: string) => void }) {
+export function MonitorTable({
+	rows,
+	selected,
+	onSelect,
+}: {
+	rows: MonitorRow[];
+	selected: string | null;
+	onSelect: (id: string) => void;
+}) {
 	const { t } = useTranslation("liveMonitors");
 	return (
 		<Section title={t("list.title")} testId="live-monitors-list">
@@ -130,9 +136,74 @@ export function MonitorTable({ rows, selected, onSelect }: { rows: MonitorRow[];
 	);
 }
 
+/** The empty list: what a monitor does, and where an endpoint agent comes from. */
+export function LiveMonitorsEmpty() {
+	const { t } = useTranslation("liveMonitors");
+	return (
+		<EmptyNote testId="live-monitors-empty">
+			<strong>{t("emptyTitle")}</strong> {t("emptyMessage")}{" "}
+			<Link to="/connect" className="text-primary font-medium underline-offset-4 hover:underline" data-testid="live-monitors-connect">
+				{t("connectAgent")}
+			</Link>
+		</EmptyNote>
+	);
+}
+
+/** Agents a monitor can watch: those with a remote endpoint (owns_model), by id. */
+export function endpointAgents(agents: Pick<AgentSummary, "id" | "owns_model">[]): string[] {
+	return agents
+		.filter((a) => a.owns_model === true)
+		.map((a) => a.id)
+		.sort();
+}
+
+/** The agent field: a list of endpoint agents, or a link to Connect when there is none. */
+export function MonitorAgentPicker({ value, agents, onChange }: { value: string; agents: string[]; onChange: (id: string) => void }) {
+	const { t } = useTranslation("liveMonitors");
+	if (agents.length === 0) {
+		return (
+			<div className="flex flex-col gap-1 text-xs">
+				{t("form.agent")}
+				<span className="text-muted-foreground">
+					{t("form.noEndpointAgents")}{" "}
+					<Link
+						to="/connect"
+						className="text-primary font-medium underline-offset-4 hover:underline"
+						data-testid="live-monitor-form-connect"
+					>
+						{t("connectAgent")}
+					</Link>
+				</span>
+			</div>
+		);
+	}
+	return (
+		<label className="flex flex-col gap-1 text-xs">
+			{t("form.agent")}
+			<select
+				className="border-input bg-card h-9 rounded-md border px-2 text-sm"
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				data-testid="live-monitor-form-agent"
+			>
+				<option value="" disabled>
+					{t("form.pickAgent")}
+				</option>
+				{agents.map((id) => (
+					<option key={id} value={id}>
+						{id}
+					</option>
+				))}
+			</select>
+		</label>
+	);
+}
+
 function NewMonitorForm({ agent, onClose, onCreated }: { agent: string; onClose: () => void; onCreated: (id: string) => void }) {
 	const { t } = useTranslation("liveMonitors");
 	const [create, state] = useCreateLiveMonitorMutation();
+	const agentList = useGetAgentsQuery();
+	const agents = endpointAgents(agentList.data?.agents ?? []);
 	const [f, setF] = useState({ name: "", agent, benchmark: "", tasks: "3", interval: "60", budget: "" });
 	const [err, setErr] = useState("");
 	const field = (k: keyof typeof f, label: string, type = "text") => (
@@ -162,7 +233,7 @@ function NewMonitorForm({ agent, onClose, onCreated }: { agent: string; onClose:
 		<Section title={t("new")} testId="live-monitor-form">
 			<div className="grid gap-3 sm:grid-cols-3">
 				{field("name", t("form.name"))}
-				{field("agent", t("form.agent"))}
+				<MonitorAgentPicker value={f.agent} agents={agents} onChange={(id) => setF({ ...f, agent: id })} />
 				{field("benchmark", t("form.benchmark"))}
 				{field("tasks", t("form.tasks"), "number")}
 				{field("interval", t("form.interval"), "number")}
@@ -174,7 +245,12 @@ function NewMonitorForm({ agent, onClose, onCreated }: { agent: string; onClose:
 				</p>
 			)}
 			<div className="flex gap-2">
-				<Button size="sm" disabled={!f.agent || state.isLoading} onClick={() => void submit()} data-testid="live-monitor-form-create">
+				<Button
+					size="sm"
+					disabled={!f.agent || !agents.includes(f.agent) || state.isLoading}
+					onClick={() => void submit()}
+					data-testid="live-monitor-form-create"
+				>
 					{t("form.create")}
 				</Button>
 				<Button size="sm" variant="ghost" onClick={onClose}>
@@ -200,7 +276,12 @@ export function MonitorDetailBody({ d }: { d: MonitorDetailResponse }) {
 	const s = d.samples;
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="live-monitor-detail">
-			<Section title={d.name} description={d.problem || `${d.agent} · ${d.benchmark} · ${d.schedule}`} actions={<MonitorActions d={d} />} testId="live-monitor-summary">
+			<Section
+				title={d.name}
+				description={d.problem || `${d.agent} · ${d.benchmark} · ${d.schedule}`}
+				actions={<MonitorActions d={d} />}
+				testId="live-monitor-summary"
+			>
 				<p className="text-muted-foreground text-xs">
 					{t("detail.tasks")}: {d.tasks.join(", ") || "-"}
 					{d.tasks_note ? ` (${d.tasks_note})` : ""}
@@ -216,7 +297,13 @@ export function MonitorDetailBody({ d }: { d: MonitorDetailResponse }) {
 					<EmptyNote testId="live-monitor-no-samples">{t("detail.noSamples")}</EmptyNote>
 				) : (
 					<div className="grid gap-3 md:grid-cols-2">
-						<LineChart title={t("detail.passRate")} series={[{ label: "", values: s.map(samplePassRate) }]} max={1} format={pct} testId="live-monitor-chart-pass" />
+						<LineChart
+							title={t("detail.passRate")}
+							series={[{ label: "", values: s.map(samplePassRate) }]}
+							max={1}
+							format={pct}
+							testId="live-monitor-chart-pass"
+						/>
 						<LineChart
 							title={t("detail.latency")}
 							series={[
@@ -226,13 +313,27 @@ export function MonitorDetailBody({ d }: { d: MonitorDetailResponse }) {
 							format={ms}
 							testId="live-monitor-chart-latency"
 						/>
-						<LineChart title={t("detail.cost")} series={[{ label: "", values: s.map((x) => x.cost_usd) }]} format={usd} testId="live-monitor-chart-cost" />
-						<LineChart title={t("detail.errors")} series={[{ label: "", values: s.map((x) => x.errors) }]} format={(v) => String(v)} testId="live-monitor-chart-errors" />
+						<LineChart
+							title={t("detail.cost")}
+							series={[{ label: "", values: s.map((x) => x.cost_usd) }]}
+							format={usd}
+							testId="live-monitor-chart-cost"
+						/>
+						<LineChart
+							title={t("detail.errors")}
+							series={[{ label: "", values: s.map((x) => x.errors) }]}
+							format={(v) => String(v)}
+							testId="live-monitor-chart-errors"
+						/>
 					</div>
 				)}
 			</Section>
 			<Section title={t("detail.incidents")} testId="live-monitor-incidents">
-				{d.incidents.length === 0 ? <EmptyNote testId="live-monitor-no-incidents">{t("detail.noIncidents")}</EmptyNote> : d.incidents.map((i) => <IncidentCard key={i.id} i={i} />)}
+				{d.incidents.length === 0 ? (
+					<EmptyNote testId="live-monitor-no-incidents">{t("detail.noIncidents")}</EmptyNote>
+				) : (
+					d.incidents.map((i) => <IncidentCard key={i.id} i={i} />)
+				)}
 			</Section>
 		</div>
 	);
@@ -271,10 +372,22 @@ function MonitorActions({ d }: { d: MonitorDetailResponse }) {
 	const [badge] = useSetMonitorBadgeMutation();
 	return (
 		<span className="flex flex-wrap items-center gap-2" data-testid="live-monitor-actions">
-			<Button size="sm" variant="outline" disabled={state.isLoading} onClick={() => void act({ id: d.id, action: "run" })} data-testid="live-monitor-run">
+			<Button
+				size="sm"
+				variant="outline"
+				disabled={state.isLoading}
+				onClick={() => void act({ id: d.id, action: "run" })}
+				data-testid="live-monitor-run"
+			>
 				{t("actions.run")}
 			</Button>
-			<Button size="sm" variant="outline" disabled={state.isLoading} onClick={() => void act({ id: d.id, action: d.paused ? "resume" : "pause" })} data-testid="live-monitor-pause">
+			<Button
+				size="sm"
+				variant="outline"
+				disabled={state.isLoading}
+				onClick={() => void act({ id: d.id, action: d.paused ? "resume" : "pause" })}
+				data-testid="live-monitor-pause"
+			>
 				{d.paused ? t("actions.resume") : t("actions.pause")}
 			</Button>
 			<Button size="sm" variant="ghost" onClick={() => void badge({ id: d.id, enabled: !d.badge })} data-testid="live-monitor-badge">
