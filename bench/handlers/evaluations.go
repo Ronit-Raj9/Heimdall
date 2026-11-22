@@ -467,8 +467,12 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 		if len(spec.Arms) != 2 {
 			return badf("mode %s takes 2 arms, got %d", spec.Mode, len(spec.Arms))
 		}
+	case schemas.EvaluationModeModelSwitch: // Z21: one agent on several models (modelswitch.go)
+		if err := checkModelSwitchArms(spec.Arms); err != nil {
+			return err
+		}
 	default:
-		return badf("mode %q is not one of score, versions, models, opponent", spec.Mode)
+		return badf("mode %q is not one of score, versions, models, opponent, model_switch", spec.Mode)
 	}
 	for i := range spec.Arms {
 		a := &spec.Arms[i]
@@ -480,6 +484,11 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 		}
 		if i == 1 && a.Label == spec.Arms[0].Label {
 			return badf("the two arms have the same label %q", a.Label)
+		}
+		for j := 1; j < i; j++ {
+			if spec.Arms[j].Label == a.Label {
+				return badf("arms %d and %d have the same label %q", j+1, i+1, a.Label)
+			}
 		}
 		a.Model, a.Provider = strings.TrimSpace(a.Model), strings.TrimSpace(a.Provider)
 		if a.Model != "" && !quickModelRe.MatchString(a.Model) {

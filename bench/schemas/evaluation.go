@@ -12,7 +12,15 @@ const (
 	EvaluationModeVersions = "versions" // two versions of one agent
 	EvaluationModeModels   = "models"   // one agent on two models
 	EvaluationModeOpponent = "opponent" // the agent against another agent
+	// EvaluationModeModelSwitch is one agent on two to
+	// EvaluationModelSwitchMaxArms models, for the model switch report and
+	// its Bifrost routing config (bench/modelswitch).
+	EvaluationModeModelSwitch = "model_switch"
 )
+
+// EvaluationModelSwitchMaxArms is the most models a model_switch
+// evaluation compares.
+const EvaluationModelSwitchMaxArms = 6
 
 // Evaluation states.
 const (
