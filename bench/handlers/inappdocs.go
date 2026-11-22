@@ -18,6 +18,9 @@ import (
 type DocSummary struct {
 	Name  string `json:"name"`
 	Title string `json:"title"`
+	// Snippet is, for a search (q), the first line of the guide that
+	// contains q, without markdown marks, cut to about 160 characters.
+	Snippet string `json:"snippet,omitempty"`
 }
 
 // DocList is GET /docs: every guide embedded in the server binary.
@@ -41,16 +44,12 @@ func init() {
 }
 
 func listDocs(ctx *fasthttp.RequestCtx, mode schemas.Mode) {
-	names := benchdocs.Names()
-	out := DocList{Docs: make([]DocSummary, 0, len(names))}
-	for _, n := range names {
-		data, ok := benchdocs.Read(n)
-		if !ok {
-			continue
-		}
-		out.Docs = append(out.Docs, DocSummary{Name: n, Title: docTitle(n, data)})
+	q, ok, msg := docSearchQuery(string(ctx.QueryArgs().Peek("q")))
+	if !ok {
+		lib.SendError(ctx, mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, msg)
+		return
 	}
-	lib.SendJSON(ctx, mode, fasthttp.StatusOK, out)
+	lib.SendJSON(ctx, mode, fasthttp.StatusOK, DocList{Docs: searchDocs(benchdocs.Names(), benchdocs.Read, q)})
 }
 
 func getDoc(ctx *fasthttp.RequestCtx, mode schemas.Mode) {
