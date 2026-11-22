@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import "@/lib/types/agentFirstI18n";
 import { Link, useParams } from "@tanstack/react-router";
 import { useGetAgentCompatibilityQuery, useGetAgentVersionsQuery } from "@/lib/store/apis/evaluationsApi";
-import { Bug, Cpu, FlaskConical, Gauge, GitCompare, ListChecks, ShieldAlert } from "lucide-react";
+import { Activity, Bug, Cpu, FlaskConical, Gauge, GitCompare, ListChecks, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, CheckPill, adapterIcon, jobState, lastJobFor, useAdapterLabel } from "../../../agents/views/agentDisplay";
 import { useAgentJobs } from "../../../agents/views/agentJobs";
@@ -113,6 +113,7 @@ export default function AgentDetailView() {
 								{ label: t("detail.menu.compareVersions"), to: "/evaluate", search: { agent: agentId, mode: "versions" }, icon: GitCompare, testId: "agent-detail-compare-versions" },
 								{ label: t("detail.menu.failureTest"), to: "/failure-tests", search: { agent: agentId }, icon: ShieldAlert, testId: "agent-detail-failure-test" },
 								{ label: t("detail.menu.whyFail"), to: "/why-agents-fail", search: { agent: agentId }, icon: Bug, testId: "agent-detail-why-fail" },
+								{ label: t("detail.menu.monitor"), to: "/scheduled-checks", search: { tab: "live", agent: agentId }, icon: Activity, testId: "agent-detail-monitor" },
 								{ label: t("detail.menu.check"), to: "/agents/$agentId", params: { agentId }, search: { tab: "checks" }, icon: ListChecks, testId: "agent-detail-check" },
 								{ label: t("detail.menu.custom"), to: "/experiments/new", search: { agent: agentId }, icon: FlaskConical, testId: "agent-detail-run" },
 							]}

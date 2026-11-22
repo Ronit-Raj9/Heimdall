@@ -1,0 +1,63 @@
+{
+	"title": "Live monitors",
+	"subtitle": "A few ready tasks run against your deployed agent on a schedule. A drop in pass rate over a rolling window, or the agent going down, opens one incident and alerts your channels.",
+	"new": "New monitor",
+	"loadError": "Could not load live monitors",
+	"detailError": "Could not load this monitor",
+	"noTicker": "Scheduled checks do not fire on this server, so monitors only run when you press Run now.",
+	"emptyTitle": "Watch a deployed agent",
+	"emptyMessage": "Pick an agent with a remote endpoint. Heimdall runs a few of its ready benchmark tasks every hour and tells you when quality drops or the endpoint goes down.",
+	"list": {
+		"title": "Monitors",
+		"agent": "Agent",
+		"status": "Status",
+		"pass": "Pass rate (24 h)",
+		"latency": "p50 / p95",
+		"spent": "Spent today",
+		"next": "Next check"
+	},
+	"status": {
+		"paused": "Paused",
+		"down": "Down",
+		"degraded": "Degraded",
+		"learning": "Learning",
+		"healthy": "Healthy",
+		"no_data": "No data yet"
+	},
+	"form": {
+		"name": "Name",
+		"agent": "Agent id",
+		"benchmark": "Benchmark (empty picks the agent's latest evaluated benchmark)",
+		"tasks": "Tasks per check",
+		"interval": "Every (minutes)",
+		"budget": "Budget per day (USD)",
+		"create": "Create monitor",
+		"cancel": "Cancel",
+		"error": "Could not create the monitor"
+	},
+	"detail": {
+		"tasks": "Tasks each check runs",
+		"charts": "Over time",
+		"passRate": "Pass rate",
+		"latency": "Latency p50 / p95 (ms)",
+		"cost": "Cost per check (USD)",
+		"errors": "Errors per check",
+		"incidents": "Incidents",
+		"noIncidents": "No incidents.",
+		"failingRuns": "Failing runs",
+		"opened": "Opened {{at}}",
+		"resolved": "Resolved {{at}}",
+		"checks": "Checks",
+		"noSamples": "No checks yet. Press Run now or wait for the next check.",
+		"badge": "Public status badge",
+		"badgeOn": "Turn badge on",
+		"badgeOff": "Turn badge off"
+	},
+	"actions": {
+		"pause": "Pause",
+		"resume": "Resume",
+		"run": "Run now",
+		"delete": "Delete",
+		"deleteConfirm": "Delete monitor {{name}}? Its history is removed."
+	}
+}

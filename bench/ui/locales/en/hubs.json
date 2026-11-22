@@ -8,7 +8,8 @@
 	"scheduled": {
 		"label": "Scheduled check views",
 		"drift": "Drift checks",
-		"schedules": "Schedules"
+		"schedules": "Schedules",
+		"live": "Live monitors"
 	},
 	"releases": {
 		"label": "Release views",

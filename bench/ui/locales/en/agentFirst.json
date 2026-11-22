@@ -17,7 +17,8 @@
 			"failureTest": "Run a failure test",
 			"whyFail": "See why it fails",
 			"check": "Readiness check",
-			"custom": "Custom comparison"
+			"custom": "Custom comparison",
+			"monitor": "Monitor this agent"
 		}
 	},
 	"runs": {
