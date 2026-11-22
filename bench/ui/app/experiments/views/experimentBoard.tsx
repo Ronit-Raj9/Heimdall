@@ -1,7 +1,14 @@
 import "./experimentsI18n";
 
 import { filterExperiments } from "@/components/experiments/experimentList";
-import { humanExperimentName, isHiddenByDefault, suiteName, systemExperiment } from "@/components/experiments/experiments.utils";
+import {
+	humanExperimentName,
+	isDebugExperiment,
+	isHiddenByDefault,
+	suiteName,
+	systemExperiment,
+} from "@/components/experiments/experiments.utils";
+import { useEvaluationNames } from "@/components/experiments/useEvaluationNames";
 import { formatRelative, formatWhen } from "@/components/platform/platform.utils";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
@@ -95,16 +102,27 @@ const STATE_TONE: Record<ExperimentState, Tone> = {
 	cancelled: "grey",
 };
 
-/** Status choices: each maps to one state filter in the URL. */
+/**
+ * Status choices. Each covers one or more experiment states; the URL keeps the first one as
+ * ?state= (running for Running), so older links keep working.
+ */
 const STATUSES: readonly {
-	key: "active" | "done" | "failed" | "created";
-	state: string;
+	key: "active" | "done" | "failed" | "cancelled" | "created";
+	states: readonly ExperimentState[];
 }[] = [
-	{ key: "active", state: "running" },
-	{ key: "done", state: "done" },
-	{ key: "failed", state: "failed" },
-	{ key: "created", state: "created" },
+	{ key: "active", states: ["running", "analyzing"] },
+	{ key: "done", states: ["done"] },
+	{ key: "failed", states: ["failed"] },
+	{ key: "cancelled", states: ["cancelled"] },
+	{ key: "created", states: ["created"] },
 ];
+
+/** True when an experiment state matches a ?state= value: a status choice's states, else that exact state. Pure. */
+export function stateMatches(state: string, filter: string | null | undefined): boolean {
+	if (!filter) return true;
+	const choice = STATUSES.find((c) => c.states[0] === filter);
+	return choice ? choice.states.includes(state as ExperimentState) : state === filter;
+}
 
 function Pill({ tone, children, testId }: { tone: Tone; children: React.ReactNode; testId?: string }) {
 	return (
@@ -184,17 +202,22 @@ export function ExperimentBoard() {
 	const showSystem = filters.all === "1";
 	const systemCount = useMemo(() => everything.filter(isHiddenByDefault).length, [everything]);
 	const all = useMemo(() => (showSystem ? everything : everything.filter((e) => !isHiddenByDefault(e))), [everything, showSystem]);
+	const evalNames = useEvaluationNames();
 	const named = useMemo(
-		() => new Map(all.map((e) => [e.exp_id, humanExperimentName(e, (k, o) => String(t(k as never, (o ?? {}) as never)))] as const)),
-		[all, t],
+		() =>
+			new Map(all.map((e) => [e.exp_id, humanExperimentName(e, (k, o) => String(t(k as never, (o ?? {}) as never)), evalNames)] as const)),
+		[all, t, evalNames],
+	);
+	// The suite filter applies first, so each status choice can say how many it would show.
+	const inSuite = useMemo(() => filterExperiments(all, { suite: filters.suite }), [all, filters.suite]);
+	const statusCounts = useMemo(
+		() => new Map(STATUSES.map((c) => [c.key, inSuite.filter((e) => c.states.includes(e.state)).length] as const)),
+		[inSuite],
 	);
 	const shown = useMemo(() => {
 		const q = filters.q?.trim().toLowerCase() ?? "";
 		// The id and typed name match in filterExperiments; the readable name and the suite match here.
-		const base = filterExperiments(all, {
-			state: filters.state,
-			suite: filters.suite,
-		});
+		const base = inSuite.filter((e) => stateMatches(e.state, filters.state));
 		return q
 			? base.filter(
 					(e) =>
@@ -204,10 +227,10 @@ export function ExperimentBoard() {
 						(e.suite ?? "").toLowerCase().includes(q),
 				)
 			: base;
-	}, [all, filters, named]);
+	}, [inSuite, filters.q, filters.state, named]);
 	const suites = useMemo(() => [...new Set(all.map((e) => e.suite).filter((s): s is string => Boolean(s)))].sort(), [all]);
 	const clear = () => void setFilters({ q: null, state: null, suite: null });
-	const statusKey = STATUSES.find((c) => c.state === filters.state)?.key;
+	const statusKey = STATUSES.find((c) => c.states[0] === filters.state)?.key;
 	const tokens = (
 		[
 			filters.state && {
@@ -259,7 +282,7 @@ export function ExperimentBoard() {
 					<FilterSelect
 						label={t("col.status")}
 						allLabel={t("chips.all")}
-						options={STATUSES.map((c) => ({ value: c.state, label: t(`chips.${c.key}`) }))}
+						options={STATUSES.map((c) => ({ value: c.states[0], label: `${t(`chips.${c.key}`)} (${statusCounts.get(c.key) ?? 0})` }))}
 						value={filters.state}
 						onChange={(v) => void setFilters({ state: v })}
 						testId="experiment-filter-status"
@@ -339,6 +362,8 @@ export function ExperimentBoard() {
 												{suiteName(e.suite)}
 												{systemExperiment(e) ? (
 													<span> · {t("system.tag")}</span>
+												) : isDebugExperiment(e) ? (
+													<span> · {t("debug.tag")}</span>
 												) : (
 													e.arms && e.arms.length > 0 && <span className="font-mono"> · {e.arms.join(" vs ")}</span>
 												)}

@@ -3,7 +3,8 @@ import { ReviewQueueTable } from "@/components/review/reviewQueueTable";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shell";
-import { ExperimentSelect, experimentsNewestFirst } from "@/components/triage/experimentSelect";
+import { ExperimentSelect, defaultPickerExperiment, useExperimentPicker } from "@/components/triage/experimentSelect";
+import { useEvaluationNames } from "@/components/experiments/useEvaluationNames";
 import { useGetReviewQueueQuery, useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import { REVIEW_REASONS, type ReviewQueueResponse } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
@@ -29,21 +30,26 @@ export default function ReviewView() {
 	const [exp, setExp] = useQueryState("exp", parseAsString);
 	const [reason, setReason] = useQueryState("reason", parseAsString);
 	const [runId, setRunId] = useQueryState("run", parseAsString);
+	const [all, setAll] = useQueryState("all", parseAsString);
 	const list = useListExperimentsQuery();
-	const experiments = useMemo(() => experimentsNewestFirst(list.data?.experiments ?? []), [list.data]);
-	const selectedExp = exp ?? experiments[0]?.exp_id;
+	const experiments = useMemo(() => list.data?.experiments ?? [], [list.data]);
+	// Checks, practice runs and debug runs are listed only with all=1, so the page opens on a real comparison.
+	const picker = useExperimentPicker(experiments, all === "1", useEvaluationNames());
+	const selectedExp = defaultPickerExperiment(picker.options, exp);
 
 	return (
 		<section className="mx-auto flex w-full max-w-[1400px] min-w-0 flex-col gap-8" data-testid="review-screen">
 			<PageHeader title={t("review.title")} subtitle={<span data-testid="review-explainer">{tu("review.subtitle")}</span>} />
 			<div className="flex flex-wrap items-end gap-3">
 				<ExperimentSelect
-					experiments={experiments}
+					picker={picker}
 					value={selectedExp}
 					onChange={(id) => {
 						void setExp(id);
 						void setRunId(null);
 					}}
+					showHidden={all === "1"}
+					onShowHidden={(on) => void setAll(on ? "1" : null)}
 					disabled={list.isLoading || experiments.length === 0}
 					testId="review-experiment-picker"
 				/>
