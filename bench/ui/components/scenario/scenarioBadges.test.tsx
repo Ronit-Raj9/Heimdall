@@ -14,7 +14,7 @@ describe("TrackBadge", () => {
 	it("names a known track with what it means", () => {
 		const html = renderToStaticMarkup(<TrackBadge track="tool_use" testId="t" />);
 		expect(html).toContain(">Tool use<");
-		expect(html).toContain('title="Call tools against a service; the final state is checked."');
+		expect(html).toContain('title="Call tools against a service; a script checks the calls or the state they left."');
 	});
 
 	it("shows a track this UI does not know as sent", () => {
