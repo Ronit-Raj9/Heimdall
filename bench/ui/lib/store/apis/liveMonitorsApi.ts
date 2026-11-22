@@ -117,7 +117,8 @@ export interface MonitorListResponse {
 	ticker: boolean;
 }
 
-export interface MonitorDetailResponse extends MonitorRow {
+/** The detail's tasks are the task ids each check runs (they shadow the row's task count). */
+export interface MonitorDetailResponse extends Omit<MonitorRow, "tasks"> {
 	samples: MonitorSample[];
 	incidents: MonitorIncident[];
 	tasks: string[];
