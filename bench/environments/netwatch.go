@@ -128,6 +128,10 @@ func (e *dockerWorkspace) startNetWatch(ctx context.Context, rc *schemas.RunCont
 	hold = append(hold, "--network", network, "--user", "65534:65534", "--cap-drop", "ALL",
 		"--security-opt", "no-new-privileges", "--read-only", "--pids-limit", "16", "--memory", "64m",
 		"--log-driver", "none", "--entrypoint", "sleep", image, "infinity")
+	// gVisor: the agent shares the holder's /etc/hosts (container: network),
+	// so the holder takes the names on all its networks at create time
+	// (gvisorhosts.go).
+	hold = e.sandboxHosts(ctx, hold, network, extra...)
 	if _, err := e.cfg.Docker.MustRun(ctx, hold...); err != nil {
 		w.remove(ctx)
 		return nil, fmt.Errorf("start network holder: %w", err)

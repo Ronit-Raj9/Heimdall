@@ -2,11 +2,14 @@ package environments
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
@@ -64,5 +67,48 @@ exit 0
 	runc := newDockerWorkspace(DockerWorkspaceConfig{Docker: utils.Docker{Binary: bin, Policy: &utils.DockerPolicy{Runtime: "runc"}}})
 	if got := runc.sandboxHosts(ctx, args, "heimdall-evalnet-org_1"); !reflect.DeepEqual(got, args) {
 		t.Fatalf("runc: got %v, want unchanged", got)
+	}
+}
+
+// TestNetWatchHolderTakesHostsUnderGVisor: with the network observer on, the
+// agent runs in the holder's namespace (container: network) and shares its
+// /etc/hosts, so under gVisor the holder's create line carries the names on
+// all its networks; the agent's own create line carries none.
+func TestNetWatchHolderTakesHostsUnderGVisor(t *testing.T) {
+	base, logPath := netWatchDocker(t)
+	dir := t.TempDir()
+	script := fmt.Sprintf(`#!/bin/sh
+case "$*" in
+  "network inspect --format"*) %[1]q "$@" >/dev/null; echo "id1"; exit 0 ;;
+  "inspect --format {{json (index"*) %[1]q "$@" >/dev/null; echo '{"IPAddress":"10.0.0.2","DNSNames":["bifrost"]}'; exit 0 ;;
+  "run --runtime runsc --name bench-r_1-watch"*) %[1]q "$@"; echo '{"t":"ready"}'; sleep 0.3; exit 0 ;;
+esac
+exec %[1]q "$@"
+`, base.Binary)
+	bin := filepath.Join(dir, "docker")
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	docker := utils.Docker{Binary: bin, Policy: &utils.DockerPolicy{Runtime: "runsc"}}
+	e := newDockerWorkspace(DockerWorkspaceConfig{Docker: docker, HelperImage: "helper:1", EvalNetwork: "evalnet", NetWatch: true})
+	rc := &schemas.RunContext{
+		Run:          &schemas.Run{RunID: "r_1"},
+		Suite:        &schemas.Suite{},
+		Task:         &schemas.Task{ID: "t"},
+		Handle:       &schemas.EnvironmentHandle{Volume: "bench-ws-r_1", AuxVolume: "bench-aux-r_1"},
+		Dir:          t.TempDir(),
+		Services:     []schemas.ServiceHandle{{Spec: schemas.ServiceSpec{ID: "kv"}}},
+		FaultRuntime: &schemas.AdapterFaultRuntime{Network: "bench-fnet-r_1"},
+	}
+	if _, err := e.Exec(t.Context(), rc, &schemas.RunPlan{Image: "agent:1", Argv: []string{"run"}, Env: map[string]string{"PATH": "/usr/bin"}}); err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	all := calls(t, logPath)
+	if callWith(all, "create --runtime runsc --add-host bifrost:10.0.0.2 --name bench-r_1-net-", "--network evalnet") == "" {
+		t.Fatalf("holder created without the gVisor hosts:\n%s", strings.Join(all, "\n"))
+	}
+	agent := callWith(all, "create", "--name bench-r_1 ", "--network container:")
+	if agent == "" || strings.Contains(agent, "--add-host") {
+		t.Fatalf("agent create line %q; want the holder's namespace and no hosts of its own", agent)
 	}
 }
