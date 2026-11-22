@@ -45,7 +45,7 @@ Overall: new model better: p 0.031 after Holm across 2, on 10 tasks (7 better, 0
 - retries / fallbacks per run: 0.00 / 0.00 vs 0.00 / 0.00
 - gateway latency per turn: unknown vs unknown
 - gate g1_protected_paths (veto): fired in 0 vs 1 runs, new
-- failure cluster the new model fixed: fail (17 runs, tasks s/t01, s/t02, s/t03, s/t04, s/t05, s/t06, s/t07, s/t08, s/t09, s/t10)
+- failure cluster the new model fixed: Failed with no error recorded on s (17 runs, tasks s/t01, s/t02, s/t03, s/t04, s/t05, s/t06, s/t07, s/t08, s/t09, s/t10)
 
 | condition | runs | success | false completion | retry amplification |
 |---|---|---|---|---|
