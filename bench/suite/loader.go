@@ -74,6 +74,46 @@ func (l *localLoader) Load(ctx context.Context, ref string) (*schemas.Suite, err
 	if fi, err := os.Stat(root); err != nil || !fi.IsDir() {
 		return nil, fmt.Errorf("suite %q: folder %s not found (%s)", ref, root, suitesBeside(filepath.Dir(root)))
 	}
+	// Full loads are cached per folder and stamp (loadcache.go).
+	// The cached load asks for no id or version, so refs that name the same
+	// folder share it; a mismatch or any load error is answered by a load
+	// with the ref's own checks, so the error text is the one it always was.
+	direct := func(ctx context.Context) (*schemas.Suite, error) {
+		return loadPack(ctx, ref, root, wantID, wantVersion)
+	}
+	if !loadCacheOn() {
+		return countedLoad(ctx, direct)
+	}
+	s, err := cachedLoad(ctx, root, !l.inLibrary(root), func(ctx context.Context) (*schemas.Suite, error) {
+		return loadPack(ctx, ref, root, "", "")
+	})
+	if err == nil && (wantID == "" || s.ID == wantID) && (wantVersion == "" || s.Version == wantVersion) {
+		return s, nil
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if err != nil && wantID == "" && wantVersion == "" {
+		return nil, err // the same load: the same error
+	}
+	return countedLoad(ctx, direct)
+}
+
+// inLibrary reports whether root is a pack of the read-only built-in
+// library (stamped without the folder walk, loadcache.go).
+func (l *localLoader) inLibrary(root string) bool {
+	if l.library == "" {
+		return false
+	}
+	lib, err := filepath.Abs(l.library)
+	if err != nil {
+		return false
+	}
+	return filepath.Dir(root) == filepath.Clean(lib)
+}
+
+// loadPack is the full read of the pack in root that Load caches.
+func loadPack(ctx context.Context, ref, root, wantID, wantVersion string) (*schemas.Suite, error) {
 	d := displayer{base: filepath.Dir(root)}
 
 	var s schemas.Suite

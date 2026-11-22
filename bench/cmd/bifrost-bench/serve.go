@@ -353,7 +353,10 @@ func (c *catalogSource) build() *schemas.Catalog {
 	root := a.cfg.Path(a.cfg.BenchmarksRoot)
 	ids, _ := (serveSuites{root: root, library: suite.LibraryBenchmarks(a.library)}).SuiteIDs(context.Background()) // org packs and the built-in library
 	for _, id := range ids {
-		s, err := loadSuite(context.Background(), root, id)
+		// Only suite.yaml, the probes and the lock: a full load of every
+		// library pack took about a minute and held up every page that reads
+		// the catalog (D4.slow).
+		s, err := suite.LoadCatalogHead(root, id)
 		if err != nil {
 			continue
 		}
