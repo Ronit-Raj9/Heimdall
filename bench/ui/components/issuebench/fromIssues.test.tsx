@@ -13,13 +13,19 @@ import {
 	READINESS_POLL_MS,
 	ReadinessBanner,
 	RunView,
+	normalizeRepo,
 	retryBody,
 	startBlocked,
 	startBody,
 	stageWords,
 } from "./fromIssues";
 
-const api = vi.hoisted(() => ({ run: {} as unknown, readiness: {} as unknown, readinessArgs: [] as unknown[] }));
+const api = vi.hoisted(() => ({
+	run: {} as unknown,
+	readiness: {} as unknown,
+	readinessArgs: [] as unknown[],
+	github: { connected: true } as { connected: boolean },
+}));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/issuebenchApi", () => ({
 	useGetIssueReadinessQuery: (...args: unknown[]) => {
@@ -33,8 +39,8 @@ vi.mock("@/lib/store/apis/issuebenchApi", () => ({
 	useRetryIssueMutation: () => mutation(),
 }));
 vi.mock("@/lib/store/apis/githubApi", () => ({
-	useGetGithubStatusQuery: () => okQuery({ connected: true }),
-	useListGithubReposQuery: () => okQuery({ repos: [] }),
+	useGetGithubStatusQuery: () => okQuery(api.github),
+	useListGithubReposQuery: () => okQuery({ repos: [{ full_name: "Ronit-Raj9/Heimdall" }] }),
 }));
 vi.mock("@/components/jobs/jobLogPanel", () => ({
 	JobLogPanel: ({ jobId }: { jobId: string }) => <div data-testid="job-log-panel-mock" data-job={jobId} />,
@@ -80,6 +86,43 @@ const html = (f: (t: T) => React.ReactNode) => render(<WithT>{f}</WithT>, hosted
 beforeEach(() => {
 	api.run = okQuery(run([item()]));
 	api.readiness = okQuery(READY);
+	api.github = { connected: true };
+});
+
+describe("repository field", () => {
+	it("accepts any owner/name, including a GitHub link, and normalizes it", () => {
+		expect(normalizeRepo("marshmallow-code/marshmallow")).toBe("marshmallow-code/marshmallow");
+		expect(normalizeRepo(" https://github.com/marshmallow-code/marshmallow.git/ ")).toBe("marshmallow-code/marshmallow");
+		expect(normalizeRepo("github.com/acme/widgets/")).toBe("acme/widgets");
+		expect(normalizeRepo("http://www.github.com/acme/widgets")).toBe("acme/widgets");
+		expect(normalizeRepo("")).toBe("");
+		expect(normalizeRepo("acme")).toBe("");
+		expect(normalizeRepo("acme/widgets/tree/main")).toBe("");
+		expect(normalizeRepo("../x")).toBe("");
+		expect(normalizeRepo("a b/c")).toBe("");
+	});
+
+	it("is a text input with the connected account's repositories as suggestions", () => {
+		const out = render(<FromIssues writable />, hostedSession("member"));
+		const input = tagOf(out, "ib-repo-input") ?? "";
+		expect(input).toContain("<input");
+		expect(input).toContain('list="');
+		expect(out).toContain("<datalist");
+		expect(out).toContain('value="Ronit-Raj9/Heimdall"');
+		expect(out).toContain('placeholder="owner/repository or a GitHub link"');
+		expect(out).not.toContain("<select");
+		expect(tagOf(out, "issuebench-scan") ?? "").toContain("disabled");
+	});
+
+	it("shows the field when GitHub is not connected and says any account works", () => {
+		api.github = { connected: false };
+		const out = render(<FromIssues writable />, hostedSession("member"));
+		expect(out).toContain('data-testid="ib-repo-input"');
+		expect(out).toContain(
+			"Connect GitHub in Settings &gt; GitHub (any account). GitHub needs a sign-in to list a repository&#x27;s pull requests, public ones included.",
+		);
+		expect(tagOf(out, "issuebench-scan") ?? "").toContain("disabled");
+	});
 });
 
 describe("retryBody", () => {

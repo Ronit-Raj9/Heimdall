@@ -62,6 +62,11 @@ type PolicyDocList struct {
 	// Limited is set for a viewer: each document lists its id, title and
 	// upload time only.
 	Limited bool `json:"limited,omitempty"`
+	// Shape is the support task policy drafts copy; empty when the
+	// benchmark has none, and Next then says why policy tasks cannot be
+	// drafted here.
+	Shape string `json:"shape,omitempty"`
+	Next  string `json:"next,omitempty"`
 }
 
 // PolicyDocView answers GET /suites/{id}/policy-docs/{doc} and the upload.
@@ -215,6 +220,11 @@ func (h *policyDocs) list(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	out := PolicyDocList{Suite: id, Docs: []PolicyDocSummary{}, Limited: limited}
+	if sh, _, err := policybench.SuiteShape(dir, ""); err == nil {
+		out.Shape = sh.From
+	} else if errors.Is(err, policybench.ErrNoShape) {
+		out.Next = err.Error()
+	}
 	for _, d := range docs {
 		if limited {
 			out.Docs = append(out.Docs, PolicyDocSummary{ID: d.ID, Title: d.Title, UploadedAt: d.UploadedAt})

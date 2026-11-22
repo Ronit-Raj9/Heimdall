@@ -1,5 +1,6 @@
-// Build tab source "From issues" (lane G06): pick a connected GitHub repository, scan it
-// for merged pull requests that close an issue, then build, check and review each one.
+// Build tab source "From issues" (lane G06): name any GitHub repository the connected account
+// can read (public ones included), scan it for merged pull requests that close an issue, then
+// build, check and review each one.
 import { JobLogPanel } from "@/components/jobs/jobLogPanel";
 import { Button } from "@/components/ui/button";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
@@ -14,7 +15,7 @@ import {
 } from "@/lib/store/apis/issuebenchApi";
 import type { IssueFix, IssueItem, IssueReadiness, IssueRun, IssueStatus } from "@/lib/types/issuebench";
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 declare module "@/lib/i18n/resources" {
@@ -41,6 +42,24 @@ export function retryBody(fix: IssueFix, answer: string | null) {
 	if (fix === "allow_service") return { fix, allow_services: [v] };
 	const n = Number(v);
 	return Number.isFinite(n) && n > 0 ? { fix, budget_usd: n } : null;
+}
+
+const REPO_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+
+/**
+ * The repository the person typed as owner/name (a GitHub link, a trailing .git or / are
+ * stripped), or "" when it is not one. Same rule as the server (pipeline.ValidRepo).
+ */
+export function normalizeRepo(input: string): string {
+	let v = input
+		.trim()
+		.replace(/^https?:\/\//i, "")
+		.replace(/^(www\.)?github\.com\//i, "");
+	v = v
+		.replace(/\/+$/, "")
+		.replace(/\.git$/i, "")
+		.replace(/\/+$/, "");
+	return REPO_RE.test(v) && !v.includes("..") ? v : "";
 }
 
 /** How often the form refreshes readiness while it is open. */
@@ -89,18 +108,21 @@ export function stageWords(it: Pick<IssueItem, "stage" | "status">, t: T): strin
 
 export function FromIssues({ writable }: { writable: boolean }) {
 	const { t } = useTranslation("issuebench");
+	const listId = useId();
 	const status = useGetGithubStatusQuery();
-	const repos = useListGithubReposQuery(1, { skip: !status.data?.connected });
+	const connected = status.data?.connected === true;
+	const repos = useListGithubReposQuery(1, { skip: !connected });
 	const [repo, setRepo] = useState("");
 	const [runId, setRunId] = useState("");
 	const [scan, scanState] = useScanIssuesMutation();
 	const [error, setError] = useState("");
 	const readiness = useGetIssueReadinessQuery(undefined, { pollingInterval: READINESS_POLL_MS });
+	const name = normalizeRepo(repo);
 
 	const onScan = async () => {
 		setError("");
 		try {
-			const run = await scan({ repo }).unwrap();
+			const run = await scan({ repo: name }).unwrap();
 			setRunId(run.id);
 		} catch (e) {
 			setError(getBenchErrorMessage(e));
@@ -110,32 +132,39 @@ export function FromIssues({ writable }: { writable: boolean }) {
 	return (
 		<div className="flex min-w-0 flex-col gap-4 text-sm" data-testid="issuebench-from-issues">
 			<p className="text-muted-foreground max-w-2xl">{t("intro")}</p>
-			{status.data && !status.data.connected ? (
+			<div className="flex flex-wrap items-end gap-2">
+				<label className="flex flex-col gap-1">
+					<span className="text-xs font-medium">{t("repo")}</span>
+					<input
+						className="border-input bg-background h-9 w-72 rounded-md border px-2"
+						value={repo}
+						list={listId}
+						placeholder={t("repoPlaceholder")}
+						autoComplete="off"
+						spellCheck={false}
+						aria-invalid={repo.trim() !== "" && !name}
+						onChange={(e) => setRepo(e.target.value)}
+						data-testid="ib-repo-input"
+					/>
+					<datalist id={listId}>
+						{(repos.data?.repos ?? []).map((r) => (
+							<option key={r.full_name} value={r.full_name} />
+						))}
+					</datalist>
+				</label>
+				<Button size="sm" disabled={!writable || !connected || !name || scanState.isLoading} onClick={onScan} dataTestId="issuebench-scan">
+					{scanState.isLoading ? t("scanning") : t("scan")}
+				</Button>
+			</div>
+			{repo.trim() !== "" && !name && (
+				<p className="text-muted-foreground text-xs" data-testid="issuebench-repo-invalid">
+					{t("repoInvalid")}
+				</p>
+			)}
+			{status.data && !connected && (
 				<p className="text-muted-foreground" data-testid="issuebench-connect-first">
 					{t("connectFirst")}
 				</p>
-			) : (
-				<div className="flex flex-wrap items-end gap-2">
-					<label className="flex flex-col gap-1">
-						<span className="text-xs font-medium">{t("repo")}</span>
-						<select
-							className="border-input bg-background h-9 rounded-md border px-2"
-							value={repo}
-							onChange={(e) => setRepo(e.target.value)}
-							data-testid="issuebench-repo"
-						>
-							<option value="">{t("pickRepo")}</option>
-							{(repos.data?.repos ?? []).map((r) => (
-								<option key={r.full_name} value={r.full_name}>
-									{r.full_name}
-								</option>
-							))}
-						</select>
-					</label>
-					<Button size="sm" disabled={!writable || !repo || scanState.isLoading} onClick={onScan} dataTestId="issuebench-scan">
-						{scanState.isLoading ? t("scanning") : t("scan")}
-					</Button>
-				</div>
 			)}
 			{error && (
 				<p className="text-destructive" role="alert">
