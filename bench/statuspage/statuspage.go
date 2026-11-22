@@ -102,7 +102,10 @@ func (s *Service) WithAutoIncidents() *Service {
 }
 
 // Watch runs the checks every interval until ctx ends, so automatic
-// incidents open and resolve while nobody reads the page.
+// incidents open and resolve while nobody reads the page. The first run is
+// one interval after the start: a server that just started has nothing to
+// report yet, and a short-lived server (a test) never runs the checks in
+// the background.
 func (s *Service) Watch(ctx context.Context, every time.Duration) {
 	if every < CacheFor {
 		every = CacheFor
@@ -110,12 +113,12 @@ func (s *Service) Watch(ctx context.Context, every time.Duration) {
 	t := time.NewTicker(every)
 	defer t.Stop()
 	for {
-		s.components(ctx)
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
 		}
+		s.components(ctx)
 	}
 }
 
