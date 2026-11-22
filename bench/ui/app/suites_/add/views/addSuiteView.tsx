@@ -4,7 +4,8 @@ import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenState
 import { PageHeader } from "@/components/shell";
 import { AddYourOwnPanel } from "@/components/suites/addYourOwnPanel";
 import { useGetImportsQuery } from "@/lib/store";
-import { AlertTriangle, ShieldAlert } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { AlertTriangle, FileCode2, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -13,6 +14,7 @@ import { useTranslation } from "react-i18next";
  */
 export default function AddSuiteView() {
 	const { t } = useTranslation("bench");
+	const { t: ta } = useTranslation("appTasks");
 	const query = useGetImportsQuery();
 	const data = query.data;
 	return (
@@ -49,6 +51,14 @@ export default function AddSuiteView() {
 					<ImporterList importers={data.importers} fetching={query.isFetching} />
 				)}
 			</Section>
+			<Link
+				to="/suites/from-api"
+				className="hover:bg-muted flex w-fit items-center gap-2 rounded-md border px-3 py-2 text-sm"
+				data-testid="imports-from-api"
+			>
+				<FileCode2 className="size-4" aria-hidden="true" />
+				{ta("entry")}
+			</Link>
 			<AddYourOwnPanel />
 		</section>
 	);

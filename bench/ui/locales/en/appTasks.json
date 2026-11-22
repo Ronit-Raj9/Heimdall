@@ -1,0 +1,108 @@
+{
+	"title": "Tasks from your API",
+	"subtitle": "Upload your OpenAPI file and your policy. Heimdall builds a copy of your app, a pinned model drafts tasks that test the policy, and each task is checked against the app copy before you review it.",
+	"breadcrumb": "Tasks from your API",
+	"entry": "Build tasks from your OpenAPI file and policy",
+	"readOnly": "You can look, but only members can start drafts, approve rules and review tasks.",
+	"steps": {
+		"upload": "Upload",
+		"rules": "Policy rules",
+		"tasks": "Draft tasks",
+		"write": "Write",
+		"review": "Review"
+	},
+	"new": {
+		"title": "New draft",
+		"benchmark": "Benchmark id",
+		"benchmarkHelp": "A new benchmark, or one made here before for the same app.",
+		"app": "App id",
+		"appHelp": "The name of your app's tools, as the agent sees them (for example shop).",
+		"appTitle": "App name (optional)",
+		"spec": "OpenAPI file (version 3, YAML or JSON)",
+		"policy": "Policy (text or Markdown)",
+		"pasteOrPick": "Paste it here or pick a file.",
+		"submit": "Check and save",
+		"invalidIds": "Use lowercase letters, digits, '-' or '_' for the benchmark and app ids."
+	},
+	"list": {
+		"title": "Drafts",
+		"empty": "No drafts yet.",
+		"open": "Open",
+		"counts": "{{rules}} rules, {{tasks}} tasks, {{pending}} waiting for review"
+	},
+	"status": {
+		"new": "Uploaded",
+		"rules_drafted": "Rules to approve",
+		"rules_approved": "Rules approved",
+		"generated": "Tasks drafted",
+		"written": "In the benchmark"
+	},
+	"model": {
+		"title": "Model",
+		"description": "The model is pinned: every call goes through the gateway on your own model key, and the job stops at the cost cap.",
+		"provider": "Provider",
+		"model": "Model",
+		"maxUsd": "Cost cap (USD)",
+		"maxUsdHelp": "Leave empty for the default cap."
+	},
+	"app": {
+		"title": "App copy",
+		"operations": "{{count}} operations, kept as tools over seeded data: {{collections}}"
+	},
+	"rules": {
+		"title": "Policy rules",
+		"description": "The model lists the policy as numbered rules. Fix any that are wrong, then approve the list once. Tasks are drafted only from approved rules.",
+		"draft": "Draft the rules",
+		"redraft": "Draft the rules again",
+		"confirm": "Drafting the rules calls the pinned model once or a few times and costs money. Go ahead?",
+		"approve": "Approve these rules",
+		"approved": "Approved by {{who}}",
+		"kind": "Kind",
+		"operations": "Operations (comma separated)",
+		"kinds": {
+			"must": "Must do",
+			"must_not": "Must never do",
+			"escalate": "Hand to a person",
+			"info": "Fact to use"
+		}
+	},
+	"tasks": {
+		"title": "Draft tasks",
+		"description": "The model writes starting data and a few conversations per rule. Each one runs against the app copy: the right calls must work, and an agent that does nothing, skips the key step or breaks the rule must fail its checks.",
+		"perRule": "Tasks per rule",
+		"judged": "Also grade what the agent tells the customer (needs a judge model in the benchmark)",
+		"draft": "Draft the tasks",
+		"confirm": "Drafting tasks calls the pinned model once per rule and once for the data, and costs money. Go ahead?",
+		"drafted": "{{count}} tasks passed",
+		"dropped": "{{count}} dropped",
+		"droppedTitle": "Dropped, and why",
+		"rule": "Rule",
+		"checks": "Checks",
+		"caught": "Wrong agents caught",
+		"none": "No task passed yet."
+	},
+	"write": {
+		"title": "Write into the benchmark",
+		"description": "Tasks go in as pending review. Run the readiness checks on the benchmark next: they build the app copy and prove each task on a real worker.",
+		"judgeProvider": "Judge provider",
+		"judgeModel": "Judge model",
+		"heldOut": "Keep these tasks held out (private)",
+		"submit": "Write {{count}} tasks",
+		"done": "Written into {{suite}}.",
+		"openBenchmark": "Run the readiness checks"
+	},
+	"review": {
+		"title": "Review",
+		"description": "Accept a task to mark it reviewed, or reject it to take it out of the benchmark.",
+		"accept": "Accept",
+		"reject": "Reject",
+		"state": {
+			"pending": "Pending review",
+			"accepted": "Accepted",
+			"rejected": "Rejected"
+		}
+	},
+	"spend": "{{calls}} model calls, ${{usd}} spent",
+	"loadError": "The draft could not be loaded",
+	"listError": "The drafts could not be loaded"
+}
