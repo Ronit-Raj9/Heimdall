@@ -270,6 +270,9 @@ services:
       BENCH_ISSUEBENCH_MAX_USD: ${BENCH_ISSUEBENCH_MAX_USD:-}
       BENCH_ISSUEBENCH_CHECK_MAX_USD: ${BENCH_ISSUEBENCH_CHECK_MAX_USD:-}
       BENCH_ISSUEBENCH_NETWORK: ${BENCH_ISSUEBENCH_NETWORK:-}
+      # Extra hosts (comma separated) a From issues build sandbox may reach
+      # through its egress proxy, on top of the Python package registries.
+      BENCH_ISSUEBENCH_EGRESS_ALLOW: ${BENCH_ISSUEBENCH_EGRESS_ALLOW:-}
       # Real-time voice calls (voice profile, docs/voice-realtime.md).
       HEIMDALL_VOICE_RTC_URL: ${HEIMDALL_VOICE_RTC_URL:-}
       HEIMDALL_VOICE_RTC_SECRET: ${HEIMDALL_VOICE_RTC_SECRET:-}
@@ -522,6 +525,10 @@ services:
       HEIMDALL_SHARED_ALLOW_RUNC: ${HEIMDALL_SHARED_ALLOW_RUNC:-}
       HEIMDALL_SHARED_SLOTS: ${HEIMDALL_SHARED_SLOTS:-4}
       HEIMDALL_SHARED_HOST_SLOTS: ${HEIMDALL_SHARED_HOST_SLOTS:-0}
+      # From issues builds (job kind issuebench.work): extra egress hosts for
+      # the build sandbox, and builds at once on this worker (default 1).
+      BENCH_ISSUEBENCH_EGRESS_ALLOW: ${BENCH_ISSUEBENCH_EGRESS_ALLOW:-}
+      HEIMDALL_SHARED_ISSUEBENCH_CONCURRENCY: ${HEIMDALL_SHARED_ISSUEBENCH_CONCURRENCY:-1}
       HEIMDALL_BENCH_DIR: ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}
       BENCH_RUNS_ROOT: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}/runs
       BENCH_RELEASES_ROOT: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}/releases
