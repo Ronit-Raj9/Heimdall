@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/policybench"
 	"github.com/maximhq/bifrost/bench/projectfs"
@@ -41,21 +42,26 @@ type PolicyDocUpload struct {
 	DryRun        bool   `json:"dry_run,omitempty"`
 }
 
-// PolicyDocSummary is one document in the list.
+// PolicyDocSummary is one document in the list. A viewer gets only the
+// id, title and upload time (Limited on the list): enough to open the
+// compliance report, nothing of the clauses or drafts.
 type PolicyDocSummary struct {
 	ID         string         `json:"id"`
-	Name       string         `json:"name"`
+	Name       string         `json:"name,omitempty"`
 	Title      string         `json:"title"`
-	Format     string         `json:"format"`
+	Format     string         `json:"format,omitempty"`
 	UploadedAt string         `json:"uploaded_at"`
-	Clauses    int            `json:"clauses"`
-	Drafts     map[string]int `json:"drafts"`
+	Clauses    int            `json:"clauses,omitempty"`
+	Drafts     map[string]int `json:"drafts,omitempty"`
 }
 
 // PolicyDocList answers GET /suites/{id}/policy-docs.
 type PolicyDocList struct {
 	Suite string             `json:"suite"`
 	Docs  []PolicyDocSummary `json:"docs"`
+	// Limited is set for a viewer: each document lists its id, title and
+	// upload time only.
+	Limited bool `json:"limited,omitempty"`
 }
 
 // PolicyDocView answers GET /suites/{id}/policy-docs/{doc} and the upload.
@@ -194,9 +200,11 @@ func (h *policyDocs) view(id, dir string, d *policybench.Doc) *PolicyDocView {
 }
 
 func (h *policyDocs) list(ctx *fasthttp.RequestCtx) {
-	if !h.needProjects(ctx) || h.refuseViewer(ctx) {
+	if !h.needProjects(ctx) {
 		return
 	}
+	p := auth.PrincipalFrom(ctx)
+	limited := p != nil && p.Role != "" && !p.Role.AtLeast(auth.RoleMember)
 	id, dir, ok := h.suiteDirParam(ctx)
 	if !ok {
 		return
@@ -206,8 +214,12 @@ func (h *policyDocs) list(ctx *fasthttp.RequestCtx) {
 		h.sendStoreError(ctx, "list policy documents", err)
 		return
 	}
-	out := PolicyDocList{Suite: id, Docs: []PolicyDocSummary{}}
+	out := PolicyDocList{Suite: id, Docs: []PolicyDocSummary{}, Limited: limited}
 	for _, d := range docs {
+		if limited {
+			out.Docs = append(out.Docs, PolicyDocSummary{ID: d.ID, Title: d.Title, UploadedAt: d.UploadedAt})
+			continue
+		}
 		out.Docs = append(out.Docs, PolicyDocSummary{ID: d.ID, Name: d.Name, Title: d.Title, Format: d.Format, UploadedAt: d.UploadedAt,
 			Clauses: len(d.Clauses), Drafts: d.Counts()})
 	}
