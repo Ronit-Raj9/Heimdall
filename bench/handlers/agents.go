@@ -43,6 +43,9 @@ type AgentsHandler struct {
 	// ...) from the list. They are not a user's agent; the admission checks
 	// still use them by path.
 	hideControls bool
+	// hidden drops other agents from the list (the Acme practice example
+	// agents on a production server); nil hides none.
+	hidden func(AgentConfigFile) bool
 }
 
 // NewAgentsHandler creates the agents handler. agents and index may be nil;
@@ -56,6 +59,13 @@ func NewAgentsHandler(mode schemas.Mode, agents AgentSource, index ReadIndex) *A
 // keep them, benchcatalog.DevContent).
 func (h *AgentsHandler) WithHiddenControls(hide bool) *AgentsHandler {
 	h.hideControls = hide
+	return h
+}
+
+// WithHiddenAgents hides the agents hide reports from GET /agents (the Acme
+// practice example agents on a production server, benchcatalog.ExampleAgents).
+func (h *AgentsHandler) WithHiddenAgents(hide func(AgentConfigFile) bool) *AgentsHandler {
+	h.hidden = hide
 	return h
 }
 
@@ -88,6 +98,9 @@ func (h *AgentsHandler) getAgents(ctx *fasthttp.RequestCtx) {
 	out := schemas.AgentList{Agents: make([]schemas.AgentSummary, 0, len(files))}
 	for _, f := range files {
 		if h.hideControls && IsControlAgent(f.Config) {
+			continue
+		}
+		if h.hidden != nil && h.hidden(f) {
 			continue
 		}
 		out.Agents = append(out.Agents, summarizeAgent(f, counts))

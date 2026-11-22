@@ -10,6 +10,8 @@ import (
 	"github.com/maximhq/bifrost/bench/selfmetrics"
 	"io/fs"
 	"net"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -203,7 +205,25 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	packs.NewHandler(mode, packSuites).RegisterRoutes(r, common...)                             // A03: GET /evaluation-packs (packs/handler.go)
 	handlers.NewSuiteHealthHandler(mode, deps.Suites, deps.Health).RegisterRoutes(r, common...) // Suite health area (handlers/suitehealth.go)
 	// Scripted controls (oracle, noop) are hidden from users except in local development (benchcatalog.DevContent).
-	handlers.NewAgentsHandler(mode, deps.Agents, deps.Index).WithHiddenControls(!benchcatalog.DevContent(cfg.Auth.IsHosted())).RegisterRoutes(r, common...)
+	// The Acme practice example agents (acme-agent, acme-solo, acme-team and
+	// any file copied from examples/acme-*) are hidden unless HEIMDALL_DEV is
+	// set; an org's real agents stay.
+	agentsHandler := handlers.NewAgentsHandler(mode, deps.Agents, deps.Index).WithHiddenControls(!benchcatalog.DevContent(cfg.Auth.IsHosted()))
+	if !benchcatalog.DevFlag() {
+		exampleAgents := benchcatalog.NewExampleAgents(benchcatalog.SourceRoot())
+		agentsHandler.WithHiddenAgents(func(f handlers.AgentConfigFile) bool {
+			id := ""
+			if f.Config != nil {
+				id = f.Config.ID
+			}
+			var content []byte
+			if cfg.Root != "" && f.Path != "" {
+				content, _ = os.ReadFile(filepath.Join(cfg.Root, filepath.FromSlash(f.Path)))
+			}
+			return exampleAgents.Match(id, content)
+		})
+	}
+	agentsHandler.RegisterRoutes(r, common...)
 	// Agent diff area: two versions of an agent config compared (handlers/agentdiff.go, docs/agent-diff.md).
 	handlers.NewAgentDiffHandler(mode, deps.Index, cfg.Root).RegisterRoutes(r, common...)
 	handlers.NewImportsHandler(mode).RegisterRoutes(r, common...) // UI area: importer catalog (handlers/imports.go)

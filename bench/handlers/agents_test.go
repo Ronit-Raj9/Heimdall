@@ -154,3 +154,23 @@ func TestAgentsHiddenControls(t *testing.T) {
 		t.Fatal("IsControlAgent")
 	}
 }
+
+// TestAgentsHiddenAgents: WithHiddenAgents drops exactly the files it
+// reports (the Acme example agents on a production server).
+func TestAgentsHiddenAgents(t *testing.T) {
+	ctx := &fasthttp.RequestCtx{}
+	NewAgentsHandler(schemas.ModeLive, fakeAgents{}, nil).WithHiddenAgents(func(f AgentConfigFile) bool {
+		return f.Path == "agents/custom.yaml"
+	}).getAgents(ctx)
+	var list schemas.AgentList
+	if err := json.Unmarshal(ctx.Response.Body(), &list); err != nil {
+		t.Fatal(err)
+	}
+	var paths []string
+	for _, a := range list.Agents {
+		paths = append(paths, a.Path)
+	}
+	if got := strings.Join(paths, ","); got != "agents/bad.yaml,agents/codex.yaml,agents/noop.yaml" {
+		t.Fatalf("agents %s", got)
+	}
+}
