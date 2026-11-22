@@ -1,0 +1,11 @@
+[project]
+name = "pkg"
+requires-python = ">=3.9,<3.13"
+
+[project.optional-dependencies]
+docs = ["sphinx"]
+dev = ["ruff"]
+testing = ["pytest>=7", "hypothesis"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

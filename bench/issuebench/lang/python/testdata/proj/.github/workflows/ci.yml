@@ -1,0 +1,15 @@
+name: ci
+on: [push]
+jobs:
+  test:
+    strategy:
+      matrix:
+        python-version:
+          - "3.10"
+          - "3.11"
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e '.[testing]'
+      - run: python -m pytest -q tests

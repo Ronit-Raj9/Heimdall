@@ -17,7 +17,7 @@ func TestGradeScriptParsers(t *testing.T) {
 			t.Errorf("grade.py has no parser %s", p)
 		}
 	}
-	for _, want := range []string{`git -c safe.directory='*' apply`, "reset_path", `grade --log /tmp/bench-test.log --exit "$code"`} {
+	for _, want := range []string{`git -c safe.directory='*' apply`, "reset_path", `grade --log /tmp/bench-test.log --exit "$code" --junit "$BENCH_JUNIT"`} {
 		if !strings.Contains(verifyScript, want) {
 			t.Errorf("verify.sh lacks %q", want)
 		}
@@ -61,6 +61,13 @@ func TestGradeScript(t *testing.T) {
 		{"parsed log", []string{"--spec", spec(ruleTests, tests...), "--log", filepath.Join("testdata", "pytest.log"), "--exit", "1"},
 			[]string{`tests="4" failures="2" errors="0"`, `<testcase classname="fail_to_pass" name="tests/test_core.py:test_add[a"></testcase>`,
 				`name="tests/test_core.py:test_sub"><failure message="status FAILED"/>`, `name="tests/test_core.py:test_gone"><failure message="not found in the test log"/>`}},
+		{"junit wins over the log", []string{"--spec", spec("junit", append(tests, specTest{Kind: kindP2P, ID: "tests/test_core.py::TestMath::test_mul[2-4]", Name: "tests/test_core.py:TestMath.test_mul[2-4]"})...),
+			"--log", filepath.Join("testdata", "pytest.log"), "--exit", "1", "--junit", filepath.Join("testdata", "junit.xml")},
+			[]string{`tests="5" failures="2" errors="0"`, `name="tests/test_core.py:test_zero"><failure message="status FAILED"/>`,
+				`name="tests/test_core.py:test_gone"></testcase>`, `name="tests/test_core.py:TestMath.test_mul[2-4]"></testcase>`,
+				`name="tests/test_core.py:test_sub"><failure message="status FAILED"/>`}},
+		{"missing junit falls back to the log", []string{"--spec", spec(ruleTests, tests...), "--log", filepath.Join("testdata", "pytest.log"), "--exit", "1", "--junit", filepath.Join(dir, "none.xml")},
+			[]string{`tests="4" failures="2" errors="0"`}},
 		{"exit code pass", []string{"--spec", spec(ruleExitCode, specTest{Kind: "test_command", ID: "exit", Name: "exit_status"}), "--exit", "0"},
 			[]string{`tests="1" failures="0"`, `<testcase classname="test_command" name="exit_status"></testcase>`}},
 		{"exit code fail", []string{"--spec", spec(ruleExitCode, specTest{Kind: "test_command", ID: "exit", Name: "exit_status"}), "--exit", "2"},
