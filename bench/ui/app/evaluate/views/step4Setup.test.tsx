@@ -1,12 +1,13 @@
 import "@/lib/i18n";
 
 import { okQuery, render, tagOf } from "@/lib/testing/render";
-import type { EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
+import type { Estimate, EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
 import type { ModelKey } from "@/lib/types/models";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { groupModels, keyStateFor, modelOptionLabel, providerOfModel, type CatalogProvider } from "@/components/models/groupedModelPicker";
 import {
 	Step4Setup,
+	concurrencyNote,
 	defaultEvaluationSpec,
 	estimateFailed,
 	estimateNotes,
@@ -671,5 +672,20 @@ describe("Step4Setup fix wave 2 (G10)", () => {
 		expect(render(<Step4Setup spec={spec({ concurrency: 2 })} onChange={() => undefined} />)).not.toContain("step4-concurrency-note");
 		q.estimate = okQuery({ runs: 20, est_cost_usd: { low: 1, high: 2, known: true }, est_minutes: { low: 10, high: 25 } });
 		expect(render(<Step4Setup spec={spec({ concurrency: 8 })} onChange={() => undefined} />)).not.toContain("step4-concurrency-note");
+	});
+});
+describe("Step4Setup over-capacity note reads the estimate's worker_slots", () => {
+	it("shows the note for the response the server sends when the worker caps the runs", () => {
+		// handlers.evalSlots: a worker of 2 slots caps concurrency and parallel at 2 and reports worker_slots.
+		const estimate: Partial<Estimate> = {
+			runs: 20,
+			est_cost_usd: { low: 1, high: 2, known: true },
+			est_minutes: { low: 10, high: 25 },
+			slots: { concurrency: 2, org_slots: 8, parallel: 2, worker_slots: 2 },
+		};
+		q.estimate = okQuery(estimate);
+		const html = render(<Step4Setup spec={spec({ concurrency: 6 })} onChange={() => undefined} />);
+		expect(html).toContain("Your worker runs 2 runs at a time, so 6 runs at once is no faster than 2.");
+		expect(concurrencyNote(estimate.slots, 2)).toBe("");
 	});
 });

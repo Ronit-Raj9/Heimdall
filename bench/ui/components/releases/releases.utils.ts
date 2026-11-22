@@ -3,14 +3,12 @@ import type { Action, ExperimentStatus, ReleasePolicyDecision, ReleaseRecord } f
 
 /**
  * What the release list reads of an experiment. `arms_differ` and `debug` come from the server's
- * experiment status (fix wave 2, lane G04); an older server leaves them out.
+ * experiment status; an older server leaves them out.
  */
-type ReleaseCandidate = Pick<ExperimentStatus, "state" | "exp_id"> & {
+type ReleaseCandidate = Pick<ExperimentStatus, "state" | "exp_id" | "arms_differ" | "debug"> & {
 	name?: string;
 	suite?: string;
 	arms?: string[];
-	arms_differ?: "model" | "none" | "agent";
-	debug?: string;
 };
 
 /** Ids of the debug copies of a run (replay, fork, step): they are never a release candidate. */

@@ -148,8 +148,8 @@ export function specReady(spec: EvaluationSpec, owns: ReadonlySet<string> = new 
 	return specProblem(spec, owns) === "";
 }
 
-/** The estimate's slots with the worker's run slots (G14 adds `worker_slots`; read it locally until then). */
-type EstimateSlots = EvaluationEstimate["slots"] & { worker_slots?: number };
+/** The estimate's slots, including what the worker runs at a time (`worker_slots`). */
+type EstimateSlots = EvaluationEstimate["slots"];
 
 /**
  * The note under "Runs at once per benchmark" when the picked value is above what the worker runs
@@ -378,7 +378,7 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 	const ready = problem === "";
 	const { main: estimate, presets, pending } = useStep4Estimate(spec, !ready);
 	const concurrency = spec.concurrency ?? 4;
-	const overWorker = concurrencyNote(estimate.data?.slots as EstimateSlots | undefined, concurrency);
+	const overWorker = concurrencyNote(estimate.data?.slots, concurrency);
 	const catalog = useGetBenchFaultsQuery();
 	const faultList = catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS;
 	const faultGroups = groupFaults(faultList);

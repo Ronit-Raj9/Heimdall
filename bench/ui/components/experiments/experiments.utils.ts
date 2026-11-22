@@ -70,11 +70,10 @@ export function isAutoName(e: { name?: string; exp_id: string }): boolean {
 }
 
 /**
- * ExperimentStatus with the debug fields the server adds in fix wave 2 (G04): the debug mode
- * (replay, fork or step) and the run it started from. Read through this type so the code stays
- * valid before and after the shared type gains them.
+ * An experiment status as the pickers read it, including the debug mode (replay, fork or step)
+ * and the run it started from (`debug`, `debug_from_run`).
  */
-export type StatusWithDebug = ExperimentStatus & { debug?: string; debug_from_run?: string };
+export type StatusWithDebug = ExperimentStatus;
 
 /** The kinds of debug run the run page can start. */
 export type DebugMode = "replay" | "fork" | "step";

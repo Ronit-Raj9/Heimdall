@@ -26,14 +26,8 @@ import { useCallback, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { VerdictHeaderStrip } from "./verdictHeaderStrip";
 
-/** What the two setups of a comparison differ in (fix wave 2, lane G04's `arms_differ`); an older server leaves it out. */
-export type ArmsDiffer = "model" | "none" | "agent";
-
-/** The experiment status fields the promote control reads; G04 adds them to ExperimentStatus. */
-type PromoteStatus = ExperimentStatus & {
-	arms_differ?: ArmsDiffer;
-	setups?: { arm: string; agent: string; agent_file: string; model: string }[];
-};
+/** What the two setups of a comparison differ in (the experiment status `arms_differ`); an older server leaves it out. */
+export type ArmsDiffer = NonNullable<ExperimentStatus["arms_differ"]>;
 
 /**
  * "Promote this version" on the Result tab: a button to the release form for two arms; a one-arm
@@ -110,7 +104,7 @@ export function VerdictPromote({
 }
 
 /** VerdictPromote with what the setups differ in, read from the experiment status. */
-function ExperimentVerdictPromote({
+export function ExperimentVerdictPromote({
 	expId,
 	arms,
 	evaluationId,
@@ -122,7 +116,7 @@ function ExperimentVerdictPromote({
 	decision: string;
 }) {
 	const experiment = useGetExperimentQuery(expId);
-	const status = experiment.data as PromoteStatus | undefined;
+	const status = experiment.data;
 	const modelB = status?.setups?.find((s) => s.arm === arms[1])?.model || undefined;
 	return (
 		<VerdictPromote

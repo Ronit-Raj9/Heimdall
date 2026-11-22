@@ -20,14 +20,8 @@ export interface ActionsTabProps {
 	suiteVersion?: string;
 }
 
-/** One setup of the experiment (fix wave 2, N66): read through a local type until ExperimentStatus carries it. */
-export interface ArmSetup {
-	arm: string;
-	agent: string;
-	agent_file: string;
-	model: string;
-}
-type StatusWithSetups = ExperimentStatus & { setups?: ArmSetup[] };
+/** One setup of the experiment (fix wave 2, N66), from the experiment status `setups`. */
+export type ArmSetup = NonNullable<ExperimentStatus["setups"]>[number];
 
 const DECISIONS = ["score", "improved", "regressed", "inconclusive", "invalid"] as const;
 
@@ -47,7 +41,7 @@ export function ActionsTab({ expId, suite, suiteVersion }: ActionsTabProps) {
 	const { t } = useTranslation("experimentActions");
 	const { t: tu } = useTranslation("compareUx");
 	const status = useGetExperimentQuery(expId);
-	const setups = (status.data as StatusWithSetups | undefined)?.setups ?? [];
+	const setups = status.data?.setups ?? [];
 	const first = setups.find((s) => s.arm === "A") ?? setups[0];
 	const suiteRef = suite ? (suiteVersion ? `${suite}@${suiteVersion}` : suite) : "";
 	// The forms read their initial values once: wait for the experiment so the prefill is not lost.

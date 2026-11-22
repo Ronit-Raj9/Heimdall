@@ -8,7 +8,7 @@ import { NotScannedList } from "@/components/integrity/awarenessPanel";
 import { useGetAwarenessQuery } from "@/lib/store/apis/integrityApi";
 import { useGetJobQuery } from "@/lib/store/apis/platformApi";
 import type { AnalysisJobKind, AnalysisView, BlameRunResult, CheckRunResult, ClustersRebuildResult, CodeScanRunResult } from "@/lib/types/analysis";
-import type { ExperimentStatus, Job, JobStatus } from "@/lib/types/bench";
+import type { Job, JobStatus } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
 import { ArrowUpRight, Coins, Database, Eye, FileSpreadsheet, Gavel, Network, ScanSearch, ShieldCheck, type LucideIcon } from "lucide-react";
 import type { TFunction } from "i18next";
@@ -166,7 +166,7 @@ export function AnalysisTab({ expId }: { expId: string }) {
 	const clusters = useGetClustersQuery({ exp: expId });
 	// multi_agent comes from the experiment status (fix wave 2, lane G04): blame splits a team run's failure between its agents.
 	const experiment = useGetExperimentQuery(expId);
-	const singleAgent = (experiment.data as (ExperimentStatus & { multi_agent?: boolean }) | undefined)?.multi_agent !== true;
+	const singleAgent = experiment.data?.multi_agent !== true;
 	const notScanned = awareness.data?.not_scanned ?? [];
 	const refresh = (views: AnalysisView[]) => {
 		if (views.includes("verdict")) void verdict.refetch();
