@@ -1,6 +1,9 @@
 import type {
 	CIWorkflowParams,
 	CIWorkflowPreview,
+	EmailPrefs,
+	EmailSettings,
+	EmailTestResult,
 	IntegrationExportList,
 	Webhook,
 	WebhookCreated,
@@ -13,7 +16,7 @@ import { BENCH_API_BASE } from "./fixtures";
 
 /** Integrations area (web parity L19): webhooks, export files, CI workflow preview. The CI-install PR
  * and repository list are githubApi (Settings > GitHub, handlers/github.go). */
-export const integrationsApi = benchApi.enhanceEndpoints({ addTagTypes: ["IntegrationWebhooks", "IntegrationExports"] }).injectEndpoints({
+export const integrationsApi = benchApi.enhanceEndpoints({ addTagTypes: ["IntegrationWebhooks", "IntegrationExports", "EmailSettings"] }).injectEndpoints({
 	endpoints: (builder) => ({
 		listWebhooks: builder.query<WebhookList, void>({
 			query: () => "/integrations/webhooks",
@@ -42,6 +45,17 @@ export const integrationsApi = benchApi.enhanceEndpoints({ addTagTypes: ["Integr
 		deleteExport: builder.mutation<void, string>({
 			query: (name) => ({ url: `/integrations/exports/${encodeURIComponent(name)}`, method: "DELETE" }),
 			invalidatesTags: ["IntegrationExports"],
+		}),
+		getEmailSettings: builder.query<EmailSettings, void>({
+			query: () => "/notifications/email",
+			providesTags: ["EmailSettings"],
+		}),
+		putEmailSettings: builder.mutation<EmailSettings, Pick<EmailPrefs, "events" | "digest">>({
+			query: (body) => ({ url: "/notifications/email", method: "PUT", body }),
+			invalidatesTags: ["EmailSettings"],
+		}),
+		testEmail: builder.mutation<EmailTestResult, void>({
+			query: () => ({ url: "/notifications/email/test", method: "POST" }),
 		}),
 		getCIWorkflow: builder.query<CIWorkflowPreview, CIWorkflowParams>({
 			query: (args) => ({ url: "/integrations/ci/workflow", params: ciWorkflowParams(args) }),
@@ -78,4 +92,7 @@ export const {
 	useListExportsQuery,
 	useDeleteExportMutation,
 	useGetCIWorkflowQuery,
+	useGetEmailSettingsQuery,
+	usePutEmailSettingsMutation,
+	useTestEmailMutation,
 } = integrationsApi;

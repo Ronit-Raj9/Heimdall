@@ -28,12 +28,14 @@ import type {
 	Webhook,
 	WebhookDelivery,
 	WebhookEventType,
+	WebhookFormat,
 } from "@/lib/types/integrations";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Activity, Download, FileDown, GitPullRequest, Webhook as WebhookIcon, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { EmailPanel } from "./emailPanel";
 import { MaximPanel } from "./maximPanel";
 import { useGetMaximQuery } from "@/lib/store/apis/traceToolsApi";
 import { useTranslation } from "react-i18next";
@@ -45,7 +47,36 @@ declare module "@/lib/i18n/resources" {
 }
 
 const FORMATS: IntegrationExportFormat[] = ["otlp", "eee", "csv", "jsonl", "harbor"];
-const EVENTS: WebhookEventType[] = ["experiment.finished", "job.failed"];
+const EVENTS: WebhookEventType[] = [
+	"evaluation.finished",
+	"evaluation.regressed",
+	"release.blocked",
+	"schedule.failed",
+	"worker.offline",
+	"experiment.finished",
+	"job.failed",
+];
+const HOOK_FORMATS: WebhookFormat[] = ["slack", "teams", "pagerduty", "json"];
+
+/** Events a hook of format f can take (webhooks/format.go EventsFor): PagerDuty pages only on problems. */
+export function eventsFor(f: WebhookFormat): WebhookEventType[] {
+	if (f === "pagerduty") return ["evaluation.regressed", "release.blocked", "schedule.failed", "worker.offline", "job.failed"];
+	return EVENTS;
+}
+
+/** What a new hook of format f starts subscribed to (webhooks/format.go DefaultEvents). */
+export function defaultEventsFor(f: WebhookFormat): WebhookEventType[] {
+	if (f === "pagerduty") return ["evaluation.regressed"];
+	if (f === "slack" || f === "teams") return ["evaluation.finished", "evaluation.regressed", "release.blocked"];
+	return ["evaluation.finished"];
+}
+
+/** Whether the add form has what a hook of format f needs. */
+export function webhookFormReady(f: WebhookFormat, url: string, routingKey: string, events: readonly WebhookEventType[]): boolean {
+	if (events.length === 0) return false;
+	if (f === "pagerduty") return /^[A-Za-z0-9]{20,64}$/.test(routingKey.trim());
+	return url.trim() !== "";
+}
 const selectClass = "border-input bg-background h-9 w-full rounded-md border px-2 text-sm";
 
 /** Integrations (web parity L19): CI workflow (install PR via Settings > GitHub), exports with download, experiment-finished webhooks. */
@@ -147,6 +178,7 @@ export default function IntegrationsView() {
 				{tab === "webhooks" && (
 					<div className="flex flex-col gap-6">
 						<WebhooksPanel />
+						<EmailPanel />
 						<DeliveryLogPanel />
 					</div>
 				)}
@@ -191,7 +223,9 @@ function WebhooksPanel() {
 	const [testHook] = useTestWebhookMutation();
 	const [url, setUrl] = useState("");
 	const [desc, setDesc] = useState("");
-	const [events, setEvents] = useState<WebhookEventType[]>(["experiment.finished"]);
+	const [format, setFormat] = useState<WebhookFormat>("slack");
+	const [routingKey, setRoutingKey] = useState("");
+	const [events, setEvents] = useState<WebhookEventType[]>(defaultEventsFor("slack"));
 	const [secret, setSecret] = useState<string | null>(null);
 	const [message, setMessage] = useState<string | null>(null);
 	const [tests, setTests] = useState<Record<string, WebhookDelivery>>({});
@@ -201,11 +235,18 @@ function WebhooksPanel() {
 
 	const add = async () => {
 		setMessage(null);
-		const res = await createHook({ url: url.trim(), events, description: desc.trim() || undefined });
+		const res = await createHook({
+			url: url.trim() || undefined,
+			events,
+			description: desc.trim() || undefined,
+			format,
+			routing_key: format === "pagerduty" ? routingKey.trim() : undefined,
+		});
 		if ("error" in res) return fail(res.error);
-		setSecret(res.data.secret);
+		if (format === "json") setSecret(res.data.secret);
 		setUrl("");
 		setDesc("");
+		setRoutingKey("");
 	};
 
 	return (
@@ -222,20 +263,53 @@ function WebhooksPanel() {
 					void add();
 				}}
 			>
+				<label className="flex flex-col gap-1 text-sm sm:col-span-3">
+					<span className="text-muted-foreground text-xs font-medium">{t("webhooks.format")}</span>
+					<select
+						className={cn(selectClass, "sm:max-w-xs")}
+						value={format}
+						onChange={(e) => {
+							const f = e.target.value as WebhookFormat;
+							setFormat(f);
+							setEvents(defaultEventsFor(f));
+						}}
+						data-testid="webhook-format"
+					>
+						{HOOK_FORMATS.map((f) => (
+							<option key={f} value={f}>
+								{t(`webhooks.formats.${f}`)}
+							</option>
+						))}
+					</select>
+					<span className="text-muted-foreground text-xs" data-testid="webhook-format-help">
+						{t(`webhooks.formatHelp.${format}`)}
+					</span>
+				</label>
+				{format === "pagerduty" && (
+					<Input
+						className="sm:col-span-3"
+						aria-label={t("webhooks.routingKey")}
+						placeholder={t("webhooks.routingKeyPlaceholder")}
+						value={routingKey}
+						onChange={(e) => setRoutingKey(e.target.value)}
+						autoComplete="off"
+						data-testid="webhook-routing-key"
+					/>
+				)}
 				<Input
-					aria-label={t("webhooks.url")}
-					placeholder={t("webhooks.urlPlaceholder")}
+					aria-label={t(`webhooks.urlLabels.${format}`)}
+					placeholder={t(`webhooks.urlPlaceholders.${format}`)}
 					value={url}
 					onChange={(e) => setUrl(e.target.value)}
 					data-testid="webhook-url"
 				/>
 				<Input aria-label={t("webhooks.description")} placeholder={t("webhooks.description")} value={desc} onChange={(e) => setDesc(e.target.value)} />
-				<Button type="submit" disabled={!url.trim() || events.length === 0 || create.isLoading} data-testid="webhook-add">
+				<Button type="submit" disabled={!webhookFormReady(format, url, routingKey, events) || create.isLoading} data-testid="webhook-add">
 					{create.isLoading ? t("webhooks.adding") : t("webhooks.add")}
 				</Button>
 				<fieldset className="flex flex-wrap gap-4 text-sm sm:col-span-3">
 					<legend className="sr-only">{t("webhooks.events")}</legend>
-					{EVENTS.map((ev) => (
+					{eventsFor(format).map((ev) => (
 						<label key={ev} className="flex items-center gap-1.5">
 							<input
 								type="checkbox"
@@ -304,6 +378,9 @@ export function WebhookList({ hooks, tests = {}, onTest, onToggle, onDelete }: W
 					<li key={h.id} className="hover:bg-muted/30 flex flex-col gap-1.5 px-4 py-3 transition-colors" data-testid={`webhook-${h.id}`}>
 						<div className="flex flex-wrap items-center gap-2">
 							<WebhookIcon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+							<Badge variant="outline" data-testid={`webhook-format-${h.id}`}>
+								{t(`webhooks.formats.${h.format ?? "json"}`)}
+							</Badge>
 							<span className="min-w-0 truncate font-mono text-sm" title={h.url}>{h.url}</span>
 							<Badge variant={h.enabled ? "success" : "secondary"}>{h.enabled ? t("webhooks.enabled") : t("webhooks.disabled")}</Badge>
 							{last ? (
@@ -315,7 +392,9 @@ export function WebhookList({ hooks, tests = {}, onTest, onToggle, onDelete }: W
 							)}
 						</div>
 						<div className="text-muted-foreground text-xs">
-							{h.events.map((e) => t(`webhooks.eventNames.${e}`)).join(", ")} · whsec_...{h.secret_last4}
+							{h.events.map((e) => t(`webhooks.eventNames.${e}`)).join(", ")}
+							{(h.format ?? "json") === "json" ? ` · whsec_...${h.secret_last4}` : ""}
+							{h.routing_key_last4 ? ` · ${t("webhooks.keyEnding", { last4: h.routing_key_last4 })}` : ""}
 							{h.description ? ` · ${h.description}` : ""}
 						</div>
 						<div className="flex flex-wrap gap-2">

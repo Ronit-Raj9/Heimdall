@@ -188,6 +188,12 @@ services:
       HEIMDALL_MASTER_KEY: ${HEIMDALL_MASTER_KEY:-}
       HEIMDALL_SHARED_RUNNER_SECRET: ${HEIMDALL_SHARED_RUNNER_SECRET:-}
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
+      # Email (docs/notifications.md): one transport, the first one set
+      # wins; none set writes emails to the server log only.
+      HEIMDALL_SMTP_URL: ${HEIMDALL_SMTP_URL:-}
+      HEIMDALL_RESEND_API_KEY: ${HEIMDALL_RESEND_API_KEY:-}
+      HEIMDALL_POSTMARK_TOKEN: ${HEIMDALL_POSTMARK_TOKEN:-}
+      HEIMDALL_MAIL_FROM: ${HEIMDALL_MAIL_FROM:-}
       # Prometheus metrics on the compose network only (docs/hosting.md,
       # Operating it); empty: off. Never publish this port.
       BENCH_SERVER_METRICS_LISTEN: ${HEIMDALL_METRICS_LISTEN:-}

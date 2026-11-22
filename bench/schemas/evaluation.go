@@ -165,4 +165,7 @@ type Evaluation struct {
 	RerunOf string `json:"rerun_of,omitempty"`
 	// Paused is true while every running child is paused (drain).
 	Paused bool `json:"paused,omitempty"`
+	// NotifiedAt is when the finish of this evaluation was sent to the
+	// org's notifications (webhooks, chat, email), so it is sent once.
+	NotifiedAt *time.Time `json:"notified_at,omitempty"`
 }

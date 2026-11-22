@@ -176,6 +176,7 @@ func (h *evaluationsHandler) cancel(ctx *fasthttp.RequestCtx) {
 		h.fail(ctx, fasthttp.StatusConflict, "evaluation "+ev.ID+" already ended ("+ev.Status+")")
 		return
 	}
+	prev := ev.Status
 	rc, _ := h.env.Services.Launcher.(RunController)
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
@@ -194,6 +195,7 @@ func (h *evaluationsHandler) cancel(ctx *fasthttp.RequestCtx) {
 		c.Status = string(schemas.ExperimentCancelled)
 	}
 	ev.Status = schemas.EvaluationCancelled
+	h.notifyFinished(ev, prev) // evalnotify.go
 	if err := h.store().Save(ev); err != nil {
 		h.fail(ctx, fasthttp.StatusInternalServerError, "save evaluation: "+err.Error())
 		return
@@ -226,6 +228,7 @@ var evalRefreshChildren = true
 func (h *evaluationsHandler) refresh(ev *schemas.Evaluation) {
 	s := h.env.Services
 	changed := false
+	prev := ev.Status
 	if s.Index != nil && evalRefreshChildren {
 		eh := &ExperimentsHandler{mode: h.env.Mode, index: s.Index, launcher: s.Launcher}
 		for i := range ev.Children {
@@ -247,6 +250,9 @@ func (h *evaluationsHandler) refresh(ev *schemas.Evaluation) {
 		ev.Status, changed = next, true
 	}
 	if h.decideGate(ev) {
+		changed = true
+	}
+	if h.notifyFinished(ev, prev) { // evalnotify.go
 		changed = true
 	}
 	if changed {

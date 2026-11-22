@@ -454,6 +454,9 @@ func payload(event string, s Schedule, rec Record) alerts.Payload {
 	if r := rec.Result; r != nil {
 		p.Experiment, p.Decision, p.Action, p.Policy = r.ExpID, r.Decision, r.Action, r.Policy
 		p.Link = alerts.LinkPath(r.ExpID)
+		if p.Link == "" && r.EvaluationID != "" {
+			p.Link = "/evaluations/" + r.EvaluationID
+		}
 		p.Summary.Runs, p.Summary.RunErrors, p.Summary.CostUSD = r.Runs, r.RunErrors, r.CostUSD
 		if p.Message == "" {
 			p.Message = r.Summary
