@@ -38,7 +38,14 @@ const REPORT = {
 	models: [model("gpt-a", 0.6, 0.01), model("gpt-b", 0.8, null)],
 	comparisons: [{ label: "gpt-a", against: "gpt-b", tasks: 10, mean_diff: -0.2, diff_low: -0.4, diff_high: 0, p: 0.1, p_adjusted: 0.1, result: "cannot_tell", reason: "Cannot tell apart at 10 tasks." }],
 	pareto: { x: "cost_per_run", x_label: "Cost per run", y: "success", points: [], frontier: [], note: "" },
-	latency_pareto: { points: [], frontier: [], note: "" },
+	latency_pareto: {
+		points: [
+			{ label: "gpt-a", model: "gpt-a", latency_ms: v(800), quality: v(0.6), placed: true, frontier: true },
+			{ label: "gpt-b", model: "gpt-b", latency_ms: v(null), quality: v(0.8), placed: false, frontier: false, reason: "latency unknown" },
+		],
+		frontier: ["gpt-a"],
+		note: "1 of 2 models placed; 1 on the frontier (no other model is both faster and better).",
+	},
 	benchmarks: [],
 	segments: [],
 	recommendation: { action: "not_enough_evidence", model: "gpt-b", strength: "weak", summary: "gpt-b leads but the gap is not proven.", reasons: ["higher quality"], caveats: [], tied: [] },
@@ -62,6 +69,7 @@ vi.mock("@/lib/store/apis/modelSwitchApi", () => ({
 	useGetModelSwitchConfigQuery: () => ({ data: EXPORT, isLoading: false, error: undefined, refetch: () => {} }),
 	useApplyModelSwitchMutation: () => [async () => ({}), { isLoading: false }],
 }));
+vi.mock("@/lib/store/apis/secretsApi", () => ({ useListSecretsQuery: () => ({ data: { secrets: [] } }) }));
 
 describe("ModelSwitchReportView", () => {
 	const html = renderToStaticMarkup(<ModelSwitchReportView evaluationId="ev1" />);
@@ -81,5 +89,12 @@ describe("ModelSwitchReportView", () => {
 		expect(html).toContain("heimdall-ev1-default");
 		expect(html).toContain("routing_rules");
 		expect(html).toContain('data-testid="model-switch-download"');
+	});
+
+	it("draws quality against latency and lists a model with unknown latency as not placed", () => {
+		expect(html).toContain('data-testid="model-switch-latency-chart"');
+		expect(html).toContain("800 ms");
+		expect(html).toContain("gpt-b is not placed: latency unknown");
+		expect(html).toContain("On the latency frontier");
 	});
 });
