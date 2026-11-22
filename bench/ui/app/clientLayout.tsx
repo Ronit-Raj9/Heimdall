@@ -1,5 +1,6 @@
 import { BenchHeader } from "@/components/benchHeader";
 import { BenchSidebar } from "@/components/benchSidebar";
+import { PlanLimitPrompt } from "@/components/billing/planLimitPrompt";
 import { AuthShell } from "@/components/platform/authShell";
 import { SharedFrame } from "@/components/share/sharedFrame";
 import { LandingView } from "@/components/site/landingView";
@@ -129,6 +130,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 					</div>
 				</div>
 			</div>
+			<PlanLimitPrompt />
 		</div>
 	);
 }

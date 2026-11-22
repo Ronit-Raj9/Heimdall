@@ -1,0 +1,108 @@
+{
+	"title": "Billing",
+	"subtitle": "Your plan, what you used this month against its limits, and your invoices.",
+	"loadError": "Could not load billing",
+	"off": "Billing is off on this server. Limits are shown so you know them, but nothing is enforced and nothing is charged.",
+	"testMode": "Payments run in Stripe test mode: use a Stripe test card, no real money moves.",
+	"checkoutDone": "Thanks. Your payment went through; the plan changes here as soon as Stripe confirms it, usually within a minute.",
+	"checkoutCancelled": "Checkout was cancelled. Nothing was charged.",
+	"plan": {
+		"title": "Current plan",
+		"status": "Subscription",
+		"seats": "Paid seats",
+		"renews": "Renews",
+		"ownKey": "Runs use your own model provider key. Heimdall never bills model usage.",
+		"free": "Free",
+		"perSeat": "${{price}} per seat per month",
+		"contact": "Contact us"
+	},
+	"status": {
+		"active": "Active",
+		"trialing": "Trial",
+		"past_due": "Payment due",
+		"canceled": "Cancelled",
+		"incomplete": "Waiting for payment",
+		"incomplete_expired": "Expired",
+		"unpaid": "Unpaid",
+		"paused": "Paused",
+		"manual": "Set by the server owner",
+		"none": "None"
+	},
+	"actions": {
+		"upgrade": "Upgrade to Team",
+		"manage": "Manage billing",
+		"syncSeats": "Sync seats",
+		"seatsSynced": "Seats match your {{count}} member(s).",
+		"seatsChanged": "Paid seats are now {{count}}.",
+		"opening": "Opening Stripe",
+		"adminOnly": "Only admins change the plan.",
+		"contact": "Contact us"
+	},
+	"meters": {
+		"title": "Usage this month",
+		"description": "From {{from}} to {{to}} (UTC). Seats and storage are counted now.",
+		"shared_worker_minutes": "Shared worker minutes",
+		"seats": "Seats",
+		"runs": "Runs",
+		"evaluations": "Evaluations",
+		"storage_bytes": "Storage",
+		"operator_judge_calls": "Judge calls on Heimdall's keys",
+		"of": "{{used}} of {{limit}}",
+		"noLimit": "No limit",
+		"reached": "Limit reached",
+		"reachedOff": "Over the plan's limit (not enforced while billing is off)",
+		"notAvailable": "Not available",
+		"seatsHint": "Members plus open invitations.",
+		"minutesHint": "Time your runs held a slot on Heimdall's shared worker. Runs on your own worker do not count.",
+		"judgeHint": "Every judge runs on your own key today, so this stays at 0."
+	},
+	"features": {
+		"title": "What your plan includes",
+		"private_benchmarks": "Private benchmarks",
+		"ci": "CI gate on pull requests",
+		"alerts": "Scheduled checks and alerts",
+		"own_worker_support": "Own worker support",
+		"invoice_billing": "Invoice billing",
+		"included": "Included",
+		"notIncluded": "Not on this plan"
+	},
+	"plans": {
+		"title": "Plans",
+		"current": "Current plan",
+		"seats": "{{count}} seats",
+		"anySeats": "Any number of seats",
+		"minutes": "{{count}} shared worker minutes a month",
+		"anyMinutes": "Shared worker minutes as agreed",
+		"ownKey": "Your own model key"
+	},
+	"invoices": {
+		"title": "Invoices",
+		"empty": "No invoices yet.",
+		"number": "Invoice",
+		"date": "Date",
+		"amount": "Amount",
+		"status": "Status",
+		"open": "View",
+		"pdf": "PDF",
+		"error": "Could not load invoices"
+	},
+	"usage": {
+		"title": "Heimdall usage",
+		"description": "What your organization used of Heimdall itself, per day (UTC): shared worker minutes, runs, evaluations and storage.",
+		"day": "Day",
+		"minutes": "Shared worker minutes",
+		"runs": "Runs",
+		"evaluations": "Evaluations",
+		"storage": "Storage",
+		"judge": "Judge calls on Heimdall's keys",
+		"storageNow": "Stored now",
+		"unavailable": "Not available: {{list}}",
+		"error": "Could not load Heimdall usage",
+		"plan": "See plan and limits"
+	},
+	"limit": {
+		"title": "Your plan does not cover this",
+		"seePlans": "See plans",
+		"dismiss": "Dismiss"
+	}
+}

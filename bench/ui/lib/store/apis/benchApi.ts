@@ -44,6 +44,7 @@ import type {
 } from "@/lib/types/bench";
 import { createApi, fetchBaseQuery, type BaseQueryFn, type FetchArgs, type FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
 import { BENCH_API_BASE, FIXTURE_PAIRS, detectFixtureMode, fixtureRefusal, resolveFixture, scopeFixture } from "./fixtures";
+import { notifyPlanLimit } from "@/lib/billing/planLimit";
 import { CSRF_HEADER, errorStatus, getAuthState, notifyUnauthorized, ORG_HEADER, whenAuthKnown } from "./session";
 
 /** Polling interval for experiment status when server-sent events are unavailable (DESIGN.md 16.7). */
@@ -168,6 +169,7 @@ const httpBaseQuery: BenchBaseQuery = async (args, api, extraOptions) => {
 	if (type === "mutation" && !url.startsWith("/auth/")) await whenAuthKnown();
 	const result = await fetchBenchQuery(args, type === api.type ? api : { ...api, type }, extraOptions);
 	if (result.error && errorStatus(result.error) === 401) notifyUnauthorized(typeof args === "string" ? args : args.url);
+	if (result.error && errorStatus(result.error) === 402) notifyPlanLimit(result.error); // Y16: upgrade prompt (lib/billing/planLimit.ts)
 	if (result.error && errorStatus(result.error) === 429) {
 		return { ...result, error: rateLimitedError((result.meta as { response?: Response } | undefined)?.response?.headers.get("Retry-After") ?? null) };
 	}

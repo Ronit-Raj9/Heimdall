@@ -1,6 +1,7 @@
 import { RoleBadge } from "@/components/platform/badges";
 import { ApiTokensTab } from "@/components/settings/apiTokensTab";
 import { AuditTab } from "@/components/settings/auditTab";
+import { BillingTab } from "@/components/settings/billingTab";
 import { GithubTab } from "@/components/settings/githubTab";
 import { MembersTab } from "@/components/settings/membersTab";
 import { OrgTab } from "@/components/settings/orgTab";
@@ -20,7 +21,7 @@ import OperateView from "@/app/operate/views/operateView";
 import UploadView from "@/app/upload/views/uploadView";
 import UsageView from "@/app/usage/views/usageView";
 import WorkersView from "@/app/workers/views/workersView";
-import { Building2, FolderTree, Gauge, Github, KeyRound, KeySquare, ListChecks, LockKeyhole, Plug, ScrollText, Server, Shield, UserRound, Users, Wrench } from "lucide-react";
+import { Building2, CreditCard, FolderTree, Gauge, Github, KeyRound, KeySquare, ListChecks, LockKeyhole, Plug, ScrollText, Server, Shield, UserRound, Users, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
 import type { ComponentType } from "react";
@@ -35,6 +36,7 @@ export const SETTINGS_TABS = [
 	"keys",
 	"runners",
 	"usage",
+	"billing",
 	"files",
 	"jobs",
 	"integrations",
@@ -53,12 +55,13 @@ export type SettingsTab = (typeof SETTINGS_TABS)[number];
 /** The tab a plain /settings opens. */
 export const DEFAULT_SETTINGS_TAB: SettingsTab = "keys";
 
-const HOSTED_ONLY: readonly SettingsTab[] = ["members", "tokens", "github", "audit", "org", "account"];
+const HOSTED_ONLY: readonly SettingsTab[] = ["members", "tokens", "github", "audit", "org", "account", "billing"];
 
 const TAB_ICON: Record<SettingsTab, ComponentType<{ className?: string }>> = {
 	keys: KeyRound,
 	runners: Server,
 	usage: Gauge,
+	billing: CreditCard,
 	files: FolderTree,
 	jobs: ListChecks,
 	integrations: Plug,
@@ -186,6 +189,8 @@ function SettingsTabBody({ tab }: { tab: SettingsTab }) {
 			return local || !org ? <WorkersView tokensLink={false} /> : <RunnersTab org={org} />;
 		case "usage":
 			return <UsageView />;
+		case "billing":
+			return <BillingTab />;
 		case "files":
 			return (
 				<RouteTabs

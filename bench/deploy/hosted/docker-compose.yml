@@ -229,6 +229,15 @@ services:
       HEIMDALL_RESEND_API_KEY: ${HEIMDALL_RESEND_API_KEY:-}
       HEIMDALL_POSTMARK_TOKEN: ${HEIMDALL_POSTMARK_TOKEN:-}
       HEIMDALL_MAIL_FROM: ${HEIMDALL_MAIL_FROM:-}
+      # Plans and billing (docs/hosting.md, Billing): off unless
+      # HEIMDALL_BILLING=on; Stripe stays in test mode unless
+      # HEIMDALL_STRIPE_ALLOW_LIVE=1.
+      HEIMDALL_BILLING: ${HEIMDALL_BILLING:-}
+      HEIMDALL_STRIPE_SECRET_KEY: ${HEIMDALL_STRIPE_SECRET_KEY:-}
+      HEIMDALL_STRIPE_WEBHOOK_SECRET: ${HEIMDALL_STRIPE_WEBHOOK_SECRET:-}
+      HEIMDALL_STRIPE_TEAM_PRICE: ${HEIMDALL_STRIPE_TEAM_PRICE:-}
+      HEIMDALL_STRIPE_ALLOW_LIVE: ${HEIMDALL_STRIPE_ALLOW_LIVE:-}
+      HEIMDALL_SALES_CONTACT: ${HEIMDALL_SALES_CONTACT:-}
       # Prometheus metrics on the compose network only (docs/hosting.md,
       # Operating it); empty: off. Never publish this port.
       BENCH_SERVER_METRICS_LISTEN: ${HEIMDALL_METRICS_LISTEN:-}
