@@ -8,7 +8,7 @@ import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useCreateAgentFromTemplateMutation, useGetAgentTemplatesQuery, useTestEndpointMutation } from "@/lib/store/apis/agentBuilderApi";
 import type { AgentTemplate, TemplateCategory } from "@/lib/types/agentBuilder";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Bot, Check, ChevronRight, Code2, Hammer, Layers, Plug, SquareTerminal, type LucideIcon } from "lucide-react";
 import { AgentAvatar, useAdapterLabel } from "../../../agents/views/agentDisplay";
 import { parseAsString, useQueryState } from "nuqs";
@@ -38,6 +38,7 @@ export function defaultAgentName(t: AgentTemplate): string {
 export default function NewAgentView() {
 	const { t } = useTranslation("agentBuilder");
 	const { t: tu } = useTranslation("agentsUx");
+	const { t: tc } = useTranslation("connectTraces");
 	const adapterLabel = useAdapterLabel();
 	const canWrite = canUse(useSession(), "member");
 	const navigate = useNavigate();
@@ -102,7 +103,15 @@ export default function NewAgentView() {
 
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="agents-new-screen">
-			<PageHeader title={t("new.title")} subtitle={t("new.subtitle")} />
+			<PageHeader
+				title={t("new.title")}
+				subtitle={t("new.subtitle")}
+				actions={
+					<Link to="/agents/from-traces" title={tc("entryHint")} className="text-primary text-xs font-medium underline underline-offset-2" data-testid="agents-new-from-traces">
+						{tc("entry")}
+					</Link>
+				}
+			/>
 			{query.isLoading ? (
 				<BlockSkeleton rows={6} testId="agents-new-loading" />
 			) : query.isError ? (
