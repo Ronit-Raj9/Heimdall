@@ -51,6 +51,7 @@ func TestPublicRoutesAreExactlyTheSite(t *testing.T) {
 		"GET /api/bench/pull/run/turns/{id}", // Y11: signed run token
 		"POST /api/bench/pull/run/repos",     // Y11: signed run token
 		"GET /api/bench/pull/repos/{id}",     // Y11: signed, expiring link
+		"POST /api/bench/gateway/usage",      // C03: heimdall plugin usage export, HEIMDALL_GATEWAY_USAGE_SECRET bearer
 		"GET /api/bench/admin/pool/assignments",
 		"POST /api/bench/admin/pool/assignments/{org}/token",
 	}
