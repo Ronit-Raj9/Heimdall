@@ -8,6 +8,7 @@ import (
 	_ "github.com/maximhq/bifrost/bench/importers/browsecompplus"  // X5a
 	_ "github.com/maximhq/bifrost/bench/importers/cheatbench"      // L06: CheatBench cheating environments
 	_ "github.com/maximhq/bifrost/bench/importers/clbench"         // L12: Continual Learning Bench
+	_ "github.com/maximhq/bifrost/bench/importers/cooperbench"     // L11: CooperBench two-agent pairs
 	_ "github.com/maximhq/bifrost/bench/importers/enterpriseops"   // L14: EnterpriseOps-Gym
 	_ "github.com/maximhq/bifrost/bench/importers/gaia"            // X5a
 	_ "github.com/maximhq/bifrost/bench/importers/harbor"
