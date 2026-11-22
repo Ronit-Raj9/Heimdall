@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/publicingress"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
@@ -88,6 +89,9 @@ func (e *dockerWorkspace) startRemoteTools(ctx context.Context, rc *schemas.RunC
 	if len(access.Services)+len(access.External) == 0 {
 		return nil
 	}
+	if why := utils.RemoteReachRefusals(rc.Agent, utils.Reach{GatewayPublicURL: "-", ToolsPublicURL: e.cfg.RemoteToolsPublicURL, ToolsListen: e.cfg.RemoteToolsListen}); len(why) > 0 {
+		return fmt.Errorf("remote tool gate: %s", why[0]) // Y03: the planner refuses this too
+	}
 	host, port, err := utils.SplitRemoteToolsListen(e.cfg.RemoteToolsListen)
 	if err != nil {
 		return err
@@ -110,47 +114,75 @@ func (e *dockerWorkspace) startRemoteTools(ctx context.Context, rc *schemas.RunC
 		publish = net.JoinHostPort(host, strconv.Itoa(port))
 	}
 	labels := utils.LabelArgs(expID, runID)
+	// Y03: behind the worker's public ingress the gate has no host port: it
+	// joins the ingress network and the ingress reaches it by name.
+	ingress := strings.TrimSpace(e.cfg.RemoteToolsIngressNetwork)
+	portArgs := []string{"-p", publish + ":" + strconv.Itoa(remoteGatePort)}
+	if ingress != "" {
+		portArgs = nil
+	}
+	create := append(append([]string{"create", "--name", name}, labels...),
+		"--user", "65534", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only",
+		"--pids-limit", "64", "--memory", "64m", "--log-driver", "json-file", "--log-opt", "max-size=1m",
+		"--network", name)
+	create = append(create, portArgs...)
+	create = append(create,
+		"-e", "BENCH_GATE_TOKEN_SHA256="+hex.EncodeToString(sum[:]),
+		"--entrypoint", "bifrost-bench", e.toolProxyImage(),
+		"toolproxy", "gate", "-listen", ":"+strconv.Itoa(remoteGatePort),
+		"-upstream", "http://"+ToolProxyHost+":"+strconv.Itoa(ToolProxyPort),
+		"-run", runID, "-until", until.Format(time.RFC3339))
 	steps := [][]string{
 		append(append([]string{"network", "create"}, labels...), name),
-		append(append([]string{"create", "--name", name}, labels...),
-			"--user", "65534", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only",
-			"--pids-limit", "64", "--memory", "64m", "--log-driver", "json-file", "--log-opt", "max-size=1m",
-			"--network", name, "-p", publish+":"+strconv.Itoa(remoteGatePort),
-			"-e", "BENCH_GATE_TOKEN_SHA256="+hex.EncodeToString(sum[:]),
-			"--entrypoint", "bifrost-bench", e.toolProxyImage(),
-			"toolproxy", "gate", "-listen", ":"+strconv.Itoa(remoteGatePort),
-			"-upstream", "http://"+ToolProxyHost+":"+strconv.Itoa(ToolProxyPort),
-			"-run", runID, "-until", until.Format(time.RFC3339)),
+		create,
 		{"network", "connect", serviceNetwork(runID), name},
-		{"start", name},
 	}
+	if ingress != "" {
+		steps = append(steps, []string{"network", "connect", ingress, name})
+	}
+	steps = append(steps, []string{"start", name})
 	for _, args := range steps {
 		if _, err := e.cfg.Docker.MustRun(ctx, args...); err != nil {
 			return fmt.Errorf("remote tool gate: %w", err)
 		}
 	}
-	res, err := e.cfg.Docker.MustRun(ctx, "port", name, strconv.Itoa(remoteGatePort)+"/tcp")
-	if err != nil {
-		return fmt.Errorf("remote tool gate port: %w", err)
-	}
-	bound, err := publishedPort(string(res.Stdout), host)
-	if err != nil {
-		return fmt.Errorf("remote tool gate port: %w", err)
-	}
-	probeHost := host
-	if ip := net.ParseIP(host); ip != nil && ip.IsUnspecified() {
-		probeHost = "127.0.0.1"
-	}
-	if err := remoteGateReady(ctx, net.JoinHostPort(probeHost, strconv.Itoa(bound)), remoteGateReadyS*time.Second); err != nil {
-		return fmt.Errorf("remote tool gate: %w: %s", err, e.logTail(ctx, name))
-	}
-	base, err := utils.RemoteToolsBaseURL(e.cfg.RemoteToolsPublicURL, host, bound)
-	if err != nil {
-		return err
+	var listen, base string
+	if ingress != "" {
+		listen = net.JoinHostPort(name, strconv.Itoa(remoteGatePort))
+		if err := remoteGateReady(ctx, listen, remoteGateReadyS*time.Second); err != nil {
+			return fmt.Errorf("remote tool gate: %w: %s", err, e.logTail(ctx, name))
+		}
+		if strings.TrimSpace(e.cfg.RemoteToolsPublicURL) == "" {
+			return fmt.Errorf("remote tool gate: remote_tools.ingress_network is set but remote_tools.public_url is empty, so a remote agent would not know where the gate is")
+		}
+		if base, err = utils.RemoteToolsBaseURL(e.cfg.RemoteToolsPublicURL, host, 0); err != nil {
+			return err
+		}
+		publicingress.Default.AddGate(runID, listen, sum, until)
+	} else {
+		res, err := e.cfg.Docker.MustRun(ctx, "port", name, strconv.Itoa(remoteGatePort)+"/tcp")
+		if err != nil {
+			return fmt.Errorf("remote tool gate port: %w", err)
+		}
+		bound, err := publishedPort(string(res.Stdout), host)
+		if err != nil {
+			return fmt.Errorf("remote tool gate port: %w", err)
+		}
+		probeHost := host
+		if ip := net.ParseIP(host); ip != nil && ip.IsUnspecified() {
+			probeHost = "127.0.0.1"
+		}
+		listen = net.JoinHostPort(host, strconv.Itoa(bound))
+		if err := remoteGateReady(ctx, net.JoinHostPort(probeHost, strconv.Itoa(bound)), remoteGateReadyS*time.Second); err != nil {
+			return fmt.Errorf("remote tool gate: %w: %s", err, e.logTail(ctx, name))
+		}
+		if base, err = utils.RemoteToolsBaseURL(e.cfg.RemoteToolsPublicURL, host, bound); err != nil {
+			return err
+		}
 	}
 	access.BaseURL, access.Token = base, token
 	if rc.Dir != "" {
-		rec := schemas.RemoteToolsRecord{Listen: net.JoinHostPort(host, strconv.Itoa(bound)), BaseURL: base, Gate: name,
+		rec := schemas.RemoteToolsRecord{Listen: listen, BaseURL: base, Gate: name,
 			Services: access.Services, External: access.External, Until: until.Format(time.RFC3339)}
 		b, err := json.MarshalIndent(rec, "", "  ")
 		if err == nil {
@@ -161,7 +193,7 @@ func (e *dockerWorkspace) startRemoteTools(ctx context.Context, rc *schemas.RunC
 		}
 	}
 	rc.RemoteTools = access
-	e.cfg.Logger.Info("remote tool gate published", "run", runID, "listen", net.JoinHostPort(host, strconv.Itoa(bound)), "services", len(access.Services), "external", len(access.External))
+	e.cfg.Logger.Info("remote tool gate published", "run", runID, "listen", listen, "services", len(access.Services), "external", len(access.External))
 	return nil
 }
 

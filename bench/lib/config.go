@@ -123,9 +123,19 @@ type GatewayConfig struct {
 // base URL a remote agent is told, when it reaches the gate through a tunnel
 // or a published address; "{port}" in it is replaced with the run's port.
 // Empty uses http://<listen host>:<port>.
+//
+// IngressListen, when set, starts this worker's public ingress
+// (bench/publicingress) on that address: one listener that serves the model
+// gateway under /gw and every live run's tool gate under /rt, only for live
+// runs. The hosted stack's Caddy forwards https://<domain>/gw and /rt to it.
+// IngressNetwork is the Docker network the ingress reaches tool gates on (the
+// worker joins it): with it set, gates are not published on a host port at
+// all and are reached by container name.
 type RemoteToolsConfig struct {
-	Listen    string `yaml:"listen" json:"listen,omitempty"`
-	PublicURL string `yaml:"public_url" json:"public_url,omitempty"`
+	Listen         string `yaml:"listen" json:"listen,omitempty"`
+	PublicURL      string `yaml:"public_url" json:"public_url,omitempty"`
+	IngressListen  string `yaml:"ingress_listen" json:"ingress_listen,omitempty"`
+	IngressNetwork string `yaml:"ingress_network" json:"ingress_network,omitempty"`
 }
 
 // FaultProxyConfig points at the fault proxy control API.

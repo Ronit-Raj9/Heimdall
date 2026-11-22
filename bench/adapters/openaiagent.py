@@ -89,13 +89,25 @@ def connect_to(addr, timeout):
     raise last
 
 
+# Y03 (G1 P1-2): a failure to connect, a close before any response byte and
+# a 502, 503 or 504 answer are retried RETRIES times; then the launcher
+# prints endpoint_unreachable and exits EXIT_UNREACHABLE.
+RETRIES = max(0, min(5, int(os.environ.get("BENCH_REMOTE_RETRIES", "3") or 3)))
+BACKOFF_S = float(os.environ.get("BENCH_REMOTE_BACKOFF_S", "2") or 2)
+RETRY_STATUS = (502, 503, 504)
+EXIT_UNREACHABLE = 75
+CONNECT_TIMEOUT_S = 20
+ANSWERED = [0]
+
+
 class Conn(http.client.HTTPConnection):
     def __init__(self, host, port, addr, timeout):
         super().__init__(host, port, timeout=timeout)
         self.addr = addr
 
     def connect(self):
-        self.sock = connect_to(self.addr, self.timeout)
+        self.sock = connect_to(self.addr, min(self.timeout, CONNECT_TIMEOUT_S))
+        self.sock.settimeout(self.timeout)
 
 
 class TLSConn(http.client.HTTPSConnection):
@@ -104,8 +116,9 @@ class TLSConn(http.client.HTTPSConnection):
         self.addr = addr
 
     def connect(self):
-        sock = connect_to(self.addr, self.timeout)
+        sock = connect_to(self.addr, min(self.timeout, CONNECT_TIMEOUT_S))
         self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
+        self.sock.settimeout(self.timeout)
 
 
 class Endpoint:
@@ -124,16 +137,46 @@ class Endpoint:
             self.headers["Authorization"] = "Bearer " + key
 
     def post(self, body, timeout):
-        cls = TLSConn if self.url.scheme == "https" else Conn
-        conn = cls(self.url.hostname, self.port, self.addr, timeout)
-        try:
-            conn.request("POST", self.path, body=json.dumps(body).encode("utf-8"), headers=self.headers)
-            resp = conn.getresponse()
-            raw = resp.read(MAX_BODY + 1)
-        except (OSError, http.client.HTTPException) as e:
-            fail(1, "request to the endpoint failed: %s" % e)
-        finally:
-            conn.close()
+        payload = json.dumps(body).encode("utf-8")
+        last = ""
+        for attempt in range(RETRIES + 1):
+            if attempt:
+                pause = min(BACKOFF_S * (2 ** (attempt - 1)), 30.0)
+                log("endpoint attempt %d failed (%s); retrying in %.0fs" % (attempt, last, pause))
+                time.sleep(pause)
+            cls = TLSConn if self.url.scheme == "https" else Conn
+            conn = cls(self.url.hostname, self.port, self.addr, timeout)
+            resp = None
+            try:
+                try:
+                    conn.connect()
+                    conn.request("POST", self.path, body=payload, headers=self.headers)
+                    resp = conn.getresponse()
+                except socket.timeout as e:
+                    if conn.sock is None:
+                        last = clean("connect: %s" % e, 200)
+                        continue
+                    fail(1, "the endpoint did not answer within %ds: %s" % (int(timeout), e))
+                except (OSError, http.client.HTTPException) as e:
+                    last = clean("no response: %s" % (e or type(e).__name__), 200)
+                    continue
+                try:
+                    raw = resp.read(MAX_BODY + 1)
+                except (OSError, http.client.HTTPException) as e:
+                    fail(1, "reading the endpoint's answer failed: %s" % e)
+            finally:
+                conn.close()
+            if resp.status in RETRY_STATUS:
+                last = "HTTP %d" % resp.status
+                continue
+            break
+        else:
+            # Y03 (G1 P1-2): the customer's endpoint is down, not the agent
+            # wrong. The bench seals the run as infrastructure (never scored).
+            print(json.dumps({"type": "endpoint_unreachable", "reason": last, "attempts": RETRIES + 1, "answered": ANSWERED[0]}, sort_keys=True), flush=True)
+            log("the endpoint did not answer after %d attempts: %s" % (RETRIES + 1, last))
+            sys.exit(EXIT_UNREACHABLE)
+        ANSWERED[0] += 1
         if len(raw) > MAX_BODY:
             fail(1, "the endpoint's answer is larger than %d bytes" % MAX_BODY)
         if resp.status // 100 != 2:

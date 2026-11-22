@@ -96,6 +96,7 @@ class Gateway:
             self.headers["x-bf-vk"] = key
         self.timeout = timeout
         self.seq = 0
+        self.legacy = False
 
     def open(self, method, params, timeout):
         self.seq += 1
@@ -119,7 +120,12 @@ class Gateway:
                 op["error"] = clean(str(e))
                 finish(1, "%s through the gateway failed: %s" % (method, e))
 
-    def call(self, method, params, timeout=None):
+    def call(self, method, params, timeout=None, soft=()):
+        """One JSON-RPC call. A JSON-RPC error whose code is in soft
+        returns (op, None) instead of ending the run."""
+        name = method
+        if self.legacy:
+            method = LEGACY_METHODS.get(method, method)
         conn, resp, op = self.open(method, params, timeout or self.timeout)
         try:
             raw = resp.read(MAX_BODY + 1)
@@ -141,8 +147,14 @@ class Gateway:
         if isinstance(doc, dict) and doc.get("error"):
             err = doc["error"] if isinstance(doc["error"], dict) else {"message": str(doc["error"])}
             op["error"] = clean("%s %s" % (err.get("code", ""), err.get("message", "")))
+            if soft and err.get("code") in soft:
+                return op, None
             finish(1, "%s returned a JSON-RPC error: %s" % (method, op["error"]))
-        return op, (doc or {}).get("result") or {}
+        result = (doc or {}).get("result") or {}
+        if self.legacy:
+            # GetTask answers a task; SendMessage a task or a message.
+            result = legacy_task(result) if name == "GetTask" else legacy_result(result)
+        return op, result
 
 
 def sse_events(resp):
@@ -263,6 +275,65 @@ class Task:
                     continue
                 out.append((name, data))
         return out
+
+
+# Y03 (G1 P0-7): agents that still speak A2A before 1.0 (protocolVersion
+# 0.x: methods message/send and tasks/get, lowercase states, "kind" on every
+# object). When SendMessage is refused as an unknown method, or the card
+# says 0.x (BENCH_A2A_PROTOCOL), the launcher sends the legacy shape and
+# reads the answer back into the 1.0 shape the rest of this file uses.
+JSONRPC_METHOD_NOT_FOUND = -32601
+LEGACY_METHODS = {"SendMessage": "message/send", "GetTask": "tasks/get", "CancelTask": "tasks/cancel"}
+LEGACY_STATES = {"submitted": "TASK_STATE_SUBMITTED", "working": "TASK_STATE_WORKING", "completed": "TASK_STATE_COMPLETED",
+                 "failed": "TASK_STATE_FAILED", "canceled": "TASK_STATE_CANCELED", "rejected": "TASK_STATE_REJECTED",
+                 "input-required": "TASK_STATE_INPUT_REQUIRED", "auth-required": "TASK_STATE_AUTH_REQUIRED"}
+
+
+def legacy_message(message):
+    parts = []
+    for p in message.get("parts") or []:
+        if "text" in p:
+            parts.append({"kind": "text", "text": p["text"]})
+        elif "data" in p:
+            parts.append({"kind": "data", "data": p["data"]})
+    return {"kind": "message", "messageId": message.get("messageId"), "role": "user", "parts": parts,
+            "metadata": message.get("metadata") or {}}
+
+
+def legacy_part(p):
+    if not isinstance(p, dict):
+        return p
+    if p.get("kind") == "file" and isinstance(p.get("file"), dict):
+        f = p["file"]
+        out = {"filename": f.get("name") or ""}
+        if isinstance(f.get("bytes"), str):
+            out["raw"] = f["bytes"]
+        return out
+    return {k: v for k, v in p.items() if k != "kind"}
+
+
+def legacy_task(t):
+    if not isinstance(t, dict):
+        return t
+    t = dict(t)
+    st = t.get("status")
+    if isinstance(st, dict):
+        st = dict(st)
+        st["state"] = LEGACY_STATES.get(str(st.get("state", "")).lower(), st.get("state"))
+        if isinstance(st.get("message"), dict):
+            st["message"] = dict(st["message"], parts=[legacy_part(p) for p in st["message"].get("parts") or []])
+        t["status"] = st
+    t["artifacts"] = [dict(a, parts=[legacy_part(p) for p in a.get("parts") or []]) for a in t.get("artifacts") or [] if isinstance(a, dict)]
+    return t
+
+
+def legacy_result(result):
+    """A 0.x result (a Task or a Message with "kind") in the 1.0 shape."""
+    if not isinstance(result, dict) or "kind" not in result:
+        return result
+    if result.get("kind") == "message":
+        return {"message": dict(result, parts=[legacy_part(p) for p in result.get("parts") or []])}
+    return {"task": legacy_task(result)}
 
 
 def is_text(part):
@@ -445,7 +516,13 @@ def main():
                 else:
                     conn.close()
     else:
-        op, result = gw.call("SendMessage", {"message": message})
+        result = None
+        if not os.environ.get("BENCH_A2A_PROTOCOL", "").startswith("0."):
+            op, result = gw.call("SendMessage", {"message": message}, soft=(JSONRPC_METHOD_NOT_FOUND,))
+        if result is None:
+            gw.legacy = True
+            REPORT["protocol"] = "legacy"
+            op, result = gw.call("SendMessage", {"message": legacy_message(message)})
         task.take_event(result)
         op["task_id"] = task.id
     polls = 0

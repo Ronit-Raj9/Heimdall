@@ -84,6 +84,15 @@ type Config struct {
 	SlotsPerProvider int
 	Logger           schemas.Logger
 	MaxHold          time.Duration // X20b: longest a breakpoint holds a request; DefaultMaxHold when zero
+	// PublicOnly dials the base URL of an organization key (an
+	// OpenAI-compatible provider, a self-hosted server) only through the
+	// guarded dialer, which refuses private, loopback, link-local
+	// (metadata), carrier-grade NAT and other non-public addresses at
+	// connect time (G3 B6). The shared hosted stack sets it
+	// (BENCH_FAULTPROXY_PUBLIC_ONLY=1): an organization types that URL, and
+	// the proxy sits on a network with internal services. Off, an
+	// organization's own worker reaches its servers on its own network.
+	PublicOnly bool
 }
 
 // SlotConfig is one key slot of a provider in Bifrost. Bifrost key names are
@@ -105,6 +114,7 @@ type Server struct {
 	plans     *planTable
 	ledger    *ledger
 	client    *http.Client
+	orgClient *http.Client // org-supplied base URLs when cfg.PublicOnly (guarded); nil: client
 	logger    schemas.Logger
 	token     string
 	org       orgSlots    // F4: organization key slots (orgslots.go)
@@ -123,6 +133,9 @@ type upstream struct {
 	// trimV1: base is an OpenAI-style base (".../v1", ".../api/paas/v4")
 	// that replaces the /v1 of the request path (organization slots, A09).
 	trimV1 bool
+	// orgBase: base is an organization key's own base URL, so it is
+	// org-supplied and dialed through orgClient (Config.PublicOnly).
+	orgBase bool
 }
 
 // slotRef is a slot and the provider it belongs to.
@@ -186,9 +199,14 @@ func NewServer(cfg Config) (*Server, error) {
 	if cfg.MaxHold > 0 {
 		dbg.maxHold = cfg.MaxHold
 	}
+	client := newUpstreamClient()
+	var orgClient *http.Client // nil: org base URLs use client
+	if cfg.PublicOnly {
+		orgClient = newGuardedUpstreamClient()
+	}
 	return &Server{
 		cfg: cfg, providers: table, upstreams: ups, slots: slots, names: names,
-		plans: plans, ledger: lg, client: newUpstreamClient(),
+		plans: plans, ledger: lg, client: client, orgClient: orgClient,
 		logger: logger, token: token, debug: dbg,
 	}, nil
 }
@@ -495,7 +513,11 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, p ProviderSpec,
 		p.Auth.apply(out, up.key)
 	}
 	out.Header.Set("Accept-Encoding", "identity")
-	resp, err := s.client.Do(out)
+	client := s.client
+	if up.orgBase && s.orgClient != nil {
+		client = s.orgClient // G3 B6: an org-supplied base URL
+	}
+	resp, err := client.Do(out)
 	if err != nil {
 		msg := redactURLError(err)
 		s.logger.Warn("upstream request failed", "slot", e.Slot, "provider", p.Name, "path", r.URL.Path, "error", msg)
@@ -615,6 +637,16 @@ func newUpstreamClient() *http.Client {
 		MaxIdleConnsPerHost:   16,
 		DisableCompression:    true,
 	}
+	return &http.Client{Transport: tr}
+}
+
+// newGuardedUpstreamClient is newUpstreamClient for organization base URLs
+// on a public-only proxy: the guarded dialer checks every address at
+// connect time, and no proxy from the environment dials for it.
+func newGuardedUpstreamClient() *http.Client {
+	tr := newUpstreamClient().Transport.(*http.Transport).Clone()
+	tr.Proxy = nil
+	tr.DialContext = utils.GuardedDialer(10 * time.Second).DialContext
 	return &http.Client{Transport: tr}
 }
 

@@ -36,6 +36,27 @@ type OrgSlotRegistrar interface {
 	RegisterOrgSlots(ctx context.Context, slots []OrgSlot) error
 }
 
+// orgSlotReplacer and orgSlotReleaser are the parts of the fault proxy
+// control API that free organization slots (G3 B7; faultproxy.Client has
+// both). A registrar without them only adds, as before.
+type orgSlotReplacer interface {
+	ReplaceOrgSlots(ctx context.Context, slots []OrgSlot, replace []string) error
+}
+
+type orgSlotReleaser interface {
+	ReleaseOrgSlots(ctx context.Context, prefixes []string) error
+}
+
+// orgSlotPrefix is the name prefix of every slot of an organization, and
+// orgProviderPrefix of one of its providers (OrgSlotName).
+func orgSlotPrefix(orgID string) string {
+	return "org_" + orgIDSafe.ReplaceAllString(strings.ToLower(orgID), "") + "_"
+}
+
+func orgProviderPrefix(orgID, provider string) string {
+	return orgSlotPrefix(orgID) + orgIDSafe.ReplaceAllString(provider, "") + "_"
+}
+
 // orgSlotsPerProvider is how many concurrent runs of one organization can
 // use one provider on this runner.
 const orgSlotsPerProvider = 8 // a team agent takes one per member; 4 starved it behind single runs
@@ -125,6 +146,21 @@ func (g *Gateway) ApplyOrgCredentials(ctx context.Context, orgID string, creds [
 			errs = append(errs, fmt.Errorf("provider %s: %w", p, err))
 		}
 	}
+	// G3 B7: a provider whose every key was deleted keeps no slots: its
+	// keys leave the fault proxy and no run of the org picks its slots.
+	st.mu.Lock()
+	var gone []string
+	for p := range st.byOrg[orgID] {
+		if _, ok := byProvider[p]; !ok {
+			gone = append(gone, p)
+		}
+	}
+	st.mu.Unlock()
+	for _, p := range gone {
+		if err := g.dropOrgProvider(ctx, st, orgID, p); err != nil {
+			errs = append(errs, fmt.Errorf("provider %s: %w", p, err))
+		}
+	}
 	if len(errs) > 0 {
 		return fmt.Errorf("org credentials for %s: %w", orgID, errors.Join(errs...))
 	}
@@ -168,7 +204,13 @@ func (g *Gateway) applyOrgProvider(ctx context.Context, reg OrgSlotRegistrar, st
 	// restart, and swaps in a changed key set. A direct provider (AWS,
 	// Google OAuth, token exchange) never passes the proxy.
 	if len(fp) > 0 {
-		if err := reg.RegisterOrgSlots(ctx, fp); err != nil {
+		var err error
+		if rp, ok := reg.(orgSlotReplacer); ok { // G3 B7: slots of a shrunk key set go with the rotation
+			err = rp.ReplaceOrgSlots(ctx, fp, []string{orgProviderPrefix(orgID, provider)})
+		} else {
+			err = reg.RegisterOrgSlots(ctx, fp)
+		}
+		if err != nil {
 			return fmt.Errorf("register keys at the fault proxy: %w", err)
 		}
 	}
@@ -195,6 +237,66 @@ func (g *Gateway) applyOrgProvider(ctx context.Context, reg OrgSlotRegistrar, st
 	}
 	st.mu.Unlock()
 	g.logger.Info("organization provider keys registered", "org", orgID, "provider", provider, "keys", len(keys), "slots", len(setup.Slots))
+	return nil
+}
+
+// dropOrgProvider forgets one provider of an organization: its slots leave
+// the fault proxy (with their keys) and the gateway's state. The
+// placeholder keys in Bifrost hold no secret and stay.
+func (g *Gateway) dropOrgProvider(ctx context.Context, st *orgCreds, orgID, provider string) error {
+	if rel, ok := g.cfg.Claims.(orgSlotReleaser); ok && g.cfg.FaultProxyURL != "" {
+		if err := rel.ReleaseOrgSlots(ctx, []string{orgProviderPrefix(orgID, provider)}); err != nil {
+			return err
+		}
+	}
+	st.mu.Lock()
+	if p, ok := st.byOrg[orgID][provider]; ok {
+		for _, s := range p.Slots {
+			delete(st.slotKey, s.Name)
+		}
+		delete(st.byOrg[orgID], provider)
+	}
+	st.mu.Unlock()
+	return nil
+}
+
+// ReleaseOrgCredentials frees everything ApplyOrgCredentials registered for
+// an organization: its slots and keys at the fault proxy, and the gateway's
+// state for it, including its experiment bindings (G3 B7). A runner calls it
+// when it stops serving the organization (the shared worker's claim ended),
+// so a busy shared proxy never fills up with organizations no runner
+// serves. Calling it again, or for an unknown organization, is harmless.
+func (g *Gateway) ReleaseOrgCredentials(ctx context.Context, orgID string) error {
+	if orgIDSafe.ReplaceAllString(strings.ToLower(orgID), "") == "" {
+		return nil
+	}
+	var err error
+	if rel, ok := g.cfg.Claims.(orgSlotReleaser); ok && g.cfg.FaultProxyURL != "" {
+		err = rel.ReleaseOrgSlots(ctx, []string{orgSlotPrefix(orgID)})
+	}
+	st := g.orgs()
+	st.mu.Lock()
+	for _, p := range st.byOrg[orgID] {
+		for _, s := range p.Slots {
+			delete(st.slotKey, s.Name)
+		}
+	}
+	delete(st.byOrg, orgID)
+	for exp, o := range st.expOrg {
+		if o == orgID {
+			delete(st.expOrg, exp)
+		}
+	}
+	for rr := range st.next {
+		if strings.HasPrefix(rr, orgID+"\x00") {
+			delete(st.next, rr)
+		}
+	}
+	st.mu.Unlock()
+	if err != nil {
+		return fmt.Errorf("release organization keys for %s: %w", orgID, err)
+	}
+	g.logger.Info("organization provider keys released", "org", orgID)
 	return nil
 }
 

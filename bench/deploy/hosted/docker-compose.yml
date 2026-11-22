@@ -80,6 +80,14 @@ networks:
     internal: true
     enable_ipv6: false
     labels: *labels
+  rtgate:
+    # shared-runner profile, internal: the shared worker reaches its runs'
+    # tool gates here by container name (remote_tools.ingress_network), so
+    # gates publish no host port. Only the worker and the gates join it.
+    name: ${HEIMDALL_RTGATE_NETWORK:-heimdall-rtgate}
+    internal: true
+    enable_ipv6: false
+    labels: *labels
   evalnet:
     # Fixed name: Bifrost's default eval network. The shared runner does
     # not start agents on it: each org gets its own internal network,
@@ -216,6 +224,13 @@ services:
       # with the shared pool on means http://bifrost:8080; "off" disables it.
       HEIMDALL_GATEWAY_LOGS_URL: ${HEIMDALL_GATEWAY_LOGS_URL:-}
       BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
+      # Where deployed agents reach the shared worker's gateway and tools
+      # (Caddy's /gw and /rt). The planner refuses a run whose agent could
+      # not reach them; same values as the shared runner's below.
+      BENCH_GATEWAY_PUBLIC_URL: ${HEIMDALL_GATEWAY_PUBLIC_URL:-https://${HEIMDALL_DOMAIN}/gw}
+      BENCH_REMOTE_TOOLS_PUBLIC_URL: ${HEIMDALL_TOOLS_PUBLIC_URL:-https://${HEIMDALL_DOMAIN}/rt}
+      # The deployed commit, for the worker install script's downloads.
+      HEIMDALL_BUILD_COMMIT: ${HEIMDALL_BUILD_COMMIT:-}
     volumes:
       - ./bench.hosted.yaml:/srv/heimdall/deploy/bench.yaml:ro
       - heimdall-data:/var/lib/heimdall
@@ -273,6 +288,9 @@ services:
       # Runs that may use one provider at once through this proxy, shared by
       # every runner here; runners set the same count (gateway slots).
       BENCH_FAULTPROXY_SLOTS_PER_PROVIDER: ${HEIMDALL_PROVIDER_SLOTS:-32}
+      # Organization key base URLs are org-supplied: dial them only at public
+      # addresses, checked at connect time (shared stack only).
+      BENCH_FAULTPROXY_PUBLIC_ONLY: "1"
       # No server-wide provider keys and no scripted fallback: every org run
       # uses the org's own keys from Models & keys, which runners register
       # per lease. A keyless call fails with "no key configured".
@@ -455,6 +473,13 @@ services:
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
       # Python with the modal package, for organizations whose runs go to Modal.
       HEIMDALL_MODAL_PYTHON: ${HEIMDALL_MODAL_PYTHON:-}
+      # Public ingress (Caddy /gw and /rt): deployed agents and cloud
+      # sandboxes reach this worker's gateway and live runs' tool gates
+      # through https://$HEIMDALL_DOMAIN, with the run's own key or token.
+      BENCH_GATEWAY_PUBLIC_URL: ${HEIMDALL_GATEWAY_PUBLIC_URL:-https://${HEIMDALL_DOMAIN}/gw}
+      BENCH_REMOTE_TOOLS_PUBLIC_URL: ${HEIMDALL_TOOLS_PUBLIC_URL:-https://${HEIMDALL_DOMAIN}/rt}
+      BENCH_REMOTE_TOOLS_INGRESS_LISTEN: 0.0.0.0:9300
+      BENCH_REMOTE_TOOLS_INGRESS_NETWORK: ${HEIMDALL_RTGATE_NETWORK:-heimdall-rtgate}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:ro
@@ -468,7 +493,7 @@ services:
       - ${HEIMDALL_REGISTRY_AUTH_DIR:-/var/lib/heimdall-registry-auth}/runner:/run/heimdall-registry:ro
     tmpfs:
       - /tmp
-    networks: [edge, upstream, buildnet]
+    networks: [edge, upstream, buildnet, rtgate]
     depends_on:
       heimdall:
         condition: service_healthy

@@ -75,6 +75,12 @@ type (
 		Suite      string `json:"suite"` // <id> or <id>@<version>
 		Task       string `json:"task,omitempty"`
 		TimeoutMin int    `json:"timeout_min,omitempty"`
+		// Real is "Try one real task" (Y03, G1 P1-1): the same one-task run
+		// on the org's own worker, with the agent's real model calls on the
+		// org's key instead of the scripted model, so endpoint agents
+		// (HTTP, OpenAI-compatible, A2A) are checked exactly as a run would
+		// call them, from where a run would call them.
+		Real bool `json:"real,omitempty"`
 	}
 	hostedSuiteAdmitParams struct {
 		Suite      string `json:"suite"`
@@ -418,6 +424,7 @@ type hostedCheckReport struct {
 	Runs   []bridgeRun `json:"runs"`
 	Result string      `json:"result"` // PASS | WARN | FAIL | ERROR
 	Detail string      `json:"detail"`
+	Real   bool        `json:"real,omitempty"` // a "try one real task" run (real model calls)
 }
 
 // checkVerdict grades a hosted agent check from its runs. The scripted model
@@ -481,11 +488,14 @@ func runHostedAgentCheck(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.
 		task = s.TaskIDs[0]
 	}
 	exp := checkExperiment(p.Agent, p.Suite, task)
+	if p.Real {
+		exp = realTryExperiment(exp)
+	}
 	m, err := l.Plan(ctx, exp)
 	if err != nil {
 		return nil, fmt.Errorf("plan the check: %w", err)
 	}
-	rep := &hostedCheckReport{Agent: p.Agent, Suite: p.Suite, Task: firstTask(m), ExpID: m.ExpID}
+	rep := &hostedCheckReport{Agent: p.Agent, Suite: p.Suite, Task: firstTask(m), ExpID: m.ExpID, Real: p.Real}
 	if err := runExperiment(ctx, l, m, timeout, log); err != nil {
 		rep.Result, rep.Detail = checkError, err.Error()
 		return rep, err
@@ -494,6 +504,9 @@ func runHostedAgentCheck(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.
 		return rep, err
 	}
 	rep.Result, rep.Detail = checkVerdict(rep.Runs, bridgeSlots(m))
+	if p.Real && rep.Result == checkPass {
+		rep.Detail = "the agent ran one real task on the worker with real model calls and finished by itself"
+	}
 	for _, r := range rep.Runs {
 		log.Printf("%-8s arm %s  %-10s %s", r.Task, r.Arm, r.Outcome, r.RunID)
 	}
@@ -530,6 +543,21 @@ func checkExperiment(agent, suite, task string) *schemas.Experiment {
 		ScriptedUpstream: true,
 	}
 	return e
+}
+
+// realTryExperiment turns the check into "Try one real task": one trial
+// of one task with the agent's real model calls (no smoke, no scripted
+// model). It runs on the org's worker like any evaluation, so an endpoint
+// agent is called from the same place and with the same gateway, tools and
+// retries as in a run. It is its own experiment, so it never changes
+// another evaluation's results.
+func realTryExperiment(e *schemas.Experiment) *schemas.Experiment {
+	out := *e
+	out.Name = "try-" + strings.TrimPrefix(e.Name, "check-")
+	out.Arms = map[string]schemas.ArmSpec{"A": {Label: "try"}}
+	out.Smoke, out.ScriptedUpstream = false, false
+	out.Concurrency = 1
+	return &out
 }
 
 func firstTask(m *schemas.Manifest) string {

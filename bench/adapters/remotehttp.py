@@ -50,6 +50,17 @@ EVENT_PREFIX = "@@heimdall-event "
 SECRET_RE = re.compile(r"(?i)(sk-[A-Za-z0-9_-]{8,}|bearer\s+[A-Za-z0-9._~+/=-]{8,}|(?:api[_-]?key|token|secret|password)[\"']?\s*[:=]\s*[\"']?[^\s\"',}]{4,})")
 
 
+# Y03 (G1 P1-2): the customer's endpoint failing before it answers is
+# infrastructure. RETRIES more attempts are made, BACKOFF_S apart (doubling);
+# then the launcher prints an endpoint_unreachable line and exits
+# EXIT_UNREACHABLE, and the bench seals the run as aborted_infra (never
+# scored; the slot gets a new run, up to three attempts).
+RETRIES = max(0, min(5, int(os.environ.get("BENCH_REMOTE_RETRIES", "3") or 3)))
+BACKOFF_S = float(os.environ.get("BENCH_REMOTE_BACKOFF_S", "2") or 2)
+RETRY_STATUS = (502, 503, 504)
+EXIT_UNREACHABLE = 75
+
+
 def emit(event):
     print(json.dumps(event, sort_keys=True), flush=True)
 
@@ -58,6 +69,12 @@ def fail(code, message):
     emit({"type": "error", "message": message})
     print("remote_http: " + message, file=sys.stderr, flush=True)
     sys.exit(code)
+
+
+def unreachable(reason, attempts):
+    emit({"type": "endpoint_unreachable", "reason": reason, "attempts": attempts})
+    print("remote_http: the agent's endpoint did not answer after %d attempts: %s" % (attempts, reason), file=sys.stderr, flush=True)
+    sys.exit(EXIT_UNREACHABLE)
 
 
 def clean(value, limit=MAX_STR):
@@ -81,13 +98,17 @@ def connect_to(addr, timeout):
     raise last
 
 
+CONNECT_TIMEOUT_S = 20
+
+
 class Conn(http.client.HTTPConnection):
     def __init__(self, host, port, addr, timeout):
         super().__init__(host, port, timeout=timeout)
         self.addr = addr
 
     def connect(self):
-        self.sock = connect_to(self.addr, self.timeout)
+        self.sock = connect_to(self.addr, min(self.timeout, CONNECT_TIMEOUT_S))
+        self.sock.settimeout(self.timeout)
 
 
 class TLSConn(http.client.HTTPSConnection):
@@ -96,8 +117,9 @@ class TLSConn(http.client.HTTPSConnection):
         self.addr = addr
 
     def connect(self):
-        sock = connect_to(self.addr, self.timeout)
+        sock = connect_to(self.addr, min(self.timeout, CONNECT_TIMEOUT_S))
         self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
+        self.sock.settimeout(self.timeout)
 
 
 def workspace_files(root, skip):
@@ -296,20 +318,54 @@ class Remote:
             return None
         return (o.path or "/") + ("?" + o.query if o.query else "")
 
-    def do(self, method, path, body, headers, timeout):
-        cls = TLSConn if self.url.scheme == "https" else Conn
-        conn = cls(self.url.hostname, self.port, self.addr, timeout)
-        try:
-            conn.request(method, path, body=body, headers=dict(self.headers, **headers))
-            resp = conn.getresponse()
-            raw = resp.read(MAX_ANSWER_BYTES + 1)
-        except (OSError, http.client.HTTPException) as e:
-            fail(1, "request to the agent failed: %s" % e)
-        finally:
-            conn.close()
-        if len(raw) > MAX_ANSWER_BYTES:
-            fail(1, "the agent's answer is larger than %d bytes" % MAX_ANSWER_BYTES)
-        return resp, raw
+    def do(self, method, path, body, headers, timeout, deadline=None):
+        """One request. With a deadline, a failure to connect (refused,
+        DNS, TLS, connect timeout) and a 502, 503 or 504 answer are retried
+        up to RETRIES times; when every attempt fails that way the endpoint
+        is unreachable, which is the customer's infrastructure, never the
+        agent's answer (exit EXIT_UNREACHABLE)."""
+        attempts = (RETRIES + 1) if deadline else 1
+        last = ""
+        for attempt in range(attempts):
+            if attempt:
+                pause = min(BACKOFF_S * (2 ** (attempt - 1)), 30.0)
+                if deadline and time.time() + pause >= deadline:
+                    break
+                emit({"type": "retry", "attempt": attempt + 1, "reason": last})
+                time.sleep(pause)
+            cls = TLSConn if self.url.scheme == "https" else Conn
+            conn = cls(self.url.hostname, self.port, self.addr, timeout)
+            try:
+                try:
+                    conn.connect()
+                except (OSError, http.client.HTTPException) as e:
+                    last = clean("connect: %s" % e, 200)
+                    continue
+                try:
+                    conn.request(method, path, body=body, headers=dict(self.headers, **headers))
+                    resp = conn.getresponse()
+                except socket.timeout as e:
+                    fail(1, "the agent did not answer within %ds: %s" % (int(timeout), e))
+                except (OSError, http.client.HTTPException) as e:
+                    # Closed or reset before a single response byte: the
+                    # endpoint (or its load balancer) is down, not answering.
+                    last = clean("no response: %s" % (e or type(e).__name__), 200)
+                    continue
+                try:
+                    raw = resp.read(MAX_ANSWER_BYTES + 1)
+                except (OSError, http.client.HTTPException) as e:
+                    fail(1, "reading the agent's answer failed: %s" % e)
+            finally:
+                conn.close()
+            if len(raw) > MAX_ANSWER_BYTES:
+                fail(1, "the agent's answer is larger than %d bytes" % MAX_ANSWER_BYTES)
+            if deadline and resp.status in RETRY_STATUS:
+                last = "HTTP %d" % resp.status
+                continue
+            return resp, raw
+        if attempts == 1:
+            fail(1, "request to the agent failed: %s" % last)
+        unreachable(last, attempts)
 
 
 def parse_json(raw):
@@ -392,7 +448,7 @@ def main():
     started = time.time()
     emit({"type": "request", "session_id": body["session_id"], "session_index": body["session_index"],
           "files": len(body.get("files", {})), "tools": len(body.get("tools", {})), "signed": bool(secret)})
-    resp, raw = remote.do("POST", path, payload, headers, timeout)
+    resp, raw = remote.do("POST", path, payload, headers, timeout, deadline)
     report = {}
     if resp.status == 202:
         resp, raw = poll(remote, resp, raw, deadline, report)

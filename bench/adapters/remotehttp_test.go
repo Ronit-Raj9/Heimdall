@@ -41,6 +41,9 @@ func TestRemoteHTTPPlan(t *testing.T) {
 	for _, traffic := range []string{"", RemoteTrafficExternal, RemoteTrafficGateway} {
 		t.Run("traffic "+traffic, func(t *testing.T) {
 			rc, cfg := remoteFixture(t, remoteAgent(traffic))
+			if traffic == RemoteTrafficGateway {
+				cfg.GatewayPublicURL = testGateway // Y03: an internet endpoint needs the published gateway
+			}
 			plan, err := newRemoteHTTPAdapter(cfg).Plan(context.Background(), rc)
 			if err != nil {
 				t.Fatal(err)
@@ -299,6 +302,23 @@ func TestRemoteHTTPNoPaidNeedsGateway(t *testing.T) {
 	}
 	rc, cfg := remoteFixture(t, remoteAgent(RemoteTrafficGateway))
 	rc.NoPaidTraffic = true
+	cfg.GatewayPublicURL = testGateway
+	if _, err := newRemoteHTTPAdapter(cfg).Plan(context.Background(), rc); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestRemoteHTTPGatewayUnreachable is Y03 (G1 P0-1): an internet endpoint
+// with model_traffic gateway on a worker whose gateway is not published is
+// refused with the reason, instead of being told an internal address.
+func TestRemoteHTTPGatewayUnreachable(t *testing.T) {
+	rc, cfg := remoteFixture(t, remoteAgent(RemoteTrafficGateway))
+	cfg.GatewayPublicURL = ""
+	if _, err := newRemoteHTTPAdapter(cfg).Plan(context.Background(), rc); err == nil || !strings.Contains(err.Error(), "gateway.public_url") {
+		t.Fatalf("err %v", err)
+	}
+	// An endpoint on the worker's own network reaches the agent URL.
+	rc.Agent.Remote.URL = "http://acme-agent:8000/run"
 	if _, err := newRemoteHTTPAdapter(cfg).Plan(context.Background(), rc); err != nil {
 		t.Fatal(err)
 	}

@@ -77,7 +77,17 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 						suite.trim() === "" ? (
 							<p className="text-destructive text-xs">{t("checks.check.needSuite", { suite: DEFAULT_SUITE })}</p>
 						) : (
-							<JobRunButton kind="agent.check" params={checkParams} label={t("checks.check.run")} />
+							<div className="flex flex-wrap items-center gap-2">
+								<JobRunButton kind="agent.check" params={checkParams} label={t("checks.check.run")} />
+								{hosted && (
+									<JobRunButton
+										kind="agent.check"
+										params={{ ...checkParams, real: true }}
+										label={t("checks.check.tryReal")}
+										variant="outline"
+									/>
+								)}
+							</div>
 						)
 					}
 				>
@@ -88,6 +98,7 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 						<Field label={t("checks.check.task")}>
 							<Input value={task} onChange={(e) => setTask(e.target.value)} data-testid="agent-check-task" />
 						</Field>
+						{hosted && <p className="text-muted-foreground text-xs sm:col-span-3" data-testid="agent-check-try-real-hint">{t("checks.check.tryRealHint")}</p>}
 						{!hosted && (
 							<label className="flex items-center gap-2 self-end pb-2 text-xs">
 								<input type="checkbox" checked={noBuild} onChange={(e) => setNoBuild(e.target.checked)} data-testid="agent-check-nobuild" />

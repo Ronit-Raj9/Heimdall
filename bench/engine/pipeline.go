@@ -169,6 +169,10 @@ func (p *Pipeline) RunSlot(ctx context.Context, in SlotInput) (*SlotResult, erro
 	up := utils.TallyUpstream(st.ev.Ledger, st.ev.Requests)
 	st.rc.Run.Practice = practiceRun(st.rc, st.ev.Ledger) // X01: labelled in run.json
 	st.rc.Run.Outcome = decideOutcome(st, up)
+	if o, pf := endpointOutcome(st.rc, st.rc.Run.Outcome); pf != nil { // Y03: a customer endpoint outage is never the agent's score (endpointinfra.go)
+		st.rc.Run.Outcome = o
+		st.rc.Run.Failures = append(st.rc.Run.Failures, *pf)
+	}
 	p.ownerAbort(ctx, st)
 	st.rc.Run.Y = scoreOf(st.rc.Run.Outcome)
 	p.reconcileMetrics(sctx, st)

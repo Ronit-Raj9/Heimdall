@@ -148,6 +148,12 @@ func (f *fakeA2A) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // runA2ALauncher runs a2a.py on the host against the fake gateway.
 func runA2ALauncher(t *testing.T, f *fakeA2A, env map[string]string) (answer string, out string, ws string, err error) {
 	t.Helper()
+	return runA2ALauncherHandler(t, f, env)
+}
+
+// runA2ALauncherHandler runs a2a.py on the host against any gateway handler.
+func runA2ALauncherHandler(t *testing.T, f http.Handler, env map[string]string) (answer string, out string, ws string, err error) {
+	t.Helper()
 	py, lerr := exec.LookPath("python3")
 	if lerr != nil {
 		t.Skip("python3 not on PATH")

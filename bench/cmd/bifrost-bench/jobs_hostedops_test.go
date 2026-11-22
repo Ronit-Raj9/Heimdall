@@ -254,3 +254,17 @@ func TestBridgeRequireRunner(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+// TestRealTryExperiment is Y03 (G1 P1-1): "Try one real task" is the check's
+// one task with real model calls, so endpoint agents are not refused as they
+// are under the scripted model.
+func TestRealTryExperiment(t *testing.T) {
+	base := checkExperiment("agents/bot.yaml", "support", "t01")
+	e := realTryExperiment(base)
+	if e.NoPaidTraffic() || e.Name != "try-bot" || len(e.Conditions[0].Tasks.IDs) != 1 || e.Conditions[0].Trials != 1 || e.Concurrency != 1 {
+		t.Fatalf("try %+v", e)
+	}
+	if !base.NoPaidTraffic() {
+		t.Fatal("the check itself must stay scripted")
+	}
+}

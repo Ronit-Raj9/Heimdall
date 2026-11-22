@@ -61,6 +61,25 @@
 		}
 	}
 
+	# Public ingress (docs/hosting.md "Agents outside the worker"): the
+	# shared worker's model gateway under /gw and its live runs' tool gates
+	# under /rt, for deployed agents and cloud sandboxes. The worker answers
+	# only for live runs: /gw needs the run's virtual key on an inference
+	# route, /rt the run's tool token; each run is rate limited there.
+	@ingress path /gw /gw/* /rt/*
+	handle @ingress {
+		request_body {
+			max_size {$HEIMDALL_INGRESS_MAX_BODY:32MiB}
+		}
+		reverse_proxy {$HEIMDALL_INGRESS_UPSTREAM:shared-runner:9300} {
+			# Model answers stream (server-sent events) unbuffered.
+			flush_interval -1
+			transport http {
+				dial_timeout 5s
+			}
+		}
+	}
+
 	handle {
 		# The API caps bodies at 1 MiB (runner uploads are chunked below
 		# it); anything far above is refused here before it reaches it.
@@ -85,7 +104,8 @@
 
 	# Access log, JSON. Request URIs can carry credentials: the one-time
 	# invitation token in /invite/<token> and /api/bench/auth/invitations/<token>,
-	# and the OAuth callback's code and state query parameters. The filter
+	# the OAuth callback's code and state query parameters, and a model
+	# client's key query parameter on /gw. The filter
 	# replaces each of those values with REDACTED before the line is written.
 	# The Referer header can repeat such a URL, so it is dropped. (Cookie and
 	# Authorization headers are already redacted by Caddy by default.)
@@ -94,7 +114,7 @@
 		format filter {
 			wrap json
 			fields {
-				request>uri regexp "((?:/invite/|/api/bench/auth/invitations/)|[?&](?:code|state)=)[^/?&#]+" "${1}REDACTED"
+				request>uri regexp "((?:/invite/|/api/bench/auth/invitations/)|[?&](?:code|state|key)=)[^/?&#]+" "${1}REDACTED"
 				request>headers>Referer delete
 			}
 		}
