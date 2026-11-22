@@ -575,8 +575,8 @@ func TestHostedAnonymousAndRunners(t *testing.T) {
 			continue
 		}
 		p := f.fill(path, f.bExp, f.bRuns[0], f.bPair)
-		if strings.HasPrefix(path, handlers.APIPrefix+"/shared/") {
-			// Share links are public by design: the token names the org and
+		if strings.HasPrefix(path, handlers.APIPrefix+"/shared/") || strings.HasPrefix(path, handlers.APIPrefix+"/live-monitor-badges/") {
+			// Share links and live monitor badges (Z22) are public by design: the token names the org and
 			// a bad token is 404, never another org's data.
 			for _, org := range []string{"acme", "beta", f.acme.ID} {
 				if r := f.do("GET", p, "", map[string]string{tenancy.OrgHeader: org}, nil); r.status != 404 {

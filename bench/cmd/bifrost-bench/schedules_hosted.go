@@ -221,7 +221,8 @@ func startHostedScheduleTicker(a *app, s handlers.Services) func() {
 	if old, loaded := hostedTickers.Swap(s.OrgID, h); loaded {
 		old.(*hostedTicker).cancel()
 	}
-	t := &scheduleTicker{root: a.cfg.Root, org: s.OrgID, hosted: true, jobs: s.Jobs, logger: a.logger, last: time.Now()}
+	t := &scheduleTicker{root: a.cfg.Root, org: s.OrgID, hosted: true, jobs: s.Jobs, logger: a.logger, last: time.Now(),
+		collect: monitorCollector(a, s)} // Z22 live monitors
 	go t.loop(ctx)
 	return func() {
 		cancel()
