@@ -32,6 +32,12 @@ var _ schemas.BifrostMCPEnvironment = (*dockerWorkspace)(nil)
 // toolProxyGatewayAlias is the tool proxy's name on the evaluation network.
 func toolProxyGatewayAlias(runID string) string { return "tp-" + runID }
 
+// servesMCPThroughGateway reports whether the run's tool proxy must sit on
+// the evaluation network for Bifrost's MCP gateway (gateway.bifrost.mcp).
+func servesMCPThroughGateway(rc *schemas.RunContext, cfg DockerWorkspaceConfig) bool {
+	return rc != nil && rc.Agent != nil && rc.Agent.Gateway.Bifrost != nil && rc.Agent.Gateway.Bifrost.MCP != nil && cfg.EvalNetwork != ""
+}
+
 // ServeMCP implements schemas.BifrostMCPEnvironment.
 func (e *dockerWorkspace) ServeMCP(ctx context.Context, rc *schemas.RunContext, codeMode bool) (*schemas.BifrostMCPEvidence, error) {
 	gw, ok := schemas.GatewayAs[schemas.BifrostMCPGateway](e.cfg.ServiceGateway.Gateway)
@@ -68,8 +74,14 @@ func (e *dockerWorkspace) ServeMCP(ctx context.Context, rc *schemas.RunContext, 
 		ev.Complete = true
 		return ev, nil
 	}
-	if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", "--alias", alias, e.cfg.EvalNetwork, toolProxyContainer(runID)); err != nil {
-		return nil, fmt.Errorf("connect the tool proxy to the evaluation network for the gateway: %w", err)
+	if _, joined := e.gatewayJoined.Load(runID); !joined {
+		// Fallback for a tool proxy started without the gateway join
+		// (startToolProxy joins before start). A network joined to a
+		// running container does not work under gVisor (runsc).
+		if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", "--alias", alias, e.cfg.EvalNetwork, toolProxyContainer(runID)); err != nil {
+			return nil, fmt.Errorf("connect the tool proxy to the evaluation network for the gateway: %w", err)
+		}
+		e.gatewayJoined.Store(runID, true)
 	}
 	clients, key, err := gw.ServeMCP(ctx, rc, ups, codeMode)
 	if err != nil {
@@ -102,6 +114,9 @@ func gatewayUpstream(agentURL, alias string) (string, error) {
 
 // RemoveMCP implements schemas.BifrostMCPEnvironment.
 func (e *dockerWorkspace) RemoveMCP(ctx context.Context, rc *schemas.RunContext) error {
+	if rc != nil && rc.Run != nil {
+		e.gatewayJoined.Delete(rc.Run.RunID)
+	}
 	gw, ok := schemas.GatewayAs[schemas.BifrostMCPGateway](e.cfg.ServiceGateway.Gateway)
 	if !ok || rc.Run == nil {
 		return nil
