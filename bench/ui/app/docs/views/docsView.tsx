@@ -2,6 +2,8 @@ import { Markdown, parseBlocks, slugify } from "@/components/docs/markdown";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState, PageHeader } from "@/components/shell";
 import { Input } from "@/components/ui/input";
+import { useSession } from "@/lib/session/sessionContext";
+import { useGetPublicDocQuery, useListPublicDocsQuery } from "@/lib/store/apis/publicSiteApi";
 import { useGetDocQuery, useListDocsQuery } from "@/lib/store/apis/welcomeApi";
 import "@/lib/types/welcomeI18n";
 import { cn } from "@/lib/utils";
@@ -37,11 +39,19 @@ const PINNED = [
 /** /docs: every guide in bench/docs, served by GET /docs and rendered in place. ?doc=<name> selects one. */
 export default function DocsView() {
 	const { t } = useTranslation("welcome");
-	const list = useListDocsQuery();
+	// A hosted visitor who is not signed in reads the public guides (GET /public/docs, internal
+	// notes left out) in the public frame; everyone else the in-app guides.
+	const session = useSession();
+	const visitor = session.authMode === "hosted" && !session.signedIn;
+	const appList = useListDocsQuery(undefined, { skip: visitor });
+	const publicList = useListPublicDocsQuery(undefined, { skip: !visitor });
+	const list = visitor ? publicList : appList;
 	const [selected, setSelected] = useQueryState("doc", parseAsString.withDefault(START_DOC));
 	const [filter, setFilter] = useState("");
 	const [anchor, setAnchor] = useState<string | undefined>();
-	const doc = useGetDocQuery(selected, { skip: !selected });
+	const appDoc = useGetDocQuery(selected, { skip: !selected || visitor });
+	const publicDoc = useGetPublicDocQuery(selected, { skip: !selected || !visitor });
+	const doc = visitor ? publicDoc : appDoc;
 
 	const docs = useMemo(() => {
 		const all = [...(list.data?.docs ?? [])];

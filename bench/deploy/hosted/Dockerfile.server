@@ -39,7 +39,40 @@ RUN test -f ui/dist/index.html \
     && go build -ldflags="-s -w" -o /out/bifrost-bench ./cmd/bifrost-bench \
     && /out/bifrost-bench version
 
-# --- Runtime: the server ------------------------------------------------------
+# --- TypeScript SDK for /downloads: compiled with the UI stage's TypeScript
+# and packed with npm into a tarball (`npm install <url>`). Nothing is
+# published to a registry; the server serves the file. (Y08)
+FROM ui AS sdk-ts
+WORKDIR /src/clients/typescript
+COPY clients/typescript/ ./
+RUN /src/ui/node_modules/.bin/tsc -p tsconfig.json --outDir dist --declaration --noEmit false \
+    && mkdir -p /out/downloads \
+    && npm pack --pack-destination /out/downloads
+
+# --- Downloads served at /downloads (docs/downloads.md, Y08): the command
+# line tool for Linux and macOS on amd64 and arm64, the Python SDK wheel and
+# sdist, the TypeScript SDK tarball and, when the commit is known, a source
+# tarball of this bench module (bench-<commit>.tar.gz, what a runner installs
+# from). All built here from this checkout, at HEIMDALL_COMMIT (upgrade.sh
+# passes git rev-parse HEAD). SHA256SUMS and manifest.json list them. In its
+# own stage so a new commit never rebuilds the server binary above.
+FROM build AS downloads
+ARG HEIMDALL_COMMIT=""
+COPY --from=sdk-ts /out/downloads/ /out/downloads/
+RUN set -eu; \
+    for p in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \
+        os=${p%/*} arch=${p#*/}; \
+        GOOS=$os GOARCH=$arch go build -ldflags="-s -w" -o "/out/downloads/bifrost-bench-$os-$arch" ./cmd/bifrost-bench; \
+    done; \
+    go run ./cmd/heimdall-dist python -src clients/python -out /out/downloads; \
+    if [ -n "$HEIMDALL_COMMIT" ]; then \
+        go run ./cmd/heimdall-dist source -root . -out /out/downloads -commit "$HEIMDALL_COMMIT"; \
+    else \
+        echo "HEIMDALL_COMMIT is not set: no source tarball (deploy/hosted/upgrade.sh sets it)"; \
+    fi; \
+    go run ./cmd/heimdall-dist manifest -dir /out/downloads -commit "$HEIMDALL_COMMIT" -version "$(/out/bifrost-bench version)"
+
+# --- Runtime base: the server without its downloads -------------------------
 # Layout: /srv/heimdall is the bench root (read-only, from the image):
 # deploy/bench.yaml (the hosted template, replaced by a bind mount in
 # compose), benchmarks/, agents/, experiments/ and the price snapshot.
@@ -49,7 +82,7 @@ RUN test -f ui/dist/index.html \
 # postgresql18-client: pg_dump and pg_restore matching the Postgres 18
 # server, for `bifrost-bench evidence backup` (database dump uploaded to the
 # evidence mirror) and `db backup`.
-FROM alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2 AS server
+FROM alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2 AS base
 # git: task from a commit, mining and git-ref compares clone public repos.
 RUN apk add --no-cache 'postgresql18-client~18' git \
     && addgroup -S -g 10001 heimdall \
@@ -80,7 +113,7 @@ CMD ["serve", "-config", "/srv/heimdall/deploy/bench.yaml"]
 # The same binary plus the Docker CLI: the runner starts agent containers on
 # the host's Docker through the mounted socket. Runs as the same non-root
 # user; compose adds the socket's group.
-FROM server AS runner
+FROM base AS runner
 COPY --from=docker:29-cli@sha256:34507eb5069d8be82c95dd3b6987d4250fd5fee49b82e2509b7d7a7030740d6d /usr/local/bin/docker /usr/local/bin/docker
 # buildx: the shared runner builds org images on the isolated BuildKit
 # (docker buildx build --builder heimdall-org-builder --load), never on the
@@ -88,6 +121,12 @@ COPY --from=docker:29-cli@sha256:34507eb5069d8be82c95dd3b6987d4250fd5fee49b82e25
 COPY --from=docker:29-cli@sha256:34507eb5069d8be82c95dd3b6987d4250fd5fee49b82e2509b7d7a7030740d6d /usr/local/libexec/docker/cli-plugins/docker-buildx /usr/local/libexec/docker/cli-plugins/docker-buildx
 HEALTHCHECK NONE
 CMD ["version"]
+
+# --- Runtime: the server, with the files it serves at /downloads ------------
+# The shared worker (runner, above) does not carry them.
+FROM base AS server
+COPY --from=downloads /out/downloads /srv/heimdall/downloads
+ENV HEIMDALL_DOWNLOADS_DIR=/srv/heimdall/downloads
 
 # The default target is the server.
 FROM server

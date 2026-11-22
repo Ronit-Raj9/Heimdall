@@ -1,0 +1,344 @@
+{
+	"nav": {
+		"label": "Heimdall",
+		"product": "Product",
+		"library": "Benchmarks",
+		"docs": "Docs",
+		"pricing": "Pricing",
+		"downloads": "Downloads",
+		"security": "Security",
+		"signIn": "Sign in",
+		"signUp": "Get started",
+		"openApp": "Open the app",
+		"menu": "Menu"
+	},
+	"footer": {
+		"tagline": "Agent benchmarking, built on Bifrost.",
+		"product": "Product",
+		"legal": "Legal",
+		"terms": "Terms of Service",
+		"privacy": "Privacy Policy",
+		"security": "Security",
+		"securityTxt": "security.txt",
+		"version": "Version {{version}}",
+		"commit": "commit {{commit}}"
+	},
+	"common": {
+		"loadError": "This page could not load its data from the server.",
+		"retry": "Try again",
+		"draft": "Draft, under legal review",
+		"draftBody": "This text is a working draft that is still being reviewed by counsel. It describes how this Heimdall server works today, but it is not yet a binding agreement. Questions: use the contact on the Security page.",
+		"updated": "Last updated {{date}}",
+		"onThisPage": "On this page"
+	},
+	"landing": {
+		"eyebrow": "Agent benchmarking",
+		"title": "Benchmark the agent you ship, not just the model behind it.",
+		"body": "Heimdall runs your agent on real benchmarks and on your own tasks, breaks its tools and model on purpose, and hands you a report card with intervals and cost per task. Gate every pull request on it.",
+		"ctaSignUp": "Get started",
+		"ctaSignIn": "Sign in",
+		"ctaDocs": "Read the docs",
+		"ctaLibrary": "Browse the benchmarks",
+		"inviteOnly": "Sign-up on this server is by invitation. Ask your admin for an invite link.",
+		"stats": {
+			"label": "The library on this server",
+			"benchmarks": "benchmarks",
+			"tasks": "tasks",
+			"ready": "ready to run",
+			"packs": "evaluation packs",
+			"none": "This server has no built-in benchmark library yet. You can still evaluate on your own tasks."
+		},
+		"agentFirst": {
+			"title": "Agent first",
+			"body": "Model leaderboards tell you which model is smart. They do not tell you whether your agent, with its prompts, tools, memory and retries, does the job. Heimdall tests the whole thing.",
+			"bring": {
+				"title": "Bring the agent as it is",
+				"body": "A command line agent, an HTTP endpoint, a container image or a framework like OpenAI Agents or LangGraph. No rewrite."
+			},
+			"faults": {
+				"title": "See how it fails",
+				"body": "Clean runs, then the same tasks with the model down, a broken tool or a misleading instruction. Failures are grouped into patterns you can act on."
+			},
+			"decide": {
+				"title": "Decide with numbers",
+				"body": "Scores with 95% intervals, paired comparisons between versions, and cost and time per task, so a release decision is not a guess."
+			}
+		},
+		"how": {
+			"title": "How it works",
+			"step1": { "title": "Connect your agent", "body": "Register it once from the app, the command line, the SDKs or your MCP client." },
+			"step2": { "title": "Pick what to test", "body": "Choose benchmarks from the library or import your own tasks and tickets." },
+			"step3": { "title": "Run on your own key", "body": "Every model call goes to your provider on your key. Heimdall shows the cost before it starts." },
+			"step4": { "title": "Read the report card", "body": "Share it, or let the pull request gate fail the build when a version gets worse." }
+		},
+		"bifrost": {
+			"title": "Built on Bifrost",
+			"body": "Every model call of every evaluation passes through Bifrost, the open source AI gateway. That is how Heimdall counts tokens and cost per task, records a trace of each step, and injects faults without touching your code.",
+			"point1": "One gateway for every provider and model your agent uses",
+			"point2": "A per-evaluation key, so spend and traces belong to one run",
+			"point3": "Faults injected at the gateway: outages, slow answers, broken tools"
+		},
+		"libraryTitle": "Packs in the library",
+		"libraryBody": "Each pack groups the benchmarks for one kind of agent. Counts are read from this server.",
+		"packBenchmarks_one": "{{count}} benchmark",
+		"packBenchmarks_other": "{{count}} benchmarks",
+		"devTitle": "Works where you work",
+		"devBody": "The command line tool, Python and TypeScript SDKs and a remote MCP endpoint, all served by this server.",
+		"devCta": "See downloads",
+		"finalTitle": "Start with one agent and one benchmark.",
+		"finalBody": "Free during beta. Bring your own model key."
+	},
+	"library": {
+		"title": "Benchmark library",
+		"subtitle": "Every benchmark this server offers, with its size, readiness and licence. Task content is shown only inside an organization.",
+		"search": "Search benchmarks",
+		"allPacks": "All",
+		"tasks": "Tasks",
+		"ready": "Ready",
+		"heldOut": "Held out",
+		"licence": "Licence",
+		"licenceUnknown": "Not recorded",
+		"packs": "Packs",
+		"source": "Upstream data",
+		"verified": "Checked by tests",
+		"judged": "Graded by a judge",
+		"unreadable": "Could not be read on this server",
+		"none": "This server has no built-in benchmark library yet.",
+		"noMatch": "No benchmark matches this search.",
+		"totals": "{{benchmarks}} benchmarks, {{tasks}} tasks, {{ready}} ready",
+		"readyHint": "Ready tasks passed the readiness checks and still match their locked files.",
+		"cta": "Evaluate your agent on these"
+	},
+	"pricing": {
+		"title": "Pricing",
+		"subtitle": "Every limit that applies to you is shown before you launch.",
+		"beta": "Beta",
+		"limits": "Limits",
+		"ctaSignUp": "Get started",
+		"ctaContact": "Contact us",
+		"faq": "Questions"
+	},
+	"downloads": {
+		"title": "Downloads",
+		"subtitle": "The command line tool, the SDKs and MCP, served by this server and built at the commit it runs. Nothing comes from GitHub or a package registry.",
+		"builtAt": "Built at commit {{commit}}, version {{version}}",
+		"none": "This server has no downloads yet. They are built with the server image (docs: Downloads).",
+		"cli": {
+			"title": "Command line tool",
+			"body": "One static binary. Check it against SHA256SUMS, then put it on your PATH as heimdall.",
+			"os": "System",
+			"size": "Size",
+			"sha": "SHA-256",
+			"install": "Install on Linux or macOS",
+			"linux": "Linux",
+			"darwin": "macOS"
+		},
+		"python": { "title": "Python SDK", "body": "Standard library only, Python 3.9 or newer.", "sdist": "Source package" },
+		"typescript": { "title": "TypeScript SDK", "body": "ES modules, Node 18 or newer, no dependencies." },
+		"mcp": {
+			"title": "MCP",
+			"body": "Connect Claude Code or any MCP client to this server with an org API token from Settings. No install.",
+			"local": "Or run it locally from the command line tool"
+		},
+		"ci": {
+			"title": "Pull request gate",
+			"body": "The workflows the agent page generates download the tool from this server with a checksum check.",
+			"github": "GitHub Actions step",
+			"gitlab": "GitLab CI include"
+		},
+		"source": { "title": "Source", "body": "The bench module at this server's commit, what a worker builds from." },
+		"checksums": "All checksums",
+		"manifest": "Manifest (JSON)",
+		"copy": "Copy"
+	},
+	"security": {
+		"title": "Security",
+		"subtitle": "How this Heimdall server protects your agents, keys and evidence, and how to report a problem.",
+		"report": {
+			"title": "Report a vulnerability",
+			"body": "Send reports to the contact in security.txt. Include the steps to reproduce and what you could reach. We aim to answer within three working days and do not take action against good-faith research that avoids other people's data and does not degrade the service.",
+			"cta": "Open security.txt"
+		},
+		"sections": {
+			"keys": {
+				"title": "Your model keys",
+				"items": [
+					"Provider keys are encrypted at rest with AES-256-GCM under a server master key that is never stored with the database.",
+					"A key is shown once when you add it and never returned by the API again.",
+					"Keys are handed to the worker only for the evaluation that needs them, and only for your organization's runs.",
+					"You can delete a key at any time from Models and keys."
+				]
+			},
+			"isolation": {
+				"title": "Isolation",
+				"items": [
+					"Every organization has its own folders, its own API router and its own database rows; a request is resolved to one organization before any handler runs.",
+					"Agents run in containers, under gVisor on the shared worker when the host supports it, with network access limited to the model gateway and the hosts a benchmark declares.",
+					"Images built from your Dockerfiles use an isolated builder, never the host's Docker daemon.",
+					"You can run everything on your own worker instead of the shared one."
+				]
+			},
+			"access": {
+				"title": "Access and audit",
+				"items": [
+					"Roles per organization: owner, admin, member and viewer. API tokens carry a role and an optional scope.",
+					"Every write, and every read of traces, evidence and exports, leaves a row in the organization's audit log.",
+					"API rate limits per token and per organization.",
+					"Share links are read-only, can expire and can be revoked at once."
+				]
+			},
+			"evidence": {
+				"title": "Evidence integrity",
+				"items": [
+					"Each finished run is hashed and chained into an append-only log, so a changed result is detected.",
+					"Report cards record the exact benchmark versions and agent configs they used.",
+					"Prompt logs can be deleted from the Prompt logs page and expire after the organization's retention period."
+				]
+			},
+			"notYet": {
+				"title": "Not available yet",
+				"items": [
+					"Single sign-on (SAML or OIDC) and SCIM provisioning.",
+					"A SOC 2 report.",
+					"A data processing agreement signed per customer. Ask us if you need one."
+				]
+			}
+		}
+	},
+	"terms": {
+		"title": "Terms of Service",
+		"updated": "2026-11-22",
+		"sections": [
+			{
+				"title": "1. Who these terms are with",
+				"body": [
+					"These terms cover your use of this Heimdall server (the service): the web app, the API, the command line tool, the SDKs and the MCP endpoint it serves. The operator of this server provides it. By creating an account or using an API token you accept these terms for yourself and, if you act for an organization, for that organization."
+				]
+			},
+			{
+				"title": "2. Accounts and organizations",
+				"body": [
+					"You need an account to use anything beyond the public pages. Keep your password and API tokens secret; you are responsible for what is done with them.",
+					"An organization's owners and admins decide who joins it and with which role. They can remove members and revoke tokens at any time."
+				]
+			},
+			{
+				"title": "3. Your content",
+				"body": [
+					"Your agents, agent configs, benchmarks and tasks you add, and the results of your evaluations are your content. You keep all rights to it. You give the operator only the permission needed to store it, run your evaluations and show the results to the people you allow.",
+					"Benchmarks in the built-in library keep their own licences, listed on the Benchmarks page. Using a benchmark means following its licence."
+				]
+			},
+			{
+				"title": "4. Your own model keys",
+				"body": [
+					"Evaluations call models with the provider keys your organization adds. Those calls are made on your account with that provider, under your agreement with it, and the provider bills you directly. The operator adds no markup and is not responsible for provider charges, outages or changes.",
+					"Estimates of cost and time are shown before an evaluation starts. They are estimates; set a spending cap on the evaluation if you need a hard limit."
+				]
+			},
+			{
+				"title": "5. Acceptable use",
+				"body": [
+					"Do not use the service to attack, scan or overload systems you do not own or have no permission to test; to run malware or code meant to escape its container; to store content you have no right to store; or to get around limits shown in the app.",
+					"The shared worker is shared by every organization. The operator may slow or stop evaluations that put it at risk, and will tell you why."
+				]
+			},
+			{
+				"title": "6. Beta, fees and changes",
+				"body": [
+					"The service is in beta. It is free during the beta, without any service level commitment. Paid plans will be published on the Pricing page at least 30 days before any charge, and nothing is charged without your consent.",
+					"Features may change while in beta. Changes to these terms are announced in the app at least 30 days before they apply, except changes required by law."
+				]
+			},
+			{
+				"title": "7. Ending use, export and deletion",
+				"body": [
+					"You can stop using the service at any time. Owners can export an organization's evaluations and delete runs, prompt logs, keys and the organization itself from the app.",
+					"The operator may suspend an account that breaks these terms, after notice where possible."
+				]
+			},
+			{
+				"title": "8. Warranties and liability",
+				"body": [
+					"The service is provided as is during the beta. Benchmark results describe the runs that were measured and are not a guarantee of how an agent behaves elsewhere.",
+					"To the extent the law allows, the operator is not liable for indirect or consequential losses, and its total liability is limited to the amounts you paid for the service in the 12 months before the claim (zero during a free beta)."
+				]
+			},
+			{
+				"title": "9. Contact",
+				"body": ["Questions about these terms go to the contact listed on the Security page."]
+			}
+		]
+	},
+	"privacy": {
+		"title": "Privacy Policy",
+		"updated": "2026-11-22",
+		"sections": [
+			{
+				"title": "1. What this covers",
+				"body": [
+					"This policy explains what this Heimdall server stores about you and your organization, why, for how long, and how to delete it. The operator of this server is responsible for that data."
+				]
+			},
+			{
+				"title": "2. What is stored",
+				"body": [
+					"Account: your email address, your name, a password hash, and your GitHub user id and name if you sign in with GitHub.",
+					"Organization content: agents and their configs, benchmarks and tasks you add, evaluation results, report cards, run traces and files your agent produced.",
+					"Prompt logs: the requests your agent sent to models and the answers it got during evaluations, recorded by the model gateway so you can debug a run.",
+					"Keys and secrets: provider keys and organization secrets, encrypted at rest; never shown again after you add them.",
+					"Technical data: IP address and user agent of requests, sign-in times, and the organization's audit log of writes and sensitive reads."
+				]
+			},
+			{
+				"title": "3. Why",
+				"body": [
+					"To run the evaluations you ask for, show their results to the people you allow, keep the service secure, stop abuse of the shared worker, and answer your support questions. The data is not sold and not used for advertising.",
+					"Your content and prompt logs are not used to train models."
+				]
+			},
+			{
+				"title": "4. Your own model keys and providers",
+				"body": [
+					"Model calls go from the worker to the provider you chose, with your key. What the provider does with that traffic is governed by your agreement with the provider, not by this policy."
+				]
+			},
+			{
+				"title": "5. How long",
+				"body": [
+					"Evaluation results and traces are kept until you delete them or the organization. An organization can set an archive period for old evaluations.",
+					"Prompt logs are kept for the retention period set on the organization's Prompt logs page and expire after it; an admin can delete them earlier from that page.",
+					"When an organization is deleted, its folders, database rows, keys and prompt logs are removed by the deletion process; copies in encrypted backups expire with the backup rotation.",
+					"Account data is kept while the account exists. Ask through the Security page contact to delete your account."
+				]
+			},
+			{
+				"title": "6. Who can see it",
+				"body": [
+					"Members of your organization, according to their role. People you send a share link to, for the one item it names, until it expires or is revoked. The operator's administrators, only to run and support the service.",
+					"Subprocessors listed below, only for what they do for the service."
+				]
+			},
+			{
+				"title": "7. Your rights",
+				"body": [
+					"You can see and export your organization's data from the app, correct your account details, and delete runs, keys, prompt logs and organizations. For anything else, including a copy of your account data or its deletion, use the contact on the Security page. Where data protection law gives you more rights, you have them."
+				]
+			}
+		],
+		"subprocessors": {
+			"title": "Subprocessors",
+			"intro": "Services that handle data for this server. The list is part of the draft and is confirmed before the policy is final.",
+			"name": "Service",
+			"purpose": "What it does",
+			"data": "Data it handles",
+			"rows": [
+				{ "name": "Microsoft Azure", "purpose": "Hosting of the server, database, workers and backups", "data": "All data listed above, encrypted in transit" },
+				{ "name": "GitHub", "purpose": "Sign-in with GitHub and repository connections, only when you use them", "data": "GitHub user id, name, email; repositories you connect" },
+				{ "name": "Let's Encrypt or ZeroSSL", "purpose": "HTTPS certificates for the server's address", "data": "The server's domain name only" },
+				{ "name": "Your model providers", "purpose": "Model calls of your evaluations, on your own key and account", "data": "Prompts and answers of your agent's runs" },
+				{ "name": "Your sandbox platforms (Modal, Daytona, E2B) or your own worker", "purpose": "Running evaluations, only when your organization connects one", "data": "Agent code, task files and run results of those evaluations" }
+			]
+		}
+	}
+}

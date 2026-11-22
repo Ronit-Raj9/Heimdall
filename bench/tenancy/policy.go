@@ -191,6 +191,25 @@ var PlatformPolicy = map[string]Rule{
 	key("GET", api+"/workers/target"):              org(viewer),
 	key("PUT", api+"/workers/target"):              org(admin),
 	key("GET", api+"/workers/kubernetes-manifest"): org(viewer),
+
+	// Public site (lane Y08, handlers/publicsite.go): the only pages a
+	// visitor reads without signing in. None holds org data; the library is
+	// counts and terms, never task content. TestPublicRoutesAreExactlyTheSite
+	// pins this list.
+	key("GET", api+"/public/overview"):      public(),
+	key("GET", api+"/public/benchmarks"):    public(),
+	key("GET", api+"/public/docs"):          public(),
+	key("GET", api+"/public/docs/{name}"):   public(),
+	key("GET", api+"/public/pricing"):       public(),
+	key("GET", api+"/public/downloads"):     public(),
+	key("GET", "/downloads/{file}"):         public(),
+	key("GET", "/.well-known/security.txt"): public(),
+	// Remote MCP (cmd/bifrost-bench/mcphttp_hosted.go): the handler requires
+	// a bearer API token and replays each tool call as that token, so every
+	// call meets this table again with the token's org and role.
+	key("POST", "/mcp"):   public(),
+	key("GET", "/mcp"):    public(), // 405: no server-sent stream
+	key("DELETE", "/mcp"): public(), // 405: no sessions to end
 }
 
 // OrgPolicy covers the org-scoped bench API: the routes every org's router

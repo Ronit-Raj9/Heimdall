@@ -2,6 +2,8 @@ import { BenchHeader } from "@/components/benchHeader";
 import { BenchSidebar } from "@/components/benchSidebar";
 import { AuthShell } from "@/components/platform/authShell";
 import { SharedFrame } from "@/components/share/sharedFrame";
+import { LandingView } from "@/components/site/landingView";
+import { PublicFrame } from "@/components/site/publicFrame";
 import { ConfirmProvider } from "@/components/platform/confirmDialog";
 import { SessionProvider } from "@/components/platform/sessionProvider";
 import { ThemeProvider } from "@/components/themeProvider";
@@ -48,6 +50,15 @@ function Frame({ children }: { children: React.ReactNode }) {
 			return <SharedFrame>{children}</SharedFrame>;
 		case "auth":
 			return <AuthShell>{children}</AuthShell>;
+		case "public":
+			return <PublicFrame>{children}</PublicFrame>;
+		case "landing":
+			// A hosted visitor at "/": the landing page, not Home (which reads org data).
+			return (
+				<PublicFrame>
+					<LandingView />
+				</PublicFrame>
+			);
 		case "login":
 			return <Navigate to="/login" search={{ return_to: location.href }} replace />;
 		case "error":

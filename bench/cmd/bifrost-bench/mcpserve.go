@@ -153,6 +153,9 @@ type mcpServer struct {
 	api     *heimdallAPI
 	version string
 	poll    time.Duration // run_evaluation's poll interval
+	// maxWait bounds run_evaluation's wait; 0 means mcpMaxWait. The remote
+	// endpoint (mcphttp_hosted.go) keeps it short: one HTTP request.
+	maxWait time.Duration
 }
 
 type rpcRequest struct {
@@ -507,7 +510,11 @@ func runEvaluationTool(ctx context.Context, s *mcpServer, raw json.RawMessage) (
 	if args.WaitMinutes > 0 {
 		wait = time.Duration(args.WaitMinutes) * time.Minute
 	}
-	wait = min(wait, mcpMaxWait)
+	limit := mcpMaxWait
+	if s.maxWait > 0 {
+		limit = s.maxWait
+	}
+	wait = min(wait, limit)
 	wctx, cancel := context.WithTimeout(ctx, wait)
 	defer cancel()
 	for {

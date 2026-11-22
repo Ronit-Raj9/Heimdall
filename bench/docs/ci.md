@@ -13,8 +13,9 @@ The fastest way to set it up is the agent page: open your agent, tab **Pull requ
 | Piece | Path |
 |---|---|
 | CLI command (used by both) | `bifrost-bench ci evaluate` (`cmd/bifrost-bench/cievaluate.go`) |
-| GitHub Action | `bench/ci/action.yml`, mode `evaluate` (the default) |
-| GitLab CI template | `bench/ci/heimdall.gitlab-ci.yml` |
+| Command line tool in CI | downloaded from your Heimdall: `GET /downloads/bifrost-bench-<os>-<arch>`, checked against `/downloads/SHA256SUMS` (`docs/downloads.md`) |
+| GitLab CI template | served by your Heimdall at `/downloads/heimdall.gitlab-ci.yml` (source `bench/ci/heimdall.gitlab-ci.yml`) |
+| GitHub Action (self-built) | `bench/ci/action.yml`, for a checkout of the Heimdall source; the generated workflows do not use it |
 | Workflow generator | `heimdall ci install github\|gitlab -agent <id>` and `GET /api/bench/integrations/ci/workflow?mode=hosted` |
 | Evaluation gate | `bench/ci/evalgate.go` |
 
@@ -35,7 +36,9 @@ heimdall ci install gitlab -agent my-agent -benchmark hd-harbor-tb2        # .gi
 
 Neither file holds a secret. GitHub gives pull requests from forks no secrets, so the job skips them.
 
-## GitHub Action
+## GitHub Actions
+
+The generated workflow uses plain `run:` steps. Nothing comes from GitHub besides `actions/checkout` and `actions/upload-artifact`: the `heimdall` command is downloaded from your own Heimdall server, built at the commit that server runs, and checked against the server's `SHA256SUMS` before it runs.
 
 ```yaml
 permissions:
@@ -51,43 +54,69 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-      - uses: Ronit-Raj9/Heimdall/bench/ci@main # pin a commit
+      - name: Download heimdall from your Heimdall server
+        shell: bash
+        env:
+          HEIMDALL_URL: ${{ vars.HEIMDALL_URL }}
+        run: |
+          set -eu
+          base="${HEIMDALL_URL%/}"
+          dir="$RUNNER_TEMP/heimdall-bin"
+          asset=bifrost-bench-linux-amd64      # the generated file picks it from uname
+          tmp=$(mktemp -d)
+          curl -fsSL "$base/downloads/SHA256SUMS" -o "$tmp/SHA256SUMS"
+          curl -fsSL "$base/downloads/$asset" -o "$tmp/$asset"
+          grep "  $asset\$" "$tmp/SHA256SUMS" > "$tmp/$asset.sha256"
+          (cd "$tmp" && sha256sum -c "$asset.sha256")
+          mkdir -p "$dir" && mv "$tmp/$asset" "$dir/heimdall" && chmod 0755 "$dir/heimdall"
+          echo "$dir" >> "$GITHUB_PATH"
+      - name: Evaluate this pull request
+        shell: bash
+        env:
+          HEIMDALL_URL: ${{ vars.HEIMDALL_URL }}
+          HEIMDALL_TOKEN: ${{ secrets.HEIMDALL_TOKEN }}
+          HEIMDALL_AGENT: my-agent
+          HEIMDALL_CONFIG: agents/my-agent.yaml
+          HEIMDALL_PACK: coding
+          HEIMDALL_FAULTS: model-down,broken-tool
+          HEIMDALL_OUT: ${{ runner.temp }}/heimdall-report
+          GITHUB_TOKEN: ${{ github.token }}
+        run: heimdall ci evaluate
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          mode: evaluate
-          url: ${{ vars.HEIMDALL_URL }}
-          token: ${{ secrets.HEIMDALL_TOKEN }}
-          agent: my-agent
-          config: agents/my-agent.yaml
-          pack: coding
-          faults: model-down,broken-tool
+          name: heimdall-report
+          path: ${{ runner.temp }}/heimdall-report/
 ```
 
-The action builds `bifrost-bench` from its own checkout and runs `ci evaluate`. Every input reaches the command as a `HEIMDALL_*` environment variable, never spliced into the shell line.
+Every setting reaches the command as a `HEIMDALL_*` environment variable, never spliced into the shell line:
 
-| Input | Meaning |
+| Variable | Meaning |
 |---|---|
-| `url`, `token` | your Heimdall and the org API token (required) |
-| `agent` | the agent id on Heimdall (required) |
-| `config` / `image` / `endpoint` | what the pull request changes: a config file in the repository, an image it built (`ref@sha256:...`), or a preview deployment URL (remote agents). Image and endpoint patch the live config |
-| `baseline` | `live` (default) or a version number |
-| `model` | model for both versions; empty uses each version's own model |
-| `pack`, `benchmarks` | benchmark pack and/or comma-separated benchmark ids |
-| `faults` | comma-separated: `model-down`, `broken-tool`, `misleading-instruction` (clean always runs) |
-| `trials`, `tasks`, `budget-usd` | repeats per task, tasks per benchmark, spend cap; empty uses the server defaults |
-| `fail-on` | outcomes that fail: `regressed`, `inconclusive`, `failed` (default `regressed,failed`) |
-| `max-score-drop`, `max-cost-increase` | extra limits: fail when a benchmark's score falls by more than this (0.05 = 5 points) or total cost grows by more than this fraction |
-| `timeout` | how long to wait (default `3h`) |
-| `github-token` | token for the comment and status (default the job's token) |
+| `HEIMDALL_URL`, `HEIMDALL_TOKEN` | your Heimdall and the org API token (required) |
+| `HEIMDALL_AGENT` | the agent id on Heimdall (required) |
+| `HEIMDALL_CONFIG` / `HEIMDALL_IMAGE` / `HEIMDALL_ENDPOINT` | what the pull request changes: a config file in the repository, an image it built (`ref@sha256:...`), or a preview deployment URL (remote agents). Image and endpoint patch the live config |
+| `HEIMDALL_BASELINE` | `live` (default) or a version number |
+| `HEIMDALL_MODEL` | model for both versions; empty uses each version's own model |
+| `HEIMDALL_PACK`, `HEIMDALL_BENCHMARKS` | benchmark pack and/or comma-separated benchmark ids |
+| `HEIMDALL_FAULTS` | comma-separated: `model-down`, `broken-tool`, `misleading-instruction` (clean always runs) |
+| `HEIMDALL_TRIALS`, `HEIMDALL_TASKS`, `HEIMDALL_BUDGET_USD` | repeats per task, tasks per benchmark, spend cap; empty uses the server defaults |
+| `HEIMDALL_FAIL_ON` | outcomes that fail: `regressed`, `inconclusive`, `failed` (default `regressed,failed`) |
+| `HEIMDALL_MAX_SCORE_DROP`, `HEIMDALL_MAX_COST_INCREASE` | extra limits: fail when a benchmark's score falls by more than this (0.05 = 5 points) or total cost grows by more than this fraction |
+| `HEIMDALL_TIMEOUT` | how long to wait (default `3h`) |
+| `HEIMDALL_OUT` | folder for `report.json`, `gate.json` and `comment.md` |
+| `GITHUB_TOKEN` | token for the comment and status (the job's token) |
 
-Outputs: `outcome`, `evaluation`, `report-url`, `version`, `exit-code`. `report.json`, `gate.json` and `comment.md` are uploaded as the `heimdall-report` artifact, and the comment is added to the job summary.
+The step exits non-zero when the gate fails, which fails the job; the report folder is kept as the `heimdall-report` artifact either way. The tool always matches your server's version, because the server built it.
 
 ## GitLab CI
 
-Include the template and extend its hidden job:
+Your Heimdall serves the template with its own address filled in. Include it and extend its hidden job:
 
 ```yaml
 include:
-  - remote: https://raw.githubusercontent.com/Ronit-Raj9/Heimdall/main/bench/ci/heimdall.gitlab-ci.yml
+  - remote: https://heimdall.example.com/downloads/heimdall.gitlab-ci.yml
 
 heimdall-evaluate:
   extends: .heimdall-evaluate
@@ -98,7 +127,7 @@ heimdall-evaluate:
     HEIMDALL_FAULTS: model-down
 ```
 
-Or commit the standalone file `heimdall ci install gitlab` (or the agent page) writes and include it with `include: - local: .gitlab/heimdall-evaluate.gitlab-ci.yml`. The job runs on merge request pipelines, is `interruptible` (a newer push cancels it, and `ci evaluate` then cancels the evaluation), and keeps `heimdall-report/` as an artifact.
+The job runs on `alpine:3.23`, adds curl, downloads `heimdall` from the same server with the checksum check, and runs `heimdall ci evaluate`. Or commit the standalone file `heimdall ci install gitlab` (or the agent page) writes and include it with `include: - local: .gitlab/heimdall-evaluate.gitlab-ci.yml`; it carries the same steps inline. The job runs on merge request pipelines, is `interruptible` (a newer push cancels it, and `ci evaluate` then cancels the evaluation), and keeps `heimdall-report/` as an artifact.
 
 ## `bifrost-bench ci evaluate`
 
@@ -169,7 +198,7 @@ Under faults (score, change from clean):
 
 ## Self-hosted gate (recorded and live modes)
 
-The same action also runs `bifrost-bench check` without a hosted Heimdall: `mode: recorded` re-analyzes a sealed experiment bundle you name (the `bundle` input is required; there is no fixture default) and `mode: live` runs an experiment file against a bench stack on a self-hosted runner. This repository's own `.github/workflows/bench-check.yml` uses recorded mode on `bench/testdata/recorded/` to guard the statistics, verdicts and evidence integrity.
+The self-built action (`bench/ci/action.yml`, used from a checkout of the Heimdall source) runs `bifrost-bench check` without a hosted Heimdall: `mode: recorded` re-analyzes a sealed experiment bundle you name (the `bundle` input is required; there is no fixture default) and `mode: live` runs an experiment file against a bench stack on a self-hosted runner. This repository's own `.github/workflows/bench-check.yml` uses recorded mode on `bench/testdata/recorded/` to guard the statistics, verdicts and evidence integrity.
 
 ### What the gate checks
 

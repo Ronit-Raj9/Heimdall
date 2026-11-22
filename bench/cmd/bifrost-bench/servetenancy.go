@@ -55,6 +55,9 @@ type hostedEnv struct {
 	// platformRoutes are the platform router's routes, set when the server
 	// is built (newHostedServer), before any org runtime is.
 	platformRoutes map[string][]string
+	// server is the hosted server once newHostedServer built it; the remote
+	// MCP endpoint replays tool calls through its handler (mcphttp_hosted.go).
+	server *server.Server
 }
 
 // hostedAreas build the platform route areas of hosted mode. Each area
@@ -171,12 +174,16 @@ func newHostedServer(env *hostedEnv) (*server.Server, error) {
 	if mw == nil {
 		mw = auth.Middleware(env.authCfg, env.auth)
 	}
-	return server.NewHosted(env.base.cfg, server.Hosted{
+	srv, err := server.NewHosted(env.base.cfg, server.Hosted{
 		Auth: mw, Directory: env.dir, Registry: env.registry, Audit: env.audit, Platform: areas,
 		Ready: readyChecks(env.base), UI: builtUI(), Logger: env.base.logger, Version: benchVersion,
 		ClientIP: clientIPOf(env.auth),
 		Limits:   apiRateLimits(env.base.logger), // lane X16: per-token and per-org API rate limits (dataops.go)
 	})
+	if err == nil {
+		env.server = srv
+	}
+	return srv, err
 }
 
 // orgBuilder builds one org's runtime: the org's app (its store, project

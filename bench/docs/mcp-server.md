@@ -16,6 +16,20 @@ bifrost-bench mcp serve
 
 Claude Code: `claude mcp add heimdall -e HEIMDALL_URL=https://heimdall.example.com -e HEIMDALL_TOKEN=hm_... -- bifrost-bench mcp serve`. Other clients take the same command and environment in their MCP server settings.
 
+## Remote endpoint (no install)
+
+A hosted Heimdall also answers MCP itself at `/mcp` (Streamable HTTP), so nothing has to be installed:
+
+```sh
+claude mcp add --transport http heimdall https://heimdall.example.com/mcp \
+  --header "Authorization: Bearer $HEIMDALL_TOKEN"
+```
+
+- It serves the same tools as `mcp serve`. Each tool's API call runs inside the server as your token, through the same policy, rate limits and audit as a direct API call, so the token's role and scope decide what it may do.
+- An org API token (`hm_...`) is required on every request: no token answers 401 with `WWW-Authenticate: Bearer`, a runner token 403. Browser requests from another origin are refused.
+- It is stateless: POST one JSON-RPC message or a batch of up to 32; requests answer `application/json`, notifications 202. There is no event stream or session, so GET and DELETE answer 405.
+- `run_evaluation` with `wait: true` waits at most 10 minutes on the remote endpoint (one HTTP request); for longer evaluations call `get_report` until the status is done.
+
 ## Tools
 
 | Tool | Reads or writes | What it does |

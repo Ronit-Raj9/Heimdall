@@ -5,10 +5,10 @@
 # card summary as one merge request comment (updated in place), sets the
 # commit status, and fails the job when the evaluation gate fails.
 #
-# Use it from .gitlab-ci.yml:
+# Your Heimdall serves this file, with its own address filled in below:
 #
 #   include:
-#     - remote: https://raw.githubusercontent.com/Ronit-Raj9/Heimdall/main/bench/ci/heimdall.gitlab-ci.yml
+#     - remote: https://heimdall.example.com/downloads/heimdall.gitlab-ci.yml
 #
 #   heimdall-evaluate:
 #     extends: .heimdall-evaluate
@@ -18,11 +18,15 @@
 #       HEIMDALL_PACK: coding
 #       HEIMDALL_FAULTS: model-down
 #
+# The job downloads the heimdall command from the same server (built at the
+# commit the server runs) and checks it against the server's SHA256SUMS.
+# Nothing is fetched from GitHub or a package registry.
+#
 # CI/CD variables (Settings > CI/CD > Variables; mask the tokens):
-#   HEIMDALL_URL    the address of your Heimdall, e.g. https://heimdall.example.com
 #   HEIMDALL_TOKEN  an org API token from Heimdall (Settings > API tokens)
 #   GITLAB_TOKEN    a project access token with the api scope, for the comment
 #                   and the commit status (the CI job token cannot write them)
+#   HEIMDALL_URL    only to point at another Heimdall than the one below
 #
 # Optional: HEIMDALL_BENCHMARKS (comma-separated), HEIMDALL_IMAGE or
 # HEIMDALL_ENDPOINT (instead of a config file), HEIMDALL_BASELINE (live or a
@@ -32,19 +36,38 @@
 # Run `heimdall ci evaluate -h` for what each does.
 .heimdall-evaluate:
   stage: test
-  image: golang:1.26
+  image: alpine:3.23
   timeout: 4h
   interruptible: true # a newer push cancels the older evaluation
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
-    HEIMDALL_SOURCE: Ronit-Raj9/Heimdall
-    HEIMDALL_SOURCE_REF: main # pin a commit for a reproducible gate
+    HEIMDALL_URL: "" # filled in by the server that serves this file
+  before_script:
+    - apk add --no-cache curl ca-certificates >/dev/null
+    - |
+      set -eu
+      base="${HEIMDALL_URL%/}"
+      [ -n "$base" ] || { echo "set HEIMDALL_URL to the address of your Heimdall" >&2; exit 1; }
+      dir=/usr/local/bin
+      case "$(uname -s)-$(uname -m)" in
+        Linux-x86_64 | Linux-amd64) asset=bifrost-bench-linux-amd64 ;;
+        Linux-aarch64 | Linux-arm64) asset=bifrost-bench-linux-arm64 ;;
+        Darwin-x86_64) asset=bifrost-bench-darwin-amd64 ;;
+        Darwin-arm64) asset=bifrost-bench-darwin-arm64 ;;
+        *) echo "Heimdall has no build for $(uname -s) $(uname -m)" >&2; exit 1 ;;
+      esac
+      tmp=$(mktemp -d)
+      curl -fsSL --retry 3 --proto '=https,http' "$base/downloads/SHA256SUMS" -o "$tmp/SHA256SUMS"
+      curl -fsSL --retry 3 --proto '=https,http' "$base/downloads/$asset" -o "$tmp/$asset"
+      grep "  $asset\$" "$tmp/SHA256SUMS" > "$tmp/$asset.sha256" || { echo "$asset is not in $base/downloads/SHA256SUMS" >&2; exit 1; }
+      (cd "$tmp" && if command -v sha256sum >/dev/null 2>&1; then sha256sum -c "$asset.sha256"; else shasum -a 256 -c "$asset.sha256"; fi)
+      mkdir -p "$dir"
+      mv "$tmp/$asset" "$dir/heimdall"
+      chmod 0755 "$dir/heimdall"
+      rm -rf "$tmp"
+      "$dir/heimdall" version
   script:
-    - git init -q /tmp/heimdall
-    - git -C /tmp/heimdall fetch -q --depth 1 "https://github.com/$HEIMDALL_SOURCE.git" "$HEIMDALL_SOURCE_REF"
-    - git -C /tmp/heimdall checkout -q FETCH_HEAD
-    - (cd /tmp/heimdall/bench && GOWORK=off CGO_ENABLED=0 go build -o /usr/local/bin/heimdall ./cmd/bifrost-bench)
     - heimdall ci evaluate -out heimdall-report
   artifacts:
     when: always

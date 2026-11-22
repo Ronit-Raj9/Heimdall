@@ -206,7 +206,11 @@ func newHostedFixtureWith(t *testing.T, realLauncher bool) *hostedFixture {
 	f.env.authMW = func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 		return func(ctx *fasthttp.RequestCtx) {
 			p := auth.Anonymous()
-			if who := string(ctx.Request.Header.Peek(testAsHeader)); who != "" {
+			who := string(ctx.Request.Header.Peek(testAsHeader))
+			if b, ok := strings.CutPrefix(string(ctx.Request.Header.Peek("Authorization")), "Bearer test-"); ok && who == "" {
+				who = b // a bearer credential of the fixture (the remote MCP endpoint replays it)
+			}
+			if who != "" {
 				q, ok := f.as[who]
 				if !ok {
 					ctx.SetStatusCode(599)
