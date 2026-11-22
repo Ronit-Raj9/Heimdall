@@ -22,6 +22,7 @@
 	"priceOutput": "Output",
 	"priceCache": "Cached input",
 	"priceHint": "What you pay on this key. Used to cost runs of a model our price list does not have, such as a custom endpoint; without it their cost shows as not known. Leave cached input empty to price it like input.",
+	"priceNoModels": "With no models listed, this price applies to every model of this provider.",
 	"save": "Save key",
 	"saving": "Saving...",
 	"cancel": "Cancel",
@@ -78,7 +79,11 @@
 	"emptyViewerAction": "Open experiments",
 	"secretsHint": "Passwords and API keys your agent's tools need (for example a web search key) live under Secrets.",
 	"secretsLink": "Manage secrets",
-	"priceHint": "Price per 1M tokens: not set (costs will show as unknown)",
+	"defaultPrice": {
+		"key": "Price per 1M tokens: {{input}} in, {{output}} out, {{cache}} cached (from your key {{label}})",
+		"priceList": "Price per 1M tokens: {{input}} in, {{output}} out, {{cache}} cached (from the price list)",
+		"none": "Price per 1M tokens: not set (costs will show as unknown)"
+	},
 	"priceHintTitle": "Heimdall works out cost from the model's price per 1 million tokens. When no price is set for a model, its cost shows as unknown, not as zero.",
 	"groups": {
 		"frontier": "Frontier APIs",

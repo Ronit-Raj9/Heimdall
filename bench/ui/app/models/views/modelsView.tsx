@@ -32,6 +32,7 @@ import type {
 	BifrostProviderSpec,
 	ModelKey,
 	ModelKeyPrice,
+	ModelPriceView,
 	ModelKeyRequest,
 	ModelKeyTestResult,
 	ModelProviderInfo,
@@ -42,6 +43,7 @@ import { cn } from "@/lib/utils";
 import { KeyRound, Pencil, Plus, Sparkles, X } from "lucide-react";
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 const STATUS_VARIANT = {
 	untested: "outline",
@@ -68,6 +70,23 @@ export function parseModels(text: string): string[] {
 
 export function formatUSD(v: number): string {
 	return `$${v.toFixed(2)}`;
+}
+
+/** A price per 1M tokens: two decimals, more only when cents would hide it ($0.075). */
+export function formatPrice(v: number): string {
+	const cents = Math.round(v * 100) / 100;
+	return Math.abs(cents - v) < 1e-9 ? formatUSD(v) : `$${Number(v.toFixed(4))}`;
+}
+
+/** The default model's price line: from a key, from the price list, or not set. */
+export function defaultPriceText(t: TFunction<"models">, price: ModelPriceView | undefined): string {
+	if (!price) return t("defaultPrice.none");
+	const vals = {
+		input: formatPrice(price.input_per_mtok),
+		output: formatPrice(price.output_per_mtok),
+		cache: formatPrice(price.cache_per_mtok || price.input_per_mtok),
+	};
+	return price.source === "key" ? t("defaultPrice.key", { ...vals, label: price.key_label ?? "" }) : t("defaultPrice.priceList", vals);
 }
 
 /** Tile tint per provider group. */
@@ -150,7 +169,9 @@ export default function ModelsView() {
 		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-8 p-4 sm:p-6" data-testid="models-view">
 			<header className="flex flex-wrap items-start justify-between gap-4">
 				<div className="flex min-w-0 flex-col gap-1">
-					<Heading className={embedded ? "text-xl font-semibold tracking-tight" : "text-2xl font-semibold tracking-tight"}>{t("title")}</Heading>
+					<Heading className={embedded ? "text-xl font-semibold tracking-tight" : "text-2xl font-semibold tracking-tight"}>
+						{t("title")}
+					</Heading>
 					<p className="text-muted-foreground text-sm">{tu("models.subtitle")}</p>
 					<p className="text-muted-foreground text-xs">
 						{t("secretsHint")}{" "}
@@ -209,7 +230,7 @@ export default function ModelsView() {
 							title={t("priceHintTitle")}
 							data-testid="models-price-hint"
 						>
-							{t("priceHint")}
+							{defaultPriceText(t, models.data.default?.price)}
 						</span>
 					</div>
 					{keys.length === 0 && (
@@ -894,6 +915,9 @@ function KeyForm({
 					))}
 				</div>
 				<p className="text-muted-foreground text-xs">{t("priceHint")}</p>
+				<p className="text-muted-foreground text-xs" data-testid="model-key-price-scope">
+					{t("priceNoModels")}
+				</p>
 			</fieldset>
 			{error && (
 				<p role="alert" className="text-chart-error-ink text-xs" data-testid="model-key-error">

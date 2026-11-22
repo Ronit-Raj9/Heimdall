@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/evidence"
 	"github.com/maximhq/bifrost/bench/keystore"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
@@ -200,5 +202,47 @@ func TestDefaultModelPrefersReportedModels(t *testing.T) {
 	keys[1].Status = "untested"
 	if d := defaultModel(keys); d == nil || d.KeyID != "g" {
 		t.Fatalf("untested report = %+v", d)
+	}
+}
+
+// TestDefaultModelCarriesPrice (F1.price): GET /models names the default
+// model's price per 1M tokens and where it comes from: the org's key (bare
+// model, the single priced key with no model list), else the price list.
+func TestDefaultModelCarriesPrice(t *testing.T) {
+	ks := keystore.NewMemory()
+	reg := modelsRegister(Services{OrgID: "org_a", Keys: ks})
+	catalog := func() ModelsCatalogResponse {
+		t.Helper()
+		r := jobsRequest(t, reg, nil, "GET", APIPrefix+"/models", "")
+		var out ModelsCatalogResponse
+		if r.StatusCode() != 200 || json.Unmarshal(r.Body(), &out) != nil {
+			t.Fatalf("GET /models: %d %s", r.StatusCode(), r.Body())
+		}
+		return out
+	}
+	withPriceList(t, map[string]evidence.ModelPrice{"gpt-4o-mini": {InputPerMTok: 0.15, OutputPerMTok: 0.6, CacheReadPerMTok: 0.075}})
+	k, err := ks.Create(context.Background(), "org_a", keystore.KindProvider, keystore.Put{Provider: "openai", Label: "ronit-biforst", Value: "sk-test-abcdefgh"}, "u")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := catalog()
+	if out.Default == nil || out.Default.Model != "gpt-4o-mini" || out.Default.Price == nil ||
+		out.Default.Price.Source != "price_list" || out.Default.Price.InputPerMTok != 0.15 || out.Default.Price.CachePerMTok != 0.075 || out.Default.Price.KeyLabel != "" {
+		t.Fatalf("price list default = %+v", out.Default)
+	}
+	price := &keystore.Price{InputPerMTok: 2, OutputPerMTok: 10, CachePerMTok: 0.1}
+	if _, err := ks.Update(context.Background(), "org_a", k.ID, keystore.Put{Provider: "openai", Label: "ronit-biforst", Price: price}, "u"); err != nil {
+		t.Fatal(err)
+	}
+	out = catalog()
+	if p := out.Default.Price; p == nil || p.Source != "key" || p.KeyLabel != "ronit-biforst" || p.InputPerMTok != 2 || p.OutputPerMTok != 10 || p.CachePerMTok != 0.1 {
+		t.Fatalf("key default = %+v", out.Default.Price)
+	}
+	SetPriceList(nil)
+	if _, err := ks.Update(context.Background(), "org_a", k.ID, keystore.Put{Provider: "openai", Label: "ronit-biforst"}, "u"); err != nil {
+		t.Fatal(err)
+	}
+	if out = catalog(); out.Default == nil || out.Default.Price != nil {
+		t.Fatalf("no price anywhere = %+v", out.Default)
 	}
 }

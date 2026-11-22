@@ -151,3 +151,50 @@ func TestAdminUsageNeedsServerAdmin(t *testing.T) {
 		t.Fatalf("anonymous admin usage = %d, want 403", ctx.Response.StatusCode())
 	}
 }
+
+// TestUsageAbortedRunIsZeroCost (F1.price): a sealed run with no metrics.json
+// and no cost rows (an infrastructure abort before any model call) costs a
+// known $0 and is counted as "no model call" in its day, not as unknown.
+func TestUsageAbortedRunIsZeroCost(t *testing.T) {
+	idx := usageIndex()
+	delete(idx.files["r_t01_A"], FileMetrics)
+	out := ComputeUsage(idx, nil, UsageQuery{From: time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC),
+		To: time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC), GroupBy: UsageByDay})
+	if out.UnknownCostRuns != 1 || out.NoModelCallRuns != 1 || !near(out.TotalCostUSD, 0.25+0.10) {
+		t.Fatalf("totals %+v", out)
+	}
+	if out.Buckets[0].Key != "2026-11-10" || out.Buckets[0].NoModelCallRuns != 1 || out.Buckets[0].UnknownCostRuns != 0 {
+		t.Fatalf("day bucket %+v", out.Buckets[0])
+	}
+	// A run that made model calls but has no metrics stays unknown.
+	idx.files["r_t01_A"][FileCost] = []byte(`[{"request_id":"q1","attempt":1,"model":"gpt-5-mini","tokens":{"fresh":10,"cache_read":0,"cache_write":0,"out":10},"usd":{"state":"observed","v":0.01,"evidence":"gateway"}}]`)
+	out = ComputeUsage(idx, nil, UsageQuery{From: time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC),
+		To: time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC), GroupBy: UsageByDay})
+	if out.UnknownCostRuns != 2 || out.NoModelCallRuns != 0 {
+		t.Fatalf("run with cost rows and no metrics %+v", out)
+	}
+}
+
+// TestUsageRepricesUnpricedRun (F1.price): a run whose cost is unknown only
+// for want of a price is costed at read time from the key price (bare model,
+// single priced key with no model list).
+func TestUsageRepricesUnpricedRun(t *testing.T) {
+	idx := usageIndex()
+	idx.files["r_t02_B"][FileMetrics] = []byte(`{"cost_usd":{"state":"unknown","v":null,"reason":"1 of 1 cost rows unpriced","evidence":"gateway"},"tokens":{"state":"observed","v":2000000}}`)
+	idx.files["r_t02_B"][FileCost] = []byte(`[{"request_id":"q1","attempt":1,"model":"gpt-6.2-sol","tokens":{"fresh":1000000,"cache_read":0,"cache_write":0,"out":1000000},"usd":{"state":"unknown","reason":"no price for model \"gpt-6.2-sol\" in snapshot s1","evidence":"gateway"}}]`)
+	ks := priceKeys(t, keystore.Put{Provider: "openai", Label: "main", Price: &keystore.Price{InputPerMTok: 2, OutputPerMTok: 10}})
+	keys, err := ks.List(context.Background(), "o1", keystore.KindProvider)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := UsageQuery{From: time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC), GroupBy: UsageByDay}
+	out := ComputeUsage(idx, keys, q)
+	if out.UnknownCostRuns != 0 || !near(out.TotalCostUSD, 0.10+0.25+0.10+12) {
+		t.Fatalf("repriced totals %+v", out)
+	}
+	// Without a price the run stays unknown.
+	out = ComputeUsage(idx, nil, q)
+	if out.UnknownCostRuns != 1 {
+		t.Fatalf("unpriced %+v", out)
+	}
+}

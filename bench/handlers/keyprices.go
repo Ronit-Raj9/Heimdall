@@ -3,8 +3,9 @@ package handlers
 // Per-key prices (lane X05, N2): a provider key may carry what the org pays
 // per million tokens. Runs of a model the pinned price snapshot does not
 // list (a custom endpoint such as xcodebest) were sealed with an unknown
-// cost; the report card and the agent leaderboard cost them from the key's
-// price at read time, never by changing the sealed run.
+// cost; the report card, the agent leaderboard and usage cost them from the
+// key's price (else the server's price list, pricelist.go) at read time,
+// never by changing the sealed run.
 
 import (
 	"context"
@@ -22,46 +23,101 @@ type KeyLister interface {
 	List(ctx context.Context, orgID string, k keystore.Kind) ([]keystore.Key, error)
 }
 
-// KeyPriceLookup returns the price of a model from the org's priced
-// provider keys, or nil when no key has a price (or keys is nil). A key
-// prices a model it lists (with or without a "<provider>/" prefix) or any
-// "<provider>/<model>" of its own provider when it lists no model. Keys are
-// tried in the store's order.
+// KeyPriceLookup returns the price of a model for an org: its priced
+// provider keys first, then the server's price list (SetPriceList). It is
+// nil when no key has a price and no price list is installed. See
+// resolvePrice for the order. Keys are tried in the store's order; a key
+// store that cannot be listed counts as no keys.
 func KeyPriceLookup(ctx context.Context, keys KeyLister, orgID string) func(model string) (evidence.ModelPrice, bool) {
-	if keys == nil {
+	var list []keystore.Key
+	if keys != nil {
+		if l, err := keys.List(ctx, orgID, keystore.KindProvider); err == nil {
+			list = l
+		}
+	}
+	return priceLookup(list)
+}
+
+// priceLookup is KeyPriceLookup over an already listed set of keys.
+func priceLookup(list []keystore.Key) func(model string) (evidence.ModelPrice, bool) {
+	priced := pricedKeys(list)
+	if len(priced) == 0 && !hasPriceList() {
 		return nil
 	}
-	list, err := keys.List(ctx, orgID, keystore.KindProvider)
-	if err != nil {
-		return nil
+	return func(model string) (evidence.ModelPrice, bool) {
+		r, ok := resolvePrice(priced, model)
+		return r.price, ok
 	}
+}
+
+// pricedKeys keeps the provider keys that carry a price.
+func pricedKeys(list []keystore.Key) []keystore.Key {
 	var priced []keystore.Key
 	for _, k := range list {
 		if k.Price != nil && (k.Kind == "" || k.Kind == keystore.KindProvider) {
 			priced = append(priced, k)
 		}
 	}
-	if len(priced) == 0 {
-		return nil
+	return priced
+}
+
+// Where a resolved price comes from.
+const (
+	PriceSourceKey       = "key"
+	PriceSourcePriceList = "price_list"
+)
+
+// resolvedPrice is a model's price and where it was found.
+type resolvedPrice struct {
+	price    evidence.ModelPrice
+	source   string // PriceSourceKey or PriceSourcePriceList
+	keyID    string // the key, for PriceSourceKey
+	keyLabel string
+}
+
+// resolvePrice finds the price of model in this order: (a) a priced key
+// that lists the model (with or without a "<provider>/" prefix), or that
+// lists no model and is of the provider a "<provider>/<model>" name names;
+// (b) for a bare model name (no "/"), the priced key with an empty model
+// list when exactly one such key exists; (c) the server's price list.
+func resolvePrice(priced []keystore.Key, model string) (resolvedPrice, bool) {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return resolvedPrice{}, false
 	}
-	return func(model string) (evidence.ModelPrice, bool) {
-		model = strings.TrimSpace(model)
-		if model == "" {
-			return evidence.ModelPrice{}, false
+	prefix, bare, _ := strings.Cut(model, "/")
+	if !strings.Contains(model, "/") {
+		prefix, bare = "", model
+	}
+	fromKey := func(k keystore.Key) resolvedPrice {
+		return resolvedPrice{price: keyModelPrice(*k.Price), source: PriceSourceKey, keyID: k.ID, keyLabel: k.Label}
+	}
+	for _, k := range priced {
+		if keyPrices(k, model, prefix, bare) {
+			return fromKey(k), true
 		}
-		prefix, bare, _ := strings.Cut(model, "/")
-		if !strings.Contains(model, "/") {
-			prefix, bare = "", model
-		}
+	}
+	if prefix == "" {
+		var open []keystore.Key
 		for _, k := range priced {
-			if keyPrices(k, model, prefix, bare) {
-				p := *k.Price
-				return evidence.ModelPrice{InputPerMTok: p.InputPerMTok, OutputPerMTok: p.OutputPerMTok,
-					CacheReadPerMTok: p.CacheRate(), CacheWritePerMTok: p.CacheRate()}, true
+			if len(k.Models) == 0 {
+				open = append(open, k)
 			}
 		}
-		return evidence.ModelPrice{}, false
+		if len(open) == 1 {
+			return fromKey(open[0]), true
+		}
 	}
+	if p, ok := listPrice(model); ok {
+		return resolvedPrice{price: p, source: PriceSourcePriceList}, true
+	}
+	return resolvedPrice{}, false
+}
+
+// keyModelPrice is a key's price as a price table entry.
+func keyModelPrice(p keystore.Price) evidence.ModelPrice {
+	return evidence.ModelPrice{InputPerMTok: p.InputPerMTok, OutputPerMTok: p.OutputPerMTok,
+		CacheReadPerMTok: p.CacheRate(), CacheWritePerMTok: p.CacheRate()}
 }
 
 // keyPrices reports whether key k prices model (split into its provider
@@ -109,21 +165,7 @@ func (s pricedSource) RunFile(runID, name string) ([]byte, error) {
 	if json.Unmarshal(data, &metrics) != nil {
 		return data, nil
 	}
-	cost, ok := metrics["cost_usd"]
-	// Only a cost unknown for unpriced rows (metrics/costusd.go): an
-	// incomplete gateway log stays unknown whatever the price.
-	if !ok || cost.State != schemas.ValueUnknown || !strings.Contains(cost.Reason, "cost rows unpriced") {
-		return data, nil
-	}
-	raw, err := s.leaderboardSource.RunFile(runID, "cost.json")
-	if err != nil {
-		return data, nil
-	}
-	var rows []schemas.CostRow
-	if json.Unmarshal(raw, &rows) != nil {
-		return data, nil
-	}
-	v, ok := evidence.RepriceCost(rows, s.lookup)
+	v, ok := repricedCost(metrics, func() ([]byte, error) { return s.leaderboardSource.RunFile(runID, FileCost) }, s.lookup)
 	if !ok {
 		return data, nil
 	}
@@ -133,4 +175,24 @@ func (s pricedSource) RunFile(runID, name string) ([]byte, error) {
 		return data, nil
 	}
 	return out, nil
+}
+
+// repricedCost is the cost_usd of a run's metrics priced with lookup, when
+// the sealed cost is unknown only for want of a price (metrics/costusd.go)
+// and every unpriced cost row (read by readCost) now has a price. An
+// incomplete gateway log stays unknown whatever the price.
+func repricedCost(metrics map[string]schemas.Value, readCost func() ([]byte, error), lookup func(model string) (evidence.ModelPrice, bool)) (schemas.Value, bool) {
+	cost, ok := metrics[costMetric]
+	if lookup == nil || !ok || cost.State != schemas.ValueUnknown || !strings.Contains(cost.Reason, "cost rows unpriced") {
+		return schemas.Value{}, false
+	}
+	raw, err := readCost()
+	if err != nil {
+		return schemas.Value{}, false
+	}
+	var rows []schemas.CostRow
+	if json.Unmarshal(raw, &rows) != nil {
+		return schemas.Value{}, false
+	}
+	return evidence.RepriceCost(rows, lookup)
 }

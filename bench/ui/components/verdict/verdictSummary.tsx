@@ -39,13 +39,15 @@ export interface VerdictSummaryProps {
 	naive: Record<string, Ratio>;
 	/** arm -> metric -> median per run, from the diagnostics; cost and tokens come from here. */
 	armMetrics?: Record<string, Record<string, Value>>;
+	/** Where the diagnostics query is when armMetrics is absent: still loading, or failed. */
+	metricsStatus?: "loading" | "error";
 	/** The one next step; the page decides where the button goes. */
 	onNext?: (action: Action) => void;
 	className?: string;
 }
 
 /** The verdict in five seconds: one headline, A vs B pass rates, cost and tokens, and what to do next. */
-export function VerdictSummary({ verdict, arms, naive, armMetrics, onNext, className }: VerdictSummaryProps) {
+export function VerdictSummary({ verdict, arms, naive, armMetrics, metricsStatus, onNext, className }: VerdictSummaryProps) {
 	const { t } = useTranslation("experimentPage");
 	const locale = getLocale();
 	const tone = DECISION_TONE[verdict.decision];
@@ -74,11 +76,21 @@ export function VerdictSummary({ verdict, arms, naive, armMetrics, onNext, class
 
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2" data-testid="verdict-summary-arms">
 				{arms.slice(0, 2).map((arm, index) => (
-					<ArmPanel key={arm} arm={arm} colour={BAR[index]} ratio={naive[arm]} metrics={armMetrics?.[arm]} />
+					<ArmPanel
+						key={arm}
+						arm={arm}
+						colour={BAR[index]}
+						ratio={naive[arm]}
+						metrics={armMetrics?.[arm]}
+						status={armMetrics ? undefined : metricsStatus}
+					/>
 				))}
 			</div>
 
-			<div className="bg-card flex flex-col gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center sm:justify-between" data-testid="verdict-summary-next">
+			<div
+				className="bg-card flex flex-col gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+				data-testid="verdict-summary-next"
+			>
 				<p className="text-sm">{nextLine(verdict, a, b, t)}</p>
 				{onNext && (
 					<Button size="sm" onClick={() => onNext(verdict.action)} dataTestId="verdict-summary-next-button">
@@ -91,15 +103,33 @@ export function VerdictSummary({ verdict, arms, naive, armMetrics, onNext, class
 	);
 }
 
-function ArmPanel({ arm, colour, ratio, metrics }: { arm: string; colour: string; ratio?: Ratio; metrics?: Record<string, Value> }) {
+function ArmPanel({
+	arm,
+	colour,
+	ratio,
+	metrics,
+	status,
+}: {
+	arm: string;
+	colour: string;
+	ratio?: Ratio;
+	metrics?: Record<string, Value>;
+	status?: "loading" | "error";
+}) {
 	const { t } = useTranslation("experimentPage");
 	const locale = getLocale();
 	const rate = ratio && ratio.den > 0 ? ratio.num / ratio.den : null;
 	const value = (name: string, kind: "usd" | "tokens") => {
 		const v = metrics?.[name];
-		if (v && v.state === "observed" && typeof v.v === "number") return formatValueNumber(v.v, kind, locale);
-		// An unknown cost almost always means the model has no price in the catalog.
-		return kind === "usd" ? t("summary.costUnknown") : t("summary.unknown");
+		if (v && v.state === "observed" && typeof v.v === "number") {
+			// Tokens per run in full (23,128), not compact: the panel has room and the exact count is what people compare.
+			return kind === "tokens"
+				? new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(v.v)
+				: formatValueNumber(v.v, kind, locale);
+		}
+		if (status === "loading") return t("summary.metricsLoading");
+		if (status === "error") return kind === "usd" ? t("summary.metricsError") : t("summary.unknown");
+		return notKnown(v?.reason, t);
 	};
 	return (
 		<div className="bg-card flex flex-col gap-3 rounded-lg border p-4" data-testid={`verdict-summary-arm-${arm}`}>
@@ -107,7 +137,9 @@ function ArmPanel({ arm, colour, ratio, metrics }: { arm: string; colour: string
 				<span className="truncate font-mono text-sm font-semibold" title={arm}>
 					{arm}
 				</span>
-				<span className="text-2xl font-semibold tabular-nums">{rate === null ? t("summary.unknown") : `${formatPp(rate * 100, locale)}%`}</span>
+				<span className="text-2xl font-semibold tabular-nums">
+					{rate === null ? t("summary.unknown") : `${formatPp(rate * 100, locale)}%`}
+				</span>
 			</div>
 			<div
 				className="bg-muted h-2.5 w-full overflow-hidden rounded-full"
@@ -117,7 +149,10 @@ function ArmPanel({ arm, colour, ratio, metrics }: { arm: string; colour: string
 				aria-valuemax={100}
 				aria-valuenow={rate === null ? undefined : Math.round(rate * 100)}
 			>
-				<div className={cn("h-full rounded-full transition-all", colour)} style={{ width: `${rate === null ? 0 : Math.min(100, rate * 100)}%` }} />
+				<div
+					className={cn("h-full rounded-full transition-all", colour)}
+					style={{ width: `${rate === null ? 0 : Math.min(100, rate * 100)}%` }}
+				/>
 			</div>
 			<span className="text-muted-foreground text-xs">
 				{ratio ? t("summary.passCount", { num: ratio.num, den: ratio.den }) : t("summary.passRate")}
@@ -141,6 +176,13 @@ function ArmPanel({ arm, colour, ratio, metrics }: { arm: string; colour: string
 }
 
 type TFn = ReturnType<typeof useTranslation<"experimentPage">>["t"];
+
+/** A value that is not known, with its own reason; the missing-price sentence only for unpriced cost rows. */
+export function notKnown(reason: string | undefined, t: TFn): string {
+	if (!reason) return t("summary.unknown");
+	if (reason.includes("unpriced")) return t("summary.costUnknown");
+	return t("summary.notKnownReason", { reason });
+}
 
 function magnitude(verdict: Verdict, locale: string): string | null {
 	const effect = verdict.effect;

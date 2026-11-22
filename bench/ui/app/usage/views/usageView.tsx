@@ -120,7 +120,12 @@ function Segmented({
 	return (
 		<div className="flex flex-col gap-1 text-xs">
 			{label && <span className="text-muted-foreground">{label}</span>}
-			<div role="radiogroup" aria-label={label || undefined} className="border-border bg-muted/50 flex rounded-lg border p-0.5" data-testid={testId}>
+			<div
+				role="radiogroup"
+				aria-label={label || undefined}
+				className="border-border bg-muted/50 flex rounded-lg border p-0.5"
+				data-testid={testId}
+			>
 				{options.map((o) => (
 					<button
 						key={o.value}
@@ -269,7 +274,14 @@ export function UsageChart({ buckets, group, total }: { buckets: UsageBucket[]; 
 						const x = pad.left + i * slot + (slot - barW) / 2;
 						return (
 							<g key={b.key} className="group">
-								<rect x={pad.left + i * slot} y={pad.top} width={slot} height={plotH} fill="currentColor" className="text-accent opacity-0 group-hover:opacity-60" />
+								<rect
+									x={pad.left + i * slot}
+									y={pad.top}
+									width={slot}
+									height={plotH}
+									fill="currentColor"
+									className="text-accent opacity-0 group-hover:opacity-60"
+								/>
 								<rect
 									x={x}
 									y={pad.top + plotH - h}
@@ -313,39 +325,44 @@ function UsageTable({ buckets, group, groupBy }: { buckets: UsageBucket[]; group
 	const rows = groupBy === "day" ? [...buckets].reverse() : buckets;
 	return (
 		<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
-		<Table aria-label={t("table.label", { group })} data-testid="usage-table">
-			<TableHeader>
-				<TableRow>
-					<TableHead>{t("table.group")}</TableHead>
-					<TableHead className="text-right">{t("table.cost")}</TableHead>
-					{groupBy !== "key" && (
-						<>
-							<TableHead className="text-right">{t("table.tokens")}</TableHead>
-							<TableHead className="text-right">{t("table.runs")}</TableHead>
-							<TableHead className="text-right">{t("table.unknown")}</TableHead>
-						</>
-					)}
-				</TableRow>
-			</TableHeader>
-			<TableBody>
-				{rows.map((b) => (
-					<TableRow key={b.key} data-testid={`usage-row-${b.key}`}>
-						<TableCell className="font-mono text-xs">
-							{b.key}
-							{b.label && <span className="text-muted-foreground ml-2 font-sans">{b.label}</span>}
-						</TableCell>
-						<TableCell className="text-right tabular-nums">{formatUSD(b.cost_usd)}</TableCell>
+			<Table aria-label={t("table.label", { group })} data-testid="usage-table">
+				<TableHeader>
+					<TableRow>
+						<TableHead>{t("table.group")}</TableHead>
+						<TableHead className="text-right">{t("table.cost")}</TableHead>
 						{groupBy !== "key" && (
 							<>
-								<TableCell className="text-right tabular-nums">{formatCount(b.tokens)}</TableCell>
-								<TableCell className="text-right tabular-nums">{b.runs}</TableCell>
-								<TableCell className="text-right tabular-nums">{b.unknown_cost_runs || ""}</TableCell>
+								<TableHead className="text-right">{t("table.tokens")}</TableHead>
+								<TableHead className="text-right">{t("table.runs")}</TableHead>
+								<TableHead className="text-right">{t("table.unknown")}</TableHead>
 							</>
 						)}
 					</TableRow>
-				))}
-			</TableBody>
-		</Table>
+				</TableHeader>
+				<TableBody>
+					{rows.map((b) => (
+						<TableRow key={b.key} data-testid={`usage-row-${b.key}`}>
+							<TableCell className="font-mono text-xs">
+								{b.key}
+								{b.label && <span className="text-muted-foreground ml-2 font-sans">{b.label}</span>}
+								{!!b.no_model_call_runs && (
+									<span className="text-muted-foreground ml-2 font-sans" data-testid={`usage-no-call-${b.key}`}>
+										{t("table.noModelCall", { count: b.no_model_call_runs })}
+									</span>
+								)}
+							</TableCell>
+							<TableCell className="text-right tabular-nums">{formatUSD(b.cost_usd)}</TableCell>
+							{groupBy !== "key" && (
+								<>
+									<TableCell className="text-right tabular-nums">{formatCount(b.tokens)}</TableCell>
+									<TableCell className="text-right tabular-nums">{b.runs}</TableCell>
+									<TableCell className="text-right tabular-nums">{b.unknown_cost_runs || ""}</TableCell>
+								</>
+							)}
+						</TableRow>
+					))}
+				</TableBody>
+			</Table>
 		</div>
 	);
 }
@@ -435,32 +452,32 @@ export function AdminUsageBody({ data, loading, error, onRetry }: AdminUsageBody
 				<EmptyState message={t("admin.empty")} testId="admin-usage-empty" />
 			) : (
 				<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
-				<Table data-testid="admin-usage-table">
-					<TableHeader>
-						<TableRow>
-							<TableHead>{t("admin.org")}</TableHead>
-							<TableHead className="text-right">{t("table.cost")}</TableHead>
-							<TableHead className="text-right">{t("table.tokens")}</TableHead>
-							<TableHead className="text-right">{t("table.runs")}</TableHead>
-							<TableHead className="text-right">{t("totals.keys")}</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{data.orgs.map((o) => (
-							<TableRow key={o.org_id} data-testid={`admin-usage-row-${o.slug}`}>
-								<TableCell>
-									{o.name || o.slug}
-									<span className="text-muted-foreground ml-2 font-mono text-xs">{o.slug}</span>
-									{o.error && <div className="text-destructive text-xs">{t("admin.orgError", { error: o.error })}</div>}
-								</TableCell>
-								<TableCell className="text-right tabular-nums">{formatUSD(o.cost_usd)}</TableCell>
-								<TableCell className="text-right tabular-nums">{formatCount(o.tokens)}</TableCell>
-								<TableCell className="text-right tabular-nums">{o.runs}</TableCell>
-								<TableCell className="text-right tabular-nums">{formatUSD(o.keys_month_spent_usd)}</TableCell>
+					<Table data-testid="admin-usage-table">
+						<TableHeader>
+							<TableRow>
+								<TableHead>{t("admin.org")}</TableHead>
+								<TableHead className="text-right">{t("table.cost")}</TableHead>
+								<TableHead className="text-right">{t("table.tokens")}</TableHead>
+								<TableHead className="text-right">{t("table.runs")}</TableHead>
+								<TableHead className="text-right">{t("totals.keys")}</TableHead>
 							</TableRow>
-						))}
-					</TableBody>
-				</Table>
+						</TableHeader>
+						<TableBody>
+							{data.orgs.map((o) => (
+								<TableRow key={o.org_id} data-testid={`admin-usage-row-${o.slug}`}>
+									<TableCell>
+										{o.name || o.slug}
+										<span className="text-muted-foreground ml-2 font-mono text-xs">{o.slug}</span>
+										{o.error && <div className="text-destructive text-xs">{t("admin.orgError", { error: o.error })}</div>}
+									</TableCell>
+									<TableCell className="text-right tabular-nums">{formatUSD(o.cost_usd)}</TableCell>
+									<TableCell className="text-right tabular-nums">{formatCount(o.tokens)}</TableCell>
+									<TableCell className="text-right tabular-nums">{o.runs}</TableCell>
+									<TableCell className="text-right tabular-nums">{formatUSD(o.keys_month_spent_usd)}</TableCell>
+								</TableRow>
+							))}
+						</TableBody>
+					</Table>
 				</div>
 			)}
 		</div>

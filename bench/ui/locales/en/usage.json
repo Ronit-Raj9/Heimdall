@@ -19,7 +19,7 @@
 		"tokens": "Tokens",
 		"runs": "Finished runs",
 		"keys": "Provider key spend this month",
-		"unknown": "{{count}} run(s) have no known cost (the model has no price) and are left out of the total."
+		"unknown": "{{count}} run(s) have no known cost and are left out of the total. Set a price on the provider key in Settings > API keys to include them."
 	},
 	"table": {
 		"group": "Group",
@@ -27,6 +27,7 @@
 		"tokens": "Tokens",
 		"runs": "Runs",
 		"unknown": "Cost not known",
+		"noModelCall": "{{count}} with no model call",
 		"label": "Usage by {{group}}"
 	},
 	"keys": {
