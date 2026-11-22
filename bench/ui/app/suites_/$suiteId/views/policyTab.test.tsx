@@ -1,9 +1,12 @@
 import "@/lib/i18n";
 
-import type { PolicyDraft, PolicyReport } from "@/lib/types/policyDocs";
+import { benchApi } from "@/lib/store/apis/benchApi";
+import type { PolicyDocView, PolicyDraft, PolicyReport } from "@/lib/types/policyDocs";
+import { configureStore } from "@reduxjs/toolkit";
 import { renderToStaticMarkup } from "react-dom/server";
+import { Provider } from "react-redux";
 import { describe, expect, it } from "vitest";
-import { generateParams, pendingByClause, rateText, ReportView } from "./policyTab";
+import { ClauseEditor, generateParams, pendingByClause, rateText, ReportView, updateClause } from "./policyTab";
 
 const draft = (task: string, clause: string, status = "pending"): PolicyDraft => ({
 	task,
@@ -62,5 +65,25 @@ describe("policy tab", () => {
 		expect(html).toContain("Breaks clause 4 when the customer insists.");
 		expect(html).toContain("/api/bench/suites/desk/policy-docs/refunds/report?format=pdf");
 		expect(html).toContain("Untested clauses: 5");
+	});
+	it("edits one clause and renders the clause editor", () => {
+		const cs = [
+			{ number: "1", text: "Refund within 30 days." },
+			{ number: "2", text: "No store credit.", title: "Credit" },
+		];
+		const next = updateClause(cs, 1, { skip: true, text: "No credit." });
+		expect(next[1]).toEqual({ number: "2", text: "No credit.", title: "Credit", skip: true });
+		expect(next[0]).toBe(cs[0]);
+		const store = configureStore({ reducer: { [benchApi.reducerPath]: benchApi.reducer }, middleware: (g) => g().concat(benchApi.middleware) });
+		const view = { suite: "desk", doc: { id: "refunds", clauses: cs, drafts: [] }, counts: {}, grader: "checks", judged: true, next: "" } as unknown as PolicyDocView;
+		const html = renderToStaticMarkup(
+			<Provider store={store}>
+				<ClauseEditor suite="desk" view={view} onClose={() => undefined} />
+			</Provider>,
+		);
+		expect(html).toContain('data-testid="policy-clause-editor"');
+		expect(html).toContain('data-testid="policy-clause-edit-1"');
+		expect(html).toContain("No store credit.");
+		expect(html).toContain("Save clauses");
 	});
 });

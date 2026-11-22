@@ -168,17 +168,23 @@ export function MappingStep({
 	gradeOn,
 	onGradeOn,
 	disabled,
+	fields = MAP_FIELDS,
+	showMetadata = true,
 	t,
 }: {
 	columns: readonly RowColumn[];
 	mapping: RowMapping;
 	onChange: (m: RowMapping) => void;
-	saveMapping: boolean;
-	onSaveMapping: (v: boolean) => void;
+	saveMapping?: boolean;
+	/** Absent: no remember checkbox (the Add benchmark page saves the mapping in the draft's plan). */
+	onSaveMapping?: (v: boolean) => void;
 	showGradeOn: boolean;
 	gradeOn?: GradeOn;
-	onGradeOn: (g: GradeOn) => void;
+	onGradeOn?: (g: GradeOn) => void;
 	disabled?: boolean;
+	/** The task fields offered; default every field the Build tab import reads. */
+	fields?: readonly MapField[];
+	showMetadata?: boolean;
 	t: T;
 }) {
 	const meta = new Set(mapping.metadata ?? []);
@@ -193,7 +199,7 @@ export function MappingStep({
 				<p className="text-muted-foreground text-xs">{t("rows.map.help")}</p>
 			</div>
 			<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-				{MAP_FIELDS.map((f) => (
+				{fields.map((f) => (
 					<Field key={f} label={t(`rows.map.field.${f}`)}>
 						<select
 							className={selectClass}
@@ -213,7 +219,7 @@ export function MappingStep({
 					</Field>
 				))}
 			</div>
-			{columns.length > 0 && (
+			{showMetadata && columns.length > 0 && (
 				<fieldset className="flex min-w-0 flex-col gap-1" data-testid="suite-build-map-metadata">
 					<legend className="text-muted-foreground text-sm">{t("rows.map.metadata")}</legend>
 					<div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -232,16 +238,18 @@ export function MappingStep({
 					<legend className="text-muted-foreground mb-1">{t("rows.map.gradeOn")}</legend>
 					{(["final", "transcript"] as const).map((g) => (
 						<label key={g} className="flex items-center gap-1.5">
-							<input type="radio" name="grade-on" checked={gradeOn === g} disabled={disabled} onChange={() => onGradeOn(g)} data-testid={`suite-build-grade-on-${g}`} />
+							<input type="radio" name="grade-on" checked={gradeOn === g} disabled={disabled} onChange={() => onGradeOn?.(g)} data-testid={`suite-build-grade-on-${g}`} />
 							{g === "final" ? t("rows.map.gradeOnFinal") : t("rows.map.gradeOnTranscript")}
 						</label>
 					))}
 				</fieldset>
 			)}
-			<label className="flex items-center gap-2 text-sm">
-				<input type="checkbox" checked={saveMapping} disabled={disabled} onChange={(e) => onSaveMapping(e.target.checked)} data-testid="suite-build-map-save" />
-				{t("rows.map.save")}
-			</label>
+			{onSaveMapping && (
+				<label className="flex items-center gap-2 text-sm">
+					<input type="checkbox" checked={!!saveMapping} disabled={disabled} onChange={(e) => onSaveMapping(e.target.checked)} data-testid="suite-build-map-save" />
+					{t("rows.map.save")}
+				</label>
+			)}
 		</div>
 	);
 }

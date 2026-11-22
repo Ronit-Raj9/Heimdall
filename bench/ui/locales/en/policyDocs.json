@@ -13,11 +13,22 @@
 		"title": "Policy documents",
 		"empty": "No policy uploaded yet.",
 		"open": "Open",
-		"summary": "{{clauses}} clauses, {{pending}} drafts pending review"
+		"summary": "{{clauses}} clauses, {{pending}} drafts pending review",
+		"delete": "Delete",
+		"deleteConfirm": "Delete {{name}} and its pending drafts? Accepted tasks stay in the benchmark.",
+		"viewerList": "Pick a policy to see its compliance report."
 	},
 	"clauses": {
 		"title": "Clauses",
-		"skipped": "skipped"
+		"skipped": "skipped",
+		"edit": "Edit clauses",
+		"editHint": "Fix the split, or tick Skip on clauses with nothing to test (definitions, contact details). Keep the number of a clause that has drafted tasks.",
+		"number": "Number",
+		"heading": "Title",
+		"text": "Text",
+		"skip": "Skip",
+		"save": "Save clauses",
+		"cancel": "Cancel"
 	},
 	"generate": {
 		"title": "Draft scenarios",

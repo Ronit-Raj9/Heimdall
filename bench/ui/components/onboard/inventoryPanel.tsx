@@ -1,12 +1,35 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MappingStep } from "@/app/suites_/$suiteId/views/rowMapper";
 import type { OnboardInventory, OnboardMatch, OnboardPlan } from "@/lib/types/onboard";
+import type { MapField, RowColumn, RowMapping } from "@/lib/types/suiteBuild";
 import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
-const MAP_FIELDS = ["question", "expected", "rubric", "wrong_answers"] as const;
+
+/** Row fields the onboard rows reader maps (onboard/source_rows.go mappingKeys), in the Build tab mapper's order. */
+export const ONBOARD_MAP_FIELDS = ["question", "expected", "rubric", "reference", "wrong_answers", "id", "title", "split"] as const satisfies readonly MapField[];
+
+/** The inventory's column paths as row mapper columns, with an example from the first sample that has one. */
+export function onboardColumns(inv: Pick<OnboardInventory, "columns" | "samples">): RowColumn[] {
+	return (inv.columns ?? []).map((path) => {
+		const example = inv.samples.find((s) => s.fields[path])?.fields[path];
+		const filled = inv.samples.filter((s) => s.fields[path]).length;
+		return { path, kind: "text", example, filled };
+	});
+}
+
+/** The plan mapping without fields left on auto, onboard only reads the fields it knows. */
+export function onboardMapping(m: RowMapping): Record<string, string> {
+	const out: Record<string, string> = {};
+	for (const f of ONBOARD_MAP_FIELDS) {
+		const v = m[f];
+		if (v) out[f] = v;
+	}
+	return out;
+}
 
 /** The detected matches as chips; a click reads the input as that source. */
 export function MatchChips({ matches, active, onPick }: { matches: OnboardMatch[]; active?: string; onPick(source: string): void }) {
@@ -46,6 +69,7 @@ export function InventoryPanel({
 	busy: boolean;
 }) {
 	const { t } = useTranslation("onboard");
+	const { t: tb } = useTranslation("suiteBuild");
 	const tx = (k: string, o?: Record<string, unknown>) => t(k as never, o as never) as unknown as string;
 	const rows = inv.kind === "rows" || inv.kind === "hf_dataset";
 	const sampleKeys = Array.from(new Set(inv.samples.flatMap((s) => Object.keys(s.fields)))).slice(0, 4);
@@ -211,30 +235,16 @@ export function InventoryPanel({
 						</label>
 					</div>
 					{rows && (inv.columns?.length ?? 0) > 0 && (
-						<div className="flex flex-wrap gap-3" data-testid="onboard-plan-mapping">
-							{MAP_FIELDS.map((f) => (
-								<label key={f} className="flex flex-col gap-1 text-xs">
-									<span className="font-medium">{tx(`plan.field.${f}`)}</span>
-									<select
-										className={selectClass}
-										value={plan.mapping?.[f] ?? ""}
-										onChange={(e) => {
-											const m = { ...(plan.mapping ?? {}) };
-											if (e.target.value) m[f] = e.target.value;
-											else delete m[f];
-											set({ mapping: m });
-										}}
-										data-testid={`onboard-map-${f}`}
-									>
-										<option value="">{t("plan.mapAuto")}</option>
-										{inv.columns?.map((c) => (
-											<option key={c} value={c}>
-												{c}
-											</option>
-										))}
-									</select>
-								</label>
-							))}
+						<div data-testid="onboard-plan-mapping">
+							<MappingStep
+								columns={onboardColumns(inv)}
+								mapping={plan.mapping ?? {}}
+								onChange={(m) => set({ mapping: onboardMapping(m) })}
+								showGradeOn={false}
+								fields={ONBOARD_MAP_FIELDS}
+								showMetadata={false}
+								t={tb}
+							/>
 						</div>
 					)}
 					<div className="flex flex-wrap items-center gap-3">

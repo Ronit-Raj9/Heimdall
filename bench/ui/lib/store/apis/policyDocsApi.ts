@@ -1,4 +1,4 @@
-import type { PolicyDocList, PolicyDocUpload, PolicyDocView, PolicyReport, PolicyReviewRequest, PolicyReviewResult } from "@/lib/types/policyDocs";
+import type { PolicyClause, PolicyDocList, PolicyDocUpload, PolicyDocView, PolicyReport, PolicyReviewRequest, PolicyReviewResult } from "@/lib/types/policyDocs";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
 
@@ -29,6 +29,14 @@ export const policyDocsApi = benchApi.injectEndpoints({
 			query: ({ suite, doc, ...body }) => ({ url: `/suites/${seg(suite)}/policy-docs/${seg(doc)}/review`, method: "POST", body }),
 			invalidatesTags: (r, _e, { suite }) => (r ? [...docTags(suite), { type: "BenchSuites" as const, id: "LIST" }] : []),
 		}),
+		setPolicyClauses: builder.mutation<PolicyDocView, { suite: string; doc: string; clauses: PolicyClause[] }>({
+			query: ({ suite, doc, clauses }) => ({ url: `/suites/${seg(suite)}/policy-docs/${seg(doc)}/clauses`, method: "PUT", body: { clauses } }),
+			invalidatesTags: (r, _e, { suite }) => (r ? docTags(suite) : []),
+		}),
+		deletePolicyDoc: builder.mutation<void, { suite: string; doc: string }>({
+			query: ({ suite, doc }) => ({ url: `/suites/${seg(suite)}/policy-docs/${seg(doc)}`, method: "DELETE" }),
+			invalidatesTags: (_r, e, { suite }) => (e ? [] : docTags(suite)),
+		}),
 		getPolicyReport: builder.query<PolicyReport, { suite: string; doc: string }>({
 			query: ({ suite, doc }) => `/suites/${seg(suite)}/policy-docs/${seg(doc)}/report`,
 			providesTags: (_r, _e, { suite }) => docTags(suite),
@@ -36,5 +44,12 @@ export const policyDocsApi = benchApi.injectEndpoints({
 	}),
 });
 
-export const { useListPolicyDocsQuery, useGetPolicyDocQuery, useUploadPolicyDocMutation, useReviewPolicyDraftsMutation, useGetPolicyReportQuery } =
-	policyDocsApi;
+export const {
+	useListPolicyDocsQuery,
+	useGetPolicyDocQuery,
+	useUploadPolicyDocMutation,
+	useReviewPolicyDraftsMutation,
+	useGetPolicyReportQuery,
+	useSetPolicyClausesMutation,
+	useDeletePolicyDocMutation,
+} = policyDocsApi;
