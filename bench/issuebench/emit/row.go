@@ -80,8 +80,8 @@ func RowOf(v issuebench.Validation, env issuebench.EnvSpec, base, image string) 
 		Image:            image,
 		LicenseName:      "proprietary",
 	}
-	if strings.TrimSpace(env.TestCmd) != "" {
-		r.TestCmds = []string{env.TestCmd}
+	if cmd := TestCmd(env, c); cmd != "" {
+		r.TestCmds = []string{cmd}
 	}
 	if !c.IssueCreated.IsZero() {
 		r.CreatedAt = c.IssueCreated.UTC().Format(time.RFC3339)
@@ -104,4 +104,33 @@ func Usable(v issuebench.Validation) string {
 		return "fix or test patch is empty"
 	}
 	return ""
+}
+
+// JUnitFlag makes pytest write the JUnit XML the swebench grader reads
+// (BENCH_JUNIT), so grading uses JUnit, not the log only.
+const JUnitFlag = `--junitxml="${BENCH_JUNIT:-/tmp/bench-junit.xml}"`
+
+// TestCmd is the task's test command: the registered Language's
+// TestCommand when there is one, else the EnvSpec's; a pytest command
+// without a JUnit report gets JUnitFlag.
+func TestCmd(env issuebench.EnvSpec, c issuebench.Candidate) string {
+	lang := env.Language
+	if lang == "" {
+		lang = c.Language
+	}
+	cmd := ""
+	for _, l := range issuebench.Languages() {
+		if l.Name() == lang {
+			cmd = l.TestCommand(nil)
+			break
+		}
+	}
+	if strings.TrimSpace(cmd) == "" {
+		cmd = env.TestCmd
+	}
+	cmd = strings.TrimSpace(cmd)
+	if strings.Contains(cmd, "pytest") && !strings.Contains(cmd, "--junitxml") {
+		cmd += " " + JUnitFlag
+	}
+	return cmd
 }

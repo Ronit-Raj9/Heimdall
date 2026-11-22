@@ -208,6 +208,11 @@ func TestEmit(t *testing.T) {
 			}
 		}
 	}
+	cmd, err := os.ReadFile(filepath.Join(root, "benchmarks", s.Suite, "tasks", s.Tasks[0], "verifier/tests/cmd.sh"))
+	must(t, err)
+	if !strings.Contains(string(cmd), "--junitxml=") || !strings.Contains(string(cmd), "BENCH_JUNIT") {
+		t.Fatalf("cmd.sh has no JUnit report: %s", cmd)
+	}
 	instr, err := os.ReadFile(filepath.Join(root, "benchmarks", s.Suite, "tasks", s.Tasks[0], "instruction.md"))
 	must(t, err)
 	if !strings.Contains(string(instr), "add(1, 2) returns -1") {
