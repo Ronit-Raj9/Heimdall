@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/adapters"
+	"github.com/maximhq/bifrost/bench/failover"
 	"github.com/maximhq/bifrost/bench/faultproxy"
 	"github.com/maximhq/bifrost/bench/gateways/bifrost"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -75,5 +76,82 @@ func TestRoutePluginFaults(t *testing.T) {
 	st3 := c04State(adapters.ParserClaudeCode)
 	if err := p3.routePluginFaults(ctx, st3); err != nil || st3.rc.Run.Gateway.FaultPath != "" {
 		t.Fatalf("proxy mode: %v %q", err, st3.rc.Run.Gateway.FaultPath)
+	}
+}
+
+// H02: a team member routes on its own key slot with its own config, and
+// never inherits the lead's headers.
+func TestRouteMemberFaults(t *testing.T) {
+	ctx := context.Background()
+	proxy := &c04Proxy{plans: map[string]schemas.FaultPlan{}}
+	pf := bifrost.NewPluginFaults(proxy)
+	p := &Pipeline{reg: &schemas.Registry{Fault: pf}}
+	outage := schemas.FaultPlan{Mode: faultproxy.ModePersistent, FromCall: 1, Status: 503, Model: "gpt-x", RunID: "run-7"}
+	_ = pf.SetPlan(ctx, "slot-2", outage)
+	_ = pf.SetPlan(ctx, "slot-3", outage)
+
+	paths := map[string]bool{}
+	carrier := c04State(adapters.ParserCodex).rc
+	carrier.Agent = &schemas.AgentConfig{Adapter: "command", AdapterCaps: &schemas.AdapterCapabilities{SupportsGatewayHeaders: true}}
+	carrier.Key = &schemas.RunKey{KeySlot: "slot-2"}
+	carrier.FaultHeaders = map[string]string{"x-heimdall-fault-plan": "lead"}
+	if err := p.routeMemberFaults(ctx, carrier, paths); err != nil {
+		t.Fatal(err)
+	}
+	pp, err := bifrost.DecodePluginPlan(carrier.FaultHeaders[bifrost.HeaderFaultPlan])
+	if err != nil || pp.Mode != bifrost.PluginModeError || pp.Model != "gpt-x" || pp.Status != 503 {
+		t.Fatalf("member plan %+v %v (%v)", pp, err, carrier.FaultHeaders)
+	}
+	if proxy.plans["slot-2"].Mode != faultproxy.ModeNone {
+		t.Fatalf("member slot still faulted on the proxy: %+v", proxy.plans["slot-2"])
+	}
+
+	plain := c04State("generic").rc
+	plain.Key = &schemas.RunKey{KeySlot: "slot-3"}
+	plain.FaultHeaders = map[string]string{"x-heimdall-fault-plan": "lead"}
+	if err := p.routeMemberFaults(ctx, plain, paths); err != nil {
+		t.Fatal(err)
+	}
+	if plain.FaultHeaders != nil || proxy.plans["slot-3"].Mode != faultproxy.ModePersistent {
+		t.Fatalf("plain member: %v %+v", plain.FaultHeaders, proxy.plans["slot-3"])
+	}
+	if got := teamFaultPath(paths); got != bifrost.FaultPathMixed {
+		t.Fatalf("team path %q", got)
+	}
+	if teamFaultPath(map[string]bool{bifrost.FaultPathPlugin: true}) != bifrost.FaultPathPlugin || teamFaultPath(nil) != "" {
+		t.Fatal("teamFaultPath")
+	}
+}
+
+// C07 on the plugin path: the primary-outage plan rides as the same inline
+// outage failover.Plan builds for Arm.Headers (error, status, model, from
+// the first call).
+func TestPrimaryOutageViaPlugin(t *testing.T) {
+	ctx := context.Background()
+	pf := bifrost.NewPluginFaults(&c04Proxy{plans: map[string]schemas.FaultPlan{}})
+	p := &Pipeline{reg: &schemas.Registry{Fault: pf}}
+	_ = pf.SetPlan(ctx, "slot-1", schemas.FaultPlan{Mode: faultproxy.ModePersistent, FromCall: 1, Status: 503, Model: "gpt-4o", RunID: "run-7"})
+	st := c04State(adapters.ParserClaudeCode)
+	st.rc.Probe = &schemas.ProbeSpec{ID: schemas.GenericProbePrimaryOutage}
+	if err := p.routePluginFaults(ctx, st); err != nil {
+		t.Fatal(err)
+	}
+	pp, err := bifrost.DecodePluginPlan(st.rc.FaultHeaders[bifrost.HeaderFaultPlan])
+	if err != nil {
+		t.Fatal(err)
+	}
+	arms, err := failover.Plan("openai", "gpt-4o", failover.Option{Enabled: true, Fallbacks: []schemas.RouteTarget{{Model: "gpt-4o-mini"}}}, true, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := bifrost.DecodePluginPlan(arms[1].Headers[failover.HeaderFaultPlan])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pp.Mode != want.Mode || pp.Status != want.Status || pp.Model != want.Model || pp.FromCall != want.FromCall {
+		t.Fatalf("plugin plan %+v, failover arm plan %+v", pp, want)
+	}
+	if st.rc.Run.Gateway.FaultPath != bifrost.FaultPathPlugin {
+		t.Fatalf("path %q", st.rc.Run.Gateway.FaultPath)
 	}
 }

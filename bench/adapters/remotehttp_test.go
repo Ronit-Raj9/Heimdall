@@ -228,6 +228,19 @@ func TestRemoteHTTPLauncher(t *testing.T) {
 	if !ok || gw["key"] != testKey || gw["url"] != testGateway {
 		t.Fatalf("gateway %v", agent.body["gateway"])
 	}
+	if _, has := gw["headers"]; has {
+		t.Fatalf("gateway headers without BENCH_GATEWAY_HEADERS: %v", gw)
+	}
+	// H02: the run's gateway headers (heimdall plugin fault plan) ride in the gateway block.
+	env[EnvGatewayHeaders] = `{"x-heimdall-fault-plan":"abc","x-heimdall-run-id":"r1"}`
+	if answer, out, err := runLauncher(t, env); err != nil || answer != "Tuesday" {
+		t.Fatalf("answer %q, err %v\n%s", answer, err, out)
+	}
+	gw, _ = agent.body["gateway"].(map[string]any)
+	if h, _ := gw["headers"].(map[string]any); h["x-heimdall-fault-plan"] != "abc" || h["x-heimdall-run-id"] != "r1" {
+		t.Fatalf("gateway headers %v", gw)
+	}
+	delete(env, EnvGatewayHeaders)
 	if strings.Contains(out, testRemoteToken) || strings.Contains(out, testKey) {
 		t.Fatal("the launcher printed a secret")
 	}

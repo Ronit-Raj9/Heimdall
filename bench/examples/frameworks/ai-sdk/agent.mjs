@@ -20,6 +20,7 @@
 //        AGENT_MODEL       model id sent to the endpoint (default gpt-5.4-mini)
 //        AGENT_MAX_STEPS   step cap: model turns (default 40)
 //        AGENT_SESSION_ID  optional; sent as the x-bf-session-id header
+//        BENCH_GATEWAY_HEADERS optional JSON object; extra headers on every model call
 // Prints the final answer last on stdout. Exit 0 when the run ends (solved
 // or not, step cap included), 1 when the model call fails.
 import { execFileSync } from 'node:child_process';
@@ -123,7 +124,10 @@ function systemPrompt() {
 
 async function main() {
   const task = fs.readFileSync(process.argv[2] || '/tmp/bench/instruction.md', 'utf8');
-  const headers = SESSION_ID ? { 'x-bf-session-id': SESSION_ID, 'x-bf-session-affinity': 'off' } : undefined;
+  // BENCH_GATEWAY_HEADERS: the run's extra gateway headers (heimdall plugin fault plan and run tags, cache headers).
+  const extra = JSON.parse(process.env.BENCH_GATEWAY_HEADERS || '{}');
+  const merged = { ...(SESSION_ID ? { 'x-bf-session-id': SESSION_ID, 'x-bf-session-affinity': 'off' } : {}), ...extra };
+  const headers = Object.keys(merged).length ? merged : undefined;
   const openai = createOpenAI({ headers }); // reads OPENAI_BASE_URL and OPENAI_API_KEY
   let result;
   try {

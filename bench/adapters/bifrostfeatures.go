@@ -110,14 +110,51 @@ func addBifrostEnv(plan *schemas.RunPlan, rc *schemas.RunContext) {
 		}
 		plan.Env[envClaudeCustomHeader] = strings.Join(lines, "\n")
 	}
+	if nativeCLI(rc.Agent) == ParserCodex { // H02: Codex sends its provider's http_headers (codexheaders.go)
+		addCodexHeaders(plan, rc.Agent, h)
+	}
 }
 
 // CarriesGatewayHeaders reports whether the agent is known to send the
-// run's extra gateway headers on every model request: Claude Code reads
-// ANTHROPIC_CUSTOM_HEADERS. Others get BENCH_GATEWAY_HEADERS too, but may
-// ignore it, so a fault that must fire is not trusted to them (lane C04).
+// run's extra gateway headers on every model request (lanes C04, H02):
+//
+//   - Claude Code reads ANTHROPIC_CUSTOM_HEADERS;
+//   - Codex gets them in its model provider's http_headers table, when its
+//     config.toml names a model_provider with a [model_providers.<id>]
+//     table (codexheaders.go);
+//   - the scripted mcploop agent sends BENCH_GATEWAY_HEADERS itself;
+//   - an OpenAI-style command agent or a remote_http agent with
+//     model_traffic gateway, when its config declares
+//     adapter_capabilities.supports_gateway_headers (the shipped framework
+//     agents put BENCH_GATEWAY_HEADERS in their client's default headers; a
+//     remote service gets them in the request's "gateway" block).
+//
+// An openai_agent endpoint's own model calls do not pass Bifrost, so it
+// never carries them. Every other agent gets BENCH_GATEWAY_HEADERS too, but
+// may ignore it, so a fault that must fire is not trusted to it: it keeps
+// the fault proxy plan.
 func CarriesGatewayHeaders(cfg *schemas.AgentConfig) bool {
-	return cfg != nil && nativeCLI(cfg) == ParserClaudeCode
+	if cfg == nil {
+		return false
+	}
+	switch nativeCLI(cfg) {
+	case ParserClaudeCode:
+		return true
+	case ParserCodex:
+		_, _, ok := codexProvider(cfg)
+		return ok
+	}
+	switch cfg.Adapter {
+	case AdapterOpenAIAgent:
+		return false
+	case AdapterScripted:
+		return cfg.Scripted != nil && cfg.Scripted.Kind == ScriptedMCPLoop
+	case AdapterRemoteHTTP:
+		if cfg.Remote == nil || cfg.Remote.ModelTraffic != RemoteTrafficGateway {
+			return false
+		}
+	}
+	return cfg.AdapterCaps != nil && cfg.AdapterCaps.SupportsGatewayHeaders
 }
 
 func headersJSON(h map[string]string) string {
