@@ -250,6 +250,7 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	// Human review area: review queue and history, POST /reviews behind the write token (handlers/reviews.go, docs/human-review.md).
 	handlers.NewReviewsHandler(mode, deps.Reviews, write).RegisterRoutes(r, common...)
 	handlers.NewInboxHandler(mode, deps.Inbox, write).RegisterRoutes(r, common...)                                    // Failure inbox area (handlers/inbox.go, docs/failure-inbox.md)
+	handlers.NewRunBifrostHandler(mode, deps.Index).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...) // C09 Through Bifrost run panel (handlers/runbifrost.go)
 	handlers.NewRoutingHandler(mode, deps.Index).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...) // W9 routing policy under test (handlers/routing.go)
 	handlers.NewSupportHandler(mode, deps.Index).RegisterRoutes(r, common...)                                         // W3 customer support scorecard (handlers/support.go)
 	handlers.NewResearchHandler(mode, deps.Index).RegisterRoutes(r, common...)                                        // W4 research with Tavily scorecard (handlers/research.go)

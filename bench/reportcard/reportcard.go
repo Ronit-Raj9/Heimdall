@@ -199,6 +199,9 @@ type Report struct {
 	// Voice is each arm's call quality on the voice benchmarks (voice.go);
 	// nil when no run was a voice call.
 	Voice []VoiceRow `json:"voice,omitempty"`
+	// Bifrost is the Through Bifrost section (bifrost.go): per arm, what
+	// the Bifrost gateway did across the runs; nil when no arm has a run.
+	Bifrost []BifrostRow `json:"bifrost,omitempty"`
 }
 
 // LearningRow is one arm's learning summary on one benchmark.
@@ -460,6 +463,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	rep.Learning = learningRows(children, labels)
 	rep.Persistence = persistence(children, labels)
 	rep.Voice = voiceRows(children, labels)
+	rep.Bifrost = bifrostRows(children, labels)
 	return rep, nil
 }
 

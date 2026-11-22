@@ -632,6 +632,21 @@ export interface Report {
 	persistence?: ReportPersistenceRow[];
 	/** Only when some runs were voice calls. */
 	voice?: ReportVoiceRow[];
+	/** Through Bifrost (C09): per arm, what the Bifrost gateway did across the runs. */
+	bifrost?: ReportBifrostRow[];
+}
+
+/** One arm's Bifrost numbers over every benchmark; an absent count was not observed by any run. */
+export interface ReportBifrostRow {
+	arm: string;
+	runs: number;
+	fallback_runs?: number;
+	fallback_known: number;
+	cache_hits?: number;
+	retries?: number;
+	input_tokens?: number;
+	cost_usd?: number;
+	cost_runs: number;
 }
 
 /** One arm's numbers over the whole evaluation; absent fields are unknown. */
