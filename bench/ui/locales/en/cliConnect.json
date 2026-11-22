@@ -1,0 +1,49 @@
+{
+	"device": {
+		"title": "Approve a CLI login",
+		"subtitle": "heimdall login on another machine printed a code. Check it matches, then approve.",
+		"codeLabel": "Code from the terminal",
+		"codeHint": "Eight letters, like BCDF-GHJK",
+		"find": "Continue",
+		"loading": "Looking up the code",
+		"notFound": "No login is waiting for this code",
+		"notFoundBody": "It expired or was mistyped. Run heimdall login again for a new code.",
+		"client": "Device",
+		"address": "From address",
+		"scope": "Access",
+		"scopes": {
+			"read": "Read only: agents, benchmarks, report cards",
+			"evaluate": "Connect agents and run evaluations",
+			"admin": "Everything your role allows"
+		},
+		"org": "Organization",
+		"expires": "Code expires {{when}}",
+		"approve": "Approve",
+		"deny": "Deny",
+		"warning": "Only approve a code you started yourself. The device gets an API token for this organization.",
+		"approved": "Approved",
+		"approvedBody": "The terminal is logged in to {{org}}. Revoke the token any time under Settings > API tokens.",
+		"denied": "Denied",
+		"deniedBody": "The terminal was told no. Nothing was created.",
+		"error": "Could not finish",
+		"local": "No login needed",
+		"localBody": "This is a local server: the CLI uses its write token. Run: echo \"$BENCH_WRITE_TOKEN\" | heimdall login -with-token"
+	},
+	"ide": {
+		"tab": "IDE",
+		"desc": "Connect agents from Cursor, Claude Code or VS Code through the Heimdall MCP server.",
+		"status": "Runs on your machine",
+		"title": "Connect from your editor",
+		"subtitle": "The Heimdall MCP server runs on your machine, reads the workspace your editor has open and uses your heimdall login. Your editor's agent can then connect an agent, check it and run a first look.",
+		"step1": "Install the heimdall binary and log in once:",
+		"step2": "Add the server to your editor:",
+		"cursor": "Add to Cursor",
+		"claudeCode": "Add to Claude Code",
+		"claudeCodeHint": "Run this in a terminal:",
+		"vscode": "VS Code: put this in .vscode/mcp.json",
+		"copy": "Copy",
+		"copied": "Copied",
+		"noSecret": "No token is in these links or commands: the MCP server reads the one heimdall login stored.",
+		"tools": "Tools it adds: connect_agent, verify_agent, first_look, and the evaluation and report card tools."
+	}
+}
