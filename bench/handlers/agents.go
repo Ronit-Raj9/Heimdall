@@ -4,6 +4,7 @@ import (
 	"context"
 	"regexp"
 	"sort"
+	"time"
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/lib"
@@ -108,17 +109,38 @@ func (h *AgentsHandler) getAgents(ctx *fasthttp.RequestCtx) {
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
 }
 
-// sealedRuns counts sealed runs per agent config id over every experiment,
-// or returns nil without an index.
-func (h *AgentsHandler) sealedRuns() map[string]int {
+// agentRunCounts is what the run index says about one agent config id.
+type agentRunCounts struct {
+	sealed  int       // sealed (scored) runs
+	total   int       // every run of the config, any outcome: aborted and cancelled ones too
+	lastRun time.Time // the latest start of any run; zero when unknown
+}
+
+// sealedRuns counts the runs per agent config id over every experiment:
+// sealed ones, all of them, and the latest start. It returns nil without an
+// index.
+func (h *AgentsHandler) sealedRuns() map[string]*agentRunCounts {
 	if h.index == nil {
 		return nil
 	}
-	counts := map[string]int{}
+	counts := map[string]*agentRunCounts{}
 	for _, exp := range h.index.Experiments() {
 		for _, rv := range h.index.Runs(exp) {
-			if rv.Sealed && rv.Run.Agent.ConfigID != "" {
-				counts[rv.Run.Agent.ConfigID]++
+			id := rv.Run.Agent.ConfigID
+			if id == "" {
+				continue
+			}
+			c := counts[id]
+			if c == nil {
+				c = &agentRunCounts{}
+				counts[id] = c
+			}
+			c.total++
+			if rv.Sealed {
+				c.sealed++
+			}
+			if started := rv.Run.Timing.Started; started.After(c.lastRun) {
+				c.lastRun = started
 			}
 		}
 	}
@@ -126,7 +148,7 @@ func (h *AgentsHandler) sealedRuns() map[string]int {
 }
 
 // summarizeAgent builds one config's entry: names, never values.
-func summarizeAgent(f AgentConfigFile, counts map[string]int) schemas.AgentSummary {
+func summarizeAgent(f AgentConfigFile, counts map[string]*agentRunCounts) schemas.AgentSummary {
 	out := schemas.AgentSummary{Path: f.Path, EnvNames: []string{}, FilePaths: []string{}}
 	if f.Err != nil || f.Config == nil {
 		out.Error = "could not read the agent config"
@@ -168,7 +190,18 @@ func summarizeAgent(f AgentConfigFile, counts map[string]int) schemas.AgentSumma
 	}
 	sort.Strings(out.FilePaths)
 	if counts != nil {
-		n := counts[c.ID]
+		n := 0
+		if rc := counts[c.ID]; rc != nil {
+			n = rc.sealed
+			if rc.total > 0 {
+				total := rc.total
+				out.RunsTotal = &total
+			}
+			if !rc.lastRun.IsZero() {
+				last := rc.lastRun.UTC()
+				out.LastRunAt = &last
+			}
+		}
 		out.SealedRuns = &n
 	}
 	return out

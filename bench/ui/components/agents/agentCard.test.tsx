@@ -37,4 +37,10 @@ describe("AgentCard", () => {
 		const html = renderToStaticMarkup(<AgentCard agent={{ ...agent("codex"), sealed_runs: null }} />);
 		expect(html).toMatch(/data-testid="agents-card-codex-runs"[\s\S]*?unknown/);
 	});
+
+	it("adds how many runs were started when that is more than the scored runs", () => {
+		const html = renderToStaticMarkup(<AgentCard agent={{ ...agent("codex"), sealed_runs: 0, runs_total: 4 }} />);
+		expect(html).toMatch(/data-testid="agents-card-codex-runs"[\s\S]*?>0<[\s\S]*?\(4 started\)/);
+		expect(renderToStaticMarkup(<AgentCard agent={{ ...agent("codex"), sealed_runs: 4, runs_total: 4 }} />)).not.toContain("started)");
+	});
 });
