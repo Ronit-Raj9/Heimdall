@@ -65,10 +65,15 @@ type gradeInputs struct {
 	workdir   string // where the verifier sees the workspace; empty keeps /workspace and the image's working directory
 
 	// Scenario inputs (applyScenario), all empty for a plain task.
-	seedImage  string // task image whose seedPath folder is the pristine workspace (instead of repoDir)
-	seedPath   string
-	snapshot   string // snapshot mode: image id of the frozen agent container, the verifier image
-	workspace  string // snapshot mode: the run's workspace volume, mounted read-only
+	seedImage string // task image whose seedPath folder is the pristine workspace (instead of repoDir)
+	seedPath  string
+	snapshot  string // snapshot mode: image id of the frozen agent container, the verifier image
+	workspace string // snapshot mode: the run's workspace volume, mounted read-only
+	// separate is the verifier image of a separate verifier (snapshot mode
+	// with environment.verifier_artifacts): the verifier runs there, with the
+	// listed paths copied out of the snapshot to /grader/collect.
+	separate   string
+	artifacts  []string
 	stateDir   string // <run folder>/state, mounted read-only at /grader/state
 	answerFile string // <run folder>/answer.txt, mounted read-only at /grader/answer.txt
 	// artifactsDir is <run folder>/artifacts, mounted read-only at
@@ -232,7 +237,9 @@ func (c *cleanRoom) run(ctx context.Context, j *gradeJob, collect collectFunc) (
 	}
 	var applied bool
 	var err error
-	if j.in.snapshot != "" {
+	if j.in.separate != "" {
+		applied, err = true, c.prepareSeparate(ctx, j)
+	} else if j.in.snapshot != "" {
 		applied, err = true, c.prepareSnapshot(ctx, j)
 	} else {
 		applied, err = c.prepare(ctx, j)
@@ -322,7 +329,11 @@ func (c *cleanRoom) verify(ctx context.Context, j *gradeJob) (int, bool, error) 
 		mount = j.in.workdir
 	}
 	image, access := j.in.image, ":ro"
-	if j.in.snapshot != "" {
+	if j.in.separate != "" {
+		// A separate verifier: its own image, the collected artifacts
+		// read-only at /grader/collect, a writable root of its own.
+		image, mount = j.in.separate, collectDir
+	} else if j.in.snapshot != "" {
 		// The grade's own copy of the run's workspace: writable, thrown away.
 		image, access = j.in.snapshot, ""
 	}
@@ -559,6 +570,15 @@ func applyScenario(rc *schemas.RunContext, in *gradeInputs) error {
 			return errors.New("snapshot grading needs the run's workspace volume")
 		}
 		in.snapshot, in.workspace = ref, rc.Handle.Volume
+		if e := rc.Task.Environment; e != nil && len(e.VerifierArtifacts) > 0 && e.VerifierImage != "" {
+			arts := e.VerifierArtifacts
+			for _, a := range arts {
+				if !path.IsAbs(a) || strings.Contains(a, "..") || path.Clean(a) == "/" {
+					return fmt.Errorf("verifier_artifacts path %q must be a clean absolute path below /", a)
+				}
+			}
+			in.separate, in.artifacts = e.VerifierImage, arts
+		}
 	}
 	if err := composeVerifier(rc, in); err != nil { // X2: environment and service networks of a compose task's verifier (compose.go)
 		return err
@@ -672,6 +692,44 @@ func (c *cleanRoom) prepareSnapshot(ctx context.Context, j *gradeJob) error {
 		"--entrypoint", "/bin/sh", j.in.prepImage, "-c", "set -eu; cp -a /bench-src/. /workspace/; chown 1000:1000 /grader/out")
 	if _, err := c.docker.MustRun(ctx, args...); err != nil {
 		return fmt.Errorf("prepare snapshot grading workspace: %w", err)
+	}
+	return nil
+}
+
+// collectDir is where a separate verifier sees the artifacts copied out of
+// the agent's container, each at its own absolute path below it.
+const collectDir = "/grader/collect"
+
+// prepareSeparate copies each verifier artifact out of the frozen agent
+// container (created from the snapshot with the run's workspace volume
+// mounted read-only at the working folder, never started) into the grade's
+// workspace volume at the same path. A path the agent did not create is left
+// out: the verifier sees it missing, as Harbor's would.
+func (c *cleanRoom) prepareSeparate(ctx context.Context, j *gradeJob) error {
+	src := j.container + "-src"
+	wd := j.in.workdir
+	if wd == "" {
+		wd = "/workspace"
+	}
+	create := append([]string{"create", "--name", src}, utils.LabelArgs(j.expID, j.runID)...)
+	create = append(create, "--network", "none", "-v", j.in.workspace+":"+wd+":ro", "--entrypoint", "/bench-none", j.in.snapshot)
+	if _, err := c.docker.MustRun(ctx, create...); err != nil {
+		return fmt.Errorf("create snapshot container: %w", err)
+	}
+	for _, a := range j.in.artifacts {
+		a = strings.TrimSuffix(path.Clean(a), "/")
+		parent := path.Dir(a)
+		to := []string{"run", "-i", "--rm", "--name", j.container + "-seed"}
+		to = append(to, utils.LabelArgs(j.expID, j.runID)...)
+		to = append(to, "--network", "none", "--user", "0", "--cap-drop", "ALL",
+			"--cap-add", "CHOWN", "--cap-add", "DAC_OVERRIDE", "--cap-add", "FOWNER", "--cap-add", "FSETID",
+			"--security-opt", "no-new-privileges", "--pids-limit", "256", "--memory", "2g", "--log-driver", "none",
+			"-v", j.workspace+":/workspace", "-v", j.out+":/grader/out",
+			"--entrypoint", "/bin/sh", j.in.prepImage, "-c", `set -eu; mkdir -p "/workspace$1"; tar -x -f - -C "/workspace$1"; chown 1000:1000 /grader/out`, "bench-collect", parent)
+		from := []string{"cp", src + ":" + a, "-"}
+		if _, err := c.docker.Pipe(ctx, from, to); err != nil {
+			c.logger.Debug("verifier artifact not collected", "run", j.runID, "path", a, "error", err)
+		}
 	}
 	return nil
 }

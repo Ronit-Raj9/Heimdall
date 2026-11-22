@@ -77,7 +77,7 @@ func writeTask(dir, id string, t *upstreamTask, p *taskPlan, up upstream) error 
 	files := map[string]string{
 		"instruction.md":         t.Instruction,
 		harborDir + "/test.sh":   p.tests.Script,
-		harborDir + "/verify.sh": verifyWrapper(id, t, p.workdir, up),
+		harborDir + "/verify.sh": verifyWrapper(id, t, p.workdir, up, p.separate),
 		referenceFile:            referenceScript(t, p),
 		emptyFile:                emptyScript,
 		exploitFile:              exploitScript,
@@ -193,6 +193,13 @@ func taskRecord(id string, t *upstreamTask, p *taskPlan, up upstream) *schemas.T
 			User:          "root", // Harbor runs the agent, solve.sh and test.sh as root
 		},
 	}
+	if p.separate {
+		task.Environment.VerifierImage = t.VerifierImage
+		for _, a := range t.Artifacts {
+			task.Environment.VerifierArtifacts = append(task.Environment.VerifierArtifacts, a.Source)
+		}
+		task.Tags = dedupe(append(task.Tags, "separate-verifier"))
+	}
 	if hexRE.MatchString(up.Revision) {
 		task.Provenance.BaseCommit = up.Revision
 	}
@@ -262,8 +269,19 @@ func tags(t *upstreamTask) []string {
 // /grader/out/reward.json. The folders are emptied first, so nothing the
 // agent left there can stand in for a reward. On a read-only root file
 // system it runs from /tmp instead, with the two paths rewritten in test.sh.
-func verifyWrapper(id string, t *upstreamTask, workdir string, up upstream) string {
+func verifyWrapper(id string, t *upstreamTask, workdir string, up upstream, separate bool) string {
 	var env strings.Builder
+	if separate {
+		// Harbor's separate verifier: the task.toml artifacts arrive from the
+		// agent's container at /grader/collect and are uploaded to their own
+		// paths in the verifier image, as Harbor uploads them.
+		// Existing folders (/, /app, ...) keep their owner and mode: upstream
+		// verifiers refuse a /tests whose parent is not root-owned.
+		env.WriteString("if [ -d /grader/collect ]; then\n" +
+			"\tif tar --version 2>/dev/null | grep -q GNU; then (cd /grader/collect && tar -cf - .) | tar -xf - -C / --no-overwrite-dir || fail \"cannot place the agent's artifacts\"\n" +
+			"\telse for e in /grader/collect/* /grader/collect/.[!.]*; do [ -e \"$e\" ] && { cp -a \"$e\" / || fail \"cannot place the agent's artifacts\"; }; done; fi\n" +
+			"fi\n")
+	}
 	for _, k := range sortedEnvKeys(t.VerifierEnv) {
 		fmt.Fprintf(&env, "export %s=%s\n", k, shellQuote(t.VerifierEnv[k]))
 	}

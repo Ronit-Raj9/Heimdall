@@ -567,3 +567,35 @@ func unpackReference(t *testing.T, script string) map[string]string {
 		out[h.Name] = string(b)
 	}
 }
+
+// TestImportSeparateVerifier covers a separate verifier from a prebuilt image
+// (-set verifier=separate).
+func TestImportSeparateVerifier(t *testing.T) {
+	from := filepath.Join("testdata", "separate")
+	t.Run("skipped by default", func(t *testing.T) {
+		abs, _ := filepath.Abs(from)
+		res, err := (&importer{now: func() time.Time { return fixedNow }}).Import(context.Background(), importers.Options{BenchRoot: t.TempDir(), From: abs, SuiteID: "s"})
+		if err == nil || res == nil || len(res.Skipped) != 2 || !strings.Contains(res.Skipped[0].Reason, "-set verifier=separate") {
+			t.Errorf("result = %+v, err = %v", res, err)
+		}
+	})
+	t.Run("mapped", func(t *testing.T) {
+		root, res := runImport(t, from, "s", importers.Options{Extra: map[string]string{"verifier": "separate", "image": "prebuilt"}})
+		if strings.Join(res.Tasks, ",") != "sep-ok" || len(res.Skipped) != 1 || !strings.Contains(res.Skipped[0].Reason, "service container") {
+			t.Fatalf("result = %+v", res)
+		}
+		s := loadSuite(t, root, "s")
+		env := s.TaskByID("sep-ok").Environment
+		if !strings.HasPrefix(env.VerifierImage, "example/sep-ok-verifier@sha256:") || strings.Join(env.VerifierArtifacts, ",") != "/app/greeting.txt,/app/out/" {
+			t.Errorf("environment = %+v", env)
+		}
+		if v := readFile(t, filepath.Join(root, "benchmarks/s/tasks/sep-ok/verifier/tests/harbor/verify.sh")); !strings.Contains(v, "--no-overwrite-dir") {
+			t.Errorf("verify.sh:\n%s", v)
+		}
+	})
+	t.Run("bad value", func(t *testing.T) {
+		if _, err := readSettings(map[string]string{"verifier": "x"}); err == nil {
+			t.Error("want an error")
+		}
+	})
+}

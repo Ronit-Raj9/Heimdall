@@ -68,6 +68,11 @@ type upstreamTask struct {
 	// ([verifier] environment_mode = "separate", a [verifier.environment]
 	// table, or [[verifier.collect]] hooks that carry the agent's work there).
 	SeparateVerifier bool
+	// ArtifactsUnmapped says why a separate verifier from a prebuilt image
+	// (VerifierImage, -set verifier=separate) cannot get the agent's work: a
+	// [[verifier.collect]] hook or an artifact that is not a plain path. Only
+	// plain paths are copied to /grader/collect there.
+	ArtifactsUnmapped string
 
 	EnvEnv      map[string]string // [environment.env]: set in the task image
 	VerifierEnv map[string]string // [verifier.env]: set for test.sh
@@ -161,6 +166,14 @@ func (t *upstreamTask) readHarbor() error {
 	}
 	t.SeparateVerifier = tomlString(verifier, "environment_mode") == "separate" || hasEnv || len(tomlList(verifier, "collect")) > 0
 	t.DockerImage = tomlString(env, "docker_image")
+	if len(t.verifierCollect) > 0 {
+		t.ArtifactsUnmapped = "[[verifier.collect]] hooks"
+	}
+	for _, a := range tomlList(doc, "artifacts") {
+		if _, ok := a.(string); !ok && t.ArtifactsUnmapped == "" {
+			t.ArtifactsUnmapped = "an artifact taken from a service container"
+		}
+	}
 	t.GPUs = int64(tomlNumber(env, "gpus"))
 	t.AllowInternet = tomlBool(env, "allow_internet")
 	t.MCPServers = len(tomlList(env, "mcp_servers"))
