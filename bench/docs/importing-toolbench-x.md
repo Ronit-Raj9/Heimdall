@@ -109,3 +109,16 @@ request text without calling a tool; `empty` does nothing.
 - One upstream hazard module (`parallel/Output_Uncertainty/Commerce__Transactions/Cart_and_checkout_issue_support/task_2.py`)
   fails to load (`NameError: name 'dataclass' is not defined`); that task stays
   in `toolbench-x-hazard` and fails admission.
+
+## Admission (22 Nov 2026)
+
+Imported into the library as `toolbench-x` and `toolbench-x-hazard`, 1,106 tasks each, locked.
+Starter sets admitted with script controls on the fleet (reference pass; empty, mutant, exploit, noop and refuse fail):
+
+- `toolbench-x`: 39 of 40 admitted.
+- `toolbench-x-hazard`: 21 of 25 admitted.
+
+Every refusal is the bench's secret scanner at static validation: some upstream tool
+modules hold high-entropy constants named `*_KEY` (`raw_key`, `env_key`, `_TASK_KEY`,
+`hint_key`, ...), which are not secrets. A scan of the clean suite flags 31 of 1,106
+tasks; they stay in the suite as drafts and need a scanner allowlist to be admitted.
