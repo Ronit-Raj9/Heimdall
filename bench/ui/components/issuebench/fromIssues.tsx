@@ -329,7 +329,7 @@ export function IssueRow({ runId, it, writable, t }: { runId: string; it: IssueI
 		}
 	};
 	const onFix = (fix: IssueFix) => {
-		const answer = fix === "retry" ? "" : window.prompt(t(`fixPrompt.${fix}`));
+		const answer = fix === "retry" || fix === "open_workers" ? "" : window.prompt(t(`fixPrompt.${fix}`));
 		const body = retryBody(fix, answer);
 		if (body) void act(retry({ id: runId, issue, ...body }).unwrap());
 	};
