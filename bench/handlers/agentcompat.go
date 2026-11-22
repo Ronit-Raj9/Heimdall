@@ -13,6 +13,12 @@ package handlers
 // and the whole answer is cached per agent config hash and pack stamps. Only
 // an agent outside the workspace (compat.ChecksTasks) needs the output rules
 // per task, so for it the full pack is loaded, cached by stamp the same way.
+//
+// A benchmark that runs inside each task's own environment (a snapshot
+// verifier on tasks with their own image, every Harbor import) also needs an
+// agent that can be rebuilt on the task image. The answer runs the same check
+// as the estimate and the launch (deriveTaskImageAgent), so the wizard never
+// offers a benchmark the evaluation would then skip.
 
 import (
 	"context"
@@ -115,6 +121,7 @@ func (h *agentCompatHandler) get(ctx *fasthttp.RequestCtx) {
 		Benchmarks:   make([]BenchmarkCompatibility, 0, len(ids)),
 	}
 	complete := true
+	var agents map[string]*schemas.AgentConfig // loaded on the first benchmark that needs the task image check
 	for _, sid := range ids {
 		row := BenchmarkCompatibility{ID: sid, Requires: []string{}, Missing: []string{}}
 		s, err := compatSuite(work, src, sid, compat.ChecksTasks(cfg))
@@ -127,6 +134,17 @@ func (h *agentCompatHandler) get(ctx *fasthttp.RequestCtx) {
 		row.Requires = suite.Requires(s).Strings()
 		ok, missing, reason, note := compat.Full(cfg, s)
 		row.OK, row.Reason, row.Note = ok, reason, note
+		if ok && taskImageCheckApplies(cfg, s) {
+			if agents == nil {
+				agents = (&evaluationsHandler{env: h.env}).agentConfigs(work)
+			}
+			why, err := h.taskImageReason(work, src, sid, s, cfg, agents)
+			if err != nil {
+				complete = false
+			} else if why != "" {
+				row.OK, row.Reason, row.Note = false, why, ""
+			}
+		}
 		row.Missing = schemas.CapabilitySet(missing).Strings()
 		out.Benchmarks = append(out.Benchmarks, row)
 	}
@@ -139,6 +157,48 @@ func (h *agentCompatHandler) get(ctx *fasthttp.RequestCtx) {
 		h.mu.Unlock()
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, &out)
+}
+
+// taskImageCheckApplies reports whether s may need cfg rebuilt on each
+// task's own image: its verifier grades a snapshot of the agent's container,
+// and cfg is not already built on a task image (scripted, or build.base_arg).
+// It reads the head only, so a pack that does not need it is never loaded.
+func taskImageCheckApplies(cfg *schemas.AgentConfig, s *schemas.Suite) bool {
+	if cfg == nil || s == nil || s.Verifier.Mode != schemas.VerifierSnapshot {
+		return false
+	}
+	return cfg.Adapter != scriptedAdapterName && (cfg.Build == nil || cfg.Build.BaseArg == "")
+}
+
+// taskImageReason is the plain reason cfg cannot run benchmark sid inside
+// each task's own environment, with the technical text after " Details: ",
+// or "" when it can. It runs deriveTaskImageAgent on the full pack (the
+// head has no tasks), as the estimate does.
+func (h *agentCompatHandler) taskImageReason(ctx context.Context, src SuiteSource, sid string, head *schemas.Suite, cfg *schemas.AgentConfig, agents map[string]*schemas.AgentConfig) (string, error) {
+	full := head
+	if len(head.Tasks) == 0 {
+		var err error
+		if full, err = compatSuite(ctx, src, sid, true); err != nil || full == nil {
+			return "", fmt.Errorf("load benchmark %s: %v", sid, err)
+		}
+	}
+	v := deriveTaskImageAgent(cfg, full, nil, agents, h.root())
+	if v.Skip == "" {
+		return "", nil
+	}
+	return fmt.Sprintf("Runs inside each task's own environment, and %s cannot join it (its image is not built on the benchmark's base image). Details: %s", cfg.ID, v.Skip), nil
+}
+
+// root is the bench root the agent Dockerfiles resolve against, as the
+// estimate reads it.
+func (h *agentCompatHandler) root() string {
+	if p := h.env.Services.Projects; p != nil {
+		return p.Root()
+	}
+	if h.env.Cfg != nil {
+		return h.env.Cfg.Root
+	}
+	return ""
 }
 
 // suiteHeads caches pack heads process-wide by folder and stamp: library

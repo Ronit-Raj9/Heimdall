@@ -13,8 +13,11 @@ import {
 	groupBenchmarks,
 	incompatibleReason,
 	keepRunnable,
+	mergeArmCompatibility,
+	otherArmAgents,
 	packSelection,
 } from "./step3Benchmarks";
+import i18n from "@/lib/i18n";
 
 const own = vi.hoisted(() => ({ create: {} as Record<string, unknown> }));
 vi.mock("@/lib/store/apis/suiteAuthoringApi", async (orig) => ({
@@ -161,7 +164,9 @@ describe("compatibility matching", () => {
 		const map = compatibilityMap(raw);
 		expect(incompatibleReason(compatFor(map, "voicebench"))).toBe("Needs voice");
 		expect(incompatibleReason(compatFor(map, "kernelbench-l2"))).toBe("Needs gpu");
-		const html = renderToStaticMarkup(<Step3BenchmarksView suites={suites} packs={packs} compatibility={raw} selected={[]} onChange={() => {}} />);
+		const html = renderToStaticMarkup(
+			<Step3BenchmarksView suites={suites} packs={packs} compatibility={raw} selected={[]} onChange={() => {}} />,
+		);
 		expect(block(html, "step3-benchmark-voicebench")).toContain('data-disabled="true"');
 		expect(block(html, "step3-benchmark-voicebench")).toMatch(/<input[^>]*disabled=""/);
 	});
@@ -171,11 +176,19 @@ describe("compatibility matching", () => {
 			agent: "bot",
 			capabilities: ["tools"],
 			benchmarks: [
-				{ id: "voicebench", ok: false, requires: [], missing: [], reason: "Agent bot cannot run benchmark voicebench: turn on tool access (remote.tools: expose)." },
+				{
+					id: "voicebench",
+					ok: false,
+					requires: [],
+					missing: [],
+					reason: "Agent bot cannot run benchmark voicebench: turn on tool access (remote.tools: expose).",
+				},
 				{ id: "hd-harbor-tb2", ok: true, requires: [], missing: [], reason: "", note: "2 of 10 tasks are skipped: needs tools." },
 			],
 		} as unknown as AgentCompatibility;
-		const html = renderToStaticMarkup(<Step3BenchmarksView suites={suites} packs={packs} compatibility={raw} selected={[]} onChange={() => {}} />);
+		const html = renderToStaticMarkup(
+			<Step3BenchmarksView suites={suites} packs={packs} compatibility={raw} selected={[]} onChange={() => {}} />,
+		);
 		expect(block(html, "step3-benchmark-voicebench")).toContain('data-disabled="true"');
 		expect(block(html, "step3-benchmark-voicebench")).toContain("turn on tool access");
 		expect(block(html, "step3-benchmark-hd-harbor-tb2")).not.toContain('data-disabled="true"');
@@ -196,7 +209,18 @@ describe("compatibility matching", () => {
 
 describe("reference hint (G4-03)", () => {
 	const ref = (benchmark: string, agent: string, score: number) =>
-		({ id: `ev:${benchmark}:${agent}`, evaluation_id: "ev", benchmark, agent, model: "m", score, ci_low: 0, ci_high: 1, runs: 10, tasks: 5 }) as never;
+		({
+			id: `ev:${benchmark}:${agent}`,
+			evaluation_id: "ev",
+			benchmark,
+			agent,
+			model: "m",
+			score,
+			ci_low: 0,
+			ci_high: 1,
+			runs: 10,
+			tasks: 5,
+		}) as never;
 
 	it("shows what known agents score on a benchmark with published runs", () => {
 		const html = renderToStaticMarkup(
@@ -206,7 +230,11 @@ describe("reference hint (G4-03)", () => {
 				compatibility={compat}
 				selected={[]}
 				onChange={() => {}}
-				reference={[ref("hd-swe-verified", "codex", 0.42), ref("hd-harbor-tb2@2.0", "codex", 0.3), ref("hd-harbor-tb2", "claude-code", 0.61)]}
+				reference={[
+					ref("hd-swe-verified", "codex", 0.42),
+					ref("hd-harbor-tb2@2.0", "codex", 0.3),
+					ref("hd-harbor-tb2", "claude-code", 0.61),
+				]}
 			/>,
 		);
 		expect(block(html, "step3-benchmark-hd-swe-verified")).toContain("codex scores about 42% here");
@@ -263,5 +291,70 @@ describe("your own tasks card", () => {
 		expect(isTaken({ status: 409 })).toBe(true);
 		expect(isTaken({ status: 400, data: { error: { message: "suite already exists" } } })).toBe(true);
 		expect(isTaken({ status: 400, data: { error: { message: "bad id" } } })).toBe(false);
+	});
+});
+
+describe("every setup's compatibility (D2.baseline)", () => {
+	const describeArm = (agent: string, setup: string, reason: string) =>
+		i18n.t("step3.otherArmCannot", { ns: "fw06", agent, setup, reason });
+	const baseline: AgentCompatibility = {
+		agent: "claude-code",
+		capabilities: ["shell"],
+		benchmarks: [
+			{ id: "hd-harbor-tb2", ok: true, requires: ["shell"], missing: [], reason: "" },
+			{
+				id: "hd-swe-verified",
+				ok: false,
+				requires: ["shell"],
+				missing: [],
+				reason:
+					"Runs inside each task's own environment, and claude-code cannot join it (its image is not built on the benchmark's base image).",
+			},
+		],
+	};
+
+	it("lists the other setups' agents once, without arm A's", () => {
+		expect(otherArmAgents("codex", [{ label: "B", agent: "claude-code" }])).toEqual([{ label: "B", agent: "claude-code" }]);
+		expect(otherArmAgents("codex", [{ label: "B", agent: "codex" }])).toEqual([]);
+		expect(otherArmAgents("codex", [{ label: "B", agent: "" }])).toEqual([]);
+		expect(
+			otherArmAgents("codex", [
+				{ label: "B", agent: "x" },
+				{ label: "C", agent: "x" },
+			]),
+		).toEqual([{ label: "B", agent: "x" }]);
+	});
+
+	it("disables a benchmark the opponent cannot run, with the setup and the reason", () => {
+		const merged = mergeArmCompatibility(compat, [{ label: "B", agent: "claude-code", compatibility: baseline }], describeArm);
+		const html = renderToStaticMarkup(
+			<Step3BenchmarksView suites={suites} packs={packs} compatibility={merged} selected={[]} onChange={() => {}} />,
+		);
+		const swe = block(html, "step3-benchmark-hd-swe-verified");
+		expect(swe).toContain('data-disabled="true"');
+		expect(swe).toMatch(/<input[^>]*disabled=""/);
+		expect(swe).toContain("claude-code (setup B) cannot run this: Runs inside each task&#x27;s own environment");
+		expect(block(html, "step3-benchmark-hd-harbor-tb2")).not.toContain("data-disabled");
+		// arm A's own reason wins over the opponent's
+		expect(block(html, "step3-benchmark-voicebench")).toContain("needs voice");
+		expect(keepRunnable(["hd-swe-verified", "hd-harbor-tb2"], merged)).toEqual(["hd-harbor-tb2"]);
+	});
+
+	it("waits for the primary answer and ignores a setup still loading", () => {
+		expect(mergeArmCompatibility(undefined, [{ label: "B", agent: "claude-code", compatibility: baseline }], describeArm)).toBeUndefined();
+		const merged = mergeArmCompatibility(compat, [{ label: "B", agent: "claude-code" }], describeArm);
+		expect(keepRunnable(["hd-swe-verified"], merged)).toEqual(["hd-swe-verified"]);
+	});
+});
+
+describe("benchmark groups (A4.cap)", () => {
+	it("does not put BFCL under Terminal even though its import track is terminal", () => {
+		expect(benchmarkCapability({ id: "hd-harbor-bfcl", track: "terminal" })).not.toBe("terminal");
+		expect(benchmarkCapability({ id: "hd-harbor-tb2@2.0", track: "terminal" })).toBe("terminal");
+		expect(benchmarkCapability({ id: "hd-harbor-skills", track: "skills" })).toBe("terminal");
+		const { groups } = groupBenchmarks([...suites, s("hd-harbor-bfcl", 50, { builtin: true, track: "terminal" })]);
+		const terminal = groups.find((g) => g.capability === "terminal");
+		expect(terminal?.suites.map((x: { id: string }) => x.id)).not.toContain("hd-harbor-bfcl");
+		expect(groups.flatMap((g) => g.suites.map((x: { id: string }) => x.id))).toContain("hd-harbor-bfcl");
 	});
 });

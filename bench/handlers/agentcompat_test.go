@@ -3,11 +3,15 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
 )
@@ -150,5 +154,55 @@ func TestAgentCompatibilityReadsHeadsAndCaches(t *testing.T) {
 	}
 	if src.loads.Load() != 0 {
 		t.Fatalf("full loads = %d, want 0", src.loads.Load())
+	}
+}
+
+// TestCompatibilityTaskImageAgentNotRunnable: a benchmark that grades a
+// snapshot of the agent's container on tasks with their own image needs an
+// agent built on each task's image. A container agent whose Dockerfile does
+// not start FROM ${BASE_IMAGE} cannot join it, so the compatibility answer
+// says the benchmark is not runnable, with the same check the estimate runs.
+func TestCompatibilityTaskImageAgentNotRunnable(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "agents/images/claude-code"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "agents/images/claude-code/Dockerfile"), []byte("FROM node:22\nRUN true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "agents/images/codex"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "agents/images/codex/Dockerfile"), []byte("ARG BASE_IMAGE=ubuntu:24.04\nFROM ${BASE_IMAGE}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	harbor := &schemas.Suite{ID: "hd-harbor-bfcl", Track: "terminal", Verifier: schemas.SuiteVerifier{Mode: schemas.VerifierSnapshot},
+		Tasks: []*schemas.Task{{ID: "t1", Environment: &schemas.TaskEnvironment{Image: "harbor/bfcl-t1:1"}}}}
+	plain := &schemas.Suite{ID: "tb-plain", Track: "terminal"}
+	suites := &fakeSuites{ids: []string{"hd-harbor-bfcl", "tb-plain"}, suites: map[string]*schemas.Suite{"hd-harbor-bfcl": harbor, "tb-plain": plain}}
+	agents := compatAgents{
+		{Path: "agents/claude-code.yaml", Config: &schemas.AgentConfig{ID: "claude-code", Adapter: "command", Image: "bench/agent-claude-code:1",
+			Build: &schemas.ImageSpec{Dockerfile: "agents/images/claude-code/Dockerfile", Tag: "bench/agent-claude-code:1"}}},
+		{Path: "agents/codex.yaml", Config: &schemas.AgentConfig{ID: "codex", Adapter: "command", Image: "bench/agent-codex:1",
+			Build: &schemas.ImageSpec{Dockerfile: "agents/images/codex/Dockerfile", Tag: "bench/agent-codex:1"}}},
+	}
+	env := OrgEnv{Mode: "local", Cfg: &lib.Config{Root: root}, Services: Services{Suites: suites, Agents: agents}}
+	code, out := doCompat(t, env, "claude-code")
+	if code != 200 || len(out.Benchmarks) != 2 {
+		t.Fatalf("status %d answer %+v", code, out)
+	}
+	bfcl, other := out.Benchmarks[0], out.Benchmarks[1]
+	want := "Runs inside each task's own environment, and claude-code cannot join it (its image is not built on the benchmark's base image)."
+	if bfcl.OK || !strings.HasPrefix(bfcl.Reason, want) {
+		t.Fatalf("bfcl = %+v, want not runnable with %q", bfcl, want)
+	}
+	if !strings.Contains(bfcl.Reason, " Details: ") || !strings.Contains(bfcl.Reason, "does not start FROM ${BASE_IMAGE}") {
+		t.Fatalf("bfcl reason %q: want the technical text after Details", bfcl.Reason)
+	}
+	if !other.OK {
+		t.Fatalf("plain benchmark = %+v, want runnable", other)
+	}
+	if code, out := doCompat(t, env, "codex"); code != 200 || !out.Benchmarks[0].OK {
+		t.Fatalf("codex (built FROM ${BASE_IMAGE}) = %d %+v, want runnable", code, out.Benchmarks)
 	}
 }
