@@ -1,0 +1,3 @@
+{"input": [{"role": "system", "content": "Answer with the city name only."}, {"role": "user", "content": "What is the capital of France?"}], "ideal": "Paris"}
+{"input": [{"role": "user", "content": "What is the capital of Japan?"}], "ideal": ["Tokyo", "Tōkyō"]}
+{"input": "What is the capital of Peru?", "ideal": "Lima"}

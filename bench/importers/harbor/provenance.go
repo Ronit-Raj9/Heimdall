@@ -38,6 +38,10 @@ func describeUpstream(from string, cfg settings) upstream {
 	if tag := headTag(root, up.Revision); tag != "" && strings.HasSuffix(up.Benchmark, "@"+shortRev(up.Revision)) {
 		up.Benchmark = repoName(up.Source, root) + "@" + strings.TrimPrefix(tag, "v")
 	}
+	// A folder written by Fetch (registry name@version) names itself.
+	if m := readManifest(from); m != nil {
+		up = upstream{Benchmark: m.Benchmark, Source: m.Source, Revision: m.Revision, License: m.License}
+	}
 	if cfg.benchmark != "" {
 		up.Benchmark = cfg.benchmark
 	}

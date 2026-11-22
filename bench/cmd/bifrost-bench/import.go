@@ -36,6 +36,7 @@ func init() {
 }
 
 const importUsage = `usage: bifrost-bench import list
+       bifrost-bench import registry | import fetch harbor <name@version> | import fetch hf <dataset> (see import fetch -h)
        bifrost-bench import <format> -from <path> -suite <id> [-ids a,b] [-limit n] [-set key=value ...] [-force]
            [-config deploy/bench.yaml]`
 
@@ -70,6 +71,12 @@ func runImport(args []string) int {
 		}
 		return exitOK
 	}
+	switch args[0] { // Z09: Harbor registry and Hugging Face sources
+	case "registry":
+		return runImportRegistry(args[1:])
+	case "fetch":
+		return runImportFetch(args[1:])
+	}
 	im, ok := importers.Get(args[0])
 	if !ok {
 		fmt.Fprintf(os.Stderr, "unknown import format %q; run `bifrost-bench import list`\n", args[0])
@@ -77,7 +84,7 @@ func runImport(args []string) int {
 	}
 	fs := flag.NewFlagSet("import "+args[0], flag.ContinueOnError)
 	config := fs.String("config", defaultConfig, "bench config")
-	from := fs.String("from", "", "local path of the upstream benchmark (a clone or a downloaded dataset)")
+	from := fs.String("from", "", "local path of the upstream benchmark (a clone or a downloaded dataset); for harbor also a registry name@version")
 	suiteID := fs.String("suite", "", "suite id to create or extend")
 	ids := fs.String("ids", "", "comma-separated upstream task ids (default: all)")
 	limit := fs.Int("limit", 0, "import at most this many tasks")
@@ -95,6 +102,11 @@ func runImport(args []string) int {
 	root, err := projectRoot(cfgPath)
 	if err != nil {
 		return fail("%v", err)
+	}
+	if args[0] == "harbor" { // Z09: -from name@version fetches from the Harbor registry
+		if *from, err = harborFromRef(*from, root); err != nil {
+			return fail("%v", err)
+		}
 	}
 	src, err := filepath.Abs(*from)
 	if err != nil {

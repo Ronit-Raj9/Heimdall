@@ -1,0 +1,34 @@
+description: Support answers
+prompts:
+  - file://prompt.txt
+tests:
+  - description: refund window
+    vars: {question: "How many days do customers have to ask for a refund?"}
+    assert:
+      - type: contains
+        value: "30 days"
+  - description: greeting
+    vars: {question: "Say hello in French, one word."}
+    assert:
+      - type: icontains
+        value: bonjour
+  - description: tone
+    vars: {question: "Decline a meeting politely.", reference: "Thank you for the invite, but I can't make it."}
+    assert:
+      - type: llm-rubric
+        value: Polite, thanks the sender, declines clearly.
+  - description: js check
+    vars: {question: "Anything"}
+    assert:
+      - type: javascript
+        value: output.length < 10
+  - description: no ref regex
+    vars: {question: "Give a ticket id"}
+    assert:
+      - type: regex
+        value: "^TCK-[0-9]+$"
+  - description: missing var
+    vars: {other: "x"}
+    assert:
+      - type: equals
+        value: "x"

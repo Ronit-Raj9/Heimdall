@@ -70,6 +70,7 @@ type Entry struct {
 // id the laptop build used (the hd-* suites).
 type recipe struct {
 	id, title, importer, suite, benchmark, source string
+	license                                       string // upstream licence when the importer's is "varies"
 	extra                                         map[string]string
 	tags                                          []string
 }
@@ -88,6 +89,13 @@ var recipes = []recipe{
 		source: "https://huggingface.co/datasets/nebius/SWE-rebench-leaderboard (export rows to JSONL, see docs/importing-swe.md)", tags: []string{"coding", "repository"}},
 	{id: "impossible-swebench", title: "ImpossibleBench (SWE-bench variant)", importer: "swebench", suite: "hd-swe-ib-swe", benchmark: "impossible_swebench",
 		source: "https://huggingface.co/datasets/fjzzq2002/impossible_swebench (export a split to JSONL, see docs/importing-swe.md)", tags: []string{"coding", "integrity"}},
+	// Z09: Harbor registry datasets, fetched by name@version.
+	{id: "bfcl", title: "Berkeley Function-Calling Leaderboard (BFCL)", importer: "harbor", suite: "hd-harbor-bfcl", benchmark: "bfcl@1.0", license: "Apache-2.0",
+		source: "bifrost-bench import fetch harbor bfcl@1.0 -to datasets/bfcl", tags: []string{"tool-use", "function-calling"}},
+	{id: "algotune", title: "AlgoTune", importer: "harbor", suite: "hd-harbor-algotune", benchmark: "algotune@1.0", license: "MIT",
+		source: "bifrost-bench import fetch harbor algotune@1.0 -to datasets/algotune", tags: []string{"coding", "optimization"}},
+	{id: "spider2-dbt", title: "Spider 2.0-DBT", importer: "harbor", suite: "hd-harbor-spider2-dbt", benchmark: "spider2-dbt@1.0", license: "MIT",
+		source: "bifrost-bench import fetch harbor spider2-dbt@1.0 -to datasets/spider2-dbt", tags: []string{"data", "sql"}},
 }
 
 // Source is where the catalog reads from.
@@ -175,6 +183,9 @@ func (s Source) List(project string) []Entry {
 		in := infos[r.importer]
 		e := Entry{ID: r.id, Title: r.title, Importer: r.importer, SuiteID: r.suite, Benchmarks: []string{r.benchmark},
 			Source: r.source, Track: in.Track, Grading: in.Grading, License: in.License, Needs: in.Needs, Tags: r.tags, Extra: r.extra}
+		if r.license != "" {
+			e.License = r.license
+		}
 		e.Summary = fmt.Sprintf("%s through the %s importer (suite %s). %s", r.benchmark, r.importer, r.suite, in.Summary)
 		if s.Root != "" && isDir(filepath.Join(s.Root, "benchmarks", r.suite)) {
 			e.Kind, e.Available = KindBundled, true
@@ -267,6 +278,7 @@ var titles = map[string]string{
 	"tau2": "tau2-bench", "kernelbench": "KernelBench", "marble": "MARBLE (MultiAgentBench)",
 	"impossiblebench": "ImpossibleBench", "swebench": "SWE-bench family", "agentdojo": "AgentDojo",
 	"mcpmark": "MCPMark", "browsecomp-plus": "BrowseComp-Plus",
+	"openai-evals": "OpenAI Evals", "promptfoo": "promptfoo",
 }
 
 func importerTitle(name string) string {
