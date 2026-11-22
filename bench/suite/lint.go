@@ -127,6 +127,7 @@ func LintTask(s *schemas.Suite, t *schemas.Task) []Problem {
 	out = append(out, lintScenarioTask(s, t)...)
 	out = append(out, lintGPUTask(s, t)...)   // X7: GPU requests (gpu.go)
 	out = append(out, lintWorldTask(s, t)...) // world clock (world.go)
+	out = append(out, lintChecksTask(s, t)...) // declarative checks.yaml (checkslint.go)
 	output := utils.OutputKind(s, t)
 
 	testsDir := filepath.Join(t.Dir, filepath.FromSlash(t.Verifier.Tests))

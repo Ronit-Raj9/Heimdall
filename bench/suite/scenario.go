@@ -33,7 +33,7 @@ func foldedKey(id string) string {
 var hyphenRunRE = regexp.MustCompile(`-+`)
 
 // answerGraders are the graders that can grade an answer task.
-var answerGraders = map[string]bool{"answer_match": true, "judge": true, "verifier_command": true}
+var answerGraders = map[string]bool{"answer_match": true, "judge": true, "verifier_command": true, "checks": true}
 
 // defaultAnswerSpec is the hidden answer file looked for in the verifier tests
 // folder when a task names none.
@@ -319,7 +319,7 @@ func lintScenarioTask(s *schemas.Suite, t *schemas.Task) []Problem {
 	switch utils.OutputKind(s, t) {
 	case schemas.OutputAnswer:
 		if !answerGraders[s.Grader] {
-			add(SeverityError, "output: answer needs grader answer_match, judge or verifier_command; the suite uses %s", s.Grader)
+			add(SeverityError, "output: answer needs grader answer_match, judge, verifier_command or checks; the suite uses %s", s.Grader)
 		}
 		if s.Grader == "answer_match" && !hasAnswerSpec(t) {
 			add(SeverityError, "verifier.answer: the answer_match grader needs the hidden answer (verifier.answer, or %s in %s)", defaultAnswerSpec, t.Verifier.Tests)
