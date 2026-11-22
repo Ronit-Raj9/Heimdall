@@ -42,7 +42,7 @@ func (h *agentDeleteHandler) fail(ctx *fasthttp.RequestCtx, status int, typ, msg
 func (h *agentDeleteHandler) delete(ctx *fasthttp.RequestCtx) {
 	ps := h.env.Services.Projects
 	if ps == nil {
-		h.fail(ctx, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable, "project files are not available on this server: start it with a project folder (bifrost-bench serve) or ask your server owner")
+		h.fail(ctx, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable, "project files are not available on this server: start it with a project folder (heimdall serve) or ask your server owner")
 		return
 	}
 	id, _ := ctx.UserValue("id").(string)

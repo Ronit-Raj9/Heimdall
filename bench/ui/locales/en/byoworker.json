@@ -96,7 +96,7 @@
 		"ca": "Certificate authority (PEM)",
 		"saToken": "Token",
 		"image": "Worker image",
-		"imageHint": "An image with bifrost-bench and your project. Leave empty to use the server's image."
+		"imageHint": "An image with heimdall and your project. Leave empty to use the server's image."
 	},
 	"target": {
 		"label": "Runs go to",

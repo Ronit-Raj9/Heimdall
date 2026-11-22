@@ -172,7 +172,7 @@ func (h *suiteAuthoring) bad(ctx *fasthttp.RequestCtx, msg string) {
 func (h *suiteAuthoring) needProjects(ctx *fasthttp.RequestCtx) bool {
 	if h.projects == nil {
 		lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable,
-			"the project file store is not available on this server; start it with a project folder (bifrost-bench serve -config <project>/deploy/bench.yaml)")
+			"the project file store is not available on this server; start it with a project folder (heimdall serve -config <project>/deploy/bench.yaml)")
 		return false
 	}
 	return true

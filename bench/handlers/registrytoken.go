@@ -177,7 +177,7 @@ func (h *RegistryTokenHandler) identify(ctx *fasthttp.RequestCtx, user, pass str
 func (h *RegistryTokenHandler) challenge(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("WWW-Authenticate", `Basic realm="heimdall library registry"`)
 	lib.SendError(ctx, h.mode, fasthttp.StatusUnauthorized, lib.ErrTypeUnauthorized,
-		"the library registry needs a Heimdall credential as the password: an org API token (hm_...) or a runner token (hmr_...), e.g. `bifrost-bench images login`")
+		"the library registry needs a Heimdall credential as the password: an org API token (hm_...) or a runner token (hmr_...), e.g. `heimdall images login`")
 }
 
 func (h *RegistryTokenHandler) limited(ip string) bool {

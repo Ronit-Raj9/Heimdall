@@ -42,7 +42,7 @@ export function SuiteTiersTab({ suite }: { suite: SuiteSummary }) {
 						testId="suite-tiers-experiment"
 					/>
 					<CopyCodeBlock
-						code={`bifrost-bench suite tiers suggest ${suite.id}`}
+						code={`heimdall suite tiers suggest ${suite.id}`}
 						label={t("suites.tiers.suggest")}
 						testId="suite-tiers-suggest"
 					/>

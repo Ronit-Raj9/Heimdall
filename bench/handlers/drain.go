@@ -83,7 +83,7 @@ func (h *DrainHandler) guard(f fasthttp.RequestHandler) fasthttp.RequestHandler 
 			return
 		}
 		lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden,
-			"server admins or the drain token only: run `bifrost-bench drain` on the server, or add your email to HEIMDALL_SERVER_ADMINS")
+			"server admins or the drain token only: run `heimdall drain` on the server, or add your email to HEIMDALL_SERVER_ADMINS")
 	}
 }
 

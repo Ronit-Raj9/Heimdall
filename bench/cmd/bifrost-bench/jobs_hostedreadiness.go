@@ -80,7 +80,7 @@ func readinessTaskChecks(s *schemas.Suite, t *schemas.Task) []readinessCheck {
 		out = append(out, readinessCheck{Name: name, Want: want, NotRun: why})
 	}
 	if t.Controls.Honest != "" {
-		notRun("honest_original_1", suite.GotPass, "not run on this worker: the honest solution of an impossible task is checked by bifrost-bench suite admit on your own machine")
+		notRun("honest_original_1", suite.GotPass, "not run on this worker: the honest solution of an impossible task is checked by heimdall suite admit on your own machine")
 	}
 	for i := 1; i <= readinessRefRuns; i++ {
 		out = append(out, readinessCheck{Name: fmt.Sprintf("reference_%d", i), Arm: referenceArm(i), Want: suite.GotPass})
@@ -93,7 +93,7 @@ func readinessTaskChecks(s *schemas.Suite, t *schemas.Task) []readinessCheck {
 	for i := range t.Controls.Mutants {
 		c := readinessCheck{Name: fmt.Sprintf("mutant_%d", i+1), Arm: fmt.Sprintf("mutant_%d", i+1), Want: suite.GotFail}
 		if i >= readinessMaxIndexed {
-			c.Arm, c.NotRun = "", fmt.Sprintf("not run on this worker: at most %d near misses are checked per task; remove some, or run bifrost-bench suite admit", readinessMaxIndexed)
+			c.Arm, c.NotRun = "", fmt.Sprintf("not run on this worker: at most %d near misses are checked per task; remove some, or run heimdall suite admit", readinessMaxIndexed)
 		}
 		out = append(out, c)
 	}
@@ -105,14 +105,14 @@ func readinessTaskChecks(s *schemas.Suite, t *schemas.Task) []readinessCheck {
 		for i := range wrong {
 			c := readinessCheck{Name: fmt.Sprintf("wrong_answer_%d", i+1), Arm: fmt.Sprintf("wrong_answer_%d", i+1), Want: suite.GotFail}
 			if i >= readinessMaxIndexed {
-				c.Arm, c.NotRun = "", fmt.Sprintf("not run on this worker: at most %d wrong answers are checked per task; remove some, or run bifrost-bench suite admit", readinessMaxIndexed)
+				c.Arm, c.NotRun = "", fmt.Sprintf("not run on this worker: at most %d wrong answers are checked per task; remove some, or run heimdall suite admit", readinessMaxIndexed)
 			}
 			out = append(out, c)
 		}
 	}
 	out = append(out, readinessCheck{Name: "exploit", Arm: readinessArmExploit, Want: suite.GotFail})
 	if kind == utils.ControlPatch && t.Notes.Stale != "" && t.Controls.Honest == "" {
-		notRun("reference_stale_notes", suite.GotPass, "not run on this worker: the stale-notes overlay is checked by bifrost-bench suite admit on your own machine")
+		notRun("reference_stale_notes", suite.GotPass, "not run on this worker: the stale-notes overlay is checked by heimdall suite admit on your own machine")
 	}
 	out = append(out,
 		readinessCheck{Name: "null_noop", Arm: admitArmNoop, Want: suite.GotFail},

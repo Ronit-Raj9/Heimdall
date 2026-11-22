@@ -66,8 +66,8 @@
 			"subtitle": "A monitor or guardrail replayed over labelled saved runs: catch rate on attack runs at a fixed false-positive rate on honest runs.",
 			"disclaimer": "Labels come from deterministic gates: honest means no veto fired, attack means a safety failure test's veto fired. A monitor is scored only on attacks the gates can see.",
 			"forExperiment": "Certifications that replayed this experiment's runs.",
-			"none": "No certification yet. Run: bifrost-bench monitor certify -monitor <config.yaml> -exp {{exp}}",
-			"noneAll": "No certification yet. Run: bifrost-bench monitor certify -monitor <config.yaml> -exp <id>",
+			"none": "No certification yet. Run: heimdall monitor certify -monitor <config.yaml> -exp {{exp}}",
+			"noneAll": "No certification yet. Run: heimdall monitor certify -monitor <config.yaml> -exp <id>",
 			"headline": "Catch rate at {{fpr}} FPR",
 			"unsupported": "sample too small",
 			"noAttacks": "no attack runs to score",
@@ -2041,7 +2041,7 @@
 			"loadError": "Could not load the release log",
 			"chainOk": "Log not tampered with",
 			"chainBroken": "Log was changed after it was written",
-			"chainBrokenHint": "A record was edited, removed or reordered after it was written. Run bifrost-bench release verify to find the first changed record.",
+			"chainBrokenHint": "A record was edited, removed or reordered after it was written. Run heimdall release verify to find the first changed record.",
 			"experiment": "Comparison",
 			"config": "Agent version",
 			"configValue": "setup {{arm}}: {{id}} ({{hash}})",
@@ -2558,7 +2558,7 @@
 		},
 		"broken": {
 			"title": "This benchmark could not be loaded",
-			"hint": "Fix the file and field named below, then run `bifrost-bench suite lint {{suite}}`."
+			"hint": "Fix the file and field named below, then run `heimdall suite lint {{suite}}`."
 		},
 		"tasks": {
 			"title": "Tasks",
@@ -2984,7 +2984,7 @@
 		"subtitle": "Every agent config in agents/, the systems under test.",
 		"synthetic": "Synthetic fixture data. These agent configs are examples for checking the screen.",
 		"loadError": "Could not load the agent configs.",
-		"empty": "No agent configs yet. Run `bifrost-bench agent init <id> -template command`.",
+		"empty": "No agent configs yet. Run `heimdall agent init <id> -template command`.",
 		"secretNote": "Environment values are never shown, only variable names. Delivered files are listed by path, never by content.",
 		"label": "Agent configs",
 		"loadFailed": "Failed to load",

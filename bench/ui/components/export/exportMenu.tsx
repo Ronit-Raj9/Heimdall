@@ -98,7 +98,7 @@ export function ExportMenu({ expId, synthetic = false, classifyError, runs = nul
 					testId="export-csv"
 				/>
 				<li className="text-muted-foreground" data-testid="export-traces">
-					{t("export.traces")} <code className="font-mono">{`bifrost-bench export otlp -exp ${expId} -to langfuse`}</code>
+					{t("export.traces")} <code className="font-mono">{`heimdall export otlp -exp ${expId} -to langfuse`}</code>
 				</li>
 			</ul>
 		</details>
@@ -154,7 +154,7 @@ export function SuiteExportMenu({ suiteId, fixtureMode = IS_FIXTURE_MODE }: { su
 				/>
 				<li className="text-muted-foreground" data-testid="export-harbor-cli">
 					{t("export.harborCli")}{" "}
-					<code className="font-mono">{`bifrost-bench export harbor -suite ${suiteId} -out harbor/ -include-hidden`}</code>
+					<code className="font-mono">{`heimdall export harbor -suite ${suiteId} -out harbor/ -include-hidden`}</code>
 				</li>
 			</ul>
 		</details>

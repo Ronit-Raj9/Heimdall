@@ -48,7 +48,7 @@
 		"none": "Nothing seen yet",
 		"forget": "Forget these traces",
 		"download": "Download agent.yaml",
-		"yamlHint": "Commit it as .heimdall/agent.yaml; the CLI reads it: bifrost-bench agent file push"
+		"yamlHint": "Commit it as .heimdall/agent.yaml; the CLI reads it: heimdall agent file push"
 	},
 	"connect": {
 		"title": "3. Connect this agent",

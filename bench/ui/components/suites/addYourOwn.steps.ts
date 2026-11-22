@@ -32,23 +32,23 @@ export interface AddStep {
 
 export const ADD_STEPS: Record<AddTab, readonly AddStep[]> = {
 	task: [
-		{ key: "init", labelKey: "suites.add.task.init", lang: "shell", code: "bifrost-bench init <dir>" },
+		{ key: "init", labelKey: "suites.add.task.init", lang: "shell", code: "heimdall init <dir>" },
 		{
 			key: "taskInit",
 			labelKey: "suites.add.task.taskInit",
 			lang: "shell",
 			code: [
-				"bifrost-bench task init -suite <suite> -id <task> \\",
+				"heimdall task init -suite <suite> -id <task> \\",
 				"    -repo <git repo path> -base <commit> -reference <commit> \\",
 				"    -tests <glob,...> -license <spdx|proprietary> -capabilities a,b",
 			].join("\n"),
 		},
 		{ key: "edit", labelKey: "suites.add.task.edit", lang: "shell", code: "$EDITOR benchmarks/<suite>/tasks/<task>/instruction.md" },
-		{ key: "validate", labelKey: "suites.add.task.validate", lang: "shell", code: "bifrost-bench task validate <suite>/<task>" },
-		{ key: "admit", labelKey: "suites.add.task.admit", lang: "shell", code: "bifrost-bench task admit <suite>/<task>" },
+		{ key: "validate", labelKey: "suites.add.task.validate", lang: "shell", code: "heimdall task validate <suite>/<task>" },
+		{ key: "admit", labelKey: "suites.add.task.admit", lang: "shell", code: "heimdall task admit <suite>/<task>" },
 	],
 	suite: [
-		{ key: "init", labelKey: "suites.add.suite.init", lang: "shell", code: "bifrost-bench suite init <id> -template node-test" },
+		{ key: "init", labelKey: "suites.add.suite.init", lang: "shell", code: "heimdall suite init <id> -template node-test" },
 		{ key: "image", labelKey: "suites.add.suite.image", lang: "shell", code: "$EDITOR benchmarks/<id>/base/Dockerfile" },
 		{
 			key: "verifier",
@@ -67,17 +67,17 @@ export const ADD_STEPS: Record<AddTab, readonly AddStep[]> = {
 			key: "lock",
 			labelKey: "suites.add.suite.lock",
 			lang: "shell",
-			code: "bifrost-bench suite lock <id>\nbifrost-bench suite admit <id>",
+			code: "heimdall suite lock <id>\nheimdall suite admit <id>",
 		},
 	],
 	agent: [
-		{ key: "init", labelKey: "suites.add.agent.init", lang: "shell", code: "bifrost-bench agent init <id> -template http-service" },
-		{ key: "build", labelKey: "suites.add.agent.build", lang: "shell", code: "bifrost-bench agent build agents/<id>.yaml -suite <suite>" },
+		{ key: "init", labelKey: "suites.add.agent.init", lang: "shell", code: "heimdall agent init <id> -template http-service" },
+		{ key: "build", labelKey: "suites.add.agent.build", lang: "shell", code: "heimdall agent build agents/<id>.yaml -suite <suite>" },
 		{
 			key: "check",
 			labelKey: "suites.add.agent.check",
 			lang: "shell",
-			code: "bifrost-bench agent check agents/<id>.yaml -suite <suite> [-task <task>]",
+			code: "heimdall agent check agents/<id>.yaml -suite <suite> [-task <task>]",
 		},
 		{
 			key: "contract",

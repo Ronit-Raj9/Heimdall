@@ -226,7 +226,7 @@ func (s *Service) CreateToken(ctx context.Context, orgID, createdBy string, req 
 // run from the bench folder of the runner's checkout with the token saved in
 // ~/.heimdall-runner-token (mode 0600).
 func (s *Service) StartCommand(pool, name string) string {
-	cmd := "bifrost-bench runner start -server " + shellQuote(s.serverURL()) + " -token-file ~/.heimdall-runner-token -pool " + shellQuote(pool)
+	cmd := "heimdall runner start -server " + shellQuote(s.serverURL()) + " -token-file ~/.heimdall-runner-token -pool " + shellQuote(pool)
 	if n := runnerName(name); n != "" {
 		cmd += " -name " + shellQuote(n)
 	}

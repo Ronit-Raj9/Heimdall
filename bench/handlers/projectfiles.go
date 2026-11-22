@@ -134,7 +134,7 @@ func init() {
 func (h *projectFilesHandler) ready(ctx *fasthttp.RequestCtx) bool {
 	if h.store == nil {
 		lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable,
-			"project files are not available on this server: start it with a project folder (bifrost-bench serve -project <dir>)")
+			"project files are not available on this server: start it with a project folder (heimdall serve -project <dir>)")
 		return false
 	}
 	return true
@@ -189,7 +189,7 @@ func (h *projectFilesHandler) sendStoreError(ctx *fasthttp.RequestCtx, rel strin
 			"the file changed since you opened it: reload it, then apply your edit again")
 	case errors.Is(err, projectfs.ErrTooLarge):
 		lib.SendError(ctx, h.mode, fasthttp.StatusRequestEntityTooLarge, lib.ErrTypeTooLarge,
-			fmt.Sprintf("file is larger than the %d byte editor limit: download it with Download (GET /project/blobs/...), and save big files with bifrost-bench push or a zip on the Upload page", projectfs.MaxFileBytes))
+			fmt.Sprintf("file is larger than the %d byte editor limit: download it with Download (GET /project/blobs/...), and save big files with heimdall push or a zip on the Upload page", projectfs.MaxFileBytes))
 	case errors.Is(err, projectfs.ErrInvalid):
 		msg := strings.TrimPrefix(err.Error(), projectfs.ErrInvalid.Error()+": ")
 		if msg == projectfs.ErrInvalid.Error() {
@@ -422,7 +422,7 @@ func (h *projectFilesHandler) export(ctx *fasthttp.RequestCtx) {
 			total += st.Size()
 			if total > maxExportBytes {
 				lib.SendError(ctx, h.mode, fasthttp.StatusRequestEntityTooLarge, lib.ErrTypeTooLarge,
-					fmt.Sprintf("project is larger than %d MiB: export it with git or bifrost-bench pull instead", maxExportBytes>>20))
+					fmt.Sprintf("project is larger than %d MiB: export it with git or heimdall pull instead", maxExportBytes>>20))
 				return
 			}
 			files = append(files, file{name: string(a) + "/" + e.Path, full: full})

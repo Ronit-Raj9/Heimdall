@@ -1,7 +1,7 @@
 {
 	"title": "Server admin",
 	"subtitle": "Manage who uses this server: users, organizations, limits and workers.",
-	"notAdmin": "Only server admins can open this page. On the server, run bifrost-bench admin grant -email you@example.com, or add your email to HEIMDALL_SERVER_ADMINS and confirm it from the link we sent you.",
+	"notAdmin": "Only server admins can open this page. On the server, run heimdall admin grant -email you@example.com, or add your email to HEIMDALL_SERVER_ADMINS and confirm it from the link we sent you.",
 	"localMode": "The server admin page is for hosted servers. A local bench has one organization and no quotas.",
 	"loadFailed": "Could not load: {{message}}",
 	"retry": "Retry",

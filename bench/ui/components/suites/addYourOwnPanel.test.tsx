@@ -45,7 +45,7 @@ describe("AddYourOwnPanel", () => {
 			"agent build",
 			"agent check",
 		]) {
-			expect(all).toContain(`bifrost-bench ${command}`);
+			expect(all).toContain(`heimdall ${command}`);
 		}
 	});
 });

@@ -97,7 +97,7 @@
 		"placeholder": "task,a_pass,a_n,b_pass,b_n\nt01,1,3,2,3",
 		"submit": "Audit table",
 		"empty": "Choose a CSV file or paste a table first.",
-		"tooLarge": "The table is larger than 1 MiB. Trim it or run `bifrost-bench audit` locally.",
+		"tooLarge": "The table is larger than 1 MiB. Trim it or run `heimdall audit` locally.",
 		"result": "Verdict {{decision}}, action {{action}}",
 		"effect": "Effect {{effect}} pp over {{tasks}} tasks",
 		"mde": "Minimal detectable effect {{mde}} pp",

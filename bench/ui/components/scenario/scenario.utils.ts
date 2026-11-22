@@ -123,8 +123,8 @@ export function durationSeconds(started: string, ended: string): number | null {
 /** The import commands for one importer: import into datasets/<name>, then lock and admit the new suite. */
 export function importCommand(name: string): string {
 	return [
-		`bifrost-bench import ${name} -from datasets/${name} -suite ${name}`,
-		`bifrost-bench suite lock ${name}`,
-		`bifrost-bench suite admit ${name}`,
+		`heimdall import ${name} -from datasets/${name} -suite ${name}`,
+		`heimdall suite lock ${name}`,
+		`heimdall suite admit ${name}`,
 	].join("\n");
 }

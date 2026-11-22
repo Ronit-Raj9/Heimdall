@@ -88,14 +88,14 @@ describe("suite facts", () => {
 		const html = renderToStaticMarkup(<SuiteDriftNotice suite={suite("acme-payments")} />);
 		expect(html).toContain('data-testid="suites-drift-task-p02"');
 		expect(html).toContain("task p02: repo_tree_sha256, status");
-		expect(html).toContain("bifrost-bench suite lock acme-payments\nbifrost-bench suite admit acme-payments");
+		expect(html).toContain("heimdall suite lock acme-payments\nheimdall suite admit acme-payments");
 		expect(renderToStaticMarkup(<SuiteDriftNotice suite={suite("coding-core")} />)).toBe("");
 	});
 
 	it("shows a broken pack's error as text with the lint command", () => {
 		const html = renderToStaticMarkup(<BrokenSuite suite={suite("acme-broken")} />);
 		expect(html).toContain('role="alert"');
-		expect(html).toContain("bifrost-bench suite lint acme-broken");
+		expect(html).toContain("heimdall suite lint acme-broken");
 	});
 });
 describe("scenario facts", () => {

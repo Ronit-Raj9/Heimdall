@@ -8,7 +8,7 @@ import { FILES_NS } from "./i18n";
 export function syncCommands(origin: string, orgSlug?: string): { pull: string; push: string } {
 	const org = orgSlug ? ` -org ${orgSlug}` : "";
 	const base = `-server ${origin}${org} -token $HEIMDALL_TOKEN -dir .`;
-	return { pull: `bifrost-bench pull ${base}`, push: `bifrost-bench push ${base}` };
+	return { pull: `heimdall pull ${base}`, push: `heimdall push ${base}` };
 }
 
 /** "Sync with your machine": the exact push/pull commands and where to get a token. */

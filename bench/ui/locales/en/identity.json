@@ -44,7 +44,7 @@
 			"invite": "Only people an organization admin invites can create an account.",
 			"allowlist": "Invited people, plus anyone with an address at the domains below. Each gets an organization of their own.",
 			"open": "Anyone with an email address can create an account and an organization. Use only for a public service.",
-			"closed": "Nobody signs up on the web. Accounts come from bifrost-bench user create on the server."
+			"closed": "Nobody signs up on the web. Accounts come from heimdall user create on the server."
 		},
 		"domains": "Allowed email domains",
 		"domainsHint": "One per line or comma separated, such as acme.com. Exact match: eu.acme.com is a separate domain.",
@@ -56,7 +56,7 @@
 		"sourceConfig": "From the server config (HEIMDALL_SIGNUP and HEIMDALL_SIGNUP_DOMAINS).",
 		"delivery": "Email delivery",
 		"deliveryEmail": "Verification links are emailed.",
-		"deliveryLog": "No mail sender is set: verification links go to the server log. Pass them on, or run bifrost-bench user verify -email <address> on the server.",
+		"deliveryLog": "No mail sender is set: verification links go to the server log. Pass them on, or run heimdall user verify -email <address> on the server.",
 		"confirmOpen": "Let anyone on the internet create an account here?",
 		"loadFailed": "Could not load the sign-up setting: {{message}}",
 		"retry": "Retry"

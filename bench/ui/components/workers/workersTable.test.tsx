@@ -47,6 +47,6 @@ describe("WorkersOff", () => {
 		expect(html).not.toContain('role="alert"');
 		expect(html).toContain("Extra workers are not turned on");
 		expect(html).toContain("BENCH_WORKER_TOKEN");
-		expect(html).toContain("bifrost-bench worker -server &lt;url&gt;");
+		expect(html).toContain("heimdall worker -server &lt;url&gt;");
 	});
 });

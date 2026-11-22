@@ -29,7 +29,7 @@
 		"line": "Row {{line}}"
 	},
 	"mock": {
-		"help": "Upload your API's OpenAPI file to get a stand-in service: the same routes over HTTP and one tool per operation, over starting data each task seeds, with the final data exported for the checks. Calls recorded in a run can be added as fixed answers with bifrost-bench mock fixtures.",
+		"help": "Upload your API's OpenAPI file to get a stand-in service: the same routes over HTTP and one tool per operation, over starting data each task seeds, with the final data exported for the checks. Calls recorded in a run can be added as fixed answers with heimdall mock fixtures.",
 		"id": "Service name",
 		"idHint": "Lowercase letters, digits, - or _; tasks name the service by it.",
 		"file": "OpenAPI file",

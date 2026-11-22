@@ -156,7 +156,7 @@ describe("helpers", () => {
 
 	it("builds the import, lock and admit commands", () => {
 		expect(importCommand("harbor")).toBe(
-			"bifrost-bench import harbor -from datasets/harbor -suite harbor\nbifrost-bench suite lock harbor\nbifrost-bench suite admit harbor",
+			"heimdall import harbor -from datasets/harbor -suite harbor\nheimdall suite lock harbor\nheimdall suite admit harbor",
 		);
 	});
 });

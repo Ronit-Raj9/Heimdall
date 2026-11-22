@@ -144,7 +144,7 @@ export function SuiteDriftNotice({ suite }: { suite: SuiteSummary }) {
 			<p className="text-muted-foreground pl-6 text-xs">{t("suites.drift.fix")}</p>
 			<CopyCodeBlock
 				className="ml-6"
-				code={`bifrost-bench suite lock ${suite.id}\nbifrost-bench suite admit ${suite.id}`}
+				code={`heimdall suite lock ${suite.id}\nheimdall suite admit ${suite.id}`}
 				label={t("suites.drift.fix")}
 				testId="suites-drift-fix"
 			/>

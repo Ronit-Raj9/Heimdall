@@ -95,7 +95,7 @@ const (
 // reads the gateway and may call the judge, both outbound.
 var ErrOffline = errors.New("live pull is off: this server runs -offline (no gateway, no outbound calls); stored live scores stay readable")
 
-var ErrNotConfigured = errors.New("live scoring is not configured: run `bifrost-bench livescore init` (docs/live-scoring.md)")
+var ErrNotConfigured = errors.New("live scoring is not configured: run `heimdall livescore init` (docs/live-scoring.md)")
 
 // SessionRecord is one scored session: who (version, grouping), when, how
 // many requests, the signals and the flags. It never holds a prompt, an

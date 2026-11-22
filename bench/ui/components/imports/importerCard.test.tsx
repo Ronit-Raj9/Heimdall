@@ -26,7 +26,7 @@ describe("ImporterCard", () => {
 
 	it("gives the exact import, lock and admit commands", () => {
 		expect(card("tau2")).toContain(
-			"bifrost-bench import tau2 -from datasets/tau2 -suite tau2\nbifrost-bench suite lock tau2\nbifrost-bench suite admit tau2",
+			"heimdall import tau2 -from datasets/tau2 -suite tau2\nheimdall suite lock tau2\nheimdall suite admit tau2",
 		);
 	});
 

@@ -155,7 +155,7 @@ export function WorkersOff() {
 			</p>
 			<p className="text-muted-foreground text-xs">{t("workers.offBody")}</p>
 			<p className="text-muted-foreground text-xs">{t("workers.offHow")}</p>
-			<CopyCodeBlock code="bifrost-bench worker -server <url>" label={t("workers.offCommand")} testId="workers-off-command" />
+			<CopyCodeBlock code="heimdall worker -server <url>" label={t("workers.offCommand")} testId="workers-off-command" />
 		</div>
 	);
 }

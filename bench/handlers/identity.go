@@ -98,7 +98,7 @@ func (h *IdentityHandler) postResend(ctx *fasthttp.RequestCtx) {
 func (h *IdentityHandler) serverAdmin(ctx *fasthttp.RequestCtx) bool {
 	if !auth.IsServerAdmin(auth.PrincipalFrom(ctx)) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden,
-			"server admins only: run `bifrost-bench admin grant -email you@example.com` on the server, or list your verified email in "+auth.ServerAdminsEnv)
+			"server admins only: run `heimdall admin grant -email you@example.com` on the server, or list your verified email in "+auth.ServerAdminsEnv)
 		return false
 	}
 	return true

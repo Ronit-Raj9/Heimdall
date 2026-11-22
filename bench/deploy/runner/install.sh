@@ -1059,6 +1059,22 @@ get_binary() {
     BENCH_VERSION=$(as_user_out "$BIN_PATH" version) || die "${BIN_PATH} does not run on this box"
     note "bifrost-bench version ${BENCH_VERSION}"
   fi
+  link_cli_name
+}
+
+# link_cli_name makes the installed binary answer to its user-facing name,
+# heimdall (the web shows "heimdall runner start ..."). It prints the name
+# it starts with, so either name works.
+link_cli_name() {
+  if is_dry; then
+    print_cmd ln -sf "$BIN_PATH" /usr/local/bin/heimdall
+    return 0
+  fi
+  if ln -sf "$BIN_PATH" /usr/local/bin/heimdall 2>/dev/null; then
+    note "linked /usr/local/bin/heimdall to ${BIN_PATH}"
+  else
+    warn "could not link /usr/local/bin/heimdall; run ${BIN_PATH} by its path"
+  fi
 }
 
 # env_keys lists the KEY of every KEY=value line of a dotenv file.

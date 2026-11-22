@@ -298,7 +298,7 @@ func (pc *pullChecker) secret(c *PullCheck, name, what string) {
 			Action: "Add an org secret named " + name + " in Settings > Secrets", Link: PullLinkSecrets, Secret: name})
 	} else {
 		c.Steps = append(c.Steps, PullStep{Problem: what + " needs the variable " + name + ", which is not set on this server",
-			Action: "Export " + name + " where bifrost-bench serve runs and restart it", Secret: name})
+			Action: "Export " + name + " where heimdall serve runs and restart it", Secret: name})
 	}
 }
 
@@ -345,7 +345,7 @@ func LivePullCheck(ctx context.Context, s Services, cfg *lib.Config) PullCheck {
 		} else if os.Getenv(j.KeyEnv) != "" {
 			pj.KeyReady = true
 		} else {
-			pj.Next = "export " + j.KeyEnv + " where bifrost-bench serve runs to use the judge"
+			pj.Next = "export " + j.KeyEnv + " where heimdall serve runs to use the judge"
 		}
 		c.Judge = pj
 	}

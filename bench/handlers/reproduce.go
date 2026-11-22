@@ -240,8 +240,8 @@ func reproduceReadme(ev *schemas.Evaluation, locks []ReproduceLock, expFiles []s
 		b.WriteString("# no experiment file was saved for this evaluation; start it on a server instead\n")
 	}
 	for _, f := range expFiles {
-		fmt.Fprintf(&b, "bifrost-bench plan %s   # check the plan first: the suite lock hash must match the table below\n", f)
-		fmt.Fprintf(&b, "bifrost-bench run %s\n", f)
+		fmt.Fprintf(&b, "heimdall plan %s   # check the plan first: the suite lock hash must match the table below\n", f)
+		fmt.Fprintf(&b, "heimdall run %s\n", f)
 	}
 	b.WriteString("```\n\n")
 	b.WriteString("Provider keys come from your environment (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, ...): the bundle holds none.\n\n")

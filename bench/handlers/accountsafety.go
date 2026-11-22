@@ -49,7 +49,7 @@ func (h *AccountSafetyHandler) fail(ctx *fasthttp.RequestCtx, err error) {
 func (h *AccountSafetyHandler) ready(ctx *fasthttp.RequestCtx) bool {
 	if h.svc == nil {
 		lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable,
-			"password reset needs hosted mode (auth.mode: hosted); on a local server use `bifrost-bench user password`")
+			"password reset needs hosted mode (auth.mode: hosted); on a local server use `heimdall user password`")
 		return false
 	}
 	return true

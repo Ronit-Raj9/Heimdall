@@ -33,14 +33,14 @@ describe("FilesView", () => {
 		expect(html).toContain('data-testid="files-export"');
 		expect(html).toContain("Download project (zip)");
 		expect(html).toContain('data-testid="files-sync-card"');
-		expect(html).toContain("bifrost-bench pull -server");
-		expect(html).toContain("bifrost-bench push -server");
+		expect(html).toContain("heimdall pull -server");
+		expect(html).toContain("heimdall push -server");
 	});
 
 	it("builds the sync commands for this server and org", () => {
 		const c = syncCommands("https://heimdall.example.com", "acme");
-		expect(c.pull).toBe("bifrost-bench pull -server https://heimdall.example.com -org acme -token $HEIMDALL_TOKEN -dir .");
-		expect(c.push).toBe("bifrost-bench push -server https://heimdall.example.com -org acme -token $HEIMDALL_TOKEN -dir .");
+		expect(c.pull).toBe("heimdall pull -server https://heimdall.example.com -org acme -token $HEIMDALL_TOKEN -dir .");
+		expect(c.push).toBe("heimdall push -server https://heimdall.example.com -org acme -token $HEIMDALL_TOKEN -dir .");
 		expect(syncCommands("http://127.0.0.1:8090").pull).not.toContain("-org");
 	});
 
