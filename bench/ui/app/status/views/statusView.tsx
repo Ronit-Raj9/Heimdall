@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { StatusDot, StatusPill, type StatusTone } from "@/components/ui/statusPill";
 import { type Incident, type StatusLevel, type StatusPage, useGetStatusPageQuery } from "@/lib/store/apis/statusApi";
 import "@/lib/types/statusI18n";
-import { useEffect } from "react";
+import { usePageTitle } from "@/lib/routing/pageTitle";
 import { useTranslation } from "react-i18next";
 
 /** How each level reads at a glance. */
@@ -26,9 +26,7 @@ export default function StatusView() {
 	const { t } = useTranslation("status");
 	const q = useGetStatusPageQuery(undefined, { pollingInterval: 30_000 });
 
-	useEffect(() => {
-		document.title = t("page.title");
-	}, [t]);
+	usePageTitle(t("page.title"));
 
 	if (q.isLoading) {
 		return (

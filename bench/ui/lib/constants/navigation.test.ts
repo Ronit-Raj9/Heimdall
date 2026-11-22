@@ -1,5 +1,8 @@
+import "@/lib/i18n";
+
+import { setPageTitleOverride } from "@/lib/routing/pageTitle";
 import { describe, expect, it } from "vitest";
-import { BENCH_NAV, BENCH_NAV_GROUPS, DEFAULT_CLOSED_GROUPS, activeNavGroup, activeNavItem } from "./navigation";
+import { BENCH_NAV, BENCH_NAV_GROUPS, DEFAULT_CLOSED_GROUPS, activeNavGroup, activeNavItem, pageTitle } from "./navigation";
 
 describe("navigation", () => {
 	it("is agent first: Home, then Agents, Test, Tasks, Watch, Release and one Settings entry", () => {
@@ -85,5 +88,21 @@ describe("navigation", () => {
 		expect(activeNavGroup("/live")).toBe("watch");
 		expect(activeNavGroup("/policies")).toBe("release");
 		expect(activeNavGroup("/jobs/j_1")).toBe("settings");
+	});
+
+	// N139, N121: the guides and the jobs pages have no sidebar entry of their own, so they name themselves.
+	it("titles the guides, the jobs list and a job page by themselves", () => {
+		expect(pageTitle("/docs")).toBe("Guides · Heimdall");
+		expect(pageTitle("/jobs")).toBe("Jobs · Heimdall");
+		expect(pageTitle("/jobs/job_1")).toBe("Job · Heimdall");
+		expect(pageTitle("/settings")).toBe("Settings · Heimdall");
+	});
+
+	it("keeps a title the page set for itself", () => {
+		setPageTitleOverride("/docs", "Hosting · Guides · Heimdall");
+		expect(pageTitle("/docs")).toBe("Hosting · Guides · Heimdall");
+		expect(pageTitle("/docs/")).toBe("Hosting · Guides · Heimdall");
+		setPageTitleOverride("/docs", undefined);
+		expect(pageTitle("/docs")).toBe("Guides · Heimdall");
 	});
 });

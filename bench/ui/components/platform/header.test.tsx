@@ -1,7 +1,7 @@
 import "@/lib/i18n";
 
 import { LOCAL_SESSION, ME_OWNER, demoSession, hostedSession } from "@/lib/testing/platformFixtures";
-import { mutation, render } from "@/lib/testing/render";
+import { mutation, render, tagOf } from "@/lib/testing/render";
 import { sessionFromMe } from "@/lib/session/sessionContext";
 import { describe, expect, it, vi } from "vitest";
 import { createOrgRequest } from "@/lib/store/apis/platformApi";
@@ -81,6 +81,29 @@ describe("UserMenu", () => {
 		expect(html).toContain('title="ada@acme.dev"');
 		expect(render(<UserMenu />, LOCAL_SESSION)).toBe("");
 		expect(render(<UserMenu />, demoSession())).toBe("");
+	});
+	// N143: the Account menu can switch organization too (the sidebar badge is hidden on the icon rail).
+	it("offers Switch organization with the other organizations to a member of several", () => {
+		const html = render(<UserMenu defaultOpen />, hostedSession("owner"));
+		expect(html).toContain("Switch organization");
+		expect(tagOf(html, "user-menu-org-labs")).toContain('role="menuitem"');
+		expect(html).toContain("Acme Labs");
+		expect(html).not.toContain('data-testid="user-menu-org-acme"');
+		expect(html).not.toContain('data-testid="user-menu-create-org"');
+	});
+	it("offers Create organization to a member of one organization", () => {
+		const single = sessionFromMe({ me: { ...ME_OWNER, orgs: [ME_OWNER.orgs[0]] }, meLoading: false });
+		const html = render(<UserMenu defaultOpen />, single);
+		expect(html).not.toContain("Switch organization");
+		expect(tagOf(html, "user-menu-create-org")).toContain('role="menuitem"');
+	});
+	it("offers an access token no organization switch", () => {
+		const token = sessionFromMe({ me: { ...ME_OWNER, kind: "token" }, meLoading: false });
+		const html = render(<UserMenu defaultOpen />, token);
+		expect(html).toContain('data-testid="user-menu"');
+		expect(html).not.toContain("Switch organization");
+		expect(html).not.toContain("user-menu-org-");
+		expect(html).not.toContain("user-menu-create-org");
 	});
 });
 describe("CreateOrgDialog", () => {

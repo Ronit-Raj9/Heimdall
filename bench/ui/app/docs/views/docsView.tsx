@@ -1,8 +1,11 @@
-import { Markdown, parseBlocks, slugify } from "@/components/docs/markdown";
+import "@/components/platform/fw23I18n";
+import { hostedDocSource, Markdown, parseBlocks, slugify } from "@/components/docs/markdown";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState, PageHeader } from "@/components/shell";
 import { Input } from "@/components/ui/input";
+import { usePageTitle } from "@/lib/routing/pageTitle";
 import { useSession } from "@/lib/session/sessionContext";
+import { errorStatus } from "@/lib/store/apis/session";
 import { useGetPublicDocQuery, useListPublicDocsQuery } from "@/lib/store/apis/publicSiteApi";
 import { useGetDocQuery, useListDocsQuery } from "@/lib/store/apis/welcomeApi";
 import "@/lib/types/welcomeI18n";
@@ -36,9 +39,19 @@ const PINNED = [
 	"runners",
 ];
 
+/** The text the guides list searches on the server for (2 to 80 characters), or undefined for none. */
+export function docsSearchTerm(filter: string): string | undefined {
+	const q = filter.trim();
+	return q.length >= 2 && q.length <= 80 ? q : undefined;
+}
+
+/** How long typing settles before the server search runs. */
+const SEARCH_DEBOUNCE_MS = 250;
+
 /** /docs: every guide in bench/docs, served by GET /docs and rendered in place. ?doc=<name> selects one. */
 export default function DocsView() {
 	const { t } = useTranslation("welcome");
+	const { t: tf } = useTranslation("fw23");
 	// A hosted visitor who is not signed in reads the public guides (GET /public/docs, internal
 	// notes left out) in the public frame; everyone else the in-app guides.
 	const session = useSession();
@@ -48,12 +61,24 @@ export default function DocsView() {
 	const list = visitor ? publicList : appList;
 	const [selected, setSelected] = useQueryState("doc", parseAsString.withDefault(START_DOC));
 	const [filter, setFilter] = useState("");
+	// Two or more characters also search the guides' bodies on the server (debounced).
+	const [term, setTerm] = useState<string | undefined>();
+	useEffect(() => {
+		const next = docsSearchTerm(filter);
+		const timer = setTimeout(() => setTerm(next), next ? SEARCH_DEBOUNCE_MS : 0);
+		return () => clearTimeout(timer);
+	}, [filter]);
+	const appSearch = useListDocsQuery(term, { skip: visitor || !term });
+	const publicSearch = useListPublicDocsQuery(term, { skip: !visitor || !term });
+	const search = term ? (visitor ? publicSearch : appSearch) : undefined;
 	const [anchor, setAnchor] = useState<string | undefined>();
 	const appDoc = useGetDocQuery(selected, { skip: !selected || visitor });
 	const publicDoc = useGetPublicDocQuery(selected, { skip: !selected || !visitor });
 	const doc = visitor ? publicDoc : appDoc;
 
 	const docs = useMemo(() => {
+		// Server hits come ranked (title matches first), each with its snippet.
+		if (search?.data) return search.data.docs;
 		const all = [...(list.data?.docs ?? [])];
 		const rank = (n: string) => {
 			const i = PINNED.indexOf(n);
@@ -62,7 +87,17 @@ export default function DocsView() {
 		all.sort((a, b) => rank(a.name) - rank(b.name) || a.title.localeCompare(b.title));
 		const f = filter.trim().toLowerCase();
 		return f ? all.filter((d) => d.title.toLowerCase().includes(f) || d.name.includes(f)) : all;
-	}, [list.data, filter]);
+	}, [list.data, filter, search?.data]);
+
+	// On a hosted server the guides' local server addresses (http://127.0.0.1:8090) point here.
+	const hosted = session.authMode === "hosted";
+	const source = useMemo(() => {
+		if (!doc.data) return undefined;
+		if (!hosted || typeof window === "undefined") return { text: doc.data.markdown, replaced: 0 };
+		return hostedDocSource(doc.data.markdown, window.location.origin);
+	}, [doc.data, hosted]);
+	usePageTitle(doc.data ? `${doc.data.title} · ${tf("titles.docs")} · Heimdall` : undefined);
+	const noGuide = Boolean(doc.error) && errorStatus(doc.error) === 404;
 
 	const toc = useMemo(() => {
 		if (!doc.data) return [];
@@ -108,12 +143,21 @@ export default function DocsView() {
 							/>
 						</div>
 						<ul className="flex min-h-0 flex-col gap-0.5 overflow-y-auto pr-1" data-testid="docs-list">
-							{docs.length === 0 && <li className="text-muted-foreground px-2 py-1 text-xs">{t("docs.empty")}</li>}
+							{docs.length === 0 && (
+								<li className="text-muted-foreground px-2 py-1 text-xs" data-testid="docs-empty">
+									{term && search?.data ? t("docs.noMatch", { q: term }) : t("docs.empty")}
+								</li>
+							)}
 							{docs.map((d) => (
 								<li key={d.name}>
-									<button
-										type="button"
-										onClick={() => open(d.name)}
+									<a
+										href={`/docs?doc=${encodeURIComponent(d.name)}`}
+										onClick={(e) => {
+											// A plain left click opens the guide in place; a modified or middle click opens a new tab.
+											if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+											e.preventDefault();
+											open(d.name);
+										}}
 										aria-current={d.name === selected ? "page" : undefined}
 										className={cn(
 											"hover:bg-accent/60 hover:text-foreground focus-visible:ring-ring/60 flex w-full items-center gap-2 truncate rounded-md border-l-2 px-2.5 py-1.5 text-left text-[13px] transition-colors focus-visible:ring-2 focus-visible:outline-none",
@@ -125,8 +169,15 @@ export default function DocsView() {
 										{d.name === START_DOC && (
 											<span className="bg-primary/10 text-primary shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold">{t("docs.start")}</span>
 										)}
-										<span className="truncate">{d.title}</span>
-									</button>
+										<span className="flex min-w-0 flex-col">
+											<span className="truncate">{d.title}</span>
+											{d.snippet && (
+												<span className="text-muted-foreground truncate text-[11px] font-normal" data-testid={`docs-snippet-${d.name}`}>
+													{d.snippet}
+												</span>
+											)}
+										</span>
+									</a>
 								</li>
 							))}
 						</ul>
@@ -134,10 +185,21 @@ export default function DocsView() {
 					<div className="min-w-0 max-w-3xl">
 						{doc.isFetching && !doc.data ? (
 							<BlockSkeleton rows={8} testId="doc-loading" />
+						) : noGuide ? (
+							<p className="text-muted-foreground text-sm" role="status" data-testid="doc-not-found">
+								{t("docs.noGuide", { name: selected })}
+							</p>
 						) : doc.error ? (
 							<LoadError title={t("docs.docError")} error={doc.error} onRetry={doc.refetch} testId="doc-error" />
-						) : doc.data ? (
-							<Markdown source={doc.data.markdown} onDocLink={open} testId="doc-body" />
+						) : doc.data && source ? (
+							<>
+								{source.replaced > 0 && (
+									<p className="text-muted-foreground mb-4 rounded-md border px-3 py-2 text-xs" data-testid="docs-local-note">
+										{t("docs.localAddressNote")}
+									</p>
+								)}
+								<Markdown source={source.text} onDocLink={open} testId="doc-body" />
+							</>
 						) : (
 							<EmptyState icon={BookOpen} message={t("docs.pick")} testId="doc-pick" />
 						)}

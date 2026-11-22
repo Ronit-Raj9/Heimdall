@@ -2,7 +2,16 @@ import { RoleGate } from "@/components/platform/accessNotes";
 import { ConfirmButton, JobStatusBadge } from "@/components/platform/badges";
 import { ForbiddenNote, isRoleRefusal } from "@/components/platform/forbiddenNote";
 import { JobProgressBar, useJobKindLabel } from "@/components/platform/jobsDrawer";
-import { durationSeconds, formatDuration, isActiveJob, jobExperimentId, jobProgress, toDate } from "@/components/platform/platform.utils";
+import {
+	durationSeconds,
+	formatDuration,
+	isActiveJob,
+	jobExperimentId,
+	jobProgress,
+	linkifyExperiments,
+	targetLabel,
+	toDate,
+} from "@/components/platform/platform.utils";
 import { useJobLog, type JobLogState } from "@/components/platform/useJobLog";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { When } from "@/components/settings/settingsBits";
@@ -16,7 +25,7 @@ import { isMissingRoute } from "@/lib/store/apis/session";
 import type { Job, JobLogLine } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, ArrowDownToLine, Gavel } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, FlaskConical, Gavel } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -85,6 +94,10 @@ export function JobDetail({ job, log }: { job: Job; log: JobLogState }) {
 	const progress = jobProgress(job);
 	const expId = jobExperimentId(job);
 	const regradeId = regradeIdOf(job);
+	const target = targetLabel(job.target);
+	// An experiment job opens its result; any other job that ran a comparison (a benchmark's
+	// readiness controls) opens that comparison.
+	const experimentJob = job.kind.startsWith("experiment.");
 	const duration = formatDuration(durationSeconds(job.started_at, job.finished_at));
 
 	return (
@@ -96,7 +109,7 @@ export function JobDetail({ job, log }: { job: Job; log: JobLogState }) {
 					<CopyId value={job.id} className="max-w-64" testId="job-id" />
 				</div>
 				<div className="flex flex-wrap items-center gap-3">
-					<h1 className="text-foreground">{job.target ? `${kindLabel(job.kind)} of ${job.target}` : kindLabel(job.kind)}</h1>
+					<h1 className="text-foreground">{target.text ? `${kindLabel(job.kind)} of ${target.text}` : kindLabel(job.kind)}</h1>
 					<JobStatusBadge status={job.status} />
 					{job.cancel_requested && activeJob && (
 						<span className="text-chart-warning-ink text-xs font-medium" data-testid="job-cancel-requested">
@@ -104,7 +117,15 @@ export function JobDetail({ job, log }: { job: Job; log: JobLogState }) {
 						</span>
 					)}
 					<div className="ml-auto flex flex-wrap items-center gap-2">
-						{expId && (
+						{expId && !experimentJob && (
+							<Button asChild variant="outline" size="sm" className="gap-1.5">
+								<Link to="/experiments/$expId" params={{ expId }} data-testid="job-open-comparison">
+									<FlaskConical className="size-3.5" aria-hidden="true" />
+									{t("jobs.page.openComparison")}
+								</Link>
+							</Button>
+						)}
+						{expId && experimentJob && (
 							<Button asChild variant="outline" size="sm" className="gap-1.5">
 								<Link
 									to="/verdict"
@@ -145,7 +166,15 @@ export function JobDetail({ job, log }: { job: Job; log: JobLogState }) {
 
 			<dl className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-lg border px-5 py-4 sm:grid-cols-3 lg:grid-cols-6" data-testid="job-facts">
 				<Fact label={t("jobs.page.target")}>
-					<span className="font-mono text-xs">{job.target || "-"}</span>
+					{target.to ? (
+						<a href={target.to} className="text-primary text-xs underline underline-offset-2" title={job.target} data-testid="job-target">
+							{target.text}
+						</a>
+					) : (
+						<span className="text-xs" title={job.target} data-testid="job-target">
+							{target.text || "-"}
+						</span>
+					)}
 				</Fact>
 				<Fact label={t("jobs.page.created")}>
 					<When value={job.created_at} />
@@ -314,7 +343,9 @@ export function JobLogPanel({ log, active }: { log: JobLogState; active: boolean
 									{line.seq}
 								</span>
 								<span className="text-zinc-500 tabular-nums select-none">{timeOf(line.at)}</span>
-								<span className={cn("break-words whitespace-pre-wrap", LEVEL_CLASS[line.level])}>{line.line}</span>
+								<span className={cn("break-words whitespace-pre-wrap", LEVEL_CLASS[line.level])}>
+									<LogText text={line.line} />
+								</span>
 							</li>
 						))}
 						{live && (
@@ -331,5 +362,28 @@ export function JobLogPanel({ log, active }: { log: JobLogState; active: boolean
 				</p>
 			)}
 		</section>
+	);
+}
+
+/** A log line with every comparison id (e_...) linked to the comparison's page. */
+export function LogText({ text }: { text: string }) {
+	return (
+		<>
+			{linkifyExperiments(text).map((part, i) =>
+				typeof part === "string" ? (
+					part
+				) : (
+					<Link
+						key={i}
+						to="/experiments/$expId"
+						params={{ expId: part.exp }}
+						className="text-sky-300 underline underline-offset-2 hover:text-sky-200"
+						data-testid="job-log-exp-link"
+					>
+						{part.exp}
+					</Link>
+				),
+			)}
+		</>
 	);
 }

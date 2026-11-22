@@ -490,13 +490,22 @@
 			"loadError": "Could not load job {{id}}",
 			"notFound": "No job {{id}} in this organization.",
 			"openExperiment": "Open comparison",
-			"openVerdict": "Open result"
+			"openVerdict": "Open result",
+			"openComparison": "Open the comparison"
 		},
 		"phases": {
 			"running": "running",
 			"analyzing": "analyzing",
 			"stopping": "stopping"
-		}
+		},
+		"targetLabel": {
+			"suite": "Benchmark {{name}}",
+			"exp": "Comparison {{id}}",
+			"agent": "Agent {{id}}",
+			"canary": "Drift monitor {{name}}",
+			"org": "This organization"
+		},
+		"shortId": "id {{id}}"
 	},
 	"experimentActions": {
 		"cancel": "Stop comparison",

@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
+	"net/url"
 	"strings"
 	"testing"
 
+	benchdocs "github.com/maximhq/bifrost/bench/docs"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
 )
@@ -191,5 +193,81 @@ func TestExtraDocsServed(t *testing.T) {
 		if strings.Contains(string(ctx.Response.Body()), `"`+name+`"`) {
 			t.Errorf("guide list includes extra %s", name)
 		}
+	}
+}
+
+func docListCtx(q string) *fasthttp.RequestCtx {
+	ctx := &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/api/bench/docs?q=" + url.QueryEscape(q))
+	return ctx
+}
+
+func decodeDocList(t *testing.T, ctx *fasthttp.RequestCtx) DocList {
+	t.Helper()
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("status %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	var out DocList
+	if err := json.Unmarshal(ctx.Response.Body(), &out); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// N138: q searches guide bodies, not titles only, and each hit carries a snippet.
+func TestDocsSearchMatchesBody(t *testing.T) {
+	ctx := docListCtx("gVisor")
+	listDocs(ctx, schemas.ModeLive)
+	out := decodeDocList(t, ctx)
+	var hosting *DocSummary
+	for i := range out.Docs {
+		if out.Docs[i].Name == "hosting" {
+			hosting = &out.Docs[i]
+		}
+		if !strings.Contains(strings.ToLower(out.Docs[i].Title+" "+out.Docs[i].Name+" "+out.Docs[i].Snippet), "gvisor") {
+			t.Errorf("%s matched q=gVisor without the word in its title, name or snippet", out.Docs[i].Name)
+		}
+	}
+	if hosting == nil {
+		t.Fatalf("q=gVisor did not find the hosting guide in %d hits", len(out.Docs))
+	}
+	if !strings.Contains(strings.ToLower(hosting.Snippet), "gvisor") || len([]rune(hosting.Snippet)) > 170 {
+		t.Fatalf("hosting snippet %q", hosting.Snippet)
+	}
+	all := &fasthttp.RequestCtx{}
+	listDocs(all, schemas.ModeLive)
+	if n := len(decodeDocList(t, all).Docs); n <= len(out.Docs) {
+		t.Fatalf("search returned %d of %d guides; want only matches", len(out.Docs), n)
+	}
+}
+
+func TestDocsSearchBadQuery(t *testing.T) {
+	for _, q := range []string{"g", " g ", strings.Repeat("x", 81)} {
+		ctx := docListCtx(q)
+		listDocs(ctx, schemas.ModeLive)
+		if ctx.Response.StatusCode() != 400 || !strings.Contains(string(ctx.Response.Body()), "q must be 2 to 80 characters") {
+			t.Errorf("q=%q: status %d body %s", q, ctx.Response.StatusCode(), ctx.Response.Body())
+		}
+	}
+}
+
+// The public list keeps leaving internal notes out when it searches.
+func TestPublicDocsSearchSkipsInternal(t *testing.T) {
+	h := NewPublicSiteHandler(PublicSiteConfig{Mode: schemas.ModeLive})
+	ctx := docListCtx("design")
+	h.docs(ctx)
+	out := decodeDocList(t, ctx)
+	if len(out.Docs) == 0 {
+		t.Fatal("q=design found no public guide")
+	}
+	for _, d := range out.Docs {
+		if _, ok := benchdocs.ReadPublic(d.Name); !ok {
+			t.Errorf("public search listed internal guide %s", d.Name)
+		}
+	}
+	bad := docListCtx("x")
+	h.docs(bad)
+	if bad.Response.StatusCode() != 400 {
+		t.Fatalf("public q=x: status %d", bad.Response.StatusCode())
 	}
 }
