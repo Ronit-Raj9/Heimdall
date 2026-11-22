@@ -63,19 +63,37 @@ no text mode, so Test says so; run a voice benchmark to check it.
 ## Text benchmarks
 
 Text conversations (support tasks with a simulated customer, tau-style
-tasks) run through Heimdall's conversation driver: each customer turn is sent
-to the platform's chat API on the run's own session, and the agent's reply
-comes back as the next turn. The platform keeps its own conversation state
-(a Vapi chat chain, a Retell chat, an ElevenLabs conversation), and Heimdall
-ends the session when the run ends.
+tasks, single questions) run through Heimdall's conversation driver. The run
+container holds the pull launcher (`adapters/pullagent.py`), which talks to
+the simulated customer and sends each customer turn to this server; the
+server sends it to the platform's chat API on the run's own session, and the
+agent's reply comes back as the next turn (`handlers/pullvoice.go`). The run
+token, signed when the run is planned, names the agent's platform and id, so
+a run cannot point the server anywhere else. The platform's API key reaches
+the launcher from your Secrets and goes with each turn in a header; it is
+never stored. The platform keeps its own conversation state (a Vapi chat
+chain, a Retell chat, an ElevenLabs conversation), and Heimdall ends the
+session when the run's time is up.
 
 A 5xx, 429 or broken connection from the platform is reported as the
-platform's failure (infrastructure), not as a wrong answer by the agent. A 4xx (wrong key, unknown agent) is reported with the
+platform's failure (infrastructure, the run is never scored), not as a wrong
+answer by the agent. A 4xx (wrong key, unknown agent) is reported with the
 platform's reason.
 
-Until a server enables the conversation driver for hosted voice agents, the
-wizard marks text benchmarks as not available for these agents and leaves
-them out, with that reason.
+Which text tasks run:
+
+| Task | Vapi, ElevenLabs | Retell | WebSocket endpoint |
+|---|---|---|---|
+| Voice call | runs | not available (no call socket) | runs |
+| Text task graded on the agent's replies (answer) | runs | runs | not available (calls only) |
+| Task graded on tool state or code changes | not available | not available | not available |
+
+The agent's own platform tools run against your backends, not the task's
+services, so a task that checks tool state cannot see them. Text benchmarks
+need an address runs reach this server at (`pull.url` or `auth.public_url`
+in the bench config). A server without one marks text benchmarks as not
+available for these agents in the wizard and leaves them out, with that
+reason.
 
 ## Voice benchmarks
 

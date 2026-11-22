@@ -37,7 +37,14 @@ func TestVoicePlatformTaskOK(t *testing.T) {
 	}
 	VoicePlatformText = true
 	defer func() { VoicePlatformText = false }()
-	if ok, why := TaskOK(agent("retell"), nil, textTask); !ok {
+	answerTask := &schemas.Task{ID: "q", Output: &schemas.OutputSpec{Kind: schemas.OutputAnswer}}
+	if ok, why := TaskOK(agent("retell"), nil, answerTask); !ok {
 		t.Errorf("with the driver wired, text runs: %q", why)
+	}
+	if ok, why := TaskOK(agent("vapi"), nil, textTask); ok || why != VoicePlatformAnswerOnly {
+		t.Errorf("a code change task: %v %q", ok, why)
+	}
+	if ok, why := TaskOK(agent("websocket"), nil, answerTask); ok || !strings.Contains(why, "only takes calls") {
+		t.Errorf("websocket text: %v %q", ok, why)
 	}
 }

@@ -55,7 +55,7 @@ func TaskOK(agent *schemas.AgentConfig, s *schemas.Suite, t *schemas.Task) (bool
 			return false, "it grades a " + outputWords(kind) + ", and the bare model only answers in text"
 		}
 	case isVoicePlatform(agent): // voiceplatform.go
-		return voicePlatformTaskOK(agent, t)
+		return voicePlatformTaskOK(agent, t, kind)
 	case isVoiceRTC(agent): // voicertc.go
 		return voiceRTCTaskOK(t)
 	}

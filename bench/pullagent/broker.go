@@ -212,6 +212,52 @@ func (b *Broker) Submit(c Claims, payload json.RawMessage, timeout time.Duration
 	return t, nil
 }
 
+// ServedBy is the client name of turns this server answers itself.
+const ServedBy = "heimdall-server"
+
+// SubmitServed queues a turn of run c that this server answers itself:
+// serve runs in its own goroutine with a context that ends at the turn's
+// deadline, and its answer (or error) ends the turn exactly as a serving
+// process's would, so the launcher reads it the same way (Wait). No
+// process needs to be connected.
+func (b *Broker) SubmitServed(c Claims, payload json.RawMessage, timeout time.Duration, serve func(ctx context.Context, payload json.RawMessage) (json.RawMessage, error)) (*Turn, error) {
+	if len(payload) > MaxTurnBytes {
+		return nil, ErrTooLarge
+	}
+	if timeout <= 0 {
+		timeout = DefaultTurnTimeout
+	}
+	timeout = min(timeout, MaxTurnTimeout)
+	b.mu.Lock()
+	now := b.now()
+	b.sweepLocked(now)
+	t := &Turn{ID: newID("turn_"), Agent: c.Agent, Run: c.Run, Payload: payload, Created: now, Deadline: now.Add(timeout),
+		org: c.Org, state: StateLeased, leasedBy: ServedBy, done: make(chan struct{})}
+	if exp := time.Unix(c.Exp, 0); exp.Before(t.Deadline) {
+		t.Deadline = exp
+	}
+	b.turns[t.ID] = t
+	deadline := t.Deadline
+	b.mu.Unlock()
+	go func() {
+		ctx, cancel := context.WithDeadline(context.Background(), deadline)
+		defer cancel()
+		answer, err := serve(ctx, payload)
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		switch {
+		case err != nil:
+			b.failLocked(t, err.Error())
+		case len(answer) > MaxAnswerBytes:
+			b.failLocked(t, "the answer is larger than the turn limit")
+		case t.state == StateLeased:
+			t.state, t.answer, t.finished = StateAnswered, append(json.RawMessage(nil), answer...), b.now()
+			close(t.done)
+		}
+	}()
+	return t, nil
+}
+
 func (b *Broker) wakeLocked(k agentKey) {
 	if ch, ok := b.notify[k]; ok {
 		close(ch)

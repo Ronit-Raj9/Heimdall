@@ -69,9 +69,68 @@ func (a *voicePlatformAdapter) BuildExecutionPlan(ctx context.Context, rc *schem
 // run container.
 func (a *voicePlatformAdapter) Cleanup(context.Context, *schemas.RunContext) error { return nil }
 
-// VoicePlatformTextReason refuses a text task in a container plan: a voice
-// platform agent answers text benchmarks through the conversation driver.
-const VoicePlatformTextReason = "a voice platform agent runs text benchmarks through the conversation driver, not a container; this run is not a voice call"
+// VoicePlatformTextReason refuses a text task the conversation driver
+// cannot run: one whose answer is not the agent's reply.
+const VoicePlatformTextReason = "a voice platform agent answers in words only, so it can run text benchmarks whose answer is its reply (no tools, no code changes)"
+
+// voiceTextAgent is the agent name on a voice text run's pull token.
+const voiceTextAgent = "voice-platform"
+
+// textPlan runs a text task through the pull launcher (pullagent.py): it
+// drives the conversation with the simulated customer turn by turn, and
+// this server answers each turn through the platform's chat API
+// (handlers/pullvoice.go), so the run's only route out is the server. The
+// signed run token names the voice_platform block; the platform's key
+// reaches the launcher as a {{secret.NAME}} reference and goes with each
+// turn in a header.
+func (a *voicePlatformAdapter) textPlan(rc *schemas.RunContext) (*schemas.RunPlan, error) {
+	spec := rc.Agent.VoicePlatform
+	if !voiceconnect.SupportsText(spec.Platform) {
+		return nil, fmt.Errorf("plan run %s: task %s is a text conversation, and a voice WebSocket endpoint only takes calls; run a voice benchmark", rc.Run.RunID, rc.Task.ID)
+	}
+	kind := utils.OutputKind(rc.Suite, rc.Task)
+	if kind != schemas.OutputAnswer {
+		return nil, fmt.Errorf("plan run %s: task %s (output %s): %s", rc.Run.RunID, rc.Task.ID, kind, VoicePlatformTextReason)
+	}
+	if rc.NoPaidTraffic {
+		return nil, fmt.Errorf("plan run %s: a smoke, scripted_upstream or agent check run cannot hold a hosted voice agent's own model calls to the scripted model", rc.Run.RunID)
+	}
+	instruction, err := readTaskFile(rc.Task, rc.Task.Instruction)
+	if err != nil {
+		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+	}
+	network := a.cfg.EvalNetwork
+	if network == "" && rc.Handle != nil {
+		network = rc.Handle.Network
+	}
+	if network == "" {
+		return nil, fmt.Errorf("plan run %s: no evaluation network", rc.Run.RunID)
+	}
+	plan, err := basePlan(rc, network)
+	if err != nil {
+		return nil, err
+	}
+	// timeout_s bounds one agent turn; the run gets its wall budget.
+	pull := &schemas.PullAgent{Tools: schemas.OpenAIToolsOff, TurnTimeoutS: spec.TimeoutS}
+	env := pullLauncherEnv(rc, pull, voiceTextAgent, plan.WallS, kind)
+	plan.Files = map[string]string{pullLauncherFile: pullLauncherSource, InstructionFile: instruction}
+	withConvHelper(plan)
+	if err := pullEnvVoice(a.cfg, rc, plan, env, voiceTextAgent, spec); err != nil {
+		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+	}
+	// The platform keeps the chat (server history): only the new message
+	// is sent each turn.
+	conv := &schemas.ConversationSpec{Driver: schemas.ConversationDriverBench, History: schemas.ConversationHistoryServer}
+	if _, err := conversationEnv(rc, conv, plan, env); err != nil {
+		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+	}
+	if spec.APIKeySecret != "" {
+		env[envVoicePlatformKey] = "{{secret." + spec.APIKeySecret + "}}"
+	}
+	plan.Env = env
+	plan.Argv = []string{"python3", "-I", pullLauncherFile}
+	return plan, nil
+}
 
 // Plan returns the bridge's plan. The API key never reaches argv or files:
 // BENCH_VOICE_PLATFORM_KEY holds a {{secret.NAME}} reference the engine
@@ -84,7 +143,7 @@ func (a *voicePlatformAdapter) Plan(ctx context.Context, rc *schemas.RunContext)
 	}
 	spec := rc.Agent.VoicePlatform
 	if !voice.IsVoiceTask(rc.Task) {
-		return nil, fmt.Errorf("plan run %s: task %s: %s", rc.Run.RunID, rc.Task.ID, VoicePlatformTextReason)
+		return a.textPlan(rc)
 	}
 	if !voiceconnect.SupportsAudio(spec.Platform) {
 		return nil, fmt.Errorf("plan run %s: task %s is a voice call and %s agents have no call WebSocket the bench can dial; run its text benchmarks instead", rc.Run.RunID, rc.Task.ID, voiceconnect.PlatformName(spec.Platform))

@@ -4,7 +4,9 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/maximhq/bifrost/bench/pullagent"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 	"github.com/maximhq/bifrost/bench/voice"
@@ -99,5 +101,44 @@ func TestVoicePlatformRefusals(t *testing.T) {
 	rc, cfg = voicePlatformFixture(t, nil)
 	if err := a(cfg).Validate(context.Background(), rc); err == nil {
 		t.Error("no block accepted")
+	}
+}
+
+// A text task of a voice platform agent runs through the pull launcher,
+// with the agent's voice_platform block on the signed run token (the
+// server answers each turn, handlers/pullvoice.go).
+func TestVoicePlatformTextPlan(t *testing.T) {
+	spec := &schemas.VoicePlatformAgent{Platform: "vapi", AgentID: "asst_1", APIKeySecret: "VAPI_KEY", TimeoutS: 45}
+	agent := &schemas.AgentConfig{ID: "acme-phone", Adapter: AdapterVoicePlatform, Image: "img", Model: "hosted",
+		Budgets: schemas.Budgets{WallS: 300}, VoicePlatform: spec}
+	rc, cfg := conversationRC(t, agent)
+	rc.Task.Output = &schemas.OutputSpec{Kind: schemas.OutputAnswer}
+	if _, err := newVoicePlatformAdapter(cfg).Plan(context.Background(), rc); err == nil || !strings.Contains(err.Error(), "pull.url") {
+		t.Fatalf("no pull URL: %v", err)
+	}
+	cfg.PullURL, cfg.OrgID = "https://heimdall.example.com/api/bench/pull/run", "org_a"
+	plan, err := newVoicePlatformAdapter(cfg).Plan(context.Background(), rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(plan.Argv, " ") != "python3 -I "+pullLauncherFile || len(plan.Egress) != 1 || plan.Egress[0] != "heimdall.example.com:443" {
+		t.Fatalf("argv %v egress %v", plan.Argv, plan.Egress)
+	}
+	if plan.Env[envVoicePlatformKey] != "{{secret.VAPI_KEY}}" || plan.Env["BENCH_CONV_HISTORY"] != schemas.ConversationHistoryServer ||
+		plan.Env["BENCH_CONV_USERS"] == "" || plan.Env[utils.EnvMCPServers] != "" || plan.Env["BENCH_PULL_TURN_S"] != "45" {
+		t.Fatalf("env %v", plan.Env)
+	}
+	c, err := pullagent.DefaultSigner().VerifyRun(plan.Env["BENCH_PULL_TOKEN"], time.Now())
+	if err != nil || c.Org != "org_a" || c.Voice == nil || c.Voice.AgentID != "asst_1" || c.Voice.Platform != "vapi" {
+		t.Fatalf("token claims %+v %v", c, err)
+	}
+	rc.Task.Output = &schemas.OutputSpec{Kind: schemas.OutputState}
+	if _, err := newVoicePlatformAdapter(cfg).Plan(context.Background(), rc); err == nil || !strings.Contains(err.Error(), VoicePlatformTextReason) {
+		t.Fatalf("state task: %v", err)
+	}
+	rc.Task.Output = &schemas.OutputSpec{Kind: schemas.OutputAnswer}
+	agent.VoicePlatform = &schemas.VoicePlatformAgent{Platform: "websocket", URL: "wss://voice.acme.example/twilio"}
+	if _, err := newVoicePlatformAdapter(cfg).Plan(context.Background(), rc); err == nil || !strings.Contains(err.Error(), "only takes calls") {
+		t.Fatalf("websocket text: %v", err)
 	}
 }

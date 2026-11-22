@@ -42,7 +42,9 @@ func endpointUnreachable(rc *schemas.RunContext) (*endpointLine, bool) {
 	if rc == nil || rc.Agent == nil || rc.Exec == nil || rc.Exec.ExitCode != endpointUnreachableExit || rc.Exec.StdoutPath == "" {
 		return nil, false
 	}
-	if rc.Agent.Remote == nil && !utils.IsOpenAIAgent(rc.Agent) {
+	// A voice platform agent's text run: the pull launcher reports the
+	// platform failing the same way (adapters/pullagent.py).
+	if rc.Agent.Remote == nil && !utils.IsOpenAIAgent(rc.Agent) && rc.Agent.VoicePlatform == nil {
 		return nil, false
 	}
 	f, err := os.Open(rc.Exec.StdoutPath)
