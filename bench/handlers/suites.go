@@ -17,6 +17,7 @@ import (
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/onboard"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
 )
@@ -154,15 +155,17 @@ func (h *SuitesHandler) ListSummaries(work context.Context) ([]schemas.SuiteSumm
 	if err != nil {
 		return nil, err
 	}
-	if h.hidden != nil {
-		kept := ids[:0:0]
-		for _, id := range ids {
-			if !h.hidden(id) {
-				kept = append(kept, id)
-			}
+	// A draft a hosted readiness run staged as draft-<set> is internal and
+	// short-lived (onboard.IsStagingSuite): never listed, so no picker built
+	// on this list (labelling, the evaluate wizard, drift monitors) offers it.
+	kept := ids[:0:0]
+	for _, id := range ids {
+		if onboard.IsStagingSuite(id) || (h.hidden != nil && h.hidden(id)) {
+			continue
 		}
-		ids = kept
+		kept = append(kept, id)
 	}
+	ids = kept
 	out := schemas.SuiteList{Suites: make([]schemas.SuiteSummary, len(ids))}
 	origin, _ := h.suites.(suiteOrigin)
 	if _, cached := h.suites.(suiteStamper); !cached {

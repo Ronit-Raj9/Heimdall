@@ -7,6 +7,7 @@ import {
 	capabilityCoverage,
 	controlRows,
 	filterOptions,
+	filterSuites,
 	filterTasks,
 	formatBytes,
 	leaderboardSuite,
@@ -15,6 +16,7 @@ import {
 	parseTaskSort,
 	probesByFamily,
 	sortTasks,
+	suiteCategory,
 } from "./suites.utils";
 
 const list = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../public/fixtures/suites.json"), "utf8")) as SuiteList;
@@ -120,5 +122,38 @@ describe("small helpers", () => {
 		expect(formatBytes(512, "en")).toBe("512 B");
 		expect(formatBytes(4210, "en")).toBe("4.1 KB");
 		expect(formatBytes(3 * 1024 * 1024, "en")).toBe("3 MB");
+	});
+});
+describe("filterSuites (My benchmarks toolbar)", () => {
+	const suites = [
+		{ id: "hd-swe-verified", description: "Real GitHub issues", builtin: true, source: "library" as const },
+		{ id: "hd-harbor-bfcl", description: "Function calling", builtin: true, source: "library" as const },
+		{ id: "zz-test-own", description: "Our support desk rows", track: "support" as const },
+		{ id: "team-misc", description: "Odd jobs" },
+	];
+	const none = { query: "", category: null, source: "all" as const };
+
+	it("keeps everything with no filters", () => {
+		expect(filterSuites(suites, none).map((s) => s.id)).toEqual(suites.map((s) => s.id));
+	});
+
+	it("searches the id, the display name and the description, ignoring case", () => {
+		expect(filterSuites(suites, { ...none, query: "ZZ-TEST" }).map((s) => s.id)).toEqual(["zz-test-own"]);
+		expect(filterSuites(suites, { ...none, query: "swe-bench verified" }).map((s) => s.id)).toEqual(["hd-swe-verified"]);
+		expect(filterSuites(suites, { ...none, query: "support desk" }).map((s) => s.id)).toEqual(["zz-test-own"]);
+		expect(filterSuites(suites, { ...none, query: "nothing like this" })).toEqual([]);
+	});
+
+	it("filters by category and by source", () => {
+		expect(filterSuites(suites, { ...none, category: "support" }).map((s) => s.id)).toEqual(["hd-harbor-bfcl", "zz-test-own"]);
+		expect(filterSuites(suites, { ...none, source: "builtin" }).map((s) => s.id)).toEqual(["hd-swe-verified", "hd-harbor-bfcl"]);
+		expect(filterSuites(suites, { ...none, source: "team" }).map((s) => s.id)).toEqual(["zz-test-own", "team-misc"]);
+	});
+
+	it("gives every benchmark a category: curated, then track, then other", () => {
+		expect(suiteCategory(suites[0])).toBe("coding");
+		expect(suiteCategory(suites[1])).toBe("support");
+		expect(suiteCategory(suites[2])).toBe("support");
+		expect(suiteCategory(suites[3])).toBe("other");
 	});
 });

@@ -12,7 +12,15 @@ export interface SourceChoice {
 	file?: File;
 }
 
-/** Step 1 of Add benchmark: one box that takes a link, a dropped file or pasted rows. */
+/** True when the box holds something to look inside: a link, a file or pasted rows (blank text is nothing). */
+export function sourceGiven({ link, rows, file }: { link: string; rows: string; file: File | null }): boolean {
+	return Boolean(file) || link.trim() !== "" || rows.trim() !== "";
+}
+
+/**
+ * Step 1 of Add benchmark: one box that takes a link, a dropped file or pasted rows. Look inside
+ * stays disabled until one is given, and the hint under it always says what to give.
+ */
 export function SourceBox({ busy, onSubmit, onClear }: { busy: boolean; onSubmit(c: SourceChoice): void; onClear?(): void }) {
 	const { t } = useTranslation("onboard");
 	const [link, setLink] = useState("");
@@ -22,6 +30,7 @@ export function SourceBox({ busy, onSubmit, onClear }: { busy: boolean; onSubmit
 	const [over, setOver] = useState(false);
 	const [error, setError] = useState("");
 	const pick = useRef<HTMLInputElement>(null);
+	const given = sourceGiven({ link, rows, file });
 	const submit = () => {
 		setError("");
 		const conn = connection.trim() || undefined;
@@ -42,7 +51,7 @@ export function SourceBox({ busy, onSubmit, onClear }: { busy: boolean; onSubmit
 					onChange={(e) => setLink(e.target.value)}
 					placeholder={t("source.linkPlaceholder")}
 					data-testid="onboard-link"
-					onKeyDown={(e) => e.key === "Enter" && submit()}
+					onKeyDown={(e) => e.key === "Enter" && given && submit()}
 				/>
 			</label>
 			<div
@@ -98,8 +107,14 @@ export function SourceBox({ busy, onSubmit, onClear }: { busy: boolean; onSubmit
 					{error}
 				</p>
 			)}
-			<div className="flex flex-wrap gap-2">
-				<Button onClick={submit} isLoading={busy} disabled={busy} dataTestId="onboard-inspect">
+			<div className="flex flex-wrap items-center gap-2">
+				<Button
+					onClick={submit}
+					isLoading={busy}
+					disabled={busy || !given}
+					dataTestId="onboard-inspect"
+					aria-describedby="onboard-source-hint"
+				>
 					{t("source.inspect")}
 				</Button>
 				{onClear && (
@@ -109,6 +124,9 @@ export function SourceBox({ busy, onSubmit, onClear }: { busy: boolean; onSubmit
 							setLink("");
 							setRows("");
 							setFile(null);
+							setConnection("");
+							setError("");
+							if (pick.current) pick.current.value = "";
 							onClear();
 						}}
 						dataTestId="onboard-clear"
@@ -117,6 +135,9 @@ export function SourceBox({ busy, onSubmit, onClear }: { busy: boolean; onSubmit
 					</Button>
 				)}
 			</div>
+			<p id="onboard-source-hint" className="text-muted-foreground text-xs" data-testid="onboard-source-hint">
+				{t("source.nothing")}
+			</p>
 		</div>
 	);
 }

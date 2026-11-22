@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { orderSuites, plainDescription, suiteDisplayDescription, suiteDisplayName, suiteSections } from "./suiteDisplay";
+import {
+	orderSuites,
+	plainDescription,
+	suiteDisplay,
+	suiteDisplayCategory,
+	suiteDisplayDescription,
+	suiteDisplayName,
+	suiteSections,
+} from "./suiteDisplay";
 
 describe("suiteDisplay", () => {
 	it("uses curated names and descriptions for known ids", () => {
@@ -10,8 +18,26 @@ describe("suiteDisplay", () => {
 		);
 	});
 
-	it("title-cases unknown ids", () => {
+	it("title-cases unknown built-in ids and ids without a summary", () => {
 		expect(suiteDisplayName("my_new-pack")).toBe("My New Pack");
+		expect(suiteDisplayName("my_new-pack", { builtin: true, source: "library" })).toBe("My New Pack");
+	});
+
+	it("shows a benchmark the team added exactly as its id was typed", () => {
+		expect(suiteDisplayName("zz-test-own", {})).toBe("zz-test-own");
+		expect(suiteDisplayName("zz-test-own", { builtin: false })).toBe("zz-test-own");
+		expect(suiteDisplay({ id: "zz-test-own", description: "" }).name).toBe("zz-test-own");
+		// A curated name still wins.
+		expect(suiteDisplayName("acme-team", {})).toBe("Team of agents");
+	});
+
+	it("names and groups the library ids the catalog lists", () => {
+		expect(suiteDisplayName("hd-harbor-bfcl", { builtin: true })).toBe("BFCL function calling");
+		expect(suiteDisplayCategory("hd-harbor-bfcl")).toBe("support");
+		expect(suiteDisplayCategory("tau2")).toBe("support");
+		expect(suiteDisplayCategory("hd-harbor-tb41-cpu")).toBe("terminal");
+		expect(suiteDisplayName("cheatbench-swe")).toBe("CheatBench SWE");
+		expect(suiteDisplayName("lhtb2")).toBe("Long-Horizon Terminal-Bench 2.0");
 	});
 
 	it("keeps only the first sentence with jargon stripped, cut near 90 characters", () => {
