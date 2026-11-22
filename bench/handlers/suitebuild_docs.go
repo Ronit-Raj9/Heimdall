@@ -25,3 +25,12 @@ func init() {
 			Auth:    AuthWrite, Request: ScenarioRowsRequest{}, Status: fasthttp.StatusCreated, Response: ScenarioRowsResult{}},
 	)
 }
+
+// Stateful mocks from OpenAPI (lane Y14): route docs.
+func init() {
+	APIRoutes = append(APIRoutes,
+		RouteDoc{Method: "POST", Path: APIPrefix + "/suites/{id}/mocks", Tag: "suites",
+			Summary: "Write services/<id>/ of a benchmark from an OpenAPI 3 file: a mock serving the same routes over HTTP and as MCP tools on seeded state it exports for checks.yaml; dry_run previews and writes nothing",
+			Auth:    AuthWrite, Request: SuiteMockRequest{}, Status: fasthttp.StatusCreated, Response: SuiteMockResult{}},
+	)
+}
