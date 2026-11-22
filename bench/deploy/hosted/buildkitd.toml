@@ -1,6 +1,22 @@
-# BuildKit settings of the shared worker's isolated builder
-# (docker-compose.yml, buildkitd): the private image registry beside it
-# speaks plain HTTP on the builder network. Only that host is trusted.
+# BuildKit settings of every org image build session on the shared worker
+# (cmd/bifrost-bench/buildsession.go, docs/hosting.md "Shared worker").
+#
+# The private image registry on the build network speaks plain HTTP and asks
+# for the read-only pull credentials the session passes; only that host is
+# trusted over HTTP.
 [registry."registry:5000"]
   http = true
   insecure = true
+
+# RUN steps share the session guard's network namespace, so they resolve
+# through Docker's embedded DNS (which follows the host's resolvers) under
+# the guard's egress rules. Without this, BuildKit would replace the
+# loopback resolver with public ones.
+[dns]
+  nameservers = ["127.0.0.11"]
+
+# Each org keeps its own build cache volume (heimdall-buildcache-<org>);
+# this caps it.
+[worker.oci]
+  gc = true
+  maxUsedSpace = "4GB"

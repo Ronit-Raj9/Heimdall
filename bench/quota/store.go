@@ -76,11 +76,12 @@ type dbStore struct {
 	killRead bool
 }
 
-// Normalize fills an empty runtime with runc.
+// Normalize fills an empty runtime with runsc (gVisor): an org never gets
+// runc without a server admin choosing it.
 func Normalize(l Limits) Limits {
 	l.Runtime = strings.TrimSpace(l.Runtime)
 	if l.Runtime == "" {
-		l.Runtime = RuntimeRunc
+		l.Runtime = RuntimeRunsc
 	}
 	return l
 }

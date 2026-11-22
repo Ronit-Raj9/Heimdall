@@ -292,10 +292,12 @@ on, which is every organization without its own quota row.
 | `HEIMDALL_SHARED_RUNNER_SECRET` | server and `shared-runner` | Secret the shared worker fetches its assignments with (`GET /api/bench/admin/pool/assignments`, no tokens in the answer) and claims one runner token per org with (`POST /api/bench/admin/pool/assignments/{org}/token`; each claim revokes that org's earlier token and is audited in the org's log). Empty turns the shared pool off. Generate with `openssl rand -hex 32`. |
 | `HEIMDALL_MASTER_KEY` | server | Base64 32-byte keystore key: provider keys are encrypted under it. `openssl rand -base64 32`. Losing it loses every stored key. Shared worker tokens are not stored readable: the server keeps only their hashes. |
 | `HEIMDALL_SERVER_ADMINS` | server | Comma-separated emails of server admins: quotas, image approval, kill switch. |
-| `HEIMDALL_SHARED_RUNTIME` | `shared-runner` | `auto` (default): every container runs under gVisor (`--runtime runsc`) when the Docker host has a `runsc` runtime, serving every org; without it the runner logs a warning, uses runc and serves only orgs whose runtime is `runc`. `runsc` refuses to start without gVisor; `runc` forces runc. |
-| `HEIMDALL_SHARED_BUILDKIT` | `shared-runner` | Address of the isolated BuildKit (`tcp://buildkitd:1234`, the `buildkitd` service of the profile). Images from org-written Dockerfiles build only there, never on the host daemon, and load as `org-<org id>/<tag>`. Empty refuses them (built-in and approved images still run). |
-| `HEIMDALL_BUILDKIT_APPARMOR` | `shared-runner` | AppArmor profile of the `buildkitd` container. Empty means unconfined. On hosts that restrict unprivileged user namespaces (Ubuntu 23.10 and later, `kernel.apparmor_restrict_unprivileged_userns=1`) rootless BuildKit cannot start and restarts in a loop; load the narrow `heimdall-buildkitd` profile once with `sudo sh deploy/hosted/install-buildkit-apparmor.sh`, set this to `heimdall-buildkitd` and run `upgrade.sh`. The profile grants user namespaces to that container only. |
-| `HEIMDALL_SHARED_REGISTRY` | `shared-runner` | The private image registry org builds take their base images from (`registry:5000`, the `registry` service of the profile; only that host is trusted over plain HTTP in `deploy/hosted/buildkitd.toml`). Empty leaves `FROM` lines alone, so `FROM bench/...` fails. |
+| `HEIMDALL_SHARED_RUNTIME` | `shared-runner` | `auto` (default): every container runs under gVisor (`--runtime runsc`), serving every org. `runsc`: gVisor, only orgs whose runtime is `runsc`. Without a `runsc` runtime on the Docker host the shared worker does not start (fail closed): install gVisor with `sudo sh deploy/hosted/install-gvisor.sh`. |
+| `HEIMDALL_SHARED_ALLOW_RUNC` | `shared-runner` | Operator override, empty by default. `1` lets the shared worker start under runc when the host has no gVisor (or with `HEIMDALL_SHARED_RUNTIME=runc`); it logs a warning on every start and then serves only orgs a server admin set to runtime `runc`. New orgs default to gVisor (`runsc`) and wait for a worker that has it. |
+| `HEIMDALL_BUILD_NETWORK` | `shared-runner` | The build network (fixed name, default `heimdall-buildnet`): the read-only registry, the shared worker and its image build sessions, nothing else. |
+| `HEIMDALL_BUILDKIT_APPARMOR` | `shared-runner` | AppArmor profile of each build session's BuildKit container. Empty means unconfined. On hosts that restrict unprivileged user namespaces (Ubuntu 23.10 and later, `kernel.apparmor_restrict_unprivileged_userns=1`) rootless BuildKit cannot start and restarts in a loop; load the narrow `heimdall-buildkitd` profile once with `sudo sh deploy/hosted/install-buildkit-apparmor.sh`, set this to `heimdall-buildkitd` and run `upgrade.sh`. The profile grants user namespaces to that container only. |
+| `HEIMDALL_SHARED_REGISTRY` | `shared-runner` | The private image registry org builds take their base images from (`registry:5000`, the read-only `registry` service of the profile; only that host is trusted over plain HTTP in `deploy/hosted/buildkitd.toml`). Empty leaves `FROM` lines alone, so `FROM bench/...` fails. |
+| `HEIMDALL_REGISTRY_AUTH_DIR` | `registry`, `shared-runner` | Folder outside the checkout with the registry's credentials and digest manifest. Empty: `bootstrap.sh`, `upgrade.sh` or `registry-sync.sh` picks `/var/lib/heimdall-registry-auth` (as root) or `~/.config/heimdall/registry-auth`, generates the credentials there and writes the path to `.env`. Delete one identity's two files to rotate it. |
 | `HEIMDALL_REGISTRY_DIR` | `registry` | Host folder for the registry's images, e.g. on the data disk. Empty: the `registry-data` Docker volume. |
 | `HEIMDALL_SHARED_PLATFORM_IMAGES` | `shared-runner` | Comma-separated images every org may pull (a trailing `/` or `:` is a prefix). Otherwise an org pulls only its approved, digest-pinned images. Org Dockerfiles take those without a registry host (and `bench/...`) from the private registry. |
 | `HEIMDALL_SHARED_GATEWAY_CONTAINER` | `shared-runner` | The gateway container every org network joins. Empty finds the compose project's `bifrost` service. |
@@ -324,15 +326,40 @@ Isolation between orgs on the shared host:
   agents, experiments, policies; never `.git`, `.heimdall/` state or the
   release log) is downloaded with that org's own runner token from
   `GET /api/bench/workers/project` before every lease.
-- Org Dockerfiles build on the rootless `buildkitd` service (no Docker socket,
-  its own network). BuildKit there cannot see images on the host daemon, so
-  the bench's own images (`FROM bench/coding-core-base:1`) and the operator's
-  platform images come from the `registry` service beside it: internal only
-  (builder network, no host port), `registry:2` pinned by digest, storage in
-  `HEIMDALL_REGISTRY_DIR` or the `registry-data` volume. The worker points
-  each such `FROM` at the registry with a named build context, so org
-  Dockerfiles stay unchanged; an image missing there fails the build before
-  it starts, naming the image and `registry-sync.sh`. Any other `FROM` must
+- Agents run under gVisor (`runsc`). The shared worker does not start on a
+  host without it unless the operator sets `HEIMDALL_SHARED_ALLOW_RUNC=1`
+  (logged on every start), and then serves only orgs a server admin set to
+  runtime `runc`. Install gVisor as root with
+  `sudo sh deploy/hosted/install-gvisor.sh` (`--check` only reports); it
+  registers runtime `runsc` with Docker, reloads Docker without restarting
+  containers and runs a test container under it. The admin Organizations
+  page shows each org's sandbox.
+- Every org Dockerfile builds in a build session of its own: a fresh
+  rootless BuildKit started for that build and removed afterwards (no Docker
+  socket, no shared daemon, process table or cache with another org's
+  build), one build at a time per org, with the org's own cache volume
+  `heimdall-buildcache-<org id>`. BuildKit runs inside the network namespace
+  of a small guard container (the runner image, `NET_ADMIN` only) whose
+  egress rules (`deploy/hosted/build-egress.sh`) refuse cloud metadata
+  (`169.254.169.254`, `168.63.129.16`), every private, link-local and
+  reserved IPv4 range (other compose services, the Docker host, the VPC)
+  and all IPv6 (`fd00:ec2::254`), and allow only the registry, the host's
+  DNS servers and the public internet (package installs). A session killed
+  before its cleanup is removed when the shared worker next starts.
+- BuildKit cannot see images on the host daemon, so the bench's own images
+  (`FROM bench/coding-core-base:1`) and the operator's platform images come
+  from the `registry` service on the build network: read only (its storage
+  is mounted read-only, deletes are off), pull credentials required, no host
+  port, `registry:2` pinned by digest, storage in `HEIMDALL_REGISTRY_DIR` or
+  the `registry-data` volume. Only `registry-sync.sh` writes: it starts
+  `registry-writer` (same storage, sync identity, on an internal network
+  nothing else joins) for the copy, removes it afterwards and records each
+  pushed image's digest in the manifest (`HEIMDALL_REGISTRY_AUTH_DIR/runner/manifest`).
+  The worker points each such `FROM` at the registry with a named build
+  context pinned by that digest (`registry:5000/bench/coding-core-base:1@sha256:...`),
+  so org Dockerfiles stay unchanged and a moved tag cannot change what a
+  build starts from; an image missing from the manifest or the registry
+  fails the build before it starts, naming the image and `registry-sync.sh`. Any other `FROM` must
   name an image BuildKit can pull itself. The built image is loaded into
   the host's Docker (`buildx --load`) for the run. Tags are
   namespaced per org (`org-<org id>/...`); an org cannot use or overwrite
@@ -433,10 +460,12 @@ each with a one-line meaning (`.env.example` has the same list):
 | Variable | Meaning |
 |---|---|
 | `HEIMDALL_SHARED_RUNNER_SECRET` | Secret of the shared worker (assignments and per-org token claims); empty turns the shared worker off. |
-| `HEIMDALL_SHARED_RUNTIME` | Container runtime of the shared worker: `auto`, `runsc` or `runc`. |
+| `HEIMDALL_SHARED_RUNTIME` | Container runtime of the shared worker: `auto` or `runsc` (gVisor, required). |
+| `HEIMDALL_SHARED_ALLOW_RUNC` | Operator override: `1` lets the shared worker run under runc without gVisor, for orgs set to runc only. Leave empty. |
 | `HEIMDALL_SHARED_SLOTS` | Runs at once per organization on the shared worker, capped by its own limit. |
-| `HEIMDALL_SHARED_BUILDKIT` | Address of the isolated BuildKit that builds images from org Dockerfiles. |
-| `HEIMDALL_SHARED_REGISTRY` | The private image registry beside that BuildKit (`registry:5000`) that org builds take bench and platform base images from. |
+| `HEIMDALL_BUILD_NETWORK` | Network of the shared worker's image build sessions and read-only registry (default `heimdall-buildnet`). |
+| `HEIMDALL_SHARED_REGISTRY` | The read-only private image registry (`registry:5000`) that org builds take bench and platform base images from, pinned by digest. |
+| `HEIMDALL_REGISTRY_AUTH_DIR` | Folder outside the checkout with that registry's credentials and digest manifest; empty picks one and writes it here. |
 | `HEIMDALL_REGISTRY_DIR` | Host folder (on the data disk) for that registry's images; empty is a Docker volume. |
 | `HEIMDALL_RUNNER_DIR` | Host folder of the shared worker's runs, releases and org projects; empty is `/var/lib/heimdall-shared-runner`. |
 | `HEIMDALL_SHARED_PLATFORM_IMAGES` | Images every organization may pull, comma-separated. |

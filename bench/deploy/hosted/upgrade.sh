@@ -13,8 +13,10 @@
 #   5. containers whose image or configuration changed are recreated, and
 #      containers of services no longer in the compose file (the retired
 #      demo-runner) are removed; wait for health
-#   6. with the shared worker running: its registry gets fresh copies of
-#      the base images (registry-sync.sh)
+#   6. with the shared worker running: its registry's credentials are
+#      generated when missing (outside the checkout, HEIMDALL_REGISTRY_AUTH_DIR)
+#      before the restart, and the registry gets fresh copies of the base
+#      images, pinned by digest (registry-sync.sh)
 #
 # Rollback, if the new version misbehaves (the previous commit is printed
 # at the start and the end of the run):
@@ -129,6 +131,10 @@ hc up -d --wait postgres
 if bench_has db; then
 	log "applying database migrations"
 	bench -- db migrate
+fi
+
+if [ -n "$shared" ]; then
+	ensure_registry_auth
 fi
 
 log "restarting changed services"

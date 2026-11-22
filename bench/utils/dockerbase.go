@@ -6,16 +6,20 @@ package utils
 // bench's own base images (bench/coding-core-base:1) or the operator's
 // platform images. The operator copies those into a private registry beside
 // the builder (deploy/hosted/registry-sync.sh), and the policy points every
-// such FROM at it with a named build context:
+// such FROM at it with a named build context, pinned by the digest the sync
+// recorded in the registry manifest (G3 B2):
 //
-//	--build-context bench/coding-core-base:1=docker-image://registry:5000/bench/coding-core-base:1
+//	--build-context bench/coding-core-base:1=docker-image://registry:5000/bench/coding-core-base:1@sha256:<digest>
 //
-// so an organization's Dockerfile stays unchanged. A base image missing from
-// the registry fails the build before it starts, naming the image.
+// so an organization's Dockerfile stays unchanged, and a tag moved in the
+// registry (by anyone) cannot change what another org's build starts from.
+// A base image missing from the manifest or the registry fails the build
+// before it starts, naming the image.
 
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -131,17 +135,54 @@ func (p *DockerPolicy) fromRegistry(ref string) bool {
 	return false
 }
 
-// RegistryHas reports whether the registry at host (host:port, plain HTTP
-// on the builder network) holds ref (name:tag, the tag defaults to latest).
-func RegistryHas(ctx context.Context, client *http.Client, host, ref string) (bool, error) {
-	name, tag := ref, "latest"
-	if i := strings.LastIndex(ref, ":"); i > strings.LastIndex(ref, "/") {
-		name, tag = ref[:i], ref[i+1:]
+// RegistryCredentials are the read-only pull credentials of the shared
+// worker's registry (deploy/hosted/registry-sync.sh writes them).
+type RegistryCredentials struct {
+	User, Password string
+}
+
+// ReadRegistryCredentials reads a "user:password" file (one line).
+func ReadRegistryCredentials(path string) (*RegistryCredentials, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("registry credentials: %w", err)
 	}
+	user, pw, ok := strings.Cut(strings.TrimSpace(string(raw)), ":")
+	if !ok || user == "" || pw == "" {
+		return nil, fmt.Errorf("registry credentials %s: want one line user:password", path)
+	}
+	return &RegistryCredentials{User: user, Password: pw}, nil
+}
+
+// splitRef splits name:tag, name@digest or name:tag@digest into the
+// repository name and the manifest reference (digest first, then tag, then
+// latest).
+func splitRef(ref string) (name, reference string) {
+	if n, d, ok := strings.Cut(ref, "@"); ok {
+		name, reference = n, d
+	} else {
+		name, reference = ref, "latest"
+		if i := strings.LastIndex(ref, ":"); i > strings.LastIndex(ref, "/") {
+			name, reference = ref[:i], ref[i+1:]
+		}
+		return name, reference
+	}
+	if i := strings.LastIndex(name, ":"); i > strings.LastIndex(name, "/") {
+		name = name[:i]
+	}
+	return name, reference
+}
+
+// RegistryHas reports whether the registry at host (host:port, plain HTTP
+// on the build network) holds ref (name:tag, name@digest or
+// name:tag@digest; the tag defaults to latest). cred, when set, is sent as
+// basic authentication.
+func RegistryHas(ctx context.Context, client *http.Client, host, ref string, cred *RegistryCredentials) (bool, error) {
+	name, reference := splitRef(ref)
 	if client == nil {
 		client = &http.Client{Timeout: 10 * time.Second}
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, "http://"+host+"/v2/"+name+"/manifests/"+tag, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, "http://"+host+"/v2/"+name+"/manifests/"+reference, nil)
 	if err != nil {
 		return false, err
 	}
@@ -149,6 +190,9 @@ func RegistryHas(ctx context.Context, client *http.Client, host, ref string) (bo
 		"application/vnd.oci.image.index.v1+json", "application/vnd.oci.image.manifest.v1+json",
 		"application/vnd.docker.distribution.manifest.list.v2+json", "application/vnd.docker.distribution.manifest.v2+json",
 	}, ", "))
+	if cred != nil {
+		req.SetBasicAuth(cred.User, cred.Password)
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return false, fmt.Errorf("image registry %s: %w", host, err)
@@ -159,13 +203,64 @@ func RegistryHas(ctx context.Context, client *http.Client, host, ref string) (bo
 		return true, nil
 	case http.StatusNotFound:
 		return false, nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return false, fmt.Errorf("image registry %s: %s for %s: the worker's pull credentials were refused (HEIMDALL_SHARED_REGISTRY_AUTH; registry-sync.sh writes them)", host, resp.Status, ref)
 	}
 	return false, fmt.Errorf("image registry %s: %s for %s", host, resp.Status, ref)
 }
 
+// digestRe is a sha256 image digest.
+var digestRe = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+
+// ErrNotPinned marks a base image the registry manifest has no digest for.
+var ErrNotPinned = errors.New("not in the registry manifest")
+
+// ReadRegistryManifest reads the registry manifest registry-sync.sh writes:
+// one "<ref> <sha256 digest>" per line, # comments and blank lines ignored,
+// a later line for the same ref winning. It maps each ref (as org
+// Dockerfiles write it) to the digest the sync pushed.
+func ReadRegistryManifest(path string) (map[string]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("registry manifest: %w", err)
+	}
+	defer f.Close()
+	out := map[string]string{}
+	sc := bufio.NewScanner(f)
+	for n := 1; sc.Scan(); n++ {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) != 2 || !digestRe.MatchString(fields[1]) || strings.Contains(fields[0], "@") {
+			return nil, fmt.Errorf("registry manifest %s line %d: want \"<image> sha256:<64 hex>\"", path, n)
+		}
+		out[fields[0]] = fields[1]
+	}
+	return out, sc.Err()
+}
+
+// ManifestPins returns a DockerPolicy.Pinned function over the manifest at
+// path, read again on every call so a sync takes effect without a restart.
+func ManifestPins(path string) func(ref string) (string, error) {
+	return func(ref string) (string, error) {
+		m, err := ReadRegistryManifest(path)
+		if err != nil {
+			return "", err
+		}
+		d, ok := m[ref]
+		if !ok {
+			return "", ErrNotPinned
+		}
+		return d, nil
+	}
+}
+
 // baseContexts are the named build contexts that point an org build's
-// bench and platform base images at the registry, or an error wrapping
-// ErrPolicy that names a base image the registry lacks.
+// bench and platform base images at the registry, each pinned by the
+// digest of the registry manifest, or an error wrapping ErrPolicy that
+// names a base image the manifest or the registry lacks.
 func (p *DockerPolicy) baseContexts(dockerfile string, buildArgs map[string]string) ([]string, error) {
 	if p.Registry == "" {
 		return nil, nil
@@ -179,16 +274,27 @@ func (p *DockerPolicy) baseContexts(dockerfile string, buildArgs map[string]stri
 		if !p.fromRegistry(ref) {
 			continue
 		}
+		if p.Pinned == nil {
+			return nil, fmt.Errorf("%w: base image %s: this worker has no registry manifest to pin it by digest (HEIMDALL_SHARED_REGISTRY_MANIFEST); ask the operator to run deploy/hosted/registry-sync.sh", ErrPolicy, ref)
+		}
+		digest, err := p.Pinned(ref)
+		switch {
+		case errors.Is(err, ErrNotPinned):
+			return nil, fmt.Errorf("%w: base image %s is not in the shared worker's image registry; ask the operator to copy it there (deploy/hosted/registry-sync.sh %s)", ErrPolicy, ref, ref)
+		case err != nil:
+			return nil, fmt.Errorf("%w: base image %s: %v", ErrPolicy, ref, err)
+		}
+		pinned := ref + "@" + digest
 		if p.RegistryHas != nil {
-			ok, err := p.RegistryHas(ref)
+			ok, err := p.RegistryHas(pinned)
 			if err != nil {
 				return nil, fmt.Errorf("%w: base image %s: %v", ErrPolicy, ref, err)
 			}
 			if !ok {
-				return nil, fmt.Errorf("%w: base image %s is not in the shared worker's image registry; ask the operator to copy it there (deploy/hosted/registry-sync.sh %s)", ErrPolicy, ref, ref)
+				return nil, fmt.Errorf("%w: base image %s (%s) is not in the shared worker's image registry any more; ask the operator to copy it there again (deploy/hosted/registry-sync.sh %s)", ErrPolicy, ref, digest, ref)
 			}
 		}
-		out = append(out, "--build-context", ref+"=docker-image://"+p.Registry+"/"+ref)
+		out = append(out, "--build-context", ref+"=docker-image://"+p.Registry+"/"+pinned)
 	}
 	return out, nil
 }

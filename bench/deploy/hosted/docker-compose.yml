@@ -20,8 +20,12 @@
 #             never published.
 #   upstream  shared-runner profile only: Bifrost, its Postgres and the fault
 #             proxy, which reaches the real provider.
-#   builder   shared-runner profile only: the isolated BuildKit, its image
-#             registry and the shared worker.
+#   buildnet  shared-runner profile only (fixed name heimdall-buildnet): the
+#             read-only image registry, the shared worker and its image
+#             build sessions, whose egress rules allow only that registry
+#             and the public internet.
+#   registrysync  internal: the registry's write side and the registry-sync
+#             tool, only while registry-sync.sh copies images.
 #   evalnet   shared-runner profile only, internal, IPv6 off: Bifrost's
 #             default eval network (each org gets its own, see below).
 #
@@ -59,10 +63,21 @@ networks:
   gatewaylogs:
     internal: true
     labels: *labels
-  builder:
-    # shared-runner profile: the isolated BuildKit, its image registry and
-    # the shared runner only. Not internal (base images are pulled), but no
-    # Heimdall service, database or gateway is on it.
+  buildnet:
+    # shared-runner profile: the read-only image registry, the shared runner
+    # and its image build sessions (each a guard plus a fresh BuildKit,
+    # started by the runner per org build; cmd/bifrost-bench/buildsession.go).
+    # Not internal (packages are installed from the internet), but no
+    # Heimdall service, database or gateway is on it, and each session's
+    # guard refuses private, link-local and metadata addresses
+    # (build-egress.sh). Fixed name: the runner starts sessions on it.
+    name: ${HEIMDALL_BUILD_NETWORK:-heimdall-buildnet}
+    enable_ipv6: false
+    labels: *labels
+  registrysync:
+    # registry-sync profile: the registry's write side and the sync tool.
+    # Nothing else joins it, and it has no route out.
+    internal: true
     enable_ipv6: false
     labels: *labels
   evalnet:
@@ -88,8 +103,6 @@ volumes:
   bifrost-data:
     labels: *labels
   faultproxy-ledger:
-    labels: *labels
-  buildkit-state:
     labels: *labels
   # The shared worker's image registry, unless HEIMDALL_REGISTRY_DIR names
   # a host folder (on the data disk) instead.
@@ -303,58 +316,66 @@ services:
   # every org whose limits allow the shared pool, one worker loop per org.
   # Needs HEIMDALL_SHARED_RUNNER_SECRET on both sides.
   #   docker compose ... --profile shared-runner up -d
-  # Isolation between orgs (docs/hosting.md "Shared runner pool"):
-  #   - containers run under gVisor (runsc) when the host has it
-  #     (HEIMDALL_SHARED_RUNTIME=auto, the default), with a loud warning
-  #     when it does not;
-  #   - org Dockerfiles build only on buildkitd below (no host socket, own
-  #     network), loaded as org-<id>/<tag>; pulls only of approved images;
+  # Isolation between orgs (docs/hosting.md "Shared worker"):
+  #   - containers run under gVisor (runsc); without it the runner does not
+  #     start unless the operator sets HEIMDALL_SHARED_ALLOW_RUNC
+  #     (install-gvisor.sh installs it);
+  #   - org Dockerfiles build in a build session of their own: a fresh
+  #     rootless BuildKit per build behind egress rules, one build at a time
+  #     per org, with the org's own cache volume (no host socket for
+  #     BuildKit); images load as org-<id>/<tag>; pulls only of approved
+  #     images;
   #   - their bench and platform base images (FROM bench/...) come from the
-  #     registry below, filled by deploy/hosted/registry-sync.sh;
+  #     read-only registry below, pinned by the digests registry-sync.sh
+  #     records;
   #   - each org's agents get their own internal network;
   #   - no server data is mounted: each org's project is downloaded with
   #     that org's own runner token, into HEIMDALL_RUNNER_DIR/projects/<org>.
-  buildkitd:
-    profiles: [shared-runner]
-    image: moby/buildkit:v0.35.0-rootless@sha256:5987568f92dafbfb679879de59c1cd8d26597f5f6635c314e166164e2615870c
-    labels: *labels
-    <<: *logging
-    # Rootless BuildKit: no Docker socket, no host paths, its own network.
-    # It needs an unconfined seccomp profile and an AppArmor profile that
-    # allows user namespaces, but holds no privilege over the host daemon.
-    # Hosts that restrict unprivileged user namespaces (Ubuntu 23.10 and
-    # later) need the heimdall-buildkitd profile: install it with
-    # install-buildkit-apparmor.sh and set HEIMDALL_BUILDKIT_APPARMOR.
-    security_opt: ["seccomp=unconfined", "apparmor=${HEIMDALL_BUILDKIT_APPARMOR:-unconfined}", "systempaths=unconfined"]
-    command: ["--addr", "tcp://0.0.0.0:1234", "--oci-worker-no-process-sandbox"]
-    volumes:
-      - buildkit-state:/home/user/.local/share/buildkit
-      # Trusts the registry below over plain HTTP, that host only.
-      - ./buildkitd.toml:/home/user/.config/buildkit/buildkitd.toml:ro
-    networks: [builder]
-    restart: unless-stopped
 
-  # The shared worker's private image registry: the bench and operator
-  # platform images that org Dockerfiles build FROM, which the isolated
-  # BuildKit cannot see on the host daemon. Internal only: on the builder
-  # network, no host port. deploy/hosted/registry-sync.sh fills it.
+  # The shared worker's private image registry as org builds see it: the
+  # bench and operator platform images that org Dockerfiles build FROM,
+  # which a build session's BuildKit cannot see on the host daemon. Read
+  # only (registry/config-read.yml, storage mounted read-only), pull
+  # credentials required, on the build network, no host port. Only
+  # registry-sync.sh writes, through registry-writer.
   registry:
     profiles: [shared-runner]
     image: registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
     labels: *labels
     <<: [*hardening, *logging]
-    environment:
-      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    # Reads the credential files (mode 0640, group of the Docker socket).
+    group_add: ["${HEIMDALL_DOCKER_GID:-0}"]
     volumes:
-      - ${HEIMDALL_REGISTRY_DIR:-registry-data}:/var/lib/registry
+      - ${HEIMDALL_REGISTRY_DIR:-registry-data}:/var/lib/registry:ro
+      - ./registry/config-read.yml:/etc/docker/registry/config.yml:ro
+      - ${HEIMDALL_REGISTRY_AUTH_DIR:-/var/lib/heimdall-registry-auth}/registry:/auth:ro
     tmpfs:
       - /tmp
-    networks: [builder]
+    networks:
+      buildnet:
+        aliases: [registry]
     restart: unless-stopped
 
+  # The registry's write side: started by registry-sync.sh only while it
+  # copies images, stopped afterwards. On the registrysync network only,
+  # with the sync identity's credentials (registry/config-write.yml).
+  registry-writer:
+    profiles: [registry-sync]
+    image: registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+    labels: *labels
+    <<: [*hardening, *logging]
+    group_add: ["${HEIMDALL_DOCKER_GID:-0}"]
+    volumes:
+      - ${HEIMDALL_REGISTRY_DIR:-registry-data}:/var/lib/registry
+      - ./registry/config-write.yml:/etc/docker/registry/config.yml:ro
+      - ${HEIMDALL_REGISTRY_AUTH_DIR:-/var/lib/heimdall-registry-auth}/writer:/auth:ro
+    tmpfs:
+      - /tmp
+    networks: [registrysync]
+
   # Tool, never started by `up`: deploy/hosted/registry-sync.sh pipes a
-  # `docker save` of a host image into it and it pushes the image to the
-  # registry above over the builder network.
+  # `docker save` of a host image into it and it pushes the image to
+  # registry-writer over the registrysync network with the sync identity.
   registry-sync:
     profiles: [registry-sync]
     image: gcr.io/go-containerregistry/crane:debug@sha256:e78770b31258a3846f878036d9c1f63fbe4c871f9f56990bf77fd95c013e3c1b
@@ -363,7 +384,9 @@ services:
     # The image is staged in the container's own layer (on disk, not RAM)
     # and goes with the container.
     entrypoint: ["/busybox/sh", "-c"]
-    networks: [builder]
+    volumes:
+      - ${HEIMDALL_REGISTRY_AUTH_DIR:-/var/lib/heimdall-registry-auth}/sync:/auth:ro
+    networks: [registrysync]
 
   shared-runner:
     profiles: [shared-runner]
@@ -396,6 +419,9 @@ services:
       HOME: /tmp
       HEIMDALL_SHARED_RUNNER_SECRET: ${HEIMDALL_SHARED_RUNNER_SECRET:-}
       HEIMDALL_SHARED_RUNTIME: ${HEIMDALL_SHARED_RUNTIME:-auto}
+      # Operator override, logged on every start: run under runc when the
+      # host has no gVisor, serving only orgs a server admin set to runc.
+      HEIMDALL_SHARED_ALLOW_RUNC: ${HEIMDALL_SHARED_ALLOW_RUNC:-}
       HEIMDALL_SHARED_SLOTS: ${HEIMDALL_SHARED_SLOTS:-1}
       HEIMDALL_BENCH_DIR: ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}
       BENCH_RUNS_ROOT: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}/runs
@@ -411,8 +437,19 @@ services:
       BENCH_GATEWAY_ORG_SLOTS_PER_PROVIDER: ${HEIMDALL_PROVIDER_SLOTS:-32}
       BENCH_RUNNER_DISK_MIN_FREE_GB: ${HEIMDALL_RUNNER_MIN_FREE_GB:-10}
       HEIMDALL_SHARED_PROJECTS_MIRROR: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}/projects
-      HEIMDALL_SHARED_BUILDKIT: ${HEIMDALL_SHARED_BUILDKIT:-tcp://buildkitd:1234}
+      # Image build sessions (cmd/bifrost-bench/buildsession.go): one fresh
+      # rootless BuildKit per org build, in the network namespace of a guard
+      # (this image, NET_ADMIN only) that installs the egress rules.
+      HEIMDALL_BUILDKIT_IMAGE: moby/buildkit:v0.35.0-rootless@sha256:5987568f92dafbfb679879de59c1cd8d26597f5f6635c314e166164e2615870c
+      HEIMDALL_BUILD_GUARD_IMAGE: ${HEIMDALL_RUNNER_IMAGE:-heimdall/runner:local}
+      HEIMDALL_BUILD_NETWORK: ${HEIMDALL_BUILD_NETWORK:-heimdall-buildnet}
+      HEIMDALL_BUILDKIT_APPARMOR: ${HEIMDALL_BUILDKIT_APPARMOR:-}
+      HEIMDALL_BUILDKIT_CONFIG: ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}/deploy/hosted/buildkitd.toml
       HEIMDALL_SHARED_REGISTRY: ${HEIMDALL_SHARED_REGISTRY:-registry:5000}
+      # Read-only pull credentials and the digest manifest, both written by
+      # registry-sync.sh into HEIMDALL_REGISTRY_AUTH_DIR/runner.
+      HEIMDALL_SHARED_REGISTRY_AUTH: /run/heimdall-registry/pull.auth
+      HEIMDALL_SHARED_REGISTRY_MANIFEST: /run/heimdall-registry/manifest
       HEIMDALL_SHARED_GATEWAY_CONTAINER: ${HEIMDALL_SHARED_GATEWAY_CONTAINER:-}
       HEIMDALL_SHARED_PLATFORM_IMAGES: ${HEIMDALL_SHARED_PLATFORM_IMAGES:-}
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
@@ -428,16 +465,15 @@ services:
       # its host path so runners hand task folders to the host's Docker
       # unchanged. Unset binds /dev/null over itself: no library, as before.
       - ${HEIMDALL_LIBRARY_DIR:-/dev/null}:${HEIMDALL_LIBRARY_DIR:-/dev/null}:ro
+      - ${HEIMDALL_REGISTRY_AUTH_DIR:-/var/lib/heimdall-registry-auth}/runner:/run/heimdall-registry:ro
     tmpfs:
       - /tmp
-    networks: [edge, upstream, builder]
+    networks: [edge, upstream, buildnet]
     depends_on:
       heimdall:
         condition: service_healthy
       bifrost:
         condition: service_healthy
-      buildkitd:
-        condition: service_started
       registry:
         condition: service_started
     restart: unless-stopped

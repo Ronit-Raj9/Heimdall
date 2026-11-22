@@ -6,7 +6,7 @@ import type { AdminOrg } from "@/lib/types/admin";
 import { describe, expect, it, vi } from "vitest";
 import { setQuotaRequest } from "@/lib/store/apis/adminApi";
 import AdminView, { adminTab } from "./adminView";
-import { AdminImagesPanel, AdminOrgsPanel, QuotaEditor } from "./adminPanels";
+import { AdminImagesPanel, AdminOrgsPanel, QuotaEditor, RuntimeBadge } from "./adminPanels";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock); // G15: empty states link out
 const tab = vi.hoisted(() => ({ value: null as string | null }));
@@ -68,11 +68,26 @@ describe("AdminView", () => {
 		for (const key of ["users", "orgs", "images", "usage", "containers"]) expect(html).toContain(`data-testid="admin-tab-${key}"`);
 	});
 
+	it("shows each org's sandbox and warns before runc", () => {
+		const runc: AdminOrg = { ...ORG, slug: "beta", quota: { ...ORG.quota!, runtime: "runc" } };
+		const row = render(<RuntimeBadge runtime="runc" testId="rt" />, admin());
+		expect(row).toContain("runc");
+		expect(row).toContain("HEIMDALL_SHARED_ALLOW_RUNC");
+		expect(render(<RuntimeBadge runtime="runsc" />, admin())).toContain("gVisor");
+		const editor = render(<QuotaEditor org={runc} onClose={() => undefined} />, admin());
+		expect(editor).toContain('data-testid="quota-runc-warning"');
+		expect(render(<QuotaEditor org={ORG} onClose={() => undefined} />, admin())).not.toContain('data-testid="quota-runc-warning"');
+		// An org without limits gets gVisor in the editor too.
+		const bare = render(<QuotaEditor org={{ ...ORG, quota: undefined }} onClose={() => undefined} />, admin());
+		expect(bare).not.toContain('data-testid="quota-runc-warning"');
+	});
+
 	it("lists orgs with their quota and edits it", () => {
 		const html = render(<AdminOrgsPanel />, admin());
 		expect(html).toContain('data-testid="admin-org-acme"');
 		expect(html).toContain("4 at once, 40 a day, $12 a day");
 		expect(html).toContain("gVisor");
+		expect(html).toContain('data-testid="admin-org-runtime-acme"');
 		const editor = render(<QuotaEditor org={ORG} onClose={() => undefined} />, admin());
 		expect(editor).toContain('data-testid="quota-save"');
 		expect(editor).toMatch(/data-testid="quota-max-concurrent"[^>]*value="4"|value="4"[^>]*data-testid="quota-max-concurrent"/);

@@ -12,7 +12,9 @@
 #      HEIMDALL_MASTER_KEY is generated when missing, never replaced.
 #   2. build the server image; --no-build uses the images already there
 #      (HEIMDALL_IMAGE). The shared worker (profile shared-runner) is set up
-#      separately: docs/hosting.md, Shared worker
+#      separately: docs/hosting.md, Shared worker. With
+#      HEIMDALL_SHARED_RUNNER_SECRET set, its image registry's credentials
+#      are generated here too (outside the checkout, HEIMDALL_REGISTRY_AUTH_DIR)
 #   3. start Postgres, apply database migrations (bifrost-bench db migrate)
 #   4. first owner account and its organization (bifrost-bench user
 #      create); the generated password is printed once
@@ -80,6 +82,10 @@ if [ -z "$build" ]; then
 else
 	log "building the server image (first build takes a few minutes: npm ci, vite, go build)"
 	hc build heimdall
+fi
+
+if [ -n "$(env_get HEIMDALL_SHARED_RUNNER_SECRET)" ]; then
+	ensure_registry_auth
 fi
 
 # 3. Database.
