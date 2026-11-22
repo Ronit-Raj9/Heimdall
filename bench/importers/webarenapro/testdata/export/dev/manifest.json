@@ -1,0 +1,3 @@
+{"schema_version":1,"split":"dev","runtime_image":"bench/webarena-pro-runtime:test","tasks":[
+{"task":"webarena-pro-dev-001","task_id":"001","config_sha256":"aa","images":{"flight-search":"webarenapro/flight-search@sha256:00"}},
+{"task":"webarena-pro-dev-002","task_id":"002","config_sha256":"bb","images":{"x-lite":"webarenapro/x-lite@sha256:11"}}]}

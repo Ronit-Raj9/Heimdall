@@ -1,0 +1,4 @@
+{"schema_version":1,"task":{"intent":"Which city and airline?","sites":["flight-search"],"task_id":"001","eval":{"operator":"AND","nodes":[
+{"id":"r1","type":"tiered","eval_config":{"strategies":[{"tier":0,"type":"answer_match","config":{"must_include":["Osaka"]}},{"tier":2,"type":"llm_judge","config":{}}]}},
+{"id":"r2","type":"tiered","eval_config":{"strategies":[{"tier":0,"type":"answer_match","config":{"must_include_any":["Jeju","7C6024"]}}]}}]}},
+"urls":{"flight-search":"http://flight-search:80"},"images":{"flight-search":"webarenapro/flight-search@sha256:00"},"setup_timeout":1800}

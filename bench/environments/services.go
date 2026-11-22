@@ -3,6 +3,10 @@ package environments
 import (
 	"archive/tar"
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -505,7 +509,7 @@ func (e *dockerWorkspace) createService(ctx context.Context, rc *schemas.RunCont
 func serviceEnv(rc *schemas.RunContext, spec schemas.ServiceSpec) map[string]string {
 	env := map[string]string{}
 	for k, v := range spec.Env {
-		env[k] = v
+		env[k] = strings.ReplaceAll(v, ServiceSecretVar, runServiceSecret(rc))
 	}
 	if simuser.SimulatorBacked(spec) { // W3 customer support: the effective user simulator settings win over the spec's
 		for k, v := range simuser.ServiceEnv(simuser.Effective(rc.Suite, rc.Experiment)) {
@@ -1050,3 +1054,30 @@ func toolProxyContainer(runID string) string { return "bench-tp-" + runID }
 func toolProxyLedgerVolume(runID string) string { return "bench-tpl-" + runID }
 
 func toolProxyCfgVolume(runID string) string { return "bench-tpc-" + runID }
+
+// ServiceSecretVar in a service's env value is replaced by a secret made
+// for the run: the same value in every service of one run, a different one
+// in every run, never written to the task or the run folder. Services that
+// share a private token (an evaluation hook between two containers) use it
+// so no token value sits in task.yaml.
+const ServiceSecretVar = "{{run.service_secret}}"
+
+var serviceSecretSalt = func() []byte {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		panic("environments: no randomness for the service secret: " + err.Error())
+	}
+	return b
+}()
+
+// runServiceSecret is HMAC-SHA256(process salt, run id), hex: stable within
+// a run (and across its services) and unguessable from the run id.
+func runServiceSecret(rc *schemas.RunContext) string {
+	id := ""
+	if rc != nil && rc.Run != nil {
+		id = rc.Run.RunID
+	}
+	m := hmac.New(sha256.New, serviceSecretSalt)
+	m.Write([]byte(id))
+	return hex.EncodeToString(m.Sum(nil))[:40]
+}
