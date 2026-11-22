@@ -27,12 +27,17 @@
 		"samples": "First rows (e-mail addresses and phone numbers hidden)",
 		"warnings": "Warnings",
 		"needs": "Needs",
-		"estimate": "About {{tasks}} tasks, {{runs}} readiness runs, {{judge}} judge calls. Drafting makes no model call.",
+		"estimate": "About {{tasks}} tasks and {{runs}} readiness runs. Readiness runs replay fixed answers on a worker with no model, so they cost nothing. Drafting makes no model call.",
+		"estimateJudge": "Rubric grading adds {{judge}} judge calls, paid on your own model key.",
 		"noSamples": "No sample to show."
 	},
 	"plan": {
 		"suite": "Benchmark id",
 		"suiteHint": "A new id creates a private benchmark; an existing one adds tasks to it.",
+		"suiteInvalid": "Use 1 to 64 lowercase letters, digits, '.', '_' or '-', starting with a letter or digit.",
+		"suiteBuiltin": "{{id}} is a built-in benchmark and cannot be changed. Pick a new id.",
+		"suiteExisting": "Adds tasks to your benchmark {{id}} ({{count}} tasks now).",
+		"suiteNew": "Creates a new private benchmark {{id}}.",
 		"grader": "How answers are graded",
 		"exact": "Exact answer (no model)",
 		"judge": "Rubric judge (a pinned model)",

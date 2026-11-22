@@ -107,6 +107,7 @@ export function SuiteTaskTable({
             <TableRow
               key={task.id}
               data-testid={`suites-task-row-${task.id}`}
+              data-task-id={task.id}
               data-state={selected === task.id ? "selected" : undefined}
               className={cn(selected === task.id && "bg-muted/60")}
             >

@@ -169,3 +169,47 @@ external:
 		t.Fatal("experiment external always was accepted")
 	}
 }
+
+// TestLintMCPLiveNoCassetteWarning (N115): an MCP server under test is always
+// called live and never replayed, so the lint does not warn about live mode
+// or a missing cassette for it; an empty allowlist still warns, and the
+// warning says which entry an MCP server needs.
+func TestLintMCPLiveNoCassetteWarning(t *testing.T) {
+	benchRoot, _ := copyPack(t)
+	mcp := schemas.ExternalAPI{ID: "shop", BaseURL: "https://mcp.shop.test/mcp", MCP: true, Mode: schemas.ExternalLive,
+		Allow: []schemas.ExternalAllow{{Methods: []string{"POST", "DELETE"}, PathPrefix: "/"}}}
+	externalProblems := func(edit func(s *schemas.Suite)) []Problem {
+		t.Helper()
+		s := loadMini(t, benchRoot)
+		edit(s)
+		var found []Problem
+		for _, p := range Lint(s) {
+			if strings.Contains(p.Message, "external") {
+				found = append(found, p)
+			}
+		}
+		return found
+	}
+	if found := externalProblems(func(s *schemas.Suite) { s.External = []schemas.ExternalAPI{mcp} }); len(found) > 0 {
+		t.Fatalf("live MCP server with an allowlist: unexpected problems %+v", found)
+	}
+	bare := mcp
+	bare.Allow = nil
+	found := externalProblems(func(s *schemas.Suite) { s.External = []schemas.ExternalAPI{bare} })
+	if len(found) != 1 || found[0].Severity != SeverityWarning || !strings.Contains(found[0].Message, "refuses every call") ||
+		!strings.Contains(found[0].Message, "{methods: [POST, DELETE], path_prefix: /}") {
+		t.Fatalf("live MCP server without an allowlist: problems %+v, want one reworded allow warning", found)
+	}
+	// A plain HTTP API in live mode keeps both warnings.
+	plain := acmeAPI("")
+	plain.Mode = schemas.ExternalLive
+	found = externalProblems(func(s *schemas.Suite) { s.External = []schemas.ExternalAPI{plain} })
+	var live, cassette bool
+	for _, p := range found {
+		live = live || strings.Contains(p.Message, "admission never runs it")
+		cassette = cassette || strings.Contains(p.Message, "cassette: not set")
+	}
+	if !live || !cassette {
+		t.Fatalf("live HTTP api: problems %+v, want the live and cassette warnings", found)
+	}
+}

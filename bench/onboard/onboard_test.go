@@ -369,3 +369,29 @@ func TestPublishRecordsDatasetVersion(t *testing.T) {
 		}
 	}
 }
+
+// TestRowsInventoryNoWrongAnswerWarning (N47): rows without a wrong answer get
+// a plain warning that says what Heimdall does and what the user can add, and
+// the estimate counts six readiness runs per task.
+func TestRowsInventoryNoWrongAnswerWarning(t *testing.T) {
+	env := testEnv(t)
+	data := "question,answer\nWhat is the hotel cap per night?,250\nHow many vacation days do new staff get?,20\nWhich form files an expense?,EXP-7\n"
+	inv, err := Inspect(context.Background(), env, Input{Data: data, Name: "faq.csv"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inv.Estimate.Tasks != 3 || inv.Estimate.ReadinessRuns != 18 || inv.Estimate.JudgeCalls != 0 {
+		t.Fatalf("estimate = %+v, want 3 tasks, 18 readiness runs, no judge calls", inv.Estimate)
+	}
+	want := "3 of 3 rows have no wrong answer. Heimdall will make one for the readiness check by changing the right answer slightly. A real wrong answer from your data (a wrong_answers column) tests the grader better."
+	found := false
+	for _, w := range inv.Warnings {
+		found = found || w == want
+		if strings.Contains(w, "near miss") || strings.Contains(w, "fixed rule") {
+			t.Errorf("warning still uses internal words: %q", w)
+		}
+	}
+	if !found {
+		t.Fatalf("warnings = %q, want %q", inv.Warnings, want)
+	}
+}
