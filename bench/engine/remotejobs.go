@@ -97,13 +97,34 @@ func (c *Coordinator) jobsLocked() *runnerJobs {
 	return &c.rj
 }
 
-// liveJobWorkerLocked reports whether a registered worker that runs jobs
-// called recently. The caller holds mu.
-func (c *Coordinator) liveJobWorkerLocked() bool {
+// takesKind reports whether w is offered runner jobs of kind. A worker
+// without JobKinds takes every kind; one with JobKinds takes only those, and
+// never counts for the empty kind ("any job at all").
+func (w *remoteWorker) takesKind(kind string) bool {
+	if len(w.jobKinds) == 0 {
+		return true
+	}
+	if kind == "" {
+		return false
+	}
+	for _, k := range w.jobKinds {
+		if k == kind {
+			return true
+		}
+	}
+	return false
+}
+
+// liveJobWorkerLocked reports whether a registered worker that runs jobs of
+// kind called recently. The caller holds mu.
+func (c *Coordinator) liveJobWorkerLocked(kind string) bool {
 	rj := c.jobsLocked()
 	now := c.now()
 	for id, w := range c.workers {
 		if rj.noJobs[id] || w.info.State == schemas.WorkerLost || now.Sub(w.info.LastSeen) > c.opts.StaleAfter {
+			continue
+		}
+		if !w.takesKind(kind) {
 			continue
 		}
 		return true
@@ -111,12 +132,20 @@ func (c *Coordinator) liveJobWorkerLocked() bool {
 	return false
 }
 
-// HasJobRunner reports whether a live runner of this coordinator can take a
-// runner job now.
+// HasJobRunner reports whether a live runner of this coordinator that takes
+// every job kind can take a runner job now. A runner limited to some kinds
+// (the shared runner) does not count.
 func (c *Coordinator) HasJobRunner() bool {
+	return c.HasJobRunnerFor("")
+}
+
+// HasJobRunnerFor reports whether a live runner of this coordinator takes
+// runner jobs of kind now. The empty kind counts only runners that take
+// every kind.
+func (c *Coordinator) HasJobRunnerFor(kind string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.liveJobWorkerLocked()
+	return c.liveJobWorkerLocked(kind)
 }
 
 // RunJob queues a runner job and waits for its end: a runner completes it
@@ -133,7 +162,7 @@ func (c *Coordinator) RunJob(ctx context.Context, job schemas.JobLease, log func
 	}
 	q := &queuedJob{job: job, log: log, queuedAt: c.now(), refusedBy: map[string]bool{}, done: make(chan struct{})}
 	c.mu.Lock()
-	if !c.liveJobWorkerLocked() {
+	if !c.liveJobWorkerLocked(job.JobKind) {
 		c.mu.Unlock()
 		return nil, ErrNoRunner
 	}
@@ -168,7 +197,7 @@ func (c *Coordinator) watchJob(q *queuedJob) {
 	}
 	now := c.now()
 	switch {
-	case q.lease == nil && !c.liveJobWorkerLocked():
+	case q.lease == nil && !c.liveJobWorkerLocked(q.job.JobKind):
 		c.dequeueLocked(q)
 		c.finishLocked(q, nil, ErrNoRunner)
 	case q.lease == nil && now.Sub(q.queuedAt) > JobClaimWait:
@@ -244,7 +273,8 @@ func (c *Coordinator) endJobLocked(l *jobLease, why string) {
 	w.info.State = stateOf(w)
 }
 
-// leaseJobLocked hands w the oldest queued job it has not refused, or nil.
+// leaseJobLocked hands w the oldest queued job of a kind it takes that it
+// has not refused, or nil.
 // The caller holds mu and has checked w has a free slot.
 func (c *Coordinator) leaseJobLocked(w *remoteWorker) *schemas.WorkerLease {
 	rj := c.jobsLocked()
@@ -259,8 +289,8 @@ func (c *Coordinator) leaseJobLocked(w *remoteWorker) *schemas.WorkerLease {
 		return nil
 	}
 	for i, q := range rj.queue {
-		if q.refusedBy[w.info.ID] || q.cancelled {
-			continue
+		if q.refusedBy[w.info.ID] || q.cancelled || !w.takesKind(q.job.JobKind) {
+			continue // a kind w does not take stays queued for another runner, with no refusal
 		}
 		rj.queue = append(rj.queue[:i:i], rj.queue[i+1:]...)
 		id := utils.NewID("j", 12)

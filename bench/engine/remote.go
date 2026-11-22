@@ -122,6 +122,7 @@ type remoteWorker struct {
 	parts    map[string]string
 	refused  map[string]string // exp id -> why the worker refused it
 	rejected int
+	jobKinds []string // runner job kinds it takes; empty: every kind
 }
 
 // remoteLease is one slot out on a remote worker.
@@ -224,6 +225,14 @@ func (c *Coordinator) Register(ctx context.Context, req *schemas.WorkerRegister)
 	if err := validLabels(req.Pool, req.Labels); err != nil {
 		return nil, err
 	}
+	if len(req.JobKinds) > 32 {
+		return nil, fmt.Errorf("%w: at most 32 job kinds", schemas.ErrWorkerRequest)
+	}
+	for _, k := range req.JobKinds {
+		if k == "" || len(k) > 64 {
+			return nil, fmt.Errorf("%w: a job kind must be 1 to 64 characters", schemas.ErrWorkerRequest)
+		}
+	}
 	scope, err := c.callScope(ctx)
 	if err != nil {
 		return nil, err
@@ -279,6 +288,7 @@ func (c *Coordinator) Register(ctx context.Context, req *schemas.WorkerRegister)
 		Slots: req.Slots, Running: []string{}, Completed: w.info.Completed, LastSeen: c.now().UTC(),
 		Pool: pool, Labels: append([]string(nil), req.Labels...), TokenID: scope.TokenID}
 	w.parts = copyStrings(req.Parts)
+	w.jobKinds = append([]string(nil), req.JobKinds...)
 	w.scope = scope
 	w.scope.Pool = pool
 	if req.Capabilities != nil { // X7: the GPUs the worker offers (gpu.go)
