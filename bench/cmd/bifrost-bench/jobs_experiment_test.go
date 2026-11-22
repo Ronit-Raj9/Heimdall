@@ -114,3 +114,47 @@ func TestExperimentJobKindsRegistered(t *testing.T) {
 		}
 	}
 }
+
+// TestProbeJobCatalogFaults (fix wave 2, N65): a fault test asks for catalog
+// faults, so a benchmark without probes of its own still runs the faults that
+// apply to it (the generic model probes), and a fault that does not apply is
+// skipped with its reason. An unknown fault name is refused up front.
+func TestProbeJobCatalogFaults(t *testing.T) {
+	m := &schemas.Manifest{ExpID: "e_parent", Experiment: schemas.Experiment{
+		Name: "base", Seed: 7, Suite: "bfcl@1",
+		Arms:       map[string]schemas.ArmSpec{"A": {}},
+		Primary:    schemas.Endpoint{Condition: schemas.ConditionClean},
+		Conditions: []schemas.ConditionSpec{{ID: schemas.ConditionClean, Tasks: schemas.TaskSelector{All: true}, Trials: 1}},
+	}}
+	s := &schemas.Suite{ID: "bfcl"}
+	want, allowed, skipped, err := probeWanted(s, nil, []string{"model-brownout", "tool-rate-limit"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(skipped) != 1 || skipped[0].Fault != "tool-rate-limit" || skipped[0].Reason == "" {
+		t.Fatalf("skipped = %+v, want tool-rate-limit with a reason", skipped)
+	}
+	e, _, err := probeExperiment(m, allowed, want, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, c := range e.Conditions {
+		ids = append(ids, c.ID)
+	}
+	if strings.Join(ids, ",") != "clean,"+schemas.GenericProbeModelBrownout {
+		t.Fatalf("conditions = %v, want clean and %s", ids, schemas.GenericProbeModelBrownout)
+	}
+	if _, _, _, err := probeWanted(s, nil, []string{"tool-rate-limit"}); err == nil || !strings.Contains(err.Error(), "none of the chosen faults can run") {
+		t.Fatalf("only inapplicable faults: %v", err)
+	}
+	// Without faults the old rule stays: the suite's own probes, all by default.
+	want, allowed, _, err = probeWanted(&schemas.Suite{ID: "s", ProbeIDs: []string{"p1"}}, nil, nil)
+	if err != nil || len(want) != 0 || strings.Join(allowed, ",") != "p1" {
+		t.Fatalf("no faults: want %v allowed %v err %v", want, allowed, err)
+	}
+	raw := json.RawMessage(`{"exp_id":"e_parent","faults":["model-brownout","no-such-fault"]}`)
+	if _, _, err := validateProbeJob(context.Background(), jobEnv{}, raw); !errors.Is(err, jobs.ErrInvalidParams) || !strings.Contains(err.Error(), "no-such-fault") {
+		t.Fatalf("unknown fault: want ErrInvalidParams naming it, got %v", err)
+	}
+}
