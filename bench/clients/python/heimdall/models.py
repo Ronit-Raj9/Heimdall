@@ -195,6 +195,16 @@ class APIToken(_APITokenRequired, total=False):
     user_id: str
 
 
+class _AblationReportRequired(TypedDict):
+    dropped: int
+    kept: int
+    tried: int
+
+
+class AblationReport(_AblationReportRequired, total=False):
+    patches: List[str]
+
+
 class _AccessRequired(TypedDict):
     mode: str
 
@@ -12517,6 +12527,7 @@ class _ValidationRequired(TypedDict):
 
 
 class Validation(_ValidationRequired, total=False):
+    ablations: Optional[AblationReport]
     flaky: List[str]
     stop: str
 
@@ -14574,6 +14585,7 @@ __all__ = [
     'A2AOperation',
     'A2ARegistration',
     'APIToken',
+    'AblationReport',
     'Access',
     'Action',
     'AdapterCapabilities',

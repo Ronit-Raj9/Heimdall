@@ -17,8 +17,8 @@ import (
 
 	"github.com/maximhq/bifrost/bench/issuebench"
 	"github.com/maximhq/bifrost/bench/issuebench/builder"
-	"github.com/maximhq/bifrost/bench/issuebench/validate"
 	_ "github.com/maximhq/bifrost/bench/issuebench/lang/python" // registers the languages a worker builds
+	"github.com/maximhq/bifrost/bench/issuebench/validate"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
