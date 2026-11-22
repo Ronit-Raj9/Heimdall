@@ -17,8 +17,9 @@ import (
 	_ "github.com/maximhq/bifrost/bench/importers/longmemeval"
 	_ "github.com/maximhq/bifrost/bench/importers/marble" // X5b: MultiAgentBench (MARBLE)
 	_ "github.com/maximhq/bifrost/bench/importers/mcpmark"
-	_ "github.com/maximhq/bifrost/bench/importers/msibench"  // MSI-Bench v2 multi-speaker room calls
-	_ "github.com/maximhq/bifrost/bench/importers/skillpool" // L14: Skill-Usage 34k pool
+	_ "github.com/maximhq/bifrost/bench/importers/msibench"     // MSI-Bench v2 multi-speaker room calls
+	_ "github.com/maximhq/bifrost/bench/importers/programbench" // L08: ProgramBench, whole-program rebuilds
+	_ "github.com/maximhq/bifrost/bench/importers/skillpool"    // L14: Skill-Usage 34k pool
 	_ "github.com/maximhq/bifrost/bench/importers/swebench"
 	_ "github.com/maximhq/bifrost/bench/importers/tau2"
 	_ "github.com/maximhq/bifrost/bench/importers/toolbenchx"   // L10: ToolBench-X

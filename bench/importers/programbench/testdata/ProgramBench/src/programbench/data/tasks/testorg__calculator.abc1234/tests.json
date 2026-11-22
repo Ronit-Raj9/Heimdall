@@ -1,0 +1,1 @@
+{"branches":{"b1":{"ignored":false,"ignore_reason":"","tests":["tests.test_a.test_x"]},"b2":{"ignored":true,"ignore_reason":"flaky","tests":["tests.test_b.test_y"]}}}
