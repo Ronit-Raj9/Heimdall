@@ -45,6 +45,9 @@ type WorkerTargetChoice struct {
 	Current       bool   `json:"current"`
 	PerEvaluation bool   `json:"per_evaluation"`
 	Note          string `json:"note,omitempty"`
+	// Slots is how many runs this worker runs at once (N93: its runners'
+	// slots, fix wave 2 decision D6); 0 when not known or not bounded.
+	Slots int `json:"slots,omitempty"`
 }
 
 // WorkerTargetSet is the body of PUT /api/bench/workers/target.

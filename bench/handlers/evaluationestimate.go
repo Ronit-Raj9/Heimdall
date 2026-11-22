@@ -76,6 +76,10 @@ type EvalEstimateRequest struct {
 
 	orgSlots int     // the org's worker slots (0: not bounded here)
 	dailyCap float64 // the org's daily spend cap (0: none)
+
+	// workerSlots is the runs at once of the worker the evaluation goes to
+	// (Services.WorkerSlots, N90; 0: not bounded here).
+	workerSlots int
 	// BifrostCache adds the cache-on copy of the one arm (cacheOnArm).
 	BifrostCache bool `json:"bifrost_cache,omitempty"`
 	// Failover is the provider failover option: the launch adds the arm
@@ -85,6 +89,10 @@ type EvalEstimateRequest struct {
 	// (EvaluationSpec.MCPRoute); a Bifrost route on a benchmark without an
 	// MCP tool server gets a note.
 	MCPRoute string `json:"mcp_route,omitempty"`
+	// Worker is where the evaluation runs (EvaluationSpec.Worker: a target
+	// or a worker's pool; "" where the organization's runs go). Only the
+	// worker slot bound of the estimate reads it (N90).
+	Worker string `json:"worker,omitempty"`
 }
 
 // evalArmID is the experiment arm id of spec arm i: A, B, C and so on, the
@@ -186,6 +194,10 @@ type EvalSlots struct {
 	Concurrency int `json:"concurrency"`
 	OrgSlots    int `json:"org_slots"`
 	Parallel    int `json:"parallel"`
+	// WorkerSlots is how many runs the worker the evaluation goes to runs
+	// at once (N90: the org's live runners of the target's pool); 0 when
+	// unknown or not bounded (a sandbox platform, local mode).
+	WorkerSlots int `json:"worker_slots,omitempty"`
 }
 
 // Power check settings: the assumed per-task SD of the paired difference
@@ -314,6 +326,7 @@ func (h *evalEstimateHandler) post(ctx *fasthttp.RequestCtx) {
 		root = h.env.Cfg.Root
 	}
 	req.orgSlots, req.dailyCap = orgSlotsAndCap(work, h.env.Services)
+	req.workerSlots = workerSlotsOf(work, h.env.Services, req.Worker)
 	est, err := estimateEvaluation(work, h.env.Services.Suites, src, &req, agents, root, h.cache)
 	if err != nil {
 		if errors.Is(err, errQuickBad) {

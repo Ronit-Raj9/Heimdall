@@ -12,6 +12,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/sandbox"
@@ -37,6 +38,8 @@ type workerPoolStore interface {
 type workerTargets struct {
 	platforms workerPlatformStore
 	workers   workerPoolStore
+	// runners fills each choice's runs at once (N93); nil leaves them out.
+	runners runnerLister
 }
 
 func (w workerTargets) halves(ctx context.Context, org string) (*sandbox.ConnectionsList, *schemas.WorkerConnectionsList, error) {
@@ -75,7 +78,28 @@ func (w workerTargets) Target(ctx context.Context, org string) (*schemas.WorkerT
 	if err != nil {
 		return nil, err
 	}
-	return targetView(pl, wl), nil
+	v := targetView(pl, wl)
+	w.fillSlots(ctx, org, v)
+	return v, nil
+}
+
+// fillSlots sets how many runs each worker choice runs at once from the
+// org's runner rows (N93, the same rule as Services.WorkerSlots); a
+// sandbox platform is not bounded. A failed lookup leaves them out.
+func (w workerTargets) fillSlots(ctx context.Context, org string, v *schemas.WorkerTargetView) {
+	if w.runners == nil {
+		return
+	}
+	rs, err := w.runners.ListRunners(ctx, org)
+	if err != nil {
+		return
+	}
+	now := time.Now()
+	for i := range v.Choices {
+		if pool, ok := workerPoolOf(v.Choices[i].Target); ok {
+			v.Choices[i].Slots = poolSlots(rs, pool, now)
+		}
+	}
 }
 
 // targetView lists the choices, the current one first among its kind.
@@ -271,6 +295,9 @@ func workerTargetsOf(env *hostedEnv) workerTargets {
 	}
 	if s := workerConnsOf(env); s != nil {
 		t.workers = s
+	}
+	if env.db != nil {
+		t.runners = runnersOf(env).svc
 	}
 	return t
 }
