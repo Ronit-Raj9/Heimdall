@@ -12,10 +12,10 @@
 # No parser: gateway-level evidence. docs/frameworks.md is the guide.
 id: fw-plain-openai
 adapter: command
-image: bench/agent-fw-plain-openai:1
+image: bench/agent-fw-plain-openai:2
 build:
   dockerfile: examples/frameworks/plain-openai/Dockerfile
-  tag: bench/agent-fw-plain-openai:1
+  tag: bench/agent-fw-plain-openai:2
   base_arg: BASE_IMAGE
 argv:
   - fw-agent
@@ -40,3 +40,7 @@ budgets:
 gateway:
   provider: openai
   max_retries: 0
+# H02: the agent puts BENCH_GATEWAY_HEADERS in its client's default headers,
+# so heimdall plugin faults ride on its model calls (image :2 and later).
+adapter_capabilities:
+  supports_gateway_headers: true

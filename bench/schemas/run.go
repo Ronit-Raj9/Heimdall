@@ -184,7 +184,9 @@ type RunGatewayInfo struct {
 	// HEIMDALL_FAULT_MODE=plugin (lane C04): "plugin" (the heimdall Bifrost
 	// plugin, plan sent as request headers) or "proxy" (the fault proxy, for
 	// an agent that cannot send extra headers or a plan the plugin cannot
-	// run). Empty in the default proxy mode.
+	// run), or "mixed" for a team run whose members do not all send the
+	// headers (each member's slot went its own way, lane H02). Empty in the
+	// default proxy mode.
 	FaultPath string `json:"fault_path,omitempty"`
 	// BudgetRefusedCalls counts the run's model calls Bifrost refused
 	// because a budget was used up (status 402 or a budget_exceeded error,

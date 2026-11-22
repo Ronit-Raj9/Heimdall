@@ -57,6 +57,9 @@ const (
 	PluginModeRateLimit = "rate_limit"
 	PluginModeLatency   = "latency"
 	PluginModeFlaky     = "flaky"
+	// PluginModeOutage is a provider outage (Status, default 503, for the
+	// window). The provider failover outage (lane C07) is sent with it.
+	PluginModeOutage = "outage"
 )
 
 // PluginPlan is the fault plan as the heimdall plugin reads it (its Plan
@@ -159,6 +162,9 @@ func (c *PluginFaults) SetPlan(ctx context.Context, slot string, plan schemas.Fa
 const (
 	FaultPathPlugin = "plugin"
 	FaultPathProxy  = "proxy"
+	// FaultPathMixed: a team run whose members do not all carry the
+	// headers; each member's slot went the way its agent allows (H02).
+	FaultPathMixed = "mixed"
 )
 
 // MoveToPlugin hands slot's current plan to the heimdall plugin: the proxy

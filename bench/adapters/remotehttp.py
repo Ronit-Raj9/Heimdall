@@ -7,6 +7,8 @@ answer path. It is bench code: the container holds nothing of the agent's.
 Request: POST <BENCH_REMOTE_URL> with a JSON body
   {"instruction", "session_id", "session_index", "output", "files"?,
    "gateway"?, "tools"?}
+"gateway" is {"url", "key", "model", "headers"?}: "headers" are extra
+request headers the service must send on each of its model calls.
 For a conversation task (BENCH_REMOTE_CHAT) the body also carries
 "messages" (the conversation so far, ending with the user's message;
 "instruction" is that message), "turn" and "turns", and "attachments"
@@ -600,12 +602,9 @@ def main():
             emit({"type": "note", "message": "workspace files left out: more than %d files or %d bytes" % (MAX_FILES, MAX_FILES_BYTES)})
         elif files:
             body["files"] = files
-    if os.environ.get("BENCH_REMOTE_TRAFFIC") == "gateway":
-        body["gateway"] = {
-            "url": os.environ.get("BENCH_REMOTE_GATEWAY_URL", ""),
-            "key": os.environ.get("BENCH_REMOTE_RUN_KEY", ""),
-            "model": os.environ.get("BENCH_REMOTE_MODEL", ""),
-        }
+    gateway = gateway_block()
+    if gateway is not None:
+        body["gateway"] = gateway
     if os.environ.get("BENCH_REMOTE_TOOLS"):
         tools, token = json.loads(os.environ["BENCH_REMOTE_TOOLS"]), os.environ.get("BENCH_REMOTE_TOOLS_TOKEN", "")
         body["tools"] = {k: dict(v, token=token) for k, v in sorted(tools.items())}
@@ -714,11 +713,20 @@ def heimdall_body(instruction, output, answer_path, files_root):
 def gateway_block():
     if os.environ.get("BENCH_REMOTE_TRAFFIC") != "gateway":
         return None
-    return {
+    block = {
         "url": os.environ.get("BENCH_REMOTE_GATEWAY_URL", ""),
         "key": os.environ.get("BENCH_REMOTE_RUN_KEY", ""),
         "model": os.environ.get("BENCH_REMOTE_MODEL", ""),
     }
+    # Extra headers for every model call through the gateway (fault plan
+    # and run tags of the heimdall plugin, cache headers); only when set.
+    try:
+        headers = json.loads(os.environ.get("BENCH_GATEWAY_HEADERS", "") or "{}")
+    except ValueError:
+        headers = {}
+    if isinstance(headers, dict) and headers:
+        block["headers"] = {str(k): str(v) for k, v in sorted(headers.items())}
+    return block
 
 
 def tools_block():

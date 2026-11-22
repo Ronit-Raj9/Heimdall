@@ -19,9 +19,11 @@ Env:   OPENAI_BASE_URL, OPENAI_API_KEY      the endpoint and its key
        AGENT_MODEL       model id sent to the endpoint (default gpt-5.4-mini)
        AGENT_MAX_STEPS   step cap: model requests (default 40)
        AGENT_SESSION_ID  optional; sent as the x-bf-session-id header
+       BENCH_GATEWAY_HEADERS optional JSON object; extra headers on every model call
 Prints the final answer last on stdout. Exit 0 when the run ends (solved or
 not, step cap included), 1 when the model call fails.
 """
+import json
 import os
 import subprocess
 import sys
@@ -123,7 +125,10 @@ def main():
     with open(sys.argv[1] if len(sys.argv) > 1 else "/tmp/bench/instruction.md") as f:
         task = f.read()
     tracer = setup_tracing()
-    headers = {"x-bf-session-id": SESSION_ID, "x-bf-session-affinity": "off"} if SESSION_ID else None
+    headers = {"x-bf-session-id": SESSION_ID, "x-bf-session-affinity": "off"} if SESSION_ID else {}
+    # BENCH_GATEWAY_HEADERS: the run's extra gateway headers (heimdall plugin fault plan and run tags, cache headers).
+    headers.update(json.loads(os.environ.get("BENCH_GATEWAY_HEADERS") or "{}"))
+    headers = headers or None
     # AsyncOpenAI reads OPENAI_BASE_URL and OPENAI_API_KEY; the headers only add the session id.
     model = OpenAIChatModel(MODEL, provider=OpenAIProvider(openai_client=AsyncOpenAI(default_headers=headers)))
     agent = Agent(model, instructions=system_prompt(), tools=[list_files, read_file, write_file, run_command])

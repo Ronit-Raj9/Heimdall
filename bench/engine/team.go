@@ -289,16 +289,20 @@ func (p *Pipeline) runTeam(ctx context.Context, st *runState) error {
 		}
 	}
 	runs := make([]schemas.MemberRun, 0, len(team))
+	faultPaths := map[string]bool{} // H02: each member's model fault path (pluginfaults.go)
 	for _, m := range team {
 		k, ok := keys[m.ID]
 		if !ok {
 			return wrapPart("gateway", p.reg.Gateway, fmt.Errorf("member %s has no key", m.ID))
 		}
-		plan, err := p.planMember(ctx, st, m, k, team)
+		plan, err := p.planMember(ctx, st, m, k, team, faultPaths)
 		if err != nil {
 			return err
 		}
 		runs = append(runs, schemas.MemberRun{Member: m, Plan: plan, Key: k, RouteToken: rc.TeamRoutes[m.ID]})
+	}
+	if fp := teamFaultPath(faultPaths); fp != "" && rc.Run != nil {
+		rc.Run.Gateway.FaultPath = fp
 	}
 	st.plan = runs[0].Plan
 	run := rc.Run
@@ -345,7 +349,7 @@ func memberFailure(results []schemas.MemberResult) error {
 // planMember builds one member's plan: the adapter's plan for the member's
 // config and key, the scenario env on the member's routes, and the team
 // variables.
-func (p *Pipeline) planMember(ctx context.Context, st *runState, m schemas.TeamMember, k schemas.MemberKey, team []schemas.TeamMember) (*schemas.RunPlan, error) {
+func (p *Pipeline) planMember(ctx context.Context, st *runState, m schemas.TeamMember, k schemas.MemberKey, team []schemas.TeamMember, faultPaths map[string]bool) (*schemas.RunPlan, error) {
 	mrc := *st.rc
 	cfg := memberConfig(st.rc.Agent, m)
 	mrc.Agent = &cfg
@@ -364,6 +368,9 @@ func (p *Pipeline) planMember(ctx context.Context, st *runState, m schemas.TeamM
 		if err := v.Validate(ctx, &mrc); err != nil {
 			return nil, wrapPart("adapter", st.adapter, fmt.Errorf("validate member %s: %w", m.ID, err))
 		}
+	}
+	if err := p.routeMemberFaults(ctx, &mrc, faultPaths); err != nil { // H02: the member's own slot and headers
+		return nil, err
 	}
 	var plan *schemas.RunPlan
 	var err error

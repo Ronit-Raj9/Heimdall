@@ -234,6 +234,9 @@ func remoteMappingEnv(rc *schemas.RunContext, spec *schemas.RemoteAgent, egress 
 	env["BENCH_REMOTE_CONNECT_MAP"] = string(raw)
 	if rc.Agent != nil && rc.Agent.Model != "" {
 		env["BENCH_REMOTE_MODEL"] = rc.Agent.Model
+		if h := BifrostHeaders(rc); len(h) > 0 { // H02: sent as "gateway.headers"; the service adds them to its model calls
+			env[EnvGatewayHeaders] = headersJSON(h)
+		}
 	}
 	if rc.Task != nil {
 		env["BENCH_REMOTE_TASK"] = rc.Task.ID
@@ -296,6 +299,9 @@ func (a *remoteHTTPAdapter) remoteEnv(rc *schemas.RunContext, spec *schemas.Remo
 		}
 		env["BENCH_REMOTE_RUN_KEY"] = rc.Key.Value
 		env["BENCH_REMOTE_MODEL"] = rc.Agent.Model
+		if h := BifrostHeaders(rc); len(h) > 0 { // H02: sent as "gateway.headers"; the service adds them to its model calls
+			env[EnvGatewayHeaders] = headersJSON(h)
+		}
 	}
 	if err := remoteCoverageEnv(rc, spec, env); err != nil {
 		return nil, err
