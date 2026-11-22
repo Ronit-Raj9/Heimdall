@@ -72,6 +72,12 @@ type PoolStatus struct {
 	KillSwitch           bool         `json:"kill_switch"`
 	Limits               quota.Limits `json:"limits"`
 	Message              string       `json:"message"`
+	// AutoApproveImages: an image request pinned by digest and within the
+	// size limit is approved at once, because the org's runs on the shared
+	// worker run under gVisor (Y10). False: a server admin approves it.
+	AutoApproveImages bool `json:"auto_approve_images"`
+	// ImageApproval says how image requests are approved, in plain words.
+	ImageApproval string `json:"image_approval"`
 }
 
 // ImageRequestBody is the body of POST /api/bench/images.
@@ -206,6 +212,12 @@ func (h *SharedPoolHandler) status(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	st := PoolStatus{SharedPoolConfigured: h.secret() != "" && h.pool != nil, KillSwitch: kill, Limits: l}
+	if ok, why := sharedpool.AutoApprovable(l, "x@sha256:"+strings.Repeat("0", 64), 0, h.pool.GVisor()); ok {
+		st.AutoApproveImages = true
+		st.ImageApproval = "Images pinned by digest and within your size limit are approved automatically: the shared worker runs them under gVisor."
+	} else {
+		st.ImageApproval = "A server admin approves each image (" + why + ")."
+	}
 	switch {
 	case kill:
 		st.Message = "The server owner paused all new runs (kill switch). Running slots finish; new ones wait until it is lifted."
@@ -275,7 +287,33 @@ func (h *SharedPoolHandler) requestImage(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	h.record(ctx, p.OrgID, "image.request", "image_request", v.ID, map[string]any{"image": v.Image, "size_bytes": v.SizeBytes})
+	if v.Status == sharedpool.StatusPending { // Y10: no human for a pinned image the shared worker runs under gVisor
+		if ok, _ := sharedpool.AutoApprovable(l, v.Image, v.SizeBytes, h.pool.GVisor()); ok {
+			auto, err := h.images.AutoApprove(work, v.ID, sharedpool.AutoApproveReason)
+			if err != nil && !errors.Is(err, sharedpool.ErrNotPending) {
+				h.internal(ctx, "approve image", err)
+				return
+			}
+			if auto != nil {
+				if err := h.allowImages(work, p.OrgID, l); err != nil {
+					h.internal(ctx, "allow custom images", err)
+					return
+				}
+				h.record(ctx, p.OrgID, "image.approved", "image_request", auto.ID, map[string]any{"image": auto.Image, "approval": sharedpool.ApprovalAutomatic})
+				v = auto
+			}
+		}
+	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, v)
+}
+
+// allowImages turns custom images on for org after an automatic approval.
+func (h *SharedPoolHandler) allowImages(ctx context.Context, org string, l quota.Limits) error {
+	if l.AllowCustomImages {
+		return nil
+	}
+	l.AllowCustomImages = true
+	return h.quota.Set(ctx, org, l, sharedpool.Actor)
 }
 
 func (h *SharedPoolHandler) listAllImages(ctx *fasthttp.RequestCtx) {

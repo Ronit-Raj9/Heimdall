@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/engine"
+	"github.com/maximhq/bifrost/bench/registrycreds"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
 )
@@ -137,7 +138,10 @@ func runRunnerStart(cmd string, args []string) int {
 			Slots: f.slots, Logger: a.logger, Pool: f.pool, Labels: f.labelList(),
 			SpendCapUSD: f.spendCap, SpendFile: filepath.Join(a.store.Root(), ".runner", "spend.json"),
 			Jobs: newRunnerJobExecutor(a), // gap G05: hosted CLI jobs (runnerjob.go)
-			Disk: hy.DiskState, ImageUse: hy.NoteImages, KeepRunFolders: a.cfg.Runner.Disk.KeepRunFolders})
+			Disk: hy.DiskState, ImageUse: hy.NoteImages, KeepRunFolders: a.cfg.Runner.Disk.KeepRunFolders,
+			PullPrivate: func(ctx context.Context, ref string, auths []schemas.RegistryAuth) error { // Y10: the org's registry logins
+				return registrycreds.Pull(ctx, a.docker, ref, auths)
+			}})
 	if err != nil {
 		return fail("%v", err)
 	}

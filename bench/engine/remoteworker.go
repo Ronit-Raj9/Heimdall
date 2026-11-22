@@ -76,6 +76,10 @@ type WorkerOptions struct {
 	Disk           func() schemas.WorkerDisk
 	ImageUse       func(ids ...string)
 	KeepRunFolders bool
+	// PullPrivate pulls an image with one of the lease's private registry
+	// logins (registrycreds.Pull under the org's Docker policy; Y10). nil:
+	// private images are pulled the usual way (docker's own login).
+	PullPrivate func(ctx context.Context, ref string, auths []schemas.RegistryAuth) error
 }
 
 // Worker is the remote side of remote execution: it registers with a
@@ -305,12 +309,18 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		w.release(ctx, lease, "the leased slot is not the manifest's slot "+lease.Slot.SlotID, true, nil)
 		return nil
 	}
-	leaseSecrets, why := w.applyLeaseCredentials(sctx, lease, exp.m.Gateway.Deferred()) // F4 key delivery, G01 org secrets (remotecreds.go)
+	leaseSecrets, leaseRegistries, why := w.applyLeaseCredentials(sctx, lease, exp.m.Gateway.Deferred()) // F4 key delivery, G01 org secrets (remotecreds.go)
 	live.setSecrets(leaseSecrets)
 	if leaseSecrets == nil && exp.m.Gateway.Deferred() {
 		leaseSecrets = map[string]string{} // G01: a hosted org's run never reads this runner's own environment
 	}
 	if why != "" {
+		w.logger.Warn("lease refused", "lease", lease.LeaseID, "experiment", lease.ExpID, "reason", why)
+		stop()
+		w.release(ctx, lease, why, false, nil)
+		return nil
+	}
+	if why := w.pullPrivateImages(sctx, exp, slot, leaseRegistries); why != "" { // Y10: private registry pulls (remotepull.go)
 		w.logger.Warn("lease refused", "lease", lease.LeaseID, "experiment", lease.ExpID, "reason", why)
 		stop()
 		w.release(ctx, lease, why, false, nil)

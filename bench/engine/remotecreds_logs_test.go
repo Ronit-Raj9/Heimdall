@@ -31,7 +31,7 @@ func TestLeaseAppliesPromptLogPolicy(t *testing.T) {
 	defer srv.Close()
 	gw := &logPolicyGateway{}
 	w := &Worker{reg: &schemas.Registry{Gateway: gw}, opts: WorkerOptions{Server: srv.URL, HTTP: srv.Client()}, logger: schemas.NoopLogger{}}
-	if _, why := w.applyLeaseCredentials(context.Background(), &schemas.WorkerLease{LeaseID: "l1", ExpID: "e1"}, false); why != "" {
+	if _, _, why := w.applyLeaseCredentials(context.Background(), &schemas.WorkerLease{LeaseID: "l1", ExpID: "e1"}, false); why != "" {
 		t.Fatalf("refused: %s", why)
 	}
 	if gw.got == nil || gw.exp != "e1" || gw.org != "org_a" || gw.got.KeepContent || gw.got.RetentionDays != schemas.PromptLogRetentionMax {

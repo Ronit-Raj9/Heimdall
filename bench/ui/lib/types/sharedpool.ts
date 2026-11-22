@@ -17,6 +17,10 @@ export interface PoolStatus {
 	kill_switch: boolean;
 	limits: OrgLimits;
 	message: string;
+	/** Images pinned by digest and within the size limit are approved at once (shared worker runs gVisor). */
+	auto_approve_images?: boolean;
+	/** How image requests are approved, in plain words. */
+	image_approval?: string;
 }
 
 export type ImageRequestStatus = "pending" | "approved" | "rejected";
@@ -33,6 +37,10 @@ export interface ImageRequest {
 	decision?: string;
 	created_at: string;
 	decided_at?: string;
+	/** automatic (gVisor, digest pinned, within the size limit) or admin. */
+	approval?: "automatic" | "admin";
+	/** What happens next, in plain words. */
+	next_step?: string;
 }
 
 export interface ImageRequestList {

@@ -354,6 +354,26 @@ Guardrails (server admin, `/api/bench/admin/...`):
 - Custom images: members request one with `POST /api/bench/images`. It must be
   pinned by digest (`name@sha256:<64 hex>`) and fit the org's image size
   limit. A server admin approves it with `POST /admin/images/{id}/approve`.
+  It is approved automatically, with no admin, when the org's runs on the
+  shared worker run under gVisor: the org's runtime is `runsc`, or a shared
+  worker with `HEIMDALL_SHARED_RUNTIME=auto` (or `runsc`) on a host with
+  gVisor asked for its assignments in the last 10 minutes. Such an image is
+  never handed to a shared worker running `runc`. Automatic approval also
+  turns custom images on for the org. Set `HEIMDALL_IMAGE_AUTO_APPROVE=off` on
+  the server to require an admin for every image. `GET /api/bench/images`
+  shows each request's `approval` (`automatic` or `admin`) and `next_step`;
+  `GET /api/bench/pool` says which way this org's images are approved.
+- Private registries: an org admin adds a login under Settings > Secrets
+  (`POST /api/bench/registry-credentials`: Docker Hub, GHCR, ECR, GCR or
+  Artifact Registry, ACR, or any other registry). The login names an org
+  secret holding the password, token, ECR secret access key or Google service
+  account JSON (user `_json_key`). The server resolves the logins for each
+  lease (ECR: a short-lived token from `GetAuthorizationToken`, so the access
+  key never leaves the server) and the worker uses one for a single
+  `docker pull` of a missing agent or task image on that host, through a
+  temporary Docker config it removes right after. The image must still be
+  approved (or a platform image) on the shared worker; logins are never
+  logged.
 - Kill switch: `POST /admin/killswitch {"on": true}` empties the shared
   worker's assignments and stops every coordinator from handing out new
   leases; slots already running finish.
