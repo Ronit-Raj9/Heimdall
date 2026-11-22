@@ -3,7 +3,9 @@ package pipeline
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/jobs"
 )
@@ -31,17 +33,50 @@ type Queuer interface {
 // AdmitKinds are the jobs queued, in order, for an emitted benchmark.
 var AdmitKinds = []string{"suite.lint", "suite.lock", "suite.admit"}
 
+// AdmitRetry is how often a kind that found its target busy is queued
+// again, and AdmitWait how long that goes on (tests shorten them).
+var (
+	AdmitRetry = 5 * time.Second
+	AdmitWait  = 6 * time.Hour
+)
+
 // QueueAdmit queues lint, lock and admit for suite with params {"suite": id}.
+// lock and admit share the target suite:<id>, and only one job per target
+// may be queued or running: admit always finds lock still there, and a
+// second accept finds the first one's admit. So a kind whose target is busy
+// (jobs.ErrConflict) is queued, in order with the kinds after it, in the
+// background as soon as the target is free. The ids are those queued now.
 func QueueAdmit(ctx context.Context, q Queuer, suite string) ([]string, error) {
 	var ids []string
-	for _, k := range AdmitKinds {
-		id, err := q.Queue(ctx, k, map[string]string{"suite": suite})
+	params := map[string]string{"suite": suite}
+	for i, k := range AdmitKinds {
+		id, err := q.Queue(ctx, k, params)
+		if errors.Is(err, jobs.ErrConflict) {
+			go queueWhenFree(context.WithoutCancel(ctx), q, AdmitKinds[i:], params)
+			return ids, nil
+		}
 		if err != nil {
 			return ids, fmt.Errorf("queue %s: %w", k, err)
 		}
 		ids = append(ids, id)
 	}
 	return ids, nil
+}
+
+func queueWhenFree(ctx context.Context, q Queuer, kinds []string, params map[string]string) {
+	deadline := time.Now().Add(AdmitWait)
+	for _, k := range kinds {
+		for {
+			_, err := q.Queue(ctx, k, params)
+			if err == nil {
+				break
+			}
+			if !errors.Is(err, jobs.ErrConflict) || time.Now().After(deadline) {
+				return
+			}
+			time.Sleep(AdmitRetry)
+		}
+	}
 }
 
 // JobCreator is the part of the job registry the adapter uses
