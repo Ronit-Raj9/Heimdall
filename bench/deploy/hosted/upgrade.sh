@@ -10,14 +10,17 @@
 #      existing :previous is kept when the service is not running), then
 #      rebuilt from the checkout
 #   4. Postgres up, migrations applied (bifrost-bench db migrate)
-#   5. containers whose image or configuration changed are recreated; wait
-#      for health
+#   5. containers whose image or configuration changed are recreated, and
+#      containers of services no longer in the compose file (the retired
+#      demo-runner) are removed; wait for health
+#   6. with the shared worker running: its registry gets fresh copies of
+#      the base images (registry-sync.sh)
 #
 # Rollback, if the new version misbehaves (the previous commit is printed
 # at the start and the end of the run):
 #   git -C <checkout> checkout <previous commit>
 #   docker tag heimdall/server:previous heimdall/server:local
-#   docker tag heimdall/runner:previous heimdall/runner:local   # demo runner only
+#   docker tag heimdall/runner:previous heimdall/runner:local   # shared worker only
 #   docker compose -f deploy/hosted/docker-compose.yml --env-file deploy/hosted/.env up -d --no-build --wait
 # With the default tags (:local) the rollback tag is :previous. A stack with
 # its own tag (HEIMDALL_IMAGE=heimdall/server:<tag>, for a second stack on
@@ -43,8 +46,12 @@ done
 
 need docker git
 require_configured
-if [ -n "$(env_get HEIMDALL_DEMO_RUNNER_TOKEN)" ]; then
-	export HEIMDALL_PROFILES=${HEIMDALL_PROFILES:+$HEIMDALL_PROFILES,}demo-runner
+# The shared worker is upgraded with the rest when it runs here: its
+# profile is added only then, so an install without it stays without it.
+shared=''
+if [ -n "$(HEIMDALL_PROFILES=shared-runner hc ps -q shared-runner 2>/dev/null)" ]; then
+	shared=1
+	export HEIMDALL_PROFILES=${HEIMDALL_PROFILES:+$HEIMDALL_PROFILES,}shared-runner
 fi
 
 repo=$(git -C "$BENCH_DIR" rev-parse --show-toplevel)
@@ -113,7 +120,7 @@ keep_previous() { # keep_previous SERVICE IMAGE
 	fi
 }
 keep_previous heimdall "$server_image"
-keep_previous demo-runner "$runner_image"
+keep_previous shared-runner "$runner_image"
 
 log "building images"
 hc build --pull
@@ -125,6 +132,11 @@ if bench_has db; then
 fi
 
 log "restarting changed services"
+# --remove-orphans removes only containers of services the compose file no
+# longer has (demo-runner); services of profiles not started here stay.
 hc up -d --wait --remove-orphans
 hc ps
+if [ -n "$shared" ]; then
+	"$HOSTED_DIR/registry-sync.sh" || log "registry-sync.sh failed: org Dockerfiles that build FROM a bench image fail until it succeeds"
+fi
 log "upgrade done ($before -> $(git -C "$repo" rev-parse HEAD)). Roll back: see the header of $0"

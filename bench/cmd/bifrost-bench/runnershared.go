@@ -53,7 +53,7 @@ import (
 
 const sharedRunnerUsage = `usage:
   bifrost-bench runner start -shared -server <url> -secret-file <path> [-runtime auto|runc|runsc] [-slots n] [-poll 30s] [-name prefix]
-      [-builder name | -buildkit tcp://host:port] [-gateway-container name] [-projects-dir path] [-config deploy/bench.yaml] [-debug]`
+      [-builder name | -buildkit tcp://host:port] [-registry host:port] [-gateway-container name] [-projects-dir path] [-config deploy/bench.yaml] [-debug]`
 
 // Shared runner environment (deploy/hosted/docker-compose.yml).
 const (
@@ -71,6 +71,10 @@ const (
 	// sharedPlatformImagesEnv lists images every org may pull (comma
 	// separated; a trailing "/" or ":" is a prefix).
 	sharedPlatformImagesEnv = "HEIMDALL_SHARED_PLATFORM_IMAGES"
+	// sharedRegistryEnv is the private image registry beside the isolated
+	// BuildKit (registry:5000): org builds take their bench and platform
+	// base images from it (utils/dockerbase.go). Empty leaves FROM alone.
+	sharedRegistryEnv = "HEIMDALL_SHARED_REGISTRY"
 	// sharedBuilderName is the buildx builder the runner creates on
 	// HEIMDALL_SHARED_BUILDKIT.
 	sharedBuilderName = "heimdall-org-builder"
@@ -93,6 +97,7 @@ func hasSharedFlag(args []string) bool {
 type sharedFlags struct {
 	server, secretFile, runtime, name, config string
 	builder, buildkit, gateway, projectsDir   string
+	registry                                  string
 	slots                                     int
 	poll                                      time.Duration
 	debug                                     bool
@@ -112,6 +117,7 @@ func parseSharedFlags(args []string) (*sharedFlags, error) {
 	fs.StringVar(&f.config, "config", defaultConfig, "bench config")
 	fs.StringVar(&f.builder, "builder", os.Getenv(sharedBuilderEnv), "buildx builder for images from org Dockerfiles")
 	fs.StringVar(&f.buildkit, "buildkit", os.Getenv(sharedBuildkitEnv), "isolated BuildKit address for images from org Dockerfiles")
+	fs.StringVar(&f.registry, "registry", os.Getenv(sharedRegistryEnv), "private image registry (host:port) org builds take bench and platform base images from")
 	fs.StringVar(&f.gateway, "gateway-container", os.Getenv(sharedGatewayEnv), "gateway container every org network joins")
 	fs.StringVar(&f.projectsDir, "projects-dir", os.Getenv(sharedMirrorEnv), "folder (same path on the Docker host) for downloaded org projects")
 	fs.BoolVar(&f.debug, "debug", false, "debug logging")
@@ -307,6 +313,8 @@ type sharedHost struct {
 	runtime     string // container runtime of every org
 	filter      string // assignment filter ("" every org)
 	builder     string // buildx builder for org images ("" refuses them)
+	registry    string // registry org builds take base images from ("" none)
+	regClient   *http.Client
 	gateway     string // gateway container every org network joins
 	gatewayHost string // the gateway's name as agents dial it
 	trusted     []string
@@ -329,10 +337,20 @@ func sharedSplitList(s string) []string {
 
 // orgPolicy is the Docker policy of one org on this runner.
 func (h *sharedHost) orgPolicy(org string, approved []string, projectRoot string) *utils.DockerPolicy {
-	return &utils.DockerPolicy{
+	p := &utils.DockerPolicy{
 		OrgID: org, Runtime: h.runtime, Builder: h.builder, TagPrefix: utils.OrgImagePrefix(org),
 		Trusted: h.trusted, Untrusted: []string{projectRoot}, Approved: append([]string(nil), approved...), Platform: h.platform,
+		Registry: h.registry,
 	}
+	if h.registry != "" {
+		host, client := h.registry, h.regClient
+		p.RegistryHas = func(ref string) (bool, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			return utils.RegistryHas(ctx, client, host, ref)
+		}
+	}
+	return p
 }
 
 // orgNetworkName is the eval network of one org.
@@ -461,6 +479,10 @@ func runSharedRunner(args []string) int {
 	}
 	if h.builder, err = ensureBuilder(ctx, a.docker, f.builder, f.buildkit); err != nil {
 		return fail("%v", err)
+	}
+	if h.builder != "" {
+		h.registry = strings.TrimSpace(f.registry)
+		h.regClient = &http.Client{Timeout: 15 * time.Second}
 	}
 	if h.builder == "" {
 		a.logger.Warn("shared runner: no isolated image builder (" + sharedBuildkitEnv + "): images from org Dockerfiles are refused; built-in and approved images still run")

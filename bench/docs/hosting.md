@@ -265,7 +265,10 @@ tag onto a half-finished build; a stack with its own image tag,
 `HEIMDALL_IMAGE=heimdall/server:<tag>`, gets `:<tag>-previous` instead, so
 two stacks on one Docker host never move each other's rollback image),
 rebuilds, applies migrations and recreates what changed, then waits for
-health. Rollback steps are in the script's header (`upgrade.sh --help`):
+health. Containers of services the compose file no longer has are removed
+(the retired `demo-runner`); services of profiles not started on this host
+are left alone. When the shared worker runs here, its profile is upgraded
+too and `registry-sync.sh` refreshes the private registry. Rollback steps are in the script's header (`upgrade.sh --help`):
 check out the previous commit, retag `:previous` as `:local`,
 `up -d --no-build`. Migrations only add tables and columns, so the previous
 version runs on the migrated database; if not, restore the dump. Upgrade
@@ -290,13 +293,19 @@ on, which is every organization without its own quota row.
 | `HEIMDALL_SERVER_ADMINS` | server | Comma-separated emails of server admins: quotas, image approval, kill switch. |
 | `HEIMDALL_SHARED_RUNTIME` | `shared-runner` | `auto` (default): every container runs under gVisor (`--runtime runsc`) when the Docker host has a `runsc` runtime, serving every org; without it the runner logs a warning, uses runc and serves only orgs whose runtime is `runc`. `runsc` refuses to start without gVisor; `runc` forces runc. |
 | `HEIMDALL_SHARED_BUILDKIT` | `shared-runner` | Address of the isolated BuildKit (`tcp://buildkitd:1234`, the `buildkitd` service of the profile). Images from org-written Dockerfiles build only there, never on the host daemon, and load as `org-<org id>/<tag>`. Empty refuses them (built-in and approved images still run). |
-| `HEIMDALL_SHARED_PLATFORM_IMAGES` | `shared-runner` | Comma-separated images every org may pull (a trailing `/` or `:` is a prefix). Otherwise an org pulls only its approved, digest-pinned images. |
+| `HEIMDALL_SHARED_REGISTRY` | `shared-runner` | The private image registry org builds take their base images from (`registry:5000`, the `registry` service of the profile; only that host is trusted over plain HTTP in `deploy/hosted/buildkitd.toml`). Empty leaves `FROM` lines alone, so `FROM bench/...` fails. |
+| `HEIMDALL_REGISTRY_DIR` | `registry` | Host folder for the registry's images, e.g. on the data disk. Empty: the `registry-data` Docker volume. |
+| `HEIMDALL_SHARED_PLATFORM_IMAGES` | `shared-runner` | Comma-separated images every org may pull (a trailing `/` or `:` is a prefix). Otherwise an org pulls only its approved, digest-pinned images. Org Dockerfiles take those without a registry host (and `bench/...`) from the private registry. |
 | `HEIMDALL_SHARED_GATEWAY_CONTAINER` | `shared-runner` | The gateway container every org network joins. Empty finds the compose project's `bifrost` service. |
 | `HEIMDALL_SHARED_SLOTS` | `shared-runner` | Slots per organization, capped by its max concurrent runs. |
 
 2. Build the task and agent images the built-in benchmarks use, e.g.
    `docker build -t bench/coding-core-base:1 benchmarks/coding-core/base`.
 3. `docker compose -f deploy/hosted/docker-compose.yml --env-file deploy/hosted/.env --profile shared-runner up -d`.
+4. `deploy/hosted/registry-sync.sh`: copies `bench/coding-core-base:1` and
+   the `HEIMDALL_SHARED_PLATFORM_IMAGES` into the private registry (below).
+   Run it again after rebuilding one of them; `upgrade.sh` runs it when the
+   shared worker is up. With arguments it copies those images instead.
 
 Each run uses the keys of the organization it belongs to, delivered for that
 run only; the shared worker has no provider key of its own. The Docker
@@ -314,8 +323,16 @@ Isolation between orgs on the shared host:
   release log) is downloaded with that org's own runner token from
   `GET /api/bench/workers/project` before every lease.
 - Org Dockerfiles build on the rootless `buildkitd` service (no Docker socket,
-  its own network). BuildKit there cannot see images on the host daemon, so an
-  org Dockerfile's `FROM` must name an image from a registry. Tags are
+  its own network). BuildKit there cannot see images on the host daemon, so
+  the bench's own images (`FROM bench/coding-core-base:1`) and the operator's
+  platform images come from the `registry` service beside it: internal only
+  (builder network, no host port), `registry:2` pinned by digest, storage in
+  `HEIMDALL_REGISTRY_DIR` or the `registry-data` volume. The worker points
+  each such `FROM` at the registry with a named build context, so org
+  Dockerfiles stay unchanged; an image missing there fails the build before
+  it starts, naming the image and `registry-sync.sh`. Any other `FROM` must
+  name an image BuildKit can pull itself. The built image is loaded into
+  the host's Docker (`buildx --load`) for the run. Tags are
   namespaced per org (`org-<org id>/...`); an org cannot use or overwrite
   another org's images or a platform tag. After upgrading, remove images that
   orgs built under global tags before this change (`docker image ls`).
@@ -395,16 +412,8 @@ masked too) with `REDACTED`, and drops the `Referer` header.
 project on 127.0.0.1:47443 and :47080 with Caddy's internal CA for
 `heimdall.localhost`, checks TLS, headers, redirect, body limit and internal
 ports, fetches the UI, signs up and creates an organization through the API,
-then removes everything. `--demo-runner` also starts the demo-runner profile
-with a runner token created through the API, waits until the server lists
-the runner, and runs a two-slot smoke experiment (toy agent, scripted model,
-no spend) on it end to end: lease, run, upload, seal, analysis, the verdict
-read over HTTPS (with the runner-side `gateway_hygiene` and
-`gateway_versions` checks), then a regrade job. It fails unless both slots
-finish with none failed, the verdict decision is not `invalid`, every named
-instrument is `pass`, `warn` or `not_applicable`, and the regrade yields a
-nonempty id whose verdict records it as `grade_source`. It needs the
-`bench/coding-core-base:1` image on the machine. `--s3` adds a local S3 endpoint (SeaweedFS, pinned by digest)
+then removes everything. (`--demo-runner` is retired with the demo-runner
+service and ignored: hosted installs have no demo.) `--s3` adds a local S3 endpoint (SeaweedFS, pinned by digest)
 as the evidence mirror and checks that `backup.sh` uploads a database dump
 and mirrors the demo experiments; it is also the way to try a mirror
 configuration before pointing it at a real bucket. It uses its own compose
@@ -425,6 +434,9 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_SHARED_RUNTIME` | Container runtime of the shared worker: `auto`, `runsc` or `runc`. |
 | `HEIMDALL_SHARED_SLOTS` | Runs at once per organization on the shared worker, capped by its own limit. |
 | `HEIMDALL_SHARED_BUILDKIT` | Address of the isolated BuildKit that builds images from org Dockerfiles. |
+| `HEIMDALL_SHARED_REGISTRY` | The private image registry beside that BuildKit (`registry:5000`) that org builds take bench and platform base images from. |
+| `HEIMDALL_REGISTRY_DIR` | Host folder (on the data disk) for that registry's images; empty is a Docker volume. |
+| `HEIMDALL_RUNNER_DIR` | Host folder of the shared worker's runs, releases and org projects; empty is `/var/lib/heimdall-shared-runner`. |
 | `HEIMDALL_SHARED_PLATFORM_IMAGES` | Images every organization may pull, comma-separated. |
 | `HEIMDALL_SHARED_GATEWAY_CONTAINER` | The model gateway container every org network joins; empty finds it by name. |
 | `HEIMDALL_MODAL_PYTHON` | Python with the `modal` package, for organizations whose runs go to Modal (shared worker). |

@@ -1,0 +1,6 @@
+# BuildKit settings of the shared worker's isolated builder
+# (docker-compose.yml, buildkitd): the private image registry beside it
+# speaks plain HTTP on the builder network. Only that host is trusted.
+[registry."registry:5000"]
+  http = true
+  insecure = true

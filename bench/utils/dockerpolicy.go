@@ -22,7 +22,10 @@ package utils
 //     suite files keep their tags and no org can claim a global tag;
 //   - an image in another org's namespace is refused outright;
 //   - `docker pull` fetches only the org's approved images (digest pinned,
-//     Assignment.Images) and the operator's platform images.
+//     Assignment.Images) and the operator's platform images;
+//   - an org build's bench and platform base images come from the private
+//     Registry beside Builder (dockerbase.go), as BuildKit cannot see the
+//     host's images.
 
 import (
 	"context"
@@ -68,6 +71,13 @@ type DockerPolicy struct {
 	// Platform lists images the operator allows every org to pull (exact
 	// references, or prefixes ending in "/" or ":").
 	Platform []string
+	// Registry is the private image registry beside Builder (host:port on
+	// the builder network). An org build's bench and platform base images
+	// come from it (dockerbase.go); empty leaves FROM lines alone.
+	Registry string
+	// RegistryHas reports whether Registry holds an image; nil skips the
+	// check (the build then fails in BuildKit instead).
+	RegistryHas func(ref string) (bool, error)
 
 	mu   sync.Mutex
 	tags map[string]string // tag as the org wrote it -> namespaced tag
@@ -297,6 +307,19 @@ func (p *DockerPolicy) rewriteBuild(rest []string) ([]string, error) {
 		return nil, fmt.Errorf("%w: images from your own Dockerfiles need the isolated image builder, which this worker does not have; ask the operator to start it (HEIMDALL_SHARED_BUILDER) or request a prebuilt image pinned by digest under Settings > Images", ErrPolicy)
 	}
 	out := []string{"buildx", "build", "--builder", p.Builder, "--load"}
+	buildArgs := map[string]string{}
+	for _, f := range flags {
+		if f.name == "--build-arg" {
+			if k, v, ok := strings.Cut(f.value, "="); ok {
+				buildArgs[k] = v
+			}
+		}
+	}
+	bases, err := p.baseContexts(dockerfile, buildArgs)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, bases...)
 	for _, f := range flags {
 		if !orgBuildFlags[f.name] {
 			return nil, fmt.Errorf("%w: docker build flag %s is not allowed for organization images", ErrPolicy, f.name)

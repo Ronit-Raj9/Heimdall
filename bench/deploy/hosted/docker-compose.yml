@@ -1,10 +1,11 @@
 # Hosted Heimdall: Caddy (HTTPS) -> Heimdall server -> Postgres, plus an
-# optional demo runner with its own Bifrost stack. From a fresh VM to a
+# optional shared worker with its own Bifrost stack. From a fresh VM to a
 # working instance: docs/hosting.md. Use the scripts beside this file rather
 # than raw compose; they pass the env file and fill in derived values:
 #
-#   deploy/hosted/bootstrap.sh   first run: .env, build, migrate, owner, demo org
+#   deploy/hosted/bootstrap.sh   first run: .env, build, migrate, owner
 #   deploy/hosted/upgrade.sh     pull, rebuild, migrate, restart
+#   deploy/hosted/registry-sync.sh  base images into the shared worker's registry
 #   deploy/hosted/backup.sh      database dump and evidence mirror
 #   deploy/hosted/smoke.sh       the whole stack on spare local ports, then down
 #
@@ -13,14 +14,16 @@
 #   docker compose -f deploy/hosted/docker-compose.yml --env-file deploy/hosted/.env up -d --wait
 #
 # Networks:
-#   edge      Caddy and the server (and the demo runner). Caddy is the only
-#             service with published ports (80, 443 and 443/udp).
+#   edge      Caddy and the server (and the shared worker). Caddy is the
+#             only service with published ports (80, 443 and 443/udp).
 #   backend   internal (no route out): the server and Postgres. Postgres is
 #             never published.
-#   upstream  demo-runner profile only: Bifrost, its Postgres and the fault
+#   upstream  shared-runner profile only: Bifrost, its Postgres and the fault
 #             proxy, which reaches the real provider.
-#   evalnet   demo-runner profile only, internal, IPv6 off: agent containers
-#             the demo runner starts can reach only Bifrost.
+#   builder   shared-runner profile only: the isolated BuildKit, its image
+#             registry and the shared worker.
+#   evalnet   shared-runner profile only, internal, IPv6 off: Bifrost's
+#             default eval network (each org gets its own, see below).
 #
 # Third-party images are pinned by digest (tag kept for reading). The server
 # and runner images are built here from this checkout
@@ -57,15 +60,15 @@ networks:
     internal: true
     labels: *labels
   builder:
-    # shared-runner profile: the isolated BuildKit and the shared runner
-    # only. Not internal (base images are pulled), but no Heimdall service,
-    # database or gateway is on it.
+    # shared-runner profile: the isolated BuildKit, its image registry and
+    # the shared runner only. Not internal (base images are pulled), but no
+    # Heimdall service, database or gateway is on it.
     enable_ipv6: false
     labels: *labels
   evalnet:
-    # Fixed name: the demo runner attaches agent containers to it by name.
-    # The shared runner does not use it: each org gets its own internal
-    # network, heimdall-evalnet-<org>, which only the gateway joins.
+    # Fixed name: Bifrost's default eval network. The shared runner does
+    # not start agents on it: each org gets its own internal network,
+    # heimdall-evalnet-<org>, which only the gateway joins.
     name: ${HEIMDALL_EVAL_NETWORK:-heimdall-evalnet}
     internal: true
     enable_ipv6: false
@@ -87,6 +90,10 @@ volumes:
   faultproxy-ledger:
     labels: *labels
   buildkit-state:
+    labels: *labels
+  # The shared worker's image registry, unless HEIMDALL_REGISTRY_DIR names
+  # a host folder (on the data disk) instead.
+  registry-data:
     labels: *labels
 
 services:
@@ -153,7 +160,7 @@ services:
       HEIMDALL_DATABASE_URL: postgres://heimdall:${HEIMDALL_PG_PASSWORD:?set HEIMDALL_PG_PASSWORD in deploy/hosted/.env}@postgres:5432/heimdall?sslmode=disable
       BENCH_AUTH_PUBLIC_URL: ${HEIMDALL_PUBLIC_URL:-https://${HEIMDALL_DOMAIN:?set HEIMDALL_DOMAIN in deploy/hosted/.env}}
       BENCH_AUTH_SIGNUP: ${HEIMDALL_SIGNUP:-invite}
-      # The public name, and "heimdall" for the demo runner on the edge network.
+      # The public name, and "heimdall" for the shared worker on the edge network.
       BENCH_SERVER_ALLOWED_HOSTS: ${HEIMDALL_DOMAIN},heimdall
       # Only compose networks reach the server (its port is not published),
       # and Caddy overwrites X-Forwarded-For with the real client address, so
@@ -212,14 +219,11 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # Profile demo-runner: a runner registered to the demo organization (pool
-  # "demo") with its own Bifrost gateway and fault proxy. Start with
-  #   docker compose ... --profile demo-runner up -d
-  # after setting HEIMDALL_DEMO_RUNNER_TOKEN. It is the only place this host
-  # runs agent containers, and only for the demo organization's suites.
+  # Profile shared-runner: the shared worker (below) with its own Bifrost
+  # gateway, fault proxy, isolated BuildKit and image registry.
 
   bifrost-postgres:
-    profiles: [demo-runner, shared-runner]
+    profiles: [shared-runner]
     image: postgres:18@sha256:979bccfde35445db618c65107d27d08c6c21339d8dc3ad4c830c6633947be0e4
     labels: *labels
     <<: *logging
@@ -241,7 +245,7 @@ services:
     restart: unless-stopped
 
   faultproxy:
-    profiles: [demo-runner, shared-runner]
+    profiles: [shared-runner]
     image: ${HEIMDALL_IMAGE:-heimdall/server:local}
     labels: *labels
     <<: [*hardening, *logging]
@@ -268,7 +272,7 @@ services:
     restart: unless-stopped
 
   bifrost:
-    profiles: [demo-runner, shared-runner]
+    profiles: [shared-runner]
     image: maximhq/bifrost:v2.5.1@sha256:5ec9873acaf1687556b6e4dd854b92b539d9debf87a5a683b66338648b84d3c8
     labels: *labels
     <<: *logging
@@ -293,68 +297,6 @@ services:
       retries: 60
     restart: unless-stopped
 
-  demo-runner:
-    profiles: [demo-runner]
-    build:
-      context: ../..
-      dockerfile: deploy/hosted/Dockerfile.server
-      target: runner
-    image: ${HEIMDALL_RUNNER_IMAGE:-heimdall/runner:local}
-    labels: *labels
-    <<: [*hardening, *logging]
-    # Agent containers are started on the host's Docker through its socket,
-    # so every path the runner hands to `docker run -v` must mean the same on
-    # the host: the checkout and the runner's data folder are mounted at
-    # their host paths.
-    group_add: ["${HEIMDALL_DOCKER_GID:-0}"]
-    working_dir: ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        set -eu
-        umask 077
-        [ -n "$${HEIMDALL_RUNNER_TOKEN:-}" ] || { echo "HEIMDALL_DEMO_RUNNER_TOKEN is empty: create a runner token for the demo org (docs/hosting.md)" >&2; exit 64; }
-        printf '%s' "$$HEIMDALL_RUNNER_TOKEN" > /tmp/runner.token
-        unset HEIMDALL_RUNNER_TOKEN
-        exec bifrost-bench runner start -server http://heimdall:8090 -token-file /tmp/runner.token \
-          -config "$$HEIMDALL_BENCH_DIR/deploy/bench.yaml" -name demo-runner -slots 1 \
-          -spend-cap-usd "$$HEIMDALL_DEMO_SPEND_CAP_USD"
-    environment:
-      HOME: /tmp
-      HEIMDALL_RUNNER_TOKEN: ${HEIMDALL_DEMO_RUNNER_TOKEN:-}
-      HEIMDALL_DEMO_SPEND_CAP_USD: ${HEIMDALL_DEMO_SPEND_CAP_USD:-5}
-      HEIMDALL_BENCH_DIR: ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}
-      BENCH_RUNS_ROOT: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-runner}/runs
-      BENCH_RELEASES_ROOT: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-runner}/releases
-      BENCH_GATEWAY_URL: http://bifrost:8080
-      BENCH_GATEWAY_AGENT_URL: http://bifrost:8080
-      BENCH_GATEWAY_FAULT_PROXY_URL: http://faultproxy:9100
-      BENCH_FAULTPROXY_CONTROL_URL: http://faultproxy:9101
-      BENCH_NETWORKS_EVAL: ${HEIMDALL_EVAL_NETWORK:-heimdall-evalnet}
-      BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
-      BENCH_FAULTPROXY_TOKEN: ${BENCH_FAULTPROXY_TOKEN:-}
-      BENCH_GATEWAY_SLOTS_PER_PROVIDER: ${HEIMDALL_PROVIDER_SLOTS:-32}
-      BENCH_GATEWAY_ORG_SLOTS_PER_PROVIDER: ${HEIMDALL_PROVIDER_SLOTS:-32}
-      BENCH_RUNNER_DISK_MIN_FREE_GB: ${HEIMDALL_RUNNER_MIN_FREE_GB:-10}
-      HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:ro
-      - ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-runner}:${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-runner}
-      # Built-in benchmark library (HEIMDALL_LIBRARY_DIR in .env), read-only at
-      # its host path so runners hand task folders to the host's Docker
-      # unchanged. Unset binds /dev/null over itself: no library, as before.
-      - ${HEIMDALL_LIBRARY_DIR:-/dev/null}:${HEIMDALL_LIBRARY_DIR:-/dev/null}:ro
-    tmpfs:
-      - /tmp
-    networks: [edge, upstream]
-    depends_on:
-      heimdall:
-        condition: service_healthy
-      bifrost:
-        condition: service_healthy
-    restart: unless-stopped
-
   # Profile shared-runner: the shared runner pool (web parity F3). Serves
   # every org whose limits allow the shared pool, one worker loop per org.
   # Needs HEIMDALL_SHARED_RUNNER_SECRET on both sides.
@@ -365,6 +307,8 @@ services:
   #     when it does not;
   #   - org Dockerfiles build only on buildkitd below (no host socket, own
   #     network), loaded as org-<id>/<tag>; pulls only of approved images;
+  #   - their bench and platform base images (FROM bench/...) come from the
+  #     registry below, filled by deploy/hosted/registry-sync.sh;
   #   - each org's agents get their own internal network;
   #   - no server data is mounted: each org's project is downloaded with
   #     that org's own runner token, into HEIMDALL_RUNNER_DIR/projects/<org>.
@@ -380,8 +324,41 @@ services:
     command: ["--addr", "tcp://0.0.0.0:1234", "--oci-worker-no-process-sandbox"]
     volumes:
       - buildkit-state:/home/user/.local/share/buildkit
+      # Trusts the registry below over plain HTTP, that host only.
+      - ./buildkitd.toml:/home/user/.config/buildkit/buildkitd.toml:ro
     networks: [builder]
     restart: unless-stopped
+
+  # The shared worker's private image registry: the bench and operator
+  # platform images that org Dockerfiles build FROM, which the isolated
+  # BuildKit cannot see on the host daemon. Internal only: on the builder
+  # network, no host port. deploy/hosted/registry-sync.sh fills it.
+  registry:
+    profiles: [shared-runner]
+    image: registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+    labels: *labels
+    <<: [*hardening, *logging]
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    volumes:
+      - ${HEIMDALL_REGISTRY_DIR:-registry-data}:/var/lib/registry
+    tmpfs:
+      - /tmp
+    networks: [builder]
+    restart: unless-stopped
+
+  # Tool, never started by `up`: deploy/hosted/registry-sync.sh pipes a
+  # `docker save` of a host image into it and it pushes the image to the
+  # registry above over the builder network.
+  registry-sync:
+    profiles: [registry-sync]
+    image: gcr.io/go-containerregistry/crane:debug@sha256:e78770b31258a3846f878036d9c1f63fbe4c871f9f56990bf77fd95c013e3c1b
+    labels: *labels
+    <<: *logging
+    # The image is staged in the container's own layer (on disk, not RAM)
+    # and goes with the container.
+    entrypoint: ["/busybox/sh", "-c"]
+    networks: [builder]
 
   shared-runner:
     profiles: [shared-runner]
@@ -430,6 +407,7 @@ services:
       BENCH_RUNNER_DISK_MIN_FREE_GB: ${HEIMDALL_RUNNER_MIN_FREE_GB:-10}
       HEIMDALL_SHARED_PROJECTS_MIRROR: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}/projects
       HEIMDALL_SHARED_BUILDKIT: ${HEIMDALL_SHARED_BUILDKIT:-tcp://buildkitd:1234}
+      HEIMDALL_SHARED_REGISTRY: ${HEIMDALL_SHARED_REGISTRY:-registry:5000}
       HEIMDALL_SHARED_GATEWAY_CONTAINER: ${HEIMDALL_SHARED_GATEWAY_CONTAINER:-}
       HEIMDALL_SHARED_PLATFORM_IMAGES: ${HEIMDALL_SHARED_PLATFORM_IMAGES:-}
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
@@ -454,5 +432,7 @@ services:
       bifrost:
         condition: service_healthy
       buildkitd:
+        condition: service_started
+      registry:
         condition: service_started
     restart: unless-stopped
