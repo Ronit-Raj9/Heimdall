@@ -20,6 +20,7 @@ import {
 	type LucideIcon,
 } from "lucide-react";
 import i18n from "@/lib/i18n";
+import { pageTitleOverride } from "@/lib/routing/pageTitle";
 
 export type BenchNavGroupId = "home" | "agents" | "test" | "tasks" | "watch" | "release" | "settings";
 
@@ -218,17 +219,27 @@ export function activeNavGroup(pathname: string): BenchNavGroupId | null {
 
 /**
  * Pages that have their own browser tab title although the sidebar highlights another entry for
- * them (through `also`): path to its fw23 locale key.
+ * them (through `also`) or none: path to its fw23 locale key.
  */
-const PAGE_TITLES: Readonly<Record<string, "titles.maxim">> = {
+const PAGE_TITLES: Readonly<Record<string, "titles.maxim" | "titles.docs" | "titles.jobs">> = {
 	"/maxim": "titles.maxim",
+	"/docs": "titles.docs",
+	"/jobs": "titles.jobs",
 };
 
-/** The browser tab title for a path: the page's own title, else its nav entry's label, then the app name. */
+/** Path prefixes with their own title, checked in order after the exact paths: an object page below a list. */
+const PAGE_TITLE_PREFIXES: readonly (readonly [string, "titles.job"])[] = [["/jobs/", "titles.job"]];
+
+/**
+ * The browser tab title for a path: the title the page set for itself (usePageTitle), then the
+ * page's own title (exact path, then prefix), else its nav entry's label, then the app name.
+ */
 export function pageTitle(pathname: string): string {
+	const override = pageTitleOverride(pathname);
+	if (override) return override;
 	const app = i18n.t("app.name", { ns: "bench" });
 	const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-	const own = PAGE_TITLES[path];
+	const own = PAGE_TITLES[path] ?? PAGE_TITLE_PREFIXES.find(([prefix]) => path.startsWith(prefix))?.[1];
 	if (own) return `${i18n.t(own, { ns: "fw23" })} · ${app}`;
 	const item = activeNavItem(pathname);
 	return item ? `${i18n.t(item.labelKey, { ns: "bench" })} · ${app}` : app;
