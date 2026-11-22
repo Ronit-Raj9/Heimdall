@@ -579,6 +579,8 @@ export interface RunDebugInfo {
 	from_exp?: string;
 	call?: number;
 	held_ms?: number;
+	/** The source run's fault condition when it was not the clean one. */
+	from_condition?: string;
 }
 
 // X7: GPU benchmarking (schemas/gpu.go, docs/gpu-tasks.md).

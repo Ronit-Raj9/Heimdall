@@ -210,18 +210,10 @@ func (h *RunsHandler) getRun(ctx *fasthttp.RequestCtx) {
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, h.withDebugAllowed(ctx, rv, out))
 }
 
-// runDetailResponse is GET /runs/{id}: the run detail plus the debug
-// actions the run allows (fix wave 2, N133), so the page shows the reason
-// instead of hiding Replay, Fork and Debug.
-type runDetailResponse struct {
-	schemas.RunDetail
-	DebugAllowed *RunDebugAllowed `json:"debug_allowed,omitempty"`
-}
-
 // withDebugAllowed adds debug_allowed, computed by the rule the debug routes
 // apply, and the source condition of a debug run (DebugSpec.FromCondition,
 // read from its frozen plan) to a run detail.
-func (h *RunsHandler) withDebugAllowed(ctx context.Context, rv *RunView, out schemas.RunDetail) runDetailResponse {
+func (h *RunsHandler) withDebugAllowed(ctx context.Context, rv *RunView, out schemas.RunDetail) schemas.RunDetail {
 	var m *schemas.Manifest
 	if h.index != nil {
 		m, _ = h.index.Manifest(rv.Slot.ExpID)
@@ -232,7 +224,8 @@ func (h *RunsHandler) withDebugAllowed(ctx context.Context, rv *RunView, out sch
 		out.Run.Debug = &d
 	}
 	probe := conditionProbe(ctx, h.suites, rv, m)
-	return runDetailResponse{RunDetail: out, DebugAllowed: runDebugAllowed(rv.Slot.Condition, probe, rv.Sealed, out.Run.Debug)}
+	out.DebugAllowed = runDebugAllowed(rv.Slot.Condition, probe, rv.Sealed, out.Run.Debug)
+	return out
 }
 
 // legacyCanonicalView gives old sealed runs a read-only canonical shape. It

@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { conditionName } from "./debugActions";
 
 /** The note at the top of a debug run: what it came from, that it never counts, and time held. */
-export function DebugBanner({ debug }: { debug: RunDebug & { from_condition?: string } }) {
+export function DebugBanner({ debug }: { debug: RunDebug }) {
 	const { t } = useTranslation("runDebug");
 	const run = debug.from_run ?? "";
 	return (

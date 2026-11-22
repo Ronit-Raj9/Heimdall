@@ -18,12 +18,8 @@ import (
 // faults are not in the recording, so those stay refused.
 
 // RunDebugAllowed says which debug actions a run allows (RunDetail
-// debug_allowed). Reason says why one is refused; empty when both are allowed.
-type RunDebugAllowed struct {
-	Replay bool   `json:"replay"`
-	Fork   bool   `json:"fork"`
-	Reason string `json:"reason,omitempty"`
-}
+// debug_allowed); the type lives in schemas.
+type RunDebugAllowed = schemas.RunDebugAllowed
 
 // debugFaultRule decides whether a run under condition cond may be debugged
 // in mode (replay, fork or step). It returns nil when allowed, else the

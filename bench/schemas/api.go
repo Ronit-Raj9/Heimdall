@@ -171,6 +171,19 @@ type RunDetail struct {
 	// Agents is the agent tree of a multi-agent run (agents.json); nil for a
 	// single-agent run.
 	Agents *AgentTree `json:"agents,omitempty"`
+
+	// DebugAllowed says which debug actions the run allows, by the rule the
+	// debug routes apply (fix wave 2, N133), so the page shows the reason
+	// instead of hiding Replay, Fork and Debug.
+	DebugAllowed *RunDebugAllowed `json:"debug_allowed,omitempty"`
+}
+
+// RunDebugAllowed says which debug actions a run allows (RunDetail
+// debug_allowed). Reason says why one is refused; empty when both are allowed.
+type RunDebugAllowed struct {
+	Replay bool   `json:"replay"`
+	Fork   bool   `json:"fork"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // RunDiff is GET /runs/{id}/diff. Patch is inert text.

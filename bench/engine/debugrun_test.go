@@ -25,8 +25,8 @@ func TestDebugPlan(t *testing.T) {
 	if runDebugOf(m) != nil {
 		t.Fatal("no debug spec, no link")
 	}
-	m.Experiment.Debug = &schemas.DebugSpec{Mode: schemas.DebugFork, FromRun: "r0", FromExp: "e0", Call: 2}
-	if d := runDebugOf(m); d.FromRun != "r0" || d.Call != 2 || d.Mode != schemas.DebugFork {
+	m.Experiment.Debug = &schemas.DebugSpec{Mode: schemas.DebugFork, FromRun: "r0", FromExp: "e0", Call: 2, FromCondition: "model-down"}
+	if d := runDebugOf(m); d.FromRun != "r0" || d.Call != 2 || d.Mode != schemas.DebugFork || d.FromCondition != "model-down" {
 		t.Fatalf("link = %+v", d)
 	}
 }
