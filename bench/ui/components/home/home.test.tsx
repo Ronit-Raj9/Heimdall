@@ -5,7 +5,21 @@ import { errorQuery, loadingQuery, okQuery, render, tagOf } from "@/lib/testing/
 import fs from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { byNewest, evaluationStats, homeStats, newestEvaluations, humanExperimentName, isSystemCheck, mergeEvents, splitExperiments, suiteAdmission, suiteReady } from "./home.utils";
+import {
+	byNewest,
+	evaluationStats,
+	homeStats,
+	newestEvaluations,
+	humanExperimentName,
+	isSystemCheck,
+	mergeEvents,
+	recentComparisons,
+	runningNow,
+	splitExperiments,
+	suiteAdmission,
+	suiteReady,
+} from "./home.utils";
+import { RunningNowList } from "@/app/index/views/homeView";
 import { RecentEvaluations, evaluationWho } from "./recentEvaluations";
 import { RecentExperiments } from "./recentExperiments";
 import { RunningCardBody, RunningExperiments } from "./runningExperiments";
@@ -67,7 +81,12 @@ describe("home utils", () => {
 				{ ...experiments[0], state: "running", started_at: "2026-11-20T00:00:00Z", spent_usd: { state: "known", v: 2.5 } },
 				{ ...experiments[1], state: "done", started_at: "2026-10-01T00:00:00Z", spent_usd: { state: "known", v: 9 } },
 			] as never,
-			[run("2026-11-20T00:00:00Z", "pass"), run("2026-11-19T00:00:00Z", "fail"), run("2026-10-01T00:00:00Z", "pass"), run("2026-11-20T00:00:00Z", "pass", false)],
+			[
+				run("2026-11-20T00:00:00Z", "pass"),
+				run("2026-11-19T00:00:00Z", "fail"),
+				run("2026-10-01T00:00:00Z", "pass"),
+				run("2026-11-20T00:00:00Z", "pass", false),
+			],
 			now,
 		);
 		expect(stats).toMatchObject({ experiments: 2, running: 1, runsWeek: 3, graded: 3, passed: 2, spendMonth: 2.5 });
@@ -152,8 +171,102 @@ describe("SuitesPanel", () => {
 		expect(tagOf(html, "home-suite-acme-broken")).toContain('data-ready="failed"');
 		expect(html).toContain("4 tasks");
 		expect(html).toContain("Coding basics");
-		expect(html).toContain("Not ready yet");
+		expect(html).toContain("1 of 3 tasks ready");
 		expect(html).not.toContain("admitted");
+	});
+	it("says how many tasks are ready, and Not ready yet only when none is", () => {
+		const base = suites.find((suite) => suite.id === "coding-core")!;
+		const html = render(
+			<SuitesPanel
+				suites={[
+					{ ...base, id: "hd-harbor-tb2", task_count: 89, admitted_count: 24, lock_state: "locked" },
+					{ ...base, id: "hd-swe-verified", task_count: 500, admitted_count: 0, lock_state: "locked" },
+				]}
+				limit={20}
+			/>,
+		);
+		expect(tagOf(html, "home-suite-state-hd-harbor-tb2")).toContain('data-readiness="needsAdmission"');
+		expect(html).toContain("24 of 89 tasks ready");
+		expect(tagOf(html, "home-suite-state-hd-swe-verified")).toContain('data-readiness="notReady"');
+		expect(html).toContain("Not ready yet");
+	});
+});
+
+describe("Running now and Recent comparisons", () => {
+	const ev = (id: string, created_at: string, status: string) =>
+		({
+			id,
+			created_at,
+			status,
+			spec: {
+				name: `eval ${id}`,
+				mode: "score",
+				arms: [{ label: "A", agent: "codex", model: "gpt-x" }],
+				benchmarks: ["tau2"],
+				tasks_per_benchmark: 5,
+				trials: 1,
+				faults: ["clean"],
+			},
+			children: [],
+		}) as unknown as import("@/lib/store/apis/evaluationsApi").Evaluation;
+	const exp = (
+		exp_id: string,
+		name: string,
+		state: ExperimentStatus["state"],
+		extra: Partial<ExperimentStatus> = {},
+	): ExperimentStatus => ({
+		exp_id,
+		name,
+		state,
+		manifest_hash: "h",
+		frozen_at: "2026-11-22T10:00:00Z",
+		started_at: "2026-11-22T10:00:00Z",
+		slots: { total: 4, done: 1, running: 1, failed: 0 },
+		spent_usd: { state: "observed", v: 0 },
+		suite: "tb2@1.0.0",
+		arms: ["A", "B"],
+		...extra,
+	});
+	const evaluations = [
+		ev("ev_1", "2026-11-22T10:00:00Z", "running"),
+		ev("ev_2", "2026-11-22T11:00:00Z", "running"),
+		ev("ev_3", "2026-11-22T12:00:00Z", "queued"),
+		ev("ev_4", "2026-11-22T13:00:00Z", "running"),
+		ev("ev_20261122_142833_4eaebd", "2026-11-22T14:28:33Z", "running"),
+		ev("ev_old", "2026-11-21T09:00:00Z", "done"),
+	];
+	const experimentsNow = [
+		exp("e_admit_acme_voice_desk_1a2b", "admit-acme-voice-desk", "running", { suite: "acme-voice-desk@1.0.0", arms: ["oracle", "noop"] }),
+		exp("e_child", "codex score tau2", "running", { arms: ["A"], evaluation_id: "ev_4" }),
+		exp("e_practice", "try coding", "running", { suite: "coding-core@1.0.0" }),
+		exp("e_mine", "prompt v2 vs v1", "running"),
+	];
+	it("lists every active evaluation, then running comparisons, cut to 4 after filtering", () => {
+		const all = runningNow(evaluations, experimentsNow);
+		expect(all.total).toBe(6);
+		expect(all.evaluations.map((e) => e.id)).toEqual(["ev_20261122_142833_4eaebd", "ev_4", "ev_3", "ev_2"]);
+		expect(all.comparisons).toEqual([]);
+		expect(all.more).toBe(2);
+		const few = runningNow(evaluations.slice(0, 2), experimentsNow);
+		expect(few.comparisons.map((e) => e.exp_id)).toEqual(["e_mine"]);
+		expect(few.more).toBe(0);
+		expect(evaluationStats(evaluations).active).toBe(5);
+	});
+	it("shows 4 of 5 active evaluations with +1 more", () => {
+		const running = runningNow(evaluations, []);
+		expect(running.total).toBe(5);
+		const html = render(<RunningNowList running={running} />);
+		expect(html).toContain('href="/evaluations/ev_20261122_142833_4eaebd"');
+		expect(html).not.toContain('href="/evaluations/ev_1"');
+		expect(tagOf(html, "home-running-more")).toContain('href="/evaluations?status=running"');
+		expect(html).toContain("+1 more");
+	});
+	it("keeps readiness checks, practice runs and evaluation benchmarks out of Recent comparisons", () => {
+		const done = experimentsNow.map((e) => ({ ...e, state: "done" as const }));
+		expect(recentComparisons(done).map((e) => e.exp_id)).toEqual(["e_mine"]);
+		const html = render(<RecentExperiments experiments={recentComparisons(done)} />);
+		expect(html).not.toContain("Readiness check");
+		expect(html).not.toContain("acme-voice-desk");
 	});
 });
 
@@ -175,7 +288,15 @@ describe("RecentEvaluations", () => {
 			id,
 			created_at,
 			status,
-			spec: { name: `eval ${id}`, mode: arms.length > 1 ? "versions" : "score", arms, benchmarks: ["hd-harbor-tb2", "tau2"], tasks_per_benchmark: 5, trials: 2, faults: ["clean"] },
+			spec: {
+				name: `eval ${id}`,
+				mode: arms.length > 1 ? "versions" : "score",
+				arms,
+				benchmarks: ["hd-harbor-tb2", "tau2"],
+				tasks_per_benchmark: 5,
+				trials: 2,
+				faults: ["clean"],
+			},
 			children: [],
 		}) as unknown as import("@/lib/store/apis/evaluationsApi").Evaluation;
 	const list = [

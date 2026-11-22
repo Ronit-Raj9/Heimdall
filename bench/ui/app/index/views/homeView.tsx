@@ -1,5 +1,16 @@
 import { Pill, StatCard } from "@/components/home/homeBits";
-import { evaluationStats, firstRunSeen, homeStats, markFirstRunSeen, isSystemCheck, monthStart, newestEvaluations, splitExperiments, type ExperimentListItem } from "@/components/home/home.utils";
+import {
+	evaluationStats,
+	firstRunSeen,
+	homeStats,
+	markFirstRunSeen,
+	monthStart,
+	newestEvaluations,
+	recentComparisons,
+	runningNow,
+	type ExperimentListItem,
+	type RunningNow,
+} from "@/components/home/home.utils";
 import { RecentEvaluations } from "@/components/home/recentEvaluations";
 import { YourAgents } from "@/components/home/yourAgents";
 import { RecentExperiments } from "@/components/home/recentExperiments";
@@ -14,7 +25,7 @@ import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useGetAgentsQuery, useGetSuitesQuery, useListExperimentsQuery } from "@/lib/store";
 import "@/lib/types/agentFirstI18n";
 import { useListRunsQuery } from "@/lib/store/apis/benchApi";
-import { useListEvaluationsQuery } from "@/lib/store/apis/evaluationsApi";
+import { useListEvaluationsQuery, type Evaluation } from "@/lib/store/apis/evaluationsApi";
 import "@/lib/types/homeI18n";
 import { cn } from "@/lib/utils";
 import { Link, Navigate } from "@tanstack/react-router";
@@ -53,17 +64,20 @@ export default function HomeView() {
 	const evaluations = evals.data ?? [];
 	const evStats = evaluationStats(evaluations);
 	const recentEvaluations = newestEvaluations(evaluations, EVALUATIONS_SHOWN);
-	const split = splitExperiments(experiments);
-	// Readiness checks Heimdall starts on its own stay out of "Running now"; Recent labels them.
-	const running = split.running.filter((exp) => !isSystemCheck(exp));
-	const recent = split.recent;
+	// Running now: active evaluations (what the Evaluations tile counts) plus running comparisons of no
+	// evaluation; checks and practice runs stay out of both lists.
+	const running = runningNow(evaluations, experiments);
+	const recent = recentComparisons(experiments);
 	const empty = list.isSuccess && experiments.length === 0;
 	const session = useSession();
 	const mayRun = canUse(session, "member");
 	const now = new Date();
 	const stats = homeStats(experiments, runs.data?.runs ?? [], now);
 
-	const tracks = useMemo(() => new Map((suites.data?.suites ?? []).map((suite) => [suite.id, suite.track as string | undefined])), [suites.data]);
+	const tracks = useMemo(
+		() => new Map((suites.data?.suites ?? []).map((suite) => [suite.id, suite.track as string | undefined])),
+		[suites.data],
+	);
 	const trackOf = (suite: string | undefined) => (suite ? tracks.get(suiteIdOf(suite)) : undefined);
 
 	// First sign-in to an org with nothing tested yet: open /evaluate, the one start path, once per browser.
@@ -152,16 +166,23 @@ export default function HomeView() {
 			{!empty && (
 				<HomeSection
 					title={t("running.title")}
-					badge={running.length > 0 ? <Pill tone="info">{running.length}</Pill> : undefined}
+					badge={running.total > 0 ? <Pill tone="info">{running.total}</Pill> : undefined}
 					testId="home-section-running"
 				>
-					{list.isLoading ? (
+					{list.isLoading || evals.isLoading ? (
 						<div className="grid gap-4 md:grid-cols-2" data-testid="home-running-loading" aria-hidden="true">
 							<div className="bg-muted h-44 animate-pulse rounded-xl" />
 							<div className="bg-muted hidden h-44 animate-pulse rounded-xl md:block" />
 						</div>
-					) : list.error ? null : (
-						<RunningExperiments experiments={running} onFinished={() => void list.refetch()} trackOf={trackOf} />
+					) : list.error && evals.error ? null : (
+						<RunningNowList
+							running={running}
+							onFinished={() => {
+								void list.refetch();
+								void evals.refetch();
+							}}
+							trackOf={trackOf}
+						/>
 					)}
 				</HomeSection>
 			)}
@@ -198,13 +219,7 @@ export default function HomeView() {
 							{list.isLoading ? (
 								<ListSkeleton rows={5} testId="home-recent-loading" />
 							) : list.error ? (
-								<LoadError
-									title={t("recent.title")}
-									error={list.error}
-									onRetry={list.refetch}
-									testId="home-recent-error"
-									className="m-3"
-								/>
+								<LoadError title={t("recent.title")} error={list.error} onRetry={list.refetch} testId="home-recent-error" className="m-3" />
 							) : recent.length === 0 ? (
 								<EmptyState
 									icon={FlaskConical}
@@ -249,6 +264,43 @@ export default function HomeView() {
 				</HomeSection>
 			</div>
 		</section>
+	);
+}
+
+/**
+ * "Running now": the active evaluations as rows that open the evaluation, then the running comparisons
+ * as live cards, and "+N more" (to the running evaluations) when the list was cut.
+ */
+export function RunningNowList({
+	running,
+	onFinished,
+	trackOf,
+}: {
+	running: RunningNow<Evaluation, ExperimentListItem>;
+	onFinished?: () => void;
+	trackOf?: (suite: string | undefined) => string | undefined;
+}) {
+	const { t } = useTranslation("home");
+	if (running.evaluations.length === 0 && running.comparisons.length === 0) return <RunningExperiments experiments={[]} />;
+	return (
+		<div className="flex min-w-0 flex-col gap-4" data-testid="home-running-now">
+			{running.evaluations.length > 0 && (
+				<div className="bg-card overflow-hidden rounded-xl border shadow-(--shadow-card)" data-testid="home-running-evaluations">
+					<RecentEvaluations evaluations={running.evaluations} />
+				</div>
+			)}
+			{running.comparisons.length > 0 && <RunningExperiments experiments={running.comparisons} onFinished={onFinished} trackOf={trackOf} />}
+			{running.more > 0 && (
+				<Link
+					to={"/evaluations" as never}
+					search={{ status: "running" } as never}
+					className="text-muted-foreground hover:text-foreground w-fit text-sm font-medium"
+					data-testid="home-running-more"
+				>
+					{t("running.more", { count: running.more })}
+				</Link>
+			)}
+		</div>
 	);
 }
 
@@ -312,10 +364,7 @@ function ListSkeleton({ rows, testId }: { rows: number; testId: string }) {
 function OnboardingCard({ mayRun }: { mayRun: boolean }) {
 	const { t } = useTranslation("home");
 	return (
-		<div
-			className="bg-card flex flex-col gap-5 rounded-xl border p-6 sm:flex-row sm:items-center"
-			data-testid="home-welcome-card"
-		>
+		<div className="bg-card flex flex-col gap-5 rounded-xl border p-6 sm:flex-row sm:items-center" data-testid="home-welcome-card">
 			<div className="flex min-w-0 flex-1 flex-col gap-1.5">
 				<h2 className="text-lg font-semibold tracking-tight">{t("onboarding.title")}</h2>
 				<p className="text-muted-foreground max-w-xl text-sm">{mayRun ? t("onboarding.body") : t("onboarding.viewer")}</p>
@@ -331,4 +380,3 @@ function OnboardingCard({ mayRun }: { mayRun: boolean }) {
 		</div>
 	);
 }
-

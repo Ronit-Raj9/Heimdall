@@ -4,7 +4,8 @@ import { getBenchErrorMessage, useCreateReleaseMutation, useGetVerdictQuery, use
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ReleaseForm } from "./releaseForm";
-import { releasableExperiments, verdictPolicyDecision } from "./releases.utils";
+import "./fw10I18n";
+import { quickRunCount, releasableExperiments, verdictPolicyDecision } from "./releases.utils";
 
 /**
  * The "Release" panel: pick an experiment, see its verdict action and policy decision, and record a
@@ -12,8 +13,18 @@ import { releasableExperiments, verdictPolicyDecision } from "./releases.utils";
  */
 export function ReleasePanel({ initialExpId }: { initialExpId?: string } = {}) {
 	const { t } = useTranslation("bench");
+	const { t: tf } = useTranslation("fw10");
 	const list = useListExperimentsQuery();
-	const experiments = useMemo(() => releasableExperiments(sortExperimentsNewestFirst(list.data?.experiments ?? [])), [list.data]);
+	// Quick runs (generated names) stay out unless asked for; a quick run opened from its page stays listed.
+	const [showQuick, setShowQuick] = useState(false);
+	const sorted = useMemo(() => sortExperimentsNewestFirst(list.data?.experiments ?? []), [list.data]);
+	const quick = useMemo(() => quickRunCount(sorted), [sorted]);
+	const experiments = useMemo(() => {
+		const shown = releasableExperiments(sorted, { quick: showQuick });
+		const opened =
+			initialExpId && !shown.some((e) => e.exp_id === initialExpId) ? sorted.find((e) => e.exp_id === initialExpId) : undefined;
+		return opened ? [opened, ...shown] : shown;
+	}, [sorted, showQuick, initialExpId]);
 	const [picked, setPicked] = useState<string | undefined>(initialExpId);
 	const expId = picked ?? experiments[0]?.exp_id;
 	const verdict = useGetVerdictQuery(expId ?? "", { skip: !expId });
@@ -36,6 +47,18 @@ export function ReleasePanel({ initialExpId }: { initialExpId?: string } = {}) {
 					<p className="text-muted-foreground mb-3 text-sm" data-testid="release-no-experiments">
 						{t("releases.panel.noExperiments")}
 					</p>
+				)}
+				{quick > 0 && (
+					<label className="text-muted-foreground mb-3 inline-flex items-center gap-2 text-xs" title={tf("releases.showQuickHint")}>
+						<input
+							type="checkbox"
+							checked={showQuick}
+							onChange={(ev) => setShowQuick(ev.target.checked)}
+							className="accent-primary size-3.5"
+							data-testid="release-show-quick"
+						/>
+						{tf("releases.showQuick", { count: quick })}
+					</label>
 				)}
 				<ReleaseForm
 					key={expId ?? "none"}

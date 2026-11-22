@@ -1,6 +1,6 @@
 import { ExperimentTrialsPanel, hasContent } from "@/components/adaptive/trialsPanel"; // W7 adaptive trials and suite tiers
 import { TERMINAL_STATES, systemExperiment } from "@/components/experiments/experiments.utils";
-import { humanExperimentName } from "@/app/experiments/views/experimentBoard";
+import { humanExperimentName } from "@/components/experiments/experiments.utils";
 import { ExperimentExportMenu } from "@/components/export/exportMenu"; // W10 export
 import { ExperimentRunActions, RegradeAction } from "@/components/platform/experimentActions";
 import { RunControlsPanel } from "@/components/experiments/runControls"; // run control

@@ -1663,6 +1663,7 @@ export interface ExperimentStatus {
 	arms?: string[];
 	/** A Decision (improved, regressed, inconclusive, invalid); typed as text so a newer server's value still renders. */
 	decision?: string;
+	evaluation_id?: string;
 }
 
 /** GET /experiments */
