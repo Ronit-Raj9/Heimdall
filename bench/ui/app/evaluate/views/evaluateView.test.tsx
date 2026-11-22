@@ -7,20 +7,45 @@ import { applyPatch, armsFor, draftToSpec, EMPTY_DRAFT, learnStepReady, type Eva
 import { agentCapabilities, splitAgents, type AgentWithCaps } from "./evaluate.utils";
 import EvaluateView, { maxReachable, stepReady } from "./evaluateView";
 
-const agent = (id: string, extra: Partial<AgentWithCaps> = {}) => ({ id, adapter: "command", model: "gpt-x", scripted_kind: "", ...extra }) as AgentWithCaps;
-const agents = [agent("codex"), agent("my-bot", { adapter: "remote_http" }), agent("oracle", { scripted_kind: "oracle" }), agent("opencode")];
+const est = vi.hoisted(() => ({ current: { isLoading: true, isFetching: true, data: undefined } as Record<string, unknown> }));
+const agent = (id: string, extra: Partial<AgentWithCaps> = {}) =>
+	({ id, adapter: "command", model: "gpt-x", scripted_kind: "", ...extra }) as AgentWithCaps;
+const agents = [
+	agent("codex"),
+	agent("my-bot", { adapter: "remote_http" }),
+	agent("oracle", { scripted_kind: "oracle" }),
+	agent("opencode"),
+];
 
 vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
 	...(await orig<object>()),
 	useGetAgentsQuery: () => ({ isLoading: false, isError: false, data: { agents }, refetch: () => undefined }),
-	useGetSuitesQuery: () => ({ isLoading: false, data: { suites: [{ id: "hd-harbor-tb2", description: "", admitted_count: 80, builtin: true }] } }),
+	useGetSuitesQuery: () => ({
+		isLoading: false,
+		data: { suites: [{ id: "hd-harbor-tb2", description: "", admitted_count: 80, builtin: true }] },
+	}),
 }));
 vi.mock("@/lib/store/apis/evaluationsApi", async (orig) => ({
 	...(await orig<object>()),
 	BASELINE_AGENTS: ["codex", "claude-code", "mini-swe-agent", "opencode", "gemini-cli"],
 	useGetEvaluationPacksQuery: () => ({ isLoading: false, data: [] }),
 	useGetAgentCompatibilityQuery: () => ({ isLoading: false, data: undefined }),
-	useGetAgentVersionsQuery: () => ({ isLoading: false, data: { agent: "codex", versions: [{ version: 1, runs: 3 }, { version: 2, runs: 0 }] } }),
+	useGetAgentVersionsQuery: () => ({
+		isLoading: false,
+		data: {
+			agent: "codex",
+			versions: [
+				{ version: 1, runs: 3 },
+				{ version: 2, runs: 0 },
+			],
+		},
+	}),
+	useEstimateEvaluationQuery: () => est.current,
+	useGetBenchFaultsQuery: () => ({ isLoading: true, data: undefined }),
+}));
+vi.mock("@/lib/store/apis/modelsApi", async (orig) => ({
+	...(await orig<object>()),
+	useGetModelsQuery: () => ({ isLoading: false, data: { providers: [], keys: [], keys_ready: true } }),
 }));
 vi.mock("@/lib/store/apis/referenceApi", async (orig) => ({
 	...(await orig<object>()),
@@ -62,7 +87,12 @@ describe("evaluateDraft", () => {
 
 	it("keeps chosen models when the mode changes", () => {
 		let d = withAgent({ mode: "models" });
-		d = applyPatch(d, { arms: [{ ...d.arms[0], model: "m1" }, { ...d.arms[1], model: "m2" }] });
+		d = applyPatch(d, {
+			arms: [
+				{ ...d.arms[0], model: "m1" },
+				{ ...d.arms[1], model: "m2" },
+			],
+		});
 		d = applyPatch(d, { mode: "score" });
 		d = applyPatch(d, { mode: "models" });
 		expect(d.arms.map((a) => a.model)).toEqual(["m1", "m2"]);
@@ -147,5 +177,34 @@ describe("EvaluateView", () => {
 	it("renders step 3 (benchmarks) from its lane file", () => {
 		const html = render("?step=3", { agent: "codex" });
 		expect(html).toContain('data-testid="step3-benchmarks"');
+	});
+
+	it("keeps Next off on step 4 when nothing can run, and says why", () => {
+		const ready = { agent: "codex", arms: [{ label: "A", agent: "codex", model: "gpt-x" }], benchmarks: ["hd-harbor-bfcl"] };
+		const reason = "hd-harbor-bfcl: this benchmark runs inside each task's own environment";
+		expect(stepReady(4, applyPatch(withAgent(), ready))).toBe(true);
+		expect(stepReady(4, applyPatch(withAgent(), ready), new Set(), reason)).toBe(false);
+		est.current = {
+			isLoading: false,
+			isFetching: false,
+			isError: false,
+			data: {
+				runs: 0,
+				est_cost_usd: { low: 0, high: 0, known: true },
+				est_minutes: { low: 0, high: 0 },
+				per_benchmark: [{ benchmark: "hd-harbor-bfcl", runs: 0, skipped: "this benchmark runs inside each task's own environment" }],
+			},
+		};
+		const html = render("?step=4", ready);
+		expect(html).toContain('data-testid="step4-setup"');
+		expect(html).toMatch(/data-testid="evaluate-next"[^>]*disabled=""/);
+		expect(html).toContain("Nothing can run with this setup: hd-harbor-bfcl: this benchmark runs inside each task&#x27;s own environment");
+		est.current = {
+			...est.current,
+			data: { runs: 4, est_cost_usd: { low: 0, high: 0, known: true }, est_minutes: { low: 1, high: 2 }, per_benchmark: [] },
+		};
+		const ok = render("?step=4", ready);
+		expect(ok).not.toMatch(/data-testid="evaluate-next"[^>]*disabled=""/);
+		expect(ok).not.toContain("Nothing can run");
 	});
 });

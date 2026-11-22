@@ -1,4 +1,12 @@
-import type { EvaluationArm, EvaluationFailover, EvaluationMCPRoute, EvaluationMode, EvaluationPresetId, EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
+import type {
+	EvaluationArm,
+	EvaluationFailover,
+	EvaluationGate,
+	EvaluationMCPRoute,
+	EvaluationMode,
+	EvaluationPresetId,
+	EvaluationSpec,
+} from "@/lib/store/apis/evaluationsApi";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 /**
@@ -11,6 +19,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
  * `budgetUsd`. Step 5 posts `draftToSpec(draft)`.
  */
 export interface EvaluateDraft {
+	/** The name typed in the wizard; blank means the default name (`defaultName`). */
 	name: string;
 	/** The agent under test (config id). */
 	agent: string | null;
@@ -40,6 +49,12 @@ export interface EvaluateDraft {
 	mcpRoute?: EvaluationMCPRoute;
 	/** Provider failover option (score mode only). */
 	failover?: EvaluationFailover | null;
+	/** The release gate checked when the evaluation finishes; null or unset is no gate. */
+	gate?: EvaluationGate | null;
+	/** Run each benchmark's tasks one after another with the agent's memory kept. */
+	stream?: EvaluationSpec["stream"] | null;
+	/** Tell the agent its budget and deadline. */
+	disclose_budget?: boolean;
 	/** Arms dropped by a mode change (for example arm B in "score"), so going back restores their models. */
 	stashedArms?: EvaluationArm[];
 }
@@ -89,7 +104,15 @@ export function armsFor(d: EvaluateDraft, defaultModel = ""): EvaluationArm[] {
 		case "score":
 			return [a];
 		case "versions":
-			return [a, keepB({ label: "B", agent: d.agent, model: b0?.model || a.model, ...(d.compareVersion != null ? { version: d.compareVersion } : {}) })];
+			return [
+				a,
+				keepB({
+					label: "B",
+					agent: d.agent,
+					model: b0?.model || a.model,
+					...(d.compareVersion != null ? { version: d.compareVersion } : {}),
+				}),
+			];
 		case "models":
 			return [a, keepB({ label: "B", agent: d.agent, model: b0?.model ?? "", ...(d.version != null ? { version: d.version } : {}) })];
 		case "opponent":
@@ -109,7 +132,7 @@ export function learnStepReady(d: EvaluateDraft): boolean {
 export function draftToSpec(d: EvaluateDraft): EvaluationSpec {
 	const faults = d.faults.includes("clean") ? d.faults : ["clean", ...d.faults];
 	return {
-		name: d.name || defaultName(d),
+		name: d.name.trim() || defaultName(d),
 		mode: d.mode,
 		arms: withBareModel(d.arms),
 		benchmarks: d.benchmarks,
@@ -124,6 +147,9 @@ export function draftToSpec(d: EvaluateDraft): EvaluationSpec {
 		...(d.bifrostCache && d.mode === "score" ? { bifrost_cache: true } : {}),
 		...(d.mcpRoute && d.mcpRoute !== "direct" ? { mcp_route: d.mcpRoute } : {}),
 		...(d.failover?.enabled && d.arms.length === 1 ? { failover: d.failover } : {}),
+		...(d.gate ? { gate: d.gate } : {}),
+		...(d.stream ? { stream: d.stream } : {}),
+		...(d.disclose_budget ? { disclose_budget: true } : {}),
 	};
 }
 
@@ -138,9 +164,15 @@ export function withBareModel(arms: EvaluationArm[]): EvaluationArm[] {
 	});
 }
 
-/** The draft fields a step that edits an EvaluationSpec (steps 4 and 5) changes. The name stays the draft's. */
-export function specToPatch(spec: EvaluationSpec): Partial<EvaluateDraft> {
+/**
+ * The draft fields a step that edits an EvaluationSpec (steps 4 and 5) changes. With the current
+ * draft `d`, the spec's name is carried too, except when it is the default name, so the default
+ * keeps following the mode; without `d` the name stays the draft's.
+ */
+export function specToPatch(spec: EvaluationSpec, d?: EvaluateDraft): Partial<EvaluateDraft> {
+	const name = d ? { name: spec.name.trim() === defaultName(d) ? "" : spec.name } : {};
 	return {
+		...name,
 		arms: spec.arms,
 		benchmarks: spec.benchmarks,
 		pack: spec.pack ? spec.pack : null,
@@ -154,6 +186,9 @@ export function specToPatch(spec: EvaluationSpec): Partial<EvaluateDraft> {
 		bifrostCache: Boolean(spec.bifrost_cache),
 		mcpRoute: spec.mcp_route ?? "direct",
 		failover: spec.failover ?? null,
+		gate: spec.gate ?? null,
+		stream: spec.stream ?? null,
+		disclose_budget: Boolean(spec.disclose_budget),
 	};
 }
 
@@ -179,12 +214,14 @@ export function applyPatch(d: EvaluateDraft, patch: Partial<EvaluateDraft>): Eva
 	if (!("arms" in patch) && ARM_KEYS.some((k) => k in patch)) {
 		next.arms = armsFor(next);
 		const kept = new Set(next.arms.map((a) => a.label));
-		next.stashedArms = [...d.arms, ...(d.stashedArms ?? []).filter((a) => !d.arms.some((x) => x.label === a.label))].filter((a) => !kept.has(a.label));
+		next.stashedArms = [...d.arms, ...(d.stashedArms ?? []).filter((a) => !d.arms.some((x) => x.label === a.label))].filter(
+			(a) => !kept.has(a.label),
+		);
 	}
 	return next;
 }
 
-const STORAGE_KEY ="heimdall.evaluateDraft";
+const STORAGE_KEY = "heimdall.evaluateDraft";
 
 function load(): EvaluateDraft {
 	try {

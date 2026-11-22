@@ -1,7 +1,9 @@
+import "@/lib/i18n";
+
 import { okQuery, render, tagOf } from "@/lib/testing/render";
 import type { EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
 import type { ModelKey } from "@/lib/types/models";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { groupModels, keyStateFor, modelOptionLabel, providerOfModel, type CatalogProvider } from "@/components/models/groupedModelPicker";
 import {
 	Step4Setup,
@@ -12,10 +14,14 @@ import {
 	groupFaults,
 	powerText,
 	specReady,
+	faultsNotApplying,
+	nothingRunsReason,
+	presetsRequest,
 	toggleFault,
 	withMCPRoute,
 } from "./step4Setup";
-import { EMPTY_DRAFT, draftToSpec, specToPatch } from "./evaluateDraft";
+import { EMPTY_DRAFT, applyPatch, draftToSpec, specToPatch } from "./evaluateDraft";
+import { createDebouncer } from "./useDebounced";
 
 const q = vi.hoisted(() => ({
 	models: {} as Record<string, unknown>,
@@ -188,7 +194,11 @@ describe("step 4 helpers", () => {
 			"price not known",
 		);
 		expect(
-			estimateText({ runs: 40, est_cost_usd: { low: 0, high: 0, known: false, reason: "no price for gpt-x" }, est_minutes: { low: 1, high: 2 } }).cost,
+			estimateText({
+				runs: 40,
+				est_cost_usd: { low: 0, high: 0, known: false, reason: "no price for gpt-x" },
+				est_minutes: { low: 1, high: 2 },
+			}).cost,
 		).toBe("price not known (no price for gpt-x)");
 		expect(estimateText({ runs: 40, est_cost_usd: { low: 12, high: 40.6, known: true }, est_minutes: { low: 1, high: 2 } }).cost).toBe(
 			"$12 to $41",
@@ -211,7 +221,9 @@ describe("Step4Setup", () => {
 		expect(html).toContain("20 runs");
 		expect(html).toContain("$1.20 to $3.40");
 		expect(html).toContain("10 to 25 min");
-		expect(q.estimateArgs[0]).toEqual([expect.objectContaining({ benchmarks: ["hd-harbor-tb2"], presets: true }), { skip: false }]);
+		expect(q.estimateArgs[0]).toEqual([expect.objectContaining({ benchmarks: ["hd-harbor-tb2"] }), { skip: false }]);
+		expect((q.estimateArgs[0] as [Record<string, unknown>])[0]).not.toHaveProperty("presets");
+		expect(q.estimateArgs[1]).toEqual([expect.objectContaining({ benchmarks: ["hd-harbor-tb2"], presets: true }), { skip: false }]);
 	});
 
 	it("warns with a keys link when the chosen provider has no working key", () => {
@@ -244,7 +256,8 @@ describe("Step4Setup", () => {
 		expect(html).toContain('data-testid="step4-own-model-A"');
 		expect(html).toContain("Its own model.");
 		expect(html).not.toContain('data-testid="step4-model-A"');
-		expect(q.estimateArgs[0]).toEqual([{ ...own, presets: true }, { skip: false }]);
+		expect(q.estimateArgs[0]).toEqual([own, { skip: false }]);
+		expect(q.estimateArgs[1]).toEqual([presetsRequest(own), { skip: false }]);
 	});
 
 	it("shows one picker per arm and skips the estimate until ready", () => {
@@ -265,7 +278,8 @@ describe("Step4Setup", () => {
 		expect(html).toContain('data-testid="step4-arm-A"');
 		expect(html).toContain('data-testid="step4-arm-B"');
 		expect(html).toContain("Pick benchmarks and a model");
-		expect(q.estimateArgs[0]).toEqual([{ ...two, presets: true }, { skip: true }]);
+		expect(q.estimateArgs[0]).toEqual([two, { skip: true }]);
+		expect(q.estimateArgs[1]).toEqual([presetsRequest(two), { skip: true }]);
 	});
 
 	it("says price not known when the estimate has no price", () => {
@@ -277,7 +291,7 @@ describe("Step4Setup", () => {
 		expect(render(<Step4Setup spec={spec()} onChange={() => undefined} />)).toContain("price not known");
 	});
 
-	it("shows an estimate with unknown price and time, and per-benchmark notes collapsed", () => {
+	it("shows an estimate with unknown price and time, and per-benchmark notes in plain view", () => {
 		q.estimate = okQuery({
 			runs: 32,
 			est_cost_usd: { low: 0, high: 0, known: false },
@@ -303,8 +317,9 @@ describe("Step4Setup", () => {
 		expect(html).toContain("32 runs");
 		expect(html).toContain("price not known");
 		expect(html).toContain("time not known");
-		expect(html).toMatch(/<details data-testid="step4-est-notes"(?![^>]*open)/);
-		expect(html).toContain("1 benchmark skipped");
+		expect(html).not.toContain("<details");
+		expect(html).toContain('data-testid="step4-est-notes"');
+		expect(html).toContain("no history for this benchmark yet");
 		expect(html).toContain("skipped, agent codex cannot run benchmark voicebench: needs voice");
 		expect(html).toContain("broken-tool is skipped: no tool layer");
 		expect(html).toContain("no official price");
@@ -465,7 +480,12 @@ describe("Step4Setup presets and slots", () => {
 				preset("thorough", 50, 2, ["clean", "model-down", "broken-tool"], null),
 			],
 		});
-		const html = render(<Step4Setup spec={{ ...defaultEvaluationSpec(), arms: [{ label: "A", agent: "codex", model: "gpt-4o-mini" }], benchmarks: ["x"] }} onChange={() => undefined} />);
+		const html = render(
+			<Step4Setup
+				spec={{ ...defaultEvaluationSpec(), arms: [{ label: "A", agent: "codex", model: "gpt-4o-mini" }], benchmarks: ["x"] }}
+				onChange={() => undefined}
+			/>,
+		);
 		expect(tagOf(html, "step4-preset-quick")).toContain('aria-checked="true"');
 		expect(tagOf(html, "step4-preset-standard")).toContain('aria-checked="false"');
 		expect(html).toContain("10 runs, about 10 min to 25 min, $1.00 to $3.00");
@@ -473,7 +493,8 @@ describe("Step4Setup presets and slots", () => {
 		expect(html).toContain("too few tasks to see a change");
 		expect(html).toContain("2 faults");
 		expect(html).toContain("Up to 4 runs at once (4 per benchmark; your organization has 4 worker slots).");
-		expect(html).toContain('data-testid="step4-from-library"');
+		expect(html).toContain('data-testid="step4-basis"');
+		expect(html).toContain("Estimated from other agents&#x27; runs of these benchmarks.");
 	});
 });
 describe("MCP route", () => {
@@ -493,7 +514,11 @@ describe("MCP route", () => {
 describe("Step4Setup provider failover", () => {
 	it("shows the toggle for one agent and blocks a bad fallback", async () => {
 		const { Step4Setup: S, specReady: ready } = await import("./step4Setup");
-		const one: EvaluationSpec = { ...defaultEvaluationSpec(), benchmarks: ["b"], arms: [{ label: "A", agent: "codex", model: "openai/gpt-4o" }] };
+		const one: EvaluationSpec = {
+			...defaultEvaluationSpec(),
+			benchmarks: ["b"],
+			arms: [{ label: "A", agent: "codex", model: "openai/gpt-4o" }],
+		};
 		expect(render(<S spec={one} onChange={() => undefined} />)).toContain('data-testid="step4-failover-toggle"');
 		const on = { ...one, failover: { enabled: true, fallbacks: [{ provider: "openai", model: "gpt-4o-mini" }] } };
 		expect(render(<S spec={on} onChange={() => undefined} />)).toContain('data-testid="step4-failover-model"');
@@ -501,5 +526,113 @@ describe("Step4Setup provider failover", () => {
 		expect(ready({ ...on, failover: { enabled: true, fallbacks: [{ provider: "anthropic", model: "c" }] } })).toBe(false);
 		const two = { ...one, arms: [...one.arms, { label: "B", agent: "other", model: "openai/gpt-4o" }] };
 		expect(render(<S spec={two} onChange={() => undefined} />)).not.toContain("step4-failover");
+	});
+});
+
+describe("Step4Setup fix wave F26", () => {
+	afterEach(() => vi.useRealTimers());
+
+	it("keeps the Release gate ticked through the wizard draft", () => {
+		const draft = applyPatch(EMPTY_DRAFT, {
+			agent: "codex",
+			arms: [{ label: "A", agent: "codex", model: "gpt-4o-mini", provider: "openai" }],
+			benchmarks: ["x"],
+		});
+		let next = draftToSpec(draft);
+		render(<Step4Setup spec={next} onChange={(s) => (next = s)} />);
+		// The checkbox handler sets the default gate; the wizard stores the spec in the draft.
+		const ticked = draftToSpec(applyPatch(draft, specToPatch({ ...next, gate: { max_regression: 0.05 } })));
+		const html = render(<Step4Setup spec={ticked} onChange={() => undefined} />);
+		expect(tagOf(html, "gate-enable")).toContain('checked=""');
+	});
+
+	it("says next to a fault and above the list when it applies to no chosen benchmark", () => {
+		q.estimate = okQuery({
+			runs: 10,
+			est_cost_usd: { low: 1, high: 2, known: true },
+			est_minutes: { low: 1, high: 2 },
+			per_benchmark: [
+				{
+					benchmark: "hd-harbor-bfcl",
+					runs: 10,
+					notes: ["MCP route: benchmark hd-harbor-bfcl has no MCP server"],
+					faults_skipped: [{ fault: "broken-tool", reason: "benchmark hd-harbor-bfcl has no tools" }],
+				},
+			],
+		});
+		const html = render(<Step4Setup spec={spec({ faults: ["clean", "broken-tool", "model-down"] })} onChange={() => undefined} />);
+		expect(html).toContain('data-testid="step4-fault-na-broken-tool"');
+		expect(html).toContain("Does not apply here: benchmark hd-harbor-bfcl has no tools");
+		expect(html).not.toContain('data-testid="step4-fault-na-model-down"');
+		expect(html).toContain("These faults do not apply to the chosen benchmarks and add no runs: Broken tool.");
+		expect(html.indexOf("step4-faults-na")).toBeLessThan(html.indexOf('data-testid="step4-fault-group-'));
+		expect(html).toContain("MCP route: benchmark hd-harbor-bfcl has no MCP server");
+		expect(html).not.toContain("<details");
+	});
+
+	it("only flags a fault skipped on every chosen benchmark", () => {
+		const e = {
+			per_benchmark: [
+				{ benchmark: "a", faults_skipped: [{ fault: "broken-tool", reason: "no tools in a" }] },
+				{ benchmark: "b", faults_skipped: [] },
+				{ benchmark: "c", skipped: "cannot run" },
+			],
+		};
+		expect(faultsNotApplying(e).size).toBe(0);
+		expect(faultsNotApplying({ per_benchmark: [e.per_benchmark[0], e.per_benchmark[2]] }).get("broken-tool")).toBe("no tools in a");
+		expect(faultsNotApplying({ per_benchmark: [] }).size).toBe(0);
+	});
+
+	it("says what the estimate is based on", () => {
+		q.estimate = okQuery({ runs: 5, est_cost_usd: { low: 1, high: 2, known: true }, est_minutes: { low: 1, high: 2 }, from_library: true });
+		expect(render(<Step4Setup spec={spec()} onChange={() => undefined} />)).toContain(
+			"Estimated from other agents&#x27; runs of these benchmarks. Your own runs will make it more exact.",
+		);
+		q.estimate = okQuery({ runs: 5, est_cost_usd: { low: 1, high: 2, known: true }, est_minutes: { low: 1, high: 2 } });
+		expect(render(<Step4Setup spec={spec()} onChange={() => undefined} />)).toContain("Estimated from past runs of this agent and model.");
+	});
+
+	it("shows why nothing can run in plain view when the estimate has no runs", () => {
+		const reason =
+			"this benchmark runs inside each task's own environment; register a container agent (agent claude-code's Dockerfile does not start FROM ${BASE_IMAGE})";
+		q.estimate = okQuery({
+			runs: 0,
+			est_cost_usd: { low: 0, high: 0, known: true },
+			est_minutes: { low: 0, high: 0 },
+			per_benchmark: [{ benchmark: "hd-harbor-bfcl", runs: 0, skipped: reason }],
+		});
+		const html = render(<Step4Setup spec={spec()} onChange={() => undefined} />);
+		expect(html).toContain('data-testid="step4-nothing-runs"');
+		expect(html).toContain("hd-harbor-bfcl: ");
+		expect(html).toContain("register a container agent");
+		expect(html).not.toContain("<details");
+		expect(nothingRunsReason(q.estimate.data as never)).toBe(`hd-harbor-bfcl: ${reason}`);
+		expect(nothingRunsReason({ runs: 3, per_benchmark: [] })).toBeNull();
+		expect(nothingRunsReason(undefined)).toBeNull();
+	});
+
+	it("does not refetch the presets when only Trials or Tasks change", () => {
+		const a = spec();
+		expect(presetsRequest({ ...a, trials: 3, tasks_per_benchmark: 50, preset: undefined })).toEqual(presetsRequest(a));
+		expect(presetsRequest(a).presets).toBe(true);
+		expect(presetsRequest({ ...a, faults: ["clean", "model-down"] })).not.toEqual(presetsRequest(a));
+		expect(presetsRequest({ ...a, benchmarks: ["other"] })).not.toEqual(presetsRequest(a));
+	});
+
+	it("sends one estimate request for two quick Trials changes", () => {
+		vi.useFakeTimers();
+		const sent: unknown[] = [];
+		const d = createDebouncer<ReturnType<typeof spec>>(400, (_k, v) => sent.push(v));
+		const two = spec({ trials: 2 });
+		const three = spec({ trials: 3 });
+		d.push(JSON.stringify(two), two);
+		vi.advanceTimersByTime(150);
+		d.push(JSON.stringify(three), three);
+		vi.advanceTimersByTime(399);
+		expect(sent).toEqual([]);
+		vi.advanceTimersByTime(1);
+		expect(sent).toEqual([three]);
+		vi.advanceTimersByTime(2000);
+		expect(sent).toHaveLength(1);
 	});
 });
