@@ -38,3 +38,7 @@ Each run starts its own app containers from the pinned images, so every task beg
 ## Controls
 
 Upstream ships no reference solutions. When every rubric node has an `answer_match` tier the importer writes a reference that calls `webarena_submit` with the expected text (29 of 400 tasks); every other task's reference refuses, so admission leaves it a draft. The empty control submits nothing; the exploit plants a fake evidence file and reward in the workspace.
+
+## Admission record (22 Nov 2026)
+
+On the fleet (docker, no gateway), the 29 answer-graded tasks: 27 admitted (reference passes, empty, exploit and null controls fail). Not admitted: `test-229` (the runtime's pipedrive UI login times out on `get_by_label("Email")`, every control) and `test-136` (mattermost + minerva-lite + nextcloud: the runtime's setup worker exits with code 1 before ready, every control). The other 371 tasks stay drafts: no upstream reference, and their rubric needs website state, browser events or the judge.
