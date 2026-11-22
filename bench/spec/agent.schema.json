@@ -87,7 +87,8 @@
       "properties": {
         "enabled": {"type": "boolean", "description": "Default true; false installs no skills."},
         "dir": {"type": "string", "pattern": "^/", "description": "Container folder the agent reads skills from."},
-        "extra": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "Skill folders relative to the bench root."}
+        "extra": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "Skill folders relative to the bench root."},
+        "set": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$", "description": "Use the task folder skill-sets/<set> instead of the task's skills folder; a task without it installs no task skills."}
       }
     },
     "memory": {

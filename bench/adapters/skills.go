@@ -37,6 +37,17 @@ type Skill struct {
 	Host string // absolute host folder holding SKILL.md
 }
 
+// SkillSetsDir is the task folder that holds alternative skill sets, one
+// subfolder per set, chosen by an agent config's skills.set.
+const SkillSetsDir = "skill-sets"
+
+func skillSet(cfg *schemas.AgentConfig) string {
+	if cfg == nil || cfg.Skills == nil {
+		return ""
+	}
+	return strings.TrimSpace(cfg.Skills.Set)
+}
+
 // SkillsEnabled reports whether an agent config installs skills at all:
 // skills.enabled, true when unset.
 func SkillsEnabled(cfg *schemas.AgentConfig) bool {
@@ -90,7 +101,17 @@ func ResolveSkills(benchRoot string, cfg *schemas.AgentConfig, task *schemas.Tas
 	}
 	type source struct{ root, rel, field string }
 	var sources []source
-	if task != nil && task.Skills != "" {
+	if set := skillSet(cfg); set != "" {
+		if !skillName.MatchString(set) {
+			return nil, fmt.Errorf("skills.set %q must match %s", set, skillName)
+		}
+		if task != nil {
+			rel := path.Join(SkillSetsDir, set)
+			if fi, err := os.Stat(filepath.Join(task.Dir, filepath.FromSlash(rel))); err == nil && fi.IsDir() {
+				sources = append(sources, source{task.Dir, rel, "task " + task.ID + " skill set " + set})
+			}
+		}
+	} else if task != nil && task.Skills != "" {
 		sources = append(sources, source{task.Dir, task.Skills, "task " + task.ID + " skills"})
 	}
 	if cfg.Skills != nil {

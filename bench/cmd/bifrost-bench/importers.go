@@ -8,6 +8,7 @@ import (
 	_ "github.com/maximhq/bifrost/bench/importers/browsecompplus"  // X5a
 	_ "github.com/maximhq/bifrost/bench/importers/cheatbench"      // L06: CheatBench cheating environments
 	_ "github.com/maximhq/bifrost/bench/importers/clbench"         // L12: Continual Learning Bench
+	_ "github.com/maximhq/bifrost/bench/importers/enterpriseops"   // L14: EnterpriseOps-Gym
 	_ "github.com/maximhq/bifrost/bench/importers/gaia"            // X5a
 	_ "github.com/maximhq/bifrost/bench/importers/harbor"
 	_ "github.com/maximhq/bifrost/bench/importers/impossiblebench"
@@ -16,7 +17,8 @@ import (
 	_ "github.com/maximhq/bifrost/bench/importers/longmemeval"
 	_ "github.com/maximhq/bifrost/bench/importers/marble" // X5b: MultiAgentBench (MARBLE)
 	_ "github.com/maximhq/bifrost/bench/importers/mcpmark"
-	_ "github.com/maximhq/bifrost/bench/importers/msibench" // MSI-Bench v2 multi-speaker room calls
+	_ "github.com/maximhq/bifrost/bench/importers/msibench"  // MSI-Bench v2 multi-speaker room calls
+	_ "github.com/maximhq/bifrost/bench/importers/skillpool" // L14: Skill-Usage 34k pool
 	_ "github.com/maximhq/bifrost/bench/importers/swebench"
 	_ "github.com/maximhq/bifrost/bench/importers/tau2"
 	_ "github.com/maximhq/bifrost/bench/importers/toolbenchx"   // L10: ToolBench-X
