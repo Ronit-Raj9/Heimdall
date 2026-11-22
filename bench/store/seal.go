@@ -61,10 +61,6 @@ func (s *FSStore) Seal(ctx context.Context, run *schemas.Run) (*schemas.SealReco
 		return nil, fmt.Errorf("seal run %s: %w", run.RunID, err)
 	}
 	defer unlockLog()
-	entries, err := s.readSealsLogFrom(log, run.ExpID)
-	if err != nil {
-		return nil, fmt.Errorf("seal run %s: %w", run.RunID, err)
-	}
 	logInfo, err := log.Stat()
 	if err != nil {
 		return nil, fmt.Errorf("seal run %s: %w", run.RunID, err)
@@ -75,7 +71,19 @@ func (s *FSStore) Seal(ctx context.Context, run *schemas.Run) (*schemas.SealReco
 		return nil, fmt.Errorf("seal run %s: %w", run.RunID, err)
 	}
 	if sealed {
+		// Rare (a crash between seal.json and the log line): the whole log.
+		entries, err := s.readSealsLogFrom(log, run.ExpID)
+		if err != nil {
+			return nil, fmt.Errorf("seal run %s: %w", run.RunID, err)
+		}
 		return s.resumeSeal(dir, run.RunID, log, entries)
+	}
+	// Only the tail of seals.log is read for the previous seal, so sealing
+	// costs the same however many runs the experiment already sealed
+	// (store/hotpath.go).
+	prevSeal, err := s.sealsLogLastHash(log, run.ExpID)
+	if err != nil {
+		return nil, fmt.Errorf("seal run %s: %w", run.RunID, err)
 	}
 	if err := scanRunSecrets(dir); err != nil {
 		return nil, fmt.Errorf("seal run %s: %w", run.RunID, err)
@@ -97,7 +105,7 @@ func (s *FSStore) Seal(ctx context.Context, run *schemas.Run) (*schemas.SealReco
 		RunID:        run.RunID,
 		ManifestHash: run.ManifestHash,
 		Files:        files,
-		PrevSeal:     lastHash(entries),
+		PrevSeal:     prevSeal,
 		SealedAt:     s.now().UTC(),
 		Format:       format,
 	}

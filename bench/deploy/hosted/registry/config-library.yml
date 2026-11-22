@@ -1,0 +1,34 @@
+# The library registry (Z13, docs/library-registry.md): library images
+# pinned by digest for every worker (shared, bring your own, cloud). It
+# trusts pull tokens the Heimdall server signs (GET /api/v1/registry/token):
+# an org's API or runner token pulls the open library and the restricted
+# suites the operator's access file allows; only the sync identity pushes
+# (bifrost-bench images sync). The realm and service come from the
+# environment (REGISTRY_AUTH_TOKEN_REALM, REGISTRY_AUTH_TOKEN_SERVICE) in
+# library-registry.compose.yml.
+version: 0.1
+log:
+  level: info
+  accesslog:
+    disabled: false
+storage:
+  filesystem:
+    rootdirectory: /var/lib/registry
+  delete:
+    enabled: false
+  maintenance:
+    uploadpurging:
+      enabled: true
+      age: 168h
+      interval: 24h
+      dryrun: false
+auth:
+  token:
+    realm: https://heimdall.example/api/v1/registry/token
+    service: heimdall-library
+    issuer: heimdall
+    rootcertbundle: /auth/token.crt
+http:
+  addr: :5000
+  headers:
+    X-Content-Type-Options: [nosniff]

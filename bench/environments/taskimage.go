@@ -29,6 +29,7 @@ func EnsureTaskImage(ctx context.Context, d utils.Docker, s *schemas.Suite, t *s
 	if err != nil || !ok {
 		return "", "", err
 	}
+	img.Pinned = utils.SuiteLockedPin(s, t.ID, "task", img.Tag) // library registry: pulled by the lock's digest (bench/imagepin)
 	id, err := d.EnsureImage(ctx, img, out)
 	if err != nil {
 		return "", "", fmt.Errorf("task %s image %s: %w", t.ID, img.Tag, err)

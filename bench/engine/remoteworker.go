@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/telemetry"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
@@ -80,6 +82,17 @@ type WorkerOptions struct {
 	// logins (registrycreds.Pull under the org's Docker policy; Y10). nil:
 	// private images are pulled the usual way (docker's own login).
 	PullPrivate func(ctx context.Context, ref string, auths []schemas.RegistryAuth) error
+	// HostSlot, when set, takes one of the host's run slots before each
+	// lease request and returns its release (Z10: the shared worker's
+	// host-wide fair semaphore, bench/hostslots). The slot is given back as
+	// soon as the request brings no work, and after the leased run. An error
+	// means ctx ended.
+	HostSlot func(ctx context.Context) (release func(), err error)
+	// Prefetch warms the images an admitted experiment's suite pins by
+	// registry digest (library registry, bench/imagepin), in the
+	// background, once per experiment, so the slots after the first start
+	// on a pulled image. Nil prefetches nothing.
+	Prefetch func(ctx context.Context, s *schemas.Suite)
 }
 
 // Worker is the remote side of remote execution: it registers with a
@@ -236,6 +249,14 @@ func (w *Worker) loop(ctx context.Context, stop context.CancelCauseFunc) {
 			continue
 		}
 		w.capLogged.Store(false)
+		hostDone := func() {} // Z10: the host-wide slot, held only while there is work (WorkerOptions.HostSlot)
+		if w.opts.HostSlot != nil {
+			rel, err := w.opts.HostSlot(ctx)
+			if err != nil {
+				return
+			}
+			hostDone = sync.OnceFunc(rel)
+		}
 		req := schemas.WorkerLeaseRequest{WorkerID: w.opts.WorkerID}
 		if w.opts.Disk != nil {
 			if d := w.opts.Disk(); d.FreeBytes >= 0 {
@@ -244,7 +265,11 @@ func (w *Worker) loop(ctx context.Context, stop context.CancelCauseFunc) {
 		}
 		var lease schemas.WorkerLease
 		err := w.call(ctx, http.MethodPost, workerAPI+"/lease", req, &lease)
+		if err != nil || lease.LeaseID == "" {
+			hostDone() // no work: the slot goes back before any wait
+		}
 		if err == nil && lease.LeaseID != "" && req.Disk != nil && req.Disk.Low {
+			hostDone()
 			// A server that does not know the disk field leased anyway: hand
 			// the lease straight back so another runner takes it.
 			w.release(ctx, &lease, "runner disk is low", false, nil)
@@ -269,13 +294,16 @@ func (w *Worker) loop(ctx context.Context, stop context.CancelCauseFunc) {
 			}
 		case lease.LeaseID != "" && lease.Kind == schemas.LeaseKindJob:
 			w.workJob(ctx, &lease)
+			hostDone()
 			continue
 		case lease.LeaseID != "":
 			// An accepted run goes straight on to the next lease; anything
 			// else (a refusal, a rejection, a failed run) waits a poll
 			// interval, so a lease the worker keeps giving back is not
 			// fetched in a tight loop.
-			if res := w.Work(ctx, &lease); res != nil && res.Accepted {
+			res := w.Work(ctx, &lease)
+			hostDone()
+			if res != nil && res.Accepted {
 				continue
 			}
 		}
@@ -293,6 +321,8 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 	// preflight and image checks can take longer than the stale threshold on
 	// a loaded worker, and a lease that only starts beating at RunSlot is
 	// lost to the coordinator's sweep before the slot even runs.
+	ctx, slotSpan := workerSlotSpan(ctx, lease) // lane Z14: joins the lease's trace (remotetelemetry.go)
+	defer slotSpan.End()
 	live := &liveBuffer{} // the run's live events, forwarded on the heartbeat
 	sctx, stop := w.heartbeat(ctx, lease, live)
 	defer stop()
@@ -376,7 +406,12 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		}
 		w.opts.ImageUse(ids...)
 	}
-	res, err := w.runner.RunSlot(sctx, in)
+	runCtx, runSpan := telemetry.Start(sctx, "run") // lane Z14
+	res, err := w.runner.RunSlot(runCtx, in)
+	if res != nil && res.Run != nil {
+		runSpan.SetAttrs(telemetry.String("heimdall.run", res.Run.RunID), telemetry.String("heimdall.outcome", string(res.Run.Outcome)))
+	}
+	runSpan.End()
 	if res != nil {
 		res.RunnerGateway = runnerGW  // Tenancy area: uploaded with the run
 		res.RunnerImages = runnerImgs // Deploy area: uploaded with the run
@@ -403,7 +438,12 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		w.release(ctx, lease, why, false, cost)
 		return nil
 	}
-	out, err := w.uploadTo(sctx, ctx, lease, res)
+	upCtx, upSpan := telemetry.Start(sctx, "upload") // lane Z14
+	out, err := w.uploadTo(upCtx, telemetry.ContextWithSpan(ctx, upSpan), lease, res)
+	if err != nil {
+		upSpan.SetError(err.Error())
+	}
+	upSpan.End()
 	if err != nil {
 		w.logger.Error("upload failed", "lease", lease.LeaseID, "run", res.Run.RunID, "error", err.Error())
 		if !errors.Is(err, schemas.ErrLeaseGone) {
@@ -459,6 +499,9 @@ func (w *Worker) admit(ctx context.Context, lease *schemas.WorkerLease) (*worker
 	w.mu.Unlock()
 	if reason != "" {
 		return nil, reason, true
+	}
+	if w.opts.Prefetch != nil && e.suite != nil {
+		go w.opts.Prefetch(context.WithoutCancel(ctx), e.suite) // outlives this lease; the hook bounds its own time
 	}
 	return e, "", false
 }
@@ -733,23 +776,81 @@ func (w *Worker) uploadTo(ctx, completeCtx context.Context, lease *schemas.Worke
 	if err != nil {
 		return nil, fmt.Errorf("hash archive: %w", err)
 	}
-	if err := w.sendChunks(ctx, lease, f.Name(), size); err != nil {
-		return nil, err
-	}
 	req := schemas.WorkerComplete{WorkerID: w.opts.WorkerID, RunID: res.Run.RunID, SealSHA256: sha256Hex(sealRaw),
 		ArchiveSHA256: sum, ArchiveBytes: size, Outcome: res.Run.Outcome, CostUSD: costValue(res),
 		Gateway: res.RunnerGateway, // Tenancy area: the runner's own preflight when the manifest defers it
 		Images:  res.RunnerImages}  // Deploy area: the runner's image ids when the manifest defers it
-	var out schemas.WorkerResult
-	if err := w.call(completeCtx, http.MethodPost, workerAPI+"/leases/"+url.PathEscape(lease.LeaseID)+"/complete", req, &out); err != nil {
-		return nil, fmt.Errorf("complete: %w", err)
+	// Z11: a coordinator that is restarting (unreachable, or re-attaching
+	// the lease: 503) is waited for, up to the lease's stale threshold, and
+	// the upload resumes where the coordinator stands (offset 0 after a
+	// restart). A refusal (lease gone, too large, bad request) is final.
+	stale := time.Duration(lease.StaleAfterMS) * time.Millisecond
+	if stale <= 0 {
+		stale = DefaultStaleAfter
 	}
-	return &out, nil
+	deadline := time.Now().Add(stale)
+	var start int64
+	for try := 0; ; try++ {
+		err := w.sendChunksFrom(ctx, lease, f.Name(), size, start)
+		if err == nil {
+			var out schemas.WorkerResult
+			if err = w.call(completeCtx, http.MethodPost, workerAPI+"/leases/"+url.PathEscape(lease.LeaseID)+"/complete", req, &out); err == nil {
+				return &out, nil
+			}
+			err = fmt.Errorf("complete: %w", err)
+		}
+		next, retry := uploadRetry(err)
+		if !retry || time.Now().After(deadline) || ctx.Err() != nil || completeCtx.Err() != nil {
+			return nil, err
+		}
+		start = next
+		w.logger.Warn("upload interrupted; retrying", "lease", lease.LeaseID, "from_offset", start, "error", err.Error())
+		wait := min(uploadRetryBackoff<<min(try, 4), 10*time.Second)
+		select {
+		case <-ctx.Done():
+			return nil, err
+		case <-time.After(wait):
+		}
+	}
+}
+
+// uploadRetryBackoff is the first wait before an interrupted upload is
+// tried again; a variable so a test can shorten it.
+var uploadRetryBackoff = time.Second
+
+var heldBytes = regexp.MustCompile(`coordinator holds (\d+) bytes`)
+
+// uploadRetry says whether an interrupted upload is tried again and from
+// which offset: a refusal is final; an offset mismatch resumes at the
+// coordinator's count (in its message); anything else (no answer, 5xx, a
+// lease being re-attached) starts over at 0, where a restarted coordinator
+// stands.
+func uploadRetry(err error) (int64, bool) {
+	switch {
+	case errors.Is(err, schemas.ErrLeaseGone), errors.Is(err, schemas.ErrUploadTooLarge), errors.Is(err, schemas.ErrWorkerRequest),
+		errors.Is(err, schemas.ErrWorkerAuth), errors.Is(err, schemas.ErrWorkerScope), errors.Is(err, schemas.ErrWorkerUnknown),
+		errors.Is(err, schemas.ErrNotFound):
+		return 0, false
+	case errors.Is(err, schemas.ErrUploadOffset):
+		m := heldBytes.FindStringSubmatch(err.Error())
+		if m == nil {
+			return 0, false
+		}
+		n, perr := strconv.ParseInt(m[1], 10, 64)
+		return n, perr == nil
+	}
+	return 0, true
 }
 
 // sendChunks sends the archive in chunks no larger than the coordinator
 // accepts. A failed chunk is retried at the same offset.
 func (w *Worker) sendChunks(ctx context.Context, lease *schemas.WorkerLease, p string, size int64) error {
+	return w.sendChunksFrom(ctx, lease, p, size, 0)
+}
+
+// sendChunksFrom is sendChunks from offset start (Z11: an upload resumed
+// after a coordinator restart).
+func (w *Worker) sendChunksFrom(ctx context.Context, lease *schemas.WorkerLease, p string, size, start int64) error {
 	chunk := DefaultChunkBytes
 	w.mu.Lock()
 	if w.registered != nil && w.registered.ChunkBytes > 0 {
@@ -767,7 +868,13 @@ func (w *Worker) sendChunks(ctx context.Context, lease *schemas.WorkerLease, p s
 	defer f.Close()
 	buf := make([]byte, chunk)
 	base := workerAPI + "/leases/" + url.PathEscape(lease.LeaseID) + "/upload?worker_id=" + url.QueryEscape(w.opts.WorkerID)
-	for off := int64(0); off < size; {
+	if start < 0 || start > size {
+		start = 0
+	}
+	if _, err := f.Seek(start, io.SeekStart); err != nil {
+		return fmt.Errorf("read archive: %w", err)
+	}
+	for off := start; off < size; {
 		n, err := io.ReadFull(f, buf)
 		if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
 			return fmt.Errorf("read archive: %w", err)
@@ -825,6 +932,7 @@ func (w *Worker) do(ctx context.Context, method, path, contentType string, body 
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+w.opts.Token)
+	telemetry.Inject(ctx, req.Header) // lane Z14: the server's request span joins the lease's trace
 	if body != nil {
 		req.Header.Set("Content-Type", contentType)
 	}

@@ -53,6 +53,11 @@ func TestPublicRoutesAreExactlyTheSite(t *testing.T) {
 		"GET /api/bench/pull/repos/{id}",     // Y11: signed, expiring link
 		"GET /api/bench/admin/pool/assignments",
 		"POST /api/bench/admin/pool/assignments/{org}/token",
+		"GET /api/bench/status",          // Z14: the public status page
+		"GET /api/bench/admin/drain",     // Z11: the handler checks the drain token or a server admin
+		"POST /api/bench/admin/drain",    // Z11: same
+		"GET /api/bench/registry/token",  // Z13: docker basic auth, checked by the handler
+		"POST /api/bench/registry/token", // Z13: same
 	}
 	var got []string
 	for k, r := range PlatformPolicy {

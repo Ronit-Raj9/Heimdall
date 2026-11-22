@@ -54,6 +54,9 @@ type Summary struct {
 	Fields   []Field `json:"fields,omitempty"`
 	// DedupKey groups repeats of one problem into one PagerDuty incident.
 	DedupKey string `json:"dedup_key,omitempty"`
+	// Resolve closes the PagerDuty incident of DedupKey instead of
+	// triggering it (a monitor incident that resolved, Z22).
+	Resolve bool `json:"resolve,omitempty"`
 }
 
 func (h Hook) format() string {
@@ -65,7 +68,7 @@ func (h Hook) format() string {
 
 // pagingEvents are the events a PagerDuty hook takes: problems someone may
 // need to act on, never routine finishes.
-var pagingEvents = []string{EventEvaluationRegressed, EventReleaseBlocked, EventScheduleFailed, EventWorkerOffline, EventJobFailed}
+var pagingEvents = []string{EventEvaluationRegressed, EventReleaseBlocked, EventScheduleFailed, EventWorkerOffline, EventJobFailed, EventMonitorIncident}
 
 // EventsFor lists the events a hook of format f can subscribe to.
 func EventsFor(f string) []string {
@@ -218,6 +221,9 @@ func pagerDutyEvent(h Hook, ev Event) map[string]any {
 	dedup := s.DedupKey
 	if dedup == "" {
 		dedup = "heimdall-" + ev.ID
+	}
+	if s.Resolve && s.DedupKey != "" {
+		return map[string]any{"routing_key": h.RoutingKey, "event_action": "resolve", "dedup_key": clip(dedup, 255)}
 	}
 	details := map[string]any{"event": ev.Type, "event_id": ev.ID}
 	for _, f := range s.Fields {

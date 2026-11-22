@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/engine"
-	"github.com/maximhq/bifrost/bench/sandbox"
 	"github.com/maximhq/bifrost/bench/registrycreds"
+	"github.com/maximhq/bifrost/bench/sandbox"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
 )
@@ -110,6 +110,8 @@ func (f *runnerFlags) labelList() []string {
 // proxy, docker): every leased experiment is planned again here and refused
 // when its manifest does not come out the same.
 func runRunnerStart(cmd string, args []string) int {
+	// Lane Z14: OTLP spans when OTEL_* names an endpoint (telemetry.go).
+	startTelemetry("heimdall-runner")
 	if hasSharedFlag(args) { // shared runner pool (runnershared.go)
 		return runSharedRunner(args)
 	}
@@ -150,7 +152,8 @@ func runRunnerStart(cmd string, args []string) int {
 			Disk: hy.DiskState, ImageUse: hy.NoteImages, KeepRunFolders: a.cfg.Runner.Disk.KeepRunFolders,
 			PullPrivate: func(ctx context.Context, ref string, auths []schemas.RegistryAuth) error { // Y10: the org's registry logins
 				return registrycreds.Pull(ctx, a.docker, ref, auths)
-			}})
+			},
+			Prefetch: runnerPrefetch(a.logger)}) // Z13: images pinned by registry digest are pulled before their slots (images.go)
 	if err != nil {
 		return fail("%v", err)
 	}

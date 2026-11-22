@@ -51,7 +51,7 @@ type (
 
 func init() {
 	handlers.ScheduleExperimentLoader = loadScheduled
-	handlers.ScheduleExtras = addCanarySchedulesAt
+	handlers.ScheduleExtras = addExtraSchedulesAt // canaries and live monitors (livemonitors.go)
 
 	registerOrMergeJobKind(jobKindSpec{
 		Kind: kindCanaryRun, Local: true,
@@ -238,13 +238,14 @@ func addCanarySchedulesAt(root string, f *schedule.File) {
 	}
 }
 
-// webScheduleFile is the org's web schedules plus its scheduled canaries.
+// webScheduleFile is the org's web schedules plus its scheduled canaries
+// and running live monitors.
 func webScheduleFile(root string) (*schedule.File, error) {
 	f, err := handlers.LoadWebSchedules(root)
 	if err != nil {
 		return nil, err
 	}
-	addCanarySchedulesAt(root, f)
+	addExtraSchedulesAt(root, f)
 	return f, nil
 }
 
@@ -320,7 +321,8 @@ func startScheduleTicker(a *app, s *handlers.Services) {
 	if _, loaded := tickers.LoadOrStore(org, struct{}{}); loaded {
 		return
 	}
-	t := &scheduleTicker{root: a.cfg.Root, org: org, hosted: s.Hosted, jobs: s.Jobs, logger: a.logger, last: time.Now()}
+	t := &scheduleTicker{root: a.cfg.Root, org: org, hosted: s.Hosted, jobs: s.Jobs, logger: a.logger, last: time.Now(),
+		collect: monitorCollector(a, *s)} // Z22 live monitors
 	go t.loop(context.Background())
 }
 
@@ -334,6 +336,9 @@ type scheduleTicker struct {
 	logger schemas.Logger
 	last   time.Time
 	warned map[string]bool
+	// collect records finished live monitor checks (Z22, livemonitors.go);
+	// nil collects nothing.
+	collect func(context.Context, time.Time)
 }
 
 func (t *scheduleTicker) loop(ctx context.Context) {
@@ -345,6 +350,9 @@ func (t *scheduleTicker) loop(ctx context.Context) {
 			return
 		case now := <-tk.C:
 			t.tick(ctx, now)
+			if t.collect != nil {
+				t.collect(ctx, now)
+			}
 		}
 	}
 }

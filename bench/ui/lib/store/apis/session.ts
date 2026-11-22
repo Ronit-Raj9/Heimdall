@@ -151,6 +151,11 @@ export function isSharePage(pathname: string): boolean {
 	return pathname.startsWith("/s/") || pathname === "/reference" || pathname === "/reference/"; // G4-03: the public reference board
 }
 
+/** The public status page (lane Z14): anyone may open it, whatever the session. */
+export function isStatusPage(pathname: string): boolean {
+	return pathname === "/status";
+}
+
 /** Paths that render without the app shell and never redirect to the login page. */
 export function isAuthPage(pathname: string): boolean {
 	return pathname === "/login" || pathname === "/signup" || pathname === "/reset-password" || pathname === "/verify-email" || pathname.startsWith("/invite/");

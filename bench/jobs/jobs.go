@@ -111,6 +111,10 @@ type Job struct {
 	Attempt    int        `json:"attempt"`
 	LeaseOwner string     `json:"lease_owner,omitempty"`
 	LeaseUntil *time.Time `json:"lease_until,omitempty"`
+	// Priority orders a queued job among the jobs of organizations with
+	// equally many running jobs of its kind (fairqueue.go): higher first,
+	// 0 normal, within MinPriority..MaxPriority.
+	Priority int `json:"priority,omitempty"`
 }
 
 // Resume reports whether this run of the job continues an earlier one.
@@ -164,7 +168,7 @@ type LogPage struct {
 }
 
 const jobColumns = `id, org_id, kind, target, status, params, progress, result, error, created_by,
-	created_at, started_at, finished_at, cancel_requested, attempt, lease_owner, lease_until`
+	created_at, started_at, finished_at, cancel_requested, attempt, lease_owner, lease_until, priority`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
@@ -178,7 +182,7 @@ func scanJob(row rowScanner) (*Job, error) {
 		cancelRequested               int64
 	)
 	if err := row.Scan(&j.ID, &j.OrgID, &j.Kind, &j.Target, &status, &params, &progress, &result, &j.Error, &j.CreatedBy,
-		&created, &started, &finished, &cancelRequested, &j.Attempt, &owner, &leaseUntil); err != nil {
+		&created, &started, &finished, &cancelRequested, &j.Attempt, &owner, &leaseUntil, &j.Priority); err != nil {
 		return nil, err
 	}
 	j.Status = Status(status)
@@ -227,9 +231,9 @@ func (s *Store) insert(ctx context.Context, j *Job) error {
 	if params == "" {
 		params = "{}"
 	}
-	_, err := s.db.SQL().ExecContext(ctx, s.q(`INSERT INTO jobs (id, org_id, kind, target, status, params, error, created_by, created_at, cancel_requested, attempt)
-		VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, 0, 0)`),
-		j.ID, j.OrgID, j.Kind, j.Target, string(StatusQueued), params, j.CreatedBy, j.CreatedAt.UnixMilli())
+	_, err := s.db.SQL().ExecContext(ctx, s.q(`INSERT INTO jobs (id, org_id, kind, target, status, params, error, created_by, created_at, cancel_requested, attempt, priority)
+		VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, 0, 0, ?)`),
+		j.ID, j.OrgID, j.Kind, j.Target, string(StatusQueued), params, j.CreatedBy, j.CreatedAt.UnixMilli(), j.Priority)
 	if err != nil {
 		if db.IsUnique(err) {
 			return fmt.Errorf("%w: %s %s", ErrConflict, j.Kind, j.Target)

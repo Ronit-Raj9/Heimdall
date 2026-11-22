@@ -257,7 +257,35 @@ $C up -d --wait
 ```sh
 deploy/hosted/upgrade.sh                 # backup, git pull --ff-only, rebuild, migrate, restart
 deploy/hosted/upgrade.sh --ref v1.2.0    # a specific tag or commit
+deploy/hosted/upgrade.sh --drain-timeout 30m   # wait longer for runs in flight
 ```
+
+Drain mode. After the new images are built and the migrations applied, the
+script drains the running server: it stops handing out new leases, and the
+script waits until no run is in flight (the `heimdall_leases_in_flight`
+metric reaches 0) or `--drain-timeout` passes (default 10m). Only then are
+the containers recreated, so the restart stops no run. Runs still in flight
+at the timeout keep their leases and are re-attached by the new server
+(durable leases, below). A failed upgrade turns drain mode off
+again; `--no-drain` skips it. By hand, inside the server container:
+
+```sh
+docker compose exec heimdall bifrost-bench drain -config /srv/heimdall/deploy/bench.yaml -timeout 10m   # on, then wait
+docker compose exec heimdall bifrost-bench drain -config /srv/heimdall/deploy/bench.yaml -status
+docker compose exec heimdall bifrost-bench drain -config /srv/heimdall/deploy/bench.yaml -off           # leases again
+```
+
+The command reads the drain token the server writes at start to
+`<runs root>/.drain.token` (mode 0600). A server admin can call the same
+route, `GET` and `POST /api/bench/admin/drain` with `{"on": true}`. Drain
+mode lives in the server process only: a restarted server always hands out
+leases.
+
+Durable leases. Runs still in flight at a restart (a drain timeout, a
+crash) are not lost when the restart is shorter than the stale threshold (2
+minutes): the server keeps every lease in the `remote_leases` table, and the
+next process re-attaches it when the experiment resumes, so the run finishes
+on its runner and is counted once (docs/remote-execution.md, Durable leases).
 
 It takes a database backup first, tags the image IDs of the running server
 and shared worker containers `:previous` (a service with no running container
@@ -433,6 +461,12 @@ and status; evaluation runs are `experiment.run`), `heimdall_leases_in_flight`,
 `heimdall_workers_disk_low` and `heimdall_remote_runs_total` (uploaded runs
 by result and outcome).
 
+Monitoring (lane Z14): the `monitoring` compose profile adds Prometheus with
+alert and SLO rules, a Grafana dashboard, an OpenTelemetry Collector and
+Tempo for platform traces; `https://<domain>/status` is the public status
+page with incident notes (`bifrost-bench status incident ...`). Setup,
+metrics, SLOs, alert runbooks and the status page: docs/monitoring.md.
+
 Runner disk: every runner (`runner start`, the shared runner) sweeps every 10
 minutes: leftovers of crashed runs (the janitor), Heimdall task and agent
 images (label `bifrost-bench=1`, tags under `bench/` or `org-<org id>/` only)
@@ -494,11 +528,16 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_REGISTRY_AUTH_DIR` | Folder outside the checkout with that registry's credentials and digest manifest; empty picks one and writes it here. |
 | `HEIMDALL_LIBRARY_RUNS_ROOT` | Run store of the platform org whose reference runs give a new organization's first estimate its cost and time (docs/evaluations.md); empty uses each organization's own runs only. |
 | `HEIMDALL_EVAL_BUDGET_MAX_USD` | Largest budget the evaluation wizard suggests (default 100 USD, lowered to an org's daily spend cap when one is set); a person can still type more. |
+| `HEIMDALL_SHARED_HOST_SLOTS` | Runs at once on the shared worker's host, all organizations together, shared fairly between those with work; empty or 0 is one per 2 CPUs and 4 GB of memory. |
+| `HEIMDALL_EXPERIMENT_LIMIT` | Evaluations running at once on the whole platform; empty or 0 is 64. |
+| `HEIMDALL_EXPERIMENT_PER_ORG` | Evaluations running at once per organization; empty or 0 is 8. |
+| `HEIMDALL_SHARED_BUILDKIT` | Address of the isolated BuildKit that builds images from org Dockerfiles. |
 | `HEIMDALL_REGISTRY_DIR` | Host folder (on the data disk) for that registry's images; empty is a Docker volume. |
 | `HEIMDALL_RUNNER_DIR` | Host folder of the shared worker's runs, releases and org projects; empty is `/var/lib/heimdall-shared-runner`. |
 | `HEIMDALL_SHARED_PLATFORM_IMAGES` | Images every organization may pull, comma-separated. |
 | `HEIMDALL_SHARED_GATEWAY_CONTAINER` | The model gateway container every org network joins; empty finds it by name. |
 | `HEIMDALL_MODAL_PYTHON` | Python with the `modal` package, for organizations whose runs go to Modal (shared worker). |
+| `HEIMDALL_SANDBOX_GPU` | Modal GPU type a shared runner declares for GPU tasks of organizations whose default worker is Modal (default `L4`; `docs/open-models.md`). |
 | `HEIMDALL_PROVIDER_SLOTS` | Runs that may use one provider at once through the shared fault proxy and per organization key. |
 | `HEIMDALL_RUNNER_MIN_FREE_GB` | Free disk a runner keeps; below it the runner takes no new work and reports disk low. |
 | `HEIMDALL_METRICS_LISTEN` | Prometheus metrics address on the compose network; empty is off. Never publish it. |
@@ -552,6 +591,15 @@ with `PUT /api/bench/admin/billing/{org_id}` and `{"plan":"enterprise"}`.
 Paid seats follow the member count every hour (and on "Sync seats"),
 prorated. `GET /api/public/pricing` serves the plans to the pricing page
 without sign-in.
+**Queue and hot paths.** Waiting evaluations take organizations in turn:
+the next one to start belongs to the organization with the fewest running,
+then the highest priority (an admin can move a queued job with
+`POST /api/bench/jobs/{id}/priority`, -10 to 10), then the oldest. The shared
+worker's host limit is shared the same way. While runs finish, the server
+updates only the changed part of its index and checks only the new results
+on their way to the evidence mirror; every result is checked again in full
+when the evaluation ends, at every mirror sweep (`storage.sweep_interval_m`)
+and by `bifrost-bench evidence sweep` in the nightly runbook.
 
 `HEIMDALL_DEV` turns on the practice suite and examples for tests and
 development; a production install never sets it.
@@ -591,6 +639,14 @@ keeps `NET_BIND_SERVICE`) and `no-new-privileges`. Caddy sets HSTS
 (one year), `nosniff`, `no-referrer` and a restrictive `Permissions-Policy`,
 caps request bodies at 2 MiB and hides `/readyz`; the server adds its CSP,
 `X-Frame-Options: DENY` and same-origin policies on every answer.
+
+### Library registry (optional)
+
+Library images can be pushed once to a registry and pinned by digest in
+each benchmark's lock, so every worker pulls the same bytes instead of
+building them; orgs pull with their own API or runner token, restricted
+benchmarks only by the orgs the access file names. Setup, the Caddy route
+and the sync and prefetch commands: `docs/library-registry.md`.
 
 ## 12. Not yet supported
 

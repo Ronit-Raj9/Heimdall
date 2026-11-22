@@ -1,0 +1,447 @@
+# Generated from slos.yml in the form `sloth generate` writes (lane Z14).
+# Recording rules: slo:sli_error:ratio_rate<window> per SLO, then
+# multiwindow multi-burn-rate alerts (Google SRE workbook, chapter 5):
+#   page:   1h and 5m windows burning 14.4x, or 6h and 30m burning 6x
+#   ticket: 1d and 2h windows burning 3x, or 3d and 6h burning 1x
+# Do not edit by hand without editing slos.yml too.
+groups:
+  - name: sloth-slo-sli-recordings-heimdall-api-availability
+    rules:
+      - record: slo:sli_error:ratio_rate5m
+        expr: |
+          ((sum(rate(heimdall_http_request_duration_seconds_count{code="5xx",area!~"health|ui"}[5m]))) / (sum(rate(heimdall_http_request_duration_seconds_count{area!~"health|ui"}[5m]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: api-availability
+          sloth_window: 5m
+      - record: slo:sli_error:ratio_rate30m
+        expr: |
+          ((sum(rate(heimdall_http_request_duration_seconds_count{code="5xx",area!~"health|ui"}[30m]))) / (sum(rate(heimdall_http_request_duration_seconds_count{area!~"health|ui"}[30m]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: api-availability
+          sloth_window: 30m
+      - record: slo:sli_error:ratio_rate1h
+        expr: |
+          ((sum(rate(heimdall_http_request_duration_seconds_count{code="5xx",area!~"health|ui"}[1h]))) / (sum(rate(heimdall_http_request_duration_seconds_count{area!~"health|ui"}[1h]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: api-availability
+          sloth_window: 1h
+      - record: slo:sli_error:ratio_rate2h
+        expr: |
+          ((sum(rate(heimdall_http_request_duration_seconds_count{code="5xx",area!~"health|ui"}[2h]))) / (sum(rate(heimdall_http_request_duration_seconds_count{area!~"health|ui"}[2h]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: api-availability
+          sloth_window: 2h
+      - record: slo:sli_error:ratio_rate6h
+        expr: |
+          ((sum(rate(heimdall_http_request_duration_seconds_count{code="5xx",area!~"health|ui"}[6h]))) / (sum(rate(heimdall_http_request_duration_seconds_count{area!~"health|ui"}[6h]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: api-availability
+          sloth_window: 6h
+      - record: slo:sli_error:ratio_rate1d
+        expr: |
+          ((sum(rate(heimdall_http_request_duration_seconds_count{code="5xx",area!~"health|ui"}[1d]))) / (sum(rate(heimdall_http_request_duration_seconds_count{area!~"health|ui"}[1d]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: api-availability
+          sloth_window: 1d
+      - record: slo:sli_error:ratio_rate3d
+        expr: |
+          ((sum(rate(heimdall_http_request_duration_seconds_count{code="5xx",area!~"health|ui"}[3d]))) / (sum(rate(heimdall_http_request_duration_seconds_count{area!~"health|ui"}[3d]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: api-availability
+          sloth_window: 3d
+  - name: sloth-slo-meta-recordings-heimdall-api-availability
+    rules:
+      - record: slo:objective:ratio
+        expr: vector(0.995)
+        labels: {sloth_service: heimdall, sloth_slo: api-availability}
+      - record: slo:error_budget:ratio
+        expr: vector(0.005)
+        labels: {sloth_service: heimdall, sloth_slo: api-availability}
+      - record: slo:period_error_budget_remaining:ratio
+        expr: 1 - (avg_over_time(slo:sli_error:ratio_rate5m{sloth_service="heimdall", sloth_slo="api-availability"}[30d]) / 0.005)
+        labels: {sloth_service: heimdall, sloth_slo: api-availability}
+  - name: sloth-slo-alerts-heimdall-api-availability
+    rules:
+      - alert: HeimdallAPIAvailability
+        expr: |
+          (max(slo:sli_error:ratio_rate1h{sloth_service="heimdall", sloth_slo="api-availability"}) > (14.4 * 0.005) and max(slo:sli_error:ratio_rate5m{sloth_service="heimdall", sloth_slo="api-availability"}) > (14.4 * 0.005))
+          or
+          (max(slo:sli_error:ratio_rate6h{sloth_service="heimdall", sloth_slo="api-availability"}) > (6 * 0.005) and max(slo:sli_error:ratio_rate30m{sloth_service="heimdall", sloth_slo="api-availability"}) > (6 * 0.005))
+        labels:
+          severity: page
+          sloth_slo: api-availability
+        annotations:
+          summary: "api-availability: error budget burning fast"
+          description: "API requests that do not fail with a server error (5xx). Health probes and the static site are left out. Objective 99.5% over 30 days; at this rate the budget is gone in under 2 days."
+          runbook_url: "docs/monitoring.md#slo-api-availability"
+      - alert: HeimdallAPIAvailability
+        expr: |
+          (max(slo:sli_error:ratio_rate1d{sloth_service="heimdall", sloth_slo="api-availability"}) > (3 * 0.005) and max(slo:sli_error:ratio_rate2h{sloth_service="heimdall", sloth_slo="api-availability"}) > (3 * 0.005))
+          or
+          (max(slo:sli_error:ratio_rate3d{sloth_service="heimdall", sloth_slo="api-availability"}) > (1 * 0.005) and max(slo:sli_error:ratio_rate6h{sloth_service="heimdall", sloth_slo="api-availability"}) > (1 * 0.005))
+        labels:
+          severity: ticket
+          sloth_slo: api-availability
+        annotations:
+          summary: "api-availability: error budget burning"
+          description: "API requests that do not fail with a server error (5xx). Health probes and the static site are left out. Objective 99.5% over 30 days."
+          runbook_url: "docs/monitoring.md#slo-api-availability"
+  - name: sloth-slo-sli-recordings-heimdall-evaluation-start-latency
+    rules:
+      - record: slo:sli_error:ratio_rate5m
+        expr: |
+          ((sum(rate(heimdall_evaluation_start_seconds_count[5m])) - sum(rate(heimdall_evaluation_start_seconds_bucket{le="300"}[5m]))) / (sum(rate(heimdall_evaluation_start_seconds_count[5m]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: evaluation-start-latency
+          sloth_window: 5m
+      - record: slo:sli_error:ratio_rate30m
+        expr: |
+          ((sum(rate(heimdall_evaluation_start_seconds_count[30m])) - sum(rate(heimdall_evaluation_start_seconds_bucket{le="300"}[30m]))) / (sum(rate(heimdall_evaluation_start_seconds_count[30m]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: evaluation-start-latency
+          sloth_window: 30m
+      - record: slo:sli_error:ratio_rate1h
+        expr: |
+          ((sum(rate(heimdall_evaluation_start_seconds_count[1h])) - sum(rate(heimdall_evaluation_start_seconds_bucket{le="300"}[1h]))) / (sum(rate(heimdall_evaluation_start_seconds_count[1h]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: evaluation-start-latency
+          sloth_window: 1h
+      - record: slo:sli_error:ratio_rate2h
+        expr: |
+          ((sum(rate(heimdall_evaluation_start_seconds_count[2h])) - sum(rate(heimdall_evaluation_start_seconds_bucket{le="300"}[2h]))) / (sum(rate(heimdall_evaluation_start_seconds_count[2h]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: evaluation-start-latency
+          sloth_window: 2h
+      - record: slo:sli_error:ratio_rate6h
+        expr: |
+          ((sum(rate(heimdall_evaluation_start_seconds_count[6h])) - sum(rate(heimdall_evaluation_start_seconds_bucket{le="300"}[6h]))) / (sum(rate(heimdall_evaluation_start_seconds_count[6h]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: evaluation-start-latency
+          sloth_window: 6h
+      - record: slo:sli_error:ratio_rate1d
+        expr: |
+          ((sum(rate(heimdall_evaluation_start_seconds_count[1d])) - sum(rate(heimdall_evaluation_start_seconds_bucket{le="300"}[1d]))) / (sum(rate(heimdall_evaluation_start_seconds_count[1d]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: evaluation-start-latency
+          sloth_window: 1d
+      - record: slo:sli_error:ratio_rate3d
+        expr: |
+          ((sum(rate(heimdall_evaluation_start_seconds_count[3d])) - sum(rate(heimdall_evaluation_start_seconds_bucket{le="300"}[3d]))) / (sum(rate(heimdall_evaluation_start_seconds_count[3d]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: evaluation-start-latency
+          sloth_window: 3d
+  - name: sloth-slo-meta-recordings-heimdall-evaluation-start-latency
+    rules:
+      - record: slo:objective:ratio
+        expr: vector(0.95)
+        labels: {sloth_service: heimdall, sloth_slo: evaluation-start-latency}
+      - record: slo:error_budget:ratio
+        expr: vector(0.05)
+        labels: {sloth_service: heimdall, sloth_slo: evaluation-start-latency}
+      - record: slo:period_error_budget_remaining:ratio
+        expr: 1 - (avg_over_time(slo:sli_error:ratio_rate5m{sloth_service="heimdall", sloth_slo="evaluation-start-latency"}[30d]) / 0.05)
+        labels: {sloth_service: heimdall, sloth_slo: evaluation-start-latency}
+  - name: sloth-slo-alerts-heimdall-evaluation-start-latency
+    rules:
+      - alert: HeimdallEvaluationStartLatency
+        expr: |
+          (max(slo:sli_error:ratio_rate1h{sloth_service="heimdall", sloth_slo="evaluation-start-latency"}) > (14.4 * 0.05) and max(slo:sli_error:ratio_rate5m{sloth_service="heimdall", sloth_slo="evaluation-start-latency"}) > (14.4 * 0.05))
+          or
+          (max(slo:sli_error:ratio_rate6h{sloth_service="heimdall", sloth_slo="evaluation-start-latency"}) > (6 * 0.05) and max(slo:sli_error:ratio_rate30m{sloth_service="heimdall", sloth_slo="evaluation-start-latency"}) > (6 * 0.05))
+        labels:
+          severity: page
+          sloth_slo: evaluation-start-latency
+        annotations:
+          summary: "evaluation-start-latency: error budget burning fast"
+          description: "Evaluations whose first run starts on a worker within 5 minutes of the evaluation opening to workers. Objective 95% over 30 days; at this rate the budget is gone in under 2 days."
+          runbook_url: "docs/monitoring.md#slo-evaluation-start-latency"
+      - alert: HeimdallEvaluationStartLatency
+        expr: |
+          (max(slo:sli_error:ratio_rate1d{sloth_service="heimdall", sloth_slo="evaluation-start-latency"}) > (3 * 0.05) and max(slo:sli_error:ratio_rate2h{sloth_service="heimdall", sloth_slo="evaluation-start-latency"}) > (3 * 0.05))
+          or
+          (max(slo:sli_error:ratio_rate3d{sloth_service="heimdall", sloth_slo="evaluation-start-latency"}) > (1 * 0.05) and max(slo:sli_error:ratio_rate6h{sloth_service="heimdall", sloth_slo="evaluation-start-latency"}) > (1 * 0.05))
+        labels:
+          severity: ticket
+          sloth_slo: evaluation-start-latency
+        annotations:
+          summary: "evaluation-start-latency: error budget burning"
+          description: "Evaluations whose first run starts on a worker within 5 minutes of the evaluation opening to workers. Objective 95% over 30 days."
+          runbook_url: "docs/monitoring.md#slo-evaluation-start-latency"
+  - name: sloth-slo-sli-recordings-heimdall-run-continuity
+    rules:
+      - record: slo:sli_error:ratio_rate5m
+        expr: |
+          ((sum(rate(heimdall_remote_leases_ended_total{reason="lost"}[5m]))) / (sum(rate(heimdall_remote_leases_ended_total[5m]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: run-continuity
+          sloth_window: 5m
+      - record: slo:sli_error:ratio_rate30m
+        expr: |
+          ((sum(rate(heimdall_remote_leases_ended_total{reason="lost"}[30m]))) / (sum(rate(heimdall_remote_leases_ended_total[30m]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: run-continuity
+          sloth_window: 30m
+      - record: slo:sli_error:ratio_rate1h
+        expr: |
+          ((sum(rate(heimdall_remote_leases_ended_total{reason="lost"}[1h]))) / (sum(rate(heimdall_remote_leases_ended_total[1h]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: run-continuity
+          sloth_window: 1h
+      - record: slo:sli_error:ratio_rate2h
+        expr: |
+          ((sum(rate(heimdall_remote_leases_ended_total{reason="lost"}[2h]))) / (sum(rate(heimdall_remote_leases_ended_total[2h]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: run-continuity
+          sloth_window: 2h
+      - record: slo:sli_error:ratio_rate6h
+        expr: |
+          ((sum(rate(heimdall_remote_leases_ended_total{reason="lost"}[6h]))) / (sum(rate(heimdall_remote_leases_ended_total[6h]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: run-continuity
+          sloth_window: 6h
+      - record: slo:sli_error:ratio_rate1d
+        expr: |
+          ((sum(rate(heimdall_remote_leases_ended_total{reason="lost"}[1d]))) / (sum(rate(heimdall_remote_leases_ended_total[1d]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: run-continuity
+          sloth_window: 1d
+      - record: slo:sli_error:ratio_rate3d
+        expr: |
+          ((sum(rate(heimdall_remote_leases_ended_total{reason="lost"}[3d]))) / (sum(rate(heimdall_remote_leases_ended_total[3d]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: run-continuity
+          sloth_window: 3d
+  - name: sloth-slo-meta-recordings-heimdall-run-continuity
+    rules:
+      - record: slo:objective:ratio
+        expr: vector(0.99)
+        labels: {sloth_service: heimdall, sloth_slo: run-continuity}
+      - record: slo:error_budget:ratio
+        expr: vector(0.01)
+        labels: {sloth_service: heimdall, sloth_slo: run-continuity}
+      - record: slo:period_error_budget_remaining:ratio
+        expr: 1 - (avg_over_time(slo:sli_error:ratio_rate5m{sloth_service="heimdall", sloth_slo="run-continuity"}[30d]) / 0.01)
+        labels: {sloth_service: heimdall, sloth_slo: run-continuity}
+  - name: sloth-slo-alerts-heimdall-run-continuity
+    rules:
+      - alert: HeimdallRunContinuity
+        expr: |
+          (max(slo:sli_error:ratio_rate1h{sloth_service="heimdall", sloth_slo="run-continuity"}) > (14.4 * 0.01) and max(slo:sli_error:ratio_rate5m{sloth_service="heimdall", sloth_slo="run-continuity"}) > (14.4 * 0.01))
+          or
+          (max(slo:sli_error:ratio_rate6h{sloth_service="heimdall", sloth_slo="run-continuity"}) > (6 * 0.01) and max(slo:sli_error:ratio_rate30m{sloth_service="heimdall", sloth_slo="run-continuity"}) > (6 * 0.01))
+        labels:
+          severity: page
+          sloth_slo: run-continuity
+        annotations:
+          summary: "run-continuity: error budget burning fast"
+          description: "Runs handed to a worker that are not lost (no heartbeat past the stale threshold, worker gone). Objective 99% over 30 days; at this rate the budget is gone in under 2 days."
+          runbook_url: "docs/monitoring.md#slo-run-continuity"
+      - alert: HeimdallRunContinuity
+        expr: |
+          (max(slo:sli_error:ratio_rate1d{sloth_service="heimdall", sloth_slo="run-continuity"}) > (3 * 0.01) and max(slo:sli_error:ratio_rate2h{sloth_service="heimdall", sloth_slo="run-continuity"}) > (3 * 0.01))
+          or
+          (max(slo:sli_error:ratio_rate3d{sloth_service="heimdall", sloth_slo="run-continuity"}) > (1 * 0.01) and max(slo:sli_error:ratio_rate6h{sloth_service="heimdall", sloth_slo="run-continuity"}) > (1 * 0.01))
+        labels:
+          severity: ticket
+          sloth_slo: run-continuity
+        annotations:
+          summary: "run-continuity: error budget burning"
+          description: "Runs handed to a worker that are not lost (no heartbeat past the stale threshold, worker gone). Objective 99% over 30 days."
+          runbook_url: "docs/monitoring.md#slo-run-continuity"
+  - name: sloth-slo-sli-recordings-heimdall-upload-acceptance
+    rules:
+      - record: slo:sli_error:ratio_rate5m
+        expr: |
+          ((sum(rate(heimdall_remote_runs_total{result="rejected"}[5m]))) / (sum(rate(heimdall_remote_runs_total[5m]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: upload-acceptance
+          sloth_window: 5m
+      - record: slo:sli_error:ratio_rate30m
+        expr: |
+          ((sum(rate(heimdall_remote_runs_total{result="rejected"}[30m]))) / (sum(rate(heimdall_remote_runs_total[30m]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: upload-acceptance
+          sloth_window: 30m
+      - record: slo:sli_error:ratio_rate1h
+        expr: |
+          ((sum(rate(heimdall_remote_runs_total{result="rejected"}[1h]))) / (sum(rate(heimdall_remote_runs_total[1h]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: upload-acceptance
+          sloth_window: 1h
+      - record: slo:sli_error:ratio_rate2h
+        expr: |
+          ((sum(rate(heimdall_remote_runs_total{result="rejected"}[2h]))) / (sum(rate(heimdall_remote_runs_total[2h]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: upload-acceptance
+          sloth_window: 2h
+      - record: slo:sli_error:ratio_rate6h
+        expr: |
+          ((sum(rate(heimdall_remote_runs_total{result="rejected"}[6h]))) / (sum(rate(heimdall_remote_runs_total[6h]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: upload-acceptance
+          sloth_window: 6h
+      - record: slo:sli_error:ratio_rate1d
+        expr: |
+          ((sum(rate(heimdall_remote_runs_total{result="rejected"}[1d]))) / (sum(rate(heimdall_remote_runs_total[1d]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: upload-acceptance
+          sloth_window: 1d
+      - record: slo:sli_error:ratio_rate3d
+        expr: |
+          ((sum(rate(heimdall_remote_runs_total{result="rejected"}[3d]))) / (sum(rate(heimdall_remote_runs_total[3d]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: upload-acceptance
+          sloth_window: 3d
+  - name: sloth-slo-meta-recordings-heimdall-upload-acceptance
+    rules:
+      - record: slo:objective:ratio
+        expr: vector(0.99)
+        labels: {sloth_service: heimdall, sloth_slo: upload-acceptance}
+      - record: slo:error_budget:ratio
+        expr: vector(0.01)
+        labels: {sloth_service: heimdall, sloth_slo: upload-acceptance}
+      - record: slo:period_error_budget_remaining:ratio
+        expr: 1 - (avg_over_time(slo:sli_error:ratio_rate5m{sloth_service="heimdall", sloth_slo="upload-acceptance"}[30d]) / 0.01)
+        labels: {sloth_service: heimdall, sloth_slo: upload-acceptance}
+  - name: sloth-slo-alerts-heimdall-upload-acceptance
+    rules:
+      - alert: HeimdallUploadAcceptance
+        expr: |
+          (max(slo:sli_error:ratio_rate1h{sloth_service="heimdall", sloth_slo="upload-acceptance"}) > (14.4 * 0.01) and max(slo:sli_error:ratio_rate5m{sloth_service="heimdall", sloth_slo="upload-acceptance"}) > (14.4 * 0.01))
+          or
+          (max(slo:sli_error:ratio_rate6h{sloth_service="heimdall", sloth_slo="upload-acceptance"}) > (6 * 0.01) and max(slo:sli_error:ratio_rate30m{sloth_service="heimdall", sloth_slo="upload-acceptance"}) > (6 * 0.01))
+        labels:
+          severity: page
+          sloth_slo: upload-acceptance
+        annotations:
+          summary: "upload-acceptance: error budget burning fast"
+          description: "Finished runs whose upload the server accepts and seals (a rejection means a run had to be repeated). Objective 99% over 30 days; at this rate the budget is gone in under 2 days."
+          runbook_url: "docs/monitoring.md#slo-upload-acceptance"
+      - alert: HeimdallUploadAcceptance
+        expr: |
+          (max(slo:sli_error:ratio_rate1d{sloth_service="heimdall", sloth_slo="upload-acceptance"}) > (3 * 0.01) and max(slo:sli_error:ratio_rate2h{sloth_service="heimdall", sloth_slo="upload-acceptance"}) > (3 * 0.01))
+          or
+          (max(slo:sli_error:ratio_rate3d{sloth_service="heimdall", sloth_slo="upload-acceptance"}) > (1 * 0.01) and max(slo:sli_error:ratio_rate6h{sloth_service="heimdall", sloth_slo="upload-acceptance"}) > (1 * 0.01))
+        labels:
+          severity: ticket
+          sloth_slo: upload-acceptance
+        annotations:
+          summary: "upload-acceptance: error budget burning"
+          description: "Finished runs whose upload the server accepts and seals (a rejection means a run had to be repeated). Objective 99% over 30 days."
+          runbook_url: "docs/monitoring.md#slo-upload-acceptance"
+  - name: sloth-slo-sli-recordings-heimdall-time-to-verdict-step
+    rules:
+      - record: slo:sli_error:ratio_rate5m
+        expr: |
+          ((sum(rate(heimdall_remote_complete_seconds_count[5m])) - sum(rate(heimdall_remote_complete_seconds_bucket{le="30"}[5m]))) / (sum(rate(heimdall_remote_complete_seconds_count[5m]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: time-to-verdict-step
+          sloth_window: 5m
+      - record: slo:sli_error:ratio_rate30m
+        expr: |
+          ((sum(rate(heimdall_remote_complete_seconds_count[30m])) - sum(rate(heimdall_remote_complete_seconds_bucket{le="30"}[30m]))) / (sum(rate(heimdall_remote_complete_seconds_count[30m]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: time-to-verdict-step
+          sloth_window: 30m
+      - record: slo:sli_error:ratio_rate1h
+        expr: |
+          ((sum(rate(heimdall_remote_complete_seconds_count[1h])) - sum(rate(heimdall_remote_complete_seconds_bucket{le="30"}[1h]))) / (sum(rate(heimdall_remote_complete_seconds_count[1h]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: time-to-verdict-step
+          sloth_window: 1h
+      - record: slo:sli_error:ratio_rate2h
+        expr: |
+          ((sum(rate(heimdall_remote_complete_seconds_count[2h])) - sum(rate(heimdall_remote_complete_seconds_bucket{le="30"}[2h]))) / (sum(rate(heimdall_remote_complete_seconds_count[2h]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: time-to-verdict-step
+          sloth_window: 2h
+      - record: slo:sli_error:ratio_rate6h
+        expr: |
+          ((sum(rate(heimdall_remote_complete_seconds_count[6h])) - sum(rate(heimdall_remote_complete_seconds_bucket{le="30"}[6h]))) / (sum(rate(heimdall_remote_complete_seconds_count[6h]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: time-to-verdict-step
+          sloth_window: 6h
+      - record: slo:sli_error:ratio_rate1d
+        expr: |
+          ((sum(rate(heimdall_remote_complete_seconds_count[1d])) - sum(rate(heimdall_remote_complete_seconds_bucket{le="30"}[1d]))) / (sum(rate(heimdall_remote_complete_seconds_count[1d]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: time-to-verdict-step
+          sloth_window: 1d
+      - record: slo:sli_error:ratio_rate3d
+        expr: |
+          ((sum(rate(heimdall_remote_complete_seconds_count[3d])) - sum(rate(heimdall_remote_complete_seconds_bucket{le="30"}[3d]))) / (sum(rate(heimdall_remote_complete_seconds_count[3d]))))
+        labels:
+          sloth_service: heimdall
+          sloth_slo: time-to-verdict-step
+          sloth_window: 3d
+  - name: sloth-slo-meta-recordings-heimdall-time-to-verdict-step
+    rules:
+      - record: slo:objective:ratio
+        expr: vector(0.99)
+        labels: {sloth_service: heimdall, sloth_slo: time-to-verdict-step}
+      - record: slo:error_budget:ratio
+        expr: vector(0.01)
+        labels: {sloth_service: heimdall, sloth_slo: time-to-verdict-step}
+      - record: slo:period_error_budget_remaining:ratio
+        expr: 1 - (avg_over_time(slo:sli_error:ratio_rate5m{sloth_service="heimdall", sloth_slo="time-to-verdict-step"}[30d]) / 0.01)
+        labels: {sloth_service: heimdall, sloth_slo: time-to-verdict-step}
+  - name: sloth-slo-alerts-heimdall-time-to-verdict-step
+    rules:
+      - alert: HeimdallSealLatency
+        expr: |
+          (max(slo:sli_error:ratio_rate1h{sloth_service="heimdall", sloth_slo="time-to-verdict-step"}) > (14.4 * 0.01) and max(slo:sli_error:ratio_rate5m{sloth_service="heimdall", sloth_slo="time-to-verdict-step"}) > (14.4 * 0.01))
+          or
+          (max(slo:sli_error:ratio_rate6h{sloth_service="heimdall", sloth_slo="time-to-verdict-step"}) > (6 * 0.01) and max(slo:sli_error:ratio_rate30m{sloth_service="heimdall", sloth_slo="time-to-verdict-step"}) > (6 * 0.01))
+        labels:
+          severity: page
+          sloth_slo: time-to-verdict-step
+        annotations:
+          summary: "time-to-verdict-step: error budget burning fast"
+          description: "Uploads the server verifies, stores and seals within 30 seconds (the step between a finished run and a visible result). Objective 99% over 30 days; at this rate the budget is gone in under 2 days."
+          runbook_url: "docs/monitoring.md#slo-time-to-verdict-step"
+      - alert: HeimdallSealLatency
+        expr: |
+          (max(slo:sli_error:ratio_rate1d{sloth_service="heimdall", sloth_slo="time-to-verdict-step"}) > (3 * 0.01) and max(slo:sli_error:ratio_rate2h{sloth_service="heimdall", sloth_slo="time-to-verdict-step"}) > (3 * 0.01))
+          or
+          (max(slo:sli_error:ratio_rate3d{sloth_service="heimdall", sloth_slo="time-to-verdict-step"}) > (1 * 0.01) and max(slo:sli_error:ratio_rate6h{sloth_service="heimdall", sloth_slo="time-to-verdict-step"}) > (1 * 0.01))
+        labels:
+          severity: ticket
+          sloth_slo: time-to-verdict-step
+        annotations:
+          summary: "time-to-verdict-step: error budget burning"
+          description: "Uploads the server verifies, stores and seals within 30 seconds (the step between a finished run and a visible result). Objective 99% over 30 days."
+          runbook_url: "docs/monitoring.md#slo-time-to-verdict-step"

@@ -172,6 +172,7 @@ type settings struct {
 	benchmark, source, revision, license string
 	tasksDir, track, agent, image        string
 	keepNetworked, keepHoneypots         bool
+	egress                               bool // -set egress=record (egress.go)
 }
 
 func readSettings(extra map[string]string) (settings, error) {
@@ -197,6 +198,11 @@ func readSettings(extra map[string]string) (settings, error) {
 			cfg.agent = v
 		case SetKeepNetworked:
 			cfg.keepNetworked = v == "true" || v == "1" || v == "yes"
+		case SetEgress: // recorded internet (egress.go)
+			if v != "record" && v != "off" {
+				return cfg, fmt.Errorf("harbor: -set egress=%s: want record or off", v)
+			}
+			cfg.egress = v == "record"
 		case SetHackVerify:
 			if v != "skip" && v != "keep" {
 				return cfg, fmt.Errorf("harbor: -set hack_verifiable=%s: want skip or keep", v)
@@ -208,7 +214,7 @@ func readSettings(extra map[string]string) (settings, error) {
 			}
 			cfg.image = v
 		default:
-			return cfg, fmt.Errorf("harbor: unknown setting %q (known: benchmark, source, revision, license, tasks_dir, track, agent, keep_networked, image, hack_verifiable)", k)
+			return cfg, fmt.Errorf("harbor: unknown setting %q (known: benchmark, source, revision, license, tasks_dir, track, agent, keep_networked, image, hack_verifiable, egress)", k)
 		}
 	}
 	return cfg, nil
@@ -316,18 +322,20 @@ func (im *importer) importTask(dir, suiteDir string, up upstream, cfg settings, 
 
 // taskPlan is everything decided about one task before it is written.
 type taskPlan struct {
-	workdir    string
-	dockerfile string // the task's Dockerfile, rewritten
-	tests      *testPlan
-	skillCopy  int  // COPY skills lines disabled
-	skills     bool // the task brings skills
-	honeypot   bool // a planted admin/ folder watched by inotifywait (Hack-Verifiable Terminal-Bench)
-	agentS     int
-	verifierS  int
-	solution   []byte       // tar.gz of the solution folder
-	skillsTar  []byte       // tar.gz of the skills folder, for the reference control
-	skillRoots []string     // folders the reference control installs the skills in
-	compose    *composePlan // X2: the task's compose file, mapped (compose.go); nil without one
+	workdir        string
+	dockerfile     string // the task's Dockerfile, rewritten
+	tests          *testPlan
+	skillCopy      int  // COPY skills lines disabled
+	skills         bool // the task brings skills
+	honeypot       bool // a planted admin/ folder watched by inotifywait (Hack-Verifiable Terminal-Bench)
+	agentS         int
+	verifierS      int
+	solution       []byte       // tar.gz of the solution folder
+	skillsTar      []byte       // tar.gz of the skills folder, for the reference control
+	skillRoots     []string     // folders the reference control installs the skills in
+	compose        *composePlan // X2: the task's compose file, mapped (compose.go); nil without one
+	egressFetch    string       // recorded internet: the first download line; set when the task gets an egress service (egress.go)
+	egressVerifier bool         // recorded internet: test.sh downloads too, so the verifier reaches the egress service
 }
 
 // plan checks t against what the bench can run and prepares the rewritten
@@ -363,14 +371,15 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 	if err != nil {
 		return nil, "cannot read solve.sh: " + err.Error()
 	}
-	if line := solutionFetch(string(solve)); line != "" && !cfg.keepNetworked {
-		return nil, "the reference solution downloads at run time (" + line + "); runs have no network, so the agent could not do it either"
+	fetch := solutionFetch(string(solve))
+	if fetch != "" && !cfg.keepNetworked && !cfg.egress {
+		return nil, "the reference solution downloads at run time (" + fetch + "); runs have no network, so the agent could not do it either; -set egress=record imports it with a recorded internet"
 	}
 	testSrc, err := os.ReadFile(filepath.Join(t.TestsDir, "test.sh"))
 	if err != nil {
 		return nil, "cannot read test.sh: " + err.Error()
 	}
-	tests, err := planTestScriptKeep(string(testSrc), cfg.keepNetworked)
+	tests, err := planTestScriptKeep(string(testSrc), cfg.keepNetworked || cfg.egress)
 	if err != nil {
 		return nil, err.Error()
 	}
@@ -413,7 +422,16 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 	if p.skills {
 		dirs = append(dirs, defaultSkillRoot)
 	}
+	if cfg.egress && (fetch != "" || len(tests.Networked) > 0) { // recorded internet (egress.go)
+		if reason := planEgress(p, t, fetch, cfg.keepNetworked); reason != "" {
+			return nil, reason
+		}
+		src = strings.TrimRight(src, "\n") + "\n" + egressDockerfile()
+	}
 	p.dockerfile = strings.TrimRight(src, "\n") + "\n" + bakeSection(tests.Bake, dirs, t.EnvEnv, info.User)
+	if p.egressFetch != "" {
+		p.dockerfile += egressTail(info.User) // recorded internet: no build-date apt lists (egress.go)
+	}
 	if p.solution, err = tarGz(t.SolutionDir); err != nil {
 		return nil, "cannot pack the solution folder: " + err.Error()
 	}

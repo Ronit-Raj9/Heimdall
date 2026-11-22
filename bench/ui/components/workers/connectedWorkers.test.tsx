@@ -160,6 +160,19 @@ describe("draftToCreate", () => {
 			settings: { app: "w", cpus: "4" },
 			secret: "tok",
 		});
+		expect(
+			draftToCreate({
+				platform: "runpod",
+				name: "gpu-1",
+				fields: { secret: "rpa_1", gpu_type: "NVIDIA H100 PCIe", gpu_count: "2", cloud_type: "COMMUNITY", disk_gb: "" },
+				kubeMode: "kubeconfig",
+			}),
+		).toEqual({
+			name: "gpu-1",
+			platform: "runpod",
+			settings: { gpu_type: "NVIDIA H100 PCIe", gpu_count: "2", cloud_type: "COMMUNITY" },
+			secret: "rpa_1",
+		});
 		expect(draftToCreate({ platform: "vm", name: "lab", fields: { secret: "x" }, kubeMode: "kubeconfig" })).toEqual({
 			name: "lab",
 			platform: "vm",

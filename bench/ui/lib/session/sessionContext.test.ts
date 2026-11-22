@@ -86,6 +86,8 @@ describe("frameFor", () => {
 		expect(frameFor({ ...signedOutSession(), status: "error" }, "/s/org_a.shr_1.sig")).toBe("share");
 		expect(frameFor(demoSession(), "/verdict")).toBe("login");
 		expect(frameFor(hostedSession("viewer"), "/settings")).toBe("app");
+		expect(frameFor(signedOutSession(), "/status")).toBe("status");
+		expect(frameFor({ ...signedOutSession(), status: "error" }, "/status")).toBe("status");
 	});
 });
 describe("email verification and allowlist sign-up (Wave A)", () => {

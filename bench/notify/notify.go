@@ -30,7 +30,7 @@ import (
 
 // EmailEvents are the events a member can get by email.
 var EmailEvents = []string{webhooks.EventEvaluationFinished, webhooks.EventEvaluationRegressed, webhooks.EventReleaseBlocked,
-	webhooks.EventScheduleFailed, webhooks.EventWorkerOffline}
+	webhooks.EventScheduleFailed, webhooks.EventWorkerOffline, webhooks.EventMonitorIncident}
 
 // Prefs is one member's email choice. A member with no saved choice gets
 // the weekly digest and no event email.

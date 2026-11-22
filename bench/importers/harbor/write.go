@@ -89,6 +89,11 @@ func writeTask(dir, id string, t *upstreamTask, p *taskPlan, up upstream) error 
 			return err
 		}
 	}
+	if p.egressFetch != "" { // recorded internet (egress.go)
+		if err := writeEgress(dir); err != nil {
+			return err
+		}
+	}
 	return writeYAML(filepath.Join(dir, "task.yaml"), taskRecord(id, t, p, up))
 }
 
@@ -133,6 +138,10 @@ func taskRecord(id string, t *upstreamTask, p *taskPlan, up upstream) *schemas.T
 	}
 	if p.compose != nil && p.compose.file != "" { // X2: the services beside the agent (compose.go)
 		task.Compose = p.compose.file
+	}
+	if p.egressFetch != "" { // recorded internet (egress.go)
+		task.Services = append(task.Services, egressService(p.egressVerifier))
+		task.Tags = dedupe(append(task.Tags, EgressTag))
 	}
 	if p.honeypot {
 		task.Protected = []string{"admin/**"}
@@ -365,7 +374,9 @@ func importNotes(id string, t *upstreamTask, p *taskPlan, up upstream) string {
 	if t.Layout == LayoutTaskMD {
 		b.WriteString("- BenchFlow's verifier hardening (deleting conftest.py files from the workspace before the tests) is not applied; the workspace is read-only while the verifier runs.\n")
 	}
-	if t.AllowInternet {
+	if p.egressFetch != "" { // recorded internet (egress.go)
+		b.WriteString(egressNotes(p.egressFetch))
+	} else if t.AllowInternet {
 		b.WriteString("- Upstream lets the agent use the internet; bench runs have no network except model calls.\n")
 	}
 	if p.compose != nil { // X2: how the compose file was mapped (compose.go)

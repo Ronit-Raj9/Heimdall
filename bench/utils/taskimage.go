@@ -24,6 +24,10 @@ type LocalImage struct {
 	Dockerfile string // absolute; empty for a prebuilt image
 	Context    string // absolute build context
 	Network    bool   // the build may use the network (BuildNetwork)
+	// Pinned is the registry reference (repo@sha256:...) the suite lock
+	// pins the image by (imagepins.go): a missing image is pulled by that
+	// digest and tagged, never built, so every worker runs the same bytes.
+	Pinned string
 }
 
 // imageNameRe is a valid docker repository path component.
@@ -148,6 +152,16 @@ func (d Docker) EnsureImage(ctx context.Context, img LocalImage, out io.Writer) 
 	}
 	if out == nil {
 		out = io.Discard
+	}
+	if img.Pinned != "" {
+		if err := d.PullPinned(ctx, nil, img.Tag, img.Pinned, out); err != nil {
+			return "", err
+		}
+		id, ok, err := d.ImageID(ctx, img.Tag)
+		if err == nil && !ok {
+			err = fmt.Errorf("image %s is still missing after pulling %s", img.Tag, img.Pinned)
+		}
+		return id, err
 	}
 	args := []string{"pull", img.Tag}
 	if img.Dockerfile != "" {

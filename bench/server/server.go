@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/maximhq/bifrost/bench/selfmetrics"
+	"github.com/maximhq/bifrost/bench/statuspage"
+	"github.com/maximhq/bifrost/bench/telemetry"
 	"io/fs"
 	"net"
 	"os"
@@ -21,8 +23,8 @@ import (
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/packs"
-	"github.com/maximhq/bifrost/bench/reference"
 	"github.com/maximhq/bifrost/bench/pullagent"
+	"github.com/maximhq/bifrost/bench/reference"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/taskhealth"
 	"github.com/valyala/fasthttp"
@@ -90,6 +92,9 @@ type Deps struct {
 	// Web parity: per-org services for the areas registered with
 	// handlers.RegisterOrgArea (handlers/orgareas.go); any field may be nil.
 	Services handlers.Services
+	// Lane Z14: the public status page, GET /status in local mode (hosted
+	// mode serves it as a platform area); nil answers 503 (handlers/statuspage.go).
+	StatusPage *statuspage.Service
 }
 
 // Server is the bench HTTP server.
@@ -144,6 +149,7 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	handlers.NewAuthHandler(mode, nil).RegisterRoutes(r, common...)                 // Auth area (P2): local mode answers GET /auth/config and /auth/me (local principal); hosted-only routes 404 (handlers/auth.go)
 	handlers.NewRunnersHandler(mode, nil, nil).RegisterRoutes(r, common...)         // Runners area (P5): runner admin is hosted only; local mode answers 503 (handlers/runners.go)
 	handlers.NewWorkerPlatformsHandler(mode, nil, nil).RegisterRoutes(r, common...) // X19a: cloud sandbox platforms are hosted only; local mode answers 503
+	handlers.NewOpenModelsHandler(mode, nil, nil).RegisterRoutes(r, common...)      // Z05: open models on the org's Modal account are hosted only; local mode answers 503
 	// Bring your own worker: hosted only; local mode answers 503 (handlers/workerconns.go).
 	handlers.NewWorkerConnsHandler(mode, nil, handlers.WorkerConnErrors{}, nil).RegisterRoutes(r, common...)
 	handlers.NewWorkerTargetHandler(mode, nil, nil).RegisterRoutes(r, common...) // where runs go: hosted only; local mode answers 503 (handlers/workertarget.go)
@@ -151,6 +157,8 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	handlers.NewReferenceHandler(mode, reference.Open(cfg.Path(cfg.RunsRoot))).RegisterRoutes(r, common...)
 	// Y11 pull-mode agents: the local runs' launchers (handlers/pullagent.go); the agent side is an org route (registerOrgRoutes).
 	handlers.NewPullAgentHandler(mode, pullagent.Shared(), pullagent.DefaultSigner(), false, cfg.PullPublicOrigin(), write).RegisterRunRoutes(r, common...)
+	// Lane Z14: the public status page (handlers/statuspage.go).
+	handlers.NewStatusPageHandler(mode, deps.StatusPage).RegisterRoutes(r, common...)
 	if deps.UI != nil {
 		NewUIHandler(mode, deps.UI).RegisterRoutes(r)
 	}
@@ -165,7 +173,7 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 		handlers.V1Alias(mode, deps.Version, false),         // Public API v1: /api/v1 rewritten onto its bench routes (handlers/apiv1.go, docs/api-v1.md)
 	)
 	s.server = &fasthttp.Server{
-		Handler:               selfmetrics.Default.Middleware(s.handler), // N9: API latency for /metrics
+		Handler:               selfmetrics.Default.Middleware(telemetry.Middleware(s.handler)), // N9: API latency for /metrics; Z14: a server span per request
 		Name:                  "bifrost-bench",
 		MaxRequestBodySize:    lib.MaxUploadBytes, // per-route limits: lib.BodyLimit in common/upload middlewares
 		ErrorHandler:          lib.RequestErrorHandler(mode, lib.MaxUploadBytes),
@@ -185,7 +193,8 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	mode := cfg.Server.Mode
 	experiments := handlers.NewExperimentsHandler(mode, deps.Index, deps.Analyzer, deps.Launcher, deps.Catalog, write)
 	handlers.NewHealthHandler(mode, deps.Version, deps.Doctor).WithLaunch(deps.Launcher != nil).RegisterRoutes(r, common...)
-	handlers.NewReadinessHandler(mode, deps.Version, deps.Ready).RegisterRoutes(r, common...) // Deploy area: GET /healthz and /readyz at the site root (handlers/readiness.go)
+	handlers.NewReadinessHandler(mode, deps.Version, deps.Ready).RegisterRoutes(r, common...)            // Deploy area: GET /healthz and /readyz at the site root (handlers/readiness.go)
+	handlers.NewDrainHandler(mode, cfg.Auth.IsHosted(), write, deps.Logger).RegisterRoutes(r, common...) // Z11 drain mode: GET/POST /admin/drain (handlers/drain.go)
 	handlers.NewCatalogHandler(mode, deps.Catalog).RegisterRoutes(r, common...)
 	experiments.RegisterRoutes(r, common...)
 	// Y11 pull-mode agents, the serving process's side (handlers/pullagent.go). On a hosted

@@ -53,6 +53,9 @@ type Spec struct {
 	// time. Destroy removes it earlier.
 	Lifetime time.Duration
 	Egress   Egress
+	// GPU is the platform's GPU request ("L4", "H100:2"); "" for none.
+	// Only GPUCapable platforms get one (gpu.go).
+	GPU string
 }
 
 // Egress is a sandbox's outbound network rule. With BlockAll the sandbox

@@ -62,6 +62,8 @@ func PlatformTitle(p string) string {
 		return "Daytona"
 	case PlatformE2B:
 		return "E2B"
+	case PlatformRunPod:
+		return "RunPod"
 	}
 	return p
 }

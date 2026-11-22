@@ -46,6 +46,10 @@ type Experiment struct {
 	// such a judge refuses and grades invalid_evaluator.
 	PaidJudge bool   `json:"paid_judge,omitempty" yaml:"paid_judge"`
 	External  string `json:"external,omitempty" yaml:"external"` // live | record | replay: overrides every external API's mode for this experiment's runs
+	// Egress overrides the mode of every egress service (recorded internet,
+	// docs/egress.md): offline, replay or live-allowlisted. Empty keeps each
+	// service's own (replay).
+	Egress string `json:"egress,omitempty" yaml:"egress"`
 	// Fairness is a comparison rule the planner and the verdict enforce
 	// (agents.go): equal_budget, or empty for none.
 	Fairness string `json:"fairness,omitempty" yaml:"fairness"`

@@ -112,6 +112,9 @@ type Summary struct {
 	// they are in Sealed too. RemoteRejected counts uploads it refused.
 	Remote         int `json:"remote,omitempty"`
 	RemoteRejected int `json:"remote_rejected,omitempty"`
+	// Reattached counts remote leases kept across a server restart and
+	// re-attached to their slot (Z11 durable leases, remotebook.go).
+	Reattached int `json:"reattached,omitempty"`
 	// W7 adaptive trials (adaptive_sched.go): optional slots the frozen rule
 	// did not release (not required, not missing) and why it stopped.
 	NotRequired int    `json:"not_required,omitempty"`

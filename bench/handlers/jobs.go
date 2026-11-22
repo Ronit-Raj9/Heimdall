@@ -99,6 +99,7 @@ func (h *JobsHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middle
 	r.GET(p+"/{id}", lib.ChainMiddlewares(h.get, middlewares...))
 	r.GET(p+"/{id}/logs", lib.ChainMiddlewares(h.logs, middlewares...))
 	r.POST(p+"/{id}/cancel", lib.ChainMiddlewares(h.cancel, writeMW...))
+	r.POST(p+"/{id}/priority", lib.ChainMiddlewares(h.priority, writeMW...)) // Z10: jobpriority.go
 }
 
 // Close ends open log streams.

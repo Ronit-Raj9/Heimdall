@@ -1,0 +1,113 @@
+# Heimdall alert rules on the server's own /metrics (lane Z14,
+# docs/monitoring.md). Loaded by prometheus.yml with slo-rules.yml.
+# Severity: page wakes someone, ticket is for working hours, info is a
+# dashboard note. Runbooks: docs/monitoring.md, one section per alert.
+groups:
+  - name: heimdall-server
+    rules:
+      - alert: HeimdallDown
+        expr: up{job="heimdall"} == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: "The Heimdall server is not answering its metrics scrape"
+          description: "Prometheus could not scrape {{ $labels.instance }} for 2 minutes. Check `docker compose ps heimdall` and its logs."
+          runbook_url: "docs/monitoring.md#heimdalldown"
+
+      - alert: HeimdallHighServerErrors
+        expr: |
+          sum(rate(heimdall_http_request_duration_seconds_count{code="5xx",area!~"health|ui"}[5m]))
+            / sum(rate(heimdall_http_request_duration_seconds_count{area!~"health|ui"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "More than 5% of API requests fail with a server error"
+          description: "5xx share over 5 minutes is {{ $value | humanizePercentage }}."
+          runbook_url: "docs/monitoring.md#heimdallhighservererrors"
+
+      - alert: HeimdallSlowAPI
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(heimdall_http_request_duration_seconds_bucket{area!~"health|ui|experiments|runs"}[10m]))) > 2
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "API p95 latency above 2 s"
+          description: "p95 over 10 minutes is {{ $value | humanizeDuration }} (streams under experiments and runs are left out)."
+          runbook_url: "docs/monitoring.md#heimdallslowapi"
+
+  - name: heimdall-workers
+    rules:
+      - alert: HeimdallHeartbeatLate
+        expr: heimdall_lease_oldest_heartbeat_age_seconds > 90
+        for: 2m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "A running evaluation's worker has not reported for over 90 s"
+          description: "Oldest heartbeat age is {{ $value | humanizeDuration }}; at 2 minutes the run is counted lost and queued again."
+          runbook_url: "docs/monitoring.md#heimdallheartbeatlate"
+
+      - alert: HeimdallNoWorkers
+        expr: |
+          (sum(heimdall_workers{state!="lost"}) or vector(0)) == 0
+            and sum(heimdall_job_queue_depth{kind=~"experiment.*"}) > 0
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "Evaluations are waiting and no worker is connected"
+          description: "Queued evaluations cannot start. Check the shared runner (`docker compose --profile shared-runner ps`) and bring-your-own workers."
+          runbook_url: "docs/monitoring.md#heimdallnoworkers"
+
+      - alert: HeimdallQueueBacklog
+        expr: sum(heimdall_job_queue_depth{kind=~"experiment.*"}) > 50
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "More than 50 evaluations waiting for 15 minutes"
+          description: "Queue depth is {{ $value }}. Add worker slots or check experiment limits."
+          runbook_url: "docs/monitoring.md#heimdallqueuebacklog"
+
+      - alert: HeimdallWorkersDiskLow
+        expr: heimdall_workers_disk_low > 0
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Workers refuse new runs because their disk is low"
+          description: "{{ $value }} worker(s) report low disk. Prune images and caches on the worker host."
+          runbook_url: "docs/monitoring.md#heimdallworkersdisklow"
+
+      - alert: HeimdallRunsLost
+        expr: increase(heimdall_remote_leases_ended_total{reason="lost"}[15m]) > 3
+        labels:
+          severity: ticket
+        annotations:
+          summary: "More than 3 runs lost in 15 minutes"
+          description: "Workers stopped reporting mid-run; the runs were queued again and charged at their estimate."
+          runbook_url: "docs/monitoring.md#heimdallrunslost"
+
+      - alert: HeimdallUploadsRejected
+        expr: increase(heimdall_remote_runs_total{result="rejected"}[15m]) > 3
+        labels:
+          severity: ticket
+        annotations:
+          summary: "More than 3 run uploads rejected in 15 minutes"
+          description: "The server refused finished runs (seal or manifest mismatch). Each is repeated; check worker versions."
+          runbook_url: "docs/monitoring.md#heimdalluploadsrejected"
+
+  - name: heimdall-telemetry
+    rules:
+      - alert: HeimdallTelemetryDropping
+        expr: sum(rate(heimdall_telemetry_spans_total{result=~"dropped|failed"}[10m])) > 0
+        for: 15m
+        labels:
+          severity: info
+        annotations:
+          summary: "Trace spans are being dropped or failing to send"
+          description: "The OTLP collector is slow or unreachable. Evaluations are not affected."
+          runbook_url: "docs/monitoring.md#heimdalltelemetrydropping"

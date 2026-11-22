@@ -1,4 +1,5 @@
 import { PROVIDERS, type ProviderId } from "@/components/models/modelPicker";
+import { ServeOpenModel } from "@/components/models/serveOpenModel";
 import {
 	BIFROST_PROVIDERS,
 	familyServing,
@@ -266,6 +267,7 @@ export default function ModelsView() {
 						))}
 					</div>
 					<OpenModels providers={providers} keys={keys} />
+					<ServeOpenModel />
 					{form && (
 						<SidePanel title={form.key ? t("editTitle") : t("addTitle")} onClose={() => setForm(null)}>
 							<KeyForm

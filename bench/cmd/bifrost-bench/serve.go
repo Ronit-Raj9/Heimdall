@@ -40,6 +40,7 @@ func runServe(args []string) int {
 	if err := fs.Parse(args); err != nil {
 		return exitUsage
 	}
+	startTelemetry("heimdall-server") // lane Z14: OTLP spans when OTEL_* names an endpoint (telemetry.go)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	// Tenancy area (P3): a hosted server runs no agent, so it needs no
@@ -48,6 +49,7 @@ func runServe(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
+	writeDrainToken(a) // Z11 drain mode: the token `bifrost-bench drain` reads (drain.go)
 	// An offline server runs nothing and reaches no gateway: everything it
 	// serves is replayed from disk, so it is never a live answer, whatever
 	// bench.yaml says (audit 7-B-03). Synthetic stays synthetic. A hosted
@@ -100,6 +102,8 @@ func runServe(args []string) int {
 	stopJobs := startLocalJobs(ctx, a, *config, deps.Launcher, ix, &deps)
 	defer stopJobs()
 	deps.Ready = readyChecks(a) // Deploy area: /readyz checks (serveready.go)
+	// Lane Z14: the public status page, GET /status (statuspage.go).
+	deps.StatusPage = newStatusService(a.cfg, deps.Ready)
 	if !*offline {
 		startLocalDataOps(ctx, a) // lane X16: retention sweeper and webhook outbox (dataops.go)
 	}

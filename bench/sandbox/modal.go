@@ -207,6 +207,9 @@ func (m *Modal) Create(ctx context.Context, s Spec) (*Box, error) {
 	if s.MemGB > 0 {
 		in["memory_mb"] = int(math.Ceil(s.MemGB * 1024))
 	}
+	if s.GPU != "" {
+		in["gpu"] = s.GPU // Z05: GPU sandboxes run on gVisor, Modal's default runtime
+	}
 	var out struct {
 		SandboxID string `json:"sandbox_id"`
 	}

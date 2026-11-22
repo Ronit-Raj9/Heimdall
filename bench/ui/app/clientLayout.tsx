@@ -5,6 +5,7 @@ import { AuthShell } from "@/components/platform/authShell";
 import { SharedFrame } from "@/components/share/sharedFrame";
 import { LandingView } from "@/components/site/landingView";
 import { PublicFrame } from "@/components/site/publicFrame";
+import { StatusFrame } from "@/components/status/statusFrame";
 import { ConfirmProvider } from "@/components/platform/confirmDialog";
 import { SessionProvider } from "@/components/platform/sessionProvider";
 import { VerifyEmailBanner } from "@/components/platform/verifyEmailBanner";
@@ -50,6 +51,8 @@ function Frame({ children }: { children: React.ReactNode }) {
 	switch (frameFor(session, location.pathname)) {
 		case "share":
 			return <SharedFrame>{children}</SharedFrame>;
+		case "status":
+			return <StatusFrame>{children}</StatusFrame>;
 		case "auth":
 			return <AuthShell>{children}</AuthShell>;
 		case "public":

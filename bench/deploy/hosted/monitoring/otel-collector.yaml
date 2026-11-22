@@ -1,0 +1,54 @@
+# OpenTelemetry Collector for Heimdall's platform traces (profile
+# monitoring, lane Z14). The server, the shared runner and Bifrost send
+# OTLP over HTTP to otel-collector:4318. Tail sampling keeps every trace
+# with an error and every slow one, plus a 10% sample of the rest, then
+# sends them to Tempo. Platform telemetry carries ids and timings only,
+# never prompt or answer content.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 400
+  tail_sampling:
+    decision_wait: 30s
+    num_traces: 50000
+    policies:
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: slow
+        type: latency
+        latency:
+          threshold_ms: 5000
+      - name: sample
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
+  batch: {}
+
+exporters:
+  otlphttp/tempo:
+    endpoint: http://tempo:4318
+
+service:
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, tail_sampling, batch]
+      exporters: [otlphttp/tempo]

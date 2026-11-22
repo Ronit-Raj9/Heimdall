@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/maximhq/bifrost/bench/imagepin"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
@@ -74,6 +75,12 @@ type FingerprintOptions struct {
 	ImageID     func(tag string) (string, bool)
 	RepoDigests func(tag string) []string
 	PinLocal    bool
+	// Pins are the library registry digests images were pushed as (tag to
+	// <registry>/<repo>@sha256:<hex>, bench/imagepin). A pinned image is
+	// recorded by that digest when the local image is that digest or cannot
+	// be inspected here. Nil reads the suite's pins file
+	// (imagepin.PinsFile), if it has one.
+	Pins map[string]string
 }
 
 // LockPinsLocal reports whether l records any local image id, so a re-lock
@@ -107,6 +114,13 @@ func Fingerprints(s *schemas.Suite, opts FingerprintOptions) (*schemas.LockFinge
 		Version: schemas.LockFingerprintsVersion,
 		Tasks:   make(map[string]schemas.Fingerprint, len(s.Tasks)),
 		Probes:  make(map[string]schemas.Fingerprint, len(s.Probes)),
+	}
+	if opts.Pins == nil && s.Root != "" {
+		pins, err := imagepin.ReadPins(imagepin.PinsPath(s.Root))
+		if err != nil {
+			return nil, err
+		}
+		opts.Pins = pins
 	}
 	var err error
 	if f.Suite, err = suiteFingerprint(s, opts); err != nil {
@@ -480,6 +494,10 @@ func identities(tags map[string]string, opts FingerprintOptions) map[string]stri
 	out := make(map[string]string, len(tags))
 	for role, tag := range tags {
 		out[role] = tagOnlyPrefix + tag
+		if p := pinnedDigest(tag, opts); p != "" {
+			out[role] = tag + digestSep + p
+			continue
+		}
 		if d := repoDigest(tag, opts); d != "" {
 			out[role] = tag + digestSep + d
 			continue
@@ -491,6 +509,48 @@ func identities(tags map[string]string, opts FingerprintOptions) map[string]stri
 		}
 	}
 	return out
+}
+
+// pinnedDigest is tag's library registry pin when the local image is the
+// pushed digest (docker lists it among the image's registry digests), or
+// when the image cannot be inspected here. A local image rebuilt since the
+// push is not that digest: it is recorded as it is, never by a pin it
+// does not match. On Docker's containerd store the pushed digest equals the
+// local id, which repoDigest ignores; a pin is what tells the two apart.
+func pinnedDigest(tag string, opts FingerprintOptions) string {
+	p := opts.Pins[tag]
+	if p == "" {
+		return ""
+	}
+	if opts.ImageID != nil {
+		id, ok := opts.ImageID(tag)
+		if !ok {
+			return p
+		}
+		if pinIsLocalID(p, id) {
+			return p
+		}
+	}
+	if opts.RepoDigests == nil {
+		return p
+	}
+	for _, d := range opts.RepoDigests(tag) {
+		if d == p {
+			return p
+		}
+	}
+	return ""
+}
+
+// pinIsLocalID reports whether a pin's digest is the local image id. On
+// Docker's containerd store the id is the content digest of the image's
+// manifest or index, the very digest a push reports, so equal means the
+// same bytes even after the registry tag was removed. On the classic store
+// the id is the config digest, never a manifest digest, so this never
+// matches there by accident.
+func pinIsLocalID(pinned, id string) bool {
+	i := strings.LastIndex(pinned, "@")
+	return i >= 0 && id != "" && pinned[i+1:] == id
 }
 
 // repoDigest picks the registry digest of tag: the one of the tag's own
@@ -582,6 +642,9 @@ func compareImageLive(want, tag string, o *FingerprintOptions) (drift, unchecked
 	}
 	if wid != "" {
 		return id != wid, false
+	}
+	if pinIsLocalID(wd, id) { // containerd store: the id is the pushed digest (pinIsLocalID)
+		return false, false
 	}
 	if o.RepoDigests == nil {
 		return false, true

@@ -87,6 +87,10 @@ type WorkerLease struct {
 	// job lease with Refuse set.
 	Kind string    `json:"kind,omitempty"`
 	Job  *JobLease `json:"job,omitempty"`
+	// Traceparent is the W3C trace context of the lease span when the
+	// server traces (lane Z14, bench/telemetry); the worker's spans and its
+	// calls for this lease join it. Empty with tracing off.
+	Traceparent string `json:"traceparent,omitempty"`
 }
 
 // LeaseKindJob marks a runner job lease (WorkerLease.Kind).
@@ -258,6 +262,9 @@ var (
 	// it was lost (missed heartbeats), released, completed, or its
 	// experiment stopped. A late upload for such a lease is refused.
 	ErrLeaseGone = errors.New("lease gone")
+	// ErrLeaseReattaching: the server kept the lease across a restart and
+	// has not re-attached it yet; the worker retries (503).
+	ErrLeaseReattaching = errors.New("the server restarted and is re-attaching this lease; retry shortly")
 	// ErrUploadTooLarge is an archive past the coordinator's size cap.
 	ErrUploadTooLarge = errors.New("upload too large")
 	// ErrUploadOffset is a chunk whose offset is not the number of bytes the
