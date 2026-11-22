@@ -10,6 +10,7 @@ import (
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/agentversions"
+	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
@@ -297,5 +298,67 @@ func TestSnapshotAgentSaveReportsOutcome(t *testing.T) {
 	}
 	if _, _, err := snapshotAgentSave(context.Background(), st, "loop.yaml", "loop", []byte("id: loop\nadapter: [\n"), "me", ""); err == nil {
 		t.Fatal("a document that does not decode must report an error")
+	}
+}
+
+// abCallAs is abCall with a principal on the request.
+func abCallAs(r *router.Router, p *auth.Principal, method, path string, body any) (int, []byte) {
+	var ctx fasthttp.RequestCtx
+	ctx.Request.Header.SetMethod(method)
+	ctx.Request.SetRequestURI(path)
+	if body != nil {
+		b, _ := json.Marshal(body)
+		ctx.Request.SetBody(b)
+	}
+	auth.SetPrincipal(&ctx, p)
+	r.Handler(&ctx)
+	return ctx.Response.StatusCode(), append([]byte(nil), ctx.Response.Body()...)
+}
+
+// N33: a version's author is the saver's email; members see a display name
+// (the member's name, else the part before "@"), never the email, and only
+// admins keep the email itself.
+func TestAgentVersionsHideEmailFromMembers(t *testing.T) {
+	r, _, _ := versionsRouter(t, nil, "")
+	saver := &auth.Principal{Kind: auth.KindUser, UserID: "usr_1", OrgID: "org_a", Role: auth.RoleMember, Email: "Ronit@example.com"}
+	if code, body := abCallAs(r, saver, "POST", APIPrefix+"/agents/from-template", AgentFromTemplateRequest{Template: "codex", ID: "my-codex"}); code != 201 {
+		t.Fatalf("create: %d %s", code, body)
+	}
+	list := func(p *auth.Principal) []AgentVersionEntry {
+		t.Helper()
+		code, body := abCallAs(r, p, "GET", APIPrefix+"/agents/my-codex/versions", nil)
+		if code != 200 {
+			t.Fatalf("list: %d %s", code, body)
+		}
+		if p.Role != auth.RoleAdmin && strings.Contains(string(body), "@example.com") {
+			t.Fatalf("member sees an email: %s", body)
+		}
+		var out AgentVersionList
+		if err := json.Unmarshal(body, &out); err != nil || len(out.Versions) != 1 {
+			t.Fatalf("list body %s: %v", body, err)
+		}
+		return out.Versions
+	}
+	member := &auth.Principal{Kind: auth.KindUser, UserID: "usr_2", OrgID: "org_a", Role: auth.RoleMember, Email: "bo@example.com"}
+	admin := &auth.Principal{Kind: auth.KindUser, UserID: "usr_3", OrgID: "org_a", Role: auth.RoleAdmin, Email: "ad@example.com"}
+
+	// No members resolver (local mode or a failed lookup): the part before "@".
+	if v := list(member)[0]; v.CreatedBy != "" || v.CreatedByName != "Ronit" {
+		t.Fatalf("member, no resolver: by %q name %q", v.CreatedBy, v.CreatedByName)
+	}
+	if v := list(admin)[0]; v.CreatedBy != "Ronit@example.com" || v.CreatedByName != "Ronit" {
+		t.Fatalf("admin, no resolver: by %q name %q", v.CreatedBy, v.CreatedByName)
+	}
+
+	// A member with a display name, found by lower-case email.
+	SetMemberNames(func(context.Context, string) (map[string]string, error) {
+		return map[string]string{"usr_1": "Ronit Raj", "ronit@example.com": "Ronit Raj"}, nil
+	})
+	t.Cleanup(func() { SetMemberNames(nil) })
+	if v := list(member)[0]; v.CreatedBy != "" || v.CreatedByName != "Ronit Raj" {
+		t.Fatalf("member, resolver: by %q name %q", v.CreatedBy, v.CreatedByName)
+	}
+	if v := list(admin)[0]; v.CreatedBy != "Ronit@example.com" || v.CreatedByName != "Ronit Raj" {
+		t.Fatalf("admin, resolver: by %q name %q", v.CreatedBy, v.CreatedByName)
 	}
 }

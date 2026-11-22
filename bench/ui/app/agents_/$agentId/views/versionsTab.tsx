@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
 	type AgentVersion,
+	type AgentVersionCreated,
 	useCreateAgentVersionMutation,
 	useGetAgentVersionQuery,
 	useGetAgentVersionsQuery,
@@ -15,6 +16,7 @@ import { skipToken } from "@reduxjs/toolkit/query/react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { lineDiff } from "./lineDiff";
+import "./gw18I18n";
 
 /** Short local date of a version, or the raw value when it does not parse. */
 export function versionDate(value: string): string {
@@ -27,20 +29,47 @@ export function sortVersions(versions: AgentVersion[]): AgentVersion[] {
 	return [...versions].sort((x, y) => y.version - x.version);
 }
 
+/** What "Save as new version" does with the server's answer (N32): a new version clears the note and opens it; an
+ * unchanged config made none, so the note stays in the box and the existing version opens. An answer without `created`
+ * (an older server) counts as a new version. */
+export function saveOutcome(data: AgentVersionCreated): {
+	clearNote: boolean;
+	select: number | undefined;
+	message: { key: "versions.created" | "versions.unchanged"; version: number };
+} {
+	const created = data.created !== false;
+	return {
+		clearNote: created,
+		select: data.version || undefined,
+		message: { key: created ? "versions.created" : "versions.unchanged", version: data.version },
+	};
+}
+
+/** The Author cell (N33): the display name the server sent, else the raw author; the raw author (an email only for
+ * admins, the server leaves it out for everyone else) is the tooltip. */
+export function authorOf(v: AgentVersion): { text: string; title: string | undefined } {
+	return { text: v.created_by_name || v.created_by || "-", title: v.created_by || undefined };
+}
+
 /** The Versions tab: every saved version, its config read-only and what changed from the one before. */
 export default function VersionsTab({ agentId }: { agentId: string }) {
 	const { t } = useTranslation("agentBuilder");
+	const { t: tg } = useTranslation("gw18");
 	const versionsQuery = useGetAgentVersionsQuery(agentId);
 	const [create, createState] = useCreateAgentVersionMutation();
 	const [note, setNote] = useState("");
 	const [selected, setSelected] = useState<number | null>(null);
+	const [saved, setSaved] = useState<ReturnType<typeof saveOutcome>["message"] | null>(null);
 	const versions = sortVersions(versionsQuery.data?.versions ?? []);
 
 	const save = async () => {
+		setSaved(null);
 		const result = await create({ agent: agentId, note: note.trim() });
-		if (!("error" in result)) {
-			setNote("");
-			if (result.data?.version) setSelected(result.data.version);
+		if (!("error" in result) && result.data) {
+			const outcome = saveOutcome(result.data);
+			if (outcome.clearNote) setNote("");
+			if (outcome.select) setSelected(outcome.select);
+			setSaved(outcome.message);
 		}
 	};
 
@@ -60,7 +89,10 @@ export default function VersionsTab({ agentId }: { agentId: string }) {
 					>
 						<Input
 							value={note}
-							onChange={(e) => setNote(e.target.value)}
+							onChange={(e) => {
+								setNote(e.target.value);
+								setSaved(null);
+							}}
 							placeholder={t("versions.notePlaceholder")}
 							aria-label={t("versions.note")}
 							className="h-8 w-56"
@@ -72,6 +104,11 @@ export default function VersionsTab({ agentId }: { agentId: string }) {
 					</form>
 				}
 			>
+				{saved && (
+					<p role="status" className="text-muted-foreground text-xs" data-testid="agent-versions-saved">
+						{tg(saved.key, { n: saved.version })}
+					</p>
+				)}
 				{createState.isError && (
 					<p className="text-destructive text-xs" data-testid="agent-versions-save-error">
 						{getBenchErrorMessage(createState.error)}
@@ -105,7 +142,9 @@ export default function VersionsTab({ agentId }: { agentId: string }) {
 								<TableRow key={v.version} data-testid={`agent-version-v${v.version}`} data-state={selected === v.version ? "selected" : undefined}>
 									<TableCell className="font-mono text-xs">v{v.version}</TableCell>
 									<TableCell className="text-xs">{versionDate(v.created_at)}</TableCell>
-									<TableCell className="text-xs">{v.created_by || "-"}</TableCell>
+									<TableCell className="text-xs" title={authorOf(v).title}>
+										{authorOf(v).text}
+									</TableCell>
 									<TableCell className="max-w-[24rem] truncate text-xs">{v.note || "-"}</TableCell>
 									<TableCell className="text-right text-xs tabular-nums">{v.runs ?? 0}</TableCell>
 									<TableCell className="text-right">

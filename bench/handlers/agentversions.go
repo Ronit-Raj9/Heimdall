@@ -24,6 +24,11 @@ import (
 type AgentVersionEntry struct {
 	schemas.AgentVersion
 	Runs int `json:"runs"`
+	// CreatedByName is how the author is shown (displayActor): the member's
+	// display name, else the part of the email before "@". For a caller who
+	// is not an org admin, an email in created_by is left out of the answer
+	// (the stored version keeps it).
+	CreatedByName string `json:"created_by_name,omitempty"`
 }
 
 // AgentVersionList is GET /agents/{id}/versions.
@@ -258,8 +263,20 @@ func (h *agentVersionsHandler) list(ctx *fasthttp.RequestCtx) {
 		}
 	}
 	counts := h.runsByHash()
+	var names map[string]string
+	if len(vs) > 0 {
+		names = orgMemberNames(ctx)
+	}
 	for _, v := range vs {
-		out.Versions = append(out.Versions, AgentVersionEntry{AgentVersion: v, Runs: counts[strings.TrimPrefix(v.AgentHash, "sha256:")]})
+		e := AgentVersionEntry{AgentVersion: v, Runs: counts[strings.TrimPrefix(v.AgentHash, "sha256:")]}
+		name, keepRaw := displayActor(ctx, v.CreatedBy, names)
+		if name != v.CreatedBy {
+			e.CreatedByName = name
+		}
+		if !keepRaw && strings.Contains(v.CreatedBy, "@") {
+			e.CreatedBy = ""
+		}
+		out.Versions = append(out.Versions, e)
 	}
 	live := agentLiveVersion(ctx, h.releases, h.projects, h.library, id)
 	if live.Version == 0 && out.Builtin { // a built-in agent with no saved config of its own

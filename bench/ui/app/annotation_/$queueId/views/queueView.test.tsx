@@ -1,13 +1,14 @@
 import "@/lib/i18n";
 
 import { LOCAL_SESSION } from "@/lib/session/sessionContext";
-import { mutation, okQuery, render } from "@/lib/testing/render";
+import { mutation, okQuery, render, tagOf } from "@/lib/testing/render";
 import type { AnnotationAgreement, AnnotationItem, AnnotationQueue } from "@/lib/types/annotation";
 import { describe, expect, it, vi } from "vitest";
-import { QueueTable, parseLabellers, queueRequest } from "@/app/annotation/views/annotationView";
+import { LabellerPicker, QueueTable, parseLabellers, perItemProblem, queueRequest } from "@/app/annotation/views/annotationView";
 import type { ExperimentStatus } from "@/lib/types/bench";
 import {
 	AddItems,
+	AnswerBlock,
 	AgreementPanel,
 	ItemTable,
 	Labeller,
@@ -19,6 +20,7 @@ import {
 } from "./queueView";
 
 const exps = vi.hoisted(() => ({ list: [] as unknown[] }));
+const people = vi.hoisted(() => ({ data: { people: [] as { user_id: string; name: string }[], local: true as boolean | undefined } }));
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("nuqs", async (importOriginal) => ({
@@ -38,6 +40,10 @@ vi.mock("@/lib/store/apis/annotationApi", () => ({
 	useResolveAnnotationItemMutation: () => mutation(),
 	useUpdateAnnotationQueueMutation: () => mutation(),
 	useDeleteAnnotationQueueMutation: () => mutation(),
+	useGetAnnotationPeopleQuery: () => okQuery(people.data),
+}));
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({
+	useGetSuitesLightQuery: () => okQuery({ suites: [] }),
 }));
 vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
 	...(await orig<typeof import("@/lib/store/apis/benchApi")>()),
@@ -84,20 +90,78 @@ describe("labelling queues", () => {
 		expect(html).toContain("support-faq");
 	});
 
-	it("builds the create body and clamps people per item", () => {
+	it("builds the create body with people per item as typed, never clamped", () => {
 		expect(
 			queueRequest({
 				name: " Refunds ",
 				benchmark: "",
 				kind: "judge",
-				reviewers: 9,
+				reviewers: 5,
 				blind: false,
 				assignment: "fixed",
-				labellers: "u_1, u_2 u_1",
+				labellers: ["u_1", "u_2", "u_1"],
 				instructions: "  ",
 			}),
 		).toEqual({ name: "Refunds", kind: "judge", reviewers_per_item: 5, blind: false, assignment: "fixed", reviewers: ["u_1", "u_2"] });
+		expect(
+			queueRequest({
+				name: "x",
+				benchmark: "",
+				kind: "runs",
+				reviewers: 0,
+				blind: true,
+				assignment: "open",
+				labellers: [],
+				instructions: "",
+			}),
+		).toEqual({ name: "x", kind: "runs", reviewers_per_item: 0, blind: true, assignment: "open" });
 		expect(parseLabellers("")).toEqual([]);
+		expect(parseLabellers("u_1, u_2 u_1")).toEqual(["u_1", "u_2"]);
+	});
+
+	it("refuses people per item outside 1 to 5 with the server's sentence (N167)", () => {
+		for (const bad of [0, -1, 6, 1.5, Number.NaN]) expect(perItemProblem(bad), String(bad)).toBe(true);
+		for (const ok of [1, 3, 5]) expect(perItemProblem(ok)).toBe(false);
+		const html = render(<SettingsTab queue={{ ...queue, reviewers_per_item: 0 }} />);
+		expect(text(html)).toContain("People per item is 1 to 5.");
+		expect(tagOf(html, "annotation-settings-save")).toContain('disabled=""');
+		expect(tagOf(render(<SettingsTab queue={queue} />), "annotation-settings-save")).not.toContain('disabled=""');
+	});
+
+	it("picks labellers by name from the members, and offers to remove an unknown id (N168)", () => {
+		people.data = {
+			people: [
+				{ user_id: "usr_1", name: "Ada Lovelace" },
+				{ user_id: "usr_2", name: "ronit" },
+			],
+			local: undefined,
+		};
+		const html = render(<LabellerPicker value={["usr_2", "not-a-user-id"]} onChange={() => undefined} testId="pick" />);
+		expect(text(html)).toContain("Who may label");
+		expect(text(html)).toContain("Every member");
+		expect(text(html)).toContain("Only these people");
+		expect(text(html)).toContain("Ada Lovelace");
+		expect(tagOf(html, "pick-person-usr_2")).toContain('checked=""');
+		expect(tagOf(html, "pick-person-usr_1")).not.toContain('checked=""');
+		expect(text(html)).toContain("Unknown person (not-a-user-id)");
+		expect(html).toContain('data-testid="pick-remove-not-a-user-id"');
+		const every = render(<LabellerPicker value={[]} onChange={() => undefined} testId="pick" />);
+		expect(every).not.toContain('data-testid="pick-person-usr_1"');
+		people.data = { people: [], local: true };
+		const local = render(<LabellerPicker value={["u_1"]} onChange={() => undefined} testId="pick" />);
+		expect(local).toContain('data-testid="pick-text"');
+		expect(text(local)).toContain("On a local server labellers are named by their user id.");
+	});
+
+	it("says where an answer came from (N72)", () => {
+		expect(text(render(<AnswerBlock item={item({ answer: "result.json:\n[]", answer_from: "files" })} />))).toContain(
+			"Files the agent wrote",
+		);
+		expect(text(render(<AnswerBlock item={item({ answer: "done", answer_from: "final_message" })} />))).toContain(
+			"Agent&#x27;s final message",
+		);
+		expect(text(render(<AnswerBlock item={item({ answer_from: "answer" })} />))).toContain("Answer file");
+		expect(text(render(<AnswerBlock item={item({})} />))).toContain("Agent answer");
 	});
 
 	it("maps keys to actions", () => {

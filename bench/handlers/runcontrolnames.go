@@ -8,10 +8,12 @@ package handlers
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/auth"
+	"github.com/valyala/fasthttp"
 )
 
 var (
@@ -19,8 +21,9 @@ var (
 	memberNames   func(ctx context.Context, orgID string) (map[string]string, error)
 )
 
-// SetMemberNames installs the resolver from user id to display text (name,
-// else email) for an organization; nil removes it.
+// SetMemberNames installs the resolver from user id, and from lower-case
+// email, to display text (the name, else the part of the email before "@")
+// for an organization; nil removes it.
 func SetMemberNames(f func(ctx context.Context, orgID string) (map[string]string, error)) {
 	memberNamesMu.Lock()
 	defer memberNamesMu.Unlock()
@@ -45,7 +48,13 @@ func orgMemberNames(ctx context.Context) map[string]string {
 	if !ok || p.OrgID == "" {
 		return nil
 	}
-	work, cancel := context.WithTimeout(ctx, memberNamesTimeout)
+	base := ctx
+	if _, ok := ctx.(*fasthttp.RequestCtx); ok {
+		// A request context ends only when the server stops (and has no
+		// server in handler tests); the timeout bounds the lookup.
+		base = auth.WithPrincipal(context.Background(), p)
+	}
+	work, cancel := context.WithTimeout(base, memberNamesTimeout)
 	defer cancel()
 	names, err := f(work, p.OrgID)
 	if err != nil {
@@ -72,4 +81,30 @@ func nameControls(ctx context.Context, out *RunControls) {
 			out.ActorNames[e.Actor] = n
 		}
 	}
+}
+
+// displayActor is how a person recorded as actor (a user id or an email) is
+// shown to the caller (fix wave 2, D4): the member's display name when the
+// actor is a member (names from orgMemberNames, keyed by user id and by
+// lower-case email), else, for an email, the part before "@", else the
+// actor as is. keepRaw is true only for an org admin (or the local
+// single-user principal), who may also see the raw actor, email included.
+func displayActor(ctx context.Context, actor string, names map[string]string) (name string, keepRaw bool) {
+	if p, ok := auth.Lookup(ctx); ok && p.Can(auth.RoleAdmin) {
+		keepRaw = true
+	}
+	actor = strings.TrimSpace(actor)
+	if actor == "" {
+		return "", keepRaw
+	}
+	if n := names[actor]; n != "" {
+		return n, keepRaw
+	}
+	if n := names[strings.ToLower(actor)]; n != "" {
+		return n, keepRaw
+	}
+	if local, _, ok := strings.Cut(actor, "@"); ok {
+		return local, keepRaw
+	}
+	return actor, keepRaw
 }
