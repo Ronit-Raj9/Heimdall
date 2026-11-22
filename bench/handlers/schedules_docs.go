@@ -6,7 +6,7 @@ func init() {
 		RouteDoc{Auth: AuthWrite, Method: "PUT", Path: APIPrefix + "/schedules", Tag: "schedules", Summary: "Replace the web schedules file (JSON file or YAML text); validated against the project, saved through project files", Request: SchedulesPut{}, Response: SchedulesResponse{}},
 		RouteDoc{Auth: AuthWrite, Method: "POST", Path: APIPrefix + "/schedules/test-alert", Tag: "schedules", Summary: "Send a test webhook alert to a receiver (url_env names an org secret or, locally, an environment variable)", Request: TestAlertRequest{}, Response: TestAlertResponse{}},
 		RouteDoc{Auth: AuthWrite, Method: "POST", Path: APIPrefix + "/schedules/{name}/run", Tag: "schedules", Summary: "Queue one schedule now as a schedule.fire job (hosted: runs on runners)", Status: 202, Response: ScheduleRunResponse{}},
-		RouteDoc{Auth: AuthWrite, Method: "POST", Path: APIPrefix + "/canaries", Tag: "canaries", Summary: "Create a drift canary definition (canaries/<name>.yaml); force overwrites", Request: CanaryInitRequest{}, Status: 201, Response: CanaryInitResponse{}},
+		RouteDoc{Auth: AuthWrite, Method: "POST", Path: APIPrefix + "/canaries", Tag: "canaries", Summary: "Create a drift canary definition (canaries/<name>.yaml); force overwrites. A refused definition answers one 422 that lists every problem: problems[] with field and message, and the same sentences joined by newlines in error.message (the edit route PUT /canaries/{name} answers the same way)", Request: CanaryInitRequest{}, Status: 201, Response: CanaryInitResponse{}},
 		RouteDoc{Auth: AuthWrite, Method: "DELETE", Path: APIPrefix + "/canaries/{name}", Tag: "canaries", Summary: "Delete a drift canary definition and its saved baselines and check records", Status: 204},
 	)
 }

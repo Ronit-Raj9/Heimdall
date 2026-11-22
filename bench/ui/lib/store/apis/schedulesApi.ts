@@ -82,6 +82,25 @@ export function isPaused(x: unknown): boolean {
 	return Boolean(x && typeof x === "object" && (x as Pausable).paused);
 }
 
+/** One problem of a refused drift monitor (POST and PUT /canaries answer 422 with problems[]). */
+export interface FieldProblem {
+	field: string;
+	message: string;
+}
+
+/** The problems[] of a refused drift monitor, each under its form field; [] for any other error. */
+export function errorProblems(err: unknown): FieldProblem[] {
+	if (!err || typeof err !== "object" || !("data" in err)) return [];
+	const data = (err as { data?: unknown }).data;
+	if (!data || typeof data !== "object") return [];
+	const list = (data as { problems?: unknown }).problems;
+	if (!Array.isArray(list)) return [];
+	return list.filter(
+		(p): p is FieldProblem =>
+			Boolean(p) && typeof (p as FieldProblem).field === "string" && typeof (p as FieldProblem).message === "string",
+	);
+}
+
 /** The server's error message from an RTK Query error, or a fallback. */
 export function errorMessage(err: unknown, fallback: string): string {
 	if (err && typeof err === "object" && "data" in err) {

@@ -293,6 +293,100 @@ func (d *Definition) Validate() error {
 	return nil
 }
 
+// Problem is one reason the website refuses a definition: the form field it
+// belongs to and a plain sentence (fix wave 2, N81).
+type Problem struct {
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
+
+// Problems lists every problem of a definition at once, in the words of the
+// website's drift monitor form, so one press names everything left to fix.
+// It refuses at least what Validate refuses; Validate keeps the YAML words
+// for the CLI and definition files.
+func (d *Definition) Problems() []Problem {
+	var out []Problem
+	add := func(field, msg string) { out = append(out, Problem{Field: field, Message: msg}) }
+	if !namePattern.MatchString(d.Name) {
+		add("name", "Use lowercase letters, digits, - or _ for the name, at most 48 characters.")
+	}
+	if strings.TrimSpace(d.Agent) == "" {
+		add("agent", "Pick an agent.")
+	}
+	if strings.TrimSpace(d.Suite) == "" {
+		add("suite", "Pick a benchmark.")
+	}
+	if !d.Tasks.All && len(d.Tasks.IDs) == 0 {
+		add("tasks", "Pick the tasks to check, or choose all tasks.")
+	} else if d.Tier != "" && !d.Tasks.All {
+		add("tasks", "A tier needs all tasks: choose all tasks.")
+	}
+	if d.Trials < 1 {
+		add("trials", "Run each task at least once.")
+	}
+	seen := map[string]bool{}
+	for _, c := range d.WatchedConditions() {
+		if c == "" || seen[c] {
+			add("conditions", fmt.Sprintf("The condition %q is empty or listed twice.", c))
+		}
+		seen[c] = true
+	}
+	switch {
+	case len(d.Targets) == 0:
+		add("targets", "Add at least one model to watch.")
+	case len(d.Targets) > len(armIDs):
+		add("targets", fmt.Sprintf("Watch at most %d models.", len(armIDs)))
+	}
+	tseen := map[string]bool{}
+	for i, t := range d.Targets {
+		if t.Model == "" {
+			add("targets", fmt.Sprintf("Model row %d has no model. Pick one or remove the row.", i+1))
+			continue
+		}
+		if tseen[t.Label()] {
+			add("targets", t.Label()+" is listed twice.")
+		}
+		tseen[t.Label()] = true
+	}
+	if d.Schedule != nil {
+		if _, err := schedule.ParseCron(d.Schedule.Cron); err != nil {
+			add("schedule", "The schedule is not a valid cron line: "+err.Error())
+		}
+		if d.Schedule.Timezone != "" {
+			if _, err := time.LoadLocation(d.Schedule.Timezone); err != nil {
+				add("schedule", fmt.Sprintf("The time zone %q is not known.", d.Schedule.Timezone))
+			}
+		}
+	}
+	switch {
+	case d.Budget.PerRunUSD < 0 || d.Budget.PerDayUSD < 0 || !finite(d.Budget.PerRunUSD) || !finite(d.Budget.PerDayUSD):
+		add("budget", "Spending limits must be numbers of 0 or more.")
+	case d.Smoke:
+	case d.Budget.PerRunUSD <= 0 || d.Budget.PerDayUSD <= 0:
+		add("budget", "Set both spending limits, or tick Practice mode.")
+	case d.Budget.PerRunUSD > d.Budget.PerDayUSD:
+		add("budget", "The limit per check is above the limit per day, so no check could start.")
+	}
+	if d.Sensitivity != "" && !slices.Contains(Sensitivities, d.Sensitivity) {
+		add("sensitivity", "Sensitivity must be one of "+strings.Join(Sensitivities, ", ")+".")
+	}
+	if f := d.NoiseFloor; f != nil && (f.Success < 0 || f.Success > 1 || f.CostUSD < 0 || f.Tokens < 0 || f.LatencyMS < 0) {
+		add("noise_floor", "Noise floors must be 0 or more, and the success floor at most 1.")
+	}
+	if d.MaxBaselineAgeDays < 0 {
+		add("max_baseline_age_days", "The baseline age limit must not be negative.")
+	}
+	if d.Concurrency < 0 {
+		add("concurrency", "Concurrency must not be negative.")
+	}
+	for _, a := range d.Alerts {
+		if err := a.Validate(); err != nil {
+			add("alerts", "Alert: "+err.Error())
+		}
+	}
+	return out
+}
+
 // armIDs are the arm ids targets take, in order.
 var armIDs = []string{"A", "B", "C", "D", "E", "F"}
 

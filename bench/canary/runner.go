@@ -22,7 +22,7 @@ var ErrBusy = errors.New("canary is already running")
 var ErrOffline = errors.New("this server cannot launch canary looks (offline: no gateway)")
 
 // ErrNoBaseline reports a run asked for before any baseline was pinned.
-var ErrNoBaseline = errors.New("no baseline pinned: run `canary baseline <name>` first")
+var ErrNoBaseline = errors.New("no baseline yet: record a baseline first")
 
 // recentCosts is how many recent records the canary's own cost forecast
 // reads.
@@ -257,8 +257,8 @@ func (r *Runner) look(ctx context.Context, d *Definition, base *Baseline, kind, 
 		return finish(OutcomeError, prevState, "plan: "+err.Error(), alerts.EventScheduleFailed)
 	}
 	if plan.Fingerprint != base.Fingerprint {
-		return finish(OutcomeStale, StateBaselineStale, fmt.Sprintf("the frozen config changed since the baseline (fingerprint %s, baseline %s): the agent config, its image, the suite lock or the task selection moved; nothing was run. Re-pin with `canary baseline %s` once the change is intended",
-			short(plan.Fingerprint), short(base.Fingerprint), d.Name))
+		return finish(OutcomeStale, StateBaselineStale, fmt.Sprintf("the frozen config changed since the baseline (fingerprint %s, baseline %s): the agent config, its image, the suite lock or the task selection moved; nothing was run. Record a new baseline once the change is intended.",
+			short(plan.Fingerprint), short(base.Fingerprint)))
 	}
 	if reason := r.forecastRefusal(d, records, plan); reason != "" {
 		return finish(OutcomeRefused, prevState, deferred(reason), alerts.EventScheduleFailed)

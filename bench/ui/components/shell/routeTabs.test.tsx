@@ -1,3 +1,5 @@
+import "@/lib/i18n";
+
 import { render, tagOf } from "@/lib/testing/render";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { describe, expect, it } from "vitest";
@@ -39,5 +41,29 @@ describe("addressable hidden tabs", () => {
 		const other = page("?tab=runs");
 		expect(other).toContain('data-active="runs"');
 		expect(other).not.toContain('data-testid="tab-checks"');
+	});
+});
+describe("unknown tab in the address (N76)", () => {
+	const page = (search: string) =>
+		render(
+			<NuqsTestingAdapter searchParams={search}>
+				<RouteTabs tabs={tabs} label="Agent views">
+					{(active) => <p data-testid="panel">{active}</p>}
+				</RouteTabs>
+			</NuqsTestingAdapter>,
+		);
+
+	it("says the page has no such tab and which tab is shown instead", () => {
+		const html = page("?tab=bogus");
+		expect(html).toContain('data-active="report-card"');
+		expect(html).toContain('data-testid="route-tabs-unknown"');
+		expect(html).toContain("This page has no bogus tab, so Report card is shown.");
+		expect(html).toContain('role="status"');
+	});
+
+	it("adds no note for a known tab, a hidden known tab or no tab", () => {
+		for (const search of ["?tab=runs", "?tab=secret", "?tab=checks", ""]) {
+			expect(page(search)).not.toContain('data-testid="route-tabs-unknown"');
+		}
 	});
 });
