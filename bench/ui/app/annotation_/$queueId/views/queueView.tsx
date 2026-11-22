@@ -410,7 +410,10 @@ export function ItemTable({ queue, items }: { queue: AnnotationQueue; items: Ann
 										{it.labels.map((l) => (
 											<li key={l.user_id + l.at}>
 												<span className={cn(l.label === "correct" ? "text-chart-success-ink" : "text-chart-error-ink")}>{l.label}</span>
-												<span className="text-muted-foreground"> {l.email || l.user_id}</span>
+												<span className="text-muted-foreground" title={l.email || l.user_id} data-testid="annotation-label-who">
+													{" "}
+													{l.name || l.email || l.user_id}
+												</span>
 												{l.note && <span className="text-muted-foreground">: {l.note}</span>}
 											</li>
 										))}
@@ -431,7 +434,7 @@ export function ItemTable({ queue, items }: { queue: AnnotationQueue; items: Ann
 									<div className="text-muted-foreground mt-1">
 										{it.resolution.label},{" "}
 										{it.resolution.method === "decided"
-											? t("items.method.decided", { who: it.resolution.email || it.resolution.user_id || "" })
+											? t("items.method.decided", { who: it.resolution.name || it.resolution.email || it.resolution.user_id || "" })
 											: t("items.method.consensus")}
 									</div>
 								)}
@@ -633,7 +636,11 @@ function AgreementTab({ queueId }: { queueId: string }) {
 export function AgreementPanel({ data }: { data: AnnotationAgreement }) {
 	const { t } = useTranslation("annotation");
 	const a = data.agreement;
-	const who = (id: string) => data.labellers?.[id] || id;
+	const who = (id: string) => (
+		<span title={data.labeller_emails?.[id] || id} data-testid="annotation-agreement-who">
+			{data.labellers?.[id] || id}
+		</span>
+	);
 	const scale = a.interpretation
 		? ` (${t(`agreement.scale.${a.interpretation}` as "agreement.scale.poor", { defaultValue: a.interpretation })})`
 		: "";

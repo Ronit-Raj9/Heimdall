@@ -38,6 +38,8 @@ export interface ProjectVersion {
 	path: string;
 	sha256: string;
 	actor?: string;
+	/** How actor is shown; an email actor is sent to org admins only. */
+	actor_name?: string;
 	note?: string;
 	size: number;
 	at: string;

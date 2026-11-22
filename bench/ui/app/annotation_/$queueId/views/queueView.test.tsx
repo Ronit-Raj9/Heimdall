@@ -305,3 +305,54 @@ describe("labelling queues", () => {
 		expect(html).not.toContain('data-testid="annotation-add-experiment"');
 	});
 });
+describe("people in labelling are shown by name (D4)", () => {
+	it("prints labellers and deciders by display name with the id or email as a tooltip", () => {
+		const html = render(
+			<ItemTable
+				queue={queue}
+				items={[
+					item({
+						id: "i_1",
+						state: "done",
+						labels: [
+							{ user_id: "u_1", name: "Ada", email: "ada@x.io", label: "correct", at: "2026-11-20T10:00:00Z" },
+							{ user_id: "u_2", name: "bo", label: "correct", at: "2026-11-20T10:01:00Z" },
+						],
+						label_count: 2,
+						resolution: { label: "correct", method: "decided", user_id: "u_3", name: "Cy", at: "2026-11-20T10:02:00Z" },
+					}),
+				]}
+			/>,
+		);
+		expect(text(html)).toContain("Ada");
+		expect(text(html)).not.toContain("ada@x.io");
+		expect(html).toContain('title="ada@x.io"');
+		expect(html).toContain('title="u_2"');
+		expect(text(html)).toContain("Cy");
+	});
+
+	it("names the people in agreement pairs, with the email as a tooltip only when sent", () => {
+		const data: AnnotationAgreement = {
+			queue: "q_1",
+			agreement: {
+				multi_labelled: 2,
+				unanimous: 1,
+				percent_agreement: 0.5,
+				cohen: [{ a: "u_1", b: "u_2", items: 2, kappa: 0, agree: 1 }],
+				cohen_mean: 0,
+				fleiss: null,
+				fleiss_items: 0,
+				interpretation: "",
+				judge: null,
+			},
+			labellers: { u_1: "Ada", u_2: "bo" },
+			labeller_emails: { u_1: "ada@x.io" },
+		};
+		const html = render(<AgreementPanel data={data} />);
+		expect(text(html)).toContain("Ada");
+		expect(text(html)).toContain("bo");
+		expect(text(html)).not.toContain("ada@x.io");
+		expect(html).toContain('title="ada@x.io"');
+		expect(html).toContain('title="u_2"');
+	});
+});

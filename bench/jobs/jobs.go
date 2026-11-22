@@ -102,6 +102,7 @@ type Job struct {
 	Result          json.RawMessage `json:"result,omitempty"`
 	Error           string          `json:"error,omitempty"`
 	CreatedBy       string          `json:"created_by,omitempty"`
+	CreatedByName   string          `json:"created_by_name,omitempty"` // how CreatedBy is shown; filled by GET /jobs/{id} only, never stored
 	CreatedAt       time.Time       `json:"created_at"`
 	StartedAt       *time.Time      `json:"started_at,omitempty"`
 	FinishedAt      *time.Time      `json:"finished_at,omitempty"`

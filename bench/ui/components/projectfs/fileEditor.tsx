@@ -186,7 +186,9 @@ export function FileEditor({ area, path, onSaved, onDeleted, onClose }: FileEdit
 									<li key={v.id} className="hover:bg-accent/50 flex flex-col gap-0.5 rounded-md px-2 py-1.5">
 										<span className="text-xs font-medium tabular-nums">{new Date(v.at).toLocaleString()}</span>
 										<span className="text-muted-foreground line-clamp-2 text-xs">
-											{v.actor && t("editor.by", { actor: v.actor })}
+											{(v.actor_name || v.actor) && (
+												<span title={v.actor || undefined}>{t("editor.by", { actor: v.actor_name || v.actor })}</span>
+											)}
 											{v.note && <span className="italic"> {v.note === "deleted" ? t("editor.deleted") : v.note}</span>}
 										</span>
 										{v.sha256 && canWrite && !binary && (
