@@ -1,9 +1,13 @@
+import { ImportFound, importedAgentName, importRequest, missingImportFields } from "@/app/agents_/new/views/platformImport";
+import { PlatformFields, suggestedPlatformSecrets } from "@/components/connect/platformFields";
 import { Section } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { canUse, useSession } from "@/lib/session/sessionContext";
+import { useGetAgentPlatformsQuery, useImportAgentFromPlatformMutation } from "@/lib/store/apis/agentImportApi";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
 	useDetectAgentMutation,
@@ -12,6 +16,8 @@ import {
 	useSaveConnectedAgentMutation,
 	useStartVerifyMutation,
 } from "@/lib/store/apis/connectApi";
+import { useListSecretsQuery } from "@/lib/store/apis/secretsApi";
+import type { AgentImportResponse, AgentPlatform } from "@/lib/types/agentImport";
 import type {
 	ConnectCandidate,
 	ConnectDetectResponse,
@@ -28,11 +34,14 @@ import {
 	VERIFY_POLL_MS,
 	bestCandidate,
 	connectionOK,
+	importPlatformFor,
 	isTerminalJob,
 	otherCandidates,
+	platformChoice,
 	secretQuestions,
 	suggestedName,
 	validAgentName,
+	verifyBenchmarkKey,
 	withAnswerPath,
 } from "./connect.utils";
 import { FailureNote } from "./failureNote";
@@ -134,7 +143,23 @@ export default function ConnectView() {
 		}
 	};
 
+	// B6: picking a platform starts clean (nothing from an earlier detect or verify stays on screen).
+	const choosePlatform = (id: string) => {
+		const c = platformChoice(id);
+		setPlatform(c.platform);
+		setDet(c.det);
+		setCand(c.cand);
+		setSaved(c.saved);
+		setInline(c.inline);
+		setJobId(c.jobId);
+		setPolling(c.polling);
+		setProbeSecrets(c.probeSecrets);
+	};
+
 	const platforms = catalog.data?.platforms ?? [];
+	// The platform's own fields come from the import catalog, the same form Import from a platform uses.
+	const importPlatforms = useGetAgentPlatformsQuery(undefined, { skip: platform === NO_PLATFORM });
+	const importable = platform === NO_PLATFORM ? undefined : importPlatformFor(platform, importPlatforms.data?.platforms ?? []);
 	const others = otherCandidates(det);
 	const verified = verify && verifyDone && connectionOK(verify.rows) && verify.status === "succeeded";
 
@@ -148,20 +173,24 @@ export default function ConnectView() {
 			/>
 
 			<section className="bg-card flex flex-col gap-3 rounded-xl border p-5" data-testid="connect-paste">
-				<label className="text-sm font-medium" htmlFor="connect-input">
-					{t("paste.label")}
-				</label>
-				<textarea
-					id="connect-input"
-					className="border-input bg-card focus-visible:ring-ring/40 min-h-24 w-full rounded-md border px-3 py-2 font-mono text-sm outline-none focus-visible:ring-2"
-					placeholder={t("paste.placeholder")}
-					value={input}
-					onChange={(e) => setInput(e.target.value)}
-					spellCheck={false}
-					data-testid="connect-input"
-				/>
+				{!importable && (
+					<>
+						<label className="text-sm font-medium" htmlFor="connect-input">
+							{t("paste.label")}
+						</label>
+						<textarea
+							id="connect-input"
+							className="border-input bg-card focus-visible:ring-ring/40 min-h-24 w-full rounded-md border px-3 py-2 font-mono text-sm outline-none focus-visible:ring-2"
+							placeholder={t("paste.placeholder")}
+							value={input}
+							onChange={(e) => setInput(e.target.value)}
+							spellCheck={false}
+							data-testid="connect-input"
+						/>
+					</>
+				)}
 				<div className="flex flex-wrap items-center gap-3">
-					<Select value={platform} onValueChange={setPlatform}>
+					<Select value={platform} onValueChange={choosePlatform}>
 						<SelectTrigger className="min-w-56" aria-label={t("paste.platform")}>
 							<SelectValue placeholder={t("paste.platform")} />
 						</SelectTrigger>
@@ -174,17 +203,25 @@ export default function ConnectView() {
 							))}
 						</SelectContent>
 					</Select>
-					<Button
-						onClick={() => void runDetect()}
-						disabled={!input.trim() && platform === NO_PLATFORM}
-						isLoading={detectState.isLoading}
-						data-testid="connect-detect"
-					>
-						{detectState.isLoading ? t("paste.detecting") : t("paste.detect")}
-					</Button>
+					{!importable && (
+						<Button
+							onClick={() => void runDetect()}
+							disabled={!input.trim() && platform === NO_PLATFORM}
+							isLoading={detectState.isLoading}
+							data-testid="connect-detect"
+						>
+							{detectState.isLoading ? t("paste.detecting") : t("paste.detect")}
+						</Button>
+					)}
 				</div>
-				<p className="text-muted-foreground text-xs">{t("paste.hint")}</p>
-				{detectState.error ? <p className="text-chart-error-ink text-sm">{getBenchErrorMessage(detectState.error)}</p> : null}
+				{importable ? (
+					<ConnectPlatformForm key={importable.id} platform={importable} />
+				) : (
+					<p className="text-muted-foreground text-xs">{t("paste.hint")}</p>
+				)}
+				{!importable && detectState.error ? (
+					<p className="text-chart-error-ink text-sm">{getBenchErrorMessage(detectState.error)}</p>
+				) : null}
 			</section>
 
 			{det && (
@@ -327,11 +364,7 @@ export default function ConnectView() {
 							</Button>
 						</div>
 						{startState.error ? <p className="text-chart-error-ink text-sm">{getBenchErrorMessage(startState.error)}</p> : null}
-						{verify && (
-							<p className="text-muted-foreground text-sm">
-								{verify.suite ? t("verify.benchmark", { id: verify.suite }) : t("verify.noBenchmark")}
-							</p>
-						)}
+						{verify && <p className="text-muted-foreground text-sm">{t(verifyBenchmarkKey(verify.suite), { id: verify.suite ?? "" })}</p>}
 						{verify && <VerifyRows rows={verify.rows} onPick={onPick} />}
 						{verify?.result?.suggest?.history && (
 							<p className="text-sm">{t("verify.history", { mode: t(`verify.historyMode.${verify.result.suggest.history}`) })}</p>
@@ -351,6 +384,91 @@ export default function ConnectView() {
 					<FirstLookLauncher agent={saved.id} />
 				</Section>
 			)}
+		</div>
+	);
+}
+
+/**
+ * B6: a platform picked on Connect shows that platform's fields (id, inputs, secret names, help and
+ * docs) and reads the agent as Import from a platform does: Read shows what was found, Create saves it.
+ */
+export function ConnectPlatformForm({ platform: p }: { platform: AgentPlatform }) {
+	const { t } = useTranslation("connect");
+	const canWrite = canUse(useSession(), "member");
+	const navigate = useNavigate();
+	const secretList = useListSecretsQuery();
+	const [agentId, setAgentId] = useState("");
+	const [inputs, setInputs] = useState<Record<string, string>>({});
+	const [secrets, setSecrets] = useState<Record<string, string>>(() => suggestedPlatformSecrets(p));
+	const [found, setFound] = useState<AgentImportResponse | null>(null);
+	const [read, readState] = useImportAgentFromPlatformMutation();
+	const [create, createState] = useImportAgentFromPlatformMutation();
+	const missing = missingImportFields(p, agentId, inputs, secrets);
+	const name = importedAgentName(p.id, found?.import.definition.name || agentId);
+	const secretNames = secretList.data?.secrets.map((s) => s.name) ?? [];
+	const onRead = async () => {
+		setFound(null);
+		const res = await read(importRequest(p, name, agentId, inputs, secrets, true));
+		if ("data" in res && res.data) setFound(res.data);
+	};
+	const onCreate = async () => {
+		const res = await create(importRequest(p, name, agentId, inputs, secrets, false));
+		if ("data" in res && res.data) void navigate({ to: "/agents/$agentId", params: { agentId: res.data.id } });
+	};
+	const error = createState.error ?? readState.error;
+	return (
+		<div className="flex flex-col gap-4" data-testid="connect-platform-form">
+			<form
+				className="grid grid-cols-1 gap-4 md:grid-cols-2"
+				onSubmit={(e) => {
+					e.preventDefault();
+					void onRead();
+				}}
+			>
+				<PlatformFields
+					platform={p}
+					agentId={agentId}
+					onAgentId={(v) => {
+						setAgentId(v);
+						setFound(null);
+					}}
+					inputs={inputs}
+					onInputs={setInputs}
+					secrets={secrets}
+					onSecrets={setSecrets}
+					secretNames={secretNames}
+					listId="connect-platform-secrets"
+				/>
+				{missing.length > 0 && (
+					<p className="text-muted-foreground text-xs md:col-span-2">{t("platform.missing", { list: missing.join(", ") })}</p>
+				)}
+				{error ? (
+					<p role="alert" className="text-chart-error-ink text-sm md:col-span-2">
+						{getBenchErrorMessage(error)}
+					</p>
+				) : null}
+				<div className="flex flex-wrap gap-2 md:col-span-2">
+					<Button
+						type="submit"
+						variant="outline"
+						disabled={!canWrite || missing.length > 0}
+						isLoading={readState.isLoading}
+						data-testid="connect-platform-read"
+					>
+						{readState.isLoading ? t("platform.reading") : t("platform.read")}
+					</Button>
+					<Button
+						type="button"
+						disabled={!canWrite || !found || !!found.validation_error}
+						isLoading={createState.isLoading}
+						onClick={() => void onCreate()}
+						data-testid="connect-platform-create"
+					>
+						{createState.isLoading ? t("platform.creating") : t("platform.create")}
+					</Button>
+				</div>
+			</form>
+			{found && <ImportFound res={found} platform={p} />}
 		</div>
 	);
 }

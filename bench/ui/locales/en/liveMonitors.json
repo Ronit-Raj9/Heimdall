@@ -33,7 +33,9 @@
 		"budget": "Budget per day (USD)",
 		"create": "Create monitor",
 		"cancel": "Cancel",
-		"error": "Could not create the monitor"
+		"error": "Could not create the monitor",
+		"noEndpointAgents": "No agent with a remote endpoint yet.",
+		"pickAgent": "Pick an agent"
 	},
 	"detail": {
 		"tasks": "Tasks each check runs",
@@ -59,5 +61,6 @@
 		"run": "Run now",
 		"delete": "Delete",
 		"deleteConfirm": "Delete monitor {{name}}? Its history is removed."
-	}
+	},
+	"connectAgent": "Connect an agent"
 }
