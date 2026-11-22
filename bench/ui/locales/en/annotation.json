@@ -84,7 +84,9 @@
 		"resolved": "Resolved as {{label}}.",
 		"calibration": "Added to the judge calibration labels.",
 		"calibrationError": "Not added to the judge calibration: {{error}}",
-		"error": "Could not save the label"
+		"error": "Could not save the label",
+		"addRuns": "Add runs",
+		"askOwner": "Ask the queue's owner to add runs."
 	},
 	"items": {
 		"title": "Items",
@@ -119,7 +121,13 @@
 		"result": "Added {{added}}, {{duplicate}} already in the queue.",
 		"skipped": "Skipped: {{list}}",
 		"assign": "Assign items to labellers",
-		"assigned": "Assigned {{count}} items."
+		"assigned": "Assigned {{count}} items.",
+		"experimentPick": "Finished run of the benchmark",
+		"experimentOption": "{{name}}, {{date}}",
+		"none": "No finished runs of {{benchmark}} yet. Run an evaluation on it first.",
+		"noneAny": "No finished runs yet. Run an evaluation first.",
+		"noneLink": "Run an evaluation",
+		"loadError": "Could not load your evaluations"
 	},
 	"agreement": {
 		"title": "Agreement",
