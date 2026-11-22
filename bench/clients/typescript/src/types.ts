@@ -582,6 +582,8 @@ export interface RunDebugInfo {
 	from_exp?: string;
 	call?: number;
 	held_ms?: number;
+	/** The source run's fault condition when it was not the clean one. */
+	from_condition?: string;
 }
 
 // X7: GPU benchmarking (schemas/gpu.go, docs/gpu-tasks.md).
@@ -1321,7 +1323,7 @@ export interface PairRun {
 }
 
 /** A pair run's model evidence (leaderboard.Provenance*). */
-export type RunProvenance = "scripted" | "model" | "mixed" | "unobserved" | "unavailable";
+export type RunProvenance = "scripted" | "model" | "mixed" | "unobserved" | "unavailable" | "replayed";
 
 /** Events of each arm matched on (event type, target). Null where a lane has no event. */
 export interface AlignedStep {
@@ -1362,6 +1364,7 @@ export interface RunDetail {
 	sealed: boolean;
 	/** Empty until the run is sealed. */
 	seal_hash: string;
+	debug_allowed?: { replay: boolean; fork: boolean; reason?: string };
 	/** Run control: requeued by an operator; kept, never counted. */
 	superseded?: boolean;
 	grade: Grade | null;
@@ -1667,6 +1670,13 @@ export interface ExperimentStatus {
 	/** A Decision (improved, regressed, inconclusive, invalid); typed as text so a newer server's value still renders. */
 	decision?: string;
 	evaluation_id?: string;
+	debug?: string;
+	debug_from_run?: string;
+	multi_agent?: boolean;
+	setups?: { arm: string; agent: string; agent_file: string; model: string }[];
+	problem?: string;
+	run_job_id?: string;
+	arms_differ?: "model" | "none" | "agent";
 }
 
 /** GET /experiments */
@@ -1701,6 +1711,7 @@ export interface RunListRow {
 	sealed_at?: string;
 	/** The first part failure's error of a non-pass run; absent when it recorded none. Inert text. */
 	error?: string;
+	paired?: boolean;
 	/** Why a sealed run is left out of scores: out_of_memory, infra_error, invalid_evaluator, unknown. */
 	excluded?: string;
 	/** Run metrics from metrics.json; absent until observed, and the list shows a dash. */
@@ -3732,6 +3743,9 @@ export interface AgentDiffVersionInfo {
 	/** Sealed runs, not yet seal-verified. */
 	sealed_runs: number;
 	latest_at: string;
+	version?: number;
+	model?: string;
+	system?: boolean;
 }
 
 /** GET /agents/diff/versions: every config hash the run folder knows. */
@@ -4106,6 +4120,8 @@ export interface Job {
 	result?: Record<string, JsonValue>;
 	error?: string;
 	created_by?: string;
+	/** How created_by is shown (GET /jobs/{id}); an email in created_by is sent to org admins only. */
+	created_by_name?: string;
 	created_at: PlatformTime;
 	started_at?: PlatformTime;
 	finished_at?: PlatformTime;

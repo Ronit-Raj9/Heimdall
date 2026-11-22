@@ -393,6 +393,50 @@ class AdmissionRecord(_AdmissionRecordRequired, total=False):
     reference_results: List[str]
 
 
+class AdmitScanCanary(TypedDict):
+    id: str
+    path: str
+    value_sha256: str
+
+
+class AdmitScanCounts(TypedDict):
+    block: int
+    info: int
+    warn: int
+
+
+class _AdmitScanDynamicRequired(TypedDict):
+    canaries: List[AdmitScanCanary]
+    duration_ms: int
+    file_events: int
+    helper_image: str
+    image: str
+    net_events: int
+    observed: bool
+    output_bytes: int
+    ran: bool
+
+
+class AdmitScanDynamic(_AdmitScanDynamicRequired, total=False):
+    commands: List[str]
+    error: str
+    exit_code: Optional[int]
+    timed_out: bool
+
+
+class _AdmitScanFileRequired(TypedDict):
+    path: str
+    scanned: bool
+    size: int
+
+
+class AdmitScanFile(_AdmitScanFileRequired, total=False):
+    binary: bool
+    note: str
+    sha256: str
+    symlink: str
+
+
 class _AdmitScanFindingRequired(TypedDict):
     detail: str
     file: str
@@ -405,6 +449,58 @@ class AdmitScanFinding(_AdmitScanFindingRequired, total=False):
     decoded: str
     excerpt: str
     line: int
+
+
+class _AdmitScanMCPRequired(TypedDict):
+    endpoint: str
+    listings: int
+    tools: List[AdmitScanMCPTool]
+
+
+class AdmitScanMCP(_AdmitScanMCPRequired, total=False):
+    list_changed: bool
+    probe_call: str
+    prompts: List[str]
+    protocol_version: str
+    resources: List[str]
+    server_name: str
+    server_version: str
+
+
+class AdmitScanMCPTool(TypedDict):
+    name: str
+    sha256: str
+
+
+class _AdmitScanOverrideRequired(TypedDict):
+    at: str
+    reason: str
+
+
+class AdmitScanOverride(_AdmitScanOverrideRequired, total=False):
+    by: str
+
+
+class _AdmitScanRecordRequired(TypedDict):
+    allow_hosts: List[str]
+    content_hash: str
+    counts: AdmitScanCounts
+    created_at: str
+    decision: str
+    findings: List[AdmitScanFinding]
+    id: str
+    kind: str
+    limits: List[str]
+    scanner_version: str
+    source: str
+    subject: str
+
+
+class AdmitScanRecord(_AdmitScanRecordRequired, total=False):
+    dynamic: Optional[AdmitScanDynamic]
+    files: List[AdmitScanFile]
+    mcp: Optional[AdmitScanMCP]
+    override: Optional[AdmitScanOverride]
 
 
 class AgentBehaviorFields(TypedDict):
@@ -493,6 +589,7 @@ class AgentConfigFields(_AgentConfigFieldsRequired, total=False):
     behavior: Optional[AgentBehaviorFields]
     description: str
     env: Dict[str, str]
+    files: List[str]
     image: str
     openai_url: str
     remote_url: str
@@ -518,6 +615,14 @@ class _AgentConfigValidateResponseRequired(TypedDict):
 class AgentConfigValidateResponse(_AgentConfigValidateResponseRequired, total=False):
     error: str
     fields: Optional[AgentConfigFields]
+
+
+class _AgentCopyRequestRequired(TypedDict):
+    new_id: str
+
+
+class AgentCopyRequest(_AgentCopyRequestRequired, total=False):
+    remove_original: bool
 
 
 class _AgentCoverageRequired(TypedDict):
@@ -776,15 +881,21 @@ class _AgentReportCardRequired(TypedDict):
 
 class AgentReportCard(_AgentReportCardRequired, total=False):
     model: str
+    models: List[str]
     version: int
 
 
-class AgentSkill(TypedDict):
+class _AgentSkillRequired(TypedDict):
     bytes: int
     files: int
     name: str
     path: str
     valid: bool
+
+
+class AgentSkill(_AgentSkillRequired, total=False):
+    scan: Optional[SkillScanSummary]
+    status: str
 
 
 class AgentSkills(TypedDict, total=False):
@@ -971,6 +1082,7 @@ class AgentVersionEntry(_AgentVersionEntryRequired, total=False):
     agent_hash: str
     author: str
     bundle_hash: str
+    created_by_name: str
     file_sha256: str
     file_version: str
     improvement: str
@@ -1070,10 +1182,14 @@ class Analysis(_AnalysisRequired, total=False):
     reported: List[Reported]
 
 
-class AnnotationAgreement(TypedDict):
+class _AnnotationAgreementRequired(TypedDict):
     agreement: Agreement
     labellers: Dict[str, str]
     queue: str
+
+
+class AnnotationAgreement(_AnnotationAgreementRequired, total=False):
+    labeller_emails: Dict[str, str]
 
 
 class AnnotationAssignResult(TypedDict):
@@ -1091,7 +1207,7 @@ class _AnnotationItemViewRequired(TypedDict):
     answer: str
     id: str
     label_count: int
-    labels: List[Label]
+    labels: List[AnnotationLabelView]
     state: str
     task: str
 
@@ -1099,6 +1215,7 @@ class _AnnotationItemViewRequired(TypedDict):
 class AnnotationItemView(_AnnotationItemViewRequired, total=False):
     agent: str
     agent_version: str
+    answer_from: str
     assigned: List[str]
     calibration: str
     calibration_error: str
@@ -1109,7 +1226,7 @@ class AnnotationItemView(_AnnotationItemViewRequired, total=False):
     judge_votes: List[str]
     my_label: str
     question: str
-    resolution: Optional[Resolution]
+    resolution: Optional[AnnotationResolutionView]
     run_id: str
 
 
@@ -1144,9 +1261,34 @@ class AnnotationLabelResult(_AnnotationLabelResultRequired, total=False):
     calibration_error: str
 
 
+class _AnnotationLabelViewRequired(TypedDict):
+    at: str
+    label: str
+    user_id: str
+
+
+class AnnotationLabelView(_AnnotationLabelViewRequired, total=False):
+    email: str
+    name: str
+    note: str
+
+
 class AnnotationNext(TypedDict):
     item: Optional[AnnotationItemView]
     queue: AnnotationQueueView
+
+
+class _AnnotationPeopleRequired(TypedDict):
+    people: List[AnnotationPerson]
+
+
+class AnnotationPeople(_AnnotationPeopleRequired, total=False):
+    local: bool
+
+
+class AnnotationPerson(TypedDict):
+    name: str
+    user_id: str
 
 
 class AnnotationQueueList(TypedDict):
@@ -1186,9 +1328,23 @@ class AnnotationQueueView(_AnnotationQueueViewRequired, total=False):
     archived: bool
     benchmark: str
     created_by_email: str
+    created_by_name: str
     description: str
     instructions: str
     reviewers: List[str]
+
+
+class _AnnotationResolutionViewRequired(TypedDict):
+    at: str
+    label: str
+    method: str
+
+
+class AnnotationResolutionView(_AnnotationResolutionViewRequired, total=False):
+    email: str
+    name: str
+    note: str
+    user_id: str
 
 
 class _AnswerRequired(TypedDict):
@@ -1332,11 +1488,15 @@ class ApplyStep(_ApplyStepRequired, total=False):
     rule_id: str
 
 
-class Approval(TypedDict):
+class _ApprovalRequired(TypedDict):
     at: str
     by: str
     reason: str
     stage: str
+
+
+class Approval(_ApprovalRequired, total=False):
+    by_name: str
 
 
 class _ArmRequired(TypedDict):
@@ -1486,6 +1646,13 @@ class ArmRef_migration(TypedDict):
     label: str
     model: str
     provider: str
+
+
+class ArmSetup(TypedDict):
+    agent: str
+    agent_file: str
+    arm: str
+    model: str
 
 
 class _ArmSpecRequired(TypedDict):
@@ -2295,6 +2462,7 @@ class _Candidate_connectRequired(TypedDict):
     kind: str
     label: str
     nonce_found: bool
+    proven: bool
     supported: bool
 
 
@@ -3301,12 +3469,16 @@ class DataPolicyRequest(TypedDict, total=False):
     pii: Optional[Policy_pii]
 
 
-class DataPolicyView(TypedDict):
+class _DataPolicyViewRequired(TypedDict):
     benchmark: str
     can_edit_access: bool
     kinds: List[str]
     modes: List[str]
     policy: Policy
+
+
+class DataPolicyView(_DataPolicyViewRequired, total=False):
+    updated_by_name: str
 
 
 class _DatasetBenchmarkRequired(TypedDict):
@@ -3391,7 +3563,23 @@ class DatasetVersionDetail(TypedDict):
 
 class DatasetVersionList(TypedDict):
     benchmark: str
-    versions: List[Version_dataset]
+    versions: List[DatasetVersionView]
+
+
+class _DatasetVersionViewRequired(TypedDict):
+    added: List[str]
+    at: str
+    removed: List[str]
+    sha256: str
+    tasks: int
+    updated: List[str]
+    version: int
+
+
+class DatasetVersionView(_DatasetVersionViewRequired, total=False):
+    actor: str
+    actor_name: str
+    source: str
 
 
 class DebugEdit(TypedDict, total=False):
@@ -3423,6 +3611,7 @@ class DebugSpec(_DebugSpecRequired, total=False):
     call: int
     cassette: Optional[Cassette]
     edit: Optional[DebugEdit]
+    from_condition: str
     from_exp: str
     from_run: str
     on_divergence: str
@@ -3675,9 +3864,13 @@ class DocList(TypedDict):
     docs: List[DocSummary]
 
 
-class DocSummary(TypedDict):
+class _DocSummaryRequired(TypedDict):
     name: str
     title: str
+
+
+class DocSummary(_DocSummaryRequired, total=False):
+    snippet: str
 
 
 class Doctor(TypedDict):
@@ -4195,6 +4388,7 @@ class EvalEstimateRequest(_EvalEstimateRequestRequired, total=False):
     pack: str
     presets: bool
     stream: Optional[StreamSpec]
+    worker: str
 
 
 class EvalMinutesRange(TypedDict):
@@ -4240,10 +4434,14 @@ class EvalPresetEstimate(_EvalPresetEstimateRequired, total=False):
     from_library: bool
 
 
-class EvalSlots(TypedDict):
+class _EvalSlotsRequired(TypedDict):
     concurrency: int
     org_slots: int
     parallel: int
+
+
+class EvalSlots(_EvalSlotsRequired, total=False):
+    worker_slots: int
 
 
 class _EvaluationRequired(TypedDict):
@@ -4261,6 +4459,7 @@ class Evaluation(_EvaluationRequired, total=False):
     org: str
     paused: bool
     rerun_of: str
+    result: Optional[EvaluationResult]
     schedule: str
 
 
@@ -4273,6 +4472,15 @@ class _EvaluationArmRequired(TypedDict):
 class EvaluationArm(_EvaluationArmRequired, total=False):
     latest_at_launch: bool
     provider: str
+    version: int
+
+
+class EvaluationArmResult(TypedDict):
+    agent: str
+    label: str
+    model: str
+    runs: int
+    score: float
     version: int
 
 
@@ -4393,6 +4601,15 @@ class _EvaluationRerunResultRequired(TypedDict):
 
 class EvaluationRerunResult(_EvaluationRerunResultRequired, total=False):
     skipped: Dict[str, str]
+
+
+class _EvaluationResultRequired(TypedDict):
+    arms: List[EvaluationArmResult]
+    at: str
+
+
+class EvaluationResult(_EvaluationResultRequired, total=False):
+    cost_usd: Optional[float]
 
 
 class _EvaluationScheduleRequestRequired(TypedDict):
@@ -4618,9 +4835,16 @@ class _ExperimentStatusRequired(TypedDict):
 class ExperimentStatus(_ExperimentStatusRequired, total=False):
     analysis_id: str
     arms: List[str]
+    arms_differ: str
+    debug: str
+    debug_from_run: str
     decision: str
     evaluation_id: str
     finished_at: Optional[str]
+    multi_agent: bool
+    problem: str
+    run_job_id: str
+    setups: List[ArmSetup]
     started_at: Optional[str]
     suite: str
     suite_version: str
@@ -4806,10 +5030,14 @@ class FaultPlan(_FaultPlanRequired, total=False):
     until_s: int
 
 
-class FaultScore(TypedDict):
+class _FaultScoreRequired(TypedDict):
     drop: float
     runs: int
     score: float
+
+
+class FaultScore(_FaultScoreRequired, total=False):
+    unpaired: int
 
 
 class FaultSkip(TypedDict):
@@ -5537,6 +5765,7 @@ class _HumanActionRequired(TypedDict):
 
 class HumanAction(_HumanActionRequired, total=False):
     by: str
+    by_name: str
     combo: str
     direction: str
     error: str
@@ -5896,6 +6125,7 @@ class _Incident_statuspageRequired(TypedDict):
 
 
 class Incident_statuspage(_Incident_statuspageRequired, total=False):
+    auto: bool
     components: List[str]
     resolved_at: Optional[str]
     scheduled_for: Optional[str]
@@ -6115,6 +6345,7 @@ class Item_annotate(_Item_annotateRequired, total=False):
     added_by: str
     agent: str
     agent_version: str
+    answer_from: str
     assigned: List[Assignment]
     calibration: str
     calibration_error: str
@@ -6142,6 +6373,7 @@ class _JobRequired(TypedDict):
 
 class Job(_JobRequired, total=False):
     created_by: str
+    created_by_name: str
     error: str
     finished_at: Optional[str]
     lease_owner: str
@@ -6630,7 +6862,7 @@ class MCPServerDraftRequest(_MCPServerDraftRequestRequired, total=False):
     tools: List[str]
 
 
-class MCPServerDraftResponse(TypedDict):
+class _MCPServerDraftResponseRequired(TypedDict):
     files: List[str]
     next: str
     no_reference: List[str]
@@ -6638,6 +6870,10 @@ class MCPServerDraftResponse(TypedDict):
     scores: Scores
     suite: str
     tasks: List[DraftTask_mcptest]
+
+
+class MCPServerDraftResponse(_MCPServerDraftResponseRequired, total=False):
+    reference_agents_keyed: List[str]
 
 
 class _MCPServerInspectRequestRequired(TypedDict):
@@ -8244,6 +8480,7 @@ class PolicyReviewResult(TypedDict):
 
 
 class PolicySaveRequest(TypedDict, total=False):
+    create_only: bool
     if_match: str
     note: str
     policy: Optional[Policy_schemas]
@@ -8449,10 +8686,24 @@ class ProjectFileSaved(_ProjectFileSavedRequired, total=False):
     entry: Optional[Entry_projectfs]
 
 
+class _ProjectFileVersionRequired(TypedDict):
+    at: str
+    id: str
+    path: str
+    sha256: str
+    size: int
+
+
+class ProjectFileVersion(_ProjectFileVersionRequired, total=False):
+    actor: str
+    actor_name: str
+    note: str
+
+
 class ProjectFileVersions(TypedDict):
     area: str
     path: str
-    versions: List[Version_projectfs]
+    versions: List[ProjectFileVersion]
 
 
 class ProjectManifest(TypedDict):
@@ -9566,6 +9817,7 @@ class Resilience(TypedDict):
 
 
 class ResilienceArm(TypedDict):
+    changed_tasks: int
     cost_inflation: Optional[float]
     cost_inflation_high: Optional[float]
     cost_inflation_low: Optional[float]
@@ -10238,9 +10490,19 @@ class _RunDebugRequired(TypedDict):
 
 class RunDebug(_RunDebugRequired, total=False):
     call: int
+    from_condition: str
     from_exp: str
     from_run: str
     held_ms: int
+
+
+class _RunDebugAllowedRequired(TypedDict):
+    fork: bool
+    replay: bool
+
+
+class RunDebugAllowed(_RunDebugAllowedRequired, total=False):
+    reason: str
 
 
 class _RunDetailRequired(TypedDict):
@@ -10261,6 +10523,7 @@ class RunDetail(_RunDetailRequired, total=False):
     answer: Optional[Answer]
     artifacts: List[ArtifactFile]
     canonical: Optional[CanonicalRun]
+    debug_allowed: Optional[RunDebugAllowed]
     evidence_contract: Optional[RunEvidenceContract]
     seal_error: str
     services: List[ServiceResult]
@@ -10366,6 +10629,7 @@ class RunListRow(_RunListRowRequired, total=False):
     grading: str
     model: str
     output: str
+    paired: bool
     sealed_at: Optional[str]
     started: Optional[str]
     steps: Optional[float]
@@ -10923,6 +11187,7 @@ class _SecretRequired(TypedDict):
 
 class Secret(_SecretRequired, total=False):
     created_by: str
+    created_by_name: str
 
 
 class SecretCreate(TypedDict):
@@ -11279,6 +11544,20 @@ class SimulatorSpec(TypedDict, total=False):
     prompt_version: str
     provider: str
     seed: int
+
+
+class SkillScanResult(TypedDict):
+    installed: bool
+    record: Optional[AdmitScanRecord]
+    skill: AgentSkill
+
+
+class SkillScanSummary(TypedDict):
+    block: int
+    decision: str
+    findings: List[AdmitScanFinding]
+    scanned_at: str
+    warn: int
 
 
 class Skip(TypedDict):
@@ -12101,6 +12380,7 @@ class _TaskReviewDecisionRequired(TypedDict):
 
 class TaskReviewDecision(_TaskReviewDecisionRequired, total=False):
     by: str
+    by_name: str
     note: str
     task_version: str
 
@@ -12761,7 +13041,7 @@ class Version(_VersionRequired, total=False):
     exp_id: str
 
 
-class VersionInfo(TypedDict):
+class _VersionInfoRequired(TypedDict):
     agent_id: str
     arms: List[ArmRef]
     config_hash: str
@@ -12769,6 +13049,12 @@ class VersionInfo(TypedDict):
     latest_at: str
     sealed_runs: int
     suites: List[str]
+
+
+class VersionInfo(_VersionInfoRequired, total=False):
+    model: str
+    system: bool
+    version: int
 
 
 class VersionList(TypedDict):
@@ -12809,19 +13095,6 @@ class _Version_improveRequired(TypedDict):
 class Version_improve(_Version_improveRequired, total=False):
     bundle: Dict[str, str]
     doc: str
-
-
-class _Version_projectfsRequired(TypedDict):
-    at: str
-    id: str
-    path: str
-    sha256: str
-    size: int
-
-
-class Version_projectfs(_Version_projectfsRequired, total=False):
-    actor: str
-    note: str
 
 
 class _ViewRequired(TypedDict):
@@ -13352,6 +13625,7 @@ class _WorkerTargetChoiceRequired(TypedDict):
 
 class WorkerTargetChoice(_WorkerTargetChoiceRequired, total=False):
     note: str
+    slots: int
     status: str
 
 
@@ -13502,6 +13776,10 @@ class AnnotationLabelResultResponse(AnnotationLabelResult):
 
 
 class AnnotationNextResponse(AnnotationNext):
+    mode: Mode
+
+
+class AnnotationPeopleResponse(AnnotationPeople):
     mode: Mode
 
 
@@ -14438,6 +14716,10 @@ class SharedItemResponse(SharedItem):
     mode: Mode
 
 
+class SkillScanResultResponse(SkillScanResult):
+    mode: Mode
+
+
 class State_pipelineResponse(State_pipeline):
     mode: Mode
 
@@ -14658,7 +14940,15 @@ __all__ = [
     'AddResult',
     'AdmissionCheck',
     'AdmissionRecord',
+    'AdmitScanCanary',
+    'AdmitScanCounts',
+    'AdmitScanDynamic',
+    'AdmitScanFile',
     'AdmitScanFinding',
+    'AdmitScanMCP',
+    'AdmitScanMCPTool',
+    'AdmitScanOverride',
+    'AdmitScanRecord',
     'AgentBehaviorFields',
     'AgentCompatibility',
     'AgentConfig',
@@ -14667,6 +14957,7 @@ __all__ = [
     'AgentConfigPut',
     'AgentConfigValidateRequest',
     'AgentConfigValidateResponse',
+    'AgentCopyRequest',
     'AgentCoverage',
     'AgentCreateRequest',
     'AgentEdge',
@@ -14725,10 +15016,14 @@ __all__ = [
     'AnnotationItemsResult',
     'AnnotationLabelRequest',
     'AnnotationLabelResult',
+    'AnnotationLabelView',
     'AnnotationNext',
+    'AnnotationPeople',
+    'AnnotationPerson',
     'AnnotationQueueList',
     'AnnotationQueueRequest',
     'AnnotationQueueView',
+    'AnnotationResolutionView',
     'Answer',
     'ApartCost',
     'AppInfo',
@@ -14753,6 +15048,7 @@ __all__ = [
     'ArmPoint',
     'ArmRef',
     'ArmRef_migration',
+    'ArmSetup',
     'ArmSpec',
     'ArmStats',
     'ArtifactFile',
@@ -14929,6 +15225,7 @@ __all__ = [
     'DatasetTasksResult',
     'DatasetVersionDetail',
     'DatasetVersionList',
+    'DatasetVersionView',
     'DebugEdit',
     'DebugRunRequest',
     'DebugRunResponse',
@@ -15004,6 +15301,7 @@ __all__ = [
     'EvalSlots',
     'Evaluation',
     'EvaluationArm',
+    'EvaluationArmResult',
     'EvaluationBifrostUse',
     'EvaluationCacheAB',
     'EvaluationCacheChild',
@@ -15015,6 +15313,7 @@ __all__ = [
     'EvaluationReleasePreview',
     'EvaluationReleaseRequest',
     'EvaluationRerunResult',
+    'EvaluationResult',
     'EvaluationScheduleRequest',
     'EvaluationScheduleResponse',
     'EvaluationSkippedTask',
@@ -15384,6 +15683,7 @@ __all__ = [
     'ProjectFile',
     'ProjectFileList',
     'ProjectFileSaved',
+    'ProjectFileVersion',
     'ProjectFileVersions',
     'ProjectManifest',
     'PromptLogPolicy',
@@ -15542,6 +15842,7 @@ __all__ = [
     'RunControlRequest',
     'RunControls',
     'RunDebug',
+    'RunDebugAllowed',
     'RunDetail',
     'RunDiff',
     'RunEvents',
@@ -15632,6 +15933,8 @@ __all__ = [
     'Signals',
     'SignupRequest',
     'SimulatorSpec',
+    'SkillScanResult',
+    'SkillScanSummary',
     'Skip',
     'Slice',
     'SliceValue',
@@ -15758,7 +16061,6 @@ __all__ = [
     'VersionView',
     'Version_dataset',
     'Version_improve',
-    'Version_projectfs',
     'View',
     'VisualAssert',
     'VisualCapture',
@@ -15838,6 +16140,7 @@ __all__ = [
     'AnnotationItemsResultResponse',
     'AnnotationLabelResultResponse',
     'AnnotationNextResponse',
+    'AnnotationPeopleResponse',
     'AnnotationQueueListResponse',
     'AnnotationQueueViewResponse',
     'AppTasksDraftViewResponse',
@@ -16073,6 +16376,7 @@ __all__ = [
     'ShareListResponse',
     'ShareViewResponse',
     'SharedItemResponse',
+    'SkillScanResultResponse',
     'State_pipelineResponse',
     'StatusResponse',
     'Status_livescoreResponse',
