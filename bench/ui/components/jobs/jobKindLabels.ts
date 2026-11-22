@@ -40,6 +40,7 @@ export const JOB_KIND_LABELS: Readonly<Record<string, string>> = {
 	"integrations.export": "Download results for other tools",
 	"issuebench.build": "Build a test environment from issues",
 	"issuebench.check": "Check an issue task with your model",
+	"issuebench.work": "Build and test an issue on a worker",
 	"k8s.status": "Kubernetes status",
 	"livescore.compare": "Compare live quality scores",
 	"livescore.init": "Set up live quality scoring",
