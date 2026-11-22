@@ -28,8 +28,29 @@ const (
 	SetImage          = "image"             // a prebuilt AgentDojo image tag; skips the build
 )
 
-// suites are AgentDojo's four suites.
-var suites = []string{"workspace", "travel", "banking", "slack"}
+// suites are AgentDojo's four suites and the three AgentDyn adds
+// (github.com/SaFo-Lab/AgentDyn, an AgentDojo fork; docs/importing-agentdojo.md).
+var suites = []string{"workspace", "travel", "banking", "slack", "shopping", "github", "dailylife"}
+
+// agentDynSuites are the suites only the AgentDyn fork has.
+var agentDynSuites = []string{"shopping", "github", "dailylife"}
+
+// agentDynRepo is the AgentDyn fork, the source of its suites.
+const agentDynRepo = "https://github.com/SaFo-Lab/AgentDyn"
+
+// adaptiveAttack is the attacker-model condition (image/heimdall/adaptive.py).
+const adaptiveAttack = "adaptive"
+
+// sourceRepo is the upstream repository a suite comes from.
+func (s settings) sourceRepo() string {
+	if slices.Contains(agentDynSuites, s.suite) {
+		return agentDynRepo
+	}
+	return upstreamRepo
+}
+
+// adaptive reports whether the adaptive attacker condition is asked for.
+func (s settings) adaptive() bool { return slices.Contains(s.attacks, adaptiveAttack) }
 
 const (
 	upstreamRepo    = "https://github.com/ethz-spylab/agentdojo"
@@ -181,7 +202,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	rec := schemas.ImportRecord{
 		Importer:  Name,
 		Benchmark: fmt.Sprintf("agentdojo@%s %s (package %s)", set.version, set.suite, cat.PackageVersion),
-		Source:    upstreamRepo,
+		Source:    set.sourceRepo(),
 		Revision:  up.revision,
 		License:   up.license,
 		At:        im.now().UTC().Truncate(time.Second),

@@ -4,7 +4,12 @@ The agent is a user's service that speaks the OpenAI chat/completions or
 Responses API. This program runs in the run's container and is bench code:
 nothing of the agent runs here.
 
-It sends the task instruction as a user message (BENCH_OPENAI_SYSTEM first
+For a conversation task (BENCH_OPENAI_CHAT) it sends the task's messages as
+they are, attachments as image or file parts of the last user message, and
+after each reply the next scripted user turn; the last reply is the answer,
+or with grade_on transcript the whole conversation as text.
+
+Otherwise it sends the task instruction as a user message (BENCH_OPENAI_SYSTEM first
 when set; with BENCH_OPENAI_HISTORY, the earlier sessions of a multi-session
 task as earlier user and assistant turns). With BENCH_MCP_SERVERS it lists
 the tools of every MCP server (the run's tool proxy) and offers them as
@@ -29,6 +34,7 @@ The connection to the endpoint goes to BENCH_REMOTE_CONNECT (the run's egress
 forwarder) when set; the Host header and the TLS server name stay the URL's.
 """
 
+import base64
 import http.client
 import json
 import os
@@ -40,6 +46,7 @@ import urllib.parse
 import urllib.request
 
 MAX_BODY = 16 << 20
+MAX_ATTACHMENT_BYTES = 8 << 20
 MAX_TOOL_RESULT = 64 << 10
 MAX_SUMMARY = 300
 SCHEMA = "bifrost.agent.event"
@@ -447,6 +454,70 @@ def converse(ep, model, system, instruction, tools, max_turns, deadline):
     return last, requests[0], summary
 
 
+def load_chat():
+    """The task's conversation (BENCH_OPENAI_CHAT), or None for a plain task."""
+    path = os.environ.get("BENCH_OPENAI_CHAT", "")
+    if not path:
+        return None
+    with open(path, encoding="utf-8") as f:
+        doc = json.load(f)
+    msgs = [{"role": m["role"], "content": m["content"]} for m in doc.get("messages") or []
+            if isinstance(m, dict) and m.get("role") in ("system", "user", "assistant") and isinstance(m.get("content"), str)]
+    if not msgs or msgs[-1]["role"] != "user":
+        fail(2, "the task's conversation does not end with the user's message")
+    return {"messages": msgs, "user_turns": [t for t in doc.get("user_turns") or [] if isinstance(t, str)],
+            "attachments": doc.get("attachments") or [], "grade_on": doc.get("grade_on") or "final"}
+
+
+def attachment_parts(items, root, api):
+    """Content parts for the first user message: images as image parts, other
+    files as file parts, by link or inline as a data URL."""
+    parts, total = [], 0
+    for a in items:
+        if not isinstance(a, dict) or not a.get("name"):
+            continue
+        mt = str(a.get("media_type") or "application/octet-stream")
+        url = str(a.get("url") or "")
+        if not url and a.get("path") and root:
+            path = os.path.join(root, str(a["path"]))
+            if os.path.islink(path) or not os.path.isfile(path):
+                continue
+            with open(path, "rb") as f:
+                data = f.read(MAX_ATTACHMENT_BYTES + 1)
+            total += len(data)
+            if total > MAX_ATTACHMENT_BYTES:
+                log("attachment %s left out: over %d bytes in all" % (a["name"], MAX_ATTACHMENT_BYTES))
+                continue
+            url = "data:%s;base64,%s" % (mt, base64.b64encode(data).decode("ascii"))
+        if not url:
+            continue
+        image = mt.startswith("image/")
+        if api == "responses":
+            if image:
+                parts.append({"type": "input_image", "image_url": url})
+            elif url.startswith("data:"):
+                parts.append({"type": "input_file", "filename": str(a["name"]), "file_data": url})
+            else:
+                parts.append({"type": "input_file", "file_url": url})
+        elif image:
+            parts.append({"type": "image_url", "image_url": {"url": url}})
+        elif url.startswith("data:"):
+            parts.append({"type": "file", "file": {"filename": str(a["name"]), "file_data": url}})
+        else:
+            parts.append({"type": "text", "text": "%s: %s" % (a["name"], url)})
+    return parts
+
+
+def with_parts(text, parts, api):
+    if not parts:
+        return text
+    return [{"type": "input_text" if api == "responses" else "text", "text": text}] + parts
+
+
+def render_chat(msgs):
+    return "\n\n".join("%s: %s" % (m["role"], text_of_content(m["content"]).strip()) for m in msgs) + "\n"
+
+
 def read_history(path):
     if not path:
         return []
@@ -504,10 +575,31 @@ def main():
                 f.write(answer)
         log("conversation done: %d agent turns, ended by %s" % (summary["agent_turns"], summary["ended_by"]))
         return
-    loop = responses_loop if os.environ.get("BENCH_OPENAI_API") == "responses" else chat_loop
-    answer, turns = loop(ep, model, history, system, instruction, tools, max_turns, deadline)
-    answer = answer or ""
-    write_history(history_path, history + [{"role": "user", "content": instruction}, {"role": "assistant", "content": answer}])
+    api = os.environ.get("BENCH_OPENAI_API", "chat")
+    loop = responses_loop if api == "responses" else chat_loop
+    chat = load_chat()
+    if chat is None:
+        answer, turns = loop(ep, model, history, system, instruction, tools, max_turns, deadline)
+        answer = answer or ""
+        write_history(history_path, history + [{"role": "user", "content": instruction}, {"role": "assistant", "content": answer}])
+    else:
+        # A conversation: the customer's messages as they are, then each
+        # scripted user turn after the agent's reply.
+        history = chat["messages"][:-1]
+        first = chat["messages"][-1]["content"]
+        parts = attachment_parts(chat["attachments"], os.environ.get("BENCH_OPENAI_FILES_DIR", "/workspace"), api)
+        user = with_parts(first, parts, api)
+        turns, answer = 0, ""
+        for n, turn in enumerate([None] + chat["user_turns"], start=1):
+            if turn is not None:
+                user = turn
+            reply, used = loop(ep, model, history, system, user, tools, max_turns, deadline)
+            turns += used
+            answer = reply or ""
+            history = history + [{"role": "user", "content": user}, {"role": "assistant", "content": answer}]
+            log("conversation turn %d of %d done" % (n, 1 + len(chat["user_turns"])))
+        if chat["grade_on"] == "transcript":
+            answer = render_chat(history)
     answer_path = os.environ.get("BENCH_ANSWER_PATH", "answer.txt")
     if answer or os.environ.get("BENCH_OPENAI_OUTPUT", "answer") == "answer":
         parent = os.path.dirname(answer_path)

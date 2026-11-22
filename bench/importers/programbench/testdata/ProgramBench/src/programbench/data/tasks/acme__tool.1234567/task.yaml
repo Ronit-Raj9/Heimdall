@@ -1,0 +1,6 @@
+repository: acme/tool
+commit: 1234567
+language: rs
+difficulty: easy
+eval_clean_hashes:
+- aaaa

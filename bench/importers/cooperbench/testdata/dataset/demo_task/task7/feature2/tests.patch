@@ -1,0 +1,6 @@
+diff --git a/tests/test_f2.py b/tests/test_f2.py
+new file mode 100644
+--- /dev/null
++++ b/tests/test_f2.py
+@@ -0,0 +1 @@
++from f2 import f2

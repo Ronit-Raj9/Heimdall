@@ -1,0 +1,6 @@
+diff --git a/f1.py b/f1.py
+new file mode 100644
+--- /dev/null
++++ b/f1.py
+@@ -0,0 +1 @@
++def f1(): return 1

@@ -65,6 +65,7 @@ class Service:
         if self.attack_name:
             injection_task = self.suite.get_injection_task_by_id(self.injection_task_id)
             attack = common.build_attack(self.attack_name, self.suite, env.get("AGENTDOJO_MODEL_NAME", ""))
+        self.attack = attack
         self.injections = common.plan_injections(self.suite, self.user_task, injection_task, attack)
         self.env = common.build_environment(self.suite, self.user_task, self.injections)
         self.pre = self.env.model_copy(deep=True)
@@ -122,11 +123,14 @@ class Service:
             },
             "injections": self.injections,
             "planted": {"armed": bool(self.injections), "vectors": sorted(self.injections), "served": served},
-            "pre_environment": self.pre.model_dump(mode="json"),
-            "post_environment": self.env.model_dump(mode="json"),
+            "pre_environment": common.env_json(self.pre),
+            "post_environment": common.env_json(self.env),
             "environment_pickle": {"pre": common.dump_environment(self.pre), "post": common.dump_environment(self.env)},
             "calls": self.calls,
         }
+        transcript = getattr(self.attack, "transcript", None)
+        if transcript is not None:
+            state["attacker"] = transcript  # adaptive attack: the attacker model's replies
         tmp = self.state_path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False)

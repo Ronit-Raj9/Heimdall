@@ -7,6 +7,13 @@ answer path. It is bench code: the container holds nothing of the agent's.
 Request: POST <BENCH_REMOTE_URL> with a JSON body
   {"instruction", "session_id", "session_index", "output", "files"?,
    "gateway"?, "tools"?}
+For a conversation task (BENCH_REMOTE_CHAT) the body also carries
+"messages" (the conversation so far, ending with the user's message;
+"instruction" is that message), "turn" and "turns", and "attachments"
+([{name, media_type, url} or {name, media_type, path, content_base64}]).
+After each reply the next scripted user turn is appended and posted again
+on the same session id; the last reply is the answer, or with grade_on
+transcript the whole conversation as text.
 and "Authorization: Bearer <token>" when the agent config names auth_env or
 auth_secret (with auth_header set, "<auth_header>: <token>" instead).
 With sign_env or sign_secret set, "X-Heimdall-Timestamp: <unix seconds>" and
@@ -58,6 +65,7 @@ MAX_EVENTS = 500
 MAX_EVENT_BYTES = 8 << 10
 MAX_ARTIFACTS = 50
 MAX_ARTIFACT_BYTES = 16 << 20
+MAX_ATTACHMENT_BYTES = 8 << 20
 MAX_STR = 256
 PENDING = ("queued", "pending", "running")
 EVENT_PREFIX = "@@heimdall-event "
@@ -418,6 +426,53 @@ def poll(remote, resp, raw, deadline, report):
             return resp, raw
 
 
+def load_chat():
+    """The task's conversation (BENCH_REMOTE_CHAT), or None for a plain task."""
+    path = os.environ.get("BENCH_REMOTE_CHAT", "")
+    if not path:
+        return None
+    with open(path, encoding="utf-8") as f:
+        doc = json.load(f)
+    msgs = [{"role": m["role"], "content": m["content"]} for m in doc.get("messages") or []
+            if isinstance(m, dict) and isinstance(m.get("content"), str)]
+    if not msgs or msgs[-1]["role"] != "user":
+        fail(2, "the task's conversation does not end with the user's message")
+    return {"messages": msgs, "user_turns": [t for t in doc.get("user_turns") or [] if isinstance(t, str)],
+            "attachments": doc.get("attachments") or [], "grade_on": doc.get("grade_on") or "final"}
+
+
+def chat_attachments(items, root):
+    """The conversation's attachments as sent to the agent: links as they are,
+    files stored with the task inline as base64, up to MAX_ATTACHMENT_BYTES."""
+    out, total = [], 0
+    for a in items:
+        if not isinstance(a, dict) or not a.get("name"):
+            continue
+        item = {"name": str(a["name"]), "media_type": str(a.get("media_type") or "application/octet-stream")}
+        if a.get("url"):
+            item["url"] = str(a["url"])
+        elif a.get("path") and root:
+            path = os.path.join(root, str(a["path"]))
+            if os.path.islink(path) or not os.path.isfile(path):
+                continue
+            with open(path, "rb") as f:
+                data = f.read(MAX_ATTACHMENT_BYTES + 1)
+            total += len(data)
+            if total > MAX_ATTACHMENT_BYTES:
+                emit({"type": "note", "message": "attachment %s left out: over %d bytes in all" % (item["name"], MAX_ATTACHMENT_BYTES)})
+                continue
+            item["path"] = str(a["path"])
+            item["content_base64"] = base64.b64encode(data).decode("ascii")
+        else:
+            continue
+        out.append(item)
+    return out
+
+
+def render_chat(msgs):
+    return "\n\n".join("%s: %s" % (m["role"], m["content"].strip()) for m in msgs) + "\n"
+
+
 def sign_headers(payload):
     headers = {"Content-Type": "application/json"}
     secret = os.environ.get("BENCH_REMOTE_SIGN_SECRET", "")
@@ -438,9 +493,14 @@ def exchange(remote, body, deadline, report):
     headers, signed = sign_headers(payload)
     path = (remote.url.path or "/") + ("?" + remote.url.query if remote.url.query else "")
     started = time.time()
-    emit({"type": "request", "session_id": body["session_id"], "session_index": body["session_index"],
-          "files": len(body.get("files", {})), "tools": len(body.get("tools", {})), "signed": signed,
-          "turn": (body.get("conversation") or {}).get("turn", 0), "repo": bool(body.get("repo"))})
+    req = {"type": "request", "session_id": body["session_id"], "session_index": body["session_index"],
+           "files": len(body.get("files", {})), "tools": len(body.get("tools", {})), "signed": signed,
+           "turn": (body.get("conversation") or {}).get("turn", 0), "repo": bool(body.get("repo"))}
+    if "messages" in body:
+        # Y13: a chat task's request carries the conversation so far.
+        req["messages"] = len(body["messages"])
+        req["turn"] = body.get("turn", 1)
+    emit(req)
     resp, raw = remote.do("POST", path, payload, headers, max(1.0, deadline - time.time()), deadline)
     if resp.status == 202:
         resp, raw = poll(remote, resp, raw, deadline, report)
@@ -513,6 +573,10 @@ def take_patch(doc, report):
 
 def main():
     if os.environ.get("BENCH_REMOTE_MAPPING") or os.environ.get("BENCH_REMOTE_AUTH"):
+        if os.environ.get("BENCH_REMOTE_CHAT"):
+            # TODO(Y13): multi-turn chat tasks on the mapped path; for now the
+            # mapped request carries only the instruction (the last user message).
+            emit({"type": "note", "message": "chat task on a mapped endpoint: only the instruction is sent, scripted user turns are not"})
         return main_mapped()  # Y10: the endpoint's own request and answer shape
     remote = Remote(os.environ["BENCH_REMOTE_URL"])
     timeout = float(os.environ.get("BENCH_REMOTE_TIMEOUT_S", "600"))
@@ -521,6 +585,7 @@ def main():
         instruction = f.read()
     answer_path = os.environ.get("BENCH_ANSWER_PATH", "answer.txt")
     output = os.environ.get("BENCH_REMOTE_OUTPUT", "answer")
+    chat = load_chat()  # Y13: chat-message task (messages, scripted user turns, attachments)
     body = {
         "instruction": instruction,
         "session_id": os.environ.get("BENCH_REMOTE_SESSION_ID", ""),
@@ -574,6 +639,29 @@ def main():
         if output != "answer":
             answer = None
         doc = last_doc
+    elif chat is not None:
+        # Y13: a conversation task. The customer's messages as they are, then
+        # each scripted user turn after the agent's reply, on one session id.
+        transcript = list(chat["messages"])
+        attachments = chat_attachments(chat["attachments"], files_root)
+        turns = [None] + chat["user_turns"]
+        answer, doc = "", None
+        for n, turn in enumerate(turns, start=1):
+            if turn is not None:
+                transcript.append({"role": "user", "content": turn})
+            req = dict(body, instruction=transcript[-1]["content"], messages=list(transcript), turn=n, turns=len(turns))
+            if attachments:
+                req["attachments"] = attachments
+            doc, raw, content_type = exchange(remote, req, deadline, report)
+            take_report(doc, report)
+            reply = answer_of(doc, raw, content_type, True) or ""
+            transcript.append({"role": "assistant", "content": reply})
+            answer = reply
+            if time.time() >= deadline and n < len(turns):
+                fail(1, "timed out after %d of %d turns" % (n, len(turns)))
+        emit({"type": "conversation", "turns": len(turns), "messages": len(transcript)})
+        if chat["grade_on"] == "transcript":
+            answer = render_chat(transcript)
     else:
         doc, raw, content_type = exchange(remote, body, deadline, report)
         answer = answer_of(doc, raw, content_type, output == "answer")

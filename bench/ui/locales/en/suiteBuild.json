@@ -79,9 +79,69 @@
 			"question": "Question",
 			"answer": "Expected answer",
 			"rubric": "Rubric",
-			"wrong": "Wrong answers tried"
+			"wrong": "Wrong answers tried",
+			"details": "Details"
 		},
-		"generatedWrong": "Written by Heimdall from your answer (the row named none). Edit them in verifier/answer.yaml."
+		"generatedWrong": "Written by Heimdall from your answer (the row named none). Edit them in verifier/answer.yaml.",
+		"verbatim": "The agent gets each task's text exactly as written in your rows, with no prompt added around it.",
+		"previewMore": "Showing the first {{shown}} of {{total}} tasks.",
+		"tooBig": "This data is over 48 MiB. Split it into smaller files of up to 20000 rows.",
+		"background": "Large import: it runs in the background and this page shows its progress.",
+		"turns": "{{count}} turns",
+		"attachCount_one": "1 file",
+		"attachCount_other": "{{count}} files",
+		"map": {
+			"title": "Map columns",
+			"help": "Choose which column feeds each part of a task. Each change refreshes the preview.",
+			"auto": "Detect automatically",
+			"skip": "Do not read",
+			"field": {
+				"question": "Question",
+				"messages": "Conversation messages",
+				"expected": "Expected answer",
+				"rubric": "Rubric",
+				"reference": "Reference answer",
+				"wrong_answers": "Wrong answers",
+				"user_turns": "Scripted user turns",
+				"attachments": "Attachments",
+				"id": "Task id",
+				"title": "Title",
+				"split": "Held-out split"
+			},
+			"kind": {
+				"text": "text",
+				"number": "number",
+				"list": "list",
+				"messages": "messages",
+				"object": "record"
+			},
+			"metadata": "Keep as task metadata",
+			"metadataHint": "Ticked columns are copied into each task's details, named after the last part of the column.",
+			"save": "Remember this mapping for the next import",
+			"saved": "Mapping saved for the next import.",
+			"gradeOn": "Grade conversations on",
+			"gradeOnFinal": "The final reply",
+			"gradeOnTranscript": "The whole conversation"
+		},
+		"attach": {
+			"label": "Attached files",
+			"help": "Files your rows name in their attachments column. Up to 5 MiB each, 40 MiB in all.",
+			"tooBig": "{{name}} is over 5 MiB.",
+			"tooMuch": "Attached files are over 40 MiB in all.",
+			"remove": "Remove"
+		},
+		"progress": {
+			"title": "Importing tasks",
+			"count": "{{written}} of {{total}} tasks written",
+			"status": {
+				"running": "Running",
+				"done": "Done",
+				"failed": "Failed",
+				"interrupted": "Stopped"
+			},
+			"problems_one": "1 row could not be imported",
+			"problems_other": "{{count}} rows could not be imported"
+		}
 	},
 	"private": {
 		"title": "3. Private tasks",

@@ -66,6 +66,24 @@
       }
     },
     "tags": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "metadata": {
+      "type": "object",
+      "description": "The task's own labels (tier, language, intent, any key) that report cards, comparisons and gates slice results by.",
+      "propertyNames": {"pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"},
+      "additionalProperties": {"type": "string", "maxLength": 200},
+      "maxProperties": 32
+    },
+    "chat": {
+      "type": "object",
+      "description": "A conversation task: the chat file (messages, scripted user turns, attachments) a chat agent receives as a messages array.",
+      "additionalProperties": false,
+      "required": ["file"],
+      "properties": {
+        "file": {"$ref": "#/$defs/rel_path"},
+        "user_turns": {"type": "integer", "minimum": 0, "maximum": 20},
+        "grade_on": {"enum": ["final", "transcript"]}
+      }
+    },
     "capabilities": {
       "type": "array",
       "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},

@@ -49,6 +49,10 @@ type userTask struct {
 type functionCall struct {
 	Function string          `json:"function"`
 	Args     json.RawMessage `json:"args"`
+	// Fill names arguments only known at run time (AgentDyn's one-time
+	// passwords) with their digit count; control.py reads them from the
+	// earlier results.
+	Fill map[string]int `json:"fill,omitempty"`
 }
 
 // injectionTask is one AgentDojo injection task: the attacker's goal.

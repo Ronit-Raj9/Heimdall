@@ -199,6 +199,12 @@ type Report struct {
 	// Voice is each arm's call quality on the voice benchmarks (voice.go);
 	// nil when no run was a voice call.
 	Voice []VoiceRow `json:"voice,omitempty"`
+
+	// Slices are the clean scores by task metadata (slices.go); empty when
+	// no task carries metadata with two or more values. Where is the
+	// metadata filter the report was narrowed to (Options.Where).
+	Slices []Slice           `json:"slices,omitempty"`
+	Where  map[string]string `json:"where,omitempty"`
 }
 
 // LearningRow is one arm's learning summary on one benchmark.
@@ -250,6 +256,9 @@ type Options struct {
 	// on the tasks they share (CompareDatasets) and never pools different
 	// task sets.
 	Tasks map[string][]string
+	// Where keeps only the runs of tasks whose metadata has every key and
+	// value (slices.go); empty keeps every task.
+	Where map[string]string
 }
 
 // graded is one counted, sealed, scored run.
@@ -284,6 +293,8 @@ type childRuns struct {
 	// a model judge grades it.
 	suiteVersion, lockHash string
 	judged                 bool
+	// meta is the child's task metadata from its manifest (slices.go).
+	meta map[string]map[string]string
 }
 
 // Build computes the report of ev over src. A child with no experiment or
@@ -358,7 +369,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 				keep[id] = true
 			}
 		}
-		cr, err := readChild(ctx, src, specArms, c)
+		cr, err := readChild(ctx, src, specArms, c, opt.Where)
 		if keep != nil {
 			cr.keepTasks(keep)
 		}
@@ -460,13 +471,17 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	rep.Learning = learningRows(children, labels)
 	rep.Persistence = persistence(children, labels)
 	rep.Voice = voiceRows(children, labels)
+	rep.Slices = sliceSections(children, labels)
+	if len(opt.Where) > 0 {
+		rep.Where = opt.Where
+	}
 	return rep, nil
 }
 
 // readChild reads one child's graded runs by arm label. A run counts as the
 // leaderboard counts it: the slot's first sealed run whose outcome is not
 // aborted_infra, with an outcome that scores; compatibility runs never count.
-func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.EvaluationArm, c schemas.EvaluationChild) (childRuns, error) {
+func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.EvaluationArm, c schemas.EvaluationChild, where map[string]string) (childRuns, error) {
 	cr := childRuns{child: c, arms: map[string][]graded{}, excluded: map[string]map[string]int{}, replays: map[string][]graded{}}
 	if c.ExperimentID == "" {
 		return cr, nil
@@ -480,6 +495,7 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 	}
 	cr.suiteVersion, cr.lockHash, cr.judged = m.SuiteVersion, m.SuiteLockHash, m.Scenario[scenarioJudgeKey] != ""
 	armLabel := mapArms(arms, m)
+	cr.meta = m.TaskMetadata
 	practice, err := practiceArms(ctx, src, m, c.ExperimentID)
 	if err != nil {
 		return cr, err
@@ -507,6 +523,9 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 			return cr, fmt.Errorf("reportcard: %w", err)
 		}
 		runs := bySlot[s]
+		if len(where) > 0 && len(runs) > 0 && !matchesWhere(cr.meta[runs[0].Slot.Task], where) {
+			continue
+		}
 		slices.SortStableFunc(runs, func(x, y leaderboard.Run) int { return cmp.Compare(x.Run.Attempt, y.Run.Attempt) })
 		i := slices.IndexFunc(runs, func(r leaderboard.Run) bool {
 			return r.Sealed && r.Run.Outcome != schemas.OutcomeAbortedInfra && !r.Superseded

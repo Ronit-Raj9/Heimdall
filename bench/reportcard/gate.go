@@ -124,6 +124,11 @@ func JudgeGate(in GateInput) *schemas.EvaluationGateResult {
 			res.Checks = append(res.Checks, regressionChecks(rin)...)
 		}
 	}
+	// Y13: metadata slice rules (slices.go); a failed slice check is counted
+	// with the others below (its Pass is false).
+	sliceRes, _, sliceNoBase := sliceChecks(in)
+	res.Checks = append(res.Checks, sliceRes...)
+	noBaseline = noBaseline || sliceNoBase
 	var failed, unsure []string
 	for _, c := range res.Checks {
 		switch {

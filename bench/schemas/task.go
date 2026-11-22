@@ -101,6 +101,15 @@ type Task struct {
 	// Clock is the task's controllable run clock (Z17, clock.go): the time
 	// the services and the agent see. Nil uses the suite's, else real time.
 	Clock *ClockSpec `json:"clock,omitempty" yaml:"clock,omitempty"`
+	// Metadata is the task's own labels from the customer's data (tier,
+	// language, intent, any key), so the report card, comparisons and
+	// gates can slice results by them (reportcard/slices.go). Empty for
+	// every task without them.
+	Metadata map[string]string `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	// Chat makes the task a conversation (chat.go): the messages a chat
+	// agent receives instead of one instruction string, attachments, and
+	// scripted user turns sent after each reply. Nil for every other task.
+	Chat *ChatInput `json:"chat,omitempty" yaml:"chat,omitempty"`
 
 	Dir string `json:"-" yaml:"-"` // absolute task folder
 }

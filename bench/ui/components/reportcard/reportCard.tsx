@@ -37,6 +37,7 @@ import {
 	reliabilityCards,
 } from "./reportCard.utils";
 import { ReliabilityCards, ResilienceCard } from "./reliabilityCards";
+import { ReportFilterBar, ReportSlices } from "./reportSlices";
 
 function costText(m: ReportArmMetrics): string {
 	const c = costDisplay(m);
@@ -50,10 +51,12 @@ export interface ReportCardProps {
 	actions?: React.ReactNode;
 	/** A shared, read-only view: no links into the organization's pages. */
 	readOnly?: boolean;
+	/** Narrows the report to tasks with this metadata (undefined clears it); enables segment filters. */
+	onWhere?: (where: Record<string, string> | undefined) => void;
 }
 
 /** The report card of one evaluation: headline answer, capabilities, benchmarks, reliability, safety. */
-export function ReportCard({ report: raw, className, actions, readOnly = false }: ReportCardProps) {
+export function ReportCard({ report: raw, className, actions, readOnly = false, onWhere }: ReportCardProps) {
 	const report = visibleReport(raw);
 	const ab = isAB(report);
 	const head = headline(report);
@@ -87,6 +90,8 @@ export function ReportCard({ report: raw, className, actions, readOnly = false }
 				{actions ?? (readOnly ? null : <ExportButtons report={report} />)}
 			</header>
 
+			<ReportFilterBar where={report.where} onClear={onWhere && (() => onWhere(undefined))} />
+
 			<Section title="By capability" description="Score is the share of runs solved. The bar shows the 95% confidence range.">
 				<CapabilityTable report={report} />
 			</Section>
@@ -94,6 +99,8 @@ export function ReportCard({ report: raw, className, actions, readOnly = false }
 			<Section title="By benchmark" description="Open a row for the verdict and a link to the experiment.">
 				<BenchmarkList report={report} readOnly={readOnly} />
 			</Section>
+
+			<ReportSlices report={report} onShowOnly={onWhere && ((key, value) => onWhere({ ...report.where, [key]: value }))} />
 
 			{reliabilityCards(report).length > 0 && (
 				<Section

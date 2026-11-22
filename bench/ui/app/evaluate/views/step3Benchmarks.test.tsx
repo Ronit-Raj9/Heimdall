@@ -2,7 +2,9 @@ import "@/lib/i18n";
 
 import type { AgentCompatibility, EvaluationPack } from "@/lib/store/apis/evaluationsApi";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { mutation, render as renderIn } from "@/lib/testing/render";
+import { describe, expect, it, vi } from "vitest";
+import { benchmarkSlug, isTaken, OwnTasksCard } from "./ownTasks";
 import {
 	Step3BenchmarksView,
 	benchmarkCapability,
@@ -13,6 +15,19 @@ import {
 	keepRunnable,
 	packSelection,
 } from "./step3Benchmarks";
+
+const own = vi.hoisted(() => ({ create: {} as Record<string, unknown> }));
+vi.mock("@/lib/store/apis/suiteAuthoringApi", async (orig) => ({
+	...(await orig<object>()),
+	useCreateSuiteMutation: () => mutation(own.create),
+}));
+vi.mock("@/lib/store/apis/suiteBuildApi", () => ({
+	useImportSuiteRowsMutation: () => mutation(),
+	useGetRowImportQuery: () => ({ data: undefined }),
+	useSetSuiteGraderMutation: () => mutation(),
+}));
+vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => mutation() }));
+vi.mock("@/lib/store/hooks", () => ({ useAppDispatch: () => vi.fn() }));
 
 const s = (id: string, admitted_count: number, extra: Record<string, unknown> = {}) =>
 	({ id, description: "", admitted_count, environment: "docker", ...extra }) as never;
@@ -200,5 +215,53 @@ describe("reference hint (G4-03)", () => {
 
 	it("shows nothing for a benchmark without published runs", () => {
 		expect(render()).not.toContain("step3-reference-");
+	});
+});
+
+describe("your own tasks card", () => {
+	it("comes first in step 3", () => {
+		const html = renderToStaticMarkup(
+			<Step3BenchmarksView suites={suites} packs={packs} selected={[]} onChange={() => {}} ownTasks={<OwnTasksCard onAdd={() => {}} />} />,
+		);
+		expect(html.indexOf('data-testid="step3-own"')).toBeGreaterThan(-1);
+		expect(html.indexOf('data-testid="step3-own"')).toBeLessThan(html.indexOf("Start from a pack"));
+		expect(html).toContain("Your own tasks");
+		expect(html).toContain('data-testid="step3-own-open"');
+	});
+	it("asks for a name and grader before creating the benchmark", () => {
+		own.create = {};
+		const html = renderIn(<OwnTasksCard onAdd={() => {}} initialOpen />);
+		expect(html).toContain('data-testid="step3-own-name"');
+		expect(html).toContain('data-testid="step3-own-grader-exact"');
+		expect(html).toContain('data-testid="step3-own-grader-judge"');
+		expect(html).toMatch(/disabled=""[^>]*data-testid="step3-own-create"|data-testid="step3-own-create"[^>]*disabled=""/);
+		expect(html.replace(/<[^>]+>/g, " ")).not.toMatch(/suite|probe|canary|sealed|lease|runner|\u2014|\u2013/i);
+	});
+	it("says when the name is taken and suggests another", () => {
+		own.create = { error: { status: 409, data: { error: { message: "suite exists" } } } };
+		const html = renderIn(<OwnTasksCard onAdd={() => {}} initialOpen />);
+		expect(html).toContain('data-testid="step3-own-error"');
+		expect(html).toContain("is taken. Try another name");
+		own.create = {};
+	});
+	it("imports rows with the mapping step and explains readiness", () => {
+		const html = renderIn(<OwnTasksCard onAdd={() => {}} initialSuite={{ id: "support-faq", grader: "judge" }} />);
+		expect(html).toContain("Benchmark support-faq created.");
+		expect(html).toContain('data-testid="suite-build-rows-data"');
+		expect(html).toContain('data-testid="suite-build-verbatim"');
+		expect(html).toContain('data-testid="step3-own-format-tickets"');
+		expect(html).not.toContain('data-testid="suite-build-rows-match"');
+		expect(html).toContain("Tasks that fail are listed here and not counted.");
+		expect(html).toContain("Launch when at least one task is ready.");
+		expect(html).not.toContain('data-testid="job-run-suite.admit"');
+		expect(html.replace(/<[^>]+>/g, " ")).not.toMatch(/probe|canary|sealed|lease|runner|\u2014|\u2013/i);
+	});
+	it("makes a benchmark id from the name", () => {
+		expect(benchmarkSlug("  Support FAQ (v2)! ")).toBe("support-faq-v2");
+		expect(benchmarkSlug("---")).toBe("");
+		expect(benchmarkSlug("a".repeat(70))).toHaveLength(64);
+		expect(isTaken({ status: 409 })).toBe(true);
+		expect(isTaken({ status: 400, data: { error: { message: "suite already exists" } } })).toBe(true);
+		expect(isTaken({ status: 400, data: { error: { message: "bad id" } } })).toBe(false);
 	});
 });
