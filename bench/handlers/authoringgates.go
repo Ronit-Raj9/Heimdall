@@ -130,6 +130,7 @@ func (h *authoringGates) listGenerated(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	out := GeneratedTaskList{Suite: s.ID, Tasks: []GeneratedTask{}, Note: generatedNote}
+	names := newActorNames(ctx)
 	for _, t := range s.Tasks {
 		if !t.IsGenerated() {
 			continue
@@ -143,8 +144,7 @@ func (h *authoringGates) listGenerated(ctx *fasthttp.RequestCtx) {
 		}
 		if d, ok := f.Decisions[t.ID]; ok {
 			if d.Generated == schemas.GeneratedFingerprint(t.GeneratedFields()) {
-				dd := d
-				g.Decision = &dd
+				g.Decision = namedDecision(names, d)
 			} else {
 				g.Stale = true
 			}
@@ -343,4 +343,12 @@ func (h *authoringGates) heldOut(ctx *fasthttp.RequestCtx) {
 		out.Written = append(out.Written, e.Rel)
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
+}
+
+// namedDecision is a review decision as an answer shows it: the reviewer by
+// display name (by_name), an email left out for a caller who is not an org
+// admin.
+func namedDecision(names *actorNames, d schemas.TaskReviewDecision) *schemas.TaskReviewDecision {
+	d.By, d.ByName = names.show(d.By)
+	return &d
 }

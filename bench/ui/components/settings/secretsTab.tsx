@@ -59,7 +59,9 @@ export function SecretsTable({ secrets, canWrite, onRotate, onDelete, deletingId
 									{t("stored")}
 								</Badge>
 							</TableCell>
-							<TableCell className="text-muted-foreground">{s.created_by ?? ""}</TableCell>
+							<TableCell className="text-muted-foreground" title={s.created_by || undefined}>
+								{s.created_by_name || s.created_by || ""}
+							</TableCell>
 							<TableCell className="text-muted-foreground">
 								<When value={s.updated_at} />
 							</TableCell>

@@ -129,6 +129,7 @@ type Round struct {
 type Approval struct {
 	Stage  string    `json:"stage"`
 	By     string    `json:"by"`
+	ByName string    `json:"by_name,omitempty"` // how By reads in an answer (a member's display name); never stored
 	Reason string    `json:"reason"`
 	At     time.Time `json:"at"`
 }

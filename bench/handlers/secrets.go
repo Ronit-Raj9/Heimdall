@@ -25,11 +25,14 @@ const MaxOrgSecrets = 100
 
 // Secret is a stored secret's metadata; the value is never part of it.
 type Secret struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	CreatedBy string    `json:"created_by,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	CreatedBy string `json:"created_by,omitempty"`
+	// CreatedByName is how the creator reads (a member's display name);
+	// empty when it would only repeat created_by.
+	CreatedByName string    `json:"created_by_name,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // SecretList is GET /secrets.
@@ -110,11 +113,14 @@ func (h *secretsHandler) list(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	out := SecretList{Secrets: make([]Secret, 0, len(keys))}
+	names := newActorNames(ctx)
 	for _, k := range keys {
 		if systemSecret(k) {
 			continue // the server's own credentials (shared runner token) are not the org's to rotate or delete
 		}
-		out.Secrets = append(out.Secrets, secretView(k))
+		v := secretView(k)
+		v.CreatedBy, v.CreatedByName = names.show(v.CreatedBy)
+		out.Secrets = append(out.Secrets, v)
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
 }

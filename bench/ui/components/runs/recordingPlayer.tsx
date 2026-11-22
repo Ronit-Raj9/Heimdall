@@ -164,11 +164,11 @@ export function RecordingPlayer({
 					<p className="text-sm font-medium">{t("actions")}</p>
 					<ul className="text-muted-foreground flex flex-col gap-0.5 text-xs">
 						{q.data.actions.map((a) => (
-							<li key={a.seq}>
+							<li key={a.seq} title={a.by || undefined}>
 								{t("actionRow", {
 									action: a.action,
 									detail: a.text ?? a.combo ?? a.direction ?? (a.x !== undefined ? `(${a.x}, ${a.y})` : ""),
-									by: a.by ?? "?",
+									by: a.by_name || a.by || "?",
 								})}
 								{a.error ? ` (${a.error})` : ""}
 							</li>

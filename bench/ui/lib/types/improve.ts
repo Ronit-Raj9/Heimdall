@@ -106,6 +106,8 @@ export interface GateResult {
 export interface Approval {
 	stage: string;
 	by: string;
+	/** How by reads (a member's display name). */
+	by_name?: string;
 	reason: string;
 	at: string;
 }

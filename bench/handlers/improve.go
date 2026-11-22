@@ -139,7 +139,31 @@ func (h *ImproveHandler) getOne(ctx *fasthttp.RequestCtx) {
 		h.sendErr(ctx, "improvement "+id, err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, d)
+	out := *d
+	out.Rounds = namedApprovals(ctx, d.Rounds)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
+}
+
+// namedApprovals is rounds with each approval's person shown by display name
+// (by_name), an email left out for a caller who is not an org admin. It
+// copies what it changes, so a cached record stays as stored.
+func namedApprovals(ctx context.Context, rounds []improve.RoundView) []improve.RoundView {
+	out := append([]improve.RoundView(nil), rounds...)
+	var names *actorNames
+	for i := range out {
+		if len(out[i].Approvals) == 0 {
+			continue
+		}
+		if names == nil {
+			names = newActorNames(ctx)
+		}
+		as := append([]improve.Approval(nil), out[i].Approvals...)
+		for j := range as {
+			as[j].By, as[j].ByName = names.show(as[j].By)
+		}
+		out[i].Approvals = as
+	}
+	return out
 }
 
 // getRound handles GET /api/bench/improvements/{id}/rounds/{k}.
@@ -160,7 +184,7 @@ func (h *ImproveHandler) getRound(ctx *fasthttp.RequestCtx) {
 		sendNotFound(ctx, h.mode, "round", pathParam(ctx, "k"))
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, d.Rounds[k-1])
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, namedApprovals(ctx, d.Rounds[k-1:k])[0])
 }
 
 // getLineage handles GET /api/bench/improvements/{id}/lineage.

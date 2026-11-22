@@ -210,8 +210,10 @@ export function PolicyForm({ view, writable, t }: { view: DataPolicyView; writab
 			</Section>
 			{writable && (
 				<div className="flex flex-wrap items-center justify-end gap-3 lg:col-span-2">
-					{view.policy.updated_by && (
-						<span className="text-muted-foreground mr-auto text-xs">{t("policy.updated", { who: view.policy.updated_by })}</span>
+					{(view.updated_by_name || view.policy.updated_by) && (
+						<span className="text-muted-foreground mr-auto text-xs" title={view.policy.updated_by || undefined} data-testid="suite-data-policy-updated">
+							{t("policy.updated", { who: view.updated_by_name || view.policy.updated_by })}
+						</span>
 					)}
 					{saved.isSuccess && <span className="text-muted-foreground text-xs">{t("policy.saved")}</span>}
 					<ErrorLine error={saved.error} testId="suite-data-policy-save-error" />

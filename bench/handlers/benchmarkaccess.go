@@ -25,6 +25,9 @@ import (
 type DataPolicyView struct {
 	Benchmark string            `json:"benchmark"`
 	Policy    datapolicy.Policy `json:"policy"`
+	// UpdatedByName is how policy.updated_by reads (a member's display
+	// name); empty when it would only repeat it.
+	UpdatedByName string `json:"updated_by_name,omitempty"`
 	// CanEditAccess is true for callers who may change the access list
 	// (org admins and owners).
 	CanEditAccess bool `json:"can_edit_access"`
@@ -165,7 +168,9 @@ func (h *dataPolicyHandler) store(ctx *fasthttp.RequestCtx) *datapolicy.Store {
 }
 
 func (h *dataPolicyHandler) view(ctx *fasthttp.RequestCtx, id string, p datapolicy.Policy) DataPolicyView {
-	return DataPolicyView{Benchmark: id, Policy: p, CanEditAccess: callerOf(ctx).Manager, Modes: pii.Modes(), Kinds: pii.Kinds()}
+	v := DataPolicyView{Benchmark: id, Policy: p, CanEditAccess: callerOf(ctx).Manager, Modes: pii.Modes(), Kinds: pii.Kinds()}
+	v.Policy.UpdatedBy, v.UpdatedByName = newActorNames(ctx).show(p.UpdatedBy)
+	return v
 }
 
 func (h *dataPolicyHandler) list(ctx *fasthttp.RequestCtx) {

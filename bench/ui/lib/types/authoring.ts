@@ -15,6 +15,8 @@ export interface GeneratedField {
 export interface TaskReviewDecision {
 	decision: "accepted" | "rejected";
 	by?: string;
+	/** How by reads (a member's display name). */
+	by_name?: string;
 	at: string;
 	note?: string;
 	task_version?: string;

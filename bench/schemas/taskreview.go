@@ -55,6 +55,7 @@ type TaskReviewFile struct {
 type TaskReviewDecision struct {
 	Decision    string    `json:"decision"` // accepted | rejected
 	By          string    `json:"by,omitempty"`
+	ByName      string    `json:"by_name,omitempty"` // how By reads in an answer (a member's display name); never stored
 	At          time.Time `json:"at"`
 	Note        string    `json:"note,omitempty"`
 	TaskVersion string    `json:"task_version,omitempty"`

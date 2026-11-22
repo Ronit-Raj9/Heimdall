@@ -3,6 +3,8 @@ export interface OrgSecret {
 	id: string;
 	name: string;
 	created_by?: string;
+	/** How created_by reads (a member's display name). */
+	created_by_name?: string;
 	created_at: string;
 	updated_at: string;
 }

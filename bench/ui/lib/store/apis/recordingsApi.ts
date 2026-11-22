@@ -44,6 +44,8 @@ export interface HumanAction {
 	combo?: string;
 	direction?: string;
 	by?: string;
+	/** How by reads (a member's display name). */
+	by_name?: string;
 	error?: string;
 }
 

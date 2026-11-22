@@ -148,8 +148,9 @@ type HumanAction struct {
 	// smaller thumbnail). Zero means X and Y are screen pixels already.
 	FrameW int    `json:"frame_w,omitempty"`
 	FrameH int    `json:"frame_h,omitempty"`
-	By     string `json:"by,omitempty"`    // who sent it (user id or email), as the server saw it
-	Error  string `json:"error,omitempty"` // the service refused or failed the input
+	By     string `json:"by,omitempty"`      // who sent it (user id or email), as the server saw it
+	ByName string `json:"by_name,omitempty"` // how By reads in GET /runs/{id}/recordings (a member's display name); never stored
+	Error  string `json:"error,omitempty"`   // the service refused or failed the input
 }
 
 // MaxHumanText caps the text of one type action.

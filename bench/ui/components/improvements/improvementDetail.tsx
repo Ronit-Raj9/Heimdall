@@ -138,8 +138,8 @@ function RoundCard({ round: r, paused, onApprove, approving }: { round: RoundVie
 				{r.sealed && <li>{t("round.heldOut", { v: pct(r.sealed.mean) })}</li>}
 			</ul>
 			{r.approvals.map((a) => (
-				<p key={a.at} className="text-chart-error-ink text-xs">
-					{t("round.approvedBy", { by: a.by, reason: a.reason })}
+				<p key={a.at} className="text-chart-error-ink text-xs" title={a.by || undefined}>
+					{t("round.approvedBy", { by: a.by_name || a.by, reason: a.reason })}
 				</p>
 			))}
 			<details className="text-xs">

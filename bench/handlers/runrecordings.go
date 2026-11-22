@@ -154,9 +154,11 @@ func (h *RunsHandler) getRunRecordings(ctx *fasthttp.RequestCtx) {
 		}
 	}
 	if data, found, err := readInternal(h.index, runID, schemas.HumanActionsFile); err == nil && found {
+		names := newActorNames(ctx)
 		for _, line := range bytes.Split(data, []byte("\n")) {
 			var a schemas.HumanAction
 			if json.Unmarshal(line, &a) == nil && a.Action != "" {
+				a.By, a.ByName = names.show(a.By)
 				out.Actions = append(out.Actions, a)
 			}
 		}

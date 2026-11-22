@@ -215,6 +215,8 @@ export interface DataPolicy {
 export interface DataPolicyView {
 	benchmark: string;
 	policy: DataPolicy;
+	/** How policy.updated_by reads (a member's display name); absent when it would only repeat it. */
+	updated_by_name?: string;
 	can_edit_access: boolean;
 	modes: PIIMode[] | null;
 	kinds: string[] | null;
