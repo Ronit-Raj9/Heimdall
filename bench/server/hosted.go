@@ -102,6 +102,7 @@ func NewHosted(cfg *lib.Config, h Hosted) (*Server, error) {
 	}
 	s := &Server{cfg: cfg, logger: logger}
 	s.handler = lib.ChainMiddlewares(disp.Handle,
+		lib.HeadAsGet(), // N150: HEAD answers like GET (link checkers, curl -I); outermost, so policy and audit see a GET
 		lib.SecurityHeaders(),
 		lib.HostGuard(mode, hostedAllowedHosts(cfg)),
 		lib.CORS(cfg.Server.CORSOrigins),

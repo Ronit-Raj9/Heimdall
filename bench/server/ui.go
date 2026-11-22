@@ -62,8 +62,15 @@ func (h *UIHandler) serve(ctx *fasthttp.RequestCtx) {
 		h.notFound(ctx, reqPath)
 		return
 	}
+	status := fasthttp.StatusOK
 	data, err := fs.ReadFile(h.dist, name)
 	if err != nil && errors.Is(err, fs.ErrNotExist) && clientRoute(name) {
+		// A first segment that is no UI route still gets the app, which shows
+		// its own "Page not found" (and its alias redirects), but with 404 so
+		// the address is not a soft 404 (N150).
+		if !spaRoots[strings.SplitN(name, "/", 2)[0]] {
+			status = fasthttp.StatusNotFound
+		}
 		name = indexFile
 		data, err = fs.ReadFile(h.dist, name)
 	}
@@ -84,7 +91,27 @@ func (h *UIHandler) serve(ctx *fasthttp.RequestCtx) {
 	default:
 		ctx.Response.Header.Set("Cache-Control", "public, max-age=3600")
 	}
+	ctx.SetStatusCode(status)
 	ctx.SetBody(data)
+}
+
+// spaRoots are the first path segments of the UI's routes: the folders under
+// ui/app ("agents_" folds to "agents", "index" is "/"). A missing path whose
+// first segment is not here answers 404, still with the app shell.
+// TestSPARootsMatchUIRoutes fails when a route folder is added or removed
+// without updating this list.
+var spaRoots = map[string]bool{
+	"": true, "admin": true, "agents": true, "annotation": true, "calibration": true, "canaries": true,
+	"catalog": true, "clusters": true, "compare": true, "connect": true, "device": true, "docs": true,
+	"downloads": true, "evaluate": true, "evaluations": true, "experiments": true, "failure-tests": true,
+	"files": true, "imports": true, "improvements": true, "inbox": true, "integrations": true, "invite": true,
+	"jobs": true, "leaderboard": true, "library": true, "live": true, "login": true, "matrix": true,
+	"maxim": true, "mcp-test": true, "migration": true, "models": true, "monitors": true, "operate": true,
+	"policies": true, "pricing": true, "privacy": true, "quickstart": true, "receipts": true, "reference": true,
+	"releases": true, "reset-password": true, "review": true, "runs": true, "s": true, "scheduled-checks": true,
+	"schedules": true, "security": true, "settings": true, "signup": true, "status": true, "suites": true,
+	"terms": true, "trends": true, "triage": true, "upload": true, "usage": true, "verdict": true,
+	"verify-email": true, "welcome": true, "why-agents-fail": true, "workers": true,
 }
 
 // assetExts are the extensions of files the UI build ships. A missing file
