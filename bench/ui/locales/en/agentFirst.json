@@ -7,6 +7,7 @@
 			"setup": "Setup",
 			"tools": "Tools",
 			"checks": "Readiness check",
+			"compareModels": "Compare models",
 			"pullRequests": "Pull requests"
 		},
 		"noVersion": "No saved version",
@@ -18,7 +19,8 @@
 			"whyFail": "See why it fails",
 			"check": "Readiness check",
 			"custom": "Custom comparison",
-			"monitor": "Monitor this agent"
+			"monitor": "Monitor this agent",
+			"compareModels": "Compare models for this agent"
 		}
 	},
 	"runs": {

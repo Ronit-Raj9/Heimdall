@@ -35,3 +35,12 @@ func init() {
 func init() {
 	OrgPolicy[key("POST", api+"/agents/test-endpoint")] = org(member)
 }
+
+// Model switch report and Bifrost routing export (lane Z21): viewers read
+// the report and download the config; writing routing rules to the org's
+// own gateway is admin only, as it changes production traffic.
+func init() {
+	OrgPolicy[key("GET", api+"/evaluations/{id}/model-switch")] = org(viewer)
+	OrgPolicy[key("GET", api+"/evaluations/{id}/model-switch/bifrost-config")] = org(viewer)
+	OrgPolicy[key("POST", api+"/evaluations/{id}/model-switch/apply")] = org(admin)
+}

@@ -1,17 +1,18 @@
 # Image of the desktop service: a virtual display (Xvfb), the openbox window
 # manager, three GUI apps (the mousepad text editor, the xfe file manager and
 # a small Tk form app in desktop.py) and the MCP server the agent drives
-# them through. No terminal emulator, browser or launcher is installed. The
-# apt step needs the network, so build the image once by hand or let
-# `bifrost-bench suite admit` build it (a plain docker build, which has the
-# network); runs never get it. About 860 MB.
+# them through. No terminal emulator, browser or launcher is installed.
+# ffmpeg records the screen for the run page (recordings:, live:); the agent
+# has no tool that reaches it. The apt step needs the network, so build the
+# image once by hand or let `bifrost-bench suite admit` build it (a plain
+# docker build, which has the network); runs never get it. About 1 GB.
 #
 #   docker build -t heimdall-example/acme-desktop:1 benchmarks/acme-desktop/services/desktop
 #
 # The base is pinned by digest (tag kept for reading), as the suite base is.
 FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
 RUN apt-get update \
- && apt-get install -y --no-install-recommends xvfb xdotool openbox mousepad xfe libtk8.6 fonts-dejavu-core \
+ && apt-get install -y --no-install-recommends xvfb xdotool openbox mousepad xfe libtk8.6 fonts-dejavu-core ffmpeg \
  && rm -rf /var/lib/apt/lists/*
 RUN useradd -m -u 1000 desk \
  && mkdir -p /tmp/.X11-unix /home/desk/Documents \

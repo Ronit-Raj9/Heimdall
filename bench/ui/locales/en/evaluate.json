@@ -83,7 +83,8 @@
 		"bareModelHelp": "The same model as your agent with one call per task, no tools and no loop. It shows whether your agent adds anything over the model. It only runs on benchmarks graded on an answer; the others are left out with the reason.",
 		"modelsLater": "You choose the two models in step 4.",
 		"arms": "Setups that will run",
-		"armLabel": "Setup {{label}}"
+		"armLabel": "Setup {{label}}",
+		"compareModelsLink": "Compare 3 to 6 models for this agent instead"
 	},
 	"placeholder": "This step is coming soon.",
 	"home": {

@@ -3,6 +3,7 @@ import { EvaluationStatusPill, ModeLabel } from "@/app/evaluations/views/evaluat
 import { EVALUATION_POLL_MS, armAgentLabel, formatCreated, isActiveStatus, splitChildren } from "@/app/evaluations/views/evaluation.utils";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { EvaluationReportCard } from "@/components/reportcard/evaluationReportCard";
+import { ModelSwitchReportView } from "@/components/modelswitch/modelSwitchReport"; // Z21 model switch report
 import { GateResultCard, PromoteEvaluation, RepeatEvaluation } from "@/components/releases/promoteEvaluation";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { EvaluationBifrostSection } from "@/components/bifrost/bifrostUse";
@@ -122,6 +123,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 				<>
 					{evaluation.gate_result && <GateResultCard gate={evaluation.gate_result} />}
 					<EvaluationReportCard evaluationId={evaluation.id} />
+					{(spec.mode as string) === "model_switch" && <ModelSwitchReportView evaluationId={evaluation.id} />}
 					{(spec.mode === "versions" || spec.mode === "score") && <PromoteEvaluation evaluationId={evaluation.id} />}
 				</>
 			) : (

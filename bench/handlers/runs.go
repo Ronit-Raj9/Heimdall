@@ -128,6 +128,8 @@ func (h *RunsHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middle
 	r.GET(p+"/services/{service}/log", lib.ChainMiddlewares(h.getRunServiceLog, middlewares...))    // X2
 	r.GET(p+"/frames", lib.ChainMiddlewares(h.getRunFrames, middlewares...))                        // screen replay frames (handlers/runframes.go)
 	r.GET(p+"/frames/{n}", lib.ChainMiddlewares(h.getRunFrame, middlewares...))
+	r.GET(p+"/recordings", lib.ChainMiddlewares(h.getRunRecordings, middlewares...))    // Z03: video, HAR and console (handlers/runrecordings.go)
+	r.GET(p+"/recordings/{n}", lib.ChainMiddlewares(h.getRunRecording, middlewares...)) // Z03
 }
 
 // getRun handles GET /api/bench/runs/{id}: the run record with its grade,

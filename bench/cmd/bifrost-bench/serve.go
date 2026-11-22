@@ -261,6 +261,11 @@ func (x indexAdapter) RunFrame(runID, name string) ([]byte, error) {
 	return x.ix.RunFrame(runID, name)
 }
 
+// RunRecordingPath implements handlers.RecordingReader (Z03, store/runrecordings.go).
+func (x indexAdapter) RunRecordingPath(runID, service, name string) (string, error) {
+	return x.ix.RunRecordingPath(runID, service, name)
+}
+
 // RunVoiceFile implements handlers.VoiceReader (X8 voice agents, store/runvoice.go).
 func (x indexAdapter) RunVoiceFile(runID, service, name string) ([]byte, error) {
 	return x.ix.RunVoiceFile(runID, service, name)

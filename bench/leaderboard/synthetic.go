@@ -62,7 +62,7 @@ func classify(ctx context.Context, src Source, recs []*record) (map[string]bool,
 			if !r.sealed {
 				continue
 			}
-			if r.run.Practice { // X01: labelled practice in run.json
+			if r.run.Practice || r.run.HumanAssisted { // X01: labelled practice in run.json; Z03: a person took control
 				out[k] = true
 				break
 			}

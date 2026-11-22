@@ -300,6 +300,10 @@ internal network.
   `/dev/shm` (64 MB); Playwright starts Chromium so that it does not depend
   on it, which is enough for server-rendered pages. Very heavy single-page
   applications may need more memory than the service's 4 GB cap.
+- **Recordings are for people.** The template's browser records a video,
+  a HAR and the console of every run, shown on the run page next to the
+  trace, and shows the page live while the agent works
+  ([`recordings.md`](recordings.md)). None of it is graded.
 - **Snapshots are text.** The agent sees the page as an accessibility
   snapshot. Fields without labels show up as unnamed elements; label your
   form fields, as the template's pages do.
@@ -307,6 +311,8 @@ internal network.
 ## See also
 
 - [`scenarios.md`](scenarios.md): services, state verifiers, probes, controls.
+- [`recordings.md`](recordings.md): the browser's video, HAR and console,
+  the live screen, and taking control of a debug run.
 - [`tool-proxy.md`](tool-proxy.md): the proxy, the ledger and tool faults.
 - [`mcp-agents.md`](mcp-agents.md): how each agent CLI is given the run's
   MCP servers.

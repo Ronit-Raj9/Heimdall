@@ -131,7 +131,7 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 		id: "watch",
 		labelKey: "shell.groups.watch",
 		items: [
-			{ to: "/why-agents-fail", labelKey: "shell.nav.whyAgentsFail", icon: SearchX, testId: "nav-link-why-agents-fail", also: ["/inbox", "/clusters", "/triage"] },
+			{ to: "/why-agents-fail", labelKey: "shell.nav.whyAgentsFail", icon: SearchX, testId: "nav-link-why-agents-fail", also: ["/inbox", "/clusters", "/triage", "/maxim"] },
 			{ to: "/scheduled-checks", labelKey: "shell.nav.scheduledChecks", icon: CalendarClock, testId: "nav-link-scheduled-checks", also: ["/canaries", "/schedules"] },
 			{ to: "/live", labelKey: "shell.nav.live", icon: Radio, testId: "nav-link-live" },
 		],

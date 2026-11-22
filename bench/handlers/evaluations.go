@@ -35,7 +35,9 @@ import (
 	"github.com/maximhq/bifrost/bench/packs"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/reportcard"
+	"github.com/maximhq/bifrost/bench/redteam"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/simuser"
 	"github.com/maximhq/bifrost/bench/tenancy"
 	"github.com/maximhq/bifrost/bench/utils"
 	"github.com/valyala/fasthttp"
@@ -268,6 +270,7 @@ func (h *evaluationsHandler) refresh(ev *schemas.Evaluation) {
 	if h.notifyFinished(ev, prev) { // evalnotify.go
 		changed = true
 	}
+	autoHarvestRedTeam(h.env, ev, time.Now()) // Z04: successful attacks become pending regressions (redteam.go)
 	if changed {
 		_ = h.store().Save(ev) // a failed save only delays the stored status
 	}
@@ -465,8 +468,12 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 		if len(spec.Arms) != 2 {
 			return badf("mode %s takes 2 arms, got %d", spec.Mode, len(spec.Arms))
 		}
+	case schemas.EvaluationModeModelSwitch: // Z21: one agent on several models (modelswitch.go)
+		if err := checkModelSwitchArms(spec.Arms); err != nil {
+			return err
+		}
 	default:
-		return badf("mode %q is not one of score, versions, models, opponent", spec.Mode)
+		return badf("mode %q is not one of score, versions, models, opponent, model_switch", spec.Mode)
 	}
 	if spec.BifrostCache {
 		if spec.Mode != schemas.EvaluationModeScore {
@@ -486,6 +493,11 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 		}
 		if i == 1 && a.Label == spec.Arms[0].Label {
 			return badf("the two arms have the same label %q", a.Label)
+		}
+		for j := 1; j < i; j++ {
+			if spec.Arms[j].Label == a.Label {
+				return badf("arms %d and %d have the same label %q", j+1, i+1, a.Label)
+			}
 		}
 		a.Model, a.Provider = strings.TrimSpace(a.Model), strings.TrimSpace(a.Provider)
 		if a.Model != "" && !quickModelRe.MatchString(a.Model) {
@@ -826,6 +838,19 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 		Concurrency: evaluationConcurrency(spec), ManifestMode: "agent_exposure",
 	}
 	f.Budget.Disclose = spec.DiscloseBudget
+	if st != nil && st.Simulator != nil && st.Simulator.Provider != "" && redteam.IsSuite(st.Root) {
+		// Z04: readiness checks play a red-team benchmark's seed attacks;
+		// an evaluation runs the adaptive attacker on the pinned model.
+		sim := *st.Simulator
+		sim.Mode = schemas.SimulatorLLM
+		if sim.MaxTurns == 0 {
+			sim.MaxTurns = simuser.DefaultMaxTurns
+		}
+		if sim.PromptVersion == "" {
+			sim.PromptVersion = simuser.PromptUserV1
+		}
+		f.Simulator = &sim
+	}
 	var variantNotes []string
 	for _, a := range spec.Arms {
 		v := variants[a.Label]

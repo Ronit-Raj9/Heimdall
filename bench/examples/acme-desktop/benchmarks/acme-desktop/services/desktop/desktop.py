@@ -29,6 +29,10 @@ The session (environment variables, set per task in task.yaml):
   DESKTOP_SEED    folder copied into the home folder at start, as the
                   desktop user (default /seed/home): a task's files: entries
                   land under it, so they get the user's ownership
+  DESKTOP_RECORD  folder the screen video is recorded into (default
+                  /tmp/desktop/rec; empty turns recording off): desktop.mp4
+                  at 2 frames a second, with desktop.mp4.start holding the
+                  epoch milliseconds of its first frame
   DUMP_ROOT       folder the state dump walks (default /home/desk/Documents)
   DUMP_JSON       name=path,... JSON files added to the dump under "json"
 
@@ -51,6 +55,24 @@ Commands:
   python3 desktop.py dump      print the state JSON
   python3 desktop.py form      the form app (the session starts it)
   python3 desktop.py dialog    the notice dialog (the session starts it)
+  python3 desktop.py stop-recording
+                               stop the screen video and wait until the
+                               file is complete (the task's recordings stop
+                               command)
+  python3 desktop.py frame     print one JPEG of the screen (the live view)
+  python3 desktop.py input     read one action as JSON on stdin and perform
+                               it: {"action": "click", "x", "y"},
+                               {"action": "type", "text"}, {"action": "key",
+                               "combo"} or {"action": "scroll", "x", "y",
+                               "direction"} (a person's input in a debug run);
+                               with frame_w and frame_h, x and y are pixels
+                               of a live frame of that size and are scaled
+                               to the screen
+
+Recording uses ffmpeg (x11grab), when the image has it. The video is a
+fragmented MP4, so even a recording cut short plays up to its last
+fragment. The video and the live frames are display evidence for people;
+the verifier never sees them.
 """
 
 import base64
@@ -80,6 +102,8 @@ RUN_DIR = os.environ.get("DESKTOP_RUN_DIR", "/tmp/desktop")
 FB_DIR = os.path.join(RUN_DIR, "fb")
 READY_FILE = os.path.join(RUN_DIR, "ready")
 APP_PID_FILE = os.path.join(RUN_DIR, "app.pid")
+RECORD_DIR = os.environ.get("DESKTOP_RECORD", os.path.join(RUN_DIR, "rec"))
+RECORD_PID_FILE = os.path.join(RUN_DIR, "ffmpeg.pid")
 DIALOG_FILE = os.path.join(RUN_DIR, "dialog.json")
 HERE = os.path.dirname(os.path.abspath(__file__))
 SERVER_NAME = "desktop"
@@ -581,8 +605,109 @@ def start_session():
         app = subprocess.Popen(argv, env=env, cwd=os.path.expanduser("~"))
         with open(APP_PID_FILE, "w") as f:
             f.write(str(app.pid))
+    start_recording()
     threading.Thread(target=watch_ready, args=(title,), daemon=True).start()
     threading.Thread(target=watch_display, args=(xvfb,), daemon=True).start()
+
+
+# ------------------------------------------------------------ Recording ----
+
+
+def start_recording():
+    """Starts ffmpeg on the display, writing RECORD_DIR/desktop.mp4. No-op
+    when recording is off or the image has no ffmpeg."""
+    if not RECORD_DIR or not shutil.which("ffmpeg"):
+        return
+    os.makedirs(RECORD_DIR, exist_ok=True)
+    w, h = screen_size()
+    out = os.path.join(RECORD_DIR, "desktop.mp4")
+    argv = ["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-f", "x11grab", "-framerate", "2",
+            "-video_size", f"{w}x{h}", "-i", DISPLAY, "-c:v", "libx264", "-preset", "veryfast", "-crf", "35",
+            "-pix_fmt", "yuv420p", "-movflags", "+frag_keyframe+empty_moov+default_base_moof", out]
+    started = int(time.time() * 1000)
+    try:
+        proc = subprocess.Popen(argv, env=dict(os.environ, DISPLAY=DISPLAY), stdin=subprocess.DEVNULL)
+    except OSError as e:
+        sys.stderr.write(f"screen recording not started: {e}\n")
+        return
+    with open(out + ".start", "w") as f:
+        f.write(str(started))
+    with open(RECORD_PID_FILE, "w") as f:
+        f.write(str(proc.pid))
+
+
+def stop_recording():
+    """Stops ffmpeg with SIGINT, which makes it finish the file, and waits up
+    to 15 s for it to exit."""
+    try:
+        with open(RECORD_PID_FILE) as f:
+            pid = int(f.read().strip())
+    except (OSError, ValueError):
+        return 0
+    try:
+        os.kill(pid, signal.SIGINT)
+    except OSError:
+        return 0
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return 0
+        time.sleep(0.2)
+    return 0
+
+
+def frame():
+    """Prints one JPEG of the screen for the live view: ffmpeg's grab scaled
+    to 960 pixels wide, or a half-size PNG when the image has no ffmpeg."""
+    if shutil.which("ffmpeg"):
+        w, h = screen_size()
+        p = subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-f", "x11grab", "-video_size", f"{w}x{h}",
+                            "-i", DISPLAY, "-frames:v", "1", "-vf", "scale=960:-2", "-q:v", "7", "-f", "image2pipe",
+                            "-vcodec", "mjpeg", "-"], env=dict(os.environ, DISPLAY=DISPLAY), capture_output=True, timeout=10)
+        if p.returncode == 0 and p.stdout:
+            sys.stdout.buffer.write(p.stdout)
+            return 0
+    w, h, rows = read_xwd(grab_xwd())
+    sw, sh, small = downscale(w, h, rows, 2)
+    sys.stdout.buffer.write(encode_png(sw, sh, small))
+    return 0
+
+
+HUMAN_ACTIONS = {"click": "click", "type": "type", "key": "key", "scroll": "scroll"}
+
+
+def human_input():
+    """Performs one person's input from stdin with the agent's own tools, so
+    a takeover acts exactly as the agent's calls do."""
+    try:
+        action = json.loads(sys.stdin.read() or "{}")
+    except ValueError:
+        sys.stderr.write("input is not JSON\n")
+        return 2
+    kind = action.get("action")
+    if kind not in HUMAN_ACTIONS:
+        sys.stderr.write("action must be click, type, key or scroll\n")
+        return 2
+    args = {k: v for k, v in action.items() if k in ("x", "y", "text", "combo", "direction")}
+    w, h = screen_size()
+    fw, fh = action.get("frame_w") or 0, action.get("frame_h") or 0
+    if fw and fh and "x" in args and "y" in args:
+        # x and y were read from a live frame (a smaller thumbnail).
+        args["x"] = min(w - 1, int(int(args["x"]) * w / int(fw)))
+        args["y"] = min(h - 1, int(int(args["y"]) * h / int(fh)))
+    if kind == "scroll":
+        args.setdefault("x", w // 2)
+        args.setdefault("y", h // 2)
+    handler = {t["name"]: t["handler"] for t in TOOLS}[kind]
+    try:
+        out = handler(args)
+    except ToolError as e:
+        sys.stderr.write(f"{e}\n")
+        return 1
+    sys.stdout.write(f"{out}\n")
+    return 0
 
 
 def watch_ready(title):
@@ -848,7 +973,8 @@ def dialog():
 
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "serve"
-    commands = {"serve": serve, "ready": ready, "dump": dump, "form": form, "dialog": dialog}
+    commands = {"serve": serve, "ready": ready, "dump": dump, "form": form, "dialog": dialog,
+                "stop-recording": stop_recording, "frame": frame, "input": human_input}
     if cmd not in commands:
         sys.exit(f"unknown command {cmd!r}; want one of {', '.join(commands)}")
     sys.exit(commands[cmd]() or 0)

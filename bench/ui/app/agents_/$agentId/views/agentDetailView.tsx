@@ -13,6 +13,7 @@ import { SavedEndpointTest } from "../../new/views/connectForm";
 import { useAgentSummary } from "./agentOps.shared";
 import AgentRunsTab from "./agentRunsTab";
 import ChecksTab from "./checksTab";
+import { CompareModelsForm } from "@/components/modelswitch/compareModelsForm";
 import ConfigTab from "./configTab";
 import PullRequestsTab from "./pullRequestsTab";
 import ReportCardTab from "./reportCardTab";
@@ -49,6 +50,7 @@ export default function AgentDetailView() {
 		{ id: "tools", label: t("detail.tabs.tools") },
 		{ id: "pull-requests", label: t("detail.tabs.pullRequests") },
 		{ id: "checks", label: t("detail.tabs.checks"), hidden: true },
+		{ id: "compare-models", label: t("detail.tabs.compareModels"), hidden: true },
 		{ id: "config", label: t("detail.tabs.setup"), hidden: true },
 	];
 	const Icon = agent ? adapterIcon(agent.adapter) : null;
@@ -111,6 +113,7 @@ export default function AgentDetailView() {
 							testId="agent-detail-more"
 							items={[
 								{ label: t("detail.menu.compareVersions"), to: "/evaluate", search: { agent: agentId, mode: "versions" }, icon: GitCompare, testId: "agent-detail-compare-versions" },
+								{ label: t("detail.menu.compareModels"), to: "/agents/$agentId", params: { agentId }, search: { tab: "compare-models" }, icon: Cpu, testId: "agent-detail-compare-models" },
 								{ label: t("detail.menu.failureTest"), to: "/failure-tests", search: { agent: agentId }, icon: ShieldAlert, testId: "agent-detail-failure-test" },
 								{ label: t("detail.menu.whyFail"), to: "/why-agents-fail", search: { agent: agentId }, icon: Bug, testId: "agent-detail-why-fail" },
 								{ label: t("detail.menu.monitor"), to: "/scheduled-checks", search: { tab: "live", agent: agentId }, icon: Activity, testId: "agent-detail-monitor" },
@@ -126,7 +129,8 @@ export default function AgentDetailView() {
 			<RouteTabs tabs={tabs} defaultTab="report-card" label={tb("detail.tabs.label")} testId="agent-detail-tabs">
 				{(active) =>
 					active === "checks" ? (
-						<ChecksTab agentId={agentId} />
+						<ChecksTab agentId={agentId} />) : active === "compare-models" ? (
+						<CompareModelsForm agentId={agentId} />
 					) : active === "tools" ? (
 						<ToolsTab agentId={agentId} />
 					) : active === "versions" ? (

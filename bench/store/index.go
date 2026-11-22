@@ -23,6 +23,7 @@ const GradeSourceOriginal = "original"
 // runFileAllowlist is every run file the API may serve. Names are plain file
 // names, so a lookup can never leave the run folder.
 var runFileAllowlist = map[string]bool{
+	"human_actions.jsonl":    true, // Z03: a person's inputs in a debug run (schemas/recordings.go)
 	"run.json":               true,
 	"agent.stream.jsonl":     true,
 	"agent.stderr.txt":       true,
@@ -377,8 +378,12 @@ func (ix *Index) RunFile(runID, name string) ([]byte, error) {
 	return b, nil
 }
 
+// redTeamStateFile is the red-team attacker's export (bench/redteam): the
+// payload a regression task replays and the report reads (Z04).
+const redTeamStateFile = "state/user/redteam.json"
+
 func runFileAllowed(name string) bool {
-	if runFileAllowlist[name] {
+	if runFileAllowlist[name] || name == redTeamStateFile {
 		return true
 	}
 	if strings.HasPrefix(name, "agent.stream.") && strings.HasSuffix(name, ".jsonl") {

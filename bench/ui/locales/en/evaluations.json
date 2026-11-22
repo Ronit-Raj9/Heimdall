@@ -23,6 +23,7 @@
 		"versions": "Compare two versions of one agent",
 		"models": "Compare two models",
 		"opponent": "Compare against a baseline agent",
+		"model_switch": "Compare models for one agent",
 		"unknown": "Evaluation ({{mode}})"
 	},
 	"status": {

@@ -659,6 +659,10 @@ every admission check above went through the proxy.
   the bench takes its own screenshot after the session and checks it
   against a hidden reference, beside the state checks
   ([`visual-grading.md`](visual-grading.md)).
+- **Screen video for people.** The template's desktop records the screen
+  with ffmpeg and shows it live while the agent works; in a debug run a
+  person may take control ([`recordings.md`](recordings.md)). None of it is
+  graded.
 - **Commands through the GUI.** xfe's "Execute command" lets the desktop
   user run commands inside the desktop container; see "Bring your own
   desktop image".
@@ -668,6 +672,8 @@ every admission check above went through the proxy.
 - [`scenarios.md`](scenarios.md): services, state verifiers, probes, controls.
 - [`browser-tasks.md`](browser-tasks.md): the same pattern with a headless
   browser and a hidden web application.
+- [`recordings.md`](recordings.md): the screen video, the live screen and
+  taking control of a debug run.
 - [`tool-proxy.md`](tool-proxy.md): the proxy, the ledger and tool faults.
 - [`mcp-agents.md`](mcp-agents.md): how each agent CLI is given the run's
   MCP servers.
