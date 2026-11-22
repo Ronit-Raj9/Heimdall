@@ -328,6 +328,11 @@ func bodyAllowed(status int) bool {
 	return status >= 200 && status != http.StatusNoContent && status != http.StatusNotModified
 }
 
+func isRedirect(code int) bool {
+	return code == http.StatusMovedPermanently || code == http.StatusFound || code == http.StatusSeeOther ||
+		code == http.StatusTemporaryRedirect || code == http.StatusPermanentRedirect
+}
+
 // Rewrite is one upstream URL prefix rewrite.
 type Rewrite struct{ From, To string }
 
@@ -362,6 +367,11 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, target string, 
 	}
 	out.Header = r.Header.Clone()
 	stripHop(out.Header)
+	// Conditional requests would record a 304 that only makes sense against
+	// the client's local copy at record time; always fetch the full body.
+	for _, k := range []string{"If-Modified-Since", "If-None-Match", "If-Range", "If-Unmodified-Since", "If-Match"} {
+		out.Header.Del(k)
+	}
 	out.ContentLength = int64(len(body))
 	if len(body) == 0 {
 		out.Body = nil
@@ -372,6 +382,19 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, target string, 
 		s.Transport = tr
 	}
 	resp, err := tr.RoundTrip(out)
+	// A rewritten fetch follows the other archive's redirects itself: the
+	// client asked for the original URL and must get the body there.
+	for hops := 0; err == nil && out.URL.String() != target && hops < 10 && isRedirect(resp.StatusCode) && (r.Method == http.MethodGet || r.Method == http.MethodHead); hops++ {
+		loc, lerr := resp.Location()
+		if lerr != nil {
+			break
+		}
+		resp.Body.Close()
+		next := out.Clone(r.Context())
+		next.URL, next.Host, next.Body, next.ContentLength = loc, "", nil, 0
+		out = next
+		resp, err = tr.RoundTrip(out)
+	}
 	if err != nil {
 		s.logRow(r.Method, target, OutcomeError, http.StatusBadGateway, 0, err.Error())
 		http.Error(w, "heimdall egress: upstream: "+err.Error(), http.StatusBadGateway)

@@ -429,6 +429,9 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 		src = strings.TrimRight(src, "\n") + "\n" + egressDockerfile()
 	}
 	p.dockerfile = strings.TrimRight(src, "\n") + "\n" + bakeSection(tests.Bake, dirs, t.EnvEnv, info.User)
+	if p.egressFetch != "" {
+		p.dockerfile += egressTail(info.User) // recorded internet: no build-date apt lists (egress.go)
+	}
 	if p.solution, err = tarGz(t.SolutionDir); err != nil {
 		return nil, "cannot pack the solution folder: " + err.Error()
 	}

@@ -83,6 +83,18 @@ RUN if [ -d /etc/apt/apt.conf.d ]; then echo 'Acquire::Check-Valid-Until "false"
 `, egress.ImageCAFile, egress.CAPath, egress.BundlePath)
 }
 
+// egressTail ends the Dockerfile of an egress task: the apt lists left by
+// the build are removed, so `apt-get update` always reads the recorded
+// index. apt keeps a local index that is newer than the one it downloads,
+// which would make a recording from a dated archive useless.
+func egressTail(user string) string {
+	s := "USER root\nRUN rm -rf /var/lib/apt/lists/* 2>/dev/null || true\n"
+	if user != "" {
+		s += "USER " + user + "\n"
+	}
+	return s
+}
+
 // writeEgress writes the task's CA, the certificate in the build context and
 // an empty cache.
 func writeEgress(dir string) error {
@@ -108,6 +120,7 @@ func egressNotes(fetch string) string {
 	fmt.Fprintf(&b, "- Recorded internet (`-set egress=record`, docs/egress.md): the reference downloads at run time (%s), so the task has an `egress` service, a forward proxy the agent and the controls reach through HTTP_PROXY and HTTPS_PROXY. ", fetch)
 	b.WriteString("`bifrost-bench egress record` runs the reference once with internet and writes `egress/cache.tar`; every run after that is answered from it byte for byte (mode replay), and a request it does not hold gets a 404 and a `miss` row in the sealed request log (state/egress/requests). ")
 	b.WriteString("The cache tar is a service file, so its sha256 is in the task's fixtures hash in the suite lock.\n")
+	b.WriteString("- The apt lists the image build left are removed at the end of the build, so `apt-get update` reads the recorded index.\n")
 	b.WriteString("- apt is set not to check Valid-Until (`/etc/apt/apt.conf.d/99heimdall-egress`), because a replayed index keeps the date it was recorded on.\n")
 	fmt.Fprintf(&b, "- The task's CA certificate is baked into the image at %s (and appended to the system bundles); its key is only in the egress service. An agent can see that its HTTPS goes through a proxy.\n", egress.CAPath)
 	b.WriteString("- An agent that downloads something the reference did not gets a 404 for it. Experiments can set `egress: live-allowlisted` to reach the recorded hosts live (not repeatable, labelled) or `egress: offline`.\n")

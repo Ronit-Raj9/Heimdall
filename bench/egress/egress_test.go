@@ -44,6 +44,10 @@ func newWorld(t *testing.T) *world {
 			io.WriteString(rw, "<a href='numpy-2.whl'>numpy</a>")
 		case "/numpy-2.whl":
 			rw.Write(big)
+		case "/dists/InRelease":
+			http.Redirect(rw, r, "/file/abc/InRelease", http.StatusFound)
+		case "/file/abc/InRelease":
+			io.WriteString(rw, "release body")
 		case "/upload-pack":
 			b, _ := io.ReadAll(r.Body)
 			io.WriteString(rw, "pack for "+string(b))
@@ -283,9 +287,12 @@ func TestRecordRewriteKeepsAskedURL(t *testing.T) {
 	if g := do(t, w.client(rp), "GET", "https://archive.example/simple/numpy/", ""); g.status != 200 || !strings.Contains(g.body, "numpy") {
 		t.Fatalf("rewritten fetch: %d %q", g.status, g.body)
 	}
+	if g := do(t, w.client(rp), "GET", "https://archive.example/dists/InRelease", ""); g.status != 200 || g.body != "release body" {
+		t.Fatalf("rewritten redirect: %d %q", g.status, g.body)
+	}
 	rec.Close()
 	rows, _ := ReadManifest(filepath.Join(dir, "manifest.jsonl"))
-	if len(rows) != 1 || rows[0].URL != "https://archive.example/simple/numpy/" {
+	if len(rows) != 2 || rows[0].URL != "https://archive.example/simple/numpy/" {
 		t.Fatalf("rows = %+v", rows)
 	}
 	if _, err := ParseRewrites([]string{"nope"}); err == nil {
