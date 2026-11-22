@@ -425,6 +425,19 @@ export interface JudgeRecord {
 	usd: Value;
 	/** Price snapshot the judge cost was priced from. */
 	price_ref?: string;
+	/** Custom judge prompt (custom-v1): each criterion's verdict and reason, the weighted share met and the share a pass needs. */
+	criteria?: JudgeCriterion[];
+	score?: number;
+	pass_at?: number;
+}
+
+/** One criterion of a custom judge prompt's verdict. */
+export interface JudgeCriterion {
+	id: string;
+	text: string;
+	weight: number;
+	met: boolean;
+	reason?: string;
 }
 
 // ---------------------------------------------------------------------------------------------

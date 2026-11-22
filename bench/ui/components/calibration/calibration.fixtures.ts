@@ -33,6 +33,7 @@ export const CALIBRATION_STATUS_FIXTURE: CalibrationStatus = {
 	state: "calibrated",
 	detail:
 		"agreement 0.950 [0.831, 0.994] (38/40) (lower bound must be at least 0.75), TNR 0.944 [0.727, 0.999] (17/18) (lower bound must be at least 0.60), false-positive rate at most 27.3%, kappa 0.90",
+	caps: false,
 	set_sha256: "9a1f0c3e5b7d2a4c6e8f0a1b3c5d7e9f1a3b5c7d9e1f3a5b7c9d1e3f5a7b9c1d",
 	labels: 46,
 	human_labels: 40,
@@ -70,7 +71,7 @@ export const CALIBRATION_STATUS_FIXTURE: CalibrationStatus = {
 		hash: "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00",
 	},
 	records: 1,
-	thresholds: { min_agreement: 0.75, min_tnr: 0.6, min_labels: 30, max_age_days: 90, source: "defaults" },
+	thresholds: { min_agreement: 0.75, min_tnr: 0.6, min_labels: 30, max_age_days: 90, min_controls: 20, source: "defaults" },
 	reminders: ["labels changed since calibration cr_7k2m9q4w1z: rerun judge calibrate to measure the judge on them"],
 	problems: [],
 };
@@ -85,12 +86,13 @@ export const CALIBRATION_UNCALIBRATED_FIXTURE: CalibrationStatus = {
 	state: "uncalibrated",
 	detail:
 		"no calibration record for judge gpt-4o-mini with prompt qa-v1; judged verdicts are capped at INCONCLUSIVE until `judge calibrate locomo` runs",
+	caps: true,
 	labels: 0,
 	human_labels: 0,
 	seed_items: 0,
 	disputed: 0,
 	records: 0,
-	thresholds: { min_agreement: 0.75, min_tnr: 0.6, min_labels: 30, max_age_days: 90, source: "defaults" },
+	thresholds: { min_agreement: 0.75, min_tnr: 0.6, min_labels: 30, max_age_days: 90, min_controls: 20, source: "defaults" },
 	reminders: [],
 	problems: [],
 };
@@ -130,7 +132,7 @@ export const VERDICT_CALIBRATION_FIXTURE: JudgeCalibrationVerdict = {
 	model: "gpt-4o-mini",
 	templates: ["77aa"],
 	human_labels: 0,
-	thresholds: { min_agreement: 0.75, min_tnr: 0.6, min_labels: 30, max_age_days: 90, source: "defaults" },
+	thresholds: { min_agreement: 0.75, min_tnr: 0.6, min_labels: 30, max_age_days: 90, min_controls: 20, source: "defaults" },
 	judged_runs: 24,
 	contested_runs: 2,
 	capped_from: "improved",

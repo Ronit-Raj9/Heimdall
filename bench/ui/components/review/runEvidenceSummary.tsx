@@ -1,6 +1,7 @@
 import { DiffText } from "@/components/runs/diffText";
 import { OutcomeBadge } from "@/components/runs/outcomeBadge";
 import { Badge } from "@/components/ui/badge";
+import { JudgeCriteria } from "./judgeCriteria";
 import type { RunDetail, RunDiff } from "@/lib/types/bench";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -72,6 +73,7 @@ export function RunEvidenceSummary({ detail, diff }: RunEvidenceSummaryProps) {
 									{tally.correct}/{tally.incorrect}/{tally.unparsable}
 								</span>
 							</span>
+							<JudgeCriteria judge={judge} testId="review-evidence-criteria" />
 						</>
 					) : (
 						<span className="text-muted-foreground">{t("review.panel.notJudged")}</span>

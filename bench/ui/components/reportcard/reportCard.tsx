@@ -27,6 +27,8 @@ import {
 	PROCESS_NOTE,
 	headline,
 	isAB,
+	judgeBadge,
+	pairedChangeText,
 	visibleReport,
 	pct,
 	points,
@@ -335,6 +337,8 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 	const [a, b] = report.arms;
 	const result = ab ? benchmarkWinner(row, a.label, b.label) : undefined;
 	const single = row.arms[a?.label ?? ""];
+	const judge = judgeBadge(row);
+	const paired = ab ? pairedChangeText(row.verdict) : undefined;
 	const summary =
 		row.verdict?.summary ||
 		(ab
@@ -355,6 +359,11 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 				/>
 				<span className="text-foreground min-w-0 flex-1 truncate font-medium">{row.benchmark}</span>
 				<span className="text-muted-foreground text-xs">{capabilityName(row.capability)}</span>
+				{judge && (
+					<Badge variant={judge.tone} title={judge.title} data-testid={`benchmark-judge-${row.benchmark}`}>
+						{judge.text}
+					</Badge>
+				)}
 				<span className="flex items-center gap-3 tabular-nums">
 					{report.arms.map((arm) => (
 						<span key={arm.label} className="text-foreground">
@@ -379,6 +388,13 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 				{row.verdict && ab && (
 					<p className="text-muted-foreground text-xs">
 						{points(row.verdict.delta)}, {row.verdict.significant ? "a real difference" : "within noise"}
+						{paired ? `; ${paired}` : ""}
+					</p>
+				)}
+				{judge && (
+					<p data-testid={`benchmark-judge-detail-${row.benchmark}`} className="text-muted-foreground text-xs">
+						{judge.title}
+						{row.suite_version ? ` Benchmark version ${row.suite_version}.` : ""}
 					</p>
 				)}
 				<dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-4">

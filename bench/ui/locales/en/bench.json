@@ -3550,7 +3550,8 @@
 			"admission_control": "Admission control"
 		},
 		"state": {
-			"calibrated": "Calibrated",
+			"calibrated": "Human-calibrated",
+			"calibrated_on_controls": "Calibrated on controls",
 			"few_labels": "Few labels",
 			"uncalibrated": "Not calibrated",
 			"allowed_uncalibrated": "Not calibrated (allowed)",

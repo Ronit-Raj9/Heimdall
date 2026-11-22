@@ -11,7 +11,7 @@ import {
 	type EvaluationCadence,
 	type EvaluationReleasePreview,
 } from "@/lib/store/apis/evalReleaseApi";
-import type { EvaluationGateResult } from "@/lib/store/apis/evaluationsApi";
+import type { EvaluationGateResult, GateCheck } from "@/lib/store/apis/evaluationsApi";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, CalendarClock, CheckCircle2, Rocket, ShieldAlert, ShieldQuestion } from "lucide-react";
@@ -42,20 +42,57 @@ export function GateResultCard({ gate, testId = "evaluation-gate" }: { gate: Eva
 			<p className="text-sm">{gate.summary}</p>
 			{gate.checks.length > 0 && (
 				<ul className="flex flex-col gap-1 text-xs">
-					{gate.checks.map((c) => (
-						<li key={`${c.rule}-${c.capability}`} className="flex items-start gap-2" data-testid={`${testId}-check-${c.rule}-${c.capability}`}>
-							{c.pass ? (
-								<CheckCircle2 className="text-chart-success-ink mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-							) : (
-								<AlertTriangle className="text-chart-error-ink mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-							)}
-							<span>{c.summary}</span>
-						</li>
-					))}
+					{gate.checks.map((c) => {
+						const detail = gateCheckDetail(c, t as never);
+						return (
+							<li
+								key={`${c.rule}-${c.capability}`}
+								className="flex items-start gap-2"
+								data-testid={`${testId}-check-${c.rule}-${c.capability}`}
+							>
+								{c.pass ? (
+									<CheckCircle2 className="text-chart-success-ink mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+								) : c.inconclusive ? (
+									<ShieldQuestion className="text-chart-warning-ink mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+								) : (
+									<AlertTriangle className="text-chart-error-ink mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+								)}
+								<span className="flex flex-col gap-0.5">
+									<span>{c.summary}</span>
+									{detail && <span className="text-muted-foreground tabular-nums">{detail}</span>}
+									{(c.notes ?? []).map((n) => (
+										<span key={n} className="text-muted-foreground">
+											{n}
+										</span>
+									))}
+								</span>
+							</li>
+						);
+					})}
 				</ul>
 			)}
 		</section>
 	);
+}
+
+/** The paired change and smallest detectable change of a regression check, "" when it has none. */
+export function gateCheckDetail(c: GateCheck, t: (k: string, o?: Record<string, unknown>) => string): string {
+	const signed = (x: number) => {
+		const p = Math.round(x * 100);
+		return `${p > 0 ? "+" : ""}${p} pts`;
+	};
+	const parts: string[] = [];
+	if (c.change != null && c.change_low != null && c.change_high != null && c.tasks)
+		parts.push(
+			t("promote.gateChange", {
+				change: signed(c.change),
+				tasks: c.tasks,
+				low: signed(c.change_low),
+				high: signed(c.change_high),
+			}),
+		);
+	if (c.mde != null) parts.push(t("promote.gateMde", { mde: Math.round(c.mde * 100) }));
+	return parts.join("; ");
 }
 
 /** The headline of a preview: "codex v4 replaces v3" or "codex v4 becomes the first release". */

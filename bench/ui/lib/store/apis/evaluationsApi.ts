@@ -129,9 +129,13 @@ export interface EvaluationGate {
 	min_score?: Record<string, number>;
 	/** Largest score drop from the baseline on any capability (0.05 is 5 points). */
 	max_regression?: number;
+	/** Count min_score on a judge-graded benchmark whose judge is not calibrated. */
+	allow_uncalibrated_judge?: boolean;
+	/** An inconclusive gate blocks a release like a failed one. */
+	fail_on_inconclusive?: boolean;
 }
 
-export type GateState = "pass" | "fail" | "no_baseline";
+export type GateState = "pass" | "fail" | "inconclusive" | "no_baseline";
 
 export interface GateCheck {
 	capability: string;
@@ -141,6 +145,18 @@ export interface GateCheck {
 	baseline?: number;
 	pass: boolean;
 	summary: string;
+	/** The rule could not decide (pass is false). */
+	inconclusive?: boolean;
+	/** Paired tasks compared (max_regression). */
+	tasks?: number;
+	/** Candidate minus baseline on the paired tasks, with its 95% paired bootstrap interval. */
+	change?: number;
+	change_low?: number;
+	change_high?: number;
+	/** Smallest change the paired tasks can detect (alpha 0.05, power 0.8). */
+	mde?: number;
+	/** What was left out: tasks only one side ran, another benchmark version. */
+	notes?: string[];
 }
 
 export interface GateBaseline {
@@ -307,6 +323,28 @@ export interface ReportVerdict {
 	ci_low?: number;
 	ci_high?: number;
 	tasks?: number;
+	/** 95% paired bootstrap interval of delta. */
+	boot_low?: number;
+	boot_high?: number;
+	/** Smallest change this many paired tasks can detect. */
+	mde?: number;
+	/** Taken back because the benchmark's judge is not calibrated; capped_from is the winner before. */
+	judge_capped?: boolean;
+	capped_from?: string;
+}
+
+/** Calibration of the model judge that grades a benchmark (G4-06). */
+export interface ReportJudgeState {
+	state: string;
+	/** "human-calibrated", "calibrated on controls", "few human labels (12 of 30)", "judge not calibrated", ... */
+	label: string;
+	/** Verdicts and min_score gates may use it. */
+	trusted: boolean;
+	model?: string;
+	human_labels: number;
+	control_items: number;
+	min_labels?: number;
+	detail?: string;
 }
 
 export interface ReportCapabilityRow {
@@ -323,6 +361,11 @@ export interface ReportBenchmarkRow {
 	verdict?: ReportVerdict;
 	/** Repeatability per arm on clean runs. */
 	reliability_card?: Record<string, ReportReliabilityCard | null>;
+	/** The benchmark version the evaluation ran. */
+	suite_version?: string;
+	lock_hash?: string;
+	/** Set when a model judge grades the benchmark. */
+	judge?: ReportJudgeState;
 }
 
 export interface ReportCurvePoint {

@@ -99,6 +99,27 @@ How one grade runs:
 
 The templates are embedded in the binary (`graders/judgeprompts/`). A change to one is a new version.
 
+### Custom judge prompts (`custom-v1`)
+
+An org can grade with its own judge prompt. The prompt is a file in the suite folder, pinned by its sha256 in `suite.yaml`; a file whose hash differs refuses to grade, so editing the prompt is a new measurement.
+
+```yaml
+grading: judged
+grader: judge
+judge:
+  provider: openai
+  model: gpt-4.1-mini
+  prompt_version: custom-v1
+  prompt_file: judge/support-v1.md
+  prompt_sha256: 9f2c...        # sha256sum judge/support-v1.md
+  pass_at: 0.8                  # weighted share of criteria a pass needs; default 1 (all)
+```
+
+- The task's `rubric` lists the criteria, one per line: `[<weight>] <text>`, or plain text for weight 1. They get ids `c1`, `c2`, ... in order.
+- The prompt may use `{{question}}`, `{{reference}}`, `{{rubric}}`, `{{criteria}}`, `{{transcript}}` and must use `{{response}}`. The response and the transcript are fenced and marked as data like every judged answer, and the guard (an answer that addresses the grader, a bare refusal) still fails an answer before any call.
+- The reply must be one JSON object, `{"criteria":[{"id":"c1","met":true,"reason":"..."}]}`, with one entry per criterion. The format is appended to the prompt unless it places `{{format}}` itself. A reply missing a criterion or not JSON is unparsable.
+- A vote is correct when the weighted share of criteria met reaches `pass_at`. `Grade.judge` keeps each criterion's verdict and reason, the score and `pass_at`; the run page and the review panel show them.
+
 ### Cost
 
 The judge's spend is priced from the response's `usage` with the same pinned price snapshot as the agent's cost rows. It is reported per run as `judge_cost_usd` and is **never** added to `cost_usd`: the judge is part of measuring, not of the agent. It is unknown when the judge model is not in the snapshot or a response carried no usage. The experiment spend cap counts the agent's cost only, so budget the judge separately: roughly `votes` times (prompt plus answer) input tokens per graded run.
