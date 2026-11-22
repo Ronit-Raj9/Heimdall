@@ -314,7 +314,7 @@ alpine sandbox without network, runs a command, round-trips a file and
 deletes it. A new platform implements `sandbox.Platform` (Check, Create,
 Exec, Upload, Download, Destroy) and calls `sandbox.Register` in `init`.
 
-## Bring your own worker (Runloop, Fly Machines, Kubernetes, your own VM)
+## Bring your own worker (Runloop, Fly Machines, RunPod, Kubernetes, your own VM)
 
 An organization can run its evaluations on compute it owns instead of the shared worker (package `byoworker`, routes in `handlers/workerconns.go`, Workers page). Every such worker is an ordinary runner with its own runner token and its own pool, named after the worker; only how it starts differs:
 
@@ -322,6 +322,7 @@ An organization can run its evaluations on compute it owns instead of the shared
 |---|---|---|
 | Runloop | Runloop API key | `POST https://api.runloop.ai/v1/devboxes` with the one-line install as the devbox entrypoint (`--foreground --install-docker`), the runner settings in `environment_variables`; stop is `POST /v1/devboxes/{id}/shutdown`. Size `X_LARGE` by default, kept alive up to 48 hours. |
 | Fly Machines | Fly token for an app the org created (`fly apps create`) | `POST https://api.machines.dev/v1/apps/{app}/machines` (image `ubuntu:24.04` unless set, `restart: always`, 4 performance CPUs and 8 GB by default); stop is `DELETE .../machines/{id}?force=true`. |
+| RunPod | RunPod API key | `POST https://rest.runpod.io/v1/pods` with GPUs (`gpu_type`, default `NVIDIA L4`, `gpu_count` 1 to 8, `cloud_type` SECURE or COMMUNITY), image `nvidia/cuda:12.4.1-runtime-ubuntu22.04` unless set, the one-line install as `dockerStartCmd`, the runner settings in `env`; stop is `DELETE /v1/pods/{id}`. The runner registers the pod's GPUs, so the org's GPU slots go to it. A pod is a container: the agent containers need an image where Docker works. |
 | Your Kubernetes cluster | A kubeconfig with inline certificates, or a service account token with the API server and its CA, scoped to one namespace | A token Secret and a one-replica Deployment of the runner image (`HEIMDALL_RUNNER_IMAGE` or the connection's image) in that namespace, running as service account `heimdall-runner`; each run is a pod of the Kubernetes driver in its own `heimdall-run-*` namespace. `GET /api/bench/workers/kubernetes-manifest?namespace=NS` serves the RBAC to apply first: a namespaced Role for the credential Heimdall holds, the driver ClusterRole for the runner, and a ValidatingAdmissionPolicy (Kubernetes 1.30+) that refuses any change the runner asks for outside `heimdall-run-*`. Admission does not cover reads, so use a cluster that holds nothing else sensitive. |
 | Your own VM | none | The answer of the create call carries one line: `curl -fsSL https://<server>/api/bench/runners/install.sh \| sudo HEIMDALL_RUNNER_TOKEN=hmr_... HEIMDALL_POOL=<name> HEIMDALL_RUNNER_NAME=<name> sh`. |
 

@@ -372,3 +372,20 @@ func labelLast4(label string) string {
 	}
 	return ""
 }
+
+// CredentialsOf returns the credentials of one connected platform, default
+// or not (Z05: an open model served on the org's Modal account), or
+// ErrNotConnected. Server internal only: the token never leaves the server.
+func (s *Connections) CredentialsOf(ctx context.Context, org, name string) (Credentials, error) {
+	if !IsPlatform(name) {
+		return Credentials{}, fmt.Errorf("%w %q", ErrUnknownPlatform, name)
+	}
+	k, err := s.find(ctx, org, providerPrefix+name)
+	if err != nil {
+		return Credentials{}, err
+	}
+	if k == nil {
+		return Credentials{}, fmt.Errorf("%s: %w", name, ErrNotConnected)
+	}
+	return s.credentials(ctx, org, k)
+}

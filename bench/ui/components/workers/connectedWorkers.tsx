@@ -45,7 +45,7 @@ const STATUS_TONE: Record<WorkerConnectionStatus, StatusTone> = {
 	error: "bad",
 };
 
-const PLATFORM_ICON: Record<string, typeof Cloud> = { runloop: Cloud, fly: Cloud, kubernetes: Ship, vm: Server };
+const PLATFORM_ICON: Record<string, typeof Cloud> = { runloop: Cloud, fly: Cloud, runpod: Cloud, kubernetes: Ship, vm: Server };
 
 function apiError(error: unknown, fallback: string): string {
 	const data = (error as { data?: { error?: { message?: string } | string } } | undefined)?.data;
@@ -292,6 +292,13 @@ export function draftToCreate(d: ConnectDraft) {
 				settings: pick("app", "region", "cpus", "memory_mb", "cpu_kind", "image"),
 				secret: (f.secret ?? "").trim(),
 			};
+		case "runpod": // Z05: GPU pods
+			return {
+				name: d.name.trim(),
+				platform: d.platform,
+				settings: pick("gpu_type", "gpu_count", "cloud_type", "image", "disk_gb"),
+				secret: (f.secret ?? "").trim(),
+			};
 		case "kubernetes": {
 			const secret =
 				d.kubeMode === "kubeconfig"
@@ -469,6 +476,27 @@ export function ConnectWorkerForm({ platforms, onClose }: { platforms: WorkerPla
 							</select>
 						</Field>
 						{text("image", t("fly.image"))}
+					</>
+				)}
+				{p === "runpod" && (
+					<>
+						{text("secret", t("runpod.secret"), t("form.secretHint"), "password")}
+						{text("gpu_type", t("runpod.gpuType"), t("runpod.gpuTypeHint"))}
+						{text("gpu_count", t("runpod.gpuCount"), undefined, "number")}
+						<Field label={t("runpod.cloudType")} htmlFor={`${base}-cloud_type`}>
+							<select
+								id={`${base}-cloud_type`}
+								className={inputClass}
+								value={draft.fields.cloud_type ?? "SECURE"}
+								onChange={(e) => set("cloud_type", e.target.value)}
+								data-testid="byo-form-cloud-type"
+							>
+								<option>SECURE</option>
+								<option>COMMUNITY</option>
+							</select>
+						</Field>
+						{text("image", t("runpod.image"), t("runpod.imageHint"))}
+						{text("disk_gb", t("runpod.disk"), undefined, "number")}
 					</>
 				)}
 				{p === "kubernetes" && (

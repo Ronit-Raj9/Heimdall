@@ -89,5 +89,5 @@ func TestRefusalsGPU(t *testing.T) {
 
 type noGPU struct{ Platform }
 
-func (noGPU) Name() string                  { return "nogpu" }
+func (noGPU) Name() string                { return "nogpu" }
 func (noGPU) Check(context.Context) error { return nil }

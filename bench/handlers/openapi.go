@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/openmodel"
 	"github.com/maximhq/bifrost/bench/sandbox"
 	"path"
 	"reflect"
@@ -315,6 +316,20 @@ var APIRoutes = []RouteDoc{
 		Auth: AuthWrite, Response: sandbox.ConnectionView{}},
 	{Method: "POST", Path: APIPrefix + "/worker-platforms/{platform}/disconnect", Tag: "runners", Summary: "Delete a platform's token; a default platform goes back to the shared worker",
 		Auth: AuthWrite, Response: sandbox.ConnectionsList{}},
+
+	// Open models on the org's Modal account (Z05, handlers/openmodels.go, package openmodel).
+	{Method: "GET", Path: APIPrefix + "/open-models/catalog", Tag: "models", Summary: "Open models Heimdall can serve on your Modal account (Qwen, DeepSeek, Llama), the engines (vLLM, SGLang) and each GPU with its count and hourly price",
+		Response: openmodel.CatalogView{}},
+	{Method: "GET", Path: APIPrefix + "/open-models", Tag: "models", Summary: "The org's open model deployments, newest first: state, endpoint, provider model name, GPU and cost limit",
+		Response: OpenModelsList{}},
+	{Method: "POST", Path: APIPrefix + "/open-models", Tag: "models", Summary: "Serve an open model on the org's Modal account with scale to zero; it becomes the org's vllm or sgl provider key once it answers, and stops when its evaluation ends or its time limit passes",
+		Auth: AuthWrite, Request: openmodel.StartRequest{}, Status: fasthttp.StatusAccepted, Response: openmodel.Deployment{}},
+	{Method: "GET", Path: APIPrefix + "/open-models/modal-apps", Tag: "models", Summary: "Serving apps on the org's Modal account that no running deployment owns (to stop by hand)",
+		Auth: AuthWrite, Response: OpenModelApps{}},
+	{Method: "GET", Path: APIPrefix + "/open-models/{id}", Tag: "models", Summary: "One open model deployment",
+		Response: openmodel.Deployment{}},
+	{Method: "POST", Path: APIPrefix + "/open-models/{id}/stop", Tag: "models", Summary: "Stop the Modal app and delete its provider key now",
+		Auth: AuthWrite, Response: openmodel.Deployment{}},
 
 	// Bring your own worker (handlers/workerconns.go, package byoworker): workers an org connects on Runloop, Fly Machines, its Kubernetes cluster or its own VM.
 	{Method: "GET", Path: APIPrefix + "/workers/connections", Tag: "workers", Summary: "Connected workers with health, capacity, platform and last seen; the default worker", Response: schemas.WorkerConnectionsList{}},

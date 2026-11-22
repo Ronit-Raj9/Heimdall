@@ -34,8 +34,8 @@ Each of these is selectable as the `provider` of an evaluation arm, and you can 
 | AWS SageMaker | `sagemaker` | your own SageMaker endpoints |
 | Replicate | `replicate` | hosting of open models |
 | Ollama | `ollama` | models on your own machine, no key |
-| vLLM | `vllm` | your own vLLM server |
-| SGLang | `sgl` | your own SGLang server |
+| vLLM | `vllm` | your own vLLM server, or an open model Heimdall serves on your Modal account (`docs/open-models.md`) |
+| SGLang | `sgl` (also `sglang`) | your own SGLang server, or one Heimdall serves on your Modal account |
 | MiniMax | `minimax` | MiniMax models, first-party |
 | BytePlus | `byteplus` | ByteDance models |
 | Sarvam | `sarvam` | Indian-language speech and chat |

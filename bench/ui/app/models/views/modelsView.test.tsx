@@ -19,6 +19,7 @@ import ModelsView, {
 
 const api = vi.hoisted(() => ({ q: {} as Record<string, unknown> }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+vi.mock("@/components/models/serveOpenModel", () => ({ ServeOpenModel: () => null })); // Z05: its own test (serveOpenModel.test.tsx)
 vi.mock("@/lib/store/apis/modelsApi", async () => {
 	const { mutation } = await import("@/lib/testing/render");
 	return {
