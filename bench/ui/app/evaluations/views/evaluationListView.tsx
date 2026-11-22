@@ -12,8 +12,12 @@ import {
 	EVALUATION_POLL_MS,
 	EVALUATION_SORTS,
 	EVALUATION_STATUS_FILTERS,
+	FAILURE_TEST_MODE,
 	evaluationAgents,
 	evaluationBenchmarks,
+	evaluationKind,
+	evaluationResultText,
+	evaluationSpend,
 	evaluationFiltersSearch,
 	filterEvaluations,
 	formatCreated,
@@ -23,7 +27,8 @@ import {
 	type EvaluationFilters,
 } from "./evaluation.utils";
 import { EvaluationLivePill } from "./evaluationLivePill";
-import { ModeLabel } from "./evaluationWords";
+import { EvaluationKindLabel } from "./evaluationWords";
+import { usd } from "@/components/reportcard/reportCard.utils";
 
 /** /evaluations: every evaluation with search, filters and sort kept in the URL; each row opens its progress and report card. */
 export default function EvaluationListView() {
@@ -78,7 +83,7 @@ function EvaluationToolbar({
 }) {
 	const { t } = useTranslation("evaluations");
 	const { t: tf } = useTranslation("fw08");
-	const modes: string[] = [...new Set(evaluations.map((e) => String(e.spec.mode)).filter(Boolean))].sort();
+	const modes: string[] = [...new Set(evaluations.map((e) => evaluationKind(e)).filter(Boolean))].sort();
 	const filtered = filters.q !== "" || filters.status !== "all" || filters.mode !== "all";
 	return (
 		<div className="flex flex-wrap items-center gap-2" data-testid="evaluations-toolbar">
@@ -125,7 +130,7 @@ function EvaluationToolbar({
 						const key = modeKey(m);
 						return (
 							<option key={m} value={m}>
-								{key ? t(key) : t("mode.unknown", { mode: m })}
+								{m === FAILURE_TEST_MODE ? t("mode.failureTest") : key ? t(key) : t("mode.unknown", { mode: m })}
 							</option>
 						);
 					})}
@@ -141,7 +146,7 @@ function EvaluationToolbar({
 				>
 					{EVALUATION_SORTS.map((s) => (
 						<option key={s} value={s}>
-							{tf(`list.sorts.${s}`)}
+							{s === "result" ? t("list.sortResult") : tf(`list.sorts.${s}`)}
 						</option>
 					))}
 				</select>
@@ -192,6 +197,8 @@ export function EvaluationTable({
 							<TableHead>{t("list.col.mode")}</TableHead>
 							<TableHead>{t("list.col.benchmarks")}</TableHead>
 							<TableHead>{t("list.col.status")}</TableHead>
+							<TableHead className="text-right">{t("list.col.result")}</TableHead>
+							<TableHead className="text-right">{t("list.col.spend")}</TableHead>
 							<TableHead>{t("list.col.created")}</TableHead>
 							<TableHead className="sr-only">{t("list.col.open")}</TableHead>
 						</TableRow>
@@ -215,11 +222,17 @@ export function EvaluationTable({
 									</TableCell>
 									<TableCell>{evaluationAgents(ev).join(", ")}</TableCell>
 									<TableCell>
-										<ModeLabel mode={ev.spec.mode} />
+										<EvaluationKindLabel evaluation={ev} />
 									</TableCell>
 									<TableCell className="tabular-nums">{t("list.benchmarkCount", { count: benches.length })}</TableCell>
 									<TableCell>
 										<EvaluationLivePill evaluation={ev} testId={`evaluation-status-${ev.id}`} />
+									</TableCell>
+									<TableCell className="text-right tabular-nums" data-testid={`evaluation-result-${ev.id}`}>
+										{evaluationResultText(ev)}
+									</TableCell>
+									<TableCell className="text-right tabular-nums" data-testid={`evaluation-spend-${ev.id}`}>
+										{usd(evaluationSpend(ev))}
 									</TableCell>
 									<TableCell className="text-muted-foreground tabular-nums">{formatCreated(ev.created_at, i18n.language)}</TableCell>
 									<TableCell className="text-right">

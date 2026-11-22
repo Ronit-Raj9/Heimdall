@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { Evaluation } from "@/lib/store/apis/evaluationsApi";
 import { normalizeEvaluationList } from "@/lib/store/apis/evaluationsApi";
+import i18n from "@/lib/i18n";
 import {
+	FAILURE_TEST_MODE,
+	childRunsText,
+	evaluationKind,
+	evaluationResultText,
+	evaluationSpend,
 	benchmarkCount,
 	childReasons,
 	displayStatus,
@@ -176,5 +182,57 @@ describe("evaluation utils (F08)", () => {
 		expect(filterEvaluations(list, { ...f, status: "running" }).map((e) => e.id)).toEqual(["ev_b", "ev_c"]);
 		expect(filterEvaluations(list, { ...f, status: "done" }).map((e) => e.id)).toEqual(["ev_a"]);
 		expect(filterEvaluations(list, { ...f, mode: "score" }).map((e) => e.id)).toEqual(["ev_a"]);
+	});
+});
+describe("stored result, kind and runs text (N161, N142)", () => {
+	const t = i18n.getFixedT("en", "evaluations");
+	const result = (scores: number[], cost?: number) => ({
+		arms: scores.map((score, i) => ({ label: "AB"[i], agent: "codex", version: 1, model: "m", score, runs: 10 })),
+		cost_usd: cost,
+		at: "2026-11-23T00:00:00Z",
+	});
+
+	it("shows the stored score, one or two arms, and a dash without one", () => {
+		expect(evaluationResultText(ev({ status: "done", result: result([0.56]) }))).toBe("56%");
+		expect(evaluationResultText(ev({ status: "done", result: result([0.4, 0.45]) }))).toBe("A 40% · B 45%");
+		expect(evaluationResultText(ev({ status: "running" }))).toBe("-");
+	});
+
+	it("takes spend from the result, else the children, else nothing", () => {
+		expect(evaluationSpend(ev({ result: result([0.5], 1.25) }))).toBe(1.25);
+		expect(evaluationSpend(ev({ children: [{ benchmark: "a", experiment_id: "e", status: "done", spent_usd: 0.5 }] }))).toBe(0.5);
+		expect(evaluationSpend(ev())).toBeNull();
+	});
+
+	it("calls a score evaluation with faults a failure test", () => {
+		expect(evaluationKind(ev({ spec: { ...ev().spec, mode: "score", faults: ["clean", "model-down"] } }))).toBe(FAILURE_TEST_MODE);
+		expect(evaluationKind(ev({ spec: { ...ev().spec, mode: "score", faults: ["clean"] } }))).toBe("score");
+		const list = [
+			ev({ id: "ev_ft", spec: { ...ev().spec, mode: "score", faults: ["clean", "model-down"] } }),
+			ev({ id: "ev_sc", spec: { ...ev().spec, mode: "score", faults: ["clean"] } }),
+		];
+		const f = parseEvaluationFilters({});
+		expect(filterEvaluations(list, { ...f, mode: FAILURE_TEST_MODE }).map((e) => e.id)).toEqual(["ev_ft"]);
+		expect(filterEvaluations(list, { ...f, mode: "score" }).map((e) => e.id)).toEqual(["ev_sc"]);
+	});
+
+	it("sorts by best result", () => {
+		const list = [ev({ id: "ev_lo", result: result([0.2]) }), ev({ id: "ev_none" }), ev({ id: "ev_hi", result: result([0.1, 0.9]) })];
+		expect(filterEvaluations(list, { ...parseEvaluationFilters({}), sort: "result" }).map((e) => e.id)).toEqual([
+			"ev_hi",
+			"ev_lo",
+			"ev_none",
+		]);
+	});
+
+	it("names the runs that could not run", () => {
+		expect(childRunsText(t, { total: 30, done: 30, running: 0, failed: 0 }, false)).toBe("30 of 30 runs done");
+		expect(childRunsText(t, { total: 30, done: 29, running: 0, failed: 1 }, false)).toBe(
+			"29 of 30 runs scored, 1 could not run (infrastructure error)",
+		);
+		expect(childRunsText(t, { total: 30, done: 20, running: 3, failed: 2 }, true)).toBe(
+			"20 of 30 runs scored, 2 could not run (infrastructure error), 3 running",
+		);
+		expect(childRunsText(t, { total: 30, done: 20, running: 3, failed: 0 }, true)).toBe("20 of 30 runs done, 3 running");
 	});
 });

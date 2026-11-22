@@ -201,8 +201,14 @@ export function defaultName(d: EvaluateDraft): string {
 			return `${who}: two models`;
 		case "opponent":
 			return d.opponent === BARE_MODEL_AGENT ? `${who} vs the bare model` : `${who} vs ${d.opponent ?? "baseline"}`;
-		default:
-			return `${who} score`;
+		default: {
+			// Score: named after the benchmarks so evaluations left unnamed still differ (N161).
+			const first = d.benchmarks[0]?.replace(/@.*$/, "");
+			if (!first) return `${who} score`;
+			const more = d.benchmarks.length > 1 ? ` and ${d.benchmarks.length - 1} more` : "";
+			const faulted = d.faults.some((f) => f !== "clean");
+			return `${who}${faulted ? " failure test" : ""} on ${first}${more}`;
+		}
 	}
 }
 

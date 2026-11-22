@@ -79,3 +79,26 @@ describe("EvaluationTable toolbar (J6.list)", () => {
 		expect(html).toContain("No evaluations match. Clear the search or filters.");
 	});
 });
+describe("EvaluationTable result and spend (N161)", () => {
+	it("shows the stored result and spend, and a failure test as such", () => {
+		const done: Evaluation = {
+			...ev,
+			id: "ev_ft",
+			status: "done",
+			spec: { ...ev.spec, name: "codex failure test on bfcl", mode: "score", arms: [ev.spec.arms[0]], faults: ["clean", "model-down"] },
+			result: {
+				arms: [{ label: "A", agent: "codex", version: 2, model: "m1", score: 0.56, runs: 30 }],
+				cost_usd: 1.5,
+				at: "2026-11-23T00:00:00Z",
+			},
+		};
+		const html = render(<EvaluationTable evaluations={[done, ev]} />);
+		expect(html).toContain(">Result<");
+		expect(html).toContain(">Spend<");
+		expect(html).toContain('data-testid="evaluation-result-ev_ft">56%');
+		expect(html).toContain('data-testid="evaluation-spend-ev_ft">$1.50');
+		expect(html).toContain('data-testid="evaluation-result-ev_1">-');
+		expect(html).toContain("Failure test");
+		expect(html).not.toContain("Score one agent");
+	});
+});

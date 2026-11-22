@@ -113,9 +113,57 @@ export function evaluationBenchmarks(evaluation: Evaluation): string[] {
 }
 
 export const EVALUATION_STATUS_FILTERS = ["all", "running", "done", "failed", "cancelled"] as const;
-export const EVALUATION_SORTS = ["newest", "oldest", "name", "spend"] as const;
+export const EVALUATION_SORTS = ["newest", "oldest", "name", "spend", "result"] as const;
 export type EvaluationStatusFilter = (typeof EVALUATION_STATUS_FILTERS)[number];
 export type EvaluationSort = (typeof EVALUATION_SORTS)[number];
+
+/** The mode filter value of a failure test: a score evaluation with faults (the Failure tests page launches these). */
+export const FAILURE_TEST_MODE = "failure_test";
+
+/** What an evaluation tests: FAILURE_TEST_MODE when it injects any fault, else its mode. */
+export function evaluationKind(evaluation: Evaluation): string {
+	const faulted = (evaluation.spec?.faults ?? []).some((f) => f !== "clean");
+	return faulted && evaluation.spec.mode === "score" ? FAILURE_TEST_MODE : String(evaluation.spec.mode);
+}
+
+/** The stored result in short: "56%" for one arm, "A 40% · B 45%" for two, "-" without one. */
+export function evaluationResultText(evaluation: Evaluation): string {
+	const arms = evaluation.result?.arms ?? [];
+	if (arms.length === 0) return "-";
+	const pc = (x: number) => `${Math.round(x * 100)}%`;
+	return arms.length === 1 ? pc(arms[0].score) : arms.map((a) => `${a.label} ${pc(a.score)}`).join(" · ");
+}
+
+/** The best arm score of the stored result, or null without one. */
+function bestResult(evaluation: Evaluation): number | null {
+	const arms = evaluation.result?.arms ?? [];
+	return arms.length === 0 ? null : Math.max(...arms.map((a) => a.score));
+}
+
+/** Spend: the stored result's cost, else the sum of the benchmarks' spend so far, else null. */
+export function evaluationSpend(evaluation: Evaluation): number | null {
+	if (typeof evaluation.result?.cost_usd === "number") return evaluation.result.cost_usd;
+	const spent = spentOf(evaluation);
+	return spent > 0 ? spent : null;
+}
+
+type RunsKey = "detail.runs" | "detail.runsWithFailed" | "detail.runsRunning";
+
+/**
+ * One benchmark's run count: "29 of 30 runs done", or with runs that could not run (an infrastructure error)
+ * "29 of 30 runs scored, 1 could not run (infrastructure error)"; while active, ", 3 running" is added.
+ */
+export function childRunsText(
+	t: (key: RunsKey, opts: Record<string, number>) => string,
+	slots: { total: number; done: number; running: number; failed: number },
+	active: boolean,
+): string {
+	const base =
+		slots.failed > 0
+			? t("detail.runsWithFailed", { done: slots.done, total: slots.total, count: slots.failed })
+			: t("detail.runs", { done: slots.done, total: slots.total });
+	return active && slots.running > 0 ? base + t("detail.runsRunning", { running: slots.running }) : base;
+}
 
 /** The list's search, filters and sort, kept in the URL (`q`, `status`, `mode`, `sort`). */
 export interface EvaluationFilters {
@@ -166,7 +214,7 @@ export function filterEvaluations(list: readonly Evaluation[], f: EvaluationFilt
 	const q = f.q.toLowerCase();
 	const out = list.filter((ev) => {
 		if (!matchesStatus(ev, f.status)) return false;
-		if (f.mode !== "all" && ev.spec.mode !== f.mode) return false;
+		if (f.mode !== "all" && evaluationKind(ev) !== f.mode) return false;
 		if (!q) return true;
 		const hay = [
 			ev.spec.name ?? "",
@@ -183,7 +231,9 @@ export function filterEvaluations(list: readonly Evaluation[], f: EvaluationFilt
 		case "name":
 			return out.sort((a, b) => (a.spec.name || a.id).localeCompare(b.spec.name || b.id));
 		case "spend":
-			return sortNewestFirst(out).sort((a, b) => spentOf(b) - spentOf(a));
+			return sortNewestFirst(out).sort((a, b) => (evaluationSpend(b) ?? 0) - (evaluationSpend(a) ?? 0));
+		case "result":
+			return sortNewestFirst(out).sort((a, b) => (bestResult(b) ?? -1) - (bestResult(a) ?? -1));
 		default:
 			return sortNewestFirst(out);
 	}

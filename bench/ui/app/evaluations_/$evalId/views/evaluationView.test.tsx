@@ -215,3 +215,21 @@ describe("EvaluationBody (F08)", () => {
 		expect(html).toContain("Budget $1.10");
 	});
 });
+describe("EvaluationBody finished progress (N142)", () => {
+	it("drops the live note once finished and names the runs that could not run", async () => {
+		const { useGetExperimentQuery } = await import("@/lib/store/apis/benchApi");
+		vi.mocked(useGetExperimentQuery).mockReturnValue(
+			okQuery({ exp_id: "e1", slots: { total: 30, done: 29, running: 0, failed: 1 } }) as never,
+		);
+		const done: Evaluation = { ...base, status: "done", children: [{ benchmark: "hd-harbor-tb2", experiment_id: "e1", status: "done" }] };
+		const html = render(<EvaluationBody evaluation={done} />);
+		expect(html).not.toContain("Updates every 3 seconds");
+		expect(html).toContain("One comparison per benchmark.");
+		expect(html).toContain("29 of 30 runs scored, 1 could not run (infrastructure error)");
+		const running = render(<EvaluationBody evaluation={base} />);
+		expect(running).toContain("Updates every 3 seconds.");
+		vi.mocked(useGetExperimentQuery).mockReturnValue(
+			okQuery({ exp_id: "e1", slots: { total: 20, done: 7, running: 2, failed: 0 } }) as never,
+		);
+	});
+});

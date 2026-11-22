@@ -60,3 +60,18 @@ describe("draft round trip (F26)", () => {
 		expect(draftToSpec(applyPatch(dflt, { mode: "models" })).name).toBe("codex: two models");
 	});
 });
+describe("defaultName (N161)", () => {
+	const d = { ...EMPTY_DRAFT, agent: "codex", mode: "score" as const };
+	it("names a score evaluation after its benchmarks", () => {
+		expect(defaultName({ ...d, benchmarks: ["hd-harbor-bfcl"] })).toBe("codex on hd-harbor-bfcl");
+		expect(defaultName({ ...d, benchmarks: ["hd-harbor-bfcl@1.0.0", "b2", "b3"] })).toBe("codex on hd-harbor-bfcl and 2 more");
+		expect(defaultName({ ...d, benchmarks: [] })).toBe("codex score");
+	});
+
+	it("names a score evaluation with faults a failure test", () => {
+		expect(defaultName({ ...d, version: 3, benchmarks: ["hd-harbor-bfcl", "b2"], faults: ["clean", "model-down"] })).toBe(
+			"codex v3 failure test on hd-harbor-bfcl and 1 more",
+		);
+		expect(defaultName({ ...d, benchmarks: ["hd-harbor-bfcl"], faults: ["clean"] })).toBe("codex on hd-harbor-bfcl");
+	});
+});
