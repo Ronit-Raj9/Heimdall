@@ -256,6 +256,8 @@ export interface EvaluationChild {
 	skipped_tasks?: EvaluationSkippedTask[];
 	/** Condition id to fault (or "attack"), fixed at launch. */
 	fault_of?: Record<string, string>;
+	/** Faults chosen for the evaluation that do not apply to this benchmark, with the reason. */
+	faults_skipped?: { fault: string; reason: string }[];
 	/** The spend cap this benchmark runs under (its share of the budget, or the $5 default). */
 	budget_usd?: number;
 	/** Modeled spend of its runs so far. */
