@@ -12,6 +12,7 @@
 		"images": "Custom images",
 		"usage": "Usage",
 		"containers": "Workers",
+		"workers": "Workers",
 		"signup": "Sign-up"
 	},
 	"overview": {
@@ -54,6 +55,12 @@
 		"quota": "Limits",
 		"edit": "Edit limits",
 		"quotaSummary": "{{concurrent}} at once, {{perDay}} a day, ${{spend}} a day",
+		"atOnce": "at most {{n}} at once",
+		"atOnceNone": "no limit at once",
+		"perDay": "{{n}} runs a day",
+		"perDayNone": "no daily run limit",
+		"spend": "${{n}} a day",
+		"spendNone": "no daily spend limit",
 		"runtime": "Sandbox",
 		"runtimeRunsc": "gVisor",
 		"runtimeRunc": "runc",
@@ -75,7 +82,9 @@
 		"reset": "Use defaults",
 		"cancel": "Cancel",
 		"saved": "Limits saved.",
-		"zeroHint": "0 means none allowed.",
+		"zeroHint": "0 means no limit.",
+		"noLimit": "No limit",
+		"defaultsLoading": "Loading this server's defaults...",
 		"runcWarning": "runc shares the host kernel. The shared worker serves runc organizations only when the operator sets HEIMDALL_SHARED_ALLOW_RUNC, and runs them under gVisor when the host has it."
 	},
 	"images": {
@@ -103,7 +112,10 @@
 		"total": "Total spend",
 		"runs": "Runs",
 		"org": "Organization",
-		"cost": "Spend (USD)"
+		"cost": "Spend (USD)",
+		"tokens": "Tokens",
+		"unknownCost": "Runs with unknown cost",
+		"orgError": "Could not read this organization's runs: {{error}}"
 	},
 	"containers": {
 		"empty": "No workers registered. Hosted runs need the shared workers or a worker per organization.",
@@ -116,7 +128,11 @@
 		"seen": "Last seen",
 		"live": "Online",
 		"offline": "Offline",
-		"refresh": "Refresh"
+		"refresh": "Refresh",
+		"remove": "Remove",
+		"removeCancel": "Cancel",
+		"confirmRemove": "Remove the record of worker {{runner}} from {{org}}? It is offline. If it still has a valid token it joins again when it starts.",
+		"removeError": "Could not remove the worker: {{message}}"
 	},
 	"localAction": "Open Operations",
 	"notAdminAction": "Back to Home",

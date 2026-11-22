@@ -106,6 +106,14 @@
 		"loadError": "Could not load where runs go",
 		"evalLabel": "This evaluation runs on",
 		"whereRunsGo": "where runs go",
-		"notForOne": "set it as where runs go on the Workers page"
+		"notForOne": "set it as where runs go on the Workers page",
+		"onlyOne": "Runs go to: {{label}}.",
+		"onlyOneSlots": "Runs go to: {{label}}. It runs {{n}} at a time.",
+		"addWorker": "Add a worker",
+		"askAdmin": "An admin can add a worker on the Workers page."
+	},
+	"shared": {
+		"hostCap": "This server's shared worker runs {{n}} at a time for all organizations together.",
+		"noRemove": "The shared worker is provided by this server, so it cannot be removed."
 	}
 }

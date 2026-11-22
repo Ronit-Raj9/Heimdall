@@ -325,3 +325,20 @@ func TestLoadTask(t *testing.T) {
 		t.Fatalf("LoadTask m02: %v", err)
 	}
 }
+
+// A task file reached through a symlinked folder that leaves the pack is
+// refused after the task folder is resolved once (E2): the walk below the
+// folder still checks every link.
+func TestLoadRefusesTaskSymlinkOutsidePack(t *testing.T) {
+	benchRoot, packRoot := copyPack(t)
+	task := filepath.Join(packRoot, "tasks", "m01")
+	elsewhere := filepath.Join(t.TempDir(), "fixtures")
+	if err := os.Rename(filepath.Join(task, "fixtures"), elsewhere); err != nil {
+		t.Fatal(err)
+	}
+	symlink(t, elsewhere, filepath.Join(task, "fixtures"))
+	_, err := newLocalLoader(benchRoot).Load(context.Background(), "mini")
+	if err == nil || !strings.Contains(err.Error(), "notes.clean: fixtures/notes.clean.md: resolves outside the folder through a symlink") {
+		t.Fatalf("want the escaping folder refused, got %v", err)
+	}
+}

@@ -342,7 +342,7 @@ export interface Estimate {
 	/** The spend cap that applies, the suggested one, and the runs a smaller cap leaves unstarted. */
 	budget?: EstimateBudget;
 	/** Runs that go at once: per benchmark, over the whole evaluation, and the org's worker slots (0: not bounded). */
-	slots?: { concurrency: number; org_slots: number; parallel: number };
+	slots?: { concurrency: number; org_slots: number; parallel: number; worker_slots?: number };
 	/** A first run: the estimate comes from library runs of other agents. */
 	from_library?: boolean;
 	/** The preset sizes of the same setup, when asked with `presets: true`. */

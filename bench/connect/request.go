@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 	"github.com/maximhq/bifrost/bench/webhooks"
 )
 
@@ -492,8 +493,11 @@ func (s *Sender) log(ex Exchange, note string) {
 	s.Log(Probe{Method: ex.Method, URL: ex.URL, Status: ex.Status, MS: ex.TotalMS, Note: note})
 }
 
-// scrub removes every secret value from text.
+// scrub removes every secret value from text and replaces every private,
+// loopback or other internal address with "a private address" (N104): the
+// address a name resolved to never reaches a member.
 func scrub(text string, secrets map[string]string) string {
+	text = utils.HidePrivateAddresses(text)
 	for _, v := range secrets {
 		if len(v) >= 4 {
 			text = strings.ReplaceAll(text, v, "[secret]")

@@ -13,6 +13,14 @@ vi.mock("@/lib/store/apis/suiteOpsApi", () => ({
 }));
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => mutation() }));
 vi.mock("@/lib/store/hooks", () => ({ useAppDispatch: () => vi.fn() }));
+// The real button asks its confirm in a dialog; the stand-in shows the question so it can be read.
+vi.mock("@/components/jobs/jobRunButton", () => ({
+	JobRunButton: (p: { kind: string; label: string; confirm?: string }) => (
+		<button type="button" data-testid={`job-run-${p.kind}`} data-confirm={p.confirm ?? ""}>
+			{p.label}
+		</button>
+	),
+}));
 
 const suite = {
 	id: "coding-core",
@@ -62,5 +70,24 @@ describe("OpsTab", () => {
 		expect(repoParams({ github: "acme/app", branch: "main" })).toEqual({ github: "acme/app", branch: "main" });
 		expect(repoParams({ github: "" })).toBeNull();
 		expect(repoParams({ repo: "" })).toEqual({ repo: "." });
+	});
+	it("asks before Freeze and says what it does (N116)", () => {
+		const html = render(<OpsTab suite={suite} />);
+		expect(html).toMatch(/data-testid="job-run-suite.lock" data-confirm="Freeze coding-core\? Every task is pinned to its current files\./);
+	});
+	it("shows each task's readiness instead of In use, and the pause reason when paused (N117)", () => {
+		const s = {
+			id: "zz-test-mcp",
+			tasks: [
+				{ id: "t1", status: "not_locked", checks: [] },
+				{ id: "t2", status: "draft", checks: [] },
+				{ id: "t3", status: "quarantined", quarantine: { reason: "flaky", at: "2026-11-01T00:00:00Z", source: "manual" }, checks: [] },
+			],
+		} as unknown as SuiteSummary;
+		const html = render(<OpsTab suite={s} />);
+		expect(html).not.toContain("In use");
+		expect(html).toMatch(/data-testid="suite-ops-task-t1"[\s\S]*?Not frozen yet/);
+		expect(html).toMatch(/data-testid="suite-ops-task-t2"[\s\S]*?Not ready/);
+		expect(html).toContain("Paused: flaky");
 	});
 });

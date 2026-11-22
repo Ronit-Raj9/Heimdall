@@ -295,7 +295,7 @@ func runHostedTasksMine(ctx context.Context, env jobEnv, j *jobs.Job, p tasksMin
 		return rep, errors.Join(fmt.Errorf("plan the proving run: %w", err), restore(nil))
 	}
 	rep.ExpID = m.ExpID
-	log.Printf("proving %d tasks on a runner: experiment %s (open it on the Experiments page)", len(prove), m.ExpID)
+	log.Printf("readiness controls of %d %s tasks run in comparison %s; open it with Open the comparison at the top of this page", len(prove), splitWord(schemas.SplitPublic), m.ExpID)
 	if err := runExperiment(ctx, l, m, max(timeout, readinessTimeout(len(m.Slots))), log); err != nil {
 		return rep, errors.Join(err, restore(nil))
 	}

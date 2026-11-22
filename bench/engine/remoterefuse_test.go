@@ -88,7 +88,7 @@ func TestRefusedLeaseOfferedAgain(t *testing.T) {
 	}
 	failed := map[string]bool{}
 	for _, ev := range drainEvents(events) {
-		if ev.Kind == EventError && strings.Contains(ev.Message, "every worker refused this run 3 times: "+reason) {
+		if ev.Kind == EventError && strings.Contains(ev.Message, "every worker refused this run 3 times: "+PlainRefusal(reason)) {
 			failed[ev.SlotID] = true
 		}
 	}
@@ -132,7 +132,7 @@ func TestRefusalEventInLog(t *testing.T) {
 	defer done()
 	registerDirect(t, rw.c, "w1", BenchVersion)
 	refuseOnce(t, rw.c, "w1", "suite lock hash differs")
-	want := "worker w1 could not take this run: suite lock hash differs. Heimdall offers it again in 1 minute."
+	want := "worker w1 could not take this run: The benchmark changed after this run was planned: start it again. Details: suite lock hash differs. Heimdall offers it again in 1 minute."
 	for _, ev := range drainEvents(events) {
 		if ev.Kind == EventError && ev.Message == want && ev.SlotID != "" {
 			return
@@ -219,5 +219,22 @@ func TestTransientRefusalRetried(t *testing.T) {
 	}
 	if syncs != 2 {
 		t.Fatalf("syncs %d, want 2", syncs)
+	}
+}
+
+// TestPlainRefusalText: the worker reasons a person can act on read as a
+// plain sentence, with the raw reason kept after "Details: " (N151).
+func TestPlainRefusalText(t *testing.T) {
+	cases := map[string]string{
+		"load suite: suite zz-test-mcp: folder /data/heimdall-runner/projects/org_1/benchmarks/zz-test-mcp not found": "The worker's copy of your project does not have this benchmark yet. Details: load suite: suite zz-test-mcp: folder /data/heimdall-runner/projects/org_1/benchmarks/zz-test-mcp not found",
+		"manifest hashes to sha256:a; it records sha256:b and the lease sha256:b":                                     "The benchmark changed after this run was planned: start it again. Details: manifest hashes to sha256:a; it records sha256:b and the lease sha256:b",
+		"local suite lock hash x is not the manifest's y":                                                             "The benchmark changed after this run was planned: start it again. Details: local suite lock hash x is not the manifest's y",
+		"part versions differ from the manifest's: grader x":                                                          "The worker runs a different Heimdall version than the server. Details: part versions differ from the manifest's: grader x",
+		"docker daemon not reachable":                                                                                 "docker daemon not reachable",
+	}
+	for raw, want := range cases {
+		if got := PlainRefusal(raw); got != want {
+			t.Errorf("PlainRefusal(%q)\n got %q\nwant %q", raw, got, want)
+		}
 	}
 }

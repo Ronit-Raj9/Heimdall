@@ -141,3 +141,56 @@ func TestFindSymlinks(t *testing.T) {
 		t.Fatalf("missing folder: %v, %v", none, err)
 	}
 }
+
+// ResolveInsideFrom gives the same answer as ResolveInside for every path of
+// the fixture, from the already resolved task folder.
+func TestResolveInsideFromMatchesResolveInside(t *testing.T) {
+	task, _ := pathFixture(t)
+	real, err := filepath.EvalSymlinks(task)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range []string{
+		"instruction.md", "repo", "repo/pkg", "repo/pkg/a.txt", "./repo/pkg/a.txt", "repo/./pkg", "repo/pkg/../pkg/a.txt",
+		"repo/same.txt", "repo/pkg/self/pkg", "/etc/passwd", "../outside/secret.txt", "repo/../../outside", "", "nope.md",
+		"repo/nope/a.txt", "instruction.md/x", "etc", "notes.md", "repo/up/secret.txt", "repo/pkg/climb", "repo/pkg/top",
+	} {
+		want, wantErr := ResolveInside(real, rel)
+		got, gotErr := ResolveInsideFrom(real, rel)
+		if (wantErr == nil) != (gotErr == nil) {
+			t.Errorf("%q: ResolveInsideFrom = %q, %v; ResolveInside = %q, %v", rel, got, gotErr, want, wantErr)
+			continue
+		}
+		if wantErr != nil {
+			if gotErr.Error() != wantErr.Error() {
+				t.Errorf("%q: error %q, want %q", rel, gotErr, wantErr)
+			}
+			continue
+		}
+		if got != want {
+			t.Errorf("%q: %q, want %q", rel, got, want)
+		}
+	}
+}
+
+// A symlink anywhere below the resolved root that leaves it is refused, as
+// by ResolveInside: a folder link, a file link and a link reached through a
+// plain folder.
+func TestResolveInsideFromRefusesEscapingSymlink(t *testing.T) {
+	task, outside := pathFixture(t)
+	real, err := filepath.EvalSymlinks(task)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(task, "deep", "er"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(outside, "secret.txt"), filepath.Join(task, "deep", "er", "leak.txt")); err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range []string{"etc", "etc/passwd", "notes.md", "repo/up/secret.txt", "deep/er/leak.txt", "repo/pkg/climb"} {
+		if got, err := ResolveInsideFrom(real, rel); err == nil || !strings.Contains(err.Error(), "resolves outside the folder") {
+			t.Errorf("ResolveInsideFrom(%q) = %q, %v; want a refusal", rel, got, err)
+		}
+	}
+}

@@ -420,7 +420,7 @@ func TestVerifyFailures(t *testing.T) {
 		Lookup: func(context.Context, string) ([]net.IPAddr, error) {
 			return []net.IPAddr{{IP: net.ParseIP("10.0.3.4")}}, nil
 		}})
-	if r := res.Row(RowReach); r.Failure == nil || r.Failure.Code != FailPrivateAddress || !strings.Contains(r.Failure.Message, "10.0.3.4") {
+	if r := res.Row(RowReach); r.Failure == nil || r.Failure.Code != FailPrivateAddress || strings.Contains(r.Failure.Message, "10.0.3.4") || !strings.Contains(r.Failure.Message, "agent.example.com is not a public internet address") {
 		t.Fatalf("private: %+v", r)
 	}
 	wrong := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

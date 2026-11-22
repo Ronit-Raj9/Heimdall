@@ -493,13 +493,14 @@ func ValidateURL(raw string, allowPrivate bool) error {
 // public name that resolves to an internal address is still refused
 // (the ranges are utils.BlockedIP's).
 func GuardedDialer(timeout time.Duration) *net.Dialer {
-	return &net.Dialer{Timeout: timeout, Control: func(_, address string, _ syscall.RawConn) error {
+	return &net.Dialer{Timeout: timeout, Resolver: utils.PublicResolver(), Control: func(_, address string, _ syscall.RawConn) error {
 		host, _, err := net.SplitHostPort(address)
 		if err != nil {
 			return err
 		}
 		if ip := net.ParseIP(host); ip == nil || blockedIP(ip) {
-			return fmt.Errorf("refused to connect to private or local address %s", host)
+			// No address in the text (fix wave 2, N104).
+			return utils.ErrBlockedAddress
 		}
 		return nil
 	}}
@@ -642,7 +643,7 @@ func (snd Sender) Send(ctx context.Context, h Hook, ev Event) Delivery {
 	}()
 	body, err := Render(h, ev)
 	if err != nil {
-		d.Error = err.Error()
+		d.Error = utils.HidePrivateAddresses(err.Error())
 		return d
 	}
 	attempts, backoff := snd.Attempts, snd.Backoff
@@ -654,7 +655,7 @@ func (snd Sender) Send(ctx context.Context, h Hook, ev Event) Delivery {
 	}
 	if !snd.AllowPrivate {
 		if err := ValidateURL(h.URL, false); err != nil {
-			d.Error = err.Error()
+			d.Error = utils.HidePrivateAddresses(err.Error())
 			return d
 		}
 	}
@@ -664,7 +665,7 @@ func (snd Sender) Send(ctx context.Context, h Hook, ev Event) Delivery {
 		code, err := snd.post(ctx, c, h, ev, d.ID, body)
 		d.StatusCode, d.Error = code, ""
 		if err != nil {
-			d.Error = err.Error()
+			d.Error = utils.HidePrivateAddresses(err.Error())
 		} else if code >= 200 && code < 300 {
 			d.OK = true
 			return d
@@ -679,7 +680,7 @@ func (snd Sender) Send(ctx context.Context, h Hook, ev Event) Delivery {
 		}
 		select {
 		case <-ctx.Done():
-			d.Error = ctx.Err().Error()
+			d.Error = utils.HidePrivateAddresses(ctx.Err().Error())
 			return d
 		case <-time.After(backoff):
 		}

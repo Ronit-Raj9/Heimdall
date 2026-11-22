@@ -42,12 +42,20 @@ export interface PlatformCardProps {
 }
 
 /** One platform: its state, the token form, and its actions. Pure, so it renders on the server in tests. */
+/** Why "Test and connect" is disabled (N14): the locale key of what to paste, or undefined once the fields are filled. */
+export function connectHint(token: string, endpoint: string, endpointRequired?: boolean): "needToken" | "needTokenAndEndpoint" | undefined {
+	if (endpointRequired && (!token.trim() || !endpoint.trim())) return "needTokenAndEndpoint";
+	if (!token.trim()) return "needToken";
+	return undefined;
+}
+
 export function PlatformCard({ platform: p, busy, error, notice, onConnect, onTest, onDefault, onDisconnect }: PlatformCardProps) {
 	const { t } = useTranslation("workerPlatforms");
 	const formId = useId();
 	const [editing, setEditing] = useState(!p.connected);
 	const [token, setToken] = useState("");
 	const [endpoint, setEndpoint] = useState(p.endpoint ?? "");
+	const hint = connectHint(token, endpoint, p.endpoint_required);
 	const showForm = editing || !p.connected;
 	const submit = (event: FormEvent) => {
 		event.preventDefault();
@@ -155,7 +163,8 @@ export function PlatformCard({ platform: p, busy, error, notice, onConnect, onTe
 								size="sm"
 								className="gap-1.5"
 								isLoading={busy}
-								disabled={!token.trim() || (p.endpoint_required && !endpoint.trim())}
+								disabled={hint !== undefined}
+								aria-describedby={hint ? `${formId}-connect-hint` : undefined}
 								dataTestId={`platform-${p.name}-connect`}
 							>
 								<PlugZap className="size-4" aria-hidden="true" />
@@ -163,6 +172,11 @@ export function PlatformCard({ platform: p, busy, error, notice, onConnect, onTe
 							</Button>
 						</div>
 					</div>
+					{hint && (
+						<p id={`${formId}-connect-hint`} className="text-muted-foreground text-right text-xs" data-testid={`platform-${p.name}-connect-hint`}>
+							{t(hint)}
+						</p>
+					)}
 				</form>
 			) : (
 				<div className="flex flex-wrap items-center justify-end gap-2 border-t pt-3">

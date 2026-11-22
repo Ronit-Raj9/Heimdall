@@ -323,3 +323,102 @@ func TestRunnerRowKeepsItsToken(t *testing.T) {
 		}
 	})
 }
+
+// TestRunnerSeenAfterTokenRotation is the N12 regression: the shared worker
+// claims a fresh token on every start and the old one is revoked, under the
+// same runner name. The new token takes the row over, so the row's last
+// seen time, slots and token follow the running worker.
+func TestRunnerSeenAfterTokenRotation(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, d *db.DB) {
+		s, c, live := newService(t, d)
+		ctx := context.Background()
+		old, err := s.CreateToken(ctx, "org_a", "usr_1", schemas.RunnerTokenCreate{Pool: "shared"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		info := schemas.WorkerInfo{ID: "shared-runner-org_a", State: schemas.WorkerIdle, Slots: 2, Running: []string{}, Pool: "shared"}
+		s.RunnerSeen(ctx, schemas.RunnerScope{OrgID: "org_a", Pool: "shared", TokenID: old.Info.ID}, info, true)
+		if _, err := s.RevokeToken(ctx, "org_a", old.Info.ID); err != nil {
+			t.Fatal(err)
+		}
+		fresh, err := s.CreateToken(ctx, "org_a", "usr_1", schemas.RunnerTokenCreate{Pool: "shared"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.add(time.Hour)
+		// A restart: a fresh service with an empty memory.
+		s2 := New(d, Options{Now: c.now, Live: live, PublicURL: "https://heimdall.example.com/"})
+		info.Slots = 3
+		s2.RunnerSeen(ctx, schemas.RunnerScope{OrgID: "org_a", Pool: "shared", TokenID: fresh.Info.ID}, info, true)
+		live.workers["org_a"] = []schemas.WorkerInfo{{ID: info.ID, State: schemas.WorkerIdle, Running: []string{}, TokenID: fresh.Info.ID, LastSeen: c.now()}}
+		list, err := s2.ListRunners(ctx, "org_a")
+		if err != nil || len(list) != 1 {
+			t.Fatalf("runners %+v %v", list, err)
+		}
+		r := list[0]
+		if r.TokenID != fresh.Info.ID || r.Slots != 3 || !r.LastSeen.Equal(c.now()) || !r.Live || r.State == schemas.RunnerLost {
+			t.Fatalf("row not taken over by the fresh token: %+v", r)
+		}
+	})
+}
+
+// TestRunnerSeenKeepsNameFromOtherValidToken: a different token that is
+// still valid never takes a name over (4-B-01 holds after N12).
+func TestRunnerSeenKeepsNameFromOtherValidToken(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, d *db.DB) {
+		s, c, _ := newService(t, d)
+		ctx := context.Background()
+		a, err := s.CreateToken(ctx, "org_a", "usr_1", schemas.RunnerTokenCreate{Pool: "gpu"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := s.CreateToken(ctx, "org_a", "usr_1", schemas.RunnerTokenCreate{Pool: "default"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		info := schemas.WorkerInfo{ID: "box-01", State: schemas.WorkerIdle, Slots: 1, Running: []string{}}
+		s.RunnerSeen(ctx, schemas.RunnerScope{OrgID: "org_a", Pool: "gpu", TokenID: a.Info.ID}, info, true)
+		c.add(time.Hour)
+		info.Slots = 9
+		s.RunnerSeen(ctx, schemas.RunnerScope{OrgID: "org_a", Pool: "default", TokenID: b.Info.ID}, info, true)
+		list, err := s.ListRunners(ctx, "org_a")
+		if err != nil || len(list) != 1 {
+			t.Fatalf("runners %+v %v", list, err)
+		}
+		if list[0].TokenID != a.Info.ID || list[0].Pool != "gpu" || list[0].Slots != 1 {
+			t.Fatalf("a valid token's row was taken over: %+v", list[0])
+		}
+	})
+}
+
+// TestRemoveSharedRunnerRefused: an org admin cannot remove the shared
+// worker (it registers again at once); a server admin may remove an
+// offline shared row through RemoveRunnerRecord.
+func TestRemoveSharedRunnerRefused(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, d *db.DB) {
+		s, _, _ := newService(t, d)
+		ctx := context.Background()
+		tok, err := s.CreateToken(ctx, "org_a", "usr_1", schemas.RunnerTokenCreate{Pool: "shared"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		s.RunnerSeen(ctx, schemas.RunnerScope{OrgID: "org_a", Pool: "shared", TokenID: tok.Info.ID},
+			schemas.WorkerInfo{ID: "shared-runner-org_a", State: schemas.WorkerIdle, Slots: 2, Running: []string{}, Pool: "shared"}, true)
+		list, _ := s.ListRunners(ctx, "org_a")
+		if len(list) != 1 {
+			t.Fatalf("runners %+v", list)
+		}
+		if _, err := s.RemoveRunner(ctx, "org_a", list[0].ID); !errors.Is(err, ErrShared) {
+			t.Fatalf("remove shared runner: %v, want ErrShared", err)
+		}
+		if l, _ := s.ListRunners(ctx, "org_a"); len(l) != 1 {
+			t.Fatalf("shared runner removed: %+v", l)
+		}
+		if _, err := s.RemoveRunnerRecord(ctx, "org_a", list[0].ID); err != nil {
+			t.Fatalf("server admin remove: %v", err)
+		}
+		if l, _ := s.ListRunners(ctx, "org_a"); len(l) != 0 {
+			t.Fatalf("record kept: %+v", l)
+		}
+	})
+}

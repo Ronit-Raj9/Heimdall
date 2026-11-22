@@ -62,6 +62,27 @@ sudo ufw enable
 Docker publishes ports through its own iptables rules, ahead of ufw; that is
 why only Caddy publishes anything. Use the cloud provider's firewall as well.
 
+### Public DNS for outbound checks
+
+Calls to addresses an organization typed in (Connect > Detect and Verify,
+webhooks, Test my MCP server, live inbox pulls) resolve host names only through
+public DNS servers, never through Docker's own resolver, so a compose service
+name such as `bifrost` or `heimdall-postgres-1` does not resolve for them at
+all. Hosts that cannot be public (a name without a dot, `localhost`, internal
+suffixes, private addresses) are refused before any lookup, and no message
+shows the address a name resolved to.
+
+- `HEIMDALL_PUBLIC_DNS` sets the servers as a comma list of `ip:port`. Unset or
+  empty means `1.1.1.1:53,8.8.8.8:53`. Entries that are not `ip:port` are
+  skipped with one warning; with no valid entry the default list is used.
+- `HEIMDALL_PUBLIC_DNS=system` keeps the container's own resolver, for a
+  server with no outbound DNS. Private hosts are still refused before any
+  lookup, but dotted internal names become resolvable again.
+- The firewall must allow outbound UDP and TCP 53 to those servers. At start
+  the server logs `public DNS ok (<servers>)`, or `public DNS unreachable
+  (<servers>): guarded outbound calls will fail; set HEIMDALL_PUBLIC_DNS=system
+  to use the container resolver` as a warning.
+
 ## 3. Install Docker and get the code
 
 ```sh
@@ -605,11 +626,12 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_CAPTCHA_SECRET`, `HEIMDALL_CAPTCHA_SITEKEY` | Optional hCaptcha on self-serve sign-up: the secret turns it on, the site key is what the sign-up page shows. Invitation sign-ups skip it. |
 | `HEIMDALL_IMAGE_AUTO_APPROVE` | `off`: every image request waits for a server admin. Empty: images a gVisor shared worker can run are approved automatically (section 9). |
 | `HEIMDALL_FAULT_MODE` | Where fault plans go, on the server and the shared worker: `proxy` (default, the fault proxy behind Bifrost) or `plugin` (headers to the heimdall Bifrost plugin, the proxy as fallback; needs the custom Bifrost build). |
+| `HEIMDALL_PUBLIC_DNS` | DNS servers for guarded outbound calls (webhooks, Test my MCP server, the live inbox pull, Connect), `host:port` pairs, comma separated. Empty uses `1.1.1.1:53,8.8.8.8:53`; `system` uses the container's own resolver. |
 | `HEIMDALL_PULL_SIGNING_KEY` | Signs run tokens and repository links of pull-mode agents (docs/pull-agents.md); the server and the shared worker share it. `bootstrap.sh` fills it when empty. |
 | `HEIMDALL_BENCH_DIR` | Host path of this checkout's `bench` folder, which the shared worker mounts at the same path; the helper scripts fill it in. |
 | `BIFROST_SETUP_TOKEN`, `BIFROST_PG_PASSWORD`, `BENCH_FAULTPROXY_TOKEN` | The shared worker's Bifrost stack: Bifrost's admin setup token, its Postgres password and the fault proxy's control token. Random values (`openssl rand -hex 24`). |
 | `HEIMDALL_S3_BUCKET`, `HEIMDALL_S3_REGION`, `HEIMDALL_S3_ENDPOINT`, `HEIMDALL_S3_ACCESS_KEY`, `HEIMDALL_S3_SECRET_KEY` | Evidence mirror (section 7): empty bucket or keys, no mirror. Empty endpoint is AWS S3; MinIO, R2 and others take `https://host[:port]`. |
-| `HEIMDALL_STATUS_PROBES` | Extra components on the public `/status` page: `id=url` pairs, comma separated. |
+| `HEIMDALL_STATUS_PROBES` | Extra components on the public `/status` page: `id=url` pairs, comma separated. Empty uses `gateway=http://bifrost:8080/health` in the hosted compose file; `none` for no extra line. |
 | `HEIMDALL_OTEL_ENDPOINT`, `HEIMDALL_OTEL_SAMPLER`, `HEIMDALL_GRAFANA_PASSWORD`, `HEIMDALL_GRAFANA_PORT`, `HEIMDALL_PROMETHEUS_RETENTION` | Monitoring profile (docs/monitoring.md): where traces go (empty: no traces) and how many are kept, Grafana's admin password and loopback port, Prometheus retention. |
 | `HEIMDALL_LIBRARY_REGISTRY_TOKEN_DIR`, `HEIMDALL_LIBRARY_REGISTRY_ACCESS`, `HEIMDALL_LIBRARY_REGISTRY_DIR`, `HEIMDALL_LIBRARY_REGISTRY_PUBLISH` | Library registry override (docs/library-registry.md, "Library registry" below): token key folder, per-org access file, image folder and published address. |
 | `HEIMDALL_VOICE_RTC_PUBLISH`, `HEIMDALL_VOICE_MAX_CALLS` | Voice gateway (profile `voice`): the host address its port is published on, where runs reach it (default `172.17.0.1:8790`) and calls at once (default 20). |

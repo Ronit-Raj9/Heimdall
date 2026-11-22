@@ -164,7 +164,26 @@ func evalSlots(req *EvalEstimateRequest, benchmarks int) EvalSlots {
 		s.Concurrency = min(s.Concurrency, s.OrgSlots)
 		s.Parallel = min(s.Parallel, s.OrgSlots)
 	}
+	if req.workerSlots > 0 { // N90: the worker runs no more than its slots at once
+		s.WorkerSlots = req.workerSlots
+		s.Concurrency = min(s.Concurrency, s.WorkerSlots)
+		s.Parallel = min(s.Parallel, s.WorkerSlots)
+	}
 	return s
+}
+
+// workerSlotsOf is how many runs the worker an evaluation goes to runs at
+// once (Services.WorkerSlots); 0 when this server does not know it or the
+// lookup fails (the estimate is then not bounded by it).
+func workerSlotsOf(ctx context.Context, s Services, target string) int {
+	if s.WorkerSlots == nil {
+		return 0
+	}
+	n, err := s.WorkerSlots(ctx, target)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
 }
 
 // orgSlotsAndCap reads the org's worker slots (max concurrent runs) and

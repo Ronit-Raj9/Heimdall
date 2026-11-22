@@ -1,5 +1,6 @@
 import "@/lib/i18n";
 
+import { hostedSession } from "@/lib/testing/platformFixtures";
 import { mutation, okQuery, render } from "@/lib/testing/render";
 import type { WorkerTargetView } from "@/lib/store/apis/workerTargetApi";
 import { describe, expect, it, vi } from "vitest";
@@ -58,9 +59,22 @@ describe("WhereRunsGo", () => {
 });
 
 describe("EvaluationWorkerPicker", () => {
-	it("hides with only the shared worker and lists every choice otherwise", () => {
-		q.target = okQuery({ target: "shared", choices: [view.choices[0]] });
-		expect(render(<EvaluationWorkerPicker value="" onChange={() => undefined} />)).toBe("");
+	it("says where runs go with one choice, its runs at once and how to add a worker (N93)", () => {
+		q.target = okQuery({ target: "shared", choices: [{ ...view.choices[0], current: true, per_evaluation: true, note: undefined, slots: 2 }] });
+		const member = render(<EvaluationWorkerPicker value="" onChange={() => undefined} />, hostedSession("member"));
+		expect(member).toContain('data-testid="eval-worker-only"');
+		expect(member).toContain("Runs go to: Shared worker. It runs 2 at a time.");
+		expect(member).toContain("An admin can add a worker on the Workers page.");
+		expect(member).not.toContain("<select");
+		const admin = render(<EvaluationWorkerPicker value="" onChange={() => undefined} />, hostedSession("admin"));
+		expect(admin).toContain('href="/settings?tab=runners"');
+		expect(admin).toContain("Add a worker");
+		expect(admin).not.toContain("An admin can add a worker");
+		q.target = okQuery({ target: "shared", choices: [{ ...view.choices[0], current: true, per_evaluation: true }] });
+		expect(render(<EvaluationWorkerPicker value="" onChange={() => undefined} />, hostedSession("member"))).toContain("Runs go to: Shared worker.</");
+	});
+
+	it("lists every choice when there are several", () => {
 		q.target = okQuery(view);
 		const html = render(<EvaluationWorkerPicker value="" onChange={() => undefined} />);
 		expect(html).toContain("Modal (a fresh sandbox per run), where runs go");

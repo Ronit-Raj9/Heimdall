@@ -260,6 +260,34 @@ type ExperimentStatus struct {
 	// one a person started, so lists can tell an evaluation's benchmarks
 	// from comparisons.
 	EvaluationID string `json:"evaluation_id,omitempty"`
+	// Debug is the debug mode of a replay, fork or step run (the manifest's
+	// experiment.debug.mode) and DebugFromRun the run it debugs, so lists can
+	// hide debug runs and tag them (fix wave 2, N29).
+	Debug        string `json:"debug,omitempty"`
+	DebugFromRun string `json:"debug_from_run,omitempty"`
+	// MultiAgent: an arm runs a team or a multi-agent topology, so blame
+	// between agents applies (N63).
+	MultiAgent bool `json:"multi_agent,omitempty"`
+	// Setups names each arm's agent, agent file and model, sorted by arm
+	// (N66).
+	Setups []ArmSetup `json:"setups,omitempty"`
+	// ArmsDiffer says what differs between exactly two arms: "model" (the
+	// same agent version on another model or provider), "none" (an A/A
+	// check) or "agent" (N165). Empty for any other arm count.
+	ArmsDiffer string `json:"arms_differ,omitempty"`
+	// Problem is why no run could start (a worker refusal, a slot that
+	// failed before its run) while nothing sealed, and RunJobID the
+	// experiment's newest run job, so the page can link its log (N151).
+	Problem  string `json:"problem,omitempty"`
+	RunJobID string `json:"run_job_id,omitempty"`
+}
+
+// ArmSetup is one arm's setup on ExperimentStatus.
+type ArmSetup struct {
+	Arm       string `json:"arm"`
+	Agent     string `json:"agent"`      // the agent config id
+	AgentFile string `json:"agent_file"` // the agent file the arm was built from
+	Model     string `json:"model"`
 }
 
 // ExperimentList is GET /experiments.

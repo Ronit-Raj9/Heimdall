@@ -97,8 +97,8 @@ var catalog = []CatalogEntry{
 	{Code: FailDNS, Title: "Name does not resolve", Trigger: "the name does not resolve from the run target",
 		Template: "{host} does not resolve from where your runs go ({target}). If it is an internal name, run `heimdall serve {url}` inside your network or connect your own worker.",
 		Action:   ActionCopyCommand, Label: "Copy the serve command", Infra: true},
-	{Code: FailPrivateAddress, Title: "Private address", Trigger: "resolves to a private or loopback address on the shared worker",
-		Template: "{host} resolves to {ip}, a private address. The shared worker never calls private networks. Use `heimdall serve {url}` from a machine that can reach it; it connects out only.",
+	{Code: FailPrivateAddress, Title: "Private address", Trigger: "the host is a private, loopback or internal address on the shared worker",
+		Template: "{host} is not a public internet address. The shared worker only calls public addresses. Run `heimdall serve {url} --map auto` on a machine that can reach it; it connects out only.",
 		Action:   ActionCopyCommand, Label: "Copy the serve command"},
 	{Code: FailIPAllowlist, Title: "Connection refused", Trigger: "connection reset or 403 with no auth challenge",
 		Template: "Your endpoint refused the connection from {source}. If it allows only listed addresses, add the shared worker's addresses shown on Workers.",
@@ -193,7 +193,7 @@ func Lookup(code string, vars map[string]string) Failure {
 }
 
 var standIn = map[string]string{
-	"host": "the endpoint", "target": "the shared worker", "url": "<your URL>", "ip": "a private address",
+	"host": "the endpoint", "target": "the shared worker", "url": "<your URL>",
 	"source": "the shared worker", "detail": "name mismatch", "secret": "AGENT_TOKEN", "status": "401",
 	"snippet": "no detail", "method": "POST", "path": "the mapped path", "other": "another route", "kind": "another kind of server",
 	"field": "user_id", "type": "string", "code": "the check code", "timeout": "60", "n": "3", "version": "0.3",

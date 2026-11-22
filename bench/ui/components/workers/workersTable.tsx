@@ -27,17 +27,42 @@ export function isSharedWorker(id: string, pool?: string): boolean {
 /** Where a user creates a worker token for their own machine (Settings, workers tab). */
 export const RUNNER_TOKEN_SETUP_HREF = "/settings?tab=runners#runner-token-setup";
 
+/** The host-wide cap of the shared worker from its "host-slots=<n>" label (N13); undefined without one. */
+export function hostSlotsOf(labels?: readonly string[] | null): number | undefined {
+	const label = labels?.find((l) => l.startsWith("host-slots="));
+	const n = label ? Number(label.slice("host-slots=".length)) : NaN;
+	return Number.isInteger(n) && n > 0 ? n : undefined;
+}
+
 /**
  * A plain explanation of the shared worker: who provides it, what it does, who pays, how many
- * runs at once (its slots), and a link to run on your own machine instead.
+ * runs at once (its slots), and a link to run on your own machine instead. With a host-slots label
+ * it also says the host cap is shared by every organization.
  */
-export function SharedWorkerNote({ slots, setupHref = RUNNER_TOKEN_SETUP_HREF, testId }: { slots: number; setupHref?: string; testId?: string }) {
+export function SharedWorkerNote({
+	slots,
+	labels,
+	setupHref = RUNNER_TOKEN_SETUP_HREF,
+	testId,
+}: {
+	slots: number;
+	labels?: readonly string[] | null;
+	setupHref?: string;
+	testId?: string;
+}) {
 	const { t } = useTranslation("bench");
+	const { t: tw } = useTranslation("byoworker");
+	const hostSlots = hostSlotsOf(labels);
 	return (
 		<div className="bg-muted/40 flex min-w-0 items-start gap-2 rounded-lg border px-3 py-2.5 text-xs" role="note" data-testid={testId}>
 			<Info className="text-muted-foreground mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
 			<div className="flex min-w-0 flex-col gap-1.5">
 				<p className="text-foreground leading-relaxed text-pretty">{t("workers.sharedExplain", { count: slots })}</p>
+				{hostSlots !== undefined && (
+					<p className="text-muted-foreground leading-relaxed text-pretty" data-testid={testId ? `${testId}-host-cap` : undefined}>
+						{tw("shared.hostCap", { n: hostSlots })}
+					</p>
+				)}
 				<a
 					href={setupHref}
 					className="text-primary w-fit font-medium underline-offset-4 hover:underline"

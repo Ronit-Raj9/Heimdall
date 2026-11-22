@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -59,8 +60,8 @@ func TestBuildPlan(t *testing.T) {
 	if p.Slots != 4 || p.Pairs != 2 || len(p.Conditions) != 1 || !p.MDEAssumedSD || p.SD != 0.30 {
 		t.Fatalf("plan = %+v", p)
 	}
-	// Two tasks: MDE exists and is large. Nothing has run: no estimates.
-	if p.MDE <= 0 || len(p.Warnings) != 0 || len(p.Errors) != 0 || p.EstUSD.IsObserved() || p.EstWallS.Reason != "no pilot yet" {
+	// Two tasks: MDE exists and is large, so the plan warns (N40). Nothing has run: no estimates.
+	if p.MDE <= 0 || len(p.Warnings) != 1 || len(p.Errors) != 0 || p.EstUSD.IsObserved() || p.EstWallS.Reason != "no pilot yet" {
 		t.Errorf("plan = %+v", p)
 	}
 	m.Slots = m.Slots[:2] // one task left
@@ -170,5 +171,55 @@ func TestVerdictPayload(t *testing.T) {
 	if body["grade_source"] != "rg_1" || body["suite"] != "coding-core@1.0.0" || verdict["decision"] != "improved" ||
 		len(gates) != 1 || len(diff) != 1 {
 		t.Fatalf("verdict = %v", body)
+	}
+}
+
+// manifestWithTasks is testManifest with n tasks on two arms.
+func manifestWithTasks(n int) *schemas.Manifest {
+	m := testManifest()
+	m.Slots = nil
+	for i := 0; i < n; i++ {
+		task := fmt.Sprintf("t%03d", i)
+		for _, arm := range []string{"A", "B"} {
+			m.Slots = append(m.Slots, schemas.Slot{SlotID: "s_" + task + "_" + arm, PairID: "p_" + task, ExpID: testExp,
+				Task: task, Arm: arm, Condition: "clean", Trial: 1, Counted: true})
+		}
+	}
+	return m
+}
+
+// A plan that can only detect a large change says so, with the task count
+// that would detect 10 points, instead of "No errors and no warnings" (N40).
+func TestBuildPlanWarnsUnderpowered(t *testing.T) {
+	m := manifestWithTasks(5)
+	m.Experiment.Verdict = schemas.VerdictSpec{Alpha: 0.05, AssumedSD: 0.30}
+	p := BuildPlan(m)
+	if len(p.Warnings) != 1 || len(p.Errors) != 0 {
+		t.Fatalf("5 tasks: warnings %q errors %q, want one warning", p.Warnings, p.Errors)
+	}
+	w := p.Warnings[0]
+	if !strings.Contains(w, "With 5 tasks this comparison can only detect a change of about ") || !strings.Contains(w, " tasks are needed to detect 10 points.") {
+		t.Fatalf("warning %q", w)
+	}
+	if !strings.Contains(w, fmt.Sprintf("about %.1f points", p.MDE)) || p.MDE < 40 || p.MDE > 60 {
+		t.Fatalf("warning %q does not name the MDE %.1f", w, p.MDE)
+	}
+	m = manifestWithTasks(200)
+	m.Experiment.Verdict = schemas.VerdictSpec{Alpha: 0.05, AssumedSD: 0.30}
+	if p := BuildPlan(m); len(p.Warnings) != 0 {
+		t.Fatalf("200 tasks: warnings %q", p.Warnings)
+	}
+}
+
+// FailedPlan shows the plain sentence, not "plan experiment: plan <id>: ..."
+// (N42, N44).
+func TestFailedPlanUsesPlainText(t *testing.T) {
+	p := FailedPlan(&schemas.Experiment{}, errors.New("plan e_zz_test_ab_fl4n: suite lock: task file-inbox is draft, not admitted"))
+	if len(p.Errors) != 1 {
+		t.Fatalf("errors %q", p.Errors)
+	}
+	if e := p.Errors[0]; strings.Contains(e, "plan experiment") || strings.Contains(e, "e_zz_test_ab_fl4n") || !strings.Contains(e, "file-inbox") ||
+		!strings.HasPrefix(e, "This benchmark has tasks that have not passed the readiness check yet") {
+		t.Fatalf("error %q", e)
 	}
 }

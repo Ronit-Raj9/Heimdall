@@ -66,6 +66,14 @@ type ActivityReporter interface {
 	Active(expID string) bool
 }
 
+// RunProblemReporter is optionally implemented by a Launcher. RunProblem
+// returns why no run of the experiment could start (a worker refusal, a slot
+// that failed before its run) while nothing sealed, and the id of the
+// experiment's newest run job; both "" when unknown (fix wave 2, N151).
+type RunProblemReporter interface {
+	RunProblem(expID string) (problem, jobID string)
+}
+
 // AnalysisIndex is optionally implemented by a ReadIndex. LatestAnalysis
 // returns the id of the newest analysis written for the experiment, if any.
 type AnalysisIndex interface {

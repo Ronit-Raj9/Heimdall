@@ -125,6 +125,56 @@ type Worker struct {
 	spend      *runnerSpend // Runners area: nil without a spend cap
 	capLogged  atomic.Bool
 	now        func() time.Time // the clock of the refusal cache (remoterefuse.go)
+	// active holds the run ids of the slots Work is running now, under mu
+	// (fix wave 2, E5): the shared runner's leftover sweep never removes the
+	// containers of these runs (cmd/bifrost-bench/runnerorphans.go).
+	active map[string]bool
+}
+
+// ActiveRuns lists, sorted, the run ids of the slots this worker is running
+// now. A run is listed from its first event (before any of its containers
+// exists) until Work returns.
+func (w *Worker) ActiveRuns() []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	out := make([]string, 0, len(w.active))
+	for id := range w.active {
+		out = append(out, id)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// workRuns is one Work call's runs in Worker.active.
+type workRuns struct {
+	w    *Worker
+	runs []string
+}
+
+// note marks runID active until done.
+func (a *workRuns) note(runID string) {
+	if runID == "" {
+		return
+	}
+	a.w.mu.Lock()
+	defer a.w.mu.Unlock()
+	if a.w.active == nil {
+		a.w.active = map[string]bool{}
+	}
+	if !a.w.active[runID] {
+		a.w.active[runID] = true
+		a.runs = append(a.runs, runID)
+	}
+}
+
+// done clears the runs this Work call noted.
+func (a *workRuns) done() {
+	a.w.mu.Lock()
+	defer a.w.mu.Unlock()
+	for _, id := range a.runs {
+		delete(a.w.active, id)
+	}
+	a.runs = nil
 }
 
 // workerExp is an experiment the worker checked: admitted with its manifest
@@ -336,6 +386,9 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 	ctx, slotSpan := workerSlotSpan(ctx, lease) // lane Z14: joins the lease's trace (remotetelemetry.go)
 	defer slotSpan.End()
 	live := &liveBuffer{} // the run's live events, forwarded on the heartbeat
+	// E5: the slot's run is active from its first event until Work returns.
+	track := &workRuns{w: w}
+	defer track.done()
 	sctx, stop := w.heartbeat(ctx, lease, live)
 	defer stop()
 	exp, reason, permanent := w.admit(sctx, lease) // QC2-08-02: preparation stops when the lease is lost
@@ -399,7 +452,8 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		}
 		return nil
 	}
-	in := SlotInput{Manifest: runM, Suite: exp.suite, Slot: slot, Attempt: lease.Attempt, Secrets: leaseSecrets, Emit: live.add,
+	emit := func(ev Event) { track.note(ev.RunID); live.add(ev) }
+	in := SlotInput{Manifest: runM, Suite: exp.suite, Slot: slot, Attempt: lease.Attempt, Secrets: leaseSecrets, Emit: emit,
 		Live: workerLiveSink{w: w, leaseID: lease.LeaseID}} // Z03: live screen frames and takeover inputs (livescreen.go)
 	if len(lease.GPUs) > 0 { // QC2-10-09: the devices the coordinator reserved, not the pool's first fit
 		a, release, why := w.leasedGPUs(sctx, lease.GPUs)

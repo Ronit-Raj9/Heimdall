@@ -133,9 +133,18 @@ func (h *SuitesHandler) getSuites(ctx *fasthttp.RequestCtx) {
 		sendUnavailable(ctx, h.mode, "suite loader")
 		return
 	}
+	var light bool
+	switch string(ctx.QueryArgs().Peek("fields")) {
+	case "", "full":
+	case "light":
+		light = true
+	default:
+		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "fields must be light or full")
+		return
+	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	list, err := h.ListSummaries(work)
+	list, err := h.listSummaries(work, light)
 	if err != nil {
 		sendDepError(ctx, h.mode, "list suites", err)
 		return
@@ -148,6 +157,14 @@ func (h *SuitesHandler) getSuites(ctx *fasthttp.RequestCtx) {
 // library packs marked. Evaluation packs (bench/packs) read ready task counts
 // from it.
 func (h *SuitesHandler) ListSummaries(work context.Context) ([]schemas.SuiteSummary, error) {
+	return h.listSummaries(work, false)
+}
+
+// listSummaries is ListSummaries; light (GET /suites?fields=light, for
+// pickers) never waits for a pack load: each entry is the cached full
+// summary of any stamp, else the head summary, without per-task lists
+// (lightSummary). A missing or stale entry starts a background refresh.
+func (h *SuitesHandler) listSummaries(work context.Context, light bool) ([]schemas.SuiteSummary, error) {
 	if h.suites == nil {
 		return nil, errors.New("suite loader is not available")
 	}
@@ -179,13 +196,18 @@ func (h *SuitesHandler) ListSummaries(work context.Context) ([]schemas.SuiteSumm
 		}
 	} else {
 		// Every pack has its own budget (suitecache.go); the waits run side
-		// by side and the loads behind them are bounded by the cache.
+		// by side and the loads behind them are bounded by the cache. The
+		// light list does not wait at all.
+		wait := suiteListBudget
+		if light {
+			wait = 0
+		}
 		var wg sync.WaitGroup
 		for i, id := range ids {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				sum, ok := h.cachedSummary(id, suiteListBudget)
+				sum, ok := h.cachedSummary(id, wait)
 				if !ok {
 					sum = headSummary(h.suites, id)
 				}
@@ -198,8 +220,19 @@ func (h *SuitesHandler) ListSummaries(work context.Context) ([]schemas.SuiteSumm
 		if origin != nil && origin.SuiteBuiltin(id) {
 			out.Suites[i].Builtin, out.Suites[i].Source = true, "library"
 		}
+		if light {
+			lightSummary(&out.Suites[i])
+		}
 	}
 	return out.Suites, nil
+}
+
+// lightSummary drops the per-task lists of a list entry: tasks, drift and
+// probes become empty lists, fingerprint drift, artifacts and tiers are left
+// out. Counts, readiness, lock state and scenario fields stay.
+func lightSummary(s *schemas.SuiteSummary) {
+	s.Tasks, s.Drift, s.Probes = []schemas.SuiteTask{}, []schemas.SuiteDrift{}, []schemas.SuiteProbe{}
+	s.FingerprintDrift, s.Artifacts, s.Tiers = nil, nil, nil
 }
 
 // getSuiteTask handles GET /api/bench/suites/{id}/tasks/{task}: one task with

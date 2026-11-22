@@ -15,3 +15,10 @@ suite_version?
 arms?
 decision?
 evaluation_id?
+debug?
+debug_from_run?
+multi_agent?
+setups?
+arms_differ?
+problem?
+run_job_id?

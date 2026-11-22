@@ -102,7 +102,12 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 									<RunnerStatusBadge state={runner.state} />
 								</div>
 								{isSharedWorker(runner.name, runner.pool) && (
-									<SharedWorkerNote slots={runner.slots} setupHref="#runner-token-setup" testId={`runner-row-${runner.id}-shared-note`} />
+									<SharedWorkerNote
+										slots={runner.slots}
+										labels={runner.labels}
+										setupHref="#runner-token-setup"
+										testId={`runner-row-${runner.id}-shared-note`}
+									/>
 								)}
 								<div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
 									<Badge variant="outline" className="rounded-full px-2 font-mono">
@@ -119,19 +124,21 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 										{tu("settings.lastSeen")} <When value={runner.last_seen} />
 									</span>
 								</div>
-								<div className="flex justify-end border-t pt-3">
-									<ConfirmButton
-										label={t("settings.runners.remove")}
-										question={t("settings.runners.confirmRemove", {
-											name: runner.name,
-										})}
-										confirmLabel={t("settings.runners.remove")}
-										cancelLabel={t("settings.runners.cancel")}
-										onConfirm={() => void removeRunner(runner.id)}
-										isLoading={removeState.isLoading && removeState.originalArgs === runner.id}
-										testId={`runner-remove-${runner.id}`}
-									/>
-								</div>
+								{!isSharedWorker(runner.name, runner.pool) && (
+									<div className="flex justify-end border-t pt-3">
+										<ConfirmButton
+											label={t("settings.runners.remove")}
+											question={t("settings.runners.confirmRemove", {
+												name: runner.name,
+											})}
+											confirmLabel={t("settings.runners.remove")}
+											cancelLabel={t("settings.runners.cancel")}
+											onConfirm={() => void removeRunner(runner.id)}
+											isLoading={removeState.isLoading && removeState.originalArgs === runner.id}
+											testId={`runner-remove-${runner.id}`}
+										/>
+									</div>
+								)}
 							</div>
 						))}
 					</div>

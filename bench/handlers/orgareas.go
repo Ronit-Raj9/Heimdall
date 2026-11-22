@@ -52,6 +52,11 @@ type Services struct {
 	// WebhookCipher seals webhook signing secrets at rest (the keystore's
 	// master key); nil stores them in plaintext (0600).
 	WebhookCipher webhooks.Cipher
+	// WorkerSlots is how many runs the org's worker for target runs at once
+	// (N90): target "" or "shared" is the shared worker, "worker:<pool>" an
+	// own worker's pool, a platform target 0 (not bounded). nil in local
+	// mode; the estimate is then not bounded by it.
+	WorkerSlots func(ctx context.Context, target string) (int, error)
 }
 
 // OrgEnv is what an org area gets when it registers its routes.

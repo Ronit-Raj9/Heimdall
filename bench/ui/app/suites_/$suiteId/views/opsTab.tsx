@@ -1,5 +1,6 @@
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { BuiltinReadOnlyNote } from "@/components/suites/builtinReadOnly";
+import { AdmissionBadge } from "@/components/suites/suiteBadges";
 import { isBuiltinSuite } from "@/components/suites/suiteDisplay";
 import { Section } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
@@ -9,7 +10,7 @@ import { canUse, useSession } from "@/lib/session/sessionContext";
 import { benchApi, getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useQuarantineTaskMutation, useRestoreTaskMutation } from "@/lib/store/apis/suiteOpsApi";
 import { useAppDispatch } from "@/lib/store/hooks";
-import type { SuiteSummary, SuiteTask } from "@/lib/types/bench";
+import type { Job, SuiteSummary, SuiteTask } from "@/lib/types/bench";
 import { SUITE_OPS_KINDS, type RepoSource, type TaskFromCommitParams, type TasksMineParams } from "@/lib/types/suiteops";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -61,12 +62,27 @@ function useRefreshSuite(suiteId: string) {
 
 function ChecksSection({ suite, writable, hosted, t }: { suite: SuiteSummary; writable: boolean; hosted: boolean; t: T }) {
 	const refresh = useRefreshSuite(suite.id);
+	const [frozen, setFrozen] = useState(false);
+	const lockDone = useCallback(
+		(job: Job) => {
+			refresh();
+			setFrozen(job.status === "succeeded");
+		},
+		[refresh],
+	);
 	return (
 		<Section title={t("checks.title")} description={t("checks.description")} testId="suite-ops-checks">
 			{writable ? (
 				<div className="flex flex-wrap items-start gap-2">
 					<JobRunButton kind={SUITE_OPS_KINDS.lint} params={{ suite: suite.id }} label={t("checks.lint")} variant="outline" />
-					<JobRunButton kind={SUITE_OPS_KINDS.lock} params={{ suite: suite.id }} label={t("checks.lock")} variant="outline" onDone={refresh} />
+					<JobRunButton
+						kind={SUITE_OPS_KINDS.lock}
+						params={{ suite: suite.id }}
+						label={t("checks.lock")}
+						variant="outline"
+						confirm={t("checks.lockConfirm", { suite: suite.id })}
+						onDone={lockDone}
+					/>
 					<JobRunButton
 						kind={SUITE_OPS_KINDS.admit}
 						params={{ suite: suite.id }}
@@ -76,6 +92,11 @@ function ChecksSection({ suite, writable, hosted, t }: { suite: SuiteSummary; wr
 					/>
 				</div>
 			) : null}
+			{frozen && (
+				<p role="status" className="mt-2 text-sm" data-testid="suite-ops-lock-done">
+					{t("checks.lockDone")}
+				</p>
+			)}
 			{hosted && (
 				<p className="text-muted-foreground mt-2 text-sm" data-testid="suite-ops-hosted-admit">
 					{t("checks.hostedAdmit", { suite: suite.id })}
@@ -142,9 +163,14 @@ function QuarantineRow({ suiteId, task, writable, t }: { suiteId: string; task: 
 			<div className="flex flex-wrap items-center gap-2">
 				<span className="font-mono text-sm">{task.id}</span>
 				{task.redacted && <span className="text-muted-foreground text-xs">{t("health.redacted")}</span>}
-				<span className={task.quarantine ? "text-chart-warning-ink text-xs" : "text-muted-foreground text-xs"}>
-					{task.quarantine ? t("health.quarantined", { reason: task.quarantine.reason }) : t("health.active")}
-				</span>
+				{task.quarantine ? (
+					<span className="text-chart-warning-ink text-xs">{t("health.quarantined", { reason: task.quarantine.reason })}</span>
+				) : (
+					<>
+						<AdmissionBadge task={task} testId={`suite-ops-admission-${task.id}`} />
+						<span className="sr-only">{t("health.active")}</span>
+					</>
+				)}
 				{writable && (
 					<span className="ml-auto flex items-center gap-2">
 						{task.quarantine ? (

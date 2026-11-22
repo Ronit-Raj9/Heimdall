@@ -124,8 +124,11 @@ func newHostedFixtureWith(t *testing.T, realLauncher bool) *hostedFixture {
 	if _, set := os.LookupEnv(benchcatalog.DevEnv); !set {
 		t.Setenv(benchcatalog.DevEnv, "1")
 	}
-	ctx := context.Background()
 	dir := t.TempDir()
+	// Cancelled before the temp folder is removed, so background loops of
+	// the hosted areas (the status page watch) stop with the test.
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 	if code := runInit([]string{dir}); code != exitOK {
 		t.Fatalf("init exit %d", code)
 	}

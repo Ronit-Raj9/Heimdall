@@ -369,6 +369,38 @@ type sharedHost struct {
 	host        string
 	prefix      string
 	hostSlots   *hostslots.Pool // Z10: the host-wide fair run limit every org's loop shares
+
+	// workers are the org loops' running workers by org (fix wave 2, E5):
+	// the leftover sweep keeps every run one of them is running.
+	workersMu sync.Mutex
+	workers   map[string]*engine.Worker
+}
+
+// setWorker registers (w non-nil) or removes the worker of org.
+func (h *sharedHost) setWorker(org string, w *engine.Worker) {
+	h.workersMu.Lock()
+	defer h.workersMu.Unlock()
+	if h.workers == nil {
+		h.workers = map[string]*engine.Worker{}
+	}
+	if w == nil {
+		delete(h.workers, org)
+		return
+	}
+	h.workers[org] = w
+}
+
+// activeRuns is the union of the registered workers' active runs.
+func (h *sharedHost) activeRuns() map[string]bool {
+	h.workersMu.Lock()
+	defer h.workersMu.Unlock()
+	out := map[string]bool{}
+	for _, w := range h.workers {
+		for _, id := range w.ActiveRuns() {
+			out[id] = true
+		}
+	}
+	return out
 }
 
 // sharedSplitList splits a comma separated list, dropping blanks.
@@ -696,6 +728,8 @@ func runSharedRunner(args []string) int {
 	h.hostSlots = sharedHostPool(f.hostSlots)
 	h.hygiene = newRunnerHygiene(a, f.projectsDir) // E6: one sweep for every org's loop: they share this runner's store and Docker (runnerhygiene.go)
 	go h.hygiene.Run(ctx)
+	// E5: leftover run containers and networks, now and every 15 minutes (runnerorphans.go).
+	go runOrphanSweeps(ctx, a.docker, h.activeRuns, a.logger)
 	startPublicIngress(ctx, a) // Y03: /gw and /rt for live runs, behind Caddy (runneringress.go)
 	var wg sync.WaitGroup
 	start := func(as sharedpool.Assignment, slots int) *sharedLoop {
@@ -765,7 +799,7 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 	go h.keepGateway(ctx, network, org)
 	proj := &orgProject{server: h.f.server, token: claim.Token, dst: root, client: h.client}
 	if err := proj.refresh(ctx); err != nil {
-		a.logger.Warn("shared runner: org project not downloaded; built-in suites only until it is", "org", org, "error", err.Error())
+		a.logger.Warn("shared runner: org project not downloaded yet; it is downloaded again before each lease", "org", org, "error", err.Error())
 	}
 	docker := utils.Docker{Binary: a.docker.Binary, Policy: l.policy}
 	oa, err := newApp(ctx, h.f.config, appOptions{gateway: true, debug: h.f.debug, docker: &docker, evalNetwork: network})
@@ -784,7 +818,7 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 		defer func() { _ = rel.ReleaseOrgCredentials(context.WithoutCancel(ctx), org) }()
 	}
 	reg = withPullOrg(reg, oa, planRoot, org) // Y11: pull agents' run tokens name the org
-	labels := []string{"shared", "runtime=" + h.runtime}
+	labels := h.sharedWorkerLabels()
 	if claim.Platform != nil { // X19a: the org's own sandbox platform runs its runs
 		pr, err := sandboxRegistry(ctx, oa, reg, claim.Platform)
 		if err != nil {
@@ -798,7 +832,7 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 	w, err := engine.NewWorker(reg, engine.NewPipeline(reg, planRoot, oa.logger),
 		sharedEnsureImages(oa, reg, planRoot, proj.refresh, plan),
 		engine.WorkerOptions{Server: h.f.server, Token: claim.Token, WorkerID: name, Host: h.host, Version: benchVersion,
-			Slots: slots, Logger: oa.logger, Pool: sharedpool.Pool, Labels: labels,
+			Slots: h.sharedWorkerSlots(slots), Logger: oa.logger, Pool: sharedpool.Pool, Labels: labels,
 			Disk: h.hygiene.DiskState, ImageUse: h.hygiene.NoteImages, KeepRunFolders: a.cfg.Runner.Disk.KeepRunFolders,
 			PullPrivate: func(ctx context.Context, ref string, auths []schemas.RegistryAuth) error { // Y10: under the org's Docker policy
 				return registrycreds.Pull(ctx, docker, ref, auths)
@@ -814,6 +848,8 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 		a.logger.Error("shared runner: worker not started", "org", org, "error", err.Error())
 		return
 	}
+	h.setWorker(org, w) // E5: the leftover sweep keeps this worker's runs
+	defer h.setWorker(org, nil)
 	a.logger.Info("shared runner: serving org", "org", org, "slots", slots, "runtime", h.runtime, "network", network)
 	if err := w.Run(ctx); err != nil && ctx.Err() == nil {
 		a.logger.Error("shared runner: worker stopped", "org", org, "error", err.Error())
@@ -877,14 +913,18 @@ func (p *orgProject) refresh(ctx context.Context) error {
 }
 
 // sharedOrgProject is the registry and project root the shared runner plans
-// an org's runs with: the org's downloaded project at root when it holds
-// suites, else the runner's own checkout. Either way the built-in library
-// is layered underneath.
+// an org's runs with: the org's downloaded project at root, with the
+// built-in library layered underneath. root/benchmarks is created when the
+// first download has not happened yet (fix wave 2, N151): planning from the
+// runner's own checkout instead would last for the life of the org loop,
+// and the later downloads before each lease could not bring the org's
+// benchmarks in. Without a root the runner's own checkout is used.
 func sharedOrgProject(a *app, root string) (*schemas.Registry, string) {
 	if root == "" {
 		return withLibrary(a.reg, a.cfg.Path(a.cfg.BenchmarksRoot)), a.cfg.Root
 	}
-	if fi, err := os.Stat(filepath.Join(root, "benchmarks")); err != nil || !fi.IsDir() {
+	if err := os.MkdirAll(filepath.Join(root, "benchmarks"), 0o755); err != nil {
+		a.logger.Warn("shared runner: org project folder not created; planning from the runner's own checkout", "error", err.Error())
 		return withLibrary(a.reg, a.cfg.Path(a.cfg.BenchmarksRoot)), a.cfg.Root
 	}
 	reg := *a.reg

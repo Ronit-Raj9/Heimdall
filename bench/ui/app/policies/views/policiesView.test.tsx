@@ -4,7 +4,16 @@ import { checkKind, PolicyForm, starterPolicy, withKind } from "@/components/gov
 import { splitIds } from "@/components/govern/monitorCertifyForm";
 import { isValidPolicyFile, normalizePolicyFile, policyPath } from "@/lib/store/apis/governApi";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { mutation, render } from "@/lib/testing/render";
+import { describe, expect, it, vi } from "vitest";
+import { freePolicyFile, PolicyEditor } from "./policiesView";
+
+vi.mock("@/lib/store/apis/governApi", async (orig) => ({
+	...(await orig<typeof import("@/lib/store/apis/governApi")>()),
+	useSavePolicyMutation: () => mutation(),
+	useValidatePolicyMutation: () => mutation(),
+	useDeletePolicyMutation: () => mutation(),
+}));
 
 const noop = () => {};
 
@@ -38,5 +47,27 @@ describe("policy file names and ids", () => {
 		expect(isValidPolicyFile("a/b.yaml")).toBe(false);
 		expect(policyPath("a b.yaml")).toBe("/policies/a%20b.yaml");
 		expect(splitIds("e_1, e_2 e_1")).toEqual(["e_1", "e_2"]);
+	});
+});
+
+// N6: a new rule set never proposes, or saves over, a file name that is taken.
+describe("new rule set file name", () => {
+	it("proposes the first free my-release-policy name", () => {
+		expect(freePolicyFile([])).toBe("my-release-policy.yaml");
+		expect(freePolicyFile(["my-release-policy.yaml"])).toBe("my-release-policy-2.yaml");
+		expect(freePolicyFile(["my-release-policy.yaml", "my-release-policy-2.yaml"])).toBe("my-release-policy-3.yaml");
+	});
+
+	it("opens the new editor on a free name", () => {
+		const html = render(<PolicyEditor isNew taken={["my-release-policy.yaml"]} />);
+		expect(html).toContain('value="my-release-policy-2.yaml"');
+		expect(html).not.toContain('data-testid="policy-file-taken"');
+	});
+
+	it("says a taken name is taken and keeps Save disabled", () => {
+		const html = render(<PolicyEditor isNew file="my-release-policy.yaml" taken={["my-release-policy.yaml"]} />);
+		expect(html).toContain('data-testid="policy-file-taken"');
+		expect(html).toContain("A rule set with this file name already exists. Pick another name.");
+		expect(html).toMatch(/<button[^>]*disabled=""[^>]*data-testid="policy-save"|<button[^>]*data-testid="policy-save"[^>]*disabled=""/);
 	});
 });

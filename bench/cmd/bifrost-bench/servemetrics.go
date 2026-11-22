@@ -49,7 +49,7 @@ func registerJobMetrics(reg *selfmetrics.Registry, r *jobs.Runner) {
 // coords returns (one in local worker mode, one per organization hosted).
 func registerCoordinatorMetrics(reg *selfmetrics.Registry, coords func() []*engine.Coordinator) {
 	total := func() engine.CoordinatorStats {
-		sum := engine.CoordinatorStats{Workers: map[string]int{}, Runs: map[string]int{}}
+		sum := engine.CoordinatorStats{Workers: map[string]int{}, Runs: map[string]int{}, SharedWorkers: map[string]int{}}
 		for _, c := range coords() {
 			st := c.Stats()
 			sum.Leases += st.Leases
@@ -60,6 +60,9 @@ func registerCoordinatorMetrics(reg *selfmetrics.Registry, coords func() []*engi
 			}
 			for k, v := range st.Workers {
 				sum.Workers[k] += v
+			}
+			for k, v := range st.SharedWorkers {
+				sum.SharedWorkers[k] += v
 			}
 			for k, v := range st.Runs {
 				sum.Runs[k] += v
@@ -81,6 +84,13 @@ func registerCoordinatorMetrics(reg *selfmetrics.Registry, coords func() []*engi
 	reg.Gauge("heimdall_workers", "Registered workers by state.", func(context.Context) []selfmetrics.Sample {
 		var out []selfmetrics.Sample
 		for state, n := range total().Workers {
+			out = append(out, selfmetrics.Sample{Labels: map[string]string{"state": state}, Value: float64(n)})
+		}
+		return out
+	})
+	reg.Gauge("heimdall_shared_workers", "Workers of the platform's shared pool by state (the status page's worker line).", func(context.Context) []selfmetrics.Sample {
+		var out []selfmetrics.Sample
+		for state, n := range total().SharedWorkers {
 			out = append(out, selfmetrics.Sample{Labels: map[string]string{"state": state}, Value: float64(n)})
 		}
 		return out

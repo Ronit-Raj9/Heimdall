@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/lib"
@@ -25,12 +26,21 @@ import (
 // next to the runs root.
 const StatusFileEnv = "HEIMDALL_STATUS_FILE"
 
-// StatusProbesEnv lists extra HTTP probes: id=url,id2=url2.
+// StatusProbesEnv lists extra HTTP probes: id=url,id2=url2. The hosted
+// compose file defaults it to the model gateway's health address.
 const StatusProbesEnv = "HEIMDALL_STATUS_PROBES"
+
+// statusWatchEvery is how often the hosted server runs the status checks on
+// its own, for the automatic incidents (statuspage/auto.go).
+const statusWatchEvery = 30 * time.Second
 
 func init() {
 	hostedAreas = append(hostedAreas, func(env *hostedEnv) (server.RouteRegistrar, error) {
-		return handlers.NewStatusPageHandler(env.base.cfg.Server.Mode, newStatusService(env.base.cfg, readyChecks(env.base))), nil
+		svc := newStatusService(env.base.cfg, readyChecks(env.base))
+		if env.ctx != nil { // automatic incidents open and resolve while nobody reads the page (N148)
+			go svc.Watch(env.ctx, statusWatchEvery)
+		}
+		return handlers.NewStatusPageHandler(env.base.cfg.Server.Mode, svc), nil
 	})
 }
 
@@ -66,9 +76,10 @@ func newStatusService(cfg *lib.Config, ready []handlers.ReadyCheck) *statuspage.
 			return nil
 		}))
 	}
-	checks = append(checks, statuspage.WorkersCheck(selfmetrics.Default), statuspage.QueueCheck(selfmetrics.Default))
+	checks = append(checks, statuspage.WorkersCheck(selfmetrics.Default), statuspage.RunsCheck(selfmetrics.Default, time.Now),
+		statuspage.QueueCheck(selfmetrics.Default))
 	checks = append(checks, statuspage.ParseProbes(os.Getenv(StatusProbesEnv), nil)...)
-	return statuspage.New(checks, statuspage.NewStore(statusFilePath(cfg)), benchVersion)
+	return statuspage.New(checks, statuspage.NewStore(statusFilePath(cfg)), benchVersion).WithAutoIncidents()
 }
 
 var errStatusCheck = errors.New("check failed")

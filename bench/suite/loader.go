@@ -248,7 +248,10 @@ func loadTask(root, id string, d displayer) (*schemas.Task, error) {
 	if t.ID != id {
 		errs = append(errs, fmt.Errorf("%s: id: got %q, want %q (the folder name and the suite.yaml tasks entry)", file, t.ID, id))
 	}
-	if _, err := utils.ResolveInside(root, filepath.Join(tasksDir, id)); err != nil {
+	// The task folder is resolved once; the files it names are checked
+	// from that real path (checkFileFrom), one Lstat per path component.
+	realDir, err := utils.ResolveInside(root, filepath.Join(tasksDir, id))
+	if err != nil {
 		return nil, fmt.Errorf("%s: task folder: %w", file, err)
 	}
 	links, err := utils.FindSymlinks(dir, dir)
@@ -262,7 +265,7 @@ func loadTask(root, id string, d displayer) (*schemas.Task, error) {
 		}
 	}
 	check := func(field, rel string, isDir bool) {
-		if err := checkFile(dir, rel, isDir); err != nil {
+		if err := checkFileFrom(realDir, rel, isDir); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %s: %w", file, field, err))
 		}
 	}
@@ -363,6 +366,21 @@ func suiteSymlinks(s *schemas.Suite, d displayer) []error {
 // file.
 func checkFile(base, rel string, isDir bool) error {
 	abs, err := resolveIn(base, rel)
+	return checkResolved(abs, rel, isDir, err)
+}
+
+// checkFileFrom is checkFile for a base that is already a real path (a
+// task folder resolved once per load): rel is checked with
+// utils.ResolveInsideFrom, which gives the same answers and errors without
+// resolving the whole path from the file system root.
+func checkFileFrom(realBase, rel string, isDir bool) error {
+	abs, err := utils.ResolveInsideFrom(realBase, rel)
+	return checkResolved(abs, rel, isDir, err)
+}
+
+// checkResolved checks that abs, the resolved path of rel, exists as a
+// folder (isDir) or a regular file. err is the resolution's error.
+func checkResolved(abs, rel string, isDir bool, err error) error {
 	if err != nil {
 		return err
 	}

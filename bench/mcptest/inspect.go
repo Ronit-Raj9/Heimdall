@@ -12,6 +12,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/admitscan"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // Inspect limits.
@@ -168,7 +169,7 @@ func Inspect(ctx context.Context, t Target, hc *http.Client, opts Options) *Repo
 	in.sent += 2
 	in.count("initialize", a, err)
 	if err != nil {
-		rep.Error = err.Error()
+		rep.Error = utils.HidePrivateAddresses(err.Error())
 		in.finish()
 		return rep
 	}
@@ -178,7 +179,7 @@ func Inspect(ctx context.Context, t Target, hc *http.Client, opts Options) *Repo
 	in.sent++
 	in.count("tools/list", a, err)
 	if err != nil {
-		rep.Error = err.Error()
+		rep.Error = utils.HidePrivateAddresses(err.Error())
 		in.finish()
 		return rep
 	}

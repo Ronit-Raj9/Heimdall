@@ -23,6 +23,45 @@ export function bestCandidate(det: ConnectDetectResponse | undefined): ConnectCa
 	return det?.candidates.find((c) => c.supported);
 }
 
+/** N105: a candidate is proven when a test request brought the check code back. */
+export function isProven(c: ConnectCandidate | undefined): boolean {
+	return Boolean(c && (c.proven ?? c.nonce_found));
+}
+
+/** The key and values of the result title (N105, N106): not recognised, could not connect, found but not proven, found. */
+export function resultTitle(
+	det: ConnectDetectResponse,
+	cand: ConnectCandidate | undefined,
+): {
+	key: "result.notRecognised" | "result.couldNotConnect" | "result.notSupported" | "result.found" | "result.foundUnproven";
+	vars?: Record<string, string>;
+} {
+	if (det.class === "unknown") return { key: "result.notRecognised" };
+	if (!cand) {
+		const f = (det.failures ?? [])[0];
+		return f ? { key: "result.couldNotConnect", vars: { reason: f.title } } : { key: "result.notSupported" };
+	}
+	return isProven(cand)
+		? { key: "result.found", vars: { label: cand.label } }
+		: { key: "result.foundUnproven", vars: { label: cand.label } };
+}
+
+/** N105: Save needs a proven answer, or an answer field the user picked. */
+export function canSave(cand: ConnectCandidate | undefined, userMapped: boolean): boolean {
+	return Boolean(cand && (isProven(cand) || userMapped));
+}
+
+/** N107: no Detect button while the import catalog of a picked platform loads, nor when the platform has its own form. */
+export function showDetectButton(
+	platform: string,
+	importable: unknown,
+	catalog: { isLoading: boolean; isError: boolean },
+	none = "none",
+): boolean {
+	if (importable) return false;
+	return !(platform !== none && catalog.isLoading);
+}
+
 /** The other candidates, shown folded. */
 export function otherCandidates(det: ConnectDetectResponse | undefined): ConnectCandidate[] {
 	const best = bestCandidate(det);

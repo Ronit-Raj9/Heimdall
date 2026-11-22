@@ -109,8 +109,17 @@ export function ExportMenu({ expId, synthetic = false, classifyError, runs = nul
  * The experiment Export menu. Once opened it reads the run table, to count the sealed runs and to learn
  * whether they are synthetic, so the EEE link asks for synthetic results labelled only when they are.
  */
-export function ExperimentExportMenu({ expId, fixtureMode = IS_FIXTURE_MODE }: { expId: string; fixtureMode?: boolean }) {
-	const [open, setOpen] = useState(false);
+export function ExperimentExportMenu({
+	expId,
+	fixtureMode = IS_FIXTURE_MODE,
+	initiallyOpen = false,
+}: {
+	expId: string;
+	fixtureMode?: boolean;
+	/** Start open (the comparison's Export tab), so the downloads show without a click (N70). */
+	initiallyOpen?: boolean;
+}) {
+	const [open, setOpen] = useState(initiallyOpen);
 	const q = useGetExperimentRunTableQuery(expId, { skip: !open || fixtureMode });
 	// Fixture mode has no server to download from, so the menu is not offered (6-C-08).
 	if (fixtureMode) return null;

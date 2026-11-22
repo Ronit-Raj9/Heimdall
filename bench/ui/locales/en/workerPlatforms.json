@@ -10,6 +10,8 @@
   "tokenLabel": "API token",
   "tokenPlaceholder": "Paste the token",
   "connect": "Test and connect",
+  "needToken": "Paste the token to test it.",
+  "needTokenAndEndpoint": "Paste the token and the endpoint to test them.",
   "replace": "Replace token",
   "cancel": "Cancel",
   "test": "Test connection",

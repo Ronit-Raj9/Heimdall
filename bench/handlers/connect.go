@@ -258,7 +258,8 @@ func (h *connectHandler) detectRoute(ctx *fasthttp.RequestCtx) {
 	work, cancel := context.WithTimeout(context.Background(), connectDetectWait)
 	defer cancel()
 	prop := h.detect(work, connect.Input{Raw: req.Input, Platform: req.Platform, ID: req.ID},
-		connect.Options{Client: endpointTestClient(h.env.Services.Hosted, connect.DefaultProbeWait), Secrets: req.Secrets, Target: h.from()})
+		connect.Options{Client: endpointTestClient(h.env.Services.Hosted, connect.DefaultProbeWait), Secrets: req.Secrets, Target: h.from(),
+			Hosted: h.env.Services.Hosted})
 	out := ConnectDetectResponse{Proposal: prop, From: h.from()}
 	if b := prop.Best(); b != nil && b.Template != "" {
 		id := suggestAgentID(b)

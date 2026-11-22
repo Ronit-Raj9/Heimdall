@@ -3082,7 +3082,7 @@
 			"support": "Support and tool use",
 			"codingHint": "Edit a repository; hidden tests decide.",
 			"terminalHint": "Work in a whole container; its state is checked afterwards.",
-			"tool_useHint": "Call tools against a service; the final state is checked.",
+			"tool_useHint": "Call tools against a service; a script checks the calls or the state they left.",
 			"mcpHint": "Tools reached over the Model Context Protocol.",
 			"memoryHint": "Several sessions; recall is checked in the last one.",
 			"skillsHint": "The same task with and without agent skills.",

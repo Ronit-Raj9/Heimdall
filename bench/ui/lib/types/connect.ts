@@ -88,6 +88,8 @@ export interface ConnectCandidate {
 	mapping?: RemoteMapping;
 	auth?: RemoteAuth;
 	nonce_found: boolean;
+	/** A test request came back with the check code: the candidate is known to work (fix wave 2, N105). */
+	proven?: boolean;
 	questions?: ConnectQuestion[];
 	capabilities?: string[];
 	command?: string;

@@ -2,8 +2,17 @@ import "@/lib/i18n";
 
 import { experimentExportPath, experimentExportUrl, parseJSONLines, suiteHarborUrl } from "@/lib/store/apis/exportApi";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
-import { ExportMenu, SuiteExportMenu } from "./exportMenu";
+import { describe, expect, it, vi } from "vitest";
+import { ExperimentExportMenu, ExportMenu, SuiteExportMenu } from "./exportMenu";
+
+const runTable = vi.hoisted(() => ({ skip: [] as boolean[] }));
+vi.mock("@/lib/store/apis/exportApi", async (orig) => ({
+	...(await orig<typeof import("@/lib/store/apis/exportApi")>()),
+	useGetExperimentRunTableQuery: (_id: string, opts?: { skip?: boolean }) => {
+		runTable.skip.push(Boolean(opts?.skip));
+		return { data: [{ synthetic: false }, { synthetic: false }], error: undefined };
+	},
+}));
 
 describe("export URLs", () => {
 	it("escapes the id as one path segment and keeps the format in the query", () => {
@@ -69,5 +78,22 @@ describe("SuiteExportMenu", () => {
 		expect(html).toContain('download="coding-core.harbor.tar.gz"');
 		expect(html).toContain("withheld");
 		expect(html).toContain("-include-hidden");
+	});
+});
+// N70: the comparison's Export tab opens the menu at once, so the tab is never an empty disclosure.
+describe("ExperimentExportMenu initiallyOpen", () => {
+	it("renders open with the three downloads and reads the run table at once", () => {
+		runTable.skip.length = 0;
+		const html = renderToStaticMarkup(<ExperimentExportMenu expId="e_smoke" fixtureMode={false} initiallyOpen />);
+		expect(html).toMatch(/<details[^>]*open=""/);
+		expect(html).toContain('href="/api/bench/experiments/e_smoke/export?format=eee"');
+		expect(html).toContain('href="/api/bench/experiments/e_smoke/export?format=jsonl"');
+		expect(html).toContain('href="/api/bench/experiments/e_smoke/export?format=csv"');
+		expect(runTable.skip).toEqual([false]);
+	});
+
+	it("starts closed by default", () => {
+		const html = renderToStaticMarkup(<ExperimentExportMenu expId="e_smoke" fixtureMode={false} />);
+		expect(html).not.toMatch(/<details[^>]*open=""/);
 	});
 });

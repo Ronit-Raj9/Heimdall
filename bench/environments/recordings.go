@@ -168,24 +168,18 @@ func (e *dockerWorkspace) copyRecording(ctx context.Context, container, dir, ser
 	defer os.Remove(spool)
 	cctx, cancel := context.WithTimeout(ctx, exportTimeout)
 	defer cancel()
-	fh, err := os.OpenFile(spool, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	// docker cp, with the docker exec tar fallback for a file written inside
+	// a gVisor sandbox, which docker cp cannot see (copyout.go).
+	res, err := e.copyToSpool(cctx, container, f.Path, spool, limit+1<<20)
 	if err != nil {
-		return fail("open spool: " + err.Error())
-	}
-	w := &cappedWriter{w: fh, limit: limit + 1<<20}
-	var errBuf strings.Builder
-	cmd := exec.CommandContext(cctx, dockerBinary(e.cfg.Docker), "cp", container+":"+f.Path, "-")
-	cmd.Stdout, cmd.Stderr = w, &errBuf
-	runErr := cmd.Run()
-	if err := errors.Join(w.err, fh.Close()); err != nil {
 		return fail("write spool: " + err.Error())
 	}
 	switch {
-	case runErr != nil && recordingPathMissing(errBuf.String()):
+	case res.failed && recordingPathMissing(res.cpStderr):
 		return fail(recordingMissingNote(f.Kind, f.Path))
-	case runErr != nil:
-		return fail("not written: " + truncate(strings.TrimSpace(errBuf.String()), 200))
-	case w.truncated:
+	case res.failed:
+		return fail("not written: " + truncate(res.cpStderr, 200))
+	case res.truncated:
 		return fail(fmt.Sprintf("over its %d byte cap", limit))
 	}
 	recs, err := unpackRecording(spool, outDir, service, f, limit, total)

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // Probe limits (section 4.3): at most 10 requests, 3 seconds each, GET
@@ -40,6 +41,13 @@ type Options struct {
 	// worker", "your worker").
 	Target string
 	Now    func() time.Time
+	// Hosted refuses, before any lookup or request, a host that cannot be a
+	// public internet address, and resolves names through the public DNS
+	// servers only (fix wave 2, N104).
+	Hosted bool
+	// Lookup resolves the URL's host; nil uses the public resolver on a
+	// hosted server and the system resolver otherwise.
+	Lookup func(ctx context.Context, host string) ([]net.IPAddr, error)
 }
 
 func (o *Options) fill() {
@@ -60,6 +68,13 @@ func (o *Options) fill() {
 	}
 	if o.Now == nil {
 		o.Now = time.Now
+	}
+	if o.Lookup == nil {
+		var r *net.Resolver
+		if o.Hosted {
+			r = utils.PublicResolver()
+		}
+		o.Lookup = func(ctx context.Context, host string) ([]net.IPAddr, error) { return utils.LookupIPAddr(ctx, r, host) }
 	}
 }
 
@@ -143,8 +158,17 @@ func (p *prober) get(u *url.URL, note string) (int, any, error) {
 }
 
 // Detect classifies the input and, for URLs and curl commands, runs the
-// URL ladder and the nonce probe. It never returns nil.
+// URL ladder and the nonce probe. It never returns nil. A candidate is
+// proven only when the check code came back (N105).
 func Detect(ctx context.Context, in Input, opt Options) *Proposal {
+	prop := detect(ctx, in, opt)
+	for i := range prop.Candidates {
+		prop.Candidates[i].Proven = prop.Candidates[i].NonceFound
+	}
+	return prop
+}
+
+func detect(ctx context.Context, in Input, opt Options) *Proposal {
 	opt.fill()
 	raw := strings.TrimSpace(in.Raw)
 	prop := &Proposal{Class: Classify(raw), Probes: []Probe{}, Candidates: []Candidate{}}
@@ -173,10 +197,12 @@ func Detect(ctx context.Context, in Input, opt Options) *Proposal {
 			cand.Evidence = append(cand.Evidence, fp.evidence)
 		}
 		if !p.reach(u) {
+			settleUnproven(&cand)
 			prop.Candidates = append(prop.Candidates, cand)
 			return prop
 		}
 		p.nonceHTTP(&cand)
+		settleUnproven(&cand)
 		prop.Candidates = append(prop.Candidates, cand)
 	case ClassURL:
 		if !strings.Contains(raw, "://") {
@@ -234,40 +260,89 @@ func firstNonEmpty(a, b string) string {
 }
 
 // reach checks that the host resolves and is not private on a hosted
-// server; it records the dns or private_address failure.
+// server; it records the dns or private_address failure. On a hosted
+// server a host that cannot be a public internet address (a single-label
+// compose name, localhost, an internal suffix, a literal private address)
+// is refused before any lookup or request, and names resolve only through
+// the public DNS servers (N104), so the answer never tells a member which
+// internal names exist.
 func (p *prober) reach(u *url.URL) bool {
-	if ip := net.ParseIP(u.Hostname()); ip != nil {
+	host := u.Hostname()
+	if p.opt.Hosted && utils.CheckPublicHost(host) != nil {
+		p.prop.Failures = append(p.prop.Failures, p.privateFailure(u))
+		return false
+	}
+	if ip := net.ParseIP(host); ip != nil {
 		return true
 	}
 	ctx, cancel := context.WithTimeout(p.ctx, DefaultProbeWait)
 	defer cancel()
-	if _, err := net.DefaultResolver.LookupHost(ctx, u.Hostname()); err != nil {
+	ips, err := p.opt.Lookup(ctx, host)
+	if err != nil {
 		var de *net.DNSError
 		if errors.As(err, &de) && (de.IsNotFound || de.IsTemporary) {
-			p.prop.Failures = append(p.prop.Failures, Lookup(FailDNS, map[string]string{"host": u.Hostname(), "target": p.opt.Target,
+			p.prop.Failures = append(p.prop.Failures, Lookup(FailDNS, map[string]string{"host": host, "target": p.opt.Target,
 				"url": redactURL(u.String()), "fix": "heimdall serve " + redactURL(u.String()) + " --map auto"}))
+			return false
+		}
+		return true
+	}
+	if p.opt.Hosted && len(ips) > 0 && allBlocked(ips) {
+		p.prop.Failures = append(p.prop.Failures, p.privateFailure(u))
+		return false
+	}
+	return true
+}
+
+// privateFailure is the private_address failure for u: the host as typed,
+// never the address it resolves to.
+func (p *prober) privateFailure(u *url.URL) Failure {
+	return Lookup(FailPrivateAddress, map[string]string{"host": u.Hostname(), "target": p.opt.Target, "url": redactURL(u.String()),
+		"fix": "heimdall serve " + redactURL(u.String()) + " --map auto"})
+}
+
+// allBlocked reports whether no address in ips is public.
+func allBlocked(ips []net.IPAddr) bool {
+	for _, ip := range ips {
+		if !utils.BlockedIP(ip.IP) {
 			return false
 		}
 	}
 	return true
 }
 
+// settleUnproven: a candidate whose test request never brought the check
+// code back is not known to work, so it is not "40% sure" (N105). It stays
+// supported only when the user can still make it work on this page: a
+// bearer token to type, a request template to write, or a field of the
+// answer to pick.
+func settleUnproven(c *Candidate) {
+	if c.NonceFound {
+		return
+	}
+	c.Confidence = 0
+	if !hasQuestion(c, "auth_secret") && !hasQuestion(c, "body") && !hasQuestion(c, "answer_path") {
+		c.Supported = false
+	}
+}
+
 // dialFailure maps a transport error to its catalog entry.
 func (p *prober) dialFailure(err error, u *url.URL) Failure {
-	if f, ok := ExplainRunError(err.Error()); ok {
+	text := scrub(err.Error(), p.opt.Secrets)
+	if f, ok := ExplainRunError(text); ok {
 		if f.Code == FailPrivateAddress || f.Code == FailDNS {
 			return Lookup(f.Code, map[string]string{"host": u.Hostname(), "target": p.opt.Target, "url": redactURL(u.String()),
-				"ip": ipInText.FindString(err.Error()), "fix": "heimdall serve " + redactURL(u.String()) + " --map auto"})
+				"fix": "heimdall serve " + redactURL(u.String()) + " --map auto"})
 		}
 		if f.Code == FailTLS {
-			return Lookup(FailTLS, map[string]string{"host": u.Hostname(), "detail": capText(err.Error(), 120)})
+			return Lookup(FailTLS, map[string]string{"host": u.Hostname(), "detail": capText(text, 120)})
 		}
 		if f.Code == FailTimeout {
 			return Lookup(FailTimeout, map[string]string{"timeout": "3"})
 		}
 		return f
 	}
-	return Failure{Code: "unreachable", Title: "No answer", Message: "The endpoint did not answer: " + capText(scrub(err.Error(), p.opt.Secrets), 200)}
+	return Failure{Code: "unreachable", Title: "No answer", Message: "The endpoint did not answer: " + capText(text, 200)}
 }
 
 // ladder runs the URL ladder (section 4.3) and appends what it found.
@@ -324,7 +399,8 @@ func (p *prober) ladder(u *url.URL) {
 		}
 	}
 	// 5/6. Nonce shape inference on the URL itself.
-	if len(cands) == 0 {
+	fallback := len(cands) == 0
+	if fallback {
 		cands = append(cands, Candidate{Kind: KindHTTP, Preset: PresetCustom, Label: "HTTP endpoint", Confidence: 0.4, Supported: true,
 			Template: TemplateHTTP, URL: u.String(), Params: map[string]string{"url": u.String()}, Evidence: []string{}})
 	}
@@ -335,6 +411,9 @@ func (p *prober) ladder(u *url.URL) {
 		case KindHTTP:
 			p.nonceHTTP(&cands[i])
 		}
+	}
+	if fallback {
+		settleUnproven(&cands[0])
 	}
 	p.prop.Candidates = append(p.prop.Candidates, cands...)
 }

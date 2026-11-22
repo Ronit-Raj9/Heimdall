@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 	"github.com/maximhq/bifrost/bench/webhooks"
 )
 
@@ -104,7 +105,9 @@ type VerifyOptions struct {
 	// Dial opens the reach row's TCP connection; nil uses the guarded
 	// dialer on hosted servers and a plain dialer otherwise.
 	Dial func(ctx context.Context, network, addr string) (net.Conn, error)
-	// Lookup resolves the reach row's host; nil uses the system resolver.
+	// Lookup resolves the reach row's host; nil uses the public resolver
+	// (utils.PublicResolver) on hosted servers and the system resolver
+	// otherwise.
 	Lookup func(ctx context.Context, host string) ([]net.IPAddr, error)
 	Now    func() time.Time
 	// RealTask adds the pending real_task row the job fills in.
@@ -228,12 +231,21 @@ func (v *verifier) reach(raw string) bool {
 		v.set(RowReach, StatusFail, "the URL is not a URL", nil, 0)
 		return false
 	}
+	private := func() *Failure {
+		f := Lookup(FailPrivateAddress, map[string]string{"host": u.Hostname(), "target": v.opt.Target, "url": redactURL(raw), "fix": "heimdall serve " + redactURL(raw) + " --map auto"})
+		return &f
+	}
+	// N104: on a hosted server a host that cannot be a public internet
+	// address is refused before any lookup, with no address in the text.
+	if v.opt.Hosted && utils.CheckPublicHost(u.Hostname()) != nil {
+		v.set(RowReach, StatusFail, u.Hostname()+" is not a public internet address", private(), 0)
+		return false
+	}
 	if err := webhooks.ValidateURL(raw, !v.opt.Hosted); err != nil {
 		msg := strings.TrimPrefix(err.Error(), webhooks.ErrInvalid.Error()+": ")
 		msg = strings.Replace(msg, "delivers to", "calls", 1)
 		if v.opt.Hosted && (strings.Contains(msg, "private") || strings.Contains(msg, "localhost")) {
-			f := Lookup(FailPrivateAddress, map[string]string{"host": u.Hostname(), "ip": u.Hostname(), "url": redactURL(raw), "fix": "heimdall serve " + redactURL(raw) + " --map auto"})
-			v.set(RowReach, StatusFail, msg, &f, 0)
+			v.set(RowReach, StatusFail, msg, private(), 0)
 			return false
 		}
 		v.set(RowReach, StatusFail, msg, nil, 0)
@@ -249,7 +261,11 @@ func (v *verifier) reach(raw string) bool {
 	if net.ParseIP(host) == nil {
 		lookup := v.opt.Lookup
 		if lookup == nil {
-			lookup = net.DefaultResolver.LookupIPAddr
+			var r *net.Resolver
+			if v.opt.Hosted {
+				r = utils.PublicResolver()
+			}
+			lookup = func(ctx context.Context, host string) ([]net.IPAddr, error) { return utils.LookupIPAddr(ctx, r, host) }
 		}
 		lctx, cancel := context.WithTimeout(v.ctx, 5*time.Second)
 		ips, err := lookup(lctx, host)
@@ -267,8 +283,7 @@ func (v *verifier) reach(raw string) bool {
 				}
 			}
 			if !public {
-				f := Lookup(FailPrivateAddress, map[string]string{"host": host, "ip": ips[0].IP.String(), "url": redactURL(raw), "fix": "heimdall serve " + redactURL(raw) + " --map auto"})
-				v.set(RowReach, StatusFail, host+" resolves to "+ips[0].IP.String(), &f, v.opt.Now().Sub(start).Milliseconds())
+				v.set(RowReach, StatusFail, host+" is not a public internet address", private(), v.opt.Now().Sub(start).Milliseconds())
 				return false
 			}
 		}
@@ -285,14 +300,15 @@ func (v *verifier) reach(raw string) bool {
 	defer cancel()
 	conn, err := dial(dctx, "tcp", net.JoinHostPort(host, port))
 	if err != nil {
-		f, ok := ExplainRunError(err.Error())
+		text := utils.HidePrivateAddresses(err.Error())
+		f, ok := ExplainRunError(text)
 		if !ok || f.Code == FailTimeout {
 			f = Lookup(FailIPAllowlist, map[string]string{"source": v.opt.Target})
 		}
 		if f.Code == FailPrivateAddress {
-			f = Lookup(FailPrivateAddress, map[string]string{"host": host, "ip": ipInText.FindString(err.Error()), "url": redactURL(raw), "fix": "heimdall serve " + redactURL(raw) + " --map auto"})
+			f = *private()
 		}
-		v.set(RowReach, StatusFail, "could not connect: "+capText(err.Error(), 160), &f, v.opt.Now().Sub(start).Milliseconds())
+		v.set(RowReach, StatusFail, "could not connect: "+capText(text, 160), &f, v.opt.Now().Sub(start).Milliseconds())
 		return false
 	}
 	detail := "connected to " + net.JoinHostPort(host, port)
@@ -300,8 +316,9 @@ func (v *verifier) reach(raw string) bool {
 		tc := tls.Client(conn, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
 		if err := tc.HandshakeContext(dctx); err != nil {
 			conn.Close()
-			f := Lookup(FailTLS, map[string]string{"host": host, "detail": capText(err.Error(), 120)})
-			v.set(RowReach, StatusFail, "TLS: "+capText(err.Error(), 160), &f, v.opt.Now().Sub(start).Milliseconds())
+			text := utils.HidePrivateAddresses(err.Error())
+			f := Lookup(FailTLS, map[string]string{"host": host, "detail": capText(text, 120)})
+			v.set(RowReach, StatusFail, "TLS: "+capText(text, 160), &f, v.opt.Now().Sub(start).Milliseconds())
 			return false
 		}
 		detail += ", TLS " + tlsVersion(tc.ConnectionState().Version)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/maximhq/bifrost/bench/hostslots"
 )
@@ -25,4 +26,26 @@ func (h *sharedHost) orgHostSlot(org string, slots int) func(ctx context.Context
 	}
 	h.hostSlots.SetWeight(org, slots)
 	return h.hostSlots.For(org)
+}
+
+// sharedWorkerSlots is the slot count the shared worker reports for one org
+// (N13): the org's own cap, at most the host pool every org shares, so the
+// Workers page and the wizard never promise more runs at once than the host
+// runs. The org's fair-share weight stays its own cap (orgHostSlot).
+func (h *sharedHost) sharedWorkerSlots(slots int) int {
+	if h.hostSlots == nil {
+		return slots
+	}
+	return min(slots, h.hostSlots.Cap())
+}
+
+// sharedWorkerLabels are the shared worker's labels: "shared", its
+// container runtime and, with a host pool, "host-slots=<n>", so pages can
+// say the host cap is shared by every organization (N13).
+func (h *sharedHost) sharedWorkerLabels() []string {
+	labels := []string{"shared", "runtime=" + h.runtime}
+	if h.hostSlots != nil {
+		labels = append(labels, "host-slots="+strconv.Itoa(h.hostSlots.Cap()))
+	}
+	return labels
 }

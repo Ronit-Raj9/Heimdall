@@ -1,3 +1,4 @@
+import { ConfirmButton } from "@/components/platform/badges";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Badge } from "@/components/ui/badge";
@@ -8,10 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
 	useDecideImageMutation,
 	useGetAdminUsageQuery,
+	useGetOrgQuotaQuery,
 	useListAdminContainersQuery,
 	useListAdminImagesQuery,
 	useListAdminOrgsQuery,
 	useListAdminUsersQuery,
+	useRemoveAdminRunnerMutation,
 	useSetOrgQuotaMutation,
 	useSetUserDisabledMutation,
 } from "@/lib/store/apis/adminApi";
@@ -127,6 +130,17 @@ export function AdminUsersPanel() {
 	);
 }
 
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+/** "at most 4 at once, no daily run limit, no daily spend limit": 0 means no limit on the server (N9). */
+export function limitsSummary(l: Pick<AdminLimits, "max_concurrent_runs" | "max_runs_per_day" | "max_spend_usd_per_day">, t: Translate): string {
+	return [
+		l.max_concurrent_runs > 0 ? t("orgs.atOnce", { n: l.max_concurrent_runs }) : t("orgs.atOnceNone"),
+		l.max_runs_per_day > 0 ? t("orgs.perDay", { n: l.max_runs_per_day }) : t("orgs.perDayNone"),
+		l.max_spend_usd_per_day > 0 ? t("orgs.spend", { n: l.max_spend_usd_per_day }) : t("orgs.spendNone"),
+	].join(", ");
+}
+
 export function AdminOrgsPanel() {
 	const { t } = useTranslation("admin");
 	const q = useListAdminOrgsQuery();
@@ -160,12 +174,7 @@ export function AdminOrgsPanel() {
 							<TableCell className="font-medium">{o.name}</TableCell>
 							<TableCell className="text-right tabular-nums">{o.members}</TableCell>
 							<TableCell className="text-muted-foreground text-sm">
-								{o.quota &&
-									t("orgs.quotaSummary", {
-										concurrent: o.quota.max_concurrent_runs,
-										perDay: o.quota.max_runs_per_day,
-										spend: o.quota.max_spend_usd_per_day,
-									})}
+								{o.quota && limitsSummary(o.quota, t as Translate)}
 							</TableCell>
 							<TableCell>
 								<RuntimeBadge runtime={o.quota?.runtime ?? "runsc"} testId={`admin-org-runtime-${o.slug}`} />
@@ -195,20 +204,27 @@ export function RuntimeBadge({ runtime, testId }: { runtime: AdminLimits["runtim
 	);
 }
 
-const DEFAULT_LIMITS: AdminLimits = {
-	max_concurrent_runs: 2,
-	max_runs_per_day: 50,
-	max_spend_usd_per_day: 10,
-	max_image_bytes: 2 * GIB,
+/** The form before an org without stored limits gets the server's answer: every number 0 (no limit), gVisor. */
+const BLANK_LIMITS: AdminLimits = {
+	max_concurrent_runs: 0,
+	max_runs_per_day: 0,
+	max_spend_usd_per_day: 0,
+	max_image_bytes: 0,
 	allow_custom_images: false,
 	shared_pool: false,
 	runtime: "runsc",
 };
 
-/** The quota form: numbers, toggles and the runtime; saved through POST /admin/orgs/{id}/quota. */
+/**
+ * The quota form: numbers, toggles and the runtime; saved through POST /admin/orgs/{id}/quota. 0 means
+ * no limit; "Use defaults" loads the server's own defaults (GET /admin/orgs/{id}/quota, N9).
+ */
 export function QuotaEditor({ org, onClose }: { org: AdminOrg; onClose(): void }) {
 	const { t } = useTranslation("admin");
-	const [form, setForm] = useState<AdminLimits>(org.quota ?? DEFAULT_LIMITS);
+	const quota = useGetOrgQuotaQuery(org.id);
+	const [edited, setForm] = useState<AdminLimits | null>(org.quota ?? null);
+	const form = edited ?? quota.data?.limits ?? BLANK_LIMITS;
+	const defaults = quota.data?.defaults;
 	const [save, state] = useSetOrgQuotaMutation();
 	const [saved, setSaved] = useState(false);
 	const num = (key: keyof AdminLimits, scale = 1) => ({
@@ -221,6 +237,12 @@ export function QuotaEditor({ org, onClose }: { org: AdminOrg; onClose(): void }
 			setForm({ ...form, [key]: Math.max(0, Number(e.target.value) || 0) * scale });
 		},
 	});
+	const noLimit = (key: keyof AdminLimits, testId: string) =>
+		Number(form[key]) === 0 && (
+			<span className="text-muted-foreground text-xs" data-testid={testId}>
+				{t("quota.noLimit")}
+			</span>
+		);
 	const submit = async () => {
 		const res = await save({ orgId: org.id, limits: { ...form, max_image_bytes: Math.round(form.max_image_bytes) } });
 		if (!("error" in res)) setSaved(true);
@@ -235,14 +257,17 @@ export function QuotaEditor({ org, onClose }: { org: AdminOrg; onClose(): void }
 					<label className="flex flex-col gap-1 text-sm">
 						{t("quota.maxConcurrent")}
 						<Input {...num("max_concurrent_runs")} data-testid="quota-max-concurrent" />
+						{noLimit("max_concurrent_runs", "quota-max-concurrent-none")}
 					</label>
 					<label className="flex flex-col gap-1 text-sm">
 						{t("quota.maxPerDay")}
-						<Input {...num("max_runs_per_day")} />
+						<Input {...num("max_runs_per_day")} data-testid="quota-max-per-day" />
+						{noLimit("max_runs_per_day", "quota-max-per-day-none")}
 					</label>
 					<label className="flex flex-col gap-1 text-sm">
 						{t("quota.maxSpend")}
-						<Input {...num("max_spend_usd_per_day")} />
+						<Input {...num("max_spend_usd_per_day")} data-testid="quota-max-spend" />
+						{noLimit("max_spend_usd_per_day", "quota-max-spend-none")}
 					</label>
 					<label className="flex flex-col gap-1 text-sm">
 						{t("quota.maxImage")}
@@ -281,7 +306,17 @@ export function QuotaEditor({ org, onClose }: { org: AdminOrg; onClose(): void }
 					<Button onClick={() => void submit()} disabled={state.isLoading} data-testid="quota-save">
 						{t("quota.save")}
 					</Button>
-					<Button variant="outline" onClick={() => setForm(DEFAULT_LIMITS)}>
+					<Button
+						variant="outline"
+						disabled={!defaults}
+						title={defaults ? undefined : t("quota.defaultsLoading")}
+						onClick={() => {
+							if (!defaults) return;
+							setSaved(false);
+							setForm(defaults);
+						}}
+						dataTestId="quota-reset"
+					>
 						{t("quota.reset")}
 					</Button>
 					<Button variant="ghost" onClick={onClose}>
@@ -408,9 +443,11 @@ export function AdminUsagePanel() {
 	const [to, setTo] = useState(() => isoDay(new Date()));
 	const q = useGetAdminUsageQuery({ from, to });
 	const gate = useGate(q, "admin-usage", t("usage.unavailable"));
-	const rows: AdminUsageRow[] = q.data?.orgs ?? q.data?.rows ?? [];
+	const rows: AdminUsageRow[] = q.data?.orgs ?? [];
 	const total = q.data?.total_cost_usd ?? rows.reduce((sum, r) => sum + (r.cost_usd ?? 0), 0);
-	const runs = q.data?.total_runs ?? rows.reduce((sum, r) => sum + (r.runs ?? 0), 0);
+	const runs = q.data?.runs ?? rows.reduce((sum, r) => sum + (r.runs ?? 0), 0);
+	const tokens = q.data?.total_tokens ?? 0;
+	const anyUnknown = rows.some((r) => (r.unknown_cost_runs ?? 0) > 0);
 	return (
 		<div className="flex flex-col gap-4" data-testid="admin-usage">
 			<div className="flex flex-wrap items-end gap-3">
@@ -430,8 +467,16 @@ export function AdminUsagePanel() {
 							{t("usage.total")}: <strong className="tabular-nums">${total.toFixed(2)}</strong>
 						</span>
 						<span>
-							{t("usage.runs")}: <strong className="tabular-nums">{runs}</strong>
+							{t("usage.runs")}:{" "}
+							<strong className="tabular-nums" data-testid="admin-usage-runs">
+								{runs}
+							</strong>
 						</span>
+						{tokens > 0 && (
+							<span>
+								{t("usage.tokens")}: <strong className="tabular-nums">{Math.round(tokens).toLocaleString()}</strong>
+							</span>
+						)}
 					</div>
 					{rows.length === 0 ? (
 						<EmptyState compact message={t("usage.empty")} testId="admin-usage-empty" />
@@ -443,14 +488,26 @@ export function AdminUsagePanel() {
 									<TableHead>{t("usage.org")}</TableHead>
 									<TableHead>{t("usage.runs")}</TableHead>
 									<TableHead>{t("usage.cost")}</TableHead>
+									{anyUnknown && <TableHead>{t("usage.unknownCost")}</TableHead>}
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{rows.map((r, i) => (
-									<TableRow key={r.org_id ?? r.key ?? i}>
-										<TableCell>{r.org_slug ?? r.org_id ?? r.key}</TableCell>
+								{rows.map((r) => (
+									<TableRow key={r.org_id} data-testid={`admin-usage-row-${r.org_id}`}>
+										<TableCell title={r.org_id}>
+											<div className="flex min-w-0 flex-col">
+												<span className="font-medium">{r.name || r.slug || r.org_id}</span>
+												{r.slug && r.name && <span className="text-muted-foreground font-mono text-xs">{r.slug}</span>}
+												{r.error && (
+													<span className="text-destructive text-xs" role="alert">
+														{t("usage.orgError", { error: r.error })}
+													</span>
+												)}
+											</div>
+										</TableCell>
 										<TableCell className="tabular-nums">{r.runs ?? 0}</TableCell>
-										<TableCell className="tabular-nums">{(r.cost_usd ?? 0).toFixed(2)}</TableCell>
+										<TableCell className="tabular-nums">${(r.cost_usd ?? 0).toFixed(2)}</TableCell>
+										{anyUnknown && <TableCell className="tabular-nums">{r.unknown_cost_runs ?? 0}</TableCell>}
 									</TableRow>
 								))}
 							</TableBody>
@@ -466,6 +523,7 @@ export function AdminUsagePanel() {
 export function AdminContainersPanel() {
 	const { t } = useTranslation("admin");
 	const q = useListAdminContainersQuery(undefined, { pollingInterval: 10000 });
+	const [remove, removeState] = useRemoveAdminRunnerMutation();
 	const gate = useGate(q, "admin-containers");
 	if (gate) return gate;
 	const runners = q.data?.runners ?? [];
@@ -477,6 +535,11 @@ export function AdminContainersPanel() {
 					{t("containers.refresh")}
 				</Button>
 			</div>
+			{removeState.error && (
+				<p className="text-destructive text-sm" role="alert" data-testid="admin-runner-remove-error">
+					{t("containers.removeError", { message: getBenchErrorMessage(removeState.error) })}
+				</p>
+			)}
 			<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
 			<Table>
 				<TableHeader>
@@ -488,12 +551,13 @@ export function AdminContainersPanel() {
 						<TableHead>{t("containers.state")}</TableHead>
 						<TableHead>{t("containers.slots")}</TableHead>
 						<TableHead>{t("containers.seen")}</TableHead>
+						<TableHead />
 					</TableRow>
 				</TableHeader>
 				<TableBody>
 					{runners.map((r) => (
 						<TableRow key={r.runner_id} data-testid={`admin-runner-${r.runner_id}`}>
-							<TableCell>{r.org_slug}</TableCell>
+							<TableCell title={r.org_id}>{r.org_name || r.org_slug}</TableCell>
 							<TableCell className="font-mono text-xs">{r.runner}</TableCell>
 							<TableCell>{r.pool}</TableCell>
 							<TableCell>{r.host}</TableCell>
@@ -504,6 +568,19 @@ export function AdminContainersPanel() {
 								{r.running.length}/{r.slots}
 							</TableCell>
 							<TableCell>{fmtDate(r.last_seen)}</TableCell>
+							<TableCell className="text-right">
+								{!r.live && (
+									<ConfirmButton
+										label={t("containers.remove")}
+										question={t("containers.confirmRemove", { runner: r.runner, org: r.org_name || r.org_slug })}
+										confirmLabel={t("containers.remove")}
+										cancelLabel={t("containers.removeCancel")}
+										onConfirm={() => void remove({ orgId: r.org_id, runnerId: r.runner_id })}
+										isLoading={removeState.isLoading && removeState.originalArgs?.runnerId === r.runner_id}
+										testId={`admin-runner-remove-${r.runner_id}`}
+									/>
+								)}
+							</TableCell>
 						</TableRow>
 					))}
 				</TableBody>

@@ -33,11 +33,14 @@ export default function PoliciesView() {
 	const canWrite = canUse(useSession(), "member");
 	const [file, setFile] = useQueryState("file", parseAsString);
 	const [creating, setCreating] = useState(false);
+	// N6: every press of New rule set mounts a fresh editor, even while a new set is already open.
+	const [newKey, setNewKey] = useState(0);
 	const list = useListPoliciesQuery();
 	const policies = list.data?.policies ?? [];
 
 	const startNew = () => {
 		setCreating(true);
+		setNewKey((n) => n + 1);
 		void setFile(null);
 	};
 
@@ -114,8 +117,9 @@ export default function PoliciesView() {
 						<CardContent className="p-5 sm:p-6">
 							{creating ? (
 								<PolicyEditor
-									key="new"
+									key={`new-${newKey}`}
 									isNew
+									taken={policies.map((p) => p.file)}
 									onSaved={(f) => {
 										setCreating(false);
 										void setFile(f);
@@ -154,8 +158,19 @@ function ExistingPolicy({ file, onDeleted }: { file: string; onDeleted(): void }
 	);
 }
 
+/** The first of my-release-policy.yaml, my-release-policy-2.yaml, ... that no rule set uses (N6). */
+export function freePolicyFile(taken: readonly string[]): string {
+	const used = new Set(taken);
+	for (let n = 1; ; n++) {
+		const name = n === 1 ? "my-release-policy.yaml" : `my-release-policy-${n}.yaml`;
+		if (!used.has(name)) return name;
+	}
+}
+
 interface PolicyEditorProps {
 	isNew?: boolean;
+	/** File names of the rule sets that exist: a new set may not take one (N6). */
+	taken?: readonly string[];
 	file?: string;
 	initialYAML?: string;
 	initialPolicy?: ReleasePolicy;
@@ -166,13 +181,13 @@ interface PolicyEditorProps {
 }
 
 /** Form or YAML editing of one policy. A file that does not parse opens on the YAML tab. */
-export function PolicyEditor({ isNew, file, initialYAML, initialPolicy, sha256, onSaved, onReload, onDeleted }: PolicyEditorProps) {
+export function PolicyEditor({ isNew, taken = [], file, initialYAML, initialPolicy, sha256, onSaved, onReload, onDeleted }: PolicyEditorProps) {
 	const { t } = useTranslation("govern");
 	const confirm = useConfirm();
 	const [mode, setMode] = useState<"form" | "yaml">(isNew || initialPolicy ? "form" : "yaml");
 	const [policy, setPolicy] = useState<ReleasePolicy>(initialPolicy ?? starterPolicy());
 	const [yaml, setYaml] = useState(initialYAML ?? "");
-	const [fileName, setFileName] = useState(file ?? "my-release-policy.yaml");
+	const [fileName, setFileName] = useState(file ?? freePolicyFile(taken));
 	const [savedPath, setSavedPath] = useState<string | null>(null);
 	const [save, saveState] = useSavePolicyMutation();
 	const [validate, validation] = useValidatePolicyMutation();
@@ -195,15 +210,18 @@ export function PolicyEditor({ isNew, file, initialYAML, initialPolicy, sha256, 
 	};
 
 	const target = normalizePolicyFile(fileName);
-	const nameOk = isValidPolicyFile(target);
+	const nameTaken = Boolean(isNew) && taken.includes(target);
+	const nameOk = isValidPolicyFile(target) && !nameTaken;
 	const doSave = async () => {
-		const res = await save({ file: target, body: { ...body(), if_match: isNew ? undefined : sha256 } });
+		// A new set is saved with create_only, so the server refuses a name taken since the list loaded (409).
+		const res = await save({ file: target, body: { ...body(), ...(isNew ? { create_only: true } : { if_match: sha256 }) } });
 		if ("data" in res && res.data) {
 			setSavedPath(res.data.path);
 			onSaved?.(res.data.file);
 		}
 	};
-	const conflict = saveState.error && "status" in saveState.error && saveState.error.status === 409;
+	// A 409 on a new set is the server's "already exists" text, shown as is; only an edit has the reload conflict.
+	const conflict = !isNew && saveState.error && "status" in saveState.error && saveState.error.status === 409;
 	const v = validation.data;
 
 	return (
@@ -213,7 +231,13 @@ export function PolicyEditor({ isNew, file, initialYAML, initialPolicy, sha256, 
 					<label className="flex min-w-60 flex-col gap-1 text-sm" title={t("policies.fileNameHint")}>
 						{t("policies.fileName")}
 						<Input value={fileName} onChange={(e) => setFileName(e.target.value)} data-testid="policy-file" aria-invalid={!nameOk} />
-						{!nameOk && <span className="text-destructive text-xs">{t("policies.fileNameHint")}</span>}
+						{nameTaken ? (
+							<span className="text-destructive text-xs" data-testid="policy-file-taken">
+								{t("policies.fileNameTaken")}
+							</span>
+						) : (
+							!nameOk && <span className="text-destructive text-xs">{t("policies.fileNameHint")}</span>
+						)}
 					</label>
 				) : (
 					<span className="flex min-w-0 flex-col">

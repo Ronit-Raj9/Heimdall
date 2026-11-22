@@ -338,15 +338,23 @@ func bridgeLauncher(env jobEnv) (handlers.Launcher, error) {
 // runExperiment freezes m, starts it and follows it to the end. A job
 // cancelled while it waits cancels the experiment too.
 func runExperiment(ctx context.Context, l handlers.Launcher, m *schemas.Manifest, timeout time.Duration, log jobs.Logger) error {
+	_, err := runExperimentFollow(ctx, l, m, timeout, log)
+	return err
+}
+
+// runExperimentFollow is runExperiment that also returns the newest error
+// event's message (a worker refusal, a slot that could not start), so a
+// readiness job that sealed nothing can say why (N151).
+func runExperimentFollow(ctx context.Context, l handlers.Launcher, m *schemas.Manifest, timeout time.Duration, log jobs.Logger) (string, error) {
 	if err := l.Create(ctx, m); err != nil {
-		return fmt.Errorf("freeze %s: %w", m.ExpID, err)
+		return "", fmt.Errorf("freeze %s: %w", m.ExpID, err)
 	}
 	log.Printf("experiment %s frozen: %d slots", m.ExpID, len(m.Slots))
 	if err := l.Start(ctx, m.ExpID); err != nil {
-		return fmt.Errorf("start %s: %w", m.ExpID, err)
+		return "", fmt.Errorf("start %s: %w", m.ExpID, err)
 	}
 	log.Printf("experiment %s queued for a runner; following it (timeout %s)", m.ExpID, timeout)
-	return waitExperiment(ctx, l, m.ExpID, timeout, bridgePollEvery, log)
+	return followExperiment(ctx, l, m.ExpID, timeout, bridgePollEvery, log)
 }
 
 // expCanceller is implemented by the serve launcher.
@@ -358,6 +366,13 @@ type expCanceller interface {
 // no longer active (the events channel closed, or the launcher reports it
 // inactive for bridgeIdlePolls polls in a row).
 func waitExperiment(ctx context.Context, l handlers.Launcher, expID string, timeout, every time.Duration, log jobs.Logger) error {
+	_, err := followExperiment(ctx, l, expID, timeout, every, log)
+	return err
+}
+
+// followExperiment is waitExperiment that also returns the newest error
+// event's message, "" when there was none (N151).
+func followExperiment(ctx context.Context, l handlers.Launcher, expID string, timeout, every time.Duration, log jobs.Logger) (lastError string, _ error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	events, unsub := l.Events(expID)
@@ -375,16 +390,19 @@ func waitExperiment(ctx context.Context, l handlers.Launcher, expID string, time
 				}
 			}
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				return fmt.Errorf("experiment %s did not finish within %s; it was cancelled (raise timeout_min, or check the Runners page)", expID, timeout)
+				return lastError, fmt.Errorf("experiment %s did not finish within %s; it was cancelled (raise timeout_min, or check the Runners page)", expID, timeout)
 			}
-			return ctx.Err()
+			return lastError, ctx.Err()
 		case ev, ok := <-events:
 			if !ok {
 				events = nil // closed: the experiment ended; confirm with the poll
 				if act == nil {
-					return nil
+					return lastError, nil
 				}
 				continue
+			}
+			if ev.Kind == "error" && ev.Message != "" {
+				lastError = ev.Message
 			}
 			logEvent(log, ev)
 		case <-tick.C:
@@ -396,7 +414,7 @@ func waitExperiment(ctx context.Context, l handlers.Launcher, expID string, time
 				continue
 			}
 			if idle++; idle >= bridgeIdlePolls {
-				return nil
+				return lastError, nil
 			}
 		}
 	}
@@ -781,16 +799,20 @@ func runReadiness(ctx context.Context, env jobEnv, l handlers.Launcher, p hosted
 		if p.TimeoutMin > 0 {
 			timeout, _ = bridgeTimeout(p.TimeoutMin)
 		}
-		log.Printf("readiness controls of %d %s tasks run in experiment %s (open it on the Experiments page)", len(group), splitWord(split), m.ExpID)
+		log.Printf("readiness controls of %d %s tasks run in comparison %s; open it with Open the comparison at the top of this page", len(group), splitWord(split), m.ExpID)
 		if progress != nil {
 			progress(map[string]any{"done": 0, "total": len(tasks), "exp_id": m.ExpID})
 		}
-		if err := runExperiment(ctx, l, m, timeout, log); err != nil {
+		lastError, err := runExperimentFollow(ctx, l, m, timeout, log)
+		if err != nil {
 			return all, expOf, err
 		}
 		runs, err := bridgeSealedRuns(ctx, env, m.ExpID)
 		if err != nil {
 			return all, expOf, err
+		}
+		if len(runs) == 0 && lastError != "" { // N151: say why, not "N tasks not admitted"
+			return all, expOf, fmt.Errorf("no readiness run could start: %s", lastError)
 		}
 		all = append(all, runs...)
 	}

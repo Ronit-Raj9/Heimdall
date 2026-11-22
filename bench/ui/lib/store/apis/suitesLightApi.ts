@@ -1,0 +1,18 @@
+import type { SuitesResponse } from "@/lib/types/bench";
+import { benchApi } from "./benchApi";
+
+/**
+ * GET /suites?fields=light (fix wave 2, E1): every benchmark with its id, version, track, task counts, readiness
+ * and source, without per-task lists. The server never waits for a pack load on this list, so pickers fill at once.
+ * It shares the LIST tag with GET /suites, so every change that refreshes the full list refreshes this one too.
+ */
+export const suitesLightApi = benchApi.injectEndpoints({
+	endpoints: (builder) => ({
+		getSuitesLight: builder.query<SuitesResponse, void>({
+			query: () => "/suites?fields=light",
+			providesTags: [{ type: "BenchSuites", id: "LIST" }],
+		}),
+	}),
+});
+
+export const { useGetSuitesLightQuery } = suitesLightApi;

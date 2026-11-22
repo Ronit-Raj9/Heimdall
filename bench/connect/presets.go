@@ -208,7 +208,7 @@ func platformCandidate(in Input) Candidate {
 	case "vapi", "retell", "elevenlabs":
 		return Candidate{Kind: KindPlatform, Preset: in.Platform, Label: platformLabel(in.Platform), Confidence: 1,
 			Evidence: []string{"picked " + platformLabel(in.Platform) + " from the list"}, Supported: false,
-			Message: "Voice platform agents are connected on the agent page's voice platform form (assistant id and key). The Connect box hands over the id: " + id}
+			Message: "Fill in the " + platformLabel(in.Platform) + " fields under Or pick a platform, or use Import from a platform on the New agent page."}
 	case PresetAgentCore:
 		if c, ok := arnCandidate(id); ok {
 			return c

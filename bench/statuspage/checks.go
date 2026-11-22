@@ -102,25 +102,27 @@ func sum(f *selfmetrics.Family, match func(map[string]string) bool) (float64, bo
 	return v, true
 }
 
-// WorkersCheck reads the worker gauges of the server's /metrics registry:
-// workers by state, the oldest heartbeat and low disks. With no worker
-// registered at all the level is unknown: the platform may simply have no
-// shared pool.
+// WorkersCheck reads the platform's shared pool from the server's /metrics
+// registry (heimdall_shared_workers, the coordinators' live state; fix wave
+// 2, N148): an organization's own workers are not a platform component and
+// never change this line. It also reads the oldest heartbeat and low disks.
+// With no shared worker registered the level is unknown: the platform may
+// simply have no shared pool.
 func WorkersCheck(reg metricsReader) Check {
 	return Check{ID: ComponentWorkers, Name: "Evaluation workers", Run: func(ctx context.Context) (Level, string) {
 		fs := reg.Gather(ctx)
-		workers := family(fs, "heimdall_workers")
+		workers := family(fs, "heimdall_shared_workers")
 		total, ok := sum(workers, nil)
 		if !ok || total == 0 {
-			return Unknown, "no worker connected"
+			return Unknown, "no shared pool on this server"
 		}
 		lost, _ := sum(workers, func(l map[string]string) bool { return l["state"] == "lost" })
 		if lost == total {
-			return MajorOutage, "no worker is answering"
+			return MajorOutage, "no shared worker is answering"
 		}
 		lvl, detail := Operational, ""
 		if lost > 0 {
-			lvl, detail = Degraded, "some workers stopped answering"
+			lvl, detail = Degraded, "some shared workers stopped answering"
 		}
 		if age, _ := sum(family(fs, "heimdall_lease_oldest_heartbeat_age_seconds"), nil); age > HeartbeatLate.Seconds() {
 			lvl, detail = Worse(lvl, Degraded), "a running evaluation reported late"

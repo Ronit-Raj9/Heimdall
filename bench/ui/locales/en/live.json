@@ -57,6 +57,8 @@
 		"activity": "What is happening",
 		"slotsTitle": "Runs",
 		"noSlots": "Waiting for the first run to start.",
+		"problem": "Runs could not start: {{problem}}",
+		"problemJobLog": "Open the job log",
 		"noEvents": "Nothing has happened yet.",
 		"loadError": "Live updates paused. Trying again.",
 		"details": "Details",
