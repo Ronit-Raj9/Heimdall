@@ -28,7 +28,7 @@ func (f *fakeBuild) Build(ctx context.Context, c issuebench.Candidate, o BuildOp
 	defer f.mu.Unlock()
 	f.calls++
 	if s, ok := f.stop[c.Issue]; ok && len(o.Secrets) == 0 {
-		return issuebench.BuildResult{Stop: s, Detail: "API_TOKEN"}, nil
+		return issuebench.BuildResult{Stop: s, Detail: "API_TOKEN", CostUSD: 0.25}, nil
 	}
 	return issuebench.BuildResult{Stop: issuebench.StopOK, CostUSD: 0.5, Env: &issuebench.EnvSpec{Repo: c.Repo, BaseImage: "python:3.12-slim"}}, nil
 }
@@ -93,6 +93,9 @@ func TestPipelineEndToEnd(t *testing.T) {
 		t.Errorf("status %s log %d", s.Status, len(s.Log))
 	}
 	it4 := s.Items[3]
+	if it4.CostUSD != 0.25 || s.Items[0].CostUSD != 0.5 { // a failed build's cost stays on its item
+		t.Errorf("item costs %v %v", it4.CostUSD, s.Items[0].CostUSD)
+	}
 	if it4.Fix != FixAddSecret || it4.Reason != "the tests need a secret: API_TOKEN" {
 		t.Errorf("issue 4 fix %q reason %q", it4.Fix, it4.Reason)
 	}

@@ -404,7 +404,7 @@ func TestSystemPromptSaysTestsUseSystemPython(t *testing.T) {
 	for _, w := range []string{"python -m pytest", "system Python", "uv pip install --system", "UV_PROJECT_ENVIRONMENT=/usr/local", "test_cmd",
 		// Attempt 3: pytest ran under the system Python, then the model chased
 		// tox's python-build-standalone downloads and gave up with a blocker.
-		"tox, nox or uv run"} {
+		"tox, nox or uv run", "never a blocker", "only when the tests really connect", "editable mode with its test extras"} {
 		if !strings.Contains(systemPrompt, w) {
 			t.Fatalf("system prompt lacks %q", w)
 		}

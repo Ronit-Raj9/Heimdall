@@ -445,7 +445,7 @@ fi
 
 # --- 7. Summary -------------------------------------------------------------------
 printf '\n%-8s %-10s %-10s %s\n' issue status cost reason
-printf '%s' "$state" | jq -r '. as $s | .items[] | [(.candidate.issue | tostring), .status, (($s.envs[.version].cost_usd // 0) | tostring), (.reason // "")] | @tsv' |
+printf '%s' "$state" | jq -r '. as $s | .items[] | [(.candidate.issue | tostring), .status, ((.cost_usd // $s.envs[.version].cost_usd // 0) | tostring), (.reason // "")] | @tsv' |
 	while IFS=$'\t' read -r n st c r; do printf '%-8s %-10s %-10s %s\n' "#$n" "$st" "\$$c" "$(redact "$r" | head -c 160)"; done
 printf 'run %s: status %s, cost $%s, benchmark %s, %s task(s) with review pending\n' "$run_id" \
 	"$(printf '%s' "$state" | jq -r .status)" "$(printf '%s' "$state" | jq -r .cost_usd)" "${bench_id:-none}" "${pending_tasks:-0}"

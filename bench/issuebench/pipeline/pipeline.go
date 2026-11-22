@@ -155,6 +155,7 @@ type Item struct {
 	Options     BuildOptions           `json:"options,omitempty"`
 	JobID       string                 `json:"job_id,omitempty"` // the job running or last run for this issue
 	Stage       string                 `json:"stage,omitempty"`  // build, validate or checks (issuebench.Stage*)
+	CostUSD     float64                `json:"cost_usd,omitempty"` // builds run for this issue, a failed one included
 }
 
 // Key is the item's id: the issue number.
@@ -529,6 +530,9 @@ func (m *Manager) step(ctx context.Context, id string, i int, logf func(string, 
 		}
 		_, _ = m.update(id, func(s *State) error {
 			s.CostUSD += res.CostUSD
+			if i < len(s.Items) {
+				s.Items[i].CostUSD += res.CostUSD
+			}
 			if res.Stop == issuebench.StopOK && res.Env != nil {
 				s.Envs[it.Version] = res
 			}
