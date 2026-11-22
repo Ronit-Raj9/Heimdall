@@ -1,6 +1,7 @@
 package graders
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -25,5 +26,18 @@ func TestRubricReply(t *testing.T) {
 	applyRubricScore(g, &schemas.AnswerSpec{Rubric: rub}, []string{reply, "junk"})
 	if g.Dimensions["rubric_score"] != 0.75 || g.Dimensions["final_answer_correct"] != 0 {
 		t.Fatalf("dimensions %v", g.Dimensions)
+	}
+}
+
+// The bigfinancebench-v1 judge replies a JSON object, so its system message
+// must not ask for a single word; every other version keeps the one-word rule.
+func TestJudgeSystemFollowsReplyFormat(t *testing.T) {
+	if s := judgeSystemFor(PromptBigFinanceV1); s != judgeGuardSystemJSON || strings.Contains(s, "exactly one word") {
+		t.Fatalf("bigfinancebench-v1 system message asks for one word: %q", s)
+	}
+	for _, v := range []string{PromptQAv1, PromptLongMemEvalV1, PromptAgentVistaV1} {
+		if judgeSystemFor(v) != judgeGuardSystem {
+			t.Fatalf("%s: system message changed", v)
+		}
 	}
 }
