@@ -376,8 +376,12 @@ func (ix *Index) RunFile(runID, name string) ([]byte, error) {
 	return b, nil
 }
 
+// redTeamStateFile is the red-team attacker's export (bench/redteam): the
+// payload a regression task replays and the report reads (Z04).
+const redTeamStateFile = "state/user/redteam.json"
+
 func runFileAllowed(name string) bool {
-	if runFileAllowlist[name] {
+	if runFileAllowlist[name] || name == redTeamStateFile {
 		return true
 	}
 	if strings.HasPrefix(name, "agent.stream.") && strings.HasSuffix(name, ".jsonl") {

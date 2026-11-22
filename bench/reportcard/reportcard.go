@@ -185,6 +185,9 @@ type Report struct {
 	// squeezed budget and converted spend into success; nil when no run
 	// reported any of it.
 	Persistence []PersistenceRow `json:"persistence,omitempty"`
+	// RedTeam is the attack success of every red-team benchmark (redteam.go);
+	// nil when the evaluation ran none.
+	RedTeam *RedTeam `json:"red_team,omitempty"`
 }
 
 // LearningRow is one arm's learning summary on one benchmark.
@@ -231,6 +234,7 @@ type Options struct {
 // graded is one counted, sealed, scored run.
 type graded struct {
 	task        string
+	runID       string // red-team section: names the hardest attack's run
 	condition   string
 	success     int
 	metrics     map[string]schemas.Value
@@ -404,6 +408,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	rep.Alignment = alignment(children, labels)
 	rep.Learning = learningRows(children, labels)
 	rep.Persistence = persistence(children, labels)
+	rep.RedTeam = redTeam(children, labels)
 	return rep, nil
 }
 
@@ -486,7 +491,7 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 		}
 		y, _ := leaderboard.VerifiedSuccess(r.Run.Outcome, metrics)
 		cond := cmp.Or(r.Slot.Condition, schemas.ConditionClean)
-		g := graded{task: r.Slot.Task, condition: cond, success: int(y), metrics: metrics, gates: gates, trial: r.Slot.Trial, streamIndex: r.Slot.StreamIndex, replay: r.Slot.StreamReplay}
+		g := graded{task: r.Slot.Task, runID: r.Run.RunID, condition: cond, success: int(y), metrics: metrics, gates: gates, trial: r.Slot.Trial, streamIndex: r.Slot.StreamIndex, replay: r.Slot.StreamReplay}
 		if isFresh {
 			cr.fresh = append(cr.fresh, g)
 		}

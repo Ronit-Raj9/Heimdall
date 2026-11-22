@@ -33,7 +33,9 @@ import (
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/packs"
 	"github.com/maximhq/bifrost/bench/projectfs"
+	"github.com/maximhq/bifrost/bench/redteam"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/simuser"
 	"github.com/maximhq/bifrost/bench/tenancy"
 	"github.com/maximhq/bifrost/bench/utils"
 	"github.com/valyala/fasthttp"
@@ -249,6 +251,7 @@ func (h *evaluationsHandler) refresh(ev *schemas.Evaluation) {
 	if h.decideGate(ev) {
 		changed = true
 	}
+	autoHarvestRedTeam(h.env, ev, time.Now()) // Z04: successful attacks become pending regressions (redteam.go)
 	if changed {
 		_ = h.store().Save(ev) // a failed save only delays the stored status
 	}
@@ -778,6 +781,19 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 		Concurrency: 2, ManifestMode: "agent_exposure",
 	}
 	f.Budget.Disclose = spec.DiscloseBudget
+	if st != nil && st.Simulator != nil && st.Simulator.Provider != "" && redteam.IsSuite(st.Root) {
+		// Z04: readiness checks play a red-team benchmark's seed attacks;
+		// an evaluation runs the adaptive attacker on the pinned model.
+		sim := *st.Simulator
+		sim.Mode = schemas.SimulatorLLM
+		if sim.MaxTurns == 0 {
+			sim.MaxTurns = simuser.DefaultMaxTurns
+		}
+		if sim.PromptVersion == "" {
+			sim.PromptVersion = simuser.PromptUserV1
+		}
+		f.Simulator = &sim
+	}
 	var variantNotes []string
 	for _, a := range spec.Arms {
 		v := variants[a.Label]
