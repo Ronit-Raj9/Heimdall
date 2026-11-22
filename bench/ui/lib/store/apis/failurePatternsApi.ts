@@ -44,6 +44,31 @@ export interface FailurePatterns {
 	agent?: string;
 	evaluation?: string;
 	groups: FailurePatternGroup[];
+	/** Agent read: the saved versions and the benchmarks the agent ran, whatever the filters, for the filter choices. */
+	versions?: number[];
+	benchmarks?: string[];
+}
+
+/** GET /agents/{id}/failure-patterns filters: one saved version, one benchmark, practice runs too. */
+export interface AgentFailurePatternsArgs {
+	agent: string;
+	version?: number;
+	benchmark?: string;
+	/** Also read runs on practice benchmarks (the made-up examples); left out by default. */
+	includePractice?: boolean;
+}
+
+/** The request of the agent read: the bare path without filters, else the path and its query params. */
+export function agentFailurePatternsRequest(
+	args: string | AgentFailurePatternsArgs,
+): string | { url: string; params: Record<string, string> } {
+	const a = typeof args === "string" ? { agent: args } : args;
+	const url = `/agents/${enc(a.agent)}/failure-patterns`;
+	const params: Record<string, string> = {};
+	if (a.version && a.version > 0) params.version = String(a.version);
+	if (a.benchmark) params.benchmark = a.benchmark;
+	if (a.includePractice) params.include_practice = "true";
+	return Object.keys(params).length === 0 ? url : { url, params };
 }
 
 /** Groups with null lists filled, so screens can map over them. */
@@ -78,8 +103,8 @@ const enc = encodeURIComponent;
 /** The failure pattern reads, injected into the bench API so the shared endpoint list stays untouched. */
 export const failurePatternsApi = benchApi.injectEndpoints({
 	endpoints: (builder) => ({
-		getAgentFailurePatterns: builder.query<FailurePatterns, string>({
-			query: (agent) => `/agents/${enc(agent)}/failure-patterns`,
+		getAgentFailurePatterns: builder.query<FailurePatterns, string | AgentFailurePatternsArgs>({
+			query: (args) => agentFailurePatternsRequest(args),
 			transformResponse: (body: FailurePatterns) => normalizeFailurePatterns(body),
 		}),
 		getEvaluationFailurePatterns: builder.query<FailurePatterns, string>({

@@ -87,3 +87,20 @@ func TestUniq(t *testing.T) {
 		t.Fatalf("uniq %v", got)
 	}
 }
+
+// TestNewClusterOutcomeOnlyTitle (J13.groups): an outcome-only cluster says
+// where its runs happened when they share a benchmark and a last tool.
+func TestNewClusterOutcomeOnlyTitle(t *testing.T) {
+	layers := Layers(Features{Outcome: "fail"})
+	run := func(id, suite, tool string) scored {
+		return scored{ref: RunRef{RunID: id, Suite: suite, Task: "t1", LastTool: tool, ConfigHash: "h1"}, layers: layers, f: Features{Outcome: "fail"}}
+	}
+	c := newCluster("c_1", []scored{run("r1", "swe-lite", "Bash"), run("r2", "swe-lite", "Bash"), run("r3", "swe-lite", "Edit")}, 3)
+	if c.Title != "Failed with no error recorded on swe-lite in Bash" {
+		t.Fatalf("title %q", c.Title)
+	}
+	c = newCluster("c_2", []scored{run("r1", "swe-lite", ""), run("r2", "other", "")}, 2)
+	if c.Title != "Failed with no error recorded" {
+		t.Fatalf("title over two benchmarks %q", c.Title)
+	}
+}

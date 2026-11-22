@@ -65,11 +65,47 @@ func newCluster(sig string, runs []scored, failures int) Cluster {
 		c.runs = append(c.runs, s.ref)
 	}
 	c.Tasks, c.Agents, c.ConfigHashes, c.Conditions, c.Experiments = uniq(tasks), uniq(agents), uniq(hashes), uniq(conds), uniq(exps)
+	c.Title = TitleIn(first.layers, oneSuite(runs), topTool(runs))
 	for i := len(runs) - 1; i >= 0 && len(c.Examples) < maxExamples; i-- {
 		c.Examples = append(c.Examples, runs[i].ref.RunID)
 	}
 	c.Scope = scopeOf(c)
 	return c
+}
+
+// oneSuite is the benchmark every run of a cluster is on, "" when they are
+// on more than one.
+func oneSuite(runs []scored) string {
+	suite := ""
+	for _, s := range runs {
+		switch {
+		case s.ref.Suite == "":
+			return ""
+		case suite == "":
+			suite = s.ref.Suite
+		case s.ref.Suite != suite:
+			return ""
+		}
+	}
+	return suite
+}
+
+// topTool is the last tool most runs of a cluster called, ties to the
+// first name in order; "" when no run recorded one.
+func topTool(runs []scored) string {
+	counts := map[string]int{}
+	best := ""
+	for _, s := range runs {
+		name := s.ref.LastTool
+		if name == "" {
+			continue
+		}
+		counts[name]++
+		if best == "" || counts[name] > counts[best] || (counts[name] == counts[best] && name < best) {
+			best = name
+		}
+	}
+	return best
 }
 
 // scopeOf says where a cluster lives: one run; one agent config and one

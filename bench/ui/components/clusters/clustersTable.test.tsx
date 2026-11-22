@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { CLUSTER_LIST_FIXTURE } from "./clusters.fixtures";
 import { ClustersSummary } from "./clustersSummary";
-import { ClusterScopeBadge, ClustersTable } from "./clustersTable";
+import { ClusterScopeBadge, ClustersTable, clusterTitle } from "./clustersTable";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
@@ -61,6 +61,27 @@ describe("ClustersTable", () => {
 
 	it("escapes titles: a quote in a title stays text", () => {
 		expect(html).toContain("timeout after repeated bash &quot;pytest -q&quot;");
+	});
+
+	it("names an outcome-only group in words, with its id small after the title", () => {
+		const bare = {
+			...limiter,
+			signature: "c_16de4c2f8378af3a",
+			title: "fail",
+			outcome: "fail" as typeof limiter.outcome,
+			layers: [{ kind: "outcome", label: "fail" }] as typeof limiter.layers,
+		};
+		const out = renderToStaticMarkup(<ClustersTable clusters={[bare]} selected={null} onSelect={() => undefined} />);
+		expect(out).toMatch(/data-testid="clusters-title-c_16de4c2f8378af3a">Failed with no error recorded</);
+		expect(out).toContain('data-testid="clusters-id-c_16de4c2f8378af3a"');
+		expect(out).toMatch(/clusters-title-c_16de4c2f8378af3a[\s\S]*clusters-id-c_16de4c2f8378af3a/);
+		const sentence = (o: string) => `<${o}>`;
+		expect(clusterTitle({ title: "timeout", outcome: "timeout", layers: bare.layers }, sentence)).toBe("<timeout>");
+		// A server title that already says more stays as it is.
+		expect(clusterTitle({ title: "Timed out on swe-lite", outcome: "timeout", layers: bare.layers }, sentence)).toBe(
+			"Timed out on swe-lite",
+		);
+		expect(clusterTitle({ title: "fails test_a", outcome: "fail", layers: limiter.layers }, sentence)).toBe("fails test_a");
 	});
 });
 

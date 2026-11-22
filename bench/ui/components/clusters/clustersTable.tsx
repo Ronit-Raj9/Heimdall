@@ -10,6 +10,23 @@ import { ChevronDown, ChevronRight, GitCommitHorizontal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { formatShare, isClusterScope, shownItems } from "./clusters.utils";
 
+/** Outcomes a title made of the outcome alone reads as a sentence for. */
+const OUTCOME_SENTENCES = ["fail", "timeout", "crash", "budget", "refusal"] as const;
+
+/**
+ * A cluster's title. A report from an older server names a cluster that has only its outcome
+ * layer by the bare outcome ("fail"); that reads as a sentence here, as the server now writes it.
+ */
+export function clusterTitle(
+	cluster: Pick<ClusterSummary, "title" | "outcome" | "layers">,
+	sentence: (outcome: (typeof OUTCOME_SENTENCES)[number]) => string,
+): string {
+	const layers = cluster.layers ?? [];
+	const bare = layers.length <= 1 && cluster.title === cluster.outcome;
+	const outcome = cluster.title as (typeof OUTCOME_SENTENCES)[number];
+	return bare && OUTCOME_SENTENCES.includes(outcome) ? sentence(outcome) : cluster.title;
+}
+
 export interface ClustersTableProps {
 	/** In the server's order: largest count first. The table never re-sorts. */
 	clusters: readonly ClusterSummary[];
@@ -21,7 +38,9 @@ export interface ClustersTableProps {
 /** One row per cluster: title, size, share of failures, scope, and where it was seen. */
 export function ClustersTable({ clusters, selected, onSelect }: ClustersTableProps) {
 	const { t } = useTranslation("bench");
+	const { t: tb } = useTranslation("agentBoard");
 	const locale = getLocale();
+	const sentence = (o: (typeof OUTCOME_SENTENCES)[number]) => tb(`clusterOutcome.${o}`);
 
 	return (
 		<Table stickyColumns={1} data-testid="clusters-table" aria-label={t("clusters.table.label")}>
@@ -47,17 +66,23 @@ export function ClustersTable({ clusters, selected, onSelect }: ClustersTablePro
 						<TableRow key={cluster.signature} data-testid={`clusters-row-${cluster.signature}`} data-state={open ? "selected" : undefined}>
 							<TableCell className="max-w-md align-top whitespace-normal">
 								<div className="flex flex-col gap-0.5">
-									<button
-										type="button"
-										onClick={toggle}
-										aria-expanded={open}
-										aria-controls="cluster-detail"
-										className="text-foreground focus-visible:ring-ring/50 w-fit cursor-pointer rounded-sm text-left font-medium break-words underline-offset-4 hover:underline focus-visible:ring-[3px] focus-visible:outline-none"
-										data-testid={`clusters-title-${cluster.signature}`}
-									>
-										{cluster.title}
-									</button>
-									<CopyId value={cluster.signature} className="text-muted-foreground text-[11px]" />
+									<div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+										<button
+											type="button"
+											onClick={toggle}
+											aria-expanded={open}
+											aria-controls="cluster-detail"
+											className="text-foreground focus-visible:ring-ring/50 w-fit cursor-pointer rounded-sm text-left font-medium break-words underline-offset-4 hover:underline focus-visible:ring-[3px] focus-visible:outline-none"
+											data-testid={`clusters-title-${cluster.signature}`}
+										>
+											{clusterTitle(cluster, sentence)}
+										</button>
+										<CopyId
+											value={cluster.signature}
+											className="text-muted-foreground/80 text-[11px] font-normal"
+											testId={`clusters-id-${cluster.signature}`}
+										/>
+									</div>
 									{cluster.after_config_change && (
 										<span
 											className="text-chart-warning-ink inline-flex items-center gap-1 text-[11px] font-medium"
