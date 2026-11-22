@@ -1924,11 +1924,34 @@ export interface ReleaseCapabilityScore {
 }
 
 /** Before (baseline) and after (candidate) of a release. */
+/** Whether a baseline from another evaluation ran the same benchmark version and tasks. */
+export interface DatasetComparison {
+	changed: boolean;
+	benchmarks: DatasetBenchmark[];
+	summary: string;
+}
+
+export interface DatasetBenchmark {
+	benchmark: string;
+	candidate_version?: string;
+	baseline_version?: string;
+	candidate_lock?: string;
+	baseline_lock?: string;
+	changed: boolean;
+	/** Tasks both sides ran with the same content. */
+	compared: number;
+	new_tasks: number;
+	dropped_tasks: number;
+	not_compared?: boolean;
+}
+
 export interface ReleaseSummary {
 	candidate: ReleaseSide;
 	baseline?: ReleaseSide;
 	capabilities?: ReleaseCapabilityScore[];
 	note?: string;
+	/** A baseline from another evaluation: whether the benchmark changed since (scores then use the shared tasks only). */
+	dataset?: DatasetComparison;
 }
 
 /** POST /releases */
@@ -2511,6 +2534,18 @@ export interface SuiteSummary {
 	fingerprint_drift?: FingerprintDrift[];
 	/** U3: the suite's tiers (docs/suite-tiers.md): pr, nightly, headroom first; nightly always listed. */
 	tiers?: SuiteTier[];
+	/** A judged suite's pinned judge and the judge calls its readiness check makes. */
+	judge?: SuiteJudge;
+}
+
+/** A judged suite's judge on the suites API. */
+export interface SuiteJudge {
+	provider: string;
+	model: string;
+	/** Calls per judged grade (votes, doubled with an auditor). */
+	votes: number;
+	/** About how many judge calls the readiness check of every task makes. */
+	readiness_calls: number;
 }
 
 /** U3: one tier of a suite, a named task subset an experiment picks with `tier:` (handlers/suitetiers.go). */

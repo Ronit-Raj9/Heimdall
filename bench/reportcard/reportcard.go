@@ -226,6 +226,12 @@ type Options struct {
 	FaultOf func(benchmark, condition string) string
 	// Arms keeps only these arm labels; empty keeps every arm.
 	Arms []string
+	// Tasks, when not nil, keeps only these tasks per benchmark (suite id):
+	// a benchmark it does not list is left out, so a comparison with an
+	// evaluation that ran another version of a benchmark scores both sides
+	// on the tasks they share (CompareDatasets) and never pools different
+	// task sets.
+	Tasks map[string][]string
 }
 
 // graded is one counted, sealed, scored run.
@@ -319,7 +325,21 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 		if c.Skipped != "" {
 			continue
 		}
+		var keep map[string]bool
+		if opt.Tasks != nil {
+			ids, ok := opt.Tasks[BenchmarkID(c.Benchmark)]
+			if !ok {
+				continue
+			}
+			keep = map[string]bool{}
+			for _, id := range ids {
+				keep[id] = true
+			}
+		}
 		cr, err := readChild(ctx, src, specArms, c)
+		if keep != nil {
+			cr.keepTasks(keep)
+		}
 		if err != nil {
 			return nil, err
 		}

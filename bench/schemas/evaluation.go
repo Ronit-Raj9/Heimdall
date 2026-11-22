@@ -121,6 +121,10 @@ type EvaluationGateResult struct {
 	Checks           []GateCheck   `json:"checks"`
 	Summary          string        `json:"summary"`
 	DecidedAt        time.Time     `json:"decided_at"`
+	// Dataset is set when the baseline comes from another evaluation: it
+	// says whether the benchmark changed since the baseline and which tasks
+	// the checks compared.
+	Dataset *DatasetComparison `json:"dataset,omitempty"`
 }
 
 // EvaluationSkippedTask is one task left out of a benchmark that still runs
@@ -143,6 +147,42 @@ type EvaluationChild struct {
 	// it stands for (clean, model-down, broken-tool, misleading-instruction),
 	// fixed at launch from faults.Conditions; the report card reads it.
 	FaultOf map[string]string `json:"fault_of,omitempty"`
+	// The dataset version the child ran, fixed at launch from its manifest
+	// (Y07): the suite version, the suite.lock hash, the task ids it ran
+	// and each task's content hash. A comparison with another evaluation
+	// uses only the tasks both ran with the same content (DatasetComparison).
+	SuiteVersion string            `json:"suite_version,omitempty"`
+	LockHash     string            `json:"lock_hash,omitempty"`
+	Tasks        []string          `json:"tasks,omitempty"`
+	TaskHashes   map[string]string `json:"task_hashes,omitempty"`
+}
+
+// DatasetComparison says whether a baseline from another evaluation ran the
+// same benchmark version as the candidate, and what the comparison used
+// when it did not: per benchmark, the tasks both ran with the same content.
+// Scores are never pooled across different task sets: when Changed, every
+// number compared (gate checks, release before and after) is computed over
+// the shared tasks only.
+type DatasetComparison struct {
+	Changed    bool               `json:"changed"`
+	Benchmarks []DatasetBenchmark `json:"benchmarks"`
+	Summary    string             `json:"summary"`
+}
+
+// DatasetBenchmark is one benchmark of a DatasetComparison.
+type DatasetBenchmark struct {
+	Benchmark        string `json:"benchmark"`
+	CandidateVersion string `json:"candidate_version,omitempty"`
+	BaselineVersion  string `json:"baseline_version,omitempty"`
+	CandidateLock    string `json:"candidate_lock,omitempty"`
+	BaselineLock     string `json:"baseline_lock,omitempty"`
+	Changed          bool   `json:"changed"`
+	Compared         int    `json:"compared"`      // tasks both sides ran with the same content
+	NewTasks         int    `json:"new_tasks"`     // candidate tasks the baseline did not run (or ran with other content)
+	DroppedTasks     int    `json:"dropped_tasks"` // baseline tasks the candidate did not run
+	// NotCompared is set when one side did not run the benchmark at all or
+	// no task is shared: the benchmark is left out of the comparison.
+	NotCompared bool `json:"not_compared,omitempty"`
 }
 
 // Evaluation is stored as .heimdall/evaluations/<id>.json in the project.

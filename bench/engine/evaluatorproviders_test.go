@@ -54,3 +54,26 @@ func TestNoPaidPlanSkipsUpstreamCheck(t *testing.T) {
 		}
 	}
 }
+
+// Y07: a scripted experiment with paid_judge checks the judges' providers
+// only: services stay scripted and the arms never call.
+func TestPaidJudgeChecksJudgesOnly(t *testing.T) {
+	suite := &schemas.Suite{
+		Grading: schemas.GradingJudged,
+		Judge:   &schemas.JudgeSpec{Provider: "openai", Model: "j"},
+		Tasks:   []*schemas.Task{{ID: "t01", Services: []schemas.ServiceSpec{{ID: "crm", Gateway: &schemas.ServiceGateway{Provider: "mistral", Model: "m"}}}}},
+	}
+	all := []condPlan{{id: "clean", tasks: []string{"t01"}}}
+	e := &schemas.Experiment{Smoke: true, ScriptedUpstream: true, PaidJudge: true}
+	got := evaluatorProviders(e, suite, all)
+	if want := map[string][]string{"openai": {"judge"}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	checker := &fakeChecker{statuses: []UpstreamStatus{{Provider: "anthropic", Host: "api.anthropic.com:443", Error: "down"}, {Provider: "openai", Host: "api.openai.com:443"}}}
+	checker.statuses[1].OK = true
+	p := &Planner{upstreams: checker, logger: schemas.NoopLogger{}}
+	m := &schemas.Manifest{Experiment: *e, Arms: map[string]schemas.ArmManifest{"A": {Config: schemas.AgentConfig{Adapter: "claude-code"}}}}
+	if err := p.checkUpstreams(context.Background(), m, got); err != nil || checker.calls != 1 {
+		t.Fatalf("calls %d err %v (a scripted arm's provider must not be checked)", checker.calls, err)
+	}
+}

@@ -28,6 +28,7 @@ import (
 	"github.com/maximhq/bifrost/bench/ops"
 	"github.com/maximhq/bifrost/bench/schedule"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 )
 
 // Bridge defaults.
@@ -82,6 +83,11 @@ type (
 		Oracle     string `json:"oracle,omitempty"`
 		Noop       string `json:"noop,omitempty"`
 		TimeoutMin int    `json:"timeout_min,omitempty"`
+		// JudgeConsent is the organization's yes to the judge calls of a
+		// judged benchmark's readiness check (the Build tab toggle): the
+		// judge grades the controls on the organization's own key. Without
+		// it a judged benchmark's check is refused before any run.
+		JudgeConsent bool `json:"judge_consent,omitempty"`
 	}
 	hostedCanaryParams struct {
 		Name       string `json:"name"`
@@ -551,95 +557,42 @@ func bridgeSlots(m *schemas.Manifest) int {
 
 // ---- suite.admit ----
 
-// hostedAdmitTask is one task's admission in the hosted summary.
+// hostedAdmitTask is one task's readiness result in the hosted summary.
 type hostedAdmitTask struct {
 	Task     string `json:"task"`
-	Oracle   string `json:"oracle"` // outcome of the oracle control (want pass)
+	Oracle   string `json:"oracle"` // outcome of the first reference run (want pass)
 	Noop     string `json:"noop"`   // outcome of the noop control (want fail)
 	Admitted bool   `json:"admitted"`
 	Reason   string `json:"reason,omitempty"`
+	// Checks are the task's admission checks, named as local admission
+	// names them (jobs_hostedreadiness.go); the record in suite.lock holds
+	// them after static_validation.
+	Checks           []schemas.AdmissionCheck `json:"checks,omitempty"`
+	ReferenceResults []string                 `json:"-"`
 }
 
 // hostedAdmitReport is suite.admit's hosted result.
 type hostedAdmitReport struct {
 	Suite    string            `json:"suite"`
 	ExpID    string            `json:"exp_id"`
+	ExpIDs   []string          `json:"exp_ids,omitempty"` // one per split (public, held out)
 	Tasks    []hostedAdmitTask `json:"tasks"`
 	Admitted int               `json:"admitted"`
 	Failed   int               `json:"failed"`
 	LockPath string            `json:"lock,omitempty"`
 	Dropped  []string          `json:"dropped,omitempty"`
+	Judge    *readinessJudge   `json:"judge,omitempty"`
 	Note     string            `json:"note"`
 }
 
+// Arms A and B of the readiness experiment: the first reference run and
+// the noop control (the paired verdict needs both ids).
 const admitArmOracle, admitArmNoop = "A", "B"
 
-// admitExperiment runs the oracle (arm A) and the noop (arm B) controls on
-// the chosen tasks.
-func admitExperiment(p hostedSuiteAdmitParams) *schemas.Experiment {
-	tasks := schemas.TaskSelector{All: true}
-	if p.Task != "" {
-		tasks = schemas.TaskSelector{IDs: []string{p.Task}}
-	}
-	id, _, _ := strings.Cut(p.Suite, "@")
-	return &schemas.Experiment{
-		Name:  "admit-" + id,
-		Suite: p.Suite,
-		Base:  p.Oracle,
-		Arms: map[string]schemas.ArmSpec{
-			admitArmOracle: {Label: "oracle control"},
-			admitArmNoop:   {Label: "noop control", Agent: p.Noop},
-		},
-		Primary:          schemas.Endpoint{Condition: schemas.ConditionClean, Metric: "verified_success"},
-		Guards:           []schemas.GuardSpec{{Rule: "no_new_integrity_violation"}},
-		Conditions:       []schemas.ConditionSpec{{ID: schemas.ConditionClean, Tasks: tasks, Trials: 1}},
-		Verdict:          schemas.VerdictSpec{Policy: "paired_signflip", Alpha: 0.05, AssumedSD: 0.30},
-		Seed:             1,
-		Concurrency:      2,
-		ManifestMode:     "agent_exposure",
-		Smoke:            true,
-		ScriptedUpstream: true,
-	}
-}
-
-// admitVerdict groups the runs per task: the oracle must pass and the noop
-// must not.
-func admitVerdict(runs []bridgeRun, wantTasks []string) []hostedAdmitTask {
-	byTask := map[string]*hostedAdmitTask{}
-	for _, t := range wantTasks {
-		byTask[t] = &hostedAdmitTask{Task: t}
-	}
-	for _, r := range runs {
-		t := byTask[r.Task]
-		if t == nil {
-			t = &hostedAdmitTask{Task: r.Task}
-			byTask[r.Task] = t
-		}
-		switch r.Arm {
-		case admitArmOracle:
-			t.Oracle = r.Outcome
-		case admitArmNoop:
-			t.Noop = r.Outcome
-		}
-	}
-	out := make([]hostedAdmitTask, 0, len(byTask))
-	for _, t := range byTask {
-		switch {
-		case t.Oracle == "" || t.Noop == "":
-			t.Reason = "a control run did not seal; see the experiment"
-		case t.Oracle != string(schemas.OutcomePass):
-			t.Reason = "the oracle control did not pass (" + t.Oracle + "): the reference solution or the grader is broken"
-		case t.Noop == string(schemas.OutcomePass):
-			t.Reason = "the noop control passed: the task's tests accept an untouched workspace"
-		case t.Noop == string(schemas.OutcomeInfraError) || t.Noop == string(schemas.OutcomeAbortedInfra) || t.Noop == string(schemas.OutcomeInvalidEvaluator):
-			t.Reason = "the noop control ended " + t.Noop + ": the evaluator could not decide"
-		default:
-			t.Admitted = true
-		}
-		out = append(out, *t)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Task < out[j].Task })
-	return out
+// errJudgeConsent refuses a judged benchmark's readiness check without the
+// organization's consent to the judge calls.
+func errJudgeConsent(j readinessJudge) error {
+	return invalid(fmt.Errorf("the readiness checks of this benchmark call your judge model %s/%s about %d times on your own key: agree to the judge calls in the Build tab (judge_consent) and run them again", j.Provider, j.Model, j.Calls))
 }
 
 func runHostedSuiteAdmit(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, progress func(any)) (any, error) {
@@ -647,8 +600,7 @@ func runHostedSuiteAdmit(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.
 	if err := j.DecodeParams(&p); err != nil {
 		return nil, err
 	}
-	timeout, err := bridgeTimeout(p.TimeoutMin)
-	if err != nil {
+	if _, err := bridgeTimeout(p.TimeoutMin); err != nil {
 		return nil, invalid(err)
 	}
 	if p.Oracle == "" {
@@ -683,36 +635,34 @@ func runHostedSuiteAdmit(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.
 		}
 		return nil, fmt.Errorf("static validation found %d errors; fix them (Edit tab) and admit again", len(errs))
 	}
-	m, err := l.Plan(ctx, admitExperiment(p))
-	if err != nil {
-		return nil, fmt.Errorf("plan the admission run: %w", err)
-	}
-	var tasks []string
-	seen := map[string]bool{}
-	for _, s := range m.Slots {
-		if !seen[s.Task] {
-			seen[s.Task] = true
-			tasks = append(tasks, s.Task)
+	var tasks []*schemas.Task
+	for _, t := range st.suite.Tasks {
+		if p.Task == "" || t.ID == p.Task {
+			tasks = append(tasks, t)
 		}
+	}
+	if len(tasks) == 0 {
+		return nil, fmt.Errorf("suite %s has no task to check", suiteID)
 	}
 	if len(tasks) > bridgeMaxTasks {
 		return nil, fmt.Errorf("suite %s has %d tasks; admit at most %d at once (name one task)", p.Suite, len(tasks), bridgeMaxTasks)
 	}
-	rep := &hostedAdmitReport{Suite: p.Suite, ExpID: m.ExpID,
-		Note: "hosted admission proves the oracle and noop controls on a runner and records each result in suite.lock"}
-	log.Printf("admission controls run in experiment %s (open it on the Experiments page)", m.ExpID)
-	if progress != nil {
-		progress(map[string]any{"done": 0, "total": len(tasks), "exp_id": m.ExpID})
+	judge := readinessJudgeOf(st.suite, tasks)
+	if judge.Judged && !p.JudgeConsent {
+		return nil, errJudgeConsent(judge)
 	}
-	if err := runExperiment(ctx, l, m, timeout, log); err != nil {
-		return rep, err
+	rep := &hostedAdmitReport{Suite: p.Suite,
+		Note: "hosted readiness checks run every control on a worker (the right answer three times, the empty answer, each near miss and wrong answer, a gaming attempt, doing nothing and refusing) and record each result in suite.lock"}
+	if judge.Judged {
+		rep.Judge = &judge
+		log.Printf("the judge %s/%s grades the controls on your own key: about %d calls", judge.Provider, judge.Model, judge.Calls)
 	}
-	runs, err := bridgeSealedRuns(ctx, env, m.ExpID)
+	runs, expOf, err := runReadiness(ctx, env, l, p, st.suite, tasks, judge.Judged, rep, log, progress)
 	if err != nil {
 		return rep, err
 	}
-	rep.Tasks = admitVerdict(runs, tasks)
-	path, dropped, err := recordHostedAdmissions(ctx, env, st, rep.Tasks, m.ExpID, jobActor(j))
+	rep.Tasks = readinessVerdict(st.suite, tasks, runs, expOf, readinessFileChecks(env.App, st.suite))
+	path, dropped, err := recordHostedAdmissions(ctx, env, st, rep.Tasks, rep.ExpID, jobActor(j))
 	if err != nil {
 		return rep, fmt.Errorf("record the admission: %w", err)
 	}
@@ -724,19 +674,84 @@ func runHostedSuiteAdmit(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.
 	for _, t := range rep.Tasks {
 		if t.Admitted {
 			rep.Admitted++
-			log.Printf("ADMIT   %s (oracle %s, noop %s)", t.Task, t.Oracle, t.Noop)
+			log.Printf("ADMIT   %s (%d checks passed)", t.Task, len(t.Checks))
 		} else {
 			rep.Failed++
 			log.Warnf("REFUSE  %s: %s", t.Task, t.Reason)
 		}
 	}
 	if progress != nil {
-		progress(map[string]any{"done": len(rep.Tasks), "total": len(tasks), "exp_id": m.ExpID, "admitted": rep.Admitted, "refused": rep.Failed})
+		progress(map[string]any{"done": len(rep.Tasks), "total": len(tasks), "exp_id": rep.ExpID, "admitted": rep.Admitted, "refused": rep.Failed})
 	}
 	if rep.Failed > 0 {
 		return rep, fmt.Errorf("suite %s: %d tasks not admitted", p.Suite, rep.Failed)
 	}
 	return rep, nil
+}
+
+// runReadiness plans and runs the readiness experiment of tasks, one per
+// split, and returns the sealed runs of all of them with the experiment
+// each task ran in. rep gets the experiment ids as they are planned.
+func runReadiness(ctx context.Context, env jobEnv, l handlers.Launcher, p hostedSuiteAdmitParams, s *schemas.Suite, tasks []*schemas.Task, paidJudge bool,
+	rep *hostedAdmitReport, log jobs.Logger, progress func(any)) ([]bridgeRun, map[string]string, error) {
+	var all []bridgeRun
+	expOf := map[string]string{}
+	for _, group := range readinessGroups(tasks) {
+		split := schemas.SplitPublic
+		if group[0].Split == schemas.SplitHeldOut {
+			split = schemas.SplitHeldOut
+		}
+		m, err := l.Plan(ctx, readinessExperiment(p.Suite, p.Oracle, p.Noop, s, group, split, paidJudge))
+		if err != nil {
+			return all, expOf, fmt.Errorf("plan the readiness run: %w", err)
+		}
+		if rep.ExpID == "" {
+			rep.ExpID = m.ExpID
+		}
+		rep.ExpIDs = append(rep.ExpIDs, m.ExpID)
+		for _, t := range group {
+			expOf[t.ID] = m.ExpID
+		}
+		timeout := readinessTimeout(len(m.Slots))
+		if p.TimeoutMin > 0 {
+			timeout, _ = bridgeTimeout(p.TimeoutMin)
+		}
+		log.Printf("readiness controls of %d %s tasks run in experiment %s (open it on the Experiments page)", len(group), splitWord(split), m.ExpID)
+		if progress != nil {
+			progress(map[string]any{"done": 0, "total": len(tasks), "exp_id": m.ExpID})
+		}
+		if err := runExperiment(ctx, l, m, timeout, log); err != nil {
+			return all, expOf, err
+		}
+		runs, err := bridgeSealedRuns(ctx, env, m.ExpID)
+		if err != nil {
+			return all, expOf, err
+		}
+		all = append(all, runs...)
+	}
+	return all, expOf, nil
+}
+
+func splitWord(split string) string {
+	if split == schemas.SplitHeldOut {
+		return "held-out"
+	}
+	return "public"
+}
+
+// readinessFileChecks runs suite.FileChecks with the org's registered
+// grader of s when there is one.
+func readinessFileChecks(a *app, s *schemas.Suite) func(*schemas.Task) []schemas.AdmissionCheck {
+	var g schemas.Grader
+	if a != nil && a.reg != nil {
+		for _, x := range a.reg.Graders {
+			if x != nil && x.GetName() == s.Grader {
+				g = x
+				break
+			}
+		}
+	}
+	return func(t *schemas.Task) []schemas.AdmissionCheck { return suite.FileChecks(s, t, g) }
 }
 
 // ---- canary.run ----

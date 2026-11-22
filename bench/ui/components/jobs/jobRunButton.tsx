@@ -15,6 +15,8 @@ export interface JobRunButtonProps {
 	label: string;
 	/** When set, asked in the in-page confirm dialog before the job is queued. */
 	confirm?: string;
+	/** Disables the button (for example until a required consent is given). */
+	disabled?: boolean;
 	/** Called once the job finished (succeeded, failed or cancelled). */
 	onDone?(job: Job): void;
 	variant?: VariantProps<typeof buttonVariants>["variant"];
@@ -24,7 +26,7 @@ export interface JobRunButtonProps {
  * Queues a job through POST /jobs and opens its live log with Cancel beneath the button. Viewers
  * see the button disabled; a refused or invalid request shows the server's message.
  */
-export function JobRunButton({ kind, params, label, confirm, onDone, variant }: JobRunButtonProps) {
+export function JobRunButton({ kind, params, label, confirm, disabled, onDone, variant }: JobRunButtonProps) {
 	const { t } = useTranslation("jobs");
 	const session = useSession();
 	const askConfirm = useConfirm();
@@ -42,7 +44,7 @@ export function JobRunButton({ kind, params, label, confirm, onDone, variant }: 
 	return (
 		<div className="flex min-w-0 flex-col gap-2" data-testid={`job-run-${kind}-wrap`}>
 			<div>
-				<Button variant={variant} disabled={!allowed || busy} isLoading={busy} onClick={() => void run()} dataTestId={`job-run-${kind}`}>
+				<Button variant={variant} disabled={!allowed || busy || !!disabled} isLoading={busy} onClick={() => void run()} dataTestId={`job-run-${kind}`}>
 					{label}
 				</Button>
 			</div>

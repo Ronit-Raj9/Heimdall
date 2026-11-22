@@ -1,12 +1,10 @@
 package suite
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -14,7 +12,6 @@ import (
 
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
-	"gopkg.in/yaml.v3"
 )
 
 // Paths and limits of script and answer controls.
@@ -160,27 +157,14 @@ func (a *admitter) answerControl(name, want, text, detail string) control {
 }
 
 // wrongAnswers reads the wrong answers of the task's hidden AnswerSpec
-// (verifier.answer, else answer.yaml in the verifier tests folder). A task
-// without an answer file has none.
+// (verifier.answer, else answer.yaml in the verifier tests folder): the
+// author's, then the generated ones. A task without an answer file has none.
 func (a *admitter) wrongAnswers() ([]string, error) {
-	rp := a.t.Verifier.Answer
-	if rp == "" {
-		rp = path.Join(filepath.ToSlash(a.t.Verifier.Tests), defaultAnswerSpec)
-	}
-	b, err := utils.ReadFileInside(a.t.Dir, rp)
-	if errors.Is(err, os.ErrNotExist) && a.t.Verifier.Answer == "" {
-		return nil, nil
-	}
+	w, err := utils.TaskWrongAnswers(a.t)
 	if err != nil {
-		return nil, fmt.Errorf("admit task %s: answer spec: %w", a.t.ID, err)
+		return nil, fmt.Errorf("admit task %s: %w", a.t.ID, err)
 	}
-	var spec schemas.AnswerSpec
-	dec := yaml.NewDecoder(bytes.NewReader(b))
-	dec.KnownFields(true)
-	if err := dec.Decode(&spec); err != nil {
-		return nil, fmt.Errorf("admit task %s: answer spec %s: %w", a.t.ID, rp, err)
-	}
-	return spec.WrongOnes, nil
+	return w, nil
 }
 
 // controlImage is the image a control runs in: the task's own image when it

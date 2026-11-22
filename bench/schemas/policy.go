@@ -168,6 +168,10 @@ type ReleaseSummary struct {
 	Baseline     *ReleaseSide             `json:"baseline,omitempty"`
 	Capabilities []ReleaseCapabilityScore `json:"capabilities,omitempty"`
 	Note         string                   `json:"note,omitempty"` // e.g. the baseline is not the live version
+	// Dataset: a baseline from another evaluation, and whether the
+	// benchmark changed since (both sides are then scored on the shared
+	// tasks only).
+	Dataset *DatasetComparison `json:"dataset,omitempty"`
 }
 
 // ReleaseRequest is POST /releases.

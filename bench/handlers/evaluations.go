@@ -33,6 +33,7 @@ import (
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/packs"
 	"github.com/maximhq/bifrost/bench/projectfs"
+	"github.com/maximhq/bifrost/bench/reportcard"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/tenancy"
 	"github.com/maximhq/bifrost/bench/utils"
@@ -854,6 +855,7 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 		created(m.ExpID)
 	}
 	child.ExperimentID, child.Status = m.ExpID, string(schemas.ExperimentCreatedState)
+	reportcard.ChildDatasetFromManifest(&child, m) // Y07: the benchmark version and tasks this child ran
 	if err := s.Launcher.Start(start, m.ExpID); err != nil {
 		child.Status, child.Skipped = string(schemas.ExperimentFailed), "start experiment (it was created; start it from its page): "+err.Error()
 		return child

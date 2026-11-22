@@ -4,7 +4,7 @@ import { LOCAL_SESSION } from "@/lib/session/sessionContext";
 import { mutation, render } from "@/lib/testing/render";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { describe, expect, it, vi } from "vitest";
-import { BuildTab, formatOfFile, graderChoice, RowPreview, sourcesFor } from "./buildTab";
+import { BuildTab, formatOfFile, graderChoice, judgeCalls, RowPreview, sourcesFor } from "./buildTab";
 import i18n from "i18next";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
@@ -55,6 +55,15 @@ describe("BuildTab", () => {
 		expect(html).toContain('data-testid="suite-build-no-rows"');
 		expect(html).toContain('data-testid="suite-ops-from-commit"');
 	});
+	it("asks a hosted member to agree to the judge calls of a judged benchmark's readiness checks", () => {
+		const judged = { ...qa, grader: "judge", judge: { provider: "openai", model: "gpt-x", votes: 1, readiness_calls: 12 } } as unknown as SuiteSummary;
+		const html = render(<BuildTab suite={judged} />, { ...LOCAL_SESSION, authMode: "hosted", role: "member" });
+		expect(html).toContain('data-testid="suite-build-readiness-judge-consent"');
+		expect(html).toContain("openai/gpt-x, about 12 calls");
+		expect(html).toMatch(/<button[^>]*disabled=""[^>]*data-testid="job-run-suite.admit"|data-testid="job-run-suite.admit"[^>]*disabled=""/);
+		const plain = render(<BuildTab suite={qa} />, { ...LOCAL_SESSION, authMode: "hosted", role: "member" });
+		expect(plain).not.toContain("suite-build-readiness-judge-consent");
+	});
 	it("shows a viewer the state but no actions", () => {
 		const html = render(<BuildTab suite={qa} />, { ...LOCAL_SESSION, authMode: "hosted", role: "viewer" });
 		expect(html).toContain('data-testid="suite-build-viewer"');
@@ -75,6 +84,12 @@ describe("buildTab helpers", () => {
 		expect(formatOfFile("rows.jsonl")).toBe("jsonl");
 		expect(formatOfFile("notes.txt")).toBeNull();
 	});
+	it("counts the judge calls of the readiness checks", () => {
+		const s = { judge: { provider: "p", model: "m", votes: 1, readiness_calls: 10 }, tasks: [{ id: "a" }, { id: "b" }] } as unknown as SuiteSummary;
+		expect(judgeCalls(s, "")).toBe(10);
+		expect(judgeCalls(s, "a")).toBe(5);
+		expect(judgeCalls({ tasks: [] } as unknown as SuiteSummary, "")).toBe(0);
+	});
 	it("previews rows and problems", () => {
 		const t = i18n.getFixedT("en", "suiteBuild");
 		const html = render(
@@ -85,7 +100,7 @@ describe("buildTab helpers", () => {
 					grader: "judge",
 					dry_run: true,
 					next: "",
-					tasks: [{ line: 2, id: "charged-twice", title: "Charged twice", question: "Billed twice", check: "Apologise", held_out: true }],
+					tasks: [{ line: 2, id: "charged-twice", title: "Charged twice", question: "Billed twice", check: "Apologise", held_out: true, wrong_answers: ["We will look into it."], generated_wrong: true }],
 					problems: [{ line: 3, message: "no check" }],
 				}}
 			/>,
@@ -94,5 +109,7 @@ describe("buildTab helpers", () => {
 		expect(html).toContain("Rubric");
 		expect(html).toContain("Row 3: no check");
 		expect(html).toContain("held out");
+		expect(html).toContain("We will look into it.");
+		expect(html).toContain("Written by Heimdall from your answer");
 	});
 });

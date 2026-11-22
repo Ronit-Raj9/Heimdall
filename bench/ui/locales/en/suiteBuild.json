@@ -78,8 +78,10 @@
 			"task": "Task",
 			"question": "Question",
 			"answer": "Expected answer",
-			"rubric": "Rubric"
-		}
+			"rubric": "Rubric",
+			"wrong": "Wrong answers tried"
+		},
+		"generatedWrong": "Written by Heimdall from your answer (the row named none). Edit them in verifier/answer.yaml."
 	},
 	"private": {
 		"title": "3. Private tasks",
@@ -104,6 +106,9 @@
 		"confirm_other": "Run the readiness checks on all {{count}} tasks? This builds images and tries the right answer and the wrong ones for each task.",
 		"confirmHosted_one": "Run the readiness checks on 1 task? It runs on a worker with scripted answers, no model calls.",
 		"confirmHosted_other": "Run the readiness checks on all {{count}} tasks? They run on a worker with scripted answers, no model calls.",
+		"confirmHostedJudged_one": "Run the readiness checks on 1 task? It runs on a worker with scripted answers; your judge model grades them, about {{calls}} calls on your own key.",
+		"confirmHostedJudged_other": "Run the readiness checks on all {{count}} tasks? They run on a worker with scripted answers; your judge model grades them, about {{calls}} calls on your own key.",
+		"judgeConsent": "Readiness checks call your judge model {{provider}}/{{model}}, about {{calls}} calls on your organization's key. The right answer is graded three times, plus each near miss and wrong answer that reaches the judge.",
 		"confirmOne": "Run the readiness checks on {{task}}?",
 		"summary": "{{ready}} of {{total}} tasks passed.",
 		"ready": "ready",
@@ -111,6 +116,7 @@
 		"passed": "passed",
 		"failed": "failed",
 		"got": "got {{got}}, wanted {{want}}",
+		"notRun": "not run on this worker",
 		"check": {
 			"static": "Files are complete and valid",
 			"reference": "The right answer passes (try {{n}})",

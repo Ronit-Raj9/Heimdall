@@ -81,6 +81,7 @@ func scenarioSummary(s *schemas.Suite, out *schemas.SuiteSummary) {
 		rec := *s.Imported
 		out.Imported = &rec
 	}
+	judgeSummary(s, out) // Y07: the judge and its readiness call count
 	for i := range out.Tasks {
 		if t := s.TaskByID(out.Tasks[i].ID); t != nil {
 			taskScenario(t, &out.Tasks[i])

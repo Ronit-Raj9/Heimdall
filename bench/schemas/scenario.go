@@ -265,6 +265,30 @@ type AnswerSpec struct {
 	Rubric    string   `json:"rubric,omitempty" yaml:"rubric"`               // judge grader: what a correct answer must contain
 	Abstain   bool     `json:"abstain,omitempty" yaml:"abstain"`             // the correct behaviour is to say the answer is not known
 	WrongOnes []string `json:"wrong_answers,omitempty" yaml:"wrong_answers"` // admission controls: answers that must fail
+	// GeneratedWrong are plausible wrong answers written by the bench, not
+	// the author (scaffold.GenerateWrongAnswers: the reference with a number
+	// changed, a statement negated, a yes or no flipped, or another row's
+	// reference). Admission grades them exactly like WrongOnes; they are
+	// kept apart so the Build tab can show which ones the author wrote.
+	GeneratedWrong []string `json:"generated_wrong_answers,omitempty" yaml:"generated_wrong_answers"`
+}
+
+// AllWrong is every wrong answer admission grades: the author's, then the
+// generated ones, without duplicates.
+func (a *AnswerSpec) AllWrong() []string {
+	if a == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, w := range append(append([]string(nil), a.WrongOnes...), a.GeneratedWrong...) {
+		if seen[w] {
+			continue
+		}
+		seen[w] = true
+		out = append(out, w)
+	}
+	return out
 }
 
 // JudgeSpec pins the judge model of a judged suite (Suite.Judge). Every field
@@ -278,7 +302,7 @@ type JudgeSpec struct {
 	Votes         int    `json:"votes,omitempty" yaml:"votes"`         // odd number of independent calls, majority decides; default 1
 	MaxTokens     int    `json:"max_tokens,omitempty" yaml:"max_tokens"`
 
-	Auditor *JudgeAuditorSpec `json:"auditor,omitempty" yaml:"auditor"` // W8 judge calibration: optional second judge from another provider; disagreement marks a run contested, never overrules
+	Auditor *JudgeAuditorSpec `json:"auditor,omitempty" yaml:"auditor,omitempty"` // W8 judge calibration: optional second judge from another provider; disagreement marks a run contested, never overrules
 }
 
 // JudgeRecord is what one judged grade rested on (Grade.Judge).

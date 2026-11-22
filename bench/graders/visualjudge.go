@@ -103,7 +103,7 @@ func (g *visualGrader) judge(ctx context.Context, rc *schemas.RunContext, spec *
 	if gr := utils.Grading(rc.Suite); gr != schemas.GradingJudged {
 		return nil, nil, fmt.Errorf("suite %s has grading %s; a rubric lets the vision judge decide outcomes, so the suite must declare grading: judged", rc.Suite.ID, gr)
 	}
-	if rc.NoPaidTraffic {
+	if rc.JudgeBlocked() {
 		return nil, nil, errors.New(NoPaidJudgeReason)
 	}
 	jc := g.cfg.Judge

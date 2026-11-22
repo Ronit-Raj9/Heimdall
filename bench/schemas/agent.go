@@ -269,7 +269,13 @@ func (p *RoutingPolicy) EffectiveModels(agentModel string) []string {
 
 // ScriptedSpec selects a scripted control agent.
 type ScriptedSpec struct {
-	Kind string `json:"kind" yaml:"kind"` // oracle | noop | exploit | refuse | toy
+	Kind string `json:"kind" yaml:"kind"` // oracle | noop | exploit | refuse | toy | empty | mutant | wrong_answer
+	// Index is 1-based: which mutant (controls.mutants) or which wrong answer
+	// of the hidden answer spec a mutant or wrong_answer control writes. On
+	// any other kind it changes nothing the control does; the hosted
+	// readiness check sets it on its repeated reference arms so each arm has
+	// its own config hash.
+	Index int `json:"index,omitempty" yaml:"index"`
 }
 
 // AgentAdapter turns an agent config into a container run plan. It starts

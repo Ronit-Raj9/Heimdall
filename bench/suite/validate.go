@@ -77,6 +77,7 @@ func ValidateTask(ctx context.Context, s *schemas.Suite, t *schemas.Task) []Prob
 	}
 	sizes := lintSizes(s.Root, t)
 	out = append(out, sizes...)
+	out = append(out, lintJudgedWrong(s, t)...) // Y07: a judged task's readiness check must show the judge a wrong answer
 	findings, err := ScanSecrets(t.Dir)
 	if err != nil {
 		add(taskYAML, SeverityError, "%v", err)

@@ -17,7 +17,7 @@ import { Link } from "@tanstack/react-router";
 import { AlertTriangle, CalendarClock, CheckCircle2, Rocket, ShieldAlert, ShieldQuestion } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ReleaseEvidence, versionName } from "./releaseEvidence";
+import { DatasetChange, ReleaseEvidence, versionName } from "./releaseEvidence";
 
 /** The gate's pass or fail as a badge with its summary and each check. Shown on the report card. */
 export function GateResultCard({ gate, testId = "evaluation-gate" }: { gate: EvaluationGateResult; testId?: string }) {
@@ -40,6 +40,7 @@ export function GateResultCard({ gate, testId = "evaluation-gate" }: { gate: Eva
 				)}
 			</div>
 			<p className="text-sm">{gate.summary}</p>
+			{gate.dataset && <DatasetChange dataset={gate.dataset} testId={`${testId}-dataset`} />}
 			{gate.checks.length > 0 && (
 				<ul className="flex flex-col gap-1 text-xs">
 					{gate.checks.map((c) => (

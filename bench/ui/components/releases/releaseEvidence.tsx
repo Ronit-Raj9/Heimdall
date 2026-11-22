@@ -1,4 +1,5 @@
-import type { ReleaseRecord, ReleaseSide, ReleaseSummary, ScoreCI } from "@/lib/types/bench";
+import { Badge } from "@/components/ui/badge";
+import type { DatasetComparison, ReleaseRecord, ReleaseSide, ReleaseSummary, ScoreCI } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
@@ -104,7 +105,36 @@ export function ReleaseEvidence({ summary, testId }: { summary: ReleaseSummary; 
 				</tbody>
 			</table>
 			{!b && <p className="text-muted-foreground text-xs">{t("releases.ev.noBaseline")}</p>}
+			{summary.dataset && <DatasetChange dataset={summary.dataset} testId={testId ? `${testId}-dataset` : undefined} />}
 			{summary.note && <p className="text-muted-foreground text-xs">{summary.note}</p>}
+		</div>
+	);
+}
+
+/**
+ * Whether the benchmark changed since the baseline: a badge, and per changed benchmark how many
+ * tasks both sides ran (the only ones compared), new and dropped. Nothing when it did not change.
+ */
+export function DatasetChange({ dataset, testId = "dataset-change" }: { dataset: DatasetComparison; testId?: string }) {
+	const { t } = useTranslation("u14");
+	if (!dataset.changed) return null;
+	return (
+		<div className="flex flex-col gap-1 text-xs" data-testid={testId}>
+			<div>
+				<Badge variant="warning">{t("dataset.changed")}</Badge>
+			</div>
+			<ul className="text-muted-foreground flex flex-col gap-0.5">
+				{dataset.benchmarks
+					.filter((b) => b.changed)
+					.map((b) => (
+						<li key={b.benchmark} data-testid={`${testId}-${b.benchmark}`}>
+							<span className="text-foreground font-mono">{b.benchmark}</span>{" "}
+							{b.not_compared
+								? t("dataset.notCompared")
+								: t("dataset.compared", { count: b.compared, added: b.new_tasks, dropped: b.dropped_tasks })}
+						</li>
+					))}
+			</ul>
 		</div>
 	);
 }
