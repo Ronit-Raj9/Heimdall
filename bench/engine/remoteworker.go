@@ -70,6 +70,9 @@ type WorkerOptions struct {
 	// Jobs runs runner job leases (gap G05, remotejobs.go); nil refuses
 	// them, and the coordinator then offers this worker no job again.
 	Jobs JobExecutor
+	// JobKinds limits the runner job kinds this worker is offered (sent at
+	// register). Empty: every kind.
+	JobKinds []string
 	// E6 runner hygiene (runnerhygiene.go). Disk reports the run store's
 	// free disk before every lease request: while it is low the runner asks
 	// for no work and the server shows why. ImageUse records the images a
@@ -214,7 +217,8 @@ func (w *Worker) Run(ctx context.Context) error {
 // register registers, retrying while the coordinator cannot be reached.
 func (w *Worker) register(ctx context.Context) error {
 	req := schemas.WorkerRegister{WorkerID: w.opts.WorkerID, Host: w.opts.Host, Version: w.opts.Version,
-		Parts: PartVersions(w.reg), Slots: w.opts.Slots, Pool: w.opts.Pool, Labels: w.opts.Labels}
+		Parts: PartVersions(w.reg), Slots: w.opts.Slots, Pool: w.opts.Pool, Labels: w.opts.Labels,
+		JobKinds: w.opts.JobKinds}
 	req.Capabilities = WorkerCapabilities(w.reg) // X7: the GPUs this worker offers; nil without a GPU pool (gpu.go)
 	for {
 		var out schemas.WorkerRegistered
