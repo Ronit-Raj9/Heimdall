@@ -1,11 +1,24 @@
 import "@/lib/i18n";
 
-import { CANARY_LIST_FIXTURE } from "@/components/canaries/canary.fixtures";
+import { CANARY_DRIFTED_FIXTURE, CANARY_LIST_FIXTURE } from "@/components/canaries/canary.fixtures";
+import { benchApi } from "@/lib/store/apis/benchApi";
+import { canaryApi } from "@/lib/store/apis/canaryApi";
+import { schedulesApi } from "@/lib/store/apis/schedulesApi";
+import { configureStore } from "@reduxjs/toolkit";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
-import { CanariesBody } from "./canariesView";
+import { Provider } from "react-redux";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildCanaryEdit, canaryFormFields, suiteRefs } from "./newCanaryForm";
+import { CanariesBody, CanaryActions, pausedCanaries } from "./canariesView";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+
+function newStore() {
+	return configureStore({
+		reducer: { [benchApi.reducerPath]: benchApi.reducer },
+		middleware: (g) => g().concat(benchApi.middleware),
+	});
+}
 
 describe("CanariesBody", () => {
 	it("lists the canaries, names a broken definition and shows the open panel", () => {
@@ -25,5 +38,111 @@ describe("CanariesBody", () => {
 		expect(html).toContain('data-testid="canaries-empty"');
 		expect(html).toContain("canary init");
 		expect(html).toContain("Catch your agent or model quietly getting worse");
+	});
+
+	it("marks a paused drift monitor in the list", () => {
+		const name = CANARY_LIST_FIXTURE.canaries[0].name;
+		const paused = pausedCanaries([
+			{ name: `canary-${name}`, kind: "canary", paused: true } as { name: string; kind: string },
+			{ name: "nightly-core", kind: "experiment", paused: true } as { name: string; kind: string },
+		]);
+		expect([...paused]).toEqual([name]);
+		const html = renderToStaticMarkup(
+			<CanariesBody data={CANARY_LIST_FIXTURE} selected={null} onSelect={() => {}} panel={null} paused={paused} />,
+		);
+		expect(html).toContain(`data-testid="canary-paused-${name}"`);
+		expect(html).toContain(">Paused<");
+	});
+});
+
+describe("CanaryActions", () => {
+	const def = CANARY_DRIFTED_FIXTURE.definition;
+	const render = (d: typeof def) =>
+		renderToStaticMarkup(
+			<Provider store={newStore()}>
+				<CanaryActions name={d.name} definition={d} onEdit={() => {}} />
+			</Provider>,
+		);
+
+	it("offers Pause, Edit and Delete next to the checks", () => {
+		const html = render({ ...def, schedule: { cron: "0 6 * * *" } });
+		expect(html).toContain('data-testid="canary-pause"');
+		expect(html).toContain('data-testid="canary-edit"');
+		expect(html).toContain('data-testid="canary-delete"');
+		expect(html).not.toContain('data-testid="canary-paused"');
+	});
+
+	it("shows Paused and Resume for a paused drift monitor", () => {
+		const html = render({ ...def, schedule: { cron: "0 6 * * *", paused: true } as typeof def.schedule });
+		expect(html).toContain('data-testid="canary-paused"');
+		expect(html).toContain('data-testid="canary-resume"');
+	});
+});
+
+describe("drift monitor form", () => {
+	it("lists the benchmarks as id@version and keeps hidden fields on edit", () => {
+		expect(
+			suiteRefs([
+				{ id: "hd-harbor-bfcl", version: "1.0.0" },
+				{ id: "x", version: "" },
+			] as never),
+		).toEqual(["hd-harbor-bfcl@1.0.0", "x"]);
+		const def = { ...CANARY_DRIFTED_FIXTURE.definition, description: "keep me", schedule: { cron: "0 6 * * *", timezone: "UTC" } };
+		const f = { ...canaryFormFields(def), tasks: "t9", cron: "0 7 * * *" };
+		const body = buildCanaryEdit(def, f);
+		expect(body.name).toBe(def.name);
+		expect(body.description).toBe("keep me");
+		expect(body.tasks).toEqual(["t9"]);
+		expect(body.schedule).toEqual({ cron: "0 7 * * *", timezone: "UTC" });
+		expect(body.force).toBeUndefined();
+		expect(buildCanaryEdit(def, { ...f, cron: "" }).schedule).toBeUndefined();
+	});
+});
+
+describe("drift monitor cache", () => {
+	afterEach(() => vi.unstubAllGlobals());
+
+	it("refetches the open drift monitor after it is deleted and created again", async () => {
+		const gets: string[] = [];
+		const NodeRequest = globalThis.Request;
+		vi.stubGlobal(
+			"Request",
+			class extends NodeRequest {
+				constructor(input: RequestInfo | URL, init?: RequestInit) {
+					super(typeof input === "string" ? new URL(input, "http://bench.test") : input, init);
+				}
+			},
+		);
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (request: Request) => {
+				const path = new URL(request.url).pathname;
+				if (request.method === "GET" && path.endsWith("/canaries/zz")) gets.push(path);
+				if (request.method === "DELETE") return new Response(null, { status: 204 });
+				return new Response(JSON.stringify({ ...CANARY_DRIFTED_FIXTURE, name: "zz", path: "canaries/zz.yaml", next: "" }), {
+					status: 200,
+					headers: { "Content-Type": "application/json" },
+				});
+			}),
+		);
+		const store = newStore();
+		const sub = store.dispatch(canaryApi.endpoints.getCanary.initiate("zz"));
+		await sub;
+		expect(gets.length).toBe(1);
+		await store.dispatch(schedulesApi.endpoints.deleteCanary.initiate("zz"));
+		await vi.waitFor(() => expect(gets.length).toBe(2));
+		await store.dispatch(
+			schedulesApi.endpoints.createCanary.initiate({
+				name: "zz",
+				agent: "agents/a.yaml",
+				suite: "s@1",
+				tasks: ["t"],
+				trials: 1,
+				targets: [{ model: "m" }],
+				budget: {},
+			}),
+		);
+		await vi.waitFor(() => expect(gets.length).toBe(3));
+		sub.unsubscribe();
 	});
 });

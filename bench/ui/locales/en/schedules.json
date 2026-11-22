@@ -86,8 +86,20 @@
 		"baselineConfirm": "Record a new baseline for this drift monitor? This runs it once.",
 		"run": "Check now",
 		"delete": "Delete",
-		"deleteConfirm": "Delete drift monitor {{name}}? Its past checks and baselines are kept.",
-		"missing": "To create the drift monitor, fill in a name, a benchmark (name@version) and at least one model to watch (provider/model)."
+		"deleteConfirm": "Delete drift monitor {{name}}? Its baseline and check history are deleted too.",
+		"missing": "To create the drift monitor, fill in a name, a benchmark (name@version) and at least one model to watch (provider/model).",
+		"edit": "Edit",
+		"editTitle": "Edit drift monitor {{name}}",
+		"save": "Save changes",
+		"saved": "Drift monitor {{name}} saved.",
+		"suitePick": "Pick a benchmark",
+		"suitesLoading": "Loading benchmarks...",
+		"suitesEmpty": "No benchmarks yet. Add one on the Benchmarks page first.",
+		"pausedNote": "Paused: scheduled checks do not run until you resume. Check now still works."
 	},
-	"noTickerAction": "Set up a drift monitor instead"
+	"noTickerAction": "Set up a drift monitor instead",
+	"paused": "Paused",
+	"pause": "Pause",
+	"resume": "Resume",
+	"editTitle": "Edit schedule {{name}}"
 }

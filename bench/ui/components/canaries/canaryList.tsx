@@ -22,14 +22,17 @@ export interface CanaryListProps {
 	canaries: readonly CanarySummary[];
 	selected?: string | null;
 	onSelect: (name: string) => void;
+	/** Names of the paused drift monitors: a Paused badge, and Paused as the next check. */
+	paused?: ReadonlySet<string>;
 }
 
 /**
  * Every canary: its state first (drifted, then watching, invalid, stale), what it watches, the
  * baseline it compares with, when it looks next and what it spent today against its daily cap.
  */
-export function CanaryList({ canaries, selected, onSelect }: CanaryListProps) {
+export function CanaryList({ canaries, selected, onSelect, paused }: CanaryListProps) {
 	const { t } = useTranslation("bench");
+	const { t: st } = useTranslation("schedules");
 	const locale = getLocale();
 	return (
 		<Table stickyColumns={1} aria-label={t("canaries.list.label")} data-testid="canary-table">
@@ -47,6 +50,7 @@ export function CanaryList({ canaries, selected, onSelect }: CanaryListProps) {
 			<TableBody>
 				{sortCanaries(canaries).map((c) => {
 					const isSelected = c.name === selected;
+					const isPaused = Boolean(paused?.has(c.name) || (c as { paused?: boolean }).paused);
 					return (
 						<TableRow
 							key={c.name}
@@ -67,6 +71,11 @@ export function CanaryList({ canaries, selected, onSelect }: CanaryListProps) {
 									{c.name}
 								</button>
 								{c.description && <p className="text-muted-foreground line-clamp-2 text-xs">{c.description}</p>}
+								{isPaused && (
+									<Badge variant="outline" className="mt-1 mr-1" data-testid={`canary-paused-${c.name}`}>
+										{st("paused")}
+									</Badge>
+								)}
 								{c.smoke && (
 									<Badge variant="outline" className="mt-1" data-testid={`canary-smoke-${c.name}`}>
 										{t("canaries.smoke")}
@@ -89,7 +98,7 @@ export function CanaryList({ canaries, selected, onSelect }: CanaryListProps) {
 							</TableCell>
 							<TableCell className="text-right tabular-nums">{c.looks}</TableCell>
 							<TableCell className="text-xs">
-								{c.next ? (formatDateTime(c.next, locale) ?? c.next) : t("canaries.list.notScheduled")}
+								{isPaused ? st("paused") : c.next ? (formatDateTime(c.next, locale) ?? c.next) : t("canaries.list.notScheduled")}
 							</TableCell>
 							<TableCell className="text-right text-xs tabular-nums" data-testid={`canary-spend-${c.name}`}>
 								{c.per_day_usd > 0

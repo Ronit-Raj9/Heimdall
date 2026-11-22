@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
 	errorMessage,
+	isPaused,
 	useGetSchedulesQuery,
+	useSetSchedulePausedMutation,
 	useRunScheduleMutation,
 	useSaveSchedulesMutation,
 	useTestAlertMutation,
@@ -97,6 +99,7 @@ export function SchedulesBody({ data, busy, onSave }: SchedulesBodyProps) {
 	const { t } = useTranslation("schedules");
 	const { t: u } = useTranslation("ux13");
 	const [adding, setAdding] = useState(false);
+	const [editing, setEditing] = useState<Schedule | null>(null);
 	const file = data.file;
 	const saveWith = (patch: Partial<SchedulesFile>) => onSave({ alerts: file.alerts ?? [], schedules: file.schedules ?? [], ...patch });
 	return (
@@ -144,6 +147,10 @@ export function SchedulesBody({ data, busy, onSave }: SchedulesBodyProps) {
 						<ScheduleTable
 							rows={data.rows}
 							onRemove={(name) => saveWith({ schedules: file.schedules.filter((s) => s.name !== name) })}
+							onEdit={(name) => {
+								setAdding(false);
+								setEditing(file.schedules.find((s) => s.name === name) ?? null);
+							}}
 							busy={busy}
 						/>
 					</section>
@@ -165,6 +172,28 @@ export function SchedulesBody({ data, busy, onSave }: SchedulesBodyProps) {
 						onAdd={(s) => {
 							saveWith({ schedules: [...(file.schedules ?? []), s] });
 							setAdding(false);
+						}}
+					/>
+				</SetupCard>
+			)}
+			{editing && (
+				<SetupCard
+					icon={CalendarClock}
+					title={t("editTitle", { name: editing.name })}
+					testId="schedules-edit"
+					actions={
+						<Button size="sm" variant="ghost" onClick={() => setEditing(null)} data-testid="schedules-edit-close">
+							{u("schedules.close")}
+						</Button>
+					}
+				>
+					<AddScheduleForm
+						key={editing.name}
+						busy={busy}
+						initial={editing}
+						onAdd={(s) => {
+							saveWith({ schedules: (file.schedules ?? []).map((x) => (x.name === editing.name ? s : x)) });
+							setEditing(null);
 						}}
 					/>
 				</SetupCard>
@@ -192,11 +221,27 @@ function lastTone(status: string): PillTone {
 	return "error";
 }
 
-function ScheduleTable({ rows, onRemove, busy }: { rows: ScheduleRow[]; onRemove(name: string): void; busy: boolean }) {
+function ScheduleTable({
+	rows,
+	onRemove,
+	onEdit,
+	busy,
+}: {
+	rows: ScheduleRow[];
+	onRemove(name: string): void;
+	onEdit(name: string): void;
+	busy: boolean;
+}) {
 	const { t } = useTranslation("schedules");
 	const { t: u } = useTranslation("ux13");
 	const [run, runState] = useRunScheduleMutation();
+	const [setPaused, pauseState] = useSetSchedulePausedMutation();
 	const [note, setNote] = useState<string | null>(null);
+	const togglePause = async (name: string, paused: boolean) => {
+		setNote(null);
+		const res = await setPaused({ name, paused });
+		if ("error" in res && res.error) setNote(errorMessage(res.error, "not changed"));
+	};
 	const runNow = async (name: string) => {
 		setNote(null);
 		const res = await run(name);
@@ -222,8 +267,15 @@ function ScheduleTable({ rows, onRemove, busy }: { rows: ScheduleRow[]; onRemove
 						{rows.map((r) => (
 							<tr key={r.name} className="hover:bg-muted/30 border-t align-middle transition-colors" data-testid={`schedule-row-${r.name}`}>
 								<td className="max-w-64 px-4 py-3">
-									<div className="truncate font-medium" title={r.name}>
-										{r.name}
+									<div className="flex items-center gap-2">
+										<span className="truncate font-medium" title={r.name}>
+											{r.name}
+										</span>
+										{isPaused(r) && (
+											<Pill tone="muted" testId={`schedule-paused-${r.name}`}>
+												{t("paused")}
+											</Pill>
+										)}
 									</div>
 									<div className="text-muted-foreground truncate text-xs" title={r.job || r.evaluation || r.experiment}>
 										{t(`kind.${r.kind}` as never, { defaultValue: r.kind })}
@@ -235,7 +287,9 @@ function ScheduleTable({ rows, onRemove, busy }: { rows: ScheduleRow[]; onRemove
 										{r.cron}
 										{r.timezone ? ` ${r.timezone}` : ""}
 									</div>
-									<div className="text-muted-foreground text-xs">{r.next ? new Date(r.next).toLocaleString() : "-"}</div>
+									<div className="text-muted-foreground text-xs">
+										{isPaused(r) ? t("paused") : r.next ? new Date(r.next).toLocaleString() : "-"}
+									</div>
 								</td>
 								<td className="px-4 py-3">
 									{r.problem ? (
@@ -256,13 +310,45 @@ function ScheduleTable({ rows, onRemove, busy }: { rows: ScheduleRow[]; onRemove
 								</td>
 								<td className="px-4 py-3">
 									<div className="flex justify-end gap-2">
-										<Button size="sm" variant="outline" disabled={runState.isLoading} onClick={() => void runNow(r.name)} data-testid={`schedule-run-${r.name}`}>
+										<Button
+											size="sm"
+											variant="outline"
+											disabled={runState.isLoading}
+											onClick={() => void runNow(r.name)}
+											data-testid={`schedule-run-${r.name}`}
+										>
 											{t("runNow")}
 										</Button>
+										<Button
+											size="sm"
+											variant="outline"
+											disabled={pauseState.isLoading}
+											onClick={() => void togglePause(r.name, !isPaused(r))}
+											data-testid={`schedule-${isPaused(r) ? "resume" : "pause"}-${r.name}`}
+										>
+											{isPaused(r) ? t("resume") : t("pause")}
+										</Button>
 										{r.source === "web" ? (
-											<Button size="sm" variant="ghost" disabled={busy} onClick={() => onRemove(r.name)} data-testid={`schedule-remove-${r.name}`}>
-												{t("remove")}
-											</Button>
+											<>
+												<Button
+													size="sm"
+													variant="outline"
+													disabled={busy}
+													onClick={() => onEdit(r.name)}
+													data-testid={`schedule-edit-${r.name}`}
+												>
+													{t("canary.edit")}
+												</Button>
+												<Button
+													size="sm"
+													variant="ghost"
+													disabled={busy}
+													onClick={() => onRemove(r.name)}
+													data-testid={`schedule-remove-${r.name}`}
+												>
+													{t("remove")}
+												</Button>
+											</>
 										) : (
 											<span className="text-muted-foreground self-center text-xs whitespace-nowrap">{t("fromCanary")}</span>
 										)}
@@ -291,12 +377,30 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 	);
 }
 
-function AddScheduleForm({ busy, onAdd }: { busy: boolean; onAdd(s: Schedule): void }) {
+/** A schedule edited in the add form: the form's fields over the saved one, so what the form does not show is kept. Exported for tests. */
+export function mergeScheduleEdit(initial: Schedule | undefined, next: Schedule): Schedule {
+	if (!initial) return next;
+	const base: Schedule = { ...initial };
+	delete base.experiment;
+	delete base.evaluation;
+	delete base.timezone;
+	delete base.max_usd_per_day;
+	return { ...base, ...next };
+}
+
+function AddScheduleForm({ busy, onAdd, initial }: { busy: boolean; onAdd(s: Schedule): void; initial?: Schedule }) {
 	const { t } = useTranslation("schedules");
 	const { t: u } = useTranslation("ux13");
 	const evaluations = useListEvaluationsQuery();
-	const [what, setWhat] = useState<"evaluation" | "experiment">("evaluation");
-	const [s, setS] = useState({ name: "", experiment: "", evaluation: "", cron: "0 6 * * *", timezone: "", max: "" });
+	const [what, setWhat] = useState<"evaluation" | "experiment">(initial?.experiment ? "experiment" : "evaluation");
+	const [s, setS] = useState({
+		name: initial?.name ?? "",
+		experiment: initial?.experiment ?? "",
+		evaluation: initial?.evaluation ?? "",
+		cron: initial?.cron ?? "0 6 * * *",
+		timezone: initial?.timezone ?? "",
+		max: initial?.max_usd_per_day ? String(initial.max_usd_per_day) : "",
+	});
 	const set = (k: keyof typeof s) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setS({ ...s, [k]: e.target.value });
 	const target = what === "evaluation" ? s.evaluation : s.experiment;
 	const ok = s.name && target && s.cron && (what === "experiment" || Number(s.max) > 0);
@@ -307,13 +411,15 @@ function AddScheduleForm({ busy, onAdd }: { busy: boolean; onAdd(s: Schedule): v
 				e.preventDefault();
 				if (!ok) return;
 				const max = Number(s.max);
-				onAdd({
-					name: s.name.trim(),
-					...(what === "evaluation" ? { evaluation: s.evaluation.trim() } : { experiment: s.experiment.trim() }),
-					cron: s.cron.trim(),
-					...(s.timezone ? { timezone: s.timezone.trim() } : {}),
-					...(max > 0 ? { max_usd_per_day: max } : {}),
-				});
+				onAdd(
+					mergeScheduleEdit(initial, {
+						name: s.name.trim(),
+						...(what === "evaluation" ? { evaluation: s.evaluation.trim() } : { experiment: s.experiment.trim() }),
+						cron: s.cron.trim(),
+						...(s.timezone ? { timezone: s.timezone.trim() } : {}),
+						...(max > 0 ? { max_usd_per_day: max } : {}),
+					}),
+				);
 			}}
 			data-testid="schedule-add-form"
 		>
@@ -355,7 +461,12 @@ function AddScheduleForm({ busy, onAdd }: { busy: boolean; onAdd(s: Schedule): v
 						</Field>
 					) : (
 						<Field label={t("add.experiment")}>
-							<Input value={s.experiment} onChange={set("experiment")} placeholder={t("add.experimentPlaceholder")} data-testid="schedule-add-experiment" />
+							<Input
+								value={s.experiment}
+								onChange={set("experiment")}
+								placeholder={t("add.experimentPlaceholder")}
+								data-testid="schedule-add-experiment"
+							/>
 						</Field>
 					)}
 				</div>
@@ -380,7 +491,7 @@ function AddScheduleForm({ busy, onAdd }: { busy: boolean; onAdd(s: Schedule): v
 				</div>
 				<div>
 					<Button type="submit" disabled={busy || !ok} data-testid="schedule-add-submit">
-						{t("add.submit")}
+						{initial ? t("canary.save") : t("add.submit")}
 					</Button>
 				</div>
 			</Step>
@@ -428,7 +539,13 @@ export function AlertsEditor({ alerts, events, secrets, busy, onChange }: Alerts
 							<span className="text-muted-foreground text-xs">
 								{a.format || "json"} · {a.events?.length ? a.events.join(", ") : "all events"}
 							</span>
-							<Button size="sm" variant="outline" disabled={testState.isLoading} onClick={() => void sendTest(a)} data-testid={`alert-test-${i}`}>
+							<Button
+								size="sm"
+								variant="outline"
+								disabled={testState.isLoading}
+								onClick={() => void sendTest(a)}
+								data-testid={`alert-test-${i}`}
+							>
 								{t("alerts.test")}
 							</Button>
 							<Button size="sm" variant="ghost" disabled={busy} onClick={() => onChange(alerts.filter((_, j) => j !== i))}>
@@ -455,7 +572,11 @@ export function AlertsEditor({ alerts, events, secrets, busy, onChange }: Alerts
 					/>
 				</Field>
 				<Field label={t("alerts.secretEnv")}>
-					<Input list="schedule-secret-names" value={draft.secret_env ?? ""} onChange={(e) => setDraft({ ...draft, secret_env: e.target.value || undefined })} />
+					<Input
+						list="schedule-secret-names"
+						value={draft.secret_env ?? ""}
+						onChange={(e) => setDraft({ ...draft, secret_env: e.target.value || undefined })}
+					/>
 				</Field>
 				<Field label={t("alerts.format")}>
 					<select
@@ -497,7 +618,13 @@ export function AlertsEditor({ alerts, events, secrets, busy, onChange }: Alerts
 				>
 					{t("alerts.add")}
 				</Button>
-				<Button size="sm" variant="outline" disabled={testState.isLoading || !draft.url_env} onClick={() => void sendTest(draft)} data-testid="alert-test-draft">
+				<Button
+					size="sm"
+					variant="outline"
+					disabled={testState.isLoading || !draft.url_env}
+					onClick={() => void sendTest(draft)}
+					data-testid="alert-test-draft"
+				>
 					{t("alerts.test")}
 				</Button>
 				{draft.url_env && results[draft.url_env] && <span className="self-center text-xs">{results[draft.url_env]}</span>}

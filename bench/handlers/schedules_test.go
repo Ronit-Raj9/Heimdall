@@ -184,3 +184,40 @@ func TestMinCronInterval(t *testing.T) {
 		t.Error("job schedule allowed hosted")
 	}
 }
+
+func TestSchedulePauseResume(t *testing.T) {
+	h, root := schedEnv(t)
+	if ctx := schedCall(h.put, `{"file":{"schedules":[{"name":"nightly","experiment":"experiments/n.yaml","cron":"0 6 * * *","max_usd_per_day":5}]}}`, ""); ctx.Response.StatusCode() != 200 {
+		t.Fatalf("put: %d %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	c := &canaryControlHandler{env: h.env}
+	ctx := schedCall(c.pauseSchedule, "", "nightly")
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("pause: %d %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	var s schedule.Schedule
+	if err := json.Unmarshal(ctx.Response.Body(), &s); err != nil || !s.Paused || s.Name != "nightly" {
+		t.Fatalf("pause answer %s %v", ctx.Response.Body(), err)
+	}
+	f, err := LoadWebSchedules(root)
+	if err != nil || !f.Schedules[0].Paused {
+		t.Fatalf("saved %+v %v", f, err)
+	}
+	get := schedCall(h.get, "", "")
+	var resp SchedulesResponse
+	if err := json.Unmarshal(get.Response.Body(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Rows) != 1 || !resp.Rows[0].Paused || resp.Rows[0].Next != "" {
+		t.Fatalf("paused row %+v", resp.Rows)
+	}
+	if ctx := schedCall(c.resumeSchedule, "", "nightly"); ctx.Response.StatusCode() != 200 {
+		t.Fatalf("resume: %d %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	if f, _ := LoadWebSchedules(root); f.Schedules[0].Paused {
+		t.Fatal("still paused after resume")
+	}
+	if ctx := schedCall(c.pauseSchedule, "", "missing"); ctx.Response.StatusCode() != 404 {
+		t.Fatalf("unknown: %d", ctx.Response.StatusCode())
+	}
+}

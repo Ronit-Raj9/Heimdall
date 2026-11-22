@@ -67,6 +67,13 @@ func init() {
 		Kind: kindCanaryRun, Hosted: true, Opts: []jobs.KindOption{jobs.WithLimit(1, 1)},
 		Validate: validateHostedCanaryRun, Run: runHostedCanaryRun,
 	})
+	// Record baseline on the Drift checks tab queues canary.baseline; the
+	// hosted server records it on runners like a look (canary.run with
+	// baseline on).
+	registerOrMergeJobKind(jobKindSpec{
+		Kind: kindCanaryBaseline, Hosted: true, Opts: []jobs.KindOption{jobs.WithLimit(1, 1)},
+		Validate: validateHostedCanaryBaseline, Run: runHostedCanaryBaseline,
+	})
 }
 
 // Params of the bridge kinds.
@@ -273,6 +280,36 @@ func validateHostedCanaryRun(ctx context.Context, env jobEnv, raw json.RawMessag
 		return nil, "", invalid(err)
 	}
 	return p, "canary:" + p.Name, nil
+}
+
+// validateHostedCanaryBaseline checks canary.baseline's params on the hosted
+// server: the local params, without from.
+func validateHostedCanaryBaseline(ctx context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
+	var p canaryBaselineParams
+	if err := strictParams(raw, &p); err != nil {
+		return nil, "", err
+	}
+	if p.From != "" {
+		return nil, "", invalid(errors.New("Pinning a baseline from an earlier comparison is not available on the hosted site; leave it empty."))
+	}
+	hp := hostedCanaryParams{Name: p.Name, Baseline: true, Note: p.Note}
+	raw2, err := json.Marshal(hp)
+	if err != nil {
+		return nil, "", err
+	}
+	if _, _, err := validateHostedCanaryRun(ctx, env, raw2); err != nil {
+		return nil, "", err
+	}
+	return p, "canary:" + p.Name, nil
+}
+
+// runHostedCanaryBaseline records a canary's baseline on runners.
+func runHostedCanaryBaseline(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, _ func(any)) (any, error) {
+	var p canaryBaselineParams
+	if err := j.DecodeParams(&p); err != nil {
+		return nil, err
+	}
+	return runHostedCanary(ctx, env, log, hostedCanaryParams{Name: p.Name, Baseline: true, Note: p.Note})
 }
 
 // requireRunner fails fast when the org's launcher has no live runner: a
@@ -826,6 +863,17 @@ func runHostedCanaryRun(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.L
 	if err := j.DecodeParams(&p); err != nil {
 		return nil, err
 	}
+	return runHostedCanary(ctx, env, log, p)
+}
+
+// noBaselineMessage is the error of a look at a canary with no baseline.
+func noBaselineMessage(name string) string {
+	return "Drift monitor " + name + " has no baseline yet: press Record baseline on Scheduled checks > Drift checks first."
+}
+
+// runHostedCanary runs one hosted look, or records a baseline when
+// p.Baseline, on the org's runners.
+func runHostedCanary(ctx context.Context, env jobEnv, log jobs.Logger, p hostedCanaryParams) (any, error) {
 	timeout, err := bridgeTimeout(p.TimeoutMin)
 	if err != nil {
 		return nil, invalid(err)
@@ -857,7 +905,7 @@ func runHostedCanaryRun(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.L
 	}
 	recs, err := r.Run(ctx, d, canary.RunOptions{Inject: p.Inject, NoConfirm: p.NoConfirm})
 	if errors.Is(err, canary.ErrNoBaseline) {
-		return nil, fmt.Errorf("canary %s has no baseline yet: run it once with baseline on (Canaries page, Pin baseline) first", d.Name)
+		return nil, errors.New(noBaselineMessage(d.Name))
 	}
 	out.Records = recs
 	finishCanaryResult(out, log)

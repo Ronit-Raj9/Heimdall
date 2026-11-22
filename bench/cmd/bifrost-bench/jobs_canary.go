@@ -3,7 +3,8 @@ package main
 // Web parity lane L17: drift canary and schedule job kinds, and the
 // in-server schedule ticker.
 //
-//   - canary.baseline (local): record or pin a canary's baseline.
+//   - canary.baseline (local): record or pin a canary's baseline. The hosted
+//     variant (jobs_hostedops.go) records one on runners.
 //   - canary.run (local): one canary look and its confirmation. The hosted
 //     variant comes from lane L27; registerOrMergeJobKind joins the two.
 //   - schedule.fire (local): run one web schedule (policies/schedules.yaml or
@@ -88,7 +89,9 @@ func init() {
 		},
 	})
 
-	registerJobKind(jobKindSpec{
+	// canary.baseline: the hosted variant (jobs_hostedops.go) joins this one,
+	// whatever the init order.
+	registerOrMergeJobKind(jobKindSpec{
 		Kind: kindCanaryBaseline, Local: true,
 		Validate: func(ctx context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
 			var p canaryBaselineParams
@@ -233,7 +236,7 @@ func addCanarySchedulesAt(root string, f *schedule.File) {
 		}
 		f.Schedules = append(f.Schedules, schedule.Schedule{
 			Name: d.ScheduleName(), Experiment: canary.DefaultDir + "/" + d.Name + ".yaml", Cron: d.Schedule.Cron,
-			Timezone: d.Schedule.Timezone, MaxUSDPerDay: d.Budget.PerDayUSD,
+			Timezone: d.Schedule.Timezone, MaxUSDPerDay: d.Budget.PerDayUSD, Paused: d.Schedule.Paused,
 		})
 	}
 }
@@ -368,6 +371,9 @@ func (t *scheduleTicker) tick(ctx context.Context, now time.Time) []string {
 	}
 	var fired []string
 	for _, s := range f.Schedules {
+		if s.Paused { // listed on the page, never queued until resumed
+			continue
+		}
 		c, err := schedule.ParseCron(s.Cron)
 		if err != nil {
 			continue
