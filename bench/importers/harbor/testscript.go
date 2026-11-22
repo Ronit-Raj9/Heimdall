@@ -25,6 +25,9 @@ type testPlan struct {
 	Bake    []string // shell commands for the image build, in script order
 	Script  string   // test.sh with the baked lines disabled or rewritten
 	Changes []string // one line per change, for the task's IMPORT.md
+	// Networked lists the lines kept as they are because they download at
+	// verify time (keep_networked or egress=record).
+	Networked []string
 }
 
 // logicalLine is one shell line with its backslash continuations joined.
@@ -78,6 +81,7 @@ func planTestScriptKeep(src string, keepNetworked bool) (*testPlan, error) {
 			if err != nil && keepNetworked {
 				venvs--
 				plan.Changes = append(plan.Changes, "kept as is, needs the network at verify time (the verifier has none, so admission fails): "+err.Error())
+				plan.Networked = append(plan.Networked, short(code))
 				out = append(out, orig...)
 				continue
 			}
@@ -90,6 +94,7 @@ func planTestScriptKeep(src string, keepNetworked bool) (*testPlan, error) {
 		default:
 			if keepNetworked {
 				plan.Changes = append(plan.Changes, fmt.Sprintf("kept as is, needs the network at verify time (%s; the verifier has none, so admission fails): %s", kind, short(code)))
+				plan.Networked = append(plan.Networked, short(code))
 				out = append(out, orig...)
 				continue
 			}

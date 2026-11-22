@@ -69,6 +69,7 @@ Settings (`-set key=value`):
 | `agent` | `agents/codex.yaml` | base agent config of the skills experiment |
 | `image` | `build` | `prebuilt` starts each task image `FROM` the image `task.toml` names (`docker_image`) instead of building the upstream Dockerfile |
 | `keep_networked` | `false` | `true` also imports tasks whose reference solution downloads at run time, and tasks whose `test.sh` downloads in a way that cannot move to the build (those lines are kept as they are and listed in `IMPORT.md`); they cannot pass admission without network and stay drafts |
+| `egress` | `off` | `record` imports tasks whose reference solution or `test.sh` downloads at run time with a recorded internet (docs/egress.md): an `egress` proxy service, a CA baked into the image, and a cache tar that `bifrost-bench egress record` fills by running the reference once with internet; runs then replay it byte for byte. Compose tasks stay skipped |
 | `hack_verifiable` | `skip` | `keep` imports tasks with a planted `admin/` honeypot (HVTB) as plain tasks, with `admin/**` protected |
 
 ## What a converted task looks like
@@ -125,6 +126,8 @@ These tools are visible to the agent: it can see that pytest and a Python under 
 | no literal `WORKDIR` | 0 | 1 |
 
 SkillsBench counts as of 18 Nov 2026 (X2): compose tasks now import through `bench/compose` (docs/multi-container.md). Of the 3 tasks in `tasks/` with a compose file, `react-performance-debugging` imports as one container (its file is `docker-compose.yml`, which Harbor does not read), `fix-visual-stability` maps (main plus an `api` service) but is skipped because its solution runs `npm install`, and `drone-planning-control` is refused because `main` reads `ANTHROPIC_API_KEY` from the host. Terminal-Bench 2.0 ships no compose file.
+
+With `-set egress=record` (docs/egress.md, 22 Nov 2026): Terminal-Bench 2.0 imports all 35 network tasks (32 reference downloads, 3 `test.sh` downloads) and SkillsBench 1.1 imports 13 of its 14 (`fix-visual-stability` stays skipped: compose plus `npm install`). The library suites `hd-harbor-tb2-egress` and `hd-harbor-skills-egress` hold exactly those tasks; how many passed admission is in their `suite.lock`.
 
 Hack-Verifiable Terminal-Bench 2.1 (89): all skipped by default; with `-set hack_verifiable=keep`, 54 imported and 35 skipped for the same network reasons as Terminal-Bench 2.0.
 

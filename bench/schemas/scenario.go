@@ -136,6 +136,11 @@ type ServiceSpec struct {
 	// Hidden keeps the service off the agent's network: only the verifier and
 	// other services reach it.
 	Hidden bool `json:"hidden,omitempty" yaml:"hidden"`
+	// Verifier lets the verifier reach the service on the run's network,
+	// with the proxy variables set. Only an egress service (recorded
+	// internet, docs/egress.md) may set it: a test script that downloads at
+	// verify time is answered from the recorded cache.
+	Verifier bool `json:"verifier,omitempty" yaml:"verifier"`
 
 	// W3 customer support: Gateway lets the service call models through the
 	// gateway on its own virtual key, never the agent's (servicegateway.go).
@@ -731,6 +736,14 @@ const (
 // API it may call (ServiceHandle.Spec.Role, ServiceResult.Role). It is never
 // a role a task declares for a service.
 const ServiceRoleExternal = "external"
+
+// Recorded internet (docs/egress.md, package egress): ServiceRoleEgress is
+// the role of the forward proxy service the agent reaches as HTTP(S)_PROXY;
+// EgressLive is the experiment egress mode that reaches real hosts.
+const (
+	ServiceRoleEgress = "egress"
+	EgressLive        = "live-allowlisted"
+)
 
 // ExternalAPI is a real HTTP API outside the bench that a task's agent may
 // call (Suite.External, Task.External; docs/external-apis.md). The agent

@@ -368,6 +368,9 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	if err := p.checkExternal(&e, suite, all); err != nil { // External APIs area: modes and cassettes (externalplan.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
+	if err := p.checkEgress(&e, suite, all); err != nil { // recorded internet: experiment egress mode (egressplan.go)
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
 	if m.TaskImages, err = p.taskImages(ctx, suite, all); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}

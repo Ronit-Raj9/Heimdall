@@ -286,6 +286,8 @@ func checkService(s schemas.ServiceSpec) error {
 		return fmt.Errorf("service %s http ready check needs a port and a path starting with /", s.ID)
 	case proxied(s) && s.Port == 0:
 		return fmt.Errorf("service %s is proxied but has no port", s.ID)
+	case s.Verifier && (s.Role != schemas.ServiceRoleEgress || s.Hidden): // recorded internet (egress.go)
+		return fmt.Errorf("service %s sets verifier, which only a visible egress service may", s.ID)
 	}
 	for p := range s.Files {
 		if !path.IsAbs(p) || path.Clean(p) != p || p == "/" {
@@ -484,6 +486,9 @@ func (e *dockerWorkspace) createService(ctx context.Context, rc *schemas.RunCont
 	if err := e.connectGatewayNetwork(ctx, rc, spec, name); err != nil { // W3 customer support
 		return err
 	}
+	if err := e.connectEgressNetwork(ctx, rc, expID, runID, spec, name); err != nil { // recorded internet: live-allowlisted only (egress.go)
+		return err
+	}
 	if hidden && !offAgentNetwork(spec) {
 		connect := append([]string{"network", "connect", "--alias", spec.ID}, hiddenAliasArgs(spec)...) // X2: compose aliases (compose.go)
 		if _, err := e.cfg.Docker.MustRun(ctx, append(connect, hiddenNetwork(runID), name)...); err != nil {
@@ -516,6 +521,7 @@ func serviceEnv(rc *schemas.RunContext, spec schemas.ServiceSpec) map[string]str
 			env[k] = v
 		}
 	}
+	egressServiceEnv(rc, spec, env) // recorded internet: the experiment's egress mode (egress.go)
 	if rc.Probe != nil {
 		for k, v := range rc.Probe.Apply.ServiceEnv[spec.ID] {
 			env[k] = v

@@ -409,7 +409,7 @@
       "description": "One container started beside the agent. Mirrors schemas.ServiceSpec.",
       "properties": {
         "id": {"type": "string", "minLength": 1},
-        "role": {"enum": ["data", "tool", "mcp", "user"]},
+        "role": {"enum": ["data", "tool", "mcp", "user", "egress"], "description": "egress: the recorded-internet forward proxy (docs/egress.md); the agent gets HTTP(S)_PROXY pointed at it."},
         "image": {"type": "string", "minLength": 1},
         "build": {
           "type": "object",
@@ -459,6 +459,7 @@
         },
         "proxy": {"type": "boolean"},
         "hidden": {"type": "boolean"},
+        "verifier": {"type": "boolean", "description": "Egress services only (docs/egress.md): the verifier reaches the service too, for a test script that downloads at verify time."},
         "gateway": {
           "type": "object",
           "additionalProperties": false,
