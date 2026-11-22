@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
+import { FailoverSettings, failoverProblem } from "@/components/evaluations/failoverSettings";
 import { GateSettings } from "@/components/releases/gateSettings";
 import {
 	type EvaluationEstimate,
@@ -129,7 +130,12 @@ export function toggleFault(faults: string[], fault: string, on: boolean): strin
  * arm on an agent in `owns` (it brings its own model) may leave the model blank.
  */
 export function specReady(spec: EvaluationSpec, owns: ReadonlySet<string> = new Set()): boolean {
-	return (spec.benchmarks.length > 0 || Boolean(spec.pack)) && spec.arms.length > 0 && spec.arms.every((a) => armHasModel(a, owns));
+	return (
+		(spec.benchmarks.length > 0 || Boolean(spec.pack)) &&
+		spec.arms.length > 0 &&
+		spec.arms.every((a) => armHasModel(a, owns)) &&
+		failoverProblem(spec.arms[0], spec.failover) === ""
+	);
 }
 
 function money(n: number): string {
@@ -448,6 +454,17 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 					</label>
 				))}
 			</section>
+
+			{spec.arms.length === 1 && (
+				<FailoverSettings
+					arm={spec.arms[0]}
+					value={spec.failover}
+					onChange={(failover) => {
+						const { failover: _old, ...rest } = spec;
+						onChange(failover ? { ...rest, failover } : rest);
+					}}
+				/>
+			)}
 
 			<GateSettings
 				gate={spec.gate}

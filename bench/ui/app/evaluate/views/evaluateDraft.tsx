@@ -1,4 +1,4 @@
-import type { EvaluationArm, EvaluationMCPRoute, EvaluationMode, EvaluationPresetId, EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
+import type { EvaluationArm, EvaluationFailover, EvaluationMCPRoute, EvaluationMode, EvaluationPresetId, EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 /**
@@ -38,6 +38,8 @@ export interface EvaluateDraft {
 	bifrostCache?: boolean;
 	/** How the arms reach MCP tool servers; unset is direct (the tool proxy only). */
 	mcpRoute?: EvaluationMCPRoute;
+	/** Provider failover option (score mode only). */
+	failover?: EvaluationFailover | null;
 	/** Arms dropped by a mode change (for example arm B in "score"), so going back restores their models. */
 	stashedArms?: EvaluationArm[];
 }
@@ -121,6 +123,7 @@ export function draftToSpec(d: EvaluateDraft): EvaluationSpec {
 		...(d.preset ? { preset: d.preset } : {}),
 		...(d.bifrostCache && d.mode === "score" ? { bifrost_cache: true } : {}),
 		...(d.mcpRoute && d.mcpRoute !== "direct" ? { mcp_route: d.mcpRoute } : {}),
+		...(d.failover?.enabled && d.arms.length === 1 ? { failover: d.failover } : {}),
 	};
 }
 
@@ -150,6 +153,7 @@ export function specToPatch(spec: EvaluationSpec): Partial<EvaluateDraft> {
 		preset: spec.preset ?? null,
 		bifrostCache: Boolean(spec.bifrost_cache),
 		mcpRoute: spec.mcp_route ?? "direct",
+		failover: spec.failover ?? null,
 	};
 }
 

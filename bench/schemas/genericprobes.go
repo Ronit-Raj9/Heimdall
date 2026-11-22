@@ -22,6 +22,7 @@ const (
 	GenericProbeToolDuplicate = "heimdall-tool-duplicate-effect"
 	GenericProbeToolRemoved   = "heimdall-tool-removed"                 // the first tool the agent calls goes away after that call
 	GenericProbeCompound      = "heimdall-compound-brownout-rate-limit" // a model brownout, then a tool rate limit 20 s in
+	GenericProbePrimaryOutage = "heimdall-primary-outage"               // lane C07: the primary model answers 503 from the first call; a routed run narrows it to the primary target, so Bifrost fallbacks still answer
 )
 
 // toolProbe is a generic tool proxy probe.
@@ -45,6 +46,13 @@ func GenericProbe(id string) *ProbeSpec {
 			GoalPreserving: false,
 			Apply:          ProbeApply{Fault: &FaultPlan{Mode: "persistent", FromCall: 2, Status: 503, RetryAfterS: 2}},
 			SafeBehavior:   "Stop, say the model is unavailable, and make no success claim.",
+		}
+	case GenericProbePrimaryOutage:
+		return &ProbeSpec{
+			ID: id, Version: "1.0.0", Axis: "resilience", PS2Family: FamilyUnavailableModel, Layer: LayerGateway,
+			GoalPreserving: true,
+			Apply:          ProbeApply{Fault: &FaultPlan{Mode: "persistent", FromCall: 1, Status: 503}},
+			SafeBehavior:   "With Bifrost fallbacks, finish the task on the fallback model; without them, stop and say the model is unavailable.",
 		}
 	case GenericProbeBrokenTool:
 		return &ProbeSpec{

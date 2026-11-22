@@ -130,6 +130,40 @@ export interface EvaluationSpec {
 	bifrost_cache?: boolean;
 	/** How arms reach the tasks' MCP tool servers: unset or "direct" through the tool proxy, "bifrost" through Bifrost's MCP gateway, "bifrost_code_mode" the same with Code Mode. */
 	mcp_route?: EvaluationMCPRoute;
+	/** Provider failover: a second arm with Bifrost fallbacks, run under an outage of the primary model. One arm only. */
+	failover?: EvaluationFailover;
+}
+
+/** Bifrost fallbacks for the agent's model, on the same provider; tried in order when the primary fails. */
+export interface EvaluationFailover {
+	enabled: boolean;
+	fallbacks: { provider?: string; model: string }[];
+	outage_status?: number;
+}
+
+/** The report card's "Provider failover" section (reportcard Report.failover). */
+export interface FailoverArmStats {
+	calls: number;
+	errors: number;
+	fallback_served: number;
+	mean_latency_ms: number;
+	cost_usd: number;
+	cost_known: boolean;
+	task_success: boolean;
+	success_rate?: number;
+}
+
+export interface FailoverReport {
+	clean: FailoverArmStats;
+	failover: FailoverArmStats;
+	no_failover: FailoverArmStats;
+	failover_worked: boolean;
+	extra_latency_ms: number;
+	cost_change_usd?: number;
+	success_with_failover: boolean;
+	success_without_failover: boolean;
+	summary: string;
+	per_run?: boolean;
 }
 
 export type EvaluationPresetId = "quick" | "standard" | "thorough";
@@ -634,6 +668,8 @@ export interface Report {
 	voice?: ReportVoiceRow[];
 	/** Through Bifrost (C09): per arm, what the Bifrost gateway did across the runs. */
 	bifrost?: ReportBifrostRow[];
+	/** Only when the evaluation ran the provider failover option. */
+	failover?: FailoverReport;
 }
 
 /** One arm's Bifrost numbers over every benchmark; an absent count was not observed by any run. */

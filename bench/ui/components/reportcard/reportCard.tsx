@@ -38,6 +38,7 @@ import {
 	reliabilityCards,
 } from "./reportCard.utils";
 import { ReliabilityCards, ResilienceCard } from "./reliabilityCards";
+import { FailoverSection } from "@/components/evaluations/failoverSettings";
 
 function costText(m: ReportArmMetrics): string {
 	const c = costDisplay(m);
@@ -113,6 +114,8 @@ export function ReportCard({ report: raw, className, actions, readOnly = false }
 					<ResilienceCard report={report} />
 				</Section>
 			)}
+
+			{report.failover && <FailoverSection report={report.failover} />}
 
 			{report.reliability.length > 0 && (
 				<Section title="Faults" description="Score when something goes wrong, and how far it drops from a clean run.">
