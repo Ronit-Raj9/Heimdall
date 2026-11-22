@@ -396,3 +396,14 @@ func TestGatewayModel(t *testing.T) {
 		t.Fatal("a revoked model must refuse")
 	}
 }
+
+// The first real run (marshmallow, gpt-5.4-mini) ran "uv sync" into .venv,
+// then every run_tests said "No module named pytest": the system prompt
+// must say the tests use the system interpreter and how to install into it.
+func TestSystemPromptSaysTestsUseSystemPython(t *testing.T) {
+	for _, w := range []string{"python -m pytest", "system Python", "uv pip install --system", "UV_PROJECT_ENVIRONMENT=/usr/local", "test_cmd"} {
+		if !strings.Contains(systemPrompt, w) {
+			t.Fatalf("system prompt lacks %q", w)
+		}
+	}
+}
