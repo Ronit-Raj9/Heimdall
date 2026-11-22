@@ -8,6 +8,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowUpRight, Check, ChevronRight, Download, Equal, Link2 } from "lucide-react";
 import * as React from "react";
 import { hasLearning, hasPersistence, LearningTable, PersistenceTable } from "./learningSections";
+import { hasVoiceCalls, VoiceCallsTable } from "./voiceCallsSection";
 import {
 	alignmentText,
 	armDescription,
@@ -125,6 +126,15 @@ export function ReportCard({ report: raw, className, actions, readOnly = false }
 			{hasPersistence(report) && (
 				<Section title="Persistence" description="Picking up after a crash, finishing when the budget runs out, and success per dollar.">
 					<PersistenceTable report={report} />
+				</Section>
+			)}
+
+			{hasVoiceCalls(report) && (
+				<Section
+					title="Voice calls by caller"
+					description="Task success, graded on the call transcript, and call quality with each simulated caller: accents, pace, interruptions, noise and phone lines."
+				>
+					<VoiceCallsTable report={report} />
 				</Section>
 			)}
 

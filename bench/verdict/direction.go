@@ -44,6 +44,7 @@ var lowerIsBetter = map[string]bool{
 	"searches": true, // W4 research with Tavily
 
 	"time_to_first_audio_ms": true, "turn_latency_p50_ms": true, "turn_latency_p95_ms": true, "dead_air_s": true, "stt_wer": true, "voice_cost_per_minute": true, // X8 voice agents
+	"audio_jitter_p95_ms": true, // real-time voice calls (metrics/voicertc.go)
 
 	// Multi-agent runs (metrics/multiagent.go): spend, delay and risk of
 	// delegation. max_fan_out, parallelism and attribution_coverage are

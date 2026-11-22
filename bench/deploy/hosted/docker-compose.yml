@@ -65,6 +65,12 @@ networks:
     # Heimdall service, database or gateway is on it.
     enable_ipv6: false
     labels: *labels
+  voice:
+    # voice profile: LiveKit, LiveKit SIP, their Redis and the real-time
+    # voice gateway. Not internal: the gateway reaches teams' LiveKit
+    # servers and start URLs, LiveKit SIP reaches SIP trunks.
+    enable_ipv6: false
+    labels: *labels
   evalnet:
     # Fixed name: Bifrost's default eval network. The shared runner does
     # not start agents on it: each org gets its own internal network,
@@ -94,6 +100,8 @@ volumes:
   # The shared worker's image registry, unless HEIMDALL_REGISTRY_DIR names
   # a host folder (on the data disk) instead.
   registry-data:
+    labels: *labels
+  voice-redis-data:
     labels: *labels
 
 services:
@@ -188,6 +196,10 @@ services:
       HEIMDALL_MASTER_KEY: ${HEIMDALL_MASTER_KEY:-}
       HEIMDALL_SHARED_RUNNER_SECRET: ${HEIMDALL_SHARED_RUNNER_SECRET:-}
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
+      # Real-time voice calls (voice profile, docs/voice-realtime.md).
+      HEIMDALL_VOICE_RTC_URL: ${HEIMDALL_VOICE_RTC_URL:-}
+      HEIMDALL_VOICE_RTC_SECRET: ${HEIMDALL_VOICE_RTC_SECRET:-}
+      HEIMDALL_VOICE_SIP_ALLOW: ${HEIMDALL_VOICE_SIP_ALLOW:-}
       # Prometheus metrics on the compose network only (docs/hosting.md,
       # Operating it); empty: off. Never publish this port.
       BENCH_SERVER_METRICS_LISTEN: ${HEIMDALL_METRICS_LISTEN:-}
@@ -416,6 +428,10 @@ services:
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
       # Python with the modal package, for organizations whose runs go to Modal.
       HEIMDALL_MODAL_PYTHON: ${HEIMDALL_MODAL_PYTHON:-}
+      # Real-time voice calls (voice profile, docs/voice-realtime.md).
+      HEIMDALL_VOICE_RTC_URL: ${HEIMDALL_VOICE_RTC_URL:-}
+      HEIMDALL_VOICE_RTC_SECRET: ${HEIMDALL_VOICE_RTC_SECRET:-}
+      HEIMDALL_VOICE_SIP_ALLOW: ${HEIMDALL_VOICE_SIP_ALLOW:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:ro
@@ -437,5 +453,108 @@ services:
       buildkitd:
         condition: service_started
       registry:
+        condition: service_started
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Profile voice: real-time voice calls (docs/voice-realtime.md). LiveKit
+  # (Apache-2.0) for WebRTC rooms, LiveKit SIP for phone numbers, and
+  # Heimdall's gateway (bench/voice/rtcgateway.py), which joins a room as the
+  # simulated caller for each run. Runs reach the gateway through their one
+  # egress forwarder at HEIMDALL_VOICE_RTC_URL; teams point their LiveKit
+  # Agents workers at LIVEKIT_PUBLIC_URL with keys the operator hands out.
+  #
+  #   docker compose -f deploy/hosted/docker-compose.yml --env-file deploy/hosted/.env --profile voice up -d
+
+  livekit:
+    profiles: [voice]
+    image: livekit/livekit-server:v1.13.10@sha256:89ca9ce0791e18d6e03bf6e2c49ceb27e1c754eae8bd50c989386c1a5963791a
+    labels: *labels
+    <<: [*hardening, *logging]
+    command: ["--config", "/etc/livekit.yaml"]
+    environment:
+      # "key: secret", one pair per line; the gateway uses the first.
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-}: ${LIVEKIT_API_SECRET:-}"
+    volumes:
+      - ./voice/livekit.yaml:/etc/livekit.yaml:ro
+    networks: [voice]
+    ports:
+      - "${LIVEKIT_SIGNAL_PUBLISH:-7880}:7880"
+      - "${LIVEKIT_RTC_TCP_PUBLISH:-7881}:7881/tcp"
+      - "50000-50100:50000-50100/udp"
+    depends_on:
+      voice-redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  voice-redis:
+    profiles: [voice]
+    image: redis:7.4-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
+    labels: *labels
+    <<: *logging
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    volumes:
+      - voice-redis-data:/data
+    networks: [voice]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  livekit-sip:
+    profiles: [voice]
+    image: livekit/sip:v1.23.0@sha256:26b5e320482c48d999073dfaf830666b1a312ad0f97d35ae67bd499659b9834e
+    labels: *labels
+    <<: *logging
+    environment:
+      SIP_CONFIG_BODY: |
+        api_key: ${LIVEKIT_API_KEY:-}
+        api_secret: ${LIVEKIT_API_SECRET:-}
+        ws_url: ws://livekit:7880
+        redis:
+          address: voice-redis:6379
+        sip_port: 5060
+        rtp_port: 10000-10100
+        use_external_ip: true
+        logging:
+          level: info
+    networks: [voice]
+    ports:
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
+      - "10000-10100:10000-10100/udp"
+    depends_on:
+      livekit:
+        condition: service_started
+    restart: unless-stopped
+
+  voice-rtc:
+    profiles: [voice]
+    build:
+      context: ../..
+      dockerfile: deploy/voice/Dockerfile.rtcgateway
+    image: ${HEIMDALL_VOICE_RTC_IMAGE:-heimdall/voice-rtc:local}
+    labels: *labels
+    <<: [*hardening, *logging]
+    environment:
+      # The gateway refuses to start without it (16 characters or more).
+      HEIMDALL_VOICE_RTC_SECRET: ${HEIMDALL_VOICE_RTC_SECRET:-}
+      HEIMDALL_VOICE_SIP_ALLOW: ${HEIMDALL_VOICE_SIP_ALLOW:-}
+      HEIMDALL_VOICE_MAX_CALLS: ${HEIMDALL_VOICE_MAX_CALLS:-20}
+      LIVEKIT_URL: ws://livekit:7880
+      LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL:-}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
+    tmpfs:
+      - /tmp
+    networks: [voice]
+    ports:
+      # Where runs' egress forwarders reach the gateway (HEIMDALL_VOICE_RTC_URL).
+      # The default binds the Docker bridge only; put Caddy in front for wss.
+      - "${HEIMDALL_VOICE_RTC_PUBLISH:-172.17.0.1:8790}:8790"
+    depends_on:
+      livekit:
         condition: service_started
     restart: unless-stopped

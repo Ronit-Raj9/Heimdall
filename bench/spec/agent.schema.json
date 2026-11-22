@@ -8,7 +8,7 @@
   "required": ["id", "adapter"],
   "properties": {
     "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},
-    "adapter": {"enum": ["command", "scripted", "remote_http", "a2a", "openai_agent"]},
+    "adapter": {"enum": ["command", "scripted", "remote_http", "a2a", "openai_agent", "voice_rtc"]},
     "image": {"type": "string", "minLength": 1},
     "build": {"$ref": "#/$defs/image"},
     "argv": {"type": "array", "items": {"type": "string"}},
@@ -134,6 +134,32 @@
         "timeout_s": {"type": "integer", "minimum": 1}
       }
     },
+    "voice_rtc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "description": "A real-time voice agent reached over a LiveKit room or a phone number through LiveKit SIP, read by the voice_rtc adapter. Mirrors schemas.VoiceRTCAgent (docs/voice-realtime.md).",
+      "properties": {
+        "mode": {"enum": ["livekit", "sip"]},
+        "livekit": {"$ref": "#/$defs/voice_rtc_livekit"},
+        "sip": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["number"],
+          "properties": {
+            "number": {"type": "string", "pattern": "^\\+[1-9][0-9]{6,14}$", "description": "The agent's phone number, E.164. Only numbers on the operator's allowlist are dialled."},
+            "trunk_id": {"type": "string"},
+            "trunk_address": {"type": "string"},
+            "from_number": {"type": "string", "pattern": "^\\+[1-9][0-9]{6,14}$"},
+            "trunk_user_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+            "trunk_password_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+            "transport": {"enum": ["udp", "tcp", "tls"]},
+            "livekit": {"$ref": "#/$defs/voice_rtc_livekit"}
+          }
+        },
+        "timeout_s": {"type": "integer", "minimum": 1, "maximum": 300}
+      }
+    },
     "a2a": {
       "type": "object",
       "additionalProperties": false,
@@ -197,9 +223,28 @@
     {
       "if": {"required": ["adapter"], "properties": {"adapter": {"const": "openai_agent"}}},
       "then": {"required": ["openai"]}
+    },
+    {
+      "if": {"required": ["adapter"], "properties": {"adapter": {"const": "voice_rtc"}}},
+      "then": {"required": ["voice_rtc"]}
     }
   ],
   "$defs": {
+    "voice_rtc_livekit": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The LiveKit server and how the agent joins the room. Empty url: Heimdall's own LiveKit server.",
+      "properties": {
+        "url": {"type": "string", "pattern": "^wss?://"},
+        "api_key_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+        "api_secret_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+        "dispatch": {"enum": ["agent", "auto", "webhook"]},
+        "agent_name": {"type": "string"},
+        "start_url": {"type": "string", "pattern": "^https?://"},
+        "start_token_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+        "room_prefix": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"}
+      }
+    },
     "bifrost_features": {
       "type": "object",
       "additionalProperties": false,

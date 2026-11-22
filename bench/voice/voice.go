@@ -61,7 +61,7 @@ const (
 // a caller probe (docs/voice-agents.md).
 var Probes = []string{ProbeNoise, ProbeSpeed, ProbeInterrupt, ProbeSilent}
 
-//go:embed voicecaller.py tonecode.py wsproto.py voiceclient.py fakeopenai.py cascadedagent.py realtimebridge.py
+//go:embed voicecaller.py tonecode.py wsproto.py voiceclient.py fakeopenai.py cascadedagent.py realtimebridge.py personas.json rtcbridge.py
 var assets embed.FS
 
 // CallerFiles are the files a voice suite's service image carries next to
@@ -237,6 +237,9 @@ func CheckCondition(suite *schemas.Suite, probe *schemas.ProbeSpec, taskIDs []st
 		if err := CheckTask(suite, t); err != nil {
 			errs = append(errs, err)
 			continue
+		}
+		if err := checkPersonaEnvs(suite, probe, t); err != nil { // caller personas (personas.go)
+			errs = append(errs, err)
 		}
 		spec := Effective(t.Voice)
 		p := ProbeOf(probe, spec.Caller)

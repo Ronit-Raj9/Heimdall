@@ -448,6 +448,8 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_API_RATE_LIMITS` | API rate limits per token and per organization (`cred_burst,cred_per_sec,org_burst,org_per_sec`, or `off`); empty is the default. |
 | `HEIMDALL_RUNNER_IMAGE` | Runner image Heimdall starts for an organization's own worker on Fly Machines or Kubernetes; empty is the published default. |
 | `HEIMDALL_GATEWAY_LOGS_URL` | The shared gateway's log API the server lists, deletes and expires one organization's prompt logs through; empty with the shared worker on is `http://bifrost:8080`, `off` disables it. |
+| `HEIMDALL_VOICE_RTC_URL`, `HEIMDALL_VOICE_RTC_SECRET`, `HEIMDALL_VOICE_SIP_ALLOW` | Real-time voice calls (compose profile `voice`): where runs reach the voice gateway, the secret per-run gateway tokens are signed with, and the E.164 prefixes Heimdall may dial. Empty URL: real-time calls are refused. Setup: docs/voice-realtime.md. |
+| `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_PUBLIC_URL` | Heimdall's own LiveKit server (profile `voice`) and the URL teams' bots join. |
 | `HEIMDALL_BACKUP_PASSPHRASE_FILE` | Passphrase file kept away from the backups; `backup.sh` then writes an encrypted copy of `.env` beside each dump. |
 
 `HEIMDALL_DEV` turns on the practice suite and examples for tests and

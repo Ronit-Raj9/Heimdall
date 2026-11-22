@@ -11,6 +11,7 @@ func Builtin(cfg CommandConfig) []schemas.AgentAdapter {
 		newRemoteHTTPAdapter(cfg),  // Remote area: agents that are deployed services (remotehttp.go)
 		newA2AAdapter(cfg),         // B1: A2A agents through Bifrost's agent gateway (a2a.go)
 		newOpenAIAgentAdapter(cfg), // A08: OpenAI-compatible endpoint agents (openaiagent.go)
+		newVoiceRTCAdapter(cfg),    // real-time voice agents over LiveKit or SIP (voicertc.go)
 	}
 }
 

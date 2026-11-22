@@ -47,8 +47,9 @@ voice:
 
 The planner refuses, with the reason, a voice task whose caller is missing,
 not role `user`, hidden, proxied, or without the `timeline.jsonl` and
-`transcript.json` exports; any transport but `websocket` (telephony, SIP and
-PSTN are not supported); a voice probe the task does not allow; a voice
+`transcript.json` exports; any transport but `websocket` (the caller always
+speaks heimdall-voice/1; agents in a LiveKit room or on a phone number are
+reached through the real-time bridge, docs/voice-realtime.md); a voice probe the task does not allow; a voice
 probe on a task with no call; and an agent's `gateway.models` the run key
 cannot serve (below).
 
@@ -433,8 +434,10 @@ transcripts are witnessed or reported), and what the call cost per minute.
 
 Not measured, and not claimed:
 
-- **Telephony.** No SIP, PSTN, codecs (G.711, Opus), jitter, packet loss or
-  DTMF. The line is a clean 16 kHz WebSocket.
+- **Telephony.** On this track the line is a clean 16 kHz WebSocket. Calls
+  over WebRTC (LiveKit) and phone numbers (LiveKit SIP), caller personas with
+  accents, noise and a G.711 phone line, and audio jitter are in
+  docs/voice-realtime.md; packet loss injection and DTMF are not covered.
 - **Audio quality.** No MOS, naturalness or prosody score, no speaker
   similarity. Barge-in is measured as "audio stopped", not as how gracefully.
 - **Real callers.** The caller is a script (or a pinned model) speaking with

@@ -184,6 +184,8 @@ func DefaultCapabilities(cfg *AgentConfig) CapabilitySet {
 		set = append(set, AllCapabilities...)
 	case "remote_http", "a2a", "openai_agent":
 		set = CapabilitySet{CapTools, CapSessions}
+	case "voice_rtc": // a real-time voice agent over LiveKit or SIP: calls only
+		set = CapabilitySet{CapVoice, CapSessions}
 	default:
 		switch {
 		case containsAny(names, voiceHint):

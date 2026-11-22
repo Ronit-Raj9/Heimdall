@@ -93,6 +93,9 @@ func RunSecretNames(rc *schemas.RunContext) []string {
 		if o := rc.Agent.OpenAI; o != nil && SecretNameOK(o.APIKeySecret) { // A08: openai.api_key_secret (adapters/openaiagent.go)
 			seen[o.APIKeySecret] = true
 		}
+		for _, n := range voiceRTCSecretNames(rc.Agent.VoiceRTC) { // voice_rtc LiveKit and trunk secrets (adapters/voicertc.go)
+			seen[n] = true
+		}
 	}
 	return sortedSet(seen)
 }

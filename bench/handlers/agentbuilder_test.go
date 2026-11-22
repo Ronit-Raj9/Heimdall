@@ -56,6 +56,8 @@ func TestEveryTemplateRendersAndValidates(t *testing.T) {
 		"openai-endpoint": {"url": "https://agent.example.com/v1", "model": "my-agent", "api_key_secret": "MY_AGENT_KEY"},
 		"docker-image":    {"image": "ghcr.io/acme/agent:1", "command": "my-agent {{instruction_file}}"},
 		"wrap-app":        {"repo_url": "https://github.com/org/agent.git", "command": "python3 -m app"},
+		"livekit-agent":   {"dispatch": "agent", "agent_name": "support-agent"},
+		"phone-number":    {"number": "+14155550100", "trunk_address": "acme.pstn.twilio.com", "from_number": "+14155550199"},
 	}
 	if len(agentTemplates) < 15 {
 		t.Fatalf("want at least 15 templates, got %d", len(agentTemplates))
