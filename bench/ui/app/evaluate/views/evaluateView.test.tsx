@@ -111,7 +111,7 @@ describe("evaluateDraft", () => {
 		expect(spec.mode).toBe("score");
 		expect(spec.tasks_per_benchmark).toBe(10);
 		expect(spec.trials).toBe(1);
-		expect(spec.name).toBe("codex score");
+		expect(spec.name).toBe("codex failure test on hd-harbor-tb2");
 	});
 
 	it("sends bifrost_cache in score mode only", () => {
