@@ -153,6 +153,14 @@ func (a *remoteHTTPAdapter) Plan(_ context.Context, rc *schemas.RunContext) (*sc
 	plan.Argv = []string{"python3", "-I", remoteLauncherFile}
 	plan.Env = env
 	plan.Files = map[string]string{remoteLauncherFile: remoteLauncherSource, InstructionFile: instruction}
+	chat, err := chatPlanFile(rc) // Chat tasks (chat.go): the conversation, sent as messages
+	if err != nil {
+		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+	}
+	if chat != "" {
+		plan.Files[chatFile] = chat
+		plan.Env["BENCH_REMOTE_CHAT"] = chatFile
+	}
 	plan.Egress = []string{target}
 	return plan, nil
 }

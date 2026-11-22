@@ -638,7 +638,10 @@ func normalizeGate(spec *schemas.EvaluationSpec) error {
 			return badf("gate: min_score for %s must be between 0 and 1", c)
 		}
 	}
-	if len(g.MinScore) == 0 && g.MaxRegression == 0 {
+	if err := normalizeGateSlices(g); err != nil { // Y13: metadata slice rules (evalgate_slices.go)
+		return err
+	}
+	if len(g.MinScore) == 0 && g.MaxRegression == 0 && len(g.Slices) == 0 {
 		spec.Gate = nil
 	}
 	return nil

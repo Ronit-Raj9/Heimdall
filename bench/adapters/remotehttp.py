@@ -7,6 +7,13 @@ answer path. It is bench code: the container holds nothing of the agent's.
 Request: POST <BENCH_REMOTE_URL> with a JSON body
   {"instruction", "session_id", "session_index", "output", "files"?,
    "gateway"?, "tools"?}
+For a conversation task (BENCH_REMOTE_CHAT) the body also carries
+"messages" (the conversation so far, ending with the user's message;
+"instruction" is that message), "turn" and "turns", and "attachments"
+([{name, media_type, url} or {name, media_type, path, content_base64}]).
+After each reply the next scripted user turn is appended and posted again
+on the same session id; the last reply is the answer, or with grade_on
+transcript the whole conversation as text.
 and "Authorization: Bearer <token>" when the agent config names auth_env or
 auth_secret (with auth_header set, "<auth_header>: <token>" instead).
 With sign_env or sign_secret set, "X-Heimdall-Timestamp: <unix seconds>" and
@@ -44,6 +51,7 @@ MAX_EVENTS = 500
 MAX_EVENT_BYTES = 8 << 10
 MAX_ARTIFACTS = 50
 MAX_ARTIFACT_BYTES = 16 << 20
+MAX_ATTACHMENT_BYTES = 8 << 20
 MAX_STR = 256
 PENDING = ("queued", "pending", "running")
 EVENT_PREFIX = "@@heimdall-event "
@@ -348,6 +356,108 @@ def poll(remote, resp, raw, deadline, report):
             return resp, raw
 
 
+def load_chat():
+    """The task's conversation (BENCH_REMOTE_CHAT), or None for a plain task."""
+    path = os.environ.get("BENCH_REMOTE_CHAT", "")
+    if not path:
+        return None
+    with open(path, encoding="utf-8") as f:
+        doc = json.load(f)
+    msgs = [{"role": m["role"], "content": m["content"]} for m in doc.get("messages") or []
+            if isinstance(m, dict) and isinstance(m.get("content"), str)]
+    if not msgs or msgs[-1]["role"] != "user":
+        fail(2, "the task's conversation does not end with the user's message")
+    return {"messages": msgs, "user_turns": [t for t in doc.get("user_turns") or [] if isinstance(t, str)],
+            "attachments": doc.get("attachments") or [], "grade_on": doc.get("grade_on") or "final"}
+
+
+def chat_attachments(items, root):
+    """The conversation's attachments as sent to the agent: links as they are,
+    files stored with the task inline as base64, up to MAX_ATTACHMENT_BYTES."""
+    out, total = [], 0
+    for a in items:
+        if not isinstance(a, dict) or not a.get("name"):
+            continue
+        item = {"name": str(a["name"]), "media_type": str(a.get("media_type") or "application/octet-stream")}
+        if a.get("url"):
+            item["url"] = str(a["url"])
+        elif a.get("path") and root:
+            path = os.path.join(root, str(a["path"]))
+            if os.path.islink(path) or not os.path.isfile(path):
+                continue
+            with open(path, "rb") as f:
+                data = f.read(MAX_ATTACHMENT_BYTES + 1)
+            total += len(data)
+            if total > MAX_ATTACHMENT_BYTES:
+                emit({"type": "note", "message": "attachment %s left out: over %d bytes in all" % (item["name"], MAX_ATTACHMENT_BYTES)})
+                continue
+            item["path"] = str(a["path"])
+            item["content_base64"] = base64.b64encode(data).decode("ascii")
+        else:
+            continue
+        out.append(item)
+    return out
+
+
+def render_chat(msgs):
+    return "\n\n".join("%s: %s" % (m["role"], m["content"].strip()) for m in msgs) + "\n"
+
+
+def exchange(remote, body, deadline, timeout, output):
+    """Posts one request and returns the agent's answer (None when the task
+    needs none and there is none)."""
+    payload = json.dumps(body).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    secret = os.environ.get("BENCH_REMOTE_SIGN_SECRET", "")
+    if secret and len(secret) < 16:
+        fail(2, "the signing secret is shorter than 16 characters")
+    if secret:
+        ts = str(int(time.time()))
+        mac = hmac.new(secret.encode("utf-8"), ts.encode("ascii") + b"." + payload, hashlib.sha256).hexdigest()
+        headers["X-Heimdall-Timestamp"] = ts
+        headers["X-Heimdall-Signature"] = "sha256=" + mac
+    path = (remote.url.path or "/") + ("?" + remote.url.query if remote.url.query else "")
+    started = time.time()
+    req = {"type": "request", "session_id": body["session_id"], "session_index": body["session_index"],
+           "files": len(body.get("files", {})), "tools": len(body.get("tools", {})), "signed": bool(secret)}
+    if "messages" in body:
+        req["messages"] = len(body["messages"])
+        req["turn"] = body.get("turn", 1)
+    emit(req)
+    left = max(1.0, min(timeout, deadline - time.time()))
+    resp, raw = remote.do("POST", path, payload, headers, left)
+    report = {}
+    if resp.status == 202:
+        resp, raw = poll(remote, resp, raw, deadline, report)
+    emit({"type": "response", "status": resp.status, "bytes": len(raw),
+          "latency_ms": int((time.time() - started) * 1000)})
+    if resp.status // 100 != 2:
+        fail(1, "the agent answered HTTP %d: %s" % (resp.status, clean(raw[:500].decode("utf-8", "replace"), 500)))
+    content_type = resp.getheader("Content-Type", "application/json").lower()
+    doc = None if content_type.startswith("text/plain") else parse_json(raw)
+    if isinstance(doc, dict) and str(doc.get("status", "completed")).lower() == "failed":
+        fail(1, "the agent reported its run failed: %s" % clean(str(doc.get("error", "")), 500))
+    answer = answer_of(doc, raw, content_type, output == "answer" or "messages" in body)
+    files_root = os.environ.get("BENCH_REMOTE_FILES_DIR", "")
+    if isinstance(doc, dict):
+        usage = usage_of(doc.get("usage"))
+        if usage:
+            report["usage"] = usage
+        for k in ("version", "build"):
+            if clean(doc.get(k)):
+                report[k] = clean(doc.get(k))
+        pass_events(doc.get("events"), report)
+        if doc.get("artifacts") is not None:
+            if os.environ.get("BENCH_REMOTE_ARTIFACTS") == "inline" and files_root:
+                write_artifacts(doc["artifacts"], files_root, report)
+            else:
+                report.setdefault("notes", []).append("artifacts sent without remote.artifacts inline; ignored")
+    if report:
+        report["type"] = "remote_report"
+        emit(report)
+    return answer
+
+
 def main():
     remote = Remote(os.environ["BENCH_REMOTE_URL"])
     timeout = float(os.environ.get("BENCH_REMOTE_TIMEOUT_S", "600"))
@@ -356,6 +466,7 @@ def main():
         instruction = f.read()
     answer_path = os.environ.get("BENCH_ANSWER_PATH", "answer.txt")
     output = os.environ.get("BENCH_REMOTE_OUTPUT", "answer")
+    chat = load_chat()
     body = {
         "instruction": instruction,
         "session_id": os.environ.get("BENCH_REMOTE_SESSION_ID", ""),
@@ -378,49 +489,29 @@ def main():
     if os.environ.get("BENCH_REMOTE_TOOLS"):
         tools, token = json.loads(os.environ["BENCH_REMOTE_TOOLS"]), os.environ.get("BENCH_REMOTE_TOOLS_TOKEN", "")
         body["tools"] = {k: dict(v, token=token) for k, v in sorted(tools.items())}
-    payload = json.dumps(body).encode("utf-8")
-    headers = {"Content-Type": "application/json"}
-    secret = os.environ.get("BENCH_REMOTE_SIGN_SECRET", "")
-    if secret and len(secret) < 16:
-        fail(2, "the signing secret is shorter than 16 characters")
-    if secret:
-        ts = str(int(time.time()))
-        mac = hmac.new(secret.encode("utf-8"), ts.encode("ascii") + b"." + payload, hashlib.sha256).hexdigest()
-        headers["X-Heimdall-Timestamp"] = ts
-        headers["X-Heimdall-Signature"] = "sha256=" + mac
-    path = (remote.url.path or "/") + ("?" + remote.url.query if remote.url.query else "")
-    started = time.time()
-    emit({"type": "request", "session_id": body["session_id"], "session_index": body["session_index"],
-          "files": len(body.get("files", {})), "tools": len(body.get("tools", {})), "signed": bool(secret)})
-    resp, raw = remote.do("POST", path, payload, headers, timeout)
-    report = {}
-    if resp.status == 202:
-        resp, raw = poll(remote, resp, raw, deadline, report)
-    emit({"type": "response", "status": resp.status, "bytes": len(raw),
-          "latency_ms": int((time.time() - started) * 1000)})
-    if resp.status // 100 != 2:
-        fail(1, "the agent answered HTTP %d: %s" % (resp.status, clean(raw[:500].decode("utf-8", "replace"), 500)))
-    content_type = resp.getheader("Content-Type", "application/json").lower()
-    doc = None if content_type.startswith("text/plain") else parse_json(raw)
-    if isinstance(doc, dict) and str(doc.get("status", "completed")).lower() == "failed":
-        fail(1, "the agent reported its run failed: %s" % clean(str(doc.get("error", "")), 500))
-    answer = answer_of(doc, raw, content_type, output == "answer")
-    if isinstance(doc, dict):
-        usage = usage_of(doc.get("usage"))
-        if usage:
-            report["usage"] = usage
-        for k in ("version", "build"):
-            if clean(doc.get(k)):
-                report[k] = clean(doc.get(k))
-        pass_events(doc.get("events"), report)
-        if doc.get("artifacts") is not None:
-            if os.environ.get("BENCH_REMOTE_ARTIFACTS") == "inline" and files_root:
-                write_artifacts(doc["artifacts"], files_root, report)
-            else:
-                report.setdefault("notes", []).append("artifacts sent without remote.artifacts inline; ignored")
-    if report:
-        report["type"] = "remote_report"
-        emit(report)
+    if chat is None:
+        answer = exchange(remote, body, deadline, timeout, output)
+    else:
+        # A conversation: the customer's messages as they are, then each
+        # scripted user turn after the agent's reply, on one session id.
+        transcript = list(chat["messages"])
+        attachments = chat_attachments(chat["attachments"], files_root)
+        turns = [None] + chat["user_turns"]
+        answer = ""
+        for n, turn in enumerate(turns, start=1):
+            if turn is not None:
+                transcript.append({"role": "user", "content": turn})
+            body = dict(body, instruction=transcript[-1]["content"], messages=list(transcript), turn=n, turns=len(turns))
+            if attachments:
+                body["attachments"] = attachments
+            reply = exchange(remote, body, deadline, timeout, output) or ""
+            transcript.append({"role": "assistant", "content": reply})
+            answer = reply
+            if time.time() >= deadline and n < len(turns):
+                fail(1, "timed out after %d of %d turns" % (n, len(turns)))
+        emit({"type": "conversation", "turns": len(turns), "messages": len(transcript)})
+        if chat["grade_on"] == "transcript":
+            answer = render_chat(transcript)
     if answer is not None:
         parent = os.path.dirname(answer_path)
         if parent:

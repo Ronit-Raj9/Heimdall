@@ -126,8 +126,11 @@ func TestImportRowsExact(t *testing.T) {
 	if fileOf(t, tasks[0].Files, "solution/answer.txt") != "30\n" {
 		t.Fatal("reference answer")
 	}
-	if !strings.Contains(fileOf(t, tasks[0].Files, "instruction.md"), "answer.txt") {
-		t.Fatal("instruction says where to answer")
+	if got := fileOf(t, tasks[0].Files, "instruction.md"); got != "How many days is the refund window?\n" {
+		t.Fatalf("instruction is not the row's own words: %q", got)
+	}
+	if !strings.Contains(fileOf(t, tasks[0].Files, "repo/README.md"), "answer.txt") {
+		t.Fatal("the workspace README says where to answer")
 	}
 }
 
@@ -146,8 +149,8 @@ func TestImportRowsJudgeAndTickets(t *testing.T) {
 	if !strings.Contains(fileOf(t, tasks[0].Files, "verifier/answer.yaml"), "rubric: Apologise and refund") {
 		t.Fatal("rubric missing")
 	}
-	if !strings.Contains(fileOf(t, tasks[0].Files, "instruction.md"), "> I was billed twice") {
-		t.Fatal("ticket instruction")
+	if got := fileOf(t, tasks[0].Files, "instruction.md"); got != "Charged twice\n\nI was billed twice\n" {
+		t.Fatalf("ticket instruction = %q", got)
 	}
 }
 

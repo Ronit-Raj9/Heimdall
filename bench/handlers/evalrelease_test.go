@@ -193,3 +193,26 @@ func TestNormalizeGate(t *testing.T) {
 		t.Errorf("a gate with no rule: %+v %v", spec.Gate, err)
 	}
 }
+
+func TestNormalizeGateSlices(t *testing.T) {
+	half, over := 0.5, 1.5
+	for _, g := range []*schemas.EvaluationGate{
+		{Slices: []schemas.GateSliceRule{{Key: "ti er", Value: "x", MinScore: &half}}},
+		{Slices: []schemas.GateSliceRule{{Key: "tier", Value: "", MinScore: &half}}},
+		{Slices: []schemas.GateSliceRule{{Key: "tier", Value: "x", MinScore: &over}}},
+		{Slices: []schemas.GateSliceRule{{Key: "tier", Value: "x", MaxRegression: 2}}},
+		{Slices: []schemas.GateSliceRule{{Key: "tier", Value: "x", MinScore: &half}, {Key: "tier", Value: "x", MaxRegression: 0.1}}},
+	} {
+		if err := normalizeGate(&schemas.EvaluationSpec{Gate: g}); err == nil {
+			t.Errorf("gate %+v accepted", g.Slices)
+		}
+	}
+	spec := &schemas.EvaluationSpec{Gate: &schemas.EvaluationGate{Slices: []schemas.GateSliceRule{{Key: "tier", Value: "free"}}}}
+	if err := normalizeGate(spec); err != nil || spec.Gate != nil {
+		t.Errorf("a slice rule with no check: %+v %v", spec.Gate, err)
+	}
+	spec = &schemas.EvaluationSpec{Gate: &schemas.EvaluationGate{Slices: []schemas.GateSliceRule{{Key: " tier ", Value: " enterprise ", MaxRegression: 0.05}}}}
+	if err := normalizeGate(spec); err != nil || spec.Gate == nil || spec.Gate.Slices[0].Key != "tier" || spec.Gate.Slices[0].Value != "enterprise" {
+		t.Errorf("slice rule kept: %+v %v", spec.Gate, err)
+	}
+}

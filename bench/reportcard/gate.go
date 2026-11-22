@@ -120,6 +120,10 @@ func JudgeGate(in GateInput) *schemas.EvaluationGateResult {
 			}
 		}
 	}
+	sliceRes, sliceFailed, sliceNoBase := sliceChecks(in) // Y13: metadata slice rules (slices.go)
+	res.Checks = append(res.Checks, sliceRes...)
+	failed += sliceFailed
+	noBaseline = noBaseline || sliceNoBase
 	switch {
 	case failed > 0:
 		res.State = schemas.GateFail

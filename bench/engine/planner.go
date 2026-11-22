@@ -286,6 +286,7 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 		BenchVersion:   BenchVersion,
 	}
 	m.HeldOutTasks = heldOutTasks(suite, all) // Suite health area: held-out split (taskscreen.go)
+	m.TaskMetadata = taskMetadata(suite, all) // Y13: metadata slices (chatplan.go)
 
 	// Lock fingerprints (fingerprints.go): the exact evaluator settings.
 	if m.FingerprintHash, err = lockFingerprintHash(suite); err != nil {

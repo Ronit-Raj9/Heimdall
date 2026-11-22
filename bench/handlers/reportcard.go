@@ -193,7 +193,16 @@ func (h *reportCardHandler) getReport(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.env.Mode, "evaluation", err)
 		return
 	}
-	rep, err := reportcard.Build(work, h.source(ctx, work), ev, h.options(work))
+	opt := h.options(work)
+	var where []string // Y13: ?where=key:value narrows the report to one metadata slice
+	for _, w := range ctx.QueryArgs().PeekMulti("where") {
+		where = append(where, string(w))
+	}
+	if opt.Where, err = reportcard.ParseWhere(where); err != nil {
+		lib.SendError(ctx, h.env.Mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, err.Error())
+		return
+	}
+	rep, err := reportcard.Build(work, h.source(ctx, work), ev, opt)
 	if err != nil {
 		sendDepError(ctx, h.env.Mode, "report card", err)
 		return

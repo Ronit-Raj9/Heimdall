@@ -121,6 +121,15 @@ func (a *openaiAgentAdapter) Plan(ctx context.Context, rc *schemas.RunContext) (
 	}
 	plan.Env = openaiEnv(rc, spec, endpoint, plan.WallS, kind)
 	plan.Files = map[string]string{openaiLauncherFile: openaiLauncherSource, InstructionFile: instruction}
+	chat, err := chatPlanFile(rc) // Chat tasks (chat.go): the conversation, sent as messages
+	if err != nil {
+		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+	}
+	if chat != "" {
+		plan.Files[chatFile] = chat
+		plan.Env["BENCH_OPENAI_CHAT"] = chatFile
+		plan.Env["BENCH_OPENAI_FILES_DIR"] = Workspace
+	}
 	if spec.System != "" {
 		plan.Files[openaiSystemFile] = spec.System
 		plan.Env["BENCH_OPENAI_SYSTEM"] = openaiSystemFile

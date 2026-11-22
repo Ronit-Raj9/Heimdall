@@ -61,6 +61,15 @@ One run is a small loop in the bench's own launcher (`adapters/openaiagent.py`):
 4. The loop ends on an answer with no tool call. That text is the answer the
    verifier grades. No answer after `max_turns` requests fails the run.
 
+Conversation tasks (chat rows of your own data, a `chat` block in
+`task.yaml`): the task's messages are sent as they are (its own `system`,
+`user` and `assistant` turns after the agent's `system` message), with the
+attachments as image or file parts of the last user message (a link as is,
+a file stored with the task as a data URL). After each answer the next
+scripted user turn is sent with the conversation so far. The last answer is
+graded, or every turn as `role: text` lines when the task is graded on the
+whole conversation.
+
 Multi-session tasks (memory benchmarks): session N is sent with sessions
 1 to N-1 as earlier `user` and `assistant` turns, the way a chat agent
 remembers a conversation. The turns are kept in the run's memory volume
