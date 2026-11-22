@@ -370,6 +370,9 @@ func runOnboardPublish(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Lo
 	}
 	out := &onboardPublishResult{PublishResult: pres, Carried: []string{}, Recheck: []string{}}
 	log.Printf("published %d tasks into %s", len(pres.Tasks), set.Suite)
+	for _, w := range pres.Warnings {
+		log.Warnf("%s", w)
+	}
 	carried, recheck, cerr := carryReadiness(ctx, env, set.Suite, pres, jobActor(j))
 	out.Carried, out.Recheck = carried, recheck
 	if cerr != nil {

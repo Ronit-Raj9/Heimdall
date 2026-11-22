@@ -34,10 +34,13 @@ const generated: GeneratedTaskList = {
 	],
 };
 
+const queue = vi.hoisted(() => ({ data: undefined as unknown }));
+queue.data = generated;
+
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => mutation() }));
 vi.mock("@/lib/store/apis/authoringApi", () => ({
-	useGetGeneratedTasksQuery: () => ({ data: generated, isError: false }),
+	useGetGeneratedTasksQuery: () => ({ data: queue.data, isError: false }),
 	useSetTaskReviewMutation: () => mutation(),
 	useLazyGetSuiteQualityQuery: () => [vi.fn(), { isFetching: false }],
 	useSplitHeldOutMutation: () => mutation(),
@@ -77,7 +80,14 @@ describe("reviewTab helpers", () => {
 	it("builds the assist params", () => {
 		expect(assistParams("s", ["rubric"], "", "m", 1, true)).toBeNull();
 		expect(assistParams("s", [], "openai", "m", 1, true)).toBeNull();
-		expect(assistParams("s", ["rubric"], " openai ", "gpt", 2, true)).toEqual({ suite: "s", ops: ["rubric"], provider: "openai", model: "gpt", budget_usd: 2, estimate: true });
+		expect(assistParams("s", ["rubric"], " openai ", "gpt", 2, true)).toEqual({
+			suite: "s",
+			ops: ["rubric"],
+			provider: "openai",
+			model: "gpt",
+			budget_usd: 2,
+			estimate: true,
+		});
 		expect(assistParams("s", ["exploit"], "openai", "gpt", 0, false)).toMatchObject({ yes: true, budget_usd: undefined });
 	});
 	it("needs a note to reject", () => {
@@ -103,5 +113,15 @@ describe("reviewTab helpers", () => {
 		expect(html).toContain("held out, but already public");
 		const clean = text(render(<QualityBody report={{ ...report, duplicates: null, contamination: [] }} t={t as never} />));
 		expect(clean).toContain("nothing found in 835 public tasks");
+	});
+	it("points an empty queue to the Policy tab, where policy drafts are made", () => {
+		queue.data = { ...generated, pending: 0, accepted: 0, tasks: [] };
+		try {
+			const html = render(<ReviewTab suite={qa} />);
+			expect(html).toContain("No drafts to review yet. Policy drafts are made on the Policy tab of a support benchmark.");
+			expect(html).toMatch(/<a[^>]*href="\/suites\/support-faq\?tab=policy"[^>]*data-testid="suite-review-queue-policy-link"/);
+		} finally {
+			queue.data = generated;
+		}
 	});
 });

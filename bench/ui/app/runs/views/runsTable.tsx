@@ -9,11 +9,12 @@ import { useGetAgentsQuery, useListRunsQuery } from "@/lib/store/apis/benchApi";
 import type { RunListParams, RunListRow } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, ListX } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, ListX } from "lucide-react";
 import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { useCallback, useMemo, type KeyboardEvent } from "react";
 import { TraceMatches, TraceSearchInput } from "./traceMatches";
 import { useTranslation } from "react-i18next";
+import "./fw21I18n";
 
 export const RUNS_PAGE = 50;
 
@@ -26,14 +27,66 @@ const parsers = {
 	q: parseAsString,
 	tq: parseAsString,
 	page: parseAsInteger,
+	sort: parseAsString,
+	dir: parseAsString,
 };
 
-/** The server request for the filters and page; agent and fault filter on the server across every page, the search box filters the page on the client. */
+export type RunSortKey = NonNullable<RunListParams["sort"]>;
+export type RunSortDir = NonNullable<RunListParams["dir"]>;
+
+/** The sort keys GET /runs accepts. */
+export const RUN_SORT_KEYS: readonly RunSortKey[] = ["started", "duration", "outcome", "cost", "tokens", "steps", "task", "agent"];
+
+/** Keys whose first click sorts A to Z; every other key starts with the largest or newest first. */
+const TEXT_SORTS: readonly RunSortKey[] = ["task", "agent", "outcome"];
+
+/** The sort in the URL, or null when it is missing or not one the server accepts. */
+export function parseRunSort(
+	sort: string | null | undefined,
+	dir: string | null | undefined,
+): { sort: RunSortKey; dir: RunSortDir } | null {
+	if (!sort || !(RUN_SORT_KEYS as readonly string[]).includes(sort)) return null;
+	const d: RunSortDir = dir === "asc" || dir === "desc" ? dir : TEXT_SORTS.includes(sort as RunSortKey) ? "asc" : "desc";
+	return { sort: sort as RunSortKey, dir: d };
+}
+
+/** The URL state after a click on the header of key: the same column flips its direction, another column starts in its natural one. The default order (newest first) clears both. */
+export function nextRunSort(
+	current: { sort?: string | null; dir?: string | null },
+	key: RunSortKey,
+): { sort: RunSortKey | null; dir: RunSortDir | null } {
+	const cur = parseRunSort(current.sort, current.dir) ?? { sort: "started" as RunSortKey, dir: "desc" as RunSortDir };
+	const dir: RunSortDir = cur.sort === key ? (cur.dir === "asc" ? "desc" : "asc") : TEXT_SORTS.includes(key) ? "asc" : "desc";
+	if (key === "started" && dir === "desc") return { sort: null, dir: null };
+	return { sort: key, dir };
+}
+
+/** The aria-sort value of a column header. */
+export function ariaSortOf(current: { sort?: string | null; dir?: string | null }, key: RunSortKey): "ascending" | "descending" | "none" {
+	const cur = parseRunSort(current.sort, current.dir) ?? { sort: "started", dir: "desc" };
+	if (cur.sort !== key) return "none";
+	return cur.dir === "asc" ? "ascending" : "descending";
+}
+
+/** The server request for the filters, sort and page; agent, fault and the sort apply on the server across every page, the search box filters the page on the client. */
 export function runsRequest(
-	f: { outcome?: string | null; suite?: string | null; arm?: string | null; agent?: string | null; fault?: string | null },
+	f: {
+		outcome?: string | null;
+		suite?: string | null;
+		arm?: string | null;
+		agent?: string | null;
+		fault?: string | null;
+		sort?: string | null;
+		dir?: string | null;
+	},
 	page: number | null,
 ): RunListParams {
 	const params: RunListParams = { limit: RUNS_PAGE };
+	const sort = parseRunSort(f.sort, f.dir);
+	if (sort) {
+		params.sort = sort.sort;
+		params.dir = sort.dir;
+	}
 	if (f.outcome) params.outcome = f.outcome;
 	if (f.suite) params.suite = f.suite;
 	if (f.arm) params.arm = f.arm;
@@ -50,18 +103,23 @@ export function runAgent(r: Pick<RunListRow, "config_id" | "arm">): string {
 }
 
 /** Agent names for the Agent filter: every configured agent, every agent the server saw in any run, and any agent on the page. Never arm ids. */
-export function agentOptions(configured: readonly string[], rows: readonly Pick<RunListRow, "config_id">[], seenOnServer: readonly string[] = []): string[] {
+export function agentOptions(
+	configured: readonly string[],
+	rows: readonly Pick<RunListRow, "config_id">[],
+	seenOnServer: readonly string[] = [],
+): string[] {
 	const seen = new Set(configured.filter(Boolean));
 	for (const r of rows) if (r.config_id) seen.add(r.config_id);
 	for (const a of seenOnServer) if (a) seen.add(a);
 	return [...seen].sort((a, b) => a.localeCompare(b));
 }
 
-/** Running runs first, then the server's newest-first order; a search narrows by task, agent or model, the agent filter by agent name. */
-export function orderRuns(rows: readonly RunListRow[], query: string | null, agent: string | null = null): RunListRow[] {
+/** Running runs first, then the server's newest-first order; with a chosen sort the server's order is kept as is. A search narrows by task, agent or model, the agent filter by agent name. */
+export function orderRuns(rows: readonly RunListRow[], query: string | null, agent: string | null = null, sorted = false): RunListRow[] {
 	const q = (query ?? "").trim().toLowerCase();
 	const hit = (r: RunListRow) => !q || [r.task, r.arm, r.config_id ?? "", r.model ?? "", r.suite].some((v) => v.toLowerCase().includes(q));
 	const shown = rows.filter((r) => hit(r) && (!agent || runAgent(r) === agent));
+	if (sorted) return shown;
 	return [...shown.filter((r) => !r.sealed), ...shown.filter((r) => r.sealed)];
 }
 
@@ -151,9 +209,16 @@ export function RunsTable() {
 	const [search, setSearch] = useQueryStates(parsers, { history: "replace" });
 	const list = useListRunsQuery(runsRequest(search, search.page));
 	const agentsQuery = useGetAgentsQuery();
-	const rows = useMemo(() => orderRuns(list.data?.runs ?? [], search.q, search.agent), [list.data, search.q, search.agent]);
+	const sorted = parseRunSort(search.sort, search.dir) !== null;
+	const rows = useMemo(() => orderRuns(list.data?.runs ?? [], search.q, search.agent, sorted), [list.data, search.q, search.agent, sorted]);
+	const onSort = (key: RunSortKey) => void setSearch({ ...nextRunSort(search, key), page: null });
 	const agents = useMemo(
-		() => agentOptions((agentsQuery.data?.agents ?? []).map((a) => a.id), list.data?.runs ?? [], list.data?.facets.agents ?? []),
+		() =>
+			agentOptions(
+				(agentsQuery.data?.agents ?? []).map((a) => a.id),
+				list.data?.runs ?? [],
+				list.data?.facets.agents ?? [],
+			),
 		[agentsQuery.data, list.data],
 	);
 	const live = rows.filter((r) => !r.sealed).length;
@@ -165,14 +230,32 @@ export function RunsTable() {
 	const traceQuery = (search.tq ?? "").trim();
 	const outcomeLabel = (o: string) => tb(`runs.outcome.${o}`, { defaultValue: o });
 	const faultLabel = (f: string) => tu(`runs.faultName.${f}`, { defaultValue: f.replace(/-/g, " ") });
-	const tokens = ([
-		search.outcome && { key: "outcome", label: `${tu("runs.outcome")}: ${outcomeLabel(search.outcome)}`, onRemove: () => void setSearch({ outcome: null, page: null }) },
-		search.suite && { key: "suite", label: `${tu("runs.suite")}: ${search.suite.replace(/@.*$/, "")}`, onRemove: () => void setSearch({ suite: null, page: null }) },
-		search.agent && { key: "agent", label: `${tu("runs.agent")}: ${search.agent}`, onRemove: () => void setSearch({ agent: null, page: null }) },
-		search.fault && { key: "fault", label: `${tu("runs.fault")}: ${faultLabel(search.fault)}`, onRemove: () => void setSearch({ fault: null, page: null }) },
-		// An older link may still carry an arm id; show it so it can be removed.
-		search.arm && { key: "arm", label: `${tu("runs.agent")}: ${search.arm}`, onRemove: () => void setSearch({ arm: null, page: null }) },
-	] as (FilterToken | false | "" | null | undefined)[]).filter((x): x is FilterToken => Boolean(x));
+	const tokens = (
+		[
+			search.outcome && {
+				key: "outcome",
+				label: `${tu("runs.outcome")}: ${outcomeLabel(search.outcome)}`,
+				onRemove: () => void setSearch({ outcome: null, page: null }),
+			},
+			search.suite && {
+				key: "suite",
+				label: `${tu("runs.suite")}: ${search.suite.replace(/@.*$/, "")}`,
+				onRemove: () => void setSearch({ suite: null, page: null }),
+			},
+			search.agent && {
+				key: "agent",
+				label: `${tu("runs.agent")}: ${search.agent}`,
+				onRemove: () => void setSearch({ agent: null, page: null }),
+			},
+			search.fault && {
+				key: "fault",
+				label: `${tu("runs.fault")}: ${faultLabel(search.fault)}`,
+				onRemove: () => void setSearch({ fault: null, page: null }),
+			},
+			// An older link may still carry an arm id; show it so it can be removed.
+			search.arm && { key: "arm", label: `${tu("runs.agent")}: ${search.arm}`, onRemove: () => void setSearch({ arm: null, page: null }) },
+		] as (FilterToken | false | "" | null | undefined)[]
+	).filter((x): x is FilterToken => Boolean(x));
 	const open = (row: RunListRow) => void navigate({ to: "/runs/$runId", params: { runId: row.run_id } } as never);
 	const onKey = (e: KeyboardEvent, row: RunListRow) => {
 		if (e.key === "Enter" || e.key === " ") {
@@ -228,7 +311,10 @@ export function RunsTable() {
 						/>
 					)}
 					{live > 0 && (
-						<span className="text-chart-info-ink ml-auto inline-flex items-center gap-1.5 text-xs font-medium" data-testid="runs-live-count">
+						<span
+							className="text-chart-info-ink ml-auto inline-flex items-center gap-1.5 text-xs font-medium"
+							data-testid="runs-live-count"
+						>
 							<span className="bg-chart-info size-1.5 animate-pulse rounded-full" />
 							{tu("runs.liveCount", { count: live })}
 						</span>
@@ -256,36 +342,32 @@ export function RunsTable() {
 						<table className="w-full min-w-[960px] text-sm" data-testid="runs-table">
 							<thead className="bg-card sticky top-0 z-10">
 								<tr className="text-muted-foreground border-b text-xs">
-									<th scope="col" className="px-4 py-2.5 text-left font-medium">
-										{tu("runs.col.task")}
-									</th>
-									<th scope="col" className="px-3 py-2.5 text-left font-medium">
-										{tu("runs.col.agent")}
-									</th>
-									<th scope="col" className="px-3 py-2.5 text-left font-medium">
-										{tu("runs.col.outcome")}
-									</th>
-									<th scope="col" className="px-3 py-2.5 text-right font-medium">
-										{tu("runs.col.steps")}
-									</th>
+									<SortHeader label={tu("runs.col.task")} sortKey="task" current={search} onSort={onSort} className="px-4 text-left" />
+									<SortHeader label={tu("runs.col.agent")} sortKey="agent" current={search} onSort={onSort} className="px-3 text-left" />
+									<SortHeader
+										label={tu("runs.col.outcome")}
+										sortKey="outcome"
+										current={search}
+										onSort={onSort}
+										className="px-3 text-left"
+									/>
+									<SortHeader label={tu("runs.col.steps")} sortKey="steps" current={search} onSort={onSort} className="px-3 text-right" />
 									<th scope="col" className="px-3 py-2.5 text-right font-medium">
 										{tu("runs.col.toolCalls")}
 									</th>
-									<th scope="col" className="px-3 py-2.5 text-right font-medium">
-										{tu("runs.col.tokens")}
-									</th>
-									<th scope="col" className="px-3 py-2.5 text-right font-medium">
-										{tu("runs.col.cost")}
-									</th>
+									<SortHeader label={tu("runs.col.tokens")} sortKey="tokens" current={search} onSort={onSort} className="px-3 text-right" />
+									<SortHeader label={tu("runs.col.cost")} sortKey="cost" current={search} onSort={onSort} className="px-3 text-right" />
 									<th scope="col" className="px-3 py-2.5 text-left font-medium">
 										{tu("runs.col.fault")}
 									</th>
-									<th scope="col" className="px-3 py-2.5 text-right font-medium">
-										{tu("runs.col.duration")}
-									</th>
-									<th scope="col" className="px-4 py-2.5 text-right font-medium">
-										{tu("runs.col.when")}
-									</th>
+									<SortHeader
+										label={tu("runs.col.duration")}
+										sortKey="duration"
+										current={search}
+										onSort={onSort}
+										className="px-3 text-right"
+									/>
+									<SortHeader label={tu("runs.col.when")} sortKey="started" current={search} onSort={onSort} className="px-4 text-right" />
 								</tr>
 							</thead>
 							<tbody>
@@ -349,6 +431,44 @@ export function RunsTable() {
 	);
 }
 
+/** A column header that sorts the list: a button inside the th, with aria-sort on the th. */
+function SortHeader({
+	label,
+	sortKey,
+	current,
+	onSort,
+	className,
+}: {
+	label: string;
+	sortKey: RunSortKey;
+	current: { sort?: string | null; dir?: string | null };
+	onSort: (key: RunSortKey) => void;
+	className: string;
+}) {
+	const { t } = useTranslation("fw21");
+	const state = ariaSortOf(current, sortKey);
+	const Icon = state === "ascending" ? ArrowUp : state === "descending" ? ArrowDown : ArrowUpDown;
+	const right = className.includes("text-right");
+	return (
+		<th scope="col" aria-sort={state} className={cn("py-2.5 font-medium", className)}>
+			<button
+				type="button"
+				onClick={() => onSort(sortKey)}
+				aria-label={t("runs.sortBy", { column: label })}
+				className={cn(
+					"hover:text-foreground focus-visible:ring-ring inline-flex items-center gap-1 rounded-sm focus-visible:ring-2 focus-visible:outline-none",
+					right && "flex-row-reverse",
+					state !== "none" && "text-foreground",
+				)}
+				data-testid={`runs-sort-${sortKey}`}
+			>
+				{label}
+				<Icon aria-hidden="true" className={cn("size-3", state === "none" && "opacity-40")} />
+			</button>
+		</th>
+	);
+}
+
 function Pager({ page, total, onPage }: { page: number; total: number; onPage: (page: number) => void }) {
 	const { t } = useTranslation("u12");
 	const pages = Math.max(1, Math.ceil(total / RUNS_PAGE));
@@ -359,13 +479,27 @@ function Pager({ page, total, onPage }: { page: number; total: number; onPage: (
 			<span className="text-muted-foreground tabular-nums">{t("runs.showing", { first, last, total })}</span>
 			{pages > 1 && (
 				<span className="flex items-center gap-1">
-					<Button variant="ghost" size="sm" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label={t("runs.prev")} dataTestId="runs-prev">
+					<Button
+						variant="ghost"
+						size="sm"
+						disabled={page <= 1}
+						onClick={() => onPage(page - 1)}
+						aria-label={t("runs.prev")}
+						dataTestId="runs-prev"
+					>
 						<ChevronLeft aria-hidden="true" />
 					</Button>
 					<span className="text-muted-foreground px-1 tabular-nums">
 						{page} / {pages}
 					</span>
-					<Button variant="ghost" size="sm" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label={t("runs.next")} dataTestId="runs-next">
+					<Button
+						variant="ghost"
+						size="sm"
+						disabled={page >= pages}
+						onClick={() => onPage(page + 1)}
+						aria-label={t("runs.next")}
+						dataTestId="runs-next"
+					>
 						<ChevronRight aria-hidden="true" />
 					</Button>
 				</span>

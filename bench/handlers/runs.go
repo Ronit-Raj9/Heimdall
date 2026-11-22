@@ -172,7 +172,9 @@ func (h *RunsHandler) getRun(ctx *fasthttp.RequestCtx) {
 		Contract     *schemas.RunEvidenceContract  `json:"evidence_contract,omitempty"`
 		AdapterFault *schemas.AdapterFaultEvidence `json:"adapter_fault,omitempty"`
 	}
-	if _, err := readJSONFile(h.index, id, FileEvidence, &evidence); err != nil {
+	// evidence.json is not served (it holds the gateway rows), so it is read
+	// as an internal file; only the two fields above leave the server.
+	if _, err := readInternalJSON(h.index, id, FileEvidence, &evidence); err != nil {
 		sendDepError(ctx, h.mode, "read evidence of run "+id, err)
 		return
 	}

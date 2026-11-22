@@ -10,7 +10,7 @@ import { ConfirmProvider } from "@/components/platform/confirmDialog";
 import { SessionProvider } from "@/components/platform/sessionProvider";
 import { VerifyEmailBanner } from "@/components/platform/verifyEmailBanner";
 import { ThemeProvider } from "@/components/themeProvider";
-import { activeNavItem } from "@/lib/constants/navigation";
+import { pageTitle } from "@/lib/constants/navigation";
 import i18n from "@/lib/i18n";
 import { frameFor, useSession } from "@/lib/session/sessionContext";
 import { ReduxProvider } from "@/lib/store";
@@ -124,7 +124,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 						<main
 							id="bench-main"
 							tabIndex={-1}
-							className="animate-in fade-in relative mx-auto flex min-h-0 w-full max-w-[1440px] flex-col px-4 py-6 outline-none duration-300 md:px-8 md:py-8 lg:px-10"
+							className="animate-in fade-in relative mx-auto flex min-h-0 w-full max-w-[1440px] flex-col px-4 py-6 duration-300 outline-none md:px-8 md:py-8 lg:px-10"
 							data-bench-main
 						>
 							<VerifyEmailBanner />
@@ -148,8 +148,7 @@ function useRouteChange() {
 	// The path focus was last handled for; the first load and a repeated effect run do nothing.
 	const handled = useRef(pathname);
 	useEffect(() => {
-		const item = activeNavItem(pathname);
-		document.title = item ? `${t(item.labelKey)} · ${t("app.name")}` : t("app.name");
+		document.title = pageTitle(pathname);
 		if (handled.current === pathname) return;
 		handled.current = pathname;
 		const content = document.querySelector<HTMLElement>("[data-bench-content]");

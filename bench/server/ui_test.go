@@ -54,3 +54,37 @@ func withFixture(m fstest.MapFS) fstest.MapFS {
 	m["fixtures/experiments.list.json"] = &fstest.MapFile{Data: []byte(`{"experiments":[{"id":"e_synthetic-codewins"}]}`)}
 	return m
 }
+
+// TestShareLinkWithDotServesApp checks that a client-side route whose last
+// segment contains a dot (a share token such as org_a.shr_b) gets the app
+// shell, while a missing asset file still answers 404.
+func TestShareLinkWithDotServesApp(t *testing.T) {
+	tests := []struct {
+		path     string
+		status   int
+		contains string
+	}{
+		{"/s/org_a.shr_b", 200, "<title>bench</title>"},
+		{"/s/org_x.shr_y/", 200, "<title>bench</title>"},
+		{"/assets/missing.js", 404, "not found"},
+		{"/assets/org_a.shr_b", 404, "not found"},
+		{"/missing.css", 404, "not found"},
+		{"/favicon.ico", 404, "not found"},
+		{"/robots.txt", 404, "not found"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			r := router.New()
+			NewUIHandler(schemas.ModeLive, testUI()).RegisterRoutes(r)
+			ctx := &fasthttp.RequestCtx{}
+			ctx.Request.SetRequestURI(tt.path)
+			r.Handler(ctx)
+			if ctx.Response.StatusCode() != tt.status {
+				t.Fatalf("status = %d, want %d: %s", ctx.Response.StatusCode(), tt.status, ctx.Response.Body())
+			}
+			if !strings.Contains(string(ctx.Response.Body()), tt.contains) {
+				t.Errorf("body %q lacks %q", ctx.Response.Body(), tt.contains)
+			}
+		})
+	}
+}

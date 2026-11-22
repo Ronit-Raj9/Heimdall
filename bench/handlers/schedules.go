@@ -220,7 +220,7 @@ func (h *schedulesHandler) get(ctx *fasthttp.RequestCtx) {
 		if i >= len(f.Schedules) {
 			row.Source = "canary"
 		}
-		if c, err := schedule.ParseCron(s.Cron); err == nil {
+		if c, err := schedule.ParseCron(s.Cron); err == nil && !s.Paused { // a paused row has no next run
 			if loc, err := s.Location(); err == nil {
 				if n := c.Next(now.In(loc)); !n.IsZero() {
 					row.Next = n.Format(time.RFC3339)

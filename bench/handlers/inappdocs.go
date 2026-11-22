@@ -7,8 +7,10 @@ import (
 
 	"github.com/fasthttp/router"
 	benchdocs "github.com/maximhq/bifrost/bench/docs"
+	"github.com/maximhq/bifrost/bench/examples"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/spec"
 	"github.com/valyala/fasthttp"
 )
 
@@ -59,13 +61,54 @@ func getDoc(ctx *fasthttp.RequestCtx, mode schemas.Mode) {
 			"doc name must be letters, digits, '-', '_' or '.', for example quickstart")
 		return
 	}
-	data, ok := benchdocs.Read(name)
+	data, ok := readGuide(name, false)
 	if !ok {
 		lib.SendError(ctx, mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound,
 			"no guide named "+name+": GET /api/bench/docs lists them")
 		return
 	}
 	lib.SendJSON(ctx, mode, fasthttp.StatusOK, DocBody{Name: name, Title: docTitle(name, data), Markdown: string(data)})
+}
+
+// readGuide returns one guide's markdown: an embedded docs/*.md guide (only
+// the public ones when public is set), or one of the extra guides built from
+// files the guides link to outside the docs folder (extraGuide).
+func readGuide(name string, public bool) ([]byte, bool) {
+	if public {
+		if data, ok := benchdocs.ReadPublic(name); ok {
+			return data, true
+		}
+	} else if data, ok := benchdocs.Read(name); ok {
+		return data, true
+	}
+	return extraGuide(name)
+}
+
+// extraGuide serves, by name, the files the guides link to with a path
+// outside the docs folder ("../spec/agent-event.schema.json",
+// "../examples/acme-node/README.md"), which the server has no route for. They
+// are readable in the app and on the public site but not listed.
+func extraGuide(name string) ([]byte, bool) {
+	switch name {
+	case "agent-event-schema":
+		schema, err := spec.FS.ReadFile("agent-event.schema.json")
+		if err != nil {
+			return nil, false
+		}
+		var b strings.Builder
+		b.WriteString("# Agent event schema\n\n")
+		b.WriteString("The JSON Schema of one agent event, the object an agent reports about one of its own steps (see [Agent events](agent-events.md)).\n\n")
+		b.WriteString("```json\n")
+		b.Write(bytes.TrimRight(schema, "\n"))
+		b.WriteString("\n```\n")
+		return []byte(b.String()), true
+	case "example-acme-node":
+		if len(examples.AcmeNodeREADME) == 0 {
+			return nil, false
+		}
+		return examples.AcmeNodeREADME, true
+	}
+	return nil, false
 }
 
 // validDocName accepts plain file stems only: no separators, no "..", at most 100 bytes.

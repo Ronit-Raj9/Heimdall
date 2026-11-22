@@ -19,6 +19,7 @@ import {
 	TrendingUp,
 	type LucideIcon,
 } from "lucide-react";
+import i18n from "@/lib/i18n";
 
 export type BenchNavGroupId = "home" | "agents" | "test" | "tasks" | "watch" | "release" | "settings";
 
@@ -123,7 +124,13 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 		id: "tasks",
 		labelKey: "shell.groups.tasks",
 		items: [
-			{ to: "/suites", labelKey: "shell.nav.suites", icon: Boxes, testId: "nav-link-suites", also: ["/catalog", "/imports", "/calibration"] },
+			{
+				to: "/suites",
+				labelKey: "shell.nav.suites",
+				icon: Boxes,
+				testId: "nav-link-suites",
+				also: ["/catalog", "/imports", "/calibration"],
+			},
 			{ to: "/annotation", labelKey: "shell.nav.labelling", icon: Tags, testId: "nav-link-labelling" },
 		],
 	},
@@ -131,15 +138,29 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 		id: "watch",
 		labelKey: "shell.groups.watch",
 		items: [
-			{ to: "/why-agents-fail", labelKey: "shell.nav.whyAgentsFail", icon: SearchX, testId: "nav-link-why-agents-fail", also: ["/inbox", "/clusters", "/triage", "/maxim"] },
-			{ to: "/scheduled-checks", labelKey: "shell.nav.scheduledChecks", icon: CalendarClock, testId: "nav-link-scheduled-checks", also: ["/canaries", "/schedules"] },
+			{
+				to: "/why-agents-fail",
+				labelKey: "shell.nav.whyAgentsFail",
+				icon: SearchX,
+				testId: "nav-link-why-agents-fail",
+				also: ["/inbox", "/clusters", "/triage", "/maxim"],
+			},
+			{
+				to: "/scheduled-checks",
+				labelKey: "shell.nav.scheduledChecks",
+				icon: CalendarClock,
+				testId: "nav-link-scheduled-checks",
+				also: ["/canaries", "/schedules"],
+			},
 			{ to: "/live", labelKey: "shell.nav.live", icon: Radio, testId: "nav-link-live" },
 		],
 	},
 	{
 		id: "release",
 		labelKey: "shell.groups.release",
-		items: [{ to: "/releases", labelKey: "shell.nav.releases", icon: PackageCheck, testId: "nav-link-releases", also: ["/review", "/policies"] }],
+		items: [
+			{ to: "/releases", labelKey: "shell.nav.releases", icon: PackageCheck, testId: "nav-link-releases", also: ["/review", "/policies"] },
+		],
 	},
 	{
 		id: "settings",
@@ -193,4 +214,22 @@ export function activeNavGroup(pathname: string): BenchNavGroupId | null {
 	const item = activeNavItem(pathname);
 	if (!item) return null;
 	return BENCH_NAV_GROUPS.find((group) => group.items.includes(item))?.id ?? null;
+}
+
+/**
+ * Pages that have their own browser tab title although the sidebar highlights another entry for
+ * them (through `also`): path to its fw23 locale key.
+ */
+const PAGE_TITLES: Readonly<Record<string, "titles.maxim">> = {
+	"/maxim": "titles.maxim",
+};
+
+/** The browser tab title for a path: the page's own title, else its nav entry's label, then the app name. */
+export function pageTitle(pathname: string): string {
+	const app = i18n.t("app.name", { ns: "bench" });
+	const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+	const own = PAGE_TITLES[path];
+	if (own) return `${i18n.t(own, { ns: "fw23" })} · ${app}`;
+	const item = activeNavItem(pathname);
+	return item ? `${i18n.t(item.labelKey, { ns: "bench" })} · ${app}` : app;
 }

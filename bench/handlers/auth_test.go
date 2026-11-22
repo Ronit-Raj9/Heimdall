@@ -153,9 +153,13 @@ func TestAuthHostedFlow(t *testing.T) {
 	if c := s.do(t, req{method: "GET", path: handlers.AuthPrefix + "/config"}); !decode[auth.AuthInfo](t, c).Bootstrap {
 		t.Fatalf("config = %s", c.Response.Body())
 	}
-	// Anonymous me is 401.
-	if c := s.do(t, req{method: "GET", path: handlers.AuthPrefix + "/me"}); c.Response.StatusCode() != 401 {
-		t.Fatalf("anonymous me = %d", c.Response.StatusCode())
+	// A visitor with no credential gets 200 and an anonymous me (G1.console);
+	// a stale session cookie still gets 401.
+	if c := s.do(t, req{method: "GET", path: handlers.AuthPrefix + "/me"}); c.Response.StatusCode() != 200 || decode[auth.Me](t, c).Kind != "anonymous" {
+		t.Fatalf("anonymous me = %d %s", c.Response.StatusCode(), c.Response.Body())
+	}
+	if c := s.do(t, req{method: "GET", path: handlers.AuthPrefix + "/me", cookie: "not-a-session"}); c.Response.StatusCode() != 401 {
+		t.Fatalf("stale cookie me = %d %s", c.Response.StatusCode(), c.Response.Body())
 	}
 	// Bootstrap signup.
 	sc := s.do(t, req{method: "POST", path: handlers.AuthPrefix + "/signup", origin: publicURL,

@@ -1,6 +1,8 @@
 import { mutation, okQuery, render } from "@/lib/testing/render";
 import type { McpReport } from "@/lib/types/mcptest";
 import { scoreBand, serverIdFrom } from "@/lib/types/mcptest";
+import { hostedSession } from "@/lib/testing/platformFixtures";
+import { skipToken } from "@reduxjs/toolkit/query";
 import { describe, expect, it, vi } from "vitest";
 import { defaultServerId, EMPTY_FORM, McpReportView, McpTestView, requestFromForm } from "./mcpTestView";
 
@@ -8,8 +10,12 @@ vi.mock("@/lib/store/apis/mcpTestApi", () => ({
 	useInspectMcpServerMutation: () => mutation(),
 	useDraftMcpBenchmarkMutation: () => mutation(),
 }));
+const secretsQuery = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/store/apis/secretsApi", () => ({
-	useListSecretsQuery: () => okQuery({ secrets: [{ id: "k1", name: "SHOP_MCP_TOKEN", created_at: "", updated_at: "" }] }),
+	useListSecretsQuery: (arg: unknown) => {
+		secretsQuery(arg);
+		return okQuery({ secrets: [{ id: "k1", name: "SHOP_MCP_TOKEN", created_at: "", updated_at: "" }] });
+	},
 }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
@@ -115,5 +121,24 @@ describe("McpTestView", () => {
 		expect(html).toContain("Test my MCP server");
 		expect(html).toContain("SHOP_MCP_TOKEN");
 		expect(html).toContain('data-testid="mcp-inspect"');
+	});
+});
+// J9.secrets: viewers get no list of the organization's secret names.
+describe("MCP test credential field", () => {
+	it("does not ask for the secret names for a viewer and offers a free-text field", () => {
+		secretsQuery.mockClear();
+		const html = render(<McpTestView />, hostedSession("viewer"));
+		expect(secretsQuery).toHaveBeenCalledWith(skipToken);
+		expect(html).not.toContain("SHOP_MCP_TOKEN");
+		expect(html).toContain('data-testid="mcp-secret-name"');
+		expect(html).toContain("Secret name");
+		expect(html).not.toContain('data-testid="mcp-secret"');
+	});
+	it("lists the secret names for a member", () => {
+		secretsQuery.mockClear();
+		const html = render(<McpTestView />, hostedSession("member"));
+		expect(secretsQuery).not.toHaveBeenCalledWith(skipToken);
+		expect(html).toContain("SHOP_MCP_TOKEN");
+		expect(html).toContain('data-testid="mcp-secret"');
 	});
 });

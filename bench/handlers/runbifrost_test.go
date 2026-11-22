@@ -119,3 +119,32 @@ func TestLoadRunBifrostOrgChecksLiveUsage(t *testing.T) {
 		t.Fatalf("sealed file should be used: %+v", out)
 	}
 }
+
+func TestLoadRunBifrostFaultPath(t *testing.T) {
+	idx := routingIndex()
+	// No fault applied: no path.
+	if out, err := LoadRunBifrost(idx, "r_b", ""); err != nil || out.FaultPath != "" {
+		t.Fatalf("clean run fault path = %q (%v), want empty", out.FaultPath, err)
+	}
+	// A run file that holds the plugin's fault row: the run's recorded path wins.
+	idx.files["r_b"][FileGatewayUsage] = []byte(`[{"request_id":"f","fault":"inject 503"}]`)
+	for i := range idx.runs {
+		if idx.runs[i].Run.RunID == "r_b" {
+			idx.runs[i].Run.Gateway.FaultPath = "plugin"
+		}
+	}
+	out, err := LoadRunBifrost(idx, "r_b", "")
+	if err != nil || out.Faults != 1 || out.FaultPath != "plugin" {
+		t.Fatalf("plugin run = %+v (%v), want fault path plugin", out, err)
+	}
+	// Faults with no recorded path: the default proxy mode applied them.
+	for i := range idx.runs {
+		if idx.runs[i].Run.RunID == "r_b" {
+			idx.runs[i].Run.Gateway.FaultPath = ""
+		}
+	}
+	out, err = LoadRunBifrost(idx, "r_b", "")
+	if err != nil || out.FaultPath != "proxy" {
+		t.Fatalf("proxy-mode run fault path = %q (%v), want proxy", out.FaultPath, err)
+	}
+}

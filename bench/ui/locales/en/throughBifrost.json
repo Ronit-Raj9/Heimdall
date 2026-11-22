@@ -21,6 +21,11 @@
 		"cost": "Cost",
 		"latency": "Average time per call"
 	},
+	"faultPath": {
+		"plugin": "{{n}} (inside Bifrost, by the Heimdall plugin)",
+		"proxy": "{{n}} (by the fault proxy behind Bifrost)",
+		"mixed": "{{n}} (some by the plugin, some by the proxy)"
+	},
 	"costUnknown": "not reported",
 	"costPartial": "{{known}} of {{calls}} calls reported a cost",
 	"col": {

@@ -150,3 +150,46 @@ func TestInAppDocsHideInternalNotes(t *testing.T) {
 		}
 	}
 }
+
+// TestExtraDocsServed covers G3: the guides link to the agent event schema
+// and the acme-node example with paths the server does not serve, so both
+// are served as in-app guides by name (in the app and on the public site),
+// without being added to the guide list.
+func TestExtraDocsServed(t *testing.T) {
+	want := map[string][]string{
+		"agent-event-schema": {"# Agent event schema", "```json", `"$schema"`},
+		"example-acme-node":  {"# Acme example project", "acme-orders"},
+	}
+	public := NewPublicSiteHandler(PublicSiteConfig{Mode: schemas.ModeLive})
+	for name, parts := range want {
+		for _, serve := range []struct {
+			where string
+			fn    func(*fasthttp.RequestCtx)
+		}{
+			{"app", func(ctx *fasthttp.RequestCtx) { getDoc(ctx, schemas.ModeLive) }},
+			{"public", public.doc},
+		} {
+			ctx := docCtx(name)
+			serve.fn(ctx)
+			if ctx.Response.StatusCode() != 200 {
+				t.Fatalf("%s %s: status %d %s", serve.where, name, ctx.Response.StatusCode(), ctx.Response.Body())
+			}
+			var out DocBody
+			if err := json.Unmarshal(ctx.Response.Body(), &out); err != nil || out.Name != name || out.Title == name {
+				t.Fatalf("%s %s: body %+v %v", serve.where, name, out.Name, err)
+			}
+			for _, p := range parts {
+				if !strings.Contains(out.Markdown, p) {
+					t.Errorf("%s %s: markdown lacks %q", serve.where, name, p)
+				}
+			}
+		}
+	}
+	ctx := &fasthttp.RequestCtx{}
+	listDocs(ctx, schemas.ModeLive)
+	for name := range want {
+		if strings.Contains(string(ctx.Response.Body()), `"`+name+`"`) {
+			t.Errorf("guide list includes extra %s", name)
+		}
+	}
+}

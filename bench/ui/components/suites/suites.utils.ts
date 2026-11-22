@@ -6,7 +6,9 @@ import type {
 	SuiteProbe,
 	SuiteSummary,
 	SuiteTask,
+	Track,
 } from "@/lib/types/bench";
+import { isBuiltinSuite, suiteDisplayCategory, suiteDisplayDescription, suiteDisplayName } from "./suiteDisplay";
 
 // Pure helpers of the suites screen: admission state, filters, sorting, coverage and grouping.
 // Everything here is testable without a browser.
@@ -272,4 +274,60 @@ export function formatBytes(bytes: number, locale: string): string {
 		unit++;
 	}
 	return `${value.toLocaleString(locale, { maximumFractionDigits: 1 })} ${units[unit]}`;
+}
+/** Capability groups of the My benchmarks category filter, in display order. */
+export const SUITE_CATEGORIES = ["terminal", "coding", "support", "research", "memory", "safety", "team", "voice", "other"] as const;
+
+export type SuiteCategory = (typeof SUITE_CATEGORIES)[number];
+
+const TRACK_CATEGORY: Partial<Record<Track, SuiteCategory>> = {
+	terminal: "terminal",
+	skills: "terminal",
+	coding: "coding",
+	artifact: "coding",
+	tool_use: "support",
+	mcp: "support",
+	support: "support",
+	qa: "research",
+	browser: "research",
+	computer_use: "research",
+	memory: "memory",
+	safety: "safety",
+};
+
+type CategoryFields = Pick<SuiteSummary, "id"> & { track?: Track };
+
+/** The capability group a benchmark is filtered under: its curated category, then its track, else "other". */
+export function suiteCategory(suite: CategoryFields): SuiteCategory {
+	const curated = suiteDisplayCategory(suite.id);
+	if (curated && (SUITE_CATEGORIES as readonly string[]).includes(curated)) return curated as SuiteCategory;
+	return (suite.track && TRACK_CATEGORY[suite.track]) || "other";
+}
+
+/** Where a benchmark came from: the built-in library, or added by the team. */
+export type SuiteSourceFilter = "all" | "builtin" | "team";
+
+export interface SuiteFilters {
+	/** Free text matched against the id, the display name and the description. */
+	query: string;
+	/** A SuiteCategory, or null for every category. */
+	category: SuiteCategory | null;
+	source: SuiteSourceFilter;
+}
+
+export const EMPTY_SUITE_FILTERS: SuiteFilters = { query: "", category: null, source: "all" };
+
+type FilterFields = CategoryFields & Pick<SuiteSummary, "description" | "builtin" | "source">;
+
+/** The benchmarks of the My benchmarks list that match the search and filters, in their given order. */
+export function filterSuites<T extends FilterFields>(suites: readonly T[], filters: SuiteFilters): T[] {
+	const q = filters.query.trim().toLowerCase();
+	return suites.filter((s) => {
+		if (filters.source === "builtin" && !isBuiltinSuite(s)) return false;
+		if (filters.source === "team" && isBuiltinSuite(s)) return false;
+		if (filters.category && suiteCategory(s) !== filters.category) return false;
+		if (!q) return true;
+		const hay = [s.id, suiteDisplayName(s.id, s), s.description ?? "", suiteDisplayDescription(s)].join(" ").toLowerCase();
+		return hay.includes(q);
+	});
 }

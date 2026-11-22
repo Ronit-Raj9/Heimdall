@@ -2,3 +2,4 @@
 # W5 drift canary (handlers/canary.go, bench/canary, docs/drift-canary.md). Change with bench.ts.
 cron
 timezone?
+paused?

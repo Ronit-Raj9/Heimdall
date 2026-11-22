@@ -33,6 +33,7 @@ type Summary struct {
 	Baseline      *Baseline `json:"baseline"`  // current baseline; null before the first
 	LastLook      *Record   `json:"last_look"` // newest record, without its run detail; null before the first
 	Looks         int       `json:"looks"`     // records since the current baseline
+	Paused        bool      `json:"paused,omitempty"`
 }
 
 // List is GET /api/bench/canaries.
@@ -85,7 +86,8 @@ func Summarize(root string, d *Definition, now time.Time) (Summary, []Record, []
 	}
 	if d.Schedule != nil {
 		s.Cron = d.Schedule.Cron
-		if c, err := schedule.ParseCron(d.Schedule.Cron); err == nil {
+		s.Paused = d.Schedule.Paused
+		if c, err := schedule.ParseCron(d.Schedule.Cron); err == nil && !d.Schedule.Paused {
 			if next := c.Next(now.In(d.Location())); !next.IsZero() {
 				s.Next = next.Format(time.RFC3339)
 			}

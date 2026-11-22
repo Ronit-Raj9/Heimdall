@@ -5,7 +5,20 @@ import { mutation, okQuery, render } from "@/lib/testing/render";
 import type { AnnotationAgreement, AnnotationItem, AnnotationQueue } from "@/lib/types/annotation";
 import { describe, expect, it, vi } from "vitest";
 import { QueueTable, parseLabellers, queueRequest } from "@/app/annotation/views/annotationView";
-import { AgreementPanel, ItemTable, Labeller, QueueScreen, SettingsTab, keyAction } from "./queueView";
+import type { ExperimentStatus } from "@/lib/types/bench";
+import {
+	AddItems,
+	AgreementPanel,
+	ItemTable,
+	Labeller,
+	QueueScreen,
+	SettingsTab,
+	addItemsBody,
+	finishedRunsOf,
+	keyAction,
+} from "./queueView";
+
+const exps = vi.hoisted(() => ({ list: [] as unknown[] }));
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("nuqs", async (importOriginal) => ({
@@ -29,6 +42,7 @@ vi.mock("@/lib/store/apis/annotationApi", () => ({
 vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
 	...(await orig<typeof import("@/lib/store/apis/benchApi")>()),
 	useGetSuitesQuery: () => okQuery({ suites: [] }),
+	useListExperimentsQuery: () => okQuery({ experiments: exps.list }),
 }));
 
 const queue: AnnotationQueue = {
@@ -170,5 +184,60 @@ describe("labelling queues", () => {
 		const ro = render(<SettingsTab queue={{ ...queue, can_manage: false }} />);
 		expect(ro).not.toContain('data-testid="annotation-settings-save"');
 		expect(text(ro)).toContain("Only the queue&#x27;s creator");
+	});
+
+	it("gives a manager of an empty queue a way to add runs, and others who to ask", () => {
+		const empty = { ...queue, counts: { ...queue.counts, total: 0 } };
+		const html = render(<Labeller queue={empty} />);
+		expect(html).toContain('data-testid="annotation-label-add-runs"');
+		expect(html).toContain('href="/annotation/q_1?tab=items"');
+		const other = render(<Labeller queue={{ ...empty, can_manage: false }} />);
+		expect(other).not.toContain('data-testid="annotation-label-add-runs"');
+		expect(text(other)).toContain("Ask the queue&#x27;s owner to add runs.");
+	});
+
+	const exp = (over: Partial<ExperimentStatus>): ExperimentStatus => ({
+		exp_id: "e_1",
+		name: "e_1",
+		state: "done",
+		manifest_hash: "h",
+		frozen_at: "2026-11-20T10:00:00Z",
+		slots: { total: 1, done: 1, running: 0, failed: 0 },
+		spent_usd: 0 as unknown as ExperimentStatus["spent_usd"],
+		suite: "support-faq@1.0.0",
+		...over,
+	});
+
+	it("offers only finished runs of the queue's benchmark, newest first", () => {
+		const list = [
+			exp({ exp_id: "e_old", name: "Old support run", finished_at: "2026-11-18T10:00:00Z" }),
+			exp({ exp_id: "e_new", name: "New support run", finished_at: "2026-11-21T10:00:00Z" }),
+			exp({ exp_id: "e_other", name: "Coding run", suite: "coding-core@1.0.0", finished_at: "2026-11-21T11:00:00Z" }),
+			exp({ exp_id: "e_running", name: "Running support run", state: "running" }),
+		];
+		expect(finishedRunsOf(list, "support-faq").map((e) => e.exp_id)).toEqual(["e_new", "e_old"]);
+		expect(finishedRunsOf(list, "").map((e) => e.exp_id)).toEqual(["e_other", "e_new", "e_old"]);
+		exps.list = list;
+		const html = render(<AddItems queue={queue} />);
+		expect(html).toContain('data-testid="annotation-add-experiment"');
+		expect(html).toContain('value="e_new"');
+		expect(html).toContain('value="e_old"');
+		expect(html).not.toContain('value="e_other"');
+		expect(html).not.toContain('value="e_running"');
+		expect(text(html)).toContain("New support run");
+		expect(html).not.toContain("<input placeholder");
+	});
+
+	it("posts the chosen experiment with the sample size and balance", () => {
+		expect(addItemsBody("q_1", "e_new", 12.7, true)).toEqual({ id: "q_1", experiment: "e_new", sample: 12, stratify: true });
+		expect(addItemsBody("q_1", "e_new", -3, false)).toEqual({ id: "q_1", experiment: "e_new", sample: 0, stratify: false });
+	});
+
+	it("says how to get runs when the benchmark has none", () => {
+		exps.list = [exp({ exp_id: "e_other", suite: "coding-core@1.0.0" })];
+		const html = render(<AddItems queue={queue} />);
+		expect(text(html)).toContain("No finished runs of support-faq yet. Run an evaluation on it first.");
+		expect(html).toContain('href="/evaluate?suite=support-faq"');
+		expect(html).not.toContain('data-testid="annotation-add-experiment"');
 	});
 });

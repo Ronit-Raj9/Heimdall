@@ -66,7 +66,7 @@ export default function SuiteView({ suiteId }: { suiteId: string }) {
     null;
   const crumbs = [
     { label: t("suites.title"), to: "/suites" },
-    { label: suiteDisplayName(suiteIdOf(suiteId)) },
+    { label: suiteDisplayName(suiteIdOf(suiteId), suite ?? undefined) },
   ];
 
   if (query.isLoading) {
@@ -148,6 +148,7 @@ function SuiteBody({
   const judged = suiteGrading(suite) === "judged";
   const builtin = isBuiltinSuite(suite);
   const tasks = suite.tasks.length;
+  const definedTiers = (suite.tiers ?? []).filter((tier) => tier.defined).length;
   const tabs: RouteTab[] = [
     { id: "tasks", label: tu("tabs.tasks"), badge: tasks },
     { id: "build", label: tb("tab"), hidden: builtin }, // X13: grader, add tasks, held out, readiness
@@ -156,11 +157,12 @@ function SuiteBody({
     { id: "review", label: ta("tab"), hidden: builtin }, // Z19: draft with a model, review generated tasks, quality checks, held out
     { id: "settings", label: tu("tabs.settings") },
     { id: "health", label: tu("tabs.health") },
+    // C2.levels: the implicit nightly level (defined false) is not a difficulty level the suite set.
     {
       id: "tiers",
       label: tu("tabs.tiers"),
-      hidden: !suite.tiers?.length,
-      badge: suite.tiers?.length || undefined,
+      hidden: definedTiers === 0,
+      badge: definedTiers || undefined,
     },
     { id: "calibration", label: tu("tabs.calibration"), hidden: !judged },
     { id: "ops", label: tu("tabs.ops") },
@@ -178,7 +180,7 @@ function SuiteBody({
         title={
           <span className="flex min-w-0 flex-col gap-0.5">
             <span className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">
-              {suiteDisplayName(suite.id)}
+              {suiteDisplayName(suite.id, suite)}
             </span>
             <span className="text-muted-foreground truncate font-mono text-xs font-normal">
               {suite.id}
@@ -304,7 +306,7 @@ function SuiteBody({
         <BrokenSuite suite={suite} />
       ) : (
         <>
-          {builtin && <BuiltinReadOnlyNote />}
+          {builtin && <BuiltinReadOnlyNote makeOwn />}
           {builtin && <SuiteReferenceScores suiteId={suite.id} />}
           <SuiteDriftNotice suite={suite} />
           <FingerprintDriftNotice suite={suite} />

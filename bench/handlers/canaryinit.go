@@ -5,6 +5,7 @@ package handlers
 // (canary.baseline, canary.run), queued with POST /jobs.
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -49,33 +50,10 @@ func (h *canaryInitHandler) create(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	d := in.Definition
-	d.Name = strings.TrimSpace(d.Name)
-	if d.Trials == 0 {
-		d.Trials = 1
-	}
-	if !canary.ValidName(d.Name) {
-		lib.SendError(ctx, h.env.Mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest,
-			"name must be lowercase letters, digits, - or _, starting with a letter or digit, at most 48 characters")
+	if !checkCanaryDefinition(ctx, h.env, &d) {
 		return
 	}
 	root := h.env.Cfg.Root
-	if d.Agent != "" {
-		clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(d.Agent)))
-		if filepath.IsAbs(d.Agent) || clean == ".." || strings.HasPrefix(clean, "../") {
-			lib.SendError(ctx, h.env.Mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, "agent must be a path inside the project, e.g. agents/codex.yaml")
-			return
-		}
-		d.Agent = clean
-		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(clean))); err != nil {
-			lib.SendError(ctx, h.env.Mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest,
-				"agent "+clean+" not found in the project; create it on the Agents page first")
-			return
-		}
-	}
-	if err := d.Validate(); err != nil {
-		lib.SendError(ctx, h.env.Mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, err.Error())
-		return
-	}
 	p := canary.Path(root, d.Name)
 	if _, err := os.Stat(p); err == nil && !in.Force {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusConflict, lib.ErrTypeConflict, "canary "+d.Name+" already exists; tick overwrite to replace it")
@@ -93,6 +71,67 @@ func (h *canaryInitHandler) create(ctx *fasthttp.RequestCtx) {
 		Next: "record a baseline (canary.baseline job), then run looks or let the schedule run them"})
 }
 
+// checkCanaryDefinition normalizes and checks a definition from the website
+// (create and edit): the name, the agent file, the benchmark and Validate.
+// It answers 422 and returns false when the definition is refused.
+func checkCanaryDefinition(ctx *fasthttp.RequestCtx, env OrgEnv, d *canary.Definition) bool {
+	d.Name = strings.TrimSpace(d.Name)
+	if d.Trials == 0 {
+		d.Trials = 1
+	}
+	refuse := func(msg string) bool {
+		lib.SendError(ctx, env.Mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, msg)
+		return false
+	}
+	if !canary.ValidName(d.Name) {
+		return refuse("name must be lowercase letters, digits, - or _, starting with a letter or digit, at most 48 characters")
+	}
+	root := env.Cfg.Root
+	if d.Agent != "" {
+		clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(d.Agent)))
+		if filepath.IsAbs(d.Agent) || clean == ".." || strings.HasPrefix(clean, "../") {
+			return refuse("agent must be a path inside the project, e.g. agents/codex.yaml")
+		}
+		d.Agent = clean
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(clean))); err != nil {
+			return refuse("agent " + clean + " not found in the project; create it on the Agents page first")
+		}
+	}
+	d.Suite = strings.TrimSpace(d.Suite)
+	if msg := canaryBenchmarkProblem(ctx, env.Services.Suites, d.Suite); msg != "" {
+		return refuse(msg)
+	}
+	if err := d.Validate(); err != nil {
+		return refuse(err.Error())
+	}
+	return true
+}
+
+// canaryBenchmarkProblem says why a canary's benchmark ref ("id" or
+// "id@version") does not name a benchmark of the org, or "". A path ref, an
+// empty ref (Validate names it) and a server without a suite source are not
+// checked here.
+func canaryBenchmarkProblem(ctx context.Context, src SuiteSource, ref string) string {
+	if src == nil || ref == "" || strings.ContainsAny(ref, `/\`) {
+		return ""
+	}
+	id, version, _ := strings.Cut(ref, "@")
+	s, err := src.LoadSuite(ctx, id)
+	if err != nil || s == nil {
+		return "Benchmark " + ref + " does not exist. Pick one from the Benchmarks page."
+	}
+	if version != "" && s.Version != version {
+		return "Benchmark " + id + " has no version " + version + "."
+	}
+	return ""
+}
+
+// canaryStatePath is one canary's saved state (baselines, check records)
+// under the runs root, as cmd/bifrost-bench keeps it (.canaries/<name>).
+func canaryStatePath(cfg *lib.Config, name string) string {
+	return filepath.Join(cfg.Path(cfg.RunsRoot), ".canaries", name)
+}
+
 func (h *canaryInitHandler) remove(ctx *fasthttp.RequestCtx) {
 	name, _ := ctx.UserValue("name").(string)
 	if !canary.ValidName(name) {
@@ -107,6 +146,14 @@ func (h *canaryInitHandler) remove(ctx *fasthttp.RequestCtx) {
 	if err != nil {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "delete canary: "+err.Error())
 		return
+	}
+	// Its baselines and check records go too, so a monitor created again
+	// with the same name starts clean.
+	if h.env.Cfg.RunsRoot != "" {
+		if err := os.RemoveAll(canaryStatePath(h.env.Cfg, name)); err != nil {
+			lib.SendError(ctx, h.env.Mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "delete canary state: "+err.Error())
+			return
+		}
 	}
 	ctx.SetStatusCode(fasthttp.StatusNoContent)
 }

@@ -24,7 +24,16 @@ const LIBRARY: PublicLibrary = {
 	available: true,
 	totals: { benchmarks: 2, tasks: 30, ready: 25, packs: 1 },
 	benchmarks: [
-		{ id: "sweb", title: "SWE tasks", description: "Fix real bugs.", licenses: ["MIT"], task_count: 20, ready_count: 18, packs: ["coding"], track: "coding" },
+		{
+			id: "sweb",
+			title: "SWE tasks",
+			description: "Fix real bugs.",
+			licenses: ["MIT"],
+			task_count: 20,
+			ready_count: 18,
+			packs: ["coding"],
+			track: "coding",
+		},
 		{ id: "tau", title: "Retail support", description: "Help customers.", licenses: [], task_count: 10, ready_count: 7, packs: [] },
 	],
 	packs: [{ id: "coding", name: "Coding", description: "Coding agents", benchmarks: ["sweb"] }],
@@ -35,7 +44,18 @@ const PRICING: PublicPricing = {
 	beta: true,
 	headline: "Free during beta",
 	note: "Bring your own model key.",
-	plans: [{ id: "beta", name: "Beta", price: "$0", period: "during beta", summary: "Everything", features: ["All benchmarks"], limits: [{ name: "Model spend", value: "Your key" }], cta: "signup" }],
+	plans: [
+		{
+			id: "beta",
+			name: "Beta",
+			price: "$0",
+			period: "during beta",
+			summary: "Everything",
+			features: ["All benchmarks"],
+			limits: [{ name: "Model spend", value: "Your key" }],
+			cta: "signup",
+		},
+	],
 	faq: [{ q: "Why my key?", a: "Spend stays on your bill." }],
 };
 
@@ -63,9 +83,7 @@ vi.mock("@/lib/store/apis/publicSiteApi", () => ({
 	useGetPublicLibraryQuery: () => okQuery(LIBRARY),
 	useGetPublicPricingQuery: () => okQuery(PRICING),
 	useGetPublicDownloadsQuery: () =>
-		fx.downloadsError
-			? errorQuery(500)
-			: okQuery(fx.downloadsEmpty ? { available: false, commit: "", version: "", files: [] } : DOWNLOADS),
+		fx.downloadsError ? errorQuery(500) : okQuery(fx.downloadsEmpty ? { available: false, commit: "", version: "", files: [] } : DOWNLOADS),
 	useListPublicDocsQuery: () => okQuery({ docs: [] }),
 	useGetPublicDocQuery: () => okQuery(undefined),
 }));
@@ -74,12 +92,30 @@ const noDash = (html: string) => expect(html).not.toMatch(/[–—]/);
 
 describe("public pages routing", () => {
 	it("lists exactly the public site and keeps every other page behind sign-in", () => {
-		expect([...PUBLIC_PAGES].sort()).toEqual(["/downloads", "/library", "/pricing", "/privacy", "/security", "/terms"]);
+		expect([...PUBLIC_PAGES].sort()).toEqual(["/downloads", "/library", "/pricing", "/privacy", "/reference", "/security", "/terms"]);
 		expect(isPublicPage("/pricing/")).toBe(true);
 		expect(isPublicPage("/settings")).toBe(false);
 		expect(isVisitorPage("/")).toBe(true);
 		expect(isVisitorPage("/docs")).toBe(true);
 		expect(isVisitorPage("/agents")).toBe(false);
+		// G2.quickstart: the get-started steps are readable before signing in.
+		expect(isVisitorPage("/quickstart")).toBe(true);
+		expect(isVisitorPage("/quickstart/")).toBe(true);
+	});
+
+	it("opens /quickstart for a visitor in the public frame and keeps it in the app for a member (G2)", () => {
+		expect(frameFor(signedOutSession(), "/quickstart")).toBe("public");
+		expect(frameFor(hostedSession("viewer"), "/quickstart")).toBe("app");
+		expect(frameFor(LOCAL_SESSION, "/quickstart")).toBe("app");
+	});
+
+	it("gives the reference board the public frame with the top links, not the bare share frame (G6)", () => {
+		expect(isPublicPage("/reference")).toBe(true);
+		expect(isPublicPage("/reference/")).toBe(true);
+		expect(frameFor(signedOutSession(), "/reference")).toBe("public");
+		expect(frameFor({ ...signedOutSession(), status: "error" }, "/reference")).toBe("public");
+		expect(frameFor(signedOutSession(), "/references")).toBe("login");
+		expect(frameFor(signedOutSession(), "/s/org_a.shr_1.sig")).toBe("share");
 	});
 
 	it("frames the public site for visitors and members alike", () => {

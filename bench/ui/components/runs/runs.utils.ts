@@ -1,4 +1,5 @@
-import type { BenchEvent, GridRow, MetricDescriptor, Outcome, Tokens, Value, ValueKind } from "@/lib/types/bench";
+import type { BenchEvent, GridRow, MetricDescriptor, Outcome, RunTiming, Tokens, Value, ValueKind } from "@/lib/types/bench";
+import { formatDuration } from "./traceView.utils";
 
 /**
  * The per-run metrics shown side by side (DESIGN.md 9.5, 18 screen 2), with the kind used when the catalog has no descriptor.
@@ -191,4 +192,22 @@ export function pairsOfRow(row: GridRow): PairCell[] {
 		byTrial.set(cell.trial, pair);
 	}
 	return [...byTrial.values()].sort((a, b) => a.trial - b.trial);
+}
+
+/** An observed number, else null. */
+function observedNumber(v: Value | undefined): number | null {
+	return v?.state === "observed" && typeof v.v === "number" ? v.v : null;
+}
+
+/** The run's time taken: the observed wall_time_s metric, then the older wall_ms and wall_s names, then the time from start to seal; a dash when none is known. */
+export function wallText(metrics: Record<string, Value>, timing?: Pick<RunTiming, "started" | "sealed">): string {
+	const s = observedNumber(metrics.wall_time_s);
+	const ms = observedNumber(metrics.wall_ms);
+	const old = observedNumber(metrics.wall_s);
+	let total = s !== null ? s * 1000 : ms !== null ? ms : old !== null ? old * 1000 : null;
+	if (total === null && timing?.started && timing.sealed) {
+		const d = new Date(timing.sealed).getTime() - new Date(timing.started).getTime();
+		if (Number.isFinite(d) && d >= 0) total = d;
+	}
+	return total === null ? "-" : formatDuration(total);
 }

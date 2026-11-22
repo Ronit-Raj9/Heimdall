@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/dataset"
 	_ "github.com/maximhq/bifrost/bench/importers/harbor"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
@@ -317,5 +318,54 @@ func TestRemoveTaskIDAndRedact(t *testing.T) {
 	}
 	if got := Redact("mail jo@x.com or +1 415 555 0100, answer 2718281828"); strings.Contains(got, "jo@") || strings.Contains(got, "555") || !strings.Contains(got, "2718281828") {
 		t.Errorf("redact %q", got)
+	}
+}
+
+// Publishing a draft records a dataset version, so the Data tab lists the
+// published tasks as version 1 right away.
+func TestPublishRecordsDatasetVersion(t *testing.T) {
+	env := testEnv(t)
+	ctx := context.Background()
+	in := Input{Data: faqCSV, Name: "faq.csv"}
+	inv, err := Inspect(ctx, env, in, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	set, err := Draft(ctx, env, in, inv.Suggest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Publish(ctx, env, set, PublishOptions{IncludeUnready: true, Actor: "alice"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := dataset.Open(env.Root)
+	vs, err := store.Versions("faq")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(vs) != 1 {
+		t.Fatalf("versions %+v, want 1", vs)
+	}
+	v := vs[0]
+	if v.N != 1 || v.Actor != "alice" || v.Tasks != len(res.Tasks) || len(v.Added) != len(res.Tasks) || !strings.Contains(v.Source, set.ID) {
+		t.Fatalf("version %+v, published %v", v, res.Tasks)
+	}
+	if res.DatasetVersion != 1 {
+		t.Errorf("result dataset version %d, want 1", res.DatasetVersion)
+	}
+	snap, err := store.Snapshot("faq", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range res.Tasks {
+		sha := snap.Tasks[id]
+		row, err := store.Row("faq", sha)
+		if err != nil || row.ID != id {
+			t.Fatalf("row of %s (%q): %+v %v", id, sha, row, err)
+		}
+		if h, _ := row.Metadata["files_sha256"].(string); len(h) != 64 {
+			t.Errorf("row %s has no folder hash: %+v", id, row.Metadata)
+		}
 	}
 }

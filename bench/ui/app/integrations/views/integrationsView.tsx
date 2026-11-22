@@ -1,3 +1,4 @@
+import "@/components/platform/fw23I18n";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { EmptyState } from "@/components/shell/emptyState";
@@ -34,7 +35,7 @@ import { PageHeader } from "@/components/shell/pageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Activity, Code2, Download, Network, FileDown, GitPullRequest, Webhook as WebhookIcon, type LucideIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { EmailPanel } from "./emailPanel";
 import { MaximPanel } from "./maximPanel";
 import { McpInstallPanel } from "@/components/connect/mcpInstall"; // Z02: Add to Cursor / Claude Code
@@ -64,7 +65,8 @@ const HOOK_FORMATS: WebhookFormat[] = ["slack", "teams", "pagerduty", "json"];
 
 /** Events a hook of format f can take (webhooks/format.go EventsFor): PagerDuty pages only on problems. */
 export function eventsFor(f: WebhookFormat): WebhookEventType[] {
-	if (f === "pagerduty") return ["evaluation.regressed", "release.blocked", "schedule.failed", "worker.offline", "job.failed", "monitor.incident"];
+	if (f === "pagerduty")
+		return ["evaluation.regressed", "release.blocked", "schedule.failed", "worker.offline", "job.failed", "monitor.incident"];
 	return EVENTS;
 }
 
@@ -75,18 +77,77 @@ export function defaultEventsFor(f: WebhookFormat): WebhookEventType[] {
 	return ["evaluation.finished"];
 }
 
+/**
+ * What is wrong with a web address before it is sent (a fw23 locale key under webhooks), or null.
+ * A hosted server delivers only to https (webhooks.ValidateURL); a local one also takes http.
+ */
+export function webhookUrlProblem(url: string, hosted: boolean): "httpsOnly" | null {
+	const trimmed = url.trim();
+	if (!hosted || trimmed === "") return null;
+	return /^https:\/\//i.test(trimmed) ? null : "httpsOnly";
+}
+
 /** Whether the add form has what a hook of format f needs. */
-export function webhookFormReady(f: WebhookFormat, url: string, routingKey: string, events: readonly WebhookEventType[]): boolean {
+export function webhookFormReady(
+	f: WebhookFormat,
+	url: string,
+	routingKey: string,
+	events: readonly WebhookEventType[],
+	hosted = false,
+): boolean {
 	if (events.length === 0) return false;
 	if (f === "pagerduty") return /^[A-Za-z0-9]{20,64}$/.test(routingKey.trim());
-	return url.trim() !== "";
+	return url.trim() !== "" && webhookUrlProblem(url, hosted) === null;
+}
+
+/** The web address field of the add form, with the address check right under it. */
+export function WebhookUrlField({
+	format,
+	url,
+	hosted,
+	onChange,
+}: {
+	format: WebhookFormat;
+	url: string;
+	hosted: boolean;
+	onChange(url: string): void;
+}) {
+	const { t } = useTranslation("integrations");
+	const { t: tf } = useTranslation("fw23");
+	const problem = webhookUrlProblem(url, hosted);
+	const hintId = useId();
+	return (
+		<div className="flex flex-col gap-1">
+			<Input
+				aria-label={t(`webhooks.urlLabels.${format}`)}
+				placeholder={t(`webhooks.urlPlaceholders.${format}`)}
+				value={url}
+				onChange={(e) => onChange(e.target.value)}
+				aria-invalid={problem !== null}
+				aria-describedby={problem ? hintId : undefined}
+				data-testid="webhook-url"
+			/>
+			{problem && (
+				<p id={hintId} className="text-chart-error-ink text-xs" data-testid="webhook-url-problem">
+					{tf(`webhooks.${problem}`)}
+				</p>
+			)}
+		</div>
+	);
 }
 const selectClass = "border-input bg-background h-9 w-full rounded-md border px-2 text-sm";
 
 /** Integrations (web parity L19): CI workflow (install PR via Settings > GitHub), exports with download, experiment-finished webhooks. */
 type IntegrationTab = "webhooks" | "exports" | "ci" | "maxim" | "ide" | "bifrost";
 
-const TAB_ICONS: Record<IntegrationTab, LucideIcon> = { webhooks: WebhookIcon, exports: FileDown, ci: GitPullRequest, maxim: Activity, ide: Code2, bifrost: Network };
+const TAB_ICONS: Record<IntegrationTab, LucideIcon> = {
+	webhooks: WebhookIcon,
+	exports: FileDown,
+	ci: GitPullRequest,
+	maxim: Activity,
+	ide: Code2,
+	bifrost: Network,
+};
 
 type Tone = "ok" | "warn" | "bad" | "idle";
 
@@ -127,7 +188,9 @@ export default function IntegrationsView() {
 			if (!hooks.data) return null;
 			const live = hooks.data.webhooks.filter((h) => h.enabled);
 			if (live.some((h) => h.last_delivery && !h.last_delivery.ok)) return { tone: "bad", label: t("cards.webhooks.failing") };
-			return live.length ? { tone: "ok", label: t("cards.webhooks.count", { count: live.length }) } : { tone: "idle", label: t("cards.webhooks.none") };
+			return live.length
+				? { tone: "ok", label: t("cards.webhooks.count", { count: live.length }) }
+				: { tone: "idle", label: t("cards.webhooks.none") };
 		}
 		if (k === "exports") {
 			if (!exportsList.data) return null;
@@ -174,13 +237,20 @@ export default function IntegrationsView() {
 							data-testid={`integrations-tab-${k}`}
 						>
 							<div className="flex items-center justify-between gap-2">
-								<span className={cn("flex size-9 items-center justify-center rounded-lg", active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+								<span
+									className={cn(
+										"flex size-9 items-center justify-center rounded-lg",
+										active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+									)}
+								>
 									<Icon className="size-4.5" aria-hidden="true" />
 								</span>
 								{st ? <StatusDot tone={st.tone} label={st.label} /> : <Skeleton className="h-5 w-20 rounded-full" />}
 							</div>
 							<div className="flex flex-col gap-0.5">
-								<span className="text-base font-semibold">{k === "ide" ? tc("ide.tab") : k === "maxim" ? tt("maxim.tab") : k === "bifrost" ? tb("tab") : t(`tabs.${k}`)}</span>
+								<span className="text-base font-semibold">
+									{k === "ide" ? tc("ide.tab") : k === "maxim" ? tt("maxim.tab") : k === "bifrost" ? tb("tab") : t(`tabs.${k}`)}
+								</span>
 								<span className="text-muted-foreground line-clamp-2 text-sm">
 									{k === "ide" ? tc("ide.desc") : k === "maxim" ? tt("maxim.desc") : k === "bifrost" ? tb("desc") : t(`cards.${k}.desc`)}
 								</span>
@@ -313,15 +383,18 @@ function WebhooksPanel() {
 						data-testid="webhook-routing-key"
 					/>
 				)}
+				<WebhookUrlField format={format} url={url} hosted={data?.hosted === true} onChange={setUrl} />
 				<Input
-					aria-label={t(`webhooks.urlLabels.${format}`)}
-					placeholder={t(`webhooks.urlPlaceholders.${format}`)}
-					value={url}
-					onChange={(e) => setUrl(e.target.value)}
-					data-testid="webhook-url"
+					aria-label={t("webhooks.description")}
+					placeholder={t("webhooks.description")}
+					value={desc}
+					onChange={(e) => setDesc(e.target.value)}
 				/>
-				<Input aria-label={t("webhooks.description")} placeholder={t("webhooks.description")} value={desc} onChange={(e) => setDesc(e.target.value)} />
-				<Button type="submit" disabled={!webhookFormReady(format, url, routingKey, events) || create.isLoading} data-testid="webhook-add">
+				<Button
+					type="submit"
+					disabled={!webhookFormReady(format, url, routingKey, events, data?.hosted === true) || create.isLoading}
+					data-testid="webhook-add"
+				>
 					{create.isLoading ? t("webhooks.adding") : t("webhooks.add")}
 				</Button>
 				<fieldset className="flex flex-wrap gap-4 text-sm sm:col-span-3">
@@ -338,8 +411,12 @@ function WebhooksPanel() {
 					))}
 				</fieldset>
 			</form>
+			{message && <ErrorNote message={message} testId="webhook-error" />}
 			{secret && (
-				<div className="border-chart-warning/60 bg-chart-warning/10 flex flex-wrap items-center gap-2 rounded-md border p-3 text-sm" data-testid="webhook-secret">
+				<div
+					className="border-chart-warning/60 bg-chart-warning/10 flex flex-wrap items-center gap-2 rounded-md border p-3 text-sm"
+					data-testid="webhook-secret"
+				>
 					<span>{t("webhooks.secretOnce")}</span>
 					<code className="bg-background rounded px-1.5 py-0.5 font-mono text-xs select-all">{secret}</code>
 					<Button size="sm" variant="outline" onClick={() => setSecret(null)}>
@@ -347,7 +424,6 @@ function WebhooksPanel() {
 					</Button>
 				</div>
 			)}
-			{message && <ErrorNote message={message} />}
 			{error ? (
 				<ErrorNote message={apiErrorMessage(error, t("errors.load"))} />
 			) : isLoading ? null : (
@@ -398,7 +474,9 @@ export function WebhookList({ hooks, tests = {}, onTest, onToggle, onDelete }: W
 							<Badge variant="outline" data-testid={`webhook-format-${h.id}`}>
 								{t(`webhooks.formats.${h.format ?? "json"}`)}
 							</Badge>
-							<span className="min-w-0 truncate font-mono text-sm" title={h.url}>{h.url}</span>
+							<span className="min-w-0 truncate font-mono text-sm" title={h.url}>
+								{h.url}
+							</span>
 							<Badge variant={h.enabled ? "success" : "secondary"}>{h.enabled ? t("webhooks.enabled") : t("webhooks.disabled")}</Badge>
 							{last ? (
 								<Badge variant={last.ok ? "success" : "destructive"} title={last.error}>
@@ -426,8 +504,13 @@ export function WebhookList({ hooks, tests = {}, onTest, onToggle, onDelete }: W
 							</Button>
 						</div>
 						{test && (
-							<p className={test.ok ? "text-chart-success-ink text-xs" : "text-chart-error-ink text-xs"} data-testid={`webhook-test-result-${h.id}`}>
-								{test.ok ? t("webhooks.testOk", { code: test.status_code }) : t("webhooks.testFail", { error: test.error ?? `HTTP ${test.status_code}` })}
+							<p
+								className={test.ok ? "text-chart-success-ink text-xs" : "text-chart-error-ink text-xs"}
+								data-testid={`webhook-test-result-${h.id}`}
+							>
+								{test.ok
+									? t("webhooks.testOk", { code: test.status_code })
+									: t("webhooks.testFail", { error: test.error ?? `HTTP ${test.status_code}` })}
 							</p>
 						)}
 					</li>
@@ -533,7 +616,12 @@ export function DeliveryTable({ deliveries, hookUrls = {}, canRetry, queued = {}
 						const state = deliveryState(d);
 						const url = hookUrls[d.hook_id];
 						return (
-							<tr key={d.id} className="border-border hover:bg-muted/30 border-t transition-colors" data-testid={`delivery-${d.id}`} data-state={state}>
+							<tr
+								key={d.id}
+								className="border-border hover:bg-muted/30 border-t transition-colors"
+								data-testid={`delivery-${d.id}`}
+								data-state={state}
+							>
 								<td className="text-muted-foreground px-3 py-2 text-xs whitespace-nowrap">{when(d.at)}</td>
 								<td className="px-3 text-xs whitespace-nowrap">{d.event}</td>
 								<td className="max-w-[14rem] truncate px-3 font-mono text-xs" title={url ?? d.hook_id}>
@@ -544,13 +632,21 @@ export function DeliveryTable({ deliveries, hookUrls = {}, canRetry, queued = {}
 								</td>
 								<td className="px-3 text-right tabular-nums">{d.status_code ?? ""}</td>
 								<td className="px-3 text-right tabular-nums">{d.attempts}</td>
-								<td className="text-muted-foreground px-3 text-xs whitespace-nowrap">{state === "retrying" ? when(d.next_attempt_at) : ""}</td>
+								<td className="text-muted-foreground px-3 text-xs whitespace-nowrap">
+									{state === "retrying" ? when(d.next_attempt_at) : ""}
+								</td>
 								<td className="text-chart-error-ink max-w-[16rem] truncate px-3 text-xs" title={d.error}>
 									{d.error ?? ""}
 								</td>
 								<td className="px-3 py-1.5 text-right">
 									{state === "failed" && canRetry && (
-										<Button size="sm" variant="outline" disabled={queued[d.id]} onClick={() => onRetry(d.id)} data-testid={`delivery-retry-${d.id}`}>
+										<Button
+											size="sm"
+											variant="outline"
+											disabled={queued[d.id]}
+											onClick={() => onRetry(d.id)}
+											data-testid={`delivery-retry-${d.id}`}
+										>
 											{queued[d.id] ? t("deliveryLog.retrying") : t("deliveryLog.retry")}
 										</Button>
 									)}
@@ -568,7 +664,13 @@ export function DeliveryTable({ deliveries, hookUrls = {}, canRetry, queued = {}
 // Exports
 
 /** The job params of an export form, or null while it is incomplete. */
-export function exportParams(format: IntegrationExportFormat, expId: string, suite: string, payloads: boolean, allowSynthetic: boolean): IntegrationsExportParams | null {
+export function exportParams(
+	format: IntegrationExportFormat,
+	expId: string,
+	suite: string,
+	payloads: boolean,
+	allowSynthetic: boolean,
+): IntegrationsExportParams | null {
 	if (format === "harbor") return suite ? { format, suite } : null;
 	if (!expId) return null;
 	const p: IntegrationsExportParams = { format, exp_id: expId };
@@ -599,7 +701,12 @@ function ExportsPanel() {
 				<div className="grid gap-3 sm:grid-cols-2">
 					<label className="flex flex-col gap-1 text-sm">
 						{t("exports.format")}
-						<select className={selectClass} value={format} onChange={(e) => setFormat(e.target.value as IntegrationExportFormat)} data-testid="export-format">
+						<select
+							className={selectClass}
+							value={format}
+							onChange={(e) => setFormat(e.target.value as IntegrationExportFormat)}
+							data-testid="export-format"
+						>
 							{FORMATS.map((f) => (
 								<option key={f} value={f}>
 									{t(`exports.formats.${f}`)}
@@ -646,7 +753,12 @@ function ExportsPanel() {
 					</label>
 				)}
 				{format !== "harbor" && !exps.isLoading && experiments.length === 0 && (
-					<EmptyState compact message={t("exports.noExperiments")} action={{ label: t("exports.experiment"), to: "/experiments" }} testId="exports-no-experiments" />
+					<EmptyState
+						compact
+						message={t("exports.noExperiments")}
+						action={{ label: t("exports.experiment"), to: "/experiments" }}
+						testId="exports-no-experiments"
+					/>
 				)}
 				<div>
 					{params ? (
@@ -689,40 +801,42 @@ export function ExportTable({ exports, onDelete }: { exports: IntegrationExport[
 	if (exports.length === 0) return <EmptyState compact message={t("exports.empty")} testId="exports-empty" />;
 	return (
 		<div className="overflow-x-auto rounded-lg border">
-		<table className="w-full text-sm" data-testid="export-table">
-			<thead className="bg-muted/50 text-muted-foreground text-left text-xs">
-				<tr>
-					<th className="px-3 py-2 font-medium">{t("exports.name")}</th>
-					<th className="px-3 font-medium">{t("exports.format")}</th>
-					<th className="px-3 text-right font-medium">{t("exports.size")}</th>
-					<th className="px-3 font-medium">{t("exports.created")}</th>
-					<th />
-				</tr>
-			</thead>
-			<tbody>
-				{exports.map((x) => (
-					<tr key={x.name} className="border-border hover:bg-muted/30 border-t transition-colors">
-						<td className="max-w-[16rem] truncate px-3 py-2 font-mono text-xs" title={x.name}>{x.name}</td>
-						<td className="px-3">
-							<Badge variant="outline">{x.format}</Badge>
-						</td>
-						<td className="px-3 text-right tabular-nums">{formatBytes(x.size)}</td>
-						<td className="text-muted-foreground px-3 text-xs whitespace-nowrap">{new Date(x.created_at).toLocaleString()}</td>
-						<td className="flex justify-end gap-1 px-3 py-1.5">
-							<Button asChild size="sm" variant="outline">
-								<a href={exportDownloadUrl(x.name)} download={x.name} data-testid={`export-download-${x.name}`}>
-									<Download className="size-4" aria-hidden="true" />
-									{t("exports.download")}
-								</a>
-							</Button>
-							<Button size="sm" variant="ghost" onClick={() => onDelete(x.name)}>
-								{t("exports.delete")}
-							</Button>
-						</td>
+			<table className="w-full text-sm" data-testid="export-table">
+				<thead className="bg-muted/50 text-muted-foreground text-left text-xs">
+					<tr>
+						<th className="px-3 py-2 font-medium">{t("exports.name")}</th>
+						<th className="px-3 font-medium">{t("exports.format")}</th>
+						<th className="px-3 text-right font-medium">{t("exports.size")}</th>
+						<th className="px-3 font-medium">{t("exports.created")}</th>
+						<th />
 					</tr>
-				))}
-			</tbody>
-		</table>
+				</thead>
+				<tbody>
+					{exports.map((x) => (
+						<tr key={x.name} className="border-border hover:bg-muted/30 border-t transition-colors">
+							<td className="max-w-[16rem] truncate px-3 py-2 font-mono text-xs" title={x.name}>
+								{x.name}
+							</td>
+							<td className="px-3">
+								<Badge variant="outline">{x.format}</Badge>
+							</td>
+							<td className="px-3 text-right tabular-nums">{formatBytes(x.size)}</td>
+							<td className="text-muted-foreground px-3 text-xs whitespace-nowrap">{new Date(x.created_at).toLocaleString()}</td>
+							<td className="flex justify-end gap-1 px-3 py-1.5">
+								<Button asChild size="sm" variant="outline">
+									<a href={exportDownloadUrl(x.name)} download={x.name} data-testid={`export-download-${x.name}`}>
+										<Download className="size-4" aria-hidden="true" />
+										{t("exports.download")}
+									</a>
+								</Button>
+								<Button size="sm" variant="ghost" onClick={() => onDelete(x.name)}>
+									{t("exports.delete")}
+								</Button>
+							</td>
+						</tr>
+					))}
+				</tbody>
+			</table>
 		</div>
 	);
 }
@@ -742,7 +856,11 @@ export function ciNextStep(st: GithubStatus | undefined, failed: boolean): "inst
 export function CIInstallLink({ step }: { step: "install" | "connect" | "manual" }) {
 	const { t } = useTranslation("integrations");
 	if (step === "manual") {
-		return <p className="text-muted-foreground text-sm" data-testid="ci-manual">{t("ci.manual")}</p>;
+		return (
+			<p className="text-muted-foreground text-sm" data-testid="ci-manual">
+				{t("ci.manual")}
+			</p>
+		);
 	}
 	return (
 		<EmptyState
@@ -761,7 +879,10 @@ function CIPanel() {
 	const [mode, setMode] = useState<"recorded" | "live">("recorded");
 	const [agent, setAgent] = useState("");
 	const [copied, setCopied] = useState(false);
-	const preview = useGetCIWorkflowQuery({ mode, agent: mode === "live" ? agent || undefined : undefined }, { skip: mode === "live" && !agent });
+	const preview = useGetCIWorkflowQuery(
+		{ mode, agent: mode === "live" ? agent || undefined : undefined },
+		{ skip: mode === "live" && !agent },
+	);
 
 	return (
 		<Section title={t("ci.heading")} intro={t("ci.intro")}>
@@ -769,7 +890,12 @@ function CIPanel() {
 			<div className="grid gap-3 sm:grid-cols-3">
 				<label className="flex flex-col gap-1 text-sm">
 					{t("ci.mode")}
-					<select className={selectClass} value={mode} onChange={(e) => setMode(e.target.value as "recorded" | "live")} data-testid="ci-mode">
+					<select
+						className={selectClass}
+						value={mode}
+						onChange={(e) => setMode(e.target.value as "recorded" | "live")}
+						data-testid="ci-mode"
+					>
 						<option value="recorded">{t("ci.modeRecorded")}</option>
 						<option value="live">{t("ci.modeLive")}</option>
 					</select>

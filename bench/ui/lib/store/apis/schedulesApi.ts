@@ -1,3 +1,4 @@
+import type { CanaryDefinition } from "@/lib/types/bench";
 import type {
 	CanaryInitRequest,
 	CanaryInitResponse,
@@ -6,6 +7,7 @@ import type {
 	SchedulesResponse,
 	TestAlertRequest,
 	TestAlertResponse,
+	Schedule,
 } from "@/lib/types/schedules";
 import { benchApi } from "./benchApi";
 
@@ -30,13 +32,27 @@ export const schedulesApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchSche
 			query: (name) => ({ url: `/schedules/${encodeURIComponent(name)}/run`, method: "POST" }),
 			invalidatesTags: ["BenchSchedules"],
 		}),
+		// Create, edit and delete also drop the cached detail of that name, so a drift monitor deleted
+		// and created again shows its new definition at once.
 		createCanary: builder.mutation<CanaryInitResponse, CanaryInitRequest>({
 			query: (body) => ({ url: "/canaries", method: "POST", body }),
-			invalidatesTags: [{ type: "BenchCanary", id: "LIST" }, "BenchSchedules"],
+			invalidatesTags: (_r, _e, body) => canaryTags(body.name),
+		}),
+		editCanary: builder.mutation<CanaryDefinition, CanaryInitRequest>({
+			query: (body) => ({ url: `/canaries/${encodeURIComponent(body.name)}`, method: "PUT", body }),
+			invalidatesTags: (_r, _e, body) => canaryTags(body.name),
 		}),
 		deleteCanary: builder.mutation<void, string>({
 			query: (name) => ({ url: `/canaries/${encodeURIComponent(name)}`, method: "DELETE" }),
-			invalidatesTags: [{ type: "BenchCanary", id: "LIST" }, "BenchSchedules"],
+			invalidatesTags: (_r, _e, name) => canaryTags(name),
+		}),
+		setCanaryPaused: builder.mutation<CanaryDefinition, { name: string; paused: boolean }>({
+			query: ({ name, paused }) => ({ url: `/canaries/${encodeURIComponent(name)}/${paused ? "pause" : "resume"}`, method: "POST" }),
+			invalidatesTags: (_r, _e, { name }) => canaryTags(name),
+		}),
+		setSchedulePaused: builder.mutation<Schedule, { name: string; paused: boolean }>({
+			query: ({ name, paused }) => ({ url: `/schedules/${encodeURIComponent(name)}/${paused ? "pause" : "resume"}`, method: "POST" }),
+			invalidatesTags: (_r, _e, { name }) => (name.startsWith("canary-") ? canaryTags(name.slice("canary-".length)) : ["BenchSchedules"]),
 		}),
 	}),
 });
@@ -47,8 +63,24 @@ export const {
 	useTestAlertMutation,
 	useRunScheduleMutation,
 	useCreateCanaryMutation,
+	useEditCanaryMutation,
 	useDeleteCanaryMutation,
+	useSetCanaryPausedMutation,
+	useSetSchedulePausedMutation,
 } = schedulesApi;
+
+/** The tags a change to drift monitor name invalidates: the list, its detail and the schedules. */
+export function canaryTags(name: string) {
+	return [{ type: "BenchCanary" as const, id: "LIST" }, { type: "BenchCanary" as const, id: name }, "BenchSchedules" as const];
+}
+
+/** A schedule or a drift monitor schedule with its paused flag (F17; not yet in the shared types). */
+export type Pausable = { paused?: boolean };
+
+/** Whether a schedule row or a drift monitor schedule is paused. */
+export function isPaused(x: unknown): boolean {
+	return Boolean(x && typeof x === "object" && (x as Pausable).paused);
+}
 
 /** The server's error message from an RTK Query error, or a fallback. */
 export function errorMessage(err: unknown, fallback: string): string {

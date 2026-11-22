@@ -260,3 +260,31 @@ func TestPolicyDocsViewerList(t *testing.T) {
 		t.Fatalf("member list: %d %s", code, body)
 	}
 }
+
+// The list says when the benchmark cannot hold policy tasks (no task with a
+// simulated customer), so the Policy tab explains it before any job runs.
+func TestPolicyDocListShapeEmptyForQA(t *testing.T) {
+	idx := &fakeIndex{manifests: map[string]*schemas.Manifest{}, files: map[string]map[string][]byte{}}
+	c := newPolicyClient(t, idx)
+	for _, b := range []string{`{"id":"faq","template":"qa"}`, `{"id":"desk","template":"support"}`} {
+		if code, body := c.do(t, "POST", "/suites", []byte(b), nil); code != 201 {
+			t.Fatalf("create %s: %d %s", b, code, body)
+		}
+	}
+	var list PolicyDocList
+	code, body := c.do(t, "GET", "/suites/faq/policy-docs", nil, nil)
+	if code != 200 || json.Unmarshal(body, &list) != nil {
+		t.Fatalf("qa list: %d %s", code, body)
+	}
+	if list.Shape != "" || list.Next != policybench.ErrNoShape.Error() {
+		t.Fatalf("qa list shape %q next %q", list.Shape, list.Next)
+	}
+	list = PolicyDocList{}
+	code, body = c.do(t, "GET", "/suites/desk/policy-docs", nil, nil)
+	if code != 200 || json.Unmarshal(body, &list) != nil {
+		t.Fatalf("support list: %d %s", code, body)
+	}
+	if list.Shape != "refund-in-policy" || list.Next != "" {
+		t.Fatalf("support list shape %q next %q", list.Shape, list.Next)
+	}
+}

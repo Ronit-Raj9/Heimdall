@@ -144,11 +144,13 @@ var APIRoutes = []RouteDoc{
 	}},
 
 	// UI regroup (U2): the run list across experiments (handlers/runlist.go).
-	{Method: "GET", Path: APIPrefix + "/runs", Tag: "runs", Summary: "Every run across experiments, newest first, with filters, paging and the values each filter can take", Response: RunList{}, Query: []QueryDoc{
+	{Method: "GET", Path: APIPrefix + "/runs", Tag: "runs", Summary: "Every run across experiments, newest first unless sort says otherwise, with filters, sorting, paging and the values each filter can take", Response: RunList{}, Query: []QueryDoc{
 		{Name: "exp", Description: "Experiment id"}, {Name: "suite", Description: "Suite id"}, {Name: "arm", Description: "Arm id"},
 		{Name: "task", Description: "Task id"}, {Name: "condition", Description: "clean or a probe id"}, {Name: "outcome", Description: "Run outcome"},
 		{Name: "track", Description: "Suite track"}, {Name: "agent", Description: "Agent config id"}, {Name: "benchmark", Description: "Suite id with or without its version"},
 		{Name: "fault", Description: "Fault name (model-down, broken-tool, misleading-instruction, ...) or clean"}, {Name: "model", Description: "Arm model"},
+		{Name: "sort", Description: "Sort key, applied before paging: started (default), duration, outcome, cost, tokens, steps, task or agent; rows without a value go last"},
+		{Name: "dir", Description: "Sort direction: asc or desc (default desc)"},
 		{Name: "limit", Description: "Page size; default 100, at most 500"}, {Name: "offset", Description: "Rows to skip"},
 	}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}", Tag: "runs", Summary: "One run with seal, grade, metrics, gates and receipts", Response: schemas.RunDetail{}},
@@ -364,7 +366,7 @@ var APIRoutes = []RouteDoc{
 
 	// Auth area (P2, handlers/auth.go, docs/auth.md). Local mode answers config and me only; the rest are hosted mode.
 	{Method: "GET", Path: AuthPrefix + "/config", Tag: "auth", Summary: "Sign-in options: auth mode, signup policy, GitHub, bootstrap", Response: auth.AuthInfo{}},
-	{Method: "GET", Path: AuthPrefix + "/me", Tag: "auth", Summary: "The caller: user, orgs with roles, current org, CSRF value; 401 when anonymous", Response: auth.Me{}},
+	{Method: "GET", Path: AuthPrefix + "/me", Tag: "auth", Summary: "The caller: user, orgs with roles, current org, CSRF value; kind anonymous (200) with no credential, 401 for an ended session", Response: auth.Me{}},
 	{Method: "POST", Path: AuthPrefix + "/signup", Tag: "auth", Summary: "Create an account under the signup policy and sign in", Request: auth.SignupRequest{}, Status: fasthttp.StatusCreated, Response: auth.Me{}},
 	{Method: "POST", Path: AuthPrefix + "/login", Tag: "auth", Summary: "Sign in with email and password; sets the session cookie", Request: auth.LoginRequest{}, Response: auth.Me{}},
 	{Method: "POST", Path: AuthPrefix + "/logout", Tag: "auth", Summary: "End the session and clear the cookie", Status: fasthttp.StatusNoContent},

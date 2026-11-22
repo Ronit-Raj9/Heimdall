@@ -2,6 +2,7 @@ import "@/lib/i18n";
 
 import { cellState, checkGroup, DraftPreview, matrixColumns, PublishPanel, ReadinessPanel } from "@/components/onboard/draftPanel";
 import { InventoryPanel, onboardColumns, onboardMapping } from "@/components/onboard/inventoryPanel";
+import { SourceBox, sourceGiven } from "@/components/onboard/sourceBox";
 import type { OnboardDraftSet, OnboardInventory } from "@/lib/types/onboard";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -59,7 +60,13 @@ const set: OnboardDraftSet = {
 			review: "accepted",
 			readiness: {
 				admitted: true,
-				checks: [pass("reference_1"), pass("reference_2"), pass("empty_control", "fail"), pass("wrong_answer_1", "fail"), pass("exploit", "fail")],
+				checks: [
+					pass("reference_1"),
+					pass("reference_2"),
+					pass("empty_control", "fail"),
+					pass("wrong_answer_1", "fail"),
+					pass("exploit", "fail"),
+				],
 			},
 			catch_rate: { caught: 3, total: 3 },
 		},
@@ -116,7 +123,9 @@ describe("Add benchmark", () => {
 	it("publishes only ready, accepted tasks by default", () => {
 		const html = renderToStaticMarkup(<PublishPanel set={set} />);
 		expect(html).toContain("1 ready and accepted of 2");
-		const done = renderToStaticMarkup(<PublishPanel set={{ ...set, published: { suite: "faq", tasks: ["hotel-cap"], created: true, held_out: 1, job_id: "j" } }} />);
+		const done = renderToStaticMarkup(
+			<PublishPanel set={{ ...set, published: { suite: "faq", tasks: ["hotel-cap"], created: true, held_out: 1, job_id: "j" } }} />,
+		);
 		expect(done).toContain('data-testid="onboard-evaluate"');
 	});
 
@@ -135,7 +144,9 @@ describe("Add benchmark", () => {
 			can_draft: false,
 			next: "map the question and answer columns",
 		};
-		const html = renderToStaticMarkup(<InventoryPanel inv={inv} plan={inv.suggest} onPlan={() => undefined} onDraft={() => undefined} busy={false} />);
+		const html = renderToStaticMarkup(
+			<InventoryPanel inv={inv} plan={inv.suggest} onPlan={() => undefined} onDraft={() => undefined} busy={false} />,
+		);
 		expect(html).toContain('data-testid="onboard-plan-mapping"');
 		expect(html).toContain("outputs.gold");
 		// The Build tab's row mapper, limited to the fields onboard reads.
@@ -148,5 +159,25 @@ describe("Add benchmark", () => {
 		expect(onboardMapping({ question: "inputs.q", expected: "", messages: "m", split: "-" })).toEqual({ question: "inputs.q", split: "-" });
 		const cols = onboardColumns({ columns: ["q"], samples: [{ ref: "row 1", fields: { q: "hi" } }] });
 		expect(cols).toEqual([{ path: "q", kind: "text", example: "hi", filled: 1 }]);
+	});
+});
+
+// C5.empty: Look inside cannot be pressed with nothing given, and the hint says what to give before
+// any click, so an empty submit never looks like it did nothing.
+describe("Add benchmark source box", () => {
+	it("disables Look inside until a link, a file or pasted rows are given, with the hint always shown", () => {
+		const html = renderToStaticMarkup(<SourceBox busy={false} onSubmit={() => undefined} onClear={() => undefined} />);
+		expect(html).toMatch(
+			/<button[^>]*disabled=""[^>]*data-testid="onboard-inspect"|<button[^>]*data-testid="onboard-inspect"[^>]*disabled=""/,
+		);
+		expect(html).toContain('data-testid="onboard-source-hint"');
+		expect(html).toContain("Give a link, a file or pasted rows.");
+	});
+	it("counts a link, a file or pasted rows as input, and blank text as none", () => {
+		expect(sourceGiven({ link: "", rows: "", file: null })).toBe(false);
+		expect(sourceGiven({ link: "   ", rows: "\n ", file: null })).toBe(false);
+		expect(sourceGiven({ link: "", rows: "question,answer\nA,B", file: null })).toBe(true);
+		expect(sourceGiven({ link: "terminal-bench@2.0", rows: "", file: null })).toBe(true);
+		expect(sourceGiven({ link: "", rows: "", file: new File(["x"], "a.csv") })).toBe(true);
 	});
 });

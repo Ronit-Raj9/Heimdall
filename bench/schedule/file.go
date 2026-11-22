@@ -48,6 +48,9 @@ type Schedule struct {
 	// Jobs); such a schedule names no experiment and spends nothing. Failure
 	// inbox area: inbox-pull (docs/failure-inbox.md).
 	Job string `json:"job,omitempty" yaml:"job,omitempty"`
+	// Paused keeps the schedule in the file but stops its cron triggers
+	// (the server ticker skips it); Run now still works.
+	Paused bool `json:"paused,omitempty" yaml:"paused,omitempty"`
 
 	// Approved is what the daemon's cap check approved for this trigger; the
 	// daemon sets it on the copy it hands the Runner, never in the file. A
