@@ -1,9 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { EvaluationWorkerPicker } from "@/components/workers/whereRunsGo";
-import { type EvaluationArm, type EvaluationSpec, useCreateEvaluationMutation, useEstimateEvaluationQuery } from "@/lib/store/apis/evaluationsApi";
+import {
+	type EvaluationArm,
+	type EvaluationSpec,
+	type FaultCatalogItem,
+	useCreateEvaluationMutation,
+	useEstimateEvaluationQuery,
+	useGetBenchFaultsQuery,
+} from "@/lib/store/apis/evaluationsApi";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { BudgetAdvice } from "./budgetAdvice";
+import { defaultName, useEvaluateDraft, type EvaluateDraftContextValue } from "./evaluateDraft";
+import { fw05 } from "./fw05I18n";
 import { OWN_MODEL_LABEL, useOwnModelAgents } from "./ownModel";
 import { FAULTS, specReady } from "./step4Setup";
 
@@ -16,8 +25,17 @@ function armText(a: EvaluationArm): string {
 	return `${agent}${version}${model}`;
 }
 
-/** One sentence per fact, in plain English, describing what the evaluation will do. */
-export function summaryLines(spec: EvaluationSpec): string[] {
+/** A chosen fault by its catalog name in lower case; an id the catalog does not know prints as the id. */
+function faultText(id: string, catalog: readonly FaultCatalogItem[]): string {
+	const f = catalog.find((c) => c.id === id) ?? FAULTS.find((c) => c.id === id);
+	return f ? f.label.toLowerCase() : id;
+}
+
+/**
+ * One sentence per fact, in plain English, describing what the evaluation will do. `catalog` is
+ * GET /faults; while it loads (or when it fails) the static list names the common faults.
+ */
+export function summaryLines(spec: EvaluationSpec, catalog: readonly FaultCatalogItem[] = FAULTS): string[] {
 	const [a, b] = spec.arms;
 	const lines: string[] = [];
 	if (spec.mode === "score" || !b) lines.push(`Score ${a ? armText(a) : "your agent"}.`);
@@ -32,10 +50,17 @@ export function summaryLines(spec: EvaluationSpec): string[] {
 	const trials = spec.trials === 1 ? "once" : `${spec.trials} times`;
 	lines.push(`Use ${spec.tasks_per_benchmark} tasks from each benchmark and try each task ${trials}.`);
 
-	const faults = FAULTS.filter((f) => spec.faults.includes(f.id)).map((f) => f.label.toLowerCase());
-	lines.push(faults.length ? `Run clean, then again with: ${faults.join(", ")}.` : "Run clean only, with no faults.");
+	const faults = spec.faults.filter((id) => id !== "clean").map((id) => faultText(id, catalog));
+	lines.push(faults.length ? fw05("summary.faults", { faults: faults.join(", ") }) : "Run clean only, with no faults.");
 
-	if (spec.bifrost_cache) lines.push("Run each task with the Bifrost cache off and again with it on, and compare the two.");
+	if (spec.mcp_route === "bifrost") lines.push(fw05("summary.mcpGateway"));
+	else if (spec.mcp_route === "bifrost_code_mode") lines.push(fw05("summary.mcpCodeMode"));
+	if (spec.bifrost_cache) lines.push(fw05("summary.cache"));
+	if (spec.failover?.enabled) {
+		const models = spec.failover.fallbacks.map((f) => (f.provider ? `${f.provider}/${f.model}` : f.model)).filter(Boolean);
+		lines.push(fw05("summary.failover", { models: models.join(", ") }));
+	}
+	if (spec.gate) lines.push(fw05("summary.gate"));
 
 	if (spec.budget_usd && spec.budget_usd > 0) lines.push(`Stop when spending reaches $${spec.budget_usd}.`);
 	else lines.push(`Stop each benchmark when its spending reaches $${DEFAULT_BENCHMARK_BUDGET} (the default budget).`);
@@ -64,6 +89,44 @@ function errorMessage(error: unknown): string {
 	return data?.error?.message ?? "Could not launch the evaluation.";
 }
 
+/** Longest evaluation name the Name box takes. */
+export const NAME_MAX = 80;
+
+/** The wizard draft when step 5 sits inside the /evaluate shell; null elsewhere (tests, previews). */
+function useDraftOrNull(): EvaluateDraftContextValue | null {
+	try {
+		return useEvaluateDraft();
+	} catch {
+		return null;
+	}
+}
+
+/** What the Name box calls: the typed name goes into the wizard draft, which carries it into the spec. */
+export function draftNameSetter(draft: Pick<EvaluateDraftContextValue, "update">): (name: string) => void {
+	return (name) => draft.update({ name });
+}
+
+/** The Name box at the top of step 5 (D8.name). Empty means the default name, shown as the placeholder. */
+export function NameField({ value, placeholder, onName }: { value: string; placeholder: string; onName(name: string): void }) {
+	return (
+		<section className="flex flex-col gap-1.5">
+			<label htmlFor="step5-name" className="text-sm font-medium">
+				{fw05("name.label")}
+			</label>
+			<input
+				id="step5-name"
+				type="text"
+				maxLength={NAME_MAX}
+				className="border-input bg-background h-8 w-full max-w-md rounded-md border px-2 text-sm"
+				placeholder={placeholder}
+				value={value}
+				onChange={(e) => onName(e.target.value.slice(0, NAME_MAX))}
+				data-testid="step5-name"
+			/>
+		</section>
+	);
+}
+
 export interface Step5LaunchProps {
 	spec: EvaluationSpec;
 	onChange(spec: EvaluationSpec): void;
@@ -75,7 +138,18 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 	const [budget, setBudget] = useState(spec.budget_usd ? String(spec.budget_usd) : "");
 	const ready = specReady(spec, useOwnModelAgents());
 	const estimate = useEstimateEvaluationQuery(spec, { skip: !ready });
+	const catalog = useGetBenchFaultsQuery();
+	const faultCatalog = catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS;
+	const draft = useDraftOrNull();
+	const [ownName, setOwnName] = useState("");
+	const nameValue = draft ? draft.draft.name : ownName;
+	const namePlaceholder = draft ? defaultName(draft.draft) : spec.name;
+	const onName = draft ? draftNameSetter(draft) : (name: string) => (setOwnName(name), onChange({ ...spec, name }));
 	const advice = estimate.data?.budget;
+	const cost = estimate.data?.est_cost_usd;
+	const fetching = Boolean(estimate.isFetching);
+	const basis =
+		estimate.data && !fetching && (cost?.known || estimate.data.from_library) ? (estimate.data.from_library ? "library" : "own") : null;
 	const setBudgetUsd = (n: number | undefined) => {
 		setBudget(n ? String(n) : "");
 		onChange({ ...spec, budget_usd: n });
@@ -90,17 +164,20 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 	}, [seeded, advice]);
 
 	const launch = async () => {
-		const body: EvaluationSpec = { ...spec, name: spec.name.trim() || summaryLines(spec)[0].replace(/\.$/, "") };
+		const typed = nameValue.trim();
+		const body: EvaluationSpec = { ...spec, name: typed || spec.name.trim() || summaryLines(spec, faultCatalog)[0].replace(/\.$/, "") };
 		const res = await create(body);
 		if ("data" in res && res.data) void navigate({ href: `/evaluations/${encodeURIComponent(res.data.id)}` });
 	};
 
 	return (
 		<div className="flex flex-col gap-5" data-testid="step5-launch">
+			<NameField value={nameValue} placeholder={namePlaceholder} onName={onName} />
+
 			<section className="flex flex-col gap-2">
 				<h3 className="text-base font-semibold">What will happen</h3>
 				<ul className="list-disc space-y-1 pl-5 text-sm" data-testid="step5-summary">
-					{summaryLines(spec).map((line) => (
+					{summaryLines(spec, faultCatalog).map((line) => (
 						<li key={line}>{line}</li>
 					))}
 				</ul>
@@ -131,7 +208,12 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 						? "Split evenly over the benchmarks; each one stops starting runs when its share is spent."
 						: `Empty means the default: each benchmark stops at $${DEFAULT_BENCHMARK_BUDGET}.`}
 				</span>
-				{advice && <BudgetAdvice budget={advice} onSet={(n) => (setSeeded(true), setBudgetUsd(n))} />}
+				{advice && <BudgetAdvice budget={advice} cost={cost} isFetching={fetching} onSet={(n) => (setSeeded(true), setBudgetUsd(n))} />}
+				{basis && (
+					<span className="text-muted-foreground text-xs" data-testid="step5-estimate-basis">
+						{fw05(basis === "library" ? "basis.library" : "basis.own")}
+					</span>
+				)}
 			</section>
 
 			<EvaluationWorkerPicker value={spec.worker ?? ""} onChange={(worker) => onChange({ ...spec, worker: worker || undefined })} />
