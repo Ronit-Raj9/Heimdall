@@ -115,7 +115,7 @@ LHTB 2.0 (https://github.com/zli12321/LHTB, 77 tasks in `tasks/` and `tasks-2.0/
 ```sh
 for d in tasks tasks-2.0; do
   bifrost-bench import harbor -from datasets/lhtb2 -suite lhtb2 -set tasks_dir=$d \
-    -set image=prebuilt -set unrunnable=draft -set pass_threshold=0.9 \\
+    -set image=prebuilt -set unrunnable=draft -set pass_threshold=0.9 \
     -set max_solution_mb=48 -set lint_waivers=upstream
 done
 ```
@@ -127,6 +127,7 @@ done
 - Separate verifier containers (3 tasks, `[verifier] environment_mode = "separate"`): tests/Dockerfile up to its first `COPY` is built as a stage of the task image and its file system copied to `/opt/harbor-verifier`; at verify time the driver replays the rest of tests/Dockerfile with the tests, runs `[verifier.environment.healthcheck]`, copies the task.toml `artifacts` from the agent's container to the same paths (honouring `regular_file_only` and `max_bytes`), and runs the upstream `test.sh` chrooted there (the root verifier keeps `SYS_CHROOT`). `[[verifier.collect]]` and a prebuilt verifier image are still refused.
 - A compose file whose `main` service names no image or build (chess-mate) now maps: under Harbor conventions main is the task image.
 - At commit 7ca0cac: 47 importable, 30 drafts (tasks-2.0 reconstruction tasks ship no `solve.sh`).
+- Admission gives a reference (or honest) solution the task's `timeouts.agent_s` (with 2 CPUs and 4 GB) when that is longer than the 120 s control budget, as Harbor runs the oracle under the agent timeout; the other controls keep 120 s. Long references (sudoku-recovery, apex-openroad-ibex-signoff, duckdb-optimizer-closure) timed out without it.
 - Git LFS holds only 5 `reference_play` gif/mp4 files under `solution/`.
 
 ### Test tools are baked into the image

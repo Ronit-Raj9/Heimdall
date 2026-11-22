@@ -248,6 +248,7 @@ func (a *admitter) runControl(ctx context.Context, c control, image string) (che
 	}
 	plan := &schemas.RunPlan{Image: image, Argv: c.argv, Env: env, Files: c.files, Workdir: a.s.Workdir,
 		WallS: exploitWallS, CPUs: 1, MemGB: 1, Network: "none", User: exploitUser}
+	a.referenceBudget(plan, c.name)
 	a.gpuControlBudget(plan) // X7: a GPU task's controls train on the GPU (gpu.go)
 	res, err := a.deps.Env.Exec(ctx, rc, plan)
 	if err != nil {
@@ -439,4 +440,24 @@ func taskImageKey(t *schemas.Task) string {
 		return "image:" + t.Environment.Image
 	}
 	return "dir:" + t.Dir
+}
+
+// Long-horizon reference budget: a reference (or honest) solution of a task
+// with its own agent time limit gets that limit and a little more room, the
+// way Harbor runs the upstream oracle under the task's agent timeout. Other
+// controls keep the short exploit budget.
+const (
+	referenceCPUs  = 2
+	referenceMemGB = 4
+)
+
+func (a *admitter) referenceBudget(plan *schemas.RunPlan, name string) {
+	if !strings.HasPrefix(name, "reference_") && !strings.HasPrefix(name, "honest_") {
+		return
+	}
+	if s := a.t.Timeouts.AgentS; s > plan.WallS {
+		plan.WallS = s
+		plan.CPUs = max(plan.CPUs, referenceCPUs)
+		plan.MemGB = max(plan.MemGB, referenceMemGB)
+	}
 }
