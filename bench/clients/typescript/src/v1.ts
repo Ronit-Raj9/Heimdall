@@ -24,6 +24,16 @@ export const V1_ROUTES: readonly (readonly [string, string])[] = [
 	["GET", "/api/v1/benchmarks/catalog"],
 	["GET", "/api/v1/benchmarks/packs"],
 	["GET", "/api/v1/benchmarks/{id}/tasks/{task}"],
+	["POST", "/api/v1/benchmarks"],
+	["PUT", "/api/v1/benchmarks/{id}/grader"],
+	["GET", "/api/v1/benchmarks/{id}/tasks"],
+	["POST", "/api/v1/benchmarks/{id}/tasks"],
+	["DELETE", "/api/v1/benchmarks/{id}/tasks/{task}"],
+	["GET", "/api/v1/benchmarks/{id}/versions"],
+	["GET", "/api/v1/benchmarks/{id}/versions/{n}"],
+	["GET", "/api/v1/benchmarks/{id}/data-policy"],
+	["PUT", "/api/v1/benchmarks/{id}/data-policy"],
+	["POST", "/api/v1/imports/platforms"],
 	["GET", "/api/v1/evaluations"],
 	["POST", "/api/v1/evaluations"],
 	["POST", "/api/v1/evaluations/estimate"],
@@ -43,6 +53,114 @@ export const V1_ROUTES: readonly (readonly [string, string])[] = [
 /** Every JSON answer carries the server mode. */
 export interface Moded {
 	mode: Mode;
+}
+
+/** One task as code sends it (docs/datasets-as-code.md). A row with the id of a task made from rows replaces it. */
+export interface DatasetRow {
+	id?: string;
+	title?: string;
+	/** The question or customer message; messages is a chat input instead. */
+	input?: string;
+	messages?: { role: string; content: string }[];
+	/** Accepted answers (answer_match) or the reference answer (judge). */
+	expected?: string | string[];
+	rubric?: string;
+	reference?: string;
+	wrong_answers?: string | string[];
+	match?: string;
+	ticket?: boolean;
+	held_out?: boolean;
+	/** Flat key and value pairs (string, number or boolean). */
+	metadata?: Record<string, string | number | boolean>;
+	attachments?: { name: string; text?: string; content_base64?: string }[];
+}
+
+export interface DatasetVersion {
+	version: number;
+	at: string;
+	actor?: string;
+	source?: string;
+	added: string[] | null;
+	updated: string[] | null;
+	removed: string[] | null;
+	tasks: number;
+	sha256: string;
+}
+
+export interface DatasetTasksResult extends Moded {
+	benchmark: string;
+	dry_run: boolean;
+	version: DatasetVersion | null;
+	added: string[] | null;
+	updated: string[] | null;
+	unchanged: string[] | null;
+	tasks: Record<string, unknown>[] | null;
+	problems: { index: number; id?: string; message: string }[] | null;
+	pii: Record<string, unknown> | null;
+	next: string;
+}
+
+export interface DatasetTask {
+	id: string;
+	title?: string;
+	held_out?: boolean;
+	from_rows: boolean;
+	row_sha256?: string;
+	chat?: boolean;
+	metadata?: Record<string, unknown>;
+	attachments?: string[];
+}
+
+export interface DatasetTaskList extends Moded {
+	benchmark: string;
+	version: number;
+	total: number;
+	offset: number;
+	tasks: DatasetTask[] | null;
+}
+
+export interface DataPolicyView extends Moded {
+	benchmark: string;
+	policy: {
+		pii: { mode: string; kinds?: string[] };
+		access: { mode: string; users?: string[] };
+		updated_by?: string;
+		updated_at?: string;
+	};
+	can_edit_access: boolean;
+	modes: string[];
+	kinds: string[];
+}
+
+/** Body of POST /api/v1/imports/platforms. Secrets name the org secrets holding each credential. */
+export interface PlatformImportRequest {
+	platform: "langsmith" | "langfuse" | "braintrust" | "datadog" | string;
+	kind: "dataset" | "traces";
+	target: "benchmark" | "inbox";
+	benchmark?: string;
+	base_url?: string;
+	dataset?: string;
+	project?: string;
+	query?: string;
+	limit?: number;
+	secrets?: Record<string, string>;
+	mapping?: Record<string, string>;
+	mode?: "upsert" | "add";
+	match?: string;
+	dry_run?: boolean;
+}
+
+export interface PlatformImportResult extends Moded {
+	platform: string;
+	kind: string;
+	target: string;
+	read: number;
+	truncated: boolean;
+	warnings: string[] | null;
+	preview: { source_id: string; input: string; expected?: string; chat?: boolean }[] | null;
+	benchmark?: DatasetTasksResult;
+	inbox?: { created: number; repeated: number; items: string[] | null; problems: string[] | null };
+	next: string;
 }
 
 export interface EvaluationArm {
@@ -318,6 +436,8 @@ class V1Transport extends Client {
 	protected override readonly apiPrefix: string = API_V1_PREFIX;
 	getJSON<T>(path: string, query?: Query, deadline?: number): Promise<T> { return this.get<T>(path, query ? clean(query) : undefined, deadline); }
 	postJSON<T>(path: string, payload: unknown): Promise<T> { return this.post<T>(path, payload); }
+	putJSON<T>(path: string, payload: unknown): Promise<T> { return this.put<T>(path, payload); }
+	deleteJSON<T>(path: string): Promise<T> { return this.del<T>(path); }
 	getRaw(path: string, query?: Query): Promise<RawResponse> { return this.raw(path, query ? clean(query) : undefined); }
 }
 
@@ -357,6 +477,57 @@ export class V1Client {
 	benchmarkCatalog(): Promise<Moded & Record<string, unknown>> { return this.t.getJSON("/benchmarks/catalog"); }
 	benchmarkPacks(): Promise<Moded & Record<string, unknown>> { return this.t.getJSON("/benchmarks/packs"); }
 	benchmarkTask(benchmark: string, task: string): Promise<Moded & Record<string, unknown>> { return this.t.getJSON(`/benchmarks/${seg(benchmark)}/tasks/${seg(task)}`); }
+
+	// Benchmarks as code (docs/datasets-as-code.md)
+	/** Create a benchmark from a template (409 when it exists); blank (default) starts it with no tasks. */
+	createBenchmark(id: string, options: { template?: string; blank?: boolean; image?: string } = {}): Promise<Moded & { id: string; files?: string[] }> {
+		const body: Record<string, unknown> = { id, template: options.template ?? "qa" };
+		if (options.blank !== false) body.blank = true;
+		if (options.image) body.image = options.image;
+		return this.t.postJSON("/benchmarks", body);
+	}
+	/** Choose a question-and-answer benchmark's grader: answer_match or judge (with its pinned judge model). */
+	setGrader(benchmark: string, grader: "answer_match" | "judge", judge?: Record<string, unknown>): Promise<Moded & Record<string, unknown>> {
+		return this.t.putJSON(`/benchmarks/${seg(benchmark)}/grader`, judge ? { grader, judge } : { grader });
+	}
+	/** A benchmark's tasks with metadata and row hash; expected answers are never listed. */
+	datasetTasks(benchmark: string, options: { offset?: number; limit?: number } = {}): Promise<DatasetTaskList> {
+		return this.t.getJSON(`/benchmarks/${seg(benchmark)}/tasks`, { offset: options.offset || undefined, limit: options.limit ?? 100 });
+	}
+	/** Add or replace tasks from rows; each change is a new version. The benchmark's personal data policy runs first; dryRun previews. */
+	upsertTasks(
+		benchmark: string,
+		rows: DatasetRow[],
+		options: { mode?: "upsert" | "add"; match?: string; source?: string; dryRun?: boolean } = {},
+	): Promise<DatasetTasksResult> {
+		const body: Record<string, unknown> = { tasks: rows, mode: options.mode ?? "upsert" };
+		if (options.match) body.match = options.match;
+		if (options.source) body.source = options.source;
+		if (options.dryRun) body.dry_run = true;
+		return this.t.postJSON(`/benchmarks/${seg(benchmark)}/tasks`, body);
+	}
+	/** Remove a task made from rows; a new version. */
+	deleteTask(benchmark: string, task: string): Promise<Moded & { benchmark: string; task: string; version: DatasetVersion | null }> {
+		return this.t.deleteJSON(`/benchmarks/${seg(benchmark)}/tasks/${seg(task)}`);
+	}
+	/** The version log of a benchmark's rows, newest first. */
+	datasetVersions(benchmark: string): Promise<Moded & { benchmark: string; versions: DatasetVersion[] | null }> {
+		return this.t.getJSON(`/benchmarks/${seg(benchmark)}/versions`);
+	}
+	/** One version: its changes and the row hash of every task. */
+	datasetVersion(benchmark: string, version: number): Promise<Moded & { benchmark: string; version: DatasetVersion; tasks: Record<string, string> }> {
+		return this.t.getJSON(`/benchmarks/${seg(benchmark)}/versions/${Math.trunc(version)}`);
+	}
+	dataPolicy(benchmark: string): Promise<DataPolicyView> { return this.t.getJSON(`/benchmarks/${seg(benchmark)}/data-policy`); }
+	/** Set the personal data mode (off, warn, mask, redact, block) and, as an org admin, the access list. A missing part keeps its value. */
+	setDataPolicy(
+		benchmark: string,
+		policy: { pii?: { mode: string; kinds?: string[] }; access?: { mode: "org" | "restricted"; users?: string[] } },
+	): Promise<DataPolicyView> {
+		return this.t.putJSON(`/benchmarks/${seg(benchmark)}/data-policy`, policy);
+	}
+	/** Import a dataset or recent traces from LangSmith, Langfuse, Braintrust or Datadog with the org's secrets. */
+	importFromPlatform(request: PlatformImportRequest): Promise<PlatformImportResult> { return this.t.postJSON("/imports/platforms", request); }
 
 	// Evaluations
 	evaluations(): Promise<EvaluationList> { return this.t.getJSON("/evaluations"); }

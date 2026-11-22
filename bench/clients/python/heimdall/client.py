@@ -378,6 +378,14 @@ class Client:
         _, body, _ = self._request("POST", path, None, payload)
         return self._json(body, "POST", path)
 
+    def _put(self, path: str, payload: Any) -> Dict[str, Any]:
+        _, body, _ = self._request("PUT", path, None, payload)
+        return self._json(body, "PUT", path)
+
+    def _delete(self, path: str) -> Dict[str, Any]:
+        _, body, _ = self._request("DELETE", path)
+        return self._json(body, "DELETE", path)
+
     def _raw(self, path: str, query: Optional[Mapping[str, Optional[str]]] = None) -> RawResponse:
         _, body, headers = self._request("GET", path, query)
         mode = headers.get(MODE_HEADER, "") or ""
@@ -414,7 +422,7 @@ class Client:
         if self.token:
             headers["Authorization"] = "Bearer " + self.token
         data: Optional[bytes] = None
-        if method == "POST":
+        if method in ("POST", "PUT"):
             if isinstance(payload, str):
                 data, headers["Content-Type"] = payload.encode("utf-8"), "application/yaml"
             elif payload is not None:

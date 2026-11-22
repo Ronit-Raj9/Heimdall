@@ -64,6 +64,8 @@ class FakeServer:
 
             do_GET = _serve
             do_POST = _serve
+            do_PUT = _serve
+            do_DELETE = _serve
 
         self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.httpd.daemon_threads = True

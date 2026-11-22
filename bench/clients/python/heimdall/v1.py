@@ -43,6 +43,16 @@ V1_ROUTES: Tuple[Tuple[str, str], ...] = (
     ("GET", "/api/v1/benchmarks/catalog"),
     ("GET", "/api/v1/benchmarks/packs"),
     ("GET", "/api/v1/benchmarks/{id}/tasks/{task}"),
+    ("POST", "/api/v1/benchmarks"),
+    ("PUT", "/api/v1/benchmarks/{id}/grader"),
+    ("GET", "/api/v1/benchmarks/{id}/tasks"),
+    ("POST", "/api/v1/benchmarks/{id}/tasks"),
+    ("DELETE", "/api/v1/benchmarks/{id}/tasks/{task}"),
+    ("GET", "/api/v1/benchmarks/{id}/versions"),
+    ("GET", "/api/v1/benchmarks/{id}/versions/{n}"),
+    ("GET", "/api/v1/benchmarks/{id}/data-policy"),
+    ("PUT", "/api/v1/benchmarks/{id}/data-policy"),
+    ("POST", "/api/v1/imports/platforms"),
     ("GET", "/api/v1/evaluations"),
     ("POST", "/api/v1/evaluations"),
     ("POST", "/api/v1/evaluations/estimate"),
@@ -61,6 +71,121 @@ V1_ROUTES: Tuple[Tuple[str, str], ...] = (
 
 
 # ---- Request and resource shapes ----
+
+
+class DatasetAttachment(TypedDict, total=False):
+    name: str
+    text: str
+    content_base64: str
+
+
+class DatasetRow(TypedDict, total=False):
+    """One task as code sends it. ``input`` or ``messages`` (chat) is the
+    question; ``expected`` the accepted answers (answer_match) or the
+    reference (judge); a row with the id of a task made from rows replaces it."""
+
+    id: str
+    title: str
+    input: str
+    messages: List[Dict[str, str]]
+    expected: Union[str, List[str]]
+    rubric: str
+    reference: str
+    wrong_answers: Union[str, List[str]]
+    match: str
+    ticket: bool
+    held_out: bool
+    metadata: Dict[str, Any]
+    attachments: List[DatasetAttachment]
+
+
+class DatasetVersion(TypedDict, total=False):
+    version: int
+    at: str
+    actor: str
+    source: str
+    added: List[str]
+    updated: List[str]
+    removed: List[str]
+    tasks: int
+    sha256: str
+
+
+class DatasetTasksResult(TypedDict, total=False):
+    mode: str
+    benchmark: str
+    dry_run: bool
+    version: Optional[DatasetVersion]
+    added: List[str]
+    updated: List[str]
+    unchanged: List[str]
+    tasks: List[Dict[str, Any]]
+    problems: List[Dict[str, Any]]
+    pii: Optional[Dict[str, Any]]
+    next: str
+
+
+class DatasetTask(TypedDict, total=False):
+    id: str
+    title: str
+    held_out: bool
+    from_rows: bool
+    row_sha256: str
+    chat: bool
+    metadata: Dict[str, Any]
+    attachments: List[str]
+
+
+class DatasetTaskList(TypedDict, total=False):
+    mode: str
+    benchmark: str
+    version: int
+    total: int
+    offset: int
+    tasks: List[DatasetTask]
+
+
+class DatasetVersionList(TypedDict, total=False):
+    mode: str
+    benchmark: str
+    versions: List[DatasetVersion]
+
+
+class DatasetVersionDetail(TypedDict, total=False):
+    mode: str
+    benchmark: str
+    version: DatasetVersion
+    tasks: Dict[str, str]
+
+
+class DataPolicy(TypedDict, total=False):
+    pii: Dict[str, Any]
+    access: Dict[str, Any]
+    updated_by: str
+    updated_at: str
+
+
+class DataPolicyView(TypedDict, total=False):
+    mode: str
+    benchmark: str
+    policy: DataPolicy
+    can_edit_access: bool
+    modes: List[str]
+    kinds: List[str]
+
+
+class PlatformImportResult(TypedDict, total=False):
+    mode: str
+    platform: str
+    kind: str
+    target: str
+    read: int
+    truncated: bool
+    warnings: List[str]
+    preview: List[Dict[str, Any]]
+    benchmark: Optional[DatasetTasksResult]
+    inbox: Optional[Dict[str, Any]]
+    next: str
 
 
 class EvaluationArm(TypedDict, total=False):
@@ -560,6 +685,94 @@ class V1Client:
 
     def benchmark_task(self, benchmark: str, task: str) -> Dict[str, Any]:
         return self._t._get("/benchmarks/%s/tasks/%s" % (_seg(benchmark), _seg(task)))
+
+    # Benchmarks as code (docs/datasets-as-code.md)
+
+    def create_benchmark(self, benchmark_id: str, template: str = "qa", blank: bool = True, image: str = "") -> Dict[str, Any]:
+        """Create a benchmark from a template (409 when it exists). ``blank`` starts it with no tasks."""
+        body: Dict[str, Any] = {"id": benchmark_id, "template": template}
+        if blank:
+            body["blank"] = True
+        if image:
+            body["image"] = image
+        return self._t._post("/benchmarks", body)
+
+    def set_grader(self, benchmark: str, grader: str, judge: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+        """Choose a question-and-answer benchmark's grader: answer_match or judge (with its pinned judge model)."""
+        body: Dict[str, Any] = {"grader": grader}
+        if judge is not None:
+            body["judge"] = dict(judge)
+        return self._t._put("/benchmarks/%s/grader" % _seg(benchmark), body)
+
+    def dataset_tasks(self, benchmark: str, offset: int = 0, limit: int = 100) -> DatasetTaskList:
+        """A benchmark's tasks with metadata and row hash; expected answers are never listed."""
+        return cast(DatasetTaskList, self._t._get("/benchmarks/%s/tasks" % _seg(benchmark), {"offset": str(int(offset)) if offset else None, "limit": str(int(limit))}))
+
+    def upsert_tasks(
+        self,
+        benchmark: str,
+        rows: List[DatasetRow],
+        mode: str = "upsert",
+        match: str = "",
+        source: str = "",
+        dry_run: bool = False,
+    ) -> DatasetTasksResult:
+        """Add or replace tasks from rows; each change is a new version. The
+        benchmark's personal data policy runs first; ``dry_run`` previews.
+        ``mode`` add refuses an id already taken."""
+        body: Dict[str, Any] = {"tasks": [dict(r) for r in rows], "mode": mode}
+        if match:
+            body["match"] = match
+        if source:
+            body["source"] = source
+        if dry_run:
+            body["dry_run"] = True
+        return cast(DatasetTasksResult, self._t._post("/benchmarks/%s/tasks" % _seg(benchmark), body))
+
+    def delete_task(self, benchmark: str, task: str) -> Dict[str, Any]:
+        """Remove a task made from rows; a new version."""
+        return self._t._delete("/benchmarks/%s/tasks/%s" % (_seg(benchmark), _seg(task)))
+
+    def dataset_versions(self, benchmark: str) -> DatasetVersionList:
+        """The version log of a benchmark's rows, newest first."""
+        return cast(DatasetVersionList, self._t._get("/benchmarks/%s/versions" % _seg(benchmark)))
+
+    def dataset_version(self, benchmark: str, version: int) -> DatasetVersionDetail:
+        """One version: its changes and the row hash of every task."""
+        return cast(DatasetVersionDetail, self._t._get("/benchmarks/%s/versions/%d" % (_seg(benchmark), int(version))))
+
+    def data_policy(self, benchmark: str) -> DataPolicyView:
+        return cast(DataPolicyView, self._t._get("/benchmarks/%s/data-policy" % _seg(benchmark)))
+
+    def set_data_policy(
+        self,
+        benchmark: str,
+        pii_mode: Optional[str] = None,
+        pii_kinds: Optional[List[str]] = None,
+        access: Optional[str] = None,
+        users: Optional[List[str]] = None,
+    ) -> DataPolicyView:
+        """Set the personal data mode (off, warn, mask, redact, block) and,
+        as an org admin, the access list (``access`` org or restricted)."""
+        body: Dict[str, Any] = {}
+        if pii_mode is not None or pii_kinds is not None:
+            current = self.data_policy(benchmark).get("policy", {}).get("pii", {}) if pii_mode is None else {}
+            pol: Dict[str, Any] = {"mode": pii_mode if pii_mode is not None else current.get("mode", "warn")}
+            if pii_kinds:
+                pol["kinds"] = list(pii_kinds)
+            body["pii"] = pol
+        if access is not None or users is not None:
+            acc: Dict[str, Any] = {"mode": access or "restricted"}
+            if users:
+                acc["users"] = list(users)
+            body["access"] = acc
+        return cast(DataPolicyView, self._t._put("/benchmarks/%s/data-policy" % _seg(benchmark), body))
+
+    def import_from_platform(self, request: Mapping[str, Any]) -> PlatformImportResult:
+        """Import a dataset or recent traces from LangSmith, Langfuse,
+        Braintrust or Datadog with the org's secrets: into a benchmark
+        (target benchmark) or the failure inbox (target inbox)."""
+        return cast(PlatformImportResult, self._t._post("/imports/platforms", dict(request)))
 
     # Evaluations
 

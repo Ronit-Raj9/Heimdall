@@ -24,6 +24,11 @@ Each v1 route is an alias of one bench route. The `V1Alias` middleware rewrites 
 | `GET /api/v1/benchmarks/catalog` | `GET /api/bench/benchmarks/catalog` |
 | `GET /api/v1/benchmarks/packs` | `GET /api/bench/evaluation-packs` |
 | `GET /api/v1/benchmarks/{id}/tasks/{task}` | `GET /api/bench/suites/{id}/tasks/{task}` |
+| `POST /api/v1/benchmarks`, `PUT /api/v1/benchmarks/{id}/grader` | `POST /api/bench/suites`, `PUT /api/bench/suites/{id}/grader` |
+| `GET, POST /api/v1/benchmarks/{id}/tasks`, `DELETE /api/v1/benchmarks/{id}/tasks/{task}` | `/api/bench/suites/{id}/dataset/tasks` (`docs/datasets-as-code.md`) |
+| `GET /api/v1/benchmarks/{id}/versions`, `GET /api/v1/benchmarks/{id}/versions/{n}` | `/api/bench/suites/{id}/dataset/versions` |
+| `GET, PUT /api/v1/benchmarks/{id}/data-policy` | `/api/bench/suites/{id}/data-policy` |
+| `POST /api/v1/imports/platforms` | the same |
 | `GET, POST /api/v1/evaluations`, `GET /api/v1/evaluations/{id}`, `POST /api/v1/evaluations/{id}/cancel`, `POST /api/v1/evaluations/estimate` | the same |
 | `GET /api/v1/evaluations/{id}/report`, `GET /api/v1/reports/{id}` | `GET /api/bench/evaluations/{id}/report` |
 | `POST /api/v1/estimate` | `POST /api/bench/estimate` |

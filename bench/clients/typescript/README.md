@@ -35,6 +35,8 @@ if (runs[0]) console.log((await hd.trace(runs[0].run_id, "jsonl")).text());
 
 `evaluateAndWait` cancels the evaluation when it times out (`cancelOnTimeout: false` keeps it) and rejects with `HeimdallTimeout`; a failed or cancelled evaluation still resolves, so check `succeeded`. Report cards come back normalized (`normalizeReportCard`): every list and per-arm metric is present.
 
+Benchmarks as code (`docs/datasets-as-code.md`): `createBenchmark(id)`, `setGrader(id, grader, judge)`, `upsertTasks(id, rows, { mode, match, source, dryRun })` (each change a new version; the personal data policy runs first), `datasetTasks(id)`, `deleteTask(id, task)`, `datasetVersions(id)`, `datasetVersion(id, n)`, `dataPolicy(id)`, `setDataPolicy(id, { pii, access })` and `importFromPlatform({...})` (LangSmith, Langfuse, Braintrust, Datadog, with the org's secrets).
+
 Every JSON response carries the server `mode` (`live`, `recorded` or `synthetic`); raw downloads (`runPatch`, `runFile`, `releaseEvidence`) resolve to a `RawResponse` whose `mode` comes from `X-Bench-Mode`. `{ requireLive: true }` rejects every answer that is not live with `ModeError`.
 
 Agent images can import `FaultSession` and wrap tool, memory, browser or retry
