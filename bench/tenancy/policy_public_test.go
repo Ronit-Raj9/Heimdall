@@ -54,6 +54,7 @@ func TestPublicRoutesAreExactlyTheSite(t *testing.T) {
 		"POST /api/bench/auth/device/code",          // Z02: starts a device login, rate limited per IP
 		"POST /api/bench/auth/device/token",         // Z02: the device code is the credential
 		"POST /api/bench/orgs/{org}/otlp/v1/traces", // Z15: org ingest token
+		"POST /api/bench/gateway/usage",             // C03: heimdall plugin usage export, HEIMDALL_GATEWAY_USAGE_SECRET bearer
 		"GET /api/bench/admin/pool/assignments",
 		"POST /api/bench/admin/pool/assignments/{org}/token",
 		"GET /api/bench/status",          // Z14: the public status page

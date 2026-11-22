@@ -227,6 +227,7 @@ var APIRoutes = []RouteDoc{
 	// W7 adaptive trials and suite tiers (adaptive.go, docs/adaptive-trials.md).
 	{Method: "GET", Path: APIPrefix + "/experiments/{id}/adaptive", Tag: "analysis", Summary: "Trials and tier panel (W7): the suite tier, the declared trials policy, the frozen adaptive design, trials used against the maximum, runs saved, the stopping reason, and what more evidence would cost", Response: AdaptiveView{}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/routing", Tag: "runs", Summary: "One run's gateway policy, the Bifrost rows that show which target served each request, and the model fidelity result", Response: schemas.RunRouting{}},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/bifrost", Tag: "runs", Summary: "Through Bifrost (C09): one run's model calls as Bifrost saw them, from the Bifrost log rows, the fault ledger and the heimdall plugin usage records when present: providers and models served, fallbacks, cache hits, faults applied, tokens, cost and latency per call", Response: RunBifrost{}},
 
 	// W10 export (export.go, docs/export.md).
 	{Method: "GET", Path: APIPrefix + "/experiments/{id}/export", Tag: "analysis", Summary: "Download the experiment's sealed results: format=eee (Every Eval Ever aggregate records, one JSON object per line, one per arm; synthetic results refused (409) unless allow_synthetic=true, then labelled), jsonl or csv (one row per sealed run)",

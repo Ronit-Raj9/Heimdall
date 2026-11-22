@@ -323,6 +323,7 @@ on, which is every organization without its own quota row.
 |---|---|---|
 | `HEIMDALL_SHARED_RUNNER_SECRET` | server and `shared-runner` | Secret the shared worker fetches its assignments with (`GET /api/bench/admin/pool/assignments`, no tokens in the answer) and claims one runner token per org with (`POST /api/bench/admin/pool/assignments/{org}/token`; each claim revokes that org's earlier token and is audited in the org's log). Empty turns the shared pool off. Generate with `openssl rand -hex 32`. |
 | `HEIMDALL_MASTER_KEY` | server | Base64 32-byte keystore key: provider keys are encrypted under it. `openssl rand -base64 32`. Losing it loses every stored key. Shared worker tokens are not stored readable: the server keeps only their hashes. |
+| `HEIMDALL_GATEWAY_USAGE_SECRET` | server and `bifrost` | Shared secret for the heimdall Bifrost plugin's usage export: the plugin posts per-request usage rows to the server (`POST /api/bench/gateway/usage`, `Authorization: Bearer`). Only used with the opt-in custom Bifrost build: the default `deploy/bifrost/config.json` has no heimdall entry, since the stock `maximhq/bifrost` image has no heimdall plugin. `deploy/bifrost/config.plugin.json` enables the plugin and reads the secret as `env.HEIMDALL_GATEWAY_USAGE_SECRET`; `deploy/hosted/docker-compose.bifrost-plugin.yml` builds Bifrost from this repo (`transports/Dockerfile`) and mounts it (see "Custom Bifrost build with the Heimdall plugin" below). `bootstrap.sh` generates it when empty. `openssl rand -hex 32`. |
 | `HEIMDALL_SERVER_ADMINS` | server | Comma-separated emails of server admins: quotas, image approval, kill switch. |
 | `HEIMDALL_SHARED_RUNTIME` | `shared-runner` | `auto` (default): every container runs under gVisor (`--runtime runsc`), serving every org. `runsc`: gVisor, only orgs whose runtime is `runsc`. Without a `runsc` runtime on the Docker host the shared worker does not start (fail closed): install gVisor with `sudo sh deploy/hosted/install-gvisor.sh`. |
 | `HEIMDALL_SHARED_ALLOW_RUNC` | `shared-runner` | Operator override, empty by default. `1` lets the shared worker start under runc when the host has no gVisor (or with `HEIMDALL_SHARED_RUNTIME=runc`); it logs a warning on every start and then serves only orgs a server admin set to runtime `runc`. New orgs default to gVisor (`runsc`) and wait for a worker that has it. |
@@ -663,3 +664,14 @@ and the sync and prefetch commands: `docs/library-registry.md`.
   log ([notifications.md](notifications.md), docs/auth.md). Invitations are
   links an admin copies and sends.
 - Master key rotation or a KMS: `HEIMDALL_MASTER_KEY` is one static key.
+
+## Custom Bifrost build with the Heimdall plugin
+
+The default stack runs the stock `maximhq/bifrost` image with `deploy/bifrost/config.json`, which has no heimdall plugin entry. To run the heimdall plugin (faults inside the gateway, run tags, usage export) opt in with the compose override:
+
+```sh
+cd bench/deploy/hosted
+docker compose -f docker-compose.yml -f docker-compose.bifrost-plugin.yml --profile shared-runner up -d --build bifrost
+```
+
+The override builds Bifrost from this repo (`transports/Dockerfile`, context the repo root, plugins/heimdall compiled in) and mounts `deploy/bifrost/config.plugin.json` in place of `config.json`: the same config plus the `heimdall` plugin enabled, `allow_inline_plans` on and usage rows posted to `http://heimdall:8090` with `HEIMDALL_GATEWAY_USAGE_SECRET` (set on both the server and `bifrost`). Without the override nothing about the plugin is loaded. The full flow against a real bifrost-http build (`deploy/bifrost/e2e/run.sh` with `HTTP=1`) has not been run against the hosted stack yet.

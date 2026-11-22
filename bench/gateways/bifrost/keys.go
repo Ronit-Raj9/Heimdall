@@ -63,6 +63,9 @@ func (g *Gateway) MintKey(ctx context.Context, rc *schemas.RunContext) (*schemas
 		}
 		extra["budgets"] = []map[string]any{{"max_limit": usd, "reset_duration": budgetReset}}
 	}
+	if cid := g.runEvalCustomer(rc); cid != "" { // C06: the evaluation budget caps every run key (evalbudget.go)
+		extra["customer_id"] = cid
+	}
 	key, err := g.createVirtualKey(ctx, runID, p, slot, keyID, model, routing, models, extra)
 	if err != nil {
 		g.releaseSlot(slot.Name, runID)

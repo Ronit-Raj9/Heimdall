@@ -119,6 +119,11 @@ type Summary struct {
 	// did not release (not required, not missing) and why it stopped.
 	NotRequired int    `json:"not_required,omitempty"`
 	StopReason  string `json:"stop_reason,omitempty"`
+	// C06 (evalbudget.go): the gateway budget owner of this evaluation, and
+	// whether the gateway reported that budget used up ("stopped by Bifrost
+	// budget").
+	GatewayBudgetID      string `json:"gateway_budget_id,omitempty"`
+	GatewayBudgetStopped bool   `json:"gateway_budget_stopped,omitempty"`
 }
 
 // schedRun is the shared state of one Run call. The spend fields are read
@@ -139,6 +144,8 @@ type schedRun struct {
 	maxCost  float64       // highest observed cost of one run
 	observed bool          // some run's cost was observed
 	freed    chan struct{} // closed and replaced whenever a reservation is released
+
+	evalBudget schemas.EvaluationBudgetGateway // C06: set when the gateway enforces this evaluation's budget; under mu (evalbudget.go)
 
 	// remoteOps counts coordinator calls working on this run outside the
 	// coordinator's lock (a lease being handed out, a completion or release
@@ -205,6 +212,8 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 		return nil, err
 	}
 	r.ctx = ctx
+	closeEvalBudget := r.openEvalBudget(ctx) // C06: the gateway enforces the evaluation budget too (evalbudget.go)
+	defer closeEvalBudget()
 	r.queue = newSlotQueue(initialSlots(m)) // W7 adaptive trials: optional slots wait for the rule (adaptive_sched.go)
 	workers := opts.Concurrency
 	if workers <= 0 {
@@ -267,6 +276,7 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 						return
 					}
 					r.process(ctx, slot)
+					r.checkEvalBudget(ctx) // C06
 					r.queue.doneLocal()
 					r.queue.markDone(slot.SlotID) // stream mode: the chain's next slot may start
 				}
@@ -295,8 +305,8 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 	r.mu.Lock()
 	out, stopped := r.sum, r.stopped
 	r.mu.Unlock()
-	r.adaptiveSummary(&out) // W7
-	if stopped {
+	r.adaptiveSummary(&out)                   // W7
+	if stopped && !out.GatewayBudgetStopped { // C06: a gateway budget stop has its own event (evalbudget.go)
 		r.s.logger.Warn("spend cap stopped leasing", "experiment", m.ExpID, "cap_usd", r.capUSD(),
 			"spent_usd", out.SpentUSD, "pending", out.Pending, "unknown_cost_runs", out.UnknownCostRuns)
 		r.emit(Event{Kind: EventBudgetStop, Message: fmt.Sprintf("spend cap %.2f USD reached at %.4f USD; %d slots not leased; %d runs had an unknown cost, counted at the per-run estimate; raise the cap with run -resume %s -total-usd <usd>",

@@ -126,12 +126,52 @@ export interface EvaluationSpec {
 	concurrency?: number;
 	/** The size preset the wizard started from; the numbers above are what runs. first_look (lane Z01): 1 benchmark, 5 tasks, 1 trial, 5 at a time; too small for a verdict. */
 	preset?: EvaluationPresetId | "first_look";
+	/** Bifrost cache on vs off (score mode): the server adds a second arm that is the same agent with Bifrost's semantic cache on. */
+	bifrost_cache?: boolean;
+	/** How arms reach the tasks' MCP tool servers: unset or "direct" through the tool proxy, "bifrost" through Bifrost's MCP gateway, "bifrost_code_mode" the same with Code Mode. */
+	mcp_route?: EvaluationMCPRoute;
+	/** Provider failover: a second arm with Bifrost fallbacks, run under an outage of the primary model. One arm only. */
+	failover?: EvaluationFailover;
+}
+
+/** Bifrost fallbacks for the agent's model, on the same provider; tried in order when the primary fails. */
+export interface EvaluationFailover {
+	enabled: boolean;
+	fallbacks: { provider?: string; model: string }[];
+	outage_status?: number;
+}
+
+/** The report card's "Provider failover" section (reportcard Report.failover). */
+export interface FailoverArmStats {
+	calls: number;
+	errors: number;
+	fallback_served: number;
+	mean_latency_ms: number;
+	cost_usd: number;
+	cost_known: boolean;
+	task_success: boolean;
+	success_rate?: number;
+}
+
+export interface FailoverReport {
+	clean: FailoverArmStats;
+	failover: FailoverArmStats;
+	no_failover: FailoverArmStats;
+	failover_worked: boolean;
+	extra_latency_ms: number;
+	cost_change_usd?: number;
+	success_with_failover: boolean;
+	success_without_failover: boolean;
+	summary: string;
+	per_run?: boolean;
 }
 
 export type EvaluationPresetId = "quick" | "standard" | "thorough";
 
 /** The estimate request: a spec, plus `presets: true` to also get the three preset sizes. */
 export type EstimateRequest = EvaluationSpec & { presets?: boolean };
+
+export type EvaluationMCPRoute = "direct" | "bifrost" | "bifrost_code_mode";
 
 /** What an evaluation must show to pass. Scores are fractions (0 to 1). */
 export interface EvaluationGate {
@@ -658,6 +698,10 @@ export interface Report {
 	where?: Record<string, string>;
 	/** Only when voice calls ran with personas or audio tests besides the plain caller. */
 	voice_calls?: ReportVoiceCallRow[];
+	/** Through Bifrost (C09): per arm, what the Bifrost gateway did across the runs. */
+	bifrost?: ReportBifrostRow[];
+	/** Only when the evaluation ran the provider failover option. */
+	failover?: FailoverReport;
 }
 
 /** One metadata key and its values, each with per arm scores over the tasks with that value. */
@@ -691,6 +735,19 @@ export function evaluationReportUrl(arg: EvaluationReportArg): string {
 		.map(([k, v]) => `where=${encodeURIComponent(`${k}:${v}`)}`)
 		.join("&");
 	return qs ? `${base}?${qs}` : base;
+}
+
+/** One arm's Bifrost numbers over every benchmark; an absent count was not observed by any run. */
+export interface ReportBifrostRow {
+	arm: string;
+	runs: number;
+	fallback_runs?: number;
+	fallback_known: number;
+	cache_hits?: number;
+	retries?: number;
+	input_tokens?: number;
+	cost_usd?: number;
+	cost_runs: number;
 }
 
 /** One arm's numbers over the whole evaluation; absent fields are unknown. */

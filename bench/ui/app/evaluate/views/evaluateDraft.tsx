@@ -1,4 +1,4 @@
-import type { EvaluationArm, EvaluationMode, EvaluationPresetId, EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
+import type { EvaluationArm, EvaluationFailover, EvaluationMCPRoute, EvaluationMode, EvaluationPresetId, EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 /**
@@ -34,6 +34,12 @@ export interface EvaluateDraft {
 	preset?: EvaluationPresetId | null;
 	/** The worker the evaluation runs on; "" is the org's default worker. */
 	worker?: string;
+	/** Bifrost cache on vs off (score mode only). */
+	bifrostCache?: boolean;
+	/** How the arms reach MCP tool servers; unset is direct (the tool proxy only). */
+	mcpRoute?: EvaluationMCPRoute;
+	/** Provider failover option (score mode only). */
+	failover?: EvaluationFailover | null;
 	/** Arms dropped by a mode change (for example arm B in "score"), so going back restores their models. */
 	stashedArms?: EvaluationArm[];
 }
@@ -115,6 +121,9 @@ export function draftToSpec(d: EvaluateDraft): EvaluationSpec {
 		...(d.worker ? { worker: d.worker } : {}),
 		...(d.concurrency ? { concurrency: d.concurrency } : {}),
 		...(d.preset ? { preset: d.preset } : {}),
+		...(d.bifrostCache && d.mode === "score" ? { bifrost_cache: true } : {}),
+		...(d.mcpRoute && d.mcpRoute !== "direct" ? { mcp_route: d.mcpRoute } : {}),
+		...(d.failover?.enabled && d.arms.length === 1 ? { failover: d.failover } : {}),
 	};
 }
 
@@ -142,6 +151,9 @@ export function specToPatch(spec: EvaluationSpec): Partial<EvaluateDraft> {
 		worker: spec.worker ?? "",
 		concurrency: spec.concurrency ?? null,
 		preset: spec.preset === "first_look" ? null : (spec.preset ?? null), // first_look (Connect box) is not a wizard size preset
+		bifrostCache: Boolean(spec.bifrost_cache),
+		mcpRoute: spec.mcp_route ?? "direct",
+		failover: spec.failover ?? null,
 	};
 }
 

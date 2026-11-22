@@ -59,6 +59,9 @@ const (
 	ToolInputDrift      = "tool-input-drift"
 	ToolDuplicateEffect = "tool-duplicate-effect"
 	CompoundBrownout    = "compound-brownout-rate-limit"
+	// PrimaryOutage is the outage of the provider failover option (lane C07).
+	// It is not in Catalog: the evaluation adds it when failover is on.
+	PrimaryOutage = "primary-outage"
 )
 
 // Fault is one fault an evaluation can ask for, as the UI lists it.
@@ -120,6 +123,7 @@ var modelModes = map[string]string{
 	ModelBrownout: schemas.GenericProbeModelBrownout,
 	ModelSlow:     schemas.GenericProbeModelSlow,
 	ModelFlaky:    schemas.GenericProbeModelFlaky,
+	PrimaryOutage: schemas.GenericProbePrimaryOutage,
 }
 
 // Skip is a fault that cannot run on a benchmark, with the reason in plain
@@ -162,7 +166,7 @@ func Conditions(names []string, s *schemas.Suite) (conds []string, skipped []Ski
 			} else {
 				skipped = append(skipped, Skip{Fault: name, Reason: fmt.Sprintf("benchmark %s has no misleading or stale notes probe", suiteID(s))})
 			}
-		case ModelBrownout, ModelSlow, ModelFlaky:
+		case ModelBrownout, ModelSlow, ModelFlaky, PrimaryOutage:
 			add(modelModes[name])
 		case ToolRateLimit, ToolSlow, ToolFlaky, ToolPartial, ToolAuthExpired, ToolRemoved, ToolInputDrift, ToolDuplicateEffect:
 			if id, reason := toolFault(s, name); id != "" {
@@ -282,7 +286,7 @@ func Map(names []string, s *schemas.Suite) map[string]string {
 			id, _ = brokenTool(s)
 		case MisleadingInstruction:
 			id = misleading(s)
-		case ModelBrownout, ModelSlow, ModelFlaky:
+		case ModelBrownout, ModelSlow, ModelFlaky, PrimaryOutage:
 			id = modelModes[name]
 		case ToolRateLimit, ToolSlow, ToolFlaky, ToolPartial, ToolAuthExpired, ToolRemoved, ToolInputDrift, ToolDuplicateEffect:
 			id, _ = toolFault(s, name)

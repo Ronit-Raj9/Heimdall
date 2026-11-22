@@ -35,11 +35,20 @@ const (
 // semantic cache key (scoped by experiment, then arm, then task), type, TTL
 // and threshold. Nil when the arm sets none.
 func BifrostHeaders(rc *schemas.RunContext) map[string]string {
-	if rc == nil || rc.Agent == nil || rc.Agent.Gateway.Bifrost == nil {
+	if rc == nil {
 		return nil
 	}
-	f := rc.Agent.Gateway.Bifrost
 	h := map[string]string{}
+	for k, v := range rc.FaultHeaders { // C04: heimdall plugin fault plan and run tags
+		h[k] = v
+	}
+	if rc.Agent == nil || rc.Agent.Gateway.Bifrost == nil {
+		if len(h) == 0 {
+			return nil
+		}
+		return h
+	}
+	f := rc.Agent.Gateway.Bifrost
 	switch f.PromptCache {
 	case schemas.PromptCacheAutoInject:
 		h["x-bf-prompt-cache-auto-inject"] = "true"
@@ -101,6 +110,14 @@ func addBifrostEnv(plan *schemas.RunPlan, rc *schemas.RunContext) {
 		}
 		plan.Env[envClaudeCustomHeader] = strings.Join(lines, "\n")
 	}
+}
+
+// CarriesGatewayHeaders reports whether the agent is known to send the
+// run's extra gateway headers on every model request: Claude Code reads
+// ANTHROPIC_CUSTOM_HEADERS. Others get BENCH_GATEWAY_HEADERS too, but may
+// ignore it, so a fault that must fire is not trusted to them (lane C04).
+func CarriesGatewayHeaders(cfg *schemas.AgentConfig) bool {
+	return cfg != nil && nativeCLI(cfg) == ParserClaudeCode
 }
 
 func headersJSON(h map[string]string) string {

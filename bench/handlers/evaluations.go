@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/failover"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -467,6 +468,14 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 	default:
 		return badf("mode %q is not one of score, versions, models, opponent", spec.Mode)
 	}
+	if spec.BifrostCache {
+		if spec.Mode != schemas.EvaluationModeScore {
+			return badf("Bifrost cache on vs off takes one agent (mode score): the server adds the cache-on arm")
+		}
+		if spec.Stream != nil {
+			return badf("Bifrost cache on vs off cannot be combined with memory carried from task to task")
+		}
+	}
 	for i := range spec.Arms {
 		a := &spec.Arms[i]
 		if a.Label == "" {
@@ -526,6 +535,9 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 	if err := normalizeFirstLook(spec); err != nil { // lane Z01 (evaluationpreset.go)
 		return err
 	}
+	if err := normalizeMCPRoute(spec); err != nil {
+		return err
+	}
 	if spec.TasksPerBenchmark == 0 {
 		spec.TasksPerBenchmark = EvaluationDefaultTasks
 	}
@@ -557,6 +569,9 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 		if err := spec.Stream.Validate(nil); err != nil {
 			return badf("%v", err)
 		}
+	}
+	if err := normalizeFailover(spec); err != nil {
+		return err
 	}
 	fs := []string{faults.Clean}
 	for _, f := range spec.Faults {
@@ -834,6 +849,11 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 		}
 		f.Stream = &st
 	}
+	if spec.BifrostCache && len(spec.Arms) == 1 {
+		// Bifrost cache on vs off: the same arm again with a semantic cache
+		// key on every model request; the spec's arm is the cache-off arm.
+		f.Arms[schemas.EvaluationCacheArm] = cacheOnArm(f.Arms[spec.Arms[0].Label])
+	}
 	if _, _, err := s.Projects.Read(work, projectfs.AreaPolicies, strings.TrimPrefix(quickRunPolicy, "policies/")); err == nil {
 		f.Policy = quickRunPolicy
 	}
@@ -927,10 +947,14 @@ func evalStreamControl(spec schemas.EvaluationSpec) bool {
 // evalArmCount is the experiment arms one benchmark of spec runs: one per
 // spec arm, plus the no-memory control when there is one.
 func evalArmCount(spec schemas.EvaluationSpec) int {
-	if evalStreamControl(spec) {
-		return len(spec.Arms) + 1
+	n := len(spec.Arms)
+	if spec.BifrostCache && len(spec.Arms) == 1 {
+		n++ // the cache-on copy (lane C08)
 	}
-	return len(spec.Arms)
+	if evalStreamControl(spec) || evalFailover(spec) {
+		n++ // the no-memory control or the failover arm (lane C07)
+	}
+	return n
 }
 
 // streamControlArm is base without memory: the same agent and model,
@@ -940,6 +964,23 @@ func streamControlArm(base schemas.ArmSpec) schemas.ArmSpec {
 	ctl := withSet(base, map[string]any{"env." + schemas.StreamControlEnv: "1"})
 	ctl.Label = base.Label + schemas.StreamControlSuffix
 	return ctl
+}
+
+// cacheOnArm is base with Bifrost's semantic cache engaged: direct mode
+// (exact request match), keyed per task so one task's answers are never
+// served to another, entries kept 1 hour. The planner refuses the arm when
+// the gateway is not Bifrost or its semantic_cache plugin is not loaded
+// without a default_cache_key (engine/bifrostfeatures.go).
+func cacheOnArm(base schemas.ArmSpec) schemas.ArmSpec {
+	on := withSet(base, map[string]any{"gateway.bifrost": map[string]any{
+		"semantic_cache": map[string]any{
+			"mode":  schemas.SemanticCacheDirect,
+			"scope": schemas.SemanticCacheScopeTask,
+			"ttl":   "1h",
+		},
+	}})
+	on.Label = base.Label + schemas.EvaluationCacheSuffix
+	return on
 }
 
 // evaluationPoolResolver resolves the worker an evaluation runs on (hosted
@@ -1021,9 +1062,45 @@ func evalArms(spec schemas.EvaluationSpec) map[string]schemas.ArmSpec {
 				arm.Agent += fmt.Sprintf("@v%d", a.Version)
 			}
 		}
-		out[a.Label] = arm
+		out[a.Label] = withSet(arm, mcpRouteSet(spec.MCPRoute))
+	}
+	if evalFailover(spec) { // lane C07: the agent again, with Bifrost fallbacks
+		a := spec.Arms[0]
+		provider, model := failoverTarget(a)
+		if set, err := failover.RoutingSet(provider, model, *spec.Failover); err == nil {
+			arm := withSet(out[a.Label], set)
+			arm.Label += failover.ArmLabelSuffix
+			out[failover.ArmID] = arm
+		}
 	}
 	return out
+}
+
+// normalizeMCPRoute keeps spec.MCPRoute empty for the direct route (so
+// evaluations that never chose one hash as before) and refuses unknown
+// routes.
+func normalizeMCPRoute(spec *schemas.EvaluationSpec) error {
+	switch spec.MCPRoute = strings.TrimSpace(spec.MCPRoute); spec.MCPRoute {
+	case "", schemas.MCPRouteDirect:
+		spec.MCPRoute = ""
+	case schemas.MCPRouteBifrost, schemas.MCPRouteBifrostCodeMode:
+	default:
+		return badf("mcp_route must be %s, %s or %s", schemas.MCPRouteDirect, schemas.MCPRouteBifrost, schemas.MCPRouteBifrostCodeMode)
+	}
+	return nil
+}
+
+// mcpRouteSet is the arm override of an MCP route: gateway.bifrost.mcp for
+// the Bifrost routes (the planner then serves the run's MCP servers through
+// Bifrost's MCP gateway, engine/bifrostfeatures.go), nothing for direct.
+func mcpRouteSet(route string) map[string]any {
+	switch route {
+	case schemas.MCPRouteBifrost:
+		return map[string]any{"gateway.bifrost.mcp.code_mode": false}
+	case schemas.MCPRouteBifrostCodeMode:
+		return map[string]any{"gateway.bifrost.mcp.code_mode": true}
+	}
+	return nil
 }
 
 // normalizeSplit keeps spec.Split empty for a public evaluation and

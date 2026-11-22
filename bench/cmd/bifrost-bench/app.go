@@ -21,6 +21,7 @@ import (
 	"github.com/maximhq/bifrost/bench/evidence"
 	"github.com/maximhq/bifrost/bench/faultproxy"
 	"github.com/maximhq/bifrost/bench/gates"
+	"github.com/maximhq/bifrost/bench/gateways/bifrost"
 	"github.com/maximhq/bifrost/bench/graders"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/metrics"
@@ -104,7 +105,11 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 	var gw schemas.Gateway
 	if opts.gateway {
 		fp := faultproxy.NewClient(cfg.FaultProxy.ControlURL, faultproxy.WithToken(os.Getenv("BENCH_FAULTPROXY_TOKEN")))
-		fault = fp
+		// C04: HEIMDALL_FAULT_MODE=plugin hands model faults to the heimdall
+		// Bifrost plugin for agents that send its headers; default proxy.
+		if fault, err = bifrost.FaultControllerFromEnv(fp); err != nil {
+			return nil, err
+		}
 		a.upstreams = proxyUpstreams{fp}
 		gw, err = newGateway(ctx, cfg, a.docker, logger, fp) // F1: the plan-writing client holds the slot claims
 		if err != nil {

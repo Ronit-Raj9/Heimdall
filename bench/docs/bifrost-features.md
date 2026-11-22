@@ -92,6 +92,36 @@ run's tool proxy are up and its key is minted (`engine/bifrostfeatures.go`,
    (Bifrost deletes a key's grants with the client); the janitor sweeps any a
    killed bench process left.
 
+**Per evaluation (`mcp_route`).** An evaluation (`POST /api/bench/evaluations`,
+wizard step 4 "MCP tools") can set `mcp_route` for all its arms:
+`direct` (the default, stored as unset) leaves the tool proxy as the only hop;
+`bifrost` sets `gateway.bifrost.mcp.code_mode: false` on every arm, and
+`bifrost_code_mode` sets it to `true` (`handlers/evaluations.go`,
+`mcpRouteSet`). The planner then does everything above per run. A benchmark
+the planner refuses for it (no visible MCP service, or an agent that cannot
+reach the gateway) is skipped with the refusal as its reason; the other
+benchmarks run. To compare direct against Bifrost, use an experiment with the
+arms shown at the top of this file instead.
+
+**Trade-off: tool faults and the tool proxy.** Routing through Bifrost does not
+replace the tool proxy: each Bifrost MCP client points at the run's proxy route
+(`http://tp-<run id>:9200/s/<service>/mcp`), so the chain is agent, Bifrost,
+tool proxy, MCP server. Tool probes (`broken-tool` and every `apply.tool`
+fault in `docs/tool-proxy.md`) still fire at the proxy, and the proxy ledger
+stays the first witness. What changes: (1) the agent sees a fault after
+Bifrost relays it, so Bifrost may reshape an error (a JSON-RPC error becomes
+Bifrost's tool error body) and adds its own latency, which shifts `timeout`
+and latency faults by a few milliseconds; (2) a fault that cuts the stream
+(`drop`, `disconnect`) is seen by Bifrost, which answers the agent with its
+own error, not a broken connection; (3) Bifrost's MCP log records a faulted
+call as an error row, so `bifrost_mcp_witness` still matches call for call;
+(4) in Code Mode one program may make several proxied calls, so a fault
+counted by call number (`from_call`) counts the program's inner calls, not
+the agent's turns. Faults that must reach the agent byte for byte are best
+run with `mcp_route: direct`. Points (2) and (3) are expected from how
+Bifrost relays MCP calls and were not yet checked on a live stack for this
+option.
+
 Plan-time refusals (with the arm named): a scripted control that runs without
 the gateway network (only `toy` and `mcploop` can reach it), a remote agent,
 a team, a suite with no visible MCP service, an empty `gateway.bifrost`.
@@ -177,6 +207,31 @@ miss row of the same run stored), and `bifrost-bench bifrost cache-replays
 (Bifrost logs the entry's `cache_id` on the storing miss row and on every hit)
 and counts hits in the same run, in another trial or arm of the same task,
 and in another task (a cross-task replay, printed with a warning).
+
+#### Bifrost cache on vs off (evaluation option)
+
+An evaluation in score mode can make the cache its test variable:
+`"bifrost_cache": true` on `POST /api/bench/evaluations` (the "Bifrost cache
+on vs off" box in the wizard's setup step). Each benchmark's experiment then
+has two arms: the spec's own arm with the cache off, and arm `cache`
+(label `<arm label> (Bifrost cache on)`), identical except for
+`gateway.bifrost.semantic_cache: {mode: direct, scope: task, ttl: 1h}`
+(handlers/evaluations.go, `cacheOnArm`). Both arms run the same tasks,
+trials and faults, and the estimate counts both. The planner still refuses
+the cache arm unless the gateway is Bifrost with the `semantic_cache` plugin
+loaded and no `default_cache_key`, so the child is skipped with that reason
+on a gateway without the cache. The option cannot be combined with memory
+carried from task to task, nor with an A/B mode.
+
+`bifrost-bench bifrost cache-ab -exp <child experiment id> [-json]`
+(bifrostfeatures.CacheAB) compares the two arms on the clean tasks both
+ran: model requests, cache hits and hit rate, mean latency per model
+request, cost (the run's `cost_usd`, else the rows' Bifrost price), cost
+saved (cache-off cost per run minus cache-on cost per run, times the
+cache-on runs), and the change in verified success, with a one-line
+summary that flags a success drop as possible stale replies. The paired
+verdict on `verified_success` between the arms is the significance test for
+the quality change.
 
 ### Complexity router
 

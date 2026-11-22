@@ -5,6 +5,7 @@ import { useConfirm } from "@/components/platform/confirmDialog";
 import { EvaluationReportCard } from "@/components/reportcard/evaluationReportCard";
 import { GateResultCard, PromoteEvaluation, RepeatEvaluation } from "@/components/releases/promoteEvaluation";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
+import { EvaluationBifrostSection } from "@/components/bifrost/bifrostUse";
 import { ShareButton } from "@/components/share/shareDialog";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Button } from "@/components/ui/button";
@@ -104,6 +105,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 				)}
 			</Section>
 			<RaiseBudgetPanel evaluation={evaluation} />
+			<EvaluationBifrostSection evaluationId={evaluation.id} />
 			{skipped.length > 0 && (
 				<Section title={t("detail.skippedTitle")} description={t("detail.skippedDescription")} testId="evaluation-skipped">
 					<ul className="flex flex-col gap-1 text-sm">

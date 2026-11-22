@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { ArrowUpRight, Check, ChevronRight, Download, Equal, Link2 } from "lucide-react";
 import * as React from "react";
+import { BifrostTable, hasBifrost } from "./bifrostSection";
 import { hasLearning, hasPersistence, LearningTable, PersistenceTable } from "./learningSections";
 import { hasVoice, VoiceTable } from "./voiceSection";
 import { hasVoiceCalls, VoiceCallsTable } from "./voiceCallsSection";
@@ -39,6 +40,7 @@ import {
 } from "./reportCard.utils";
 import { ReliabilityCards, ResilienceCard } from "./reliabilityCards";
 import { ReportFilterBar, ReportSlices } from "./reportSlices";
+import { FailoverSection } from "@/components/evaluations/failoverSettings";
 
 function costText(m: ReportArmMetrics): string {
 	const c = costDisplay(m);
@@ -121,6 +123,8 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 				</Section>
 			)}
 
+			{report.failover && <FailoverSection report={report.failover} />}
+
 			{report.reliability.length > 0 && (
 				<Section title="Faults" description="Score when something goes wrong, and how far it drops from a clean run.">
 					<ReliabilityTable report={report} />
@@ -151,6 +155,12 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 					description="Task success, graded on the call transcript, and call quality with each simulated caller: accents, pace, interruptions, noise and phone lines."
 				>
 					<VoiceCallsTable report={report} />
+				</Section>
+			)}
+
+			{hasBifrost(report) && (
+				<Section title="Through Bifrost" description="What the Bifrost gateway did for each agent's model calls: fallbacks, cache hits, retries, tokens and cost.">
+					<BifrostTable report={report} />
 				</Section>
 			)}
 

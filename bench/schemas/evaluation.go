@@ -52,7 +52,10 @@ type EvaluationSpec struct {
 	TasksPerBenchmark int             `json:"tasks_per_benchmark"` // default 10 (the Quick look preset), admitted tasks only
 	Trials            int             `json:"trials"`              // repeats per task, default 1 (more tasks beat more trials)
 	Faults            []string        `json:"faults"`              // "clean" always; plus model-down, broken-tool, misleading-instruction
-	BudgetUSD         float64         `json:"budget_usd,omitempty"`
+	// Failover is the "Provider failover" option (lane C07): a second arm
+	// with Bifrost fallbacks and a primary model outage condition.
+	Failover  *FailoverOption `json:"failover,omitempty"`
+	BudgetUSD float64         `json:"budget_usd,omitempty"`
 	// Split is the task split the evaluation runs: public (the default) or
 	// held_out, an explicit opt-in for a held-out evaluation. Tasks of the
 	// other split never run in it.
@@ -78,10 +81,39 @@ type EvaluationSpec struct {
 	// score mode, concurrency 5; its report card says it is too small for a
 	// verdict.
 	Preset string `json:"preset,omitempty"`
+	// BifrostCache makes Bifrost's semantic cache the test variable
+	// ("Bifrost cache on vs off"): score mode only, the one arm runs with
+	// the cache off and the server adds a second arm, identical except that
+	// every model request sends a semantic cache key (direct mode, scoped
+	// to the task, 1 hour TTL), so the report can show the hit rate and the
+	// latency, cost and quality change the cache brings
+	// (bifrostfeatures.CacheAB).
+	BifrostCache bool `json:"bifrost_cache,omitempty"`
+	// MCPRoute is how every arm reaches the tasks' MCP tool servers:
+	// "" or "direct" through the tool proxy only, "bifrost" through
+	// Bifrost's MCP gateway (gateway.bifrost.mcp, classic tools),
+	// "bifrost_code_mode" the same with Code Mode clients. Through Bifrost
+	// the tool proxy still sits behind Bifrost, so tool faults keep working
+	// (docs/bifrost-features.md, "MCP through Bifrost").
+	MCPRoute string `json:"mcp_route,omitempty"`
 }
 
 // EvaluationPresetFirstLook is the first-look preset (EvaluationSpec.Preset).
 const EvaluationPresetFirstLook = "first_look"
+
+// EvaluationCacheArm is the arm id of the cache-on copy an evaluation with
+// BifrostCache adds; the spec's own arm is the cache-off arm.
+const EvaluationCacheArm = "cache"
+
+// EvaluationCacheSuffix ends the label of that arm.
+const EvaluationCacheSuffix = " (Bifrost cache on)"
+
+// MCP routes of an evaluation (EvaluationSpec.MCPRoute).
+const (
+	MCPRouteDirect          = "direct"
+	MCPRouteBifrost         = "bifrost"
+	MCPRouteBifrostCodeMode = "bifrost_code_mode"
+)
 
 // EvaluationGate is what an evaluation must show to pass. Scores are
 // verified success rates (0 to 1) over clean runs, per capability.

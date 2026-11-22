@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/failover"
 	"io/fs"
 	"math"
 	"slices"
@@ -209,6 +210,12 @@ type Report struct {
 	// of the voice benchmarks (caller personas, voice probes); nil without
 	// a voice run under a condition other than clean (voicecalls.go).
 	VoiceCalls []VoiceCallRow `json:"voice_calls,omitempty"`
+	// Bifrost is the Through Bifrost section (bifrost.go): per arm, what
+	// the Bifrost gateway did across the runs; nil when no arm has a run.
+	Bifrost []BifrostRow `json:"bifrost,omitempty"`
+	// Failover is the "Provider failover" section (lane C07, failover.go);
+	// nil unless the evaluation ran the failover option.
+	Failover *failover.Report `json:"failover,omitempty"`
 }
 
 // LearningRow is one arm's learning summary on one benchmark.
@@ -480,6 +487,12 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 		rep.Where = opt.Where
 	}
 	rep.VoiceCalls = voiceCallRows(children, labels)
+	rep.Bifrost = bifrostRows(children, labels)
+	fo, err := failoverSection(ctx, src, ev)
+	if err != nil {
+		return nil, err
+	}
+	rep.Failover = fo
 	return rep, nil
 }
 

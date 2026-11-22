@@ -20,6 +20,7 @@ require (
 	github.com/maximhq/bifrost/framework v1.12.1
 	github.com/maximhq/bifrost/plugins/compat v0.5.5
 	github.com/maximhq/bifrost/plugins/governance v1.12.1
+	github.com/maximhq/bifrost/plugins/heimdall v0.0.0-00010101000000-000000000000
 	github.com/maximhq/bifrost/plugins/logging v1.12.1
 	github.com/maximhq/bifrost/plugins/maxim v1.7.16
 	github.com/maximhq/bifrost/plugins/modelcatalogresolver v1.1.16
@@ -241,3 +242,6 @@ require (
 )
 
 replace github.com/mark3labs/mcp-go => github.com/maximhq/mcp-go v0.0.0-20261102181017-b7da3bc145a1
+
+// Heimdall plugin lives in this repo (plugins/heimdall) and is not published.
+replace github.com/maximhq/bifrost/plugins/heimdall => ../plugins/heimdall

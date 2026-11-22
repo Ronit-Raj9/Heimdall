@@ -75,6 +75,8 @@ type EvalEstimateRequest struct {
 
 	orgSlots int     // the org's worker slots (0: not bounded here)
 	dailyCap float64 // the org's daily spend cap (0: none)
+	// BifrostCache adds the cache-on copy of the one arm (cacheOnArm).
+	BifrostCache bool `json:"bifrost_cache,omitempty"`
 }
 
 // streamControl reports whether the launch adds the no-memory control arm
@@ -85,6 +87,9 @@ func (r *EvalEstimateRequest) streamControl() bool {
 
 // armCount is the experiment arms one benchmark runs, the control included.
 func (r *EvalEstimateRequest) armCount() int {
+	if r.BifrostCache && len(r.Arms) == 1 {
+		return 2
+	}
 	if r.streamControl() {
 		return len(r.Arms) + 1
 	}

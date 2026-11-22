@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
+import { FailoverSettings, failoverProblem } from "@/components/evaluations/failoverSettings";
 import { GateSettings } from "@/components/releases/gateSettings";
 import {
 	type EvaluationEstimate,
+	type EvaluationMCPRoute,
 	type EvaluationSpec,
 	type FaultCatalogItem,
 	useEstimateEvaluationQuery,
@@ -96,6 +98,27 @@ export function defaultEvaluationSpec(): EvaluationSpec {
 	};
 }
 
+/** The MCP routes step 4 offers, in order. */
+export const MCP_ROUTES: { id: EvaluationMCPRoute; label: string; help: string }[] = [
+	{ id: "direct", label: "Direct", help: "The agent calls the task's MCP servers through Heimdall's tool proxy." },
+	{
+		id: "bifrost",
+		label: "Through Bifrost MCP gateway",
+		help: "Each run gets its own Bifrost MCP clients and MCP key, so every tool call shows in Bifrost's MCP logs. Tool faults still apply: the tool proxy sits behind Bifrost.",
+	},
+	{
+		id: "bifrost_code_mode",
+		label: "Through Bifrost, Code Mode",
+		help: "As above, but the agent sees Bifrost's Code Mode tools and writes programs that call the servers.",
+	},
+];
+
+/** spec with route set; "direct" leaves mcp_route out so the spec is as before. */
+export function withMCPRoute(spec: EvaluationSpec, route: EvaluationMCPRoute): EvaluationSpec {
+	const { mcp_route: _old, ...rest } = spec;
+	return route === "direct" ? rest : { ...rest, mcp_route: route };
+}
+
 /** Faults with "clean" always first and present, no repeats. */
 export function toggleFault(faults: string[], fault: string, on: boolean): string[] {
 	const rest = faults.filter((f) => f !== "clean" && f !== fault);
@@ -107,7 +130,12 @@ export function toggleFault(faults: string[], fault: string, on: boolean): strin
  * arm on an agent in `owns` (it brings its own model) may leave the model blank.
  */
 export function specReady(spec: EvaluationSpec, owns: ReadonlySet<string> = new Set()): boolean {
-	return (spec.benchmarks.length > 0 || Boolean(spec.pack)) && spec.arms.length > 0 && spec.arms.every((a) => armHasModel(a, owns));
+	return (
+		(spec.benchmarks.length > 0 || Boolean(spec.pack)) &&
+		spec.arms.length > 0 &&
+		spec.arms.every((a) => armHasModel(a, owns)) &&
+		failoverProblem(spec.arms[0], spec.failover) === ""
+	);
 }
 
 function money(n: number): string {
@@ -379,6 +407,64 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 					</fieldset>
 				))}
 			</section>
+
+			{spec.mode === "score" ? (
+				<section className="flex flex-col gap-2">
+					<h3 className="text-base font-semibold">Bifrost cache</h3>
+					<label className="flex items-start gap-2 text-sm" data-testid="step4-bifrost-cache">
+						<input
+							type="checkbox"
+							className="mt-1"
+							checked={Boolean(spec.bifrost_cache)}
+							onChange={(e) => {
+								const { bifrost_cache: _old, ...rest } = spec;
+								onChange(e.target.checked ? { ...rest, bifrost_cache: true } : rest);
+							}}
+						/>
+						<span>
+							<span className="font-medium">Bifrost cache on vs off</span>
+							<span className="text-muted-foreground block">
+								Runs your agent twice, identical except that Bifrost&apos;s semantic cache is on for the second copy. The report shows the cache hit
+								rate, the latency and cost saved, and any change in success. Doubles the runs.
+							</span>
+						</span>
+					</label>
+				</section>
+			) : null}
+
+			<section className="flex flex-col gap-2" data-testid="step4-mcp-route">
+				<h3 className="text-base font-semibold">MCP tools</h3>
+				<p className="text-muted-foreground text-sm">
+					How agents reach the task's MCP tool servers. Benchmarks with no MCP server, and agents that cannot reach Bifrost, are skipped
+					when routed through Bifrost.
+				</p>
+				{MCP_ROUTES.map((r) => (
+					<label key={r.id} className="flex items-start gap-2 text-sm" data-testid={`step4-mcp-route-${r.id}`}>
+						<input
+							type="radio"
+							name="step4-mcp-route"
+							className="mt-1"
+							checked={(spec.mcp_route ?? "direct") === r.id}
+							onChange={() => onChange(withMCPRoute(spec, r.id))}
+						/>
+						<span>
+							<span className="font-medium">{r.label}</span>
+							<span className="text-muted-foreground block">{r.help}</span>
+						</span>
+					</label>
+				))}
+			</section>
+
+			{spec.arms.length === 1 && (
+				<FailoverSettings
+					arm={spec.arms[0]}
+					value={spec.failover}
+					onChange={(failover) => {
+						const { failover: _old, ...rest } = spec;
+						onChange(failover ? { ...rest, failover } : rest);
+					}}
+				/>
+			)}
 
 			<GateSettings
 				gate={spec.gate}
