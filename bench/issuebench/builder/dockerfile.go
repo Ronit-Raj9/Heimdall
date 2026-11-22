@@ -8,15 +8,40 @@ import (
 
 // readOnlyRe matches commands that only look around; they are not recorded
 // as install steps.
-var readOnlyRe = regexp.MustCompile(`^\s*(ls|cat|head|tail|grep|rg|find|pwd|echo|which|type|env|printenv|wc|file|stat|tree|less|more|python[0-9.]*\s+(-V|--version)|pip[0-9.]*\s+(list|show|freeze|--version)|uv\s+--version|git\s+(status|log|diff|show))\b`)
+var readOnlyRe = regexp.MustCompile(`^\s*(ls|cat|head|tail|grep|rg|find|pwd|echo|printf|which|type|env|printenv|wc|file|stat|tree|less|more|true|sed\s+-n|python[0-9.]*\s+(-V|--version)|python[0-9.]*\s+-m\s+pip\s+(list|show|freeze|--version)|pip[0-9.]*\s+(list|show|freeze|--version)|uv\s+--version|git\s+(status|log|diff|show))\b`)
 
-// stateChanging says whether a successful command belongs in the Dockerfile.
+// setupRe matches the parts of a command that only set up the shell for
+// the next part (the builder's own cd and export prefix).
+var setupRe = regexp.MustCompile(`^\s*(cd\s+\S+|export(\s+[A-Za-z_][A-Za-z0-9_]*=\S*)+)\s*$`)
+
+// splitRe cuts a one-line command at its && ; || and | separators. It does
+// not parse quotes: a part that only looks read-only because of a quoted
+// separator is rare, and Heimdall's fresh-container check then fails the
+// build instead of hiding it.
+var splitRe = regexp.MustCompile(`&&|\|\||;|\|`)
+
+// stateChanging says whether a successful command belongs in the
+// Dockerfile: not when every part only looks around (after the cd and
+// export prefix), as in "cd /testbed && python -V && sed -n 1,80p setup.cfg".
 func stateChanging(cmd string) bool {
 	c := strings.TrimSpace(cmd)
 	if c == "" || strings.HasPrefix(c, "#") {
 		return false
 	}
-	return !readOnlyRe.MatchString(c)
+	if strings.Contains(c, "\n") || strings.Contains(c, "<<") || strings.Contains(c, ">") {
+		return true // heredocs, scripts and redirects may write files
+	}
+	looked := false
+	for _, part := range splitRe.Split(c, -1) {
+		switch {
+		case strings.TrimSpace(part) == "" || setupRe.MatchString(part):
+		case readOnlyRe.MatchString(part):
+			looked = true
+		default:
+			return true
+		}
+	}
+	return !looked
 }
 
 // GitInstallRun installs git when the base image lacks it.

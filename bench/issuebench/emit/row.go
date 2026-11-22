@@ -65,7 +65,10 @@ func ProblemStatement(c issuebench.Candidate) string {
 
 // RowOf builds the row for one validated candidate. base is the commit of
 // the scrubbed repository (fresh history), image the thin per-task image.
-func RowOf(v issuebench.Validation, env issuebench.EnvSpec, base, image string) Row {
+func RowOf(v issuebench.Validation, env issuebench.EnvSpec, base, image, license string) Row {
+	if license == "" {
+		license = LicenseUnknown
+	}
 	c := v.Candidate
 	r := Row{
 		InstanceID:       InstanceID(c),
@@ -78,7 +81,7 @@ func RowOf(v issuebench.Validation, env issuebench.EnvSpec, base, image string) 
 		FailToPass:       append([]string{}, v.FailToPass...),
 		PassToPass:       append([]string{}, v.PassToPass...),
 		Image:            image,
-		LicenseName:      "proprietary",
+		LicenseName:      license,
 	}
 	if cmd := TestCmd(env, c); cmd != "" {
 		r.TestCmds = []string{cmd}

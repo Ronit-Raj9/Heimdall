@@ -80,3 +80,23 @@ func TestDockerfileInstallsGit(t *testing.T) {
 		t.Fatalf("Dockerfile has no git install before the steps:\n%s", df)
 	}
 }
+
+// The builder's cd/export prefix made every inspection a RUN line (real
+// hosted run: "cd /testbed && python -V && sed -n '1,220p' pyproject.toml").
+func TestStateChangingSkipsPrefixedInspection(t *testing.T) {
+	pre := "cd /testbed && export PIP_DISABLE_PIP_VERSION_CHECK=1 UV_EXCLUDE_NEWER=2026-04-02T12:53:27Z && "
+	for cmd, want := range map[string]bool{
+		pre + "python -V && sed -n '1,220p' pyproject.toml && printf '--- tox.ini ---' && sed -n '1,120p' tox.ini": false,
+		pre + "python -m pip list | grep pytest":    false,
+		pre + "python -m pip install -e '.[tests]'": true,
+		pre + "cat setup.cfg && pip install pytest": true,
+		pre + "echo x > conftest.py":                true,
+		"python - <<'PY'\nprint(1)\nPY":             true,
+		"cd /testbed && export A=1":                 true,
+		"ls -la":                                    false,
+	} {
+		if got := stateChanging(cmd); got != want {
+			t.Errorf("stateChanging(%q) = %v, want %v", cmd, got, want)
+		}
+	}
+}

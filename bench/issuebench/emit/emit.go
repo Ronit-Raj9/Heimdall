@@ -120,6 +120,7 @@ func emitRepo(ctx context.Context, im importers.Importer, repo string, in []Inpu
 	var rows bytes.Buffer
 	var ready []prepared
 	var cands []issuebench.Candidate
+	suiteLicense := ""
 	for _, x := range in {
 		id := InstanceID(x.Validation.Candidate)
 		if why := Usable(x.Validation); why != "" {
@@ -129,6 +130,13 @@ func emitRepo(ctx context.Context, im importers.Importer, repo string, in []Inpu
 		if x.RepoDir == "" {
 			out.Skipped = append(out.Skipped, importers.Skip{ID: id, Reason: "no checkout of the base commit"})
 			continue
+		}
+		lic := DetectLicense(x.RepoDir)
+		switch {
+		case suiteLicense == "":
+			suiteLicense = lic
+		case suiteLicense != lic:
+			suiteLicense = LicenseUnknown
 		}
 		base, err := ScrubGit(ctx, x.RepoDir)
 		if err != nil {
@@ -144,7 +152,7 @@ func emitRepo(ctx context.Context, im importers.Importer, repo string, in []Inpu
 		if err != nil {
 			return nil, err
 		}
-		b, err := json.Marshal(RowOf(x.Validation, x.Env, base, layers.TaskRef))
+		b, err := json.Marshal(RowOf(x.Validation, x.Env, base, layers.TaskRef, lic))
 		if err != nil {
 			return nil, err
 		}
@@ -169,7 +177,7 @@ func emitRepo(ctx context.Context, im importers.Importer, repo string, in []Inpu
 		Extra: map[string]string{
 			"benchmark":      "issuebench",
 			"workspace_path": Workspace,
-			"license":        "proprietary",
+			"license":        licenseOr(suiteLicense),
 		},
 		Logger: opts.Logger,
 	}
@@ -372,4 +380,11 @@ func wrongScript(patch string) string {
 	}
 	return "#!/bin/sh\n# Wrong patch control: a near miss that must fail the tests.\nset -e\n" +
 		"git -c safe.directory='*' apply --whitespace=nowarn - <<'" + delim + "'\n" + patch + delim + "\n"
+}
+
+func licenseOr(l string) string {
+	if l == "" {
+		return LicenseUnknown
+	}
+	return l
 }

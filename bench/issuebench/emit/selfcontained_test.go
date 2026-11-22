@@ -128,7 +128,7 @@ func TestEmitSelfContainRefuses(t *testing.T) {
 	}
 	repo := t.TempDir()
 	big := make([]byte, issuebench.MaxRepoArchiveBytes+(1<<20)-(64<<10)) // about 8.9 MiB compressed
-	_, _ = rand.Read(big) // random bytes do not compress
+	_, _ = rand.Read(big)                                                // random bytes do not compress
 	must(t, os.WriteFile(filepath.Join(repo, "blob.bin"), big, 0o644))
 	task := mkTask()
 	err := SelfContain(task, env, repo)

@@ -153,8 +153,8 @@ type Item struct {
 	Validation  *issuebench.Validation `json:"validation,omitempty"`
 	Instruction string                 `json:"instruction,omitempty"` // edited instruction; empty uses the issue text
 	Options     BuildOptions           `json:"options,omitempty"`
-	JobID       string                 `json:"job_id,omitempty"` // the job running or last run for this issue
-	Stage       string                 `json:"stage,omitempty"`  // build, validate or checks (issuebench.Stage*)
+	JobID       string                 `json:"job_id,omitempty"`   // the job running or last run for this issue
+	Stage       string                 `json:"stage,omitempty"`    // build, validate or checks (issuebench.Stage*)
 	CostUSD     float64                `json:"cost_usd,omitempty"` // builds run for this issue, a failed one included
 }
 
