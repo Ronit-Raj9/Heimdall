@@ -343,6 +343,8 @@ func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.Work
 			r.remoteOps.Add(1) // detach waits for this call (2-A-07)
 		}
 	}
+	// X2: fewest leases out, then oldest turn, then attach order (fairlease.go).
+	exps = c.fairOrderLocked(exps)
 	accept := remoteGPUAccept(w.info.GPUs, c.gpusHeldLocked(workerID)) // X7: GPU slots only to a worker with free GPUs (gpu.go)
 	c.mu.Unlock()
 	defer func() {
@@ -381,6 +383,7 @@ func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.Work
 			return nil, nil
 		}
 		c.leases[id] = l
+		r.lastLeased = c.now() // X2: its turn is taken (fairlease.go)
 		w.info.Running = append(w.info.Running, slot.SlotID)
 		w.info.State = schemas.WorkerRunning
 		l.persisted = l.lastBeat
@@ -681,6 +684,7 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 	l.r.emit(Event{Kind: EventRunSealed, SlotID: l.slot.SlotID, RunID: res.Run.RunID, Stage: schemas.StageSeal, Outcome: res.Run.Outcome,
 		Message: "sealed on remote worker " + l.worker})
 	again := res.Run.Outcome == schemas.OutcomeAbortedInfra && l.r.attemptsLeft(ctx, l.slot)
+	again = c.remoteRunEnded(l, res.Run, again) // X2: retry wait and same-error stop (infrastop.go)
 	l.r.endRemote(l, again)
 	return out, nil
 }
@@ -1281,6 +1285,7 @@ func (r *schedRun) leaseRemoteWhere(owner string, accept func(*schemas.Task) boo
 	if accept != nil {
 		match = func(s *schemas.Slot) bool { return accept(r.suite.TaskByID(s.Task)) }
 	}
+	match = r.retryWaitMatch(match) // X2: a slot inside its retry wait stays queued (fairlease.go)
 	for r.ctx.Err() == nil {
 		slot, ok := r.queue.takeWhere(match)
 		if !ok {
