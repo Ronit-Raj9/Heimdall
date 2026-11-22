@@ -25,8 +25,32 @@ const data: RunBifrost = {
 	latency_ms: 1520,
 	avg_latency_ms: 760,
 	call_list: [
-		{ id: "p", at: "", provider: "anthropic", model_requested: "claude-sonnet-4-5", model_served: "claude-sonnet-4-5", status: "error", error_status: 503, fallback_index: 0, cache_hit: false, fault: "inject 503", latency_ms: 20 },
-		{ id: "f", at: "", provider: "openai", model_requested: "claude-sonnet-4-5", model_served: "gpt-5", status: "success", fallback_index: 1, cache_hit: true, tokens: tok(100, 20), cost_usd: 0.002, latency_ms: 1500 },
+		{
+			id: "p",
+			at: "",
+			provider: "anthropic",
+			model_requested: "claude-sonnet-4-5",
+			model_served: "claude-sonnet-4-5",
+			status: "error",
+			error_status: 503,
+			fallback_index: 0,
+			cache_hit: false,
+			fault: "inject 503",
+			latency_ms: 20,
+		},
+		{
+			id: "f",
+			at: "",
+			provider: "openai",
+			model_requested: "claude-sonnet-4-5",
+			model_served: "gpt-5",
+			status: "success",
+			fallback_index: 1,
+			cache_hit: true,
+			tokens: tok(100, 20),
+			cost_usd: 0.002,
+			latency_ms: 1500,
+		},
 	],
 };
 
@@ -59,5 +83,15 @@ describe("ThroughBifrost", () => {
 		expect(usd(0.5)).toBe("$0.5000");
 		expect(ms(12.4)).toBe("12 ms");
 		expect(runBifrostPath("a/b")).toBe("/runs/a%2Fb/bifrost");
+	});
+	it("says which path applied the faults", () => {
+		const plugin = renderToStaticMarkup(<ThroughBifrost data={{ ...data, fault_path: "plugin" }} arm="A" />);
+		expect(plugin).toContain("1 (inside Bifrost, by the Heimdall plugin)");
+		const proxy = renderToStaticMarkup(<ThroughBifrost data={{ ...data, fault_path: "proxy" }} arm="A" />);
+		expect(proxy).toContain("1 (by the fault proxy behind Bifrost)");
+		const mixed = renderToStaticMarkup(<ThroughBifrost data={{ ...data, fault_path: "mixed" }} arm="A" />);
+		expect(mixed).toContain("1 (some by the plugin, some by the proxy)");
+		const none = renderToStaticMarkup(<ThroughBifrost data={{ ...data, faults: 0, fault_path: undefined }} arm="A" />);
+		expect(none).not.toContain("by the");
 	});
 });

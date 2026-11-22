@@ -39,6 +39,8 @@ export interface RunBifrost {
 	latency_ms: number;
 	avg_latency_ms: number;
 	call_list: BifrostCall[];
+	/** Where the run's faults were applied: plugin (inside Bifrost), proxy (the fault proxy behind Bifrost) or mixed; absent when none was. */
+	fault_path?: "plugin" | "proxy" | "mixed";
 }
 
 export const runBifrostApi = benchApi.injectEndpoints({

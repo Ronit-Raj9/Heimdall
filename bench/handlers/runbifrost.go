@@ -79,6 +79,12 @@ type RunBifrost struct {
 	LatencyMS  float64        `json:"latency_ms"`         // sum over calls
 	AvgLatency float64        `json:"avg_latency_ms"`
 	CallList   []BifrostCall  `json:"call_list"`
+	// FaultPath is where the run's faults were applied: "plugin" (inside
+	// Bifrost, by the Heimdall plugin), "proxy" (by the fault proxy behind
+	// Bifrost) or "mixed" (some each). It is the run's gateway.fault_path,
+	// or "proxy" for a run with faults and no recorded path (the default
+	// proxy mode). Empty when no fault was applied.
+	FaultPath string `json:"fault_path,omitempty"`
 }
 
 // RunBifrostHandler serves the Through Bifrost panel.
@@ -168,7 +174,24 @@ func LoadRunBifrost(index ReadIndex, runID, org string) (*RunBifrost, error) {
 			}
 		}
 	}
-	return BuildRunBifrost(runID, ev.Requests, ev.Ledger, usage), nil
+	out := BuildRunBifrost(runID, ev.Requests, ev.Ledger, usage)
+	if rv, ok := index.Run(runID); ok {
+		out.FaultPath = faultPathOf(rv.Run.Gateway.FaultPath, out.Faults)
+	}
+	return out, nil
+}
+
+// faultPathOf is the panel's fault path: the recorded one, else "proxy"
+// when faults were applied (the fault proxy is the default mode and records
+// no path), else empty.
+func faultPathOf(recorded string, faults int) string {
+	switch {
+	case faults == 0:
+		return ""
+	case recorded != "":
+		return recorded
+	}
+	return "proxy"
 }
 
 // pluginUsageOf maps the ingest route's records to the panel's usage rows.

@@ -77,7 +77,8 @@ type RunListFacets struct {
 	Models      []string `json:"models"`
 }
 
-// RunList is GET /runs: one page of runs, newest first, the number that
+// RunList is GET /runs: one page of runs in the asked order (newest first by
+// default), the number that
 // matched the filters, and the facets.
 type RunList struct {
 	Runs   []RunListRow  `json:"runs"`
@@ -147,10 +148,11 @@ func (f runListFilter) match(row RunListRow) bool {
 // rowAgent is the agent a run used: its config id, else its arm id.
 func rowAgent(row RunListRow) string { return cmp.Or(row.ConfigID, row.Arm) }
 
-// listRuns handles GET /api/bench/runs?exp=&suite=&benchmark=&arm=&agent=&model=&task=&condition=&fault=&outcome=&track=&limit=&offset=.
-// Every run of every experiment the index holds, attempts included, newest
-// start first. A filter value that is not a valid id is a 400; limit is
-// capped at runListMaxLimit.
+// listRuns handles GET /api/bench/runs?exp=&suite=&benchmark=&arm=&agent=&model=&task=&condition=&fault=&outcome=&track=&sort=&dir=&limit=&offset=.
+// Every run of every experiment the index holds, attempts included, in the
+// order of sort and dir (default newest start first), sorted before paging.
+// A filter value that is not a valid id, or an unknown sort or dir, is a
+// 400; limit is capped at runListMaxLimit.
 func (h *RunListHandler) listRuns(ctx *fasthttp.RequestCtx) {
 	if h.index == nil {
 		sendUnavailable(ctx, h.mode, "run index")
@@ -179,6 +181,10 @@ func (h *RunListHandler) listRuns(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	limit = min(max(limit, 1), runListMaxLimit)
+	order, ok := h.sortArgs(ctx)
+	if !ok {
+		return
+	}
 
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
@@ -196,28 +202,41 @@ func (h *RunListHandler) listRuns(ctx *fasthttp.RequestCtx) {
 			views[row.RunID] = rv
 		}
 	}
-	slices.SortFunc(all, func(a, b RunListRow) int {
-		return cmp.Or(compareTimeDesc(a.Started, b.Started), cmp.Compare(a.ExpID, b.ExpID), cmp.Compare(a.RunID, b.RunID))
-	})
 
 	out := RunList{Runs: []RunListRow{}, Limit: limit, Offset: offset, Facets: runListFacets(all)}
+	var matched []RunListRow
 	for _, row := range all {
-		if !f.match(row) {
-			continue
+		if f.match(row) {
+			matched = append(matched, row)
 		}
-		if out.Total >= offset && len(out.Runs) < limit {
-			out.Runs = append(out.Runs, row)
-		}
-		out.Total++
 	}
-	page := make([]RunView, 0, len(out.Runs))
-	for _, row := range out.Runs {
+	out.Total = len(matched)
+	// A sort on a metric reads metrics.json for every matched run, so the
+	// order holds across pages; any other sort reads it for the page only.
+	if order.needsMetrics() {
+		fillRunMetrics(h.index, matched, views)
+	}
+	order.sort(matched)
+	if offset < len(matched) {
+		out.Runs = matched[offset:min(offset+limit, len(matched))]
+	}
+	if !order.needsMetrics() {
+		fillRunMetrics(h.index, out.Runs, views)
+	}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+}
+
+// fillRunMetrics sets the cost, steps, tool calls and tokens of rows from
+// each run's metrics.json.
+func fillRunMetrics(index ReadIndex, rows []RunListRow, views map[string]RunView) {
+	page := make([]RunView, 0, len(rows))
+	for _, row := range rows {
 		page = append(page, views[row.RunID])
 	}
-	read := runMetrics(h.index, page)
+	read := runMetrics(index, page)
 	costs := costsOf(page, read)
-	for i := range out.Runs {
-		r := &out.Runs[i]
+	for i := range rows {
+		r := &rows[i]
 		if c, found := costs[r.RunID]; found {
 			r.CostUSD = &c
 		}
@@ -227,7 +246,128 @@ func (h *RunListHandler) listRuns(ctx *fasthttp.RequestCtx) {
 			r.Tokens = observed(mr.values, metrics.Tokens)
 		}
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+}
+
+// runListSorts are the sort keys GET /runs accepts, in the order the error
+// message lists them.
+var runListSorts = []string{"started", "duration", "outcome", "cost", "tokens", "steps", "task", "agent"}
+
+// runListOrder is the sort of GET /runs: a key of runListSorts and a
+// direction. The default is started, newest first.
+type runListOrder struct {
+	key  string
+	desc bool
+}
+
+// sortArgs reads sort and dir. An unknown value is a 400 that names the
+// allowed ones.
+func (h *RunListHandler) sortArgs(ctx *fasthttp.RequestCtx) (runListOrder, bool) {
+	args := ctx.QueryArgs()
+	order := runListOrder{key: "started", desc: true}
+	if v := strings.TrimSpace(string(args.Peek("sort"))); v != "" {
+		if !slices.Contains(runListSorts, v) {
+			lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "sort must be one of "+strings.Join(runListSorts, ", "))
+			return order, false
+		}
+		order.key = v
+	}
+	switch v := strings.TrimSpace(string(args.Peek("dir"))); v {
+	case "":
+	case "asc":
+		order.desc = false
+	case "desc":
+		order.desc = true
+	default:
+		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "dir must be one of asc, desc")
+		return order, false
+	}
+	return order, true
+}
+
+// needsMetrics reports whether the sort key is read from metrics.json.
+func (o runListOrder) needsMetrics() bool {
+	return o.key == "cost" || o.key == "tokens" || o.key == "steps"
+}
+
+// sort orders rows in place. A row without a value for the key (no start,
+// no cost, an unsealed run's duration) goes last in either direction; ties
+// keep the default order, newest start first.
+func (o runListOrder) sort(rows []RunListRow) {
+	slices.SortStableFunc(rows, func(a, b RunListRow) int {
+		var c int
+		switch o.key {
+		case "started":
+			c = compareMaybe(timeKey(a.Started), timeKey(b.Started), o.desc)
+		case "duration":
+			c = compareMaybe(durationKey(a), durationKey(b), o.desc)
+		case "cost":
+			c = compareMaybe(costKey(a.CostUSD), costKey(b.CostUSD), o.desc)
+		case "tokens":
+			c = compareMaybe(a.Tokens, b.Tokens, o.desc)
+		case "steps":
+			c = compareMaybe(a.Steps, b.Steps, o.desc)
+		case "outcome":
+			c = flip(cmp.Compare(a.Outcome, b.Outcome), o.desc)
+		case "task":
+			c = flip(cmp.Compare(a.Task, b.Task), o.desc)
+		case "agent":
+			c = flip(cmp.Compare(rowAgent(a), rowAgent(b)), o.desc)
+		}
+		return cmp.Or(c, compareTimeDesc(a.Started, b.Started), cmp.Compare(a.ExpID, b.ExpID), cmp.Compare(a.RunID, b.RunID))
+	})
+}
+
+// flip negates c for a descending sort.
+func flip(c int, desc bool) int {
+	if desc {
+		return -c
+	}
+	return c
+}
+
+// compareMaybe compares two optional values in the given direction, with a
+// missing value after any present one.
+func compareMaybe(a, b *float64, desc bool) int {
+	switch {
+	case a == nil && b == nil:
+		return 0
+	case a == nil:
+		return 1
+	case b == nil:
+		return -1
+	}
+	return flip(cmp.Compare(*a, *b), desc)
+}
+
+// timeKey is t as Unix seconds, nil when absent.
+func timeKey(t *time.Time) *float64 {
+	if t == nil || t.IsZero() {
+		return nil
+	}
+	v := float64(t.UnixNano()) / 1e9
+	return &v
+}
+
+// durationKey is a sealed run's seconds from start to seal, nil when either
+// time is missing.
+func durationKey(r RunListRow) *float64 {
+	if r.Started == nil || r.SealedAt == nil || r.Started.IsZero() || r.SealedAt.IsZero() {
+		return nil
+	}
+	v := r.SealedAt.Sub(*r.Started).Seconds()
+	return &v
+}
+
+// costKey is an observed cost in USD, nil when the cost is not known.
+func costKey(v *schemas.Value) *float64 {
+	if v == nil || !v.IsObserved() {
+		return nil
+	}
+	f, ok := v.Float()
+	if !ok {
+		return nil
+	}
+	return &f
 }
 
 // observed is metric name's value when observed, else nil.

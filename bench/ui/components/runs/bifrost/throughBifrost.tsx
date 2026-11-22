@@ -25,6 +25,16 @@ export function ms(v: number): string {
 	return v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${Math.round(v)} ms`;
 }
 
+/** The "Faults applied" value: the count, and which path applied the faults when the run recorded one. */
+export function faultsValue(
+	data: Pick<RunBifrost, "faults" | "fault_path">,
+	t: (key: "faultPath.plugin" | "faultPath.proxy" | "faultPath.mixed", opts: { n: number }) => string,
+): string {
+	const path = data.fault_path;
+	if (data.faults > 0 && (path === "plugin" || path === "proxy" || path === "mixed")) return t(`faultPath.${path}`, { n: data.faults });
+	return String(data.faults);
+}
+
 /** Lane C09: the run page's Through Bifrost panel, fetched by run id. */
 export function RunThroughBifrost({ runId, arm }: { runId: string; arm: string }) {
 	const { t } = useTranslation("throughBifrost");
@@ -52,13 +62,17 @@ export function ThroughBifrost({ data, arm }: { data: RunBifrost; arm: string })
 				<Stat label={t("stat.calls")} value={String(data.calls)} testId={`bifrost-${arm}-calls`} />
 				<Stat label={t("stat.fallbacks")} value={String(data.fallbacks)} testId={`bifrost-${arm}-fallbacks`} />
 				<Stat label={t("stat.cacheHits")} value={String(data.cache_hits)} testId={`bifrost-${arm}-cache`} />
-				<Stat label={t("stat.faults")} value={String(data.faults)} testId={`bifrost-${arm}-faults`} />
+				<Stat label={t("stat.faults")} value={faultsValue(data, (key, opts) => t(key, opts))} testId={`bifrost-${arm}-faults`} />
 				<Stat label={t("stat.errors")} value={String(data.errors)} testId={`bifrost-${arm}-errors`} />
 				<Stat label={t("stat.tokens")} value={tokens.toLocaleString("en-US")} testId={`bifrost-${arm}-tokens`} />
 				<Stat
 					label={t("stat.cost")}
 					value={data.cost_usd != null ? usd(data.cost_usd) : t("costUnknown")}
-					note={data.cost_usd != null && data.cost_known < data.calls ? t("costPartial", { known: data.cost_known, calls: data.calls }) : undefined}
+					note={
+						data.cost_usd != null && data.cost_known < data.calls
+							? t("costPartial", { known: data.cost_known, calls: data.calls })
+							: undefined
+					}
 					testId={`bifrost-${arm}-cost`}
 				/>
 				<Stat label={t("stat.latency")} value={ms(data.avg_latency_ms)} testId={`bifrost-${arm}-latency`} />
