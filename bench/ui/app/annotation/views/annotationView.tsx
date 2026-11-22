@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusPill } from "@/components/ui/statusPill";
 import { canUse, useSession } from "@/lib/session/sessionContext";
-import { useCreateAnnotationQueueMutation, useGetAnnotationQueuesQuery } from "@/lib/store/apis/annotationApi";
-import { getBenchErrorMessage, useGetSuitesQuery } from "@/lib/store/apis/benchApi";
+import { useCreateAnnotationQueueMutation, useGetAnnotationPeopleQuery, useGetAnnotationQueuesQuery } from "@/lib/store/apis/annotationApi";
+import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import type { AnnotationAssignment, AnnotationKind, AnnotationQueue, AnnotationQueueRequest } from "@/lib/types/annotation";
 import { Link } from "@tanstack/react-router";
 import { Plus, Tags } from "lucide-react";
@@ -39,6 +40,115 @@ export function parseLabellers(text: string): string[] {
 				.map((s) => s.trim())
 				.filter(Boolean),
 		),
+	);
+}
+
+/** True when people per item is not a whole number from 1 to 5 (N167): the form says so and disables saving; the value
+ * is never clamped. */
+export function perItemProblem(n: number): boolean {
+	return !Number.isInteger(n) || n < 1 || n > 5;
+}
+
+/**
+ * Who may label a queue (N168): every member, or only the people ticked in the list of members by name (user id in the
+ * tooltip). An id on the queue that is not a member shows as an unknown person with Remove. A local server has no
+ * members list, so it keeps the free-text box of user ids. `value` is the queue's labeller ids; empty means every member.
+ */
+export function LabellerPicker({
+	value,
+	onChange,
+	disabled,
+	testId,
+}: {
+	value: string[];
+	onChange: (ids: string[]) => void;
+	disabled?: boolean;
+	testId: string;
+}) {
+	const { t } = useTranslation("annotation");
+	const people = useGetAnnotationPeopleQuery();
+	const [only, setOnly] = useState(value.length > 0);
+	const [text, setText] = useState(value.join(", "));
+	if (people.data?.local) {
+		return (
+			<Field label={t("create.labellersIds")} hint={`${t("create.labellersLocal")} ${t("create.labellersHint")}`}>
+				<Input
+					value={text}
+					onChange={(e) => {
+						setText(e.target.value);
+						onChange(parseLabellers(e.target.value));
+					}}
+					disabled={disabled}
+					data-testid={`${testId}-text`}
+				/>
+			</Field>
+		);
+	}
+	const list = people.data?.people ?? [];
+	const known = new Set(list.map((p) => p.user_id));
+	const unknown = value.filter((id) => !known.has(id));
+	const toggle = (id: string, on: boolean) => onChange(on ? [...value.filter((v) => v !== id), id] : value.filter((v) => v !== id));
+	return (
+		<fieldset className="flex min-w-0 flex-col gap-2 text-sm" disabled={disabled} data-testid={testId}>
+			<legend className="text-muted-foreground mb-1">{t("create.labellers")}</legend>
+			<div className="flex flex-wrap gap-4">
+				<label className="flex items-center gap-2">
+					<input
+						type="radio"
+						name={`${testId}-mode`}
+						checked={!only}
+						onChange={() => {
+							setOnly(false);
+							onChange([]);
+						}}
+						data-testid={`${testId}-every`}
+					/>
+					{t("create.labellersEvery")}
+				</label>
+				<label className="flex items-center gap-2">
+					<input type="radio" name={`${testId}-mode`} checked={only} onChange={() => setOnly(true)} data-testid={`${testId}-only`} />
+					{t("create.labellersOnly")}
+				</label>
+			</div>
+			{only && (
+				<div className="flex flex-col gap-1">
+					{people.isLoading ? (
+						<BlockSkeleton rows={2} testId={`${testId}-loading`} />
+					) : people.error ? (
+						<span role="alert" className="text-chart-error-ink text-xs">
+							{t("create.labellersLoadError")}
+						</span>
+					) : (
+						<>
+							<span className="text-muted-foreground text-xs">{t("create.labellersPick")}</span>
+							<ul className="flex max-h-48 flex-col gap-1 overflow-auto">
+								{list.map((p) => (
+									<li key={p.user_id}>
+										<label className="flex items-center gap-2" title={p.user_id}>
+											<input
+												type="checkbox"
+												checked={value.includes(p.user_id)}
+												onChange={(e) => toggle(p.user_id, e.target.checked)}
+												data-testid={`${testId}-person-${p.user_id}`}
+											/>
+											{p.name}
+										</label>
+									</li>
+								))}
+							</ul>
+						</>
+					)}
+					{unknown.map((id) => (
+						<div key={id} className="flex items-center gap-2 text-xs">
+							<span className="text-chart-warning-ink">{t("create.labellersUnknown", { id })}</span>
+							<Button type="button" size="sm" variant="ghost" onClick={() => toggle(id, false)} data-testid={`${testId}-remove-${id}`}>
+								{t("create.labellersRemove")}
+							</Button>
+						</div>
+					))}
+				</div>
+			)}
+		</fieldset>
 	);
 }
 
@@ -136,18 +246,18 @@ export function queueRequest(form: {
 	reviewers: number;
 	blind: boolean;
 	assignment: AnnotationAssignment;
-	labellers: string;
+	labellers: string[];
 	instructions: string;
 }): AnnotationQueueRequest {
 	const body: AnnotationQueueRequest = {
 		name: form.name.trim(),
 		kind: form.kind,
-		reviewers_per_item: Math.min(5, Math.max(1, Math.trunc(form.reviewers) || 1)),
+		reviewers_per_item: form.reviewers,
 		blind: form.blind,
 		assignment: form.assignment,
 	};
 	if (form.benchmark) body.benchmark = form.benchmark;
-	const labellers = parseLabellers(form.labellers);
+	const labellers = Array.from(new Set(form.labellers));
 	if (labellers.length) body.reviewers = labellers;
 	if (form.instructions.trim()) body.instructions = form.instructions.trim();
 	return body;
@@ -155,7 +265,7 @@ export function queueRequest(form: {
 
 function CreateQueueForm({ onDone }: { onDone: () => void }) {
 	const { t } = useTranslation("annotation");
-	const suites = useGetSuitesQuery();
+	const suites = useGetSuitesLightQuery();
 	const [create, created] = useCreateAnnotationQueueMutation();
 	const [form, setForm] = useState({
 		name: "",
@@ -164,7 +274,7 @@ function CreateQueueForm({ onDone }: { onDone: () => void }) {
 		reviewers: 2,
 		blind: true,
 		assignment: "open" as AnnotationAssignment,
-		labellers: "",
+		labellers: [] as string[],
 		instructions: "",
 	});
 	const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -175,7 +285,7 @@ function CreateQueueForm({ onDone }: { onDone: () => void }) {
 				className="bg-card grid min-w-0 grid-cols-1 gap-4 rounded-xl border p-5 md:grid-cols-2"
 				onSubmit={(e) => {
 					e.preventDefault();
-					if (!form.name.trim()) return;
+					if (!form.name.trim() || perItemProblem(form.reviewers)) return;
 					void create(queueRequest(form))
 						.unwrap()
 						.then(onDone)
@@ -217,13 +327,14 @@ function CreateQueueForm({ onDone }: { onDone: () => void }) {
 						<option value="judge">{t("create.kindJudge")}</option>
 					</select>
 				</Field>
-				<Field label={t("create.reviewers")} hint={t("create.reviewersHint")}>
+				<Field label={t("create.reviewers")} hint={perItemProblem(form.reviewers) ? t("create.reviewersRange") : t("create.reviewersHint")}>
 					<Input
 						type="number"
 						min={1}
 						max={5}
-						value={form.reviewers}
-						onChange={(e) => set("reviewers", Number(e.target.value))}
+						value={Number.isNaN(form.reviewers) ? "" : form.reviewers}
+						onChange={(e) => set("reviewers", e.target.value === "" ? Number.NaN : Number(e.target.value))}
+						aria-invalid={perItemProblem(form.reviewers) || undefined}
 						data-testid="annotation-create-reviewers"
 					/>
 				</Field>
@@ -238,9 +349,7 @@ function CreateQueueForm({ onDone }: { onDone: () => void }) {
 						<option value="fixed">{t("create.assignmentFixed")}</option>
 					</select>
 				</Field>
-				<Field label={t("create.labellers")} hint={t("create.labellersHint")}>
-					<Input value={form.labellers} onChange={(e) => set("labellers", e.target.value)} data-testid="annotation-create-labellers" />
-				</Field>
+				<LabellerPicker value={form.labellers} onChange={(ids) => set("labellers", ids)} testId="annotation-create-labellers" />
 				<label className="flex items-center gap-2 text-sm md:col-span-2">
 					<input
 						type="checkbox"
@@ -267,7 +376,11 @@ function CreateQueueForm({ onDone }: { onDone: () => void }) {
 					<Button type="button" variant="ghost" onClick={onDone}>
 						{t("create.cancel")}
 					</Button>
-					<Button type="submit" disabled={created.isLoading || !form.name.trim()} data-testid="annotation-create-submit">
+					<Button
+						type="submit"
+						disabled={created.isLoading || !form.name.trim() || perItemProblem(form.reviewers)}
+						data-testid="annotation-create-submit"
+					>
 						{t("create.submit")}
 					</Button>
 				</div>

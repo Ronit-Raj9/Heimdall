@@ -991,7 +991,7 @@ func (h *agentBuilder) createFromTemplate(ctx *fasthttp.RequestCtx, req AgentFro
 func (h *agentBuilder) agentID(ctx *fasthttp.RequestCtx) (string, bool) {
 	id, _ := ctx.UserValue("id").(string)
 	if !agentIDRe.MatchString(id) {
-		h.badRequest(ctx, fmt.Sprintf("agent id %q is not valid", id))
+		h.badRequest(ctx, fmt.Sprintf("agent id %q: use lowercase letters, digits, '.', '_' or '-', starting with a letter or digit, at most 63 characters", id))
 		return "", false
 	}
 	return id, true

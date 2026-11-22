@@ -42,12 +42,17 @@ export interface AgentVersion {
 	hash: string;
 	created_at: string;
 	created_by: string;
+	created_by_name?: string;
 	note: string;
 	/** Runs made with this version; present on the list endpoint. */
 	runs?: number;
 	/** The Files API version of agents/<id>.yaml this snapshot was taken from (GET /project/versions/agents/<id>.yaml). */
 	file_version?: string;
 	file_sha256?: string;
+}
+
+export interface AgentVersionCreated extends AgentVersion {
+	created: boolean;
 }
 
 /** GET /agents/{id}/versions */
@@ -874,14 +879,16 @@ export function emptyReport(): Report {
 }
 
 /**
- * GET /agents/{id}/report-card answers {agent, version, model, report}, with report null when no
+ * GET /agents/{id}/report-card answers {agent, version, model, report, models}, with report null when no
  * evaluation ran the agent. Both that wrapper and a bare report become a Report; no report is an
- * empty one (evaluation "").
+ * empty one (evaluation ""). models (the models the agent's evaluations used) is kept on the result.
  */
-export function unwrapAgentReportCard(body: unknown): Report {
+export function unwrapAgentReportCard(body: unknown): Report & { models?: string[] } {
 	if (body && typeof body === "object" && "report" in body) {
-		const report = (body as { report?: Report | null }).report;
-		return report ?? emptyReport();
+		const { report, models } = body as { report?: Report | null; models?: string[] };
+		const out: Report & { models?: string[] } = { ...(report ?? emptyReport()) };
+		if (Array.isArray(models)) out.models = models;
+		return out;
 	}
 	return (body as Report | null) ?? emptyReport();
 }
@@ -926,7 +933,7 @@ export const evaluationsApi = benchApi
 				query: ({ agent, version }) => `/agents/${enc(agent)}/versions/${version}`,
 				providesTags: (_r, _e, { agent, version }) => [{ type: "AgentVersions", id: `${agent}@${version}` }],
 			}),
-			snapshotAgentVersion: builder.mutation<AgentVersion, { agent: string; note?: string }>({
+			snapshotAgentVersion: builder.mutation<AgentVersionCreated, { agent: string; note?: string }>({
 				query: ({ agent, note }) => ({
 					url: `/agents/${enc(agent)}/versions`,
 					method: "POST",
@@ -997,7 +1004,7 @@ export const evaluationsApi = benchApi
 				query: (arg) => evaluationReportUrl(arg),
 				providesTags: (_r, _e, arg) => [{ type: "Evaluations", id: `${typeof arg === "string" ? arg : arg.id}/report` }],
 			}),
-			getAgentReportCard: builder.query<Report, { agent: string; version?: number; model?: string }>({
+			getAgentReportCard: builder.query<Report & { models?: string[] }, { agent: string; version?: number; model?: string }>({
 				query: (params) => agentReportCardRequest(params),
 				transformResponse: (body: unknown) => unwrapAgentReportCard(body),
 				providesTags: (_r, _e, { agent }) => [{ type: "Evaluations", id: `card/${agent}` }],

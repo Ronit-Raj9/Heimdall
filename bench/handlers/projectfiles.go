@@ -60,9 +60,17 @@ type ProjectFileSaved struct {
 
 // ProjectFileVersions is GET /project/versions/{area}/{path}.
 type ProjectFileVersions struct {
-	Area     string              `json:"area"`
-	Path     string              `json:"path"`
-	Versions []projectfs.Version `json:"versions"`
+	Area     string               `json:"area"`
+	Path     string               `json:"path"`
+	Versions []ProjectFileVersion `json:"versions"`
+}
+
+// ProjectFileVersion is one saved version of a file: ActorName is how its
+// actor is shown (actornames.go); an email actor is left out for a caller
+// who is not an org admin.
+type ProjectFileVersion struct {
+	projectfs.Version
+	ActorName string `json:"actor_name,omitempty"`
 }
 
 // maxExportBytes bounds GET /project/export.zip (uncompressed input).
@@ -351,10 +359,14 @@ func (h *projectFilesHandler) versions(ctx *fasthttp.RequestCtx) {
 		h.sendStoreError(ctx, rel, err)
 		return
 	}
-	if vs == nil {
-		vs = []projectfs.Version{}
+	out := ProjectFileVersions{Area: string(a), Path: strings.Trim(rel, "/"), Versions: make([]ProjectFileVersion, 0, len(vs))}
+	names := newActorNames(ctx)
+	for _, v := range vs {
+		pv := ProjectFileVersion{Version: v}
+		pv.Actor, pv.ActorName = names.show(v.Actor)
+		out.Versions = append(out.Versions, pv)
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, ProjectFileVersions{Area: string(a), Path: strings.Trim(rel, "/"), Versions: vs})
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
 }
 
 // export streams every area as one zip (area/<path>); .git, .heimdall,

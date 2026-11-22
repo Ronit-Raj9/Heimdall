@@ -187,7 +187,7 @@ func (c *counter) top() string {
 func InferAgent(spans []agentevents.Span) Draft {
 	d := Draft{Spans: len(spans)}
 	var agents, services, models, providers, frameworks, languages, routes counter
-	var subagents counter
+	var subagents, otherModels counter
 	tools := map[string]*ToolSeen{}
 	var toolOrder []string
 	declared := map[string]bool{}
@@ -259,6 +259,12 @@ func InferAgent(spans []agentevents.Span) Draft {
 				models.add(m)
 			}
 		}
+		// Any other span that is not a tool call and names a model
+		// (planning, retrieval spans) is a fallback: it is used only when no
+		// model or agent span names one.
+		if sp.Type != agentevents.TypeLLM && sp.Type != agentevents.TypeAgent && sp.Type != agentevents.TypeToolCall {
+			otherModels.add(first(a, "gen_ai.request.model", "gen_ai.response.model", "llm.model_name"))
+		}
 		for _, n := range declaredTools(a) {
 			declared[n] = true
 		}
@@ -285,6 +291,9 @@ func InferAgent(spans []agentevents.Span) Draft {
 		d.Framework = "langgraph"
 	}
 	d.Language = languages.top()
+	if len(models.order) == 0 {
+		models = otherModels
+	}
 	d.Models = models.sorted()
 	d.Provider = providers.top()
 	for _, s := range subagents.sorted() {

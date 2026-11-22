@@ -57,6 +57,7 @@ export function FailoverSettings({ arm, value, onChange }: FailoverSettingsProps
 						value={fb ? { provider: fb.provider ?? "", model: fb.model } : null}
 						onChange={(v) => onChange({ enabled: true, fallbacks: [{ provider: v.provider, model: v.model }] })}
 						testId="step4-failover-model"
+						providers={armProvider(arm) ? [armProvider(arm)] : []}
 					/>
 					{problem && (
 						<p className="text-destructive text-xs" data-testid="step4-failover-problem">

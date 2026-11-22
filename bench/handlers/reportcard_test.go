@@ -86,3 +86,35 @@ func TestReportCardRoutes(t *testing.T) {
 		t.Fatalf("no index: %d", code)
 	}
 }
+
+// TestAgentReportCardListsModels: the agent report card answer lists the
+// models the agent's evaluations used, for the Model filter (N34).
+func TestAgentReportCardListsModels(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, filepath.FromSlash(ReportCardEvaluationsDir))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, ev := range []schemas.Evaluation{
+		{ID: "ev_1", Status: "done", CreatedAt: time.Now(), Spec: schemas.EvaluationSpec{Mode: "models", Arms: []schemas.EvaluationArm{
+			{Label: "A", Agent: "codex", Model: "gpt-6-luna"}, {Label: "B", Agent: "codex", Model: "gpt-6.2-sol"},
+		}}},
+		{ID: "ev_2", Status: "done", CreatedAt: time.Now(), Spec: schemas.EvaluationSpec{Mode: "score", Arms: []schemas.EvaluationArm{
+			{Label: "A", Agent: "other", Model: "claude-x"},
+		}}},
+	} {
+		data, _ := json.Marshal(ev)
+		if err := os.WriteFile(filepath.Join(dir, ev.ID+".json"), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	env := OrgEnv{Cfg: &lib.Config{Root: root}, Mode: testMode, Services: Services{Index: leaderboardIndex()}}
+	code, body := reportCardServe(t, env, APIPrefix+"/agents/codex/report-card")
+	if code != fasthttp.StatusOK {
+		t.Fatalf("agent card %d %v", code, body)
+	}
+	models, _ := body["models"].([]any)
+	if len(models) != 2 || models[0] != "gpt-6-luna" || models[1] != "gpt-6.2-sol" {
+		t.Fatalf("models %v, want [gpt-6-luna gpt-6.2-sol]", body["models"])
+	}
+}

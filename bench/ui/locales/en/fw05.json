@@ -20,5 +20,30 @@
 	},
 	"name": {
 		"label": "Name"
+	},
+	"problem": {
+		"noBenchmark": "Pick at least one benchmark.",
+		"noModel": "Pick a model for setup {{label}}."
+	},
+	"slots": {
+		"overWorker": "Your worker runs {{n}} runs at a time, so {{value}} runs at once is no faster than {{n}}."
+	},
+	"launch": {
+		"budgetNotNumber": "Enter an amount in dollars, for example 5.",
+		"budgetNotPositive": "Enter an amount above $0, or leave the box empty for the default of ${{cap}} per benchmark.",
+		"budgetTooHigh": "The most one evaluation can spend is ${{max}}.",
+		"budgetAboveSuggested": "This is above the suggested maximum of {{max}} for your organization.",
+		"latestVersion": " latest version"
+	},
+	"own": {
+		"noLetters": "Use letters or digits in the name.",
+		"builtinTaken": "{{id}} is a built-in benchmark. Pick another name.",
+		"orgTaken": "Your organization already has a benchmark called {{id}}. Pick another name, for example {{suggest}}.",
+		"madeFrom": "Benchmark id: {{id}} (made from the name)"
+	},
+	"pack": {
+		"all": "{{benchmarks}} · {{tasks}}",
+		"some": "{{benchmarks}}, {{runnable}} your agent can run · {{tasks}} it can run",
+		"none": "{{benchmarks}}, none your agent can run: {{reason}}"
 	}
 }

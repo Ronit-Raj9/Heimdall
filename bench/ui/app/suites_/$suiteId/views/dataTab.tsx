@@ -268,7 +268,9 @@ export function VersionTable({ versions, t }: { versions: DatasetVersion[]; t: T
 								v{v.version}
 							</td>
 							<td className="text-muted-foreground px-4 py-2 text-xs">{new Date(v.at).toLocaleString()}</td>
-							<td className="text-muted-foreground px-4 py-2 text-xs">{v.actor || "-"}</td>
+							<td className="text-muted-foreground px-4 py-2 text-xs" title={v.actor || undefined}>
+								{v.actor_name || v.actor || "-"}
+							</td>
 							<td className="text-muted-foreground max-w-48 truncate px-4 py-2 text-xs" title={v.source}>
 								{v.source || "-"}
 							</td>

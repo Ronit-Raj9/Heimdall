@@ -196,3 +196,36 @@ func TestCatalogAgreesWithBifrostProviders(t *testing.T) {
 		t.Errorf("Bifrost providers missing from the /models catalog: %v", missing)
 	}
 }
+
+// A key's raw model listing carries image, speech, transcription and
+// embedding ids; none of them may become the default chat model (N37).
+func TestReportedModelSkipsNonChat(t *testing.T) {
+	var openai ModelProviderInfo
+	for _, p := range modelProviders() {
+		if p.ID == "openai" {
+			openai = p
+		}
+	}
+	got, _ := reportedModel(openai, []string{"chatgpt-image-latest", "gpt-4o-mini-tts", "gpt-4o-mini-transcribe", "text-embedding-3-small", "my-chat-model"})
+	if got != "my-chat-model" {
+		t.Errorf("reportedModel = %q, want my-chat-model", got)
+	}
+	if got, _ := reportedModel(openai, []string{"chatgpt-image-latest", "whisper-1", "dall-e-3"}); got != "" {
+		t.Errorf("reportedModel with no chat id = %q, want empty", got)
+	}
+	keys := []ModelKeyView{{ID: "k1", Provider: "openai", Status: keystore.StatusOK, ModelsAvailable: []string{"chatgpt-image-latest", "gpt-4o-mini-tts"}}}
+	d := defaultModel(keys)
+	if d == nil || d.Model == "" || !chatModelID(openai, d.Model) {
+		t.Fatalf("defaultModel = %+v, want a catalog chat model", d)
+	}
+	for _, id := range []string{"gpt-4o-mini-tts", "chatgpt-image-latest", "text-embedding-3-large", "omni-moderation-latest", "gpt-4o-realtime-preview", "whisper-1", "sora-2", "gpt-4o-search-preview"} {
+		if chatModelID(openai, id) {
+			t.Errorf("chatModelID(%q) = true, want false", id)
+		}
+	}
+	for _, id := range []string{"gpt-5.4-mini", "gpt-6.2-sol", "o4-mini"} {
+		if !chatModelID(openai, id) {
+			t.Errorf("chatModelID(%q) = false, want true", id)
+		}
+	}
+}

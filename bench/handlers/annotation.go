@@ -62,6 +62,9 @@ type AnnotationQueueView struct {
 	// CanManage is true for the queue's creator and org admins.
 	CanManage bool `json:"can_manage"`
 	CanLabel  bool `json:"can_label"`
+	// CreatedByName is the creator's display name (annotationpeople.go);
+	// created_by_email is left out for a caller who is not an org admin.
+	CreatedByName string `json:"created_by_name,omitempty"`
 }
 
 // AnnotationQueueList answers GET /annotation/queues.
@@ -94,27 +97,28 @@ type AnnotationItemsResult struct {
 // and peer labels and the judge's verdict stay hidden until the caller
 // has labelled (or the item is done).
 type AnnotationItemView struct {
-	ID           string               `json:"id"`
-	State        string               `json:"state"`
-	Task         string               `json:"task"`
-	Question     string               `json:"question,omitempty"`
-	Answer       string               `json:"answer"`
-	RunID        string               `json:"run_id,omitempty"`
-	Experiment   string               `json:"experiment,omitempty"`
-	Agent        string               `json:"agent,omitempty"`
-	AgentVersion string               `json:"agent_version,omitempty"`
-	Hidden       []string             `json:"hidden,omitempty"` // what blind mode or label order hides
-	JudgeLabel   string               `json:"judge_label,omitempty"`
-	JudgeVotes   []string             `json:"judge_votes,omitempty"`
-	JudgeReason  string               `json:"judge_reason,omitempty"`
-	Labels       []annotate.Label     `json:"labels"`
-	LabelCount   int                  `json:"label_count"`
-	MyLabel      string               `json:"my_label,omitempty"`
-	Resolution   *annotate.Resolution `json:"resolution,omitempty"`
-	Calibration  string               `json:"calibration,omitempty"`
-	CalibError   string               `json:"calibration_error,omitempty"`
-	Assigned     []string             `json:"assigned,omitempty"`
-	AddedAt      time.Time            `json:"added_at"`
+	ID           string                    `json:"id"`
+	State        string                    `json:"state"`
+	Task         string                    `json:"task"`
+	Question     string                    `json:"question,omitempty"`
+	Answer       string                    `json:"answer"`
+	AnswerFrom   string                    `json:"answer_from,omitempty"` // answer, files or final_message (annotate.AnswerFrom*)
+	RunID        string                    `json:"run_id,omitempty"`
+	Experiment   string                    `json:"experiment,omitempty"`
+	Agent        string                    `json:"agent,omitempty"`
+	AgentVersion string                    `json:"agent_version,omitempty"`
+	Hidden       []string                  `json:"hidden,omitempty"` // what blind mode or label order hides
+	JudgeLabel   string                    `json:"judge_label,omitempty"`
+	JudgeVotes   []string                  `json:"judge_votes,omitempty"`
+	JudgeReason  string                    `json:"judge_reason,omitempty"`
+	Labels       []AnnotationLabelView     `json:"labels"`
+	LabelCount   int                       `json:"label_count"`
+	MyLabel      string                    `json:"my_label,omitempty"`
+	Resolution   *AnnotationResolutionView `json:"resolution,omitempty"`
+	Calibration  string                    `json:"calibration,omitempty"`
+	CalibError   string                    `json:"calibration_error,omitempty"`
+	Assigned     []string                  `json:"assigned,omitempty"`
+	AddedAt      time.Time                 `json:"added_at"`
 }
 
 // AnnotationItemList answers GET /annotation/queues/{id}/items.
@@ -157,8 +161,26 @@ type AnnotationAssignResult struct {
 type AnnotationAgreement struct {
 	Queue     string             `json:"queue"`
 	Agreement annotate.Agreement `json:"agreement"`
-	// Labellers names the people in the pairs (user id to email).
+	// Labellers names the people in the pairs (user id to display name,
+	// never an email for a caller who is not an org admin).
 	Labellers map[string]string `json:"labellers"`
+	// LabellerEmails is user id to email, for org admins only.
+	LabellerEmails map[string]string `json:"labeller_emails,omitempty"`
+}
+
+// AnnotationPerson is one member who can be named as a labeller.
+type AnnotationPerson struct {
+	UserID string `json:"user_id"`
+	Name   string `json:"name"`
+}
+
+// AnnotationPeople answers GET /annotation/people: the organization's
+// members by user id and display name (displayActor's rule: never an
+// email), sorted by name. Local is true on a server with no members list
+// (local mode), where labellers are named by their user id.
+type AnnotationPeople struct {
+	People []AnnotationPerson `json:"people"`
+	Local  bool               `json:"local,omitempty"`
 }
 
 type annotationHandler struct {
@@ -188,6 +210,7 @@ func init() {
 		r.POST(p+"/{id}/items/{item}/labels", env.W(h.label))
 		r.POST(p+"/{id}/items/{item}/resolve", env.W(h.resolve))
 		r.GET(p+"/{id}/agreement", env.R(h.agreement))
+		r.GET(APIPrefix+"/annotation/people", env.R(h.people))
 	})
 }
 
@@ -273,11 +296,14 @@ func (h *annotationHandler) queueView(c caller, f *annotate.File) AnnotationQueu
 // itemView applies blind mode and label order to one item. manage shows
 // the queue owner everything but, in a blind queue, the agent.
 func itemView(c caller, q *annotate.Queue, it *annotate.Item, manage bool) AnnotationItemView {
-	v := AnnotationItemView{ID: it.ID, State: it.State(q.ReviewersPerItem), Task: it.Task, Question: it.Question, Answer: it.Answer,
+	v := AnnotationItemView{ID: it.ID, State: it.State(q.ReviewersPerItem), Task: it.Task, Question: it.Question, Answer: it.Answer, AnswerFrom: it.AnswerFrom,
 		RunID: it.RunID, Experiment: it.Experiment, Agent: it.Agent, AgentVersion: it.AgentVersion,
 		JudgeLabel: it.JudgeLabel, JudgeVotes: it.JudgeVotes, JudgeReason: it.JudgeReason,
-		Labels: []annotate.Label{}, LabelCount: len(it.Labels), Resolution: it.Resolution, Calibration: it.Calibration,
+		Labels: []AnnotationLabelView{}, LabelCount: len(it.Labels), Calibration: it.Calibration,
 		CalibError: it.CalibrationError, AddedAt: it.AddedAt}
+	if it.Resolution != nil {
+		v.Resolution = &AnnotationResolutionView{Resolution: *it.Resolution}
+	}
 	mine := ""
 	for _, l := range it.Labels {
 		if l.UserID == c.UserID {
@@ -292,11 +318,13 @@ func itemView(c caller, q *annotate.Queue, it *annotate.Item, manage bool) Annot
 	}
 	if manage || mine != "" || done {
 		if manage || done {
-			v.Labels = append(v.Labels, it.Labels...)
+			for _, l := range it.Labels {
+				v.Labels = append(v.Labels, AnnotationLabelView{Label: l})
+			}
 		} else {
 			for _, l := range it.Labels {
 				if l.UserID == c.UserID {
-					v.Labels = append(v.Labels, l)
+					v.Labels = append(v.Labels, AnnotationLabelView{Label: l})
 				}
 			}
 			v.Hidden = append(v.Hidden, "peer_labels")
@@ -365,7 +393,7 @@ func (h *annotationHandler) list(ctx *fasthttp.RequestCtx) {
 	c := callerOf(ctx)
 	out := AnnotationQueueList{Queues: []AnnotationQueueView{}}
 	for i := range fs {
-		out.Queues = append(out.Queues, h.queueView(c, &fs[i]))
+		out.Queues = append(out.Queues, h.queueViewFor(ctx, c, &fs[i]))
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
 }
@@ -405,6 +433,9 @@ func (h *annotationHandler) create(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	c := callerOf(ctx)
+	if !h.checkPeople(ctx, req) {
+		return
+	}
 	var q annotate.Queue
 	applyQueueRequest(&q, req)
 	if !h.checkBenchmark(ctx, c, strings.TrimSpace(q.Benchmark)) {
@@ -419,7 +450,7 @@ func (h *annotationHandler) create(ctx *fasthttp.RequestCtx) {
 		h.sendErr(ctx, err)
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusCreated, h.queueView(c, &annotate.File{Queue: *made}))
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusCreated, h.queueViewFor(ctx, c, &annotate.File{Queue: *made}))
 }
 
 // load reads the queue of {id} and checks benchmark access.
@@ -447,7 +478,7 @@ func (h *annotationHandler) get(ctx *fasthttp.RequestCtx) {
 	if !ok {
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, h.queueView(c, f))
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, h.queueViewFor(ctx, c, f))
 }
 
 func (h *annotationHandler) update(ctx *fasthttp.RequestCtx) {
@@ -468,6 +499,9 @@ func (h *annotationHandler) update(ctx *fasthttp.RequestCtx) {
 		h.bad(ctx, "body: "+err.Error())
 		return
 	}
+	if !h.checkPeople(ctx, req) {
+		return
+	}
 	if req.Benchmark != nil && strings.TrimSpace(*req.Benchmark) != f.Queue.Benchmark && !h.checkBenchmark(ctx, c, strings.TrimSpace(*req.Benchmark)) {
 		return
 	}
@@ -484,7 +518,68 @@ func (h *annotationHandler) update(ctx *fasthttp.RequestCtx) {
 		h.sendErr(ctx, err)
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, h.queueView(c, nf))
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, h.queueViewFor(ctx, c, nf))
+}
+
+// checkPeople refuses (422) a sent people per item outside 1 to 5 (never
+// turned into 1) and, when the server has a members list, a labeller who
+// is not a member of the organization by user id (N167). Without a members
+// list (local mode, or the lookup failed) labellers stay free user ids.
+func (h *annotationHandler) checkPeople(ctx *fasthttp.RequestCtx, req AnnotationQueueRequest) bool {
+	if n := req.ReviewersPerItem; n != nil && (*n < 1 || *n > annotate.MaxReviewersPerItm) {
+		lib.SendError(ctx, h.env.Mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, "People per item is 1 to 5.")
+		return false
+	}
+	if req.Reviewers == nil || len(*req.Reviewers) == 0 {
+		return true
+	}
+	names := orgMemberNames(ctx)
+	if names == nil {
+		return true
+	}
+	for _, id := range *req.Reviewers {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		// The members list is keyed by user id and by email; labellers are
+		// matched by user id, so an email is not a labeller.
+		if _, ok := names[id]; !ok || strings.Contains(id, "@") {
+			lib.SendError(ctx, h.env.Mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest,
+				id+" is not a member of this organization. Pick labellers from the list.")
+			return false
+		}
+	}
+	return true
+}
+
+// people lists the members who can be named as labellers (N168).
+func (h *annotationHandler) people(ctx *fasthttp.RequestCtx) {
+	out := AnnotationPeople{People: []AnnotationPerson{}}
+	names := orgMemberNames(ctx)
+	if names == nil {
+		out.Local = true
+		lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
+		return
+	}
+	for id := range names {
+		if strings.Contains(id, "@") { // the email keys of the same members
+			continue
+		}
+		name, _ := displayActor(ctx, id, names)
+		if strings.Contains(name, "@") {
+			name, _, _ = strings.Cut(name, "@")
+		}
+		out.People = append(out.People, AnnotationPerson{UserID: id, Name: name})
+	}
+	sort.Slice(out.People, func(i, j int) bool {
+		a, b := strings.ToLower(out.People[i].Name), strings.ToLower(out.People[j].Name)
+		if a != b {
+			return a < b
+		}
+		return out.People[i].UserID < out.People[j].UserID
+	})
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
 }
 
 func (h *annotationHandler) remove(ctx *fasthttp.RequestCtx) {
@@ -598,16 +693,19 @@ func (h *annotationHandler) runItems(ctx *fasthttp.RequestCtx, q *annotate.Queue
 			skipped = append(skipped, "run "+run.RunID+": task "+task+" is held out")
 			continue
 		}
-		ans, err := ix.RunFile(run.RunID, graders.AnswerFile)
-		if err != nil || strings.TrimSpace(string(ans)) == "" {
-			skipped = append(skipped, "run "+run.RunID+": no answer")
+		ans, from := runAnswer(ix, &run)
+		if from == "" {
+			skipped = append(skipped, "run "+run.RunID+": the run saved no answer, changed no files and sent no final message")
 			continue
 		}
-		if len(ans) > 64<<10 || !utf8.Valid(ans) {
+		if from == annotate.AnswerFromFiles && len(ans) > annotationAnswerMax && utf8.ValidString(ans) {
+			ans = shortenFilesAnswer(ans)
+		}
+		if len(ans) > annotationAnswerMax || !utf8.ValidString(ans) {
 			skipped = append(skipped, "run "+run.RunID+": the answer is not text of at most 64 KiB")
 			continue
 		}
-		it := annotate.Item{Task: task, Answer: string(ans), RunID: run.RunID, Experiment: req.Experiment,
+		it := annotate.Item{Task: task, Answer: ans, AnswerFrom: from, RunID: run.RunID, Experiment: req.Experiment,
 			Agent: firstNonEmptyStr(run.Agent.ConfigID, rv.Slot.Arm), AgentVersion: run.Agent.AgentVersion, Ref: "run/" + run.RunID}
 		if b, err := ix.RunFile(run.RunID, FileGrade); err == nil {
 			var g schemas.Grade
@@ -637,6 +735,53 @@ func (h *annotationHandler) runItems(ctx *fasthttp.RequestCtx, q *annotate.Queue
 		items = append(items, it)
 	}
 	return sampleItems(items, req.Sample, req.Stratify, req.Experiment), skipped, nil
+}
+
+// annotationAnswerMax is the most text one labelling item holds (64 KiB,
+// the store's limit).
+const annotationAnswerMax = 64 << 10
+
+// filesShortenedNote ends the files the agent wrote when they were longer
+// than one item holds.
+const filesShortenedNote = "Shortened: the full files are in the run."
+
+// shortenFilesAnswer keeps the start of the files the agent wrote (whole
+// lines where it can, never a split character) so that it and the line
+// filesShortenedNote fit in annotationAnswerMax.
+func shortenFilesAnswer(ans string) string {
+	tail := "\n\n" + filesShortenedNote + "\n"
+	cut := annotationAnswerMax - len(tail)
+	if cut >= len(ans) {
+		return ans
+	}
+	for cut > 0 && !utf8.RuneStart(ans[cut]) {
+		cut--
+	}
+	head := ans[:cut]
+	if i := strings.LastIndexByte(head, '\n'); i > len(head)/2 {
+		head = head[:i]
+	}
+	return strings.TrimRight(head, "\n") + tail
+}
+
+// runAnswer is what a person labels for a run, and where it came from
+// (D5): the answer file the run exported, else the files the agent wrote
+// (its workspace diff, annotate.AnswerFromDiff), else the agent's final
+// message. from is "" when the run has none of the three. None of them
+// carries the grade, so a blind queue stays blind.
+func runAnswer(ix ReadIndex, run *schemas.Run) (text, from string) {
+	if b, err := ix.RunFile(run.RunID, graders.AnswerFile); err == nil && strings.TrimSpace(string(b)) != "" {
+		return string(b), annotate.AnswerFromFile
+	}
+	if b, err := ix.RunFile(run.RunID, FileDiff); err == nil {
+		if s := annotate.AnswerFromDiff(b); strings.TrimSpace(s) != "" {
+			return s, annotate.AnswerFromFiles
+		}
+	}
+	if run.Claim != nil && strings.TrimSpace(run.Claim.Text) != "" {
+		return run.Claim.Text, annotate.AnswerFromFinalMessage
+	}
+	return "", ""
 }
 
 // readInstruction reads a task's instruction, at most 16 KiB.
@@ -713,7 +858,7 @@ func (h *annotationHandler) items(ctx *fasthttp.RequestCtx) {
 		limit = 100
 	}
 	manage := canManage(c, &f.Queue)
-	out := AnnotationItemList{Queue: h.queueView(c, f), Items: []AnnotationItemView{}}
+	out := AnnotationItemList{Queue: h.queueViewFor(ctx, c, f), Items: []AnnotationItemView{}}
 	n := 0
 	for i := range f.Items {
 		it := &f.Items[i]
@@ -721,7 +866,7 @@ func (h *annotationHandler) items(ctx *fasthttp.RequestCtx) {
 			continue
 		}
 		if n >= offset && len(out.Items) < limit {
-			out.Items = append(out.Items, itemView(c, &f.Queue, it, manage))
+			out.Items = append(out.Items, itemViewFor(ctx, c, &f.Queue, it, manage))
 		}
 		n++
 	}
@@ -768,9 +913,9 @@ func (h *annotationHandler) next(ctx *fasthttp.RequestCtx) {
 	if nf == nil {
 		nf = f
 	}
-	out := AnnotationNext{Queue: h.queueView(c, nf)}
+	out := AnnotationNext{Queue: h.queueViewFor(ctx, c, nf)}
 	if it != nil {
-		v := itemView(c, q, it, false)
+		v := itemViewFor(ctx, c, q, it, false)
 		out.Item = &v
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
@@ -800,7 +945,7 @@ func (h *annotationHandler) label(ctx *fasthttp.RequestCtx) {
 		out.Calibration, out.CalibrationError = h.calibrate(ctx, st, &res.Queue, &res.Item)
 		res.Item.Calibration, res.Item.CalibrationError = out.Calibration, out.CalibrationError
 	}
-	out.Item = itemView(c, &res.Queue, &res.Item, false)
+	out.Item = itemViewFor(ctx, c, &res.Queue, &res.Item, false)
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusCreated, out)
 }
 
@@ -830,7 +975,7 @@ func (h *annotationHandler) resolve(ctx *fasthttp.RequestCtx) {
 	out := AnnotationLabelResult{Resolved: true}
 	out.Calibration, out.CalibrationError = h.calibrate(ctx, st, q, it)
 	it.Calibration, it.CalibrationError = out.Calibration, out.CalibrationError
-	out.Item = itemView(c, q, it, true)
+	out.Item = itemViewFor(ctx, c, q, it, true)
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
 }
 
@@ -917,7 +1062,14 @@ func (h *annotationHandler) agreement(ctx *fasthttp.RequestCtx) {
 	out.Agreement = annotate.ComputeAgreement(items, f.Queue.ReviewersPerItem)
 	for _, it := range items {
 		for _, l := range it.Labels {
-			out.Labellers[l.UserID] = firstNonEmptyStr(l.Email, l.UserID)
+			name, raw := annotationPeopleOf(ctx).person(l.UserID, l.Email)
+			out.Labellers[l.UserID] = name
+			if raw != "" {
+				if out.LabellerEmails == nil {
+					out.LabellerEmails = map[string]string{}
+				}
+				out.LabellerEmails[l.UserID] = raw
+			}
 		}
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)

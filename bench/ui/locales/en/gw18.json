@@ -1,0 +1,6 @@
+{
+	"versions": {
+		"created": "Saved as version {{n}}.",
+		"unchanged": "Nothing changed since v{{n}}, so no new version was made. Change the settings on the Setup tab first."
+	}
+}

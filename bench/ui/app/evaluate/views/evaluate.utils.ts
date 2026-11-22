@@ -1,3 +1,5 @@
+import { isBaselineAgent } from "@/app/agents/views/agentDisplay";
+import { pickableAgents } from "@/components/agents/agentPicker";
 import { BASELINE_AGENTS, type Capability, type EvaluationMode } from "@/lib/store/apis/evaluationsApi";
 import type { AgentSummary } from "@/lib/types/bench";
 
@@ -32,22 +34,18 @@ export function agentCapabilities(a: AgentWithCaps): Capability[] {
 	return ["shell", "tools"];
 }
 
-/** Scripted doubles and demo agents: not useful to evaluate, hidden from step 1. */
-const TEST_IDS = new Set(["oracle", "noop", "toy", "refuse", "exploit", "subagents-control", "team-control", "mcploop"]);
-
-export function isTestAgent(a: Pick<AgentSummary, "id" | "scripted_kind">): boolean {
-	return Boolean(a.scripted_kind) || TEST_IDS.has(a.id) || a.id.startsWith("live-");
-}
-
-/** Built-in library agents (shipped with Heimdall) versus the org's own. */
+/** Built-in library agents (shipped with Heimdall) versus the org's own: the server's flag, else the baseline list My agents uses. */
 export function isBuiltinAgent(a: AgentWithCaps): boolean {
-	if (typeof a.builtin === "boolean") return a.builtin;
-	return BASELINE_AGENTS.includes(a.id) || a.id.startsWith("fw-") || a.id === "custom-python" || a.id === "claude-code-gpt";
+	return a.builtin ?? isBaselineAgent(a);
 }
 
-/** Org agents first, then built-in, test doubles dropped; alphabetical inside each group. */
+/**
+ * Org agents first, then built-in; alphabetical inside each group, baselines first among built-in. The agents are the
+ * ones every other agent picker offers (`pickableAgents`, N97): test doubles, demo agents and broken files never.
+ */
 export function splitAgents(agents: readonly AgentWithCaps[]): { own: AgentWithCaps[]; builtin: AgentWithCaps[] } {
-	const usable = agents.filter((a) => !isTestAgent(a) && !a.error);
+	const { yours, baselines } = pickableAgents(agents);
+	const usable = [...yours, ...baselines] as AgentWithCaps[];
 	const byId = (x: AgentWithCaps, y: AgentWithCaps) => x.id.localeCompare(y.id);
 	return {
 		own: usable.filter((a) => !isBuiltinAgent(a)).sort(byId),
@@ -55,6 +53,13 @@ export function splitAgents(agents: readonly AgentWithCaps[]): { own: AgentWithC
 			.filter(isBuiltinAgent)
 			.sort((x, y) => Number(!BASELINE_AGENTS.includes(x.id)) - Number(!BASELINE_AGENTS.includes(y.id)) || byId(x, y)),
 	};
+}
+
+/** The highest saved version of an agent (what "Latest" runs), from GET /agents/{id}/versions. */
+export function latestVersion(versions: readonly { version: number }[] | null | undefined): number | undefined {
+	let max: number | undefined;
+	for (const v of versions ?? []) if (max === undefined || v.version > max) max = v.version;
+	return max;
 }
 
 /** Baseline agents a user can compare against, without the agent under test. */

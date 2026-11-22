@@ -87,8 +87,16 @@ type DatasetTaskList struct {
 
 // DatasetVersionList answers GET /suites/{id}/dataset/versions.
 type DatasetVersionList struct {
-	Benchmark string            `json:"benchmark"`
-	Versions  []dataset.Version `json:"versions"`
+	Benchmark string               `json:"benchmark"`
+	Versions  []DatasetVersionView `json:"versions"`
+}
+
+// DatasetVersionView is one version of a benchmark's rows: ActorName is how
+// its actor is shown (actornames.go); an email actor is left out for a
+// caller who is not an org admin.
+type DatasetVersionView struct {
+	dataset.Version
+	ActorName string `json:"actor_name,omitempty"`
 }
 
 // DatasetVersionDetail answers GET /suites/{id}/dataset/versions/{n}.
@@ -555,7 +563,14 @@ func (h *datasetAPI) versions(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	slices.Reverse(vs)
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, DatasetVersionList{Benchmark: id, Versions: vs})
+	out := DatasetVersionList{Benchmark: id, Versions: make([]DatasetVersionView, 0, len(vs))}
+	names := newActorNames(ctx)
+	for _, v := range vs {
+		dv := DatasetVersionView{Version: v}
+		dv.Actor, dv.ActorName = names.show(v.Actor)
+		out.Versions = append(out.Versions, dv)
+	}
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
 }
 
 // version handles GET /suites/{id}/dataset/versions/{n}.

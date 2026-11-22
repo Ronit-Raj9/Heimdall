@@ -1,4 +1,4 @@
-import { Field, parseLabellers, selectClass } from "@/app/annotation/views/annotationView";
+import { Field, LabellerPicker, perItemProblem, selectClass } from "@/app/annotation/views/annotationView";
 import { humanExperimentName, suiteName } from "@/components/experiments/experiments.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
@@ -242,12 +242,7 @@ export function Labeller({ queue }: { queue: AnnotationQueue }) {
 							</pre>
 						</div>
 					)}
-					<div className="flex flex-col gap-1">
-						<span className="text-muted-foreground text-xs font-medium">{t("label.answer")}</span>
-						<pre className="bg-muted/40 max-h-96 overflow-auto rounded-md p-3 text-sm whitespace-pre-wrap" data-testid="annotation-answer">
-							{item.answer}
-						</pre>
-					</div>
+					<AnswerBlock item={item} />
 					{queue.kind === "judge" && (
 						<p className="text-muted-foreground text-xs" data-testid="annotation-judge">
 							{item.judge_label ? t("label.judgeSaid", { label: item.judge_label }) : t("label.judgeHidden")}
@@ -297,6 +292,29 @@ export function Labeller({ queue }: { queue: AnnotationQueue }) {
 					) : null}
 				</div>
 			)}
+		</div>
+	);
+}
+
+/** The answer to label with a caption saying where it came from (N72): the answer file, the files the agent wrote (in a
+ * monospace block) or its final message. Items added directly have no source and keep the plain caption. */
+export function AnswerBlock({ item }: { item: Pick<AnnotationItem, "answer" | "answer_from"> }) {
+	const { t } = useTranslation("annotation");
+	const from = item.answer_from;
+	return (
+		<div className="flex flex-col gap-1">
+			<span className="text-muted-foreground text-xs font-medium" data-testid="annotation-answer-from">
+				{from ? t(`label.answerFrom.${from}`) : t("label.answer")}
+			</span>
+			<pre
+				className={cn(
+					"bg-muted/40 max-h-96 overflow-auto rounded-md p-3 text-sm whitespace-pre-wrap",
+					from === "files" && "font-mono text-xs",
+				)}
+				data-testid="annotation-answer"
+			>
+				{item.answer}
+			</pre>
 		</div>
 	);
 }
@@ -392,7 +410,10 @@ export function ItemTable({ queue, items }: { queue: AnnotationQueue; items: Ann
 										{it.labels.map((l) => (
 											<li key={l.user_id + l.at}>
 												<span className={cn(l.label === "correct" ? "text-chart-success-ink" : "text-chart-error-ink")}>{l.label}</span>
-												<span className="text-muted-foreground"> {l.email || l.user_id}</span>
+												<span className="text-muted-foreground" title={l.email || l.user_id} data-testid="annotation-label-who">
+													{" "}
+													{l.name || l.email || l.user_id}
+												</span>
 												{l.note && <span className="text-muted-foreground">: {l.note}</span>}
 											</li>
 										))}
@@ -413,7 +434,7 @@ export function ItemTable({ queue, items }: { queue: AnnotationQueue; items: Ann
 									<div className="text-muted-foreground mt-1">
 										{it.resolution.label},{" "}
 										{it.resolution.method === "decided"
-											? t("items.method.decided", { who: it.resolution.email || it.resolution.user_id || "" })
+											? t("items.method.decided", { who: it.resolution.name || it.resolution.email || it.resolution.user_id || "" })
 											: t("items.method.consensus")}
 									</div>
 								)}
@@ -615,7 +636,11 @@ function AgreementTab({ queueId }: { queueId: string }) {
 export function AgreementPanel({ data }: { data: AnnotationAgreement }) {
 	const { t } = useTranslation("annotation");
 	const a = data.agreement;
-	const who = (id: string) => data.labellers?.[id] || id;
+	const who = (id: string) => (
+		<span title={data.labeller_emails?.[id] || id} data-testid="annotation-agreement-who">
+			{data.labellers?.[id] || id}
+		</span>
+	);
 	const scale = a.interpretation
 		? ` (${t(`agreement.scale.${a.interpretation}` as "agreement.scale.poor", { defaultValue: a.interpretation })})`
 		: "";
@@ -696,40 +721,42 @@ export function SettingsTab({ queue }: { queue: AnnotationQueue }) {
 	const [instructions, setInstructions] = useState(queue.instructions ?? "");
 	const [reviewers, setReviewers] = useState(queue.reviewers_per_item);
 	const [blind, setBlind] = useState(queue.blind);
-	const [labellers, setLabellers] = useState((queue.reviewers ?? []).join(", "));
+	const [labellers, setLabellers] = useState<string[]>(queue.reviewers ?? []);
 	const disabled = !queue.can_manage;
+	const badPerItem = perItemProblem(reviewers);
 	return (
 		<Section title={t("settings.title")} description={disabled ? t("settings.readOnly") : undefined} testId="annotation-settings">
 			<form
 				className="bg-card grid min-w-0 grid-cols-1 gap-4 rounded-xl border p-5 md:grid-cols-2"
 				onSubmit={(e) => {
 					e.preventDefault();
+					if (badPerItem) return;
 					void update({
 						id: queue.id,
 						name: name.trim(),
 						instructions,
-						reviewers_per_item: Math.min(5, Math.max(1, Math.trunc(reviewers) || 1)),
+						reviewers_per_item: reviewers,
 						blind,
-						reviewers: parseLabellers(labellers),
+						reviewers: labellers,
 					});
 				}}
 			>
 				<Field label={t("create.name")}>
 					<Input value={name} onChange={(e) => setName(e.target.value)} disabled={disabled} data-testid="annotation-settings-name" />
 				</Field>
-				<Field label={t("create.reviewers")} hint={t("create.reviewersHint")}>
+				<Field label={t("create.reviewers")} hint={badPerItem ? t("create.reviewersRange") : t("create.reviewersHint")}>
 					<Input
 						type="number"
 						min={1}
 						max={5}
-						value={reviewers}
-						onChange={(e) => setReviewers(Number(e.target.value))}
+						value={Number.isNaN(reviewers) ? "" : reviewers}
+						onChange={(e) => setReviewers(e.target.value === "" ? Number.NaN : Number(e.target.value))}
+						aria-invalid={badPerItem || undefined}
 						disabled={disabled}
+						data-testid="annotation-settings-reviewers"
 					/>
 				</Field>
-				<Field label={t("create.labellers")} hint={t("create.labellersHint")}>
-					<Input value={labellers} onChange={(e) => setLabellers(e.target.value)} disabled={disabled} />
-				</Field>
+				<LabellerPicker value={labellers} onChange={setLabellers} disabled={disabled} testId="annotation-settings-labellers" />
 				<label className="flex items-center gap-2 text-sm">
 					<input
 						type="checkbox"
@@ -779,7 +806,7 @@ export function SettingsTab({ queue }: { queue: AnnotationQueue }) {
 						>
 							{t("settings.delete")}
 						</Button>
-						<Button type="submit" disabled={updated.isLoading} data-testid="annotation-settings-save">
+						<Button type="submit" disabled={updated.isLoading || badPerItem} data-testid="annotation-settings-save">
 							{t("settings.save")}
 						</Button>
 					</div>

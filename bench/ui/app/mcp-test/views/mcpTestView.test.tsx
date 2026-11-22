@@ -4,7 +4,7 @@ import { scoreBand, serverIdFrom } from "@/lib/types/mcptest";
 import { hostedSession } from "@/lib/testing/platformFixtures";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { describe, expect, it, vi } from "vitest";
-import { defaultServerId, EMPTY_FORM, McpReportView, McpTestView, requestFromForm } from "./mcpTestView";
+import { defaultServerId, DraftEvaluateLink, EMPTY_FORM, McpReportView, McpTestView, requestFromForm } from "./mcpTestView";
 
 vi.mock("@/lib/store/apis/mcpTestApi", () => ({
 	useInspectMcpServerMutation: () => mutation(),
@@ -140,5 +140,38 @@ describe("MCP test credential field", () => {
 		expect(secretsQuery).not.toHaveBeenCalledWith(skipToken);
 		expect(html).toContain("SHOP_MCP_TOKEN");
 		expect(html).toContain('data-testid="mcp-secret"');
+	});
+});
+describe("DraftEvaluateLink (N113)", () => {
+	const done = (keyed?: string[]) => ({
+		suite: "zz-test-mcp",
+		tasks: [],
+		no_reference: [],
+		files: [],
+		scores: report.scores,
+		reference_agents: ["codex", "claude-code", "opencode"],
+		...(keyed ? { reference_agents_keyed: keyed } : {}),
+		next: "",
+	});
+
+	it("opens a one-agent evaluation with the only keyed agent", () => {
+		const html = render(<DraftEvaluateLink done={done(["codex"])} />);
+		expect(html).toContain('href="/evaluate?suite=zz-test-mcp&amp;agent=codex"');
+		expect(html).toContain("Evaluate with codex");
+		expect(html).not.toContain("claude-code");
+	});
+
+	it("compares two keyed agents in opponent mode", () => {
+		const html = render(<DraftEvaluateLink done={done(["codex", "claude-code"])} />);
+		expect(html).toContain('href="/evaluate?suite=zz-test-mcp&amp;agent=codex&amp;mode=opponent&amp;opponent=claude-code"');
+		expect(html).toContain("Evaluate with codex and claude-code");
+	});
+
+	it("explains the missing key and links Models & keys when no agent has one", () => {
+		const html = render(<DraftEvaluateLink done={done()} />);
+		expect(html).not.toContain('data-testid="mcp-draft-evaluate"');
+		expect(html).toContain("None of the reference agents (claude-code, codex, opencode) has a model key in this organization.");
+		expect(html).toContain('href="/models"');
+		expect(html).toContain("Models &amp; keys");
 	});
 });

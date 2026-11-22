@@ -1,3 +1,4 @@
+import { CopyAgentDialog } from "@/components/agents/copyAgentDialog";
 import { DeleteAgentDialog } from "@/components/agents/deleteAgentDialog";
 import "@/components/agents/fw13I18n";
 import { OverflowMenu } from "@/components/agents/overflowMenu";
@@ -8,7 +9,7 @@ import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useGetAgentConfigQuery } from "@/lib/store/apis/agentBuilderApi";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useGetAgentCompatibilityQuery, useGetAgentVersionsQuery } from "@/lib/store/apis/evaluationsApi";
-import { Activity, Bug, Cpu, FlaskConical, Gauge, GitCompare, ListChecks, ShieldAlert, Trash2 } from "lucide-react";
+import { Activity, Bug, Copy, Cpu, FlaskConical, Gauge, GitCompare, ListChecks, PencilLine, ShieldAlert, Trash2 } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, CheckPill, adapterIcon, jobState, lastJobFor, useAdapterLabel } from "../../../agents/views/agentDisplay";
@@ -37,7 +38,8 @@ export function latestVersion(versions: ReadonlyArray<{ version: number }> | und
  * every pull request). ?tab=checks (the readiness check) and ?tab=compare-models open from the menu and
  * then show as the last tab. ?delete=1 (the menu's "Delete agent") asks to delete the agent; it is
  * offered only to members, and only for an agent whose settings file lives in this project (built-in
- * library agents have none).
+ * library agents have none). ?copy=duplicate and ?copy=rename (the menu's "Duplicate agent" and "Rename agent")
+ * ask for a new name under the same rule.
  */
 export default function AgentDetailView() {
 	const { t } = useTranslation("agentFirst");
@@ -51,6 +53,8 @@ export default function AgentDetailView() {
 	const config = useGetAgentConfigQuery(agentId, { skip: !writable });
 	const canDelete = writable && config.isSuccess;
 	const [deleteParam, setDeleteParam] = useQueryState("delete", parseAsString.withOptions({ history: "replace" }));
+	const [copyParam, setCopyParam] = useQueryState("copy", parseAsString.withOptions({ history: "replace" }));
+	const copyMode = copyParam === "rename" ? "rename" : copyParam === "duplicate" ? "duplicate" : null;
 	const { agent } = useAgentSummary(agentId);
 	const jobs = useAgentJobs();
 	const adapterLabel = useAdapterLabel();
@@ -190,6 +194,22 @@ export default function AgentDetailView() {
 								...(canDelete
 									? [
 											{
+												label: tf("copyAgent.menuDuplicate"),
+												to: "/agents/$agentId",
+												params: { agentId },
+												search: { copy: "duplicate" },
+												icon: Copy,
+												testId: "agent-detail-duplicate",
+											},
+											{
+												label: tf("copyAgent.menuRename"),
+												to: "/agents/$agentId",
+												params: { agentId },
+												search: { copy: "rename" },
+												icon: PencilLine,
+												testId: "agent-detail-rename",
+											},
+											{
 												label: tf("deleteAgent.menu"),
 												to: "/agents/$agentId",
 												params: { agentId },
@@ -206,6 +226,15 @@ export default function AgentDetailView() {
 			/>
 			{canDelete && deleteParam !== null && (
 				<DeleteAgentDialog agentId={agentId} onClose={() => void setDeleteParam(null)} onDeleted={() => void navigate({ to: "/agents" })} />
+			)}
+			{canDelete && copyMode !== null && (
+				<CopyAgentDialog
+					key={`${agentId}-${copyMode}`}
+					agentId={agentId}
+					mode={copyMode}
+					onClose={() => void setCopyParam(null)}
+					onCopied={(newId) => void navigate({ to: "/agents/$agentId", params: { agentId: newId } })}
+				/>
 			)}
 			{agent?.adapter === "command" && agent.image && <AgentImageApproval image={agent.image} />}
 			{agent && (agent.adapter === "remote_http" || agent.adapter === "openai_agent") && <SavedEndpointTest agentId={agentId} />}

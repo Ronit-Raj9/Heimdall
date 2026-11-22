@@ -160,6 +160,22 @@ describe("NewAgentView", () => {
 			"An agent named my-plain-loop already exists. Pick another name.",
 		);
 		expect(nameProblem("my-plain-loop-2", new Set(["my-plain-loop"]))).toBe("");
-		expect(nameProblem("Bad Name", new Set())).toBe("Use lowercase letters, digits, '.', '_' or '-', starting with a letter or digit.");
+		expect(nameProblem("bad Name", new Set())).toBe("Use lowercase letters, digits, '.', '_' or '-', starting with a letter or digit.");
+	});
+
+	it("names each name problem in order, the 63 limit with the count", () => {
+		expect(nameProblem("", new Set())).toBe("Give the agent a name.");
+		expect(nameProblem("a".repeat(120), new Set())).toBe("Use at most 63 characters (120 now).");
+		expect(nameProblem("-x", new Set())).toBe("Start with a lowercase letter or a digit.");
+		expect(nameProblem("Upper", new Set())).toBe("Start with a lowercase letter or a digit.");
+		expect(nameProblem("a b", new Set())).toBe("Use lowercase letters, digits, '.', '_' or '-', starting with a letter or digit.");
+		expect(nameProblem("a".repeat(63), new Set())).toBe("");
+	});
+
+	it("says the limit and the real file the name is saved as", () => {
+		agentIds = [];
+		const html = render("?template=plain-loop");
+		expect(html).toContain("up to 63 characters. Saved as agents/my-plain-loop.yaml.");
+		agentIds = ["taken"];
 	});
 });

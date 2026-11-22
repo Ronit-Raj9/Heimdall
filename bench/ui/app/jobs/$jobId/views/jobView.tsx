@@ -163,7 +163,13 @@ export function JobDetail({ job, log }: { job: Job; log: JobLogState }) {
 					{job.created_by && job.created_by === session.user?.id ? (
 						<span className="text-xs">{session.user.name || session.user.email}</span>
 					) : (
-						<span className="font-mono text-xs">{job.created_by || "-"}</span>
+						<span
+							className={cn("text-xs", !job.created_by_name && "font-mono")}
+							title={job.created_by || undefined}
+							data-testid="job-created-by"
+						>
+							{job.created_by_name || job.created_by || "-"}
+						</span>
 					)}
 					{job.attempt > 1 && <span className="text-muted-foreground ml-2 text-xs">{t("jobs.attempt", { n: job.attempt })}</span>}
 				</Fact>

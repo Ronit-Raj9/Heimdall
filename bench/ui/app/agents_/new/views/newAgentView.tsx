@@ -1,9 +1,9 @@
+import { agentNameProblem } from "@/components/agents/agentName";
 import { ModelPicker, type ModelRef, type ProviderId } from "@/components/models/modelPicker";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState, PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import i18n from "@/lib/i18n";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
@@ -59,11 +59,12 @@ export function defaultAgentName(t: AgentTemplate, taken: ReadonlySet<string> = 
 	}
 }
 
-/** Why name cannot be used for a new agent, or "" when it can. */
+/**
+ * Why name cannot be used for a new agent, or "" when it can: empty, too long (with the count), a bad first
+ * character, any other bad character, then a name another agent already uses.
+ */
 export function nameProblem(name: string, taken: ReadonlySet<string>): string {
-	if (!ID_RE.test(name)) return i18n.t("new.nameInvalid", { ns: "agentBuilder" });
-	if (taken.has(name)) return i18n.t("new.nameExists", { ns: "agentBuilder", name });
-	return "";
+	return agentNameProblem(name, taken);
 }
 
 /**
@@ -134,7 +135,7 @@ export default function NewAgentView() {
 		if (!body) return;
 		const res = isPull ? await putConfig({ id: name, yaml: pullAgentYAML(name, pullOpts, notes), create_only: true }) : await create(body);
 		if ("data" in res && res.data) {
-			if (returnTo === "/evaluate") void navigate({ to: "/evaluate", search: { agent: res.data.id } as never });
+			if (returnTo === "/evaluate") void navigate({ to: "/evaluate", search: { agent: res.data.id, keep: "1" } as never });
 			else void navigate({ to: "/agents/$agentId", params: { agentId: res.data.id } });
 		}
 	};
@@ -268,7 +269,7 @@ export default function NewAgentView() {
 										data-testid="agent-name"
 									/>
 									<span className={cn("text-xs", nameOk && !nameTaken ? "text-muted-foreground" : "text-destructive")}>
-										{problem || t("new.nameHelp")}
+										{problem || t("new.nameHelp", { name: name || "<name>" })}
 									</span>
 								</label>
 								{ownModel ? (

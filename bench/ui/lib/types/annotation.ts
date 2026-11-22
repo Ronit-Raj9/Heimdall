@@ -20,6 +20,8 @@ export interface AnnotationQueue {
 	reviewers?: string[];
 	created_by: string;
 	created_by_email?: string;
+	/** The creator's display name; created_by_email is sent to org admins only. */
+	created_by_name?: string;
 	created_at: string;
 	updated_at: string;
 	archived?: boolean;
@@ -70,6 +72,8 @@ export interface AnnotationItemsResult {
 export interface AnnotationLabelEntry {
 	user_id: string;
 	email?: string;
+	/** The labeller's display name; email is sent to org admins only. */
+	name?: string;
 	label: AnnotationLabel;
 	note?: string;
 	at: string;
@@ -80,6 +84,8 @@ export interface AnnotationResolution {
 	method: "consensus" | "decided";
 	user_id?: string;
 	email?: string;
+	/** The decider's display name; email is sent to org admins only. */
+	name?: string;
 	note?: string;
 	at: string;
 }
@@ -90,6 +96,8 @@ export interface AnnotationItem {
 	task: string;
 	question?: string;
 	answer: string;
+	/** Where a run's answer was read (N72): the answer file, the files the agent wrote, or its final message. */
+	answer_from?: AnnotationAnswerFrom;
 	run_id?: string;
 	experiment?: string;
 	agent?: string;
@@ -134,6 +142,20 @@ export interface PairKappa {
 	agree: number;
 }
 
+export type AnnotationAnswerFrom = "answer" | "files" | "final_message";
+
+/** One member who can be named as a labeller: GET /annotation/people. */
+export interface AnnotationPerson {
+	user_id: string;
+	name: string;
+}
+
+/** GET /annotation/people: members by display name; `local` on a server with no members list. */
+export interface AnnotationPeople {
+	people: AnnotationPerson[];
+	local?: boolean;
+}
+
 export interface AnnotationAgreement {
 	queue: string;
 	agreement: {
@@ -155,6 +177,8 @@ export interface AnnotationAgreement {
 		} | null;
 	};
 	labellers: Record<string, string> | null;
+	/** User id to email, sent to org admins only (a tooltip). */
+	labeller_emails?: Record<string, string>;
 }
 
 // Benchmark data: rows as versions, data policy, platform imports.
@@ -163,6 +187,8 @@ export interface DatasetVersion {
 	version: number;
 	at: string;
 	actor?: string;
+	/** How actor is shown; an email actor is sent to org admins only. */
+	actor_name?: string;
 	source?: string;
 	added: string[] | null;
 	updated: string[] | null;

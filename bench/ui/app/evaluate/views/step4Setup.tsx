@@ -13,6 +13,7 @@ import {
 	useEstimateEvaluationQuery,
 	useGetBenchFaultsQuery,
 } from "@/lib/store/apis/evaluationsApi";
+import { fw05 } from "./fw05I18n";
 import { armHasModel, useOwnModelAgents } from "./ownModel";
 import { CONCURRENCY_CHOICES, PresetPicker, slotsText } from "./presetPicker";
 import { useDebounced } from "./useDebounced";
@@ -130,16 +131,34 @@ export function toggleFault(faults: string[], fault: string, on: boolean): strin
 }
 
 /**
- * Whether the spec is complete enough to estimate or launch: benchmarks and a model on every arm. An
- * arm on an agent in `owns` (it brings its own model) may leave the model blank.
+ * Why the spec cannot be estimated or launched yet, in plain words; "" when it can. In order: no
+ * benchmark (and no pack), the first setup without a model (an arm on an agent in `owns` brings
+ * its own model and may leave it blank), then the failover problem.
  */
+export function specProblem(spec: EvaluationSpec, owns: ReadonlySet<string> = new Set()): string {
+	if (spec.benchmarks.length === 0 && !spec.pack) return fw05("problem.noBenchmark");
+	if (spec.arms.length === 0) return fw05("problem.noModel", { label: "A" });
+	const noModel = spec.arms.find((a) => !armHasModel(a, owns));
+	if (noModel) return fw05("problem.noModel", { label: noModel.label });
+	return failoverProblem(spec.arms[0], spec.failover);
+}
+
+/** Whether the spec is complete enough to estimate or launch: specProblem has nothing to say. */
 export function specReady(spec: EvaluationSpec, owns: ReadonlySet<string> = new Set()): boolean {
-	return (
-		(spec.benchmarks.length > 0 || Boolean(spec.pack)) &&
-		spec.arms.length > 0 &&
-		spec.arms.every((a) => armHasModel(a, owns)) &&
-		failoverProblem(spec.arms[0], spec.failover) === ""
-	);
+	return specProblem(spec, owns) === "";
+}
+
+/** The estimate's slots with the worker's run slots (G14 adds `worker_slots`; read it locally until then). */
+type EstimateSlots = EvaluationEstimate["slots"] & { worker_slots?: number };
+
+/**
+ * The note under "Runs at once per benchmark" when the picked value is above what the worker runs
+ * at a time; "" otherwise (no worker bound known, or the value fits).
+ */
+export function concurrencyNote(slots: EstimateSlots | undefined, value: number): string {
+	const n = slots?.worker_slots ?? 0;
+	if (!(n > 0) || value <= n) return "";
+	return fw05("slots.overWorker", { n: String(n), value: String(value) });
 }
 
 function money(n: number): string {
@@ -355,8 +374,11 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 	const { t } = useTranslation("fw26");
 	const owns = useOwnModelAgents();
 	const [picking, setPicking] = useState<Set<string>>(() => new Set());
-	const ready = specReady(spec, owns);
+	const problem = specProblem(spec, owns);
+	const ready = problem === "";
 	const { main: estimate, presets, pending } = useStep4Estimate(spec, !ready);
+	const concurrency = spec.concurrency ?? 4;
+	const overWorker = concurrencyNote(estimate.data?.slots as EstimateSlots | undefined, concurrency);
 	const catalog = useGetBenchFaultsQuery();
 	const faultList = catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS;
 	const faultGroups = groupFaults(faultList);
@@ -450,13 +472,20 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 					onPick={(n) => onChange({ ...spec, trials: n, preset: undefined })}
 					testId="step4-trials"
 				/>
-				<Choices
-					label="Runs at once per benchmark"
-					value={spec.concurrency ?? 4}
-					options={CONCURRENCY_CHOICES}
-					onPick={(n) => onChange({ ...spec, concurrency: n })}
-					testId="step4-concurrency"
-				/>
+				<div className="flex flex-col gap-1.5">
+					<Choices
+						label="Runs at once per benchmark"
+						value={concurrency}
+						options={CONCURRENCY_CHOICES}
+						onPick={(n) => onChange({ ...spec, concurrency: n })}
+						testId="step4-concurrency"
+					/>
+					{overWorker && (
+						<p className="text-muted-foreground max-w-xs text-xs" data-testid="step4-concurrency-note">
+							{overWorker}
+						</p>
+					)}
+				</div>
 			</section>
 
 			<section className="flex flex-col gap-2">
@@ -572,7 +601,9 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 
 			<section className="bg-muted/40 rounded-md border p-3 text-sm" data-testid="step4-estimate" aria-live="polite">
 				{!ready ? (
-					<span className="text-muted-foreground">Pick benchmarks and a model to see an estimate.</span>
+					<span className="text-muted-foreground" data-testid="step4-estimate-problem">
+						{problem}
+					</span>
 				) : estimate.isError && estimateFailed(estimate.error) ? (
 					<span className="text-muted-foreground">Could not estimate this evaluation right now.</span>
 				) : estimate.data ? (

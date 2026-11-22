@@ -83,6 +83,21 @@ export function groupModels(catalog: CatalogProvider[], keys: ModelKey[], query 
 		.map(({ g }) => g);
 }
 
+/** Model ids that two or more provider groups list (the same name under OpenAI and an OpenAI-compatible endpoint). */
+export function duplicateIds(groups: readonly Pick<ModelGroup, "models">[]): Set<string> {
+	const count = new Map<string, number>();
+	for (const g of groups) for (const id of new Set(g.models.map((m) => m.id))) count.set(id, (count.get(id) ?? 0) + 1);
+	return new Set([...count].filter(([, n]) => n > 1).map(([id]) => id));
+}
+
+/**
+ * The text of one model option: the id, then the provider name when another provider lists the
+ * same id (a closed select shows only the option text, not its group), then "[open]".
+ */
+export function optionLabel(m: ModelGroupItem, g: Pick<ModelGroup, "name">, dup: boolean): string {
+	return `${m.id}${dup ? ` (${g.name})` : ""}${m.open ? "  [open]" : ""}`;
+}
+
 const OTHER = "__other__:";
 const selectClass = "border-input bg-background h-8 rounded-md border px-2 text-sm disabled:opacity-50";
 
@@ -91,6 +106,11 @@ export interface GroupedModelPickerProps {
 	onChange(v: PickedModel): void;
 	disabled?: boolean;
 	testId?: string;
+	/**
+	 * Only these providers' groups are listed (a fallback model must stay on the agent's provider).
+	 * An empty list means the provider is not known yet: the picker is disabled and says so.
+	 */
+	providers?: readonly string[];
 }
 
 /** The provider of the first group that lists model (one with a working key first), or "". */
@@ -105,7 +125,7 @@ export function modelOptionLabel(providerName: string, model: string): string {
 	return providerName ? `${providerName}: ${model}` : model;
 }
 
-export function GroupedModelPicker({ value, onChange, disabled, testId }: GroupedModelPickerProps) {
+export function GroupedModelPicker({ value, onChange, disabled: disabledProp, testId, providers }: GroupedModelPickerProps) {
 	const id = useId();
 	const tid = testId ?? "grouped-model-picker";
 	const models = useGetModelsQuery();
@@ -114,7 +134,11 @@ export function GroupedModelPicker({ value, onChange, disabled, testId }: Groupe
 	const keys = models.data?.keys ?? [];
 	const [query, setQuery] = useState("");
 	const [typing, setTyping] = useState<string | null>(null);
-	const groups = groupModels(catalog, keys, query);
+	const only = (list: ModelGroup[]) => (providers ? list.filter((g) => providers.includes(g.provider)) : list);
+	const groups = only(groupModels(catalog, keys, query));
+	const dup = duplicateIds(only(groupModels(catalog, keys)));
+	const noProvider = providers !== undefined && providers.length === 0;
+	const disabled = disabledProp || noProvider;
 	const model = value?.model ?? "";
 	// A model given without its provider (an agent's default model) takes the catalog provider that lists it.
 	const provider = value?.provider || providerOfModel(groupModels(catalog, keys), model);
@@ -167,7 +191,7 @@ export function GroupedModelPicker({ value, onChange, disabled, testId }: Groupe
 					data-testid={`${tid}-model`}
 				>
 					<option value="" disabled>
-						{loaded ? "Choose a model" : "Loading models..."}
+						{noProvider ? "Pick the agent's model first" : loaded ? "Choose a model" : "Loading models..."}
 					</option>
 					{model !== "" && !listed && !customFor && (
 						<option value={selected}>{modelOptionLabel(providerName, model)}</option>
@@ -179,8 +203,7 @@ export function GroupedModelPicker({ value, onChange, disabled, testId }: Groupe
 						>
 							{g.models.map((m) => (
 								<option key={m.id} value={`${g.provider}\u0000${m.id}`}>
-									{m.id}
-									{m.open ? "  [open]" : ""}
+									{optionLabel(m, g, dup.has(m.id))}
 								</option>
 							))}
 							<option value={`${OTHER}${g.provider}`}>Other {g.name} model...</option>

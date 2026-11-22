@@ -4113,6 +4113,8 @@ export interface Job {
 	result?: Record<string, JsonValue>;
 	error?: string;
 	created_by?: string;
+	/** How created_by is shown (GET /jobs/{id}); an email in created_by is sent to org admins only. */
+	created_by_name?: string;
 	created_at: PlatformTime;
 	started_at?: PlatformTime;
 	finished_at?: PlatformTime;

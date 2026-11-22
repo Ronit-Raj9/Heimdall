@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"net/http/httptest"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/keystore"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/mcptest"
 	"github.com/maximhq/bifrost/bench/mcptest/mcptestfake"
@@ -125,5 +127,51 @@ func TestMCPServerDraftAndReport(t *testing.T) {
 	}
 	if st, _ := c.do(t, "GET", "/mcp-servers/benchmarks/nope/report", nil, nil); st != 404 {
 		t.Fatalf("unknown benchmark = %d", st)
+	}
+}
+
+// TestMCPDraftReferenceAgentsKeyedFirst covers N113: an org with only an
+// OpenAI key gets codex (openai) first and as the only keyed reference agent;
+// claude-code and opencode default to anthropic, which has no key. A local
+// server (keys not required) keeps the fixed order with every agent keyed.
+func TestMCPDraftReferenceAgentsKeyedFirst(t *testing.T) {
+	ctx := context.Background()
+	ks := keystore.NewMemory()
+	if _, err := ks.Create(ctx, "org_a", keystore.KindProvider, keystore.Put{Provider: "openai", Label: "main", Value: "sk-main-123456789"}, "t"); err != nil {
+		t.Fatal(err)
+	}
+	ps, err := projectfs.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := referenceAgentProvider(ps)
+	if got := provider(ctx, "codex"); got != "openai" {
+		t.Fatalf("codex provider = %q, want openai", got)
+	}
+	ordered, keyed := referenceAgentsKeyed(ctx, ks, "org_a", true, provider)
+	if strings.Join(ordered, ",") != "codex,claude-code,opencode" || strings.Join(keyed, ",") != "codex" {
+		t.Fatalf("hosted openai-only org: ordered %v keyed %v", ordered, keyed)
+	}
+	if _, keyed := referenceAgentsKeyed(ctx, keystore.NewMemory(), "org_a", true, provider); len(keyed) != 0 {
+		t.Fatalf("org without keys: keyed %v, want none", keyed)
+	}
+	ordered, keyed = referenceAgentsKeyed(ctx, nil, "org_a", false, provider)
+	if strings.Join(ordered, ",") != strings.Join(MCPReferenceAgents, ",") || len(keyed) != len(MCPReferenceAgents) {
+		t.Fatalf("local server: ordered %v keyed %v", ordered, keyed)
+	}
+
+	idx := &fakeIndex{manifests: map[string]*schemas.Manifest{"e1": {}}}
+	c, _, url := newMCPTestClient(t, false, idx)
+	body, _ := json.Marshal(map[string]any{"id": "shop-mcp", "server_id": "shop", "url": url, "secret": "SHOP_MCP_TOKEN", "auth_scheme": "Bearer", "call_read_only": true})
+	st, out := c.do(t, "POST", "/mcp-servers/benchmarks", body, nil)
+	if st != 201 {
+		t.Fatalf("draft = %d %s", st, out)
+	}
+	var res struct {
+		ReferenceAgents      []string `json:"reference_agents"`
+		ReferenceAgentsKeyed []string `json:"reference_agents_keyed"`
+	}
+	if err := json.Unmarshal(out, &res); err != nil || len(res.ReferenceAgentsKeyed) != len(MCPReferenceAgents) || len(res.ReferenceAgents) != len(MCPReferenceAgents) {
+		t.Fatalf("draft answer = %s", out)
 	}
 }

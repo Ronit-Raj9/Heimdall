@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/importers"
+	"github.com/maximhq/bifrost/bench/schemas"
 )
 
 // Job kinds that run a CLI command of this binary (web parity, lane L02).
@@ -21,7 +22,7 @@ func init() {
 	registerJobKind(cliJob("import.run", true, true, importRunArgs))
 	registerJobKind(cliJob("tasks.mine", true, false, tasksMineArgs))
 	registerJobKind(cliJob("export.run", true, true, exportRunArgs))
-	registerJobKind(cliJob("scan.skill", true, false, scanSkillArgs)) // hosted variant: jobs_runnerjob.go (static in process, dynamic on a runner)
+	registerJobKind(withOkExit(cliJob("scan.skill", true, false, scanSkillArgs), "skill scan", scanSkillOkExit)) // hosted variant: jobs_runnerjob.go (static in process, dynamic on a runner)
 	registerJobKind(cliJob("scan.mcp", true, false, scanMCPArgs))
 }
 
@@ -297,6 +298,51 @@ func scanSkillArgs(raw json.RawMessage) ([]string, error) {
 		argv = append(argv, "-dynamic")
 	}
 	return append(argv, path), nil
+}
+
+// scanSkillOkExit reads the verdict of skill scan -json (an indented
+// admission record, exit 0 admitted or 1 blocked): a blocked skill is a
+// finished scan whose result says so, never a failed job (fix wave 2, N23).
+// Any other exit, or output without a record, keeps the usual handling.
+func scanSkillOkExit(code int, out []byte) (map[string]any, bool) {
+	if code != 0 && code != exitBlocked {
+		return nil, false
+	}
+	var rec *schemas.AdmitScanRecord
+	for i := 0; i < len(out); {
+		j := bytes.IndexByte(out[i:], '{')
+		if j < 0 {
+			break
+		}
+		i += j
+		if i > 0 && out[i-1] != '\n' { // a record starts a line
+			i++
+			continue
+		}
+		var r schemas.AdmitScanRecord
+		dec := json.NewDecoder(bytes.NewReader(out[i:]))
+		if dec.Decode(&r) == nil && r.Decision != "" {
+			rec = &r
+			i += int(dec.InputOffset())
+			continue
+		}
+		i++
+	}
+	if rec == nil {
+		return nil, false
+	}
+	blocked := rec.Decision == schemas.AdmitScanBlocked
+	if blocked != (code == exitBlocked) {
+		return nil, false
+	}
+	b, w := rec.Counts.Block, rec.Counts.Warn
+	res := map[string]any{"decision": rec.Decision, "block": b, "warn": w}
+	if blocked {
+		res["summary"] = fmt.Sprintf("Scan finished: blocked (%d problems that block, %d warnings)", b, w)
+	} else {
+		res["summary"] = fmt.Sprintf("Scan finished: %s (%d warnings)", rec.Decision, w)
+	}
+	return res, true
 }
 
 // scanMCPArgs: {path} -> mcp scan <service config> -json (runs the server in

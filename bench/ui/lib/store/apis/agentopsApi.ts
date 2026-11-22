@@ -1,4 +1,4 @@
-import type { AgentMCPRequest, AgentMCPResponse, AgentSkillsResponse } from "@/lib/types/agentops";
+import type { AgentMCPRequest, AgentMCPResponse, AgentSkillsResponse, SkillScanResult } from "@/lib/types/agentops";
 import { benchApi } from "./benchApi";
 
 const enc = encodeURIComponent;
@@ -10,7 +10,8 @@ export const agentopsApi = benchApi.enhanceEndpoints({ addTagTypes: ["AgentSkill
 			query: (id) => `/agents/${enc(id)}/skills`,
 			providesTags: (_r, _e, id) => [{ type: "AgentSkills", id }],
 		}),
-		uploadAgentSkill: builder.mutation<AgentSkillsResponse, { id: string; name: string; file: Blob; replace?: boolean }>({
+		/** Upload answers the scan's verdict: the skill is installed only when the scan admits it. */
+		uploadAgentSkill: builder.mutation<SkillScanResult, { id: string; name: string; file: Blob; replace?: boolean }>({
 			query: ({ id, name, file, replace }) => ({
 				url: `/agents/${enc(id)}/skills`,
 				method: "POST",
@@ -18,6 +19,11 @@ export const agentopsApi = benchApi.enhanceEndpoints({ addTagTypes: ["AgentSkill
 				body: file,
 				headers: { "Content-Type": "application/zip" },
 			}),
+			invalidatesTags: (_r, _e, { id }) => [{ type: "AgentSkills", id }, "BenchAgents"],
+		}),
+		/** Scan one skill where it is: a blocked installed skill is uninstalled, an admitted blocked one installed. */
+		scanAgentSkill: builder.mutation<SkillScanResult, { id: string; name: string }>({
+			query: ({ id, name }) => ({ url: `/agents/${enc(id)}/skills/${enc(name)}/scan`, method: "POST" }),
 			invalidatesTags: (_r, _e, { id }) => [{ type: "AgentSkills", id }, "BenchAgents"],
 		}),
 		deleteAgentSkill: builder.mutation<AgentSkillsResponse, { id: string; name: string }>({
@@ -38,6 +44,7 @@ export const agentopsApi = benchApi.enhanceEndpoints({ addTagTypes: ["AgentSkill
 export const {
 	useGetAgentSkillsQuery,
 	useUploadAgentSkillMutation,
+	useScanAgentSkillMutation,
 	useDeleteAgentSkillMutation,
 	useGetAgentMCPQuery,
 	usePutAgentMCPMutation,

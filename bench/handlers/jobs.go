@@ -210,6 +210,11 @@ func (h *JobsHandler) get(ctx *fasthttp.RequestCtx) {
 		h.sendError(ctx, "job "+id, err)
 		return
 	}
+	if j != nil && j.CreatedBy != "" {
+		v := *j
+		v.CreatedBy, v.CreatedByName = newActorNames(ctx).show(j.CreatedBy)
+		j = &v
+	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, j)
 }
 

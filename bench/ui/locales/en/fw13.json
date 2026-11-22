@@ -7,5 +7,21 @@
 		"confirm": "Delete agent",
 		"deleting": "Deleting...",
 		"failed": "Could not delete the agent: {{message}}"
+	},
+	"copyAgent": {
+		"menuDuplicate": "Duplicate agent",
+		"menuRename": "Rename agent",
+		"titleDuplicate": "Duplicate agent {{id}}",
+		"titleRename": "Rename agent {{id}}",
+		"bodyDuplicate": "Makes a new agent from this agent's settings, skills and tools. The copy starts at version 1.",
+		"bodyRename": "Rename makes {{new}} from this agent's settings and removes {{old}}. Past runs, results and saved versions keep the name {{old}}.",
+		"newName": "New name",
+		"newNamePlaceholder": "the new name",
+		"sameName": "Pick a different name.",
+		"cancel": "Cancel",
+		"duplicate": "Duplicate",
+		"rename": "Rename",
+		"saving": "Saving...",
+		"failed": "Could not copy the agent: {{message}}"
 	}
 }
