@@ -27,6 +27,7 @@ import (
 	"github.com/maximhq/bifrost/bench/db/dbconfig"
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/evidencestore/evconfig"
+	"github.com/maximhq/bifrost/bench/issuebench"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/secrets"
@@ -38,6 +39,7 @@ import (
 var runnerJobCommands = map[string]bool{
 	"agent": true, "mcp": true, "skill": true, "monitor": true, "gpu": true,
 	"voice": true, "visual": true, "simulator": true, "evidence": true,
+	"issuebench": true,
 }
 
 // Runner job limits.
@@ -61,6 +63,9 @@ func newRunnerJobExecutor(a *app) engine.JobExecutor {
 
 // RunJob implements engine.JobExecutor.
 func (x runnerJobExecutor) RunJob(ctx context.Context, job *schemas.JobLease, log func(string)) (*engine.JobRun, error) {
+	if job != nil && job.JobKind == issuebench.WorkJobKind {
+		return newOwnIssuebenchExecutor(x.cfg).RunJob(ctx, job, log)
+	}
 	if job == nil || len(job.Argv) == 0 || !runnerJobCommands[job.Argv[0]] {
 		return nil, errors.New("this runner refuses the job: its command is not one runner jobs may run")
 	}

@@ -49,6 +49,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/hostslots"
+	"github.com/maximhq/bifrost/bench/issuebench"
 	"github.com/maximhq/bifrost/bench/quota"
 	"github.com/maximhq/bifrost/bench/sharedpool"
 )
@@ -598,6 +599,14 @@ func runSharedRunner(args []string) int {
 	if err := h.setupBuilds(ctx); err != nil {
 		return fail("shared runner: %v", err)
 	}
+	if err := ensureIssuebenchEgressImage(ctx, a.docker); err != nil {
+		a.logger.Warn("shared runner: the issuebench egress proxy image is not available; From issues builds fail until it is", "error", err.Error())
+	}
+	if n, err := sweepIssuebench(ctx, a.docker, h.prefix); err != nil {
+		a.logger.Warn("shared runner: leftover issuebench containers not swept", "error", err.Error())
+	} else if n > 0 {
+		a.logger.Info(fmt.Sprintf("shared runner: removed %d leftover issuebench object(s)", n))
+	}
 	h.gateway = f.gateway
 	if h.gateway == "" {
 		h.gateway = findGateway(ctx, a.docker)
@@ -717,9 +726,11 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 				return registrycreds.Pull(ctx, docker, ref, auths)
 			},
 			HostSlot: h.orgHostSlot(org, slots),
-			Prefetch: runnerPrefetch(oa.logger, docker)}) // Z13 in the shared runner: under the org's Docker policy
-	// No Jobs: hosted CLI jobs would run the docker CLI outside the org's
-	// policy; the worker refuses them and they go to the org's own workers.
+			Prefetch: runnerPrefetch(oa.logger, docker), // Z13 in the shared runner: under the org's Docker policy
+			// Only issuebench.work runs here, in process, under the org's
+			// Docker policy; every other job kind goes to the org's own workers.
+			Jobs: newSharedIssuebenchExecutor(h, oa, org, docker), JobKinds: []string{issuebench.WorkJobKind},
+		})
 	if err != nil {
 		a.logger.Error("shared runner: worker not started", "org", org, "error", err.Error())
 		return
