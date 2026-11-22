@@ -40,8 +40,10 @@
 			"rows": "Spreadsheet or JSONL",
 			"tickets": "Support tickets",
 			"commit": "Repository commit",
+			"issues": "From issues",
 			"traces": "Production failures"
 		},
+		"issuesHosted": "From issues needs a connected GitHub repository, available on the hosted website.",
 		"codeSuite": "Spreadsheets and tickets go into a question-and-answer benchmark. Create one from Benchmarks > New to add them.",
 		"traces": "Failures your agent had in production arrive in the inbox (from Langfuse, LangSmith, OpenTelemetry or the webhook). Open one and choose Turn into task to add it to this benchmark, then run the readiness checks here.",
 		"openInbox": "Open the inbox"
