@@ -67,7 +67,12 @@ func frozenTasks(ctx context.Context) map[string]bool {
 // check on the scripted model, which exposes nothing to a real model) an
 // explicit list is taken as written and only warned about. A condition left
 // with no task is refused.
-func (p *Planner) screenTasks(ctx context.Context, suite *schemas.Suite, specs []schemas.ConditionSpec, conds []condPlan, warnOnly bool) ([]condPlan, error) {
+//
+// keepPending (a readiness check: smoke on the scripted model) keeps a
+// generated task waiting for review on an explicit list: readiness is what
+// the reviewer reads before accepting it, so it must run first. A rejected
+// one stays out.
+func (p *Planner) screenTasks(ctx context.Context, suite *schemas.Suite, specs []schemas.ConditionSpec, conds []condPlan, warnOnly, keepPending bool) ([]condPlan, error) {
 	var quarantined map[string]schemas.TaskQuarantine
 	var unreviewed map[string]string // generated task id -> pending | rejected (taskreview.go)
 	frozen := frozenTasks(ctx)
@@ -129,7 +134,9 @@ func (p *Planner) screenTasks(ctx context.Context, suite *schemas.Suite, specs [
 					dropped = append(dropped, id+" ("+taskOf+" split)")
 					continue
 				}
-				if isU {
+				if isU && keepPending && rv == schemas.ReviewPending {
+					p.logger.Warn("readiness check runs a generated task waiting for review", "condition", cp.id, "task", id)
+				} else if isU {
 					p.logger.Warn("skipping generated task: it counts only after a person accepts it", "condition", cp.id, "task", id, "review", rv)
 					dropped = append(dropped, id+" (generated, review "+rv+")")
 					continue
@@ -267,12 +274,13 @@ func taskSplit(t *schemas.Task) string {
 // screenAll screens the experiment's conditions and its compatibility
 // conditions (screenTasks).
 func (p *Planner) screenAll(ctx context.Context, suite *schemas.Suite, e *schemas.Experiment, conds, compat []condPlan, warnOnly bool) ([]condPlan, []condPlan, error) {
-	conds, err := p.screenTasks(ctx, suite, e.Conditions, conds, warnOnly)
+	keepPending := e.Smoke && e.ScriptedUpstream
+	conds, err := p.screenTasks(ctx, suite, e.Conditions, conds, warnOnly, keepPending)
 	if err != nil {
 		return nil, nil, err
 	}
 	if e.Compatibility != nil {
-		if compat, err = p.screenTasks(ctx, suite, compatSpecs(e.Compatibility), compat, warnOnly); err != nil {
+		if compat, err = p.screenTasks(ctx, suite, compatSpecs(e.Compatibility), compat, warnOnly, keepPending); err != nil {
 			return nil, nil, fmt.Errorf("compatibility: %w", err)
 		}
 	}

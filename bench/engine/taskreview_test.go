@@ -94,3 +94,20 @@ func TestPlanRegeneratedTaskIsPendingAgain(t *testing.T) {
 		t.Fatalf("regenerated t04 planned: %v", plannedTasks(m))
 	}
 }
+
+// The readiness check (smoke on the scripted model) of a freshly emitted
+// benchmark lists only tasks waiting for review; it must run them, or a
+// From issues benchmark can never be admitted (first real hosted run:
+// "selects no tasks ... (generated, review pending)"). Rejected stays out.
+func TestReadinessPlansPendingGeneratedTasks(t *testing.T) {
+	b := reviewBench(t)
+	e := testExperiment(schemas.ConditionSpec{ID: "clean", Tasks: schemas.TaskSelector{IDs: []string{"t03", "t05"}}, Trials: 1})
+	e.Smoke, e.ScriptedUpstream = true, true
+	m, err := NewPlanner(b.reg, b.root, &warnLog{}).Plan(context.Background(), e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := plannedTasks(m); !slices.Equal(got, []string{"t03"}) {
+		t.Fatalf("readiness planned %v, want the pending t03 only", got)
+	}
+}
