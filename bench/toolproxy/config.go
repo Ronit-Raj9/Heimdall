@@ -69,6 +69,10 @@ type ExternalRoute struct {
 	MaxCalls int    `json:"max_calls,omitempty"`
 	MaxBytes int64  `json:"max_bytes,omitempty"`
 	TimeoutS int    `json:"timeout_s,omitempty"`
+	// MCP marks a streamable HTTP MCP server (schemas.ExternalAPI.MCP):
+	// GET is answered 405, a call to the route's root goes to the base URL's
+	// own path, and ledger rows name the JSON-RPC method or the tool called.
+	MCP bool `json:"mcp,omitempty"`
 }
 
 var serviceID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)

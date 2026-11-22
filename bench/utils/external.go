@@ -189,7 +189,7 @@ func ExternalMode(api schemas.ExternalAPI, experiment string, haveCassette bool)
 		}
 		return mode, nil
 	case schemas.ExternalLive, schemas.ExternalRecord:
-		if experiment == "" {
+		if experiment == "" && !(api.MCP && mode == schemas.ExternalLive) { // an MCP server under test is always called live
 			return "", fmt.Errorf("external api %s mode %s calls the real host and is not repeatable; the experiment must opt in with external: %s", api.ID, mode, mode)
 		}
 		return mode, nil
@@ -221,6 +221,17 @@ func ExternalUnrepeatable(m *schemas.Manifest) bool {
 // ExternalURL is where the agent reaches external API id.
 func ExternalURL(id string) string {
 	return externalProxyBase + ExternalPathPrefix + id
+}
+
+// ExternalAllowFor is the allowlist the proxy enforces for a: its own, or
+// for an MCP server with none, POST and DELETE on the MCP endpoint (a
+// session's messages and its end). GET, the optional server stream, is
+// answered 405 by the proxy for MCP servers.
+func ExternalAllowFor(a schemas.ExternalAPI) []schemas.ExternalAllow {
+	if len(a.Allow) > 0 || !a.MCP {
+		return a.Allow
+	}
+	return []schemas.ExternalAllow{{Methods: []string{"POST", "DELETE"}, PathPrefix: "/"}}
 }
 
 // ExternalAuthHeader is the header an API's credential is sent in.

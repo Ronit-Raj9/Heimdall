@@ -59,6 +59,7 @@ type externalRoute struct {
 	MaxCalls   int                     `json:"max_calls,omitempty"`
 	MaxBytes   int64                   `json:"max_bytes,omitempty"`
 	TimeoutS   int                     `json:"timeout_s,omitempty"`
+	MCP        bool                    `json:"mcp,omitempty"`
 }
 
 // externalAPIs resolves the run's external APIs: it validates them, refuses
@@ -115,8 +116,8 @@ func externalRoutes(runID string, ext []externalAPI) []toolRoute {
 	for _, x := range ext {
 		a := x.ref.API
 		er := &externalRoute{
-			Mode: x.mode, Allow: a.Allow, Headers: a.Headers,
-			MaxCalls: a.MaxCalls, MaxBytes: a.MaxBytes, TimeoutS: a.TimeoutS,
+			Mode: x.mode, Allow: utils.ExternalAllowFor(a), Headers: a.Headers,
+			MaxCalls: a.MaxCalls, MaxBytes: a.MaxBytes, TimeoutS: a.TimeoutS, MCP: a.MCP,
 		}
 		if er.MaxCalls == 0 {
 			er.MaxCalls = utils.DefaultExternalMaxCalls
@@ -278,8 +279,12 @@ func externalHandles(runID, image string, ext []externalAPI) ([]schemas.ServiceH
 	var rs []schemas.ServiceResult
 	for _, x := range ext {
 		a := x.ref.API
+		spec := schemas.ServiceSpec{ID: a.ID, Role: schemas.ServiceRoleExternal}
+		if a.MCP { // an MCP server under test: listed to the agent as an MCP server (utils.MCPServers)
+			spec.MCP = &schemas.MCPEndpoint{}
+		}
 		hs = append(hs, schemas.ServiceHandle{
-			Spec:      schemas.ServiceSpec{ID: a.ID, Role: schemas.ServiceRoleExternal},
+			Spec:      spec,
 			Container: toolProxyContainer(runID),
 			Host:      ToolProxyHost,
 			URL:       utils.ExternalURL(a.ID),

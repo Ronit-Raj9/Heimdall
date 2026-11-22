@@ -5,7 +5,7 @@ import { BASELINE_AGENTS, useGetAgentVersionsQuery, type Capability } from "@/li
 import "@/lib/types/evaluateI18n";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { Bot, Check, Plus } from "lucide-react";
+import { Bot, Check, Plug, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { armsFor, useEvaluateDraft } from "./evaluateDraft";
 import { agentCapabilities, REGISTER_RETURN, splitAgents, type AgentWithCaps } from "./evaluate.utils";
@@ -113,7 +113,13 @@ export function Step1Agent() {
 	const pick = (a: AgentWithCaps) => {
 		if (a.id === draft.agent) return;
 		const next = { ...draft, agent: a.id, version: null, compareVersion: null, arms: [] };
-		update({ agent: a.id, version: null, compareVersion: null, opponent: draft.opponent === a.id ? null : draft.opponent, arms: armsFor(next, a.model) });
+		update({
+			agent: a.id,
+			version: null,
+			compareVersion: null,
+			opponent: draft.opponent === a.id ? null : draft.opponent,
+			arms: armsFor(next, a.model),
+		});
 	};
 
 	const grid = (list: AgentWithCaps[]) => (
@@ -154,7 +160,13 @@ export function Step1Agent() {
 								</Link>
 							</Button>
 						</div>
-						{own.length ? grid(own) : <p className="text-muted-foreground text-sm">{t("agent.noneYours")} {t("agent.registerHint")}</p>}
+						{own.length ? (
+							grid(own)
+						) : (
+							<p className="text-muted-foreground text-sm">
+								{t("agent.noneYours")} {t("agent.registerHint")}
+							</p>
+						)}
 					</section>
 					<section className="flex flex-col gap-3">
 						<h3 className="text-sm font-semibold">{t("agent.builtin")}</h3>
@@ -162,6 +174,24 @@ export function Step1Agent() {
 					</section>
 				</>
 			)}
+
+			<section
+				className="border-border/70 bg-muted/30 flex flex-wrap items-center gap-3 rounded-xl border p-4"
+				data-testid="evaluate-mcp-server"
+			>
+				<span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg">
+					<Plug className="size-4" aria-hidden />
+				</span>
+				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+					<span className="text-sm font-semibold">{t("agent.mcpServer.title")}</span>
+					<span className="text-muted-foreground text-sm">{t("agent.mcpServer.hint")}</span>
+				</span>
+				<Button asChild variant="outline" size="sm">
+					<Link to={"/mcp-test" as never} data-testid="evaluate-mcp-server-link">
+						{t("agent.mcpServer.cta")}
+					</Link>
+				</Button>
+			</section>
 
 			{draft.agent ? (
 				<VersionPicker agent={draft.agent} value={draft.version} onChange={(v) => update({ version: v })} />

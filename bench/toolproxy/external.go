@@ -156,6 +156,11 @@ func (s *Server) serveExternal(w http.ResponseWriter, r *http.Request, rest, age
 		s.externalRefuse(w, x, &row, http.StatusBadRequest, bad)
 		return
 	}
+	if x.cfg.MCP && r.Method == http.MethodGet { // no server stream through the proxy; clients fall back to POST answers
+		w.Header().Set("Allow", "POST, DELETE")
+		s.externalRefuse(w, x, &row, http.StatusMethodNotAllowed, fmt.Sprintf("external mcp server %s offers no GET stream through the proxy; send messages with POST", id))
+		return
+	}
 	if !x.allowed(r.Method, path) {
 		s.externalRefuse(w, x, &row, http.StatusForbidden, fmt.Sprintf("%s %s is not on the allowlist of external api %s", r.Method, path, id))
 		return
@@ -181,6 +186,9 @@ func (s *Server) serveExternal(w http.ResponseWriter, r *http.Request, rest, age
 		}
 	}
 	row.Arguments, row.ArgsSHA256 = Capture(x.redactBytes(args))
+	if x.cfg.MCP {
+		row.Tool = x.redact(mcpRequestLabel(body, row.Tool))
+	}
 	ft, hit := s.faults.decide(id, row.Tool, agent) // Multi-agent area: a member's route names the member
 	if hit && ft.Mode == FaultInputDrift {          // lane X22: a new-shape call is translated and forwarded
 		nb, stale := driftCall(ft, body)
@@ -358,6 +366,9 @@ func (s *Server) externalAnswer(w http.ResponseWriter, x *externalRoute, row *sc
 		out[k] = vs
 	}
 	row.Status, row.IsError = status, status >= 400
+	if x.cfg.MCP && !row.IsError {
+		row.IsError = mcpAnswerIsError(h.Get("Content-Type"), raw)
+	}
 	row.Result, row.ResultSHA256 = Capture(raw)
 	w.WriteHeader(status)
 	_, werr := w.Write(raw)
@@ -421,6 +432,9 @@ func (s *Server) externalError(w http.ResponseWriter, _ *externalRoute, row *sch
 func (x *externalRoute) request(ctx context.Context, r *http.Request, path string, body []byte) *http.Request {
 	u := *x.base
 	u.Path, u.RawPath = strings.TrimRight(x.base.Path, "/")+path, ""
+	if x.cfg.MCP && path == "/" && x.base.Path != "" { // the MCP endpoint itself, without a trailing slash
+		u.Path = x.base.Path
+	}
 	u.RawQuery = r.URL.RawQuery
 	u.Fragment, u.User = "", nil
 	req := (&http.Request{
