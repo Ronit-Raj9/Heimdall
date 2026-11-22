@@ -243,3 +243,49 @@ func TestRealTryExperiment(t *testing.T) {
 		t.Fatal("the check itself must stay scripted")
 	}
 }
+
+// TestHostedCanaryBaselineKind: Record baseline (canary.baseline) is known
+// on the hosted server too, joined with the local kind, and the hosted side
+// refuses pinning an earlier comparison.
+func TestHostedCanaryBaselineKind(t *testing.T) {
+	var spec *jobKindSpec
+	jobKindsMu.Lock()
+	for i := range jobKinds {
+		if jobKinds[i].Kind == kindCanaryBaseline {
+			spec = &jobKinds[i]
+		}
+	}
+	jobKindsMu.Unlock()
+	if spec == nil || !spec.Hosted || !spec.Local {
+		t.Fatalf("canary.baseline not registered for both modes: %+v", spec)
+	}
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "canaries"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "canaries", "c1.yaml"), []byte("name: c1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	env := jobEnv{ProjectRoot: root, Hosted: true}
+	ctx := context.Background()
+	p, _, err := spec.Validate(ctx, env, json.RawMessage(`{"name":"c1","note":"first"}`))
+	if err != nil {
+		t.Fatalf("hosted baseline refused: %v", err)
+	}
+	if bp, ok := p.(canaryBaselineParams); !ok || bp.Name != "c1" || bp.Note != "first" {
+		t.Fatalf("params %#v", p)
+	}
+	_, _, err = spec.Validate(ctx, env, json.RawMessage(`{"name":"c1","from":"exp_1"}`))
+	if !errors.Is(err, jobs.ErrInvalidParams) || !strings.Contains(err.Error(), "not available on the hosted site") {
+		t.Fatalf("from not refused: %v", err)
+	}
+	if _, _, err := spec.Validate(ctx, env, json.RawMessage(`{"name":"missing"}`)); !errors.Is(err, jobs.ErrInvalidParams) {
+		t.Fatalf("missing canary: %v", err)
+	}
+}
+
+func TestHostedCanaryNoBaselineMessage(t *testing.T) {
+	if got := noBaselineMessage("zz"); got != "Drift monitor zz has no baseline yet: press Record baseline on Scheduled checks > Drift checks first." {
+		t.Fatalf("message %q", got)
+	}
+}

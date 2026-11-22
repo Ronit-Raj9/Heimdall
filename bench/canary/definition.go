@@ -113,6 +113,8 @@ func (t Target) Label() string {
 type ScheduleSpec struct {
 	Cron     string `json:"cron" yaml:"cron"`                             // 5-field cron expression
 	Timezone string `json:"timezone,omitempty" yaml:"timezone,omitempty"` // IANA name; empty is the host's zone
+	// Paused stops the scheduled checks; Check now still works.
+	Paused bool `json:"paused,omitempty" yaml:"paused,omitempty"`
 }
 
 // Budget caps spend. Both are required for a canary that can spend.

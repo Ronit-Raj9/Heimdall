@@ -9,9 +9,16 @@ import { Bird, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { useGetCanariesQuery, useGetCanaryQuery } from "@/lib/store/apis/canaryApi";
-import { useDeleteCanaryMutation } from "@/lib/store/apis/schedulesApi";
+import {
+	errorMessage,
+	isPaused,
+	useDeleteCanaryMutation,
+	useGetSchedulesQuery,
+	useSetCanaryPausedMutation,
+} from "@/lib/store/apis/schedulesApi";
+import { Badge } from "@/components/ui/badge";
 import { NewCanaryForm } from "./newCanaryForm";
-import type { CanaryListResponse } from "@/lib/types/bench";
+import type { CanaryDefinition, CanaryListResponse } from "@/lib/types/bench";
 import { parseAsString, useQueryState } from "nuqs";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -29,6 +36,9 @@ export default function CanariesView() {
 	const open = name ?? (data ? (sortCanaries(data.canaries)[0]?.name ?? null) : null);
 	const { t: u } = useTranslation("ux13");
 	const [formOpen, setFormOpen] = useState(false);
+	const [editing, setEditing] = useState<CanaryDefinition | null>(null);
+	const schedules = useGetSchedulesQuery();
+	const paused = pausedCanaries(schedules.data?.rows);
 	const hasAny = Boolean(data && (data.canaries.length > 0 || data.errors.length > 0));
 
 	return (
@@ -54,6 +64,9 @@ export default function CanariesView() {
 					}}
 				/>
 			)}
+			{editing && (
+				<NewCanaryForm key={editing.name} initial={editing} onClose={() => setEditing(null)} onCreated={() => setEditing(null)} />
+			)}
 			{list.isLoading ? (
 				<BlockSkeleton rows={4} testId="canaries-loading" />
 			) : list.error || !data ? (
@@ -63,7 +76,20 @@ export default function CanariesView() {
 					data={data}
 					selected={open}
 					onSelect={(next) => void setName(next)}
-					panel={open ? <CanaryPanel key={open} name={open} /> : null}
+					paused={paused}
+					panel={
+						open ? (
+							<CanaryPanel
+								key={open}
+								name={open}
+								onEdit={(d) => {
+									setFormOpen(false);
+									setEditing(d);
+								}}
+								onDeleted={() => void setName(null)}
+							/>
+						) : null
+					}
 					onCreate={formOpen ? undefined : () => setFormOpen(true)}
 				/>
 			)}
@@ -79,10 +105,21 @@ export interface CanariesBodyProps {
 	panel: ReactNode;
 	/** Opens the new-canary form; the empty state's primary action. */
 	onCreate?: () => void;
+	/** Names of the paused drift monitors. */
+	paused?: ReadonlySet<string>;
+}
+
+/** The drift monitors whose schedule is paused, from the schedules rows (canary-<name>). Exported for tests. */
+export function pausedCanaries(rows: readonly { name: string; kind: string }[] | undefined): Set<string> {
+	const out = new Set<string>();
+	for (const r of rows ?? []) {
+		if (r.kind === "canary" && r.name.startsWith("canary-") && isPaused(r)) out.add(r.name.slice("canary-".length));
+	}
+	return out;
 }
 
 /** The loaded list, definition errors, and the open canary. Exported for tests. */
-export function CanariesBody({ data, selected, onSelect, panel, onCreate }: CanariesBodyProps) {
+export function CanariesBody({ data, selected, onSelect, panel, onCreate, paused }: CanariesBodyProps) {
 	const { t } = useTranslation("bench");
 	const { t: u } = useTranslation("ux13");
 	if (data.canaries.length === 0 && data.errors.length === 0) {
@@ -107,7 +144,7 @@ export function CanariesBody({ data, selected, onSelect, panel, onCreate }: Cana
 	return (
 		<div className="flex min-w-0 flex-col gap-6">
 			<Section title={t("canaries.list.title")} description={t("canaries.list.description")} testId="canaries-list">
-				<CanaryList canaries={data.canaries} selected={selected} onSelect={onSelect} />
+				<CanaryList canaries={data.canaries} selected={selected} onSelect={onSelect} paused={paused} />
 				{data.errors.length > 0 && (
 					<ul className="text-chart-error-ink text-xs" data-testid="canaries-errors">
 						{data.errors.map((e) => (
@@ -122,7 +159,7 @@ export function CanariesBody({ data, selected, onSelect, panel, onCreate }: Cana
 }
 
 /** One canary, fetched, with the run button. */
-function CanaryPanel({ name }: { name: string }) {
+function CanaryPanel({ name, onEdit, onDeleted }: { name: string; onEdit(d: CanaryDefinition): void; onDeleted(): void }) {
 	const { t } = useTranslation("bench");
 	const detail = useGetCanaryQuery(name);
 	if (detail.isLoading) return <BlockSkeleton rows={6} testId="canary-loading" />;
@@ -136,29 +173,91 @@ function CanaryPanel({ name }: { name: string }) {
 			/>
 		);
 	}
-	return <CanaryDetailBody detail={detail.data} actions={<CanaryActions name={name} />} />;
+	const def = detail.data.definition;
+	return (
+		<CanaryDetailBody
+			detail={detail.data}
+			actions={<CanaryActions name={name} definition={def} onEdit={() => onEdit(def)} onDeleted={onDeleted} />}
+		/>
+	);
 }
 
-/** Baseline and look as background jobs (canary.baseline, canary.run) with a live log; delete the definition. */
-function CanaryActions({ name }: { name: string }) {
+/**
+ * Baseline and look as background jobs (canary.baseline, canary.run) with a live log; pause or resume
+ * the schedule, edit or delete the definition. Exported for tests.
+ */
+export function CanaryActions({
+	name,
+	definition,
+	onEdit,
+	onDeleted,
+}: {
+	name: string;
+	definition?: CanaryDefinition;
+	onEdit?(): void;
+	onDeleted?(): void;
+}) {
 	const { t } = useTranslation("schedules");
 	const confirm = useConfirm();
 	const [remove, removeState] = useDeleteCanaryMutation();
+	const [setPaused, pauseState] = useSetCanaryPausedMutation();
+	const [note, setNote] = useState<string | null>(null);
+	const scheduled = Boolean(definition?.schedule);
+	const paused = isPaused(definition?.schedule);
 	return (
 		<span className="flex flex-wrap items-center gap-2" data-testid="canary-actions">
-			<JobRunButton kind="canary.baseline" params={{ name }} label={t("canary.baseline")} confirm={t("canary.baselineConfirm")} variant="outline" />
+			{paused && (
+				<Badge variant="outline" title={t("canary.pausedNote")} data-testid="canary-paused">
+					{t("paused")}
+				</Badge>
+			)}
+			<JobRunButton
+				kind="canary.baseline"
+				params={{ name }}
+				label={t("canary.baseline")}
+				confirm={t("canary.baselineConfirm")}
+				variant="outline"
+			/>
 			<JobRunButton kind="canary.run" params={{ name }} label={t("canary.run")} variant="outline" />
+			{scheduled && (
+				<Button
+					size="sm"
+					variant="outline"
+					disabled={pauseState.isLoading}
+					onClick={async () => {
+						setNote(null);
+						const res = await setPaused({ name, paused: !paused });
+						if ("error" in res && res.error) setNote(errorMessage(res.error, "not changed"));
+					}}
+					data-testid={paused ? "canary-resume" : "canary-pause"}
+				>
+					{paused ? t("resume") : t("pause")}
+				</Button>
+			)}
+			{onEdit && (
+				<Button size="sm" variant="outline" onClick={onEdit} data-testid="canary-edit">
+					{t("canary.edit")}
+				</Button>
+			)}
 			<Button
 				size="sm"
 				variant="ghost"
 				disabled={removeState.isLoading}
 				onClick={async () => {
-					if (await confirm(t("canary.deleteConfirm", { name }))) void remove(name);
+					if (!(await confirm(t("canary.deleteConfirm", { name })))) return;
+					const res = await remove(name);
+					if ("error" in res && res.error) setNote(errorMessage(res.error, "not deleted"));
+					else onDeleted?.();
 				}}
 				data-testid="canary-delete"
 			>
 				{t("canary.delete")}
 			</Button>
+			{note && (
+				<span className="text-xs" data-testid="canary-action-note">
+					{note}
+				</span>
+			)}
 		</span>
 	);
 }
