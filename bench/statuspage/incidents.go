@@ -78,6 +78,9 @@ type Incident struct {
 	ScheduledFor *time.Time `json:"scheduled_for,omitempty"` // maintenance start, when announced ahead
 	ResolvedAt   *time.Time `json:"resolved_at,omitempty"`
 	Updates      []Update   `json:"updates"` // oldest first
+	// Auto marks an incident a platform check opened on its own (auto.go);
+	// only those are ever resolved automatically.
+	Auto bool `json:"auto,omitempty"`
 }
 
 // Limits on operator text, which is shown publicly as plain text.
@@ -190,6 +193,7 @@ type Open struct {
 	Components   []string
 	Message      string
 	ScheduledFor *time.Time
+	Auto         bool // opened by a platform check (auto.go)
 }
 
 // Open records a new incident and returns it.
@@ -221,7 +225,7 @@ func (s *Store) Open(o Open) (Incident, error) {
 	}
 	now := s.now().UTC()
 	in := Incident{ID: newID(), Title: strings.TrimSpace(o.Title), Status: o.Status, Impact: o.Impact, Components: comps,
-		StartedAt: now, Updates: []Update{{At: now, Status: o.Status, Message: strings.TrimSpace(o.Message)}}}
+		StartedAt: now, Updates: []Update{{At: now, Status: o.Status, Message: strings.TrimSpace(o.Message)}}, Auto: o.Auto}
 	if o.ScheduledFor != nil {
 		t := o.ScheduledFor.UTC()
 		in.ScheduledFor = &t

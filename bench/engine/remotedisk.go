@@ -66,13 +66,17 @@ type CoordinatorStats struct {
 	WorkersDiskLow int            // workers whose last report said their disk is low
 	Runs           map[string]int // uploaded runs: "accepted/<outcome>" or "rejected"
 	Attached       int            // experiments attached for remote slots
+	// SharedWorkers counts the platform's shared pool only
+	// (schemas.SharedRunnerPool), by state: the public status page's worker
+	// line (fix wave 2, N148).
+	SharedWorkers map[string]int
 }
 
 // Stats reads the coordinator's live state.
 func (c *Coordinator) Stats() CoordinatorStats {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	st := CoordinatorStats{Leases: len(c.leases), Workers: map[string]int{}, Runs: map[string]int{}, Attached: len(c.exps)}
+	st := CoordinatorStats{Leases: len(c.leases), Workers: map[string]int{}, Runs: map[string]int{}, Attached: len(c.exps), SharedWorkers: map[string]int{}}
 	now := c.now()
 	for _, l := range c.leases {
 		if age := now.Sub(l.lastBeat); age > st.OldestBeat {
@@ -81,6 +85,9 @@ func (c *Coordinator) Stats() CoordinatorStats {
 	}
 	for _, w := range c.workers {
 		st.Workers[w.info.State]++
+		if w.info.Pool == schemas.SharedRunnerPool {
+			st.SharedWorkers[w.info.State]++
+		}
 		if w.info.Disk != nil && w.info.Disk.Low {
 			st.WorkersDiskLow++
 		}

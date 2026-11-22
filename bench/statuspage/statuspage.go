@@ -89,6 +89,34 @@ type Service struct {
 	mu        sync.Mutex
 	cached    []Component
 	checkedAt time.Time
+	auto      *autoIncidents // nil: no automatic incidents (auto.go)
+}
+
+// WithAutoIncidents makes the service open and resolve automatic incidents
+// from its fresh check runs (auto.go). It needs a store.
+func (s *Service) WithAutoIncidents() *Service {
+	if s.store != nil {
+		s.auto = newAutoIncidents(s.store)
+	}
+	return s
+}
+
+// Watch runs the checks every interval until ctx ends, so automatic
+// incidents open and resolve while nobody reads the page.
+func (s *Service) Watch(ctx context.Context, every time.Duration) {
+	if every < CacheFor {
+		every = CacheFor
+	}
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		s.components(ctx)
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
 }
 
 // New returns a service. store may be nil (no incidents).
@@ -178,5 +206,6 @@ func (s *Service) components(ctx context.Context) ([]Component, time.Time) {
 	}
 	wg.Wait()
 	s.cached, s.checkedAt = out, now
+	s.auto.observe(out, now)
 	return append([]Component(nil), out...), now
 }
