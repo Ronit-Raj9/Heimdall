@@ -295,6 +295,9 @@ add_secret "$password"
 csrf=''
 sess POST /api/bench/auth/signup "$(jq -nc --arg e "$email" --arg p "$password" '{email: $e, password: $p, name: "Issue bench e2e"}')"
 want "POST /auth/signup" 200 201
+# This stack sends no email, so the owner is verified on the server (the
+# same command an operator runs); POST /orgs refuses an unverified account.
+out=$(bench -- user verify -email "$email" 2>&1) || fail "bifrost-bench user verify -email $email: $(printf '%s' "$out" | tail -n 3)"
 sess GET /api/bench/auth/me
 csrf=$(printf '%s' "$body" | jq -r '.csrf // .session.csrf // empty')
 [ -n "$csrf" ] || fail "no CSRF token in /auth/me"
