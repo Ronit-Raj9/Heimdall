@@ -106,7 +106,8 @@ export function parseBlocks(source: string): Block[] {
 		while (i < lines.length) {
 			const l = lines[i];
 			const t = l.trim();
-			if (t === "" || /^(#{1,6})\s/.test(t) || /^(`{3,}|~{3,})/.test(t) || t.startsWith(">") || LIST_ITEM.test(l) || t.startsWith("|")) break;
+			if (t === "" || /^(#{1,6})\s/.test(t) || /^(`{3,}|~{3,})/.test(t) || t.startsWith(">") || LIST_ITEM.test(l) || t.startsWith("|"))
+				break;
 			body.push(t);
 			i++;
 		}
@@ -138,6 +139,21 @@ export function safeHref(href: string): string | null {
 	return h;
 }
 
+/**
+ * Files outside the docs folder that guides link to with a relative path. The server serves no
+ * such path, so each known one opens an in-app guide built from the same file (GET /docs/{name}).
+ */
+const RELATIVE_DOCS: Record<string, string> = {
+	"../spec/agent-event.schema.json": "agent-event-schema",
+	"../examples/acme-node/README.md": "example-acme-node",
+};
+
+/** The in-app guide a relative "../" link opens, or null when there is none. Exported for tests. */
+export function relativeDocTarget(href: string): string | null {
+	const path = href.split("#")[0] ?? "";
+	return RELATIVE_DOCS[path] ?? null;
+}
+
 const INLINE = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\[[^\]]+\]\([^)\s]+\))|(\*[^*\s][^*]*\*)|(_[^_\s][^_]*_)/g;
 
 function renderInline(text: string, onDocLink: MarkdownProps["onDocLink"], keyBase: string): ReactNode[] {
@@ -162,7 +178,32 @@ function renderInline(text: string, onDocLink: MarkdownProps["onDocLink"], keyBa
 			const label = lm?.[1] ?? tok;
 			const href = safeHref(lm?.[2] ?? "");
 			const doc = href ? /^(?:\.\/)?([\w.-]+)\.md(?:#([\w-]+))?$/.exec(href) : null;
-			if (doc && isInternalDoc(doc[1])) {
+			const outside = href?.startsWith("../") ? relativeDocTarget(href) : undefined;
+			if (outside !== undefined) {
+				// A link out of the docs folder: a known file opens its in-app guide; any other
+				// would be a broken link, so it is plain text.
+				if (outside === null) {
+					out.push(label);
+				} else {
+					out.push(
+						<a
+							key={key}
+							href={`/docs?doc=${outside}`}
+							className="text-primary underline underline-offset-2"
+							onClick={
+								onDocLink
+									? (e) => {
+											e.preventDefault();
+											onDocLink(outside);
+										}
+									: undefined
+							}
+						>
+							{label}
+						</a>,
+					);
+				}
+			} else if (doc && isInternalDoc(doc[1])) {
 				out.push(label);
 			} else if (doc && onDocLink) {
 				out.push(
@@ -291,7 +332,10 @@ export function Markdown({ source, onDocLink, className, testId = "markdown" }: 
 					case "list": {
 						const Tag = b.ordered ? "ol" : "ul";
 						return (
-							<Tag key={k} className={cn("marker:text-muted-foreground flex flex-col gap-1.5 pl-6", b.ordered ? "list-decimal" : "list-disc")}>
+							<Tag
+								key={k}
+								className={cn("marker:text-muted-foreground flex flex-col gap-1.5 pl-6", b.ordered ? "list-decimal" : "list-disc")}
+							>
 								{b.items.map((it, j) => (
 									<li key={j}>{renderInline(it, onDocLink, `${k}-${j}`)}</li>
 								))}

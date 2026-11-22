@@ -132,6 +132,10 @@ func (s *Service) Authenticate(ctx *fasthttp.RequestCtx) (*Principal, error) {
 		}
 		// A stale cookie: forget it and carry on anonymous.
 		s.clearCookie(ctx, SessionCookie, "/")
+		if write && s.originVerdict(ctx) == originForeign {
+			return nil, ErrOrigin
+		}
+		return &Principal{Kind: KindAnonymous, staleSession: true}, nil
 	}
 	if write && s.originVerdict(ctx) == originForeign {
 		return nil, ErrOrigin

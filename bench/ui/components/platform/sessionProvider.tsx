@@ -1,8 +1,8 @@
-import { SessionContext, sessionFromMe } from "@/lib/session/sessionContext";
+import { meIsAnonymous, SessionContext, sessionFromMe } from "@/lib/session/sessionContext";
 import { useAppDispatch } from "@/lib/store/hooks";
 import { benchApi } from "@/lib/store/apis/benchApi";
 import { useGetAuthConfigQuery, useGetMeQuery } from "@/lib/store/apis/platformApi";
-import { isUnauthorized, onUnauthorized, ORG_SWITCH_KEY } from "@/lib/store/apis/session";
+import { onUnauthorized, ORG_SWITCH_KEY } from "@/lib/store/apis/session";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 
 /**
@@ -15,7 +15,8 @@ import { useEffect, useMemo, useRef, type ReactNode } from "react";
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
 	const me = useGetMeQuery();
-	const anonymous = isUnauthorized(me.error);
+	// A visitor: 401 (an ended session) or 200 with kind anonymous (no credential at all).
+	const anonymous = meIsAnonymous(me.data, me.error);
 	const config = useGetAuthConfigQuery(undefined, { skip: !anonymous });
 	const dispatch = useAppDispatch();
 	const session = useMemo(

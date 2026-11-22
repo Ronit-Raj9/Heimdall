@@ -125,6 +125,10 @@ type Principal struct {
 	sessionID string
 	// csrf is the session's CSRF value, set only for session principals.
 	csrf string
+	// staleSession is set on an anonymous principal whose request presented
+	// a session cookie that names no live session: GET /auth/me answers it
+	// 401, where a request with no credential at all gets an anonymous 200.
+	staleSession bool
 }
 
 // Anonymous returns a principal with no identity and no role.

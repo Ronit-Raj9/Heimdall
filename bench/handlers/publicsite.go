@@ -283,7 +283,7 @@ func (h *PublicSiteHandler) doc(ctx *fasthttp.RequestCtx) {
 			"doc name must be letters, digits, '-', '_' or '.', for example quickstart")
 		return
 	}
-	data, ok := benchdocs.ReadPublic(name)
+	data, ok := readGuide(name, true)
 	if !ok {
 		lib.SendError(ctx, h.c.Mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound,
 			"no guide named "+name+": GET "+PublicPrefix+"/docs lists them")

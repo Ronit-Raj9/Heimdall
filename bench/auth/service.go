@@ -640,7 +640,14 @@ func LocalMe() Me {
 // the current organization and the session's CSRF value.
 func (s *Service) Me(ctx context.Context, p *Principal) (*Me, error) {
 	if !p.IsAuthenticated() {
-		return nil, ErrUnauthenticated
+		// A visitor with no credential at all is answered, not refused: the
+		// UI asks on every page and a 401 there is console noise. A session
+		// cookie that names no live session still answers 401, which the UI
+		// reads as "signed out" (the session ended).
+		if p == nil || p.staleSession {
+			return nil, ErrUnauthenticated
+		}
+		return &Me{AuthMode: "hosted", Kind: string(KindAnonymous), Orgs: []MeOrg{}}, nil
 	}
 	me := &Me{AuthMode: "hosted", Kind: string(p.Kind), CurrentOrg: p.OrgID, Role: p.Role, CSRF: p.csrf, Orgs: []MeOrg{}}
 	switch p.Kind {

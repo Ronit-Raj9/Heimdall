@@ -1,15 +1,19 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { isInternalDoc, Markdown, parseBlocks, parseCallout, safeHref, slugify } from "./markdown";
+import { isInternalDoc, Markdown, parseBlocks, parseCallout, relativeDocTarget, safeHref, slugify } from "./markdown";
 
 describe("Markdown", () => {
 	it("parses the common blocks", () => {
-		const blocks = parseBlocks("# Title\n\nSome *text*.\n\n```sh\nmake\n```\n\n- a\n- b\n\n| x | y |\n|---|---|\n| 1 | 2 |\n\n> note\n\n---\n");
+		const blocks = parseBlocks(
+			"# Title\n\nSome *text*.\n\n```sh\nmake\n```\n\n- a\n- b\n\n| x | y |\n|---|---|\n| 1 | 2 |\n\n> note\n\n---\n",
+		);
 		expect(blocks.map((b) => b.kind)).toEqual(["heading", "para", "code", "list", "table", "quote", "rule"]);
 	});
 
 	it("never renders raw HTML or script links", () => {
-		const html = renderToStaticMarkup(<Markdown source={'<script>alert(1)</script>\n\n[x](javascript:alert(1)) [y](https://e.com) `<b>`'} />);
+		const html = renderToStaticMarkup(
+			<Markdown source={"<script>alert(1)</script>\n\n[x](javascript:alert(1)) [y](https://e.com) `<b>`"} />,
+		);
 		expect(html).not.toContain("<script>");
 		expect(html).not.toContain("javascript:");
 		expect(html).toContain('href="https://e.com"');
@@ -17,7 +21,9 @@ describe("Markdown", () => {
 	});
 
 	it("turns guide links into in-place links and slugs headings", () => {
-		const html = renderToStaticMarkup(<Markdown source={"## Run it now\n\nSee [runners](runners.md#setup)."} onDocLink={() => undefined} />);
+		const html = renderToStaticMarkup(
+			<Markdown source={"## Run it now\n\nSee [runners](runners.md#setup)."} onDocLink={() => undefined} />,
+		);
 		expect(html).toContain('id="run-it-now"');
 		expect(html).toContain('href="?doc=runners"');
 		expect(safeHref("data:text/html,x")).toBeNull();
@@ -35,6 +41,29 @@ describe("Markdown", () => {
 		expect(isInternalDoc("CLI_WEB_PARITY")).toBe(true);
 		expect(isInternalDoc("spike")).toBe(true);
 		expect(isInternalDoc("hosting")).toBe(false);
+	});
+
+	// G3: links out of the docs folder point at files the server does not serve.
+	it("turns the schema and example links into in-app guide links, and other ../ links into plain text", () => {
+		const source =
+			"See [`spec/agent-event.schema.json`](../spec/agent-event.schema.json), [schema](../spec/agent-event.schema.json#x), " +
+			"[`examples/acme-node`](../examples/acme-node/README.md) and [other](../examples/acme-web/README.md).";
+		const opened: string[] = [];
+		const html = renderToStaticMarkup(<Markdown source={source} onDocLink={(name) => opened.push(name)} />);
+		expect(html).toContain('href="/docs?doc=agent-event-schema"');
+		expect(html).toContain('href="/docs?doc=example-acme-node"');
+		expect(html).not.toContain("../spec");
+		expect(html).not.toContain("../examples");
+		expect(html).toContain("other");
+		expect(html.match(/<a /g)?.length).toBe(3);
+		// Without an in-place handler (the public site) the links still go to the app's docs page.
+		const plain = renderToStaticMarkup(<Markdown source={source} />);
+		expect(plain).toContain('href="/docs?doc=agent-event-schema"');
+		expect(plain).toContain('href="/docs?doc=example-acme-node"');
+		expect(plain).not.toContain("../examples/acme-web");
+		expect(relativeDocTarget("../spec/agent-event.schema.json")).toBe("agent-event-schema");
+		expect(relativeDocTarget("../examples/acme-node/README.md#setup")).toBe("example-acme-node");
+		expect(relativeDocTarget("../examples/acme-web/README.md")).toBeNull();
 	});
 
 	it("renders callouts and code blocks with a copy button", () => {

@@ -10,6 +10,7 @@ import (
 	"github.com/maximhq/bifrost/bench/db"
 	"github.com/maximhq/bifrost/bench/db/dbtest"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/valyala/fasthttp"
 )
 
 type testEnv struct {
@@ -577,8 +578,62 @@ func TestSwitchOrgAndMe(t *testing.T) {
 	if o, err := e.svc.SwitchOrg(bg, a, slug, ""); err != nil || o.ID != a.OrgID {
 		t.Fatalf("switch by slug = %+v, %v", o, err)
 	}
-	if _, err := e.svc.Me(bg, Anonymous()); !errors.Is(err, ErrUnauthenticated) {
-		t.Fatalf("anonymous me = %v", err)
+	// A visitor with no credential gets a signed-out answer, not an error
+	// (TestMeAnonymousIs200).
+	if me, err := e.svc.Me(bg, Anonymous()); err != nil || me.Kind != string(KindAnonymous) {
+		t.Fatalf("anonymous me = %+v, %v", me, err)
+	}
+}
+
+// TestMeAnonymousIs200 covers G1.console: a caller with no credential at
+// all is answered with an anonymous Me (no error, so 200), so the landing
+// page and docs show no 401 in the browser console.
+func TestMeAnonymousIs200(t *testing.T) {
+	e := newTestEnv(t, SignupOpen)
+	ctx := &fasthttp.RequestCtx{}
+	ctx.Request.Header.SetMethod("GET")
+	ctx.Request.SetRequestURI("/api/bench/auth/me")
+	p, err := e.svc.Authenticate(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	me, err := e.svc.Me(bg, p)
+	if err != nil {
+		t.Fatalf("anonymous me = %v, want no error", err)
+	}
+	if me.AuthMode != "hosted" || me.Kind != "anonymous" || me.Orgs == nil || len(me.Orgs) != 0 || me.CSRF != "" || me.User != nil {
+		t.Fatalf("anonymous me = %+v", me)
+	}
+}
+
+// TestMeExpiredSessionIs401 checks that a presented session cookie that no
+// longer names a live session still answers 401: the UI reads 401 as
+// "signed out" and must keep doing so.
+func TestMeExpiredSessionIs401(t *testing.T) {
+	e := newTestEnv(t, SignupOpen)
+	_, sess := e.signup(t, "a@example.com")
+	e.clk.Advance(72 * time.Hour)
+	ctx := &fasthttp.RequestCtx{}
+	ctx.Request.Header.SetMethod("GET")
+	ctx.Request.SetRequestURI("/api/bench/auth/me")
+	ctx.Request.Header.SetCookie(SessionCookie, sess.Cookie)
+	p, err := e.svc.Authenticate(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.svc.Me(bg, p); !errors.Is(err, ErrUnauthenticated) {
+		t.Fatalf("expired session me = %v, want ErrUnauthenticated", err)
+	}
+	ctx2 := &fasthttp.RequestCtx{}
+	ctx2.Request.Header.SetMethod("GET")
+	ctx2.Request.SetRequestURI("/api/bench/auth/me")
+	ctx2.Request.Header.SetCookie(SessionCookie, "not-a-session")
+	p2, err := e.svc.Authenticate(ctx2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.svc.Me(bg, p2); !errors.Is(err, ErrUnauthenticated) {
+		t.Fatalf("unknown session me = %v, want ErrUnauthenticated", err)
 	}
 }
 
