@@ -3,10 +3,29 @@ import "@/lib/i18n";
 import type { AgentTemplate, EndpointTestResult } from "@/lib/types/agentBuilder";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { defaultParams, detectFramework, EndpointTestPanel, missingParams, picksOwnModel, testable } from "./connectForm";
+import {
+	capText,
+	defaultParams,
+	detectFramework,
+	EndpointPreviewView,
+	EndpointTestPanel,
+	missingParams,
+	optionLabel,
+	ParamFields,
+	paramVisible,
+	picksOwnModel,
+	RAW_CAP,
+	testable,
+} from "./connectForm";
 
+const role = vi.hoisted(() => ({ admin: true }));
 vi.mock("@/lib/store/apis/benchApi", () => ({ getBenchErrorMessage: () => "boom" }));
-vi.mock("@/lib/store/apis/agentBuilderApi", () => ({ useTestEndpointMutation: () => [vi.fn(), { isLoading: false }] }));
+vi.mock("@/lib/store/apis/agentBuilderApi", () => ({
+	useTestEndpointMutation: () => [vi.fn(), { isLoading: false }],
+	usePreviewEndpointMutation: () => [vi.fn(), { isLoading: false }],
+}));
+vi.mock("@/lib/store/apis/secretsApi", () => ({ useCreateSecretMutation: () => [vi.fn(), { isLoading: false }] }));
+vi.mock("@/lib/session/sessionContext", () => ({ canUse: () => role.admin, useSession: () => ({}) }));
 
 const http: AgentTemplate = {
 	id: "http-url",
@@ -83,5 +102,84 @@ describe("EndpointTestPanel", () => {
 		expect(html).toContain("answered 401");
 		expect(renderToStaticMarkup(<EndpointTestPanel error={{ status: 500 }} loading={false} />)).toContain("boom");
 		expect(renderToStaticMarkup(<EndpointTestPanel loading />)).toContain("Sending a sample task");
+	});
+});
+
+describe("mapping fields", () => {
+	const mapped: AgentTemplate = {
+		...http,
+		params: [
+			{ name: "url", label: "URL", required: true },
+			{ name: "auth_type", label: "Auth", required: false, kind: "select", options: ["none", "oauth2"], option_labels: { oauth2: "OAuth 2 client credentials" }, group: "auth" },
+			{ name: "token_url", label: "Token URL", required: false, group: "auth", show_when: { auth_type: ["oauth2"] } },
+			{ name: "client_secret", label: "Client secret", required: false, kind: "secret", group: "auth", show_when: { auth_type: ["oauth2"] } },
+			{ name: "answer_path", label: "Answer path", required: false, group: "mapping" },
+		],
+	};
+
+	it("shows a field only for its listed values", () => {
+		const tok = mapped.params[2];
+		expect(paramVisible(tok, { auth_type: "none" })).toBe(false);
+		expect(paramVisible(tok, {})).toBe(false);
+		expect(paramVisible(tok, { auth_type: "oauth2" })).toBe(true);
+		expect(paramVisible(mapped.params[0], {})).toBe(true);
+	});
+
+	it("labels select options", () => {
+		expect(optionLabel(mapped.params[1], "oauth2")).toBe("OAuth 2 client credentials");
+		expect(optionLabel(mapped.params[1], "none")).toBe("none");
+		expect(optionLabel({ name: "framework", label: "F", required: false }, "crewai")).toBe("CrewAI");
+	});
+
+	it("renders the mapping fold and hides fields until chosen", () => {
+		const hidden = renderToStaticMarkup(<ParamFields tpl={mapped} params={{ auth_type: "none" }} onChange={() => undefined} />);
+		expect(hidden).toContain('data-testid="param-group-mapping"');
+		expect(hidden).toContain("Request and answer mapping");
+		expect(hidden).toContain("OAuth 2 client credentials");
+		expect(hidden).not.toContain("param-token_url");
+		const shown = renderToStaticMarkup(<ParamFields tpl={mapped} params={{ auth_type: "oauth2" }} onChange={() => undefined} />);
+		expect(shown).toContain("param-token_url");
+		expect(shown).toContain('data-testid="new-secret-client_secret"');
+	});
+
+	it("offers a new secret to admins only", () => {
+		role.admin = false;
+		const html = renderToStaticMarkup(<ParamFields tpl={mapped} params={{ auth_type: "oauth2" }} onChange={() => undefined} />);
+		role.admin = true;
+		expect(html).toContain("param-client_secret");
+		expect(html).not.toContain("new-secret-client_secret");
+	});
+});
+
+describe("request preview and test details", () => {
+	const sent = { step: "request", method: "POST", url: "https://a/run", headers: [["Authorization", "Bearer ****"]] as [string, string][], body: '{"q":"hi"}' };
+
+	it("shows the request and where the answer is read", () => {
+		const html = renderToStaticMarkup(<EndpointPreviewView data={{ ok: true, requests: [sent], reads: "the JSON path output.text" }} loading={false} />);
+		expect(html).toContain("POST");
+		expect(html).toContain("https://a/run");
+		expect(html).toContain("Authorization: Bearer ****");
+		expect(html).toContain("{&quot;q&quot;:&quot;hi&quot;}");
+		expect(html).toContain("Answer read from: the JSON path output.text");
+	});
+
+	it("shows why the preview is empty", () => {
+		const html = renderToStaticMarkup(<EndpointPreviewView data={{ ok: false, error: "url is required", requests: [], reads: "" }} loading={false} />);
+		expect(html).toContain("url is required");
+		expect(renderToStaticMarkup(<EndpointPreviewView loading={false} />)).toContain("Fill in the required fields");
+	});
+
+	it("shows requests sent, raw response and reads after a test", () => {
+		const res: EndpointTestResult = { ok: true, matched: true, adapter: "remote_http", url: "https://a/run", latency_ms: 5, answer: "READY", trace: [], notes: [], requests: [sent], raw_response: '{"output":{"text":"READY"}}', reads: "output.text" };
+		const html = renderToStaticMarkup(<EndpointTestPanel result={res} loading={false} />);
+		expect(html).toContain('data-testid="endpoint-test-requests"');
+		expect(html).toContain("Requests sent (1)");
+		expect(html).toContain('data-testid="endpoint-test-raw"');
+		expect(html).toContain("Answer read from: output.text");
+	});
+
+	it("caps a long raw answer", () => {
+		expect(capText("x".repeat(RAW_CAP + 10)).length).toBe(RAW_CAP + 4);
+		expect(capText("short")).toBe("short");
 	});
 });

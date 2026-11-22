@@ -6,6 +6,7 @@ import type {
 	AgentFromTemplateRequest,
 	AgentFromTemplateResponse,
 	AgentTemplateList,
+	EndpointPreview,
 	EndpointTestRequest,
 	EndpointTestResult,
 } from "@/lib/types/agentBuilder";
@@ -36,6 +37,10 @@ export const agentBuilderApi = benchApi.enhanceEndpoints({ addTagTypes: ["AgentC
 		testEndpoint: builder.mutation<EndpointTestResult, EndpointTestRequest>({
 			query: (body) => ({ url: "/agents/test-endpoint", method: "POST", body, timeout: 130_000 }),
 		}),
+		/** Renders the requests a sample task would send (nothing is sent). */
+		previewEndpoint: builder.mutation<EndpointPreview, EndpointTestRequest>({
+			query: (body) => ({ url: "/agents/endpoint-preview", method: "POST", body }),
+		}),
 		validateAgentConfig: builder.mutation<AgentConfigValidateResponse, AgentConfigValidateRequest>({
 			query: (body) => ({ url: "/agents/config/validate", method: "POST", body }),
 		}),
@@ -49,4 +54,5 @@ export const {
 	usePutAgentConfigMutation,
 	useValidateAgentConfigMutation,
 	useTestEndpointMutation,
+	usePreviewEndpointMutation,
 } = agentBuilderApi;

@@ -1,22 +1,46 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useTestEndpointMutation } from "@/lib/store/apis/agentBuilderApi";
+import { canUse, useSession } from "@/lib/session/sessionContext";
+import { usePreviewEndpointMutation, useTestEndpointMutation } from "@/lib/store/apis/agentBuilderApi";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import type { AgentTemplate, EndpointTestResult, TemplateParam } from "@/lib/types/agentBuilder";
+import { useCreateSecretMutation } from "@/lib/store/apis/secretsApi";
+import type { AgentFromTemplateRequest, AgentTemplate, EndpointTestResult, SentRequest, TemplateParam } from "@/lib/types/agentBuilder";
+import { MAX_SECRET_BYTES, normalizeSecretName, secretNameProblem } from "@/lib/types/secrets";
 import { cn } from "@/lib/utils";
-import { ChevronRight, CircleCheck, CircleX, Loader2 } from "lucide-react";
+import { ChevronRight, CircleCheck, CircleX, KeyRound, Loader2 } from "lucide-react";
+import { useEffect, useId, useState, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
  * Connect your agent (lane X10, J3 and J4): the form fields of the bring-your-own templates by kind
  * (secret names, switches, numbers, a framework choice, KEY=VALUE lines), folded into Authentication,
- * Tools and Advanced, plus the "Test my endpoint" result.
+ * Tools and Advanced, plus the "Test my endpoint" result. Lane Y10 adds the request and answer mapping
+ * fold, fields shown only for some choices (show_when), a live preview of the request a sample task sends,
+ * and an inline "New secret" form on every secret field.
  */
 
 export type Params = Record<string, string>;
 
-const GROUPS = ["auth", "tools", "advanced"] as const;
+const GROUPS = ["mapping", "auth", "tools", "advanced"] as const;
+
+/** Whether a field shows: each param named in show_when has one of the listed values. Hidden values are still sent. */
+export function paramVisible(p: TemplateParam, params: Params): boolean {
+	if (!p.show_when) return true;
+	return Object.entries(p.show_when).every(([name, values]) => values.includes(params[name] ?? ""));
+}
+
+/** The text a select option shows. */
+export function optionLabel(p: TemplateParam, o: string): string {
+	if (p.option_labels?.[o]) return p.option_labels[o];
+	return p.name === "framework" ? frameworkLabel(o) : o;
+}
+
+/** Caps a raw answer shown on the page. */
+export const RAW_CAP = 8 * 1024;
+export function capText(s: string, cap = RAW_CAP): string {
+	return s.length > cap ? `${s.slice(0, cap)}\n...` : s;
+}
 
 /** The params a template starts with: every param's default. */
 export function defaultParams(tpl: AgentTemplate): Params {
@@ -95,7 +119,7 @@ function ParamField({ p, value, onChange }: { p: TemplateParam; value: string; o
 			<select className="border-input bg-card h-9 rounded-md border px-3 text-sm" value={value} onChange={(e) => onChange(e.target.value)} data-testid={id}>
 				{(p.options ?? []).map((o) => (
 					<option key={o} value={o}>
-						{p.name === "framework" ? frameworkLabel(o) : o}
+						{optionLabel(p, o)}
 					</option>
 				))}
 			</select>
@@ -125,19 +149,153 @@ function ParamField({ p, value, onChange }: { p: TemplateParam; value: string; o
 		);
 	}
 	return (
-		<label className="flex flex-col gap-1 text-sm">
-			<span className="font-medium">
-				{p.label}
-				{p.required && <span className="text-muted-foreground"> *</span>}
-			</span>
-			{control}
+		<div className="flex flex-col gap-1 text-sm">
+			<label className="flex flex-col gap-1">
+				<span className="font-medium">
+					{p.label}
+					{p.required && <span className="text-muted-foreground"> *</span>}
+				</span>
+				{control}
+			</label>
 			{(p.help || p.kind === "secret") && (
 				<span className="text-muted-foreground text-xs">
 					{p.help}
 					{p.kind === "secret" && !p.help?.includes("Settings > Secrets") ? ` ${t("new.secretHelp")}` : ""}
 				</span>
 			)}
-		</label>
+			{p.kind === "secret" && <NewSecretInline param={p.name} onSaved={onChange} />}
+		</div>
+	);
+}
+
+/**
+ * "New secret" next to a secret field: stores a secret in Settings > Secrets without leaving the form
+ * and fills the field with its name. The value is dropped from the page once saved. Admins only.
+ */
+export function NewSecretInline({ param, onSaved }: { param: string; onSaved(name: string): void }) {
+	const { t } = useTranslation("agentBuilder");
+	const { t: ts } = useTranslation("secrets");
+	const session = useSession();
+	const formId = useId();
+	const [open, setOpen] = useState(false);
+	const [name, setName] = useState("");
+	const [value, setValue] = useState("");
+	const [touched, setTouched] = useState(false);
+	const [saved, setSaved] = useState<string | null>(null);
+	const [create, state] = useCreateSecretMutation();
+	if (!canUse(session, "admin")) return null;
+
+	const problem = secretNameProblem(name);
+	const nameError = !touched ? undefined : problem === "required" ? ts("nameRequired") : problem === "format" ? ts("nameFormat") : problem === "reserved" ? ts("nameReserved") : undefined;
+	const tooBig = new TextEncoder().encode(value).length > MAX_SECRET_BYTES;
+	const valueError = !touched ? undefined : !value ? ts("valueRequired") : tooBig ? ts("valueTooLarge") : undefined;
+	const close = () => {
+		setOpen(false);
+		setName("");
+		setValue("");
+		setTouched(false);
+	};
+	const save = async () => {
+		setTouched(true);
+		if (problem || !value || tooBig) return;
+		try {
+			const res = await create({ name, value }).unwrap();
+			onSaved(res.name);
+			setSaved(res.name);
+			close();
+		} catch {
+			// state.error renders the failure; the value stays so the user can retry.
+		}
+	};
+	// The page form must not submit when Enter is pressed in here.
+	const onKey = (e: KeyboardEvent) => {
+		if (e.key === "Enter") {
+			e.preventDefault();
+			void save();
+		}
+	};
+
+	if (!open) {
+		return (
+			<p className="flex flex-wrap items-center gap-2 text-xs">
+				<Button
+					type="button"
+					size="sm"
+					variant="ghost"
+					className="w-fit"
+					onClick={() => {
+						setOpen(true);
+						setSaved(null);
+					}}
+					data-testid={`new-secret-${param}`}
+				>
+					<KeyRound className="size-3.5" aria-hidden="true" />
+					{t("new.newSecret.button")}
+				</Button>
+				{saved && (
+					<span className="text-chart-success-ink" data-testid={`new-secret-saved-${param}`} aria-live="polite">
+						{t("new.newSecret.saved", { name: saved })}
+					</span>
+				)}
+			</p>
+		);
+	}
+	return (
+		<div className="bg-muted/30 flex flex-col gap-2 rounded-md border p-3" data-testid={`new-secret-form-${param}`}>
+			<div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+				<div className="flex min-w-0 flex-col gap-1">
+					<label htmlFor={`${formId}-name`} className="text-xs font-medium">
+						{ts("name")}
+					</label>
+					<Input
+						id={`${formId}-name`}
+						autoComplete="off"
+						data-1p-ignore="true"
+						data-lpignore="true"
+						spellCheck={false}
+						className="font-mono"
+						value={name}
+						onChange={(e) => setName(normalizeSecretName(e.target.value))}
+						onKeyDown={onKey}
+						aria-invalid={Boolean(nameError) || undefined}
+						data-testid={`new-secret-name-${param}`}
+					/>
+					{nameError && <span className="text-destructive text-xs">{nameError}</span>}
+				</div>
+				<div className="flex min-w-0 flex-col gap-1">
+					<label htmlFor={`${formId}-value`} className="text-xs font-medium">
+						{ts("value")}
+					</label>
+					<Input
+						id={`${formId}-value`}
+						type="password"
+						autoComplete="new-password"
+						data-1p-ignore="true"
+						data-lpignore="true"
+						value={value}
+						onChange={(e) => setValue(e.target.value)}
+						onKeyDown={onKey}
+						aria-invalid={Boolean(valueError) || undefined}
+						data-testid={`new-secret-value-${param}`}
+					/>
+					{valueError && <span className="text-destructive text-xs">{valueError}</span>}
+				</div>
+			</div>
+			{state.error ? (
+				<p role="alert" className="text-destructive text-xs">
+					{getBenchErrorMessage(state.error)}
+				</p>
+			) : null}
+			<div className="flex items-center gap-2">
+				<Button type="button" size="sm" disabled={state.isLoading} onClick={() => void save()} data-testid={`new-secret-save-${param}`}>
+					{t("new.newSecret.save")}
+				</Button>
+				<Button type="button" size="sm" variant="ghost" onClick={close}>
+					{ts("cancel")}
+				</Button>
+				<span className="text-muted-foreground text-xs">{t("new.newSecret.help")}</span>
+			</div>
+		</div>
 	);
 }
 
@@ -146,7 +304,7 @@ export function ParamFields({ tpl, params, onChange }: { tpl: AgentTemplate; par
 	const { t } = useTranslation("agentBuilder");
 	const set = (name: string, v: string) => onChange({ ...params, [name]: v });
 	const detected = tpl.id === "wrap-app" ? detectFramework(params) : null;
-	const field = (p: TemplateParam) => <ParamField key={p.name} p={p} value={params[p.name] ?? ""} onChange={(v) => set(p.name, v)} />;
+	const field = (p: TemplateParam) => !paramVisible(p, params) ? null : <ParamField key={p.name} p={p} value={params[p.name] ?? ""} onChange={(v) => set(p.name, v)} />;
 	return (
 		<div className="flex flex-col gap-4" data-testid="connect-fields">
 			{tpl.params.filter((p) => !p.group).map(field)}
@@ -164,7 +322,7 @@ export function ParamFields({ tpl, params, onChange }: { tpl: AgentTemplate; par
 				</p>
 			)}
 			{GROUPS.map((g) => {
-				const ps = tpl.params.filter((p) => p.group === g);
+				const ps = tpl.params.filter((p) => p.group === g && paramVisible(p, params));
 				if (!ps.length) return null;
 				const open = g === "auth" && ps.some((p) => (params[p.name] ?? "") !== "");
 				return (
@@ -217,6 +375,27 @@ export function EndpointTestPanel({ result, error, loading }: { result?: Endpoin
 					</pre>
 				</div>
 			)}
+			{result.reads && (
+				<p className="text-muted-foreground text-xs" data-testid="endpoint-test-reads">
+					{t("new.endpointPreview.reads", { reads: result.reads })}
+				</p>
+			)}
+			{result.requests && result.requests.length > 0 && (
+				<details>
+					<summary className="text-muted-foreground cursor-pointer text-xs select-none">{t("new.test.requests", { count: result.requests.length })}</summary>
+					<div className="mt-1.5" data-testid="endpoint-test-requests">
+						<SentRequests requests={result.requests} />
+					</div>
+				</details>
+			)}
+			{result.raw_response && (
+				<details>
+					<summary className="text-muted-foreground cursor-pointer text-xs select-none">{t("new.test.raw")}</summary>
+					<pre className="bg-muted mt-1.5 max-h-60 overflow-auto rounded p-2 font-mono text-[11px] break-all whitespace-pre-wrap" data-testid="endpoint-test-raw">
+						{capText(result.raw_response)}
+					</pre>
+				</details>
+			)}
 			{result.notes.map((n) => (
 				<p key={n} className="text-muted-foreground text-xs">
 					{n}
@@ -253,6 +432,78 @@ export function SavedEndpointTest({ agentId }: { agentId: string }) {
 				<span className="text-muted-foreground text-xs">{t("new.test.help")}</span>
 			</div>
 			<EndpointTestPanel result={state.data} error={state.error} loading={state.isLoading} />
+		</div>
+	);
+}
+
+/** Requests as sent: method, URL, headers in send order, body. Secret values arrive masked. */
+export function SentRequests({ requests }: { requests: SentRequest[] }) {
+	const { t } = useTranslation("agentBuilder");
+	return (
+		<ol className="flex flex-col gap-2">
+			{requests.map((r, i) => (
+				<li key={i} className="bg-muted flex min-w-0 flex-col gap-1 rounded p-2 font-mono text-[11px]" data-testid="sent-request">
+					<span className="flex min-w-0 flex-wrap items-center gap-2">
+						{requests.length > 1 && r.step && <Badge variant="neutral">{t(`new.endpointPreview.step.${r.step}`, { defaultValue: r.step })}</Badge>}
+						<span className="font-semibold">{r.method}</span>
+						<span className="min-w-0 break-all">{r.url}</span>
+					</span>
+					{r.headers.length > 0 && (
+						<ul className="text-muted-foreground flex flex-col">
+							{r.headers.map(([k, v], j) => (
+								<li key={j} className="break-all">
+									{k}: {v}
+								</li>
+							))}
+						</ul>
+					)}
+					{r.body && <pre className="max-h-40 overflow-auto break-all whitespace-pre-wrap">{capText(r.body)}</pre>}
+				</li>
+			))}
+		</ol>
+	);
+}
+
+/** How long the form waits after the last edit before asking for a fresh preview. */
+export const PREVIEW_DELAY_MS = 500;
+
+/** The live preview of the request a sample task sends, refreshed shortly after each edit. Nothing is sent. */
+export function EndpointPreviewPanel({ body }: { body: AgentFromTemplateRequest | null }) {
+	const [run, state] = usePreviewEndpointMutation();
+	const key = body ? JSON.stringify(body) : "";
+	useEffect(() => {
+		if (!key) return;
+		const timer = setTimeout(() => void run({ template: JSON.parse(key) as AgentFromTemplateRequest }), PREVIEW_DELAY_MS);
+		return () => clearTimeout(timer);
+	}, [key, run]);
+	return <EndpointPreviewView data={state.data} error={state.error} loading={state.isLoading} />;
+}
+
+export function EndpointPreviewView({ data, error, loading }: { data?: { ok: boolean; error?: string; requests: SentRequest[]; reads: string }; error?: unknown; loading: boolean }) {
+	const { t } = useTranslation("agentBuilder");
+	return (
+		<div className="flex min-w-0 flex-col gap-2 rounded-md border p-3 text-sm" data-testid="endpoint-preview" aria-live="polite">
+			<p className="flex items-center gap-2 font-medium">
+				{t("new.endpointPreview.title")}
+				{loading && <Loader2 className="text-muted-foreground size-3.5 animate-spin" aria-hidden="true" />}
+			</p>
+			<span className="text-muted-foreground text-xs">{t("new.endpointPreview.help")}</span>
+			{error ? (
+				<p className="text-destructive text-xs" data-testid="endpoint-preview-error">
+					{getBenchErrorMessage(error)}
+				</p>
+			) : data && !data.ok ? (
+				<p className="text-muted-foreground text-xs" data-testid="endpoint-preview-error">
+					{data.error || t("new.endpointPreview.empty")}
+				</p>
+			) : null}
+			{data && data.requests.length > 0 && <SentRequests requests={data.requests} />}
+			{data?.reads && (
+				<p className="text-xs" data-testid="endpoint-preview-reads">
+					{t("new.endpointPreview.reads", { reads: data.reads })}
+				</p>
+			)}
+			{!data && !error && !loading && <p className="text-muted-foreground text-xs">{t("new.endpointPreview.empty")}</p>}
 		</div>
 	);
 }

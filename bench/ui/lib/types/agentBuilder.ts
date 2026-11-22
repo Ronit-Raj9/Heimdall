@@ -12,8 +12,12 @@ export interface TemplateParam {
 	kind?: "text" | "secret" | "bool" | "number" | "select" | "multiline";
 	options?: string[];
 	default?: string;
-	/** Fold the field sits under: auth, tools, advanced; none means always shown. */
-	group?: "auth" | "tools" | "advanced";
+	/** Fold the field sits under: mapping, auth, tools, advanced; none means always shown. */
+	group?: "mapping" | "auth" | "tools" | "advanced";
+	/** Shown text per select option; an option without one shows its value. */
+	option_labels?: Record<string, string>;
+	/** Show the field only when each named param has one of the listed values. A hidden field's value is still sent. */
+	show_when?: Record<string, string[]>;
 }
 
 export interface AgentTemplate {
@@ -148,4 +152,28 @@ export interface EndpointTestResult {
 	reported?: Record<string, unknown>;
 	trace: EndpointTestStep[];
 	notes: string[];
+	/** The requests sent, secret values masked (remotemap.Sent). */
+	requests?: SentRequest[];
+	/** The last answer's body as received. */
+	raw_response?: string;
+	/** How the answer was read, in words. */
+	reads?: string;
+}
+
+/** One request as shown to the user (remotemap.Sent); secret values are masked. */
+export interface SentRequest {
+	step: "start" | "request" | "poll" | "end" | string;
+	method: string;
+	url: string;
+	/** [name, value] in send order. */
+	headers: [string, string][];
+	body?: string;
+}
+
+/** POST /agents/endpoint-preview: the requests a sample task would send, nothing sent. */
+export interface EndpointPreview {
+	ok: boolean;
+	error?: string;
+	requests: SentRequest[];
+	reads: string;
 }

@@ -13,7 +13,7 @@ import { Bot, Check, ChevronRight, Code2, Hammer, Layers, Plug, SquareTerminal, 
 import { AgentAvatar, useAdapterLabel } from "../../../agents/views/agentDisplay";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useMemo, useState } from "react";
-import { defaultParams, EndpointTestPanel, missingParams, ParamFields, picksOwnModel, testable } from "./connectForm";
+import { defaultParams, EndpointPreviewPanel, EndpointTestPanel, missingParams, ParamFields, picksOwnModel, testable } from "./connectForm";
 import { useTranslation } from "react-i18next";
 
 // "Bring your own" first: the gallery is for the user's own agent; the others are examples.
@@ -224,6 +224,7 @@ export default function NewAgentView() {
 									</div>
 								)}
 								{tpl.params.length > 0 && <ParamFields tpl={tpl} params={params} onChange={setParams} />}
+								{tpl.adapter === "remote_http" && <EndpointPreviewPanel body={body} />}
 								{testable(tpl) && canWrite && (
 									<div className="flex flex-col gap-2" data-testid="endpoint-test">
 										<Button type="button" variant="outline" className="w-fit" disabled={missingParam || testState.isLoading} onClick={onTest} data-testid="endpoint-test-button">
