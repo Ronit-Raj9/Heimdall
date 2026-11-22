@@ -46,7 +46,7 @@ func (h *CatalogHandler) getCatalog(ctx *fasthttp.RequestCtx) {
 // changed in place, because c shares them with the cached catalog.
 func NormalizeCatalog(c schemas.Catalog) schemas.Catalog {
 	c.Suites = emptyIfNil(c.Suites)
-	c.Probes = emptyIfNil(c.Probes)
+	c.Probes = withGenericProbes(c.Probes)
 	c.Agents = emptyIfNil(c.Agents)
 	c.Metrics = emptyIfNil(c.Metrics)
 	c.Gates = emptyIfNil(c.Gates)
@@ -61,6 +61,25 @@ func NormalizeCatalog(c schemas.Catalog) schemas.Catalog {
 	}
 	c.Suites = suites
 	return c
+}
+
+// withGenericProbes returns probes (never nil) followed by every generic probe
+// (schemas.GenericProbeIDs) whose id no probe file uses, so the catalog lists
+// the probes every benchmark shares with their layer (fix wave 2, N69). The
+// result is a new slice: probes belongs to the cached catalog.
+func withGenericProbes(probes []schemas.ProbeSpec) []schemas.ProbeSpec {
+	out := make([]schemas.ProbeSpec, len(probes), len(probes)+len(schemas.GenericProbeIDs))
+	copy(out, probes)
+	have := make(map[string]bool, len(probes))
+	for _, p := range probes {
+		have[p.ID] = true
+	}
+	for _, id := range schemas.GenericProbeIDs {
+		if p := schemas.GenericProbe(id); p != nil && !have[id] {
+			out = append(out, *p)
+		}
+	}
+	return out
 }
 
 // emptyIfNil turns a nil slice into an empty one.

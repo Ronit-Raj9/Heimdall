@@ -1549,7 +1549,7 @@
 		"diagnosticsError": "Could not load the details by fault.",
 		"conditions": "Failure tests",
 		"layer": "{{layer}} layer",
-		"layerUnknown": "layer not in the catalog",
+		"layerUnknown": "layer not recorded",
 		"layers": {
 			"fixture": "fixture",
 			"gateway": "gateway",

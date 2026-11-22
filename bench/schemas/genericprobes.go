@@ -25,6 +25,16 @@ const (
 	GenericProbePrimaryOutage = "heimdall-primary-outage"               // lane C07: the primary model answers 503 from the first call; a routed run narrows it to the primary target, so Bifrost fallbacks still answer
 )
 
+// GenericProbeIDs lists every generic probe, in the order the catalog shows
+// them (fix wave 2, N69): GET /catalog lists them next to the probe files, so
+// a view that looks a probe up there (the failure test funnel) finds its
+// layer. TestGenericProbeIDsComplete keeps it in step with the constants.
+var GenericProbeIDs = []string{
+	GenericProbeModelDown, GenericProbeBrokenTool, GenericProbeModelBrownout, GenericProbeModelSlow, GenericProbeModelFlaky,
+	GenericProbeToolRateLimit, GenericProbeToolSlow, GenericProbeToolFlaky, GenericProbeToolPartial, GenericProbeToolDuplicate,
+	GenericProbeToolRemoved, GenericProbeCompound, GenericProbePrimaryOutage,
+}
+
 // toolProbe is a generic tool proxy probe.
 func toolProbe(id string, ft ToolFault, safe string, metrics ...string) *ProbeSpec {
 	return &ProbeSpec{ID: id, Version: "1.0.0", Axis: "resilience", PS2Family: FamilyBrokenTool, Layer: LayerTool,
