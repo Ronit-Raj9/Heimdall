@@ -45,6 +45,8 @@ open("trace.jsonl", "wb").write(hd.trace(hd.runs(limit=1)["runs"][0]["run_id"], 
 
 `evaluate_and_wait` cancels the evaluation when it times out (`cancel_on_timeout=True`) and raises `HeimdallTimeout`; a failed or cancelled evaluation still returns, so check `result.succeeded`. `ReportCard` carries `arms`, `capabilities`, `benchmarks` (with the A/B `verdict` on two-arm evaluations), `reliability` per fault, `safety`, `overall` and `server_mode`.
 
+Benchmarks as code (`docs/datasets-as-code.md`): `create_benchmark(id)`, `set_grader(id, "answer_match" | "judge", judge)`, `upsert_tasks(id, rows, mode, match, source, dry_run)` (each change a new version; the personal data policy runs first), `dataset_tasks(id)`, `delete_task(id, task)`, `dataset_versions(id)`, `dataset_version(id, n)`, `data_policy(id)`, `set_data_policy(id, pii_mode, pii_kinds, access, users)` and `import_from_platform({...})` (LangSmith, Langfuse, Braintrust, Datadog, with the org's secrets).
+
 ## Mode on every response
 
 Every JSON method returns the server's object as a dict with a top-level `mode`: `live`, `recorded` or `synthetic`. Only `live` is a real measurement. Raw downloads (`run_patch`, `run_file`, `release_evidence`) return a `RawResponse` whose `mode` comes from the `X-Bench-Mode` header. `mode_of(response)` reads either. `Client(..., require_live=True)` raises `ModeError` on any answer that is not live, so a CI job cannot pass on a recorded demo.

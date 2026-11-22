@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { BuildTab } from "./buildTab";
 import { SuiteCalibrationTab } from "./calibrationTab";
+import { DataTab } from "./dataTab";
 import { OpsTab } from "./opsTab";
 import { EditTab } from "./editTab";
 import { SuiteExportTab, SuiteHealthTab, SuiteTiersTab } from "./suiteTabs";
@@ -134,6 +135,7 @@ function SuiteBody({
   const { t } = useTranslation("bench");
   const { t: tu } = useTranslation("suitesUx");
   const { t: tb } = useTranslation("suiteBuild");
+  const { t: td } = useTranslation("benchData");
   // Health is a separate request: a failure or a 503 (no run store) shows "health unavailable" and never blocks the page.
   const healthQuery = useGetSuiteHealthQuery(suite.id, {
     skip: Boolean(suite.error),
@@ -145,6 +147,7 @@ function SuiteBody({
   const tabs: RouteTab[] = [
     { id: "tasks", label: tu("tabs.tasks"), badge: tasks },
     { id: "build", label: tb("tab"), hidden: builtin }, // X13: grader, add tasks, held out, readiness
+    { id: "data", label: td("tab"), hidden: builtin }, // Y15: personal data policy, access, versions, platform imports
     { id: "settings", label: tu("tabs.settings") },
     { id: "health", label: tu("tabs.health") },
     {
@@ -325,6 +328,8 @@ function SuiteBody({
                 <SuiteCalibrationTab suite={suite} />
               ) : active === "build" ? (
                 <BuildTab suite={suite} />
+              ) : active === "data" ? (
+                <DataTab suite={suite} />
               ) : active === "ops" ? (
                 <OpsTab suite={suite} />
               ) : active === "edit" ? (

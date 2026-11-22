@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/dataset"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/scaffold"
@@ -52,6 +53,8 @@ type RowImportResult struct {
 	Tasks    []scaffold.RowTask    `json:"tasks"`
 	Problems []scaffold.RowProblem `json:"problems"`
 	Next     string                `json:"next"`
+	// PII is what the benchmark's personal data policy saw and did (lane Y15).
+	PII *dataset.PIIReport `json:"pii,omitempty"`
 }
 
 // SuiteGraderRequest is the body of PUT /suites/{id}/grader.
@@ -168,6 +171,12 @@ func (h *suiteBuild) importRows(ctx *fasthttp.RequestCtx) {
 		h.bad(ctx, err.Error())
 		return
 	}
+	rows, blocked, piiReport, err := cleanRows(h.projects.Root(), id, rows) // lane Y15: personal data policy (rowspii.go)
+	if err != nil {
+		lib.SendError(ctx, h.mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "read the benchmark's data policy: "+err.Error())
+		return
+	}
+	problems = append(problems, blocked...)
 	existing := map[string]bool{}
 	for _, t := range s.Tasks {
 		existing[t] = true
@@ -185,7 +194,7 @@ func (h *suiteBuild) importRows(ctx *fasthttp.RequestCtx) {
 		Source: source, Taken: func(id string) bool { return existing[id] }})
 	problems = append(problems, more...)
 	slices.SortStableFunc(problems, func(a, b scaffold.RowProblem) int { return a.Line - b.Line })
-	out := RowImportResult{Suite: id, Grader: grader, DryRun: req.DryRun, Tasks: tasks, Problems: problems}
+	out := RowImportResult{Suite: id, Grader: grader, DryRun: req.DryRun, Tasks: tasks, Problems: problems, PII: piiReport}
 	if out.Tasks == nil {
 		out.Tasks = []scaffold.RowTask{}
 	}

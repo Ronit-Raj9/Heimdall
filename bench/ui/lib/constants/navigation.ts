@@ -13,6 +13,7 @@ import {
 	Radio,
 	SearchX,
 	Settings,
+	Tags,
 	Zap,
 	TrendingUp,
 	type LucideIcon,
@@ -32,6 +33,7 @@ export interface BenchNavItem {
 		| "/failure-tests"
 		| "/runs"
 		| "/suites"
+		| "/annotation"
 		| "/why-agents-fail"
 		| "/scheduled-checks"
 		| "/live"
@@ -47,6 +49,7 @@ export interface BenchNavItem {
 		| "shell.nav.failureTests"
 		| "shell.nav.runs"
 		| "shell.nav.suites"
+		| "shell.nav.labelling"
 		| "shell.nav.whyAgentsFail"
 		| "shell.nav.scheduledChecks"
 		| "shell.nav.live"
@@ -115,7 +118,10 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 	{
 		id: "tasks",
 		labelKey: "shell.groups.tasks",
-		items: [{ to: "/suites", labelKey: "shell.nav.suites", icon: Boxes, testId: "nav-link-suites", also: ["/catalog", "/imports", "/calibration"] }],
+		items: [
+			{ to: "/suites", labelKey: "shell.nav.suites", icon: Boxes, testId: "nav-link-suites", also: ["/catalog", "/imports", "/calibration"] },
+			{ to: "/annotation", labelKey: "shell.nav.labelling", icon: Tags, testId: "nav-link-labelling" },
+		],
 	},
 	{
 		id: "watch",

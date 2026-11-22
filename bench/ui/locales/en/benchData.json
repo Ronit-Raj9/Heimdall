@@ -1,0 +1,81 @@
+{
+	"tab": "Data",
+	"intro": "Where this benchmark's tasks come from, every change to them as a version, how personal data in imported rows is handled, and who may read the task content.",
+	"policy": {
+		"title": "Personal data",
+		"description": "Every import and every row sent through the API is scanned for emails, phone numbers, card numbers, national ids, bank accounts and names before it becomes a task.",
+		"mode": "When personal data is found",
+		"modes": {
+			"off": "Do not scan",
+			"warn": "Keep it and report it",
+			"mask": "Mask it (j***@example.com, card ending 4242)",
+			"redact": "Replace it with a placeholder",
+			"block": "Refuse the row"
+		},
+		"kinds": "Look for",
+		"kindsAll": "Everything (leave all unticked)",
+		"kind": {
+			"email": "Emails",
+			"phone": "Phone numbers",
+			"card": "Card numbers",
+			"national_id": "National ids",
+			"bank_account": "Bank accounts",
+			"name": "Names"
+		},
+		"save": "Save",
+		"saved": "Saved.",
+		"updated": "Last changed by {{who}}.",
+		"loadError": "Could not load the data policy"
+	},
+	"access": {
+		"title": "Who may read the tasks",
+		"description": "Restricted: only organization admins, owners and the people listed see task inputs and answers. Everyone still sees scores.",
+		"org": "Everyone in the organization",
+		"restricted": "Admins, owners and the people listed",
+		"users": "People (user ids, comma separated)",
+		"adminOnly": "Only an organization admin or owner changes who may read the tasks.",
+		"denied": "This benchmark's task content is restricted. Ask an organization admin for access."
+	},
+	"versions": {
+		"title": "Versions",
+		"description": "Each change to the tasks made from rows, newest first. An evaluation records the version it ran on.",
+		"empty": "No versions yet. Add tasks from rows, an import or the API.",
+		"version": "Version",
+		"when": "When",
+		"by": "By",
+		"source": "From",
+		"changes": "Changes",
+		"tasks": "Tasks",
+		"change": "+{{added}} changed {{updated}} -{{removed}}",
+		"loadError": "Could not load the versions"
+	},
+	"api": {
+		"title": "Manage from code",
+		"description": "The same rows, versions and policy through API v1 or the Python and TypeScript clients."
+	},
+	"import": {
+		"title": "Import from another platform",
+		"description": "Bring a dataset or recent traces from LangSmith, Langfuse, Braintrust or Datadog, with the keys you keep in Secrets. Always previewed first.",
+		"platform": "Platform",
+		"kind": "What to import",
+		"kindDataset": "A dataset, as tasks of this benchmark",
+		"kindTraces": "Recent traces, as tasks of this benchmark",
+		"dataset": "Dataset",
+		"project": "Project",
+		"query": "Filter (optional)",
+		"limit": "At most",
+		"baseUrl": "Server address (self-hosted only)",
+		"secret": "Secret for {{label}}",
+		"missingSecret": "Add a secret named {{name}} first.",
+		"secretsLink": "Open Secrets",
+		"preview": "Preview",
+		"import": "Import {{count}} records",
+		"read": "Read {{count}} records.",
+		"truncated": "More records exist; only the first ones were read.",
+		"wrote": "Version {{version}}: {{added}} added, {{updated}} changed, {{unchanged}} unchanged.",
+		"nothing": "Nothing changed.",
+		"problems": "{{count}} records could not become tasks.",
+		"pii": "Personal data: {{summary}}",
+		"loadError": "Could not load the platforms"
+	}
+}

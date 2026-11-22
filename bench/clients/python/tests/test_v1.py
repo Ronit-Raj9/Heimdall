@@ -181,6 +181,37 @@ class V1ClientTest(unittest.TestCase):
     def test_routes_are_v1(self) -> None:
         for method, path in V1_ROUTES:
             self.assertIn(method, ("GET", "POST", "PUT"))
+
+    def test_benchmarks_as_code(self) -> None:
+        self.srv.on("POST", "/api/v1/benchmarks", json_reply(201, {"id": "faq", "files": ["suite.yaml"]}))
+        self.srv.on("PUT", "/api/v1/benchmarks/faq/grader", json_reply(200, {"suite": "faq", "grader": "answer_match"}))
+        self.srv.on("POST", "/api/v1/benchmarks/faq/tasks", json_reply(201, {"benchmark": "faq", "version": {"version": 1, "added": ["q1"]}, "added": ["q1"], "problems": []}))
+        self.srv.on("GET", "/api/v1/benchmarks/faq/tasks?limit=50", json_reply(200, {"benchmark": "faq", "version": 1, "total": 1, "tasks": [{"id": "q1", "from_rows": True}]}))
+        self.srv.on("GET", "/api/v1/benchmarks/faq/versions", json_reply(200, {"benchmark": "faq", "versions": [{"version": 1}]}))
+        self.srv.on("GET", "/api/v1/benchmarks/faq/versions/1", json_reply(200, {"benchmark": "faq", "version": {"version": 1}, "tasks": {"q1": "ab"}}))
+        self.srv.on("DELETE", "/api/v1/benchmarks/faq/tasks/q1", json_reply(200, {"benchmark": "faq", "task": "q1", "version": {"version": 2}}))
+        self.srv.on("PUT", "/api/v1/benchmarks/faq/data-policy", json_reply(200, {"benchmark": "faq", "policy": {"pii": {"mode": "mask"}, "access": {"mode": "restricted"}}}))
+        self.srv.on("POST", "/api/v1/imports/platforms", json_reply(200, {"platform": "langfuse", "read": 2, "preview": []}))
+
+        self.assertEqual(self.hd.create_benchmark("faq")["id"], "faq")
+        self.assertEqual(json.loads(self.srv.requests[-1]["body"]), {"id": "faq", "template": "qa", "blank": True})
+        self.hd.set_grader("faq", "answer_match")
+        self.assertEqual(json.loads(self.srv.requests[-1]["body"]), {"grader": "answer_match"})
+        res = self.hd.upsert_tasks("faq", [{"id": "q1", "input": "2+2?", "expected": ["4"], "metadata": {"tier": "free"}}], source="ci")
+        self.assertEqual(res["added"], ["q1"])
+        self.assertEqual(json.loads(self.srv.requests[-1]["body"])["source"], "ci")
+        self.assertEqual(self.hd.dataset_tasks("faq", limit=50)["tasks"][0]["id"], "q1")
+        self.assertEqual(self.hd.dataset_versions("faq")["versions"][0]["version"], 1)
+        self.assertEqual(self.hd.dataset_version("faq", 1)["tasks"]["q1"], "ab")
+        self.assertEqual(self.hd.delete_task("faq", "q1")["version"]["version"], 2)
+        self.assertEqual(self.srv.requests[-1]["method"], "DELETE")
+        self.hd.set_data_policy("faq", pii_mode="mask", access="restricted", users=["u_1"])
+        self.assertEqual(json.loads(self.srv.requests[-1]["body"]), {"pii": {"mode": "mask"}, "access": {"mode": "restricted", "users": ["u_1"]}})
+        self.assertEqual(self.hd.import_from_platform({"platform": "langfuse", "kind": "dataset", "dataset": "d", "target": "benchmark", "benchmark": "faq", "dry_run": True})["read"], 2)
+
+    def test_routes_are_v1(self) -> None:
+        for method, path in V1_ROUTES:
+            self.assertIn(method, ("GET", "POST", "PUT", "DELETE"))
             self.assertTrue(path.startswith("/api/v1/"), path)
 
 

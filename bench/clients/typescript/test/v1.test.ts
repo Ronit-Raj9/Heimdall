@@ -156,4 +156,33 @@ describe("V1Client", () => {
 		assert.equal((await hd.otlp("r_1", true)).text(), "{}");
 		for (const [, path] of V1_ROUTES) assert.ok(path.startsWith("/api/v1/"));
 	});
+
+	it("manages a benchmark as code", async () => {
+		on("POST", "/api/v1/benchmarks", jsonReply(201, { id: "faq", files: ["suite.yaml"] }));
+		on("PUT", "/api/v1/benchmarks/faq/grader", jsonReply(200, { suite: "faq", grader: "answer_match" }));
+		on("POST", "/api/v1/benchmarks/faq/tasks", jsonReply(201, { benchmark: "faq", version: { version: 1, added: ["q1"] }, added: ["q1"], problems: [] }));
+		on("GET", "/api/v1/benchmarks/faq/tasks?limit=50", jsonReply(200, { benchmark: "faq", version: 1, total: 1, offset: 0, tasks: [{ id: "q1", from_rows: true }] }));
+		on("GET", "/api/v1/benchmarks/faq/versions", jsonReply(200, { benchmark: "faq", versions: [{ version: 1 }] }));
+		on("GET", "/api/v1/benchmarks/faq/versions/1", jsonReply(200, { benchmark: "faq", version: { version: 1 }, tasks: { q1: "ab" } }));
+		on("DELETE", "/api/v1/benchmarks/faq/tasks/q1", jsonReply(200, { benchmark: "faq", task: "q1", version: { version: 2 } }));
+		on("PUT", "/api/v1/benchmarks/faq/data-policy", jsonReply(200, { benchmark: "faq", policy: { pii: { mode: "mask" }, access: { mode: "restricted" } } }));
+		on("POST", "/api/v1/imports/platforms", jsonReply(200, { platform: "langfuse", read: 2, preview: [] }));
+		const hd = new V1Client(base, { token: "hm_tok" });
+		assert.equal((await hd.createBenchmark("faq")).id, "faq");
+		assert.deepEqual(JSON.parse(requests.at(-1)!.body), { id: "faq", template: "qa", blank: true });
+		await hd.setGrader("faq", "answer_match");
+		assert.deepEqual(JSON.parse(requests.at(-1)!.body), { grader: "answer_match" });
+		const res = await hd.upsertTasks("faq", [{ id: "q1", input: "2+2?", expected: ["4"], metadata: { tier: "free" } }], { source: "ci" });
+		assert.deepEqual(res.added, ["q1"]);
+		assert.equal(JSON.parse(requests.at(-1)!.body).source, "ci");
+		assert.equal((await hd.datasetTasks("faq", { limit: 50 })).tasks?.[0]?.id, "q1");
+		assert.equal((await hd.datasetVersions("faq")).versions?.[0]?.version, 1);
+		assert.equal((await hd.datasetVersion("faq", 1)).tasks.q1, "ab");
+		assert.equal((await hd.deleteTask("faq", "q1")).version?.version, 2);
+		assert.equal(requests.at(-1)!.method, "DELETE");
+		await hd.setDataPolicy("faq", { pii: { mode: "mask" }, access: { mode: "restricted", users: ["u_1"] } });
+		assert.equal(requests.at(-1)!.method, "PUT");
+		assert.equal((await hd.importFromPlatform({ platform: "langfuse", kind: "dataset", dataset: "d", target: "benchmark", benchmark: "faq", dry_run: true })).read, 2);
+		for (const r of requests) assert.equal(r.headers.authorization, "Bearer hm_tok");
+	});
 });
