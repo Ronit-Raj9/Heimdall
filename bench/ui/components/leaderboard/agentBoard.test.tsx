@@ -3,7 +3,8 @@ import "@/lib/i18n";
 import { agentLeaderboardRequest, type AgentLeaderboardRow } from "@/lib/store/apis/agentLeaderboardApi";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { AgentBoardTable, AgentBoardToolbar } from "./agentBoard";
+import { nextTableSort, sortRows, type TableSort } from "@/components/ui/useTableSort";
+import { AgentBoardTable, AgentBoardToolbar, agentFirstDir, agentSortAccessors, scoreKey } from "./agentBoard";
 import { ALL, filterParam, formatCost, formatShare, reportCardSearch } from "./agentBoard.utils";
 
 const rows: AgentLeaderboardRow[] = [
@@ -54,7 +55,14 @@ describe("agent board", () => {
 
 	it("marks small samples, ranks only with a capability, and never shows $0 for unpriced runs", () => {
 		const html = renderToStaticMarkup(
-			<AgentBoardTable rows={rows} capabilities={["terminal", "coding"]} rankBy="coding" minRuns={10} minTasks={5} onOpen={() => undefined} />,
+			<AgentBoardTable
+				rows={rows}
+				capabilities={["terminal", "coding"]}
+				rankBy="coding"
+				minRuns={10}
+				minTasks={5}
+				onOpen={() => undefined}
+			/>,
 		);
 		expect(html).toContain(">Rank<");
 		expect(html.match(/data-testid="agent-board-rank"/g)?.length).toBe(2);
@@ -77,11 +85,43 @@ describe("agent board", () => {
 			customer: "simulated customer",
 			simulator: "anthropic/claude-sim@v2",
 		};
-		const html = renderToStaticMarkup(<AgentBoardTable rows={[rows[0], sim]} capabilities={["support", "coding"]} onOpen={() => undefined} />);
+		const html = renderToStaticMarkup(
+			<AgentBoardTable rows={[rows[0], sim]} capabilities={["support", "coding"]} onOpen={() => undefined} />,
+		);
 		expect(html.match(/data-testid="agent-board-simulated-customer"/g)?.length).toBe(1);
 		expect(html).toContain(">simulated customer<");
 		expect(html).toContain("anthropic/claude-sim@v2");
 		expect(html).toContain("50%");
+	});
+
+	it("sorts by a clicked column and reverses on the second click (cost per run)", () => {
+		const cheap: AgentLeaderboardRow = { ...rows[0], agent: "cheap", version: 1, cost_usd: 0.01 };
+		const all = [rows[0], rows[1], cheap];
+		const accessors = agentSortAccessors(["coding", "terminal"]);
+		const order = (sort: TableSort<string>) => sortRows(all, sort, accessors).map((r) => r.agent);
+		const once = nextTableSort<string>({ key: null, dir: "asc" }, "cost", agentFirstDir);
+		expect(once).toEqual({ key: "cost", dir: "asc" });
+		// A cost that is not known sorts last in either direction.
+		expect(order(once)).toEqual(["cheap", "codex", "my-agent"]);
+		const twice = nextTableSort(once, "cost", agentFirstDir);
+		expect(twice).toEqual({ key: "cost", dir: "desc" });
+		expect(order(twice)).toEqual(["codex", "cheap", "my-agent"]);
+		// Scores start best first.
+		expect(nextTableSort<string>({ key: "cost", dir: "asc" }, scoreKey("coding"), agentFirstDir).dir).toBe("desc");
+
+		const html = renderToStaticMarkup(
+			<AgentBoardTable
+				rows={sortRows(all, twice, accessors)}
+				capabilities={["coding"]}
+				onOpen={() => undefined}
+				head={(key) => ({ active: key === twice.key, dir: twice.dir, onSort: () => undefined })}
+			/>,
+		);
+		expect(html).toMatch(/aria-sort="descending"[^>]*data-testid="agent-board-col-cost"/);
+		expect(html).toContain('data-testid="agent-board-col-cost-sort"');
+		expect(html).toContain('aria-label="Sort by Cost per run, sorted descending"');
+		expect(html.match(/aria-sort="none"/g)?.length).toBe(4);
+		expect(html.indexOf("agent-board-row-codex")).toBeLessThan(html.indexOf("agent-board-row-cheap"));
 	});
 
 	it("shows the clear button only when filtered", () => {
@@ -102,6 +142,9 @@ describe("agent board", () => {
 		expect(reportCardSearch(rows[0])).toEqual({ tab: "report-card", version: "2", model: "gpt-5.4-mini" });
 		expect(reportCardSearch(rows[1])).toEqual({ tab: "report-card", model: "deepseek-chat" });
 		expect(agentLeaderboardRequest({})).toBe("/leaderboard/agents");
-		expect(agentLeaderboardRequest({ capability: "coding", model: "" })).toEqual({ url: "/leaderboard/agents", params: { capability: "coding" } });
+		expect(agentLeaderboardRequest({ capability: "coding", model: "" })).toEqual({
+			url: "/leaderboard/agents",
+			params: { capability: "coding" },
+		});
 	});
 });

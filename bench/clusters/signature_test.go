@@ -201,9 +201,9 @@ func TestLayersAndTitle(t *testing.T) {
 			kinds: []string{LayerOutcome, LayerLastTool}, title: "fail: tool Bash errored"},
 		{name: "fallback to condition", f: Features{Outcome: "budget", Condition: "model-outage"},
 			kinds: []string{LayerOutcome, LayerCondition}, title: "budget: under model-outage"},
-		{name: "clean with nothing", f: Features{Outcome: "fail", Condition: "clean"}, kinds: []string{LayerOutcome}, title: "fail"},
+		{name: "clean with nothing", f: Features{Outcome: "fail", Condition: "clean"}, kinds: []string{LayerOutcome}, title: "Failed with no error recorded"},
 		{name: "refusal ignores non-message errors", f: Features{Outcome: "refusal", Error: &Fingerprint{Source: SourceStderr, Text: "x"}},
-			kinds: []string{LayerOutcome}, title: "refusal"},
+			kinds: []string{LayerOutcome}, title: "Refused the task"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -219,6 +219,33 @@ func TestLayersAndTitle(t *testing.T) {
 				t.Fatalf("title %q, want %q", got, tt.title)
 			}
 		})
+	}
+}
+
+// TestTitleOutcomeOnly (J13.groups): a signature with only its outcome
+// layer reads as a sentence, never the bare outcome id, and says where its
+// runs happened when they share one benchmark or a last tool.
+func TestTitleOutcomeOnly(t *testing.T) {
+	outcome := func(o string) []Layer { return Layers(Features{Outcome: o}) }
+	for _, tt := range []struct {
+		layers          []Layer
+		benchmark, tool string
+		want            string
+	}{
+		{outcome("fail"), "", "", "Failed with no error recorded"},
+		{outcome("timeout"), "", "", "Timed out"},
+		{outcome("crash"), "", "", "Crashed"},
+		{outcome("fail"), "swe-lite", "", "Failed with no error recorded on swe-lite"},
+		{outcome("timeout"), "swe-lite", "Bash", "Timed out on swe-lite in Bash"},
+		{outcome("crash"), "", "Bash", "Crashed in Bash"},
+		{outcome("unknown"), "", "", "unknown"},
+		// A signature that names what failed keeps its title.
+		{Layers(Features{Outcome: "crash", Error: &Fingerprint{Source: SourceToolProxy, Tool: "desk.refund", Text: "500"}}), "swe-lite", "Bash",
+			"crash: tool error: desk.refund 500"},
+	} {
+		if got := TitleIn(tt.layers, tt.benchmark, tt.tool); got != tt.want {
+			t.Errorf("TitleIn(%v, %q, %q) = %q, want %q", tt.layers, tt.benchmark, tt.tool, got, tt.want)
+		}
 	}
 }
 

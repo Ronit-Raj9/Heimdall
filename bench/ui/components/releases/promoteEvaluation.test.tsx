@@ -170,3 +170,24 @@ describe("GateResultCard and RepeatEvaluation", () => {
 		expect(html).toContain("Repeat weekly");
 	});
 });
+
+describe("PromoteEvaluation says why there is no button (J7.promote)", () => {
+	it("tells a viewer and a demo visitor that only members promote", async () => {
+		const { demoSession, hostedSession } = await import("@/lib/testing/platformFixtures");
+		previewHook.mockReturnValue(okQuery(preview));
+		for (const session of [hostedSession("viewer"), demoSession()]) {
+			const html = render(<PromoteEvaluation evaluationId="ev_1" />, session);
+			expect(html).not.toContain('data-testid="evaluation-promote-open"');
+			expect(html).toContain('data-testid="evaluation-promote-why"');
+			expect(html).toContain("Only members of the organization can promote.");
+		}
+	});
+	it("gives the problem as the reason and no members note to a member", async () => {
+		const { hostedSession } = await import("@/lib/testing/platformFixtures");
+		previewHook.mockReturnValue(okQuery({ ...preview, problem: "codex v4 is already the live version" }));
+		const html = render(<PromoteEvaluation evaluationId="ev_1" />, hostedSession("member"));
+		expect(html).not.toContain('data-testid="evaluation-promote-open"');
+		expect(html).toContain("codex v4 is already the live version");
+		expect(html).not.toContain("Only members of the organization can promote.");
+	});
+});

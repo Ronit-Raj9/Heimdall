@@ -6,6 +6,7 @@ import {
 	chainLinks,
 	formatReleaseTime,
 	newestFirst,
+	quickRunCount,
 	releasableExperiments,
 	releaseBlockers,
 	releaseRequestFrom,
@@ -127,13 +128,32 @@ describe("verdictPolicyDecision", () => {
 describe("releasableExperiments", () => {
 	it("keeps only finished experiments, in order, so a running one is never picked by default", () => {
 		const list = [
-			{ exp_id: "e_running", state: "running" as const },
-			{ exp_id: "e_done", state: "done" as const },
-			{ exp_id: "e_analyzing", state: "analyzing" as const },
-			{ exp_id: "e_failed", state: "failed" as const },
-			{ exp_id: "e_done2", state: "done" as const },
+			{ exp_id: "e_running", name: "running one", state: "running" as const },
+			{ exp_id: "e_done", name: "prompt v2", state: "done" as const },
+			{ exp_id: "e_analyzing", name: "analyzing one", state: "analyzing" as const },
+			{ exp_id: "e_failed", name: "failed one", state: "failed" as const },
+			{ exp_id: "e_done2", name: "model switch", state: "done" as const },
 		];
 		expect(releasableExperiments(list).map((e) => e.exp_id)).toEqual(["e_done", "e_done2"]);
 		expect(releasableExperiments([])).toEqual([]);
+	});
+	it("drops readiness checks, practice runs and quick runs unless quick runs are asked for", () => {
+		const done = "done" as const;
+		const list = [
+			{
+				exp_id: "e_admit_acme_voice_desk_1a2b",
+				name: "admit-acme-voice-desk",
+				state: done,
+				suite: "acme-voice-desk@1.0.0",
+				arms: ["oracle", "noop"],
+			},
+			{ exp_id: "e_admit_acme_safety_5e8q", name: "admit-acme-safety", state: done, suite: "acme-safety@1.0.0", arms: ["oracle", "noop"] },
+			{ exp_id: "e_practice", name: "try it", state: done, suite: "coding-core@1.0.0", arms: ["A", "B"] },
+			{ exp_id: "e_quick", name: "quick-20261121-101500-ab12", state: done, suite: "tb2@1.0.0", arms: ["A", "B"] },
+			{ exp_id: "e_real", name: "prompt v2 vs v1", state: done, suite: "tb2@1.0.0", arms: ["A", "B"] },
+		];
+		expect(releasableExperiments(list).map((e) => e.exp_id)).toEqual(["e_real"]);
+		expect(releasableExperiments(list, { quick: true }).map((e) => e.exp_id)).toEqual(["e_quick", "e_real"]);
+		expect(quickRunCount(list)).toBe(1);
 	});
 });

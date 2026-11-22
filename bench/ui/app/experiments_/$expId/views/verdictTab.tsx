@@ -26,15 +26,45 @@ import { useTranslation } from "react-i18next";
 import { VerdictHeaderStrip } from "./verdictHeaderStrip";
 
 /**
+ * "Promote this version" on the Result tab: a button to the release form for two arms; a one-arm
+ * run of an evaluation is promoted from the evaluation (one release covers all its benchmarks).
+ */
+export function VerdictPromote({ expId, arms, evaluationId }: { expId: string; arms: readonly string[]; evaluationId?: string }) {
+	const { t } = useTranslation("u14");
+	const toEvaluation = arms.length === 1 && Boolean(evaluationId);
+	if (arms.length !== 2 && !toEvaluation) return null;
+	const label = (
+		<>
+			<Rocket className="size-4" aria-hidden="true" />
+			{t("promote.verdictButton")}
+		</>
+	);
+	return (
+		<div className="flex justify-end">
+			<Button size="sm" asChild>
+				{toEvaluation ? (
+					<Link to="/evaluations/$evalId" params={{ evalId: evaluationId! }} data-testid="verdict-promote">
+						{label}
+					</Link>
+				) : (
+					<Link to="/releases" search={{ exp: expId } as never} data-testid="verdict-promote">
+						{label}
+					</Link>
+				)}
+			</Button>
+		</div>
+	);
+}
+
+/**
  * The Verdict tab of an experiment (DESIGN.md 18, screen 1): the decision, what changed, the naive
  * count, policy, gates, diagnostics and the task grid. ?grade= names a grade source (a regrade id,
  * or reviewed); every block says which grades it reads, so a regrade is never mixed silently with
  * the sealed grid and gates.
  */
-export function VerdictTab({ expId }: { expId: string }) {
+export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationId?: string }) {
 	const { t } = useTranslation("bench");
 	const { t: tPage } = useTranslation("experimentPage");
-	const { t: tRel } = useTranslation("u14");
 	const navigate = useNavigate();
 	const [grade, setGrade] = useQueryState("grade", parseAsString);
 	const [, setTab] = useQueryState("tab", parseAsString);
@@ -149,19 +179,7 @@ export function VerdictTab({ expId }: { expId: string }) {
 				</p>
 			)}
 
-			{arms.length === 2 && (
-				<div className="flex justify-end">
-					<Link
-						to="/releases"
-						search={{ exp: payload.exp_id } as never}
-						className="text-primary inline-flex items-center gap-1.5 text-sm font-medium hover:underline"
-						data-testid="verdict-promote"
-					>
-						<Rocket className="size-4" aria-hidden="true" />
-						{tRel("promote.verdictButton")}
-					</Link>
-				</div>
-			)}
+			<VerdictPromote expId={payload.exp_id} arms={arms} evaluationId={evaluationId} />
 
 			{isScoreVerdict(payload.verdict) ? (
 				<ScoreSummary

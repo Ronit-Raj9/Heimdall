@@ -1663,6 +1663,7 @@ export interface ExperimentStatus {
 	arms?: string[];
 	/** A Decision (improved, regressed, inconclusive, invalid); typed as text so a newer server's value still renders. */
 	decision?: string;
+	evaluation_id?: string;
 }
 
 /** GET /experiments */
@@ -2813,6 +2814,8 @@ export interface AgentSummary {
 	file_paths: string[];
 	/** Sealed runs of this config id in any experiment; null without a run index. */
 	sealed_runs: number | null;
+	runs_total?: number | null;
+	last_run_at?: string | null;
 	/** Effective capabilities (shell, tools, mcp, sessions, ...): the config's own list or its adapter defaults. */
 	capabilities?: string[];
 	error?: string;

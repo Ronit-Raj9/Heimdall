@@ -1,10 +1,15 @@
+import { DeleteAgentDialog } from "@/components/agents/deleteAgentDialog";
+import "@/components/agents/fw13I18n";
 import { OverflowMenu } from "@/components/agents/overflowMenu";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import "@/lib/types/agentFirstI18n";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { useGetAgentConfigQuery } from "@/lib/store/apis/agentBuilderApi";
+import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useGetAgentCompatibilityQuery, useGetAgentVersionsQuery } from "@/lib/store/apis/evaluationsApi";
-import { Activity, Bug, Cpu, FlaskConical, Gauge, GitCompare, ListChecks, ShieldAlert } from "lucide-react";
+import { Activity, Bug, Cpu, FlaskConical, Gauge, GitCompare, ListChecks, ShieldAlert, Trash2 } from "lucide-react";
+import { parseAsString, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, CheckPill, adapterIcon, jobState, lastJobFor, useAdapterLabel } from "../../../agents/views/agentDisplay";
 import { useAgentJobs } from "../../../agents/views/agentJobs";
@@ -29,12 +34,23 @@ export function latestVersion(versions: ReadonlyArray<{ version: number }> | und
 /**
  * One agent (/agents/$agentId?tab=): name, version, capabilities, one primary Evaluate button and a
  * "more" menu, then Report card (default), Versions, Runs, Setup, Tools and Pull requests (test on
- * every pull request). ?tab=checks (the readiness check, from the menu) and the old ?tab=config still open.
+ * every pull request). ?tab=checks (the readiness check) and ?tab=compare-models open from the menu and
+ * then show as the last tab. ?delete=1 (the menu's "Delete agent") asks to delete the agent; it is
+ * offered only to members, and only for an agent whose settings file lives in this project (built-in
+ * library agents have none).
  */
 export default function AgentDetailView() {
 	const { t } = useTranslation("agentFirst");
 	const { t: tb } = useTranslation("agentBuilder");
+	const { t: tf } = useTranslation("fw13");
 	const { agentId } = useParams({ from: "/agents_/$agentId" });
+	const navigate = useNavigate();
+	const session = useSession();
+	const writable = canUse(session, "member");
+	// GET /agents/{id}/config reads the project's file: a built-in agent has none (404).
+	const config = useGetAgentConfigQuery(agentId, { skip: !writable });
+	const canDelete = writable && config.isSuccess;
+	const [deleteParam, setDeleteParam] = useQueryState("delete", parseAsString.withOptions({ history: "replace" }));
 	const { agent } = useAgentSummary(agentId);
 	const jobs = useAgentJobs();
 	const adapterLabel = useAdapterLabel();
@@ -49,8 +65,8 @@ export default function AgentDetailView() {
 		{ id: "setup", label: t("detail.tabs.setup") },
 		{ id: "tools", label: t("detail.tabs.tools") },
 		{ id: "pull-requests", label: t("detail.tabs.pullRequests") },
-		{ id: "checks", label: t("detail.tabs.checks"), hidden: true },
-		{ id: "compare-models", label: t("detail.tabs.compareModels"), hidden: true },
+		{ id: "checks", label: t("detail.tabs.checks"), hidden: true, addressable: true },
+		{ id: "compare-models", label: t("detail.tabs.compareModels"), hidden: true, addressable: true },
 		{ id: "config", label: t("detail.tabs.setup"), hidden: true },
 	];
 	const Icon = agent ? adapterIcon(agent.adapter) : null;
@@ -85,9 +101,17 @@ export default function AgentDetailView() {
 								</span>
 							)}
 							{capabilities.length > 0 && (
-								<span className="inline-flex flex-wrap items-center gap-1" data-testid="agent-detail-capabilities" aria-label={tb("detail.capabilities")}>
+								<span
+									className="inline-flex flex-wrap items-center gap-1"
+									data-testid="agent-detail-capabilities"
+									aria-label={tb("detail.capabilities")}
+								>
 									{capabilities.map((cap) => (
-										<span key={cap} className="bg-muted/60 rounded-md border px-1.5 py-0.5 font-mono text-[11px]" data-testid={`agent-capability-${cap}`}>
+										<span
+											key={cap}
+											className="bg-muted/60 rounded-md border px-1.5 py-0.5 font-mono text-[11px]"
+											data-testid={`agent-capability-${cap}`}
+										>
 											{cap}
 										</span>
 									))}
@@ -112,24 +136,84 @@ export default function AgentDetailView() {
 							label={t("detail.more")}
 							testId="agent-detail-more"
 							items={[
-								{ label: t("detail.menu.compareVersions"), to: "/evaluate", search: { agent: agentId, mode: "versions" }, icon: GitCompare, testId: "agent-detail-compare-versions" },
-								{ label: t("detail.menu.compareModels"), to: "/agents/$agentId", params: { agentId }, search: { tab: "compare-models" }, icon: Cpu, testId: "agent-detail-compare-models" },
-								{ label: t("detail.menu.failureTest"), to: "/failure-tests", search: { agent: agentId }, icon: ShieldAlert, testId: "agent-detail-failure-test" },
-								{ label: t("detail.menu.whyFail"), to: "/why-agents-fail", search: { agent: agentId }, icon: Bug, testId: "agent-detail-why-fail" },
-								{ label: t("detail.menu.monitor"), to: "/scheduled-checks", search: { tab: "live", agent: agentId }, icon: Activity, testId: "agent-detail-monitor" },
-								{ label: t("detail.menu.check"), to: "/agents/$agentId", params: { agentId }, search: { tab: "checks" }, icon: ListChecks, testId: "agent-detail-check" },
-								{ label: t("detail.menu.custom"), to: "/experiments/new", search: { agent: agentId }, icon: FlaskConical, testId: "agent-detail-run" },
+								{
+									label: t("detail.menu.compareVersions"),
+									to: "/evaluate",
+									search: { agent: agentId, mode: "versions" },
+									icon: GitCompare,
+									testId: "agent-detail-compare-versions",
+								},
+								{
+									label: t("detail.menu.compareModels"),
+									to: "/agents/$agentId",
+									params: { agentId },
+									search: { tab: "compare-models" },
+									icon: Cpu,
+									testId: "agent-detail-compare-models",
+								},
+								{
+									label: t("detail.menu.failureTest"),
+									to: "/failure-tests",
+									search: { agent: agentId },
+									icon: ShieldAlert,
+									testId: "agent-detail-failure-test",
+								},
+								{
+									label: t("detail.menu.whyFail"),
+									to: "/why-agents-fail",
+									search: { agent: agentId },
+									icon: Bug,
+									testId: "agent-detail-why-fail",
+								},
+								{
+									label: t("detail.menu.monitor"),
+									to: "/scheduled-checks",
+									search: { tab: "live", agent: agentId },
+									icon: Activity,
+									testId: "agent-detail-monitor",
+								},
+								{
+									label: t("detail.menu.check"),
+									to: "/agents/$agentId",
+									params: { agentId },
+									search: { tab: "checks" },
+									icon: ListChecks,
+									testId: "agent-detail-check",
+								},
+								{
+									label: t("detail.menu.custom"),
+									to: "/experiments/new",
+									search: { agent: agentId },
+									icon: FlaskConical,
+									testId: "agent-detail-run",
+								},
+								...(canDelete
+									? [
+											{
+												label: tf("deleteAgent.menu"),
+												to: "/agents/$agentId",
+												params: { agentId },
+												search: { delete: "1" },
+												icon: Trash2,
+												testId: "agent-detail-delete",
+											},
+										]
+									: []),
 							]}
 						/>
 					</div>
 				}
 			/>
+			{canDelete && deleteParam !== null && (
+				<DeleteAgentDialog agentId={agentId} onClose={() => void setDeleteParam(null)} onDeleted={() => void navigate({ to: "/agents" })} />
+			)}
 			{agent?.adapter === "command" && agent.image && <AgentImageApproval image={agent.image} />}
 			{agent && (agent.adapter === "remote_http" || agent.adapter === "openai_agent") && <SavedEndpointTest agentId={agentId} />}
 			<RouteTabs tabs={tabs} defaultTab="report-card" label={tb("detail.tabs.label")} testId="agent-detail-tabs">
 				{(active) =>
 					active === "checks" ? (
-						<ChecksTab agentId={agentId} />) : active === "compare-models" ? (
+						<ChecksTab agentId={agentId} />
+					) : active === "compare-models" ? (
 						<CompareModelsForm agentId={agentId} />
 					) : active === "tools" ? (
 						<ToolsTab agentId={agentId} />

@@ -6,7 +6,15 @@ import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenSta
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { EXPERIMENT_POLL_MS, useGetCatalogQuery, useGetExperimentQuery, useGetHealthQuery } from "@/lib/store/apis/benchApi";
+import { splitAgents } from "@/app/agents/views/agentConfigsTab";
+import {
+	EXPERIMENT_POLL_MS,
+	useGetAgentsQuery,
+	useGetCatalogQuery,
+	useGetExperimentQuery,
+	useGetHealthQuery,
+} from "@/lib/store/apis/benchApi";
+import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
 import { launchAvailable, type ExperimentStatus } from "@/lib/types/bench";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useMemo, useState } from "react";
@@ -14,7 +22,7 @@ import { useTranslation } from "react-i18next";
 import { ExperimentForm } from "./experimentForm";
 import { dateSeed, defaultFormValues } from "./experimentFormSchema";
 import { MatrixBuilder } from "./matrixBuilder";
-import { defaultBuilderValues } from "./matrixBuilderSchema";
+import { defaultBuilderValues, keyedProviders, type BuilderAgentIds } from "./matrixBuilderSchema";
 
 /** New experiment and preflight (DESIGN.md 18 screen 4). /experiments/new?exp=<id> shows that experiment's live progress. */
 export default function NewExperimentView() {
@@ -24,13 +32,31 @@ export default function NewExperimentView() {
 	// ?mode=ab opens the A/B config-change form; the default is the agents x models builder.
 	const [mode, setMode] = useQueryState("mode", parseAsString);
 	const abMode = mode === "ab";
+	// ?agent= (an agent page's "Custom comparison") starts the builder on that agent.
+	const [agentParam] = useQueryState("agent", parseAsString);
 	const [capUsd, setCapUsd] = useState<number | undefined>(undefined);
 	const catalog = useGetCatalogQuery();
+	// The builder lists the agents My agents shows and runs models on providers the org has keys for.
+	const agentsList = useGetAgentsQuery();
+	const modelKeys = useGetModelsQuery();
+	const agentGroups = useMemo<BuilderAgentIds | undefined>(() => {
+		if (!agentsList.data) return undefined;
+		const { yours, baselines } = splitAgents(agentsList.data.agents);
+		return { yours: yours.map((a) => a.id), baselines: baselines.map((a) => a.id) };
+	}, [agentsList.data]);
+	const sideLoading = agentsList.isLoading || modelKeys.isLoading;
 	const health = useGetHealthQuery();
 	const defaults = useMemo(() => (catalog.data ? defaultFormValues(catalog.data, dateSeed(new Date())) : null), [catalog.data]);
 	const builderDefaults = useMemo(
-		() => (catalog.data ? defaultBuilderValues(catalog.data, dateSeed(new Date())) : null),
-		[catalog.data],
+		() =>
+			catalog.data && !sideLoading
+				? defaultBuilderValues(catalog.data, dateSeed(new Date()), {
+						agent: agentParam,
+						shownAgents: agentGroups ? [...agentGroups.yours, ...agentGroups.baselines] : undefined,
+						providersWithKey: keyedProviders(modelKeys.data?.keys ?? []),
+					})
+				: null,
+		[catalog.data, sideLoading, agentParam, agentGroups, modelKeys.data],
 	);
 	const onStarted = (id: string, cap: number) => {
 		setCapUsd(cap);
@@ -49,7 +75,7 @@ export default function NewExperimentView() {
 
 			{!launchAvailable(health.data) ? (
 				<EmptyNote testId="new-experiment-offline">{t("experiments.new.offline")}</EmptyNote>
-			) : catalog.isLoading ? (
+			) : catalog.isLoading || sideLoading ? (
 				<BlockSkeleton rows={10} testId="new-experiment-loading" />
 			) : catalog.error || !catalog.data ? (
 				<LoadError
@@ -96,7 +122,7 @@ export default function NewExperimentView() {
 						{abMode || !builderDefaults ? (
 							<ExperimentForm catalog={catalog.data} defaults={defaults} onStarted={onStarted} />
 						) : (
-							<MatrixBuilder catalog={catalog.data} defaults={builderDefaults} onStarted={onStarted} />
+							<MatrixBuilder catalog={catalog.data} defaults={builderDefaults} agentGroups={agentGroups} onStarted={onStarted} />
 						)}
 					</div>
 				</RoleGate>

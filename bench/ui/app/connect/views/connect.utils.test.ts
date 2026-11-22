@@ -4,8 +4,11 @@ import {
 	bestCandidate,
 	connectionOK,
 	estimateMinutes,
+	importPlatformFor,
 	isTerminalJob,
 	otherCandidates,
+	platformChoice,
+	verifyBenchmarkKey,
 	rowTone,
 	secretQuestions,
 	validAgentName,
@@ -71,5 +74,40 @@ describe("connect utils", () => {
 		expect(validAgentName("new")).toBe(false);
 		expect(estimateMinutes(0)).toBe(0);
 		expect(estimateMinutes(61)).toBe(2);
+	});
+});
+
+// B6: picking a platform starts clean and maps to the import platform with the same fields.
+describe("platform choice", () => {
+	it("clears every earlier result", () => {
+		expect(platformChoice("vapi")).toEqual({
+			platform: "vapi",
+			det: undefined,
+			cand: undefined,
+			saved: undefined,
+			inline: undefined,
+			jobId: undefined,
+			polling: false,
+			probeSecrets: {},
+		});
+	});
+
+	it("finds the import platform of a Connect platform id", () => {
+		const list = [{ id: "vapi" }, { id: "agentcore" }, { id: "copilot_studio" }] as never[];
+		expect(importPlatformFor("vapi", list)).toEqual({ id: "vapi" });
+		expect(importPlatformFor("bedrock_agentcore", list)).toEqual({ id: "agentcore" });
+		expect(importPlatformFor("copilot_studio", list)).toEqual({ id: "copilot_studio" });
+		expect(importPlatformFor("bedrock_agent", list)).toBeUndefined();
+		expect(importPlatformFor("none", list)).toBeUndefined();
+	});
+});
+
+// B8.task: a practice benchmark on the real-task row is named as the fallback it is.
+describe("verify benchmark line", () => {
+	it("says when the real task runs on a practice benchmark", () => {
+		expect(verifyBenchmarkKey("acme-memory")).toBe("verify.benchmarkPractice");
+		expect(verifyBenchmarkKey("coding-core")).toBe("verify.benchmarkPractice");
+		expect(verifyBenchmarkKey("gaia@1")).toBe("verify.benchmark");
+		expect(verifyBenchmarkKey(undefined)).toBe("verify.noBenchmark");
 	});
 });

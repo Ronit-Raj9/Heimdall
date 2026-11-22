@@ -4,7 +4,7 @@ import "@/lib/types/homeI18n";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { suiteReady } from "./home.utils";
+import { suiteHomeState } from "./home.utils";
 
 const DOT: Record<"ready" | "attention" | "failed", string> = {
 	ready: "bg-chart-success",
@@ -13,7 +13,8 @@ const DOT: Record<"ready" | "attention" | "failed", string> = {
 };
 
 /**
- * Benchmarks as a plain list: human name, task count and a small Ready or Not ready yet dot. The
+ * Benchmarks as a plain list: human name, task count and a small readiness dot in the Benchmarks
+ * page's words ("Ready", "24 of 89 tasks ready", "Not ready yet" only when no task is). The
  * built-in library comes first, then what the org added; the practice examples sit collapsed below.
  */
 export function SuitesPanel({ suites, limit = 6 }: { suites: readonly SuiteSummary[]; limit?: number }) {
@@ -55,8 +56,16 @@ export function SuitesPanel({ suites, limit = 6 }: { suites: readonly SuiteSumma
 
 function SuiteRow({ suite }: { suite: SuiteSummary }) {
 	const { t } = useTranslation("home");
-	const ready = !suite.error && suiteReady(suite);
-	const state = suite.error ? "failed" : ready ? "ready" : "attention";
+	const { t: ts } = useTranslation("suitesUx");
+	const { state, readiness } = suiteHomeState(suite);
+	const label =
+		state === "ready"
+			? t("suites.ready")
+			: state === "failed"
+				? t("suites.failed")
+				: readiness === "notReady"
+					? t("suites.attention")
+					: ts(`status.${readiness}`, { ready: suite.admitted_count, total: suite.task_count });
 	const { name, description } = suiteDisplay(suite);
 	return (
 		<li className="min-w-0" data-testid={`home-suite-${suite.id}`} data-ready={state}>
@@ -73,9 +82,10 @@ function SuiteRow({ suite }: { suite: SuiteSummary }) {
 				<span
 					className="text-muted-foreground inline-flex shrink-0 items-center gap-1.5 text-xs whitespace-nowrap"
 					data-testid={`home-suite-state-${suite.id}`}
+					data-readiness={readiness}
 				>
 					<span className={cn("size-1.5 rounded-full", DOT[state])} aria-hidden="true" />
-					{state === "ready" ? t("suites.ready") : state === "failed" ? t("suites.failed") : t("suites.attention")}
+					{label}
 				</span>
 			</Link>
 		</li>

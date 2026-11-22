@@ -62,6 +62,7 @@
 		"again": "Verify again",
 		"starting": "Starting",
 		"benchmark": "Benchmark for the real task: {{id}}",
+		"benchmarkPractice": "Benchmark for the real task: {{id}} (a practice benchmark: nothing else fits this agent)",
 		"noBenchmark": "No benchmark picked: the real task row is skipped.",
 		"ok": "Your agent is connected.",
 		"failed": "Fix the first failing row, then verify again.",
@@ -100,5 +101,12 @@
 	},
 	"errors": {
 		"empty": "Paste something first, or pick a platform."
+	},
+	"platform": {
+		"read": "Read the agent",
+		"reading": "Reading",
+		"create": "Create agent",
+		"creating": "Creating",
+		"missing": "Still needed: {{list}}"
 	}
 }

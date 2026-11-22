@@ -4,10 +4,31 @@ import type { AgentTemplate } from "@/lib/types/agentBuilder";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import NewAgentView, { defaultAgentName } from "./newAgentView";
+import NewAgentView, { defaultAgentName, nameProblem } from "./newAgentView";
 
 const templates: AgentTemplate[] = [
-	{ id: "codex", name: "Codex CLI", category: "cli", description: "Codex", adapter: "command", providers: ["openai"], default_model: "gpt-x", builds: true, params: [] },
+	{
+		id: "codex",
+		name: "Codex CLI",
+		category: "cli",
+		description: "Codex",
+		adapter: "command",
+		providers: ["openai"],
+		default_model: "gpt-x",
+		builds: true,
+		params: [],
+	},
+	{
+		id: "plain-loop",
+		name: "Plain loop",
+		category: "framework",
+		description: "Loop",
+		adapter: "command",
+		providers: ["openai"],
+		default_model: "gpt-x",
+		builds: true,
+		params: [],
+	},
 	{
 		id: "http-url",
 		name: "Your HTTP endpoint",
@@ -34,7 +55,14 @@ const templates: AgentTemplate[] = [
 		default_model: "m",
 		builds: false,
 		params: [
-			{ name: "framework", label: "Framework", required: false, kind: "select", options: ["langgraph", "crewai", "openai-agents", "custom"], default: "custom" },
+			{
+				name: "framework",
+				label: "Framework",
+				required: false,
+				kind: "select",
+				options: ["langgraph", "crewai", "openai-agents", "custom"],
+				default: "custom",
+			},
 			{ name: "repo_url", label: "Git repository", required: false },
 			{ name: "image", label: "Docker image", required: false },
 			{ name: "command", label: "Start command", required: true },
@@ -50,7 +78,11 @@ vi.mock("@/lib/store/apis/agentBuilderApi", () => ({
 	usePutAgentConfigMutation: () => [vi.fn(), { isLoading: false }],
 }));
 vi.mock("@/lib/store/apis/secretsApi", () => ({ useCreateSecretMutation: () => [vi.fn(), { isLoading: false }] }));
-vi.mock("@/lib/store/apis/benchApi", () => ({ getBenchErrorMessage: () => "err", useGetAgentsQuery: () => ({ data: { agents: [{ id: "taken" }] } }) }));
+let agentIds = ["taken"];
+vi.mock("@/lib/store/apis/benchApi", () => ({
+	getBenchErrorMessage: () => "err",
+	useGetAgentsQuery: () => ({ data: { agents: agentIds.map((id) => ({ id })) } }),
+}));
 vi.mock("./platformImport", () => ({ PlatformImportCard: () => <div data-testid="platform-import" /> }));
 vi.mock("@/lib/session/sessionContext", () => ({ canUse: () => true, useSession: () => ({}) }));
 vi.mock("@/components/models/modelPicker", () => ({ ModelPicker: () => <div data-testid="model-picker" /> }));
@@ -109,5 +141,25 @@ describe("NewAgentView", () => {
 
 	it("pre-fills a valid name", () => {
 		expect(defaultAgentName(templates[0])).toBe("my-codex");
+	});
+
+	it("pre-fills the first free name, skipping agents that already exist", () => {
+		expect(defaultAgentName(templates[0], new Set(["my-codex"]))).toBe("my-codex-2");
+		expect(defaultAgentName(templates[0], new Set(["my-codex", "my-codex-2"]))).toBe("my-codex-3");
+		expect(defaultAgentName(templates[0], new Set(["other"]))).toBe("my-codex");
+		agentIds = ["my-plain-loop"];
+		const html = render("?template=plain-loop");
+		expect(html).toContain('value="my-plain-loop-2"');
+		expect(html).not.toContain('value="my-plain-loop"');
+		expect(html).not.toContain("already exists");
+		agentIds = ["taken"];
+	});
+
+	it("blocks Create for a taken name, for every template", () => {
+		expect(nameProblem("my-plain-loop", new Set(["my-plain-loop"]))).toBe(
+			"An agent named my-plain-loop already exists. Pick another name.",
+		);
+		expect(nameProblem("my-plain-loop-2", new Set(["my-plain-loop"]))).toBe("");
+		expect(nameProblem("Bad Name", new Set())).toBe("Use lowercase letters, digits, '.', '_' or '-', starting with a letter or digit.");
 	});
 });

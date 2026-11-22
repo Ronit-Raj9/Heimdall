@@ -1,13 +1,29 @@
+import { isAutoName, isPracticeExperiment, systemExperiment } from "@/components/experiments/experiments.utils";
 import type { Action, ExperimentStatus, ReleasePolicyDecision, ReleaseRecord } from "@/lib/types/bench";
 
+type ReleaseCandidate = Pick<ExperimentStatus, "state" | "exp_id"> & { name?: string; suite?: string; arms?: string[] };
+
+/** A finished comparison of two versions that a person started: not a check or a practice run. */
+function citable(e: ReleaseCandidate): boolean {
+	// Only finished ones: picking a running experiment would ask the server for its verdict, and the
+	// server analyzes on demand and saves that analysis into the running experiment's folder.
+	if (e.state !== "done") return false;
+	// Only comparisons of two versions: a one-arm run has no candidate to release.
+	if (e.arms !== undefined && e.arms.length < 2) return false;
+	return systemExperiment(e) === null && !isPracticeExperiment(e);
+}
+
 /**
- * The experiments a release can cite: only finished ones. Picking a running experiment would ask the
- * server for its verdict, and the server analyzes on demand and saves that analysis into the running
- * experiment's folder (a partial, usually invalid, verdict).
+ * The experiments a release can cite: finished two-setup comparisons, without Heimdall's own
+ * readiness checks and practice runs. Quick runs (a generated name) appear only with `quick`.
  */
-export function releasableExperiments<T extends Pick<ExperimentStatus, "state"> & { arms?: string[] }>(experiments: readonly T[]): T[] {
-	// Only finished comparisons of two versions: a one-arm run has no candidate to release.
-	return experiments.filter((e) => e.state === "done" && (e.arms === undefined || e.arms.length >= 2));
+export function releasableExperiments<T extends ReleaseCandidate>(experiments: readonly T[], opts: { quick?: boolean } = {}): T[] {
+	return experiments.filter((e) => citable(e) && (opts.quick || !isAutoName(e)));
+}
+
+/** How many citable experiments are quick runs, hidden until "Show quick runs" is ticked. */
+export function quickRunCount(experiments: readonly ReleaseCandidate[]): number {
+	return experiments.filter((e) => citable(e) && isAutoName(e)).length;
 }
 
 /** Records newest first. The API returns log order, oldest first; equal times keep the later log line first. */

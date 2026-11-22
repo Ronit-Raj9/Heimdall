@@ -1,4 +1,14 @@
-import type { ConnectCandidate, ConnectDetectResponse, ConnectQuestion, VerifyRow, VerifyRowStatus } from "@/lib/types/connect";
+import { isPracticeSuite } from "@/components/suites/suiteDisplay";
+import type { AgentPlatform } from "@/lib/types/agentImport";
+import type {
+	ConnectCandidate,
+	ConnectDetectResponse,
+	ConnectQuestion,
+	ConnectSaveResponse,
+	ConnectVerifyStatus,
+	VerifyRow,
+	VerifyRowStatus,
+} from "@/lib/types/connect";
 
 /** How often the verification job is polled while it runs. */
 export const VERIFY_POLL_MS = 1500;
@@ -77,4 +87,45 @@ export function validAgentName(id: string): boolean {
 /** Minutes, rounded up, of an estimate in seconds; 0 when unknown. */
 export function estimateMinutes(seconds: number): number {
 	return seconds > 0 ? Math.max(1, Math.ceil(seconds / 60)) : 0;
+}
+
+/** What the Connect page holds after a platform is picked: the platform and nothing from before. */
+export interface PlatformChoice {
+	platform: string;
+	det: ConnectDetectResponse | undefined;
+	cand: ConnectCandidate | undefined;
+	saved: ConnectSaveResponse | undefined;
+	inline: ConnectVerifyStatus | undefined;
+	jobId: string | undefined;
+	polling: boolean;
+	probeSecrets: Record<string, string>;
+}
+
+/** Picking a platform clears the earlier detect result, candidate, saved agent and verify job. */
+export function platformChoice(platform: string): PlatformChoice {
+	return {
+		platform,
+		det: undefined,
+		cand: undefined,
+		saved: undefined,
+		inline: undefined,
+		jobId: undefined,
+		polling: false,
+		probeSecrets: {},
+	};
+}
+
+/** Connect platform ids that the import catalog spells differently. */
+const IMPORT_PLATFORM_IDS: Record<string, string> = { bedrock_agentcore: "agentcore" };
+
+/** The import platform (with its own fields) behind a Connect platform id, if there is one. */
+export function importPlatformFor(id: string, platforms: AgentPlatform[]): AgentPlatform | undefined {
+	const want = IMPORT_PLATFORM_IDS[id] ?? id;
+	return platforms.find((p) => p.id === want);
+}
+
+/** The line above the verify rows: the real task's benchmark, flagged when it is only a practice one. */
+export function verifyBenchmarkKey(suite: string | undefined): "verify.benchmark" | "verify.benchmarkPractice" | "verify.noBenchmark" {
+	if (!suite) return "verify.noBenchmark";
+	return isPracticeSuite(suite.split("@")[0]) ? "verify.benchmarkPractice" : "verify.benchmark";
 }

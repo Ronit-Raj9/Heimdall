@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_SORT, sortEntries, type LeaderboardSort } from "./leaderboard.utils";
+import { DEFAULT_SORT, nextSort, sortEntries, type LeaderboardSort } from "./leaderboard.utils";
 import { LeaderboardTable } from "./leaderboardTable";
 
 // A plain anchor stands in for the router's Link, so the target URL is visible in the markup.
@@ -113,5 +113,19 @@ describe("LeaderboardTable", () => {
 		expect(html).toMatch(/<button type="button"[^>]*aria-label="Sort by Tokens, sorted ascending"/);
 		const desc = render({ key: "rank", dir: "desc" });
 		expect(desc).toMatch(/aria-sort="descending"[^>]*data-testid="leaderboard-head-rank"/);
+	});
+	it("reverses the rows on a second click of the same header (By benchmark sort is wired)", () => {
+		const ranks = (html: string) => [...html.matchAll(/data-testid="leaderboard-row-(\d+)"/g)].map((m) => Number(m[1]));
+		const once = nextSort(DEFAULT_SORT, "tasks");
+		const twice = nextSort(once, "tasks");
+		expect(twice.key).toBe("tasks");
+		expect(twice.dir).not.toBe(once.dir);
+		const a = ranks(render(once));
+		const b = ranks(render(twice));
+		expect(a.length).toBe(board.entries.length);
+		const tasks = (order: number[]) => order.map((r) => board.entries.find((e) => e.rank === r)?.tasks ?? 0);
+		expect(tasks(a)).toEqual([...tasks(a)].sort((x, y) => (once.dir === "asc" ? x - y : y - x)));
+		expect(tasks(b)).toEqual([...tasks(b)].sort((x, y) => (twice.dir === "asc" ? x - y : y - x)));
+		expect(render(once)).toContain('data-testid="leaderboard-sort-tasks"');
 	});
 });

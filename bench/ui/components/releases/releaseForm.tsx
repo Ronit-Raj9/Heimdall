@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import "@/app/experiments/views/experimentsI18n";
+import { humanExperimentName } from "@/components/experiments/experiments.utils";
 import { EMPTY_RELEASE_FORM, canRelease, releaseBlockers, releaseRequestFrom, type ReleaseFormValues } from "./releases.utils";
 
 /** The verdict the release would cite. */
@@ -34,6 +36,17 @@ export interface ReleaseFormProps {
 	submitError?: string;
 	created?: ReleaseRecord;
 	onSubmit: (request: ReleaseRequest) => void;
+}
+
+/** A picker option: the readable name a person knows, then the id in small grey text. */
+export function ExperimentOption({ experiment }: { experiment: ExperimentStatus }) {
+	const { t } = useTranslation("experimentsUx");
+	return (
+		<span className="flex min-w-0 items-baseline gap-2" data-testid={`release-experiment-label-${experiment.exp_id}`}>
+			<span className="truncate">{humanExperimentName(experiment, (k, o) => String(t(k as never, (o ?? {}) as never)))}</span>
+			<span className="text-muted-foreground shrink-0 font-mono text-xs">{experiment.exp_id}</span>
+		</span>
+	);
 }
 
 /**
@@ -72,7 +85,7 @@ export function ReleaseForm(props: ReleaseFormProps) {
 					<SelectContent>
 						{experiments.map((e) => (
 							<SelectItem key={e.exp_id} value={e.exp_id} data-testid={`release-experiment-option-${e.exp_id}`}>
-								{t("releases.panel.experimentOption", { name: e.name || e.exp_id, id: e.exp_id })}
+								<ExperimentOption experiment={e} />
 							</SelectItem>
 						))}
 					</SelectContent>

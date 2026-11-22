@@ -17,6 +17,8 @@ gateway
 env_names
 file_paths
 sealed_runs
+runs_total?
+last_run_at?
 capabilities?
 error?
 reports_events?

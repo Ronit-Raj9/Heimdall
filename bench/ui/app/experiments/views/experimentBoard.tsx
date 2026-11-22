@@ -1,7 +1,7 @@
 import "./experimentsI18n";
 
 import { filterExperiments } from "@/components/experiments/experimentList";
-import { systemExperiment } from "@/components/experiments/experiments.utils";
+import { humanExperimentName, isHiddenByDefault, suiteName, systemExperiment } from "@/components/experiments/experiments.utils";
 import { formatRelative, formatWhen } from "@/components/platform/platform.utils";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
@@ -31,41 +31,8 @@ import {
 	X,
 } from "lucide-react";
 import { parseAsString, useQueryStates } from "nuqs";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-
-/** A name the server wrote for the user (QuickRun) rather than one the user typed. */
-const AUTO_NAME = /^quick-\d{8}-\d{6}(-[0-9a-f]+)?$/i;
-
-/** Suite id without its version: coding-core@1.0.0 to coding-core. */
-export function suiteName(suite: string | undefined): string {
-	return (suite ?? "").split("@")[0];
-}
-
-/** True when the experiment's name was generated (or missing), so the UI should build a readable one. */
-export function isAutoName(e: Pick<ExperimentStatus, "name" | "exp_id">): boolean {
-	const name = e.name.trim();
-	return !name || name === e.exp_id || AUTO_NAME.test(name);
-}
-
-/**
- * The label shown for an experiment. A typed name wins. A generated one becomes
- * "<arm> vs <arm> on <suite>" when the arm ids say something, else "Quick run on <suite>". Pure.
- */
-export function humanExperimentName(
-	e: Pick<ExperimentStatus, "name" | "exp_id" | "suite" | "arms">,
-	t: (key: "quickRun" | "armsVs" | "noSuite" | "system.readiness" | "system.agent" | "system.drift", opts?: Record<string, string>) => string,
-): string {
-	// Heimdall's own checks (admit-*, check-*, canary-*) read as what they are, not as comparisons.
-	const sys = systemExperiment(e);
-	if (sys) return t(`system.${sys.kind}`, { name: sys.subject });
-	if (!isAutoName(e)) return e.name.trim();
-	const suite = suiteName(e.suite) || t("noSuite");
-	const arms = (e.arms ?? []).filter(Boolean);
-	// Single-letter ids (A, B) carry no meaning on their own.
-	if (arms.length > 0 && arms.some((a) => a.length > 1)) return t("armsVs", { arms: arms.join(" vs "), suite });
-	return t("quickRun", { suite });
-}
 
 const SUITE_ICONS: readonly [RegExp, LucideIcon][] = [
 	[/terminal|shell|bash|cli/, SquareTerminal],
@@ -208,15 +175,19 @@ export function ExperimentBoard() {
 	const locale = getLocale();
 	const list = useListExperimentsQuery();
 	const [filters, setFilters] = useQueryStates(
-		{ q: parseAsString, state: parseAsString, suite: parseAsString },
+		{ q: parseAsString, state: parseAsString, suite: parseAsString, all: parseAsString },
 		{ history: "replace", throttleMs: 200 },
 	);
 	const everything = useMemo(() => list.data?.experiments ?? [], [list.data]);
-	// Automatic readiness, agent and drift checks are hidden unless asked for.
-	const [showSystem, setShowSystem] = useState(false);
-	const systemCount = useMemo(() => everything.filter((e) => systemExperiment(e)).length, [everything]);
-	const all = useMemo(() => (showSystem ? everything : everything.filter((e) => !systemExperiment(e))), [everything, showSystem]);
-	const named = useMemo(() => new Map(all.map((e) => [e.exp_id, humanExperimentName(e, (k, o) => String(t(k as never, (o ?? {}) as never)))] as const)), [all, t]);
+	// Automatic checks, practice runs and the single-setup benchmarks of an evaluation are not
+	// comparisons: hidden unless asked for (URL all=1), so the list matches its subtitle.
+	const showSystem = filters.all === "1";
+	const systemCount = useMemo(() => everything.filter(isHiddenByDefault).length, [everything]);
+	const all = useMemo(() => (showSystem ? everything : everything.filter((e) => !isHiddenByDefault(e))), [everything, showSystem]);
+	const named = useMemo(
+		() => new Map(all.map((e) => [e.exp_id, humanExperimentName(e, (k, o) => String(t(k as never, (o ?? {}) as never)))] as const)),
+		[all, t],
+	);
 	const shown = useMemo(() => {
 		const q = filters.q?.trim().toLowerCase() ?? "";
 		// The id and typed name match in filterExperiments; the readable name and the suite match here.
@@ -237,14 +208,20 @@ export function ExperimentBoard() {
 	const suites = useMemo(() => [...new Set(all.map((e) => e.suite).filter((s): s is string => Boolean(s)))].sort(), [all]);
 	const clear = () => void setFilters({ q: null, state: null, suite: null });
 	const statusKey = STATUSES.find((c) => c.state === filters.state)?.key;
-	const tokens = ([
-		filters.state && {
-			key: "state",
-			label: `${t("col.status")}: ${statusKey ? t(`chips.${statusKey}`) : filters.state}`,
-			onRemove: () => void setFilters({ state: null }),
-		},
-		filters.suite && { key: "suite", label: `${t("chips.benchmark")}: ${suiteName(filters.suite)}`, onRemove: () => void setFilters({ suite: null }) },
-	] as (FilterToken | false | "" | null | undefined)[]).filter((x): x is FilterToken => Boolean(x));
+	const tokens = (
+		[
+			filters.state && {
+				key: "state",
+				label: `${t("col.status")}: ${statusKey ? t(`chips.${statusKey}`) : filters.state}`,
+				onRemove: () => void setFilters({ state: null }),
+			},
+			filters.suite && {
+				key: "suite",
+				label: `${t("chips.benchmark")}: ${suiteName(filters.suite)}`,
+				onRemove: () => void setFilters({ suite: null }),
+			},
+		] as (FilterToken | false | "" | null | undefined)[]
+	).filter((x): x is FilterToken => Boolean(x));
 
 	if (list.isLoading) return <BlockSkeleton rows={6} testId="experiment-list-loading" />;
 	if (list.error || !list.data) {
@@ -302,7 +279,7 @@ export function ExperimentBoard() {
 							<input
 								type="checkbox"
 								checked={showSystem}
-								onChange={(ev) => setShowSystem(ev.target.checked)}
+								onChange={(ev) => void setFilters({ all: ev.target.checked ? "1" : null })}
 								className="accent-primary size-3.5"
 								data-testid="experiment-show-system"
 							/>

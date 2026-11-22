@@ -46,6 +46,7 @@ func BuildStatus(m *schemas.Manifest, runs []RunView, f StatusFacts) schemas.Exp
 		ExpID: m.ExpID, Name: m.Experiment.Name, ManifestHash: m.Hash, FrozenAt: m.CreatedAt,
 		SpentUSD: spentUSD(runs, f.Costs), AnalysisID: f.AnalysisID,
 		Suite: cmp.Or(m.SuiteID, m.Experiment.Suite), SuiteVersion: m.SuiteVersion, Arms: slices.Sorted(maps.Keys(m.Arms)), // UI regroup (U2)
+		EvaluationID: m.Experiment.EvaluationID,
 	}
 	counted := countedRuns(runs)
 	unsealed := map[string]bool{}

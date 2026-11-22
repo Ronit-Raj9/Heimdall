@@ -41,7 +41,9 @@
 		"plainSuite_one": "Testing on {{suite}} · {{done}} of {{total}} run done",
 		"plainSuite_other": "Testing on {{suite}} · {{done}} of {{total}} runs done",
 		"checkName": "Readiness check",
-		"untitled": "Untitled comparison"
+		"untitled": "Untitled comparison",
+		"more_one": "+{{count}} more",
+		"more_other": "+{{count}} more"
 	},
 	"evaluations": {
 		"title": "Recent evaluations",

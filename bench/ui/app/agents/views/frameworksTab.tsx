@@ -3,10 +3,11 @@ import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState, EntityLink } from "@/components/shell";
 import { ToneBadge } from "@/components/suites/suiteBadges";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { Bot, Check, Minus } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AgentsQuery } from "./agentConfigsTab";
+import { splitAgents, type AgentsQuery } from "./agentConfigsTab";
 
 /**
  * Frameworks tab: every config side by side by how it is built and what evidence its runs carry,
@@ -15,12 +16,36 @@ import type { AgentsQuery } from "./agentConfigsTab";
  */
 export function FrameworksTab({ query }: { query: AgentsQuery }) {
 	const { t } = useTranslation("bench");
-	const rows = useMemo(() => frameworkRows(query.data?.agents ?? []), [query.data]);
+	const { t: tu } = useTranslation("agentsUx");
+	const [showTests, setShowTests] = useState(false);
+	// The same test agents the Configs tab hides are hidden here too, until "Show them".
+	const tests = useMemo(() => splitAgents(query.data?.agents ?? []).tests, [query.data]);
+	const rows = useMemo(() => {
+		const agents = query.data?.agents ?? [];
+		return frameworkRows(showTests ? agents : agents.filter((agent) => !tests.includes(agent)));
+	}, [query.data, showTests, tests]);
 	if (query.isLoading) return <BlockSkeleton rows={6} testId="frameworks-loading" />;
 	if (query.isError || !query.data) {
 		return <LoadError title={t("agents.loadError")} error={query.error} onRetry={() => void query.refetch()} testId="frameworks-error" />;
 	}
-	if (rows.length === 0) return <EmptyState icon={Bot} message={t("agents.empty")} testId="frameworks-empty" />;
+	const hiddenTests = tests.filter((agent) => !agent.error && agent.id).length;
+	const testsToggle =
+		hiddenTests > 0 ? (
+			<span className="text-muted-foreground inline-flex items-center gap-2 text-xs" data-testid="frameworks-tests-hidden">
+				{showTests ? null : tu("list.testsHidden", { count: hiddenTests })}
+				<Button
+					type="button"
+					size="sm"
+					variant="ghost"
+					className="h-6 px-2 text-xs"
+					onClick={() => setShowTests((v) => !v)}
+					data-testid="frameworks-tests-toggle"
+				>
+					{showTests ? tu("list.hideTests") : tu("list.showTests")}
+				</Button>
+			</span>
+		) : null;
+	if (rows.length === 0 && !testsToggle) return <EmptyState icon={Bot} message={t("agents.empty")} testId="frameworks-empty" />;
 	const native = rows.filter((row) => row.nativeTrace).length;
 	const scripted = rows.filter((row) => row.scripted).length;
 	return (
@@ -29,6 +54,7 @@ export function FrameworksTab({ query }: { query: AgentsQuery }) {
 				<ToneBadge tone="neutral">{t("agents.frameworks.configs", { count: rows.length })}</ToneBadge>
 				<ToneBadge tone="good">{t("agents.frameworks.nativeCount", { count: native })}</ToneBadge>
 				{scripted > 0 && <ToneBadge tone="warn">{t("agents.frameworks.scriptedCount", { count: scripted })}</ToneBadge>}
+				{testsToggle}
 			</div>
 			<div className="min-w-0 rounded-sm border">
 				<Table aria-label={t("agents.frameworks.label")} stickyColumns={1} data-testid="frameworks-table">

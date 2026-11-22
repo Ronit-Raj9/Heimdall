@@ -5,7 +5,7 @@ import { SessionContext, type SessionInfo } from "@/lib/session/sessionContext";
 import { demoSession, hostedSession } from "@/lib/testing/platformFixtures";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ReleaseForm } from "./releaseForm";
+import { ExperimentOption, ReleaseForm } from "./releaseForm";
 import type { ReleaseFormValues } from "./releases.utils";
 
 const experiment: ExperimentStatus = {
@@ -135,5 +135,18 @@ describe("ReleaseForm in hosted mode", () => {
 	it("tells a viewer the role needed and shows a demo visitor no form", () => {
 		expect(inSession(hostedSession("viewer"))).toContain('data-testid="release-form-role"');
 		expect(inSession(demoSession())).toBe("");
+	});
+});
+describe("ExperimentOption", () => {
+	it("reads the human name with the id as grey secondary text", () => {
+		const html = renderToStaticMarkup(
+			<ExperimentOption experiment={{ ...experiment, name: "quick-20261121-101500-ab12", suite: "tb2@1.0.0", arms: ["A", "B"] }} />,
+		);
+		expect(html).toContain("Quick run on tb2");
+		expect(html).toContain("text-muted-foreground");
+		expect(html).toContain(">e_synth_notes<");
+		expect(html).not.toContain("quick-20261121");
+		const check = renderToStaticMarkup(<ExperimentOption experiment={{ ...experiment, name: "admit-acme-safety" }} />);
+		expect(check).toContain("Readiness check for acme-safety");
 	});
 });

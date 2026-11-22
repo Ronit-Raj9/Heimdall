@@ -36,6 +36,9 @@ type BenchmarkInfo struct {
 	EstimateBasis string  `json:"estimate_basis,omitempty"`
 	// Reference is true when the reference board has a row for it.
 	Reference bool `json:"reference,omitempty"`
+	// Practice is true for a small made-up practice benchmark (the Acme
+	// examples, coding-core): picked only when nothing else fits.
+	Practice bool `json:"practice,omitempty"`
 }
 
 // FirstLookPick is the picker's answer.
@@ -48,6 +51,9 @@ type FirstLookPick struct {
 	EstimateS   float64         `json:"estimate_s"` // whole first look, tasks run 5 at a time
 	Note        string          `json:"note"`
 	Considered  []BenchmarkInfo `json:"considered"`
+	// Practice is true when the pick is a practice benchmark because no
+	// other benchmark fits this agent.
+	Practice bool `json:"practice,omitempty"`
 }
 
 // ErrNoFirstLook is the picker's error when no benchmark fits.
@@ -56,14 +62,23 @@ var ErrNoFirstLook = errors.New("no benchmark on this server fits this agent for
 // PickFirstLook picks the first-look benchmark: compatible, with at least
 // one task, graded without a model when the org has no provider key, then
 // the fastest by estimate (unknown estimates last), a reference row as the
-// tie breaker, then the id.
+// tie breaker, then the id. Practice benchmarks are considered only when no
+// other benchmark fits.
 func PickFirstLook(infos []BenchmarkInfo, hasOrgKey bool) (FirstLookPick, error) {
-	var ok []BenchmarkInfo
+	var ok, practice []BenchmarkInfo
 	for _, b := range infos {
 		if !b.Compatible || b.Tasks == 0 || (b.NeedsModel && !hasOrgKey) {
 			continue
 		}
+		if b.Practice {
+			practice = append(practice, b)
+			continue
+		}
 		ok = append(ok, b)
+	}
+	usePractice := len(ok) == 0 && len(practice) > 0
+	if usePractice {
+		ok = practice
 	}
 	if len(ok) == 0 {
 		if !hasOrgKey {
@@ -103,6 +118,9 @@ func PickFirstLook(infos []BenchmarkInfo, hasOrgKey bool) (FirstLookPick, error)
 	if best.Reference {
 		reason += ", with a reference row"
 	}
+	if usePractice {
+		reason += "; a practice benchmark: nothing else fits this agent"
+	}
 	est := 0.0
 	if best.EstimateS > 0 {
 		waves := (tasks + FirstLookConcurrency - 1) / FirstLookConcurrency
@@ -112,7 +130,7 @@ func PickFirstLook(infos []BenchmarkInfo, hasOrgKey bool) (FirstLookPick, error)
 		ok = ok[:8]
 	}
 	return FirstLookPick{Benchmark: best.ID, Reason: reason, Tasks: tasks, Trials: FirstLookTrials, Concurrency: FirstLookConcurrency,
-		EstimateS: est, Note: FirstLookNote, Considered: ok}, nil
+		EstimateS: est, Note: FirstLookNote, Considered: ok, Practice: usePractice}, nil
 }
 
 func humanS(s float64) string {

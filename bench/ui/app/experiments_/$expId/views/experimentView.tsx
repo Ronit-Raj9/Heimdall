@@ -1,6 +1,5 @@
 import { ExperimentTrialsPanel, hasContent } from "@/components/adaptive/trialsPanel"; // W7 adaptive trials and suite tiers
-import { TERMINAL_STATES, systemExperiment } from "@/components/experiments/experiments.utils";
-import { humanExperimentName } from "@/app/experiments/views/experimentBoard";
+import { TERMINAL_STATES, humanExperimentName, systemExperiment } from "@/components/experiments/experiments.utils";
 import { ExperimentExportMenu } from "@/components/export/exportMenu"; // W10 export
 import { ExperimentRunActions, RegradeAction } from "@/components/platform/experimentActions";
 import { RunControlsPanel } from "@/components/experiments/runControls"; // run control
@@ -15,7 +14,14 @@ import { StatusBadge } from "@/components/shell/statusBadge";
 import { Button } from "@/components/ui/button";
 import { useGetExperimentAdaptiveQuery } from "@/lib/store/apis/adaptiveApi";
 import { useAppDispatch } from "@/lib/store";
-import { EXPERIMENT_POLL_MS, benchApi, experimentResultTags, useGetExperimentQuery, useGetGridQuery, useGetVerdictQuery } from "@/lib/store/apis/benchApi";
+import {
+	EXPERIMENT_POLL_MS,
+	benchApi,
+	experimentResultTags,
+	useGetExperimentQuery,
+	useGetGridQuery,
+	useGetVerdictQuery,
+} from "@/lib/store/apis/benchApi";
 import { useGetExperimentResearchQuery } from "@/lib/store/apis/researchApi";
 import { useGetExperimentRoutingQuery } from "@/lib/store/apis/routingApi";
 import { errorStatus } from "@/lib/store/apis/session";
@@ -24,7 +30,7 @@ import { compareSearch } from "@/components/experiments/legacyRoutes";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { DeleteAction } from "@/components/platform/deleteAction";
 import { useDeleteExperimentMutation } from "@/lib/store/apis/dataOpsApi";
-import { Bot, Download, GitCompareArrows, Hourglass, SearchX } from "lucide-react";
+import { Bot, Download, GitCompareArrows, Hourglass, Layers, SearchX } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
@@ -40,6 +46,7 @@ import { MigrationTab } from "./migrationTab";
 import { ReceiptsTab } from "./receiptsTab";
 import { ScorecardsTab } from "./scorecardsTab";
 import { VerdictTab } from "./verdictTab";
+import "./fw11I18n";
 
 /**
  * /experiments/$expId: one experiment. The header carries its status, verdict and actions; the tabs
@@ -51,6 +58,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	const [grade] = useQueryState("grade", parseAsString);
 	const { t: tPage } = useTranslation("experimentPage");
 	const { t: tx } = useTranslation("experimentsUx");
+	const { t: tf } = useTranslation("fw11");
 	const [tabParam, setTab] = useQueryState("tab", parseAsString);
 	const status = useGetExperimentQuery(expId);
 	const live = status.data ? !TERMINAL_STATES.has(status.data.state) && status.data.state !== "created" : false;
@@ -121,7 +129,10 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	// Lead with a human title ("codex on coding-core", "Readiness check for acme-safety"); the raw id stays small below.
 	const system = systemExperiment(st);
 	const title = humanExperimentName({ ...st, arms }, (k, o) => String(tx(k as never, (o ?? {}) as never)));
-	const bannerKey = system?.kind === "agent" ? "header.systemBannerAgent" : system?.kind === "drift" ? "header.systemBannerDrift" : "header.systemBanner";
+	// The evaluation that made this experiment (GET /experiments/{id} carries it once the server sends it).
+	const evaluationId = st.evaluation_id || undefined;
+	const bannerKey =
+		system?.kind === "agent" ? "header.systemBannerAgent" : system?.kind === "drift" ? "header.systemBannerDrift" : "header.systemBanner";
 
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="experiment-screen" data-exp-id={expId}>
@@ -183,18 +194,49 @@ export default function ExperimentView({ expId }: { expId: string }) {
 				</p>
 			)}
 
+			{evaluationId && arms.length === 1 && (
+				<p
+					className="bg-muted/60 text-foreground flex flex-wrap items-start gap-2 rounded-lg border px-4 py-3 text-sm"
+					role="note"
+					data-testid="experiment-evaluation-note"
+				>
+					<Layers className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					<span className="min-w-0 flex-1">{tf("page.evaluationNote")}</span>
+					<Link
+						to="/evaluations/$evalId"
+						params={{ evalId: evaluationId }}
+						className="text-primary font-medium hover:underline"
+						data-testid="experiment-evaluation-link"
+					>
+						{tf("page.openEvaluation")}
+					</Link>
+				</p>
+			)}
+
 			{live && <LiveProgress status={st} />}
 
 			{!notStarted && <RunControlsPanel expId={expId} state={st.state} />}
 
-			<RouteTabs tabs={tabs} defaultTab={defaultExperimentTab(arms.length)} label={t("experiments.page.tabsLabel")} testId="experiment-tabs">
+			<RouteTabs
+				tabs={tabs}
+				defaultTab={defaultExperimentTab(arms.length)}
+				label={t("experiments.page.tabsLabel")}
+				testId="experiment-tabs"
+			>
 				{(active) =>
 					active === ANALYSIS_TAB_ID ? (
 						<AnalysisTab expId={expId} />
 					) : notStarted && active === "verdict" ? (
 						<EmptyState icon={Hourglass} message={t("experiments.page.notStarted")} testId="experiment-not-started" />
 					) : (
-						<ExperimentTab tab={active as ExperimentTabId} expId={expId} arms={arms} suite={st.suite} suiteVersion={st.suite_version} />
+						<ExperimentTab
+							tab={active as ExperimentTabId}
+							expId={expId}
+							arms={arms}
+							suite={st.suite}
+							suiteVersion={st.suite_version}
+							evaluationId={evaluationId}
+						/>
 					)
 				}
 			</RouteTabs>
@@ -233,18 +275,32 @@ function SuiteGlyph({ suite }: { suite?: string }) {
 	);
 }
 
-function ExperimentTab({ tab, expId, arms, suite, suiteVersion }: { tab: ExperimentTabId; expId: string; arms: readonly string[]; suite?: string; suiteVersion?: string }) {
+function ExperimentTab({
+	tab,
+	expId,
+	arms,
+	suite,
+	suiteVersion,
+	evaluationId,
+}: {
+	tab: ExperimentTabId;
+	expId: string;
+	arms: readonly string[];
+	suite?: string;
+	suiteVersion?: string;
+	evaluationId?: string;
+}) {
 	switch (tab) {
 		case "verdict":
-			return <VerdictTab expId={expId} />;
+			return <VerdictTab expId={expId} evaluationId={evaluationId} />;
 		case "runs":
 			return <RunList expId={expId} testId="experiment-runs" />;
 		case "matrix":
 			return <MatrixTab expId={expId} />;
 		case "cost":
-			return <CostTab expId={expId} />;
+			return <CostTab expId={expId} arms={arms} />;
 		case "migration":
-			return <MigrationTab expId={expId} arms={arms} />;
+			return <MigrationTab expId={expId} arms={arms} evaluationId={evaluationId} />;
 		case "adaptive":
 			return <ExperimentTrialsPanel expId={expId} />;
 		case "scorecards":

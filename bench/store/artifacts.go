@@ -384,9 +384,16 @@ func validateRunIDs(r *schemas.Run) error {
 	return validateID("run_id", r.RunID)
 }
 
+// ValidRegradeID reports whether the store accepts id as a regrade id (the
+// ^[a-z0-9_]+$ rule of every store id), so a regrade job can refuse a name
+// before it starts instead of failing when it writes the result.
+func ValidRegradeID(id string) bool {
+	return len(id) > 0 && len(id) <= maxIDLen && idPattern.MatchString(id)
+}
+
 // validateID keeps every path component built from an id inside the store.
 func validateID(kind, id string) error {
-	if len(id) == 0 || len(id) > maxIDLen || !idPattern.MatchString(id) {
+	if !ValidRegradeID(id) {
 		return fmt.Errorf("invalid %s %q: want ^[a-z0-9_]+$", kind, id)
 	}
 	return nil

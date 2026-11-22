@@ -15,6 +15,7 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,6 +40,23 @@ type FailurePatterns struct {
 	Agent      string                `json:"agent,omitempty"`
 	Evaluation string                `json:"evaluation,omitempty"`
 	Groups     []FailurePatternGroup `json:"groups"`
+	// Versions and Benchmarks (agent read) are the saved versions and the
+	// benchmarks the agent ran, whatever the version and benchmark filters,
+	// for the page's filter choices. Practice benchmarks are listed only
+	// with include_practice.
+	Versions   []int    `json:"versions,omitempty"`
+	Benchmarks []string `json:"benchmarks,omitempty"`
+}
+
+// AgentFailureFilter narrows GET /agents/{id}/failure-patterns: Version
+// (0: every version) keeps one saved version, Benchmark ("": every
+// benchmark) one suite id, and IncludePractice keeps the runs of practice
+// benchmarks (PracticeBenchmark: the made-up Acme examples and the
+// coding-core starter), which are left out by default.
+type AgentFailureFilter struct {
+	Version         int
+	Benchmark       string
+	IncludePractice bool
 }
 
 // FailurePatternGroup is one agent version (agent read) or one evaluation
@@ -127,7 +145,36 @@ func (h *failurePatternsHandler) getAgent(ctx *fasthttp.RequestCtx) {
 		sendUnavailable(ctx, h.env.Mode, "run index")
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, BuildAgentFailurePatterns(index, agent, newVersionIndex(h.root(), suite.LibraryDir()), h.catalog()))
+	filter, ok := agentFailureFilter(ctx, h.env.Mode)
+	if !ok {
+		return
+	}
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, BuildAgentFailurePatterns(index, agent, newVersionIndex(h.root(), suite.LibraryDir()), h.catalog(), filter))
+}
+
+// agentFailureFilter reads version, benchmark and include_practice; it
+// answers 400 and reports false on a bad value.
+func agentFailureFilter(ctx *fasthttp.RequestCtx, mode schemas.Mode) (AgentFailureFilter, bool) {
+	args := ctx.QueryArgs()
+	var f AgentFailureFilter
+	if v := strings.TrimSpace(string(args.Peek("version"))); v != "" {
+		n, err := strconv.Atoi(strings.TrimPrefix(v, "v"))
+		if err != nil || n < 1 {
+			lib.SendError(ctx, mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "version must be a saved version number such as 1")
+			return f, false
+		}
+		f.Version = n
+	}
+	f.Benchmark = strings.TrimSpace(string(args.Peek("benchmark")))
+	if v := strings.TrimSpace(string(args.Peek("include_practice"))); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			lib.SendError(ctx, mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "include_practice must be true or false")
+			return f, false
+		}
+		f.IncludePractice = b
+	}
+	return f, true
 }
 
 // getEvaluation handles GET /api/bench/evaluations/{id}/failure-patterns:
@@ -268,17 +315,40 @@ func triageOf(index ReadIndex, m *schemas.Manifest, catalog *schemas.Catalog) (*
 
 // BuildAgentFailurePatterns folds every experiment arm that ran agent into
 // one group per version (or per config hash when the config is not a saved
-// version). Groups are ordered newest run first.
-func BuildAgentFailurePatterns(index ReadIndex, agent string, versions *versionIndex, catalog *schemas.Catalog) *FailurePatterns {
+// version), keeping the arms filter lets through. An arm's version is the
+// one its evaluation recorded, else the saved version whose agent hash
+// matches. Groups are ordered newest run first.
+func BuildAgentFailurePatterns(index ReadIndex, agent string, versions *versionIndex, catalog *schemas.Catalog, filter AgentFailureFilter) *FailurePatterns {
 	out := &FailurePatterns{Agent: agent, Groups: []FailurePatternGroup{}}
 	accs := map[string]*failureAcc{}
+	versionSeen, benchSeen := map[int]bool{}, map[string]bool{}
 	seen := 0
 	for _, m := range newestManifests(index) {
+		bench := manifestBenchmark(index, m)
+		if !filter.IncludePractice && PracticeBenchmark(bench) {
+			continue
+		}
 		var arms []string
+		armVersion := map[string]int{}
 		for id, a := range m.Arms {
-			if id != "compat" && a.Config.ID == agent {
-				arms = append(arms, id)
+			if id == "compat" || a.Config.ID != agent {
+				continue
 			}
+			v, ok := versions.fromEvaluation(m, id)
+			if !ok {
+				v = versions.lookup(agent, armAgentHash(a.Config)) // versions match by agent hash
+			}
+			if v > 0 {
+				versionSeen[v] = true
+			}
+			if bench != "" {
+				benchSeen[bench] = true
+			}
+			if (filter.Version != 0 && v != filter.Version) || (filter.Benchmark != "" && bench != filter.Benchmark) {
+				continue
+			}
+			arms = append(arms, id)
+			armVersion[id] = v
 		}
 		if len(arms) == 0 {
 			continue
@@ -293,7 +363,7 @@ func BuildAgentFailurePatterns(index ReadIndex, agent string, versions *versionI
 		}
 		for _, arm := range arms {
 			hash := m.Arms[arm].ConfigHash
-			v := versions.lookup(agent, armAgentHash(m.Arms[arm].Config)) // versions match by agent hash
+			v := armVersion[arm]
 			key, label := fmt.Sprintf("v%d", v), fmt.Sprintf("v%d", v)
 			if v == 0 {
 				short := strings.TrimPrefix(hash, "sha256:")
@@ -318,7 +388,31 @@ func BuildAgentFailurePatterns(index ReadIndex, agent string, versions *versionI
 	slices.SortFunc(out.Groups, func(x, y FailurePatternGroup) int {
 		return cmp.Or(y.LastAt.Compare(x.LastAt), cmp.Compare(y.Version, x.Version), cmp.Compare(x.Key, y.Key))
 	})
+	for v := range versionSeen {
+		out.Versions = append(out.Versions, v)
+	}
+	slices.Sort(out.Versions)
+	for b := range benchSeen {
+		out.Benchmarks = append(out.Benchmarks, b)
+	}
+	slices.Sort(out.Benchmarks)
 	return out
+}
+
+// manifestBenchmark is the suite id (without its version) an experiment
+// ran: the manifest's, else its first slot's, else its first run's.
+func manifestBenchmark(index ReadIndex, m *schemas.Manifest) string {
+	id := m.SuiteID
+	if id == "" && len(m.Slots) > 0 {
+		id = m.Slots[0].Suite
+	}
+	if id == "" {
+		if runs := index.Runs(m.ExpID); len(runs) > 0 {
+			id = runs[0].Slot.Suite
+		}
+	}
+	id, _, _ = strings.Cut(id, "@")
+	return id
 }
 
 // BuildEvaluationFailurePatterns folds an evaluation's child experiments

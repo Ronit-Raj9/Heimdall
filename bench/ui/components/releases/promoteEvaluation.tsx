@@ -1,4 +1,3 @@
-import { RoleNote } from "@/components/platform/accessNotes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,10 +13,11 @@ import {
 import type { EvaluationGateResult, GateCheck } from "@/lib/store/apis/evaluationsApi";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, CalendarClock, CheckCircle2, Rocket, ShieldAlert, ShieldQuestion } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, Lock, Rocket, ShieldAlert, ShieldQuestion } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { DatasetChange, ReleaseEvidence, versionName } from "./releaseEvidence";
+import "@/app/experiments_/$expId/views/fw11I18n";
 
 /** The gate's pass or fail as a badge with its summary and each check. Shown on the report card. */
 export function GateResultCard({ gate, testId = "evaluation-gate" }: { gate: EvaluationGateResult; testId?: string }) {
@@ -28,14 +28,19 @@ export function GateResultCard({ gate, testId = "evaluation-gate" }: { gate: Eva
 	return (
 		<section className="bg-card flex flex-col gap-3 rounded-xl border p-5" data-testid={testId} data-state={gate.state}>
 			<div className="flex flex-wrap items-center gap-2">
-				<Icon className={cn("size-4", pass ? "text-chart-success-ink" : fail ? "text-chart-error-ink" : "text-chart-warning-ink")} aria-hidden="true" />
+				<Icon
+					className={cn("size-4", pass ? "text-chart-success-ink" : fail ? "text-chart-error-ink" : "text-chart-warning-ink")}
+					aria-hidden="true"
+				/>
 				<h2 className="text-sm font-semibold">{t("promote.gateTitle")}</h2>
 				<Badge variant={pass ? "success" : fail ? "destructive" : "warning"} data-testid={`${testId}-state`}>
 					{t(`promote.gate.${gate.state}` as never, { defaultValue: gate.state })}
 				</Badge>
 				{gate.baseline && (
 					<span className="text-muted-foreground text-xs">
-						{t(gate.baseline.live ? "promote.comparedLive" : "promote.compared", { name: versionName(gate.baseline.agent, gate.baseline.version) })}
+						{t(gate.baseline.live ? "promote.comparedLive" : "promote.compared", {
+							name: versionName(gate.baseline.agent, gate.baseline.version),
+						})}
 					</span>
 				)}
 			</div>
@@ -109,6 +114,7 @@ export function previewTitle(p: EvaluationReleasePreview, t: (k: string, o?: Rec
  */
 export function PromoteEvaluation({ evaluationId }: { evaluationId: string }) {
 	const { t } = useTranslation("u14");
+	const { t: tf } = useTranslation("fw11");
 	const session = useSession();
 	const preview = useGetEvaluationReleasePreviewQuery(evaluationId);
 	const [release, state] = useReleaseEvaluationMutation();
@@ -122,7 +128,8 @@ export function PromoteEvaluation({ evaluationId }: { evaluationId: string }) {
 	const title = p.agent ? previewTitle(p, t as never) : t("promote.title");
 	const blocked = p.blocked.length > 0;
 	const canWrite = canUse(session, "member");
-	const enabled = !p.problem && (!blocked || (override && reason.trim() !== "")) && !state.isLoading && (approver.trim() !== "" || session.signedIn);
+	const enabled =
+		!p.problem && (!blocked || (override && reason.trim() !== "")) && !state.isLoading && (approver.trim() !== "" || session.signedIn);
 	return (
 		<section className="bg-card flex flex-col gap-4 rounded-xl border p-5" data-testid="evaluation-promote">
 			<div className="flex flex-wrap items-start justify-between gap-3">
@@ -155,7 +162,10 @@ export function PromoteEvaluation({ evaluationId }: { evaluationId: string }) {
 				</p>
 			)}
 			{!p.problem && blocked && (
-				<div className="border-destructive/40 bg-destructive/5 flex flex-col gap-1 rounded-md border px-3 py-2 text-sm" data-testid="evaluation-promote-blocked">
+				<div
+					className="border-destructive/40 bg-destructive/5 flex flex-col gap-1 rounded-md border px-3 py-2 text-sm"
+					data-testid="evaluation-promote-blocked"
+				>
 					{p.blocked.map((b) => (
 						<p key={b} className="flex items-start gap-2">
 							<AlertTriangle className="text-chart-error-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -164,7 +174,12 @@ export function PromoteEvaluation({ evaluationId }: { evaluationId: string }) {
 					))}
 				</div>
 			)}
-			{!canWrite && session.signedIn && <RoleNote min="member" testId="evaluation-promote-role" />}
+			{!canWrite && !state.data && (
+				<p className="text-muted-foreground flex items-center gap-1.5 text-xs" data-testid="evaluation-promote-why">
+					<Lock className="size-3 shrink-0" aria-hidden="true" />
+					{tf("promote.membersOnly")}
+				</p>
+			)}
 			{open && !state.data && canWrite && (
 				<form
 					className="flex flex-col gap-3 border-t pt-4"
@@ -222,7 +237,9 @@ export function PromoteEvaluation({ evaluationId }: { evaluationId: string }) {
 						<Button type="submit" disabled={!enabled} isLoading={state.isLoading} dataTestId="evaluation-promote-submit">
 							{t("promote.submit", { name: versionName(p.agent, p.version) })}
 						</Button>
-						<span className="text-muted-foreground text-xs">{t("promote.covers", { count: p.children.filter((c) => c.included).length })}</span>
+						<span className="text-muted-foreground text-xs">
+							{t("promote.covers", { count: p.children.filter((c) => c.included).length })}
+						</span>
 					</div>
 					{state.isError && (
 						<p role="alert" className="text-chart-error-ink text-sm break-words" data-testid="evaluation-promote-error">
@@ -266,7 +283,14 @@ export function RepeatEvaluation({ evaluationId }: { evaluationId: string }) {
 			) : (
 				<>
 					{(["nightly", "weekly"] as const).map((c) => (
-						<Button key={c} size="sm" variant="outline" disabled={state.isLoading} onClick={() => void go(c)} data-testid={`evaluation-repeat-${c}`}>
+						<Button
+							key={c}
+							size="sm"
+							variant="outline"
+							disabled={state.isLoading}
+							onClick={() => void go(c)}
+							data-testid={`evaluation-repeat-${c}`}
+						>
 							<CalendarClock className="size-4" aria-hidden="true" />
 							{t(`promote.repeat.${c}` as never)}
 						</Button>

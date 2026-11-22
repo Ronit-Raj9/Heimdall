@@ -15,6 +15,7 @@ import (
 	"github.com/maximhq/bifrost/bench/keystore"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/reportcard"
+	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
 )
 
@@ -120,6 +121,68 @@ func TestAgentLeaderboardNoVersions(t *testing.T) {
 	if len(b.Rows) != 2 || b.Rows[0].Version != 0 || b.Rows[0].ConfigHash != "sha256:bbb" || b.Rows[0].AgentHash == "" {
 		t.Errorf("rows = %+v", b.Rows)
 	}
+}
+
+// writeTestEvaluation stores ev under root the way the evaluation store does.
+func writeTestEvaluation(t *testing.T, root string, ev schemas.Evaluation) {
+	t.Helper()
+	dir := filepath.Join(root, filepath.FromSlash(ReportCardEvaluationsDir))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(ev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ev.ID+".json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestLeaderboardVersionFromEvaluation (J4.version): an experiment an
+// evaluation created takes its version from the evaluation record, even when
+// no saved version's agent hash matches the planned arm config. A score
+// evaluation's added variant arm takes the single arm's version.
+func TestLeaderboardVersionFromEvaluation(t *testing.T) {
+	t.Run("versions", func(t *testing.T) {
+		idx := agentBoardIndex()
+		m := idx.manifests[testExp]
+		m.Experiment.EvaluationID = "ev_versions"
+		root := t.TempDir()
+		writeTestEvaluation(t, root, schemas.Evaluation{ID: "ev_versions", Spec: schemas.EvaluationSpec{Mode: "versions", Arms: []schemas.EvaluationArm{
+			{Label: "baseline", Agent: "codex", Version: 1, Model: "gpt-5.4-mini"},
+			{Label: "notes", Agent: "codex@v3", Model: "gpt-5.4-mini"},
+		}}})
+		_, b := getAgentBoard(t, idx, root, "?capability=coding")
+		got := map[int]bool{}
+		for _, r := range b.Rows {
+			got[r.Version] = true
+		}
+		if len(b.Rows) != 2 || !got[1] || !got[3] {
+			t.Errorf("rows = %+v, want codex v1 and v3", b.Rows)
+		}
+	})
+	t.Run("score variant arm", func(t *testing.T) {
+		idx := agentBoardIndex()
+		m := idx.manifests[testExp]
+		m.Experiment.EvaluationID = "ev_score"
+		root := t.TempDir()
+		writeTestEvaluation(t, root, schemas.Evaluation{ID: "ev_score", Spec: schemas.EvaluationSpec{Mode: "score", Arms: []schemas.EvaluationArm{
+			{Label: "codex", Agent: "codex", Version: 2, Model: "gpt-5.4-mini", LatestAtLaunch: true},
+		}}})
+		_, b := getAgentBoard(t, idx, root, "?capability=coding")
+		if len(b.Rows) != 1 || b.Rows[0].Version != 2 {
+			t.Errorf("rows = %+v, want one codex v2 row", b.Rows)
+		}
+	})
+	t.Run("missing evaluation falls back to the hash", func(t *testing.T) {
+		idx := agentBoardIndex()
+		idx.manifests[testExp].Experiment.EvaluationID = "ev_gone"
+		_, b := getAgentBoard(t, idx, t.TempDir(), "?capability=coding")
+		if len(b.Rows) != 2 || b.Rows[0].Version != 0 {
+			t.Errorf("rows = %+v, want two unsaved rows", b.Rows)
+		}
+	})
 }
 
 // TestAgentLeaderboardOnlyRealRuns: practice benchmarks (Acme examples,

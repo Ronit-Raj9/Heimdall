@@ -5,7 +5,7 @@ import { LOCAL_SESSION, REGRADE_JOB, demoSession, hostedSession } from "@/lib/te
 import { mutation, render } from "@/lib/testing/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ExperimentRunActions, RegradeAction, regradeIdOf } from "./experimentActions";
-import { EMPTY_REGRADE_FORM, regradeFormProblem, regradeRequest } from "./regradeDialog";
+import { EMPTY_REGRADE_FORM, RegradeDialog, regradeFormProblem, regradeRequest, suggestRegradeId } from "./regradeDialog";
 
 const api = vi.hoisted(() => ({
 	regrade: {} as Record<string, unknown>,
@@ -15,7 +15,9 @@ const api = vi.hoisted(() => ({
 	health: undefined as unknown,
 	controls: undefined as unknown,
 }));
-vi.mock("@/components/jobs/jobLogPanel", () => ({ JobLogPanel: ({ jobId }: { jobId: string }) => <div data-testid="job-log-panel">{jobId}</div> }));
+vi.mock("@/components/jobs/jobLogPanel", () => ({
+	JobLogPanel: ({ jobId }: { jobId: string }) => <div data-testid="job-log-panel">{jobId}</div>,
+}));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/platformApi")>()),
@@ -139,5 +141,24 @@ describe("regrade form", () => {
 		expect(regradeFormProblem({ ...EMPTY_REGRADE_FORM, lockChoice: "frozen" })).toBe("needLock");
 		expect(regradeFormProblem({ ...EMPTY_REGRADE_FORM, lockChoice: "frozen", suiteLock: "../x.lock" })).toBe("badLock");
 		expect(regradeFormProblem({ ...EMPTY_REGRADE_FORM, note: "x".repeat(2001) })).toBe("longNote");
+	});
+});
+
+describe("re-score name", () => {
+	it("refuses a name the store refuses and suggests the converted one", () => {
+		expect(regradeFormProblem({ ...EMPTY_REGRADE_FORM, id: "zz-test-rescore" })).toBe("badId");
+		expect(regradeFormProblem({ ...EMPTY_REGRADE_FORM, id: "Rg.V2" })).toBe("badId");
+		expect(regradeFormProblem({ ...EMPTY_REGRADE_FORM, id: "zz_test_rescore" })).toBeNull();
+		expect(suggestRegradeId("zz-test-rescore")).toBe("zz_test_rescore");
+		expect(suggestRegradeId(" Rg.V2 ")).toBe("rg_v2");
+		expect(suggestRegradeId("bad name!")).toBeNull();
+	});
+	it("shows the rule under the field and offers the fix", () => {
+		const html = render(
+			<RegradeDialog expId="e_1" initial={{ ...EMPTY_REGRADE_FORM, id: "zz-test-rescore" }} onSubmit={() => {}} onClose={() => {}} />,
+		);
+		expect(html).toContain("re-score name zz-test-rescore: use lower-case letters, digits and _ only, for example zz_test_rescore");
+		expect(html).toContain('data-testid="regrade-id-fix"');
+		expect(html).toContain("Use zz_test_rescore");
 	});
 });

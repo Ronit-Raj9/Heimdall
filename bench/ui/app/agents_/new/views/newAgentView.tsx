@@ -3,9 +3,15 @@ import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState, PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import i18n from "@/lib/i18n";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { useCreateAgentFromTemplateMutation, useGetAgentTemplatesQuery, usePutAgentConfigMutation, useTestEndpointMutation } from "@/lib/store/apis/agentBuilderApi";
+import {
+	useCreateAgentFromTemplateMutation,
+	useGetAgentTemplatesQuery,
+	usePutAgentConfigMutation,
+	useTestEndpointMutation,
+} from "@/lib/store/apis/agentBuilderApi";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import type { AgentTemplate, TemplateCategory } from "@/lib/types/agentBuilder";
 import { cn } from "@/lib/utils";
@@ -41,9 +47,23 @@ const CATEGORY_ICON: Record<TemplateCategory, LucideIcon> = {
 };
 const ID_RE = /^[a-z0-9][a-z0-9._-]{0,62}$/;
 
-/** A free default name for template t: "my-<template>". */
-export function defaultAgentName(t: AgentTemplate): string {
-	return `my-${t.id}`;
+/**
+ * The default name for template t: the first of "my-<template>", "my-<template>-2",
+ * "my-<template>-3", ... that no existing agent uses.
+ */
+export function defaultAgentName(t: AgentTemplate, taken: ReadonlySet<string> = new Set()): string {
+	const base = `my-${t.id}`;
+	if (!taken.has(base)) return base;
+	for (let n = 2; ; n++) {
+		if (!taken.has(`${base}-${n}`)) return `${base}-${n}`;
+	}
+}
+
+/** Why name cannot be used for a new agent, or "" when it can. */
+export function nameProblem(name: string, taken: ReadonlySet<string>): string {
+	if (!ID_RE.test(name)) return i18n.t("new.nameInvalid", { ns: "agentBuilder" });
+	if (taken.has(name)) return i18n.t("new.nameExists", { ns: "agentBuilder", name });
+	return "";
 }
 
 /**
@@ -64,7 +84,8 @@ export default function NewAgentView() {
 	const templates = useMemo(() => withPullTemplate(query.data?.templates ?? []), [query.data]);
 	const tpl = templates.find((x) => x.id === templateId) ?? null;
 
-	const [name, setName] = useState("");
+	// null: the name was not edited, so it follows the first free default.
+	const [typedName, setTypedName] = useState<string | null>(null);
 	const [model, setModel] = useState<ModelRef | null>(null);
 	const [notes, setNotes] = useState("");
 	const [params, setParams] = useState<Record<string, string>>({});
@@ -76,13 +97,18 @@ export default function NewAgentView() {
 	const isPull = tpl?.adapter === "pull";
 	const [pullOpts, setPullOpts] = useState<PullOptions>(DEFAULT_PULL_OPTIONS);
 	const [putConfig, putState] = usePutAgentConfigMutation();
-	const agents = useGetAgentsQuery(undefined, { skip: !isPull });
-	const nameTaken = isPull && !!agents.data?.agents.some((a) => a.id === name);
+	// Every template checks the name against the existing agents, so Create never overwrites one.
+	const agents = useGetAgentsQuery();
+	const takenIds = useMemo(() => new Set((agents.data?.agents ?? []).map((a) => a.id)), [agents.data]);
+	const name = typedName ?? (tpl ? defaultAgentName(tpl, takenIds) : "");
+	const setName = (v: string) => setTypedName(v);
+	const problem = nameProblem(name, takenIds);
+	const nameTaken = takenIds.has(name);
 
 	// Picking a template pre-fills the rest, so Create is the only other click.
 	useEffect(() => {
 		if (!tpl) return;
-		setName(defaultAgentName(tpl));
+		setTypedName(null);
 		setModel({ provider: (tpl.providers[0] ?? "openai") as ProviderId, model: tpl.default_model });
 		setParams(defaultParams(tpl));
 		setPullOpts(DEFAULT_PULL_OPTIONS);
@@ -92,7 +118,7 @@ export default function NewAgentView() {
 	}, [tpl]);
 
 	const nameOk = ID_RE.test(name);
-	const missingParam = tpl ? missingParams(tpl, params).length > 0 || nameTaken : true;
+	const missingParam = tpl ? missingParams(tpl, params).length > 0 : true;
 	const ownModel = tpl ? picksOwnModel(tpl, params) : false;
 	const body = tpl
 		? {
@@ -106,7 +132,7 @@ export default function NewAgentView() {
 
 	const onCreate = async () => {
 		if (!body) return;
-		const res = isPull ? await putConfig({ id: name, yaml: pullAgentYAML(name, pullOpts, notes) }) : await create(body);
+		const res = isPull ? await putConfig({ id: name, yaml: pullAgentYAML(name, pullOpts, notes), create_only: true }) : await create(body);
 		if ("data" in res && res.data) {
 			if (returnTo === "/evaluate") void navigate({ to: "/evaluate", search: { agent: res.data.id } as never });
 			else void navigate({ to: "/agents/$agentId", params: { agentId: res.data.id } });
@@ -130,7 +156,12 @@ export default function NewAgentView() {
 				title={t("new.title")}
 				subtitle={t("new.subtitle")}
 				actions={
-					<Link to="/agents/from-traces" title={tc("entryHint")} className="text-primary text-xs font-medium underline underline-offset-2" data-testid="agents-new-from-traces">
+					<Link
+						to="/agents/from-traces"
+						title={tc("entryHint")}
+						className="text-primary text-xs font-medium underline underline-offset-2"
+						data-testid="agents-new-from-traces"
+					>
 						{tc("entry")}
 					</Link>
 				}
@@ -198,7 +229,10 @@ export default function NewAgentView() {
 							);
 						})}
 					</div>
-					<div className="bg-card flex min-w-0 flex-col gap-5 rounded-xl border p-6 shadow-sm lg:sticky lg:top-4" data-testid="agents-new-form">
+					<div
+						className="bg-card flex min-w-0 flex-col gap-5 rounded-xl border p-6 shadow-sm lg:sticky lg:top-4"
+						data-testid="agents-new-form"
+					>
 						{tpl ? (
 							<div className="flex min-w-0 items-center gap-3">
 								<AgentAvatar name={tpl.name} />
@@ -234,7 +268,7 @@ export default function NewAgentView() {
 										data-testid="agent-name"
 									/>
 									<span className={cn("text-xs", nameOk && !nameTaken ? "text-muted-foreground" : "text-destructive")}>
-										{!nameOk ? t("new.nameInvalid") : nameTaken ? t("pull.form.nameTaken") : t("new.nameHelp")}
+										{problem || t("new.nameHelp")}
 									</span>
 								</label>
 								{ownModel ? (
@@ -261,7 +295,14 @@ export default function NewAgentView() {
 								{tpl.adapter === "remote_http" && <EndpointPreviewPanel body={body} />}
 								{testable(tpl) && canWrite && (
 									<div className="flex flex-col gap-2" data-testid="endpoint-test">
-										<Button type="button" variant="outline" className="w-fit" disabled={missingParam || testState.isLoading} onClick={onTest} data-testid="endpoint-test-button">
+										<Button
+											type="button"
+											variant="outline"
+											className="w-fit"
+											disabled={missingParam || testState.isLoading}
+											onClick={onTest}
+											data-testid="endpoint-test-button"
+										>
 											{t("new.test.button")}
 										</Button>
 										<span className="text-muted-foreground text-xs">{t("new.test.help")}</span>
@@ -284,26 +325,38 @@ export default function NewAgentView() {
 										{tu("gallery.more")}
 									</summary>
 									<div className="mt-3 flex flex-col gap-4">
-								<label className="flex flex-col gap-1 text-sm">
-									<span className="font-medium">{t("new.notes")}</span>
-									<textarea
-										className="border-input bg-card min-h-16 rounded-md border px-3 py-2 text-sm"
-										value={notes}
-										maxLength={4000}
-										placeholder={t("new.notesPlaceholder")}
-										onChange={(e) => setNotes(e.target.value)}
-									/>
-								</label>
-								{tpl.docs && <p className="text-muted-foreground text-xs">{t("new.docs", { docs: tpl.docs })}</p>}
+										<label className="flex flex-col gap-1 text-sm">
+											<span className="font-medium">{t("new.notes")}</span>
+											<textarea
+												className="border-input bg-card min-h-16 rounded-md border px-3 py-2 text-sm"
+												value={notes}
+												maxLength={4000}
+												placeholder={t("new.notesPlaceholder")}
+												onChange={(e) => setNotes(e.target.value)}
+											/>
+										</label>
+										{tpl.docs && <p className="text-muted-foreground text-xs">{t("new.docs", { docs: tpl.docs })}</p>}
 										{canWrite && (
-											<Button type="button" variant="ghost" size="sm" className="w-fit" disabled={!nameOk || missingParam} onClick={() => void onPreview()}>
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												className="w-fit"
+												disabled={!nameOk || missingParam}
+												onClick={() => void onPreview()}
+											>
 												{preview !== null ? t("new.hidePreview") : t("new.preview")}
 											</Button>
 										)}
 									</div>
 								</details>
 								{canWrite && (
-									<Button type="submit" className="w-full" disabled={!nameOk || missingParam || createState.isLoading || putState.isLoading} data-testid="agent-create">
+									<Button
+										type="submit"
+										className="w-full"
+										disabled={!nameOk || nameTaken || missingParam || createState.isLoading || putState.isLoading}
+										data-testid="agent-create"
+									>
 										{createState.isLoading || putState.isLoading ? t("new.creating") : t("new.create")}
 									</Button>
 								)}

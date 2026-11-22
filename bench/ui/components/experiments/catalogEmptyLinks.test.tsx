@@ -19,10 +19,11 @@ describe("create links", () => {
 		expect(html).toContain("Create your own");
 	});
 
-	it("experiments list leaves New experiment to the top bar", () => {
+	it("experiments list has New comparison for members only", () => {
 		const html = render(<ExperimentListView />, hostedSession("member"));
-		expect(html).not.toContain('data-testid="experiments-new"');
-		expect(html).not.toContain('href="/experiments/new"');
+		expect(html).toContain('data-testid="experiments-new"');
+		expect(html).toContain('href="/experiments/new"');
+		expect(render(<ExperimentListView />, hostedSession("viewer"))).not.toContain("experiments-new");
 		expect(render(<ExperimentListView />, demoSession())).not.toContain("experiments-new");
 	});
 

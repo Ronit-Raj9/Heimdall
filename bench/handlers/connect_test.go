@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/benchcatalog"
 	"github.com/maximhq/bifrost/bench/connect"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -225,6 +226,43 @@ func TestFirstLookPreset(t *testing.T) {
 		}
 		if err == nil {
 			t.Errorf("case %d: want an error", i)
+		}
+	}
+}
+
+// B8.task: the verify job and the first look pick a real benchmark over the
+// practice examples (acme-*, coding-core); practice is only the fallback,
+// and a hosted org never gets the hidden practice suite.
+func TestConnectFirstLookSkipsPractice(t *testing.T) {
+	old := evalCompat
+	evalCompat = func(a *schemas.AgentConfig, s *schemas.Suite) (bool, []schemas.Capability, string) {
+		return true, nil, ""
+	}
+	defer func() { evalCompat = old }()
+	fast := []*schemas.Task{{ID: "a", Timeouts: schemas.TaskTimeouts{AgentS: 10}}}
+	slow := []*schemas.Task{{ID: "b", Timeouts: schemas.TaskTimeouts{AgentS: 300}}}
+	suites := &fakeSuites{ids: []string{"acme-memory", "coding-core", "realqa"}, suites: map[string]*schemas.Suite{
+		"acme-memory": {ID: "acme-memory", TaskIDs: []string{"a"}, Tasks: fast},
+		"coding-core": {ID: "coding-core", TaskIDs: []string{"a"}, Tasks: fast},
+		"realqa":      {ID: "realqa", TaskIDs: []string{"b"}, Tasks: slow},
+	}}
+	h := &connectHandler{env: OrgEnv{Mode: schemas.Mode("live"), Services: Services{Suites: suites}}}
+	cfg := &schemas.AgentConfig{ID: "bot"}
+	p, err := h.pick(context.Background(), cfg)
+	if err != nil || p.Benchmark != "realqa" || p.Practice {
+		t.Fatalf("real benchmark first: %+v %v", p, err)
+	}
+	suites.ids = []string{"acme-memory", "coding-core"}
+	p, err = h.pick(context.Background(), cfg)
+	if err != nil || !p.Practice || (p.Benchmark != "acme-memory" && p.Benchmark != "coding-core") {
+		t.Fatalf("practice fallback: %+v %v", p, err)
+	}
+	t.Setenv(benchcatalog.DevEnv, "")
+	h.env.Services.Hosted = true
+	suites.ids = []string{"coding-core"}
+	for _, b := range h.benchmarkInfos(context.Background(), cfg) {
+		if b.ID == "coding-core" {
+			t.Fatalf("hosted org sees the hidden practice suite: %+v", b)
 		}
 	}
 }

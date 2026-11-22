@@ -1,0 +1,11 @@
+{
+	"deleteAgent": {
+		"menu": "Delete agent",
+		"title": "Delete agent {{id}}?",
+		"body": "Its settings file is removed. Past runs, results and saved versions stay.",
+		"keep": "Keep agent",
+		"confirm": "Delete agent",
+		"deleting": "Deleting...",
+		"failed": "Could not delete the agent: {{message}}"
+	}
+}

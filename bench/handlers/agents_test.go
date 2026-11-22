@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
@@ -172,5 +173,38 @@ func TestAgentsHiddenAgents(t *testing.T) {
 	}
 	if got := strings.Join(paths, ","); got != "agents/bad.yaml,agents/codex.yaml,agents/noop.yaml" {
 		t.Fatalf("agents %s", got)
+	}
+}
+
+// TestAgentSummaryCountsAllRuns: an aborted run (never sealed) counts in
+// runs_total, not in sealed_runs, and last_run_at is the latest start of any
+// run of the config.
+func TestAgentSummaryCountsAllRuns(t *testing.T) {
+	idx := testIndex()
+	for i := range idx.runs {
+		idx.runs[i].Run.Agent.ConfigID = "custom"
+		idx.runs[i].Run.Timing.Started = time.Date(2026, 11, 20, 10, i, 0, 0, time.UTC)
+	}
+	idx.runs[0].Sealed = false
+	idx.runs[0].Run.Outcome = ""
+	idx.runs[0].Run.Timing.Started = time.Date(2026, 11, 21, 9, 0, 0, 0, time.UTC)
+	resp := newSuitesClient(t, nil, fakeAgents{}, idx).do(t, "GET", APIPrefix+"/agents", nil, nil)
+	if resp.StatusCode() != 200 {
+		t.Fatalf("status = %d: %s", resp.StatusCode(), resp.Body())
+	}
+	body := decodeBody(t, resp)
+	custom := agentByID(t, body, "agents/custom.yaml")
+	if custom["sealed_runs"] != float64(3) || custom["runs_total"] != float64(4) {
+		t.Errorf("custom sealed_runs = %v, runs_total = %v, want 3 and 4", custom["sealed_runs"], custom["runs_total"])
+	}
+	if custom["last_run_at"] != "2026-11-21T09:00:00Z" {
+		t.Errorf("custom last_run_at = %v", custom["last_run_at"])
+	}
+	codex := agentByID(t, body, "agents/codex.yaml")
+	if _, ok := codex["runs_total"]; ok {
+		t.Errorf("codex runs_total = %v, want omitted without runs", codex["runs_total"])
+	}
+	if _, ok := codex["last_run_at"]; ok {
+		t.Errorf("codex last_run_at = %v, want omitted without runs", codex["last_run_at"])
 	}
 }

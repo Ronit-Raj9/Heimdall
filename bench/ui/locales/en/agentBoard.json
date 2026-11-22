@@ -46,5 +46,21 @@
 	"notEnough": "not enough runs",
 	"notEnoughHint": "Not ranked: {{runs}} runs over {{tasks}} tasks; ranking needs {{minRuns}} runs over {{minTasks}} tasks",
 	"costNotKnown": "not known",
-	"costUnpriced": "{{count}} of {{runs}} runs unpriced"
+	"costUnpriced": "{{count}} of {{runs}} runs unpriced",
+	"why": {
+		"version": "Version",
+		"benchmark": "Benchmark",
+		"all": "All",
+		"includePractice": "Include practice runs",
+		"includePracticeHint": "Practice runs are the made-up example benchmarks. They are left out unless you tick this.",
+		"emptyFiltered": "No runs of {{agent}} match these filters.",
+		"clearFilters": "Clear filters"
+	},
+	"clusterOutcome": {
+		"fail": "Failed with no error recorded",
+		"timeout": "Timed out",
+		"crash": "Crashed",
+		"budget": "Ran out of budget",
+		"refusal": "Refused the task"
+	}
 }
