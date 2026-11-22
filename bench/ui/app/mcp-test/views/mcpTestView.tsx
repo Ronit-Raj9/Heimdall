@@ -1,3 +1,4 @@
+import "@/components/platform/fw23I18n";
 import { PageHeader } from "@/components/shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import { Section } from "@/components/ui/section";
 import { StatCard, StatGrid } from "@/components/ui/statCard";
 import { apiErrorMessage } from "@/lib/store/apis/integrationsApi";
 import { useDraftMcpBenchmarkMutation, useInspectMcpServerMutation } from "@/lib/store/apis/mcpTestApi";
+import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useListSecretsQuery } from "@/lib/store/apis/secretsApi";
 import "@/lib/types/mcptestI18n";
 import {
@@ -17,6 +19,7 @@ import {
 	type McpToolQuality,
 } from "@/lib/types/mcptest";
 import { cn } from "@/lib/utils";
+import { skipToken } from "@reduxjs/toolkit/query/react";
 import { Link } from "@tanstack/react-router";
 import { Check, Minus, Plug, X } from "lucide-react";
 import { useState } from "react";
@@ -299,8 +302,12 @@ function DraftForm({ report, request }: { report: McpReport; request: McpInspect
 /** /mcp-test: inspect the org's MCP server, then draft a benchmark of it. */
 export function McpTestView() {
 	const { t } = useTranslation("mcptest");
+	const { t: tf } = useTranslation("fw23");
 	const [form, setForm] = useState<McpForm>(EMPTY_FORM);
-	const secrets = useListSecretsQuery();
+	const session = useSession();
+	// Secret names are for members and above (J9.secrets); a viewer types a name instead.
+	const listSecrets = canUse(session, "member");
+	const secrets = useListSecretsQuery(listSecrets ? undefined : skipToken);
 	const [inspect, st] = useInspectMcpServerMutation();
 	const [report, setReport] = useState<McpReport | null>(null);
 	const [sent, setSent] = useState<McpInspectRequest | null>(null);
@@ -330,21 +337,32 @@ export function McpTestView() {
 				</label>
 				<div className="grid gap-3 sm:grid-cols-3">
 					<label className="flex flex-col gap-1.5 text-sm">
-						<span className="font-medium">{t("form.secret")}</span>
-						<select
-							className="border-input bg-background h-9 rounded-lg border px-2 text-sm"
-							value={form.secret}
-							onChange={(e) => set({ secret: e.target.value })}
-							data-testid="mcp-secret"
-						>
-							<option value="">{t("form.secretNone")}</option>
-							{(secrets.data?.secrets ?? []).map((s) => (
-								<option key={s.id} value={s.name}>
-									{s.name}
-								</option>
-							))}
-						</select>
-						<span className="text-muted-foreground text-xs">{t("form.secretHint")}</span>
+						<span className="font-medium">{listSecrets ? t("form.secret") : tf("mcp.secretName")}</span>
+						{listSecrets ? (
+							<select
+								className="border-input bg-background h-9 rounded-lg border px-2 text-sm"
+								value={form.secret}
+								onChange={(e) => set({ secret: e.target.value })}
+								data-testid="mcp-secret"
+							>
+								<option value="">{t("form.secretNone")}</option>
+								{(secrets.data?.secrets ?? []).map((s) => (
+									<option key={s.id} value={s.name}>
+										{s.name}
+									</option>
+								))}
+							</select>
+						) : (
+							<Input
+								value={form.secret}
+								onChange={(e) => set({ secret: e.target.value.trim() })}
+								placeholder={tf("mcp.secretNamePlaceholder")}
+								aria-label={tf("mcp.secretName")}
+								autoComplete="off"
+								data-testid="mcp-secret-name"
+							/>
+						)}
+						<span className="text-muted-foreground text-xs">{listSecrets ? t("form.secretHint") : tf("mcp.secretNameHint")}</span>
 					</label>
 					{form.secret && (
 						<label className="flex flex-col gap-1.5 text-sm">
