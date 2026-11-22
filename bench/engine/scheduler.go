@@ -1471,6 +1471,18 @@ func (q *slotQueue) drop() int {
 	return n
 }
 
+// takeAll removes every pending slot and returns them in queue order. They
+// were never out, so remote is unchanged; the caller ends each one (for
+// example with slotError).
+func (q *slotQueue) takeAll() []*schemas.Slot {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	out := q.pending
+	q.pending = nil
+	q.notifyLocked()
+	return out
+}
+
 // finish ends a slot that was out and needs nothing more from this queue.
 func (q *slotQueue) finish() {
 	q.mu.Lock()

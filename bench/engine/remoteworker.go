@@ -124,14 +124,17 @@ type Worker struct {
 	exps       map[string]*workerExp
 	spend      *runnerSpend // Runners area: nil without a spend cap
 	capLogged  atomic.Bool
+	now        func() time.Time // the clock of the refusal cache (remoterefuse.go)
 }
 
 // workerExp is an experiment the worker checked: admitted with its manifest
-// and suite, or refused for good with the reason.
+// and suite, or refused with the reason. A refusal is reused for refuseRetry
+// only, then the experiment is checked again (X3, remoterefuse.go).
 type workerExp struct {
-	m       *schemas.Manifest
-	suite   *schemas.Suite
-	refused string
+	m         *schemas.Manifest
+	suite     *schemas.Suite
+	refused   string
+	refusedAt time.Time
 }
 
 // NewWorker returns a worker. reg must hold the worker's own store, where its
@@ -187,7 +190,7 @@ func NewWorker(reg *schemas.Registry, runner SlotRunner, replan Replanner, opts 
 	if err != nil {
 		return nil, fmt.Errorf("worker: %w", err)
 	}
-	return &Worker{reg: reg, runner: runner, replan: replan, opts: opts, logger: opts.Logger, exps: map[string]*workerExp{}, spend: spend}, nil
+	return &Worker{reg: reg, runner: runner, replan: replan, opts: opts, logger: opts.Logger, exps: map[string]*workerExp{}, spend: spend, now: time.Now}, nil
 }
 
 // ID is the worker id it registers under.
@@ -472,8 +475,9 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 	return out
 }
 
-// admit checks a leased experiment once and caches the answer. It refuses
-// for good when the manifest does not hash to the lease's manifest hash, the
+// admit checks a leased experiment and caches the answer; a refusal is
+// cached for refuseRetry, then the project is synced and checked again (X3).
+// It refuses when the manifest does not hash to the lease's manifest hash, the
 // local suite lock or part versions differ, or the manifest recomputed by
 // planning the same experiment with the worker's own project differs (only
 // what a second plan cannot repeat is taken from the coordinator:
@@ -485,6 +489,9 @@ func (w *Worker) admit(ctx context.Context, lease *schemas.WorkerLease) (*worker
 	w.mu.Lock()
 	e, ok := w.exps[lease.ExpID]
 	w.mu.Unlock()
+	if ok && e.refused != "" && !w.refusalFresh(e) {
+		ok = false // X3: the cached refusal expired; sync and check again
+	}
 	if ok {
 		if e.refused != "" {
 			return nil, e.refused, true
@@ -502,7 +509,7 @@ func (w *Worker) admit(ctx context.Context, lease *schemas.WorkerLease) (*worker
 	var reason string
 	e.suite, reason = w.check(ctx, lease, &m)
 	if reason != "" {
-		e.refused = reason
+		e.refused, e.refusedAt = reason, w.now()
 	}
 	w.mu.Lock()
 	w.exps[lease.ExpID] = e
