@@ -93,7 +93,30 @@ export function ExperimentProgressCard({ status: given, capUsd, onNew }: Experim
 				</LiveStat>
 			</div>
 
-			{(live.slots.length > 0 || live.live) && (
+			{status.problem && (
+				<div
+					className="border-chart-warning/40 bg-chart-warning/10 text-chart-warning-ink flex flex-col gap-2 rounded-lg border p-3 text-sm"
+					role="status"
+					data-testid="experiment-progress-problem"
+				>
+					<p className="flex items-start gap-1.5">
+						<CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+						<span className="min-w-0 break-words">{t("progress.problem", { problem: status.problem })}</span>
+					</p>
+					{status.run_job_id && (
+						<Link
+							to="/jobs/$jobId"
+							params={{ jobId: status.run_job_id }}
+							className="text-primary w-fit text-xs font-medium underline-offset-2 hover:underline"
+							data-testid="experiment-progress-problem-log"
+						>
+							{t("progress.problemJobLog")}
+						</Link>
+					)}
+				</div>
+			)}
+
+			{(live.slots.length > 0 || (live.live && !status.problem)) && (
 				<div className="flex flex-col gap-2">
 					<h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{t("progress.slotsTitle")}</h3>
 					{live.slots.length > 0 ? (

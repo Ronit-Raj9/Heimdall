@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/agentversions"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -26,6 +27,10 @@ type StatusFacts struct {
 	// release (verdict.NotRequiredSlots). A slot named here with no run is
 	// left out of the progress: it is work the experiment will never do.
 	NotRequired map[string]bool
+	// Problem is why no run of the experiment could start, from its newest
+	// run job (RunProblemReporter), and RunJobID that job's id (N151).
+	Problem  string
+	RunJobID string
 }
 
 // BuildStatus derives an experiment's progress from its manifest and runs.
@@ -40,13 +45,20 @@ type StatusFacts struct {
 // launcher still holds it), running while the launcher is active or a run is
 // unsealed, cancelled when its run job was cancelled with slots left, created
 // before any run, and failed when the experiment stopped with slots left: a
-// budget stop, a crash or a restart. It is pure.
+// budget stop, a crash or a restart. With no runs, an ended run job and a run
+// problem (every worker refused it, no slot could start) it is failed, not
+// created (N151). It is pure.
 func BuildStatus(m *schemas.Manifest, runs []RunView, f StatusFacts) schemas.ExperimentStatus {
 	st := schemas.ExperimentStatus{
 		ExpID: m.ExpID, Name: m.Experiment.Name, ManifestHash: m.Hash, FrozenAt: m.CreatedAt,
 		SpentUSD: spentUSD(runs, f.Costs), AnalysisID: f.AnalysisID,
 		Suite: cmp.Or(m.SuiteID, m.Experiment.Suite), SuiteVersion: m.SuiteVersion, Arms: slices.Sorted(maps.Keys(m.Arms)), // UI regroup (U2)
 		EvaluationID: m.Experiment.EvaluationID,
+		MultiAgent:   multiAgent(m), Setups: armSetups(m), ArmsDiffer: armsDiffer(m),
+		Problem: f.Problem, RunJobID: f.RunJobID,
+	}
+	if d := m.Experiment.Debug; d != nil { // N29: debug runs are told apart in lists
+		st.Debug, st.DebugFromRun = d.Mode, d.FromRun
 	}
 	counted := countedRuns(runs)
 	unsealed := map[string]bool{}
@@ -88,12 +100,62 @@ func BuildStatus(m *schemas.Manifest, runs []RunView, f StatusFacts) schemas.Exp
 		st.State = schemas.ExperimentCancelled
 	case len(unsealed) > 0:
 		st.State = schemas.ExperimentRunning
+	case len(runs) == 0 && f.Problem != "": // N151: nothing could start, and the page says why
+		st.State = schemas.ExperimentFailed
 	case len(runs) == 0:
 		st.State = schemas.ExperimentCreatedState
 	default:
 		st.State = schemas.ExperimentFailed
 	}
 	return st
+}
+
+// multiAgent reports whether any arm runs a team or a multi-agent topology.
+func multiAgent(m *schemas.Manifest) bool {
+	for _, a := range m.Arms {
+		if len(a.Config.Team) > 0 || (a.Config.Topology != "" && a.Config.Topology != "single") {
+			return true
+		}
+	}
+	return false
+}
+
+// armSetups lists each arm's agent id, agent file and model, sorted by arm.
+func armSetups(m *schemas.Manifest) []schemas.ArmSetup {
+	var out []schemas.ArmSetup
+	for _, id := range slices.Sorted(maps.Keys(m.Arms)) {
+		a := m.Arms[id]
+		out = append(out, schemas.ArmSetup{Arm: id, Agent: a.Config.ID, AgentFile: cmp.Or(m.Experiment.Arms[id].Agent, m.Experiment.Base), Model: a.Config.Model})
+	}
+	return out
+}
+
+// armsDiffer says what differs between exactly two arms: "model" when both
+// run the same agent version (agentversions.AgentHash) on another model or
+// gateway provider, "none" when nothing differs (an A/A check), "agent"
+// otherwise. Any other arm count, or a config that cannot be hashed, is "".
+func armsDiffer(m *schemas.Manifest) string {
+	if len(m.Arms) != 2 {
+		return ""
+	}
+	ids := slices.Sorted(maps.Keys(m.Arms))
+	a, b := m.Arms[ids[0]].Config, m.Arms[ids[1]].Config
+	ha, err := agentversions.AgentHash(a)
+	if err != nil {
+		return ""
+	}
+	hb, err := agentversions.AgentHash(b)
+	if err != nil {
+		return ""
+	}
+	switch {
+	case ha != hb:
+		return "agent"
+	case a.Model != b.Model || a.Gateway.Provider != b.Gateway.Provider:
+		return "model"
+	default:
+		return "none"
+	}
 }
 
 // countedRuns picks each slot's counted run the way the store does: the

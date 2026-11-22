@@ -151,7 +151,7 @@ func (h *ExperimentsHandler) createExperiment(ctx *fasthttp.RequestCtx) {
 		if SendModelKeyRefusal(ctx, h.mode, err) { // X01: a missing model key links to Models & keys
 			return
 		}
-		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "plan experiment: "+err.Error())
+		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, PlainPlanError(err)) // N42: plain words, no transient id
 		return
 	}
 	work, cancel := workContext(ctx, readTimeout)
@@ -359,14 +359,41 @@ func BuildPlan(m *schemas.Manifest) schemas.ExperimentPlan {
 		return p
 	}
 	p.MDE = mde * 100
+	if p.MDE > underpoweredMDEpp { // N40: say when the design can only see a large change
+		w := fmt.Sprintf("With %d tasks this comparison can only detect a change of about %.1f points or more; smaller differences will read as cannot tell.", tasks, p.MDE)
+		if need := tasksToDetect(p.SD, alpha, tasks); need > 0 {
+			w += fmt.Sprintf(" About %d tasks are needed to detect 10 points.", need)
+		}
+		p.Warnings = append(p.Warnings, w)
+	}
 	return p
 }
 
+// underpoweredMDEpp is the minimal detectable effect, in points, above which
+// a plan warns that the comparison can only see a large change (N40).
+const underpoweredMDEpp = 20.0
+
+// maxTasksToDetect is the largest task count tasksToDetect tries.
+const maxTasksToDetect = 2000
+
+// tasksToDetect is the smallest task count from "from" up to
+// maxTasksToDetect whose minimal detectable effect is at most 10 points, or
+// 0 when none is.
+func tasksToDetect(sd, alpha float64, from int) int {
+	for n := max(from, 2); n <= maxTasksToDetect; n++ {
+		if stats.MDE(n, sd, alpha, mdePower) <= 0.10 {
+			return n
+		}
+	}
+	return 0
+}
+
 // FailedPlan is the plan answered when the planner refuses an experiment:
-// nothing sized, the planner's error in errors. It is pure.
+// nothing sized, the planner's error in plain words (PlainPlanError) in
+// errors. It is pure.
 func FailedPlan(exp *schemas.Experiment, err error) schemas.ExperimentPlan {
 	p := emptyPlan(exp)
-	p.Errors = append(p.Errors, "plan experiment: "+err.Error())
+	p.Errors = append(p.Errors, PlainPlanError(err))
 	return p
 }
 
@@ -424,9 +451,19 @@ func (h *ExperimentsHandler) status(m *schemas.Manifest, runs []RunView, started
 		active = ar.Active(m.ExpID)
 	}
 	metrics := runMetrics(h.index, runs)
+	var problem, jobID string
+	if rp, ok := h.launcher.(RunProblemReporter); ok && !anySealed(runs) {
+		problem, jobID = rp.RunProblem(m.ExpID) // N151: why no run could start, and the job whose log says more
+	}
 	return BuildStatus(m, runs, StatusFacts{Costs: costsOf(runs, metrics), Active: active, AnalysisID: h.latestAnalysis(m.ExpID),
 		Cancelled:   !active && h.cancelledFact(m.ExpID), // Jobs area: cancelled state (experimentjobs.go)
-		NotRequired: notRequiredSlots(m, runs, metrics)})
+		NotRequired: notRequiredSlots(m, runs, metrics), Problem: problem, RunJobID: jobID})
+}
+
+// anySealed reports whether any run is sealed. Only an experiment with no
+// sealed run asks for its run problem, so a list page reads few jobs.
+func anySealed(runs []RunView) bool {
+	return slices.ContainsFunc(runs, func(rv RunView) bool { return rv.Sealed })
 }
 
 // notRequiredSlots replays the manifest's frozen adaptive rule over the

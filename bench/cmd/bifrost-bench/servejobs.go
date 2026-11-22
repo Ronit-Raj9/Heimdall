@@ -72,6 +72,8 @@ type launcher struct {
 	stateMu  sync.Mutex
 	states   map[string]jobs.Status // newest experiment.run job status per target
 	statesAt time.Time
+
+	problems runProblemCache // N151: newest run problem per experiment (runproblem.go)
 }
 
 // liveRun is one running experiment's event fan-out.
@@ -303,6 +305,10 @@ type expRunProgress struct {
 	Skipped   int                `json:"skipped"`
 	Errors    int                `json:"errors"`
 	LastEvent *schemas.LiveEvent `json:"last_event,omitempty"`
+	// LastError is the newest error event's message (a worker refusal, a
+	// slot that could not start), kept when later events arrive, so the
+	// comparison page can say why nothing ran (N151, runproblem.go).
+	LastError string `json:"last_error,omitempty"`
 }
 
 // expRunResult is experiment.run's result.
@@ -371,6 +377,7 @@ func (l *launcher) execute(ctx context.Context, m *schemas.Manifest, run *liveRu
 				prog.Skipped++
 			case engine.EventError:
 				prog.Errors++
+				prog.LastError = ev.Message // N151 (runproblem.go)
 				log.Errorf("slot %s: %s", ev.SlotID, ev.Message)
 			case engine.EventBudgetStop, engine.EventDone:
 				log.Printf("%s: %s", ev.Kind, ev.Message)

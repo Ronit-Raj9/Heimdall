@@ -62,6 +62,9 @@ type PolicySaveRequest struct {
 	Policy  *schemas.Policy `json:"policy,omitempty"`
 	IfMatch string          `json:"if_match,omitempty"`
 	Note    string          `json:"note,omitempty"`
+	// CreateOnly saves a new rule set only when no file of that name exists
+	// (409 otherwise), so a new set never replaces an existing one (N6).
+	CreateOnly bool `json:"create_only,omitempty"`
 }
 
 // PolicyValidation is POST /policies/validate: whether the document parses,
@@ -81,7 +84,7 @@ var PoliciesRouteDocs = []RouteDoc{
 	{Method: "POST", Path: APIPrefix + "/policies/validate", Tag: "policies", Summary: "Validate a release policy (YAML or the form's JSON) without saving; answers the decoded policy and the YAML a save would write",
 		Auth: AuthWrite, Request: PolicySaveRequest{}, Response: PolicyValidation{}},
 	{Method: "GET", Path: APIPrefix + "/policies/{name}", Tag: "policies", Summary: "One release policy: raw YAML, sha256 and the decoded policy", Response: PolicyDocument{}},
-	{Method: "PUT", Path: APIPrefix + "/policies/{name}", Tag: "policies", Summary: "Create or replace a release policy after validating it with the planner's parser; if_match guards against overwriting a newer edit (409)",
+	{Method: "PUT", Path: APIPrefix + "/policies/{name}", Tag: "policies", Summary: "Create or replace a release policy after validating it with the planner's parser; if_match guards against overwriting a newer edit (409); create_only refuses a file name that already exists (409)",
 		Auth: AuthWrite, Request: PolicySaveRequest{}, Response: PolicyDocument{}},
 	{Method: "DELETE", Path: APIPrefix + "/policies/{name}", Tag: "policies", Summary: "Delete a release policy file", Auth: AuthWrite, NoContent: true},
 }
@@ -209,6 +212,18 @@ func (h policiesHandler) put(ctx *fasthttp.RequestCtx) {
 	if _, perr := policy.Parse(raw, "policies/"+file); perr != nil {
 		lib.SendError(ctx, h.mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, "policy not saved: "+perr.Error())
 		return
+	}
+	if req.CreateOnly { // N6: a new rule set never saves over an existing file
+		_, _, rerr := h.store.Read(ctx, projectfs.AreaPolicies, file)
+		switch {
+		case rerr == nil:
+			lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict,
+				fmt.Sprintf("A rule set named %s already exists. Pick another file name.", strings.TrimSuffix(strings.TrimSuffix(file, ".yaml"), ".yml")))
+			return
+		case !errors.Is(rerr, projectfs.ErrNotFound):
+			h.storeErr(ctx, rerr)
+			return
+		}
 	}
 	note := req.Note
 	if note == "" {

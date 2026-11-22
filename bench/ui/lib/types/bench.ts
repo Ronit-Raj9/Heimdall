@@ -1664,6 +1664,13 @@ export interface ExperimentStatus {
 	/** A Decision (improved, regressed, inconclusive, invalid); typed as text so a newer server's value still renders. */
 	decision?: string;
 	evaluation_id?: string;
+	debug?: string;
+	debug_from_run?: string;
+	multi_agent?: boolean;
+	setups?: { arm: string; agent: string; agent_file: string; model: string }[];
+	problem?: string;
+	run_job_id?: string;
+	arms_differ?: "model" | "none" | "agent";
 }
 
 /** GET /experiments */
