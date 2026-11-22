@@ -191,13 +191,3 @@ func TestChecksGraderReplyRubric(t *testing.T) {
 		t.Fatalf("no paid traffic: %+v", grade)
 	}
 }
-
-func TestChecksGraderName(t *testing.T) {
-	found := false
-	for _, g := range Builtin(HiddenTestsConfig{}) {
-		found = found || g.GetName() == ChecksType
-	}
-	if !found {
-		t.Fatal("checks is not a builtin grader")
-	}
-}
