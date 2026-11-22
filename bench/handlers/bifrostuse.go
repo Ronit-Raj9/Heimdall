@@ -82,6 +82,7 @@ func init() {
 		h := &bifrostUseHandler{env: env}
 		r.GET(APIPrefix+"/integrations/bifrost", env.R(h.org))
 		r.GET(APIPrefix+"/evaluations/{id}/bifrost", env.R(h.evaluation))
+		r.GET(APIPrefix+"/evaluations/{id}/bifrost/cache", env.R(h.cacheAB)) // C08 cache on vs off report (evalcacheab.go)
 	})
 }
 
@@ -91,11 +92,13 @@ func (h *bifrostUseHandler) org(ctx *fasthttp.RequestCtx) {
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, h.summary(work))
 }
 
-func (h *bifrostUseHandler) evaluation(ctx *fasthttp.RequestCtx) {
+// loadEvaluation reads the {id} evaluation of the caller's org; it has sent
+// the error and returns nil when there is none.
+func (h *bifrostUseHandler) loadEvaluation(ctx *fasthttp.RequestCtx) *schemas.Evaluation {
 	id, _ := ctx.UserValue("id").(string)
 	if !evalstore.ValidID(id) {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "evaluation id must look like ev_<letters and digits>")
-		return
+		return nil
 	}
 	ev, err := evalstore.Open(h.root()).Load(id)
 	if err == nil && h.env.Services.OrgID != "" && ev.Org != "" && ev.Org != h.env.Services.OrgID {
@@ -103,10 +106,18 @@ func (h *bifrostUseHandler) evaluation(ctx *fasthttp.RequestCtx) {
 	}
 	if errors.Is(err, evalstore.ErrNotFound) {
 		sendNotFound(ctx, h.env.Mode, "evaluation", id)
-		return
+		return nil
 	}
 	if err != nil {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, err.Error())
+		return nil
+	}
+	return ev
+}
+
+func (h *bifrostUseHandler) evaluation(ctx *fasthttp.RequestCtx) {
+	ev := h.loadEvaluation(ctx)
+	if ev == nil {
 		return
 	}
 	work, cancel := context.WithTimeout(context.Background(), 4*time.Second)
@@ -185,6 +196,10 @@ func loadedPlugins(ctx context.Context, base, token string) ([]string, error) {
 	return body.Plugins, nil
 }
 
+// HeimdallPluginName is the name the heimdall Bifrost plugin registers
+// under (plugins/heimdall PluginName); the gateway lists it by that name.
+const HeimdallPluginName = "heimdall"
+
 func hasPlugin(list []string, names ...string) bool {
 	for _, p := range list {
 		for _, n := range names {
@@ -246,7 +261,7 @@ func BifrostFeatures(s BifrostUse) []BifrostFeature {
 		{ID: "semantic_cache", Name: "Semantic cache", State: optional(pluginState(s, "semantic_cache", "semanticcache")),
 			Detail: "With the semantic cache plugin loaded, an evaluation can compare cache on and cache off and report hit rate and cost saved.",
 			Docs:   bifrostDocsBase + "/features/semantic-caching", Code: "bench/gateways/bifrost/bifrostcache.go"},
-		{ID: "heimdall_plugin", Name: "Heimdall plugin", State: optional(pluginState(s, "heimdall")),
+		{ID: "heimdall_plugin", Name: "Heimdall plugin", State: optional(pluginState(s, HeimdallPluginName)),
 			Detail: "A Bifrost plugin that injects model faults inside the gateway and tags each call with the run and evaluation ids.",
 			Docs:   bifrostDocsBase + "/plugins/writing-go-plugin", Code: "plugins/heimdall"},
 		{ID: "logs", Name: "Request logs", State: optional(pluginState(s, "logging")),
@@ -298,6 +313,25 @@ func EvaluationBifrostFeatures(ev *schemas.Evaluation, s BifrostUse) []BifrostFe
 	add("virtual_keys", "One virtual key per run, revoked when the run ends.")
 	if sp.BudgetUSD > 0 {
 		add("budgets", fmt.Sprintf("Budget $%.2f for this evaluation, enforced by Bifrost on the run keys.", sp.BudgetUSD))
+	}
+	if fo := sp.Failover; fo != nil && fo.Enabled { // C07 provider failover option
+		var fbs []string
+		for _, f := range fo.Fallbacks {
+			fbs = append(fbs, strings.TrimPrefix(f.Provider+"/"+f.Model, "/"))
+		}
+		d := "Provider failover: a second arm sets Bifrost fallbacks for the agent's model and runs under an outage of the primary model."
+		if len(fbs) > 0 {
+			d = "Provider failover: a second arm sets Bifrost fallbacks (" + strings.Join(fbs, ", ") + ") for the agent's model and runs under an outage of the primary model. The report card shows whether failover worked."
+		}
+		add("fallbacks", d)
+	}
+	if sp.BifrostCache { // C08 cache on vs off option
+		add("semantic_cache", "Bifrost cache on vs off: a second arm, identical except that Bifrost's semantic cache is on, so the report shows the hit rate and the latency and cost saved.")
+	}
+	if sp.MCPRoute == schemas.MCPRouteBifrost || sp.MCPRoute == schemas.MCPRouteBifrostCodeMode { // C11 MCP route
+		out = append(out, BifrostFeature{ID: "mcp_gateway", Name: "MCP gateway", State: BifrostFeatureOn,
+			Detail: "MCP tool calls go through Bifrost's MCP gateway, so they show in Bifrost's logs. The tool proxy stays behind Bifrost, so tool faults still work.",
+			Docs:   bifrostDocsBase + "/features/mcp", Code: "bench/handlers/evaluations.go"})
 	}
 	var gwFaults []string
 	for _, f := range sp.Faults {

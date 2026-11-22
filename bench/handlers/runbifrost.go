@@ -144,19 +144,21 @@ func LoadRunBifrost(index ReadIndex, runID string) (*RunBifrost, error) {
 			return nil, fmt.Errorf("parse %s of run %s: %w", FileEvidence, runID, err)
 		}
 	}
+	// The heimdall plugin's usage rows sent to the ingest route
+	// (gatewayusage.go, lane C03) win when present; the run file is the
+	// fallback for sealed runs whose rows are no longer held in memory.
 	var usage []PluginUsage
-	data, found, err = readInternal(index, runID, FileGatewayUsage)
-	if err != nil {
-		return nil, err
-	}
-	if found {
-		if err := json.Unmarshal(data, &usage); err != nil {
-			return nil, fmt.Errorf("parse %s of run %s: %w", FileGatewayUsage, runID, err)
+	if run, ok := GatewayUsageForRun(runID); ok && len(run.Records) > 0 {
+		usage = pluginUsageOf(run.Records)
+	} else {
+		data, found, err = readInternal(index, runID, FileGatewayUsage)
+		if err != nil {
+			return nil, err
 		}
-	}
-	if len(usage) == 0 { // the heimdall plugin's live usage rows (gatewayusage.go, lane C03)
-		if run, ok := GatewayUsageForRun(runID); ok {
-			usage = pluginUsageOf(run.Records)
+		if found {
+			if err := json.Unmarshal(data, &usage); err != nil {
+				return nil, fmt.Errorf("parse %s of run %s: %w", FileGatewayUsage, runID, err)
+			}
 		}
 	}
 	return BuildRunBifrost(runID, ev.Requests, ev.Ledger, usage), nil
