@@ -61,6 +61,7 @@ export interface MaximFormProps {
 /** The Maxim connection form and its delivery counts. Pure: the panel wires the API. */
 export function MaximForm({ conn, draft, onDraft, onSave, onTest, onDisconnect, busy = null, message = null }: MaximFormProps) {
 	const { t } = useTranslation("traceTools");
+	const { t: tf } = useTranslation("maximFailures");
 	const set = (patch: Partial<MaximDraft>) => onDraft({ ...draft, ...patch });
 	return (
 		<form
@@ -162,6 +163,11 @@ export function MaximForm({ conn, draft, onDraft, onSave, onTest, onDisconnect, 
 					<Button type="button" variant="ghost" disabled={busy !== null} onClick={onDisconnect} data-testid="maxim-disconnect">
 						{t("maxim.disconnect")}
 					</Button>
+				)}
+				{conn?.connected && (
+					<a href="/maxim" className="text-primary text-sm underline-offset-2 hover:underline" data-testid="maxim-showcase-link">
+						{tf("showcaseLink")}
+					</a>
 				)}
 				{message && (
 					<span
