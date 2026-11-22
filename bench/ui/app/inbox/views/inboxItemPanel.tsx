@@ -58,6 +58,7 @@ export function InboxItemPanel({ itemId, suites, onClose }: { itemId: string; su
 					{draft && <InboxDraftNext draft={draft} />}
 					<InboxActions
 						item={detail.data.item}
+						session={detail.data.session}
 						suites={suites}
 						mode={detail.data.mode}
 						submitting={accepted.isLoading || rejected.isLoading || snoozed.isLoading}

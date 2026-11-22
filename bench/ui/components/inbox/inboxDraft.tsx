@@ -1,5 +1,5 @@
 import type { InboxDraft } from "@/lib/types/bench";
-import { AlertTriangle, PencilLine } from "lucide-react";
+import { AlertTriangle, CircleCheck, PencilLine } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
  */
 export function InboxDraftResult({ draft }: { draft: InboxDraft }) {
 	const { t } = useTranslation("bench");
+	const { t: tg } = useTranslation("inboxGuide");
 	// Go writes an empty list as null; read it as empty.
 	const warnings = draft.warnings ?? [];
 	const editMe = draft.edit_me ?? [];
@@ -19,10 +20,17 @@ export function InboxDraftResult({ draft }: { draft: InboxDraft }) {
 			data-testid="inbox-draft"
 		>
 			<p className="text-foreground font-medium">{t("inbox.draft.title", { task: draft.task })}</p>
-			<p className="flex items-start gap-2 font-medium" data-testid="inbox-draft-needs-human">
-				<PencilLine className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-				{t("inbox.draft.needsHuman")}
-			</p>
+			{draft.finished ? (
+				<p className="flex items-start gap-2 font-medium" data-testid="inbox-draft-finished">
+					<CircleCheck className="text-chart-success-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					{tg("finished")}
+				</p>
+			) : (
+				<p className="flex items-start gap-2 font-medium" data-testid="inbox-draft-needs-human">
+					<PencilLine className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					{t("inbox.draft.needsHuman")}
+				</p>
+			)}
 			<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
 				<dt className="text-muted-foreground">{t("inbox.draft.dir")}</dt>
 				<dd className="font-mono break-all">{draft.dir}</dd>

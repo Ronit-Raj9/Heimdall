@@ -1,0 +1,69 @@
+{
+	"title": "What should have happened?",
+	"mode": {
+		"label": "How to write the task",
+		"guided": "Write it now",
+		"draft": "Draft to finish by hand",
+		"guidedHint": "Say what a correct agent does here. The task is written finished, with its checks, a reference and a mutant that must fail, so only its readiness check is left.",
+		"draftHint": "The task is written as a draft whose files are marked EDIT ME; finish them in the file editor, then run its readiness check."
+	},
+	"golden": "This session went well, so what the agent did is filled in as the expected behaviour. Fix anything that was not right.",
+	"instruction": {
+		"label": "Instruction (optional)",
+		"hint": "Empty keeps the user's first message as it was sent, after redaction."
+	},
+	"keepTurns_one": "Keep the user's later message in the instruction",
+	"keepTurns_other": "Keep the user's {{count}} later messages in the instruction, in order",
+	"answers": {
+		"label": "The right answer",
+		"hint": "One fact per line. A correct answer must contain every line.",
+		"required": "Write the right answer.",
+		"recorded": "What the agent answered",
+		"recordedWrong": "This answer is wrong: it must fail"
+	},
+	"calls": {
+		"hint": "The calls the agent made, in order. Mark each one right (a correct agent makes it, with these arguments) or wrong (it must never happen), and add any call that was missing.",
+		"none": "The session made no tool calls.",
+		"tool": "Tool name",
+		"toolPlaceholder": "tool name",
+		"verdict": "Was {{tool}} right?",
+		"right": "Right",
+		"wrong": "Wrong",
+		"skip": "Not checked",
+		"args": "Arguments of {{tool}}",
+		"argsPlaceholder": "arguments that must match, as JSON, for example {\"order_id\": \"A-1\"}",
+		"badArgs": "Arguments must be a JSON object, or empty.",
+		"toolRequired": "Name every added call's tool.",
+		"required": "Mark at least one call right or wrong, or write a reply rubric.",
+		"add": "Add a missing call",
+		"remove": "Remove this call",
+		"ordered": "The right calls must happen in this order"
+	},
+	"rubric": {
+		"label": "What the final reply must say (optional)",
+		"hint": "Judged by a model, so the benchmark needs a pinned judge."
+	},
+	"switchGrader": {
+		"label": "Grade this benchmark by its checks",
+		"hint": "Tasks written here are graded by their checks file. Benchmarks that grade another way switch; their other tasks keep their own checks and need their readiness checks again."
+	},
+	"finished": "Ready for its readiness check: every file is written.",
+	"bulk": {
+		"title": "Accept several at once",
+		"hint": "Every ticked item becomes a task in one benchmark with the same settings. Failures listed below are left as they were.",
+		"items": "Items",
+		"golden": "passing",
+		"suite": "Benchmark",
+		"suitePlaceholder": "Pick a benchmark",
+		"recorded": "The recorded sessions were right (goldens): use what the agent did as the expected behaviour",
+		"rubric": "Shared reply rubric (optional)",
+		"switchGrader": "Grade the benchmark by its checks (tool-use and mcp benchmarks)",
+		"submit_one": "Accept {{count}} item",
+		"submit_other": "Accept {{count}} items",
+		"none": "Tick the items to accept.",
+		"needsSuite": "Pick the benchmark the tasks go into.",
+		"asDrafts": "With neither ticked nor a rubric, the items become drafts to finish by hand.",
+		"result": "Accepted {{accepted}}, not accepted {{failed}}.",
+		"failed": "{{id}}: {{error}}"
+	}
+}

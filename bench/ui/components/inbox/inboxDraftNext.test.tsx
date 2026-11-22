@@ -7,7 +7,7 @@ import { draftTarget, InboxDraftNext } from "./inboxDraftNext";
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => mutation() }));
 
-const draft = { task: "support-faq/charged-twice", dir: "benchmarks/support-faq/tasks/charged-twice", template: "qa", edit_me: [], next: [] };
+const draft = { task: "support-faq/charged-twice", dir: "benchmarks/support-faq/tasks/charged-twice", template: "qa", edit_me: [], finished: false, next: [] };
 
 describe("InboxDraftNext", () => {
 	it("links to the task and runs its readiness check", () => {
