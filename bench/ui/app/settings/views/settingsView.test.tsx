@@ -94,6 +94,14 @@ vi.mock("@/lib/store/apis/secretsApi", async () => {
 		useDeleteSecretMutation: () => m({}),
 	}; // G15: local settings shows the secrets tab
 });
+vi.mock("@/lib/store/apis/registryCredentialsApi", async () => {
+	const { mutation: m } = await import("@/lib/testing/render");
+	return {
+		useListRegistryCredentialsQuery: () => ({ data: { credentials: [] }, isLoading: false }),
+		useCreateRegistryCredentialMutation: () => m({}),
+		useDeleteRegistryCredentialMutation: () => m({}),
+	}; // Y10: private registry logins on the secrets tab
+});
 vi.mock("@/lib/store/apis/dataOpsApi", async (importOriginal) => {
 	const real = await importOriginal<typeof import("@/lib/store/apis/dataOpsApi")>();
 	const { mutation: m } = await import("@/lib/testing/render");

@@ -52,6 +52,7 @@ func TestSharedPoolRoutes(t *testing.T) {
 	d := dbtest.OpenSQLite(t)
 	def := quota.DefaultLimits
 	def.SharedPool = true
+	def.Runtime = "runc" // the manual approval path (J6); gVisor orgs get digest-pinned images approved automatically (Y10)
 	q := quota.Open(d, quota.Options{Defaults: &def})
 	keys, _ := keystore.Open(d, make([]byte, 32))
 	images := &sharedpool.ImageStore{DB: d}

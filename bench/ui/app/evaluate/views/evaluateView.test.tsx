@@ -22,6 +22,10 @@ vi.mock("@/lib/store/apis/evaluationsApi", async (orig) => ({
 	useGetAgentCompatibilityQuery: () => ({ isLoading: false, data: undefined }),
 	useGetAgentVersionsQuery: () => ({ isLoading: false, data: { agent: "codex", versions: [{ version: 1, runs: 3 }, { version: 2, runs: 0 }] } }),
 }));
+vi.mock("@/lib/store/apis/referenceApi", async (orig) => ({
+	...(await orig<object>()),
+	useGetReferenceBoardQuery: () => ({ isLoading: false, data: undefined }), // Y09: no published reference scores
+}));
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({ children, ...p }: { children: React.ReactNode; "data-testid"?: string }) => <a data-testid={p["data-testid"]}>{children}</a>,
 }));

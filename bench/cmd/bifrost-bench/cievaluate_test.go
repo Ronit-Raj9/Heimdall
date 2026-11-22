@@ -370,7 +370,7 @@ func TestCIInstallHosted(t *testing.T) {
 		t.Fatalf("github exit %d", code)
 	}
 	b, err := os.ReadFile(filepath.Join(dir, ".github", "workflows", "heimdall-evaluate.yml"))
-	if err != nil || !strings.Contains(string(b), `config: "agents/my-agent.yaml"`) {
+	if err != nil || !strings.Contains(string(b), `HEIMDALL_CONFIG: "agents/my-agent.yaml"`) {
 		t.Fatalf("%v\n%s", err, b)
 	}
 	if code := runCI([]string{"install", "gitlab", "-agent", "my-agent", "-benchmark", "hd-harbor-tb2", "-url", "https://h.example.com"}); code != exitOK {
