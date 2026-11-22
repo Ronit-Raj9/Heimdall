@@ -22,6 +22,7 @@ import {
 } from "@/lib/types/authoring";
 import type { Job, SuiteSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
+import { Link } from "@tanstack/react-router";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -93,7 +94,9 @@ function DraftSection({ suite }: { suite: SuiteSummary }) {
 	const { t } = useTranslation("authoring");
 	const answer = suite.output === "answer";
 	const judged = suite.grader === "judge";
-	const [ops, setOps] = useState<AssistOp[]>(judged ? ["rubric", "criterion_wrong", "near_miss_wrong", "exploit"] : ["near_miss_wrong", "exploit"]);
+	const [ops, setOps] = useState<AssistOp[]>(
+		judged ? ["rubric", "criterion_wrong", "near_miss_wrong", "exploit"] : ["near_miss_wrong", "exploit"],
+	);
 	const [provider, setProvider] = useState("");
 	const [model, setModel] = useState("");
 	const [budget, setBudget] = useState(1);
@@ -110,7 +113,8 @@ function DraftSection({ suite }: { suite: SuiteSummary }) {
 	}
 	const estimate = assistParams(suite.id, ops, provider, model, budget, true);
 	const run = assistParams(suite.id, ops, provider, model, budget, false);
-	const toggle = (op: AssistOp) => setOps((cur) => (cur.includes(op) ? cur.filter((o) => o !== op) : ASSIST_OPS.filter((o) => o === op || cur.includes(o))));
+	const toggle = (op: AssistOp) =>
+		setOps((cur) => (cur.includes(op) ? cur.filter((o) => o !== op) : ASSIST_OPS.filter((o) => o === op || cur.includes(o))));
 	return (
 		<Section title={t("draft.title")} description={t("draft.description")} testId="suite-review-draft">
 			<fieldset className="flex flex-col gap-2">
@@ -189,6 +193,7 @@ function AssistSummary({ result, t }: { result: AssistResult; t: T }) {
 
 function QueueSection({ suite }: { suite: SuiteSummary }) {
 	const { t } = useTranslation("authoring");
+	const { t: tp } = useTranslation("policyDocs");
 	const q = useGetGeneratedTasksQuery(suite.id);
 	return (
 		<Section title={t("queue.title")} description={t("queue.description")} testId="suite-review-queue">
@@ -198,7 +203,16 @@ function QueueSection({ suite }: { suite: SuiteSummary }) {
 				</p>
 			) : !q.data || q.data.tasks.length === 0 ? (
 				<p className="text-muted-foreground text-sm" data-testid="suite-review-queue-empty">
-					{t("queue.empty")}
+					{tp("reviewEmpty")}{" "}
+					<Link
+						to="/suites/$suiteId"
+						params={{ suiteId: suite.id }}
+						search={{ tab: "policy" } as never}
+						className="text-primary underline"
+						data-testid="suite-review-queue-policy-link"
+					>
+						{tp("reviewEmptyLink")}
+					</Link>
 				</p>
 			) : (
 				<>
@@ -233,7 +247,10 @@ function GeneratedRow({ suite, task, t }: { suite: string; task: GeneratedTask; 
 			<div className="flex flex-wrap items-center gap-2">
 				<span className="font-mono text-sm">{task.task}</span>
 				{task.title && <span className="text-muted-foreground truncate text-sm">{task.title}</span>}
-				<span className={cn("rounded-full border px-2 py-0.5 text-xs", stateTone[task.review])} data-testid={`suite-review-state-${task.task}`}>
+				<span
+					className={cn("rounded-full border px-2 py-0.5 text-xs", stateTone[task.review])}
+					data-testid={`suite-review-state-${task.task}`}
+				>
 					{t(`queue.state.${task.review}`)}
 				</span>
 				{task.stale && <span className="text-muted-foreground text-xs">{t("queue.stale")}</span>}
@@ -261,7 +278,12 @@ function GeneratedRow({ suite, task, t }: { suite: string; task: GeneratedTask; 
 						placeholder={t("queue.note")}
 						data-testid={`suite-review-note-${task.task}`}
 					/>
-					<Button size="sm" disabled={isLoading || task.review === "accepted"} onClick={() => send("accepted")} dataTestId={`suite-review-accept-${task.task}`}>
+					<Button
+						size="sm"
+						disabled={isLoading || task.review === "accepted"}
+						onClick={() => send("accepted")}
+						dataTestId={`suite-review-accept-${task.task}`}
+					>
 						{t("queue.accept")}
 					</Button>
 					<Button
@@ -289,7 +311,13 @@ function QualitySection({ suite }: { suite: SuiteSummary }) {
 			description={t("quality.description")}
 			testId="suite-review-quality"
 			actions={
-				<Button size="sm" variant="outline" isLoading={q.isFetching} onClick={() => void check(suite.id)} dataTestId="suite-review-quality-run">
+				<Button
+					size="sm"
+					variant="outline"
+					isLoading={q.isFetching}
+					onClick={() => void check(suite.id)}
+					dataTestId="suite-review-quality-run"
+				>
 					{t("quality.run")}
 				</Button>
 			}
@@ -333,8 +361,7 @@ export function QualityBody({ report, t }: { report: QualityReport; t: T }) {
 					<ul className="flex flex-col gap-1">
 						{hits.map((h) => (
 							<li key={h.task} className={cn("text-xs", h.severity === "error" && "text-chart-error-ink")}>
-								<span className="font-mono">{h.task}</span>{" "}
-								{t("quality.overlap", { pct: pct(h.overlap), matches: h.matches.join(", ") })}
+								<span className="font-mono">{h.task}</span> {t("quality.overlap", { pct: pct(h.overlap), matches: h.matches.join(", ") })}
 								{h.severity === "error" && ` (${t("quality.heldOutError")})`}
 							</li>
 						))}
@@ -371,13 +398,25 @@ function SplitSection({ suite }: { suite: SuiteSummary }) {
 		<Section title={t("split.title")} description={t("split.description")} testId="suite-review-split">
 			<div className="grid gap-3 sm:grid-cols-3">
 				<Field label={t("split.pct")}>
-					<Input type="number" min={1} max={90} value={share} onChange={(e) => setShare(Number(e.target.value))} data-testid="suite-review-split-pct" />
+					<Input
+						type="number"
+						min={1}
+						max={90}
+						value={share}
+						onChange={(e) => setShare(Number(e.target.value))}
+						data-testid="suite-review-split-pct"
+					/>
 				</Field>
 				<Field label={t("split.seed")}>
 					<Input type="number" value={seed} onChange={(e) => setSeed(Number(e.target.value))} data-testid="suite-review-split-seed" />
 				</Field>
 				<Field label={t("split.stratify")}>
-					<select className={selectClass} value={stratify} onChange={(e) => setStratify(e.target.value)} data-testid="suite-review-split-stratify">
+					<select
+						className={selectClass}
+						value={stratify}
+						onChange={(e) => setStratify(e.target.value)}
+						data-testid="suite-review-split-stratify"
+					>
 						<option value="">{t("split.stratifyNone")}</option>
 						{(["difficulty", "kind", "project", "capability"] as const).map((k) => (
 							<option key={k} value={k}>
@@ -388,25 +427,39 @@ function SplitSection({ suite }: { suite: SuiteSummary }) {
 				</Field>
 			</div>
 			<label className="flex items-center gap-2 text-sm">
-				<input type="checkbox" checked={confirmPublic} onChange={(e) => setConfirmPublic(e.target.checked)} data-testid="suite-review-split-confirm" />
+				<input
+					type="checkbox"
+					checked={confirmPublic}
+					onChange={(e) => setConfirmPublic(e.target.checked)}
+					data-testid="suite-review-split-confirm"
+				/>
 				{t("split.confirmPublic")}
 			</label>
 			<div className="flex flex-wrap gap-2">
 				<Button size="sm" variant="outline" isLoading={isLoading} onClick={() => void go(true)} dataTestId="suite-review-split-preview">
 					{t("split.preview")}
 				</Button>
-				<Button size="sm" disabled={isLoading || !result || result.held_out === 0 || (result.refused?.length ?? 0) > 0} onClick={() => void go(false)} dataTestId="suite-review-split-apply">
+				<Button
+					size="sm"
+					disabled={isLoading || !result || result.held_out === 0 || (result.refused?.length ?? 0) > 0}
+					onClick={() => void go(false)}
+					dataTestId="suite-review-split-apply"
+				>
 					{t("split.apply")}
 				</Button>
 			</div>
 			{result && (
 				<div className="flex flex-col gap-1 text-sm" data-testid="suite-review-split-result">
 					<span>{t("split.result", { held: result.held_out, public: result.public })}</span>
-					{(result.refused?.length ?? 0) > 0 && <span className="text-chart-warning-ink">{t("split.refused", { tasks: result.refused!.join(", ") })}</span>}
+					{(result.refused?.length ?? 0) > 0 && (
+						<span className="text-chart-warning-ink">{t("split.refused", { tasks: result.refused!.join(", ") })}</span>
+					)}
 					<span className="text-muted-foreground">{result.next}</span>
 				</div>
 			)}
-			{!(error && typeof error === "object" && "status" in error && error.status === 409) && <ErrorLine error={error} testId="suite-review-split-error" />}
+			{!(error && typeof error === "object" && "status" in error && error.status === 409) && (
+				<ErrorLine error={error} testId="suite-review-split-error" />
+			)}
 		</Section>
 	);
 }

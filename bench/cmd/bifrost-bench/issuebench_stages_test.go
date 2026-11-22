@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -79,7 +81,7 @@ func TestIssueBenchStagesPlainStops(t *testing.T) {
 	c := issuebench.Candidate{Repo: "o/r", Issue: 7, BaseSHA: "abc", PRMerged: time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)}
 
 	st := issuebenchStagesFor(ibEnv(t, nil))
-	if _, _, err := st.Scanner.Scan(ctx, "o/r", pipeline.ScanOptions{}); err == nil || !strings.Contains(err.Error(), "GitHub is not connected") {
+	if _, _, err := st.Scanner.Scan(ctx, "o/r", pipeline.ScanOptions{}); err == nil || err.Error() != ibNotConnected {
 		t.Fatalf("scan without a connection: %v", err)
 	}
 	if _, err := st.Builder.Build(ctx, c, pipeline.BuildOptions{}, logf); err == nil || !strings.Contains(err.Error(), "no job runner") {
@@ -150,5 +152,29 @@ func TestIssueBenchRunnerScript(t *testing.T) {
 	t.Cleanup(func() { ibCommand = old })
 	if _, err := (ibRunner{image: "img"}).Run(context.Background(), nil, c, validate.Run{State: validate.StateGold, Command: "x"}); !errors.Is(err, validate.ErrPatchApply) {
 		t.Fatalf("patch failure: %v", err)
+	}
+}
+
+// The scan works on any public repository with any connected account, so
+// the not-connected text says so, and a repository GitHub does not show
+// gets a sentence that names it.
+func TestIssueBenchScanTokenAndNotFoundText(t *testing.T) {
+	want := "Connect GitHub in Settings > GitHub (any account). GitHub needs a sign-in to list a repository's pull requests, public ones included."
+	if ibNotConnected != want {
+		t.Fatalf("not connected text %q", ibNotConnected)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"repository":null}}`))
+	}))
+	defer srv.Close()
+	old := ibGitHubAPI
+	ibGitHubAPI = srv.URL
+	t.Cleanup(func() { ibGitHubAPI = old })
+	t.Setenv("GITHUB_TOKEN", "t0k")
+	st := issuebenchStagesFor(ibEnv(t, nil))
+	_, _, err := st.Scanner.Scan(context.Background(), "marshmallow-code/marshmallow", pipeline.ScanOptions{})
+	if err == nil || err.Error() != "Repository marshmallow-code/marshmallow was not found, or it is private and your GitHub account cannot read it." {
+		t.Fatalf("scan of a missing repository: %v", err)
 	}
 }

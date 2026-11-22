@@ -1,8 +1,9 @@
 {
 	"intro": "Turn merged pull requests that close an issue into tasks: the issue text is the instruction, the repository before the fix is the start, the pull request's tests grade the agent. Python with pytest for now.",
 	"repo": "Repository",
-	"pickRepo": "Pick a repository",
-	"connectFirst": "Connect GitHub in Settings first.",
+	"repoPlaceholder": "owner/repository or a GitHub link",
+	"repoInvalid": "Type a repository as owner/repository, for example marshmallow-code/marshmallow, or paste its GitHub link.",
+	"connectFirst": "Connect GitHub in Settings > GitHub (any account). GitHub needs a sign-in to list a repository's pull requests, public ones included.",
 	"scan": "Find issues",
 	"scanning": "Looking for issues...",
 	"funnel": {

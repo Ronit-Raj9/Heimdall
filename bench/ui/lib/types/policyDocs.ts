@@ -62,6 +62,10 @@ export interface PolicyDocList {
 	suite: string;
 	docs: PolicyDocSummary[];
 	limited?: boolean;
+	/** The support task policy drafts copy; absent when the benchmark has none. */
+	shape?: string;
+	/** Why policy tasks cannot be drafted here (set when shape is absent for that reason). */
+	next?: string;
 }
 
 export interface PolicyDocUpload {

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -109,8 +110,25 @@ func (s *ibStages) token(ctx context.Context) (string, error) {
 	if t := strings.TrimSpace(os.Getenv("GITHUB_TOKEN")); t != "" {
 		return t, nil
 	}
-	return "", errors.New("GitHub is not connected for this organization: an admin can connect it in Settings > GitHub")
+	return "", errors.New(ibNotConnected)
 }
+
+// ibNotConnected is the scan's answer without a GitHub sign-in. Any
+// connected account can scan any public repository, but GitHub's API needs
+// a sign-in to list pull requests.
+const ibNotConnected = "Connect GitHub in Settings > GitHub (any account). GitHub needs a sign-in to list a repository's pull requests, public ones included."
+
+// ibRepoNotFound names the repository GitHub did not show to the account.
+type ibRepoNotFound struct {
+	repo string
+	err  error
+}
+
+func (e *ibRepoNotFound) Error() string {
+	return "Repository " + e.repo + " was not found, or it is private and your GitHub account cannot read it."
+}
+
+func (e *ibRepoNotFound) Unwrap() error { return e.err }
 
 type ibScanner struct{ s *ibStages }
 
@@ -129,6 +147,9 @@ func (a ibScanner) Scan(ctx context.Context, repo string, opts pipeline.ScanOpti
 	}
 	res, err := scan.Scan(ctx, &scan.Client{APIURL: ibGitHubAPI, Token: tok}, o)
 	if err != nil {
+		if ae := (*scan.APIError)(nil); errors.As(err, &ae) && ae.Status == http.StatusNotFound {
+			return nil, issuebench.Funnel{}, &ibRepoNotFound{repo: repo, err: err}
+		}
 		return nil, issuebench.Funnel{}, err
 	}
 	return res.Candidates, res.Funnel, nil

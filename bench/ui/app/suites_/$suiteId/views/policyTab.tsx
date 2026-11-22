@@ -51,7 +51,10 @@ export function updateClause(clauses: readonly PolicyClause[], i: number, patch:
 }
 
 /** The policy.generate job params: an estimate, or a confirmed run within the budget. */
-export function generateParams(v: { suite: string; doc: string; provider: string; model: string; budget: string }, estimate: boolean): PolicyGenerateParams {
+export function generateParams(
+	v: { suite: string; doc: string; provider: string; model: string; budget: string },
+	estimate: boolean,
+): PolicyGenerateParams {
 	const budget = Number(v.budget);
 	return {
 		suite: v.suite,
@@ -81,7 +84,7 @@ function ErrorLine({ error }: { error: unknown }) {
 	);
 }
 
-function UploadSection({ suite, onUploaded }: { suite: string; onUploaded: (doc: string) => void }) {
+function UploadSection({ suite, onUploaded, blocked = false }: { suite: string; onUploaded: (doc: string) => void; blocked?: boolean }) {
 	const { t } = useTranslation("policyDocs");
 	const [file, setFile] = useState<File | null>(null);
 	const [preview, setPreview] = useState<PolicyDocView | null>(null);
@@ -107,13 +110,19 @@ function UploadSection({ suite, onUploaded }: { suite: string; onUploaded: (doc:
 					accept=".pdf,.docx,.md,.markdown,.txt"
 					className="h-9 w-72"
 					aria-label={t("upload.file")}
+					disabled={blocked}
 					onChange={(e: ChangeEvent<HTMLInputElement>) => (setFile(e.target.files?.[0] ?? null), setPreview(null))}
 					data-testid="policy-upload-file"
 				/>
-				<Button variant="outline" disabled={!file || state.isLoading} onClick={() => void send(true)} dataTestId="policy-upload-preview">
+				<Button
+					variant="outline"
+					disabled={blocked || !file || state.isLoading}
+					onClick={() => void send(true)}
+					dataTestId="policy-upload-preview"
+				>
 					{t("upload.preview")}
 				</Button>
-				<Button disabled={!file || state.isLoading} onClick={() => void send(false)} dataTestId="policy-upload-save">
+				<Button disabled={blocked || !file || state.isLoading} onClick={() => void send(false)} dataTestId="policy-upload-save">
 					{t("upload.save")}
 				</Button>
 			</div>
@@ -179,7 +188,11 @@ export function ClauseEditor({ suite, view, onClose }: { suite: string; view: Po
 							onChange={(e) => setClauses(updateClause(clauses, i, { text: e.target.value }))}
 						/>
 						<label className="flex items-center gap-1.5 text-xs">
-							<input type="checkbox" checked={!!c.skip} onChange={(e) => setClauses(updateClause(clauses, i, { skip: e.target.checked }))} />
+							<input
+								type="checkbox"
+								checked={!!c.skip}
+								onChange={(e) => setClauses(updateClause(clauses, i, { skip: e.target.checked }))}
+							/>
 							{t("clauses.skip")}
 						</label>
 					</li>
@@ -202,7 +215,7 @@ function str(v: JsonValue | undefined): string {
 	return v === undefined || v === null ? "" : String(v);
 }
 
-function GenerateSection({ suite, doc, onDone }: { suite: string; doc: string; onDone: () => void }) {
+function GenerateSection({ suite, doc, onDone, blocked = false }: { suite: string; doc: string; onDone: () => void; blocked?: boolean }) {
 	const { t } = useTranslation("policyDocs");
 	const [provider, setProvider] = useState("");
 	const [model, setModel] = useState("");
@@ -219,7 +232,7 @@ function GenerateSection({ suite, doc, onDone }: { suite: string; doc: string; o
 		const r = await create({ kind: "policy.generate", params: generateParams({ suite, doc, provider, model, budget }, estimate) });
 		if ("data" in r && r.data) setJobId(r.data.id);
 	};
-	const ready = provider.trim() && model.trim() && !state.isLoading && (!jobId || terminal);
+	const ready = !blocked && provider.trim() && model.trim() && !state.isLoading && (!jobId || terminal);
 	const res = j?.result;
 	return (
 		<section className="flex flex-col gap-2" data-testid="policy-generate">
@@ -227,20 +240,44 @@ function GenerateSection({ suite, doc, onDone }: { suite: string; doc: string; o
 			<div className="flex flex-wrap items-end gap-2">
 				<label className="flex flex-col gap-1 text-sm">
 					<span className="text-muted-foreground">{t("generate.provider")}</span>
-					<Input className="h-9 w-40" value={provider} onChange={(e) => setProvider(e.target.value)} data-testid="policy-generate-provider" />
+					<Input
+						className="h-9 w-40"
+						value={provider}
+						disabled={blocked}
+						onChange={(e) => setProvider(e.target.value)}
+						data-testid="policy-generate-provider"
+					/>
 				</label>
 				<label className="flex flex-col gap-1 text-sm">
 					<span className="text-muted-foreground">{t("generate.model")}</span>
-					<Input className="h-9 w-56" value={model} onChange={(e) => setModel(e.target.value)} data-testid="policy-generate-model" />
+					<Input
+						className="h-9 w-56"
+						value={model}
+						disabled={blocked}
+						onChange={(e) => setModel(e.target.value)}
+						data-testid="policy-generate-model"
+					/>
 				</label>
 				<label className="flex flex-col gap-1 text-sm">
 					<span className="text-muted-foreground">{t("generate.budget")}</span>
-					<Input className="h-9 w-24" inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} data-testid="policy-generate-budget" />
+					<Input
+						className="h-9 w-24"
+						inputMode="decimal"
+						value={budget}
+						disabled={blocked}
+						onChange={(e) => setBudget(e.target.value)}
+						data-testid="policy-generate-budget"
+					/>
 				</label>
 				<Button variant="outline" disabled={!ready} onClick={() => void start(true)} dataTestId="policy-generate-estimate">
 					{t("generate.estimate")}
 				</Button>
-				<Button disabled={!ready} onClick={() => void start(false)} dataTestId="policy-generate-start" title={t("generate.confirm", { budget, model })}>
+				<Button
+					disabled={!ready}
+					onClick={() => void start(false)}
+					dataTestId="policy-generate-start"
+					title={t("generate.confirm", { budget, model })}
+				>
 					{t("generate.start")}
 				</Button>
 			</div>
@@ -254,7 +291,10 @@ function GenerateSection({ suite, doc, onDone }: { suite: string; doc: string; o
 			)}
 			{j?.status === "succeeded" && !res?.estimate && (
 				<p className="text-xs">
-					{t("generate.done", { drafted: Array.isArray(res?.drafted) ? res.drafted.length : 0, spent: Number(res?.spent_usd ?? 0).toFixed(2) })}
+					{t("generate.done", {
+						drafted: Array.isArray(res?.drafted) ? res.drafted.length : 0,
+						spent: Number(res?.spent_usd ?? 0).toFixed(2),
+					})}
 				</p>
 			)}
 			{(j?.status === "failed" || j?.status === "cancelled") && (
@@ -274,7 +314,8 @@ function DraftsSection({ suite, view }: { suite: string; view: PolicyDocView }) 
 	const groups = pendingByClause(view.doc.drafts);
 	const needSwitch = view.grader !== "checks" || !view.judged;
 	const judge = needSwitch && jp.trim() && jm.trim() ? { switch_grader: true, judge: { provider: jp.trim(), model: jm.trim() } } : {};
-	const act = (accept: string[], reject: string[]) => void review({ suite, doc: view.doc.id, accept, reject, ...(accept.length ? judge : {}) });
+	const act = (accept: string[], reject: string[]) =>
+		void review({ suite, doc: view.doc.id, accept, reject, ...(accept.length ? judge : {}) });
 	const all = groups.flatMap(([, ds]) => ds.map((d) => d.task));
 	return (
 		<section className="flex flex-col gap-2" data-testid="policy-drafts">
@@ -298,7 +339,11 @@ function DraftsSection({ suite, view }: { suite: string; view: PolicyDocView }) 
 							<p className="text-sm font-medium">{t("drafts.clause", { number: clause })}</p>
 							<ul className="flex flex-col gap-2">
 								{ds.map((d) => (
-									<li key={d.task} className="flex flex-wrap items-start justify-between gap-2 text-sm" data-testid={`policy-draft-${d.task}`}>
+									<li
+										key={d.task}
+										className="flex flex-wrap items-start justify-between gap-2 text-sm"
+										data-testid={`policy-draft-${d.task}`}
+									>
 										<div className="min-w-0 flex-1">
 											<span className="text-muted-foreground text-xs">{t(`drafts.kind.${d.kind}`, { defaultValue: d.kind })}</span>{" "}
 											<strong>{d.title}</strong>
@@ -343,7 +388,9 @@ export function ReportView({ suite, report }: { suite: string; report: PolicyRep
 					{t("report.pdf")}
 				</a>
 			</div>
-			<p className="text-muted-foreground text-xs">{t("report.summary", { tested: report.tested_clauses, clauses: report.clauses, runs: report.runs })}</p>
+			<p className="text-muted-foreground text-xs">
+				{t("report.summary", { tested: report.tested_clauses, clauses: report.clauses, runs: report.runs })}
+			</p>
 			{report.agents.length === 0 && <p className="text-muted-foreground text-sm">{t("report.empty")}</p>}
 			{report.agents.map((a) => (
 				<div key={a.agent} className="rounded-sm border p-2">
@@ -387,12 +434,14 @@ export function ReportView({ suite, report }: { suite: string; report: PolicyRep
 					)}
 				</div>
 			))}
-			{report.untested_clauses.length > 0 && <p className="text-muted-foreground text-xs">{t("report.untested", { list: report.untested_clauses.join(", ") })}</p>}
+			{report.untested_clauses.length > 0 && (
+				<p className="text-muted-foreground text-xs">{t("report.untested", { list: report.untested_clauses.join(", ") })}</p>
+			)}
 		</section>
 	);
 }
 
-function DocDetail({ suite, doc, writable }: { suite: string; doc: string; writable: boolean }) {
+function DocDetail({ suite, doc, writable, blocked }: { suite: string; doc: string; writable: boolean; blocked: boolean }) {
 	const { t } = useTranslation("policyDocs");
 	const view = useGetPolicyDocQuery({ suite, doc }, { skip: !writable });
 	const report = useGetPolicyReportQuery({ suite, doc });
@@ -412,7 +461,7 @@ function DocDetail({ suite, doc, writable }: { suite: string; doc: string; writa
 							</Button>
 						</div>
 					)}
-					<GenerateSection suite={suite} doc={doc} onDone={refetch} />
+					<GenerateSection suite={suite} doc={doc} onDone={refetch} blocked={blocked} />
 					<DraftsSection suite={suite} view={view.data} />
 				</>
 			)}
@@ -432,6 +481,8 @@ export function PolicyTab({ suite }: { suite: SuiteSummary }) {
 	const [remove, removeState] = useDeletePolicyDocMutation();
 	const [doc, setDoc] = useState("");
 	const docs = list.data?.docs ?? [];
+	// No support task to copy: say so before anything is uploaded or a job fails.
+	const noShape = !!list.data && !list.data.shape;
 	const current = (docs.some((d) => d.id === doc) ? doc : "") || docs[0]?.id || "";
 	const onDelete = (id: string, name: string) => {
 		if (typeof window !== "undefined" && !window.confirm(t("docs.deleteConfirm", { name }))) return;
@@ -447,7 +498,16 @@ export function PolicyTab({ suite }: { suite: SuiteSummary }) {
 					{t("viewerNote")}
 				</p>
 			)}
-			{writable && <UploadSection suite={suite.id} onUploaded={setDoc} />}
+			{noShape && (
+				<p
+					role="note"
+					className="border-chart-error/40 bg-chart-error/5 text-chart-error-ink max-w-3xl rounded-sm border px-4 py-2 text-sm"
+					data-testid="policy-no-shape"
+				>
+					{t("noShape")}
+				</p>
+			)}
+			{writable && <UploadSection suite={suite.id} onUploaded={setDoc} blocked={noShape} />}
 			<section className="flex flex-col gap-2" data-testid="policy-docs">
 				<h3 className="text-sm font-medium">{t("docs.title")}</h3>
 				{!writable && docs.length > 1 && <p className="text-muted-foreground text-xs">{t("docs.viewerList")}</p>}
@@ -457,12 +517,19 @@ export function PolicyTab({ suite }: { suite: SuiteSummary }) {
 					<ul className="flex flex-col gap-1 text-sm">
 						{docs.map((d) => (
 							<li key={d.id} className="flex flex-wrap items-center gap-2">
-								<Button size="sm" variant={d.id === current ? "default" : "outline"} onClick={() => setDoc(d.id)} dataTestId={`policy-doc-${d.id}`}>
+								<Button
+									size="sm"
+									variant={d.id === current ? "default" : "outline"}
+									onClick={() => setDoc(d.id)}
+									dataTestId={`policy-doc-${d.id}`}
+								>
 									{t("docs.open")}
 								</Button>
 								<span className="font-medium">{d.title || d.name || d.id}</span>
 								{!list.data?.limited && (
-									<span className="text-muted-foreground text-xs">{t("docs.summary", { clauses: d.clauses ?? 0, pending: d.drafts?.pending ?? 0 })}</span>
+									<span className="text-muted-foreground text-xs">
+										{t("docs.summary", { clauses: d.clauses ?? 0, pending: d.drafts?.pending ?? 0 })}
+									</span>
 								)}
 								{writable && (
 									<Button
@@ -482,7 +549,7 @@ export function PolicyTab({ suite }: { suite: SuiteSummary }) {
 				<ErrorLine error={list.error} />
 				<ErrorLine error={removeState.error} />
 			</section>
-			{current && <DocDetail suite={suite.id} doc={current} writable={writable} />}
+			{current && <DocDetail suite={suite.id} doc={current} writable={writable} blocked={noShape} />}
 		</div>
 	);
 }
