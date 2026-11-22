@@ -323,6 +323,13 @@ type VersionInfo struct {
 	Arms       []ArmRef  `json:"arms"`        // newest first
 	SealedRuns int       `json:"sealed_runs"` // sealed runs, not yet seal-verified
 	LatestAt   time.Time `json:"latest_at"`   // newest manifest that holds it
+	// Version is the saved agent version the newest arm ran, 0 when it is
+	// not known; Model is that arm's model. System marks Heimdall's own
+	// controls: a scripted agent (oracle, noop) or a hash that only readiness
+	// checks ran. The server fills all three; Versions leaves them empty.
+	Version int    `json:"version,omitempty"`
+	Model   string `json:"model,omitempty"`
+	System  bool   `json:"system,omitempty"`
 }
 
 // ArmRef is one experiment arm that resolved to a config hash.

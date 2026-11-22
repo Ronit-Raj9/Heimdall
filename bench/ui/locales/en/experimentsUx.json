@@ -4,7 +4,8 @@
 	"quickRun": "Quick run on {{suite}}",
 	"armsVs": "{{arms}} on {{suite}}",
 	"noSuite": "an unknown benchmark",
-	"searchPlaceholder": "Search by name or benchmark",
+	"searchPlaceholder": "Search by name, evaluation or benchmark",
+	"evaluationChild": "{{evaluation}} · {{suite}}",
 	"chips": {
 		"label": "Filter by status",
 		"suiteLabel": "Filter by benchmark",
@@ -13,6 +14,7 @@
 		"active": "Running",
 		"done": "Finished",
 		"failed": "Failed",
+		"cancelled": "Cancelled",
 		"created": "Not started"
 	},
 	"status": {
@@ -47,8 +49,18 @@
 		"agent": "Agent check for {{name}}",
 		"drift": "Drift monitor: {{name}}",
 		"tag": "automatic check",
-		"toggle": "Also show readiness checks, practice runs and single benchmarks of evaluations ({{count}})",
-		"toggleHint": "Automatic checks Heimdall runs by itself (benchmark readiness checks, agent checks and drift monitors), runs on the practice benchmarks, and the one-setup benchmarks of an evaluation. None of them compares two setups.",
-		"hidden": "({{count}} hidden: checks, practice runs and single benchmarks of evaluations)"
+		"toggle": "Also show readiness checks, practice runs, debug runs and single benchmarks of evaluations ({{count}})",
+		"toggleHint": "Automatic checks Heimdall runs by itself (benchmark readiness checks, agent checks and drift monitors), runs on the practice benchmarks, and the one-setup benchmarks of an evaluation. Debug runs replay, fork or step through one recorded run and never count toward results. None of them compares two setups.",
+		"hidden": "({{count}} hidden: checks, practice runs, debug runs and single benchmarks of evaluations)"
+	},
+	"debug": {
+		"replay": "Replay of run {{run}}",
+		"fork": "Fork of run {{run}}",
+		"step": "Debug rerun of run {{run}}",
+		"tag": "debug run"
+	},
+	"picker": {
+		"showHidden": "Also show checks, practice runs and debug runs ({{count}})",
+		"showHiddenHint": "Readiness checks, agent checks and drift monitors Heimdall runs by itself, runs on the practice benchmarks, and replay, fork or step runs of one recorded run."
 	}
 }

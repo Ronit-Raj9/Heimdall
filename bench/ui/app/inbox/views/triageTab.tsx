@@ -4,7 +4,8 @@ import { TriageBanner } from "@/components/triage/triageBanner";
 import { TriageDrillDown, TriageRunEvidence } from "@/components/triage/triageDrillDown";
 import { TriageTable } from "@/components/triage/triageTable";
 import { runLocations, triageArms } from "@/components/triage/triage.utils";
-import { ExperimentSelect, experimentsNewestFirst } from "@/components/triage/experimentSelect";
+import { ExperimentSelect, defaultPickerExperiment, useExperimentPicker } from "@/components/triage/experimentSelect";
+import { useEvaluationNames } from "@/components/experiments/useEvaluationNames";
 import { Card } from "@/components/ui/card";
 import { useGetGridQuery, useGetRunQuery, useGetTriageQuery, useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import { FlaskConical, SearchCheck } from "lucide-react";
@@ -21,15 +22,18 @@ export function triageExpId(raw: string | null): string | null {
 /**
  * The Triage tab of /inbox: ?tab=triage&exp=&pattern= (the old /triage redirects here). Observed
  * failure patterns per arm of one experiment, never root causes (docs/triage.md). With no ?exp= the
- * newest experiment is shown; the picker changes it.
+ * newest real comparison is shown (checks, practice and debug runs only with ?all=1); the picker changes it.
  */
 export default function TriageTab() {
 	const { t } = useTranslation("bench");
 	const [expParam, setExp] = useQueryState("exp", parseAsString);
 	const [, setPattern] = useQueryState("pattern", parseAsString);
+	const [all, setAll] = useQueryState("all", parseAsString);
 	const list = useListExperimentsQuery();
-	const experiments = useMemo(() => experimentsNewestFirst(list.data?.experiments ?? []), [list.data]);
-	const expId = triageExpId(expParam) ?? experiments[0]?.exp_id ?? null;
+	const experiments = useMemo(() => list.data?.experiments ?? [], [list.data]);
+	// Checks, practice runs and debug runs are listed only with all=1, so the tab opens on a real comparison.
+	const picker = useExperimentPicker(experiments, all === "1", useEvaluationNames());
+	const expId = defaultPickerExperiment(picker.options, triageExpId(expParam)) ?? null;
 
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="triage-screen">
@@ -37,12 +41,14 @@ export default function TriageTab() {
 			<TriageBanner />
 			<div className="flex flex-wrap items-end gap-3">
 				<ExperimentSelect
-					experiments={experiments}
+					picker={picker}
 					value={expId}
 					onChange={(next) => {
 						void setExp(next);
 						void setPattern(null);
 					}}
+					showHidden={all === "1"}
+					onShowHidden={(on) => void setAll(on ? "1" : null)}
 					disabled={list.isLoading || experiments.length === 0}
 					testId="triage-experiment-picker"
 				/>

@@ -68,16 +68,25 @@ const rows: ExperimentStatus[] = [
 		arms: ["A", "B"],
 	},
 ];
-const url = vi.hoisted(() => ({ all: null as string | null }));
+const url = vi.hoisted(() => ({
+	all: null as string | null,
+	q: null as string | null,
+	state: null as string | null,
+	extra: [] as import("@/lib/types/bench").ExperimentStatus[],
+}));
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("nuqs", () => ({
 	parseAsString: {},
-	useQueryStates: () => [{ q: null, state: null, suite: null, all: url.all }, () => undefined],
+	useQueryStates: () => [{ q: url.q, state: url.state, suite: null, all: url.all }, () => undefined],
 }));
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
-	useListExperimentsQuery: () => okQuery({ experiments: rows }),
+	useListExperimentsQuery: () => okQuery({ experiments: [...rows, ...url.extra] }),
+}));
+vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
+	useListEvaluationsQuery: () => okQuery([{ id: "ev_two", spec: { name: "codex: two models" } }]),
 }));
 
 const t = (k: string, o?: Record<string, string>) => `${k}:${o?.arms ?? ""}:${o?.suite ?? ""}`;
@@ -109,7 +118,7 @@ describe("ExperimentBoard", () => {
 		expect(html).toContain("B is better");
 		expect(html).toContain("3 of 8");
 		expect(html).toContain('data-testid="experiment-filter-status"');
-		expect(html).toContain('<option value="running">Running</option>');
+		expect(html).toContain('<option value="running">Running (1)</option>');
 		expect(html).toContain('data-testid="experiment-filter-suite"');
 		expect(html).toContain(">terminal-ops</option>");
 		expect(html).not.toContain("experiment-chip-");
@@ -123,7 +132,7 @@ describe("ExperimentBoard", () => {
 		expect(html).not.toContain("experiment-row-e_eval_child");
 		expect(html).not.toContain("experiment-row-e_practice");
 		expect(html).toContain("experiment-row-e_named");
-		expect(html).toContain("Also show readiness checks, practice runs and single benchmarks of evaluations (3)");
+		expect(html).toContain("Also show readiness checks, practice runs, debug runs and single benchmarks of evaluations (3)");
 		expect(html).toContain("Showing 2 of 2");
 		url.all = "1";
 		const every = render(<ExperimentBoard />);
@@ -138,5 +147,60 @@ describe("ExperimentBoard", () => {
 		expect(tagOf(html, "experiments-new")).toContain('href="/experiments/new"');
 		expect(html).toContain("New comparison");
 		expect(html).toContain("The single benchmarks of an evaluation are on its evaluation page.");
+	});
+
+	it("offers Cancelled, counts each status and puts analyzing under Running (N1)", () => {
+		url.extra = [
+			{ ...rows[1], exp_id: "e_cancel", name: "Stopped one", state: "cancelled", decision: undefined },
+			{ ...rows[1], exp_id: "e_analyze", name: "Working one", state: "analyzing", decision: undefined },
+		];
+		const html = render(<ExperimentBoard />);
+		expect(html).toContain('<option value="cancelled">Cancelled (1)</option>');
+		expect(html).toContain('<option value="running">Running (2)</option>');
+		expect(html).toContain('<option value="done">Finished (1)</option>');
+		url.state = "cancelled";
+		const cancelled = render(<ExperimentBoard />);
+		expect(cancelled).toContain("experiment-row-e_cancel");
+		expect(cancelled).not.toContain("experiment-row-e_named");
+		url.state = "running";
+		const running = render(<ExperimentBoard />);
+		expect(running).toContain("experiment-row-e_analyze");
+		expect(running).toContain("experiment-row-e_quick1");
+		expect(running).not.toContain("experiment-row-e_cancel");
+		url.state = null;
+		url.extra = [];
+	});
+	it("names evaluation benchmarks after their evaluation and finds them by it (N2)", () => {
+		url.extra = [
+			{
+				...rows[0],
+				exp_id: "e_eval_two",
+				name: "eval-20261122-143334-423797-hd-harbor-bfcl",
+				suite: "hd-harbor-bfcl@1.0.0",
+				evaluation_id: "ev_two",
+				arms: ["A", "B"],
+			},
+		];
+		url.q = "two models";
+		const html = render(<ExperimentBoard />);
+		url.q = null;
+		url.extra = [];
+		expect(html).toContain("experiment-row-e_eval_two");
+		expect(html).toContain("codex: two models · BFCL function calling");
+		expect(html).not.toContain("experiment-row-e_named");
+		expect(html).toContain("Search by name, evaluation or benchmark");
+	});
+	it("hides debug runs by default and tags them when shown (N29)", () => {
+		url.extra = [{ ...rows[1], exp_id: "e_replay_r_n697kiewjt_x4qq", name: "replay r_n697kiewjt", arms: ["A"], decision: undefined }];
+		const html = render(<ExperimentBoard />);
+		expect(html).not.toContain("experiment-row-e_replay_r_n697kiewjt_x4qq");
+		expect(html).toContain("debug runs");
+		url.all = "1";
+		const every = render(<ExperimentBoard />);
+		url.all = null;
+		url.extra = [];
+		expect(every).toContain("experiment-row-e_replay_r_n697kiewjt_x4qq");
+		expect(every).toContain("Replay of run r_n697kiewjt");
+		expect(every).toContain(" · debug run<");
 	});
 });

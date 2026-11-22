@@ -309,7 +309,9 @@ export function AgentBoardTable({ rows, capabilities, onOpen, rankBy, minRuns, m
 								)}
 							</div>
 						</TableCell>
-						<TableCell className="font-mono text-xs">{row.version > 0 ? `v${row.version}` : t("noVersion")}</TableCell>
+						<TableCell className="font-mono text-xs" title={row.version > 0 ? undefined : t("noVersionHint")}>
+							{row.version > 0 ? `v${row.version}` : t("noVersion")}
+						</TableCell>
 						<TableCell className="font-mono text-xs">{row.model || "-"}</TableCell>
 						{capabilities.map((c) => {
 							const s = row.capabilities[c];

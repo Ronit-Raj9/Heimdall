@@ -5,7 +5,8 @@ import type { AgentDiffVersionInfo } from "@/lib/types/bench";
 import { ArrowLeftRight } from "lucide-react";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
-import { findVersion, groupVersionsByAgent, versionLabel } from "./agentDiff.utils";
+import { countSystemVersions, findVersion, groupVersionsByAgent, versionLabel } from "./agentDiff.utils";
+import "./gw03I18n";
 
 export interface VersionPickerProps {
 	/** Every config hash the run folder knows. */
@@ -24,6 +25,9 @@ export interface VersionPickerProps {
 	/** Empty strings clear the param so the server default applies. */
 	onScope: (scope: { suite: string; condition: string }) => void;
 	onSynthetic: (on: boolean) => void;
+	/** Lists system checks (oracle, noop, readiness check setups) too; URL state system=1. */
+	showSystem?: boolean;
+	onShowSystem?: (on: boolean) => void;
 	disabled?: boolean;
 }
 
@@ -33,9 +37,12 @@ export interface VersionPickerProps {
  */
 export function VersionPicker(props: VersionPickerProps) {
 	const { t } = useTranslation("bench");
+	const { t: tg } = useTranslation("gw03");
 	const scopeId = useId();
 	const syntheticId = useId();
 	const { a, b, suite, condition, synthetic, disabled } = props;
+	const showSystem = Boolean(props.showSystem);
+	const systemCount = countSystemVersions(props.versions);
 	return (
 		<div className="flex flex-col gap-3" role="group" aria-label={t("agentDiff.picker.label")} data-testid="agentdiff-picker">
 			<div className="flex flex-wrap items-end gap-3">
@@ -44,6 +51,7 @@ export function VersionPicker(props: VersionPickerProps) {
 					value={a}
 					versions={props.versions}
 					onChange={props.onA}
+					showSystem={showSystem}
 					disabled={disabled}
 					testId="agentdiff-picker-a"
 				/>
@@ -63,9 +71,23 @@ export function VersionPicker(props: VersionPickerProps) {
 					value={b}
 					versions={props.versions}
 					onChange={props.onB}
+					showSystem={showSystem}
 					disabled={disabled}
 					testId="agentdiff-picker-b"
 				/>
+				{systemCount > 0 && props.onShowSystem && (
+					<label className="text-muted-foreground flex h-9 items-center gap-2 text-xs" title={tg("diffPicker.showSystemHint")}>
+						<input
+							type="checkbox"
+							checked={showSystem}
+							onChange={(event) => props.onShowSystem?.(event.target.checked)}
+							disabled={disabled}
+							className="accent-primary size-3.5"
+							data-testid="agentdiff-picker-system"
+						/>
+						{tg("diffPicker.showSystem", { count: systemCount })}
+					</label>
+				)}
 			</div>
 			<form
 				className="flex flex-wrap items-end gap-3"
@@ -146,14 +168,17 @@ interface VersionSelectProps {
 	value: string;
 	versions: readonly AgentDiffVersionInfo[];
 	onChange: (selector: string) => void;
+	showSystem: boolean;
 	disabled?: boolean;
 	testId: string;
 }
 
-function VersionSelect({ label, value, versions, onChange, disabled, testId }: VersionSelectProps) {
+function VersionSelect({ label, value, versions, onChange, showSystem, disabled, testId }: VersionSelectProps) {
 	const { t } = useTranslation("bench");
+	const { t: tg } = useTranslation("gw03");
 	const id = useId();
-	const groups = groupVersionsByAgent(versions);
+	// A chosen system version stays listed, so the select never shows a value it does not hold.
+	const groups = groupVersionsByAgent(versions, { showSystem: showSystem || Boolean(findVersion(versions, value)?.system) });
 	// A selector the list does not hold as is (a prefix, an arm, an unknown hash): a prefix of a
 	// listed hash selects that hash; anything else still shows as selected, raw.
 	const matched = findVersion(versions, value);
@@ -186,7 +211,7 @@ function VersionSelect({ label, value, versions, onChange, disabled, testId }: V
 									className="font-mono text-xs"
 									title={t("agentDiff.picker.optionHint", { hash: version.config_hash, count: version.sealed_runs })}
 								>
-									{versionLabel(version)}
+									{versionLabel(version, tg("diffPicker.unsaved"))}
 								</SelectItem>
 							))}
 						</SelectGroup>

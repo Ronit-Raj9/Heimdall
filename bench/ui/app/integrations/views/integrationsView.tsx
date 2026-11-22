@@ -43,6 +43,9 @@ import { BifrostUsePanel, bifrostUseStatus } from "@/components/bifrost/bifrostU
 import { useGetBifrostUseQuery } from "@/lib/store/apis/bifrostUseApi";
 import { useGetMaximQuery } from "@/lib/store/apis/traceToolsApi";
 import { useTranslation } from "react-i18next";
+import "@/app/experiments/views/experimentsI18n";
+import { exportPickerGroups, type ExperimentPickerOption } from "@/components/experiments/experiments.utils";
+import { useEvaluationNames } from "@/components/experiments/useEvaluationNames";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
@@ -679,8 +682,16 @@ export function exportParams(
 	return p;
 }
 
-function ExportsPanel() {
+/**
+ * The Download results panel. The comparison picker groups its choices (Evaluations, Comparisons,
+ * and checks, practice and debug runs behind a box) with readable names; the raw id is the
+ * option's tooltip. showHiddenAtStart ticks the box on first render.
+ */
+export function ExportsPanel({ showHiddenAtStart = false }: { showHiddenAtStart?: boolean } = {}) {
 	const { t } = useTranslation("integrations");
+	const { t: tx } = useTranslation("experimentsUx");
+	const evalNames = useEvaluationNames();
+	const [showHidden, setShowHidden] = useState(showHiddenAtStart);
 	const confirm = useConfirm();
 	const exps = useListExperimentsQuery();
 	const suites = useGetSuitesQuery();
@@ -694,6 +705,8 @@ function ExportsPanel() {
 	const [message, setMessage] = useState<string | null>(null);
 	const params = exportParams(format, expId, suite, payloads, allowSynthetic);
 	const experiments = exps.data?.experiments ?? [];
+	const groups = exportPickerGroups(experiments, (k, o) => String(tx(k as never, (o ?? {}) as never)), evalNames, showHidden);
+	const optionText = (o: ExperimentPickerOption) => `${o.label} · ${o.state ? tx(`status.${o.state}`, { defaultValue: o.state }) : ""}`;
 
 	return (
 		<div className="flex flex-col gap-4">
@@ -727,17 +740,48 @@ function ExportsPanel() {
 							</select>
 						</label>
 					) : (
-						<label className="flex flex-col gap-1 text-sm">
-							{t("exports.experiment")}
-							<select className={selectClass} value={expId} onChange={(e) => setExpId(e.target.value)} data-testid="export-experiment">
-								<option value="">{t("exports.pickExperiment")}</option>
-								{experiments.map((x) => (
-									<option key={x.exp_id} value={x.exp_id}>
-										{x.name ? `${x.name} (${x.exp_id})` : x.exp_id} · {x.state}
-									</option>
-								))}
-							</select>
-						</label>
+						<div className="flex flex-col gap-1 text-sm">
+							<label className="flex flex-col gap-1">
+								{t("exports.experiment")}
+								<select className={selectClass} value={expId} onChange={(e) => setExpId(e.target.value)} data-testid="export-experiment">
+									<option value="">{t("exports.pickExperiment")}</option>
+									{(
+										[
+											["evaluations", groups.evaluations],
+											["comparisons", groups.comparisons],
+											["other", groups.other],
+										] as const
+									).map(
+										([key, options]) =>
+											options.length > 0 && (
+												<optgroup key={key} label={t(`exports.groups.${key}`)}>
+													{options.map((o) => (
+														<option key={o.id} value={o.id} title={o.id}>
+															{optionText(o)}
+														</option>
+													))}
+												</optgroup>
+											),
+									)}
+								</select>
+							</label>
+							{groups.hiddenCount > 0 && (
+								<label className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+									<input
+										type="checkbox"
+										checked={showHidden}
+										onChange={(e) => {
+											setShowHidden(e.target.checked);
+											// A hidden choice cannot stay selected once its group is hidden again.
+											if (!e.target.checked && groups.other.some((o) => o.id === expId)) setExpId("");
+										}}
+										className="accent-primary size-3.5"
+										data-testid="export-show-hidden"
+									/>
+									{t("exports.showHidden", { count: groups.hiddenCount })}
+								</label>
+							)}
+						</div>
 					)}
 				</div>
 				{format === "otlp" && (

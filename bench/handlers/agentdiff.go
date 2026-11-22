@@ -9,6 +9,7 @@ import (
 	"github.com/maximhq/bifrost/bench/agentdiff"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/valyala/fasthttp"
 )
 
@@ -42,13 +43,16 @@ type AgentDiffHandler struct {
 	mode     schemas.Mode
 	index    ReadIndex
 	contents agentdiff.ContentSource
+	// root and library name the saved agent versions and evaluations the
+	// version list reads (agentversions.VersionOf, the evaluation store).
+	root, library string
 }
 
 // NewAgentDiffHandler creates the agent diff handler. index may be nil.
 // root is the bench root notes files are read from for text diffs; empty
 // compares them by hash only.
 func NewAgentDiffHandler(mode schemas.Mode, index ReadIndex, root string) *AgentDiffHandler {
-	return &AgentDiffHandler{mode: mode, index: index, contents: agentdiff.RootContents(root)}
+	return &AgentDiffHandler{mode: mode, index: index, contents: agentdiff.RootContents(root), root: root, library: suite.LibraryDir()}
 }
 
 // RegisterRoutes registers GET /agents/diff and GET /agents/diff/versions.
@@ -103,7 +107,52 @@ func (h *AgentDiffHandler) getVersions(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	list := agentdiff.Versions(src)
+	markVersions(src, newVersionIndex(h.root, h.library), list.Versions)
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &list)
+}
+
+// markVersions fills each version's saved agent version, model and system
+// flag from its newest arm, reading one manifest per hash. The version comes
+// from the evaluation that created the experiment, else from the saved
+// version whose agent hash matches the arm config. A hash is a system row
+// when its agent is scripted (oracle, noop and the other test doubles) or
+// when every arm that ran it belongs to a readiness check (e_admit_ ids), so
+// the picker can hide them.
+func markVersions(src agentdiff.Source, versions *versionIndex, list []agentdiff.VersionInfo) {
+	for i := range list {
+		v := &list[i]
+		admitOnly := len(v.Arms) > 0
+		for _, a := range v.Arms {
+			if !strings.HasPrefix(a.ExpID, "e_admit_") {
+				admitOnly = false
+				break
+			}
+		}
+		v.System = admitOnly
+		if len(v.Arms) == 0 {
+			continue
+		}
+		newest := v.Arms[0]
+		m, ok := src.Manifest(newest.ExpID)
+		if !ok || m == nil {
+			continue
+		}
+		arm, ok := m.Arms[newest.Arm]
+		if !ok {
+			continue
+		}
+		cfg := arm.Config
+		v.Model = cfg.Model
+		if cfg.Adapter == "scripted" || cfg.Scripted != nil {
+			v.System = true
+			continue
+		}
+		if n, ok := versions.fromEvaluation(m, newest.Arm); ok {
+			v.Version = n
+		} else if ah := armAgentHash(cfg); ah != "" {
+			v.Version = versions.lookup(cfg.ID, ah)
+		}
+	}
 }
 
 // AgentDiffSource adapts a ReadIndex to the agent diff's Source, verdict
