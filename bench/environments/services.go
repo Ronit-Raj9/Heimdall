@@ -369,9 +369,11 @@ func (e *dockerWorkspace) createNetworks(ctx context.Context, expID, runID strin
 
 // startProbe starts the container ready checks run in: the helper image,
 // idle, on the service networks, with nothing but python3 and sleep used.
+// It is created, joined to the hidden network and only then started: under
+// gVisor (runsc) a container never sees a network joined after it started.
 func (e *dockerWorkspace) startProbe(ctx context.Context, rc *schemas.RunContext, expID, runID string, hidden bool) (string, error) {
 	name := helperName(runID, "svcprobe")
-	args := append([]string{"run", "-d", "--name", name}, utils.LabelArgs(expID, runID)...)
+	args := append([]string{"create", "--name", name}, utils.LabelArgs(expID, runID)...)
 	args = append(args, "--network", serviceNetwork(runID), "--user", "65534:65534", "--cap-drop", "ALL",
 		"--security-opt", "no-new-privileges", "--read-only", "--pids-limit", "64", "--memory", "128m",
 		"--log-driver", "none", "--entrypoint", "sleep", e.helperImage(rc), "infinity")
@@ -384,6 +386,10 @@ func (e *dockerWorkspace) startProbe(ctx context.Context, rc *schemas.RunContext
 			e.removeContainers(ctx, name)
 			return "", fmt.Errorf("connect probe container: %w", err)
 		}
+	}
+	if _, err := e.cfg.Docker.MustRun(ctx, "start", name); err != nil {
+		e.removeContainers(ctx, name)
+		return "", fmt.Errorf("start probe container: %w", err)
 	}
 	return name, nil
 }
@@ -664,6 +670,12 @@ func (e *dockerWorkspace) startToolProxy(ctx context.Context, rc *schemas.RunCon
 		if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", hiddenNetwork(runID), name); err != nil {
 			return fmt.Errorf("connect tool proxy to the upstream network: %w", err)
 		}
+	}
+	if servesMCPThroughGateway(rc, e.cfg) { // B2: the gateway reaches the proxy on the evaluation network; joined before start for gVisor (bifrostmcp.go)
+		if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", "--alias", toolProxyGatewayAlias(runID), e.cfg.EvalNetwork, name); err != nil {
+			return fmt.Errorf("connect tool proxy to the evaluation network for the gateway: %w", err)
+		}
+		e.gatewayJoined.Store(runID, true)
 	}
 	raw, err := json.Marshal(struct {
 		RunID   string            `json:"run_id"`

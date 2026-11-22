@@ -114,18 +114,31 @@ type netWatch struct {
 }
 
 // startNetWatch starts the holder on network and the observer in its
-// namespace, and returns once the observer has opened its socket. Every
-// container is labelled with the run, so Destroy removes leftovers.
-func (e *dockerWorkspace) startNetWatch(ctx context.Context, rc *schemas.RunContext, expID, runID, network string) (*netWatch, error) {
+// namespace, and returns once the observer has opened its socket. The holder
+// is created, joined to every network in extra (the run's service and fault
+// networks) and only then started: under gVisor (runsc) a container never
+// sees a network joined after it started. Every container is labelled with
+// the run, so Destroy removes leftovers.
+func (e *dockerWorkspace) startNetWatch(ctx context.Context, rc *schemas.RunContext, expID, runID, network string, extra []string) (*netWatch, error) {
 	image := e.helperImage(rc)
 	w := &netWatch{d: e.cfg.Docker, logger: e.cfg.Logger, holder: helperName(runID, "net"), watcher: helperName(runID, "watch"), done: make(chan struct{})}
 	e.removeContainers(ctx, w.holder, w.watcher)
 	labels := utils.LabelArgs(expID, runID)
-	hold := append([]string{"run", "-d", "--name", w.holder}, labels...)
+	hold := append([]string{"create", "--name", w.holder}, labels...)
 	hold = append(hold, "--network", network, "--user", "65534:65534", "--cap-drop", "ALL",
 		"--security-opt", "no-new-privileges", "--read-only", "--pids-limit", "16", "--memory", "64m",
 		"--log-driver", "none", "--entrypoint", "sleep", image, "infinity")
 	if _, err := e.cfg.Docker.MustRun(ctx, hold...); err != nil {
+		w.remove(ctx)
+		return nil, fmt.Errorf("start network holder: %w", err)
+	}
+	for _, n := range extra {
+		if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", n, w.holder); err != nil {
+			w.remove(ctx)
+			return nil, fmt.Errorf("connect network holder to %s: %w", n, err)
+		}
+	}
+	if _, err := e.cfg.Docker.MustRun(ctx, "start", w.holder); err != nil {
 		w.remove(ctx)
 		if tool := missingExecutable(err.Error()); tool != "" {
 			return nil, fmt.Errorf("start network holder: %s", utils.HelperLacks(image, tool))

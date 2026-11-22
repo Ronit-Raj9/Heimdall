@@ -32,7 +32,7 @@ func TestEvaluationFailoverArmsAndOutage(t *testing.T) {
 	if exp == nil {
 		t.Fatalf("no experiment planned: %+v", ev.Children)
 	}
-	fo, ok := exp.Arms[failover.ArmID]
+	fo, ok := exp.Arms["B"] // the failover arm is arm B (withVariantArms)
 	if len(exp.Arms) != 2 || !ok || !strings.HasSuffix(fo.Label, failover.ArmLabelSuffix) {
 		t.Fatalf("arms %+v", exp.Arms)
 	}

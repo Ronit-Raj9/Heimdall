@@ -171,6 +171,14 @@ type schedRun struct {
 	cancelMu     sync.Mutex
 	cancels      map[string]context.CancelCauseFunc // in-flight local slots by id
 	heldOut      map[string]*schemas.Slot           // slots an operator cancelled, out of the queue; under mu
+
+	// X2 fair leases, retry wait and setup stop (fairlease.go, infrastop.go).
+	lastLeased   time.Time            // when a remote lease of this run was last handed out; under the coordinator's mu
+	notBefore    map[string]time.Time // slot id -> earliest time a remote worker may lease it again; under mu
+	retryNow     func() time.Time     // the coordinator clock notBefore was set with; under mu
+	setupFails   int                  // runs in a row that failed the same way before their agent started; under mu
+	setupSig     string               // that failure's signature (infraSignature); under mu
+	agentStarted bool                 // some run reached its agent: the setup stop never applies; under mu
 }
 
 // NewScheduler returns a scheduler. janitor may be nil (tests, or a host
@@ -1469,6 +1477,18 @@ func (q *slotQueue) drop() int {
 		q.notifyLocked()
 	}
 	return n
+}
+
+// takeAll removes every pending slot and returns them in queue order. They
+// were never out, so remote is unchanged; the caller ends each one (for
+// example with slotError).
+func (q *slotQueue) takeAll() []*schemas.Slot {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	out := q.pending
+	q.pending = nil
+	q.notifyLocked()
+	return out
 }
 
 // finish ends a slot that was out and needs nothing more from this queue.

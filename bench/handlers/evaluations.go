@@ -15,7 +15,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/maximhq/bifrost/bench/failover"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -810,6 +809,9 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 		variants[a.Label] = v
 	}
 	condIDs, fskips := faults.Conditions(spec.Faults, st)
+	for _, fs := range fskips { // D10: the faults that do not apply here, for the pages
+		child.FaultsSkipped = append(child.FaultsSkipped, schemas.FaultSkip{Fault: fs.Fault, Reason: fs.Reason})
+	}
 	if len(condIDs) == 0 || condIDs[0] != schemas.ConditionClean {
 		condIDs = append([]string{schemas.ConditionClean}, condIDs...)
 	}
@@ -862,22 +864,15 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 		}
 		variantNotes = append(variantNotes, "arm "+a.Label+": "+v.Note)
 	}
+	// Score mode variants (D5, D6): the cache-on copy, the failover arm and
+	// the no-memory control of the one arm, the first of them as arm B so
+	// the paired verdict plans (withVariantArms).
+	var fresh string
+	f.Arms, fresh = withVariantArms(spec, f.Arms)
 	if spec.Stream != nil {
 		st := *spec.Stream
-		if evalStreamControl(spec) {
-			// Score mode with memory carried: a visible "<agent> (no memory)"
-			// control runs the same tasks in the same order with empty memory,
-			// for forward transfer. It is counted in the estimate and kept off
-			// every leaderboard (schemas.StreamControlArm).
-			f.Arms[evalControlArm] = streamControlArm(f.Arms[spec.Arms[0].Label])
-			st.FreshArm = evalControlArm
-		}
+		st.FreshArm = fresh
 		f.Stream = &st
-	}
-	if spec.BifrostCache && len(spec.Arms) == 1 {
-		// Bifrost cache on vs off: the same arm again with a semantic cache
-		// key on every model request; the spec's arm is the cache-off arm.
-		f.Arms[schemas.EvaluationCacheArm] = cacheOnArm(f.Arms[spec.Arms[0].Label])
 	}
 	if _, _, err := s.Projects.Read(work, projectfs.AreaPolicies, strings.TrimPrefix(quickRunPolicy, "policies/")); err == nil {
 		f.Policy = quickRunPolicy
@@ -970,16 +965,10 @@ func evalStreamControl(spec schemas.EvaluationSpec) bool {
 }
 
 // evalArmCount is the experiment arms one benchmark of spec runs: one per
-// spec arm, plus the no-memory control when there is one.
+// spec arm, plus the variant arms of a score evaluation (withVariantArms).
 func evalArmCount(spec schemas.EvaluationSpec) int {
-	n := len(spec.Arms)
-	if spec.BifrostCache && len(spec.Arms) == 1 {
-		n++ // the cache-on copy (lane C08)
-	}
-	if evalStreamControl(spec) || evalFailover(spec) {
-		n++ // the no-memory control or the failover arm (lane C07)
-	}
-	return n
+	arms, _ := withVariantArms(spec, evalArms(spec))
+	return len(arms)
 }
 
 // streamControlArm is base without memory: the same agent and model,
@@ -1064,7 +1053,8 @@ func appendRunnerPool(body []byte, pool string) ([]byte, error) {
 	return append(body, []byte("runner:\n  pool: "+pool+"\n")...), nil
 }
 
-// evalArms turns the spec's arms into experiment arms, one per spec arm.
+// evalArms turns the spec's arms into experiment arms, one per spec arm
+// (withVariantArms adds a score evaluation's variants).
 // Score mode is one arm scored on its own (no hidden second run): the
 // planner plans it and the verdict gives a score with an interval.
 func evalArms(spec schemas.EvaluationSpec) map[string]schemas.ArmSpec {
@@ -1088,15 +1078,6 @@ func evalArms(spec schemas.EvaluationSpec) map[string]schemas.ArmSpec {
 			}
 		}
 		out[a.Label] = withSet(arm, mcpRouteSet(spec.MCPRoute))
-	}
-	if evalFailover(spec) { // lane C07: the agent again, with Bifrost fallbacks
-		a := spec.Arms[0]
-		provider, model := failoverTarget(a)
-		if set, err := failover.RoutingSet(provider, model, *spec.Failover); err == nil {
-			arm := withSet(out[a.Label], set)
-			arm.Label += failover.ArmLabelSuffix
-			out[failover.ArmID] = arm
-		}
 	}
 	return out
 }

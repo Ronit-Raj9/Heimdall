@@ -13,7 +13,7 @@ import (
 
 // failoverSection is the "Provider failover" section (lane C07) of an
 // evaluation run with the failover option: the plain arm on clean runs is
-// the clean arm, the fallback arm (failover.ArmID) under the primary outage
+// the clean arm, the fallback arm (the arm labelled with failover.ArmLabelSuffix) under the primary outage
 // is the failover arm, and the plain arm under the outage is the
 // no-failover arm. nil when the option was off or no run counted.
 func failoverSection(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation) (*failover.Report, error) {
@@ -27,6 +27,14 @@ func failoverSection(ctx context.Context, src leaderboard.Source, ev *schemas.Ev
 		}
 		if d, ok := src.LatestDecision(c.ExperimentID); ok && d == schemas.DecisionInvalid {
 			continue
+		}
+		// The fallback arm by its label: B in new evaluations, failover.ArmID
+		// in older ones (handlers withVariantArms).
+		fbArm := failover.ArmID
+		if m, ok := src.Manifest(c.ExperimentID); ok {
+			if id := schemas.VariantArmID(m, failover.ArmLabelSuffix); id != "" {
+				fbArm = id
+			}
 		}
 		bySlot := map[string][]leaderboard.Run{}
 		for _, r := range src.Runs(c.ExperimentID) {
@@ -48,7 +56,7 @@ func failoverSection(ctx context.Context, src leaderboard.Source, ev *schemas.Ev
 				continue
 			}
 			cond := cmp.Or(r.Slot.Condition, schemas.ConditionClean)
-			fb := r.Slot.Arm == failover.ArmID
+			fb := r.Slot.Arm == fbArm
 			var cell *failover.RunCell
 			switch {
 			case !fb && cond == schemas.ConditionClean:

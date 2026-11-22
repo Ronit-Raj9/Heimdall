@@ -442,12 +442,12 @@ func TestEvaluationStreamAndBudgetDisclosure(t *testing.T) {
 	}
 	ev := decodeEval(t, ctx)
 	exp := l.planned[ev.Children[0].ExperimentID]
-	if exp.Stream == nil || exp.Stream.Memory != "carry" || exp.Stream.Replay != 1 || exp.Stream.FreshArm != evalControlArm {
+	if exp.Stream == nil || exp.Stream.Memory != "carry" || exp.Stream.Replay != 1 || exp.Stream.FreshArm != "B" {
 		t.Fatalf("stream %+v", exp.Stream)
 	}
 	// Score mode with memory carried adds a visible no-memory control of the
 	// one agent, told apart only by its marker env var.
-	ctl, ok := exp.Arms[evalControlArm]
+	ctl, ok := exp.Arms["B"] // the control is arm B (withVariantArms)
 	if len(exp.Arms) != 2 || !ok || !strings.HasSuffix(ctl.Label, schemas.StreamControlSuffix) || ctl.Set["env."+schemas.StreamControlEnv] != "1" ||
 		ctl.Label != exp.Arms["A"].Label+schemas.StreamControlSuffix {
 		t.Fatalf("control arm %+v of %+v", ctl, exp.Arms)

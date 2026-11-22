@@ -237,7 +237,7 @@ func (c *Coordinator) loadLeases() {
 		c.pending[rec.ID] = &pendingLease{rec: rec, lastBeat: now}
 		w, ok := c.workers[rec.WorkerID]
 		if !ok {
-			w = &remoteWorker{refused: map[string]string{}, info: rec.Worker, parts: copyStrings(rec.Parts), scope: rec.Scope}
+			w = &remoteWorker{refused: map[string]*leaseRefusal{}, info: rec.Worker, parts: copyStrings(rec.Parts), scope: rec.Scope}
 			w.info.Running = nil
 			w.info.Rejected = 0
 			c.workers[rec.WorkerID] = w

@@ -120,7 +120,7 @@ type remoteWorker struct {
 	info     schemas.WorkerInfo
 	scope    schemas.RunnerScope // hosted: the token it registered with; zero in local mode
 	parts    map[string]string
-	refused  map[string]string // exp id -> why the worker refused it
+	refused  map[string]*leaseRefusal // exp id -> the worker's refusals of it (X3, remoterefuse.go)
 	rejected int
 	jobKinds []string // runner job kinds it takes; empty: every kind
 }
@@ -256,7 +256,7 @@ func (c *Coordinator) Register(ctx context.Context, req *schemas.WorkerRegister)
 		return nil, fmt.Errorf("worker %s: %w: the name is registered with another runner token; remove that runner first", req.WorkerID, schemas.ErrWorkerScope)
 	}
 	if !ok {
-		w = &remoteWorker{refused: map[string]string{}}
+		w = &remoteWorker{refused: map[string]*leaseRefusal{}}
 		c.workers[req.WorkerID] = w
 		c.order = append(c.order, req.WorkerID)
 	}
@@ -277,7 +277,7 @@ func (c *Coordinator) Register(ctx context.Context, req *schemas.WorkerRegister)
 	// is leased again (QC2-08-03); a still-broken one is stopped again after
 	// maxRejections uploads. WorkerInfo.Rejected shows the count meanwhile.
 	if ok {
-		w.refused = map[string]string{}
+		w.refused = map[string]*leaseRefusal{}
 		if w.rejected > 0 {
 			c.logger.Warn("remote worker registered again; its rejected-upload count starts over", "worker", req.WorkerID,
 				"rejected", w.rejected, "same_build", w.info.Version == req.Version && sameStrings(w.parts, req.Parts))
@@ -304,7 +304,8 @@ func (c *Coordinator) Register(ctx context.Context, req *schemas.WorkerRegister)
 // Lease hands the worker its next slot, or nil when there is none for now:
 // every slot is done, out, or waiting for the spend cap, or the worker holds
 // as many leases as it offers slots. An experiment the worker refused is
-// never offered to it again.
+// offered to it again after refuseRetry, and never after maxRefusals
+// (remoterefuse.go).
 func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.WorkerLease, error) {
 	scope, err := c.callScope(ctx)
 	if err != nil {
@@ -338,11 +339,13 @@ func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.Work
 	}
 	var exps []*schedRun
 	for _, r := range c.exps {
-		if _, refused := w.refused[r.m.ExpID]; !refused && c.openTo(w, r) {
+		if !c.refusedLocked(w, r) && c.openTo(w, r) { // X3: a refusal expires (remoterefuse.go)
 			exps = append(exps, r)
 			r.remoteOps.Add(1) // detach waits for this call (2-A-07)
 		}
 	}
+	// X2: fewest leases out, then oldest turn, then attach order (fairlease.go).
+	exps = c.fairOrderLocked(exps)
 	accept := remoteGPUAccept(w.info.GPUs, c.gpusHeldLocked(workerID)) // X7: GPU slots only to a worker with free GPUs (gpu.go)
 	c.mu.Unlock()
 	defer func() {
@@ -381,6 +384,7 @@ func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.Work
 			return nil, nil
 		}
 		c.leases[id] = l
+		r.lastLeased = c.now() // X2: its turn is taken (fairlease.go)
 		w.info.Running = append(w.info.Running, slot.SlotID)
 		w.info.State = schemas.WorkerRunning
 		l.persisted = l.lastBeat
@@ -681,13 +685,16 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 	l.r.emit(Event{Kind: EventRunSealed, SlotID: l.slot.SlotID, RunID: res.Run.RunID, Stage: schemas.StageSeal, Outcome: res.Run.Outcome,
 		Message: "sealed on remote worker " + l.worker})
 	again := res.Run.Outcome == schemas.OutcomeAbortedInfra && l.r.attemptsLeft(ctx, l.slot)
+	again = c.remoteRunEnded(l, res.Run, again) // X2: retry wait and same-error stop (infrastop.go)
 	l.r.endRemote(l, again)
 	return out, nil
 }
 
 // Release takes a lease back without a run. A refusal (the worker's manifest
-// hash, suite lock hash or part versions differ) costs nothing and keeps the
-// experiment from being offered to that worker again; a run abandoned after
+// hash, suite lock hash or part versions differ) costs nothing, is shown in
+// the job log, and keeps the experiment from that worker for refuseRetry;
+// once every worker refused it maxRefusals times its queued slots fail with
+// the reason (X3, remoterefuse.go). A run abandoned after
 // its agent started is charged its reported cost, or the estimate when that
 // is unknown.
 func (c *Coordinator) Release(ctx context.Context, leaseID string, req *schemas.WorkerRelease) error {
@@ -714,19 +721,22 @@ func (c *Coordinator) Release(ctx context.Context, leaseID string, req *schemas.
 		return err
 	}
 	why := "released: " + req.Reason
+	var refusal string
 	if req.Refuse {
 		why = "refused: " + req.Reason
-		if w := c.workers[l.worker]; w != nil {
-			w.refused[l.r.m.ExpID] = req.Reason
-		}
+		refusal = c.noteRefusalLocked(l, req.Reason) // X3 (remoterefuse.go)
 	}
 	c.endLocked(l, why)
+	allRefused := req.Refuse && c.everyWorkerRefusedLocked(l.r)
 	l.r.remoteOps.Add(1) // detach waits for the bookkeeping below (2-A-07)
 	c.mu.Unlock()
 	defer l.r.remoteOps.Done()
 	c.remove(l.archive)
 	c.logger.Warn("remote lease given back", "experiment", l.r.m.ExpID, "slot", l.slot.SlotID, "worker", l.worker,
 		"refused", req.Refuse, "reason", req.Reason)
+	if refusal != "" {
+		l.r.emit(Event{Kind: EventError, SlotID: l.slot.SlotID, Message: refusal})
+	}
 	event := map[bool]string{true: "refused", false: "released"}[req.Refuse]
 	if req.CostUSD != nil {
 		usd, known := l.r.charge(req.CostUSD, l.est, "abandoned lease "+l.id)
@@ -743,6 +753,9 @@ func (c *Coordinator) Release(ctx context.Context, leaseID string, req *schemas.
 		l.r.slotError(l.slot, fmt.Errorf("remote workers gave the slot back %d times without a run; last: %s", maxAttempts, req.Reason))
 	}
 	l.r.endRemote(l, again)
+	if allRefused { // X3: no worker is left that may take it; end the queued slots with the reason
+		l.r.failRefused(req.Reason)
+	}
 	return nil
 }
 
@@ -1281,6 +1294,7 @@ func (r *schedRun) leaseRemoteWhere(owner string, accept func(*schemas.Task) boo
 	if accept != nil {
 		match = func(s *schemas.Slot) bool { return accept(r.suite.TaskByID(s.Task)) }
 	}
+	match = r.retryWaitMatch(match) // X2: a slot inside its retry wait stays queued (fairlease.go)
 	for r.ctx.Err() == nil {
 		slot, ok := r.queue.takeWhere(match)
 		if !ok {

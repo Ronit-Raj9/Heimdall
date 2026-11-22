@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"sort"
@@ -77,23 +78,41 @@ type EvalEstimateRequest struct {
 	dailyCap float64 // the org's daily spend cap (0: none)
 	// BifrostCache adds the cache-on copy of the one arm (cacheOnArm).
 	BifrostCache bool `json:"bifrost_cache,omitempty"`
+	// Failover is the provider failover option: the launch adds the arm
+	// with fallbacks and the primary outage condition (normalizeFailover).
+	Failover *schemas.FailoverOption `json:"failover,omitempty"`
+	// MCPRoute is how the arms reach the tasks' MCP tool servers
+	// (EvaluationSpec.MCPRoute); a Bifrost route on a benchmark without an
+	// MCP tool server gets a note.
+	MCPRoute string `json:"mcp_route,omitempty"`
 }
 
-// streamControl reports whether the launch adds the no-memory control arm
-// (evalStreamControl).
-func (r *EvalEstimateRequest) streamControl() bool {
-	return len(r.Arms) == 1 && r.Stream != nil && r.Stream.Memory == schemas.StreamMemoryCarry
+// evalArmID is the experiment arm id of spec arm i: A, B, C and so on, the
+// labels the launch gives arms without one.
+func evalArmID(i int) string {
+	return string(rune('A' + i))
 }
 
-// armCount is the experiment arms one benchmark runs, the control included.
+// specView is the evaluation spec the request stands for, as far as the
+// experiment's arms go; spec arm i is labelled evalArmID(i), the id the
+// estimate's experiment gives it.
+func (r *EvalEstimateRequest) specView() schemas.EvaluationSpec {
+	spec := schemas.EvaluationSpec{Mode: r.Mode, BifrostCache: r.BifrostCache, Stream: r.Stream, Failover: r.Failover, MCPRoute: r.MCPRoute,
+		Faults: r.Faults, Concurrency: r.Concurrency}
+	if spec.Mode == "" && len(r.Arms) == 1 {
+		spec.Mode = schemas.EvaluationModeScore
+	}
+	for i, a := range r.Arms {
+		spec.Arms = append(spec.Arms, schemas.EvaluationArm{Label: evalArmID(i), Agent: a.Agent, Version: a.Version, Model: a.Model, Provider: a.Provider})
+	}
+	return spec
+}
+
+// armCount is the experiment arms one benchmark runs: the spec arms and
+// the variants the launch adds (cache-on copy, failover arm, no-memory
+// control), as evalArmCount counts them.
 func (r *EvalEstimateRequest) armCount() int {
-	if r.BifrostCache && len(r.Arms) == 1 {
-		return 2
-	}
-	if r.streamControl() {
-		return len(r.Arms) + 1
-	}
-	return len(r.Arms)
+	return evalArmCount(r.specView())
 }
 
 // EvalCostRange is a cost range in USD. Known false means at least one part
@@ -483,6 +502,15 @@ func normalizeEvalRequest(req *EvalEstimateRequest) error {
 			return badf("%v", err)
 		}
 	}
+	spec := req.specView()
+	if err := normalizeFailover(&spec); err != nil { // D6: as the launch: the failover arm and the primary outage
+		return err
+	}
+	req.Failover, req.Faults = spec.Failover, spec.Faults
+	if err := normalizeMCPRoute(&spec); err != nil {
+		return err
+	}
+	req.MCPRoute = spec.MCPRoute
 	if req.BudgetUSD < 0 {
 		return badf("budget_usd must not be negative")
 	}
@@ -579,6 +607,9 @@ func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSour
 	if why != "" {
 		be.Notes = append(be.Notes, "some tasks are skipped: "+why)
 	}
+	if req.MCPRoute != "" && !suiteHasMCPServer(st) { // D4.toolfaults: the route changes nothing here
+		be.Notes = append(be.Notes, fmt.Sprintf("The MCP route does not apply to %s: it has no MCP tool server.", id))
+	}
 	sets := make([]map[string]any, len(req.Arms))
 	for i, a := range req.Arms {
 		path, _ := normalizeAgent(a.Agent)
@@ -606,23 +637,13 @@ func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSour
 		be.Notes = append(be.Notes, "no forecast on this server")
 		return be
 	}
-	exp := evalExperiment(st, req, tasks, conds)
-	for i, set := range sets {
-		if set == nil {
-			continue
-		}
-		for id := range exp.Arms {
-			if id == evalArmIDs[i] {
-				exp.Arms[id] = withSet(exp.Arms[id], set)
-			}
-		}
-	}
+	exp := evalExperiment(st, req, tasks, conds, sets)
 	f, err := cache.estimate(ctx, src, exp, forecastKey(root, st, exp, req, agents))
 	if err != nil {
 		be.Notes = append(be.Notes, "no forecast: "+err.Error())
 		return be
 	}
-	applyForecast(&be, f, req.armCount(), req.orgSlots)
+	applyForecast(&be, f, slices.Sorted(maps.Keys(exp.Arms)), req.orgSlots)
 	return be
 }
 
@@ -632,14 +653,14 @@ func evalAdmittedTasks(st *schemas.Suite) []string {
 	return admittedTasks(st, schemas.SplitPublic).IDs
 }
 
-// evalArmIDs names the spec arms A, B.
-var evalArmIDs = []string{"A", "B"}
-
 // evalExperiment is the experiment an evaluation would launch on st: one
 // arm per spec arm, so a single setup is one arm scored on its own and the
-// estimate counts exactly the runs the launch plans; a score-mode stream
-// with memory carried adds its no-memory control as arm B.
-func evalExperiment(st *schemas.Suite, req *EvalEstimateRequest, tasks, conds []string) *schemas.Experiment {
+// estimate counts exactly the runs the launch plans, with the MCP route and
+// the task-image variant set of each arm (sets, by spec arm; nil entries
+// add nothing), plus the variants a score evaluation adds
+// (withVariantArms: the cache-on copy, the failover arm, the no-memory
+// control of a stream with memory carried), the first of them as arm B.
+func evalExperiment(st *schemas.Suite, req *EvalEstimateRequest, tasks, conds []string, sets []map[string]any) *schemas.Experiment {
 	arms := map[string]schemas.ArmSpec{}
 	base := ""
 	for i, a := range req.Arms {
@@ -658,15 +679,17 @@ func evalExperiment(st *schemas.Suite, req *EvalEstimateRequest, tasks, conds []
 		if a.Label != "" {
 			arm.Label = a.Label
 		}
-		arms[evalArmIDs[i]] = arm
+		arm = withSet(arm, mcpRouteSet(req.MCPRoute))
+		if i < len(sets) && sets[i] != nil {
+			arm = withSet(arm, sets[i])
+		}
+		arms[evalArmID(i)] = arm
 	}
+	arms, fresh := withVariantArms(req.specView(), arms)
 	var stream *schemas.StreamSpec
 	if req.Stream != nil {
 		st := *req.Stream
-		if req.streamControl() {
-			arms[evalArmIDs[1]] = streamControlArm(arms[evalArmIDs[0]])
-			st.FreshArm = evalArmIDs[1]
-		}
+		st.FreshArm = fresh
 		stream = &st
 	}
 	cs := make([]schemas.ConditionSpec, 0, len(conds))
@@ -690,9 +713,9 @@ func evalExperiment(st *schemas.Suite, req *EvalEstimateRequest, tasks, conds []
 	}
 }
 
-// applyForecast reads the spec arms' ranges out of f. Cost and time are
-// known only when every spec arm has a history range.
-func applyForecast(be *EvalBenchmarkEstimate, f *schemas.Forecast, nArms, slots int) {
+// applyForecast reads the ranges of the experiment's arms (want, by id) out
+// of f. Cost and time are known only when every arm has a history range.
+func applyForecast(be *EvalBenchmarkEstimate, f *schemas.Forecast, want []string, slots int) {
 	if f == nil {
 		be.Notes = append(be.Notes, "the forecast returned nothing")
 		return
@@ -703,7 +726,7 @@ func applyForecast(be *EvalBenchmarkEstimate, f *schemas.Forecast, nArms, slots 
 		be.Concurrency = min(be.Concurrency, slots)
 	}
 	be.Notes = append(be.Notes, f.Notes...)
-	want := evalArmIDs[:nArms]
+	nArms := len(want)
 	costKnown, timeKnown, found := true, true, 0
 	var agentLow, agentHigh float64
 	for _, a := range f.Arms {
