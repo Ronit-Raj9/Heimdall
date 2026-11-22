@@ -1,0 +1,79 @@
+# Bifrost built from this repository with the Heimdall plugin (plugins/heimdall).
+#
+# transports/Dockerfile builds with GOWORK=off against published module
+# versions, but this fork's transports imports packages that only exist in the
+# repo (core/streamusage, plugins/routing/complexity) and the unpublished
+# heimdall plugin. This file builds the same binary inside a Go workspace over
+# the local core, framework, transports and plugin modules, the way upstream CI
+# does (.github/workflows/scripts/setup-go-workspace.sh). The runtime stage
+# matches transports/Dockerfile.
+#
+#   docker build -f bench/deploy/bifrost/Dockerfile.plugin -t heimdall/bifrost-plugin:local .
+#
+# Context: the repository root. Used by deploy/hosted/docker-compose.bifrost-plugin.yml.
+
+# --- UI build stage ---
+FROM node:25-alpine3.23@sha256:bdf2cca6fe3dabd014ea60163eca3f0f7015fbd5c7ee1b0e9ccb4ced6eb02ef4 AS ui-builder
+WORKDIR /app
+RUN apk upgrade --no-cache
+COPY ui/package*.json ./
+RUN npm ci
+COPY ui/ ./
+RUN npm run build-enterprise
+
+# --- Go build stage (workspace over the local modules) ---
+FROM golang:1.27.3-alpine3.24@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS builder
+RUN apk upgrade --no-cache && \
+	apk add --no-cache gcc musl-dev sqlite-dev binutils binutils-gold
+ENV CGO_ENABLED=1 GOOS=linux GOTOOLCHAIN=local
+WORKDIR /src
+COPY core/ core/
+COPY framework/ framework/
+COPY plugins/ plugins/
+COPY transports/ transports/
+RUN go work init ./core ./framework ./transports && \
+	for d in ./plugins/*/; do if [ -f "$d/go.mod" ]; then go work use "$d"; fi; done && \
+	cat go.work
+COPY --from=ui-builder /app/out ./transports/bifrost-http/ui
+WORKDIR /src/transports
+ARG VERSION=unknown
+RUN go build \
+	-ldflags="-w -s -X main.Version=v${VERSION} -extldflags '-static'" \
+	-a -trimpath \
+	-tags "sqlite_static" \
+	-o /app/main \
+	./bifrost-http
+RUN test -f /app/main && cp docker-entrypoint.sh /app/docker-entrypoint.sh
+
+# --- Runtime stage (same as transports/Dockerfile) ---
+FROM alpine:3.23.7@sha256:ff7f0c727dd796aa36787bfcd9a64bf35a6ce72a73451b3359fde849b6703d63
+WORKDIR /app
+RUN apk upgrade --no-cache && \
+	apk add --no-cache musl libgcc ca-certificates zlib
+COPY --from=builder /app/main .
+COPY --from=builder /app/docker-entrypoint.sh .
+ARG ARG_APP_PORT=8080
+ARG ARG_APP_HOST=0.0.0.0
+ARG ARG_LOG_LEVEL=info
+ARG ARG_LOG_STYLE=json
+ARG ARG_APP_DIR=/app/data
+ENV APP_PORT=$ARG_APP_PORT \
+	APP_HOST=$ARG_APP_HOST \
+	LOG_LEVEL=$ARG_LOG_LEVEL \
+	LOG_STYLE=$ARG_LOG_STYLE \
+	APP_DIR=$ARG_APP_DIR
+ENV GOGC="" \
+	GOMEMLIMIT=""
+RUN mkdir -p "$APP_DIR/logs" && \
+	adduser -D -s /bin/sh appuser && \
+	chown -R appuser:appuser /app && \
+	chown -R appuser:0 "$APP_DIR" && \
+	{ [ "$APP_DIR" = "/app" ] || chmod -R g=rwX "$APP_DIR"; } && \
+	chmod +x /app/docker-entrypoint.sh
+USER 1000:0
+VOLUME ["${APP_DIR}"]
+EXPOSE $APP_PORT
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+	CMD wget -q -O /dev/null http://127.0.0.1:${APP_PORT}/health || exit 1
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["/app/main"]

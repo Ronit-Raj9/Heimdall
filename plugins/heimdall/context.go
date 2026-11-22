@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"strings"
+	"sync"
 
 	"github.com/maximhq/bifrost/core/schemas"
 )
@@ -31,6 +32,11 @@ type contextKey string
 const (
 	ContextKeyInfo  contextKey = "heimdall-info"  // *RequestInfo
 	ContextKeyFault contextKey = "heimdall-fault" // string: the fault mode applied on this request, if any
+	// ContextKeyFaultSlot holds a *faultSlot set by HTTPTransportPreHook on the
+	// HTTP request context. Bifrost core runs PreLLMHook on a child context,
+	// so a value set there never reaches HTTPTransportResponseHeadersHook; the
+	// shared slot carries the decision back up.
+	ContextKeyFaultSlot contextKey = "heimdall-fault-slot"
 )
 
 // RequestInfo is the Heimdall identity of one request.
@@ -41,6 +47,25 @@ type RequestInfo struct {
 	Arm         string `json:"arm,omitempty"`
 	FaultPlanID string `json:"fault_plan_id,omitempty"`
 	InlinePlan  *Plan  `json:"-"`
+}
+
+// faultSlot carries the fault decision from PreLLMHook (child context) to
+// HTTPTransportResponseHeadersHook (the HTTP request context).
+type faultSlot struct {
+	mu sync.Mutex
+	d  *Decision
+}
+
+func (s *faultSlot) set(d *Decision) {
+	s.mu.Lock()
+	s.d = d
+	s.mu.Unlock()
+}
+
+func (s *faultSlot) get() *Decision {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.d
 }
 
 // Empty reports whether the request carries no Heimdall identity at all.
