@@ -357,3 +357,138 @@ a warning naming the task to admit again.
 - Proof time is the admission's: about 3 minutes per task on an 8-core
   machine under heavy load (load average above 40), mostly the 3 reference
   gradings and the 2 null-agent workspaces.
+
+## From issues on the hosted site
+
+**Add benchmark, From issues** turns closed GitHub issues of one repository
+into tasks: it scans the issues and their fixing pull requests, builds a test
+environment with a builder model, checks that the fix's tests fail before the
+fix and pass after it, runs model checks, and emits tasks for you to review.
+On a laptop (`bifrost-bench serve`) every step runs in the server process. On
+the hosted site the work is split.
+
+### What runs where
+
+| Step | Hosted site |
+|---|---|
+| Scan (GitHub API) | server |
+| Build the environment and test one issue | a worker, as one runner job of kind `issuebench.work` ("Build and test an issue on a worker") |
+| Model checks on the built tasks | server, through the server's model gateway |
+| Emit the tasks (git only) | server |
+| Lint, lock and admit the emitted tasks | a worker, as for any other task |
+
+One issue is one job: a build-mode job builds the environment for its
+version (a month of the repository's history) and validates its own issue;
+later issues of the same version run a validate-mode job on that
+environment. A job is not retried by itself (no silent paid retries); use
+**Retry** on the issue.
+
+The job runs in the worker process, under the organization's Docker policy
+on the shared worker (gVisor, `heimdall.org` labels, `org-<org id>/...`
+images). The worker:
+
+1. Fetches the issue's base commit (a fresh shallow fetch per job into the
+   job's scratch folder, no cache, removed at the end).
+2. Build mode: runs the builder agent in a sandbox container on a per-job
+   internal network whose only way out is the egress proxy (below), then
+   builds the environment image from the builder's Dockerfile.
+3. Runs the fail-to-pass and pass-to-pass tests with `--network none`.
+4. Sends back result.json (the environment spec and the validation) and
+   removes its containers, network and images.
+
+Only result.json leaves the worker. The repository, the build log and the
+environment image stay on the worker and are removed when the job ends. The
+live log of each job shows on the issue (secret values redacted).
+
+### Egress allowlist
+
+The build sandbox reaches only these hosts, through an L7 proxy
+(`bench/egress:1`, mode `live-allowlisted`) that sits on the job's internal
+network:
+
+- `pypi.org`, `files.pythonhosted.org`
+- `deb.debian.org`, `security.debian.org`
+
+The operator adds hosts with `BENCH_ISSUEBENCH_EGRESS_ALLOW` (comma
+separated host names, at most 32 in all) in `deploy/hosted/.env`, then runs
+`upgrade.sh`. Test runs have no network at all.
+
+### GitHub token
+
+- A public repository (anonymous `git ls-remote` works) sends no token to the
+  worker.
+- A private repository needs GitHub connected for the organization (Settings,
+  GitHub). The server reads the token for that job only and sends it in the
+  job lease to a runner of the same organization. The worker keeps it in
+  memory and gives it to git only through `GIT_CONFIG_*` environment
+  variables: never in argv, a file, `.git/config` or a container. It is
+  redacted from every log line on the worker and again on the server.
+
+### Model key
+
+The server mints one Bifrost virtual key per build job on its own gateway,
+with the organization's own provider key from Models & keys. The worker gets
+only that key and calls the gateway with it; the provider key never leaves
+the server. The server revokes the key when the job ends (also on cancel or
+failure) and adds the job's reported cost to that key's month spend. The
+build's dollar cap (`BENCH_ISSUEBENCH_MAX_USD`, default 5 USD) also stops the
+builder on the worker.
+
+### Which worker
+
+- **The shared worker** takes `issuebench.work` when the operator runs the
+  `shared-runner` profile (docs/hosting.md section 9). It runs one build at a
+  time by default (`HEIMDALL_SHARED_ISSUEBENCH_CONCURRENCY`).
+- **An organization's own worker** takes every job kind. It needs Docker and
+  must reach the server's gateway at `BENCH_GATEWAY_PUBLIC_URL` (Caddy `/gw`
+  on the hosted site). Without it the job fails with `this worker can not
+  reach the server's model gateway: the operator sets
+  BENCH_GATEWAY_PUBLIC_URL`.
+- The server needs a model gateway too: without the `shared-runner` profile's
+  Bifrost, environments can not be built on the hosted site at all.
+
+### gVisor and snapshots
+
+The builder rolls its sandbox back to earlier states with `docker commit`.
+Under gVisor with its default in-sandbox overlay, a commit may miss files
+changed after the container started. The worker checks this once per
+runtime. When commits drop changes it replays the builder's commands from
+the base image instead, which is correct but slower, and logs once: `this
+worker's container runtime does not keep changes on docker commit; the
+builder replays commands instead`. For speed, the operator may register
+runsc with the runtime flag `--overlay2=none`; this is optional.
+
+### Limits
+
+- Repository archive per emitted task: 8 MiB (`environment/repo.tar.gz`). An
+  emitted task is self-contained (`environment/Dockerfile` plus that archive),
+  so admit rebuilds its image on the worker with no registry. A larger
+  checkout is refused at emit.
+- One job: 4 hours wall time. Request file 4 MiB, result 8 MiB.
+- Each emitted task adds its archive to the organization's project, which the
+  shared worker downloads before every lease (at most 2 GiB and 200000 files
+  unpacked). Many tasks from a big repository add up; remove tasks you do not
+  keep.
+
+### No worker online
+
+When no worker that takes `issuebench.work` is online, **Start** answers 409
+with a message starting `No worker online:`, and an issue that reaches its
+build step without one stops with the fix `open_workers` (open the Workers page). To fix it, turn on
+the shared pool for the organization (server admin) or connect a worker of
+your own (Settings, Workers; docs/runners.md), then press **Retry**.
+
+### Readiness
+
+`GET /api/bench/issuebench/readiness` (any member of the organization)
+answers what the form needs before a start:
+
+```json
+{"hosted": true, "worker_online": true, "github": true, "gateway": true, "default_model": false, "message": ""}
+```
+
+`worker_online` is a worker that takes `issuebench.work` now (always true
+locally), `github` a GitHub token for the scan, `gateway` a model gateway on
+the server, `default_model` `BENCH_ISSUEBENCH_PROVIDER` and
+`BENCH_ISSUEBENCH_MODEL` set. `message` names the first missing piece in
+plain words. The page shows it as a banner and checks it again at start.

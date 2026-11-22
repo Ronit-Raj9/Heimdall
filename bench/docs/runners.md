@@ -213,6 +213,31 @@ agent templates and the built-in library reproduce, plus images a server
 admin approved for that organization. Setup and guardrails:
 [hosting.md](hosting.md) section 9.
 
+## Job kinds
+
+Besides experiment slots, a runner takes runner jobs: hosted CLI jobs that
+start containers (agent build, scans, checks) and From issues builds. Each
+job has a kind, and a runner says at register which kinds it takes
+(`JobKinds`; empty means every kind). The coordinator leases a job only to a
+runner that takes its kind; a job of another kind stays queued for a runner
+that takes it.
+
+| Runner | Kinds it takes |
+|---|---|
+| An organization's own runner | every kind |
+| The shared worker | `issuebench.work` only ("Build and test an issue on a worker") |
+
+`issuebench.work` runs in the runner process, not as a `bifrost-bench`
+subprocess: on the shared worker that keeps every Docker call under the
+org's policy, and on an own runner it needs Docker and a reachable
+`BENCH_GATEWAY_PUBLIC_URL` (the server's gateway, through Caddy `/gw`). The
+lease carries a small request file and the job's secrets (a per-job model key,
+the gateway URLs and, for a private repository only, the GitHub token), held
+in memory only and redacted from every log line. Only result.json comes back.
+Details: [tasks-from-your-repo.md](tasks-from-your-repo.md), "From issues on
+the hosted site". With no runner online that takes a kind, a job of that kind
+fails with `No worker online:`.
+
 ## What a runner token can not do
 
 - Read or write anything but the worker routes: the tenancy policy refuses a

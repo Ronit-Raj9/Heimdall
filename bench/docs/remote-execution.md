@@ -77,6 +77,8 @@ Before it runs anything of an experiment, the worker fetches the manifest and ch
 
 A refusal releases the lease with `refuse: true`. It costs nothing, the slot goes back to the queue, the coordinator records the reason and never offers that experiment to that worker again.
 
+Runner jobs (hosted CLI jobs and From issues builds, lease kind `job`) carry a job kind such as `issuebench.work`. A worker names the kinds it takes when it registers (`job_kinds`, empty means all), and the coordinator leases a job only to a worker that takes its kind. A job of a kind the worker does not take stays queued for another worker and is never refused; the shared worker takes `issuebench.work` only. A job lease may carry `secrets` (for `issuebench.work`: the per-job model key, the gateway URLs and, for a private repository, the GitHub token): the worker keeps them in memory, never writes them to disk or argv, and redacts them from the log lines its heartbeats carry ([runners.md](runners.md#job-kinds)).
+
 ### Leases, heartbeats and lost workers
 
 A remote lease is an ordinary store lease on the slot, held by the coordinator for owner `worker:<worker id>:<lease id>`, with the same rules as a local slot (`docs/runner-safety.md`): the worker heartbeats at the scheduler's interval (15 s) and each heartbeat refreshes the store lease.

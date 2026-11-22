@@ -337,6 +337,8 @@ on, which is every organization without its own quota row.
 | `HEIMDALL_GATEWAY_PUBLIC_URL`, `HEIMDALL_TOOLS_PUBLIC_URL` | server and `shared-runner` | Where deployed agents (HTTP, OpenAI-compatible, A2A) and cloud sandboxes (Modal, Daytona, E2B) reach the shared worker's model gateway and live runs' tool gates. Default `https://$HEIMDALL_DOMAIN/gw` and `https://$HEIMDALL_DOMAIN/rt`: Caddy forwards both to the worker's public ingress, which answers only for live runs, with the run's own key or token, rate limited per run (docs/remote-execution.md, "Published through the server"). Leave them at the default. |
 | `HEIMDALL_RTGATE_NETWORK` | `shared-runner` | Internal network the worker reaches its runs' tool gates on (default `heimdall-rtgate`). |
 | `HEIMDALL_SHARED_SLOTS` | `shared-runner` | Slots per organization, capped by its max concurrent runs. Default 4, the default max concurrent runs of an org. |
+| `HEIMDALL_SHARED_ISSUEBENCH_CONCURRENCY` | `shared-runner` | From issues builds (job kind `issuebench.work`) at once on the shared worker, all organizations together. Default 1; a waiting job logs `waiting for a free build slot on this worker`. |
+| `BENCH_ISSUEBENCH_EGRESS_ALLOW` | server and `shared-runner` | Extra hosts (comma separated) a From issues build sandbox may reach through its egress proxy, on top of `pypi.org`, `files.pythonhosted.org`, `deb.debian.org` and `security.debian.org`. Host names only, at most 32 hosts in all. |
 
 2. Build the task and agent images the built-in benchmarks use, e.g.
    `docker build -t bench/coding-core-base:1 benchmarks/coding-core/base`.
@@ -401,9 +403,43 @@ Isolation between orgs on the shared host:
   another org's images or a platform tag. After upgrading, remove images that
   orgs built under global tags before this change (`docker image ls`).
 - Hosted CLI jobs (agent build and similar) do not run on the shared worker;
-  they run on an org's own workers.
+  they run on an org's own workers. The one exception is the job kind
+  `issuebench.work` (From issues builds, below): the shared worker takes it
+  and runs it in process, under the org's own Docker policy.
 - Run one shared worker per runtime: a second one with the same secret claims
   the same orgs' tokens and revokes the first one's.
+
+From issues builds on the shared worker (job kind `issuebench.work`, "Build
+and test an issue on a worker"; the full flow is in
+[tasks-from-your-repo.md](tasks-from-your-repo.md), "From issues on the
+hosted site"):
+
+- The server scans GitHub, runs the model checks and emits the tasks. Building
+  and testing one issue is one runner job, leased only to a worker that takes
+  that kind. The shared worker registers for `issuebench.work` only; an
+  organization's own worker takes every kind.
+- The job runs in the shared worker process, never as a `bifrost-bench`
+  subprocess, so every Docker call goes through the org's policy: runtime
+  `runsc`, labels `heimdall.org=<org id>`, images in `org-<org id>/...`.
+- Each job gets its own internal network `heimdall-ib-<job>` with no route
+  out, and an egress proxy container (`bench/egress:1`, mode
+  `live-allowlisted`) that is the only way out, to the allowlist above. The
+  shared worker builds `bench/egress:1` at start when it is missing, and
+  removes leftover issuebench containers and networks of its own.
+- Builds at once: `HEIMDALL_SHARED_ISSUEBENCH_CONCURRENCY` (default 1).
+- gVisor and snapshots: the builder agent rolls its sandbox back with
+  `docker commit`. With gVisor's default in-sandbox overlay a commit may miss
+  files changed after start; the worker checks this once per runtime and, when
+  commits drop changes, replays the builder's commands from the base image
+  instead (logged once: `this worker's container runtime does not keep
+  changes on docker commit; the builder replays commands instead`). Replay is
+  correct but slower. To keep commits fast, register runsc with the flag
+  `--overlay2=none` in `/etc/docker/daemon.json` (`"runtimeArgs":
+  ["--overlay2=none"]`) and reload Docker; this is optional.
+- The shared worker needs the `shared-runner` profile's Bifrost: the server
+  mints each job's model key on that gateway. Without the profile, From issues
+  builds can not run on the hosted site at all, and the readiness route says
+  so.
 
 Guardrails (server admin, `/api/bench/admin/...`):
 
@@ -535,7 +571,9 @@ each with a one-line meaning (`.env.example` has the same list):
 | `BENCH_ISSUEBENCH_PROVIDER`, `BENCH_ISSUEBENCH_MODEL` | Builder model for benchmarks made from GitHub issues (From issues) when the form names none; empty means the form must pick one. |
 | `BENCH_ISSUEBENCH_MAX_USD` | Dollar cap of one build from issues; empty is 5 USD. |
 | `BENCH_ISSUEBENCH_CHECK_MAX_USD` | Dollar cap of one model check job on a built benchmark; empty is 1 USD. |
-| `BENCH_ISSUEBENCH_NETWORK` | Docker network of build from issues containers; empty is Docker's default. |
+| `BENCH_ISSUEBENCH_NETWORK` | Docker network of build from issues containers when the server builds them itself (not hosted); empty is Docker's default. On the hosted site builds run on a worker on a per-job internal network instead. |
+| `BENCH_ISSUEBENCH_EGRESS_ALLOW` | Extra hosts (comma separated) a From issues build sandbox may reach through its egress proxy, on top of the Python package registries; empty adds none. |
+| `HEIMDALL_SHARED_ISSUEBENCH_CONCURRENCY` | From issues builds at once on the shared worker; empty is 1. |
 | `HEIMDALL_SHARED_BUILDKIT` | Address of the isolated BuildKit that builds images from org Dockerfiles. |
 | `HEIMDALL_REGISTRY_DIR` | Host folder (on the data disk) for that registry's images; empty is a Docker volume. |
 | `HEIMDALL_RUNNER_DIR` | Host folder of the shared worker's runs, releases and org projects; empty is `/var/lib/heimdall-shared-runner`. |
