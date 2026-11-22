@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -113,6 +114,10 @@ type DockerWorkspaceConfig struct {
 // step in short-lived containers, so the host never touches agent files.
 type dockerWorkspace struct {
 	cfg DockerWorkspaceConfig
+	// gatewayJoined holds the run ids whose tool proxy joined the
+	// evaluation network before it started (B2 MCP through Bifrost,
+	// bifrostmcp.go), so ServeMCP does not join it again.
+	gatewayJoined sync.Map
 }
 
 // newDockerWorkspace builds the environment and fills config defaults.
@@ -309,10 +314,20 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 			network, svcNet = svcNet, ""
 		}
 	}
-	joiner := name
-	if w := e.netWatch(ctx, rc, expID, runID, network); w != nil {
+	// Networks the agent's namespace joins after create and before start
+	// (gVisor never sees a network joined to a running container).
+	var extra []string
+	if svcNet != "" {
+		extra = append(extra, svcNet)
+	}
+	if rc.FaultRuntime != nil {
+		extra = append(extra, rc.FaultRuntime.Network)
+	}
+	holderJoined := false
+	if w := e.netWatch(ctx, rc, expID, runID, network, extra); w != nil {
 		defer w.close(ctx)
-		network, joiner = "container:"+w.holder, w.holder
+		// The holder owns the namespace and joined extra before it started.
+		network, holderJoined = "container:"+w.holder, true
 	}
 	// Agent steps area: trusted process and workspace observers (observers.go); never fail the run.
 	obs := e.startObservers(ctx, rc, plan, expID, runID)
@@ -334,14 +349,14 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 		keep = false
 		return nil, notLaunched(fmt.Errorf("exec run %s: create agent container: %w", runID, cerr))
 	}
-	if svcNet != "" {
-		if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", svcNet, joiner); err != nil {
+	if svcNet != "" && !holderJoined {
+		if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", svcNet, name); err != nil {
 			keep = false
 			return nil, notLaunched(fmt.Errorf("exec run %s: join service network: %w", runID, err))
 		}
 	}
-	if rc.FaultRuntime != nil {
-		if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", rc.FaultRuntime.Network, joiner); err != nil {
+	if rc.FaultRuntime != nil && !holderJoined {
+		if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", rc.FaultRuntime.Network, name); err != nil {
 			keep = false
 			return nil, notLaunched(fmt.Errorf("join adapter fault network: %w", err))
 		}
@@ -372,11 +387,11 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 // netWatch starts the network observer when NetWatch is on and the agent has
 // a network. A failure is recorded in the run folder and returns nil, so the
 // agent still runs, on the evaluation network itself.
-func (e *dockerWorkspace) netWatch(ctx context.Context, rc *schemas.RunContext, expID, runID, network string) *netWatch {
+func (e *dockerWorkspace) netWatch(ctx context.Context, rc *schemas.RunContext, expID, runID, network string, extra []string) *netWatch {
 	if !e.cfg.NetWatch || network == "none" {
 		return nil
 	}
-	w, err := e.startNetWatch(ctx, rc, expID, runID, network)
+	w, err := e.startNetWatch(ctx, rc, expID, runID, network, extra)
 	if err == nil {
 		return w
 	}
