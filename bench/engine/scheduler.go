@@ -292,6 +292,7 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 						return
 					}
 					r.runGPUSlot(ctx, slot)
+					r.checkEvalBudget(ctx)        // C06: GPU runs spend the same budget
 					r.queue.markDone(slot.SlotID) // stream mode
 				}
 			}()

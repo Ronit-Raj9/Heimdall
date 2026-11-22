@@ -1,6 +1,9 @@
 package schemas
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // Evaluations (agent-first benchmarking, contract section 3): one agent, or
 // two arms for an A/B, across many benchmarks at once. Each benchmark becomes
@@ -115,6 +118,25 @@ const EvaluationCacheArm = "cache"
 
 // EvaluationCacheSuffix ends the label of that arm.
 const EvaluationCacheSuffix = " (Bifrost cache on)"
+
+// CacheVariantArm reports whether arm of m is the cache-on copy an
+// evaluation with BifrostCache adds: arm id EvaluationCacheArm and a label
+// ending in EvaluationCacheSuffix. It is a variant of the spec's own arm, not
+// a separate setup, so readers that rank setups (the leaderboards) leave its
+// runs out; the cache on vs off report reads them (lane C08).
+func CacheVariantArm(m *Manifest, arm string) bool {
+	if m == nil || arm != EvaluationCacheArm {
+		return false
+	}
+	label := ""
+	if spec, ok := m.Experiment.Arms[arm]; ok {
+		label = spec.Label
+	}
+	if a, ok := m.Arms[arm]; ok && a.Label != "" {
+		label = a.Label
+	}
+	return strings.HasSuffix(label, EvaluationCacheSuffix)
+}
 
 // MCP routes of an evaluation (EvaluationSpec.MCPRoute).
 const (

@@ -5,6 +5,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/maximhq/bifrost/bench/schemas"
 )
 
 // budgetGateway is the fake gateway with a gateway-side evaluation budget
@@ -96,5 +98,62 @@ func TestSchedulerGatewayBudgetNeedsCap(t *testing.T) {
 	}
 	if len(gw.opened) != 0 || sum.GatewayBudgetStopped || sum.Sealed != 4 {
 		t.Fatalf("opened %v summary %+v", gw.opened, sum)
+	}
+}
+
+// C06 after GPU runs: a GPU worker's sealed run is followed by the same
+// gateway budget check, so GPU slots stop once Bifrost reports used up.
+func TestSchedulerGatewayBudgetStopsGPURuns(t *testing.T) {
+	b := newBench(t)
+	for i := range b.suite.Tasks {
+		b.suite.Tasks[i].Resources = &schemas.Resources{GPU: &schemas.GPURequest{Count: 1}}
+	}
+	b.reg.GPUs = gtxPool(t)
+	gw := &budgetGateway{fakeGateway: b.gw, usedAfter: 1}
+	b.reg.Gateway = gw
+	e := testExperiment()
+	e.Budget.TotalUSD = 50
+	m := b.plan(t, e)
+	sum, err := NewScheduler(b.reg, b.root, nil, nil).Run(context.Background(), m, RunOptions{Concurrency: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sum.GatewayBudgetStopped || sum.Sealed >= len(m.Slots) {
+		t.Fatalf("GPU runs went past the Bifrost budget: %+v", sum)
+	}
+}
+
+// C06 after remote runs: an upload the coordinator accepts is followed by
+// the gateway budget check, so no more leases go out once it is used up.
+func TestRemoteGatewayBudgetStop(t *testing.T) {
+	rw := newRemoteWorld(t, testExperiment(), RemoteOptions{})
+	done := rw.attach(t)
+	gw := &budgetGateway{fakeGateway: rw.coord.b.gw, usedAfter: 1}
+	rw.r.mu.Lock()
+	rw.r.evalBudget = gw
+	rw.r.mu.Unlock()
+	w := rw.worker(t, "w1", newRemoteSide(t))
+	l := lease(t, w)
+	if l == nil {
+		t.Fatal("no lease")
+	}
+	if res := w.Work(context.Background(), l); res == nil || !res.Accepted {
+		t.Fatalf("run: %+v", res)
+	}
+	if l2 := lease(t, w); l2 != nil {
+		t.Fatalf("lease %s handed out after the Bifrost budget was used up", l2.LeaseID)
+	}
+	if sum := done(); !sum.GatewayBudgetStopped || sum.StopReason != gatewayBudgetStopMessage || sum.Remote != 1 {
+		t.Fatalf("summary %+v", sum)
+	}
+}
+
+func TestBudgetRefusedCalls(t *testing.T) {
+	log := &schemas.RequestLog{Requests: []schemas.GatewayRequest{{ID: "a", BudgetRefused: true}, {ID: "b"}, {ID: "c", BudgetRefused: true}}}
+	if n := budgetRefusedCalls(log); n != 2 {
+		t.Fatalf("refused %d, want 2", n)
+	}
+	if budgetRefusedCalls(nil) != 0 {
+		t.Fatal("nil log")
 	}
 }

@@ -12,7 +12,8 @@ import (
 // the registered gateway can enforce an evaluation budget itself, Run opens
 // one for the evaluation's spend cap before any slot is leased, so every run
 // key is minted under it and the gateway refuses model calls past the cap.
-// After each local run the scheduler asks the gateway whether the budget is
+// After each run (local, GPU worker, or a remote worker's upload, accepted
+// or rejected) the scheduler asks the gateway whether the budget is
 // used up; if so it stops leasing like the bench's own spend cap, and the
 // summary and events say the evaluation was stopped by the gateway budget.
 
@@ -62,6 +63,9 @@ func (r *schedRun) checkEvalBudget(ctx context.Context) bool {
 	if gw == nil || done {
 		return false
 	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	cctx, cancel := context.WithTimeout(ctx, evalBudgetTimeout)
 	spent, limit, exhausted, err := gw.EvaluationBudgetSpent(cctx, r.m.ExpID)
 	cancel()
@@ -86,4 +90,20 @@ func (r *schedRun) checkEvalBudget(ctx context.Context) bool {
 	r.s.logger.Warn("gateway evaluation budget used up", "experiment", r.m.ExpID, "spent_usd", spent, "limit_usd", limit)
 	r.emit(Event{Kind: EventBudgetStop, Message: fmt.Sprintf("%s: the evaluation's Bifrost budget of %.2f USD is used up (%.4f USD spent as Bifrost counts it); no more runs are started", gatewayBudgetStopMessage, limit, spent)})
 	return true
+}
+
+// budgetRefusedCalls counts the run's model calls Bifrost refused because a
+// budget was used up (schemas.GatewayRequest.BudgetRefused, set by the
+// Bifrost gateway from bifrost.IsBifrostBudgetStop).
+func budgetRefusedCalls(log *schemas.RequestLog) int {
+	if log == nil {
+		return 0
+	}
+	n := 0
+	for _, r := range log.Requests {
+		if r.BudgetRefused {
+			n++
+		}
+	}
+	return n
 }

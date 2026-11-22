@@ -173,10 +173,14 @@ type Safety struct {
 
 // Report is GET /evaluations/{id}/report.
 type Report struct {
-	Evaluation   string                    `json:"evaluation"`
-	Status       string                    `json:"status,omitempty"`
-	Split        string                    `json:"split"`          // public, or held_out for a held-out evaluation
-	Mode         string                    `json:"mode,omitempty"` // the evaluation's mode; "score" has one arm and no verdict
+	Evaluation string `json:"evaluation"`
+	Status     string `json:"status,omitempty"`
+	Split      string `json:"split"`          // public, or held_out for a held-out evaluation
+	Mode       string `json:"mode,omitempty"` // the evaluation's mode; "score" has one arm and no verdict
+	// MCPRoute is how the arms reached the tasks' MCP tool servers (lane
+	// C11, EvaluationSpec.MCPRoute): bifrost or bifrost_code_mode; empty
+	// is direct.
+	MCPRoute     string                    `json:"mcp_route,omitempty"`
 	Arms         []Arm                     `json:"arms"`
 	Capabilities []Capability              `json:"capabilities"`
 	Benchmarks   []Benchmark               `json:"benchmarks"`
@@ -344,7 +348,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 		split = schemas.SplitPublic
 	}
 	rep := &Report{
-		Evaluation: ev.ID, Status: ev.Status, Split: split, Mode: ev.Spec.Mode, Arms: []Arm{}, Capabilities: []Capability{}, Benchmarks: []Benchmark{},
+		Evaluation: ev.ID, Status: ev.Status, Split: split, Mode: ev.Spec.Mode, MCPRoute: ev.Spec.MCPRoute, Arms: []Arm{}, Capabilities: []Capability{}, Benchmarks: []Benchmark{},
 		Reliability: []Reliability{}, Resilience: []Resilience{}, Safety: Safety{AttackResisted: map[string]float64{}, CheatRate: map[string]float64{}},
 	}
 	// Score mode is one arm scored on its own. Evaluations launched before

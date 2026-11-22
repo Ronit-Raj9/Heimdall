@@ -183,6 +183,9 @@ func parseDetail(raw []byte) (*parsedRow, error) {
 			r.ErrorMessage = d.ErrorDetails.Error.Message
 		}
 	}
+	if r.Status == "error" && (r.ErrorStatus != 0 || r.ErrorMessage != "") {
+		r.BudgetRefused = IsBifrostBudgetStop(r.ErrorStatus, r.ErrorMessage) // C06: marked on the run (Run.Gateway.BudgetRefusedCalls)
+	}
 	r.ToolCalls = d.toolCalls()
 	r.ToolResultIDs = toolResultIDs(d.RawRequest)
 	r.AgentLabel = agentLabel(d.Metadata) // Multi-agent area: a declared agent header (team.go)

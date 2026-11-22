@@ -170,6 +170,10 @@ func (p *Pipeline) RunSlot(ctx context.Context, in SlotInput) (*SlotResult, erro
 	sctx, scancel := context.WithTimeout(context.WithoutCancel(ctx), sealTimeout)
 	defer scancel()
 	up := utils.TallyUpstream(st.ev.Ledger, st.ev.Requests)
+	if n := budgetRefusedCalls(st.ev.Requests); n > 0 { // C06: calls Bifrost refused for budget
+		st.rc.Run.Gateway.BudgetRefusedCalls = n
+		p.logger.Warn("Bifrost refused model calls of the run: budget used up", "run", st.rc.Run.RunID, "slot", st.rc.Slot.SlotID, "refused", n)
+	}
 	st.rc.Run.Practice = practiceRun(st.rc, st.ev.Ledger) // X01: labelled in run.json
 	st.rc.Run.Outcome = decideOutcome(st, up)
 	if o, pf := endpointOutcome(st.rc, st.rc.Run.Outcome); pf != nil { // Y03: a customer endpoint outage is never the agent's score (endpointinfra.go)

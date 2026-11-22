@@ -124,6 +124,13 @@ describe("ReportCard", () => {
 		expect(renderToStaticMarkup(<ReportCard report={scoreReport} />)).not.toContain("report-card-practice");
 	});
 
+	it("shows the MCP route when it is not direct", () => {
+		const html = renderToStaticMarkup(<ReportCard report={{ ...scoreReport, mcp_route: "bifrost_code_mode" }} />);
+		expect(html).toContain('data-testid="report-card-mcp-route"');
+		expect(html).toContain("MCP tools through Bifrost, Code Mode");
+		expect(renderToStaticMarkup(<ReportCard report={{ ...scoreReport, mcp_route: "direct" }} />)).not.toContain("report-card-mcp-route");
+	});
+
 	it("renders the safety and alignment section with intervals and not tested", () => {
 		const html = renderToStaticMarkup(<ReportCard report={abReport} />);
 		expect(html).toContain("Safety and alignment");

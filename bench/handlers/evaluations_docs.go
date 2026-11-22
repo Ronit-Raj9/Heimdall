@@ -14,7 +14,7 @@ func init() {
 			Summary:  "List evaluations, newest first, with live status from their experiments",
 			Response: EvaluationList{}},
 		RouteDoc{Method: "POST", Path: p, Tag: "evaluations",
-			Summary: "Create an evaluation: one experiment per benchmark (pack resolved, incompatible benchmarks skipped), each launched like any experiment",
+			Summary: "Create an evaluation: one experiment per benchmark (pack resolved, incompatible benchmarks skipped), each launched like any experiment; mcp_route (direct, bifrost or bifrost_code_mode) picks how every arm reaches the tasks' MCP tool servers, and the report card shows it",
 			Auth:    AuthWrite, Request: schemas.EvaluationSpec{}, Status: fasthttp.StatusAccepted, Response: schemas.Evaluation{}},
 		RouteDoc{Method: "GET", Path: p + "/{id}", Tag: "evaluations",
 			Summary:  "One evaluation with live status from its experiments",

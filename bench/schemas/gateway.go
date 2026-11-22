@@ -161,27 +161,30 @@ func (l *RequestLog) Tally() *GatewayTally {
 
 // GatewayRequest is one Bifrost log row with its detail fields.
 type GatewayRequest struct {
-	ID             string          `json:"id"`
-	ParentID       string          `json:"parent_id,omitempty"`
-	Timestamp      time.Time       `json:"timestamp"`
-	Status         string          `json:"status"` // success | error | processing
-	Kind           string          `json:"kind"`   // message | count_tokens | models | other
-	Provider       string          `json:"provider"`
-	ModelRequested string          `json:"model_requested"`
-	ModelServed    string          `json:"model_served"`
-	FallbackIndex  int             `json:"fallback_index"`
-	Stream         bool            `json:"stream"`
-	LatencyMS      float64         `json:"latency_ms"`
-	Tokens         *Tokens         `json:"tokens,omitempty"` // nil when usage was not recorded
-	BifrostUSD     *float64        `json:"bifrost_usd,omitempty"`
-	CacheHit       bool            `json:"cache_hit"`
-	ResponseID     string          `json:"response_id,omitempty"` // provider message id when stored
-	ErrorStatus    int             `json:"error_status,omitempty"`
-	ErrorMessage   string          `json:"error_message,omitempty"`
-	Attempts       []Attempt       `json:"attempts,omitempty"`
-	ToolCalls      []ToolCallRef   `json:"tool_calls,omitempty"`      // tool calls in the response
-	ToolResultIDs  []string        `json:"tool_result_ids,omitempty"` // tool results in the request input
-	Raw            json.RawMessage `json:"raw,omitempty"`
+	ID             string    `json:"id"`
+	ParentID       string    `json:"parent_id,omitempty"`
+	Timestamp      time.Time `json:"timestamp"`
+	Status         string    `json:"status"` // success | error | processing
+	Kind           string    `json:"kind"`   // message | count_tokens | models | other
+	Provider       string    `json:"provider"`
+	ModelRequested string    `json:"model_requested"`
+	ModelServed    string    `json:"model_served"`
+	FallbackIndex  int       `json:"fallback_index"`
+	Stream         bool      `json:"stream"`
+	LatencyMS      float64   `json:"latency_ms"`
+	Tokens         *Tokens   `json:"tokens,omitempty"` // nil when usage was not recorded
+	BifrostUSD     *float64  `json:"bifrost_usd,omitempty"`
+	CacheHit       bool      `json:"cache_hit"`
+	ResponseID     string    `json:"response_id,omitempty"` // provider message id when stored
+	ErrorStatus    int       `json:"error_status,omitempty"`
+	ErrorMessage   string    `json:"error_message,omitempty"`
+	// BudgetRefused marks a call Bifrost refused because a governance
+	// budget was used up (gateways/bifrost.IsBifrostBudgetStop).
+	BudgetRefused bool            `json:"budget_refused,omitempty"`
+	Attempts      []Attempt       `json:"attempts,omitempty"`
+	ToolCalls     []ToolCallRef   `json:"tool_calls,omitempty"`      // tool calls in the response
+	ToolResultIDs []string        `json:"tool_result_ids,omitempty"` // tool results in the request input
+	Raw           json.RawMessage `json:"raw,omitempty"`
 	// W9 routing policy under test: the routing rule Bifrost matched for this
 	// row and the routing engines it logged (routing-rule, governance, ...).
 	RoutingRuleID   string   `json:"routing_rule_id,omitempty"`

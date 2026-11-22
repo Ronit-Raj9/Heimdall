@@ -670,6 +670,8 @@ export interface Report {
 	split?: "public" | "held_out" | string;
 	/** The evaluation's mode. "score" shows one arm and never an A/B verdict. */
 	mode?: EvaluationMode | string;
+	/** How the arms reached the tasks' MCP tool servers; absent is direct. */
+	mcp_route?: EvaluationMCPRoute | string;
 	arms: ReportArm[];
 	capabilities: ReportCapabilityRow[];
 	benchmarks: ReportBenchmarkRow[];

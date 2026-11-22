@@ -304,8 +304,9 @@ func collect(ctx context.Context, src Source) ([]*record, error) {
 
 // newRecord builds a slot's record from its runs, or nil when the slot's arm
 // resolves to no config hash, is a legacy score-mode repeat
-// (schemas.LegacyRepeatArm) or a stream's no-memory control
-// (schemas.StreamControlArm).
+// (schemas.LegacyRepeatArm), a stream's no-memory control
+// (schemas.StreamControlArm) or a Bifrost cache-on variant
+// (schemas.CacheVariantArm).
 func newRecord(exp *expInfo, runs []Run) *record {
 	slices.SortStableFunc(runs, func(x, y Run) int { return cmp.Compare(x.Run.Attempt, y.Run.Attempt) })
 	pick, sealed := runs[len(runs)-1], false
@@ -326,6 +327,9 @@ func newRecord(exp *expInfo, runs []Run) *record {
 	}
 	if schemas.StreamControlArm(exp.m, pick.Slot.Arm) {
 		return nil // a stream's no-memory control: forward transfer only, never ranked
+	}
+	if schemas.CacheVariantArm(exp.m, pick.Slot.Arm) {
+		return nil // the Bifrost cache-on variant of another arm (C08): read by the cache report, never ranked as its own setup
 	}
 	rec := &record{exp: exp, slot: pick.Slot, run: pick.Run, sealed: sealed, counted: counted}
 	if pick.Slot.Arm == "compat" && exp.m.Compatibility != nil {
