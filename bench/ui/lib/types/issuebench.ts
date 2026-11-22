@@ -47,6 +47,7 @@ export interface IssueRun {
 	repo: string;
 	status: "scanned" | "running" | "done" | "failed" | "canceled";
 	consent: boolean;
+	builder_model?: { provider?: string; model?: string; key_id?: string };
 	detail?: string;
 	funnel: IssueFunnel;
 	items: IssueItem[] | null;

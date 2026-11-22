@@ -22,6 +22,13 @@ declare module "@/lib/i18n/resources" {
 
 type T = ReturnType<typeof useTranslation<"issuebench">>["t"];
 
+/** The start body: consent, plus the builder model when both fields are filled (empty uses the server's default). */
+export function startBody(consent: boolean, provider: string, model: string) {
+	const p = provider.trim();
+	const m = model.trim();
+	return p && m ? { consent, provider: p, model: m } : { consent };
+}
+
 /** The body of a retry with the fix the person chose; null when they cancelled the prompt. */
 export function retryBody(fix: IssueFix, answer: string | null) {
 	if (fix === "retry") return { fix };
@@ -97,6 +104,8 @@ function RunView({ id, writable, t }: { id: string; writable: boolean; t: T }) {
 	const run = useGetIssueRunQuery(id, { pollingInterval: poll });
 	const [start, startState] = useStartIssueRunMutation();
 	const [consent, setConsent] = useState(false);
+	const [provider, setProvider] = useState("");
+	const [model, setModel] = useState("");
 	const [error, setError] = useState("");
 	const data = run.data;
 	const running = data?.status === "running";
@@ -108,7 +117,7 @@ function RunView({ id, writable, t }: { id: string; writable: boolean; t: T }) {
 	const onStart = async () => {
 		setError("");
 		try {
-			await start({ id, consent }).unwrap();
+			await start({ id, ...startBody(consent, provider, model) }).unwrap();
 			setPoll(2000);
 		} catch (e) {
 			setError(getBenchErrorMessage(e));
@@ -121,7 +130,27 @@ function RunView({ id, writable, t }: { id: string; writable: boolean; t: T }) {
 			{items.length === 0 ? (
 				<p className="text-muted-foreground">{t("none")}</p>
 			) : (
-				<div className="flex flex-wrap items-center gap-3">
+				<div className="flex flex-wrap items-end gap-3">
+					<label className="flex flex-col gap-1">
+						<span className="text-xs font-medium">{t("provider")}</span>
+						<input
+							className="border-input bg-background h-9 w-36 rounded-md border px-2"
+							value={provider}
+							placeholder={data.builder_model?.provider || "openai"}
+							onChange={(e) => setProvider(e.target.value)}
+							data-testid="issuebench-provider"
+						/>
+					</label>
+					<label className="flex flex-col gap-1">
+						<span className="text-xs font-medium">{t("model")}</span>
+						<input
+							className="border-input bg-background h-9 w-48 rounded-md border px-2"
+							value={model}
+							placeholder={data.builder_model?.model || t("modelDefault")}
+							onChange={(e) => setModel(e.target.value)}
+							data-testid="issuebench-model"
+						/>
+					</label>
 					<label className="flex items-center gap-2">
 						<input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} data-testid="issuebench-consent" />
 						<span>{t("consent")}</span>

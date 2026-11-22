@@ -158,3 +158,48 @@ func TestMissingStagesSayWhy(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+type modelBuild struct {
+	mu  sync.Mutex
+	got []ModelChoice
+}
+
+func (f *modelBuild) Build(ctx context.Context, c issuebench.Candidate, o BuildOptions, logf func(string, ...any)) (issuebench.BuildResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.got = append(f.got, o.ModelChoice)
+	return issuebench.BuildResult{Stop: issuebench.StopOK, Env: &issuebench.EnvSpec{Repo: c.Repo, BaseImage: "python:3.12-slim"}}, nil
+}
+
+type modelValidate struct {
+	mu  sync.Mutex
+	got []ModelChoice
+}
+
+func (f *modelValidate) Validate(ctx context.Context, c issuebench.Candidate, env issuebench.EnvSpec, logf func(string, ...any)) (issuebench.Validation, error) {
+	f.mu.Lock()
+	f.got = append(f.got, ModelFrom(ctx))
+	f.mu.Unlock()
+	return fakeValidate{}.Validate(ctx, c, env, logf)
+}
+
+func TestPipelineModelChoice(t *testing.T) {
+	b, v := &modelBuild{}, &modelValidate{}
+	m := NewManager(t.TempDir(), Stages{Scanner: fakeScan{cands: []issuebench.Candidate{cand(1, 3)}}, Builder: b, Validator: v, Emitter: &fakeEmit{}})
+	s, err := m.Scan(context.Background(), "a/b", ScanOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.StartWith(s.ID, true, ModelChoice{Provider: "openai"}); !errors.Is(err, ErrBadRequest) {
+		t.Fatalf("half a choice: %v", err)
+	}
+	pick := ModelChoice{Provider: "anthropic", Model: "claude-x", KeyID: "k1"}
+	if _, err := m.StartWith(s.ID, true, pick); err != nil {
+		t.Fatal(err)
+	}
+	m.Wait()
+	s, _ = m.Load(s.ID)
+	if s.Model != pick || len(b.got) != 1 || b.got[0] != pick || len(v.got) != 1 || v.got[0] != pick {
+		t.Fatalf("model not carried: state %+v build %+v validate %+v", s.Model, b.got, v.got)
+	}
+}

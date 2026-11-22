@@ -85,43 +85,72 @@ func validateIssuebenchBuild(_ context.Context, env jobEnv, raw json.RawMessage)
 	return p, p.Repo + "@" + p.Version, nil
 }
 
-// issuebenchModelFor wires the builder's gateway model; tests replace it.
-var issuebenchModelFor = func(ctx context.Context, env jobEnv, p issuebenchBuildParams, jobID string) (builder.Model, func(), error) {
-	gw, url, closeGW, err := calibrateGatewayFor(ctx, env)
+// issuebenchGatewayFor opens the job's gateway and, hosted, registers the
+// org's own key for provider with it. expID binds the per-job key to the org.
+func issuebenchGatewayFor(ctx context.Context, env jobEnv, provider, keyID string) (gw schemas.Gateway, url, expID string, closeGW func(), err error) {
+	gw, url, closeGW, err = calibrateGatewayFor(ctx, env)
 	if err != nil {
-		return nil, nil, err
+		return nil, "", "", nil, err
 	}
-	expID := ""
 	if env.Hosted {
 		cg, ok := gw.(calibrateGateway)
 		if !ok {
 			closeGW()
-			return nil, nil, errors.New("this server's gateway can not route calls to the org's own key")
+			return nil, "", "", nil, errors.New("this server's gateway can not route calls to the org's own key")
 		}
-		k, err := calibrateOrgKey(ctx, env.Services.Keys, env.OrgID, p.Provider, p.KeyID)
+		k, err := calibrateOrgKey(ctx, env.Services.Keys, env.OrgID, provider, keyID)
 		if err != nil {
 			closeGW()
-			return nil, nil, err
+			return nil, "", "", nil, err
 		}
 		value, err := env.Services.Keys.Reveal(ctx, env.OrgID, k.ID)
 		if err != nil || value == "" {
 			closeGW()
-			return nil, nil, fmt.Errorf("read key %s: it can not be decrypted; replace it on /models", k.ID)
+			return nil, "", "", nil, fmt.Errorf("read key %s: it can not be decrypted; replace it on /models", k.ID)
 		}
 		cred := schemas.ProviderCredential{KeyID: k.ID, Provider: k.Provider, BaseURL: k.BaseURL, Models: k.Models, Value: value}
 		if err := cg.ApplyOrgCredentials(ctx, env.OrgID, []schemas.ProviderCredential{cred}); err != nil {
 			closeGW()
-			return nil, nil, fmt.Errorf("register the org key with the gateway: %w", err)
+			return nil, "", "", nil, fmt.Errorf("register the org key with the gateway: %w", err)
 		}
 		expID = "issuebench-" + calibrateOrgSafe(env.OrgID)
 		cg.BindExperimentOrg(expID, env.OrgID)
 	}
-	var price func(string, schemas.Tokens) (float64, bool)
-	if env.App.prices != nil {
-		price = graders.PricesFrom(env.App.prices.Lookup)
+	return gw, url, expID, closeGW, nil
+}
+
+func issuebenchPrice(env jobEnv) func(string, schemas.Tokens) (float64, bool) {
+	if env.App != nil && env.App.prices != nil {
+		return graders.PricesFrom(env.App.prices.Lookup)
+	}
+	return nil
+}
+
+// issuebenchAddSpend adds a job's model cost to the org key's month spend.
+func issuebenchAddSpend(ctx context.Context, env jobEnv, log jobs.Logger, provider, keyID string, cost float64) {
+	if !env.Hosted || cost <= 0 || env.Services.Keys == nil {
+		return
+	}
+	if k, err := calibrateOrgKey(ctx, env.Services.Keys, env.OrgID, provider, keyID); err == nil {
+		if err := env.Services.Keys.AddSpend(ctx, env.OrgID, k.ID, cost); err != nil {
+			log.Warnf("add $%.4f to key %s's month spend: %v", cost, k.ID, err)
+		}
+	}
+}
+
+// issuebenchModelFor wires the builder's gateway model; tests replace it.
+var issuebenchModelFor = func(ctx context.Context, env jobEnv, p issuebenchBuildParams, jobID string) (builder.Model, func(), error) {
+	gw, url, expID, closeGW, err := issuebenchGatewayFor(ctx, env, p.Provider, p.KeyID)
+	if err != nil {
+		return nil, nil, err
+	}
+	price := issuebenchPrice(env)
+	var logger schemas.Logger
+	if env.App != nil {
+		logger = env.App.logger
 	}
 	m := builder.NewGatewayModel(builder.GatewayConfig{Gateway: gw, URL: url, Provider: p.Provider, Model: p.Model, Temperature: 0,
-		Price: price, KeyName: "r_ib" + issuebenchKeySafe(jobID), ExpID: expID, Logger: env.App.logger})
+		Price: price, KeyName: "r_ib" + issuebenchKeySafe(jobID), ExpID: expID, Logger: logger})
 	return m, func() { m.Close(ctx); closeGW() }, nil
 }
 
@@ -177,12 +206,6 @@ func runIssuebenchBuild(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.L
 	if res.Stop != issuebench.StopOK {
 		log.Warnf("build stopped: %s: %s", res.Stop, res.Detail)
 	}
-	if env.Hosted && res.CostUSD > 0 && env.Services.Keys != nil {
-		if k, err := calibrateOrgKey(ctx, env.Services.Keys, env.OrgID, p.Provider, p.KeyID); err == nil {
-			if err := env.Services.Keys.AddSpend(ctx, env.OrgID, k.ID, res.CostUSD); err != nil {
-				log.Warnf("add $%.4f to key %s's month spend: %v", res.CostUSD, k.ID, err)
-			}
-		}
-	}
+	issuebenchAddSpend(ctx, env, log, p.Provider, p.KeyID, res.CostUSD)
 	return res, nil
 }
