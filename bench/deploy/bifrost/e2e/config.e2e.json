@@ -1,0 +1,38 @@
+{
+  "$schema": "https://www.getbifrost.ai/schema",
+  "disable_onboarding": true,
+  "client": {
+    "enable_logging": false,
+    "enforce_auth_on_inference": false,
+    "allow_direct_keys": false
+  },
+  "providers": {
+    "openai": {
+      "keys": [
+        {
+          "name": "heimdall-e2e-mock",
+          "value": "e2e-dummy-key",
+          "models": ["gpt-4o-mini"],
+          "weight": 1
+        }
+      ],
+      "network_config": {
+        "base_url": "__UPSTREAM__",
+        "max_retries": 0,
+        "default_request_timeout_in_seconds": 10
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "heimdall",
+      "enabled": true,
+      "config": {
+        "enabled": true,
+        "plans": {
+          "rl-first": {"mode": "rate_limit", "retry_after_s": 7, "calls": 1}
+        }
+      }
+    }
+  ]
+}
