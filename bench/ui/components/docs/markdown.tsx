@@ -1,3 +1,5 @@
+import { DOCS_REPO_DIR, REPO_BLOB_URL } from "@/lib/constants/repo";
+import i18n from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { TriangleAlert, Check, Copy, Info, Lightbulb, OctagonAlert, type LucideIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -154,6 +156,50 @@ export function relativeDocTarget(href: string): string | null {
 	return RELATIVE_DOCS[path] ?? null;
 }
 
+/**
+ * A relative link to a repository file that is not a guide (`../examples/acme-web/README.md`,
+ * `probes/tool-poison.yaml`), as the file's address on GitHub: resolved from bench/docs/, anchor
+ * kept. Null for guide links (`foo.md`), the in-app files of RELATIVE_DOCS, absolute or scheme
+ * links, and paths that leave the repository. Exported for tests (N137).
+ */
+export function repoFileUrl(href: string): string | null {
+	const h = href.trim();
+	if (!h || h.startsWith("#") || h.startsWith("/") || /^[a-z][a-z0-9+.-]*:/i.test(h)) return null;
+	if (/^(?:\.\/)?[\w.-]+\.md(?:#[\w-]+)?$/.test(h)) return null;
+	if (relativeDocTarget(h) !== null) return null;
+	const hash = h.indexOf("#");
+	const path = hash >= 0 ? h.slice(0, hash) : h;
+	const anchor = hash >= 0 ? h.slice(hash) : "";
+	const parts = DOCS_REPO_DIR.split("/").filter(Boolean);
+	for (const seg of path.split("/")) {
+		if (seg === "" || seg === ".") continue;
+		if (seg === "..") {
+			if (parts.length === 0) return null;
+			parts.pop();
+		} else {
+			parts.push(seg);
+		}
+	}
+	if (parts.length === 0) return null;
+	return `${REPO_BLOB_URL}${parts.join("/")}${anchor}`;
+}
+
+/** The local server addresses guides use in samples; on a hosted server they point at this server instead. */
+const LOCAL_SERVER = /http:\/\/(?:127\.0\.0\.1|localhost):8090(?![0-9])/g;
+
+/**
+ * A guide's markdown for a hosted reader: every `http://127.0.0.1:8090` and `http://localhost:8090`
+ * becomes this server's origin, with the count of replacements (N136). Exported for tests.
+ */
+export function hostedDocSource(markdown: string, origin: string): { text: string; replaced: number } {
+	let replaced = 0;
+	const base = origin.replace(/\/+$/, "");
+	const text = markdown.replace(LOCAL_SERVER, () => {
+		replaced++;
+		return base;
+	});
+	return { text, replaced };
+}
 const INLINE = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\[[^\]]+\]\([^)\s]+\))|(\*[^*\s][^*]*\*)|(_[^_\s][^_]*_)/g;
 
 function renderInline(text: string, onDocLink: MarkdownProps["onDocLink"], keyBase: string): ReactNode[] {
@@ -179,7 +225,17 @@ function renderInline(text: string, onDocLink: MarkdownProps["onDocLink"], keyBa
 			const href = safeHref(lm?.[2] ?? "");
 			const doc = href ? /^(?:\.\/)?([\w.-]+)\.md(?:#([\w-]+))?$/.exec(href) : null;
 			const outside = href?.startsWith("../") ? relativeDocTarget(href) : undefined;
-			if (outside !== undefined) {
+			const repoFile = href ? repoFileUrl(href) : null;
+			if (repoFile) {
+				// A repository file outside the guides (an example's README, a probe file): it opens
+				// on GitHub, since this server does not serve it.
+				out.push(
+					<a key={key} href={repoFile} className="text-primary underline underline-offset-2" target="_blank" rel="noreferrer noopener">
+						{label}
+						<span className="text-muted-foreground ml-1 text-[0.8em] no-underline">{i18n.t("docs.onGitHub", { ns: "welcome" })}</span>
+					</a>,
+				);
+			} else if (outside !== undefined) {
 				// A link out of the docs folder: a known file opens its in-app guide; any other
 				// would be a broken link, so it is plain text.
 				if (outside === null) {

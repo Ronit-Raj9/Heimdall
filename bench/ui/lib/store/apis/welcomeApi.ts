@@ -1,11 +1,17 @@
 import type { DocBody, DocList, QuickRunRequest, QuickRunResponse } from "@/lib/types/welcome";
 import { benchApi } from "./benchApi";
 
+/** GET /docs, with the snippet a search hit carries (fix wave 2, N138). */
+export interface DocSearchList extends DocList {
+	docs: (DocList["docs"][number] & { snippet?: string })[];
+}
+
 /** Onboarding (lane L21): in-app docs and the wizard's one-call run (POST /quickrun, lane L28). */
 export const welcomeApi = benchApi.enhanceEndpoints({ addTagTypes: ["WelcomeDocs"] }).injectEndpoints({
 	endpoints: (builder) => ({
-		listDocs: builder.query<DocList, void>({
-			query: () => "/docs",
+		// q (2 to 80 characters) searches titles, names and bodies; each hit then carries a snippet.
+		listDocs: builder.query<DocSearchList, string | void>({
+			query: (q) => (q ? `/docs?q=${encodeURIComponent(q)}` : "/docs"),
 			providesTags: ["WelcomeDocs"],
 		}),
 		getDoc: builder.query<DocBody, string>({

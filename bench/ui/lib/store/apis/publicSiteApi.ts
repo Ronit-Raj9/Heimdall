@@ -1,4 +1,5 @@
-import type { DocBody, DocList } from "@/lib/types/welcome";
+import type { DocBody } from "@/lib/types/welcome";
+import type { DocSearchList } from "./welcomeApi";
 import type { DownloadsManifest, PublicLibrary, PublicOverview, PublicPricing } from "@/lib/types/site";
 import { benchApi } from "./benchApi";
 
@@ -12,7 +13,10 @@ export const publicSiteApi = benchApi.enhanceEndpoints({ addTagTypes: ["PublicSi
 		getPublicLibrary: builder.query<PublicLibrary, void>({ query: () => "/public/benchmarks", providesTags: ["PublicSite"] }),
 		getPublicPricing: builder.query<PublicPricing, void>({ query: () => "/public/pricing", providesTags: ["PublicSite"] }),
 		getPublicDownloads: builder.query<DownloadsManifest, void>({ query: () => "/public/downloads", providesTags: ["PublicSite"] }),
-		listPublicDocs: builder.query<DocList, void>({ query: () => "/public/docs", providesTags: ["PublicSite"] }),
+		listPublicDocs: builder.query<DocSearchList, string | void>({
+			query: (q) => (q ? `/public/docs?q=${encodeURIComponent(q)}` : "/public/docs"),
+			providesTags: ["PublicSite"],
+		}),
 		getPublicDoc: builder.query<DocBody, string>({
 			query: (name) => `/public/docs/${encodeURIComponent(name)}`,
 			providesTags: (_r, _e, name) => [{ type: "PublicSite", id: name }],
