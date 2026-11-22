@@ -95,3 +95,16 @@ describe("JobsDrawer", () => {
 		expect(render(<JobsIndicator />, hostedSession())).toContain("jobs-indicator");
 	});
 });
+
+// N121: a drawer row names the target in words and never shows a job's full id as its title.
+describe("JobsDrawer rows", () => {
+	it("labels the target and leaves the raw id out", () => {
+		const noTarget = { ...FAILED_JOB, id: "job_0123456789abcdef", target: undefined, status: "succeeded" as const };
+		const suite = { ...FAILED_JOB, id: "job_fedcba9876543210", target: "suite:zz-test-mcp", status: "succeeded" as const };
+		const html = render(<JobsDrawer jobs={[noTarget, suite]} isLoading={false} onRetry={() => undefined} onClose={() => undefined} />);
+		expect(html).toContain("Benchmark zz-test-mcp");
+		expect(html).not.toContain(">suite:zz-test-mcp<");
+		expect(html.replace(/data-testid="[^"]*"|href="[^"]*"/g, "")).not.toContain("job_0123456789abcdef");
+		expect(html).toContain("01234567");
+	});
+});

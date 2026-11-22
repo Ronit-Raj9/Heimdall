@@ -1,3 +1,5 @@
+import { suiteDisplayName } from "@/components/suites/suiteDisplay";
+import i18n from "@/lib/i18n";
 import type { ApiToken, Job, JobStatus, PlatformTime } from "@/lib/types/bench";
 
 /** A platform time as a Date: RFC 3339 text or unix milliseconds. Null for absent or unreadable values. */
@@ -97,11 +99,78 @@ export function jobFraction(job: Pick<Job, "progress" | "status">): number | nul
 	return Math.min(1, Math.max(0, progress.done / progress.total));
 }
 
-/** The experiment a job acts on, from its target or params. */
-export function jobExperimentId(job: Pick<Job, "target" | "params" | "kind">): string | null {
-	if (!job.kind.startsWith("experiment.")) return null;
-	const fromParams = job.params && typeof job.params.exp_id === "string" ? job.params.exp_id : null;
-	return fromParams ?? (job.target ? job.target : null);
+/**
+ * The comparison a job acts on or started: an experiment job's own experiment (params, then
+ * target), else the exp_id any job reports in its progress or result (the readiness job of a
+ * benchmark runs its controls in one, N121).
+ */
+export function jobExperimentId(job: Pick<Job, "target" | "params" | "kind"> & Partial<Pick<Job, "progress" | "result">>): string | null {
+	if (job.kind.startsWith("experiment.")) {
+		const fromParams = job.params && typeof job.params.exp_id === "string" ? job.params.exp_id : null;
+		return fromParams ?? (job.target ? job.target : null);
+	}
+	for (const source of [job.progress, job.result]) {
+		if (source && typeof source === "object" && typeof source.exp_id === "string" && source.exp_id) return source.exp_id;
+	}
+	return null;
+}
+
+/** A job target in words, with the page it names when there is one. */
+export interface TargetLabel {
+	text: string;
+	to?: string;
+}
+
+/**
+ * A job's target ("suite:<id>", "exp:<id>", "agent:<id>", "canary:<name>", "org:<id>") in plain
+ * words with a link to its page; any other target is shown as is (N121).
+ */
+export function targetLabel(target: string | undefined | null): TargetLabel {
+	const raw = (target ?? "").trim();
+	if (!raw) return { text: "" };
+	const at = raw.indexOf(":");
+	const kind = at > 0 ? raw.slice(0, at) : "";
+	const id = at > 0 ? raw.slice(at + 1) : "";
+	if (!id) return { text: raw };
+	const t = (key: "suite" | "exp" | "agent" | "canary" | "org", vars: Record<string, string>) =>
+		i18n.t(`jobs.targetLabel.${key}`, { ns: "platform", ...vars });
+	switch (kind) {
+		// A benchmark's curated name when it has one, else its id as typed (job targets carry no summary).
+		case "suite":
+			return {
+				text: t("suite", { name: suiteDisplayName(id, { builtin: false }) }),
+				to: `/suites/${encodeURIComponent(id)}`,
+			};
+		case "exp":
+			return { text: t("exp", { id }), to: `/experiments/${encodeURIComponent(id)}` };
+		case "agent":
+			return { text: t("agent", { id }), to: `/agents/${encodeURIComponent(id)}` };
+		case "canary":
+			return { text: t("canary", { name: id }), to: "/scheduled-checks?tab=drift" };
+		case "org":
+			return { text: t("org", {}) };
+		default:
+			return { text: raw };
+	}
+}
+
+/** A job id short enough for a list row: the first 8 characters after "job_". */
+export function shortJobId(id: string): string {
+	return id.replace(/^job_/, "").slice(0, 8);
+}
+
+/** Text split at comparison ids (e_...), each id kept as {exp} so a log line can link it. */
+export function linkifyExperiments(text: string): (string | { exp: string })[] {
+	const out: (string | { exp: string })[] = [];
+	let last = 0;
+	for (const m of text.matchAll(/\be_[a-z0-9_]+/g)) {
+		const at = m.index ?? 0;
+		if (at > last) out.push(text.slice(last, at));
+		out.push({ exp: m[0] });
+		last = at + m[0].length;
+	}
+	if (last < text.length) out.push(text.slice(last));
+	return out;
 }
 
 /** Token state at a moment: revoked wins over expired. */

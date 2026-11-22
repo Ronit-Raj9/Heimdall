@@ -12,7 +12,7 @@ import { Link } from "@tanstack/react-router";
 import { ChevronRight, ListTodo, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { formatRelative, isActiveJob, jobFraction, splitJobs } from "./platform.utils";
+import { formatRelative, isActiveJob, jobFraction, shortJobId, splitJobs, targetLabel } from "./platform.utils";
 
 /** How often the indicator refreshes when nothing is running and the drawer is closed. */
 const IDLE_POLL_MS = 30_000;
@@ -80,7 +80,13 @@ function JobRow({ job, onOpen }: { job: Job; onOpen: () => void }) {
 					/>
 				</span>
 				<span className="text-muted-foreground flex items-center gap-2 text-xs">
-					<span className="truncate font-mono">{job.target || job.id}</span>
+					{job.target ? (
+						<span className="truncate" title={job.target}>
+							{targetLabel(job.target).text}
+						</span>
+					) : (
+						<span className="truncate font-mono">{t("jobs.shortId", { id: shortJobId(job.id) })}</span>
+					)}
 					{job.cancel_requested && isActiveJob(job) && <span className="text-chart-warning-ink">{t("jobs.cancelRequested")}</span>}
 					{when && <span className="ml-auto shrink-0 tabular-nums">{when}</span>}
 				</span>
