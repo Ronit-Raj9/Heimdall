@@ -64,6 +64,9 @@ service's first tool call.
   ids, GitHub and Slack tokens) are masked. The run folder is sealed only
   when it holds no secret, and a HAR is where one would show up.
 - A recording that fails never fails the run. It is listed with its reason.
+  When a service writes no file at a recording's path, the reason is a
+  plain note: the agent never opened a page or screen, or the image cannot
+  record (see [Images that record](#images-that-record)).
 
 The run folder gets `recordings/<service>/<id>-<file>` for each file and
 `recordings/recordings.jsonl` with one line per recording (service, id,
@@ -98,6 +101,35 @@ cut short still plays), with `desktop.mp4.start`. Set `DESKTOP_RECORD` to
 another folder, or to empty to turn recording off. The template task's
 `stop` is `desktop.py stop-recording`, which stops ffmpeg so it writes the
 end of the file and returns when it has. Expect tens of MB per hour.
+
+## Images that record
+
+Recording depends on the service image, not on Heimdall alone.
+
+- **Browser.** The template's base is `mcr.microsoft.com/playwright/mcp`
+  v0.0.83 (Playwright 1.64), pinned by digest. That version reads
+  `browser.contextOptions` from `--config` and passes `recordVideo` and
+  `recordHar` to every isolated context; checked in the pinned image (one
+  navigate, then SIGTERM, leaves `video/page-1.webm`, `har/context-1.har`
+  and `console.jsonl`). The image ships its own ffmpeg for Playwright's
+  video, so nothing else is installed. An older Playwright MCP, or an image
+  started without `record.js`, still runs the task but writes no video or
+  HAR; the run page then lists each missing recording with a note.
+  `visual/capture.go` uses the same pin for screenshots; bump both together
+  (a scaffold test checks they match).
+- **Desktop.** The computer-use template installs ffmpeg with apt, which
+  makes the image about 1 GB. A desktop image built before recordings (for
+  example from an older template) has no ffmpeg: `desktop.py` then skips
+  recording, the live screen falls back to a half-size PNG, and the run
+  page notes the missing video. To record, rebuild it once (the apt step
+  needs the network; runs never get it):
+
+  ```sh
+  docker build -t <tag in the task's services: image> benchmarks/<suite>/services/desktop
+  bifrost-bench suite admit <suite>   # locks the new image digest
+  ```
+
+  Expect a few minutes and about 1 GB of disk for the image.
 
 ## The run page
 
