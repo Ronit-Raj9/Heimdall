@@ -351,6 +351,9 @@ func EnsureImages(ctx context.Context, cfg *lib.Config, d utils.Docker, s *schem
 		}
 		suiteDockerfile = real
 	}
+	if err := ensurePinned(ctx, d, s.BaseImage.Tag, utils.SuiteLockedPin(s, "", "base", s.BaseImage.Tag), w); err != nil {
+		return fmt.Errorf("suite %s base image: %w", s.ID, err)
+	}
 	if err := EnsureImage(ctx, d, s.BaseImage.Tag, suiteDockerfile, w); err != nil {
 		return fmt.Errorf("suite %s base image: %w", s.ID, err)
 	}
@@ -361,6 +364,9 @@ func EnsureImages(ctx context.Context, cfg *lib.Config, d utils.Docker, s *schem
 		helperDockerfile := filepath.Join(cfg.Root, "deploy", "helper", "Dockerfile")
 		if _, err := os.Stat(helperDockerfile); err != nil {
 			helperDockerfile = ""
+		}
+		if err := ensurePinned(ctx, d, helper, utils.SuiteLockedPin(s, "", "helper", helper), w); err != nil {
+			return fmt.Errorf("helper image (images.helper): %w", err)
 		}
 		if err := EnsureImage(ctx, d, helper, helperDockerfile, w); err != nil {
 			return fmt.Errorf("helper image (images.helper): %w", err)
@@ -429,6 +435,21 @@ func ServiceBuilds(s *schemas.Suite) []ServiceBuild {
 		}
 	}
 	return out
+}
+
+// ensurePinned pulls a missing image the suite lock pins by registry
+// digest (library registry, bench/imagepin) and tags it, so EnsureImage then
+// finds it instead of building another copy. No pin, or an image already
+// here, does nothing.
+func ensurePinned(ctx context.Context, d utils.Docker, tag, pinned string, w io.Writer) error {
+	if tag == "" || pinned == "" {
+		return nil
+	}
+	if _, ok, err := d.ImageID(ctx, tag); err != nil || ok {
+		return err
+	}
+	fmt.Fprintf(out(w), "pulling %s (%s, pinned by the suite lock)\n", tag, pinned)
+	return d.PullPinned(ctx, nil, tag, pinned, nil)
 }
 
 // EnsureImage builds tag from dockerfile (in the Dockerfile's folder) when

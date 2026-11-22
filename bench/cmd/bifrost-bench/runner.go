@@ -139,7 +139,8 @@ func runRunnerStart(cmd string, args []string) int {
 			Slots: f.slots, Logger: a.logger, Pool: f.pool, Labels: f.labelList(),
 			SpendCapUSD: f.spendCap, SpendFile: filepath.Join(a.store.Root(), ".runner", "spend.json"),
 			Jobs: newRunnerJobExecutor(a), // gap G05: hosted CLI jobs (runnerjob.go)
-			Disk: hy.DiskState, ImageUse: hy.NoteImages, KeepRunFolders: a.cfg.Runner.Disk.KeepRunFolders})
+			Disk: hy.DiskState, ImageUse: hy.NoteImages, KeepRunFolders: a.cfg.Runner.Disk.KeepRunFolders,
+			Prefetch: runnerPrefetch(a.logger)}) // Z13: images pinned by registry digest are pulled before their slots (images.go)
 	if err != nil {
 		return fail("%v", err)
 	}

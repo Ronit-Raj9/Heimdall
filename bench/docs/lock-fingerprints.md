@@ -81,7 +81,12 @@ Each fingerprint has three parts.
     on every machine that pulls it and is compared by digest. Docker's
     containerd image store reports a digest equal to the local id for every
     image, local builds included, so there every image is recorded by tag
-    only.
+    only, unless the image was pushed to the library registry: `images
+    sync` writes the pushed digest to the suite's `.suite.image-pins`
+    file and `suite lock` records that digest (`docs/library-registry.md`).
+    A worker without the image then pulls exactly that digest and tags it.
+    On the containerd store an image id equal to the pinned digest is the
+    same image.
   - `<tag>@sha256:<hex>`: a local image id, only with `suite lock
     -pin-local-images`. Strict and valid only on the machine (or the
     registry) that built it; use it for a team's own machine. Once a lock

@@ -1,0 +1,49 @@
+# Library registry (Z13, docs/library-registry.md): an override file, not
+# part of the default stack. Use it with
+#
+#   HEIMDALL_COMPOSE_OVERRIDE=deploy/hosted/library-registry.compose.yml
+#
+# (or copy its services into docker-compose.override.yml). It adds the
+# registry, publishes it on the host's loopback for the operator's sync, and
+# gives the server the token signing key. Caddy routes /v2/ on the public
+# domain to it (docs/library-registry.md, Caddy).
+services:
+  library-registry:
+    image: registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+    labels:
+      heimdall: "1"
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    environment:
+      REGISTRY_AUTH_TOKEN_REALM: ${HEIMDALL_PUBLIC_URL:-https://${HEIMDALL_DOMAIN:?set HEIMDALL_DOMAIN}}/api/v1/registry/token
+      REGISTRY_AUTH_TOKEN_SERVICE: ${HEIMDALL_LIBRARY_REGISTRY_SERVICE:-heimdall-library}
+      REGISTRY_AUTH_TOKEN_ISSUER: ${HEIMDALL_LIBRARY_REGISTRY_ISSUER:-heimdall}
+    volumes:
+      - ${HEIMDALL_LIBRARY_REGISTRY_DIR:-library-registry-data}:/var/lib/registry
+      - ./registry/config-library.yml:/etc/docker/registry/config.yml:ro
+      # Only the certificate: the signing key stays with the server.
+      - ${HEIMDALL_LIBRARY_REGISTRY_TOKEN_DIR:?set HEIMDALL_LIBRARY_REGISTRY_TOKEN_DIR}/token.crt:/auth/token.crt:ro
+    tmpfs:
+      - /tmp
+    networks: [edge]
+    ports:
+      # The operator's `bifrost-bench images sync` pushes here from the host.
+      - "127.0.0.1:${HEIMDALL_LIBRARY_REGISTRY_PUBLISH:-5001}:5000"
+    restart: unless-stopped
+
+  heimdall:
+    environment:
+      HEIMDALL_LIBRARY_REGISTRY_TOKEN_DIR: /run/heimdall-registry-token
+      HEIMDALL_LIBRARY_REGISTRY_SERVICE: ${HEIMDALL_LIBRARY_REGISTRY_SERVICE:-heimdall-library}
+      HEIMDALL_LIBRARY_REGISTRY_ISSUER: ${HEIMDALL_LIBRARY_REGISTRY_ISSUER:-heimdall}
+      HEIMDALL_LIBRARY_REGISTRY_ACCESS: ${HEIMDALL_LIBRARY_REGISTRY_ACCESS:+/run/heimdall-registry-access.yaml}
+      HEIMDALL_LIBRARY_REGISTRY_SYNC_AUTH: /run/heimdall-registry-token/sync.htpasswd
+    volumes:
+      - ${HEIMDALL_LIBRARY_REGISTRY_TOKEN_DIR:?set HEIMDALL_LIBRARY_REGISTRY_TOKEN_DIR}:/run/heimdall-registry-token:ro
+      - ${HEIMDALL_LIBRARY_REGISTRY_ACCESS:-/dev/null}:/run/heimdall-registry-access.yaml:ro
+
+volumes:
+  library-registry-data:
+    labels:
+      heimdall: "1"

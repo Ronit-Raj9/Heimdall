@@ -76,6 +76,11 @@ type WorkerOptions struct {
 	Disk           func() schemas.WorkerDisk
 	ImageUse       func(ids ...string)
 	KeepRunFolders bool
+	// Prefetch warms the images an admitted experiment's suite pins by
+	// registry digest (library registry, bench/imagepin), in the
+	// background, once per experiment, so the slots after the first start
+	// on a pulled image. Nil prefetches nothing.
+	Prefetch func(ctx context.Context, s *schemas.Suite)
 }
 
 // Worker is the remote side of remote execution: it registers with a
@@ -449,6 +454,9 @@ func (w *Worker) admit(ctx context.Context, lease *schemas.WorkerLease) (*worker
 	w.mu.Unlock()
 	if reason != "" {
 		return nil, reason, true
+	}
+	if w.opts.Prefetch != nil && e.suite != nil {
+		go w.opts.Prefetch(context.WithoutCancel(ctx), e.suite) // outlives this lease; the hook bounds its own time
 	}
 	return e, "", false
 }
