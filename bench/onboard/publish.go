@@ -152,7 +152,11 @@ func Publish(ctx context.Context, env *Env, set *DraftSet, o PublishOptions) (*P
 		return res, err
 	}
 	if res.HeldOut > 0 {
-		guid, _, err := suite.EnsureCanary(target)
+		want, err := draftCanaryOwn(set)
+		if err != nil {
+			return res, fmt.Errorf("canary: %w", err)
+		}
+		guid, err := ensureCanaryAs(target, want)
 		if err != nil {
 			return res, fmt.Errorf("canary: %w", err)
 		}

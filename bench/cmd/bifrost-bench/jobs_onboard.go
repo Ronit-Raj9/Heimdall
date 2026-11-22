@@ -122,7 +122,19 @@ func runOnboardReady(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logg
 	if env.Hosted {
 		where = "a worker"
 	}
+	// Stamp the canary into a draft with held-out tasks before the checks,
+	// so the records match the files publish copies and carry over.
+	oenv := &onboard.Env{Root: root, BenchmarksDir: env.App.cfg.Path(env.App.cfg.BenchmarksRoot), Hosted: env.Hosted, Actor: jobActor(j)}
+	var stampErr error
 	set, err := updateSet(root, p.Set, func(s *onboard.DraftSet) {
+		guid, changed, err := s.StampCanary(ctx, oenv)
+		if err != nil {
+			stampErr = err
+			return
+		}
+		if len(changed) > 0 {
+			log.Printf("stamped canary %s into %d draft tasks (held-out tasks in the draft)", guid, len(changed))
+		}
 		total := len(s.Tasks)
 		if p.Task != "" {
 			total = 1
@@ -131,6 +143,9 @@ func runOnboardReady(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logg
 	})
 	if err != nil {
 		return nil, err
+	}
+	if stampErr != nil {
+		return nil, fmt.Errorf("stamp the canary in the draft: %w", stampErr)
 	}
 	res := &onboardReadyResult{Set: set.ID, Suite: set.Suite, Where: where, Tasks: map[string]*schemas.AdmissionRecord{}, Problems: []suite.Problem{}}
 	reasons := map[string]string{}
