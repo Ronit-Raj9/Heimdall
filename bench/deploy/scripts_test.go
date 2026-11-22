@@ -42,7 +42,8 @@ case " $* " in
 *"inspect --format "*) echo sha256:feedfacecafe ;;
 *" pg_dump "*) echo dump ;;
 *" tar "*"-cf"*) echo archive ;;
-*" help"*) printf '  evidence   mirror and restore\n' ;;
+*" registry htpasswd "*) read -r _; echo "heimdall-x:hash" ;;
+*" help"*) printf '  evidence   mirror and restore\n  registry   credentials\n' ;;
 esac
 exit 0
 `
@@ -310,7 +311,7 @@ func TestUpgradeRollbackTagPerStack(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.image, func(t *testing.T) {
 			bin, logPath := stubDocker(t, false)
-			env := []string{"HEIMDALL_ENV_FILE=" + backupEnv(t, ""), "HEIMDALL_PROJECT=l13-upgrade", "STUB_RUNNING=1", "HEIMDALL_IMAGE=" + tc.image}
+			env := []string{"HEIMDALL_ENV_FILE=" + backupEnv(t, "HEIMDALL_REGISTRY_AUTH_DIR="+filepath.Join(t.TempDir(), "auth")+"\n"), "HEIMDALL_PROJECT=l13-upgrade", "STUB_RUNNING=1", "HEIMDALL_IMAGE=" + tc.image}
 			out, err := runScript(t, bin, env, "hosted/upgrade.sh", "--no-pull", "--no-backup")
 			if err != nil {
 				t.Fatalf("upgrade.sh: %v\n%s", err, out)

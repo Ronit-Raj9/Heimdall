@@ -111,3 +111,74 @@ require_configured() {
 		case $v in replace-with-* | heimdall.example.com) die "$k in $ENV_FILE still holds the placeholder '$v'" ;; esac
 	done
 }
+
+# write_secret FILE VALUE writes VALUE (one line) to FILE atomically, mode
+# 0640, group of the Docker socket: the registry and the shared worker join
+# that group to read it; nothing else on the host does.
+write_secret() {
+	local tmp
+	tmp=$(mktemp "$1.XXXXXX")
+	printf '%s\n' "$2" >"$tmp"
+	chgrp "$(docker_gid)" "$tmp" 2>/dev/null || true
+	chmod 0640 "$tmp"
+	mv -f "$tmp" "$1"
+}
+
+# ensure_registry_auth creates the shared worker registry's credentials when
+# missing (G3 B2), in HEIMDALL_REGISTRY_AUTH_DIR, outside the checkout:
+#   registry/htpasswd   read-only registry: the pull identity (bcrypt)
+#   writer/htpasswd     registry-writer: the sync identity (bcrypt)
+#   sync/push.auth      the sync tool's user:password
+#   runner/pull.auth    the shared worker's user:password (read-only pulls)
+#   runner/manifest     image digests registry-sync.sh pushed (it writes it)
+# Existing files are kept; delete one identity's two files to rotate it.
+# Sets registry_auth_changed=1 when it wrote credentials. Needs the server
+# image (the hash comes from `bifrost-bench registry htpasswd`).
+registry_auth_changed=''
+ensure_registry_auth() {
+	local dir gid sub pw line
+	dir=${HEIMDALL_REGISTRY_AUTH_DIR:-$(env_get HEIMDALL_REGISTRY_AUTH_DIR)}
+	if [ -z "$dir" ]; then
+		if [ -w /var/lib ]; then
+			dir=/var/lib/heimdall-registry-auth
+		else
+			dir=${XDG_CONFIG_HOME:-$HOME/.config}/heimdall/registry-auth
+		fi
+		env_set HEIMDALL_REGISTRY_AUTH_DIR "$dir"
+		log "registry credentials go to $dir (HEIMDALL_REGISTRY_AUTH_DIR)"
+	fi
+	case $dir in
+	/*) ;;
+	*) die "HEIMDALL_REGISTRY_AUTH_DIR must be an absolute path: $dir" ;;
+	esac
+	local repo
+	repo=$(git -C "$BENCH_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$BENCH_DIR")
+	case $dir/ in "$repo"/* | "$BENCH_DIR"/*) die "HEIMDALL_REGISTRY_AUTH_DIR ($dir) is inside the checkout; keep credentials outside it" ;; esac
+	export HEIMDALL_REGISTRY_AUTH_DIR=$dir
+	gid=$(docker_gid)
+	for sub in "" registry writer sync runner; do
+		mkdir -p "$dir/$sub"
+		chgrp "$gid" "$dir/$sub" 2>/dev/null || log "could not give $dir/$sub to group $gid (the Docker socket's); the registry may not read it"
+		chmod 0750 "$dir/$sub"
+	done
+	if [ ! -s "$dir/registry/htpasswd" ] || [ ! -s "$dir/runner/pull.auth" ]; then
+		bench_has registry || die "the server image has no 'registry' command: build it first (upgrade.sh)"
+		pw=$(random_hex)
+		line=$(printf '%s\n' "$pw" | bench -- registry htpasswd -user heimdall-pull) || die "hashing the registry pull password failed"
+		write_secret "$dir/registry/htpasswd" "$line"
+		write_secret "$dir/runner/pull.auth" "heimdall-pull:$pw"
+		registry_auth_changed=1
+		log "generated the registry's read-only pull credentials"
+	fi
+	if [ ! -s "$dir/writer/htpasswd" ] || [ ! -s "$dir/sync/push.auth" ]; then
+		bench_has registry || die "the server image has no 'registry' command: build it first (upgrade.sh)"
+		pw=$(random_hex)
+		line=$(printf '%s\n' "$pw" | bench -- registry htpasswd -user heimdall-sync) || die "hashing the registry sync password failed"
+		write_secret "$dir/writer/htpasswd" "$line"
+		write_secret "$dir/sync/push.auth" "heimdall-sync:$pw"
+		registry_auth_changed=1
+		log "generated the registry sync credentials"
+	fi
+	unset pw line
+	[ -f "$dir/runner/manifest" ] || write_secret "$dir/runner/manifest" "# image digest, one per line; written by deploy/hosted/registry-sync.sh"
+}

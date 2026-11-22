@@ -71,12 +71,28 @@ func TestFromRegistry(t *testing.T) {
 	}
 }
 
+func writeManifest(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "manifest")
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+var (
+	digestA = "sha256:" + strings.Repeat("a", 64)
+	digestB = "sha256:" + strings.Repeat("b", 64)
+)
+
 func TestPolicyBuildBaseContexts(t *testing.T) {
 	org := writeDockerfile(t, "FROM bench/coding-core-base:1\nFROM ubuntu:24.04\nFROM python:3.12\n")
-	have := map[string]bool{"bench/coding-core-base:1": true, "python:3.12": true}
+	manifest := writeManifest(t, "# heimdall registry manifest\nbench/coding-core-base:1 "+digestA+"\npython:3.12 "+digestB+"\n")
+	var asked []string
 	p := &DockerPolicy{
 		TagPrefix: "org-a/", Builder: "heimdall-org-builder", Registry: "registry:5000", Platform: []string{"python:"},
-		RegistryHas: func(ref string) (bool, error) { return have[ref], nil },
+		Pinned:      ManifestPins(manifest),
+		RegistryHas: func(ref string) (bool, error) { asked = append(asked, ref); return true, nil },
 	}
 	out, err := p.Rewrite([]string{"build", "-t", "x:1", org})
 	if err != nil {
@@ -84,8 +100,8 @@ func TestPolicyBuildBaseContexts(t *testing.T) {
 	}
 	got := strings.Join(out, " ")
 	for _, want := range []string{
-		"--build-context bench/coding-core-base:1=docker-image://registry:5000/bench/coding-core-base:1",
-		"--build-context python:3.12=docker-image://registry:5000/python:3.12",
+		"--build-context bench/coding-core-base:1=docker-image://registry:5000/bench/coding-core-base:1@" + digestA,
+		"--build-context python:3.12=docker-image://registry:5000/python:3.12@" + digestB,
 		"-t org-a/x:1",
 	} {
 		if !strings.Contains(got, want) {
@@ -95,15 +111,32 @@ func TestPolicyBuildBaseContexts(t *testing.T) {
 	if strings.Contains(got, "ubuntu") {
 		t.Errorf("public image rewritten: %s", got)
 	}
+	// The registry is asked for the pinned digest, never the tag.
+	if strings.Join(asked, " ") != "bench/coding-core-base:1@"+digestA+" python:3.12@"+digestB {
+		t.Errorf("registry checks %v", asked)
+	}
 	// The org still may not pass build contexts of its own.
 	if _, err := p.Rewrite([]string{"build", "--build-context", "bench/coding-core-base:1=/", "-t", "x", org}); !errors.Is(err, ErrPolicy) {
 		t.Fatalf("org build context accepted: %v", err)
 	}
-	// A base image the registry lacks fails before the build, naming it.
-	delete(have, "python:3.12")
+	// A base image the manifest lacks fails before the build, naming it.
+	if err := os.WriteFile(manifest, []byte("bench/coding-core-base:1 "+digestA+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	_, err = p.Rewrite([]string{"build", "-t", "x:1", org})
 	if !errors.Is(err, ErrPolicy) || !strings.Contains(err.Error(), "python:3.12") || !strings.Contains(err.Error(), "registry-sync.sh") {
 		t.Fatalf("missing base image: %v", err)
+	}
+	// A pinned digest the registry no longer holds fails too.
+	p.Pinned = func(string) (string, error) { return digestA, nil }
+	p.RegistryHas = func(string) (bool, error) { return false, nil }
+	if _, err = p.Rewrite([]string{"build", "-t", "x:1", org}); !errors.Is(err, ErrPolicy) || !strings.Contains(err.Error(), digestA) {
+		t.Fatalf("digest gone from the registry: %v", err)
+	}
+	// No manifest at all: never by tag.
+	p.Pinned = nil
+	if _, err = p.Rewrite([]string{"build", "-t", "x:1", org}); !errors.Is(err, ErrPolicy) || !strings.Contains(err.Error(), "manifest") {
+		t.Fatalf("no manifest: %v", err)
 	}
 	// Without a registry FROM lines stay as written.
 	p.Registry = ""
@@ -113,12 +146,47 @@ func TestPolicyBuildBaseContexts(t *testing.T) {
 	}
 }
 
+func TestReadRegistryManifest(t *testing.T) {
+	m, err := ReadRegistryManifest(writeManifest(t, "# c\n\nbench/a:1 "+digestA+"\nbench/a:1 "+digestB+"\npython:3 "+digestA+"\n"))
+	if err != nil || m["bench/a:1"] != digestB || m["python:3"] != digestA || len(m) != 2 {
+		t.Fatalf("manifest %v %v", m, err)
+	}
+	for _, bad := range []string{"bench/a:1\n", "bench/a:1 sha256:abc\n", "bench/a@" + digestA + " " + digestA + "\n", "a b c\n"} {
+		if _, err := ReadRegistryManifest(writeManifest(t, bad)); err == nil {
+			t.Errorf("accepted %q", bad)
+		}
+	}
+	if _, err := ManifestPins(filepath.Join(t.TempDir(), "none"))("bench/a:1"); err == nil || errors.Is(err, ErrNotPinned) {
+		t.Fatalf("missing manifest file: %v", err)
+	}
+	if _, err := ManifestPins(writeManifest(t, ""))("bench/a:1"); !errors.Is(err, ErrNotPinned) {
+		t.Fatalf("unknown image: %v", err)
+	}
+}
+
+func TestReadRegistryCredentials(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "pull.auth")
+	os.WriteFile(path, []byte("heimdall-pull:s3cret:x\n"), 0o600)
+	c, err := ReadRegistryCredentials(path)
+	if err != nil || c.User != "heimdall-pull" || c.Password != "s3cret:x" {
+		t.Fatalf("credentials %+v %v", c, err)
+	}
+	os.WriteFile(path, []byte("nopassword"), 0o600)
+	if _, err := ReadRegistryCredentials(path); err == nil {
+		t.Fatal("accepted a line without a password")
+	}
+}
+
 func TestRegistryHas(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pw, ok := r.BasicAuth()
 		switch {
 		case r.Method != http.MethodHead:
 			w.WriteHeader(http.StatusMethodNotAllowed)
-		case r.URL.Path == "/v2/bench/coding-core-base/manifests/1", r.URL.Path == "/v2/python/manifests/latest":
+		case !ok || user != "pull" || pw != "pw":
+			w.WriteHeader(http.StatusUnauthorized)
+		case r.URL.Path == "/v2/bench/coding-core-base/manifests/1", r.URL.Path == "/v2/python/manifests/latest",
+			r.URL.Path == "/v2/bench/coding-core-base/manifests/"+digestA:
 			w.WriteHeader(http.StatusOK)
 		case r.URL.Path == "/v2/broken/manifests/latest":
 			w.WriteHeader(http.StatusInternalServerError)
@@ -129,13 +197,21 @@ func TestRegistryHas(t *testing.T) {
 	defer srv.Close()
 	host := strings.TrimPrefix(srv.URL, "http://")
 	ctx := context.Background()
-	for ref, want := range map[string]bool{"bench/coding-core-base:1": true, "python": true, "bench/coding-core-base:2": false} {
-		got, err := RegistryHas(ctx, srv.Client(), host, ref)
+	cred := &RegistryCredentials{User: "pull", Password: "pw"}
+	for ref, want := range map[string]bool{
+		"bench/coding-core-base:1": true, "python": true, "bench/coding-core-base:2": false,
+		"bench/coding-core-base:1@" + digestA: true, "bench/coding-core-base@" + digestA: true,
+		"bench/coding-core-base:1@" + digestB: false,
+	} {
+		got, err := RegistryHas(ctx, srv.Client(), host, ref, cred)
 		if err != nil || got != want {
 			t.Errorf("RegistryHas(%s) = %v %v, want %v", ref, got, err, want)
 		}
 	}
-	if _, err := RegistryHas(ctx, srv.Client(), host, "broken"); err == nil {
+	if _, err := RegistryHas(ctx, srv.Client(), host, "broken", cred); err == nil {
 		t.Error("server error not reported")
+	}
+	if _, err := RegistryHas(ctx, srv.Client(), host, "python", nil); err == nil || !strings.Contains(err.Error(), "credentials") {
+		t.Errorf("refused credentials not reported: %v", err)
 	}
 }

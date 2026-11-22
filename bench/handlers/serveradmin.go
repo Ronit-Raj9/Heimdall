@@ -381,7 +381,7 @@ func ValidateAdminLimits(in AdminLimits) (quota.Limits, error) {
 	}
 	rt := strings.TrimSpace(in.Runtime)
 	if rt == "" {
-		rt = "runc"
+		rt = quota.RuntimeRunsc
 	}
 	if rt != "runc" && rt != "runsc" {
 		bad = append(bad, `runtime: "runc" or "runsc" (gVisor)`)
@@ -399,7 +399,7 @@ func ValidateAdminLimits(in AdminLimits) (quota.Limits, error) {
 func limitsOut(l quota.Limits) AdminLimits {
 	rt := l.Runtime
 	if rt == "" {
-		rt = "runc"
+		rt = quota.RuntimeRunsc
 	}
 	return AdminLimits{
 		MaxConcurrentRuns: l.MaxConcurrentRuns, MaxRunsPerDay: l.MaxRunsPerDay,

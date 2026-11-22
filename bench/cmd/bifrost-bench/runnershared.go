@@ -52,7 +52,7 @@ import (
 )
 
 const sharedRunnerUsage = `usage:
-  bifrost-bench runner start -shared -server <url> -secret-file <path> [-runtime auto|runc|runsc] [-slots n] [-poll 30s] [-name prefix]
+  bifrost-bench runner start -shared -server <url> -secret-file <path> [-runtime auto|runsc|runc] [-slots n] [-poll 30s] [-name prefix]
       [-builder name | -buildkit tcp://host:port] [-registry host:port] [-gateway-container name] [-projects-dir path] [-config deploy/bench.yaml] [-debug]`
 
 // Shared runner environment (deploy/hosted/docker-compose.yml).
@@ -80,8 +80,14 @@ const (
 	sharedBuilderName = "heimdall-org-builder"
 	// sharedNetworkPrefix starts every org's eval network name.
 	sharedNetworkPrefix = "heimdall-evalnet-"
-	// runtimeAuto picks gVisor when the host has it.
+	// runtimeAuto is gVisor, required: without runsc the runner does not
+	// start unless the operator allows runc (allowRuncEnv).
 	runtimeAuto = "auto"
+	// allowRuncEnv is the operator's explicit, logged override that lets a
+	// shared runner without gVisor start under runc (G3 B8). It then serves
+	// only orgs whose limits a server admin set to runtime runc; every
+	// other org (new orgs included, whose default is runsc) is not served.
+	allowRuncEnv = "HEIMDALL_SHARED_ALLOW_RUNC"
 )
 
 // hasSharedFlag reports whether args ask for shared runner mode.
@@ -139,33 +145,56 @@ func parseSharedFlags(args []string) (*sharedFlags, error) {
 	return f, nil
 }
 
-// gvisorMissing is the warning a shared runner logs when the host has no
-// gVisor.
-const gvisorMissing = "gVisor (runsc) is not installed on this Docker host: org agents run under runc and share the host kernel. " +
-	"Install gVisor (https://gvisor.dev/docs/user_guide/install/), register it with Docker as runtime \"runsc\" and restart the shared runner. " +
-	"Orgs whose limits require gVisor are not served until then."
+// gvisorMissing is the error a shared runner stops with when the host has
+// no gVisor and the operator did not allow runc.
+const gvisorMissing = "gVisor (runsc) is not installed on this Docker host, and the shared worker does not run org agents without it. " +
+	"Install it as root with deploy/hosted/install-gvisor.sh (docs/hosting.md, Shared worker) and start the shared runner again. " +
+	"To run under runc anyway, for orgs a server admin set to runtime runc only, set " + allowRuncEnv + "=1 (logged on every start)."
+
+// runcOverride is the warning a shared runner logs on every start under
+// the runc override.
+const runcOverride = allowRuncEnv + " is set: org agents run under runc and share the host kernel. " +
+	"Only orgs whose runtime a server admin set to runc are served; every other org waits for a worker with gVisor."
+
+// allowRunc reports whether the operator set the runc override.
+func allowRunc(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
 
 // resolveSharedRuntime picks the container runtime and the assignment
-// filter. auto: runsc when the host has it, serving every org; else runc,
-// serving only runc orgs, with a warning. An explicit runsc needs runsc.
-func resolveSharedRuntime(want string, hasRunsc bool) (runtime, filter, warning string, err error) {
+// filter (G3 B8, fail closed). auto and runsc need runsc: auto serves every
+// org under it, runsc only orgs whose runtime is runsc. Without runsc, or
+// with -runtime runc, the runner refuses to start unless allowRunc (the
+// operator's override): then it runs runc and serves only orgs whose
+// limits say runc, which never happens by default.
+func resolveSharedRuntime(want string, hasRunsc, allowRunc bool) (runtime, filter, warning string, err error) {
 	switch want {
 	case quota.RuntimeRunsc:
 		if !hasRunsc {
-			return "", "", "", errors.New("-runtime runsc: the Docker host has no runsc runtime; install gVisor or use -runtime auto")
+			return "", "", "", errors.New("-runtime runsc: the Docker host has no runsc runtime; install gVisor with deploy/hosted/install-gvisor.sh")
 		}
 		return quota.RuntimeRunsc, quota.RuntimeRunsc, "", nil
 	case quota.RuntimeRunc:
-		w := ""
+		if !allowRunc {
+			return "", "", "", errors.New("-runtime runc: refused without " + allowRuncEnv + "=1; org agents would share the host kernel")
+		}
+		w := runcOverride
 		if hasRunsc {
-			w = "gVisor (runsc) is installed but -runtime runc was given: org agents run under runc. Use -runtime auto to run them under gVisor."
+			w += " gVisor is installed: use -runtime auto to run every org under it."
 		}
 		return quota.RuntimeRunc, quota.RuntimeRunc, w, nil
 	default:
 		if hasRunsc {
 			return quota.RuntimeRunsc, "", "", nil
 		}
-		return quota.RuntimeRunc, quota.RuntimeRunc, gvisorMissing, nil
+		if !allowRunc {
+			return "", "", "", errors.New(gvisorMissing)
+		}
+		return quota.RuntimeRunc, quota.RuntimeRunc, runcOverride, nil
 	}
 }
 
@@ -312,9 +341,14 @@ type sharedHost struct {
 	secret      string
 	runtime     string // container runtime of every org
 	filter      string // assignment filter ("" every org)
-	builder     string // buildx builder for org images ("" refuses them)
-	registry    string // registry org builds take base images from ("" none)
+	builder     string   // buildx builder for org images ("" refuses them, unless sessions)
+	sessions    bool     // org images build in build sessions of their own (buildsession.go)
+	exe         string   // this binary, for the build session command
+	lockDir     string   // per-org build locks
+	registry    string   // registry org builds take base images from ("" none)
 	regClient   *http.Client
+	regCred     *utils.RegistryCredentials // read-only pull credentials ("" none)
+	manifest    string                     // registry manifest path (digest pins)
 	gateway     string // gateway container every org network joins
 	gatewayHost string // the gateway's name as agents dial it
 	trusted     []string
@@ -342,15 +376,78 @@ func (h *sharedHost) orgPolicy(org string, approved []string, projectRoot string
 		Trusted: h.trusted, Untrusted: []string{projectRoot}, Approved: append([]string(nil), approved...), Platform: h.platform,
 		Registry: h.registry,
 	}
+	if h.sessions {
+		p.Session = buildSessionArgv(h.exe, org, h.prefix, h.lockDir)
+	}
 	if h.registry != "" {
-		host, client := h.registry, h.regClient
+		host, client, cred := h.registry, h.regClient, h.regCred
+		if h.manifest != "" {
+			p.Pinned = utils.ManifestPins(h.manifest)
+		}
 		p.RegistryHas = func(ref string) (bool, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
-			return utils.RegistryHas(ctx, client, host, ref)
+			return utils.RegistryHas(ctx, client, host, ref, cred)
 		}
 	}
 	return p
+}
+
+// setupBuilds picks how org Dockerfiles build: in build sessions when
+// HEIMDALL_BUILDKIT_IMAGE is set (the hosted compose sets it), else on an
+// existing -builder or -buildkit (one daemon for every org, outside
+// compose only), else not at all. It also loads the registry's pull
+// credentials and manifest.
+func (h *sharedHost) setupBuilds(ctx context.Context) error {
+	a, f := h.base, h.f
+	switch {
+	case strings.TrimSpace(os.Getenv(buildkitImageEnv)) != "":
+		if err := checkBuildSessions(ctx, a.docker); err != nil {
+			return err
+		}
+		exe, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("build sessions: %w", err)
+		}
+		h.sessions, h.exe = true, exe
+		h.lockDir = filepath.Join(filepath.Dir(filepath.Clean(f.projectsDir)), "build-locks")
+		if n, err := sweepBuildSessions(ctx, a.docker, h.prefix); err != nil {
+			a.logger.Warn("shared runner: leftover image build sessions not removed", "error", err.Error())
+		} else if n > 0 {
+			a.logger.Info("shared runner: removed leftover image build session containers", "count", n)
+		}
+		a.logger.Info("shared runner: org images build in a fresh BuildKit per build, one build at a time per org, behind egress rules")
+	default:
+		var err error
+		if h.builder, err = ensureBuilder(ctx, a.docker, f.builder, f.buildkit); err != nil {
+			return err
+		}
+		if h.builder != "" {
+			a.logger.Warn("shared runner: org images build on one shared BuildKit (" + h.builder + "), not in build sessions: set " + buildkitImageEnv + " to isolate each build")
+		}
+	}
+	if !h.sessions && h.builder == "" {
+		a.logger.Warn("shared runner: no isolated image builder (" + buildkitImageEnv + "): images from org Dockerfiles are refused; built-in and approved images still run")
+		return nil
+	}
+	h.registry = strings.TrimSpace(f.registry)
+	if h.registry == "" {
+		return nil
+	}
+	h.regClient = &http.Client{Timeout: 15 * time.Second}
+	if path := strings.TrimSpace(os.Getenv(registryAuthEnv)); path != "" {
+		cred, err := utils.ReadRegistryCredentials(path)
+		if err != nil {
+			a.logger.Warn("shared runner: registry pull credentials not read; org builds FROM bench images fail until registry-sync.sh writes them", "error", err.Error())
+		} else {
+			h.regCred = cred
+		}
+	}
+	h.manifest = strings.TrimSpace(os.Getenv(registryManifestEnv))
+	if h.manifest == "" {
+		a.logger.Warn("shared runner: no registry manifest (" + registryManifestEnv + "): org builds FROM bench and platform images are refused, since they would use a mutable tag")
+	}
+	return nil
 }
 
 // orgNetworkName is the eval network of one org.
@@ -470,22 +567,23 @@ func runSharedRunner(args []string) int {
 	h := &sharedHost{base: a, f: f, secret: secret, client: &http.Client{Timeout: 2 * time.Minute},
 		platform: sharedSplitList(os.Getenv(sharedPlatformImagesEnv)), gatewayHost: gatewayAlias(a.cfg.Gateway.AgentURL)}
 	var warning string
-	h.runtime, h.filter, warning, err = resolveSharedRuntime(f.runtime, dockerHasRunsc(ctx, a.docker))
+	h.runtime, h.filter, warning, err = resolveSharedRuntime(f.runtime, dockerHasRunsc(ctx, a.docker), allowRunc(os.Getenv(allowRuncEnv)))
 	if err != nil {
-		return fail("%v", err)
+		return fail("shared runner: %v", err)
 	}
 	if warning != "" {
-		a.logger.Warn("shared runner: " + warning)
+		a.logger.Warn("shared runner: "+warning, "override", allowRuncEnv)
 	}
-	if h.builder, err = ensureBuilder(ctx, a.docker, f.builder, f.buildkit); err != nil {
-		return fail("%v", err)
+	host, _ := os.Hostname()
+	h.host, h.prefix = host, f.name
+	if h.prefix == "" {
+		h.prefix = "shared-" + host
 	}
-	if h.builder != "" {
-		h.registry = strings.TrimSpace(f.registry)
-		h.regClient = &http.Client{Timeout: 15 * time.Second}
+	if f.projectsDir == "" {
+		f.projectsDir = filepath.Join(a.cfg.Path(a.cfg.RunsRoot), "..", "projects")
 	}
-	if h.builder == "" {
-		a.logger.Warn("shared runner: no isolated image builder (" + sharedBuildkitEnv + "): images from org Dockerfiles are refused; built-in and approved images still run")
+	if err := h.setupBuilds(ctx); err != nil {
+		return fail("shared runner: %v", err)
 	}
 	h.gateway = f.gateway
 	if h.gateway == "" {
@@ -497,14 +595,6 @@ func runSharedRunner(args []string) int {
 	h.trusted = []string{a.cfg.Root}
 	if lib := suite.LibraryDir(); lib != "" {
 		h.trusted = append(h.trusted, lib)
-	}
-	if f.projectsDir == "" {
-		f.projectsDir = filepath.Join(a.cfg.Path(a.cfg.RunsRoot), "..", "projects")
-	}
-	host, _ := os.Hostname()
-	h.host, h.prefix = host, f.name
-	if h.prefix == "" {
-		h.prefix = "shared-" + host
 	}
 	h.hygiene = newRunnerHygiene(a, f.projectsDir) // E6: one sweep for every org's loop: they share this runner's store and Docker (runnerhygiene.go)
 	go h.hygiene.Run(ctx)

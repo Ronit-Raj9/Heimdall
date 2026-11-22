@@ -1,0 +1,27 @@
+# The shared worker's image registry as org builds see it (G3 B2): read
+# only, pull credentials required. Its storage is also mounted read-only.
+# Only registry-sync.sh writes, through the registry-writer service
+# (config-write.yml), which runs only while it copies images.
+version: 0.1
+log:
+  level: info
+  accesslog:
+    disabled: false
+storage:
+  filesystem:
+    rootdirectory: /var/lib/registry
+  delete:
+    enabled: false
+  maintenance:
+    readonly:
+      enabled: true
+    uploadpurging:
+      enabled: false
+auth:
+  htpasswd:
+    realm: heimdall-registry
+    path: /auth/htpasswd
+http:
+  addr: :5000
+  headers:
+    X-Content-Type-Options: [nosniff]

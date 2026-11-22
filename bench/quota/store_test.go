@@ -16,10 +16,10 @@ func TestDBStoreLimitsAndKillSwitch(t *testing.T) {
 	def.SharedPool = true
 	s := quota.Open(d, quota.Options{Defaults: &def})
 	l, err := s.Get(ctx, "org1")
-	if err != nil || !l.SharedPool || l.Runtime != "runc" {
+	if err != nil || !l.SharedPool || l.Runtime != "runsc" {
 		t.Fatalf("defaults: %+v %v", l, err)
 	}
-	l.Runtime, l.MaxConcurrentRuns, l.AllowCustomImages = "runsc", 4, true
+	l.Runtime, l.MaxConcurrentRuns, l.AllowCustomImages = "runc", 4, true
 	if err := s.Set(ctx, "org1", l, "admin"); err != nil {
 		t.Fatal(err)
 	}

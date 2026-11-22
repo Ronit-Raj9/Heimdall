@@ -164,23 +164,37 @@ func TestDailyCapsOverIndex(t *testing.T) {
 }
 
 func TestResolveSharedRuntime(t *testing.T) {
+	// G3 B8: gVisor or nothing, unless the operator allows runc; runc then
+	// serves only orgs a server admin set to runc.
 	cases := []struct {
 		want       string
-		has        bool
+		has, allow bool
 		rt, filter string
 		warn, fail bool
 	}{
-		{"auto", true, "runsc", "", false, false},
-		{"auto", false, "runc", "runc", true, false},
-		{"runsc", true, "runsc", "runsc", false, false},
-		{"runsc", false, "", "", false, true},
-		{"runc", true, "runc", "runc", true, false},
-		{"runc", false, "runc", "runc", false, false},
+		{"auto", true, false, "runsc", "", false, false},
+		{"auto", true, true, "runsc", "", false, false},
+		{"auto", false, false, "", "", false, true},
+		{"auto", false, true, "runc", "runc", true, false},
+		{"runsc", true, false, "runsc", "runsc", false, false},
+		{"runsc", false, true, "", "", false, true},
+		{"runc", true, false, "", "", false, true},
+		{"runc", false, false, "", "", false, true},
+		{"runc", true, true, "runc", "runc", true, false},
+		{"runc", false, true, "runc", "runc", true, false},
 	}
 	for _, c := range cases {
-		rt, filter, warn, err := resolveSharedRuntime(c.want, c.has)
+		rt, filter, warn, err := resolveSharedRuntime(c.want, c.has, c.allow)
 		if (err != nil) != c.fail || rt != c.rt || filter != c.filter || (warn != "") != c.warn {
-			t.Errorf("%s has=%v: %q %q %q %v", c.want, c.has, rt, filter, warn, err)
+			t.Errorf("%s has=%v allow=%v: %q %q %q %v", c.want, c.has, c.allow, rt, filter, warn, err)
+		}
+	}
+	if _, _, _, err := resolveSharedRuntime("auto", false, false); err == nil || !strings.Contains(err.Error(), "install-gvisor.sh") || !strings.Contains(err.Error(), allowRuncEnv) {
+		t.Fatalf("missing gVisor error does not say what to do: %v", err)
+	}
+	for v, want := range map[string]bool{"1": true, "true": true, " YES ": true, "": false, "0": false, "no": false, "runc": false} {
+		if allowRunc(v) != want {
+			t.Errorf("allowRunc(%q) != %v", v, want)
 		}
 	}
 	if !runtimesHaveRunsc([]byte(`{"runc":{"path":"runc"},"runsc":{"path":"/usr/bin/runsc"}}`)) || runtimesHaveRunsc([]byte(`{"runc":{}}`)) || runtimesHaveRunsc([]byte(`x`)) {
