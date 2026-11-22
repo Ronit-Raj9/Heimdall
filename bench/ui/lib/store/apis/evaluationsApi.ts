@@ -119,6 +119,40 @@ export interface EvaluationSpec {
 	stream?: { memory: "carry" | "fresh"; order?: "suite" | "seeded"; replay?: number; threshold?: number };
 	/** Tell the agent its budget and deadline (BENCH_BUDGET_USD, BENCH_DEADLINE). */
 	disclose_budget?: boolean;
+	/** Provider failover: a second arm with Bifrost fallbacks, run under an outage of the primary model. One arm only. */
+	failover?: EvaluationFailover;
+}
+
+/** Bifrost fallbacks for the agent's model, on the same provider; tried in order when the primary fails. */
+export interface EvaluationFailover {
+	enabled: boolean;
+	fallbacks: { provider?: string; model: string }[];
+	outage_status?: number;
+}
+
+/** The report card's "Provider failover" section (reportcard Report.failover). */
+export interface FailoverArmStats {
+	calls: number;
+	errors: number;
+	fallback_served: number;
+	mean_latency_ms: number;
+	cost_usd: number;
+	cost_known: boolean;
+	task_success: boolean;
+	success_rate?: number;
+}
+
+export interface FailoverReport {
+	clean: FailoverArmStats;
+	failover: FailoverArmStats;
+	no_failover: FailoverArmStats;
+	failover_worked: boolean;
+	extra_latency_ms: number;
+	cost_change_usd?: number;
+	success_with_failover: boolean;
+	success_without_failover: boolean;
+	summary: string;
+	per_run?: boolean;
 }
 
 /** What an evaluation must show to pass. Scores are fractions (0 to 1). */
@@ -490,6 +524,8 @@ export interface Report {
 	learning?: ReportLearningRow[];
 	/** Only when runs reported resume, budget or success per dollar numbers. */
 	persistence?: ReportPersistenceRow[];
+	/** Only when the evaluation ran the provider failover option. */
+	failover?: FailoverReport;
 }
 
 /** One arm's numbers over the whole evaluation; absent fields are unknown. */

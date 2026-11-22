@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/failover"
 	"io/fs"
 	"math"
 	"slices"
@@ -185,6 +186,9 @@ type Report struct {
 	// squeezed budget and converted spend into success; nil when no run
 	// reported any of it.
 	Persistence []PersistenceRow `json:"persistence,omitempty"`
+	// Failover is the "Provider failover" section (lane C07, failover.go);
+	// nil unless the evaluation ran the failover option.
+	Failover *failover.Report `json:"failover,omitempty"`
 }
 
 // LearningRow is one arm's learning summary on one benchmark.
@@ -404,6 +408,11 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	rep.Alignment = alignment(children, labels)
 	rep.Learning = learningRows(children, labels)
 	rep.Persistence = persistence(children, labels)
+	fo, err := failoverSection(ctx, src, ev)
+	if err != nil {
+		return nil, err
+	}
+	rep.Failover = fo
 	return rep, nil
 }
 

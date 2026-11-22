@@ -54,15 +54,9 @@ const (
 // back on.
 const DefaultOutageStatus = 503
 
-// Option is the evaluation option as the UI and API send it.
-type Option struct {
-	Enabled bool `json:"enabled"`
-	// Fallbacks are tried in order after the primary model fails. Provider
-	// may be empty (the run's provider) but must not name another one.
-	Fallbacks []schemas.RouteTarget `json:"fallbacks"`
-	// OutageStatus is the status of the injected outage (default 503).
-	OutageStatus int `json:"outage_status,omitempty"`
-}
+// Option is the evaluation option as the UI and API send it
+// (schemas.EvaluationSpec.Failover).
+type Option = schemas.FailoverOption
 
 // Arm is the setup of one arm: the routing policy for the run key, the
 // fault plan, and where the fault is applied.
@@ -78,7 +72,7 @@ type Arm struct {
 }
 
 // Validate refuses an option that cannot test anything.
-func (o Option) Validate(provider, primaryModel string) error {
+func Validate(o Option, provider, primaryModel string) error {
 	if !o.Enabled {
 		return nil
 	}
@@ -116,7 +110,7 @@ func Plan(provider, primaryModel string, o Option, pluginPresent bool, planID st
 	if !o.Enabled {
 		return nil, errors.New("provider failover is off")
 	}
-	if err := o.Validate(provider, primaryModel); err != nil {
+	if err := Validate(o, provider, primaryModel); err != nil {
 		return nil, err
 	}
 	status := o.OutageStatus
@@ -145,7 +139,7 @@ func Plan(provider, primaryModel string, o Option, pluginPresent bool, planID st
 		f := outage
 		a.Fault, a.Via = &f, via
 		if via == ViaPlugin {
-			raw, err := json.Marshal(pluginPlan{Mode: "error", Status: status, Provider: provider, Model: primaryModel, FromCall: 1})
+			raw, err := json.Marshal(pluginPlan{Mode: pluginModeOutage, Status: status, Model: primaryModel, FromCall: 1})
 			if err != nil {
 				return Arm{}, err
 			}
@@ -173,11 +167,11 @@ func Plan(provider, primaryModel string, o Option, pluginPresent bool, planID st
 
 // pluginPlan is the inline plan the heimdall plugin reads: an error outage
 // scoped to the primary provider and model, from the first call.
-// TODO(C01): align field names with plugins/heimdall Plan once it lands.
+// Field names follow plugins/heimdall Plan (faults.go, lane C01), which
+// has no provider field: the model filter scopes the outage.
 type pluginPlan struct {
 	Mode     string `json:"mode"`
 	Status   int    `json:"status"`
-	Provider string `json:"provider,omitempty"`
 	Model    string `json:"model,omitempty"`
 	FromCall int    `json:"from_call,omitempty"`
 }
@@ -187,4 +181,37 @@ func bare(model string) string {
 		return m
 	}
 	return model
+}
+
+// pluginModeOutage is plugins/heimdall ModeOutage.
+const pluginModeOutage = "outage"
+
+// Experiment wiring (handlers/evaluations.go): the failover evaluation is
+// one experiment with two arms (the agent, and the agent with fallbacks)
+// and two conditions (clean, and the primary outage probe). The clean
+// condition of the plain arm is the clean arm; the outage condition of the
+// failover arm and the plain arm are the failover and no-failover arms.
+
+// ArmLabelSuffix marks the experiment arm that carries the fallbacks.
+const ArmLabelSuffix = " with failover"
+
+// ArmID is the experiment arm id of the fallback arm.
+const ArmID = "failover"
+
+// RoutingSet is the arm override that gives the failover arm its Bifrost
+// fallback_chain policy ("gateway.routing" in the agent config).
+func RoutingSet(provider, primaryModel string, o Option) (map[string]any, error) {
+	arms, err := Plan(provider, primaryModel, o, false, "")
+	if err != nil {
+		return nil, err
+	}
+	raw, err := json.Marshal(arms[1].Policy)
+	if err != nil {
+		return nil, err
+	}
+	var pol map[string]any
+	if err := json.Unmarshal(raw, &pol); err != nil {
+		return nil, err
+	}
+	return map[string]any{"gateway.routing": pol}, nil
 }

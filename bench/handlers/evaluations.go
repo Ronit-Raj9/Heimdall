@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/failover"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -528,6 +529,9 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 			return badf("%v", err)
 		}
 	}
+	if err := normalizeFailover(spec); err != nil {
+		return err
+	}
 	fs := []string{faults.Clean}
 	for _, f := range spec.Faults {
 		if f = strings.TrimSpace(f); f != "" && !contains(fs, f) {
@@ -892,7 +896,7 @@ func evalStreamControl(spec schemas.EvaluationSpec) bool {
 // evalArmCount is the experiment arms one benchmark of spec runs: one per
 // spec arm, plus the no-memory control when there is one.
 func evalArmCount(spec schemas.EvaluationSpec) int {
-	if evalStreamControl(spec) {
+	if evalStreamControl(spec) || evalFailover(spec) {
 		return len(spec.Arms) + 1
 	}
 	return len(spec.Arms)
@@ -987,6 +991,15 @@ func evalArms(spec schemas.EvaluationSpec) map[string]schemas.ArmSpec {
 			}
 		}
 		out[a.Label] = arm
+	}
+	if evalFailover(spec) { // lane C07: the agent again, with Bifrost fallbacks
+		a := spec.Arms[0]
+		provider, model := failoverTarget(a)
+		if set, err := failover.RoutingSet(provider, model, *spec.Failover); err == nil {
+			arm := withSet(out[a.Label], set)
+			arm.Label += failover.ArmLabelSuffix
+			out[failover.ArmID] = arm
+		}
 	}
 	return out
 }

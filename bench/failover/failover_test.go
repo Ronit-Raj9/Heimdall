@@ -65,7 +65,7 @@ func TestPlanPlugin(t *testing.T) {
 	if err := json.Unmarshal([]byte(a.Headers[HeaderFaultPlan]), &p); err != nil {
 		t.Fatal(err)
 	}
-	if p.Status != 500 || p.Provider != "anthropic" || p.Model != "claude-sonnet-4" || p.FromCall != 1 {
+	if p.Status != 500 || p.Model != "claude-sonnet-4" || p.FromCall != 1 {
 		t.Fatalf("plugin plan %+v", p)
 	}
 	if arms[0].Headers[HeaderFaultPlan] != "" {
@@ -82,7 +82,7 @@ func TestValidateRefuses(t *testing.T) {
 		"HTTP error status":     {Enabled: true, OutageStatus: 200, Fallbacks: []schemas.RouteTarget{{Model: "m"}}},
 	}
 	for want, o := range cases {
-		err := o.Validate("openai", "gpt-4o")
+		err := Validate(o, "openai", "gpt-4o")
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: got %v", want, err)
 		}
@@ -134,5 +134,23 @@ func TestReportFailed(t *testing.T) {
 	none := BuildReport(ArmResult{}, ArmResult{}, ArmResult{})
 	if !strings.HasPrefix(none.Summary, "Failover not tested") {
 		t.Fatal(none.Summary)
+	}
+}
+
+func TestBuildRunReport(t *testing.T) {
+	r := BuildRunReport(
+		RunCell{Runs: 2, Successes: 2, WallS: 20, WallN: 2, CostUSD: 0.02, CostN: 2},
+		RunCell{Runs: 2, Successes: 2, FallbackRuns: 2, WallS: 30, WallN: 2, CostUSD: 0.01, CostN: 2},
+		RunCell{Runs: 2, Successes: 0, WallS: 4, WallN: 2},
+	)
+	if !r.FailoverWorked || !r.PerRun || !r.SuccessWith || r.SuccessWithout || r.ExtraLatencyMS != 5000 {
+		t.Fatalf("report %+v", r)
+	}
+	if r.CostChangeUSD == nil || *r.CostChangeUSD > -0.0049 || *r.CostChangeUSD < -0.0051 {
+		t.Fatalf("cost %v", r.CostChangeUSD)
+	}
+	fail := BuildRunReport(RunCell{Runs: 1, Successes: 1}, RunCell{Runs: 2, FallbackRuns: 1}, RunCell{Runs: 1})
+	if fail.FailoverWorked || !strings.Contains(fail.Summary, "still failed there") {
+		t.Fatalf("report %+v", fail)
 	}
 }

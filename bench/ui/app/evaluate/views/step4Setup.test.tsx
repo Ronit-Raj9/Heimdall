@@ -432,3 +432,16 @@ describe("Step4Setup", () => {
 		expect(powerText({})).toBeUndefined();
 	});
 });
+describe("Step4Setup provider failover", () => {
+	it("shows the toggle for one agent and blocks a bad fallback", async () => {
+		const { Step4Setup: S, specReady: ready } = await import("./step4Setup");
+		const one: EvaluationSpec = { ...defaultEvaluationSpec(), benchmarks: ["b"], arms: [{ label: "A", agent: "codex", model: "openai/gpt-4o" }] };
+		expect(render(<S spec={one} onChange={() => undefined} />)).toContain('data-testid="step4-failover-toggle"');
+		const on = { ...one, failover: { enabled: true, fallbacks: [{ provider: "openai", model: "gpt-4o-mini" }] } };
+		expect(render(<S spec={on} onChange={() => undefined} />)).toContain('data-testid="step4-failover-model"');
+		expect(ready(on)).toBe(true);
+		expect(ready({ ...on, failover: { enabled: true, fallbacks: [{ provider: "anthropic", model: "c" }] } })).toBe(false);
+		const two = { ...one, arms: [...one.arms, { label: "B", agent: "other", model: "openai/gpt-4o" }] };
+		expect(render(<S spec={two} onChange={() => undefined} />)).not.toContain("step4-failover");
+	});
+});

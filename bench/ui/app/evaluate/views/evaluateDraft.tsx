@@ -1,4 +1,4 @@
-import type { EvaluationArm, EvaluationMode, EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
+import type { EvaluationArm, EvaluationFailover, EvaluationMode, EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 /**
@@ -30,6 +30,8 @@ export interface EvaluateDraft {
 	budgetUsd: number | null;
 	/** The worker the evaluation runs on; "" is the org's default worker. */
 	worker?: string;
+	/** Provider failover option (score mode only). */
+	failover?: EvaluationFailover | null;
 	/** Arms dropped by a mode change (for example arm B in "score"), so going back restores their models. */
 	stashedArms?: EvaluationArm[];
 }
@@ -103,6 +105,7 @@ export function draftToSpec(d: EvaluateDraft): EvaluationSpec {
 		faults,
 		...(d.budgetUsd != null ? { budget_usd: d.budgetUsd } : {}),
 		...(d.worker ? { worker: d.worker } : {}),
+		...(d.failover?.enabled && d.arms.length === 1 ? { failover: d.failover } : {}),
 	};
 }
 
@@ -117,6 +120,7 @@ export function specToPatch(spec: EvaluationSpec): Partial<EvaluateDraft> {
 		faults: spec.faults,
 		budgetUsd: spec.budget_usd ?? null,
 		worker: spec.worker ?? "",
+		failover: spec.failover ?? null,
 	};
 }
 

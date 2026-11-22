@@ -52,7 +52,10 @@ type EvaluationSpec struct {
 	TasksPerBenchmark int             `json:"tasks_per_benchmark"` // default 8 (the fewest that can reach significance after Holm over a few benchmarks), admitted tasks only
 	Trials            int             `json:"trials"`              // repeats per task, default 2
 	Faults            []string        `json:"faults"`              // "clean" always; plus model-down, broken-tool, misleading-instruction
-	BudgetUSD         float64         `json:"budget_usd,omitempty"`
+	// Failover is the "Provider failover" option (lane C07): a second arm
+	// with Bifrost fallbacks and a primary model outage condition.
+	Failover  *FailoverOption `json:"failover,omitempty"`
+	BudgetUSD float64         `json:"budget_usd,omitempty"`
 	// Split is the task split the evaluation runs: public (the default) or
 	// held_out, an explicit opt-in for a held-out evaluation. Tasks of the
 	// other split never run in it.
