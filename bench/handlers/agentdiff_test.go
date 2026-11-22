@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/lib"
@@ -131,4 +132,64 @@ func TestAgentDiffContract(t *testing.T) {
 			checkKeys(t, fmt.Sprintf("AgentDiffVersionList.%s #%d", path, i), obj, loadKeys(t, typ), false)
 		}
 	}
+}
+
+// TestDiffVersionsMarkSystemAndVersion (N159): the diff version list marks
+// readiness check hashes and scripted controls as system rows, and names the
+// saved agent version and model of the others.
+func TestDiffVersionsMarkSystemAndVersion(t *testing.T) {
+	idx := agentDiffIndex()
+	idx.manifests[testExp].Experiment.EvaluationID = "ev_versions"
+	idx.manifests["e_admit_acme_ab12"] = &schemas.Manifest{
+		SuiteID: "acme-safety", SuiteVersion: "1.0.0", CreatedAt: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC),
+		Arms: map[string]schemas.ArmManifest{
+			"A": {Label: "right answer, try 1", ConfigHash: "sha256:ooo", Config: schemas.AgentConfig{ID: "oracle", Adapter: "scripted"}},
+			"B": {Label: "gpt-5.5", ConfigHash: "sha256:ccc", Config: schemas.AgentConfig{ID: "codex", Adapter: "command", Model: "gpt-5.5"}},
+		},
+	}
+	root := t.TempDir()
+	writeTestEvaluation(t, root, schemas.Evaluation{ID: "ev_versions", Spec: schemas.EvaluationSpec{Mode: "versions", Arms: []schemas.EvaluationArm{
+		{Label: "baseline", Agent: "codex", Version: 1, Model: "gpt-5.4-mini"},
+		{Label: "notes", Agent: "codex@v3", Model: "gpt-5.5"},
+	}}})
+	r := router.New()
+	NewAgentDiffHandler(testMode, idx, root).RegisterRoutes(r, lib.BodyLimit(testMode, lib.MaxBodyBytes))
+	var ctx fasthttp.RequestCtx
+	ctx.Request.Header.SetMethod(fasthttp.MethodGet)
+	ctx.Request.SetRequestURI(APIPrefix + "/agents/diff/versions")
+	r.Handler(&ctx)
+	var body struct {
+		Versions []map[string]any `json:"versions"`
+	}
+	if err := json.Unmarshal(ctx.Response.Body(), &body); err != nil {
+		t.Fatalf("decode %q: %v", ctx.Response.Body(), err)
+	}
+	got := map[string]map[string]any{}
+	for _, v := range body.Versions {
+		got[v["config_hash"].(string)] = v
+	}
+	want := map[string]struct {
+		version float64
+		model   string
+		system  bool
+	}{
+		"sha256:aaa": {1, "gpt-5.4-mini", false},
+		"sha256:bbb": {3, "gpt-5.5", false},
+		"sha256:ooo": {0, "", true},
+		"sha256:ccc": {0, "gpt-5.5", true},
+	}
+	for hash, w := range want {
+		v, ok := got[hash]
+		if !ok {
+			t.Errorf("%s missing from %v", hash, body.Versions)
+			continue
+		}
+		version, _ := v["version"].(float64)
+		model, _ := v["model"].(string)
+		system, _ := v["system"].(bool)
+		if version != w.version || model != w.model || system != w.system {
+			t.Errorf("%s: version %v model %q system %v, want %v %q %v", hash, version, model, system, w.version, w.model, w.system)
+		}
+	}
+	checkKeys(t, "AgentDiffVersionInfo", got["sha256:bbb"], loadKeys(t, "AgentDiffVersionInfo"), false)
 }
