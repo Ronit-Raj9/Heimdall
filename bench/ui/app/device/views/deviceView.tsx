@@ -25,6 +25,22 @@ export function normalizeUserCode(raw: string): string {
 }
 
 /**
+ * A sign-in code as the server makes them: 8 letters with no vowels, shown as XXXX-XXXX. The alphabet
+ * is userCodeAlphabet in auth/device.go; change both together.
+ */
+const USER_CODE = /^[BCDFGHJKLMNPQRSTVWXZ]{4}-[BCDFGHJKLMNPQRSTVWXZ]{4}$/;
+
+/** Whether the typed or linked text is a sign-in code, after normalizeUserCode. */
+export function isUserCode(code: string): boolean {
+	return USER_CODE.test(normalizeUserCode(code));
+}
+
+/** Whether to say the text is not a code: it is long enough to be one (8 or more letters) and is not. */
+export function notACode(raw: string): boolean {
+	return raw.replace(/[\s-]/g, "").length >= 8 && !isUserCode(raw);
+}
+
+/**
  * The page `heimdall login` sends the user to (/device?code=...): shows which device asks, what
  * access it gets and in which organization, then approves or denies. The token is minted on the
  * server and handed to the terminal; it never shows here.
@@ -35,7 +51,8 @@ export default function DeviceView({ initialCode }: { initialCode?: string }) {
 	const [typed, setTyped] = useState(initialCode ?? "");
 	const [code, setCode] = useState(initialCode ? normalizeUserCode(initialCode) : "");
 	const [done, setDone] = useState<"approved" | "denied" | null>(null);
-	const info = useGetDeviceQuery(code, { skip: !code || session.authMode === "local" });
+	// A code that cannot be one is refused here, before any lookup.
+	const info = useGetDeviceQuery(code, { skip: !code || !isUserCode(code) || session.authMode === "local" });
 	const [approve, approveState] = useApproveDeviceMutation();
 	const [deny, denyState] = useDenyDeviceMutation();
 	const orgName = session.org?.name ?? session.org?.slug ?? "";
@@ -70,9 +87,11 @@ export default function DeviceView({ initialCode }: { initialCode?: string }) {
 		);
 	}
 
+	// The link's own code, still in the field, that cannot be a code (any length).
+	const badLink = Boolean(initialCode) && typed === initialCode && !isUserCode(typed);
 	const onFind = (event: FormEvent) => {
 		event.preventDefault();
-		setCode(normalizeUserCode(typed));
+		if (isUserCode(typed)) setCode(normalizeUserCode(typed));
 	};
 	const form = (
 		<form className="flex items-end gap-2" onSubmit={onFind} data-testid="device-form">
@@ -88,14 +107,21 @@ export default function DeviceView({ initialCode }: { initialCode?: string }) {
 					data-testid="device-code"
 				/>
 				<span className="text-muted-foreground text-xs">{t("device.codeHint")}</span>
+				{(notACode(typed) || badLink) && (
+					<span className="text-chart-error-ink text-xs" role="alert" data-testid="device-not-a-code">
+						{t("device.notACode")}
+					</span>
+				)}
 			</label>
-			<Button type="submit" dataTestId="device-find" disabled={!typed.trim()}>
+			<Button type="submit" dataTestId="device-find" disabled={!isUserCode(typed)}>
 				{t("device.find")}
 			</Button>
 		</form>
 	);
 
 	if (!code) return wrap(form);
+	// A linked ?code= that is not a code: the form says why, and nothing was looked up.
+	if (!isUserCode(code)) return wrap(form);
 	if (info.isLoading) return wrap(<BlockSkeleton rows={3} testId="device-loading" />);
 	if (info.isError || !info.data) {
 		return wrap(

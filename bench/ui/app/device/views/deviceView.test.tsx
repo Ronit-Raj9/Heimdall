@@ -3,14 +3,17 @@ import "@/lib/i18n";
 import { hostedSession, LOCAL_SESSION } from "@/lib/testing/platformFixtures";
 import { errorQuery, loadingQuery, okQuery, render } from "@/lib/testing/render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import DeviceView, { normalizeUserCode } from "./deviceView";
+import DeviceView, { isUserCode, normalizeUserCode, notACode } from "./deviceView";
 
-const api = vi.hoisted(() => ({ device: {} as unknown }));
+const api = vi.hoisted(() => ({ device: {} as unknown, lookups: [] as { code: string; skip?: boolean }[] }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/deviceLoginApi", async () => {
 	const { mutation: m } = await import("@/lib/testing/render");
 	return {
-		useGetDeviceQuery: () => api.device,
+		useGetDeviceQuery: (code: string, opts?: { skip?: boolean }) => {
+			api.lookups.push({ code, skip: opts?.skip });
+			return api.device;
+		},
 		useApproveDeviceMutation: () => m({}),
 		useDenyDeviceMutation: () => m({}),
 	};
@@ -59,5 +62,27 @@ describe("DeviceView", () => {
 		expect(normalizeUserCode("bcdf ghjk")).toBe("BCDF-GHJK");
 		expect(normalizeUserCode("BCDF-GHJK")).toBe("BCDF-GHJK");
 		expect(normalizeUserCode("ab")).toBe("AB");
+	});
+
+	it("knows a sign-in code: 8 letters with no vowels (N146)", () => {
+		expect(isUserCode("abc")).toBe(false);
+		expect(isUserCode("bcdf ghjk")).toBe(true);
+		expect(isUserCode("BCDF-GHJK")).toBe(true);
+		expect(isUserCode("ABCD-EFGH")).toBe(false);
+		expect(isUserCode("BCDF-GHJKL")).toBe(false);
+		expect(notACode("abc")).toBe(false);
+		expect(notACode("abcdefgh")).toBe(true);
+		expect(notACode("bcdfghjk")).toBe(false);
+	});
+	it("refuses a linked code that cannot be one, before any lookup, and keeps Continue disabled", () => {
+		api.lookups = [];
+		const html = render(<DeviceView initialCode="abc" />, hostedSession());
+		expect(html).toContain('data-testid="device-form"');
+		expect(html).toContain("That is not a sign-in code. Codes are 8 letters with no vowels, like BCDF-GHJK.");
+		expect(html).not.toContain('data-testid="device-not-found"');
+		expect(html).toMatch(/<button[^>]*disabled=""[^>]*data-testid="device-find"|<button[^>]*data-testid="device-find"[^>]*disabled=""/);
+		expect(api.lookups.every((l) => l.skip)).toBe(true);
+		const vowels = render(<DeviceView initialCode="ABCD-EFGH" />, hostedSession());
+		expect(vowels).toContain('data-testid="device-not-a-code"');
 	});
 });
