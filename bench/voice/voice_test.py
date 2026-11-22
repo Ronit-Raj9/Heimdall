@@ -221,6 +221,15 @@ class ProtocolTest(unittest.TestCase):
 
             call.engines = SimpleNamespace(speak=speak)
             call.conn = SimpleNamespace(send_binary=send)
+            # Record, at the moment an interrupt starts, whether the answer is
+            # still pending. One that starts after the answer finished (a tick
+            # can run before the call ends) is allowed.
+            started_while_pending = []
+
+            async def interrupt():
+                started_while_pending.append(call.answering or (call.pending_reply is not None and not call.pending_reply.done()))
+
+            call.interrupt = interrupt
             call.pending_reply = asyncio.create_task(call.reply(1, "prior utterance", "fixture"))
             reply = call.pending_reply
             await asyncio.wait_for(reply_started.wait(), 2)
@@ -231,10 +240,10 @@ class ProtocolTest(unittest.TestCase):
             await asyncio.wait_for(reply, 2)
             call.ended.set()
             await ticker
-            return sends, call.speak_task
+            return sends, started_while_pending
 
-        sends, speak_task = asyncio.run(run())
-        self.assertIsNone(speak_task, "an interrupt started while the answer was pending")
+        sends, started_while_pending = asyncio.run(run())
+        self.assertNotIn(True, started_while_pending, "an interrupt started while the answer was pending")
         self.assertEqual(sends, [1, 1, 1])
 
     def test_tone_code(self):
