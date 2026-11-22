@@ -2,6 +2,8 @@ import { DEFAULT_BENCHMARK_BUDGET, parseBudget } from "@/app/evaluate/views/step
 import { AgentPicker } from "@/components/agents/agentPicker";
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
 import { faultName, points, usd } from "@/components/reportcard/reportCard.utils";
+import "@/app/evaluations/views/gw08I18n";
+import { faultChange } from "@/components/reportcard/reportCard.utils";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
@@ -349,11 +351,7 @@ export default function FailureTestsView() {
 				) : past.length === 0 ? (
 					<EmptyNote testId="ft-past-empty">{t("ft.pastEmpty")}</EmptyNote>
 				) : (
-					<ul className="flex flex-col gap-3" data-testid="ft-past-list">
-						{past.map((ev) => (
-							<PastTest key={ev.id} ev={ev} />
-						))}
-					</ul>
+					<PastTestList evs={past} />
 				)}
 			</Section>
 		</section>
@@ -396,9 +394,57 @@ function NumberChoice({
 	);
 }
 
-/** One past failure test: who, when, status, and the drop per fault once it finished. */
+/** A stopped (failed or cancelled) failure test with no finished benchmark, so no fault result. */
+function stoppedWithoutResults(ev: Evaluation): boolean {
+	return (ev.status === "failed" || ev.status === "cancelled") && !(ev.children ?? []).some((c) => c.status === "done");
+}
+
+/** The past failure tests; stopped ones with no results are hidden by default (D19), with their count. */
+export function PastTestList({ evs }: { evs: readonly Evaluation[] }) {
+	const { t } = useTranslation("gw08");
+	const [hideStopped, setHideStopped] = useState(true);
+	const stopped = evs.filter(stoppedWithoutResults).length;
+	const shown = hideStopped ? evs.filter((ev) => !stoppedWithoutResults(ev)) : evs;
+	return (
+		<div className="flex flex-col gap-3">
+			{stopped > 0 && (
+				<div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
+					<label className="flex items-center gap-1.5">
+						<input
+							type="checkbox"
+							checked={hideStopped}
+							onChange={(e) => setHideStopped(e.target.checked)}
+							data-testid="ft-past-hide-stopped"
+						/>
+						{t("ft.hideStopped")}
+					</label>
+					{hideStopped && <span data-testid="ft-past-hidden-count">{t("ft.stoppedHidden", { count: stopped })}</span>}
+				</div>
+			)}
+			<ul className="flex flex-col gap-3" data-testid="ft-past-list">
+				{shown.map((ev) => (
+					<PastTest key={ev.id} ev={ev} />
+				))}
+			</ul>
+		</div>
+	);
+}
+
+/** Why a finished failure test shows no fault result, by its state. */
+function noResultsKey(ev: Evaluation): "ft.emptyFailed" | "ft.emptyCancelled" | "ft.emptyAllSkipped" | "ft.emptyDone" {
+	if (ev.status === "failed") return "ft.emptyFailed";
+	if (ev.status === "cancelled") return "ft.emptyCancelled";
+	const chosen = (ev.spec?.faults ?? []).filter((f) => f !== "clean").length;
+	const benches = (ev.children ?? []).length;
+	if (chosen > 0 && benches > 0 && skippedFaultCount(ev) >= chosen * benches) return "ft.emptyAllSkipped";
+	return "ft.emptyDone";
+}
+
+/** One past failure test: who, when, status, its faults, and the change from clean per fault once it finished. */
 export function PastTest({ ev }: { ev: Evaluation }) {
 	const { t } = useTranslation("agentFirst");
+	const { t: tg } = useTranslation("gw08");
+	const faults = (ev.spec?.faults ?? []).filter((f) => f !== "clean");
 	const finished = ev.status === "done" || ev.status === "cancelled" || ev.status === "failed";
 	const report = useGetEvaluationReportQuery(finished ? ev.id : skipToken);
 	const label = report.data?.arms?.[0]?.label;
@@ -420,6 +466,11 @@ export function PastTest({ ev }: { ev: Evaluation }) {
 					{t(`ft.status.${ev.status}`, { defaultValue: ev.status })}
 				</span>
 			</div>
+			{faults.length > 0 && (
+				<p className="text-muted-foreground text-xs" data-testid={`ft-past-${ev.id}-faults`}>
+					{tg("ft.faults", { faults: faults.map((f) => faultName(String(f))).join(", ") })}
+				</p>
+			)}
 			{skipped > 0 && (
 				<p className="text-muted-foreground text-xs" data-testid={`ft-past-${ev.id}-skipped`}>
 					{t("ft.pastSkipped", { count: skipped })}
@@ -430,17 +481,21 @@ export function PastTest({ ev }: { ev: Evaluation }) {
 			) : report.isLoading ? (
 				<BlockSkeleton rows={1} testId={`ft-past-${ev.id}-loading`} />
 			) : rows.length === 0 ? (
-				<p className="text-muted-foreground text-xs">{t("ft.noResults")}</p>
+				<p className="text-muted-foreground text-xs" data-testid={`ft-past-${ev.id}-empty`}>
+					{tg(noResultsKey(ev))}
+				</p>
 			) : (
 				<ul className="flex flex-wrap gap-2" data-testid={`ft-past-${ev.id}-results`}>
 					{rows.map((r) => {
 						const s = r.arms[label as string];
+						const change = faultChange(s);
+						const tone = change.hurt ? "text-chart-error-ink" : change.helped ? "text-chart-success-ink" : "text-muted-foreground";
 						return (
 							<li key={r.fault} className="rounded-md border px-2.5 py-1.5 text-xs">
 								<span className="text-muted-foreground">{faultName(r.fault)}</span>{" "}
 								<span className="font-semibold tabular-nums">{Math.round(s.score * 100)}%</span>{" "}
-								<span className={s.drop > 0 ? "text-chart-error-ink tabular-nums" : "text-muted-foreground tabular-nums"}>
-									({points(-s.drop)})
+								<span className={`${tone} tabular-nums`} data-testid={`ft-past-${ev.id}-change-${r.fault}`}>
+									({change.hurt || change.helped ? tg("ft.vsClean", { change: change.text }) : tg("ft.noChange")})
 								</span>
 							</li>
 						);

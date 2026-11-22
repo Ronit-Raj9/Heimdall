@@ -194,7 +194,9 @@ function ResilienceRows({ report }: { report: Report }) {
 						const range =
 							m.degradation_ratio_low !== null && m.degradation_ratio_high !== null
 								? ` (${ratio(m.degradation_ratio_low)} to ${ratio(m.degradation_ratio_high)})`
-								: "";
+								: m.changed_tasks === 0
+									? `, the fault changed no task's result in ${m.tasks} tasks, too few runs for a range`
+									: "";
 						return (
 							<li
 								key={`${row.fault}-${arm.label}`}

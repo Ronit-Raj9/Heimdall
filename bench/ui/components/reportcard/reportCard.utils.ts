@@ -175,6 +175,17 @@ export function points(x: number | undefined | null): string {
 	return `${p > 0 ? "+" : ""}${p} pts`;
 }
 
+/**
+ * A fault score's change from a normal (clean) run of the same tasks, the one sign rule every page uses:
+ * negative means the fault hurt, positive that the agent did better under it, and a change that rounds
+ * to 0 points reads "no change".
+ */
+export function faultChange(fs: { drop: number } | undefined | null): { text: string; hurt: boolean; helped: boolean } {
+	if (!fs || !Number.isFinite(fs.drop)) return { text: "-", hurt: false, helped: false };
+	const p = Math.round(fs.drop * 100);
+	return { text: p === 0 ? "no change" : points(fs.drop), hurt: p < 0, helped: p > 0 };
+}
+
 export function usd(x: number | undefined | null): string {
 	if (x === undefined || x === null || !Number.isFinite(x)) return "-";
 	return x < 10 ? `$${x.toFixed(2)}` : `$${Math.round(x).toLocaleString("en-US")}`;
@@ -324,6 +335,22 @@ export function capabilityRows(report: Report): CapabilityRow[] {
 
 export function reportFileName(report: Report): string {
 	return `report-card-${(report.evaluation || "evaluation").replace(/[^a-zA-Z0-9_-]/g, "_")}.json`;
+}
+
+/** How long the JSON download keeps its object URL: revoking in the same tick can cancel the download in some browsers. */
+export const DOWNLOAD_REVOKE_MS = 1000;
+
+/** Saves the report as JSON from memory (no server call); the object URL is revoked after DOWNLOAD_REVOKE_MS. */
+export function downloadReportJSON(report: Report): void {
+	const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = reportFileName(report);
+	document.body.appendChild(a);
+	a.click();
+	a.remove();
+	setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_REVOKE_MS);
 }
 /** Plain words for why runs were left out of a score. */
 const EXCLUDED_NAMES: Record<string, string> = {
