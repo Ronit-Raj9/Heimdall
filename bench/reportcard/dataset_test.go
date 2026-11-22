@@ -2,6 +2,7 @@ package reportcard
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -85,5 +86,54 @@ func TestCompareDatasetsUsesSharedTasks(t *testing.T) {
 	evB.Children[0].TaskHashes = map[string]string{"t1": "old"}
 	if _, sh := CompareDatasets(src, evCand, evB); strings.Contains(strings.Join(sh["support"], ","), "t1") {
 		t.Fatalf("changed task t1 was compared: %v", sh)
+	}
+}
+
+// A4.gate: a re-run of the same benchmark version that sampled 5 of the 10
+// tasks the baseline ran has not changed the benchmark. The five tasks the
+// baseline also ran were not picked this time; they were not "no longer run".
+func TestCompareDatasetsSameLockSampleIsNotDropped(t *testing.T) {
+	src := newSource()
+	var base, cand []fixRun
+	for i := 1; i <= 10; i++ {
+		task := fmt.Sprintf("t%02d", i)
+		base = append(base, pass("A", task, 1, nil))
+		if i <= 5 {
+			cand = append(cand, pass("A", task, 1, nil))
+		}
+	}
+	src.add("exp_base", "hd-harbor-bfcl", []string{"A"}, base)
+	src.add("exp_cand", "hd-harbor-bfcl", []string{"A"}, cand)
+	for _, exp := range []string{"exp_base", "exp_cand"} {
+		for _, r := range src.runs[exp] {
+			src.manifests[exp].Slots = append(src.manifests[exp].Slots, r.Slot)
+		}
+		src.manifests[exp].SuiteLockHash = "sha256:samesamesame"
+	}
+	score := func(id, exp string) *schemas.Evaluation {
+		return &schemas.Evaluation{ID: id, Status: StatusDone, Spec: schemas.EvaluationSpec{Mode: "score", Arms: []schemas.EvaluationArm{{Label: "A", Agent: "codex", Model: "m"}}},
+			Children: []schemas.EvaluationChild{{Benchmark: "hd-harbor-bfcl", ExperimentID: exp, Status: "done"}}}
+	}
+	cmp, shared := CompareDatasets(src, score("ev_cand", "exp_cand"), score("ev_base", "exp_base"))
+	if cmp.Changed || len(cmp.Benchmarks) != 1 {
+		t.Fatalf("comparison %+v", cmp)
+	}
+	row := cmp.Benchmarks[0]
+	if row.Changed || row.DroppedTasks != 0 || row.NewTasks != 0 || row.Compared != 5 || row.NotCompared {
+		t.Fatalf("row %+v", row)
+	}
+	want := "hd-harbor-bfcl: compared on the 5 tasks both ran; the baseline also ran 5 tasks this evaluation did not pick"
+	if !strings.Contains(cmp.Summary, want) || strings.Contains(cmp.Summary, "no longer run") || strings.Contains(cmp.Summary, "changed since") {
+		t.Fatalf("summary %q", cmp.Summary)
+	}
+	if got := strings.Join(shared["hd-harbor-bfcl"], ","); got != "t01,t02,t03,t04,t05" {
+		t.Fatalf("shared %q", got)
+	}
+
+	// A different lock is a changed benchmark and keeps the old wording.
+	src.manifests["exp_cand"].SuiteLockHash = "sha256:otherotherot"
+	cmp, _ = CompareDatasets(src, score("ev_cand", "exp_cand"), score("ev_base", "exp_base"))
+	if !cmp.Changed || cmp.Benchmarks[0].DroppedTasks != 5 || !strings.Contains(cmp.Summary, "5 baseline tasks no longer run") {
+		t.Fatalf("lock changed: %+v", cmp)
 	}
 }

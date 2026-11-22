@@ -216,3 +216,22 @@ func TestNormalizeGateSlices(t *testing.T) {
 		t.Errorf("slice rule kept: %+v %v", spec.Gate, err)
 	}
 }
+
+// A4.gate: an evaluation of the version that is already live does not
+// "replace" it: the preview leaves ReplacesVersion empty instead of
+// "codex v1 replaces v1".
+func TestReleaseSameVersionHasNoReplaces(t *testing.T) {
+	r, root, _, ev := evalReleaseFixture(t, nil)
+	ev.Spec.Arms[1].Version = 1
+	if err := evalstore.Open(root).Save(ev); err != nil {
+		t.Fatal(err)
+	}
+	ctx := evalCall(r, "GET", APIPrefix+"/evaluations/"+ev.ID+"/release-preview", "")
+	var p EvaluationReleasePreview
+	if err := json.Unmarshal(ctx.Response.Body(), &p); err != nil {
+		t.Fatal(err)
+	}
+	if p.Version != 1 || p.Live.Version != 1 || p.ReplacesVersion != 0 || !strings.Contains(p.Problem, "already the live version") {
+		t.Fatalf("preview %+v", p)
+	}
+}

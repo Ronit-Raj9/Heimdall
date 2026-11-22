@@ -1,13 +1,17 @@
+import { printExport } from "@/components/share/shareDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { EvaluationArm, Report, ReportAlignmentRate, ReportArmMetrics, ReportBenchmark } from "@/lib/store/apis/evaluationsApi";
+import { reportExportUrl, reproduceUrl } from "@/lib/store/apis/shareApi";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpRight, Check, ChevronRight, Download, Equal, Link2 } from "lucide-react";
+import { ArrowUpRight, Check, ChevronRight, Download, Equal, FileCode2, FileText, Link2, Package, Printer } from "lucide-react";
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 import { BifrostTable, hasBifrost } from "./bifrostSection";
+import "./fw09I18n";
 import { hasLearning, hasPersistence, LearningTable, PersistenceTable } from "./learningSections";
 import { hasVoice, VoiceTable } from "./voiceSection";
 import { hasVoiceCalls, VoiceCallsTable } from "./voiceCallsSection";
@@ -138,7 +142,10 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 			)}
 
 			{hasLearning(report) && (
-				<Section title="Learning over time" description="Tasks run one after another with the agent's memory kept. Change is in percentage points.">
+				<Section
+					title="Learning over time"
+					description="Tasks run one after another with the agent's memory kept. Change is in percentage points."
+				>
 					<LearningTable report={report} />
 				</Section>
 			)}
@@ -165,7 +172,10 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 			)}
 
 			{hasBifrost(report) && (
-				<Section title="Through Bifrost" description="What the Bifrost gateway did for each agent's model calls: fallbacks, cache hits, retries, tokens and cost.">
+				<Section
+					title="Through Bifrost"
+					description="What the Bifrost gateway did for each agent's model calls: fallbacks, cache hits, retries, tokens and cost."
+				>
 					<BifrostTable report={report} />
 				</Section>
 			)}
@@ -272,7 +282,9 @@ function MetricCells({ metrics }: { metrics?: ReportArmMetrics }) {
 			<TableCell className={num}>
 				<CostValue metrics={metrics} />
 			</TableCell>
-			<TableCell className={num}>{metrics && metrics.tokens != null ? compactNumber(metrics.tokens) : metrics?.runs ? "Not known" : "-"}</TableCell>
+			<TableCell className={num}>
+				{metrics && metrics.tokens != null ? compactNumber(metrics.tokens) : metrics?.runs ? "Not known" : "-"}
+			</TableCell>
 			<TableCell className={num}>{metrics ? compactNumber(metrics.steps) : "-"}</TableCell>
 			<TableCell className={num}>{metrics ? compactNumber(metrics.tool_calls) : "-"}</TableCell>
 			<TableCell className={num}>{metrics ? duration(metrics.wall_s) : "-"}</TableCell>
@@ -454,7 +466,10 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 							<React.Fragment key={arm.label}>
 								<MetricPair label={`${prefix}runs`} value={m ? compactNumber(m.runs) : "-"} />
 								<MetricPair label={`${prefix}cost`} value={m ? costText(m) : "-"} />
-								<MetricPair label={`${prefix}tokens`} value={m && m.tokens != null ? compactNumber(m.tokens) : m?.runs ? "Not known" : "-"} />
+								<MetricPair
+									label={`${prefix}tokens`}
+									value={m && m.tokens != null ? compactNumber(m.tokens) : m?.runs ? "Not known" : "-"}
+								/>
 								<MetricPair label={`${prefix}time`} value={m ? duration(m.wall_s) : "-"} />
 							</React.Fragment>
 						);
@@ -670,9 +685,12 @@ function AlignmentSection({ report }: { report: Report }) {
 	);
 }
 
-/** JSON download and copy link. */
+/** JSON download, the server exports of the report's evaluation (HTML, Markdown, PDF, reproduce kit) and copy link. */
 export function ExportButtons({ report }: { report: Report }) {
+	const { t } = useTranslation("fw09");
 	const [copied, setCopied] = React.useState<"" | "ok" | "fail">("");
+	const [pdfFailed, setPdfFailed] = React.useState(false);
+	const id = report.evaluation;
 
 	const download = () => {
 		const blob = new Blob([JSON.stringify(report, null, 2)], {
@@ -704,6 +722,38 @@ export function ExportButtons({ report }: { report: Report }) {
 				<Download aria-hidden="true" />
 				Download JSON
 			</Button>
+			{id && (
+				<>
+					<Button asChild variant="outline" size="sm">
+						<a href={reportExportUrl(id, "html")} download data-testid="report-download-html">
+							<FileText aria-hidden="true" />
+							{t("export.html")}
+						</a>
+					</Button>
+					<Button asChild variant="outline" size="sm">
+						<a href={reportExportUrl(id, "md")} download data-testid="report-download-md">
+							<FileCode2 aria-hidden="true" />
+							{t("export.markdown")}
+						</a>
+					</Button>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						dataTestId="report-download-pdf"
+						onClick={async () => setPdfFailed(!(await printExport(reportExportUrl(id, "html"))))}
+					>
+						<Printer aria-hidden="true" />
+						{t("export.pdf")}
+					</Button>
+					<Button asChild variant="outline" size="sm">
+						<a href={reproduceUrl(id)} download data-testid="report-download-reproduce">
+							<Package aria-hidden="true" />
+							{t("export.reproduce")}
+						</a>
+					</Button>
+				</>
+			)}
 			<Button variant="outline" size="sm" onClick={copyLink} data-testid="report-copy-link">
 				<Link2 aria-hidden="true" />
 				{copied === "ok" ? "Link copied" : "Copy link"}
@@ -711,6 +761,11 @@ export function ExportButtons({ report }: { report: Report }) {
 			<span role="status" aria-live="polite" className="sr-only">
 				{copied === "ok" ? "Link copied" : copied === "fail" ? "Could not copy the link" : ""}
 			</span>
+			{pdfFailed && (
+				<p className="text-destructive w-full text-xs" role="alert" data-testid="report-pdf-failed">
+					{t("export.pdfFailed")}
+				</p>
+			)}
 		</div>
 	);
 }

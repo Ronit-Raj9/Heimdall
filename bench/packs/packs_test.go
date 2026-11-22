@@ -66,6 +66,11 @@ func TestCapabilityOf(t *testing.T) {
 	cases := []struct{ id, track, want string }{
 		{"hd-harbor-tb2", "terminal", CapTerminal},
 		{"hd-harbor-skills", "skills", CapTerminal},
+		{"hd-harbor-tb41-cpu", "terminal", CapTerminal},
+		{"hd-harbor-bfcl", "terminal", CapSupport},
+		{"hd-harbor-bfcl", "", CapSupport},
+		{"hd-harbor-other", "", CapCoding},
+		{"hd-harbor-other", "terminal", CapTerminal},
 		{"hd-swe-verified", "", CapCoding},
 		{"hd-swe-ib-lcb", "coding", CapCoding},
 		{"hd-swe-ib-swe", "coding", CapSafety},

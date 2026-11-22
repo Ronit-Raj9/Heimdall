@@ -1,4 +1,6 @@
+import "@/components/reportcard/fw09I18n";
 import { Badge } from "@/components/ui/badge";
+import i18n from "@/lib/i18n";
 import type { DatasetComparison, ReleaseRecord, ReleaseSide, ReleaseSummary, ScoreCI } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
@@ -8,10 +10,19 @@ export function versionName(agent: string, version?: number): string {
 	return version ? `${agent} v${version}` : agent;
 }
 
-/** The headline of a release: "codex v4 replaces v3", "codex v4 is the first release", or the old fallback. */
-export function releaseTitle(r: Pick<ReleaseRecord, "agent_id" | "version" | "replaces_version" | "agent_config_id" | "arm">, t: (k: string, o?: Record<string, unknown>) => string): string {
+/**
+ * The headline of a release: "codex v4 replaces v3", "codex v4 is the first release", or the old fallback.
+ * compared_version is the version the evidence was compared with (a release preview's baseline): when it
+ * is the same version, the title says so instead of "codex v1 replaces v1".
+ */
+export function releaseTitle(
+	r: Pick<ReleaseRecord, "agent_id" | "version" | "replaces_version" | "agent_config_id" | "arm"> & { compared_version?: number },
+	t: (k: string, o?: Record<string, unknown>) => string,
+): string {
 	if (!r.agent_id) return r.agent_config_id || r.arm;
 	const name = versionName(r.agent_id, r.version);
+	const same = !!r.version && (r.replaces_version === r.version || r.compared_version === r.version);
+	if (same) return i18n.t("release.sameVersion", { ns: "fw09", name });
 	return r.replaces_version ? t("releases.replaces", { name, prev: `v${r.replaces_version}` }) : t("releases.first", { name });
 }
 
@@ -45,7 +56,13 @@ function rows(s: ReleaseSummary, t: (k: string) => string): Row[] {
 			better: direction(cap.baseline?.score, cap.candidate.score, true),
 		});
 	}
-	out.push({ key: "score", label: t("releases.ev.overall"), before: b ? scoreText(b) : undefined, after: scoreText(c), better: direction(b?.score, c.score, true) });
+	out.push({
+		key: "score",
+		label: t("releases.ev.overall"),
+		before: b ? scoreText(b) : undefined,
+		after: scoreText(c),
+		better: direction(b?.score, c.score, true),
+	});
 	const opt = (v: number | undefined, f: (x: number) => string) => (v === undefined ? "-" : f(v));
 	out.push({
 		key: "cost",

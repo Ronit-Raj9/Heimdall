@@ -121,7 +121,11 @@ func (h *evalReleaseHandler) buildPreview(ctx context.Context, ev *schemas.Evalu
 		return p, nil
 	}
 	p.Agent, p.Version, p.Candidate, p.Live = r.Agent, r.CandidateVersion, r.Candidate, r.Live
-	p.ReplacesVersion = r.Live.Version
+	if r.Live.Version != r.CandidateVersion {
+		// A version does not replace itself: an evaluation of the live
+		// version compares with an earlier evaluation of it instead.
+		p.ReplacesVersion = r.Live.Version
+	}
 	p.Baseline, p.Summary, p.Decision = r.Baseline, r.summary(), r.decision()
 	p.Gate = ev.GateResult
 	if p.Gate == nil {

@@ -96,8 +96,8 @@ func ChildDatasetFromManifest(c *schemas.EvaluationChild, m *schemas.Manifest) {
 }
 
 // CompareDatasets compares the benchmarks candidate ran with those base
-// ran. tasks is nil when nothing changed (the reports compare as they are);
-// otherwise it lists, per compared benchmark, the tasks both ran with the
+// ran. tasks is nil when both ran the same tasks of the same versions (the
+// reports compare as they are); otherwise it lists, per compared benchmark, the tasks both ran with the
 // same content, and a benchmark it leaves out is not compared.
 func CompareDatasets(src leaderboard.Source, candidate, base *schemas.Evaluation) (*schemas.DatasetComparison, map[string][]string) {
 	sides := func(ev *schemas.Evaluation) (map[string]childDataset, []string) {
@@ -131,7 +131,7 @@ func CompareDatasets(src leaderboard.Source, candidate, base *schemas.Evaluation
 	}
 	cmp := &schemas.DatasetComparison{Benchmarks: []schemas.DatasetBenchmark{}}
 	tasks := map[string][]string{}
-	var lines []string
+	var lines, sampled []string // sampled: same benchmark, a different sample of its tasks
 	for _, id := range order {
 		c, inCand := cand[id]
 		b, inBase := was[id]
@@ -144,15 +144,55 @@ func CompareDatasets(src leaderboard.Source, candidate, base *schemas.Evaluation
 			row.Changed, row.NotCompared, row.DroppedTasks = true, true, len(b.tasks)
 			lines = append(lines, fmt.Sprintf("%s ran only in the baseline; not compared", id))
 		default:
+			// The same lock (and version) is the same benchmark: tasks one side
+			// ran and the other did not are a different sample of it, not new
+			// or dropped tasks. Only a task whose content differs is a change.
+			sameLock := c.lock != "" && c.lock == b.lock && (c.version == "" || b.version == "" || c.version == b.version)
 			var shared []string
+			changedTasks := 0
 			for t, h := range c.tasks {
 				bh, ok := b.tasks[t]
-				if ok && (h == "" || bh == "" || h == bh) {
+				switch {
+				case ok && (h == "" || bh == "" || h == bh):
 					shared = append(shared, t)
+				case ok:
+					changedTasks++
 				}
 			}
 			slices.Sort(shared)
 			row.Compared = len(shared)
+			if sameLock {
+				candOnly := len(c.tasks) - len(shared) - changedTasks
+				notPicked := len(b.tasks) - len(shared) - changedTasks
+				row.NewTasks = changedTasks
+				row.Changed = changedTasks > 0 || len(shared) == 0
+				switch {
+				case len(shared) == 0:
+					row.NotCompared = true
+					lines = append(lines, fmt.Sprintf("%s: no task in common with the baseline; not compared", id))
+				default:
+					tasks[id] = shared
+					if changedTasks == 0 && candOnly == 0 && notPicked == 0 {
+						break
+					}
+					l := fmt.Sprintf("%s: compared on the %d tasks both ran", id, len(shared))
+					if changedTasks > 0 {
+						l += fmt.Sprintf("; %d changed tasks not compared", changedTasks)
+					}
+					if notPicked > 0 {
+						l += fmt.Sprintf("; the baseline also ran %d tasks this evaluation did not pick", notPicked)
+					}
+					if candOnly > 0 {
+						l += fmt.Sprintf("; this evaluation also ran %d tasks the baseline did not pick", candOnly)
+					}
+					if row.Changed {
+						lines = append(lines, l)
+					} else {
+						sampled = append(sampled, l)
+					}
+				}
+				break
+			}
 			row.NewTasks = len(c.tasks) - len(shared)
 			row.DroppedTasks = len(b.tasks) - len(shared)
 			row.Changed = row.NewTasks > 0 || row.DroppedTasks > 0 ||
@@ -183,10 +223,15 @@ func CompareDatasets(src leaderboard.Source, candidate, base *schemas.Evaluation
 		cmp.Benchmarks = append(cmp.Benchmarks, row)
 	}
 	if !cmp.Changed {
-		cmp.Summary = "The baseline ran the same benchmark versions and tasks."
-		return cmp, nil
+		if len(sampled) == 0 {
+			cmp.Summary = "The baseline ran the same benchmark versions and tasks."
+			return cmp, nil
+		}
+		// Same versions, different samples: compare on the tasks both ran.
+		cmp.Summary = "The baseline ran the same benchmark versions: " + strings.Join(sampled, ". ") + "."
+		return cmp, tasks
 	}
-	cmp.Summary = "Benchmark changed since baseline: " + strings.Join(lines, ". ") + "."
+	cmp.Summary = "Benchmark changed since baseline: " + strings.Join(append(lines, sampled...), ". ") + "."
 	return cmp, tasks
 }
 

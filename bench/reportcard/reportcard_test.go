@@ -590,3 +590,16 @@ func TestBuildCarriesMCPRoute(t *testing.T) {
 		t.Fatalf("mcp route %q", rep.MCPRoute)
 	}
 }
+
+// TestCapabilityForBFCLIsSupport: BFCL is a function calling benchmark, so it
+// counts under support and tool use, not under its harbor import track.
+func TestCapabilityForBFCLIsSupport(t *testing.T) {
+	for _, track := range []string{"", "terminal"} {
+		if got := CapabilityFor("hd-harbor-bfcl", track); got != "support" {
+			t.Errorf("CapabilityFor(hd-harbor-bfcl, %q) = %q, want support", track, got)
+		}
+	}
+	if got := CapabilityFor("hd-harbor-tb2", "terminal"); got != "terminal" {
+		t.Errorf("CapabilityFor(hd-harbor-tb2) = %q, want terminal", got)
+	}
+}
