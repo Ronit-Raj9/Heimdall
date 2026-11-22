@@ -1,3 +1,4 @@
+import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { type WorkerTargetChoice, useGetWorkerTargetQuery, useSetWorkerTargetMutation } from "@/lib/store/apis/workerTargetApi";
 import { useId, useState } from "react";
@@ -72,13 +73,37 @@ export function WhereRunsGo() {
 	);
 }
 
-/** Evaluate wizard: pick where an evaluation runs. Renders nothing off the hosted platform or with only the shared worker. */
+/** Settings, Workers tab: where an admin adds a worker. */
+export const ADD_WORKER_HREF = "/settings?tab=runners";
+
+/**
+ * Evaluate wizard: pick where an evaluation runs. Renders nothing off the hosted platform. With one
+ * choice it says where runs go, how many it runs at a time, and how to add a worker (N93).
+ */
 export function EvaluationWorkerPicker({ value, onChange }: { value: string; onChange(worker: string): void }) {
 	const { t } = useTranslation("byoworker");
+	const session = useSession();
 	const query = useGetWorkerTargetQuery();
 	const fieldId = useId();
 	const data = query.data;
-	if (!data || data.choices.length <= 1) return null;
+	if (!data || data.choices.length === 0) return null;
+	if (data.choices.length === 1) {
+		const only = data.choices[0];
+		const label = choiceLabel(only, t("target.sandbox"));
+		const line = only.slots && only.slots > 0 ? t("target.onlyOneSlots", { label, n: only.slots }) : t("target.onlyOne", { label });
+		return (
+			<section className="flex flex-col gap-1 text-sm" data-testid="eval-worker-only">
+				<p className="text-foreground">{line}</p>
+				{canUse(session, "admin") ? (
+					<a href={ADD_WORKER_HREF} className="text-primary w-fit text-xs font-medium underline-offset-4 hover:underline" data-testid="eval-worker-add">
+						{t("target.addWorker")}
+					</a>
+				) : (
+					<p className="text-muted-foreground text-xs">{t("target.askAdmin")}</p>
+				)}
+			</section>
+		);
+	}
 	const current = data.choices.find((c) => c.current);
 	return (
 		<section className="flex flex-col gap-1.5" data-testid="eval-worker">

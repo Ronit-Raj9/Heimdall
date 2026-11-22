@@ -9,16 +9,22 @@ import { PageHeader } from "@/components/shell";
 import { StatCard, TonePill } from "@/app/operate/views/uxBits";
 import { cn } from "@/lib/utils";
 import { parseAsString, useQueryState } from "nuqs";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { AdminContainersPanel, AdminImagesPanel, AdminOrgsPanel, AdminUsagePanel, AdminUsersPanel } from "./adminPanels";
 import { AdminSignupPanel } from "./adminSignupPanel";
 
-export const ADMIN_TABS = ["overview", "users", "orgs", "signup", "images", "usage", "containers"] as const;
+export const ADMIN_TABS = ["overview", "users", "orgs", "signup", "images", "usage", "workers"] as const;
 export type AdminTab = (typeof ADMIN_TABS)[number];
+
+/** Old tab ids that still open their tab (N152: the Workers tab was "containers"); the URL is rewritten to the current id. */
+const ADMIN_TAB_ALIASES: Record<string, AdminTab> = { containers: "workers" };
 
 /** A tab from the URL, overview when unknown. */
 export function adminTab(value: string | null | undefined): AdminTab {
-	return (ADMIN_TABS as readonly string[]).includes(value ?? "") ? (value as AdminTab) : "overview";
+	const v = value ?? "";
+	if (v in ADMIN_TAB_ALIASES) return ADMIN_TAB_ALIASES[v];
+	return (ADMIN_TABS as readonly string[]).includes(v) ? (v as AdminTab) : "overview";
 }
 
 /** Server admin page: only server admins (by user id, CLI grant, or verified HEIMDALL_SERVER_ADMINS email) reach the panels. */
@@ -27,6 +33,9 @@ export default function AdminView({ param = "tab" }: { /** Search parameter of t
 	const session = useSession();
 	const [tabParam, setTab] = useQueryState(param, parseAsString);
 	const tab = adminTab(tabParam);
+	useEffect(() => {
+		if (tabParam && tabParam in ADMIN_TAB_ALIASES) void setTab(ADMIN_TAB_ALIASES[tabParam]);
+	}, [tabParam, setTab]);
 
 	if (session.authMode === "local") {
 		return (
@@ -61,7 +70,7 @@ export default function AdminView({ param = "tab" }: { /** Search parameter of t
 				<TabsContent value="signup">{tab === "signup" && <AdminSignupPanel />}</TabsContent>
 				<TabsContent value="images">{tab === "images" && <AdminImagesPanel />}</TabsContent>
 				<TabsContent value="usage">{tab === "usage" && <AdminUsagePanel />}</TabsContent>
-				<TabsContent value="containers">{tab === "containers" && <AdminContainersPanel />}</TabsContent>
+				<TabsContent value="workers">{tab === "workers" && <AdminContainersPanel />}</TabsContent>
 			</Tabs>
 		</div>
 	);

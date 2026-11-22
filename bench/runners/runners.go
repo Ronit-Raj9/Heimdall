@@ -55,6 +55,10 @@ var (
 	// ErrBadToken is an unknown, malformed, revoked or expired runner
 	// token. Callers answer 401 and never say which.
 	ErrBadToken = errors.New("runner token unknown, revoked or expired")
+	// ErrShared refuses removing the shared worker through an org's
+	// runner routes: the server provides it and it registers again at
+	// once (N12). Handlers answer 409.
+	ErrShared = errors.New("The shared worker is provided by this server and cannot be removed. To stop using it, connect your own worker or a sandbox platform.")
 )
 
 // Live is the coordinators' live view of an organization's runners
@@ -456,8 +460,14 @@ func (s *Service) upsert(ctx context.Context, scope schemas.RunnerScope, info sc
 	}
 	// A row another token registered keeps its token and pool: a runner
 	// of a different token under the same name never takes it over, also
-	// after a restart emptied the coordinator's memory (4-B-01).
-	q += ` WHERE runners.token_id = excluded.token_id OR runners.token_id IS NULL OR runners.token_id = ''`
+	// after a restart emptied the coordinator's memory (4-B-01). A row
+	// whose token was revoked is taken over (N12): the shared worker
+	// claims a fresh token on every start and revokes the old one, under
+	// the same name, so its row must follow the running worker. Tokens are
+	// per org and the conflict key holds the org, so this never crosses
+	// organizations.
+	q += ` WHERE runners.token_id = excluded.token_id OR runners.token_id IS NULL OR runners.token_id = ''
+		OR runners.token_id IN (SELECT id FROM runner_tokens WHERE revoked_at IS NOT NULL)`
 	_, err = s.db.Exec(ctx, q, db.NewID("rnr"), scope.OrgID, info.ID, pool, string(lb), info.Version, info.Host, info.Slots,
 		len(info.Running), scope.TokenID, state, ms, ms)
 	return err
@@ -561,7 +571,28 @@ func (s *Service) GetRunner(ctx context.Context, orgID, id string) (*schemas.Run
 // leases are lost at once and its slots go back to the queue. A runner whose
 // token is still valid registers again on its next call; revoke the token to
 // keep it out.
+//
+// The shared worker is refused with ErrShared (N12): this server provides
+// it and it registers again at once; a server admin removes its stale rows
+// with RemoveRunnerRecord.
 func (s *Service) RemoveRunner(ctx context.Context, orgID, id string) (*schemas.RunnerView, error) {
+	v, err := s.GetRunner(ctx, orgID, id)
+	if err != nil {
+		return nil, err
+	}
+	if v.Pool == schemas.SharedRunnerPool { // sharedpool.Pool
+		return nil, ErrShared
+	}
+	return s.removeRunner(ctx, orgID, id)
+}
+
+// RemoveRunnerRecord deletes a runner's row for a server admin (N11),
+// the shared worker's too.
+func (s *Service) RemoveRunnerRecord(ctx context.Context, orgID, id string) (*schemas.RunnerView, error) {
+	return s.removeRunner(ctx, orgID, id)
+}
+
+func (s *Service) removeRunner(ctx context.Context, orgID, id string) (*schemas.RunnerView, error) {
 	v, err := s.GetRunner(ctx, orgID, id)
 	if err != nil {
 		return nil, err

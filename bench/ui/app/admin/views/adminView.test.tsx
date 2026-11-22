@@ -42,6 +42,9 @@ vi.mock("@/lib/store/apis/adminApi", async (importOriginal) => ({
 	useSetOrgQuotaMutation: () => mutation(),
 	useListAdminImagesQuery: () => imgs.result ?? errorQuery(404, "no route"),
 	useDecideImageMutation: () => mutation(),
+	useGetOrgQuotaQuery: () => okQuery({ org_id: ORG.id, limits: ORG.quota, defaults: ORG.quota, persisted: true }),
+	useListAdminContainersQuery: () => okQuery({ runners: [], running_slots: 0 }),
+	useRemoveAdminRunnerMutation: () => mutation(),
 }));
 
 const admin = () => ({ ...hostedSession("owner"), serverAdmin: true });
@@ -65,7 +68,8 @@ describe("AdminView", () => {
 		expect(html).toContain('data-testid="admin-kill-switch"');
 		expect(html).toContain("Resume runs");
 		expect(html).toContain('data-testid="admin-quota-stub"');
-		for (const key of ["users", "orgs", "images", "usage", "containers"]) expect(html).toContain(`data-testid="admin-tab-${key}"`);
+		for (const key of ["users", "orgs", "images", "usage", "workers"]) expect(html).toContain(`data-testid="admin-tab-${key}"`);
+		expect(html).not.toContain('data-testid="admin-tab-containers"');
 	});
 
 	it("shows each org's sandbox and warns before runc", () => {
@@ -85,7 +89,7 @@ describe("AdminView", () => {
 	it("lists orgs with their quota and edits it", () => {
 		const html = render(<AdminOrgsPanel />, admin());
 		expect(html).toContain('data-testid="admin-org-acme"');
-		expect(html).toContain("4 at once, 40 a day, $12 a day");
+		expect(html).toContain("at most 4 at once, 40 runs a day, $12 a day");
 		expect(html).toContain("gVisor");
 		expect(html).toContain('data-testid="admin-org-runtime-acme"');
 		const editor = render(<QuotaEditor org={ORG} onClose={() => undefined} />, admin());
@@ -118,5 +122,15 @@ describe("AdminView", () => {
 		expect(setQuotaRequest("org/x", ORG.quota!)).toMatchObject({ url: "/admin/orgs/org%2Fx/quota", method: "POST" });
 		expect(adminTab("orgs")).toBe("orgs");
 		expect(adminTab("nope")).toBe("overview");
+	});
+
+	it("names the Workers tab workers and keeps old containers links working (N152)", () => {
+		expect(adminTab("workers")).toBe("workers");
+		expect(adminTab("containers")).toBe("workers");
+		tab.value = "workers";
+		expect(render(<AdminView />, admin())).toContain('data-testid="admin-containers-empty"');
+		tab.value = "containers";
+		expect(render(<AdminView />, admin())).toContain('data-testid="admin-containers-empty"');
+		tab.value = null;
 	});
 });

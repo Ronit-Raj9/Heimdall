@@ -10,6 +10,7 @@ import (
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/runners"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
 )
@@ -247,6 +248,10 @@ func (h *RunnersHandler) write(ctx *fasthttp.RequestCtx, org, action, targetType
 }
 
 func (h *RunnersHandler) sendErr(ctx *fasthttp.RequestCtx, what string, err error) {
+	if errors.Is(err, runners.ErrShared) { // N12: a plain sentence, no prefix
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, runners.ErrShared.Error())
+		return
+	}
 	if errors.Is(err, schemas.ErrWorkerRequest) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, what+": "+err.Error())
 		return

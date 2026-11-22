@@ -10,6 +10,7 @@ import (
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/auth"
+	"github.com/maximhq/bifrost/bench/runners"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
 )
@@ -257,5 +258,20 @@ func TestWorkersHostedAuth(t *testing.T) {
 	resp := call(t, plain, runnerA, "GET", "/api/bench/workers/whoami", "")
 	if resp.StatusCode() != 200 || !strings.Contains(string(resp.Body()), `"mode":"local"`) {
 		t.Fatalf("whoami %d %s", resp.StatusCode(), resp.Body())
+	}
+}
+
+// TestRemoveSharedRunnerAnswers409 (N12): removing the shared worker
+// through the org's runner routes answers 409 with a plain sentence.
+func TestRemoveSharedRunnerAnswers409(t *testing.T) {
+	api := &fakeRunnerAdmin{err: runners.ErrShared}
+	h := NewRunnersHandler(schemas.ModeLive, api, nil)
+	reg := func(r *router.Router) { h.RegisterRoutes(r) }
+	admin := &auth.Principal{Kind: auth.KindUser, UserID: "usr_1", OrgID: "org_a", Role: auth.RoleAdmin}
+	resp := call(t, reg, admin, "POST", "/api/bench/runners/rnr_1/remove", "")
+	body := string(resp.Body())
+	if resp.StatusCode() != fasthttp.StatusConflict || !strings.Contains(body, "The shared worker is provided by this server and cannot be removed.") ||
+		strings.Contains(body, "remove runner:") {
+		t.Fatalf("remove shared runner: %d %s", resp.StatusCode(), body)
 	}
 }

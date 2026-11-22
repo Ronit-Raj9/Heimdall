@@ -818,7 +818,7 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 		defer func() { _ = rel.ReleaseOrgCredentials(context.WithoutCancel(ctx), org) }()
 	}
 	reg = withPullOrg(reg, oa, planRoot, org) // Y11: pull agents' run tokens name the org
-	labels := []string{"shared", "runtime=" + h.runtime}
+	labels := h.sharedWorkerLabels()
 	if claim.Platform != nil { // X19a: the org's own sandbox platform runs its runs
 		pr, err := sandboxRegistry(ctx, oa, reg, claim.Platform)
 		if err != nil {
@@ -832,7 +832,7 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 	w, err := engine.NewWorker(reg, engine.NewPipeline(reg, planRoot, oa.logger),
 		sharedEnsureImages(oa, reg, planRoot, proj.refresh, plan),
 		engine.WorkerOptions{Server: h.f.server, Token: claim.Token, WorkerID: name, Host: h.host, Version: benchVersion,
-			Slots: slots, Logger: oa.logger, Pool: sharedpool.Pool, Labels: labels,
+			Slots: h.sharedWorkerSlots(slots), Logger: oa.logger, Pool: sharedpool.Pool, Labels: labels,
 			Disk: h.hygiene.DiskState, ImageUse: h.hygiene.NoteImages, KeepRunFolders: a.cfg.Runner.Disk.KeepRunFolders,
 			PullPrivate: func(ctx context.Context, ref string, auths []schemas.RegistryAuth) error { // Y10: under the org's Docker policy
 				return registrycreds.Pull(ctx, docker, ref, auths)

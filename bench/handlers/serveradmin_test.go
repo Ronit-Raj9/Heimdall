@@ -42,6 +42,10 @@ func (fakeAdminRunners) ListRunners(_ context.Context, org string) ([]schemas.Ru
 	return []schemas.RunnerView{{ID: "rnr_1", Name: "shared-1", Pool: "shared", State: "running", Running: []string{"s1"}, RunningSlots: 1, Slots: 2, Live: true}}, nil
 }
 
+func (fakeAdminRunners) RemoveRunnerRecord(context.Context, string, string) (*schemas.RunnerView, error) {
+	return nil, schemas.ErrNotFound
+}
+
 type memQuota struct {
 	mu   sync.Mutex
 	m    map[string]quota.Limits
@@ -156,5 +160,109 @@ func TestServerAdminNilDeps(t *testing.T) {
 		if resp := call(t, reg, p, "GET", APIPrefix+"/admin"+path, ""); resp.StatusCode() != fasthttp.StatusServiceUnavailable {
 			t.Fatalf("GET %s: %d, want 503", path, resp.StatusCode())
 		}
+	}
+}
+
+// removableRunners is an AdminRunners with one offline and one live
+// runner in org_a, recording removals.
+type removableRunners struct {
+	rows    map[string]schemas.RunnerView
+	removed []string
+}
+
+func newRemovableRunners() *removableRunners {
+	return &removableRunners{rows: map[string]schemas.RunnerView{
+		"rnr_dead": {ID: "rnr_dead", OrgID: "org_a", Name: "demo-runner", Pool: "default", State: "lost", Slots: 1},
+		"rnr_live": {ID: "rnr_live", OrgID: "org_a", Name: "shared-runner-org_a", Pool: "shared", State: "idle", Slots: 2, Live: true},
+	}}
+}
+
+func (f *removableRunners) ListRunners(_ context.Context, org string) ([]schemas.RunnerView, error) {
+	out := []schemas.RunnerView{}
+	for _, id := range []string{"rnr_dead", "rnr_live"} {
+		if r, ok := f.rows[id]; ok && r.OrgID == org {
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
+
+func (f *removableRunners) RemoveRunnerRecord(_ context.Context, org, id string) (*schemas.RunnerView, error) {
+	r, ok := f.rows[id]
+	if !ok || r.OrgID != org {
+		return nil, schemas.ErrNotFound
+	}
+	delete(f.rows, id)
+	f.removed = append(f.removed, org+"/"+id)
+	return &r, nil
+}
+
+func removeRunnerServer(rs *removableRunners, actions *[]string) func(r *router.Router) {
+	dir := &fakeAdminDir{orgs: []AdminOrg{{ID: "org_a", Slug: "a", Name: "Acme"}}}
+	h := NewServerAdminHandler(schemas.ModeLive, dir, rs, &memQuota{m: map[string]quota.Limits{}}, true,
+		func(_ *fasthttp.RequestCtx, org, action, _, id string, _ map[string]any) {
+			*actions = append(*actions, action+" "+org+"/"+id)
+		}).
+		WithAdminCheck(func(p *auth.Principal) bool { return p != nil && p.Email == "root@x.test" })
+	return func(r *router.Router) { h.RegisterRoutes(r) }
+}
+
+// TestAdminRemoveOfflineRunner (N11): a server admin removes an offline
+// worker's record of any org; the removal is audited.
+func TestAdminRemoveOfflineRunner(t *testing.T) {
+	rs := newRemovableRunners()
+	var actions []string
+	reg := removeRunnerServer(rs, &actions)
+	admin := &auth.Principal{Kind: auth.KindUser, UserID: "usr_admin", Email: "root@x.test"}
+	resp := call(t, reg, admin, "POST", APIPrefix+"/admin/containers/org_a/rnr_dead/remove", "")
+	if resp.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("remove offline runner: %d %s", resp.StatusCode(), resp.Body())
+	}
+	var got schemas.RunnerView
+	if err := json.Unmarshal(resp.Body(), &got); err != nil || got.Name != "demo-runner" {
+		t.Fatalf("answer %s %v", resp.Body(), err)
+	}
+	if strings.Join(rs.removed, ",") != "org_a/rnr_dead" || strings.Join(actions, ",") != "admin.runner.remove org_a/rnr_dead" {
+		t.Fatalf("removed %v audit %v", rs.removed, actions)
+	}
+	if resp := call(t, reg, admin, "POST", APIPrefix+"/admin/containers/org_a/rnr_nope/remove", ""); resp.StatusCode() != fasthttp.StatusNotFound {
+		t.Fatalf("unknown runner: %d %s", resp.StatusCode(), resp.Body())
+	}
+	resp = call(t, reg, admin, "GET", APIPrefix+"/admin/containers", "")
+	var cs AdminContainerList
+	_ = json.Unmarshal(resp.Body(), &cs)
+	if len(cs.Runners) != 1 || cs.Runners[0].OrgName != "Acme" {
+		t.Fatalf("containers after removal: %s", resp.Body())
+	}
+}
+
+// TestAdminRemoveLiveRunnerRefused (N11): a worker that is online is not
+// removed (409 with a plain sentence).
+func TestAdminRemoveLiveRunnerRefused(t *testing.T) {
+	rs := newRemovableRunners()
+	var actions []string
+	reg := removeRunnerServer(rs, &actions)
+	admin := &auth.Principal{Kind: auth.KindUser, UserID: "usr_admin", Email: "root@x.test"}
+	resp := call(t, reg, admin, "POST", APIPrefix+"/admin/containers/org_a/rnr_live/remove", "")
+	if resp.StatusCode() != fasthttp.StatusConflict || !strings.Contains(string(resp.Body()), "This worker is online. Stop it or revoke its token first.") {
+		t.Fatalf("remove live runner: %d %s", resp.StatusCode(), resp.Body())
+	}
+	if len(rs.removed) != 0 || len(actions) != 0 {
+		t.Fatalf("removed %v audit %v", rs.removed, actions)
+	}
+}
+
+// TestAdminRemoveRunnerNotAdmin (N11): only a server admin may remove a
+// worker record.
+func TestAdminRemoveRunnerNotAdmin(t *testing.T) {
+	rs := newRemovableRunners()
+	var actions []string
+	reg := removeRunnerServer(rs, &actions)
+	owner := &auth.Principal{Kind: auth.KindUser, UserID: "usr_b", Email: "b@x.test", Role: auth.RoleOwner}
+	if resp := call(t, reg, owner, "POST", APIPrefix+"/admin/containers/org_a/rnr_dead/remove", ""); resp.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("non-admin remove: %d %s", resp.StatusCode(), resp.Body())
+	}
+	if len(rs.removed) != 0 {
+		t.Fatalf("removed %v", rs.removed)
 	}
 }

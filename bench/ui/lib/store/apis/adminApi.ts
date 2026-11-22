@@ -26,6 +26,11 @@ export function disableUserRequest(userId: string, disabled: boolean): FetchArgs
 	return { url: `/admin/users/${seg(userId)}/disable`, method: "POST", body: { disabled } };
 }
 
+/** POST /admin/containers/{org}/{id}/remove: a server admin removes an offline worker's record (N11). */
+export function removeAdminRunnerRequest(orgId: string, runnerId: string): FetchArgs {
+	return { url: `/admin/containers/${seg(orgId)}/${seg(runnerId)}/remove`, method: "POST" };
+}
+
 /** POST /admin/images/{id}/approve or /reject (shared pool area, L03). */
 export function imageDecisionRequest(id: string, decision: "approve" | "reject", reason?: string): FetchArgs {
 	return { url: `/admin/images/${seg(id)}/${decision}`, method: "POST", body: reason ? { note: reason } : {} };
@@ -69,6 +74,10 @@ export const adminApi = benchApi.enhanceEndpoints({ addTagTypes: ["AdminUsers", 
 			query: () => "/admin/containers",
 			providesTags: ["AdminContainers"],
 		}),
+		removeAdminRunner: builder.mutation<unknown, { orgId: string; runnerId: string }>({
+			query: ({ orgId, runnerId }) => removeAdminRunnerRequest(orgId, runnerId),
+			invalidatesTags: ["AdminContainers"],
+		}),
 		listAdminImages: builder.query<{ images: AdminImage[] }, AdminImage["status"] | void>({
 			query: (status) => (status ? `/admin/images?status=${encodeURIComponent(status)}` : "/admin/images"),
 			providesTags: ["AdminImages"],
@@ -93,6 +102,7 @@ export const {
 	useGetKillSwitchQuery,
 	useSetKillSwitchMutation,
 	useListAdminContainersQuery,
+	useRemoveAdminRunnerMutation,
 	useListAdminImagesQuery,
 	useDecideImageMutation,
 	useGetAdminUsageQuery,

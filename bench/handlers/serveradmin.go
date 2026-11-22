@@ -64,6 +64,7 @@ type AdminLimits struct {
 type AdminContainer struct {
 	OrgID    string    `json:"org_id"`
 	OrgSlug  string    `json:"org_slug"`
+	OrgName  string    `json:"org_name,omitempty"`
 	RunnerID string    `json:"runner_id"`
 	Runner   string    `json:"runner"`
 	Pool     string    `json:"pool"`
@@ -116,9 +117,12 @@ type AdminDirectory interface {
 	Orgs(ctx context.Context) ([]AdminOrg, error)
 }
 
-// AdminRunners lists the runners of one org (runners.Service.ListRunners).
+// AdminRunners lists the runners of one org (runners.Service.ListRunners)
+// and removes a worker's record (runners.Service.RemoveRunnerRecord, the
+// shared worker's too, N11).
 type AdminRunners interface {
 	ListRunners(ctx context.Context, orgID string) ([]schemas.RunnerView, error)
+	RemoveRunnerRecord(ctx context.Context, orgID, id string) (*schemas.RunnerView, error)
 }
 
 // ErrAdminNotFound is what an AdminDirectory returns for an unknown user.
@@ -163,6 +167,7 @@ func (h *ServerAdminHandler) RegisterRoutes(r *router.Router, mw ...lib.Middlewa
 	r.GET(p+"/killswitch", g(h.getKill))
 	r.POST(p+"/killswitch", g(h.setKill))
 	r.GET(p+"/containers", g(h.containers))
+	r.POST(p+"/containers/{org}/{id}/remove", g(h.removeRunner))
 }
 
 // guard answers 403 to anyone who is not a server admin.
@@ -500,11 +505,58 @@ func (h *ServerAdminHandler) containers(ctx *fasthttp.RequestCtx) {
 				running = []string{}
 			}
 			out.Runners = append(out.Runners, AdminContainer{
-				OrgID: o.ID, OrgSlug: o.Slug, RunnerID: r.ID, Runner: r.Name, Pool: r.Pool, Host: r.Host,
+				OrgID: o.ID, OrgSlug: o.Slug, OrgName: o.Name, RunnerID: r.ID, Runner: r.Name, Pool: r.Pool, Host: r.Host,
 				State: r.State, Live: r.Live, Slots: r.Slots, Running: running, LastSeen: r.LastSeen,
 			})
 			out.RunningSlots += r.RunningSlots
 		}
 	}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+}
+
+// removeRunner deletes an offline worker's record from an organization
+// (N11): a dead runner, or a shared worker row a restart left behind. An
+// online worker is refused (409): it would register again at once.
+func (h *ServerAdminHandler) removeRunner(ctx *fasthttp.RequestCtx) {
+	if h.runners == nil {
+		sendUnavailable(ctx, h.mode, "runner directory")
+		return
+	}
+	org, ok := idParam(ctx, h.mode, "org", "organization")
+	if !ok {
+		return
+	}
+	id, ok := idParam(ctx, h.mode, "id", "worker")
+	if !ok {
+		return
+	}
+	wctx, cancel := workContext(ctx, readTimeout)
+	defer cancel()
+	rs, err := h.runners.ListRunners(wctx, org)
+	if err != nil {
+		sendDepError(ctx, h.mode, "list workers", err)
+		return
+	}
+	var found *schemas.RunnerView
+	for i := range rs {
+		if rs[i].ID == id {
+			found = &rs[i]
+			break
+		}
+	}
+	if found == nil {
+		lib.SendError(ctx, h.mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, "no such worker: "+id)
+		return
+	}
+	if found.Live {
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, "This worker is online. Stop it or revoke its token first.")
+		return
+	}
+	out, err := h.runners.RemoveRunnerRecord(wctx, org, id)
+	if err != nil {
+		sendDepError(ctx, h.mode, "remove worker", err)
+		return
+	}
+	h.write(ctx, org, "admin.runner.remove", "runner", id, map[string]any{"name": out.Name, "pool": out.Pool, "org": org})
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
 }

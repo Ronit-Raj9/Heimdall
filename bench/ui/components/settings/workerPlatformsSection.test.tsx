@@ -4,7 +4,7 @@ import type { WorkerPlatform } from "@/lib/store/apis/workerPlatformsApi";
 import { platformStatusTone } from "@/lib/store/apis/workerPlatformsApi";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { PlatformCard, platformsOff } from "./workerPlatformsSection";
+import { PlatformCard, connectHint, platformsOff } from "./workerPlatformsSection";
 
 const noop = () => {};
 const base: WorkerPlatform = {
@@ -76,5 +76,22 @@ describe("helpers", () => {
 		expect(platformStatusTone(undefined)).toBe("outline");
 		expect(platformsOff({ status: 503 })).toBe(true);
 		expect(platformsOff({ status: 500 })).toBe(false);
+	});
+});
+describe("why Test and connect is disabled (N14)", () => {
+	it("says what to paste while the button is disabled", () => {
+		const html = card(base);
+		expect(html).toContain("Paste the token to test it.");
+		expect(html).toContain('aria-describedby="');
+		const needsEndpoint = card({ ...base, name: "daytona", title: "Daytona", endpoint_label: "API URL", endpoint_required: true });
+		expect(needsEndpoint).toContain("Paste the token and the endpoint to test them.");
+	});
+
+	it("drops the hint once the fields are filled", () => {
+		expect(connectHint("", "", false)).toBe("needToken");
+		expect(connectHint("", "", true)).toBe("needTokenAndEndpoint");
+		expect(connectHint("tok", "", true)).toBe("needTokenAndEndpoint");
+		expect(connectHint("tok", "", false)).toBeUndefined();
+		expect(connectHint("tok", "https://x", true)).toBeUndefined();
 	});
 });
