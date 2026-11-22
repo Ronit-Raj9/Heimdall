@@ -8,6 +8,7 @@
 # answer goes (BENCH_ANSWER_PATH, else answer.txt in the working directory).
 import json
 import os
+import re
 import sys
 import urllib.request
 
@@ -48,11 +49,23 @@ rpc("initialize", {"protocolVersion": "2025-06-18", "capabilities": {},
                    "clientInfo": {"name": "agentdojo-control", "version": "1"}})
 post({"jsonrpc": "2.0", "method": "notifications/initialized"})
 names = {t["name"] for t in rpc("tools/list", {})["tools"]}
+results = []
 for call in plan["calls"]:
     if call["function"] not in names:
         sys.exit(f"server has no tool {call['function']}")
-    res = rpc("tools/call", {"name": call["function"], "arguments": call.get("args") or {}})
+    args = dict(call.get("args") or {})
+    # "fill": {arg: n} marks a one-time password the tools generate at run
+    # time (AgentDyn); it is the last n-digit number in earlier results
+    # (not after "." or ":", which would be a timestamp part).
+    for k, n in (call.get("fill") or {}).items():
+        for prev in reversed(results):
+            found = re.findall(r"(?<![\d.:])\d{%d}(?!\d)" % int(n), prev)
+            if found:
+                args[k] = found[-1]
+                break
+    res = rpc("tools/call", {"name": call["function"], "arguments": args})
     text = "".join(c.get("text", "") for c in res.get("content", []) if c.get("type") == "text")
+    results.append(text)
     print(f"{call['function']} -> {'error: ' if res.get('isError') else ''}{text[:200]}", flush=True)
     if res.get("isError"):
         sys.exit(f"ground-truth call {call['function']} failed")

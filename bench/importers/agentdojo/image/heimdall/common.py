@@ -12,6 +12,7 @@ import importlib.metadata
 import io
 import pickle
 import re
+import types
 
 from agentdojo.attacks.attack_registry import ATTACKS
 from agentdojo.attacks.base_attacks import DEFAULT_MODEL_NAME
@@ -20,6 +21,7 @@ from agentdojo.functions_runtime import FunctionCall
 from agentdojo.models import MODEL_NAMES
 from agentdojo.task_suite.load_suites import get_suite, get_suites
 from pydantic import BaseModel
+from pydantic_core import to_jsonable_python
 
 import agentdojo.attacks  # noqa: F401  registers the attacks
 
@@ -41,6 +43,7 @@ SUPPORTED_ATTACKS = [
     "important_instructions_no_names",
     "important_instructions_wrong_user_name",
     "tool_knowledge",
+    "adaptive",  # attacker model via the gateway (adaptive.py); not an upstream attack
 ]
 
 # Attacks whose upstream constructor addresses the victim model by name.
@@ -91,12 +94,85 @@ def build_attack(name, suite, model_name=""):
     """
     if name not in SUPPORTED_ATTACKS:
         raise ValueError(f"attack {name!r} is not supported; supported: {SUPPORTED_ATTACKS}")
+    if name == "adaptive":
+        import adaptive  # the image runs with -I; server.py puts /opt/heimdall on sys.path
+
+        seed = build_attack("important_instructions", suite, model_name)
+        return adaptive.build(suite, seed)
     if name not in ATTACKS:
         raise ValueError(f"attack {name!r} is not registered by this AgentDojo version")
     attack = ATTACKS[name](suite, StubPipeline())
     if name in _MODEL_NAMED:
         attack.model_name = model_name or DEFAULT_MODEL_NAME
     return attack
+
+
+def _json_fallback(value):
+    # AgentDyn environments keep upstream tool functions in their state (the
+    # shopping platform's verification_stack); JSON names them, the pickle
+    # keeps them.
+    if callable(value):
+        return f"<function {getattr(value, '__module__', '?')}.{getattr(value, '__qualname__', repr(value))}>"
+    raise TypeError(f"cannot serialize {type(value).__name__}")
+
+
+def _to_json(value, on_path):
+    """JSON data for value; a model met again on its own path becomes a marker.
+
+    AgentDyn's pending OTP actions hold (function, (platform, ...)), a model
+    that contains itself, which pydantic refuses to dump.
+    """
+    if isinstance(value, BaseModel):
+        if id(value) in on_path:
+            return f"<cycle {type(value).__name__}>"
+        on_path.add(id(value))
+        try:
+            return {k: _to_json(getattr(value, k), on_path) for k in type(value).model_fields}
+        finally:
+            on_path.discard(id(value))
+    if isinstance(value, dict):
+        return {k if isinstance(k, str) else str(k): _to_json(v, on_path) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_to_json(v, on_path) for v in value]
+    if callable(value) and not isinstance(value, type) and not isinstance(value, enum.Enum):
+        return _json_fallback(value)
+    return to_jsonable_python(value, fallback=_json_fallback)
+
+
+def env_json(env):
+    """The environment as JSON data, naming any function it holds."""
+    return _to_json(env, set())
+
+
+_DIGITS_PLACEHOLDER = re.compile(r"^\$(\d+)-digits$")
+
+
+def runtime_fills(call):
+    """{arg: digit count} for ground-truth arguments only known at run time.
+
+    AgentDyn's ground truths write a one-time password the tools generate
+    randomly and mail to the user as a placeholder ("$6-digits"); a replay
+    reads it from the earlier tool results.
+    """
+    out = {}
+    for k, v in (getattr(call, "placeholder_args", None) or {}).items():
+        m = _DIGITS_PLACEHOLDER.match(str(v))
+        if m and k in call.args:
+            out[k] = int(m.group(1))
+    return out
+
+
+def fill_args(args, fills, results):
+    """Fills each runtime argument with the last n-digit number in results
+    (a number right after "." or ":" is a timestamp part, not a password)."""
+    args = dict(args)
+    for k, n in fills.items():
+        for text in reversed(results):
+            found = re.findall(r"(?<![\d.:])\d{%d}(?!\d)" % n, text or "")
+            if found:
+                args[k] = found[-1]
+                break
+    return args
 
 
 def plan_injections(suite, user_task, injection_task, attack):
@@ -152,7 +228,7 @@ def normalize(text):
 def strings_in(value):
     """Yields every string inside a tool result (models, lists, dicts)."""
     if hasattr(value, "model_dump"):
-        value = value.model_dump(mode="json")
+        value = _to_json(value, set())
     if isinstance(value, str):
         yield value
     elif isinstance(value, dict):
@@ -182,7 +258,7 @@ _DATETIME_TYPES = {"date", "datetime", "time", "timedelta", "timezone"}
 
 
 class _EnvironmentUnpickler(pickle.Unpickler):
-    """Loads only AgentDojo environment models, their enums and datetimes."""
+    """Loads only AgentDojo environment models, their enums, datetimes and suite functions."""
 
     def find_class(self, module, name):
         if module == "datetime" and name in _DATETIME_TYPES:
@@ -190,6 +266,10 @@ class _EnvironmentUnpickler(pickle.Unpickler):
         if module.startswith("agentdojo."):
             obj = super().find_class(module, name)
             if isinstance(obj, type) and issubclass(obj, (BaseModel, enum.Enum)):
+                return obj
+            # AgentDyn keeps pending OTP actions as upstream tool functions in
+            # the environment; a pickle names them, it does not carry code.
+            if module.startswith("agentdojo.default_suites.") and isinstance(obj, types.FunctionType):
                 return obj
         raise pickle.UnpicklingError(f"{module}.{name} is not an environment type")
 

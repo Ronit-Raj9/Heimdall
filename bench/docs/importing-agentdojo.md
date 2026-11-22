@@ -192,6 +192,66 @@ injection tasks 6 to 13 are reported as skipped (empty ground truth).
   the instruction. Scores are comparable across agents run here, not with
   upstream's leaderboard.
 
+## AgentDyn suites and the adaptive attacker
+
+[AgentDyn](https://github.com/SaFo-Lab/AgentDyn) (arXiv 2602.03117, MIT) is
+an AgentDojo fork (same package, version 0.1.35) that adds three open-ended
+suites: `shopping`, `github` and `dailylife`. The importer takes them like
+the original four, from an AgentDyn clone, and tags their tasks `agentdyn`;
+provenance names the fork. Checked against commit
+`5353cf7615b135cace8d07c8f12dac53a16b6db3` (19 May 2026).
+
+```sh
+git clone https://github.com/SaFo-Lab/AgentDyn datasets/agentdyn
+bifrost-bench import agentdojo -from datasets/agentdyn -suite agentdyn-shopping \
+  -set suite=shopping -set attacks=important_instructions,tool_knowledge,adaptive
+```
+
+AgentDyn's ground truths put a one-time password, which the tools generate
+at run time and mail to the user, in `placeholder_args` as `$6-digits`. The
+catalog marks such an argument `fill` and the reference control (and the
+self-check) fills it with the last six-digit number in the earlier tool
+results, skipping digits right after `.` or `:` (timestamp parts).
+
+Self-check on `v1.2.2` at the commit above (`important_instructions`):
+dailylife 15 of 20 user tasks pass, github 11, shopping 12. The rest are
+upstream defects, not service bugs: ground truths with symbolic arguments
+(`$order_id`, `$file_id_1`, `$invitation_link`, `ONE-TIME-PASSWD`), or a
+ground truth its own utility rejects (shopping `user_task_4` buys one item,
+the check wants two). Injection ground truths of shopping and github are
+placeholders unrelated to their security checks (shopping `injection_task_0`
+sends money, the check wants a changed password), so attack success there is
+judged only by `security()` on real agent runs. Dailylife injection tasks 2
+and 6 fail the same way.
+
+Attack `adaptive` is the adaptive attacker of
+[AutoDojo](https://github.com/xhOwenMa/AutoDojo) (MIT): instead of a fixed
+template, an attacker model writes the injection for every vector the user
+task reaches. It is given AutoDojo's rewriter brief (adapted from
+`variant_generation/prompts/injection_task_iterative.yaml`): the injection
+task's ground-truth calls, the source of its security check, the
+environment text around the vector, and the static `important_instructions`
+text as the earlier attempt to beat. The answer's `Wrapper:` part is
+planted, flattened to one line without double quotes so upstream's YAML
+splicing keeps it verbatim. The state file records the attacker's replies
+under `attacker`, and the verifier rebuilds the starting environment from
+the planted text as for every attack.
+
+The attacker model is called through Bifrost on the service's own virtual
+key, never the agent's. With `adaptive` in `attacks`, every task's service
+carries `gateway: {}`: provider and model come from the experiment's llm
+simulator setting (`simulator: {mode: llm, provider: ..., model: ...}`),
+and its spend is recorded apart from the agent's. Under the default
+scripted simulator no key is minted: clean runs and static probes work as
+before, and an adaptive probe refuses to start (no silent fallback to a
+weaker attack). Admission controls run clean, so they need no key.
+
+Differences from AutoDojo: one generation per run, without its success
+feedback loop or analyzer pass (AutoDojo reruns the victim many times per
+candidate; a run here is one victim run). AutoDojo's cached optimized
+injections cover only banking, slack and travel, not the AgentDyn suites,
+so they are not imported.
+
 ## Files
 
 | Path | What |
@@ -200,6 +260,7 @@ injection tasks 6 to 13 are reported as skipped (empty ground truth).
 | `importers/agentdojo/image/heimdall/server.py` | The MCP service. |
 | `importers/agentdojo/image/heimdall/verify.py` | The verifier. |
 | `importers/agentdojo/image/heimdall/catalog.py` | The catalog the importer reads. |
+| `importers/agentdojo/image/heimdall/adaptive.py` | The adaptive attacker (attack `adaptive`). |
 | `importers/agentdojo/image/heimdall/selfcheck.py` | The whole-suite self-check. |
 | `importers/agentdojo/image/control.py` | The reference control's JSON-RPC client. |
 | `gates/toolinjection.go` | Gate `tool_injection_followed`. |

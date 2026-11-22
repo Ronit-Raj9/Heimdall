@@ -3,7 +3,8 @@ package main
 // The importers register themselves from init(); this file only links them.
 import (
 	_ "github.com/maximhq/bifrost/bench/importers/agentdojo"
-	_ "github.com/maximhq/bifrost/bench/importers/agentvista"      // L05: AgentVista multimodal agent questions
+	_ "github.com/maximhq/bifrost/bench/importers/agentvista" // L05: AgentVista multimodal agent questions
+	_ "github.com/maximhq/bifrost/bench/importers/balrog"
 	_ "github.com/maximhq/bifrost/bench/importers/bigfinancebench" // L07: BigFinanceBench public finance questions
 	_ "github.com/maximhq/bifrost/bench/importers/browsecompplus"  // X5a
 	_ "github.com/maximhq/bifrost/bench/importers/cheatbench"      // L06: CheatBench cheating environments
