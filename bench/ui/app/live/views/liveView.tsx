@@ -54,10 +54,10 @@ export default function LiveView() {
 					)}
 					{data.mode === "live" && needSetup && setupOpen && (
 						<div id="live-setup" className="scroll-mt-4">
-							<LiveSetup existing={Boolean(data.problem) || configured} hosted={hosted} onClose={() => setSetupOpen(false)} />
+							<LiveSetup existing={Boolean(data.configured || data.problem)} hosted={hosted} onClose={() => setSetupOpen(false)} />
 						</div>
 					)}
-					<LiveBody status={data} actions={data.mode === "live" && !hosted ? <PullButton /> : undefined} />
+					<LiveBody status={data} hosted={hosted} actions={data.mode === "live" && !hosted ? <PullButton /> : undefined} />
 				</>
 			)}
 		</section>

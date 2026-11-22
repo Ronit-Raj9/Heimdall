@@ -365,12 +365,15 @@ func (l liveSource) scorer() (*livescore.Scorer, error) { return scorerFor(l.a) 
 func (l liveSource) Status(_ context.Context) (*livescore.Status, error) {
 	s, err := l.scorer()
 	if errors.Is(err, livescore.ErrNotConfigured) {
+		// No settings file is not a problem, only "not set up yet" (N131):
+		// Problem means a file exists and did not load.
 		return &livescore.Status{Evidence: livescore.EvidenceClass, Note: livescore.StatusNote, Versions: []livescore.VersionView{},
-			Signals: livescore.SignalDefs(), Worst: []livescore.SessionRecord{}, Events: []livescore.LogEvent{}, Problem: err.Error()}, nil
+			Signals: livescore.SignalDefs(), Worst: []livescore.SessionRecord{}, Events: []livescore.LogEvent{}}, nil
 	}
 	if err != nil {
 		return &livescore.Status{Evidence: livescore.EvidenceClass, Note: livescore.StatusNote, Versions: []livescore.VersionView{},
-			Signals: livescore.SignalDefs(), Worst: []livescore.SessionRecord{}, Events: []livescore.LogEvent{}, Problem: err.Error()}, nil
+			Signals: livescore.SignalDefs(), Worst: []livescore.SessionRecord{}, Events: []livescore.LogEvent{},
+			Problem: "the live scoring settings file could not be read: " + err.Error()}, nil
 	}
 	return s.Status(time.Now().UTC())
 }

@@ -103,16 +103,24 @@ export function liveInitParams(split: LiveSplit, v: Required<Omit<LiveInitParams
 	return p;
 }
 
+/** Save is possible with complete params, and over existing settings only once Replace is ticked (N131). */
+export function liveSetupCanSave(params: LiveInitParams | null, existing: boolean | undefined, force: boolean): boolean {
+	return params !== null && (!existing || force);
+}
+
 const EMPTY = { url: "", token_env: "", baseline_key: "", candidate_key: "", tag_header: "x-bf-lh-agent-version", baseline_tag: "", candidate_tag: "" };
 
 /** The setup form: queues livescore.init, which writes livescore/config.yaml. */
 export function LiveSetup({ existing, hosted, onClose }: { existing?: boolean; hosted?: boolean; onClose?(): void }) {
 	const { t } = useTranslation("liveinbox");
 	const { t: u } = useTranslation("ux13");
+	const { t: g } = useTranslation("gw16");
 	const refresh = useRefreshLive();
 	const [split, setSplit] = useState<LiveSplit>("keys");
 	const [v, setV] = useState(EMPTY);
-	const [force, setForce] = useState(Boolean(existing));
+	// Replace starts unticked even when settings exist: one Save must never overwrite them by default (N131).
+	const [force, setForce] = useState(false);
+	const needsTick = Boolean(existing) && !force;
 	const [createJob, state] = useCreateJobMutation();
 	const [jobId, setJobId] = useState<string | null>(null);
 	const ids = useId();
@@ -193,15 +201,25 @@ export function LiveSetup({ existing, hosted, onClose }: { existing?: boolean; h
 					</div>
 				</Step>
 				<Step n={3} title={u("live.stepSave")} last>
+					{existing && (
+						<p className="text-foreground text-xs" data-testid="live-setup-existing">
+							{g("live.existing")}
+						</p>
+					)}
 					<label className="text-muted-foreground flex items-center gap-2 text-xs">
 						<input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} data-testid="live-setup-force" />
 						{t("live.setup.force")}
 					</label>
 					<div className="flex flex-wrap items-center gap-3">
-						<Button disabled={!params || state.isLoading} onClick={() => void submit()} data-testid="live-setup-submit">
+						<Button disabled={!liveSetupCanSave(params, existing, force) || state.isLoading} onClick={() => void submit()} data-testid="live-setup-submit">
 							{t("live.setup.submit")}
 						</Button>
 						{!params && <span className="text-muted-foreground text-xs">{t("live.setup.incomplete")}</span>}
+						{params && needsTick && (
+							<span className="text-muted-foreground text-xs" data-testid="live-setup-tick-hint">
+								{g("live.tickToSave")}
+							</span>
+						)}
 						{state.isError && (
 							<span className="text-chart-error-ink text-xs" role="alert" data-testid="live-setup-error">
 								{errorText}
