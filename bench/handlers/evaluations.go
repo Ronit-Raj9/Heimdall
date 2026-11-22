@@ -523,6 +523,9 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 	if err := h.normalizeSplit(spec); err != nil {
 		return err
 	}
+	if err := normalizeFirstLook(spec); err != nil { // lane Z01 (evaluationpreset.go)
+		return err
+	}
 	if spec.TasksPerBenchmark == 0 {
 		spec.TasksPerBenchmark = EvaluationDefaultTasks
 	}
@@ -802,7 +805,7 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 		Budget:      schemas.BudgetSpec{TotalUSD: budget, ReserveUSD: quickReserve(budget, evalArmCount(spec)*len(tasks.IDs)*spec.Trials*len(conds))},
 		Verdict:     quickVerdict{Policy: "paired_signflip"},
 		Seed:        ev.CreatedAt.Unix(),
-		Concurrency: evalConcurrency(spec), ManifestMode: "agent_exposure",
+		Concurrency: evaluationConcurrency(spec), ManifestMode: "agent_exposure",
 	}
 	f.Budget.Disclose = spec.DiscloseBudget
 	var variantNotes []string

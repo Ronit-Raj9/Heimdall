@@ -61,7 +61,7 @@ type EvalPresetEstimate struct {
 // normalizePreset checks spec.Preset; the numbers of the spec are what
 // runs, the preset only names where they came from.
 func normalizePreset(spec *schemas.EvaluationSpec) error {
-	if spec.Preset == "" {
+	if spec.Preset == "" || spec.Preset == schemas.EvaluationPresetFirstLook { // first_look: normalizeFirstLook (lane Z01)
 		return nil
 	}
 	for _, p := range EvaluationPresets {
@@ -69,7 +69,7 @@ func normalizePreset(spec *schemas.EvaluationSpec) error {
 			return nil
 		}
 	}
-	return badf("preset %q is not one of quick, standard, thorough", spec.Preset)
+	return badf("preset %q is not one of quick, standard, thorough, first_look", spec.Preset)
 }
 
 // estimatePresets estimates every preset of req's setup: req with the

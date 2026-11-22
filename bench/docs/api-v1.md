@@ -24,6 +24,7 @@ Each v1 route is an alias of one bench route. The `V1Alias` middleware rewrites 
 | `GET, POST /api/v1/agents/{id}/versions`, `GET /api/v1/agents/{id}/versions/{n}` | the same under `/api/bench` |
 | `GET /api/v1/agents/{id}/compatibility` | the same |
 | `GET /api/v1/agents/{id}/report-card` | the same |
+| `GET /api/v1/connect/failures`, `POST /api/v1/connect/detect`, `POST /api/v1/connect/agents`, `POST /api/v1/connect/verify`, `GET /api/v1/connect/verify/{id}`, `POST /api/v1/connect/first-look` | the same (the Connect box: detect what was pasted, save it as an agent, verify it row by row with the agent.verify job, plan the first look) |
 | `GET /api/v1/benchmarks` | `GET /api/bench/suites` |
 | `GET /api/v1/benchmarks/catalog` | `GET /api/bench/benchmarks/catalog` |
 | `GET /api/v1/benchmarks/packs` | `GET /api/bench/evaluation-packs` |

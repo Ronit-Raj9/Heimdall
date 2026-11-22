@@ -124,8 +124,8 @@ export interface EvaluationSpec {
 	disclose_budget?: boolean;
 	/** Runs of one benchmark that go at once, 1 to 16; unset is 4. The org's worker slots still bound it. */
 	concurrency?: number;
-	/** The size preset the wizard started from; the numbers above are what runs. */
-	preset?: EvaluationPresetId;
+	/** The size preset the wizard started from; the numbers above are what runs. first_look (lane Z01): 1 benchmark, 5 tasks, 1 trial, 5 at a time; too small for a verdict. */
+	preset?: EvaluationPresetId | "first_look";
 }
 
 export type EvaluationPresetId = "quick" | "standard" | "thorough";

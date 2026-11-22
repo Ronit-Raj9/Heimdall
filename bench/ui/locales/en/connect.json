@@ -1,0 +1,100 @@
+{
+	"title": "Connect an agent",
+	"subtitle": "Paste what you have. Heimdall works out how to call it, proves it with a real task and starts a first look.",
+	"crumb": "Agents",
+	"paste": {
+		"label": "Endpoint URL, curl command, repository, image or platform id",
+		"placeholder": "https://bot.acme.com/chat\nor: curl -X POST https://bot.acme.com/chat -H \"X-API-Key: ...\" -d '{\"message\":\"hi\"}'",
+		"platform": "Or pick a platform",
+		"platformNone": "No platform: detect from what I paste",
+		"platformId": "{{label}}",
+		"detect": "Detect",
+		"detecting": "Detecting",
+		"hint": "Every check is listed below. Requests go only to the host you paste, at most 10, and carry User-Agent heimdall-connect/1."
+	},
+	"result": {
+		"found": "Found: {{label}}",
+		"confidence": "{{pct}}% sure",
+		"nonceFound": "The check code came back: Heimdall knows where the answer is.",
+		"nonceMissing": "The check code did not come back yet.",
+		"notSupported": "Recognised, but not connectable here",
+		"evidence": "Why",
+		"probes": "Requests made from {{from}} ({{count}})",
+		"other": "Other ways to connect",
+		"command": "Command to copy",
+		"copy": "Copy",
+		"copied": "Copied"
+	},
+	"mapping": {
+		"title": "How Heimdall will call your agent",
+		"own": "Your endpoint speaks Heimdall's own request and answer shape.",
+		"method": "Method",
+		"url": "URL",
+		"body": "Request template",
+		"answerPath": "Answer path",
+		"stream": "Streamed answer",
+		"streamPath": "Text of each event",
+		"headers": "Headers",
+		"auth": "Sign-in",
+		"start": "Opens a session first",
+		"poll": "Polls for the answer",
+		"yaml": "Agent file",
+		"yamlError": "This config does not validate yet: {{error}}",
+		"name": "Agent name",
+		"save": "Save agent",
+		"saving": "Saving",
+		"saved": "Saved as {{path}}",
+		"pickField": "Pick the field that holds the reply"
+	},
+	"secret": {
+		"title": "Secrets",
+		"help": "Values go straight to Settings > Secrets. The agent file keeps the name only.",
+		"name": "Secret name",
+		"value": "Value",
+		"save": "Store secret",
+		"stored": "Stored as {{name}}",
+		"retry": "Detect again with this secret"
+	},
+	"verify": {
+		"title": "Prove it",
+		"description": "Each row is a real request. The last row runs one benchmark task through the real run path on your worker; it is not counted.",
+		"start": "Verify",
+		"again": "Verify again",
+		"starting": "Starting",
+		"benchmark": "Benchmark for the real task: {{id}}",
+		"noBenchmark": "No benchmark picked: the real task row is skipped.",
+		"ok": "Your agent is connected.",
+		"failed": "Fix the first failing row, then verify again.",
+		"history": "Conversation memory: {{mode}}",
+		"historyMode": {
+			"server": "kept by your agent (server)",
+			"client": "sent by Heimdall each turn (client)",
+			"none": "none (one-shot)"
+		},
+		"status": {
+			"pending": "waiting",
+			"running": "checking",
+			"pass": "ok",
+			"warn": "check",
+			"fail": "failed",
+			"skip": "skipped"
+		},
+		"fix": "Fix"
+	},
+	"firstLook": {
+		"title": "First look",
+		"plan": "Plan the first look",
+		"planning": "Picking a benchmark",
+		"pick": "{{benchmark}}: {{tasks}} tasks, {{trials}} trial, {{concurrency}} at a time",
+		"estimate": "About {{minutes}} min",
+		"estimateUnknown": "No time estimate yet",
+		"reference": "Reference: {{agent}} on {{model}} scored {{score}}%",
+		"start": "Start first look",
+		"starting": "Starting",
+		"note": "First look: 5 tasks. Too small for a verdict; run the full pack for one.",
+		"notGate": "A first look is never a release gate and never shown on a leaderboard."
+	},
+	"errors": {
+		"empty": "Paste something first, or pick a platform."
+	}
+}
