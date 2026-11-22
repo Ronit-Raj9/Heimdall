@@ -1,7 +1,7 @@
 import "@/lib/i18n";
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ReportCard } from "./reportCard";
 import { abReport, scoreReport } from "./reportCard.fixtures";
 import {
@@ -13,6 +13,7 @@ import {
 	costDisplay,
 	duration,
 	excludedText,
+	downloadReportJSON,
 	headline,
 	overallScore,
 	points,
@@ -145,7 +146,7 @@ describe("ReportCard", () => {
 		expect(html).toContain("codex v1 better");
 		expect(html).toContain("No clear winner");
 		expect(html).toContain("codex v2 solves 30 points more");
-		expect(html).toContain("A drop");
+		expect(html).toContain("A change from normal");
 		expect(html).toContain('href="/experiments/exp_6"');
 	});
 
@@ -378,5 +379,55 @@ describe("report exports (A11)", () => {
 		expect(html).toContain('data-testid="report-download-json"');
 		expect(html).not.toContain("report/export");
 		expect(html).not.toContain('data-testid="report-download-pdf"');
+	});
+});
+describe("fault table (N57)", () => {
+	it("heads the change column 'Change from normal' and says 'no change' for 0", () => {
+		const report = { ...scoreReport, reliability: [{ fault: "model-down", arms: { A: { score: 0.56, drop: 0, runs: 9 } } }] };
+		const html = renderToStaticMarkup(<ReportCard report={report} />);
+		expect(html).toContain("Change from normal");
+		expect(html).not.toContain(">Drop<");
+		expect(html).toContain("no change");
+		expect(html).toContain("how it changed from a normal run of the same tasks");
+		expect(html).not.toContain("report-reliability-unpaired");
+	});
+
+	it("says how many fault runs were left out", () => {
+		const one = { ...scoreReport, reliability: [{ fault: "model-down", arms: { A: { score: 0.56, drop: 0, runs: 9, unpaired: 1 } } }] };
+		expect(renderToStaticMarkup(<ReportCard report={one} />)).toContain(
+			"1 run under faults was left out: its task has no finished normal run to compare with.",
+		);
+		const three: typeof abReport = {
+			...abReport,
+			reliability: [
+				{ fault: "broken-tool", arms: { A: { score: 0.1, drop: -0.3, unpaired: 2 }, B: { score: 0.4, drop: -0.15 } } },
+				{ fault: "model-down", arms: { B: { score: 0.4, drop: 0.04, unpaired: 1 } } },
+			],
+		};
+		const html = renderToStaticMarkup(<ReportCard report={three} />);
+		expect(html).toContain("3 runs under faults were left out: their task has no finished normal run to compare with.");
+		expect(html).toContain("+4 pts");
+	});
+});
+
+describe("Download JSON (N59)", () => {
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.unstubAllGlobals();
+		vi.restoreAllMocks();
+	});
+
+	it("revokes the object URL only after the timer runs", () => {
+		vi.useFakeTimers();
+		const anchor = { href: "", download: "", click: vi.fn(), remove: vi.fn() };
+		vi.stubGlobal("document", { createElement: () => anchor, body: { appendChild: vi.fn() } });
+		vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:x");
+		const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+		downloadReportJSON({ ...abReport, evaluation: "ev_x" });
+		expect(anchor.download).toBe("report-card-ev_x.json");
+		expect(anchor.click).toHaveBeenCalledOnce();
+		expect(revoke).not.toHaveBeenCalled();
+		vi.advanceTimersByTime(1000);
+		expect(revoke).toHaveBeenCalledWith("blob:x");
 	});
 });

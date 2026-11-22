@@ -164,6 +164,7 @@ func (h *evaluationsHandler) list(ctx *fasthttp.RequestCtx) {
 		h.livePaused(ev)
 		out.Evaluations = append(out.Evaluations, ev)
 	}
+	h.backfillResults(out.Evaluations) // N161: results of evaluations that finished before they were stored (evalresult.go)
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
 }
 
@@ -173,6 +174,9 @@ func (h *evaluationsHandler) get(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	h.refresh(ev)
+	if h.fillResult(ev) { // N161: an evaluation that finished before results were stored (evalresult.go)
+		_ = h.store().Save(ev)
+	}
 	h.livePaused(ev)
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, ev)
 }
@@ -266,6 +270,9 @@ func (h *evaluationsHandler) refresh(ev *schemas.Evaluation) {
 		ev.Status, changed = next, true
 	}
 	if h.decideGate(ev) {
+		changed = true
+	}
+	if prev != schemas.EvaluationDone && h.fillResult(ev) { // N161: stored once when it finishes (evalresult.go)
 		changed = true
 	}
 	if h.notifyFinished(ev, prev) { // evalnotify.go

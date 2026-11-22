@@ -1,0 +1,17 @@
+{
+	"home": {
+		"noDrop": "no drop"
+	},
+	"ft": {
+		"faults": "Faults: {{faults}}",
+		"vsClean": "{{change}} vs clean",
+		"noChange": "no change",
+		"emptyFailed": "Failed before any fault run finished.",
+		"emptyCancelled": "Cancelled before any fault run finished.",
+		"emptyAllSkipped": "None of the chosen faults applied to these benchmarks.",
+		"emptyDone": "No fault run of this agent finished.",
+		"hideStopped": "Hide stopped tests",
+		"stoppedHidden_one": "{{count}} stopped test hidden",
+		"stoppedHidden_other": "{{count}} stopped tests hidden"
+	}
+}

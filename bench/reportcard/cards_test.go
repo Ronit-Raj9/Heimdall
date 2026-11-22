@@ -2,6 +2,9 @@ package reportcard
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -87,5 +90,71 @@ func TestDefaultFaultCatalogIDs(t *testing.T) {
 	// generic probes map without benchmark metadata.
 	if DefaultFault("outage-model-down") != "" || DefaultFault("clean") != "" || DefaultFault("important_instructions") != "" {
 		t.Fatal("DefaultFault guessed a fault from a name")
+	}
+}
+
+// pairedFaultFixture is the live BFCL case of N57 and N58: 10 tasks with one
+// trial each, the clean run of t9 is an infrastructure error, and every
+// fault run has the same outcome as its clean run except t9, which passes.
+func pairedFaultFixture() []fixRun {
+	var runs []fixRun
+	for i := 0; i < 10; i++ {
+		task := fmt.Sprintf("t%d", i)
+		outcome := schemas.OutcomeFail
+		if i < 5 {
+			outcome = schemas.OutcomePass
+		}
+		clean := outcome
+		if i == 9 {
+			clean, outcome = schemas.OutcomeAbortedInfra, schemas.OutcomePass
+		}
+		runs = append(runs,
+			fixRun{arm: "A", task: task, outcome: clean},
+			fixRun{arm: "A", task: task, cond: FaultModelDown, outcome: outcome},
+		)
+	}
+	return runs
+}
+
+func TestReliabilityPairsByTask(t *testing.T) {
+	src := newSource()
+	src.add("exp", "hd-harbor-bfcl", []string{"A"}, pairedFaultFixture())
+	ev := abEval(schemas.EvaluationChild{Benchmark: "hd-harbor-bfcl", ExperimentID: "exp", Status: "done"})
+	ev.Spec.Arms = ev.Spec.Arms[:1]
+	rep, err := Build(context.Background(), src, ev, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Reliability) != 1 || rep.Reliability[0].Fault != FaultModelDown {
+		t.Fatalf("reliability %+v", rep.Reliability)
+	}
+	a := rep.Reliability[0].Arms["A"]
+	if a.Drop != 0 || a.Score != round(5.0/9) || a.Runs != 9 || a.Unpaired != 1 {
+		t.Fatalf("fault score %+v, want score 5/9, change 0, 9 runs, 1 unpaired", a)
+	}
+}
+
+func TestResilienceNoChangedTaskHasNoRange(t *testing.T) {
+	src := newSource()
+	src.add("exp", "hd-harbor-bfcl", []string{"A"}, pairedFaultFixture())
+	ev := abEval(schemas.EvaluationChild{Benchmark: "hd-harbor-bfcl", ExperimentID: "exp", Status: "done"})
+	ev.Spec.Arms = ev.Spec.Arms[:1]
+	rep, err := Build(context.Background(), src, ev, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Resilience) != 1 {
+		t.Fatalf("resilience %+v", rep.Resilience)
+	}
+	a := rep.Resilience[0].Arms["A"]
+	if a.Tasks != 9 || a.DegradationRatio == nil || *a.DegradationRatio != 1 || a.ChangedTasks != 0 {
+		t.Fatalf("resilience arm %+v", a)
+	}
+	if a.DegradationLow != nil || a.DegradationHigh != nil {
+		t.Fatalf("no task changed its result, so there is no range: %v to %v", *a.DegradationLow, *a.DegradationHigh)
+	}
+	b, _ := json.Marshal(a)
+	if !strings.Contains(string(b), `"changed_tasks":0`) {
+		t.Fatalf("changed_tasks must be sent even when 0: %s", b)
 	}
 }

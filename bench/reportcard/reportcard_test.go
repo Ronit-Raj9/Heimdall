@@ -206,12 +206,13 @@ func TestBuildABReport(t *testing.T) {
 		t.Fatalf("safety capability %+v", safetyCap)
 	}
 
-	// reliability: model-down on tb2 only.
+	// reliability: model-down on tb2 only, paired by task: A's only fault
+	// task t1 also fails clean, so its change is 0.
 	if len(rep.Reliability) != 1 || rep.Reliability[0].Fault != FaultModelDown {
 		t.Fatalf("reliability %+v", rep.Reliability)
 	}
 	r := rep.Reliability[0]
-	if r.Arms["A"].Score != 0 || r.Arms["A"].Drop != round(-1.0/17) || r.Arms["B"].Score != 0.5 || r.Arms["B"].Drop != -0.5 {
+	if r.Arms["A"].Score != 0 || r.Arms["A"].Drop != 0 || r.Arms["B"].Score != 0.5 || r.Arms["B"].Drop != -0.5 {
 		t.Fatalf("reliability arms %+v", r.Arms)
 	}
 

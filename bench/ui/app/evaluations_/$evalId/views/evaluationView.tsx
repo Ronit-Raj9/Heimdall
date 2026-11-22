@@ -1,11 +1,12 @@
 import { EvaluationRunActions } from "@/components/experiments/runControls"; // run control: pause, resume, rerun failures
 import "./fw08I18n";
-import { EvaluationStatusPill, ModeLabel } from "@/app/evaluations/views/evaluationWords";
+import { EvaluationKindLabel, EvaluationStatusPill } from "@/app/evaluations/views/evaluationWords";
 import { EvaluationLivePill } from "@/app/evaluations/views/evaluationLivePill";
 import {
 	EVALUATION_POLL_MS,
 	armAgentLabel,
 	childReasons,
+	childRunsText,
 	evaluationBudget,
 	formatCreated,
 	isActiveStatus,
@@ -85,7 +86,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 			<section className="bg-card flex flex-col gap-4 rounded-xl border p-5" data-testid="evaluation-header">
 				<div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
 					<span className="font-medium" data-testid="evaluation-mode">
-						<ModeLabel mode={spec.mode} />
+						<EvaluationKindLabel evaluation={evaluation} />
 					</span>
 					<span className="text-muted-foreground">{t("detail.setup", { tasks: spec.tasks_per_benchmark, trials: spec.trials })}</span>
 					<span className="text-muted-foreground">
@@ -109,7 +110,10 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 			</section>
 			<Section
 				title={t("detail.progressTitle")}
-				description={t(spec.mode === "score" ? "detail.progressDescriptionScore" : "detail.progressDescription")}
+				description={
+					t(spec.mode === "score" ? "detail.progressDescriptionScore" : "detail.progressDescription") +
+					(active ? ` ${t("detail.liveNote")}` : "")
+				}
 				testId="evaluation-progress"
 			>
 				{run.length === 0 ? (
@@ -206,7 +210,7 @@ export function ChildRow({ child, score = false }: { child: EvaluationChild; sco
 			<span className="min-w-40 font-medium">{child.benchmark}</span>
 			<EvaluationStatusPill status={child.status} testId={`evaluation-child-status-${child.benchmark}`} />
 			<span className="text-muted-foreground tabular-nums" data-testid={`evaluation-child-runs-${child.benchmark}`}>
-				{slots ? t("detail.runs", { done: slots.done, total: slots.total }) : t("detail.runsUnknown")}
+				{slots ? childRunsText((key, opts) => t(key, opts), slots, active) : t("detail.runsUnknown")}
 			</span>
 			{childStoppedText(child) ? (
 				<span className="text-chart-warning-ink text-xs font-medium" data-testid={`evaluation-child-budget-stopped-${child.benchmark}`}>

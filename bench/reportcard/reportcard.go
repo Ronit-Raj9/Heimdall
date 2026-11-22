@@ -148,12 +148,16 @@ type Benchmark struct {
 	tasks map[string][]TaskTally
 }
 
-// FaultScore is one arm's score under a fault and its change from clean on
-// the same benchmarks (negative: the fault hurt).
+// FaultScore is one arm's score under a fault and its change from clean
+// (negative: the fault hurt). Score and Drop are over tasks that ran both
+// clean and under the fault: a fault run whose task has no clean run left
+// after the exclusions is not counted and adds to Unpaired instead, so a
+// task with no usable clean run cannot add a fake gain or loss.
 type FaultScore struct {
-	Score float64 `json:"score"`
-	Drop  float64 `json:"drop"`
-	Runs  int     `json:"runs"`
+	Score    float64 `json:"score"`
+	Drop     float64 `json:"drop"`
+	Runs     int     `json:"runs"`
+	Unpaired int     `json:"unpaired,omitempty"`
 }
 
 // Reliability is one fault condition.
@@ -1000,16 +1004,26 @@ func relabelOverall(o verdictab.OverallVerdict, la, lb string) verdictab.Overall
 }
 
 // reliability scores each fault per arm, pooled over the benchmarks that ran
-// it, with the drop from the same arm's clean score on those benchmarks.
+// it, with the change from the same arm's clean score. Both sides are paired
+// by task: per child and arm, a fault run counts only when its task has a
+// clean run, and the clean side counts only the tasks that ran under that
+// fault (fault runs left out are counted in Unpaired).
 func reliability(children []childRuns, labels []string, faultOf func(childRuns, string) string) []Reliability {
-	type acc struct{ fs, fn, cs, cn int }
+	type acc struct{ fs, fn, cs, cn, unpaired int }
+	type side struct{ succ, runs int }
 	byFault := map[string]map[string]*acc{}
 	benches := map[string][]string{}
 	for _, cr := range children {
-		seen := map[string]bool{}
 		for _, l := range labels {
-			clean := filter(cr.arms[l], schemas.ConditionClean)
-			cs := successes(clean)
+			clean := map[string]*side{}
+			for _, r := range filter(cr.arms[l], schemas.ConditionClean) {
+				if clean[r.task] == nil {
+					clean[r.task] = &side{}
+				}
+				clean[r.task].succ += r.success
+				clean[r.task].runs++
+			}
+			paired := map[string]map[string]bool{} // fault -> tasks counted on the clean side
 			for _, r := range cr.arms[l] {
 				f := faultOf(cr, r.condition)
 				if f == "" || f == Attack || r.condition == schemas.ConditionClean {
@@ -1023,15 +1037,23 @@ func reliability(children []childRuns, labels []string, faultOf func(childRuns, 
 					a = &acc{}
 					byFault[f][l] = a
 				}
-				a.fs += r.success
-				a.fn++
-				if !seen[f+"\x00"+l] {
-					seen[f+"\x00"+l] = true
-					a.cs += cs
-					a.cn += len(clean)
-				}
 				if !slices.Contains(benches[f], cr.child.Benchmark) {
 					benches[f] = append(benches[f], cr.child.Benchmark)
+				}
+				c := clean[r.task]
+				if c == nil || c.runs == 0 {
+					a.unpaired++
+					continue
+				}
+				a.fs += r.success
+				a.fn++
+				if paired[f] == nil {
+					paired[f] = map[string]bool{}
+				}
+				if !paired[f][r.task] {
+					paired[f][r.task] = true
+					a.cs += c.succ
+					a.cn += c.runs
 				}
 			}
 		}
@@ -1051,7 +1073,7 @@ func reliability(children []childRuns, labels []string, faultOf func(childRuns, 
 				continue
 			}
 			s := float64(a.fs) / float64(a.fn)
-			fs := FaultScore{Score: round(s), Runs: a.fn}
+			fs := FaultScore{Score: round(s), Runs: a.fn, Unpaired: a.unpaired}
 			if a.cn > 0 {
 				fs.Drop = round(s - float64(a.cs)/float64(a.cn))
 			}

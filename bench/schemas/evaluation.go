@@ -373,4 +373,29 @@ type Evaluation struct {
 	// NotifiedAt is when the finish of this evaluation was sent to the
 	// org's notifications (webhooks, chat, email), so it is sent once.
 	NotifiedAt *time.Time `json:"notified_at,omitempty"`
+	// Result is the report card's headline numbers, stored once when the
+	// evaluation finished (or filled in on a later read for one that
+	// finished before results were stored), so lists can show a score and
+	// spend without building every report card. It is not rebuilt after a
+	// regrade; the evaluation's own report card is always live.
+	Result *EvaluationResult `json:"result,omitempty"`
+}
+
+// EvaluationResult is the stored headline of a finished evaluation: each
+// arm's clean score and runs over every benchmark, and the clean spend
+// summed over the arms (nil when any arm's spend is not known).
+type EvaluationResult struct {
+	Arms    []EvaluationArmResult `json:"arms"`
+	CostUSD *float64              `json:"cost_usd,omitempty"`
+	At      time.Time             `json:"at"`
+}
+
+// EvaluationArmResult is one arm of an EvaluationResult.
+type EvaluationArmResult struct {
+	Label   string  `json:"label"`
+	Agent   string  `json:"agent"`
+	Version int     `json:"version"`
+	Model   string  `json:"model"`
+	Score   float64 `json:"score"`
+	Runs    int     `json:"runs"`
 }

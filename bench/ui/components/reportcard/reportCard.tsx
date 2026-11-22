@@ -39,8 +39,9 @@ import {
 	visibleReport,
 	pct,
 	points,
-	reportFileName,
 	reliabilityCards,
+	downloadReportJSON,
+	faultChange,
 } from "./reportCard.utils";
 import { ReliabilityCards, ResilienceCard, StoreDroppedFaults } from "./reliabilityCards";
 import { ReportFilterBar, ReportSlices } from "./reportSlices";
@@ -127,7 +128,7 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 			{(report.resilience?.length ?? 0) > 0 && (
 				<Section
 					title="Resilience"
-					description="Under each fault, the share of clean success kept (x1.00 is no loss, with its 95% range), how often clean successes still succeed, the change in cost and the time to recover."
+					description="Under each fault, the share of clean success kept (x1.00 is no loss, with its 95% range when the runs allow one), how often clean successes still succeed, the change in cost and the time to recover."
 				>
 					<ResilienceCard report={report} />
 				</Section>
@@ -138,7 +139,7 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 			{report.failover && <FailoverSection report={report.failover} />}
 
 			{report.reliability.length > 0 && (
-				<Section title="Faults" description="Score when something goes wrong, and how far it drops from a clean run.">
+				<Section title="Faults" description="Score when something goes wrong, and how it changed from a normal run of the same tasks.">
 					<ReliabilityTable report={report} />
 				</Section>
 			)}
@@ -526,42 +527,53 @@ function MetricPair({ label, value }: { label: string; value: string }) {
 }
 
 function ReliabilityTable({ report }: { report: Report }) {
+	// Fault runs whose task has no finished normal run are left out of both columns (paired by task).
+	const unpaired = report.reliability.reduce((n, row) => n + Object.values(row.arms ?? {}).reduce((m, a) => m + (a?.unpaired ?? 0), 0), 0);
 	return (
-		<Table data-testid="report-reliability" aria-label="Score under each fault">
-			<TableHeader>
-				<TableRow>
-					<TableHead scope="col">Fault</TableHead>
-					{report.arms.map((arm) => (
-						<React.Fragment key={arm.label}>
-							<TableHead scope="col" className="text-right">
-								{isAB(report) ? `${arm.label} score` : "Score"}
-							</TableHead>
-							<TableHead scope="col" className="text-right">
-								{isAB(report) ? `${arm.label} drop` : "Drop"}
-							</TableHead>
-						</React.Fragment>
-					))}
-				</TableRow>
-			</TableHeader>
-			<TableBody>
-				{report.reliability.map((row) => (
-					<TableRow key={row.fault} data-testid={`fault-${row.fault}`}>
-						<TableHead scope="row" className="font-medium">
-							{faultName(row.fault)}
-						</TableHead>
-						{report.arms.map((arm) => {
-							const m = row.arms[arm.label];
-							return (
-								<React.Fragment key={arm.label}>
-									<TableCell className="text-right tabular-nums">{pct(m?.score)}</TableCell>
-									<TableCell className="text-right tabular-nums">{m ? points(m.drop) : "-"}</TableCell>
-								</React.Fragment>
-							);
-						})}
+		<>
+			<Table data-testid="report-reliability" aria-label="Score under each fault">
+				<TableHeader>
+					<TableRow>
+						<TableHead scope="col">Fault</TableHead>
+						{report.arms.map((arm) => (
+							<React.Fragment key={arm.label}>
+								<TableHead scope="col" className="text-right">
+									{isAB(report) ? `${arm.label} score` : "Score"}
+								</TableHead>
+								<TableHead scope="col" className="text-right">
+									{isAB(report) ? `${arm.label} change from normal` : "Change from normal"}
+								</TableHead>
+							</React.Fragment>
+						))}
 					</TableRow>
-				))}
-			</TableBody>
-		</Table>
+				</TableHeader>
+				<TableBody>
+					{report.reliability.map((row) => (
+						<TableRow key={row.fault} data-testid={`fault-${row.fault}`}>
+							<TableHead scope="row" className="font-medium">
+								{faultName(row.fault)}
+							</TableHead>
+							{report.arms.map((arm) => {
+								const m = row.arms[arm.label];
+								return (
+									<React.Fragment key={arm.label}>
+										<TableCell className="text-right tabular-nums">{pct(m?.score)}</TableCell>
+										<TableCell className="text-right tabular-nums">{m ? faultChange(m).text : "-"}</TableCell>
+									</React.Fragment>
+								);
+							})}
+						</TableRow>
+					))}
+				</TableBody>
+			</Table>
+			{unpaired > 0 && (
+				<p className="text-muted-foreground mt-2 text-xs" data-testid="report-reliability-unpaired">
+					{unpaired === 1
+						? "1 run under faults was left out: its task has no finished normal run to compare with."
+						: `${unpaired} runs under faults were left out: their task has no finished normal run to compare with.`}
+				</p>
+			)}
+		</>
 	);
 }
 
@@ -694,19 +706,7 @@ export function ExportButtons({ report }: { report: Report }) {
 	const [pdfFailed, setPdfFailed] = React.useState(false);
 	const id = report.evaluation;
 
-	const download = () => {
-		const blob = new Blob([JSON.stringify(report, null, 2)], {
-			type: "application/json",
-		});
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement("a");
-		a.href = url;
-		a.download = reportFileName(report);
-		document.body.appendChild(a);
-		a.click();
-		a.remove();
-		URL.revokeObjectURL(url);
-	};
+	const download = () => downloadReportJSON(report);
 
 	const copyLink = async () => {
 		try {

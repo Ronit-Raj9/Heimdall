@@ -1,6 +1,7 @@
 import { isBaselineAgent, isTestAgent, AgentAvatar } from "@/app/agents/views/agentDisplay";
 import { formatRelative } from "@/components/platform/platform.utils";
-import { capabilityName, faultName, pct, usd } from "@/components/reportcard/reportCard.utils";
+import { capabilityName, faultChange, faultName, pct, usd } from "@/components/reportcard/reportCard.utils";
+import "@/app/evaluations/views/gw08I18n";
 import { Button } from "@/components/ui/button";
 import { getLocale } from "@/lib/i18n";
 import { useGetAgentReportCardQuery, useGetAgentVersionsQuery, type Evaluation, type Report } from "@/lib/store/apis/evaluationsApi";
@@ -22,14 +23,16 @@ export interface AgentCardStats {
 	capabilities: { id: string; score: number }[];
 	/** Dollars per solved run over the report's benchmarks; null when nothing was solved or no cost was seen. */
 	costPerSolved: number | null;
-	/** The fault with the largest drop from a clean run, or null without fault results. */
+	/** The fault with the largest loss from a clean run (most negative change), or null when no fault lowered the score. */
 	worstDrop: { fault: string; drop: number } | null;
+	/** True when the report has any fault result for this agent. */
+	faultsTested: boolean;
 }
 
 /** What one Home card shows, from an agent's report card (its first arm). */
 export function agentCardStats(report: Report | undefined): AgentCardStats {
 	const label = report?.arms?.[0]?.label;
-	if (!report || !label) return { capabilities: [], costPerSolved: null, worstDrop: null };
+	if (!report || !label) return { capabilities: [], costPerSolved: null, worstDrop: null, faultsTested: false };
 	const capabilities = (report.capabilities ?? [])
 		.map((c) => ({ id: String(c.capability), score: c.arms?.[label]?.score }))
 		.filter((c): c is { id: string; score: number } => typeof c.score === "number");
@@ -43,12 +46,16 @@ export function agentCardStats(report: Report | undefined): AgentCardStats {
 		cost += (m.cost_usd ?? 0) * m.runs;
 		solved += m.score * m.runs;
 	}
+	// drop is the change from clean (negative: the fault hurt, faultChange), so the worst is the smallest below 0.
 	let worstDrop: AgentCardStats["worstDrop"] = null;
+	let faultsTested = false;
 	for (const r of report.reliability ?? []) {
 		const d = r.arms?.[label]?.drop;
-		if (typeof d === "number" && (worstDrop === null || d > worstDrop.drop)) worstDrop = { fault: r.fault, drop: d };
+		if (typeof d !== "number") continue;
+		faultsTested = true;
+		if (faultChange({ drop: d }).hurt && (worstDrop === null || d < worstDrop.drop)) worstDrop = { fault: r.fault, drop: d };
 	}
-	return { capabilities, costPerSolved: priced && solved > 0 ? cost / solved : null, worstDrop };
+	return { capabilities, costPerSolved: priced && solved > 0 ? cost / solved : null, worstDrop, faultsTested };
 }
 
 /** "Your agents" on Home: one card per own agent, or a way to add the first one. */
@@ -81,6 +88,7 @@ export function YourAgents({ agents, evaluations, mayRun }: { agents: readonly A
 
 function AgentCard({ agent, evaluations, mayRun }: { agent: AgentSummary; evaluations: readonly Evaluation[]; mayRun: boolean }) {
 	const { t } = useTranslation("agentFirst");
+	const { t: tg } = useTranslation("gw08");
 	const locale = getLocale();
 	const report = useGetAgentReportCardQuery({ agent: agent.id });
 	const versions = useGetAgentVersionsQuery(agent.id);
@@ -130,9 +138,11 @@ function AgentCard({ agent, evaluations, mayRun }: { agent: AgentSummary; evalua
 						<div className="flex flex-col gap-0.5">
 							<dt className="text-muted-foreground">{t("home.faultDrop")}</dt>
 							<dd className="font-medium tabular-nums" data-testid={`${testId}-drop`}>
-								{stats.worstDrop === null
-									? t("home.notTested")
-									: t("home.drop", { points: Math.round(stats.worstDrop.drop * 100), fault: faultName(stats.worstDrop.fault) })}
+								{stats.worstDrop !== null
+									? t("home.drop", { points: faultChange(stats.worstDrop).text, fault: faultName(stats.worstDrop.fault) })
+									: stats.faultsTested
+										? tg("home.noDrop")
+										: t("home.notTested")}
 							</dd>
 						</div>
 					</dl>

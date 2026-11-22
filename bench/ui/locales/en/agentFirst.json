@@ -105,7 +105,7 @@
 		"unknown": "unknown",
 		"faultDrop": "Drop under faults",
 		"notTested": "not tested",
-		"drop": "-{{points}} pts ({{fault}})",
+		"drop": "{{points}} ({{fault}})",
 		"lastEvaluation": "Last evaluation {{when}}",
 		"evaluate": "Evaluate"
 	},
