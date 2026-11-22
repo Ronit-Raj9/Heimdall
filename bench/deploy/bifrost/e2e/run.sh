@@ -48,8 +48,30 @@ trap cleanup EXIT
 UP_PORT="${UP_PORT:-18711}"
 BF_PORT="${BF_PORT:-18712}"
 
-echo "== stage 2: build bifrost-http"
-(cd "$ROOT/transports" && nice -n 10 go build -o "$WORK/bifrost-http" ./bifrost-http)
+echo "== stage 2: build bifrost-http (temporary go.work over the local modules, like make build LOCAL=1)"
+GOVER="$(sed -n 's/^go //p' "$ROOT/core/go.mod")"
+{
+  echo "go $GOVER"
+  echo "use ("
+  for m in core framework transports plugins/*/; do
+    [[ -f "$ROOT/$m/go.mod" ]] && echo "  $ROOT/${m%/}"
+  done
+  echo ")"
+  echo "replace github.com/mark3labs/mcp-go => github.com/maximhq/mcp-go v0.0.0-20261102181017-b7da3bc145a1"
+} > "$WORK/go.work"
+UI_DIR="$ROOT/transports/bifrost-http/ui"
+UI_PLACEHOLDER=0
+if [[ ! -d "$UI_DIR" ]]; then
+  # main.go embeds ui/; the e2e check needs no UI, so a placeholder is enough.
+  mkdir -p "$UI_DIR" && echo '<!doctype html><title>e2e</title>' > "$UI_DIR/index.html"
+  UI_PLACEHOLDER=1
+fi
+set +e
+(cd "$ROOT/transports/bifrost-http" && GOWORK="$WORK/go.work" nice -n 10 go build -o "$WORK/bifrost-http" .)
+rc=$?
+set -e
+[[ "$UI_PLACEHOLDER" == "1" ]] && rm -rf "$UI_DIR"
+[[ $rc == 0 ]] || { echo "FAIL: bifrost-http build"; exit 1; }
 
 python3 "$HERE/mock_upstream.py" "$UP_PORT" "$WORK/upstream_hits" &
 UP_PID=$!
