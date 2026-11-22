@@ -13,6 +13,7 @@ package main
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -107,10 +108,33 @@ func monitorIncidentEvent(env handlers.OrgEnv, m livemon.Monitor, n livemon.Noti
 	}
 	verb := map[string]string{livemon.NoticeOpened: "Incident opened", livemon.NoticeUpdated: "Incident update", livemon.NoticeResolved: "Resolved"}[n.Event]
 	d.Message = verb + " on monitor " + m.Name + " (" + m.Agent + "): " + n.Incident.Title + ". " + n.Incident.Detail
-	return webhooks.NewEvent(webhooks.EventMonitorIncident, env.Services.OrgID, d)
+	ev := webhooks.NewEvent(webhooks.EventMonitorIncident, env.Services.OrgID, d)
+	// The Y05 channel formats (Slack, Teams, PagerDuty, email) render the
+	// Summary; one incident is one PagerDuty incident, resolved with it.
+	sev := webhooks.SeverityError
+	if n.Event == livemon.NoticeResolved {
+		sev = webhooks.SeverityInfo
+	}
+	ev.Summary = &webhooks.Summary{Title: verb + " on monitor " + m.Name + ": " + n.Incident.Title, Text: n.Incident.Detail,
+		Severity: sev, Link: d.Link, DedupKey: "heimdall-monitor-" + m.ID + "-" + n.Incident.ID,
+		Resolve: n.Event == livemon.NoticeResolved,
+		Fields: []webhooks.Field{{Label: "Agent", Value: m.Agent}, {Label: "Benchmark", Value: m.Benchmark},
+			{Label: "Failing runs", Value: strconv.Itoa(len(d.Runs))}}}
+	return ev
 }
 
-// deliverMonitorNotice sends a notice through the org's webhook outbox.
+// deliverMonitorNotice sends a notice through the org's webhook outbox
+// (every Y05 channel the org's hooks use) and to the members who chose
+// monitor.incident by email.
 func deliverMonitorNotice(env handlers.OrgEnv, m livemon.Monitor, n livemon.Notice) {
-	deliverWebhookEvent(env.Services.OrgID, monitorIncidentEvent(env, m, n))
+	org := env.Services.OrgID
+	webhookOrgsMu.Lock()
+	o, ok := webhookOrgs[org]
+	webhookOrgsMu.Unlock()
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	emitOrgEvent(ctx, org, o.root, o.hosted, monitorIncidentEvent(env, m, n))
 }

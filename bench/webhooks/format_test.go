@@ -200,3 +200,22 @@ func TestJSONHookCarriesSummary(t *testing.T) {
 		t.Fatalf("json body %v", m)
 	}
 }
+
+// INT4: a monitor incident pages on PagerDuty and its resolve closes the same incident.
+func TestMonitorIncidentPagerDutyResolve(t *testing.T) {
+	if !Accepts(FormatPagerDuty, EventMonitorIncident) {
+		t.Fatal("pagerduty hook should take monitor.incident")
+	}
+	h := Hook{ID: "wh_1", Format: FormatPagerDuty, RoutingKey: "rk"}
+	ev := NewEvent(EventMonitorIncident, "org_1", map[string]any{"action": "opened"})
+	ev.Summary = &Summary{Title: "Incident opened on monitor m", Severity: SeverityError, DedupKey: "heimdall-monitor-m-i"}
+	open := pagerDutyEvent(h, ev)
+	if open["event_action"] != "trigger" || open["dedup_key"] != "heimdall-monitor-m-i" {
+		t.Fatalf("opened: %v", open)
+	}
+	ev.Summary.Resolve = true
+	done := pagerDutyEvent(h, ev)
+	if done["event_action"] != "resolve" || done["dedup_key"] != "heimdall-monitor-m-i" {
+		t.Fatalf("resolved: %v", done)
+	}
+}

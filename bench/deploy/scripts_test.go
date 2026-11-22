@@ -29,6 +29,7 @@ func stubDocker(t *testing.T, existing bool) (bin, logPath string) {
 		ps = "echo 0123456789ab"
 	}
 	script := `#!/usr/bin/env bash
+trap '' PIPE # bench_has greps -q the help: an early grep exit must not kill the stub (pipefail race)
 printf '%s\n' "$*" >>` + logPath + `
 case " $* " in
 *" ps -aq "*) [ -z "${STUB_LS_RC:-}" ] || exit "$STUB_LS_RC"; ` + ps + ` ;;

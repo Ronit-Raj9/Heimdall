@@ -66,7 +66,8 @@
 			"schedule.failed": "A scheduled check failed",
 			"worker.offline": "A worker went offline",
 			"experiment.finished": "A comparison finished",
-			"job.failed": "A background job failed"
+			"job.failed": "A background job failed",
+			"monitor.incident": "A live monitor opened or resolved an incident"
 		},
 		"add": "Add web address",
 		"adding": "Adding...",

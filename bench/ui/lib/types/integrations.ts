@@ -7,7 +7,8 @@ export type WebhookEventType =
 	| "schedule.failed"
 	| "worker.offline"
 	| "experiment.finished"
-	| "job.failed";
+	| "job.failed"
+	| "monitor.incident";
 
 /** What a hook's receiver gets: the signed JSON event, or a Slack, Microsoft Teams or PagerDuty message. */
 export type WebhookFormat = "json" | "slack" | "teams" | "pagerduty";
@@ -61,7 +62,7 @@ export interface WebhookInput {
 }
 
 /** Events a member can get by email (handlers/notifications.go). */
-export type EmailEventType = "evaluation.finished" | "evaluation.regressed" | "release.blocked" | "schedule.failed" | "worker.offline";
+export type EmailEventType = "evaluation.finished" | "evaluation.regressed" | "release.blocked" | "schedule.failed" | "worker.offline" | "monitor.incident";
 
 export interface EmailPrefs {
 	events: EmailEventType[];
