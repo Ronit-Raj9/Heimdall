@@ -1,6 +1,7 @@
 package schemas
 
 import (
+	"slices"
 	"strings"
 	"time"
 )
@@ -120,22 +121,49 @@ const EvaluationCacheArm = "cache"
 const EvaluationCacheSuffix = " (Bifrost cache on)"
 
 // CacheVariantArm reports whether arm of m is the cache-on copy an
-// evaluation with BifrostCache adds: arm id EvaluationCacheArm and a label
-// ending in EvaluationCacheSuffix. It is a variant of the spec's own arm, not
-// a separate setup, so readers that rank setups (the leaderboards) leave its
-// runs out; the cache on vs off report reads them (lane C08).
+// evaluation with BifrostCache adds: the arm whose label ends in
+// EvaluationCacheSuffix, whatever its id (B in new evaluations,
+// EvaluationCacheArm in older ones). It is a variant of the spec's own arm,
+// not a separate setup, so readers that rank setups (the leaderboards) leave
+// its runs out; the cache on vs off report reads them (lane C08).
 func CacheVariantArm(m *Manifest, arm string) bool {
-	if m == nil || arm != EvaluationCacheArm {
-		return false
+	return m != nil && arm != "" && strings.HasSuffix(variantArmLabel(m, arm), EvaluationCacheSuffix)
+}
+
+// VariantArmID is the id of the arm of m whose label ends in suffix (an
+// evaluation's cache-on copy, failover arm or no-memory control), read from
+// m.Arms and m.Experiment.Arms; "" when none. Readers find a variant arm by
+// its label, never by its id: the first variant of a score evaluation is arm
+// B (so the paired verdict can read it), later ones keep their own ids.
+func VariantArmID(m *Manifest, suffix string) string {
+	if m == nil || suffix == "" {
+		return ""
 	}
-	label := ""
-	if spec, ok := m.Experiment.Arms[arm]; ok {
-		label = spec.Label
+	ids := make([]string, 0, len(m.Arms)+len(m.Experiment.Arms))
+	for id := range m.Arms {
+		ids = append(ids, id)
 	}
+	for id := range m.Experiment.Arms {
+		if _, dup := m.Arms[id]; !dup {
+			ids = append(ids, id)
+		}
+	}
+	slices.Sort(ids)
+	for _, id := range ids {
+		if strings.HasSuffix(variantArmLabel(m, id), suffix) {
+			return id
+		}
+	}
+	return ""
+}
+
+// variantArmLabel is the label of arm in m: the manifest's arm label, else the
+// experiment's.
+func variantArmLabel(m *Manifest, arm string) string {
 	if a, ok := m.Arms[arm]; ok && a.Label != "" {
-		label = a.Label
+		return a.Label
 	}
-	return strings.HasSuffix(label, EvaluationCacheSuffix)
+	return m.Experiment.Arms[arm].Label
 }
 
 // MCP routes of an evaluation (EvaluationSpec.MCPRoute).
@@ -250,6 +278,13 @@ type EvaluationSkippedTask struct {
 	Reason string `json:"reason"`
 }
 
+// FaultSkip is one fault of an evaluation that does not apply to a
+// benchmark, with the reason.
+type FaultSkip struct {
+	Fault  string `json:"fault"`
+	Reason string `json:"reason"`
+}
+
 // EvaluationChild is one benchmark of an evaluation and its experiment.
 type EvaluationChild struct {
 	Benchmark    string `json:"benchmark"`
@@ -263,6 +298,10 @@ type EvaluationChild struct {
 	// it stands for (clean, model-down, broken-tool, misleading-instruction),
 	// fixed at launch from faults.Conditions; the report card reads it.
 	FaultOf map[string]string `json:"fault_of,omitempty"`
+	// FaultsSkipped are the faults chosen for the evaluation that do not
+	// apply to this benchmark, with the reason (faults.Conditions), fixed at
+	// launch.
+	FaultsSkipped []FaultSkip `json:"faults_skipped,omitempty"`
 	// BudgetUSD is the spend cap this benchmark runs under (its share of
 	// the evaluation budget, or the per-benchmark default), raised in place
 	// by "raise budget and continue".
