@@ -89,6 +89,7 @@ export ANTHROPIC_API_KEY='' OPENAI_API_KEY=''
 export HEIMDALL_ENV_FILE=$work/smoke.env
 ENV_FILE=$HEIMDALL_ENV_FILE
 export HEIMDALL_EVAL_NETWORK=$HEIMDALL_PROJECT-evalnet
+export HEIMDALL_BUILD_NETWORK=$HEIMDALL_PROJECT-buildnet
 # The smoke tags go in the process environment too: compose prefers the
 # shell's HEIMDALL_IMAGE to the env file, so a caller's exported production
 # tag would otherwise be rebuilt by `hc build`. A smoke tag naming a
@@ -111,6 +112,8 @@ HEIMDALL_PG_PASSWORD=$(random_hex)
 HEIMDALL_HTTP_PUBLISH=127.0.0.1:$http_port
 HEIMDALL_HTTPS_PUBLISH=127.0.0.1:$https_port
 HEIMDALL_EVAL_NETWORK=$HEIMDALL_EVAL_NETWORK
+HEIMDALL_BUILD_NETWORK=$HEIMDALL_BUILD_NETWORK
+HEIMDALL_REGISTRY_AUTH_DIR=$work/registry-auth
 HEIMDALL_BENCH_DIR=$BENCH_DIR
 HEIMDALL_IMAGE=$HEIMDALL_IMAGE
 HEIMDALL_RUNNER_IMAGE=$HEIMDALL_RUNNER_IMAGE

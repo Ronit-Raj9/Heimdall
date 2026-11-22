@@ -43,6 +43,8 @@ func runRunner(args []string) int {
 		return runRunnerStart("runner start", args[1:])
 	case "status":
 		return runRunnerStatus(args[1:], os.Stdout)
+	case "build-session": // internal: the shared runner runs org image builds through it (buildsession.go)
+		return runBuildSession(args[1:])
 	case "-h", "--help", "help":
 		fmt.Fprintln(os.Stdout, runnerUsage)
 		return exitOK

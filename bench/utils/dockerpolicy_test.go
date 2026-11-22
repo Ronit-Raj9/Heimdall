@@ -135,3 +135,45 @@ func TestPolicyRefusedCommand(t *testing.T) {
 		t.Fatalf("Command refusal: %v", err)
 	}
 }
+
+// G3 B3: with a Session, an org build runs under the session command (a
+// fresh builder per build), never straight on a shared builder; other
+// docker calls and platform builds stay plain docker calls.
+func TestPolicyBuildSession(t *testing.T) {
+	trusted, org := t.TempDir(), t.TempDir()
+	for _, d := range []string{trusted, org} {
+		if err := os.WriteFile(filepath.Join(d, "Dockerfile"), []byte("FROM scratch\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	p := &DockerPolicy{Runtime: "runsc", TagPrefix: "org-a/", Trusted: []string{trusted},
+		Session: []string{"/bin/session", "runner", "build-session", "-org", "a"}}
+	d := Docker{Binary: "/usr/bin/docker", Policy: p}
+	cmd := d.Command(context.Background(), "build", "-t", "x:1", "--network", "none", org)
+	got := strings.Join(cmd.Args, " ")
+	want := "/bin/session runner build-session -org a -docker /usr/bin/docker -- buildx build --load -t org-a/x:1 --network none " + org
+	if cmd.Path != "/bin/session" || got != want || cmd.Err != nil {
+		t.Fatalf("org build under a session:\n got %s (%s, %v)\nwant %s", got, cmd.Path, cmd.Err, want)
+	}
+	if strings.Contains(got, "--builder") {
+		t.Fatalf("a session build named a shared builder: %s", got)
+	}
+	if cmd.Cancel == nil || cmd.WaitDelay != sessionStopGrace {
+		t.Fatal("a cancelled session build is killed without its cleanup")
+	}
+	for _, args := range [][]string{
+		{"build", "-t", "bench/base:1", trusted},
+		{"run", "--rm", "img"},
+		{"image", "inspect", "x"},
+	} {
+		c := d.Command(context.Background(), args...)
+		if c.Path != "/usr/bin/docker" {
+			t.Errorf("%v ran under the session: %v", args, c.Args)
+		}
+	}
+	// A refused build never starts a session.
+	c := d.Command(context.Background(), "build", "--secret", "id=x", "-t", "x", org)
+	if !errors.Is(c.Err, ErrPolicy) {
+		t.Fatalf("refused build: %v", c.Err)
+	}
+}

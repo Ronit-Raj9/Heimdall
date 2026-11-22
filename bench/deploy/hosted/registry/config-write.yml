@@ -1,0 +1,20 @@
+# The write side of the shared worker's image registry (G3 B2): started by
+# registry-sync.sh only while it copies images, on the registry-sync network
+# that nothing else joins, with the sync identity's credentials. Org builds
+# never reach it; they pull through the read-only registry (config-read.yml).
+version: 0.1
+log:
+  level: info
+storage:
+  filesystem:
+    rootdirectory: /var/lib/registry
+  delete:
+    enabled: true
+auth:
+  htpasswd:
+    realm: heimdall-registry-sync
+    path: /auth/htpasswd
+http:
+  addr: :5000
+  headers:
+    X-Content-Type-Options: [nosniff]

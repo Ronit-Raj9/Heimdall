@@ -25,7 +25,10 @@ package utils
 //     Assignment.Images) and the operator's platform images;
 //   - an org build's bench and platform base images come from the private
 //     Registry beside Builder (dockerbase.go), as BuildKit cannot see the
-//     host's images.
+//     host's images, pinned by digest (Pinned);
+//   - with a Session, every org build runs inside a build session of its
+//     own (cmd/bifrost-bench/buildsession.go): a fresh BuildKit behind
+//     egress rules, one build at a time per org, destroyed afterwards.
 
 import (
 	"context"
@@ -35,6 +38,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
+	"time"
 )
 
 // OrgImagePrefix is the image namespace of one organization: org-<id>/.
@@ -75,9 +80,19 @@ type DockerPolicy struct {
 	// the builder network). An org build's bench and platform base images
 	// come from it (dockerbase.go); empty leaves FROM lines alone.
 	Registry string
-	// RegistryHas reports whether Registry holds an image; nil skips the
-	// check (the build then fails in BuildKit instead).
+	// Pinned returns the digest the registry manifest records for a base
+	// image, or an error wrapping ErrNotPinned. Nil refuses every base
+	// image from Registry: they are never used by a mutable tag.
+	Pinned func(ref string) (string, error)
+	// RegistryHas reports whether Registry holds an image (ref@digest); nil
+	// skips the check (the build then fails in BuildKit instead).
 	RegistryHas func(ref string) (bool, error)
+	// Session is the command an org build runs under instead of the docker
+	// CLI: its argv prefix, to which "-docker <bin> --" and the build's
+	// docker arguments are appended. The session picks the builder
+	// (BUILDX_BUILDER), so Builder is then unused. Empty runs org builds on
+	// Builder directly.
+	Session []string
 
 	mu   sync.Mutex
 	tags map[string]string // tag as the org wrote it -> namespaced tag
@@ -303,10 +318,13 @@ func (p *DockerPolicy) rewriteBuild(rest []string) ([]string, error) {
 		// built on the host daemon as before.
 		return append([]string{"build"}, rest...), nil
 	}
-	if p.Builder == "" {
-		return nil, fmt.Errorf("%w: images from your own Dockerfiles need the isolated image builder, which this worker does not have; ask the operator to start it (HEIMDALL_SHARED_BUILDER) or request a prebuilt image pinned by digest under Settings > Images", ErrPolicy)
+	if p.Builder == "" && len(p.Session) == 0 {
+		return nil, fmt.Errorf("%w: images from your own Dockerfiles need the isolated image builder, which this worker does not have; ask the operator to set it up (HEIMDALL_BUILDKIT_IMAGE, docs/hosting.md) or request a prebuilt image pinned by digest under Settings > Images", ErrPolicy)
 	}
-	out := []string{"buildx", "build", "--builder", p.Builder, "--load"}
+	out := []string{"buildx", "build", "--load"}
+	if len(p.Session) == 0 {
+		out = []string{"buildx", "build", "--builder", p.Builder, "--load"}
+	}
 	buildArgs := map[string]string{}
 	for _, f := range flags {
 		if f.name == "--build-arg" {
@@ -350,15 +368,43 @@ func (p *DockerPolicy) rewriteBuild(rest []string) ([]string, error) {
 	return append(out, ctxDir), nil
 }
 
+// sessionArgv returns the command line of an org build under the policy's
+// build session, or nil when rewritten is not an org build or there is no
+// session.
+func (p *DockerPolicy) sessionArgv(docker string, rewritten []string) []string {
+	if p == nil || len(p.Session) == 0 || len(rewritten) < 2 || rewritten[0] != "buildx" || rewritten[1] != "build" {
+		return nil
+	}
+	out := append(append([]string(nil), p.Session...), "-docker", docker, "--")
+	return append(out, rewritten...)
+}
+
+// sessionStopGrace is how long a build session has to remove its builder
+// after its context ends (it gets SIGTERM, then SIGKILL).
+const sessionStopGrace = 30 * time.Second
+
 // command builds the exec.Cmd of `docker args...` under d's policy. A
 // refused call yields a command whose Start returns the refusal.
 func (d Docker) command(ctx context.Context, args []string) *exec.Cmd {
 	rewritten, err := d.Policy.Rewrite(args)
+	bin := d.bin()
+	session := false
+	if err == nil {
+		if argv := d.Policy.sessionArgv(bin, rewritten); argv != nil {
+			bin, rewritten, session = argv[0], argv[1:], true
+		}
+	}
 	var cmd *exec.Cmd
 	if ctx != nil {
-		cmd = exec.CommandContext(ctx, d.bin(), rewritten...)
+		cmd = exec.CommandContext(ctx, bin, rewritten...)
 	} else {
-		cmd = exec.Command(d.bin(), rewritten...)
+		cmd = exec.Command(bin, rewritten...)
+	}
+	if session && ctx != nil {
+		// A build session cleans up its builder on SIGTERM; SIGKILL would
+		// leave it running until the runner's next start.
+		cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
+		cmd.WaitDelay = sessionStopGrace
 	}
 	if err != nil {
 		cmd.Err = err

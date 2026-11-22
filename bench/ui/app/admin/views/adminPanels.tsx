@@ -147,6 +147,7 @@ export function AdminOrgsPanel() {
 						<TableHead>{t("orgs.name")}</TableHead>
 						<TableHead className="text-right">{t("orgs.members")}</TableHead>
 						<TableHead>{t("orgs.quota")}</TableHead>
+						<TableHead>{t("orgs.runtime")}</TableHead>
 						<TableHead />
 					</TableRow>
 				</TableHeader>
@@ -165,7 +166,9 @@ export function AdminOrgsPanel() {
 										perDay: o.quota.max_runs_per_day,
 										spend: o.quota.max_spend_usd_per_day,
 									})}
-								{o.quota?.runtime === "runsc" && <Badge variant="secondary" className="ml-2">gVisor</Badge>}
+							</TableCell>
+							<TableCell>
+								<RuntimeBadge runtime={o.quota?.runtime ?? "runsc"} testId={`admin-org-runtime-${o.slug}`} />
 							</TableCell>
 							<TableCell className="text-right">
 								<Button size="sm" variant="outline" onClick={() => setEditing(o.id)} data-testid={`admin-org-edit-${o.slug}`}>
@@ -181,6 +184,17 @@ export function AdminOrgsPanel() {
 	);
 }
 
+/** The sandbox an org's agents get on the shared worker: gVisor by default; runc only where a server admin chose it. */
+export function RuntimeBadge({ runtime, testId }: { runtime: AdminLimits["runtime"]; testId?: string }) {
+	const { t } = useTranslation("admin");
+	const runc = runtime === "runc";
+	return (
+		<Badge variant={runc ? "destructive" : "secondary"} title={t(runc ? "orgs.runtimeRuncHint" : "orgs.runtimeRunscHint")} data-testid={testId}>
+			{t(runc ? "orgs.runtimeRunc" : "orgs.runtimeRunsc")}
+		</Badge>
+	);
+}
+
 const DEFAULT_LIMITS: AdminLimits = {
 	max_concurrent_runs: 2,
 	max_runs_per_day: 50,
@@ -188,7 +202,7 @@ const DEFAULT_LIMITS: AdminLimits = {
 	max_image_bytes: 2 * GIB,
 	allow_custom_images: false,
 	shared_pool: false,
-	runtime: "runc",
+	runtime: "runsc",
 };
 
 /** The quota form: numbers, toggles and the runtime; saved through POST /admin/orgs/{id}/quota. */
@@ -242,9 +256,14 @@ export function QuotaEditor({ org, onClose }: { org: AdminOrg; onClose(): void }
 							onChange={(e) => setForm({ ...form, runtime: e.target.value === "runsc" ? "runsc" : "runc" })}
 							data-testid="quota-runtime"
 						>
-							<option value="runc">{t("quota.runc")}</option>
 							<option value="runsc">{t("quota.runsc")}</option>
+							<option value="runc">{t("quota.runc")}</option>
 						</select>
+						{form.runtime === "runc" && (
+							<span className="text-destructive text-xs" data-testid="quota-runc-warning">
+								{t("quota.runcWarning")}
+							</span>
+						)}
 					</label>
 				</div>
 				<label className="flex items-center gap-2 text-sm">
