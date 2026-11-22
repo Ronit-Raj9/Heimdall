@@ -1,9 +1,8 @@
-import { importTabRedirect } from "@/lib/routing/navRedirects";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import AddBenchmarkPage from "./page";
 
-// Agent-first nav (X09): adding a benchmark is the Import tab of Benchmarks.
+// Add benchmark (lane Z20): one front door for any input. The importer list
+// stays on the Import tab of Benchmarks (/suites?tab=import).
 export const Route = createFileRoute("/suites_/add")({
-	beforeLoad: () => {
-		throw redirect({ ...importTabRedirect(), replace: true } as never);
-	},
+	component: AddBenchmarkPage,
 });

@@ -1,0 +1,142 @@
+import "@/lib/i18n";
+
+import { cellState, checkGroup, DraftPreview, matrixColumns, PublishPanel, ReadinessPanel } from "@/components/onboard/draftPanel";
+import { InventoryPanel } from "@/components/onboard/inventoryPanel";
+import type { OnboardDraftSet, OnboardInventory } from "@/lib/types/onboard";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
+import AddBenchmarkView from "./addBenchmarkView";
+
+vi.mock("@tanstack/react-router", () => ({
+	Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode }) => (
+		<a href={to} {...rest}>
+			{children}
+		</a>
+	),
+}));
+
+const { idleMutation } = vi.hoisted(() => ({ idleMutation: () => [() => undefined, { isLoading: false, error: undefined }] }));
+vi.mock("@/lib/store/apis/onboardApi", () => ({
+	useUploadOnboardFileMutation: idleMutation,
+	useDetectOnboardMutation: idleMutation,
+	useInspectOnboardMutation: idleMutation,
+	useCreateOnboardDraftMutation: idleMutation,
+	useDeleteOnboardDraftMutation: idleMutation,
+	useEditOnboardTaskMutation: idleMutation,
+	useStartOnboardReadinessMutation: idleMutation,
+	usePublishOnboardDraftMutation: idleMutation,
+	useListOnboardDraftsQuery: () => ({ data: { drafts: [] } }),
+	useGetOnboardDraftQuery: () => ({ data: undefined }),
+}));
+
+const pass = (name: string, want = "pass") => ({ name, want, got: want, passed: true });
+const set: OnboardDraftSet = {
+	id: "20261122-101500-ab12cd",
+	suite: "faq",
+	new_suite: true,
+	title: "faq",
+	kind: "rows",
+	source: "rows",
+	input: { upload: "onboard/x/faq.csv" },
+	plan: { source: "rows", suite: "faq", held_out: { pct: 25, seed: 1 } },
+	grader: "answer_match",
+	public: false,
+	problems: [{ ref: "row 7", message: "no check: give an answer" }],
+	readiness: { status: "done", where: "this server", done: 2, total: 2, admitted: 1, refused: 1 },
+	tasks: [
+		{
+			id: "hotel-cap",
+			origin: { source: "faq.csv", ref: "row 2" },
+			title: "What is the hotel cap?",
+			instruction: "# What is the hotel cap?",
+			checks: ['The final answer must equal "250" (case and spacing ignored).'],
+			controls: [
+				{ kind: "reference", path: "solution/answer.txt", origin: "source" },
+				{ kind: "wrong_answer", path: "controls/mutant-1.txt", origin: "source" },
+			],
+			gates: [{ gate: "static", ok: true, blocking: true }],
+			held_out: true,
+			review: "accepted",
+			readiness: {
+				admitted: true,
+				checks: [pass("reference_1"), pass("reference_2"), pass("empty_control", "fail"), pass("wrong_answer_1", "fail"), pass("exploit", "fail")],
+			},
+			catch_rate: { caught: 3, total: 3 },
+		},
+		{
+			id: "days",
+			origin: { source: "faq.csv", ref: "row 3" },
+			title: "Vacation days",
+			instruction: "# Vacation days",
+			checks: ['The final answer must equal "20".'],
+			controls: [],
+			gates: [{ gate: "duplicate", ok: false, blocking: false, message: "near copy of task x" }],
+			held_out: false,
+			review: "accepted",
+			readiness: { admitted: false, checks: [pass("reference_1"), { name: "exploit", want: "fail", got: "pass", passed: false }] },
+			catch_rate: { caught: 0, total: 1 },
+			reason: "failed: exploit",
+		},
+	],
+};
+
+describe("Add benchmark", () => {
+	it("renders the drop box first", () => {
+		const html = renderToStaticMarkup(<AddBenchmarkView />);
+		expect(html).toContain('data-testid="onboard-source"');
+		expect(html).toContain('data-testid="onboard-drop"');
+		expect(html).not.toContain("\u2014");
+	});
+
+	it("groups readiness checks into matrix columns", () => {
+		expect(checkGroup("reference_3")).toBe("reference");
+		expect(checkGroup("oracle_control")).toBe("reference");
+		expect(checkGroup("mutant_1")).toBe("wrong");
+		expect(checkGroup("empty_patch")).toBe("empty");
+		expect(matrixColumns(set.tasks)).toEqual(["reference", "empty", "wrong", "exploit"]);
+		expect(cellState(set.tasks[1].readiness?.checks, "exploit")).toBe("fail");
+		expect(cellState(set.tasks[1].readiness?.checks, "empty")).toBe("none");
+	});
+
+	it("shows the matrix with catch rates and reasons", () => {
+		const html = renderToStaticMarkup(<ReadinessPanel set={set} />);
+		expect(html).toContain('data-testid="onboard-matrix"');
+		expect(html).toContain("3/3");
+		expect(html).toContain("failed: exploit");
+		expect(html).toContain("not run");
+	});
+
+	it("previews tasks with gates and problems", () => {
+		const html = renderToStaticMarkup(<DraftPreview set={set} />);
+		expect(html).toContain('data-testid="onboard-task-hotel-cap"');
+		expect(html).toContain("Duplicate");
+		expect(html).toContain("row 7");
+	});
+
+	it("publishes only ready, accepted tasks by default", () => {
+		const html = renderToStaticMarkup(<PublishPanel set={set} />);
+		expect(html).toContain("1 ready and accepted of 2");
+		const done = renderToStaticMarkup(<PublishPanel set={{ ...set, published: { suite: "faq", tasks: ["hotel-cap"], created: true, held_out: 1, job_id: "j" } }} />);
+		expect(done).toContain('data-testid="onboard-evaluate"');
+	});
+
+	it("lets rows be mapped when nothing could be read yet", () => {
+		const inv: OnboardInventory = {
+			kind: "rows",
+			source: "rows",
+			title: "ls",
+			license: "your data",
+			unit: "row",
+			units: 2,
+			columns: ["inputs.q", "outputs.gold"],
+			samples: [],
+			suggest: { source: "rows", suite: "ls", held_out: { pct: 25, seed: 1 } },
+			estimate: { tasks: 0, readiness_runs: 0, judge_calls: 0, assist_usd: 0 },
+			can_draft: false,
+			next: "map the question and answer columns",
+		};
+		const html = renderToStaticMarkup(<InventoryPanel inv={inv} plan={inv.suggest} onPlan={() => undefined} onDraft={() => undefined} busy={false} />);
+		expect(html).toContain('data-testid="onboard-plan-mapping"');
+		expect(html).toContain("outputs.gold");
+	});
+});
