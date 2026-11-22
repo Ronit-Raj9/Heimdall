@@ -463,12 +463,17 @@ class AgentConfig(_AgentConfigRequired, total=False):
     voice_rtc: Optional[VoiceRTCAgent]
 
 
-class AgentConfigDoc(TypedDict):
+class _AgentConfigDocRequired(TypedDict):
     fields: AgentConfigFields
     id: str
     path: str
     sha256: str
     yaml: str
+
+
+class AgentConfigDoc(_AgentConfigDocRequired, total=False):
+    version: int
+    version_created: bool
 
 
 class _AgentConfigFieldsRequired(TypedDict):
@@ -494,6 +499,7 @@ class AgentConfigFields(_AgentConfigFieldsRequired, total=False):
 
 
 class AgentConfigPut(TypedDict, total=False):
+    create_only: bool
     fields: Optional[AgentConfigFields]
     if_match: str
     yaml: str
@@ -866,8 +872,10 @@ class _AgentSummaryRequired(TypedDict):
 class AgentSummary(_AgentSummaryRequired, total=False):
     capabilities: List[str]
     error: str
+    last_run_at: Optional[str]
     owns_model: bool
     reports_events: str
+    runs_total: Optional[int]
 
 
 class _AgentTemplateRequired(TypedDict):
@@ -1752,6 +1760,7 @@ class _BenchmarkInfoRequired(TypedDict):
 
 class BenchmarkInfo(_BenchmarkInfoRequired, total=False):
     estimate_basis: str
+    practice: bool
     reason: str
     reference: bool
 
@@ -4181,6 +4190,8 @@ class EvalEstimateRequest(_EvalEstimateRequestRequired, total=False):
     bifrost_cache: bool
     budget_usd: float
     concurrency: int
+    failover: Optional[FailoverOption]
+    mcp_route: str
     pack: str
     presets: bool
     stream: Optional[StreamSpec]
@@ -4301,6 +4312,7 @@ class EvaluationChild(_EvaluationChildRequired, total=False):
     budget_stopped: bool
     budget_usd: float
     fault_of: Dict[str, str]
+    faults_skipped: List[FaultSkip]
     lock_hash: str
     not_started: int
     skipped: str
@@ -4607,6 +4619,7 @@ class ExperimentStatus(_ExperimentStatusRequired, total=False):
     analysis_id: str
     arms: List[str]
     decision: str
+    evaluation_id: str
     finished_at: Optional[str]
     started_at: Optional[str]
     suite: str
@@ -4722,7 +4735,9 @@ class _FailurePatternsRequired(TypedDict):
 
 class FailurePatterns(_FailurePatternsRequired, total=False):
     agent: str
+    benchmarks: List[str]
     evaluation: str
+    versions: List[int]
 
 
 class _FairnessReportRequired(TypedDict):
@@ -4795,6 +4810,11 @@ class FaultScore(TypedDict):
     drop: float
     runs: int
     score: float
+
+
+class FaultSkip(TypedDict):
+    fault: str
+    reason: str
 
 
 class _FaultStepRequired(TypedDict):
@@ -4902,7 +4922,7 @@ class FirstDivergence(TypedDict):
     note: str
 
 
-class FirstLookPick(TypedDict):
+class _FirstLookPickRequired(TypedDict):
     benchmark: str
     concurrency: int
     considered: List[BenchmarkInfo]
@@ -4911,6 +4931,10 @@ class FirstLookPick(TypedDict):
     reason: str
     tasks: int
     trials: int
+
+
+class FirstLookPick(_FirstLookPickRequired, total=False):
+    practice: bool
 
 
 class _FixRequired(TypedDict):
@@ -7093,6 +7117,17 @@ class ModelOption(_ModelOptionRequired, total=False):
     open_weights: bool
 
 
+class _ModelPriceViewRequired(TypedDict):
+    cache_per_mtok: float
+    input_per_mtok: float
+    output_per_mtok: float
+    source: str
+
+
+class ModelPriceView(_ModelPriceViewRequired, total=False):
+    key_label: str
+
+
 class _ModelProviderInfoRequired(TypedDict):
     bifrost_provider: str
     custom_base_url: bool
@@ -7120,6 +7155,7 @@ class _ModelRefViewRequired(TypedDict):
 
 class ModelRefView(_ModelRefViewRequired, total=False):
     key_id: str
+    price: Optional[ModelPriceView]
 
 
 class ModelSummary(TypedDict):
@@ -8111,6 +8147,8 @@ class _PolicyDocListRequired(TypedDict):
 
 class PolicyDocList(_PolicyDocListRequired, total=False):
     limited: bool
+    next: str
+    shape: str
 
 
 class _PolicyDocSummaryRequired(TypedDict):
@@ -10123,6 +10161,7 @@ class _RunBifrostRequired(TypedDict):
 
 class RunBifrost(_RunBifrostRequired, total=False):
     cost_usd: Optional[float]
+    fault_path: str
 
 
 class _RunCallRequired(TypedDict):
@@ -10187,7 +10226,9 @@ class _RunControlsRequired(TypedDict):
 
 
 class RunControls(_RunControlsRequired, total=False):
+    actor_names: Dict[str, str]
     log_problem: str
+    paused_by_name: str
     rerun_of: str
 
 
@@ -10720,6 +10761,7 @@ class Schedule(_ScheduleRequired, total=False):
     fail_on: List[str]
     job: str
     max_usd_per_day: float
+    paused: bool
     policy: str
     timezone: str
 
@@ -10746,6 +10788,7 @@ class ScheduleRow(_ScheduleRowRequired, total=False):
     last: Optional[Record_schedule]
     max_usd_per_day: float
     next: str
+    paused: bool
     policy: str
     problem: str
     timezone: str
@@ -10761,6 +10804,7 @@ class _ScheduleSpecRequired(TypedDict):
 
 
 class ScheduleSpec(_ScheduleSpecRequired, total=False):
+    paused: bool
     timezone: str
 
 
@@ -11810,7 +11854,7 @@ class SuiteUploadResult(TypedDict):
     suite: str
 
 
-class Summary(TypedDict):
+class _SummaryRequired(TypedDict):
     agent: str
     alpha: float
     baseline: Optional[Baseline]
@@ -11831,6 +11875,10 @@ class Summary(TypedDict):
     targets: List[Target]
     tasks: int
     trials: int
+
+
+class Summary(_SummaryRequired, total=False):
+    paused: bool
 
 
 class _Summary_improveRequired(TypedDict):
@@ -12483,6 +12531,7 @@ class _UsageBucketRequired(TypedDict):
 
 class UsageBucket(_UsageBucketRequired, total=False):
     label: str
+    no_model_call_runs: int
 
 
 class _UsageKeySpendRequired(TypedDict):
@@ -12497,7 +12546,7 @@ class UsageKeySpend(_UsageKeySpendRequired, total=False):
     last4: str
 
 
-UsageReport = TypedDict('UsageReport', {'buckets': "List[UsageBucket]", 'experiments': "int", 'from': "str", 'group_by': "str", 'keys': "List[UsageKeySpend]", 'keys_month_spent_usd': "float", 'note': "str", 'runs': "int", 'to': "str", 'total_cost_usd': "float", 'total_tokens': "float", 'unknown_cost_runs': "int"}, total=False)
+UsageReport = TypedDict('UsageReport', {'buckets': "List[UsageBucket]", 'experiments': "int", 'from': "str", 'group_by': "str", 'keys': "List[UsageKeySpend]", 'keys_month_spent_usd': "float", 'no_model_call_runs': "int", 'note': "str", 'runs': "int", 'to': "str", 'total_cost_usd': "float", 'total_tokens': "float", 'unknown_cost_runs': "int"}, total=False)
 
 
 class User(TypedDict):
@@ -13625,6 +13674,10 @@ class DatasetVersionListResponse(DatasetVersionList):
 DebugRunResponseResponse = DebugRunResponse
 
 
+class DefinitionResponse(Definition):
+    mode: Mode
+
+
 class DeletedInfoResponse(DeletedInfo):
     mode: Mode
 
@@ -14342,6 +14395,10 @@ class ScenarioRowsResultResponse(ScenarioRowsResult):
     mode: Mode
 
 
+class ScheduleResponse(Schedule):
+    mode: Mode
+
+
 class ScheduleRunResponseResponse(ScheduleRunResponse):
     mode: Mode
 
@@ -14990,6 +15047,7 @@ __all__ = [
     'FaultCatalog',
     'FaultPlan',
     'FaultScore',
+    'FaultSkip',
     'FaultStep',
     'FieldChange',
     'File',
@@ -15198,6 +15256,7 @@ __all__ = [
     'ModelKeysResponse',
     'ModelMatrix',
     'ModelOption',
+    'ModelPriceView',
     'ModelProviderInfo',
     'ModelRef',
     'ModelRefView',
@@ -15822,6 +15881,7 @@ __all__ = [
     'DatasetVersionDetailResponse',
     'DatasetVersionListResponse',
     'DebugRunResponseResponse',
+    'DefinitionResponse',
     'DeletedInfoResponse',
     'DeliveryResponse',
     'DeploymentResponse',
@@ -16002,6 +16062,7 @@ __all__ = [
     'RunnerWhoamiResponse',
     'RunnersListResponse',
     'ScenarioRowsResultResponse',
+    'ScheduleResponse',
     'ScheduleRunResponseResponse',
     'SchedulesResponseResponse',
     'SearchResultResponse',
