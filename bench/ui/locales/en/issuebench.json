@@ -49,12 +49,27 @@
 		"add_secret": "Add secret",
 		"allow_service": "Allow service",
 		"raise_budget": "Raise budget",
-		"retry": "Retry"
+		"retry": "Retry",
+		"open_workers": "Open workers"
 	},
 	"fixPrompt": {
 		"add_secret": "Name of the secret to add (from Secrets)",
 		"allow_service": "Service to allow (for example postgres)",
 		"raise_budget": "New budget in dollars"
 	},
-	"none": "No usable issues in this repository."
+	"none": "No usable issues in this repository.",
+	"stage": {
+		"build": "Building the environment on a worker",
+		"validate": "Running the tests on a worker",
+		"checks": "Checking the issue text"
+	},
+	"showLog": "Show log",
+	"hideLog": "Hide log",
+	"readiness": {
+		"noWorker": "No worker online: building and testing issues runs on a worker, never on the server. Add a worker or turn on the shared worker.",
+		"noGateway": "This server has no model gateway, so environments can not be built. The operator starts the shared-runner profile.",
+		"openWorkers": "Open Settings > Workers",
+		"startNoWorker": "Start needs a worker online",
+		"startNoGateway": "Start needs the server's model gateway"
+	}
 }

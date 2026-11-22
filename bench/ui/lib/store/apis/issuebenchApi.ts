@@ -1,11 +1,14 @@
 // Issues to benchmark (lane G06): org routes under /issuebench/runs.
-import type { IssueRetryBody, IssueRun } from "@/lib/types/issuebench";
+import type { IssueReadiness, IssueRetryBody, IssueRun } from "@/lib/types/issuebench";
 import { benchApi } from "./benchApi";
 
 const runPath = (id: string) => `/issuebench/runs/${encodeURIComponent(id)}`;
 
 export const issuebenchApi = benchApi.enhanceEndpoints({ addTagTypes: ["IssueRun"] }).injectEndpoints({
 	endpoints: (builder) => ({
+		getIssueReadiness: builder.query<IssueReadiness, void>({
+			query: () => "/issuebench/readiness",
+		}),
 		getIssueRun: builder.query<IssueRun, string>({
 			query: (id) => runPath(id),
 			providesTags: (_r, _e, id) => [{ type: "IssueRun", id }],
@@ -28,4 +31,11 @@ export const issuebenchApi = benchApi.enhanceEndpoints({ addTagTypes: ["IssueRun
 	}),
 });
 
-export const { useGetIssueRunQuery, useScanIssuesMutation, useStartIssueRunMutation, useReviewIssueMutation, useRetryIssueMutation } = issuebenchApi;
+export const {
+	useGetIssueReadinessQuery,
+	useGetIssueRunQuery,
+	useScanIssuesMutation,
+	useStartIssueRunMutation,
+	useReviewIssueMutation,
+	useRetryIssueMutation,
+} = issuebenchApi;

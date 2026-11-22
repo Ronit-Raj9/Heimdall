@@ -1,17 +1,20 @@
 // Build tab source "From issues" (lane G06): pick a connected GitHub repository, scan it
 // for merged pull requests that close an issue, then build, check and review each one.
+import { JobLogPanel } from "@/components/jobs/jobLogPanel";
 import { Button } from "@/components/ui/button";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useGetGithubStatusQuery, useListGithubReposQuery } from "@/lib/store/apis/githubApi";
 import {
+	useGetIssueReadinessQuery,
 	useGetIssueRunQuery,
 	useRetryIssueMutation,
 	useReviewIssueMutation,
 	useScanIssuesMutation,
 	useStartIssueRunMutation,
 } from "@/lib/store/apis/issuebenchApi";
-import type { IssueFix, IssueItem, IssueRun } from "@/lib/types/issuebench";
-import { useState } from "react";
+import type { IssueFix, IssueItem, IssueReadiness, IssueRun, IssueStatus } from "@/lib/types/issuebench";
+import { Link } from "@tanstack/react-router";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 declare module "@/lib/i18n/resources" {
@@ -31,13 +34,57 @@ export function startBody(consent: boolean, provider: string, model: string) {
 
 /** The body of a retry with the fix the person chose; null when they cancelled the prompt. */
 export function retryBody(fix: IssueFix, answer: string | null) {
-	if (fix === "retry") return { fix };
+	if (fix === "retry" || fix === "open_workers") return { fix };
 	if (answer === null || answer.trim() === "") return null;
 	const v = answer.trim();
 	if (fix === "add_secret") return { fix, secrets: [v] };
 	if (fix === "allow_service") return { fix, allow_services: [v] };
 	const n = Number(v);
 	return Number.isFinite(n) && n > 0 ? { fix, budget_usd: n } : null;
+}
+
+/** How often the form refreshes readiness while it is open. */
+export const READINESS_POLL_MS = 15000;
+
+/** Why Start is blocked on the hosted site, or "" when it is not (no worker taking issuebench.work, or no model gateway). */
+export function startBlocked(r: IssueReadiness | undefined): "" | "worker" | "gateway" {
+	if (!r || !r.hosted) return "";
+	if (!r.worker_online) return "worker";
+	if (!r.gateway) return "gateway";
+	return "";
+}
+
+/** Settings > Workers, the page the no-worker job error also links to. */
+function WorkersLink({ children, testId }: { children: ReactNode; testId: string }) {
+	return (
+		<Link to="/settings" search={{ tab: "runners" } as never} className="text-primary underline" data-testid={testId}>
+			{children}
+		</Link>
+	);
+}
+
+/** The banner above Start when the hosted site can not build: no worker online, or no model gateway. */
+export function ReadinessBanner({ readiness, t }: { readiness: IssueReadiness | undefined; t: T }) {
+	const why = startBlocked(readiness);
+	if (!why || !readiness) return null;
+	const message = readiness.message || t(why === "worker" ? "readiness.noWorker" : "readiness.noGateway");
+	return (
+		<div
+			role="alert"
+			className="border-chart-error/40 bg-chart-error/5 text-chart-error-ink flex flex-col gap-1 rounded-lg border px-3 py-2 text-xs"
+			data-testid="issuebench-readiness"
+		>
+			<span>{message}</span>
+			{why === "worker" && <WorkersLink testId="issuebench-readiness-workers">{t("readiness.openWorkers")}</WorkersLink>}
+		</div>
+	);
+}
+
+/** Words for what a worker job does for an issue right now, or "" when nothing runs. */
+export function stageWords(it: Pick<IssueItem, "stage" | "status">, t: T): string {
+	const done: IssueStatus[] = ["ready", "failed", "accepted", "rejected"];
+	if (!it.stage || done.includes(it.status)) return "";
+	return t(`stage.${it.stage}`);
 }
 
 export function FromIssues({ writable }: { writable: boolean }) {
@@ -48,6 +95,7 @@ export function FromIssues({ writable }: { writable: boolean }) {
 	const [runId, setRunId] = useState("");
 	const [scan, scanState] = useScanIssuesMutation();
 	const [error, setError] = useState("");
+	const readiness = useGetIssueReadinessQuery(undefined, { pollingInterval: READINESS_POLL_MS });
 
 	const onScan = async () => {
 		setError("");
@@ -94,12 +142,12 @@ export function FromIssues({ writable }: { writable: boolean }) {
 					{error}
 				</p>
 			)}
-			{runId && <RunView id={runId} writable={writable} t={t} />}
+			{runId && <RunView id={runId} writable={writable} readiness={readiness.data} t={t} />}
 		</div>
 	);
 }
 
-function RunView({ id, writable, t }: { id: string; writable: boolean; t: T }) {
+export function RunView({ id, writable, readiness, t }: { id: string; writable: boolean; readiness?: IssueReadiness; t: T }) {
 	const [poll, setPoll] = useState(0);
 	const run = useGetIssueRunQuery(id, { pollingInterval: poll });
 	const [start, startState] = useStartIssueRunMutation();
@@ -113,6 +161,7 @@ function RunView({ id, writable, t }: { id: string; writable: boolean; t: T }) {
 	if (!running && poll !== 0 && data) setPoll(0);
 	if (!data) return null;
 	const items = data.items ?? [];
+	const blocked = startBlocked(readiness);
 
 	const onStart = async () => {
 		setError("");
@@ -127,6 +176,7 @@ function RunView({ id, writable, t }: { id: string; writable: boolean; t: T }) {
 	return (
 		<div className="flex min-w-0 flex-col gap-4">
 			<FunnelTable run={data} t={t} />
+			{items.length > 0 && <ReadinessBanner readiness={readiness} t={t} />}
 			{items.length === 0 ? (
 				<p className="text-muted-foreground">{t("none")}</p>
 			) : (
@@ -155,7 +205,13 @@ function RunView({ id, writable, t }: { id: string; writable: boolean; t: T }) {
 						<input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} data-testid="issuebench-consent" />
 						<span>{t("consent")}</span>
 					</label>
-					<Button size="sm" disabled={!writable || !consent || running || startState.isLoading} onClick={onStart} dataTestId="issuebench-start">
+					<Button
+						size="sm"
+						disabled={!writable || !consent || running || startState.isLoading || blocked !== ""}
+						title={blocked ? t(blocked === "worker" ? "readiness.startNoWorker" : "readiness.startNoGateway") : undefined}
+						onClick={onStart}
+						dataTestId="issuebench-start"
+					>
 						{running ? t("running") : t("start")}
 					</Button>
 					<span className="text-muted-foreground text-xs">{t("cost", { cost: data.cost_usd.toFixed(2) })}</span>
@@ -238,7 +294,25 @@ function IssueGrid({ run, writable, t }: { run: IssueRun; writable: boolean; t: 
 	);
 }
 
-function IssueRow({ runId, it, writable, t }: { runId: string; it: IssueItem; writable: boolean; t: T }) {
+/** A "Show log" toggle that opens the job's live log for the issue's current or last job. */
+export function IssueJobLog({ jobId, t, initialOpen = false }: { jobId: string; t: T; initialOpen?: boolean }) {
+	const [open, setOpen] = useState(initialOpen);
+	return (
+		<div className="flex flex-col gap-1">
+			<button
+				type="button"
+				className="text-primary w-fit text-left underline"
+				onClick={() => setOpen(!open)}
+				data-testid={`issuebench-log-toggle-${jobId}`}
+			>
+				{open ? t("hideLog") : t("showLog")}
+			</button>
+			{open && <JobLogPanel jobId={jobId} onClose={() => setOpen(false)} />}
+		</div>
+	);
+}
+
+export function IssueRow({ runId, it, writable, t }: { runId: string; it: IssueItem; writable: boolean; t: T }) {
 	const [review, reviewState] = useReviewIssueMutation();
 	const [retry, retryState] = useRetryIssueMutation();
 	const [editing, setEditing] = useState(false);
@@ -255,17 +329,23 @@ function IssueRow({ runId, it, writable, t }: { runId: string; it: IssueItem; wr
 		}
 	};
 	const onFix = (fix: IssueFix) => {
-		const answer = fix === "retry" ? "" : window.prompt(t(`fixPrompt.${fix}`));
+		const answer = fix === "retry" || fix === "open_workers" ? "" : window.prompt(t(`fixPrompt.${fix}`));
 		const body = retryBody(fix, answer);
 		if (body) void act(retry({ id: runId, issue, ...body }).unwrap());
 	};
 	const v = it.validation;
+	const stage = stageWords(it, t);
 	return (
 		<tr className="border-t align-top" data-testid={`issuebench-row-${issue}`}>
 			<td className="py-1 pr-2 tabular-nums">#{issue}</td>
 			<td className="py-1 pr-2">
 				{editing ? (
-					<textarea className="border-input w-full min-w-64 rounded-md border p-1" rows={5} value={text} onChange={(e) => setText(e.target.value)} />
+					<textarea
+						className="border-input w-full min-w-64 rounded-md border p-1"
+						rows={5}
+						value={text}
+						onChange={(e) => setText(e.target.value)}
+					/>
 				) : (
 					it.candidate.issue_title
 				)}
@@ -273,7 +353,13 @@ function IssueRow({ runId, it, writable, t }: { runId: string; it: IssueItem; wr
 			<td className="py-1 pr-2">{it.version}</td>
 			<td className="py-1 pr-2">
 				<span data-testid={`issuebench-status-${issue}`}>{t(`status.${it.status}`)}</span>
+				{stage && (
+					<div className="text-muted-foreground" data-testid={`issuebench-stage-${issue}`}>
+						{stage}
+					</div>
+				)}
 				{it.reason && <div className="text-muted-foreground">{it.reason}</div>}
+				{it.job_id && <IssueJobLog jobId={it.job_id} t={t} />}
 				{error && <div className="text-destructive">{error}</div>}
 			</td>
 			<td className="py-1 pr-2">{v ? t("tests", { f2p: v.fail_to_pass?.length ?? 0, p2p: v.pass_to_pass?.length ?? 0 }) : ""}</td>
@@ -281,13 +367,24 @@ function IssueRow({ runId, it, writable, t }: { runId: string; it: IssueItem; wr
 				<div className="flex flex-wrap gap-1">
 					{writable && it.status === "ready" && !editing && (
 						<>
-							<Button size="sm" disabled={busy} onClick={() => void act(review({ id: runId, issue, decision: "accept" }).unwrap())} dataTestId={`issuebench-accept-${issue}`}>
+							<Button
+								size="sm"
+								disabled={busy}
+								onClick={() => void act(review({ id: runId, issue, decision: "accept" }).unwrap())}
+								dataTestId={`issuebench-accept-${issue}`}
+							>
 								{t("accept")}
 							</Button>
 							<Button size="sm" variant="outline" disabled={busy} onClick={() => setEditing(true)}>
 								{t("edit")}
 							</Button>
-							<Button size="sm" variant="outline" disabled={busy} onClick={() => void act(review({ id: runId, issue, decision: "reject" }).unwrap())} dataTestId={`issuebench-reject-${issue}`}>
+							<Button
+								size="sm"
+								variant="outline"
+								disabled={busy}
+								onClick={() => void act(review({ id: runId, issue, decision: "reject" }).unwrap())}
+								dataTestId={`issuebench-reject-${issue}`}
+							>
 								{t("reject")}
 							</Button>
 						</>
@@ -296,14 +393,29 @@ function IssueRow({ runId, it, writable, t }: { runId: string; it: IssueItem; wr
 						<Button
 							size="sm"
 							disabled={busy}
-							onClick={() => void act(review({ id: runId, issue, decision: "edit", instruction: text }).unwrap().then(() => setEditing(false)))}
+							onClick={() =>
+								void act(
+									review({ id: runId, issue, decision: "edit", instruction: text })
+										.unwrap()
+										.then(() => setEditing(false)),
+								)
+							}
 						>
 							{t("save")}
 						</Button>
 					)}
+					{it.status === "failed" && it.fix === "open_workers" && (
+						<WorkersLink testId={`issuebench-open-workers-${issue}`}>{t("fix.open_workers")}</WorkersLink>
+					)}
 					{writable && it.status === "failed" && it.fix && (
-						<Button size="sm" variant="outline" disabled={busy} onClick={() => onFix(it.fix as IssueFix)} dataTestId={`issuebench-fix-${issue}`}>
-							{t(`fix.${it.fix}`)}
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={busy}
+							onClick={() => onFix(it.fix as IssueFix)}
+							dataTestId={`issuebench-fix-${issue}`}
+						>
+							{t(it.fix === "open_workers" ? "fix.retry" : `fix.${it.fix}`)}
 						</Button>
 					)}
 				</div>
