@@ -90,6 +90,8 @@ export interface AnnotationItem {
 	task: string;
 	question?: string;
 	answer: string;
+	/** Where a run's answer was read (N72): the answer file, the files the agent wrote, or its final message. */
+	answer_from?: AnnotationAnswerFrom;
 	run_id?: string;
 	experiment?: string;
 	agent?: string;
@@ -132,6 +134,20 @@ export interface PairKappa {
 	items: number;
 	kappa: number | null;
 	agree: number;
+}
+
+export type AnnotationAnswerFrom = "answer" | "files" | "final_message";
+
+/** One member who can be named as a labeller: GET /annotation/people. */
+export interface AnnotationPerson {
+	user_id: string;
+	name: string;
+}
+
+/** GET /annotation/people: members by display name; `local` on a server with no members list. */
+export interface AnnotationPeople {
+	people: AnnotationPerson[];
+	local?: boolean;
 }
 
 export interface AnnotationAgreement {

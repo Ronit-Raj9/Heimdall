@@ -6,6 +6,7 @@ import type {
 	AnnotationLabel,
 	AnnotationLabelResult,
 	AnnotationNext,
+	AnnotationPeople,
 	AnnotationQueue,
 	AnnotationQueueList,
 	AnnotationQueueRequest,
@@ -93,6 +94,10 @@ export const annotationApi = benchApi.enhanceEndpoints({ addTagTypes: ["Annotati
 			}),
 			invalidatesTags: (_r, _e, { id }) => queueTags(id),
 		}),
+		// The members a queue can name as labellers (N168); names only, never emails.
+		getAnnotationPeople: builder.query<AnnotationPeople, void>({
+			query: () => "/annotation/people",
+		}),
 		getAnnotationAgreement: builder.query<AnnotationAgreement, string>({
 			query: (id) => `${queuePath(id)}/agreement`,
 			providesTags: (_r, _e, id) => [{ type: "AnnotationQueues", id: `${id}/agreement` }],
@@ -139,6 +144,7 @@ export const {
 	useLabelAnnotationItemMutation,
 	useResolveAnnotationItemMutation,
 	useGetAnnotationAgreementQuery,
+	useGetAnnotationPeopleQuery,
 	useGetDatasetVersionsQuery,
 	useGetDataPolicyQuery,
 	useSetDataPolicyMutation,

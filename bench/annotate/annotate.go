@@ -104,10 +104,14 @@ type Queue struct {
 
 // Item is one thing to label.
 type Item struct {
-	ID           string   `json:"id"`
-	Task         string   `json:"task"`
-	Question     string   `json:"question,omitempty"`
-	Answer       string   `json:"answer"`
+	ID       string `json:"id"`
+	Task     string `json:"task"`
+	Question string `json:"question,omitempty"`
+	Answer   string `json:"answer"`
+	// AnswerFrom says where a run's answer was read (AnswerFromFile,
+	// AnswerFromFiles or AnswerFromFinalMessage); empty for items added
+	// directly.
+	AnswerFrom   string   `json:"answer_from,omitempty"`
 	RunID        string   `json:"run_id,omitempty"`
 	Experiment   string   `json:"experiment,omitempty"`
 	Agent        string   `json:"agent,omitempty"`
@@ -698,4 +702,83 @@ func (s *Store) SetCalibration(id, itemID, calID, calErr string) error {
 		return nil
 	})
 	return err
+}
+
+// Where a run's answer was read, in the order they are tried (N72): the
+// answer file the run exported, the files the agent wrote (its workspace
+// diff, AnswerFromDiff), the agent's final message.
+const (
+	AnswerFromFile         = "answer"
+	AnswerFromFiles        = "files"
+	AnswerFromFinalMessage = "final_message"
+)
+
+// AnswerFromDiff turns a run's workspace diff into the text a person
+// labels. When every file in the diff is new, it is each file's path, a
+// colon and its content, files separated by a blank line. Any other diff
+// (a changed or deleted file, text outside a file block) is returned as it
+// is. Blank input gives "". It is deterministic and calls no model.
+func AnswerFromDiff(diff []byte) string {
+	text := string(diff)
+	if strings.TrimSpace(text) == "" {
+		return ""
+	}
+	type newFile struct {
+		path  string
+		lines []string
+	}
+	var files []*newFile
+	var cur *newFile
+	isNew, inHunk := false, false
+	done := func() bool { return cur == nil || isNew }
+	for _, line := range strings.Split(strings.TrimSuffix(text, "\n"), "\n") {
+		if rest, ok := strings.CutPrefix(line, "diff --git "); ok {
+			if !done() {
+				return text
+			}
+			p := rest
+			if i := strings.LastIndex(rest, " b/"); i >= 0 {
+				p = rest[i+3:]
+			}
+			cur = &newFile{path: p}
+			files = append(files, cur)
+			isNew, inHunk = false, false
+			continue
+		}
+		if cur == nil {
+			return text
+		}
+		if !inHunk {
+			switch {
+			case strings.HasPrefix(line, "new file mode"), line == "--- /dev/null":
+				isNew = true
+			case strings.HasPrefix(line, "+++ b/"):
+				cur.path = strings.TrimPrefix(line, "+++ b/")
+			case strings.HasPrefix(line, "@@"):
+				inHunk = true
+			}
+			continue
+		}
+		switch {
+		case strings.HasPrefix(line, "+"):
+			cur.lines = append(cur.lines, line[1:])
+		case strings.HasPrefix(line, "@@"), strings.HasPrefix(line, "\\"):
+		default:
+			return text // a context or removed line: not a new file
+		}
+	}
+	if len(files) == 0 || !done() {
+		return text
+	}
+	var b strings.Builder
+	for i, f := range files {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString(f.path + ":\n")
+		for _, l := range f.lines {
+			b.WriteString(l + "\n")
+		}
+	}
+	return b.String()
 }
