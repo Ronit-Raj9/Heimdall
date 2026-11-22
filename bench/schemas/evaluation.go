@@ -75,7 +75,22 @@ type EvaluationSpec struct {
 	// Preset names the size preset the wizard started from (quick, standard,
 	// thorough); informational, the numbers above are what runs.
 	Preset string `json:"preset,omitempty"`
+	// BifrostCache makes Bifrost's semantic cache the test variable
+	// ("Bifrost cache on vs off"): score mode only, the one arm runs with
+	// the cache off and the server adds a second arm, identical except that
+	// every model request sends a semantic cache key (direct mode, scoped
+	// to the task, 1 hour TTL), so the report can show the hit rate and the
+	// latency, cost and quality change the cache brings
+	// (bifrostfeatures.CacheAB).
+	BifrostCache bool `json:"bifrost_cache,omitempty"`
 }
+
+// EvaluationCacheArm is the arm id of the cache-on copy an evaluation with
+// BifrostCache adds; the spec's own arm is the cache-off arm.
+const EvaluationCacheArm = "cache"
+
+// EvaluationCacheSuffix ends the label of that arm.
+const EvaluationCacheSuffix = " (Bifrost cache on)"
 
 // EvaluationGate is what an evaluation must show to pass. Scores are
 // verified success rates (0 to 1) over clean runs, per capability.

@@ -17,19 +17,20 @@ import (
 
 // B2 Bifrost features under test (docs/bifrost-features.md).
 
-const bifrostUsage = `usage: bifrost-bench bifrost cache-replays -exp <id> [-config deploy/bench.yaml] [-json]
+const bifrostUsage = `usage: bifrost-bench bifrost cache-replays|cache-ab -exp <id> [-config deploy/bench.yaml] [-json]
+cache-ab: for a "Bifrost cache on vs off" evaluation child, compares the cache-off arm with the cache-on arm on the clean tasks both ran: cache hit rate, mean latency per model request, cost saved and success change.
 Traces every semantic cache hit of an experiment's sealed runs to the run that stored the cached entry (Bifrost's cache_id) and counts hits by scope: the same run, another trial or arm of the same task, or another task (a cross-task replay). Reads the run folders only; no gateway is needed.`
 
 func init() {
-	register("bifrost", "Bifrost features under test: cache-replays -exp <id>", runBifrostCmd)
+	register("bifrost", "Bifrost features under test: cache-replays|cache-ab -exp <id>", runBifrostCmd)
 }
 
 func runBifrostCmd(args []string) int {
-	if len(args) == 0 || args[0] != "cache-replays" {
+	if len(args) == 0 || (args[0] != "cache-replays" && args[0] != "cache-ab") {
 		fmt.Fprintln(os.Stderr, bifrostUsage)
 		return exitUsage
 	}
-	fs := flag.NewFlagSet("bifrost cache-replays", flag.ContinueOnError)
+	fs := flag.NewFlagSet("bifrost "+args[0], flag.ContinueOnError)
 	config := fs.String("config", defaultConfig, "bench config; its runs_root is read")
 	exp := fs.String("exp", "", "experiment id")
 	asJSON := fs.Bool("json", false, "print JSON")
@@ -42,6 +43,13 @@ func runBifrostCmd(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
+	if args[0] == "cache-ab" {
+		runs, err := experimentCacheRuns(ctx, a.store, *exp)
+		if err != nil {
+			return fail("cache on vs off: %v", err)
+		}
+		return printCacheAB(os.Stdout, *exp, bifrostfeatures.CacheAB(runs, cacheOffArm(runs), schemas.EvaluationCacheArm), *asJSON)
+	}
 	runs, err := experimentRows(ctx, a.store, *exp)
 	if err != nil {
 		return fail("cache replays: %v", err)
@@ -51,13 +59,26 @@ func runBifrostCmd(args []string) int {
 
 // experimentRows reads every counted sealed run's gateway rows.
 func experimentRows(ctx context.Context, st *store.FSStore, expID string) ([]bifrostfeatures.RunRows, error) {
+	runs, err := experimentCacheRuns(ctx, st, expID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]bifrostfeatures.RunRows, 0, len(runs))
+	for _, r := range runs {
+		out = append(out, r.RunRows)
+	}
+	return out, nil
+}
+
+// experimentCacheRuns reads every counted sealed run's gateway rows, verified
+// success and cost.
+func experimentCacheRuns(ctx context.Context, st *store.FSStore, expID string) ([]bifrostfeatures.CacheRun, error) {
 	sealed, err := st.SealedRuns(ctx, expID, store.GradeSourceOriginal)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]bifrostfeatures.RunRows, 0, len(sealed))
+	out := make([]bifrostfeatures.CacheRun, 0, len(sealed))
 	for _, r := range sealed {
-		rr := bifrostfeatures.RunRows{RunID: r.Run.RunID, Task: r.Slot.Task, Arm: r.Slot.Arm, Condition: r.Slot.Condition, Trial: r.Slot.Trial}
 		raw, err := os.ReadFile(filepath.Join(r.Dir, "evidence.json"))
 		if err != nil {
 			return nil, fmt.Errorf("run %s: %w", r.Run.RunID, err)
@@ -66,12 +87,44 @@ func experimentRows(ctx context.Context, st *store.FSStore, expID string) ([]bif
 		if err := json.Unmarshal(raw, &ev); err != nil {
 			return nil, fmt.Errorf("run %s: evidence.json: %w", r.Run.RunID, err)
 		}
+		var rows []schemas.GatewayRequest
 		if ev.Requests != nil {
-			rr.Rows = ev.Requests.Requests
+			rows = ev.Requests.Requests
 		}
-		out = append(out, rr)
+		out = append(out, bifrostfeatures.CacheRunOf(r, rows))
 	}
 	return out, nil
+}
+
+// cacheOffArm is the arm of runs that is not the cache-on arm (the
+// evaluation's own arm, "A" by default).
+func cacheOffArm(runs []bifrostfeatures.CacheRun) string {
+	for _, r := range runs {
+		if r.Arm != schemas.EvaluationCacheArm {
+			return r.Arm
+		}
+	}
+	return "A"
+}
+
+func printCacheAB(w io.Writer, expID string, rep bifrostfeatures.CacheABReport, asJSON bool) int {
+	if asJSON {
+		b, err := json.MarshalIndent(rep, "", "  ")
+		if err != nil {
+			return fail("encode: %v", err)
+		}
+		fmt.Fprintf(w, "%s\n", b)
+		return exitOK
+	}
+	fmt.Fprintf(w, "experiment %s: Bifrost cache on vs off over %d task(s)\n", expID, rep.Tasks)
+	tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
+	fmt.Fprintln(tw, "ARM\tRUNS\tREQUESTS\tCACHE HITS\tHIT RATE\tMEAN LATENCY MS\tCOST USD\tSUCCESS")
+	for _, a := range []bifrostfeatures.CacheArmStats{rep.Off, rep.On} {
+		fmt.Fprintf(tw, "%s\t%d\t%d\t%d\t%.0f%%\t%.0f\t%.4f\t%d/%d\n", a.Arm, a.Runs, a.Requests, a.CacheHits, a.HitRate*100, a.MeanLatencyMS, a.CostUSD, a.Successes, a.SuccessRuns)
+	}
+	_ = tw.Flush()
+	fmt.Fprintln(w, rep.Summary)
+	return exitOK
 }
 
 func printCacheReplays(w io.Writer, expID string, rep bifrostfeatures.ReplayReport, asJSON bool) int {

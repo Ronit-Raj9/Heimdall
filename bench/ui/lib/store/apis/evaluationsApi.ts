@@ -126,6 +126,8 @@ export interface EvaluationSpec {
 	concurrency?: number;
 	/** The size preset the wizard started from; the numbers above are what runs. */
 	preset?: EvaluationPresetId;
+	/** Bifrost cache on vs off (score mode): the server adds a second arm that is the same agent with Bifrost's semantic cache on. */
+	bifrost_cache?: boolean;
 }
 
 export type EvaluationPresetId = "quick" | "standard" | "thorough";

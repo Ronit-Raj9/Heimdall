@@ -30,6 +30,13 @@ beforeEach(() => {
 });
 
 describe("summaryLines", () => {
+	it("says when the Bifrost cache is the test variable", () => {
+		expect(summaryLines(spec({ bifrost_cache: true }))).toContain(
+			"Run each task with the Bifrost cache off and again with it on, and compare the two.",
+		);
+		expect(summaryLines(spec()).join(" ")).not.toMatch(/Bifrost cache/);
+	});
+
 	it("says an own-model arm runs on its own model", () => {
 		expect(summaryLines(spec({ arms: [{ label: "A", agent: "bot", model: "" }] }))[0]).toBe("Score bot on its own model.");
 	});
