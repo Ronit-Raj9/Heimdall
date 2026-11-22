@@ -151,6 +151,27 @@ except OSError:
 	if got := docker(t, ctx, "exec", desk, "python3", "-I", "-B", "-c", probe); !strings.Contains(got, "no egress") {
 		t.Errorf("egress probe: %s", got)
 	}
+
+	// Z03: an image with ffmpeg records the screen from the start of the
+	// session, shows a live JPEG and takes a person's input.
+	if exec.CommandContext(ctx, "docker", "exec", desk, "sh", "-c", "command -v ffmpeg").Run() != nil {
+		t.Log("image has no ffmpeg; recording checks skipped")
+		return
+	}
+	frame := docker(t, ctx, "exec", desk, "python3", "-I", "-B", "/opt/desktop/desktop.py", "frame")
+	if !strings.HasPrefix(frame, "\xff\xd8\xff") {
+		t.Errorf("live frame is not a JPEG: %q", frame[:min(len(frame), 8)])
+	}
+	in := exec.CommandContext(ctx, "docker", "exec", "-i", desk, "python3", "-I", "-B", "/opt/desktop/desktop.py", "input")
+	in.Stdin = strings.NewReader(`{"action":"click","x":480,"y":300,"frame_w":960,"frame_h":600}`)
+	if out, err := in.CombinedOutput(); err != nil || !strings.Contains(string(out), "(640, 400)") {
+		t.Errorf("input: %v %s", err, out)
+	}
+	docker(t, ctx, "exec", desk, "python3", "-I", "-B", "/opt/desktop/desktop.py", "stop-recording")
+	rec := docker(t, ctx, "exec", desk, "sh", "-c", "stat -c '%n %s' /tmp/desktop/rec/desktop.mp4 /tmp/desktop/rec/desktop.mp4.start")
+	if !strings.Contains(rec, "desktop.mp4.start") || strings.Contains(rec, "desktop.mp4 0\n") {
+		t.Errorf("recording files: %s", rec)
+	}
 }
 
 func docker(t *testing.T, ctx context.Context, args ...string) string {

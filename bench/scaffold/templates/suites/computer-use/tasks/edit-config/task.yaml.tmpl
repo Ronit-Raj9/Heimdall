@@ -35,6 +35,22 @@ services:
       # The desktop's final state as one JSON document (see desktop.py).
       - id: state.json
         argv: ["python3", "-I", "/opt/desktop/desktop.py", "dump"]
+    # Recordings: the screen video ffmpeg writes from the start of the
+    # session (2 frames a second). After the state dump, the stop command
+    # finishes the file; it is copied into the run at recordings/desktop/,
+    # sealed with it and shown on the run page next to the trace. The
+    # verifier never sees it.
+    recordings:
+      stop: ["python3", "-I", "/opt/desktop/desktop.py", "stop-recording"]
+      files:
+        - {id: screen, path: /tmp/desktop/rec, kind: video}
+    # Live view: the run page shows the screen while the agent works (a JPEG
+    # every 2 s, display only). In a debug run a person may take control
+    # with the input command; the run is then marked human assisted and
+    # never counted.
+    live:
+      frame: ["python3", "-I", "/opt/desktop/desktop.py", "frame"]
+      input: ["python3", "-I", "/opt/desktop/desktop.py", "input"]
 verifier:
   tests: verifier/tests
   required: []

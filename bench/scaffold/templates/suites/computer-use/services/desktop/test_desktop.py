@@ -205,5 +205,50 @@ class DumpTest(unittest.TestCase):
         self.assertIn("error", desktop.parse_ini("[a\nb"))
 
 
+class HumanInputTest(unittest.TestCase):
+    """A person's input in a debug run (desktop.py input): the agent's own
+    tools perform it, and a click read off a smaller live frame is scaled to
+    the screen."""
+
+    def run_input(self, action):
+        calls = []
+        tools = desktop.TOOLS
+        desktop.TOOLS = [{"name": t["name"], "handler": (lambda name: lambda args: calls.append((name, args)) or "ok")(t["name"])} for t in tools]
+        stdin = sys.stdin
+        try:
+            import io
+            sys.stdin = io.StringIO(json.dumps(action))
+            with open(os.devnull, "w") as null:
+                out, sys.stdout = sys.stdout, null
+                try:
+                    code = desktop.human_input()
+                finally:
+                    sys.stdout = out
+        finally:
+            desktop.TOOLS, sys.stdin = tools, stdin
+        return code, calls
+
+    def test_click_scaled_from_frame(self):
+        os.environ["DESKTOP_SIZE"] = "1280x800"
+        code, calls = self.run_input({"action": "click", "x": 480, "y": 300, "frame_w": 960, "frame_h": 600})
+        self.assertEqual(code, 0)
+        self.assertEqual(calls, [("click", {"x": 640, "y": 400})])
+
+    def test_scroll_defaults_to_centre(self):
+        os.environ["DESKTOP_SIZE"] = "1280x800"
+        code, calls = self.run_input({"action": "scroll", "direction": "down"})
+        self.assertEqual(code, 0)
+        self.assertEqual(calls, [("scroll", {"direction": "down", "x": 640, "y": 400})])
+
+    def test_unknown_action(self):
+        with open(os.devnull, "w") as null:
+            err, sys.stderr = sys.stderr, null
+            try:
+                code, calls = self.run_input({"action": "shell", "text": "rm -rf /"})
+            finally:
+                sys.stderr = err
+        self.assertEqual((code, calls), (2, []))
+
+
 if __name__ == "__main__":
     unittest.main()

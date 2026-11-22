@@ -555,6 +555,8 @@ export interface Run {
 	hardware?: HardwareRecord;
 	/** X20b: a replay, fork or breakpoint run's link to the run it came from (lib/types/runDebug.ts). */
 	debug?: RunDebugInfo;
+	/** Z03: a person took control of this debug run; it never counts (schemas/recordings.go). */
+	human_assisted?: boolean;
 }
 
 /** run.json debug (schemas/debug.go): where a debug run came from. lib/types/runDebug.ts re-exports it as RunDebug. */

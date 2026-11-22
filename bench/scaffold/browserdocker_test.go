@@ -126,6 +126,23 @@ except OSError as e:
 		t.Fatalf("browser egress check: %v %s", err, out)
 	}
 
+	// Z03: the live screen shows the page the reference used, and a
+	// person's input reaches it.
+	ls, ok := env.(schemas.LiveScreen)
+	if !ok {
+		t.Fatal("docker workspace shows no live screen")
+	}
+	if got := ls.LiveServices(rc); len(got) != 1 || got[0].ID != "browser" || !got[0].Takeover {
+		t.Fatalf("live services %+v", got)
+	}
+	img, mime, err := ls.LiveFrame(ctx, rc, "browser")
+	if err != nil || mime != "image/jpeg" || len(img) < 100 {
+		t.Fatalf("live frame: %v %s %d bytes", err, mime, len(img))
+	}
+	if err := ls.LiveInput(ctx, rc, "browser", schemas.HumanAction{Action: schemas.HumanScroll, Direction: "down"}); err != nil {
+		t.Fatalf("live input: %v", err)
+	}
+
 	files, err := svc.ExportState(ctx, rc)
 	if err != nil || len(files) != 1 || files[0].Error != "" {
 		t.Fatalf("export state: %v %+v", err, files)
@@ -144,6 +161,33 @@ except OSError as e:
 		if reward := readFile(t, filepath.Join(gout, "reward.json")); !strings.Contains(reward, `"reward": 1`) {
 			t.Fatalf("reward %s", reward)
 		}
+	}
+
+	// Z03: the browser's video, HAR and console are in recordings/, not in
+	// state/ where the verifier reads.
+	idx := readFile(t, filepath.Join(rc.Dir, schemas.RecordingsDir, schemas.RecordingsIndexFile))
+	kinds := map[string]schemas.RecordingRecord{}
+	for _, line := range strings.Split(strings.TrimSpace(idx), "\n") {
+		var r schemas.RecordingRecord
+		if err := json.Unmarshal([]byte(line), &r); err != nil {
+			t.Fatalf("recordings index line %q: %v", line, err)
+		}
+		if r.Error != "" {
+			t.Errorf("recording %s/%s: %s", r.Service, r.ID, r.Error)
+		}
+		kinds[r.Kind] = r
+	}
+	if v := kinds[schemas.RecordingVideo]; v.File == "" || v.Bytes < 1000 || v.StartedAt.IsZero() || v.Mime != "video/webm" {
+		t.Errorf("video record %+v", v)
+	}
+	if h := kinds[schemas.RecordingHAR]; h.File == "" || !strings.Contains(readFile(t, filepath.Join(rc.Dir, schemas.RecordingsDir, "browser", h.File)), "webapp:8000") {
+		t.Errorf("HAR record %+v", h)
+	}
+	if _, ok := kinds[schemas.RecordingConsole]; !ok {
+		t.Error("no console record")
+	}
+	if entries, _ := os.ReadDir(filepath.Join(rc.Dir, "state", "browser")); len(entries) != 0 {
+		t.Errorf("recordings leaked into the verifier's state: %v", entries)
 	}
 
 	f, err := os.Open(filepath.Join(rc.Dir, "tools.jsonl"))

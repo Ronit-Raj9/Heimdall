@@ -71,6 +71,9 @@ type SlotInput struct {
 	// lease (G01, remotecreds.go). Non-nil, they are the run's only secret
 	// source; nil, the registry's Secrets source resolves them.
 	Secrets map[string]string
+	// Live takes the run's live screen frames and returns a person's queued
+	// inputs (Z03, livescreen.go); nil publishes to the local hub.
+	Live LiveSink
 }
 
 // SlotResult is a finished run.

@@ -33,6 +33,8 @@ import { HoldPanel } from "@/components/runs/debug/holdPanel";
 import { TraceDiff } from "@/components/runs/debug/traceDiff";
 import { formatDuration } from "@/components/runs/traceView.utils";
 import { ScreenReplay, useRunFrames } from "@/components/runs/screenReplay"; // U08 screen replay
+import { LiveScreen } from "@/components/runs/liveScreen"; // Z03 live screen and takeover
+import { RecordingTab, useRunRecordings } from "@/components/runs/recordingPlayer"; // Z03 recordings
 import { RunServiceLogs } from "@/components/services/serviceLogs"; // X2
 import { EmptyState } from "@/components/shell/emptyState";
 import { EntityLink } from "@/components/shell/entityLink";
@@ -88,6 +90,8 @@ export default function RunView({ runId }: { runId: string }) {
   const voice = useGetRunVoiceQuery(runId, { skip: !detail.data });
   const { t: tReplay } = useTranslation("replay"); // U08
   const frames = useRunFrames(runId, detail.data ? !detail.data.sealed : false); // U08
+  const { t: tRec } = useTranslation("recordings"); // Z03
+  const recordings = useRunRecordings(runId, !detail.data?.sealed); // Z03: recordings exist once the run is exported
 
   if (detail.isLoading) return <BlockSkeleton rows={8} testId="run-loading" />;
   if (detail.error || !detail.data) {
@@ -129,6 +133,7 @@ export default function RunView({ runId }: { runId: string }) {
     testId: `run-tab-${id}`,
   }));
   if (frames.data?.frames.length) tabs.splice(2, 0, { id: "replay", label: tReplay("tab"), testId: "run-tab-replay" }); // U08
+  if (recordings.data?.recordings.length) tabs.splice(2, 0, { id: "recording", label: tRec("tab"), testId: "run-tab-recording" }); // Z03
 
   return (
     <div
@@ -159,6 +164,11 @@ export default function RunView({ runId }: { runId: string }) {
             {d.sealed ? (
               <>
                 <OutcomeBadge outcome={run.outcome} testId="run-outcome" />
+                {run.human_assisted && (
+                  <span className="text-chart-warning-ink text-xs" title={tRec("humanAssistedNote")} data-testid="run-human-assisted">
+                    {tRec("humanAssisted")}
+                  </span>
+                )}
                 {run.agent.oom_killed && run.outcome === "infra_error" && (
                   <span className="text-muted-foreground text-xs" data-testid="run-excluded-oom">
                     {t("runs.excludedOutOfMemory", { defaultValue: "excluded: out of memory" })}
@@ -234,6 +244,8 @@ export default function RunView({ runId }: { runId: string }) {
         {(active) =>
           active === "replay" ? (
             <ScreenReplay runId={runId} live={!d.sealed} />
+          ) : active === "recording" ? (
+            <RecordingTab runId={runId} />
           ) : (
             <RunTab tab={active as RunTabId} detail={d} agents={agents.data} />
           )
@@ -293,6 +305,7 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
   const { run, slot, grade } = detail;
   return (
     <div className="flex flex-col gap-8" data-testid="run-overview">
+      {!detail.sealed && <LiveScreen runId={run.run_id} />}
       <RunFailureCard run={run} />
       <div className="flex flex-col gap-4" data-testid="run-summary">
         <div className="flex flex-wrap items-center gap-2">

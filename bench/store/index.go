@@ -23,6 +23,7 @@ const GradeSourceOriginal = "original"
 // runFileAllowlist is every run file the API may serve. Names are plain file
 // names, so a lookup can never leave the run folder.
 var runFileAllowlist = map[string]bool{
+	"human_actions.jsonl":    true, // Z03: a person's inputs in a debug run (schemas/recordings.go)
 	"run.json":               true,
 	"agent.stream.jsonl":     true,
 	"agent.stderr.txt":       true,

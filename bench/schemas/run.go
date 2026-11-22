@@ -139,6 +139,10 @@ type Run struct {
 	Practice bool            `json:"practice,omitempty"`
 	Hardware *HardwareRecord `json:"hardware,omitempty"` // X7: the GPUs a GPU task's run held (schemas/gpu.go); nil otherwise
 	Debug    *RunDebug       `json:"debug,omitempty"`    // a debug run's link to its source run (debug.go); nil otherwise
+	// HumanAssisted marks a debug run a person took control of (Z03,
+	// recordings.go): its inputs are in human_actions.jsonl, and like a
+	// practice run it never enters a verdict, report card or leaderboard.
+	HumanAssisted bool `json:"human_assisted,omitempty"`
 }
 
 // RunTiming records when the run passed its milestones.
