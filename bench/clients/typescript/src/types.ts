@@ -428,6 +428,19 @@ export interface JudgeRecord {
 	usd: Value;
 	/** Price snapshot the judge cost was priced from. */
 	price_ref?: string;
+	/** Custom judge prompt (custom-v1): each criterion's verdict and reason, the weighted share met and the share a pass needs. */
+	criteria?: JudgeCriterion[];
+	score?: number;
+	pass_at?: number;
+}
+
+/** One criterion of a custom judge prompt's verdict. */
+export interface JudgeCriterion {
+	id: string;
+	text: string;
+	weight: number;
+	met: boolean;
+	reason?: string;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -558,6 +571,8 @@ export interface Run {
 	hardware?: HardwareRecord;
 	/** X20b: a replay, fork or breakpoint run's link to the run it came from (lib/types/runDebug.ts). */
 	debug?: RunDebugInfo;
+	/** Z03: a person took control of this debug run; it never counts (schemas/recordings.go). */
+	human_assisted?: boolean;
 }
 
 /** run.json debug (schemas/debug.go): where a debug run came from. lib/types/runDebug.ts re-exports it as RunDebug. */
@@ -863,8 +878,12 @@ export interface Experiment {
 	requirements?: CapabilityRequirements;
 	smoke?: boolean;
 	scripted_upstream?: boolean;
+	/** Lets the suite's model judges call their real provider in a smoke or scripted_upstream experiment. */
+	paid_judge?: boolean;
 	/** live | record | replay: overrides every external API's mode for this experiment's runs. */
 	external?: string;
+	/** offline | replay | live-allowlisted: overrides every egress service's mode (recorded internet). */
+	egress?: string;
 	fairness?: string;
 	attribution?: Record<string, unknown>;
 	matrix?: Record<string, unknown>;
@@ -1927,11 +1946,34 @@ export interface ReleaseCapabilityScore {
 }
 
 /** Before (baseline) and after (candidate) of a release. */
+/** Whether a baseline from another evaluation ran the same benchmark version and tasks. */
+export interface DatasetComparison {
+	changed: boolean;
+	benchmarks: DatasetBenchmark[];
+	summary: string;
+}
+
+export interface DatasetBenchmark {
+	benchmark: string;
+	candidate_version?: string;
+	baseline_version?: string;
+	candidate_lock?: string;
+	baseline_lock?: string;
+	changed: boolean;
+	/** Tasks both sides ran with the same content. */
+	compared: number;
+	new_tasks: number;
+	dropped_tasks: number;
+	not_compared?: boolean;
+}
+
 export interface ReleaseSummary {
 	candidate: ReleaseSide;
 	baseline?: ReleaseSide;
 	capabilities?: ReleaseCapabilityScore[];
 	note?: string;
+	/** A baseline from another evaluation: whether the benchmark changed since (scores then use the shared tasks only). */
+	dataset?: DatasetComparison;
 }
 
 /** POST /releases */
@@ -2514,6 +2556,18 @@ export interface SuiteSummary {
 	fingerprint_drift?: FingerprintDrift[];
 	/** U3: the suite's tiers (docs/suite-tiers.md): pr, nightly, headroom first; nightly always listed. */
 	tiers?: SuiteTier[];
+	/** A judged suite's pinned judge and the judge calls its readiness check makes. */
+	judge?: SuiteJudge;
+}
+
+/** A judged suite's judge on the suites API. */
+export interface SuiteJudge {
+	provider: string;
+	model: string;
+	/** Calls per judged grade (votes, doubled with an auditor). */
+	votes: number;
+	/** About how many judge calls the readiness check of every task makes. */
+	readiness_calls: number;
 }
 
 /** U3: one tier of a suite, a named task subset an experiment picks with `tier:` (handlers/suitetiers.go). */
@@ -3711,7 +3765,8 @@ export type Role = "viewer" | "member" | "admin" | "owner";
 export type PrincipalKind = "user" | "token" | "runner" | "anonymous" | "local";
 
 /** auth.signup: who may create an account. */
-export type SignupPolicy = "invite" | "open" | "closed";
+/** Who may sign up from the web (auth/signupmode.go). allowlist: an invitation, or an address at an allowed domain. */
+export type SignupPolicy = "invite" | "allowlist" | "open" | "closed";
 
 /** A time from a platform route: RFC 3339, or unix milliseconds. */
 export type PlatformTime = string | number;
@@ -3754,8 +3809,10 @@ export interface AuthMe {
 	role?: Role;
 	/** Session CSRF value: sent as X-Heimdall-CSRF on every cookie-authenticated write. */
 	csrf?: string;
-	/** A user listed in HEIMDALL_SERVER_ADMINS (auth/serveradmin.go). */
+	/** A server admin: listed by user id, granted from the CLI, or a verified listed email (auth/serveradmin.go). */
 	server_admin?: boolean;
+	/** Set for a signed-in user: whether their email is verified (auth/verify.go). Absent on older servers. */
+	email_verified?: boolean;
 }
 
 /** GET /auth/config (auth.AuthInfo): what the sign-in page offers, answered to anyone. */
@@ -3769,7 +3826,14 @@ export interface AuthConfig {
 	captcha?: boolean;
 	/** hCaptcha site key for the sign-up widget. */
 	captcha_site_key?: string;
+	/** Under signup allowlist: the email domains that may sign up without an invitation. */
+	signup_domains?: string[];
+	/** email: verification links are mailed; log: they go to the server log and the server admin passes them on. */
+	email_delivery?: EmailDelivery;
 }
+
+/** Where verification links go (auth/verify.go). */
+export type EmailDelivery = "email" | "log";
 
 /** POST /auth/login. */
 export interface LoginRequest {
@@ -4045,6 +4109,8 @@ export interface Job {
 	attempt: number;
 	lease_owner?: string;
 	lease_until?: PlatformTime;
+	/** Claim order among equally loaded organizations, -10 to 10; absent is 0 (POST /jobs/{id}/priority). */
+	priority?: number;
 }
 
 /** GET /jobs (handlers/jobs.go JobList): newest first, and the kinds POST /jobs accepts. */
@@ -4188,6 +4254,8 @@ export interface InboxItem {
 	tools?: string[];
 	model?: string;
 	outcome: InboxOutcome;
+	/** A passing session sampled as a regression golden; its accept starts from "the recorded session was right". */
+	golden?: boolean;
 	/** Values removed before storage, counted by kind. Never the values. */
 	redacted?: Record<string, number>;
 	/** Set once accepted. */
@@ -4238,6 +4306,24 @@ export interface InboxItemDetail {
 	item: InboxItem;
 	/** Plain text to show as is. Never rendered as HTML. */
 	preview: string;
+	/** The redacted requests, tool calls and final answer, for the "what should have happened" form. */
+	session?: InboxSession;
+}
+
+/** One recorded tool call: arguments as JSON text, result cut short. */
+export interface InboxSessionCall {
+	seq: number;
+	tool: string;
+	args: string;
+	result?: string;
+	is_error: boolean;
+}
+
+/** The redacted session of an item, for the accept form. */
+export interface InboxSession {
+	requests: string[];
+	calls: InboxSessionCall[];
+	final_answer?: string;
 }
 
 /** The draft task an accept wrote. It still needs a person to finish, validate and admit it. */
@@ -4248,6 +4334,8 @@ export interface InboxDraft {
 	template: string;
 	/** Files with EDIT ME markers, relative to dir. */
 	edit_me: string[];
+	/** A guided accept wrote every file; only the readiness check is left. */
+	finished: boolean;
 	/** Next steps, in order. */
 	next: string[];
 	warnings?: string[];
@@ -4269,6 +4357,8 @@ export interface InboxIngestResult {
 	item_id: string;
 	created: boolean;
 	occurrences: number;
+	/** Passing sessions not kept: the source's daily golden sample was full. */
+	skipped?: number;
 }
 
 /** GET /inbox query. An absent or empty param is left out. */
@@ -4282,6 +4372,62 @@ export interface InboxAcceptRequest {
 	suite: string;
 	kind?: InboxTaskKind;
 	task_id?: string;
+	/** "What should have happened": with it the task is written finished, not as an EDIT ME draft. */
+	guide?: InboxGuide;
+	/** Move the benchmark to grader checks (a guided tool-use or mcp task needs it). */
+	switch_grader?: boolean;
+	/** Pins the judge a reply rubric needs. */
+	judge?: InboxJudge;
+}
+
+/** One tool call of a guide; args must be a subset of the call's arguments. */
+export interface InboxGuideCall {
+	tool: string;
+	args?: Record<string, unknown>;
+}
+
+/** What should have happened in a recorded session. */
+export interface InboxGuide {
+	/** Replaces the first user request; empty keeps it as sent. */
+	instruction?: string;
+	/** Adds the user's later messages to the instruction, in order. */
+	keep_turns?: boolean;
+	/** The recorded answer or tool calls were right (a golden). */
+	use_recorded?: boolean;
+	/** qa and memory: the right answer, one fact per entry. */
+	answers?: string[];
+	match?: "exact" | "contains_all" | "regex" | "numeric" | "choice";
+	wrong_answers?: string[];
+	recorded_wrong?: boolean;
+	/** tool-use and mcp: calls a correct agent makes, in order when ordered. */
+	calls?: InboxGuideCall[];
+	/** Calls it must never make. */
+	forbidden?: InboxGuideCall[];
+	ordered?: boolean;
+	/** Judged rubric for the final reply. */
+	reply_rubric?: string;
+}
+
+/** The judge of a reply rubric. */
+export interface InboxJudge {
+	provider: string;
+	model: string;
+}
+
+/** POST /inbox/accept body: several items into one benchmark with one shared guide. */
+export interface InboxBulkAcceptRequest {
+	ids: string[];
+	suite: string;
+	kind?: InboxTaskKind;
+	guide?: InboxGuide;
+	switch_grader?: boolean;
+	judge?: InboxJudge;
+}
+
+/** POST /inbox/accept answer: each item accepted, or why not. */
+export interface InboxBulkAcceptResult {
+	accepted: InboxAcceptResult[];
+	failed: { id: string; error: string }[];
 }
 
 /** POST /inbox/{id}/reject body. With duplicate_of the item becomes a duplicate. */
@@ -4726,7 +4872,14 @@ export type CanaryRunAcceptedResponse = WithMode<CanaryRunAccepted>;
 // W8 judge calibration (docs/judge-calibration.md, handlers/calibration.go).
 
 /** Calibration instrument and suite states. */
-export type CalibrationState = "calibrated" | "few_labels" | "uncalibrated" | "allowed_uncalibrated" | "unreliable" | "not_judged";
+export type CalibrationState =
+	| "calibrated"
+	| "calibrated_on_controls"
+	| "few_labels"
+	| "uncalibrated"
+	| "allowed_uncalibrated"
+	| "unreliable"
+	| "not_judged";
 
 /** k of n with its exact two-sided 95% interval; value, lo and hi are null when n is 0. */
 export interface CalibrationRate {
@@ -4827,6 +4980,8 @@ export interface JudgeCalibrationThresholds {
 	min_tnr: number;
 	min_labels: number;
 	max_age_days: number;
+	/** Fewest admission-control items for "calibrated on controls". */
+	min_controls: number;
 	/** "defaults" or the release policy file. */
 	source: string;
 }
@@ -4841,6 +4996,8 @@ export interface CalibrationStatus {
 	prompt_sha256?: string;
 	state: CalibrationState;
 	detail: string;
+	/** Judged verdicts are capped at INCONCLUSIVE in this state. */
+	caps: boolean;
 	set_sha256?: string;
 	labels: number;
 	human_labels: number;
@@ -4906,6 +5063,8 @@ export interface JudgeCalibrationVerdict {
 	record_hash?: string;
 	record_at?: string;
 	human_labels: number;
+	/** Admission-control items of the record. */
+	control_items?: number;
 	agreement?: CalibrationRate;
 	tnr?: CalibrationRate;
 	fpr?: CalibrationRate;

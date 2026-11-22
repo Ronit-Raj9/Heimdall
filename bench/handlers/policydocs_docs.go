@@ -27,8 +27,8 @@ func init() {
 			Summary: "Accept drafted tasks into the benchmark (one suite.yaml write, optionally switching to grader checks with a pinned reply judge) or reject them",
 			Auth:    AuthWrite, Request: PolicyReviewRequest{}, Response: PolicyReviewResult{}},
 		RouteDoc{Method: "GET", Path: base + "/{doc}/report", Tag: "suites",
-			Summary: "Compliance report of a policy document: per-clause pass rate with 95% ranges per agent, plain-words findings with example runs; format=json, markdown or pdf",
-			Query: []QueryDoc{{Name: "format", Description: "json (default), markdown or pdf"}, {Name: "exp", Description: "only the runs of this evaluation"}},
+			Summary:  "Compliance report of a policy document: per-clause pass rate with 95% ranges per agent, plain-words findings with example runs; format=json, markdown or pdf",
+			Query:    []QueryDoc{{Name: "format", Description: "json (default), markdown or pdf"}, {Name: "exp", Description: "only the runs of this evaluation"}},
 			Response: policyReportDoc{}, AlsoRaw: "application/pdf"},
 	)
 }

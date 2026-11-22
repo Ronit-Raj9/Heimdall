@@ -93,6 +93,9 @@
         "prompt_version": {"type": "string", "minLength": 1},
         "votes": {"type": "integer", "minimum": 1},
         "max_tokens": {"type": "integer", "minimum": 1},
+        "prompt_file": {"type": "string", "description": "Custom judge prompt (prompt_version custom-v1): the org's prompt file in the suite folder."},
+        "prompt_sha256": {"type": "string", "pattern": "^([0-9a-f]{64})?$", "description": "sha256 pin of prompt_file; a changed file refuses to grade until the pin is updated."},
+        "pass_at": {"type": ["number", "null"], "exclusiveMinimum": 0, "maximum": 1, "description": "Weighted share of the task's criteria a pass needs (default 1: every criterion)."},
         "auditor": {
           "type": "object",
           "additionalProperties": false,

@@ -13,5 +13,5 @@ func init() {
 	OrgPolicy[key("POST", api+"/connect/agent-file/check")] = org(member)
 	OrgPolicy[key("POST", api+"/otlp/v1/traces")] = deny("the hosted server takes traces per org: POST /api/bench/orgs/{org}/otlp/v1/traces with an ingest token (Agents, Connect from traces)")
 	PlatformPolicy[key("GET", api+"/github/repos/{owner}/{repo}/agent-file")] = org(member) // the repository's .heimdall/agent.yaml
-	PlatformPolicy[key("POST", api+"/orgs/{org}/otlp/v1/traces")] = public() // the handler checks the org's ingest token, rate limited per org
+	PlatformPolicy[key("POST", api+"/orgs/{org}/otlp/v1/traces")] = public()                // the handler checks the org's ingest token, rate limited per org
 }

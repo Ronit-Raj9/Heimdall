@@ -50,13 +50,14 @@ type TakeoverRequest struct {
 }
 
 type liveHandler struct {
-	mode schemas.Mode
-	hub  *livefeed.Hub
+	mode  schemas.Mode
+	hub   *livefeed.Hub
+	index ReadIndex // the org's runs: a run of another org answers 404, never "not live"
 }
 
 func init() {
 	RegisterOrgArea("liveview", func(env OrgEnv, r *router.Router) {
-		h := &liveHandler{mode: env.Mode, hub: livefeed.For(env.Services.OrgID)}
+		h := &liveHandler{mode: env.Mode, hub: livefeed.For(env.Services.OrgID), index: env.Services.Index}
 		p := APIPrefix + "/runs/{id}"
 		r.GET(p+"/live", env.R(h.getLive))
 		r.GET(p+"/live/frame", env.R(h.getLiveFrame))
@@ -90,15 +91,23 @@ func (h *liveHandler) runID(ctx *fasthttp.RequestCtx) (string, bool) {
 	return id, true
 }
 
-// getLive handles GET /api/bench/runs/{id}/live. A run that is not showing
-// its screen answers 200 with live false.
+// getLive handles GET /api/bench/runs/{id}/live. A run of the org that is
+// not showing its screen answers 200 with live false; a run the org's index
+// does not hold (another org's, or none) answers 404.
 func (h *liveHandler) getLive(ctx *fasthttp.RequestCtx) {
 	id, ok := h.runID(ctx)
 	if !ok {
 		return
 	}
 	out := RunLiveStatus{RunID: id}
-	if f, ok := h.hub.Frame(id); ok {
+	f, live := h.hub.Frame(id) // the hub is the org's own, so a frame means the run is the org's
+	if !live && h.index != nil {
+		if rv, ok := h.index.Run(id); !ok || rv == nil {
+			sendNotFound(ctx, h.mode, "run", id)
+			return
+		}
+	}
+	if live {
 		out.Live, out.Service, out.Mime, out.Debug, out.TakeoverOK = true, f.Service, f.Mime, f.Debug, f.TakeoverOK
 		out.At = f.At.UTC().Format(time.RFC3339Nano)
 		out.Pending = h.hub.Pending(id)

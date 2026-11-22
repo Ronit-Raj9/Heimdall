@@ -142,6 +142,11 @@ type gatewayUsageHandler struct {
 }
 
 func (h *gatewayUsageHandler) ingest(ctx *fasthttp.RequestCtx) {
+	if len(ctx.Request.Header.Peek("Authorization")) == 0 { // anonymous: 401 whether or not the ingest is on
+		lib.SendError(ctx, h.env.Mode, fasthttp.StatusUnauthorized, lib.ErrTypeUnauthorized,
+			"gateway usage ingest needs Authorization: Bearer <shared secret>")
+		return
+	}
 	secret := h.getenv(GatewayUsageSecretEnv)
 	if secret == "" {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable,

@@ -9,6 +9,7 @@ import tarfile
 import tempfile
 import threading
 import unittest
+from unittest import mock
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -115,8 +116,11 @@ class ServeTest(unittest.TestCase):
             serve("bot", lambda t: "x", url=self.url, token="tok")
 
     def test_needs_url_and_token(self):
-        with self.assertRaises(ValueError):
-            serve("bot", lambda t: "x", url="", token="")
+        # Empty url and token fall back to HEIMDALL_URL and HEIMDALL_TOKEN,
+        # which the contract test sets: clear them, or serve runs forever.
+        with mock.patch.dict(os.environ, {"HEIMDALL_URL": "", "HEIMDALL_TOKEN": ""}):
+            with self.assertRaises(ValueError):
+                serve("bot", lambda t: "x", url="", token="")
 
 
 if __name__ == "__main__":

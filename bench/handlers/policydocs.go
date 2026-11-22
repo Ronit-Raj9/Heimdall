@@ -60,15 +60,15 @@ type PolicyDocList struct {
 
 // PolicyDocView answers GET /suites/{id}/policy-docs/{doc} and the upload.
 type PolicyDocView struct {
-	Suite  string            `json:"suite"`
-	DryRun bool              `json:"dry_run,omitempty"`
-	Doc    *policybench.Doc  `json:"doc"`
-	Counts map[string]int    `json:"counts"`
-	Shape  string            `json:"shape,omitempty"`
+	Suite  string             `json:"suite"`
+	DryRun bool               `json:"dry_run,omitempty"`
+	Doc    *policybench.Doc   `json:"doc"`
+	Counts map[string]int     `json:"counts"`
+	Shape  string             `json:"shape,omitempty"`
 	Tools  []policybench.Tool `json:"tools,omitempty"`
-	Grader string            `json:"grader"`
-	Judged bool              `json:"judged"`
-	Next   string            `json:"next"`
+	Grader string             `json:"grader"`
+	Judged bool               `json:"judged"`
+	Next   string             `json:"next"`
 }
 
 // PolicyClausesRequest is the body of PUT /suites/{id}/policy-docs/{doc}/clauses.

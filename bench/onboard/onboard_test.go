@@ -203,8 +203,11 @@ func TestMappingNestedColumns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if inv.CanDraft {
-		t.Fatalf("unmapped nested rows drafted: %+v", inv)
+	// Y13's row mapper recognises the LangSmith-style inputs/outputs shape,
+	// so the nested columns map to question and expected without a manual
+	// mapping.
+	if !inv.CanDraft || len(inv.Samples) == 0 || inv.Samples[0].Fields["question"] != "Capital of France?" || inv.Samples[0].Fields["expected"] != "Paris" {
+		t.Fatalf("nested rows not auto-mapped: %+v", inv)
 	}
 	want := map[string]bool{"inputs.q": false, "outputs.gold": false}
 	for _, c := range inv.Columns {

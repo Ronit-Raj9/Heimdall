@@ -92,6 +92,7 @@ func TestAssignments(t *testing.T) {
 	d := dbtest.OpenSQLite(t)
 	def := quota.DefaultLimits
 	def.SharedPool = true
+	def.Runtime = quota.RuntimeRunc // the default is runsc now (Y04/Z10); these orgs run runc
 	q := quota.Open(d, quota.Options{Defaults: &def})
 	keys, err := keystore.Open(d, make([]byte, 32))
 	if err != nil {
@@ -212,6 +213,7 @@ func TestAutoApproval(t *testing.T) {
 	d := dbtest.OpenSQLite(t)
 	def := quota.DefaultLimits
 	def.SharedPool = true
+	def.Runtime = quota.RuntimeRunc // the default is runsc now (Y04/Z10); these orgs run runc
 	q := quota.Open(d, quota.Options{Defaults: &def})
 	images := &ImageStore{DB: d}
 	s := &Service{Quota: q, Minter: &fakeMinter{}, Images: images, Orgs: func(context.Context) ([]string, error) { return []string{"org1"}, nil }}
