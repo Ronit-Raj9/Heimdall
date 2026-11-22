@@ -75,7 +75,7 @@ func TestBuildSession(t *testing.T) {
 	}
 	cs := calls(t, dir)
 	guard := callWith(cs, "run -d --rm --name heimdall-build-org_a-s1-guard")
-	for _, want := range []string{"--network heimdall-buildnet", "--cap-drop ALL --cap-add NET_ADMIN", "--read-only",
+	for _, want := range []string{"--network heimdall-buildnet --network-alias hb-build-s1", "--cap-drop ALL --cap-add NET_ADMIN", "--read-only",
 		"--label heimdall.build-runner=shared-x", "--entrypoint /usr/local/bin/heimdall-build-egress heimdall/runner:local"} {
 		if !strings.Contains(guard, want) {
 			t.Errorf("guard %q lacks %q", guard, want)
@@ -93,7 +93,7 @@ func TestBuildSession(t *testing.T) {
 	// and both are removed afterwards (BuildKit first: it lives in the
 	// guard's network namespace).
 	order := []string{"volume create", "run -d --rm --name heimdall-build-org_a-s1-guard", "logs heimdall-build-org_a-s1-guard",
-		"run -d --rm --name heimdall-build-org_a-s1-buildkit", "buildx create --name heimdall-build-org_a-s1 --driver remote tcp://heimdall-build-org_a-s1-guard:1234",
+		"run -d --rm --name heimdall-build-org_a-s1-buildkit", "buildx create --name heimdall-build-org_a-s1 --driver remote tcp://hb-build-s1:1234",
 		"buildx inspect --bootstrap", "buildx build", "buildx rm -f heimdall-build-org_a-s1", "rm -f heimdall-build-org_a-s1-buildkit", "rm -f heimdall-build-org_a-s1-guard"}
 	i := 0
 	for _, c := range cs {
@@ -188,5 +188,19 @@ func TestBuildSessionCommandLine(t *testing.T) {
 		if code := runBuildSession(bad); code != exitUsage {
 			t.Errorf("%v: exit %d", bad, code)
 		}
+	}
+}
+
+// A real org id (org_ plus a 26 character ULID) makes the container names
+// longer than a 63 character DNS label, which Docker's resolver refuses, so
+// buildx never reached BuildKit (first real hosted run). buildx dials the
+// guard's short alias instead.
+func TestBuildSessionHostIsADNSLabel(t *testing.T) {
+	n := newSessionNames("org_01m81h3nbdpbtfyg8hw89nmz15", buildSessionID())
+	if len(n.guard) <= 63 {
+		t.Fatalf("test premise: guard name %q fits a label", n.guard)
+	}
+	if len(n.host) > 63 || strings.ContainsAny(n.host, "_.") {
+		t.Fatalf("host %q is not a DNS label", n.host)
 	}
 }

@@ -146,8 +146,8 @@ func ValidateTests(ctx context.Context, r TestRunner, env issuebench.EnvSpec, c 
 
 func tail(b []byte) string {
 	s := strings.TrimSpace(string(b))
-	if len(s) > 400 {
-		s = s[len(s)-400:]
+	if len(s) > 2000 {
+		s = s[len(s)-2000:]
 	}
 	return s
 }

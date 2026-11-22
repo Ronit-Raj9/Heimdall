@@ -179,11 +179,16 @@ func buildSessionID() string {
 // sessionNames are the docker object names of one session.
 type sessionNames struct {
 	id, guard, buildkit, builder, volume string
+	// host is the guard's network alias, the name buildx dials. The
+	// container names carry the org id and pass DNS's 63 character label
+	// limit for a real org id (org_ plus 26), which Docker's resolver then
+	// refuses ("Message too large").
+	host string
 }
 
 func newSessionNames(org, id string) sessionNames {
 	base := "heimdall-build-" + org + "-" + id
-	return sessionNames{id: id, guard: base + "-guard", buildkit: base + "-buildkit", builder: base,
+	return sessionNames{id: id, guard: base + "-guard", buildkit: base + "-buildkit", builder: base, host: "hb-build-" + id,
 		volume: "heimdall-buildcache-" + org}
 }
 
@@ -245,7 +250,7 @@ func (c *buildSessionConfig) start(ctx context.Context, d utils.Docker, env []st
 		return fmt.Errorf("build cache volume: %w", err)
 	}
 	guard := append([]string{"run", "-d", "--rm", "--name", n.guard}, labels...)
-	guard = append(guard, "--network", c.Network, "--user", "0:0", "--cap-drop", "ALL", "--cap-add", "NET_ADMIN",
+	guard = append(guard, "--network", c.Network, "--network-alias", n.host, "--user", "0:0", "--cap-drop", "ALL", "--cap-add", "NET_ADMIN",
 		"--security-opt", "no-new-privileges:true", "--read-only", "--tmpfs", "/run", "--tmpfs", "/tmp",
 		"--memory", "64m", "--pids-limit", "64", "--entrypoint", buildGuardEntry, c.GuardImage)
 	if _, err := d.MustRun(ctx, guard...); err != nil {
@@ -269,7 +274,7 @@ func (c *buildSessionConfig) start(ctx context.Context, d utils.Docker, env []st
 	if _, err := d.MustRun(ctx, bk...); err != nil {
 		return fmt.Errorf("start the build's BuildKit: %w", err)
 	}
-	if _, err := d.MustRunEnv(ctx, env, "buildx", "create", "--name", n.builder, "--driver", "remote", "tcp://"+n.guard+":1234"); err != nil {
+	if _, err := d.MustRunEnv(ctx, env, "buildx", "create", "--name", n.builder, "--driver", "remote", "tcp://"+n.host+":1234"); err != nil {
 		return fmt.Errorf("connect to the build's BuildKit: %w", err)
 	}
 	deadline := time.Now().Add(buildkitTimeout)
