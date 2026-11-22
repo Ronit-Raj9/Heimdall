@@ -1,6 +1,16 @@
 // Integrations area (web parity L19, handlers/integrations.go).
 
-export type WebhookEventType = "experiment.finished" | "job.failed";
+export type WebhookEventType =
+	| "evaluation.finished"
+	| "evaluation.regressed"
+	| "release.blocked"
+	| "schedule.failed"
+	| "worker.offline"
+	| "experiment.finished"
+	| "job.failed";
+
+/** What a hook's receiver gets: the signed JSON event, or a Slack, Microsoft Teams or PagerDuty message. */
+export type WebhookFormat = "json" | "slack" | "teams" | "pagerduty";
 
 export interface WebhookDelivery {
 	id: string;
@@ -28,6 +38,9 @@ export interface Webhook {
 	created_by?: string;
 	created_at: string;
 	last_delivery?: WebhookDelivery;
+	format?: WebhookFormat;
+	/** End of a PagerDuty hook's integration key. */
+	routing_key_last4?: string;
 }
 
 export interface WebhookList {
@@ -41,6 +54,37 @@ export interface WebhookInput {
 	events?: WebhookEventType[];
 	description?: string;
 	enabled?: boolean;
+	/** Fixed when the hook is created. */
+	format?: WebhookFormat;
+	/** PagerDuty Events API v2 integration key (pagerduty hooks only). */
+	routing_key?: string;
+}
+
+/** Events a member can get by email (handlers/notifications.go). */
+export type EmailEventType = "evaluation.finished" | "evaluation.regressed" | "release.blocked" | "schedule.failed" | "worker.offline";
+
+export interface EmailPrefs {
+	events: EmailEventType[];
+	digest: boolean;
+	updated_at?: string;
+}
+
+/** GET /notifications/email: the caller's own email notifications. */
+export interface EmailSettings {
+	available: boolean;
+	reason?: string;
+	/** False while the server has no mail service: emails are only written to its log. */
+	delivers: boolean;
+	provider: string;
+	email?: string;
+	events: EmailEventType[];
+	prefs: EmailPrefs;
+}
+
+export interface EmailTestResult {
+	to: string;
+	delivers: boolean;
+	provider: string;
 }
 
 export interface WebhookCreated {

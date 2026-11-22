@@ -59,15 +59,17 @@ func (s *Store) Enqueue(ev Event) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	body, err := json.Marshal(ev)
-	if err != nil {
-		return nil, err
-	}
 	now := time.Now().UTC()
 	var ids []string
 	for _, h := range hs {
 		if !h.Enabled || !slices.Contains(h.Events, ev.Type) {
 			continue
+		}
+		// The body is rendered in the hook's format now, so a retry sends
+		// the same bytes (and a PagerDuty dedup key stays the same).
+		body, err := Render(h, ev)
+		if err != nil {
+			return ids, err
 		}
 		next := now
 		it := outboxItem{Body: body, Delivery: Delivery{ID: "whd_" + randHex(8), HookID: h.ID, Event: ev.Type, EventID: ev.ID, At: now,

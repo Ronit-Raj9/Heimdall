@@ -249,11 +249,31 @@ func webhookEventFor(j jobs.Job, status jobs.Status, result []byte, msg string) 
 
 // dispatchJobWebhooks is the jobs finish hook.
 func dispatchJobWebhooks(j jobs.Job, status jobs.Status, result []byte, msg string) {
+	if ev, ok := scheduleFailedEvent(j, status, result, msg); ok { // Y05 (notify.go)
+		deliverOrgEvent(j.OrgID, ev)
+	}
+	if j.Kind == kindExperimentRun {
+		// The experiment may have been an evaluation's last benchmark.
+		defer refreshOrgEvaluations(j.OrgID)
+	}
 	ev, ok := webhookEventFor(j, status, result, msg)
 	if !ok {
 		return
 	}
 	deliverWebhookEvent(j.OrgID, ev)
+}
+
+// deliverOrgEvent is deliverWebhookEvent plus member email (notify.go).
+func deliverOrgEvent(org string, ev webhooks.Event) {
+	webhookOrgsMu.Lock()
+	o, ok := webhookOrgs[org]
+	webhookOrgsMu.Unlock()
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	emitOrgEvent(ctx, org, o.root, o.hosted, ev)
 }
 
 // deliverWebhookEvent sends ev to the webhooks of org, when its services

@@ -481,6 +481,9 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_SERVER_ADMINS` | Comma-separated emails of server admins: quotas, image approval, kill switch. An address counts only once verified (docs/auth.md, Server admins). |
 | `HEIMDALL_SERVER_ADMIN_IDS` | Comma-separated user ids of server admins; `bifrost-bench admin grant -email X` does the same from the database. |
 | `HEIMDALL_SIGNUP_DOMAINS` | Email domains that may sign up without an invitation under `HEIMDALL_SIGNUP=allowlist`. |
+| `HEIMDALL_SMTP_URL` | Email through SMTP: `smtp://user:pass@host:587` (STARTTLS) or `smtps://user:pass@host:465`. Evaluation alerts, the weekly digest and account emails ([notifications.md](notifications.md)). |
+| `HEIMDALL_RESEND_API_KEY` / `HEIMDALL_POSTMARK_TOKEN` | Email through Resend or Postmark instead of SMTP. The first transport set wins (SMTP, Resend, Postmark); none set writes emails to the server log only. |
+| `HEIMDALL_MAIL_FROM` | From address of every email, e.g. `Heimdall <alerts@example.com>`; required with any transport. |
 | `HEIMDALL_API_RATE_LIMITS` | API rate limits per token and per organization (`cred_burst,cred_per_sec,org_burst,org_per_sec`, or `off`); empty is the default. |
 | `HEIMDALL_RUNNER_IMAGE` | Runner image Heimdall starts for an organization's own worker on Fly Machines or Kubernetes; empty is the published default. |
 | `HEIMDALL_GATEWAY_LOGS_URL` | The shared gateway's log API the server lists, deletes and expires one organization's prompt logs through; empty with the shared worker on is `http://bifrost:8080`, `off` disables it. |
@@ -532,7 +535,9 @@ caps request bodies at 2 MiB and hides `/readyz`; the server adds its CSP,
 - Choice of data residency or region per organization: everything lives on
   this machine (and the S3 mirror you configure).
 - High availability: one server process and one Postgres; scale up, not out.
-- Email delivery: invitations are links an admin copies and sends. Email
-  verification links go through a mail sender when one is wired in, and to
-  the server log otherwise (docs/auth.md, Email verification).
+- Email delivery needs a transport: until `HEIMDALL_SMTP_URL` (or a Resend
+  or Postmark key) and `HEIMDALL_MAIL_FROM` are set, emails (alerts, the
+  weekly digest, email verification links) are only written to the server
+  log ([notifications.md](notifications.md), docs/auth.md). Invitations are
+  links an admin copies and sends.
 - Master key rotation or a KMS: `HEIMDALL_MASTER_KEY` is one static key.

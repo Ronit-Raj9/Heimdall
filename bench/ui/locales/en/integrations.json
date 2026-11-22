@@ -1,6 +1,6 @@
 {
 	"title": "Integrations",
-	"subtitle": "Connect Heimdall to the tools you already use: GitHub, chat alerts and other analysis tools.",
+	"subtitle": "Connect Heimdall to the tools you already use: GitHub, Slack, Microsoft Teams, PagerDuty, email and other analysis tools.",
 	"tabs": {
 		"ci": "Pull request checks",
 		"exports": "Download results",
@@ -52,14 +52,19 @@
 		"created": "Created"
 	},
 	"webhooks": {
-		"heading": "Get a message when a test finishes",
-		"intro": "Heimdall sends a signed message to each web address you add, for example a Slack or team chat hook.",
+		"heading": "Send results and alerts to your tools",
+		"intro": "Heimdall posts to Slack, Microsoft Teams, PagerDuty or any web address when an evaluation finishes, an agent gets worse, a release is blocked, a scheduled check fails or a worker goes offline. Failed deliveries are retried for 24 hours.",
 		"hostedNote": "This server delivers only to public https URLs.",
 		"url": "Web address to send to",
 		"urlPlaceholder": "https://example.com/hooks/heimdall",
 		"description": "Description (optional)",
 		"events": "When to send",
 		"eventNames": {
+			"evaluation.finished": "An evaluation finished",
+			"evaluation.regressed": "An agent got worse",
+			"release.blocked": "A release is blocked",
+			"schedule.failed": "A scheduled check failed",
+			"worker.offline": "A worker went offline",
 			"experiment.finished": "A comparison finished",
 			"job.failed": "A background job failed"
 		},
@@ -67,7 +72,7 @@
 		"adding": "Adding...",
 		"secretOnce": "Secret for checking messages are really from Heimdall. Shown once, store it now:",
 		"dismiss": "I stored it",
-		"empty": "Nothing set up yet. Add a web address to get a message when a comparison finishes.",
+		"empty": "Nothing set up yet. Add Slack, Teams, PagerDuty or a web address to hear when an evaluation finishes or an agent gets worse.",
 		"test": "Send test",
 		"testOk": "Test delivered (HTTP {{code}})",
 		"testFail": "Test failed: {{error}}",
@@ -82,7 +87,35 @@
 		"never": "never delivered",
 		"deliveries": "Recent deliveries",
 		"signing": "Verify X-Heimdall-Signature: sha256 HMAC of \"<X-Heimdall-Timestamp>.<body>\" with the webhook's secret.",
-		"signingTitle": "How to verify"
+		"signingTitle": "How to verify",
+		"format": "Send to",
+		"formats": {
+			"json": "Web address (signed JSON)",
+			"slack": "Slack",
+			"teams": "Microsoft Teams",
+			"pagerduty": "PagerDuty"
+		},
+		"urlLabels": {
+			"json": "Web address to send to",
+			"slack": "Slack incoming webhook URL",
+			"teams": "Teams workflow webhook URL",
+			"pagerduty": "Events API address (leave empty for events.pagerduty.com)"
+		},
+		"urlPlaceholders": {
+			"json": "https://example.com/hooks/heimdall",
+			"slack": "https://hooks.slack.com/services/...",
+			"teams": "https://prod-00.westus.logic.azure.com/workflows/...",
+			"pagerduty": "https://events.pagerduty.com/v2/enqueue"
+		},
+		"formatHelp": {
+			"json": "Each message is the event as JSON, signed with the secret shown once below.",
+			"slack": "In Slack, add the Incoming Webhooks app to a channel and paste its URL. Messages show the score, the change and a button to the report card.",
+			"teams": "In Teams, add the Workflows app \"Post to a channel when a webhook request is received\" and paste its URL. Messages are cards with the score and the change.",
+			"pagerduty": "In PagerDuty, add an Events API v2 integration to a service and paste its integration key. Only problems page: regressions, blocked releases, failed checks, offline workers. Send test checks the key without opening an incident."
+		},
+		"routingKey": "Integration key",
+		"routingKeyPlaceholder": "32 character Events API v2 key",
+		"keyEnding": "key ...{{last4}}"
 	},
 	"errors": {
 		"load": "Could not load this section. Reload the page; if it keeps failing, check that the server is running.",
@@ -91,7 +124,7 @@
 	},
 	"cards": {
 		"webhooks": {
-			"desc": "Get a message when a test finishes.",
+			"desc": "Slack, Teams, PagerDuty, email and web addresses.",
 			"none": "Not set up",
 			"count_one": "{{count}} active",
 			"count_other": "{{count}} active",
@@ -130,5 +163,19 @@
 		"retrying": "Queued",
 		"empty": "No deliveries yet. They appear here when an event fires.",
 		"unknownHook": "Deleted webhook"
+	},
+	"email": {
+		"heading": "Email me",
+		"intro": "Your own choice: what reaches {{email}} by email. Other members choose for themselves.",
+		"digest": "Weekly digest every Monday: your agents, their scores, what changed and what it cost",
+		"events": "Also email me when",
+		"save": "Save",
+		"saving": "Saving...",
+		"saved": "Saved",
+		"test": "Send test email",
+		"testSent": "Test email sent to {{to}}",
+		"testLogged": "Test email written to the server log for {{to}}: this server has no mail service yet",
+		"notDelivering": "This server has no mail service set up yet, so emails are only written to its log. Ask your server owner to set HEIMDALL_SMTP_URL, or a Resend or Postmark key.",
+		"unavailable": "Email notifications are not available here: {{reason}}."
 	}
 }

@@ -103,6 +103,7 @@ func TestPolicyDefaults(t *testing.T) {
 		method, _, _ := strings.Cut(k, " ")
 		switch {
 		case r.Access == AccessDeny:
+		case selfWrites[k] && r.Access == AccessOrg:
 		case method == "GET" && r.Access == AccessOrg && r.Min != viewer:
 			t.Errorf("%s: GET needs %s", k, r.Min)
 		case method != "GET" && r.Access == AccessOrg && !r.Min.AtLeast(member):

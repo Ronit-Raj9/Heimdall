@@ -3,7 +3,18 @@ import "@/lib/i18n";
 import type { Webhook } from "@/lib/types/integrations";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { CIInstallLink, DeliveryTable, ExportTable, WebhookList, anyRetrying, ciNextStep, exportParams } from "./integrationsView";
+import {
+	CIInstallLink,
+	DeliveryTable,
+	ExportTable,
+	WebhookList,
+	anyRetrying,
+	ciNextStep,
+	defaultEventsFor,
+	eventsFor,
+	exportParams,
+	webhookFormReady,
+} from "./integrationsView";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
@@ -27,6 +38,29 @@ describe("integrations view", () => {
 		expect(html).toContain("last delivery failed");
 		expect(html).toContain("whsec_...abcd");
 		expect(html).toContain("Test delivered (HTTP 204)");
+	});
+
+	it("shows a chat or paging hook by its service, without a signing secret", () => {
+		const slack: Webhook = { ...hook, id: "wh_2", format: "slack", events: ["evaluation.finished", "evaluation.regressed"], last_delivery: undefined };
+		const pd: Webhook = { ...hook, id: "wh_3", format: "pagerduty", events: ["evaluation.regressed"], routing_key_last4: "9f2c", last_delivery: undefined };
+		const html = renderToStaticMarkup(<WebhookList hooks={[slack, pd]} onTest={() => {}} onToggle={() => {}} onDelete={() => {}} />);
+		expect(html).toContain("Slack");
+		expect(html).toContain("PagerDuty");
+		expect(html).toContain("An evaluation finished, An agent got worse");
+		expect(html).toContain("key ...9f2c");
+		expect(html).not.toContain("whsec_...");
+	});
+
+	it("limits PagerDuty to problems and checks what each format needs", () => {
+		expect(eventsFor("pagerduty")).not.toContain("evaluation.finished");
+		expect(eventsFor("slack")).toContain("evaluation.finished");
+		expect(defaultEventsFor("pagerduty")).toEqual(["evaluation.regressed"]);
+		expect(defaultEventsFor("teams")).toContain("release.blocked");
+		expect(webhookFormReady("pagerduty", "", "a".repeat(32), ["evaluation.regressed"])).toBe(true);
+		expect(webhookFormReady("pagerduty", "", "short", ["evaluation.regressed"])).toBe(false);
+		expect(webhookFormReady("slack", "", "", ["evaluation.finished"])).toBe(false);
+		expect(webhookFormReady("slack", "https://hooks.slack.com/services/x", "", [])).toBe(false);
+		expect(webhookFormReady("slack", "https://hooks.slack.com/services/x", "", ["evaluation.finished"])).toBe(true);
 	});
 
 	it("offers a next step when there is no webhook or export", () => {

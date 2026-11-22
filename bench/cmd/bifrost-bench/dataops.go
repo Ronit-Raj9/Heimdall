@@ -318,6 +318,7 @@ func startLocalDataOps(ctx context.Context, a *app) {
 	startWebhookOutbox(ctx, a.logger, func() map[string]webhookOrg {
 		return map[string]webhookOrg{auth.LocalOrgID: {root: a.cfg.Root}}
 	})
+	startLocalNotifications(ctx, a) // Y05 (notify.go)
 }
 
 // recentlyActive is the local server's activity check: an experiment whose
@@ -356,6 +357,7 @@ func startHostedDataOps(ctx context.Context, env *hostedEnv) {
 		}
 		return out
 	})
+	startHostedNotifications(ctx, env) // Y05 (notify.go)
 }
 
 func hostedRetentionTargets(env *hostedEnv) []retentionTarget {

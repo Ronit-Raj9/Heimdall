@@ -48,15 +48,22 @@ import (
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
-// Event types a hook can subscribe to.
+// Event types a hook can subscribe to. docs/notifications.md documents
+// each payload.
 const (
-	EventExperimentFinished = "experiment.finished" // an experiment ended (succeeded, failed or cancelled): its run job, a schedule.fire job, or an in-process run
-	EventJobFailed          = "job.failed"          // any other background job failed
-	EventPing               = "ping"                // the Test button; always delivered to the hook tested
+	EventExperimentFinished  = "experiment.finished"  // an experiment ended (succeeded, failed or cancelled): its run job, a schedule.fire job, or an in-process run
+	EventJobFailed           = "job.failed"           // any other background job failed
+	EventEvaluationFinished  = "evaluation.finished"  // an evaluation ended (done, failed or cancelled), with its scores and change
+	EventEvaluationRegressed = "evaluation.regressed" // an evaluation found the agent worse than its baseline or the previous scheduled run
+	EventReleaseBlocked      = "release.blocked"      // a finished evaluation's version cannot be released without an override
+	EventScheduleFailed      = "schedule.failed"      // a scheduled check could not run or failed its check
+	EventWorkerOffline       = "worker.offline"       // a connected worker stopped answering
+	EventPing                = "ping"                 // the Test button; always delivered to the hook tested
 )
 
 // Events lists the subscribable event types.
-var Events = []string{EventExperimentFinished, EventJobFailed}
+var Events = []string{EventEvaluationFinished, EventEvaluationRegressed, EventReleaseBlocked, EventScheduleFailed, EventWorkerOffline,
+	EventExperimentFinished, EventJobFailed}
 
 // Limits.
 const (
@@ -84,6 +91,13 @@ type Hook struct {
 	SecretEnc   string    `json:"secret_enc,omitempty"` // Secret sealed by the Cipher; Secret is then empty on disk
 	CreatedBy   string    `json:"created_by,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
+	// Format is the body the receiver gets (format.go): json (the signed
+	// Event, the default), slack, teams or pagerduty.
+	Format string `json:"format,omitempty"`
+	// RoutingKey is the PagerDuty integration key of a pagerduty hook,
+	// sealed like Secret (RoutingKeyEnc) when the store has a Cipher.
+	RoutingKey    string `json:"routing_key,omitempty"`
+	RoutingKeyEnc string `json:"routing_key_enc,omitempty"`
 }
 
 // Cipher seals hook secrets at rest. keystore.Sealer implements it with the
@@ -104,6 +118,9 @@ type View struct {
 	CreatedBy    string    `json:"created_by,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 	LastDelivery *Delivery `json:"last_delivery,omitempty"`
+	Format       string    `json:"format"`
+	// RoutingKeyLast4 is the end of a pagerduty hook's integration key.
+	RoutingKeyLast4 string `json:"routing_key_last4,omitempty"`
 }
 
 // View returns the hook without its secret.
@@ -112,8 +129,12 @@ func (h Hook) View() View {
 	if len(last4) > 4 {
 		last4 = last4[len(last4)-4:]
 	}
-	return View{ID: h.ID, URL: redactURL(h.URL), Events: h.Events, Description: h.Description, Enabled: h.Enabled,
-		SecretLast4: last4, CreatedBy: h.CreatedBy, CreatedAt: h.CreatedAt}
+	v := View{ID: h.ID, URL: redactURL(h.URL), Events: h.Events, Description: h.Description, Enabled: h.Enabled,
+		SecretLast4: last4, CreatedBy: h.CreatedBy, CreatedAt: h.CreatedAt, Format: h.format()}
+	if k := h.RoutingKey; len(k) > 4 {
+		v.RoutingKeyLast4 = k[len(k)-4:]
+	}
+	return v
 }
 
 // Input is what Create and Update take. On Update a nil field keeps its value.
@@ -122,6 +143,10 @@ type Input struct {
 	Events      *[]string `json:"events,omitempty"`
 	Description *string   `json:"description,omitempty"`
 	Enabled     *bool     `json:"enabled,omitempty"`
+	// Format is json (default), slack, teams or pagerduty; fixed at create.
+	Format *string `json:"format,omitempty"`
+	// RoutingKey is the PagerDuty integration key (pagerduty hooks only).
+	RoutingKey *string `json:"routing_key,omitempty"`
 }
 
 // Event is the JSON body of a delivery.
@@ -131,6 +156,9 @@ type Event struct {
 	OrgID string    `json:"org_id,omitempty"`
 	At    time.Time `json:"at"`
 	Data  any       `json:"data"`
+	// Summary is the human message chat and paging formats show; json
+	// receivers get it too.
+	Summary *Summary `json:"summary,omitempty"`
 }
 
 // Delivery is the outcome of one event sent to one hook.
@@ -209,6 +237,16 @@ func (s *Store) load() ([]Hook, error) {
 		} else if h.Secret != "" && s.cipher != nil {
 			legacy = true
 		}
+		if h.RoutingKeyEnc != "" {
+			if s.cipher == nil {
+				return nil, fmt.Errorf("webhook %s: its routing key is encrypted and this server has no master key", h.ID)
+			}
+			plain, err := s.cipher.Open(routingKeyID(h.ID), h.RoutingKeyEnc)
+			if err != nil {
+				return nil, fmt.Errorf("webhook %s: decrypt routing key: %w", h.ID, err)
+			}
+			h.RoutingKey, h.RoutingKeyEnc = plain, ""
+		}
 	}
 	if legacy {
 		// A file written before secrets were sealed: seal it now.
@@ -226,6 +264,13 @@ func (s *Store) save(hs []Hook) error {
 	disk := slices.Clone(hs)
 	if s.cipher != nil {
 		for i := range disk {
+			if disk[i].RoutingKey != "" {
+				enc, err := s.cipher.Seal(routingKeyID(disk[i].ID), disk[i].RoutingKey)
+				if err != nil {
+					return fmt.Errorf("webhook %s: encrypt routing key: %w", disk[i].ID, err)
+				}
+				disk[i].RoutingKey, disk[i].RoutingKeyEnc = "", enc
+			}
 			if disk[i].Secret == "" {
 				continue
 			}
@@ -282,12 +327,30 @@ func (s *Store) Get(id string) (Hook, error) {
 
 // Create adds a hook with a fresh secret; the returned Hook carries it.
 func (s *Store) Create(in Input, actor string, allowPrivate bool) (Hook, error) {
-	h := Hook{Enabled: true, CreatedBy: actor, CreatedAt: time.Now().UTC(), Events: []string{EventExperimentFinished}}
+	h := Hook{Enabled: true, CreatedBy: actor, CreatedAt: time.Now().UTC(), Format: FormatJSON}
+	if in.Format != nil {
+		f := strings.TrimSpace(*in.Format)
+		if f == "" {
+			f = FormatJSON
+		}
+		if !slices.Contains(Formats, f) {
+			return Hook{}, fmt.Errorf("%w: unknown format %q (one of %s)", ErrInvalid, f, strings.Join(Formats, ", "))
+		}
+		h.Format = f
+	}
+	h.Events = DefaultEvents(h.Format)
+	if h.Format == FormatPagerDuty && in.URL == nil {
+		u := PagerDutyEventsURL
+		in.URL = &u
+	}
 	if err := apply(&h, in, allowPrivate); err != nil {
 		return Hook{}, err
 	}
 	if h.URL == "" {
 		return Hook{}, fmt.Errorf("%w: url is required", ErrInvalid)
+	}
+	if h.Format == FormatPagerDuty && h.RoutingKey == "" {
+		return Hook{}, fmt.Errorf("%w: a PagerDuty hook needs routing_key, the integration key of an Events API v2 service", ErrInvalid)
 	}
 	h.ID = "wh_" + randHex(8)
 	h.Secret = "whsec_" + randHex(24)
@@ -344,6 +407,19 @@ func (s *Store) Delete(id string) error {
 }
 
 func apply(h *Hook, in Input, allowPrivate bool) error {
+	if in.Format != nil && h.ID != "" && strings.TrimSpace(*in.Format) != h.format() {
+		return fmt.Errorf("%w: the format of a webhook cannot change; add a new one", ErrInvalid)
+	}
+	if in.RoutingKey != nil {
+		k := strings.TrimSpace(*in.RoutingKey)
+		if h.format() != FormatPagerDuty {
+			return fmt.Errorf("%w: routing_key is only for PagerDuty hooks", ErrInvalid)
+		}
+		if !routingKeyRe.MatchString(k) {
+			return fmt.Errorf("%w: routing_key must be the 32 character integration key of a PagerDuty Events API v2 service", ErrInvalid)
+		}
+		h.RoutingKey = k
+	}
 	if in.URL != nil {
 		u := strings.TrimSpace(*in.URL)
 		if err := ValidateURL(u, allowPrivate); err != nil {
@@ -356,6 +432,9 @@ func apply(h *Hook, in Input, allowPrivate bool) error {
 		for _, e := range *in.Events {
 			if !slices.Contains(Events, e) {
 				return fmt.Errorf("%w: unknown event %q (one of %s)", ErrInvalid, e, strings.Join(Events, ", "))
+			}
+			if !Accepts(h.format(), e) {
+				return fmt.Errorf("%w: a %s hook does not take %s (it takes %s)", ErrInvalid, h.format(), e, strings.Join(EventsFor(h.format()), ", "))
 			}
 			if !slices.Contains(evs, e) {
 				evs = append(evs, e)
@@ -561,7 +640,7 @@ func (snd Sender) Send(ctx context.Context, h Hook, ev Event) Delivery {
 			d.State = StateDelivered
 		}
 	}()
-	body, err := json.Marshal(ev)
+	body, err := Render(h, ev)
 	if err != nil {
 		d.Error = err.Error()
 		return d
