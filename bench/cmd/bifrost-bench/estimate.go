@@ -91,20 +91,116 @@ func (a *app) priced(model string) bool {
 }
 
 // forecast reads the sealed history of the manifest's suite through the
-// store's verified index and forecasts the manifest.
+// store's verified index (cached for historyCacheTTL, cachedHistory) and
+// forecasts the manifest.
 func (a *app) forecast(ctx context.Context, m *schemas.Manifest) (*schemas.Forecast, error) {
-	h, err := forecast.LoadHistory(ctx, a.store, m, sealedRunFile)
+	start := time.Now()
+	h, hit, err := a.cachedHistory(ctx, a.store, m, false)
 	if err != nil {
 		return nil, err
 	}
+	library, libraryHit := a.cachedLibraryRuns(ctx, m)
 	concurrency := m.Experiment.Concurrency
 	if concurrency <= 0 {
 		concurrency = engine.DefaultConcurrency
 	}
-	return forecast.Estimate(forecast.Input{
+	f := forecast.Estimate(forecast.Input{
 		Manifest: m, History: h.Runs, Priced: a.priced, PriceRef: a.prices.Ref(), Concurrency: concurrency, Notes: h.Notes(), Now: time.Now(),
-		Library: a.libraryRuns(ctx, m), Reprice: a.reprice,
-	}), nil
+		Library: library, Reprice: a.reprice,
+	})
+	a.logger.Debug("forecast", "experiment", m.ExpID, "suite", m.SuiteID+"@"+m.SuiteVersion,
+		"history_cache", hitText(hit), "library_cache", hitText(libraryHit), "took_ms", time.Since(start).Milliseconds())
+	return f, nil
+}
+
+// historyCacheTTL is how long the sealed history of a suite is served from
+// historyCache; a run sealed in the store changes its fingerprint and ends
+// the entry sooner.
+const historyCacheTTL = 60 * time.Second
+
+// historyCache holds the sealed history per store and suite version for the
+// estimates the evaluation wizard asks for on every change (D4.slow).
+var historyCache = forecast.NewHistoryCache(historyCacheTTL)
+
+// cachedHistory is forecast.LoadHistory (or LoadLibrary when library) of m
+// in st through historyCache; hit says the store was not scanned again. A
+// store with no folder on disk is read directly.
+func (a *app) cachedHistory(ctx context.Context, st forecast.Store, m *schemas.Manifest, library bool) (*forecast.History, bool, error) {
+	key, fp := storeFingerprint(ctx, st)
+	if fp == "" {
+		if library {
+			h, err := forecast.LoadLibrary(ctx, st, m, sealedRunFile)
+			return h, false, err
+		}
+		h, err := forecast.LoadHistory(ctx, st, m, sealedRunFile)
+		return h, false, err
+	}
+	s, hit, err := historyCache.Suite(ctx, st, key, fp, m, sealedRunFile)
+	if err != nil {
+		return nil, false, err
+	}
+	var h *forecast.History
+	if library {
+		h, err = s.Library(m)
+	} else {
+		h, err = s.History(m)
+	}
+	return h, hit && err == nil, err
+}
+
+// cachedLibraryRuns is libraryRuns (forecastlibrary.go) through
+// historyCache: every sealed run on m's suite version in the org's store
+// and the operator's library store. hit is true when no store was scanned.
+func (a *app) cachedLibraryRuns(ctx context.Context, m *schemas.Manifest) ([]forecast.HistoryRun, bool) {
+	var out []forecast.HistoryRun
+	hit := true
+	for _, st := range []forecast.Store{a.store, a.operatorLibrary()} {
+		if st == nil {
+			continue
+		}
+		h, ok, err := a.cachedHistory(ctx, st, m, true)
+		if err != nil {
+			a.logger.Warn("library runs not read", "experiment", m.ExpID, "error", err.Error())
+			continue
+		}
+		hit = hit && ok
+		out = append(out, h.Runs...)
+	}
+	return out, hit
+}
+
+// storeFingerprint names a run store on disk (its root) and stamps what it
+// holds: the number of experiments and, through the size and time of each
+// experiment's seals.log (one line per sealed run), the sealed runs. Both
+// are "" for a store with no root or one that cannot be listed (no caching).
+func storeFingerprint(ctx context.Context, st forecast.Store) (key, fingerprint string) {
+	r, ok := st.(interface{ Root() string })
+	if !ok || r.Root() == "" {
+		return "", ""
+	}
+	root := r.Root()
+	ids, err := st.ListExperiments(ctx)
+	if err != nil {
+		return "", ""
+	}
+	var size, latest int64
+	for _, id := range ids {
+		info, err := os.Stat(filepath.Join(root, id, "seals.log")) // store.sealsLogFile
+		if err != nil {
+			continue // no run sealed yet
+		}
+		size += info.Size()
+		latest = max(latest, info.ModTime().UnixNano())
+	}
+	return root, fmt.Sprintf("%d/%d/%d", len(ids), size, latest)
+}
+
+// hitText is "hit" or "miss" for the debug log.
+func hitText(hit bool) string {
+	if hit {
+		return "hit"
+	}
+	return "miss"
 }
 
 // printEstimate prints the forecast under plan's slot counts. A forecast

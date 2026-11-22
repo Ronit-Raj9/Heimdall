@@ -10,6 +10,7 @@ package handlers
 import (
 	"context"
 	"slices"
+	"sync"
 
 	"github.com/maximhq/bifrost/bench/faults"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -73,30 +74,64 @@ func normalizePreset(spec *schemas.EvaluationSpec) error {
 }
 
 // estimatePresets estimates every preset of req's setup: req with the
-// preset's tasks, trials and faults (added to req's own). A preset that
-// cannot be estimated is left out.
+// preset's tasks, trials and faults (added to req's own). The presets are
+// estimated side by side (at most presetParallel at once) through the same
+// forecast cache and come back in the order of EvaluationPresets (D4.slow).
+// A preset that cannot be estimated is left out.
 func estimatePresets(ctx context.Context, suites SuiteSource, src ForecastSource, req *EvalEstimateRequest, agents map[string]*schemas.AgentConfig, root string, cache *forecastCache) []EvalPresetEstimate {
-	out := make([]EvalPresetEstimate, 0, len(EvaluationPresets))
-	for _, p := range EvaluationPresets {
-		r := *req
-		r.Presets, r.TasksPerBenchmark, r.Trials = false, p.TasksPerBenchmark, p.Trials
-		r.Faults = slices.Clone(req.Faults)
-		for _, f := range p.Faults {
-			if !slices.Contains(r.Faults, f) {
-				r.Faults = append(r.Faults, f)
+	results := make([]*EvalPresetEstimate, len(EvaluationPresets))
+	sem := make(chan struct{}, presetParallel)
+	var wg sync.WaitGroup
+	for i, p := range EvaluationPresets {
+		r := presetRequest(req, p)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			est, err := estimateEvaluation(ctx, suites, src, r, agents, root, cache)
+			if err != nil {
+				return
 			}
+			pe := EvalPresetEstimate{EvalPreset: p, Runs: est.Runs, EstCostUSD: est.EstCostUSD, EstMinutes: est.EstMinutes,
+				MDEpp: est.Power.Overall.MDEpp, FromLibrary: est.FromLibrary}
+			pe.Faults = r.Faults
+			pe.MDEPerBenchmarkPP = worstMDE(est.Power.PerBenchmark)
+			results[i] = &pe
+		}()
+	}
+	wg.Wait()
+	out := make([]EvalPresetEstimate, 0, len(EvaluationPresets))
+	for _, pe := range results {
+		if pe != nil {
+			out = append(out, *pe)
 		}
-		est, err := estimateEvaluation(ctx, suites, src, &r, agents, root, cache)
-		if err != nil {
-			continue
-		}
-		pe := EvalPresetEstimate{EvalPreset: p, Runs: est.Runs, EstCostUSD: est.EstCostUSD, EstMinutes: est.EstMinutes,
-			MDEpp: est.Power.Overall.MDEpp, FromLibrary: est.FromLibrary}
-		pe.Faults = r.Faults
-		pe.MDEPerBenchmarkPP = worstMDE(est.Power.PerBenchmark)
-		out = append(out, pe)
 	}
 	return out
+}
+
+// presetParallel is how many presets are estimated at once.
+const presetParallel = 3
+
+// presetRequest is req sized as preset p, with its own copies of everything
+// the estimate may write (normalizeEvalRequest trims the arms in place), so
+// presets estimated side by side never share them.
+func presetRequest(req *EvalEstimateRequest, p EvalPreset) *EvalEstimateRequest {
+	r := *req
+	r.Presets, r.TasksPerBenchmark, r.Trials = false, p.TasksPerBenchmark, p.Trials
+	r.Arms = slices.Clone(req.Arms)
+	r.Benchmarks = slices.Clone(req.Benchmarks)
+	if req.Stream != nil {
+		st := *req.Stream
+		r.Stream = &st
+	}
+	r.Faults = slices.Clone(req.Faults)
+	for _, f := range p.Faults {
+		if !slices.Contains(r.Faults, f) {
+			r.Faults = append(r.Faults, f)
+		}
+	}
+	return &r
 }
 
 // worstMDE is the largest per-benchmark smallest detectable change, nil
