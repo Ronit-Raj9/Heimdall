@@ -6,14 +6,16 @@ import { useGetJobQuery } from "@/lib/store/apis/platformApi";
 import {
 	policyReportUrl,
 	useGetPolicyDocQuery,
+	useDeletePolicyDocMutation,
 	useGetPolicyReportQuery,
 	useListPolicyDocsQuery,
 	useReviewPolicyDraftsMutation,
+	useSetPolicyClausesMutation,
 	useUploadPolicyDocMutation,
 } from "@/lib/store/apis/policyDocsApi";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import type { JsonValue, SuiteSummary } from "@/lib/types/bench";
-import type { PolicyDocView, PolicyDraft, PolicyGenerateParams, PolicyRate, PolicyReport } from "@/lib/types/policyDocs";
+import type { PolicyClause, PolicyDocView, PolicyDraft, PolicyGenerateParams, PolicyRate, PolicyReport } from "@/lib/types/policyDocs";
 import { useEffect, useState, type ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -41,6 +43,11 @@ export function pendingByClause(drafts: PolicyDraft[]): [string, PolicyDraft[]][
 		out.set(d.clause, [...(out.get(d.clause) ?? []), d]);
 	}
 	return [...out.entries()];
+}
+
+/** clauses with clause i changed by patch; the rest unchanged. */
+export function updateClause(clauses: readonly PolicyClause[], i: number, patch: Partial<PolicyClause>): PolicyClause[] {
+	return clauses.map((c, j) => (j === i ? { ...c, ...patch } : c));
 }
 
 /** The policy.generate job params: an estimate, or a confirmed run within the budget. */
@@ -133,6 +140,61 @@ function ClauseList({ view }: { view: PolicyDocView }) {
 				</li>
 			))}
 		</ol>
+	);
+}
+
+/** Edits the clauses in place and saves them with PUT .../clauses (the server checks numbers and drafted clauses). */
+export function ClauseEditor({ suite, view, onClose }: { suite: string; view: PolicyDocView; onClose: () => void }) {
+	const { t } = useTranslation("policyDocs");
+	const [clauses, setClauses] = useState<PolicyClause[]>(() => view.doc.clauses.map((c) => ({ ...c })));
+	const [save, state] = useSetPolicyClausesMutation();
+	const submit = async () => {
+		const r = await save({ suite, doc: view.doc.id, clauses });
+		if ("data" in r && r.data) onClose();
+	};
+	return (
+		<section className="flex flex-col gap-2" data-testid="policy-clause-editor">
+			<h3 className="text-sm font-medium">{t("clauses.edit")}</h3>
+			<p className="text-muted-foreground text-xs">{t("clauses.editHint")}</p>
+			<ol className="flex max-h-[32rem] flex-col gap-2 overflow-y-auto rounded-sm border p-2">
+				{clauses.map((c, i) => (
+					<li key={i} className="flex min-w-0 flex-wrap items-start gap-2 text-sm" data-testid={`policy-clause-edit-${i}`}>
+						<Input
+							className="h-9 w-20 font-mono"
+							aria-label={t("clauses.number")}
+							value={c.number}
+							onChange={(e) => setClauses(updateClause(clauses, i, { number: e.target.value }))}
+						/>
+						<Input
+							className="h-9 w-48"
+							aria-label={t("clauses.heading")}
+							placeholder={t("clauses.heading")}
+							value={c.title ?? ""}
+							onChange={(e) => setClauses(updateClause(clauses, i, { title: e.target.value }))}
+						/>
+						<textarea
+							className="border-input bg-background min-h-16 min-w-0 flex-1 rounded-md border px-2 py-1 text-sm"
+							aria-label={t("clauses.text")}
+							value={c.text}
+							onChange={(e) => setClauses(updateClause(clauses, i, { text: e.target.value }))}
+						/>
+						<label className="flex items-center gap-1.5 text-xs">
+							<input type="checkbox" checked={!!c.skip} onChange={(e) => setClauses(updateClause(clauses, i, { skip: e.target.checked }))} />
+							{t("clauses.skip")}
+						</label>
+					</li>
+				))}
+			</ol>
+			<div className="flex gap-2">
+				<Button disabled={state.isLoading} onClick={() => void submit()} dataTestId="policy-clauses-save">
+					{t("clauses.save")}
+				</Button>
+				<Button variant="ghost" disabled={state.isLoading} onClick={onClose}>
+					{t("clauses.cancel")}
+				</Button>
+			</div>
+			<ErrorLine error={state.error} />
+		</section>
 	);
 }
 
@@ -331,14 +393,25 @@ export function ReportView({ suite, report }: { suite: string; report: PolicyRep
 }
 
 function DocDetail({ suite, doc, writable }: { suite: string; doc: string; writable: boolean }) {
+	const { t } = useTranslation("policyDocs");
 	const view = useGetPolicyDocQuery({ suite, doc }, { skip: !writable });
 	const report = useGetPolicyReportQuery({ suite, doc });
+	const [editing, setEditing] = useState(false);
 	const refetch = view.refetch;
 	return (
 		<div className="flex flex-col gap-6">
 			{writable && view.data && (
 				<>
-					<ClauseList view={view.data} />
+					{editing ? (
+						<ClauseEditor key={view.data.doc.id} suite={suite} view={view.data} onClose={() => setEditing(false)} />
+					) : (
+						<div className="flex flex-col gap-2">
+							<ClauseList view={view.data} />
+							<Button size="sm" variant="outline" className="self-start" onClick={() => setEditing(true)} dataTestId="policy-clauses-edit">
+								{t("clauses.edit")}
+							</Button>
+						</div>
+					)}
 					<GenerateSection suite={suite} doc={doc} onDone={refetch} />
 					<DraftsSection suite={suite} view={view.data} />
 				</>
@@ -355,10 +428,17 @@ export function PolicyTab({ suite }: { suite: SuiteSummary }) {
 	const { t } = useTranslation("policyDocs");
 	const session = useSession();
 	const writable = canUse(session, "member");
-	const list = useListPolicyDocsQuery(suite.id, { skip: !writable });
+	const list = useListPolicyDocsQuery(suite.id);
+	const [remove, removeState] = useDeletePolicyDocMutation();
 	const [doc, setDoc] = useState("");
 	const docs = list.data?.docs ?? [];
-	const current = doc || docs[0]?.id || "";
+	const current = (docs.some((d) => d.id === doc) ? doc : "") || docs[0]?.id || "";
+	const onDelete = (id: string, name: string) => {
+		if (typeof window !== "undefined" && !window.confirm(t("docs.deleteConfirm", { name }))) return;
+		void remove({ suite: suite.id, doc: id }).then((r) => {
+			if (!("error" in r) && id === doc) setDoc("");
+		});
+	};
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="suite-policy-tab">
 			<p className="text-muted-foreground max-w-3xl text-sm">{t("intro")}</p>
@@ -368,27 +448,40 @@ export function PolicyTab({ suite }: { suite: SuiteSummary }) {
 				</p>
 			)}
 			{writable && <UploadSection suite={suite.id} onUploaded={setDoc} />}
-			{writable && (
-				<section className="flex flex-col gap-2">
-					<h3 className="text-sm font-medium">{t("docs.title")}</h3>
-					{docs.length === 0 ? (
-						<p className="text-muted-foreground text-sm">{t("docs.empty")}</p>
-					) : (
-						<ul className="flex flex-col gap-1 text-sm">
-							{docs.map((d) => (
-								<li key={d.id} className="flex flex-wrap items-center gap-2">
-									<Button size="sm" variant={d.id === current ? "default" : "outline"} onClick={() => setDoc(d.id)} dataTestId={`policy-doc-${d.id}`}>
-										{t("docs.open")}
+			<section className="flex flex-col gap-2" data-testid="policy-docs">
+				<h3 className="text-sm font-medium">{t("docs.title")}</h3>
+				{!writable && docs.length > 1 && <p className="text-muted-foreground text-xs">{t("docs.viewerList")}</p>}
+				{docs.length === 0 ? (
+					<p className="text-muted-foreground text-sm">{t("docs.empty")}</p>
+				) : (
+					<ul className="flex flex-col gap-1 text-sm">
+						{docs.map((d) => (
+							<li key={d.id} className="flex flex-wrap items-center gap-2">
+								<Button size="sm" variant={d.id === current ? "default" : "outline"} onClick={() => setDoc(d.id)} dataTestId={`policy-doc-${d.id}`}>
+									{t("docs.open")}
+								</Button>
+								<span className="font-medium">{d.title || d.name || d.id}</span>
+								{!list.data?.limited && (
+									<span className="text-muted-foreground text-xs">{t("docs.summary", { clauses: d.clauses ?? 0, pending: d.drafts?.pending ?? 0 })}</span>
+								)}
+								{writable && (
+									<Button
+										size="sm"
+										variant="ghost"
+										disabled={removeState.isLoading}
+										onClick={() => onDelete(d.id, d.title || d.name || d.id)}
+										dataTestId={`policy-doc-delete-${d.id}`}
+									>
+										{t("docs.delete")}
 									</Button>
-									<span className="font-medium">{d.title || d.name}</span>
-									<span className="text-muted-foreground text-xs">{t("docs.summary", { clauses: d.clauses, pending: d.drafts?.pending ?? 0 })}</span>
-								</li>
-							))}
-						</ul>
-					)}
-					<ErrorLine error={list.error} />
-				</section>
-			)}
+								)}
+							</li>
+						))}
+					</ul>
+				)}
+				<ErrorLine error={list.error} />
+				<ErrorLine error={removeState.error} />
+			</section>
 			{current && <DocDetail suite={suite.id} doc={current} writable={writable} />}
 		</div>
 	);

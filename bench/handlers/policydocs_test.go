@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/policybench"
 	"github.com/maximhq/bifrost/bench/projectfs"
@@ -20,6 +21,9 @@ import (
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttputil"
 )
+
+// testViewerHeader makes a test request come from an org viewer.
+const testViewerHeader = "X-Test-Viewer"
 
 func newPolicyClient(t *testing.T, idx ReadIndex) *authoringClient {
 	t.Helper()
@@ -43,7 +47,13 @@ func newPolicyClient(t *testing.T, idx ReadIndex) *authoringClient {
 		a(env, r)
 	}
 	ln := fasthttputil.NewInmemoryListener()
-	srv := &fasthttp.Server{Handler: r.Handler, MaxRequestBodySize: lib.MaxUploadBytes}
+	h := func(ctx *fasthttp.RequestCtx) {
+		if len(ctx.Request.Header.Peek(testViewerHeader)) > 0 {
+			auth.SetPrincipal(ctx, &auth.Principal{Kind: auth.KindUser, UserID: "u2", OrgID: "org1", Role: auth.RoleViewer, Email: "v@x.io"})
+		}
+		r.Handler(ctx)
+	}
+	srv := &fasthttp.Server{Handler: h, MaxRequestBodySize: lib.MaxUploadBytes}
 	go func() { _ = srv.Serve(ln) }()
 	t.Cleanup(func() { _ = srv.Shutdown() })
 	return &authoringClient{client: &fasthttp.Client{Dial: func(string) (net.Conn, error) { return ln.Dial() }}, root: root}
@@ -214,5 +224,39 @@ func TestPolicyDocsFlow(t *testing.T) {
 	}
 	if code, _ := c.do(t, "GET", "/suites/desk/policy-docs/"+docID, nil, nil); code != 404 {
 		t.Fatalf("deleted doc: %d", code)
+	}
+}
+
+// A viewer lists the documents by id and title only (to open the report),
+// and still cannot open a document or its drafts.
+func TestPolicyDocsViewerList(t *testing.T) {
+	idx := &fakeIndex{manifests: map[string]*schemas.Manifest{}, files: map[string]map[string][]byte{}}
+	c := newPolicyClient(t, idx)
+	if code, body := c.do(t, "POST", "/suites", []byte(`{"id":"desk","template":"support"}`), nil); code != 201 {
+		t.Fatalf("create: %d %s", code, body)
+	}
+	up := PolicyDocUpload{Name: "acme-policy.md", Text: testPolicy}
+	code, body := c.do(t, "POST", "/suites/desk/policy-docs", jsonBody(t, up), nil)
+	var v PolicyDocView
+	if code != 201 || json.Unmarshal(body, &v) != nil {
+		t.Fatalf("upload: %d %s", code, body)
+	}
+	viewer := map[string]string{testViewerHeader: "1"}
+	var list PolicyDocList
+	code, body = c.do(t, "GET", "/suites/desk/policy-docs", nil, viewer)
+	if code != 200 || json.Unmarshal(body, &list) != nil || !list.Limited || len(list.Docs) != 1 {
+		t.Fatalf("viewer list: %d %s", code, body)
+	}
+	d := list.Docs[0]
+	if d.ID != v.Doc.ID || d.Title == "" || d.Name != "" || d.Clauses != 0 || d.Drafts != nil {
+		t.Fatalf("viewer list leaks more than id and title: %s", body)
+	}
+	if code, _ := c.do(t, "GET", "/suites/desk/policy-docs/"+v.Doc.ID, nil, viewer); code != 403 {
+		t.Fatalf("viewer opened the document: %d", code)
+	}
+	code, body = c.do(t, "GET", "/suites/desk/policy-docs", nil, nil)
+	list = PolicyDocList{}
+	if code != 200 || json.Unmarshal(body, &list) != nil || list.Limited || list.Docs[0].Clauses != 2 {
+		t.Fatalf("member list: %d %s", code, body)
 	}
 }

@@ -1,7 +1,7 @@
 import "@/lib/i18n";
 
 import { cellState, checkGroup, DraftPreview, matrixColumns, PublishPanel, ReadinessPanel } from "@/components/onboard/draftPanel";
-import { InventoryPanel } from "@/components/onboard/inventoryPanel";
+import { InventoryPanel, onboardColumns, onboardMapping } from "@/components/onboard/inventoryPanel";
 import type { OnboardDraftSet, OnboardInventory } from "@/lib/types/onboard";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -138,5 +138,15 @@ describe("Add benchmark", () => {
 		const html = renderToStaticMarkup(<InventoryPanel inv={inv} plan={inv.suggest} onPlan={() => undefined} onDraft={() => undefined} busy={false} />);
 		expect(html).toContain('data-testid="onboard-plan-mapping"');
 		expect(html).toContain("outputs.gold");
+		// The Build tab's row mapper, limited to the fields onboard reads.
+		expect(html).toContain('data-testid="suite-build-map-reference"');
+		expect(html).not.toContain('data-testid="suite-build-map-messages"');
+		expect(html).not.toContain('data-testid="suite-build-map-save"');
+	});
+
+	it("keeps only onboard fields that are set in the plan mapping", () => {
+		expect(onboardMapping({ question: "inputs.q", expected: "", messages: "m", split: "-" })).toEqual({ question: "inputs.q", split: "-" });
+		const cols = onboardColumns({ columns: ["q"], samples: [{ ref: "row 1", fields: { q: "hi" } }] });
+		expect(cols).toEqual([{ path: "q", kind: "text", example: "hi", filled: 1 }]);
 	});
 });

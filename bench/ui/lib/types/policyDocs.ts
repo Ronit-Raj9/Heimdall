@@ -47,19 +47,21 @@ export interface PolicyDocView {
 	next: string;
 }
 
+/** One document in the list; a viewer's list (limited) has the id, title and upload time only. */
 export interface PolicyDocSummary {
 	id: string;
-	name: string;
+	name?: string;
 	title: string;
-	format: string;
+	format?: string;
 	uploaded_at: string;
-	clauses: number;
-	drafts: Record<string, number>;
+	clauses?: number;
+	drafts?: Record<string, number>;
 }
 
 export interface PolicyDocList {
 	suite: string;
 	docs: PolicyDocSummary[];
+	limited?: boolean;
 }
 
 export interface PolicyDocUpload {

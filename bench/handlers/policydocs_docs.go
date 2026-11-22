@@ -10,7 +10,7 @@ func init() {
 	base := APIPrefix + "/suites/{id}/policy-docs"
 	APIRoutes = append(APIRoutes,
 		RouteDoc{Method: "GET", Path: base, Tag: "suites",
-			Summary: "Policy documents uploaded to a support benchmark, with their clause and draft counts (member)", Response: PolicyDocList{}},
+			Summary: "Policy documents uploaded to a support benchmark, with their clause and draft counts; a viewer gets ids, titles and upload times only (limited), to open the report", Response: PolicyDocList{}},
 		RouteDoc{Method: "POST", Path: base, Tag: "suites",
 			Summary: "Upload a policy or SOP (PDF, DOCX, Markdown or text, base64 or pasted) and split it into numbered clauses; dry_run previews and writes nothing",
 			Auth:    AuthWrite, Request: PolicyDocUpload{}, Status: fasthttp.StatusCreated, Response: PolicyDocView{}},
