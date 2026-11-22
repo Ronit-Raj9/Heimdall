@@ -54,6 +54,8 @@ func TaskOK(agent *schemas.AgentConfig, s *schemas.Suite, t *schemas.Task) (bool
 		if kind != schemas.OutputAnswer {
 			return false, "it grades a " + outputWords(kind) + ", and the bare model only answers in text"
 		}
+	case isVoicePlatform(agent): // voiceplatform.go
+		return voicePlatformTaskOK(agent, t)
 	}
 	return true, ""
 }
@@ -79,7 +81,7 @@ func ChecksTasks(agent *schemas.AgentConfig) bool {
 	if agent == nil {
 		return false
 	}
-	return utils.IsOpenAIAgent(agent) || utils.IsA2A(agent) || utils.IsPullAgent(agent) || agent.Adapter == "remote_http" || agent.Remote != nil || utils.IsBareModel(agent)
+	return utils.IsOpenAIAgent(agent) || utils.IsA2A(agent) || utils.IsPullAgent(agent) || agent.Adapter == "remote_http" || agent.Remote != nil || utils.IsBareModel(agent) || isVoicePlatform(agent)
 }
 
 func remoteTaskOK(r *schemas.RemoteAgent, s *schemas.Suite, t *schemas.Task, kind, who, block string) (bool, string) {

@@ -51,11 +51,15 @@ var _ = lib.SendJSON
 
 func TestEveryTemplateRendersAndValidates(t *testing.T) {
 	params := map[string]map[string]string{
-		"http-url":        {"url": "https://agent.example.com/run"},
-		"a2a-card":        {"card_url": "https://agent.example.com/.well-known/agent-card.json"},
-		"openai-endpoint": {"url": "https://agent.example.com/v1", "model": "my-agent", "api_key_secret": "MY_AGENT_KEY"},
-		"docker-image":    {"image": "ghcr.io/acme/agent:1", "command": "my-agent {{instruction_file}}"},
-		"wrap-app":        {"repo_url": "https://github.com/org/agent.git", "command": "python3 -m app"},
+		"http-url":         {"url": "https://agent.example.com/run"},
+		"a2a-card":         {"card_url": "https://agent.example.com/.well-known/agent-card.json"},
+		"openai-endpoint":  {"url": "https://agent.example.com/v1", "model": "my-agent", "api_key_secret": "MY_AGENT_KEY"},
+		"docker-image":     {"image": "ghcr.io/acme/agent:1", "command": "my-agent {{instruction_file}}"},
+		"wrap-app":         {"repo_url": "https://github.com/org/agent.git", "command": "python3 -m app"},
+		"vapi-assistant":   {"agent_id": "asst_1", "api_key_secret": "VAPI_KEY"},
+		"retell-agent":     {"agent_id": "agent_1", "api_key_secret": "RETELL_KEY"},
+		"elevenlabs-agent": {"agent_id": "agent_1"},
+		"voice-websocket":  {"url": "wss://voice.example.com/twilio"},
 	}
 	if len(agentTemplates) < 15 {
 		t.Fatalf("want at least 15 templates, got %d", len(agentTemplates))

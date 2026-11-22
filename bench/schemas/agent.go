@@ -109,6 +109,9 @@ type AgentConfig struct {
 	A2A    *A2AAgent    `json:"a2a,omitempty" yaml:"a2a"`       // B1: read only by the a2a adapter and the engine (a2a.go)
 	OpenAI *OpenAIAgent `json:"openai,omitempty" yaml:"openai"` // A08: read only by the openai_agent adapter (adapters/openaiagent.go)
 	Pull   *PullAgent   `json:"pull,omitempty" yaml:"pull"`     // Y11: read only by the pull adapter (adapters/pull.go)
+	// VoicePlatform is read only by the voice_platform adapter and the text
+	// conversation driver (voiceplatform.go, bench/voiceconnect).
+	VoicePlatform *VoicePlatformAgent `json:"voice_platform,omitempty" yaml:"voice_platform"`
 
 	// Multi-agent fields (agents.go, docs/multi-agent.md). Team runs one
 	// container per member, each on its own gateway key, under the run-wide

@@ -182,3 +182,28 @@ func TestAudioRows(t *testing.T) {
 		t.Fatalf("hypotheses %+v", h)
 	}
 }
+
+func TestAnalyzeTalkOvers(t *testing.T) {
+	raw := `{"ev":"call_start","t_ms":0,"wall_ms":1}
+{"ev":"caller_speech_start","t_ms":100,"turn":1,"kind":"opening","text":"hi"}
+{"ev":"agent_speech_start","t_ms":300,"utt":1}
+{"ev":"overlap","t_ms":300,"by":"agent","caller_turn":1,"utt":1}
+{"ev":"overlap","t_ms":900,"by":"caller","caller_turn":2,"utt":1}
+{"ev":"caller_speech_end","t_ms":1000,"turn":1}
+{"ev":"call_end","t_ms":2000,"duration_ms":2000,"ended_by":"caller_done"}
+`
+	ev, err := ParseTimeline([]byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := Analyze(ev, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.TalkOvers != 1 {
+		t.Fatalf("talk-overs %d, want 1 (the caller's own overlap is a barge-in, not a talk-over)", a.TalkOvers)
+	}
+	if b := analyze(t, "call-good.jsonl", nil); b.TalkOvers != 0 {
+		t.Fatalf("good call talk-overs %d", b.TalkOvers)
+	}
+}

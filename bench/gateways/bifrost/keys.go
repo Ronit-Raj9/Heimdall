@@ -302,6 +302,9 @@ func noModelSpend(rc *schemas.RunContext) bool {
 	if a != nil && a.Remote != nil && a.Remote.ModelTraffic != "gateway" && len(a.Team) == 0 {
 		return true // a deployed agent whose model calls never pass this gateway
 	}
+	if a != nil && a.VoicePlatform != nil && len(a.Team) == 0 {
+		return true // a voice agent hosted on its platform: its model calls never pass this gateway
+	}
 	if a == nil || a.Adapter != "scripted" || a.Scripted == nil {
 		return false
 	}

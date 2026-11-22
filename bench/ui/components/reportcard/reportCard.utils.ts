@@ -99,6 +99,7 @@ export function visibleReport(report: Report): Report {
 		overall: undefined,
 		learning: report.learning?.filter((l) => l.arm === label),
 		persistence: report.persistence?.filter((p) => p.arm === label),
+		voice: report.voice?.filter((v) => v.arm === label),
 	};
 }
 

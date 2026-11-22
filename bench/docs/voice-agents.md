@@ -10,6 +10,9 @@ guide was built and checked at $0: scripted controls, the fault proxy's
 scripted model, a local fake for audio and chat, and local speech engines.
 
 The wire protocol an agent speaks is in [`docs/voice-protocol.md`](voice-protocol.md).
+An agent hosted on Vapi, Retell, ElevenLabs Agents or your own call
+WebSocket (Twilio Media Streams format) connects without a container: see
+[`docs/voice-platforms.md`](voice-platforms.md).
 
 ## Start
 
@@ -433,8 +436,9 @@ transcripts are witnessed or reported), and what the call cost per minute.
 
 Not measured, and not claimed:
 
-- **Telephony.** No SIP, PSTN, codecs (G.711, Opus), jitter, packet loss or
-  DTMF. The line is a clean 16 kHz WebSocket.
+- **Telephony.** No SIP, PSTN, jitter, packet loss or DTMF. The line is a
+  clean 16 kHz WebSocket; a hosted agent on a Twilio Media Streams socket
+  gets mu-law 8 kHz (`docs/voice-platforms.md`), but no Opus.
 - **Audio quality.** No MOS, naturalness or prosody score, no speaker
   similarity. Barge-in is measured as "audio stopped", not as how gracefully.
 - **Real callers.** The caller is a script (or a pinned model) speaking with

@@ -31,6 +31,7 @@ const (
 	DeadAirS           = "dead_air_s"
 	STTWER             = "stt_wer"
 	VoiceCostPerMinute = "voice_cost_per_minute"
+	TalkOvers          = "talk_overs"
 )
 
 var (
@@ -163,6 +164,16 @@ func voiceMetrics() []*voiceMetric {
 				}
 			}
 			return schemas.Observed(float64(n)/float64(len(a.BargeIns)), schemas.EvidenceBoundary)
+		}},
+		&voiceMetric{d: schemas.MetricDescriptor{
+			Name: TalkOvers, Version: version, Label: "Talk-overs per call", Kind: schemas.KindCount,
+			HigherIsBetter: false, MinEvidence: schemas.EvidenceBoundary,
+			Description: "Times per call the agent started speaking while the caller was still talking (not counting the caller's own interruptions), from the voice caller's timeline, averaged over voice runs whose call finished.",
+		}, compute: func(_ *schemas.RunContext, _ *schemas.Evidence, a *voice.Analysis) schemas.Value {
+			if !a.Complete {
+				return schemas.Unknown("the voice timeline has no call_end: the call did not finish cleanly", schemas.EvidenceBoundary)
+			}
+			return schemas.Observed(float64(a.TalkOvers), schemas.EvidenceBoundary)
 		}},
 		&voiceMetric{d: schemas.MetricDescriptor{
 			Name: DeadAirS, Version: version, Label: "Dead air (s)", Kind: schemas.KindDuration,

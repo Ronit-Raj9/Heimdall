@@ -196,6 +196,9 @@ type Report struct {
 	// squeezed budget and converted spend into success; nil when no run
 	// reported any of it.
 	Persistence []PersistenceRow `json:"persistence,omitempty"`
+	// Voice is each arm's call quality on the voice benchmarks (voice.go);
+	// nil when no run was a voice call.
+	Voice []VoiceRow `json:"voice,omitempty"`
 }
 
 // LearningRow is one arm's learning summary on one benchmark.
@@ -456,6 +459,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	rep.Alignment = alignment(children, labels)
 	rep.Learning = learningRows(children, labels)
 	rep.Persistence = persistence(children, labels)
+	rep.Voice = voiceRows(children, labels)
 	return rep, nil
 }
 

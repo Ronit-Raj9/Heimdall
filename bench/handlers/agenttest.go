@@ -210,6 +210,8 @@ func (h *agentTestHandler) run(ctx context.Context, cfg *schemas.AgentConfig) *E
 		return h.runMapped(ctx, cfg, res, step, fail, start)
 	case cfg.Remote != nil && (cfg.Adapter == "remote_http" || cfg.Adapter == ""):
 		return h.runRemote(ctx, cfg.Remote, res, step, fail, start)
+	case cfg.VoicePlatform != nil: // agenttestvoice.go
+		return h.runVoicePlatform(ctx, cfg.VoicePlatform, res, step, fail, start)
 	case utils.IsA2A(cfg):
 		return h.runA2A(ctx, cfg.A2A, res, step, fail, start) // Y03: straight to the agent's card and JSON-RPC endpoint (agenttest_a2a.go)
 	}

@@ -61,7 +61,7 @@ const (
 // a caller probe (docs/voice-agents.md).
 var Probes = []string{ProbeNoise, ProbeSpeed, ProbeInterrupt, ProbeSilent}
 
-//go:embed voicecaller.py tonecode.py wsproto.py voiceclient.py fakeopenai.py cascadedagent.py realtimebridge.py
+//go:embed voicecaller.py tonecode.py wsproto.py voiceclient.py fakeopenai.py cascadedagent.py realtimebridge.py platformbridge.py
 var assets embed.FS
 
 // CallerFiles are the files a voice suite's service image carries next to
@@ -71,6 +71,11 @@ var CallerFiles = []string{"voicecaller.py", "tonecode.py", "wsproto.py", "voice
 // AgentFiles are the reference agents' files (an agent image carries them
 // with the client helpers).
 var AgentFiles = []string{"cascadedagent.py", "realtimebridge.py", "voiceclient.py", "tonecode.py", "wsproto.py"}
+
+// BridgeFiles are what the voice_platform adapter writes into its run
+// container: the bridge to a hosted voice agent and the client helpers it
+// dials the caller with (docs/voice-platforms.md).
+var BridgeFiles = []string{"platformbridge.py", "voiceclient.py", "tonecode.py", "wsproto.py"}
 
 // File returns one embedded Python file.
 func File(name string) []byte {
