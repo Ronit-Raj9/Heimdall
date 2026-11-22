@@ -43,9 +43,9 @@ func TestFetchRefusesPrivateHosts(t *testing.T) {
 func TestFetchDialGuard(t *testing.T) {
 	// Names are checked again at dial time: an address that resolves inside is refused.
 	f := NewFetcher()
-	tr := f.httpClient().Transport.(*http.Transport)
+	c := f.httpClient()
 	for _, addr := range []string{"127.0.0.1:443", "10.1.2.3:443", "[::1]:443", "169.254.169.254:443"} {
-		if _, err := tr.DialContext(context.Background(), "tcp", addr); err == nil || !errors.Is(err, ErrFetchRefused) {
+		if _, err := c.Get("https://" + addr + "/"); err == nil || !errors.Is(err, ErrFetchRefused) {
 			t.Errorf("dial %s: %v, want refused", addr, err)
 		}
 	}

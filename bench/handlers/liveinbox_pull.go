@@ -18,6 +18,7 @@ import (
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/livescore"
 	"github.com/maximhq/bifrost/bench/traceinbox"
+	"github.com/maximhq/bifrost/bench/utils"
 	"github.com/maximhq/bifrost/bench/webhooks"
 	"github.com/valyala/fasthttp"
 )
@@ -102,7 +103,7 @@ func (t *capTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	t.mu.Unlock()
 	resp, err := t.next.RoundTrip(r)
 	if err != nil {
-		return nil, err
+		return nil, utils.HideAddresses(err) // N104: a dial error names the resolved address; pull errors reach the job log
 	}
 	resp.Body = &capBody{rc: resp.Body, t: t}
 	return resp, nil

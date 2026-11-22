@@ -14,6 +14,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // Apply limits.
@@ -124,14 +126,15 @@ func GatewayClient(public bool) *http.Client {
 				return err
 			}
 			if ip := net.ParseIP(host); ip == nil || blockedIP(ip) {
-				return fmt.Errorf("%w: %s is a private or local address", ErrGatewayRefused, host)
+				return fmt.Errorf("%w: the host is a private or local address", ErrGatewayRefused)
 			}
 			return nil
 		}
 	}
 	return &http.Client{
-		Timeout:   applyTimeout,
-		Transport: &http.Transport{DialContext: d.DialContext, Proxy: nil, TLSHandshakeTimeout: 10 * time.Second},
+		Timeout: applyTimeout,
+		// N104: the dial error names the resolved address; private ones are hidden.
+		Transport: utils.HidingAddresses(&http.Transport{DialContext: d.DialContext, Proxy: nil, TLSHandshakeTimeout: 10 * time.Second}),
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse // a redirect could carry the credential elsewhere
 		},

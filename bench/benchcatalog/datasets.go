@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/projectfs"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // Dataset upload and server-side fetch for importer entries (gap G11). A
@@ -237,14 +238,16 @@ func (f *Fetcher) httpClient() *http.Client {
 				return err
 			}
 			if ip := net.ParseIP(host); ip == nil || blockedIP(ip) {
-				return fmt.Errorf("%w: %s resolves to a private or local address", ErrFetchRefused, host)
+				return fmt.Errorf("%w: the host resolves to a private or local address", ErrFetchRefused)
 			}
 			return nil
 		}
 	}
 	tr := &http.Transport{Proxy: nil, DialContext: d.DialContext, TLSHandshakeTimeout: 10 * time.Second,
 		ResponseHeaderTimeout: 30 * time.Second, MaxIdleConns: 2}
-	f.client = &http.Client{Transport: tr, CheckRedirect: func(req *http.Request, via []*http.Request) error {
+	// N104: the dial error names the address the host resolved to; the
+	// refusal reaches the member, so private addresses are hidden.
+	f.client = &http.Client{Transport: utils.HidingAddresses(tr), CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) >= MaxFetchRedirect {
 			return fmt.Errorf("%w: more than %d redirects", ErrFetchRefused, MaxFetchRedirect)
 		}

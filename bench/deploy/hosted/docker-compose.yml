@@ -382,6 +382,8 @@ services:
       # Organization key base URLs are org-supplied: dial them only at public
       # addresses, checked at connect time (shared stack only).
       BENCH_FAULTPROXY_PUBLIC_ONLY: "1"
+      # Its guarded dialer resolves names through the public DNS servers.
+      HEIMDALL_PUBLIC_DNS: ${HEIMDALL_PUBLIC_DNS:-}
       # No server-wide provider keys and no scripted fallback: every org run
       # uses the org's own keys from Models & keys, which runners register
       # per lease. A keyless call fails with "no key configured".
@@ -536,6 +538,7 @@ services:
       BENCH_PULL_URL: ${HEIMDALL_PUBLIC_URL:-https://${HEIMDALL_DOMAIN}} # where a pull run's launcher reaches the server
       HEIMDALL_SHARED_RUNTIME: ${HEIMDALL_SHARED_RUNTIME:-auto}
       HEIMDALL_FAULT_MODE: ${HEIMDALL_FAULT_MODE:-} # proxy (default) or plugin, the same as the server
+      HEIMDALL_PUBLIC_DNS: ${HEIMDALL_PUBLIC_DNS:-} # guarded calls to org sandbox platforms resolve through these servers
       # Operator override, logged on every start: run under runc when the
       # host has no gVisor, serving only orgs a server admin set to runc.
       HEIMDALL_SHARED_ALLOW_RUNC: ${HEIMDALL_SHARED_ALLOW_RUNC:-}

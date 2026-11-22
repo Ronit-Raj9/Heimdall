@@ -194,11 +194,18 @@ func (h *agentTestHandler) secrets(ctx context.Context, names ...string) (map[st
 func (h *agentTestHandler) run(ctx context.Context, cfg *schemas.AgentConfig) *EndpointTestResult {
 	res := &EndpointTestResult{Adapter: cfg.Adapter, Trace: []EndpointTestStep{}, Notes: []string{}}
 	start := h.now()
+	// A dial error can carry the address a name resolved to (N104): the
+	// error and, on a hosted server, every trace line show private addresses
+	// as "a private address".
 	step := func(kind, format string, a ...any) {
-		res.Trace = append(res.Trace, EndpointTestStep{AtMS: h.now().Sub(start).Milliseconds(), Kind: kind, Detail: fmt.Sprintf(format, a...)})
+		detail := fmt.Sprintf(format, a...)
+		if h.env.Services.Hosted {
+			detail = utils.HidePrivateAddresses(detail)
+		}
+		res.Trace = append(res.Trace, EndpointTestStep{AtMS: h.now().Sub(start).Milliseconds(), Kind: kind, Detail: detail})
 	}
 	fail := func(format string, a ...any) *EndpointTestResult {
-		res.Error = fmt.Sprintf(format, a...)
+		res.Error = utils.HidePrivateAddresses(fmt.Sprintf(format, a...))
 		step("error", "%s", res.Error)
 		res.LatencyMS = h.now().Sub(start).Milliseconds()
 		return res
