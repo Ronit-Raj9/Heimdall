@@ -352,16 +352,16 @@ type sharedHost struct {
 	secret      string
 	runtime     string // container runtime of every org
 	filter      string // assignment filter ("" every org)
-	builder     string   // buildx builder for org images ("" refuses them, unless sessions)
-	sessions    bool     // org images build in build sessions of their own (buildsession.go)
-	exe         string   // this binary, for the build session command
-	lockDir     string   // per-org build locks
-	registry    string   // registry org builds take base images from ("" none)
+	builder     string // buildx builder for org images ("" refuses them, unless sessions)
+	sessions    bool   // org images build in build sessions of their own (buildsession.go)
+	exe         string // this binary, for the build session command
+	lockDir     string // per-org build locks
+	registry    string // registry org builds take base images from ("" none)
 	regClient   *http.Client
 	regCred     *utils.RegistryCredentials // read-only pull credentials ("" none)
 	manifest    string                     // registry manifest path (digest pins)
-	gateway     string // gateway container every org network joins
-	gatewayHost string // the gateway's name as agents dial it
+	gateway     string                     // gateway container every org network joins
+	gatewayHost string                     // the gateway's name as agents dial it
 	trusted     []string
 	platform    []string
 	client      *http.Client

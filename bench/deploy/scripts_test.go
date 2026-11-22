@@ -18,7 +18,8 @@ import (
 // Environment knobs let a test fail single steps: STUB_LS_RC (inventory ls
 // commands), STUB_PAUSE_RC, STUB_PAUSED (server already paused),
 // STUB_EVIDENCE_RC and STUB_SEAL_HALF (the seal check reports a
-// half-published seal that many times before passing).
+// half-published seal that many times before passing), STUB_DRAIN (help
+// lists the drain command), STUB_DRAIN_RC and STUB_UP_RC (the restart).
 func stubDocker(t *testing.T, existing bool) (bin, logPath string) {
 	t.Helper()
 	bin = t.TempDir()
@@ -43,7 +44,9 @@ case " $* " in
 *" pg_dump "*) echo dump ;;
 *" tar "*"-cf"*) echo archive ;;
 *" registry htpasswd "*) read -r _; echo "heimdall-x:hash" ;;
-*" help"*) printf '  evidence   mirror and restore\n  registry   credentials\n' ;;
+*" drain "*) exit "${STUB_DRAIN_RC:-0}" ;;
+*" up -d --wait --remove-orphans "*) exit "${STUB_UP_RC:-0}" ;;
+*" help"*) printf '  evidence   mirror and restore\n  registry   credentials\n'; [ -z "${STUB_DRAIN:-}" ] || printf '  drain      stop new leases\n' ;;
 esac
 exit 0
 `
@@ -403,5 +406,55 @@ func TestBootstrapGeneratesMasterKey(t *testing.T) {
 		if !strings.Contains(string(raw), tc.want+"\n") || strings.Count(string(raw), "HEIMDALL_MASTER_KEY=") != 1 {
 			t.Fatalf("have %q: env file:\n%s\noutput:\n%s", tc.have, raw, out)
 		}
+	}
+}
+
+// TestUpgradeDrainsBeforeRestart is Z11 drain mode: upgrade.sh builds the
+// new images, then drains the running server (no new leases, wait for runs
+// in flight) and only then restarts it, and turns drain mode off after the
+// restart (a server that was not recreated would otherwise stay drained). A
+// drain timeout (exit 5) still upgrades; --no-drain and a server without the
+// drain command skip it; a failed restart turns drain mode off again.
+func TestUpgradeDrainsBeforeRestart(t *testing.T) {
+	const drainCall = "exec -T heimdall /usr/local/bin/bifrost-bench drain -config /srv/heimdall/deploy/bench.yaml"
+	cases := []struct {
+		name      string
+		env, args []string
+		wantErr   bool
+		want      []string // in this order
+		absent    string
+	}{
+		{name: "drained", env: []string{"STUB_DRAIN=1"},
+			want: []string{"build --pull", drainCall + " -timeout 10m", "up -d --wait --remove-orphans", drainCall + " -off"}},
+		{name: "timeout still upgrades", env: []string{"STUB_DRAIN=1", "STUB_DRAIN_RC=5"}, args: []string{"--drain-timeout", "30s"},
+			want: []string{drainCall + " -timeout 30s", "up -d --wait --remove-orphans", drainCall + " -off"}},
+		{name: "no drain flag", env: []string{"STUB_DRAIN=1"}, args: []string{"--no-drain"},
+			want: []string{"up -d --wait --remove-orphans"}, absent: drainCall},
+		{name: "older server", want: []string{"up -d --wait --remove-orphans"}, absent: drainCall},
+		{name: "failed restart undrains", env: []string{"STUB_DRAIN=1", "STUB_UP_RC=1"}, wantErr: true,
+			want: []string{drainCall + " -timeout 10m", "up -d --wait --remove-orphans", drainCall + " -off"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bin, logPath := stubDocker(t, false)
+			env := append([]string{"HEIMDALL_ENV_FILE=" + backupEnv(t, ""), "HEIMDALL_PROJECT=z11-upgrade", "STUB_RUNNING=1"}, tc.env...)
+			out, err := runScript(t, bin, env, "hosted/upgrade.sh", append([]string{"--no-pull", "--no-backup"}, tc.args...)...)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("upgrade.sh: %v (want error %v)\n%s", err, tc.wantErr, out)
+			}
+			b, _ := os.ReadFile(logPath)
+			log := string(b)
+			at := 0
+			for _, w := range tc.want {
+				i := strings.Index(log[at:], w)
+				if i < 0 {
+					t.Fatalf("want %q after offset %d in docker calls:\n%s\nscript output:\n%s", w, at, log, out)
+				}
+				at += i + len(w)
+			}
+			if tc.absent != "" && strings.Contains(log, tc.absent) {
+				t.Fatalf("unexpected %q in docker calls:\n%s", tc.absent, log)
+			}
+		})
 	}
 }

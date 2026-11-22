@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/engine"
-	"github.com/maximhq/bifrost/bench/sandbox"
 	"github.com/maximhq/bifrost/bench/registrycreds"
+	"github.com/maximhq/bifrost/bench/sandbox"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
 )

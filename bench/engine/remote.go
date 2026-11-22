@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	drainmode "github.com/maximhq/bifrost/bench/drain"
 	"github.com/maximhq/bifrost/bench/runctl"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/secrets"
@@ -65,6 +66,13 @@ type RemoteOptions struct {
 	// loss. Default: <store root>/.remote.
 	StagingDir string
 	Logger     schemas.Logger
+	// Leases, when set, keeps every slot lease in a lease book so a server
+	// restart keeps the runs in flight (Z11 durable leases, remotebook.go).
+	// nil: leases live in memory only and a restart ends them.
+	Leases LeaseBook
+	// ReattachGrace is how long after boot the heartbeats of kept leases
+	// are accepted before their experiment resumes. Default: StaleAfter.
+	ReattachGrace time.Duration
 }
 
 // RunnerBook records hosted runners as the coordinator sees them (Runners
@@ -97,6 +105,13 @@ type Coordinator struct {
 	ended   map[string]string // lease id -> why it ended; a late call for it is refused with this
 	rj      runnerJobs        // runner jobs (gap G05, remotejobs.go)
 	runs    map[string]int    // uploaded runs by result: accepted (by outcome) or rejected; /metrics (remotedisk.go)
+
+	// Z11 durable leases (remotebook.go): leases kept across a restart,
+	// waiting for their experiment, and the lease book's write queue.
+	pending  map[string]*pendingLease
+	bootAt   time.Time
+	bookQ    chan bookOp
+	bookOnce sync.Once
 }
 
 // remoteWorker is one registered worker.
@@ -124,6 +139,7 @@ type remoteLease struct {
 	closing           bool      // complete or release in progress; the sweep leaves it alone
 	started           time.Time // when the lease was handed out (lane Y16 metering)
 	metered           bool      // its time was handed to RemoteOptions.Meter
+	persisted         time.Time // Z11: last heartbeat written to the lease book
 }
 
 // NewCoordinator returns a coordinator over reg's store. The token must be
@@ -160,8 +176,9 @@ func NewCoordinator(reg *schemas.Registry, opts RemoteOptions) (*Coordinator, er
 		return nil, fmt.Errorf("coordinator: staging folder: %w", err)
 	}
 	c := &Coordinator{store: reg.Store, logger: opts.Logger, opts: opts, now: time.Now,
-		workers: map[string]*remoteWorker{}, leases: map[string]*remoteLease{}, ended: map[string]string{}}
+		workers: map[string]*remoteWorker{}, leases: map[string]*remoteLease{}, ended: map[string]string{}, pending: map[string]*pendingLease{}}
 	c.reapStaging(c.now())
+	c.loadLeases() // Z11: leases kept across the restart (remotebook.go)
 	if opts.OrgID == "" {
 		c.tokenSum = sha256.Sum256([]byte(opts.Token))
 	}
@@ -230,6 +247,7 @@ func (c *Coordinator) Register(ctx context.Context, req *schemas.WorkerRegister)
 		c.workers[req.WorkerID] = w
 		c.order = append(c.order, req.WorkerID)
 	}
+	c.dropPendingOfLocked(req.WorkerID) // Z11: kept leases of the old process are gone too (remotebook.go)
 	for _, l := range c.leases {
 		if l.worker == req.WorkerID && !l.closing {
 			// The old process is gone, so its store lease is closed under its
@@ -296,6 +314,10 @@ func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.Work
 		c.mu.Unlock()
 		return nil, nil
 	}
+	if drainmode.Active() { // Z11 drain mode: no new lease; leases out keep their heartbeats, uploads and completes
+		c.mu.Unlock()
+		return nil, nil
+	}
 	if jl := c.leaseJobLocked(w); jl != nil { // runner jobs first: a user waits on them (remotejobs.go)
 		c.mu.Unlock()
 		return jl, nil
@@ -347,6 +369,7 @@ func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.Work
 		c.leases[id] = l
 		w.info.Running = append(w.info.Running, slot.SlotID)
 		w.info.State = schemas.WorkerRunning
+		l.persisted = l.lastBeat
 		c.mu.Unlock()
 		// The reservation is journaled before the lease is answered, so a
 		// coordinator crash or stop never forgets it (QC2-07-02); a lease
@@ -358,6 +381,7 @@ func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.Work
 			r.endRemote(l, true)
 			return nil, fmt.Errorf("lease %s: reservation not journaled: %w", id, err)
 		}
+		c.bookPut(l) // Z11: kept across a restart (remotebook.go)
 		r.emit(Event{Kind: EventStage, SlotID: slot.SlotID, Stage: schemas.StageLeased,
 			Message: fmt.Sprintf("leased to remote worker %s (attempt %d)", workerID, attempt)})
 		return c.leaseView(l), nil
@@ -397,6 +421,9 @@ func (c *Coordinator) Heartbeat(ctx context.Context, leaseID, workerID string) e
 	if handled, err := c.jobHeartbeat(ctx, leaseID, workerID, scope); handled {
 		return err
 	}
+	if handled, err := c.pendingHeartbeat(ctx, leaseID, workerID, scope); handled { // Z11 (remotebook.go)
+		return err
+	}
 	c.mu.Lock()
 	l, err := c.leaseLocked(leaseID, workerID, scope)
 	c.mu.Unlock()
@@ -417,8 +444,15 @@ func (c *Coordinator) Heartbeat(ctx context.Context, leaseID, workerID string) e
 	}
 	c.mu.Lock()
 	live := c.leases[l.id] == l && !l.closing
+	touch := false
 	if c.leases[l.id] == l {
 		l.lastBeat = c.now()
+		if touch = c.opts.Leases != nil && l.lastBeat.Sub(l.persisted) >= c.touchEvery(); touch {
+			l.persisted = l.lastBeat
+		}
+	}
+	if touch {
+		c.bookSend(bookOp{id: l.id, at: l.lastBeat}) // Z11: queued in order, written outside the lock
 	}
 	w := c.workers[workerID]
 	var seen schemas.RunnerScope
@@ -499,6 +533,9 @@ func (c *Coordinator) Upload(ctx context.Context, leaseID, workerID string, offs
 	if handled, n, err := c.jobUpload(leaseID, workerID, scope, offset, data); handled {
 		return n, err
 	}
+	if handled, err := c.pendingCall(leaseID, workerID, scope); handled { // Z11 (remotebook.go)
+		return 0, err
+	}
 	c.mu.Lock()
 	l, err := c.leaseLocked(leaseID, workerID, scope)
 	switch {
@@ -563,6 +600,9 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 	}
 	if handled, out, err := c.jobComplete(leaseID, scope, req); handled {
 		return out, err
+	}
+	if handled, err := c.pendingCall(leaseID, req.WorkerID, scope); handled { // Z11 (remotebook.go)
+		return nil, err
 	}
 	c.mu.Lock()
 	l, err := c.leaseLocked(leaseID, req.WorkerID, scope)
@@ -640,6 +680,9 @@ func (c *Coordinator) Release(ctx context.Context, leaseID string, req *schemas.
 		return err
 	}
 	if handled, err := c.jobRelease(leaseID, scope, req); handled {
+		return err
+	}
+	if handled, err := c.pendingCall(leaseID, req.WorkerID, scope); handled { // Z11 (remotebook.go)
 		return err
 	}
 	c.mu.Lock()
@@ -720,6 +763,7 @@ func (c *Coordinator) Sweep(now time.Time) {
 // ended on its context) is ended: its store lease released, its slot counted
 // pending, and a later upload for it refused.
 func (c *Coordinator) attach(r *schedRun) func() {
+	c.revive(r) // Z11: leases kept across a restart, before any other lease call sees r (remotebook.go)
 	c.mu.Lock()
 	c.exps = append(c.exps, r)
 	c.mu.Unlock()
@@ -747,15 +791,34 @@ func (c *Coordinator) attach(r *schedRun) func() {
 				break
 			}
 		}
-		var left []*remoteLease
+		var left, kept []*remoteLease
+		suspend := c.suspending(r) // Z11: a server shutdown keeps the leases for the next process (remotebook.go)
 		for _, l := range c.leases {
 			if l.r == r && !l.closing { // a closing lease belongs to its Complete call, which ends it once (2-A-07)
+				if suspend {
+					// Out of this process's table only: the store lease stays
+					// held, the book row open, and nothing is charged.
+					// Until the process exits its heartbeats are still
+					// answered (a kept lease waits like one loaded at boot).
+					delete(c.leases, l.id)
+					c.pending[l.id] = &pendingLease{rec: c.recordLocked(l), lastBeat: l.lastBeat}
+					c.bootAt = c.now()
+					kept = append(kept, l)
+					continue
+				}
 				left = append(left, l)
 				c.endLocked(l, "the experiment's scheduler stopped")
 			}
 		}
 		c.mu.Unlock()
 		r.remoteOps.Wait() // every in-flight lease, completion or release call has settled
+		for _, l := range kept {
+			c.logger.Info("lease kept for the next server process: the run continues on its worker", "experiment", r.m.ExpID,
+				"slot", l.slot.SlotID, "worker", l.worker, "lease", l.id)
+			r.count(func(s *Summary) { s.Pending++ })
+			r.release(l.est)
+			r.queue.finish()
+		}
 		for _, l := range left {
 			c.remove(l.archive)
 			// The worker may have started and spent: the lease is charged
@@ -1066,6 +1129,7 @@ func (c *Coordinator) revokeCancelled(r *schedRun, st *runctl.State) {
 func (c *Coordinator) endLocked(l *remoteLease, why string) {
 	delete(c.leases, l.id)
 	c.ended[l.id] = why
+	c.bookSend(bookOp{id: l.id, end: true, why: why}) // Z11: the lease book's row closes too (remotebook.go)
 	w := c.workers[l.worker]
 	if !l.metered {
 		l.metered = true
@@ -1499,7 +1563,7 @@ func (r *schedRun) remoteCharges(sealed map[string]bool) (out []journalEntry, to
 		}
 	}
 	for _, e := range open {
-		if ended[e.Lease] || sealed[e.Lease] {
+		if ended[e.Lease] || sealed[e.Lease] || r.opts.Remote.isPending(r.m.ExpID, e.Lease) { // Z11: a kept lease is re-attached, not charged (remotebook.go)
 			continue
 		}
 		usd := max(*e.ReservedUSD, 0)

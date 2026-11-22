@@ -18,6 +18,7 @@ import (
 	runnerdeploy "github.com/maximhq/bifrost/bench/deploy/runner"
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/handlers"
+	"github.com/maximhq/bifrost/bench/leasebook"
 	"github.com/maximhq/bifrost/bench/runners"
 	"github.com/maximhq/bifrost/bench/server"
 	"github.com/maximhq/bifrost/bench/store"
@@ -92,7 +93,11 @@ func runnersOf(env *hostedEnv) *hostedRunners {
 	}
 	svc := runners.New(env.db, runners.Options{PublicURL: env.base.cfg.Auth.PublicURL, Logger: env.base.logger,
 		Repo: os.Getenv(runnerRepoEnv), Ref: installRevision()})
-	hub := engine.NewRemoteHub(engine.RemoteOptions{Logger: env.base.logger, Book: svc, Meter: billingMeter{env: env}}) // Y16: shared worker minutes (billing_hosted.go)
+	ropts := engine.RemoteOptions{Logger: env.base.logger, Book: svc, Meter: billingMeter{env: env}} // Y16: shared worker minutes (billing_hosted.go)
+	if env.db != nil {
+		ropts.Leases = &leasebook.Book{DB: env.db} // Z11 durable leases: a restart keeps runs in flight (engine/remotebook.go)
+	}
+	hub := engine.NewRemoteHub(ropts)
 	svc.SetLive(hub)
 	v, loaded := runnerEnvs.LoadOrStore(env, &hostedRunners{hub: hub, svc: svc})
 	rs := v.(*hostedRunners)

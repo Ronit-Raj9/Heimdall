@@ -48,6 +48,7 @@ func runServe(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
+	writeDrainToken(a) // Z11 drain mode: the token `bifrost-bench drain` reads (drain.go)
 	// An offline server runs nothing and reaches no gateway: everything it
 	// serves is replayed from disk, so it is never a live answer, whatever
 	// bench.yaml says (audit 7-B-03). Synthetic stays synthetic. A hosted
