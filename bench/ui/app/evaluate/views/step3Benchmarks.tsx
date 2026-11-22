@@ -1,5 +1,6 @@
+import { BenchmarkChecklist } from "@/components/evaluations/benchmarkChecklist";
 import { RedTeamPanel } from "@/components/redteam/redTeamPanel";
-import { suiteDisplayCategory, suiteDisplayDescription, suiteDisplayName, suiteSections } from "@/components/suites/suiteDisplay";
+import { suiteDisplayCategory, suiteSections } from "@/components/suites/suiteDisplay";
 import { useGetSuitesQuery } from "@/lib/store/apis/benchApi";
 import {
 	type AgentCompatibility,
@@ -291,7 +292,6 @@ export function Step3BenchmarksView({
 	const known = entriesByBenchmark(reference ?? []);
 	const ready = new Map(suites.map((s) => [s.id, s.admitted_count ?? 0]));
 	const chosen = new Set(selected);
-	const { groups } = groupBenchmarks(suites);
 
 	const toggle = (id: string) => {
 		const next = chosen.has(id) ? selected.filter((b) => b !== id) : [...selected, id];
@@ -315,52 +315,6 @@ export function Step3BenchmarksView({
 					? tr("hint.one", { agent: h.agent, score: h.score })
 					: tr("hint.many", { agent: h.agent, low: h.low, high: h.high })}
 			</span>
-		);
-	};
-
-	const row = (s: SuiteRow) => {
-		const c = compatFor(compat, s.id);
-		const reason = incompatibleReason(c);
-		const disabled = Boolean(reason) || Boolean(checking);
-		const on = chosen.has(s.id) && !disabled;
-		const n = s.admitted_count ?? 0;
-		const note =
-			reason ||
-			(checking ? "Checking whether your agent can run it..." : "") ||
-			(isGpuBenchmark(s.id) ? "Needs a GPU worker" : "") ||
-			(c?.ok ? (c.note ?? "") : "");
-		return (
-			<li key={s.id}>
-				<label
-					data-testid={`step3-benchmark-${s.id}`}
-					data-disabled={disabled || undefined}
-					title={s.id}
-					className={cn(
-						"flex items-start gap-3 rounded-md px-2 py-1.5 text-sm",
-						disabled ? "cursor-not-allowed opacity-50" : "hover:bg-muted/60 cursor-pointer",
-					)}
-				>
-					<input
-						type="checkbox"
-						className="accent-primary mt-0.5 size-3.5"
-						checked={on}
-						disabled={disabled}
-						onChange={() => toggle(s.id)}
-					/>
-					<span className="min-w-0 flex-1">
-						<span className="flex items-baseline justify-between gap-3">
-							<span className="truncate font-medium">{suiteDisplayName(s.id)}</span>
-							<span className={cn("shrink-0 text-xs tabular-nums", n ? "text-muted-foreground" : "text-amber-600 dark:text-amber-400")}>
-								{n ? `${plural(n, "ready task")}` : "No ready tasks"}
-							</span>
-						</span>
-						<span className="text-muted-foreground block truncate text-xs" title={note || undefined}>
-							{note ? note : suiteDisplayDescription(s)}
-						</span>
-						{hintLine(s.id)}
-					</span>
-				</label>
-			</li>
 		);
 	};
 
@@ -408,22 +362,16 @@ export function Step3BenchmarksView({
 
 			<section>
 				<h3 className="mb-2 text-sm font-medium">Or pick benchmarks</h3>
-				{groups.length === 0 ? (
-					<p className="text-muted-foreground text-sm">
-						{loading
-							? "Loading benchmarks..."
-							: "No benchmark has ready tasks yet. Benchmarks that are not ready yet are listed on the Benchmarks page."}
-					</p>
-				) : (
-					<div className="flex flex-col gap-4">
-						{groups.map((g) => (
-							<div key={g.capability} data-testid={`step3-group-${g.capability}`}>
-								<div className="text-muted-foreground mb-1 px-2 text-xs font-medium tracking-wide uppercase">{g.label}</div>
-								<ul className="flex flex-col">{g.suites.map(row)}</ul>
-							</div>
-						))}
-					</div>
-				)}
+				<BenchmarkChecklist
+					suites={suites}
+					compatibility={compatibility}
+					checking={checking}
+					selected={selected}
+					onToggle={toggle}
+					loading={loading}
+					testIdPrefix="step3"
+					extra={hintLine}
+				/>
 			</section>
 
 			<div className="text-muted-foreground border-t pt-3 text-sm" data-testid="step3-summary" aria-live="polite">
