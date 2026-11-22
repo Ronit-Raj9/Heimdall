@@ -12,9 +12,10 @@ import { cn } from "@/lib/utils";
 import { entriesByBenchmark, referenceHint } from "@/components/reference/reference.utils";
 import { type ReferenceEntry, useGetReferenceBoardQuery } from "@/lib/store/apis/referenceApi";
 import "@/lib/types/referenceI18n";
-import { useEffect } from "react";
+import { type ReactNode, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useEvaluateDraft } from "./evaluateDraft";
+import { OwnTasksCard } from "./ownTasks";
 
 // Lane A12: wizard step 3, "Benchmarks". Pick a pack or any set of single benchmarks. Benchmarks the
 // chosen agent cannot run are greyed out with the reason from /agents/{id}/compatibility.
@@ -198,10 +199,12 @@ export interface Step3BenchmarksViewProps {
 	checking?: boolean;
 	/** Published reference scores (gap G4-03), every benchmark; absent or empty shows no hint. */
 	reference?: readonly ReferenceEntry[];
+	/** The "Your own tasks" card, shown first (the container passes it; the pure view stays data-free). */
+	ownTasks?: ReactNode;
 }
 
 /** Pure view: packs, grouped multi-select and the selected count. Data comes in through props. */
-export function Step3BenchmarksView({ suites, packs, compatibility, selected, pack, onChange, loading, checking, reference }: Step3BenchmarksViewProps) {
+export function Step3BenchmarksView({ suites, packs, compatibility, selected, pack, onChange, loading, checking, reference, ownTasks }: Step3BenchmarksViewProps) {
 	const { t: tr } = useTranslation("reference");
 	const compat = compatibilityMap(compatibility);
 	const known = entriesByBenchmark(reference ?? []);
@@ -276,6 +279,7 @@ export function Step3BenchmarksView({ suites, packs, compatibility, selected, pa
 
 	return (
 		<div className="flex flex-col gap-6" data-testid="step3-benchmarks">
+			{ownTasks}
 			<section>
 				<h3 className="mb-2 text-sm font-medium">Start from a pack</h3>
 				{packs.length === 0 ? (
@@ -387,6 +391,7 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({ draft, 
 			loading={suites.isLoading || packs.isLoading}
 			checking={checking}
 			reference={reference.data?.entries}
+			ownTasks={<OwnTasksCard onAdd={(id) => onChange({ benchmarks: draft.benchmarks.includes(id) ? draft.benchmarks : [...draft.benchmarks, id], pack: undefined })} />}
 		/>
 	);
 }

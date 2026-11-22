@@ -8,7 +8,9 @@ package handlers
 // suite.admit job.
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -20,6 +22,7 @@ import (
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/scaffold"
+	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/valyala/fasthttp"
 	"gopkg.in/yaml.v3"
@@ -43,6 +46,31 @@ type RowImportRequest struct {
 	DryRun bool `json:"dry_run,omitempty"`
 	// Source names where the rows came from, for provenance (a file name).
 	Source string `json:"source,omitempty"`
+
+	// Lane Y13 row mapper. Mapping picks the column of each field (dotted
+	// paths into nested records); empty fields are detected. With no
+	// mapping the one saved by an earlier import (import-map.yaml) is used.
+	Mapping *scaffold.RowMapping `json:"mapping,omitempty"`
+	// SaveMapping keeps Mapping in benchmarks/<id>/import-map.yaml so the
+	// next import of the same export reuses it.
+	SaveMapping bool `json:"save_mapping,omitempty"`
+	// GradeOn is how conversation rows are graded when a row names none:
+	// final (the agent's last reply, default) or transcript (the whole
+	// conversation).
+	GradeOn string `json:"grade_on,omitempty"`
+	// Attachments are files uploaded with the rows, by file name; a row
+	// names them in its attachments column. Each at most 5 MiB.
+	Attachments map[string]RowAttachmentUpload `json:"attachments,omitempty"`
+	// Async imports in the background and answers 202 with the import's
+	// progress (GET /suites/{id}/rows/imports/{import}). Imports of more
+	// than 500 rows are always async.
+	Async bool `json:"async,omitempty"`
+}
+
+// RowAttachmentUpload is one uploaded file.
+type RowAttachmentUpload struct {
+	ContentBase64 string `json:"content_base64"`
+	MediaType     string `json:"media_type,omitempty"`
 }
 
 // RowImportResult answers POST /suites/{id}/rows.
@@ -55,6 +83,18 @@ type RowImportResult struct {
 	Next     string                `json:"next"`
 	// PII is what the benchmark's personal data policy saw and did (lane Y15).
 	PII *dataset.PIIReport `json:"pii,omitempty"`
+
+	// Rows is how many records the data holds; TasksTotal how many can
+	// become tasks (Tasks lists at most the first 500 of a preview).
+	Rows       int `json:"rows"`
+	TasksTotal int `json:"tasks_total"`
+	// Columns are the column paths the data holds, for the mapping step;
+	// Mapping is the mapping the import used (detected fields filled in).
+	Columns      []scaffold.RowColumn `json:"columns"`
+	Mapping      scaffold.RowMapping  `json:"mapping"`
+	MappingSaved bool                 `json:"mapping_saved,omitempty"`
+	// Import is the background import, for an async import.
+	Import *RowImportStatus `json:"import,omitempty"`
 }
 
 // SuiteGraderRequest is the body of PUT /suites/{id}/grader.
@@ -91,6 +131,7 @@ func init() {
 	RegisterOrgArea("suitebuild", func(env OrgEnv, r *router.Router) {
 		h := &suiteBuild{&suiteAuthoring{mode: env.Mode, projects: env.Services.Projects, suites: env.Services.Suites}}
 		r.POST(APIPrefix+"/suites/{id}/rows", env.U(refuseBuiltin(env.Mode, h.suites, h.importRows)))
+		r.GET(APIPrefix+"/suites/{id}/rows/imports/{import}", env.R(refuseBuiltin(env.Mode, h.suites, h.importStatus)))
 		r.PUT(APIPrefix+"/suites/{id}/grader", env.W(refuseBuiltin(env.Mode, h.suites, h.setGrader)))
 		r.PUT(APIPrefix+"/suites/{id}/tasks/{task}/split", env.W(refuseBuiltin(env.Mode, h.suites, h.setSplit)))
 	})
@@ -139,19 +180,37 @@ func (h *suiteBuild) importRows(ctx *fasthttp.RequestCtx) {
 	}
 	var req RowImportRequest
 	if err := decodeAuthoring(ctx.PostBody(), &req); err != nil {
-		h.bad(ctx, `body must be {"format","data","match"?,"held_out"?,"dry_run"?,"source"?}: `+err.Error())
+		h.bad(ctx, `body must be {"format","data","match"?,"held_out"?,"dry_run"?,"source"?,"mapping"?,"save_mapping"?,"grade_on"?,"attachments"?,"async"?}: `+err.Error())
 		return
 	}
-	if len(req.Data) > maxRowImportBytes {
-		lib.SendError(ctx, h.mode, fasthttp.StatusRequestEntityTooLarge, lib.ErrTypeBadRequest, "the data is over 8 MiB; split it into smaller files")
+	limit := maxRowImportBytes
+	if req.Async || len(req.Data) > maxRowImportBytes {
+		limit = maxAsyncRowImportBytes
+	}
+	if len(req.Data) > limit {
+		lib.SendError(ctx, h.mode, fasthttp.StatusRequestEntityTooLarge, lib.ErrTypeBadRequest,
+			fmt.Sprintf("the data is over %d MiB; split it into smaller files", limit>>20))
 		return
 	}
 	if req.Match != "" && !slices.Contains([]string{"exact", "contains_all", "regex", "numeric", "choice"}, req.Match) {
 		h.bad(ctx, "match: want exact, contains_all, regex, numeric or choice")
 		return
 	}
+	if req.GradeOn != "" && req.GradeOn != schemas.ChatGradeFinal && req.GradeOn != schemas.ChatGradeTranscript {
+		h.bad(ctx, "grade_on: want final or transcript")
+		return
+	}
 	if len(req.Source) > 200 || strings.ContainsAny(req.Source, "\n\r") {
 		h.bad(ctx, "source: one line of at most 200 characters")
+		return
+	}
+	if err := req.Mapping.Validate(); err != nil {
+		h.bad(ctx, err.Error())
+		return
+	}
+	uploads, msg := decodeUploads(req.Attachments)
+	if msg != "" {
+		h.bad(ctx, msg)
 		return
 	}
 	raw, s, ok := h.readAnswerSuite(ctx, id, dir)
@@ -166,11 +225,24 @@ func (h *suiteBuild) importRows(ctx *fasthttp.RequestCtx) {
 			"benchmark "+id+" uses grader "+s.Grader+"; pick the exact answer or the rubric judge grader first")
 		return
 	}
-	rows, problems, err := scaffold.ParseRows(req.Format, []byte(req.Data))
+	recs, lines, err := scaffold.ReadRecords(req.Format, []byte(req.Data))
 	if err != nil {
 		h.bad(ctx, err.Error())
 		return
 	}
+	if len(recs) > maxAsyncImportRows {
+		h.bad(ctx, fmt.Sprintf("%d rows; import at most %d at once (split the file)", len(recs), maxAsyncImportRows))
+		return
+	}
+	mapping := req.Mapping
+	if mapping.Empty() {
+		mapping = h.savedMapping(dir)
+	}
+	effective := scaffold.DetectMapping(recs)
+	if mapping != nil {
+		effective = mergeMapping(effective, *mapping)
+	}
+	rows, problems := scaffold.MapRows(recs, lines, req.Format == scaffold.RowFormatTickets, mapping)
 	rows, blocked, piiReport, err := cleanRows(h.projects.Root(), id, rows) // lane Y15: personal data policy (rowspii.go)
 	if err != nil {
 		lib.SendError(ctx, h.mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "read the benchmark's data policy: "+err.Error())
@@ -191,28 +263,83 @@ func (h *suiteBuild) importRows(ctx *fasthttp.RequestCtx) {
 		source = req.Format + " import"
 	}
 	tasks, more := scaffold.ImportRows(rows, scaffold.RowTaskOptions{Grader: grader, Match: req.Match, HeldOut: req.HeldOut,
-		Source: source, Taken: func(id string) bool { return existing[id] }})
+		Source: source, Taken: func(id string) bool { return existing[id] }, Uploads: uploads, GradeOn: req.GradeOn})
 	problems = append(problems, more...)
 	slices.SortStableFunc(problems, func(a, b scaffold.RowProblem) int { return a.Line - b.Line })
-	out := RowImportResult{Suite: id, Grader: grader, DryRun: req.DryRun, Tasks: tasks, Problems: problems, PII: piiReport}
+	out := RowImportResult{Suite: id, Grader: grader, DryRun: req.DryRun, Tasks: tasks, Problems: problems,
+		Rows: len(recs), TasksTotal: len(tasks), Columns: scaffold.Columns(recs), Mapping: effective, PII: piiReport}
 	if out.Tasks == nil {
 		out.Tasks = []scaffold.RowTask{}
 	}
 	if out.Problems == nil {
 		out.Problems = []scaffold.RowProblem{}
 	}
+	if len(out.Tasks) > scaffold.MaxImportRows {
+		out.Tasks = out.Tasks[:scaffold.MaxImportRows]
+	}
+	if len(out.Problems) > maxListedProblems {
+		out.Problems = out.Problems[:maxListedProblems]
+	}
 	if req.DryRun || len(tasks) == 0 {
 		out.Next = "Check the preview, then import."
+		if len(tasks) > scaffold.MaxImportRows {
+			out.Next = fmt.Sprintf("Check the preview (the first %d of %d tasks), then import: more than %d rows import in the background.", scaffold.MaxImportRows, len(tasks), scaffold.MaxImportRows)
+		}
 		if !req.DryRun {
 			out.Next = "No row could become a task; fix the rows listed and import again."
 		}
 		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
 		return
 	}
-	if len(tasks) > scaffold.MaxImportRows {
-		h.bad(ctx, "too many rows")
+	if req.SaveMapping && req.Mapping != nil && !req.Mapping.Empty() {
+		if err := h.saveMapping(ctx, id, *req.Mapping, actorName(ctx)); err != nil {
+			h.sendStoreError(ctx, "save the column mapping", err)
+			return
+		}
+		out.MappingSaved = true
+	}
+	if req.Async || len(tasks) > scaffold.MaxImportRows {
+		st, err := h.startImport(id, dir, source, actorName(ctx), tasks, problems, len(recs))
+		if err != nil {
+			lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, err.Error())
+			return
+		}
+		out.Import = st
+		out.Next = fmt.Sprintf("Importing %d tasks in the background; this page shows the progress. Run the readiness checks when it is done.", len(tasks))
+		lib.SendJSON(ctx, h.mode, fasthttp.StatusAccepted, &out)
 		return
 	}
+	if busy := rowImports.running(h.projects.Root(), id); busy != "" {
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, "an import into "+id+" is still running ("+busy+"); wait for it to finish")
+		return
+	}
+	if err := h.writeRowTasks(ctx, id, dir, raw, tasks, source, actorName(ctx)); err != nil {
+		var se storeErr
+		if errors.As(err, &se) {
+			h.sendStoreError(ctx, se.what, se.err)
+		} else {
+			lib.SendError(ctx, h.mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, err.Error())
+		}
+		return
+	}
+	out.Next = "Run the readiness checks: each new task must prove its check passes the right answer and fails wrong ones before evaluations use it."
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, &out)
+}
+
+// storeErr is a project store failure of writeRowTasks.
+type storeErr struct {
+	what string
+	err  error
+}
+
+func (e storeErr) Error() string { return e.what + ": " + e.err.Error() }
+
+func (e storeErr) Unwrap() error { return e.err }
+
+// writeRowTasks writes tasks into the suite folder and adds them to
+// suite.yaml (raw, the file as read) in one versioned write. On failure the
+// task folders written are removed.
+func (h *suiteBuild) writeRowTasks(ctx context.Context, id, dir string, raw []byte, tasks []scaffold.RowTask, source, actor string) error {
 	var written []string
 	undo := func() {
 		for _, d := range written {
@@ -224,27 +351,23 @@ func (h *suiteBuild) importRows(ctx *fasthttp.RequestCtx) {
 		taskDir := filepath.Join(dir, "tasks", t.ID)
 		if err := writeTreeAtomic(taskDir, t.Files); err != nil {
 			undo()
-			h.sendStoreError(ctx, "write task "+t.ID, err)
-			return
+			return storeErr{"write task " + t.ID, err}
 		}
 		written = append(written, taskDir)
 		next, _, err := scaffold.AddTaskID(edited, t.ID)
 		if err != nil {
 			undo()
-			lib.SendError(ctx, h.mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, "add the tasks to suite.yaml: "+err.Error())
-			return
+			return errors.New("add the tasks to suite.yaml: " + err.Error())
 		}
 		edited = next
 	}
 	if _, err := h.projects.Write(ctx, projectfs.AreaBenchmarks, id+"/"+suite.SuiteFile, edited,
-		projectfs.WriteOpts{Actor: actorName(ctx), Note: "import " + plural(len(tasks), "task") + " from " + source, IfMatch: shaOf(raw)}); err != nil {
+		projectfs.WriteOpts{Actor: actor, Note: "import " + plural(len(tasks), "task") + " from " + source, IfMatch: shaOf(raw)}); err != nil {
 		undo()
-		h.sendStoreError(ctx, "add the tasks to suite.yaml", err)
-		return
+		return storeErr{"add the tasks to suite.yaml", err}
 	}
 	_ = os.Chmod(filepath.Join(dir, suite.SuiteFile), 0o644)
-	out.Next = "Run the readiness checks: each new task must prove its check passes the right answer and fails wrong ones before evaluations use it."
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, &out)
+	return nil
 }
 
 func plural(n int, noun string) string {

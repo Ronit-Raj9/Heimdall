@@ -1,4 +1,4 @@
-import type { RowImportRequest, RowImportResult, SuiteGraderRequest, SuiteGraderResult, TaskSplitResult } from "@/lib/types/suiteBuild";
+import type { RowImportRequest, RowImportResult, RowImportStatus, SuiteGraderRequest, SuiteGraderResult, TaskSplitResult } from "@/lib/types/suiteBuild";
 import { benchApi } from "./benchApi";
 
 const seg = (v: string) => encodeURIComponent(v);
@@ -14,6 +14,9 @@ export const suiteBuildApi = benchApi.injectEndpoints({
 			query: ({ suite, ...body }) => ({ url: `/suites/${seg(suite)}/rows`, method: "POST", body }),
 			invalidatesTags: (r, _e, { suite, dry_run }) => (dry_run || !r ? [] : suiteTags(suite)),
 		}),
+		getRowImport: builder.query<RowImportStatus, { suite: string; id: string }>({
+			query: ({ suite, id }) => `/suites/${seg(suite)}/rows/imports/${seg(id)}`,
+		}),
 		setSuiteGrader: builder.mutation<SuiteGraderResult, { suite: string } & SuiteGraderRequest>({
 			query: ({ suite, ...body }) => ({ url: `/suites/${seg(suite)}/grader`, method: "PUT", body }),
 			invalidatesTags: (_r, _e, { suite }) => suiteTags(suite),
@@ -25,4 +28,4 @@ export const suiteBuildApi = benchApi.injectEndpoints({
 	}),
 });
 
-export const { useImportSuiteRowsMutation, useSetSuiteGraderMutation, useSetTaskSplitMutation } = suiteBuildApi;
+export const { useImportSuiteRowsMutation, useGetRowImportQuery, useSetSuiteGraderMutation, useSetTaskSplitMutation } = suiteBuildApi;

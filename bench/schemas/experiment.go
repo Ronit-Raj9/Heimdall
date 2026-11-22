@@ -407,6 +407,12 @@ type Manifest struct {
 	// from it, so a held-out score is never mixed into a public board.
 	HeldOutTasks []string `json:"held_out_tasks,omitempty"`
 
+	// TaskMetadata is the metadata of every planned task that has any
+	// (task id -> key -> value), frozen so report cards and gates slice
+	// results by what the tasks said when they ran (lane Y13). Empty for a
+	// plan whose tasks carry none.
+	TaskMetadata map[string]map[string]string `json:"task_metadata,omitempty"`
+
 	// Lock fingerprints (docs/lock-fingerprints.md), each empty for a plan
 	// of a legacy lock or without docker. FingerprintHash is the sha256 of
 	// the canonical JSON of the suite lock's fingerprints section, so a run

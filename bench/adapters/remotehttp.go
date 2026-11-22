@@ -160,6 +160,14 @@ func (a *remoteHTTPAdapter) Plan(_ context.Context, rc *schemas.RunContext) (*sc
 	plan.Argv = []string{"python3", "-I", remoteLauncherFile}
 	plan.Env = env
 	plan.Files = map[string]string{remoteLauncherFile: remoteLauncherSource, InstructionFile: instruction}
+	chat, err := chatPlanFile(rc) // Chat tasks (chat.go): the conversation, sent as messages
+	if err != nil {
+		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+	}
+	if chat != "" {
+		plan.Files[chatFile] = chat
+		plan.Env["BENCH_REMOTE_CHAT"] = chatFile
+	}
 	plan.Egress = []string{target}
 	if remotemap.Mapped(spec) { // Y10: the token endpoint of the auth block is a second destination
 		if plan.Egress, err = remotemap.EgressTargets(spec); err != nil {

@@ -95,6 +95,20 @@ type EvaluationGate struct {
 	// FailOnInconclusive makes an inconclusive gate block a release like a
 	// failed one. Off, it is shown and does not block.
 	FailOnInconclusive bool `json:"fail_on_inconclusive,omitempty"`
+	// Slices hold the tasks of one metadata value to their own rules
+	// (lane Y13), for example enterprise-tier tickets must not drop.
+	Slices []GateSliceRule `json:"slices,omitempty"`
+}
+
+// GateSliceRule is a gate rule on the tasks whose metadata Key is Value.
+type GateSliceRule struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+	// MinScore is the lowest score allowed on the slice; nil is no check.
+	MinScore *float64 `json:"min_score,omitempty"`
+	// MaxRegression is the largest drop from the baseline allowed on the
+	// slice, as a fraction; 0 is no check.
+	MaxRegression float64 `json:"max_regression,omitempty"`
 }
 
 // Gate states.
