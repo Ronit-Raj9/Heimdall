@@ -32,9 +32,11 @@ import type {
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { Activity, Download, FileDown, GitPullRequest, Webhook as WebhookIcon, type LucideIcon } from "lucide-react";
+import { Activity, Download, Network, FileDown, GitPullRequest, Webhook as WebhookIcon, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { MaximPanel } from "./maximPanel";
+import { BifrostUsePanel, bifrostUseStatus } from "@/components/bifrost/bifrostUse";
+import { useGetBifrostUseQuery } from "@/lib/store/apis/bifrostUseApi";
 import { useGetMaximQuery } from "@/lib/store/apis/traceToolsApi";
 import { useTranslation } from "react-i18next";
 
@@ -49,9 +51,9 @@ const EVENTS: WebhookEventType[] = ["experiment.finished", "job.failed"];
 const selectClass = "border-input bg-background h-9 w-full rounded-md border px-2 text-sm";
 
 /** Integrations (web parity L19): CI workflow (install PR via Settings > GitHub), exports with download, experiment-finished webhooks. */
-type IntegrationTab = "webhooks" | "exports" | "ci" | "maxim";
+type IntegrationTab = "webhooks" | "exports" | "ci" | "maxim" | "bifrost";
 
-const TAB_ICONS: Record<IntegrationTab, LucideIcon> = { webhooks: WebhookIcon, exports: FileDown, ci: GitPullRequest, maxim: Activity };
+const TAB_ICONS: Record<IntegrationTab, LucideIcon> = { webhooks: WebhookIcon, exports: FileDown, ci: GitPullRequest, maxim: Activity, bifrost: Network };
 
 type Tone = "ok" | "warn" | "bad" | "idle";
 
@@ -82,7 +84,9 @@ export default function IntegrationsView() {
 	const exportsList = useListExportsQuery();
 	const gh = useGetGithubStatusQuery();
 	const maxim = useGetMaximQuery();
+	const bifrost = useGetBifrostUseQuery();
 	const { t: tt } = useTranslation("traceTools");
+	const { t: tb } = useTranslation("bifrostUse");
 
 	const status = (k: IntegrationTab): { tone: Tone; label: string } | null => {
 		if (k === "webhooks") {
@@ -95,6 +99,11 @@ export default function IntegrationsView() {
 			if (!exportsList.data) return null;
 			const n = exportsList.data.exports.length;
 			return n ? { tone: "ok", label: t("cards.exports.count", { count: n }) } : { tone: "idle", label: t("cards.exports.none") };
+		}
+		if (k === "bifrost") {
+			if (bifrost.isLoading) return null;
+			const b = bifrostUseStatus(bifrost.data);
+			return { tone: b.tone, label: b.count ? `${b.count} ${tb("state.on").toLowerCase()}` : tb("state.off") };
 		}
 		if (k === "maxim") {
 			if (maxim.isLoading) return null;
@@ -111,8 +120,8 @@ export default function IntegrationsView() {
 	return (
 		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 p-6" data-testid="integrations-view">
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
-			<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" role="tablist" aria-label={t("title")}>
-				{(["webhooks", "exports", "ci", "maxim"] as const).map((k) => {
+			<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" role="tablist" aria-label={t("title")}>
+				{(["webhooks", "exports", "ci", "maxim", "bifrost"] as const).map((k) => {
 					const Icon = TAB_ICONS[k];
 					const active = k === tab;
 					const st = status(k);
@@ -136,8 +145,8 @@ export default function IntegrationsView() {
 								{st ? <StatusDot tone={st.tone} label={st.label} /> : <Skeleton className="h-5 w-20 rounded-full" />}
 							</div>
 							<div className="flex flex-col gap-0.5">
-								<span className="text-base font-semibold">{k === "maxim" ? tt("maxim.tab") : t(`tabs.${k}`)}</span>
-								<span className="text-muted-foreground line-clamp-2 text-sm">{k === "maxim" ? tt("maxim.desc") : t(`cards.${k}.desc`)}</span>
+								<span className="text-base font-semibold">{k === "maxim" ? tt("maxim.tab") : k === "bifrost" ? tb("tab") : t(`tabs.${k}`)}</span>
+								<span className="text-muted-foreground line-clamp-2 text-sm">{k === "maxim" ? tt("maxim.desc") : k === "bifrost" ? tb("desc") : t(`cards.${k}.desc`)}</span>
 							</div>
 						</button>
 					);
@@ -153,6 +162,7 @@ export default function IntegrationsView() {
 				{tab === "exports" && <ExportsPanel />}
 				{tab === "ci" && <CIPanel />}
 				{tab === "maxim" && <MaximPanel />}
+				{tab === "bifrost" && <BifrostUsePanel />}
 			</div>
 		</div>
 	);
