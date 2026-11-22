@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"path"
 	"strconv"
 	"strings"
@@ -85,12 +86,19 @@ func init() {
 // linked to the Files API version that save made (no second history: the
 // version entry names that file version). It is best effort: the save
 // already happened, and a document that does not decode as an agent is not
-// versioned.
-func snapshotAgentSave(ctx context.Context, store projectfs.Store, rel, id string, doc []byte, actor, note string) {
+// versioned. It returns the version current after the save and whether the
+// save made it; a failure is logged and returned (0 when no version is
+// known), never fatal to the save.
+func snapshotAgentSave(ctx context.Context, store projectfs.Store, rel, id string, doc []byte, actor, note string) (int, bool, error) {
 	if store == nil || !agentversions.ValidID(id) {
-		return
+		return 0, false, nil
 	}
-	_, _, _ = agentversions.Record(store.Root(), id, agentFileHistory(ctx, store, rel, doc, actor, note))
+	v, created, err := agentversions.Record(store.Root(), id, agentFileHistory(ctx, store, rel, doc, actor, note))
+	if err != nil {
+		log.Printf("agent %s: saved, but recording the agent version failed: %v", id, err)
+		return v.Version, created, err
+	}
+	return v.Version, created, nil
 }
 
 // agentFileHistory returns the Files API history of agents/<rel>, oldest
