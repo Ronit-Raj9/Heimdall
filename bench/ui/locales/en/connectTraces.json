@@ -1,0 +1,69 @@
+{
+	"title": "Connect from traces",
+	"subtitle": "Point your OpenTelemetry exporter at Heimdall. When the first traces arrive, Heimdall proposes the agent they show.",
+	"crumbAgents": "Agents",
+	"crumbNew": "New agent",
+	"endpoint": {
+		"title": "1. Send traces",
+		"description": "Any OpenTelemetry SDK, OpenInference, OpenLLMetry or Logfire works. Only what is needed to find your agent is kept: names, models, tools called, routes. Never prompts, answers or tool arguments.",
+		"url": "Traces endpoint",
+		"auth": "Authorization: Bearer with {{hint}}",
+		"makeToken": "Create an ingest token",
+		"tokenShown": "Copy this token now. It is shown once and is already filled in below.",
+		"tokenNeedsAdmin": "An org admin creates ingest tokens.",
+		"install": "Install",
+		"env": "Environment",
+		"code": "Code",
+		"copy": "Copy",
+		"copied": "Copied"
+	},
+	"waiting": {
+		"title": "2. Waiting for the first trace",
+		"description": "This page checks every few seconds. Run your agent once with the settings above.",
+		"orFile": "Or infer from an OTLP export file (JSON or protobuf). Nothing is kept.",
+		"pickFile": "Infer from a file",
+		"fileError": "That file is not an OTLP trace export: {{error}}"
+	},
+	"draft": {
+		"title": "2. What your traces show",
+		"received": "{{traces}} traces, {{spans}} spans kept, {{exports}} exports received",
+		"fromFile": "From the file you picked (not kept)",
+		"confidence": "Confidence: {{level}}",
+		"confidenceLevel": {
+			"high": "high",
+			"medium": "medium",
+			"low": "low"
+		},
+		"seen": "Seen in your traces",
+		"field": "Field",
+		"value": "Value",
+		"from": "Where it came from",
+		"tools": "Tools called",
+		"toolCalls": "{{calls}} calls",
+		"toolErrors": "{{errors}} faults",
+		"declared": "Tools the agent declared",
+		"subagents": "Sub-agents",
+		"hints": "Benchmarks these traces point at",
+		"questions": "Still to answer",
+		"none": "Nothing seen yet",
+		"forget": "Forget these traces",
+		"download": "Download agent.yaml",
+		"yamlHint": "Commit it as .heimdall/agent.yaml; the CLI reads it: bifrost-bench agent file push"
+	},
+	"connect": {
+		"title": "3. Connect this agent",
+		"description": "The connect test then proves it: Heimdall sends a real request and checks the answer.",
+		"name": "Agent name",
+		"url": "Endpoint URL",
+		"urlCard": "Agent card URL",
+		"secret": "Auth token secret (optional)",
+		"secretHint": "Name of a secret in Settings > Secrets. Traces never carry auth headers.",
+		"wrapHint": "No serving route in your traces. Open Wrap my existing app to give the repository and start command.",
+		"openWrap": "Wrap my existing app",
+		"submit": "Connect this agent",
+		"incomplete": "Give a valid name and an http or https URL.",
+		"failed": "Could not create the agent: {{error}}"
+	},
+	"entry": "Connect from traces",
+	"entryHint": "Already sending OpenTelemetry traces? Let Heimdall propose the agent."
+}

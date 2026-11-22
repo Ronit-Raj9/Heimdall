@@ -19,9 +19,9 @@ import (
 //	ExportTraceServiceRequest: 1 resource_spans (ResourceSpans)
 //	ResourceSpans: 1 resource (Resource), 2 scope_spans (ScopeSpans)
 //	Resource: 1 attributes (KeyValue)
-//	ScopeSpans: 2 spans (Span)
+//	ScopeSpans: 1 scope (InstrumentationScope: 1 name, 2 version), 2 spans (Span)
 //	Span: 1 trace_id, 2 span_id, 4 parent_span_id (bytes), 5 name,
-//	      7 start_time_unix_nano, 8 end_time_unix_nano (fixed64),
+//	      6 kind (enum), 7 start_time_unix_nano, 8 end_time_unix_nano (fixed64),
 //	      9 attributes (KeyValue), 15 status (Status)
 //	Status: 2 message, 3 code (enum)
 //	KeyValue: 1 key, 2 value (AnyValue)
@@ -108,6 +108,7 @@ func decodeProtoRequest(data []byte) ([]span, error) {
 			return nil, err
 		}
 		service := ""
+		var resource map[string]string
 		for _, f := range rs {
 			if f.n == 1 && f.wire == wireBytes {
 				res, err := pbFields(f.buf)
@@ -121,6 +122,7 @@ func decodeProtoRequest(data []byte) ([]span, error) {
 					}
 				}
 				service = attrs["service.name"]
+				resource = attrs
 			}
 		}
 		for _, f := range rs {
@@ -131,6 +133,21 @@ func decodeProtoRequest(data []byte) ([]span, error) {
 			if err != nil {
 				return nil, err
 			}
+			scope, scopeVersion := "", ""
+			for _, sf := range ss {
+				if sf.n == 1 && sf.wire == wireBytes { // InstrumentationScope: 1 name, 2 version
+					if sc, err := pbFields(sf.buf); err == nil {
+						for _, x := range sc {
+							switch {
+							case x.n == 1 && x.wire == wireBytes:
+								scope = string(x.buf)
+							case x.n == 2 && x.wire == wireBytes:
+								scopeVersion = string(x.buf)
+							}
+						}
+					}
+				}
+			}
 			for _, sf := range ss {
 				if sf.n != 2 || sf.wire != wireBytes {
 					continue
@@ -140,6 +157,8 @@ func decodeProtoRequest(data []byte) ([]span, error) {
 					return nil, err
 				}
 				sp.service = service
+				sp.resource = resource
+				sp.scope, sp.scopeVersion = scope, scopeVersion
 				out = append(out, sp)
 			}
 		}
@@ -163,6 +182,8 @@ func pbSpan(b []byte) (span, error) {
 			sp.parentID = hex.EncodeToString(f.buf)
 		case f.n == 5 && f.wire == wireBytes:
 			sp.name = string(f.buf)
+		case f.n == 6 && f.wire == wireVarint:
+			sp.kind = int(f.num)
 		case f.n == 7 && f.wire == wireFixed64:
 			sp.start = nanos(f.num)
 		case f.n == 8 && f.wire == wireFixed64:

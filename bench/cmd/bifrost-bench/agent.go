@@ -36,6 +36,9 @@ const agentUsage = `usage: bifrost-bench agent <init|build|check> ...
   agent check <agents/id.yaml> -suite <suite> [-task <task>] [-json] [-no-build] [-runs checks]
       free conformance run on the fault proxy's scripted model; exit 1 on any FAIL
 
+  agent file <check|push|from-traces> [-f .heimdall/agent.yaml]
+      the committed agent file, and an agent inferred from OTLP traces (agent file -h)
+
   agent versions <id> [-json]
       saved versions of the agent config (server with -server, else .heimdall/agent-versions)
   agent snapshot <id> [-note text] [-json]
@@ -63,6 +66,8 @@ func runAgent(args []string) int {
 		return runAgentDiff(args[1:], os.Stdout)
 	case "versions", "snapshot": // A20: saved versions of an agent config (agentversions.go)
 		return runAgentVersionsCmd(args[0], args[1:], os.Stdout)
+	case "file": // lane Z15: .heimdall/agent.yaml and inference from traces (agentfile.go)
+		return runAgentFile(args[1:], os.Stdout)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown agent subcommand %q\n\n%s\n", args[0], agentUsage)
 		return exitUsage
