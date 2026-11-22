@@ -50,6 +50,11 @@ base URL without user info, query or fragment, path prefixes that start with
 `/`, upper-case methods, header names (no `Host` or hop-by-hop headers), the
 variable name, the mode, and that an id is not also a service id.
 
+An external API with `mcp: true` is a streamable HTTP MCP server outside the
+bench: agents get it as an MCP server, and `mode: live` needs no experiment
+opt-in because the server is what is measured. See
+[mcp-server-testing.md](mcp-server-testing.md#external-mcp-servers-in-the-engine).
+
 ## What the agent sees
 
 The agent reaches API `<id>` at `http://toolproxy:9200/x/<id>/<path>`, plain

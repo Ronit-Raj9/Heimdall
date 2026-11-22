@@ -149,6 +149,10 @@ func HasExports(services []schemas.ServiceSpec) bool {
 func MCPServers(services []schemas.ServiceHandle) map[string]string {
 	out := map[string]string{}
 	for _, h := range services {
+		if h.Spec.Role == schemas.ServiceRoleExternal && h.Spec.MCP != nil && h.URL != "" { // an external MCP server: the proxy URL is its endpoint
+			out[h.Spec.ID] = strings.TrimRight(h.URL, "/")
+			continue
+		}
 		if h.Spec.Role != schemas.ServiceRoleMCP || h.Spec.Hidden || h.URL == "" {
 			continue
 		}

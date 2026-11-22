@@ -287,7 +287,8 @@
         "cassette": {"$ref": "#/$defs/rel_path", "description": "Recorded calls (JSONL) replay mode answers from."},
         "max_calls": {"type": "integer", "minimum": 0},
         "max_bytes": {"type": "integer", "minimum": 0},
-        "timeout_s": {"type": "integer", "minimum": 0}
+        "timeout_s": {"type": "integer", "minimum": 0},
+        "mcp": {"type": "boolean", "description": "A streamable HTTP MCP server under test: base_url is its MCP endpoint, agents get it as an MCP server, and mode live needs no experiment opt-in."}
       }
     },
     "output": {

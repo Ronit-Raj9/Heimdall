@@ -700,6 +700,13 @@ type ExternalAPI struct {
 	MaxCalls int    `json:"max_calls,omitempty" yaml:"max_calls"` // calls per run; default 200
 	MaxBytes int64  `json:"max_bytes,omitempty" yaml:"max_bytes"` // per request and per response body; default 4 MiB
 	TimeoutS int    `json:"timeout_s,omitempty" yaml:"timeout_s"` // per call; default 30
+	// MCP marks the API as a streamable HTTP MCP server outside the bench
+	// (docs/mcp-server-testing.md): base_url is its MCP endpoint, agents get
+	// it as an MCP server (BENCH_MCP_SERVERS and their native config) at
+	// http://toolproxy:9200/x/<id>, an empty allowlist allows POST and DELETE
+	// on the endpoint, ledger rows name the tool called, and mode live needs
+	// no experiment opt-in because the server itself is what is measured.
+	MCP bool `json:"mcp,omitempty" yaml:"mcp"`
 }
 
 // ExternalAllow is one allowlist entry of an external API.
