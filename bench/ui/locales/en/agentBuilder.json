@@ -36,7 +36,8 @@
 		"groups": {
 			"auth": "Authentication",
 			"tools": "Tools",
-			"advanced": "Advanced"
+			"advanced": "Advanced",
+			"mapping": "Request and answer mapping"
 		},
 		"ownModel": "This agent picks its own model. Evaluations report it as the agent's own model.",
 		"secretHelp": "Add secrets on Settings > Secrets.",
@@ -57,7 +58,27 @@
 			"failed": "The test failed",
 			"answer": "Answer",
 			"trace": "Trace",
-			"status": "HTTP {{status}}"
+			"status": "HTTP {{status}}",
+			"requests": "Requests sent ({{count}})",
+			"raw": "Raw response"
+		},
+		"newSecret": {
+			"button": "New secret",
+			"save": "Save secret",
+			"saved": "Saved {{name}} and filled it in",
+			"help": "Stored in Settings > Secrets. The value is not kept on this page."
+		},
+		"endpointPreview": {
+			"title": "Request preview",
+			"help": "What a sample task would send, with secret values hidden. Nothing is sent until you test.",
+			"empty": "Fill in the required fields to see the request.",
+			"reads": "Answer read from: {{reads}}",
+			"step": {
+				"start": "start",
+				"request": "request",
+				"poll": "check",
+				"end": "finish"
+			}
 		}
 	},
 	"detail": {

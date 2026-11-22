@@ -206,3 +206,56 @@ func TestProjectSkip(t *testing.T) {
 		}
 	}
 }
+
+func TestAutoApproval(t *testing.T) {
+	ctx := context.Background()
+	d := dbtest.OpenSQLite(t)
+	def := quota.DefaultLimits
+	def.SharedPool = true
+	q := quota.Open(d, quota.Options{Defaults: &def})
+	images := &ImageStore{DB: d}
+	s := &Service{Quota: q, Minter: &fakeMinter{}, Images: images, Orgs: func(context.Context) ([]string, error) { return []string{"org1"}, nil }}
+	img := "ghcr.io/acme/agent@" + digest
+	l, _ := q.Get(ctx, "org1")
+	if ok, why := AutoApprovable(l, img, 100, s.GVisor()); ok || why == "" {
+		t.Fatal("approvable with no gVisor worker seen")
+	}
+	if ok, _ := AutoApprovable(quota.Limits{Runtime: "runsc"}, img, 100, false); !ok {
+		t.Fatal("runsc org not approvable")
+	}
+	if ok, _ := AutoApprovable(quota.Limits{Runtime: "runsc", MaxImageBytes: 10}, img, 100, false); ok {
+		t.Fatal("approvable above the size limit")
+	}
+	r, _ := images.Request(ctx, "org1", img, 100, "", "u1")
+	if r.NextStep == "" || r.Status != StatusPending {
+		t.Fatalf("%+v", r)
+	}
+	// A runc worker does not auto-approve.
+	if _, err := s.Assignments(ctx, "runc"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := images.Get(ctx, r.ID); got.Status != StatusPending || s.GVisor() {
+		t.Fatalf("runc worker approved: %+v", got)
+	}
+	// A worker running gVisor asks for every org: pending pinned images are approved.
+	as, err := s.Assignments(ctx, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := images.Get(ctx, r.ID)
+	if got.Status != StatusApproved || got.Approval != ApprovalAutomatic || !s.GVisor() {
+		t.Fatalf("not auto-approved: %+v", got)
+	}
+	if len(as.Assignments) != 1 || len(as.Assignments[0].Images) != 1 {
+		t.Fatalf("gVisor assignment images: %+v", as)
+	}
+	// The automatic approval never reaches a runc worker.
+	as, _ = s.Assignments(ctx, "runc")
+	if len(as.Assignments) != 1 || len(as.Assignments[0].Images) != 0 {
+		t.Fatalf("runc assignment got an automatic image: %+v", as)
+	}
+	t.Setenv(AutoApproveEnv, "off")
+	if ok, _ := AutoApprovable(quota.Limits{Runtime: "runsc"}, img, 1, true); ok {
+		t.Fatal("approvable with automatic approval off")
+	}
+}

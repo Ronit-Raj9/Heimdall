@@ -52,8 +52,15 @@ type TemplateParam struct {
 	Kind    string   `json:"kind,omitempty"`
 	Options []string `json:"options,omitempty"`
 	Default string   `json:"default,omitempty"`
-	// Group puts advanced fields under a fold: "auth", "tools", "advanced".
+	// Group puts advanced fields under a fold: "auth", "tools", "advanced",
+	// "mapping".
 	Group string `json:"group,omitempty"`
+	// OptionLabels are display names of a select's options (lane Y10).
+	OptionLabels map[string]string `json:"option_labels,omitempty"`
+	// ShowWhen shows the field only while each named param has one of the
+	// listed values (lane Y10: a preset's inputs, a sign-in method's
+	// fields). Hidden fields are still sent.
+	ShowWhen map[string][]string `json:"show_when,omitempty"`
 }
 
 // AgentTemplate is one entry of GET /agents/templates.
@@ -400,9 +407,12 @@ func inlineAgentYAML(t AgentTemplate, id string, params map[string]string) ([]by
 		"gateway": map[string]any{"provider": t.Providers[0], "max_retries": 0}}
 	switch t.ID {
 	case "http-url":
-		u, err := httpURL("url")
-		if err != nil {
-			return nil, err
+		u, fixed := connectPresetURL(params) // Y10: a platform preset (Bedrock, Agentforce, Copilot Studio) sets the URL
+		if !fixed {
+			var err error
+			if u, err = httpURL("url"); err != nil {
+				return nil, err
+			}
 		}
 		block, err := connectHTTPBlock(u, params)
 		if err != nil {
@@ -886,6 +896,12 @@ func (h *agentBuilder) fromTemplate(ctx *fasthttp.RequestCtx) {
 		h.badRequest(ctx, err.Error())
 		return
 	}
+	h.createFromTemplate(ctx, req)
+}
+
+// createFromTemplate renders, validates and writes a new agent from a
+// template (POST /agents/from-template and POST /agents, lane Y10).
+func (h *agentBuilder) createFromTemplate(ctx *fasthttp.RequestCtx, req AgentFromTemplateRequest) {
 	t, ok := findTemplate(req.Template)
 	if !ok {
 		h.badRequest(ctx, fmt.Sprintf("unknown template %q: GET /agents/templates lists them", req.Template))

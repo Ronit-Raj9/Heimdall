@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"github.com/maximhq/bifrost/bench/adapters"
 	"github.com/maximhq/bifrost/bench/ops"
+	"github.com/maximhq/bifrost/bench/registrycreds"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/tenancy"
@@ -703,7 +704,10 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 		sharedEnsureImages(oa, reg, planRoot, proj.refresh, plan),
 		engine.WorkerOptions{Server: h.f.server, Token: claim.Token, WorkerID: name, Host: h.host, Version: benchVersion,
 			Slots: slots, Logger: oa.logger, Pool: sharedpool.Pool, Labels: labels,
-			Disk: h.hygiene.DiskState, ImageUse: h.hygiene.NoteImages, KeepRunFolders: a.cfg.Runner.Disk.KeepRunFolders})
+			Disk: h.hygiene.DiskState, ImageUse: h.hygiene.NoteImages, KeepRunFolders: a.cfg.Runner.Disk.KeepRunFolders,
+			PullPrivate: func(ctx context.Context, ref string, auths []schemas.RegistryAuth) error { // Y10: under the org's Docker policy
+				return registrycreds.Pull(ctx, docker, ref, auths)
+			}})
 	// No Jobs: hosted CLI jobs would run the docker CLI outside the org's
 	// policy; the worker refuses them and they go to the org's own workers.
 	if err != nil {

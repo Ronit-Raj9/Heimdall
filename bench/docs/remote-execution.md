@@ -222,6 +222,46 @@ The launcher sums all of this in one `remote_report` stdout line; `evidence.json
 
 **Async agents.** A `202` answer is followed on the same host: the status URL is the `Location` header, else `status_url` in the body, else `<remote.url>/<id>` for an `id` in the body. A status URL on another host, scheme or port is refused (the run's egress allows only the URL's host and port). The launcher polls with `GET`, the same bearer token, every `Retry-After` seconds (1 to 30, default 2), until the answer is no longer `202` and its `status` is not `queued`, `pending` or `running`, or the timeout passes. The final document is read like a direct answer.
 
+### Request and answer mapping
+
+Most deployed agents do not speak the shape above. `remote.mapping` describes the endpoint's own request and answer instead, and `remote.auth` its auth, so no shim is needed. The connect form fills both from a platform preset and previews the request for a sample task; "Test my endpoint" sends it and shows the parsed answer.
+
+```yaml
+remote:
+  url: https://my-deployment.us.langgraph.app/runs/wait
+  auth_secret: LANGSMITH_KEY
+  auth_header: x-api-key
+  mapping:
+    preset: langgraph
+    body: '{"assistant_id": "agent", "input": {"messages": [{"role": "user", "content": "{{instruction}}"}]}}'
+    answer_path: messages[-1].content
+```
+
+| Field | Meaning |
+|---|---|
+| `method`, `headers`, `query` | The main request. Header and query values may hold `{{secret.NAME}}` (Settings > Secrets). |
+| `body` | Request template: JSON with placeholders. A string that is exactly one placeholder takes its JSON value (`"{{messages}}"` becomes an array). Empty sends Heimdall's own body. |
+| `answer_path` | Where the answer is, in a JSONPath subset: `a.b`, `[0]`, `[-1]`, `[*]`, `['key']`, `[?(@.type=='message')]`, `[?(@.x!='y')]`, `[?(@.x)]`. Several matches are joined with a newline. |
+| `stream`, `stream_path`, `stream_decode` | A streamed answer: `sse` (server-sent events) or `aws_eventstream` (Bedrock). `stream_path` picks each event's text; `stream_decode: base64` decodes it. |
+| `start`, `end` | A request before (open a session; `id_path` becomes `{{start.id}}`; 409 reuses the session) and after (close it, best effort). |
+| `poll` | Fetch the answer after the main request until `answer_path` matches twice in a row. `reply_id_path` reads an id from the main answer as `{{reply.id}}`. |
+
+Placeholders: `{{instruction}}`, `{{messages}}`, `{{tools}}`, `{{metadata}}`, `{{gateway}}`, `{{session_id}}`, `{{session_index}}`, `{{output}}`, `{{model}}`, `{{uuid}}`, `{{start.id}}`, `{{reply.id}}`. Every step stays on the URL's host.
+
+Presets: LangGraph Platform, Google ADK, Mastra, n8n webhook, OpenAI Responses API, AWS Bedrock Agents (InvokeAgent), Salesforce Agentforce (Agent API), Microsoft Copilot Studio (Direct Line), Vercel AI SDK route, chat completion endpoint (`GET /api/bench/agents/endpoint-presets`).
+
+`remote.auth` (every credential is a secret name, never a value; nothing is logged):
+
+| `type` | Fields | What happens |
+|---|---|---|
+| `oauth2_client_credentials` | `token_url`, `client_id_secret`, `client_secret_secret`, `scope`, `audience` | A token is fetched once per run and fetched again a minute before it expires. |
+| `azure_entra` | `tenant_id` (or `token_url`), `client_id_secret`, `client_secret_secret`, `scope` | Microsoft Entra ID client credentials, same caching. |
+| `aws_sigv4` | `access_key_secret`, `secret_key_secret`, `session_token_secret`, `region`, `service` | Every request is signed with Signature Version 4. |
+| `gcp_id_token` | `service_account_secret` (JSON key), `audience` | The key signs an assertion exchanged for a Google ID token (Cloud Run, IAP). |
+| any or none | `client_cert_secret`, `client_key_secret`, `ca_cert_secret` | Mutual TLS with a PEM client certificate. |
+
+A token endpoint on another host is a second destination of the run's forwarder (`egress.json` lists both).
+
 ### Channel 2 in detail: the published tool gate
 
 With `tools: expose` and a task that has proxied services or external APIs, the environment starts, after the tool proxy, a gate container `bench-rt-<run id>` (the tool proxy image, `bifrost-bench toolproxy gate`):
@@ -259,7 +299,7 @@ The bench host runs `bifrost-bench`; the deployment runs elsewhere.
 
 ### The one route out
 
-The launcher stays on the internal evaluation network like any agent. The plan asks for egress to exactly the URL's host and port (`RunPlan.Egress`); the environment then starts a per-run forwarder container (`bench-eg-<run id>`, the launcher image, nobody, every capability dropped, read-only root) on a fresh outbound network, joins it to the evaluation network, and forwards TCP to that one host and port and nowhere else. The launcher connects to the forwarder while keeping the URL's host in the `Host` header and as the TLS server name, so TLS is verified end to end against the real host. The forwarder is recorded in `egress.json` in the run folder, the egress gate's result names the allowed destination, and the forwarder and its network are removed when the agent exits (the janitor removes a leftover by its run label).
+The launcher stays on the internal evaluation network like any agent. The plan asks for egress to exactly the URL's host and port (`RunPlan.Egress`); the environment then starts a per-run forwarder container (`bench-eg-<run id>`, the launcher image, nobody, every capability dropped, read-only root) on a fresh outbound network, joins it to the evaluation network, and forwards TCP to that one host and port and nowhere else (plus, with `remote.auth`, the token endpoint on its own forwarder port). The launcher connects to the forwarder while keeping the URL's host in the `Host` header and as the TLS server name, so TLS is verified end to end against the real host. The forwarder is recorded in `egress.json` in the run folder, the egress gate's result names the allowed destination, and the forwarder and its network are removed when the agent exits (the janitor removes a leftover by its run label).
 
 ### Model traffic
 

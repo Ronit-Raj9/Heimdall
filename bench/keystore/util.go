@@ -66,8 +66,8 @@ func keylessProvider(k Kind, p string) bool {
 
 // normalize trims and validates a Put. create requires a value.
 func normalize(k Kind, in Put, create bool) (Put, error) {
-	if k != KindProvider && k != KindSecret {
-		return in, fmt.Errorf("%w: kind must be provider or secret", ErrInvalid)
+	if k != KindProvider && k != KindSecret && k != KindRegistry {
+		return in, fmt.Errorf("%w: kind must be provider, secret or registry", ErrInvalid)
 	}
 	in.Provider = strings.TrimSpace(in.Provider)
 	in.Label = strings.TrimSpace(in.Label)
@@ -86,6 +86,9 @@ func normalize(k Kind, in Put, create bool) (Put, error) {
 		if in.BaseURL == "" {
 			return in, fmt.Errorf("%w: custom provider %s needs a base URL (an OpenAI-compatible endpoint ending in /v1)", ErrInvalid, in.Provider)
 		}
+	}
+	if k == KindRegistry && (in.Provider == "" || in.Label == "") {
+		return in, fmt.Errorf("%w: a registry login needs a kind and a host", ErrInvalid)
 	}
 	if k == KindSecret && in.Provider == "" && in.Label == "" {
 		return in, fmt.Errorf("%w: a secret needs a name", ErrInvalid)

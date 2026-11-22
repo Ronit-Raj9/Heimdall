@@ -37,9 +37,27 @@ const connectDefaultTimeout = 600
 var connectTimeoutParam = TemplateParam{Name: "timeout_s", Label: "Timeout (seconds)", Kind: ParamNumber, Default: strconv.Itoa(connectDefaultTimeout), Group: "advanced",
 	Help: "How long Heimdall waits for one answer. Keep it under the run's time limit (900 s)."}
 
-var connectHTTPParams = []TemplateParam{
+var connectHTTPParams = connectHTTPForm()
+
+// connectHTTPForm is the HTTP endpoint form: the platform and its inputs,
+// the URL and the J3 fields, then the mapping and sign-in fields (lane
+// Y10, agentconnectmap.go).
+func connectHTTPForm() []TemplateParam {
+	var head, tail []TemplateParam
+	for _, p := range connectMappingParams() {
+		if p.Group == "" {
+			head = append(head, p)
+		} else {
+			tail = append(tail, p)
+		}
+	}
+	return append(append(head, connectHTTPBase...), tail...)
+}
+
+var connectHTTPBase = []TemplateParam{
 	{Name: "url", Label: "Endpoint URL", Placeholder: "https://agent.example.com/v1/answer", Required: true,
-		Help: "Heimdall posts each task here as JSON and reads the answer."},
+		ShowWhen: showWhen("preset", remotemapUserURLPresets()...),
+		Help:     "Heimdall posts each task here and reads the answer. Some platforms (Bedrock, Agentforce, Copilot Studio) build it from the fields above."},
 	{Name: "auth_secret", Label: "Auth token", Kind: ParamSecret, Placeholder: "MY_AGENT_TOKEN", Group: "auth",
 		Help: "Name of a secret in Settings > Secrets. Sent as Authorization: Bearer <token>. Leave empty if the endpoint needs no auth."},
 	{Name: "auth_header", Label: "Token header", Placeholder: "Authorization", Group: "auth",
@@ -165,7 +183,17 @@ func connectHTTPBlock(u string, params map[string]string) (map[string]any, error
 	if err != nil {
 		return nil, err
 	}
+	u, mapping, rauth, err := connectMapping(u, params)
+	if err != nil {
+		return nil, err
+	}
 	block := map[string]any{"url": u, "timeout_s": timeout}
+	if mapping != nil {
+		block["mapping"] = toYAMLMap(mapping)
+	}
+	if rauth != nil {
+		block["auth"] = toYAMLMap(rauth)
+	}
 	auth, err := connectSecretName(params, "auth_secret", "auth token secret")
 	if err != nil {
 		return nil, err

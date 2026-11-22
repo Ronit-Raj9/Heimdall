@@ -32,7 +32,13 @@ type LeaseCredentials struct {
 	// organization and turns prompt text logging off when it says so. nil
 	// from an older server: keys stay untagged, as before.
 	PromptLogging *PromptLogPolicy `json:"prompt_logging,omitempty"`
-	IssuedAt      time.Time        `json:"issued_at"`
+	// Registries are the organization's private image registry logins
+	// (lane Y10, bench/registrycreds), passwords resolved (an ECR login is a
+	// fresh token, never the access key). The runner uses one only for the
+	// `docker pull` of an image on its host, through a temporary Docker
+	// config removed right after; never logged.
+	Registries []RegistryAuth `json:"registries,omitempty"`
+	IssuedAt   time.Time      `json:"issued_at"`
 }
 
 // Gateway log row metadata keys a hosted runner stamps on each virtual key

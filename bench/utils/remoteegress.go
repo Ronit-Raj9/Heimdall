@@ -35,16 +35,17 @@ const (
 )
 
 // remoteForwarder is the forwarder's program, run with python3 -I -c. It
-// takes its one destination from BENCH_EGRESS_TARGET and connects nowhere
-// else. With BENCH_EGRESS_PUBLIC_ONLY=1 (the shared worker, G3 B6) it
+// forwards port 9300 to BENCH_EGRESS_TARGET and, for a plan with more
+// destinations (a remote agent whose auth fetches tokens from another host,
+// lane Y10), port 9300+i to the i-th entry of BENCH_EGRESS_EXTRA, and
+// connects nowhere else. With BENCH_EGRESS_PUBLIC_ONLY=1 (the shared worker, G3 B6) it
 // resolves the destination on every connection and connects only to an
 // address that is public: never loopback, private, link-local (the metadata
 // address), carrier-grade NAT, unique local, NAT64 or reserved. The check is
 // on the address it connects to, so a name that rebinds to an internal
 // address between connections is still refused.
 const remoteForwarder = `import os, socket, threading, ipaddress
-host, port = os.environ["BENCH_EGRESS_TARGET"].rsplit(":", 1)
-host = host.strip("[]")
+targets = [os.environ["BENCH_EGRESS_TARGET"]] + [t for t in os.environ.get("BENCH_EGRESS_EXTRA", "").split(",") if t]
 public_only = os.environ.get("BENCH_EGRESS_PUBLIC_ONLY") == "1"
 extra = [ipaddress.ip_network(n) for n in ("100.64.0.0/10", "64:ff9b::/96", "64:ff9b:1::/48", "0.0.0.0/8", "240.0.0.0/4")]
 def public(ip):
@@ -54,7 +55,7 @@ def public(ip):
     if not a.is_global or a.is_multicast:
         return False
     return not any(a in n for n in extra if n.version == a.version)
-def connect():
+def connect(host, port):
     if not public_only:
         return socket.create_connection((host, int(port)), timeout=30)
     last = OSError("no address for %s" % host)
@@ -71,7 +72,6 @@ def connect():
             s.close()
             last = e
     raise last
-srv = socket.create_server(("0.0.0.0", 9300))
 def pipe(a, b):
     try:
         while True:
@@ -87,9 +87,9 @@ def pipe(a, b):
                 s.shutdown(socket.SHUT_RDWR)
             except OSError:
                 pass
-def serve(c):
+def serve(c, host, port):
     try:
-        u = connect()
+        u = connect(host, port)
         u.settimeout(None)
     except OSError as e:
         print("connect to %s:%s failed: %s" % (host, port, e), flush=True)
@@ -97,10 +97,17 @@ def serve(c):
         return
     threading.Thread(target=pipe, args=(c, u), daemon=True).start()
     pipe(u, c)
-print("forwarding :9300 to %s:%s" % (host, port), flush=True)
-while True:
-    c, _ = srv.accept()
-    threading.Thread(target=serve, args=(c,), daemon=True).start()
+def listen(i, target):
+    host, port = target.rsplit(":", 1)
+    host = host.strip("[]")
+    srv = socket.create_server(("0.0.0.0", 9300 + i))
+    print("forwarding :%d to %s:%s" % (9300 + i, host, port), flush=True)
+    while True:
+        c, _ = srv.accept()
+        threading.Thread(target=serve, args=(c, host, port), daemon=True).start()
+for i, t in enumerate(targets[1:], 1):
+    threading.Thread(target=listen, args=(i, t), daemon=True).start()
+listen(0, targets[0])
 `
 
 // EgressPublicOnly makes every per-run egress forwarder (remote agents and
@@ -166,6 +173,16 @@ func RemoteEgressAddr(runID string) string {
 	return RemoteEgressName(runID) + ":" + strconv.Itoa(RemoteEgressPort)
 }
 
+// MaxRemoteEgress caps the destinations of one plan: the agent's host and
+// the token endpoints its auth needs.
+const MaxRemoteEgress = 4
+
+// RemoteEgressAddrN is where a run's launcher reaches the forwarder port of
+// its i-th egress destination (0 is RemoteEgressAddr).
+func RemoteEgressAddrN(runID string, i int) string {
+	return RemoteEgressName(runID) + ":" + strconv.Itoa(RemoteEgressPort+i)
+}
+
 // RemoteEgressTarget returns the host:port an http or https URL connects to.
 func RemoteEgressTarget(raw string) (string, error) {
 	u, err := url.Parse(raw)
@@ -184,7 +201,8 @@ func RemoteEgressTarget(raw string) (string, error) {
 
 // StartRemoteEgress starts the forwarder a plan's Egress asks for, attached
 // to the agent's network, and records it in the run folder. A plan without
-// Egress gets nil and no forwarder. One destination per run is supported.
+// Egress gets nil and no forwarder. Up to MaxRemoteEgress destinations, each
+// on its own forwarder port.
 // The forwarder runs as nobody with every capability dropped, a read-only
 // root and small limits; it carries the run's labels, so the janitor removes
 // a leftover.
@@ -195,16 +213,21 @@ func StartRemoteEgress(ctx context.Context, d Docker, rc *schemas.RunContext, pl
 	if rc == nil || rc.Run == nil || rc.Run.RunID == "" {
 		return nil, errors.New("remote egress: run context has no run")
 	}
-	if len(plan.Egress) != 1 {
-		return nil, fmt.Errorf("remote egress: %d destinations; one is supported", len(plan.Egress))
+	if len(plan.Egress) > MaxRemoteEgress {
+		return nil, fmt.Errorf("remote egress: %d destinations; at most %d are supported", len(plan.Egress), MaxRemoteEgress)
 	}
 	target := plan.Egress[0]
-	if err := checkHostPort(target); err != nil {
-		return nil, fmt.Errorf("remote egress: %w", err)
+	for _, t := range plan.Egress {
+		if err := checkHostPort(t); err != nil {
+			return nil, fmt.Errorf("remote egress: %w", err)
+		}
 	}
-	if err := checkEgressHost(target); err != nil {
-		return nil, fmt.Errorf("remote egress: %w", err)
+	for _, t := range plan.Egress {
+		if err := checkEgressHost(t); err != nil {
+			return nil, fmt.Errorf("remote egress: %w", err)
+		}
 	}
+	extra := strings.Join(plan.Egress[1:], ",")
 	if network == "" || network == "none" || network == "host" || network == "bridge" {
 		return nil, fmt.Errorf("remote egress: agent network %q cannot be joined", network)
 	}
@@ -217,7 +240,7 @@ func StartRemoteEgress(ctx context.Context, d Docker, rc *schemas.RunContext, pl
 		append(append([]string{"network", "create"}, labels...), e.name),
 		append(append(append(append([]string{"create", "--name", e.name}, labels...),
 			"--user", "65534", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only",
-			"--pids-limit", "64", "--memory", "64m", "--network", e.name, "-e", "BENCH_EGRESS_TARGET="+target),
+			"--pids-limit", "64", "--memory", "64m", "--network", e.name, "-e", "BENCH_EGRESS_TARGET="+target, "-e", "BENCH_EGRESS_EXTRA="+extra),
 			egressGuardArgs()...), "--entrypoint", "python3", plan.Image, "-I", "-c", remoteForwarder),
 		{"network", "connect", network, e.name},
 		{"start", e.name},
@@ -228,7 +251,7 @@ func StartRemoteEgress(ctx context.Context, d Docker, rc *schemas.RunContext, pl
 			return nil, fmt.Errorf("remote egress to %s: %w", target, err)
 		}
 	}
-	rec := EgressRecord{Allowed: []string{target}, Forwarder: e.name, Joined: network, Started: time.Now().UTC()}
+	rec := EgressRecord{Allowed: append([]string(nil), plan.Egress...), Forwarder: e.name, Joined: network, Started: time.Now().UTC()}
 	if rc.Dir != "" {
 		b, err := json.MarshalIndent(rec, "", "  ")
 		if err == nil {

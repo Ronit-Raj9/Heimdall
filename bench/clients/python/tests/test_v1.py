@@ -145,9 +145,42 @@ class V1ClientTest(unittest.TestCase):
         self.assertIn("step", t.text())
         self.assertEqual(self.hd.otlp("r_1", payloads=True).data, b"{}")
 
+    def test_agents_as_code(self) -> None:
+        doc = "id: support-bot  # the agent\nadapter: remote_http\n"
+        self.srv.on("POST", "/api/v1/agents", json_reply(201, {"id": "support-bot", "path": "agents/support-bot.yaml"}),
+                    error_reply(409, "conflict", "an agent named support-bot already exists"))
+        self.srv.on("PUT", "/api/v1/agents/support-bot", json_reply(200, {"id": "support-bot", "sha256": "abc"}))
+        self.srv.on("POST", "/api/v1/agents/support-bot/versions", json_reply(201, {"version": 1, "created": True}),
+                    json_reply(200, {"version": 2, "created": True}))
+        self.srv.on("POST", "/api/v1/agents/support-bot/test", json_reply(200, {"ok": True, "answer": "4", "reads": "answer"}))
+        self.srv.on("GET", "/api/v1/agents/support-bot", json_reply(200, {"id": "support-bot", "yaml": doc, "sha256": "abc"}))
+
+        first = self.hd.push_agent(doc, note="ci")
+        self.assertEqual((first["created"], first["version"]["version"]), (True, 1))
+        second = self.hd.push_agent(doc)
+        self.assertEqual((second["created"], second["version"]["version"]), (False, 2))
+        bodies = [(r["method"], r["path"], json.loads(r["body"])) for r in self.srv.requests]
+        self.assertEqual(bodies[0], ("POST", "/api/v1/agents", {"yaml": doc, "id": "support-bot"}))
+        self.assertEqual(bodies[3], ("PUT", "/api/v1/agents/support-bot", {"yaml": doc}))
+        self.assertTrue(self.hd.test_agent("support-bot")["ok"])
+        self.assertEqual(self.hd.get_agent("support-bot")["sha256"], "abc")
+
+        self.srv.on("POST", "/api/v1/agents", json_reply(201, {"id": "x", "dry_run": True}))
+        self.hd.create_agent(template="http-url", id="x", params={"url": "https://a.example"}, dry_run=True)
+        self.assertEqual(json.loads(self.srv.requests[-1]["body"]),
+                         {"template": "http-url", "id": "x", "params": {"url": "https://a.example"}, "dry_run": True})
+        with self.assertRaises(ValueError):
+            self.hd.create_agent(yaml=doc, template="http-url")
+        with self.assertRaises(ValueError):
+            self.hd.push_agent("adapter: remote_http\n")
+        self.srv.on("POST", "/api/v1/agents", error_reply(400, "bad_request", "bad yaml"))
+        with self.assertRaises(HeimdallError) as cm:
+            self.hd.push_agent(doc)
+        self.assertEqual(cm.exception.status, 400)
+
     def test_routes_are_v1(self) -> None:
         for method, path in V1_ROUTES:
-            self.assertIn(method, ("GET", "POST"))
+            self.assertIn(method, ("GET", "POST", "PUT"))
             self.assertTrue(path.startswith("/api/v1/"), path)
 
 

@@ -20,13 +20,17 @@ import (
 	"github.com/maximhq/bifrost/bench/db"
 )
 
-// Kind is "provider" or "secret".
-type Kind string // "provider" | "secret"
+// Kind is "provider", "secret" or "registry".
+type Kind string // "provider" | "secret" | "registry"
 
 // Kinds.
 const (
 	KindProvider Kind = "provider"
 	KindSecret   Kind = "secret"
+	// KindRegistry is a private image registry login (bench/registrycreds):
+	// Provider is the registry kind, Label the host, Value its settings as
+	// JSON. The password itself stays in a KindSecret the settings name.
+	KindRegistry Kind = "registry"
 )
 
 // MasterKeyEnv holds the base64 32-byte master key.

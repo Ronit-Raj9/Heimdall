@@ -414,7 +414,7 @@ class Client:
         if self.token:
             headers["Authorization"] = "Bearer " + self.token
         data: Optional[bytes] = None
-        if method == "POST":
+        if method in ("POST", "PUT"):
             if isinstance(payload, str):
                 data, headers["Content-Type"] = payload.encode("utf-8"), "application/yaml"
             elif payload is not None:

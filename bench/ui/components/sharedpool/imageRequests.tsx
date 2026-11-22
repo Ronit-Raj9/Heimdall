@@ -125,6 +125,11 @@ export function ImageRequestsCard({ initialImage }: { initialImage?: string }) {
 					</p>
 				</div>
 			</div>
+			{pool.data?.image_approval && (
+				<p className="text-muted-foreground text-xs" data-testid="image-approval-mode">
+					{pool.data.image_approval}
+				</p>
+			)}
 			{allowed === false && (
 				<p className="border-chart-warning/40 bg-chart-warning/10 rounded-md border px-3 py-2 text-xs" data-testid="image-requests-off">
 					Your org cannot run custom images on shared workers yet. You can still send a request: the admin turns this on when approving it.
@@ -138,7 +143,12 @@ export function ImageRequestsCard({ initialImage }: { initialImage?: string }) {
 								{r.image}
 							</span>
 							<ImageStatusBadge status={r.status} />
-							{r.decision && <span className="text-muted-foreground w-full text-xs">Admin note: {r.decision}</span>}
+							{r.decision && r.approval !== "automatic" && <span className="text-muted-foreground w-full text-xs">Admin note: {r.decision}</span>}
+							{r.next_step && (
+								<span className="text-muted-foreground w-full text-xs" data-testid={`image-next-step-${r.id}`}>
+									{r.next_step}
+								</span>
+							)}
 						</li>
 					))}
 				</ul>
@@ -161,6 +171,7 @@ export function AgentImageApproval({ image }: { image: string }) {
 				<>
 					<ImageStatusBadge status={req.status} />
 					{req.status === "rejected" && req.decision && <span className="text-muted-foreground">{req.decision}</span>}
+					{req.next_step && <span className="text-muted-foreground" data-testid="agent-image-next-step">{req.next_step}</span>}
 				</>
 			) : (
 				<>

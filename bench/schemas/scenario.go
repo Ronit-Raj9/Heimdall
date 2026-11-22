@@ -437,6 +437,12 @@ type RemoteAgent struct {
 	AuthHeader string   `json:"auth_header,omitempty" yaml:"auth_header"`
 	SignSecret string   `json:"sign_secret,omitempty" yaml:"sign_secret"`
 	ToolAllow  []string `json:"tool_allow,omitempty" yaml:"tool_allow"`
+
+	// Mapping and Auth (lane Y10, remotemap.go): the endpoint's own request
+	// and answer shape, and OAuth 2, Entra ID, SigV4, Google ID token or
+	// mutual TLS auth. nil keeps Heimdall's shape and the token above.
+	Mapping *RemoteMapping `json:"mapping,omitempty" yaml:"mapping"`
+	Auth    *RemoteAuth    `json:"auth,omitempty" yaml:"auth"`
 }
 
 // ToolCall is one tool invocation recorded by the per-run tool proxy

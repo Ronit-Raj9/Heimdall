@@ -34,6 +34,11 @@ EVALUATION_TERMINAL_STATES = ("done", "failed", "cancelled")
 # each one against GET /api/v1/openapi.json of a real server.
 V1_ROUTES: Tuple[Tuple[str, str], ...] = (
     ("GET", "/api/v1/agents"),
+    ("POST", "/api/v1/agents"),
+    ("GET", "/api/v1/agents/templates"),
+    ("GET", "/api/v1/agents/{id}"),
+    ("PUT", "/api/v1/agents/{id}"),
+    ("POST", "/api/v1/agents/{id}/test"),
     ("GET", "/api/v1/agents/{id}/versions"),
     ("POST", "/api/v1/agents/{id}/versions"),
     ("GET", "/api/v1/agents/{id}/versions/{n}"),
@@ -137,6 +142,46 @@ class AgentVersionList(TypedDict, total=False):
     agent: str
     builtin: bool
     versions: List[AgentVersionEntry]
+
+
+class AgentCreated(TypedDict, total=False):
+    """Answer of POST /api/v1/agents."""
+
+    mode: str
+    id: str
+    path: str
+    files: List[str]
+    yaml: str
+    dry_run: bool
+
+
+class AgentConfigDoc(TypedDict, total=False):
+    """Answer of GET and PUT /api/v1/agents/{id}: the agent file and its hash."""
+
+    mode: str
+    id: str
+    path: str
+    yaml: str
+    sha256: str
+    fields: Dict[str, Any]
+
+
+class AgentTestResult(TypedDict, total=False):
+    """Answer of POST /api/v1/agents/{id}/test. ``ok`` false says why in ``error``."""
+
+    mode: str
+    ok: bool
+    adapter: str
+    url: str
+    status: int
+    latency_ms: int
+    answer: str
+    error: str
+    requests: List[Dict[str, Any]]
+    raw_response: str
+    reads: str
+    trace: List[Dict[str, Any]]
+    notes: List[str]
 
 
 class AgentVersionDoc(TypedDict, total=False):
@@ -488,6 +533,16 @@ class EvaluationResult:
 # ---- Client ----
 
 
+def _yaml_id(doc: str) -> str:
+    """The top-level ``id:`` of an agent YAML (standard library only, no YAML parser)."""
+    for line in doc.splitlines():
+        if line.startswith("id:"):
+            v = line[3:].split("#", 1)[0].strip().strip("'\"")
+            if v:
+                return v
+    raise ValueError("the YAML has no top-level id: pass agent=")
+
+
 class _V1Transport(Client):
     api_prefix = API_V1_PREFIX
 
@@ -528,6 +583,76 @@ class V1Client:
 
     def agents(self) -> Dict[str, Any]:
         return self._t._get("/agents")
+
+    def agent_templates(self) -> Dict[str, Any]:
+        """The agent templates and their params (for ``create_agent(template=...)``)."""
+        return self._t._get("/agents/templates")
+
+    def get_agent(self, agent: str) -> AgentConfigDoc:
+        """The agent's YAML, form fields and sha256."""
+        return cast(AgentConfigDoc, self._t._get("/agents/%s" % _seg(agent)))
+
+    def create_agent(
+        self,
+        yaml: Optional[str] = None,
+        template: Optional[str] = None,
+        id: Optional[str] = None,
+        params: Optional[Mapping[str, str]] = None,
+        model: Optional[Mapping[str, str]] = None,
+        dry_run: bool = False,
+    ) -> AgentCreated:
+        """Create an agent from its YAML, or from a template and its params.
+
+        A taken name raises HeimdallError with status 409; ``push_agent``
+        creates or updates. ``dry_run`` validates and writes nothing.
+        """
+        if (yaml is None) == (template is None):
+            raise ValueError("pass yaml or template, not both")
+        body: Dict[str, Any] = {"dry_run": dry_run} if dry_run else {}
+        if yaml is not None:
+            body["yaml"] = yaml
+            if id:
+                body["id"] = id
+        else:
+            if not id:
+                raise ValueError("a template needs an id")
+            body.update({"template": template, "id": id})
+            if params:
+                body["params"] = dict(params)
+            if model:
+                body["model"] = dict(model)
+        return cast(AgentCreated, self._t._post("/agents", body))
+
+    def update_agent(self, agent: str, yaml: str, if_match: Optional[str] = None) -> AgentConfigDoc:
+        """Replace the agent's YAML. ``if_match`` (a sha256 from get_agent) refuses a file changed since."""
+        body: Dict[str, Any] = {"yaml": yaml}
+        if if_match:
+            body["if_match"] = if_match
+        _, raw, _ = self._t._request("PUT", "/agents/%s" % _seg(agent), None, body)
+        return cast(AgentConfigDoc, self._t._json(raw, "PUT", "/agents/%s" % _seg(agent)))
+
+    def push_agent(self, yaml: str, agent: Optional[str] = None, note: str = "") -> Dict[str, Any]:
+        """Create the agent, or update it when it exists, then record a version.
+
+        ``agent`` is the id in the YAML (read from it when not given). Returns
+        {"agent", "created", "version"}: created is True for a new agent;
+        version is the answer of create_agent_version.
+        """
+        if agent is None:
+            agent = _yaml_id(yaml)
+        created = True
+        try:
+            self.create_agent(yaml=yaml, id=agent)
+        except HeimdallError as e:
+            if e.status != 409:
+                raise
+            created = False
+            self.update_agent(agent, yaml)
+        return {"agent": agent, "created": created, "version": self.create_agent_version(agent, note)}
+
+    def test_agent(self, agent: str) -> AgentTestResult:
+        """Send the saved agent one sample task. Check ``ok``; ``error`` says what failed."""
+        return cast(AgentTestResult, self._t._post("/agents/%s/test" % _seg(agent), {}))
 
     def agent_versions(self, agent: str) -> AgentVersionList:
         return cast(AgentVersionList, self._t._get("/agents/%s/versions" % _seg(agent)))

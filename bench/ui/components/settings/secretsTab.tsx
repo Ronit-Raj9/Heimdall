@@ -12,6 +12,7 @@ import { MAX_SECRET_BYTES, normalizeSecretName, secretNameProblem, type OrgSecre
 import { LockKeyhole } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import { RegistryLoginsSection } from "./registryLogins";
 import { SettingsSection, TableFrame, When } from "./settingsBits";
 
 function byteLength(v: string): number {
@@ -195,6 +196,7 @@ export function SecretsTab(_props: Record<string, unknown> = {}) {
 						</p>
 					))}
 			</SettingsSection>
+			<RegistryLoginsSection secretNames={secrets.map((s) => s.name)} />
 		</div>
 	);
 }

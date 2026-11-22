@@ -46,7 +46,9 @@ vi.mock("@/lib/store/apis/agentBuilderApi", () => ({
 	useGetAgentTemplatesQuery: () => ({ isLoading: false, isError: false, data: { templates }, refetch: () => undefined }),
 	useCreateAgentFromTemplateMutation: () => [vi.fn(), { isLoading: false }],
 	useTestEndpointMutation: () => [vi.fn(), { isLoading: false, reset: () => undefined }],
+	usePreviewEndpointMutation: () => [vi.fn(), { isLoading: false }],
 }));
+vi.mock("@/lib/store/apis/secretsApi", () => ({ useCreateSecretMutation: () => [vi.fn(), { isLoading: false }] }));
 vi.mock("@/lib/store/apis/benchApi", () => ({ getBenchErrorMessage: () => "err" }));
 vi.mock("@/lib/session/sessionContext", () => ({ canUse: () => true, useSession: () => ({}) }));
 vi.mock("@/components/models/modelPicker", () => ({ ModelPicker: () => <div data-testid="model-picker" /> }));

@@ -25,6 +25,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/keystore"
 	"github.com/maximhq/bifrost/bench/quota"
@@ -188,7 +189,80 @@ type Service struct {
 	Platform func(ctx context.Context, orgID string) (*PlatformAssignment, error)
 
 	mu sync.Mutex // one claim at a time
+
+	// Now is the clock of the gVisor observation (nil: time.Now).
+	Now func() time.Time
+
+	rtMu     sync.Mutex
+	gvisorAt time.Time // last assignments call from a shared worker running gVisor
 }
+
+// GVisorWindow is how long one assignments call from a shared worker that
+// runs gVisor counts as "the shared worker runs gVisor".
+const GVisorWindow = 10 * time.Minute
+
+// AutoApproveEnv turns automatic image approval off when set to "off".
+const AutoApproveEnv = "HEIMDALL_IMAGE_AUTO_APPROVE"
+
+// AutoApproveOn reports whether automatic image approval is on (default).
+func AutoApproveOn() bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv(AutoApproveEnv)))
+	return v != "off" && v != "false" && v != "0"
+}
+
+func (s *Service) now() time.Time {
+	if s.Now != nil {
+		return s.Now()
+	}
+	return time.Now()
+}
+
+// noteRuntime records the assignment filter of a shared worker: "" (every
+// org, which a worker asks for only when it runs gVisor) or runsc.
+func (s *Service) noteRuntime(filter string) {
+	if filter == quota.RuntimeRunc {
+		return
+	}
+	s.rtMu.Lock()
+	s.gvisorAt = s.now()
+	s.rtMu.Unlock()
+}
+
+// GVisor reports whether a shared worker running every container under
+// gVisor asked for its assignments within GVisorWindow.
+func (s *Service) GVisor() bool {
+	if s == nil {
+		return false
+	}
+	s.rtMu.Lock()
+	defer s.rtMu.Unlock()
+	return !s.gvisorAt.IsZero() && s.now().Sub(s.gvisorAt) < GVisorWindow
+}
+
+// AutoApprovable reports whether a request of an org with limits l may be
+// approved without a server admin: automatic approval is on, the image is
+// pinned by digest, it fits the size limit (when one is set), and the
+// org's runs on the shared worker run under gVisor (the org's runtime is
+// runsc, or gvisor: a shared worker running gVisor serves every org). The
+// reason says why not, in plain words, when it may not.
+func AutoApprovable(l quota.Limits, image string, size int64, gvisor bool) (bool, string) {
+	switch {
+	case !AutoApproveOn():
+		return false, "automatic approval is off on this server"
+	case !gvisor && l.Runtime != quota.RuntimeRunsc:
+		return false, "the shared worker does not run agents under gVisor"
+	}
+	if _, _, err := CheckImageRef(image); err != nil {
+		return false, err.Error()
+	}
+	if err := CheckImageSize(size, l); err != nil {
+		return false, err.Error()
+	}
+	return true, ""
+}
+
+// AutoApproveReason is the decision recorded on an automatic approval.
+const AutoApproveReason = "approved automatically: pinned by digest, within the size limit, runs under gVisor"
 
 // assigned returns the org's normalized limits, its sandbox platform (nil
 // when it runs on the shared worker) and whether the shared pool serves it
@@ -244,6 +318,8 @@ func (s *Service) Assignments(ctx context.Context, runtime string) (*Assignments
 	if err != nil {
 		return nil, err
 	}
+	s.noteRuntime(runtime)
+	gvisor := runtime != quota.RuntimeRunc // "" is asked only by a worker running gVisor
 	for _, org := range orgs {
 		l, plat, ok, err := s.assigned(ctx, org, runtime)
 		if err != nil {
@@ -257,14 +333,59 @@ func (s *Service) Assignments(ctx context.Context, runtime string) (*Assignments
 			return nil, fmt.Errorf("org %s: %w", org, err)
 		}
 		a := Assignment{OrgID: org, Pool: Pool, TokenID: id, Runtime: l.Runtime, MaxConcurrentRuns: l.MaxConcurrentRuns, Platform: plat.publicView()}
+		if s.Images != nil && gvisor {
+			if err := s.autoApprovePending(ctx, org, l); err != nil {
+				return nil, err
+			}
+			if l, err = s.Quota.Get(ctx, org); err != nil {
+				return nil, err
+			}
+			l = quota.Normalize(l)
+		}
 		if s.Images != nil && l.AllowCustomImages {
-			if a.Images, err = s.Images.Approved(ctx, org); err != nil {
+			if a.Images, err = s.Images.ApprovedFor(ctx, org, gvisor); err != nil {
 				return nil, err
 			}
 		}
 		out.Assignments = append(out.Assignments, a)
 	}
 	return out, nil
+}
+
+// autoApprovePending approves the org's pending requests that qualify for
+// automatic approval, now that a shared worker running gVisor serves it
+// (requests filed while none was seen, or before a server restart).
+func (s *Service) autoApprovePending(ctx context.Context, org string, l quota.Limits) error {
+	pending, err := s.Images.List(ctx, org, StatusPending)
+	if err != nil {
+		return err
+	}
+	for _, r := range pending {
+		if ok, _ := AutoApprovable(l, r.Image, r.SizeBytes, true); !ok {
+			continue
+		}
+		if _, err := s.Images.AutoApprove(ctx, r.ID, AutoApproveReason); err != nil && !errors.Is(err, ErrNotPending) {
+			return err
+		}
+		if err := s.AllowImages(ctx, org); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// AllowImages turns custom images on for an org (an approved image is of
+// no use otherwise, J6). It changes nothing when they are already on.
+func (s *Service) AllowImages(ctx context.Context, org string) error {
+	l, err := s.Quota.Get(ctx, org)
+	if err != nil {
+		return err
+	}
+	if l.AllowCustomImages {
+		return nil
+	}
+	l.AllowCustomImages = true
+	return s.Quota.Set(ctx, org, l, Actor)
 }
 
 // ClaimToken mints a fresh shared pool runner token for one assigned org

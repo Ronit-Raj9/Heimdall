@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/keystore"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/registrycreds"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
 )
@@ -47,6 +49,10 @@ func leaseHolders(orgID string) LeaseHolders {
 	}
 	return leaseHoldersFor(orgID)
 }
+
+// leaseRegistryResolver resolves registry logins for leases; one value so
+// ECR tokens are cached across leases.
+var leaseRegistryResolver = &registrycreds.Resolver{}
 
 // LeaseCredentialsPath is the route pattern.
 const LeaseCredentialsPath = APIPrefix + "/workers/leases/{lease_id}/credentials"
@@ -143,6 +149,17 @@ func (h *leaseCredsHandler) get(ctx *fasthttp.RequestCtx) {
 			return
 		}
 		out.Secrets = secrets
+	}
+	if ks, ok := h.keys.(registrycreds.KeySource); ok { // Y10: private registry logins for this lease's pulls
+		regs, problems, err := leaseRegistryResolver.Resolve(work, ks, h.orgID)
+		if err != nil {
+			lib.SendError(ctx, h.mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "read the organization's registry logins failed")
+			return
+		}
+		out.Registries = regs
+		for _, p := range problems {
+			log.Printf("lease %s: registry login for %s not usable: %s", leaseID, p.Host, p.Reason)
+		}
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
 }

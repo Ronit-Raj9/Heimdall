@@ -68,7 +68,7 @@ func TestApplyLeaseCredentialsNoFallback(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, why := w.applyLeaseCredentials(context.Background(), &schemas.WorkerLease{LeaseID: "l1", ExpID: "exp_1"}, tc.hosted)
+			_, _, why := w.applyLeaseCredentials(context.Background(), &schemas.WorkerLease{LeaseID: "l1", ExpID: "exp_1"}, tc.hosted)
 			if tc.wantWhy == "" && why != "" || tc.wantWhy != "" && !strings.Contains(why, tc.wantWhy) {
 				t.Fatalf("why = %q, want %q", why, tc.wantWhy)
 			}
