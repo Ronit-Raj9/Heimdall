@@ -34,9 +34,15 @@ import (
 // dependency (no GitHub connection, no docker, no model set, no job runner)
 // is returned as an error in plain words; the pipeline shows it on the item.
 //
-// The builder's model comes from BENCH_ISSUEBENCH_PROVIDER and
-// BENCH_ISSUEBENCH_MODEL; BENCH_ISSUEBENCH_MAX_USD is the per-build dollar
-// cap (default 5) unless a retry raised it.
+// The builder's model is the provider and model the person picked in the
+// From issues form, else BENCH_ISSUEBENCH_PROVIDER and BENCH_ISSUEBENCH_MODEL;
+// BENCH_ISSUEBENCH_MAX_USD is the per-build dollar cap (default 5) unless a
+// retry raised it. The same model runs the G04 model checks (leak, clarity,
+// interface note, near-miss wrong patches) as an issuebench.check job capped
+// at BENCH_ISSUEBENCH_CHECK_MAX_USD (default 1); with no model set the checks
+// are skipped and a person reads the issue. Emit's three image layers are
+// built here (BuildLayers) before lint, lock and admit are queued, since
+// admit runs the task image and builds none.
 
 func init() {
 	handlers.IssueBenchStages = issuebenchStagesFor
@@ -46,6 +52,11 @@ func issuebenchStagesFor(env handlers.OrgEnv) pipeline.Stages {
 	root := ""
 	if env.Cfg != nil {
 		root = env.Cfg.Root
+	}
+	// Absolute, so the repo_dir the build job checks against its ProjectRoot
+	// (the same org root, hosted or local) is not joined to the root twice.
+	if abs, err := filepath.Abs(root); err == nil && root != "" {
+		root = abs
 	}
 	ib := &ibStages{root: root, orgID: env.Services.OrgID, keys: env.Services.Keys, jobs: env.Services.Jobs}
 	return pipeline.Stages{Scanner: ibScanner{ib}, Builder: ibBuilder{ib}, Validator: ibValidator{ib}, Emitter: ibEmitter{ib}}
@@ -198,9 +209,10 @@ func (a ibBuilder) Build(ctx context.Context, c issuebench.Candidate, opts pipel
 	if s.jobs == nil {
 		return issuebench.BuildResult{}, errors.New("this server has no job runner to build environments")
 	}
-	provider, model := strings.TrimSpace(os.Getenv("BENCH_ISSUEBENCH_PROVIDER")), strings.TrimSpace(os.Getenv("BENCH_ISSUEBENCH_MODEL"))
+	mc := ibModel(opts.ModelChoice)
+	provider, model := mc.Provider, mc.Model
 	if provider == "" || model == "" {
-		return issuebench.BuildResult{}, errors.New("no builder model is set: the operator sets BENCH_ISSUEBENCH_PROVIDER and BENCH_ISSUEBENCH_MODEL")
+		return issuebench.BuildResult{}, errors.New("no builder model is set: pick a provider and model in the From issues form, or the operator sets BENCH_ISSUEBENCH_PROVIDER and BENCH_ISSUEBENCH_MODEL")
 	}
 	maxUSD := 5.0
 	if v, err := strconv.ParseFloat(os.Getenv("BENCH_ISSUEBENCH_MAX_USD"), 64); err == nil && v > 0 {
@@ -215,39 +227,57 @@ func (a ibBuilder) Build(ctx context.Context, c issuebench.Candidate, opts pipel
 		return issuebench.BuildResult{}, err
 	}
 	params, _ := json.Marshal(issuebenchBuildParams{Repo: c.Repo, Version: version, RepoDir: dir, Candidates: []issuebench.Candidate{c},
-		Provider: provider, Model: model, MaxUSD: maxUSD, Consent: true})
-	j, err := s.jobs.Create(ctx, jobs.NewJob{OrgID: s.orgID, Kind: kindIssuebenchBuild, Params: params, CreatedBy: "system"})
-	if err != nil {
-		return issuebench.BuildResult{}, fmt.Errorf("queue the build: %w", err)
+		Provider: provider, Model: model, KeyID: mc.KeyID, MaxUSD: maxUSD, Consent: true})
+	var res issuebench.BuildResult
+	if err := s.runJob(ctx, kindIssuebenchBuild, params, &res, func(id string) {
+		logf("issue #%d: build job %s on %s/%s (cap $%.2f)", c.Issue, id, provider, model, maxUSD)
+	}); err != nil {
+		return issuebench.BuildResult{}, err
 	}
-	logf("issue #%d: build job %s on %s/%s (cap $%.2f)", c.Issue, j.ID, provider, model, maxUSD)
+	if res.Env != nil {
+		res.Env.Repo, res.Env.Version = c.Repo, version
+		s.saveEnv(*res.Env)
+	}
+	return res, nil
+}
+
+// ibModel is the person's pick, else the operator's environment.
+func ibModel(mc pipeline.ModelChoice) pipeline.ModelChoice {
+	if mc.Provider != "" && mc.Model != "" {
+		return mc
+	}
+	return pipeline.ModelChoice{Provider: strings.TrimSpace(os.Getenv("BENCH_ISSUEBENCH_PROVIDER")), Model: strings.TrimSpace(os.Getenv("BENCH_ISSUEBENCH_MODEL"))}
+}
+
+// runJob queues one job of kind, waits for it and decodes its result into out.
+func (s *ibStages) runJob(ctx context.Context, kind string, params []byte, out any, queued func(id string)) error {
+	j, err := s.jobs.Create(ctx, jobs.NewJob{OrgID: s.orgID, Kind: kind, Params: params, CreatedBy: "system"})
+	if err != nil {
+		return fmt.Errorf("queue %s: %w", kind, err)
+	}
+	queued(j.ID)
 	for {
 		switch j.Status {
 		case jobs.StatusSucceeded:
-			var res issuebench.BuildResult
-			if err := json.Unmarshal(j.Result, &res); err != nil {
-				return res, fmt.Errorf("read the build result: %w", err)
+			if err := json.Unmarshal(j.Result, out); err != nil {
+				return fmt.Errorf("read the %s result: %w", kind, err)
 			}
-			if res.Env != nil {
-				res.Env.Repo, res.Env.Version = c.Repo, version
-				s.saveEnv(*res.Env)
-			}
-			return res, nil
+			return nil
 		case jobs.StatusFailed, jobs.StatusCancelled:
 			msg := j.Error
 			if msg == "" {
 				msg = string(j.Status)
 			}
-			return issuebench.BuildResult{}, fmt.Errorf("build job %s: %s", j.ID, msg)
+			return fmt.Errorf("%s job %s: %s", kind, j.ID, msg)
 		}
 		select {
 		case <-ctx.Done():
 			_, _ = s.jobs.Cancel(context.WithoutCancel(ctx), s.orgID, j.ID)
-			return issuebench.BuildResult{}, ctx.Err()
+			return ctx.Err()
 		case <-time.After(ibPoll):
 		}
 		if j, err = s.jobs.Get(ctx, s.orgID, j.ID); err != nil {
-			return issuebench.BuildResult{}, fmt.Errorf("read build job: %w", err)
+			return fmt.Errorf("read %s job: %w", kind, err)
 		}
 	}
 }
@@ -273,7 +303,39 @@ func (a ibValidator) Validate(ctx context.Context, c issuebench.Candidate, env i
 	if err != nil {
 		return issuebench.Validation{}, err
 	}
+	if v.Stop != "" {
+		return *v, nil // the tests already stopped it (or the leak heuristic did)
+	}
+	if err := a.s.modelChecks(ctx, v, logf); err != nil {
+		return issuebench.Validation{}, err
+	}
 	return *v, nil
+}
+
+// modelChecks runs the G04 model checks as an issuebench.check job and puts
+// the result on v. With no model or no job runner it leaves v as the tests
+// left it (Checks.Clear false, so a person reads the issue).
+func (s *ibStages) modelChecks(ctx context.Context, v *issuebench.Validation, logf func(string, ...any)) error {
+	c := v.Candidate
+	mc := ibModel(pipeline.ModelFrom(ctx))
+	if mc.Provider == "" || mc.Model == "" || s.jobs == nil {
+		logf("issue #%d: model checks skipped: no model is set, so read the issue for leaks and clarity yourself", c.Issue)
+		return nil
+	}
+	maxUSD := 1.0
+	if f, err := strconv.ParseFloat(os.Getenv("BENCH_ISSUEBENCH_CHECK_MAX_USD"), 64); err == nil && f > 0 {
+		maxUSD = f
+	}
+	params, _ := json.Marshal(issuebenchCheckParams{Candidate: c, Provider: mc.Provider, Model: mc.Model, KeyID: mc.KeyID, MaxUSD: maxUSD, Consent: true})
+	var res issuebenchCheckResult
+	if err := s.runJob(ctx, kindIssuebenchCheck, params, &res, func(id string) {
+		logf("issue #%d: model check job %s on %s/%s (cap $%.2f)", c.Issue, id, mc.Provider, mc.Model, maxUSD)
+	}); err != nil {
+		return err
+	}
+	v.Checks, v.Stop = res.Checks, res.Stop
+	logf("issue #%d: model checks done: %d calls, $%.4f", c.Issue, res.Calls, res.CostUSD)
+	return nil
 }
 
 // image builds the environment image once per repo version from the
@@ -363,18 +425,79 @@ func (a ibEmitter) Emit(ctx context.Context, repo string, tasks []issuebench.Val
 		}
 		in = append(in, emit.Input{Validation: v, Env: *env, RepoDir: dir})
 	}
-	opts := emit.Options{BenchRoot: s.root, WorkDir: work}
-	if s.jobs != nil {
-		opts.Readiness = pipeline.JobQueuer{Jobs: s.jobs, OrgID: s.orgID}
-	}
-	rep, err := emit.Emit(ctx, in, opts)
+	// Readiness waits until the image layers exist: admit runs the task image.
+	rep, err := emit.Emit(ctx, in, emit.Options{BenchRoot: s.root, WorkDir: work})
 	if err != nil {
 		return "", err
 	}
 	if len(rep.Suites) == 0 {
 		return "", errors.New("no benchmark was written")
 	}
+	for i := range rep.Suites {
+		su := &rep.Suites[i]
+		for _, tid := range su.Tasks {
+			if err := ibLayers.BuildLayers(ctx, su.BuildDirs[tid]); err != nil {
+				return su.Suite, fmt.Errorf("task %s: %w", tid, err)
+			}
+		}
+		if s.jobs != nil && len(su.Tasks) > 0 {
+			if su.Jobs, err = pipeline.QueueAdmit(ctx, pipeline.JobQueuer{Jobs: s.jobs, OrgID: s.orgID}, su.Suite); err != nil {
+				return su.Suite, err
+			}
+		}
+	}
 	return rep.Suites[0].Suite, nil
+}
+
+// ibLayers builds emit's image layers; tests replace it.
+var ibLayers pipeline.LayerBuilder = ibDockerLayers{}
+
+// ibDockerLayers builds the base, env and task images of one emitted task
+// from the build context emit wrote, skipping an image that already exists
+// (base and env are shared by every task of a repository version).
+type ibDockerLayers struct{}
+
+// ibTarBuild sends the context through tar -h, as the context's repo/ is a
+// link to the scrubbed checkout and docker does not follow links.
+const ibTarBuild = `tar -C "$1" -ch . | docker build --quiet -t "$2" -f "$3" -`
+
+// BuildLayers implements pipeline.LayerBuilder.
+func (ibDockerLayers) BuildLayers(ctx context.Context, dir string) error {
+	if dir == "" {
+		return errors.New("no image build context")
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "layers.json"))
+	if err != nil {
+		return fmt.Errorf("read the image layers: %w", err)
+	}
+	var l emit.Layers
+	if err := json.Unmarshal(raw, &l); err != nil || l.BaseRef == "" || l.EnvRef == "" || l.TaskRef == "" {
+		return errors.New("layers.json does not name the three images")
+	}
+	if _, err := ibCommand(ctx, nil, "docker", "version", "--format", "{{.Server.Version}}"); err != nil {
+		return errors.New("docker is not available on this server, so the task images can not be built")
+	}
+	for _, step := range []struct{ ref, file string }{{l.BaseRef, "Dockerfile.base"}, {l.EnvRef, "Dockerfile.env"}, {l.TaskRef, "Dockerfile"}} {
+		if _, err := ibCommand(ctx, nil, "docker", "image", "inspect", step.ref); err == nil {
+			continue
+		}
+		var out []byte
+		if step.file == "Dockerfile.base" { // no files needed: the Dockerfile on stdin, no context
+			df, err := os.ReadFile(filepath.Join(dir, step.file))
+			if err != nil {
+				return err
+			}
+			out, err = ibCommand(ctx, df, "docker", "build", "--quiet", "-t", step.ref, "-")
+			if err != nil {
+				return fmt.Errorf("build image %s failed: %s", step.ref, ibTail(out))
+			}
+			continue
+		}
+		if out, err = ibCommand(ctx, nil, "sh", "-c", ibTarBuild, "sh", dir, step.ref, step.file); err != nil {
+			return fmt.Errorf("build image %s failed: %s", step.ref, ibTail(out))
+		}
+	}
+	return nil
 }
 
 func ibTail(b []byte) string {

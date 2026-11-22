@@ -13,8 +13,8 @@ export const issuebenchApi = benchApi.enhanceEndpoints({ addTagTypes: ["IssueRun
 		scanIssues: builder.mutation<IssueRun, { repo: string; limit?: number }>({
 			query: (body) => ({ url: "/issuebench/runs", method: "POST", body }),
 		}),
-		startIssueRun: builder.mutation<IssueRun, { id: string; consent: boolean }>({
-			query: ({ id, consent }) => ({ url: `${runPath(id)}/start`, method: "POST", body: { consent } }),
+		startIssueRun: builder.mutation<IssueRun, { id: string; consent: boolean; provider?: string; model?: string }>({
+			query: ({ id, ...body }) => ({ url: `${runPath(id)}/start`, method: "POST", body }),
 			invalidatesTags: (_r, _e, a) => [{ type: "IssueRun", id: a.id }],
 		}),
 		reviewIssue: builder.mutation<IssueRun, { id: string; issue: number; decision: "accept" | "reject" | "edit"; instruction?: string }>({

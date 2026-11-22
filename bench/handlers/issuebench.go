@@ -56,6 +56,7 @@ type IssueRunCreate struct {
 // IssueRunStart is the body of POST /issuebench/runs/{id}/start.
 type IssueRunStart struct {
 	Consent bool `json:"consent"`
+	pipeline.ModelChoice
 }
 
 // IssueRetry is the body of POST /issuebench/runs/{id}/issues/{issue}/retry.
@@ -175,7 +176,7 @@ func (h *issueBenchHandler) start(ctx *fasthttp.RequestCtx) {
 	if !h.decode(ctx, &req) {
 		return
 	}
-	s, err := h.m.Start(pathParam(ctx, "id"), req.Consent)
+	s, err := h.m.StartWith(pathParam(ctx, "id"), req.Consent, req.ModelChoice)
 	if err != nil {
 		h.fail(ctx, err)
 		return

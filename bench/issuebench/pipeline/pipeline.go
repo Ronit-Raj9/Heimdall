@@ -36,8 +36,41 @@ type Scanner interface {
 	Scan(ctx context.Context, repo string, opts ScanOptions) ([]issuebench.Candidate, issuebench.Funnel, error)
 }
 
-// BuildOptions carry the one-click fixes a person chose for a retry.
+// ModelChoice is the provider and model the person picked in the From
+// issues form for the builder and the model checks; empty falls back to the
+// operator's BENCH_ISSUEBENCH_PROVIDER and BENCH_ISSUEBENCH_MODEL.
+type ModelChoice struct {
+	Provider string `json:"provider,omitempty"`
+	Model    string `json:"model,omitempty"`
+	KeyID    string `json:"key_id,omitempty"` // which of the org's keys for the provider; empty picks one
+}
+
+// Valid is nil when both provider and model are set, or neither.
+func (m ModelChoice) Valid() error {
+	if (m.Provider == "") != (m.Model == "") {
+		return fmt.Errorf("%w: pick both a provider and a model, or neither", ErrBadRequest)
+	}
+	return nil
+}
+
+type modelCtxKey struct{}
+
+// WithModel carries the run's model choice to the stages (the validator's
+// model checks read it with ModelFrom).
+func WithModel(ctx context.Context, m ModelChoice) context.Context {
+	return context.WithValue(ctx, modelCtxKey{}, m)
+}
+
+// ModelFrom is the model choice WithModel stored, or the zero choice.
+func ModelFrom(ctx context.Context) ModelChoice {
+	m, _ := ctx.Value(modelCtxKey{}).(ModelChoice)
+	return m
+}
+
+// BuildOptions carry the one-click fixes a person chose for a retry, and
+// the run's model choice.
 type BuildOptions struct {
+	ModelChoice
 	Secrets       []string `json:"secrets,omitempty"`        // secret names made available to the build
 	AllowServices []string `json:"allow_services,omitempty"` // services the build may start (postgres, redis)
 	BudgetUSD     float64  `json:"budget_usd,omitempty"`     // dollar cap; 0 is the builder's default
@@ -137,6 +170,7 @@ type State struct {
 	Repo      string                            `json:"repo"`
 	Status    string                            `json:"status"`
 	Consent   bool                              `json:"consent"`
+	Model     ModelChoice                       `json:"builder_model,omitempty"` // picked at start; empty uses the operator's model
 	Detail    string                            `json:"detail,omitempty"`
 	Funnel    issuebench.Funnel                 `json:"funnel"`
 	Items     []Item                            `json:"items"`
@@ -324,14 +358,26 @@ func (m *Manager) Scan(ctx context.Context, repo string, opts ScanOptions) (*Sta
 // Start runs a scanned run in the background. consent must be true: the
 // builder and validation send repository code to the org's model provider.
 func (m *Manager) Start(id string, consent bool) (*State, error) {
+	return m.StartWith(id, consent, ModelChoice{})
+}
+
+// StartWith is Start with the builder model the person picked; an empty
+// choice keeps the run's earlier choice.
+func (m *Manager) StartWith(id string, consent bool, model ModelChoice) (*State, error) {
 	if !consent {
 		return nil, ErrNoConsent
+	}
+	if err := model.Valid(); err != nil {
+		return nil, err
 	}
 	if m.isRunning(id) {
 		return nil, ErrBusy
 	}
 	s, err := m.update(id, func(s *State) error {
 		s.Consent = true
+		if model.Provider != "" {
+			s.Model = model
+		}
 		s.Status = RunRunning
 		s.Detail = ""
 		return nil
@@ -463,7 +509,11 @@ func (m *Manager) step(ctx context.Context, id string, i int, logf func(string, 
 		}
 		m.setItem(id, i, StatusBuilding, "", "", nil)
 		logf("issue #%d: building the environment for version %s", c.Issue, it.Version)
-		res, err := m.stages.Builder.Build(ctx, c, it.Options, logf)
+		opts := it.Options
+		if opts.Provider == "" {
+			opts.ModelChoice = s.Model
+		}
+		res, err := m.stages.Builder.Build(ctx, c, opts, logf)
 		if err != nil {
 			m.setItem(id, i, StatusFailed, "build failed: "+err.Error(), FixRetry, nil)
 			logf("issue #%d: build failed: %v", c.Issue, err)
@@ -492,7 +542,7 @@ func (m *Manager) step(ctx context.Context, id string, i int, logf func(string, 
 		m.setItem(id, i, StatusFailed, "validation is not available on this server yet", FixRetry, nil)
 		return
 	}
-	v, err := m.stages.Validator.Validate(ctx, c, *env.Env, logf)
+	v, err := m.stages.Validator.Validate(WithModel(ctx, s.Model), c, *env.Env, logf)
 	if err != nil {
 		m.setItem(id, i, StatusFailed, "validation failed: "+err.Error(), FixRetry, nil)
 		return
@@ -663,6 +713,12 @@ func (m *Manager) Retry(id string, issue int, fix string, opts BuildOptions) (*S
 		case FixRetry, "":
 		default:
 			return fmt.Errorf("%w: unknown fix %q", ErrBadRequest, fix)
+		}
+		if err := opts.ModelChoice.Valid(); err != nil {
+			return err
+		}
+		if opts.Provider != "" {
+			it.Options.ModelChoice = opts.ModelChoice
 		}
 		it.Options.Secrets = append(it.Options.Secrets, opts.Secrets...)
 		it.Options.AllowServices = append(it.Options.AllowServices, opts.AllowServices...)
