@@ -2201,7 +2201,7 @@
 			"facts": "Benchmark {{suite}}, agent {{agent}}, {{tasks}} tasks, each tried {{trials}} times. Sensitivity {{sensitivity}} (false alarm level {{alpha}}).",
 			"allTasks": "all",
 			"baseline": "Baseline {{exp}}, saved {{at}}, {{looks}} checks since.",
-			"noBaseline": "No baseline yet. Press Record baseline (terminal: heimdall canary baseline {{name}})."
+			"noBaseline": "No baseline yet. Press Record baseline to save the first one."
 		},
 		"history": {
 			"title": "History",
