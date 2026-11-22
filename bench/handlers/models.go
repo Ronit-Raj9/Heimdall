@@ -101,6 +101,51 @@ type ModelRefView struct {
 	Provider string `json:"provider"`
 	Model    string `json:"model"`
 	KeyID    string `json:"key_id,omitempty"`
+	// Price is what the model costs per 1M tokens and where that price
+	// comes from; absent when neither a key nor the price list knows it.
+	Price *ModelPriceView `json:"price,omitempty"`
+}
+
+// ModelPriceView is a model's price per 1M tokens and its source: "key"
+// (a price set on one of the org's provider keys, named by KeyLabel) or
+// "price_list" (the server's price snapshot).
+type ModelPriceView struct {
+	InputPerMTok  float64 `json:"input_per_mtok"`
+	OutputPerMTok float64 `json:"output_per_mtok"`
+	CachePerMTok  float64 `json:"cache_per_mtok"`
+	Source        string  `json:"source"`
+	KeyLabel      string  `json:"key_label,omitempty"`
+}
+
+// modelPriceView prices ref from the org's keys (as listed) and the price
+// list, nil when neither knows the model. The name "<provider>/<model>" is
+// tried first so a key of the default's own provider wins; then the bare
+// name, which also reaches the single key with no model list and the list.
+func modelPriceView(keys []ModelKeyView, ref ModelRefView) *ModelPriceView {
+	list := make([]keystore.Key, 0, len(keys))
+	for _, k := range keys {
+		list = append(list, keystore.Key{ID: k.ID, Kind: keystore.KindProvider, Provider: k.Provider, Label: k.Label, Models: k.Models, Price: k.Price})
+	}
+	priced := pricedKeys(list)
+	r, ok := resolvePrice(priced, ref.Provider+"/"+ref.Model)
+	if !ok || r.source != PriceSourceKey {
+		r, ok = resolvePrice(priced, ref.Model)
+	}
+	if !ok {
+		return nil
+	}
+	v := &ModelPriceView{InputPerMTok: r.price.InputPerMTok, OutputPerMTok: r.price.OutputPerMTok, CachePerMTok: r.price.CacheReadPerMTok, Source: r.source}
+	if r.source == PriceSourceKey {
+		v.KeyLabel = r.keyLabel
+		if v.KeyLabel == "" {
+			for _, k := range keys {
+				if k.ID == r.keyID {
+					v.KeyLabel = k.Provider
+				}
+			}
+		}
+	}
+	return v
 }
 
 // ModelsCatalogResponse is GET /models: the providers with suggested
@@ -197,6 +242,9 @@ func (h *modelsHandler) catalog(ctx *fasthttp.RequestCtx) {
 		}
 		resp.Keys, resp.KeysReady = keys, true
 		resp.Default = defaultModel(keys)
+		if resp.Default != nil {
+			resp.Default.Price = modelPriceView(keys, *resp.Default)
+		}
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, resp)
 }

@@ -77,3 +77,19 @@ describe("helpers", () => {
 		expect(defaultRange(new Date("2026-11-21T12:00:00Z"))).toEqual({ from: "2026-10-23", to: "2026-11-21" });
 	});
 });
+
+describe("UsageBody runs without a cost (F1.price)", () => {
+	it("says how to price the runs left out and marks days with runs that made no model call", () => {
+		const data: UsageReport = {
+			...report,
+			no_model_call_runs: 3,
+			buckets: report.buckets.map((b) => (b.key === "2026-11-10" ? { ...b, no_model_call_runs: 3 } : b)),
+		};
+		const html = renderToStaticMarkup(<UsageBody data={data} />);
+		expect(html).toMatch(
+			/data-testid="usage-unknown-note"[^>]*>1 run\(s\) have no known cost and are left out of the total\. Set a price on the provider key in Settings &gt; API keys to include them\.</,
+		);
+		expect(html).toMatch(/data-testid="usage-no-call-2026-11-10"[^>]*>3 with no model call</);
+		expect(html).not.toContain('data-testid="usage-no-call-2026-11-12"');
+	});
+});
