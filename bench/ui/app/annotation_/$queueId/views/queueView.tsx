@@ -1,5 +1,5 @@
 import { Field, parseLabellers, selectClass } from "@/app/annotation/views/annotationView";
-import { humanExperimentName, suiteName } from "@/app/experiments/views/experimentBoard";
+import { humanExperimentName, suiteName } from "@/components/experiments/experiments.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { Button, buttonVariants } from "@/components/ui/button";
