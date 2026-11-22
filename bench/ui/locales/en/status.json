@@ -46,6 +46,8 @@
 		"wholePlatform": "Affects the whole platform",
 		"started": "Started {{time}}",
 		"scheduledFor": "Starts {{time}}",
-		"resolved": "Resolved {{time}}"
+		"resolved": "Resolved {{time}}",
+		"auto": "Found automatically",
+		"autoHint": "A platform check opened this incident on its own; it closes when the check passes again."
 	}
 }

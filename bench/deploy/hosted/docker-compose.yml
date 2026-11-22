@@ -210,6 +210,9 @@ services:
       HEIMDALL_CAPTCHA_SITEKEY: ${HEIMDALL_CAPTCHA_SITEKEY:-}
       HEIMDALL_IMAGE_AUTO_APPROVE: ${HEIMDALL_IMAGE_AUTO_APPROVE:-}
       HEIMDALL_FAULT_MODE: ${HEIMDALL_FAULT_MODE:-}
+      # DNS servers for guarded outbound calls (webhooks, MCP test, Connect):
+      # empty uses 1.1.1.1:53,8.8.8.8:53; "system" uses the container's resolver.
+      HEIMDALL_PUBLIC_DNS: ${HEIMDALL_PUBLIC_DNS:-}
       # security.txt Contact (mailto: or https:); empty uses <public url>/security.
       HEIMDALL_SECURITY_CONTACT: ${HEIMDALL_SECURITY_CONTACT:-}
       # The public name, and "heimdall" for the shared worker on the edge network.
@@ -293,7 +296,9 @@ services:
       OTEL_SERVICE_NAME: heimdall-server
       OTEL_TRACES_SAMPLER: ${HEIMDALL_OTEL_SAMPLER:-parentbased_always_on}
       HEIMDALL_STATUS_FILE: /var/lib/heimdall/status/incidents.json
-      HEIMDALL_STATUS_PROBES: ${HEIMDALL_STATUS_PROBES:-}
+      # Extra /status lines; the default probes the model gateway (the bifrost
+      # service below, the address its own healthcheck uses).
+      HEIMDALL_STATUS_PROBES: ${HEIMDALL_STATUS_PROBES:-gateway=http://bifrost:8080/health}
       # Per-token and per-org API rate limits (empty: the built-in defaults,
       # "off": none), and the runner image Heimdall starts for an org's own
       # worker on Fly Machines or Kubernetes (empty: the published default).

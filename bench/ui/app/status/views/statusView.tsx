@@ -129,7 +129,10 @@ export function StatusPageView({ page }: { page: StatusPage }) {
 	);
 }
 
-function IncidentCard({ incident, names }: { incident: Incident; names: Map<string, string> }) {
+/** An incident a platform check opened on its own (fix wave 2, N148); `auto` is not in the shared type yet. */
+type MaybeAutoIncident = Incident & { auto?: boolean };
+
+function IncidentCard({ incident, names }: { incident: MaybeAutoIncident; names: Map<string, string> }) {
 	const { t } = useTranslation("status");
 	const affected = (incident.components ?? []).map((id) => names.get(id) ?? id);
 	const tone: StatusTone =
@@ -139,7 +142,18 @@ function IncidentCard({ incident, names }: { incident: Incident; names: Map<stri
 		<article className="bg-card flex flex-col gap-3 rounded-xl border px-4 py-4" data-testid={`status-incident-${incident.id}`}>
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<h3 className="text-sm font-semibold">{incident.title}</h3>
-				<StatusPill tone={tone}>{t(`incident.status.${incident.status}`)}</StatusPill>
+				<span className="flex items-center gap-2">
+					{incident.auto && (
+						<span
+							className="text-muted-foreground rounded-md border px-1.5 py-0.5 text-xs"
+							title={t("incident.autoHint")}
+							data-testid={`status-incident-auto-${incident.id}`}
+						>
+							{t("incident.auto")}
+						</span>
+					)}
+					<StatusPill tone={tone}>{t(`incident.status.${incident.status}`)}</StatusPill>
+				</span>
 			</div>
 			<p className="text-muted-foreground text-xs">
 				{affected.length > 0 ? t("incident.affects", { components: affected.join(", ") }) : t("incident.wholePlatform")}

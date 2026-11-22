@@ -129,7 +129,7 @@ func TestMetricChecks(t *testing.T) {
 	reg := selfmetrics.New()
 	workers := map[string]float64{}
 	age, low, queue := 0.0, 0.0, 0.0
-	reg.Gauge("heimdall_workers", "", func(context.Context) []selfmetrics.Sample {
+	reg.Gauge("heimdall_shared_workers", "", func(context.Context) []selfmetrics.Sample {
 		var out []selfmetrics.Sample
 		for s, n := range workers {
 			out = append(out, selfmetrics.Sample{Labels: map[string]string{"state": s}, Value: n})
@@ -150,11 +150,11 @@ func TestMetricChecks(t *testing.T) {
 		wantQ   Level
 		wantDet string
 	}{
-		{"none", func() {}, Unknown, Operational, "no worker connected"},
+		{"none", func() {}, Unknown, Operational, "no shared pool on this server"},
 		{"healthy", func() { workers = map[string]float64{"idle": 2, "running": 1} }, Operational, Operational, ""},
 		{"late", func() { age = 120 }, Degraded, Operational, "a running evaluation reported late"},
 		{"disk", func() { age = 0; low = 1 }, Degraded, Operational, "some workers are low on disk"},
-		{"all lost", func() { low = 0; workers = map[string]float64{"lost": 3} }, MajorOutage, Operational, "no worker is answering"},
+		{"all lost", func() { low = 0; workers = map[string]float64{"lost": 3} }, MajorOutage, Operational, "no shared worker is answering"},
 		{"queue busy", func() { workers = map[string]float64{"idle": 1}; queue = QueueBusy + 1 }, Operational, Degraded, ""},
 	}
 	for _, c := range cases {
