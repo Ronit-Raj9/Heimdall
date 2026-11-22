@@ -45,5 +45,23 @@
     "writer": {
       "batch_interval": "500ms"
     }
-  }
+  },
+  "plugins": [
+    {
+      "name": "heimdall",
+      "enabled": false,
+      "config": {
+        "enabled": true,
+        "allow_inline_plans": true,
+        "usage": {
+          "url": "http://heimdall:8090",
+          "secret": "env.HEIMDALL_GATEWAY_USAGE_SECRET",
+          "batch_size": 50,
+          "flush_ms": 1000,
+          "timeout_ms": 5000,
+          "queue_limit": 5000
+        }
+      }
+    }
+  ]
 }

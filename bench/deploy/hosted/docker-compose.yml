@@ -201,6 +201,8 @@ services:
       # with the shared pool on means http://bifrost:8080; "off" disables it.
       HEIMDALL_GATEWAY_LOGS_URL: ${HEIMDALL_GATEWAY_LOGS_URL:-}
       BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
+      # Checks usage rows the heimdall Bifrost plugin posts; same value as bifrost's.
+      HEIMDALL_GATEWAY_USAGE_SECRET: ${HEIMDALL_GATEWAY_USAGE_SECRET:-}
     volumes:
       - ./bench.hosted.yaml:/srv/heimdall/deploy/bench.yaml:ro
       - heimdall-data:/var/lib/heimdall
@@ -279,6 +281,8 @@ services:
     environment:
       BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
       BIFROST_PG_PASSWORD: ${BIFROST_PG_PASSWORD:-}
+      # Shared with the heimdall service: the heimdall plugin's usage export.
+      HEIMDALL_GATEWAY_USAGE_SECRET: ${HEIMDALL_GATEWAY_USAGE_SECRET:-}
       LOG_STYLE: json
     volumes:
       - bifrost-data:/app/data

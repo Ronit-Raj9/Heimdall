@@ -4270,7 +4270,7 @@
           },
           "name": {
             "type": "string",
-            "description": "Name of the plugin (built-in: telemetry, prompts, logging, governance, maxim, semantic_cache, otel, or custom plugin name)"
+            "description": "Name of the plugin (built-in: telemetry, prompts, logging, governance, maxim, semantic_cache, otel, heimdall, or custom plugin name)"
           },
           "config": {
             "type": "object",
@@ -4493,6 +4493,115 @@
                     "is_enterprise": {
                       "type": "boolean",
                       "description": "Enable enterprise mode features"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "const": "heimdall"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "config": {
+                  "type": "object",
+                  "description": "Configuration for the Heimdall agent benchmark plugin (fault injection and run tagging). The plugin entry's own enabled flag loads it; config.enabled turns fault injection on.",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "description": "Turn fault injection on. Run tagging works whenever the plugin is loaded.",
+                      "default": false
+                    },
+                    "allow_inline_plans": {
+                      "type": "boolean",
+                      "description": "Accept a fault plan sent inline in the x-heimdall-fault-plan header. Only for trusted callers (Heimdall workers behind the gateway).",
+                      "default": false
+                    },
+                    "usage": {
+                      "type": "object",
+                      "description": "Per-request usage export to Heimdall. Off when url is empty.",
+                      "properties": {
+                        "url": {"type": "string", "description": "Heimdall base URL (records go to POST /api/bench/gateway/usage)."},
+                        "secret": {"type": "string", "description": "Shared secret sent as Authorization: Bearer. Supports env.NAME."},
+                        "batch_size": {"type": "integer", "minimum": 0, "description": "Records per POST."},
+                        "flush_ms": {"type": "integer", "minimum": 0, "description": "Max wait before a partial batch is sent."},
+                        "timeout_ms": {"type": "integer", "minimum": 0, "description": "Timeout per POST."},
+                        "queue_limit": {"type": "integer", "minimum": 0, "description": "Records held before new ones are dropped."}
+                      },
+                      "additionalProperties": false
+                    },
+                    "plans": {
+                      "type": "object",
+                      "description": "Named fault plans, selected per request with x-heimdall-fault-plan-id.",
+                      "additionalProperties": {
+                        "type": "object",
+                        "description": "One fault plan (same semantics as Heimdall's fault proxy).",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "enum": ["", "none", "error", "rate_limit", "timeout", "latency", "flaky", "outage"],
+                            "description": "Fault mode."
+                          },
+                          "status": {
+                            "type": "integer",
+                            "minimum": 400,
+                            "maximum": 599,
+                            "description": "Error status to answer (error default 500, outage default 503)."
+                          },
+                          "retry_after_s": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Retry-After seconds for rate_limit."
+                          },
+                          "delay_ms": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 600000,
+                            "description": "Hold time for timeout and latency."
+                          },
+                          "fail_prob": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "description": "Failure probability for flaky."
+                          },
+                          "seed": {
+                            "type": "string",
+                            "description": "Seed for flaky, so a rerun fails the same calls."
+                          },
+                          "from_call": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "First faulted call, 1-based (default 1)."
+                          },
+                          "calls": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "End the window after this many calls."
+                          },
+                          "until_s": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "End the window this many seconds after its first faulted call."
+                          },
+                          "model": {
+                            "type": "string",
+                            "description": "Only fault this model (empty or * means all)."
+                          },
+                          "message": {
+                            "type": "string",
+                            "description": "Error message to return."
+                          }
+                        },
+                        "additionalProperties": false
+                      }
                     }
                   },
                   "additionalProperties": false

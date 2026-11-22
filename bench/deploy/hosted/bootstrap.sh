@@ -66,6 +66,9 @@ if [ -z "$(env_get HEIMDALL_MASTER_KEY)" ]; then
 	log "generating HEIMDALL_MASTER_KEY (keep a copy in your secrets manager: backups leave it out)"
 	env_set HEIMDALL_MASTER_KEY "$(openssl rand -base64 32)"
 fi
+# Shared by the server and Bifrost (heimdall plugin usage export). Older env
+# files get one too; an existing value is kept.
+[ -n "$(env_get HEIMDALL_GATEWAY_USAGE_SECRET)" ] || env_set HEIMDALL_GATEWAY_USAGE_SECRET "$(random_hex)"
 [ -n "$(env_get HEIMDALL_BENCH_DIR)" ] || env_set HEIMDALL_BENCH_DIR "$BENCH_DIR"
 [ -z "$domain" ] || env_set HEIMDALL_DOMAIN "$domain"
 [ -z "$email" ] || env_set HEIMDALL_ACME_EMAIL "$email"
