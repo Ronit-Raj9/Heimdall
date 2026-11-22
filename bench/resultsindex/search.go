@@ -1,7 +1,8 @@
 package resultsindex
 
 // Cross-run trace search (X23): a full-text index over every sealed run's
-// steps, tool calls, final answer, gate reasons and grade reason, so a
+// steps, tool calls, trace events, model error messages, final answer (or
+// final message), gate reasons and grade reason, so a
 // reader can find "every run that called refund_order and said all tests
 // pass" across experiments.
 //
@@ -35,6 +36,8 @@ const (
 	SearchFieldAnswer   = "answer"
 	SearchFieldGate     = "gate"
 	SearchFieldGrade    = "grade"
+	SearchFieldEvent    = "event" // a trace event's summary or target (fix wave 2, N49)
+	SearchFieldError    = "error" // a model error: a gateway row's error message or an error event
 )
 
 // Search limits.
@@ -295,6 +298,12 @@ type searchEvidence struct {
 	Answer    *schemas.Answer      `json:"answer"`
 	Grade     *schemas.Grade       `json:"grade"`
 	Gates     []schemas.GateResult `json:"gates"`
+	// Events, the claim and the gateway rows carry what a run whose agent
+	// runs its own tools records nowhere else: the command lines, the
+	// model error bodies and the final message (N49).
+	Events   []schemas.Event     `json:"events"`
+	Claim    *schemas.Claim      `json:"claim"`
+	Requests *schemas.RequestLog `json:"requests"`
 }
 
 // buildDoc reads one run's evidence.json, tools.jsonl, gates.json and
@@ -338,12 +347,18 @@ func buildDoc(src SearchSource, r SearchRun) (*searchDoc, error) {
 // docFrom builds a document from the run's evidence. It is pure.
 func docFrom(sealHash string, ev *searchEvidence) *searchDoc {
 	d := &searchDoc{sealHash: sealHash, tools: map[string]bool{}}
+	seen := map[string]bool{} // lowered passage texts: the same line from a step and an event counts once
 	add := func(field, label, text string, seq int) {
 		text = clip(strings.TrimSpace(text), maxFieldRunes)
 		if text == "" || len(d.passages) >= maxPassages {
 			return
 		}
-		d.passages = append(d.passages, passage{field: field, label: label, text: text, lower: strings.ToLower(text), seq: seq})
+		lower := strings.ToLower(text)
+		if seen[lower] {
+			return
+		}
+		seen[lower] = true
+		d.passages = append(d.passages, passage{field: field, label: label, text: text, lower: lower, seq: seq})
 	}
 	for _, s := range ev.Steps {
 		if s.ToolName != "" {
@@ -368,8 +383,28 @@ func docFrom(sealHash string, ev *searchEvidence) *searchDoc {
 		}
 		add(SearchFieldToolCall, c.Tool, text, c.Seq)
 	}
-	if ev.Answer != nil {
+	for _, e := range ev.Events {
+		if e.ToolName != "" {
+			d.tools[strings.ToLower(e.ToolName)] = true
+		}
+		text := strings.TrimSpace(e.Summary)
+		if e.Target != "" && !strings.Contains(text, e.Target) {
+			text += " " + e.Target
+		}
+		// Event seqs are per source and do not match step numbers: no seq.
+		add(eventField(e), cmp.Or(e.ToolName, string(e.Type)), text, 0)
+	}
+	if ev.Requests != nil {
+		for _, r := range ev.Requests.Requests {
+			if r.ErrorMessage != "" {
+				add(SearchFieldError, cmp.Or(r.ModelServed, r.ModelRequested), r.ErrorMessage, 0)
+			}
+		}
+	}
+	if ev.Answer != nil && strings.TrimSpace(ev.Answer.Text) != "" {
 		add(SearchFieldAnswer, "", ev.Answer.Text, 0)
+	} else if ev.Claim != nil {
+		add(SearchFieldAnswer, "", ev.Claim.Text, 0) // the final message when the run has no answer
 	}
 	for _, g := range ev.Gates {
 		if g.Fired {
@@ -384,6 +419,18 @@ func docFrom(sealHash string, ev *searchEvidence) *searchDoc {
 		add(SearchFieldGrade, "", text, 0)
 	}
 	return d
+}
+
+// eventField is the search field of one trace event: error for an error,
+// tool_call for a tool call or result, else event.
+func eventField(e schemas.Event) string {
+	switch {
+	case e.IsError || e.Type == schemas.EventError || e.Type == schemas.EventRetry || strings.HasPrefix(e.Summary, "error "):
+		return SearchFieldError
+	case e.Type == schemas.EventToolCall || e.Type == schemas.EventToolResult:
+		return SearchFieldToolCall
+	}
+	return SearchFieldEvent
 }
 
 // match checks q's terms and tools against a document: every term must
@@ -401,10 +448,18 @@ func match(d *searchDoc, q SearchQuery) (SearchHit, bool) {
 		i, n int
 	}
 	var cands []scored
+	// A plain word that is the name of a tool the run called matches like
+	// tool: does (N50): a witness row may be the only one that names it.
+	for k, t := range q.Terms {
+		if d.tools[t] {
+			found[k] = true
+		}
+	}
 	for i, p := range d.passages {
 		n := 0
+		label := strings.ToLower(p.label)
 		for k, t := range q.Terms {
-			if strings.Contains(p.lower, t) {
+			if strings.Contains(p.lower, t) || (label == t && d.tools[t]) {
 				found[k] = true
 				n++
 			}

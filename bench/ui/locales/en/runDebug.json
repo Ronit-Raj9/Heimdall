@@ -6,7 +6,10 @@
 		"debugHint": "Rerun live and pause at chosen model calls.",
 		"started": "Debug run {{id}} started",
 		"open": "Open",
-		"failed": "Could not start the debug run"
+		"failed": "Could not start the debug run",
+		"forkNeedsClean": "Fork and Debug need a run without a fault. This run ran under {{fault}}.",
+		"replayNeedsClean": "Replay, Fork and Debug need a run without a fault or with a model fault. This run ran under {{fault}}, which a replay cannot repeat.",
+		"compareSource": "Compare with source"
 	},
 	"banner": {
 		"replay": "Replay of run {{run}}",
@@ -15,7 +18,11 @@
 		"note": "Debug runs never count toward results, report cards or leaderboards.",
 		"held": "Paused for {{time}} at breakpoints; the agent's clock did not run meanwhile.",
 		"source": "Source run",
-		"diff": "Compare with source"
+		"diff": "Compare with source",
+		"fromCondition": "The source run ran under {{fault}}: its fault answers are replayed as recorded."
+	},
+	"provenance": {
+		"replayed": "replayed from the recording"
 	},
 	"inspector": {
 		"title": "Step {{seq}}",

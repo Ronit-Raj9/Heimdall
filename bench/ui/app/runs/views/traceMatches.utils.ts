@@ -45,3 +45,25 @@ export function hitAgentLabel(hit: Pick<SearchHit, "agent" | "version">): string
 	if (!hit.version) return hit.agent;
 	return /^v/i.test(hit.version) ? `${hit.agent} ${hit.version}` : `${hit.agent} v${hit.version}`;
 }
+
+/** Where a trace search hit opens on the run page (N51): a tab, and the step to select on Step by step. */
+export interface HitTarget {
+	tab: "overview" | "timeline" | "output";
+	step?: number;
+}
+
+/**
+ * The run page target of a hit: the first step match opens Step by step on that step; a tool call,
+ * event or error match opens Step by step; an answer opens Output; a gate or grade reason opens
+ * Overview, where they are shown. A hit with no match opens Step by step.
+ */
+export function hitTarget(hit: Pick<SearchHit, "matches">): HitTarget {
+	const matches = hit.matches ?? [];
+	const step = matches.find((m) => m.field === "step" && typeof m.seq === "number" && m.seq > 0);
+	if (step) return { tab: "timeline", step: step.seq };
+	const first = matches[0];
+	if (!first) return { tab: "timeline" };
+	if (first.field === "answer") return { tab: "output" };
+	if (first.field === "gate" || first.field === "grade") return { tab: "overview" };
+	return { tab: "timeline" };
+}

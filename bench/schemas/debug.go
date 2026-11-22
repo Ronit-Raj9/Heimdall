@@ -55,6 +55,10 @@ type DebugSpec struct {
 	Edit         *DebugEdit   `json:"edit,omitempty" yaml:"edit,omitempty"`
 	Breakpoints  *Breakpoints `json:"breakpoints,omitempty" yaml:"breakpoints,omitempty"`
 	Cassette     *Cassette    `json:"cassette,omitempty" yaml:"cassette,omitempty"`
+	// FromCondition is the source run's fault condition when it was not
+	// clean (a replay of a model-fault run). The debug run itself always
+	// plans the clean condition: the cassette carries the faulted answers.
+	FromCondition string `json:"from_condition,omitempty" yaml:"from_condition,omitempty"`
 }
 
 // DebugEdit is the operator's change at the fork call. Response replaces the
@@ -175,6 +179,9 @@ type RunDebug struct {
 	FromRun string `json:"from_run,omitempty"`
 	FromExp string `json:"from_exp,omitempty"`
 	Call    int    `json:"call,omitempty"`
+	// FromCondition is DebugSpec.FromCondition: the source run's fault
+	// condition, empty when it was clean.
+	FromCondition string `json:"from_condition,omitempty"`
 	// HeldMS is the time the run spent held at breakpoints; the agent's
 	// wall clock did not run during it.
 	HeldMS int64 `json:"held_ms,omitempty"`

@@ -151,15 +151,18 @@ const (
 	ProvenanceMixed       = "mixed"       // both the scripted and a real model answered calls
 	ProvenanceUnobserved  = "unobserved"  // no recorded model call: no ledger, or one without a passed message
 	ProvenanceUnavailable = "unavailable" // the ledger could not be read or parsed
+	ProvenanceReplayed    = "replayed"    // every recorded model call was answered from a recording (a debug replay)
 )
 
 // LedgerProvenance classifies one run's proxy.ledger.jsonl by the model
 // evidence it records. A labelled proxy is taken at its word per line; an
 // unlabelled passed message falls back to the scripted fingerprint
 // (scriptedEntry), else counts as a real model call. A ledger with no passed
-// message call is unobserved: nothing shows a model played. It is pure.
+// message call is unobserved: nothing shows a model played. A ledger whose
+// passed calls were all answered from a recording (upstream "replay") is
+// replayed. It is pure.
 func LedgerProvenance(data []byte) (string, error) {
-	real, scripted := false, false
+	real, scripted, replayed := false, false, false
 	for i, line := range bytes.Split(data, []byte("\n")) {
 		if len(bytes.TrimSpace(line)) == 0 {
 			continue
@@ -174,6 +177,8 @@ func LedgerProvenance(data []byte) (string, error) {
 		switch {
 		case e.Upstream == schemas.LedgerUpstreamScripted:
 			scripted = true
+		case e.Upstream == schemas.LedgerUpstreamReplay:
+			replayed = true
 		case e.Upstream == schemas.LedgerUpstreamReal && e.Status >= 200 && e.Status < 300:
 			real = true
 		case e.Upstream == "" && scriptedEntry(e):
@@ -189,6 +194,8 @@ func LedgerProvenance(data []byte) (string, error) {
 		return ProvenanceScripted, nil
 	case real:
 		return ProvenanceModel, nil
+	case replayed:
+		return ProvenanceReplayed, nil
 	}
 	return ProvenanceUnobserved, nil
 }

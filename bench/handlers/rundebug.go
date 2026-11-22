@@ -354,14 +354,17 @@ func (h *runDebugHandler) debugExperiment(ctx context.Context, rv *RunView, m *s
 		// A replay of a replay reproduces the same recording: debug the source instead.
 		return nil, fmt.Errorf("%w: this run is itself a replay; replay or fork its source run %s", errDebugConflict, m.Experiment.Debug.FromRun)
 	}
-	if rv.Slot.Condition != schemas.ConditionClean {
-		return nil, fmt.Errorf("%w: only runs without a fault can be replayed, forked or stepped; this run ran under %s", errDebugConflict, rv.Slot.Condition)
+	if err := debugFaultRule(rv.Slot.Condition, conditionProbe(ctx, h.env.Services.Suites, rv, m), mode); err != nil {
+		return nil, fmt.Errorf("%w: %v", errDebugConflict, err)
 	}
 	arm, ok := m.Experiment.Arms[rv.Slot.Arm]
 	if !ok {
 		return nil, fmt.Errorf("%w: agent version %s is not in the evaluation's plan", errDebugConflict, rv.Slot.Arm)
 	}
 	d := &schemas.DebugSpec{Mode: mode, FromRun: rv.Run.RunID, FromExp: rv.Slot.ExpID, OnDivergence: req.OnDivergence, Breakpoints: req.Breakpoints}
+	if rv.Slot.Condition != schemas.ConditionClean {
+		d.FromCondition = rv.Slot.Condition // a model-fault replay: the child stays clean, the cassette carries the faulted answers
+	}
 	switch mode {
 	case schemas.DebugFork:
 		d.Call = req.Call

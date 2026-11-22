@@ -24,6 +24,13 @@ describe("ArmProvenance", () => {
 		expect(unavailable).toContain("provenance unavailable");
 		expect(unavailable).toContain("proxy ledger invalid");
 	});
+	it("says a debug replay's calls came from the recording, not that none was recorded (N27)", () => {
+		const html = render(<ArmProvenance arm="A" provenance="replayed" />);
+		expect(html).toContain("replayed from the recording");
+		expect(html).not.toContain("no model call recorded");
+		expect(html).not.toContain("border-chart-warning");
+		expect(render(<ArmProvenance arm="B" provenance="unobserved" />)).toContain("border-chart-warning");
+	});
 	it("says nothing for an older server without the field", () => {
 		expect(render(<ArmProvenance arm="A" provenance={undefined} />)).toBe("");
 	});

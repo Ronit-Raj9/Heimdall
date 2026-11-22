@@ -160,3 +160,19 @@ describe("RunExportMenu", () => {
     expect(html).toContain("Export");
   });
 });
+
+describe("TraceView initial step (N51)", () => {
+  it("selects the step a link asked for, with every step shown", () => {
+    const html = renderToStaticMarkup(
+      <TraceView data={data} arm="A" initialFilter="commands" initialStep={2} />,
+    );
+    expect(html).toMatch(/data-selected="true"[^>]*data-testid="trace-row-A-2"|data-testid="trace-row-A-2"[^>]*data-selected="true"/);
+    expect(html).toContain('data-testid="trace-row-A-1"');
+  });
+  it("ignores a step that is not in the trace", () => {
+    const html = renderToStaticMarkup(
+      <TraceView data={data} arm="A" initialStep={99} />,
+    );
+    expect(html).not.toContain('data-selected="true"');
+  });
+});

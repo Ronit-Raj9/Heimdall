@@ -57,6 +57,9 @@ type RunListRow struct {
 	Started   *time.Time      `json:"started,omitempty"`
 	SealedAt  *time.Time      `json:"sealed_at,omitempty"`
 	Error     string          `json:"error,omitempty"` // the first part failure's error of a non-pass run, cut to 600 bytes; empty when none
+	// Paired marks a run whose experiment compares two or more setups and is
+	// not a debug run, so "Compare Setup A and B" has two sides to show.
+	Paired bool `json:"paired,omitempty"`
 	// Excluded is why a sealed run is left out of scores (schemas.ExcludedReason):
 	// out_of_memory, infra_error, invalid_evaluator or unknown; empty when it scores.
 	Excluded string `json:"excluded,omitempty"`
@@ -405,6 +408,7 @@ func validModelFilter(v string) bool {
 func armFacts(row *RunListRow, rv RunView, m *schemas.Manifest, versions *versionIndex) {
 	row.AgentVer = rv.Run.Agent.AgentVersion
 	var agentHash string
+	row.Paired = m != nil && len(m.Arms) >= 2 && m.Experiment.Debug == nil
 	if m != nil {
 		if arm, ok := m.Arms[rv.Slot.Arm]; ok {
 			row.Model = arm.Config.Model

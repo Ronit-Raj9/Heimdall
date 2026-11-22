@@ -1,6 +1,6 @@
 /** Trace search and the Maxim integration (lane X23). Shapes mirror the Go handlers. */
 
-export type SearchMatchField = "step" | "tool_call" | "answer" | "gate" | "grade";
+export type SearchMatchField = "step" | "tool_call" | "answer" | "gate" | "grade" | "event" | "error";
 
 export interface SearchMatch {
 	field: SearchMatchField | (string & {});
