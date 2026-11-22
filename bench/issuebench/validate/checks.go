@@ -46,6 +46,10 @@ type Checker struct {
 	// IsTestFile tells test files from code files for checking that a
 	// near-miss patch changes only code; nil uses the candidate's lists.
 	IsTestFile func(path string) bool
+	// NoAblations leaves the fix's hunk ablations out of the wrong patches:
+	// the worker verified them against the tests (VerifyAblations) and the
+	// kept ones are added from the Validation.
+	NoAblations bool
 }
 
 const checkSystem = "You review a candidate coding benchmark task built from a GitHub issue and the pull request that fixed it. " +
@@ -157,7 +161,9 @@ func (k *Checker) Run(ctx context.Context, c issuebench.Candidate, needInterface
 	for _, p := range wr.Patches {
 		out.WrongPatches = append(out.WrongPatches, normalisePatch(p.Diff))
 	}
-	out.WrongPatches = append(out.WrongPatches, hunkAblations(c.FixPatch, maxAblations)...)
+	if !k.NoAblations {
+		out.WrongPatches = append(out.WrongPatches, hunkAblations(c.FixPatch, maxAblations)...)
+	}
 	return out, "", nil
 }
 

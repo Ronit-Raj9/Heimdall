@@ -268,3 +268,59 @@ func leakScore(issue, fixPatch string) (float64, int) {
 	}
 	return float64(hit) / float64(total), hit
 }
+
+// RankedAblations returns at most limit ablations of patch, each leaving out
+// one hunk of a code file (not a test file, not documentation, not a file the
+// patch creates or deletes), the hunks with the most changed lines first.
+func RankedAblations(patch string, isTest func(string) bool, limit int) []string {
+	files := splitPatch(patch)
+	type ref struct{ file, hunk, changed int }
+	var refs []ref
+	total := 0
+	for fi, f := range files {
+		total += len(f.Hunks)
+		if f.Created || f.Deleted || docPath(f.Path) || (isTest != nil && isTest(f.Path)) {
+			continue
+		}
+		for hi, h := range f.Hunks {
+			n := 0
+			for _, line := range strings.Split(h, "\n") {
+				if (strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++")) || (strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---")) {
+					n++
+				}
+			}
+			refs = append(refs, ref{fi, hi, n})
+		}
+	}
+	if total < 2 || limit <= 0 {
+		return nil
+	}
+	sort.SliceStable(refs, func(i, j int) bool { return refs[i].changed > refs[j].changed })
+	var out []string
+	for _, drop := range refs {
+		if len(out) >= limit {
+			break
+		}
+		var b strings.Builder
+		for fi, f := range files {
+			var kept []string
+			for hi, h := range f.Hunks {
+				if fi == drop.file && hi == drop.hunk {
+					continue
+				}
+				kept = append(kept, h)
+			}
+			if len(kept) == 0 {
+				continue
+			}
+			b.WriteString(f.Header)
+			for _, h := range kept {
+				b.WriteString(h)
+			}
+		}
+		if s := b.String(); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}

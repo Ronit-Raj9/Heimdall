@@ -17,6 +17,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/issuebench"
 	"github.com/maximhq/bifrost/bench/issuebench/builder"
+	"github.com/maximhq/bifrost/bench/issuebench/validate"
 	_ "github.com/maximhq/bifrost/bench/issuebench/lang/python" // registers the languages a worker builds
 	"github.com/maximhq/bifrost/bench/schemas"
 )
@@ -120,13 +121,22 @@ func Run(ctx context.Context, d Deps, req issuebench.WorkRequest, secrets map[st
 		timeout = time.Duration(s) * time.Second
 	}
 	logf("running the tests in %s with no network", tag)
-	v, err := ValidateTests(ctx, TestRunner{Docker: d.Docker, Image: tag, Runtime: d.Runtime, JobID: req.JobID, Timeout: timeout}, env, req.Candidate)
+	tr := TestRunner{Docker: d.Docker, Image: tag, Runtime: d.Runtime, JobID: req.JobID, Timeout: timeout}
+	v, err := ValidateTests(ctx, tr, env, req.Candidate)
 	if err != nil {
 		return stopOrErr(res, fmt.Errorf("the tests could not run: %w", err))
 	}
 	v.Checks = issuebench.LLMChecks{}
-	res.Validation = &v
 	logf("tests done: %d fail to pass, %d pass to pass", len(v.FailToPass), len(v.PassToPass))
+	if v.Stop == "" && len(v.FailToPass) > 0 {
+		rep, err := validate.VerifyAblations(ctx, tr, &env, v.Candidate, &v, validate.LanguageFor(v.Candidate.Language), validate.MaxVerifiedAblations)
+		if err != nil {
+			return stopOrErr(res, fmt.Errorf("the near misses could not run: %w", err))
+		}
+		v.Ablations = &rep
+		logf("near misses from the fix: %d tried, %d kept (they fail the tests), %d dropped (they pass or do not apply: behaviour-neutral hunks such as refactors)", rep.Tried, rep.Kept, rep.Dropped)
+	}
+	res.Validation = &v
 	return res, nil
 }
 

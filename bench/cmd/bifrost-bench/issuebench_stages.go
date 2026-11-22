@@ -336,7 +336,7 @@ func (s *ibStages) modelChecks(ctx context.Context, v *issuebench.Validation, lo
 	if f, err := strconv.ParseFloat(os.Getenv("BENCH_ISSUEBENCH_CHECK_MAX_USD"), 64); err == nil && f > 0 {
 		maxUSD = f
 	}
-	params, _ := json.Marshal(issuebenchCheckParams{Candidate: c, Provider: mc.Provider, Model: mc.Model, KeyID: mc.KeyID, MaxUSD: maxUSD, Consent: true})
+	params, _ := json.Marshal(issuebenchCheckParams{Candidate: c, Provider: mc.Provider, Model: mc.Model, KeyID: mc.KeyID, MaxUSD: maxUSD, Consent: true, NoAblations: s.hosted})
 	var res issuebenchCheckResult
 	if err := s.runJob(ctx, kindIssuebenchCheck, params, &res, func(id string) {
 		issuebench.NoteJob(ctx, issuebench.StageChecks, id)
@@ -345,6 +345,10 @@ func (s *ibStages) modelChecks(ctx context.Context, v *issuebench.Validation, lo
 		return err
 	}
 	v.Checks, v.Stop = res.Checks, res.Stop
+	if s.hosted && v.Ablations != nil {
+		// Only the ablations the worker saw fail the tests are near misses.
+		v.Checks.WrongPatches = append(v.Checks.WrongPatches, v.Ablations.Patches...)
+	}
 	logf("issue #%d: model checks done: %d calls, $%.4f", c.Issue, res.Calls, res.CostUSD)
 	return nil
 }

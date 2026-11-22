@@ -135,4 +135,18 @@ type Validation struct {
 	Flaky      []string  `json:"flaky,omitempty"`
 	Checks     LLMChecks `json:"checks"`
 	Stop       string    `json:"stop,omitempty"`
+	// Ablations are the fix's hunk ablations the worker ran (hosted): only
+	// the verified wrong ones become near-miss controls.
+	Ablations *AblationReport `json:"ablations,omitempty"`
+}
+
+// AblationReport is what running the fix's hunk ablations found: Patches
+// are the kept ones (at least one FAIL_TO_PASS test fails, or a
+// PASS_TO_PASS test breaks); a dropped one passed (a behaviour-neutral hunk
+// such as a refactor) or did not apply.
+type AblationReport struct {
+	Tried   int      `json:"tried"`
+	Kept    int      `json:"kept"`
+	Dropped int      `json:"dropped"`
+	Patches []string `json:"patches,omitempty"`
 }

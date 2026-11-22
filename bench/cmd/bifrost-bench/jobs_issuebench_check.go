@@ -35,6 +35,9 @@ type issuebenchCheckParams struct {
 	KeyID           string               `json:"key_id,omitempty"`
 	MaxUSD          float64              `json:"max_usd"`
 	Consent         bool                 `json:"consent"`
+	// NoAblations: the hunk ablations were verified on the worker and come
+	// from the Validation (hosted); the check adds no unverified ones.
+	NoAblations bool `json:"no_ablations,omitempty"`
 }
 
 // issuebenchCheckResult is the job's result.
@@ -102,7 +105,7 @@ func runIssuebenchCheck(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.L
 	}
 	defer closeFn()
 	log.Printf("checking issue #%d of %s on %s/%s (cap $%.2f)", p.Candidate.Issue, p.Candidate.Repo, p.Provider, p.Model, p.MaxUSD)
-	checks, stop, err := (&validate.Checker{Model: model}).Run(ctx, p.Candidate, p.KeepErrorToPass)
+	checks, stop, err := (&validate.Checker{Model: model, NoAblations: p.NoAblations}).Run(ctx, p.Candidate, p.KeepErrorToPass)
 	if err != nil {
 		return nil, err
 	}
