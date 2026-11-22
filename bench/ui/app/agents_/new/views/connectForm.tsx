@@ -504,6 +504,9 @@ export function EndpointPreviewView({ data, error, loading }: { data?: { ok: boo
 				</p>
 			)}
 			{!data && !error && !loading && <p className="text-muted-foreground text-xs">{t("new.endpointPreview.empty")}</p>}
+		</div>
+	);
+}
 
 /**
  * "Your own code (pull mode)": the agent runs in the customer's process (heimdall.serve) and

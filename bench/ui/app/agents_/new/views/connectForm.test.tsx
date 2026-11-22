@@ -187,6 +187,8 @@ describe("request preview and test details", () => {
 	it("caps a long raw answer", () => {
 		expect(capText("x".repeat(RAW_CAP + 10)).length).toBe(RAW_CAP + 4);
 		expect(capText("short")).toBe("short");
+	});
+});
 
 describe("pull mode", () => {
 	it("adds the pull option once and hides the model picker", () => {

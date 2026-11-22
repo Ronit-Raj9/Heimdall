@@ -61,8 +61,11 @@ func TestCompareDatasetsUsesSharedTasks(t *testing.T) {
 	gate := schemas.EvaluationGate{MaxRegression: 0.05}
 	in := GateInput{Gate: gate, Agent: "codex", Candidate: "A", Report: full, Baseline: &schemas.GateBaseline{Agent: "codex", Version: 1},
 		BaselineArm: "A", BaselineReport: was, Now: time.Now()}
-	if res := JudgeGate(in); res.State != schemas.GateFail {
-		t.Fatalf("pooled over different task sets the gate fails: %+v", res)
+	// The regression check pairs tasks (Y06), so even the full report is
+	// compared on the four shared tasks only: the two new hard tasks never
+	// count as a drop.
+	if res := JudgeGate(in); res.State == schemas.GateFail {
+		t.Fatalf("paired regression check compares shared tasks only: %+v", res)
 	}
 	in.CompareReport, in.Dataset = pinned, cmp
 	res := JudgeGate(in)

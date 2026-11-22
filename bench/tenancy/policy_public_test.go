@@ -38,11 +38,19 @@ func TestPublicRoutesAreExactlyTheSite(t *testing.T) {
 		"POST /api/bench/auth/logout",
 		"POST /api/bench/auth/signup",
 		"POST /mcp",
+		"GET /api/public/pricing",           // Y16: the plans the pricing page shows
+		"GET /api/bench/reference/board",    // Y09: the public reference score board
+		"POST /api/bench/auth/verify-email", // Y01: the emailed verification token is the credential
 		// Public in the table, but the handler checks a credential of its
 		// own: a reset token, an org ingest token, the shared runner secret.
 		"GET /api/bench/auth/reset/{token}",
 		"POST /api/bench/auth/reset/{token}",
 		"POST /api/bench/orgs/{org}/inbox/ingest",
+		"POST /api/bench/billing/webhook",    // Y16: Stripe signature
+		"POST /api/bench/pull/run/turns",     // Y11: signed run token
+		"GET /api/bench/pull/run/turns/{id}", // Y11: signed run token
+		"POST /api/bench/pull/run/repos",     // Y11: signed run token
+		"GET /api/bench/pull/repos/{id}",     // Y11: signed, expiring link
 		"GET /api/bench/admin/pool/assignments",
 		"POST /api/bench/admin/pool/assignments/{org}/token",
 	}

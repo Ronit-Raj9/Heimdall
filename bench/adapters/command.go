@@ -271,6 +271,7 @@ func templateVars(rc *schemas.RunContext, cfg CommandConfig, instruction string)
 		"workspace":        Workspace,
 		"model":            rc.Agent.Model,
 		"gateway.url":      strings.TrimRight(cfg.GatewayAgentURL, "/"),
+		"gateway.provider": rc.Agent.Gateway.Provider, // the bare-model agent's model prefix (G4-21)
 		"run.id":           rc.Run.RunID,
 		"run.session":      rc.Run.RunID,
 		"exp.id":           expID(rc),

@@ -44,7 +44,7 @@ func init() {
 		return handlers.NewPublicSiteHandler(handlers.PublicSiteConfig{
 			Mode:            a.cfg.Server.Mode,
 			Library:         lib.list,
-			Pricing:         publicPricing,
+			Pricing:         sitePricing(env),
 			DownloadsDir:    strings.TrimSpace(os.Getenv(DownloadsDirEnv)),
 			GitLabTemplate:  ci.GitLabTemplate(),
 			PublicURL:       a.cfg.Auth.PublicURL,
