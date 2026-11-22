@@ -191,3 +191,77 @@ func TestCLIArgBuilders(t *testing.T) {
 		}
 	}
 }
+
+// fakeScanCLI makes cliExecutable a script that prints out (as skill scan
+// -json does: an indented record, with log lines around it) and exits code.
+func fakeScanCLI(t *testing.T, out string, code int) {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "out.txt"), []byte(out), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(dir, "fake-cli")
+	body := fmt.Sprintf("#!/bin/sh\necho 'scanning skill' >&2\ncat %q\nexit %d\n", filepath.Join(dir, "out.txt"), code)
+	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	old := cliExecutable
+	cliExecutable = func() (string, error) { return script, nil }
+	t.Cleanup(func() { cliExecutable = old })
+}
+
+func scanSkillSpecs(t *testing.T) (local, hosted jobKindSpec) {
+	t.Helper()
+	jobKindsMu.Lock()
+	defer jobKindsMu.Unlock()
+	for _, k := range jobKinds {
+		if k.Kind != "scan.skill" {
+			continue
+		}
+		if k.Local {
+			local = k
+		}
+		if k.Hosted {
+			hosted = k
+		}
+	}
+	if local.Run == nil || hosted.Run == nil {
+		t.Fatal("scan.skill job kinds not registered")
+	}
+	return local, hosted
+}
+
+func TestScanSkillJobBlockedIsFinished(t *testing.T) {
+	rec := schemas.AdmitScanRecord{Kind: "skill", Subject: "bad", Decision: schemas.AdmitScanBlocked,
+		Counts: schemas.AdmitScanCounts{Block: 2, Warn: 1}}
+	b, _ := json.MarshalIndent(rec, "", "  ")
+	fakeScanCLI(t, string(b)+"\n", 1)
+	root := t.TempDir()
+	cfg := &lib.Config{RunsRoot: "runs", BenchmarksRoot: "benchmarks", Root: root,
+		Server: lib.ServerConfig{Listen: "127.0.0.1:0", Mode: schemas.ModeSynthetic}}
+	env := jobEnv{App: &app{cfg: cfg}, ProjectRoot: root}
+	job := &jobs.Job{Params: json.RawMessage(`{"path":"agents/codex/skills/bad"}`)}
+	local, hosted := scanSkillSpecs(t)
+	for name, spec := range map[string]jobKindSpec{"local": local, "hosted static": hosted} {
+		res, err := spec.Run(context.Background(), env, job, &cliTestLog{}, func(any) {})
+		if err != nil {
+			t.Fatalf("%s: a blocked scan failed the job: %v", name, err)
+		}
+		m, _ := res.(map[string]any)
+		if m == nil || m["decision"] != "blocked" || fmt.Sprint(m["block"]) != "2" || fmt.Sprint(m["warn"]) != "1" {
+			t.Fatalf("%s: result = %#v", name, res)
+		}
+		if want := "Scan finished: blocked (2 problems that block, 1 warnings)"; m["summary"] != want {
+			t.Fatalf("%s: summary = %q, want %q", name, m["summary"], want)
+		}
+	}
+	// Exit 1 without a record, and any other exit code, still fail the job.
+	fakeScanCLI(t, "no record\n", 1)
+	if _, err := local.Run(context.Background(), env, job, &cliTestLog{}, func(any) {}); err == nil {
+		t.Fatal("exit 1 without a record finished the job")
+	}
+	fakeScanCLI(t, string(b)+"\n", 4)
+	if _, err := local.Run(context.Background(), env, job, &cliTestLog{}, func(any) {}); err == nil || !strings.Contains(err.Error(), "code 4") {
+		t.Fatalf("exit 4: %v", err)
+	}
+}

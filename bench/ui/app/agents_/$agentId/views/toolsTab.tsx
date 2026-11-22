@@ -11,10 +11,12 @@ import {
 	useGetAgentMCPQuery,
 	useGetAgentSkillsQuery,
 	usePutAgentMCPMutation,
+	useScanAgentSkillMutation,
 	useUploadAgentSkillMutation,
 } from "@/lib/store/apis/agentopsApi";
-import { MCP_FORMATS, scanMCPJob, scanSkillJob, type AgentMCPResponse } from "@/lib/types/agentops";
-import { useEffect, useState } from "react";
+import { MCP_FORMATS, scanMCPJob, type AgentMCPResponse, type AgentSkill, type SkillScanResult } from "@/lib/types/agentops";
+import type { TFunction } from "i18next";
+import { useEffect, useReducer, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type AgentOpsTabProps, Field, OpsSection, useAgentId } from "./agentOps.shared";
 
@@ -52,21 +54,111 @@ export function ToolsTab(props: AgentOpsTabProps = {}) {
 	);
 }
 
-function SkillsSection({ id }: { id: string }) {
+/** The skill upload form: the picked zip, the skill name, whether the user typed the name, and the file input's key. */
+export interface SkillForm {
+	file: File | null;
+	name: string;
+	/** The user typed in the name box: picking another file keeps the typed name. */
+	touched: boolean;
+	/** Bumped after an upload so the browser's file input is emptied too. */
+	inputKey: number;
+}
+
+export const initialSkillForm: SkillForm = { file: null, name: "", touched: false, inputKey: 0 };
+
+export type SkillFormAction = { type: "pick"; file: File | null } | { type: "name"; name: string } | { type: "uploaded" };
+
+/** The name follows each picked file until the user types one; an upload resets the form and the file input. */
+export function skillFormReducer(s: SkillForm, a: SkillFormAction): SkillForm {
+	switch (a.type) {
+		case "pick":
+			return { ...s, file: a.file, name: a.file && !s.touched ? skillNameFromFile(a.file.name) : s.name };
+		case "name":
+			return { ...s, name: a.name, touched: true };
+		case "uploaded":
+			return { ...initialSkillForm, inputKey: s.inputKey + 1 };
+	}
+}
+
+type AgentOpsT = TFunction<"agentops">;
+
+/** The message after an upload: installed, or not installed with the number of problems that block it. */
+export function skillUploadMessage(t: AgentOpsT, res: SkillScanResult): { ok: boolean; text: string } {
+	const { block, warn } = res.record.counts;
+	if (!res.installed) return { ok: false, text: t("tools.skills.blockedUpload", { name: res.skill.name, count: block }) };
+	const text = t("tools.skills.admitted", { name: res.skill.name });
+	return { ok: true, text: warn > 0 ? `${text} ${t("tools.skills.admittedWarn", { warn })}` : text };
+}
+
+/** The verdict of a Scan press. */
+export function skillScanMessage(t: AgentOpsT, res: SkillScanResult): { ok: boolean; text: string } {
+	const { block, warn } = res.record.counts;
+	return res.installed
+		? { ok: true, text: t("tools.skills.scanAdmitted", { warn }) }
+		: { ok: false, text: t("tools.skills.scanBlocked", { block, warn }) };
+}
+
+function SkillStatusBadge({ skill }: { skill: AgentSkill }) {
+	const { t } = useTranslation("agentops");
+	const testId = `agent-skill-status-${skill.name}`;
+	if (skill.status === "installed")
+		return (
+			<Badge variant="outline" className="border-green-600 text-green-700" data-testid={testId}>
+				{t("tools.skills.statusInstalled")}
+			</Badge>
+		);
+	if (skill.status === "blocked")
+		return (
+			<Badge variant="destructive" data-testid={testId}>
+				{t("tools.skills.statusBlocked")}
+			</Badge>
+		);
+	if (skill.status === "not_scanned")
+		return (
+			<Badge variant="outline" className="border-amber-600 text-amber-700" data-testid={testId}>
+				{t("tools.skills.statusNotScanned")}
+			</Badge>
+		);
+	return null;
+}
+
+/** The findings of a skill's last scan that block or warn, under a Why disclosure. */
+function SkillFindings({ skill }: { skill: AgentSkill }) {
+	const { t } = useTranslation("agentops");
+	const findings = skill.scan?.findings ?? [];
+	if (findings.length === 0) return null;
+	return (
+		<details className="w-full text-xs" open={skill.status === "blocked"} data-testid={`agent-skill-findings-${skill.name}`}>
+			<summary className="cursor-pointer">{t("tools.skills.why")}</summary>
+			<ul className="mt-1 space-y-1">
+				{findings.map((f, i) => (
+					<li key={i} className={f.severity === "block" ? "text-destructive" : "text-amber-700"}>
+						<span className="font-mono">{f.rule}</span> <span className="font-mono">{f.line ? `${f.file}:${f.line}` : f.file}</span> {f.detail}
+					</li>
+				))}
+			</ul>
+		</details>
+	);
+}
+
+export function SkillsSection({ id, initial = initialSkillForm }: { id: string; initial?: SkillForm }) {
 	const { t } = useTranslation("agentops");
 	const confirm = useConfirm();
 	const { data, error, isLoading } = useGetAgentSkillsQuery(id);
 	const [upload, { isLoading: uploading }] = useUploadAgentSkillMutation();
+	const [scan] = useScanAgentSkillMutation();
 	const [remove] = useDeleteAgentSkillMutation();
-	const [file, setFile] = useState<File | null>(null);
-	const [name, setName] = useState("");
+	const [form, dispatch] = useReducer(skillFormReducer, initial);
+	const { file, name } = form;
 	const [replace, setReplace] = useState(false);
 	const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+	const [scanning, setScanning] = useState<string | null>(null);
+	const [verdicts, setVerdicts] = useState<Record<string, { ok: boolean; text: string }>>({});
+	const dir = data?.dir ?? `agents/${id}/skills`;
 
 	const pick = (f: File | null) => {
-		setFile(f);
+		dispatch({ type: "pick", file: f });
 		setMessage(null);
-		if (f && !name) setName(skillNameFromFile(f.name));
 	};
 	const problem = !file
 		? t("tools.skills.needZip")
@@ -79,11 +171,17 @@ function SkillsSection({ id }: { id: string }) {
 		if (!file || problem) return;
 		const res = await upload({ id, name, file, replace });
 		if ("error" in res && res.error) setMessage({ ok: false, text: getBenchErrorMessage(res.error) });
-		else {
-			setMessage({ ok: true, text: t("tools.skills.uploaded", { name }) });
-			setFile(null);
-			setName("");
+		else if (res.data) {
+			setMessage(skillUploadMessage(t, res.data));
+			dispatch({ type: "uploaded" });
 		}
+	};
+	const runScan = async (skill: string) => {
+		setScanning(skill);
+		const res = await scan({ id, name: skill });
+		setScanning(null);
+		const verdict = "error" in res && res.error ? { ok: false, text: getBenchErrorMessage(res.error) } : res.data ? skillScanMessage(t, res.data) : null;
+		if (verdict) setVerdicts((v) => ({ ...v, [skill]: verdict }));
 	};
 	const del = async (skill: string) => {
 		if (!(await confirm(t("tools.skills.confirmDelete", { name: skill })))) return;
@@ -94,7 +192,7 @@ function SkillsSection({ id }: { id: string }) {
 	return (
 		<OpsSection
 			title={t("tools.skills.title")}
-			hint={t("tools.skills.hint", { dir: data?.dir ?? `agents/${id}/skills` })}
+			hint={t("tools.skills.hint", { dir })}
 			testId="agent-skills-section"
 		>
 			{isLoading ? (
@@ -111,15 +209,33 @@ function SkillsSection({ id }: { id: string }) {
 							<span className="text-muted-foreground text-xs">
 								{t("tools.skills.size", { files: s.files, kib: (s.bytes / 1024).toFixed(1) })}
 							</span>
+							<SkillStatusBadge skill={s} />
 							{!s.valid && <Badge variant="destructive">{t("tools.skills.noSkillMd")}</Badge>}
 							<span className="ml-auto flex items-center gap-2">
-								<JobRunButton {...scanSkillJob(s.path)} label={t("tools.skills.scan")} variant="outline" />
 								<RoleGate min="member" fallback={null}>
+									<Button
+										size="sm"
+										variant="outline"
+										disabled={scanning === s.name}
+										onClick={() => void runScan(s.name)}
+										data-testid={`agent-skill-scan-${s.name}`}
+									>
+										{scanning === s.name ? t("tools.skills.scanning") : t("tools.skills.scan")}
+									</Button>
 									<Button size="sm" variant="ghost" onClick={() => void del(s.name)} data-testid={`agent-skill-delete-${s.name}`}>
 										{t("tools.skills.delete")}
 									</Button>
 								</RoleGate>
 							</span>
+							{verdicts[s.name] && (
+								<p
+									className={verdicts[s.name].ok ? "w-full text-xs text-green-700" : "text-destructive w-full text-xs"}
+									data-testid={`agent-skill-verdict-${s.name}`}
+								>
+									{verdicts[s.name].text}
+								</p>
+							)}
+							<SkillFindings skill={s} />
 						</li>
 					))}
 				</ul>
@@ -128,16 +244,22 @@ function SkillsSection({ id }: { id: string }) {
 					{t("tools.skills.empty")}
 				</p>
 			)}
-			{data && data.skills.length > 0 && !data.installed && (
+			{data && data.skills.some((s) => s.status === "installed") && !data.installed && (
 				<p className="text-xs text-amber-600">{t("tools.skills.notInstalled", { dir: data.dir })}</p>
 			)}
 			<RoleGate min="member">
 			<div className="flex flex-wrap items-end gap-3">
 				<Field label={t("tools.skills.zip")}>
-					<input type="file" accept=".zip,application/zip" onChange={(e) => pick(e.target.files?.[0] ?? null)} data-testid="agent-skill-file" />
+					<input
+						key={form.inputKey}
+						type="file"
+						accept=".zip,application/zip"
+						onChange={(e) => pick(e.target.files?.[0] ?? null)}
+						data-testid="agent-skill-file"
+					/>
 				</Field>
 				<Field label={t("tools.skills.name")}>
-					<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="code-review" data-testid="agent-skill-name" />
+					<Input value={name} onChange={(e) => dispatch({ type: "name", name: e.target.value })} placeholder="code-review" data-testid="agent-skill-name" />
 				</Field>
 				<label className="flex items-center gap-2 pb-2 text-xs">
 					<input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
@@ -149,6 +271,11 @@ function SkillsSection({ id }: { id: string }) {
 			</div>
 			</RoleGate>
 			{file && problem && <p className="text-destructive text-xs">{problem}</p>}
+			{file && !problem && (
+				<p className="text-muted-foreground text-xs" data-testid="agent-skill-will-save">
+					{t("tools.skills.willSave", { name, dir })}
+				</p>
+			)}
 			{message && (
 				<p className={message.ok ? "text-xs text-green-700" : "text-destructive text-xs"} data-testid="agent-skill-message">
 					{message.text}

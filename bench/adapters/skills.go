@@ -94,12 +94,17 @@ func SkillsDir(cfg *schemas.AgentConfig) (string, error) {
 // subfolders are skills, each of which must hold SKILL.md (hidden entries and
 // loose files in a collection are skipped). Every path must stay inside its
 // root after symlinks are resolved, and two skills may not share a name.
-// skills.enabled false returns none.
+// A skill an agent uploaded (agents/<id>/skills/<name>) must have a passing
+// scan of its current files (skillgate.go); an upload collection that is
+// missing or empty installs nothing. skills.enabled false returns none.
 func ResolveSkills(benchRoot string, cfg *schemas.AgentConfig, task *schemas.Task) ([]Skill, error) {
 	if !SkillsEnabled(cfg) {
 		return nil, nil
 	}
-	type source struct{ root, rel, field string }
+	type source struct {
+		root, rel, field string
+		extra            bool // a skills.extra entry: an agent's upload collection is gated by its scans
+	}
 	var sources []source
 	if set := skillSet(cfg); set != "" {
 		if !skillName.MatchString(set) {
@@ -108,20 +113,23 @@ func ResolveSkills(benchRoot string, cfg *schemas.AgentConfig, task *schemas.Tas
 		if task != nil {
 			rel := path.Join(SkillSetsDir, set)
 			if fi, err := os.Stat(filepath.Join(task.Dir, filepath.FromSlash(rel))); err == nil && fi.IsDir() {
-				sources = append(sources, source{task.Dir, rel, "task " + task.ID + " skill set " + set})
+				sources = append(sources, source{task.Dir, rel, "task " + task.ID + " skill set " + set, false})
 			}
 		}
 	} else if task != nil && task.Skills != "" {
-		sources = append(sources, source{task.Dir, task.Skills, "task " + task.ID + " skills"})
+		sources = append(sources, source{task.Dir, task.Skills, "task " + task.ID + " skills", false})
 	}
 	if cfg.Skills != nil {
 		for i, e := range cfg.Skills.Extra {
-			sources = append(sources, source{benchRoot, e, fmt.Sprintf("skills.extra[%d]", i)})
+			sources = append(sources, source{benchRoot, e, fmt.Sprintf("skills.extra[%d]", i), true})
 		}
 	}
 	from := map[string]string{} // skill name -> source field
 	var out []Skill
 	for _, src := range sources {
+		if src.extra && emptyUploadCollection(src.root, src.rel) {
+			continue
+		}
 		dir, err := resolveInside(src.root, src.rel)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", src.field, err)
@@ -129,6 +137,11 @@ func ResolveSkills(benchRoot string, cfg *schemas.AgentConfig, task *schemas.Tas
 		found, err := skillsIn(dir)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", src.field, err)
+		}
+		if src.extra {
+			if err := gateExtraSkills(src.root, dir, found); err != nil {
+				return nil, err
+			}
 		}
 		for _, s := range found {
 			if prev, dup := from[s.Name]; dup {
@@ -140,6 +153,26 @@ func ResolveSkills(benchRoot string, cfg *schemas.AgentConfig, task *schemas.Tas
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
+}
+
+// gateExtraSkills applies the skill scan gate (skillgate.go) to the skills
+// a skills.extra entry resolved to: every skill of an agent's upload
+// collection needs a passing scan of its current files.
+func gateExtraSkills(root, dir string, found []Skill) error {
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return fmt.Errorf("resolve root: %w", err)
+	}
+	for _, s := range found {
+		agent, _, ok := uploadCollection(realRoot, s.Host)
+		if !ok {
+			continue
+		}
+		if err := gateUploadedSkill(realRoot, agent, s); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // SkillHashes returns container path -> sha256 for every file of every skill

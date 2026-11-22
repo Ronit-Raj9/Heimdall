@@ -1,10 +1,17 @@
 package handlers
 
-// Agent ops area (web parity lane L09): an agent's skills (zip upload into
-// agents/<id>/skills/<name>/, list, delete) and its MCP tools (the agent's
+// Agent ops area (web parity lane L09): an agent's skills (zip upload,
+// scan, list, delete) and its MCP tools (the agent's
 // mcp delivery block plus agents/<id>/mcp.yaml, the MCP servers the admission
 // scan checks). Files go through projectfs, so every path is confined to the
 // org's project and every write is validated and versioned there.
+//
+// Skill install is gated by a scan (fix wave 2, N22): an upload lands in
+// agents/<id>/skills-pending/<name>/, is scanned in process (static, no
+// container), and moves to agents/<id>/skills/<name>/ (the folder skills.extra
+// lists) only when the scan admits it. The outcome is kept in
+// agents/<id>/skill-scans/<name>.json; adapters.ResolveSkills refuses an
+// uploaded skill without a passing scan of its current files.
 
 import (
 	"bytes"
@@ -16,8 +23,11 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/adapters"
+	"github.com/maximhq/bifrost/bench/admitscan"
 	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/projectfs"
@@ -35,13 +45,44 @@ var agentOpsNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`
 // mcpFormats are the agent mcp.format values the adapters render.
 var mcpFormats = map[string]bool{"": true, "codex_toml": true, "claude_json": true, "opencode_json": true, "generic_json": true, "env": true}
 
+// Skill statuses (AgentSkill.Status).
+const (
+	SkillInstalled  = "installed"   // in skills/ with a passing scan of its current files
+	SkillBlocked    = "blocked"     // the scan blocked it; kept in skills-pending/, never installed
+	SkillNotScanned = "not_scanned" // no scan of its current files; runs refuse it until it passes one
+)
+
+// maxSkillFindings caps the findings a skill's scan summary lists.
+const maxSkillFindings = 20
+
 // AgentSkill is one skill folder of an agent.
 type AgentSkill struct {
-	Name  string `json:"name"`
-	Path  string `json:"path"` // relative to the project, e.g. agents/codex/skills/review
-	Files int    `json:"files"`
-	Bytes int64  `json:"bytes"`
-	Valid bool   `json:"valid"` // holds SKILL.md at its top
+	Name   string            `json:"name"`
+	Path   string            `json:"path"` // relative to the project, e.g. agents/codex/skills/review
+	Files  int               `json:"files"`
+	Bytes  int64             `json:"bytes"`
+	Valid  bool              `json:"valid"`            // holds SKILL.md at its top
+	Status string            `json:"status,omitempty"` // installed | blocked | not_scanned
+	Scan   *SkillScanSummary `json:"scan,omitempty"`   // the last scan of this skill, when there is one
+}
+
+// SkillScanSummary is the last scan of one skill: its decision, counts and
+// the findings that block or warn (at most 20).
+type SkillScanSummary struct {
+	Decision  string                     `json:"decision"` // admitted | blocked
+	Block     int                        `json:"block"`
+	Warn      int                        `json:"warn"`
+	ScannedAt time.Time                  `json:"scanned_at"`
+	Findings  []schemas.AdmitScanFinding `json:"findings"`
+}
+
+// SkillScanResult answers a skill upload and POST .../skills/{name}/scan:
+// the skill as listed after the scan, whether it is installed, and the scan
+// record.
+type SkillScanResult struct {
+	Skill     AgentSkill               `json:"skill"`
+	Installed bool                     `json:"installed"`
+	Record    *schemas.AdmitScanRecord `json:"record"`
 }
 
 // AgentSkillsResponse is GET /agents/{id}/skills.
@@ -84,6 +125,7 @@ func registerAgentOps(env OrgEnv, r *router.Router) {
 		r.GET(APIPrefix+"/agents/{id}/skills", env.R(h.listSkills))
 		r.POST(APIPrefix+"/agents/{id}/skills", env.U(h.uploadSkill))
 		r.DELETE(APIPrefix+"/agents/{id}/skills/{name}", env.W(h.deleteSkill))
+		r.POST(APIPrefix+"/agents/{id}/skills/{name}/scan", env.W(h.scanSkill))
 		r.GET(APIPrefix+"/agents/{id}/mcp", env.R(h.getMCP))
 		r.PUT(APIPrefix+"/agents/{id}/mcp", env.W(h.putMCP))
 	}
@@ -172,8 +214,6 @@ func (h *agentOpsHandler) fsError(ctx *fasthttp.RequestCtx, what string, err err
 	}
 }
 
-func skillsDir(id string) string { return id + "/skills" }
-
 // areaRel is an entry path relative to the agents area (entries may name the
 // area or not).
 func areaRel(p string) string {
@@ -184,17 +224,26 @@ func areaRel(p string) string {
 	return p
 }
 
-// skills lists the skill folders under agents/<id>/skills.
-func listAgentSkills(ctx context.Context, ps projectfs.Store, id string) ([]AgentSkill, error) {
-	entries, err := ps.List(ctx, projectfs.AreaAgents, skillsDir(id), true)
+func skillsDir(id string) string { return id + "/" + adapters.SkillUploadDir }
+
+func pendingSkillsDir(id string) string { return id + "/" + adapters.SkillPendingDir }
+
+func skillScanRel(id, name string) string {
+	return id + "/" + adapters.SkillScansDir + "/" + name + ".json"
+}
+
+// listSkillFolders lists the skill folders under dir (relative to the agents
+// area).
+func listSkillFolders(ctx context.Context, ps projectfs.Store, dir string) (map[string]*AgentSkill, error) {
+	byName := map[string]*AgentSkill{}
+	entries, err := ps.List(ctx, projectfs.AreaAgents, dir, true)
 	if errors.Is(err, projectfs.ErrNotFound) {
-		return []AgentSkill{}, nil
+		return byName, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	byName := map[string]*AgentSkill{}
-	prefix := skillsDir(id) + "/"
+	prefix := dir + "/"
 	for _, e := range entries {
 		rel := areaRel(e.Path)
 		if !strings.HasPrefix(rel, prefix) || rel == prefix {
@@ -220,8 +269,90 @@ func listAgentSkills(ctx context.Context, ps projectfs.Store, id string) ([]Agen
 			s.Valid = true
 		}
 	}
-	out := make([]AgentSkill, 0, len(byName))
-	for _, s := range byName {
+	return byName, nil
+}
+
+// readSkillScan reads agents/<id>/skill-scans/<name>.json, nil when there is
+// none or it cannot be read.
+func readSkillScan(ctx context.Context, ps projectfs.Store, id, name string) *adapters.SkillScanFile {
+	data, _, err := ps.Read(ctx, projectfs.AreaAgents, skillScanRel(id, name))
+	if err != nil {
+		return nil
+	}
+	var f adapters.SkillScanFile
+	if json.Unmarshal(data, &f) != nil {
+		return nil
+	}
+	return &f
+}
+
+// skillTreeSHA256 hashes a skill folder (relative to the agents area).
+func skillTreeSHA256(ps projectfs.Store, dir string) (string, error) {
+	abs, err := ps.Resolve(projectfs.AreaAgents, dir)
+	if err != nil {
+		return "", err
+	}
+	return adapters.SkillTreeSHA256(abs)
+}
+
+// scanSummary is the list view of a scan file.
+func scanSummary(f *adapters.SkillScanFile) *SkillScanSummary {
+	if f == nil {
+		return nil
+	}
+	out := &SkillScanSummary{Decision: f.Decision, ScannedAt: f.ScannedAt, Findings: []schemas.AdmitScanFinding{}}
+	if f.Record != nil {
+		out.Block, out.Warn = f.Record.Counts.Block, f.Record.Counts.Warn
+		for _, fd := range f.Record.Findings {
+			if fd.Severity != schemas.AdmitScanSeverityBlock && fd.Severity != schemas.AdmitScanSeverityWarn {
+				continue
+			}
+			if len(out.Findings) < maxSkillFindings {
+				out.Findings = append(out.Findings, fd)
+			}
+		}
+	}
+	return out
+}
+
+// listAgentSkills lists an agent's skill folders: installed ones under
+// agents/<id>/skills and blocked uploads under agents/<id>/skills-pending,
+// each with its status read from its scan file (never scanned here: a read
+// writes nothing). A name in both lists once, as the installed folder.
+func listAgentSkills(ctx context.Context, ps projectfs.Store, id string) ([]AgentSkill, error) {
+	installed, err := listSkillFolders(ctx, ps, skillsDir(id))
+	if err != nil {
+		return nil, err
+	}
+	pending, err := listSkillFolders(ctx, ps, pendingSkillsDir(id))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]AgentSkill, 0, len(installed)+len(pending))
+	for name, s := range installed {
+		scan := readSkillScan(ctx, ps, id, name)
+		s.Scan = scanSummary(scan)
+		s.Status = SkillNotScanned
+		if scan != nil {
+			if sum, err := skillTreeSHA256(ps, skillsDir(id)+"/"+name); err == nil && sum == scan.TreeSHA256 {
+				s.Status = SkillBlocked
+				if scan.Decision == schemas.AdmitScanAdmitted {
+					s.Status = SkillInstalled
+				}
+			}
+		}
+		out = append(out, *s)
+	}
+	for name, s := range pending {
+		if installed[name] != nil {
+			continue
+		}
+		scan := readSkillScan(ctx, ps, id, name)
+		s.Scan = scanSummary(scan)
+		s.Status = SkillBlocked
+		if scan == nil {
+			s.Status = SkillNotScanned
+		}
 		out = append(out, *s)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
@@ -256,8 +387,10 @@ func (h *agentOpsHandler) listSkills(ctx *fasthttp.RequestCtx) {
 }
 
 // uploadSkill unpacks a zip (the request body, application/zip) into
-// agents/<id>/skills/<name>/ and lists the skills folder in the agent's
-// skills.extra so every run installs it. ?name= names the skill.
+// agents/<id>/skills-pending/<name>/, scans it, and installs it (moves it to
+// agents/<id>/skills/<name>/ and lists that folder in the agent's
+// skills.extra) only when the scan admits it. A blocked skill stays in
+// skills-pending/ and is never installed. ?name= names the skill.
 func (h *agentOpsHandler) uploadSkill(ctx *fasthttp.RequestCtx) {
 	ref, ps, ok := h.agent(ctx)
 	if !ok {
@@ -281,21 +414,22 @@ func (h *agentOpsHandler) uploadSkill(ctx *fasthttp.RequestCtx) {
 		h.fail(ctx, fasthttp.StatusUnsupportedMediaType, lib.ErrTypeUnsupportedMedia, "the upload is not a .zip file: zip the skill folder (it must hold SKILL.md) and upload that")
 		return
 	}
-	dir := skillsDir(ref.ID) + "/" + name
+	replace := ctx.QueryArgs().GetBool("replace")
 	existing, _ := listAgentSkills(ctx, ps, ref.ID)
 	for _, s := range existing {
-		if s.Name == name && !ctx.QueryArgs().GetBool("replace") {
+		if s.Name == name && !replace {
 			h.fail(ctx, fasthttp.StatusConflict, lib.ErrTypeConflict, fmt.Sprintf("skill %q already exists: delete it first or upload with replace", name))
 			return
 		}
 	}
 	o := projectfs.WriteOpts{Actor: actor(ctx), Note: "upload skill " + name}
-	if ctx.QueryArgs().GetBool("replace") {
-		if err := ps.Delete(ctx, projectfs.AreaAgents, dir, o); err != nil && !errors.Is(err, projectfs.ErrNotFound) {
+	if replace {
+		if _, err := removeSkill(ctx, ps, ref.ID, name, o); err != nil {
 			h.fsError(ctx, "replace skill", err)
 			return
 		}
 	}
+	dir := pendingSkillsDir(ref.ID) + "/" + name
 	if _, err := ps.ExtractZip(ctx, projectfs.AreaAgents, dir, bytes.NewReader(body), int64(len(body)), o); err != nil {
 		h.fsError(ctx, "unpack skill zip", err)
 		return
@@ -309,14 +443,150 @@ func (h *agentOpsHandler) uploadSkill(ctx *fasthttp.RequestCtx) {
 		h.fail(ctx, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "the zip holds no SKILL.md at its top (or inside one top folder): a skill is a folder with SKILL.md, nothing was kept")
 		return
 	}
-	if err := h.ensureSkillsExtra(ctx, ps, ref, o); err != nil {
-		h.fsError(ctx, "add the skill to "+ref.Project, err)
+	res, ok := h.scanAndApply(ctx, ps, ref, name, false, o)
+	if !ok {
 		return
 	}
-	h.listSkills(ctx)
-	if ctx.Response.StatusCode() == fasthttp.StatusOK {
-		ctx.SetStatusCode(fasthttp.StatusCreated)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusCreated, res)
+}
+
+// scanSkill scans one skill where it is (installed or pending) and applies
+// the decision: a blocked installed skill moves back to skills-pending/ (it
+// is uninstalled), an admitted pending skill is installed.
+func (h *agentOpsHandler) scanSkill(ctx *fasthttp.RequestCtx) {
+	ref, ps, ok := h.agent(ctx)
+	if !ok {
+		return
 	}
+	name, _ := ctx.UserValue("name").(string)
+	if !agentOpsNamePattern.MatchString(name) {
+		h.fail(ctx, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, fmt.Sprintf("skill name %q is not valid", name))
+		return
+	}
+	installed := skillFolderExists(ctx, ps, skillsDir(ref.ID)+"/"+name)
+	if !installed && !skillFolderExists(ctx, ps, pendingSkillsDir(ref.ID)+"/"+name) {
+		h.fail(ctx, fasthttp.StatusNotFound, lib.ErrTypeNotFound, "no skill named "+name)
+		return
+	}
+	res, ok := h.scanAndApply(ctx, ps, ref, name, installed, projectfs.WriteOpts{Actor: actor(ctx), Note: "scan skill " + name})
+	if !ok {
+		return
+	}
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, res)
+}
+
+func skillFolderExists(ctx context.Context, ps projectfs.Store, dir string) bool {
+	_, err := ps.List(ctx, projectfs.AreaAgents, dir, false)
+	return err == nil
+}
+
+// scanAndApply scans skill name of ref in skills/ (installed) or
+// skills-pending/, saves the scan file, installs an admitted skill and
+// uninstalls a blocked one. It answers the error itself when it fails.
+func (h *agentOpsHandler) scanAndApply(ctx *fasthttp.RequestCtx, ps projectfs.Store, ref agentRef, name string, installed bool, o projectfs.WriteOpts) (SkillScanResult, bool) {
+	dir := pendingSkillsDir(ref.ID) + "/" + name
+	if installed {
+		dir = skillsDir(ref.ID) + "/" + name
+	}
+	abs, err := ps.Resolve(projectfs.AreaAgents, dir)
+	if err != nil {
+		h.fsError(ctx, "scan skill "+name, err)
+		return SkillScanResult{}, false
+	}
+	sum, err := adapters.SkillTreeSHA256(abs)
+	var rec *schemas.AdmitScanRecord
+	if err == nil {
+		rec, err = admitscan.ScanSkill(ctx, abs, admitscan.DefaultOptions())
+	}
+	if err != nil {
+		h.fail(ctx, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest,
+			fmt.Sprintf("the scan could not read skill %s: it may hold a link or a special file. Upload it again as a plain folder.", name))
+		return SkillScanResult{}, false
+	}
+	rec.Source = "agents/" + dir // a project path, never the server's folder
+	decision := schemas.AdmitScanBlocked
+	if rec.Decision == schemas.AdmitScanAdmitted {
+		decision = schemas.AdmitScanAdmitted
+	}
+	data, err := json.MarshalIndent(adapters.SkillScanFile{Decision: decision, TreeSHA256: sum, ScannedAt: time.Now().UTC(), Record: rec}, "", "  ")
+	if err == nil {
+		_, err = ps.Write(ctx, projectfs.AreaAgents, skillScanRel(ref.ID, name), append(data, '\n'), o)
+	}
+	if err != nil {
+		h.fsError(ctx, "save the scan of skill "+name, err)
+		return SkillScanResult{}, false
+	}
+	switch {
+	case decision == schemas.AdmitScanAdmitted && !installed:
+		err = moveSkillFolder(ctx, ps, dir, skillsDir(ref.ID)+"/"+name, o)
+	case decision != schemas.AdmitScanAdmitted && installed:
+		err = moveSkillFolder(ctx, ps, dir, pendingSkillsDir(ref.ID)+"/"+name, o)
+	}
+	if err != nil {
+		h.fsError(ctx, "move skill "+name, err)
+		return SkillScanResult{}, false
+	}
+	if decision == schemas.AdmitScanAdmitted {
+		if err := h.ensureSkillsExtra(ctx, ps, ref, o); err != nil {
+			h.fsError(ctx, "add the skill to "+ref.Project, err)
+			return SkillScanResult{}, false
+		}
+	}
+	res := SkillScanResult{Installed: decision == schemas.AdmitScanAdmitted, Record: rec}
+	skills, err := listAgentSkills(ctx, ps, ref.ID)
+	if err != nil {
+		h.fsError(ctx, "list skills", err)
+		return SkillScanResult{}, false
+	}
+	for _, s := range skills {
+		if s.Name == name {
+			res.Skill = s
+		}
+	}
+	return res, true
+}
+
+// moveSkillFolder moves a skill folder (relative to the agents area): every
+// file is read and written under to, then from is deleted. A folder already
+// at to is replaced.
+func moveSkillFolder(ctx context.Context, ps projectfs.Store, from, to string, o projectfs.WriteOpts) error {
+	files, err := ps.List(ctx, projectfs.AreaAgents, from, true)
+	if err != nil {
+		return err
+	}
+	if err := ps.Delete(ctx, projectfs.AreaAgents, to, o); err != nil && !errors.Is(err, projectfs.ErrNotFound) {
+		return err
+	}
+	for _, f := range files {
+		if f.Dir {
+			continue
+		}
+		rel := strings.TrimPrefix(areaRel(f.Path), from+"/")
+		data, _, err := ps.Read(ctx, projectfs.AreaAgents, from+"/"+rel)
+		if err != nil {
+			return err
+		}
+		if _, err := ps.Write(ctx, projectfs.AreaAgents, to+"/"+rel, data, o); err != nil {
+			return err
+		}
+	}
+	return ps.Delete(ctx, projectfs.AreaAgents, from, o)
+}
+
+// removeSkill deletes skill name of agent id wherever it is (skills/ or
+// skills-pending/) and its scan file. found is false when there was nothing
+// to delete.
+func removeSkill(ctx context.Context, ps projectfs.Store, id, name string, o projectfs.WriteOpts) (found bool, err error) {
+	for _, rel := range []string{skillsDir(id) + "/" + name, pendingSkillsDir(id) + "/" + name, skillScanRel(id, name)} {
+		err := ps.Delete(ctx, projectfs.AreaAgents, rel, o)
+		switch {
+		case err == nil:
+			found = found || !strings.HasSuffix(rel, ".json")
+		case !errors.Is(err, projectfs.ErrNotFound):
+			return found, err
+		}
+	}
+	return found, nil
 }
 
 // hoistSingleFolder moves the files of a zip that held one top folder
@@ -394,7 +664,11 @@ func (h *agentOpsHandler) deleteSkill(ctx *fasthttp.RequestCtx) {
 		h.fail(ctx, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, fmt.Sprintf("skill name %q is not valid", name))
 		return
 	}
-	if err := ps.Delete(ctx, projectfs.AreaAgents, skillsDir(ref.ID)+"/"+name, projectfs.WriteOpts{Actor: actor(ctx), Note: "delete skill " + name}); err != nil {
+	found, err := removeSkill(ctx, ps, ref.ID, name, projectfs.WriteOpts{Actor: actor(ctx), Note: "delete skill " + name})
+	if err == nil && !found {
+		err = projectfs.ErrNotFound
+	}
+	if err != nil {
 		h.fsError(ctx, "delete skill "+name, err)
 		return
 	}
