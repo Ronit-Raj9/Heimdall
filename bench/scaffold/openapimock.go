@@ -198,7 +198,9 @@ func MockFromOpenAPI(name string, data []byte) (*MockSpec, []string, error) {
 func classifyOperation(method, p string) MockOperation {
 	segs := strings.Split(strings.Trim(p, "/"), "/")
 	mo := MockOperation{Method: method, Path: p, Kind: MockAction}
-	isParam := func(s string) bool { return strings.HasPrefix(s, "{") && strings.HasSuffix(s, "}") && paramRE.MatchString(s) }
+	isParam := func(s string) bool {
+		return strings.HasPrefix(s, "{") && strings.HasSuffix(s, "}") && paramRE.MatchString(s)
+	}
 	for _, s := range segs {
 		if isParam(s) {
 			mo.PathParams = append(mo.PathParams, paramRE.FindStringSubmatch(s)[1])

@@ -80,6 +80,14 @@ func InstructionFiles(s *schemas.Suite) ([]StampResult, error) {
 // line of the same format is replaced. Stamping changes instruction hashes,
 // so the suite must be locked and admitted again afterwards; callers say so.
 func StampCanary(s *schemas.Suite, guid string) ([]StampResult, error) {
+	return StampCanaryTasks(s, guid, nil)
+}
+
+// StampCanaryTasks is StampCanary limited to the tasks in only (every task
+// when only is nil). Publishing held-out tasks into an existing benchmark
+// stamps just the tasks it adds, so the benchmark's admitted tasks keep
+// their instruction hashes and readiness records.
+func StampCanaryTasks(s *schemas.Suite, guid string, only []string) ([]StampResult, error) {
 	if !utils.ValidCanary(guid) {
 		return nil, fmt.Errorf("suite %s: canary %q is not a lowercase GUID", s.ID, guid)
 	}
@@ -87,7 +95,17 @@ func StampCanary(s *schemas.Suite, guid string) ([]StampResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("suite %s: %w", s.ID, err)
 	}
+	var want map[string]bool
+	if only != nil {
+		want = map[string]bool{}
+		for _, id := range only {
+			want[id] = true
+		}
+	}
 	for i, f := range files {
+		if want != nil && !want[f.Task] {
+			continue
+		}
 		data, err := os.ReadFile(f.Path)
 		if err != nil {
 			return files[:i], fmt.Errorf("task %s: read instruction: %w", f.Task, err)

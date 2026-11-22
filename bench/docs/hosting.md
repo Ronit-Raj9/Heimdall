@@ -532,6 +532,10 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_SHARED_HOST_SLOTS` | Runs at once on the shared worker's host, all organizations together, shared fairly between those with work; empty or 0 is one per 2 CPUs and 4 GB of memory. |
 | `HEIMDALL_EXPERIMENT_LIMIT` | Evaluations running at once on the whole platform; empty or 0 is 64. |
 | `HEIMDALL_EXPERIMENT_PER_ORG` | Evaluations running at once per organization; empty or 0 is 8. |
+| `BENCH_ISSUEBENCH_PROVIDER`, `BENCH_ISSUEBENCH_MODEL` | Builder model for benchmarks made from GitHub issues (From issues) when the form names none; empty means the form must pick one. |
+| `BENCH_ISSUEBENCH_MAX_USD` | Dollar cap of one build from issues; empty is 5 USD. |
+| `BENCH_ISSUEBENCH_CHECK_MAX_USD` | Dollar cap of one model check job on a built benchmark; empty is 1 USD. |
+| `BENCH_ISSUEBENCH_NETWORK` | Docker network of build from issues containers; empty is Docker's default. |
 | `HEIMDALL_SHARED_BUILDKIT` | Address of the isolated BuildKit that builds images from org Dockerfiles. |
 | `HEIMDALL_REGISTRY_DIR` | Host folder (on the data disk) for that registry's images; empty is a Docker volume. |
 | `HEIMDALL_RUNNER_DIR` | Host folder of the shared worker's runs, releases and org projects; empty is `/var/lib/heimdall-shared-runner`. |

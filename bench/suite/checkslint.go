@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/maximhq/bifrost/bench/taskchecks"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/taskchecks"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 

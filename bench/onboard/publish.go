@@ -163,7 +163,10 @@ func Publish(ctx context.Context, env *Env, set *DraftSet, o PublishOptions) (*P
 		res.Canary = guid
 		if loaders := suite.Builtin(env.Benchmarks()); len(loaders) > 0 {
 			if s, err := loaders[0].Load(ctx, set.Suite); err == nil {
-				if _, err := suite.StampCanary(s, guid); err != nil {
+				// Only the tasks published now: stamping the benchmark's
+				// older tasks would change their files and drop their
+				// admission.
+				if _, err := suite.StampCanaryTasks(s, guid, res.Tasks); err != nil {
 					return res, fmt.Errorf("stamp the canary: %w", err)
 				}
 			}

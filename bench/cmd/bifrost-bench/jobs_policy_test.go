@@ -62,7 +62,9 @@ func policyJobFixture(t *testing.T) (jobEnv, keystore.Store, *keystore.Key, *org
 	t.Cleanup(srv.Close)
 	gw := &orgCalGateway{}
 	oldGW, oldRoot, oldPrice := policyGatewayFor, policySuiteRoot, policyPrices
-	policyGatewayFor = func(context.Context, jobEnv) (schemas.Gateway, string, func(), error) { return gw, srv.URL, func() {}, nil }
+	policyGatewayFor = func(context.Context, jobEnv) (schemas.Gateway, string, func(), error) {
+		return gw, srv.URL, func() {}, nil
+	}
 	policySuiteRoot = func(jobEnv, string) (string, error) { return root, nil }
 	policyPrices = func(jobEnv) func(string, schemas.Tokens) (float64, bool) {
 		return func(m string, tok schemas.Tokens) (float64, bool) {
@@ -84,9 +86,9 @@ func policyJobFixture(t *testing.T) (jobEnv, keystore.Store, *keystore.Key, *org
 
 func TestPolicyGenerateParams(t *testing.T) {
 	for _, bad := range []string{
-		`{"suite":"desk","doc":"acme-1","provider":"openai","model":"m"}`,                          // no yes
-		`{"suite":"desk","doc":"Bad Doc","provider":"openai","model":"m","yes":true}`,               // doc id
-		`{"suite":"desk","doc":"acme-1","model":"m","yes":true}`,                                    // no provider
+		`{"suite":"desk","doc":"acme-1","provider":"openai","model":"m"}`,                            // no yes
+		`{"suite":"desk","doc":"Bad Doc","provider":"openai","model":"m","yes":true}`,                // doc id
+		`{"suite":"desk","doc":"acme-1","model":"m","yes":true}`,                                     // no provider
 		`{"suite":"desk","doc":"acme-1","provider":"openai","model":"m","yes":true,"budget_usd":-1}`, // budget
 		`{"suite":"desk","doc":"acme-1","provider":"openai","model":"m","yes":true,"extra":1}`,       // unknown field
 	} {

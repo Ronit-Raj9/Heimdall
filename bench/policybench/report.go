@@ -64,11 +64,11 @@ type Finding struct {
 
 // AgentReport is the report of one agent (agent version).
 type AgentReport struct {
-	Agent    string         `json:"agent"`
-	Total    Rate           `json:"total"`
+	Agent    string          `json:"agent"`
+	Total    Rate            `json:"total"`
 	ByKind   map[string]Rate `json:"by_kind"`
-	Clauses  []ClauseResult `json:"clauses"`
-	Findings []Finding      `json:"findings"`
+	Clauses  []ClauseResult  `json:"clauses"`
+	Findings []Finding       `json:"findings"`
 }
 
 // Report is the compliance report of a policy document.

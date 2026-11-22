@@ -49,16 +49,16 @@ func TestAgentFileToRequest(t *testing.T) {
 
 func TestAgentFileRefusals(t *testing.T) {
 	cases := map[string]string{
-		"version: 2\nid: a\nconnect: {template: http-url}\n":                                   "version: 2",
-		"id: Bad ID\nconnect: {template: http-url}\n":                                          "id:",
-		"id: a\n":                                                                              "connect:",
-		"id: a\nconnect: {template: http-url}\nconfig: {adapter: command}\n":                   "not both",
-		"id: a\nconnect: {template: http-url, token: abc}\n":                                   "never holds them",
-		"id: a\nconnect: {template: http-url, auth_secret: sk-abcdefghijklmnopqrstuvwx}\n":     "not a secret name",
+		"version: 2\nid: a\nconnect: {template: http-url}\n": "version: 2",
+		"id: Bad ID\nconnect: {template: http-url}\n":        "id:",
+		"id: a\n": "connect:",
+		"id: a\nconnect: {template: http-url}\nconfig: {adapter: command}\n":                         "not both",
+		"id: a\nconnect: {template: http-url, token: abc}\n":                                         "never holds them",
+		"id: a\nconnect: {template: http-url, auth_secret: sk-abcdefghijklmnopqrstuvwx}\n":           "not a secret name",
 		"id: a\nconnect: {template: http-url, url: 'https://x.io/?k=sk-abcdefghijklmnopqrstuvwx'}\n": "looks like a key",
-		"id: a\nconfig: {adapter: command, env: {OPENAI_API_KEY: sk-abcdefghijklmnopqrstuvwx}}\n":   "looks like a key",
-		"id: a\nconnect: {template: http-url}\nunknown: 1\n":                                   "field unknown not found",
-		"id: a\nconnect: {template: http-url}\nevaluate: {preset: huge}\n":                     "evaluate.preset",
+		"id: a\nconfig: {adapter: command, env: {OPENAI_API_KEY: sk-abcdefghijklmnopqrstuvwx}}\n":    "looks like a key",
+		"id: a\nconnect: {template: http-url}\nunknown: 1\n":                                         "field unknown not found",
+		"id: a\nconnect: {template: http-url}\nevaluate: {preset: huge}\n":                           "evaluate.preset",
 	}
 	for in, want := range cases {
 		_, err := ParseAgentFile([]byte(in))

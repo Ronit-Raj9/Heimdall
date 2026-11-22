@@ -48,7 +48,7 @@ func TestEmailEventGoesToMembersWhoChoseIt(t *testing.T) {
 	log := mail.NewLog(nil)
 	h := &Hub{Mail: log, PublicURL: "https://h.example.com", Members: members(
 		Member{UserID: "u1", Email: "ana@example.com"},
-		Member{UserID: "u2", Email: "bo@example.com"},                  // never chose
+		Member{UserID: "u2", Email: "bo@example.com"},                 // never chose
 		Member{UserID: "u3", Email: "cy@example.com", Disabled: true}, // disabled
 	)}
 	ev := webhooks.NewEvent(webhooks.EventEvaluationRegressed, "org1", nil)

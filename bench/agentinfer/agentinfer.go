@@ -484,7 +484,9 @@ var frameworkRules = []frameworkRule{
 	{scopeHas("autogen"), "autogen"},
 	{scopeHas("haystack"), "haystack"},
 	{scopeHas("langchain"), "langchain"},
-	{func(scope, name string) bool { return scope == "ai" || strings.HasPrefix(name, "ai.generatetext") || strings.HasPrefix(name, "ai.streamtext") }, "ai-sdk"},
+	{func(scope, name string) bool {
+		return scope == "ai" || strings.HasPrefix(name, "ai.generatetext") || strings.HasPrefix(name, "ai.streamtext")
+	}, "ai-sdk"},
 	{scopeHas("instrumentation.openai", "opentelemetry.instrumentation.openai", "openai.openai"), "plain-loop"},
 	{scopeHas("instrumentation.anthropic"), "plain-loop"},
 }

@@ -262,6 +262,14 @@ services:
       # (docs/hosting.md, Settings reference); 0: the defaults (64 and 8).
       BENCH_JOBS_EXPERIMENT_LIMIT: ${HEIMDALL_EXPERIMENT_LIMIT:-0}
       BENCH_JOBS_EXPERIMENT_PER_ORG: ${HEIMDALL_EXPERIMENT_PER_ORG:-0}
+      # Benchmarks built from GitHub issues (From issues, docs/hosting.md,
+      # Settings reference): builder model when the form names none, dollar
+      # caps per build and per model check job, and the build network.
+      BENCH_ISSUEBENCH_PROVIDER: ${BENCH_ISSUEBENCH_PROVIDER:-}
+      BENCH_ISSUEBENCH_MODEL: ${BENCH_ISSUEBENCH_MODEL:-}
+      BENCH_ISSUEBENCH_MAX_USD: ${BENCH_ISSUEBENCH_MAX_USD:-}
+      BENCH_ISSUEBENCH_CHECK_MAX_USD: ${BENCH_ISSUEBENCH_CHECK_MAX_USD:-}
+      BENCH_ISSUEBENCH_NETWORK: ${BENCH_ISSUEBENCH_NETWORK:-}
       # Real-time voice calls (voice profile, docs/voice-realtime.md).
       HEIMDALL_VOICE_RTC_URL: ${HEIMDALL_VOICE_RTC_URL:-}
       HEIMDALL_VOICE_RTC_SECRET: ${HEIMDALL_VOICE_RTC_SECRET:-}

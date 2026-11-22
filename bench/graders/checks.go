@@ -15,8 +15,8 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/calibration"
-	"github.com/maximhq/bifrost/bench/taskchecks"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/taskchecks"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 

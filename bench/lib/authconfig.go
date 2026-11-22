@@ -56,7 +56,7 @@ type AuthConfig struct {
 	// invitation under signup allowlist (exact match, case-insensitive).
 	// BENCH_AUTH_SIGNUP_DOMAINS, comma-separated.
 	SignupDomains []string `yaml:"signup_domains" json:"signup_domains,omitempty"`
-	InviteTTLH   int    `yaml:"invite_ttl_h" json:"invite_ttl_h,omitempty"`
+	InviteTTLH    int      `yaml:"invite_ttl_h" json:"invite_ttl_h,omitempty"`
 	// TrustedProxies are the IPs or CIDRs of reverse proxies in front of
 	// the server (Caddy in deploy/hosted). Only a request arriving from one
 	// of them has its client address read from X-Forwarded-For, for rate

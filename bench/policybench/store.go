@@ -125,7 +125,9 @@ func titleOf(text, name string) string {
 func Dir(suiteRoot, id string) string { return filepath.Join(suiteRoot, DocsDir, id) }
 
 // DraftDir is a draft task's folder.
-func DraftDir(suiteRoot, id, task string) string { return filepath.Join(Dir(suiteRoot, id), "drafts", task) }
+func DraftDir(suiteRoot, id, task string) string {
+	return filepath.Join(Dir(suiteRoot, id), "drafts", task)
+}
 
 // Load reads a document record.
 func Load(suiteRoot, id string) (*Doc, error) {
