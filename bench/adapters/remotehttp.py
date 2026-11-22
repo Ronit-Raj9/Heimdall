@@ -15,7 +15,11 @@ For a conversation task (BENCH_REMOTE_CHAT) the body also carries
 ([{name, media_type, url} or {name, media_type, path, content_base64}]).
 After each reply the next scripted user turn is appended and posted again
 on the same session id; the last reply is the answer, or with grade_on
-transcript the whole conversation as text.
+transcript the whole conversation as text. On a mapped endpoint
+(BENCH_REMOTE_MAPPING) each turn is one main request on the session the
+mapping names ({{session_id}}, or {{start.id}} from the start step, which
+runs once): {{instruction}} is the latest user message and {{messages}} the
+conversation so far.
 and "Authorization: Bearer <token>" when the agent config names auth_env or
 auth_secret (with auth_header set, "<auth_header>: <token>" instead).
 With sign_env or sign_secret set, "X-Heimdall-Timestamp: <unix seconds>" and
@@ -575,10 +579,6 @@ def take_patch(doc, report):
 
 def main():
     if os.environ.get("BENCH_REMOTE_MAPPING") or os.environ.get("BENCH_REMOTE_AUTH"):
-        if os.environ.get("BENCH_REMOTE_CHAT"):
-            # TODO(Y13): multi-turn chat tasks on the mapped path; for now the
-            # mapped request carries only the instruction (the last user message).
-            emit({"type": "note", "message": "chat task on a mapped endpoint: only the instruction is sent, scripted user turns are not"})
         return main_mapped()  # Y10: the endpoint's own request and answer shape
     remote = Remote(os.environ["BENCH_REMOTE_URL"])
     timeout = float(os.environ.get("BENCH_REMOTE_TIMEOUT_S", "600"))
@@ -819,11 +819,14 @@ class Vars:
         self.model = os.environ.get("BENCH_REMOTE_MODEL", "")
         self.start_id = ""
         self.reply_id = ""
+        self.messages = None  # Y13 chat task: the conversation so far
 
     def lookup(self, name, secrets):
         if name == "instruction":
             return self.instruction
         if name == "messages":
+            if self.messages is not None:
+                return list(self.messages)
             return [{"role": "user", "content": self.instruction}]
         if name == "tools":
             return tools_block()
@@ -1412,7 +1415,6 @@ def main_mapped():
         return base.do(method, path, body, hs, remaining())
 
     report = {"mapped": mapping.get("preset") or "custom"}
-    started = time.time()
     st = mapping.get("start")
     if st:
         req = build("start", (st.get("method") or "POST").upper(), st["url"], dict(common, **(st.get("headers") or {})), None, st.get("body"), None)
@@ -1427,8 +1429,16 @@ def main_mapped():
             v.start_id = matches_text(path_eval(parse_path(st["id_path"]), doc), "") if doc is not None else ""
             if not v.start_id:
                 fail(1, "the start step's answer has nothing at %s" % st["id_path"])
-    try:
-        default = None if mapping.get("body") else json.dumps(heimdall_body(instruction, output, answer_path, files_root)).encode("utf-8")
+
+    def ask(extra=None):
+        """One main request (with its poll) and the answer it reads."""
+        started = time.time()
+        default = None
+        if not mapping.get("body"):
+            hb = heimdall_body(v.instruction, output, answer_path, files_root)
+            if extra:
+                hb.update(extra)
+            default = json.dumps(hb).encode("utf-8")
         req = build("request", (mapping.get("method") or "POST").upper(), url_tmpl, common, mapping.get("query"), mapping.get("body"), default)
         answer = None
         if mapping.get("stream"):
@@ -1475,6 +1485,38 @@ def main_mapped():
             else:
                 answer, more = read_answer(resp, raw, output, files_root)
                 report.update(more)
+        return answer
+
+    chat = load_chat()  # Y13: scripted user turns on one session
+    try:
+        if chat is None:
+            answer = ask()
+        else:
+            # Each turn reuses the session the mapping names ({{session_id}},
+            # {{start.id}} from the start step, which runs once); {{messages}}
+            # carries the whole conversation for stateless endpoints and
+            # {{instruction}} the latest user message for stateful ones.
+            transcript = list(chat["messages"])
+            attachments = chat_attachments(chat["attachments"], files_root)
+            turns = [None] + chat["user_turns"]
+            answer = ""
+            for n, turn in enumerate(turns, start=1):
+                if turn is not None:
+                    transcript.append({"role": "user", "content": turn})
+                v.instruction = transcript[-1]["content"]
+                v.messages = list(transcript)
+                extra = {"messages": list(transcript), "turn": n, "turns": len(turns)}
+                if attachments:
+                    extra["attachments"] = attachments
+                reply = ask(extra) or ""
+                transcript.append({"role": "assistant", "content": reply})
+                answer = reply
+                if time.time() >= deadline and n < len(turns):
+                    fail(1, "timed out after %d of %d turns" % (n, len(turns)))
+            emit({"type": "conversation", "turns": len(turns), "messages": len(transcript)})
+            report["conversation"] = {"turns": len(turns)}
+            if chat["grade_on"] == "transcript":
+                answer = render_chat(transcript)
     finally:
         end = mapping.get("end")
         if end:

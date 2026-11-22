@@ -209,3 +209,86 @@ func TestOpenAIAgentLauncherConversation(t *testing.T) {
 		t.Fatalf("second messages %v", second)
 	}
 }
+
+// H06: a chat task on a mapped endpoint (Y10 mapping) sends every scripted
+// user turn on the one session the start step opened.
+func TestRemoteHTTPLauncherMappedConversation(t *testing.T) {
+	py, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 not on PATH")
+	}
+	var mu sync.Mutex
+	var starts int
+	var turns []map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		defer mu.Unlock()
+		switch r.URL.Path {
+		case "/threads":
+			starts++
+			_, _ = w.Write([]byte(`{"thread_id":"t-9"}`))
+		case "/threads/t-9/runs":
+			var body map[string]any
+			if err := json.Unmarshal(raw, &body); err != nil {
+				http.Error(w, err.Error(), 400)
+				return
+			}
+			turns = append(turns, body)
+			reply := "A replacement is on its way."
+			if len(turns) == 2 {
+				reply = "About 3 days."
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"out": map[string]any{"text": reply}})
+		default:
+			http.Error(w, "no route "+r.URL.Path, 404)
+		}
+	}))
+	defer srv.Close()
+	port := portOf(t, srv.URL)
+	for _, grade := range []string{"final", "transcript"} {
+		t.Run(grade, func(t *testing.T) {
+			starts, turns = 0, nil
+			dir, chat, ws := chatWorkspace(t, grade)
+			script := filepath.Join(dir, "remotehttp.py")
+			inst := filepath.Join(dir, "instruction.md")
+			for p, c := range map[string]string{script: remoteLauncherSource, inst: "user: My grinder arrived cracked.\n"} {
+				if err := os.WriteFile(p, []byte(c), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			mapping := `{"preset":"custom","body":"{\"input\": \"{{instruction}}\", \"history\": \"{{messages}}\", \"session\": \"{{session_id}}\"}","answer_path":"out.text",` +
+				`"start":{"method":"POST","url":"/threads","body":"{}","id_path":"thread_id"}}`
+			base := "http://agent.invalid:" + port
+			answer := filepath.Join(ws, "answer.txt")
+			cmd := exec.Command(py, "-I", script)
+			cmd.Env = []string{"BENCH_REMOTE_INSTRUCTION=" + inst, "BENCH_ANSWER_PATH=" + answer, "BENCH_REMOTE_FILES_DIR=" + ws,
+				"BENCH_REMOTE_CHAT=" + chat, "BENCH_REMOTE_URL=" + base + "/threads/{{start.id}}/runs", "BENCH_REMOTE_MAPPING=" + mapping,
+				`BENCH_REMOTE_CONNECT_MAP={"agent.invalid:` + port + `":"127.0.0.1:` + port + `"}`,
+				"BENCH_REMOTE_SESSION_ID=r1", "BENCH_REMOTE_TIMEOUT_S=10"}
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("%v\n%s", err, out)
+			}
+			if starts != 1 || len(turns) != 2 {
+				t.Fatalf("%d starts, %d turns\n%s", starts, len(turns), out)
+			}
+			if turns[0]["input"] != "My grinder arrived cracked." || turns[1]["input"] != "How long will the replacement take?" || turns[1]["session"] != "r1" {
+				t.Fatalf("turns %v", turns)
+			}
+			if h := turns[1]["history"].([]any); len(h) != 4 || h[2].(map[string]any)["content"] != "A replacement is on its way." {
+				t.Fatalf("history %v", h)
+			}
+			if strings.Contains(string(out), "scripted user turns are not") {
+				t.Fatalf("old note still printed\n%s", out)
+			}
+			got, _ := os.ReadFile(answer)
+			if grade == "final" && string(got) != "About 3 days." {
+				t.Fatalf("answer %q", got)
+			}
+			if grade == "transcript" && !strings.Contains(string(got), "assistant: About 3 days.") {
+				t.Fatalf("transcript %q", got)
+			}
+		})
+	}
+}

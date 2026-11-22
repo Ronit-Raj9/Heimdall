@@ -212,6 +212,9 @@ export interface ConnectFirstLookResponse {
 	pick: FirstLookPick;
 	evaluation: EvaluationSpec;
 	reference?: { score?: number; ci_low?: number; ci_high?: number; agent?: string; model?: string } | null;
+	/** Optional second card: the agent against the bare model, same benchmark and size (H06). */
+	bare_model?: EvaluationSpec;
+	bare_model_reason?: string;
 }
 
 export interface ConnectPlatform {

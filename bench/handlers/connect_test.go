@@ -16,6 +16,7 @@ import (
 	"github.com/maximhq/bifrost/bench/connect"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 var connectCodeRe = regexp.MustCompile(`HMD-[A-Z0-9]{5}`)
@@ -159,6 +160,33 @@ func TestConnectFirstLookAndCatalog(t *testing.T) {
 	_ = json.Unmarshal(body, &fl)
 	if fl.Pick.Benchmark != "fastqa" || fl.Evaluation.Preset != "first_look" || fl.Evaluation.Benchmarks[0] != "fastqa" || fl.Evaluation.TasksPerBenchmark != 1 {
 		t.Fatalf("pick %+v", fl)
+	}
+	// H06: "Compare with the bare model" is a second card; the first look keeps its preset.
+	if fl.BareModel == nil || fl.BareModel.Arms[1].Model != fl.Evaluation.Arms[0].Model {
+		t.Fatalf("bare-model card on the agent's model: %+v %q", fl.BareModel, fl.BareModelReason)
+	}
+	code, body = abCall(r, "POST", APIPrefix+"/connect/first-look", ConnectFirstLookRequest{Agent: "bot", Model: "gpt-x", Provider: "openai"})
+	fl = ConnectFirstLookResponse{}
+	_ = json.Unmarshal(body, &fl)
+	bm := fl.BareModel
+	if code != 200 || fl.Evaluation.Preset != "first_look" || fl.Evaluation.Mode != "score" || len(fl.Evaluation.Arms) != 1 || bm == nil {
+		t.Fatalf("first look with model %d %s", code, body)
+	}
+	if bm.Mode != "opponent" || bm.Preset != "" || len(bm.Arms) != 2 || bm.Arms[1].Agent != "bare-model" || bm.Arms[1].Model != "gpt-x" ||
+		bm.Benchmarks[0] != "fastqa" || bm.TasksPerBenchmark != 1 || bm.Trials != 1 || bm.Concurrency != 5 {
+		t.Fatalf("bare-model card %+v", bm)
+	}
+	evalCompat = func(a *schemas.AgentConfig, s *schemas.Suite) (bool, []schemas.Capability, string) {
+		if utils.IsBareModel(a) {
+			return false, nil, "it grades a code change"
+		}
+		return s.ID != "hd-swe-verified", nil, ""
+	}
+	code, body = abCall(r, "POST", APIPrefix+"/connect/first-look", ConnectFirstLookRequest{Agent: "bot", Model: "gpt-x"})
+	fl = ConnectFirstLookResponse{}
+	_ = json.Unmarshal(body, &fl)
+	if code != 200 || fl.BareModel != nil || !strings.Contains(fl.BareModelReason, "code change") {
+		t.Fatalf("incompatible bare model %d %s", code, body)
 	}
 	code, body = abCall(r, "GET", APIPrefix+"/connect/failures", nil)
 	var cat ConnectCatalog

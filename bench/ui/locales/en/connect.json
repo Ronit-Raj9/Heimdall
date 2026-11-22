@@ -92,7 +92,11 @@
 		"start": "Start first look",
 		"starting": "Starting",
 		"note": "First look: 5 tasks. Too small for a verdict; run the full pack for one.",
-		"notGate": "A first look is never a release gate and never shown on a leaderboard."
+		"notGate": "A first look is never a release gate and never shown on a leaderboard.",
+		"bareTitle": "Compare with the bare model",
+		"bareHelp": "Optional. Runs the same {{tasks}} tasks on {{benchmark}} twice: your agent, and the bare model ({{model}} alone, no tools). It shows what your agent adds over the model.",
+		"bareStart": "Start the comparison",
+		"bareNone": "No bare-model comparison: {{reason}}"
 	},
 	"errors": {
 		"empty": "Paste something first, or pick a platform."

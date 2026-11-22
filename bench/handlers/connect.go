@@ -31,6 +31,7 @@ import (
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 	"github.com/valyala/fasthttp"
 	"gopkg.in/yaml.v3"
 )
@@ -120,6 +121,13 @@ type ConnectFirstLookResponse struct {
 	// Reference is the reference board row for this benchmark and model,
 	// when the server has one.
 	Reference any `json:"reference,omitempty"`
+	// BareModel is the optional second card, "Compare with the bare model"
+	// (G4-21 baseline): an opponent evaluation of the agent against the bare
+	// model on the agent's model, same benchmark and size as the first look.
+	// The first look itself (Evaluation, preset first_look) is unchanged.
+	// Nil when it does not fit; BareModelReason says why.
+	BareModel       *schemas.EvaluationSpec `json:"bare_model,omitempty"`
+	BareModelReason string                  `json:"bare_model_reason,omitempty"`
 }
 
 // ConnectExplainRequest is POST /connect/explain: a run or check error.
@@ -728,8 +736,40 @@ func (h *connectHandler) firstLook(ctx *fasthttp.RequestCtx) {
 		Faults:            []string{},
 	}
 	out := ConnectFirstLookResponse{Pick: pick, Evaluation: ev}
+	out.BareModel, out.BareModelReason = h.bareModelCard(work, cfg, req, model, pick)
 	if FirstLookReference != nil {
 		out.Reference = FirstLookReference(work, pick.Benchmark, model)
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
+}
+
+// bareModelCard is the first look's optional "Compare with the bare model"
+// evaluation, or nil and the reason it is not offered.
+func (h *connectHandler) bareModelCard(ctx context.Context, cfg *schemas.AgentConfig, req ConnectFirstLookRequest, model string, pick connect.FirstLookPick) (*schemas.EvaluationSpec, string) {
+	if req.Agent == utils.BareModelAgent || utils.IsBareModel(cfg) {
+		return nil, "this agent is the bare model"
+	}
+	if model == "" {
+		return nil, "the agent names no model, and the bare model runs on the agent's model"
+	}
+	if src := h.env.Services.Suites; src != nil {
+		s, err := src.LoadSuite(ctx, pick.Benchmark)
+		if err != nil || s == nil {
+			return nil, "the benchmark could not be read"
+		}
+		bare := &schemas.AgentConfig{ID: utils.BareModelAgent, Adapter: "command", Model: model, Env: map[string]string{utils.BareModelEnv: "1"}}
+		if ok, _, reason := evalCompat(bare, s); !ok {
+			return nil, "the bare model cannot run " + pick.Benchmark + ": " + reason
+		}
+	}
+	return &schemas.EvaluationSpec{
+		Name:              "First look: " + req.Agent + " vs the bare model",
+		Mode:              schemas.EvaluationModeOpponent,
+		Arms:              []schemas.EvaluationArm{{Label: "A", Agent: req.Agent, Model: model, Provider: req.Provider}, {Label: "B", Agent: utils.BareModelAgent, Model: model, Provider: req.Provider}},
+		Benchmarks:        []string{pick.Benchmark},
+		TasksPerBenchmark: pick.Tasks,
+		Trials:            connect.FirstLookTrials,
+		Faults:            []string{},
+		Concurrency:       connect.FirstLookConcurrency,
+	}, ""
 }
