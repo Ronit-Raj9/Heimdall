@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"github.com/maximhq/bifrost/bench/selfmetrics"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/store"
 )
 
 // workerTokenEnv names the coordinator's worker token. Unset, the worker API
@@ -61,7 +63,13 @@ func withWorkers(a *app, l handlers.Launcher) (handlers.Launcher, handlers.Worke
 		a.logger.Warn("worker mode needs a server that launches experiments; " + workerTokenEnv + " is ignored")
 		return l, nil
 	}
-	c, err := engine.NewCoordinator(a.reg, engine.RemoteOptions{Token: token, Logger: a.logger})
+	// Z11 durable leases: kept in <runs>/.remote/leases, so a restart of
+	// serve keeps the runs of remote workers in flight.
+	ropts := engine.RemoteOptions{Token: token, Logger: a.logger}
+	if fs, ok := a.reg.Store.(*store.FSStore); ok && fs != nil {
+		ropts.Leases = engine.FileLeaseBook{Dir: filepath.Join(fs.Root(), ".remote", "leases")}
+	}
+	c, err := engine.NewCoordinator(a.reg, ropts)
 	if err != nil {
 		a.logger.Error("worker mode off: " + err.Error())
 		return l, nil

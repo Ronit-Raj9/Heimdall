@@ -264,7 +264,8 @@ script drains the running server: it stops handing out new leases, and the
 script waits until no run is in flight (the `heimdall_leases_in_flight`
 metric reaches 0) or `--drain-timeout` passes (default 10m). Only then are
 the containers recreated, so the restart stops no run. Runs still in flight
-at the timeout restart with the server. A failed upgrade turns drain mode off
+at the timeout keep their leases and are re-attached by the new server
+(durable leases, below). A failed upgrade turns drain mode off
 again; `--no-drain` skips it. By hand, inside the server container:
 
 ```sh
@@ -278,6 +279,12 @@ The command reads the drain token the server writes at start to
 route, `GET` and `POST /api/bench/admin/drain` with `{"on": true}`. Drain
 mode lives in the server process only: a restarted server always hands out
 leases.
+
+Durable leases. Runs still in flight at a restart (a drain timeout, a
+crash) are not lost when the restart is shorter than the stale threshold (2
+minutes): the server keeps every lease in the `remote_leases` table, and the
+next process re-attaches it when the experiment resumes, so the run finishes
+on its runner and is counted once (docs/remote-execution.md, Durable leases).
 
 It takes a database backup first, tags the image IDs of the running server
 and shared worker containers `:previous` (a service with no running container

@@ -15,7 +15,10 @@
 #      script waits until no run is in flight, or --drain-timeout passes
 #      (bifrost-bench drain inside the server container); images are already
 #      built, so the window without new leases is only the restart. Runs
-#      still in flight at the timeout are restarted with the server. Skipped
+#      still in flight at the timeout keep their leases (durable leases) and
+#      are re-attached by the new server when the restart takes under 2
+#      minutes; a shared worker container that is recreated stops its own
+#      runs. Skipped
 #      with --no-drain, or when the running server has no drain command
 #   5. containers whose image or configuration changed are recreated, and
 #      containers of services no longer in the compose file (the retired
@@ -174,7 +177,7 @@ drain_server() {
 	hc exec -T heimdall /usr/local/bin/bifrost-bench drain -config /srv/heimdall/deploy/bench.yaml -timeout "$drain_timeout" || rc=$?
 	case $rc in
 	0) log "drained: no run in flight" ;;
-	5) log "drain timeout ($drain_timeout): the runs still in flight restart with the server" ;;
+	5) log "drain timeout ($drain_timeout): the runs still in flight keep their leases and are re-attached after the restart" ;;
 	*) log "drain failed (exit $rc): restarting without waiting" ;;
 	esac
 }

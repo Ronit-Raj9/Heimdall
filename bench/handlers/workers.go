@@ -388,6 +388,9 @@ func (h *WorkersHandler) sendErr(ctx *fasthttp.RequestCtx, what string, err erro
 		lib.SendError(ctx, h.mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, msg)
 	case errors.Is(err, schemas.ErrLeaseGone):
 		lib.SendError(ctx, h.mode, fasthttp.StatusGone, lib.ErrTypeConflict, msg)
+	case errors.Is(err, schemas.ErrLeaseReattaching): // Z11 durable leases: the worker retries
+		ctx.Response.Header.Set("Retry-After", "2")
+		lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable, msg)
 	case errors.Is(err, schemas.ErrUploadOffset):
 		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, msg)
 	case errors.Is(err, schemas.ErrUploadTooLarge):

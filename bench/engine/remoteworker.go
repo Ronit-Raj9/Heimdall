@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -723,23 +724,81 @@ func (w *Worker) uploadTo(ctx, completeCtx context.Context, lease *schemas.Worke
 	if err != nil {
 		return nil, fmt.Errorf("hash archive: %w", err)
 	}
-	if err := w.sendChunks(ctx, lease, f.Name(), size); err != nil {
-		return nil, err
-	}
 	req := schemas.WorkerComplete{WorkerID: w.opts.WorkerID, RunID: res.Run.RunID, SealSHA256: sha256Hex(sealRaw),
 		ArchiveSHA256: sum, ArchiveBytes: size, Outcome: res.Run.Outcome, CostUSD: costValue(res),
 		Gateway: res.RunnerGateway, // Tenancy area: the runner's own preflight when the manifest defers it
 		Images:  res.RunnerImages}  // Deploy area: the runner's image ids when the manifest defers it
-	var out schemas.WorkerResult
-	if err := w.call(completeCtx, http.MethodPost, workerAPI+"/leases/"+url.PathEscape(lease.LeaseID)+"/complete", req, &out); err != nil {
-		return nil, fmt.Errorf("complete: %w", err)
+	// Z11: a coordinator that is restarting (unreachable, or re-attaching
+	// the lease: 503) is waited for, up to the lease's stale threshold, and
+	// the upload resumes where the coordinator stands (offset 0 after a
+	// restart). A refusal (lease gone, too large, bad request) is final.
+	stale := time.Duration(lease.StaleAfterMS) * time.Millisecond
+	if stale <= 0 {
+		stale = DefaultStaleAfter
 	}
-	return &out, nil
+	deadline := time.Now().Add(stale)
+	var start int64
+	for try := 0; ; try++ {
+		err := w.sendChunksFrom(ctx, lease, f.Name(), size, start)
+		if err == nil {
+			var out schemas.WorkerResult
+			if err = w.call(completeCtx, http.MethodPost, workerAPI+"/leases/"+url.PathEscape(lease.LeaseID)+"/complete", req, &out); err == nil {
+				return &out, nil
+			}
+			err = fmt.Errorf("complete: %w", err)
+		}
+		next, retry := uploadRetry(err)
+		if !retry || time.Now().After(deadline) || ctx.Err() != nil || completeCtx.Err() != nil {
+			return nil, err
+		}
+		start = next
+		w.logger.Warn("upload interrupted; retrying", "lease", lease.LeaseID, "from_offset", start, "error", err.Error())
+		wait := min(uploadRetryBackoff<<min(try, 4), 10*time.Second)
+		select {
+		case <-ctx.Done():
+			return nil, err
+		case <-time.After(wait):
+		}
+	}
+}
+
+// uploadRetryBackoff is the first wait before an interrupted upload is
+// tried again; a variable so a test can shorten it.
+var uploadRetryBackoff = time.Second
+
+var heldBytes = regexp.MustCompile(`coordinator holds (\d+) bytes`)
+
+// uploadRetry says whether an interrupted upload is tried again and from
+// which offset: a refusal is final; an offset mismatch resumes at the
+// coordinator's count (in its message); anything else (no answer, 5xx, a
+// lease being re-attached) starts over at 0, where a restarted coordinator
+// stands.
+func uploadRetry(err error) (int64, bool) {
+	switch {
+	case errors.Is(err, schemas.ErrLeaseGone), errors.Is(err, schemas.ErrUploadTooLarge), errors.Is(err, schemas.ErrWorkerRequest),
+		errors.Is(err, schemas.ErrWorkerAuth), errors.Is(err, schemas.ErrWorkerScope), errors.Is(err, schemas.ErrWorkerUnknown),
+		errors.Is(err, schemas.ErrNotFound):
+		return 0, false
+	case errors.Is(err, schemas.ErrUploadOffset):
+		m := heldBytes.FindStringSubmatch(err.Error())
+		if m == nil {
+			return 0, false
+		}
+		n, perr := strconv.ParseInt(m[1], 10, 64)
+		return n, perr == nil
+	}
+	return 0, true
 }
 
 // sendChunks sends the archive in chunks no larger than the coordinator
 // accepts. A failed chunk is retried at the same offset.
 func (w *Worker) sendChunks(ctx context.Context, lease *schemas.WorkerLease, p string, size int64) error {
+	return w.sendChunksFrom(ctx, lease, p, size, 0)
+}
+
+// sendChunksFrom is sendChunks from offset start (Z11: an upload resumed
+// after a coordinator restart).
+func (w *Worker) sendChunksFrom(ctx context.Context, lease *schemas.WorkerLease, p string, size, start int64) error {
 	chunk := DefaultChunkBytes
 	w.mu.Lock()
 	if w.registered != nil && w.registered.ChunkBytes > 0 {
@@ -757,7 +816,13 @@ func (w *Worker) sendChunks(ctx context.Context, lease *schemas.WorkerLease, p s
 	defer f.Close()
 	buf := make([]byte, chunk)
 	base := workerAPI + "/leases/" + url.PathEscape(lease.LeaseID) + "/upload?worker_id=" + url.QueryEscape(w.opts.WorkerID)
-	for off := int64(0); off < size; {
+	if start < 0 || start > size {
+		start = 0
+	}
+	if _, err := f.Seek(start, io.SeekStart); err != nil {
+		return fmt.Errorf("read archive: %w", err)
+	}
+	for off := start; off < size; {
 		n, err := io.ReadFull(f, buf)
 		if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
 			return fmt.Errorf("read archive: %w", err)
