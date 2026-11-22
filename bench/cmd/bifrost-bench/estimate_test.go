@@ -125,7 +125,9 @@ func TestForecastFromStore(t *testing.T) {
 	if got := *f.Arms[0].CostUSD.Median; got < 0.3999 || got > 0.4001 {
 		t.Fatalf("arm A median cost %v, want 4 x 0.10 (the scripted runs at 9 left out)", got)
 	}
-	if f.Arms[1].Basis != schemas.BasisBudgetBound || *f.Arms[1].CostUSD.High != 0.8 || f.Concurrency != 2 {
+	// Arm B has no history of its own: its first estimate comes from the library (the other
+	// arm's runs on the same suite, repriced for m-b), not the per-run budget bound.
+	if f.Arms[1].Basis != schemas.BasisLibrary || f.Arms[1].HistoryRuns != 4 || !strings.Contains(f.Arms[1].BasisText, "library data") || f.Concurrency != 2 {
 		t.Fatalf("arm B %+v", f.Arms[1])
 	}
 	if f.Fit != schemas.FitFits || !strings.Contains(strings.Join(f.Notes, ";"), "4 synthetic runs") || f.PriceRef == "" {
@@ -133,7 +135,7 @@ func TestForecastFromStore(t *testing.T) {
 	}
 	var out bytes.Buffer
 	printForecast(&out, f)
-	for _, want := range []string{"arm A", "basis config_hash", "at most $0.8000", "budget $2.00: fits", "note: left out 4 synthetic runs"} {
+	for _, want := range []string{"arm A", "basis config_hash", "basis library: first run", "cost $0.2667 to $0.6000", "budget $2.00: fits", "note: left out 4 synthetic runs"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("forecast output lacks %q:\n%s", want, out.String())
 		}

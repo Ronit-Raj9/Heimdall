@@ -298,7 +298,7 @@ on, which is every organization without its own quota row.
 | `HEIMDALL_REGISTRY_DIR` | `registry` | Host folder for the registry's images, e.g. on the data disk. Empty: the `registry-data` Docker volume. |
 | `HEIMDALL_SHARED_PLATFORM_IMAGES` | `shared-runner` | Comma-separated images every org may pull (a trailing `/` or `:` is a prefix). Otherwise an org pulls only its approved, digest-pinned images. Org Dockerfiles take those without a registry host (and `bench/...`) from the private registry. |
 | `HEIMDALL_SHARED_GATEWAY_CONTAINER` | `shared-runner` | The gateway container every org network joins. Empty finds the compose project's `bifrost` service. |
-| `HEIMDALL_SHARED_SLOTS` | `shared-runner` | Slots per organization, capped by its max concurrent runs. |
+| `HEIMDALL_SHARED_SLOTS` | `shared-runner` | Slots per organization, capped by its max concurrent runs. Default 4, the default max concurrent runs of an org. |
 
 2. Build the task and agent images the built-in benchmarks use, e.g.
    `docker build -t bench/coding-core-base:1 benchmarks/coding-core/base`.
@@ -433,7 +433,9 @@ each with a one-line meaning (`.env.example` has the same list):
 |---|---|
 | `HEIMDALL_SHARED_RUNNER_SECRET` | Secret of the shared worker (assignments and per-org token claims); empty turns the shared worker off. |
 | `HEIMDALL_SHARED_RUNTIME` | Container runtime of the shared worker: `auto`, `runsc` or `runc`. |
-| `HEIMDALL_SHARED_SLOTS` | Runs at once per organization on the shared worker, capped by its own limit. |
+| `HEIMDALL_SHARED_SLOTS` | Runs at once per organization on the shared worker, capped by its own limit (default 4). |
+| `HEIMDALL_LIBRARY_RUNS_ROOT` | Run store of the platform org whose reference runs give a new organization's first estimate its cost and time (docs/evaluations.md); empty uses each organization's own runs only. |
+| `HEIMDALL_EVAL_BUDGET_MAX_USD` | Largest budget the evaluation wizard suggests (default 100 USD, lowered to an org's daily spend cap when one is set); a person can still type more. |
 | `HEIMDALL_SHARED_BUILDKIT` | Address of the isolated BuildKit that builds images from org Dockerfiles. |
 | `HEIMDALL_SHARED_REGISTRY` | The private image registry beside that BuildKit (`registry:5000`) that org builds take bench and platform base images from. |
 | `HEIMDALL_REGISTRY_DIR` | Host folder (on the data disk) for that registry's images; empty is a Docker volume. |

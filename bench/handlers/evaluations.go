@@ -42,12 +42,20 @@ import (
 
 // Evaluation defaults and limits.
 const (
-	EvaluationDefaultTasks  = 8
-	EvaluationDefaultTrials = 2
+	// The defaults are the Quick look preset (G4-16): 10 tasks once each.
+	// More tasks narrow the margin faster than more trials, so a second
+	// trial is opt-in.
+	EvaluationDefaultTasks  = 10
+	EvaluationDefaultTrials = 1
 	EvaluationMaxTasks      = 50
 	EvaluationMaxTrials     = 10
 	EvaluationMaxBenchmarks = 40
 	EvaluationMaxBudget     = 1000.0
+	// EvaluationDefaultConcurrency is how many runs of one benchmark go at
+	// once when the spec sets none; the org's worker slots still bound what
+	// actually runs side by side. EvaluationMaxConcurrency bounds the spec.
+	EvaluationDefaultConcurrency = 4
+	EvaluationMaxConcurrency     = 16
 	// evaluationLaunchTimeout bounds planning and starting every child.
 	evaluationLaunchTimeout = 3 * time.Minute
 )
@@ -241,6 +249,9 @@ func (h *evaluationsHandler) refresh(ev *schemas.Evaluation) {
 			if string(st.State) != c.Status && !(c.Status == string(schemas.ExperimentCancelled) && !terminalChild(string(st.State))) {
 				c.Status, changed = string(st.State), true
 			}
+			if h.budgetFacts(c, m, st) { // G4-01: spend, cap and runs the cap left unstarted (evaluationbudget.go)
+				changed = true
+			}
 		}
 	}
 	if next := evaluationStatus(ev); next != ev.Status {
@@ -289,7 +300,7 @@ func evaluationStatus(ev *schemas.Evaluation) string {
 			}
 			return schemas.EvaluationRunning
 		}
-		if c.Status == string(schemas.ExperimentDone) {
+		if c.Status == string(schemas.ExperimentDone) || c.BudgetStopped { // a budget stop keeps its finished runs: the report card shows them
 			done++
 		}
 	}
@@ -434,6 +445,9 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 			spec.Mode = schemas.EvaluationModeModels
 		}
 	}
+	if err := h.ensureBareModel(ctx, spec); err != nil { // G4-21: the baseline's files, before the arms are read
+		return err
+	}
 	switch spec.Mode {
 	case schemas.EvaluationModeScore:
 		if len(spec.Arms) != 1 {
@@ -516,6 +530,12 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 	}
 	if spec.BudgetUSD < 0 || spec.BudgetUSD > EvaluationMaxBudget {
 		return badf("budget_usd must be between 0 and %v", EvaluationMaxBudget)
+	}
+	if spec.Concurrency < 0 || spec.Concurrency > EvaluationMaxConcurrency {
+		return badf("concurrency must be between 1 and %d (0 is the default, %d)", EvaluationMaxConcurrency, EvaluationDefaultConcurrency)
+	}
+	if err := normalizePreset(spec); err != nil {
+		return err
 	}
 	if err := normalizeGate(spec); err != nil {
 		return err
@@ -686,7 +706,7 @@ func (h *evaluationsHandler) agentConfigs(ctx context.Context) map[string]*schem
 // evaluation as a whole.
 func (h *evaluationsHandler) launchChild(work context.Context, start context.Context, created func(string), ev *schemas.Evaluation, bench string, agents map[string]*schemas.AgentConfig, budget float64, who string) schemas.EvaluationChild {
 	s := h.env.Services
-	child := schemas.EvaluationChild{Benchmark: bench}
+	child := schemas.EvaluationChild{Benchmark: bench, BudgetUSD: budget}
 	skip := func(format string, a ...any) schemas.EvaluationChild {
 		child.Status, child.Skipped = schemas.EvaluationChildSkipped, fmt.Sprintf(format, a...)
 		return child
@@ -775,7 +795,7 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 		Budget:      schemas.BudgetSpec{TotalUSD: budget, ReserveUSD: quickReserve(budget, evalArmCount(spec)*len(tasks.IDs)*spec.Trials*len(conds))},
 		Verdict:     quickVerdict{Policy: "paired_signflip"},
 		Seed:        ev.CreatedAt.Unix(),
-		Concurrency: 2, ManifestMode: "agent_exposure",
+		Concurrency: evalConcurrency(spec), ManifestMode: "agent_exposure",
 	}
 	f.Budget.Disclose = spec.DiscloseBudget
 	var variantNotes []string
@@ -854,6 +874,7 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 		created(m.ExpID)
 	}
 	child.ExperimentID, child.Status = m.ExpID, string(schemas.ExperimentCreatedState)
+	prewarmImages(s.Launcher, m) // G4-04: pull or build the images now, not at the first run
 	if err := s.Launcher.Start(start, m.ExpID); err != nil {
 		child.Status, child.Skipped = string(schemas.ExperimentFailed), "start experiment (it was created; start it from its page): "+err.Error()
 		return child
@@ -970,7 +991,7 @@ func evalArms(spec schemas.EvaluationSpec) map[string]schemas.ArmSpec {
 	out := map[string]schemas.ArmSpec{}
 	base := spec.Arms[0].Agent
 	for _, a := range spec.Arms {
-		arm := evalArmFor(a.Provider, a.Model)
+		arm := bareModelArm(evalArmFor(a.Provider, a.Model), a.Agent, a.Provider, a.Model)
 		agentLabel := a.Agent
 		if a.Version > 0 {
 			agentLabel += fmt.Sprintf(" v%d", a.Version)

@@ -103,6 +103,11 @@ type sharedFlags struct {
 	debug                                     bool
 }
 
+// sharedDefaultSlots is the shared runner's slots per org without -slots:
+// the default max concurrent runs of an org (quota.DefaultLimits), so the
+// org's limit, not the runner flag, is what bounds a first evaluation.
+const sharedDefaultSlots = 4
+
 func parseSharedFlags(args []string) (*sharedFlags, error) {
 	f := &sharedFlags{}
 	fs := flag.NewFlagSet("runner start -shared", flag.ContinueOnError)
@@ -111,7 +116,7 @@ func parseSharedFlags(args []string) (*sharedFlags, error) {
 	fs.StringVar(&f.server, "server", "", "hosted server URL")
 	fs.StringVar(&f.secretFile, "secret-file", "", "file holding "+sharedpool.SecretEnv+"; mode 0600")
 	fs.StringVar(&f.runtime, "runtime", runtimeAuto, "auto (gVisor when the host has runsc), runc or runsc")
-	fs.IntVar(&f.slots, "slots", 1, "slots per org (capped by the org's max concurrent runs)")
+	fs.IntVar(&f.slots, "slots", sharedDefaultSlots, "slots per org (capped by the org's max concurrent runs)")
 	fs.DurationVar(&f.poll, "poll", 30*time.Second, "how often to fetch the assignments")
 	fs.StringVar(&f.name, "name", "", "runner name prefix (default: shared-<host>)")
 	fs.StringVar(&f.config, "config", defaultConfig, "bench config")

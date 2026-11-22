@@ -1,0 +1,38 @@
+# Bare-model baseline: the same model with no agent scaffolding. One model
+# call with the task text, no tools, no loop (agents/images/bare-model/).
+# An evaluation adds it as the opponent with "Compare with the bare model",
+# on the same model as your agent, so the report card says whether the agent
+# adds anything over the model alone.
+#
+# It can only answer in text, so it runs on benchmarks graded on an answer
+# (question sets, research answers); on a benchmark that grades a code
+# change, tool state or files the evaluation leaves it out with the reason.
+#
+# Speaks OpenAI chat completions to Bifrost's /openai/v1 route. BENCH_MODEL
+# is provider/model; an arm sets model and gateway.provider together.
+id: bare-model
+adapter: command
+image: bench/agent-bare-model:1
+build:
+  dockerfile: agents/images/bare-model/Dockerfile
+  tag: bench/agent-bare-model:1
+  base_arg: BASE_IMAGE
+argv:
+  - bare-model
+env:
+  BENCH_BASE_URL: "{{gateway.url}}/openai/v1"
+  BENCH_API_KEY: "{{run.key}}"
+  BENCH_MODEL: "{{gateway.provider}}/{{model}}"
+  BENCH_INSTRUCTION_FILE: "{{instruction_file}}"
+  BENCH_SESSION_ID: "{{run.session}}"
+  BENCH_NO_TOOLS: "1"
+# Placeholder: every evaluation sets the model to your agent's model.
+model: gpt-5.4-mini
+budgets:
+  wall_s: 600
+  turns: 1
+  cpus: 1
+  mem_gb: 1
+gateway:
+  provider: openai
+  max_retries: 0

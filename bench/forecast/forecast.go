@@ -59,6 +59,15 @@ type Input struct {
 	Concurrency int // workers the scheduler will run; the experiment's, else the scheduler default
 	Notes       []string
 	Now         time.Time
+	// Library is every sealed run on the suite version, of any agent and
+	// model (LoadLibrary), plus the operator's library runs when the server
+	// has them. An arm with no history of its own is estimated from it
+	// (library.go); nil keeps the old "cannot estimate" answer.
+	Library []HistoryRun
+	// Reprice is the price ratio range from one model to another (low,
+	// mid, high), from the price snapshot; false when either is unpriced.
+	// Nil prices library runs only when they ran on the arm's own model.
+	Reprice func(from, to string) (lo, mid, hi float64, ok bool)
 }
 
 // Estimate forecasts every arm of a planned manifest and the total, and
@@ -128,6 +137,11 @@ func estimateArm(id string, arm schemas.ArmManifest, tasks []string, suite strin
 		a.Basis = schemas.BasisConfigHash
 	case len(byAgent) > 0:
 		a.Basis, hist = schemas.BasisAgentModel, byAgent
+	case len(in.Library) > 0:
+		if lib, ok := libraryArm(a, arm, tasks, suite, in); ok {
+			return lib
+		}
+		return boundArm(a, arm, in)
 	default:
 		return boundArm(a, arm, in)
 	}
@@ -336,7 +350,7 @@ func basisSummary(arms []schemas.ArmForecast) string {
 	for _, a := range arms {
 		counts[a.Basis]++
 	}
-	if counts[schemas.BasisConfigHash]+counts[schemas.BasisAgentModel] == 0 {
+	if counts[schemas.BasisConfigHash]+counts[schemas.BasisAgentModel]+counts[schemas.BasisLibrary] == 0 {
 		if counts[schemas.BasisBudgetBound] > 0 {
 			return "No history for any arm: upper bounds from per-run usd budgets only, no estimate."
 		}
@@ -346,6 +360,7 @@ func basisSummary(arms []schemas.ArmForecast) string {
 	for _, b := range []struct{ key, words string }{
 		{schemas.BasisConfigHash, "sealed runs of the same config"},
 		{schemas.BasisAgentModel, "sealed runs of the same agent and model"},
+		{schemas.BasisLibrary, "library runs of other agents on these tasks (first run: your agent may differ)"},
 		{schemas.BasisBudgetBound, "a per-run usd budget bound only"},
 		{schemas.BasisNone, "no history (cannot estimate)"},
 	} {

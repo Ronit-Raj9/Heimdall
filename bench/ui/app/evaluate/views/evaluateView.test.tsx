@@ -69,8 +69,8 @@ describe("evaluateDraft", () => {
 		const spec = draftToSpec({ ...withAgent(), faults: ["broken-tool"], benchmarks: ["hd-harbor-tb2"] });
 		expect(spec.faults).toEqual(["clean", "broken-tool"]);
 		expect(spec.mode).toBe("score");
-		expect(spec.tasks_per_benchmark).toBe(8);
-		expect(spec.trials).toBe(2);
+		expect(spec.tasks_per_benchmark).toBe(10);
+		expect(spec.trials).toBe(1);
 		expect(spec.name).toBe("codex score");
 	});
 

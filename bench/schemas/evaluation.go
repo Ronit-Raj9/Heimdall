@@ -49,8 +49,8 @@ type EvaluationSpec struct {
 	Arms              []EvaluationArm `json:"arms"`       // 1 arm for score, 2 for A/B
 	Benchmarks        []string        `json:"benchmarks"` // suite ids; or Pack
 	Pack              string          `json:"pack,omitempty"`
-	TasksPerBenchmark int             `json:"tasks_per_benchmark"` // default 8 (the fewest that can reach significance after Holm over a few benchmarks), admitted tasks only
-	Trials            int             `json:"trials"`              // repeats per task, default 2
+	TasksPerBenchmark int             `json:"tasks_per_benchmark"` // default 10 (the Quick look preset), admitted tasks only
+	Trials            int             `json:"trials"`              // repeats per task, default 1 (more tasks beat more trials)
 	Faults            []string        `json:"faults"`              // "clean" always; plus model-down, broken-tool, misleading-instruction
 	BudgetUSD         float64         `json:"budget_usd,omitempty"`
 	// Split is the task split the evaluation runs: public (the default) or
@@ -68,6 +68,13 @@ type EvaluationSpec struct {
 	Stream *StreamSpec `json:"stream,omitempty"`
 	// DiscloseBudget tells the agent its budget and deadline.
 	DiscloseBudget bool `json:"disclose_budget,omitempty"`
+	// Concurrency is how many runs of one benchmark go at once; 0 is the
+	// default (handlers.EvaluationDefaultConcurrency). The org's worker
+	// slots still bound what runs side by side.
+	Concurrency int `json:"concurrency,omitempty"`
+	// Preset names the size preset the wizard started from (quick, standard,
+	// thorough); informational, the numbers above are what runs.
+	Preset string `json:"preset,omitempty"`
 }
 
 // EvaluationGate is what an evaluation must show to pass. Scores are
@@ -143,6 +150,16 @@ type EvaluationChild struct {
 	// it stands for (clean, model-down, broken-tool, misleading-instruction),
 	// fixed at launch from faults.Conditions; the report card reads it.
 	FaultOf map[string]string `json:"fault_of,omitempty"`
+	// BudgetUSD is the spend cap this benchmark runs under (its share of
+	// the evaluation budget, or the per-benchmark default), raised in place
+	// by "raise budget and continue".
+	BudgetUSD float64 `json:"budget_usd,omitempty"`
+	// SpentUSD is the modeled spend of its runs so far, read live.
+	SpentUSD float64 `json:"spent_usd,omitempty"`
+	// BudgetStopped is true when the spend cap stopped it with runs left;
+	// NotStarted counts the runs it never started.
+	BudgetStopped bool `json:"budget_stopped,omitempty"`
+	NotStarted    int  `json:"not_started,omitempty"`
 }
 
 // Evaluation is stored as .heimdall/evaluations/<id>.json in the project.

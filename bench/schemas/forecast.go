@@ -39,6 +39,7 @@ const (
 	BasisConfigHash  = "config_hash"  // sealed runs of the same resolved agent config
 	BasisAgentModel  = "agent_model"  // sealed runs of the same agent id and model
 	BasisBudgetBound = "budget_bound" // no history: per-run usd budget times runs, an upper bound only
+	BasisLibrary     = "library"      // no history of this agent: other agents' sealed runs on the same suite, repriced for the arm's model
 	BasisNone        = "none"         // no history, cannot estimate
 )
 

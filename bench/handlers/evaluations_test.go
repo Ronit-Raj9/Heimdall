@@ -224,14 +224,14 @@ func TestEvaluationABArmsAndVersions(t *testing.T) {
 		t.Fatalf("status %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
 	}
 	ev := decodeEval(t, ctx)
-	if ev.Spec.TasksPerBenchmark != EvaluationDefaultTasks || ev.Spec.Trials != 2 || strings.Join(ev.Spec.Faults, ",") != "clean" {
+	if ev.Spec.TasksPerBenchmark != EvaluationDefaultTasks || ev.Spec.Trials != EvaluationDefaultTrials || strings.Join(ev.Spec.Faults, ",") != "clean" {
 		t.Fatalf("defaults %+v", ev.Spec)
 	}
 	exp := l.planned[ev.Children[0].ExperimentID]
 	if exp.Arms["A"].Agent != "agents/scripted.yaml@v2" || exp.Arms["B"].Agent != "agents/other.yaml" || exp.Arms["B"].Set["gateway.provider"] != "openrouter" {
 		t.Fatalf("arms %+v", exp.Arms)
 	}
-	if exp.Conditions[0].Trials != 2 || len(exp.Conditions[0].Tasks.IDs) != EvaluationDefaultTasks {
+	if exp.Conditions[0].Trials != EvaluationDefaultTrials || len(exp.Conditions[0].Tasks.IDs) != EvaluationDefaultTasks {
 		t.Fatalf("conditions %+v", exp.Conditions)
 	}
 }

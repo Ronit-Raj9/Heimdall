@@ -16,6 +16,7 @@ vi.mock("@/lib/store/apis/evaluationsApi", async (orig) => ({
 	...(await orig<object>()),
 	useGetEvaluationQuery: vi.fn(),
 	useCancelEvaluationMutation: vi.fn(() => [() => ({ unwrap: () => Promise.resolve() }), { isLoading: false }]),
+	useRaiseEvaluationBudgetMutation: vi.fn(() => [() => undefined, { isLoading: false }]),
 }));
 
 vi.mock("@/components/releases/promoteEvaluation", () => ({
@@ -105,5 +106,32 @@ describe("EvaluationBody delete (X16)", () => {
 		const done = render(<EvaluationBody evaluation={{ ...base, status: "done" }} />, hostedSession("admin"));
 		expect(tagOf(done, "evaluation-delete")).not.toContain('disabled=""');
 		expect(render(<EvaluationBody evaluation={{ ...base, status: "done" }} />, hostedSession("viewer"))).not.toContain('data-testid="evaluation-delete"');
+	});
+});
+
+describe("EvaluationBody budget (G4-01)", () => {
+	it("shows spend per benchmark, the runs the cap stopped and Raise budget and continue", () => {
+		const html = render(
+			<EvaluationBody
+				evaluation={{
+					...base,
+					status: "done",
+					children: [
+						{ benchmark: "hd-harbor-tb2", experiment_id: "e1", status: "failed", budget_usd: 5, spent_usd: 4.6, budget_stopped: true, not_started: 13 },
+						{ benchmark: "tau2", experiment_id: "e2", status: "done", budget_usd: 5, spent_usd: 2.1 },
+					],
+				}}
+			/>,
+		);
+		expect(html).toContain("Stopped at the $5.00 budget: 13 runs not started");
+		expect(html).toContain("$2.10 of $5.00 spent");
+		expect(html).toContain("The budget stopped 1 benchmark: 13 runs not started.");
+		expect(html).toContain("Raise budget and continue");
+		expect(html).toContain('value="10"');
+	});
+
+	it("shows no raise panel when nothing was stopped", () => {
+		const html = render(<EvaluationBody evaluation={base} />);
+		expect(html).not.toContain('data-testid="evaluation-budget-stopped"');
 	});
 });

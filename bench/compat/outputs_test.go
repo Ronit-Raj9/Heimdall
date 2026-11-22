@@ -86,3 +86,22 @@ func TestTaskOKKinds(t *testing.T) {
 		t.Fatalf("nothing to publish: %v %q", ok, why)
 	}
 }
+
+func TestBareModelOnlyAnswers(t *testing.T) {
+	bare := &schemas.AgentConfig{ID: "bare-model", Adapter: "command", Env: map[string]string{"BENCH_NO_TOOLS": "1"}}
+	answer := &schemas.Suite{ID: "qa", Output: &schemas.OutputSpec{Kind: schemas.OutputAnswer}, Tasks: []*schemas.Task{{ID: "q1"}}}
+	code := &schemas.Suite{ID: "code", Tasks: []*schemas.Task{{ID: "c1"}}}
+	if !ChecksTasks(bare) {
+		t.Fatal("the bare model has output rules")
+	}
+	if ok, why := TaskOK(bare, answer, answer.Tasks[0]); !ok {
+		t.Fatalf("answer task refused: %s", why)
+	}
+	ok, why := TaskOK(bare, code, code.Tasks[0])
+	if ok || !strings.Contains(why, "code change") || !strings.Contains(why, "only answers in text") {
+		t.Fatalf("code task: ok=%v why=%q", ok, why)
+	}
+	if ok, _, reason, _ := Full(bare, code); ok || reason == "" {
+		t.Fatalf("Full on code suite ok=%v reason=%q", ok, reason)
+	}
+}

@@ -102,9 +102,9 @@ export interface EvaluationSpec {
 	/** Suite ids; or Pack. */
 	benchmarks: string[];
 	pack?: PackId | string;
-	/** Default 5, admitted tasks only. */
+	/** Default 10 (the Quick look preset), admitted tasks only. */
 	tasks_per_benchmark: number;
-	/** Repeats per task, default 2. */
+	/** Repeats per task, default 1. */
 	trials: number;
 	/** "clean" always; plus "model-down", "broken-tool", "misleading-instruction". */
 	faults: EvaluationFault[];
@@ -119,7 +119,16 @@ export interface EvaluationSpec {
 	stream?: { memory: "carry" | "fresh"; order?: "suite" | "seeded"; replay?: number; threshold?: number };
 	/** Tell the agent its budget and deadline (BENCH_BUDGET_USD, BENCH_DEADLINE). */
 	disclose_budget?: boolean;
+	/** Runs of one benchmark that go at once, 1 to 16; unset is 4. The org's worker slots still bound it. */
+	concurrency?: number;
+	/** The size preset the wizard started from; the numbers above are what runs. */
+	preset?: EvaluationPresetId;
 }
+
+export type EvaluationPresetId = "quick" | "standard" | "thorough";
+
+/** The estimate request: a spec, plus `presets: true` to also get the three preset sizes. */
+export type EstimateRequest = EvaluationSpec & { presets?: boolean };
 
 /** What an evaluation must show to pass. Scores are fractions (0 to 1). */
 export interface EvaluationGate {
@@ -176,6 +185,13 @@ export interface EvaluationChild {
 	skipped_tasks?: EvaluationSkippedTask[];
 	/** Condition id to fault (or "attack"), fixed at launch. */
 	fault_of?: Record<string, string>;
+	/** The spend cap this benchmark runs under (its share of the budget, or the $5 default). */
+	budget_usd?: number;
+	/** Modeled spend of its runs so far. */
+	spent_usd?: number;
+	/** The spend cap stopped it with runs left; `not_started` counts them. */
+	budget_stopped?: boolean;
+	not_started?: number;
 }
 
 export interface Evaluation {
@@ -217,6 +233,8 @@ export interface EstimateBenchmark {
 	skipped?: string;
 	notes?: string[] | null;
 	faults_skipped?: { fault: string; reason: string }[] | null;
+	/** Some setup has no runs of its own: cost and time come from other agents' library runs. */
+	from_library?: boolean;
 	[key: string]: unknown;
 }
 
@@ -243,6 +261,56 @@ export interface Estimate {
 	notes?: string[] | null;
 	/** Arm models the price snapshot does not list: no cost is estimated for them. */
 	unpriced_models?: string[];
+	/** The spend cap that applies, the suggested one, and the runs a smaller cap leaves unstarted. */
+	budget?: EstimateBudget;
+	/** Runs that go at once: per benchmark, over the whole evaluation, and the org's worker slots (0: not bounded). */
+	slots?: { concurrency: number; org_slots: number; parallel: number };
+	/** A first run: the estimate comes from library runs of other agents. */
+	from_library?: boolean;
+	/** The preset sizes of the same setup, when asked with `presets: true`. */
+	presets?: EstimatePreset[] | null;
+}
+
+export type BudgetFit = "fits" | "may_exceed" | "exceeds" | "unknown";
+
+/** handlers.EvalBudget */
+export interface EstimateBudget {
+	budget_usd: number;
+	per_benchmark_usd: number;
+	/** No budget was given: the per-benchmark default applies. */
+	default: boolean;
+	default_per_benchmark_usd: number;
+	/** Covers the high cost estimate with headroom, at least the default, at most `max_usd`. */
+	suggested_usd: number;
+	max_usd: number;
+	fit: BudgetFit | string;
+	runs_skipped_low: number;
+	runs_skipped_high: number;
+	note?: string;
+}
+
+/** handlers.EvalPresetEstimate */
+export interface EstimatePreset {
+	id: EvaluationPresetId;
+	label: string;
+	summary: string;
+	tasks_per_benchmark: number;
+	trials: number;
+	faults: string[];
+	runs: number;
+	est_cost_usd: Range & { known: boolean; reason?: string };
+	est_minutes: Range & { known?: boolean };
+	/** Smallest change it can detect overall, in points; null when it cannot decide. */
+	mde_pp: number | null;
+	mde_per_benchmark_pp: number | null;
+	from_library?: boolean;
+}
+
+/** POST /evaluations/{id}/raise-budget */
+export interface RaiseBudgetRequest {
+	id: string;
+	/** The new budget of the whole evaluation, in USD. */
+	budget_usd: number;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -630,6 +698,14 @@ export const evaluationsApi = benchApi
 					{ type: "Evaluations", id: "LIST" },
 				],
 			}),
+			/** Raise the budget and continue the benchmarks the spend cap stopped. */
+			raiseEvaluationBudget: builder.mutation<Evaluation, RaiseBudgetRequest>({
+				query: ({ id, budget_usd }) => ({ url: `/evaluations/${enc(id)}/raise-budget`, method: "POST", body: { budget_usd } }),
+				invalidatesTags: (_r, _e, { id }) => [
+					{ type: "Evaluations", id },
+					{ type: "Evaluations", id: "LIST" },
+				],
+			}),
 			estimateEvaluation: builder.mutation<Estimate, EvaluationSpec>({
 				query: (body) => ({
 					url: "/evaluations/estimate",
@@ -638,7 +714,7 @@ export const evaluationsApi = benchApi
 				}),
 			}),
 			/** The same estimate as a query, so a form can show it live (cached per spec). */
-			getEvaluationEstimate: builder.query<Estimate, EvaluationSpec>({
+			getEvaluationEstimate: builder.query<Estimate, EstimateRequest>({
 				query: (body) => ({
 					url: "/evaluations/estimate",
 					method: "POST",
@@ -676,6 +752,7 @@ export const {
 	useGetEvaluationQuery,
 	useCreateEvaluationMutation,
 	useCancelEvaluationMutation,
+	useRaiseEvaluationBudgetMutation,
 	useEstimateEvaluationMutation,
 	useGetEvaluationPacksQuery,
 	useGetEvaluationReportQuery,

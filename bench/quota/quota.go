@@ -28,8 +28,10 @@ type Store interface {
 // DefaultLimits are the limits of an org with no row. The daily run and
 // spend caps are off (0) by default: they are enforced when a server admin
 // sets them (X01: the shared worker is uncapped for now). Runs are paid for
-// with the organization's own model keys.
-var DefaultLimits = Limits{MaxConcurrentRuns: 2, MaxRunsPerDay: 0, MaxSpendUSDPerDay: 0,
+// with the organization's own model keys. Four runs at once (G4-04) lets a
+// first evaluation of a few benchmarks finish inside an hour; the org's
+// limits are shown on Settings > Workers and in every estimate.
+var DefaultLimits = Limits{MaxConcurrentRuns: 4, MaxRunsPerDay: 0, MaxSpendUSDPerDay: 0,
 	MaxImageBytes: 2 << 30, Runtime: "runc"}
 
 // NewStub returns the Phase 0 stub store.
