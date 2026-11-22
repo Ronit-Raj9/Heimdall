@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
  */
 export function AgentCard({ agent }: { agent: AgentSummary }) {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("agentsUx");
 	const testId = `agents-card-${agent.id || agent.path.replace(/[^A-Za-z0-9_-]/g, "-")}`;
 	if (agent.error) {
 		return (
@@ -59,7 +60,17 @@ export function AgentCard({ agent }: { agent: AgentSummary }) {
 		{
 			key: "runs",
 			label: t("agents.runs"),
-			value: agent.sealed_runs === null ? t("agents.runsUnknown") : <span className="tabular-nums">{agent.sealed_runs}</span>,
+			value:
+				agent.sealed_runs === null ? (
+					t("agents.runsUnknown")
+				) : (
+					<span className="tabular-nums">
+						<span>{agent.sealed_runs}</span>
+						{(agent.runs_total ?? 0) > agent.sealed_runs && (
+							<span className="text-muted-foreground"> {tu("list.startedRuns", { count: agent.runs_total ?? 0 })}</span>
+						)}
+					</span>
+				),
 			hint: t("agents.runsHint"),
 		},
 	];

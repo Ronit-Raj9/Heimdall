@@ -27,7 +27,15 @@ const TEST_DOUBLE_TEXT = /\b(test[ -]?double|stub agent|fake agent|mock agent|de
 type TestAgentFields = Pick<AgentSummary, "id" | "scripted_kind" | "adapter"> & { description?: string; notes?: string };
 
 /** Agents every new org starts with, shown for comparison under "Baseline agents". */
-export const BASELINE_AGENT_IDS: ReadonlySet<string> = new Set(["codex", "claude-code", "mini-swe-agent", "opencode", "gemini-cli", "fw-plain-openai", "custom-python"]);
+export const BASELINE_AGENT_IDS: ReadonlySet<string> = new Set([
+	"codex",
+	"claude-code",
+	"mini-swe-agent",
+	"opencode",
+	"gemini-cli",
+	"fw-plain-openai",
+	"custom-python",
+]);
 
 export function isBaselineAgent(agent: Pick<AgentSummary, "id">): boolean {
 	return BASELINE_AGENT_IDS.has(agent.id);
@@ -37,6 +45,52 @@ export function isTestAgent(agent: TestAgentFields): boolean {
 	if (agent.scripted_kind || agent.adapter === "scripted") return true;
 	if (TEST_IDS.has(agent.id) || agent.id.startsWith("live-")) return true;
 	return TEST_DOUBLE_TEXT.test(`${agent.description ?? ""} ${agent.notes ?? ""}`);
+}
+
+/** How the agents list can be ordered (URL state `sort`). */
+export const AGENT_SORTS = ["name", "last", "runs"] as const;
+export type AgentSort = (typeof AGENT_SORTS)[number];
+
+/** The agents whose id, file, model or adapter contains q (case-insensitive). An empty q keeps every agent. */
+export function filterAgents<T extends Pick<AgentSummary, "id" | "path" | "model" | "adapter">>(
+	agents: readonly T[],
+	q: string | null | undefined,
+): T[] {
+	const needle = (q ?? "").trim().toLowerCase();
+	if (!needle) return [...agents];
+	return agents.filter((agent) =>
+		[agent.id, agent.path, agent.model, agent.adapter].some((field) => (field ?? "").toLowerCase().includes(needle)),
+	);
+}
+
+/** Every run of the agent the server knows of, any outcome; the scored count when the total is not served. */
+export function agentRunsTotal(agent: Pick<AgentSummary, "sealed_runs" | "runs_total">): number {
+	return agent.runs_total ?? agent.sealed_runs ?? 0;
+}
+
+function lastRunMs(agent: Pick<AgentSummary, "last_run_at">): number {
+	const ms = agent.last_run_at ? Date.parse(agent.last_run_at) : Number.NaN;
+	return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
+}
+
+function nameOf(agent: Pick<AgentSummary, "id" | "path">): string {
+	return agent.id || agent.path;
+}
+
+/**
+ * The agents in the chosen order: by name (A to Z), by last run (newest first, never-run last) or
+ * by runs (most first). Ties fall back to the name, so the order is stable.
+ */
+export function sortAgents<T extends Pick<AgentSummary, "id" | "path" | "sealed_runs" | "runs_total" | "last_run_at">>(
+	agents: readonly T[],
+	sort: AgentSort,
+): T[] {
+	const byName = (a: T, b: T) => nameOf(a).localeCompare(nameOf(b));
+	const out = [...agents];
+	if (sort === "last") return out.sort((a, b) => lastRunMs(b) - lastRunMs(a) || byName(a, b));
+	if (sort === "runs")
+		return out.sort((a, b) => agentRunsTotal(b) - agentRunsTotal(a) || (b.sealed_runs ?? 0) - (a.sealed_runs ?? 0) || byName(a, b));
+	return out.sort(byName);
 }
 
 const KNOWN_ADAPTERS = ["command", "remote_http", "a2a", "pull", "scripted"] as const;

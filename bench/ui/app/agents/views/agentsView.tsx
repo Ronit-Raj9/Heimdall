@@ -5,7 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { Plug, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AgentDiffTab from "./agentDiffTab";
-import { AgentConfigsTab } from "./agentConfigsTab";
+import { AgentConfigsTab, configsCount } from "./agentConfigsTab";
 import { FrameworksTab } from "./frameworksTab";
 
 /**
@@ -21,7 +21,7 @@ export default function AgentsView() {
 	const query = useGetAgentsQuery();
 	const data = query.data;
 	const tabs: RouteTab[] = [
-		{ id: "configs", label: t("agents.tabs.configs"), badge: data ? data.agents.length : undefined },
+		{ id: "configs", label: t("agents.tabs.configs"), badge: data ? configsCount(data.agents) : undefined },
 		{ id: "diff", label: t("agents.tabs.diff") },
 		{ id: "frameworks", label: t("agents.tabs.frameworks") },
 	];

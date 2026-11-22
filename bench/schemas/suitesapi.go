@@ -262,6 +262,13 @@ type AgentSummary struct {
 	EnvNames         []string      `json:"env_names"`   // sorted; values are never served
 	FilePaths        []string      `json:"file_paths"`  // container paths the adapter writes, sorted
 	SealedRuns       *int          `json:"sealed_runs"` // sealed runs of this config id; null without a run index
+	// RunsTotal counts every run of this config id in the run index, any
+	// outcome (aborted and cancelled runs too); omitted without runs or an
+	// index. SealedRuns counts only the scored ones.
+	RunsTotal *int `json:"runs_total,omitempty"`
+	// LastRunAt is when the latest run of this config id started; omitted
+	// when it never ran or there is no index.
+	LastRunAt *time.Time `json:"last_run_at,omitempty"`
 	// Capabilities is what the agent can do: its own capabilities: list, else
 	// the defaults of its adapter (EffectiveCapabilities). Empty when the
 	// config failed to decode.
