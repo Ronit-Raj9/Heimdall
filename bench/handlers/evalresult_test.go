@@ -9,6 +9,7 @@ import (
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/evalstore"
+	"github.com/maximhq/bifrost/bench/leaderboard"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/reportcard"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -164,5 +165,77 @@ func TestEvaluationListBackfillsAtMostThree(t *testing.T) {
 		if id := fmt.Sprintf("ev_20261123_000000_aa%d", i); !has[id] {
 			t.Fatalf("second read: %s has no result (%v)", id, has)
 		}
+	}
+}
+
+// Four old evaluations whose report card cannot be built must not hold the
+// three backfill slots: after one failed attempt they wait
+// evalResultRetryAfter, so the next list fills the good one, and after the
+// hold they are tried again.
+func TestEvaluationListBackfillSkipsFailedOnes(t *testing.T) {
+	h, st, _ := evalResultFixture(t, "ev_20261123_000000_bad0", schemas.EvaluationDone, time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC))
+	for i := 1; i < 4; i++ {
+		ev := evalResultEvaluation(fmt.Sprintf("ev_20261123_000000_bad%d", i), schemas.EvaluationDone, time.Date(2026, 11, 1+i, 0, 0, 0, 0, time.UTC))
+		if err := st.Save(ev); err != nil {
+			t.Fatal(err)
+		}
+	}
+	good := evalResultEvaluation("ev_20261123_000000_good", schemas.EvaluationDone, time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC))
+	if err := st.Save(good); err != nil {
+		t.Fatal(err)
+	}
+	tries := map[string]int{}
+	build := evalResultBuild
+	evalResultBuild = func(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, opt reportcard.Options) (*reportcard.Report, error) {
+		tries[ev.ID]++
+		if ev.ID != good.ID {
+			return nil, fmt.Errorf("broken child")
+		}
+		return build(ctx, src, ev, opt)
+	}
+	t.Cleanup(func() { evalResultBuild = build })
+	now := time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC)
+	h.now = func() time.Time { return now }
+	list := func() {
+		r := router.New()
+		r.GET(APIPrefix+"/evaluations", h.list)
+		var ctx fasthttp.RequestCtx
+		ctx.Request.Header.SetMethod(fasthttp.MethodGet)
+		ctx.Request.SetRequestURI(APIPrefix + "/evaluations")
+		r.Handler(&ctx)
+		if ctx.Response.StatusCode() != fasthttp.StatusOK {
+			t.Fatalf("status %d %s", ctx.Response.StatusCode(), ctx.Response.Body())
+		}
+	}
+	hasResult := func(id string) bool {
+		ev, err := st.Load(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ev.Result != nil
+	}
+	// First read: the three oldest (broken) take the slots and fail.
+	list()
+	if tries["ev_20261123_000000_bad0"] != 1 || tries["ev_20261123_000000_bad2"] != 1 || tries["ev_20261123_000000_bad3"] != 0 || hasResult(good.ID) {
+		t.Fatalf("first read tries %v", tries)
+	}
+	// Second read: those three are on hold, so bad3 and the good one get slots.
+	list()
+	if !hasResult(good.ID) {
+		t.Fatalf("good evaluation not filled on the second read (tries %v)", tries)
+	}
+	if tries["ev_20261123_000000_bad0"] != 1 || tries["ev_20261123_000000_bad3"] != 1 {
+		t.Fatalf("second read tries %v", tries)
+	}
+	// Within the hold nothing broken is tried again.
+	list()
+	if tries["ev_20261123_000000_bad0"] != 1 || tries["ev_20261123_000000_bad3"] != 1 {
+		t.Fatalf("third read tries %v", tries)
+	}
+	// After the hold the oldest are tried again.
+	now = now.Add(evalResultRetryAfter)
+	list()
+	if tries["ev_20261123_000000_bad0"] != 2 {
+		t.Fatalf("after the hold tries %v", tries)
 	}
 }
