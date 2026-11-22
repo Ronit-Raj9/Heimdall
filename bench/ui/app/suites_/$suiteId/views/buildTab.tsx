@@ -13,10 +13,11 @@ import type { AnswerGrader, AnswerMatch, RowFormat, RowImportResult } from "@/li
 import { SUITE_OPS_KINDS } from "@/lib/types/suiteops";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { FileSpreadsheet, GitCommitHorizontal, Inbox, MessageSquareText } from "lucide-react";
+import { Braces, FileSpreadsheet, GitCommitHorizontal, Headset, Inbox, MessageSquareText } from "lucide-react";
 import { useCallback, useMemo, useState, type ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { FromCommitSection } from "./opsTab";
+import { MockFromOpenAPI, ScenarioRowsImport } from "./scenarioBuild";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
@@ -183,18 +184,28 @@ export function GraderSection({ suite, writable, t }: { suite: SuiteSummary; wri
 
 // Add tasks
 
-type Source = "rows" | "tickets" | "commit" | "traces";
+type Source = "rows" | "tickets" | "commit" | "traces" | "scenarios" | "mock";
 
-const SOURCE_ICONS = { rows: FileSpreadsheet, tickets: MessageSquareText, commit: GitCommitHorizontal, traces: Inbox } as const;
+const SOURCE_ICONS = {
+	rows: FileSpreadsheet,
+	tickets: MessageSquareText,
+	commit: GitCommitHorizontal,
+	traces: Inbox,
+	scenarios: Headset,
+	mock: Braces,
+} as const;
 
-export function sourcesFor(suite: Pick<SuiteSummary, "output">): Source[] {
+/** Where tasks can come from: answer benchmarks take rows, code ones commits, tool ones (Y14) conversations and an API mock. */
+export function sourcesFor(suite: Pick<SuiteSummary, "output" | "track">): Source[] {
 	if (isAnswerSuite(suite)) return ["rows", "tickets", "traces"];
 	if (!suite.output || suite.output === "diff") return ["commit", "traces"];
-	return ["traces"];
+	if (suite.track === "support") return ["scenarios", "mock", "traces"];
+	return ["mock", "traces"];
 }
 
 function AddTasksSection({ suite, writable, hosted, t }: { suite: SuiteSummary; writable: boolean; hosted: boolean; t: T }) {
 	const { t: tops } = useTranslation("suiteops");
+	const { t: ts } = useTranslation("scenarioBuild");
 	const sources = sourcesFor(suite);
 	const [source, setSource] = useState<Source>(sources[0]);
 	return (
@@ -214,7 +225,7 @@ function AddTasksSection({ suite, writable, hosted, t }: { suite: SuiteSummary; 
 								dataTestId={`suite-build-source-${s}`}
 							>
 								<Icon className="size-4" aria-hidden="true" />
-								{t(`add.source.${s}`)}
+								{s === "scenarios" || s === "mock" ? ts(`source.${s}`) : t(`add.source.${s}`)}
 							</Button>
 						);
 					})}
@@ -224,6 +235,8 @@ function AddTasksSection({ suite, writable, hosted, t }: { suite: SuiteSummary; 
 						{t("add.codeSuite")}
 					</p>
 				)}
+				{source === "scenarios" && (writable ? <ScenarioRowsImport suite={suite} writable={writable} /> : <p className="text-muted-foreground text-sm">{t("viewerNote")}</p>)}
+				{source === "mock" && (writable ? <MockFromOpenAPI suite={suite} writable={writable} /> : <p className="text-muted-foreground text-sm">{t("viewerNote")}</p>)}
 				{source === "rows" && <RowsImport suite={suite} writable={writable} format="rows" t={t} />}
 				{source === "tickets" && <RowsImport suite={suite} writable={writable} format="tickets" t={t} />}
 				{source === "commit" && (writable ? <FromCommitSection suite={suite} hosted={hosted} t={tops} /> : <p className="text-muted-foreground text-sm">{t("viewerNote")}</p>)}
