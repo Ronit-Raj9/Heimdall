@@ -409,6 +409,24 @@ func (g *Gateway) boundOrg(rc *schemas.RunContext) (string, bool) {
 	return org, ok
 }
 
+// RunOrg is the organization rc's experiment is bound to, by
+// BindExperimentOrg or SetExperimentLogPolicy; ok is false for a run of no
+// organization (a local install). The engine tags plugin usage rows with it
+// and keeps only rows of that organization at seal (H01).
+func (g *Gateway) RunOrg(rc *schemas.RunContext) (string, bool) {
+	if org, ok := g.boundOrg(rc); ok && org != "" {
+		return org, true
+	}
+	if rc == nil || rc.Run == nil || rc.Run.ExpID == "" {
+		return "", false
+	}
+	st := g.orgLogState()
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	org, ok := st.expOrg[rc.Run.ExpID]
+	return org, ok && org != ""
+}
+
 // orgProvider returns the organization slots a run of rc uses for provider
 // name, when its experiment is bound to an organization with a key for it.
 func (g *Gateway) orgProvider(rc *schemas.RunContext, name string) (ProviderSetup, bool) {

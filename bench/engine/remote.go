@@ -987,6 +987,11 @@ func (c *Coordinator) storeRunOnce(ctx context.Context, l *remoteLease, req *sch
 	if err := c.writeProvenance(ctx, l, req, up); err != nil {
 		return nil, dir, false, err
 	}
+	// H01: rows the worker's Bifrost plugin posted to this server, of this
+	// coordinator's organization only.
+	if err := sealGatewayUsage(ctx, c.store, run, c.opts.OrgID); err != nil {
+		return nil, dir, false, err
+	}
 	for _, t := range up.transitions {
 		if err := c.store.AppendTransition(ctx, run, t); err != nil {
 			return nil, dir, false, fmt.Errorf("append transition: %w", err)

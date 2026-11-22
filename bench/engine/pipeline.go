@@ -562,7 +562,9 @@ func (p *Pipeline) writeArtifacts(ctx context.Context, st *runState) error {
 			return err
 		}
 	}
-	return nil
+	// H01: the heimdall plugin's usage rows of the run's organization
+	// (gatewayusage.go), so the Through Bifrost panel survives a restart.
+	return sealGatewayUsage(ctx, p.reg.Store, st.rc.Run, p.runOrg(st.rc))
 }
 
 func (p *Pipeline) canonicalRun(st *runState, gates []schemas.GateResult) (*schemas.CanonicalRun, error) {

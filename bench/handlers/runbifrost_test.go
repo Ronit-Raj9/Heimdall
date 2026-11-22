@@ -81,7 +81,7 @@ func TestPluginUsageOf(t *testing.T) {
 func TestLoadRunBifrostPrefersLiveUsage(t *testing.T) {
 	idx := routingIndex()
 	idx.files["r_b"][FileGatewayUsage] = []byte(`[{"request_id":"file-only","cache_hit":true}]`)
-	if out, err := LoadRunBifrost(idx, "r_b"); err != nil || out.CacheHits != 1 {
+	if out, err := LoadRunBifrost(idx, "r_b", ""); err != nil || out.CacheHits != 1 {
 		t.Fatalf("file fallback: %+v %v", out, err)
 	}
 	prev := gatewayUsage
@@ -89,11 +89,33 @@ func TestLoadRunBifrostPrefersLiveUsage(t *testing.T) {
 		"r_b": {{RequestID: "live", RunID: "r_b", Provider: "openai", Model: "gpt-5", FaultApplied: "rate_limit"}},
 	}, dropped: map[string]int{}}
 	defer func() { gatewayUsage = prev }()
-	out, err := LoadRunBifrost(idx, "r_b")
+	out, err := LoadRunBifrost(idx, "r_b", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if out.CacheHits != 0 || out.Faults < 1 {
 		t.Fatalf("live rows should win over the run file: %+v", out)
+	}
+}
+
+func TestLoadRunBifrostOrgChecksLiveUsage(t *testing.T) {
+	idx := routingIndex()
+	idx.files["r_b"][FileGatewayUsage] = []byte(`[{"request_id":"sealed","cache_hit":true}]`)
+	prev := gatewayUsage
+	gatewayUsage = &gatewayUsageStore{runs: map[string][]GatewayUsageRecord{
+		"r_b": {{RequestID: "other-org", RunID: "r_b", OrgID: "o2", FaultApplied: "rate_limit"}},
+	}, dropped: map[string]int{}}
+	defer func() { gatewayUsage = prev }()
+	out, err := LoadRunBifrost(idx, "r_b", "o1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range out.CallList {
+		if c.ID == "other-org" {
+			t.Fatalf("another org's live row shown: %+v", out.CallList)
+		}
+	}
+	if out.CacheHits != 1 {
+		t.Fatalf("sealed file should be used: %+v", out)
 	}
 }

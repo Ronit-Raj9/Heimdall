@@ -119,3 +119,38 @@ func TestGatewayUsageStoreBounds(t *testing.T) {
 		t.Fatalf("runs %d", len(s.runs))
 	}
 }
+
+func TestSealedGatewayUsageKeepsRunOrgOnly(t *testing.T) {
+	prev := gatewayUsage
+	gatewayUsage = &gatewayUsageStore{runs: map[string][]GatewayUsageRecord{}, dropped: map[string]int{}}
+	defer func() { gatewayUsage = prev }()
+	gatewayUsage.add([]GatewayUsageRecord{
+		{RunID: "r1", OrgID: "o1", RequestID: "mine", Provider: "openai", Model: "m", CostUSD: 0.5, FaultApplied: "rate_limit"},
+		{RunID: "r1", OrgID: "o2", RequestID: "theirs"},
+		{RunID: "r1", RequestID: "untagged"},
+	})
+	data, ok := SealedGatewayUsage("r1", "o1")
+	if !ok {
+		t.Fatal("no rows sealed")
+	}
+	var got []PluginUsage
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].RequestID != "mine" || got[0].Fault != "rate_limit" || got[0].CostUSD == nil || *got[0].CostUSD != 0.5 {
+		t.Fatalf("sealed rows: %+v", got)
+	}
+	if data, ok := SealedGatewayUsage("r1", ""); !ok || !strings.Contains(string(data), "untagged") || strings.Contains(string(data), "mine") {
+		t.Fatalf("local seal keeps only untagged rows: %s", data)
+	}
+	if _, ok := SealedGatewayUsage("r1", "o3"); ok {
+		t.Fatal("org with no rows sealed something")
+	}
+	if _, ok := SealedGatewayUsage("nope", "o1"); ok {
+		t.Fatal("unknown run sealed something")
+	}
+	// The in-memory read for the panel is org-checked too.
+	if run, ok := GatewayUsageForRun("r1", "o2"); !ok || len(run.Records) != 1 || run.Records[0].RequestID != "theirs" {
+		t.Fatalf("org read: %+v", run)
+	}
+}
