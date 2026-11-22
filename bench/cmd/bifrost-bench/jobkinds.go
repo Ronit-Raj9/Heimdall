@@ -48,7 +48,41 @@ type jobKindSpec struct {
 	// test_url[http://user:pass@example.com], and the task's reference answer
 	// could then never pass admission.
 	ExactResult bool
+	// OkExit, on a cliJob kind, may turn the command's exit into a finished
+	// job: it gets the exit code and the command's whole output and returns
+	// the job's result. Only scan.skill sets it (fix wave 2, N23): a scan
+	// that blocks a skill exits 1, and that is a verdict, not a failure.
+	OkExit cliOkExit
 }
+
+// cliOkExit maps a CLI job's exit code and output to a finished job's
+// result; ok false keeps the usual handling (exit 0 succeeds, any other
+// code fails the job).
+type cliOkExit func(code int, stdout []byte) (result map[string]any, ok bool)
+
+// cliOkExits maps the leading command words of a CLI job's argv (for
+// example "skill scan") to the OkExit of its kind, so every path that runs
+// the command through runCLI (the hosted in-process variant too) maps the
+// exit the same way.
+var cliOkExits = map[string]cliOkExit{}
+
+// withOkExit sets a cliJob kind's OkExit for the command words it runs.
+func withOkExit(spec jobKindSpec, command string, fn cliOkExit) jobKindSpec {
+	spec.OkExit = fn
+	cliOkExits[command] = fn
+	return spec
+}
+
+// okExitFor returns the OkExit registered for argv's command words.
+func okExitFor(argv []string) cliOkExit {
+	if len(argv) < 2 {
+		return nil
+	}
+	return cliOkExits[argv[0]+" "+argv[1]]
+}
+
+// cliOutputCap bounds the output runCLI keeps for an OkExit.
+const cliOutputCap = 8 << 20
 
 var (
 	jobKindsMu sync.Mutex
@@ -303,6 +337,8 @@ func runCLI(ctx context.Context, env jobEnv, argv []string, log jobs.Logger) (an
 	pgid := cmd.Process.Pid
 
 	var last string
+	okExit := okExitFor(argv)
+	var output bytes.Buffer // the whole output, kept only for an OkExit
 	lines := make(chan struct{})
 	go func() {
 		defer close(lines)
@@ -312,6 +348,10 @@ func runCLI(ctx context.Context, env jobEnv, argv []string, log jobs.Logger) (an
 			line := sc.Text()
 			if t := bytes.TrimSpace([]byte(line)); len(t) > 1 && t[0] == '{' && json.Valid(t) {
 				last = string(t)
+			}
+			if okExit != nil && output.Len() < cliOutputCap {
+				output.WriteString(line)
+				output.WriteByte('\n')
 			}
 			log.Printf("%s", line)
 		}
@@ -344,6 +384,18 @@ func runCLI(ctx context.Context, env jobEnv, argv []string, log jobs.Logger) (an
 		return nil, ctx.Err()
 	}
 	var ee *exec.ExitError
+	if okExit != nil && (err == nil || errors.As(err, &ee)) {
+		code := 0
+		if ee != nil {
+			code = ee.ExitCode()
+		}
+		if res, ok := okExit(code, output.Bytes()); ok {
+			if s, _ := res["summary"].(string); s != "" {
+				log.Printf("%s", s)
+			}
+			return res, nil
+		}
+	}
 	if errors.As(err, &ee) {
 		return nil, fmt.Errorf("%s exited with code %d; the log above says why", kindLabel(argv), ee.ExitCode())
 	}

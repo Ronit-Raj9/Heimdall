@@ -19,6 +19,7 @@ vi.mock("@/lib/store/apis/agentopsApi", () => ({
 	useGetAgentSkillsQuery: () => ({ data: state.skills, isLoading: false }),
 	useGetAgentMCPQuery: () => ({ data: state.mcp, isLoading: false }),
 	useUploadAgentSkillMutation: () => [vi.fn(), { isLoading: false }],
+	useScanAgentSkillMutation: () => [vi.fn(), { isLoading: false }],
 	useDeleteAgentSkillMutation: () => [vi.fn(), { isLoading: false }],
 	usePutAgentMCPMutation: () => [vi.fn(), { isLoading: false }],
 }));
@@ -80,7 +81,8 @@ describe("agent ops tabs", () => {
 		expect(html).toContain('href="/agents/new"');
 	});
 
-	it("tools tab lists skills with a scan job and the MCP servers", () => {
+	it("tools tab lists skills with a scan button and the MCP servers", () => {
+		state.hosted = false; // the Scan button is for members: a local session may use it
 		state.skills = {
 			agent: "codex",
 			config_path: "agents/codex.yaml",
@@ -99,7 +101,7 @@ describe("agent ops tabs", () => {
 		};
 		const html = renderToStaticMarkup(<ToolsTab agentId="codex" />);
 		expect(html).toContain("review");
-		expect(html).toContain('data-testid="job-run-scan.skill"');
+		expect(html).toContain('data-testid="agent-skill-scan-review"');
 		expect(html).toContain('data-testid="agent-mcp-server-list"');
 		expect(html).toContain("files (version pinned)");
 		expect(html).toContain('data-testid="job-run-scan.mcp"');
