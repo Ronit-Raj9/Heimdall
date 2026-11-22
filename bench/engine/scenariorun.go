@@ -316,6 +316,9 @@ func scenarioEnv(rc *schemas.RunContext) (map[string]string, error) {
 			return nil, err
 		}
 	}
+	for k, v := range schemas.ClockEnv(rc.Suite, rc.Task) { // Z17 run clock (schemas/clock.go)
+		env[k] = v
+	}
 	if utils.OutputKind(rc.Suite, rc.Task) == schemas.OutputAnswer {
 		env[utils.EnvAnswerPath] = utils.AnswerContainerPath(rc.Suite, rc.Task)
 	}

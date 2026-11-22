@@ -1,0 +1,1 @@
+post("https://slack.com/api/chat.postMessage", {"channel": "CGENERAL", "text": "The office will be closed this Friday, February 27th for a facilities maintenance day. All employees should work from home. The building will reopen Monday as normal."})

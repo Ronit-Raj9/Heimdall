@@ -182,6 +182,7 @@
         "events": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["after_session", "service", "action"], "properties": {"after_session": {"type": "integer", "minimum": 1}, "service": {"type": "string", "minLength": 1}, "action": {"type": "string", "minLength": 1}}}}
       }
     },
+    "clock": {"type": "object", "additionalProperties": false, "required": ["start"], "description": "Z17 run clock: the time services and the agent see (BENCH_NOW, BENCH_CLOCK_RATE, FAKETIME), hashed into the lock (schemas/clock.go).", "properties": {"start": {"type": "string", "minLength": 10, "description": "RFC 3339, or YYYY-MM-DD (midnight UTC)."}, "rate": {"type": "number", "minimum": 0, "maximum": 1000, "description": "Clock seconds per real second; 0 means 1."}}},
     "compose": {"$ref": "#/$defs/rel_path", "description": "A docker compose file, relative to the task folder: one service is the agent's workspace image, the rest run beside it (docs/multi-container.md)."},
     "resources": {
       "type": "object",

@@ -1,0 +1,1 @@
+post("https://api.bufferapp.com/1/updates/create.json", {"profile_ids": ["ch_twitter"], "text": "Join us for the NexGen 2.0 Launch on February 28th at 2 PM EST! Register: nexgen.example.com/launch", "scheduled_at": "2026-08-05T09:00:00Z"})

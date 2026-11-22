@@ -98,6 +98,10 @@ type Task struct {
 	// for every task without one.
 	World *WorldSpec `json:"world,omitempty" yaml:"world,omitempty"`
 
+	// Clock is the task's controllable run clock (Z17, clock.go): the time
+	// the services and the agent see. Nil uses the suite's, else real time.
+	Clock *ClockSpec `json:"clock,omitempty" yaml:"clock,omitempty"`
+
 	Dir string `json:"-" yaml:"-"` // absolute task folder
 }
 

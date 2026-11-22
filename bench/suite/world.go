@@ -25,3 +25,16 @@ func lintWorldTask(s *schemas.Suite, t *schemas.Task) []Problem {
 	}
 	return nil
 }
+
+// lintClockTask checks the run clock (Z17, schemas/clock.go) of a task and
+// of its suite.
+func lintClockTask(s *schemas.Suite, t *schemas.Task) []Problem {
+	var out []Problem
+	if err := t.Clock.Validate(); err != nil {
+		out = append(out, Problem{Path: rel(s.Root, filepath.Join(t.Dir, TaskFile)), Severity: SeverityError, Message: err.Error()})
+	}
+	if err := s.Clock.Validate(); err != nil {
+		out = append(out, Problem{Path: rel(s.Root, filepath.Join(s.Root, "suite.yaml")), Severity: SeverityError, Message: "suite " + err.Error()})
+	}
+	return out
+}
