@@ -134,30 +134,76 @@ func FaultControllerFromEnv(proxy schemas.FaultController) (schemas.FaultControl
 	return SelectFaultController(os.Getenv(FaultModeEnv), proxy)
 }
 
-// SetPlan binds plan to slot. A plan the plugin runs is kept here and the
-// proxy slot is set to a clean pass-through plan (so its ledger still
-// records the run); any other plan goes to the proxy unchanged.
+// SetPlan binds plan to slot on the fault proxy, unchanged, and keeps it
+// here. The plan moves to the plugin only when the engine calls
+// MoveToPlugin for an agent that sends the headers, so a slot nobody moved
+// is always faulted by the proxy, never silently left clean.
 func (c *PluginFaults) SetPlan(ctx context.Context, slot string, plan schemas.FaultPlan) error {
 	if err := faultproxy.ValidatePlan(plan); err != nil {
 		return err
 	}
-	via := PluginCanRun(plan)
-	if c.proxy != nil {
-		forward := plan
-		if via {
-			forward = schemas.FaultPlan{Mode: faultproxy.ModeNone, RunID: plan.RunID}
-		}
-		if err := c.proxy.SetPlan(ctx, slot, forward); err != nil {
-			return err
-		}
-	} else if !via {
-		return fmt.Errorf("fault mode %q needs the fault proxy, and none is configured", plan.Mode)
+	if c.proxy == nil {
+		return fmt.Errorf("fault plan %q for slot %s: no fault proxy configured and the agent has not been moved to the heimdall plugin", plan.Mode, slot)
+	}
+	if err := c.proxy.SetPlan(ctx, slot, plan); err != nil {
+		return err
 	}
 	c.mu.Lock()
 	prev := c.slots[slot]
-	c.slots[slot] = slotPlan{plan: plan, viaPlug: via, tags: prev.tags}
+	c.slots[slot] = slotPlan{plan: plan, tags: prev.tags}
 	c.mu.Unlock()
 	return nil
+}
+
+// Fault paths recorded on the run (schemas.RunGatewayInfo.FaultPath).
+const (
+	FaultPathPlugin = "plugin"
+	FaultPathProxy  = "proxy"
+)
+
+// MoveToPlugin hands slot's current plan to the heimdall plugin: the proxy
+// slot is set to a clean plan with the run id (so its ledger still records
+// the run) and the plan rides in the headers Headers returns from now on.
+// Call it once the plan is armed and just before the agent's request
+// headers are fixed. A plan the plugin cannot run (or a slot with no plan)
+// stays on the proxy; the path that applies is returned.
+func (c *PluginFaults) MoveToPlugin(ctx context.Context, slot string, tags RunTags) (map[string]string, string, error) {
+	c.mu.Lock()
+	sp, ok := c.slots[slot]
+	c.mu.Unlock()
+	if !ok || !PluginCanRun(sp.plan) {
+		return nil, FaultPathProxy, nil
+	}
+	if c.proxy != nil {
+		if err := c.proxy.SetPlan(ctx, slot, schemas.FaultPlan{Mode: faultproxy.ModeNone, RunID: sp.plan.RunID}); err != nil {
+			return nil, FaultPathProxy, err
+		}
+	}
+	c.mu.Lock()
+	sp.viaPlug, sp.tags = true, tags
+	c.slots[slot] = sp
+	c.mu.Unlock()
+	out := map[string]string{}
+	for k := range c.Headers(slot) {
+		out[strings.ToLower(k)] = c.Headers(slot).Get(k)
+	}
+	return out, FaultPathPlugin, nil
+}
+
+// SetPlanPlugin binds plan to slot and moves it to the plugin at once
+// (bench-side callers that send the headers themselves, via Transport).
+func (c *PluginFaults) SetPlanPlugin(ctx context.Context, slot string, plan schemas.FaultPlan, tags RunTags) (string, error) {
+	if !PluginCanRun(plan) {
+		return FaultPathProxy, c.SetPlan(ctx, slot, plan)
+	}
+	if err := faultproxy.ValidatePlan(plan); err != nil {
+		return "", err
+	}
+	c.mu.Lock()
+	c.slots[slot] = slotPlan{plan: plan, tags: tags}
+	c.mu.Unlock()
+	_, path, err := c.MoveToPlugin(ctx, slot, tags)
+	return path, err
 }
 
 // ClearPlan drops slot's plan here and on the proxy.
@@ -324,4 +370,34 @@ func DecodePluginPlan(s string) (PluginPlan, error) {
 		return p, fmt.Errorf("fault plan header: %w", err)
 	}
 	return p, nil
+}
+
+// Debug runs (replay, breakpoints) stay on the fault proxy: these pass the
+// optional controller interfaces through, so plugin mode keeps them working.
+
+// PutCassette implements schemas.ReplayController when the proxy does.
+func (c *PluginFaults) PutCassette(ctx context.Context, slot string, cs *schemas.Cassette) error {
+	rc, ok := c.proxy.(schemas.ReplayController)
+	if !ok {
+		return fmt.Errorf("the fault proxy controller cannot replay")
+	}
+	return rc.PutCassette(ctx, slot, cs)
+}
+
+// Holds implements schemas.HoldController when the proxy does.
+func (c *PluginFaults) Holds(ctx context.Context, runID string) (*schemas.HoldStatus, error) {
+	hc, ok := c.proxy.(schemas.HoldController)
+	if !ok {
+		return nil, fmt.Errorf("the fault proxy controller has no breakpoints")
+	}
+	return hc.Holds(ctx, runID)
+}
+
+// ReleaseHold implements schemas.HoldController when the proxy does.
+func (c *PluginFaults) ReleaseHold(ctx context.Context, slot string, r schemas.HoldRelease) error {
+	hc, ok := c.proxy.(schemas.HoldController)
+	if !ok {
+		return fmt.Errorf("the fault proxy controller has no breakpoints")
+	}
+	return hc.ReleaseHold(ctx, slot, r)
 }

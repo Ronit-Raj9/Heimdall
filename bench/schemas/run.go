@@ -176,6 +176,12 @@ type RunGatewayInfo struct {
 	KeySlot      string `json:"key_slot,omitempty"`
 	OrgKeyID     string `json:"org_key_id,omitempty"` // the organization model key that served the run (budget accounting)
 	SessionID    string `json:"session_id,omitempty"`
+	// FaultPath is where the run's model fault plan ran under
+	// HEIMDALL_FAULT_MODE=plugin (lane C04): "plugin" (the heimdall Bifrost
+	// plugin, plan sent as request headers) or "proxy" (the fault proxy, for
+	// an agent that cannot send extra headers or a plan the plugin cannot
+	// run). Empty in the default proxy mode.
+	FaultPath string `json:"fault_path,omitempty"`
 }
 
 // PartFailure records that one part failed for this run. A part failure never
@@ -234,6 +240,10 @@ type RunContext struct {
 	// scripted_upstream). Parts that would mint their own gateway keys (model
 	// judges) refuse instead of calling.
 	NoPaidTraffic bool
+	// FaultHeaders are the x-heimdall-* headers the agent sends on its model
+	// requests when its fault plan runs in the heimdall Bifrost plugin (lane
+	// C04). Set by the engine before the agent's plan is built.
+	FaultHeaders map[string]string `json:"-"`
 
 	// Scenario state (scenario.go), set by the engine as the run proceeds.
 	Services     []ServiceHandle // started services, including the tool proxy's view of them

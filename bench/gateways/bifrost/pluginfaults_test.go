@@ -83,10 +83,19 @@ func TestPluginFaultsInjectsThroughGateway(t *testing.T) {
 	if err := pf.SetPlan(ctx, "slot-a", plan); err != nil {
 		t.Fatal(err)
 	}
+	if got := proxy.plans["slot-a"]; got.Mode != faultproxy.ModePersistent {
+		t.Fatalf("before the move the proxy must hold the real plan, got %+v", got)
+	}
+	if pf.Headers("slot-a").Get(HeaderFaultPlan) != "" {
+		t.Fatal("no plan header before the move")
+	}
+	hdrs, path, err := pf.MoveToPlugin(ctx, "slot-a", RunTags{EvaluationID: "ev-9", Org: "org-1", Arm: "b"})
+	if err != nil || path != FaultPathPlugin || hdrs[HeaderFaultPlan] == "" || hdrs[HeaderRunID] != "run-1" {
+		t.Fatalf("move: %v %q %v", err, path, hdrs)
+	}
 	if got := proxy.plans["slot-a"]; got.Mode != faultproxy.ModeNone || got.RunID != "run-1" {
 		t.Fatalf("proxy should get a clean pass-through plan, got %+v", got)
 	}
-	pf.Tag("slot-a", RunTags{EvaluationID: "ev-9", Org: "org-1", Arm: "b"})
 
 	srv, seen := fakePluginGateway(t)
 	hc := &http.Client{Transport: pf.Transport("slot-a", nil)}
@@ -138,6 +147,15 @@ func TestPluginFaultsFallsBackToProxy(t *testing.T) {
 	if proxy.plans["s"].Mode != faultproxy.ModeScripted {
 		t.Fatalf("scripted plan must go to the proxy, got %+v", proxy.plans["s"])
 	}
+	if _, path, _ := pf.MoveToPlugin(ctx, "s", RunTags{}); path != FaultPathProxy {
+		t.Fatalf("scripted plan cannot move, path %q", path)
+	}
+	if proxy.plans["s"].Mode != faultproxy.ModeScripted {
+		t.Fatal("failed move must leave the proxy plan")
+	}
+	if _, path, _ := pf.MoveToPlugin(ctx, "nobody", RunTags{}); path != FaultPathProxy {
+		t.Fatal("unknown slot stays on proxy")
+	}
 	h := pf.Headers("s")
 	if h.Get(HeaderFaultPlan) != "" || h.Get(HeaderRunID) != "r2" {
 		t.Fatalf("fallback plan: no plan header, run tag kept; got %v", h)
@@ -150,8 +168,8 @@ func TestPluginFaultsFallsBackToProxy(t *testing.T) {
 	if err := solo.SetPlan(ctx, "s", plan); err == nil {
 		t.Fatal("want error without a proxy")
 	}
-	if err := solo.SetPlan(ctx, "s", schemas.FaultPlan{Mode: faultproxy.ModeFlaky, FailProb: 0.3, Status: 503}); err != nil {
-		t.Fatal(err)
+	if path, err := solo.SetPlanPlugin(ctx, "s", schemas.FaultPlan{Mode: faultproxy.ModeFlaky, FailProb: 0.3, Status: 503}, RunTags{}); err != nil || path != FaultPathPlugin {
+		t.Fatal(path, err)
 	}
 	if solo.Headers("s").Get(HeaderFaultPlan) == "" {
 		t.Fatal("flaky plan should ride as a header")
