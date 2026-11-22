@@ -44,6 +44,8 @@ export interface AdminQuota {
 export interface AdminContainer {
 	org_id: string;
 	org_slug: string;
+	/** The organization's display name (N11). */
+	org_name?: string;
 	runner_id: string;
 	runner: string;
 	pool: string;
@@ -81,19 +83,28 @@ export interface AdminImage {
 	decided_at?: string;
 }
 
-/** L25 GET /admin/usage, read defensively: only the fields the page shows. */
+/** One organization's row of GET /admin/usage (handlers.AdminOrgUsage). */
 export interface AdminUsageRow {
-	org_id?: string;
-	org_slug?: string;
-	key?: string;
-	cost_usd?: number;
-	runs?: number;
+	org_id: string;
+	slug?: string;
+	name?: string;
+	cost_usd: number;
+	tokens?: number;
+	runs: number;
+	/** Runs whose model price is not known: their cost is not in cost_usd. */
+	unknown_cost_runs?: number;
+	keys_month_spent_usd?: number;
+	/** Why this organization's runs could not be read. */
+	error?: string;
 }
+/** GET /admin/usage (handlers.AdminUsageReport). */
 export interface AdminUsage {
-	total_cost_usd?: number;
-	total_runs?: number;
-	rows?: AdminUsageRow[];
-	orgs?: AdminUsageRow[];
+	from: string;
+	to: string;
+	total_cost_usd: number;
+	total_tokens?: number;
+	runs: number;
+	orgs: AdminUsageRow[];
 }
 
 declare module "@/lib/i18n/resources" {

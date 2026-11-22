@@ -16,6 +16,8 @@ export interface WorkerTargetChoice {
 	/** False when one evaluation cannot pick it on its own; note says why. */
 	per_evaluation: boolean;
 	note?: string;
+	/** How many runs this worker runs at once (its runners' slots); absent when not known or not bounded. */
+	slots?: number;
 }
 
 export interface WorkerTargetView {

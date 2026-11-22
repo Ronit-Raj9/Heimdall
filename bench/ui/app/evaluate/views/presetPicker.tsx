@@ -1,4 +1,6 @@
 import type { EstimatePreset, EvaluationEstimate, EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
+import i18n from "i18next";
+import "./gw14I18n";
 import { cn } from "@/lib/utils";
 
 /**
@@ -89,13 +91,17 @@ export function PresetPicker({
 	);
 }
 
-/** "Up to 8 runs at once (4 per benchmark; your organization has 4 worker slots)." */
+/**
+ * "Up to 8 runs at once (4 per benchmark; your organization has 4 worker slots)." or, when the estimate
+ * knows the worker's slots (N90), "Up to 2 runs at once: the worker this evaluation uses runs 2 at a time."
+ */
 export function slotsText(e: Pick<EvaluationEstimate, "slots">): string | undefined {
 	const s = e.slots;
 	if (!s || !s.parallel) return undefined;
-	const per = `${s.concurrency} per benchmark`;
-	const org = s.org_slots > 0 ? `; your organization has ${s.org_slots} worker ${s.org_slots === 1 ? "slot" : "slots"}` : "";
-	return `Up to ${s.parallel} ${s.parallel === 1 ? "run" : "runs"} at once (${per}${org}).`;
+	const t = i18n.getFixedT(null, "gw14");
+	if (s.worker_slots && s.worker_slots > 0) return t("slots.worker", { count: s.parallel, n: s.worker_slots });
+	const org = s.org_slots > 0 ? t("slots.orgSlots", { count: s.org_slots }) : "";
+	return t("slots.upTo", { count: s.parallel, detail: `${t("slots.perBenchmark", { count: s.concurrency })}${org}` });
 }
 
 export const CONCURRENCY_CHOICES = [1, 2, 4, 8] as const;
