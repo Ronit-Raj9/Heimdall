@@ -160,7 +160,9 @@ func (f *fakeDocker) Run(ctx context.Context, stdin []byte, args ...string) ([]b
 			return nil, &issuebench.ExitError{Code: 1, Output: []byte("container not running")}
 		}
 		script := args[len(args)-1]
-		if strings.HasPrefix(script, "echo ") && strings.Contains(script, "base64 -d") {
+		if strings.HasPrefix(script, "cat > /tmp/.hb_cmd") {
+			script = string(stdin)
+		} else if strings.HasPrefix(script, "echo ") && strings.Contains(script, "base64 -d") {
 			enc := strings.Fields(script)[1]
 			b, _ := base64.StdEncoding.DecodeString(enc)
 			script = string(b)

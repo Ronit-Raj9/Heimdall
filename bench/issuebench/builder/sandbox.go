@@ -2,7 +2,6 @@ package builder
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"log"
@@ -357,8 +356,10 @@ func (s *dockerSandbox) Exec(ctx context.Context, cmd string, timeout time.Durat
 func (s *dockerSandbox) exec(ctx context.Context, cmd string, timeout time.Duration) (int, string, error) {
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	enc := base64.StdEncoding.EncodeToString([]byte(cmd))
-	out, err := s.cfg.Run(cctx, nil, "exec", "-w", Workdir, s.id, "bash", "-lc", "echo "+enc+" | base64 -d > /tmp/.hb_cmd && bash /tmp/.hb_cmd")
+	// The command goes in on stdin, never in argv: a state overlay carries
+	// whole files (base64), and one argv string over 128 KiB fails with
+	// "argument list too long" before docker runs (a 97 KB CHANGELOG did).
+	out, err := s.cfg.Run(cctx, []byte(cmd), "exec", "-i", "-w", Workdir, s.id, "bash", "-lc", "cat > /tmp/.hb_cmd && bash /tmp/.hb_cmd </dev/null")
 	if ctx.Err() != nil {
 		return -1, string(out), ctx.Err()
 	}
