@@ -112,6 +112,9 @@ type AgentConfig struct {
 	// VoicePlatform is read only by the voice_platform adapter and the text
 	// conversation driver (voiceplatform.go, bench/voiceconnect).
 	VoicePlatform *VoicePlatformAgent `json:"voice_platform,omitempty" yaml:"voice_platform"`
+	// VoiceRTC is read only by the voice_rtc adapter (real-time calls over
+	// LiveKit or SIP, voicertc.go, bench/voicertc).
+	VoiceRTC *VoiceRTCAgent `json:"voice_rtc,omitempty" yaml:"voice_rtc"`
 
 	// Multi-agent fields (agents.go, docs/multi-agent.md). Team runs one
 	// container per member, each on its own gateway key, under the run-wide

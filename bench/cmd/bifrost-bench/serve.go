@@ -28,10 +28,13 @@ import (
 )
 
 func init() {
-	register("serve", "serve the web UI and the API over the run folder", runServe)
+	register("serve", "serve the web UI and the API over the run folder; serve <target> serves your agent to Heimdall (pull mode)", runServe)
 }
 
 func runServe(args []string) int {
+	if agentServeTarget(args) { // Z02: `serve <target>` serves an agent in pull mode (agentserve.go)
+		return runAgentServe(args)
+	}
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	config := fs.String("config", defaultConfig, "bench config")
 	offline := fs.Bool("offline", false, "serve recorded runs only: no gateway, no launching")

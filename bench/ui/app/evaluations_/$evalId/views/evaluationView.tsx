@@ -22,6 +22,7 @@ import { useDeleteEvaluationMutation } from "@/lib/store/apis/dataOpsApi";
 import { useState } from "react";
 import { childSpendText, childStoppedText, RaiseBudgetPanel } from "./raiseBudget";
 import { useTranslation } from "react-i18next";
+import { FirstLookNote } from "@/app/connect/views/firstLookLauncher"; // lane Z01: first look is too small for a verdict
 
 /** /evaluations/$evalId: live progress per benchmark, then the report card. */
 export default function EvaluationView({ evalId }: { evalId: string }) {
@@ -80,6 +81,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 					</span>
 					<span className="text-muted-foreground ml-auto text-xs tabular-nums">{formatCreated(evaluation.created_at, i18n.language)}</span>
 				</div>
+				{spec.preset === "first_look" && <FirstLookNote />}
 				<div className="grid gap-3 sm:grid-cols-2">
 					{(spec.arms ?? []).map((arm) => (
 						<ArmCard key={arm.label} arm={arm} single={(spec.arms ?? []).length < 2} />

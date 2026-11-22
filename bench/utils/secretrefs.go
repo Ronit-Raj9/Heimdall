@@ -96,6 +96,9 @@ func RunSecretNames(rc *schemas.RunContext) []string {
 		if v := rc.Agent.VoicePlatform; v != nil && SecretNameOK(v.APIKeySecret) { // voice_platform.api_key_secret (adapters/voiceplatform.go)
 			seen[v.APIKeySecret] = true
 		}
+		for _, n := range voiceRTCSecretNames(rc.Agent.VoiceRTC) { // voice_rtc LiveKit and trunk secrets (adapters/voicertc.go)
+			seen[n] = true
+		}
 	}
 	return sortedSet(seen)
 }

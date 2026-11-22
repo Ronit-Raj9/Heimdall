@@ -42,7 +42,12 @@
 		"versionHelp": "Each saved change to an agent is a new version. The report card is for the exact version you pick.",
 		"capabilities": "What this agent can do",
 		"capabilitiesDefault": "Default for this kind of agent",
-		"capabilitiesEdit": "Change in the agent settings"
+		"capabilitiesEdit": "Change in the agent settings",
+		"mcpServer": {
+			"title": "Test my MCP server",
+			"hint": "Testing an MCP server instead of an agent? Standard agents run tasks against your server and the report covers reliability, error handling, speed, input schemas and tool descriptions.",
+			"cta": "Test my MCP server"
+		}
 	},
 	"capability": {
 		"shell": "Shell",

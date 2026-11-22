@@ -205,6 +205,10 @@ type Report struct {
 	// metadata filter the report was narrowed to (Options.Where).
 	Slices []Slice           `json:"slices,omitempty"`
 	Where  map[string]string `json:"where,omitempty"`
+	// VoiceCalls is each arm's task success and call quality per condition
+	// of the voice benchmarks (caller personas, voice probes); nil without
+	// a voice run under a condition other than clean (voicecalls.go).
+	VoiceCalls []VoiceCallRow `json:"voice_calls,omitempty"`
 }
 
 // LearningRow is one arm's learning summary on one benchmark.
@@ -475,6 +479,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	if len(opt.Where) > 0 {
 		rep.Where = opt.Where
 	}
+	rep.VoiceCalls = voiceCallRows(children, labels)
 	return rep, nil
 }
 

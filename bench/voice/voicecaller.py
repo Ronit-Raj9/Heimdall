@@ -25,6 +25,14 @@ The caller:
     whisper) and answers it;
   - applies voice probes (BENCH_VOICE_PROBE): noise, speed, interrupt
     (barge in while the agent talks), silent (the caller goes quiet);
+  - plays a caller persona (BENCH_VOICE_PERSONA: an id from personas.json
+    or an inline JSON object, docs/voice-realtime.md): voice and accent (a
+    Piper voice and speaker), speaking rate, reaction time, a chance of
+    talking over each long agent answer, background noise, a narrowband
+    phone line, hesitations and patience;
+  - finds the agent's speech with an energy detector, or with the Silero
+    voice activity model when BENCH_VOICE_VAD=silero and the image has
+    onnxruntime and the model (SILERO_VAD_MODEL);
   - writes state/timeline.jsonl (every audio frame boundary, speech start and
     end for both sides, transcripts, interruptions, control messages),
     state/transcript.json (the conversation in the text simulator's shape,
@@ -38,11 +46,14 @@ The caller:
 """
 
 import argparse
+import array
 import asyncio
 import hashlib
 import importlib.util
 import json
+import math
 import os
+import random
 import subprocess
 import sys
 import threading
@@ -74,11 +85,165 @@ DEFAULTS = {
     "max_audio_s": 240,
     "keep_audio": True,
     "hangup_grace_ms": 600,
+    "vad": "energy",          # energy | silero
 }
 
 KIT_FILES = ("voiceclient.py", "tonecode.py", "wsproto.py")
 REPROMPT = "Hello? Are you still there?"
 INTERRUPT_LINE = "Sorry, sorry, could you say that again?"
+PERSONA_INTERRUPT_LINE = "Sorry, can I stop you there for a second?"
+PERSONA_FILE = os.path.join(HERE, "personas.json")
+PERSONA_KEYS = {"id", "label", "accent", "voice", "speaker", "speed", "reply_delay_ms", "interruption_rate",
+                "interrupt_after_ms", "noise_snr_db", "channel", "patience", "filler_rate"}
+
+
+def load_persona(value):
+    """The persona a BENCH_VOICE_PERSONA value names: a personas.json id or an inline JSON object.
+
+    The same checks as bench/voice/personas.go (CheckPersona), so a persona
+    the plan accepted plays, and one it would refuse stops the caller."""
+    value = (value or "").strip()
+    if not value:
+        return None
+    if value.startswith("{"):
+        try:
+            p = json.loads(value)
+        except ValueError as e:
+            raise SystemExit(f"voicecaller: BENCH_VOICE_PERSONA is not valid JSON: {e}")
+        if not isinstance(p, dict):
+            raise SystemExit("voicecaller: BENCH_VOICE_PERSONA inline value must be a JSON object")
+    else:
+        try:
+            with open(PERSONA_FILE, encoding="utf-8") as f:
+                lib = json.load(f).get("personas") or []
+        except OSError:
+            raise SystemExit(f"voicecaller: BENCH_VOICE_PERSONA {value!r} needs {PERSONA_FILE} in the caller image "
+                             "(bench/voice/personas.json; deploy/voice/caller.Dockerfile copies it)")
+        p = next((x for x in lib if x.get("id") == value), None)
+        if p is None:
+            raise SystemExit(f"voicecaller: BENCH_VOICE_PERSONA {value!r} is not in personas.json")
+    unknown = set(p) - PERSONA_KEYS
+    if unknown:
+        raise SystemExit(f"voicecaller: persona has unknown fields {sorted(unknown)}")
+    out = {"id": str(p.get("id") or "inline"), "label": str(p.get("label") or ""), "accent": str(p.get("accent") or ""),
+           "voice": str(p.get("voice") or ""), "speaker": str(p.get("speaker") or ""),
+           "speed": float(p.get("speed") or 1.0), "reply_delay_ms": p.get("reply_delay_ms"),
+           "interruption_rate": float(p.get("interruption_rate") or 0), "interrupt_after_ms": int(p.get("interrupt_after_ms") or 1200),
+           "noise_snr_db": float(p.get("noise_snr_db") or 0), "channel": str(p.get("channel") or "wideband"),
+           "patience": p.get("patience"), "filler_rate": float(p.get("filler_rate") or 0)}
+    checks = [(0.5 <= out["speed"] <= 2, "speed want 0.5 to 2"), (0 <= out["interruption_rate"] <= 1, "interruption_rate want 0 to 1"),
+              (0 <= out["noise_snr_db"] <= 60, "noise_snr_db want 0 to 60"), (out["channel"] in ("wideband", "phone"), "channel want wideband or phone"),
+              (0 <= out["filler_rate"] <= 1, "filler_rate want 0 to 1"), (0 <= out["interrupt_after_ms"] <= 30000, "interrupt_after_ms want 0 to 30000")]
+    for ok, why in checks:
+        if not ok:
+            raise SystemExit(f"voicecaller: persona {out['id']}: {why}")
+    return out
+
+
+# ---- phone line ----
+
+def _biquad(x, b0, b1, b2, a1, a2):
+    out = array.array("h", bytes(2 * len(x)))
+    x1 = x2 = y1 = y2 = 0.0
+    for i, v in enumerate(x):
+        y = b0 * v + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+        x2, x1, y2, y1 = x1, v, y1, y
+        out[i] = max(-32768, min(32767, int(y)))
+    return out
+
+
+def _coeffs(kind, f0, rate, q=0.7071):
+    w = 2 * math.pi * f0 / rate
+    alpha = math.sin(w) / (2 * q)
+    c = math.cos(w)
+    if kind == "low":
+        b0, b1, b2 = (1 - c) / 2, 1 - c, (1 - c) / 2
+    else:
+        b0, b1, b2 = (1 + c) / 2, -(1 + c), (1 + c) / 2
+    a0, a1, a2 = 1 + alpha, -2 * c, 1 - alpha
+    return b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0
+
+
+def _ulaw_round_trip(v):
+    """One sample through G.711 mu-law and back."""
+    sign = v < 0
+    m = min(32635, abs(v)) + 132
+    exp = max(0, min(7, m.bit_length() - 8))
+    mant = (m >> (exp + 3)) & 0x0F
+    y = ((mant << 3) + 132) << exp
+    y -= 132
+    return -y if sign else y
+
+
+def phone_line(pcm):
+    """pcm as a narrowband phone line passes it: 300 to 3400 Hz, 8 kHz, G.711 mu-law."""
+    x = tonecode.to_samples(pcm)
+    if not x:
+        return b""
+    x = _biquad(x, *_coeffs("high", 300.0, tonecode.SAMPLE_RATE))
+    x = _biquad(x, *_coeffs("low", 3400.0, tonecode.SAMPLE_RATE))
+    narrow = tonecode.to_samples(tonecode.resample(tonecode.to_bytes(x), tonecode.SAMPLE_RATE, 8000))
+    coded = array.array("h", (_ulaw_round_trip(v) for v in narrow))
+    return tonecode.resample(tonecode.to_bytes(coded), 8000, tonecode.SAMPLE_RATE)
+
+
+# ---- voice activity ----
+
+class EnergyVAD:
+    name = "energy"
+
+    def voiced(self, pcm):
+        return tonecode.rms(pcm) > VOICED_RMS
+
+
+class SileroVAD:
+    """The Silero voice activity model (v5 ONNX, MIT) on 512-sample windows at 16 kHz.
+
+    A frame is voiced when the model's speech probability on the latest
+    window is over the threshold and the frame is not silent (energy gate)."""
+
+    name = "silero"
+    WINDOW = 512
+    CONTEXT = 64
+
+    def __init__(self, path, threshold=0.5):
+        import numpy  # type: ignore
+        import onnxruntime  # type: ignore
+        opts = onnxruntime.SessionOptions()
+        opts.inter_op_num_threads = 1
+        opts.intra_op_num_threads = 1
+        self.np = numpy
+        self.sess = onnxruntime.InferenceSession(path, sess_options=opts, providers=["CPUExecutionProvider"])
+        self.threshold = threshold
+        self.state = numpy.zeros((2, 1, 128), dtype=numpy.float32)
+        self.context = numpy.zeros((1, self.CONTEXT), dtype=numpy.float32)
+        self.pending = numpy.zeros(0, dtype=numpy.float32)
+        self.prob = 0.0
+
+    def voiced(self, pcm):
+        np = self.np
+        x = np.frombuffer(bytes(pcm), dtype=np.int16).astype(np.float32) / 32768.0
+        self.pending = np.concatenate([self.pending, x])
+        while len(self.pending) >= self.WINDOW:
+            win = self.pending[: self.WINDOW].reshape(1, -1)
+            self.pending = self.pending[self.WINDOW:]
+            inp = np.concatenate([self.context, win], axis=1)
+            out, self.state = self.sess.run(None, {"input": inp, "state": self.state, "sr": np.array(16000, dtype=np.int64)})
+            self.context = inp[:, -self.CONTEXT:]
+            self.prob = float(out[0][0])
+        return self.prob >= self.threshold and tonecode.rms(pcm) > VOICED_RMS / 4
+
+
+def make_vad(kind):
+    if kind == "silero":
+        path = os.environ.get("SILERO_VAD_MODEL", "/opt/voice/silero_vad.onnx")
+        if not os.path.exists(path):
+            raise SystemExit(f"voicecaller: BENCH_VOICE_VAD silero needs the model at {path}")
+        try:
+            return SileroVAD(path)
+        except ImportError:
+            raise SystemExit("voicecaller: BENCH_VOICE_VAD silero needs numpy and onnxruntime in the image")
+    return EnergyVAD()
 
 
 def env_settings(env):
@@ -97,6 +262,17 @@ def env_settings(env):
         raise SystemExit(f"voicecaller: BENCH_VOICE_TTS {s['tts']!r}: want tone or piper")
     if s["stt"] not in ("auto", "tone", "whisper"):
         raise SystemExit(f"voicecaller: BENCH_VOICE_STT {s['stt']!r}: want auto, tone or whisper")
+    if s["vad"] not in ("energy", "silero"):
+        raise SystemExit(f"voicecaller: BENCH_VOICE_VAD {s['vad']!r}: want energy or silero")
+    persona = load_persona(env.get("BENCH_VOICE_PERSONA", ""))
+    if persona:
+        # The persona's timing applies unless the task sets the variable itself.
+        if persona["reply_delay_ms"] is not None and not env.get("BENCH_VOICE_REPLY_DELAY_MS"):
+            s["reply_delay_ms"] = int(persona["reply_delay_ms"])
+        if persona["patience"] is not None and not env.get("BENCH_VOICE_MAX_REPROMPTS"):
+            s["max_reprompts"] = int(persona["patience"])
+        persona["seed"] = int(env.get("BENCH_VOICE_PERSONA_SEED") or 20261122)
+    s["persona"] = persona
     probe = {"id": env.get("BENCH_VOICE_PROBE", "")}
     if probe["id"]:
         if probe["id"] not in ("noise", "speed", "interrupt", "silent"):
@@ -139,6 +315,16 @@ class Engines:
         self.cache_lock = threading.Lock()
         self.piper_bin = os.environ.get("PIPER_BIN", "/opt/voice/piper/piper")
         self.piper_voice = os.environ.get("PIPER_VOICE", "/opt/voice/voices/en_US-ljspeech-medium.onnx")
+        self.persona = settings.get("persona")
+        self.piper_speaker = None
+        self.persona_voice = "default"  # what the persona's voice became: default, piper or not_applied (tone code)
+        if self.persona and self.persona["voice"]:
+            voices = os.environ.get("PIPER_VOICES_DIR") or os.path.dirname(self.piper_voice)
+            if self.tts == "piper":
+                self.piper_voice = os.path.join(voices, self.persona["voice"] + ".onnx")
+                self.persona_voice = "piper"
+            else:
+                self.persona_voice = "not_applied"
         # Recorded lines: the user file's "audio" map, line text -> WAV path.
         # A line in it is played from the recording (a benchmark's own audio,
         # e.g. VoiceBench) instead of being synthesized; its text stays the
@@ -149,6 +335,12 @@ class Engines:
         try:
             if self.tts == "piper" and not (os.path.exists(self.piper_bin) and os.path.exists(self.piper_voice)):
                 raise SystemExit(f"voicecaller: tts piper needs {self.piper_bin} and {self.piper_voice}")
+            if self.tts == "piper" and self.persona and self.persona["speaker"]:
+                with open(self.piper_voice + ".json", encoding="utf-8") as f:
+                    ids = json.load(f).get("speaker_id_map") or {}
+                if self.persona["speaker"] not in ids:
+                    raise SystemExit(f"voicecaller: persona {self.persona['id']}: voice {os.path.basename(self.piper_voice)} has no speaker {self.persona['speaker']!r}")
+                self.piper_speaker = int(ids[self.persona["speaker"]])
             if self.stt in ("whisper", "auto"):
                 try:
                     from faster_whisper import WhisperModel  # type: ignore
@@ -174,8 +366,12 @@ class Engines:
                 pcm = tonecode.to_16k(f.read())
             res = (tonecode.silence(60) + pcm + tonecode.silence(60), "recording")
         elif self.tts == "piper":
-            out = subprocess.run([self.piper_bin, "--model", self.piper_voice, "--output-raw", "--noise_scale", "0",
-                                  "--noise_w", "0", "--quiet"], input=text.encode(), capture_output=True, timeout=120, check=False)
+            argv = [self.piper_bin, "--model", self.piper_voice, "--output-raw", "--noise_scale", "0", "--noise_w", "0", "--quiet"]
+            if self.piper_speaker is not None:
+                argv += ["--speaker", str(self.piper_speaker)]
+            if self.persona and self.persona["speed"] != 1.0:
+                argv += ["--length_scale", "%.3f" % (1.0 / self.persona["speed"])]
+            out = subprocess.run(argv, input=text.encode(), capture_output=True, timeout=120, check=False)
             if out.returncode != 0:
                 raise RuntimeError("piper failed: " + out.stderr.decode("utf-8", "replace")[-300:])
             with open(self.piper_voice + ".json", encoding="utf-8") as f:
@@ -258,11 +454,23 @@ class Track:
 
 
 class Call:
+    # Defaults for a call without a persona (and for tests that build a Call field by field).
+    persona = None
+    persona_rng = None
+    persona_rolled = frozenset()
+    persona_barges = 0
+    vad = EnergyVAD()
+
     def __init__(self, conn, cfg, settings, engines, state_dir, session):
         self.conn = conn
         self.cfg = cfg
         self.s = settings
         self.probe = settings["probe"]
+        self.persona = settings.get("persona")
+        self.persona_rng = random.Random(self.persona["seed"]) if self.persona else None
+        self.persona_rolled = set()   # agent utterances the persona already decided to talk over or not
+        self.persona_barges = 0
+        self.vad = make_vad(settings.get("vad", "energy"))
         self.engines = engines
         self.state_dir = state_dir
         self.t0 = time.monotonic()
@@ -272,7 +480,8 @@ class Call:
         self.agent_track = Track(settings["max_audio_s"])
         self.session = session  # the text simulator, its transcript and its persistence (simuser.Session)
         self.transcript = self.session.transcript
-        self.transcript["voice"] = {"protocol": PROTOCOL, "called": True, "tts": settings["tts"], "stt": settings["stt"], "probe": self.probe.get("id") or None}
+        self.transcript["voice"] = {"protocol": PROTOCOL, "called": True, "tts": settings["tts"], "stt": settings["stt"], "probe": self.probe.get("id") or None,
+                                    "persona": self.persona["id"] if self.persona else None}
         self.ended = asyncio.Event()
         self.ended_by = None
         # Agent playout.
@@ -348,7 +557,7 @@ class Call:
         now = self.now()
         while self.queue and self.queue[0][0] <= now:
             start, pcm, recv, seq = self.queue.pop(0)
-            voiced = tonecode.rms(pcm) > VOICED_RMS
+            voiced = self.vad.voiced(pcm)
             dur = len(pcm) * 1000.0 / 32000.0
             self.log("frame", dir="agent", seq=seq, play_ms=round(start, 1), recv_ms=round(recv, 1), ms=round(dur, 1), voiced=voiced)
             if self.s["keep_audio"]:
@@ -457,8 +666,20 @@ class Call:
         """Speak one caller line at real-time pace; ends the call after a STOP line."""
         stop = STOP in text
         line = text.replace(STOP, "").strip() or "Okay."
+        persona = self.persona
+        if persona and persona["filler_rate"] > 0 and kind in ("reply", "opening") and self.persona_rng.random() < persona["filler_rate"]:
+            line = "Um, " + line[:1].lower() + line[1:]
         pcm, engine = await asyncio.get_running_loop().run_in_executor(None, self.engines.speak, line)
         applied = {}
+        if persona:
+            # The persona's voice, accent and pace are Piper settings (Engines.speak); tone code
+            # and recorded lines keep their own pace, so a tone-code control stays readable.
+            if persona["noise_snr_db"] > 0:
+                pcm = tonecode.add_noise(pcm, persona["noise_snr_db"], persona["seed"] + 1000 + self.caller_turn)
+                applied["persona_noise_snr_db"] = persona["noise_snr_db"]
+            if persona["channel"] == "phone":
+                pcm = await asyncio.get_running_loop().run_in_executor(None, phone_line, pcm)
+                applied["channel"] = "phone"
         pid = self.probe.get("id")
         if pid == "noise":
             pcm = tonecode.add_noise(pcm, self.probe["snr_db"], self.probe["seed"] + self.caller_turn)
@@ -502,13 +723,15 @@ class Call:
             await asyncio.sleep(self.s["hangup_grace_ms"] / 1000.0)
             self.finish("caller_done" if self.transcript.get("ended_by") != "max_turns" else "max_turns")
 
-    async def interrupt(self):
-        line = self.probe["line"]
+    async def interrupt(self, line=None, by="probe"):
+        line = line or self.probe["line"]
         self.barges += 1
+        if by == "persona":
+            self.persona_barges += 1
         now = self.now()
         self.utt_interrupted = True
         self.barge = {"n": self.barges, "utt": self.agent_utt, "caller_start_ms": round(now, 1), "agent_stop_ms": None}
-        self.log("barge_in_start", utt=self.agent_utt, line=line)
+        self.log("barge_in_start", utt=self.agent_utt, line=line, by=by)
         with self.session.lock:
             self.transcript["events"].append({"seq": len(self.transcript["events"]) + 1, "role": "user", "content": line,
                                               "rule": "interrupt"})
@@ -563,9 +786,16 @@ class Call:
                         self.floor_since = now
                         self.speak_task = asyncio.get_running_loop().create_task(self.say(REPROMPT, "reprompt"))
             pid = self.probe.get("id")
-            if (pid == "interrupt" and self.agent_speaking and not self.caller_speaking and not starting and self.barges == 0
+            if (pid == "interrupt" and self.agent_speaking and not self.caller_speaking and not starting and self.barges - self.persona_barges == 0
                     and self.agent_utt >= self.probe["turn"] and now - self.utt_start >= self.probe["after_ms"]):
                 self.speak_task = asyncio.get_running_loop().create_task(self.interrupt())
+            elif (self.persona and self.persona["interruption_rate"] > 0 and self.agent_speaking and not self.caller_speaking and not starting
+                  and self.agent_utt >= 2 and self.agent_utt not in self.persona_rolled
+                  and now - self.utt_start >= self.persona["interrupt_after_ms"]):
+                # One roll per long agent answer (the greeting is never talked over).
+                self.persona_rolled.add(self.agent_utt)
+                if self.persona_rng.random() < self.persona["interruption_rate"]:
+                    self.speak_task = asyncio.get_running_loop().create_task(self.interrupt(PERSONA_INTERRUPT_LINE, "persona"))
             if self.agent_hung_up and not self.queue and not self.agent_speaking:
                 self.finish("agent_hangup")
             await asyncio.sleep(FRAME_MS / 2000.0)
@@ -635,10 +865,13 @@ class Call:
             self.finish("agent_hangup" if self.agent_hung_up else "agent_disconnected")
 
     async def run(self):
-        settings = {k: v for k, v in self.s.items() if k != "probe"}
+        settings = {k: v for k, v in self.s.items() if k not in ("probe", "persona")}
+        persona = None
+        if self.persona:
+            persona = dict(self.persona, voice_applied=self.engines.persona_voice)
         self.log("call_start", protocol=PROTOCOL, wall_ms=int(self.wall0 * 1000), task=self.cfg.get("id", ""),
                  mode=self.transcript.get("mode"), settings=settings, probe=self.probe if self.probe.get("id") else None,
-                 stt_note=self.engines.whisper_error or None)
+                 stt_note=self.engines.whisper_error or None, persona=persona, vad=self.vad.name)
         await self.conn.send_text(json.dumps({"type": "start", "protocol": PROTOCOL, "call_id": self.cfg.get("id", "call"),
                                               "format": {"encoding": "pcm_s16le", "sample_rate": tonecode.SAMPLE_RATE,
                                                          "channels": 1, "frame_ms": FRAME_MS}}))
@@ -691,6 +924,7 @@ class Service:
         self.env = env
         self.cfg = load_config(args.config)
         self.settings = env_settings(env)
+        make_vad(self.settings["vad"])  # refuse a missing VAD model at start, not when the agent calls
         self.engines = Engines(self.settings)
         audio = self.cfg.get("audio") if isinstance(self.cfg.get("audio"), dict) else {}
         self.engines.audio_lines = {str(k).strip(): str(v) for k, v in audio.items()}
@@ -762,6 +996,8 @@ class Service:
         self.engines.load()
         script = self.cfg.get("script") if isinstance(self.cfg.get("script"), dict) else {}
         lines = [script.get("opening"), script.get("done"), script.get("default"), REPROMPT, self.settings["probe"].get("line")]
+        if self.settings.get("persona") and self.settings["persona"]["interruption_rate"] > 0:
+            lines.append(PERSONA_INTERRUPT_LINE)
         lines += [r.get("say") for r in script.get("replies") or [] if isinstance(r, dict)]
         for line in lines:
             if isinstance(line, str) and line.strip():

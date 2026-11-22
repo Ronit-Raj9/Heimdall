@@ -553,6 +553,8 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_SECURITY_CONTACT` | Where security reports go (`mailto:` or `https:`), published at `/.well-known/security.txt`; empty points at the `/security` page. |
 | `HEIMDALL_BILLING` | `on` enforces plan limits and sells Team through Stripe; empty meters and shows limits only (section 10, Billing). |
 | `HEIMDALL_STRIPE_SECRET_KEY`, `HEIMDALL_STRIPE_WEBHOOK_SECRET`, `HEIMDALL_STRIPE_TEAM_PRICE` | Stripe secret key, webhook signing secret and Team price id; a live key needs `HEIMDALL_STRIPE_ALLOW_LIVE=1`. |
+| `HEIMDALL_VOICE_RTC_URL`, `HEIMDALL_VOICE_RTC_SECRET`, `HEIMDALL_VOICE_SIP_ALLOW` | Real-time voice calls (compose profile `voice`): where runs reach the voice gateway, the secret per-run gateway tokens are signed with, and the E.164 prefixes Heimdall may dial. Empty URL: real-time calls are refused. Setup: docs/voice-realtime.md. |
+| `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_PUBLIC_URL` | Heimdall's own LiveKit server (profile `voice`) and the URL teams' bots join. |
 | `HEIMDALL_BACKUP_PASSPHRASE_FILE` | Passphrase file kept away from the backups; `backup.sh` then writes an encrypted copy of `.env` beside each dump. |
 
 ### Billing

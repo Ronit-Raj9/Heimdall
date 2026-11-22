@@ -124,8 +124,8 @@ export interface EvaluationSpec {
 	disclose_budget?: boolean;
 	/** Runs of one benchmark that go at once, 1 to 16; unset is 4. The org's worker slots still bound it. */
 	concurrency?: number;
-	/** The size preset the wizard started from; the numbers above are what runs. */
-	preset?: EvaluationPresetId;
+	/** The size preset the wizard started from; the numbers above are what runs. first_look (lane Z01): 1 benchmark, 5 tasks, 1 trial, 5 at a time; too small for a verdict. */
+	preset?: EvaluationPresetId | "first_look";
 }
 
 export type EvaluationPresetId = "quick" | "standard" | "thorough";
@@ -606,6 +606,22 @@ export interface ReportVoiceRow {
 	voice_cost_per_minute?: ReportRate;
 }
 
+/** One agent on the voice benchmarks under one simulated caller (a persona or an audio test); absent fields were not measured. */
+export interface ReportVoiceCallRow {
+	arm: string;
+	/** "clean" for the plain caller, else the persona or audio test id. */
+	condition: string;
+	runs: number;
+	successes: number;
+	success_rate: number;
+	time_to_first_audio_ms?: ReportRate;
+	turn_latency_p95_ms?: ReportRate;
+	barge_in_handled?: ReportRate;
+	audio_jitter_p95_ms?: ReportRate;
+	/** Word error rate of the agent's speech recognition against what the caller said (0 to 1, lower is better). */
+	stt_wer?: ReportRate;
+}
+
 /** GET /evaluations/{id}/report and GET /agents/{id}/report-card */
 export interface Report {
 	evaluation: string;
@@ -640,6 +656,8 @@ export interface Report {
 	slices?: ReportSlice[];
 	/** The metadata filter this report was narrowed to (?where=key:value). */
 	where?: Record<string, string>;
+	/** Only when voice calls ran with personas or audio tests besides the plain caller. */
+	voice_calls?: ReportVoiceCallRow[];
 }
 
 /** One metadata key and its values, each with per arm scores over the tasks with that value. */

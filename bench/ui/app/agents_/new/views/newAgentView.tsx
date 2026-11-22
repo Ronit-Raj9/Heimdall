@@ -9,7 +9,7 @@ import { useCreateAgentFromTemplateMutation, useGetAgentTemplatesQuery, usePutAg
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import type { AgentTemplate, TemplateCategory } from "@/lib/types/agentBuilder";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Bot, Check, ChevronRight, Code2, Hammer, Layers, Plug, SquareTerminal, type LucideIcon } from "lucide-react";
 import { AgentAvatar, useAdapterLabel } from "../../../agents/views/agentDisplay";
 import { parseAsString, useQueryState } from "nuqs";
@@ -28,6 +28,7 @@ import {
 	withPullTemplate,
 	type PullOptions,
 } from "./connectForm";
+import { PlatformImportCard } from "./platformImport";
 import { useTranslation } from "react-i18next";
 
 // "Bring your own" first: the gallery is for the user's own agent; the others are examples.
@@ -52,6 +53,7 @@ export function defaultAgentName(t: AgentTemplate): string {
 export default function NewAgentView() {
 	const { t } = useTranslation("agentBuilder");
 	const { t: tu } = useTranslation("agentsUx");
+	const { t: tc } = useTranslation("connectTraces");
 	const adapterLabel = useAdapterLabel();
 	const canWrite = canUse(useSession(), "member");
 	const navigate = useNavigate();
@@ -124,7 +126,15 @@ export default function NewAgentView() {
 
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="agents-new-screen">
-			<PageHeader title={t("new.title")} subtitle={t("new.subtitle")} />
+			<PageHeader
+				title={t("new.title")}
+				subtitle={t("new.subtitle")}
+				actions={
+					<Link to="/agents/from-traces" title={tc("entryHint")} className="text-primary text-xs font-medium underline underline-offset-2" data-testid="agents-new-from-traces">
+						{tc("entry")}
+					</Link>
+				}
+			/>
 			{query.isLoading ? (
 				<BlockSkeleton rows={6} testId="agents-new-loading" />
 			) : query.isError ? (
@@ -135,6 +145,7 @@ export default function NewAgentView() {
 				<div className="grid min-w-0 grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
 					<div className="flex min-w-0 flex-col gap-8">
 						<h2 className="sr-only">{tu("gallery.step1")}</h2>
+						<PlatformImportCard returnTo={returnTo} />
 						{CATEGORIES.map((cat) => {
 							const items = templates.filter((x) => x.category === cat);
 							if (!items.length) return null;

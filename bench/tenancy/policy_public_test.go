@@ -46,11 +46,14 @@ func TestPublicRoutesAreExactlyTheSite(t *testing.T) {
 		"GET /api/bench/auth/reset/{token}",
 		"POST /api/bench/auth/reset/{token}",
 		"POST /api/bench/orgs/{org}/inbox/ingest",
-		"POST /api/bench/billing/webhook",    // Y16: Stripe signature
-		"POST /api/bench/pull/run/turns",     // Y11: signed run token
-		"GET /api/bench/pull/run/turns/{id}", // Y11: signed run token
-		"POST /api/bench/pull/run/repos",     // Y11: signed run token
-		"GET /api/bench/pull/repos/{id}",     // Y11: signed, expiring link
+		"POST /api/bench/billing/webhook",           // Y16: Stripe signature
+		"POST /api/bench/pull/run/turns",            // Y11: signed run token
+		"GET /api/bench/pull/run/turns/{id}",        // Y11: signed run token
+		"POST /api/bench/pull/run/repos",            // Y11: signed run token
+		"GET /api/bench/pull/repos/{id}",            // Y11: signed, expiring link
+		"POST /api/bench/auth/device/code",          // Z02: starts a device login, rate limited per IP
+		"POST /api/bench/auth/device/token",         // Z02: the device code is the credential
+		"POST /api/bench/orgs/{org}/otlp/v1/traces", // Z15: org ingest token
 		"GET /api/bench/admin/pool/assignments",
 		"POST /api/bench/admin/pool/assignments/{org}/token",
 		"GET /api/bench/status",          // Z14: the public status page

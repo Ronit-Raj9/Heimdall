@@ -51,6 +51,7 @@ vi.mock("@/lib/store/apis/agentBuilderApi", () => ({
 }));
 vi.mock("@/lib/store/apis/secretsApi", () => ({ useCreateSecretMutation: () => [vi.fn(), { isLoading: false }] }));
 vi.mock("@/lib/store/apis/benchApi", () => ({ getBenchErrorMessage: () => "err", useGetAgentsQuery: () => ({ data: { agents: [{ id: "taken" }] } }) }));
+vi.mock("./platformImport", () => ({ PlatformImportCard: () => <div data-testid="platform-import" /> }));
 vi.mock("@/lib/session/sessionContext", () => ({ canUse: () => true, useSession: () => ({}) }));
 vi.mock("@/components/models/modelPicker", () => ({ ModelPicker: () => <div data-testid="model-picker" /> }));
 vi.mock("@tanstack/react-router", () => ({
@@ -73,6 +74,7 @@ describe("NewAgentView", () => {
 		expect(html).toContain("Coding command-line tools");
 		expect(html).toContain("Bring your own");
 		expect(html).toContain("Pick a template to continue.");
+		expect(html).toContain('data-testid="platform-import"');
 	});
 
 	it("shows the form for the selected template with its params", () => {

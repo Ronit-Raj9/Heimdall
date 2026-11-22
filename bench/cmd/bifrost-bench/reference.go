@@ -71,8 +71,35 @@ server database and storage root). Run it where the server runs, with
 func init() {
 	register("reference", "public reference board of known agents on the library benchmarks: reference import|publish|unpublish|list", runReference)
 	hostedAreas = append(hostedAreas, func(env *hostedEnv) (server.RouteRegistrar, error) {
-		return handlers.NewReferenceHandler(env.base.cfg.Server.Mode, reference.Open(env.layout.StorageRoot)), nil
+		src := reference.Open(env.layout.StorageRoot)
+		handlers.FirstLookReference = firstLookReference(src) // lane Z01: the Connect box's first look shows the board's row
+		return handlers.NewReferenceHandler(env.base.cfg.Server.Mode, src), nil
 	})
+}
+
+// firstLookReference returns the reference board entry of a benchmark for
+// the Connect box's first look: the entry on the same model when there is
+// one, else the best scored entry, else nil (no board or no entry).
+func firstLookReference(src handlers.ReferenceBoardSource) func(ctx context.Context, benchmark, model string) any {
+	return func(_ context.Context, benchmark, model string) any {
+		b, err := src.Load()
+		if err != nil || b == nil || benchmark == "" {
+			return nil
+		}
+		var best *reference.Entry
+		for _, e := range b.ForBenchmark(benchmark) {
+			if model != "" && e.Model == model {
+				return e
+			}
+			if best == nil || e.Score > best.Score {
+				best = &e
+			}
+		}
+		if best == nil {
+			return nil
+		}
+		return *best
+	}
 }
 
 func runReference(args []string) int {

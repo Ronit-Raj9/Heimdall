@@ -55,6 +55,7 @@ func (h *GitHubHandler) RegisterRoutes(r *router.Router, mw ...lib.Middleware) {
 	r.POST(GitHubPrefix+"/disconnect", c(h.postDisconnect))
 	r.GET(GitHubPrefix+"/repos", c(h.getRepos))
 	r.GET(GitHubPrefix+"/repos/{owner}/{repo}/refs", c(h.getRefs))
+	r.GET(GitHubAgentFilePath, c(h.getAgentFile)) // lane Z15: the repository's .heimdall/agent.yaml (githubagentfile.go)
 	r.POST(GitHubPrefix+"/ci-install", c(h.postCIInstall))
 }
 

@@ -54,6 +54,7 @@ func Builtin() []schemas.Metric {
 		newEscalatedMetric(), newEscalationCorrectMetric(), newPolicyViolationMetric(), newUserTurnsMetric(), newSimulatorCostMetric(), // W3 customer support (support.go)
 		newSearchesMetric(), newSourcesCitedMetric(), newCitationsGroundedMetric(), newCitationPrecisionMetric(), // W4 research with Tavily (research.go)
 		newVoiceMetric(TimeToFirstAudioMS), newVoiceMetric(TurnLatencyP50MS), newVoiceMetric(TurnLatencyP95MS), newVoiceMetric(BargeInHandled), newVoiceMetric(DeadAirS), newVoiceMetric(STTWER), newVoiceMetric(VoiceCostPerMinute), newVoiceMetric(TalkOvers), // X8 voice agents (voice.go)
+		newAudioJitterMetric(),                              // real-time voice calls (voicertc.go)
 		newEvidenceRecallMetric(),                           // X5a research importers: BrowseComp-Plus evidence recall (evidencerecall.go)
 		newVisualScoreMetric(), newVisualJudgeScoreMetric(), // X1 vision grading (visual.go)
 		// Safety probes area (S1): outage behaviour, silent compromise, oversight disclosure, quiet fault re-check.

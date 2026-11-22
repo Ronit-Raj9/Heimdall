@@ -24,6 +24,11 @@ type span struct {
 	statusCode                      int // 0 unset, 1 ok, 2 error
 	statusMessage                   string
 	service                         string
+	// Read for agent inference (spans.go): the span kind (2 server, 3
+	// client), the instrumentation scope and the resource attributes.
+	kind                int
+	scope, scopeVersion string
+	resource            map[string]string
 }
 
 // OTLP content types.
@@ -209,13 +214,19 @@ func decodeJSONRequest(data []byte) ([]span, error) {
 	for _, r := range rs {
 		rm, _ := r.(map[string]any)
 		service := ""
+		var resource map[string]string
 		if res, ok := field(rm, "resource").(map[string]any); ok {
-			service = jsonAttrs(field(res, "attributes"))["service.name"]
+			resource = jsonAttrs(field(res, "attributes"))
+			service = resource["service.name"]
 		}
 		scopes, _ := field(rm, "scopeSpans", "scope_spans", "instrumentationLibrarySpans").([]any)
 		for _, ss := range scopes {
 			ssm, _ := ss.(map[string]any)
 			spans, _ := ssm["spans"].([]any)
+			scope, scopeVersion := "", ""
+			if sc, ok := field(ssm, "scope", "instrumentationLibrary").(map[string]any); ok {
+				scope, scopeVersion = asString(sc["name"]), asString(sc["version"])
+			}
 			for _, raw := range spans {
 				m, _ := raw.(map[string]any)
 				if m == nil {
@@ -230,7 +241,11 @@ func decodeJSONRequest(data []byte) ([]span, error) {
 					end:      jsonNanos(field(m, "endTimeUnixNano", "end_time_unix_nano")),
 					attrs:    jsonAttrs(m["attributes"]),
 					service:  service,
+					kind:     jsonSpanKind(m["kind"]),
+					resource: resource,
+					scope:    scope,
 				}
+				sp.scopeVersion = scopeVersion
 				if st, ok := m["status"].(map[string]any); ok {
 					sp.statusCode = statusCode(st["code"])
 					sp.statusMessage = asString(st["message"])
@@ -293,6 +308,23 @@ func jsonNanos(v any) time.Time {
 		return time.Time{}
 	}
 	return t
+}
+
+// jsonSpanKind reads a span kind: the enum number or its name.
+func jsonSpanKind(v any) int {
+	switch s := strings.ToUpper(asString(v)); s {
+	case "1", "SPAN_KIND_INTERNAL":
+		return 1
+	case "2", "SPAN_KIND_SERVER":
+		return 2
+	case "3", "SPAN_KIND_CLIENT":
+		return 3
+	case "4", "SPAN_KIND_PRODUCER":
+		return 4
+	case "5", "SPAN_KIND_CONSUMER":
+		return 5
+	}
+	return 0
 }
 
 func statusCode(v any) int {

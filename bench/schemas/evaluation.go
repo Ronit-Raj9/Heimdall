@@ -73,9 +73,15 @@ type EvaluationSpec struct {
 	// slots still bound what runs side by side.
 	Concurrency int `json:"concurrency,omitempty"`
 	// Preset names the size preset the wizard started from (quick, standard,
-	// thorough); informational, the numbers above are what runs.
+	// thorough); informational, the numbers above are what runs. first_look
+	// (lane Z01, the Connect box): one benchmark, 5 tasks, 1 trial, clean only,
+	// score mode, concurrency 5; its report card says it is too small for a
+	// verdict.
 	Preset string `json:"preset,omitempty"`
 }
+
+// EvaluationPresetFirstLook is the first-look preset (EvaluationSpec.Preset).
+const EvaluationPresetFirstLook = "first_look"
 
 // EvaluationGate is what an evaluation must show to pass. Scores are
 // verified success rates (0 to 1) over clean runs, per capability.

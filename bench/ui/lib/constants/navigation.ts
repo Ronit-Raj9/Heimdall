@@ -10,6 +10,7 @@ import {
 	House,
 	ListOrdered,
 	PackageCheck,
+	Plug,
 	Radio,
 	SearchX,
 	Settings,
@@ -31,6 +32,7 @@ export interface BenchNavItem {
 		| "/evaluations"
 		| "/experiments"
 		| "/failure-tests"
+		| "/mcp-test"
 		| "/runs"
 		| "/suites"
 		| "/annotation"
@@ -47,6 +49,7 @@ export interface BenchNavItem {
 		| "shell.nav.evaluations"
 		| "shell.nav.experiments"
 		| "shell.nav.failureTests"
+		| "shell.nav.mcpTest"
 		| "shell.nav.runs"
 		| "shell.nav.suites"
 		| "shell.nav.labelling"
@@ -94,7 +97,7 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 		id: "agents",
 		labelKey: "shell.groups.agents",
 		items: [
-			{ to: "/agents", labelKey: "shell.nav.agents", icon: Bot, testId: "nav-link-agents", also: ["/agents_"] },
+			{ to: "/agents", labelKey: "shell.nav.agents", icon: Bot, testId: "nav-link-agents", also: ["/agents_", "/connect"] },
 			{ to: "/leaderboard", labelKey: "shell.nav.leaderboard", icon: ListOrdered, testId: "nav-link-leaderboard", also: ["/trends"] },
 			{ to: "/improvements", labelKey: "shell.nav.improvements", icon: TrendingUp, testId: "nav-link-improvements" },
 		],
@@ -112,6 +115,7 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 				also: ["/verdict", "/matrix", "/migration", "/receipts"],
 			},
 			{ to: "/failure-tests", labelKey: "shell.nav.failureTests", icon: Zap, testId: "nav-link-failure-tests" },
+			{ to: "/mcp-test", labelKey: "shell.nav.mcpTest", icon: Plug, testId: "nav-link-mcp-test" },
 			{ to: "/runs", labelKey: "shell.nav.runs", icon: CirclePlay, testId: "nav-link-runs", also: ["/compare"] },
 		],
 	},

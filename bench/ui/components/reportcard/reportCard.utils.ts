@@ -100,6 +100,7 @@ export function visibleReport(report: Report): Report {
 		learning: report.learning?.filter((l) => l.arm === label),
 		persistence: report.persistence?.filter((p) => p.arm === label),
 		voice: report.voice?.filter((v) => v.arm === label),
+		voice_calls: report.voice_calls?.filter((v) => v.arm === label),
 	};
 }
 
