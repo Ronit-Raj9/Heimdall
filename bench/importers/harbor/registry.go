@@ -20,6 +20,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -365,7 +366,9 @@ func fetchGit(ctx context.Context, repoURL, commit string, tasks []RegistryTask,
 	steps := [][]string{
 		{"init", "-q"},
 		{"remote", "add", "origin", repoURL},
-		append([]string{"sparse-checkout", "set", "--no-cone", "--"}, sparsePatterns(paths)...),
+		// Cone mode matches folders by hash; non-cone patterns make checkout
+		// quadratic in the task count (minutes for thousands of tasks).
+		append([]string{"sparse-checkout", "set", "--cone", "--"}, paths...),
 		{"fetch", "-q", "--depth", "1", "--filter=blob:none", "origin", commit},
 		{"checkout", "-q", "FETCH_HEAD"},
 	}
@@ -384,15 +387,6 @@ func fetchGit(ctx context.Context, repoURL, commit string, tasks []RegistryTask,
 		}
 	}
 	return os.RemoveAll(work)
-}
-
-// sparsePatterns turns folders into non-cone sparse patterns ("/a/b/").
-func sparsePatterns(paths []string) []string {
-	out := make([]string, 0, len(paths))
-	for _, p := range paths {
-		out = append(out, "/"+strings.Trim(p, "/")+"/")
-	}
-	return out
 }
 
 func runGit(ctx context.Context, dir string, args ...string) error {
@@ -414,7 +408,7 @@ func runGit(ctx context.Context, dir string, args ...string) error {
 var hfBase = "https://huggingface.co"
 
 // hfWorkers is how many files of one task download at once.
-const hfWorkers = 16
+const hfWorkers = 6
 
 // hfRepo returns "org/name" for a Hugging Face dataset git URL, else "".
 func hfRepo(raw string) string {
@@ -445,7 +439,19 @@ func fetchHF(ctx context.Context, repoURL, commit string, tasks []RegistryTask, 
 		var files []string
 		next := fmt.Sprintf("%s/api/datasets/%s/tree/%s/%s?recursive=true", hfBase, repo, commit, escapePath(root))
 		for next != "" {
-			b, link, err := httpGetLink(ctx, opts.HTTP, next, opts.HFToken)
+			var b []byte
+			var link string
+			var err error
+			for attempt := 0; attempt < downloadAttempts; attempt++ {
+				if b, link, err = httpGetLink(ctx, opts.HTTP, next, opts.HFToken); err == nil || !retryable(err) {
+					break
+				}
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(retryWait(err, attempt)):
+				}
+			}
 			if err != nil {
 				return fmt.Errorf("harbor fetch %s: list %s: %w", repo, root, err)
 			}
@@ -552,7 +558,7 @@ func httpGetLink(ctx context.Context, c *http.Client, u, token string) ([]byte, 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, "", fmt.Errorf("GET %s: %s", redactURL(u), resp.Status)
+		return nil, "", &statusError{url: u, code: resp.StatusCode, text: resp.Status}
 	}
 	b, err := io.ReadAll(io.LimitReader(resp.Body, 256<<20))
 	return b, nextLink(resp.Header.Get("Link")), err
@@ -577,24 +583,44 @@ func nextLink(h string) string {
 // download fetches u into out, retrying rate limits and server errors.
 func download(ctx context.Context, c *http.Client, u, token, out string) error {
 	var err error
-	for attempt := 0; attempt < 4; attempt++ {
+	for attempt := 0; attempt < downloadAttempts; attempt++ {
 		if err = downloadOnce(ctx, c, u, token, out); err == nil || !retryable(err) {
 			return err
 		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(time.Duration(attempt+1) * 2 * time.Second):
+		case <-time.After(retryWait(err, attempt)):
 		}
 	}
 	return err
 }
 
+// downloadAttempts covers the Hub's five-minute rate-limit window.
+const downloadAttempts = 10
+
+// retryBase scales the waits; tests shrink it.
+var retryBase = time.Second
+
+// retryWait is the reply's Retry-After when it sent one, else a wait that
+// grows with each attempt (longer for a rate limit).
+func retryWait(err error, attempt int) time.Duration {
+	var se *statusError
+	if errors.As(err, &se) && se.code == http.StatusTooManyRequests {
+		if se.retryAfter > 0 {
+			return se.retryAfter
+		}
+		return time.Duration(30*(attempt+1)) * retryBase
+	}
+	return time.Duration(2*(attempt+1)) * retryBase
+}
+
 // statusError is a non-200 reply.
 type statusError struct {
-	url  string
-	code int
-	text string
+	url        string
+	code       int
+	text       string
+	retryAfter time.Duration
 }
 
 func (e *statusError) Error() string { return "GET " + redactURL(e.url) + ": " + e.text }
@@ -618,7 +644,11 @@ func downloadOnce(ctx context.Context, c *http.Client, u, token, out string) err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return &statusError{url: u, code: resp.StatusCode, text: resp.Status}
+		se := &statusError{url: u, code: resp.StatusCode, text: resp.Status}
+		if n, err := strconv.Atoi(strings.TrimSpace(resp.Header.Get("Retry-After"))); err == nil && n > 0 && n <= 900 {
+			se.retryAfter = time.Duration(n) * time.Second
+		}
+		return se
 	}
 	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
 		return err

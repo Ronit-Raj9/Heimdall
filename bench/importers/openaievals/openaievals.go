@@ -382,7 +382,7 @@ func rowsFor(s evalSpec, regDir, grader string) ([]scaffold.Row, string) {
 		}
 		q := renderInput(all["input"])
 		ideals := idealList(all["ideal"])
-		r := scaffold.Row{Line: line, ID: fmt.Sprintf("%s-%d", slug(s.Name), line), Question: q, Category: s.Name}
+		r := scaffold.Row{Line: line, ID: fmt.Sprintf("%s-%d", slug(s.Name), line), Title: fmt.Sprintf("%s, sample %d", s.Name, line), Question: q, Category: s.Name}
 		switch s.Class {
 		case classMatch:
 			r.Match, r.Expected = "regex", regexes(ideals, `^\s*`, false)

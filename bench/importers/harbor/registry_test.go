@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 const testCommit = "6bedd7878dc5d6f3456b4d80b781eb3c2d84f262"
@@ -102,7 +103,7 @@ func fakeGit(calls *[][]string) func(ctx context.Context, dir string, args ...st
 			patterns = args[4:]
 		case "checkout":
 			for _, p := range patterns {
-				d := filepath.Join(dir, filepath.FromSlash(strings.Trim(p, "/")))
+				d := filepath.Join(dir, filepath.FromSlash(p))
 				if err := os.MkdirAll(d, 0o755); err != nil {
 					return err
 				}
@@ -216,5 +217,34 @@ func TestNextLink(t *testing.T) {
 	}
 	if nextLink("") != "" {
 		t.Fatal("empty header")
+	}
+}
+
+func TestDownloadRetriesRateLimit(t *testing.T) {
+	old := retryBase
+	retryBase = time.Millisecond
+	defer func() { retryBase = old }()
+	n := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n++
+		if n < 3 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+	out := filepath.Join(t.TempDir(), "f")
+	if err := download(context.Background(), nil, srv.URL, "", out); err != nil || n != 3 {
+		t.Fatalf("err %v after %d calls", err, n)
+	}
+	if b, _ := os.ReadFile(out); string(b) != "ok" {
+		t.Fatalf("body %q", b)
+	}
+	if w := retryWait(&statusError{code: 429, retryAfter: 7 * time.Second}, 0); w != 7*time.Second {
+		t.Fatalf("Retry-After ignored: %v", w)
+	}
+	if retryable(&statusError{code: 404}) {
+		t.Fatal("404 retried")
 	}
 }

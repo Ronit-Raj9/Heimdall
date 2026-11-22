@@ -152,8 +152,8 @@ func (c *Client) Splits(ctx context.Context, dataset string) ([]Split, error) {
 func (c *Client) Info(ctx context.Context, s Split) (*Info, error) {
 	var out struct {
 		DatasetInfo struct {
-			License     string `json:"license"`
-			Description string `json:"description"`
+			License     string         `json:"license"`
+			Description string         `json:"description"`
 			Features    map[string]any `json:"features"`
 			Splits      map[string]struct {
 				NumExamples int `json:"num_examples"`

@@ -1,4 +1,4 @@
-# Importing OpenAI Evals (and Hugging Face datasets)
+# Importing OpenAI Evals, promptfoo and Hugging Face datasets
 
 The hosted OpenAI Evals product shuts down on 30 Nov 2026. Evals written for the open-source framework (https://github.com/openai/evals, MIT) keep working as Heimdall question-and-answer suites: each sample becomes one answer task, checked with no model, or by the pinned judge for model-graded evals.
 
@@ -40,6 +40,28 @@ bifrost-bench suite lint my-evals && bifrost-bench suite lock my-evals && bifros
 ```
 
 Settings: `evals` (names or ids, default all), `grader` (`answer_match` default, or `judge`), `judge_provider` and `judge_model` (required with `grader=judge`), `image` (default `bench/coding-core-base:1`), `license` (default MIT), `source`. `-ids` selects task ids, `-limit` caps the count. An existing suite is extended only when it has the same grader. Model-graded evals are skipped in an `answer_match` suite with the reason.
+
+## promptfoo
+
+OpenAI points Evals users to promptfoo. `import promptfoo` reads `promptfooconfig.yaml` (or a folder holding it): every prompt crossed with every test becomes one answer task, the prompt with the test's `{{vars}}` filled in as the question. `defaultTest` vars and asserts apply to every test.
+
+| Assertion | Heimdall check |
+| --- | --- |
+| `equals` | regex `^\s*<value>\s*$` |
+| `starts-with` | regex `^\s*<value>` |
+| `contains`, `icontains` | regex `<value>`, `(?i)` for icontains |
+| `regex` | the pattern |
+| `contains-all`, `icontains-all` | `contains_all` |
+| `llm-rubric`, `model-graded-closedqa`, `factuality` | judge rubric (`-set grader=judge`) |
+
+- A test needs exactly one checking assertion; `not-*`, `javascript`, `python`, `is-json`, `similar`, `cost`, `latency` and the rest are skipped with the reason.
+- Admission proves each check passes a correct answer. The reference is `vars.reference` (or `vars.expected`, `vars.answer`), else the value of an `equals`, `starts-with` or `contains` assertion. A test with none (a bare `regex` or `llm-rubric`) is skipped until you add `vars.reference`.
+- Text prompts and `file://` prompts and tests files inside the config folder are read; chat-format JSON prompts, CSV tests files and Nunjucks tags (`{% %}`) are not.
+
+```sh
+bifrost-bench import promptfoo -from my-promptfoo-project -suite support-regressions
+bifrost-bench import promptfoo -from my-promptfoo-project -suite support-graded -set grader=judge -set judge_provider=openai -set judge_model=<model>
+```
 
 ## Hugging Face datasets
 
