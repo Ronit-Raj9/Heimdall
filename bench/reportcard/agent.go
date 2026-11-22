@@ -72,6 +72,25 @@ func SelectForAgent(evals []schemas.Evaluation, agent string, version int, model
 	})
 }
 
+// ModelsForAgent lists the models an agent's report card can be filtered
+// by: the distinct non-empty models of every arm that runs agent (at
+// version, 0: any) in a done or running evaluation, sorted.
+func ModelsForAgent(evals []schemas.Evaluation, agent string, version int) []string {
+	var out []string
+	for _, ev := range evals {
+		if ev.Status != StatusDone && ev.Status != StatusRunning {
+			continue
+		}
+		for _, a := range ev.Spec.Arms {
+			if a.Model != "" && ArmMatches(a, agent, version, "") && !slices.Contains(out, a.Model) {
+				out = append(out, a.Model)
+			}
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
 // MapArms maps a child experiment's arm ids to the evaluation's arm labels,
 // the same way the report card reads the child (readChild). Callers skip the
 // "compat" arm themselves.

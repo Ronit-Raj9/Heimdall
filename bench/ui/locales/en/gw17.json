@@ -1,0 +1,10 @@
+{
+	"name": {
+		"empty": "Give the agent a name.",
+		"tooLong": "Use at most 63 characters ({{count}} now).",
+		"start": "Start with a lowercase letter or a digit."
+	},
+	"reportCard": {
+		"versionMissing": "Version {{version}} of this agent was not found. Showing the latest version."
+	}
+}

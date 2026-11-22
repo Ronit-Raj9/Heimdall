@@ -243,3 +243,42 @@ func mustSpans(t *testing.T) []agentevents.Span {
 }
 
 func fasthttpNow() time.Time { return time.Date(2026, 11, 22, 10, 0, 0, 0, time.UTC) }
+
+// TestInferBadFileMessage: a file that is not an OTLP trace export gets one
+// plain sentence naming the cause (with line and column for broken JSON),
+// never the decoder's raw text (N110).
+func TestInferBadFileMessage(t *testing.T) {
+	r := connectTracesRouter(t, t.TempDir(), false)
+	msgOf := func(ct, body string) string {
+		t.Helper()
+		ctx := otlpPost(r, ConnectTracesInferPath, "", ct, body)
+		if ctx.Response.StatusCode() != 400 {
+			t.Fatalf("%q: status %d", body, ctx.Response.StatusCode())
+		}
+		var out struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(ctx.Response.Body(), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out.Error.Message
+	}
+	const hint = " Export your traces as OTLP JSON, for example with the OpenTelemetry Collector file exporter, and upload that file."
+	cases := []struct{ ct, body, want string }{
+		{"application/json", "{\n  not json", "This file is not an OTLP trace export: it is not valid JSON. The first problem is at line 2, column 3." + hint},
+		{"application/json", `{"spans": []}`, "This file is valid JSON but has no resourceSpans, so it is not an OTLP trace export." + hint},
+		{"application/json", `[1, 2]`, "This file is valid JSON but has no resourceSpans, so it is not an OTLP trace export." + hint},
+		{"application/x-protobuf", "\xff\xff\xff", "This file could not be read as an OTLP trace export (JSON or protobuf)." + hint},
+	}
+	for _, c := range cases {
+		msg := msgOf(c.ct, c.body)
+		if msg != c.want {
+			t.Errorf("%q:\n got %q\nwant %q", c.body, msg, c.want)
+		}
+		if strings.Count(msg, "OTLP trace export") != 1 || strings.Contains(msg, "invalid character") || strings.Contains(msg, "OTLP JSON:") {
+			t.Errorf("%q: message repeats itself or shows the raw error: %q", c.body, msg)
+		}
+	}
+}

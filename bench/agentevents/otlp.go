@@ -97,6 +97,10 @@ func spanType(sp span) string {
 		return TypeMemoryRead
 	case strings.HasPrefix(name, "plan"):
 		return TypePlan
+	case first(sp.attrs, "gen_ai.request.model", "gen_ai.response.model", "llm.model_name") != "" && first(sp.attrs, "gen_ai.tool.name", "tool.name") == "":
+		// A model named without a GenAI operation (older conventions, many
+		// OpenAI instrumentations) is still a model call.
+		return TypeLLM
 	}
 	return TypeSpan
 }
@@ -195,6 +199,10 @@ func first(attrs map[string]string, keys ...string) string {
 	return ""
 }
 
+// ErrNoResourceSpans is returned for a JSON body without resourceSpans: valid
+// JSON, but not an OTLP trace export.
+var ErrNoResourceSpans = errUnsupported("OTLP JSON: no resourceSpans")
+
 // decodeJSONRequest reads the OTLP/JSON encoding: lowerCamelCase field names
 // (snake_case accepted too), hex trace and span ids, 64-bit integers as
 // strings or numbers.
@@ -203,11 +211,11 @@ func decodeJSONRequest(data []byte) ([]span, error) {
 	dec.UseNumber()
 	var root map[string]any
 	if err := dec.Decode(&root); err != nil {
-		return nil, unsupported("OTLP JSON: %v", err)
+		return nil, fmt.Errorf("OTLP JSON: %w", err)
 	}
 	rsv := field(root, "resourceSpans", "resource_spans")
 	if rsv == nil {
-		return nil, unsupported("OTLP JSON: no resourceSpans")
+		return nil, ErrNoResourceSpans
 	}
 	rs, _ := rsv.([]any)
 	var out []span

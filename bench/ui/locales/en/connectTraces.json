@@ -22,7 +22,7 @@
 		"description": "This page checks every few seconds. Run your agent once with the settings above.",
 		"orFile": "Or infer from an OTLP export file (JSON or protobuf). Nothing is kept.",
 		"pickFile": "Infer from a file",
-		"fileError": "That file is not an OTLP trace export: {{error}}"
+		"fileError": "{{error}}"
 	},
 	"draft": {
 		"title": "2. What your traces show",

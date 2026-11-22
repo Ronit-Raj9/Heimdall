@@ -1,3 +1,4 @@
+import type { AgentConfigDoc } from "@/lib/types/agentBuilder";
 import { benchApi } from "./benchApi";
 
 /**
@@ -10,7 +11,18 @@ export const agentDeleteApi = benchApi.enhanceEndpoints({ addTagTypes: ["AgentCo
 			query: (id) => ({ url: `/agents/${encodeURIComponent(id)}`, method: "DELETE" }),
 			invalidatesTags: (_r, error, id) => (error ? [] : ["BenchAgents", { type: "AgentConfig", id }]),
 		}),
+		/**
+		 * POST /agents/{id}/copy (fix wave 2): writes the agent's settings under new_id (the copy starts at v1). With
+		 * remove_original it renames the agent: the original goes, its runs, results and saved versions keep the old name.
+		 */
+		copyAgent: builder.mutation<AgentConfigDoc, { id: string; new_id: string; remove_original?: boolean }>({
+			query: ({ id, ...body }) => ({ url: `/agents/${encodeURIComponent(id)}/copy`, method: "POST", body }),
+			invalidatesTags: (_r, error, { id, new_id, remove_original }) =>
+				error
+					? []
+					: ["BenchAgents", { type: "AgentConfig", id: new_id }, ...(remove_original ? [{ type: "AgentConfig" as const, id }] : [])],
+		}),
 	}),
 });
 
-export const { useDeleteAgentMutation } = agentDeleteApi;
+export const { useDeleteAgentMutation, useCopyAgentMutation } = agentDeleteApi;

@@ -4,7 +4,7 @@ import type { TraceConnectInfo } from "@/lib/types/connectTraces";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { connectRequest, withToken } from "@/lib/store/apis/connectTracesHelpers";
-import FromTracesView from "./fromTracesView";
+import FromTracesView, { TraceFileError } from "./fromTracesView";
 
 const base: TraceConnectInfo = {
 	endpoint: "https://h.example/api/bench/orgs/org_a/otlp/v1/traces",
@@ -102,5 +102,16 @@ describe("connect helpers", () => {
 	it("fills the token into setup lines", () => {
 		expect(withToken("A=$HEIMDALL_INGEST_TOKEN", "hmi_x")).toBe("A=hmi_x");
 		expect(withToken("A=$HEIMDALL_INGEST_TOKEN", null)).toBe("A=$HEIMDALL_INGEST_TOKEN");
+	});
+});
+
+describe("bad trace file", () => {
+	it("shows the server's sentence once, without a prefix of its own", () => {
+		const msg =
+			"This file is not an OTLP trace export: it is not valid JSON. The first problem is at line 2, column 3. Export your traces as OTLP JSON, for example with the OpenTelemetry Collector file exporter, and upload that file.";
+		const html = renderToStaticMarkup(<TraceFileError error={msg} />);
+		expect(html).toContain('data-testid="from-traces-file-error"');
+		expect(html.split("OTLP trace export").length - 1).toBe(1);
+		expect(html).not.toContain("That file is not");
 	});
 });

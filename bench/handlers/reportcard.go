@@ -44,6 +44,9 @@ type AgentReportCard struct {
 	Version int                `json:"version,omitempty"`
 	Model   string             `json:"model,omitempty"`
 	Report  *reportcard.Report `json:"report"`
+	// Models are the models this agent's done or running evaluations used
+	// (at Version when given): the choices of the report card's Model filter.
+	Models []string `json:"models,omitempty"`
 }
 
 // fileEvaluations reads <root>/.heimdall/evaluations/*.json.
@@ -245,7 +248,7 @@ func (h *reportCardHandler) getAgentReportCard(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.env.Mode, "evaluations", err)
 		return
 	}
-	out := AgentReportCard{Agent: agent, Version: version, Model: model}
+	out := AgentReportCard{Agent: agent, Version: version, Model: model, Models: reportcard.ModelsForAgent(evals, agent, version)}
 	ev, labels := reportcard.SelectForAgent(evals, agent, version, model)
 	if ev != nil {
 		opt := h.options(work)
