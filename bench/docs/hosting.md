@@ -634,6 +634,14 @@ keeps `NET_BIND_SERVICE`) and `no-new-privileges`. Caddy sets HSTS
 caps request bodies at 2 MiB and hides `/readyz`; the server adds its CSP,
 `X-Frame-Options: DENY` and same-origin policies on every answer.
 
+### Library registry (optional)
+
+Library images can be pushed once to a registry and pinned by digest in
+each benchmark's lock, so every worker pulls the same bytes instead of
+building them; orgs pull with their own API or runner token, restricted
+benchmarks only by the orgs the access file names. Setup, the Caddy route
+and the sync and prefetch commands: `docs/library-registry.md`.
+
 ## 12. Not yet supported
 
 - SSO / SAML / OIDC other than GitHub OAuth.

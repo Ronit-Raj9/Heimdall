@@ -150,7 +150,8 @@ func runRunnerStart(cmd string, args []string) int {
 			Disk: hy.DiskState, ImageUse: hy.NoteImages, KeepRunFolders: a.cfg.Runner.Disk.KeepRunFolders,
 			PullPrivate: func(ctx context.Context, ref string, auths []schemas.RegistryAuth) error { // Y10: the org's registry logins
 				return registrycreds.Pull(ctx, a.docker, ref, auths)
-			}})
+			},
+			Prefetch: runnerPrefetch(a.logger)}) // Z13: images pinned by registry digest are pulled before their slots (images.go)
 	if err != nil {
 		return fail("%v", err)
 	}
