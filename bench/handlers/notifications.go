@@ -61,8 +61,23 @@ func init() {
 		}
 		p := APIPrefix + "/notifications/email"
 		r.GET(p, env.R(h.get))
-		r.PUT(p, env.W(h.put))
-		r.POST(p+"/test", env.W(h.test))
+		// Self writes (tenancy selfWrites): they change only the caller's
+		// own settings, so a viewer passes. env.W is the member write
+		// guard in hosted mode and would refuse the viewer the policy
+		// allows; a signed-in principal of any role is enough here (the
+		// tenancy dispatcher still applies the org(viewer) rule).
+		self := func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+			guarded := func(ctx *fasthttp.RequestCtx) {
+				if !auth.PrincipalFrom(ctx).IsAuthenticated() {
+					lib.SendError(ctx, env.Mode, fasthttp.StatusUnauthorized, lib.ErrTypeUnauthorized, "sign in to change your email notifications")
+					return
+				}
+				next(ctx)
+			}
+			return lib.ChainMiddlewares(guarded, env.Common...)
+		}
+		r.PUT(p, self(h.put))
+		r.POST(p+"/test", self(h.test))
 	})
 	APIRoutes = append(APIRoutes,
 		RouteDoc{Method: "GET", Path: APIPrefix + "/notifications/email", Tag: "integrations", Summary: "Your own email notifications: which events reach you by email, the weekly digest, and whether this server can send email", Response: EmailSettings{}},

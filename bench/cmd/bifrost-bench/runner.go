@@ -19,6 +19,7 @@ import (
 	"github.com/maximhq/bifrost/bench/sandbox"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // Runners area (docs/runners.md): `runner start` runs this machine as a
@@ -153,7 +154,7 @@ func runRunnerStart(cmd string, args []string) int {
 			PullPrivate: func(ctx context.Context, ref string, auths []schemas.RegistryAuth) error { // Y10: the org's registry logins
 				return registrycreds.Pull(ctx, a.docker, ref, auths)
 			},
-			Prefetch: runnerPrefetch(a.logger)}) // Z13: images pinned by registry digest are pulled before their slots (images.go)
+			Prefetch: runnerPrefetch(a.logger, utils.Docker{})}) // Z13: images pinned by registry digest are pulled before their slots (images.go)
 	if err != nil {
 		return fail("%v", err)
 	}

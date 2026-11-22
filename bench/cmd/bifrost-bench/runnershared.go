@@ -716,7 +716,8 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 			PullPrivate: func(ctx context.Context, ref string, auths []schemas.RegistryAuth) error { // Y10: under the org's Docker policy
 				return registrycreds.Pull(ctx, docker, ref, auths)
 			},
-			HostSlot: h.orgHostSlot(org, slots)})
+			HostSlot: h.orgHostSlot(org, slots),
+			Prefetch: runnerPrefetch(oa.logger, docker)}) // Z13 in the shared runner: under the org's Docker policy
 	// No Jobs: hosted CLI jobs would run the docker CLI outside the org's
 	// policy; the worker refuses them and they go to the org's own workers.
 	if err != nil {

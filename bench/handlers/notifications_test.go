@@ -29,8 +29,12 @@ func notifyCall(r *router.Router, p *auth.Principal, method, uri, body string) *
 func TestEmailSettingsRoutes(t *testing.T) {
 	root := t.TempDir()
 	r := router.New()
+	// The hosted write guard (member and above), as server.go passes it:
+	// the self writes must not go through it, or a viewer could not stop
+	// email to their own address although the policy allows it.
+	write := auth.RequireRole(schemas.ModeRecorded, auth.RoleMember)
 	for _, a := range OrgAreas() {
-		a(OrgEnv{Cfg: &lib.Config{Root: root}, Mode: schemas.ModeRecorded}, r)
+		a(OrgEnv{Cfg: &lib.Config{Root: root}, Mode: schemas.ModeRecorded, Write: write}, r)
 	}
 	p := APIPrefix + "/notifications/email"
 	ana := &auth.Principal{Kind: auth.KindUser, UserID: "u1", OrgID: "org1", Email: "ana@example.com", Role: auth.RoleViewer}
@@ -84,5 +88,16 @@ func TestEmailSettingsRoutes(t *testing.T) {
 	tok := &auth.Principal{Kind: auth.KindToken, OrgID: "org1"}
 	if ctx := notifyCall(r, tok, "POST", p+"/test", ""); ctx.Response.StatusCode() != fasthttp.StatusConflict {
 		t.Fatalf("token test %d", ctx.Response.StatusCode())
+	}
+}
+
+// A signed-out caller is refused the self writes.
+func TestEmailSettingsSignedOut(t *testing.T) {
+	r := router.New()
+	for _, a := range OrgAreas() {
+		a(OrgEnv{Cfg: &lib.Config{Root: t.TempDir()}, Mode: schemas.ModeRecorded}, r)
+	}
+	if ctx := notifyCall(r, nil, "PUT", APIPrefix+"/notifications/email", `{"events":[]}`); ctx.Response.StatusCode() != fasthttp.StatusUnauthorized {
+		t.Fatalf("signed out put %d", ctx.Response.StatusCode())
 	}
 }

@@ -557,6 +557,20 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_VOICE_RTC_URL`, `HEIMDALL_VOICE_RTC_SECRET`, `HEIMDALL_VOICE_SIP_ALLOW` | Real-time voice calls (compose profile `voice`): where runs reach the voice gateway, the secret per-run gateway tokens are signed with, and the E.164 prefixes Heimdall may dial. Empty URL: real-time calls are refused. Setup: docs/voice-realtime.md. |
 | `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_PUBLIC_URL` | Heimdall's own LiveKit server (profile `voice`) and the URL teams' bots join. |
 | `HEIMDALL_BACKUP_PASSPHRASE_FILE` | Passphrase file kept away from the backups; `backup.sh` then writes an encrypted copy of `.env` beside each dump. |
+| `HEIMDALL_DOMAIN`, `HEIMDALL_ACME_EMAIL` | The public host name Caddy serves and gets a certificate for, and the ACME account address for expiry and revocation notices. |
+| `HEIMDALL_PG_PASSWORD` | Password of the server's Postgres role, hex only (it goes inside the connection URL compose builds as `HEIMDALL_DATABASE_URL`). |
+| `HEIMDALL_SIGNUP_PER_HOUR` | New self-serve accounts per hour across every address, also the burst; empty or 0 keeps the default (20 at once, then one per 3 minutes). Invitation sign-ups are not counted. |
+| `HEIMDALL_CAPTCHA_SECRET`, `HEIMDALL_CAPTCHA_SITEKEY` | Optional hCaptcha on self-serve sign-up: the secret turns it on, the site key is what the sign-up page shows. Invitation sign-ups skip it. |
+| `HEIMDALL_IMAGE_AUTO_APPROVE` | `off`: every image request waits for a server admin. Empty: images a gVisor shared worker can run are approved automatically (section 9). |
+| `HEIMDALL_FAULT_MODE` | Where fault plans go, on the server and the shared worker: `proxy` (default, the fault proxy behind Bifrost) or `plugin` (headers to the heimdall Bifrost plugin, the proxy as fallback; needs the custom Bifrost build). |
+| `HEIMDALL_PULL_SIGNING_KEY` | Signs run tokens and repository links of pull-mode agents (docs/pull-agents.md); the server and the shared worker share it. `bootstrap.sh` fills it when empty. |
+| `HEIMDALL_BENCH_DIR` | Host path of this checkout's `bench` folder, which the shared worker mounts at the same path; the helper scripts fill it in. |
+| `BIFROST_SETUP_TOKEN`, `BIFROST_PG_PASSWORD`, `BENCH_FAULTPROXY_TOKEN` | The shared worker's Bifrost stack: Bifrost's admin setup token, its Postgres password and the fault proxy's control token. Random values (`openssl rand -hex 24`). |
+| `HEIMDALL_S3_BUCKET`, `HEIMDALL_S3_REGION`, `HEIMDALL_S3_ENDPOINT`, `HEIMDALL_S3_ACCESS_KEY`, `HEIMDALL_S3_SECRET_KEY` | Evidence mirror (section 7): empty bucket or keys, no mirror. Empty endpoint is AWS S3; MinIO, R2 and others take `https://host[:port]`. |
+| `HEIMDALL_STATUS_PROBES` | Extra components on the public `/status` page: `id=url` pairs, comma separated. |
+| `HEIMDALL_OTEL_ENDPOINT`, `HEIMDALL_OTEL_SAMPLER`, `HEIMDALL_GRAFANA_PASSWORD`, `HEIMDALL_GRAFANA_PORT`, `HEIMDALL_PROMETHEUS_RETENTION` | Monitoring profile (docs/monitoring.md): where traces go (empty: no traces) and how many are kept, Grafana's admin password and loopback port, Prometheus retention. |
+| `HEIMDALL_LIBRARY_REGISTRY_TOKEN_DIR`, `HEIMDALL_LIBRARY_REGISTRY_ACCESS`, `HEIMDALL_LIBRARY_REGISTRY_DIR`, `HEIMDALL_LIBRARY_REGISTRY_PUBLISH` | Library registry override (docs/library-registry.md, "Library registry" below): token key folder, per-org access file, image folder and published address. |
+| `HEIMDALL_VOICE_RTC_PUBLISH`, `HEIMDALL_VOICE_MAX_CALLS` | Voice gateway (profile `voice`): the host address its port is published on, where runs reach it (default `172.17.0.1:8790`) and calls at once (default 20). |
 
 ### Billing
 

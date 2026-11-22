@@ -200,6 +200,11 @@ services:
       BENCH_AUTH_PUBLIC_URL: ${HEIMDALL_PUBLIC_URL:-https://${HEIMDALL_DOMAIN:?set HEIMDALL_DOMAIN in deploy/hosted/.env}}
       BENCH_AUTH_SIGNUP: ${HEIMDALL_SIGNUP:-invite}
       BENCH_AUTH_SIGNUP_DOMAINS: ${HEIMDALL_SIGNUP_DOMAINS:-}
+      HEIMDALL_SIGNUP_PER_HOUR: ${HEIMDALL_SIGNUP_PER_HOUR:-}
+      HEIMDALL_CAPTCHA_SECRET: ${HEIMDALL_CAPTCHA_SECRET:-}
+      HEIMDALL_CAPTCHA_SITEKEY: ${HEIMDALL_CAPTCHA_SITEKEY:-}
+      HEIMDALL_IMAGE_AUTO_APPROVE: ${HEIMDALL_IMAGE_AUTO_APPROVE:-}
+      HEIMDALL_FAULT_MODE: ${HEIMDALL_FAULT_MODE:-}
       # security.txt Contact (mailto: or https:); empty uses <public url>/security.
       HEIMDALL_SECURITY_CONTACT: ${HEIMDALL_SECURITY_CONTACT:-}
       # The public name, and "heimdall" for the shared worker on the edge network.
@@ -503,6 +508,7 @@ services:
       HEIMDALL_PULL_SIGNING_KEY: ${HEIMDALL_PULL_SIGNING_KEY:-} # pull-mode agents: the same key as the server
       BENCH_PULL_URL: ${HEIMDALL_PUBLIC_URL:-https://${HEIMDALL_DOMAIN}} # where a pull run's launcher reaches the server
       HEIMDALL_SHARED_RUNTIME: ${HEIMDALL_SHARED_RUNTIME:-auto}
+      HEIMDALL_FAULT_MODE: ${HEIMDALL_FAULT_MODE:-} # proxy (default) or plugin, the same as the server
       # Operator override, logged on every start: run under runc when the
       # host has no gVisor, serving only orgs a server admin set to runc.
       HEIMDALL_SHARED_ALLOW_RUNC: ${HEIMDALL_SHARED_ALLOW_RUNC:-}
