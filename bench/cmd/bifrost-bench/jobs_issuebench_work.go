@@ -34,7 +34,7 @@ import (
 
 func init() {
 	registerJobKind(jobKindSpec{Kind: issuebench.WorkJobKind, Hosted: true, Opts: []jobs.KindOption{jobs.WithMaxAttempts(1)},
-		Validate: validateIssuebenchWork, Run: runIssuebenchWork})
+		Validate: validateIssuebenchWork, Run: runIssuebenchWork, ExactResult: true})
 	handlers.IssueBenchReadiness = issuebenchReadiness
 }
 
@@ -197,7 +197,7 @@ func runIssuebenchWork(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Lo
 			return nil, fmt.Errorf("the worker's result of %d bytes passes the %d byte cap", len(raw), issuebench.MaxWorkResultBytes)
 		}
 		if len(raw) > 0 {
-			if err := json.Unmarshal(raw, &res); err != nil {
+			if err := json.Unmarshal([]byte(redact(string(raw))), &res); err != nil {
 				return nil, fmt.Errorf("the worker's result is not a work result: %s", redact(err.Error()))
 			}
 			haveResult = true

@@ -41,6 +41,13 @@ type jobKindSpec struct {
 	// Args is the argv builder of a cliJob kind (nil otherwise); runner
 	// job variants reuse it (gap G05, jobs_runnerjob.go).
 	Args cliArgs
+	// ExactResult: the kind's Run redacts its result by the exact secret
+	// values it handled, and the pattern scrub is skipped for the result
+	// (log and error keep it). issuebench.work returns task content: the
+	// scrub's URL userinfo rule rewrote a test id such as
+	// test_url[http://user:pass@example.com], and the task's reference answer
+	// could then never pass admission.
+	ExactResult bool
 }
 
 var (
@@ -102,6 +109,9 @@ func runRedacted(ctx context.Context, s jobKindSpec, env jobEnv, j *jobs.Job, lo
 	rl.Flush()
 	if err != nil {
 		err = errors.New(secrets.Redact(err.Error()))
+	}
+	if s.ExactResult {
+		return res, err
 	}
 	return redactResult(res), err
 }
