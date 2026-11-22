@@ -383,7 +383,11 @@ func TestIssuebenchWorkValidate(t *testing.T) {
 	bad := []issuebench.WorkParams{
 		{Request: ibwServerRequest(issuebench.WorkModeBuild)}, // no consent
 		{Request: issuebench.WorkRequest{Mode: "x"}, Consent: true},
-		{Request: func() issuebench.WorkRequest { r := ibwServerRequest(issuebench.WorkModeValidate); r.Env = nil; return r }(), Consent: true},
+		{Request: func() issuebench.WorkRequest {
+			r := ibwServerRequest(issuebench.WorkModeValidate)
+			r.Env = nil
+			return r
+		}(), Consent: true},
 	}
 	for _, p := range bad {
 		raw, _ := json.Marshal(p)
