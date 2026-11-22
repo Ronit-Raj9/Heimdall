@@ -1,4 +1,9 @@
 import { DEFAULT_BENCHMARK_BUDGET, parseBudget } from "@/app/evaluate/views/step5Launch";
+import { budgetLine } from "@/app/evaluate/views/budgetAdvice";
+import { keepRunnable } from "@/app/evaluate/views/step3Benchmarks";
+import { ESTIMATE_DEBOUNCE_MS, FAULTS, estimateText, groupFaults } from "@/app/evaluate/views/step4Setup";
+import { useDebounced } from "@/app/evaluate/views/useDebounced";
+import { BenchmarkChecklist } from "@/components/evaluations/benchmarkChecklist";
 import { AgentPicker } from "@/components/agents/agentPicker";
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
 import { faultName, points, usd } from "@/components/reportcard/reportCard.utils";
@@ -13,12 +18,13 @@ import { useGetAgentsQuery, useGetSuitesQuery } from "@/lib/store";
 import {
 	useCreateEvaluationMutation,
 	useEstimateEvaluationQuery,
+	useGetAgentCompatibilityQuery,
 	useGetAgentVersionsQuery,
+	useGetBenchFaultsQuery,
 	useGetEvaluationReportQuery,
 	useListEvaluationsQuery,
 	type Estimate,
 	type Evaluation,
-	type EvaluationFault,
 	type EvaluationSpec,
 } from "@/lib/store/apis/evaluationsApi";
 import { canUse, useSession } from "@/lib/session/sessionContext";
@@ -28,12 +34,14 @@ import { skipToken } from "@reduxjs/toolkit/query/react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ShieldAlert } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "./gw07I18n";
 
-/** The PS2 faults a failure test can inject, in display order (EvaluationFault is any catalog id since X22). */
-export type FailureFault = Extract<EvaluationFault, string> & ("model-down" | "broken-tool" | "misleading-instruction");
-export const FAILURE_FAULTS: FailureFault[] = ["model-down", "broken-tool", "misleading-instruction"];
+/** A fault a failure test can inject: any id of the fault catalog (GET /faults). */
+export type FailureFault = string;
+/** The faults ticked when the page opens: the three PS2 faults (decision D19). */
+export const FAILURE_FAULTS: readonly FailureFault[] = ["model-down", "broken-tool", "misleading-instruction"];
 
 /** Past failure tests listed. */
 export const PAST_SHOWN = 10;
@@ -87,7 +95,7 @@ export function failureTestSpec(f: FailureTestForm, agent?: Pick<AgentSummary, "
 		benchmarks: f.benchmarks,
 		tasks_per_benchmark: f.tasks,
 		trials: f.trials,
-		faults: ["clean", ...FAILURE_FAULTS.filter((x) => f.faults.includes(x))],
+		faults: ["clean", ...new Set(f.faults.filter((x) => x !== "clean"))],
 		...(budget !== undefined ? { budget_usd: budget } : {}),
 	};
 }
@@ -144,18 +152,64 @@ export function pastFailureTests(evaluations: readonly Evaluation[], agent: stri
 }
 
 /**
- * Failure tests (/failure-tests?agent=): run the PS2 faults (model goes down, broken tool,
- * misleading instruction) on any benchmark for one agent, then see how far its score drops.
- * Launch creates an evaluation with those faults; results come from its report card.
+ * The estimate box above Run (fix wave 2, N125): runs, cost and minutes from POST /evaluations/estimate,
+ * "Updating..." while a change waits or loads, a plain line when it fails (the server's text only as a
+ * title), and the budget line once a budget is typed. Before the form is complete it says what is missing.
+ */
+export function FailureTestEstimate({
+	problem,
+	estimate,
+	pending,
+	budgetTyped,
+}: {
+	problem: ReturnType<typeof formProblem>;
+	estimate: { data?: Estimate; isFetching?: boolean; isError?: boolean; error?: unknown };
+	pending: boolean;
+	budgetTyped: boolean;
+}) {
+	const { t } = useTranslation("agentFirst");
+	const { t: tg } = useTranslation("gw07");
+	const updating = pending || Boolean(estimate.isFetching);
+	return (
+		<div className="flex min-w-0 flex-1 flex-col gap-1 text-sm" data-testid="ft-estimate" aria-live="polite">
+			{problem !== null ? (
+				<span className="text-muted-foreground">{tg("ft.toSeeCost", { need: t(`ft.need.${problem}`) })}</span>
+			) : estimate.data ? (
+				<span className="font-medium">
+					{tg("ft.estimateLine", estimateText(estimate.data))}
+					{updating && <span className="text-muted-foreground font-normal"> {tg("ft.updating")}</span>}
+				</span>
+			) : estimate.isError ? (
+				<span className="text-muted-foreground" title={getBenchErrorMessage(estimate.error)} data-testid="ft-estimate-error">
+					{tg("ft.estimateFailed")}
+				</span>
+			) : (
+				<span className="text-muted-foreground">{t("ft.estimating")}</span>
+			)}
+			{problem === null && budgetTyped && estimate.data?.budget && (
+				<span className="text-muted-foreground text-xs" data-testid="ft-budget-line">
+					{budgetLine(estimate.data.budget, estimate.data.est_cost_usd, updating)}
+				</span>
+			)}
+		</div>
+	);
+}
+
+/**
+ * Failure tests (/failure-tests?agent=): run faults from the shared fault catalog (GET /faults, the
+ * same list the evaluate wizard offers) on any benchmark for one agent, then see how far its score
+ * drops. Launch creates an evaluation with those faults; results come from its report card.
  */
 export default function FailureTestsView() {
 	const { t } = useTranslation("agentFirst");
+	const { t: tg } = useTranslation("gw07");
 	const navigate = useNavigate();
 	const mayRun = canUse(useSession(), "member");
 	const [agentParam, setAgentParam] = useQueryState("agent", parseAsString.withOptions({ history: "replace" }));
 	const agents = useGetAgentsQuery();
 	const suites = useGetSuitesQuery();
 	const evals = useListEvaluationsQuery();
+	const catalog = useGetBenchFaultsQuery();
 	const [form, setForm] = useState<FailureTestForm>({
 		agent: agentParam ?? "",
 		version: 0,
@@ -167,13 +221,27 @@ export default function FailureTestsView() {
 		trials: 1,
 	});
 	const versions = useGetAgentVersionsQuery(form.agent || skipToken);
+	const compat = useGetAgentCompatibilityQuery(form.agent, { skip: !form.agent });
 	const [create, createState] = useCreateEvaluationMutation();
 	const summary = (agents.data?.agents ?? []).find((a) => a.id === form.agent);
 	// The agent's default model applies only while the user has not picked one, and the form says so.
 	const chosen = resolvedModel(form, summary);
 	const problem = formProblem(form, summary);
 	const spec = failureTestSpec(form, summary);
-	const estimate = useEstimateEvaluationQuery(problem === null ? spec : skipToken);
+	// The estimate waits until the form has been still for a moment, like the wizard's step 4.
+	const settled = useDebounced(spec, ESTIMATE_DEBOUNCE_MS);
+	const pending = JSON.stringify(settled) !== JSON.stringify(spec);
+	const estimate = useEstimateEvaluationQuery(problem === null ? settled : skipToken);
+	// currentData, not data: data keeps the previous agent's answer while the new one loads.
+	const compatibility = compat.currentData;
+	const checking = Boolean(form.agent) && !compat.currentData && !compat.isError;
+	const runnable = keepRunnable(form.benchmarks, compatibility);
+	const answered = compatibility?.benchmarks.map((b) => `${b.id}:${b.ok}`).join(",");
+	useEffect(() => {
+		// Benchmarks picked before the answer came (or for another agent) that this agent cannot run leave the selection.
+		if (runnable.length !== form.benchmarks.length) setForm((f) => ({ ...f, benchmarks: keepRunnable(f.benchmarks, compatibility) }));
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [answered, form.benchmarks.join(",")]);
 
 	const pickAgent = (id: string) => {
 		setForm((f) => pickAgentForm(f, id));
@@ -187,6 +255,8 @@ export default function FailureTestsView() {
 	const versionList = [...(versions.data?.versions ?? [])].sort((a, b) => b.version - a.version);
 	const suiteList = suites.data?.suites ?? [];
 	const past = pastFailureTests(evals.data ?? [], form.agent);
+	const faultGroups = groupFaults(catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS);
+	const budgetTyped = (form.budgetText ?? "").trim() !== "";
 
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="failure-tests-screen">
@@ -231,21 +301,31 @@ export default function FailureTestsView() {
 
 					<fieldset className="flex flex-col gap-2">
 						<legend className="mb-2 text-sm font-semibold">{t("ft.faults")}</legend>
-						<div className="flex flex-wrap gap-2">
-							{FAILURE_FAULTS.map((fault) => (
-								<label key={fault} className="inline-flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm">
-									<input
-										type="checkbox"
-										className="mt-0.5"
-										checked={form.faults.includes(fault)}
-										onChange={(e) => setForm((f) => ({ ...f, faults: toggle(f.faults, fault, e.target.checked) }))}
-										data-testid={`ft-fault-${fault}`}
-									/>
-									<span className="flex flex-col">
-										<span className="font-medium">{faultName(fault)}</span>
-										<span className="text-muted-foreground text-xs">{t(`ft.faultHint.${fault}`)}</span>
-									</span>
-								</label>
+						<div className="flex flex-col gap-3">
+							{faultGroups.map((g) => (
+								<div key={g.group} className="flex flex-col gap-1.5" data-testid={`ft-fault-group-${g.group}`}>
+									<span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{g.group}</span>
+									<div className="flex flex-wrap gap-2">
+										{g.faults.map((fault) => (
+											<label
+												key={fault.id}
+												className="inline-flex max-w-sm cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm"
+											>
+												<input
+													type="checkbox"
+													className="mt-0.5"
+													checked={form.faults.includes(fault.id)}
+													onChange={(e) => setForm((f) => ({ ...f, faults: toggle(f.faults, fault.id, e.target.checked) }))}
+													data-testid={`ft-fault-${fault.id}`}
+												/>
+												<span className="flex flex-col">
+													<span className="font-medium">{fault.label}</span>
+													<span className="text-muted-foreground text-xs">{fault.help}</span>
+												</span>
+											</label>
+										))}
+									</div>
+								</div>
 							))}
 						</div>
 						<p className="text-muted-foreground text-xs">{t("ft.cleanNote")}</p>
@@ -263,23 +343,21 @@ export default function FailureTestsView() {
 								</Link>
 							</p>
 						) : (
-							<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-								{suiteList.map((s) => (
-									<label key={s.id} className="inline-flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm">
-										<input
-											type="checkbox"
-											className="mt-0.5"
-											checked={form.benchmarks.includes(s.id)}
-											onChange={(e) => setForm((f) => ({ ...f, benchmarks: toggle(f.benchmarks, s.id, e.target.checked) }))}
-											data-testid={`ft-benchmark-${s.id}`}
-										/>
-										<span className="flex min-w-0 flex-col">
-											<span className="truncate font-mono text-xs font-medium">{s.id}</span>
-											{s.description && <span className="text-muted-foreground line-clamp-2 text-xs">{s.description}</span>}
-										</span>
-									</label>
-								))}
-							</div>
+							<>
+								{!form.agent && (
+									<p className="text-muted-foreground text-xs" data-testid="ft-benchmarks-pick-agent">
+										{tg("ft.pickAgentFirst")}
+									</p>
+								)}
+								<BenchmarkChecklist
+									suites={suiteList}
+									compatibility={compatibility}
+									checking={checking}
+									selected={form.benchmarks}
+									onToggle={(id) => setForm((f) => ({ ...f, benchmarks: toggle(f.benchmarks, id, !f.benchmarks.includes(id)) }))}
+									testIdPrefix="ft"
+								/>
+							</>
 						)}
 					</fieldset>
 
@@ -313,20 +391,9 @@ export default function FailureTestsView() {
 							/>
 							<span className="text-muted-foreground font-normal">{t("ft.budgetHint", { amount: DEFAULT_BENCHMARK_BUDGET })}</span>
 						</label>
-						<div className="text-muted-foreground ml-auto text-sm" data-testid="ft-estimate">
-							{problem !== null
-								? t(`ft.need.${problem}`)
-								: estimate.data
-									? t("ft.estimate", {
-											runs: estimate.data.runs,
-											cost: estimate.data.est_cost_usd.known
-												? `${usd(estimate.data.est_cost_usd.low)}-${usd(estimate.data.est_cost_usd.high)}`
-												: t("ft.costUnknown"),
-										})
-									: estimate.isError
-										? getBenchErrorMessage(estimate.error)
-										: t("ft.estimating")}
-						</div>
+					</div>
+					<div className="bg-muted/40 flex flex-wrap items-center gap-4 rounded-lg border px-4 py-3">
+						<FailureTestEstimate problem={problem} estimate={estimate} pending={pending} budgetTyped={budgetTyped} />
 						{mayRun && (
 							<Button onClick={() => void launch()} disabled={problem !== null || createState.isLoading} dataTestId="ft-launch">
 								<ShieldAlert aria-hidden="true" />

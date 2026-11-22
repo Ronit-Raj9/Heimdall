@@ -67,6 +67,11 @@ type GitHubStatus struct {
 	ConnectedBy string     `json:"connected_by,omitempty"`
 	ConnectedAt *time.Time `json:"connected_at,omitempty"`
 	Hint        string     `json:"hint,omitempty"`
+	// Hosted is set on a hosted server (fix wave 2, N67): a hosted project has
+	// no git history of its own, so Compare two git refs offers GitHub
+	// repositories only. These routes are served by the hosted platform
+	// router alone (cmd/bifrost-bench/github_hosted.go), so it is always set.
+	Hosted bool `json:"hosted,omitempty"`
 }
 
 // GitHubStartRequest is POST /github/connect/start.
@@ -188,7 +193,7 @@ func (h *GitHubHandler) getStatus(ctx *fasthttp.RequestCtx) {
 		h.fail(ctx, http.StatusForbidden, "request not resolved to an organization")
 		return
 	}
-	st := GitHubStatus{Configured: h.conn.Configured()}
+	st := GitHubStatus{Configured: h.conn.Configured(), Hosted: true}
 	switch {
 	case !st.Configured:
 		st.Hint = auth.ErrGitHubRepoDisabled.Error()

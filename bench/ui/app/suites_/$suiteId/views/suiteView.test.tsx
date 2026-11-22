@@ -8,12 +8,13 @@ import SuiteView from "./suiteView";
 // newer revision the page says it shows the current one.
 
 const broken = { id: "example", version: "2.0.0", description: "", tasks: [], lock_state: "fresh", error: "broken for the test" };
-const fixture = vi.hoisted(() => ({ suites: [] as unknown[] }));
+const fixture = vi.hoisted(() => ({ suites: [] as unknown[], runs: undefined as unknown, health: {} as unknown }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store")>()),
 	useGetSuitesQuery: () => okQuery({ mode: "live", suites: fixture.suites }),
-	useGetSuiteHealthQuery: () => ({}),
+	useGetSuiteHealthQuery: () => fixture.health,
+	useListRunsQuery: () => fixture.runs ?? okQuery({ runs: [], total: 0, limit: 1 }),
 }));
 vi.mock("./suiteTabs", () => ({ SuiteExportTab: () => null, SuiteHealthTab: () => null, SuiteTiersTab: () => null }));
 vi.mock("./calibrationTab", () => ({ SuiteCalibrationTab: () => null }));
@@ -87,5 +88,49 @@ describe("SuiteView built-in note (C2.tabs)", () => {
 		const html = render(<SuiteView suiteId="zz-test-own" />);
 		expect(html).not.toContain("Zz Test Own");
 		expect(html).not.toContain("make your own benchmark");
+	});
+});
+describe("SuiteView stat tiles (N164)", () => {
+	const bfcl = () => healthy({ id: "hd-harbor-bfcl", builtin: true, source: "library" });
+	it("counts runs from the run list, not the health report", () => {
+		fixture.suites = [bfcl()];
+		fixture.health = { isError: true, error: { status: 500 } };
+		fixture.runs = okQuery({ runs: [], total: 59, limit: 1 });
+		const html = render(<SuiteView suiteId="hd-harbor-bfcl" />);
+		expect(html).toMatch(/Runs so far[\s\S]{0,400}?>59</);
+		expect(html).not.toContain("None yet");
+	});
+	it("says Counting while the run list loads and - with the error when it fails", () => {
+		fixture.suites = [bfcl()];
+		fixture.health = {};
+		fixture.runs = { data: undefined, isLoading: true, isFetching: true, isError: false };
+		expect(render(<SuiteView suiteId="hd-harbor-bfcl" />)).toContain("Counting...");
+		fixture.runs = {
+			data: undefined,
+			isLoading: false,
+			isError: true,
+			error: { status: 500, data: { error: { message: "run store down" } } },
+		};
+		const html = render(<SuiteView suiteId="hd-harbor-bfcl" />);
+		expect(html).toMatch(/title="[^"]*"[^>]*>-</);
+		expect(html).not.toContain("None yet");
+	});
+	it("says None yet only when the benchmark has no runs", () => {
+		fixture.suites = [bfcl()];
+		fixture.runs = okQuery({ runs: [], total: 0, limit: 1 });
+		expect(render(<SuiteView suiteId="hd-harbor-bfcl" />)).toContain("None yet");
+	});
+	it("labels the benchmark's own failure tests and says the model faults work on every benchmark", () => {
+		fixture.suites = [bfcl()];
+		fixture.runs = undefined;
+		const html = render(<SuiteView suiteId="hd-harbor-bfcl" />);
+		expect(html).toContain("Its own failure tests");
+		expect(html).toContain("Plus model faults (outage, brownout, flaky) that work on every benchmark.");
+	});
+	it("says it is working out task health while the health report loads", () => {
+		fixture.suites = [bfcl()];
+		fixture.health = { isLoading: true };
+		expect(render(<SuiteView suiteId="hd-harbor-bfcl" />)).toContain("Working out task health...");
+		fixture.health = {};
 	});
 });

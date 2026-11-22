@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/engine"
+	"github.com/maximhq/bifrost/bench/faults"
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/ops"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -57,8 +58,13 @@ type (
 		NoStart       bool     `json:"no_start,omitempty"`
 	}
 	probeJobParams struct {
-		ExpID   string   `json:"exp_id"`
-		Probes  []string `json:"probes,omitempty"` // default: every probe of the suite
+		ExpID  string   `json:"exp_id"`
+		Probes []string `json:"probes,omitempty"` // default (no probes and no faults): every probe of the suite
+		// Faults are fault catalog names (faults.Names, such as model-brownout),
+		// mapped to conditions on the benchmark by faults.Conditions, so a
+		// benchmark without probes of its own still gets a fault test (fix
+		// wave 2, N65).
+		Faults  []string `json:"faults,omitempty"`
 		Trials  int      `json:"trials,omitempty"` // default: the clean condition's trials
 		NoStart bool     `json:"no_start,omitempty"`
 	}
@@ -179,10 +185,45 @@ func validateProbeJob(ctx context.Context, env jobEnv, raw json.RawMessage) (any
 			return nil, "", invalid(err)
 		}
 	}
+	for _, f := range p.Faults {
+		if !slices.Contains(faults.Names, f) {
+			return nil, "", invalid(fmt.Errorf("unknown fault %q; pick one from the list", f))
+		}
+	}
 	if _, err := validateParentExp(ctx, env, p.ExpID); err != nil {
 		return nil, "", err
 	}
 	return p, expTarget(p.ExpID), nil
+}
+
+// probeWanted resolves what a probe job asks for on s: want is the suite
+// probes it names plus the conditions of the catalog faults it names, and
+// allowed is every id the follow-up may run (the suite's own probes plus those
+// fault conditions). A fault that cannot run on s is in skipped. With faults
+// asked and none of them able to run (and no probe named), it is an error.
+func probeWanted(s *schemas.Suite, probes, faultNames []string) (want, allowed []string, skipped []faults.Skip, err error) {
+	allowed = slices.Clone(s.ProbeIDs)
+	want = slices.Clone(probes)
+	if len(faultNames) == 0 {
+		return want, allowed, nil, nil
+	}
+	conds, skipped := faults.Conditions(faultNames, s)
+	for _, id := range conds[1:] {
+		if !slices.Contains(allowed, id) {
+			allowed = append(allowed, id)
+		}
+		if !slices.Contains(want, id) {
+			want = append(want, id)
+		}
+	}
+	if len(want) == 0 {
+		reasons := make([]string, 0, len(skipped))
+		for _, sk := range skipped {
+			reasons = append(reasons, sk.Fault+": "+sk.Reason)
+		}
+		return nil, nil, skipped, fmt.Errorf("none of the chosen faults can run on benchmark %s: %s", s.ID, strings.Join(reasons, "; "))
+	}
+	return want, allowed, skipped, nil
 }
 
 // probeExperiment is the parent's experiment with its clean condition and
@@ -262,9 +303,16 @@ func runProbeJob(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, 
 	if err != nil {
 		return nil, err
 	}
-	e, notes, err := probeExperiment(m, s.ProbeIDs, p.Probes, p.Trials)
+	want, allowed, skipped, err := probeWanted(s, p.Probes, p.Faults)
 	if err != nil {
 		return nil, err
+	}
+	e, notes, err := probeExperiment(m, allowed, want, p.Trials)
+	if err != nil {
+		return nil, err
+	}
+	for _, sk := range skipped {
+		notes = append(notes, fmt.Sprintf("fault %s does not apply to %s: %s", sk.Fault, s.ID, sk.Reason))
 	}
 	for _, n := range notes {
 		log.Printf("%s", n)

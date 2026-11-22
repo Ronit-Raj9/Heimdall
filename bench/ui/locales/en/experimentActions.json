@@ -11,7 +11,7 @@
 	"extend": {
 		"title": "Extend",
 		"description": "Add trials or tasks to firm up an unclear result.",
-		"decision": "Current verdict: {{decision}}",
+		"decision": "Current result: {{decision}}",
 		"sizing": "Suggested: about {{tasks}} more tasks to reach {{target}} pp.",
 		"already": "This experiment is itself a follow-up of {{expId}}. Extend the first experiment instead.",
 		"mode": "What to add",
@@ -25,13 +25,22 @@
 	},
 	"probe": {
 		"title": "Fault test",
-		"description": "Re-run each setup with faults added to see how it holds up.",
-		"none": "The benchmark has no failure tests. Add them to the benchmark file, then come back.",
-		"loading": "Loading the benchmark's failure tests",
-		"pick": "Failure tests (none ticked means all)",
+		"description": "Re-run each setup with faults added, on the same tasks, to see how it holds up.",
+		"loading": "Loading the fault list",
+		"catalog": "Faults to add",
+		"own": "This benchmark's own failure tests",
+		"tickOne": "Tick at least one fault.",
+		"catalogError": "Could not load the fault list: {{error}}",
 		"trials": "Tries per failure test",
 		"run": "Run failure tests",
 		"confirm": "Run failure tests on {{expId}}? It spends model budget."
+	},
+	"decisionWords": {
+		"score": "score only (one setup)",
+		"improved": "B is better",
+		"regressed": "B is worse",
+		"inconclusive": "no clear difference yet",
+		"invalid": "the test was broken"
 	},
 	"migrate": {
 		"title": "Compare models",

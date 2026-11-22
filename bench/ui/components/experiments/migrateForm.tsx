@@ -9,17 +9,31 @@ import { FollowUpJob } from "./followUpJob";
  * Compare models: one agent on its current model and on candidates over the same suite, through
  * the experiment.migrate job. Used by the experiment actions tab and the compare page.
  */
-export function MigrateForm({ suite: initialSuite = "", testId = "migrate-form" }: { suite?: string; testId?: string }) {
+export function MigrateForm({
+	suite: initialSuite = "",
+	initialAgent = "",
+	initialFrom = "",
+	testId = "migrate-form",
+}: {
+	suite?: string;
+	/** The agent file to start from (agents/<id>.yaml), such as the comparison's setup A; kept only when listed. */
+	initialAgent?: string;
+	/** The current model to start from. */
+	initialFrom?: string;
+	testId?: string;
+}) {
 	const { t } = useTranslation("experimentActions");
 	const uid = useId();
 	const agents = useGetAgentsQuery();
-	const [agent, setAgent] = useState("");
+	const [picked, setAgent] = useState(initialAgent);
 	const [suite, setSuite] = useState(initialSuite);
-	const [from, setFrom] = useState("");
+	const [from, setFrom] = useState(initialFrom);
 	const [to, setTo] = useState("");
 	const [trials, setTrials] = useState(3);
 	const [budget, setBudget] = useState(0);
 	const list = agents.data?.agents ?? [];
+	// A start agent no listed agent has leaves the select empty: never a made-up option.
+	const agent = list.some((a) => a.path === picked) ? picked : "";
 	const pickAgent = (path: string) => {
 		setAgent(path);
 		const a = list.find((x) => x.path === path);
