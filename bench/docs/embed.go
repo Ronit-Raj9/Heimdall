@@ -65,3 +65,30 @@ func Read(name string) ([]byte, bool) {
 	}
 	return data, true
 }
+
+// publicHidden are user guides the in-app Help lists but the public site
+// (no sign-in, lane Y08) does not: the research source log behind DESIGN.
+var publicHidden = map[string]bool{"sources": true}
+
+// Public reports whether guide name is on the public site: a user guide
+// (not Internal) that is not in publicHidden.
+func Public(name string) bool { return !Internal(name) && !publicHidden[name] }
+
+// PublicNames lists the guides the public site serves, sorted.
+func PublicNames() []string {
+	var out []string
+	for _, n := range Names() {
+		if Public(n) {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// ReadPublic is Read for the public site: guides outside Public are not served.
+func ReadPublic(name string) ([]byte, bool) {
+	if !Public(name) {
+		return nil, false
+	}
+	return Read(name)
+}

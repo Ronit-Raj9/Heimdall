@@ -3,6 +3,7 @@
 // standalone bench before the platform) behave exactly as before.
 import { errorStatus, getAuthState, isAuthPage, isSharePage, isUnauthorized, roleAtLeast } from "@/lib/store/apis/session";
 import type { AuthConfig, AuthMe, AuthMode, OrgSummary, PlatformUser, PrincipalKind, Role } from "@/lib/types/bench";
+import { isPublicPage, isVisitorPage } from "@/lib/routing/publicPages";
 import { createContext, useContext } from "react";
 
 export interface SessionInfo {
@@ -141,13 +142,19 @@ export function useSession(): SessionInfo {
 
 /**
  * What the app frame shows for a path: a share link's page on its own (whatever the session), the
- * auth pages without the shell, the login page for a hosted visitor who is not signed in, else the
- * app shell.
+ * auth pages without the shell, the public site (landing, docs, benchmark library, pricing,
+ * downloads, security and legal pages) in the public frame, the login page for a hosted visitor who
+ * is not signed in on any other page, else the app shell.
  */
-export function frameFor(session: SessionInfo, pathname: string): "share" | "auth" | "login" | "app" | "error" {
+export function frameFor(session: SessionInfo, pathname: string): "share" | "auth" | "login" | "app" | "error" | "public" | "landing" {
 	if (isSharePage(pathname)) return "share";
+	// The public site (lane Y08) reads only /public/*, so it renders whatever the session says.
+	if (isPublicPage(pathname)) return "public";
 	if (session.status === "error") return "error";
 	if (isAuthPage(pathname)) return "auth";
-	if (session.authMode === "hosted" && session.status === "ready" && !session.signedIn) return "login";
+	if (session.authMode === "hosted" && session.status === "ready" && !session.signedIn) {
+		if (isVisitorPage(pathname)) return pathname === "/" ? "landing" : "public";
+		return "login";
+	}
 	return "app";
 }

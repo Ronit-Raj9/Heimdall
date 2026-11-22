@@ -275,6 +275,10 @@ check out the previous commit, retag `:previous` as `:local`,
 version runs on the migrated database; if not, restore the dump. Upgrade
 runners to the same commit (`deploy/runner/README.md`, Upgrade).
 
+Each build also rebuilds the files the server offers at `/downloads` (the
+command line tool, the Python and TypeScript SDKs, a source tarball) at the
+checkout's commit (`docs/downloads.md`); CI jobs download the tool from there.
+
 ## 9. Shared worker (optional)
 
 The shared worker lets every organization run the built-in agents and
@@ -487,6 +491,7 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_API_RATE_LIMITS` | API rate limits per token and per organization (`cred_burst,cred_per_sec,org_burst,org_per_sec`, or `off`); empty is the default. |
 | `HEIMDALL_RUNNER_IMAGE` | Runner image Heimdall starts for an organization's own worker on Fly Machines or Kubernetes; empty is the published default. |
 | `HEIMDALL_GATEWAY_LOGS_URL` | The shared gateway's log API the server lists, deletes and expires one organization's prompt logs through; empty with the shared worker on is `http://bifrost:8080`, `off` disables it. |
+| `HEIMDALL_SECURITY_CONTACT` | Where security reports go (`mailto:` or `https:`), published at `/.well-known/security.txt`; empty points at the `/security` page. |
 | `HEIMDALL_BACKUP_PASSPHRASE_FILE` | Passphrase file kept away from the backups; `backup.sh` then writes an encrypted copy of `.env` beside each dump. |
 
 `HEIMDALL_DEV` turns on the practice suite and examples for tests and

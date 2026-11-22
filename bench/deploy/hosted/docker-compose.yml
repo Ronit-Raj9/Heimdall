@@ -173,6 +173,9 @@ services:
       context: ../..
       dockerfile: deploy/hosted/Dockerfile.server
       target: server
+      args:
+        # The commit /downloads is built at (deploy/hosted/lib.sh sets it).
+        HEIMDALL_COMMIT: ${HEIMDALL_COMMIT:-}
     image: ${HEIMDALL_IMAGE:-heimdall/server:local}
     labels: *labels
     <<: [*hardening, *logging]
@@ -182,6 +185,8 @@ services:
       BENCH_AUTH_PUBLIC_URL: ${HEIMDALL_PUBLIC_URL:-https://${HEIMDALL_DOMAIN:?set HEIMDALL_DOMAIN in deploy/hosted/.env}}
       BENCH_AUTH_SIGNUP: ${HEIMDALL_SIGNUP:-invite}
       BENCH_AUTH_SIGNUP_DOMAINS: ${HEIMDALL_SIGNUP_DOMAINS:-}
+      # security.txt Contact (mailto: or https:); empty uses <public url>/security.
+      HEIMDALL_SECURITY_CONTACT: ${HEIMDALL_SECURITY_CONTACT:-}
       # The public name, and "heimdall" for the shared worker on the edge network.
       BENCH_SERVER_ALLOWED_HOSTS: ${HEIMDALL_DOMAIN},heimdall
       # Only compose networks reach the server (its port is not published),
