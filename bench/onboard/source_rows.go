@@ -413,7 +413,7 @@ func inspectRows(name string, data []byte, plan Plan, public bool) (*Inventory, 
 		inv.Unit = "ticket"
 	}
 	if wrong < tasks {
-		inv.Warnings = append(inv.Warnings, fmt.Sprintf("%d of %d rows give no wrong answer: a fixed rule writes one, which proves less than a real near miss", tasks-wrong, tasks))
+		inv.Warnings = append(inv.Warnings, fmt.Sprintf("%d of %d rows have no wrong answer. Heimdall will make one for the readiness check by changing the right answer slightly. A real wrong answer from your data (a wrong_answers column) tests the grader better.", tasks-wrong, tasks))
 	}
 	inv.Next = "Check the plan, then Draft: nothing is added to a benchmark until you publish."
 	if !inv.CanDraft {
