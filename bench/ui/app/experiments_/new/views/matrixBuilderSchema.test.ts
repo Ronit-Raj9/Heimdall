@@ -1,14 +1,18 @@
-import type { Catalog } from "@/lib/types/bench";
+import type { Catalog, SuiteSummary } from "@/lib/types/bench";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+	agentFromLinkMissing,
 	builderAgentGroups,
 	builderPlanIsStale,
 	defaultBuilderValues,
+	defaultRunnableSuite,
 	guessProvider,
 	keyedProviders,
 	matrixPreview,
+	readyTaskMap,
+	suiteMenuGroups,
 	toMatrixExperiment,
 	validateBuilder,
 } from "./matrixBuilderSchema";
@@ -181,5 +185,105 @@ describe("keyedProviders", () => {
 				{ provider: "gemini", status: "untested" },
 			] as never),
 		).toEqual(["openai", "gemini"]);
+	});
+});
+// Fix wave 2 (N39, N42, N155): defaults follow readiness and the org's agents; forms send only ready tasks.
+describe("ready tasks (N39, N42)", () => {
+	const ids = (n: number, prefix: string) => Array.from({ length: n }, (_, i) => `${prefix}${i + 1}`);
+	const many: Catalog = {
+		...catalog,
+		suites: [
+			{ id: "acme-desktop", version: "1.0.0", tasks: ["file-inbox", "calendar"], probes: ["model-outage"] },
+			{ id: "coding-core", version: "1.0.0", tasks: ids(4, "t"), probes: ["stale-notes"] },
+			{ id: "hd-harbor-bfcl", version: "2.0.0", tasks: ids(20, "b"), probes: [] },
+			{ id: "hd-drafty", version: "1.0.0", tasks: ids(30, "d"), probes: [] },
+		],
+	};
+	const summary = (id: string, version: string, tasks: { id: string; status: string; stale?: boolean }[]) =>
+		({ id, version, tasks: tasks.map((t) => ({ stale: false, ...t })) }) as unknown as SuiteSummary;
+	const suites: SuiteSummary[] = [
+		summary("acme-desktop", "1.0.0", [
+			{ id: "file-inbox", status: "draft" },
+			{ id: "calendar", status: "admitted" },
+		]),
+		summary(
+			"coding-core",
+			"1.0.0",
+			ids(4, "t").map((id) => ({ id, status: "admitted" })),
+		),
+		summary("hd-harbor-bfcl", "2.0.0", [...ids(19, "b").map((id) => ({ id, status: "admitted" })), { id: "b20", status: "draft" }]),
+		summary(
+			"hd-drafty",
+			"1.0.0",
+			ids(30, "d").map((id, i) => ({ id, status: i === 0 ? "admitted" : "draft" })),
+		),
+	];
+	const ready = readyTaskMap(many, suites);
+
+	it("counts only admitted tasks whose files still match", () => {
+		const stale = readyTaskMap(many, [summary("acme-desktop", "1.0.0", [{ id: "calendar", status: "admitted", stale: true }])]);
+		expect(stale?.get("acme-desktop@1.0.0")).toEqual({ ids: [], total: 2 });
+		expect(ready?.get("hd-harbor-bfcl@2.0.0")?.ids).toHaveLength(19);
+		expect(ready?.get("acme-desktop@1.0.0")).toEqual({ ids: ["calendar"], total: 2 });
+		expect(readyTaskMap(many, undefined)).toBeUndefined();
+	});
+
+	it("defaults to the non-practice benchmark with the most ready tasks, skipping coding-core and acme-*", () => {
+		expect(defaultRunnableSuite(many, ready)?.id).toBe("hd-harbor-bfcl");
+		expect(defaultBuilderValues(many, 1, { ready }).suite).toBe("hd-harbor-bfcl@2.0.0");
+	});
+
+	it("falls back to the practice benchmark with the most ready tasks, then the first", () => {
+		// No benchmark that is not practice has 2 ready tasks: hd-harbor-bfcl has none, hd-drafty one.
+		const practiceOnly = readyTaskMap(many, [
+			...suites.slice(0, 2),
+			summary("hd-harbor-bfcl", "2.0.0", [{ id: "b1", status: "draft" }]),
+			suites[3],
+		]);
+		expect(defaultRunnableSuite(many, practiceOnly)?.id).toBe("coding-core");
+		const noneReady = readyTaskMap(
+			many,
+			suites.map((x) => ({ ...x, tasks: x.tasks.map((t) => ({ ...t, status: "draft" as const })) })),
+		);
+		expect(defaultRunnableSuite(many, noneReady)?.id).toBe("acme-desktop");
+	});
+
+	it("sends only ready ids for all tasks and takes the first N ready ids", () => {
+		const v = {
+			...defaultBuilderValues(many, 1, { ready }),
+			suite: "acme-desktop@1.0.0",
+			agents: ["agents/claude-code.yaml", "agents/codex.yaml"],
+			taskScope: "all" as const,
+		};
+		const exp = toMatrixExperiment(v, many, ready);
+		expect(exp.conditions[0].tasks).toEqual({ ids: ["calendar"] });
+		const first = toMatrixExperiment({ ...v, suite: "hd-harbor-bfcl@2.0.0", taskScope: "first", taskCount: 19 }, many, ready);
+		expect(first.conditions[0].tasks).toEqual({ ids: ids(19, "b") });
+		// Every task ready: "all" stays all.
+		expect(toMatrixExperiment({ ...v, suite: "coding-core@1.0.0" }, many, ready).conditions[0].tasks).toEqual({ all: true });
+		// The task count range uses the ready count.
+		const s = many.suites[2];
+		expect(validateBuilder({ ...v, suite: "hd-harbor-bfcl@2.0.0", taskScope: "first", taskCount: 20 }, s, ready).taskCount).toBe(
+			"taskCountRange",
+		);
+		expect(validateBuilder({ ...v, suite: "hd-harbor-bfcl@2.0.0", taskScope: "first", taskCount: 19 }, s, ready).taskCount).toBeUndefined();
+	});
+
+	it("lists ready benchmarks first and benchmarks with no ready task apart", () => {
+		const none = readyTaskMap(many, [summary("acme-desktop", "1.0.0", [{ id: "file-inbox", status: "draft" }]), ...suites.slice(1)]);
+		const groups = suiteMenuGroups(many, none);
+		expect(groups.ready.map((s) => s.id)).toEqual(["coding-core", "hd-harbor-bfcl", "hd-drafty"]);
+		expect(groups.notReady.map((s) => s.id)).toEqual(["acme-desktop"]);
+		expect(suiteMenuGroups(many, undefined).notReady).toEqual([]);
+	});
+});
+
+describe("agentFromLinkMissing (N155)", () => {
+	it("is true only for a linked agent the builder does not list", () => {
+		expect(agentFromLinkMissing("zz-nope", ["codex"])).toBe(true);
+		expect(agentFromLinkMissing("codex", ["codex"])).toBe(false);
+		expect(agentFromLinkMissing("agents/codex.yaml", ["codex"])).toBe(false);
+		expect(agentFromLinkMissing(null, ["codex"])).toBe(false);
+		expect(agentFromLinkMissing("  ", ["codex"])).toBe(false);
 	});
 });

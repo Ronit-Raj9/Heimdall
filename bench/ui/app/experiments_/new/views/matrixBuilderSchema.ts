@@ -1,5 +1,6 @@
 import type { ModelRef, ProviderId } from "@/components/models/modelPicker";
-import type { Catalog, CatalogAgent, CatalogSuite, Experiment } from "@/lib/types/bench";
+import { isPracticeExperiment } from "@/components/experiments/experiments.utils";
+import type { Catalog, CatalogAgent, CatalogSuite, Experiment, SuiteSummary } from "@/lib/types/bench";
 import type { ModelKey } from "@/lib/types/models";
 import { suiteRef } from "./experimentFormSchema";
 
@@ -66,10 +67,59 @@ export function guessProvider(model: string): ProviderId | undefined {
 	return undefined;
 }
 
-/** The suite to start from: coding-core when the project has it (the starter suite), else the first. */
-export function defaultSuite(catalog: Catalog): CatalogSuite | undefined {
+/**
+ * The tasks of each benchmark that can run, keyed by "<id>@<version>": admitted tasks whose files still
+ * match the lock and that are not kept out of plans, in the catalog's task order. `total` is the
+ * catalog's task count. A benchmark missing from the map is not known, and every task of it counts.
+ */
+export type ReadyTasks = ReadonlyMap<string, { ids: readonly string[]; total: number }>;
+
+/** Ready tasks per catalog benchmark from GET /suites; undefined while the list is not known. */
+export function readyTaskMap(catalog: Catalog, suites: readonly SuiteSummary[] | undefined): ReadyTasks | undefined {
+	if (!suites) return undefined;
+	const out = new Map<string, { ids: readonly string[]; total: number }>();
+	for (const s of catalog.suites ?? []) {
+		const summary = suites.find((x) => x.id === s.id && x.version === s.version);
+		if (!summary) continue;
+		const ok = new Set((summary.tasks ?? []).filter((t) => t.status === "admitted" && !t.stale && !t.quarantine).map((t) => t.id));
+		const tasks = s.tasks ?? [];
+		out.set(suiteRef(s), { ids: tasks.filter((id) => ok.has(id)), total: tasks.length });
+	}
+	return out;
+}
+
+/** The tasks of suite that can run: its ready ids when known, else every task. */
+export function readyIds(suite: CatalogSuite | undefined, ready: ReadyTasks | undefined): readonly string[] {
+	if (!suite) return [];
+	return ready?.get(suiteRef(suite))?.ids ?? suite.tasks ?? [];
+}
+
+/** True when ready is known for suite and some of its tasks cannot run. */
+export function someNotReady(suite: CatalogSuite | undefined, ready: ReadyTasks | undefined): boolean {
+	const entry = suite ? ready?.get(suiteRef(suite)) : undefined;
+	return entry !== undefined && entry.ids.length < entry.total;
+}
+
+/**
+ * The suite to start from: the benchmark that is not practice with the most ready tasks (at least 2),
+ * ties by id; else the practice benchmark with the most ready tasks; else the first.
+ */
+export function defaultRunnableSuite(catalog: Catalog, ready?: ReadyTasks): CatalogSuite | undefined {
 	const suites = catalog.suites ?? [];
-	return suites.find((s) => s.id === "coding-core") ?? suites[0];
+	const count = (s: CatalogSuite) => readyIds(s, ready).length;
+	const best = (list: CatalogSuite[]) =>
+		[...list].sort((a, b) => count(b) - count(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0] as CatalogSuite | undefined;
+	const real = suites.filter((s) => !isPracticeExperiment({ suite: s.id }) && count(s) >= 2);
+	if (real.length > 0) return best(real);
+	const practice = suites.filter((s) => isPracticeExperiment({ suite: s.id }) && count(s) > 0);
+	return best(practice) ?? suites[0];
+}
+
+/** The benchmark menu: benchmarks with a ready task first, in catalog order, then those with none. */
+export function suiteMenuGroups(catalog: Catalog, ready: ReadyTasks | undefined): { ready: CatalogSuite[]; notReady: CatalogSuite[] } {
+	const suites = catalog.suites ?? [];
+	const none = (s: CatalogSuite) => readyIds(s, ready).length === 0 && ready?.has(suiteRef(s)) === true;
+	return { ready: suites.filter((s) => !none(s)), notReady: suites.filter(none) };
 }
 
 /** What the page knows beside the catalog when it opens the builder. */
@@ -80,6 +130,8 @@ export interface BuilderDefaultsOptions {
 	shownAgents?: readonly string[];
 	/** Providers the org has a working key for, in the order to prefer them. */
 	providersWithKey?: readonly ProviderId[];
+	/** Ready tasks per benchmark (GET /suites); absent counts every task. */
+	ready?: ReadyTasks;
 }
 
 /**
@@ -100,7 +152,7 @@ export function keyedProviders(keys: readonly Pick<ModelKey, "provider" | "statu
 }
 
 /** The agent to start on: the one ?agent= names when the builder lists it, else the first listed. */
-function startAgent(catalog: Catalog, opts: BuilderDefaultsOptions): CatalogAgent | undefined {
+export function startAgent(catalog: Catalog, opts: BuilderDefaultsOptions): CatalogAgent | undefined {
 	const agents = catalog.agents ?? [];
 	// In the listed order (the org's own agents before the built-in ones).
 	const shown = opts.shownAgents ? opts.shownAgents.flatMap((id) => agents.filter((a) => a.id === id)) : agents;
@@ -111,12 +163,22 @@ function startAgent(catalog: Catalog, opts: BuilderDefaultsOptions): CatalogAgen
 }
 
 /**
- * Builder defaults: the starter suite, the agent ?agent= names (else the first listed agent), its own
+ * True when ?agent= names an agent the builder does not list (N155), so the page says it started on
+ * another one. shown holds agent ids; a config path "agents/<id>.yaml" of a listed agent counts too.
+ */
+export function agentFromLinkMissing(agentParam: string | null | undefined, shown: readonly string[]): boolean {
+	const wanted = agentParam?.trim();
+	if (!wanted) return false;
+	return !shown.some((id) => id === wanted || `agents/${id}.yaml` === wanted);
+}
+
+/**
+ * Builder defaults: the benchmark with the most ready tasks (defaultRunnableSuite), the agent ?agent= names (else the first listed agent), its own
  * model on a provider the org has a key for plus one empty row to fill in (a matrix needs two arms),
  * 5 tasks x 1 trial, clean only.
  */
 export function defaultBuilderValues(catalog: Catalog, seed: number, opts: BuilderDefaultsOptions = {}): BuilderValues {
-	const suite = defaultSuite(catalog);
+	const suite = defaultRunnableSuite(catalog, opts.ready);
 	const agent = startAgent(catalog, opts);
 	const keyed = opts.providersWithKey ?? [];
 	const models: ModelRef[] = [];
@@ -128,7 +190,7 @@ export function defaultBuilderValues(catalog: Catalog, seed: number, opts: Build
 		agents: agent ? [agent.path] : [],
 		models,
 		taskScope: "first",
-		taskCount: Math.min(5, Math.max(1, suite?.tasks.length ?? 5)),
+		taskCount: Math.min(5, Math.max(1, suite ? readyIds(suite, opts.ready).length : 5)),
 		trials: 1,
 		adaptive: false,
 		adaptiveMin: 1,
@@ -167,14 +229,14 @@ export function filledModels(v: BuilderValues): ModelRef[] {
 	return v.models.map((m) => ({ ...m, model: m.model.trim() })).filter((m) => m.model !== "");
 }
 
-/** The tasks every condition runs. */
-export function selectedTasks(v: BuilderValues, suite: CatalogSuite | undefined): string[] {
-	const tasks = suite?.tasks ?? [];
+/** The tasks every condition runs: the ready tasks of the suite, all of them or the first taskCount. */
+export function selectedTasks(v: BuilderValues, suite: CatalogSuite | undefined, ready?: ReadyTasks): string[] {
+	const tasks = readyIds(suite, ready);
 	return v.taskScope === "all" ? [...tasks] : tasks.slice(0, Math.max(0, v.taskCount));
 }
 
 /** The arms the planner will generate, labelled as engine/matrixplan.go labels them. */
-export function matrixPreview(v: BuilderValues, suite: CatalogSuite | undefined): MatrixPreview {
+export function matrixPreview(v: BuilderValues, suite: CatalogSuite | undefined, ready?: ReadyTasks): MatrixPreview {
 	const models = filledModels(v);
 	const withAgent = v.agents.length > 1;
 	const withModel = models.length > 0;
@@ -189,7 +251,7 @@ export function matrixPreview(v: BuilderValues, suite: CatalogSuite | undefined)
 			arms.push({ id: armId(arms.length), label: label.join(" / "), agent, model });
 		}
 	}
-	const tasks = selectedTasks(v, suite).length;
+	const tasks = selectedTasks(v, suite, ready).length;
 	const conditions = 1 + v.probes.length;
 	return { arms, tasks, conditions, maxRuns: arms.length * conditions * tasks * Math.max(0, v.trials) };
 }
@@ -201,7 +263,7 @@ function armId(i: number): string {
 const isInt = (n: number) => Number.isInteger(n);
 
 /** Field errors in the values, as builder error keys. Empty means the form can be planned. */
-export function validateBuilder(v: BuilderValues, suite: CatalogSuite | undefined): BuilderErrors {
+export function validateBuilder(v: BuilderValues, suite: CatalogSuite | undefined, ready?: ReadyTasks): BuilderErrors {
 	const e: BuilderErrors = {};
 	if (!v.name.trim()) e.name = "nameRequired";
 	if (!v.suite || !suite) e.suite = "suiteRequired";
@@ -215,12 +277,12 @@ export function validateBuilder(v: BuilderValues, suite: CatalogSuite | undefine
 		if (seen.has(key)) e[`models.${i}`] = "modelDuplicate";
 		seen.add(key);
 	});
-	const arms = matrixPreview(v, suite).arms.length;
+	const arms = matrixPreview(v, suite, ready).arms.length;
 	if (!e.agents) {
 		if (arms < 2) e.models = filledModels(v).length === 0 && v.models.length > 0 ? "modelEmpty" : "tooFewArms";
 		else if (arms > MAX_ARMS) e.models = "tooManyArms";
 	}
-	const max = suite?.tasks.length ?? 0;
+	const max = readyIds(suite, ready).length;
 	if (v.taskScope === "first" && (!isInt(v.taskCount) || v.taskCount < 1 || (max > 0 && v.taskCount > max))) e.taskCount = "taskCountRange";
 	if (!isInt(v.trials) || v.trials < 1 || v.trials > 50) e.trials = "trialsRange";
 	else if (v.adaptive && v.trials < 2) e.trials = "adaptiveTrials";
@@ -238,10 +300,12 @@ export function primaryMetric(catalog: Catalog): string {
 }
 
 /** The experiment the builder describes: a matrix experiment the planner expands into arms. */
-export function toMatrixExperiment(v: BuilderValues, catalog: Catalog): Experiment {
+export function toMatrixExperiment(v: BuilderValues, catalog: Catalog, ready?: ReadyTasks): Experiment {
 	const suite = catalog.suites.find((s) => suiteRef(s) === v.suite);
-	const all = v.taskScope === "all" || (suite !== undefined && v.taskCount >= suite.tasks.length);
-	const tasks = all ? { all: true } : { ids: selectedTasks(v, suite) };
+	const runnable = readyIds(suite, ready);
+	const all = v.taskScope === "all" || (suite !== undefined && v.taskCount >= runnable.length);
+	// N42: "all" on a benchmark with tasks that are not ready names the ready ones, so the plan is not refused.
+	const tasks = all && !someNotReady(suite, ready) ? { all: true } : { ids: all ? [...runnable] : selectedTasks(v, suite, ready) };
 	const models = filledModels(v).map((m) => ({ model: m.model, provider: m.provider }));
 	const matrix: Record<string, unknown> = {};
 	if (v.agents.length > 1) matrix.agents = [...v.agents];
@@ -268,8 +332,8 @@ export function toMatrixExperiment(v: BuilderValues, catalog: Catalog): Experime
 }
 
 /** Whether a planned experiment no longer matches the form. */
-export function builderPlanIsStale(planned: Experiment, v: BuilderValues, catalog: Catalog): boolean {
-	return JSON.stringify(toMatrixExperiment(v, catalog)) !== JSON.stringify(planned);
+export function builderPlanIsStale(planned: Experiment, v: BuilderValues, catalog: Catalog, ready?: ReadyTasks): boolean {
+	return JSON.stringify(toMatrixExperiment(v, catalog, ready)) !== JSON.stringify(planned);
 }
 
 /** The agent the catalog lists at path, for its label. */

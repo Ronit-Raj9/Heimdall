@@ -1,6 +1,8 @@
 import type benchEn from "@/locales/en/bench.json";
 import type { Catalog, CatalogSuite, Experiment, JsonValue } from "@/lib/types/bench";
 import { z } from "zod";
+// A cycle with matrixBuilderSchema (it imports suiteRef): both only call each other's functions at run time.
+import { defaultRunnableSuite, startAgent, type BuilderDefaultsOptions, type ReadyTasks } from "./matrixBuilderSchema";
 
 /** A t() key for a validation message. Zod messages are keys, translated where the error renders. */
 export type ValidationKey = `experiments.new.validation.${keyof (typeof benchEn)["experiments"]["new"]["validation"]}`;
@@ -75,30 +77,37 @@ export function suiteRef(suite: CatalogSuite): string {
 	return `${suite.id}@${suite.version}`;
 }
 
-/** clean plus every probe of the suite. clean and the first probe run all tasks three times; the rest start off. */
+/**
+ * clean plus every probe of the suite. Only clean starts on, running all tasks three times: a failure
+ * test is a choice the user makes (N39), so every probe is listed and starts off.
+ */
 export function conditionsFor(suite: CatalogSuite | undefined): ConditionFormValues[] {
 	if (!suite) return [];
 	return ["clean", ...(suite.probes ?? [])].map((condition, i) => {
-		const on = i <= 1;
+		const on = i === 0;
 		return { condition, enabled: on, allTasks: true, taskIds: [], trials: on ? 3 : 1 };
 	});
 }
 
-/** Form defaults from the catalog. The seed is passed in so this stays pure. */
-export function defaultFormValues(catalog: Catalog, seed: number): ExperimentFormValues {
+/**
+ * Form defaults from the catalog, chosen like the builder's (N39): the benchmark with the most ready
+ * tasks, the ?agent= agent or the first agent My agents lists, and the normal run as the main test.
+ * The seed is passed in so this stays pure.
+ */
+export function defaultFormValues(catalog: Catalog, seed: number, opts: BuilderDefaultsOptions = {}): ExperimentFormValues {
 	// A list the server sent as null (no agents/ folder) reads as empty here, never as a crash.
-	const suite = catalog.suites?.[0];
+	const suite = catalog.suites ? defaultRunnableSuite(catalog, opts.ready) : undefined;
 	const metrics = catalog.metrics ?? [];
 	const primaryMetric = metrics.find((m) => m.name === "verified_success") ?? metrics[0];
 	return {
 		name: "",
 		suite: suite ? suiteRef(suite) : "",
-		base: catalog.agents?.[0]?.path ?? "",
+		base: (catalog.agents ? startAgent(catalog, opts) : undefined)?.path ?? "",
 		armALabel: "baseline",
 		armBLabel: "",
 		overridePath: "",
 		overrideValue: "",
-		primaryCondition: suite?.probes?.[0] ?? "clean",
+		primaryCondition: "clean",
 		primaryMetric: primaryMetric?.name ?? "",
 		conditions: conditionsFor(suite),
 		seed,
@@ -120,9 +129,12 @@ export function parseOverrideValue(raw: string): JsonValue {
 
 /**
  * The experiment the form describes (DESIGN.md 16.6). Guards follow the design's default: no
- * regression on clean when clean runs and is not the primary, and no new integrity violation.
+ * regression on clean when clean runs and is not the primary, and no new integrity violation. With
+ * ready tasks known, "all tasks" on a benchmark with tasks that are not ready sends the ready ids (N42).
  */
-export function toExperiment(v: ExperimentFormValues): Experiment {
+export function toExperiment(v: ExperimentFormValues, ready?: ReadyTasks): Experiment {
+	const entry = ready?.get(v.suite);
+	const allTasks = entry && entry.ids.length < entry.total ? { ids: [...entry.ids] } : { all: true };
 	const enabled = v.conditions.filter((c) => c.enabled);
 	const cleanGuard = enabled.some((c) => c.condition === "clean") && v.primaryCondition !== "clean";
 	return {
@@ -138,7 +150,7 @@ export function toExperiment(v: ExperimentFormValues): Experiment {
 		guards: [...(cleanGuard ? [{ condition: "clean", rule: "no_regression" }] : []), { rule: "no_new_integrity_violation" }],
 		conditions: enabled.map((c) => ({
 			id: c.condition,
-			tasks: c.allTasks ? { all: true } : { ids: [...c.taskIds] },
+			tasks: c.allTasks ? { ...allTasks } : { ids: [...c.taskIds] },
 			trials: c.trials,
 		})),
 		budget: { total_usd: v.totalUsd },
@@ -159,7 +171,7 @@ export function dateSeed(now: Date): number {
  * form submits, so the schema's own normalisation (trimmed name and labels) never marks a fresh
  * plan stale; values that no longer validate always do.
  */
-export function planIsStale(planned: Experiment, values: unknown): boolean {
+export function planIsStale(planned: Experiment, values: unknown, ready?: ReadyTasks): boolean {
 	const parsed = experimentFormSchema.safeParse(values);
-	return !parsed.success || JSON.stringify(toExperiment(parsed.data)) !== JSON.stringify(planned);
+	return !parsed.success || JSON.stringify(toExperiment(parsed.data, ready)) !== JSON.stringify(planned);
 }
