@@ -29,7 +29,7 @@ func TestOnboardPublishCarriesReadiness(t *testing.T) {
 	env := jobEnv{App: &app{cfg: cfg, logger: schemas.NoopLogger{}}, ProjectRoot: root}
 	oenv := &onboard.Env{Root: root}
 	csv := "question,answer\nWhat is 6 x 7?,42\nCapital of France?,Paris\nLargest planet?,Jupiter\n"
-	set, err := onboard.Draft(ctx, oenv, onboard.Input{Data: csv, Name: "quiz.csv"}, onboard.Plan{Suite: "quiz", Hold: onboard.SplitPlan{Pct: 34, Seed: 3}})
+	set, err := onboard.Draft(ctx, oenv, onboard.Input{Data: csv, Name: "quiz.csv"}, onboard.Plan{Suite: "quiz"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,9 @@ func TestOnboardPublishCarriesReadiness(t *testing.T) {
 	if got.Published == nil || got.Published.JobID != "job_p" || len(got.Published.Carried) != 2 {
 		t.Fatalf("set published %+v", got.Published)
 	}
-	if res.HeldOut != 1 || res.Canary == "" {
+	// No held-out tasks here: stamping the canary on a held-out publish
+	// changes the suite and task files, so those tasks are rechecked.
+	if res.HeldOut != 0 || res.Canary != "" {
 		t.Errorf("held out %d canary %q", res.HeldOut, res.Canary)
 	}
 }

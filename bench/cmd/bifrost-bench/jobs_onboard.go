@@ -369,12 +369,15 @@ func runOnboardPublish(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Lo
 	if len(recheck) > 0 {
 		out.Next = fmt.Sprintf("Published. %d tasks need the readiness checks on the benchmark's Build tab before evaluations use them.", len(recheck))
 	}
-	if _, err := updateSet(root, set.ID, func(s *onboard.DraftSet) {
-		if s.Published != nil {
-			s.Published.Carried, s.Published.Recheck, s.Published.JobID = carried, recheck, j.ID
-		}
-	}); err != nil {
+	// The set's lock is still held here, so reload and save directly
+	// (updateSet would take the same lock again and deadlock).
+	if s, err := onboard.LoadSet(root, set.ID); err != nil {
 		log.Warnf("record the publish on the draft: %v", err)
+	} else if s.Published != nil {
+		s.Published.Carried, s.Published.Recheck, s.Published.JobID = carried, recheck, j.ID
+		if err := s.Save(); err != nil {
+			log.Warnf("record the publish on the draft: %v", err)
+		}
 	}
 	return out, nil
 }
