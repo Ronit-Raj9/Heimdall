@@ -23,6 +23,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/adapters"
 	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/projectfs"
@@ -94,6 +95,28 @@ func (h *projectFilesHandler) refuseBuiltinPath(ctx *fasthttp.RequestCtx, a proj
 	}
 	sendBuiltinReadOnly(ctx, h.mode, id)
 	return true
+}
+
+// refuseScanRecordPath answers 403 for a write or delete under
+// agents/<id>/skill-scans/: a scan record admits a skill to runs
+// (adapters.ResolveSkills), so only Heimdall's own scan writes it. Reading
+// it stays open, and the skill folders themselves stay editable.
+func (h *projectFilesHandler) refuseScanRecordPath(ctx *fasthttp.RequestCtx, a projectfs.Area, rel string) bool {
+	if !isScanRecordPath(a, rel) {
+		return false
+	}
+	lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, "Scan records are written by Heimdall only.")
+	return true
+}
+
+// isScanRecordPath reports whether rel in area a is under
+// agents/<id>/skill-scans/ (the folder itself included), after cleaning.
+func isScanRecordPath(a projectfs.Area, rel string) bool {
+	if a != projectfs.AreaAgents {
+		return false
+	}
+	parts := strings.Split(strings.TrimPrefix(path.Clean("/"+rel), "/"), "/")
+	return len(parts) >= 2 && parts[1] == adapters.SkillScansDir
 }
 
 func init() {
@@ -297,7 +320,7 @@ func (h *projectFilesHandler) put(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	a, rel, ok := h.pathParams(ctx)
-	if !ok || h.refuseBuiltinPath(ctx, a, rel) {
+	if !ok || h.refuseBuiltinPath(ctx, a, rel) || h.refuseScanRecordPath(ctx, a, rel) {
 		return
 	}
 	body := ctx.PostBody()
@@ -327,7 +350,7 @@ func (h *projectFilesHandler) del(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	a, rel, ok := h.pathParams(ctx)
-	if !ok || h.refuseBuiltinPath(ctx, a, rel) {
+	if !ok || h.refuseBuiltinPath(ctx, a, rel) || h.refuseScanRecordPath(ctx, a, rel) {
 		return
 	}
 	if err := h.store.Delete(ctx, a, rel, writeOpts(ctx)); err != nil {
