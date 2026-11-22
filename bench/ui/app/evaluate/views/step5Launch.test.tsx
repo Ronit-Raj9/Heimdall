@@ -4,7 +4,7 @@ import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EvaluateDraftProvider } from "./evaluateDraft";
 import { defaultEvaluationSpec } from "./step4Setup";
-import { NameField, Step5Launch, draftNameSetter, parseBudget, summaryLines } from "./step5Launch";
+import { MAX_BUDGET, NameField, Step5Launch, budgetProblem, draftNameSetter, parseBudget, summaryLines } from "./step5Launch";
 
 const q = vi.hoisted(() => ({
 	create: [] as unknown as readonly [unknown, Record<string, unknown>],
@@ -90,7 +90,7 @@ describe("summaryLines", () => {
 	});
 
 	it("says an own-model arm runs on its own model", () => {
-		expect(summaryLines(spec({ arms: [{ label: "A", agent: "bot", model: "" }] }))[0]).toBe("Score bot on its own model.");
+		expect(summaryLines(spec({ arms: [{ label: "A", agent: "bot", model: "" }] }))[0]).toBe("Score bot latest version on its own model.");
 	});
 
 	it("describes a score evaluation in plain sentences", () => {
@@ -111,7 +111,9 @@ describe("summaryLines", () => {
 			{ label: "B", agent: "codex", model: "deepseek-chat", provider: "deepseek" },
 		];
 		const lines = summaryLines(spec({ mode: "models", arms, benchmarks: [], pack: "coding", trials: 1 }));
-		expect(lines[0]).toBe("Compare two models: codex on gpt-4o-mini against codex on deepseek/deepseek-chat.");
+		expect(lines[0]).toBe(
+			"Compare two models: codex latest version on gpt-4o-mini against codex latest version on deepseek/deepseek-chat.",
+		);
 		expect(lines[1]).toBe("Run the coding pack of benchmarks.");
 		expect(lines[2]).toContain("try each task once");
 		expect(lines[3]).toBe("Run clean only, with no faults.");
@@ -295,3 +297,73 @@ function findByTestId(node: unknown, id: string): ReactElement | undefined {
 	if (el.props?.["data-testid"] === id) return el;
 	return findByTestId(el.props?.children, id);
 }
+describe("step 5 fix wave 2 (G10)", () => {
+	it("checks the budget text (N91)", () => {
+		expect(MAX_BUDGET).toBe(1000);
+		expect(budgetProblem("")).toBe("");
+		expect(budgetProblem("  ")).toBe("");
+		expect(budgetProblem("2.5")).toBe("");
+		expect(budgetProblem("1000")).toBe("");
+		expect(budgetProblem("abc")).toBe("Enter an amount in dollars, for example 5.");
+		expect(budgetProblem("-5")).toBe("Enter an amount above $0, or leave the box empty for the default of $5 per benchmark.");
+		expect(budgetProblem("0")).toBe("Enter an amount above $0, or leave the box empty for the default of $5 per benchmark.");
+		expect(budgetProblem("100000")).toBe("The most one evaluation can spend is $1000.");
+	});
+
+	it("blocks Launch with the sentence for a bad budget and says no default for it (N91)", () => {
+		const html = render(<Step5Launch spec={spec({ budget_usd: -5 })} onChange={() => undefined} />);
+		expect(tagOf(html, "step5-launch-button")).toContain('disabled=""');
+		expect(html).toContain('data-testid="step5-budget-problem"');
+		expect(html).toContain("Enter an amount above $0");
+		expect(tagOf(html, "step5-budget")).toContain('aria-invalid="true"');
+		expect(tagOf(html, "step5-budget")).toContain('type="text"');
+		expect(html).not.toContain("(the default budget)");
+		const high = render(<Step5Launch spec={spec({ budget_usd: 100000 })} onChange={() => undefined} />);
+		expect(tagOf(high, "step5-launch-button")).toContain('disabled=""');
+		expect(high).toContain("The most one evaluation can spend is $1000.");
+		const blank = render(<Step5Launch spec={spec()} onChange={() => undefined} />);
+		expect(blank).not.toContain("step5-budget-problem");
+		expect(blank).toContain("(the default budget)");
+	});
+
+	it("warns above the organization's suggested maximum without blocking (N91)", () => {
+		q.estimate = okQuery({
+			runs: 4,
+			budget: {
+				budget_usd: 200,
+				per_benchmark_usd: 100,
+				default: false,
+				default_per_benchmark_usd: 5,
+				suggested_usd: 2,
+				max_usd: 100,
+				fit: "fits",
+				runs_skipped_low: 0,
+				runs_skipped_high: 0,
+			},
+		});
+		const html = render(<Step5Launch spec={spec({ budget_usd: 200 })} onChange={() => undefined} />);
+		expect(html).toContain("This is above the suggested maximum of $100 for your organization.");
+		expect(tagOf(html, "step5-launch-button")).not.toContain('disabled=""');
+	});
+
+	it("says the real reason Launch is off (N89)", () => {
+		const html = render(<Step5Launch spec={spec({ failover: { enabled: true, fallbacks: [] } })} onChange={() => undefined} />);
+		expect(tagOf(html, "step5-launch-button")).toContain('disabled=""');
+		expect(html).toContain("Pick a fallback model.");
+		expect(html).not.toContain("Pick benchmarks and a model for every setup first.");
+		expect(render(<Step5Launch spec={spec({ benchmarks: [] })} onChange={() => undefined} />)).toContain("Pick at least one benchmark.");
+	});
+
+	it("names the latest version when a setup has none (N95)", () => {
+		const lines = summaryLines(
+			spec({
+				mode: "versions",
+				arms: [
+					{ label: "A", agent: "codex", model: "gpt-4o-mini", provider: "openai" },
+					{ label: "B", agent: "codex", version: 1, model: "gpt-4o-mini", provider: "openai" },
+				],
+			}),
+		);
+		expect(lines[0]).toBe("Compare two versions: codex latest version on openai/gpt-4o-mini against codex v1 on openai/gpt-4o-mini.");
+	});
+});

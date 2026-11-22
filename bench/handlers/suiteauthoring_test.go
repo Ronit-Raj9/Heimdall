@@ -251,3 +251,46 @@ func TestSuiteAuthoringViewerCannotReadFiles(t *testing.T) {
 		t.Fatalf("viewer read: %d, want 403", ctx.Response.StatusCode())
 	}
 }
+
+// POST /suites with the id of a built-in library benchmark answers 403 and
+// writes nothing, so a name taken by the library never touches the org's
+// benchmarks folder (N101).
+func TestCreateSuiteRefusesBuiltinID(t *testing.T) {
+	root := t.TempDir()
+	ps, err := projectfs.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := libraryFakeSuites{fakeSuites: &fakeSuites{}, builtin: map[string]bool{"coding-core": true}}
+	r := router.New()
+	env := OrgEnv{
+		Cfg: &lib.Config{Root: root}, Mode: testMode,
+		Services: Services{Projects: ps, Suites: src},
+		Write:    lib.RequireWriteToken(testMode, testToken),
+		Common:   []lib.Middleware{lib.BodyLimit(testMode, lib.MaxBodyBytes)},
+		Upload:   []lib.Middleware{lib.BodyLimit(testMode, lib.MaxUploadBytes)},
+	}
+	orgAreasMu.Lock()
+	area := orgAreas["suiteauthoring"]
+	orgAreasMu.Unlock()
+	area(env, r)
+	ln := fasthttputil.NewInmemoryListener()
+	srv := &fasthttp.Server{Handler: r.Handler}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Shutdown() })
+	c := &authoringClient{client: &fasthttp.Client{Dial: func(string) (net.Conn, error) { return ln.Dial() }}, root: root}
+
+	code, body := c.do(t, "POST", "/suites", []byte(`{"id":"coding-core","template":"qa","blank":true}`), nil)
+	if code != 403 || !strings.Contains(string(body), "coding-core") {
+		t.Fatalf("create built-in id: %d %s, want 403 naming the id", code, body)
+	}
+	err = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err == nil && strings.Contains(p, "coding-core") {
+			t.Errorf("wrote %s for a refused built-in id", p)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

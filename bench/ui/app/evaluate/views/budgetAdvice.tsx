@@ -50,7 +50,10 @@ export function budgetLine(b: EstimateBudget, cost: EstimateCost | undefined, is
 	const budget = usd(b.budget_usd);
 	if (!cost || !cost.known) return fw05("budget.unknown", { budget });
 	const range = { low: usd(cost.low), high: usd(cost.high) };
-	return cost.high <= b.budget_usd ? fw05("budget.covers", { budget, ...range }) : fw05("budget.mayExceed", { budget, ...range });
+	// The server's fit splits the budget per benchmark (rounded down to cents), so a total that looks
+	// covered can still leave runs unstarted: follow the fit, never say "covers" next to its warning.
+	const short = b.fit === "exceeds" || b.fit === "may_exceed";
+	return cost.high <= b.budget_usd && !short ? fw05("budget.covers", { budget, ...range }) : fw05("budget.mayExceed", { budget, ...range });
 }
 
 export interface BudgetAdviceProps {

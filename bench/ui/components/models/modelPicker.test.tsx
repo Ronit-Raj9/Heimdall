@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import { okQuery, loadingQuery, render, tagOf } from "@/lib/testing/render";
 import type { ModelKey, ModelProviderInfo, ModelsCatalogResponse } from "@/lib/types/models";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ModelPicker, modelChoices, providersFor, searchModels } from "./modelPicker";
+import { ModelPicker, isChatModelId, modelChoices, providersFor, searchModels } from "./modelPicker";
 
 const q = vi.hoisted(() => ({ models: {} as Record<string, unknown> }));
 vi.mock("@/lib/store/apis/modelsApi", () => ({ useGetModelsQuery: () => q.models }));
@@ -192,5 +192,29 @@ describe("searchModels", () => {
 	it("lists providers without suggested models for chat only", () => {
 		expect(providersFor("agent", providers)).toContain("ollama");
 		expect(providersFor("voice-stt", providers)).toEqual(["openai"]);
+	});
+});
+describe("chat model lists (N37)", () => {
+	const raw = ["gpt-5.4-mini", "gpt-4o-mini-tts", "chatgpt-image-latest", "text-embedding-3-small", "gpt-4o-mini-transcribe", "whisper-1"];
+	it("drops speech, image, transcription and embedding ids a key reported for chat purposes", () => {
+		const c = modelChoices("openai", "agent", providers, [key({ models_available: raw })]);
+		expect(c.reported).toEqual(["gpt-5.4-mini"]);
+	});
+	it("keeps a key's own model list as the owner chose it", () => {
+		const c = modelChoices("openai", "judge", providers, [key({ models: ["gpt-4o-mini-tts"], models_available: raw })]);
+		expect(c.reported).toEqual(["gpt-4o-mini-tts", "gpt-5.4-mini"]);
+	});
+	it("does not filter speech purposes", () => {
+		const c = modelChoices("openai", "voice-tts", providers, [key({ models: ["gpt-4o-mini-tts"] })]);
+		expect(c.reported).toContain("gpt-4o-mini-tts");
+	});
+	it("follows the catalog purposes, else the id", () => {
+		expect(isChatModelId("whisper-1", providers, "openai")).toBe(false);
+		expect(isChatModelId("gpt-4o", providers, "openai")).toBe(true);
+		expect(isChatModelId("dall-e-3", providers, "openai")).toBe(false);
+		expect(isChatModelId("omni-moderation-latest", providers, "openai")).toBe(false);
+		expect(isChatModelId("gpt-4o-realtime-preview", providers, "openai")).toBe(false);
+		expect(isChatModelId("gpt-6.2-sol", providers, "openai")).toBe(true);
+		expect(isChatModelId("qwen/qwen3.8-27b", providers, "openrouter")).toBe(true);
 	});
 });

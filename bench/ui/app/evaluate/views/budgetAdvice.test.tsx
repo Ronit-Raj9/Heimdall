@@ -44,6 +44,15 @@ describe("budgetLine", () => {
 		);
 	});
 
+	it("fit exceeds never says covers (N92)", () => {
+		const cheap = { low: 0.001, high: 0.004, known: true };
+		for (const fit of ["exceeds", "may_exceed"] as const) {
+			const line = budgetLine(budget({ budget_usd: 0.01, per_benchmark_usd: 0, fit }), cheap, false);
+			expect(line).not.toContain("covers");
+			expect(line).toContain("may go over your $0.01 budget");
+		}
+	});
+
 	it("says Updating... while a new estimate loads", () => {
 		expect(budgetLine(budget(), known, true)).toBe("Updating...");
 	});
