@@ -251,8 +251,14 @@ func TestBusyIgnoresStaleFanOut(t *testing.T) {
 // Experiment runs on the hosted runner are capped so waiting experiments
 // leave workers to the other kinds (audit 4-C-08).
 func TestHostedHubLimitsExperimentWorkers(t *testing.T) {
-	if hostedExpLimit >= hostedWorkers || hostedExpPerOrg > hostedExpLimit || hostedExpPerOrg < 1 {
-		t.Fatalf("hosted sizing %d workers, %d experiments, %d per org", hostedWorkers, hostedExpLimit, hostedExpPerOrg)
+	h := newJobsHub(dbtest.Open(t), utils.NewStdLogger(os.Stderr, false), true, true, "")
+	sz := h.sizing
+	if sz.ExperimentLimit >= sz.Workers || sz.ExperimentPerOrg > sz.ExperimentLimit || sz.ExperimentPerOrg < 1 {
+		t.Fatalf("hosted sizing %d workers, %d experiments, %d per org", sz.Workers, sz.ExperimentLimit, sz.ExperimentPerOrg)
+	}
+	small := newJobsHubSized(dbtest.Open(t), utils.NewStdLogger(os.Stderr, false), true, true, "", lib.JobsConfig{ExperimentLimit: 3, ExperimentPerOrg: 1})
+	if small.sizing.ExperimentLimit != 3 || small.sizing.ExperimentPerOrg != 1 || small.sizing.Workers != 11 {
+		t.Fatalf("configured sizing %+v", small.sizing)
 	}
 }
 

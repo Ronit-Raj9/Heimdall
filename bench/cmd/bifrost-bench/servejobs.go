@@ -25,6 +25,7 @@ import (
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/jobs"
+	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/ops"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/server"
@@ -98,7 +99,7 @@ func (l *launcher) Create(ctx context.Context, m *schemas.Manifest) error {
 	if err := l.a.store.CreateExperiment(ctx, m); err != nil {
 		return err
 	}
-	return l.rebuild(ctx)
+	return l.refreshExperiment(ctx, m.ExpID) // Z10: this experiment only (indexrefresh.go)
 }
 
 func (l *launcher) rebuild(ctx context.Context) error {
@@ -358,7 +359,7 @@ func (l *launcher) execute(ctx context.Context, m *schemas.Manifest, run *liveRu
 			case engine.EventRunSealed:
 				prog.Sealed++
 				log.Printf("sealed %s (slot %s): %s", ev.RunID, ev.SlotID, ev.Outcome)
-				_ = l.rebuild(context.WithoutCancel(ctx))
+				l.refreshOnSeal(m.ExpID, ev.SlotID)      // Z10: debounced refresh of the sealed slot only (indexrefresh.go)
 				evidenceOnSeal(l.org, m.ExpID)           // Evidence storage area (P6), wired by Tenancy: mirror the sealed run now (evidence.go)
 				l.chargeKeySpend(ctx, m, ev.RunID, log)  // G10: the run's cost to its model key (keybudget.go)
 				maximOnSeal(l.org, ev.RunID, l.a.logger) // X23: send the run to the org's Maxim log repository when it asks for that (maxim.go)
@@ -415,6 +416,7 @@ func (l *launcher) execute(ctx context.Context, m *schemas.Manifest, run *liveRu
 	prog.Phase = "analyzing"
 	progress(prog)
 	actx := context.WithoutCancel(ctx)
+	_ = l.rebuild(actx) // Z10: seals refreshed the index slot by slot; the full rebuild runs at experiment end
 	an, _, aerr := l.a.analyze(actx, m.ExpID, "")
 	if aerr != nil {
 		run.publish(schemas.LiveEvent{Kind: "error", Message: "analyze: " + aerr.Error(), At: time.Now()})
@@ -425,6 +427,7 @@ func (l *launcher) execute(ctx context.Context, m *schemas.Manifest, run *liveRu
 		log.Printf("analysis %s: %s", an.AnalysisID, an.Verdict.Decision)
 	}
 	_ = l.rebuild(actx)
+	evidenceOnExperimentEnd(l.org, m.ExpID) // Z10: full mirror verification at experiment end (evidenceincr.go)
 	if err != nil {
 		return res, err
 	}
@@ -573,15 +576,11 @@ const (
 // scheduler is idempotent, so it gets more claims than the default.
 const expRunMaxAttempts = 20
 
-// Hosted job runner sizing. A hosted experiment.run waits in its scheduler
+// Hosted job runner sizing comes from the config's jobs section
+// (lib/jobsconfig.go, Z10). A hosted experiment.run waits in its scheduler
 // until a matching runner takes its slots, possibly for ever, so experiments
-// get at most hostedExpLimit workers (hostedExpPerOrg per organization) and
-// the rest are left to the ops kinds and to other organizations.
-const (
-	hostedWorkers   = 6
-	hostedExpLimit  = 4
-	hostedExpPerOrg = 2
-)
+// get at most ExperimentLimit workers (ExperimentPerOrg per organization)
+// and the rest are left to the ops kinds and to other organizations.
 
 // jobsHub is serve's job runner and the way a job finds its organization's
 // launcher: the one local launcher, or in hosted mode the launcher the
@@ -590,8 +589,9 @@ type jobsHub struct {
 	runner     *jobs.Runner
 	db         *db.DB
 	hosted     bool
-	launches   bool   // experiment.run is registered (not -offline)
-	configPath string // serve's -config, for agent.check's own app
+	launches   bool           // experiment.run is registered (not -offline)
+	configPath string         // serve's -config, for agent.check's own app
+	sizing     lib.JobsConfig // hosted: resolved jobs section (Z10)
 
 	mu    sync.Mutex
 	orgs  map[string]*launcher
@@ -599,12 +599,18 @@ type jobsHub struct {
 }
 
 func newJobsHub(d *db.DB, logger schemas.Logger, hosted, launches bool, configPath string) *jobsHub {
+	return newJobsHubSized(d, logger, hosted, launches, configPath, lib.JobsConfig{})
+}
+
+// newJobsHubSized is newJobsHub with the config's jobs section (hosted).
+func newJobsHubSized(d *db.DB, logger schemas.Logger, hosted, launches bool, configPath string, sizing lib.JobsConfig) *jobsHub {
+	sizing = sizing.Resolved()
 	opts := jobs.Options{Logger: logger}
 	if hosted {
-		opts.Workers = hostedWorkers
+		opts.Workers = sizing.Workers
 	}
 	h := &jobsHub{runner: jobs.New(d, opts), db: d, hosted: hosted, launches: launches, configPath: configPath,
-		orgs: map[string]*launcher{}}
+		orgs: map[string]*launcher{}, sizing: sizing}
 	h.registerKinds()
 	registerJobMetrics(selfmetrics.Default, h.runner) // N9: /metrics job queue and statuses (servemetrics.go)
 	return h
@@ -772,7 +778,7 @@ func (h *jobsHub) registerExperimentRun() {
 		// takes its slots, so it is claimed only for an organization with a
 		// live runner: experiments of organizations without one stay queued
 		// and never hold the experiment workers an eligible one needs.
-		opts = append(opts, jobs.WithLimit(hostedExpLimit, hostedExpPerOrg), jobs.WithClaimGate(h.orgsWithRunners))
+		opts = append(opts, jobs.WithLimit(h.sizing.ExperimentLimit, h.sizing.ExperimentPerOrg), jobs.WithClaimGate(h.orgsWithRunners))
 	}
 	h.runner.Register(kindExperimentRun, h.withLauncher(func(ctx context.Context, l *launcher, j *jobs.Job, log jobs.Logger, progress func(any)) (any, error) {
 		return l.runJob(ctx, j, log, progress)
@@ -1147,7 +1153,7 @@ func hostedHub(env *hostedEnv) *jobsHub {
 	// Hosted -offline keeps experiment.run: the hosted coordinator queues
 	// leases for runners and launches nothing itself, so offline changes
 	// nothing here, as the startup warning says (audit 8-C-03, 4-B-11).
-	h := newJobsHub(env.db, env.base.logger, true, true, "")
+	h := newJobsHubSized(env.db, env.base.logger, true, true, "", env.base.cfg.Jobs) // Z10: sizing from the jobs section
 	h.build = func(ctx context.Context, orgID string) (any, func(), error) {
 		org, err := env.dir.OrgByID(ctx, orgID)
 		if err != nil {

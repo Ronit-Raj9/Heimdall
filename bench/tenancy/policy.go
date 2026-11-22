@@ -168,6 +168,8 @@ var PlatformPolicy = map[string]Rule{
 	key("GET", api+"/jobs/{id}/logs"):    org(viewer),
 	key("POST", api+"/jobs/{id}/cancel"): org(member),
 
+	key("POST", api+"/jobs/{id}/priority"): org(admin), // Z10: reorder a queued job (handlers/jobpriority.go)
+
 	// Runners and runner tokens (P5): admin of the current org.
 	key("GET", api+"/runners"):                     org(admin),
 	key("GET", api+"/runners/{id}"):                org(admin),

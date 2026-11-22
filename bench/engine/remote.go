@@ -927,7 +927,7 @@ func (c *Coordinator) storeRunOnce(ctx context.Context, l *remoteLease, req *sch
 	if err != nil {
 		return nil, dir, false, fmt.Errorf("seal: %w", err)
 	}
-	if err := c.store.Verify(ctx, run.ExpID, run.RunID); err != nil {
+	if err := verifyAccepted(ctx, c.store, run); err != nil { // hot path: remoteverify.go
 		c.logger.Error("remote run does not verify after sealing; not accepted", "run", run.RunID, "error", err.Error())
 		return nil, dir, true, errors.New(unverifiedPrefix + err.Error())
 	}

@@ -91,6 +91,10 @@ type MirrorOptions struct {
 	// and sends again any whose object is gone or differs (a bucket that
 	// lost an object). A normal pass trusts the listing for those files.
 	Repair bool
+	// Incremental verifies only the runs sealed after the listing's last
+	// seal (incremental.go). The seal hook's passes use it; sweeps, repair
+	// and the pass at experiment end verify everything.
+	Incremental bool
 }
 
 // ExperimentWith is Experiment with options.
@@ -104,13 +108,25 @@ func (m *Mirror) ExperimentWith(ctx context.Context, org Org, expID string, opts
 }
 
 func (m *Mirror) experimentLocked(ctx context.Context, org Org, expID string, opts MirrorOptions) (*MirrorResult, error) {
-	snap, err := takeSnapshot(ctx, org, expID)
+	// The listing is read first so an incremental pass can start from it;
+	// a full pass reads it after the snapshot, as before.
+	var prev *Listing
+	var prevSHA string
+	var err error
+	incremental := opts.Incremental && !opts.Repair
+	if incremental {
+		if prev, prevSHA, err = readListing(ctx, m.Blob, org.ID, expID); err != nil && !isNotFound(err) {
+			return nil, err
+		}
+	}
+	snap, err := takeSnapshotWith(ctx, org, expID, prev)
 	if err != nil {
 		return nil, err
 	}
-	prev, prevSHA, err := readListing(ctx, m.Blob, org.ID, expID)
-	if err != nil && !isNotFound(err) {
-		return nil, err
+	if !incremental {
+		if prev, prevSHA, err = readListing(ctx, m.Blob, org.ID, expID); err != nil && !isNotFound(err) {
+			return nil, err
+		}
 	}
 	if err := checkAgainstListing(snap, prev); err != nil {
 		return nil, fmt.Errorf("experiment %s/%s: %w: %w", org.ID, expID, err, ErrRefused)

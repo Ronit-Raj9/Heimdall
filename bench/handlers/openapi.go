@@ -358,6 +358,8 @@ var APIRoutes = []RouteDoc{
 		Response: jobs.LogPage{}, AlsoRaw: "text/event-stream"},
 	{Method: "POST", Path: APIPrefix + "/jobs/{id}/cancel", Tag: "jobs", Summary: "Cancel a job: a queued one at once, a running one when its handler stops; 409 when it already ended (member)",
 		Auth: AuthWrite, Status: fasthttp.StatusAccepted, Response: jobs.Job{}},
+	{Method: "POST", Path: APIPrefix + "/jobs/{id}/priority", Tag: "jobs", Summary: "Move a queued job up or down the claim order (priority -10 to 10, 0 normal); the claim is round robin across organizations first, so it reorders only among equally loaded ones; 409 when the job already started (admin)",
+		Auth: AuthWrite, Request: JobPriority{}, Response: jobs.Job{}},
 
 	// Auth area (P2, handlers/auth.go, docs/auth.md). Local mode answers config and me only; the rest are hosted mode.
 	{Method: "GET", Path: AuthPrefix + "/config", Tag: "auth", Summary: "Sign-in options: auth mode, signup policy, GitHub, bootstrap", Response: auth.AuthInfo{}},

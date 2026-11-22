@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/db"
@@ -153,6 +154,7 @@ type Runner struct {
 	active  map[string]int    // running jobs per kind
 	orgAct  map[[2]string]int // running jobs per kind and organization
 	claimMu sync.Mutex        // one claim at a time, so the kind limits hold
+	idle    atomic.Int64      // unix nanos until which a claim is skipped: the last one found nothing (fairqueue.go)
 	wg      sync.WaitGroup    // workers and the sweeper
 	jobsWG  sync.WaitGroup    // running handlers
 }
@@ -221,6 +223,7 @@ type NewJob struct {
 	Kind      string
 	Params    json.RawMessage // nil means {}
 	CreatedBy string          // user, token or "system"
+	Priority  int             // claim order among equally loaded orgs (fairqueue.go); clamped to MinPriority..MaxPriority
 }
 
 // Create validates and queues a job the API asked for: the kind must be
@@ -276,7 +279,7 @@ func (r *Runner) enqueue(ctx context.Context, k *kind, n NewJob) (*Job, error) {
 		}
 	}
 	j := &Job{ID: db.NewID("job"), OrgID: n.OrgID, Kind: k.name, Target: target, Status: StatusQueued,
-		Params: params, CreatedBy: n.CreatedBy, CreatedAt: r.now().UTC()}
+		Params: params, CreatedBy: n.CreatedBy, CreatedAt: r.now().UTC(), Priority: clampPriority(n.Priority)}
 	if err := r.insert(ctx, j); err != nil {
 		return nil, err
 	}
@@ -286,6 +289,7 @@ func (r *Runner) enqueue(ctx context.Context, k *kind, n NewJob) (*Job, error) {
 
 // poke wakes one idle worker so a new job starts without waiting a poll.
 func (r *Runner) poke() {
+	r.clearIdle()
 	select {
 	case r.wake <- struct{}{}:
 	default:
@@ -416,6 +420,9 @@ func (r *Runner) sweeper() {
 func (r *Runner) claim(ctx context.Context) (*Job, error) {
 	r.claimMu.Lock()
 	defer r.claimMu.Unlock()
+	if r.queueIdle() { // another worker just found nothing (fairqueue.go)
+		return nil, nil
+	}
 	r.mu.Lock()
 	names := make([]string, 0, len(r.kinds))
 	full := map[string][]string{} // kind -> organizations at the kind's per-org cap
@@ -486,7 +493,7 @@ func (r *Runner) claim(ctx context.Context) (*Job, error) {
 		Table:     "jobs",
 		Where:     where,
 		Args:      args,
-		OrderBy:   "created_at, id",
+		OrderBy:   fairOrder, // per-org round robin, then priority, then age (fairqueue.go)
 		Set:       "status = ?, lease_owner = ?, lease_until = ?, attempt = attempt + 1, started_at = COALESCE(started_at, ?)",
 		SetArgs:   []any{string(StatusRunning), r.opts.Owner, now.Add(r.opts.LeaseFor).UnixMilli(), now.UnixMilli()},
 		Returning: jobColumns,
@@ -496,6 +503,7 @@ func (r *Runner) claim(ctx context.Context) (*Job, error) {
 	}
 	j, err := scanJob(row)
 	if errors.Is(err, sql.ErrNoRows) {
+		r.markIdle()
 		return nil, nil
 	}
 	if err == nil {
@@ -510,6 +518,7 @@ func (r *Runner) claim(ctx context.Context) (*Job, error) {
 // release returns the claim's place under the kind limits once the job
 // ended (or was handed back) on this runner.
 func (r *Runner) release(j *Job) {
+	r.clearIdle() // a freed place under a cap can make a queued job claimable
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.active[j.Kind]--; r.active[j.Kind] <= 0 {

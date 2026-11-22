@@ -17,3 +17,4 @@ cancel_requested
 attempt
 lease_owner?
 lease_until?
+priority?

@@ -68,6 +68,14 @@ func (f *faultyStore) Verify(ctx context.Context, expID, runID string) error {
 	return f.FSStore.Verify(ctx, expID, runID)
 }
 
+// VerifySealed is the coordinator's hot-path check (remoteverify.go).
+func (f *faultyStore) VerifySealed(ctx context.Context, run *schemas.Run) error {
+	if f.failVerify {
+		return errors.New("seal mismatch")
+	}
+	return f.FSStore.VerifySealed(ctx, run)
+}
+
 // A transient copy error after the run folder exists is retried from the
 // extracted upload; no half-copied run is left to settle the slot as
 // infra_error (audit 4-C-18).

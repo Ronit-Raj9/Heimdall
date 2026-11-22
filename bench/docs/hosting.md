@@ -494,6 +494,10 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_REGISTRY_AUTH_DIR` | Folder outside the checkout with that registry's credentials and digest manifest; empty picks one and writes it here. |
 | `HEIMDALL_LIBRARY_RUNS_ROOT` | Run store of the platform org whose reference runs give a new organization's first estimate its cost and time (docs/evaluations.md); empty uses each organization's own runs only. |
 | `HEIMDALL_EVAL_BUDGET_MAX_USD` | Largest budget the evaluation wizard suggests (default 100 USD, lowered to an org's daily spend cap when one is set); a person can still type more. |
+| `HEIMDALL_SHARED_HOST_SLOTS` | Runs at once on the shared worker's host, all organizations together, shared fairly between those with work; empty or 0 is one per 2 CPUs and 4 GB of memory. |
+| `HEIMDALL_EXPERIMENT_LIMIT` | Evaluations running at once on the whole platform; empty or 0 is 64. |
+| `HEIMDALL_EXPERIMENT_PER_ORG` | Evaluations running at once per organization; empty or 0 is 8. |
+| `HEIMDALL_SHARED_BUILDKIT` | Address of the isolated BuildKit that builds images from org Dockerfiles. |
 | `HEIMDALL_REGISTRY_DIR` | Host folder (on the data disk) for that registry's images; empty is a Docker volume. |
 | `HEIMDALL_RUNNER_DIR` | Host folder of the shared worker's runs, releases and org projects; empty is `/var/lib/heimdall-shared-runner`. |
 | `HEIMDALL_SHARED_PLATFORM_IMAGES` | Images every organization may pull, comma-separated. |
@@ -553,6 +557,15 @@ with `PUT /api/bench/admin/billing/{org_id}` and `{"plan":"enterprise"}`.
 Paid seats follow the member count every hour (and on "Sync seats"),
 prorated. `GET /api/public/pricing` serves the plans to the pricing page
 without sign-in.
+**Queue and hot paths.** Waiting evaluations take organizations in turn:
+the next one to start belongs to the organization with the fewest running,
+then the highest priority (an admin can move a queued job with
+`POST /api/bench/jobs/{id}/priority`, -10 to 10), then the oldest. The shared
+worker's host limit is shared the same way. While runs finish, the server
+updates only the changed part of its index and checks only the new results
+on their way to the evidence mirror; every result is checked again in full
+when the evaluation ends, at every mirror sweep (`storage.sweep_interval_m`)
+and by `bifrost-bench evidence sweep` in the nightly runbook.
 
 `HEIMDALL_DEV` turns on the practice suite and examples for tests and
 development; a production install never sets it.
