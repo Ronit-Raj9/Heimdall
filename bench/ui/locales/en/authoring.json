@@ -1,0 +1,83 @@
+{
+	"tab": "Review",
+	"draft": {
+		"title": "Draft with a model",
+		"description": "A model on your own key drafts the parts you would otherwise write: rubric criteria, one wrong reply per criterion, near-miss wrong answers and a gaming attempt per task. Every drafted field is labelled, and the task waits for your review before it counts.",
+		"answerOnly": "Drafting works on question-and-answer benchmarks. This benchmark grades code or workspace state with its own tests.",
+		"ops": "What to draft",
+		"op": {
+			"rubric": "Rubric criteria",
+			"criterion_wrong": "One wrong reply per criterion",
+			"near_miss_wrong": "Near-miss wrong answers",
+			"exploit": "A gaming attempt"
+		},
+		"opHint": {
+			"rubric": "2 to 6 weighted criteria from the reference reply, for tasks with no rubric. Judge-graded benchmarks only.",
+			"criterion_wrong": "Each reply meets every criterion but one, so the readiness check shows each criterion is enforced.",
+			"near_miss_wrong": "A swapped name, a missing step, a broken rule or a wrong number.",
+			"exploit": "Claims the work is done, quotes the rules, or flatters the grader. It must fail."
+		},
+		"provider": "Provider",
+		"model": "Model",
+		"modelHint": "Pick a model from another family than the judge and the agent you test, so one model does not grade its own words.",
+		"budget": "Budget (USD)",
+		"budgetHint": "A hard cap for the whole job, charged to your own model key.",
+		"estimate": "Estimate the cost",
+		"run": "Draft",
+		"confirm": "Draft with {{model}} on your own key, up to ${{budget}}? Drafted tasks wait for your review.",
+		"forecast": "Up to {{calls}} calls, at most ${{usd}}.",
+		"spent": "Spent ${{usd}} of ${{budget}}.",
+		"needModel": "Enter a provider and a model."
+	},
+	"queue": {
+		"title": "Generated tasks",
+		"description": "A generated task counts in no evaluation, gate, release or report card until a person accepts it. Run the readiness check first: it shows whether each drafted wrong answer fails.",
+		"empty": "No generated tasks. Drafted tasks appear here for review.",
+		"counts": "{{pending}} waiting, {{accepted}} accepted, {{rejected}} rejected",
+		"fields": "Drafted fields",
+		"cost": "${{usd}}",
+		"accept": "Accept",
+		"reject": "Reject",
+		"note": "What is wrong (needed to reject)",
+		"stale": "Drafted again since the last decision",
+		"decidedBy": "{{decision}} by {{by}}",
+		"state": {
+			"pending": "Waiting for review",
+			"accepted": "Accepted",
+			"rejected": "Rejected"
+		},
+		"loadError": "Could not load the generated tasks"
+	},
+	"quality": {
+		"title": "Quality checks",
+		"description": "Finds duplicate tasks in this benchmark and tasks whose words already appear in public benchmarks of the library. Free: no model is called.",
+		"run": "Check",
+		"duplicates": "Duplicates",
+		"exact": "same text",
+		"near": "{{pct}}% the same",
+		"public": "Found in public benchmarks",
+		"overlap": "{{pct}}% of its text, like {{matches}}",
+		"heldOutError": "held out, but already public",
+		"clean": "No duplicates and nothing found in {{count}} public tasks."
+	},
+	"split": {
+		"title": "Hold out tasks automatically",
+		"description": "Picks a share of tasks to keep out of every public view, the same way each time for the same seed, and marks their instructions so copies can be traced. Public tasks (imported or found in the library) are held out only if you confirm.",
+		"pct": "Share held out (%)",
+		"seed": "Seed",
+		"stratify": "Balance by",
+		"stratifyNone": "Nothing",
+		"stratifyOpt": {
+			"difficulty": "Difficulty",
+			"kind": "Kind",
+			"project": "Project",
+			"capability": "Capability"
+		},
+		"confirmPublic": "Hold out public tasks too",
+		"preview": "Preview",
+		"apply": "Hold out",
+		"applyConfirm": "Hold out {{count}} tasks? Their instructions change, so lock the benchmark and run the readiness check again.",
+		"result": "{{held}} held out, {{public}} public",
+		"refused": "Public data, not held out: {{tasks}}"
+	}
+}

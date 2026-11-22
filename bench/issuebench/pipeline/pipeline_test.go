@@ -1,0 +1,160 @@
+package pipeline
+
+import (
+	"context"
+	"errors"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/maximhq/bifrost/bench/issuebench"
+)
+
+type fakeScan struct{ cands []issuebench.Candidate }
+
+func (f fakeScan) Scan(ctx context.Context, repo string, o ScanOptions) ([]issuebench.Candidate, issuebench.Funnel, error) {
+	return f.cands, issuebench.Funnel{MergedPRs: 10, Linked: 4, Qualified: len(f.cands), Reasons: map[string]int{"no tests": 6}}, nil
+}
+
+type fakeBuild struct {
+	mu    sync.Mutex
+	calls int
+	stop  map[int]issuebench.StopReason // by issue, first call only
+}
+
+func (f *fakeBuild) Build(ctx context.Context, c issuebench.Candidate, o BuildOptions, logf func(string, ...any)) (issuebench.BuildResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls++
+	if s, ok := f.stop[c.Issue]; ok && len(o.Secrets) == 0 {
+		return issuebench.BuildResult{Stop: s, Detail: "API_TOKEN"}, nil
+	}
+	return issuebench.BuildResult{Stop: issuebench.StopOK, CostUSD: 0.5, Env: &issuebench.EnvSpec{Repo: c.Repo, BaseImage: "python:3.12-slim"}}, nil
+}
+
+type fakeValidate struct{}
+
+func (fakeValidate) Validate(ctx context.Context, c issuebench.Candidate, env issuebench.EnvSpec, logf func(string, ...any)) (issuebench.Validation, error) {
+	v := issuebench.Validation{Candidate: c, PassToPass: []string{"t::ok"}, Checks: issuebench.LLMChecks{Clear: true}}
+	if c.Issue != 3 {
+		v.FailToPass = []string{"t::fixed"}
+	}
+	return v, nil
+}
+
+type fakeEmit struct{ got []issuebench.Validation }
+
+func (f *fakeEmit) Emit(ctx context.Context, repo string, t []issuebench.Validation) (string, error) {
+	f.got = t
+	return "issues-" + "a-b", nil
+}
+
+func cand(issue int, month time.Month) issuebench.Candidate {
+	return issuebench.Candidate{Repo: "a/b", Issue: issue, PR: issue + 100, IssueBody: "body", PRMerged: time.Date(2026, month, 2, 0, 0, 0, 0, time.UTC)}
+}
+
+func TestPipelineEndToEnd(t *testing.T) {
+	b := &fakeBuild{stop: map[int]issuebench.StopReason{4: issuebench.StopNeedsSecret}}
+	e := &fakeEmit{}
+	m := NewManager(t.TempDir(), Stages{
+		Scanner: fakeScan{cands: []issuebench.Candidate{cand(1, 3), cand(2, 3), cand(3, 4), cand(4, 5), {Issue: 9, Skip: "bot"}}},
+		Builder: b, Validator: fakeValidate{}, Emitter: e,
+	})
+	ctx := context.Background()
+	if _, err := m.Scan(ctx, "bad repo", ScanOptions{}); !errors.Is(err, ErrBadRequest) {
+		t.Fatalf("bad repo: %v", err)
+	}
+	s, err := m.Scan(ctx, "a/b", ScanOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Items) != 4 || s.Funnel.MergedPRs != 10 {
+		t.Fatalf("items %d funnel %+v", len(s.Items), s.Funnel)
+	}
+	if _, err := m.Start(s.ID, false); !errors.Is(err, ErrNoConsent) {
+		t.Fatalf("no consent: %v", err)
+	}
+	if _, err := m.Start(s.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	m.Wait()
+	s, _ = m.Load(s.ID)
+	want := map[int]string{1: StatusReady, 2: StatusReady, 3: StatusFailed, 4: StatusFailed}
+	for _, it := range s.Items {
+		if it.Status != want[it.Candidate.Issue] {
+			t.Errorf("issue %d: %s (%s)", it.Candidate.Issue, it.Status, it.Reason)
+		}
+	}
+	if b.calls != 3 { // version 2026-03 reused for issues 1 and 2
+		t.Errorf("builds %d, want 3", b.calls)
+	}
+	if s.Status != RunDone || len(s.Log) == 0 {
+		t.Errorf("status %s log %d", s.Status, len(s.Log))
+	}
+	it4 := s.Items[3]
+	if it4.Fix != FixAddSecret || it4.Reason != "the tests need a secret: API_TOKEN" {
+		t.Errorf("issue 4 fix %q reason %q", it4.Fix, it4.Reason)
+	}
+	if _, err := m.Retry(s.ID, 4, FixAddSecret, BuildOptions{}); !errors.Is(err, ErrBadRequest) {
+		t.Fatalf("retry without secret: %v", err)
+	}
+	if _, err := m.Retry(s.ID, 4, FixAddSecret, BuildOptions{Secrets: []string{"API_TOKEN"}}); err != nil {
+		t.Fatal(err)
+	}
+	m.Wait()
+	s, _ = m.Load(s.ID)
+	if s.Items[3].Status != StatusReady {
+		t.Fatalf("after fix: %s %s", s.Items[3].Status, s.Items[3].Reason)
+	}
+	if _, err := m.Review(ctx, s.ID, 3, Review{Decision: "accept"}); !errors.Is(err, ErrBadRequest) {
+		t.Fatalf("accept failed item: %v", err)
+	}
+	if _, err := m.Review(ctx, s.ID, 1, Review{Decision: "edit", Instruction: "clearer text"}); err != nil {
+		t.Fatal(err)
+	}
+	s, err = m.Review(ctx, s.ID, 1, Review{Decision: "accept"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Benchmark != "issues-a-b" || len(e.got) != 1 || e.got[0].Candidate.IssueBody != "clearer text" {
+		t.Fatalf("emit: bench %q got %+v", s.Benchmark, e.got)
+	}
+	if _, err := m.Review(ctx, s.ID, 2, Review{Decision: "reject"}); err != nil {
+		t.Fatal(err)
+	}
+	runs, err := m.List()
+	if err != nil || len(runs) != 1 || runs[0].Log != nil {
+		t.Fatalf("list %v %+v", err, runs)
+	}
+}
+
+func TestResumeSkipsFinishedItems(t *testing.T) {
+	b := &fakeBuild{}
+	m := NewManager(t.TempDir(), Stages{Scanner: fakeScan{cands: []issuebench.Candidate{cand(1, 3), cand(2, 4)}}, Builder: b, Validator: fakeValidate{}})
+	s, _ := m.Scan(context.Background(), "a/b", ScanOptions{})
+	_, _ = m.update(s.ID, func(s *State) error {
+		s.Consent = true
+		s.Items[0].Status = StatusReady
+		return nil
+	})
+	if err := m.Run(context.Background(), s.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if b.calls != 1 {
+		t.Fatalf("builds %d, want 1", b.calls)
+	}
+}
+
+func TestMissingStagesSayWhy(t *testing.T) {
+	m := NewManager(t.TempDir(), Stages{Scanner: fakeScan{cands: []issuebench.Candidate{cand(1, 3)}}})
+	s, _ := m.Scan(context.Background(), "a/b", ScanOptions{})
+	_, _ = m.Start(s.ID, true)
+	m.Wait()
+	s, _ = m.Load(s.ID)
+	if s.Items[0].Status != StatusFailed || s.Items[0].Reason == "" {
+		t.Fatalf("%+v", s.Items[0])
+	}
+	if _, err := m.Load("../x"); !errors.Is(err, ErrNotFound) {
+		t.Fatal(err)
+	}
+}

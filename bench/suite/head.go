@@ -66,6 +66,7 @@ func Stamp(dir string, perTask bool) string {
 	add(filepath.Join(dir, SuiteFile))
 	add(filepath.Join(dir, LockFile))
 	add(filepath.Join(dir, schemas.SuiteHealthFileName)) // quarantine sidecar
+	add(filepath.Join(dir, schemas.TaskReviewFileName))  // review sidecar of generated tasks
 	tasks := filepath.Join(dir, tasksDir)
 	add(tasks)
 	if !perTask {

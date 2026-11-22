@@ -80,10 +80,14 @@ fi
 if [ "$W" != "$SRC" ]; then
 	export PYTHONPATH="$W${PYTHONPATH:+:$PYTHONPATH}"
 fi
+# A test command that writes a JUnit report (pytest --junitxml="$BENCH_JUNIT",
+# as tasks built from issues do) is graded from that report first.
+export BENCH_JUNIT=/tmp/bench-junit.xml
+rm -f "$BENCH_JUNIT"
 bash "$G/cmd.sh" > /tmp/bench-test.log 2>&1
 code=$?
 tail -c 1000000 /tmp/bench-test.log > "$OUT/test.log"
-grade --log /tmp/bench-test.log --exit "$code" || exit 3
+grade --log /tmp/bench-test.log --exit "$code" --junit "$BENCH_JUNIT" || exit 3
 exit 0
 `
 
@@ -93,15 +97,19 @@ exit 0
 // tests.json gives, or one testcase for the test command's exit status when
 // the task follows upstream's exit-code rule. A test passes only when the log
 // shows it PASSED or XFAIL; a test missing from the log fails, as upstream
-// counts it.
+// counts it. When the test command also wrote a JUnit XML report
+// (--junit), its results are read too and win over the log for the tests
+// it names, matched to upstream ids by file path and pytest node id.
 const gradeScript = `"""Turn a SWE-bench-style test log into the JUnit report the bench reads.
 
-Usage: grade.py --spec tests.json --out junit.xml (--log FILE --exit N | --broken REASON)
+Usage: grade.py --spec tests.json --out junit.xml (--log FILE --exit N [--junit FILE] | --broken REASON)
 """
 
 import argparse
 import json
+import os
 import re
+import xml.etree.ElementTree as ET
 from xml.sax.saxutils import quoteattr
 
 PASSED, FAILED, SKIPPED, ERROR, XFAIL = "PASSED", "FAILED", "SKIPPED", "ERROR", "XFAIL"
@@ -241,6 +249,52 @@ def parse_django(log):
     return status_map
 
 
+def junit_ids(classname, name, file):
+    """Every pytest node id a JUnit testcase can stand for."""
+    ids = set()
+    parts = [p for p in classname.split(".") if p]
+    if file:
+        file = file.replace("\\", "/")
+        mod = file[:-3].replace("/", ".") if file.endswith(".py") else ""
+        rest = parts
+        if mod and classname.startswith(mod):
+            rest = [p for p in classname[len(mod):].split(".") if p]
+        ids.add("::".join([file] + rest + [name]))
+    for k in range(1, len(parts) + 1):
+        ids.add("::".join(["/".join(parts[:k]) + ".py"] + parts[k:] + [name]))
+    if not parts:
+        ids.add(name)
+    return ids
+
+
+def parse_junit(path):
+    """Status per pytest node id from a JUnit XML report, or {} when absent."""
+    if not path or not os.path.isfile(path):
+        return {}
+    try:
+        root = ET.parse(path).getroot()
+    except (ET.ParseError, OSError, ValueError):
+        return {}
+    status_map = {}
+    for case in root.iter("testcase"):
+        tags = {child.tag for child in case}
+        if "failure" in tags:
+            status = FAILED
+        elif "error" in tags:
+            status = ERROR
+        elif "skipped" in tags:
+            skipped = case.find("skipped")
+            kind = (skipped.get("type") or "") + (skipped.get("message") or "")
+            status = XFAIL if "xfail" in kind.lower() else SKIPPED
+        else:
+            status = PASSED
+        for i in junit_ids(case.get("classname") or "", case.get("name") or "", case.get("file") or ""):
+            # A failing duplicate (call passed, teardown errored) wins.
+            if status_map.get(i) not in (FAILED, ERROR):
+                status_map[i] = status
+    return status_map
+
+
 PARSERS = {
     "parse_log_pytest": parse_pytest,
     "parse_log_pytest_options": parse_pytest_options,
@@ -261,6 +315,7 @@ def cases_for(spec, args):
         return [(t, None if ok else "failure", "test command exited %d" % args.exit) for t in tests]
     with open(args.log, encoding="utf-8", errors="replace") as f:
         status_map = PARSERS[spec["log_parser"]](f.read())
+    status_map.update(parse_junit(args.junit))
     out = []
     for t in tests:
         status = status_map.get(t["id"])
@@ -280,6 +335,7 @@ def main():
     p.add_argument("--log")
     p.add_argument("--exit", type=int, default=0)
     p.add_argument("--broken")
+    p.add_argument("--junit")
     args = p.parse_args()
     with open(args.spec, encoding="utf-8") as f:
         spec = json.load(f)

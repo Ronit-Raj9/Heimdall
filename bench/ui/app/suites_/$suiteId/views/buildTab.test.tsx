@@ -85,6 +85,7 @@ describe("buildTab helpers", () => {
 		expect(sourcesFor({ output: "answer" })).toEqual(["rows", "tickets", "traces"]);
 		expect(sourcesFor({ output: "state" })).toEqual(["mock", "traces"]);
 		expect(sourcesFor({ output: "state", track: "support" })).toEqual(["scenarios", "mock", "traces"]);
+		expect(sourcesFor({ output: "diff" })).toEqual(["commit", "issues", "traces"]);
 		expect(formatOfFile("faq.CSV")).toBe("csv");
 		expect(formatOfFile("rows.jsonl")).toBe("jsonl");
 		expect(formatOfFile("notes.txt")).toBeNull();

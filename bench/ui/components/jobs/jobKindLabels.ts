@@ -36,6 +36,7 @@ export const JOB_KIND_LABELS: Readonly<Record<string, string>> = {
 	"inbox.source": "Add a failure source",
 	"index.rebuild": "Refresh search index",
 	"integrations.export": "Download results for other tools",
+	"issuebench.build": "Build a test environment from issues",
 	"k8s.status": "Kubernetes status",
 	"livescore.compare": "Compare live quality scores",
 	"livescore.init": "Set up live quality scoring",

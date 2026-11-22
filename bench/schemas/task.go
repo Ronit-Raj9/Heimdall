@@ -71,6 +71,11 @@ type Task struct {
 	// a condition sets split: held_out or names it, and the API never serves
 	// its instruction or files unless the server config allows it.
 	Split string `json:"split,omitempty" yaml:"split"`
+	// Review is the review state of a generated task (review.go): pending,
+	// accepted or rejected. Empty means a person wrote the task, unless
+	// Provenance.Generated lists a field a model drafted, which makes it
+	// pending. A decision in the suite's review sidecar overrides it.
+	Review string `json:"review,omitempty" yaml:"review,omitempty"`
 
 	Voice *VoiceSpec `json:"voice,omitempty" yaml:"voice"` // X8 voice agents: the task is a phone call with a voice caller (voice.go)
 	// Team runs the task with a multi-container team (agents.go) when the
@@ -174,6 +179,10 @@ type TaskProvenance struct {
 	// Failure inbox: the production incident the task was drafted from
 	// (`inbox accept`, docs/failure-inbox.md). Absent on every other task.
 	Incident *TaskIncident `json:"incident,omitempty" yaml:"incident,omitempty"`
+	// Generated lists every field a model drafted (bench/authoring), so the
+	// task shows which words a person did not write. Absent on every
+	// hand-written task.
+	Generated []GeneratedField `json:"generated,omitempty" yaml:"generated,omitempty"`
 }
 
 // TaskIncident links a task to the failure inbox item it came from, so a
