@@ -104,7 +104,8 @@ It is safe to run again; each step skips what is done. In order:
    Postgres and gateway secrets, the keystore master key
    (`HEIMDALL_MASTER_KEY`, base64 of 32 random bytes), your domain and ACME
    e-mail. Review the file: signup policy (`HEIMDALL_SIGNUP`: `invite` by
-   default, `open`, `closed`), GitHub, S3 mirror, shared worker.
+   default, `allowlist` with `HEIMDALL_SIGNUP_DOMAINS`, `open`, `closed`;
+   docs/auth.md), GitHub, S3 mirror, shared worker.
 2. builds the server image from this checkout (`deploy/hosted/Dockerfile.server`:
    `npm ci` and the UI build, then a static Go binary with the UI embedded, on
    a non-root Alpine runtime; about 5 minutes the first time)
@@ -444,7 +445,9 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_PROVIDER_SLOTS` | Runs that may use one provider at once through the shared fault proxy and per organization key. |
 | `HEIMDALL_RUNNER_MIN_FREE_GB` | Free disk a runner keeps; below it the runner takes no new work and reports disk low. |
 | `HEIMDALL_METRICS_LISTEN` | Prometheus metrics address on the compose network; empty is off. Never publish it. |
-| `HEIMDALL_SERVER_ADMINS` | Comma-separated emails of server admins: quotas, image approval, kill switch. |
+| `HEIMDALL_SERVER_ADMINS` | Comma-separated emails of server admins: quotas, image approval, kill switch. An address counts only once verified (docs/auth.md, Server admins). |
+| `HEIMDALL_SERVER_ADMIN_IDS` | Comma-separated user ids of server admins; `bifrost-bench admin grant -email X` does the same from the database. |
+| `HEIMDALL_SIGNUP_DOMAINS` | Email domains that may sign up without an invitation under `HEIMDALL_SIGNUP=allowlist`. |
 | `HEIMDALL_API_RATE_LIMITS` | API rate limits per token and per organization (`cred_burst,cred_per_sec,org_burst,org_per_sec`, or `off`); empty is the default. |
 | `HEIMDALL_RUNNER_IMAGE` | Runner image Heimdall starts for an organization's own worker on Fly Machines or Kubernetes; empty is the published default. |
 | `HEIMDALL_GATEWAY_LOGS_URL` | The shared gateway's log API the server lists, deletes and expires one organization's prompt logs through; empty with the shared worker on is `http://bifrost:8080`, `off` disables it. |
@@ -464,7 +467,11 @@ development; a production install never sets it.
       published; do not add a `ports:` entry to it.
 - [ ] `deploy/hosted/.env` is mode 600 and not committed; backups of it are
       as secret as it is.
-- [ ] Signup is `invite` or `closed` unless you mean to run an open service.
+- [ ] Signup is `invite`, `allowlist` or `closed` unless you mean to run an
+      open service. Check the live value: `curl -s https://$HEIMDALL_DOMAIN/api/bench/auth/config`
+      (a server admin's override from Admin, Sign-up wins over `.env`).
+- [ ] Server admins are bound by user id: `bifrost-bench admin list` on the
+      server shows each one and how it became admin.
 - [ ] Rotate secrets: the Postgres password (`ALTER USER heimdall PASSWORD
       '<new>'` in `$C exec postgres psql -U heimdall`, then `.env`, then
       `upgrade.sh --no-pull`), the GitHub client secret (on GitHub, then
@@ -492,5 +499,7 @@ caps request bodies at 2 MiB and hides `/readyz`; the server adds its CSP,
 - Choice of data residency or region per organization: everything lives on
   this machine (and the S3 mirror you configure).
 - High availability: one server process and one Postgres; scale up, not out.
-- Email delivery: invitations are links an admin copies and sends.
+- Email delivery: invitations are links an admin copies and sends. Email
+  verification links go through a mail sender when one is wired in, and to
+  the server log otherwise (docs/auth.md, Email verification).
 - Master key rotation or a KMS: `HEIMDALL_MASTER_KEY` is one static key.

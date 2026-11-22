@@ -7,7 +7,7 @@ import { BlockSkeleton } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { signupOffered, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { useGetInvitationQuery, useSignupMutation } from "@/lib/store/apis/platformApi";
+import { useGetAuthConfigQuery, useGetInvitationQuery, useSignupMutation } from "@/lib/store/apis/platformApi";
 import { Link, Navigate } from "@tanstack/react-router";
 import { Info } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -34,6 +34,10 @@ export default function SignupView({ invitation }: { invitation?: string }) {
 	const { t: tCaptcha } = useTranslation("accountSafety");
 	const [captchaToken, setCaptchaToken] = useState("");
 	const [signup, state] = useSignupMutation();
+	// Wave A: the allowlist hint and how the verification link arrives.
+	const { t: ti } = useTranslation("identity");
+	const authConfig = useGetAuthConfigQuery(undefined, { skip: session.authMode === "local" });
+	const delivery = authConfig.data?.email_delivery;
 	// An invitation fixes the email: the account must be the one invited.
 	const invitedEmail = invite.data?.email;
 
@@ -87,6 +91,7 @@ export default function SignupView({ invitation }: { invitation?: string }) {
 		}
 	};
 
+	const allowlist = !invitation && !session.bootstrap && session.signup === "allowlist" ? (session.signupDomains ?? []).join(", ") : "";
 	const subtitle = invite.data
 		? t("auth.signup.subtitleInvite", { org: invite.data.org_name, role: t(`roles.${invite.data.role}`).toLowerCase() })
 		: t("auth.signup.subtitle");
@@ -104,6 +109,12 @@ export default function SignupView({ invitation }: { invitation?: string }) {
 					<span className="text-foreground truncate font-medium">{invite.data.org_name}</span>
 					<RoleBadge role={invite.data.role} className="ml-auto" />
 				</div>
+			)}
+			{allowlist && (
+				<p className="bg-muted/50 text-muted-foreground flex items-start gap-2.5 rounded-xl px-3.5 py-3 text-sm" data-testid="signup-allowlist">
+					<Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					{ti("signup.allowlistOnly", { domains: allowlist })}
+				</p>
 			)}
 			<form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)} noValidate data-testid="signup-form">
 				<AuthField
@@ -157,6 +168,11 @@ export default function SignupView({ invitation }: { invitation?: string }) {
 				>
 					{t("auth.signup.submit")}
 				</Button>
+				{delivery && (
+					<p className="text-muted-foreground text-xs" data-testid="signup-verify-note">
+						{delivery === "log" ? ti("signup.verifyLog") : ti("signup.verifyEmail")}
+					</p>
+				)}
 			</form>
 			<p className="text-muted-foreground text-center text-sm">
 				{t("auth.signup.haveAccount")}{" "}

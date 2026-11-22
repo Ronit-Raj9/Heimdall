@@ -5,21 +5,38 @@ import { errorQuery, loadingQuery, mutation, okQuery, render, tagOf } from "@/li
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SignupView from "./signupView";
 
-const api = vi.hoisted(() => ({ invite: {} as unknown, signup: {} as Record<string, unknown> }));
+const api = vi.hoisted(() => ({ invite: {} as unknown, signup: {} as Record<string, unknown>, config: { data: undefined } as unknown }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/platformApi")>()),
 	useGetInvitationQuery: () => api.invite,
 	useSignupMutation: () => mutation(api.signup),
-	useGetAuthConfigQuery: () => ({ data: undefined }), // L22: no captcha in these tests
+	useGetAuthConfigQuery: () => api.config, // L22: no captcha in these tests
 }));
 
 beforeEach(() => {
 	api.invite = { ...loadingQuery(), isLoading: false };
 	api.signup = {};
+	api.config = { data: undefined };
 });
 
 describe("SignupView", () => {
+	it("offers the form under an allowlist and names the allowed domains (Wave A)", () => {
+		const html = render(<SignupView />, signedOutSession({ ...AUTH_CONFIG, signup: "allowlist", signup_domains: ["acme.dev", "labs.dev"] }));
+		expect(html).toContain('data-testid="signup-form"');
+		expect(html).toContain('data-testid="signup-allowlist"');
+		expect(html).toContain("acme.dev, labs.dev");
+		// An allowlist without domains is invitation only.
+		expect(render(<SignupView />, signedOutSession({ ...AUTH_CONFIG, signup: "allowlist", signup_domains: [] }))).toContain('data-testid="signup-invite-only"');
+	});
+
+	it("says how the confirmation link arrives", () => {
+		api.config = okQuery({ ...AUTH_CONFIG, email_delivery: "log" });
+		expect(render(<SignupView />, signedOutSession())).toContain("Your server admin passes on the link that confirms your address.");
+		api.config = okQuery({ ...AUTH_CONFIG, email_delivery: "email" });
+		expect(render(<SignupView />, signedOutSession())).toContain("We will email you a link to confirm your address.");
+	});
+
 	it("shows the form when sign-up is open", () => {
 		const html = render(<SignupView />, signedOutSession());
 		expect(html).toContain('data-testid="signup-form"');

@@ -11,8 +11,9 @@ import { cn } from "@/lib/utils";
 import { parseAsString, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
 import { AdminContainersPanel, AdminImagesPanel, AdminOrgsPanel, AdminUsagePanel, AdminUsersPanel } from "./adminPanels";
+import { AdminSignupPanel } from "./adminSignupPanel";
 
-export const ADMIN_TABS = ["overview", "users", "orgs", "images", "usage", "containers"] as const;
+export const ADMIN_TABS = ["overview", "users", "orgs", "signup", "images", "usage", "containers"] as const;
 export type AdminTab = (typeof ADMIN_TABS)[number];
 
 /** A tab from the URL, overview when unknown. */
@@ -20,7 +21,7 @@ export function adminTab(value: string | null | undefined): AdminTab {
 	return (ADMIN_TABS as readonly string[]).includes(value ?? "") ? (value as AdminTab) : "overview";
 }
 
-/** Server admin page: only server admins (HEIMDALL_SERVER_ADMINS) reach the panels. */
+/** Server admin page: only server admins (by user id, CLI grant, or verified HEIMDALL_SERVER_ADMINS email) reach the panels. */
 export default function AdminView({ param = "tab" }: { /** Search parameter of the panel tab; "section" inside Settings, whose own tab is ?tab=. */ param?: string } = {}) {
 	const { t } = useTranslation("admin");
 	const session = useSession();
@@ -57,6 +58,7 @@ export default function AdminView({ param = "tab" }: { /** Search parameter of t
 				</TabsContent>
 				<TabsContent value="users">{tab === "users" && <AdminUsersPanel />}</TabsContent>
 				<TabsContent value="orgs">{tab === "orgs" && <AdminOrgsPanel />}</TabsContent>
+				<TabsContent value="signup">{tab === "signup" && <AdminSignupPanel />}</TabsContent>
 				<TabsContent value="images">{tab === "images" && <AdminImagesPanel />}</TabsContent>
 				<TabsContent value="usage">{tab === "usage" && <AdminUsagePanel />}</TabsContent>
 				<TabsContent value="containers">{tab === "containers" && <AdminContainersPanel />}</TabsContent>

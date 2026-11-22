@@ -160,6 +160,7 @@ services:
       HEIMDALL_DATABASE_URL: postgres://heimdall:${HEIMDALL_PG_PASSWORD:?set HEIMDALL_PG_PASSWORD in deploy/hosted/.env}@postgres:5432/heimdall?sslmode=disable
       BENCH_AUTH_PUBLIC_URL: ${HEIMDALL_PUBLIC_URL:-https://${HEIMDALL_DOMAIN:?set HEIMDALL_DOMAIN in deploy/hosted/.env}}
       BENCH_AUTH_SIGNUP: ${HEIMDALL_SIGNUP:-invite}
+      BENCH_AUTH_SIGNUP_DOMAINS: ${HEIMDALL_SIGNUP_DOMAINS:-}
       # The public name, and "heimdall" for the shared worker on the edge network.
       BENCH_SERVER_ALLOWED_HOSTS: ${HEIMDALL_DOMAIN},heimdall
       # Only compose networks reach the server (its port is not published),
@@ -185,6 +186,7 @@ services:
       # shared pool runner tokens with, and the secret the shared runner
       # fetches its assignments with (empty: no shared pool).
       HEIMDALL_SERVER_ADMINS: ${HEIMDALL_SERVER_ADMINS:-}
+      HEIMDALL_SERVER_ADMIN_IDS: ${HEIMDALL_SERVER_ADMIN_IDS:-}
       HEIMDALL_MASTER_KEY: ${HEIMDALL_MASTER_KEY:-}
       HEIMDALL_SHARED_RUNNER_SECRET: ${HEIMDALL_SHARED_RUNNER_SECRET:-}
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}

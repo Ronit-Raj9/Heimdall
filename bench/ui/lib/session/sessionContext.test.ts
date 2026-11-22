@@ -1,7 +1,7 @@
 import { AUTH_CONFIG, ME_LOCAL, ME_OWNER, demoSession, hostedSession, signedOutSession } from "@/lib/testing/platformFixtures";
 import { afterEach, describe, expect, it } from "vitest";
 import { setAuthState } from "@/lib/store/apis/session";
-import { LOCAL_SESSION, canUse, frameFor, sessionFromMe, usesWriteToken } from "./sessionContext";
+import { LOCAL_SESSION, canUse, frameFor, needsEmailVerification, sessionFromMe, signupOffered, usesWriteToken } from "./sessionContext";
 
 afterEach(() => setAuthState({ mode: "local" }));
 
@@ -83,5 +83,24 @@ describe("frameFor", () => {
 		expect(frameFor({ ...signedOutSession(), status: "error" }, "/s/org_a.shr_1.sig")).toBe("share");
 		expect(frameFor(demoSession(), "/verdict")).toBe("login");
 		expect(frameFor(hostedSession("viewer"), "/settings")).toBe("app");
+	});
+});
+describe("email verification and allowlist sign-up (Wave A)", () => {
+	it("reads email_verified for users only", () => {
+		expect(sessionFromMe({ me: { ...ME_OWNER, email_verified: false }, meLoading: false }).emailVerified).toBe(false);
+		expect(needsEmailVerification(sessionFromMe({ me: { ...ME_OWNER, email_verified: false }, meLoading: false }))).toBe(true);
+		expect(needsEmailVerification(sessionFromMe({ me: { ...ME_OWNER, email_verified: true }, meLoading: false }))).toBe(false);
+		// An older server sends no field: no banner.
+		expect(needsEmailVerification(sessionFromMe({ me: ME_OWNER, meLoading: false }))).toBe(false);
+		const token = sessionFromMe({ me: { ...ME_OWNER, kind: "token", email_verified: false }, meLoading: false });
+		expect(token.emailVerified).toBeUndefined();
+	});
+
+	it("offers the sign-up form under an allowlist only with domains", () => {
+		const anon = (signup_domains?: string[]) =>
+			sessionFromMe({ meError: { status: 401, data: {} }, meLoading: false, config: { auth_mode: "hosted", github: false, signup: "allowlist", signup_domains } });
+		expect(signupOffered(anon(["acme.dev"]))).toBe(true);
+		expect(signupOffered(anon([]))).toBe(false);
+		expect(signupOffered(anon())).toBe(false);
 	});
 });
