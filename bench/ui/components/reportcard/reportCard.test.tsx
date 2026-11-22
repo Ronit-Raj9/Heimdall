@@ -397,7 +397,7 @@ describe("fault table (N57)", () => {
 		expect(renderToStaticMarkup(<ReportCard report={one} />)).toContain(
 			"1 run under faults was left out: its task has no finished normal run to compare with.",
 		);
-		const three = {
+		const three: typeof abReport = {
 			...abReport,
 			reliability: [
 				{ fault: "broken-tool", arms: { A: { score: 0.1, drop: -0.3, unpaired: 2 }, B: { score: 0.4, drop: -0.15 } } },
