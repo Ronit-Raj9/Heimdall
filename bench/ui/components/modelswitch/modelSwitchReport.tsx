@@ -3,6 +3,7 @@ import { ParetoChart } from "@/components/migration/paretoChart";
 import { costText, formatShare, observed } from "@/components/migration/pareto.utils";
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
+import { ApplyPanel } from "./applyPanel";
 import { getLocale } from "@/lib/i18n";
 import { useGetModelSwitchConfigQuery, useGetModelSwitchQuery, type ModelSwitchReport, type SwitchGroup } from "@/lib/store/apis/modelSwitchApi";
 import type { Value } from "@/lib/types/bench";
@@ -199,6 +200,7 @@ function RoutingExport({ evaluationId }: { evaluationId: string }) {
 						<TextList title={t("export.headers")} items={ex.headers.map((h) => `${h.header}: ${h.values.join(", ")}`)} testId="model-switch-headers" />
 					)}
 					{ex.budget_hints.length > 0 && <TextList title={t("export.budget")} items={ex.budget_hints.map((b) => b.text)} testId="model-switch-budget" />}
+					<ApplyPanel evaluationId={evaluationId} ruleCount={ex.config.governance.routing_rules.length} />
 					<pre className="bg-muted max-h-80 overflow-auto rounded p-3 text-xs" data-testid="model-switch-json">
 						{json}
 					</pre>

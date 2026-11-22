@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { BarChart3, Check, Cpu, GitCompare, Swords } from "lucide-react";
 import type { ComponentType } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "@tanstack/react-router";
 import { useEvaluateDraft } from "./evaluateDraft";
 import { LEARN_MODES, opponentChoices, type AgentWithCaps } from "./evaluate.utils";
 import { VersionPicker } from "./step1Agent";
@@ -99,6 +100,11 @@ export function Step2Learn() {
 			)}
 
 			{draft.mode === "models" && <p className="text-muted-foreground text-sm">{t("learn.modelsLater")}</p>}
+			{draft.mode === "models" && draft.agent && (
+				<Link to="/agents/$agentId" params={{ agentId: draft.agent }} search={{ tab: "compare-models" }} className="text-primary w-fit text-sm hover:underline" data-testid="evaluate-compare-models-link">
+					{t("learn.compareModelsLink")}
+				</Link>
+			)}
 
 			{draft.arms.length > 0 && (
 				<div className="flex flex-col gap-2" data-testid="evaluate-arms">

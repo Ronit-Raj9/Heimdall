@@ -21,7 +21,10 @@
 		"needBenchmark": "Pick at least one benchmark.",
 		"needModels": "Pick at least two different models.",
 		"duplicate": "Each model can be picked once.",
-		"error": "Could not start the comparison: {{message}}"
+		"error": "Could not start the comparison: {{message}}",
+		"estimateCost": "Estimated cost {{low}} to {{high}} USD.",
+		"estimateCostUnknown": "Cost is unknown until the models are priced.",
+		"estimateMinutes": "About {{low}} to {{high}} minutes."
 	},
 	"report": {
 		"title": "Model switch report",

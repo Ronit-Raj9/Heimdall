@@ -76,7 +76,8 @@
 		"pickOpponent": "Pick a baseline agent",
 		"modelsLater": "You choose the two models in step 4.",
 		"arms": "Setups that will run",
-		"armLabel": "Setup {{label}}"
+		"armLabel": "Setup {{label}}",
+		"compareModelsLink": "Compare 3 to 6 models for this agent instead"
 	},
 	"placeholder": "This step is coming soon.",
 	"home": {

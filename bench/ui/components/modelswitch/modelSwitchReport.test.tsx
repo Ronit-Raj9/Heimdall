@@ -60,6 +60,7 @@ const EXPORT: ModelSwitchExport = {
 vi.mock("@/lib/store/apis/modelSwitchApi", () => ({
 	useGetModelSwitchQuery: () => ({ data: REPORT, isLoading: false, error: undefined, refetch: () => {} }),
 	useGetModelSwitchConfigQuery: () => ({ data: EXPORT, isLoading: false, error: undefined, refetch: () => {} }),
+	useApplyModelSwitchMutation: () => [async () => ({}), { isLoading: false }],
 }));
 
 describe("ModelSwitchReportView", () => {
