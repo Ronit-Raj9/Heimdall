@@ -1,6 +1,5 @@
 import { ExperimentTrialsPanel, hasContent } from "@/components/adaptive/trialsPanel"; // W7 adaptive trials and suite tiers
-import { TERMINAL_STATES, systemExperiment } from "@/components/experiments/experiments.utils";
-import { humanExperimentName } from "@/components/experiments/experiments.utils";
+import { TERMINAL_STATES, humanExperimentName, systemExperiment } from "@/components/experiments/experiments.utils";
 import { ExperimentExportMenu } from "@/components/export/exportMenu"; // W10 export
 import { ExperimentRunActions, RegradeAction } from "@/components/platform/experimentActions";
 import { RunControlsPanel } from "@/components/experiments/runControls"; // run control
@@ -131,7 +130,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	const system = systemExperiment(st);
 	const title = humanExperimentName({ ...st, arms }, (k, o) => String(tx(k as never, (o ?? {}) as never)));
 	// The evaluation that made this experiment (GET /experiments/{id} carries it once the server sends it).
-	const evaluationId = (st as typeof st & { evaluation_id?: string }).evaluation_id || undefined;
+	const evaluationId = st.evaluation_id || undefined;
 	const bannerKey =
 		system?.kind === "agent" ? "header.systemBannerAgent" : system?.kind === "drift" ? "header.systemBannerDrift" : "header.systemBanner";
 
