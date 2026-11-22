@@ -3,13 +3,13 @@ import "@/lib/i18n";
 import type { AgentCompatibility } from "@/lib/store/apis/evaluationsApi";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { BenchmarkChecklist } from "./benchmarkChecklist";
+import { BenchmarkChecklist, type ChecklistSuite } from "./benchmarkChecklist";
 
-const suites = [
+const suites: ChecklistSuite[] = [
 	{ id: "hd-harbor-bfcl", description: "Function calling", admitted_count: 12, builtin: true, source: "library", track: "terminal" },
 	{ id: "longmemeval-s", description: "Long memory", admitted_count: 30, builtin: true, source: "library", track: "memory" },
 	{ id: "not-ready", description: "Nothing admitted", admitted_count: 0, builtin: true, source: "library", track: "qa" },
-];
+].map((s) => ({ ...s, environment: undefined }) as unknown as ChecklistSuite);
 
 const compatibility: AgentCompatibility = {
 	agent: "zz-test-loop",
