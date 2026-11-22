@@ -213,6 +213,9 @@ services:
       # DNS servers for guarded outbound calls (webhooks, MCP test, Connect):
       # empty uses 1.1.1.1:53,8.8.8.8:53; "system" uses the container's resolver.
       HEIMDALL_PUBLIC_DNS: ${HEIMDALL_PUBLIC_DNS:-}
+      # Python with the modal package: Settings > Workers tests a Modal token
+      # with it before keeping it.
+      HEIMDALL_MODAL_PYTHON: ${HEIMDALL_MODAL_PYTHON:-/opt/modal/bin/python3}
       # security.txt Contact (mailto: or https:); empty uses <public url>/security.
       HEIMDALL_SECURITY_CONTACT: ${HEIMDALL_SECURITY_CONTACT:-}
       # The public name, and "heimdall" for the shared worker on the edge network.
@@ -578,8 +581,9 @@ services:
       HEIMDALL_SHARED_GATEWAY_CONTAINER: ${HEIMDALL_SHARED_GATEWAY_CONTAINER:-}
       HEIMDALL_SHARED_PLATFORM_IMAGES: ${HEIMDALL_SHARED_PLATFORM_IMAGES:-}
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
-      # Python with the modal package, for organizations whose runs go to Modal.
-      HEIMDALL_MODAL_PYTHON: ${HEIMDALL_MODAL_PYTHON:-}
+      # Python with the modal package, for organizations whose runs go to Modal
+      # (the image ships one in /opt/modal).
+      HEIMDALL_MODAL_PYTHON: ${HEIMDALL_MODAL_PYTHON:-/opt/modal/bin/python3}
       # Public ingress (Caddy /gw and /rt): deployed agents and cloud
       # sandboxes reach this worker's gateway and live runs' tool gates
       # through https://$HEIMDALL_DOMAIN, with the run's own key or token.
