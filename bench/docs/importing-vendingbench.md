@@ -32,4 +32,4 @@ The suite's `pass_threshold` is 1500 (the starting balance): a pass is a complet
 
 - The verifier is the snapshot verifier on the run network, not Harbor's separate container. The score itself comes from sim-server, which the agent cannot write to except through its tools.
 - The baked venv with fastmcp is visible to the agent. It holds no task data.
-- 365-day runs need thousands of tool calls; budget accordingly.
+- 365-day runs need thousands of tool calls; budget accordingly. Admission runs the reference with the task's agent budget (`timeouts.agent_s`, upstream's 43200 s): the scripted operator needs about 2 h for a year, over the short budget of the other controls.
