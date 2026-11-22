@@ -70,3 +70,10 @@ func TestRunBifrostRoute(t *testing.T) {
 		t.Fatalf("missing run status %d", ctx.Response.StatusCode())
 	}
 }
+
+func TestPluginUsageOf(t *testing.T) {
+	got := pluginUsageOf([]GatewayUsageRecord{{RequestID: "f", Provider: "openai", Model: "gpt-5", InputTokens: 3, OutputTokens: 4, CostUSD: 0.1, LatencyMS: 9, CacheHit: true, FaultApplied: "rate_limit"}})
+	if len(got) != 1 || got[0].Fault != "rate_limit" || *got[0].CostUSD != 0.1 || got[0].InputTokens != 3 || !got[0].CacheHit {
+		t.Fatalf("got %+v", got)
+	}
+}

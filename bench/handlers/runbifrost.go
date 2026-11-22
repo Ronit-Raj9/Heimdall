@@ -154,7 +154,24 @@ func LoadRunBifrost(index ReadIndex, runID string) (*RunBifrost, error) {
 			return nil, fmt.Errorf("parse %s of run %s: %w", FileGatewayUsage, runID, err)
 		}
 	}
+	if len(usage) == 0 { // the heimdall plugin's live usage rows (gatewayusage.go, lane C03)
+		if run, ok := GatewayUsageForRun(runID); ok {
+			usage = pluginUsageOf(run.Records)
+		}
+	}
 	return BuildRunBifrost(runID, ev.Requests, ev.Ledger, usage), nil
+}
+
+// pluginUsageOf maps the ingest route's records to the panel's usage rows.
+func pluginUsageOf(recs []GatewayUsageRecord) []PluginUsage {
+	out := make([]PluginUsage, 0, len(recs))
+	for _, r := range recs {
+		cost := r.CostUSD
+		out = append(out, PluginUsage{RequestID: r.RequestID, RunID: r.RunID, Provider: r.Provider, Model: r.Model,
+			InputTokens: int64(r.InputTokens), OutputTokens: int64(r.OutputTokens), CostUSD: &cost,
+			LatencyMS: float64(r.LatencyMS), CacheHit: r.CacheHit, FallbackUsed: r.FallbackUsed, Fault: r.FaultApplied})
+	}
+	return out
 }
 
 // BuildRunBifrost folds Bifrost rows, the fault ledger and plugin usage
@@ -198,11 +215,11 @@ func BuildRunBifrost(runID string, log *schemas.RequestLog, ledger []schemas.Led
 			continue
 		}
 		c := &out.CallList[i] // the plugin fills what the log row lacks
-		if c.Fault == "" {
+		if u.Fault != "" {    // plugin rows win where they say something
 			c.Fault = u.Fault
 		}
 		c.CacheHit = c.CacheHit || u.CacheHit
-		if c.CostUSD == nil {
+		if u.CostUSD != nil {
 			c.CostUSD = u.CostUSD
 		}
 		if c.Tokens == nil && (u.InputTokens > 0 || u.OutputTokens > 0) {
