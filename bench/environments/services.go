@@ -511,6 +511,11 @@ func serviceEnv(rc *schemas.RunContext, spec schemas.ServiceSpec) map[string]str
 	for k, v := range spec.Env {
 		env[k] = strings.ReplaceAll(v, ServiceSecretVar, runServiceSecret(rc))
 	}
+	for k, v := range schemas.ClockEnv(rc.Suite, rc.Task) { // Z17 run clock (schemas/clock.go); the spec's own env wins
+		if _, set := env[k]; !set {
+			env[k] = v
+		}
+	}
 	if simuser.SimulatorBacked(spec) { // W3 customer support: the effective user simulator settings win over the spec's
 		for k, v := range simuser.ServiceEnv(simuser.Effective(rc.Suite, rc.Experiment)) {
 			env[k] = v

@@ -416,6 +416,30 @@ services:
   one shared database that every task works on.
 - Services and the tool proxy have no route out of the run's network.
 
+### Run clock (`clock:`)
+
+A task (or its suite, for every task without one) can fix the time its
+services and the agent see, so a task written as "schedule it for tomorrow"
+means the same day on every run:
+
+```yaml
+clock:
+  start: 2026-03-14T09:00:00Z   # RFC 3339, or YYYY-MM-DD for midnight UTC
+  rate: 1                       # clock seconds per real second; 0 or absent means 1
+```
+
+Every service, the agent and the script controls get `BENCH_NOW` (the start,
+RFC 3339 UTC), `BENCH_CLOCK_RATE` and `FAKETIME` (libfaketime's absolute form,
+`@2026-03-14 09:00:00`, with ` x<rate>` when the rate is not 1). A service
+image that preloads libfaketime (`LD_PRELOAD`) gets the clock in every
+dynamically linked process without code changes; the bench never sets
+`LD_PRELOAD` itself. Statically linked binaries (Go) ignore `FAKETIME`, and
+Linux time namespaces do not cover the wall clock, so such a service must read
+`BENCH_NOW`. A value the service spec sets in its own `env` wins. The
+effective clock is hashed into the task's fixtures, so changing it is a new
+task version. A start that does not parse, or a rate outside 0 to 1000, is a
+`task validate` error.
+
 ## Tool faults and hostile tool results
 
 A probe of layer `tool` is a fault the per-run tool proxy injects

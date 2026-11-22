@@ -1,0 +1,1 @@
+post("https://api.zoom.us/v2/users/agent@company.example.com/meetings", {"topic": "Client Demo - NexGen Platform", "type": 2, "start_time": "2026-02-27T19:00:00Z", "duration": 60, "timezone": "America/New_York"})

@@ -4,6 +4,7 @@ package main
 import (
 	_ "github.com/maximhq/bifrost/bench/importers/agentdojo"
 	_ "github.com/maximhq/bifrost/bench/importers/agentvista"      // L05: AgentVista multimodal agent questions
+	_ "github.com/maximhq/bifrost/bench/importers/automationbench" // Z17: AutomationBench business workflows over simulated SaaS apps
 	_ "github.com/maximhq/bifrost/bench/importers/bigfinancebench" // L07: BigFinanceBench public finance questions
 	_ "github.com/maximhq/bifrost/bench/importers/browsecompplus"  // X5a
 	_ "github.com/maximhq/bifrost/bench/importers/cheatbench"      // L06: CheatBench cheating environments

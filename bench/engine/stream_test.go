@@ -213,3 +213,12 @@ func TestWorldDateEnv(t *testing.T) {
 		t.Fatalf("env %v %v", env, err)
 	}
 }
+
+// Z17: the agent sees the task's run clock.
+func TestClockEnvAgent(t *testing.T) {
+	rc := &schemas.RunContext{Task: &schemas.Task{ID: "t", Clock: &schemas.ClockSpec{Start: "2026-03-14T09:00:00Z", Rate: 2}}}
+	env, err := scenarioEnv(rc)
+	if err != nil || env[schemas.EnvNow] != "2026-03-14T09:00:00Z" || env[schemas.EnvClockRate] != "2" {
+		t.Fatalf("env %v %v", env, err)
+	}
+}

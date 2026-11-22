@@ -1,0 +1,2 @@
+{"mode": "scripted", "personas": [{"id": "fin", "name": "Priya Shah", "role": "Finance lead", "email": "priya@company.example.com",
+  "rules": [{"if_contains": ["policy"], "reply": "Policy is in the Expense Policy tab."}], "default_reply": "Thanks."}]}
