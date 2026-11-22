@@ -57,12 +57,27 @@ export interface SessionSources {
 }
 
 /**
+ * Whether GET /auth/me says nobody is signed in on a hosted server: a 401 (a presented session that
+ * ended) or a 200 with kind anonymous (a visitor with no credential at all). Either way the sign-in
+ * options (GET /auth/config) are needed.
+ */
+export function meIsAnonymous(me: AuthMe | undefined, meError: unknown): boolean {
+	if (isUnauthorized(meError)) return true;
+	return me?.auth_mode === "hosted" && (me.kind ?? "anonymous") === "anonymous";
+}
+
+/**
  * The session from GET /auth/me. A 404 (a server from before the platform) or auth_mode local is
- * local mode; a 401 is a hosted server with nobody signed in, who gets the login page (hosted installs
- * serve no public demo).
+ * local mode; a 401, or a 200 with kind anonymous, is a hosted server with nobody signed in, who gets
+ * the login page (hosted installs serve no public demo).
  */
 export function sessionFromMe({ me, meError, meLoading, config }: SessionSources): SessionInfo {
-	const offers = { signup: config?.signup, github: Boolean(config?.github), bootstrap: Boolean(config?.bootstrap), signupDomains: config?.signup_domains };
+	const offers = {
+		signup: config?.signup,
+		github: Boolean(config?.github),
+		bootstrap: Boolean(config?.bootstrap),
+		signupDomains: config?.signup_domains,
+	};
 	// A 401 wins over earlier data: the session ended since the last answer.
 	if (isUnauthorized(meError)) {
 		// Still loading while the sign-in options are on their way.
