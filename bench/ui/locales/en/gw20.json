@@ -1,0 +1,5 @@
+{
+	"routeTabs": {
+		"unknown": "This page has no {{tab}} tab, so {{label}} is shown."
+	}
+}
