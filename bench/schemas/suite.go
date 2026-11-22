@@ -38,6 +38,8 @@ type Suite struct {
 
 	Tiers map[string]TaskSelector `json:"tiers,omitempty" yaml:"tiers,omitempty"` // W7 suite tiers: pr, nightly, headroom (docs/suite-tiers.md)
 
+	Clock *ClockSpec `json:"clock,omitempty" yaml:"clock,omitempty"` // Z17: run clock of every task without its own (clock.go)
+
 	Root     string       `json:"-" yaml:"-"` // absolute folder of the pack
 	Tasks    []*Task      `json:"-" yaml:"-"` // loaded tasks, in TaskIDs order
 	Probes   []*ProbeSpec `json:"-" yaml:"-"` // loaded probes, in ProbeIDs order

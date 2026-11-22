@@ -4,6 +4,7 @@ package main
 import (
 	_ "github.com/maximhq/bifrost/bench/importers/agentdojo"
 	_ "github.com/maximhq/bifrost/bench/importers/agentvista"      // L05: AgentVista multimodal agent questions
+	_ "github.com/maximhq/bifrost/bench/importers/automationbench" // Z17: AutomationBench business workflows over simulated SaaS apps
 	_ "github.com/maximhq/bifrost/bench/importers/bigfinancebench" // L07: BigFinanceBench public finance questions
 	_ "github.com/maximhq/bifrost/bench/importers/browsecompplus"  // X5a
 	_ "github.com/maximhq/bifrost/bench/importers/cheatbench"      // L06: CheatBench cheating environments
@@ -17,8 +18,10 @@ import (
 	_ "github.com/maximhq/bifrost/bench/importers/longmemeval"
 	_ "github.com/maximhq/bifrost/bench/importers/marble" // X5b: MultiAgentBench (MARBLE)
 	_ "github.com/maximhq/bifrost/bench/importers/mcpmark"
-	_ "github.com/maximhq/bifrost/bench/importers/msibench"  // MSI-Bench v2 multi-speaker room calls
-	_ "github.com/maximhq/bifrost/bench/importers/skillpool" // L14: Skill-Usage 34k pool
+	_ "github.com/maximhq/bifrost/bench/importers/msibench"    // MSI-Bench v2 multi-speaker room calls
+	_ "github.com/maximhq/bifrost/bench/importers/openaievals" // Z09: OpenAI Evals migration
+	_ "github.com/maximhq/bifrost/bench/importers/promptfoo"   // Z09: promptfoo configs
+	_ "github.com/maximhq/bifrost/bench/importers/skillpool"   // L14: Skill-Usage 34k pool
 	_ "github.com/maximhq/bifrost/bench/importers/swebench"
 	_ "github.com/maximhq/bifrost/bench/importers/tau2"
 	_ "github.com/maximhq/bifrost/bench/importers/toolbenchx"   // L10: ToolBench-X

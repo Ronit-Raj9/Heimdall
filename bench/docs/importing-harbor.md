@@ -36,6 +36,25 @@ git clone --depth 1 --branch v1.0 https://github.com/benchflow-ai/skillsbench da
 
 SkillsBench `main` is about 1.1 GB checked out. A sparse checkout of a few tasks is enough to try the importer (`git clone --filter=blob:none --sparse ...`, then `git sparse-checkout set --no-cone '/*' '!/*/' '/tasks/<id>/'`).
 
+### From the Harbor registry (name@version)
+
+Harbor's `registry.json` (https://github.com/harbor-framework/harbor) lists about 80 dataset versions, each a list of task folders pinned to a git commit. `bifrost-bench` resolves a name and fetches exactly those folders, with no Harbor CLI:
+
+```sh
+bifrost-bench import registry                     # agent datasets: name@version, tasks, licence
+bifrost-bench import registry -kind model_test    # single-question model tests (aime, gpqa-diamond, ...), listed apart
+bifrost-bench import fetch harbor bfcl@1.0 -to datasets/bfcl            # all 3,641 tasks
+bifrost-bench import fetch harbor spider2-dbt@1.0 -to datasets/spider2-dbt -limit 5
+bifrost-bench import harbor -from datasets/bfcl -suite hd-harbor-bfcl
+```
+
+- A bare name works when the registry has one version of it; otherwise name the version.
+- Git sources are fetched shallow and sparse at the pinned commit (`git fetch --depth 1 --filter=blob:none`, only the task folders). Datasets kept on the Hugging Face Hub (`git_url` on huggingface.co) are listed with the Hub tree API and downloaded file by file; `HF_TOKEN` is sent for gated sets.
+- The fetch writes `tasks/<task>/`, `registry.json` (this dataset's entry) and `harbor-dataset.json` (benchmark, source, commit, licence). The importer reads `harbor-dataset.json`, so the suite's `imported:` block names `bfcl@1.0` and the pinned commit without `-set`.
+- A repeated fetch keeps folders already there, so an interrupted fetch resumes.
+- `import harbor -from bfcl@1.0` (a registry name instead of a path) fetches into `datasets/harbor/bfcl@1.0` first, then imports.
+- The registry carries no licence. `import registry` shows the licences checked upstream for a few names (bfcl Apache-2.0, algotune MIT, spider2-dbt MIT, terminal-bench Apache-2.0) and `NOASSERTION` for the rest: check the upstream benchmark before you publish a suite.
+
 Harbor hub datasets need the Harbor CLI. Run it in a container, never on the host, with no credentials mounted:
 
 ```sh

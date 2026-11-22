@@ -1,0 +1,29 @@
+capitals:
+  id: capitals.dev.v0
+  description: Capital cities.
+  metrics: [accuracy]
+capitals.dev.v0:
+  class: evals.elsuite.basic.match:Match
+  args:
+    samples_jsonl: capitals/samples.jsonl
+capitals-includes:
+  id: capitals-includes.dev.v0
+capitals-includes.dev.v0:
+  class: evals.elsuite.basic.includes:Includes
+  args:
+    samples_jsonl: capitals/samples.jsonl
+    ignore_case: true
+tone:
+  id: tone.dev.v0
+tone.dev.v0:
+  class: evals.elsuite.modelgraded.classify:ModelBasedClassify
+  args:
+    samples_jsonl: tone/samples.jsonl
+    eval_type: cot_classify
+    modelgraded_spec: closedqa
+custom:
+  id: custom.dev.v0
+custom.dev.v0:
+  class: evals.elsuite.custom.thing:Thing
+  args:
+    samples_jsonl: capitals/samples.jsonl

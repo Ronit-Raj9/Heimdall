@@ -1,0 +1,57 @@
+openapi: 3.0.3
+info:
+  title: Acme Shop API
+  version: 1.2.0
+paths:
+  /orders:
+    get:
+      operationId: listOrders
+      summary: List orders
+      parameters:
+        - {name: customer_id, in: query, schema: {type: string}}
+  /orders/{order_id}:
+    get:
+      operationId: getOrder
+      summary: Get one order
+      parameters:
+        - {name: order_id, in: path, required: true, schema: {type: string}}
+    patch:
+      operationId: updateOrder
+      summary: Change an order's status or refund
+      parameters:
+        - {name: order_id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OrderPatch'}
+  /customers/{customer_id}:
+    get:
+      operationId: getCustomer
+      summary: Get one customer
+      parameters:
+        - {name: customer_id, in: path, required: true, schema: {type: string}}
+  /tickets:
+    post:
+      operationId: createTicket
+      summary: Open a ticket for a person on the team
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customer_id, subject]
+              properties:
+                customer_id: {type: string}
+                subject: {type: string}
+                priority: {type: string, enum: [low, high]}
+components:
+  schemas:
+    OrderPatch:
+      type: object
+      properties:
+        status: {type: string, enum: [placed, shipped, delivered, refunded, cancelled]}
+        refund_amount: {type: number}
+        customer_id: {type: string}
+        total: {type: number}
+        delivered_at: {type: string}

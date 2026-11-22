@@ -2,6 +2,7 @@
 	"run": "Run",
 	"add": {
 		"button": "Add benchmark",
+		"anything": "From a file or link",
 		"catalog": "From catalog",
 		"create": "Create your own"
 	},

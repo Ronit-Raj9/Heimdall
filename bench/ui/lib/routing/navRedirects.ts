@@ -38,9 +38,14 @@ export function catalogRedirect(search: RouteSearch = {}): RedirectTarget {
 	return asTab("/suites", "catalog", search);
 }
 
-/** /imports and /suites/add: the Import tab of Benchmarks. */
+/** /imports: the Import tab of Benchmarks. /suites/add is no longer redirected (see addBenchmarkTarget). */
 export function importTabRedirect(): RedirectTarget {
 	return { to: "/suites", search: { tab: "import" } };
+}
+
+/** /suites/add is the Add benchmark page (lane Z20), its own route, not a redirect to the Import tab. */
+export function addBenchmarkTarget(): RedirectTarget {
+	return { to: "/suites/add", search: {} };
 }
 
 /** /canaries?name=: the Drift checks tab of Scheduled checks, the open check kept. */

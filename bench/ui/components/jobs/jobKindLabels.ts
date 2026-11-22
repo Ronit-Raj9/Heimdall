@@ -6,6 +6,7 @@
  */
 export const JOB_KIND_LABELS: Readonly<Record<string, string>> = {
 	"agent.build": "Build agent",
+	"apptasks.generate": "Draft tasks from your API",
 	"agent.check": "Agent check",
 	"agent.diff": "Compare agent versions",
 	"awareness.run": "Test-awareness check",

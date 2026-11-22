@@ -94,6 +94,10 @@ func scenarioParts(s *schemas.Suite, t *schemas.Task) (scenarioHashParts, error)
 		sum, err := fileHash(t.Dir, t.Compose)
 		put(p.fixtures, "compose", sum, err)
 	}
+	if c := schemas.EffectiveClock(s, t); c != nil { // Z17 run clock (schemas/clock.go)
+		sum, err := utils.HashJSON(c)
+		put(p.fixtures, "clock", sum, err)
+	}
 	if t.Skills != "" {
 		sum, err := treeHashRel(t.Dir, t.Skills)
 		put(p.fixtures, "skills", sum, err)
