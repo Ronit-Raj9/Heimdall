@@ -55,7 +55,7 @@ describe("ConfigTab save and check messages", () => {
 		expect(state.keys.length).toBeGreaterThanOrEqual(2);
 		expect(new Set(state.keys)).toEqual(new Set([saveKey("zz-test-loop")]));
 		expect(html.indexOf('data-testid="config-saved"')).toBeLessThan(html.indexOf('data-testid="config-tab"'));
-		expect(html).not.toMatch(/[–—]/);
+		expect(html).not.toMatch(/[\u2013\u2014]/);
 	});
 
 	it("says when a save kept the version", () => {
