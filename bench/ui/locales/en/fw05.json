@@ -1,0 +1,24 @@
+{
+	"budget": {
+		"covers": "Your {{budget}} budget covers the expected cost ({{low}} to {{high}}).",
+		"mayExceed": "The expected cost ({{low}} to {{high}}) may go over your {{budget}} budget. Runs stop when the budget is used up.",
+		"unknown": "The cost is not known yet. Runs stop when the {{budget}} budget is used up.",
+		"noBudget": "No budget set: each benchmark may spend up to {{cap}}.",
+		"updating": "Updating..."
+	},
+	"summary": {
+		"faults": "Run clean, then again with: {{faults}}.",
+		"mcpGateway": "MCP tool calls go through Bifrost's MCP gateway.",
+		"mcpCodeMode": "MCP tool calls go through Bifrost's MCP gateway, with Code Mode.",
+		"cache": "Also runs a second setup with Bifrost's cache on.",
+		"failover": "Also runs a second setup with Bifrost fallbacks ({{models}}) while the main model is down.",
+		"gate": "Checks the release rules when it finishes."
+	},
+	"basis": {
+		"library": "Estimated from other agents' runs of these benchmarks. Your own runs will make it more exact.",
+		"own": "Estimated from past runs of this agent and model."
+	},
+	"name": {
+		"label": "Name"
+	}
+}
