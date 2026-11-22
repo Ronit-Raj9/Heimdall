@@ -7,11 +7,13 @@ package handlers
 // plugin sends the shared secret from HEIMDALL_GATEWAY_USAGE_SECRET as a
 // bearer token, so the route is public to the org guard and the handler
 // checks the secret itself. Rows are kept per run in memory, bounded, for
-// the run page's Bifrost panel; the run's own gateway log stays the record
-// of truth.
+// live runs; at seal the engine writes the run's rows of the run's
+// organization into the run folder (SealedGatewayUsage, H01), and the run's
+// own gateway log stays the record of truth.
 
 import (
 	"crypto/subtle"
+	"encoding/json"
 	"os"
 	"strings"
 	"sync"
@@ -108,8 +110,40 @@ var gatewayUsage = &gatewayUsageStore{runs: map[string][]GatewayUsageRecord{}, d
 
 // GatewayUsageForRun returns the run's rows and totals as reported by the
 // heimdall plugin; ok is false when the plugin reported nothing for it.
-func GatewayUsageForRun(runID string) (GatewayUsageRun, bool) {
-	return gatewayUsage.get(runID, "")
+// org non-empty keeps only rows tagged with that organization.
+func GatewayUsageForRun(runID, org string) (GatewayUsageRun, bool) {
+	return gatewayUsage.get(runID, org)
+}
+
+// SealedGatewayUsage is the run's plugin usage rows whose org tag is org,
+// as the FileGatewayUsage array the Through Bifrost panel reads (H01). The
+// engine calls it at seal (engine.SetGatewayUsageSource, wired in
+// cmd/bifrost-bench). Rows tagged with another organization, or untagged
+// rows of an organization's run, are left out. ok is false when no row
+// is left.
+func SealedGatewayUsage(runID, org string) ([]byte, bool) {
+	recs := gatewayUsage.forOrg(runID, org)
+	if len(recs) == 0 {
+		return nil, false
+	}
+	data, err := json.MarshalIndent(pluginUsageOf(recs), "", "  ")
+	if err != nil {
+		return nil, false
+	}
+	return data, true
+}
+
+// forOrg copies the run's rows whose org tag equals org exactly.
+func (s *gatewayUsageStore) forOrg(runID, org string) []GatewayUsageRecord {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []GatewayUsageRecord
+	for _, r := range s.runs[runID] {
+		if r.OrgID == org {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 func init() {

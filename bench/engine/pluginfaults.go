@@ -30,7 +30,7 @@ func (p *Pipeline) routePluginFaults(ctx context.Context, st *runState) error {
 	var hdrs map[string]string
 	if adapters.CarriesGatewayHeaders(st.rc.Agent) {
 		var err error
-		hdrs, path, err = r.MoveToPlugin(ctx, st.rc.Key.KeySlot, runTags(st.rc))
+		hdrs, path, err = r.MoveToPlugin(ctx, st.rc.Key.KeySlot, runTags(st.rc, p.runOrg(st.rc)))
 		if err != nil {
 			return &partError{part: faultPart, err: fmt.Errorf("move fault plan of key slot %s to the heimdall plugin: %w", st.rc.Key.KeySlot, err)}
 		}
@@ -44,8 +44,11 @@ func (p *Pipeline) routePluginFaults(ctx context.Context, st *runState) error {
 	return nil
 }
 
-func runTags(rc *schemas.RunContext) bifrost.RunTags {
-	var t bifrost.RunTags
+// runTags are the x-heimdall-* tags of rc's run. org is the run's
+// organization: the plugin stamps it on every usage row, and the ingest
+// store keeps only rows of the run's organization (H01).
+func runTags(rc *schemas.RunContext, org string) bifrost.RunTags {
+	t := bifrost.RunTags{Org: org}
 	if rc.Experiment != nil {
 		t.EvaluationID = rc.Experiment.ID
 	}

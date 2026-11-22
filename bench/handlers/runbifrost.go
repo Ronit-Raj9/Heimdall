@@ -10,6 +10,7 @@ import (
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/tenancy"
 	"github.com/valyala/fasthttp"
 )
 
@@ -120,7 +121,11 @@ func (h *RunBifrostHandler) getRunBifrost(ctx *fasthttp.RequestCtx) {
 	if refuseHeldOutRun(ctx, h.mode, h.index, h.heldOutVisible, rv) {
 		return
 	}
-	out, err := LoadRunBifrost(h.index, runID)
+	org := ""
+	if o, ok := tenancy.OrgFrom(ctx); ok {
+		org = o.ID
+	}
+	out, err := LoadRunBifrost(h.index, runID, org)
 	if err != nil {
 		sendDepError(ctx, h.mode, "bifrost facts of run "+runID, err)
 		return
@@ -129,8 +134,10 @@ func (h *RunBifrostHandler) getRunBifrost(ctx *fasthttp.RequestCtx) {
 }
 
 // LoadRunBifrost reads a run's evidence and plugin usage and builds its
-// Through Bifrost facts.
-func LoadRunBifrost(index ReadIndex, runID string) (*RunBifrost, error) {
+// Through Bifrost facts. org non-empty (hosted) keeps only the in-memory
+// plugin rows tagged with that organization; the sealed run file holds only
+// the run's own organization's rows already.
+func LoadRunBifrost(index ReadIndex, runID, org string) (*RunBifrost, error) {
 	var ev struct {
 		Requests *schemas.RequestLog   `json:"requests"`
 		Ledger   []schemas.LedgerEntry `json:"ledger"`
@@ -148,7 +155,7 @@ func LoadRunBifrost(index ReadIndex, runID string) (*RunBifrost, error) {
 	// (gatewayusage.go, lane C03) win when present; the run file is the
 	// fallback for sealed runs whose rows are no longer held in memory.
 	var usage []PluginUsage
-	if run, ok := GatewayUsageForRun(runID); ok && len(run.Records) > 0 {
+	if run, ok := GatewayUsageForRun(runID, org); ok && len(run.Records) > 0 {
 		usage = pluginUsageOf(run.Records)
 	} else {
 		data, found, err = readInternal(index, runID, FileGatewayUsage)
