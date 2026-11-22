@@ -67,7 +67,7 @@ func LayersOf(env issuebench.EnvSpec, instanceID, base string) (Layers, error) {
 		if c == "" {
 			continue
 		}
-		b.WriteString("RUN " + strings.ReplaceAll(c, "\n", " \\\n    ") + "\n")
+		b.WriteString("RUN " + RunLine(c) + "\n")
 	}
 	// The env layer installs from the repository files; the task layer then
 	// replaces the folder, so no file of another task is left behind.

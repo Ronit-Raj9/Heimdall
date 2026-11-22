@@ -23,11 +23,12 @@ func TestEmitSelfContainedDockerfile(t *testing.T) {
 	env := issuebench.EnvSpec{BaseImage: "python:3.11-slim", Commands: []string{"  pip install -e .  ", "", "apt-get update\napt-get install -y make"}}
 	want := "# Written by Heimdall's issue emitter. The worker builds this image at admission.\n" +
 		"FROM python:3.11-slim\n" +
+		"SHELL [\"/bin/bash\", \"-lc\"]\n" +
 		"RUN (command -v git >/dev/null || (apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*))\n" +
 		"WORKDIR /testbed\n" +
 		"ADD repo.tar.gz /testbed/\n" +
 		"RUN pip install -e .\n" +
-		"RUN apt-get update \\\n    apt-get install -y make\n" +
+		"RUN <<'HEIMDALL_STEP'\nset -e\napt-get update\napt-get install -y make\nHEIMDALL_STEP\n" +
 		"RUN rm -rf /testbed\n" +
 		"ADD repo.tar.gz /testbed/\n" +
 		"WORKDIR /testbed\n"

@@ -96,6 +96,11 @@ type WorkerOptions struct {
 	// background, once per experiment, so the slots after the first start
 	// on a pulled image. Nil prefetches nothing.
 	Prefetch func(ctx context.Context, s *schemas.Suite)
+	// Sync, when set, brings the worker's project up to date before a lease
+	// is checked (the shared worker downloads the org's project). Without it
+	// a benchmark added after the last download fails "load suite" and the
+	// lease is refused. An error is logged and the last copy is used.
+	Sync func(ctx context.Context) error
 }
 
 // Worker is the remote side of remote execution: it registers with a
@@ -514,6 +519,11 @@ func (w *Worker) admit(ctx context.Context, lease *schemas.WorkerLease) (*worker
 // check runs the admission checks of admit and creates the experiment in the
 // worker's store.
 func (w *Worker) check(ctx context.Context, lease *schemas.WorkerLease, m *schemas.Manifest) (*schemas.Suite, string) {
+	if w.opts.Sync != nil {
+		if err := w.opts.Sync(ctx); err != nil && w.opts.Logger != nil {
+			w.opts.Logger.Warn("project not refreshed before the lease; checking it with the last copy", "error", err.Error())
+		}
+	}
 	h, err := ManifestHash(m)
 	switch {
 	case err != nil:

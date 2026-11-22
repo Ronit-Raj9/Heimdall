@@ -727,6 +727,7 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 			},
 			HostSlot: h.orgHostSlot(org, slots),
 			Prefetch: runnerPrefetch(oa.logger, docker), // Z13 in the shared runner: under the org's Docker policy
+			Sync:     proj.refresh,                      // a benchmark emitted after the last download loads (ETag: cheap when unchanged)
 			// Only issuebench.work runs here, in process, under the org's
 			// Docker policy; every other job kind goes to the org's own workers.
 			Jobs: newSharedIssuebenchExecutor(h, oa, org, docker), JobKinds: []string{issuebench.WorkJobKind},

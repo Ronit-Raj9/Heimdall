@@ -34,6 +34,14 @@ func SelfContainedDockerfile(env issuebench.EnvSpec) string {
 	var b strings.Builder
 	b.WriteString("# Written by Heimdall's issue emitter. The worker builds this image at admission.\n")
 	b.WriteString("FROM " + env.BaseImage + "\n")
+	// The builder ran every step with bash -lc and its time pins; the image
+	// at admit runs them the same way.
+	b.WriteString("SHELL [\"/bin/bash\", \"-lc\"]\n")
+	for _, l := range strings.Split(env.Dockerfile, "\n") {
+		if strings.HasPrefix(l, "ENV ") {
+			b.WriteString(l + "\n")
+		}
+	}
 	b.WriteString("RUN (command -v git >/dev/null || (apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*))\n")
 	b.WriteString("WORKDIR " + Workspace + "\n")
 	b.WriteString("ADD repo.tar.gz " + Workspace + "/\n")
@@ -42,7 +50,7 @@ func SelfContainedDockerfile(env issuebench.EnvSpec) string {
 		if c == "" {
 			continue
 		}
-		b.WriteString("RUN " + strings.ReplaceAll(c, "\n", " \\\n    ") + "\n")
+		b.WriteString("RUN " + RunLine(c) + "\n")
 	}
 	// The install steps may write into the repository; the task starts from
 	// the clean files again.
@@ -50,6 +58,18 @@ func SelfContainedDockerfile(env issuebench.EnvSpec) string {
 	b.WriteString("ADD repo.tar.gz " + Workspace + "/\n")
 	b.WriteString("WORKDIR " + Workspace + "\n")
 	return b.String()
+}
+
+// RunLine is one install step as a RUN instruction. A multi-line step is a
+// heredoc: joining its lines with backslashes broke a step that has its own
+// heredoc (python - <<'PY' ...), and BuildKit refused the whole Dockerfile
+// with "unterminated heredoc" at admit.
+func RunLine(cmd string) string {
+	c := strings.TrimSpace(cmd)
+	if !strings.Contains(c, "\n") {
+		return c
+	}
+	return "<<'HEIMDALL_STEP'\nset -e\n" + c + "\nHEIMDALL_STEP"
 }
 
 // SelfContain writes environment/Dockerfile and environment/repo.tar.gz

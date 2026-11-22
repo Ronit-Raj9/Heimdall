@@ -424,7 +424,8 @@ if [ -n "$bench_id" ]; then
 			n_jobs=$(printf '%s' "$jobs_json" | jq length)
 			open=$(printf '%s' "$jobs_json" | jq '[.[] | select(.status | IN("queued", "running"))] | length')
 			[ "$n_jobs" = 0 ] && [ "$(date +%s)" -ge "$jobs_by" ] && break
-			[ "$n_jobs" = 3 ] && [ "$open" = 0 ] && break
+			# suite.lint has no target, so the target filter lists lock and admit only.
+			[ "$n_jobs" -ge 2 ] && [ "$open" = 0 ] && break
 			say "admission jobs: $(printf '%s' "$jobs_json" | jq -r 'map("\(.kind)=\(.status)") | join(" ")')"
 		fi
 		[ "$(left)" -gt 0 ] || break
