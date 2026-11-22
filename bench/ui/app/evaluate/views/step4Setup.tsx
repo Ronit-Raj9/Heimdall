@@ -3,6 +3,7 @@ import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
 import { GateSettings } from "@/components/releases/gateSettings";
 import {
 	type EvaluationEstimate,
+	type EvaluationMCPRoute,
 	type EvaluationSpec,
 	type FaultCatalogItem,
 	useEstimateEvaluationQuery,
@@ -92,6 +93,27 @@ export function defaultEvaluationSpec(): EvaluationSpec {
 		trials: 2,
 		faults: ["clean"],
 	};
+}
+
+/** The MCP routes step 4 offers, in order. */
+export const MCP_ROUTES: { id: EvaluationMCPRoute; label: string; help: string }[] = [
+	{ id: "direct", label: "Direct", help: "The agent calls the task's MCP servers through Heimdall's tool proxy." },
+	{
+		id: "bifrost",
+		label: "Through Bifrost MCP gateway",
+		help: "Each run gets its own Bifrost MCP clients and MCP key, so every tool call shows in Bifrost's MCP logs. Tool faults still apply: the tool proxy sits behind Bifrost.",
+	},
+	{
+		id: "bifrost_code_mode",
+		label: "Through Bifrost, Code Mode",
+		help: "As above, but the agent sees Bifrost's Code Mode tools and writes programs that call the servers.",
+	},
+];
+
+/** spec with route set; "direct" leaves mcp_route out so the spec is as before. */
+export function withMCPRoute(spec: EvaluationSpec, route: EvaluationMCPRoute): EvaluationSpec {
+	const { mcp_route: _old, ...rest } = spec;
+	return route === "direct" ? rest : { ...rest, mcp_route: route };
 }
 
 /** Faults with "clean" always first and present, no repeats. */
@@ -350,6 +372,29 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 							</label>
 						))}
 					</fieldset>
+				))}
+			</section>
+
+			<section className="flex flex-col gap-2" data-testid="step4-mcp-route">
+				<h3 className="text-base font-semibold">MCP tools</h3>
+				<p className="text-muted-foreground text-sm">
+					How agents reach the task's MCP tool servers. Benchmarks with no MCP server, and agents that cannot reach Bifrost, are skipped
+					when routed through Bifrost.
+				</p>
+				{MCP_ROUTES.map((r) => (
+					<label key={r.id} className="flex items-start gap-2 text-sm" data-testid={`step4-mcp-route-${r.id}`}>
+						<input
+							type="radio"
+							name="step4-mcp-route"
+							className="mt-1"
+							checked={(spec.mcp_route ?? "direct") === r.id}
+							onChange={() => onChange(withMCPRoute(spec, r.id))}
+						/>
+						<span>
+							<span className="font-medium">{r.label}</span>
+							<span className="text-muted-foreground block">{r.help}</span>
+						</span>
+					</label>
 				))}
 			</section>
 

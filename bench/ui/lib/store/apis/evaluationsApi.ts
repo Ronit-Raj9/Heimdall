@@ -119,7 +119,11 @@ export interface EvaluationSpec {
 	stream?: { memory: "carry" | "fresh"; order?: "suite" | "seeded"; replay?: number; threshold?: number };
 	/** Tell the agent its budget and deadline (BENCH_BUDGET_USD, BENCH_DEADLINE). */
 	disclose_budget?: boolean;
+	/** How arms reach the tasks' MCP tool servers: unset or "direct" through the tool proxy, "bifrost" through Bifrost's MCP gateway, "bifrost_code_mode" the same with Code Mode. */
+	mcp_route?: EvaluationMCPRoute;
 }
+
+export type EvaluationMCPRoute = "direct" | "bifrost" | "bifrost_code_mode";
 
 /** What an evaluation must show to pass. Scores are fractions (0 to 1). */
 export interface EvaluationGate {

@@ -502,6 +502,9 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 	if err := h.normalizeSplit(spec); err != nil {
 		return err
 	}
+	if err := normalizeMCPRoute(spec); err != nil {
+		return err
+	}
 	if spec.TasksPerBenchmark == 0 {
 		spec.TasksPerBenchmark = EvaluationDefaultTasks
 	}
@@ -986,9 +989,36 @@ func evalArms(spec schemas.EvaluationSpec) map[string]schemas.ArmSpec {
 				arm.Agent += fmt.Sprintf("@v%d", a.Version)
 			}
 		}
-		out[a.Label] = arm
+		out[a.Label] = withSet(arm, mcpRouteSet(spec.MCPRoute))
 	}
 	return out
+}
+
+// normalizeMCPRoute keeps spec.MCPRoute empty for the direct route (so
+// evaluations that never chose one hash as before) and refuses unknown
+// routes.
+func normalizeMCPRoute(spec *schemas.EvaluationSpec) error {
+	switch spec.MCPRoute = strings.TrimSpace(spec.MCPRoute); spec.MCPRoute {
+	case "", schemas.MCPRouteDirect:
+		spec.MCPRoute = ""
+	case schemas.MCPRouteBifrost, schemas.MCPRouteBifrostCodeMode:
+	default:
+		return badf("mcp_route must be %s, %s or %s", schemas.MCPRouteDirect, schemas.MCPRouteBifrost, schemas.MCPRouteBifrostCodeMode)
+	}
+	return nil
+}
+
+// mcpRouteSet is the arm override of an MCP route: gateway.bifrost.mcp for
+// the Bifrost routes (the planner then serves the run's MCP servers through
+// Bifrost's MCP gateway, engine/bifrostfeatures.go), nothing for direct.
+func mcpRouteSet(route string) map[string]any {
+	switch route {
+	case schemas.MCPRouteBifrost:
+		return map[string]any{"gateway.bifrost.mcp.code_mode": false}
+	case schemas.MCPRouteBifrostCodeMode:
+		return map[string]any{"gateway.bifrost.mcp.code_mode": true}
+	}
+	return nil
 }
 
 // normalizeSplit keeps spec.Split empty for a public evaluation and
