@@ -28,7 +28,7 @@ import (
 // Routes the onboarding flow calls.
 const (
 	connectDetectPath = "/api/v1/connect/detect"          // Z01: server-side detection
-	agentVerifyPath   = "/api/v1/agents/%s/verify"        // Z01: agent.verify job
+	connectVerifyPath = "/api/v1/connect/verify"          // Z01: agent.verify job (GET .../{job} polls it)
 	agentTestV1Path   = "/api/v1/agents/%s/test"          // Y10: one sample task
 	agentsV1Path      = "/api/v1/agents"                  // Y10: create from YAML
 	agentConfigPath   = "/api/bench/agents/%s/config"     // r-merge: write agents/<id>.yaml
@@ -262,11 +262,11 @@ type verifyResult struct {
 func (a *onboardAPI) verify(ctx context.Context, id string, pull bool) (*verifyResult, error) {
 	out := &verifyResult{Agent: id}
 	var raw map[string]any
-	_, err := a.call(ctx, http.MethodPost, fmt.Sprintf(agentVerifyPath, url.PathEscape(id)), map[string]any{}, &raw)
+	_, err := a.call(ctx, http.MethodPost, connectVerifyPath, map[string]any{"agent": id}, &raw)
 	if err == nil {
 		out.Source, out.Raw = "agent.verify", raw
 		if job := jobIDOf(raw); job != "" {
-			if done, werr := a.waitJob(ctx, job, 5*time.Minute); werr == nil {
+			if done, werr := a.waitVerify(ctx, job, 5*time.Minute); werr == nil {
 				raw = done
 				out.Raw = done
 			}
@@ -291,7 +291,7 @@ func (a *onboardAPI) verify(ctx context.Context, id string, pull bool) (*verifyR
 	_, err = a.call(ctx, http.MethodPost, fmt.Sprintf(agentTestV1Path, url.PathEscape(id)), map[string]any{}, &raw)
 	if err != nil {
 		if missingRoute(err) {
-			return nil, errors.New("this server has no agent verification route yet (needs /api/v1/agents/{id}/verify or /test); run a first look instead")
+			return nil, errors.New("this server has no agent verification route yet (needs /api/v1/connect/verify or /api/v1/agents/{id}/test); run a first look instead")
 		}
 		return nil, err
 	}
@@ -348,6 +348,33 @@ func jobIDOf(raw map[string]any) string {
 		return id
 	}
 	return ""
+}
+
+// waitVerify polls Z01's agent.verify job (GET /api/v1/connect/verify/{job})
+// until it ends and returns its result (ok, rows), else the last status.
+func (a *onboardAPI) waitVerify(ctx context.Context, id string, max time.Duration) (map[string]any, error) {
+	deadline := time.Now().Add(max)
+	for {
+		var st map[string]any
+		if _, err := a.call(ctx, http.MethodGet, connectVerifyPath+"/"+url.PathEscape(id), nil, &st); err != nil {
+			return nil, err
+		}
+		switch st["status"] {
+		case "succeeded", "failed", "cancelled":
+			if res, ok := st["result"].(map[string]any); ok {
+				return res, nil
+			}
+			return st, nil
+		}
+		if time.Now().After(deadline) {
+			return st, errors.New("verification still running")
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
 }
 
 // waitJob polls a job until it ends.

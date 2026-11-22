@@ -83,7 +83,7 @@ func (f *fakeOnboardHeimdall) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		}
 		f.agents[id] = req.YAML
 		send(200, map[string]any{"id": id})
-	case strings.HasPrefix(key, "POST /api/v1/agents/") && strings.HasSuffix(key, "/verify"):
+	case key == "POST /api/v1/connect/verify": // a server without Z01: falls back to pull status
 		send(404, map[string]any{"error": map[string]any{"message": "no route", "type": "not_found"}})
 	case key == "GET /api/v1/pull/agents":
 		send(200, map[string]any{"agents": []any{map[string]any{"name": "support-bot", "connected": f.serving}}})

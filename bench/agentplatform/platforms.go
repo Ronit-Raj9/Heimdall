@@ -1,4 +1,4 @@
-// Package platformimport imports an agent that lives on an agent platform
+// Package agentplatform imports an agent that lives on an agent platform
 // (Vapi, Retell, ElevenLabs Agents, AWS Bedrock AgentCore, Salesforce
 // Agentforce, Microsoft Copilot Studio, Google Vertex AI Agent Engine,
 // LangGraph Platform) by its platform id (INFRA_I2 item 9, section 4.8).
@@ -16,7 +16,7 @@
 //     has one).
 //
 // The config names org secrets only; no secret value is ever part of it.
-package platformimport
+package agentplatform
 
 import (
 	"context"

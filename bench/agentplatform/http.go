@@ -1,4 +1,4 @@
-package platformimport
+package agentplatform
 
 import (
 	"bytes"

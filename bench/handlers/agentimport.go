@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/agentplatform"
 	"github.com/maximhq/bifrost/bench/lib"
-	"github.com/maximhq/bifrost/bench/platformimport"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/valyala/fasthttp"
 )
@@ -28,7 +28,7 @@ import (
 
 // AgentPlatformList is GET /agents/platforms.
 type AgentPlatformList struct {
-	Platforms []platformimport.Platform `json:"platforms"`
+	Platforms []agentplatform.Platform `json:"platforms"`
 }
 
 // AgentImportRequest is POST /agents/import-platform.
@@ -47,12 +47,12 @@ type AgentImportRequest struct {
 
 // AgentImportResponse is the imported agent.
 type AgentImportResponse struct {
-	ID     string                 `json:"id"`
-	Path   string                 `json:"path"`
-	Files  []string               `json:"files"`
-	YAML   string                 `json:"yaml"`
-	DryRun bool                   `json:"dry_run"`
-	Import *platformimport.Result `json:"import"`
+	ID     string                `json:"id"`
+	Path   string                `json:"path"`
+	Files  []string              `json:"files"`
+	YAML   string                `json:"yaml"`
+	DryRun bool                  `json:"dry_run"`
+	Import *agentplatform.Result `json:"import"`
 	// ValidationError is set on a dry run whose config this server's agent
 	// schema refuses (a save would fail with it).
 	ValidationError string `json:"validation_error,omitempty"`
@@ -94,7 +94,7 @@ func init() {
 }
 
 func (h *agentImportHandler) platforms(ctx *fasthttp.RequestCtx) {
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, AgentPlatformList{Platforms: platformimport.Platforms})
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, AgentPlatformList{Platforms: agentplatform.Platforms})
 }
 
 func (h *agentImportHandler) bad(ctx *fasthttp.RequestCtx, msg string) {
@@ -119,8 +119,8 @@ func (h *agentImportHandler) importAgent(ctx *fasthttp.RequestCtx) {
 		h.bad(ctx, fmt.Sprintf("agent name %q is reserved by the web UI: pick another", req.ID))
 		return
 	}
-	preq := platformimport.Request{Platform: strings.TrimSpace(req.Platform), AgentID: req.AgentID, Inputs: req.Inputs, Secrets: req.Secrets}
-	if _, err := platformimport.Check(preq); err != nil {
+	preq := agentplatform.Request{Platform: strings.TrimSpace(req.Platform), AgentID: req.AgentID, Inputs: req.Inputs, Secrets: req.Secrets}
+	if _, err := agentplatform.Check(preq); err != nil {
 		h.bad(ctx, err.Error())
 		return
 	}
@@ -131,7 +131,7 @@ func (h *agentImportHandler) importAgent(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	rel := "agents/" + req.ID + ".yaml"
-	side := platformimport.SidecarPath(req.ID)
+	side := agentplatform.SidecarPath(req.ID)
 	work, cancel := context.WithTimeout(context.Background(), agentImportWait)
 	defer cancel()
 	if !req.DryRun {
@@ -143,39 +143,39 @@ func (h *agentImportHandler) importAgent(ctx *fasthttp.RequestCtx) {
 			}
 		}
 	}
-	secrets, err := (&agentTestHandler{env: h.env}).secrets(work, platformimport.SecretNames(preq)...)
+	secrets, err := (&agentTestHandler{env: h.env}).secrets(work, agentplatform.SecretNames(preq)...)
 	if err != nil {
 		h.bad(ctx, err.Error())
 		return
 	}
 	hosted := h.env.Services.Hosted
-	c := &platformimport.Client{HTTP: h.client(hosted, 20*time.Second), Now: h.now, Rewrite: h.rewrite,
+	c := &agentplatform.Client{HTTP: h.client(hosted, 20*time.Second), Now: h.now, Rewrite: h.rewrite,
 		CheckURL: func(raw string) error { return (&agentTestHandler{env: h.env}).checkURL(raw) }}
 	res, err := c.Import(work, preq, secrets)
 	if err != nil {
 		// The platform is down or unreachable: 502. It refused the key,
 		// has no such agent or the input is wrong: 422.
 		status := fasthttp.StatusUnprocessableEntity
-		var se *platformimport.StatusError
+		var se *agentplatform.StatusError
 		if errors.As(err, &se) && se.Status >= 500 || strings.Contains(err.Error(), "did not answer") {
 			status = fasthttp.StatusBadGateway
 		}
 		lib.SendError(ctx, h.env.Mode, status, lib.ErrTypeBadRequest, "import from "+preq.Platform+": "+err.Error())
 		return
 	}
-	def := platformimport.AgentDefaults{}
+	def := agentplatform.AgentDefaults{}
 	if t, ok := findTemplate("http-url"); ok {
 		def.Model = t.DefaultModel
 		if len(t.Providers) > 0 {
 			def.Provider = t.Providers[0]
 		}
 	}
-	doc, err := platformimport.AgentYAML(req.ID, res, def)
+	doc, err := agentplatform.AgentYAML(req.ID, res, def)
 	if err != nil {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, err.Error())
 		return
 	}
-	sideDoc, err := platformimport.SidecarJSON(res)
+	sideDoc, err := agentplatform.SidecarJSON(res)
 	if err != nil {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, err.Error())
 		return
