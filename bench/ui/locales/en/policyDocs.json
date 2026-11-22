@@ -1,0 +1,64 @@
+{
+	"tab": "Policy",
+	"intro": "Upload a policy or SOP (PDF, DOCX, Markdown or text). Heimdall splits it into numbered clauses and drafts three support conversations per clause: a normal case, an edge case and a customer who insists on breaking the rule. Drafts wait for your review; accepted ones become tasks, and the readiness check proves a compliant reply passes and a violating one fails.",
+	"viewerNote": "Policy documents and their drafts include reference replies, so only members can open them. The report is below.",
+	"upload": {
+		"title": "Upload a policy",
+		"file": "Policy file",
+		"preview": "Preview clauses",
+		"save": "Upload",
+		"previewNote": "Preview only: nothing is saved yet. {{count}} clauses found."
+	},
+	"docs": {
+		"title": "Policy documents",
+		"empty": "No policy uploaded yet.",
+		"open": "Open",
+		"summary": "{{clauses}} clauses, {{pending}} drafts pending review"
+	},
+	"clauses": {
+		"title": "Clauses",
+		"skipped": "skipped"
+	},
+	"generate": {
+		"title": "Draft scenarios",
+		"provider": "Provider",
+		"model": "Model",
+		"budget": "Budget (USD)",
+		"budgetHint": "Generation stops when this is spent. Hosted cap: $5.",
+		"estimate": "Estimate cost",
+		"start": "Draft scenarios",
+		"confirm": "Draft scenarios for up to ${{budget}} on {{model}}",
+		"forecast": "Forecast: ${{usd}} for {{clauses}} clauses.",
+		"running": "Job {{id}} is {{status}}.",
+		"done": "Drafted {{drafted}} scenarios, spent ${{spent}}.",
+		"failed": "The job failed: {{error}}"
+	},
+	"drafts": {
+		"title": "Drafts pending review",
+		"empty": "No drafts pending review.",
+		"kind": {
+			"normal": "normal case",
+			"edge": "edge case",
+			"adversarial": "customer insists"
+		},
+		"clause": "Clause {{number}}",
+		"accept": "Accept",
+		"reject": "Reject",
+		"acceptAll": "Accept all pending",
+		"judgeProvider": "Reply judge provider",
+		"judgeModel": "Reply judge model",
+		"switchNote": "This benchmark does not use grader checks with a pinned reply judge yet. Accepting switches it; its other tasks then need their readiness checks again."
+	},
+	"report": {
+		"title": "Compliance report",
+		"empty": "No counted runs of accepted tasks yet. Run an evaluation of this benchmark first.",
+		"summary": "{{tested}} of {{clauses}} clauses tested, {{runs}} runs.",
+		"clause": "Clause",
+		"passRate": "Pass rate",
+		"range": "{{lo}} to {{hi}}",
+		"findings": "Where it breaks",
+		"untested": "Untested clauses: {{list}}",
+		"markdown": "Download Markdown",
+		"pdf": "Download PDF"
+	}
+}
