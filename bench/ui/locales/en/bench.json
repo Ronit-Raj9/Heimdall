@@ -3625,8 +3625,8 @@
 		"pulled": "Done: {{sessions}} sessions scored",
 		"pullError": "Could not read new sessions",
 		"evidenceLabel": "Based on real traffic.",
-		"unconfigured": "Live quality scoring is not set up yet. Use Set up live scoring above. (Terminal: bifrost-bench livescore init)",
-		"problem": "Live quality scoring is off: {{problem}}",
+		"unconfigured": "Live quality scoring is not set up yet. Use Set up live scoring above.",
+		"problem": "Live quality scoring is off: the settings file could not be read. Open Set up live scoring to replace it.",
 		"result": {
 			"better": "Better",
 			"worse": "Worse",

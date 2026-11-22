@@ -43,7 +43,13 @@ export default function ImprovementView({ id }: { id: string }) {
 			{q.isLoading ? (
 				<BlockSkeleton rows={6} testId="improvement-loading" />
 			) : q.error || !d ? (
-				<LoadError title={t("detail.loadError")} error={q.error} onRetry={() => void q.refetch()} testId="improvement-error" />
+				<LoadError
+					title={t("detail.loadError")}
+					error={q.error}
+					onRetry={() => void q.refetch()}
+					testId="improvement-error"
+					notFound={{ text: t("detail.notFound", { id }), backTo: "/improvements", backLabel: t("detail.notFoundBack") }}
+				/>
 			) : (
 				<ImprovementDetailBody data={d} approving={approveState.isLoading} onApprove={(round, reason) => void approve({ id, round, reason })} />
 			)}

@@ -19,6 +19,7 @@ import {
 } from "./live.utils";
 import type { LiveComparison, LiveSessionRecord, LiveSignalDef, LiveStatus, LiveVersionView } from "./livescore.types";
 import "./fw15I18n";
+import "@/components/improvements/gw16I18n";
 
 /** The job kind that compares two live versions; with simulate it runs on made-up sessions. */
 export const LIVE_COMPARE_KIND = "livescore.compare";
@@ -42,6 +43,8 @@ export interface LiveBodyProps {
 	status: LiveStatus;
 	/** The pull button and its state; omitted in recorded mode and in tests. */
 	actions?: ReactNode;
+	/** The hosted server: no terminal there, so the "not set up" text names no CLI command. */
+	hosted?: boolean;
 }
 
 /**
@@ -49,13 +52,22 @@ export interface LiveBodyProps {
  * with sample counts and e-values per signal, every signal over time per version, and the worst
  * sessions linked to their failure inbox items. Every number here is live evidence.
  */
-export function LiveBody({ status, actions }: LiveBodyProps) {
+export function LiveBody({ status, actions, hosted }: LiveBodyProps) {
 	const { t } = useTranslation("bench");
+	const { t: g } = useTranslation("gw16");
 	if (!status.configured || status.problem) {
+		// A settings file that did not load is named in plain words; the raw reason stays in the title.
 		return (
 			<div className="flex min-w-0 flex-col gap-4">
 				<EmptyNote testId="live-unconfigured">
-					{status.problem ? t("live.problem", { problem: status.problem }) : t("live.unconfigured")}
+					{status.problem ? (
+						<span title={status.problem}>{t("live.problem")}</span>
+					) : (
+						<>
+							{t("live.unconfigured")}
+							{!hosted && <> {g("live.terminal")}</>}
+						</>
+					)}
 				</EmptyNote>
 				<SimulatedTry />
 			</div>

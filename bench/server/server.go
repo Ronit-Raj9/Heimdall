@@ -166,6 +166,7 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	// Host check, CORS and security headers wrap the router itself, so they
 	// cover the UI, the 404 answer and every API route alike.
 	s.handler = lib.ChainMiddlewares(r.Handler,
+		lib.HeadAsGet(), // N150: HEAD answers like GET (link checkers, curl -I)
 		lib.SecurityHeaders(),
 		lib.HostGuard(mode, cfg.Server.AllowedHosts),
 		lib.CORS(cfg.Server.CORSOrigins),

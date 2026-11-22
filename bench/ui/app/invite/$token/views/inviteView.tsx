@@ -9,6 +9,7 @@ import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useAcceptInvitationMutation, useGetInvitationQuery, useLogoutMutation } from "@/lib/store/apis/platformApi";
 import { Link } from "@tanstack/react-router";
 import { MailCheck } from "lucide-react";
+import "@/components/improvements/gw16I18n";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -17,6 +18,7 @@ import { useTranslation } from "react-i18next";
  */
 export default function InviteView({ token }: { token: string }) {
 	const { t } = useTranslation("platform");
+	const { t: g } = useTranslation("gw16");
 	const session = useSession();
 	const invite = useGetInvitationQuery(token);
 	const [accept, acceptState] = useAcceptInvitationMutation();
@@ -35,9 +37,24 @@ export default function InviteView({ token }: { token: string }) {
 		return (
 			<div className="flex flex-col gap-6" data-testid="invite-invalid">
 				<AuthHeading title={t("auth.invite.invalid")} subtitle={t("auth.invite.invalidBody")} />
-				<Button asChild variant="outline" className="h-10 w-full">
-					<Link to="/login">{t("auth.signup.signIn")}</Link>
-				</Button>
+				{session.signedIn ? (
+					<>
+						{session.user?.email && (
+							<p className="text-muted-foreground text-sm" data-testid="invite-signed-in-as">
+								{g("invite.signedInAs", { email: session.user.email })}
+							</p>
+						)}
+						<Button asChild className="h-10 w-full">
+							<Link to="/" data-testid="invite-home">
+								{g("invite.home")}
+							</Link>
+						</Button>
+					</>
+				) : (
+					<Button asChild variant="outline" className="h-10 w-full">
+						<Link to="/login">{t("auth.signup.signIn")}</Link>
+					</Button>
+				)}
 			</div>
 		);
 	}

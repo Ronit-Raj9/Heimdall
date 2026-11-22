@@ -116,14 +116,14 @@ func TestLivescoreScheduleJobAndServe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Not configured: no job, and the page says how to start.
+	// Not configured: no job, and the page says it is not set up (N131: not a problem).
 	file := &schedule.File{}
 	addLivescoreSchedule(a, file)
 	if len(file.Schedules) != 0 {
 		t.Fatalf("schedules %+v without a config", file.Schedules)
 	}
 	st, err := serveLivescore(a, false).Status(ctx)
-	if err != nil || st.Problem == "" || !strings.Contains(st.Problem, "livescore init") {
+	if err != nil || st.Configured || st.Problem != "" {
 		t.Fatalf("unconfigured status %+v %v", st, err)
 	}
 	text, err := livescore.Template(livescore.InitOptions{BaselineKey: "vk-a", CandidateKey: "vk-b"})
@@ -161,5 +161,46 @@ func TestLivescoreScheduleJobAndServe(t *testing.T) {
 	}
 	if st, err := off.Status(ctx); err != nil || st == nil {
 		t.Fatalf("offline status %+v %v", st, err)
+	}
+}
+
+// TestLiveStatusUnconfiguredHasNoProblem checks that a project without
+// livescore/config.yaml answers "not configured" with no problem text, so the
+// page neither shows the CLI error nor treats a settings file as present, and
+// that a file that does not load is a problem in plain words (N131).
+func TestLiveStatusUnconfiguredHasNoProblem(t *testing.T) {
+	config, _ := liveProject(t)
+	ctx := context.Background()
+	a, err := newApp(ctx, config, appOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := serveLivescore(a, false).Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Configured || st.Problem != "" {
+		t.Fatalf("unconfigured status: configured=%v problem=%q, want false and empty", st.Configured, st.Problem)
+	}
+	body, err := json.Marshal(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "livescore init") || strings.Contains(string(body), `"problem"`) {
+		t.Errorf("unconfigured status JSON %s names the CLI or a problem", body)
+	}
+	dir := filepath.Join(a.cfg.Root, livescore.Dir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, livescore.ConfigFile), []byte("not: [valid"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	st, err = serveLivescore(a, false).Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Configured || !strings.HasPrefix(st.Problem, "the live scoring settings file could not be read: ") {
+		t.Fatalf("broken config status: configured=%v problem=%q", st.Configured, st.Problem)
 	}
 }

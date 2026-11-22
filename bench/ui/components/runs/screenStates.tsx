@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
+import { isNotFoundError } from "@/lib/store/apis/notFound";
 import { cn } from "@/lib/utils";
+import { Link } from "@tanstack/react-router";
 import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -14,14 +16,44 @@ export interface LoadErrorProps {
 	/** data-testid of the block; the retry button gets "<testId>-retry". */
 	testId: string;
 	className?: string;
+	/**
+	 * What to say when the error is a 404: the thing does not exist, so a retry cannot help. Given,
+	 * a 404 shows this text and a link back instead of the server message and Retry. Absent, a 404
+	 * renders like any other error.
+	 */
+	notFound?: LoadErrorNotFound;
+}
+
+/** The 404 branch of LoadError: a plain sentence and where to go instead. */
+export interface LoadErrorNotFound {
+	text: string;
+	backTo: string;
+	backLabel: string;
 }
 
 /** A failed request: what failed, the server's message, and a retry. Used by the runs, receipts and new-experiment screens. */
-export function LoadError({ title, error, onRetry, testId, className }: LoadErrorProps) {
+export function LoadError({ title, error, onRetry, testId, className, notFound }: LoadErrorProps) {
 	const { t } = useTranslation("bench");
 	const session = useSession();
 	// Hosted mode: a 403 is the caller's role, not a fault; say so instead of offering a retry.
 	if (isRoleRefusal(session, error)) return <ForbiddenNote error={error} testId={testId} className={className} />;
+	if (notFound && isNotFoundError(error)) {
+		return (
+			<div
+				role="alert"
+				data-testid={testId}
+				data-not-found="true"
+				className={cn("bg-muted/20 flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3.5 text-sm sm:flex-nowrap", className)}
+			>
+				<p className="text-foreground min-w-0 flex-1 font-medium">{notFound.text}</p>
+				<Button asChild variant="outline" size="sm">
+					<Link to={notFound.backTo} data-testid={`${testId}-back`}>
+						{notFound.backLabel}
+					</Link>
+				</Button>
+			</div>
+		);
+	}
 	return (
 		<div
 			role="alert"

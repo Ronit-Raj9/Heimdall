@@ -3,6 +3,23 @@ import type { FetchArgs } from "@reduxjs/toolkit/query/react";
 import { benchApi } from "./benchApi";
 
 /**
+ * The body of POST /improvements: the fields of improve.Spec the web form sets. The server fills
+ * every other field with its defaults (improve/spec.go) and parses the body strictly.
+ */
+export interface ImprovementSpecBody {
+	kind: "improvement";
+	name: string;
+	/** agents/<id>.yaml */
+	agent: string;
+	/** <suite id>@<version> */
+	suite: string;
+	rounds: number;
+	/** Container paths of the agent's files map: exact files, and folders ending in "/". */
+	editable: { files: string[]; dirs?: string[] };
+	improver: { budget_usd: number };
+}
+
+/**
  * Improvement runs (bench/improve). Reads take no token; approve and stop are writes and carry the
  * write token like every bench mutation. Both refresh the list and the run so the page can poll.
  */
@@ -15,6 +32,11 @@ export const improveApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchImprov
 		getImprovement: builder.query<ImprovementDetail, string>({
 			query: (id) => improvementPath(id),
 			providesTags: (_r, _e, id) => [{ type: "BenchImprovement", id }],
+		}),
+		// POST /improvements (admins): the spec as JSON; the server freezes it and starts the run (202).
+		createImprovement: builder.mutation<ImprovementSummary, ImprovementSpecBody>({
+			query: (body) => ({ url: "/improvements", method: "POST", body }),
+			invalidatesTags: [{ type: "BenchImprovement", id: "LIST" }],
 		}),
 		approveImprovementRound: builder.mutation<ImprovementSummary, { id: string; round: number; reason: string }>({
 			query: (a) => approveRequest(a.id, a.round, a.reason),
@@ -43,4 +65,10 @@ export function approveRequest(id: string, round: number, reason: string): Fetch
 	return { url: `${improvementPath(id)}/rounds/${round}/approve`, method: "POST", body: { reason } };
 }
 
-export const { useGetImprovementsQuery, useGetImprovementQuery, useApproveImprovementRoundMutation, useStopImprovementMutation } = improveApi;
+export const {
+	useGetImprovementsQuery,
+	useGetImprovementQuery,
+	useCreateImprovementMutation,
+	useApproveImprovementRoundMutation,
+	useStopImprovementMutation,
+} = improveApi;

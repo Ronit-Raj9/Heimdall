@@ -48,6 +48,26 @@ func ChainMiddlewares(handler fasthttp.RequestHandler, middlewares ...Middleware
 	return chained
 }
 
+// HeadAsGet answers HEAD like GET (N150). Every route is registered for GET
+// only and the router answers 405 to HEAD, which breaks link checkers and
+// `curl -I`. The request runs as a GET (so policy, audit and rate limits see
+// a read), then the response keeps the GET's status, headers and
+// Content-Length and drops the body. Put it outermost in a chain.
+func HeadAsGet() Middleware {
+	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+		return func(ctx *fasthttp.RequestCtx) {
+			if !ctx.IsHead() {
+				next(ctx)
+				return
+			}
+			ctx.Request.Header.SetMethod(fasthttp.MethodGet)
+			next(ctx)
+			ctx.Request.Header.SetMethod(fasthttp.MethodHead)
+			ctx.Response.SkipBody = true
+		}
+	}
+}
+
 // ResolveWriteToken returns the token from BENCH_WRITE_TOKEN, or a fresh
 // random one. generated is true when the caller must show the token once.
 func ResolveWriteToken() (token string, generated bool, err error) {

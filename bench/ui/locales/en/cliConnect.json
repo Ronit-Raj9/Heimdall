@@ -27,7 +27,8 @@
 		"deniedBody": "The terminal was told no. Nothing was created.",
 		"error": "Could not finish",
 		"local": "No login needed",
-		"localBody": "This is a local server: the CLI uses its write token. Run: echo \"$BENCH_WRITE_TOKEN\" | heimdall login -with-token"
+		"localBody": "This is a local server: the CLI uses its write token. Run: echo \"$BENCH_WRITE_TOKEN\" | heimdall login -with-token",
+		"notACode": "That is not a sign-in code. Codes are 8 letters with no vowels, like BCDF-GHJK."
 	},
 	"ide": {
 		"tab": "IDE",

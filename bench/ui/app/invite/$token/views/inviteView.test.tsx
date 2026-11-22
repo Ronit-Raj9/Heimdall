@@ -64,4 +64,17 @@ describe("InviteView", () => {
 		api.invite = loadingQuery();
 		expect(render(<InviteView token="t" />, grace)).toContain("invite-loading");
 	});
+
+	it("sends a signed-in user on a bad link home instead of offering Sign in (N146)", () => {
+		api.invite = errorQuery(404, "invitation not found");
+		const html = render(<InviteView token="zz-bad-token" />, grace);
+		expect(html).toContain('data-testid="invite-invalid"');
+		expect(html).toContain("Go to my home page");
+		expect(html).toContain('href="/"');
+		expect(html).toContain("You are signed in as Grace@acme.dev.");
+		expect(html).not.toContain('href="/login"');
+		const visitor = render(<InviteView token="zz-bad-token" />, signedOutSession());
+		expect(visitor).toContain('href="/login"');
+		expect(visitor).not.toContain("Go to my home page");
+	});
 });
