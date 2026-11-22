@@ -4042,6 +4042,8 @@ export interface Job {
 	attempt: number;
 	lease_owner?: string;
 	lease_until?: PlatformTime;
+	/** Claim order among equally loaded organizations, -10 to 10; absent is 0 (POST /jobs/{id}/priority). */
+	priority?: number;
 }
 
 /** GET /jobs (handlers/jobs.go JobList): newest first, and the kinds POST /jobs accepts. */

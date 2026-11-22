@@ -75,6 +75,10 @@ type Config struct {
 	// GC, build cache prune, free disk floor; lib/runnerconfig.go).
 	Runner RunnerConfig `yaml:"runner" json:"runner,omitzero"`
 
+	// Jobs sizes the hosted job runner: experiments at once on the platform
+	// and per organization, and job workers (lib/jobsconfig.go).
+	Jobs JobsConfig `yaml:"jobs" json:"jobs,omitzero"`
+
 	Root string `yaml:"-" json:"-"` // bench root that relative paths resolve against
 }
 
@@ -216,6 +220,9 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("environment.driver must be docker or kubernetes, got %q", c.Environment.Driver)
 	}
 	if err := c.Runner.Validate(); err != nil {
+		return err
+	}
+	if err := c.Jobs.Validate(); err != nil {
 		return err
 	}
 	if err := c.Gateway.validateSlots(); err != nil {

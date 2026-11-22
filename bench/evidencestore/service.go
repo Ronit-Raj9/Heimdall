@@ -82,7 +82,7 @@ type Service struct {
 	PassTimeout time.Duration
 
 	mu      sync.Mutex
-	pending map[[2]string]bool
+	pending map[[2]string]bool // true: a full pass (NotifyFull), false: incremental
 	kick    chan struct{}
 	cancel  context.CancelFunc
 	done    chan struct{}
@@ -117,8 +117,23 @@ func (s *Service) Notify(orgID, expID string) {
 	if s == nil || validID("org_id", orgID) != nil || validID("exp_id", expID) != nil {
 		return
 	}
+	s.queue(orgID, expID, false)
+}
+
+// NotifyFull queues one experiment for a full pass, which verifies every
+// seal and the whole chain again: the pass at experiment end. A seal's
+// Notify in the same burst does not downgrade it.
+func (s *Service) NotifyFull(orgID, expID string) {
+	if s == nil || validID("org_id", orgID) != nil || validID("exp_id", expID) != nil {
+		return
+	}
+	s.queue(orgID, expID, true)
+}
+
+func (s *Service) queue(orgID, expID string, full bool) {
+	k := [2]string{orgID, expID}
 	s.mu.Lock()
-	s.pending[[2]string{orgID, expID}] = true
+	s.pending[k] = s.pending[k] || full
 	s.mu.Unlock()
 	select {
 	case s.kick <- struct{}{}:
@@ -160,6 +175,7 @@ func (s *Service) loop(ctx context.Context) {
 func (s *Service) drain(ctx context.Context) {
 	s.mu.Lock()
 	keys := make([][2]string, 0, len(s.pending))
+	full := s.pending
 	for k := range s.pending {
 		keys = append(keys, k)
 	}
@@ -173,7 +189,10 @@ func (s *Service) drain(ctx context.Context) {
 			continue
 		}
 		pctx, cancel := context.WithTimeout(ctx, s.PassTimeout)
-		_, err = s.mirror.Experiment(pctx, org, k[1])
+		// A seal's pass is incremental (only the runs sealed since the last
+		// pass are verified); the pass at experiment end and every sweep
+		// verify everything.
+		_, err = s.mirror.ExperimentWith(pctx, org, k[1], MirrorOptions{Incremental: !full[k]})
 		cancel()
 		if err != nil && !errors.Is(err, context.Canceled) {
 			s.mirror.logger().Error("evidence mirror: experiment not mirrored; the next sweep retries", "org_id", k[0], "exp_id", k[1], "error", err.Error())

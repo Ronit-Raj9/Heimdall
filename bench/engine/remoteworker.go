@@ -76,6 +76,12 @@ type WorkerOptions struct {
 	Disk           func() schemas.WorkerDisk
 	ImageUse       func(ids ...string)
 	KeepRunFolders bool
+	// HostSlot, when set, takes one of the host's run slots before each
+	// lease request and returns its release (Z10: the shared worker's
+	// host-wide fair semaphore, bench/hostslots). The slot is given back as
+	// soon as the request brings no work, and after the leased run. An error
+	// means ctx ended.
+	HostSlot func(ctx context.Context) (release func(), err error)
 }
 
 // Worker is the remote side of remote execution: it registers with a
@@ -232,6 +238,14 @@ func (w *Worker) loop(ctx context.Context, stop context.CancelCauseFunc) {
 			continue
 		}
 		w.capLogged.Store(false)
+		hostDone := func() {} // Z10: the host-wide slot, held only while there is work (WorkerOptions.HostSlot)
+		if w.opts.HostSlot != nil {
+			rel, err := w.opts.HostSlot(ctx)
+			if err != nil {
+				return
+			}
+			hostDone = sync.OnceFunc(rel)
+		}
 		req := schemas.WorkerLeaseRequest{WorkerID: w.opts.WorkerID}
 		if w.opts.Disk != nil {
 			if d := w.opts.Disk(); d.FreeBytes >= 0 {
@@ -240,7 +254,11 @@ func (w *Worker) loop(ctx context.Context, stop context.CancelCauseFunc) {
 		}
 		var lease schemas.WorkerLease
 		err := w.call(ctx, http.MethodPost, workerAPI+"/lease", req, &lease)
+		if err != nil || lease.LeaseID == "" {
+			hostDone() // no work: the slot goes back before any wait
+		}
 		if err == nil && lease.LeaseID != "" && req.Disk != nil && req.Disk.Low {
+			hostDone()
 			// A server that does not know the disk field leased anyway: hand
 			// the lease straight back so another runner takes it.
 			w.release(ctx, &lease, "runner disk is low", false, nil)
@@ -265,13 +283,16 @@ func (w *Worker) loop(ctx context.Context, stop context.CancelCauseFunc) {
 			}
 		case lease.LeaseID != "" && lease.Kind == schemas.LeaseKindJob:
 			w.workJob(ctx, &lease)
+			hostDone()
 			continue
 		case lease.LeaseID != "":
 			// An accepted run goes straight on to the next lease; anything
 			// else (a refusal, a rejection, a failed run) waits a poll
 			// interval, so a lease the worker keeps giving back is not
 			// fetched in a tight loop.
-			if res := w.Work(ctx, &lease); res != nil && res.Accepted {
+			res := w.Work(ctx, &lease)
+			hostDone()
+			if res != nil && res.Accepted {
 				continue
 			}
 		}

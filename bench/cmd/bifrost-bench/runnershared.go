@@ -47,6 +47,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/engine"
+	"github.com/maximhq/bifrost/bench/hostslots"
 	"github.com/maximhq/bifrost/bench/quota"
 	"github.com/maximhq/bifrost/bench/sharedpool"
 )
@@ -99,6 +100,7 @@ type sharedFlags struct {
 	builder, buildkit, gateway, projectsDir   string
 	registry                                  string
 	slots                                     int
+	hostSlots                                 int // Z10: runs at once on the whole host, every org together (0: from CPUs and memory)
 	poll                                      time.Duration
 	debug                                     bool
 }
@@ -112,6 +114,7 @@ func parseSharedFlags(args []string) (*sharedFlags, error) {
 	fs.StringVar(&f.secretFile, "secret-file", "", "file holding "+sharedpool.SecretEnv+"; mode 0600")
 	fs.StringVar(&f.runtime, "runtime", runtimeAuto, "auto (gVisor when the host has runsc), runc or runsc")
 	fs.IntVar(&f.slots, "slots", 1, "slots per org (capped by the org's max concurrent runs)")
+	fs.IntVar(&f.hostSlots, "host-slots", 0, "runs at once on this host across every org, shared fairly (0: 1 per 2 CPUs and 4 GB of memory)")
 	fs.DurationVar(&f.poll, "poll", 30*time.Second, "how often to fetch the assignments")
 	fs.StringVar(&f.name, "name", "", "runner name prefix (default: shared-<host>)")
 	fs.StringVar(&f.config, "config", defaultConfig, "bench config")
@@ -133,6 +136,8 @@ func parseSharedFlags(args []string) (*sharedFlags, error) {
 		return nil, errors.New("-runtime must be auto, runc or runsc")
 	case f.slots < 1 || f.slots > 64:
 		return nil, errors.New("-slots must be 1 to 64")
+	case f.hostSlots < 0 || f.hostSlots > 4096:
+		return nil, errors.New("-host-slots must be 0 (auto) to 4096")
 	case f.poll < time.Second:
 		return nil, errors.New("-poll must be at least 1s")
 	}
@@ -322,6 +327,7 @@ type sharedHost struct {
 	client      *http.Client
 	host        string
 	prefix      string
+	hostSlots   *hostslots.Pool // Z10: the host-wide fair run limit every org's loop shares
 }
 
 // sharedSplitList splits a comma separated list, dropping blanks.
@@ -506,6 +512,7 @@ func runSharedRunner(args []string) int {
 	if h.prefix == "" {
 		h.prefix = "shared-" + host
 	}
+	h.hostSlots = sharedHostPool(f.hostSlots)
 	h.hygiene = newRunnerHygiene(a, f.projectsDir) // E6: one sweep for every org's loop: they share this runner's store and Docker (runnerhygiene.go)
 	go h.hygiene.Run(ctx)
 	var wg sync.WaitGroup
@@ -523,7 +530,7 @@ func runSharedRunner(args []string) int {
 		return l
 	}
 	loops := map[string]*sharedLoop{}
-	a.logger.Info(fmt.Sprintf("shared runner %s: runtime %s, %d slot(s) per org, server %s", h.prefix, h.runtime, f.slots, f.server))
+	a.logger.Info(fmt.Sprintf("shared runner %s: runtime %s, %d slot(s) per org, %d on the host, server %s", h.prefix, h.runtime, f.slots, h.hostSlots.Cap(), f.server))
 	tick := time.NewTicker(f.poll)
 	defer tick.Stop()
 	for {
@@ -601,7 +608,8 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 		sharedEnsureImages(oa, reg, planRoot, proj.refresh, plan),
 		engine.WorkerOptions{Server: h.f.server, Token: claim.Token, WorkerID: name, Host: h.host, Version: benchVersion,
 			Slots: slots, Logger: oa.logger, Pool: sharedpool.Pool, Labels: labels,
-			Disk: h.hygiene.DiskState, ImageUse: h.hygiene.NoteImages, KeepRunFolders: a.cfg.Runner.Disk.KeepRunFolders})
+			Disk: h.hygiene.DiskState, ImageUse: h.hygiene.NoteImages, KeepRunFolders: a.cfg.Runner.Disk.KeepRunFolders,
+			HostSlot: h.orgHostSlot(org, slots)})
 	// No Jobs: hosted CLI jobs would run the docker CLI outside the org's
 	// policy; the worker refuses them and they go to the org's own workers.
 	if err != nil {

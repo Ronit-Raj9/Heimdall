@@ -188,6 +188,10 @@ services:
       HEIMDALL_MASTER_KEY: ${HEIMDALL_MASTER_KEY:-}
       HEIMDALL_SHARED_RUNNER_SECRET: ${HEIMDALL_SHARED_RUNNER_SECRET:-}
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
+      # Evaluations running at once on the platform and per organization
+      # (docs/hosting.md, Settings reference); 0: the defaults (64 and 8).
+      BENCH_JOBS_EXPERIMENT_LIMIT: ${HEIMDALL_EXPERIMENT_LIMIT:-0}
+      BENCH_JOBS_EXPERIMENT_PER_ORG: ${HEIMDALL_EXPERIMENT_PER_ORG:-0}
       # Prometheus metrics on the compose network only (docs/hosting.md,
       # Operating it); empty: off. Never publish this port.
       BENCH_SERVER_METRICS_LISTEN: ${HEIMDALL_METRICS_LISTEN:-}
@@ -389,12 +393,14 @@ services:
         exec bifrost-bench runner start -shared -server http://heimdall:8090 -secret-file /tmp/shared.secret \
           -config "$$HEIMDALL_BENCH_DIR/deploy/bench.yaml" -name shared-runner \
           -runtime "$$HEIMDALL_SHARED_RUNTIME" -slots "$$HEIMDALL_SHARED_SLOTS" \
+          -host-slots "$$HEIMDALL_SHARED_HOST_SLOTS" \
           -projects-dir "$$HEIMDALL_SHARED_PROJECTS_MIRROR"
     environment:
       HOME: /tmp
       HEIMDALL_SHARED_RUNNER_SECRET: ${HEIMDALL_SHARED_RUNNER_SECRET:-}
       HEIMDALL_SHARED_RUNTIME: ${HEIMDALL_SHARED_RUNTIME:-auto}
       HEIMDALL_SHARED_SLOTS: ${HEIMDALL_SHARED_SLOTS:-1}
+      HEIMDALL_SHARED_HOST_SLOTS: ${HEIMDALL_SHARED_HOST_SLOTS:-0}
       HEIMDALL_BENCH_DIR: ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}
       BENCH_RUNS_ROOT: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}/runs
       BENCH_RELEASES_ROOT: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}/releases

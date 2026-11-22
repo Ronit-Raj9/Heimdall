@@ -434,6 +434,9 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_SHARED_RUNNER_SECRET` | Secret of the shared worker (assignments and per-org token claims); empty turns the shared worker off. |
 | `HEIMDALL_SHARED_RUNTIME` | Container runtime of the shared worker: `auto`, `runsc` or `runc`. |
 | `HEIMDALL_SHARED_SLOTS` | Runs at once per organization on the shared worker, capped by its own limit. |
+| `HEIMDALL_SHARED_HOST_SLOTS` | Runs at once on the shared worker's host, all organizations together, shared fairly between those with work; empty or 0 is one per 2 CPUs and 4 GB of memory. |
+| `HEIMDALL_EXPERIMENT_LIMIT` | Evaluations running at once on the whole platform; empty or 0 is 64. |
+| `HEIMDALL_EXPERIMENT_PER_ORG` | Evaluations running at once per organization; empty or 0 is 8. |
 | `HEIMDALL_SHARED_BUILDKIT` | Address of the isolated BuildKit that builds images from org Dockerfiles. |
 | `HEIMDALL_SHARED_REGISTRY` | The private image registry beside that BuildKit (`registry:5000`) that org builds take bench and platform base images from. |
 | `HEIMDALL_REGISTRY_DIR` | Host folder (on the data disk) for that registry's images; empty is a Docker volume. |
@@ -449,6 +452,16 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_RUNNER_IMAGE` | Runner image Heimdall starts for an organization's own worker on Fly Machines or Kubernetes; empty is the published default. |
 | `HEIMDALL_GATEWAY_LOGS_URL` | The shared gateway's log API the server lists, deletes and expires one organization's prompt logs through; empty with the shared worker on is `http://bifrost:8080`, `off` disables it. |
 | `HEIMDALL_BACKUP_PASSPHRASE_FILE` | Passphrase file kept away from the backups; `backup.sh` then writes an encrypted copy of `.env` beside each dump. |
+
+**Queue and hot paths.** Waiting evaluations take organizations in turn:
+the next one to start belongs to the organization with the fewest running,
+then the highest priority (an admin can move a queued job with
+`POST /api/bench/jobs/{id}/priority`, -10 to 10), then the oldest. The shared
+worker's host limit is shared the same way. While runs finish, the server
+updates only the changed part of its index and checks only the new results
+on their way to the evidence mirror; every result is checked again in full
+when the evaluation ends, at every mirror sweep (`storage.sweep_interval_m`)
+and by `bifrost-bench evidence sweep` in the nightly runbook.
 
 `HEIMDALL_DEV` turns on the practice suite and examples for tests and
 development; a production install never sets it.

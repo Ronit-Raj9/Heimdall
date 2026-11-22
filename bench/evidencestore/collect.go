@@ -224,6 +224,17 @@ func mirrorPathAllowed(p string) error {
 // whose name can not be an object key returns ErrRefused and nothing is
 // mirrored.
 func takeSnapshot(ctx context.Context, org Org, expID string) (*snapshot, error) {
+	return takeSnapshotWith(ctx, org, expID, nil)
+}
+
+// takeSnapshotWith is takeSnapshot, incremental when base (the experiment's
+// current listing) is given and the local seals.log still starts with the
+// seals base records (incremental.go): then only the runs sealed after
+// base.LastSeal are verified and listed, the chain is checked from there,
+// and the runs base already names are left to the listing. Anything else
+// (no base, a log that does not extend it, another manifest) is a full
+// snapshot.
+func takeSnapshotWith(ctx context.Context, org Org, expID string, base *Listing) (*snapshot, error) {
 	if err := validID("org_id", org.ID); err != nil {
 		return nil, err
 	}
@@ -257,13 +268,18 @@ func takeSnapshot(ctx context.Context, org Org, expID string) (*snapshot, error)
 	if err != nil {
 		return nil, fmt.Errorf("experiment %s/%s: %w: %w", org.ID, expID, err, ErrRefused)
 	}
-	if err := verifyChainSettled(org.Store, expID); err != nil {
-		return nil, fmt.Errorf("experiment %s/%s: %w: %w", org.ID, expID, err, ErrRefused)
-	}
-	for _, e := range entries {
-		if err := org.Store.Verify(ctx, expID, e.RunID); err != nil {
+	inc := incrementalFrom(base, entries, manifestHash)
+	if inc == nil {
+		if err := verifyChainSettled(org.Store, expID); err != nil {
 			return nil, fmt.Errorf("experiment %s/%s: %w: %w", org.ID, expID, err, ErrRefused)
 		}
+		for _, e := range entries {
+			if err := org.Store.Verify(ctx, expID, e.RunID); err != nil {
+				return nil, fmt.Errorf("experiment %s/%s: %w: %w", org.ID, expID, err, ErrRefused)
+			}
+		}
+	} else if err := inc.checkLog(entries); err != nil {
+		return nil, fmt.Errorf("experiment %s/%s: %w: %w", org.ID, expID, err, ErrRefused)
 	}
 	snap := &snapshot{OrgID: org.ID, ExpID: expID, ManifestHash: manifestHash, Seals: len(entries)}
 	if len(entries) > 0 {
@@ -306,6 +322,15 @@ func takeSnapshot(ctx context.Context, org Org, expID string) (*snapshot, error)
 			if !ok {
 				snap.Pending = append(snap.Pending, parts[3])
 				return fs.SkipDir
+			}
+			if inc != nil {
+				if inc.listed(parts[3]) { // in the listing already: not read again
+					delete(logged, parts[3])
+					return fs.SkipDir
+				}
+				if err := inc.verifyRun(ctx, org, expID, p, parts[3], hash, manifestHash); err != nil {
+					return fmt.Errorf("run %s: %w: %w", parts[3], err, ErrRefused)
+				}
 			}
 			files, err := sealedRunFiles(p, rel, hash)
 			if err != nil {
@@ -356,8 +381,10 @@ func takeSnapshot(ctx context.Context, org Org, expID string) (*snapshot, error)
 		sort.Strings(missing)
 		return nil, fmt.Errorf("experiment %s/%s: run %s is in seals.log but has no run folder: %w", org.ID, expID, missing[0], ErrRefused)
 	}
-	if err := checkSealsName(dir, entries, manifestHash); err != nil {
-		return nil, fmt.Errorf("experiment %s/%s: %w: %w", org.ID, expID, err, ErrRefused)
+	if inc == nil { // incremental: verifyRun checked each new seal's manifest
+		if err := checkSealsName(dir, entries, manifestHash); err != nil {
+			return nil, fmt.Errorf("experiment %s/%s: %w: %w", org.ID, expID, err, ErrRefused)
+		}
 	}
 	keyRoom := maxKeyLen - len(expPrefix(org.ID, expID))
 	for _, f := range snap.Files {
