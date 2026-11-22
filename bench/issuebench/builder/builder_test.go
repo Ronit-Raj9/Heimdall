@@ -401,7 +401,10 @@ func TestGatewayModel(t *testing.T) {
 // then every run_tests said "No module named pytest": the system prompt
 // must say the tests use the system interpreter and how to install into it.
 func TestSystemPromptSaysTestsUseSystemPython(t *testing.T) {
-	for _, w := range []string{"python -m pytest", "system Python", "uv pip install --system", "UV_PROJECT_ENVIRONMENT=/usr/local", "test_cmd"} {
+	for _, w := range []string{"python -m pytest", "system Python", "uv pip install --system", "UV_PROJECT_ENVIRONMENT=/usr/local", "test_cmd",
+		// Attempt 3: pytest ran under the system Python, then the model chased
+		// tox's python-build-standalone downloads and gave up with a blocker.
+		"tox, nox or uv run"} {
 		if !strings.Contains(systemPrompt, w) {
 			t.Fatalf("system prompt lacks %q", w)
 		}

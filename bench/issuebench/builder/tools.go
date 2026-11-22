@@ -20,6 +20,7 @@ Rules:
 - Keep the time pinning environment variables; do not upgrade past them.
 - Prefer the CI workflow's install steps. Use one command per install step.
 - The tests run as "python -m pytest" with the base image's system Python, so install into that interpreter: pip install, or with uv either "uv pip install --system" or UV_PROJECT_ENVIRONMENT=/usr/local before "uv sync". Never leave the dependencies only in a virtualenv (.venv) unless you pass a test_cmd that runs that virtualenv's python.
+- Do not run the tests through tox, nox or uv run: they provision other interpreters, which this network can not download. Once "python -m pytest" runs the PR tests under the system Python, that is the environment; call run_tests and submit.
 - Network reaches package registries only. If the tests need a GPU, a database or other service, a secret, or a private registry, call submit with that blocker.
 Steps: detect the package manager and test runner; pick a base image; install; run_tests with state base+tests (PR tests should fail) and gold (they should pass); then submit.
 Heimdall checks your work itself in a fresh container; submit is rejected with a reason if the check fails.`
