@@ -28,13 +28,16 @@ declare module "@/lib/i18n/resources" {
 	}
 }
 
-/** The grader a suite uses, in the four words the website shows. */
-export type GraderChoice = "tests" | "state" | "exact" | "judge";
+/** The grader a suite uses, in the words the website shows. */
+export type GraderChoice = "tests" | "state" | "exact" | "judge" | "toolCalls";
 
-export function graderChoice(suite: Pick<SuiteSummary, "grader" | "output">): GraderChoice {
+export function graderChoice(suite: Pick<SuiteSummary, "grader" | "output" | "track">): GraderChoice {
 	if (suite.grader === "judge") return "judge";
 	if (suite.grader === "answer_match") return "exact";
 	if (suite.output === "state") return "state";
+	// A tool-use benchmark with no output kind (an MCP benchmark drafted on the website): its script
+	// checks the tool calls the agent made, not a code change (N119).
+	if (suite.track === "tool_use" && !suite.output) return "toolCalls";
 	return "tests";
 }
 
@@ -70,6 +73,13 @@ export function BuildTab({ suite }: { suite: SuiteSummary }) {
 
 const CHOICES: GraderChoice[] = ["tests", "state", "exact", "judge"];
 
+/** The choices shown: "toolCalls" takes the place of "tests" only when it is the suite's grader. */
+const choicesFor = (current: GraderChoice): GraderChoice[] => (current === "toolCalls" ? CHOICES.map((c) => (c === "tests" ? "toolCalls" : c)) : CHOICES);
+
+/** The section text: answer suites can switch graders; tool-use and code suites keep their own. */
+const graderDescription = (answer: boolean, current: GraderChoice, t: T) =>
+	answer ? t("grader.description") : current === "toolCalls" ? t("grader.fixedToolUse") : t("grader.fixed");
+
 export function GraderSection({ suite, writable, t }: { suite: SuiteSummary; writable: boolean; t: T }) {
 	const current = graderChoice(suite);
 	const answer = isAnswerSuite(suite);
@@ -91,10 +101,10 @@ export function GraderSection({ suite, writable, t }: { suite: SuiteSummary; wri
 		});
 	};
 	return (
-		<Section title={t("grader.title")} description={answer ? t("grader.description") : t("grader.fixed")} testId="suite-build-grader">
+		<Section title={t("grader.title")} description={graderDescription(answer, current, t)} testId="suite-build-grader">
 			<div className="flex min-w-0 flex-col gap-4">
 				<div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4" role="radiogroup" aria-label={t("grader.title")}>
-					{CHOICES.map((c) => (
+					{choicesFor(current).map((c) => (
 						<label
 							key={c}
 							className={cn(
@@ -272,7 +282,7 @@ function SplitRow({ suiteId, task, writable, t }: { suiteId: string; task: Suite
 					onClick={() => void setSplit({ suite: suiteId, task: task.id, held_out: !held })}
 					dataTestId={`suite-build-split-toggle-${task.id}`}
 				>
-					{held ? t("private.makePublic") : t("private.makeHeldOut")}
+					{state.isLoading ? t("private.saving") : held ? t("private.makePublic") : t("private.makeHeldOut")}
 				</Button>
 			)}
 			{state.error ? (

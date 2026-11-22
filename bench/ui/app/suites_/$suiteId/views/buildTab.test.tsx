@@ -9,11 +9,12 @@ import i18n from "i18next";
 import { attachmentProblem, attachmentsBody, columnLabel, dataMode, hasConversations, ImportProgress, MappingStep, mappingBody } from "./rowMapper";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+const mockSplit = vi.hoisted(() => ({ state: {} as Record<string, unknown> }));
 vi.mock("@/lib/store/apis/suiteBuildApi", () => ({
 	useImportSuiteRowsMutation: () => mutation(),
 	useGetRowImportQuery: () => ({ data: undefined }),
 	useSetSuiteGraderMutation: () => mutation(),
-	useSetTaskSplitMutation: () => mutation(),
+	useSetTaskSplitMutation: () => mutation(mockSplit.state),
 }));
 vi.mock("@/lib/store/apis/suiteOpsApi", () => ({ useQuarantineTaskMutation: () => mutation(), useRestoreTaskMutation: () => mutation() }));
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => mutation() }));
@@ -221,5 +222,26 @@ describe("background import progress", () => {
 		expect(html).toContain("3 rows could not be imported");
 		expect(html).toContain("Row 4: no question");
 		expect(html).toContain("Fix the rows and import again.");
+	});
+});
+
+describe("tool-use benchmarks and private tasks (N118, N119)", () => {
+	it("names the grader of a tool-use benchmark Tool calls", () => {
+		expect(graderChoice({ track: "tool_use", grader: "verifier_command", output: undefined })).toBe("toolCalls");
+		expect(graderChoice({ track: "tool_use", grader: "verifier_command", output: "state" })).toBe("state");
+		const mcp = { ...code, id: "zz-test-mcp", track: "tool_use", grader: "verifier_command" } as unknown as SuiteSummary;
+		const html = render(<BuildTab suite={mcp} />);
+		expect(html).toMatch(/data-testid="suite-build-grader-toolCalls"[\s\S]*?checked=""[\s\S]*?Tool calls[\s\S]*?In use/);
+		expect(html).not.toContain("Hidden tests run on the agent");
+		expect(html).toContain("checks the agent&#x27;s tool calls");
+	});
+	it("shows Saving... on a task row while its split is saved", () => {
+		mockSplit.state = { isLoading: true };
+		try {
+			const html = render(<BuildTab suite={qa} />);
+			expect(html).toMatch(/data-testid="suite-build-split-toggle-sso-plan"[^>]*>[\s\S]*?Saving\.\.\./);
+		} finally {
+			mockSplit.state = {};
+		}
 	});
 });

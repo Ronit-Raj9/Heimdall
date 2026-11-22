@@ -48,6 +48,50 @@ func ResolveInside(root, rel string) (string, error) {
 	return real, nil
 }
 
+// ResolveInsideFrom is ResolveInside for a root that is already a real path
+// (resolved once, for example by ResolveInside): it checks rel lexically and
+// walks its components from resolvedRoot with one os.Lstat each instead of
+// resolving the whole path from "/". When a component is a symlink, or rel
+// climbs with "..", it falls back to ResolveInside for that path, so links
+// get the same full resolution and containment check. It returns the same
+// path and the same errors as ResolveInside(resolvedRoot, rel).
+func ResolveInsideFrom(resolvedRoot, rel string) (string, error) {
+	if rel == "" {
+		return "", errors.New("empty path")
+	}
+	native := filepath.FromSlash(rel)
+	if filepath.IsAbs(native) || strings.HasPrefix(rel, "/") {
+		return "", fmt.Errorf("%s: want a path relative to the folder", rel)
+	}
+	if !filepath.IsLocal(native) {
+		return "", fmt.Errorf("%s: path leaves the folder", rel)
+	}
+	sep := string(filepath.Separator)
+	cur := resolvedRoot
+	for _, part := range strings.Split(native, sep) {
+		switch part {
+		case "", ".":
+			continue
+		case "..":
+			return ResolveInside(resolvedRoot, rel)
+		}
+		cur += sep + part
+		fi, err := os.Lstat(cur)
+		if errors.Is(err, fs.ErrNotExist) {
+			return "", fmt.Errorf("%s not found", rel)
+		}
+		if err != nil {
+			// Not a folder on the way, or unreadable: the full resolution
+			// gives the same answer ResolveInside would.
+			return ResolveInside(resolvedRoot, rel)
+		}
+		if fi.Mode()&fs.ModeSymlink != 0 {
+			return ResolveInside(resolvedRoot, rel)
+		}
+	}
+	return filepath.Clean(cur), nil
+}
+
 // ReadFileInside reads rel inside root through an os.Root, which follows
 // symlinks only while they stay inside root, so a link swapped in after
 // ResolveInside checked the path still cannot read a file outside it.

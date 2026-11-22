@@ -13,17 +13,24 @@ import (
 // the pack for lock drift: minutes for a built-in library pack with
 // thousands of tasks and gigabytes of audio. GET /suites therefore never
 // loads a pack in the request. It serves, per pack, the cached full summary
-// of the pack's current stamp; else the last full summary while a refresh
-// runs; else waits up to suiteListBudget for a fresh load and, failing that,
-// serves the cheap head summary (suite.yaml and suite.lock only).
+// of the pack's current stamp. After a change (a stale summary) it waits for
+// the refresh when the pack's last load fit in the wait, so a write to a
+// small organization pack shows on the next read, and serves the old summary
+// at once for a slow pack. With no summary at all it waits up to
+// suiteListBudget once per refresh and, failing that, serves the cheap head
+// summary (suite.yaml and suite.lock only).
 const (
 	// suiteListBudgetDefault is how long GET /suites waits for one uncached
 	// pack. Every pack has its own budget; the waits run side by side.
 	suiteListBudgetDefault = 4 * time.Second
 	// suiteSummaryTimeout bounds one background full summary.
 	suiteSummaryTimeout = 15 * time.Minute
-	// suiteLoadParallel is the most full summaries built at once.
-	suiteLoadParallel = 2
+	// suiteLoadParallel is the most organization pack summaries built at
+	// once; suiteLibraryLoadParallel the most library pack summaries. The
+	// two pools are separate, so a library rebuild never delays an
+	// organization pack.
+	suiteLoadParallel        = 2
+	suiteLibraryLoadParallel = 1
 )
 
 // suiteStamper is the optional SuiteSource side the list cache needs
@@ -40,9 +47,10 @@ type suiteStamper interface {
 // summaryCache holds full suite summaries process-wide, keyed by pack folder:
 // library packs are shared by every organization's handler.
 type summaryCache struct {
-	mu    sync.Mutex
-	slots map[string]*summarySlot
-	sem   chan struct{}
+	mu     sync.Mutex
+	slots  map[string]*summarySlot
+	orgSem chan struct{} // load slots of organization packs
+	libSem chan struct{} // load slots of library packs (heavy)
 }
 
 type summarySlot struct {
@@ -52,6 +60,11 @@ type summarySlot struct {
 
 	loadStamp string        // stamp of the refresh in flight, "" for none
 	loading   chan struct{} // closed when that refresh ends
+
+	// lastLoad is how long the last finished load took (zero before the
+	// first one): a stale read waits for a refresh only when the pack loads
+	// within the wait.
+	lastLoad time.Duration
 }
 
 var suiteSummaries = newSummaryCache(suiteLoadParallel)
@@ -59,18 +72,34 @@ var suiteSummaries = newSummaryCache(suiteLoadParallel)
 // suiteListBudget is suiteListBudgetDefault; tests shorten it.
 var suiteListBudget = suiteListBudgetDefault
 
+// newSummaryCache makes a cache with parallel organization load slots and
+// suiteLibraryLoadParallel library load slots.
 func newSummaryCache(parallel int) *summaryCache {
-	return &summaryCache{slots: map[string]*summarySlot{}, sem: make(chan struct{}, parallel)}
+	return &summaryCache{
+		slots:  map[string]*summarySlot{},
+		orgSem: make(chan struct{}, parallel),
+		libSem: make(chan struct{}, suiteLibraryLoadParallel),
+	}
 }
 
 // summaryLoad builds a full summary under ctx. ok false means the result is
 // not worth caching (the load ran out of time).
 type summaryLoad func(ctx context.Context) (sum schemas.SuiteSummary, ok bool)
 
-// get returns the full summary of dir at stamp, or the last one while a
-// refresh runs. With neither it starts a load and waits up to wait for it.
-// found is false when nothing could be served in time.
-func (c *summaryCache) get(dir, stamp string, load summaryLoad, wait time.Duration) (schemas.SuiteSummary, bool) {
+// get returns the full summary of dir at stamp. found is false when nothing
+// could be served in time.
+//
+//   - Fresh (a summary of stamp): returned at once.
+//   - Stale (a summary of another stamp): the refresh is started or joined.
+//     When the pack's last load took no longer than wait, get waits for it up
+//     to wait and returns the new summary if it landed, else the stale one;
+//     a slow or never measured pack gets the stale one at once.
+//   - None: when a refresh of stamp was already in flight before this call,
+//     not found at once (the caller serves the head summary; a load is never
+//     waited for twice); else the load starts and get waits up to wait.
+//
+// heavy loads (library packs) take the library load slot.
+func (c *summaryCache) get(dir, stamp string, load summaryLoad, wait time.Duration, heavy bool) (schemas.SuiteSummary, bool) {
 	c.mu.Lock()
 	slot := c.slots[dir]
 	if slot == nil {
@@ -82,16 +111,30 @@ func (c *summaryCache) get(dir, stamp string, load summaryLoad, wait time.Durati
 		c.mu.Unlock()
 		return sum, true
 	}
-	done := c.refreshLocked(dir, slot, stamp, load)
-	if slot.have { // stale: served while the refresh runs
+	joined := slot.loading != nil && slot.loadStamp == stamp
+	done := c.refreshLocked(slot, stamp, load, heavy)
+	if slot.have { // stale
 		sum := slot.sum
+		quick := slot.lastLoad > 0 && slot.lastLoad <= wait
 		c.mu.Unlock()
+		if !quick {
+			return sum, true
+		}
+		if fresh, ok := c.await(slot, stamp, done, wait); ok {
+			return fresh, true
+		}
 		return sum, true
 	}
 	c.mu.Unlock()
-	if wait <= 0 {
+	if joined || wait <= 0 {
 		return schemas.SuiteSummary{}, false
 	}
+	return c.await(slot, stamp, done, wait)
+}
+
+// await waits up to wait for done and returns slot's summary when it is of
+// stamp by then.
+func (c *summaryCache) await(slot *summarySlot, stamp string, done chan struct{}, wait time.Duration) (schemas.SuiteSummary, bool) {
 	t := time.NewTimer(wait)
 	defer t.Stop()
 	select {
@@ -107,25 +150,32 @@ func (c *summaryCache) get(dir, stamp string, load summaryLoad, wait time.Durati
 	return schemas.SuiteSummary{}, false
 }
 
-// refreshLocked starts a background load of dir at stamp unless one is in
+// refreshLocked starts a background load of slot at stamp unless one is in
 // flight for it, and returns the channel closed when it ends. c.mu is held.
-func (c *summaryCache) refreshLocked(dir string, slot *summarySlot, stamp string, load summaryLoad) chan struct{} {
+func (c *summaryCache) refreshLocked(slot *summarySlot, stamp string, load summaryLoad, heavy bool) chan struct{} {
 	if slot.loading != nil && slot.loadStamp == stamp {
 		return slot.loading
+	}
+	sem := c.orgSem
+	if heavy {
+		sem = c.libSem
 	}
 	done := make(chan struct{})
 	slot.loadStamp, slot.loading = stamp, done
 	go func() {
 		defer close(done)
-		c.sem <- struct{}{}
-		defer func() { <-c.sem }()
+		sem <- struct{}{}
+		defer func() { <-sem }()
 		ctx, cancel := context.WithTimeout(context.Background(), suiteSummaryTimeout)
 		defer cancel()
+		start := time.Now()
 		sum, ok := load(ctx)
+		took := time.Since(start)
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		if ok {
 			slot.have, slot.stamp, slot.sum = true, stamp, sum
+			slot.lastLoad = max(took, time.Nanosecond)
 		}
 		if slot.loading == done {
 			slot.loadStamp, slot.loading = "", nil
@@ -135,7 +185,8 @@ func (c *summaryCache) refreshLocked(dir string, slot *summarySlot, stamp string
 }
 
 // cachedSummary is the list entry of suite id through the cache, or ok false
-// when src has no stamper or nothing was ready within wait.
+// when src has no stamper or nothing was ready within wait. Library packs
+// load in their own slot.
 func (h *SuitesHandler) cachedSummary(id string, wait time.Duration) (schemas.SuiteSummary, bool) {
 	st, ok := h.suites.(suiteStamper)
 	if !ok {
@@ -145,7 +196,7 @@ func (h *SuitesHandler) cachedSummary(id string, wait time.Duration) (schemas.Su
 	if h.heldOutVisible { // held-out tasks are redacted unless visible: a separate entry
 		dir += "\x00held-out-visible"
 	}
-	return suiteSummaries.get(dir, stamp, h.fullSummary(id), wait)
+	return suiteSummaries.get(dir, stamp, h.fullSummary(id), wait, isBuiltinSuite(h.suites, id))
 }
 
 // fullSummary loads suite id and summarizes it, the slow path the cache

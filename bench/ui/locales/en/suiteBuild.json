@@ -11,18 +11,21 @@
 		"title": "1. How answers are checked",
 		"description": "Exact answer checks the agent's answer against yours with no model. Rubric judge asks a model you pin to grade the answer against your rubric.",
 		"fixed": "This benchmark checks code or workspace changes with its own tests. Its grader comes with its template; question-and-answer benchmarks can switch between exact answer and rubric judge.",
+		"fixedToolUse": "This benchmark checks the agent's tool calls with its own script. Its grader comes with the benchmark; question-and-answer benchmarks can switch between exact answer and rubric judge.",
 		"current": "In use",
 		"choice": {
 			"tests": "Tests",
 			"state": "State check",
 			"exact": "Exact answer",
-			"judge": "Rubric judge"
+			"judge": "Rubric judge",
+		"toolCalls": "Tool calls"
 		},
 		"hint": {
 			"tests": "Hidden tests run on the agent's code change.",
 			"state": "A script checks the state the agent left behind (database, files, tickets).",
 			"exact": "Matches the expected answer: exact, contains all, number, pattern or choice.",
-			"judge": "A pinned model grades each answer against your rubric."
+			"judge": "A pinned model grades each answer against your rubric.",
+		"toolCalls": "A script checks the tool calls the agent made and what the server answered."
 		},
 		"provider": "Judge provider",
 		"model": "Judge model",
@@ -153,7 +156,8 @@
 		"heldOut": "held out",
 		"public": "public",
 		"makeHeldOut": "Hold out",
-		"makePublic": "Make public"
+		"makePublic": "Make public",
+		"saving": "Saving..."
 	},
 	"readiness": {
 		"title": "4. Readiness checks",
