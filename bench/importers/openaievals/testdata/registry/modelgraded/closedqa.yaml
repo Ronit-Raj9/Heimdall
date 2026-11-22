@@ -1,0 +1,13 @@
+closedqa:
+  prompt: |-
+    You are assessing a submitted answer on a given task based on a criterion.
+    [Task]: {input}
+    [Submission]: {completion}
+    [Criterion]: {criteria}
+    Does the submission meet the criterion? Answer Y or N.
+  choice_strings: YN
+  choice_scores:
+    "Y": 1.0
+    "N": 0.0
+  input_outputs:
+    input: completion

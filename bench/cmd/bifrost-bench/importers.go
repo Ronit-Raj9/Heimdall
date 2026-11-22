@@ -17,6 +17,7 @@ import (
 	_ "github.com/maximhq/bifrost/bench/importers/longmemeval"
 	_ "github.com/maximhq/bifrost/bench/importers/marble" // X5b: MultiAgentBench (MARBLE)
 	_ "github.com/maximhq/bifrost/bench/importers/mcpmark"
+	_ "github.com/maximhq/bifrost/bench/importers/openaievals" // Z09: OpenAI Evals migration
 	_ "github.com/maximhq/bifrost/bench/importers/msibench"  // MSI-Bench v2 multi-speaker room calls
 	_ "github.com/maximhq/bifrost/bench/importers/skillpool" // L14: Skill-Usage 34k pool
 	_ "github.com/maximhq/bifrost/bench/importers/swebench"
