@@ -1,7 +1,8 @@
 import { Field, parseLabellers, selectClass } from "@/app/annotation/views/annotationView";
+import { humanExperimentName, suiteName } from "@/app/experiments/views/experimentBoard";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatCard, StatGrid } from "@/components/ui/statCard";
 import { StatusPill, type StatusTone } from "@/components/ui/statusPill";
@@ -18,7 +19,7 @@ import {
 	useResolveAnnotationItemMutation,
 	useUpdateAnnotationQueueMutation,
 } from "@/lib/store/apis/annotationApi";
-import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
+import { getBenchErrorMessage, useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import type {
 	AnnotationAgreement,
 	AnnotationItem,
@@ -27,10 +28,11 @@ import type {
 	AnnotationQueue,
 	AnnotationState,
 } from "@/lib/types/annotation";
+import type { ExperimentStatus } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Check, Tags, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 type T = ReturnType<typeof useTranslation<"annotation">>["t"];
@@ -177,7 +179,26 @@ export function Labeller({ queue }: { queue: AnnotationQueue }) {
 	}, [item, load, submit]);
 
 	if (!writable || !queue.can_label) return <EmptyNote testId="annotation-label-cannot">{t("label.cannotLabel")}</EmptyNote>;
-	if (queue.counts.total === 0) return <EmptyNote testId="annotation-label-no-items">{t("label.noItems")}</EmptyNote>;
+	if (queue.counts.total === 0)
+		return (
+			<div className="flex min-w-0 flex-col items-center gap-3">
+				<EmptyNote testId="annotation-label-no-items" className="w-full">
+					{t("label.noItems")}
+					{!queue.can_manage && ` ${t("label.askOwner")}`}
+				</EmptyNote>
+				{queue.can_manage && (
+					<Link
+						to="/annotation/$queueId"
+						params={{ queueId: queue.id }}
+						search={{ tab: "items" } as never}
+						className={buttonVariants({ size: "sm" })}
+						data-testid="annotation-label-add-runs"
+					>
+						{t("label.addRuns")}
+					</Link>
+				)}
+			</div>
+		);
 	const choices = choiceLabels(queue, t);
 
 	return (
@@ -434,49 +455,113 @@ export function ItemTable({ queue, items }: { queue: AnnotationQueue; items: Ann
 	);
 }
 
-function AddItems({ queue }: { queue: AnnotationQueue }) {
-	const { t } = useTranslation("annotation");
+/** When an experiment ended, for sorting: finished, else started, else frozen. */
+const endedAt = (e: ExperimentStatus) => e.finished_at || e.started_at || e.frozen_at || "";
+
+/**
+ * The experiments whose runs can fill a queue: finished ones on the queue's benchmark (any
+ * version), newest first. A queue with no benchmark takes every finished experiment. Pure.
+ */
+export function finishedRunsOf(experiments: readonly ExperimentStatus[], benchmark: string | undefined): ExperimentStatus[] {
+	const want = suiteName(benchmark);
+	return experiments
+		.filter((e) => e.state === "done" && (!want || suiteName(e.suite) === want))
+		.sort((a, b) => endedAt(b).localeCompare(endedAt(a)));
+}
+
+/** The body of POST /annotation/queues/{id}/items for one experiment. Pure. */
+export function addItemsBody(id: string, experiment: string, sample: number, stratify: boolean) {
+	return { id, experiment, sample: Math.max(0, Math.trunc(sample) || 0), stratify };
+}
+
+const dateOf = (iso: string, locale: string) => {
+	const d = new Date(iso);
+	return Number.isNaN(d.getTime()) ? "" : new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(d);
+};
+
+export function AddItems({ queue }: { queue: AnnotationQueue }) {
+	const { t, i18n } = useTranslation("annotation");
+	const { t: tx } = useTranslation("experimentsUx");
+	const list = useListExperimentsQuery();
 	const [add, added] = useAddAnnotationItemsMutation();
 	const [assign, assigned] = useAssignAnnotationItemsMutation();
-	const [experiment, setExperiment] = useState("");
+	const [picked, setPicked] = useState("");
 	const [sample, setSample] = useState(0);
 	const [stratify, setStratify] = useState(true);
+	const options = useMemo(() => finishedRunsOf(list.data?.experiments ?? [], queue.benchmark), [list.data, queue.benchmark]);
+	const experiment = options.some((e) => e.exp_id === picked) ? picked : (options[0]?.exp_id ?? "");
+	const benchmark = suiteName(queue.benchmark);
 	return (
 		<Section title={t("add.title")} description={t("add.description")} testId="annotation-add">
+			{list.isLoading ? (
+				<BlockSkeleton rows={2} testId="annotation-add-loading" />
+			) : list.error ? (
+				<LoadError title={t("add.loadError")} error={list.error} onRetry={() => void list.refetch()} testId="annotation-add-load-error" />
+			) : options.length === 0 ? (
+				<EmptyNote testId="annotation-add-none">
+					{benchmark ? t("add.none", { benchmark }) : t("add.noneAny")}{" "}
+					<Link
+						to="/evaluate"
+						search={(benchmark ? { suite: benchmark } : {}) as never}
+						className="text-primary hover:underline"
+						data-testid="annotation-add-evaluate"
+					>
+						{t("add.noneLink")}
+					</Link>
+				</EmptyNote>
+			) : null}
 			<form
 				className="bg-card flex min-w-0 flex-wrap items-end gap-3 rounded-xl border p-4"
 				onSubmit={(e) => {
 					e.preventDefault();
-					if (!experiment.trim()) return;
-					void add({ id: queue.id, experiment: experiment.trim(), sample: Math.max(0, Math.trunc(sample) || 0), stratify });
+					if (!experiment) return;
+					void add(addItemsBody(queue.id, experiment, sample, stratify));
 				}}
 			>
-				<Field label={t("add.experiment")}>
-					<Input
-						value={experiment}
-						onChange={(e) => setExperiment(e.target.value)}
-						placeholder={t("add.experimentPlaceholder")}
-						className="w-72"
-						data-testid="annotation-add-experiment"
-					/>
-				</Field>
-				<Field label={t("add.sample")}>
-					<Input
-						type="number"
-						min={0}
-						value={sample}
-						onChange={(e) => setSample(Number(e.target.value))}
-						className="w-28"
-						data-testid="annotation-add-sample"
-					/>
-				</Field>
-				<label className="flex h-9 items-center gap-2 text-sm">
-					<input type="checkbox" checked={stratify} onChange={(e) => setStratify(e.target.checked)} data-testid="annotation-add-stratify" />
-					{t("add.stratify")}
-				</label>
-				<Button type="submit" disabled={added.isLoading || !experiment.trim()} data-testid="annotation-add-submit">
-					{t("add.submit")}
-				</Button>
+				{options.length > 0 && (
+					<>
+						<Field label={t("add.experimentPick")}>
+							<select
+								className={cn(selectClass, "w-80 max-w-full")}
+								value={experiment}
+								onChange={(e) => setPicked(e.target.value)}
+								data-testid="annotation-add-experiment"
+							>
+								{options.map((e) => {
+									const name = humanExperimentName(e, (k, o) => String(tx(k as never, (o ?? {}) as never)));
+									const date = dateOf(endedAt(e), i18n.language);
+									return (
+										<option key={e.exp_id} value={e.exp_id}>
+											{date ? t("add.experimentOption", { name, date }) : name}
+										</option>
+									);
+								})}
+							</select>
+						</Field>
+						<Field label={t("add.sample")}>
+							<Input
+								type="number"
+								min={0}
+								value={sample}
+								onChange={(e) => setSample(Number(e.target.value))}
+								className="w-28"
+								data-testid="annotation-add-sample"
+							/>
+						</Field>
+						<label className="flex h-9 items-center gap-2 text-sm">
+							<input
+								type="checkbox"
+								checked={stratify}
+								onChange={(e) => setStratify(e.target.checked)}
+								data-testid="annotation-add-stratify"
+							/>
+							{t("add.stratify")}
+						</label>
+						<Button type="submit" disabled={added.isLoading || !experiment} data-testid="annotation-add-submit">
+							{t("add.submit")}
+						</Button>
+					</>
+				)}
 				{queue.assignment === "fixed" && (
 					<Button
 						type="button"
