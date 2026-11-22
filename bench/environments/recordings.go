@@ -181,6 +181,8 @@ func (e *dockerWorkspace) copyRecording(ctx context.Context, container, dir, ser
 		return fail("write spool: " + err.Error())
 	}
 	switch {
+	case runErr != nil && recordingPathMissing(errBuf.String()):
+		return fail(recordingMissingNote(f.Kind, f.Path))
 	case runErr != nil:
 		return fail("not written: " + truncate(strings.TrimSpace(errBuf.String()), 200))
 	case w.truncated:
@@ -191,9 +193,31 @@ func (e *dockerWorkspace) copyRecording(ctx context.Context, container, dir, ser
 		return fail("unpack: " + err.Error())
 	}
 	if len(recs) == 0 {
-		return fail("not written: no " + f.Kind + " file at " + f.Path)
+		return fail(recordingMissingNote(f.Kind, f.Path))
 	}
 	return recs
+}
+
+// recordingPathMissing reports whether docker cp failed because the path is
+// not in the container (as opposed to a daemon or timeout error).
+func recordingPathMissing(stderr string) bool {
+	s := strings.ToLower(stderr)
+	return strings.Contains(s, "could not find the file") || strings.Contains(s, "no such file") || strings.Contains(s, "no such container:path")
+}
+
+// recordingMissingNote is the plain note of a recording the service did not
+// write. The common cause is an image that cannot record (a browser image
+// without Heimdall's record.js launcher, a Playwright MCP server that
+// ignores contextOptions, a desktop image without ffmpeg) or an agent that
+// never used the screen. It never fails the run (docs/recordings.md).
+func recordingMissingNote(kind, p string) string {
+	switch kind {
+	case schemas.RecordingVideo:
+		return "no video at " + p + ": the agent may not have opened a page or screen, or the service image cannot record (a browser image needs Heimdall's record.js launcher and @playwright/mcp 0.0.83 or later, a desktop image needs ffmpeg). Rebuild the image from its template; see docs/recordings.md"
+	case schemas.RecordingHAR:
+		return "no HAR at " + p + ": the agent may not have opened a page, or the browser image cannot record (it needs Heimdall's record.js launcher and @playwright/mcp 0.0.83 or later). Rebuild the image from its template; see docs/recordings.md"
+	}
+	return "no " + kind + " file at " + p + ": the service did not write it"
 }
 
 // unpackRecording reads the docker cp tar of one recording into outDir:

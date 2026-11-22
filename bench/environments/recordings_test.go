@@ -3,6 +3,7 @@ package environments
 import (
 	"archive/tar"
 	"bufio"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 func recSpec(files ...schemas.RecordingFile) schemas.ServiceSpec {
@@ -203,5 +205,39 @@ func TestRecordingIndexOutsideState(t *testing.T) {
 func TestImageMime(t *testing.T) {
 	if ImageMime([]byte("\x89PNG\r\n\x1a\nx")) != "image/png" || ImageMime([]byte{0xFF, 0xD8, 0xFF, 1}) != "image/jpeg" || ImageMime([]byte("GIF8")) != "" {
 		t.Error("magic")
+	}
+}
+
+// TestCopyRecordingMissingIsPlainNote: an image that cannot record (no
+// launcher, an old Playwright MCP, no ffmpeg) writes no file; the record
+// carries a plain note naming the fix, not docker's raw error, and the run
+// goes on (H10).
+func TestCopyRecordingMissingIsPlainNote(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "docker")
+	script := "#!/bin/sh\necho \"Error response from daemon: Could not find the file /tmp/rec/video in container bench-r_1-svc-browser\" >&2\nexit 1\n"
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	e := newDockerWorkspace(DockerWorkspaceConfig{Docker: utils.Docker{Binary: bin}, Logger: schemas.NoopLogger{}})
+	var total int64
+	for _, f := range []schemas.RecordingFile{
+		{ID: "video", Path: "/tmp/rec/video", Kind: schemas.RecordingVideo},
+		{ID: "har", Path: "/tmp/rec/har", Kind: schemas.RecordingHAR},
+	} {
+		recs := e.copyRecording(context.Background(), "bench-r_1-svc-browser", dir, "browser", f, &total)
+		if len(recs) != 1 || recs[0].Error == "" {
+			t.Fatalf("%s: records %+v", f.ID, recs)
+		}
+		msg := recs[0].Error
+		if strings.Contains(msg, "Error response") || !strings.Contains(msg, "docs/recordings.md") || !strings.Contains(msg, "record.js") {
+			t.Errorf("%s note %q", f.ID, msg)
+		}
+	}
+	if !strings.Contains(recordingMissingNote(schemas.RecordingVideo, "/tmp/desktop/rec"), "ffmpeg") {
+		t.Error("video note does not name ffmpeg")
+	}
+	if recordingPathMissing("Error response from daemon: timeout") {
+		t.Error("a daemon error read as a missing path")
 	}
 }
