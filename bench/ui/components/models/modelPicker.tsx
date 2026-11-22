@@ -58,6 +58,25 @@ export function providersFor(purpose: ModelPurpose, catalog: ModelProviderInfo[]
 	});
 }
 
+/**
+ * Model ids that cannot serve a chat loop: speech, transcription, image, embedding, moderation,
+ * realtime and search models. The server's chatModelID (handlers/models_catalog.go) uses the same
+ * pattern; keep the two in step.
+ */
+const NON_CHAT_RE =
+	/(^|[-_/.:])(tts|transcribe|whisper|embed|embedding|image|dall-e|moderation|realtime|audio|speech|sora|search-preview)([-_/.:]|$)/i;
+
+/**
+ * Whether a model id can serve a chat loop (agent, judge or simulated user). A model the catalog
+ * lists for the provider counts when one of its purposes is a chat purpose; any other id counts
+ * unless its name says it is a speech, image, embedding or similar model.
+ */
+export function isChatModelId(id: string, catalog: ModelProviderInfo[], provider: ProviderId): boolean {
+	const listed = catalog.find((p) => p.id === provider)?.models?.find((m) => m.id === id);
+	if (listed) return listed.purposes.some((p) => CHAT_PURPOSES.includes(p));
+	return !NON_CHAT_RE.test(id) && !id.toLowerCase().startsWith("chatgpt-image");
+}
+
 /** Suggested model ids for a provider and purpose: the key's own model list first, else the catalog, cheapest first. */
 export function modelSuggestions(provider: ProviderId, purpose: ModelPurpose, catalog: ModelProviderInfo[], key?: ModelKey): string[] {
 	if (key && key.models.length > 0) return key.models;
@@ -77,7 +96,7 @@ export interface ModelChoices {
 
 /**
  * The model dropdown's options for a provider: first what the org's keys reported (a key's own
- * allowed models, then the ids its provider listed at the last successful test), then the
+ * allowed models, then the chat ids its provider listed at the last successful test), then the
  * catalog's suggestions. With key set only that key counts; invalid keys never do.
  */
 export function modelChoices(
@@ -97,7 +116,9 @@ export function modelChoices(
 		}
 	};
 	for (const k of usable) for (const m of k.models) add(reported, m);
-	if (CHAT_PURPOSES.includes(purpose)) for (const k of usable) for (const m of k.models_available ?? []) add(reported, m);
+	// A provider's raw listing also carries speech, image and embedding models; a chat list keeps chat models only.
+	if (CHAT_PURPOSES.includes(purpose))
+		for (const k of usable) for (const m of k.models_available ?? []) if (isChatModelId(m, catalog, provider)) add(reported, m);
 	const suggested: string[] = [];
 	for (const m of modelSuggestions(provider, purpose, catalog)) add(suggested, m);
 	return { reported, suggested };

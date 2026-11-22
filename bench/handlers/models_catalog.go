@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"regexp"
+	"strings"
+
 	"github.com/maximhq/bifrost/bench/keystore"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
@@ -121,9 +124,11 @@ func defaultModel(keys []ModelKeyView) *ModelRefView {
 			continue
 		}
 		if k.Status == keystore.StatusOK && len(k.ModelsAvailable) > 0 {
-			model, rank := reportedModel(providers[k.Provider], k.ModelsAvailable)
-			consider(model, rank-reportedBonus)
-			continue
+			// A key that reported no chat model falls back to the catalog suggestions.
+			if model, rank := reportedModel(providers[k.Provider], k.ModelsAvailable); model != "" {
+				consider(model, rank-reportedBonus)
+				continue
+			}
 		}
 		// A custom endpoint's static list is only examples (it serves
 		// whatever its server serves), so it never sets the default.
@@ -144,8 +149,33 @@ const reportedBonus = 1 << 20
 // preferredReported is picked first when a key reports it.
 const preferredReported = "gpt-6.2-sol"
 
+// nonChatModelRE matches model ids that cannot serve a chat loop: speech,
+// transcription, image, embedding, moderation, realtime and search models.
+// The UI's isChatModelId (ui/components/models/modelPicker.tsx) uses the same
+// pattern; keep the two in step.
+var nonChatModelRE = regexp.MustCompile(`(?i)(^|[-_/.:])(tts|transcribe|whisper|embed|embedding|image|dall-e|moderation|realtime|audio|speech|sora|search-preview)([-_/.:]|$)`)
+
+// chatModelID reports whether model id of provider p can serve a chat loop
+// (agent, judge or simulated user). A model the catalog lists counts when
+// one of its purposes is a chat purpose; any other id counts unless its name
+// says it is a speech, image, embedding or similar model.
+func chatModelID(p ModelProviderInfo, id string) bool {
+	for _, o := range p.Models {
+		if o.ID == id {
+			for _, c := range chatPurposes {
+				if hasPurpose(o, c) {
+					return true
+				}
+			}
+			return false
+		}
+	}
+	return !nonChatModelRE.MatchString(id) && !strings.HasPrefix(strings.ToLower(id), "chatgpt-image")
+}
+
 // reportedModel picks from the models a key reported: the preferred model when
-// present, else the cheapest suggested agent model it serves, else the first.
+// present, else the cheapest suggested agent model it serves, else the first
+// one that can serve a chat loop, else "" (the caller then uses the catalog).
 func reportedModel(p ModelProviderInfo, avail []string) (string, int) {
 	have := map[string]bool{}
 	for _, m := range avail {
@@ -163,7 +193,12 @@ func reportedModel(p ModelProviderInfo, avail []string) (string, int) {
 	if best != "" {
 		return best, bestRank
 	}
-	return avail[0], 500
+	for _, m := range avail {
+		if chatModelID(p, m) {
+			return m, 500
+		}
+	}
+	return "", 500
 }
 
 func hasPurpose(o ModelOption, p string) bool {

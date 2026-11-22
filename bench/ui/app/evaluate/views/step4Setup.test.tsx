@@ -13,6 +13,7 @@ import {
 	estimateText,
 	groupFaults,
 	powerText,
+	specProblem,
 	specReady,
 	faultsNotApplying,
 	nothingRunsReason,
@@ -277,7 +278,7 @@ describe("Step4Setup", () => {
 		const html = render(<Step4Setup spec={two} onChange={() => undefined} />);
 		expect(html).toContain('data-testid="step4-arm-A"');
 		expect(html).toContain('data-testid="step4-arm-B"');
-		expect(html).toContain("Pick benchmarks and a model");
+		expect(html).toContain("Pick at least one benchmark.");
 		expect(q.estimateArgs[0]).toEqual([two, { skip: true }]);
 		expect(q.estimateArgs[1]).toEqual([presetsRequest(two), { skip: true }]);
 	});
@@ -634,5 +635,41 @@ describe("Step4Setup fix wave F26", () => {
 		expect(sent).toEqual([three]);
 		vi.advanceTimersByTime(2000);
 		expect(sent).toHaveLength(1);
+	});
+});
+describe("Step4Setup fix wave 2 (G10)", () => {
+	const estimateSection = (html: string) => html.slice(html.indexOf('data-testid="step4-estimate"'));
+
+	it("names the real reason the spec is not ready", () => {
+		expect(specProblem(spec({ benchmarks: [] }))).toBe("Pick at least one benchmark.");
+		expect(specProblem(spec({ pack: "memory", benchmarks: [] }))).toBe("");
+		expect(specProblem(spec({ arms: [{ label: "A", agent: "codex", model: "" }] }))).toBe("Pick a model for setup A.");
+		expect(specProblem(spec({ arms: [{ label: "A", agent: "bot", model: "" }] }), new Set(["bot"]))).toBe("");
+		const noFallback = spec({ failover: { enabled: true, fallbacks: [] } });
+		expect(specProblem(noFallback)).toBe("Pick a fallback model.");
+		expect(specReady(noFallback)).toBe(false);
+		expect(specReady(spec())).toBe(true);
+	});
+
+	it("failover on without fallback shows Pick a fallback model. in the estimate box", () => {
+		const html = render(<Step4Setup spec={spec({ failover: { enabled: true, fallbacks: [] } })} onChange={() => undefined} />);
+		const box = estimateSection(html);
+		expect(box).toContain("Pick a fallback model.");
+		expect(box).not.toContain("Pick benchmarks and a model to see an estimate.");
+	});
+
+	it("worker_slots 2 and 4 picked shows the note", () => {
+		q.estimate = okQuery({
+			runs: 20,
+			est_cost_usd: { low: 1, high: 2, known: true },
+			est_minutes: { low: 10, high: 25 },
+			slots: { concurrency: 4, org_slots: 0, parallel: 4, worker_slots: 2 },
+		});
+		const html = render(<Step4Setup spec={spec({ concurrency: 4 })} onChange={() => undefined} />);
+		expect(html).toContain('data-testid="step4-concurrency-note"');
+		expect(html).toContain("Your worker runs 2 runs at a time, so 4 runs at once is no faster than 2.");
+		expect(render(<Step4Setup spec={spec({ concurrency: 2 })} onChange={() => undefined} />)).not.toContain("step4-concurrency-note");
+		q.estimate = okQuery({ runs: 20, est_cost_usd: { low: 1, high: 2, known: true }, est_minutes: { low: 10, high: 25 } });
+		expect(render(<Step4Setup spec={spec({ concurrency: 8 })} onChange={() => undefined} />)).not.toContain("step4-concurrency-note");
 	});
 });

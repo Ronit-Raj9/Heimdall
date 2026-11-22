@@ -7,12 +7,14 @@ import { useSession } from "@/lib/session/sessionContext";
 import { benchApi } from "@/lib/store/apis/benchApi";
 import { authoringError, useCreateSuiteMutation } from "@/lib/store/apis/suiteAuthoringApi";
 import { useSetSuiteGraderMutation } from "@/lib/store/apis/suiteBuildApi";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import { useAppDispatch } from "@/lib/store/hooks";
 import type { Job } from "@/lib/types/bench";
 import { SUITE_OPS_KINDS } from "@/lib/types/suiteops";
 import { cn } from "@/lib/utils";
-import { useCallback, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { fw05 } from "./fw05I18n";
 
 // Lane Y13: the "Your own tasks" card of wizard step 3. Creates a private question-and-answer
 // benchmark, imports the customer's rows through the Build tab's import form, runs the readiness
@@ -26,6 +28,31 @@ export function benchmarkSlug(name: string): string {
 		.replace(/^-+|-+$/g, "")
 		.slice(0, 64)
 		.replace(/-+$/g, "");
+}
+
+/**
+ * Why the name cannot become a new benchmark, checked before Create; "" when it can. `suites` is the
+ * benchmark list (built-in and the organization's); while it loads pass [] and the server decides.
+ */
+export function nameProblem(slug: string, name: string, suites: readonly { id: string; builtin?: boolean }[]): string {
+	if (!slug) return name.trim() ? fw05("own.noLetters") : "";
+	const same = suites.find((s) => s.id === slug);
+	if (!same) return "";
+	if (same.builtin) return fw05("own.builtinTaken", { id: slug });
+	const ids = new Set(suites.map((s) => s.id));
+	let n = 2;
+	while (ids.has(`${slug}-${n}`)) n++;
+	return fw05("own.orgTaken", { id: slug, suggest: `${slug}-${n}` });
+}
+
+/**
+ * Asks for the light benchmark list and hands the name's problem to children. It is mounted only
+ * once a name is typed, so a closed or empty card sends no request. While the list loads the
+ * existing-id check is skipped and the server's checks decide.
+ */
+function WithNameProblem({ slug, name, children }: { slug: string; name: string; children: (problem: string) => ReactNode }) {
+	const list = useGetSuitesLightQuery();
+	return <>{children(nameProblem(slug, name, list.data?.suites ?? []))}</>;
 }
 
 /** Whether a create error means the id is already used. */
@@ -44,15 +71,17 @@ export interface OwnTasksCardProps {
 	initialOpen?: boolean;
 	/** A benchmark already created by this card: the card resumes at the import step. */
 	initialSuite?: { id: string; grader: "exact" | "judge" };
+	/** The Name box's starting text (tests). */
+	initialName?: string;
 }
 
-export function OwnTasksCard({ onAdd, initialOpen = false, initialSuite }: OwnTasksCardProps) {
+export function OwnTasksCard({ onAdd, initialOpen = false, initialSuite, initialName = "" }: OwnTasksCardProps) {
 	const { t } = useTranslation("evaluate");
 	const { t: tb } = useTranslation("suiteBuild");
 	const session = useSession();
 	const dispatch = useAppDispatch();
 	const [open, setOpen] = useState(initialOpen || Boolean(initialSuite));
-	const [name, setName] = useState("");
+	const [name, setName] = useState(initialName);
 	const [grader, setGrader] = useState<Grader>(initialSuite?.grader ?? "exact");
 	const [judge, setJudge] = useState({ provider: "", model: "", votes: 1 });
 	const [stage, setStage] = useState<Stage>(initialSuite ? "rows" : "setup");
@@ -63,6 +92,15 @@ export function OwnTasksCard({ onAdd, initialOpen = false, initialSuite }: OwnTa
 	const [createSuite, created] = useCreateSuiteMutation();
 	const [setSuiteGrader, graded] = useSetSuiteGraderMutation();
 	const slug = benchmarkSlug(name);
+	// The name is checked against built-in and organization benchmarks before Create (the server checks again).
+	const checkName = (show: (problem: string) => ReactNode) =>
+		name.trim() !== "" && !suiteId ? (
+			<WithNameProblem slug={slug} name={name}>
+				{show}
+			</WithNameProblem>
+		) : (
+			show("")
+		);
 	const judgeReady = grader === "exact" || (judge.provider.trim() !== "" && judge.model.trim() !== "");
 	const report = useMemo(() => (job ? readinessReport(job.result) : null), [job]);
 	const ready = report ? report.tasks.filter((x) => x.ready).length : 0;
@@ -121,8 +159,15 @@ export function OwnTasksCard({ onAdd, initialOpen = false, initialSuite }: OwnTa
 						<Input value={name} disabled={Boolean(suiteId)} placeholder={t("benchmarks.own.namePlaceholder")} onChange={(e) => setName(e.target.value)} data-testid="step3-own-name" />
 						{slug && (
 							<span className="text-muted-foreground font-mono text-xs" data-testid="step3-own-slug">
-								{t("benchmarks.own.id", { id: slug })}
+								{slug === name.trim().toLowerCase() ? t("benchmarks.own.id", { id: slug }) : fw05("own.madeFrom", { id: slug })}
 							</span>
+						)}
+						{checkName((problem) =>
+							problem ? (
+								<span className="text-chart-error-ink text-xs" role="alert" data-testid="step3-own-name-problem">
+									{problem}
+								</span>
+							) : null,
 						)}
 					</label>
 					<fieldset className="flex min-w-0 flex-col gap-2">
@@ -145,14 +190,16 @@ export function OwnTasksCard({ onAdd, initialOpen = false, initialSuite }: OwnTa
 						{grader === "judge" && <JudgeFields {...judge} onChange={(p) => setJudge((j) => ({ ...j, ...p }))} t={tb as BuildT} />}
 					</fieldset>
 					<div>
-						<Button
-							disabled={!slug || !judgeReady || created.isLoading || graded.isLoading}
-							isLoading={created.isLoading || graded.isLoading}
-							onClick={() => void create()}
-							dataTestId="step3-own-create"
-						>
-							{t("benchmarks.own.create")}
-						</Button>
+						{checkName((problem) => (
+							<Button
+								disabled={!slug || problem !== "" || !judgeReady || created.isLoading || graded.isLoading}
+								isLoading={created.isLoading || graded.isLoading}
+								onClick={() => void create()}
+								dataTestId="step3-own-create"
+							>
+								{t("benchmarks.own.create")}
+							</Button>
+						))}
 					</div>
 					{createError && (
 						<p role="alert" className="text-chart-error-ink text-xs" data-testid="step3-own-error">

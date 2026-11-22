@@ -18,6 +18,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useEvaluateDraft } from "./evaluateDraft";
 import { OwnTasksCard } from "./ownTasks";
+import { fw05 } from "./fw05I18n";
 
 // Lane A12: wizard step 3, "Benchmarks". Pick a pack or any set of single benchmarks. Benchmarks the
 // chosen agent cannot run are greyed out with the reason from /agents/{id}/compatibility. In an A/B
@@ -378,6 +379,16 @@ export function Step3BenchmarksView({
 							const runnable = packSelection(p, suites, compat);
 							const tasks = runnable.reduce((n, id) => n + (ready.get(id) ?? 0), 0);
 							const active = pack === p.id;
+							// Say whose counts the card shows: every member, the ones the agent can run, or none and why.
+							const counts = { benchmarks: plural(members.length, "benchmark"), tasks: plural(tasks, "ready task") };
+							const firstReason = members.map((id) => incompatibleReason(compatFor(compat, id))).find(Boolean) ?? "";
+							const why = firstReason.replace(/^agent .* cannot run benchmark [^:]*:\s*/i, "").replace(/^./, (c) => c.toLowerCase());
+							const countText =
+								runnable.length >= members.length
+									? fw05("pack.all", counts)
+									: runnable.length === 0
+										? fw05("pack.none", { benchmarks: counts.benchmarks, reason: why })
+										: fw05("pack.some", { ...counts, runnable: String(runnable.length) });
 							return (
 								<button
 									key={p.id}
@@ -395,9 +406,8 @@ export function Step3BenchmarksView({
 									<span className="text-muted-foreground block truncate text-xs">
 										{PACK_DESCRIPTION[p.id] ?? `${CAPABILITY_LABEL[p.capability as BenchmarkCapability] ?? p.capability} benchmarks.`}
 									</span>
-									<span className="text-muted-foreground mt-1.5 block text-xs tabular-nums">
-										{plural(members.length, "benchmark")}
-										{runnable.length < members.length ? ` (${runnable.length} runnable)` : ""} · {plural(tasks, "ready task")}
+									<span className="text-muted-foreground mt-1.5 block text-xs tabular-nums" data-testid={`step3-pack-${p.id}-counts`}>
+										{countText}
 									</span>
 								</button>
 							);

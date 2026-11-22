@@ -14,13 +14,14 @@ import { BudgetAdvice } from "./budgetAdvice";
 import { defaultName, useEvaluateDraft, type EvaluateDraftContextValue } from "./evaluateDraft";
 import { fw05 } from "./fw05I18n";
 import { OWN_MODEL_LABEL, useOwnModelAgents } from "./ownModel";
-import { FAULTS, specReady } from "./step4Setup";
+import { FAULTS, specProblem } from "./step4Setup";
 
 /** Wizard step 5: a plain summary of the evaluation, an optional budget and the Launch button. */
 
 function armText(a: EvaluationArm): string {
 	const agent = a.agent || "your agent";
-	const version = a.version ? ` v${a.version}` : "";
+	// No version means the latest one; the number is not known here without asking the server.
+	const version = a.version ? ` v${a.version}` : a.agent ? fw05("launch.latestVersion") : "";
 	const model = a.model ? ` on ${a.provider ? `${a.provider}/` : ""}${a.model}` : a.agent ? ` on ${OWN_MODEL_LABEL}` : "";
 	return `${agent}${version}${model}`;
 }
@@ -69,6 +70,20 @@ export function summaryLines(spec: EvaluationSpec, catalog: readonly FaultCatalo
 
 /** The server's spend cap per benchmark when an evaluation sets no budget (EvaluationDefaultBenchmarkBudget). */
 export const DEFAULT_BENCHMARK_BUDGET = 5;
+
+/** The most one evaluation may spend (the server's EvaluationMaxBudget). */
+export const MAX_BUDGET = 1000;
+
+/** What is wrong with the budget box text, in plain words; "" when it is blank (the default) or a valid amount. */
+export function budgetProblem(text: string): string {
+	const t = text.trim();
+	if (t === "") return "";
+	const n = Number(t);
+	if (!Number.isFinite(n)) return fw05("launch.budgetNotNumber");
+	if (n <= 0) return fw05("launch.budgetNotPositive", { cap: String(DEFAULT_BENCHMARK_BUDGET) });
+	if (n > MAX_BUDGET) return fw05("launch.budgetTooHigh", { max: String(MAX_BUDGET) });
+	return "";
+}
 
 /** Budget box text to a spec value: blank or not a positive number means no budget. */
 export function parseBudget(text: string): number | undefined {
@@ -136,10 +151,14 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 	const navigate = useNavigate();
 	const [create, state] = useCreateEvaluationMutation();
 	const [budget, setBudget] = useState(spec.budget_usd ? String(spec.budget_usd) : "");
-	const ready = specReady(spec, useOwnModelAgents());
+	const problem = specProblem(spec, useOwnModelAgents());
+	const ready = problem === "";
+	const budgetIssue = budgetProblem(budget);
 	const estimate = useEstimateEvaluationQuery(spec, { skip: !ready });
 	const catalog = useGetBenchFaultsQuery();
 	const faultCatalog = catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS;
+	// A bad budget is not the default budget: the summary leaves the budget line out until it is fixed.
+	const summary = budgetIssue ? summaryLines(spec, faultCatalog).slice(0, -1) : summaryLines(spec, faultCatalog);
 	const draft = useDraftOrNull();
 	const [ownName, setOwnName] = useState("");
 	const nameValue = draft ? draft.draft.name : ownName;
@@ -147,6 +166,9 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 	const onName = draft ? draftNameSetter(draft) : (name: string) => (setOwnName(name), onChange({ ...spec, name }));
 	const advice = estimate.data?.budget;
 	const cost = estimate.data?.est_cost_usd;
+	const typedBudget = parseBudget(budget);
+	const aboveSuggested =
+		!budgetIssue && typedBudget !== undefined && advice && advice.max_usd > 0 && typedBudget > advice.max_usd ? advice.max_usd : 0;
 	const fetching = Boolean(estimate.isFetching);
 	const basis =
 		estimate.data && !fetching && (cost?.known || estimate.data.from_library) ? (estimate.data.from_library ? "library" : "own") : null;
@@ -177,7 +199,7 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 			<section className="flex flex-col gap-2">
 				<h3 className="text-base font-semibold">What will happen</h3>
 				<ul className="list-disc space-y-1 pl-5 text-sm" data-testid="step5-summary">
-					{summaryLines(spec, faultCatalog).map((line) => (
+					{summary.map((line) => (
 						<li key={line}>{line}</li>
 					))}
 				</ul>
@@ -189,10 +211,10 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 				</label>
 				<input
 					id="step5-budget"
-					type="number"
-					min={0}
-					step="0.5"
+					type="text"
 					inputMode="decimal"
+					aria-invalid={budgetIssue ? true : undefined}
+					aria-describedby={budgetIssue ? "step5-budget-problem" : undefined}
 					className="border-input bg-background h-8 w-32 rounded-md border px-2 text-sm"
 					placeholder={`$${DEFAULT_BENCHMARK_BUDGET} per benchmark`}
 					value={budget}
@@ -203,6 +225,16 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 					}}
 					data-testid="step5-budget"
 				/>
+				{budgetIssue && (
+					<span id="step5-budget-problem" className="text-destructive text-xs" role="alert" data-testid="step5-budget-problem">
+						{budgetIssue}
+					</span>
+				)}
+				{aboveSuggested > 0 && (
+					<span className="text-chart-warning-ink text-xs" role="status" data-testid="step5-budget-above-max">
+						{fw05("launch.budgetAboveSuggested", { max: `$${aboveSuggested}` })}
+					</span>
+				)}
 				<span className="text-muted-foreground text-xs" data-testid="step5-budget-help">
 					{spec.budget_usd
 						? "Split evenly over the benchmarks; each one stops starting runs when its share is spent."
@@ -233,10 +265,14 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 			) : null}
 
 			<div>
-				<Button onClick={() => void launch()} disabled={!ready || state.isLoading} data-testid="step5-launch-button">
+				<Button onClick={() => void launch()} disabled={!ready || budgetIssue !== "" || state.isLoading} data-testid="step5-launch-button">
 					{state.isLoading ? "Launching..." : "Launch evaluation"}
 				</Button>
-				{!ready && <p className="text-muted-foreground mt-1 text-xs">Pick benchmarks and a model for every setup first.</p>}
+				{!ready && (
+					<p className="text-muted-foreground mt-1 text-xs" data-testid="step5-not-ready">
+						{problem}
+					</p>
+				)}
 			</div>
 		</div>
 	);
