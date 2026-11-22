@@ -78,3 +78,23 @@ second feature's tests fail.
   offline; the images already hold the dependencies.
 - **Trusted runner.** The runner comes from the task folder, not from the
   image's `/usr/local/bin/runner.sh`, which a root agent could change.
+
+## Library admission (lane L11, 2026-11-22)
+
+All 652 pairs are imported into the built-in suite `cooperbench`. A starter
+set of 44 pairs across 15 task images was admitted on the fleet with
+reference runs; 32 are ready, 12 stay drafts:
+
+- `reference_1` fails offline (reward 0, no tests collected): pillow task25,
+  task68, task290 (x2), openai-tiktoken task0 (x2), huggingface-datasets
+  task3997, llama-index task18813, dspy task8587, react-hook-form task85.
+  Their runners rebuild native code or fetch packages, which the network-less
+  verifier cannot do.
+- `mutant_1` passes (tests do not separate the features): go-chi task27 f1-f2.
+- Static validation: dspy task8635 f4-f5 instruction has a high-entropy
+  `TIP_KEY` string the secret scanner flags.
+
+The other 608 pairs are unadmitted (not yet checked). Tasks on the heaviest
+images (dottxt-ai-outlines, typst, huggingface-datasets task6252/task7309)
+were left out of the starter set for fleet disk space, not because they
+cannot run.
