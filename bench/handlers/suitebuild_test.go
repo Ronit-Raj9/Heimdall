@@ -34,7 +34,7 @@ func newBuildClient(t *testing.T) *authoringClient {
 		Upload:   []lib.Middleware{lib.BodyLimit(testMode, lib.MaxUploadBytes)},
 	}
 	orgAreasMu.Lock()
-	areas := []func(OrgEnv, *router.Router){orgAreas["suiteauthoring"], orgAreas["suitebuild"]}
+	areas := []func(OrgEnv, *router.Router){orgAreas["suiteauthoring"], orgAreas["suitebuild"], orgAreas["scenariorows"]}
 	orgAreasMu.Unlock()
 	for _, a := range areas {
 		a(env, r)

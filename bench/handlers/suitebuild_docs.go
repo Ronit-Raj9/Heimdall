@@ -16,3 +16,12 @@ func init() {
 			Auth:    AuthWrite, Request: TaskSplitRequest{}, Response: TaskSplitResult{}},
 	)
 }
+
+// Scenario rows (lane Y14): route docs.
+func init() {
+	APIRoutes = append(APIRoutes,
+		RouteDoc{Method: "POST", Path: APIPrefix + "/suites/{id}/scenario-rows", Tag: "suites",
+			Summary: "Add support tasks with a simulated customer and a declarative checks.yaml from CSV or JSON Lines scenario rows; dry_run previews and writes nothing",
+			Auth:    AuthWrite, Request: ScenarioRowsRequest{}, Status: fasthttp.StatusCreated, Response: ScenarioRowsResult{}},
+	)
+}
