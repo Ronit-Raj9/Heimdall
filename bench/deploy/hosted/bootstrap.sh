@@ -4,20 +4,22 @@
 #
 #   deploy/hosted/bootstrap.sh --domain heimdall.example.com --email ops@example.com \
 #       --owner-email you@example.com [--owner-name "Your Name"] [--owner-org "Acme"] \
-#       [--demo-runner] [--no-build]
+#       [--no-build]
 #
 # Steps:
 #   1. deploy/hosted/.env: created from .env.example with random database and
 #      gateway secrets (chmod 600); --domain and --email fill in the site.
 #      HEIMDALL_MASTER_KEY is generated when missing, never replaced.
-#   2. build the server image (and the runner image with --demo-runner);
-#      --no-build uses the images already there (HEIMDALL_IMAGE)
+#   2. build the server image; --no-build uses the images already there
+#      (HEIMDALL_IMAGE). The shared worker (profile shared-runner) is set up
+#      separately: docs/hosting.md, Shared worker
 #   3. start Postgres, apply database migrations (bifrost-bench db migrate)
 #   4. first owner account and its organization (bifrost-bench user
 #      create); the generated password is printed once
 #   5. no demo organization: a hosted install requires sign-in for every
-#      organization and has no public demo (--demo-runs and --no-demo are
-#      still accepted and ignored, so older commands keep working)
+#      organization and has no public demo (--demo-runs, --no-demo and
+#      --demo-runner are still accepted and ignored, so older commands keep
+#      working)
 #   6. start everything and wait for health; print the URL
 set -euo pipefail
 # shellcheck source=lib.sh
@@ -28,7 +30,7 @@ usage() {
 	exit "${1:-0}"
 }
 
-domain='' email='' owner_email='' owner_name='' owner_org='' demo_flag='' demo_runner='' build=1
+domain='' email='' owner_email='' owner_name='' owner_org='' demo_flag='' build=1
 while [ $# -gt 0 ]; do
 	case $1 in
 	--domain) domain=${2:?--domain needs a value}; shift 2 ;;
@@ -38,7 +40,7 @@ while [ $# -gt 0 ]; do
 	--owner-org) owner_org=${2:?--owner-org needs a value}; shift 2 ;;
 	--demo-runs) : "${2:?--demo-runs needs a directory}"; demo_flag=1; shift 2 ;; # retired, ignored
 	--no-demo) shift ;;                                                         # retired: there is never a demo
-	--demo-runner) demo_runner=1; shift ;;
+	--demo-runner) demo_flag=1; shift ;;                                         # retired, ignored
 	--no-build) build=''; shift ;;
 	-h | --help) usage 0 ;;
 	*) printf 'unknown argument: %s\n\n' "$1" >&2; usage 64 ;;
@@ -71,18 +73,10 @@ perm=$(stat -c %a "$ENV_FILE")
 [ "$perm" = 600 ] || { log "tightening $ENV_FILE from $perm to 600"; chmod 600 "$ENV_FILE"; }
 require_configured
 domain=$(env_get HEIMDALL_DOMAIN)
-if [ -n "$demo_runner" ]; then
-	runner_dir=$(env_get HEIMDALL_RUNNER_DIR)
-	runner_dir=${runner_dir:-/var/lib/heimdall-runner}
-	[ -d "$runner_dir" ] || die "create the demo runner's data folder first: sudo install -d -o 10001 -g 10001 -m 750 $runner_dir"
-fi
 
 # 2. Images.
 if [ -z "$build" ]; then
 	log "--no-build: using the images already present"
-elif [ -n "$demo_runner" ]; then
-	log "building images (first build takes a few minutes: npm ci, vite, go build)"
-	HEIMDALL_PROFILES=demo-runner hc build heimdall demo-runner
 else
 	log "building the server image (first build takes a few minutes: npm ci, vite, go build)"
 	hc build heimdall
@@ -126,18 +120,12 @@ fi
 # organization left over from an older bootstrap is ignored by the server
 # (anonymous visitors never reach it) and can be deleted by its owner.
 if [ -n "$demo_flag" ]; then
-	log "--demo-runs is ignored: hosted installs have no public demo organization"
+	log "--demo-runs and --demo-runner are ignored: hosted installs have no demo organization or demo runner"
 fi
 
-# 6. Everything up. The demo runner joins only once its token is set.
-if [ -n "$demo_runner" ] && [ -n "$(env_get HEIMDALL_DEMO_RUNNER_TOKEN)" ]; then
-	export HEIMDALL_PROFILES=${HEIMDALL_PROFILES:+$HEIMDALL_PROFILES,}demo-runner
-fi
+# 6. Everything up.
 log "starting the stack"
 hc up -d --wait
 public_url=${HEIMDALL_PUBLIC_URL:-$(env_get HEIMDALL_PUBLIC_URL)}
 log "Heimdall is up: ${public_url:-https://$domain}/"
 log "status: docker compose -f $COMPOSE_FILE --env-file $ENV_FILE ps   logs: ... logs -f heimdall caddy"
-if [ -n "$demo_runner" ] && [ -z "$(env_get HEIMDALL_DEMO_RUNNER_TOKEN)" ]; then
-	log "demo runner: create a runner token for one of your organizations, pool 'demo', set HEIMDALL_DEMO_RUNNER_TOKEN in $ENV_FILE, then run this script again with --demo-runner"
-fi

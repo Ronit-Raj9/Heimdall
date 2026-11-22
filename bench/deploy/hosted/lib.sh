@@ -5,7 +5,7 @@
 # Environment it reads:
 #   HEIMDALL_ENV_FILE   env file (default deploy/hosted/.env)
 #   HEIMDALL_PROJECT    compose project name (default from the compose file: heimdall)
-#   HEIMDALL_PROFILES   extra compose profiles, comma-separated (e.g. demo-runner)
+#   HEIMDALL_PROFILES   extra compose profiles, comma-separated (e.g. shared-runner)
 #   HEIMDALL_COMPOSE_OVERRIDE  extra compose file (default
 #                       deploy/hosted/docker-compose.override.yml when present)
 
@@ -54,7 +54,7 @@ env_set() {
 
 random_hex() { openssl rand -hex 24; }
 
-# docker_gid prints the group owning the Docker socket (the demo runner joins
+# docker_gid prints the group owning the Docker socket (the shared worker joins
 # it to start agent containers).
 docker_gid() {
 	local sock=/var/run/docker.sock

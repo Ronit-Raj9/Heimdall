@@ -76,7 +76,7 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
 ENTRYPOINT ["/usr/local/bin/bifrost-bench"]
 CMD ["serve", "-config", "/srv/heimdall/deploy/bench.yaml"]
 
-# --- Runtime: the demo runner (compose profile demo-runner) -----------------
+# --- Runtime: the shared worker (compose profile shared-runner) -------------
 # The same binary plus the Docker CLI: the runner starts agent containers on
 # the host's Docker through the mounted socket. Runs as the same non-root
 # user; compose adds the socket's group.

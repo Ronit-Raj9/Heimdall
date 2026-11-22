@@ -15,23 +15,16 @@
 #   - creates a public_read organization and imports the recorded runs of
 #     bench/testdata/recorded into it with the CLI, then checks that
 #     anonymous HTTPS reads are refused (hosted installs require sign-in)
-#   - with --demo-runner: builds the runner image, switches the session to
-#     the new organization and back, creates a runner token (pool demo) in
-#     the signup organization through the API, starts the demo-runner
-#     profile (Bifrost, its Postgres, the fault proxy and the runner
-#     container), waits until the server lists the runner, creates and
-#     starts a two-slot smoke experiment (toy agent, scripted model, no
-#     spend) for pool demo, waits until the runner has leased, run and
-#     uploaded its slots and the server has sealed and analyzed them, reads
-#     the verdict over HTTPS (gateway_hygiene and gateway_versions printed),
-#     then regrades it as a job and reads the regraded verdict
 #   - with --s3: a local S3 endpoint (SeaweedFS, pinned) as the evidence
 #     mirror; backup.sh then uploads a database dump and mirrors the demo
 #     experiments, and `evidence list` must show both
 #   - tears everything down (volumes included), also on failure; only a
 #     project this invocation created is ever torn down
 #
-#   deploy/hosted/smoke.sh [--keep] [--no-build] [--demo-runner] [--s3]
+#   deploy/hosted/smoke.sh [--keep] [--no-build] [--s3]
+#
+# --demo-runner is retired with the demo-runner service (hosted installs
+# have no demo) and is ignored.
 #
 # Environment: SMOKE_HTTPS_PORT (default 47443), SMOKE_HTTP_PORT (47080),
 # SMOKE_PROJECT (default heimdall-smoke-<UTC time>-<pid>, unique per
@@ -44,12 +37,12 @@ set -euo pipefail
 # shellcheck source=lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-keep='' build=1 demo_runner='' s3=''
+keep='' build=1 s3=''
 while [ $# -gt 0 ]; do
 	case $1 in
 	--keep) keep=1; shift ;;
 	--no-build) build=; shift ;;
-	--demo-runner) demo_runner=1; shift ;;
+	--demo-runner) log "--demo-runner is retired (no demo runner on hosted installs); ignored"; shift ;;
 	--s3) s3=1; shift ;;
 	-h | --help) header_help "${BASH_SOURCE[0]}"; exit 0 ;;
 	*) die "unknown argument: $1" ;;
@@ -140,39 +133,17 @@ YAML
 		printf 'HEIMDALL_S3_SECRET_KEY=%s\n' "$(random_hex)"
 	} >>"$HEIMDALL_ENV_FILE"
 fi
-runner_dir=''
-if [ -n "$demo_runner" ]; then
-	# The runner container (uid 10001) writes here at the same path as on
-	# the host; a throwaway folder, so open permissions are fine.
-	runner_dir=$work/runner
-	mkdir -m 0777 "$runner_dir"
-	chmod 0711 "$work"
-	{
-		printf 'HEIMDALL_RUNNER_DIR=%s\n' "$runner_dir"
-		printf 'BIFROST_SETUP_TOKEN=%s\n' "$(random_hex)"
-		printf 'BIFROST_PG_PASSWORD=%s\n' "$(random_hex)"
-		printf 'BENCH_FAULTPROXY_TOKEN=%s\n' "$(random_hex)"
-	} >>"$HEIMDALL_ENV_FILE"
-	export HEIMDALL_PROFILES=demo-runner
-fi
 
 teardown() {
 	local rc=$?
 	if [ "$rc" -ne 0 ]; then
 		log "FAILED (exit $rc); last server and caddy logs:"
 		hc logs --no-color --tail 40 heimdall caddy >&2 || true
-		[ -z "$demo_runner" ] || hc logs --no-color --tail 40 demo-runner bifrost faultproxy >&2 || true
 	fi
 	if [ -n "$keep" ]; then
 		log "--keep: stack left running as project $HEIMDALL_PROJECT; env file $HEIMDALL_ENV_FILE"
 		log "tear down: HEIMDALL_ENV_FILE=$HEIMDALL_ENV_FILE HEIMDALL_PROJECT=$HEIMDALL_PROJECT bash -c '. $HOSTED_DIR/lib.sh; hc down -v --remove-orphans'"
 	else
-		if [ -n "$runner_dir" ]; then
-			# Run folders written by uid 10001 (sealed ones read-only) are
-			# removed from inside, as root of a throwaway container.
-			docker run --rm --user 0:0 -v "$runner_dir:$runner_dir" --entrypoint /bin/sh "$smoke_image" \
-				-c "rm -rf '$runner_dir'" >/dev/null 2>&1 || true
-		fi
 		hc down -v --remove-orphans >/dev/null 2>&1 || true
 		rm -rf "$work" || log "could not remove $work"
 	fi
@@ -197,7 +168,6 @@ fail() {
 if [ -n "$build" ]; then
 	log "building the server image (log: $work/build.log)"
 	services=(heimdall)
-	[ -z "$demo_runner" ] || services+=(demo-runner)
 	hc build "${services[@]}" >"$work/build.log" 2>&1 || { tail -n 40 "$work/build.log" >&2; fail "image build"; }
 	ok "images built: ${services[*]}"
 fi
@@ -360,132 +330,6 @@ if [ -n "$s3" ]; then
 	done
 	printf '%s\n' "$list" | grep -q '\.pgdump' || fail "no database backup in the bucket: $list"
 	ok "evidence list: both demo experiments mirrored, a database backup in _backups/db/"
-fi
-
-if [ -n "$demo_runner" ]; then
-	# The experiment runs in the organization signup created (seeded with
-	# the coding-core suite). Switching to the new one and back checks
-	# switch-org on the way.
-	home_org=$(c -H "Origin: $origin" "$origin/api/bench/auth/me" | jq -r '.current_org // empty')
-	[ -n "$home_org" ] || fail "/auth/me names no current organization"
-	for target in "$slug" "$home_org"; do
-		code=$(c -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H "Origin: $origin" -H "X-Heimdall-CSRF: $csrf" \
-			--data "$(jq -nc --arg s "$target" '{org: $s}')" "$origin/api/bench/auth/switch-org")
-		[ "$code" = 200 ] || fail "POST /api/bench/auth/switch-org to $target answered $code"
-		csrf=$(c -H "Origin: $origin" "$origin/api/bench/auth/me" | jq -r '.csrf // empty')
-	done
-	[ "$(c -H "Origin: $origin" "$origin/api/bench/auth/me" | jq -r '.current_org // empty')" = "$home_org" ] || fail "switch-org back to $home_org did not stick"
-	ok "switch-org to $slug and back to the signup organization $home_org"
-	resp=$(c -X POST -H 'Content-Type: application/json' -H "Origin: $origin" -H "X-Heimdall-CSRF: $csrf" -w '\n%{http_code}' \
-		--data '{"pool":"demo","name":"smoke demo runner"}' "$origin/api/bench/runners/tokens")
-	code=${resp##*$'\n'}
-	resp=${resp%$'\n'*}
-	[ "$code" = 201 ] || fail "POST /api/bench/runners/tokens answered $code: $resp"
-	token=$(printf '%s' "$resp" | jq -r .token)
-	case $token in hmr_*) ;; *) fail "runner token does not look like hmr_...: ${token:0:8}" ;; esac
-	env_set HEIMDALL_DEMO_RUNNER_TOKEN "$token"
-	ok "runner token created through the API (pool demo, shown once)"
-	hc up -d --wait --wait-timeout 300 >>"$work/compose.log" 2>&1 || { cat "$work/compose.log" >&2; fail "the demo-runner profile did not start"; }
-	ok "demo-runner profile up: Bifrost, its Postgres, fault proxy, runner"
-	state=''
-	for _ in $(seq 1 60); do
-		state=$(c -H "Origin: $origin" "$origin/api/bench/runners" | jq -r '.runners[]? | select(.name == "demo-runner") | .state' 2>/dev/null || true)
-		[ -n "$state" ] && break
-		sleep 2
-	done
-	[ -n "$state" ] || fail "the server never listed the demo runner"
-	ok "server lists runner demo-runner (state $state)"
-
-	# One experiment through the runner, end to end. The organization's
-	# project has the suite but no agent configs yet: the toy agent from the
-	# image goes in through the container (there is no agent upload API).
-	hc exec -T heimdall sh -c "cp /srv/heimdall/agents/toy.yaml /var/lib/heimdall/runs/projects/$home_org/agents/toy.yaml" ||
-		fail "could not seed agents/toy.yaml into the organization's project"
-	exp_yaml='name: hosted-smoke
-smoke: true
-suite: coding-core@1.0.0
-base: agents/toy.yaml
-arms:
-  A: {label: toy}
-  B: {label: toy with a shorter wall clock, set: {budgets.wall_s: 600}}
-primary: {condition: clean, metric: verified_success}
-conditions:
-  - {id: clean, tasks: [t01], trials: 1}
-budget: {total_usd: 0}
-verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
-seed: 20261118
-concurrency: 1
-runner: {pool: demo}'
-	resp=$(c -X POST -H 'Content-Type: application/yaml' -H "Origin: $origin" -H "X-Heimdall-CSRF: $csrf" -w '\n%{http_code}' \
-		--data-binary "$exp_yaml" "$origin/api/bench/experiments")
-	code=${resp##*$'\n'}
-	resp=${resp%$'\n'*}
-	[ "$code" = 201 ] || fail "POST /api/bench/experiments answered $code: $resp"
-	exp_id=$(printf '%s' "$resp" | jq -r .exp_id)
-	ok "experiment $exp_id planned and frozen on the server (pool demo)"
-	code=$(c -o /dev/null -w '%{http_code}' -X POST -H "Origin: $origin" -H "X-Heimdall-CSRF: $csrf" "$origin/api/bench/experiments/$exp_id/start")
-	case $code in 200 | 202) ;; *) fail "POST /api/bench/experiments/$exp_id/start answered $code" ;; esac
-	ok "experiment started"
-	st=''
-	for _ in $(seq 1 "${SMOKE_RUN_WAIT:-180}"); do
-		st=$(c -H "Origin: $origin" "$origin/api/bench/experiments/$exp_id" || true)
-		case $(printf '%s' "$st" | jq -r '.state // empty' 2>/dev/null) in done | failed | cancelled) break ;; esac
-		sleep 5
-	done
-	printf '%s' "$st" | jq -c '{state, slots, spent_usd}' >&2 || true
-	slots=$(printf '%s' "$st" | jq -c '.slots // {}' 2>/dev/null || echo '{}')
-	[ "$(printf '%s' "$st" | jq -r '.state // empty' 2>/dev/null)" = "done" ] || fail "experiment $exp_id did not finish: ${st:0:300}"
-	# Both slots (arms A and B, one trial each) must succeed: a done state
-	# also covers slots that failed on the runner.
-	done_slots=$(printf '%s' "$slots" | jq -r '.done // 0')
-	printf '%s' "$slots" | jq -e '(.total // 0) == 2 and (.done // 0) == (.total // 0) and (.failed // 0) == 0' >/dev/null ||
-		fail "experiment $exp_id slots are not all done: $slots"
-	ok "runner leased, ran and uploaded $done_slots slot(s); the server sealed them and analyzed $exp_id"
-
-	verdict=$(c -H "Origin: $origin" -w '\n%{http_code}' "$origin/api/bench/experiments/$exp_id/verdict")
-	code=${verdict##*$'\n'}
-	verdict=${verdict%$'\n'*}
-	[ "$code" = 200 ] || fail "GET /api/bench/experiments/$exp_id/verdict answered $code: ${verdict:0:300}"
-	decision=$(printf '%s' "$verdict" | jq -r '.verdict.decision // empty' 2>/dev/null || true)
-	case $decision in
-	improved | regressed | inconclusive) ;;
-	*) fail "verdict decision is '${decision:-missing}', want improved, regressed or inconclusive: $(printf '%s' "$verdict" | jq -c '{decision: .verdict.decision, action: .verdict.action, reasons: .verdict.invalid_reasons}' 2>/dev/null || printf '%s' "${verdict:0:300}")" ;;
-	esac
-	ok "verdict over HTTPS: $(printf '%s' "$verdict" | jq -c '{decision: .verdict.decision, action: .verdict.action, analysis: .analysis_id}')"
-	for inst in gateway_hygiene gateway_versions runner_images; do
-		row=$(printf '%s' "$verdict" | jq -c --arg n "$inst" '.verdict.instruments[]? | select(.name == $n)')
-		[ -n "$row" ] || fail "verdict has no $inst instrument"
-		# fail and unknown are not healthy; warn changes nothing by default.
-		case $(printf '%s' "$row" | jq -r '.status // empty') in
-		pass | warn | not_applicable) ;;
-		*) fail "instrument $inst is not healthy: $row" ;;
-		esac
-		ok "instrument $row"
-	done
-
-	resp=$(c -X POST -H 'Content-Type: application/json' -H "Origin: $origin" -H "X-Heimdall-CSRF: $csrf" -w '\n%{http_code}' \
-		--data '{"note":"hosted smoke regrade"}' "$origin/api/bench/experiments/$exp_id/regrade")
-	code=${resp##*$'\n'}
-	resp=${resp%$'\n'*}
-	[ "$code" = 202 ] || fail "POST /api/bench/experiments/$exp_id/regrade answered $code: $resp"
-	job=$(printf '%s' "$resp" | jq -r .id)
-	js=''
-	for _ in $(seq 1 120); do
-		js=$(c -H "Origin: $origin" "$origin/api/bench/jobs/$job" | jq -r '.status // empty' 2>/dev/null || true)
-		case $js in succeeded | failed | cancelled) break ;; esac
-		sleep 2
-	done
-	[ "$js" = succeeded ] || fail "regrade job $job ended $js: $(c -H "Origin: $origin" "$origin/api/bench/jobs/$job")"
-	jr=$(c -H "Origin: $origin" "$origin/api/bench/jobs/$job")
-	rg=$(printf '%s' "$jr" | jq -r '.params.id // .result.id // empty' 2>/dev/null || true)
-	[ -n "$rg" ] || fail "regrade job $job names no regrade id: ${jr:0:300}"
-	rv=$(c -H "Origin: $origin" -w '\n%{http_code}' "$origin/api/bench/experiments/$exp_id/verdict?grade_source=$rg")
-	code=${rv##*$'\n'}
-	rv=${rv%$'\n'*}
-	[ "$code" = 200 ] || fail "regraded verdict (grade_source=$rg) answered $code: ${rv:0:300}"
-	[ "$(printf '%s' "$rv" | jq -r '.grade_source // empty' 2>/dev/null)" = "$rg" ] ||
-		fail "regraded verdict does not record grade_source $rg: $(printf '%s' "$rv" | jq -c '{grade_source, analysis_id}' 2>/dev/null || printf '%s' "${rv:0:300}")"
-	ok "regrade job $job succeeded in the signup organization; verdict with grade_source=$rg over HTTPS"
 fi
 
 log "smoke test passed: $pass checks"
