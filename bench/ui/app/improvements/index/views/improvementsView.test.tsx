@@ -1,7 +1,12 @@
 import "@/lib/i18n";
 
 import { IMPROVEMENT_FIXTURE } from "@/components/improvements/improve.fixtures";
-import { NewImprovementForm, improvementFormProblems, improvementSpec, type ImprovementForm } from "@/components/improvements/newImprovementDialog";
+import {
+	NewImprovementForm,
+	improvementFormProblems,
+	improvementSpec,
+	type ImprovementForm,
+} from "@/components/improvements/newImprovementDialog";
 import { hostedSession } from "@/lib/testing/platformFixtures";
 import { okQuery, render } from "@/lib/testing/render";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -59,12 +64,20 @@ describe("ImprovementsView", () => {
 });
 
 describe("NewImprovementForm", () => {
-	const props = { onChange: () => undefined, onSubmit: () => undefined, onCancel: () => undefined, agents: ["acme-agent"], suites: ["hd-harbor-bfcl@1.0.0"] };
+	const props = {
+		onChange: () => undefined,
+		onSubmit: () => undefined,
+		onCancel: () => undefined,
+		agents: ["acme-agent"],
+		suites: ["hd-harbor-bfcl@1.0.0"],
+	};
 
 	it("disables Create and says why when the agent has no files", () => {
 		const html = render(<NewImprovementForm {...props} form={{ ...filled, files: [] }} agentFiles={[]} />);
 		expect(html).toContain("This agent has no files Heimdall can change (its settings have no files section).");
-		expect(html).toMatch(/<button[^>]*disabled=""[^>]*data-testid="new-improvement-submit"|<button[^>]*data-testid="new-improvement-submit"[^>]*disabled=""/);
+		expect(html).toMatch(
+			/<button[^>]*disabled=""[^>]*data-testid="new-improvement-submit"|<button[^>]*data-testid="new-improvement-submit"[^>]*disabled=""/,
+		);
 		expect(improvementFormProblems({ ...filled, files: [] }, [])).toContain("noFiles");
 	});
 

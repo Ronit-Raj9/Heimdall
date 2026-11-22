@@ -38,9 +38,13 @@ export function presetPower(p: Pick<EstimatePreset, "mde_pp">): string {
 }
 
 /** The preset the spec matches (tasks, trials and faults), if any. */
-export function matchingPreset(spec: Pick<EvaluationSpec, "tasks_per_benchmark" | "trials" | "faults">, presets: readonly EstimatePreset[]): string | undefined {
+export function matchingPreset(
+	spec: Pick<EvaluationSpec, "tasks_per_benchmark" | "trials" | "faults">,
+	presets: readonly EstimatePreset[],
+): string | undefined {
 	const same = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x) => b.includes(x));
-	return presets.find((p) => p.tasks_per_benchmark === spec.tasks_per_benchmark && p.trials === spec.trials && same(p.faults, spec.faults))?.id;
+	return presets.find((p) => p.tasks_per_benchmark === spec.tasks_per_benchmark && p.trials === spec.trials && same(p.faults, spec.faults))
+		?.id;
 }
 
 export function PresetPicker({

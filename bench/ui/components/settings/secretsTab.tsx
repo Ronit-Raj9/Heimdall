@@ -7,7 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { useCreateSecretMutation, useDeleteSecretMutation, useListSecretsQuery, useRotateSecretMutation } from "@/lib/store/apis/secretsApi";
+import {
+	useCreateSecretMutation,
+	useDeleteSecretMutation,
+	useListSecretsQuery,
+	useRotateSecretMutation,
+} from "@/lib/store/apis/secretsApi";
 import { MAX_SECRET_BYTES, normalizeSecretName, secretNameProblem, type OrgSecret } from "@/lib/types/secrets";
 import { LockKeyhole } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
@@ -94,7 +99,13 @@ export function SecretsTable({ secrets, canWrite, onRotate, onDelete, deletingId
 												onChange={(event) => setValue(event.target.value)}
 												data-testid={`secret-rotate-value-${s.id}`}
 											/>
-											<Button type="submit" size="sm" disabled={!value} isLoading={rotatingId === s.id} dataTestId={`secret-rotate-save-${s.id}`}>
+											<Button
+												type="submit"
+												size="sm"
+												disabled={!value}
+												isLoading={rotatingId === s.id}
+												dataTestId={`secret-rotate-save-${s.id}`}
+											>
 												{t("rotateSave")}
 											</Button>
 											<Button
@@ -225,7 +236,13 @@ function AddSecretSection({ taken }: { taken: string[] }) {
 					: taken.includes(name)
 						? t("nameTaken")
 						: undefined;
-	const valueError = !touched ? undefined : !value ? t("valueRequired") : byteLength(value) > MAX_SECRET_BYTES ? t("valueTooLarge") : undefined;
+	const valueError = !touched
+		? undefined
+		: !value
+			? t("valueRequired")
+			: byteLength(value) > MAX_SECRET_BYTES
+				? t("valueTooLarge")
+				: undefined;
 
 	const onSubmit = async (event: FormEvent) => {
 		event.preventDefault();

@@ -113,7 +113,11 @@ export function JobLogPanel({ jobId, onClose, onFinished }: JobLogPanelProps) {
 			{data && <JobExperimentLink job={data} />}
 			{data?.status === "queued" && <p className="text-muted-foreground text-sm">{t("panel.queued")}</p>}
 			{data?.status === "failed" && (
-				<p role="alert" className="border-chart-error/40 bg-chart-error/5 text-chart-error-ink rounded-lg border px-3 py-2 text-xs" data-testid="job-log-panel-error">
+				<p
+					role="alert"
+					className="border-chart-error/40 bg-chart-error/5 text-chart-error-ink rounded-lg border px-3 py-2 text-xs"
+					data-testid="job-log-panel-error"
+				>
 					{t("panel.failed")} {data.error}
 				</p>
 			)}

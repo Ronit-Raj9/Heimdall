@@ -108,7 +108,15 @@ export function liveSetupCanSave(params: LiveInitParams | null, existing: boolea
 	return params !== null && (!existing || force);
 }
 
-const EMPTY = { url: "", token_env: "", baseline_key: "", candidate_key: "", tag_header: "x-bf-lh-agent-version", baseline_tag: "", candidate_tag: "" };
+const EMPTY = {
+	url: "",
+	token_env: "",
+	baseline_key: "",
+	candidate_key: "",
+	tag_header: "x-bf-lh-agent-version",
+	baseline_tag: "",
+	candidate_tag: "",
+};
 
 /** The setup form: queues livescore.init, which writes livescore/config.yaml. */
 export function LiveSetup({ existing, hosted, onClose }: { existing?: boolean; hosted?: boolean; onClose?(): void }) {
@@ -170,7 +178,14 @@ export function LiveSetup({ existing, hosted, onClose }: { existing?: boolean; h
 								key={s}
 								className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors ${split === s ? "border-primary bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-muted"}`}
 							>
-								<input type="radio" className="sr-only" name={`${ids}-split`} checked={split === s} onChange={() => setSplit(s)} data-testid={`live-setup-split-${s}`} />
+								<input
+									type="radio"
+									className="sr-only"
+									name={`${ids}-split`}
+									checked={split === s}
+									onChange={() => setSplit(s)}
+									data-testid={`live-setup-split-${s}`}
+								/>
 								{t(`live.setup.${s}`)}
 							</label>
 						))}
@@ -191,7 +206,12 @@ export function LiveSetup({ existing, hosted, onClose }: { existing?: boolean; h
 				</Step>
 				<Step n={2} title={u("live.stepGateway")}>
 					<div className="flex flex-wrap gap-3">
-						{field("url", t("live.setup.url"), hosted ? t("live.setup.urlHintHosted") : t("live.setup.urlHint"), hosted ? "https://gateway.example.com" : "http://localhost:8080")}
+						{field(
+							"url",
+							t("live.setup.url"),
+							hosted ? t("live.setup.urlHintHosted") : t("live.setup.urlHint"),
+							hosted ? "https://gateway.example.com" : "http://localhost:8080",
+						)}
 						{field(
 							"token_env",
 							hosted ? t("live.setup.tokenEnvHosted") : t("live.setup.tokenEnv"),
@@ -211,7 +231,11 @@ export function LiveSetup({ existing, hosted, onClose }: { existing?: boolean; h
 						{t("live.setup.force")}
 					</label>
 					<div className="flex flex-wrap items-center gap-3">
-						<Button disabled={!liveSetupCanSave(params, existing, force) || state.isLoading} onClick={() => void submit()} data-testid="live-setup-submit">
+						<Button
+							disabled={!liveSetupCanSave(params, existing, force) || state.isLoading}
+							onClick={() => void submit()}
+							data-testid="live-setup-submit"
+						>
 							{t("live.setup.submit")}
 						</Button>
 						{!params && <span className="text-muted-foreground text-xs">{t("live.setup.incomplete")}</span>}

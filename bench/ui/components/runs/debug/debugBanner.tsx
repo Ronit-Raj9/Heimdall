@@ -22,7 +22,9 @@ export function DebugBanner({ debug }: { debug: RunDebug }) {
 				</span>
 			)}
 			<span className="text-muted-foreground text-xs">{t("banner.note")}</span>
-			{debug.held_ms ? <span className="text-muted-foreground text-xs">{t("banner.held", { time: formatDuration(debug.held_ms) })}</span> : null}
+			{debug.held_ms ? (
+				<span className="text-muted-foreground text-xs">{t("banner.held", { time: formatDuration(debug.held_ms) })}</span>
+			) : null}
 		</div>
 	);
 }

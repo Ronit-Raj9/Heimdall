@@ -114,7 +114,13 @@ export function FileEditor({ area, path, onSaved, onDeleted, onClose }: FileEdit
 							{saveState.isLoading ? t("editor.saving") : t("editor.save")}
 						</Button>
 					)}
-					<Button size="sm" variant={showHistory ? "secondary" : "ghost"} onClick={() => setShowHistory((v) => !v)} aria-expanded={showHistory} data-testid="file-editor-history">
+					<Button
+						size="sm"
+						variant={showHistory ? "secondary" : "ghost"}
+						onClick={() => setShowHistory((v) => !v)}
+						aria-expanded={showHistory}
+						data-testid="file-editor-history"
+					>
 						<History className="size-4" aria-hidden="true" />
 						{t("editor.history")}
 					</Button>
@@ -127,7 +133,14 @@ export function FileEditor({ area, path, onSaved, onDeleted, onClose }: FileEdit
 						</Button>
 					)}
 					{canWrite && !binary && !missing && (
-						<Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" disabled={removeState.isLoading} onClick={onDelete} data-testid="file-editor-delete">
+						<Button
+							size="sm"
+							variant="ghost"
+							className="text-destructive hover:text-destructive"
+							disabled={removeState.isLoading}
+							onClick={onDelete}
+							data-testid="file-editor-delete"
+						>
 							<Trash2 className="size-4" aria-hidden="true" />
 							{t("editor.delete")}
 						</Button>
@@ -142,11 +155,19 @@ export function FileEditor({ area, path, onSaved, onDeleted, onClose }: FileEdit
 			{(file.isLoading || missing || loadError || message) && (
 				<div className="flex flex-col gap-1 border-b px-3 py-2">
 					{file.isLoading && <p className="text-muted-foreground text-sm">{t("editor.loading")}</p>}
-					{missing && <p className="text-muted-foreground text-sm" data-testid="file-editor-new">{t("editor.newFile")}</p>}
+					{missing && (
+						<p className="text-muted-foreground text-sm" data-testid="file-editor-new">
+							{t("editor.newFile")}
+						</p>
+					)}
 					{loadError && <p className="text-destructive text-sm">{loadError}</p>}
 					{message && (
 						<div
-							className={message.kind === "ok" ? "flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400" : "text-destructive flex flex-wrap items-center gap-2 text-sm"}
+							className={
+								message.kind === "ok"
+									? "flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400"
+									: "text-destructive flex flex-wrap items-center gap-2 text-sm"
+							}
 							data-testid={`file-editor-${message.kind}`}
 							role="status"
 						>
@@ -163,7 +184,9 @@ export function FileEditor({ area, path, onSaved, onDeleted, onClose }: FileEdit
 			)}
 			<div className={showHistory ? "grid min-w-0 md:grid-cols-[minmax(0,1fr)_16rem]" : "min-w-0"}>
 				{binary ? (
-					<p className="text-muted-foreground p-6 text-sm" data-testid="file-editor-binary">{t("editor.binary")}</p>
+					<p className="text-muted-foreground p-6 text-sm" data-testid="file-editor-binary">
+						{t("editor.binary")}
+					</p>
 				) : (
 					<textarea
 						aria-label={`${area}/${path}`}

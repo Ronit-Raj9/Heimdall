@@ -36,61 +36,63 @@ export function imageDecisionRequest(id: string, decision: "approve" | "reject",
 	return { url: `/admin/images/${seg(id)}/${decision}`, method: "POST", body: reason ? { note: reason } : {} };
 }
 
-export const adminApi = benchApi.enhanceEndpoints({ addTagTypes: ["AdminUsers", "AdminOrgs", "AdminKill", "AdminImages", "AdminContainers"] }).injectEndpoints({
-	endpoints: (builder) => ({
-		getAdminOverview: builder.query<AdminOverview, void>({
-			query: () => "/admin/overview",
-			providesTags: ["AdminUsers", "AdminOrgs", "AdminKill", "AdminContainers"],
+export const adminApi = benchApi
+	.enhanceEndpoints({ addTagTypes: ["AdminUsers", "AdminOrgs", "AdminKill", "AdminImages", "AdminContainers"] })
+	.injectEndpoints({
+		endpoints: (builder) => ({
+			getAdminOverview: builder.query<AdminOverview, void>({
+				query: () => "/admin/overview",
+				providesTags: ["AdminUsers", "AdminOrgs", "AdminKill", "AdminContainers"],
+			}),
+			listAdminUsers: builder.query<{ users: AdminUser[] }, void>({
+				query: () => "/admin/users",
+				providesTags: ["AdminUsers"],
+			}),
+			setUserDisabled: builder.mutation<{ id: string; disabled: boolean }, { id: string; disabled: boolean }>({
+				query: ({ id, disabled }) => disableUserRequest(id, disabled),
+				invalidatesTags: ["AdminUsers"],
+			}),
+			listAdminOrgs: builder.query<{ orgs: AdminOrg[] }, void>({
+				query: () => "/admin/orgs",
+				providesTags: ["AdminOrgs"],
+			}),
+			getOrgQuota: builder.query<AdminQuota, string>({
+				query: (orgId) => `/admin/orgs/${seg(orgId)}/quota`,
+				providesTags: ["AdminOrgs"],
+			}),
+			setOrgQuota: builder.mutation<AdminQuota, { orgId: string; limits: AdminLimits }>({
+				query: ({ orgId, limits }) => setQuotaRequest(orgId, limits),
+				invalidatesTags: ["AdminOrgs"],
+			}),
+			getKillSwitch: builder.query<{ on: boolean }, void>({
+				query: () => "/admin/killswitch",
+				providesTags: ["AdminKill"],
+			}),
+			setKillSwitch: builder.mutation<{ on: boolean }, boolean>({
+				query: (on) => ({ url: "/admin/killswitch", method: "POST", body: { on } }),
+				invalidatesTags: ["AdminKill"],
+			}),
+			listAdminContainers: builder.query<{ runners: AdminContainer[]; running_slots: number }, void>({
+				query: () => "/admin/containers",
+				providesTags: ["AdminContainers"],
+			}),
+			removeAdminRunner: builder.mutation<unknown, { orgId: string; runnerId: string }>({
+				query: ({ orgId, runnerId }) => removeAdminRunnerRequest(orgId, runnerId),
+				invalidatesTags: ["AdminContainers"],
+			}),
+			listAdminImages: builder.query<{ images: AdminImage[] }, AdminImage["status"] | void>({
+				query: (status) => (status ? `/admin/images?status=${encodeURIComponent(status)}` : "/admin/images"),
+				providesTags: ["AdminImages"],
+			}),
+			decideImage: builder.mutation<unknown, { id: string; decision: "approve" | "reject"; reason?: string }>({
+				query: ({ id, decision, reason }) => imageDecisionRequest(id, decision, reason),
+				invalidatesTags: ["AdminImages", "AdminOrgs"],
+			}),
+			getAdminUsage: builder.query<AdminUsage, { from?: string; to?: string }>({
+				query: (params) => ({ url: "/admin/usage", params: Object.fromEntries(Object.entries(params).filter(([, v]) => v)) }),
+			}),
 		}),
-		listAdminUsers: builder.query<{ users: AdminUser[] }, void>({
-			query: () => "/admin/users",
-			providesTags: ["AdminUsers"],
-		}),
-		setUserDisabled: builder.mutation<{ id: string; disabled: boolean }, { id: string; disabled: boolean }>({
-			query: ({ id, disabled }) => disableUserRequest(id, disabled),
-			invalidatesTags: ["AdminUsers"],
-		}),
-		listAdminOrgs: builder.query<{ orgs: AdminOrg[] }, void>({
-			query: () => "/admin/orgs",
-			providesTags: ["AdminOrgs"],
-		}),
-		getOrgQuota: builder.query<AdminQuota, string>({
-			query: (orgId) => `/admin/orgs/${seg(orgId)}/quota`,
-			providesTags: ["AdminOrgs"],
-		}),
-		setOrgQuota: builder.mutation<AdminQuota, { orgId: string; limits: AdminLimits }>({
-			query: ({ orgId, limits }) => setQuotaRequest(orgId, limits),
-			invalidatesTags: ["AdminOrgs"],
-		}),
-		getKillSwitch: builder.query<{ on: boolean }, void>({
-			query: () => "/admin/killswitch",
-			providesTags: ["AdminKill"],
-		}),
-		setKillSwitch: builder.mutation<{ on: boolean }, boolean>({
-			query: (on) => ({ url: "/admin/killswitch", method: "POST", body: { on } }),
-			invalidatesTags: ["AdminKill"],
-		}),
-		listAdminContainers: builder.query<{ runners: AdminContainer[]; running_slots: number }, void>({
-			query: () => "/admin/containers",
-			providesTags: ["AdminContainers"],
-		}),
-		removeAdminRunner: builder.mutation<unknown, { orgId: string; runnerId: string }>({
-			query: ({ orgId, runnerId }) => removeAdminRunnerRequest(orgId, runnerId),
-			invalidatesTags: ["AdminContainers"],
-		}),
-		listAdminImages: builder.query<{ images: AdminImage[] }, AdminImage["status"] | void>({
-			query: (status) => (status ? `/admin/images?status=${encodeURIComponent(status)}` : "/admin/images"),
-			providesTags: ["AdminImages"],
-		}),
-		decideImage: builder.mutation<unknown, { id: string; decision: "approve" | "reject"; reason?: string }>({
-			query: ({ id, decision, reason }) => imageDecisionRequest(id, decision, reason),
-			invalidatesTags: ["AdminImages", "AdminOrgs"],
-		}),
-		getAdminUsage: builder.query<AdminUsage, { from?: string; to?: string }>({
-			query: (params) => ({ url: "/admin/usage", params: Object.fromEntries(Object.entries(params).filter(([, v]) => v)) }),
-		}),
-	}),
-});
+	});
 
 export const {
 	useGetAdminOverviewQuery,

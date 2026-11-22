@@ -28,7 +28,9 @@ export function adminTab(value: string | null | undefined): AdminTab {
 }
 
 /** Server admin page: only server admins (by user id, CLI grant, or verified HEIMDALL_SERVER_ADMINS email) reach the panels. */
-export default function AdminView({ param = "tab" }: { /** Search parameter of the panel tab; "section" inside Settings, whose own tab is ?tab=. */ param?: string } = {}) {
+export default function AdminView({
+	param = "tab",
+}: { /** Search parameter of the panel tab; "section" inside Settings, whose own tab is ?tab=. */ param?: string } = {}) {
 	const { t } = useTranslation("admin");
 	const session = useSession();
 	const [tabParam, setTab] = useQueryState(param, parseAsString);
@@ -163,7 +165,12 @@ export function AdminOverviewPanel() {
 							on ? "bg-chart-error" : "bg-muted-foreground/30 group-hover:bg-muted-foreground/40",
 						)}
 					>
-						<span className={cn("bg-background inline-block size-5 rounded-full shadow transition-transform", on ? "translate-x-6" : "translate-x-1")} />
+						<span
+							className={cn(
+								"bg-background inline-block size-5 rounded-full shadow transition-transform",
+								on ? "translate-x-6" : "translate-x-1",
+							)}
+						/>
 					</span>
 				</button>
 			</section>

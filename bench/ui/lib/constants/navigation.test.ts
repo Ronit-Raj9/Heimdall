@@ -32,7 +32,21 @@ describe("navigation", () => {
 
 	it("never lists a start path other than /evaluate, nor the retired pages", () => {
 		const routes = BENCH_NAV.map((item) => item.to as string);
-		for (const gone of ["/welcome", "/quickstart", "/experiments/new", "/catalog", "/canaries", "/schedules", "/review", "/policies", "/models", "/workers", "/jobs", "/docs", "/admin"]) {
+		for (const gone of [
+			"/welcome",
+			"/quickstart",
+			"/experiments/new",
+			"/catalog",
+			"/canaries",
+			"/schedules",
+			"/review",
+			"/policies",
+			"/models",
+			"/workers",
+			"/jobs",
+			"/docs",
+			"/admin",
+		]) {
 			expect(routes).not.toContain(gone);
 		}
 	});

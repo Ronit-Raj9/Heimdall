@@ -57,10 +57,16 @@ describe("AnalysisTab", () => {
 			result: { findings: 2, scanned: 3, runs: 4, vetoed: ["r_1"], by_severity: {}, skipped: 0, exp_id: "e_x" },
 		});
 		expect(ok).toBe("2 counted findings over 3 of 4 runs; 1 would be vetoed");
-		expect(summarizeAnalysisResult(t, codescan, { status: "failed", error: "experiment e_x: not found" })).toBe("experiment e_x: not found");
+		expect(summarizeAnalysisResult(t, codescan, { status: "failed", error: "experiment e_x: not found" })).toBe(
+			"experiment e_x: not found",
+		);
 		expect(summarizeAnalysisResult(t, codescan, { status: "running" })).toBe("");
 	});
 	it("posts an audit table as CSV", () => {
-		expect(auditRequest("task,a_pass,a_n,b_pass,b_n\n")).toMatchObject({ url: "/audit", method: "POST", headers: { "Content-Type": "text/csv" } });
+		expect(auditRequest("task,a_pass,a_n,b_pass,b_n\n")).toMatchObject({
+			url: "/audit",
+			method: "POST",
+			headers: { "Content-Type": "text/csv" },
+		});
 	});
 });

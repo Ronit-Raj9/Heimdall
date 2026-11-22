@@ -139,7 +139,11 @@ export default function VersionsTab({ agentId }: { agentId: string }) {
 						</TableHeader>
 						<TableBody>
 							{versions.map((v) => (
-								<TableRow key={v.version} data-testid={`agent-version-v${v.version}`} data-state={selected === v.version ? "selected" : undefined}>
+								<TableRow
+									key={v.version}
+									data-testid={`agent-version-v${v.version}`}
+									data-state={selected === v.version ? "selected" : undefined}
+								>
 									<TableCell className="font-mono text-xs">v{v.version}</TableCell>
 									<TableCell className="text-xs">{versionDate(v.created_at)}</TableCell>
 									<TableCell className="text-xs" title={authorOf(v).title}>
@@ -171,7 +175,10 @@ export default function VersionsTab({ agentId }: { agentId: string }) {
 /** One version's YAML (read-only) and its diff against the version just before it. */
 function VersionConfig({ agentId, version, versions }: { agentId: string; version: number; versions: AgentVersion[] }) {
 	const { t } = useTranslation("agentBuilder");
-	const previous = versions.filter((v) => v.version < version).map((v) => v.version).sort((x, y) => y - x)[0];
+	const previous = versions
+		.filter((v) => v.version < version)
+		.map((v) => v.version)
+		.sort((x, y) => y - x)[0];
 	const current = useGetAgentVersionQuery({ agent: agentId, version });
 	const before = useGetAgentVersionQuery(previous ? { agent: agentId, version: previous } : skipToken);
 	const yaml = current.data?.yaml ?? "";
@@ -181,7 +188,12 @@ function VersionConfig({ agentId, version, versions }: { agentId: string; versio
 			{current.isLoading ? (
 				<BlockSkeleton rows={6} testId="agent-version-config-loading" />
 			) : current.isError ? (
-				<LoadError title={t("versions.configError")} error={current.error} onRetry={() => void current.refetch()} testId="agent-version-config-error" />
+				<LoadError
+					title={t("versions.configError")}
+					error={current.error}
+					onRetry={() => void current.refetch()}
+					testId="agent-version-config-error"
+				/>
 			) : (
 				<div className="grid min-w-0 gap-4 lg:grid-cols-2">
 					<pre className="bench-mono-block max-h-[28rem] overflow-auto py-2 text-xs" tabIndex={0} data-testid="agent-version-yaml">

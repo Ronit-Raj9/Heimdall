@@ -56,10 +56,23 @@ export function splitModels(text: string): string[] {
 }
 
 /** The migrate params, or null while a required field is missing. */
-export function migrateParams(f: { agent: string; suite: string; from: string; to: string; trials: number; budget: number }): MigrateJobParams | null {
+export function migrateParams(f: {
+	agent: string;
+	suite: string;
+	from: string;
+	to: string;
+	trials: number;
+	budget: number;
+}): MigrateJobParams | null {
 	const to = splitModels(f.to).filter((m) => m !== f.from.trim());
 	if (!f.agent || !f.suite.trim() || !f.from.trim() || to.length === 0) return null;
-	const p: MigrateJobParams = { agent: f.agent, suite: f.suite.trim(), from: f.from.trim(), to, trials: Math.max(1, Math.floor(f.trials) || 1) };
+	const p: MigrateJobParams = {
+		agent: f.agent,
+		suite: f.suite.trim(),
+		from: f.from.trim(),
+		to,
+		trials: Math.max(1, Math.floor(f.trials) || 1),
+	};
 	if (f.budget > 0) p.budget_usd = f.budget;
 	return p;
 }

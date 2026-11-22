@@ -46,7 +46,8 @@ export function FailoverSettings({ arm, value, onChange }: FailoverSettingsProps
 				<span>
 					<span className="font-medium">Test Bifrost fallbacks</span>
 					<span className="text-muted-foreground block">
-						Adds a run of the agent with a Bifrost fallback model, and takes the primary model down. The report shows if failover worked, the extra time and cost, and task success with and without it.
+						Adds a run of the agent with a Bifrost fallback model, and takes the primary model down. The report shows if failover worked,
+						the extra time and cost, and task success with and without it.
 					</span>
 				</span>
 			</label>

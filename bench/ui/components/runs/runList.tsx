@@ -228,11 +228,7 @@ export function RunTable({ rows, showExperiment = true }: { rows: readonly RunLi
 							</span>
 						</TableCell>
 						<TableCell>
-							{row.sealed ? (
-								<RowOutcome row={row} />
-							) : (
-								<span className="text-chart-info-ink text-xs">{t("runs.list.inFlight")}</span>
-							)}
+							{row.sealed ? <RowOutcome row={row} /> : <span className="text-chart-info-ink text-xs">{t("runs.list.inFlight")}</span>}
 						</TableCell>
 						<TableCell className="text-right">
 							<span className="inline-flex items-center gap-1">

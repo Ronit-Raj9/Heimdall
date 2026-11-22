@@ -24,10 +24,7 @@ vi.mock("@/components/jobs/jobRunButton", () => ({
 
 const suite = {
 	id: "coding-core",
-	tasks: [
-		{ id: "fix-a", quarantine: { reason: "flaky verifier", at: "2026-11-01T00:00:00Z", source: "manual" } },
-		{ id: "fix-b" },
-	],
+	tasks: [{ id: "fix-a", quarantine: { reason: "flaky verifier", at: "2026-11-01T00:00:00Z", source: "manual" } }, { id: "fix-b" }],
 } as unknown as SuiteSummary;
 
 describe("OpsTab", () => {

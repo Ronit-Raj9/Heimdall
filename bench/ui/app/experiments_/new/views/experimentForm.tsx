@@ -571,9 +571,7 @@ function ConditionsEditor({
 									{...register(`conditions.${index}.enabled`)}
 								/>
 								<span className="font-mono text-sm">{field.condition}</span>
-								<span className="text-muted-foreground text-xs">
-									{conditionLayerText(field.condition, probe, t)}
-								</span>
+								<span className="text-muted-foreground text-xs">{conditionLayerText(field.condition, probe, t)}</span>
 							</label>
 							<label className="flex items-center gap-2 text-xs">
 								<span className="text-muted-foreground">{t("experiments.new.fields.trials")}</span>
@@ -641,7 +639,9 @@ function TaskSelection({
 								onChange={() => field.onChange(true)}
 								data-testid={`experiment-condition-${conditionId}-tasks-all`}
 							/>
-							{partlyReady ? tb("fields.tasksAllReady", { count: tasks.length }) : t("experiments.new.fields.tasksAll", { count: tasks.length })}
+							{partlyReady
+								? tb("fields.tasksAllReady", { count: tasks.length })
+								: t("experiments.new.fields.tasksAll", { count: tasks.length })}
 						</label>
 						<label className="flex cursor-pointer items-center gap-1.5">
 							<input

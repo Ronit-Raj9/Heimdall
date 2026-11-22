@@ -28,10 +28,7 @@ export default function LiveView() {
 	const [setupOpen, setSetupOpen] = useState(() => typeof window !== "undefined" && window.location.hash === "#live-setup");
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="live-screen">
-			<PageHeader
-				title={t("live.title")}
-				subtitle={t("live.subtitle")}
-			/>
+			<PageHeader title={t("live.title")} subtitle={t("live.subtitle")} />
 			{status.isLoading ? (
 				<BlockSkeleton rows={5} testId="live-loading" />
 			) : status.error || !data ? (

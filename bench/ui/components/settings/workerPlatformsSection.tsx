@@ -173,7 +173,11 @@ export function PlatformCard({ platform: p, busy, error, notice, onConnect, onTe
 						</div>
 					</div>
 					{hint && (
-						<p id={`${formId}-connect-hint`} className="text-muted-foreground text-right text-xs" data-testid={`platform-${p.name}-connect-hint`}>
+						<p
+							id={`${formId}-connect-hint`}
+							className="text-muted-foreground text-right text-xs"
+							data-testid={`platform-${p.name}-connect-hint`}
+						>
 							{t(hint)}
 						</p>
 					)}

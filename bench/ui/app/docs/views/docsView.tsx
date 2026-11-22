@@ -161,13 +161,17 @@ export default function DocsView() {
 										aria-current={d.name === selected ? "page" : undefined}
 										className={cn(
 											"hover:bg-accent/60 hover:text-foreground focus-visible:ring-ring/60 flex w-full items-center gap-2 truncate rounded-md border-l-2 px-2.5 py-1.5 text-left text-[13px] transition-colors focus-visible:ring-2 focus-visible:outline-none",
-											d.name === selected ? "border-primary bg-accent text-foreground font-medium" : "text-muted-foreground border-transparent",
+											d.name === selected
+												? "border-primary bg-accent text-foreground font-medium"
+												: "text-muted-foreground border-transparent",
 										)}
 										title={d.title}
 										data-testid={`docs-item-${d.name}`}
 									>
 										{d.name === START_DOC && (
-											<span className="bg-primary/10 text-primary shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold">{t("docs.start")}</span>
+											<span className="bg-primary/10 text-primary shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold">
+												{t("docs.start")}
+											</span>
 										)}
 										<span className="flex min-w-0 flex-col">
 											<span className="truncate">{d.title}</span>
@@ -182,7 +186,7 @@ export default function DocsView() {
 							))}
 						</ul>
 					</nav>
-					<div className="min-w-0 max-w-3xl">
+					<div className="max-w-3xl min-w-0">
 						{doc.isFetching && !doc.data ? (
 							<BlockSkeleton rows={8} testId="doc-loading" />
 						) : noGuide ? (
@@ -217,7 +221,10 @@ export default function DocsView() {
 													e.preventDefault();
 													document.getElementById(h.id)?.scrollIntoView({ block: "start", behavior: "smooth" });
 												}}
-												className={cn("text-muted-foreground hover:text-foreground -ml-px block truncate border-l border-transparent py-0.5 transition-colors hover:border-foreground/40", h.level === 3 ? "pl-6" : "pl-3")}
+												className={cn(
+													"text-muted-foreground hover:text-foreground -ml-px block truncate border-l border-transparent py-0.5 transition-colors hover:border-foreground/40",
+													h.level === 3 ? "pl-6" : "pl-3",
+												)}
 												title={h.text}
 											>
 												{h.text.replace(/[`*_]/g, "")}

@@ -25,7 +25,12 @@ export function TraceDiff({ runId, otherRunId }: { runId: string; otherRunId?: s
 				</div>
 				<label className="ml-auto flex flex-col gap-1 text-xs font-medium">
 					{t("diff.pick")}
-					<Input value={other} onChange={(e) => setOther(e.target.value.trim())} className="h-8 w-48 font-mono text-xs" data-testid="trace-diff-other" />
+					<Input
+						value={other}
+						onChange={(e) => setOther(e.target.value.trim())}
+						className="h-8 w-48 font-mono text-xs"
+						data-testid="trace-diff-other"
+					/>
 				</label>
 			</div>
 			{right.error ? (
@@ -42,7 +47,10 @@ export function DiffTable({ left, right }: { left: readonly StepRecord[]; right:
 	const { rows, firstDiff } = useMemo(() => alignTraces(left, right), [left, right]);
 	return (
 		<div className="flex min-w-0 flex-col gap-2">
-			<p className={cn("text-xs", firstDiff === null ? "text-muted-foreground" : "text-chart-error-ink font-medium")} data-testid="trace-diff-first">
+			<p
+				className={cn("text-xs", firstDiff === null ? "text-muted-foreground" : "text-chart-error-ink font-medium")}
+				data-testid="trace-diff-first"
+			>
 				{firstDiff === null ? t("diff.noDiff") : t("diff.firstDiff", { call: firstDiff })}
 			</p>
 			<div className="overflow-x-auto rounded-xl border">

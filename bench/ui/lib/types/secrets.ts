@@ -42,5 +42,8 @@ export function secretNameProblem(name: string): SecretNameProblem {
 
 /** Turns "tavily api-key" into "TAVILY_API_KEY" as the user types. */
 export function normalizeSecretName(raw: string): string {
-	return raw.toUpperCase().replace(/[\s-]+/g, "_").replace(/[^A-Z0-9_]/g, "");
+	return raw
+		.toUpperCase()
+		.replace(/[\s-]+/g, "_")
+		.replace(/[^A-Z0-9_]/g, "");
 }

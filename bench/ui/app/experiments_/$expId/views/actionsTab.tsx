@@ -52,7 +52,13 @@ export function ActionsTab({ expId, suite, suiteVersion }: ActionsTabProps) {
 			<ExtendCard expId={expId} />
 			<ProbeCard expId={expId} suite={suite} />
 			<ActionCard icon={GitCompareArrows} title={t("migrate.title")} description={t("migrate.description")} testId="actions-migrate">
-				<MigrateForm key={formKey} suite={suiteRef} initialAgent={first?.agent_file} initialFrom={first?.model} testId="actions-migrate-form" />
+				<MigrateForm
+					key={formKey}
+					suite={suiteRef}
+					initialAgent={first?.agent_file}
+					initialFrom={first?.model}
+					testId="actions-migrate-form"
+				/>
 			</ActionCard>
 			<CompareRefsCard key={formKey} suite={suiteRef} initialAgent={first?.agent_file} />
 		</div>
@@ -100,7 +106,10 @@ function ExtendCard({ expId }: { expId: string }) {
 			defaultOpen={open && !parent}
 			status={
 				decision ? (
-					<span className="bg-muted text-muted-foreground mt-1 w-fit rounded-full px-2 py-0.5 text-xs" data-testid="actions-extend-decision">
+					<span
+						className="bg-muted text-muted-foreground mt-1 w-fit rounded-full px-2 py-0.5 text-xs"
+						data-testid="actions-extend-decision"
+					>
 						{t("extend.decision", {
 							decision: decisionText(decision, {
 								score: t("decisionWords.score"),
@@ -115,7 +124,9 @@ function ExtendCard({ expId }: { expId: string }) {
 			}
 		>
 			<div className="flex flex-col gap-3">
-				{more && !more.over && <p className="text-muted-foreground text-xs">{t("extend.sizing", { tasks: more.tasks, target: more.target_pp })}</p>}
+				{more && !more.over && (
+					<p className="text-muted-foreground text-xs">{t("extend.sizing", { tasks: more.tasks, target: more.target_pp })}</p>
+				)}
 				{parent ? (
 					<p className="text-muted-foreground text-sm" data-testid="actions-extend-followup">
 						{t("extend.already", { expId: parent.exp_id })}

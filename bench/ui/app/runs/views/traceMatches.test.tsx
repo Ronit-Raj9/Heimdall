@@ -18,7 +18,14 @@ describe("splitHighlights", () => {
 		]);
 	});
 	it("merges overlaps, clamps out-of-range and drops empty spans", () => {
-		expect(splitHighlights("abcdef", [[4, 99], [0, 2], [1, 3], [5, 5]])).toEqual([
+		expect(
+			splitHighlights("abcdef", [
+				[4, 99],
+				[0, 2],
+				[1, 3],
+				[5, 5],
+			]),
+		).toEqual([
 			{ text: "abc", mark: true },
 			{ text: "d", mark: false },
 			{ text: "ef", mark: true },

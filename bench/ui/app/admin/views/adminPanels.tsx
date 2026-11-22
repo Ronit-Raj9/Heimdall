@@ -52,7 +52,14 @@ function useGate(state: { isLoading: boolean; error?: unknown; refetch: () => un
 	if (state.error) {
 		const status = errorStatus(state.error);
 		if (unavailable && (status === 404 || status === 405 || status === 503)) {
-			return <EmptyState compact message={unavailable} action={{ label: t("hostingGuide"), to: "/docs", search: { doc: "hosting" } }} testId={`${testId}-unavailable`} />;
+			return (
+				<EmptyState
+					compact
+					message={unavailable}
+					action={{ label: t("hostingGuide"), to: "/docs", search: { doc: "hosting" } }}
+					testId={`${testId}-unavailable`}
+				/>
+			);
 		}
 		return (
 			<EmptyState
@@ -88,43 +95,43 @@ export function AdminUsersPanel() {
 			<Input placeholder={t("users.search")} value={filter} onChange={(e) => setFilter(e.target.value)} className="w-full sm:max-w-sm" />
 			{state.error && <p className="text-destructive text-sm">{getBenchErrorMessage(state.error)}</p>}
 			<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
-			<Table>
-				<TableHeader>
-					<TableRow>
-						<TableHead>{t("users.email")}</TableHead>
-						<TableHead>{t("users.name")}</TableHead>
-						<TableHead className="text-right">{t("users.orgs")}</TableHead>
-						<TableHead>{t("users.created")}</TableHead>
-						<TableHead>{t("users.status")}</TableHead>
-						<TableHead />
-					</TableRow>
-				</TableHeader>
-				<TableBody>
-					{users.map((u) => (
-						<TableRow key={u.id} data-testid={`admin-user-${u.id}`}>
-							<TableCell className="max-w-64">
-								<div className="flex min-w-0 items-center gap-2">
-									<span className="truncate font-medium" title={u.email}>
-										{u.email}
-									</span>
-									{u.server_admin && <Badge variant="secondary">{t("users.serverAdmin")}</Badge>}
-								</div>
-							</TableCell>
-							<TableCell className="text-muted-foreground">{u.name}</TableCell>
-							<TableCell className="text-right tabular-nums">{u.orgs}</TableCell>
-							<TableCell className="text-muted-foreground text-xs whitespace-nowrap">{fmtDate(u.created_at)}</TableCell>
-							<TableCell>
-								<Badge variant={u.disabled ? "destructive" : "success"}>{u.disabled ? t("users.disabled") : t("users.active")}</Badge>
-							</TableCell>
-							<TableCell className="text-right">
-								<Button size="sm" variant="outline" disabled={state.isLoading} onClick={() => void toggle(u.id, u.email, u.disabled)}>
-									{u.disabled ? t("users.enable") : t("users.disable")}
-								</Button>
-							</TableCell>
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead>{t("users.email")}</TableHead>
+							<TableHead>{t("users.name")}</TableHead>
+							<TableHead className="text-right">{t("users.orgs")}</TableHead>
+							<TableHead>{t("users.created")}</TableHead>
+							<TableHead>{t("users.status")}</TableHead>
+							<TableHead />
 						</TableRow>
-					))}
-				</TableBody>
-			</Table>
+					</TableHeader>
+					<TableBody>
+						{users.map((u) => (
+							<TableRow key={u.id} data-testid={`admin-user-${u.id}`}>
+								<TableCell className="max-w-64">
+									<div className="flex min-w-0 items-center gap-2">
+										<span className="truncate font-medium" title={u.email}>
+											{u.email}
+										</span>
+										{u.server_admin && <Badge variant="secondary">{t("users.serverAdmin")}</Badge>}
+									</div>
+								</TableCell>
+								<TableCell className="text-muted-foreground">{u.name}</TableCell>
+								<TableCell className="text-right tabular-nums">{u.orgs}</TableCell>
+								<TableCell className="text-muted-foreground text-xs whitespace-nowrap">{fmtDate(u.created_at)}</TableCell>
+								<TableCell>
+									<Badge variant={u.disabled ? "destructive" : "success"}>{u.disabled ? t("users.disabled") : t("users.active")}</Badge>
+								</TableCell>
+								<TableCell className="text-right">
+									<Button size="sm" variant="outline" disabled={state.isLoading} onClick={() => void toggle(u.id, u.email, u.disabled)}>
+										{u.disabled ? t("users.enable") : t("users.disable")}
+									</Button>
+								</TableCell>
+							</TableRow>
+						))}
+					</TableBody>
+				</Table>
 			</div>
 		</div>
 	);
@@ -133,7 +140,10 @@ export function AdminUsersPanel() {
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 /** "at most 4 at once, no daily run limit, no daily spend limit": 0 means no limit on the server (N9). */
-export function limitsSummary(l: Pick<AdminLimits, "max_concurrent_runs" | "max_runs_per_day" | "max_spend_usd_per_day">, t: Translate): string {
+export function limitsSummary(
+	l: Pick<AdminLimits, "max_concurrent_runs" | "max_runs_per_day" | "max_spend_usd_per_day">,
+	t: Translate,
+): string {
 	return [
 		l.max_concurrent_runs > 0 ? t("orgs.atOnce", { n: l.max_concurrent_runs }) : t("orgs.atOnceNone"),
 		l.max_runs_per_day > 0 ? t("orgs.perDay", { n: l.max_runs_per_day }) : t("orgs.perDayNone"),
@@ -154,40 +164,38 @@ export function AdminOrgsPanel() {
 		<div className="flex flex-col gap-4" data-testid="admin-orgs">
 			{current && <QuotaEditor key={current.id} org={current} onClose={() => setEditing(null)} />}
 			<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
-			<Table>
-				<TableHeader>
-					<TableRow>
-						<TableHead>{t("orgs.slug")}</TableHead>
-						<TableHead>{t("orgs.name")}</TableHead>
-						<TableHead className="text-right">{t("orgs.members")}</TableHead>
-						<TableHead>{t("orgs.quota")}</TableHead>
-						<TableHead>{t("orgs.runtime")}</TableHead>
-						<TableHead />
-					</TableRow>
-				</TableHeader>
-				<TableBody>
-					{orgs.map((o) => (
-						<TableRow key={o.id} data-testid={`admin-org-${o.slug}`}>
-							<TableCell className="font-mono text-xs">
-								{o.slug} {o.public_read && <Badge variant="outline">{t("orgs.public")}</Badge>}
-							</TableCell>
-							<TableCell className="font-medium">{o.name}</TableCell>
-							<TableCell className="text-right tabular-nums">{o.members}</TableCell>
-							<TableCell className="text-muted-foreground text-sm">
-								{o.quota && limitsSummary(o.quota, t as Translate)}
-							</TableCell>
-							<TableCell>
-								<RuntimeBadge runtime={o.quota?.runtime ?? "runsc"} testId={`admin-org-runtime-${o.slug}`} />
-							</TableCell>
-							<TableCell className="text-right">
-								<Button size="sm" variant="outline" onClick={() => setEditing(o.id)} data-testid={`admin-org-edit-${o.slug}`}>
-									{t("orgs.edit")}
-								</Button>
-							</TableCell>
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead>{t("orgs.slug")}</TableHead>
+							<TableHead>{t("orgs.name")}</TableHead>
+							<TableHead className="text-right">{t("orgs.members")}</TableHead>
+							<TableHead>{t("orgs.quota")}</TableHead>
+							<TableHead>{t("orgs.runtime")}</TableHead>
+							<TableHead />
 						</TableRow>
-					))}
-				</TableBody>
-			</Table>
+					</TableHeader>
+					<TableBody>
+						{orgs.map((o) => (
+							<TableRow key={o.id} data-testid={`admin-org-${o.slug}`}>
+								<TableCell className="font-mono text-xs">
+									{o.slug} {o.public_read && <Badge variant="outline">{t("orgs.public")}</Badge>}
+								</TableCell>
+								<TableCell className="font-medium">{o.name}</TableCell>
+								<TableCell className="text-right tabular-nums">{o.members}</TableCell>
+								<TableCell className="text-muted-foreground text-sm">{o.quota && limitsSummary(o.quota, t as Translate)}</TableCell>
+								<TableCell>
+									<RuntimeBadge runtime={o.quota?.runtime ?? "runsc"} testId={`admin-org-runtime-${o.slug}`} />
+								</TableCell>
+								<TableCell className="text-right">
+									<Button size="sm" variant="outline" onClick={() => setEditing(o.id)} data-testid={`admin-org-edit-${o.slug}`}>
+										{t("orgs.edit")}
+									</Button>
+								</TableCell>
+							</TableRow>
+						))}
+					</TableBody>
+				</Table>
 			</div>
 		</div>
 	);
@@ -198,7 +206,11 @@ export function RuntimeBadge({ runtime, testId }: { runtime: AdminLimits["runtim
 	const { t } = useTranslation("admin");
 	const runc = runtime === "runc";
 	return (
-		<Badge variant={runc ? "destructive" : "secondary"} title={t(runc ? "orgs.runtimeRuncHint" : "orgs.runtimeRunscHint")} data-testid={testId}>
+		<Badge
+			variant={runc ? "destructive" : "secondary"}
+			title={t(runc ? "orgs.runtimeRuncHint" : "orgs.runtimeRunscHint")}
+			data-testid={testId}
+		>
 			{t(runc ? "orgs.runtimeRunc" : "orgs.runtimeRunsc")}
 		</Badge>
 	);
@@ -292,7 +304,11 @@ export function QuotaEditor({ org, onClose }: { org: AdminOrg; onClose(): void }
 					</label>
 				</div>
 				<label className="flex items-center gap-2 text-sm">
-					<input type="checkbox" checked={form.allow_custom_images} onChange={(e) => setForm({ ...form, allow_custom_images: e.target.checked })} />
+					<input
+						type="checkbox"
+						checked={form.allow_custom_images}
+						onChange={(e) => setForm({ ...form, allow_custom_images: e.target.checked })}
+					/>
 					{t("quota.allowCustom")}
 				</label>
 				<label className="flex items-center gap-2 text-sm">
@@ -301,7 +317,11 @@ export function QuotaEditor({ org, onClose }: { org: AdminOrg; onClose(): void }
 				</label>
 				<p className="text-muted-foreground text-xs">{t("quota.zeroHint")}</p>
 				{state.error && <p className="text-destructive text-sm">{getBenchErrorMessage(state.error)}</p>}
-				{saved && <p className="text-sm" data-testid="quota-saved">{t("quota.saved")}</p>}
+				{saved && (
+					<p className="text-sm" data-testid="quota-saved">
+						{t("quota.saved")}
+					</p>
+				)}
 				<div className="flex gap-2">
 					<Button onClick={() => void submit()} disabled={state.isLoading} data-testid="quota-save">
 						{t("quota.save")}
@@ -340,11 +360,20 @@ export function AdminImagesPanel() {
 	const [rejecting, setRejecting] = useState<string | null>(null);
 	const [note, setNote] = useState("");
 	const gate = useGate(q, "admin-images", t("images.unavailable"));
-	const statusLabel = (s: string) => (s === "approved" ? t("images.approved") : s === "rejected" ? t("images.rejected") : t("images.pending"));
+	const statusLabel = (s: string) =>
+		s === "approved" ? t("images.approved") : s === "rejected" ? t("images.rejected") : t("images.pending");
 	const filters = (
 		<div className="flex gap-1" role="tablist" aria-label={t("images.status")} data-testid="admin-images-filter">
 			{IMAGE_FILTERS.map((f) => (
-				<Button key={f} size="sm" variant={filter === f ? "secondary" : "ghost"} role="tab" aria-selected={filter === f} onClick={() => setFilter(f)} data-testid={`admin-images-filter-${f}`}>
+				<Button
+					key={f}
+					size="sm"
+					variant={filter === f ? "secondary" : "ghost"}
+					role="tab"
+					aria-selected={filter === f}
+					onClick={() => setFilter(f)}
+					data-testid={`admin-images-filter-${f}`}
+				>
 					{f === "all" ? t("images.all", { defaultValue: "All" }) : statusLabel(f)}
 				</Button>
 			))}
@@ -389,7 +418,9 @@ export function AdminImagesPanel() {
 									<TableCell>{img.org_id}</TableCell>
 									<TableCell>{fmtBytes(img.size_bytes)}</TableCell>
 									<TableCell>
-										<Badge variant={img.status === "approved" ? "success" : img.status === "rejected" ? "destructive" : "warning"}>{statusLabel(img.status)}</Badge>
+										<Badge variant={img.status === "approved" ? "success" : img.status === "rejected" ? "destructive" : "warning"}>
+											{statusLabel(img.status)}
+										</Badge>
 									</TableCell>
 									<TableCell>
 										{img.requested_by} {fmtDate(img.created_at)}
@@ -414,10 +445,21 @@ export function AdminImagesPanel() {
 												</div>
 											) : (
 												<div className="flex justify-end gap-2">
-													<Button size="sm" disabled={state.isLoading} onClick={() => void decide({ id: img.id, decision: "approve" })} data-testid={`admin-image-approve-${img.id}`}>
+													<Button
+														size="sm"
+														disabled={state.isLoading}
+														onClick={() => void decide({ id: img.id, decision: "approve" })}
+														data-testid={`admin-image-approve-${img.id}`}
+													>
 														{t("images.approve")}
 													</Button>
-													<Button size="sm" variant="outline" disabled={state.isLoading} onClick={() => setRejecting(img.id)} data-testid={`admin-image-reject-${img.id}`}>
+													<Button
+														size="sm"
+														variant="outline"
+														disabled={state.isLoading}
+														onClick={() => setRejecting(img.id)}
+														data-testid={`admin-image-reject-${img.id}`}
+													>
 														{t("images.reject")}
 													</Button>
 												</div>
@@ -482,36 +524,36 @@ export function AdminUsagePanel() {
 						<EmptyState compact message={t("usage.empty")} testId="admin-usage-empty" />
 					) : (
 						<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
-						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>{t("usage.org")}</TableHead>
-									<TableHead>{t("usage.runs")}</TableHead>
-									<TableHead>{t("usage.cost")}</TableHead>
-									{anyUnknown && <TableHead>{t("usage.unknownCost")}</TableHead>}
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{rows.map((r) => (
-									<TableRow key={r.org_id} data-testid={`admin-usage-row-${r.org_id}`}>
-										<TableCell title={r.org_id}>
-											<div className="flex min-w-0 flex-col">
-												<span className="font-medium">{r.name || r.slug || r.org_id}</span>
-												{r.slug && r.name && <span className="text-muted-foreground font-mono text-xs">{r.slug}</span>}
-												{r.error && (
-													<span className="text-destructive text-xs" role="alert">
-														{t("usage.orgError", { error: r.error })}
-													</span>
-												)}
-											</div>
-										</TableCell>
-										<TableCell className="tabular-nums">{r.runs ?? 0}</TableCell>
-										<TableCell className="tabular-nums">${(r.cost_usd ?? 0).toFixed(2)}</TableCell>
-										{anyUnknown && <TableCell className="tabular-nums">{r.unknown_cost_runs ?? 0}</TableCell>}
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead>{t("usage.org")}</TableHead>
+										<TableHead>{t("usage.runs")}</TableHead>
+										<TableHead>{t("usage.cost")}</TableHead>
+										{anyUnknown && <TableHead>{t("usage.unknownCost")}</TableHead>}
 									</TableRow>
-								))}
-							</TableBody>
-						</Table>
+								</TableHeader>
+								<TableBody>
+									{rows.map((r) => (
+										<TableRow key={r.org_id} data-testid={`admin-usage-row-${r.org_id}`}>
+											<TableCell title={r.org_id}>
+												<div className="flex min-w-0 flex-col">
+													<span className="font-medium">{r.name || r.slug || r.org_id}</span>
+													{r.slug && r.name && <span className="text-muted-foreground font-mono text-xs">{r.slug}</span>}
+													{r.error && (
+														<span className="text-destructive text-xs" role="alert">
+															{t("usage.orgError", { error: r.error })}
+														</span>
+													)}
+												</div>
+											</TableCell>
+											<TableCell className="tabular-nums">{r.runs ?? 0}</TableCell>
+											<TableCell className="tabular-nums">${(r.cost_usd ?? 0).toFixed(2)}</TableCell>
+											{anyUnknown && <TableCell className="tabular-nums">{r.unknown_cost_runs ?? 0}</TableCell>}
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
 						</div>
 					)}
 				</>
@@ -541,50 +583,51 @@ export function AdminContainersPanel() {
 				</p>
 			)}
 			<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
-			<Table>
-				<TableHeader>
-					<TableRow>
-						<TableHead>{t("containers.org")}</TableHead>
-						<TableHead>{t("containers.runner")}</TableHead>
-						<TableHead>{t("containers.pool")}</TableHead>
-						<TableHead>{t("containers.host")}</TableHead>
-						<TableHead>{t("containers.state")}</TableHead>
-						<TableHead>{t("containers.slots")}</TableHead>
-						<TableHead>{t("containers.seen")}</TableHead>
-						<TableHead />
-					</TableRow>
-				</TableHeader>
-				<TableBody>
-					{runners.map((r) => (
-						<TableRow key={r.runner_id} data-testid={`admin-runner-${r.runner_id}`}>
-							<TableCell title={r.org_id}>{r.org_name || r.org_slug}</TableCell>
-							<TableCell className="font-mono text-xs">{r.runner}</TableCell>
-							<TableCell>{r.pool}</TableCell>
-							<TableCell>{r.host}</TableCell>
-							<TableCell>
-								<Badge variant={r.live ? "success" : "secondary"}>{r.live ? t("containers.live") : t("containers.offline")}</Badge> {r.state}
-							</TableCell>
-							<TableCell className="tabular-nums" title={r.running.join(", ")}>
-								{r.running.length}/{r.slots}
-							</TableCell>
-							<TableCell>{fmtDate(r.last_seen)}</TableCell>
-							<TableCell className="text-right">
-								{!r.live && (
-									<ConfirmButton
-										label={t("containers.remove")}
-										question={t("containers.confirmRemove", { runner: r.runner, org: r.org_name || r.org_slug })}
-										confirmLabel={t("containers.remove")}
-										cancelLabel={t("containers.removeCancel")}
-										onConfirm={() => void remove({ orgId: r.org_id, runnerId: r.runner_id })}
-										isLoading={removeState.isLoading && removeState.originalArgs?.runnerId === r.runner_id}
-										testId={`admin-runner-remove-${r.runner_id}`}
-									/>
-								)}
-							</TableCell>
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead>{t("containers.org")}</TableHead>
+							<TableHead>{t("containers.runner")}</TableHead>
+							<TableHead>{t("containers.pool")}</TableHead>
+							<TableHead>{t("containers.host")}</TableHead>
+							<TableHead>{t("containers.state")}</TableHead>
+							<TableHead>{t("containers.slots")}</TableHead>
+							<TableHead>{t("containers.seen")}</TableHead>
+							<TableHead />
 						</TableRow>
-					))}
-				</TableBody>
-			</Table>
+					</TableHeader>
+					<TableBody>
+						{runners.map((r) => (
+							<TableRow key={r.runner_id} data-testid={`admin-runner-${r.runner_id}`}>
+								<TableCell title={r.org_id}>{r.org_name || r.org_slug}</TableCell>
+								<TableCell className="font-mono text-xs">{r.runner}</TableCell>
+								<TableCell>{r.pool}</TableCell>
+								<TableCell>{r.host}</TableCell>
+								<TableCell>
+									<Badge variant={r.live ? "success" : "secondary"}>{r.live ? t("containers.live") : t("containers.offline")}</Badge>{" "}
+									{r.state}
+								</TableCell>
+								<TableCell className="tabular-nums" title={r.running.join(", ")}>
+									{r.running.length}/{r.slots}
+								</TableCell>
+								<TableCell>{fmtDate(r.last_seen)}</TableCell>
+								<TableCell className="text-right">
+									{!r.live && (
+										<ConfirmButton
+											label={t("containers.remove")}
+											question={t("containers.confirmRemove", { runner: r.runner, org: r.org_name || r.org_slug })}
+											confirmLabel={t("containers.remove")}
+											cancelLabel={t("containers.removeCancel")}
+											onConfirm={() => void remove({ orgId: r.org_id, runnerId: r.runner_id })}
+											isLoading={removeState.isLoading && removeState.originalArgs?.runnerId === r.runner_id}
+											testId={`admin-runner-remove-${r.runner_id}`}
+										/>
+									)}
+								</TableCell>
+							</TableRow>
+						))}
+					</TableBody>
+				</Table>
 			</div>
 		</div>
 	);

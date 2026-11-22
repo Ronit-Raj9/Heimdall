@@ -63,8 +63,17 @@ export default function LibraryView() {
 				{lib.data?.available && totals && (
 					<p className="text-muted-foreground font-mono text-xs" data-testid="library-totals">
 						{totals.filtered
-							? t("library.totalsFiltered", { shown: totals.shown, benchmarks: totals.benchmarks, tasks: totals.tasks.toLocaleString(), ready: totals.ready.toLocaleString() })
-							: t("library.totals", { benchmarks: totals.benchmarks, tasks: totals.tasks.toLocaleString(), ready: totals.ready.toLocaleString() })}
+							? t("library.totalsFiltered", {
+									shown: totals.shown,
+									benchmarks: totals.benchmarks,
+									tasks: totals.tasks.toLocaleString(),
+									ready: totals.ready.toLocaleString(),
+								})
+							: t("library.totals", {
+									benchmarks: totals.benchmarks,
+									tasks: totals.tasks.toLocaleString(),
+									ready: totals.ready.toLocaleString(),
+								})}
 					</p>
 				)}
 			</SiteHeader>
@@ -73,7 +82,10 @@ export default function LibraryView() {
 			) : lib.error ? (
 				<LoadError title={t("common.loadError")} error={lib.error} onRetry={lib.refetch} testId="library-error" />
 			) : !lib.data?.available || lib.data.benchmarks.length === 0 ? (
-				<div className="bg-card text-muted-foreground flex items-center gap-3 rounded-xl border px-5 py-6 text-sm" data-testid="library-none">
+				<div
+					className="bg-card text-muted-foreground flex items-center gap-3 rounded-xl border px-5 py-6 text-sm"
+					data-testid="library-none"
+				>
 					<Library className="size-5 shrink-0" aria-hidden="true" />
 					{t("library.none")}
 				</div>
@@ -89,7 +101,9 @@ export default function LibraryView() {
 									onClick={() => void setPack(p.id || null)}
 									className={cn(
 										"rounded-full border px-3 py-1 text-[13px] transition-colors",
-										pack === p.id ? "bg-foreground text-background border-foreground" : "bg-card text-muted-foreground hover:text-foreground",
+										pack === p.id
+											? "bg-foreground text-background border-foreground"
+											: "bg-card text-muted-foreground hover:text-foreground",
 									)}
 									data-testid={`library-pack-${p.id || "all"}`}
 								>
@@ -147,7 +161,12 @@ function BenchmarkCard({ b, packs, canOpen }: { b: PublicBenchmark; packs: Publi
 							</Link>
 						) : (
 							<>
-								<Link to="/login" search={{ return_to: `/suites/${b.id}` }} className="hover:underline" data-testid={`library-open-${b.id}`}>
+								<Link
+									to="/login"
+									search={{ return_to: `/suites/${b.id}` }}
+									className="hover:underline"
+									data-testid={`library-open-${b.id}`}
+								>
 									{b.title}
 								</Link>
 								<span className="text-muted-foreground ml-2 text-xs font-normal">{t("library.signInToOpen")}</span>

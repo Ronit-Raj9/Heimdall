@@ -58,9 +58,18 @@ describe("ExperimentForm condition layers", () => {
 		const shared: Catalog = {
 			...catalog,
 			probes: [{ ...catalog.probes.find((p) => p.id === "stale-notes")!, layer: "gateway" }, ...catalog.probes],
-			suites: catalog.suites.map((s) => ({ ...s, probe_layers: { "stale-notes": "fixture", "model-outage": "gateway", "test-crash": "tool_shim", "empty-test-run": "tool_shim" } })),
+			suites: catalog.suites.map((s) => ({
+				...s,
+				probe_layers: { "stale-notes": "fixture", "model-outage": "gateway", "test-crash": "tool_shim", "empty-test-run": "tool_shim" },
+			})),
 		};
-		const html = render(<ExperimentForm catalog={shared} defaults={defaultFormValues(shared, dateSeed(new Date("2026-11-18T06:00:00Z")))} onStarted={() => undefined} />);
+		const html = render(
+			<ExperimentForm
+				catalog={shared}
+				defaults={defaultFormValues(shared, dateSeed(new Date("2026-11-18T06:00:00Z")))}
+				onStarted={() => undefined}
+			/>,
+		);
 		const row = html.slice(html.indexOf('data-testid="experiment-condition-stale-notes"'));
 		expect(row.slice(0, row.indexOf("</label>"))).toContain("fixture failure test");
 		expect(row.slice(0, row.indexOf("</label>"))).not.toContain("gateway failure test");
@@ -100,7 +109,9 @@ describe("ExperimentForm benchmark and agent menus (N39)", () => {
 	it("names ready counts and marks practice benchmarks", () => {
 		const t = i18n.getFixedT("en", "builder");
 		const s = { id: "acme-desktop", version: "1.0.0", tasks: ["a", "b"], probes: [] };
-		expect(suiteOptionText(s, new Map([["acme-desktop@1.0.0", { ids: ["a"], total: 2 }]]), t)).toBe("acme-desktop@1.0.0 (1 of 2 ready) (practice)");
+		expect(suiteOptionText(s, new Map([["acme-desktop@1.0.0", { ids: ["a"], total: 2 }]]), t)).toBe(
+			"acme-desktop@1.0.0 (1 of 2 ready) (practice)",
+		);
 		expect(suiteOptionText({ ...s, id: "hd-x" }, undefined, t)).toBe("hd-x@1.0.0 (2 tasks)");
 	});
 

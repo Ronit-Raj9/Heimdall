@@ -114,7 +114,11 @@ export function OwnTasksCard({ onAdd, initialOpen = false, initialSuite, initial
 			id = res.data.id || slug;
 		}
 		if (grader === "judge") {
-			const g = await setSuiteGrader({ suite: id, grader: "judge", judge: { provider: judge.provider.trim(), model: judge.model.trim(), votes: judge.votes } });
+			const g = await setSuiteGrader({
+				suite: id,
+				grader: "judge",
+				judge: { provider: judge.provider.trim(), model: judge.model.trim(), votes: judge.votes },
+			});
 			if (!("data" in g)) {
 				setSuiteId(id);
 				return;
@@ -130,14 +134,23 @@ export function OwnTasksCard({ onAdd, initialOpen = false, initialSuite, initial
 	const onDone = useCallback(
 		(j: Job) => {
 			setJob(j);
-			dispatch(benchApi.util.invalidateTags([{ type: "BenchSuites", id: "LIST" }, { type: "BenchSuites", id: `${suiteId}/health` }]));
+			dispatch(
+				benchApi.util.invalidateTags([
+					{ type: "BenchSuites", id: "LIST" },
+					{ type: "BenchSuites", id: `${suiteId}/health` },
+				]),
+			);
 			const r = readinessReport(j.result);
 			if (r && r.tasks.some((x) => x.ready)) onAdd(suiteId);
 		},
 		[dispatch, suiteId, onAdd],
 	);
 
-	const createError = created.error ? (isTaken(created.error) ? t("benchmarks.own.taken", { id: slug, suggest: `${slug}-2` }) : authoringError(created.error, t("benchmarks.own.createError"))) : "";
+	const createError = created.error
+		? isTaken(created.error)
+			? t("benchmarks.own.taken", { id: slug, suggest: `${slug}-2` })
+			: authoringError(created.error, t("benchmarks.own.createError"))
+		: "";
 
 	return (
 		<section className="rounded-md border px-3 py-3" data-testid="step3-own">
@@ -156,7 +169,13 @@ export function OwnTasksCard({ onAdd, initialOpen = false, initialSuite, initial
 				<div className="mt-3 flex min-w-0 flex-col gap-3" data-testid="step3-own-setup">
 					<label className="flex min-w-0 flex-col gap-1 text-sm">
 						<span className="text-muted-foreground">{t("benchmarks.own.name")}</span>
-						<Input value={name} disabled={Boolean(suiteId)} placeholder={t("benchmarks.own.namePlaceholder")} onChange={(e) => setName(e.target.value)} data-testid="step3-own-name" />
+						<Input
+							value={name}
+							disabled={Boolean(suiteId)}
+							placeholder={t("benchmarks.own.namePlaceholder")}
+							onChange={(e) => setName(e.target.value)}
+							data-testid="step3-own-name"
+						/>
 						{slug && (
 							<span className="text-muted-foreground font-mono text-xs" data-testid="step3-own-slug">
 								{slug === name.trim().toLowerCase() ? t("benchmarks.own.id", { id: slug }) : fw05("own.madeFrom", { id: slug })}
@@ -176,7 +195,10 @@ export function OwnTasksCard({ onAdd, initialOpen = false, initialSuite, initial
 							{(["exact", "judge"] as const).map((g) => (
 								<label
 									key={g}
-									className={cn("flex cursor-pointer flex-col gap-0.5 rounded-md border px-3 py-2 text-sm", grader === g && "border-primary bg-primary/5")}
+									className={cn(
+										"flex cursor-pointer flex-col gap-0.5 rounded-md border px-3 py-2 text-sm",
+										grader === g && "border-primary bg-primary/5",
+									)}
 									data-testid={`step3-own-grader-${g}`}
 								>
 									<span className="flex items-center gap-2 font-medium">
@@ -220,12 +242,27 @@ export function OwnTasksCard({ onAdd, initialOpen = false, initialSuite, initial
 					</p>
 					<div className="flex flex-wrap items-center gap-2" role="tablist" aria-label={t("benchmarks.own.format")}>
 						{(["rows", "tickets"] as const).map((f) => (
-							<Button key={f} role="tab" aria-selected={format === f} size="sm" variant={format === f ? "default" : "outline"} onClick={() => setFormat(f)} dataTestId={`step3-own-format-${f}`}>
+							<Button
+								key={f}
+								role="tab"
+								aria-selected={format === f}
+								size="sm"
+								variant={format === f ? "default" : "outline"}
+								onClick={() => setFormat(f)}
+								dataTestId={`step3-own-format-${f}`}
+							>
 								{t(`benchmarks.own.${f}`)}
 							</Button>
 						))}
 					</div>
-					<RowsImportForm key={format} suiteId={suiteId} exact={grader === "exact"} format={format} onImported={onImported} t={tb as BuildT} />
+					<RowsImportForm
+						key={format}
+						suiteId={suiteId}
+						exact={grader === "exact"}
+						format={format}
+						onImported={onImported}
+						t={tb as BuildT}
+					/>
 					<div className="flex min-w-0 flex-col gap-2 border-t pt-3" data-testid="step3-own-readiness">
 						<h4 className="text-sm font-medium">{t("benchmarks.own.readinessTitle")}</h4>
 						<p className="text-muted-foreground text-xs">{t("benchmarks.own.readinessHelp")}</p>
@@ -236,7 +273,11 @@ export function OwnTasksCard({ onAdd, initialOpen = false, initialSuite, initial
 								kind={SUITE_OPS_KINDS.admit}
 								params={{ suite: suiteId }}
 								label={t("benchmarks.own.readinessRun")}
-								confirm={session.authMode === "hosted" ? tb("readiness.confirmHosted", { count: imported }) : tb("readiness.confirm", { count: imported })}
+								confirm={
+									session.authMode === "hosted"
+										? tb("readiness.confirmHosted", { count: imported })
+										: tb("readiness.confirm", { count: imported })
+								}
 								onDone={onDone}
 							/>
 						)}

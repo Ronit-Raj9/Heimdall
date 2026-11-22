@@ -133,7 +133,8 @@ function SkillFindings({ skill }: { skill: AgentSkill }) {
 			<ul className="mt-1 space-y-1">
 				{findings.map((f, i) => (
 					<li key={i} className={f.severity === "block" ? "text-destructive" : "text-amber-700"}>
-						<span className="font-mono">{f.rule}</span> <span className="font-mono">{f.line ? `${f.file}:${f.line}` : f.file}</span> {f.detail}
+						<span className="font-mono">{f.rule}</span> <span className="font-mono">{f.line ? `${f.file}:${f.line}` : f.file}</span>{" "}
+						{f.detail}
 					</li>
 				))}
 			</ul>
@@ -180,7 +181,8 @@ export function SkillsSection({ id, initial = initialSkillForm }: { id: string; 
 		setScanning(skill);
 		const res = await scan({ id, name: skill });
 		setScanning(null);
-		const verdict = "error" in res && res.error ? { ok: false, text: getBenchErrorMessage(res.error) } : res.data ? skillScanMessage(t, res.data) : null;
+		const verdict =
+			"error" in res && res.error ? { ok: false, text: getBenchErrorMessage(res.error) } : res.data ? skillScanMessage(t, res.data) : null;
 		if (verdict) setVerdicts((v) => ({ ...v, [skill]: verdict }));
 	};
 	const del = async (skill: string) => {
@@ -190,11 +192,7 @@ export function SkillsSection({ id, initial = initialSkillForm }: { id: string; 
 	};
 
 	return (
-		<OpsSection
-			title={t("tools.skills.title")}
-			hint={t("tools.skills.hint", { dir })}
-			testId="agent-skills-section"
-		>
+		<OpsSection title={t("tools.skills.title")} hint={t("tools.skills.hint", { dir })} testId="agent-skills-section">
 			{isLoading ? (
 				<p className="text-muted-foreground text-xs">{t("tools.skills.loading")}</p>
 			) : error ? (
@@ -248,27 +246,32 @@ export function SkillsSection({ id, initial = initialSkillForm }: { id: string; 
 				<p className="text-xs text-amber-600">{t("tools.skills.notInstalled", { dir: data.dir })}</p>
 			)}
 			<RoleGate min="member">
-			<div className="flex flex-wrap items-end gap-3">
-				<Field label={t("tools.skills.zip")}>
-					<input
-						key={form.inputKey}
-						type="file"
-						accept=".zip,application/zip"
-						onChange={(e) => pick(e.target.files?.[0] ?? null)}
-						data-testid="agent-skill-file"
-					/>
-				</Field>
-				<Field label={t("tools.skills.name")}>
-					<Input value={name} onChange={(e) => dispatch({ type: "name", name: e.target.value })} placeholder="code-review" data-testid="agent-skill-name" />
-				</Field>
-				<label className="flex items-center gap-2 pb-2 text-xs">
-					<input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
-					{t("tools.skills.replace")}
-				</label>
-				<Button disabled={!!problem || uploading} onClick={() => void submit()} data-testid="agent-skill-upload">
-					{uploading ? t("tools.skills.uploading") : t("tools.skills.upload")}
-				</Button>
-			</div>
+				<div className="flex flex-wrap items-end gap-3">
+					<Field label={t("tools.skills.zip")}>
+						<input
+							key={form.inputKey}
+							type="file"
+							accept=".zip,application/zip"
+							onChange={(e) => pick(e.target.files?.[0] ?? null)}
+							data-testid="agent-skill-file"
+						/>
+					</Field>
+					<Field label={t("tools.skills.name")}>
+						<Input
+							value={name}
+							onChange={(e) => dispatch({ type: "name", name: e.target.value })}
+							placeholder="code-review"
+							data-testid="agent-skill-name"
+						/>
+					</Field>
+					<label className="flex items-center gap-2 pb-2 text-xs">
+						<input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
+						{t("tools.skills.replace")}
+					</label>
+					<Button disabled={!!problem || uploading} onClick={() => void submit()} data-testid="agent-skill-upload">
+						{uploading ? t("tools.skills.uploading") : t("tools.skills.upload")}
+					</Button>
+				</div>
 			</RoleGate>
 			{file && problem && <p className="text-destructive text-xs">{problem}</p>}
 			{file && !problem && (
@@ -289,7 +292,11 @@ function MCPSection({ id }: { id: string }) {
 	const { t } = useTranslation("agentops");
 	const { data, error, isLoading } = useGetAgentMCPQuery(id);
 	const [save, { isLoading: saving }] = usePutAgentMCPMutation();
-	const [form, setForm] = useState(() => ({ format: data?.format ?? "", mount_path: data?.mount_path ?? "", servers_yaml: data?.servers_yaml ?? "" }));
+	const [form, setForm] = useState(() => ({
+		format: data?.format ?? "",
+		mount_path: data?.mount_path ?? "",
+		servers_yaml: data?.servers_yaml ?? "",
+	}));
 	const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
 	useEffect(() => {
@@ -304,11 +311,7 @@ function MCPSection({ id }: { id: string }) {
 	};
 
 	return (
-		<OpsSection
-			title={t("tools.mcp.title")}
-			hint={t("tools.mcp.hint")}
-			testId="agent-mcp-section"
-		>
+		<OpsSection title={t("tools.mcp.title")} hint={t("tools.mcp.hint")} testId="agent-mcp-section">
 			{isLoading ? (
 				<p className="text-muted-foreground text-xs">{t("tools.mcp.loading")}</p>
 			) : error ? (
@@ -358,7 +361,9 @@ function MCPSection({ id }: { id: string }) {
 								{saving ? t("tools.mcp.saving") : t("tools.mcp.save")}
 							</Button>
 						</RoleGate>
-						{data && data.servers.length > 0 && !dirty && <JobRunButton {...scanMCPJob(data.servers_file)} label={t("tools.mcp.scan")} variant="outline" />}
+						{data && data.servers.length > 0 && !dirty && (
+							<JobRunButton {...scanMCPJob(data.servers_file)} label={t("tools.mcp.scan")} variant="outline" />
+						)}
 						{dirty && <span className="text-muted-foreground text-xs">{t("tools.mcp.saveFirst")}</span>}
 					</div>
 					{message && (

@@ -19,7 +19,15 @@ function tag(html: string, testId: string): string {
 	return html.match(new RegExp(`<[a-z]+[^>]*data-testid="${testId}"[^>]*>`))?.[0] ?? "";
 }
 
-const v = { url: "", token_env: "", baseline_key: "vk-a", candidate_key: "vk-b", tag_header: "x-bf-lh-agent-version", baseline_tag: "", candidate_tag: "" };
+const v = {
+	url: "",
+	token_env: "",
+	baseline_key: "vk-a",
+	candidate_key: "vk-b",
+	tag_header: "x-bf-lh-agent-version",
+	baseline_tag: "",
+	candidate_tag: "",
+};
 
 describe("liveInitParams", () => {
 	it("sends the keys split", () => {

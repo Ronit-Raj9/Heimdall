@@ -18,12 +18,31 @@ vi.mock("@/lib/store/apis/platformApi", () => ({ useGetJobQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => [vi.fn(), { isLoading: false }] }));
 vi.mock("@tanstack/react-router", () => ({ Link: ({ children }: { children: unknown }) => children }));
 
-const base = { agent: "agents/codex.yaml", suite: "coding-core@1.0.0", repo: "", refA: "main", refB: "feature/x", tasks: "", trials: 3, budget: 0 };
+const base = {
+	agent: "agents/codex.yaml",
+	suite: "coding-core@1.0.0",
+	repo: "",
+	refA: "main",
+	refB: "feature/x",
+	tasks: "",
+	trials: 3,
+	budget: 0,
+};
 
 describe("compareRefsParams", () => {
 	it("builds the job params and drops blanks", () => {
-		expect(compareRefsParams(base)).toEqual({ agent: "agents/codex.yaml", suite: "coding-core@1.0.0", ref_a: "main", ref_b: "feature/x", trials: 3 });
-		expect(compareRefsParams({ ...base, repo: "acme/agent", tasks: "t1, t2,t1", budget: 2 })).toMatchObject({ repo: "acme/agent", tasks: ["t1", "t2"], budget_usd: 2 });
+		expect(compareRefsParams(base)).toEqual({
+			agent: "agents/codex.yaml",
+			suite: "coding-core@1.0.0",
+			ref_a: "main",
+			ref_b: "feature/x",
+			trials: 3,
+		});
+		expect(compareRefsParams({ ...base, repo: "acme/agent", tasks: "t1, t2,t1", budget: 2 })).toMatchObject({
+			repo: "acme/agent",
+			tasks: ["t1", "t2"],
+			budget_usd: 2,
+		});
 	});
 	it("waits for an agent, a suite and two different refs", () => {
 		expect(compareRefsParams({ ...base, agent: "" })).toBeNull();

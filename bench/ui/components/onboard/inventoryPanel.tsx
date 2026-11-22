@@ -13,7 +13,16 @@ import { useTranslation } from "react-i18next";
 const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
 
 /** Row fields the onboard rows reader maps (onboard/source_rows.go mappingKeys), in the Build tab mapper's order. */
-export const ONBOARD_MAP_FIELDS = ["question", "expected", "rubric", "reference", "wrong_answers", "id", "title", "split"] as const satisfies readonly (typeof MAP_FIELDS)[number][];
+export const ONBOARD_MAP_FIELDS = [
+	"question",
+	"expected",
+	"rubric",
+	"reference",
+	"wrong_answers",
+	"id",
+	"title",
+	"split",
+] as const satisfies readonly (typeof MAP_FIELDS)[number][];
 
 /** The inventory's column paths as row mapper columns, with an example from the first sample that has one. */
 export function onboardColumns(inv: Pick<OnboardInventory, "columns" | "samples">): RowColumn[] {
@@ -58,7 +67,11 @@ export function MatchChips({ matches, active, onPick }: { matches: OnboardMatch[
 }
 
 /** The line under the Benchmark id box: the rule, a refusal, or what drafting into this id does. */
-function suiteIdLine(check: SuiteIdCheck, id: string, tx: (k: string, o?: Record<string, unknown>) => string): { text: string; error: boolean } {
+function suiteIdLine(
+	check: SuiteIdCheck,
+	id: string,
+	tx: (k: string, o?: Record<string, unknown>) => string,
+): { text: string; error: boolean } {
 	switch (check.state) {
 		case "invalid":
 		case "empty":
@@ -175,7 +188,11 @@ export function InventoryPanel({
 				</p>
 			)}
 			{!inv.can_draft && !mappable ? (
-				<p role="note" className="border-chart-info/50 bg-chart-info/10 rounded-sm border px-3 py-2 text-sm" data-testid="onboard-cannot-draft">
+				<p
+					role="note"
+					className="border-chart-info/50 bg-chart-info/10 rounded-sm border px-3 py-2 text-sm"
+					data-testid="onboard-cannot-draft"
+				>
 					<span className="font-medium">{t("source.cannotDraft")}.</span> {inv.next}
 				</p>
 			) : (

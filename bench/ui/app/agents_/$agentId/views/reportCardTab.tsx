@@ -116,12 +116,23 @@ export default function ReportCardTab({ agentId }: { agentId: string }) {
 					</span>
 				</EmptyNote>
 			) : report.isError || !report.data ? (
-				<LoadError title={t("reportCard.loadError")} error={report.error} onRetry={() => void report.refetch()} testId="agent-report-card-error" />
+				<LoadError
+					title={t("reportCard.loadError")}
+					error={report.error}
+					onRetry={() => void report.refetch()}
+					testId="agent-report-card-error"
+				/>
 			) : (
 				<>
 					<ReportCard
 						report={report.data}
-						actions={<ShareButton kind="report_card" target={agentId} query={shareQuery({ version: version || undefined, model: model || undefined })} />}
+						actions={
+							<ShareButton
+								kind="report_card"
+								target={agentId}
+								query={shareQuery({ version: version || undefined, model: model || undefined })}
+							/>
+						}
 					/>
 					<ReportFailures report={report.data} agent={agentId} />
 				</>

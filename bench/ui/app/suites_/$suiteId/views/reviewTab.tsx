@@ -265,7 +265,10 @@ function GeneratedRow({ suite, task, t }: { suite: string; task: GeneratedTask; 
 			</div>
 			{task.decision && (
 				<p className="text-muted-foreground text-xs" title={task.decision.by || undefined}>
-					{t("queue.decidedBy", { decision: t(`queue.state.${task.decision.decision}`), by: task.decision.by_name || task.decision.by || "?" })}
+					{t("queue.decidedBy", {
+						decision: t(`queue.state.${task.decision.decision}`),
+						by: task.decision.by_name || task.decision.by || "?",
+					})}
 					{task.decision.note ? `: ${task.decision.note}` : ""}
 				</p>
 			)}

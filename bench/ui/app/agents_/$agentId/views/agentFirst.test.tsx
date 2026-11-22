@@ -20,8 +20,18 @@ const report = (over: Partial<Report> = {}): Report => ({
 	arms: [{ label: "A", agent: "support-bot", version: 2, model: "gpt-x" }],
 	capabilities: [{ capability: "support", benchmarks: ["b1", "b2"], arms: { A: { score: 0.5, ci_low: 0.4, ci_high: 0.6, runs: 20 } } }],
 	benchmarks: [
-		{ benchmark: "b1", capability: "support", experiment_id: "e1", arms: { A: { score: 0.5, ci_low: 0, ci_high: 1, runs: 10, cost_usd: 0.2 } } },
-		{ benchmark: "b2", capability: "support", experiment_id: "e2", arms: { A: { score: 0.25, ci_low: 0, ci_high: 1, runs: 4, cost_usd: 0.1 } } },
+		{
+			benchmark: "b1",
+			capability: "support",
+			experiment_id: "e1",
+			arms: { A: { score: 0.5, ci_low: 0, ci_high: 1, runs: 10, cost_usd: 0.2 } },
+		},
+		{
+			benchmark: "b2",
+			capability: "support",
+			experiment_id: "e2",
+			arms: { A: { score: 0.25, ci_low: 0, ci_high: 1, runs: 4, cost_usd: 0.1 } },
+		},
 	],
 	reliability: [
 		{ fault: "broken-tool", arms: { A: { score: 0.3, drop: -0.2 } } },
@@ -97,7 +107,9 @@ describe("agent page", () => {
 				capabilities: ["shell"],
 			},
 		};
-		expect(JSON.stringify(buildFields(fields, textsOf(fields)))).toBe(JSON.stringify({ ...fields, env: {}, behavior: { ...fields.behavior } }));
+		expect(JSON.stringify(buildFields(fields, textsOf(fields)))).toBe(
+			JSON.stringify({ ...fields, env: {}, behavior: { ...fields.behavior } }),
+		);
 		const edited = buildFields(fields, { ...textsOf(fields), memory: "/a\n\n /c ", fallbacks: "m3,  m4" });
 		expect(edited.behavior?.memory_paths).toEqual(["/a", "/c"]);
 		expect(edited.behavior?.fallbacks).toEqual(["m3", "m4"]);
@@ -122,22 +134,38 @@ describe("home agent cards", () => {
 		// drop is the change from clean: negative means the fault hurt (fix wave 2, N126).
 		expect(s.worstDrop).toEqual({ fault: "model-down", drop: -0.4 });
 		expect(agentCardStats(undefined)).toEqual({ capabilities: [], costPerSolved: null, worstDrop: null, faultsTested: false });
-		const unpriced = report({ benchmarks: [{ benchmark: "b1", capability: "support", experiment_id: "e1", arms: { A: { score: 0.5, ci_low: 0, ci_high: 1, runs: 2, cost_usd: 0 } } }] });
+		const unpriced = report({
+			benchmarks: [
+				{
+					benchmark: "b1",
+					capability: "support",
+					experiment_id: "e1",
+					arms: { A: { score: 0.5, ci_low: 0, ci_high: 1, runs: 2, cost_usd: 0 } },
+				},
+			],
+		});
 		expect(agentCardStats(unpriced).costPerSolved).toBeNull();
 	});
 
 	it("lists only the org's own agents", () => {
 		const a = (id: string, extra: Partial<AgentSummary> = {}) => ({ id, adapter: "command", scripted_kind: "", ...extra }) as AgentSummary;
-		expect(ownAgents([a("codex"), a("support-bot"), a("oracle", { adapter: "scripted" }), a("broken", { error: "bad" } as never), a("mine")]).map((x) => x.id)).toEqual([
-			"support-bot",
-			"mine",
-		]);
+		expect(
+			ownAgents([
+				a("codex"),
+				a("support-bot"),
+				a("oracle", { adapter: "scripted" }),
+				a("broken", { error: "bad" } as never),
+				a("mine"),
+			]).map((x) => x.id),
+		).toEqual(["support-bot", "mine"]);
 	});
 });
 
 describe("failure patterns", () => {
 	it("normalizes nulls, sorts seen patterns and computes rates", () => {
-		const n = normalizeFailurePatterns({ groups: [{ ...group(), models: null, patterns: [{ ...group().patterns[0], examples: null }] } as never] });
+		const n = normalizeFailurePatterns({
+			groups: [{ ...group(), models: null, patterns: [{ ...group().patterns[0], examples: null }] } as never],
+		});
 		expect(n.groups[0].models).toEqual([]);
 		expect(n.groups[0].patterns[0].examples).toEqual([]);
 		expect(normalizeFailurePatterns(null).groups).toEqual([]);
@@ -155,12 +183,25 @@ describe("failure patterns", () => {
 	it("why agents fail names versions and lists every pattern once", () => {
 		expect(groupName({ version: 3, label: "v3" }, "Unsaved config")).toBe("v3");
 		expect(groupName({ version: 0, label: "unsaved config abc123" }, "Unsaved config")).toBe("Unsaved config abc123");
-		expect(patternIds([group(), group({ key: "v1" })]).map((p) => p.pattern)).toEqual(["pattern_loop", "pattern_unverified_finish", "pattern_ignored_error"]);
+		expect(patternIds([group(), group({ key: "v1" })]).map((p) => p.pattern)).toEqual([
+			"pattern_loop",
+			"pattern_unverified_finish",
+			"pattern_ignored_error",
+		]);
 	});
 });
 
 describe("failure tests", () => {
-	const form: FailureTestForm = { agent: "support-bot", version: 2, provider: "openai", model: "gpt-x", benchmarks: ["b1"], faults: ["broken-tool", "model-down"], tasks: 3, trials: 1 };
+	const form: FailureTestForm = {
+		agent: "support-bot",
+		version: 2,
+		provider: "openai",
+		model: "gpt-x",
+		benchmarks: ["b1"],
+		faults: ["broken-tool", "model-down"],
+		tasks: 3,
+		trials: 1,
+	};
 
 	it("launches one score arm with a clean baseline plus the chosen faults in the order picked", () => {
 		const spec = failureTestSpec(form);
@@ -181,7 +222,21 @@ describe("failure tests", () => {
 
 	it("past tests are evaluations with a fault, newest first, for the agent", () => {
 		const ev = (id: string, agent: string, faults: string[], at: string) =>
-			({ id, status: "done", created_at: at, children: [], spec: { name: id, mode: "score", arms: [{ label: "A", agent, model: "m" }], benchmarks: [], tasks_per_benchmark: 1, trials: 1, faults } }) as Evaluation;
+			({
+				id,
+				status: "done",
+				created_at: at,
+				children: [],
+				spec: {
+					name: id,
+					mode: "score",
+					arms: [{ label: "A", agent, model: "m" }],
+					benchmarks: [],
+					tasks_per_benchmark: 1,
+					trials: 1,
+					faults,
+				},
+			}) as Evaluation;
 		const list = [
 			ev("e1", "support-bot", ["clean", "broken-tool"], "2026-11-01T00:00:00Z"),
 			ev("e2", "support-bot", ["clean"], "2026-11-02T00:00:00Z"),

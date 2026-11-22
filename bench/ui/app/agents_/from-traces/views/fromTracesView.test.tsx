@@ -11,7 +11,14 @@ const base: TraceConnectInfo = {
 	base: "https://h.example/api/bench/orgs/org_a/otlp",
 	hosted: true,
 	token_hint: "an ingest token of this org",
-	setup: [{ id: "otel", label: "OpenTelemetry SDK", install: "pip install x", env: "OTEL_EXPORTER_OTLP_TRACES_HEADERS=Authorization=Bearer%20$HEIMDALL_INGEST_TOKEN" }],
+	setup: [
+		{
+			id: "otel",
+			label: "OpenTelemetry SDK",
+			install: "pip install x",
+			env: "OTEL_EXPORTER_OTLP_TRACES_HEADERS=Authorization=Bearer%20$HEIMDALL_INGEST_TOKEN",
+		},
+	],
 	exports: 0,
 	spans_kept: 0,
 };
@@ -25,7 +32,9 @@ vi.mock("@/lib/store/apis/connectTracesApi", async () => ({
 	useInferFromTraceFileMutation: () => [vi.fn(), { isLoading: false }],
 }));
 vi.mock("@/lib/store/apis/liveinboxApi", () => ({ useCreateInboxTokenMutation: () => [vi.fn(), { isLoading: false, isError: false }] }));
-vi.mock("@/lib/store/apis/agentBuilderApi", () => ({ useCreateAgentFromTemplateMutation: () => [vi.fn(), { isLoading: false, isError: false }] }));
+vi.mock("@/lib/store/apis/agentBuilderApi", () => ({
+	useCreateAgentFromTemplateMutation: () => [vi.fn(), { isLoading: false, isError: false }],
+}));
 vi.mock("@/lib/store/apis/benchApi", () => ({ getBenchErrorMessage: () => "err" }));
 vi.mock("@/lib/session/sessionContext", () => ({ canUse: () => true, useSession: () => ({}) }));
 vi.mock("@tanstack/react-router", () => ({
@@ -93,8 +102,13 @@ describe("connect helpers", () => {
 		expect(connectRequest(draft, { id: "Bad", url: "https://x.io", authSecret: "" })).toBeNull();
 		expect(connectRequest(draft, { id: "bot", url: "ftp://x", authSecret: "" })).toBeNull();
 		expect(connectRequest(draft, { id: "bot", url: "https://x.io", authSecret: "sk-not a name" })).toBeNull();
-		expect(connectRequest({ template: "openai-endpoint" }, { id: "bot", url: "https://x.io/v1", authSecret: "K" })?.params).toEqual({ url: "https://x.io/v1", api_key_secret: "K" });
-		expect(connectRequest({ template: "a2a-card" }, { id: "bot", url: "https://x.io/.well-known/agent-card.json", authSecret: "K" })?.params).toEqual({
+		expect(connectRequest({ template: "openai-endpoint" }, { id: "bot", url: "https://x.io/v1", authSecret: "K" })?.params).toEqual({
+			url: "https://x.io/v1",
+			api_key_secret: "K",
+		});
+		expect(
+			connectRequest({ template: "a2a-card" }, { id: "bot", url: "https://x.io/.well-known/agent-card.json", authSecret: "K" })?.params,
+		).toEqual({
 			card_url: "https://x.io/.well-known/agent-card.json",
 		});
 	});

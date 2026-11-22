@@ -70,7 +70,10 @@ export function ExportMenu({ expId, synthetic = false, classifyError, runs = nul
 							<Download className="size-3.5" aria-hidden="true" />
 							{t("export.eee")}
 						</span>
-						<span className={classifyError ? "text-chart-error-ink text-xs" : "text-muted-foreground text-xs"} role={classifyError ? "alert" : undefined}>
+						<span
+							className={classifyError ? "text-chart-error-ink text-xs" : "text-muted-foreground text-xs"}
+							role={classifyError ? "alert" : undefined}
+						>
 							{classifyError ? t("export.eeeClassifyError", { error: getBenchErrorMessage(classifyError) }) : t("export.eeeClassifying")}
 						</span>
 					</li>

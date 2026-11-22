@@ -30,7 +30,16 @@ const hold = {
 };
 
 const step = (over: Partial<StepRecord>): StepRecord =>
-	({ seq: 1, ts: "2026-11-22T00:00:00Z", kind: "model_turn", source: "gateway", proof: "verified", turn: 1, summary: "", ...over }) as StepRecord;
+	({
+		seq: 1,
+		ts: "2026-11-22T00:00:00Z",
+		kind: "model_turn",
+		source: "gateway",
+		proof: "verified",
+		turn: 1,
+		summary: "",
+		...over,
+	}) as StepRecord;
 
 const detail = (over: { sealed?: boolean; condition?: string; debug?: RunDetail["run"]["debug"] } = {}) =>
 	({
@@ -111,13 +120,25 @@ describe("step inspector", () => {
 	});
 	it("hides fork when the run cannot be forked and reports load states", () => {
 		api.call = loadingQuery();
-		const html = render(<StepInspector runId="r_1" step={step({ request_id: "q1" })} call={{ call: 1, status: 200, action: "pass" }} canFork={false} onClose={() => undefined} />);
+		const html = render(
+			<StepInspector
+				runId="r_1"
+				step={step({ request_id: "q1" })}
+				call={{ call: 1, status: 200, action: "pass" }}
+				canFork={false}
+				onClose={() => undefined}
+			/>,
+		);
 		expect(html).not.toContain("inspector-fork");
 		expect(html).toContain("inspector-raw-loading");
 		api.call = errorQuery(404);
-		expect(render(<StepInspector runId="r_1" step={step({ request_id: "q1" })} canFork onClose={() => undefined} />)).toContain("inspector-raw-error");
+		expect(render(<StepInspector runId="r_1" step={step({ request_id: "q1" })} canFork onClose={() => undefined} />)).toContain(
+			"inspector-raw-error",
+		);
 		api.call = okQuery({ run_id: "r_1", request_id: "q1", status: 200, request: "", response: "", available: false });
-		expect(render(<StepInspector runId="r_1" step={step({ request_id: "q1" })} canFork onClose={() => undefined} />)).toContain("inspector-raw-missing");
+		expect(render(<StepInspector runId="r_1" step={step({ request_id: "q1" })} canFork onClose={() => undefined} />)).toContain(
+			"inspector-raw-missing",
+		);
 	});
 });
 

@@ -47,7 +47,13 @@ vi.mock("@tanstack/react-router", () => ({
 	),
 }));
 
-const codex: Partial<AgentSummary> = { id: "codex", path: "agents/codex.yaml", image: "bench/codex:1", dockerfile: "agents/images/codex/Dockerfile", per_suite_build: false };
+const codex: Partial<AgentSummary> = {
+	id: "codex",
+	path: "agents/codex.yaml",
+	image: "bench/codex:1",
+	dockerfile: "agents/images/codex/Dockerfile",
+	per_suite_build: false,
+};
 
 describe("agent ops tabs", () => {
 	it("checks tab offers check, build and diff jobs locally", () => {
@@ -117,7 +123,9 @@ describe("agent ops tabs", () => {
 		state.hosted = false;
 		const checks = renderToStaticMarkup(<ChecksTab agentId="codex" />);
 		expect(checks).toContain(en.checks.check.title);
-		expect(checks).toContain(en.checks.build.hintDockerfile.replace("{{image}}", "bench/codex:1").replace("{{dockerfile}}", "agents/images/codex/Dockerfile"));
+		expect(checks).toContain(
+			en.checks.build.hintDockerfile.replace("{{image}}", "bench/codex:1").replace("{{dockerfile}}", "agents/images/codex/Dockerfile"),
+		);
 		expect(checks).toContain(en.checks.diff.open);
 		const tools = renderToStaticMarkup(<ToolsTab agentId="codex" />);
 		expect(tools).toContain(en.tools.skills.title);

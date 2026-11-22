@@ -114,7 +114,13 @@ export function Step2Learn() {
 
 			{draft.mode === "models" && <p className="text-muted-foreground text-sm">{t("learn.modelsLater")}</p>}
 			{draft.mode === "models" && draft.agent && (
-				<Link to="/agents/$agentId" params={{ agentId: draft.agent }} search={{ tab: "compare-models" }} className="text-primary w-fit text-sm hover:underline" data-testid="evaluate-compare-models-link">
+				<Link
+					to="/agents/$agentId"
+					params={{ agentId: draft.agent }}
+					search={{ tab: "compare-models" }}
+					className="text-primary w-fit text-sm hover:underline"
+					data-testid="evaluate-compare-models-link"
+				>
 					{t("learn.compareModelsLink")}
 				</Link>
 			)}
@@ -126,7 +132,11 @@ export function Step2Learn() {
 						{draft.arms.map((a) => (
 							<li key={a.label} className="bg-muted rounded-lg px-3 py-1.5 font-mono text-xs">
 								{t("learn.armLabel", { label: a.label })}: {a.agent || "?"}
-								{a.version != null ? ` v${a.version}` : latest !== undefined && a.agent === draft.agent ? tg("learn.latest", { n: latest }) : ""}
+								{a.version != null
+									? ` v${a.version}`
+									: latest !== undefined && a.agent === draft.agent
+										? tg("learn.latest", { n: latest })
+										: ""}
 								{a.model ? ` / ${a.model}` : ""}
 							</li>
 						))}

@@ -57,7 +57,12 @@ export function ImprovementsTable({ rows, admin = false }: { rows: ImprovementSu
 	const { t } = useTranslation("improve");
 	if (rows.length === 0) {
 		return (
-			<FeatureHero icon={TrendingUp} title={t("empty.title")} message={admin ? t("empty.messageAdmin") : t("empty.message")} testId="improvements-empty">
+			<FeatureHero
+				icon={TrendingUp}
+				title={t("empty.title")}
+				message={admin ? t("empty.messageAdmin") : t("empty.message")}
+				testId="improvements-empty"
+			>
 				<ImprovementCli testId="improvements-cli" />
 			</FeatureHero>
 		);
@@ -80,7 +85,11 @@ export function ImprovementsTable({ rows, admin = false }: { rows: ImprovementSu
 					{rows.map((r) => (
 						<tr key={r.id} className="hover:bg-muted/40 border-b last:border-0">
 							<td className="px-3 py-2">
-								<Link to="/improvements/$improvementId" params={{ improvementId: r.id }} className="text-foreground font-medium hover:underline">
+								<Link
+									to="/improvements/$improvementId"
+									params={{ improvementId: r.id }}
+									className="text-foreground font-medium hover:underline"
+								>
 									{r.name}
 								</Link>
 							</td>
@@ -93,7 +102,11 @@ export function ImprovementsTable({ rows, admin = false }: { rows: ImprovementSu
 							<td className="px-3 py-2 tabular-nums">{t("list.roundsValue", { done: r.rounds_done, total: r.rounds })}</td>
 							<td className="px-3 py-2 tabular-nums">{r.commits}</td>
 							<td className="px-3 py-2">
-								{r.verdict ? <StatusPill tone={verdictTone(r.verdict)}>{points(r.sealed_gain)}</StatusPill> : <span className="text-muted-foreground">-</span>}
+								{r.verdict ? (
+									<StatusPill tone={verdictTone(r.verdict)}>{points(r.sealed_gain)}</StatusPill>
+								) : (
+									<span className="text-muted-foreground">-</span>
+								)}
 							</td>
 							<td className="px-3 py-2 text-right tabular-nums">{usd(r.total_usd)}</td>
 						</tr>

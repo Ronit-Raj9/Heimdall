@@ -31,7 +31,13 @@ export function ImprovementDetailBody({ data, onApprove, approving }: Improvemen
 			<Section title={t("round.title")} testId="improvement-rounds">
 				<div className="flex flex-col gap-3">
 					{data.round_views.map((r) => (
-						<RoundCard key={r.n} round={r} paused={data.status === "awaiting_approval" && r.n === data.round_views.length} onApprove={onApprove} approving={approving} />
+						<RoundCard
+							key={r.n}
+							round={r}
+							paused={data.status === "awaiting_approval" && r.n === data.round_views.length}
+							onApprove={onApprove}
+							approving={approving}
+						/>
 					))}
 				</div>
 			</Section>
@@ -80,7 +86,13 @@ function VerdictCard({ data }: { data: ImprovementDetail }) {
 				</ul>
 			)}
 			<p className="text-muted-foreground text-xs">
-				{t("detail.splits", { dev: data.splits.dev.length, audit: data.splits.audit, sealed: data.splits.sealed, looks: data.audit_looks, max: data.audit_looks_max })}
+				{t("detail.splits", {
+					dev: data.splits.dev.length,
+					audit: data.splits.audit,
+					sealed: data.splits.sealed,
+					looks: data.audit_looks,
+					max: data.audit_looks_max,
+				})}
 			</p>
 			{data.error && <p className="text-chart-error-ink text-xs">{t("detail.error", { error: data.error })}</p>}
 		</div>
@@ -94,7 +106,10 @@ function IntegrityStrip({ data }: { data: ImprovementDetail }) {
 			{data.integrity.map((row) => {
 				const hits = [...new Set([...row.fired, ...row.tripwires])];
 				return (
-					<li key={row.round} className={cn("flex min-w-40 flex-col gap-1 rounded-md border p-2 text-xs", hits.length > 0 && "border-chart-error/40")}>
+					<li
+						key={row.round}
+						className={cn("flex min-w-40 flex-col gap-1 rounded-md border p-2 text-xs", hits.length > 0 && "border-chart-error/40")}
+					>
 						<span className="text-foreground font-medium">{t("round.heading", { n: row.round })}</span>
 						{hits.length === 0 ? (
 							<span className="text-muted-foreground">{t("integrity.clean")}</span>
@@ -109,7 +124,9 @@ function IntegrityStrip({ data }: { data: ImprovementDetail }) {
 						{(row.vetoes_incumbent > 0 || row.vetoes_candidate > 0) && (
 							<span className="text-muted-foreground">{t("integrity.vetoes", { a: row.vetoes_incumbent, b: row.vetoes_candidate })}</span>
 						)}
-						{row.honeypot_passes > 0 && <span className="text-chart-error-ink">{t("integrity.impossible", { n: row.honeypot_passes })}</span>}
+						{row.honeypot_passes > 0 && (
+							<span className="text-chart-error-ink">{t("integrity.impossible", { n: row.honeypot_passes })}</span>
+						)}
 					</li>
 				);
 			})}
@@ -117,7 +134,17 @@ function IntegrityStrip({ data }: { data: ImprovementDetail }) {
 	);
 }
 
-function RoundCard({ round: r, paused, onApprove, approving }: { round: RoundView; paused: boolean; onApprove?: (round: number, reason: string) => void; approving?: boolean }) {
+function RoundCard({
+	round: r,
+	paused,
+	onApprove,
+	approving,
+}: {
+	round: RoundView;
+	paused: boolean;
+	onApprove?: (round: number, reason: string) => void;
+	approving?: boolean;
+}) {
 	const { t } = useTranslation("improve");
 	const [reason, setReason] = useState("");
 	const decision = r.decision || "pending";
@@ -128,13 +155,26 @@ function RoundCard({ round: r, paused, onApprove, approving }: { round: RoundVie
 			<div className="flex flex-wrap items-center gap-2">
 				<span className="text-foreground text-sm font-semibold">{t("round.heading", { n: r.n })}</span>
 				<StatusPill tone={tone}>{t(`round.decision.${decision}`)}</StatusPill>
-				<span className="text-muted-foreground text-xs">{t("round.candidate", { parent: versionLabel(r.parent), candidate: versionLabel(r.candidate) })}</span>
-				<span className="text-muted-foreground ml-auto text-xs tabular-nums">{t("round.cost", { v: usd(r.cost.improver + r.cost.screen + r.cost.audit + r.cost.sealed) })}</span>
+				<span className="text-muted-foreground text-xs">
+					{t("round.candidate", { parent: versionLabel(r.parent), candidate: versionLabel(r.candidate) })}
+				</span>
+				<span className="text-muted-foreground ml-auto text-xs tabular-nums">
+					{t("round.cost", { v: usd(r.cost.improver + r.cost.screen + r.cost.audit + r.cost.sealed) })}
+				</span>
 			</div>
 			{r.why && <p className="text-foreground text-sm">{r.why}</p>}
 			<ul className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
 				{r.screen && <li>{t("round.practice", { a: pct(r.screen.a.mean), b: pct(r.screen.b.mean) })}</li>}
-				{r.audit && ev && <li>{t("round.gate", { a: pct(r.audit.a.mean), b: pct(r.audit.b.mean), e: ev.max_e_up.toFixed(1), threshold: Math.round(ev.threshold) })}</li>}
+				{r.audit && ev && (
+					<li>
+						{t("round.gate", {
+							a: pct(r.audit.a.mean),
+							b: pct(r.audit.b.mean),
+							e: ev.max_e_up.toFixed(1),
+							threshold: Math.round(ev.threshold),
+						})}
+					</li>
+				)}
 				{r.sealed && <li>{t("round.heldOut", { v: pct(r.sealed.mean) })}</li>}
 			</ul>
 			{r.approvals.map((a) => (
@@ -144,7 +184,11 @@ function RoundCard({ round: r, paused, onApprove, approving }: { round: RoundVie
 			))}
 			<details className="text-xs">
 				<summary className="text-muted-foreground cursor-pointer">{t("round.diff")}</summary>
-				{r.diff.length === 0 ? <p className="text-muted-foreground mt-2">{t("round.noDiff")}</p> : r.diff.map((f) => <FileDiffView key={f.path} diff={f} />)}
+				{r.diff.length === 0 ? (
+					<p className="text-muted-foreground mt-2">{t("round.noDiff")}</p>
+				) : (
+					r.diff.map((f) => <FileDiffView key={f.path} diff={f} />)
+				)}
 			</details>
 			{paused && onApprove && (
 				<form
@@ -155,7 +199,13 @@ function RoundCard({ round: r, paused, onApprove, approving }: { round: RoundVie
 					}}
 					data-testid="improvement-approve-form"
 				>
-					<Input aria-label={t("round.approveReason")} placeholder={t("round.approveReason")} value={reason} onChange={(e) => setReason(e.target.value)} className="min-w-64 flex-1" />
+					<Input
+						aria-label={t("round.approveReason")}
+						placeholder={t("round.approveReason")}
+						value={reason}
+						onChange={(e) => setReason(e.target.value)}
+						className="min-w-64 flex-1"
+					/>
 					<Button type="submit" size="sm" disabled={!reason.trim() || approving}>
 						{t("round.approveSubmit")}
 					</Button>
@@ -176,7 +226,13 @@ function FileDiffView({ diff }: { diff: FileDiff }) {
 			</div>
 			<pre className="max-h-80 overflow-auto p-2 font-mono text-[11px] leading-5">
 				{diff.lines.map((l, i) => (
-					<div key={i} className={cn(l.op === "+" && "bg-chart-success/10 text-chart-success-ink", l.op === "-" && "bg-chart-error/10 text-chart-error-ink")}>
+					<div
+						key={i}
+						className={cn(
+							l.op === "+" && "bg-chart-success/10 text-chart-success-ink",
+							l.op === "-" && "bg-chart-error/10 text-chart-error-ink",
+						)}
+					>
 						{l.op} {l.text}
 					</div>
 				))}
@@ -197,7 +253,10 @@ function LineageTree({ data }: { data: ImprovementDetail }) {
 				{rows.map(({ node, depth }) => (
 					<li
 						key={node.ref}
-						className={cn("flex flex-wrap items-center gap-2 text-xs", (node.status === "rejected" || node.status === "control") && "opacity-60")}
+						className={cn(
+							"flex flex-wrap items-center gap-2 text-xs",
+							(node.status === "rejected" || node.status === "control") && "opacity-60",
+						)}
 						style={{ paddingLeft: `${depth * 20}px` }}
 					>
 						<span className="text-foreground font-mono font-medium">{versionLabel(node.ref)}</span>

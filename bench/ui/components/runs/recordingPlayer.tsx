@@ -6,14 +6,7 @@ import { cn } from "@/lib/utils";
 import { Columns2, Download, Film, Pause, Play, UserRound, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	activeStepIndex,
-	formatClock,
-	formatSize,
-	otherRecordings,
-	playableVideos,
-	stepMarks,
-} from "./recordingPlayer.utils";
+import { activeStepIndex, formatClock, formatSize, otherRecordings, playableVideos, stepMarks } from "./recordingPlayer.utils";
 
 /** Recordings of a run: GET /runs/{id}/recordings. */
 export function useRunRecordings(runId: string, skip = false) {
@@ -61,7 +54,12 @@ export function RecordingPlayer({
 	}, [active]);
 
 	if (q.isLoading) return <Skeleton className="aspect-video w-full rounded-xl" data-testid="recording-loading" />;
-	if (q.error) return <p className="text-destructive text-sm" data-testid="recording-error">{t("loadError")}</p>;
+	if (q.error)
+		return (
+			<p className="text-destructive text-sm" data-testid="recording-error">
+				{t("loadError")}
+			</p>
+		);
 	if (!video) {
 		return (
 			<div className="flex flex-col items-center gap-3 py-12 text-center" data-testid="recording-empty">
@@ -87,7 +85,10 @@ export function RecordingPlayer({
 		<div className="flex min-w-0 flex-col gap-3" data-testid="recording-player" data-run-id={runId}>
 			{label && <p className="text-sm font-medium">{label}</p>}
 			{q.data?.human_assisted && (
-				<p className="bg-chart-warning/10 text-chart-warning-ink flex items-center gap-2 rounded-md px-3 py-2 text-xs" data-testid="recording-human-assisted">
+				<p
+					className="bg-chart-warning/10 text-chart-warning-ink flex items-center gap-2 rounded-md px-3 py-2 text-xs"
+					data-testid="recording-human-assisted"
+				>
 					<UserRound className="size-4" aria-hidden="true" />
 					{t("humanAssistedNote")}
 				</p>
@@ -105,8 +106,11 @@ export function RecordingPlayer({
 						onLoadedMetadata={(e) => setDuration(Number.isFinite(e.currentTarget.duration) ? e.currentTarget.duration : 0)}
 						data-testid="recording-video"
 					/>
-					<div className="relative h-2 rounded-full bg-muted" aria-hidden="true" data-testid="recording-marks">
-						<span className="bg-primary/30 absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.min(100, (now / total) * 100)}%` }} />
+					<div className="bg-muted relative h-2 rounded-full" aria-hidden="true" data-testid="recording-marks">
+						<span
+							className="bg-primary/30 absolute inset-y-0 left-0 rounded-full"
+							style={{ width: `${Math.min(100, (now / total) * 100)}%` }}
+						/>
 						{marks.map((m, i) => (
 							<span
 								key={m.step.seq}
@@ -118,7 +122,13 @@ export function RecordingPlayer({
 					<div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
 						{videos.length > 1 &&
 							videos.map((v, i) => (
-								<Button key={v.index} size="sm" variant={i === pick ? "default" : "outline"} onClick={() => setPick(i)} data-testid={`recording-pick-${i}`}>
+								<Button
+									key={v.index}
+									size="sm"
+									variant={i === pick ? "default" : "outline"}
+									onClick={() => setPick(i)}
+									data-testid={`recording-pick-${i}`}
+								>
 									{t("video", { n: i + 1 })}
 								</Button>
 							))}
@@ -136,14 +146,22 @@ export function RecordingPlayer({
 					{marks.length === 0 ? (
 						<p className="text-muted-foreground text-xs">{t("noSteps")}</p>
 					) : (
-						<ol ref={list} className="flex max-h-[28rem] flex-col gap-1 overflow-y-auto" aria-label={t("steps")} data-testid="recording-steps">
+						<ol
+							ref={list}
+							className="flex max-h-[28rem] flex-col gap-1 overflow-y-auto"
+							aria-label={t("steps")}
+							data-testid="recording-steps"
+						>
 							{marks.map((m, i) => (
 								<li key={m.step.seq} data-step={i}>
 									<button
 										type="button"
 										onClick={() => jump(m.offsetMs)}
 										aria-current={i === active ? "step" : undefined}
-										className={cn("hover:bg-muted flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm", i === active && "bg-muted font-medium")}
+										className={cn(
+											"hover:bg-muted flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm",
+											i === active && "bg-muted font-medium",
+										)}
 										data-testid={`recording-step-${i}`}
 									>
 										<span className="text-muted-foreground w-10 shrink-0 text-xs tabular-nums">{formatClock(m.offsetMs)}</span>
@@ -189,7 +207,9 @@ function RecordingFiles({ files }: { files: RecordingView[] }) {
 			<ul className="flex flex-col gap-1 text-xs">
 				{files.map((f) => (
 					<li key={f.index} className="flex items-center gap-2">
-						<span className="font-mono">{f.service}/{f.id}</span>
+						<span className="font-mono">
+							{f.service}/{f.id}
+						</span>
 						<span className="text-muted-foreground">{f.kind}</span>
 						{f.url && !f.error ? (
 							<a className="text-primary underline-offset-2 hover:underline" href={f.url} download={f.file}>
@@ -280,7 +300,13 @@ export function RecordingTab({ runId }: { runId: string }) {
 						className="max-w-xs"
 						data-testid="recording-compare-input"
 					/>
-					<Button type="submit" size="sm" variant="outline" disabled={!other.trim() || other.trim() === runId} data-testid="recording-compare-show">
+					<Button
+						type="submit"
+						size="sm"
+						variant="outline"
+						disabled={!other.trim() || other.trim() === runId}
+						data-testid="recording-compare-show"
+					>
 						{t("compare.show")}
 					</Button>
 				</div>

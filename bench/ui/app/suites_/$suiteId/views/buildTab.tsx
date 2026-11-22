@@ -74,7 +74,8 @@ export function BuildTab({ suite }: { suite: SuiteSummary }) {
 const CHOICES: GraderChoice[] = ["tests", "state", "exact", "judge"];
 
 /** The choices shown: "toolCalls" takes the place of "tests" only when it is the suite's grader. */
-const choicesFor = (current: GraderChoice): GraderChoice[] => (current === "toolCalls" ? CHOICES.map((c) => (c === "tests" ? "toolCalls" : c)) : CHOICES);
+const choicesFor = (current: GraderChoice): GraderChoice[] =>
+	current === "toolCalls" ? CHOICES.map((c) => (c === "tests" ? "toolCalls" : c)) : CHOICES;
 
 /** The section text: answer suites can switch graders; tool-use and code suites keep their own. */
 const graderDescription = (answer: boolean, current: GraderChoice, t: T) =>
@@ -145,11 +146,21 @@ export function GraderSection({ suite, writable, t }: { suite: SuiteSummary; wri
 				)}
 				{answer && writable && (
 					<div className="flex flex-wrap items-center gap-3">
-						<Button onClick={submit} disabled={!changed || !judgeReady || saved.isLoading} isLoading={saved.isLoading} dataTestId="suite-build-grader-save">
+						<Button
+							onClick={submit}
+							disabled={!changed || !judgeReady || saved.isLoading}
+							isLoading={saved.isLoading}
+							dataTestId="suite-build-grader-save"
+						>
 							{choice === "judge" ? t("grader.pin") : t("grader.save")}
 						</Button>
 						{suite.grading === "judged" && (
-							<Link to="/suites/$suiteId" params={{ suiteId: suite.id }} search={{ tab: "calibration" } as never} className="text-primary text-sm hover:underline">
+							<Link
+								to="/suites/$suiteId"
+								params={{ suiteId: suite.id }}
+								search={{ tab: "calibration" } as never}
+								className="text-primary text-sm hover:underline"
+							>
 								{t("grader.calibrate")}
 							</Link>
 						)}
@@ -220,12 +231,28 @@ function AddTasksSection({ suite, writable, hosted, t }: { suite: SuiteSummary; 
 						{t("add.codeSuite")}
 					</p>
 				)}
-				{source === "scenarios" && (writable ? <ScenarioRowsImport suite={suite} writable={writable} /> : <p className="text-muted-foreground text-sm">{t("viewerNote")}</p>)}
-				{source === "mock" && (writable ? <MockFromOpenAPI suite={suite} writable={writable} /> : <p className="text-muted-foreground text-sm">{t("viewerNote")}</p>)}
+				{source === "scenarios" &&
+					(writable ? (
+						<ScenarioRowsImport suite={suite} writable={writable} />
+					) : (
+						<p className="text-muted-foreground text-sm">{t("viewerNote")}</p>
+					))}
+				{source === "mock" &&
+					(writable ? (
+						<MockFromOpenAPI suite={suite} writable={writable} />
+					) : (
+						<p className="text-muted-foreground text-sm">{t("viewerNote")}</p>
+					))}
 				{source === "rows" && <RowsImport suite={suite} writable={writable} format="rows" t={t} />}
 				{source === "tickets" && <RowsImport suite={suite} writable={writable} format="tickets" t={t} />}
-				{source === "commit" && (writable ? <FromCommitSection suite={suite} hosted={hosted} t={tops} /> : <p className="text-muted-foreground text-sm">{t("viewerNote")}</p>)}
-				{source === "issues" && (hosted ? <FromIssues writable={writable} /> : <p className="text-muted-foreground text-sm">{t("add.issuesHosted")}</p>)}
+				{source === "commit" &&
+					(writable ? (
+						<FromCommitSection suite={suite} hosted={hosted} t={tops} />
+					) : (
+						<p className="text-muted-foreground text-sm">{t("viewerNote")}</p>
+					))}
+				{source === "issues" &&
+					(hosted ? <FromIssues writable={writable} /> : <p className="text-muted-foreground text-sm">{t("add.issuesHosted")}</p>)}
 				{source === "traces" && (
 					<div className="flex flex-col items-start gap-2 text-sm" data-testid="suite-build-traces">
 						<p className="text-muted-foreground max-w-2xl">{t("add.traces")}</p>
@@ -273,7 +300,9 @@ function SplitRow({ suiteId, task, writable, t }: { suiteId: string; task: Suite
 		<li className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm" data-testid={`suite-build-split-${task.id}`}>
 			<span className="font-mono">{task.id}</span>
 			{!task.redacted && task.title && <span className="text-muted-foreground truncate text-xs">{task.title}</span>}
-			<span className={cn("ml-auto text-xs", held ? "text-foreground font-medium" : "text-muted-foreground")}>{held ? t("private.heldOut") : t("private.public")}</span>
+			<span className={cn("ml-auto text-xs", held ? "text-foreground font-medium" : "text-muted-foreground")}>
+				{held ? t("private.heldOut") : t("private.public")}
+			</span>
 			{writable && (
 				<Button
 					size="sm"
@@ -304,7 +333,12 @@ function ReadinessSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: b
 	const onDone = useCallback(
 		(j: Job) => {
 			setJob(j);
-			dispatch(benchApi.util.invalidateTags([{ type: "BenchSuites", id: "LIST" }, { type: "BenchSuites", id: `${suite.id}/health` }]));
+			dispatch(
+				benchApi.util.invalidateTags([
+					{ type: "BenchSuites", id: "LIST" },
+					{ type: "BenchSuites", id: `${suite.id}/health` },
+				]),
+			);
 		},
 		[dispatch, suite.id],
 	);
@@ -331,7 +365,12 @@ function ReadinessSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: b
 				) : (
 					<div className="flex flex-wrap items-end gap-3">
 						<Field label={t("readiness.scope")}>
-							<select className={selectClass} value={task} onChange={(e) => setTask(e.target.value)} data-testid="suite-build-readiness-scope">
+							<select
+								className={selectClass}
+								value={task}
+								onChange={(e) => setTask(e.target.value)}
+								data-testid="suite-build-readiness-scope"
+							>
 								<option value="">{t("readiness.all", { count: suite.tasks.length })}</option>
 								{suite.tasks.map((x) => (
 									<option key={x.id} value={x.id}>

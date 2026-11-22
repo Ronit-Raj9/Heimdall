@@ -56,7 +56,12 @@ export function OpsTab({ suite }: { suite: SuiteSummary }) {
 function useRefreshSuite(suiteId: string) {
 	const dispatch = useAppDispatch();
 	return useCallback(() => {
-		dispatch(benchApi.util.invalidateTags([{ type: "BenchSuites", id: "LIST" }, { type: "BenchSuites", id: `${suiteId}/health` }]));
+		dispatch(
+			benchApi.util.invalidateTags([
+				{ type: "BenchSuites", id: "LIST" },
+				{ type: "BenchSuites", id: `${suiteId}/health` },
+			]),
+		);
 	}, [dispatch, suiteId]);
 }
 
@@ -174,7 +179,13 @@ function QuarantineRow({ suiteId, task, writable, t }: { suiteId: string; task: 
 				{writable && (
 					<span className="ml-auto flex items-center gap-2">
 						{task.quarantine ? (
-							<Button size="sm" variant="outline" disabled={busy} onClick={() => void doRestore()} data-testid={`suite-ops-restore-${task.id}`}>
+							<Button
+								size="sm"
+								variant="outline"
+								disabled={busy}
+								onClick={() => void doRestore()}
+								data-testid={`suite-ops-restore-${task.id}`}
+							>
 								{t("health.restore")}
 							</Button>
 						) : (
@@ -188,7 +199,13 @@ function QuarantineRow({ suiteId, task, writable, t }: { suiteId: string; task: 
 									onChange={(e) => setReason(e.target.value)}
 									data-testid={`suite-ops-reason-${task.id}`}
 								/>
-								<Button size="sm" variant="outline" disabled={busy} onClick={() => void doQuarantine()} data-testid={`suite-ops-quarantine-${task.id}`}>
+								<Button
+									size="sm"
+									variant="outline"
+									disabled={busy}
+									onClick={() => void doQuarantine()}
+									data-testid={`suite-ops-quarantine-${task.id}`}
+								>
 									{t("health.quarantine")}
 								</Button>
 							</>
@@ -215,7 +232,19 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /** Repository picker: GitHub owner/name, or (local mode) a folder on disk. */
-function RepoPicker({ value, onChange, hosted, t, testId }: { value: RepoSource; onChange(v: RepoSource): void; hosted: boolean; t: T; testId: string }) {
+function RepoPicker({
+	value,
+	onChange,
+	hosted,
+	t,
+	testId,
+}: {
+	value: RepoSource;
+	onChange(v: RepoSource): void;
+	hosted: boolean;
+	t: T;
+	testId: string;
+}) {
 	const useGitHub = hosted || value.repo === undefined;
 	return (
 		<div className="flex min-w-0 flex-col gap-2" data-testid={testId}>
@@ -234,7 +263,11 @@ function RepoPicker({ value, onChange, hosted, t, testId }: { value: RepoSource;
 			{useGitHub ? (
 				<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
 					<Field label={t("source.github")}>
-						<Input value={value.github ?? ""} placeholder={t("source.githubPlaceholder")} onChange={(e) => onChange({ ...value, github: e.target.value })} />
+						<Input
+							value={value.github ?? ""}
+							placeholder={t("source.githubPlaceholder")}
+							onChange={(e) => onChange({ ...value, github: e.target.value })}
+						/>
 					</Field>
 					<Field label={t("source.branch")}>
 						<Input value={value.branch ?? ""} onChange={(e) => onChange({ ...value, branch: e.target.value })} />
@@ -269,7 +302,14 @@ export function FromCommitSection({ suite, hosted, t }: { suite: SuiteSummary; h
 	const repo = repoParams(src);
 	const ready = repo && id.trim() && base.trim() && reference.trim();
 	const params: TaskFromCommitParams | null = ready
-		? { suite: suite.id, id: id.trim(), base: base.trim(), reference: reference.trim(), ...repo, ...(tests.trim() ? { tests: splitList(tests) } : {}) }
+		? {
+				suite: suite.id,
+				id: id.trim(),
+				base: base.trim(),
+				reference: reference.trim(),
+				...repo,
+				...(tests.trim() ? { tests: splitList(tests) } : {}),
+			}
 		: null;
 	return (
 		<Section title={t("fromCommit.title")} description={t("fromCommit.description")} testId="suite-ops-from-commit">
@@ -324,7 +364,13 @@ function MineSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: boolea
 						<Input value={since} onChange={(e) => setSince(e.target.value)} />
 					</Field>
 					<Field label={t("mine.limit")}>
-						<Input type="number" min={1} max={50} value={limit} onChange={(e) => setLimit(Math.min(50, Math.max(1, Number(e.target.value) || 1)))} />
+						<Input
+							type="number"
+							min={1}
+							max={50}
+							value={limit}
+							onChange={(e) => setLimit(Math.min(50, Math.max(1, Number(e.target.value) || 1)))}
+						/>
 					</Field>
 				</div>
 				<label className="flex items-center gap-2 text-sm">

@@ -59,12 +59,23 @@ export function agentCardStats(report: Report | undefined): AgentCardStats {
 }
 
 /** "Your agents" on Home: one card per own agent, or a way to add the first one. */
-export function YourAgents({ agents, evaluations, mayRun }: { agents: readonly AgentSummary[]; evaluations: readonly Evaluation[]; mayRun: boolean }) {
+export function YourAgents({
+	agents,
+	evaluations,
+	mayRun,
+}: {
+	agents: readonly AgentSummary[];
+	evaluations: readonly Evaluation[];
+	mayRun: boolean;
+}) {
 	const { t } = useTranslation("agentFirst");
 	const own = ownAgents(agents);
 	if (own.length === 0) {
 		return (
-			<div className="bg-card text-muted-foreground flex flex-wrap items-center gap-3 rounded-xl border border-dashed px-5 py-4 text-sm" data-testid="home-agents-empty">
+			<div
+				className="bg-card text-muted-foreground flex flex-wrap items-center gap-3 rounded-xl border border-dashed px-5 py-4 text-sm"
+				data-testid="home-agents-empty"
+			>
 				<span>{t("home.empty")}</span>
 				{mayRun && (
 					<Button asChild size="sm">
@@ -109,7 +120,10 @@ function AgentCard({ agent, evaluations, mayRun }: { agent: AgentSummary; evalua
 				>
 					{agent.id}
 				</Link>
-				<span className="bg-muted text-muted-foreground ml-auto shrink-0 rounded-md px-1.5 py-0.5 font-mono text-xs" data-testid={`${testId}-version`}>
+				<span
+					className="bg-muted text-muted-foreground ml-auto shrink-0 rounded-md px-1.5 py-0.5 font-mono text-xs"
+					data-testid={`${testId}-version`}
+				>
 					{version === null ? t("detail.noVersion") : `v${version}`}
 				</span>
 			</div>
@@ -124,7 +138,8 @@ function AgentCard({ agent, evaluations, mayRun }: { agent: AgentSummary; evalua
 					<ul className="flex flex-wrap gap-1.5" aria-label={t("home.scores")} data-testid={`${testId}-scores`}>
 						{stats.capabilities.map((c) => (
 							<li key={c.id} className="bg-muted/60 rounded-md border px-2 py-0.5 text-xs">
-								<span className="text-muted-foreground">{capabilityName(c.id)}</span> <span className="font-semibold tabular-nums">{pct(c.score)}</span>
+								<span className="text-muted-foreground">{capabilityName(c.id)}</span>{" "}
+								<span className="font-semibold tabular-nums">{pct(c.score)}</span>
 							</li>
 						))}
 					</ul>

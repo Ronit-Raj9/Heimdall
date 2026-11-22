@@ -7,10 +7,28 @@ import { getBenchErrorMessage, useGetClustersQuery, useGetExperimentQuery, useGe
 import { NotScannedList } from "@/components/integrity/awarenessPanel";
 import { useGetAwarenessQuery } from "@/lib/store/apis/integrityApi";
 import { useGetJobQuery } from "@/lib/store/apis/platformApi";
-import type { AnalysisJobKind, AnalysisView, BlameRunResult, CheckRunResult, ClustersRebuildResult, CodeScanRunResult } from "@/lib/types/analysis";
+import type {
+	AnalysisJobKind,
+	AnalysisView,
+	BlameRunResult,
+	CheckRunResult,
+	ClustersRebuildResult,
+	CodeScanRunResult,
+} from "@/lib/types/analysis";
 import type { Job, JobStatus } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpRight, Coins, Database, Eye, FileSpreadsheet, Gavel, Network, ScanSearch, ShieldCheck, type LucideIcon } from "lucide-react";
+import {
+	ArrowUpRight,
+	Coins,
+	Database,
+	Eye,
+	FileSpreadsheet,
+	Gavel,
+	Network,
+	ScanSearch,
+	ShieldCheck,
+	type LucideIcon,
+} from "lucide-react";
 import type { TFunction } from "i18next";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
@@ -83,7 +101,11 @@ export function analysisJobParams(spec: AnalysisJobSpec, expId: string): Record<
 }
 
 /** A one-line summary of a finished job's result, or "" when there is nothing to say. */
-export function summarizeAnalysisResult(t: TFunction<"analysis">, spec: AnalysisJobSpec, job: Pick<Job, "status" | "result" | "error">): string {
+export function summarizeAnalysisResult(
+	t: TFunction<"analysis">,
+	spec: AnalysisJobSpec,
+	job: Pick<Job, "status" | "result" | "error">,
+): string {
 	if (job.status === "failed") return job.error ?? "";
 	if (job.status !== "succeeded") return "";
 	const r = (job.result ?? {}) as unknown;
@@ -317,7 +339,13 @@ export function AnalysisTab({ expId }: { expId: string }) {
 						>
 							{t("links.costExplain")}
 						</Link>
-						<Link to="/experiments/$expId" params={{ expId }} search={{ tab: "cost" } as never} className={CHIP} data-testid="analysis-link-pareto">
+						<Link
+							to="/experiments/$expId"
+							params={{ expId }}
+							search={{ tab: "cost" } as never}
+							className={CHIP}
+							data-testid="analysis-link-pareto"
+						>
 							{t("links.pareto")}
 						</Link>
 						<Link to="/leaderboard" className={CHIP} data-testid="analysis-link-leaderboard-pareto">
@@ -374,7 +402,7 @@ function ClusterBars({ clusters }: { clusters: readonly { signature: string; cou
 						<span className="truncate" title={`${c.signature}: ${c.title}`}>
 							{c.title}
 						</span>
-						<span className="tabular-nums text-xs font-semibold">{c.count}</span>
+						<span className="text-xs font-semibold tabular-nums">{c.count}</span>
 					</span>
 					<span className="bg-muted h-1.5 overflow-hidden rounded-full">
 						<span className="bg-destructive/70 block h-full rounded-full" style={{ width: `${(100 * c.count) / max}%` }} />
@@ -502,7 +530,13 @@ function AuditUpload() {
 	};
 	const v = result.data;
 	return (
-		<ActionCard icon={FileSpreadsheet} title={t("audit.title")} description={t("audit.description")} testId="analysis-audit" defaultOpen={Boolean(v)}>
+		<ActionCard
+			icon={FileSpreadsheet}
+			title={t("audit.title")}
+			description={t("audit.description")}
+			testId="analysis-audit"
+			defaultOpen={Boolean(v)}
+		>
 			<div className="flex flex-col gap-3 text-sm">
 				<label className="flex flex-col gap-1">
 					<span>{t("audit.file")}</span>

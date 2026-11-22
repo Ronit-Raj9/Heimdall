@@ -87,16 +87,22 @@ export function hasScenarioEvidence(
 ): boolean {
 	return Boolean(
 		detail.tool_calls?.length ||
-			detail.sessions?.length ||
-			detail.answer ||
-			detail.state?.length ||
-			detail.services?.length ||
-			detail.artifacts?.length,
+		detail.sessions?.length ||
+		detail.answer ||
+		detail.state?.length ||
+		detail.services?.length ||
+		detail.artifacts?.length,
 	);
 }
 
 /** Counts for the tool-call trace header. */
-export function toolCallCounts(calls: readonly ToolCall[]): { calls: number; errors: number; faults: number; other: number; unparsed: number } {
+export function toolCallCounts(calls: readonly ToolCall[]): {
+	calls: number;
+	errors: number;
+	faults: number;
+	other: number;
+	unparsed: number;
+} {
 	const tools = calls.filter(isToolCallRow);
 	return {
 		calls: tools.length,

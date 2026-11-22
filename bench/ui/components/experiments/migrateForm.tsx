@@ -64,7 +64,13 @@ export function MigrateForm({
 				</label>
 				<label className={field} htmlFor={`${uid}-suite`}>
 					{t("migrate.suite")}
-					<Input id={`${uid}-suite`} value={suite} onChange={(e) => setSuite(e.target.value)} placeholder="coding-core@1.0.0" data-testid={`${testId}-suite`} />
+					<Input
+						id={`${uid}-suite`}
+						value={suite}
+						onChange={(e) => setSuite(e.target.value)}
+						placeholder="coding-core@1.0.0"
+						data-testid={`${testId}-suite`}
+					/>
 				</label>
 				<label className={field} htmlFor={`${uid}-from`}>
 					{t("migrate.from")}

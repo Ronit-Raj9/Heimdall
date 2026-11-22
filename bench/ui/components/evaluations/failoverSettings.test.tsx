@@ -48,14 +48,28 @@ describe("FailoverSection", () => {
 });
 
 describe("FailoverSettings fallback list (N89)", () => {
-	const provider = (id: string, name: string, model: string) => ({ id, name, needs_base_url: false, key_hint: "", models: [{ id: model, purposes: ["agent"], rank: 1 }] });
+	const provider = (id: string, name: string, model: string) => ({
+		id,
+		name,
+		needs_base_url: false,
+		key_hint: "",
+		models: [{ id: model, purposes: ["agent"], rank: 1 }],
+	});
 	q.models = okQuery({
-		providers: [provider("openai", "OpenAI", "gpt-4o-mini"), provider("anthropic", "Anthropic", "claude-haiku"), provider("groq", "Groq", "llama-3-8b")],
+		providers: [
+			provider("openai", "OpenAI", "gpt-4o-mini"),
+			provider("anthropic", "Anthropic", "claude-haiku"),
+			provider("groq", "Groq", "llama-3-8b"),
+		],
 		keys: [],
 	});
 	it("lists only the provider of the agent's model", () => {
 		const html = render(
-			<FailoverSettings arm={{ label: "A", agent: "codex", provider: "openai", model: "gpt-4o" }} value={{ enabled: true, fallbacks: [] }} onChange={() => undefined} />,
+			<FailoverSettings
+				arm={{ label: "A", agent: "codex", provider: "openai", model: "gpt-4o" }}
+				value={{ enabled: true, fallbacks: [] }}
+				onChange={() => undefined}
+			/>,
 		);
 		expect(html).toContain("gpt-4o-mini");
 		expect(html).not.toContain("claude-haiku");
@@ -63,7 +77,13 @@ describe("FailoverSettings fallback list (N89)", () => {
 		expect(html).toContain("Pick a fallback model.");
 	});
 	it("waits for the agent's model before listing anything", () => {
-		const html = render(<FailoverSettings arm={{ label: "A", agent: "codex", model: "" }} value={{ enabled: true, fallbacks: [] }} onChange={() => undefined} />);
+		const html = render(
+			<FailoverSettings
+				arm={{ label: "A", agent: "codex", model: "" }}
+				value={{ enabled: true, fallbacks: [] }}
+				onChange={() => undefined}
+			/>,
+		);
 		expect(html).not.toContain("gpt-4o-mini");
 		expect(html).toContain("Pick the agent&#x27;s model first");
 	});

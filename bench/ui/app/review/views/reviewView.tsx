@@ -214,7 +214,9 @@ function ReasonFilter({
 			onClick={onClick}
 			className={cn(
 				"inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition",
-				active ? "border-primary bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted",
+				active
+					? "border-primary bg-primary text-primary-foreground"
+					: "bg-background text-muted-foreground hover:text-foreground hover:bg-muted",
 			)}
 			data-testid={testId}
 		>
@@ -234,7 +236,14 @@ function ReasonFilter({
 			<Filter className="text-muted-foreground mr-1 size-3.5" aria-hidden="true" />
 			{chip(ALL_REASONS, tu("review.all"), total, value === null, () => onChange(null))}
 			{reasons.map((r) =>
-				chip(r, isReviewReason(r) ? t(`review.reason.${r}`) : r, counts[r] ?? 0, value === r, () => onChange(r), `review-reason-option-${r}`),
+				chip(
+					r,
+					isReviewReason(r) ? t(`review.reason.${r}`) : r,
+					counts[r] ?? 0,
+					value === r,
+					() => onChange(r),
+					`review-reason-option-${r}`,
+				),
 			)}
 		</div>
 	);

@@ -105,7 +105,16 @@ describe("AdminView", () => {
 	it("lists pending image requests with the image, the org's note and approve or reject", () => {
 		imgs.result = okQuery({
 			images: [
-				{ id: "ir1", org_id: "org_acme", image: "ghcr.io/acme/a@sha256:" + "a".repeat(64), size_bytes: 900 << 20, note: "support agent", status: "pending", requested_by: "u1", created_at: "2026-11-20T00:00:00Z" },
+				{
+					id: "ir1",
+					org_id: "org_acme",
+					image: "ghcr.io/acme/a@sha256:" + "a".repeat(64),
+					size_bytes: 900 << 20,
+					note: "support agent",
+					status: "pending",
+					requested_by: "u1",
+					created_at: "2026-11-20T00:00:00Z",
+				},
 			],
 		});
 		const html = render(<AdminImagesPanel />, admin());

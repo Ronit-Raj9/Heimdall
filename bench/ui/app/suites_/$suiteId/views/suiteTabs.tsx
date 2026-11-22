@@ -41,11 +41,7 @@ export function SuiteTiersTab({ suite }: { suite: SuiteSummary }) {
 						label={t("suites.tiers.useTitle")}
 						testId="suite-tiers-experiment"
 					/>
-					<CopyCodeBlock
-						code={`heimdall suite tiers suggest ${suite.id}`}
-						label={t("suites.tiers.suggest")}
-						testId="suite-tiers-suggest"
-					/>
+					<CopyCodeBlock code={`heimdall suite tiers suggest ${suite.id}`} label={t("suites.tiers.suggest")} testId="suite-tiers-suggest" />
 				</div>
 			</Section>
 		</div>

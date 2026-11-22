@@ -95,7 +95,11 @@ export function EvaluationWorkerPicker({ value, onChange }: { value: string; onC
 			<section className="flex flex-col gap-1 text-sm" data-testid="eval-worker-only">
 				<p className="text-foreground">{line}</p>
 				{canUse(session, "admin") ? (
-					<a href={ADD_WORKER_HREF} className="text-primary w-fit text-xs font-medium underline-offset-4 hover:underline" data-testid="eval-worker-add">
+					<a
+						href={ADD_WORKER_HREF}
+						className="text-primary w-fit text-xs font-medium underline-offset-4 hover:underline"
+						data-testid="eval-worker-add"
+					>
 						{t("target.addWorker")}
 					</a>
 				) : (

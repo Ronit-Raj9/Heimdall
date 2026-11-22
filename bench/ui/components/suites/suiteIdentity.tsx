@@ -50,7 +50,9 @@ export function SuiteStatusPill({ suite, testId, className }: { suite: SuiteSumm
 			data-status={state}
 		>
 			<span className={cn("size-1.5 shrink-0 rounded-full", DOT_TONE[state])} aria-hidden="true" />
-			{state === "frozenNotChecked" ? tg("status.frozenNotChecked") : t(`status.${state}`, { ready: suite.admitted_count, total: suite.task_count })}
+			{state === "frozenNotChecked"
+				? tg("status.frozenNotChecked")
+				: t(`status.${state}`, { ready: suite.admitted_count, total: suite.task_count })}
 		</span>
 	);
 }

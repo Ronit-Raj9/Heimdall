@@ -125,7 +125,9 @@ describe("ActionsTab setups and Extend words (N66)", () => {
 		};
 		const html = render(<ActionsTab expId="e1" suite="coding-core" />);
 		expect(html).toMatch(/data-testid="actions-migrate-form-agent"[\s\S]*?<option value="agents\/codex.yaml" selected="">/);
-		expect(html).toMatch(/value="gpt-6-luna"[^>]*data-testid="actions-migrate-form-from"|data-testid="actions-migrate-form-from"[^>]*value="gpt-6-luna"/);
+		expect(html).toMatch(
+			/value="gpt-6-luna"[^>]*data-testid="actions-migrate-form-from"|data-testid="actions-migrate-form-from"[^>]*value="gpt-6-luna"/,
+		);
 		expect(html).toMatch(/data-testid="actions-compare-refs-form-agent"[\s\S]*?<option value="agents\/codex.yaml" selected="">/);
 	});
 	it("reads a score run in plain words and needs no Extend anyway", () => {

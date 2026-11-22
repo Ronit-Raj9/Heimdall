@@ -23,7 +23,13 @@ export default function ImprovementView({ id }: { id: string }) {
 				title={d?.name ?? id}
 				subtitle={d ? `${d.agent} on ${d.suite}` : undefined}
 				breadcrumbs={[{ label: t("detail.back"), to: "/improvements" }]}
-				meta={d && <StatusPill tone={statusTone(d.status)} pulse={d.running}>{t(`status.${d.status}`)}</StatusPill>}
+				meta={
+					d && (
+						<StatusPill tone={statusTone(d.status)} pulse={d.running}>
+							{t(`status.${d.status}`)}
+						</StatusPill>
+					)
+				}
 				actions={
 					live ? (
 						<Button
@@ -51,7 +57,11 @@ export default function ImprovementView({ id }: { id: string }) {
 					notFound={{ text: t("detail.notFound", { id }), backTo: "/improvements", backLabel: t("detail.notFoundBack") }}
 				/>
 			) : (
-				<ImprovementDetailBody data={d} approving={approveState.isLoading} onApprove={(round, reason) => void approve({ id, round, reason })} />
+				<ImprovementDetailBody
+					data={d}
+					approving={approveState.isLoading}
+					onApprove={(round, reason) => void approve({ id, round, reason })}
+				/>
 			)}
 		</section>
 	);

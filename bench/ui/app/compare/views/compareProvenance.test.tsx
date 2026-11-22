@@ -12,7 +12,9 @@ vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/route
 // 6-A-03, QC2-27-06: each run says what model evidence it has, independent of the server mode.
 describe("ArmProvenance", () => {
 	it("labels a scripted run and a run with recorded model calls", () => {
-		expect(tagOf(render(<ArmProvenance arm="A" provenance="scripted" />), "runs-pair-provenance-A")).toContain('data-provenance="scripted"');
+		expect(tagOf(render(<ArmProvenance arm="A" provenance="scripted" />), "runs-pair-provenance-A")).toContain(
+			'data-provenance="scripted"',
+		);
 		expect(render(<ArmProvenance arm="A" provenance="scripted" />)).toContain("scripted");
 		expect(render(<ArmProvenance arm="B" provenance="model" />)).toContain("real model");
 	});

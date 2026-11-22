@@ -66,7 +66,11 @@ export default function PoliciesView() {
 				<EmptyState
 					icon={ShieldCheck}
 					message={t("policies.empty")}
-					action={canWrite ? { label: t("policies.createDefault"), onClick: startNew } : { label: t("policies.readGuide"), to: "/docs", search: { doc: "releases" } }}
+					action={
+						canWrite
+							? { label: t("policies.createDefault"), onClick: startNew }
+							: { label: t("policies.readGuide"), to: "/docs", search: { doc: "releases" } }
+					}
 					testId="policies-empty"
 				/>
 			) : (
@@ -94,7 +98,11 @@ export default function PoliciesView() {
 												p.valid ? "bg-primary/10 text-primary" : "bg-destructive/10 text-chart-error-ink",
 											)}
 										>
-											{p.valid ? <ShieldCheck className="size-4.5" aria-hidden="true" /> : <ShieldAlert className="size-4.5" aria-hidden="true" />}
+											{p.valid ? (
+												<ShieldCheck className="size-4.5" aria-hidden="true" />
+											) : (
+												<ShieldAlert className="size-4.5" aria-hidden="true" />
+											)}
 										</span>
 										<span className="flex min-w-0 flex-col gap-0.5">
 											<span className="truncate text-sm font-semibold" title={p.file}>
@@ -181,7 +189,17 @@ interface PolicyEditorProps {
 }
 
 /** Form or YAML editing of one policy. A file that does not parse opens on the YAML tab. */
-export function PolicyEditor({ isNew, taken = [], file, initialYAML, initialPolicy, sha256, onSaved, onReload, onDeleted }: PolicyEditorProps) {
+export function PolicyEditor({
+	isNew,
+	taken = [],
+	file,
+	initialYAML,
+	initialPolicy,
+	sha256,
+	onSaved,
+	onReload,
+	onDeleted,
+}: PolicyEditorProps) {
 	const { t } = useTranslation("govern");
 	const confirm = useConfirm();
 	const [mode, setMode] = useState<"form" | "yaml">(isNew || initialPolicy ? "form" : "yaml");
@@ -325,36 +343,36 @@ export function PolicyEditor({ isNew, taken = [], file, initialYAML, initialPoli
 
 			<RoleNote min="member" />
 			<RoleGate min="member" fallback={null}>
-			<div className="flex flex-wrap justify-between gap-2 border-t pt-5">
-				<div>
-					{!isNew && file && (
-						<Button
-							variant="ghost"
-							disabled={delState.isLoading}
-							onClick={async () => {
-								if (!(await confirm(t("policies.deleteConfirm", { file })))) return;
-								const res = await del(file);
-								if (!("error" in res)) onDeleted?.();
-							}}
-							data-testid="policy-delete"
-						>
-							{t("policies.delete")}
+				<div className="flex flex-wrap justify-between gap-2 border-t pt-5">
+					<div>
+						{!isNew && file && (
+							<Button
+								variant="ghost"
+								disabled={delState.isLoading}
+								onClick={async () => {
+									if (!(await confirm(t("policies.deleteConfirm", { file })))) return;
+									const res = await del(file);
+									if (!("error" in res)) onDeleted?.();
+								}}
+								data-testid="policy-delete"
+							>
+								{t("policies.delete")}
+							</Button>
+						)}
+					</div>
+					<div className="flex gap-2">
+						<Button variant="outline" disabled={validation.isLoading} onClick={() => void validate(body())} data-testid="policy-validate">
+							{t("policies.validate")}
 						</Button>
-					)}
+						<Button
+							disabled={saveState.isLoading || !nameOk || (mode === "form" && policy.checks.length === 0)}
+							onClick={() => void doSave()}
+							data-testid="policy-save"
+						>
+							{saveState.isLoading ? t("policies.saving") : t("policies.save")}
+						</Button>
+					</div>
 				</div>
-				<div className="flex gap-2">
-					<Button variant="outline" disabled={validation.isLoading} onClick={() => void validate(body())} data-testid="policy-validate">
-						{t("policies.validate")}
-					</Button>
-					<Button
-						disabled={saveState.isLoading || !nameOk || (mode === "form" && policy.checks.length === 0)}
-						onClick={() => void doSave()}
-						data-testid="policy-save"
-					>
-						{saveState.isLoading ? t("policies.saving") : t("policies.save")}
-					</Button>
-				</div>
-			</div>
 			</RoleGate>
 		</div>
 	);

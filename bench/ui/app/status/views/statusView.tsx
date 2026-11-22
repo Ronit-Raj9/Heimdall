@@ -58,11 +58,7 @@ export function StatusPageView({ page }: { page: StatusPage }) {
 		<div className="flex flex-col gap-8" data-testid="status-page">
 			<header className="flex flex-col gap-2">
 				<h1 className="text-xl font-semibold">{t("page.heading")}</h1>
-				<div
-					className="bg-card flex items-center gap-3 rounded-xl border px-4 py-4"
-					data-testid="status-overall"
-					data-level={page.level}
-				>
+				<div className="bg-card flex items-center gap-3 rounded-xl border px-4 py-4" data-testid="status-overall" data-level={page.level}>
 					<StatusDot tone={levelTone[page.level]} className="size-2.5" pulse={page.level !== "operational"} />
 					<span className="text-base font-medium">{t(`overall.${page.level}`)}</span>
 				</div>
@@ -134,7 +130,13 @@ function IncidentCard({ incident, names }: { incident: MaybeAutoIncident; names:
 	const { t } = useTranslation("status");
 	const affected = (incident.components ?? []).map((id) => names.get(id) ?? id);
 	const tone: StatusTone =
-		incident.status === "resolved" ? "ok" : incident.status === "scheduled" || incident.impact === "maintenance" ? "running" : incident.impact === "minor" ? "warn" : "bad";
+		incident.status === "resolved"
+			? "ok"
+			: incident.status === "scheduled" || incident.impact === "maintenance"
+				? "running"
+				: incident.impact === "minor"
+					? "warn"
+					: "bad";
 	const updates = [...incident.updates].reverse(); // newest first
 	return (
 		<article className="bg-card flex flex-col gap-3 rounded-xl border px-4 py-4" data-testid={`status-incident-${incident.id}`}>

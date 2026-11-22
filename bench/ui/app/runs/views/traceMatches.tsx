@@ -180,7 +180,10 @@ export function TraceSearchInput({ value, onChange, delay = 300 }: { value: stri
 	return (
 		<label className="relative min-w-48 flex-1 sm:max-w-sm" title={t("search.help")}>
 			<span className="sr-only">{t("search.label")}</span>
-			<FileSearch className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" aria-hidden="true" />
+			<FileSearch
+				className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2"
+				aria-hidden="true"
+			/>
 			<input
 				type="search"
 				value={draft}

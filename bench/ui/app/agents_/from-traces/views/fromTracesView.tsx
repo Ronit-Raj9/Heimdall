@@ -139,7 +139,8 @@ function EndpointSection({ info }: { info: TraceConnectInfo }) {
 							role="tab"
 							aria-selected={s.id === setup?.id}
 							className={
-								"rounded-md border px-2 py-1 text-xs " + (s.id === setup?.id ? "border-primary text-foreground font-medium" : "text-muted-foreground")
+								"rounded-md border px-2 py-1 text-xs " +
+								(s.id === setup?.id ? "border-primary text-foreground font-medium" : "text-muted-foreground")
 							}
 							onClick={() => setSetupId(s.id)}
 							data-testid={`from-traces-setup-${s.id}`}
@@ -242,7 +243,11 @@ export function DraftSection({
 	return (
 		<Section
 			title={t("draft.title")}
-			description={fromFile ? t("draft.fromFile") : t("draft.received", { traces: draft.traces, spans: info?.spans_kept ?? draft.spans, exports: info?.exports ?? 0 })}
+			description={
+				fromFile
+					? t("draft.fromFile")
+					: t("draft.received", { traces: draft.traces, spans: info?.spans_kept ?? draft.spans, exports: info?.exports ?? 0 })
+			}
 			testId="from-traces-draft"
 		>
 			<div className="flex min-w-0 flex-col gap-4">
@@ -281,7 +286,8 @@ export function DraftSection({
 						<ul className="flex flex-wrap gap-2" data-testid="from-traces-tools">
 							{draft.tools!.map((tl) => (
 								<li key={tl.name} className="rounded-md border px-2 py-1 text-xs">
-									<span className="font-mono">{tl.name}</span> <span className="text-muted-foreground">{t("draft.toolCalls", { calls: tl.calls })}</span>
+									<span className="font-mono">{tl.name}</span>{" "}
+									<span className="text-muted-foreground">{t("draft.toolCalls", { calls: tl.calls })}</span>
 									{tl.errors ? <span className="text-destructive"> {t("draft.toolErrors", { errors: tl.errors })}</span> : null}
 								</li>
 							))}
@@ -337,7 +343,13 @@ export function DraftSection({
 						</Button>
 					) : (
 						canWrite && (
-							<Button size="sm" variant="ghost" disabled={forgetState.isLoading} onClick={() => void forget()} data-testid="from-traces-forget">
+							<Button
+								size="sm"
+								variant="ghost"
+								disabled={forgetState.isLoading}
+								onClick={() => void forget()}
+								data-testid="from-traces-forget"
+							>
 								{t("draft.forget")}
 							</Button>
 						)
@@ -365,7 +377,11 @@ function ConnectSection({ draft }: { draft: TraceDraft }) {
 	if (template === "wrap-app") {
 		return (
 			<Section title={t("connect.title")} description={t("connect.wrapHint")} testId="from-traces-connect">
-				<Link to="/agents/new" search={{ template: "wrap-app" } as never} className="text-primary text-xs font-medium underline underline-offset-2">
+				<Link
+					to="/agents/new"
+					search={{ template: "wrap-app" } as never}
+					className="text-primary text-xs font-medium underline underline-offset-2"
+				>
 					{t("connect.openWrap")}
 				</Link>
 			</Section>
@@ -381,12 +397,24 @@ function ConnectSection({ draft }: { draft: TraceDraft }) {
 				</label>
 				<label className="flex flex-col gap-1 text-xs" htmlFor={`${ids}-url`}>
 					<span className="font-medium">{template === "a2a-card" ? t("connect.urlCard") : t("connect.url")}</span>
-					<Input id={`${ids}-url`} value={url} placeholder="https://agent.example.com/chat" onChange={(e) => setURL(e.target.value)} data-testid="from-traces-endpoint-url" />
+					<Input
+						id={`${ids}-url`}
+						value={url}
+						placeholder="https://agent.example.com/chat"
+						onChange={(e) => setURL(e.target.value)}
+						data-testid="from-traces-endpoint-url"
+					/>
 				</label>
 				{template !== "a2a-card" && (
 					<label className="flex flex-col gap-1 text-xs" htmlFor={`${ids}-secret`}>
 						<span className="font-medium">{t("connect.secret")}</span>
-						<Input id={`${ids}-secret`} value={authSecret} placeholder="MY_AGENT_TOKEN" onChange={(e) => setAuthSecret(e.target.value)} data-testid="from-traces-secret" />
+						<Input
+							id={`${ids}-secret`}
+							value={authSecret}
+							placeholder="MY_AGENT_TOKEN"
+							onChange={(e) => setAuthSecret(e.target.value)}
+							data-testid="from-traces-secret"
+						/>
 						<span className="text-muted-foreground">{t("connect.secretHint")}</span>
 					</label>
 				)}

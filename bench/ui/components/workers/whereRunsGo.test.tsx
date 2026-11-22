@@ -60,7 +60,10 @@ describe("WhereRunsGo", () => {
 
 describe("EvaluationWorkerPicker", () => {
 	it("says where runs go with one choice, its runs at once and how to add a worker (N93)", () => {
-		q.target = okQuery({ target: "shared", choices: [{ ...view.choices[0], current: true, per_evaluation: true, note: undefined, slots: 2 }] });
+		q.target = okQuery({
+			target: "shared",
+			choices: [{ ...view.choices[0], current: true, per_evaluation: true, note: undefined, slots: 2 }],
+		});
 		const member = render(<EvaluationWorkerPicker value="" onChange={() => undefined} />, hostedSession("member"));
 		expect(member).toContain('data-testid="eval-worker-only"');
 		expect(member).toContain("Runs go to: Shared worker. It runs 2 at a time.");
@@ -71,7 +74,9 @@ describe("EvaluationWorkerPicker", () => {
 		expect(admin).toContain("Add a worker");
 		expect(admin).not.toContain("An admin can add a worker");
 		q.target = okQuery({ target: "shared", choices: [{ ...view.choices[0], current: true, per_evaluation: true }] });
-		expect(render(<EvaluationWorkerPicker value="" onChange={() => undefined} />, hostedSession("member"))).toContain("Runs go to: Shared worker.</");
+		expect(render(<EvaluationWorkerPicker value="" onChange={() => undefined} />, hostedSession("member"))).toContain(
+			"Runs go to: Shared worker.</",
+		);
 	});
 
 	it("lists every choice when there are several", () => {

@@ -193,9 +193,7 @@ export function GroupedModelPicker({ value, onChange, disabled: disabledProp, te
 					<option value="" disabled>
 						{noProvider ? "Pick the agent's model first" : loaded ? "Choose a model" : "Loading models..."}
 					</option>
-					{model !== "" && !listed && !customFor && (
-						<option value={selected}>{modelOptionLabel(providerName, model)}</option>
-					)}
+					{model !== "" && !listed && !customFor && <option value={selected}>{modelOptionLabel(providerName, model)}</option>}
 					{groups.map((g) => (
 						<optgroup
 							key={g.provider}

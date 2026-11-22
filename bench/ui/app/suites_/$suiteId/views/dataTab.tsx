@@ -211,7 +211,11 @@ export function PolicyForm({ view, writable, t }: { view: DataPolicyView; writab
 			{writable && (
 				<div className="flex flex-wrap items-center justify-end gap-3 lg:col-span-2">
 					{(view.updated_by_name || view.policy.updated_by) && (
-						<span className="text-muted-foreground mr-auto text-xs" title={view.policy.updated_by || undefined} data-testid="suite-data-policy-updated">
+						<span
+							className="text-muted-foreground mr-auto text-xs"
+							title={view.policy.updated_by || undefined}
+							data-testid="suite-data-policy-updated"
+						>
 							{t("policy.updated", { who: view.updated_by_name || view.policy.updated_by })}
 						</span>
 					)}

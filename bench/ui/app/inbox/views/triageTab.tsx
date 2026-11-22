@@ -94,11 +94,7 @@ function ExperimentTriage({ expId }: { expId: string }) {
 
 	return (
 		<div className="flex flex-col gap-6">
-			<Section
-				title={t("triage.table.title")}
-				description={t("triage.table.description")}
-				testId="triage-table-section"
-			>
+			<Section title={t("triage.table.title")} description={t("triage.table.description")} testId="triage-table-section">
 				{!observed ? (
 					<EmptyState compact icon={SearchCheck} message={t("triage.empty")} testId="triage-empty" />
 				) : (

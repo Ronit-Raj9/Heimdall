@@ -71,7 +71,13 @@ export function CompareRefsForm({
 			<div className="grid gap-3 sm:grid-cols-2">
 				<label className={field} htmlFor={`${uid}-agent`}>
 					{t("compare.agent")}
-					<select id={`${uid}-agent`} className={select} value={agent} onChange={(e) => setAgent(e.target.value)} data-testid={`${testId}-agent`}>
+					<select
+						id={`${uid}-agent`}
+						className={select}
+						value={agent}
+						onChange={(e) => setAgent(e.target.value)}
+						data-testid={`${testId}-agent`}
+					>
 						<option value="">{t("compare.agentPlaceholder")}</option>
 						{list.map((a) => (
 							<option key={a.path} value={a.path}>
@@ -87,13 +93,27 @@ export function CompareRefsForm({
 				</label>
 				<label className={field} htmlFor={`${uid}-suite`}>
 					{t("compare.suite")}
-					<Input id={`${uid}-suite`} value={suite} onChange={(e) => setSuite(e.target.value)} placeholder="coding-core@1.0.0" data-testid={`${testId}-suite`} />
+					<Input
+						id={`${uid}-suite`}
+						value={suite}
+						onChange={(e) => setSuite(e.target.value)}
+						placeholder="coding-core@1.0.0"
+						data-testid={`${testId}-suite`}
+					/>
 				</label>
 				<label className={`${field} sm:col-span-2`} htmlFor={`${uid}-repo`}>
 					{t("compare.repo")}
 					{connected ? (
-						<select id={`${uid}-repo`} className={select} value={repo} onChange={(e) => pickRepo(e.target.value)} data-testid={`${testId}-repo`}>
-							<option value="">{repos.isLoading ? t("compare.repoLoading") : hosted ? t("compare.pickRepo") : t("compare.repoProject")}</option>
+						<select
+							id={`${uid}-repo`}
+							className={select}
+							value={repo}
+							onChange={(e) => pickRepo(e.target.value)}
+							data-testid={`${testId}-repo`}
+						>
+							<option value="">
+								{repos.isLoading ? t("compare.repoLoading") : hosted ? t("compare.pickRepo") : t("compare.repoProject")}
+							</option>
 							{(repos.data?.repos ?? []).map((r) => (
 								<option key={r.full_name} value={r.full_name}>
 									{r.full_name}

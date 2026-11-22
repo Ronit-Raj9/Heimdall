@@ -47,7 +47,15 @@ vi.mock("@/lib/store/apis/failurePatternsApi", async (importOriginal) => ({
 					experiments: ["e1"],
 					last_at: "",
 					patterns: [
-						{ pattern: "pattern_loop", label: "Loop", description: "same call repeated", count: 3, observed: 10, unknown: 0, examples: [{ run_id: "r1", exp_id: "e1", benchmark: "hd-harbor-tb2", task: "t1", outcome: "fail" }] },
+						{
+							pattern: "pattern_loop",
+							label: "Loop",
+							description: "same call repeated",
+							count: 3,
+							observed: 10,
+							unknown: 0,
+							examples: [{ run_id: "r1", exp_id: "e1", benchmark: "hd-harbor-tb2", task: "t1", outcome: "fail" }],
+						},
 						{ pattern: "pattern_ignored_error", label: "Ignored error", description: "", count: 0, observed: 10, unknown: 0, examples: [] },
 					],
 				},
@@ -68,7 +76,18 @@ vi.mock("@/lib/store/apis/modelsApi", () => ({
 vi.mock("@tanstack/react-router", () => ({
 	useSearch: () => state.search,
 	useNavigate: () => (opts: unknown) => state.navigated.push(opts),
-	Link: ({ to, search, params: _params, children, ...rest }: { to: string; search?: Record<string, string>; params?: unknown; children: React.ReactNode }) => (
+	Link: ({
+		to,
+		search,
+		params: _params,
+		children,
+		...rest
+	}: {
+		to: string;
+		search?: Record<string, string>;
+		params?: unknown;
+		children: React.ReactNode;
+	}) => (
 		<a href={search ? `${to}?${new URLSearchParams(search).toString()}` : to} {...rest}>
 			{children}
 		</a>
@@ -135,7 +154,9 @@ describe("report card tab", () => {
 		state.report = {
 			evaluation: "ev_1",
 			arms: [{ label: "A", agent: "codex", version: 2, model: "gpt-x" }],
-			capabilities: [{ capability: "terminal", benchmarks: ["hd-harbor-tb2"], arms: { A: { score: 0.41, ci_low: 0.3, ci_high: 0.52, runs: 30 } } }],
+			capabilities: [
+				{ capability: "terminal", benchmarks: ["hd-harbor-tb2"], arms: { A: { score: 0.41, ci_low: 0.3, ci_high: 0.52, runs: 30 } } },
+			],
 			benchmarks: [],
 			reliability: [],
 			models: ["gpt-x"],
@@ -162,7 +183,10 @@ describe("report card tab", () => {
 		expect(modelOptions(["a"], "gpt-6-luna")).toEqual(["gpt-6-luna", "a"]);
 		expect(modelOptions(undefined, "a")).toEqual(["a"]);
 		expect(agentReportCardRequest({ agent: "my agent" })).toEqual({ url: "/agents/my%20agent/report-card" });
-		expect(agentReportCardRequest({ agent: "x", version: 2, model: "m" })).toEqual({ url: "/agents/x/report-card", params: { version: "2", model: "m" } });
+		expect(agentReportCardRequest({ agent: "x", version: 2, model: "m" })).toEqual({
+			url: "/agents/x/report-card",
+			params: { version: "2", model: "m" },
+		});
 	});
 
 	it("reads version and model from the address and names its selects (N54, N55)", () => {

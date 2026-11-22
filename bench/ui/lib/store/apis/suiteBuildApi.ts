@@ -1,4 +1,11 @@
-import type { RowImportRequest, RowImportResult, RowImportStatus, SuiteGraderRequest, SuiteGraderResult, TaskSplitResult } from "@/lib/types/suiteBuild";
+import type {
+	RowImportRequest,
+	RowImportResult,
+	RowImportStatus,
+	SuiteGraderRequest,
+	SuiteGraderResult,
+	TaskSplitResult,
+} from "@/lib/types/suiteBuild";
 import { benchApi } from "./benchApi";
 
 const seg = (v: string) => encodeURIComponent(v);

@@ -111,7 +111,12 @@ describe("defaultFormValues", () => {
 // N42: "all tasks" on a benchmark with draft tasks sends only the ready ids, so the planner never refuses.
 describe("toExperiment with ready tasks", () => {
 	it("sends the ready ids for all tasks when some tasks are not ready", () => {
-		const values = { ...valid(), suite: "s@1", primaryCondition: "clean", conditions: [{ condition: "clean", enabled: true, allTasks: true, taskIds: [], trials: 1 }] };
+		const values = {
+			...valid(),
+			suite: "s@1",
+			primaryCondition: "clean",
+			conditions: [{ condition: "clean", enabled: true, allTasks: true, taskIds: [], trials: 1 }],
+		};
 		const ready = new Map([["s@1", { ids: ["a", "c"], total: 3 }]]);
 		expect(toExperiment(values, ready).conditions).toEqual([{ id: "clean", tasks: { ids: ["a", "c"] }, trials: 1 }]);
 		expect(toExperiment(values, new Map([["s@1", { ids: ["a", "b", "c"], total: 3 }]])).conditions[0].tasks).toEqual({ all: true });

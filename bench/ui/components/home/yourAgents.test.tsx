@@ -16,7 +16,14 @@ vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 						evaluation: "ev_9",
 						arms: [{ label: "A", agent, model: "gpt-x" }],
 						capabilities: [{ capability: "support", benchmarks: ["b"], arms: { A: { score: 0.62, ci_low: 0.5, ci_high: 0.7, runs: 10 } } }],
-						benchmarks: [{ benchmark: "b", capability: "support", experiment_id: "e", arms: { A: { score: 0.5, ci_low: 0, ci_high: 1, runs: 10, cost_usd: 0.1 } } }],
+						benchmarks: [
+							{
+								benchmark: "b",
+								capability: "support",
+								experiment_id: "e",
+								arms: { A: { score: 0.5, ci_low: 0, ci_high: 1, runs: 10, cost_usd: 0.1 } },
+							},
+						],
 						reliability: [{ fault: "broken-tool", arms: { A: { score: 0.3, drop: -0.32 } } }],
 					},
 				}
@@ -24,7 +31,18 @@ vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 }));
 
 vi.mock("@tanstack/react-router", () => ({
-	Link: ({ to, search: _s, params: _p, children, ...rest }: { to: string; search?: unknown; params?: unknown; children: React.ReactNode }) => (
+	Link: ({
+		to,
+		search: _s,
+		params: _p,
+		children,
+		...rest
+	}: {
+		to: string;
+		search?: unknown;
+		params?: unknown;
+		children: React.ReactNode;
+	}) => (
 		<a href={to} {...rest}>
 			{children}
 		</a>
@@ -35,7 +53,9 @@ const agent = (id: string) => ({ id, adapter: "command", scripted_kind: "", path
 
 describe("Home: your agents", () => {
 	it("shows version, score per capability, cost per solved task, drop under faults and last evaluation", () => {
-		const html = renderToStaticMarkup(<YourAgents agents={[agent("codex"), agent("support-bot"), agent("draft-bot")]} evaluations={[]} mayRun />);
+		const html = renderToStaticMarkup(
+			<YourAgents agents={[agent("codex"), agent("support-bot"), agent("draft-bot")]} evaluations={[]} mayRun />,
+		);
 		expect(html).not.toContain("home-agent-codex");
 		expect(html).toContain('data-testid="home-agent-support-bot-version">v4');
 		expect(html).toContain("62%");
