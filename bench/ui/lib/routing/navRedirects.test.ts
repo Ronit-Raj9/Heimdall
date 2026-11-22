@@ -4,6 +4,7 @@ import {
 	canariesRedirect,
 	catalogRedirect,
 	importTabRedirect,
+	addBenchmarkTarget,
 	policiesRedirect,
 	reviewRedirect,
 	schedulesRedirect,
@@ -28,6 +29,10 @@ describe("navRedirects", () => {
 	it("folds catalog and import into Benchmarks", () => {
 		expect(catalogRedirect()).toEqual({ to: "/suites", search: { tab: "catalog" } });
 		expect(importTabRedirect()).toEqual({ to: "/suites", search: { tab: "import" } });
+	});
+
+	it("keeps /suites/add as the Add benchmark page, not the Import tab", () => {
+		expect(addBenchmarkTarget()).toEqual({ to: "/suites/add", search: {} });
 	});
 
 	it("folds drift monitors and schedules into Scheduled checks", () => {

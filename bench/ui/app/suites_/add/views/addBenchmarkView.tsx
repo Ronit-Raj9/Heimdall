@@ -25,6 +25,9 @@ export const DRAFT_POLL_MS = 3000;
 /**
  * /suites/add: drop anything, see what was found, preview each task with its checks and
  * controls, run the readiness checks live, publish privately.
+ *
+ * TODO(INT4): when lane y-13 (row mapper) is merged, map rows of a dataset input through its
+ * row mapper here instead of the detect/inspect suggestion alone.
  */
 export default function AddBenchmarkView() {
 	const { t } = useTranslation("onboard");

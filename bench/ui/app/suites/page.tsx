@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import SuitesView from "./views/suitesView";
 
 // Composition only. Benchmarks: My benchmarks (default), Catalog (the old /catalog) and Import
-// (the old /imports and /suites/add) as tabs, ?tab= in the URL.
+// (the old /imports) as tabs, ?tab= in the URL. /suites/add is the Add benchmark page (Z20).
 export default function SuitesPage() {
 	const { t } = useTranslation("hubs");
 	return (

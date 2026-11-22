@@ -9,7 +9,7 @@ import { AlertTriangle, FileCode2, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 /**
- * The Import tab of Benchmarks (/suites?tab=import; the old /imports and /suites/add). Import a public benchmark with the exact commands
+ * The Import tab of Benchmarks (/suites?tab=import; the old /imports). Import a public benchmark with the exact commands
  * of each importer the server links, or bring your own tasks and suite.
  */
 export default function AddSuiteView() {
