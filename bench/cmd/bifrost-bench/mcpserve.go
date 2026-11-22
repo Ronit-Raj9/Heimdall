@@ -23,6 +23,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/maximhq/bifrost/bench/connectlocal"
 )
 
 // mcpProtocolVersions are the MCP revisions this server speaks, newest first.
@@ -45,13 +47,34 @@ func runMCPServe(args []string) int {
 		fmt.Fprintln(os.Stderr, mcpUsage)
 		return exitUsage
 	}
+	token := strings.TrimSpace(os.Getenv(*tokenEnv))
+	if token == "" { // Z02: fall back to the server and token `heimdall login` stored
+		explicit := os.Getenv("HEIMDALL_URL")
+		fs.Visit(func(f *flag.Flag) {
+			if f.Name == "url" {
+				explicit = *base
+			}
+		})
+		if c, err := connectlocal.LoadCredentials(); err == nil {
+			key := connectlocal.NormalizeServer(explicit)
+			if key == "" {
+				key = c.Default
+			}
+			if sc := c.Servers[key]; sc != nil && sc.Token != "" {
+				token = sc.Token
+				if explicit == "" {
+					*base = key
+				}
+			}
+		}
+	}
 	u, err := url.Parse(strings.TrimRight(*base, "/"))
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return fail("mcp serve: -url must be an http(s) server root, got %q", *base)
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	api := &heimdallAPI{base: u.String(), token: strings.TrimSpace(os.Getenv(*tokenEnv)), client: &http.Client{Timeout: *timeout}}
+	api := &heimdallAPI{base: u.String(), token: token, client: &http.Client{Timeout: *timeout}}
 	srv := &mcpServer{api: api, version: benchVersion, poll: 10 * time.Second}
 	if err := srv.serve(ctx, os.Stdin, os.Stdout); err != nil {
 		return fail("mcp serve: %v", err)

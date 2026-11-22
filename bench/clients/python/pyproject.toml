@@ -15,6 +15,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 
+[project.scripts]
+heimdall = "heimdall.cli:main"
+
 [tool.setuptools]
 packages = ["heimdall"]
 
