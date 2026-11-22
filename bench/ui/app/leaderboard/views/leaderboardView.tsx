@@ -40,6 +40,8 @@ import { useTranslation } from "react-i18next";
 import { LeaderboardParetoPanel } from "@/components/migration/migrationReport"; // W6 cost against verified success
 import TrendsTab from "./trendsTab";
 import { AgentBoardTab } from "@/components/leaderboard/agentBoard"; // A17: agent leaderboard, the default tab
+import { ReferenceBoardPanel } from "@/components/reference/referenceBoard"; // G4-03: the reference board
+import "@/lib/types/referenceI18n";
 
 /**
  * Leaderboard: /leaderboard?tab=. Agents (default: one row per agent version and model), the
@@ -49,18 +51,22 @@ import { AgentBoardTab } from "@/components/leaderboard/agentBoard"; // A17: age
 export default function LeaderboardView() {
 	const { t } = useTranslation("bench");
 	const { t: ta } = useTranslation("agentBoard");
+	const { t: tr } = useTranslation("reference");
 	// Links into one benchmark's board (?suite=) still land on it, not on Agents.
 	const [suiteParam] = useQueryState("suite", parseAsString);
 	const tabs: RouteTab[] = [
 		{ id: "agents", label: ta("tabs.agents") },
 		{ id: "leaderboard", label: ta("tabs.byBenchmark") },
 		{ id: "trends", label: t("leaderboard.tabs.trends") },
+		{ id: "reference", label: tr("tab") }, // G4-03: scores of known agents from the Heimdall team's published runs
 	];
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="leaderboard-page">
 			<PageHeader title={t("leaderboard.title")} subtitle={t("leaderboard.pageSubtitle")} actions={<LeaderboardShare />} />
 			<RouteTabs tabs={tabs} defaultTab={suiteParam ? "leaderboard" : "agents"} label={t("leaderboard.tabs.label")} testId="leaderboard-tabs">
-				{(active) => (active === "trends" ? <TrendsTab /> : active === "leaderboard" ? <LeaderboardTab /> : <AgentBoardTab />)}
+				{(active) =>
+					active === "trends" ? <TrendsTab /> : active === "leaderboard" ? <LeaderboardTab /> : active === "reference" ? <ReferenceTab /> : <AgentBoardTab />
+				}
 			</RouteTabs>
 		</section>
 	);
@@ -81,7 +87,7 @@ function LeaderboardShare() {
 	const [capability] = useQueryState("capability", parseAsString);
 	const [model] = useQueryState("model", parseAsString);
 	const active = tab ?? (suite ? "leaderboard" : "agents");
-	if (active === "trends" || split) return null;
+	if (active === "trends" || active === "reference" || split) return null;
 	if (active === "agents") return <ShareButton kind="leaderboard" target="agents" query={shareQuery({ capability, model })} />;
 	return <ShareButton kind="leaderboard" target="models" query={shareQuery({ suite, condition, scope, synthetic, grade_source: gradeSource })} />;
 }
@@ -289,4 +295,19 @@ function EmptyBoard({ data, onShowSynthetic }: { data: LeaderboardResponse; onSh
 	}
 	if ((data.suites ?? []).length === 0) return <EmptyNote testId="leaderboard-no-runs">{t("leaderboard.noRuns")}</EmptyNote>;
 	return <EmptyNote testId="leaderboard-empty">{t("leaderboard.empty")}</EmptyNote>;
+}
+/** The Reference tab: known agents on the built-in benchmarks, from the published reference runs. */
+function ReferenceTab() {
+	const { t } = useTranslation("reference");
+	return (
+		<section className="flex min-w-0 flex-col gap-4" data-testid="reference-tab">
+			<div className="flex flex-wrap items-baseline justify-between gap-2">
+				<p className="text-muted-foreground max-w-3xl text-sm">{t("subtitle")}</p>
+				<a className="text-primary text-sm hover:underline" href="/reference" data-testid="reference-public-link">
+					{t("publicLink")}
+				</a>
+			</div>
+			<ReferenceBoardPanel />
+		</section>
+	);
 }

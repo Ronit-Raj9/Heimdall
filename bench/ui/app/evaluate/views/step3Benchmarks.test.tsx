@@ -178,3 +178,27 @@ describe("compatibility matching", () => {
 		expect(keepRunnable(["voicebench"], undefined)).toEqual(["voicebench"]);
 	});
 });
+
+describe("reference hint (G4-03)", () => {
+	const ref = (benchmark: string, agent: string, score: number) =>
+		({ id: `ev:${benchmark}:${agent}`, evaluation_id: "ev", benchmark, agent, model: "m", score, ci_low: 0, ci_high: 1, runs: 10, tasks: 5 }) as never;
+
+	it("shows what known agents score on a benchmark with published runs", () => {
+		const html = renderToStaticMarkup(
+			<Step3BenchmarksView
+				suites={suites}
+				packs={packs}
+				compatibility={compat}
+				selected={[]}
+				onChange={() => {}}
+				reference={[ref("hd-swe-verified", "codex", 0.42), ref("hd-harbor-tb2@2.0", "codex", 0.3), ref("hd-harbor-tb2", "claude-code", 0.61)]}
+			/>,
+		);
+		expect(block(html, "step3-benchmark-hd-swe-verified")).toContain("codex scores about 42% here");
+		expect(block(html, "step3-benchmark-hd-harbor-tb2")).toContain("Agents like claude-code score about 30% to 61% here");
+	});
+
+	it("shows nothing for a benchmark without published runs", () => {
+		expect(render()).not.toContain("step3-reference-");
+	});
+});

@@ -1,5 +1,7 @@
 import { BuiltinReadOnlyNote } from "@/components/suites/builtinReadOnly";
-import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
+import { ReferenceBoardPanel } from "@/components/reference/referenceBoard"; // G4-03: how known agents score on a library benchmark
+import "@/lib/types/referenceI18n";
+import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
 import { GradingBadge } from "@/components/scenario/scenarioBadges";
 import { suiteGrading } from "@/components/scenario/scenario.utils";
 import {
@@ -294,6 +296,7 @@ function SuiteBody({
       ) : (
         <>
           {builtin && <BuiltinReadOnlyNote />}
+          {builtin && <SuiteReferenceScores suiteId={suite.id} />}
           <SuiteDriftNotice suite={suite} />
           <FingerprintDriftNotice suite={suite} />
           <RouteTabs
@@ -391,4 +394,28 @@ function suiteSkill(suite: SuiteSummary): string | null {
     .slice(0, 2)
     .map(([c]) => c.replace(/[-_]/g, " "));
   return top.length ? top.join(" and ") : null;
+}
+
+/** A built-in benchmark's reference scores: how known agents score here, or a plain note when none is published. */
+function SuiteReferenceScores({ suiteId }: { suiteId: string }) {
+  const { t } = useTranslation("reference");
+  return (
+    <Section
+      title={t("benchmark.title")}
+      description={t("benchmark.description")}
+      testId="suite-reference"
+      actions={
+        <Link
+          to="/leaderboard"
+          search={{ tab: "reference" }}
+          className="text-primary text-sm hover:underline"
+          data-testid="suite-reference-all"
+        >
+          {t("benchmark.all")}
+        </Link>
+      }
+    >
+      <ReferenceBoardPanel benchmark={suiteId} />
+    </Section>
+  );
 }

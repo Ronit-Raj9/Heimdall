@@ -9,7 +9,11 @@ import {
 } from "@/lib/store/apis/evaluationsApi";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
+import { entriesByBenchmark, referenceHint } from "@/components/reference/reference.utils";
+import { type ReferenceEntry, useGetReferenceBoardQuery } from "@/lib/store/apis/referenceApi";
+import "@/lib/types/referenceI18n";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useEvaluateDraft } from "./evaluateDraft";
 
 // Lane A12: wizard step 3, "Benchmarks". Pick a pack or any set of single benchmarks. Benchmarks the
@@ -192,11 +196,15 @@ export interface Step3BenchmarksViewProps {
 	loading?: boolean;
 	/** The agent's compatibility is still loading: rows wait instead of reading as runnable. */
 	checking?: boolean;
+	/** Published reference scores (gap G4-03), every benchmark; absent or empty shows no hint. */
+	reference?: readonly ReferenceEntry[];
 }
 
 /** Pure view: packs, grouped multi-select and the selected count. Data comes in through props. */
-export function Step3BenchmarksView({ suites, packs, compatibility, selected, pack, onChange, loading, checking }: Step3BenchmarksViewProps) {
+export function Step3BenchmarksView({ suites, packs, compatibility, selected, pack, onChange, loading, checking, reference }: Step3BenchmarksViewProps) {
+	const { t: tr } = useTranslation("reference");
 	const compat = compatibilityMap(compatibility);
+	const known = entriesByBenchmark(reference ?? []);
 	const ready = new Map(suites.map((s) => [s.id, s.admitted_count ?? 0]));
 	const chosen = new Set(selected);
 	const { groups } = groupBenchmarks(suites);
@@ -212,6 +220,17 @@ export function Step3BenchmarksView({ suites, packs, compatibility, selected, pa
 
 	const readyTasks = selected.reduce((n, id) => n + (ready.get(id) ?? 0), 0);
 	const skipped = selected.filter((id) => incompatibleReason(compatFor(compat, id))).length;
+
+	// "Agents like codex score about 42% here": only from published reference runs, never a guess.
+	const hintLine = (id: string) => {
+		const h = referenceHint(known.get(benchmarkKey(id)));
+		if (!h) return null;
+		return (
+			<span className="text-primary/90 block truncate text-xs" data-testid={`step3-reference-${id}`}>
+				{h.kind === "one" ? tr("hint.one", { agent: h.agent, score: h.score }) : tr("hint.many", { agent: h.agent, low: h.low, high: h.high })}
+			</span>
+		);
+	};
 
 	const row = (s: SuiteRow) => {
 		const c = compatFor(compat, s.id);
@@ -248,6 +267,7 @@ export function Step3BenchmarksView({ suites, packs, compatibility, selected, pa
 						<span className="text-muted-foreground block truncate text-xs" title={note || undefined}>
 							{note ? note : suiteDisplayDescription(s)}
 						</span>
+						{hintLine(s.id)}
 					</span>
 				</label>
 			</li>
@@ -345,6 +365,7 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({ draft, 
 	const suites = useGetSuitesQuery();
 	const packs = useGetEvaluationPacksQuery();
 	const compat = useGetAgentCompatibilityQuery(draft.agent, { skip: !draft.agent });
+	const reference = useGetReferenceBoardQuery(); // a failure only hides the hints
 	// currentData, not data: data keeps the previous agent's answer while the new one loads.
 	const compatibility = compat.currentData;
 	const checking = Boolean(draft.agent) && !compatibility && !compat.isError;
@@ -365,6 +386,7 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({ draft, 
 			onChange={onChange}
 			loading={suites.isLoading || packs.isLoading}
 			checking={checking}
+			reference={reference.data?.entries}
 		/>
 	);
 }

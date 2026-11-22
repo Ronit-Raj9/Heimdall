@@ -21,6 +21,7 @@ import (
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/packs"
+	"github.com/maximhq/bifrost/bench/reference"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/taskhealth"
 	"github.com/valyala/fasthttp"
@@ -145,6 +146,8 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	// Bring your own worker: hosted only; local mode answers 503 (handlers/workerconns.go).
 	handlers.NewWorkerConnsHandler(mode, nil, handlers.WorkerConnErrors{}, nil).RegisterRoutes(r, common...)
 	handlers.NewWorkerTargetHandler(mode, nil, nil).RegisterRoutes(r, common...) // where runs go: hosted only; local mode answers 503 (handlers/workertarget.go)
+	// G4-03: the public reference board (handlers/reference.go).
+	handlers.NewReferenceHandler(mode, reference.Open(cfg.Path(cfg.RunsRoot))).RegisterRoutes(r, common...)
 	if deps.UI != nil {
 		NewUIHandler(mode, deps.UI).RegisterRoutes(r)
 	}
