@@ -1,0 +1,35 @@
+import "@/lib/i18n";
+
+import { render } from "@/lib/testing/render";
+import { describe, expect, it, vi } from "vitest";
+import { LoadError } from "./screenStates";
+
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+
+const notFound = { status: 404, data: { error: { message: "improvement not found: zz-nope" } } };
+const broken = { status: 500, data: { error: { message: "disk full" } } };
+const back = { text: "No improvement run named zz-nope.", backTo: "/improvements", backLabel: "Back to improvements" };
+
+describe("LoadError", () => {
+	it("says a 404 does not exist and links back instead of offering Retry", () => {
+		const html = render(<LoadError title="Could not load" error={notFound} onRetry={() => undefined} testId="x-error" notFound={back} />);
+		expect(html).toContain("No improvement run named zz-nope.");
+		expect(html).toContain('href="/improvements"');
+		expect(html).toContain("Back to improvements");
+		expect(html).not.toContain("x-error-retry");
+		expect(html).not.toContain("improvement not found: zz-nope");
+	});
+
+	it("keeps Retry and the server message for other errors, even with notFound given", () => {
+		const html = render(<LoadError title="Could not load" error={broken} onRetry={() => undefined} testId="x-error" notFound={back} />);
+		expect(html).toContain("x-error-retry");
+		expect(html).toContain("disk full");
+		expect(html).not.toContain("Back to improvements");
+	});
+
+	it("renders a 404 like any error when notFound is not given", () => {
+		const html = render(<LoadError title="Could not load" error={notFound} onRetry={() => undefined} testId="x-error" />);
+		expect(html).toContain("x-error-retry");
+		expect(html).toContain("improvement not found: zz-nope");
+	});
+});

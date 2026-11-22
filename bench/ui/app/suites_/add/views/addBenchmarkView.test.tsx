@@ -3,6 +3,7 @@ import "@/lib/i18n";
 import { cellState, checkGroup, DraftPreview, matrixColumns, PublishPanel, ReadinessPanel } from "@/components/onboard/draftPanel";
 import { InventoryPanel, onboardColumns, onboardMapping } from "@/components/onboard/inventoryPanel";
 import { SourceBox, sourceGiven } from "@/components/onboard/sourceBox";
+import { SUITE_ID_RE, suggestSuiteId, suiteIdCheck } from "@/components/onboard/onboard.utils";
 import type { OnboardDraftSet, OnboardInventory } from "@/lib/types/onboard";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -28,6 +29,17 @@ vi.mock("@/lib/store/apis/onboardApi", () => ({
 	usePublishOnboardDraftMutation: idleMutation,
 	useListOnboardDraftsQuery: () => ({ data: { drafts: [] } }),
 	useGetOnboardDraftQuery: () => ({ data: undefined }),
+}));
+
+// N46: the id checks read the light suite list.
+const lightSuites = vi.hoisted(() => ({
+	suites: [
+		{ id: "coding-core", version: "1.0.0", builtin: true, source: "library", task_count: 40 },
+		{ id: "faq", version: "1.0.0", task_count: 4 },
+	] as unknown[],
+}));
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({
+	useGetSuitesLightQuery: () => ({ data: { mode: "live", suites: lightSuites.suites } }),
 }));
 
 const pass = (name: string, want = "pass") => ({ name, want, got: want, passed: true });
@@ -179,5 +191,79 @@ describe("Add benchmark source box", () => {
 		expect(sourceGiven({ link: "", rows: "question,answer\nA,B", file: null })).toBe(true);
 		expect(sourceGiven({ link: "terminal-bench@2.0", rows: "", file: null })).toBe(true);
 		expect(sourceGiven({ link: "", rows: "", file: new File(["x"], "a.csv") })).toBe(true);
+	});
+});
+// N46 and N47: the Benchmark id is checked as it is typed, and the estimate says what readiness costs.
+describe("Add benchmark plan checks", () => {
+	const inv: OnboardInventory = {
+		kind: "rows",
+		source: "rows",
+		title: "faq.csv",
+		license: "your data",
+		unit: "row",
+		units: 3,
+		columns: ["question", "answer"],
+		samples: [{ ref: "row 1", fields: { question: "q", answer: "a" } }],
+		suggest: { source: "rows", suite: "faq", held_out: { pct: 25, seed: 1 } },
+		estimate: { tasks: 3, readiness_runs: 18, judge_calls: 0, assist_usd: 0 },
+		can_draft: true,
+		next: "Check the plan, then Draft",
+	};
+	const panel = (suite: string, over: Partial<OnboardInventory> = {}) =>
+		renderToStaticMarkup(
+			<InventoryPanel
+				inv={{ ...inv, ...over }}
+				plan={{ ...inv.suggest, suite }}
+				onPlan={() => undefined}
+				onDraft={() => undefined}
+				busy={false}
+			/>,
+		);
+	const draftDisabled = (html: string) =>
+		/<button[^>]*disabled=""[^>]*data-testid="onboard-draft"|<button[^>]*data-testid="onboard-draft"[^>]*disabled=""/.test(html);
+
+	it("applies the server's id rule", () => {
+		expect(SUITE_ID_RE.test("faq")).toBe(true);
+		expect(SUITE_ID_RE.test("my-suite_1.2")).toBe(true);
+		expect(SUITE_ID_RE.test("bad id!")).toBe(false);
+		expect(SUITE_ID_RE.test("-x")).toBe(false);
+		expect(SUITE_ID_RE.test("a".repeat(65))).toBe(false);
+		const suites = lightSuites.suites as { id: string; builtin?: boolean; task_count: number }[];
+		expect(suiteIdCheck("bad id!", suites)).toEqual({ state: "invalid" });
+		expect(suiteIdCheck("coding-core", suites)).toEqual({ state: "builtin" });
+		expect(suiteIdCheck("faq", suites)).toEqual({ state: "existing", count: 4 });
+		expect(suiteIdCheck("new-one", suites)).toEqual({ state: "new" });
+		expect(suiteIdCheck("", suites)).toEqual({ state: "empty" });
+		expect(suggestSuiteId("My FAQ (2024).csv", suites)).toBe("my-faq-2024");
+		expect(suggestSuiteId("coding-core", suites)).toBe("coding-core-own");
+	});
+
+	it("shows the rule and disables Draft for an invalid id", () => {
+		const html = panel("bad id!");
+		expect(html).toContain('data-testid="onboard-plan-suite-check"');
+		expect(html).toContain("Use 1 to 64 lowercase letters");
+		expect(draftDisabled(html)).toBe(true);
+	});
+
+	it("refuses a built-in benchmark id", () => {
+		const html = panel("coding-core");
+		expect(html).toContain("coding-core is a built-in benchmark and cannot be changed. Pick a new id.");
+		expect(draftDisabled(html)).toBe(true);
+	});
+
+	it("explains that an existing org benchmark gets the tasks added", () => {
+		const html = panel("faq");
+		expect(html).toContain("Adds tasks to your benchmark faq (4 tasks now).");
+		expect(draftDisabled(html)).toBe(false);
+		expect(panel("brand-new")).toContain("Creates a new private benchmark brand-new.");
+	});
+
+	it("says readiness runs cost nothing, and names judge calls only when there are any", () => {
+		const html = panel("faq");
+		expect(html).toContain("18 readiness runs");
+		expect(html).toContain("cost nothing");
+		expect(html).not.toContain("judge calls");
+		const judged = panel("faq", { estimate: { tasks: 3, readiness_runs: 18, judge_calls: 18, assist_usd: 0 } });
+		expect(judged).toContain("Rubric grading adds 18 judge calls, paid on your own model key.");
 	});
 });

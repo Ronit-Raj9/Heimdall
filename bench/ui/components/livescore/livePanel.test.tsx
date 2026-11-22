@@ -69,7 +69,9 @@ describe("LiveBody", () => {
 			/>,
 		);
 		expect(html).toContain('data-testid="live-unconfigured"');
-		expect(html).toContain("livescore init");
+		expect(html).toContain("Live quality scoring is not set up yet. Use Set up live scoring above.");
+		expect(html).toContain("(Terminal: heimdall livescore init)");
+		expect(html).not.toContain("bifrost-bench");
 		const broken = renderToStaticMarkup(
 			<LiveBody
 				status={{
@@ -78,7 +80,27 @@ describe("LiveBody", () => {
 				}}
 			/>,
 		);
-		expect(broken).toContain("Live quality scoring is off: parse livescore/config.yaml: unknown key");
+		expect(broken).toContain("Live quality scoring is off: the settings file could not be read. Open Set up live scoring to replace it.");
+		// The raw reason only in the title attribute, never in the text.
+		expect(broken).toContain('title="parse livescore/config.yaml: unknown key"');
+		expect(broken).not.toContain(">parse livescore/config.yaml");
+	});
+
+	it("names no command line on the hosted server (N131)", () => {
+		const html = renderToStaticMarkup(
+			<LiveBody
+				hosted
+				status={{
+					...LIVE_STATUS_FIXTURE,
+					configured: false,
+					problem: undefined,
+					compare: undefined,
+				}}
+			/>,
+		);
+		expect(html).toContain("Live quality scoring is not set up yet.");
+		expect(html).not.toContain("livescore init");
+		expect(html).not.toContain("Terminal");
 	});
 
 	it("offers a simulated try of live scoring before it is set up (J15.setup)", () => {

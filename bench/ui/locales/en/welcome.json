@@ -117,7 +117,12 @@
 		"loadError": "Could not load the guides.",
 		"docError": "Could not load this guide.",
 		"start": "Start here",
-		"onThisPage": "On this page"
+		"onThisPage": "On this page",
+		"onGitHub": "(on GitHub)",
+		"localAddressNote": "Addresses in this guide that pointed to a local server now point to this server.",
+		"noGuide": "There is no guide named {{name}}. Pick one from the list.",
+		"noMatch": "No guide mentions {{q}}.",
+		"searching": "Searching the guides"
 	},
 	"stepHelp": {
 		"suite": "Choose a benchmark: a set of tasks with automatic checks.",

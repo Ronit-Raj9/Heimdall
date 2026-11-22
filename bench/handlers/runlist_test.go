@@ -330,3 +330,41 @@ func TestListRunsBadSort(t *testing.T) {
 		}
 	}
 }
+
+// N27: the runs list offers "Compare Setup A and B" only for a run of an
+// experiment with two or more setups that is not a debug run. Every slot has
+// a pair id, so the pair id alone cannot say it.
+func TestRunListPairedOnlyForTwoArms(t *testing.T) {
+	paired := func(mut func(m *schemas.Manifest)) map[string]bool {
+		idx := runListIndex()
+		if mut != nil {
+			mut(idx.manifests[testExp])
+		}
+		out := getRunList(t, runListClient(t, idx, runListSuites()), "")
+		got := map[string]bool{}
+		for _, row := range out.Runs {
+			if row.PairID == "" {
+				t.Fatalf("%s has no pair id", row.RunID)
+			}
+			got[row.RunID] = row.Paired
+		}
+		return got
+	}
+	for id, p := range paired(nil) {
+		if !p {
+			t.Errorf("two-arm experiment: %s not paired", id)
+		}
+	}
+	for id, p := range paired(func(m *schemas.Manifest) { delete(m.Arms, "B") }) {
+		if p {
+			t.Errorf("one-arm experiment: %s paired", id)
+		}
+	}
+	for id, p := range paired(func(m *schemas.Manifest) {
+		m.Experiment.Debug = &schemas.DebugSpec{Mode: schemas.DebugReplay, FromRun: "r_x"}
+	}) {
+		if p {
+			t.Errorf("debug experiment: %s paired", id)
+		}
+	}
+}

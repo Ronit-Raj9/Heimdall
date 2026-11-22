@@ -20,7 +20,7 @@ import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenState
 import { RunExportMenu } from "@/components/runs/runExportMenu";
 import { RunFailureCard } from "@/components/runs/runFailureCard";
 import { RunTraceView } from "@/components/runs/traceView";
-import { canReplay, RunDebugActions } from "@/components/runs/debug/debugActions"; // X20b run debugging
+import { canFork, RunDebugActions } from "@/components/runs/debug/debugActions"; // X20b run debugging
 import { DebugBanner } from "@/components/runs/debug/debugBanner";
 import { HoldPanel } from "@/components/runs/debug/holdPanel";
 import { TraceDiff } from "@/components/runs/debug/traceDiff";
@@ -41,12 +41,12 @@ import { formatDateTime, shortHash } from "@/components/verdict/verdict.utils";
 import { RunVisualPanel } from "@/components/visual/runVisualPanel"; // X1 vision grading
 import { RunVoicePanel } from "@/components/voice/runVoicePanel"; // X8 voice agents
 import i18n, { getLocale } from "@/lib/i18n";
-import { useGetCatalogQuery, useGetRunEventsQuery, useGetRunQuery } from "@/lib/store/apis/benchApi";
+import { useGetCatalogQuery, useGetExperimentQuery, useGetRunEventsQuery, useGetRunQuery } from "@/lib/store/apis/benchApi";
 import { useGetRunAgentsQuery } from "@/lib/store/apis/runAgentsApi";
 import { errorStatus } from "@/lib/store/apis/session";
 import { useGetRunVoiceQuery } from "@/lib/store/apis/voiceApi";
 import type { GateResult, RunDetail, Value } from "@/lib/types/bench";
-import { Link } from "@tanstack/react-router";
+import { Link, useSearch } from "@tanstack/react-router";
 import { Coins, Footprints, GitCompareArrows, SearchX, Timer, Wrench, type LucideIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -171,14 +171,7 @@ export default function RunView({ runId }: { runId: string }) {
 						<RunExportMenu runId={runId} sealed={Boolean(d.sealed)} />
 						<ShareButton kind="run_trace" target={runId} />
 						<MaximRunButton runId={runId} sealed={Boolean(d.sealed)} />
-						{slot.pair_id ? (
-							<Button variant="outline" size="sm" asChild>
-								<Link to="/compare" search={compareSearch(slot.pair_id, slot.exp_id) as never} data-testid="run-compare">
-									<GitCompareArrows aria-hidden="true" />
-									{t("runs.page.compare")}
-								</Link>
-							</Button>
-						) : null}
+						<RunCompareButton detail={d} />
 					</div>
 				}
 			/>
@@ -255,10 +248,7 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
 					<GradeSourceTag source={detail.grade_source} judged={Boolean(grade?.judged)} testId="run-grade-source" />
 				</div>
 				<div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-					<StatCard icon={Footprints} label={tt("overview.steps")} value={metricText(detail.metrics.steps)} testId="run-stat-steps" />
-					<StatCard icon={Wrench} label={tt("overview.toolCalls")} value={metricText(detail.metrics.tool_calls)} testId="run-stat-tools" />
-					<StatCard icon={Coins} label={tt("overview.cost")} value={metricText(detail.metrics.cost_usd, "usd")} testId="run-stat-cost" />
-					<StatCard icon={Timer} label={tt("overview.time")} value={wallText(detail.metrics, detail.run.timing)} testId="run-stat-time" />
+					<RunStatCards detail={detail} />
 				</div>
 			</div>
 
@@ -365,9 +355,82 @@ function metricText(value: Value | undefined, unit?: "usd"): string {
 	return unit === "usd" ? `$${value.v.toFixed(value.v < 1 ? 4 : 2)}` : value.v.toLocaleString();
 }
 
-function StatCard({ icon: Icon, label, value, testId }: { icon: LucideIcon; label: string; value: string; testId: string }) {
+/**
+ * The Overview stat cards. "Model turns" counts model turns that got an answer (the steps metric); the
+ * Step by step tab also counts tool uses and commands, so the two numbers differ on purpose (N28).
+ */
+export function RunStatCards({ detail }: { detail: RunDetail }) {
+	const { t: tt } = useTranslation("runTrace");
 	return (
-		<div className="bg-card flex flex-col gap-1 rounded-xl border p-4 transition-shadow hover:shadow-md" data-testid={testId}>
+		<>
+			<StatCard
+				icon={Footprints}
+				label={tt("overview.steps")}
+				hint={tt("overview.stepsHint")}
+				value={metricText(detail.metrics.steps)}
+				testId="run-stat-steps"
+			/>
+			<StatCard icon={Wrench} label={tt("overview.toolCalls")} value={metricText(detail.metrics.tool_calls)} testId="run-stat-tools" />
+			<StatCard icon={Coins} label={tt("overview.cost")} value={metricText(detail.metrics.cost_usd, "usd")} testId="run-stat-cost" />
+			<StatCard icon={Timer} label={tt("overview.time")} value={wallText(detail.metrics, detail.run.timing)} testId="run-stat-time" />
+		</>
+	);
+}
+
+/**
+ * The header's compare action (N27). "Compare Setup A and B" only for a run of an experiment with two or
+ * more setups that is not a debug run (every slot has a pair id, also in one-setup experiments, so the
+ * pair id alone cannot say it). A debug run instead offers "Compare with source": the side by side view
+ * on its Step by step tab. Nothing shows while the experiment loads.
+ */
+export function RunCompareButton({ detail }: { detail: RunDetail }) {
+	const { t } = useTranslation("bench");
+	const { t: td } = useTranslation("runDebug");
+	const { slot, run } = detail;
+	const exp = useGetExperimentQuery(slot.exp_id, { skip: Boolean(run.debug) || !slot.pair_id });
+	if (run.debug) {
+		if (!run.debug.from_run) return null;
+		return (
+			<Button variant="outline" size="sm" asChild>
+				<Link
+					to="/runs/$runId"
+					params={{ runId: run.run_id }}
+					search={{ tab: "timeline" } as never}
+					hash="trace-diff"
+					data-testid="run-compare-source"
+				>
+					<GitCompareArrows aria-hidden="true" />
+					{td("actions.compareSource")}
+				</Link>
+			</Button>
+		);
+	}
+	if (!slot.pair_id || (exp.data?.arms ?? []).length < 2) return null;
+	return (
+		<Button variant="outline" size="sm" asChild>
+			<Link to="/compare" search={compareSearch(slot.pair_id, slot.exp_id) as never} data-testid="run-compare">
+				<GitCompareArrows aria-hidden="true" />
+				{t("runs.page.compare")}
+			</Link>
+		</Button>
+	);
+}
+
+function StatCard({
+	icon: Icon,
+	label,
+	hint,
+	value,
+	testId,
+}: {
+	icon: LucideIcon;
+	label: string;
+	hint?: string;
+	value: string;
+	testId: string;
+}) {
+	return (
+		<div className="bg-card flex flex-col gap-1 rounded-xl border p-4 transition-shadow hover:shadow-md" title={hint} data-testid={testId}>
 			<span className="text-muted-foreground flex items-center gap-1.5 text-xs">
 				<Icon className="size-3.5" aria-hidden="true" />
 				{label}
@@ -386,17 +449,25 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 	);
 }
 
+/** The step a link asked for (?step=, a trace search hit, N51); undefined when absent or not a positive integer. */
+export function stepParam(search: Record<string, unknown>): number | undefined {
+	const raw = search.step;
+	const n = typeof raw === "number" ? raw : typeof raw === "string" && /^\d+$/.test(raw) ? Number(raw) : NaN;
+	return Number.isInteger(n) && n > 0 ? n : undefined;
+}
+
 function TimelineTab({ detail }: { detail: RunDetail }) {
 	const { t } = useTranslation("bench");
 	const arm = detail.slot.arm;
 	const runId = detail.run.run_id;
 	const events = useGetRunEventsQuery(runId);
+	const initialStep = stepParam(useSearch({ strict: false }) as Record<string, unknown>);
 	return (
 		<div className="flex flex-col gap-8" data-testid="run-timeline">
 			<RunRemoteCoverage runId={runId} arm={arm} />
 			<RunGatewayPolicy runId={runId} />
 			{!detail.sealed && <HoldPanel runId={runId} />}
-			<RunTraceView runId={runId} arm={arm} live={!detail.sealed} canFork={canReplay(detail)} />
+			<RunTraceView runId={runId} arm={arm} live={!detail.sealed} canFork={canFork(detail)} initialStep={initialStep} />
 			{detail.run.debug?.from_run && <TraceDiff runId={runId} otherRunId={detail.run.debug.from_run} />}
 			{detail.sessions && detail.sessions.length > 0 && <SessionsTimeline sessions={detail.sessions} arm={arm} />}
 			{detail.tool_calls && detail.tool_calls.length > 0 && <ToolCallTable calls={detail.tool_calls} arm={arm} />}

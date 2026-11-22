@@ -7,7 +7,7 @@ vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/route
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
-import { AdminUsageBody, UsageBody, defaultRange, formatUSD } from "./usageView";
+import { AdminUsageBody, UsageBody, UsageLinkNotes, defaultRange, formatUSD, rangeFromSearch, usageSearchState } from "./usageView";
 
 const report: UsageReport = {
 	from: "2026-11-09",
@@ -91,5 +91,50 @@ describe("UsageBody runs without a cost (F1.price)", () => {
 		);
 		expect(html).toMatch(/data-testid="usage-no-call-2026-11-10"[^>]*>3 with no model call</);
 		expect(html).not.toContain('data-testid="usage-no-call-2026-11-12"');
+	});
+});
+// N75: /usage?from=... (and /settings?tab=usage&from=...) opens on the dates, grouping and scope in the link.
+describe("usage link parameters", () => {
+	const now = new Date("2026-11-23T12:00:00Z");
+	it("takes the range from the link", () => {
+		expect(rangeFromSearch({ from: "2026-11-01" }, now)).toEqual({ from: "2026-11-01", to: "2026-11-23", invalid: [] });
+		expect(rangeFromSearch({ from: "2026-11-01", to: "2026-11-10" }, now)).toEqual({ from: "2026-11-01", to: "2026-11-10", invalid: [] });
+		expect(rangeFromSearch({ to: "2026-10-31" }, now)).toEqual({ from: "2026-10-02", to: "2026-10-31", invalid: [] });
+		expect(rangeFromSearch({}, now)).toEqual({ ...defaultRange(now), invalid: [] });
+	});
+	it("swaps a reversed range", () => {
+		expect(rangeFromSearch({ from: "2026-11-20", to: "2026-11-01" }, now)).toEqual({ from: "2026-11-01", to: "2026-11-20", invalid: [] });
+	});
+	it("falls back to the last 30 days and flags a date that is not real", () => {
+		expect(rangeFromSearch({ from: "2026-02-30" }, now)).toEqual({ ...defaultRange(now), invalid: ["2026-02-30"] });
+		expect(rangeFromSearch({ from: "yesterday", to: "2026-11-10" }, now)).toEqual({
+			from: "2026-10-12",
+			to: "2026-11-10",
+			invalid: ["yesterday"],
+		});
+	});
+	it("checks the grouping and the scope", () => {
+		const st = usageSearchState({ from: "2026-11-01", group: "model", scope: "platform" }, now, true);
+		expect(st).toMatchObject({ range: { from: "2026-11-01", to: "2026-11-23" }, group: "model", scope: "platform", ignored: [] });
+		const bad = usageSearchState({ group: "week", scope: "platform" }, now, false);
+		expect(bad.group).toBe("day");
+		expect(bad.scope).toBe("org");
+		expect(bad.ignored).toEqual([
+			{ key: "group", value: "week" },
+			{ key: "scope", value: "platform" },
+		]);
+	});
+	it("says which link value was ignored", () => {
+		const html = renderToStaticMarkup(
+			<UsageLinkNotes
+				ignored={[
+					{ key: "from", value: "2026-02-30" },
+					{ key: "group", value: "week" },
+				]}
+			/>,
+		);
+		expect(html).toContain("The date 2026-02-30 in the link is not a valid date, so the last 30 days are shown.");
+		expect(html).toContain("The grouping week in the link is not one of Day, Model, Agent or Provider key, so Day is used.");
+		expect(renderToStaticMarkup(<UsageLinkNotes ignored={[]} />)).toBe("");
 	});
 });

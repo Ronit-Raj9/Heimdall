@@ -5,7 +5,8 @@
 	"empty": {
 		"title": "No improvement runs yet",
 		"message": "Start one from the command line with a spec that names your agent, a benchmark and the files the agent may change.",
-		"cli": "bifrost-bench improve create -f improvements/my-agent.yaml -run"
+		"cli": "heimdall improve create -f improvements/my-agent.yaml -run",
+		"messageAdmin": "No improvement runs yet. Start one with New improvement run."
 	},
 	"list": {
 		"name": "Run",
@@ -51,7 +52,9 @@
 		"splits": "{{dev}} practice, {{audit}} gate and {{sealed}} held-out tasks; gate looks {{looks}} of {{max}}",
 		"stop": "Stop",
 		"stopConfirm": "Stop this improvement run? The current version stays as it is.",
-		"error": "Last error: {{error}}"
+		"error": "Last error: {{error}}",
+		"notFound": "No improvement run named {{id}}.",
+		"notFoundBack": "Back to improvements"
 	},
 	"curve": {
 		"title": "Learning curve",
@@ -129,5 +132,33 @@
 		"sealed": "Held-out scoring",
 		"controls": "Comparison runs",
 		"cap": "Cap per round for rewriting: {{v}}"
+	},
+	"create": {
+		"open": "New improvement run",
+		"adminOnly": "Only organization admins can start an improvement run, because it spends the organization's model keys.",
+		"title": "New improvement run",
+		"description": "The agent rewrites the files you pick, round by round. A change is kept only when it wins on tasks the agent never saw.",
+		"name": "Name",
+		"nameError": "Use lowercase letters, digits and dashes, up to 63 characters.",
+		"agent": "Agent",
+		"agentPick": "Pick one of your agents",
+		"noAgents": "You have no agents of your own yet. Add one on the Agents page first.",
+		"benchmark": "Benchmark",
+		"benchmarkPick": "Pick a benchmark",
+		"files": "Files the agent may change",
+		"filesLoading": "Reading the agent's files",
+		"noFiles": "This agent has no files Heimdall can change (its settings have no files section). Add a prompt or notes file on the agent's Setup tab first.",
+		"filesNone": "Tick at least one file.",
+		"folder": "folder",
+		"rounds": "Rounds",
+		"roundsError": "Pick 1 to 20 rounds.",
+		"budget": "Budget per round (dollars)",
+		"budgetError": "The budget must be above 0.",
+		"roundNote": "Each round runs the agent on practice, gate and held-out tasks of the benchmark and spends up to the round budget on the improver.",
+		"submit": "Create",
+		"cancel": "Cancel",
+		"cli": "Use the command line instead",
+		"copy": "Copy",
+		"copied": "Copied"
 	}
 }

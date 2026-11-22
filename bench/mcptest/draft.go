@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/scaffold"
+	"github.com/maximhq/bifrost/bench/schemas"
 	"gopkg.in/yaml.v3"
 )
 
@@ -277,8 +278,19 @@ func instruction(server string, t ToolView, call ToolCallResult, hasRef bool) st
 	return b.String()
 }
 
+// DraftAllow is the tool proxy allowlist of a drafted MCP benchmark: POST
+// carries the MCP messages and DELETE ends the session, on every path under
+// the server's URL. GET stays refused (the proxy offers no server stream).
+func DraftAllow() []schemas.ExternalAllow {
+	return []schemas.ExternalAllow{{Methods: []string{"POST", "DELETE"}, PathPrefix: "/"}}
+}
+
 func suiteYAML(o DraftOptions, tasks []string) []byte {
-	ext := map[string]any{"id": o.ServerID, "base_url": o.URL, "mcp": true, "mode": "live", "max_calls": maxCallsRun, "timeout_s": 30}
+	allow := []any{}
+	for _, a := range DraftAllow() {
+		allow = append(allow, map[string]any{"methods": a.Methods, "path_prefix": a.PathPrefix})
+	}
+	ext := map[string]any{"id": o.ServerID, "base_url": o.URL, "mcp": true, "mode": "live", "max_calls": maxCallsRun, "timeout_s": 30, "allow": allow}
 	if o.AuthEnv != "" {
 		ext["auth_env"] = o.AuthEnv
 		if o.AuthHeader != "" {

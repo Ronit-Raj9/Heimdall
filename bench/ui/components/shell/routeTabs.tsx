@@ -2,6 +2,8 @@ import { cn } from "@/lib/utils";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { parseAsString, useQueryState } from "nuqs";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import "./gw20I18n";
 
 export interface RouteTab {
 	/** The value of the search parameter, for example "matrix". */
@@ -31,6 +33,15 @@ export function resolveTab(tabs: readonly RouteTab[], requested: string | null |
 }
 
 /**
+ * The requested tab id when no tab of the page has it (visible, hidden or addressable), else null. A
+ * hidden tab that exists is not unknown: the page has its own note for it. Exported for tests.
+ */
+export function unknownTab(tabs: readonly RouteTab[], requested: string | null | undefined): string | null {
+	if (!requested || tabs.some((tab) => tab.id === requested)) return null;
+	return requested;
+}
+
+/**
  * The active tab bound to a search parameter (default "tab"). Choosing the default tab removes
  * the parameter, so a page's plain URL is its default tab. Switching replaces the history entry.
  */
@@ -40,7 +51,7 @@ export function useRouteTab(tabs: readonly RouteTab[], opts: { defaultTab?: stri
 	const active = resolveTab(tabs, requested, opts.defaultTab);
 	const fallback = resolveTab(tabs, null, opts.defaultTab);
 	const select = (id: string) => void setRequested(id === fallback ? null : id);
-	return [active, select] as const;
+	return [active, select, requested] as const;
 }
 
 export interface RouteTabsProps {
@@ -63,8 +74,13 @@ export interface RouteTabsProps {
  * On a narrow screen the strip scrolls sideways.
  */
 export function RouteTabs({ tabs, defaultTab, param, label, children, className, testId }: RouteTabsProps) {
-	const [active, select] = useRouteTab(tabs, { defaultTab, param });
+	const { t } = useTranslation("gw20");
+	const [active, select, requested] = useRouteTab(tabs, { defaultTab, param });
 	if (active === null) return null;
+	// A link with a tab id this page does not have shows the default tab and says so; choosing a tab
+	// replaces the parameter, so the note goes away.
+	const unknown = unknownTab(tabs, requested);
+	const shownLabel = tabs.find((tab) => tab.id === active)?.label;
 	// An active addressable tab goes at the end of the strip; it leaves when another tab is chosen.
 	const visible = [...tabs.filter((tab) => !tab.hidden), ...tabs.filter((tab) => tab.hidden && tab.addressable && tab.id === active)];
 	return (
@@ -97,6 +113,11 @@ export function RouteTabs({ tabs, defaultTab, param, label, children, className,
 					</TabsPrimitive.Trigger>
 				))}
 			</TabsPrimitive.List>
+			{unknown && (
+				<p role="status" className="text-muted-foreground text-xs" data-testid="route-tabs-unknown">
+					{t("routeTabs.unknown", { tab: unknown, label: typeof shownLabel === "string" ? shownLabel : active })}
+				</p>
+			)}
 			<TabsPrimitive.Content value={active} className="focus-visible:ring-ring/40 min-w-0 rounded-sm outline-none focus-visible:ring-2">
 				{children(active)}
 			</TabsPrimitive.Content>

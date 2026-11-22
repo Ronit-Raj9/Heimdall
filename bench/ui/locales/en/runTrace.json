@@ -47,7 +47,8 @@
   },
   "overview": {
     "agentSaid": "What the agent said vs what the grader found",
-    "steps": "Steps",
+    "steps": "Model turns",
+    "stepsHint": "Model turns that got an answer. The Step by step tab also counts tool uses and commands.",
     "toolCalls": "Tool uses",
     "cost": "Cost",
     "time": "Time taken",

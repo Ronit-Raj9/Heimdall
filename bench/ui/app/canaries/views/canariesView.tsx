@@ -33,7 +33,10 @@ export default function CanariesView() {
 	const [name, setName] = useQueryState("name", parseAsString);
 	const list = useGetCanariesQuery();
 	const data = list.data;
-	const open = name ?? (data ? (sortCanaries(data.canaries)[0]?.name ?? null) : null);
+	// A name that is neither a monitor nor a broken definition is never opened: the page says so instead
+	// (not while the list refreshes, so a monitor created a moment ago is not called unknown).
+	const unknown = !list.isFetching && unknownCanary(data, name);
+	const open = unknown ? null : (name ?? (data ? (sortCanaries(data.canaries)[0]?.name ?? null) : null));
 	const { t: u } = useTranslation("ux13");
 	const [formOpen, setFormOpen] = useState(false);
 	const [editing, setEditing] = useState<CanaryDefinition | null>(null);
@@ -67,6 +70,7 @@ export default function CanariesView() {
 			{editing && (
 				<NewCanaryForm key={editing.name} initial={editing} onClose={() => setEditing(null)} onCreated={() => setEditing(null)} />
 			)}
+			{unknown && name && <UnknownCanaryNotice name={name} onShowAll={() => void setName(null)} />}
 			{list.isLoading ? (
 				<BlockSkeleton rows={4} testId="canaries-loading" />
 			) : list.error || !data ? (
@@ -107,6 +111,29 @@ export interface CanariesBodyProps {
 	onCreate?: () => void;
 	/** Names of the paused drift monitors. */
 	paused?: ReadonlySet<string>;
+}
+
+/** Whether name is set and is neither a drift monitor nor a definition that failed to load. Exported for tests. */
+export function unknownCanary(data: CanaryListResponse | undefined, name: string | null | undefined): boolean {
+	if (!data || !name) return false;
+	return !data.canaries.some((c) => c.name === name) && !data.errors.some((e) => e.name === name);
+}
+
+/** The notice for a link to a drift monitor that does not exist, with a way back to the list. Exported for tests. */
+export function UnknownCanaryNotice({ name, onShowAll }: { name: string; onShowAll(): void }) {
+	const { t } = useTranslation("schedules");
+	return (
+		<div
+			role="status"
+			className="border-border bg-muted/40 flex flex-wrap items-center gap-3 rounded-md border px-3 py-2 text-sm"
+			data-testid="canary-unknown"
+		>
+			<span>{t("canary.unknown", { name })}</span>
+			<Button size="sm" variant="outline" onClick={onShowAll} data-testid="canary-unknown-show-all">
+				{t("canary.showAll")}
+			</Button>
+		</div>
+	);
 }
 
 /** The drift monitors whose schedule is paused, from the schedules rows (canary-<name>). Exported for tests. */
@@ -219,6 +246,11 @@ export function CanaryActions({
 				variant="outline"
 			/>
 			<JobRunButton kind="canary.run" params={{ name }} label={t("canary.run")} variant="outline" />
+			{!scheduled && (
+				<span className="text-muted-foreground text-xs" data-testid="canary-no-schedule">
+					{t("canary.noSchedulePause")}
+				</span>
+			)}
 			{scheduled && (
 				<Button
 					size="sm"

@@ -71,40 +71,62 @@ func (h *canaryInitHandler) create(ctx *fasthttp.RequestCtx) {
 		Next: "record a baseline (canary.baseline job), then run looks or let the schedule run them"})
 }
 
+// CanaryProblemsBody is the 422 answer of a refused drift monitor (create
+// and edit): every problem at once, each under its form field, and the same
+// sentences joined by newlines in error.message for clients that read only
+// the error shape.
+type CanaryProblemsBody struct {
+	Error    lib.ErrorField   `json:"error"`
+	Problems []canary.Problem `json:"problems"`
+}
+
 // checkCanaryDefinition normalizes and checks a definition from the website
-// (create and edit): the name, the agent file, the benchmark and Validate.
-// It answers 422 and returns false when the definition is refused.
+// (create and edit): the agent file and the benchmark against the project,
+// plus every problem of the definition itself (Definition.Problems). It
+// answers one 422 that lists every problem and returns false when the
+// definition is refused.
 func checkCanaryDefinition(ctx *fasthttp.RequestCtx, env OrgEnv, d *canary.Definition) bool {
 	d.Name = strings.TrimSpace(d.Name)
+	d.Suite = strings.TrimSpace(d.Suite)
 	if d.Trials == 0 {
 		d.Trials = 1
 	}
-	refuse := func(msg string) bool {
-		lib.SendError(ctx, env.Mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, msg)
-		return false
-	}
-	if !canary.ValidName(d.Name) {
-		return refuse("name must be lowercase letters, digits, - or _, starting with a letter or digit, at most 48 characters")
-	}
+	var problems []canary.Problem
 	root := env.Cfg.Root
 	if d.Agent != "" {
 		clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(d.Agent)))
 		if filepath.IsAbs(d.Agent) || clean == ".." || strings.HasPrefix(clean, "../") {
-			return refuse("agent must be a path inside the project, e.g. agents/codex.yaml")
-		}
-		d.Agent = clean
-		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(clean))); err != nil {
-			return refuse("agent " + clean + " not found in the project; create it on the Agents page first")
+			problems = append(problems, canary.Problem{Field: "agent", Message: "Pick an agent from the list; the agent must be a file inside the project."})
+		} else {
+			d.Agent = clean
+			if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(clean))); err != nil {
+				problems = append(problems, canary.Problem{Field: "agent", Message: "Agent " + clean + " is not in this project. Create it on the Agents page first."})
+			}
 		}
 	}
-	d.Suite = strings.TrimSpace(d.Suite)
 	if msg := canaryBenchmarkProblem(ctx, env.Services.Suites, d.Suite); msg != "" {
-		return refuse(msg)
+		problems = append(problems, canary.Problem{Field: "suite", Message: msg})
 	}
-	if err := d.Validate(); err != nil {
-		return refuse(err.Error())
+	problems = append(problems, d.Problems()...)
+	if len(problems) == 0 {
+		// Problems refuses at least what Validate refuses; this keeps the
+		// CLI rule as the last word should the two ever differ.
+		if err := d.Validate(); err != nil {
+			problems = append(problems, canary.Problem{Field: "definition", Message: err.Error()})
+		}
 	}
-	return true
+	if len(problems) == 0 {
+		return true
+	}
+	msgs := make([]string, len(problems))
+	for i, p := range problems {
+		msgs[i] = p.Message
+	}
+	lib.SendJSON(ctx, env.Mode, fasthttp.StatusUnprocessableEntity, CanaryProblemsBody{
+		Error:    lib.ErrorField{Message: strings.Join(msgs, "\n"), Type: lib.ErrTypeBadRequest},
+		Problems: problems,
+	})
+	return false
 }
 
 // canaryBenchmarkProblem says why a canary's benchmark ref ("id" or

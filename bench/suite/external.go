@@ -98,8 +98,19 @@ func lintExternalRefs(file, field string, refs []utils.ExternalRef, services, ea
 		case earlier[r.API.ID]:
 			add(SeverityError, "%s.id: %q is already an external api in %s", at, r.API.ID, SuiteFile)
 		}
+		// An MCP server under test is always called live (utils.ExternalMode) and
+		// never replayed: the proxy records its calls, so the live-mode and
+		// cassette warnings do not apply to it.
+		liveMCP := r.API.MCP && r.API.Mode == schemas.ExternalLive
 		if len(r.API.Allow) == 0 {
-			add(SeverityWarning, "%s.allow: empty, so the tool proxy refuses every call to %s", at, r.API.ID)
+			if r.API.MCP {
+				add(SeverityWarning, "%s.allow: empty, so the tool proxy refuses every call to %s; add {methods: [POST, DELETE], path_prefix: /} for an MCP server", at, r.API.ID)
+			} else {
+				add(SeverityWarning, "%s.allow: empty, so the tool proxy refuses every call to %s", at, r.API.ID)
+			}
+		}
+		if liveMCP {
+			continue
 		}
 		if r.API.Mode == schemas.ExternalLive || r.API.Mode == schemas.ExternalRecord {
 			add(SeverityWarning, "%s.mode: %s calls the real host and is not repeatable; it runs only when an experiment sets external: %s, and admission never runs it", at, r.API.Mode, r.API.Mode)

@@ -397,8 +397,10 @@ function PairHeader({ pair, back }: { pair: PairResponse; back: React.ReactNode 
  */
 export function ArmProvenance({ provenance, note, arm }: { provenance: RunProvenance | undefined; note?: string; arm: string }) {
 	const { t } = useTranslation("bench");
+	const { t: td } = useTranslation("runDebug");
 	if (!provenance) return null;
-	const warn = provenance !== "model";
+	// A debug replay's calls were answered from the source run's recording (N27): not a warning.
+	const warn = provenance !== "model" && provenance !== "replayed";
 	return (
 		<span
 			className={cn(
@@ -409,7 +411,7 @@ export function ArmProvenance({ provenance, note, arm }: { provenance: RunProven
 			data-provenance={provenance}
 			title={note}
 		>
-			{t(`runs.provenance.${provenance}`)}
+			{provenance === "replayed" ? td("provenance.replayed") : t(`runs.provenance.${provenance}`)}
 			{note && <span className="sr-only">: {note}</span>}
 		</span>
 	);

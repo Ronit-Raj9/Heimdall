@@ -264,13 +264,13 @@ func (h *PublicSiteHandler) benchmarks(ctx *fasthttp.RequestCtx) {
 }
 
 func (h *PublicSiteHandler) docs(ctx *fasthttp.RequestCtx) {
-	names := benchdocs.PublicNames()
-	out := DocList{Docs: make([]DocSummary, 0, len(names))}
-	for _, n := range names {
-		if data, ok := benchdocs.ReadPublic(n); ok {
-			out.Docs = append(out.Docs, DocSummary{Name: n, Title: docTitle(n, data)})
-		}
+	q, ok, msg := docSearchQuery(string(ctx.QueryArgs().Peek("q")))
+	if !ok {
+		lib.SendError(ctx, h.c.Mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, msg)
+		return
 	}
+	// Only public guides are searched: internal notes stay out of the list and its matches.
+	out := DocList{Docs: searchDocs(benchdocs.PublicNames(), benchdocs.ReadPublic, q)}
 	publicCache(ctx, 300)
 	lib.SendJSON(ctx, h.c.Mode, fasthttp.StatusOK, out)
 }

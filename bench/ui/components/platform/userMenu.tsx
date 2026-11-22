@@ -4,19 +4,31 @@ import { useSession } from "@/lib/session/sessionContext";
 import { useLogoutMutation } from "@/lib/store/apis/platformApi";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { KeyRound, LogOut, Settings } from "lucide-react";
+import "@/components/platform/fw23I18n";
+import { CreateOrgDialog } from "@/components/platform/createOrgDialog";
+import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
+import { ArrowLeftRight, KeyRound, LogOut, Plus, Settings } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { initials } from "./platform.utils";
+import { useOrgSwitch } from "./useOrgSwitch";
 
 /**
  * Hosted mode: who is signed in, a way to settings, and sign out. Local mode and demo visitors see
  * nothing here (the demo banner carries the sign-in link).
  */
-export function UserMenu() {
+export interface UserMenuProps {
+	/** Renders the menu open (tests render to static markup and cannot click). */
+	defaultOpen?: boolean;
+}
+
+export function UserMenu({ defaultOpen = false }: UserMenuProps = {}) {
 	const { t } = useTranslation("platform");
+	const { t: tf } = useTranslation("fw23");
 	const session = useSession();
-	const [open, setOpen] = useState(false);
+	const [open, setOpen] = useState(defaultOpen);
+	const [creating, setCreating] = useState(false);
+	const orgSwitch = useOrgSwitch(session.org?.id);
 	const [logout, logoutState] = useLogoutMutation();
 	const rootRef = useRef<HTMLDivElement>(null);
 	const triggerRef = useRef<HTMLButtonElement>(null);
@@ -54,6 +66,12 @@ export function UserMenu() {
 	};
 
 	const label = session.user?.name || session.user?.email || t("header.viaToken");
+	// A user (not an access token, which belongs to one organization) can switch from here too:
+	// the sidebar badge is easy to miss on the icon rail (N143).
+	const canSwitch = session.kind !== "token";
+	const others = canSwitch ? session.orgs.filter((option) => option.id !== session.org?.id) : [];
+	const itemCls =
+		"hover:bg-accent focus-visible:bg-accent flex min-h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm";
 	return (
 		<div ref={rootRef} className="relative">
 			<button
@@ -98,6 +116,53 @@ export function UserMenu() {
 							</span>
 						)}
 					</div>
+					{others.length > 0 && (
+						<>
+							<div className="bg-border my-1 h-px" />
+							<div
+								className="text-muted-foreground flex items-center gap-1.5 px-2.5 pt-1 pb-0.5 text-[11px] font-medium"
+								data-testid="user-menu-switch"
+							>
+								<ArrowLeftRight className="size-3" aria-hidden="true" />
+								{tf("account.switchOrg")}
+							</div>
+							{others.map((option) => (
+								<button
+									key={option.id}
+									type="button"
+									role="menuitem"
+									onClick={() => {
+										setOpen(false);
+										void orgSwitch.choose(option.id);
+									}}
+									disabled={orgSwitch.isLoading}
+									className={itemCls}
+									data-testid={`user-menu-org-${option.slug}`}
+								>
+									<span className="truncate">{option.name}</span>
+									{option.role && <RoleBadge role={option.role} className="ml-auto" />}
+								</button>
+							))}
+						</>
+					)}
+					{canSwitch && others.length === 0 && session.orgs.length <= 1 && (
+						<>
+							<div className="bg-border my-1 h-px" />
+							<button
+								type="button"
+								role="menuitem"
+								onClick={() => {
+									setOpen(false);
+									setCreating(true);
+								}}
+								className={itemCls}
+								data-testid="user-menu-create-org"
+							>
+								<Plus className="text-muted-foreground size-4" aria-hidden="true" />
+								{tf("orgs.create")}
+							</button>
+						</>
+					)}
 					<div className="bg-border my-1 h-px" />
 					<Link
 						to="/settings"
@@ -122,6 +187,16 @@ export function UserMenu() {
 					</button>
 				</div>
 			)}
+			{orgSwitch.error && (
+				<p
+					role="alert"
+					className="text-chart-error-ink bg-popover absolute top-10 right-0 z-50 w-64 rounded-md border px-2.5 py-1.5 text-xs"
+					data-testid="user-menu-switch-error"
+				>
+					{tf("account.switchError", { error: getBenchErrorMessage(orgSwitch.error) })}
+				</p>
+			)}
+			{creating && <CreateOrgDialog onClose={() => setCreating(false)} />}
 		</div>
 	);
 }

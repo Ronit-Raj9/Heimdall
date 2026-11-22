@@ -80,7 +80,7 @@ func Summarize(root string, d *Definition, now time.Time) (Summary, []Record, []
 	s := Summary{Name: d.Name, Description: d.Description, Suite: d.Suite, Agent: d.Agent, Targets: slices.Clone(d.Targets),
 		Trials: d.Trials, Sensitivity: d.SensitivityOr(), Alpha: d.Alpha(), Smoke: d.Smoke,
 		PerRunUSD: d.Budget.PerRunUSD, PerDayUSD: d.Budget.PerDayUSD, State: StateNoBaseline,
-		Reason: "no baseline pinned: run `canary baseline " + d.Name + "`"}
+		Reason: "No baseline yet. Press Record baseline to measure the reference result."}
 	if !d.Tasks.All {
 		s.Tasks = len(d.Tasks.IDs)
 	}

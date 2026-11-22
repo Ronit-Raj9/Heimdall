@@ -27,3 +27,4 @@ model?
 agent_version?
 version?
 fault?
+paired?

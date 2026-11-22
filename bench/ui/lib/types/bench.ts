@@ -1318,7 +1318,7 @@ export interface PairRun {
 }
 
 /** A pair run's model evidence (leaderboard.Provenance*). */
-export type RunProvenance = "scripted" | "model" | "mixed" | "unobserved" | "unavailable";
+export type RunProvenance = "scripted" | "model" | "mixed" | "unobserved" | "unavailable" | "replayed";
 
 /** Events of each arm matched on (event type, target). Null where a lane has no event. */
 export interface AlignedStep {
@@ -1359,6 +1359,7 @@ export interface RunDetail {
 	sealed: boolean;
 	/** Empty until the run is sealed. */
 	seal_hash: string;
+	debug_allowed?: { replay: boolean; fork: boolean; reason?: string };
 	/** Run control: requeued by an operator; kept, never counted. */
 	superseded?: boolean;
 	grade: Grade | null;
@@ -1705,6 +1706,7 @@ export interface RunListRow {
 	sealed_at?: string;
 	/** The first part failure's error of a non-pass run; absent when it recorded none. Inert text. */
 	error?: string;
+	paired?: boolean;
 	/** Why a sealed run is left out of scores: out_of_memory, infra_error, invalid_evaluator, unknown. */
 	excluded?: string;
 	/** Run metrics from metrics.json; absent until observed, and the list shows a dash. */

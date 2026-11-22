@@ -9,7 +9,8 @@ import { sharedExportUrl, useGetSharedQuery, type SharedItem } from "@/lib/store
 import type { Leaderboard, RunDetail, VerdictPayload } from "@/lib/types/bench";
 import "@/lib/types/shareI18n";
 import { Download, EyeOff, FileCode2 } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { usePageTitle } from "@/lib/routing/pageTitle";
+import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 /** GET /agents/{id}/report-card as the server sends it: the report, or null before any evaluation. */
@@ -48,10 +49,7 @@ export default function SharedView({ token }: { token: string }) {
 	const { t } = useTranslation("share");
 	const shared = useGetSharedQuery(token);
 
-	useEffect(() => {
-		const name = shared.data?.share.label || t("page.shared");
-		document.title = `${name} · Heimdall`;
-	}, [shared.data, t]);
+	usePageTitle(`${shared.data?.share.label || t("page.shared")} · Heimdall`);
 
 	if (shared.isLoading) {
 		return (

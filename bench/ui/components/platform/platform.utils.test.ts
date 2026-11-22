@@ -1,3 +1,5 @@
+import "@/lib/i18n";
+
 import { FAILED_JOB, REGRADE_JOB, RUNNING_JOB } from "@/lib/testing/platformFixtures";
 import { describe, expect, it } from "vitest";
 import {
@@ -9,9 +11,11 @@ import {
 	jobExperimentId,
 	jobFraction,
 	jobProgress,
+	linkifyExperiments,
 	looksLikeEmail,
 	runnerStartCommand,
 	splitJobs,
+	targetLabel,
 	toDate,
 	tokenState,
 } from "./platform.utils";
@@ -81,5 +85,35 @@ describe("tokens and forms", () => {
 	it("uses the server's runner command, or builds one for this origin", () => {
 		expect(runnerStartCommand("https://h.dev", "gpu", "bifrost-bench runner start -server x")).toBe("bifrost-bench runner start -server x");
 		expect(runnerStartCommand("https://h.dev", "gpu")).toContain("-server https://h.dev");
+	});
+});
+
+// N121: the job page links the comparison a readiness job ran in and names its target in words.
+describe("job targets and comparisons", () => {
+	it("finds the comparison any job reports in its progress or result", () => {
+		expect(jobExperimentId({ kind: "suite.admit", target: "suite:zz", params: null, progress: { exp_id: "e_admit_x" } })).toBe("e_admit_x");
+		expect(jobExperimentId({ kind: "suite.admit", target: "suite:zz", params: null, result: { exp_id: "e_admit_y" } })).toBe("e_admit_y");
+		expect(jobExperimentId({ kind: "suite.admit", target: "suite:zz", params: null })).toBeNull();
+	});
+
+	it("says what a target is, with a link to its page", () => {
+		expect(targetLabel("suite:zz-test-mcp")).toEqual({ text: "Benchmark zz-test-mcp", to: "/suites/zz-test-mcp" });
+		expect(targetLabel("exp:e_1")).toEqual({ text: "Comparison e_1", to: "/experiments/e_1" });
+		expect(targetLabel("agent:a_1")).toEqual({ text: "Agent a_1", to: "/agents/a_1" });
+		expect(targetLabel("canary:nightly")).toEqual({ text: "Drift monitor nightly", to: "/scheduled-checks?tab=drift" });
+		expect(targetLabel("org:o_1")).toEqual({ text: "This organization" });
+		expect(targetLabel("e_plain")).toEqual({ text: "e_plain" });
+		expect(targetLabel("")).toEqual({ text: "" });
+		expect(targetLabel(undefined)).toEqual({ text: "" });
+	});
+
+	it("splits log text at comparison ids", () => {
+		expect(linkifyExperiments("controls run in comparison e_ab12_c; open it")).toEqual([
+			"controls run in comparison ",
+			{ exp: "e_ab12_c" },
+			"; open it",
+		]);
+		expect(linkifyExperiments("no ids here")).toEqual(["no ids here"]);
+		expect(linkifyExperiments("name_e_x stays")).toEqual(["name_e_x stays"]);
 	});
 });

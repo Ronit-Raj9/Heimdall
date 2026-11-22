@@ -11,7 +11,8 @@ import type { AdminUsageReport, UsageBucket, UsageGroupBy, UsageReport } from "@
 import { cn } from "@/lib/utils";
 import { Coins, Hash, KeyRound, PlayCircle } from "lucide-react";
 import { StatCard } from "@/app/operate/views/uxBits";
-import { useId, useState } from "react";
+import { parseAsString, useQueryStates } from "nuqs";
+import { useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 const GROUPS: UsageGroupBy[] = ["day", "model", "agent", "key"];
@@ -28,6 +29,92 @@ export function defaultRange(now = new Date()): { from: string; to: string } {
 	return { from: isoDay(from), to: isoDay(now) };
 }
 
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** True for a YYYY-MM-DD that is a real calendar day. */
+function realDay(v: string): boolean {
+	if (!DAY_RE.test(v)) return false;
+	const d = new Date(`${v}T00:00:00Z`);
+	return !Number.isNaN(d.getTime()) && isoDay(d) === v;
+}
+
+/**
+ * The range from the link's from and to (N75): a value counts only when it is a real YYYY-MM-DD day; a reversed range
+ * is swapped; a missing or ignored from is 30 days before to, a missing or ignored to is today. invalid lists the
+ * values that were ignored.
+ */
+export function rangeFromSearch(
+	search: { from?: string | null; to?: string | null },
+	now = new Date(),
+): { from: string; to: string; invalid: string[] } {
+	const invalid: string[] = [];
+	const pick = (v?: string | null) => {
+		if (!v) return null;
+		if (realDay(v)) return v;
+		invalid.push(v);
+		return null;
+	};
+	const from = pick(search.from);
+	const to = pick(search.to);
+	if (!from && !to) return { ...defaultRange(now), invalid };
+	if (!from) return { ...defaultRange(new Date(`${to}T12:00:00Z`)), invalid };
+	const end = to ?? defaultRange(now).to;
+	return from <= end ? { from, to: end, invalid } : { from: end, to: from, invalid };
+}
+
+export type UsageScope = "org" | "platform";
+
+/** A link value the page could not use. */
+export interface IgnoredParam {
+	key: "from" | "to" | "group" | "scope";
+	value: string;
+}
+
+/** Everything the usage page reads from its link: range, grouping and scope, and what was ignored. */
+export function usageSearchState(
+	search: { from?: string | null; to?: string | null; group?: string | null; scope?: string | null },
+	now: Date,
+	serverAdmin: boolean,
+): { range: { from: string; to: string }; group: UsageGroupBy; scope: UsageScope; ignored: IgnoredParam[] } {
+	const r = rangeFromSearch(search, now);
+	const ignored: IgnoredParam[] = r.invalid.map((value) => ({ key: value === search.from ? "from" : "to", value }));
+	let group: UsageGroupBy = "day";
+	if (search.group) {
+		if ((GROUPS as string[]).includes(search.group)) group = search.group as UsageGroupBy;
+		else ignored.push({ key: "group", value: search.group });
+	}
+	let scope: UsageScope = "org";
+	if (search.scope) {
+		if (search.scope === "org" || (search.scope === "platform" && serverAdmin)) scope = search.scope;
+		else ignored.push({ key: "scope", value: search.scope });
+	}
+	return { range: { from: r.from, to: r.to }, group, scope, ignored };
+}
+
+/** One line per link value that was ignored, so a shared link never shows other numbers silently. */
+export function UsageLinkNotes({ ignored }: { ignored: IgnoredParam[] }) {
+	const { t } = useTranslation("usage");
+	if (ignored.length === 0) return null;
+	const groups = GROUPS.map((g) => t(`group.${g}`));
+	const list = `${groups.slice(0, -1).join(", ")} or ${groups[groups.length - 1]}`;
+	return (
+		<ul className="text-muted-foreground flex flex-col gap-1 text-xs" role="status" data-testid="usage-link-notes">
+			{ignored.map((p) => (
+				<li key={`${p.key}-${p.value}`} data-testid={`usage-link-ignored-${p.key}`}>
+					{p.key === "group"
+						? t("link.badGroup", { value: p.value, groups: list, fallback: t("group.day") })
+						: p.key === "scope"
+							? t("link.badScope", { value: p.value })
+							: t("link.badDate", { value: p.value })}
+				</li>
+			))}
+		</ul>
+	);
+}
+
+/** The usage page's link parameters (N75); a control change writes its parameter back, replacing the history entry. */
+const USAGE_QUERY = { from: parseAsString, to: parseAsString, group: parseAsString, scope: parseAsString };
+
 export function formatUSD(v: number): string {
 	if (v !== 0 && Math.abs(v) < 0.01) return `$${v.toFixed(4)}`;
 	return `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -41,9 +128,15 @@ export function formatCount(v: number): string {
 export default function UsageView() {
 	const { t } = useTranslation("usage");
 	const session = useSession();
-	const [range, setRange] = useState(defaultRange);
-	const [groupBy, setGroupBy] = useState<UsageGroupBy>("day");
-	const [scope, setScope] = useState<"org" | "platform">("org");
+	const [search, setSearch] = useQueryStates(USAGE_QUERY, { history: "replace" });
+	const state = useMemo(() => usageSearchState(search, new Date(), session.serverAdmin === true), [search, session.serverAdmin]);
+	const { range, group: groupBy, scope, ignored } = state;
+	const setRange = (next: (r: { from: string; to: string }) => { from: string; to: string }) => {
+		const r = next(range);
+		void setSearch({ from: r.from, to: r.to });
+	};
+	const setGroupBy = (g: UsageGroupBy) => void setSearch({ group: g === "day" ? null : g });
+	const setScope = (sc: UsageScope) => void setSearch({ scope: sc === "org" ? null : sc });
 	const platform = scope === "platform" && session.serverAdmin === true;
 	const org = useGetUsageQuery({ ...range, group_by: groupBy }, { skip: platform });
 	const admin = useGetAdminUsageQuery(range, { skip: !platform });
@@ -89,11 +182,12 @@ export default function UsageView() {
 							{ value: "org", label: t("scope.org") },
 							{ value: "platform", label: t("scope.platform") },
 						]}
-						onChange={(v) => setScope(v as "org" | "platform")}
+						onChange={(v) => setScope(v as UsageScope)}
 						testId="usage-scope"
 					/>
 				)}
 			</div>
+			<UsageLinkNotes ignored={ignored} />
 			{platform ? (
 				<AdminUsageBody data={admin.data} loading={admin.isLoading} error={admin.error} onRetry={() => void admin.refetch()} />
 			) : (

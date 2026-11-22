@@ -261,6 +261,8 @@ forecast  No history for any arm: cannot estimate.
 every arm is a scripted agent: $0, no consent needed; running 40 episodes
 ```
 
+On the website the same verdict is the comparison's Result tab; see [web-quickstart.md](web-quickstart.md).
+
 The verdict card it printed, as markdown (the same text the CI comment posts):
 
 ```markdown

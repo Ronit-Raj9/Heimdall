@@ -279,3 +279,31 @@ func TestValidArgs(t *testing.T) {
 		}
 	}
 }
+
+// TestDraftAllowsMCPPost (N115): the drafted benchmark lets the tool proxy
+// send POST (MCP messages) and DELETE (session end) to the server, and the
+// lint has no warning about its external API.
+func TestDraftAllowsMCPPost(t *testing.T) {
+	_, _, dir := draft(t)
+	s, err := suite.Builtin(filepath.Dir(dir))[0].Load(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("drafted suite does not load: %v", err)
+	}
+	if len(s.External) != 1 {
+		t.Fatalf("external = %+v", s.External)
+	}
+	allow := s.External[0].Allow
+	if len(allow) != 1 || allow[0].PathPrefix != "/" || !slices.Equal(allow[0].Methods, []string{"POST", "DELETE"}) {
+		t.Fatalf("allow = %+v, want POST and DELETE under /", allow)
+	}
+	if !slices.EqualFunc(allow, mcptest.DraftAllow(), func(a, b schemas.ExternalAllow) bool {
+		return a.PathPrefix == b.PathPrefix && slices.Equal(a.Methods, b.Methods)
+	}) {
+		t.Fatalf("allow = %+v, want DraftAllow %+v", allow, mcptest.DraftAllow())
+	}
+	for _, p := range suite.Lint(s) {
+		if strings.Contains(p.Message, "external") {
+			t.Errorf("lint %s: %s: %s", p.Severity, p.Path, p.Message)
+		}
+	}
+}

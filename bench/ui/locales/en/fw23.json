@@ -21,7 +21,10 @@
 		"status": "System status"
 	},
 	"titles": {
-		"maxim": "Maxim failures"
+		"maxim": "Maxim failures",
+		"docs": "Guides",
+		"jobs": "Jobs",
+		"job": "Job"
 	},
 	"webhooks": {
 		"httpsOnly": "Only https addresses are allowed on this server."
@@ -30,5 +33,9 @@
 		"secretName": "Secret name",
 		"secretNamePlaceholder": "MY_SERVER_TOKEN",
 		"secretNameHint": "Type the name of an organization secret. Viewers cannot see the list of secret names."
+	},
+	"account": {
+		"switchOrg": "Switch organization",
+		"switchError": "Could not switch organization: {{error}}"
 	}
 }

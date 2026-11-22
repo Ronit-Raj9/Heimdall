@@ -78,6 +78,8 @@ export interface AgentConfigFields {
 	description?: string;
 	/** Instructions, memory, retries and limits, capabilities. Absent from an older server. */
 	behavior?: AgentBehaviorFields;
+	/** Container paths of the agent's files map, sorted. Read only: a PUT ignores it. Absent when the agent has none. */
+	files?: string[];
 }
 
 /** The Setup form's behavior fields; each maps to one key of the agent YAML (empty removes it). */

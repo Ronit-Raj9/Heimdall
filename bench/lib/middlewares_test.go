@@ -172,3 +172,44 @@ func TestRequestErrorHandler(t *testing.T) {
 		t.Fatalf("other = %d", ctx.Response.StatusCode())
 	}
 }
+
+// TestHeadAnswersLikeGet checks that HEAD reaches a GET-only route as a GET
+// and answers with the GET's status and Content-Length but no body (N150).
+func TestHeadAnswersLikeGet(t *testing.T) {
+	var seen string
+	getOnly := func(ctx *fasthttp.RequestCtx) {
+		seen = string(ctx.Method())
+		if !ctx.IsGet() {
+			ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+			return
+		}
+		ctx.SetContentType("application/json")
+		ctx.SetBodyString(`{"files":["a","b"]}`)
+	}
+	ctx := run(ChainMiddlewares(getOnly, HeadAsGet()), func(r *fasthttp.Request) { r.Header.SetMethod(fasthttp.MethodHead) })
+	if seen != fasthttp.MethodGet {
+		t.Fatalf("handler saw method %q, want GET", seen)
+	}
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("status = %d, want 200", ctx.Response.StatusCode())
+	}
+	if !ctx.Request.Header.IsHead() {
+		t.Error("the request method was not restored to HEAD after the handler")
+	}
+	var buf strings.Builder
+	if _, err := ctx.Response.WriteTo(&buf); err != nil {
+		t.Fatal(err)
+	}
+	raw := buf.String()
+	if !strings.Contains(raw, "Content-Length: 19") {
+		t.Errorf("HEAD answer lacks the GET's Content-Length: %q", raw)
+	}
+	if strings.Contains(raw, `"files"`) {
+		t.Errorf("HEAD answer has a body: %q", raw)
+	}
+	// A GET is untouched.
+	ctx = run(ChainMiddlewares(getOnly, HeadAsGet()), nil)
+	if ctx.Response.StatusCode() != fasthttp.StatusOK || string(ctx.Response.Body()) != `{"files":["a","b"]}` || ctx.Response.SkipBody {
+		t.Errorf("GET = %d %q skip=%v", ctx.Response.StatusCode(), ctx.Response.Body(), ctx.Response.SkipBody)
+	}
+}

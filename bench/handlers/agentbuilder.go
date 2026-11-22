@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"net/url"
 	"path"
 	"regexp"
@@ -132,6 +133,10 @@ type AgentConfigFields struct {
 	// instructions, memory, retries and limits, and capabilities. Nil (an
 	// older client) leaves those keys of the file alone.
 	Behavior *AgentBehaviorFields `json:"behavior,omitempty"`
+	// Files are the container paths of the agent's files map, sorted: what
+	// an improvement run may list as editable (N128). Read only: a PUT
+	// ignores them, the files map is edited in the YAML.
+	Files []string `json:"files,omitempty"`
 }
 
 // AgentBehaviorFields are the Setup form's behavior fields (lane X11). Each
@@ -686,6 +691,9 @@ func abFieldsOf(cfg *schemas.AgentConfig, doc []byte) AgentConfigFields {
 		f.OpenAIURL = cfg.OpenAI.URL
 	}
 	f.Behavior = abBehaviorOf(cfg)
+	if len(cfg.Files) > 0 {
+		f.Files = slices.Sorted(maps.Keys(cfg.Files))
+	}
 	var n yaml.Node
 	if yaml.Unmarshal(doc, &n) == nil && len(n.Content) == 1 {
 		c := n.HeadComment

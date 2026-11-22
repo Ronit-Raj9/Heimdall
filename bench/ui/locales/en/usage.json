@@ -4,6 +4,11 @@
 	"from": "From",
 	"to": "To",
 	"groupBy": "Group by",
+	"link": {
+		"badDate": "The date {{value}} in the link is not a valid date, so the last 30 days are shown.",
+		"badGroup": "The grouping {{value}} in the link is not one of {{groups}}, so {{fallback}} is used.",
+		"badScope": "The scope {{value}} in the link is not available to you, so this organization is shown."
+	},
 	"group": {
 		"day": "Day",
 		"model": "Model",

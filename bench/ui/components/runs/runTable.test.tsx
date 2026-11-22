@@ -11,6 +11,7 @@ const row = (arm: string, extra: Partial<RunListRow> = {}): RunListRow => ({
 	run_id: `r_${arm.toLowerCase()}1`,
 	exp_id: "e_x",
 	pair_id: "p_1",
+	paired: true,
 	suite: "coding-core",
 	track: "coding",
 	output: "diff",
@@ -38,6 +39,11 @@ describe("RunTable", () => {
 		expect(html).toContain('href="/suites/coding-core?tab=tasks&amp;task=t01"');
 		expect(html).toContain('href="/compare?pair=p_1&amp;exp=e_x"');
 		expect(html).toContain('data-grade-source="verified"');
+	});
+	it("offers no comparison for a run of a one-setup or debug experiment (N27)", () => {
+		const html = renderToStaticMarkup(<RunTable rows={[row("A", { paired: false }), row("B", { paired: undefined })]} />);
+		expect(html).not.toContain("/compare?");
+		expect(html).not.toContain("-compare");
 	});
 	it("marks a judged score and a run still in flight", () => {
 		const html = renderToStaticMarkup(
