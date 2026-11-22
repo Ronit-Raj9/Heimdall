@@ -124,7 +124,15 @@ func (h *reportCardHandler) options(ctx context.Context) reportcard.Options {
 	}
 	cache := map[string]string{}
 	faultMaps := map[string]map[string]string{}
-	return reportcard.Options{CapabilityOf: func(benchmark string) string {
+	judges := map[string]*reportcard.JudgeState{}
+	return reportcard.Options{JudgeOf: func(id string) *reportcard.JudgeState {
+		js, ok := judges[id]
+		if !ok {
+			js = suiteJudgeState(ctx, suites, id)
+			judges[id] = js
+		}
+		return js
+	}, CapabilityOf: func(benchmark string) string {
 		if c, ok := cache[benchmark]; ok {
 			return c
 		}

@@ -3,4 +3,5 @@ min_agreement
 min_tnr
 min_labels
 max_age_days
+min_controls
 source

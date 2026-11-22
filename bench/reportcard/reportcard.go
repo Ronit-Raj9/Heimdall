@@ -134,6 +134,17 @@ type Benchmark struct {
 	// ReliabilityCard is each arm's repeatability on the clean runs; an arm
 	// with no clean runs has no entry.
 	ReliabilityCard map[string]*ReliabilityCard `json:"reliability_card"`
+	// SuiteVersion and LockHash are the benchmark version the child
+	// experiment ran (its manifest); a gate compares across evaluations
+	// only on the same version.
+	SuiteVersion string `json:"suite_version,omitempty"`
+	LockHash     string `json:"lock_hash,omitempty"`
+	// Judge is set when a model judge grades the benchmark: its
+	// calibration state and whether verdicts and min_score gates may use it.
+	Judge *JudgeState `json:"judge,omitempty"`
+
+	// tasks is each arm's clean per-task tally, for paired gates.
+	tasks map[string][]TaskTally
 }
 
 // FaultScore is one arm's score under a fault and its change from clean on
@@ -226,6 +237,10 @@ type Options struct {
 	FaultOf func(benchmark, condition string) string
 	// Arms keeps only these arm labels; empty keeps every arm.
 	Arms []string
+	// JudgeOf is the calibration state of a judge-graded benchmark (suite
+	// id, without the version). nil, or a nil result, reads as "not
+	// checked": verdicts on it are capped like an uncalibrated judge's.
+	JudgeOf func(benchmark string) *JudgeState
 }
 
 // graded is one counted, sealed, scored run.
@@ -256,6 +271,10 @@ type childRuns struct {
 	// freshName is the fresh arm's display name ("codex v2 on m (no
 	// memory)"), "" without one.
 	freshName string
+	// From the child's manifest: the benchmark version it ran and whether
+	// a model judge grades it.
+	suiteVersion, lockHash string
+	judged                 bool
 }
 
 // Build computes the report of ev over src. A child with no experiment or
@@ -336,7 +355,11 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	var verdictRow []int        // rep.Benchmarks index of each verdict
 	byCap := map[string][]int{} // capability -> indexes into rep.Benchmarks
 	for _, cr := range children {
-		b := Benchmark{Benchmark: cr.child.Benchmark, Capability: capOf(cr.child.Benchmark), ExperimentID: cr.child.ExperimentID, Arms: map[string]Metrics{}, ReliabilityCard: map[string]*ReliabilityCard{}}
+		b := Benchmark{Benchmark: cr.child.Benchmark, Capability: capOf(cr.child.Benchmark), ExperimentID: cr.child.ExperimentID, Arms: map[string]Metrics{}, ReliabilityCard: map[string]*ReliabilityCard{},
+			SuiteVersion: cr.suiteVersion, LockHash: cr.lockHash, tasks: map[string][]TaskTally{}}
+		if cr.judged {
+			b.Judge = judgeState(opt.JudgeOf, cr.child.Benchmark)
+		}
 		for _, l := range labels {
 			clean := filter(cr.arms[l], schemas.ConditionClean)
 			m := metricsOf(clean)
@@ -345,9 +368,15 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 			if card := reliabilityCard(clean); card != nil {
 				b.ReliabilityCard[l] = card
 			}
+			for _, c := range clustersOf(clean, "") {
+				b.tasks[l] = append(b.tasks[l], TaskTally{Key: c.key, Succ: c.succ, Runs: c.runs})
+			}
 		}
 		if ab {
 			v := compare(filter(cr.arms[labels[0]], schemas.ConditionClean), filter(cr.arms[labels[1]], schemas.ConditionClean))
+			if b.Judge != nil && !b.Judge.Trusted {
+				v = verdictab.JudgeCap(v, b.Judge.capNote())
+			}
 			verdicts = append(verdicts, v)
 			verdictRow = append(verdictRow, len(rep.Benchmarks))
 		}
@@ -364,6 +393,9 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 			v.Summary = verdictab.BenchmarkSummary(v, na, nb)
 			if holm {
 				v.Summary += verdictab.HolmNote
+			}
+			if v.JudgeCapped {
+				v.Summary += " " + rep.Benchmarks[verdictRow[k]].Judge.capNote()
 			}
 			v = relabelVerdict(v, labels[0], labels[1])
 			rep.Benchmarks[verdictRow[k]].Verdict = &v
@@ -422,6 +454,7 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 	if d, ok := src.LatestDecision(c.ExperimentID); ok && d == schemas.DecisionInvalid {
 		return cr, nil
 	}
+	cr.suiteVersion, cr.lockHash, cr.judged = m.SuiteVersion, m.SuiteLockHash, m.Scenario[scenarioJudgeKey] != ""
 	armLabel := mapArms(arms, m)
 	practice, err := practiceArms(ctx, src, m, c.ExperimentID)
 	if err != nil {

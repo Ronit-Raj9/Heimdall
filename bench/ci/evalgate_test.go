@@ -23,6 +23,31 @@ func rep(winner string, sig bool, liveScore, prScore, liveCost, prCost float64) 
 	}
 }
 
+// paired gives the report's one benchmark n paired tasks of which drops
+// lost one point each (PR minus live), as the report card computes them.
+func paired(r *reportcard.Report, n, drops int) *reportcard.Report {
+	v := r.Benchmarks[0].Verdict
+	v.Tasks, v.TaskDiffs = n, make([]float64, n)
+	for i := range drops {
+		v.TaskDiffs[i] = -1
+	}
+	v.Delta = -float64(drops) / float64(n)
+	if r.Overall.Significant {
+		r.Overall.Delta = v.Delta
+	}
+	return r
+}
+
+// capped marks the benchmark judge-graded by an uncalibrated judge, as the
+// report card leaves it.
+func capped(r *reportcard.Report) *reportcard.Report {
+	v := verdictab.JudgeCap(*r.Benchmarks[0].Verdict, "not calibrated")
+	r.Benchmarks[0].Verdict = &v
+	r.Benchmarks[0].Judge = &reportcard.JudgeState{State: "uncalibrated", Label: "judge not calibrated"}
+	r.Overall = &verdictab.OverallVerdict{Winner: verdictab.WinnerUnclear, Benchmarks: 1, Wins: map[string]int{verdictab.WinnerUnclear: 1}}
+	return r
+}
+
 func TestEvaluateGate(t *testing.T) {
 	def := GateOptions{FailOn: DefaultFailOn}
 	cases := []struct {
@@ -38,7 +63,10 @@ func TestEvaluateGate(t *testing.T) {
 		{"unclear passes by default", "done", rep("unclear", false, 0.5, 0.45, 1, 1), def, OutcomeInconclusive, 0},
 		{"unclear fails when listed", "done", rep("unclear", false, 0.5, 0.45, 1, 1), GateOptions{FailOn: []string{OutcomeInconclusive}}, OutcomeInconclusive, GateExitInconclusive},
 		{"tie", "done", rep("tie", false, 0.5, 0.5, 1, 1), def, OutcomeSame, 0},
-		{"score drop limit", "done", rep("unclear", false, 0.5, 0.4, 1, 1), GateOptions{FailOn: DefaultFailOn, MaxScoreDrop: 0.05}, OutcomeRegressed, GateExitRegressed},
+		{"score drop limit inside the noise", "done", paired(rep("unclear", false, 0.5, 0.4, 1, 1), 10, 1), GateOptions{FailOn: DefaultFailOn, MaxScoreDrop: 0.05}, OutcomeInconclusive, 0},
+		{"real score drop over the limit", "done", paired(rep("unclear", false, 0.5, 0.25, 1, 1), 40, 10), GateOptions{FailOn: DefaultFailOn, MaxScoreDrop: 0.05}, OutcomeRegressed, GateExitRegressed},
+		{"real score drop under the limit", "done", paired(rep("A", true, 0.5, 0.25, 1, 1), 40, 10), GateOptions{FailOn: DefaultFailOn, MaxScoreDrop: 0.5}, OutcomeInconclusive, 0},
+		{"capped judge verdict never regresses", "done", capped(paired(rep("A", true, 0.6, 0.4, 1, 1), 40, 10)), def, OutcomeInconclusive, 0},
 		{"cost limit", "done", rep("B", true, 0.4, 0.6, 1, 2), GateOptions{FailOn: DefaultFailOn, MaxCostIncrease: 0.25}, OutcomeRegressed, GateExitRegressed},
 		{"failed", "failed", rep("B", true, 0.4, 0.6, 1, 1), def, OutcomeFailed, GateExitFailed},
 		{"no runs", "done", &reportcard.Report{}, def, OutcomeFailed, GateExitFailed},
@@ -68,6 +96,13 @@ func TestEvaluationComment(t *testing.T) {
 	for _, want := range []string{EvaluationMarker("my-agent"), "v5 (this pull request) vs v3 (live)", "Gate failed", "| b1 | 60%", "**worse**", "-20 pts", "$2.00 | $3.00 | +50%", "model-down", "[Open the full report card](https://h/evaluations/ev_x)", "`0123456789ab`"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("comment lacks %q:\n%s", want, s)
+		}
+	}
+	j := capped(paired(rep("A", true, 0.6, 0.4, 2, 3), 8, 2))
+	cs := EvaluationComment(CommentInput{Agent: "my-agent", LiveVersion: 3, PRVersion: 5, Report: j, Gate: EvaluateGate("done", j, GateOptions{FailOn: DefaultFailOn})})
+	for _, want := range []string{"Graded by", "judge, judge not calibrated", "unclear (judge not calibrated)", "Size: 8 paired tasks can detect a change of about 35 points"} {
+		if !strings.Contains(cs, want) {
+			t.Errorf("judged comment lacks %q:\n%s", want, cs)
 		}
 	}
 	if strings.ContainsAny(s, "\u2014\u2013") {

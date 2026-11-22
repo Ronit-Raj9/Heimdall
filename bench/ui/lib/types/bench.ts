@@ -4723,7 +4723,14 @@ export type CanaryRunAcceptedResponse = WithMode<CanaryRunAccepted>;
 // W8 judge calibration (docs/judge-calibration.md, handlers/calibration.go).
 
 /** Calibration instrument and suite states. */
-export type CalibrationState = "calibrated" | "few_labels" | "uncalibrated" | "allowed_uncalibrated" | "unreliable" | "not_judged";
+export type CalibrationState =
+	| "calibrated"
+	| "calibrated_on_controls"
+	| "few_labels"
+	| "uncalibrated"
+	| "allowed_uncalibrated"
+	| "unreliable"
+	| "not_judged";
 
 /** k of n with its exact two-sided 95% interval; value, lo and hi are null when n is 0. */
 export interface CalibrationRate {
@@ -4824,6 +4831,8 @@ export interface JudgeCalibrationThresholds {
 	min_tnr: number;
 	min_labels: number;
 	max_age_days: number;
+	/** Fewest admission-control items for "calibrated on controls". */
+	min_controls: number;
 	/** "defaults" or the release policy file. */
 	source: string;
 }
@@ -4838,6 +4847,8 @@ export interface CalibrationStatus {
 	prompt_sha256?: string;
 	state: CalibrationState;
 	detail: string;
+	/** Judged verdicts are capped at INCONCLUSIVE in this state. */
+	caps: boolean;
 	set_sha256?: string;
 	labels: number;
 	human_labels: number;
@@ -4903,6 +4914,8 @@ export interface JudgeCalibrationVerdict {
 	record_hash?: string;
 	record_at?: string;
 	human_labels: number;
+	/** Admission-control items of the record. */
+	control_items?: number;
 	agreement?: CalibrationRate;
 	tnr?: CalibrationRate;
 	fpr?: CalibrationRate;

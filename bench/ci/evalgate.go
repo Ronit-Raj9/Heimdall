@@ -115,19 +115,34 @@ func EvaluateGate(status string, rep *reportcard.Report, o GateOptions) GateResu
 	return res
 }
 
+// judge reads the report card (G4-07). A benchmark regresses when its
+// paired drop is real: the A/B verdict is significant, or the 95% paired
+// bootstrap interval of the change lies below zero. With max-score-drop set
+// the drop must also be larger than it; a drop over the limit the interval
+// cannot tell from noise makes the outcome inconclusive, never regressed.
+// A benchmark whose judge is not calibrated has its verdict capped on the
+// report card and is never a regression here.
 func judge(rep *reportcard.Report, o GateOptions) (string, []string) {
-	var regress []string
-	if ov := rep.Overall; ov != nil && ov.Significant && ov.Winner == ArmLive {
+	var regress, unsure []string
+	if ov := rep.Overall; ov != nil && ov.Significant && ov.Winner == ArmLive && (o.MaxScoreDrop <= 0 || -ov.Delta > o.MaxScoreDrop+1e-9) {
 		regress = append(regress, fmt.Sprintf("worse overall by %s per task", pts(ov.Delta)))
 	}
 	for _, b := range rep.Benchmarks {
-		live, pr := b.Arms[ArmLive], b.Arms[ArmPR]
-		if v := b.Verdict; v != nil && v.Significant && v.Winner == ArmLive {
-			regress = append(regress, fmt.Sprintf("%s: worse by %s, and the gap is real", b.Benchmark, pts(v.Delta)))
+		v := b.Verdict
+		if v == nil || v.JudgeCapped || v.Tasks == 0 {
 			continue
 		}
-		if o.MaxScoreDrop > 0 && live.Runs > 0 && pr.Runs > 0 && live.Score-pr.Score > o.MaxScoreDrop+1e-9 {
-			regress = append(regress, fmt.Sprintf("%s: score fell by %s, over the %s limit", b.Benchmark, pts(live.Score-pr.Score), pts(o.MaxScoreDrop)))
+		pc := verdictab.Paired(v.TaskDiffs)
+		drop := -v.Delta
+		real := (v.Significant && v.Winner == ArmLive) || (pc.OK && pc.Hi < 0)
+		over := o.MaxScoreDrop <= 0 || drop > o.MaxScoreDrop+1e-9
+		switch {
+		case real && over && o.MaxScoreDrop > 0:
+			regress = append(regress, fmt.Sprintf("%s: score fell by %s%s, a real drop over the %s limit", b.Benchmark, pts(drop), intervalText(pc), pts(o.MaxScoreDrop)))
+		case real && over && v.Significant && v.Winner == ArmLive:
+			regress = append(regress, fmt.Sprintf("%s: worse by %s, and the gap is real", b.Benchmark, pts(v.Delta)))
+		case o.MaxScoreDrop > 0 && over && drop > 0:
+			unsure = append(unsure, fmt.Sprintf("%s: score fell by %s%s, over the %s limit, but that could be noise; %s", b.Benchmark, pts(drop), intervalText(pc), pts(o.MaxScoreDrop), mdeText(v.Tasks)))
 		}
 	}
 	if o.MaxCostIncrease > 0 {
@@ -141,6 +156,9 @@ func judge(rep *reportcard.Report, o GateOptions) (string, []string) {
 	if len(regress) > 0 {
 		return OutcomeRegressed, regress
 	}
+	if len(unsure) > 0 {
+		return OutcomeInconclusive, unsure
+	}
 	ov := rep.Overall
 	switch {
 	case ov != nil && ov.Significant && ov.Winner == ArmPR:
@@ -149,6 +167,23 @@ func judge(rep *reportcard.Report, o GateOptions) (string, []string) {
 		return OutcomeSame, []string{"about the same as the live version on every benchmark"}
 	}
 	return OutcomeInconclusive, []string{"no real gap yet: more tasks or trials would settle it"}
+}
+
+// intervalText is " (95% interval -20 pts to -2 pts)", "" without one.
+func intervalText(pc verdictab.PairedChange) string {
+	if !pc.OK {
+		return ""
+	}
+	return fmt.Sprintf(" (95%% interval %s to %s)", signedPts(pc.Lo), signedPts(pc.Hi))
+}
+
+// mdeText is the smallest change n paired tasks can detect, in words.
+func mdeText(n int) string {
+	m := verdictab.MDE(n)
+	if math.IsInf(m, 0) || math.IsNaN(m) {
+		return fmt.Sprintf("%d paired task is too few to detect any change", n)
+	}
+	return fmt.Sprintf("%d paired tasks can detect a change of about %s", n, pts(m))
 }
 
 // totalCost sums arm's cost over every benchmark; known is false when any
@@ -235,13 +270,13 @@ func EvaluationComment(in CommentInput) string {
 	}
 	rep := in.Report
 	if rep != nil && len(rep.Benchmarks) > 0 {
-		fmt.Fprintf(&b, "| Benchmark | Live v%d | This PR v%d | Change | Verdict |\n", in.LiveVersion, in.PRVersion)
-		b.WriteString("|---|---|---|---|---|\n")
+		fmt.Fprintf(&b, "| Benchmark | Live v%d | This PR v%d | Change | Verdict | Graded by |\n", in.LiveVersion, in.PRVersion)
+		b.WriteString("|---|---|---|---|---|---|\n")
 		bs := append([]reportcard.Benchmark(nil), rep.Benchmarks...)
 		sort.SliceStable(bs, func(i, j int) bool { return bs[i].Benchmark < bs[j].Benchmark })
 		for _, x := range bs {
 			live, pr := x.Arms[ArmLive], x.Arms[ArmPR]
-			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n", mdCell(x.Benchmark), scoreCell(live), scoreCell(pr), changeCell(live, pr), verdictCell(x.Verdict))
+			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %s |\n", mdCell(x.Benchmark), scoreCell(live), scoreCell(pr), changeCell(live, pr), verdictCell(x.Verdict), gradedByCell(x.Judge))
 		}
 		liveCost, liveKnown := totalCost(rep, ArmLive)
 		prCost, prKnown := totalCost(rep, ArmPR)
@@ -264,6 +299,9 @@ func EvaluationComment(in CommentInput) string {
 	if rep != nil && rep.Overall != nil && rep.Overall.Benchmarks > 0 {
 		w := rep.Overall.Wins
 		fmt.Fprintf(&b, "Benchmarks won: this PR %d, live %d, tied %d, unclear %d.\n\n", w[ArmPR], w[ArmLive], w[verdictab.WinnerTie], w[verdictab.WinnerUnclear])
+	}
+	if line := sizeLine(rep); line != "" {
+		b.WriteString(line + "\n\n")
 	}
 	var foot []string
 	if in.ReportURL != "" {
@@ -344,9 +382,39 @@ func changeCell(live, pr reportcard.Metrics) string {
 	return signedPts(pr.Score - live.Score)
 }
 
+// gradedByCell is how a benchmark is graded: a check, or a model judge
+// with its calibration state.
+func gradedByCell(j *reportcard.JudgeState) string {
+	if j == nil {
+		return "check"
+	}
+	return "judge, " + mdCell(j.Label)
+}
+
+// sizeLine says the smallest change the evaluation can detect per
+// benchmark, from the smallest paired task count.
+func sizeLine(rep *reportcard.Report) string {
+	if rep == nil {
+		return ""
+	}
+	n := 0
+	for _, b := range rep.Benchmarks {
+		if v := b.Verdict; v != nil && v.Tasks > 0 && (n == 0 || v.Tasks < n) {
+			n = v.Tasks
+		}
+	}
+	if n == 0 {
+		return ""
+	}
+	return "Size: " + mdeText(n) + " on a benchmark (smaller gaps read as unclear)."
+}
+
 func verdictCell(v *verdictab.BenchmarkVerdict) string {
 	if v == nil {
 		return ""
+	}
+	if v.JudgeCapped {
+		return "unclear (judge not calibrated)"
 	}
 	switch v.Winner {
 	case ArmPR:

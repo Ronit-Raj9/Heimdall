@@ -268,6 +268,7 @@ type CalibrationStatus struct {
 	PromptSHA256  string                     `json:"prompt_sha256,omitempty"`
 	State         string                     `json:"state"` // calibrated | calibrated_on_controls | few_labels | uncalibrated | unreliable | not_judged
 	Detail        string                     `json:"detail"`
+	Caps          bool                       `json:"caps"` // judged verdicts are capped at INCONCLUSIVE in this state
 	SetSHA256     string                     `json:"set_sha256,omitempty"`
 	Labels        int                        `json:"labels"`       // rows in labels.jsonl
 	HumanLabels   int                        `json:"human_labels"` // distinct items labelled by people
