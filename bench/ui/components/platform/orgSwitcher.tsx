@@ -3,12 +3,11 @@ import { RoleBadge } from "@/components/platform/badges";
 import { CreateOrgDialog } from "@/components/platform/createOrgDialog";
 import { useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { useSwitchOrgMutation } from "@/lib/store/apis/platformApi";
 import { cn } from "@/lib/utils";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { Building2, Check, ChevronsUpDown, Loader2, Plus } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useOrgSwitch } from "./useOrgSwitch";
 
 /** First letters of an organization name, for its square. */
 function orgMark(name: string): string {
@@ -31,9 +30,7 @@ export function OrgSwitcher({ defaultOpen = false }: OrgSwitcherProps) {
 	const { t } = useTranslation("platform");
 	const { t: tf } = useTranslation("fw23");
 	const session = useSession();
-	const navigate = useNavigate();
-	const pathname = useRouterState({ select: (state) => state.location.pathname });
-	const [switchOrg, state] = useSwitchOrgMutation();
+	const state = useOrgSwitch(session.org?.id);
 	const [open, setOpen] = useState(defaultOpen);
 	const [creating, setCreating] = useState(false);
 	const rootRef = useRef<HTMLDivElement>(null);
@@ -85,15 +82,9 @@ export function OrgSwitcher({ defaultOpen = false }: OrgSwitcherProps) {
 		);
 	}
 
-	const choose = async (orgId: string) => {
+	const choose = (orgId: string) => {
 		setOpen(false);
-		if (orgId === org?.id) return;
-		try {
-			await switchOrg({ org: orgId }).unwrap();
-			void navigate({ href: pathname });
-		} catch {
-			// state.error renders the failure.
-		}
+		void state.choose(orgId);
 	};
 
 	const itemCls =
@@ -145,7 +136,7 @@ export function OrgSwitcher({ defaultOpen = false }: OrgSwitcherProps) {
 								type="button"
 								role="menuitemradio"
 								aria-checked={current}
-								onClick={() => void choose(option.id)}
+								onClick={() => choose(option.id)}
 								className={itemCls}
 								data-testid={`org-option-${option.slug}`}
 							>
