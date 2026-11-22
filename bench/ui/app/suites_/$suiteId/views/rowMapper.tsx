@@ -183,7 +183,7 @@ export function MappingStep({
 	onGradeOn?: (g: GradeOn) => void;
 	disabled?: boolean;
 	/** The task fields offered; default every field the Build tab import reads. */
-	fields?: readonly MapField[];
+	fields?: readonly (typeof MAP_FIELDS)[number][];
 	showMetadata?: boolean;
 	t: T;
 }) {

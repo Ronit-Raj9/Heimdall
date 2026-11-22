@@ -1,16 +1,16 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MappingStep } from "@/app/suites_/$suiteId/views/rowMapper";
+import { MAP_FIELDS, MappingStep } from "@/app/suites_/$suiteId/views/rowMapper";
 import type { OnboardInventory, OnboardMatch, OnboardPlan } from "@/lib/types/onboard";
-import type { MapField, RowColumn, RowMapping } from "@/lib/types/suiteBuild";
+import type { RowColumn, RowMapping } from "@/lib/types/suiteBuild";
 import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
 
 /** Row fields the onboard rows reader maps (onboard/source_rows.go mappingKeys), in the Build tab mapper's order. */
-export const ONBOARD_MAP_FIELDS = ["question", "expected", "rubric", "reference", "wrong_answers", "id", "title", "split"] as const satisfies readonly MapField[];
+export const ONBOARD_MAP_FIELDS = ["question", "expected", "rubric", "reference", "wrong_answers", "id", "title", "split"] as const satisfies readonly (typeof MAP_FIELDS)[number][];
 
 /** The inventory's column paths as row mapper columns, with an example from the first sample that has one. */
 export function onboardColumns(inv: Pick<OnboardInventory, "columns" | "samples">): RowColumn[] {
