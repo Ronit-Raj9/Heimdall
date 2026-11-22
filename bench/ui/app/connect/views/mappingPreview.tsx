@@ -1,5 +1,6 @@
 import type { ConnectCandidate } from "@/lib/types/connect";
 import { useTranslation } from "react-i18next";
+import { isProven } from "./connect.utils";
 
 function Field({ label, children, testId }: { label: string; children: React.ReactNode; testId?: string }) {
 	return (
@@ -36,7 +37,9 @@ export function MappingPreview({ candidate }: { candidate: ConnectCandidate }) {
 					<code className="text-xs">{url}</code>
 				</Field>
 			)}
-			{!m && candidate.template === "http-url" && <p className="text-muted-foreground text-sm">{t("mapping.own")}</p>}
+			{!m && candidate.template === "http-url" && isProven(candidate) && (
+				<p className="text-muted-foreground text-sm">{t("mapping.own")}</p>
+			)}
 			{m?.start && (
 				<Field label={t("mapping.start")}>
 					<code className="text-xs">

@@ -26,19 +26,23 @@ import type {
 	ConnectSaveResponse,
 	ConnectVerifyStatus,
 } from "@/lib/types/connect";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { CircleCheck, Plug } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	VERIFY_POLL_MS,
 	bestCandidate,
+	canSave,
 	connectionOK,
 	importPlatformFor,
+	isProven,
 	isTerminalJob,
 	otherCandidates,
 	platformChoice,
+	resultTitle,
 	secretQuestions,
+	showDetectButton,
 	suggestedName,
 	validAgentName,
 	verifyBenchmarkKey,
@@ -51,6 +55,62 @@ import { SecretCapture } from "./secretCapture";
 import { VerifyRows } from "./verifyRows";
 
 const NO_PLATFORM = "none";
+
+/** N105: how sure, only for a proven candidate; otherwise why it is not proven yet. */
+export function CandidateStatus({ cand }: { cand: ConnectCandidate }) {
+	const { t } = useTranslation("connect");
+	const proven = isProven(cand);
+	return (
+		<div className="flex flex-wrap items-center gap-2 text-sm" data-testid="connect-candidate-status">
+			{proven && <Badge variant="outline">{t("result.confidence", { pct: Math.round(cand.confidence * 100) })}</Badge>}
+			{proven ? (
+				<span className="text-chart-success-ink flex items-center gap-1.5">
+					<CircleCheck className="size-4" aria-hidden />
+					{t("result.nonceFound")}
+				</span>
+			) : (
+				<span className="text-muted-foreground">{t("result.nonceMissing")}</span>
+			)}
+		</div>
+	);
+}
+
+/** Candidates that cannot be connected here; input that was not recognised shows only what to paste (N106). */
+export function UnsupportedCandidates({ det }: { det: ConnectDetectResponse }) {
+	const unknown = det.class === "unknown";
+	return (
+		<>
+			{det.candidates.map((c, i) => (
+				<div key={`${c.label}-${i}`} className="flex flex-col gap-2 rounded-lg border p-3 text-sm" data-testid="connect-unsupported">
+					{!unknown && <div className="font-medium">{c.label}</div>}
+					{c.message && <p>{c.message}</p>}
+					{c.command && <code className="bg-muted rounded px-2 py-1 text-xs">{c.command}</code>}
+				</div>
+			))}
+		</>
+	);
+}
+
+/** N107: while the picked platform's form loads, say so; if the list fails, show why and link to Import from a platform. */
+export function PlatformCatalogNote({ label, loading, error }: { label: string; loading: boolean; error: string | undefined }) {
+	const { t } = useTranslation("connect");
+	if (loading) {
+		return (
+			<p className="text-muted-foreground text-sm" data-testid="connect-platform-loading">
+				{t("paste.loadingPlatform", { label })}
+			</p>
+		);
+	}
+	if (!error) return null;
+	return (
+		<p className="text-chart-error-ink text-sm" data-testid="connect-platform-error">
+			{t("paste.platformError", { error })}{" "}
+			<Link to="/agents/new" className="underline">
+				{t("paste.importLink")}
+			</Link>
+		</p>
+	);
+}
 
 /**
  * /connect (lane Z01): one paste box for any agent. Detect shows what was found and why, the
@@ -75,6 +135,8 @@ export default function ConnectView() {
 	const [inline, setInline] = useState<ConnectVerifyStatus | undefined>();
 	const [jobId, setJobId] = useState<string | undefined>();
 	const [polling, setPolling] = useState(false);
+	// N105: an answer field the user picked counts as a mapping Save may write.
+	const [userMapped, setUserMapped] = useState(false);
 	const polled = useGetVerifyQuery(jobId ?? "", { skip: !jobId, pollingInterval: polling ? VERIFY_POLL_MS : 0 });
 	const verify = jobId ? (polled.data ?? inline) : inline;
 	const verifyDone = verify ? isTerminalJob(verify.status) : false;
@@ -87,6 +149,7 @@ export default function ConnectView() {
 		setSaved(undefined);
 		setInline(undefined);
 		setJobId(undefined);
+		setUserMapped(false);
 		const body = platform !== NO_PLATFORM ? { input, platform, id: input, secrets } : { input, secrets };
 		const res = await detect(body);
 		if ("data" in res && res.data) {
@@ -104,7 +167,10 @@ export default function ConnectView() {
 	};
 
 	const onPick = (path: string) => {
-		if (cand) setCand(withAnswerPath(cand, path));
+		if (cand) {
+			setCand(withAnswerPath(cand, path));
+			setUserMapped(true);
+		}
 	};
 
 	const onFix = (f: ConnectFailure) => {
@@ -154,6 +220,7 @@ export default function ConnectView() {
 		setJobId(c.jobId);
 		setPolling(c.polling);
 		setProbeSecrets(c.probeSecrets);
+		setUserMapped(false);
 	};
 
 	const platforms = catalog.data?.platforms ?? [];
@@ -161,6 +228,21 @@ export default function ConnectView() {
 	const importPlatforms = useGetAgentPlatformsQuery(undefined, { skip: platform === NO_PLATFORM });
 	const importable = platform === NO_PLATFORM ? undefined : importPlatformFor(platform, importPlatforms.data?.platforms ?? []);
 	const others = otherCandidates(det);
+	const title = det ? resultTitle(det, cand) : undefined;
+	const titleText = (() => {
+		if (!title) return "";
+		switch (title.key) {
+			case "result.found":
+				return t("result.found", { label: title.vars?.label ?? "" });
+			case "result.foundUnproven":
+				return t("result.foundUnproven", { label: title.vars?.label ?? "" });
+			case "result.couldNotConnect":
+				return t("result.couldNotConnect", { reason: title.vars?.reason ?? "" });
+			default:
+				return t(title.key);
+		}
+	})();
+	const pickedLabel = platforms.find((p) => p.id === platform)?.label ?? platform;
 	const verified = verify && verifyDone && connectionOK(verify.rows) && verify.status === "succeeded";
 
 	return (
@@ -203,7 +285,7 @@ export default function ConnectView() {
 							))}
 						</SelectContent>
 					</Select>
-					{!importable && (
+					{showDetectButton(platform, importable, importPlatforms, NO_PLATFORM) && (
 						<Button
 							onClick={() => void runDetect()}
 							disabled={!input.trim() && platform === NO_PLATFORM}
@@ -214,6 +296,13 @@ export default function ConnectView() {
 						</Button>
 					)}
 				</div>
+				{platform !== NO_PLATFORM && !importable && (importPlatforms.isLoading || importPlatforms.isError) && (
+					<PlatformCatalogNote
+						label={pickedLabel}
+						loading={importPlatforms.isLoading}
+						error={importPlatforms.isError ? getBenchErrorMessage(importPlatforms.error) : undefined}
+					/>
+				)}
 				{importable ? (
 					<ConnectPlatformForm key={importable.id} platform={importable} />
 				) : (
@@ -225,29 +314,10 @@ export default function ConnectView() {
 			</section>
 
 			{det && (
-				<Section title={cand ? t("result.found", { label: cand.label }) : t("result.notSupported")} testId="connect-result">
+				<Section title={titleText} testId="connect-result">
 					<div className="flex flex-col gap-4">
-						{cand && (
-							<div className="flex flex-wrap items-center gap-2 text-sm">
-								<Badge variant="outline">{t("result.confidence", { pct: Math.round(cand.confidence * 100) })}</Badge>
-								{cand.nonce_found ? (
-									<span className="text-chart-success-ink flex items-center gap-1.5">
-										<CircleCheck className="size-4" aria-hidden />
-										{t("result.nonceFound")}
-									</span>
-								) : (
-									<span className="text-muted-foreground">{t("result.nonceMissing")}</span>
-								)}
-							</div>
-						)}
-						{!cand &&
-							det.candidates.map((c) => (
-								<div key={c.label} className="flex flex-col gap-2 rounded-lg border p-3 text-sm" data-testid="connect-unsupported">
-									<div className="font-medium">{c.label}</div>
-									{c.message && <p>{c.message}</p>}
-									{c.command && <code className="bg-muted rounded px-2 py-1 text-xs">{c.command}</code>}
-								</div>
-							))}
+						{cand && <CandidateStatus cand={cand} />}
+						{!cand && <UnsupportedCandidates det={det} />}
 						{cand?.message && <p className="text-sm">{cand.message}</p>}
 						{(cand?.evidence ?? []).length > 0 && (
 							<div>
@@ -338,13 +408,18 @@ export default function ConnectView() {
 							</label>
 							<Button
 								onClick={() => void doSave()}
-								disabled={!validAgentName(name)}
+								disabled={!validAgentName(name) || !canSave(cand, userMapped)}
 								isLoading={saveState.isLoading}
 								data-testid="connect-save"
 							>
 								{saveState.isLoading ? t("mapping.saving") : t("mapping.save")}
 							</Button>
 						</div>
+						{!canSave(cand, userMapped) && (
+							<p className="text-muted-foreground text-sm" data-testid="connect-save-needs-proof">
+								{t("mapping.saveNeedsProof")}
+							</p>
+						)}
 						{saved && <p className="text-chart-success-ink text-sm">{t("mapping.saved", { path: saved.path })}</p>}
 						{saveState.error ? <p className="text-chart-error-ink text-sm">{getBenchErrorMessage(saveState.error)}</p> : null}
 					</div>

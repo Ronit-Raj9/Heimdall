@@ -62,6 +62,27 @@ sudo ufw enable
 Docker publishes ports through its own iptables rules, ahead of ufw; that is
 why only Caddy publishes anything. Use the cloud provider's firewall as well.
 
+### Public DNS for outbound checks
+
+Calls to addresses an organization typed in (Connect > Detect and Verify,
+webhooks, Test my MCP server, live inbox pulls) resolve host names only through
+public DNS servers, never through Docker's own resolver, so a compose service
+name such as `bifrost` or `heimdall-postgres-1` does not resolve for them at
+all. Hosts that cannot be public (a name without a dot, `localhost`, internal
+suffixes, private addresses) are refused before any lookup, and no message
+shows the address a name resolved to.
+
+- `HEIMDALL_PUBLIC_DNS` sets the servers as a comma list of `ip:port`. Unset or
+  empty means `1.1.1.1:53,8.8.8.8:53`. Entries that are not `ip:port` are
+  skipped with one warning; with no valid entry the default list is used.
+- `HEIMDALL_PUBLIC_DNS=system` keeps the container's own resolver, for a
+  server with no outbound DNS. Private hosts are still refused before any
+  lookup, but dotted internal names become resolvable again.
+- The firewall must allow outbound UDP and TCP 53 to those servers. At start
+  the server logs `public DNS ok (<servers>)`, or `public DNS unreachable
+  (<servers>): guarded outbound calls will fail; set HEIMDALL_PUBLIC_DNS=system
+  to use the container resolver` as a warning.
+
 ## 3. Install Docker and get the code
 
 ```sh
