@@ -574,3 +574,19 @@ func TestProcessScores(t *testing.T) {
 		t.Fatal("rollup without process")
 	}
 }
+
+// C11: the report card carries the evaluation's MCP route.
+func TestBuildCarriesMCPRoute(t *testing.T) {
+	src := newSource()
+	src.add("exp_1", "longmemeval", []string{"main"}, []fixRun{pass("main", "q1", 1, nil)})
+	ev := &schemas.Evaluation{ID: "ev_mcp", Status: StatusDone, Spec: schemas.EvaluationSpec{Mode: "score", MCPRoute: schemas.MCPRouteBifrost,
+		Arms: []schemas.EvaluationArm{{Label: "A", Agent: "codex", Model: "m"}}},
+		Children: []schemas.EvaluationChild{{Benchmark: "longmemeval", ExperimentID: "exp_1"}}}
+	rep, err := Build(context.Background(), src, ev, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.MCPRoute != schemas.MCPRouteBifrost {
+		t.Fatalf("mcp route %q", rep.MCPRoute)
+	}
+}

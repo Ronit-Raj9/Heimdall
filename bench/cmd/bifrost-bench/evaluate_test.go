@@ -49,6 +49,30 @@ func TestEvalRunFlagsScore(t *testing.T) {
 	}
 }
 
+func TestEvalRunFlagsMCPRoute(t *testing.T) {
+	if s := mustSpec(t, "--agent", "codex", "--model", "m", "--pack", "coding"); s.MCPRoute != "" {
+		t.Fatalf("default route %q", s.MCPRoute)
+	}
+	if s := mustSpec(t, "--agent", "codex", "--model", "m", "--pack", "coding", "--mcp-route", "direct"); s.MCPRoute != "" {
+		t.Fatalf("direct route %q", s.MCPRoute)
+	}
+	if s := mustSpec(t, "-agent", "codex", "-model", "m", "-pack", "coding", "-mcp-route", "bifrost_code_mode"); s.MCPRoute != schemas.MCPRouteBifrostCodeMode {
+		t.Fatalf("route %q", s.MCPRoute)
+	}
+	o, err := parseEvalFlags("run", []string{"--agent", "codex", "--model", "m", "--pack", "coding", "--mcp-route", "nope"})
+	if err == nil {
+		_, err = buildEvalSpec(o)
+	}
+	if err == nil || !strings.Contains(err.Error(), "--mcp-route") {
+		t.Fatalf("bad route: %v", err)
+	}
+	var b strings.Builder
+	renderReport(&b, &evalReport{Evaluation: "ev1", MCPRoute: schemas.MCPRouteBifrost})
+	if !strings.Contains(b.String(), "MCP tools: through Bifrost's MCP gateway") {
+		t.Fatalf("report:\n%s", b.String())
+	}
+}
+
 func TestEvalRunFlagsAB(t *testing.T) {
 	s := mustSpec(t, "--agent", "codex@v1", "--vs", "codex@v2", "--model", "m", "--benchmarks", "a, b", "--tasks", "3", "--trials", "1")
 	if s.Mode != schemas.EvaluationModeVersions || len(s.Arms) != 2 || s.Arms[1].Version != 2 || s.Arms[1].Label != "B" {

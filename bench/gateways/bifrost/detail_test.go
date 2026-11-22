@@ -267,3 +267,25 @@ func mustHash(t *testing.T, v any) string {
 	}
 	return h
 }
+
+// C06: a call Bifrost refused because a budget was used up is marked on its
+// row, so the run counts it (Run.Gateway.BudgetRefusedCalls).
+func TestParseDetailBudgetRefused(t *testing.T) {
+	for _, c := range []struct {
+		name, row string
+		want      bool
+	}{
+		{"402", `{"id":"r1","status":"error","error_details":{"status_code":402,"error":{"message":"payment required"}}}`, true},
+		{"budget text", `{"id":"r2","status":"error","error_details":{"status_code":429,"error":{"message":"virtual key budget exceeded"}}}`, true},
+		{"other error", `{"id":"r3","status":"error","error_details":{"status_code":503,"error":{"message":"upstream down"}}}`, false},
+		{"success", `{"id":"r4","status":"success"}`, false},
+	} {
+		p, err := parseDetail([]byte(c.row))
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if p.Req.BudgetRefused != c.want {
+			t.Errorf("%s: budget refused %v, want %v", c.name, p.Req.BudgetRefused, c.want)
+		}
+	}
+}

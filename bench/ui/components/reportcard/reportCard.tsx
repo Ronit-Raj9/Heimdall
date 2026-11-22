@@ -84,6 +84,11 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 							Held-out tasks only
 						</p>
 					)}
+					{report.mcp_route && report.mcp_route !== "direct" && (
+						<p data-testid="report-card-mcp-route" className="text-muted-foreground text-xs">
+							{report.mcp_route === "bifrost_code_mode" ? "MCP tools through Bifrost, Code Mode" : "MCP tools through Bifrost MCP gateway"}
+						</p>
+					)}
 					{ab && <ArmLegend arms={report.arms} />}
 					{report.practice_runs ? (
 						<p data-testid="report-card-practice" className="text-muted-foreground max-w-prose text-xs">

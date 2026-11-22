@@ -59,3 +59,28 @@ func TestBuildDropsStreamControlArm(t *testing.T) {
 		t.Fatalf("entries %v, want both", got)
 	}
 }
+
+// An evaluation with the Bifrost cache option runs a "(Bifrost cache on)"
+// copy of its one arm (lane C08). It is a variant, not a separate setup:
+// the board leaves it out.
+func TestBuildDropsCacheVariantArm(t *testing.T) {
+	f := newFake()
+	m := f.exp("e_cache", "s@1", 0, map[string]schemas.ArmManifest{
+		"A":                        arm("codex on m", "h_a", "command"),
+		schemas.EvaluationCacheArm: arm("codex on m"+schemas.EvaluationCacheSuffix, "h_cache", "command"),
+	})
+	for _, task := range []string{"t1", "t2"} {
+		f.pass("e_cache", task, "A", "clean", 1, 0.1)
+		f.pass("e_cache", task, schemas.EvaluationCacheArm, "clean", 1, 0.1)
+	}
+	lb := buildOrFail(t, f, Query{Now: t0})
+	if got := entryHashes(lb); !slices.Equal(got, []string{"h_a"}) {
+		t.Fatalf("entries %v, want only h_a", got)
+	}
+	// An arm named cache without the cache label is an ordinary arm.
+	m.Arms[schemas.EvaluationCacheArm] = arm("my cache agent", "h_cache", "command")
+	lb = buildOrFail(t, f, Query{Now: t0})
+	if got := entryHashes(lb); len(got) != 2 {
+		t.Fatalf("entries %v, want both", got)
+	}
+}

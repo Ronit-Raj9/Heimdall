@@ -186,6 +186,10 @@ type RunGatewayInfo struct {
 	// an agent that cannot send extra headers or a plan the plugin cannot
 	// run). Empty in the default proxy mode.
 	FaultPath string `json:"fault_path,omitempty"`
+	// BudgetRefusedCalls counts the run's model calls Bifrost refused
+	// because a budget was used up (status 402 or a budget_exceeded error,
+	// GatewayRequest.BudgetRefused). Zero when none was.
+	BudgetRefusedCalls int `json:"budget_refused_calls,omitempty"`
 }
 
 // PartFailure records that one part failed for this run. A part failure never

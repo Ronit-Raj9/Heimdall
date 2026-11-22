@@ -648,6 +648,7 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 		l.r.count(func(s *Summary) { s.RemoteRejected++ })
 		usd, known := l.r.charge(&req.CostUSD, l.est, "rejected upload of lease "+l.id)
 		c.journalCharge(l.r, "rejected", l, reason, usd, known) // before the answer: a resumed scheduler counts it again
+		l.r.checkEvalBudget(l.r.ctx)                            // C06: a rejected run still spent Bifrost budget
 		l.r.emit(Event{Kind: EventError, SlotID: l.slot.SlotID, RunID: req.RunID, Message: "remote upload rejected: " + reason})
 		// A run sealed here that then failed verification stays in the
 		// store for an operator (verify/recover); queueing the slot again
@@ -666,6 +667,7 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 	l.r.record(res, l.est)
 	l.r.count(func(s *Summary) { s.Remote++ })
 	c.journal(l.r, "accepted", l, string(res.Run.Outcome))
+	l.r.checkEvalBudget(l.r.ctx) // C06: remote runs spend the same Bifrost budget
 	l.r.emit(Event{Kind: EventRunSealed, SlotID: l.slot.SlotID, RunID: res.Run.RunID, Stage: schemas.StageSeal, Outcome: res.Run.Outcome,
 		Message: "sealed on remote worker " + l.worker})
 	again := res.Run.Outcome == schemas.OutcomeAbortedInfra && l.r.attemptsLeft(ctx, l.slot)

@@ -44,7 +44,8 @@ const evalUsage = `usage: bifrost-bench eval <run|list|show|report|cancel> ...
   eval run --agent codex[@vN] --model M (--pack coding | --benchmarks a,b)
            [--vs agent@vM | --vs-model M2] [--tasks 8] [--trials 2]
            [--faults model-down,broken-tool,misleading-instruction] [--name N]
-           [--budget USD] [--estimate] [--json]
+           [--budget USD] [--mcp-route direct|bifrost|bifrost_code_mode]
+           [--estimate] [--json]
       start an evaluation (or only print its estimate with --estimate)
   eval list [--json]                 evaluations, newest first
   eval show <id> [--json]            status of one evaluation and its experiments
@@ -84,6 +85,7 @@ type evalOpts struct {
 
 	agent, vs, vsModel, model, provider string
 	pack, benchmarks, faults, name      string
+	mcpRoute                            string
 	tasks, trials                       int
 	budget                              float64
 
@@ -135,6 +137,7 @@ func parseEvalFlags(sub string, args []string) (*evalOpts, error) {
 		fs.StringVar(&o.name, "name", "", "evaluation name")
 		fs.Float64Var(&o.budget, "budget", 0, "spending limit in USD (0 = none)")
 		fs.BoolVar(&o.estimate, "estimate", false, "print the estimate only; start nothing")
+		fs.StringVar(&o.mcpRoute, "mcp-route", "", "how agents reach the tasks' MCP tool servers: direct (default), bifrost or bifrost_code_mode")
 	}
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
@@ -242,6 +245,13 @@ func buildEvalSpec(o *evalOpts) (*schemas.EvaluationSpec, error) {
 		if !evalHas(spec.Faults, f) {
 			spec.Faults = append(spec.Faults, f)
 		}
+	}
+	switch r := strings.TrimSpace(o.mcpRoute); r { // C11 MCP route
+	case "", schemas.MCPRouteDirect:
+	case schemas.MCPRouteBifrost, schemas.MCPRouteBifrostCodeMode:
+		spec.MCPRoute = r
+	default:
+		return nil, fmt.Errorf("unknown --mcp-route %q (%s, %s or %s)", r, schemas.MCPRouteDirect, schemas.MCPRouteBifrost, schemas.MCPRouteBifrostCodeMode)
 	}
 	if spec.Name == "" {
 		spec.Name = defaultEvalName(spec)
@@ -424,6 +434,7 @@ type evalVerdict struct {
 type evalReport struct {
 	Evaluation   string                  `json:"evaluation"`
 	Arms         []schemas.EvaluationArm `json:"arms"`
+	MCPRoute     string                  `json:"mcp_route,omitempty"` // C11: empty is direct
 	Capabilities []struct {
 		Capability string                `json:"capability"`
 		Benchmarks []string              `json:"benchmarks"`
@@ -490,6 +501,9 @@ func renderEvaluation(w io.Writer, ev *schemas.Evaluation) {
 		fmt.Fprintf(w, "arm %s:    %s\n", a.Label, armName(a))
 	}
 	fmt.Fprintf(w, "tasks:    %d per benchmark, %d trials, faults %s\n", ev.Spec.TasksPerBenchmark, ev.Spec.Trials, strings.Join(ev.Spec.Faults, ","))
+	if ev.Spec.MCPRoute != "" {
+		fmt.Fprintf(w, "mcp:      %s\n", mcpRouteName(ev.Spec.MCPRoute))
+	}
 	if len(ev.Children) == 0 {
 		return
 	}
@@ -557,6 +571,9 @@ func renderReport(w io.Writer, r *evalReport) {
 	fmt.Fprintf(w, "report card %s\n", r.Evaluation)
 	for _, a := range r.Arms {
 		fmt.Fprintf(w, "  %s = %s\n", a.Label, armName(a))
+	}
+	if r.MCPRoute != "" {
+		fmt.Fprintf(w, "  MCP tools: %s\n", mcpRouteName(r.MCPRoute))
 	}
 	fmt.Fprintln(w)
 	head := func(tw io.Writer, first ...string) {
@@ -975,4 +992,17 @@ func (l *localEval) cancel(ctx context.Context, id string) (*schemas.Evaluation,
 		}
 	}
 	return ev, l.save(ev)
+}
+
+// mcpRouteName is the plain name of an evaluation's MCP route (C11).
+func mcpRouteName(r string) string {
+	switch r {
+	case schemas.MCPRouteBifrost:
+		return "through Bifrost's MCP gateway"
+	case schemas.MCPRouteBifrostCodeMode:
+		return "through Bifrost's MCP gateway in code mode"
+	case "", schemas.MCPRouteDirect:
+		return "direct to the tool servers"
+	}
+	return r
 }
