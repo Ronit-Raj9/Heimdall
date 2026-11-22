@@ -26,6 +26,7 @@ import (
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/remotemap"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/toolproxy"
 	"github.com/maximhq/bifrost/bench/utils"
@@ -70,6 +71,12 @@ type EndpointTestResult struct {
 	Reported  map[string]any     `json:"reported,omitempty"`
 	Trace     []EndpointTestStep `json:"trace"`
 	Notes     []string           `json:"notes"`
+	// Requests are the requests sent (secret values masked), RawResponse
+	// the endpoint's last answer as received (capped) and Reads how the
+	// answer was read (lane Y10, a mapped endpoint).
+	Requests    []remotemap.Sent `json:"requests,omitempty"`
+	RawResponse string           `json:"raw_response,omitempty"`
+	Reads       string           `json:"reads,omitempty"`
 }
 
 type agentTestHandler struct {
@@ -199,6 +206,8 @@ func (h *agentTestHandler) run(ctx context.Context, cfg *schemas.AgentConfig) *E
 	switch {
 	case utils.IsOpenAIAgent(cfg) && cfg.OpenAI != nil:
 		return h.runOpenAI(ctx, cfg, res, step, fail, start)
+	case cfg.Remote != nil && (cfg.Adapter == "remote_http" || cfg.Adapter == "") && remotemap.Mapped(cfg.Remote):
+		return h.runMapped(ctx, cfg, res, step, fail, start)
 	case cfg.Remote != nil && (cfg.Adapter == "remote_http" || cfg.Adapter == ""):
 		return h.runRemote(ctx, cfg.Remote, res, step, fail, start)
 	case utils.IsA2A(cfg):

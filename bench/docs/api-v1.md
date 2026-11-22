@@ -17,6 +17,10 @@ Each v1 route is an alias of one bench route. The `V1Alias` middleware rewrites 
 | v1 route | Served by |
 |---|---|
 | `GET /api/v1/agents` | `GET /api/bench/agents` |
+| `POST /api/v1/agents` | `POST /api/bench/agents` (create from `yaml`, or from `template` with `id`, `params`, `model`; `dry_run` validates only; 409 when the name is taken) |
+| `GET /api/v1/agents/templates` | the same (the templates and their params) |
+| `GET /api/v1/agents/{id}`, `PUT /api/v1/agents/{id}` | `GET, PUT /api/bench/agents/{id}/config` (the YAML, form fields and `sha256`; PUT takes `yaml` or `fields` and an optional `if_match`) |
+| `POST /api/v1/agents/{id}/test` | the same (one sample task to a saved HTTP, OpenAI-compatible or A2A agent: answer, requests sent with secrets masked, raw response, trace) |
 | `GET, POST /api/v1/agents/{id}/versions`, `GET /api/v1/agents/{id}/versions/{n}` | the same under `/api/bench` |
 | `GET /api/v1/agents/{id}/compatibility` | the same |
 | `GET /api/v1/agents/{id}/report-card` | the same |
@@ -43,7 +47,7 @@ Hosted mode: send an organization API token, `Authorization: Bearer hm_...`, mad
 | Scope | Allows |
 |---|---|
 | `read` | every read the role allows |
-| `evaluate` | `read`, plus `POST /evaluations`, `/evaluations/estimate`, `/evaluations/{id}/cancel`, `/estimate`, registering an agent version, and creating, planning, starting, cancelling and resuming experiments |
+| `evaluate` | `read`, plus `POST /evaluations`, `/evaluations/estimate`, `/evaluations/{id}/cancel`, `/estimate`, registering an agent version, testing a saved agent (`POST /agents/{id}/test`), and creating, planning, starting, cancelling and resuming experiments |
 | `admin` | everything the role allows |
 
 A read on a route that needs role admin also needs scope `admin`. Each operation in the OpenAPI document names the scope it needs in `x-heimdall-token-scope`. A token created without a scope gets `admin`; tokens created before scopes existed are limited by their role alone. A refused scope answers 403 `forbidden` naming the scope required.
@@ -58,3 +62,7 @@ A read on a route that needs role admin also needs scope `admin`. Each operation
 6. **What is not covered.** `/api/bench` (the UI's internal API), the worker and runner routes, and the `x-` extensions of the OpenAPI document may change in any release.
 
 Adding a route to v1 means one line in `V1Routes` plus a `RouteDoc` for its bench route; `TestV1RoutesAreServed` (`server/apiv1_test.go`) fails when the bench route is not registered, has no policy entry or no description.
+
+## Agents as code
+
+A CI job keeps agent files in git and pushes them with an `admin` scope token: `POST /api/v1/agents` with `{"yaml": "<file>"}` creates an agent (409 when it exists), `PUT /api/v1/agents/{id}` with `{"yaml": "<file>"}` updates it, `POST /api/v1/agents/{id}/versions` records a version, and `POST /api/v1/agents/{id}/test` checks that an endpoint agent answers (an `evaluate` token is enough for the version and the test). The SDKs wrap these as `create_agent`, `update_agent`, `push_agent` (create or update), `get_agent` and `test_agent` (Python) and `createAgent`, `updateAgent`, `pushAgent`, `getAgent`, `testAgent` (TypeScript).

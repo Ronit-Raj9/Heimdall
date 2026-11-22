@@ -121,6 +121,31 @@ describe("V1Client", () => {
 		await assert.rejects(new V1Client(base, { requireLive: true }).evaluations(), ModeError);
 	});
 
+	it("pushes, tests and reads agents as code", async () => {
+		const doc = "id: support-bot  # the agent\nadapter: remote_http\n";
+		const errReply = (status: number, type: string) => jsonReply(status, { error: { message: type, type } });
+		on("POST", "/api/v1/agents", jsonReply(201, { id: "support-bot", path: "agents/support-bot.yaml" }), errReply(409, "conflict"));
+		on("PUT", "/api/v1/agents/support-bot", jsonReply(200, { id: "support-bot", sha256: "abc" }));
+		on("POST", "/api/v1/agents/support-bot/versions", jsonReply(201, { version: 1, created: true }), jsonReply(200, { version: 2, created: true }));
+		on("POST", "/api/v1/agents/support-bot/test", jsonReply(200, { ok: true, answer: "4", trace: [], notes: [] }));
+		on("GET", "/api/v1/agents/support-bot", jsonReply(200, { id: "support-bot", yaml: doc, sha256: "abc" }));
+		const hd = new V1Client(base, { token: "hm_tok" });
+		const first = await hd.pushAgent(doc, { note: "ci" });
+		assert.deepEqual([first.created, first.version.version], [true, 1]);
+		const second = await hd.pushAgent(doc);
+		assert.deepEqual([second.created, second.version.version], [false, 2]);
+		assert.deepEqual([requests[0]!.method, requests[0]!.url, JSON.parse(requests[0]!.body)], ["POST", "/api/v1/agents", { yaml: doc, id: "support-bot" }]);
+		assert.deepEqual([requests[3]!.method, JSON.parse(requests[3]!.body)], ["PUT", { yaml: doc }]);
+		assert.equal((await hd.testAgent("support-bot")).ok, true);
+		assert.equal((await hd.getAgent("support-bot")).sha256, "abc");
+		on("POST", "/api/v1/agents", jsonReply(200, { id: "x", dry_run: true }));
+		await hd.createAgent({ template: "http-url", id: "x", params: { url: "https://a.example" }, dryRun: true });
+		assert.deepEqual(JSON.parse(requests.at(-1)!.body), { template: "http-url", id: "x", params: { url: "https://a.example" }, dry_run: true });
+		await assert.rejects(hd.pushAgent("adapter: remote_http\n"), /no top-level id/);
+		on("POST", "/api/v1/agents", errReply(400, "bad_request"));
+		await assert.rejects(hd.pushAgent(doc), (err: unknown) => err instanceof HeimdallError && err.status === 400);
+	});
+
 	it("exports traces raw", async () => {
 		on("GET", "/api/v1/runs/r_1/trace?format=jsonl", { status: 200, headers: { "Content-Type": "application/x-ndjson", "X-Bench-Mode": "live" }, body: '{"step":1}\n' });
 		on("GET", "/api/v1/runs/r_1/otlp?payloads=true", { status: 200, headers: { "Content-Type": "application/json", "X-Bench-Mode": "live" }, body: "{}" });

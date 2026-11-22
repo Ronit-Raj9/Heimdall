@@ -54,6 +54,11 @@ type V1Route struct {
 // route's request and response are fit to keep for the life of v1.
 var V1Routes = []V1Route{
 	v1("GET", "/agents", "/agents"),
+	v1("POST", "/agents", "/agents"),                     // Y10: create from YAML or a template
+	v1("GET", "/agents/templates", "/agents/templates"),  // Y10
+	v1("GET", "/agents/{id}", "/agents/{id}/config"),     // Y10: the agent's YAML, fields and sha256
+	v1("PUT", "/agents/{id}", "/agents/{id}/config"),     // Y10: update (yaml or fields, if_match)
+	v1("POST", "/agents/{id}/test", "/agents/{id}/test"), // Y10: one sample task
 	v1("GET", "/agents/{id}/versions", "/agents/{id}/versions"),
 	v1("POST", "/agents/{id}/versions", "/agents/{id}/versions"),
 	v1("GET", "/agents/{id}/versions/{n}", "/agents/{id}/versions/{n}"),

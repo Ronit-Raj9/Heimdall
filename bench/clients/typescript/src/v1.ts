@@ -15,6 +15,11 @@ export const EVALUATION_TERMINAL_STATES: readonly string[] = ["done", "failed", 
 /** Every v1 route the client calls, as [method, OpenAPI path]; the live test checks them against GET /api/v1/openapi.json. */
 export const V1_ROUTES: readonly (readonly [string, string])[] = [
 	["GET", "/api/v1/agents"],
+	["POST", "/api/v1/agents"],
+	["GET", "/api/v1/agents/templates"],
+	["GET", "/api/v1/agents/{id}"],
+	["PUT", "/api/v1/agents/{id}"],
+	["POST", "/api/v1/agents/{id}/test"],
 	["GET", "/api/v1/agents/{id}/versions"],
 	["POST", "/api/v1/agents/{id}/versions"],
 	["GET", "/api/v1/agents/{id}/versions/{n}"],
@@ -299,6 +304,62 @@ export function armScore(report: ReportCard, arm: string): number | null {
 	return runs > 0 ? total / runs : null;
 }
 
+/** Body of POST /api/v1/agents: the agent's YAML, or a template with its params. */
+export type AgentCreate =
+	| { yaml: string; id?: string; dryRun?: boolean }
+	| { template: string; id: string; params?: Record<string, string>; model?: { provider: string; model: string; key_id?: string }; dryRun?: boolean };
+
+/** Answer of POST /api/v1/agents. */
+export interface AgentCreated extends Moded {
+	id: string;
+	path: string;
+	files: string[];
+	yaml: string;
+	dry_run: boolean;
+}
+
+/** Answer of GET and PUT /api/v1/agents/{id}: the agent file and its hash. */
+export interface AgentConfigDoc extends Moded {
+	id: string;
+	path: string;
+	yaml: string;
+	sha256: string;
+	fields: Record<string, unknown>;
+}
+
+/** Answer of POST /api/v1/agents/{id}/test; ok false says why in error. */
+export interface AgentTestResult extends Moded {
+	ok: boolean;
+	adapter?: string;
+	url?: string;
+	status?: number;
+	latency_ms?: number;
+	answer?: string;
+	error?: string;
+	requests?: Record<string, unknown>[];
+	raw_response?: string;
+	reads?: string;
+	trace: { at_ms: number; kind: string; detail: string }[];
+	notes: string[];
+}
+
+/** What pushAgent resolves to. */
+export interface AgentPushed {
+	agent: string;
+	created: boolean;
+	version: Moded & AgentVersionEntry & { created: boolean };
+}
+
+/** The top-level id: of an agent YAML. */
+export function yamlAgentId(doc: string): string {
+	for (const line of doc.split(/\r?\n/)) {
+		if (!line.startsWith("id:")) continue;
+		const v = (line.slice(3).split("#", 1)[0] ?? "").trim().replace(/^['"]|['"]$/g, "");
+		if (v) return v;
+	}
+	throw new Error("the YAML has no top-level id: pass agent");
+}
+
 /** What evaluateAndWait resolves to. */
 export interface EvaluationResult {
 	evaluation: Evaluation;
@@ -318,6 +379,7 @@ class V1Transport extends Client {
 	protected override readonly apiPrefix: string = API_V1_PREFIX;
 	getJSON<T>(path: string, query?: Query, deadline?: number): Promise<T> { return this.get<T>(path, query ? clean(query) : undefined, deadline); }
 	postJSON<T>(path: string, payload: unknown): Promise<T> { return this.post<T>(path, payload); }
+	putJSON<T>(path: string, payload: unknown): Promise<T> { return this.put<T>(path, payload); }
 	getRaw(path: string, query?: Query): Promise<RawResponse> { return this.raw(path, query ? clean(query) : undefined); }
 }
 
@@ -341,6 +403,35 @@ export class V1Client {
 
 	// Agents
 	agents(): Promise<Moded & Record<string, unknown>> { return this.t.getJSON("/agents"); }
+	/** The agent templates and their params (for createAgent with a template). */
+	agentTemplates(): Promise<Moded & Record<string, unknown>> { return this.t.getJSON("/agents/templates"); }
+	/** The agent's YAML, form fields and sha256. */
+	getAgent(agent: string): Promise<AgentConfigDoc> { return this.t.getJSON(`/agents/${seg(agent)}`); }
+	/** Create an agent from its YAML or a template. A taken name rejects with HeimdallError status 409; pushAgent creates or updates. */
+	createAgent(spec: AgentCreate): Promise<AgentCreated> {
+		const { dryRun, ...rest } = spec;
+		if ("yaml" in rest && "template" in rest) throw new Error("pass yaml or template, not both");
+		return this.t.postJSON("/agents", dryRun ? { ...rest, dry_run: true } : rest);
+	}
+	/** Replace the agent's YAML; ifMatch (a sha256 from getAgent) refuses a file changed since. */
+	updateAgent(agent: string, yaml: string, ifMatch?: string): Promise<AgentConfigDoc> {
+		return this.t.putJSON(`/agents/${seg(agent)}`, ifMatch ? { yaml, if_match: ifMatch } : { yaml });
+	}
+	/** Create the agent, or update it when it exists, then record a version (agents as code in CI). */
+	async pushAgent(yaml: string, options: { agent?: string; note?: string } = {}): Promise<AgentPushed> {
+		const agent = options.agent ?? yamlAgentId(yaml);
+		let created = true;
+		try {
+			await this.createAgent({ yaml, id: agent });
+		} catch (err) {
+			if (!(err instanceof HeimdallError) || err.status !== 409) throw err;
+			created = false;
+			await this.updateAgent(agent, yaml);
+		}
+		return { agent, created, version: await this.createAgentVersion(agent, options.note ?? "") };
+	}
+	/** Send the saved agent one sample task. Check ok; error says what failed. */
+	testAgent(agent: string): Promise<AgentTestResult> { return this.t.postJSON(`/agents/${seg(agent)}/test`, {}); }
 	agentVersions(agent: string): Promise<AgentVersionList> { return this.t.getJSON(`/agents/${seg(agent)}/versions`); }
 	agentVersion(agent: string, version: number): Promise<AgentVersionDoc> { return this.t.getJSON(`/agents/${seg(agent)}/versions/${Math.trunc(version)}`); }
 	/** Register the agent's current config as a new version (created false when unchanged). */

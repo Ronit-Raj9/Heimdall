@@ -350,6 +350,11 @@ export class Client {
 		return this.json<T>(res, "POST", path);
 	}
 
+	protected async put<T>(path: string, payload: unknown): Promise<T> {
+		const res = await this.request("PUT", path, undefined, payload);
+		return this.json<T>(res, "PUT", path);
+	}
+
 	protected async raw(path: string, query?: Query): Promise<RawResponse> {
 		const res = await this.request("GET", path, query);
 		const mode = res.headers.get(MODE_HEADER) ?? "";
@@ -384,7 +389,7 @@ export class Client {
 	 * after the headers is a timeout like a late answer, with the same retry rules. deadline (epoch
 	 * ms), when given, also caps every attempt and the waits between them.
 	 */
-	private async request(method: "GET" | "POST", path: string, query?: Query, payload?: unknown, deadline?: number): Promise<Answer> {
+	private async request(method: "GET" | "POST" | "PUT", path: string, query?: Query, payload?: unknown, deadline?: number): Promise<Answer> {
 		let url = this.baseUrl + this.apiPrefix + path;
 		const params = new URLSearchParams();
 		for (const [k, v] of Object.entries(query ?? {})) {
@@ -395,7 +400,7 @@ export class Client {
 		const headers: Record<string, string> = { Accept: "application/json" };
 		if (this.token) headers.Authorization = `Bearer ${this.token}`;
 		let body: string | undefined;
-		if (method === "POST") {
+		if (method === "POST" || method === "PUT") {
 			if (typeof payload === "string") {
 				body = payload;
 				headers["Content-Type"] = "application/yaml";
