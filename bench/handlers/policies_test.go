@@ -113,3 +113,28 @@ func TestPoliciesRejects(t *testing.T) {
 		t.Fatalf("nil store: %d", ctx.Response.StatusCode())
 	}
 }
+
+// Saving a new rule set never overwrites an existing file: create_only
+// answers 409 and leaves the file as it was (N6).
+func TestPutPolicyCreateOnlyRefusesExisting(t *testing.T) {
+	h, root := newPoliciesHandler(t)
+	path := filepath.Join(root, "policies", "my-release-policy.yaml")
+	if err := os.WriteFile(path, []byte(testPolicyYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	other := strings.Replace(testPolicyYAML, "name: tiny", "name: other", 1)
+	ctx := callPolicy(h.put, "PUT", "my-release-policy.yaml", PolicySaveRequest{YAML: other, CreateOnly: true})
+	if ctx.Response.StatusCode() != fasthttp.StatusConflict {
+		t.Fatalf("create_only on an existing file: %d %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	if !strings.Contains(string(ctx.Response.Body()), "A rule set named my-release-policy already exists. Pick another file name.") {
+		t.Fatalf("body %s", ctx.Response.Body())
+	}
+	if b, _ := os.ReadFile(path); string(b) != testPolicyYAML {
+		t.Fatalf("file changed: %q", b)
+	}
+	ctx = callPolicy(h.put, "PUT", "my-release-policy-2.yaml", PolicySaveRequest{YAML: other, CreateOnly: true})
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("create_only on a new file: %d %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+}

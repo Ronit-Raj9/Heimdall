@@ -165,3 +165,120 @@ func TestBuildStatusEvaluationID(t *testing.T) {
 		t.Fatalf("evaluation_id %q, want the manifest's evaluation", st.EvaluationID)
 	}
 }
+
+// A replay, fork or step run says which debug mode made it and from which
+// run, so lists can hide it and tag it (N29, S-A1).
+func TestBuildStatusCarriesDebugMode(t *testing.T) {
+	m := *testIndex().manifests[testExp]
+	if st := BuildStatus(&m, nil, StatusFacts{}); st.Debug != "" || st.DebugFromRun != "" {
+		t.Fatalf("debug %q from %q on a plain experiment", st.Debug, st.DebugFromRun)
+	}
+	m.Experiment.Debug = &schemas.DebugSpec{Mode: "replay", FromRun: "r_1"}
+	if st := BuildStatus(&m, nil, StatusFacts{}); st.Debug != "replay" || st.DebugFromRun != "r_1" {
+		t.Fatalf("debug %q from %q, want replay from r_1", st.Debug, st.DebugFromRun)
+	}
+}
+
+// multi_agent is set only when an arm runs a team or a multi-agent
+// topology, so Compute blame is offered only there (N63).
+func TestBuildStatusMultiAgent(t *testing.T) {
+	m := *testIndex().manifests[testExp]
+	if st := BuildStatus(&m, nil, StatusFacts{}); st.MultiAgent {
+		t.Fatal("single-agent experiment reads multi_agent")
+	}
+	arms := map[string]schemas.ArmManifest{"A": m.Arms["A"], "B": m.Arms["B"]}
+	b := arms["B"]
+	b.Config.Topology = "single"
+	arms["B"] = b
+	m.Arms = arms
+	if st := BuildStatus(&m, nil, StatusFacts{}); st.MultiAgent {
+		t.Fatal("topology single reads multi_agent")
+	}
+	b.Config.Team = []schemas.TeamMember{{ID: "lead"}, {ID: "worker"}}
+	arms["B"] = b
+	if st := BuildStatus(&m, nil, StatusFacts{}); !st.MultiAgent {
+		t.Fatal("team arm does not read multi_agent")
+	}
+	b.Config.Team, b.Config.Topology = nil, "orchestrator_worker"
+	arms["B"] = b
+	if st := BuildStatus(&m, nil, StatusFacts{}); !st.MultiAgent {
+		t.Fatal("orchestrator_worker topology does not read multi_agent")
+	}
+}
+
+// setups names each arm's agent, agent file and model, sorted by arm, so the
+// Actions forms start from the comparison's own setup (N66).
+func TestBuildStatusSetups(t *testing.T) {
+	m := *testIndex().manifests[testExp]
+	m.Experiment.Base = "agents/codex.yaml"
+	m.Experiment.Arms = map[string]schemas.ArmSpec{"A": {Label: "a"}, "B": {Label: "b", Agent: "agents/claude.yaml"}}
+	m.Arms = map[string]schemas.ArmManifest{
+		"B": {Config: schemas.AgentConfig{ID: "claude-code", Model: "claude-x"}},
+		"A": {Config: schemas.AgentConfig{ID: "codex", Model: "gpt-6-luna"}},
+	}
+	st := BuildStatus(&m, nil, StatusFacts{})
+	want := []schemas.ArmSetup{
+		{Arm: "A", Agent: "codex", AgentFile: "agents/codex.yaml", Model: "gpt-6-luna"},
+		{Arm: "B", Agent: "claude-code", AgentFile: "agents/claude.yaml", Model: "claude-x"},
+	}
+	if fmt.Sprint(st.Setups) != fmt.Sprint(want) {
+		t.Fatalf("setups %+v, want %+v", st.Setups, want)
+	}
+}
+
+// arms_differ: two arms of the same agent version on different models read
+// model, on the same model none (A/A); a changed agent reads agent (N165).
+func TestStatusArmsDifferModel(t *testing.T) {
+	m := *testIndex().manifests[testExp]
+	cfg := schemas.AgentConfig{ID: "codex", Image: "img", Model: "gpt-6-luna"}
+	other := cfg
+	other.Model = "gpt-6-sol"
+	m.Arms = map[string]schemas.ArmManifest{"A": {Config: cfg}, "B": {Config: other}}
+	if st := BuildStatus(&m, nil, StatusFacts{}); st.ArmsDiffer != "model" {
+		t.Fatalf("arms_differ %q, want model", st.ArmsDiffer)
+	}
+	other.Model, other.Gateway.Provider = cfg.Model, "openrouter"
+	m.Arms = map[string]schemas.ArmManifest{"A": {Config: cfg}, "B": {Config: other}}
+	if st := BuildStatus(&m, nil, StatusFacts{}); st.ArmsDiffer != "model" {
+		t.Fatalf("provider change: arms_differ %q, want model", st.ArmsDiffer)
+	}
+	m.Arms = map[string]schemas.ArmManifest{"A": {Config: cfg}, "B": {Config: cfg}}
+	if st := BuildStatus(&m, nil, StatusFacts{}); st.ArmsDiffer != "none" {
+		t.Fatalf("A/A: arms_differ %q, want none", st.ArmsDiffer)
+	}
+	m.Arms = map[string]schemas.ArmManifest{"A": {Config: cfg}}
+	if st := BuildStatus(&m, nil, StatusFacts{}); st.ArmsDiffer != "" {
+		t.Fatalf("one arm: arms_differ %q, want empty", st.ArmsDiffer)
+	}
+}
+
+func TestStatusArmsDifferAgent(t *testing.T) {
+	m := *testIndex().manifests[testExp]
+	cfg := schemas.AgentConfig{ID: "codex", Image: "img", Model: "gpt-6-luna"}
+	other := cfg
+	other.Image = "img2"
+	m.Arms = map[string]schemas.ArmManifest{"A": {Config: cfg}, "B": {Config: other}}
+	if st := BuildStatus(&m, nil, StatusFacts{}); st.ArmsDiffer != "agent" {
+		t.Fatalf("arms_differ %q, want agent", st.ArmsDiffer)
+	}
+}
+
+// With no runs, an ended run job and a run problem (every worker refused,
+// or no slot could start) the comparison reads failed with the problem, not
+// "created" with "Waiting for the first run to start" (N151).
+func TestStatusFailedWithRunProblem(t *testing.T) {
+	m := testIndex().manifests[testExp]
+	st := BuildStatus(m, nil, StatusFacts{Problem: "The worker's copy of your project does not have this benchmark yet.", RunJobID: "job_1"})
+	if st.State != schemas.ExperimentFailed || st.Problem == "" || st.RunJobID != "job_1" {
+		t.Fatalf("state %s problem %q job %q, want failed with the problem", st.State, st.Problem, st.RunJobID)
+	}
+	if st := BuildStatus(m, nil, StatusFacts{Problem: "x", Active: true}); st.State != schemas.ExperimentRunning {
+		t.Fatalf("active job: state %s, want running", st.State)
+	}
+	if st := BuildStatus(m, nil, StatusFacts{Problem: "x", Cancelled: true}); st.State != schemas.ExperimentCancelled {
+		t.Fatalf("cancelled job: state %s, want cancelled", st.State)
+	}
+	if st := BuildStatus(m, nil, StatusFacts{}); st.State != schemas.ExperimentCreatedState {
+		t.Fatalf("no problem: state %s, want created", st.State)
+	}
+}

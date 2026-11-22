@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -53,10 +54,11 @@ func (c *Coordinator) noteRefusalLocked(l *remoteLease, reason string) string {
 	}
 	f.reason, f.at = reason, c.now()
 	f.n++
+	plain := PlainRefusal(reason)
 	if f.n >= maxRefusals {
-		return fmt.Sprintf("worker %s could not take this run: %s. It refused it %d times, so Heimdall stops offering it to this worker.", l.worker, reason, f.n)
+		return fmt.Sprintf("worker %s could not take this run: %s. It refused it %d times, so Heimdall stops offering it to this worker.", l.worker, plain, f.n)
 	}
-	return fmt.Sprintf("worker %s could not take this run: %s. Heimdall offers it again in 1 minute.", l.worker, reason)
+	return fmt.Sprintf("worker %s could not take this run: %s. Heimdall offers it again in 1 minute.", l.worker, plain)
 }
 
 // everyWorkerRefusedLocked reports whether no worker is left for r: every
@@ -85,10 +87,30 @@ func (c *Coordinator) everyWorkerRefusedLocked(r *schedRun) bool {
 
 // failRefused ends every queued slot of r with the last refusal reason.
 func (r *schedRun) failRefused(reason string) {
-	err := fmt.Errorf("every worker refused this run %d times: %s", maxRefusals, reason)
+	err := fmt.Errorf("every worker refused this run %d times: %s", maxRefusals, PlainRefusal(reason))
 	for _, slot := range r.queue.takeAll() {
 		r.slotError(slot, err)
 	}
+}
+
+// PlainRefusal says a worker's refusal reason in plain words where a person
+// can act on it, and keeps the raw reason after "Details: " (fix wave 2,
+// N151): a benchmark missing from the worker's project copy, a benchmark
+// changed after the run was planned, or a worker on another Heimdall
+// version. Any other reason is returned as is.
+func PlainRefusal(reason string) string {
+	var plain string
+	switch {
+	case strings.HasPrefix(reason, "load suite") && strings.Contains(reason, "not found"):
+		plain = "The worker's copy of your project does not have this benchmark yet."
+	case strings.Contains(reason, "manifest hashes to"), strings.Contains(reason, "suite lock hash"):
+		plain = "The benchmark changed after this run was planned: start it again."
+	case strings.Contains(reason, "part versions differ"):
+		plain = "The worker runs a different Heimdall version than the server."
+	default:
+		return reason
+	}
+	return plain + " Details: " + reason
 }
 
 // refusalFresh reports whether a worker's cached refusal may still be
