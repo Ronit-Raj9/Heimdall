@@ -1,12 +1,15 @@
 import { MigrationReportView } from "@/components/migration/migrationReport";
+import { ApplyPanel } from "@/components/modelswitch/applyPanel";
 import { ModeBadge } from "@/components/modeBadge";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
 import { cn } from "@/lib/utils";
 import type { MigrationParams, MigrationResponse } from "@/lib/types/bench";
 import { useGetMigrationQuery } from "@/lib/store/apis/migrationApi";
+import { useGetModelSwitchConfigQuery } from "@/lib/store/apis/modelSwitchApi";
 import { parseAsString, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
+import "./fw11I18n";
 
 /**
  * The Migration tab (docs/model-migration.md): moving from one arm to the others. ?from= is one arm
@@ -25,7 +28,7 @@ export function migrationParams(
 	return out;
 }
 
-export function MigrationTab({ expId, arms }: { expId: string; arms: readonly string[] }) {
+export function MigrationTab({ expId, arms, evaluationId }: { expId: string; arms: readonly string[]; evaluationId?: string }) {
 	const { t } = useTranslation("bench");
 	const [from, setFrom] = useQueryState("from", parseAsString);
 	const [to, setTo] = useQueryState("to", parseAsString);
@@ -90,8 +93,43 @@ export function MigrationTab({ expId, arms }: { expId: string; arms: readonly st
 			) : (
 				<MigrationReportView report={current} />
 			)}
+			{evaluationId && arms.length >= 2 && <MigrationApply evaluationId={evaluationId} />}
 		</div>
 	);
+}
+
+/** The server's error.message of an RTK Query error, else "". */
+function errorText(error: unknown): string {
+	const e = error as { data?: { error?: { message?: string } } } | undefined;
+	return e?.data?.error?.message ?? "";
+}
+
+/**
+ * "Apply to my Bifrost" for a comparison an evaluation made: the same panel as the evaluation's
+ * model switch report. The server builds the routing rules only for two or more models of one
+ * agent and answers 400 "not a model comparison" otherwise, which is shown instead of the panel.
+ */
+export function MigrationApply({ evaluationId }: { evaluationId: string }) {
+	const { t } = useTranslation("fw11");
+	const q = useGetModelSwitchConfigQuery({ id: evaluationId, options: {} });
+	if (q.isLoading) {
+		return (
+			<p className="text-muted-foreground text-sm" data-testid="migration-apply-loading">
+				{t("apply.loading")}
+			</p>
+		);
+	}
+	if (q.error || !q.data) {
+		const reason = errorText(q.error);
+		if (!reason) return null;
+		return (
+			<p className="text-muted-foreground rounded-lg border px-4 py-3 text-sm" role="note" data-testid="migration-apply-unavailable">
+				{t("apply.unavailable", { reason })}
+			</p>
+		);
+	}
+	if (!q.data.ready) return null;
+	return <ApplyPanel evaluationId={evaluationId} ruleCount={q.data.config.governance.routing_rules.length} />;
 }
 
 /** The settings the rendered report was built with, read from the response, never from the URL. */

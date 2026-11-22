@@ -1,4 +1,5 @@
 import "./builderI18n";
+import "@/app/experiments_/$expId/views/fw11I18n";
 
 import { readWriteToken, saveWriteToken } from "@/components/experiments/experiments.utils";
 import { EstimateBox } from "@/components/experiments/estimateBox";
@@ -16,19 +17,21 @@ import {
 	usePlanExperimentMutation,
 	useStartExperimentMutation,
 } from "@/lib/store/apis/benchApi";
-import type { Catalog, Experiment, ExperimentPlan } from "@/lib/types/bench";
+import type { Catalog, CatalogAgent, Experiment, ExperimentPlan } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { ChevronDown, Plus, X } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { suiteRef } from "./experimentFormSchema";
 import {
+	builderAgentGroups,
 	builderPlanIsStale,
 	catalogAgent,
 	guessProvider,
 	matrixPreview,
 	toMatrixExperiment,
 	validateBuilder,
+	type BuilderAgentIds,
 	type BuilderErrorKey,
 	type BuilderValues,
 } from "./matrixBuilderSchema";
@@ -36,13 +39,16 @@ import {
 export interface MatrixBuilderProps {
 	catalog: Catalog;
 	defaults: BuilderValues;
+	/** The agent ids My agents lists (GET /agents split by splitAgents); absent lists every catalog agent. */
+	agentGroups?: BuilderAgentIds;
 	/** Called once the experiment is created and started (or created with a failed start), with its id and cap. */
 	onStarted: (expId: string, capUsd: number) => void;
 }
 
 /** The no-YAML builder: agents x models x suite, adaptive toggle, preview, estimate, plan and run. */
-export function MatrixBuilder({ catalog, defaults, onStarted }: MatrixBuilderProps) {
+export function MatrixBuilder({ catalog, defaults, agentGroups, onStarted }: MatrixBuilderProps) {
 	const { t } = useTranslation("builder");
+	const { t: tf } = useTranslation("fw11");
 	const [v, setV] = useState<BuilderValues>(defaults);
 	const [touched, setTouched] = useState(false);
 	const [token, setToken] = useState(readWriteToken);
@@ -71,6 +77,33 @@ export function MatrixBuilder({ catalog, defaults, onStarted }: MatrixBuilderPro
 	const extrasError = Boolean(shown.adaptiveMin || shown.concurrency || shown.seed);
 	const set = <K extends keyof BuilderValues>(k: K, value: BuilderValues[K]) => setV((prev) => ({ ...prev, [k]: value }));
 
+	// The agents My agents shows: the org's own, then the built-in ones; a chosen agent stays listed.
+	const listed = useMemo(() => {
+		const g = builderAgentGroups(catalog, agentGroups);
+		const known = new Set([...g.yours, ...g.builtIn].map((a) => a.path));
+		const extra = catalog.agents.filter((a) => v.agents.includes(a.path) && !known.has(a.path));
+		return { yours: [...g.yours, ...extra], builtIn: g.builtIn };
+	}, [catalog, agentGroups, v.agents]);
+	const agentChoice = (a: CatalogAgent) => {
+		const on = v.agents.includes(a.path);
+		return (
+			<li key={a.path}>
+				<label
+					className={cn("flex cursor-pointer items-center gap-2 rounded-sm border px-3 py-2 text-sm", on && "border-primary bg-primary/10")}
+				>
+					<input
+						type="checkbox"
+						className="accent-primary size-4"
+						checked={on}
+						onChange={(e) => toggleAgent(a.path, e.target.checked)}
+						data-testid={`builder-agent-${a.id}`}
+					/>
+					<span className="font-mono">{a.id}</span>
+					{a.model && <span className="text-muted-foreground text-xs">{t("fields.agentModel", { model: a.model })}</span>}
+				</label>
+			</li>
+		);
+	};
 	const needsToken = tokenBox && !token.trim();
 	const stale = planned !== null && builderPlanIsStale(planned.experiment, v, catalog);
 	const busy = createState.isLoading || startState.isLoading;
@@ -190,31 +223,18 @@ export function MatrixBuilder({ catalog, defaults, onStarted }: MatrixBuilderPro
 
 				<Step n={2} title={t("steps.who")} hint={t("steps.whoHint")}>
 					<SubSection title={t("sections.agents")} description={t("sections.agentsHint")} error={shown.agents}>
+						{agentGroups && <p className="text-muted-foreground text-xs font-medium">{tf("builder.yourAgents")}</p>}
 						<ul className="flex flex-wrap gap-2" data-testid="builder-agents">
-							{catalog.agents.map((a) => {
-								const on = v.agents.includes(a.path);
-								return (
-									<li key={a.path}>
-										<label
-											className={cn(
-												"flex cursor-pointer items-center gap-2 rounded-sm border px-3 py-2 text-sm",
-												on && "border-primary bg-primary/10",
-											)}
-										>
-											<input
-												type="checkbox"
-												className="accent-primary size-4"
-												checked={on}
-												onChange={(e) => toggleAgent(a.path, e.target.checked)}
-												data-testid={`builder-agent-${a.id}`}
-											/>
-											<span className="font-mono">{a.id}</span>
-											{a.model && <span className="text-muted-foreground text-xs">{t("fields.agentModel", { model: a.model })}</span>}
-										</label>
-									</li>
-								);
-							})}
+							{listed.yours.map((a) => agentChoice(a))}
 						</ul>
+						{listed.builtIn.length > 0 && (
+							<>
+								<p className="text-muted-foreground text-xs font-medium">{tf("builder.builtInAgents")}</p>
+								<ul className="flex flex-wrap gap-2" data-testid="builder-agents-builtin">
+									{listed.builtIn.map((a) => agentChoice(a))}
+								</ul>
+							</>
+						)}
 					</SubSection>
 					<SubSection title={t("sections.models")} description={t("sections.modelsHint")} error={shown.models}>
 						<ul className="flex flex-col gap-2" data-testid="builder-models">

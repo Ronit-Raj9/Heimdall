@@ -95,7 +95,17 @@ describe("GateResultCard and RepeatEvaluation", () => {
 					agent: "codex",
 					candidate: "B",
 					baseline: { agent: "codex", version: 3, live: true },
-					checks: [{ capability: "terminal", rule: "max_regression", threshold: 0.05, observed: 0.3, baseline: 0.5, pass: false, summary: "terminal fell from 50% to 30%" }],
+					checks: [
+						{
+							capability: "terminal",
+							rule: "max_regression",
+							threshold: 0.05,
+							observed: 0.3,
+							baseline: 0.5,
+							pass: false,
+							summary: "terminal fell from 50% to 30%",
+						},
+					],
 					summary: "Gate failed: terminal fell from 50% to 30%",
 					decided_at: "2026-11-20T11:00:00Z",
 				}}
@@ -148,5 +158,26 @@ describe("GateResultCard and RepeatEvaluation", () => {
 		const html = render(<RepeatEvaluation evaluationId="ev_1" />);
 		expect(html).toContain('data-testid="evaluation-repeat-nightly"');
 		expect(html).toContain("Repeat weekly");
+	});
+});
+
+describe("PromoteEvaluation says why there is no button (J7.promote)", () => {
+	it("tells a viewer and a demo visitor that only members promote", async () => {
+		const { demoSession, hostedSession } = await import("@/lib/testing/platformFixtures");
+		previewHook.mockReturnValue(okQuery(preview));
+		for (const session of [hostedSession("viewer"), demoSession()]) {
+			const html = render(<PromoteEvaluation evaluationId="ev_1" />, session);
+			expect(html).not.toContain('data-testid="evaluation-promote-open"');
+			expect(html).toContain('data-testid="evaluation-promote-why"');
+			expect(html).toContain("Only members of the organization can promote.");
+		}
+	});
+	it("gives the problem as the reason and no members note to a member", async () => {
+		const { hostedSession } = await import("@/lib/testing/platformFixtures");
+		previewHook.mockReturnValue(okQuery({ ...preview, problem: "codex v4 is already the live version" }));
+		const html = render(<PromoteEvaluation evaluationId="ev_1" />, hostedSession("member"));
+		expect(html).not.toContain('data-testid="evaluation-promote-open"');
+		expect(html).toContain("codex v4 is already the live version");
+		expect(html).not.toContain("Only members of the organization can promote.");
 	});
 });

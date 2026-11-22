@@ -3,9 +3,13 @@ import { Input } from "@/components/ui/input";
 import type { ExperimentRegradeRequest } from "@/lib/types/bench";
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "@/app/experiments_/$expId/views/fw11I18n";
 
-/** The regrade id rule the server enforces (ops.ValidID); "original" and "reviewed" are reserved grade sources. */
-const REGRADE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+/**
+ * The regrade id rule the store enforces (store.ValidRegradeID: ^[a-z0-9_]+$, at most 128 characters);
+ * "original" and "reviewed" are reserved grade sources.
+ */
+const REGRADE_ID = /^[a-z0-9_]{1,128}$/;
 const RESERVED_IDS = new Set(["original", "reviewed"]);
 /** The server refuses a longer note. */
 export const MAX_REGRADE_NOTE = 2000;
@@ -35,6 +39,16 @@ export function regradeFormProblem(v: RegradeFormValues): "badId" | "reservedId"
 	return null;
 }
 
+/**
+ * The name the store would accept for id: lower case, "-" and "." turned into "_". Null when that
+ * still breaks the rule or changes nothing.
+ */
+export function suggestRegradeId(id: string): string | null {
+	const trimmed = id.trim();
+	const next = trimmed.toLowerCase().replace(/[-.]/g, "_");
+	return next !== trimmed && REGRADE_ID.test(next) && !RESERVED_IDS.has(next) ? next : null;
+}
+
 /** The POST /experiments/{id}/regrade body: only the options the user set. */
 export function regradeRequest(v: RegradeFormValues): ExperimentRegradeRequest {
 	const body: ExperimentRegradeRequest = {};
@@ -46,6 +60,8 @@ export function regradeRequest(v: RegradeFormValues): ExperimentRegradeRequest {
 
 export interface RegradeDialogProps {
 	expId: string;
+	/** The form to open with (tests); empty by default. */
+	initial?: RegradeFormValues;
 	isLoading?: boolean;
 	onSubmit(body: ExperimentRegradeRequest): void;
 	onClose(): void;
@@ -56,9 +72,11 @@ export interface RegradeDialogProps {
  * a note every report shows, an optional regrade id that becomes the verdict's grade source).
  * Submitting queues the experiment.regate job; the caller shows its log.
  */
-export function RegradeDialog({ expId, isLoading, onSubmit, onClose }: RegradeDialogProps) {
+export function RegradeDialog({ expId, initial, isLoading, onSubmit, onClose }: RegradeDialogProps) {
 	const { t } = useTranslation("platform");
-	const [v, setV] = useState<RegradeFormValues>(EMPTY_REGRADE_FORM);
+	const { t: tf } = useTranslation("fw11");
+	const [v, setV] = useState<RegradeFormValues>(initial ?? EMPTY_REGRADE_FORM);
+	const suggestion = suggestRegradeId(v.id);
 	const titleId = useId();
 	const problem = regradeFormProblem(v);
 	useEffect(() => {
@@ -134,7 +152,19 @@ export function RegradeDialog({ expId, isLoading, onSubmit, onClose }: RegradeDi
 					<Input value={v.id} onChange={(e) => setV({ ...v, id: e.target.value })} placeholder="rg_gates_v2" data-testid="regrade-id" />
 					<span className="text-muted-foreground">{t("experimentActions.regradeDialog.idHint")}</span>
 				</label>
-				{problem && (v.id || v.lockChoice === "frozen" || v.note) && (
+				{problem === "badId" && (
+					<div className="flex flex-wrap items-center gap-2 text-xs" data-testid="regrade-id-problem">
+						<span role="alert" className="text-chart-error-ink">
+							{tf("regrade.badId", { id: v.id.trim() })}
+						</span>
+						{suggestion && (
+							<Button type="button" variant="outline" size="sm" onClick={() => setV({ ...v, id: suggestion })} dataTestId="regrade-id-fix">
+								{tf("regrade.useSuggestion", { id: suggestion })}
+							</Button>
+						)}
+					</div>
+				)}
+				{problem && problem !== "badId" && (v.id || v.lockChoice === "frozen" || v.note) && (
 					<p role="alert" className="text-chart-error-ink text-xs" data-testid="regrade-problem">
 						{t(`experimentActions.regradeDialog.problems.${problem}`)}
 					</p>
