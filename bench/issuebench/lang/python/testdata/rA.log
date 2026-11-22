@@ -1,0 +1,17 @@
+============================= test session starts ==============================
+collected 6 items
+
+tests/test_core.py ..F.sx                                                [100%]
+
+=================================== FAILURES ===================================
+___________________________________ test_sub ___________________________________
+E       AssertionError: assert 1 == 2
+=========================== short test summary info ============================
+PASSED tests/test_core.py::test_zero
+PASSED tests/test_core.py::test_add[a b]
+PASSED ./tests/test_core.py::TestMath::test_mul[2-4]
+SKIPPED [1] tests/test_core.py:30: needs network
+XFAIL tests/test_core.py::test_known - reason: bug 12
+FAILED tests/test_core.py::test_sub - AssertionError: assert 1 == 2
+ERROR tests/test_core.py::test_db - fixture 'db' not found
+========== 1 failed, 3 passed, 1 skipped, 1 xfailed, 1 error in 0.12s ==========
