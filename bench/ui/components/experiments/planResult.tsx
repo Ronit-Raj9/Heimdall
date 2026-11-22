@@ -1,4 +1,5 @@
-import { ValueCell } from "@/components/valueCell";
+import "@/app/experiments_/new/views/builderI18n";
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getLocale } from "@/lib/i18n";
 import type { ExperimentPlan } from "@/lib/types/bench";
@@ -13,10 +14,21 @@ export function planBlocksStart(plan: Pick<ExperimentPlan, "errors">): boolean {
 
 /**
  * POST /experiments/plan, shown before anything runs: blocking errors first, then warnings,
- * sizes, the minimal detectable effect with its assumed-SD note, and estimated time and cost.
+ * sizes and the minimal detectable effect with its assumed-SD note. The plan never knows time or cost
+ * (no run has happened), so it points at the Estimate instead of printing unknowns (N41).
+ * estimateShown: the page shows an estimate of this same experiment.
  */
-export function PlanResult({ plan, className }: { plan: ExperimentPlan; className?: string }) {
+export function PlanResult({
+	plan,
+	className,
+	estimateShown = false,
+}: {
+	plan: ExperimentPlan;
+	className?: string;
+	estimateShown?: boolean;
+}) {
 	const { t } = useTranslation("bench");
+	const { t: tb } = useTranslation("builder");
 	const locale = getLocale();
 	const pp = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(plan.mde);
 	const sd = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(plan.sd);
@@ -75,12 +87,6 @@ export function PlanResult({ plan, className }: { plan: ExperimentPlan; classNam
 				<Stat label={t("experiments.new.plan.pairs")} testId="plan-pairs">
 					<span className="tabular-nums">{plan.pairs}</span>
 				</Stat>
-				<Stat label={t("experiments.new.plan.estTime")} testId="plan-est-time">
-					<ValueCell value={plan.est_wall_s} kind="duration" testId="plan-est-time-value" />
-				</Stat>
-				<Stat label={t("experiments.new.plan.estCost")} testId="plan-est-cost">
-					<ValueCell value={plan.est_usd} kind="usd" testId="plan-est-cost-value" />
-				</Stat>
 				<Stat label={t("experiments.new.plan.mde")} testId="plan-mde" className="col-span-2">
 					<span className="tabular-nums">{t("experiments.new.plan.mdeValue", { value: pp })}</span>
 					<span
@@ -91,6 +97,9 @@ export function PlanResult({ plan, className }: { plan: ExperimentPlan; classNam
 					</span>
 				</Stat>
 			</dl>
+			<p className="text-muted-foreground text-xs" data-testid="plan-time-cost">
+				{estimateShown ? tb("plan.timeCostSee") : tb("plan.timeCostPress")}
+			</p>
 
 			{plan.conditions.length > 0 && (
 				<div className="flex flex-col gap-1.5">

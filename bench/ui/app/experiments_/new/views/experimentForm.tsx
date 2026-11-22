@@ -1,3 +1,6 @@
+import "./builderI18n";
+import "@/app/experiments_/$expId/views/fw11I18n";
+
 import { readWriteToken, saveWriteToken } from "@/components/experiments/experiments.utils";
 import { useSession, usesWriteToken } from "@/lib/session/sessionContext";
 import { PlanResult, planBlocksStart } from "@/components/experiments/planResult";
@@ -6,13 +9,22 @@ import { LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateExperimentMutation, usePlanExperimentMutation, useStartExperimentMutation } from "@/lib/store/apis/benchApi";
-import type { Catalog, Experiment, ExperimentPlan } from "@/lib/types/bench";
+import type { Catalog, CatalogAgent, Experiment, ExperimentPlan } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useId, useState } from "react";
-import { Controller, useFieldArray, useForm, useWatch, type Control, type FieldError, type UseFormRegister } from "react-hook-form";
+import {
+	Controller,
+	useFieldArray,
+	useForm,
+	useWatch,
+	type Control,
+	type FieldError,
+	type FieldErrors,
+	type UseFormRegister,
+} from "react-hook-form";
 import { catalogProbeFor, probeLayerLabel } from "@/components/receipts/receipts.utils";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
@@ -25,12 +37,30 @@ import {
 	type ExperimentFormValues,
 	type ValidationKey,
 } from "./experimentFormSchema";
+import { builderAgentGroups, readyIds, someNotReady, type BuilderAgentIds, type ReadyTasks } from "./matrixBuilderSchema";
+import { PlanInvalidAlert, invalidFields, type FormFieldName } from "./planInvalid";
+import { SuiteMenuItems } from "./suiteOptions";
 
 export interface ExperimentFormProps {
 	catalog: Catalog;
 	defaults: ExperimentFormValues;
+	/** Ready tasks per benchmark (GET /suites): "all tasks" sends only these (N42). Absent counts every task. */
+	ready?: ReadyTasks;
+	/** The agent ids My agents lists (GET /agents split by splitAgents); absent lists every catalog agent. */
+	agentGroups?: BuilderAgentIds;
 	/** Called once the experiment is created and started, with its id and spend cap. */
 	onStarted: (expId: string, capUsd: number) => void;
+}
+
+/** Brings a form field into view and focuses it when it can take focus (N43). */
+function revealField(name: FormFieldName, setFocus: (name: FormFieldName) => void) {
+	try {
+		setFocus(name);
+	} catch {
+		// A field without a focusable element (the conditions list) is only scrolled to.
+	}
+	if (typeof document === "undefined") return;
+	document.querySelector(`[data-form-field="${name}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
 }
 
 interface Planned {
@@ -39,10 +69,11 @@ interface Planned {
 }
 
 /** The experiment form, the planner and the create-and-start action. */
-export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormProps) {
+export function ExperimentForm({ catalog, defaults, ready, agentGroups, onStarted }: ExperimentFormProps) {
 	const { t } = useTranslation("bench");
+	const { t: tf } = useTranslation("fw11");
 	const form = useForm<ExperimentFormValues>({ resolver: zodResolver(experimentFormSchema), defaultValues: defaults, mode: "onTouched" });
-	const { control, register, handleSubmit, setValue, formState } = form;
+	const { control, register, handleSubmit, setValue, setFocus, formState } = form;
 	const values = useWatch({ control });
 	const [token, setToken] = useState(readWriteToken);
 	// Hosted mode has no token box: the session cookie and its CSRF header authorise the writes.
@@ -54,7 +85,10 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 	const [create, createState] = useCreateExperimentMutation();
 	const [start, startState] = useStartExperimentMutation();
 
-	const stale = planned !== null && planIsStale(planned.experiment, values);
+	const stale = planned !== null && planIsStale(planned.experiment, values, ready);
+	// N43: after a Plan press, every field still to fix is named next to the button.
+	const invalid = formState.isSubmitted ? invalidFields(formState.errors) : [];
+	const focusField = (name: FormFieldName) => revealField(name, setFocus);
 	const busy = createState.isLoading || startState.isLoading;
 	// Local mode: plan, estimate, create and start are all writes behind the token, so it is asked first.
 	const needsToken = tokenBox && !token.trim();
@@ -68,9 +102,14 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 					? t("experiments.new.actions.blocked")
 					: null;
 
+	const onInvalid = (errors: FieldErrors<ExperimentFormValues>) => {
+		const first = invalidFields(errors)[0];
+		if (first) focusField(first);
+	};
+
 	const onPlan = handleSubmit(async (formValues) => {
 		if (needsToken) return;
-		const experiment = toExperiment(formValues);
+		const experiment = toExperiment(formValues, ready);
 		setActionError(null);
 		setPlanned(null);
 		try {
@@ -79,7 +118,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 		} catch {
 			// planState.error renders the failure.
 		}
-	});
+	}, onInvalid);
 
 	const onCreateAndStart = async () => {
 		if (!planned || blockReason) return;
@@ -103,6 +142,18 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 	};
 
 	const suite = catalog.suites.find((s) => suiteRef(s) === values.suite);
+	// The base agent menu lists what My agents shows (the org's own, then built-in); a chosen agent stays listed.
+	const agentMenu = (() => {
+		const g = builderAgentGroups(catalog, agentGroups);
+		const known = new Set([...g.yours, ...g.builtIn].map((a) => a.path));
+		const extra = (catalog.agents ?? []).filter((a) => a.path === values.base && !known.has(a.path));
+		return { yours: [...g.yours, ...extra], builtIn: g.builtIn };
+	})();
+	const agentItem = (agent: CatalogAgent) => (
+		<SelectItem key={agent.path} value={agent.path} data-testid={`experiment-base-option-${agent.id}`}>
+			{t("experiments.new.fields.baseOption", { id: agent.id, model: agent.model })}
+		</SelectItem>
+	);
 
 	return (
 		<form
@@ -117,7 +168,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 			<div className="flex min-w-0 flex-col gap-6">
 				<FormSection title={t("experiments.new.sections.what")}>
 					<div className="grid gap-4 md:grid-cols-3">
-						<Field label={t("experiments.new.fields.name")} error={formState.errors.name}>
+						<Field label={t("experiments.new.fields.name")} error={formState.errors.name} name="name">
 							{(id, describedBy) => (
 								<Input
 									id={id}
@@ -129,7 +180,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 								/>
 							)}
 						</Field>
-						<Field label={t("experiments.new.fields.suite")} error={formState.errors.suite}>
+						<Field label={t("experiments.new.fields.suite")} error={formState.errors.suite} name="suite">
 							{(id) => (
 								<Controller
 									control={control}
@@ -141,40 +192,47 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 												field.onChange(next);
 												const nextSuite = catalog.suites.find((s) => suiteRef(s) === next);
 												setValue("conditions", conditionsFor(nextSuite), { shouldValidate: formState.isSubmitted });
-												setValue("primaryCondition", nextSuite?.probes[0] ?? "clean");
+												setValue("primaryCondition", "clean");
 											}}
 										>
-											<SelectTrigger id={id} className="w-full" data-testid="experiment-suite-select">
+											<SelectTrigger ref={field.ref} id={id} className="w-full" data-testid="experiment-suite-select">
 												<SelectValue />
 											</SelectTrigger>
 											<SelectContent>
-												{catalog.suites.map((s) => (
-													<SelectItem key={suiteRef(s)} value={suiteRef(s)} data-testid={`experiment-suite-option-${s.id}`}>
-														{t("experiments.new.fields.suiteOption", { id: s.id, version: s.version, count: s.tasks.length })}
-													</SelectItem>
-												))}
+												<SuiteMenuItems catalog={catalog} ready={ready} testIdPrefix="experiment-suite-option" />
 											</SelectContent>
 										</Select>
 									)}
 								/>
 							)}
 						</Field>
-						<Field label={t("experiments.new.fields.base")} error={formState.errors.base}>
+						<Field label={t("experiments.new.fields.base")} error={formState.errors.base} name="base">
 							{(id) => (
 								<Controller
 									control={control}
 									name="base"
 									render={({ field }) => (
 										<Select value={field.value} onValueChange={field.onChange}>
-											<SelectTrigger id={id} className="w-full" data-testid="experiment-base-select">
+											<SelectTrigger ref={field.ref} id={id} className="w-full" data-testid="experiment-base-select">
 												<SelectValue />
 											</SelectTrigger>
 											<SelectContent>
-												{catalog.agents.map((agent) => (
-													<SelectItem key={agent.path} value={agent.path} data-testid={`experiment-base-option-${agent.id}`}>
-														{t("experiments.new.fields.baseOption", { id: agent.id, model: agent.model })}
-													</SelectItem>
-												))}
+												{agentGroups ? (
+													<>
+														<SelectGroup>
+															<SelectLabel>{tf("builder.yourAgents")}</SelectLabel>
+															{agentMenu.yours.map(agentItem)}
+														</SelectGroup>
+														{agentMenu.builtIn.length > 0 && (
+															<SelectGroup>
+																<SelectLabel>{tf("builder.builtInAgents")}</SelectLabel>
+																{agentMenu.builtIn.map(agentItem)}
+															</SelectGroup>
+														)}
+													</>
+												) : (
+													agentMenu.yours.map(agentItem)
+												)}
 											</SelectContent>
 										</Select>
 									)}
@@ -192,6 +250,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 								label={t("experiments.new.fields.label")}
 								error={formState.errors.armALabel}
 								hint={t("experiments.new.fields.armAHint")}
+								name="armALabel"
 							>
 								{(id, describedBy) => (
 									<Input
@@ -207,7 +266,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 						</div>
 						<div className="border-primary/40 flex flex-col gap-3 rounded-sm border p-3">
 							<span className="text-sm font-semibold">{t("experiments.new.fields.armB")}</span>
-							<Field label={t("experiments.new.fields.label")} error={formState.errors.armBLabel}>
+							<Field label={t("experiments.new.fields.label")} error={formState.errors.armBLabel} name="armBLabel">
 								{(id, describedBy) => (
 									<Input
 										id={id}
@@ -220,7 +279,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 								)}
 							</Field>
 							<div className="grid gap-3">
-								<Field label={t("experiments.new.fields.overridePath")} error={formState.errors.overridePath}>
+								<Field label={t("experiments.new.fields.overridePath")} error={formState.errors.overridePath} name="overridePath">
 									{(id, describedBy) => (
 										<Input
 											id={id}
@@ -235,7 +294,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 										/>
 									)}
 								</Field>
-								<Field label={t("experiments.new.fields.overrideValue")} error={formState.errors.overrideValue}>
+								<Field label={t("experiments.new.fields.overrideValue")} error={formState.errors.overrideValue} name="overrideValue">
 									{(id, describedBy) => (
 										<Input
 											id={id}
@@ -258,7 +317,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 
 				<FormSection title={t("experiments.new.sections.primary")} description={t("experiments.new.fields.primaryHint")}>
 					<div className="grid gap-4 md:grid-cols-2">
-						<Field label={t("experiments.new.fields.primaryCondition")} error={formState.errors.primaryCondition}>
+						<Field label={t("experiments.new.fields.primaryCondition")} error={formState.errors.primaryCondition} name="primaryCondition">
 							{(id, describedBy) => (
 								<Controller
 									control={control}
@@ -266,6 +325,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 									render={({ field }) => (
 										<Select value={field.value} onValueChange={field.onChange}>
 											<SelectTrigger
+												ref={field.ref}
 												id={id}
 												aria-describedby={describedBy}
 												className="w-full font-mono"
@@ -291,14 +351,14 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 								/>
 							)}
 						</Field>
-						<Field label={t("experiments.new.fields.primaryMetric")} error={formState.errors.primaryMetric}>
+						<Field label={t("experiments.new.fields.primaryMetric")} error={formState.errors.primaryMetric} name="primaryMetric">
 							{(id) => (
 								<Controller
 									control={control}
 									name="primaryMetric"
 									render={({ field }) => (
 										<Select value={field.value} onValueChange={field.onChange}>
-											<SelectTrigger id={id} className="w-full" data-testid="experiment-primary-metric-select">
+											<SelectTrigger ref={field.ref} id={id} className="w-full" data-testid="experiment-primary-metric-select">
 												<SelectValue />
 											</SelectTrigger>
 											<SelectContent>
@@ -317,18 +377,27 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 				</FormSection>
 
 				<FormSection title={t("experiments.new.sections.conditions")}>
-					<ConditionsEditor control={control} register={register} catalog={catalog} suite={values.suite} tasks={suite?.tasks ?? []} />
-					{formState.errors.conditions?.message && (
-						<ErrorText message={formState.errors.conditions.message} testId="experiment-conditions-error" />
-					)}
-					{formState.errors.conditions?.root?.message && (
-						<ErrorText message={formState.errors.conditions.root.message} testId="experiment-conditions-error" />
-					)}
+					<div className="flex flex-col gap-3" data-form-field="conditions">
+						<ConditionsEditor
+							control={control}
+							register={register}
+							catalog={catalog}
+							suite={values.suite}
+							tasks={readyIds(suite, ready)}
+							partlyReady={someNotReady(suite, ready)}
+						/>
+						{formState.errors.conditions?.message && (
+							<ErrorText message={formState.errors.conditions.message} testId="experiment-conditions-error" />
+						)}
+						{formState.errors.conditions?.root?.message && (
+							<ErrorText message={formState.errors.conditions.root.message} testId="experiment-conditions-error" />
+						)}
+					</div>
 				</FormSection>
 
 				<FormSection title={t("experiments.new.sections.run")}>
 					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-						<Field label={t("experiments.new.fields.seed")} error={formState.errors.seed}>
+						<Field label={t("experiments.new.fields.seed")} error={formState.errors.seed} name="seed">
 							{(id, describedBy) => (
 								<Input
 									id={id}
@@ -341,7 +410,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 								/>
 							)}
 						</Field>
-						<Field label={t("experiments.new.fields.concurrency")} error={formState.errors.concurrency}>
+						<Field label={t("experiments.new.fields.concurrency")} error={formState.errors.concurrency} name="concurrency">
 							{(id, describedBy) => (
 								<Input
 									id={id}
@@ -357,7 +426,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 							)}
 						</Field>
 						{!tokenBox && (
-							<Field label={t("experiments.new.fields.runnerPool")} error={formState.errors.runnerPool}>
+							<Field label={t("experiments.new.fields.runnerPool")} error={formState.errors.runnerPool} name="runnerPool">
 								{(id, describedBy) => (
 									<Input
 										id={id}
@@ -369,7 +438,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 								)}
 							</Field>
 						)}
-						<Field label={t("experiments.new.fields.totalUsd")} error={formState.errors.totalUsd}>
+						<Field label={t("experiments.new.fields.totalUsd")} error={formState.errors.totalUsd} name="totalUsd">
 							{(id, describedBy) => (
 								<Input
 									id={id}
@@ -437,6 +506,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 								{t("experiments.new.actions.createAndStart")}
 							</Button>
 						</div>
+						<PlanInvalidAlert fields={invalid} onFocus={focusField} />
 						{blockReason && (
 							<p
 								className={cn("text-xs", stale ? "text-chart-warning-ink" : "text-muted-foreground")}
@@ -449,7 +519,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 							<LoadError title={t("experiments.new.actions.planError")} error={planState.error} testId="experiment-plan-error" />
 						)}
 						{actionError && <LoadError title={actionError.title} error={actionError.error} testId="experiment-action-error" />}
-						{planned && <PlanResult plan={planned.plan} className={cn(stale && "opacity-60")} />}
+						{planned && <PlanResult plan={planned.plan} estimateShown className={cn(stale && "opacity-60")} />}
 						{planned && <PlanEstimate experiment={planned.experiment} className={cn(stale && "opacity-60")} />}
 					</CardContent>
 				</Card>
@@ -464,13 +534,17 @@ function ConditionsEditor({
 	catalog,
 	suite,
 	tasks,
+	partlyReady,
 }: {
 	control: Control<ExperimentFormValues>;
 	register: UseFormRegister<ExperimentFormValues>;
 	catalog: Catalog;
 	/** The selected suite reference: its probe_layers decide a probe id two suites share (QC2-27-10). */
 	suite: string | undefined;
+	/** The tasks that can run (the ready ones when known). */
 	tasks: readonly string[];
+	/** Some tasks of the suite are not ready, so the counts say "ready tasks". */
+	partlyReady: boolean;
 }) {
 	const { t } = useTranslation("bench");
 	const { fields } = useFieldArray({ control, name: "conditions" });
@@ -521,6 +595,7 @@ function ConditionsEditor({
 								index={index}
 								conditionId={field.condition}
 								tasks={tasks}
+								partlyReady={partlyReady}
 								allTasks={Boolean(current?.allTasks)}
 							/>
 						)}
@@ -536,15 +611,18 @@ function TaskSelection({
 	index,
 	conditionId,
 	tasks,
+	partlyReady,
 	allTasks,
 }: {
 	control: Control<ExperimentFormValues>;
 	index: number;
 	conditionId: string;
 	tasks: readonly string[];
+	partlyReady: boolean;
 	allTasks: boolean;
 }) {
 	const { t } = useTranslation("bench");
+	const { t: tb } = useTranslation("builder");
 	const groupName = useId();
 	return (
 		<div className="flex flex-col gap-2 pl-6">
@@ -555,6 +633,7 @@ function TaskSelection({
 					<div className="flex flex-wrap gap-4 text-xs" role="radiogroup">
 						<label className="flex cursor-pointer items-center gap-1.5">
 							<input
+								ref={field.ref}
 								type="radio"
 								name={groupName}
 								className="accent-primary cursor-pointer"
@@ -562,7 +641,7 @@ function TaskSelection({
 								onChange={() => field.onChange(true)}
 								data-testid={`experiment-condition-${conditionId}-tasks-all`}
 							/>
-							{t("experiments.new.fields.tasksAll", { count: tasks.length })}
+							{partlyReady ? tb("fields.tasksAllReady", { count: tasks.length }) : t("experiments.new.fields.tasksAll", { count: tasks.length })}
 						</label>
 						<label className="flex cursor-pointer items-center gap-1.5">
 							<input
@@ -585,7 +664,7 @@ function TaskSelection({
 					render={({ field, fieldState }) => (
 						<div className="flex flex-col gap-1">
 							<div className="flex flex-wrap gap-1.5">
-								{tasks.map((task) => {
+								{tasks.map((task, i) => {
 									const checked = field.value.includes(task);
 									return (
 										<label
@@ -596,6 +675,7 @@ function TaskSelection({
 											)}
 										>
 											<input
+												ref={i === 0 ? field.ref : undefined}
 												type="checkbox"
 												className="accent-primary cursor-pointer"
 												checked={checked}
@@ -636,11 +716,14 @@ function Field({
 	label,
 	error,
 	hint,
+	name,
 	children,
 }: {
 	label: string;
 	error?: FieldError;
 	hint?: string;
+	/** The form field inside, so Plan can bring the first invalid one into view (N43). */
+	name?: FormFieldName;
 	children: (id: string, describedBy: string | undefined) => React.ReactNode;
 }) {
 	const id = useId();
@@ -648,7 +731,7 @@ function Field({
 	const errorId = `${id}-error`;
 	const describedBy = [hint ? hintId : null, error?.message ? errorId : null].filter(Boolean).join(" ") || undefined;
 	return (
-		<div className="flex min-w-0 flex-col gap-1.5">
+		<div className="flex min-w-0 flex-col gap-1.5" data-form-field={name}>
 			<label htmlFor={id} className="text-xs font-medium">
 				{label}
 			</label>

@@ -1,3 +1,5 @@
+import "./builderI18n";
+
 import { CatalogEmptyLinks } from "@/components/experiments/catalogEmptyLinks";
 import { ExperimentProgressCard } from "@/components/experiments/experimentProgress";
 import { RoleGate } from "@/components/platform/accessNotes";
@@ -13,6 +15,7 @@ import {
 	useGetCatalogQuery,
 	useGetExperimentQuery,
 	useGetHealthQuery,
+	useGetSuitesQuery,
 } from "@/lib/store/apis/benchApi";
 import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
 import { launchAvailable, type ExperimentStatus } from "@/lib/types/bench";
@@ -22,7 +25,15 @@ import { useTranslation } from "react-i18next";
 import { ExperimentForm } from "./experimentForm";
 import { dateSeed, defaultFormValues } from "./experimentFormSchema";
 import { MatrixBuilder } from "./matrixBuilder";
-import { defaultBuilderValues, keyedProviders, type BuilderAgentIds } from "./matrixBuilderSchema";
+import {
+	agentFromLinkMissing,
+	catalogAgent,
+	defaultBuilderValues,
+	keyedProviders,
+	readyTaskMap,
+	type BuilderAgentIds,
+	type BuilderDefaultsOptions,
+} from "./matrixBuilderSchema";
 
 /** New experiment and preflight (DESIGN.md 18 screen 4). /experiments/new?exp=<id> shows that experiment's live progress. */
 export default function NewExperimentView() {
@@ -44,20 +55,33 @@ export default function NewExperimentView() {
 		const { yours, baselines } = splitAgents(agentsList.data.agents);
 		return { yours: yours.map((a) => a.id), baselines: baselines.map((a) => a.id) };
 	}, [agentsList.data]);
-	const sideLoading = agentsList.isLoading || modelKeys.isLoading;
+	// Ready tasks per benchmark (N39, N42): the full list, since the light list has no per-task status.
+	// A failed list leaves every task counted, as before.
+	const suites = useGetSuitesQuery();
+	const ready = useMemo(() => (catalog.data ? readyTaskMap(catalog.data, suites.data?.suites) : undefined), [catalog.data, suites.data]);
+	const sideLoading = agentsList.isLoading || modelKeys.isLoading || suites.isLoading;
 	const health = useGetHealthQuery();
-	const defaults = useMemo(() => (catalog.data ? defaultFormValues(catalog.data, dateSeed(new Date())) : null), [catalog.data]);
-	const builderDefaults = useMemo(
-		() =>
-			catalog.data && !sideLoading
-				? defaultBuilderValues(catalog.data, dateSeed(new Date()), {
-						agent: agentParam,
-						shownAgents: agentGroups ? [...agentGroups.yours, ...agentGroups.baselines] : undefined,
-						providersWithKey: keyedProviders(modelKeys.data?.keys ?? []),
-					})
-				: null,
-		[catalog.data, sideLoading, agentParam, agentGroups, modelKeys.data],
+	const defaultsOptions = useMemo<BuilderDefaultsOptions>(
+		() => ({
+			agent: agentParam,
+			shownAgents: agentGroups ? [...agentGroups.yours, ...agentGroups.baselines] : undefined,
+			providersWithKey: keyedProviders(modelKeys.data?.keys ?? []),
+			ready,
+		}),
+		[agentParam, agentGroups, modelKeys.data, ready],
 	);
+	const defaults = useMemo(
+		() => (catalog.data && !sideLoading ? defaultFormValues(catalog.data, dateSeed(new Date()), defaultsOptions) : null),
+		[catalog.data, sideLoading, defaultsOptions],
+	);
+	const builderDefaults = useMemo(
+		() => (catalog.data && !sideLoading ? defaultBuilderValues(catalog.data, dateSeed(new Date()), defaultsOptions) : null),
+		[catalog.data, sideLoading, defaultsOptions],
+	);
+	// N155: ?agent= names an agent the forms do not list, so say which one they start with instead.
+	const startPath = abMode ? defaults?.base : builderDefaults?.agents[0];
+	const startId = catalog.data && startPath ? catalogAgent(catalog.data, startPath)?.id : undefined;
+	const linkMissing = Boolean(agentGroups && startId && agentFromLinkMissing(agentParam, defaultsOptions.shownAgents ?? []));
 	const onStarted = (id: string, cap: number) => {
 		setCapUsd(cap);
 		void setExpId(id);
@@ -119,10 +143,24 @@ export default function NewExperimentView() {
 							</Button>
 							{abMode && <span className="text-muted-foreground text-xs">{tb("mode.abHint")}</span>}
 						</div>
+						{linkMissing && (
+							<p
+								className="border-chart-warning/60 bg-chart-warning/10 rounded-sm border px-3 py-2 text-sm"
+								data-testid="new-experiment-agent-missing"
+							>
+								{tb("link.agentMissing", { id: agentParam?.trim(), first: startId })}
+							</p>
+						)}
 						{abMode || !builderDefaults ? (
-							<ExperimentForm catalog={catalog.data} defaults={defaults} onStarted={onStarted} />
+							<ExperimentForm catalog={catalog.data} defaults={defaults} ready={ready} agentGroups={agentGroups} onStarted={onStarted} />
 						) : (
-							<MatrixBuilder catalog={catalog.data} defaults={builderDefaults} agentGroups={agentGroups} onStarted={onStarted} />
+							<MatrixBuilder
+								catalog={catalog.data}
+								defaults={builderDefaults}
+								agentGroups={agentGroups}
+								ready={ready}
+								onStarted={onStarted}
+							/>
 						)}
 					</div>
 				</RoleGate>

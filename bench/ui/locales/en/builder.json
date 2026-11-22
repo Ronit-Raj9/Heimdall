@@ -38,7 +38,13 @@
 		"token": "Write token",
 		"tokenHint": "Local mode: plan, estimate and run are writes. The token stays in this tab.",
 		"tokenPlaceholder": "paste the serve write token",
-		"tasks": "Tasks"
+		"tasks": "Tasks",
+		"suiteOptionReady": "{{id}}@{{version}} ({{ready}} of {{total}} ready)",
+		"practiceOption": "{{option}} (practice)",
+		"notReadyGroup": "Not ready yet",
+		"notReadyTitle": "Run its readiness check on the benchmark page first.",
+		"tasksAllReady": "All {{count}} ready tasks",
+		"tasksFirstSuffixReady": "ready tasks of {{count}}"
 	},
 	"preview": {
 		"title": "Matrix preview",
@@ -59,10 +65,25 @@
 		"planError": "Planning failed",
 		"estimateError": "Estimate failed",
 		"createError": "Could not create the experiment",
-		"startError": "Experiment {{id}} was created but did not start. Use Start on its page to try again."
+		"startError": "Experiment {{id}} was created but did not start. Use Start on its page to try again.",
+		"fixFields_one": "Fix {{count}} field above before planning.",
+		"fixFields_other": "Fix {{count}} fields above before planning."
 	},
 	"estimate": {
-		"title": "Estimate"
+		"title": "Estimate",
+		"costNoHistory": "Not known yet: nothing like this has run on this benchmark, so there is no history to estimate from.",
+		"costNoHistoryShort": "Not known yet (no history)",
+		"budgetCap": "The budget of {{budget}} stops the comparison when it is spent.",
+		"priceRef": "Model prices come from {{ref}}.",
+		"priceRefNoHistory": "Model prices come from {{ref}}. They are used once there is history to price.",
+		"timeLimitBound": "at most {{high}} (from each agent's time limit)"
+	},
+	"plan": {
+		"timeCostPress": "Time and cost: press Estimate cost.",
+		"timeCostSee": "Time and cost: see the Estimate."
+	},
+	"link": {
+		"agentMissing": "Agent {{id}} is not one of your agents, so the comparison starts with {{first}}."
 	},
 	"errors": {
 		"nameRequired": "Give the experiment a name.",
