@@ -22,6 +22,7 @@ type scenarioAdmitEnv struct {
 	starts   int
 	sessions []int
 	envs     []map[string]string
+	walls    map[string]int // control agent id -> wall clock limit it ran with
 }
 
 func (e *scenarioAdmitEnv) StartServices(_ context.Context, rc *schemas.RunContext) ([]schemas.ServiceHandle, []schemas.ServiceResult, error) {
@@ -63,6 +64,12 @@ func (e *scenarioAdmitEnv) Exec(ctx context.Context, rc *schemas.RunContext, pla
 		return nil, err
 	}
 	e.envs = append(e.envs, plan.Env)
+	if rc.Agent != nil {
+		if e.walls == nil {
+			e.walls = map[string]int{}
+		}
+		e.walls[rc.Agent.ID] = plan.WallS
+	}
 	if a, ok := plan.Files[controlAnswerPath]; ok {
 		e.answer[rc.Run.RunID] = a
 	}
@@ -487,5 +494,44 @@ func TestAdmitArtifactNeedsEnvironment(t *testing.T) {
 	c := checksByName(rec)["reference_1"]
 	if rec.Admitted || c.Got != GotError || !strings.Contains(c.Detail, "cannot export artifacts") {
 		t.Fatalf("admitted %v reference %+v", rec.Admitted, c)
+	}
+}
+
+// TestAdmitReferenceWallClock: only the reference control may run as long
+// as the task's agent (timeouts.agent_s); every other control keeps the
+// short control limit.
+func TestAdmitReferenceWallClock(t *testing.T) {
+	benchRoot, pack := copyPack(t)
+	task := filepath.Join(pack, "tasks", "m01")
+	writeFiles(t, task, map[string]string{
+		"controls/answer.txt":        "7\n",
+		"controls/empty.txt":         "",
+		"controls/wrong.txt":         "8\n",
+		"verifier/tests/answer.yaml": "match: exact\nexpected: [\"7\"]\nwrong_answers: [\"9\"]\n",
+	})
+	s := loadMini(t, benchRoot)
+	s.Grader = "answer_match"
+	tk := s.Tasks[0]
+	tk.Output = &schemas.OutputSpec{Kind: schemas.OutputAnswer}
+	tk.Controls = schemas.TaskControls{Reference: "controls/answer.txt", Empty: "controls/empty.txt", Mutants: []string{"controls/wrong.txt"}, Exploit: "controls/exploit.sh"}
+	tk.Timeouts.AgentS = 7200
+	env := newScenarioAdmitEnv()
+	if _, err := Admit(context.Background(), AdmitDeps{Env: env, Grader: fileGrader{"answer_match", answerFile, "7"}}, s, tk); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.walls) == 0 {
+		t.Fatal("no control ran")
+	}
+	for id, wall := range env.walls {
+		want := exploitWallS
+		if strings.HasPrefix(id, "admission-reference_") {
+			want = 7200
+		}
+		if wall != want {
+			t.Errorf("%s ran with wall %d s, want %d", id, wall, want)
+		}
+	}
+	if env.walls["admission-reference_1"] != 7200 {
+		t.Errorf("reference_1 wall %d, want 7200 (walls %v)", env.walls["admission-reference_1"], env.walls)
 	}
 }
