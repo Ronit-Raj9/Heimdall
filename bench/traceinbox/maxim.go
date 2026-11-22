@@ -284,3 +284,22 @@ func clone(m map[string]any) map[string]any {
 	}
 	return out
 }
+
+// MaximSession converts one Maxim trace (the data object of GET
+// /v1/log-repositories/logs/traces) into a session, as a pull does. The
+// session is not yet redacted; Take redacts it before it is stored.
+func MaximSession(traceID string, data json.RawMessage) (*traceimport.Session, error) {
+	var t maximTrace
+	if err := json.Unmarshal(data, &t); err != nil {
+		return nil, fmt.Errorf("maxim trace %s: %w", traceID, err)
+	}
+	raw, err := json.Marshal(maximTranscript(traceID, &t))
+	if err != nil {
+		return nil, err
+	}
+	tr, err := traceimport.Parse(raw, traceimport.FormatChat)
+	if err != nil {
+		return nil, fmt.Errorf("maxim trace %s: %w", traceID, err)
+	}
+	return tr.Sessions[0], nil
+}

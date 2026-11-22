@@ -1,0 +1,94 @@
+{
+	"title": "From your Maxim production failures to regression tests",
+	"subtitle": "Pull the traces Maxim flagged in production, see them grouped by how they failed, and turn each group into a task your agent must pass before the next release.",
+	"steps": {
+		"pull": "Pull failures from your Maxim log repository",
+		"cluster": "See them grouped by failure mode",
+		"draft": "Draft one task per group, with generated checks",
+		"review": "Say what should have happened",
+		"ready": "Run the readiness check, then the task joins your evaluations"
+	},
+	"notConnected": "Maxim is not connected. Connect your log repository in Settings first; the API key stays in the org key store.",
+	"connect": "Connect Maxim",
+	"connectedTo": "Connected to log repository {{repo}} in workspace {{workspace}}",
+	"filter": {
+		"title": "Which traces failed",
+		"description": "Any trace that matches one rule is taken. Every trace is redacted before it is stored.",
+		"evaluators": "Failed evaluators",
+		"evaluatorsHint": "Online evaluator names, comma separated, as Maxim shows them",
+		"errors": "Traces Maxim marks as errored",
+		"scoreBelow": "Score below",
+		"scoreEvaluators": "Scored by",
+		"scoreEvaluatorsHint": "Empty: any evaluator",
+		"days": "Last days",
+		"limit": "At most traces",
+		"pull": "Pull failures",
+		"pulling": "Pulling from Maxim...",
+		"needRule": "Pick at least one rule: failed evaluators, errored traces or a score threshold."
+	},
+	"imports": {
+		"title": "Imports",
+		"empty": "No import yet. Pull failures above to start.",
+		"row": "{{failed}} failures, {{clusters}} groups, {{tasks}} tasks",
+		"pending": "{{count}} waiting for review"
+	},
+	"counts": {
+		"scanned": "Traces read",
+		"failed": "Failures",
+		"errored": "Errored",
+		"evaluator": "Evaluator failed",
+		"lowScore": "Low score",
+		"newItems": "New in the inbox"
+	},
+	"truncated": "The import stopped at its trace limit. Pull again with a narrower window to see the rest.",
+	"clusters": {
+		"title": "Failure groups",
+		"description": "Traces that failed the same way: the same failing tool and error, or the same failing evaluator.",
+		"empty": "No failures matched. Try a longer window or another evaluator.",
+		"traces": "{{count}} traces",
+		"open": "Open in Maxim",
+		"select": "Pick group {{label}}",
+		"drafted": "Drafted"
+	},
+	"draft": {
+		"benchmark": "Benchmark",
+		"pickBenchmark": "Pick a benchmark",
+		"perCluster": "Tasks per group",
+		"button": "Draft tasks from {{count}} groups",
+		"done": "{{count}} tasks drafted, pending review."
+	},
+	"tasks": {
+		"title": "Tasks waiting for review",
+		"description": "Generated checks never count until a person accepts them. A task that is not accepted is never used in an evaluation.",
+		"empty": "No task drafted yet. Pick groups above and draft tasks.",
+		"request": "What the user asked",
+		"recorded": "What the agent answered in production",
+		"answer": "The right answer",
+		"answerHint": "One short line is matched exactly; several lines are facts the answer must all contain.",
+		"rubric": "What should have happened",
+		"instruction": "Request the agent gets (optional)",
+		"instructionHint": "Empty keeps the recorded request.",
+		"accept": "Accept and check readiness",
+		"reject": "Reject",
+		"rejectReason": "Why it is not a task",
+		"readinessAgain": "Run the readiness check again",
+		"openTask": "Open the benchmark",
+		"openJob": "See the readiness check",
+		"editMe": "Finish these files first: {{files}}",
+		"generated": "Generated checks: {{ids}}",
+		"reviewedBy": "Reviewed by {{who}}"
+	},
+	"state": {
+		"pending_review": "Waiting for review",
+		"needs_files": "Files to finish",
+		"accepted": "Accepted",
+		"rejected": "Rejected"
+	},
+	"readiness": {
+		"not_run": "Not checked",
+		"queued": "Checking",
+		"ready": "Ready",
+		"not_ready": "Not ready"
+	},
+	"showcaseLink": "Turn Maxim production failures into regression tests"
+}

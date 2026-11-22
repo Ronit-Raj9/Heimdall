@@ -393,6 +393,51 @@ actions. Actions need the write token and live mode. The API:
 | `POST /api/bench/inbox/{id}/snooze` `{days}` | write token |
 | `POST /api/bench/inbox/ingest` | the webhook's own token |
 
+## Maxim failures in bulk
+
+The Maxim page (`/maxim`, linked from the Inbox and from Settings >
+Integrations) turns a Maxim log repository's production failures into
+regression tasks in one pass, on the org's own Maxim connection (the API
+key stays in the org key store):
+
+1. **Pull.** Say which traces failed: online evaluators that failed them,
+   traces Maxim marks as errored, or an evaluator score below a threshold
+   (of named evaluators, or any). A window of 1 to 90 days, at most 1000
+   traces. Every trace goes through the inbox (redaction, signature, dedupe)
+   as source `maxim-bulk`.
+2. **Groups.** Inbox items that failed the same way form one group: the
+   same first failing tool and error line, or, when no tool failed, the
+   same failing evaluator or low score. The request is ignored on purpose,
+   so one group spans many user requests.
+3. **Draft.** Pick groups and a benchmark; each group becomes one task (up
+   to 5) through the inbox accept, and the group's other items are marked
+   duplicates of it. Each draft also gets `verifier/checks.yaml`
+   (declarative checks: every tool that failed in production must now
+   return a result without an error, and a reply rubric) and
+   `verifier/scenario.json` (a scenario row: the first request opens, later
+   user turns become facts), and the tags `maxim` and `pending-review`.
+   Everything generated is labelled generated.
+4. **Review.** A person says what should have happened: the right answer
+   for a question and answer task (one line is matched exactly, several
+   lines are facts that must all be present; the recorded production answer
+   becomes a wrong answer readiness must fail), a rubric, and optionally a
+   cleaner request. Accepting drops `pending-review`. A tool-use or MCP
+   draft whose state checks still hold EDIT ME lines is "files to finish"
+   until a person edits them.
+5. **Readiness.** Accepting queues the task's readiness check (the
+   `suite.admit` job for that one task). Only an admitted task is used by
+   evaluations, so a draft nobody accepted never reaches a gate or a
+   report card. Reject removes the draft's folder and its entry in
+   `suite.yaml`.
+
+Imports are kept as `inbox/bulk/<id>.json` (the newest 200). API:
+`GET|POST /api/bench/integrations/maxim/batches`, `GET .../batches/{id}`,
+`POST .../batches/{id}/draft`, and `POST
+.../batches/{id}/tasks/{suite}/{task}/accept|reject|readiness`. Maxim's
+search and trace endpoints are read as its public OpenAPI description
+states them (22 Nov 2026); the tests use a local fake of them, and no real
+Maxim has been called.
+
 ## Storage
 
 Plain files under `inbox/` in the project, no database:

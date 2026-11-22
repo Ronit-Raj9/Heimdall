@@ -6,6 +6,7 @@ import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { useGetInboxQuery } from "@/lib/store/apis/inboxApi";
 import type { InboxListResponse } from "@/lib/types/bench";
+import { Link } from "@tanstack/react-router";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { useId, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -51,6 +52,7 @@ export default function InboxView() {
 export function InboxTab() {
 	const { t } = useTranslation("bench");
 	const { t: u } = useTranslation("ux13");
+	const { t: m } = useTranslation("maximFailures");
 	const [filter, setFilter] = useQueryState("state", parseAsStringLiteral(INBOX_FILTERS).withDefault(DEFAULT_FILTER));
 	const [source, setSource] = useQueryState("source", parseAsString);
 	const [itemId, setItemId] = useQueryState("item", parseAsString);
@@ -64,6 +66,9 @@ export function InboxTab() {
 			<div className="flex flex-wrap items-center gap-3">
 				<p className="text-muted-foreground max-w-3xl text-sm">{t("inbox.subtitle")}</p>
 				{data?.mode === "live" && <InboxPullButton check={ready?.inbox} />}
+				<Link to="/maxim" className="text-primary text-sm underline-offset-2 hover:underline" data-testid="inbox-maxim-link">
+					{m("showcaseLink")}
+				</Link>
 			</div>
 			{list.isLoading ? (
 				<BlockSkeleton rows={6} testId="inbox-loading" />

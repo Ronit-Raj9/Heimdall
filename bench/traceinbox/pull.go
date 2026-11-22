@@ -476,3 +476,16 @@ func oneLine(s string, n int) string {
 	}
 	return s[:cut] + "..."
 }
+
+// TakeResult is what Take did with one flagged session.
+type TakeResult = takeResult
+
+// Take records one flagged session from src the way a pull does (redact,
+// signature, dedupe), for callers that fetch sessions themselves, such as
+// the bulk trace import (bench/tracebulk).
+func (ib *Inbox) Take(src *Source, fl Flagged) (TakeResult, error) {
+	if src == nil {
+		return takeResult{}, errors.New("no source")
+	}
+	return ib.take(src, fl)
+}
