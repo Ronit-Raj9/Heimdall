@@ -41,6 +41,7 @@ type Options struct {
 	HeldOut       HeldOutPlan
 	Force         bool   // replace task folders that already exist
 	Readiness     Queuer // nil: readiness is left for the caller
+	SelfContained bool   // hosted: each task carries environment/Dockerfile and repo.tar.gz, no image
 	Logger        schemas.Logger
 }
 
@@ -195,6 +196,11 @@ func emitRepo(ctx context.Context, im importers.Importer, repo string, in []Inpu
 		}
 		if err := finishTask(dir, p, held[inst]); err != nil {
 			return nil, fmt.Errorf("task %s: %w", tid, err)
+		}
+		if opts.SelfContained {
+			if err := SelfContain(dir, p.in.Env, p.in.RepoDir); err != nil {
+				return nil, fmt.Errorf("task %s: %w", tid, err)
+			}
 		}
 		out.Tasks = append(out.Tasks, tid)
 		out.Images[tid] = p.layers

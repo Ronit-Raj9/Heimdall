@@ -58,7 +58,7 @@ func issuebenchStagesFor(env handlers.OrgEnv) pipeline.Stages {
 	if abs, err := filepath.Abs(root); err == nil && root != "" {
 		root = abs
 	}
-	ib := &ibStages{root: root, orgID: env.Services.OrgID, keys: env.Services.Keys, jobs: env.Services.Jobs}
+	ib := &ibStages{root: root, orgID: env.Services.OrgID, keys: env.Services.Keys, jobs: env.Services.Jobs, hosted: env.Services.Hosted}
 	return pipeline.Stages{Scanner: ibScanner{ib}, Builder: ibBuilder{ib}, Validator: ibValidator{ib}, Emitter: ibEmitter{ib}}
 }
 
@@ -69,6 +69,9 @@ type ibStages struct {
 	keys  keystore.Store
 	jobs  handlers.JobsAPI
 	mu    sync.Mutex // one checkout or image build at a time per org
+	// hosted: build and test run as issuebench.work jobs on a worker
+	// (issuebench_stages_hosted.go); the server runs no Docker.
+	hosted bool
 }
 
 func (s *ibStages) dir(parts ...string) string {
@@ -222,6 +225,9 @@ func (a ibBuilder) Build(ctx context.Context, c issuebench.Candidate, opts pipel
 		maxUSD = opts.BudgetUSD
 	}
 	version := pipeline.DefaultVersion(c)
+	if s.hosted {
+		return s.buildOnWorker(ctx, c, version, mc, maxUSD, logf)
+	}
 	dir := s.dir("src", strings.ReplaceAll(c.Repo, "/", "__")+"@"+version)
 	if err := s.checkout(ctx, c.Repo, c.BaseSHA, dir); err != nil {
 		return issuebench.BuildResult{}, err
@@ -230,6 +236,7 @@ func (a ibBuilder) Build(ctx context.Context, c issuebench.Candidate, opts pipel
 		Provider: provider, Model: model, KeyID: mc.KeyID, MaxUSD: maxUSD, Consent: true})
 	var res issuebench.BuildResult
 	if err := s.runJob(ctx, kindIssuebenchBuild, params, &res, func(id string) {
+		issuebench.NoteJob(ctx, issuebench.StageBuild, id)
 		logf("issue #%d: build job %s on %s/%s (cap $%.2f)", c.Issue, id, provider, model, maxUSD)
 	}); err != nil {
 		return issuebench.BuildResult{}, err
@@ -285,6 +292,9 @@ func (s *ibStages) runJob(ctx context.Context, kind string, params []byte, out a
 type ibValidator struct{ s *ibStages }
 
 func (a ibValidator) Validate(ctx context.Context, c issuebench.Candidate, env issuebench.EnvSpec, logf func(string, ...any)) (issuebench.Validation, error) {
+	if a.s.hosted {
+		return a.s.validateOnWorker(ctx, c, env, logf)
+	}
 	if _, err := ibCommand(ctx, nil, "docker", "version", "--format", "{{.Server.Version}}"); err != nil {
 		return issuebench.Validation{}, errors.New("docker is not available on this server, so tests can not run")
 	}
@@ -329,6 +339,7 @@ func (s *ibStages) modelChecks(ctx context.Context, v *issuebench.Validation, lo
 	params, _ := json.Marshal(issuebenchCheckParams{Candidate: c, Provider: mc.Provider, Model: mc.Model, KeyID: mc.KeyID, MaxUSD: maxUSD, Consent: true})
 	var res issuebenchCheckResult
 	if err := s.runJob(ctx, kindIssuebenchCheck, params, &res, func(id string) {
+		issuebench.NoteJob(ctx, issuebench.StageChecks, id)
 		logf("issue #%d: model check job %s on %s/%s (cap $%.2f)", c.Issue, id, mc.Provider, mc.Model, maxUSD)
 	}); err != nil {
 		return err
@@ -426,7 +437,9 @@ func (a ibEmitter) Emit(ctx context.Context, repo string, tasks []issuebench.Val
 		in = append(in, emit.Input{Validation: v, Env: *env, RepoDir: dir})
 	}
 	// Readiness waits until the image layers exist: admit runs the task image.
-	rep, err := emit.Emit(ctx, in, emit.Options{BenchRoot: s.root, WorkDir: work})
+	// Hosted: each task carries its own Dockerfile and repository archive,
+	// and the worker builds the image at admit; the server builds no layer.
+	rep, err := emit.Emit(ctx, in, emit.Options{BenchRoot: s.root, WorkDir: work, SelfContained: s.hosted})
 	if err != nil {
 		return "", err
 	}
@@ -436,6 +449,9 @@ func (a ibEmitter) Emit(ctx context.Context, repo string, tasks []issuebench.Val
 	for i := range rep.Suites {
 		su := &rep.Suites[i]
 		for _, tid := range su.Tasks {
+			if s.hosted {
+				break
+			}
 			if err := ibLayers.BuildLayers(ctx, su.BuildDirs[tid]); err != nil {
 				return su.Suite, fmt.Errorf("task %s: %w", tid, err)
 			}
