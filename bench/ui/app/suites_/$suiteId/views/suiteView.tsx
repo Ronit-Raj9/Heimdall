@@ -49,6 +49,7 @@ import { OpsTab } from "./opsTab";
 import { EditTab } from "./editTab";
 import { SuiteExportTab, SuiteHealthTab, SuiteTiersTab } from "./suiteTabs";
 import { SuiteTasksTab } from "./tasksTab";
+import { ReviewTab } from "./reviewTab";
 
 /**
  * One suite: /suites/$suiteId?tab=. Tasks (default, with the task table's filters and ?task= for
@@ -136,6 +137,7 @@ function SuiteBody({
   const { t: tu } = useTranslation("suitesUx");
   const { t: tb } = useTranslation("suiteBuild");
   const { t: td } = useTranslation("benchData");
+  const { t: ta } = useTranslation("authoring");
   // Health is a separate request: a failure or a 503 (no run store) shows "health unavailable" and never blocks the page.
   const healthQuery = useGetSuiteHealthQuery(suite.id, {
     skip: Boolean(suite.error),
@@ -148,6 +150,7 @@ function SuiteBody({
     { id: "tasks", label: tu("tabs.tasks"), badge: tasks },
     { id: "build", label: tb("tab"), hidden: builtin }, // X13: grader, add tasks, held out, readiness
     { id: "data", label: td("tab"), hidden: builtin }, // Y15: personal data policy, access, versions, platform imports
+    { id: "review", label: ta("tab"), hidden: builtin }, // Z19: draft with a model, review generated tasks, quality checks, held out
     { id: "settings", label: tu("tabs.settings") },
     { id: "health", label: tu("tabs.health") },
     {
@@ -330,6 +333,8 @@ function SuiteBody({
                 <BuildTab suite={suite} />
               ) : active === "data" ? (
                 <DataTab suite={suite} />
+              ) : active === "review" ? (
+                <ReviewTab suite={suite} />
               ) : active === "ops" ? (
                 <OpsTab suite={suite} />
               ) : active === "edit" ? (

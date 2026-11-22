@@ -85,6 +85,23 @@
         "imported_from": {"type": "string", "minLength": 1, "description": "Benchmark and version, for imported tasks."},
         "created_by": {"type": "string", "minLength": 1, "description": "Tool that scaffolded the task, e.g. task init."},
         "instruction_reviewed": {"type": "boolean", "description": "False when a tool drafted the instruction (tasks mine) and no human has reviewed it; task review sets it true."},
+        "generated": {
+          "type": "array",
+          "description": "Fields a model drafted (bench/authoring): which field, by which op, model and prompt, at what cost. A task with any is generated and stays pending review until a person accepts it. Mirrors schemas.GeneratedField.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["field", "op"],
+            "properties": {
+              "field": {"type": "string", "minLength": 1},
+              "op": {"type": "string", "minLength": 1},
+              "model": {"type": "string"},
+              "prompt_sha": {"type": "string"},
+              "cost_usd": {"type": "number", "minimum": 0},
+              "at": {"type": "string"}
+            }
+          }
+        },
         "incident": {
           "type": "object",
           "additionalProperties": false,
@@ -228,6 +245,7 @@
         }
       }
     },
+    "review": {"enum": ["pending", "accepted", "rejected"], "description": "Review state of a generated task (docs/authoring-assist.md): pending keeps it out of new evaluations, gates, releases and report cards until a person accepts it. A decision on the suite review sidecar (suite.review.json) overrides it without changing the lock."},
     "split": {"enum": ["public", "held_out"], "description": "public (default) or held_out: tasks: all selects public tasks only, and the API never serves a held-out task's instruction or files (docs/held-out-and-canaries.md)."},
     "voice": {
       "type": "object",
