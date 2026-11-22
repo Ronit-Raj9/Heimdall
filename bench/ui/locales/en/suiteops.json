@@ -7,6 +7,8 @@
 		"lint": "Check files",
 		"lock": "Freeze",
 		"admit": "Run readiness check",
+		"lockConfirm": "Freeze {{suite}}? Every task is pinned to its current files. Later edits to a task need a new freeze.",
+		"lockDone": "Frozen. Next step: Run readiness check.",
 		"admitConfirm": "Run the readiness check on every task of {{suite}}? This builds images and tries a correct solution for each task.",
 		"hostedAdmit": "The readiness check runs a perfect reference agent and a do-nothing agent on each task, on a worker (Workers page). Ready tasks can be run right after.",
 		"hostedAdmitConfirm": "Run the readiness check on every task of {{suite}}? Each task runs on a worker in practice mode (no real model, free)."
@@ -19,7 +21,7 @@
 		"empty": "This benchmark has no tasks yet. Cut one from a commit below.",
 		"task": "Task",
 		"state": "State",
-		"active": "In use",
+		"active": "Not paused",
 		"quarantined": "Paused: {{reason}}",
 		"redacted": "held out",
 		"reasonPlaceholder": "Why? (required)",

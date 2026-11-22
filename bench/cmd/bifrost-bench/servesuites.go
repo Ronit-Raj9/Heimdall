@@ -110,8 +110,17 @@ func (s serveSuites) LoadSuite(ctx context.Context, id string) (*schemas.Suite, 
 // suite.lock. Nothing is written. A fingerprinted lock is relocked with
 // fingerprints, so drift names fingerprint fields too; a legacy lock is
 // relocked without them, as before, so it never reads as stale only for
-// lacking the section.
+// lacking the section. A read-only library pack is hashed once per stamp
+// and lock (lockdriftcache.go).
 func (s serveSuites) LockDrift(ctx context.Context, st *schemas.Suite) ([]schemas.SuiteDrift, error) {
+	if k, ok := s.libraryDriftKey(st); ok {
+		return lockDrifts.get(k, func() ([]schemas.SuiteDrift, error) { return s.lockDrift(ctx, st) })
+	}
+	return s.lockDrift(ctx, st)
+}
+
+// lockDrift is LockDrift without the cache.
+func (s serveSuites) lockDrift(ctx context.Context, st *schemas.Suite) ([]schemas.SuiteDrift, error) {
 	var fresh *schemas.SuiteLock
 	var err error
 	if st.Lock != nil && st.Lock.Fingerprints != nil {

@@ -24,6 +24,21 @@ export const suiteBuildApi = benchApi.injectEndpoints({
 		setTaskSplit: builder.mutation<TaskSplitResult, { suite: string; task: string; held_out: boolean }>({
 			query: ({ suite, task, held_out }) => ({ url: `/suites/${seg(suite)}/tasks/${seg(task)}/split`, method: "PUT", body: { held_out } }),
 			invalidatesTags: (_r, _e, { suite }) => suiteTags(suite),
+			// N118: flip the row and the "N of M held out" count in the cached list as soon as the PUT
+			// succeeds, so the page never waits on the list refetch to show the new state.
+			async onQueryStarted({ suite, task }, { dispatch, queryFulfilled }) {
+				try {
+					const { data } = await queryFulfilled;
+					dispatch(
+						benchApi.util.updateQueryData("getSuites", undefined, (draft) => {
+							const row = draft.suites.find((x) => x.id === suite)?.tasks.find((x) => x.id === task);
+							if (row) row.split = data.split;
+						}),
+					);
+				} catch {
+					// The error shows on the row (useSetTaskSplitMutation state); the cache stays as it was.
+				}
+			},
 		}),
 	}),
 });

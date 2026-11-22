@@ -258,7 +258,8 @@ var APIRoutes = []RouteDoc{
 	{Method: "POST", Path: APIPrefix + "/inbox/ingest", Tag: "inbox", Summary: "Push one flagged trace (OTLP, Langfuse or chat JSON); the webhook's own token, a size cap and a rate limit guard it; 503 while off",
 		Auth: AuthInbox, Request: traceinbox.IngestRequest{}, Status: fasthttp.StatusCreated, Response: schemas.InboxIngestResult{}},
 
-	{Method: "GET", Path: APIPrefix + "/suites", Tag: "suites", Summary: "Suites with their tasks", Response: schemas.SuiteList{}},
+	{Method: "GET", Path: APIPrefix + "/suites", Tag: "suites", Summary: "Suites with their tasks", Response: schemas.SuiteList{},
+		Query: []QueryDoc{{Name: "fields", Description: "light: no per-task lists, never waits for a load (pickers); full: the default"}}},
 	{Method: "GET", Path: APIPrefix + "/suites/{id}/tasks/{task}", Tag: "suites", Summary: "One task of a suite", Response: schemas.SuiteTaskDetail{}},
 	{Method: "GET", Path: APIPrefix + "/suites/{id}/health", Tag: "suites", Summary: "Task health of a suite: verifier flakiness, agent variance, infra, observed difficulty", Response: schemas.SuiteHealth{}}, // Suite health area (suitehealth.go)
 	// W8 judge calibration (calibration.go, docs/judge-calibration.md).
