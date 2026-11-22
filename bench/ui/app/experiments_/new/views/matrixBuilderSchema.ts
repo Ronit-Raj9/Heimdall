@@ -1,5 +1,6 @@
 import type { ModelRef, ProviderId } from "@/components/models/modelPicker";
 import type { Catalog, CatalogAgent, CatalogSuite, Experiment } from "@/lib/types/bench";
+import type { ModelKey } from "@/lib/types/models";
 import { suiteRef } from "./experimentFormSchema";
 
 /**
@@ -71,16 +72,56 @@ export function defaultSuite(catalog: Catalog): CatalogSuite | undefined {
 	return suites.find((s) => s.id === "coding-core") ?? suites[0];
 }
 
+/** What the page knows beside the catalog when it opens the builder. */
+export interface BuilderDefaultsOptions {
+	/** ?agent=: the agent id (or config path) to start on. */
+	agent?: string | null;
+	/** Agent ids the builder lists (My agents' own and built-in agents); absent lists every catalog agent. */
+	shownAgents?: readonly string[];
+	/** Providers the org has a working key for, in the order to prefer them. */
+	providersWithKey?: readonly ProviderId[];
+}
+
 /**
- * Builder defaults: the starter suite, the first agent, its own model plus one empty row to fill
- * in (a matrix needs two arms), 5 tasks x 1 trial, clean only.
+ * The provider to run model with: the one its name suggests when the org has a key for it, else the
+ * first provider with a working key; with no key known, the guess from the name.
  */
-export function defaultBuilderValues(catalog: Catalog, seed: number): BuilderValues {
+export function defaultProvider(model: string, providersWithKey: readonly ProviderId[] = []): ProviderId {
+	const guess = guessProvider(model);
+	if (providersWithKey.length === 0) return guess ?? "openai";
+	return guess && providersWithKey.includes(guess) ? guess : providersWithKey[0];
+}
+
+/** Providers the org has a working key for (any key not marked invalid), in key order. */
+export function keyedProviders(keys: readonly Pick<ModelKey, "provider" | "status">[]): ProviderId[] {
+	const out: ProviderId[] = [];
+	for (const k of keys) if (k.status !== "invalid" && !out.includes(k.provider)) out.push(k.provider);
+	return out;
+}
+
+/** The agent to start on: the one ?agent= names when the builder lists it, else the first listed. */
+function startAgent(catalog: Catalog, opts: BuilderDefaultsOptions): CatalogAgent | undefined {
+	const agents = catalog.agents ?? [];
+	// In the listed order (the org's own agents before the built-in ones).
+	const shown = opts.shownAgents ? opts.shownAgents.flatMap((id) => agents.filter((a) => a.id === id)) : agents;
+	const wanted = opts.agent?.trim();
+	return (
+		(wanted ? shown.find((a) => a.id === wanted || a.path === wanted) : undefined) ?? shown[0] ?? (opts.shownAgents ? undefined : agents[0])
+	);
+}
+
+/**
+ * Builder defaults: the starter suite, the agent ?agent= names (else the first listed agent), its own
+ * model on a provider the org has a key for plus one empty row to fill in (a matrix needs two arms),
+ * 5 tasks x 1 trial, clean only.
+ */
+export function defaultBuilderValues(catalog: Catalog, seed: number, opts: BuilderDefaultsOptions = {}): BuilderValues {
 	const suite = defaultSuite(catalog);
-	const agent = catalog.agents?.[0];
+	const agent = startAgent(catalog, opts);
+	const keyed = opts.providersWithKey ?? [];
 	const models: ModelRef[] = [];
-	if (agent?.model) models.push({ provider: guessProvider(agent.model) ?? "openai", model: agent.model });
-	models.push({ provider: models[0]?.provider ?? "openai", model: "" });
+	if (agent?.model) models.push({ provider: defaultProvider(agent.model, keyed), model: agent.model });
+	models.push({ provider: models[0]?.provider ?? keyed[0] ?? "openai", model: "" });
 	return {
 		name: `compare-${seed}`,
 		suite: suite ? suiteRef(suite) : "",
@@ -234,4 +275,24 @@ export function builderPlanIsStale(planned: Experiment, v: BuilderValues, catalo
 /** The agent the catalog lists at path, for its label. */
 export function catalogAgent(catalog: Catalog, path: string): CatalogAgent | undefined {
 	return catalog.agents.find((a) => a.path === path);
+}
+
+/** Agent ids of GET /agents as My agents splits them (the org's own, then the built-in ones). */
+export interface BuilderAgentIds {
+	yours: readonly string[];
+	baselines: readonly string[];
+}
+
+/**
+ * The catalog agents the builder lists, grouped as My agents shows them: the org's own, then the
+ * built-in ones. Any other catalog agent (example and test agents) is left out. Without the agents
+ * list every catalog agent is listed as the org's own.
+ */
+export function builderAgentGroups(catalog: Catalog, ids: BuilderAgentIds | undefined): { yours: CatalogAgent[]; builtIn: CatalogAgent[] } {
+	const agents = catalog.agents ?? [];
+	if (!ids) return { yours: [...agents], builtIn: [] };
+	return {
+		yours: agents.filter((a) => ids.yours.includes(a.id)),
+		builtIn: agents.filter((a) => ids.baselines.includes(a.id) && !ids.yours.includes(a.id)),
+	};
 }

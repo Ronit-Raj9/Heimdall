@@ -1,0 +1,24 @@
+{
+	"builder": {
+		"yourAgents": "Your agents",
+		"builtInAgents": "Built-in agents"
+	},
+	"cost": {
+		"oneArm": "Why the cost moved compares two setups. This run has one setup."
+	},
+	"page": {
+		"evaluationNote": "This is one benchmark of an evaluation. Result, Model switch and Extra trials appear when two setups run on the same tasks.",
+		"openEvaluation": "Open the evaluation"
+	},
+	"promote": {
+		"membersOnly": "Only members of the organization can promote."
+	},
+	"apply": {
+		"loading": "Loading the routing rules...",
+		"unavailable": "Apply to my Bifrost is not available here: {{reason}}"
+	},
+	"regrade": {
+		"badId": "re-score name {{id}}: use lower-case letters, digits and _ only, for example zz_test_rescore",
+		"useSuggestion": "Use {{id}}"
+	}
+}

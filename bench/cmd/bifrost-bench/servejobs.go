@@ -856,6 +856,11 @@ func (h *jobsHub) registerOps() {
 			if err := ops.ValidID("id", p.ID); err != nil {
 				return nil, "", invalid(err)
 			}
+			// The store keeps regrades under ^[a-z0-9_]+$ names; refuse any other
+			// name now, not when the job writes its result.
+			if !store.ValidRegradeID(p.ID) {
+				return nil, "", invalid(fmt.Errorf("re-score name %s: use lower-case letters, digits and _ only, for example zz_test_rescore", p.ID))
+			}
 			if p.ID == schemas.GradeSourceOriginal || p.ID == schemas.GradeSourceReviewed {
 				return nil, "", invalid(fmt.Errorf("id %q is reserved", p.ID))
 			}

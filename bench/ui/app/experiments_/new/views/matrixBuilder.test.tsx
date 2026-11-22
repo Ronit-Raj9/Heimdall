@@ -67,4 +67,31 @@ describe("MatrixBuilder", () => {
 		expect(html).toContain('data-testid="builder-write-token"');
 		expect(html).toMatch(/data-testid="builder-plan"[^>]*disabled=""/);
 	});
+
+	it("lists only the agents My agents shows, built-in agents in their own group (J7.new-default)", () => {
+		const withDemo: Catalog = {
+			...catalog,
+			agents: [
+				...catalog.agents,
+				{ id: "codex", path: "agents/codex.yaml", adapter: "command", model: "gpt-5.4-mini" },
+				{ id: "acme-agent", path: "agents/acme-agent.yaml", adapter: "command", model: "claude-sonnet-4-5" },
+				{ id: "storm", path: "agents/storm.yaml", adapter: "command", model: "" },
+				{ id: "noop", path: "agents/noop.yaml", adapter: "scripted", model: "" },
+			],
+		};
+		const html = render(
+			<MatrixBuilder
+				catalog={withDemo}
+				defaults={defaultBuilderValues(withDemo, 1, { agent: "codex" })}
+				agentGroups={{ yours: [], baselines: ["codex", "claude-code"] }}
+				onStarted={() => undefined}
+			/>,
+			hostedSession("member"),
+		);
+		expect(html).toContain('data-testid="builder-agent-codex"');
+		expect(html).toContain('data-testid="builder-agent-claude-code"');
+		expect(html).toContain('data-testid="builder-agents-builtin"');
+		expect(html).toContain("Built-in agents");
+		for (const id of ["acme-agent", "storm", "noop"]) expect(html).not.toContain(`data-testid="builder-agent-${id}"`);
+	});
 });

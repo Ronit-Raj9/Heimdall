@@ -9,7 +9,10 @@ import ExperimentView from "./experimentView";
 
 const api = vi.hoisted(() => ({ status: {} as unknown }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
-vi.mock("nuqs", async (importOriginal) => ({ ...(await importOriginal<typeof import("nuqs")>()), useQueryState: () => [null, () => undefined] }));
+vi.mock("nuqs", async (importOriginal) => ({
+	...(await importOriginal<typeof import("nuqs")>()),
+	useQueryState: () => [null, () => undefined],
+}));
 vi.mock("@/lib/store", () => ({ useAppDispatch: () => () => undefined }));
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
@@ -74,5 +77,25 @@ describe("ExperimentView delete (X16)", () => {
 		const html = render(<ExperimentView expId="e_done" />, hostedSession("member"));
 		expect(html).not.toContain('data-testid="experiment-delete"');
 		expect(html).toContain("experiment-delete-admin-only");
+	});
+});
+
+describe("ExperimentView one benchmark of an evaluation (J7.tabs)", () => {
+	const done = (extra: Record<string, unknown>) => ({ ...created("e_child"), state: "done", ...extra });
+	it("says what a one-setup evaluation child is and links the evaluation", () => {
+		api.status = okQuery(done({ arms: ["A"], evaluation_id: "ev_1" }));
+		const html = render(<ExperimentView expId="e_child" />);
+		expect(html).toContain('data-testid="experiment-evaluation-note"');
+		expect(html).toContain(
+			"This is one benchmark of an evaluation. Result, Model switch and Extra trials appear when two setups run on the same tasks.",
+		);
+		expect(html).toContain("Open the evaluation");
+		expect(html).toContain('href="/evaluations/ev_1"');
+	});
+	it("has no note on a comparison of two setups or one outside an evaluation", () => {
+		api.status = okQuery(done({ arms: ["A", "B"], evaluation_id: "ev_1" }));
+		expect(render(<ExperimentView expId="e_child" />)).not.toContain("experiment-evaluation-note");
+		api.status = okQuery(done({ arms: ["A"] }));
+		expect(render(<ExperimentView expId="e_child" />)).not.toContain("experiment-evaluation-note");
 	});
 });

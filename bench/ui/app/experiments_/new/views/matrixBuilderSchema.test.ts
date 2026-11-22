@@ -2,7 +2,16 @@ import type { Catalog } from "@/lib/types/bench";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { builderPlanIsStale, defaultBuilderValues, guessProvider, matrixPreview, toMatrixExperiment, validateBuilder } from "./matrixBuilderSchema";
+import {
+	builderAgentGroups,
+	builderPlanIsStale,
+	defaultBuilderValues,
+	guessProvider,
+	keyedProviders,
+	matrixPreview,
+	toMatrixExperiment,
+	validateBuilder,
+} from "./matrixBuilderSchema";
 
 const fixture = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../../../public/fixtures/catalog.json"), "utf8")) as Catalog;
 const catalog: Catalog = {
@@ -120,5 +129,57 @@ describe("validateBuilder", () => {
 		expect(guessProvider("claude-haiku-4-5")).toBe("anthropic");
 		expect(guessProvider("gemini-3-pro")).toBe("gemini");
 		expect(guessProvider("mystery")).toBeUndefined();
+	});
+});
+
+describe("defaultBuilderValues with ?agent= and the org's keys (J7.new-default)", () => {
+	const withDemo: Catalog = {
+		...catalog,
+		agents: [
+			{ id: "acme-agent", path: "agents/acme-agent.yaml", adapter: "command", model: "claude-sonnet-4-5" },
+			...catalog.agents,
+			{ id: "noop", path: "agents/noop.yaml", adapter: "scripted", model: "" },
+		],
+	};
+	it("starts on the agent ?agent= names, with a provider the org has a key for", () => {
+		const v = defaultBuilderValues(withDemo, 1, { agent: "codex", providersWithKey: ["openai"] });
+		expect(v.agents).toEqual(["agents/codex.yaml"]);
+		expect(v.models[0]).toEqual({ provider: "openai", model: "gpt-5.4-mini" });
+		expect(v.models[1]).toEqual({ provider: "openai", model: "" });
+	});
+	it("takes a keyed provider over the guessed one when the guess has no key", () => {
+		const v = defaultBuilderValues(withDemo, 1, { agent: "claude-code", providersWithKey: ["openrouter"] });
+		expect(v.models[0]).toEqual({ provider: "openrouter", model: "claude-haiku-4-5" });
+	});
+	it("keeps the guessed provider when it has a key, and guesses when no key is known", () => {
+		expect(defaultBuilderValues(withDemo, 1, { agent: "claude-code", providersWithKey: ["openai", "anthropic"] }).models[0].provider).toBe(
+			"anthropic",
+		);
+		expect(defaultBuilderValues(withDemo, 1, { agent: "codex", providersWithKey: [] }).models[0].provider).toBe("openai");
+	});
+	it("starts on the first shown agent, never a demo agent, when ?agent= is missing or unknown", () => {
+		const shown = ["codex", "claude-code"];
+		expect(defaultBuilderValues(withDemo, 1, { shownAgents: shown }).agents).toEqual(["agents/codex.yaml"]);
+		expect(defaultBuilderValues(withDemo, 1, { agent: "nope", shownAgents: shown }).agents).toEqual(["agents/codex.yaml"]);
+		expect(defaultBuilderValues(withDemo, 1, { agent: "noop", shownAgents: shown }).agents).toEqual(["agents/codex.yaml"]);
+	});
+	it("groups the catalog agents as My agents does and leaves the rest out", () => {
+		const g = builderAgentGroups(withDemo, { yours: ["codex"], baselines: ["claude-code"] });
+		expect(g.yours.map((a) => a.id)).toEqual(["codex"]);
+		expect(g.builtIn.map((a) => a.id)).toEqual(["claude-code"]);
+		expect(builderAgentGroups(withDemo, undefined).yours.map((a) => a.id)).toEqual(["acme-agent", "claude-code", "codex", "noop"]);
+	});
+});
+
+describe("keyedProviders", () => {
+	it("lists providers with a key that is not invalid, once each", () => {
+		expect(
+			keyedProviders([
+				{ provider: "anthropic", status: "invalid" },
+				{ provider: "openai", status: "ok" },
+				{ provider: "openai", status: "untested" },
+				{ provider: "gemini", status: "untested" },
+			] as never),
+		).toEqual(["openai", "gemini"]);
 	});
 });
