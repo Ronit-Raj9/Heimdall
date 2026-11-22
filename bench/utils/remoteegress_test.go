@@ -92,12 +92,26 @@ func TestStartRemoteEgress(t *testing.T) {
 	var none *RemoteEgress
 	none.Stop(ctx)
 
+	// Y10: a second destination (a token endpoint) gets the next forwarder port.
+	two := &schemas.RunPlan{Image: "img", Egress: []string{"agent.example.com:443", "login.example.com:443"}}
+	if _, err := StartRemoteEgress(ctx, d, rc, two, "eval"); err != nil {
+		t.Fatal(err)
+	}
+	got = calls(t, log)
+	if !strings.Contains(strings.Join(got, "\n"), "BENCH_EGRESS_EXTRA=login.example.com:443") {
+		t.Fatalf("docker calls:\n%s", strings.Join(got, "\n"))
+	}
+	if RemoteEgressAddrN("r_1", 1) != "bench-eg-r_1:9301" {
+		t.Fatal(RemoteEgressAddrN("r_1", 1))
+	}
+
 	bad := []struct {
 		plan    *schemas.RunPlan
 		network string
 		want    string
 	}{
-		{&schemas.RunPlan{Egress: []string{"a:1", "b:2"}}, "eval", "one is supported"},
+		{&schemas.RunPlan{Egress: []string{"a:1", "b:2", "c:3", "d:4", "e:5"}}, "eval", "at most 4"},
+		{&schemas.RunPlan{Egress: []string{"a:1", "nohost"}}, "eval", "destination"},
 		{&schemas.RunPlan{Egress: []string{"nohost"}}, "eval", "destination"},
 		{&schemas.RunPlan{Egress: []string{"a:99999"}}, "eval", "not host:port"},
 		{&schemas.RunPlan{Egress: []string{"a:1"}}, "none", "cannot be joined"},

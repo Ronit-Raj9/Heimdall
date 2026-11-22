@@ -115,7 +115,49 @@
         "auth_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Org secret (Settings > Secrets) sent as the auth token; used instead of auth_env."},
         "auth_header": {"type": "string", "pattern": "^[A-Za-z0-9-]{1,64}$", "description": "Header the token goes in. Empty or Authorization sends 'Authorization: Bearer <token>'; another name sends the raw token."},
         "sign_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Org secret (Settings > Secrets) each request body is signed with (HMAC-SHA256); used instead of sign_env."},
-        "tool_allow": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "With tools expose: only these tool and MCP service ids (and external API ids) are sent to the deployment. Empty sends every one."}
+        "tool_allow": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "With tools expose: only these tool and MCP service ids (and external API ids) are sent to the deployment. Empty sends every one."},
+        "mapping": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Lane Y10: the endpoint's own request and answer shape. Mirrors schemas.RemoteMapping (docs/remote-execution.md, Request and answer mapping).",
+            "properties": {
+              "preset": {"type": "string"},
+              "method": {"enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "get", "post", "put", "patch", "delete"]},
+              "headers": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Extra headers; values may hold {{secret.NAME}}."},
+              "query": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Extra query parameters; values may hold {{secret.NAME}}."},
+              "body": {"type": "string", "description": "Request template: JSON with placeholders such as {{instruction}}, {{messages}}, {{session_id}}."},
+              "answer_path": {"type": "string", "description": "JSONPath-like path to the answer, for example choices[0].message.content."},
+              "stream": {"enum": ["sse", "aws_eventstream"]},
+              "stream_path": {"type": "string"},
+              "stream_decode": {"enum": ["base64"]},
+              "start": {"type": "object", "additionalProperties": false, "required": ["url"], "properties": {"method": {"enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "get", "post", "put", "patch", "delete"]}, "url": {"type": "string", "minLength": 1}, "headers": {"type": "object", "additionalProperties": {"type": "string"}}, "body": {"type": "string"}, "id_path": {"type": "string"}}},
+              "end": {"type": "object", "additionalProperties": false, "required": ["url"], "properties": {"method": {"enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "get", "post", "put", "patch", "delete"]}, "url": {"type": "string", "minLength": 1}, "headers": {"type": "object", "additionalProperties": {"type": "string"}}, "body": {"type": "string"}, "id_path": {"type": "string"}}},
+              "poll": {"type": "object", "additionalProperties": false, "required": ["url", "answer_path"], "properties": {"url": {"type": "string", "minLength": 1}, "answer_path": {"type": "string", "minLength": 1}, "interval_s": {"type": "integer", "minimum": 0, "maximum": 30}, "reply_id_path": {"type": "string"}}}
+            }
+        },
+        "auth": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Lane Y10: OAuth 2 client credentials, Microsoft Entra ID, AWS SigV4, a Google ID token and/or mutual TLS. Mirrors schemas.RemoteAuth. Every credential is a Settings > Secrets name.",
+            "properties": {
+              "type": {"enum": ["oauth2_client_credentials", "azure_entra", "aws_sigv4", "gcp_id_token"]},
+              "token_url": {"type": "string", "pattern": "^https://"},
+              "tenant_id": {"type": "string"},
+              "client_id_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+              "client_secret_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+              "scope": {"type": "string"},
+              "audience": {"type": "string"},
+              "access_key_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+              "secret_key_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+              "session_token_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+              "region": {"type": "string"},
+              "service": {"type": "string"},
+              "service_account_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+              "client_cert_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+              "client_key_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+              "ca_cert_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"}
+            }
+        }
       }
     },
     "openai": {

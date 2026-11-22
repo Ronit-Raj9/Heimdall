@@ -3,12 +3,14 @@ package adapters
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/maximhq/bifrost/bench/remotemap"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
@@ -154,7 +156,66 @@ func (a *remoteHTTPAdapter) Plan(_ context.Context, rc *schemas.RunContext) (*sc
 	plan.Env = env
 	plan.Files = map[string]string{remoteLauncherFile: remoteLauncherSource, InstructionFile: instruction}
 	plan.Egress = []string{target}
+	if remotemap.Mapped(spec) { // Y10: the token endpoint of the auth block is a second destination
+		if plan.Egress, err = remotemap.EgressTargets(spec); err != nil {
+			return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+		}
+		if err := remoteMappingEnv(rc, spec, plan.Egress, env); err != nil {
+			return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+		}
+	}
 	return plan, nil
+}
+
+// remoteMappingEnv hands the launcher the mapping and auth block (lane
+// Y10): BENCH_REMOTE_MAPPING with every {{secret.NAME}} written as
+// {{env_secret.NAME}} (the engine expands {{secret.NAME}} in env values, and
+// a value spliced into JSON could break it), BENCH_REMOTE_AUTH with secret
+// names only, BENCH_REMOTE_SECRET_<NAME> = {{secret.NAME}} for each secret
+// (expanded by the engine, redacted in plan.json), and
+// BENCH_REMOTE_CONNECT_MAP, the forwarder port of each destination.
+func remoteMappingEnv(rc *schemas.RunContext, spec *schemas.RemoteAgent, egress []string, env map[string]string) error {
+	if m := spec.Mapping; m != nil {
+		raw, err := json.Marshal(m)
+		if err != nil {
+			return err
+		}
+		env["BENCH_REMOTE_MAPPING"] = strings.ReplaceAll(strings.ReplaceAll(string(raw), "{{secret.", "{{env_secret."), "{{ secret.", "{{env_secret.")
+	} else {
+		env["BENCH_REMOTE_MAPPING"] = "{}"
+	}
+	if a := spec.Auth; a != nil {
+		c := *a
+		c.TokenURL = remotemap.TokenURL(a)
+		raw, err := json.Marshal(c)
+		if err != nil {
+			return err
+		}
+		env["BENCH_REMOTE_AUTH"] = string(raw)
+	}
+	for _, n := range spec.SecretNames() {
+		if !envNamePattern.MatchString(n) {
+			return fmt.Errorf("secret name %q is not a Settings > Secrets name", n)
+		}
+		if n == spec.AuthSecret || n == spec.SignSecret {
+			continue // BENCH_REMOTE_TOKEN and BENCH_REMOTE_SIGN_SECRET
+		}
+		env["BENCH_REMOTE_SECRET_"+n] = "{{secret." + n + "}}"
+	}
+	cm := map[string]string{}
+	for i, t := range egress {
+		cm[t] = utils.RemoteEgressAddrN(rc.Run.RunID, i)
+	}
+	raw, _ := json.Marshal(cm)
+	env["BENCH_REMOTE_CONNECT_MAP"] = string(raw)
+	if rc.Agent != nil && rc.Agent.Model != "" {
+		env["BENCH_REMOTE_MODEL"] = rc.Agent.Model
+	}
+	if rc.Task != nil {
+		env["BENCH_REMOTE_TASK"] = rc.Task.ID
+	}
+	env["BENCH_REMOTE_RUN"] = rc.Run.RunID
+	return nil
 }
 
 // remoteEnv is the launcher's environment.

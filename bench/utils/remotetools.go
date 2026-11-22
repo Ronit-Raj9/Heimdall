@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/maximhq/bifrost/bench/remotemap"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -47,7 +48,7 @@ func CheckRemoteAgent(r *schemas.RemoteAgent) error {
 	default:
 		return fmt.Errorf("remote.artifacts %q: want inline or none", r.Artifacts)
 	}
-	return nil
+	return remotemap.Check(r) // Y10: request and response mapping, auth
 }
 
 // RemoteOutputAllowed says whether a remote agent can run a task with output

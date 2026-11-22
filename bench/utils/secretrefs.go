@@ -83,8 +83,8 @@ func RunSecretNames(rc *schemas.RunContext) []string {
 		for _, n := range SecretRefs(rc.Agent.Env) {
 			seen[n] = true
 		}
-		if r := rc.Agent.Remote; r != nil { // J3: remote.auth_secret and remote.sign_secret (adapters/remotehttp.go)
-			for _, n := range []string{r.AuthSecret, r.SignSecret} {
+		if r := rc.Agent.Remote; r != nil { // J3: remote.auth_secret and remote.sign_secret (adapters/remotehttp.go); Y10: auth block and mapping headers
+			for _, n := range r.SecretNames() {
 				if SecretNameOK(n) {
 					seen[n] = true
 				}

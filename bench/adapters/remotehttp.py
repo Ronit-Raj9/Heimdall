@@ -348,63 +348,69 @@ def poll(remote, resp, raw, deadline, report):
             return resp, raw
 
 
-def main():
-    remote = Remote(os.environ["BENCH_REMOTE_URL"])
-    timeout = float(os.environ.get("BENCH_REMOTE_TIMEOUT_S", "600"))
-    deadline = time.time() + timeout
-    with open(os.environ["BENCH_REMOTE_INSTRUCTION"], encoding="utf-8") as f:
-        instruction = f.read()
-    answer_path = os.environ.get("BENCH_ANSWER_PATH", "answer.txt")
-    output = os.environ.get("BENCH_REMOTE_OUTPUT", "answer")
+def heimdall_body(instruction, output, answer_path, files_root):
+    """Heimdall's own request body."""
     body = {
         "instruction": instruction,
         "session_id": os.environ.get("BENCH_REMOTE_SESSION_ID", ""),
         "session_index": int(os.environ.get("BENCH_REMOTE_SESSION_INDEX", "1")),
         "output": output,
     }
-    files_root = os.environ.get("BENCH_REMOTE_FILES_DIR", "")
     if files_root and os.path.isdir(files_root):
         files = workspace_files(files_root, os.path.abspath(answer_path))
         if files is None:
             emit({"type": "note", "message": "workspace files left out: more than %d files or %d bytes" % (MAX_FILES, MAX_FILES_BYTES)})
         elif files:
             body["files"] = files
-    if os.environ.get("BENCH_REMOTE_TRAFFIC") == "gateway":
-        body["gateway"] = {
-            "url": os.environ.get("BENCH_REMOTE_GATEWAY_URL", ""),
-            "key": os.environ.get("BENCH_REMOTE_RUN_KEY", ""),
-            "model": os.environ.get("BENCH_REMOTE_MODEL", ""),
-        }
-    if os.environ.get("BENCH_REMOTE_TOOLS"):
-        tools, token = json.loads(os.environ["BENCH_REMOTE_TOOLS"]), os.environ.get("BENCH_REMOTE_TOOLS_TOKEN", "")
-        body["tools"] = {k: dict(v, token=token) for k, v in sorted(tools.items())}
-    payload = json.dumps(body).encode("utf-8")
-    headers = {"Content-Type": "application/json"}
+    gateway = gateway_block()
+    if gateway is not None:
+        body["gateway"] = gateway
+    tools = tools_block()
+    if tools:
+        body["tools"] = tools
+    return body
+
+
+def gateway_block():
+    if os.environ.get("BENCH_REMOTE_TRAFFIC") != "gateway":
+        return None
+    return {
+        "url": os.environ.get("BENCH_REMOTE_GATEWAY_URL", ""),
+        "key": os.environ.get("BENCH_REMOTE_RUN_KEY", ""),
+        "model": os.environ.get("BENCH_REMOTE_MODEL", ""),
+    }
+
+
+def tools_block():
+    if not os.environ.get("BENCH_REMOTE_TOOLS"):
+        return {}
+    tools, token = json.loads(os.environ["BENCH_REMOTE_TOOLS"]), os.environ.get("BENCH_REMOTE_TOOLS_TOKEN", "")
+    return {k: dict(v, token=token) for k, v in sorted(tools.items())}
+
+
+def sign_headers(payload):
+    """The HMAC signature headers of a request body, {} without a secret."""
     secret = os.environ.get("BENCH_REMOTE_SIGN_SECRET", "")
-    if secret and len(secret) < 16:
+    if not secret:
+        return {}
+    if len(secret) < 16:
         fail(2, "the signing secret is shorter than 16 characters")
-    if secret:
-        ts = str(int(time.time()))
-        mac = hmac.new(secret.encode("utf-8"), ts.encode("ascii") + b"." + payload, hashlib.sha256).hexdigest()
-        headers["X-Heimdall-Timestamp"] = ts
-        headers["X-Heimdall-Signature"] = "sha256=" + mac
-    path = (remote.url.path or "/") + ("?" + remote.url.query if remote.url.query else "")
-    started = time.time()
-    emit({"type": "request", "session_id": body["session_id"], "session_index": body["session_index"],
-          "files": len(body.get("files", {})), "tools": len(body.get("tools", {})), "signed": bool(secret)})
-    resp, raw = remote.do("POST", path, payload, headers, timeout)
-    report = {}
-    if resp.status == 202:
-        resp, raw = poll(remote, resp, raw, deadline, report)
-    emit({"type": "response", "status": resp.status, "bytes": len(raw),
-          "latency_ms": int((time.time() - started) * 1000)})
+    ts = str(int(time.time()))
+    mac = hmac.new(secret.encode("utf-8"), ts.encode("ascii") + b"." + payload, hashlib.sha256).hexdigest()
+    return {"X-Heimdall-Timestamp": ts, "X-Heimdall-Signature": "sha256=" + mac}
+
+
+def read_answer(resp, raw, output, files_root):
+    """Reads Heimdall's own answer shape: the answer text (or None) and the
+    agent's self-report."""
     if resp.status // 100 != 2:
         fail(1, "the agent answered HTTP %d: %s" % (resp.status, clean(raw[:500].decode("utf-8", "replace"), 500)))
-    content_type = resp.getheader("Content-Type", "application/json").lower()
+    content_type = (resp.getheader("Content-Type") or "application/json").lower()
     doc = None if content_type.startswith("text/plain") else parse_json(raw)
     if isinstance(doc, dict) and str(doc.get("status", "completed")).lower() == "failed":
         fail(1, "the agent reported its run failed: %s" % clean(str(doc.get("error", "")), 500))
     answer = answer_of(doc, raw, content_type, output == "answer")
+    report = {}
     if isinstance(doc, dict):
         usage = usage_of(doc.get("usage"))
         if usage:
@@ -418,6 +424,10 @@ def main():
                 write_artifacts(doc["artifacts"], files_root, report)
             else:
                 report.setdefault("notes", []).append("artifacts sent without remote.artifacts inline; ignored")
+    return answer, report
+
+
+def write_answer(answer, answer_path, report):
     if report:
         report["type"] = "remote_report"
         emit(report)
@@ -428,6 +438,774 @@ def main():
         with open(answer_path, "w", encoding="utf-8") as f:
             f.write(answer)
     emit({"type": "result", "answer_bytes": len((answer or "").encode("utf-8"))})
+
+
+def main():
+    if os.environ.get("BENCH_REMOTE_MAPPING") or os.environ.get("BENCH_REMOTE_AUTH"):
+        return main_mapped()
+    remote = Remote(os.environ["BENCH_REMOTE_URL"])
+    timeout = float(os.environ.get("BENCH_REMOTE_TIMEOUT_S", "600"))
+    deadline = time.time() + timeout
+    with open(os.environ["BENCH_REMOTE_INSTRUCTION"], encoding="utf-8") as f:
+        instruction = f.read()
+    answer_path = os.environ.get("BENCH_ANSWER_PATH", "answer.txt")
+    output = os.environ.get("BENCH_REMOTE_OUTPUT", "answer")
+    files_root = os.environ.get("BENCH_REMOTE_FILES_DIR", "")
+    body = heimdall_body(instruction, output, answer_path, files_root)
+    payload = json.dumps(body).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    sig = sign_headers(payload)
+    headers.update(sig)
+    path = (remote.url.path or "/") + ("?" + remote.url.query if remote.url.query else "")
+    started = time.time()
+    emit({"type": "request", "session_id": body["session_id"], "session_index": body["session_index"],
+          "files": len(body.get("files", {})), "tools": len(body.get("tools", {})), "signed": bool(sig)})
+    resp, raw = remote.do("POST", path, payload, headers, timeout)
+    report = {}
+    if resp.status == 202:
+        resp, raw = poll(remote, resp, raw, deadline, report)
+    emit({"type": "response", "status": resp.status, "bytes": len(raw),
+          "latency_ms": int((time.time() - started) * 1000)})
+    answer, more = read_answer(resp, raw, output, files_root)
+    report.update(more)
+    write_answer(answer, answer_path, report)
+
+
+# ---------------------------------------------------------------------------
+# Request and response mapping (lane Y10; remotemap/ is the Go twin and the
+# tests run both against the same endpoints). BENCH_REMOTE_MAPPING holds the
+# mapping (schemas.RemoteMapping) with every {{secret.NAME}} written as
+# {{env_secret.NAME}}, whose value is BENCH_REMOTE_SECRET_<NAME>.
+# BENCH_REMOTE_AUTH holds the auth block (secret names only) and
+# BENCH_REMOTE_CONNECT_MAP maps each host:port the run may reach to its
+# forwarder port.
+
+PH_RE = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\}\}")
+TOKEN_EARLY = 60
+MAX_POLLS = 600
+MAX_STREAM_EVENTS = 20000
+
+
+def secret_value(name):
+    v = os.environ.get("BENCH_REMOTE_SECRET_" + name, "")
+    if not v:
+        fail(2, "secret %s is not set: add it on Settings > Secrets" % name)
+    return v
+
+
+class Vars:
+    def __init__(self, instruction, output):
+        self.instruction = instruction
+        self.output = output
+        self.session_id = os.environ.get("BENCH_REMOTE_SESSION_ID", "")
+        self.session_index = int(os.environ.get("BENCH_REMOTE_SESSION_INDEX", "1"))
+        self.model = os.environ.get("BENCH_REMOTE_MODEL", "")
+        self.start_id = ""
+        self.reply_id = ""
+
+    def lookup(self, name, secrets):
+        if name == "instruction":
+            return self.instruction
+        if name == "messages":
+            return [{"role": "user", "content": self.instruction}]
+        if name == "tools":
+            return tools_block()
+        if name == "metadata":
+            m = {"session_id": self.session_id, "session_index": self.session_index, "output": self.output}
+            for k, env in (("task", "BENCH_REMOTE_TASK"), ("run", "BENCH_REMOTE_RUN")):
+                if os.environ.get(env):
+                    m[k] = os.environ[env]
+            return m
+        if name == "gateway":
+            return gateway_block()
+        if name == "session_id":
+            return self.session_id
+        if name == "session_index":
+            return self.session_index
+        if name == "output":
+            return self.output
+        if name == "model":
+            return self.model
+        if name == "uuid":
+            return os.urandom(16).hex()
+        if name == "start.id":
+            return self.start_id
+        if name == "reply.id":
+            return self.reply_id
+        if name.startswith("env_secret.") and secrets:
+            return secret_value(name[len("env_secret."):])
+        fail(2, "unknown placeholder {{%s}} in the mapping" % name)
+
+
+def text_of(v):
+    if v is None:
+        return ""
+    if isinstance(v, str):
+        return v
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return json.dumps(v)
+    return json.dumps(v, separators=(",", ":"), sort_keys=True)
+
+
+def render_text(s, v, secrets=False, escape=None):
+    def sub(m):
+        t = text_of(v.lookup(m.group(1), secrets))
+        return escape(t) if escape else t
+    return PH_RE.sub(sub, s or "")
+
+
+def path_escape(t):
+    return urllib.parse.quote(t, safe="$&+=:@")
+
+
+def render_node(n, v):
+    if isinstance(n, str):
+        m = PH_RE.fullmatch(n)
+        if m:
+            return v.lookup(m.group(1), False)
+        return render_text(n, v)
+    if isinstance(n, list):
+        return [render_node(e, v) for e in n]
+    if isinstance(n, dict):
+        return {k: render_node(e, v) for k, e in n.items()}
+    return n
+
+
+def render_body(tmpl, v):
+    try:
+        doc = json.loads(tmpl)
+    except ValueError as e:
+        fail(2, "the request template is not valid JSON: %s" % e)
+    return json.dumps(render_node(doc, v)).encode("utf-8")
+
+
+# Paths: the JSONPath subset of remotemap/path.go.
+
+def parse_path(src):
+    s = src.strip()
+    if s.startswith("$"):
+        s = s[1:]
+    segs, i = [], 0
+    while i < len(s):
+        c = s[i]
+        if c == "." or (i == 0 and c != "["):
+            if c == ".":
+                i += 1
+            j = i
+            while j < len(s) and s[j] not in ".[":
+                j += 1
+            if j == i:
+                fail(2, "path %r has an empty key" % src)
+            segs.append(("wild",) if s[i:j] == "*" else ("key", s[i:j]))
+            i = j
+        elif c == "[":
+            rest = s[i + 1:]
+            if rest.startswith("*]"):
+                segs.append(("wild",))
+                i += 3
+            elif rest[:1] in ("'", '"'):
+                j = rest.find(rest[0], 1)
+                if j < 0 or rest[j + 1:j + 2] != "]":
+                    fail(2, "path %r has an unterminated key" % src)
+                segs.append(("key", rest[1:j]))
+                i += j + 3
+            elif rest.startswith("?("):
+                j = rest.find(")]")
+                if j < 0:
+                    fail(2, "path %r has an unterminated filter" % src)
+                segs.append(parse_filter(rest[2:j], src))
+                i += j + 3
+            else:
+                j = rest.find("]")
+                try:
+                    segs.append(("index", int(rest[:j].strip())))
+                except ValueError:
+                    fail(2, "path %r has a bad index" % src)
+                i += j + 2
+        else:
+            fail(2, "path %r: unexpected %r" % (src, c))
+    return segs
+
+
+def parse_filter(expr, src):
+    expr = expr.strip()
+    op, left, right = "", expr, ""
+    for o in ("==", "!="):
+        k = expr.find(o)
+        if k >= 0:
+            op, left, right = o, expr[:k].strip(), expr[k + 2:].strip()
+            break
+    if not left.startswith("@.") or len(left) < 3:
+        fail(2, "path %r: bad filter" % src)
+    field = left[2:].split(".")
+    value = None
+    if op:
+        if len(right) >= 2 and right[0] in "'\"" and right[-1] == right[0]:
+            value = right[1:-1]
+        elif right in ("true", "false"):
+            value = right == "true"
+        elif right == "null":
+            value = None
+        else:
+            try:
+                value = float(right)
+            except ValueError:
+                fail(2, "path %r: bad filter value" % src)
+    return ("filter", field, op, value)
+
+
+def filter_match(seg, v):
+    _, field, op, value = seg
+    for f in field:
+        if not isinstance(v, dict) or f not in v:
+            return False
+        v = v[f]
+    if not op:
+        return v is not None
+    if isinstance(value, float) and isinstance(v, (int, float)) and not isinstance(v, bool):
+        eq = float(v) == value
+    else:
+        eq = v == value and type(v) is type(value)
+    return eq if op == "==" else not eq
+
+
+def path_eval(segs, doc):
+    cur = [doc]
+    for sg in segs:
+        nxt = []
+        for v in cur:
+            if sg[0] == "key":
+                if isinstance(v, dict) and sg[1] in v:
+                    nxt.append(v[sg[1]])
+            elif sg[0] == "index":
+                if isinstance(v, list):
+                    i = sg[1] + len(v) if sg[1] < 0 else sg[1]
+                    if 0 <= i < len(v):
+                        nxt.append(v[i])
+            elif sg[0] == "wild":
+                if isinstance(v, list):
+                    nxt.extend(v)
+                elif isinstance(v, dict):
+                    nxt.extend(v[k] for k in sorted(v))
+            else:
+                if isinstance(v, list):
+                    nxt.extend(e for e in v if filter_match(sg, e))
+                elif isinstance(v, dict) and filter_match(sg, v):
+                    nxt.append(v)
+        cur = nxt
+    return cur
+
+
+def matches_text(ms, sep):
+    return sep.join(text_of(m) for m in ms if m is not None)
+
+
+# Auth.
+
+def rsa_sign_sha256(pem_text, data):
+    """PKCS#1 v1.5 SHA-256 signature with an RSA key in PEM (PKCS#8 or
+    PKCS#1), in pure Python: the launcher runs on the bench's stdlib only."""
+    lines = [l for l in pem_text.strip().splitlines() if not l.startswith("-----")]
+    der = base64.b64decode("".join(lines))
+
+    def read(b, i):
+        tag, n = b[i], b[i + 1]
+        i += 2
+        if n & 0x80:
+            k = n & 0x7F
+            n = int.from_bytes(b[i:i + k], "big")
+            i += k
+        return tag, b[i:i + n], i + n
+
+    _, seq, _ = read(der, 0)
+    _, _, i = read(seq, 0)
+    tag, val, j = read(seq, i)
+    if tag == 0x30:  # PKCS#8: the RSAPrivateKey is in the octet string
+        _, octet, _ = read(seq, j)
+        _, seq, _ = read(octet, 0)
+    ints, i = [], 0
+    while i < len(seq) and len(ints) < 4:
+        _, v, i = read(seq, i)
+        ints.append(int.from_bytes(v, "big"))
+    n, d = ints[1], ints[3]
+    k = (n.bit_length() + 7) // 8
+    t = bytes.fromhex("3031300d060960864801650304020105000420") + hashlib.sha256(data).digest()
+    em = b"\x00\x01" + b"\xff" * (k - 3 - len(t)) + b"\x00" + t
+    return pow(int.from_bytes(em, "big"), d, n).to_bytes(k, "big")
+
+
+def b64url(b):
+    return base64.urlsafe_b64encode(b).rstrip(b"=").decode("ascii")
+
+
+def sigv4_escape(s):
+    return urllib.parse.quote(s, safe="-_.~")
+
+
+def sigv4_sign(method, host, path_query, headers, body, keys):
+    """Adds the AWS Signature Version 4 headers (remotemap/auth.go SignV4)."""
+    t = time.gmtime()
+    amz = time.strftime("%Y%m%dT%H%M%SZ", t)
+    day = amz[:8]
+    headers["X-Amz-Date"] = amz
+    if keys.get("session_token"):
+        headers["X-Amz-Security-Token"] = keys["session_token"]
+    path, _, query = path_query.partition("?")
+    canon_path = "/".join(sigv4_escape(seg) for seg in (path or "/").split("/")) if keys["service"] != "s3" else (path or "/")
+    pairs = sorted(sigv4_escape(k) + "=" + sigv4_escape(v) for k, v in urllib.parse.parse_qsl(query, keep_blank_values=True))
+    hs = {"host": host, "x-amz-date": amz}
+    for k, v in headers.items():
+        if k.lower() == "content-type":
+            hs["content-type"] = v
+    if keys.get("session_token"):
+        hs["x-amz-security-token"] = keys["session_token"]
+    names = sorted(hs)
+    canon_headers = "".join(n + ":" + " ".join(hs[n].split()) + "\n" for n in names)
+    signed = ";".join(names)
+    canonical = "\n".join([method, canon_path, "&".join(pairs), canon_headers, signed, hashlib.sha256(body or b"").hexdigest()])
+    scope = "%s/%s/%s/aws4_request" % (day, keys["region"], keys["service"])
+    to_sign = "AWS4-HMAC-SHA256\n%s\n%s\n%s" % (amz, scope, hashlib.sha256(canonical.encode("utf-8")).hexdigest())
+
+    def mac(k, m):
+        return hmac.new(k, m.encode("utf-8"), hashlib.sha256).digest()
+
+    key = mac(mac(mac(mac(("AWS4" + keys["secret_key"]).encode("utf-8"), day), keys["region"]), keys["service"]), "aws4_request")
+    sig = hmac.new(key, to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
+    headers["Authorization"] = "AWS4-HMAC-SHA256 Credential=%s/%s, SignedHeaders=%s, Signature=%s" % (keys["access_key"], scope, signed, sig)
+
+
+class Auth:
+    """The auth block of one run: tokens are fetched once and again shortly
+    before they expire; SigV4 signs every request."""
+
+    def __init__(self, spec, endpoints, header):
+        self.spec, self.endpoints, self.header = spec, endpoints, header or "Authorization"
+        self.token, self.expires, self.fetches = "", 0.0, 0
+        self.type = spec.get("type", "")
+
+    def tls_context(self):
+        if not self.spec.get("client_cert_secret"):
+            return None
+        import ssl
+        import tempfile
+        ctx = ssl.create_default_context()
+        if self.spec.get("ca_cert_secret"):
+            ctx = ssl.create_default_context(cadata=secret_value(self.spec["ca_cert_secret"]))
+        fd, path = tempfile.mkstemp(prefix="bench-mtls-")
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write(secret_value(self.spec["client_cert_secret"]).strip() + "\n" + secret_value(self.spec["client_key_secret"]).strip() + "\n")
+            ctx.load_cert_chain(path)
+        except (ssl.SSLError, OSError) as e:
+            fail(2, "client certificate: %s (want PEM certificate and key secrets)" % e)
+        finally:
+            os.unlink(path)
+        return ctx
+
+    def fetch(self, timeout):
+        url = self.spec["token_url"]
+        if self.type == "gcp_id_token":
+            try:
+                key = json.loads(secret_value(self.spec["service_account_secret"]))
+                email, pem_key = key["client_email"], key["private_key"]
+            except (ValueError, KeyError, TypeError):
+                fail(2, "the service account secret is not a Google service account JSON key")
+            head = {"alg": "RS256", "typ": "JWT"}
+            if key.get("private_key_id"):
+                head["kid"] = key["private_key_id"]
+            iat = int(time.time())
+            claims = {"iss": email, "sub": email, "aud": url, "iat": iat, "exp": iat + 3600, "target_audience": self.spec.get("audience", "")}
+            signing = b64url(json.dumps(head).encode()) + "." + b64url(json.dumps(claims).encode())
+            jwt = signing + "." + b64url(rsa_sign_sha256(pem_key, signing.encode("ascii")))
+            form = {"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer", "assertion": jwt}
+            field = "id_token"
+        else:
+            form = {"grant_type": "client_credentials", "client_id": secret_value(self.spec["client_id_secret"]),
+                    "client_secret": secret_value(self.spec["client_secret_secret"])}
+            for k in ("scope", "audience"):
+                if self.spec.get(k):
+                    form[k] = self.spec[k]
+            field = "access_token"
+        ep = self.endpoints.get(url)
+        body = urllib.parse.urlencode(form).encode("ascii")
+        resp, raw = ep.do("POST", ep.path_of(url), body, {"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"}, timeout, plain=True)
+        doc = parse_json(raw) or {}
+        host = urllib.parse.urlsplit(url).netloc
+        if resp.status // 100 != 2:
+            why = doc.get("error_description") or doc.get("error") or "" if isinstance(doc, dict) else ""
+            fail(1, "token endpoint %s answered %d %s" % (host, resp.status, clean(str(why), 200)))
+        tok = doc.get(field) if isinstance(doc, dict) else None
+        if not isinstance(tok, str) or not tok:
+            fail(1, "token endpoint %s answered without %s" % (host, field))
+        try:
+            ttl = float(doc.get("expires_in", 3600))
+        except (TypeError, ValueError):
+            ttl = 3600.0
+        self.fetches += 1
+        emit({"type": "auth", "token_fetches": self.fetches, "host": host})
+        return tok, time.time() + ttl
+
+    def apply(self, method, host, path_query, headers, body, timeout):
+        if self.type == "aws_sigv4":
+            sigv4_sign(method, host, path_query, headers, body, {
+                "access_key": secret_value(self.spec["access_key_secret"]), "secret_key": secret_value(self.spec["secret_key_secret"]),
+                "session_token": secret_value(self.spec["session_token_secret"]) if self.spec.get("session_token_secret") else "",
+                "region": self.spec["region"], "service": self.spec["service"]})
+        elif self.type in ("oauth2_client_credentials", "azure_entra", "gcp_id_token"):
+            if not self.token or time.time() + TOKEN_EARLY >= self.expires:
+                self.token, self.expires = self.fetch(timeout)
+            if self.header.lower() == "authorization":
+                headers["Authorization"] = "Bearer " + self.token
+            else:
+                headers[self.header] = self.token
+
+
+class Endpoint(Remote):
+    """A host the run may reach, through its forwarder port."""
+
+    def __init__(self, url, connect_map, ctx=None):
+        Remote.__init__(self, url)
+        key = "%s:%d" % (self.url.hostname, self.port)
+        if ":" in self.url.hostname:
+            key = "[%s]:%d" % (self.url.hostname, self.port)
+        if key in connect_map:
+            host, _, p = connect_map[key].rpartition(":")
+            self.addr = (host, int(p))
+        elif connect_map and not os.environ.get("BENCH_REMOTE_CONNECT"):
+            self.addr = (self.url.hostname, self.port)
+        self.ctx = ctx
+
+    def path_of(self, url):
+        u = urllib.parse.urlsplit(url)
+        return (u.path or "/") + ("?" + u.query if u.query else "")
+
+    def open(self, method, path, body, headers, timeout, plain=False):
+        if self.url.scheme == "https":
+            conn = TLSConn(self.url.hostname, self.port, self.addr, timeout)
+            if self.ctx is not None and not plain:
+                conn._context = self.ctx
+        else:
+            conn = Conn(self.url.hostname, self.port, self.addr, timeout)
+        h = dict(headers)
+        if plain:
+            h = {k: v for k, v in h.items()}
+        else:
+            h = dict(self.headers, **headers)
+        try:
+            conn.request(method, path, body=body, headers=h)
+            return conn, conn.getresponse()
+        except (OSError, http.client.HTTPException) as e:
+            conn.close()
+            fail(1, "request to %s failed: %s" % (self.url.hostname, e))
+
+    def do(self, method, path, body, headers, timeout, plain=False):
+        conn, resp = self.open(method, path, body, headers, timeout, plain)
+        try:
+            raw = resp.read(MAX_ANSWER_BYTES + 1)
+        except (OSError, http.client.HTTPException) as e:
+            fail(1, "read the answer of %s: %s" % (self.url.hostname, e))
+        finally:
+            conn.close()
+        if len(raw) > MAX_ANSWER_BYTES:
+            fail(1, "the agent's answer is larger than %d bytes" % MAX_ANSWER_BYTES)
+        return resp, raw
+
+
+def stream_piece(payload, segs, decode):
+    payload = payload.strip()
+    if not payload:
+        return ""
+    try:
+        doc = json.loads(payload)
+        is_json = True
+    except ValueError:
+        doc, is_json = None, False
+    if not is_json:
+        text = "" if segs is not None else (payload.decode("utf-8", "replace") if isinstance(payload, bytes) else payload)
+    elif segs is None:
+        text = doc if isinstance(doc, str) else ""
+    else:
+        text = matches_text(path_eval(segs, doc), "")
+    if decode == "base64" and text:
+        try:
+            text = base64.b64decode(text, validate=True).decode("utf-8", "replace")
+        except ValueError:
+            fail(1, "a stream piece is not base64")
+    return text
+
+
+def read_sse(resp, segs, decode):
+    out, data, events = [], [], 0
+    done = False
+
+    def flush():
+        nonlocal events
+        if not data:
+            return False
+        payload = "\n".join(data)
+        del data[:]
+        events += 1
+        if events > MAX_STREAM_EVENTS:
+            fail(1, "more than %d stream events" % MAX_STREAM_EVENTS)
+        if payload.strip() == "[DONE]":
+            return True
+        out.append(stream_piece(payload, segs, decode))
+        return False
+
+    while not done:
+        line = resp.readline(4 << 20)
+        if not line:
+            break
+        line = line.decode("utf-8", "replace").rstrip("\r\n")
+        if line == "":
+            done = flush()
+        elif line.startswith("data:"):
+            v = line[5:]
+            data.append(v[1:] if v.startswith(" ") else v)
+    if not done:
+        flush()
+    return "".join(out), events
+
+
+def read_exact(resp, n):
+    b = b""
+    while len(b) < n:
+        chunk = resp.read(n - len(b))
+        if not chunk:
+            return b
+        b += chunk
+    return b
+
+
+def read_eventstream(resp, segs, decode):
+    import zlib
+    out, events = [], 0
+    while True:
+        prelude = read_exact(resp, 12)
+        if not prelude:
+            break
+        if len(prelude) < 12:
+            fail(1, "the event stream ended inside a message")
+        total, hlen = int.from_bytes(prelude[0:4], "big"), int.from_bytes(prelude[4:8], "big")
+        if zlib.crc32(prelude[:8]) != int.from_bytes(prelude[8:12], "big"):
+            fail(1, "event stream prelude checksum mismatch")
+        if total < 16 or total > 16 << 20 or hlen > total - 16:
+            fail(1, "event stream message is malformed")
+        rest = read_exact(resp, total - 12)
+        if len(rest) < total - 12:
+            fail(1, "the event stream ended inside a message")
+        if zlib.crc32(prelude + rest[:-4]) != int.from_bytes(rest[-4:], "big"):
+            fail(1, "event stream message checksum mismatch")
+        headers, hb = {}, rest[:hlen]
+        i = 0
+        sizes = {0: 0, 1: 0, 2: 1, 3: 2, 4: 4, 5: 8, 8: 8, 9: 16}
+        while i < len(hb):
+            n = hb[i]
+            name = hb[i + 1:i + 1 + n].decode("utf-8", "replace")
+            typ = hb[i + 1 + n]
+            i += 2 + n
+            if typ in (6, 7):
+                ln = int.from_bytes(hb[i:i + 2], "big")
+                if typ == 7:
+                    headers[name] = hb[i + 2:i + 2 + ln].decode("utf-8", "replace")
+                i += 2 + ln
+            elif typ in sizes:
+                i += sizes[typ]
+            else:
+                fail(1, "event stream headers are malformed")
+        payload = rest[hlen:-4]
+        events += 1
+        if events > MAX_STREAM_EVENTS:
+            fail(1, "more than %d stream events" % MAX_STREAM_EVENTS)
+        if headers.get(":message-type") in ("exception", "error"):
+            msg = headers.get(":exception-type", "") + headers.get(":error-code", "")
+            doc = parse_json(payload)
+            if isinstance(doc, dict) and doc.get("message"):
+                msg += ": " + str(doc["message"])
+            fail(1, "the agent's stream reported %s" % clean(msg, 500))
+        out.append(stream_piece(payload, segs, decode))
+    return "".join(out), events
+
+
+def main_mapped():
+    mapping = json.loads(os.environ.get("BENCH_REMOTE_MAPPING") or "{}")
+    auth_spec = json.loads(os.environ.get("BENCH_REMOTE_AUTH") or "null")
+    connect_map = json.loads(os.environ.get("BENCH_REMOTE_CONNECT_MAP") or "{}")
+    url_tmpl = os.environ["BENCH_REMOTE_URL"]
+    timeout = float(os.environ.get("BENCH_REMOTE_TIMEOUT_S", "600"))
+    deadline = time.time() + timeout
+    with open(os.environ["BENCH_REMOTE_INSTRUCTION"], encoding="utf-8") as f:
+        instruction = f.read()
+    answer_path = os.environ.get("BENCH_ANSWER_PATH", "answer.txt")
+    output = os.environ.get("BENCH_REMOTE_OUTPUT", "answer")
+    files_root = os.environ.get("BENCH_REMOTE_FILES_DIR", "")
+    v = Vars(instruction, output)
+    base = Endpoint(url_tmpl, connect_map)
+    endpoints = {}
+    auth = None
+    if auth_spec:
+        auth = Auth(auth_spec, endpoints, os.environ.get("BENCH_REMOTE_AUTH_HEADER", ""))
+        base.ctx = auth.tls_context()
+        if auth_spec.get("token_url"):
+            endpoints[auth_spec["token_url"]] = Endpoint(auth_spec["token_url"], connect_map)
+    if auth and auth.type in ("oauth2_client_credentials", "azure_entra", "gcp_id_token"):
+        base.headers.pop("Authorization", None)  # a fetched token replaces the static one
+    common = mapping.get("headers") or {}
+
+    def remaining():
+        left = deadline - time.time()
+        if left <= 0:
+            fail(1, "the agent did not answer in time")
+        return left
+
+    def build(step, method, url, headers, query, body_tmpl, default_body):
+        target = render_text(url, v, False, path_escape)
+        full = urllib.parse.urljoin(urllib.parse.urlunsplit(base.url), target)
+        path = base.same_origin(full)
+        if path is None:
+            fail(2, "the %s url is not on the agent URL's host" % step)
+        if query:
+            u = urllib.parse.urlsplit(path)
+            q = urllib.parse.parse_qsl(u.query, keep_blank_values=True)
+            q = [p for p in q if p[0] not in query] + [(k, render_text(query[k], v, True)) for k in sorted(query)]
+            path = u.path + "?" + urllib.parse.urlencode(q)
+        hs = {k: render_text(val, v, True) for k, val in sorted((headers or {}).items())}
+        body = None
+        if body_tmpl:
+            body = render_body(body_tmpl, v)
+        elif default_body is not None and method in ("POST", "PUT", "PATCH"):
+            body = default_body
+        if body is not None:
+            hs.setdefault("Content-Type", "application/json")
+        hs.setdefault("Accept", "application/json, text/event-stream, text/plain")
+        return method, path, hs, body
+
+    def send(step, req, sign=False, stream=False):
+        method, path, hs, body = req
+        if sign and body is not None:
+            hs.update(sign_headers(body))
+        if auth:
+            host = base.url.netloc
+            auth.apply(method, host, path, hs, body, max(1.0, min(30.0, remaining())))
+        emit({"type": "request", "step": step, "method": method, "bytes": len(body or b"")})
+        if stream:
+            return base.open(method, path, body, hs, remaining())
+        return base.do(method, path, body, hs, remaining())
+
+    report = {"mapped": mapping.get("preset") or "custom"}
+    started = time.time()
+    st = mapping.get("start")
+    if st:
+        req = build("start", (st.get("method") or "POST").upper(), st["url"], dict(common, **(st.get("headers") or {})), None, st.get("body"), None)
+        resp, raw = send("start", req)
+        emit({"type": "response", "step": "start", "status": resp.status, "bytes": len(raw)})
+        if resp.status == 409:
+            emit({"type": "note", "message": "the start step answered 409: the session already exists, so it is reused"})
+        elif resp.status // 100 != 2:
+            fail(1, "the start step answered HTTP %d: %s" % (resp.status, clean(raw[:500].decode("utf-8", "replace"), 500)))
+        elif st.get("id_path"):
+            doc = parse_json(raw)
+            v.start_id = matches_text(path_eval(parse_path(st["id_path"]), doc), "") if doc is not None else ""
+            if not v.start_id:
+                fail(1, "the start step's answer has nothing at %s" % st["id_path"])
+    try:
+        default = None if mapping.get("body") else json.dumps(heimdall_body(instruction, output, answer_path, files_root)).encode("utf-8")
+        req = build("request", (mapping.get("method") or "POST").upper(), url_tmpl, common, mapping.get("query"), mapping.get("body"), default)
+        answer = None
+        if mapping.get("stream"):
+            conn, resp = send("request", req, sign=True, stream=True)
+            try:
+                if resp.status // 100 != 2:
+                    raw = resp.read(4096)
+                    fail(1, "the agent answered HTTP %d: %s" % (resp.status, clean(raw.decode("utf-8", "replace"), 500)))
+                segs = parse_path(mapping["stream_path"]) if mapping.get("stream_path") else None
+                if mapping["stream"] == "aws_eventstream":
+                    answer, events = read_eventstream(resp, segs, mapping.get("stream_decode", ""))
+                else:
+                    answer, events = read_sse(resp, segs, mapping.get("stream_decode", ""))
+            except (OSError, http.client.HTTPException) as e:
+                fail(1, "read the agent's stream: %s" % e)
+            finally:
+                conn.close()
+            emit({"type": "response", "step": "request", "status": resp.status, "events": events,
+                  "latency_ms": int((time.time() - started) * 1000)})
+            if not answer:
+                fail(1, "the stream carried no text at %s (%d events)" % (mapping.get("stream_path") or "its data lines", events))
+            report["events_streamed"] = events
+        else:
+            resp, raw = send("request", req, sign=True)
+            emit({"type": "response", "step": "request", "status": resp.status, "bytes": len(raw),
+                  "latency_ms": int((time.time() - started) * 1000)})
+            if resp.status // 100 != 2:
+                fail(1, "the agent answered HTTP %d: %s" % (resp.status, clean(raw[:500].decode("utf-8", "replace"), 500)))
+            pl = mapping.get("poll")
+            if pl:
+                answer = poll_mapped(pl, raw, v, build, send, common, remaining, report)
+            elif mapping.get("answer_path"):
+                doc = parse_json(raw)
+                if doc is None:
+                    fail(1, "the agent's answer is not JSON, so answer_path %s cannot read it" % mapping["answer_path"])
+                ms = path_eval(parse_path(mapping["answer_path"]), doc)
+                if not ms:
+                    fail(1, "the agent's answer has nothing at %s: %s" % (mapping["answer_path"], clean(raw[:300].decode("utf-8", "replace"), 300)))
+                answer = matches_text(ms, "\n")
+                if isinstance(doc, dict):
+                    usage = usage_of(doc.get("usage"))
+                    if usage:
+                        report["usage"] = usage
+            else:
+                answer, more = read_answer(resp, raw, output, files_root)
+                report.update(more)
+    finally:
+        end = mapping.get("end")
+        if end:
+            try:
+                req = build("end", (end.get("method") or "DELETE").upper(), end["url"], dict(common, **(end.get("headers") or {})), None, end.get("body"), None)
+                method, path, hs, body = req
+                if auth:
+                    auth.apply(method, base.url.netloc, path, hs, body, 10)
+                resp, _ = base.do(method, path, body, hs, 10)
+                emit({"type": "response", "step": "end", "status": resp.status})
+            except SystemExit:
+                pass
+    if auth and auth.fetches:
+        report["token_fetches"] = auth.fetches
+    write_answer(answer, answer_path, report)
+
+
+def poll_mapped(pl, first, v, build, send, common, remaining, report):
+    if pl.get("reply_id_path"):
+        doc = parse_json(first)
+        v.reply_id = matches_text(path_eval(parse_path(pl["reply_id_path"]), doc), "") if doc is not None else ""
+        if not v.reply_id:
+            fail(1, "the agent's answer has nothing at %s" % pl["reply_id_path"])
+    segs = parse_path(render_text(pl["answer_path"], v))
+    interval = max(int(pl.get("interval_s") or 1), 1)
+    settled, polls = "", 0
+    for _ in range(MAX_POLLS):
+        if remaining() <= interval:
+            break
+        time.sleep(interval)
+        resp, raw = send("poll", build("poll", "GET", pl["url"], common, None, "", None))
+        polls += 1
+        if resp.status // 100 != 2:
+            fail(1, "the poll answered HTTP %d: %s" % (resp.status, clean(raw[:500].decode("utf-8", "replace"), 500)))
+        doc = parse_json(raw)
+        if doc is None:
+            continue
+        text = matches_text(path_eval(segs, doc), "\n")
+        if not text:
+            continue
+        if text == settled:
+            break
+        settled = text
+    report["polls"] = polls
+    emit({"type": "poll", "polls": polls})
+    if not settled:
+        fail(1, "no answer at %s after %d polls" % (pl["answer_path"], polls))
+    return settled
 
 
 if __name__ == "__main__":
