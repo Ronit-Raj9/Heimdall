@@ -461,6 +461,12 @@ and status; evaluation runs are `experiment.run`), `heimdall_leases_in_flight`,
 `heimdall_workers_disk_low` and `heimdall_remote_runs_total` (uploaded runs
 by result and outcome).
 
+Monitoring (lane Z14): the `monitoring` compose profile adds Prometheus with
+alert and SLO rules, a Grafana dashboard, an OpenTelemetry Collector and
+Tempo for platform traces; `https://<domain>/status` is the public status
+page with incident notes (`bifrost-bench status incident ...`). Setup,
+metrics, SLOs, alert runbooks and the status page: docs/monitoring.md.
+
 Runner disk: every runner (`runner start`, the shared runner) sweeps every 10
 minutes: leftovers of crashed runs (the janitor), Heimdall task and agent
 images (label `bifrost-bench=1`, tags under `bench/` or `org-<org id>/` only)

@@ -58,6 +58,7 @@ type Registry struct {
 	mu         sync.Mutex
 	collectors []collector
 	lat        map[histKey]*hist
+	hists      []*HistogramVec // lane Z14: histograms updated as things happen (vec.go)
 	timeout    time.Duration
 }
 
@@ -176,6 +177,7 @@ func (r *Registry) Gather(ctx context.Context) []Family {
 func (r *Registry) Render(ctx context.Context) string {
 	var b strings.Builder
 	r.renderLatency(&b)
+	r.renderHists(&b) // lane Z14 (vec.go)
 	for _, f := range r.Gather(ctx) {
 		fmt.Fprintf(&b, "# HELP %s %s\n# TYPE %s %s\n", f.Name, escHelp(f.Help), f.Name, f.Type)
 		for _, s := range f.Samples {

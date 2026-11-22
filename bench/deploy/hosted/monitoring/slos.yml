@@ -1,0 +1,99 @@
+# Heimdall service level objectives (lane Z14, docs/monitoring.md).
+#
+# Source of truth in Sloth's prometheus/v1 format
+# (https://github.com/slok/sloth). slo-rules.yml next to this file holds the
+# recording rules and multiwindow burn-rate alerts for exactly these SLOs,
+# in the form Sloth generates; after changing this file regenerate it with
+#
+#   sloth generate -i slos.yml -o slo-rules.yml
+#
+# or edit slo-rules.yml by hand to match (deploy/monitoring_test.go checks
+# that both name the same SLOs and only metrics the server exports).
+#
+# Every indicator is computed from the server's own /metrics. Metric labels
+# never hold an org, experiment, run or lease id; one SLO covers the whole
+# platform.
+version: "prometheus/v1"
+service: "heimdall"
+labels:
+  owner: platform
+slos:
+  - name: "api-availability"
+    objective: 99.5
+    description: "API requests that do not fail with a server error (5xx). Health probes and the static site are left out."
+    sli:
+      events:
+        error_query: sum(rate(heimdall_http_request_duration_seconds_count{code="5xx",area!~"health|ui"}[{{.window}}]))
+        total_query: sum(rate(heimdall_http_request_duration_seconds_count{area!~"health|ui"}[{{.window}}]))
+    alerting:
+      name: HeimdallAPIAvailability
+      page_alert:
+        labels:
+          severity: page
+      ticket_alert:
+        labels:
+          severity: ticket
+
+  - name: "evaluation-start-latency"
+    objective: 95
+    description: "Evaluations whose first run starts on a worker within 5 minutes of the evaluation opening to workers."
+    sli:
+      events:
+        error_query: sum(rate(heimdall_evaluation_start_seconds_count[{{.window}}])) - sum(rate(heimdall_evaluation_start_seconds_bucket{le="300"}[{{.window}}]))
+        total_query: sum(rate(heimdall_evaluation_start_seconds_count[{{.window}}]))
+    alerting:
+      name: HeimdallEvaluationStartLatency
+      page_alert:
+        labels:
+          severity: page
+      ticket_alert:
+        labels:
+          severity: ticket
+
+  - name: "run-continuity"
+    objective: 99
+    description: "Runs handed to a worker that are not lost (no heartbeat past the stale threshold, worker gone)."
+    sli:
+      events:
+        error_query: sum(rate(heimdall_remote_leases_ended_total{reason="lost"}[{{.window}}]))
+        total_query: sum(rate(heimdall_remote_leases_ended_total[{{.window}}]))
+    alerting:
+      name: HeimdallRunContinuity
+      page_alert:
+        labels:
+          severity: page
+      ticket_alert:
+        labels:
+          severity: ticket
+
+  - name: "upload-acceptance"
+    objective: 99
+    description: "Finished runs whose upload the server accepts and seals (a rejection means a run had to be repeated)."
+    sli:
+      events:
+        error_query: sum(rate(heimdall_remote_runs_total{result="rejected"}[{{.window}}]))
+        total_query: sum(rate(heimdall_remote_runs_total[{{.window}}]))
+    alerting:
+      name: HeimdallUploadAcceptance
+      page_alert:
+        labels:
+          severity: page
+      ticket_alert:
+        labels:
+          severity: ticket
+
+  - name: "time-to-verdict-step"
+    objective: 99
+    description: "Uploads the server verifies, stores and seals within 30 seconds (the step between a finished run and a visible result)."
+    sli:
+      events:
+        error_query: sum(rate(heimdall_remote_complete_seconds_count[{{.window}}])) - sum(rate(heimdall_remote_complete_seconds_bucket{le="30"}[{{.window}}]))
+        total_query: sum(rate(heimdall_remote_complete_seconds_count[{{.window}}]))
+    alerting:
+      name: HeimdallSealLatency
+      page_alert:
+        labels:
+          severity: page
+      ticket_alert:
+        labels:
+          severity: ticket

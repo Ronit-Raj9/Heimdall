@@ -1,0 +1,681 @@
+{
+  "uid": "heimdall-platform",
+  "title": "Heimdall platform",
+  "tags": [
+    "heimdall"
+  ],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Service level objectives",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "API availability: error budget left (30 d)",
+      "description": "Share of the 30-day error budget not yet spent (slos.yml).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "heimdall-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 5,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "slo:period_error_budget_remaining:ratio{sloth_slo=\"api-availability\"}",
+          "legendFormat": "api-availability",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Evaluation start: error budget left (30 d)",
+      "description": "Share of the 30-day error budget not yet spent (slos.yml).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "heimdall-prometheus"
+      },
+      "gridPos": {
+        "x": 5,
+        "y": 1,
+        "w": 5,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "slo:period_error_budget_remaining:ratio{sloth_slo=\"evaluation-start-latency\"}",
+          "legendFormat": "evaluation-start-latency",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Run continuity: error budget left (30 d)",
+      "description": "Share of the 30-day error budget not yet spent (slos.yml).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "heimdall-prometheus"
+      },
+      "gridPos": {
+        "x": 10,
+        "y": 1,
+        "w": 5,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "slo:period_error_budget_remaining:ratio{sloth_slo=\"run-continuity\"}",
+          "legendFormat": "run-continuity",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Upload acceptance: error budget left (30 d)",
+      "description": "Share of the 30-day error budget not yet spent (slos.yml).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "heimdall-prometheus"
+      },
+      "gridPos": {
+        "x": 15,
+        "y": 1,
+        "w": 5,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "slo:period_error_budget_remaining:ratio{sloth_slo=\"upload-acceptance\"}",
+          "legendFormat": "upload-acceptance",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Seal within 30 s: error budget left (30 d)",
+      "description": "Share of the 30-day error budget not yet spent (slos.yml).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "heimdall-prometheus"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 1,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "slo:period_error_budget_remaining:ratio{sloth_slo=\"time-to-verdict-step\"}",
+          "legendFormat": "time-to-verdict-step",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 7,
+      "type": "row",
+      "title": "API",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Requests per second by area",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "heimdall-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "sum by (area) (rate(heimdall_http_request_duration_seconds_count{area!~\"health|ui\"}[5m]))",
+          "legendFormat": "{{area}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Server error share (5xx)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "heimdall-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 7,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "sum(rate(heimdall_http_request_duration_seconds_count{code=\"5xx\",area!~\"health|ui\"}[5m])) / sum(rate(heimdall_http_request_duration_seconds_count{area!~\"health|ui\"}[5m]))",
+          "legendFormat": "5xx",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Latency p50 / p95 / p99",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "heimdall-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 7,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(heimdall_http_request_duration_seconds_bucket{area!~\"health|ui\"}[5m])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(heimdall_http_request_duration_seconds_bucket{area!~\"health|ui\"}[5m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(heimdall_http_request_duration_seconds_bucket{area!~\"health|ui\"}[5m])))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 11,
+      "type": "row",
+      "title": "Evaluations and workers",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Evaluations waiting to start",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "heimdall-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "sum by (kind) (heimdall_job_queue_depth)",
+          "legendFormat": "{{kind}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Workers by state",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "heimdall-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "sum by (state) (heimdall_workers)",
+          "legendFormat": "{{state}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "heimdall_workers_disk_low",
+          "legendFormat": "disk low",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Runs in flight and oldest heartbeat",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "heimdall-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "heimdall_leases_in_flight",
+          "legendFormat": "in flight",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "heimdall_lease_oldest_heartbeat_age_seconds",
+          "legendFormat": "oldest heartbeat (s)",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Evaluation start latency p50 / p95",
+      "description": "Time from an evaluation opening to workers to its first run starting.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "heimdall-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(heimdall_evaluation_start_seconds_bucket[30m])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(heimdall_evaluation_start_seconds_bucket[30m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Run ends by reason",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "heimdall-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 24,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "sum by (reason) (rate(heimdall_remote_leases_ended_total[5m]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Uploads by result",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "heimdall-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 24,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "sum by (result) (rate(heimdall_remote_runs_total[5m]))",
+          "legendFormat": "{{result}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(heimdall_remote_complete_seconds_bucket[10m])))",
+          "legendFormat": "p95 seal time (s)",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 18,
+      "type": "row",
+      "title": "Telemetry",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "Spans sent, dropped, failed",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "heimdall-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 33,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "heimdall-prometheus"
+          },
+          "expr": "sum by (result) (rate(heimdall_telemetry_spans_total[5m]))",
+          "legendFormat": "{{result}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {}
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [
+    {
+      "title": "Traces (Tempo)",
+      "type": "link",
+      "url": "/explore?left=%7B%22datasource%22:%22heimdall-tempo%22%7D"
+    }
+  ]
+}

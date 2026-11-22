@@ -15,6 +15,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/calibration"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/telemetry"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
@@ -444,6 +445,8 @@ func (g *judge) call(ctx context.Context, key *schemas.RunKey, spec schemas.Judg
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(virtualKeyHeader, key.Value)
+	// lane Z14: Bifrost's OTel plugin joins the run's trace.
+	telemetry.Inject(ctx, req.Header)
 	for _, h := range utils.MaximHeadersFrom(ctx) { // X23: tagged as Heimdall's own call for Bifrost's Maxim plugin
 		req.Header.Set(h[0], h[1])
 	}
