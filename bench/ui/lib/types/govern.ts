@@ -57,6 +57,8 @@ export interface PolicySaveRequest {
 	policy?: ReleasePolicy;
 	if_match?: string;
 	note?: string;
+	/** Save only when no rule set of this file name exists (409 otherwise); a new set never replaces one. */
+	create_only?: boolean;
 }
 
 export interface PolicyValidation {

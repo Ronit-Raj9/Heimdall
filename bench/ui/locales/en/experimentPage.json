@@ -120,5 +120,8 @@
 		"changes": "The settings that differ between the two setups, and the raw solved counts.",
 		"policy": "Whether this result meets your rule for releasing a change.",
 		"tasks": "Each task, with how A and B did on it. Click a cell to compare the two runs."
+	},
+	"exportTab": {
+		"description": "Download every saved run of this comparison as JSON lines or CSV, or as Every Eval Ever records."
 	}
 }

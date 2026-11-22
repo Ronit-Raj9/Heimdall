@@ -12,6 +12,7 @@
 		"pick": "Pick a rule set on the left, or create a new one.",
 		"fileName": "File name",
 		"fileNameHint": "Lower case letters, digits, '-', '_' or '.', ending in .yaml",
+		"fileNameTaken": "A rule set with this file name already exists. Pick another name.",
 		"form": "Simple editor",
 		"yaml": "Text file (YAML)",
 		"name": "Name",

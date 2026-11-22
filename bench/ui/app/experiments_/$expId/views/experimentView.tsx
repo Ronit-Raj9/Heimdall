@@ -310,8 +310,19 @@ function ExperimentTab({
 		case "integrity":
 			return <IntegrityTab expId={expId} />;
 		case "export":
-			return <ExperimentExportMenu expId={expId} />;
+			return <ExportTab expId={expId} />;
 		case "actions":
 			return <ActionsTab expId={expId} suite={suite} suiteVersion={suiteVersion} />;
 	}
+}
+
+/** The Export tab: one line on what the downloads are, then the export menu open (N70). */
+function ExportTab({ expId }: { expId: string }) {
+	const { t } = useTranslation("experimentPage");
+	return (
+		<div className="flex min-w-0 flex-col gap-3" data-testid="experiment-export-tab">
+			<p className="text-muted-foreground text-sm">{t("exportTab.description")}</p>
+			<ExperimentExportMenu expId={expId} initiallyOpen />
+		</div>
+	);
 }
