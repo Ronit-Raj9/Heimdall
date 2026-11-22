@@ -92,13 +92,13 @@ func TestStartRemoteEgress(t *testing.T) {
 	var none *RemoteEgress
 	none.Stop(ctx)
 
-	// Y10: a second destination (a token endpoint) gets the next forwarder port.
+	// Y10: a second destination (a token endpoint) gets its own forwarder.
 	two := &schemas.RunPlan{Image: "img", Egress: []string{"agent.example.com:443", "login.example.com:443"}}
 	if _, err := StartRemoteEgress(ctx, d, rc, two, "eval"); err != nil {
 		t.Fatal(err)
 	}
 	got = calls(t, log)
-	if !strings.Contains(strings.Join(got, "\n"), "BENCH_EGRESS_EXTRA=login.example.com:443") {
+	if !strings.Contains(strings.Join(got, "\n"), "BENCH_EGRESS_TARGET=login.example.com:443") {
 		t.Fatalf("docker calls:\n%s", strings.Join(got, "\n"))
 	}
 	if RemoteEgressAddrN("r_1", 1) != "bench-eg-r_1-2:9300" {

@@ -245,7 +245,7 @@ func (g *checksGrader) judgeReply(ctx context.Context, rc *schemas.RunContext, r
 	task := instructionText(rc.Task)
 	ans := &schemas.AnswerSpec{Question: task, Rubric: strings.TrimSpace(rubric)}
 	prompt := renderJudgePromptCap(string(tmpl), ans, conv, maxConversationRunes)
-	rec, _, err = g.judge.voteReplies(ctx, rc, spec, prompt)
+	rec, _, err = g.judge.voteReplies(ctx, rc, spec, prompt, nil)
 	if err != nil {
 		return nil, false, false, "", err
 	}

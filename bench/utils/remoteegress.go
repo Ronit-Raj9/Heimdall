@@ -238,7 +238,6 @@ func StartRemoteEgress(ctx context.Context, d Docker, rc *schemas.RunContext, pl
 			return nil, fmt.Errorf("remote egress: %w", err)
 		}
 	}
-	extra := strings.Join(plan.Egress[1:], ",")
 	if network == "" || network == "none" || network == "host" || network == "bridge" {
 		return nil, fmt.Errorf("remote egress: agent network %q cannot be joined", network)
 	}
