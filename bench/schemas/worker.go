@@ -38,6 +38,9 @@ type WorkerRegister struct {
 	// GPUs (X7). Nil from a worker without GPUs, which is never leased a slot
 	// of a GPU task.
 	Capabilities *WorkerCapabilities `json:"capabilities,omitempty"`
+	// JobKinds lists the runner job kinds the worker takes (JobLease.JobKind).
+	// Empty: every kind (an org's own runner, and every older build).
+	JobKinds []string `json:"job_kinds,omitempty"`
 }
 
 // WorkerRegistered is the answer to a registration: the upload limits the
@@ -108,6 +111,24 @@ type JobLease struct {
 	Argv    []string `json:"argv"`
 	Files   []byte   `json:"files,omitempty"`   // zip of the project snapshot
 	Collect []string `json:"collect,omitempty"` // project-relative folders or files to bring back
+	// Secrets are values only for the claiming runner (a per-job model key,
+	// a repository token). The runner holds them in memory only; they are
+	// never logged, stored or written to a file. Use Redacted to log a lease.
+	Secrets map[string]string `json:"secrets,omitempty"`
+}
+
+// Redacted returns a copy of the lease with every secret value replaced by
+// "[redacted]", for log lines and errors.
+func (j JobLease) Redacted() JobLease {
+	if j.Secrets == nil {
+		return j
+	}
+	s := make(map[string]string, len(j.Secrets))
+	for k := range j.Secrets {
+		s[k] = "[redacted]"
+	}
+	j.Secrets = s
+	return j
 }
 
 // JobComplete is the job part of a complete call: the job's error, empty
