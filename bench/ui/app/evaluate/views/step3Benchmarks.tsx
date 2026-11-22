@@ -13,13 +13,15 @@ import { cn } from "@/lib/utils";
 import { entriesByBenchmark, referenceHint } from "@/components/reference/reference.utils";
 import { type ReferenceEntry, useGetReferenceBoardQuery } from "@/lib/store/apis/referenceApi";
 import "@/lib/types/referenceI18n";
-import { type ReactNode, useEffect } from "react";
+import "./fw06I18n";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useEvaluateDraft } from "./evaluateDraft";
 import { OwnTasksCard } from "./ownTasks";
 
 // Lane A12: wizard step 3, "Benchmarks". Pick a pack or any set of single benchmarks. Benchmarks the
-// chosen agent cannot run are greyed out with the reason from /agents/{id}/compatibility.
+// chosen agent cannot run are greyed out with the reason from /agents/{id}/compatibility. In an A/B
+// evaluation every setup's agent is checked: a benchmark is runnable only when all of them can run it.
 
 /**
  * The slice of the wizard draft this step reads and writes. Field names follow EvaluationSpec
@@ -29,6 +31,8 @@ export interface EvaluateDraftBenchmarks {
 	agent: string;
 	benchmarks: string[];
 	pack?: string;
+	/** The other setups of an A/B evaluation (arms after A), with their agent. */
+	arms?: readonly { label: string; agent: string }[];
 }
 
 export interface Step3BenchmarksProps<D extends EvaluateDraftBenchmarks = EvaluateDraftBenchmarks> {
@@ -91,7 +95,11 @@ export function benchmarkCapability(suite: Pick<SuiteRow, "id" | "track">): Benc
 	if (isGpuBenchmark(id)) return "gpu";
 	const curated = suiteDisplayCategory(id);
 	if (curated && (CAPABILITY_ORDER as readonly string[]).includes(curated)) return curated as BenchmarkCapability;
-	if (id.startsWith("hd-harbor")) return "terminal";
+	// Only the shell benchmarks among the imported Harbor packs read as Terminal by id. BFCL is function
+	// calling (tools); its import track says "terminal" only because that is the Harbor importer's default.
+	const bare = benchmarkKey(id);
+	if (bare === "hd-harbor-tb2" || bare === "hd-harbor-skills") return "terminal";
+	if (bare.startsWith("hd-harbor-bfcl")) return "support";
 	if (id.startsWith("hd-swe-ib")) return "safety";
 	if (id.startsWith("hd-swe")) return "coding";
 	if (id.startsWith("agentdojo")) return "safety";
@@ -124,7 +132,14 @@ export function compatibilityMap(compatibility: AgentCompatibility | undefined):
 		const missing = Array.isArray(r.missing) ? r.missing : [];
 		const reason = r.reason ?? "";
 		const ok = typeof r.ok === "boolean" ? r.ok : missing.length === 0 && !reason;
-		out.set(benchmarkKey(id), { id, ok, requires: Array.isArray(r.requires) ? r.requires : [], missing, reason, ...(r.note ? { note: r.note } : {}) });
+		out.set(benchmarkKey(id), {
+			id,
+			ok,
+			requires: Array.isArray(r.requires) ? r.requires : [],
+			missing,
+			reason,
+			...(r.note ? { note: r.note } : {}),
+		});
 	}
 	return out;
 }
@@ -172,6 +187,60 @@ export function groupBenchmarks(suites: readonly SuiteRow[]): { groups: Benchmar
 	return { groups };
 }
 
+/** One other setup of an A/B evaluation and its agent's compatibility answer (undefined while loading). */
+export interface ArmCompatibility {
+	label: string;
+	agent: string;
+	compatibility?: AgentCompatibility;
+}
+
+/** The setups after A whose agent differs from A's, once per agent (the first label wins). */
+export function otherArmAgents(
+	primary: string,
+	arms: readonly { label: string; agent: string }[] | undefined,
+): { label: string; agent: string }[] {
+	const seen = new Set<string>([primary]);
+	const out: { label: string; agent: string }[] = [];
+	for (const a of arms ?? []) {
+		if (!a.agent || seen.has(a.agent)) continue;
+		seen.add(a.agent);
+		out.push({ label: a.label, agent: a.agent });
+	}
+	return out;
+}
+
+/**
+ * The primary agent's compatibility with every other setup's answer folded in: a benchmark the
+ * primary agent can run but another setup's agent cannot becomes not runnable, with
+ * describe(agent, setup, reason) as its reason. Undefined while the primary answer is unknown.
+ */
+export function mergeArmCompatibility(
+	primary: AgentCompatibility | undefined,
+	others: readonly ArmCompatibility[],
+	describe: (agent: string, setup: string, reason: string) => string,
+): AgentCompatibility | undefined {
+	if (!primary) return undefined;
+	const base = compatibilityMap(primary);
+	const rows = new Map<string, BenchmarkCompatibility>(base);
+	for (const o of others) {
+		if (!o.compatibility) continue;
+		for (const [key, c] of compatibilityMap(o.compatibility)) {
+			const own = rows.get(key);
+			if (own && !own.ok) continue; // the primary agent's own reason comes first
+			if (!incompatibleReason(c)) continue;
+			const why = c.reason || (c.missing.length ? `Needs ${c.missing.join(", ")}` : "");
+			rows.set(key, {
+				id: own?.id ?? c.id,
+				ok: false,
+				requires: own?.requires ?? c.requires,
+				missing: c.missing,
+				reason: describe(o.agent, o.label, why),
+			});
+		}
+	}
+	return { ...primary, benchmarks: [...rows.values()] };
+}
+
 /** selected without the benchmarks compatibility says the agent cannot run. */
 export function keepRunnable(selected: readonly string[], compatibility: AgentCompatibility | undefined): string[] {
 	const compat = compatibilityMap(compatibility);
@@ -205,7 +274,18 @@ export interface Step3BenchmarksViewProps {
 }
 
 /** Pure view: packs, grouped multi-select and the selected count. Data comes in through props. */
-export function Step3BenchmarksView({ suites, packs, compatibility, selected, pack, onChange, loading, checking, reference, ownTasks }: Step3BenchmarksViewProps) {
+export function Step3BenchmarksView({
+	suites,
+	packs,
+	compatibility,
+	selected,
+	pack,
+	onChange,
+	loading,
+	checking,
+	reference,
+	ownTasks,
+}: Step3BenchmarksViewProps) {
 	const { t: tr } = useTranslation("reference");
 	const compat = compatibilityMap(compatibility);
 	const known = entriesByBenchmark(reference ?? []);
@@ -231,7 +311,9 @@ export function Step3BenchmarksView({ suites, packs, compatibility, selected, pa
 		if (!h) return null;
 		return (
 			<span className="text-primary/90 block truncate text-xs" data-testid={`step3-reference-${id}`}>
-				{h.kind === "one" ? tr("hint.one", { agent: h.agent, score: h.score }) : tr("hint.many", { agent: h.agent, low: h.low, high: h.high })}
+				{h.kind === "one"
+					? tr("hint.one", { agent: h.agent, score: h.score })
+					: tr("hint.many", { agent: h.agent, low: h.low, high: h.high })}
 			</span>
 		);
 	};
@@ -242,7 +324,11 @@ export function Step3BenchmarksView({ suites, packs, compatibility, selected, pa
 		const disabled = Boolean(reason) || Boolean(checking);
 		const on = chosen.has(s.id) && !disabled;
 		const n = s.admitted_count ?? 0;
-		const note = reason || (checking ? "Checking whether your agent can run it..." : "") || (isGpuBenchmark(s.id) ? "Needs a GPU worker" : "") || (c?.ok ? (c.note ?? "") : "");
+		const note =
+			reason ||
+			(checking ? "Checking whether your agent can run it..." : "") ||
+			(isGpuBenchmark(s.id) ? "Needs a GPU worker" : "") ||
+			(c?.ok ? (c.note ?? "") : "");
 		return (
 			<li key={s.id}>
 				<label
@@ -323,7 +409,11 @@ export function Step3BenchmarksView({ suites, packs, compatibility, selected, pa
 			<section>
 				<h3 className="mb-2 text-sm font-medium">Or pick benchmarks</h3>
 				{groups.length === 0 ? (
-					<p className="text-muted-foreground text-sm">{loading ? "Loading benchmarks..." : "No benchmark has ready tasks yet. Benchmarks that are not ready yet are listed on the Benchmarks page."}</p>
+					<p className="text-muted-foreground text-sm">
+						{loading
+							? "Loading benchmarks..."
+							: "No benchmark has ready tasks yet. Benchmarks that are not ready yet are listed on the Benchmarks page."}
+					</p>
 				) : (
 					<div className="flex flex-col gap-4">
 						{groups.map((g) => (
@@ -354,7 +444,12 @@ export function Step3BenchmarksView({ suites, packs, compatibility, selected, pa
 /** Wizard step 3 on the shared wizard draft (useEvaluateDraft from ./evaluateDraft). */
 export function Step3Benchmarks() {
 	const { draft, update } = useEvaluateDraft();
-	const slice: EvaluateDraftBenchmarks = { agent: draft.agent ?? "", benchmarks: draft.benchmarks, pack: draft.pack ?? undefined };
+	const slice: EvaluateDraftBenchmarks = {
+		agent: draft.agent ?? "",
+		benchmarks: draft.benchmarks,
+		pack: draft.pack ?? undefined,
+		arms: draft.arms.slice(1),
+	};
 	const onChange = (patch: Partial<EvaluateDraftBenchmarks>) =>
 		update({
 			...(patch.benchmarks ? { benchmarks: patch.benchmarks } : {}),
@@ -371,16 +466,22 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({ draft, 
 	const packs = useGetEvaluationPacksQuery();
 	const compat = useGetAgentCompatibilityQuery(draft.agent, { skip: !draft.agent });
 	const reference = useGetReferenceBoardQuery(); // a failure only hides the hints
+	const { t } = useTranslation("fw06");
+	const others = otherArmAgents(draft.agent, draft.arms);
+	const arms = useArmCompatibility(others);
 	// currentData, not data: data keeps the previous agent's answer while the new one loads.
-	const compatibility = compat.currentData;
-	const checking = Boolean(draft.agent) && !compatibility && !compat.isError;
+	const compatibility = mergeArmCompatibility(compat.currentData, arms.answers, (agent, setup, reason) =>
+		reason ? t("step3.otherArmCannot", { agent, setup, reason }) : t("step3.otherArmCannotGeneric", { agent, setup }),
+	);
+	const checking = Boolean(draft.agent) && ((!compat.currentData && !compat.isError) || arms.checking);
 	// Benchmarks picked before the answer came (or for another agent) that this agent cannot run
 	// leave the selection, so the launch never carries them.
 	const runnable = keepRunnable(draft.benchmarks, compatibility);
+	const answered = compatibility?.benchmarks.map((b) => `${b.id}:${b.ok}`).join(",");
 	useEffect(() => {
 		if (runnable.length !== draft.benchmarks.length) onChange({ benchmarks: runnable });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [compatibility, draft.benchmarks.join(",")]);
+	}, [answered, draft.benchmarks.join(",")]);
 	return (
 		<div className="flex flex-col gap-6">
 			<Step3BenchmarksView
@@ -393,10 +494,53 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({ draft, 
 				loading={suites.isLoading || packs.isLoading}
 				checking={checking}
 				reference={reference.data?.entries}
-				ownTasks={<OwnTasksCard onAdd={(id) => onChange({ benchmarks: draft.benchmarks.includes(id) ? draft.benchmarks : [...draft.benchmarks, id], pack: undefined })} />}
+				ownTasks={
+					<OwnTasksCard
+						onAdd={(id) =>
+							onChange({ benchmarks: draft.benchmarks.includes(id) ? draft.benchmarks : [...draft.benchmarks, id], pack: undefined })
+						}
+					/>
+				}
 			/>
+			{others.map((o) => (
+				<ArmCompatProbe key={o.agent} agent={o.agent} onAnswer={arms.report} />
+			))}
 			{/* Z04: write the org's red-team benchmark and add it here. */}
-			<RedTeamPanel selected={draft.benchmarks} onAdd={(id) => onChange({ benchmarks: [...new Set([...draft.benchmarks, id])], pack: undefined })} />
+			<RedTeamPanel
+				selected={draft.benchmarks}
+				onAdd={(id) => onChange({ benchmarks: [...new Set([...draft.benchmarks, id])], pack: undefined })}
+			/>
 		</div>
 	);
+}
+interface ProbeAnswer {
+	compatibility?: AgentCompatibility;
+	failed: boolean;
+}
+
+/**
+ * Compatibility of every other setup's agent. Hooks cannot be called a variable number of times, so
+ * each agent is queried by an ArmCompatProbe the caller renders (one per agent), which reports here.
+ * checking is true until every agent has an answer or failed (a failed answer reads as runnable,
+ * like the primary agent's).
+ */
+export function useArmCompatibility(others: readonly { label: string; agent: string }[]) {
+	const [byAgent, setByAgent] = useState<Record<string, ProbeAnswer>>({});
+	const report = (agent: string, answer: ProbeAnswer) =>
+		setByAgent((prev) =>
+			prev[agent]?.compatibility === answer.compatibility && prev[agent]?.failed === answer.failed ? prev : { ...prev, [agent]: answer },
+		);
+	const answers: ArmCompatibility[] = others.map((o) => ({ ...o, compatibility: byAgent[o.agent]?.compatibility }));
+	const checking = others.some((o) => !byAgent[o.agent]?.compatibility && !byAgent[o.agent]?.failed);
+	return { answers, checking, report };
+}
+
+/** Queries one agent's compatibility and reports the answer; renders nothing. */
+function ArmCompatProbe({ agent, onAnswer }: { agent: string; onAnswer: (agent: string, answer: ProbeAnswer) => void }) {
+	const q = useGetAgentCompatibilityQuery(agent);
+	useEffect(() => {
+		onAnswer(agent, { compatibility: q.currentData, failed: q.isError });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [agent, q.currentData, q.isError]);
+	return null;
 }
