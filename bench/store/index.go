@@ -43,6 +43,7 @@ var runFileAllowlist = map[string]bool{
 	"seal.json":              true,
 	"transitions.jsonl":      true,
 	"adapter.fault.json":     true,
+	"answer.txt":             true, // lane Y15: annotation queues read the answer a run sealed (never served over HTTP: handlers keep their own allowlist)
 	"adapter.fault.jsonl":    true,
 	"realism.json":           true, // Eval integrity area (S2): a neutral run's realism record (environments/realism.go)
 }

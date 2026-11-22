@@ -229,5 +229,6 @@ func NewOrgRouter(cfg *lib.Config, orgID string, deps Deps) *OrgRouter {
 	common := []lib.Middleware{tenancy.RequireOrgReader(mode, orgID), lib.BodyLimit(mode, lib.MaxBodyBytes)}
 	r := newRouter(mode)
 	ex := registerOrgRoutes(r, cfg, deps, write, common)
-	return &OrgRouter{Handler: r.Handler, Routes: r.List(), experiments: ex}
+	// Lane Y15: a restricted benchmark's /suites/{id} routes only for the people on its access list.
+	return &OrgRouter{Handler: handlers.BenchmarkAccessGuard(mode, cfg.Root)(r.Handler), Routes: r.List(), experiments: ex}
 }

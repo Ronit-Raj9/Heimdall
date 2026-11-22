@@ -64,6 +64,17 @@ var V1Routes = []V1Route{
 	v1("GET", "/benchmarks/catalog", "/benchmarks/catalog"),
 	v1("GET", "/benchmarks/packs", "/evaluation-packs"),
 	v1("GET", "/benchmarks/{id}/tasks/{task}", "/suites/{id}/tasks/{task}"),
+	// Lane Y15: benchmarks managed as code (docs/datasets-as-code.md).
+	v1("POST", "/benchmarks", "/suites"),
+	v1("PUT", "/benchmarks/{id}/grader", "/suites/{id}/grader"),
+	v1("GET", "/benchmarks/{id}/tasks", "/suites/{id}/dataset/tasks"),
+	v1("POST", "/benchmarks/{id}/tasks", "/suites/{id}/dataset/tasks"),
+	v1("DELETE", "/benchmarks/{id}/tasks/{task}", "/suites/{id}/dataset/tasks/{task}"),
+	v1("GET", "/benchmarks/{id}/versions", "/suites/{id}/dataset/versions"),
+	v1("GET", "/benchmarks/{id}/versions/{n}", "/suites/{id}/dataset/versions/{n}"),
+	v1("GET", "/benchmarks/{id}/data-policy", "/suites/{id}/data-policy"),
+	v1("PUT", "/benchmarks/{id}/data-policy", "/suites/{id}/data-policy"),
+	v1("POST", "/imports/platforms", "/imports/platforms"),
 
 	v1("GET", "/evaluations", "/evaluations"),
 	v1("POST", "/evaluations", "/evaluations"),
