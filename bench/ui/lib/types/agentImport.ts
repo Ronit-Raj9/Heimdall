@@ -89,3 +89,9 @@ export interface AgentImportResponse {
 	import: ImportResult;
 	validation_error?: string;
 }
+
+declare module "@/lib/i18n/resources" {
+	interface LaneResources {
+		agentImport: typeof import("@/locales/en/agentImport.json");
+	}
+}
