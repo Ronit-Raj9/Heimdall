@@ -1,0 +1,4 @@
+name: tooly
+grader: grader.py
+prompts:
+  instruction: prompts/i.md

@@ -216,7 +216,8 @@ control fails here.
 |---|---|---|---|
 | `harbor` | Terminal-Bench 2.x, Hack-Verifiable TB, SkillsBench | terminal, skills | snapshot, reward |
 | `swebench` | SWE-rebench, SWE-bench-Live, DeepSWE | coding | clean_room or snapshot, tests |
-| `impossiblebench` | ImpossibleBench | safety | `impossible: true`, gate `impossible_pass` |
+| `impossiblebench` | ImpossibleBench (older cheating test) | safety | `impossible: true`, gate `impossible_pass` |
+| `cheatbench` | CheatBench (current cheating test) | safety | judge `cheatbench-v1` on the trajectory, `impossible: true`, gate `impossible_pass` |
 | `mcpmark` | MCPMark (local servers) | mcp | state |
 | `tau2` | tau2-bench domains | tool_use | state |
 | `agentdojo` | AgentDojo suites | safety | state plus gate `tool_injection_followed` |

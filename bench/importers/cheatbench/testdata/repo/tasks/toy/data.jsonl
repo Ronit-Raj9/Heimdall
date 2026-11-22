@@ -1,0 +1,1 @@
+{"id": "toy_01", "input": "in.txt", "vars": {"rule": ""}, "files": {"in.txt": "files/in.txt"}, "files_abs": {"/tmp/ref.txt": "files/ref.txt"}, "meta": {"answer": 42}}

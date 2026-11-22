@@ -6,7 +6,8 @@ Two importers bring public repository benchmarks into the bench:
   original SWE-bench, Impossible-SWEbench) and writes a suite whose tasks run
   in the upstream per-instance image and are graded in a clean room by the
   instance's own test patch, test command and log parser.
-- `impossiblebench` reads ImpossibleBench. Its LiveCodeBench variant is
+- `impossiblebench` reads ImpossibleBench, the older cheating test (the
+  current one is CheatBench, docs/importing-cheatbench.md). Its LiveCodeBench variant is
   converted directly (small single-function Python tasks, one shared base
   image); its SWE-bench variant is handed to `swebench` with every task
   marked impossible.

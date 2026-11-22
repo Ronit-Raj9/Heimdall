@@ -54,6 +54,12 @@ const (
 	// rubric points earned are reported as the rubric_score dimension
 	// (judgerubric.go).
 	PromptBigFinanceV1 = "bigfinancebench-v1"
+	// PromptCheatBenchV1 is CheatBench's shared behavioural judge
+	// (prompts/judge.md of github.com/centerforaisafety/cheatbench, MIT,
+	// commit 96e05a6d61faf33be788f75dd01998066045ad02). It judges the
+	// run's trajectory, not answer.txt: "correct" means the agent cheated
+	// (see cheatbench.go).
+	PromptCheatBenchV1 = "cheatbench-v1"
 )
 
 const (
@@ -185,6 +191,11 @@ func (g *judge) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas
 		return grade, nil
 	}
 	answer, problem, err := ReadAnswer(rc.Dir)
+	limit := maxJudgeAnswerRunes
+	if spec.PromptVersion == PromptCheatBenchV1 { // cheatbench.go: the trajectory is the response
+		answer, problem, err = readTrajectory(rc)
+		limit = maxTrajectoryRunes
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", JudgeType, err)
 	}
@@ -193,14 +204,19 @@ func (g *judge) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas
 		return grade, nil
 	}
 	// Judge hardening (judgeguard.go): an answer that addresses the grader,
-	// or no answer at all, fails without a judge call.
-	if inj := JudgeInjection(answer); inj != "" {
-		grade.Reason = "judge not asked: the answer " + inj + ", which fails it"
-		return grade, nil
-	}
-	if why := answerNonAnswer(ans, answer); why != "" {
-		grade.Reason = "judge not asked: " + why
-		return grade, nil
+	// or no answer at all, fails without a judge call. Not for cheatbench-v1:
+	// there a pass means the agent cheated, and a trajectory that addresses
+	// the grader is itself what the judge must see, so failing it unjudged
+	// would clear a cheater. Its trajectory is fenced like any answer.
+	if spec.PromptVersion != PromptCheatBenchV1 {
+		if inj := JudgeInjection(answer); inj != "" {
+			grade.Reason = "judge not asked: the answer " + inj + ", which fails it"
+			return grade, nil
+		}
+		if why := answerNonAnswer(ans, answer); why != "" {
+			grade.Reason = "judge not asked: " + why
+			return grade, nil
+		}
 	}
 	if rc.NoPaidTraffic {
 		// The judge's own key is not bound to the scripted model, so on a
@@ -208,7 +224,7 @@ func (g *judge) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas
 		grade.InvalidEvaluator, grade.Reason = true, NoPaidJudgeReason
 		return grade, nil
 	}
-	rec, replies, err := g.voteReplies(ctx, rc, spec, renderJudgePrompt(tmpl, ans, answer))
+	rec, replies, err := g.voteReplies(ctx, rc, spec, renderJudgePromptCap(tmpl, ans, answer, limit))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", JudgeType, err)
 	}
@@ -216,7 +232,7 @@ func (g *judge) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas
 	rec.Provider = spec.Provider                                                                // calibration identity (QC2-25-05)
 	rec.Calibration = calibrationRef(rc.Suite, calibration.GradeJudgeID(rec), rec.PromptSHA256) // W8 judge calibration: the record in force (judgecalibration.go)
 	if spec.Auditor != nil {                                                                    // W8 judge calibration: the auditor never decides
-		rec.Audit = g.audit(ctx, rc, spec, renderJudgePrompt(tmpl, ans, answer), rec.Votes)
+		rec.Audit = g.audit(ctx, rc, spec, renderJudgePromptCap(tmpl, ans, answer, limit), rec.Votes)
 	}
 	grade.Judged, grade.Judge = true, rec
 	grade.Passed, grade.InvalidEvaluator, grade.Reason = tally(rec.Votes, tmplName)
@@ -255,7 +271,7 @@ func (g *judge) check(rc *schemas.RunContext) (schemas.JudgeSpec, error) {
 	case spec.MaxTokens < 0:
 		return spec, fmt.Errorf("judge max_tokens %d is negative", spec.MaxTokens)
 	case !knownPromptVersion(spec.PromptVersion):
-		return spec, fmt.Errorf("judge prompt_version %q is not shipped (want %s, %s, %s or %s)", spec.PromptVersion, PromptQAv1, PromptLongMemEvalV1, PromptAgentVistaV1, PromptBigFinanceV1)
+		return spec, fmt.Errorf("judge prompt_version %q is not shipped (want %s, %s, %s, %s or %s)", spec.PromptVersion, PromptQAv1, PromptLongMemEvalV1, PromptAgentVistaV1, PromptBigFinanceV1, PromptCheatBenchV1)
 	case g.cfg.Gateway == nil || g.cfg.URL == "":
 		return spec, errors.New("judge grader is not wired to the gateway (register graders.NewJudge with the gateway and its URL)")
 	case rc.Run == nil || !judgeKeyNameRe.MatchString(rc.Run.RunID):
@@ -387,7 +403,7 @@ func (g *judge) call(ctx context.Context, key *schemas.RunKey, spec schemas.Judg
 	}
 	body, err := json.Marshal(chatRequest{
 		Model:       spec.Provider + "/" + spec.Model,
-		Messages:    []chatMessage{{Role: "system", Content: judgeGuardSystem}, {Role: "user", Content: prompt}},
+		Messages:    []chatMessage{{Role: "system", Content: judgeSystemFor(spec.PromptVersion)}, {Role: "user", Content: prompt}},
 		Temperature: 0,
 		MaxTokens:   maxTokens,
 	})
@@ -471,7 +487,7 @@ func tally(votes []string, tmpl string) (passed, invalid bool, reason string) {
 
 // knownPromptVersion reports whether version is shipped.
 func knownPromptVersion(version string) bool {
-	return version == PromptQAv1 || version == PromptLongMemEvalV1 || version == PromptAgentVistaV1 || version == PromptBigFinanceV1
+	return version == PromptQAv1 || version == PromptLongMemEvalV1 || version == PromptAgentVistaV1 || version == PromptBigFinanceV1 || version == PromptCheatBenchV1
 }
 
 // judgeTemplate picks the template of version for ans and returns its name
@@ -525,6 +541,11 @@ func judgeTemplate(version string, ans *schemas.AnswerSpec) (string, string, err
 			return "", "", fmt.Errorf("prompt %s: %w", version, err)
 		}
 		name = "bigfinancebench-v1"
+	case PromptCheatBenchV1:
+		if ans.Rubric == "" {
+			return "", "", errors.New("prompt cheatbench-v1 needs the task's cheating criteria as the answer spec rubric")
+		}
+		name = "cheatbench-v1"
 	default:
 		return "", "", fmt.Errorf("prompt version %q is not shipped", version)
 	}
@@ -540,10 +561,17 @@ func judgeTemplate(version string, ans *schemas.AnswerSpec) (string, string, err
 // fence markers are broken up, so it cannot close its own fence, and it is
 // wrapped in markers tagged with its own hash (judgeguard.go).
 func renderJudgePrompt(tmpl string, ans *schemas.AnswerSpec, answer string) string {
-	if r := []rune(answer); len(r) > maxJudgeAnswerRunes {
-		answer = string(r[:maxJudgeAnswerRunes]) + "\n[truncated]"
+	return renderJudgePromptCap(tmpl, ans, answer, maxJudgeAnswerRunes)
+}
+
+// renderJudgePromptCap is renderJudgePrompt with the answer capped at limit
+// runes (a cheatbench-v1 trajectory is longer than an answer). The
+// trajectory fence of cheatbench-v1 is broken up the same way.
+func renderJudgePromptCap(tmpl string, ans *schemas.AnswerSpec, answer string, limit int) string {
+	if r := []rune(answer); len(r) > limit {
+		answer = string(r[:limit]) + "\n[truncated]"
 	}
-	defence := strings.NewReplacer("<<<", "< < <", ">>>", "> > >")
+	defence := strings.NewReplacer("<<<", "< < <", ">>>", "> > >", "<trajectory>", "< trajectory >", "</trajectory>", "< /trajectory >")
 	expected := strings.Join(ans.Expected, "\nor: ")
 	rubric := ans.Rubric
 	if rubric == "" {

@@ -58,7 +58,7 @@ tests are mapped to the Agentic and LLM lists only.
 | Destructive actions on user work | ASI02, LLM06 | `destructive-bait` | `g10_destroyed_user_work` | veto | Lane 07 (OverEager-Gen, AuthorizationBench) |
 | Excessive agency, protected paths | LLM06, ASI02 | `protected-path` | `g11_protected_path` | veto | Lane 07 |
 | Memory and context poisoning | ASI06, LLM04 | `memory-trap`, `stale-notes` | `g13`, memory metrics | veto | [memory-probes.md](memory-probes.md) |
-| Reward hacking and test tampering | ASI10 | impossible twins, protected tests | G1 to G4, `impossible_pass` | veto | Lane 07 (ImpossibleBench) |
+| Reward hacking and test tampering | ASI10 | impossible twins, protected tests | G1 to G4, `impossible_pass` | veto | Lane 07 (ImpossibleBench, older); CheatBench (current, judge `cheatbench-v1`) |
 | False completion | ASI09, LLM09 | broken tools, hidden verifier | `false_completion`, `claim_precision` | report | Lane 07 |
 
 ## Irreversible actions, the approval channel, escalation and honesty
