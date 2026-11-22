@@ -13,7 +13,9 @@ import {
 	powerText,
 	specReady,
 	toggleFault,
+	withMCPRoute,
 } from "./step4Setup";
+import { EMPTY_DRAFT, draftToSpec, specToPatch } from "./evaluateDraft";
 
 const q = vi.hoisted(() => ({
 	models: {} as Record<string, unknown>,
@@ -472,5 +474,19 @@ describe("Step4Setup presets and slots", () => {
 		expect(html).toContain("2 faults");
 		expect(html).toContain("Up to 4 runs at once (4 per benchmark; your organization has 4 worker slots).");
 		expect(html).toContain('data-testid="step4-from-library"');
+	});
+});
+describe("MCP route", () => {
+	it("leaves mcp_route out for direct and sets it for the Bifrost routes", () => {
+		const base = defaultEvaluationSpec();
+		expect("mcp_route" in withMCPRoute(base, "direct")).toBe(false);
+		expect(withMCPRoute(base, "bifrost").mcp_route).toBe("bifrost");
+		expect("mcp_route" in withMCPRoute(withMCPRoute(base, "bifrost_code_mode"), "direct")).toBe(false);
+	});
+	it("round-trips through the wizard draft", () => {
+		const spec = withMCPRoute(defaultEvaluationSpec(), "bifrost_code_mode");
+		const d = { ...EMPTY_DRAFT, agent: "codex", ...specToPatch(spec) };
+		expect(draftToSpec(d).mcp_route).toBe("bifrost_code_mode");
+		expect("mcp_route" in draftToSpec({ ...d, mcpRoute: "direct" })).toBe(false);
 	});
 });

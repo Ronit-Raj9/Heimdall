@@ -1,4 +1,4 @@
-import type { EvaluationArm, EvaluationMode, EvaluationPresetId, EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
+import type { EvaluationArm, EvaluationMCPRoute, EvaluationMode, EvaluationPresetId, EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 /**
@@ -36,6 +36,8 @@ export interface EvaluateDraft {
 	worker?: string;
 	/** Bifrost cache on vs off (score mode only). */
 	bifrostCache?: boolean;
+	/** How the arms reach MCP tool servers; unset is direct (the tool proxy only). */
+	mcpRoute?: EvaluationMCPRoute;
 	/** Arms dropped by a mode change (for example arm B in "score"), so going back restores their models. */
 	stashedArms?: EvaluationArm[];
 }
@@ -118,6 +120,7 @@ export function draftToSpec(d: EvaluateDraft): EvaluationSpec {
 		...(d.concurrency ? { concurrency: d.concurrency } : {}),
 		...(d.preset ? { preset: d.preset } : {}),
 		...(d.bifrostCache && d.mode === "score" ? { bifrost_cache: true } : {}),
+		...(d.mcpRoute && d.mcpRoute !== "direct" ? { mcp_route: d.mcpRoute } : {}),
 	};
 }
 
@@ -146,6 +149,7 @@ export function specToPatch(spec: EvaluationSpec): Partial<EvaluateDraft> {
 		concurrency: spec.concurrency ?? null,
 		preset: spec.preset ?? null,
 		bifrostCache: Boolean(spec.bifrost_cache),
+		mcpRoute: spec.mcp_route ?? "direct",
 	};
 }
 

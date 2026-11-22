@@ -92,6 +92,36 @@ run's tool proxy are up and its key is minted (`engine/bifrostfeatures.go`,
    (Bifrost deletes a key's grants with the client); the janitor sweeps any a
    killed bench process left.
 
+**Per evaluation (`mcp_route`).** An evaluation (`POST /api/bench/evaluations`,
+wizard step 4 "MCP tools") can set `mcp_route` for all its arms:
+`direct` (the default, stored as unset) leaves the tool proxy as the only hop;
+`bifrost` sets `gateway.bifrost.mcp.code_mode: false` on every arm, and
+`bifrost_code_mode` sets it to `true` (`handlers/evaluations.go`,
+`mcpRouteSet`). The planner then does everything above per run. A benchmark
+the planner refuses for it (no visible MCP service, or an agent that cannot
+reach the gateway) is skipped with the refusal as its reason; the other
+benchmarks run. To compare direct against Bifrost, use an experiment with the
+arms shown at the top of this file instead.
+
+**Trade-off: tool faults and the tool proxy.** Routing through Bifrost does not
+replace the tool proxy: each Bifrost MCP client points at the run's proxy route
+(`http://tp-<run id>:9200/s/<service>/mcp`), so the chain is agent, Bifrost,
+tool proxy, MCP server. Tool probes (`broken-tool` and every `apply.tool`
+fault in `docs/tool-proxy.md`) still fire at the proxy, and the proxy ledger
+stays the first witness. What changes: (1) the agent sees a fault after
+Bifrost relays it, so Bifrost may reshape an error (a JSON-RPC error becomes
+Bifrost's tool error body) and adds its own latency, which shifts `timeout`
+and latency faults by a few milliseconds; (2) a fault that cuts the stream
+(`drop`, `disconnect`) is seen by Bifrost, which answers the agent with its
+own error, not a broken connection; (3) Bifrost's MCP log records a faulted
+call as an error row, so `bifrost_mcp_witness` still matches call for call;
+(4) in Code Mode one program may make several proxied calls, so a fault
+counted by call number (`from_call`) counts the program's inner calls, not
+the agent's turns. Faults that must reach the agent byte for byte are best
+run with `mcp_route: direct`. Points (2) and (3) are expected from how
+Bifrost relays MCP calls and were not yet checked on a live stack for this
+option.
+
 Plan-time refusals (with the arm named): a scripted control that runs without
 the gateway network (only `toy` and `mcploop` can reach it), a remote agent,
 a team, a suite with no visible MCP service, an empty `gateway.bifrost`.

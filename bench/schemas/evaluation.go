@@ -83,6 +83,13 @@ type EvaluationSpec struct {
 	// latency, cost and quality change the cache brings
 	// (bifrostfeatures.CacheAB).
 	BifrostCache bool `json:"bifrost_cache,omitempty"`
+	// MCPRoute is how every arm reaches the tasks' MCP tool servers:
+	// "" or "direct" through the tool proxy only, "bifrost" through
+	// Bifrost's MCP gateway (gateway.bifrost.mcp, classic tools),
+	// "bifrost_code_mode" the same with Code Mode clients. Through Bifrost
+	// the tool proxy still sits behind Bifrost, so tool faults keep working
+	// (docs/bifrost-features.md, "MCP through Bifrost").
+	MCPRoute string `json:"mcp_route,omitempty"`
 }
 
 // EvaluationCacheArm is the arm id of the cache-on copy an evaluation with
@@ -91,6 +98,13 @@ const EvaluationCacheArm = "cache"
 
 // EvaluationCacheSuffix ends the label of that arm.
 const EvaluationCacheSuffix = " (Bifrost cache on)"
+
+// MCP routes of an evaluation (EvaluationSpec.MCPRoute).
+const (
+	MCPRouteDirect          = "direct"
+	MCPRouteBifrost         = "bifrost"
+	MCPRouteBifrostCodeMode = "bifrost_code_mode"
+)
 
 // EvaluationGate is what an evaluation must show to pass. Scores are
 // verified success rates (0 to 1) over clean runs, per capability.

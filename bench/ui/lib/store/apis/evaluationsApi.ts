@@ -128,12 +128,16 @@ export interface EvaluationSpec {
 	preset?: EvaluationPresetId;
 	/** Bifrost cache on vs off (score mode): the server adds a second arm that is the same agent with Bifrost's semantic cache on. */
 	bifrost_cache?: boolean;
+	/** How arms reach the tasks' MCP tool servers: unset or "direct" through the tool proxy, "bifrost" through Bifrost's MCP gateway, "bifrost_code_mode" the same with Code Mode. */
+	mcp_route?: EvaluationMCPRoute;
 }
 
 export type EvaluationPresetId = "quick" | "standard" | "thorough";
 
 /** The estimate request: a spec, plus `presets: true` to also get the three preset sizes. */
 export type EstimateRequest = EvaluationSpec & { presets?: boolean };
+
+export type EvaluationMCPRoute = "direct" | "bifrost" | "bifrost_code_mode";
 
 /** What an evaluation must show to pass. Scores are fractions (0 to 1). */
 export interface EvaluationGate {
