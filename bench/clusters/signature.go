@@ -211,10 +211,52 @@ func Signature(layers []Layer) string {
 	return "c_" + hex.EncodeToString(sum[:])[:16]
 }
 
+// outcomeSentences name a signature that has only its outcome layer: the
+// bare outcome ("fail") reads as a raw id on the failure groups page.
+var outcomeSentences = map[string]string{
+	string(schemas.OutcomeFail):    "Failed with no error recorded",
+	string(schemas.OutcomeTimeout): "Timed out",
+	string(schemas.OutcomeCrash):   "Crashed",
+	string(schemas.OutcomeBudget):  "Ran out of budget",
+	string(schemas.OutcomeRefusal): "Refused the task",
+}
+
+// outcomeOnly reports whether layers hold nothing but the outcome.
+func outcomeOnly(layers []Layer) bool {
+	return len(layers) == 1 && layers[0].Kind == LayerOutcome
+}
+
+// TitleIn is Title with where the runs of a cluster happened: a signature
+// that has only its outcome layer gets " on <benchmark>" when every run is
+// on one benchmark and " in <tool>" when the runs share a most used last
+// tool, so "fail" reads "Failed with no error recorded on swe-lite in
+// Bash". Other signatures already name what failed and keep Title. It is
+// pure.
+func TitleIn(layers []Layer, benchmark, tool string) string {
+	t := Title(layers)
+	if !outcomeOnly(layers) {
+		return t
+	}
+	if benchmark != "" {
+		t += " on " + benchmark
+	}
+	if tool != "" {
+		t += " in " + tool
+	}
+	return t
+}
+
 // Title is the human name of a signature, built from its layers: "fails
 // test_limiter_window", "timeout after repeated bash \"pytest -q\"",
-// "g1_protected_paths gate", "tool error: desk.refund 500". It is pure.
+// "g1_protected_paths gate", "tool error: desk.refund 500". A signature with
+// only its outcome layer reads as a sentence: "Failed with no error
+// recorded", "Timed out", "Crashed". It is pure.
 func Title(layers []Layer) string {
+	if outcomeOnly(layers) {
+		if s, ok := outcomeSentences[layers[0].Label]; ok {
+			return s
+		}
+	}
 	var head string
 	var parts []string
 	for _, l := range layers {

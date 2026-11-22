@@ -2,13 +2,11 @@ import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SortableHead } from "@/components/ui/sortableHead";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Toolbar } from "@/components/ui/toolbar";
-import {
-	useGetAgentLeaderboardQuery,
-	type AgentLeaderboardParams,
-	type AgentLeaderboardRow,
-} from "@/lib/store/apis/agentLeaderboardApi";
+import { useTableSort, type SortAccessors, type SortHeadProps, type TableSort, type TableSortDir } from "@/components/ui/useTableSort";
+import { useGetAgentLeaderboardQuery, type AgentLeaderboardParams, type AgentLeaderboardRow } from "@/lib/store/apis/agentLeaderboardApi";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
 import { parseAsString, useQueryState } from "nuqs";
@@ -25,10 +23,35 @@ declare module "@/lib/i18n/resources" {
 /** Capabilities in display order (contract section 4). */
 const CAPABILITY_ORDER = ["terminal", "coding", "memory", "support", "research", "voice", "safety", "team", "gpu"] as const;
 
+/** The sort key of a capability's score column. */
+export const scoreKey = (capability: string) => `score:${capability}`;
+
+/** What each Agents table column sorts on: names as text, scores and cost as numbers (a cost not known sorts last). */
+export function agentSortAccessors(capabilities: readonly string[]): SortAccessors<AgentLeaderboardRow, string> {
+	const out: SortAccessors<AgentLeaderboardRow, string> = {
+		agent: (r) => r.agent,
+		version: (r) => (r.version > 0 ? r.version : null),
+		model: (r) => r.model || null,
+		cost: (r) => {
+			const c = rowCost(r);
+			return c.known && typeof r.cost_usd === "number" ? r.cost_usd : null;
+		},
+	};
+	for (const c of capabilities) out[scoreKey(c)] = (r) => r.capabilities[c]?.score ?? null;
+	return out;
+}
+
+/** First click on a column: best first. Scores and versions descend; names and cost ascend. */
+export const agentFirstDir = (key: string): TableSortDir => (key.startsWith("score:") || key === "version" ? "desc" : "asc");
+
+/** The Agents table keeps the server's order until a column is clicked. */
+const AGENT_SORT_INITIAL: TableSort<string> = { key: null, dir: "asc" };
+
 /** A capability's display name; an unknown one shows its id. */
 function useCapabilityLabel() {
 	const { t } = useTranslation("agentBoard");
-	return (c: string) => ((CAPABILITY_ORDER as readonly string[]).includes(c) ? t(`capability.${c as (typeof CAPABILITY_ORDER)[number]}`) : c);
+	return (c: string) =>
+		(CAPABILITY_ORDER as readonly string[]).includes(c) ? t(`capability.${c as (typeof CAPABILITY_ORDER)[number]}`) : c;
 }
 
 /**
@@ -46,6 +69,8 @@ export function AgentBoardTab() {
 	const board = useGetAgentLeaderboardQuery(params);
 	const navigate = useNavigate();
 	const data = board.data;
+	const sortAccessors = useMemo(() => agentSortAccessors(data?.capabilities ?? []), [data?.capabilities]);
+	const sorted = useTableSort(data?.rows ?? EMPTY_ROWS, AGENT_SORT_INITIAL, sortAccessors, { firstDir: agentFirstDir });
 	const hasFilters = Boolean(params.capability || params.model);
 	const reset = () => {
 		void setCapability(null);
@@ -93,7 +118,8 @@ export function AgentBoardTab() {
 					) : (
 						<div className={cn("bg-card min-w-0 overflow-x-auto rounded-xl border transition-opacity", board.isFetching && "opacity-60")}>
 							<AgentBoardTable
-								rows={data.rows}
+								rows={sorted.rows}
+								head={sorted.head}
 								capabilities={data.capabilities}
 								rankBy={params.capability}
 								minRuns={data.min_runs}
@@ -107,6 +133,8 @@ export function AgentBoardTab() {
 		</section>
 	);
 }
+
+const EMPTY_ROWS: AgentLeaderboardRow[] = [];
 
 export interface AgentBoardToolbarProps {
 	capability: string;
@@ -207,6 +235,8 @@ export interface AgentBoardTableProps {
 	rankBy?: string;
 	minRuns?: number;
 	minTasks?: number;
+	/** Sort props of a column (agentSortAccessors keys); without it the headers do not sort. */
+	head?: (key: string) => SortHeadProps;
 }
 
 /**
@@ -214,24 +244,28 @@ export interface AgentBoardTableProps {
  * its 95% range and sample, cost per run. A score under the minimum sample is shown but marked
  * "not enough runs" and never ranked; an unpriced cost is "not known", never $0.
  */
-export function AgentBoardTable({ rows, capabilities, onOpen, rankBy, minRuns, minTasks }: AgentBoardTableProps) {
+export function AgentBoardTable({ rows, capabilities, onOpen, rankBy, minRuns, minTasks, head }: AgentBoardTableProps) {
 	const { t } = useTranslation("agentBoard");
 	const capLabel = useCapabilityLabel();
 	const mins = { minRuns: minRuns ?? DEFAULT_MIN_RUNS, minTasks: minTasks ?? DEFAULT_MIN_TASKS };
+	const column = (key: string, label: string, testId: string, align: "left" | "right" = "left") =>
+		head ? (
+			<SortableHead key={key} label={label} align={align} testId={testId} {...head(key)} />
+		) : (
+			<TableHead key={key} className={cn(align === "right" && "text-right")} data-testid={testId}>
+				{label}
+			</TableHead>
+		);
 	return (
 		<Table data-testid="agent-board-table">
 			<TableHeader>
 				<TableRow>
 					{rankBy && <TableHead className="w-12 text-right">{t("columns.rank")}</TableHead>}
-					<TableHead>{t("columns.agent")}</TableHead>
-					<TableHead>{t("columns.version")}</TableHead>
-					<TableHead>{t("columns.model")}</TableHead>
-					{capabilities.map((c) => (
-						<TableHead key={c} className="text-right" data-testid={`agent-board-col-${c}`}>
-							{capLabel(c)}
-						</TableHead>
-					))}
-					<TableHead className="text-right">{t("columns.cost")}</TableHead>
+					{column("agent", t("columns.agent"), "agent-board-col-agent")}
+					{column("version", t("columns.version"), "agent-board-col-version")}
+					{column("model", t("columns.model"), "agent-board-col-model")}
+					{capabilities.map((c) => column(scoreKey(c), capLabel(c), `agent-board-col-${c}`, "right"))}
+					{column("cost", t("columns.cost"), "agent-board-col-cost", "right")}
 				</TableRow>
 			</TableHeader>
 			<TableBody>
@@ -325,7 +359,11 @@ function CostCell({ row }: { row: AgentLeaderboardRow }) {
 	if (c.known) return <>{c.text}</>;
 	const detail = t("costUnpriced", { count: c.unpriced, runs: c.runs });
 	return (
-		<span data-testid="agent-board-cost-unknown" title={c.note ? `${detail}: ${c.note}` : detail} className="inline-flex flex-col items-end leading-tight">
+		<span
+			data-testid="agent-board-cost-unknown"
+			title={c.note ? `${detail}: ${c.note}` : detail}
+			className="inline-flex flex-col items-end leading-tight"
+		>
 			<span className="text-muted-foreground font-sans">{t("costNotKnown")}</span>
 			{c.runs > 0 && <span className="text-muted-foreground font-sans text-[11px]">{detail}</span>}
 		</span>

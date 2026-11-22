@@ -65,7 +65,7 @@ func exampleIDs(p FailurePatternCount) []string {
 }
 
 func TestBuildAgentFailurePatterns(t *testing.T) {
-	out := BuildAgentFailurePatterns(failureIndex(), "codex", newVersionIndex(failureRoot(t), ""), nil)
+	out := BuildAgentFailurePatterns(failureIndex(), "codex", newVersionIndex(failureRoot(t), ""), nil, withPractice)
 	if out.Agent != "codex" || len(out.Groups) != 2 {
 		t.Fatalf("groups = %+v", out.Groups)
 	}
@@ -94,18 +94,65 @@ func TestBuildAgentFailurePatterns(t *testing.T) {
 		t.Fatalf("unsaved loop = %+v", loopA)
 	}
 
-	if other := BuildAgentFailurePatterns(failureIndex(), "claude-code", newVersionIndex("", ""), nil); len(other.Groups) != 0 {
+	if other := BuildAgentFailurePatterns(failureIndex(), "claude-code", newVersionIndex("", ""), nil, withPractice); len(other.Groups) != 0 {
 		t.Fatalf("an agent that never ran has no groups: %+v", other.Groups)
 	}
 	// Without a versions index every config is unsaved.
-	if plain := BuildAgentFailurePatterns(failureIndex(), "codex", newVersionIndex("", ""), nil); len(plain.Groups) != 2 || plain.Groups[0].Version != 0 {
+	if plain := BuildAgentFailurePatterns(failureIndex(), "codex", newVersionIndex("", ""), nil, withPractice); len(plain.Groups) != 2 || plain.Groups[0].Version != 0 {
 		t.Fatalf("no index: %+v", plain.Groups)
 	}
 	// A run folder with unreadable metrics skips its experiment, never fails the read.
 	broken := failureIndex()
 	broken.files["r_t01_A"][FileMetrics] = []byte(`{not json`)
-	if out := BuildAgentFailurePatterns(broken, "codex", newVersionIndex("", ""), nil); len(out.Groups) != 0 {
+	if out := BuildAgentFailurePatterns(broken, "codex", newVersionIndex("", ""), nil, withPractice); len(out.Groups) != 0 {
 		t.Fatalf("broken experiment: %+v", out.Groups)
+	}
+}
+
+// withPractice reads every run, practice benchmarks included (the test
+// index runs coding-core).
+var withPractice = AgentFailureFilter{IncludePractice: true}
+
+// TestFailurePatternFilters (J13.filters): practice benchmarks are left out
+// by default; version and benchmark narrow the groups while the filter
+// choices stay whole; an evaluation's recorded version names the group.
+func TestFailurePatternFilters(t *testing.T) {
+	versions := func() *versionIndex { return newVersionIndex(failureRoot(t), "") }
+	if out := BuildAgentFailurePatterns(failureIndex(), "codex", versions(), nil, AgentFailureFilter{}); len(out.Groups) != 0 || len(out.Benchmarks) != 0 {
+		t.Fatalf("practice runs read by default: %+v", out)
+	}
+	all := BuildAgentFailurePatterns(failureIndex(), "codex", versions(), nil, withPractice)
+	if len(all.Groups) != 2 || !slices.Equal(all.Versions, []int{2}) || !slices.Equal(all.Benchmarks, []string{"coding-core"}) {
+		t.Fatalf("with practice: groups %d versions %v benchmarks %v", len(all.Groups), all.Versions, all.Benchmarks)
+	}
+	v2 := BuildAgentFailurePatterns(failureIndex(), "codex", versions(), nil, AgentFailureFilter{IncludePractice: true, Version: 2})
+	if len(v2.Groups) != 1 || v2.Groups[0].Key != "v2" || !slices.Equal(v2.Versions, []int{2}) {
+		t.Fatalf("version 2: %+v", v2.Groups)
+	}
+	other := BuildAgentFailurePatterns(failureIndex(), "codex", versions(), nil, AgentFailureFilter{IncludePractice: true, Benchmark: "hd-swe-verified"})
+	if len(other.Groups) != 0 || !slices.Equal(other.Benchmarks, []string{"coding-core"}) {
+		t.Fatalf("other benchmark: %+v", other)
+	}
+
+	// A real benchmark is read by default; the arm versions come from the
+	// evaluation that created the experiment.
+	idx := failureIndex()
+	m := idx.manifests[testExp]
+	m.SuiteID = "hd-swe-verified"
+	m.Experiment.EvaluationID = "ev_score"
+	root := failureRoot(t)
+	writeTestEvaluation(t, root, schemas.Evaluation{ID: "ev_score", Spec: schemas.EvaluationSpec{Mode: "score",
+		Arms: []schemas.EvaluationArm{{Label: "codex", Agent: "codex", Version: 5, Model: "gpt-x"}}}})
+	out := BuildAgentFailurePatterns(idx, "codex", newVersionIndex(root, ""), nil, AgentFailureFilter{})
+	if len(out.Groups) != 1 || out.Groups[0].Key != "v5" || out.Groups[0].Label != "v5" || out.Groups[0].Runs != 4 || !slices.Equal(out.Benchmarks, []string{"hd-swe-verified"}) {
+		t.Fatalf("evaluation version: %+v", out)
+	}
+	for _, p := range out.Groups[0].Patterns {
+		for _, ex := range p.Examples {
+			if ex.Benchmark == "" {
+				t.Fatalf("example without benchmark: %+v", ex)
+			}
+		}
 	}
 }
 
@@ -161,9 +208,23 @@ func TestFailurePatternRoutes(t *testing.T) {
 	}
 	env := OrgEnv{Cfg: &lib.Config{Root: root}, Mode: testMode, Services: Services{Index: failureIndex(), Catalog: fakeCatalog{}}}
 
-	code, body := failureServe(t, env, APIPrefix+"/agents/codex/failure-patterns")
+	code, body := failureServe(t, env, APIPrefix+"/agents/codex/failure-patterns?include_practice=true")
 	if groups, _ := body["groups"].([]any); code != fasthttp.StatusOK || body["agent"] != "codex" || len(groups) != 2 {
 		t.Fatalf("agent %d %v", code, body)
+	}
+	// coding-core is a practice benchmark: left out by default.
+	code, body = failureServe(t, env, APIPrefix+"/agents/codex/failure-patterns")
+	if groups, _ := body["groups"].([]any); code != fasthttp.StatusOK || len(groups) != 0 {
+		t.Fatalf("agent default %d %v", code, body)
+	}
+	code, body = failureServe(t, env, APIPrefix+"/agents/codex/failure-patterns?include_practice=true&version=2")
+	if groups, _ := body["groups"].([]any); code != fasthttp.StatusOK || len(groups) != 1 {
+		t.Fatalf("agent version 2 %d %v", code, body)
+	}
+	for _, q := range []string{"version=two", "version=0", "include_practice=maybe"} {
+		if code, _ := failureServe(t, env, APIPrefix+"/agents/codex/failure-patterns?"+q); code != fasthttp.StatusBadRequest {
+			t.Fatalf("%s: %d, want 400", q, code)
+		}
 	}
 	code, body = failureServe(t, env, APIPrefix+"/evaluations/ev_1/failure-patterns")
 	if groups, _ := body["groups"].([]any); code != fasthttp.StatusOK || body["evaluation"] != "ev_1" || len(groups) != 1 {

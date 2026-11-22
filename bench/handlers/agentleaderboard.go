@@ -253,6 +253,28 @@ func (h *LeaderboardHandler) entryAgentHash(e schemas.LeaderboardEntry) string {
 	return ""
 }
 
+// entryEvaluationVersion is the agent version an entry's runs ran at, read
+// from the evaluation that created its newest experiment with one
+// (armVersionFromEvaluation); false when none of its experiments came from
+// an evaluation that recorded the version.
+func (h *LeaderboardHandler) entryEvaluationVersion(versions *versionIndex, e schemas.LeaderboardEntry) (int, bool) {
+	for _, exp := range e.Experiments {
+		m, ok := h.index.Manifest(exp)
+		if !ok || m == nil {
+			continue
+		}
+		for id, arm := range m.Arms {
+			if arm.ConfigHash != e.ConfigHash {
+				continue
+			}
+			if v, ok := versions.fromEvaluation(m, id); ok {
+				return v, true
+			}
+		}
+	}
+	return 0, false
+}
+
 // armAgentHash is the agent hash of an arm's config without its "sha256:"
 // prefix, the key agent versions are matched by; "" when it cannot be
 // computed.
@@ -282,7 +304,10 @@ func (h *LeaderboardHandler) foldEntries(rows map[string]*rowAcc, versions *vers
 			continue
 		}
 		agentHash := h.entryAgentHash(e)
-		version := versions.lookup(e.Agent, agentHash)
+		version, ok := h.entryEvaluationVersion(versions, e)
+		if !ok {
+			version = versions.lookup(e.Agent, agentHash)
+		}
 		key := e.Agent + "\x00" + e.Model + "\x00"
 		if pin != "" {
 			key += "sim:" + pin + "\x00"
@@ -459,14 +484,42 @@ func (h *LeaderboardHandler) suiteTrack(ctx context.Context, id string) string {
 
 // versionIndex maps an agent's agent hash to its version
 // (agentversions.VersionOf: the project's saved versions, else v1 of a
-// built-in library agent), cached per agent and hash.
+// built-in library agent), cached per agent and hash. evals, read from the
+// project's evaluation store, give the version an evaluation recorded for
+// the experiments it created (fromEvaluation), which callers try first.
 type versionIndex struct {
 	root, library string
 	cache         map[string]int
+	evals         ReportCardEvaluations
+	evalCache     map[string]*schemas.Evaluation // nil value: could not be read
 }
 
 func newVersionIndex(root, library string) *versionIndex {
-	return &versionIndex{root: root, library: library, cache: map[string]int{}}
+	v := &versionIndex{root: root, library: library, cache: map[string]int{}, evalCache: map[string]*schemas.Evaluation{}}
+	if root != "" {
+		v.evals = NewFileEvaluations(root)
+	}
+	return v
+}
+
+// fromEvaluation is armVersionFromEvaluation with each evaluation read once.
+func (v *versionIndex) fromEvaluation(m *schemas.Manifest, arm string) (int, bool) {
+	if v == nil || v.evals == nil || m == nil || m.Experiment.EvaluationID == "" {
+		return 0, false
+	}
+	id := m.Experiment.EvaluationID
+	ev, seen := v.evalCache[id]
+	if !seen {
+		var err error
+		if ev, err = v.evals.Get(context.Background(), id); err != nil {
+			ev = nil
+		}
+		v.evalCache[id] = ev
+	}
+	if ev == nil {
+		return 0, false
+	}
+	return evaluationArmVersion(ev, m, arm)
 }
 
 // lookup returns the version whose agent hash matches, 0 when none does.
