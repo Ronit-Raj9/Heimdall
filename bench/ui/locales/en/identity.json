@@ -1,0 +1,64 @@
+{
+	"verify": {
+		"title": "Confirm your email",
+		"subtitle": "Confirm this address to finish setting up your account.",
+		"confirm": "Confirm email",
+		"confirming": "Confirming",
+		"done": "Email confirmed",
+		"doneBody": "{{email}} is confirmed. You can now create API tokens, invite people and create organizations.",
+		"continue": "Continue to Heimdall",
+		"signIn": "Sign in",
+		"missing": "This link is incomplete",
+		"missingBody": "Open the full link from the email, or sign in and send a new one.",
+		"invalid": "This link does not work any more",
+		"invalidBody": "It expired, was already used, or a newer link replaced it. Sign in and send a new one from the banner.",
+		"error": "Could not confirm the email",
+		"note": "The link works once and expires 24 hours after it was sent."
+	},
+	"banner": {
+		"title": "Confirm your email address",
+		"bodyEmail": "We sent a link to {{email}}. Until you open it you can run evaluations, but not create API tokens, invite people or create organizations.",
+		"bodyLog": "This server does not send email. Check with your admin: the link for {{email}} is in the server log. Until you open it you can run evaluations, but not create API tokens, invite people or create organizations.",
+		"resend": "Send a new link",
+		"sentEmail": "A new link is on its way to {{email}}.",
+		"sentLog": "A new link is in the server log. Check with your admin.",
+		"already": "Your email is already confirmed."
+	},
+	"signup": {
+		"allowlistOnly": "Sign up here with an address at {{domains}}. Other addresses need an invitation.",
+		"verifyEmail": "We will email you a link to confirm your address.",
+		"verifyLog": "Your server admin passes on the link that confirms your address."
+	},
+	"locked": "Confirm your email first: open the link we sent you, or send a new one from the banner at the top of the page.",
+	"admin": {
+		"tab": "Sign-up",
+		"title": "Who can sign up",
+		"subtitle": "Applies to the web sign-up page and GitHub sign-in. Invitations always work, except when sign-up is closed.",
+		"modes": {
+			"invite": "Invitation only",
+			"allowlist": "Invitation or allowed domains",
+			"open": "Anyone",
+			"closed": "Closed"
+		},
+		"modeHelp": {
+			"invite": "Only people an organization admin invites can create an account.",
+			"allowlist": "Invited people, plus anyone with an address at the domains below. Each gets an organization of their own.",
+			"open": "Anyone with an email address can create an account and an organization. Use only for a public service.",
+			"closed": "Nobody signs up on the web. Accounts come from bifrost-bench user create on the server."
+		},
+		"domains": "Allowed email domains",
+		"domainsHint": "One per line or comma separated, such as acme.com. Exact match: eu.acme.com is a separate domain.",
+		"domainsNeeded": "Add at least one domain.",
+		"save": "Save",
+		"saved": "Saved. New sign-ups follow this setting now.",
+		"reset": "Use the server config",
+		"sourceAdmin": "Set here by {{who}} {{when}}. The server config says {{mode}}.",
+		"sourceConfig": "From the server config (HEIMDALL_SIGNUP and HEIMDALL_SIGNUP_DOMAINS).",
+		"delivery": "Email delivery",
+		"deliveryEmail": "Verification links are emailed.",
+		"deliveryLog": "No mail sender is set: verification links go to the server log. Pass them on, or run bifrost-bench user verify -email <address> on the server.",
+		"confirmOpen": "Let anyone on the internet create an account here?",
+		"loadFailed": "Could not load the sign-up setting: {{message}}",
+		"retry": "Retry"
+	}
+}

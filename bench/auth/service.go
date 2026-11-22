@@ -52,6 +52,9 @@ type Deps struct {
 	Hasher *Hasher
 	// HTTPClient talks to GitHub; nil uses a client with a 10 s timeout.
 	HTTPClient *http.Client
+	// SendMail delivers verification email; nil writes the links to the
+	// server log (verify.go). SetMailSender can install one later.
+	SendMail MailSender
 	// Now is the clock; nil is time.Now.
 	Now    func() time.Time
 	Logger schemas.Logger
@@ -73,6 +76,11 @@ type Service struct {
 	// captcha.go): a global self-serve signup cap and optional hCaptcha.
 	signupAll *Limiter
 	captcha   *captchaConfig
+	// verifySend paces verification links per user; mail is the sender and
+	// signup the server admin's signup override (verify.go, signupmode.go).
+	verifySend *Limiter
+	mail       mailBox
+	signup     signupState
 
 	purgeMu   sync.Mutex
 	lastPurge time.Time
@@ -133,6 +141,8 @@ func New(cfg Config, deps Deps) (*Service, error) {
 	s.probeIP = NewLimiter(TokenPerIP, now)
 	s.signupAll = NewLimiter(SignupGlobalFromEnv(os.Getenv), now)
 	s.captcha = envCaptcha()
+	s.verifySend = NewLimiter(VerifyResendLimit, now)
+	s.mail.send = deps.SendMail
 	return s, nil
 }
 
@@ -268,6 +278,9 @@ func (s *Service) sessionPrincipal(ctx context.Context, cookie string) (*Princip
 		return nil, nil
 	}
 	p := &Principal{Kind: KindUser, UserID: u.ID, Email: u.Email, sessionID: id, csrf: row.CSRF}
+	if err := s.resolveIdentity(ctx, p, u); err != nil {
+		return nil, err
+	}
 	if row.OrgID != "" {
 		role, err := s.st.membershipRole(ctx, s.st.d.SQL(), row.OrgID, u.ID)
 		switch {
@@ -436,13 +449,16 @@ type SignupRequest struct {
 	Captcha string `json:"captcha,omitempty"`
 }
 
-// Signup creates an account under the signup policy:
+// Signup creates an account under the signup policy (signupmode.go):
 //   - the first account of an empty install (bootstrap) owns a new org,
 //     unless the policy is closed;
-//   - with an invitation token (policy invite or open), the account joins
+//   - with an invitation token (any policy but closed), the account joins
 //     the inviting org with the invited role; the email must match;
-//   - with policy open, any account owns a new org of its own;
+//   - with policy open, any account owns a new org of its own; with
+//     allowlist, an account at an allowed email domain does;
 //   - otherwise signup is refused.
+//
+// The new account starts unverified and is sent a verification link.
 func (s *Service) Signup(ctx context.Context, req SignupRequest, ip, ua, replace string) (*User, *NewSession, error) {
 	email := NormalizeEmail(req.Email)
 	// deny audits a refusal before any account work (every signup outcome
@@ -461,7 +477,8 @@ func (s *Service) Signup(ctx context.Context, req SignupRequest, ip, ua, replace
 	if ok, wait := s.signupEmail.Allow(email); !ok {
 		return deny(errRateLimited(wait))
 	}
-	if req.Invitation == "" && s.cfg.Signup != SignupClosed {
+	mode, domains := s.signupPolicy(ctx)
+	if req.Invitation == "" && mode != SignupClosed {
 		if ok, wait := s.signupAll.Allow("all"); !ok {
 			return deny(errRateLimited(wait))
 		}
@@ -479,7 +496,7 @@ func (s *Service) Signup(ctx context.Context, req SignupRequest, ip, ua, replace
 	if len(name) > 200 {
 		return deny(errBadRequest("name is longer than 200 characters"))
 	}
-	if s.cfg.Signup == SignupClosed {
+	if mode == SignupClosed {
 		// Closed: nothing on the web creates accounts, not even the first
 		// one; `bifrost-bench user create` does.
 		return deny(ErrSignupNotAllowed)
@@ -513,8 +530,8 @@ func (s *Service) Signup(ctx context.Context, req SignupRequest, ip, ua, replace
 			if err != nil {
 				return err
 			}
-			if n > 0 && s.cfg.Signup != SignupOpen {
-				return ErrSignupNotAllowed
+			if n > 0 && !selfServeAllowed(mode, domains, email) {
+				return signupRefusal(mode)
 			}
 		}
 		nu, err := s.st.insertUser(ctx, tx, email, name, hash, "")
@@ -564,6 +581,12 @@ func (s *Service) Signup(ctx context.Context, req SignupRequest, ip, ua, replace
 		s.record(AuditEvent{OrgID: inv.OrgID, ActorType: "user", ActorID: u.ID, Action: "auth.invite_accept", TargetType: "invitation", TargetID: inv.ID, IP: ip,
 			Details: map[string]any{"role": string(inv.Role)}})
 	}
+	// A password account starts unverified: send the first link now. A
+	// failure is logged; the user can resend from the banner.
+	s.verifySend.Allow(u.ID)
+	if _, err := s.issueVerification(ctx, u, ip); err != nil {
+		s.logger.Warn(fmt.Sprintf("auth: verification link for new account %s: %v", u.ID, err))
+	}
 	return u, sess, nil
 }
 
@@ -599,8 +622,12 @@ type Me struct {
 	Role       Role    `json:"role,omitempty"`
 	// CSRF is the value cookie-authenticated writes send in X-Heimdall-CSRF.
 	CSRF string `json:"csrf,omitempty"`
-	// ServerAdmin is true for a user listed in HEIMDALL_SERVER_ADMINS (serveradmin.go).
+	// ServerAdmin is true for a server admin (serveradmin.go): listed by
+	// user id, granted from the CLI, or listed by a verified email.
 	ServerAdmin bool `json:"server_admin,omitempty"`
+	// EmailVerified is set for a signed-in user: whether their email is
+	// verified (verify.go). Absent for tokens and local mode.
+	EmailVerified *bool `json:"email_verified,omitempty"`
 }
 
 // LocalMe is GET /auth/me in local mode.
@@ -623,7 +650,15 @@ func (s *Service) Me(ctx context.Context, p *Principal) (*Me, error) {
 			return nil, err
 		}
 		me.User = u
-		me.ServerAdmin = IsServerAdmin(p) || isServerAdminEmail(u.Email)
+		// Resolved from the database here (not from p): SessionMe builds p
+		// before the session was ever read.
+		q := *p
+		if err := s.resolveIdentity(ctx, &q, u); err != nil {
+			return nil, err
+		}
+		verified := q.EmailVerified
+		me.EmailVerified = &verified
+		me.ServerAdmin = IsServerAdmin(&q)
 		orgs, err := s.st.memberships(ctx, s.st.d.SQL(), u.ID)
 		if err != nil {
 			return nil, err
@@ -761,15 +796,25 @@ type AuthInfo struct {
 	// Captcha is true when signup needs a captcha (even without a site key
 	// configured, so the page can explain the failure).
 	Captcha bool `json:"captcha,omitempty"`
+	// SignupDomains are the email domains that may sign up without an
+	// invitation, set when Signup is allowlist.
+	SignupDomains []string `json:"signup_domains,omitempty"`
+	// EmailDelivery is email when the server mails verification links, log
+	// when they go to the server log (ask the server admin).
+	EmailDelivery string `json:"email_delivery,omitempty"`
 }
 
 // Info describes the sign-in options.
 func (s *Service) Info(ctx context.Context) AuthInfo {
-	info := AuthInfo{AuthMode: "hosted", Signup: string(s.cfg.Signup), GitHub: s.cfg.GitHub != nil}
+	mode, domains := s.signupPolicy(ctx)
+	info := AuthInfo{AuthMode: "hosted", Signup: string(mode), GitHub: s.cfg.GitHub != nil, EmailDelivery: s.emailDelivery()}
+	if mode == SignupAllowlist {
+		info.SignupDomains = nonNil(domains)
+	}
 	if s.captcha != nil {
 		info.Captcha, info.CaptchaSiteKey = true, s.captcha.siteKey
 	}
-	if s.cfg.Signup != SignupClosed {
+	if mode != SignupClosed {
 		if n, err := s.st.countUsers(ctx, s.st.d.SQL()); err == nil && n == 0 {
 			info.Bootstrap = true
 		}

@@ -43,6 +43,16 @@ func init() {
 type adminDirectory struct{ d *db.DB }
 
 func (a adminDirectory) Users(ctx context.Context) ([]handlers.AdminUser, error) {
+	// Server admin status is by user id or verified email, never an email
+	// match alone (audit B1).
+	admins := map[string]bool{}
+	list, err := auth.ServerAdmins(ctx, a.d)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range list {
+		admins[e.UserID] = true
+	}
 	rows, err := a.d.Query(ctx, `SELECT u.id, u.email, u.name, u.github_id, u.disabled, u.created_at,
 		(SELECT COUNT(*) FROM memberships m WHERE m.user_id = u.id)
 		FROM users u ORDER BY u.created_at, u.id LIMIT ?`, maxAdminUsers)
@@ -59,7 +69,7 @@ func (a adminDirectory) Users(ctx context.Context) ([]handlers.AdminUser, error)
 			return nil, err
 		}
 		u.GitHub, u.Disabled, u.CreatedAt = gh.Valid && gh.String != "", dis != 0, db.Time(created)
-		u.ServerAdmin = auth.IsServerAdmin(&auth.Principal{Kind: auth.KindUser, Email: u.Email})
+		u.ServerAdmin = admins[u.ID]
 		out = append(out, u)
 	}
 	return out, rows.Err()

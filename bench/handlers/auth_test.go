@@ -1,7 +1,11 @@
 package handlers_test
 
 import (
+	"context"
 	"encoding/json"
+	"net/url"
+	"regexp"
+	"sync"
 	"net"
 	"strings"
 	"testing"
@@ -24,20 +28,32 @@ const publicURL = "https://heimdall.example"
 type authServer struct {
 	h   fasthttp.RequestHandler
 	svc *auth.Service
+	// mails are the verification mails sent, "to\ntext" each.
+	mu    sync.Mutex
+	mails []string
 }
 
 func newAuthServer(t *testing.T, signup auth.SignupPolicy) *authServer {
 	t.Helper()
 	cfg := auth.Config{Hosted: true, ServerMode: schemas.ModeLive, PublicURL: publicURL, Signup: signup,
 		SessionTTL: 24 * time.Hour, SessionIdle: 24 * time.Hour, InviteTTL: 24 * time.Hour, AllowedOrigins: []string{publicURL}}
+	as := &authServer{}
 	svc, err := auth.New(cfg, auth.Deps{DB: dbtest.Open(t),
-		Hasher: auth.NewHasher(auth.Argon2Params{Memory: 1024, Time: 1, Threads: 1, SaltLen: 16, KeyLen: 32})})
+		Hasher: auth.NewHasher(auth.Argon2Params{Memory: 1024, Time: 1, Threads: 1, SaltLen: 16, KeyLen: 32}),
+		SendMail: func(_ context.Context, to, _, text, _ string) error {
+			as.mu.Lock()
+			as.mails = append(as.mails, to+"\n"+text)
+			as.mu.Unlock()
+			return nil
+		}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	r := router.New()
 	handlers.NewAuthHandler(schemas.ModeLive, svc).RegisterRoutes(r, lib.BodyLimit(schemas.ModeLive, lib.MaxBodyBytes))
-	return &authServer{h: lib.ChainMiddlewares(r.Handler, auth.Middleware(cfg, svc)), svc: svc}
+	handlers.NewIdentityHandler(schemas.ModeLive, svc).RegisterRoutes(r, lib.BodyLimit(schemas.ModeLive, lib.MaxBodyBytes))
+	as.h, as.svc = lib.ChainMiddlewares(r.Handler, auth.Middleware(cfg, svc)), svc
+	return as
 }
 
 type req struct {
@@ -168,6 +184,41 @@ func TestAuthHostedFlow(t *testing.T) {
 	if c := s.do(t, req{method: "POST", path: handlers.AuthPrefix + "/tokens", cookie: cookie, csrf: me.CSRF, origin: "https://evil.example", body: body}); c.Response.StatusCode() != 403 {
 		t.Fatalf("token from foreign origin = %d", c.Response.StatusCode())
 	}
+	// Unverified: signed in, but no API tokens until the emailed link is
+	// opened (Wave A, B1).
+	if me.EmailVerified == nil || *me.EmailVerified {
+		t.Fatalf("signup me verified: %s", sc.Response.Body())
+	}
+	if c := s.do(t, req{method: "POST", path: handlers.AuthPrefix + "/tokens", cookie: cookie, csrf: me.CSRF, origin: publicURL, body: body}); c.Response.StatusCode() != 403 ||
+		!strings.Contains(string(c.Response.Body()), "verify your email") {
+		t.Fatalf("token by unverified user = %d %s", c.Response.StatusCode(), c.Response.Body())
+	}
+	resend := s.do(t, req{method: "POST", path: handlers.VerifyResendPath, cookie: cookie, csrf: me.CSRF, origin: publicURL})
+	if got := decode[auth.VerifySent](t, resend); resend.Response.StatusCode() != 200 || got.Delivery != auth.DeliveryEmail || strings.Contains(string(resend.Response.Body()), "token=") {
+		t.Fatalf("resend = %d %s", resend.Response.StatusCode(), resend.Response.Body())
+	}
+	s.mu.Lock()
+	last := s.mails[len(s.mails)-1]
+	s.mu.Unlock()
+	m := regexp.MustCompile(`verify-email\?token=(\S+)`).FindStringSubmatch(last)
+	if len(m) != 2 {
+		t.Fatalf("no link in mail %q", last)
+	}
+	tok, _ := url.QueryUnescape(m[1])
+	if c := s.do(t, req{method: "POST", path: handlers.VerifyEmailPath, origin: publicURL, body: `{"token":"bogus"}`}); c.Response.StatusCode() != 404 {
+		t.Fatalf("bogus verify = %d", c.Response.StatusCode())
+	}
+	vc := s.do(t, req{method: "POST", path: handlers.VerifyEmailPath, origin: publicURL, body: `{"token":"` + tok + `"}`})
+	if got := decode[auth.VerifyResult](t, vc); vc.Response.StatusCode() != 200 || !got.Verified || got.Email != "owner@example.com" {
+		t.Fatalf("verify = %d %s", vc.Response.StatusCode(), vc.Response.Body())
+	}
+	if got := decode[auth.Me](t, s.do(t, req{method: "GET", path: handlers.AuthPrefix + "/me", cookie: cookie})); got.EmailVerified == nil || !*got.EmailVerified {
+		t.Fatal("me not verified after the link")
+	}
+	// Signup settings are server admins only.
+	if c := s.do(t, req{method: "GET", path: handlers.SignupSettingPath, cookie: cookie}); c.Response.StatusCode() != 403 {
+		t.Fatalf("signup settings by non-admin = %d", c.Response.StatusCode())
+	}
 	tc := s.do(t, req{method: "POST", path: handlers.AuthPrefix + "/tokens", cookie: cookie, csrf: me.CSRF, origin: publicURL, body: body})
 	if tc.Response.StatusCode() != 201 {
 		t.Fatalf("token create = %d %s", tc.Response.StatusCode(), tc.Response.Body())
@@ -266,7 +317,7 @@ func TestAuthInvitationAcceptAndSwitchOrg(t *testing.T) {
 	ownerMe := decode[auth.Me](t, owner)
 	guest := s.do(t, req{method: "POST", path: handlers.AuthPrefix + "/signup", ip: "198.51.100.11", body: `{"email":"guest@example.com","password":"violet-tractor-umbrella"}`})
 	gCookie, gMe := sessionCookie(t, guest), decode[auth.Me](t, guest)
-	ownerP := &auth.Principal{Kind: auth.KindUser, UserID: ownerMe.User.ID, OrgID: ownerMe.CurrentOrg, Role: auth.RoleOwner}
+	ownerP := &auth.Principal{Kind: auth.KindUser, UserID: ownerMe.User.ID, OrgID: ownerMe.CurrentOrg, Role: auth.RoleOwner, EmailVerified: true}
 	inv, err := s.svc.CreateInvitation(t.Context(), ownerP, ownerMe.CurrentOrg, "guest@example.com", auth.RoleMember, "")
 	if err != nil {
 		t.Fatal(err)

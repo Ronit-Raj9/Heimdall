@@ -160,8 +160,61 @@ the server and audit logs; a rate-limited callback is `429` with
 | Policy | Web signup |
 |---|---|
 | `invite` (default) | only with an invitation token for that email |
+| `allowlist` | an invitation, or an address at one of `auth.signup_domains` (exact domain match), which owns a new organization; with no domains it is `invite` |
 | `open` | anyone; each new account owns a new organization (or joins one with an invitation) |
 | `closed` | none, not even the first account; accounts come from the CLI |
+
+The policy applies to GitHub sign-in too. Hosted installs default to
+`invite`; set `HEIMDALL_SIGNUP=allowlist` and
+`HEIMDALL_SIGNUP_DOMAINS=acme.com,acme.io` in `deploy/hosted/.env` (then
+`upgrade.sh --no-pull`) to let a company's own addresses in. A server admin
+can also change both live from Admin, Sign-up (`POST /api/bench/admin/signup`);
+that override is stored in the database, wins over the config, and every
+replica picks it up within 30 seconds. "Use the server config" drops it.
+
+## Email verification
+
+A password signup starts unverified. The server makes a one-time link
+(`/verify-email?token=...`, valid 24 hours, only its sha256 stored, a newer
+link replaces the pending one) and sends it through the `auth.MailSender`
+callback (`func(ctx, to, subject, text, html string) error`, set with
+`Deps.SendMail` or `Service.SetMailSender`). With no sender configured, or
+when sending fails, the link is written to the server log instead
+(`docker compose logs heimdall | grep "verification link"`) and the UI tells
+the user to check with their admin. The page posts the token back on a
+button press, so a mail scanner fetching the link verifies nothing.
+
+The rule: an unverified account can sign in, accept invitations and use its
+organizations with its role (run evaluations, read results). Until verified
+it can not create API tokens, invite anyone, create another organization, or
+be a server admin. GitHub-linked accounts count as verified (GitHub vouches
+for the primary address), and so do accounts made by `bifrost-bench user
+create`. An operator can mark one by hand:
+
+```sh
+bifrost-bench user verify -email someone@example.com
+```
+
+A verification counts only while the account's email is the one verified.
+Resends are paced at 3 per user, then 1 every 10 minutes.
+
+## Server admins
+
+A server admin sees every tenant, disables users, edits quotas and flips the
+kill switch, so the role never comes from an email match alone. A signed-in
+user is a server admin when any of these holds:
+
+- their user id is in `HEIMDALL_SERVER_ADMIN_IDS` (comma-separated);
+- an operator granted it on the server: `bifrost-bench admin grant -email
+  you@example.com` (by user id; `admin revoke` and `admin list` too);
+- their email is in `HEIMDALL_SERVER_ADMINS` and verified. The first request
+  after that binds the address to the user id; the binding applies only while
+  the address stays listed.
+
+API tokens, runners and anonymous callers are never server admins. An
+existing admin whose password account predates verification keeps working
+once they open a verification link (Resend in the banner; with no mail sender
+the link is in the server log) or once the operator runs `admin grant`.
 
 On an empty install (no users) under `invite` or `open`, the first signup
 creates the owner account and its organization (`GET /auth/config` reports
@@ -212,8 +265,13 @@ audit API: `auth.login`, `auth.login_failed`, `auth.login_rate_limited`,
 `auth.logout`, `auth.signup`, `auth.signup_failed`, `auth.switch_org`,
 `auth.password_change`, `auth.password_change_failed`, `auth.token_create`,
 `auth.token_revoke`, `auth.invite_create`, `auth.invite_revoke`,
-`auth.invite_accept`, `auth.github_link`, and from the CLI
-`auth.user_create` and `auth.password_set` (actor `system`). Failed logins
+`auth.invite_accept`, `auth.github_link`, `auth.verify_email_sent`,
+`auth.email_verified`, `auth.verify_email_failed`, `auth.server_admin_bound`,
+`auth.signup_settings`, and from the CLI `auth.user_create`,
+`auth.password_set`, `auth.email_verified`, `auth.server_admin_grant` and
+`auth.server_admin_revoke` (actor `system`). Share link reads write
+`shares.view` (anonymous, with the address and user agent) into the link's
+organization, at most once per link, address and route an hour. Failed logins
 (including rate-limited ones and GitHub callbacks refused before the code
 exchange), refused signups (validation, rate limit, closed policy) and failed
 password changes are recorded with actor `anonymous` or the user and the
@@ -241,6 +299,11 @@ fields refused (trailing data after it is a 400).
 | `GET tokens` | admin of the current org | tokens without secrets |
 | `POST tokens` `{name, role, expires_in_days}` | session, admin | 201, the token shown once |
 | `POST tokens/{id}/revoke` | admin of the current org | 204 |
+| `POST verify-email` `{token}` | link holder | email, verified; 404 when unknown, expired, used or replaced |
+| `POST verify-email/resend` | session | where the new link went (`email` or `log`); never the link |
+
+`GET` and `POST /api/bench/admin/signup` (server admin) read and set the
+signup override.
 
 Invitations are created, listed and revoked under
 `/api/bench/orgs/{org}/invitations` (tenancy area), backed by

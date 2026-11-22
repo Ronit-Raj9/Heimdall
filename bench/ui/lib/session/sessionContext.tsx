@@ -28,6 +28,10 @@ export interface SessionInfo {
 	github: boolean;
 	/** An empty install: the first sign-up creates the owner, whatever the signup policy. */
 	bootstrap: boolean;
+	/** Under signup allowlist: the domains that may sign up without an invitation. */
+	signupDomains?: string[];
+	/** A signed-in user: whether their email is verified; undefined for tokens, local mode and older servers. */
+	emailVerified?: boolean;
 }
 
 export const LOCAL_SESSION: SessionInfo = {
@@ -57,7 +61,7 @@ export interface SessionSources {
  * serve no public demo).
  */
 export function sessionFromMe({ me, meError, meLoading, config }: SessionSources): SessionInfo {
-	const offers = { signup: config?.signup, github: Boolean(config?.github), bootstrap: Boolean(config?.bootstrap) };
+	const offers = { signup: config?.signup, github: Boolean(config?.github), bootstrap: Boolean(config?.bootstrap), signupDomains: config?.signup_domains };
 	// A 401 wins over earlier data: the session ended since the last answer.
 	if (isUnauthorized(meError)) {
 		// Still loading while the sign-in options are on their way.
@@ -83,6 +87,7 @@ export function sessionFromMe({ me, meError, meLoading, config }: SessionSources
 			role: signedIn ? (me.role ?? org?.role) : undefined,
 			signedIn,
 			serverAdmin: me.server_admin === true,
+			emailVerified: kind === "user" && typeof me.email_verified === "boolean" ? me.email_verified : undefined,
 			...offers,
 		};
 	}
@@ -109,9 +114,17 @@ export function canUse(session: SessionInfo, min: Role = "member"): boolean {
 	return roleAtLeast(session.role, min);
 }
 
-/** Whether a visitor without an invitation may use the signup form: open signup or an empty install. */
+/**
+ * Whether a visitor without an invitation may use the signup form: open signup, an allowlist with at
+ * least one domain (the server checks the address), or an empty install.
+ */
 export function signupOffered(session: SessionInfo): boolean {
-	return session.signup === "open" || session.bootstrap;
+	return session.signup === "open" || (session.signup === "allowlist" && (session.signupDomains?.length ?? 0) > 0) || session.bootstrap;
+}
+
+/** True when the signed-in user still has to verify their email (the banner and the locked actions). */
+export function needsEmailVerification(session: SessionInfo): boolean {
+	return session.authMode === "hosted" && session.kind === "user" && session.emailVerified === false;
 }
 
 /** True when this tab should show the write-token box: local mode only. */

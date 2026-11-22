@@ -20,6 +20,9 @@ const (
 	SignupInvite SignupPolicy = lib.SignupInvite
 	SignupOpen   SignupPolicy = lib.SignupOpen
 	SignupClosed SignupPolicy = lib.SignupClosed
+	// SignupAllowlist admits invitations, and self-serve signups from the
+	// email domains in Config.SignupDomains (signupmode.go).
+	SignupAllowlist SignupPolicy = lib.SignupAllowlist
 )
 
 // Config is the resolved auth configuration the service and middleware use.
@@ -38,6 +41,10 @@ type Config struct {
 	// InviteTTL is how long an invitation stays valid.
 	InviteTTL time.Duration
 	Signup    SignupPolicy
+	// SignupDomains are the domains signup allowlist admits without an
+	// invitation, normalized (lowercase, no "@"). A server admin can
+	// override Signup and SignupDomains from the web (signupmode.go).
+	SignupDomains []string
 	// AllowedOrigins are the origins a cookie-authenticated write may come
 	// from: the public URL's origin plus server.cors_origins.
 	AllowedOrigins []string
@@ -80,6 +87,9 @@ func ConfigFrom(c *lib.Config, writeToken string) (Config, error) {
 		InviteTTL:   hours(a.InviteTTLH, lib.DefaultInviteTTLHours),
 		Signup:      SignupPolicy(a.SignupPolicy()),
 		WriteToken:  writeToken,
+	}
+	for _, d := range a.SignupDomains {
+		out.SignupDomains = append(out.SignupDomains, lib.NormalizeSignupDomain(d))
 	}
 	if !out.Hosted {
 		return out, nil

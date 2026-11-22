@@ -254,7 +254,8 @@ func (s *Service) githubSignIn(ctx context.Context, id *GitHubIdentity, ip, ua, 
 // policy: bootstrap and open get an org of their own; otherwise a pending
 // invitation for the verified email is required and accepted.
 func (s *Service) githubCreate(ctx context.Context, tx *sql.Tx, id *GitHubIdentity) (*User, *githubSignup, error) {
-	if s.cfg.Signup == SignupClosed {
+	mode, domains := s.signupPolicy(ctx)
+	if mode == SignupClosed {
 		return nil, nil, ErrSignupNotAllowed
 	}
 	if err := s.st.lockAccounts(ctx, tx); err != nil {
@@ -268,8 +269,8 @@ func (s *Service) githubCreate(ctx context.Context, tx *sql.Tx, id *GitHubIdenti
 	if err != nil && !errors.Is(err, db.ErrNotFound) {
 		return nil, nil, err
 	}
-	if inv == nil && n > 0 && s.cfg.Signup != SignupOpen {
-		return nil, nil, ErrSignupNotAllowed
+	if inv == nil && n > 0 && !selfServeAllowed(mode, domains, id.Email) {
+		return nil, nil, signupRefusal(mode)
 	}
 	name := id.Name
 	if name == "" {

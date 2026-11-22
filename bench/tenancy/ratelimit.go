@@ -17,14 +17,20 @@ import (
 // gets 429 with Retry-After in whole seconds. Runner tokens are not limited
 // here: their heartbeats and uploads are paced by the worker protocol, and
 // starving a runner would fail a run. Anonymous callers have no credential
-// bucket; the org bucket of a public org still applies. The buckets live in
-// memory (auth.Limiter), so several replicas multiply the limits.
+// bucket; the org bucket of a public org still applies. Share link routes
+// (AccessShare) never touch the org bucket: they have buckets of their own,
+// one per link and one per client IP (sharelimits.go, audit B4). The buckets
+// live in memory (auth.Limiter), so several replicas multiply the limits.
 
 // RateLimitConfig shapes the two buckets. A zero Burst turns that bucket
 // off.
 type RateLimitConfig struct {
 	PerCredential auth.RateLimit
 	PerOrg        auth.RateLimit
+	// PerShareLink and PerShareIP limit anonymous share link reads: one
+	// bucket per link and one per client IP, never charged to the org.
+	PerShareLink auth.RateLimit
+	PerShareIP   auth.RateLimit
 }
 
 // DefaultRateLimits are generous for people and scripts alike: a credential
@@ -33,12 +39,17 @@ type RateLimitConfig struct {
 var DefaultRateLimits = RateLimitConfig{
 	PerCredential: auth.RateLimit{Burst: 120, Every: 50 * time.Millisecond},
 	PerOrg:        auth.RateLimit{Burst: 600, Every: 10 * time.Millisecond},
+	PerShareLink:  DefaultShareLinkLimit,
+	PerShareIP:    DefaultShareIPLimit,
 }
 
 // RateLimits holds the live buckets.
 type RateLimits struct {
 	cred *auth.Limiter
 	org  *auth.Limiter
+	// shareLink and shareIP are the share link buckets (sharelimits.go).
+	shareLink *auth.Limiter
+	shareIP   *auth.Limiter
 }
 
 // NewRateLimits builds the buckets of c. now may be nil (time.Now).
@@ -49,6 +60,12 @@ func NewRateLimits(c RateLimitConfig, now func() time.Time) *RateLimits {
 	}
 	if c.PerOrg.Burst > 0 {
 		rl.org = auth.NewLimiter(c.PerOrg, now)
+	}
+	if c.PerShareLink.Burst > 0 {
+		rl.shareLink = auth.NewLimiter(c.PerShareLink, now)
+	}
+	if c.PerShareIP.Burst > 0 {
+		rl.shareIP = auth.NewLimiter(c.PerShareIP, now)
 	}
 	return rl
 }

@@ -4,6 +4,7 @@ import { AuthShell } from "@/components/platform/authShell";
 import { SharedFrame } from "@/components/share/sharedFrame";
 import { ConfirmProvider } from "@/components/platform/confirmDialog";
 import { SessionProvider } from "@/components/platform/sessionProvider";
+import { VerifyEmailBanner } from "@/components/platform/verifyEmailBanner";
 import { ThemeProvider } from "@/components/themeProvider";
 import { activeNavItem } from "@/lib/constants/navigation";
 import i18n from "@/lib/i18n";
@@ -111,6 +112,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 							className="animate-in fade-in relative mx-auto flex min-h-0 w-full max-w-[1440px] flex-col px-4 py-6 outline-none duration-300 md:px-8 md:py-8 lg:px-10"
 							data-bench-main
 						>
+							<VerifyEmailBanner />
 							{children}
 						</main>
 					</div>

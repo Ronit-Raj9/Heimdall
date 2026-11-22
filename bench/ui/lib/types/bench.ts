@@ -3708,7 +3708,8 @@ export type Role = "viewer" | "member" | "admin" | "owner";
 export type PrincipalKind = "user" | "token" | "runner" | "anonymous" | "local";
 
 /** auth.signup: who may create an account. */
-export type SignupPolicy = "invite" | "open" | "closed";
+/** Who may sign up from the web (auth/signupmode.go). allowlist: an invitation, or an address at an allowed domain. */
+export type SignupPolicy = "invite" | "allowlist" | "open" | "closed";
 
 /** A time from a platform route: RFC 3339, or unix milliseconds. */
 export type PlatformTime = string | number;
@@ -3751,8 +3752,10 @@ export interface AuthMe {
 	role?: Role;
 	/** Session CSRF value: sent as X-Heimdall-CSRF on every cookie-authenticated write. */
 	csrf?: string;
-	/** A user listed in HEIMDALL_SERVER_ADMINS (auth/serveradmin.go). */
+	/** A server admin: listed by user id, granted from the CLI, or a verified listed email (auth/serveradmin.go). */
 	server_admin?: boolean;
+	/** Set for a signed-in user: whether their email is verified (auth/verify.go). Absent on older servers. */
+	email_verified?: boolean;
 }
 
 /** GET /auth/config (auth.AuthInfo): what the sign-in page offers, answered to anyone. */
@@ -3766,7 +3769,14 @@ export interface AuthConfig {
 	captcha?: boolean;
 	/** hCaptcha site key for the sign-up widget. */
 	captcha_site_key?: string;
+	/** Under signup allowlist: the email domains that may sign up without an invitation. */
+	signup_domains?: string[];
+	/** email: verification links are mailed; log: they go to the server log and the server admin passes them on. */
+	email_delivery?: EmailDelivery;
 }
+
+/** Where verification links go (auth/verify.go). */
+export type EmailDelivery = "email" | "log";
 
 /** POST /auth/login. */
 export interface LoginRequest {

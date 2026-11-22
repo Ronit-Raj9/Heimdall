@@ -9,3 +9,4 @@ current_org?
 role?
 csrf?
 server_admin?
+email_verified?
