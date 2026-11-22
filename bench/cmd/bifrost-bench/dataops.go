@@ -558,5 +558,8 @@ func parseRateLimits(v string) (tenancy.RateLimitConfig, error) {
 		}
 		return auth.RateLimit{Burst: int(burst), Every: time.Duration(float64(time.Second) / perSec)}
 	}
-	return tenancy.RateLimitConfig{PerCredential: shape(n[0], n[1]), PerOrg: shape(n[2], n[3])}, nil
+	// Share link buckets keep their defaults: the four numbers shape the
+	// credential and org buckets only (share traffic never uses those).
+	return tenancy.RateLimitConfig{PerCredential: shape(n[0], n[1]), PerOrg: shape(n[2], n[3]),
+		PerShareLink: tenancy.DefaultShareLinkLimit, PerShareIP: tenancy.DefaultShareIPLimit}, nil
 }

@@ -100,6 +100,10 @@ type Dispatcher struct {
 	c        DispatcherConfig
 	platform *matcher
 	orgs     *matcher
+	// views dedupes share link view audit rows (sharelimits.go); now is its
+	// clock, nil for time.Now (tests set it).
+	views shareViews
+	now   func() time.Time
 }
 
 // NewDispatcher checks the config and builds the route matchers.
@@ -183,7 +187,12 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, d.c.Mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, "route has no organization")
 		return
 	}
-	if !d.c.Limits.allow(ctx, d.c.Mode, p, o) {
+	if rule.Access == AccessShare {
+		// Share links have their own buckets, never the org's (audit B4).
+		if !d.c.Limits.allowShare(ctx, d.c.Mode, shareRef, ClientIP(ctx)) {
+			return
+		}
+	} else if !d.c.Limits.allow(ctx, d.c.Mode, p, o) {
 		return
 	}
 	actx, cancel := workContext()
@@ -216,6 +225,9 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 	}
 	if IsRead(method) && rule.AuditRead && ctx.Response.StatusCode() < 400 {
 		d.auditRead(ctx, o.ID, method, pat)
+	}
+	if rule.Access == AccessShare && ctx.Response.StatusCode() < 400 {
+		d.auditShareView(ctx, o.ID, pat, shareRef)
 	}
 }
 

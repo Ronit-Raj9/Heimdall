@@ -247,7 +247,8 @@ func TestParseRateLimits(t *testing.T) {
 	}{
 		{"", tenancy.DefaultRateLimits, false},
 		{"off", tenancy.RateLimitConfig{}, false},
-		{"10,2,100,0", tenancy.RateLimitConfig{PerCredential: auth.RateLimit{Burst: 10, Every: 500 * time.Millisecond}}, false},
+		{"10,2,100,0", tenancy.RateLimitConfig{PerCredential: auth.RateLimit{Burst: 10, Every: 500 * time.Millisecond},
+			PerShareLink: tenancy.DefaultShareLinkLimit, PerShareIP: tenancy.DefaultShareIPLimit}, false},
 		{"1,2,3", tenancy.RateLimitConfig{}, true},
 		{"a,b,c,d", tenancy.RateLimitConfig{}, true},
 	}
