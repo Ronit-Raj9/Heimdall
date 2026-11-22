@@ -279,3 +279,23 @@ func TestAgentVersionsRegisterCandidate(t *testing.T) {
 		t.Fatalf("bad yaml: %d %s", code, body)
 	}
 }
+
+// TestSnapshotAgentSaveReportsOutcome: the version a save left current, and
+// a failure, reach the caller instead of being dropped (J3.edit).
+func TestSnapshotAgentSaveReportsOutcome(t *testing.T) {
+	r, _, st := versionsRouter(t, nil, "")
+	if code, body := abCall(r, "POST", APIPrefix+"/agents/from-template", AgentFromTemplateRequest{Template: "plain-loop", ID: "loop"}); code != 201 {
+		t.Fatalf("create: %d %s", code, body)
+	}
+	doc, _, err := st.Read(context.Background(), projectfs.AreaAgents, "loop.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, created, err := snapshotAgentSave(context.Background(), st, "loop.yaml", "loop", doc, "me", "")
+	if err != nil || n != 1 || created {
+		t.Fatalf("same doc: %d %v %v", n, created, err)
+	}
+	if _, _, err := snapshotAgentSave(context.Background(), st, "loop.yaml", "loop", []byte("id: loop\nadapter: [\n"), "me", ""); err == nil {
+		t.Fatal("a document that does not decode must report an error")
+	}
+}

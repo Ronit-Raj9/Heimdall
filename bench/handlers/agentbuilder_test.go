@@ -161,3 +161,69 @@ func TestFromTemplateNoStore(t *testing.T) {
 		t.Fatalf("want 503, got %d", code)
 	}
 }
+
+// TestPutConfigReportsVersion: a save answers with the agent version it
+// left current and whether it made a new one (J3.edit).
+func TestPutConfigReportsVersion(t *testing.T) {
+	r, _ := builderRouter(t)
+	if code, body := abCall(r, "POST", APIPrefix+"/agents/from-template", AgentFromTemplateRequest{Template: "plain-loop", ID: "loop"}); code != 201 {
+		t.Fatalf("create: %d %s", code, body)
+	}
+	code, body := abCall(r, "GET", APIPrefix+"/agents/loop/config", nil)
+	if code != 200 {
+		t.Fatalf("get: %d %s", code, body)
+	}
+	var doc AgentConfigDoc
+	_ = json.Unmarshal(body, &doc)
+	if doc.Version != 0 || doc.VersionCreated {
+		t.Fatalf("GET must not report a save: %+v", doc)
+	}
+	put := func(p AgentConfigPut) AgentConfigDoc {
+		t.Helper()
+		code, body := abCall(r, "PUT", APIPrefix+"/agents/loop/config", p)
+		if code != 200 {
+			t.Fatalf("put: %d %s", code, body)
+		}
+		var out AgentConfigDoc
+		_ = json.Unmarshal(body, &out)
+		return out
+	}
+	if out := put(AgentConfigPut{YAML: doc.YAML}); out.Version != 1 || out.VersionCreated {
+		t.Fatalf("same yaml: version %d created %v", out.Version, out.VersionCreated)
+	}
+	f := doc.Fields
+	f.WallS = 777
+	if out := put(AgentConfigPut{Fields: &f}); out.Version != 2 || !out.VersionCreated {
+		t.Fatalf("changed budget: version %d created %v", out.Version, out.VersionCreated)
+	}
+	if !strings.Contains(string(body), `"sha256"`) {
+		t.Fatal("doc shape changed")
+	}
+}
+
+// TestPutConfigCreateOnlyRefusesExisting: the pull path of the new agent page
+// sends create_only, and the server refuses to overwrite an existing agent
+// (B7.dup).
+func TestPutConfigCreateOnlyRefusesExisting(t *testing.T) {
+	r, st := builderRouter(t)
+	if code, body := abCall(r, "POST", APIPrefix+"/agents/from-template", AgentFromTemplateRequest{Template: "plain-loop", ID: "my-plain-loop"}); code != 201 {
+		t.Fatalf("create: %d %s", code, body)
+	}
+	before, _, err := st.Read(context.Background(), projectfs.AreaAgents, "my-plain-loop.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := strings.Replace(string(before), "id: my-plain-loop", "id: my-plain-loop\n# overwritten", 1)
+	code, body := abCall(r, "PUT", APIPrefix+"/agents/my-plain-loop/config", AgentConfigPut{YAML: other, CreateOnly: true})
+	if code != 409 || !strings.Contains(string(body), "An agent named my-plain-loop already exists. Pick another name.") {
+		t.Fatalf("create_only on an existing agent: %d %s", code, body)
+	}
+	after, _, _ := st.Read(context.Background(), projectfs.AreaAgents, "my-plain-loop.yaml")
+	if string(after) != string(before) {
+		t.Fatal("create_only overwrote the agent")
+	}
+	fresh := strings.Replace(string(before), "id: my-plain-loop", "id: my-plain-loop-2", 1)
+	if code, body := abCall(r, "PUT", APIPrefix+"/agents/my-plain-loop-2/config", AgentConfigPut{YAML: fresh, CreateOnly: true}); code != 200 {
+		t.Fatalf("create_only on a free name: %d %s", code, body)
+	}
+}

@@ -155,6 +155,11 @@ type AgentConfigDoc struct {
 	YAML   string            `json:"yaml"`
 	SHA256 string            `json:"sha256"`
 	Fields AgentConfigFields `json:"fields"`
+	// Version and VersionCreated answer a save (PUT): the agent version
+	// current after it, and whether the save made it. A change of model or
+	// provider alone keeps the version (agentversions.AgentHash).
+	Version        int  `json:"version,omitempty"`
+	VersionCreated bool `json:"version_created,omitempty"`
 }
 
 // AgentConfigPut is the PUT body: yaml replaces the file; fields (when yaml
@@ -163,6 +168,9 @@ type AgentConfigPut struct {
 	YAML    string             `json:"yaml,omitempty"`
 	Fields  *AgentConfigFields `json:"fields,omitempty"`
 	IfMatch string             `json:"if_match,omitempty"`
+	// CreateOnly refuses the save (409) when the agent already exists, so a
+	// new agent never overwrites one with the same name.
+	CreateOnly bool `json:"create_only,omitempty"`
 }
 
 // AgentConfigValidateRequest is POST /agents/config/validate.
@@ -994,7 +1002,12 @@ func (h *agentBuilder) readDoc(work context.Context, id string) ([]byte, project
 }
 
 func (h *agentBuilder) sendDoc(ctx *fasthttp.RequestCtx, status int, id string, doc []byte, sha string) {
-	out := AgentConfigDoc{ID: id, Path: "agents/" + id + ".yaml", YAML: string(doc), SHA256: sha}
+	h.sendDocVersion(ctx, status, AgentConfigDoc{ID: id, Path: "agents/" + id + ".yaml", YAML: string(doc), SHA256: sha})
+}
+
+// sendDocVersion sends out with its form fields filled from out.YAML.
+func (h *agentBuilder) sendDocVersion(ctx *fasthttp.RequestCtx, status int, out AgentConfigDoc) {
+	id, doc := out.ID, []byte(out.YAML)
 	if cfg, err := decodeAgent(doc, out.Path); err == nil {
 		out.Fields = abFieldsOf(cfg, doc)
 	} else {
@@ -1061,14 +1074,27 @@ func (h *agentBuilder) putConfig(ctx *fasthttp.RequestCtx) {
 		h.badRequest(ctx, fmt.Sprintf("id in the YAML (%s) must stay %s: create a new agent to rename it", cfg.ID, id))
 		return
 	}
+	if req.CreateOnly {
+		if _, _, err := h.readDoc(work, id); err == nil || !errors.Is(err, projectfs.ErrNotFound) {
+			if err == nil || errors.Is(err, projectfs.ErrInvalid) { // ErrInvalid: it is a folder
+				lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict,
+					fmt.Sprintf("An agent named %s already exists. Pick another name.", id))
+				return
+			}
+			h.storeError(ctx, "read "+rel, err)
+			return
+		}
+	}
 	e, err := h.projects.Write(work, projectfs.AreaAgents, id+".yaml", doc,
 		projectfs.WriteOpts{Actor: abActor(ctx), Note: "agent builder: edit config", IfMatch: req.IfMatch})
 	if err != nil {
 		h.storeError(ctx, "write "+rel, err)
 		return
 	}
-	snapshotAgentSave(work, h.projects, id+".yaml", id, doc, abActor(ctx), "") // A06: agent versions
-	h.sendDoc(ctx, fasthttp.StatusOK, id, doc, e.SHA256)
+	out := AgentConfigDoc{ID: id, Path: rel, YAML: string(doc), SHA256: e.SHA256}
+	// A06: agent versions. A failure is logged there; the save itself stands.
+	out.Version, out.VersionCreated, _ = snapshotAgentSave(work, h.projects, id+".yaml", id, doc, abActor(ctx), "")
+	h.sendDocVersion(ctx, fasthttp.StatusOK, out)
 }
 
 func (h *agentBuilder) validate(ctx *fasthttp.RequestCtx) {
