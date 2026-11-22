@@ -1,8 +1,8 @@
 # Opt-in: a custom Bifrost build with the Heimdall plugin (plugins/heimdall).
 # The default stack runs the stock maximhq/bifrost image, which has no
 # heimdall plugin, with deploy/bifrost/config.json (no heimdall entry). This
-# override builds Bifrost from this repo (transports/Dockerfile, context the
-# repo root) and mounts deploy/bifrost/config.plugin.json, where the plugin
+# override builds Bifrost from this repo (bench/deploy/bifrost/Dockerfile.plugin,
+# a Go workspace build over the local modules; context the repo root) and mounts deploy/bifrost/config.plugin.json, where the plugin
 # is enabled, takes inline fault plans and posts usage rows to the server
 # with HEIMDALL_GATEWAY_USAGE_SECRET. docs/bifrost-integration.md, "Custom
 # Bifrost build with the Heimdall plugin".
@@ -12,6 +12,6 @@ services:
     image: heimdall/bifrost-plugin:local
     build:
       context: ../../..
-      dockerfile: transports/Dockerfile
+      dockerfile: bench/deploy/bifrost/Dockerfile.plugin
     volumes:
       - ../bifrost/config.plugin.json:/app/data/config.json:ro

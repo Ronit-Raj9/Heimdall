@@ -182,7 +182,7 @@ opt-in: `bench/deploy/bifrost/config.plugin.json` is the same config with
 the `heimdall` plugin enabled, `allow_inline_plans` on and usage posted to
 `http://heimdall:8090` with `env.HEIMDALL_GATEWAY_USAGE_SECRET`, and
 `bench/deploy/hosted/docker-compose.bifrost-plugin.yml` builds Bifrost from
-this repo (`transports/Dockerfile`, context the repo root) and mounts it
+this repo (`deploy/bifrost/Dockerfile.plugin`, a Go workspace build over the local core, framework, transports and plugin modules, since this fork's transports needs packages that are not published; context the repo root) and mounts it
 (`docs/hosting.md`, same heading). A local end to end check is in
 `bench/deploy/bifrost/e2e/`.
 
