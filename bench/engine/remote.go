@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	drainmode "github.com/maximhq/bifrost/bench/drain"
 	"github.com/maximhq/bifrost/bench/runctl"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/secrets"
@@ -288,6 +289,10 @@ func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.Work
 		defer func() { c.book(ctx, seen, c.infoOf(w), false) }()
 	}
 	if len(w.info.Running) >= w.info.Slots || w.rejected >= maxRejections {
+		c.mu.Unlock()
+		return nil, nil
+	}
+	if drainmode.Active() { // Z11 drain mode: no new lease; leases out keep their heartbeats, uploads and completes
 		c.mu.Unlock()
 		return nil, nil
 	}

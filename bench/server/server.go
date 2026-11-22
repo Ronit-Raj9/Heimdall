@@ -180,6 +180,7 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	experiments := handlers.NewExperimentsHandler(mode, deps.Index, deps.Analyzer, deps.Launcher, deps.Catalog, write)
 	handlers.NewHealthHandler(mode, deps.Version, deps.Doctor).WithLaunch(deps.Launcher != nil).RegisterRoutes(r, common...)
 	handlers.NewReadinessHandler(mode, deps.Version, deps.Ready).RegisterRoutes(r, common...) // Deploy area: GET /healthz and /readyz at the site root (handlers/readiness.go)
+	handlers.NewDrainHandler(mode, cfg.Auth.IsHosted(), write, deps.Logger).RegisterRoutes(r, common...) // Z11 drain mode: GET/POST /admin/drain (handlers/drain.go)
 	handlers.NewCatalogHandler(mode, deps.Catalog).RegisterRoutes(r, common...)
 	experiments.RegisterRoutes(r, common...)
 	// Held-out tasks: a held-out task's run content needs held_out.visible too.

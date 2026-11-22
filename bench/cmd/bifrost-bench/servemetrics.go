@@ -10,6 +10,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/drain"
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -67,6 +68,7 @@ func registerCoordinatorMetrics(reg *selfmetrics.Registry, coords func() []*engi
 		return sum
 	}
 	one := func(v float64) []selfmetrics.Sample { return []selfmetrics.Sample{{Value: v}} }
+	drain.AddSource(func() int { return total().Leases }) // Z11: drain mode waits for these leases (drain.go)
 	reg.Gauge("heimdall_leases_in_flight", "Slot and job leases out on workers.", func(context.Context) []selfmetrics.Sample {
 		return one(float64(total().Leases))
 	})

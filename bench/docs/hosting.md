@@ -256,7 +256,28 @@ $C up -d --wait
 ```sh
 deploy/hosted/upgrade.sh                 # backup, git pull --ff-only, rebuild, migrate, restart
 deploy/hosted/upgrade.sh --ref v1.2.0    # a specific tag or commit
+deploy/hosted/upgrade.sh --drain-timeout 30m   # wait longer for runs in flight
 ```
+
+Drain mode. After the new images are built and the migrations applied, the
+script drains the running server: it stops handing out new leases, and the
+script waits until no run is in flight (the `heimdall_leases_in_flight`
+metric reaches 0) or `--drain-timeout` passes (default 10m). Only then are
+the containers recreated, so the restart stops no run. Runs still in flight
+at the timeout restart with the server. A failed upgrade turns drain mode off
+again; `--no-drain` skips it. By hand, inside the server container:
+
+```sh
+docker compose exec heimdall bifrost-bench drain -config /srv/heimdall/deploy/bench.yaml -timeout 10m   # on, then wait
+docker compose exec heimdall bifrost-bench drain -config /srv/heimdall/deploy/bench.yaml -status
+docker compose exec heimdall bifrost-bench drain -config /srv/heimdall/deploy/bench.yaml -off           # leases again
+```
+
+The command reads the drain token the server writes at start to
+`<runs root>/.drain.token` (mode 0600). A server admin can call the same
+route, `GET` and `POST /api/bench/admin/drain` with `{"on": true}`. Drain
+mode lives in the server process only: a restarted server always hands out
+leases.
 
 It takes a database backup first, tags the image IDs of the running server
 and shared worker containers `:previous` (a service with no running container
