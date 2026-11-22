@@ -47,6 +47,7 @@ vi.mock("@/lib/store/apis/agentBuilderApi", () => ({
 	useCreateAgentFromTemplateMutation: () => [vi.fn(), { isLoading: false }],
 	useTestEndpointMutation: () => [vi.fn(), { isLoading: false, reset: () => undefined }],
 }));
+vi.mock("./platformImport", () => ({ PlatformImportCard: () => <div data-testid="platform-import" /> }));
 vi.mock("@/lib/store/apis/benchApi", () => ({ getBenchErrorMessage: () => "err" }));
 vi.mock("@/lib/session/sessionContext", () => ({ canUse: () => true, useSession: () => ({}) }));
 vi.mock("@/components/models/modelPicker", () => ({ ModelPicker: () => <div data-testid="model-picker" /> }));
@@ -70,6 +71,7 @@ describe("NewAgentView", () => {
 		expect(html).toContain("Coding command-line tools");
 		expect(html).toContain("Bring your own");
 		expect(html).toContain("Pick a template to continue.");
+		expect(html).toContain('data-testid="platform-import"');
 	});
 
 	it("shows the form for the selected template with its params", () => {

@@ -1,0 +1,40 @@
+{
+	"title": "Import from a platform",
+	"subtitle": "Your agent already lives on Vapi, Retell, ElevenLabs, Bedrock AgentCore, Agentforce, Copilot Studio, Vertex AI or LangGraph Platform? Give its id and the key, and Heimdall reads its prompt, tools and settings and connects it for you.",
+	"open": "Import an agent by its id",
+	"close": "Hide",
+	"platform": "Platform",
+	"kind": {
+		"voice": "Voice agent",
+		"endpoint": "Endpoint agent"
+	},
+	"imports": "Reads: {{list}}",
+	"docs": "Platform docs",
+	"secretHelp": "Name of an org secret (Settings > Secrets) that holds it. The value never leaves the server.",
+	"name": "Agent name in Heimdall",
+	"nameHelp": "Lowercase letters, digits, '.', '_' or '-'.",
+	"read": "Read the agent",
+	"reading": "Reading...",
+	"create": "Create agent",
+	"creating": "Creating...",
+	"memberOnly": "Only members can import agents.",
+	"found": {
+		"title": "Found on {{platform}}",
+		"name": "Name",
+		"description": "Description",
+		"model": "Model",
+		"language": "Language",
+		"firstMessage": "First message",
+		"prompt": "Prompt",
+		"tools": "Tools ({{count}})",
+		"voice": "Voice",
+		"protocol": "Protocol",
+		"status": "Status",
+		"version": "Version",
+		"preset": "Endpoint preset",
+		"hints": "Can do",
+		"warnings": "Check these",
+		"notValid": "This server cannot save the agent yet: {{error}}",
+		"config": "Agent config"
+	}
+}

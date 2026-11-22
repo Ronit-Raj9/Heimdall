@@ -14,6 +14,7 @@ import { AgentAvatar, useAdapterLabel } from "../../../agents/views/agentDisplay
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useMemo, useState } from "react";
 import { defaultParams, EndpointTestPanel, missingParams, ParamFields, picksOwnModel, testable } from "./connectForm";
+import { PlatformImportCard } from "./platformImport";
 import { useTranslation } from "react-i18next";
 
 // "Bring your own" first: the gallery is for the user's own agent; the others are examples.
@@ -113,6 +114,7 @@ export default function NewAgentView() {
 				<div className="grid min-w-0 grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
 					<div className="flex min-w-0 flex-col gap-8">
 						<h2 className="sr-only">{tu("gallery.step1")}</h2>
+						<PlatformImportCard returnTo={returnTo} />
 						{CATEGORIES.map((cat) => {
 							const items = templates.filter((x) => x.category === cat);
 							if (!items.length) return null;
