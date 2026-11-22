@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -201,5 +202,98 @@ func TestPipelineModelChoice(t *testing.T) {
 	s, _ = m.Load(s.ID)
 	if s.Model != pick || len(b.got) != 1 || b.got[0] != pick || len(v.got) != 1 || v.got[0] != pick {
 		t.Fatalf("model not carried: state %+v build %+v validate %+v", s.Model, b.got, v.got)
+	}
+}
+
+// noteBuild and noteValidate report their jobs through NoteJob, the way the
+// hosted stage adapters do.
+type noteBuild struct{ fail error }
+
+func (f *noteBuild) Build(ctx context.Context, c issuebench.Candidate, o BuildOptions, logf func(string, ...any)) (issuebench.BuildResult, error) {
+	issuebench.NoteJob(ctx, issuebench.StageBuild, "job-b")
+	if f.fail != nil {
+		return issuebench.BuildResult{}, f.fail
+	}
+	return issuebench.BuildResult{Stop: issuebench.StopOK, Env: &issuebench.EnvSpec{Repo: c.Repo, BaseImage: "python:3.12-slim"}}, nil
+}
+
+type noteValidate struct{ fail error }
+
+func (f noteValidate) Validate(ctx context.Context, c issuebench.Candidate, env issuebench.EnvSpec, logf func(string, ...any)) (issuebench.Validation, error) {
+	issuebench.NoteJob(ctx, issuebench.StageValidate, "job-v")
+	if f.fail != nil {
+		return issuebench.Validation{}, f.fail
+	}
+	issuebench.NoteJob(ctx, issuebench.StageChecks, "job-c")
+	return issuebench.Validation{Candidate: c, FailToPass: []string{"t::fixed"}, Checks: issuebench.LLMChecks{Clear: true}}, nil
+}
+
+func TestPipelineNotesJobAndStage(t *testing.T) {
+	m := NewManager(t.TempDir(), Stages{Scanner: fakeScan{cands: []issuebench.Candidate{cand(1, 3)}}, Builder: &noteBuild{}, Validator: noteValidate{}})
+	s, _ := m.Scan(context.Background(), "a/b", ScanOptions{})
+	if _, err := m.Start(s.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	m.Wait()
+	s, _ = m.Load(s.ID)
+	it := s.Items[0]
+	if it.Status != StatusReady || it.JobID != "job-c" || it.Stage != issuebench.StageChecks {
+		t.Fatalf("item %+v", it)
+	}
+	found := false
+	for _, l := range s.Log {
+		if l.Line == "issue #1: build runs as job job-b" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("no job line in log %+v", s.Log)
+	}
+}
+
+func TestPipelineNoWorkerOnline(t *testing.T) {
+	noWorker := errors.New("No worker online: this job starts containers, so on the hosted site it runs on a worker")
+	for _, tc := range []struct {
+		name  string
+		build error
+		valid error
+		stage string
+	}{
+		{"build", fmt.Errorf("queue job: %w", noWorker), nil, issuebench.StageBuild},
+		{"validate", nil, fmt.Errorf("queue job: %w", noWorker), issuebench.StageValidate},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b := &noteBuild{fail: tc.build}
+			v := &noteValidate{fail: tc.valid}
+			m := NewManager(t.TempDir(), Stages{Scanner: fakeScan{cands: []issuebench.Candidate{cand(1, 3)}}, Builder: b, Validator: v})
+			s, _ := m.Scan(context.Background(), "a/b", ScanOptions{})
+			if _, err := m.Start(s.ID, true); err != nil {
+				t.Fatal(err)
+			}
+			m.Wait()
+			s, _ = m.Load(s.ID)
+			it := s.Items[0]
+			if it.Status != StatusFailed || it.Fix != FixOpenWorkers || it.Reason != noWorker.Error() || it.Stage != tc.stage {
+				t.Fatalf("item %+v", it)
+			}
+			b.fail, v.fail = nil, nil
+			if _, err := m.Retry(s.ID, 1, FixOpenWorkers, BuildOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			m.Wait()
+			s, _ = m.Load(s.ID)
+			if it := s.Items[0]; it.Status != StatusReady || it.Fix != "" {
+				t.Fatalf("after retry %+v", it)
+			}
+		})
+	}
+}
+
+func TestFailReason(t *testing.T) {
+	if r, f := failReason("build failed: ", errors.New("boom")); r != "build failed: boom" || f != FixRetry {
+		t.Fatalf("%q %q", r, f)
+	}
+	if r, f := failReason("build failed: ", errors.New("run job: No worker online: open workers")); r != "No worker online: open workers" || f != FixOpenWorkers {
+		t.Fatalf("%q %q", r, f)
 	}
 }

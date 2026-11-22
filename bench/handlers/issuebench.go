@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/issuebench"
 	"github.com/maximhq/bifrost/bench/issuebench/pipeline"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -26,6 +27,19 @@ import (
 // IssueBenchStages returns the pipeline stages for one org; nil gives every
 // org a pipeline with no stages.
 var IssueBenchStages func(env OrgEnv) pipeline.Stages
+
+// IssueBenchReadiness says whether From issues can build on this site now
+// (a worker takes issuebench.work, GitHub, a model gateway). cmd/bifrost-bench
+// sets it; nil gives the plain answer: ready locally, no worker when hosted.
+var IssueBenchReadiness func(ctx context.Context, env OrgEnv) issuebench.Readiness
+
+// issueReadiness is IssueBenchReadiness or its nil fallback.
+func issueReadiness(ctx context.Context, env OrgEnv) issuebench.Readiness {
+	if IssueBenchReadiness != nil {
+		return IssueBenchReadiness(ctx, env)
+	}
+	return issuebench.Readiness{Hosted: env.Services.Hosted, WorkerOnline: !env.Services.Hosted}
+}
 
 // IssueBenchDir is where an org's runs are kept, under its project root.
 const IssueBenchDir = ".heimdall/issuebench"
@@ -72,18 +86,21 @@ type IssueRunList struct {
 
 const issueBenchPrefix = APIPrefix + "/issuebench/runs"
 
+const issueBenchReadinessPath = APIPrefix + "/issuebench/readiness"
+
 func init() {
 	RegisterOrgArea("issuebench", func(env OrgEnv, r *router.Router) {
 		root := "" // no config (handler tests that mount every org area): runs under ./issuebench
 		if env.Cfg != nil {
 			root = env.Cfg.Root
 		}
-		h := &issueBenchHandler{mode: env.Mode, m: IssueBenchManager(root, func() pipeline.Stages {
+		h := &issueBenchHandler{mode: env.Mode, env: env, m: IssueBenchManager(root, func() pipeline.Stages {
 			if IssueBenchStages == nil {
 				return pipeline.Stages{}
 			}
 			return IssueBenchStages(env)
 		})}
+		r.GET(issueBenchReadinessPath, env.R(h.readiness))
 		r.GET(issueBenchPrefix, env.R(h.list))
 		r.POST(issueBenchPrefix, env.W(h.create))
 		r.GET(issueBenchPrefix+"/{id}", env.R(h.get))
@@ -96,6 +113,7 @@ func init() {
 
 type issueBenchHandler struct {
 	mode schemas.Mode
+	env  OrgEnv
 	m    *pipeline.Manager
 }
 
@@ -118,6 +136,14 @@ func (h *issueBenchHandler) decode(ctx *fasthttp.RequestCtx, v any) bool {
 		return false
 	}
 	return true
+}
+
+// readiness handles GET /issuebench/readiness: what From issues needs on
+// this site and the first missing piece in plain words.
+func (h *issueBenchHandler) readiness(ctx *fasthttp.RequestCtx) {
+	work, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, issueReadiness(work, h.env))
 }
 
 func (h *issueBenchHandler) list(ctx *fasthttp.RequestCtx) {
@@ -176,6 +202,19 @@ func (h *issueBenchHandler) start(ctx *fasthttp.RequestCtx) {
 	if !h.decode(ctx, &req) {
 		return
 	}
+	if h.env.Services.Hosted && req.Consent {
+		work, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		rd := issueReadiness(work, h.env)
+		cancel()
+		if !rd.WorkerOnline {
+			msg := rd.Message
+			if msg == "" {
+				msg = issueNoWorker
+			}
+			lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, msg)
+			return
+		}
+	}
 	s, err := h.m.StartWith(pathParam(ctx, "id"), req.Consent, req.ModelChoice)
 	if err != nil {
 		h.fail(ctx, err)
@@ -183,6 +222,12 @@ func (h *issueBenchHandler) start(ctx *fasthttp.RequestCtx) {
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusAccepted, s)
 }
+
+// issueNoWorker is the 409 text when readiness gives no message of its own
+// (the same words as cmd/bifrost-bench errNoJobRunner).
+const issueNoWorker = "No worker online: this job starts containers, so on the hosted site it runs on a worker, never on the server. " +
+	"Open Settings > Workers and use \"Add a worker\" to start one on your machine (one command), " +
+	"or turn on the shared worker there if your server owner offers it (Settings > Workers shows its status)."
 
 func (h *issueBenchHandler) cancel(ctx *fasthttp.RequestCtx) {
 	s, err := h.m.Cancel(pathParam(ctx, "id"))

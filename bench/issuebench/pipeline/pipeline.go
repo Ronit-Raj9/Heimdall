@@ -140,6 +140,7 @@ const (
 	FixAllowService = "allow_service"
 	FixRaiseBudget  = "raise_budget"
 	FixRetry        = "retry"
+	FixOpenWorkers  = "open_workers" // no worker takes the job: open Settings > Workers, then retry
 )
 
 // Item is one candidate's progress.
@@ -152,6 +153,8 @@ type Item struct {
 	Validation  *issuebench.Validation `json:"validation,omitempty"`
 	Instruction string                 `json:"instruction,omitempty"` // edited instruction; empty uses the issue text
 	Options     BuildOptions           `json:"options,omitempty"`
+	JobID       string                 `json:"job_id,omitempty"` // the job running or last run for this issue
+	Stage       string                 `json:"stage,omitempty"`  // build, validate or checks (issuebench.Stage*)
 }
 
 // Key is the item's id: the issue number.
@@ -501,6 +504,10 @@ func (m *Manager) step(ctx context.Context, id string, i int, logf func(string, 
 		return // validated, ready, failed, accepted, rejected: nothing to do
 	}
 	c := it.Candidate
+	ctx = issuebench.WithJobNote(ctx, func(stage, jobID string) {
+		m.setJob(id, i, stage, jobID)
+		logf("issue #%d: %s runs as job %s", c.Issue, stage, jobID)
+	})
 	env, ok := s.Envs[it.Version]
 	if !ok || env.Stop != issuebench.StopOK || env.Env == nil {
 		if m.stages.Builder == nil {
@@ -515,8 +522,9 @@ func (m *Manager) step(ctx context.Context, id string, i int, logf func(string, 
 		}
 		res, err := m.stages.Builder.Build(ctx, c, opts, logf)
 		if err != nil {
-			m.setItem(id, i, StatusFailed, "build failed: "+err.Error(), FixRetry, nil)
-			logf("issue #%d: build failed: %v", c.Issue, err)
+			reason, fix := failReason("build failed: ", err)
+			m.setItem(id, i, StatusFailed, reason, fix, nil)
+			logf("issue #%d: %s", c.Issue, reason)
 			return
 		}
 		_, _ = m.update(id, func(s *State) error {
@@ -544,7 +552,9 @@ func (m *Manager) step(ctx context.Context, id string, i int, logf func(string, 
 	}
 	v, err := m.stages.Validator.Validate(WithModel(ctx, s.Model), c, *env.Env, logf)
 	if err != nil {
-		m.setItem(id, i, StatusFailed, "validation failed: "+err.Error(), FixRetry, nil)
+		reason, fix := failReason("validation failed: ", err)
+		m.setItem(id, i, StatusFailed, reason, fix, nil)
+		logf("issue #%d: %s", c.Issue, reason)
 		return
 	}
 	if reason := Unusable(v); reason != "" {
@@ -567,6 +577,30 @@ func (m *Manager) setItem(id string, i int, status, reason, fix string, v *issue
 		}
 		return nil
 	})
+}
+
+// setJob records which job runs a stage of item i now.
+func (m *Manager) setJob(id string, i int, stage, jobID string) {
+	_, _ = m.update(id, func(s *State) error {
+		if i < len(s.Items) {
+			s.Items[i].Stage, s.Items[i].JobID = stage, jobID
+		}
+		return nil
+	})
+}
+
+// noWorkerPhrase starts the error a stage returns when no worker takes its
+// job (the server's errNoJobRunner).
+const noWorkerPhrase = "No worker online"
+
+// failReason turns a stage error into plain words and a one-click fix: no
+// worker online offers open_workers, anything else a retry.
+func failReason(prefix string, err error) (reason, fix string) {
+	msg := err.Error()
+	if i := strings.Index(msg, noWorkerPhrase); i >= 0 {
+		return msg[i:], FixOpenWorkers
+	}
+	return prefix + msg, FixRetry
 }
 
 // Unusable says why a validation cannot become a task, or "".
@@ -710,7 +744,7 @@ func (m *Manager) Retry(id string, issue int, fix string, opts BuildOptions) (*S
 			if opts.BudgetUSD <= 0 {
 				return fmt.Errorf("%w: budget_usd must be above 0", ErrBadRequest)
 			}
-		case FixRetry, "":
+		case FixRetry, FixOpenWorkers, "":
 		default:
 			return fmt.Errorf("%w: unknown fix %q", ErrBadRequest, fix)
 		}
