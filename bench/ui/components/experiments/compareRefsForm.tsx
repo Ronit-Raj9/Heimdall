@@ -14,14 +14,25 @@ import { FollowUpJob } from "./followUpJob";
  * With GitHub connected the refs come from the repository's branches and tags; otherwise they are
  * free text against the project's own git repository.
  */
-export function CompareRefsForm({ suite: initialSuite = "", testId = "compare-refs-form" }: { suite?: string; testId?: string }) {
+export function CompareRefsForm({
+	suite: initialSuite = "",
+	initialAgent = "",
+	testId = "compare-refs-form",
+}: {
+	suite?: string;
+	/** The agent file to start from (agents/<id>.yaml), such as the comparison's setup A; kept only when listed. */
+	initialAgent?: string;
+	testId?: string;
+}) {
 	const { t } = useTranslation("refCompare");
 	const uid = useId();
 	const agents = useGetAgentsQuery();
 	const status = useGetGithubStatusQuery();
 	const connected = status.data?.connected === true;
+	// A hosted project has no git history of its own: only a GitHub repository can be compared (fix wave 2, N67).
+	const hosted = status.data?.hosted === true;
 	const repos = useListGithubReposQuery(connected ? 1 : skipToken);
-	const [agent, setAgent] = useState("");
+	const [picked, setAgent] = useState(initialAgent);
 	const [suite, setSuite] = useState(initialSuite);
 	const [repo, setRepo] = useState("");
 	const [refA, setRefA] = useState("");
@@ -32,8 +43,11 @@ export function CompareRefsForm({ suite: initialSuite = "", testId = "compare-re
 	const [owner, name] = repo.split("/");
 	const refs = useGetGithubRefsQuery(connected && owner && name ? { owner, repo: name } : skipToken);
 	const list = agents.data?.agents ?? [];
+	// A start agent no listed agent has leaves the select empty: never a made-up option.
+	const agent = list.some((a) => a.path === picked) ? picked : "";
 	const refNames = refs.data?.refs.map((r) => r.name) ?? [];
-	const params = compareRefsParams({
+	const needRepo = hosted && !repo;
+	const built = compareRefsParams({
 		agent,
 		suite,
 		repo,
@@ -43,6 +57,7 @@ export function CompareRefsForm({ suite: initialSuite = "", testId = "compare-re
 		trials,
 		budget,
 	});
+	const params = needRepo ? null : built;
 	const same = refA.trim() !== "" && refA.trim() === refB.trim();
 	const field = "flex flex-col gap-1 text-sm";
 	const select = "border-input bg-background h-9 rounded-md border px-2 text-sm";
@@ -78,7 +93,7 @@ export function CompareRefsForm({ suite: initialSuite = "", testId = "compare-re
 					{t("compare.repo")}
 					{connected ? (
 						<select id={`${uid}-repo`} className={select} value={repo} onChange={(e) => pickRepo(e.target.value)} data-testid={`${testId}-repo`}>
-							<option value="">{repos.isLoading ? t("compare.repoLoading") : t("compare.repoProject")}</option>
+							<option value="">{repos.isLoading ? t("compare.repoLoading") : hosted ? t("compare.pickRepo") : t("compare.repoProject")}</option>
 							{(repos.data?.repos ?? []).map((r) => (
 								<option key={r.full_name} value={r.full_name}>
 									{r.full_name}
@@ -87,7 +102,7 @@ export function CompareRefsForm({ suite: initialSuite = "", testId = "compare-re
 						</select>
 					) : (
 						<span className="text-muted-foreground flex flex-col gap-1 text-xs" data-testid={`${testId}-connect`}>
-							<span>{t("compare.connectHint")}</span>
+							<span>{hosted ? t("compare.connectHosted") : t("compare.connectHint")}</span>
 							<Link to="/settings" search={{ tab: "github" } as never} className="underline">
 								{t("compare.connect")}
 							</Link>
@@ -140,7 +155,7 @@ export function CompareRefsForm({ suite: initialSuite = "", testId = "compare-re
 				params={params}
 				label={t("compare.run")}
 				confirm={t("compare.confirm")}
-				missing={same ? t("compare.same") : t("compare.missing")}
+				missing={needRepo ? t("compare.pickRepoFirst") : same ? t("compare.same") : t("compare.missing")}
 				testId={`${testId}-job`}
 			/>
 		</div>
