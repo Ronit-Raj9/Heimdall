@@ -19,6 +19,9 @@ func stateChanging(cmd string) bool {
 	return !readOnlyRe.MatchString(c)
 }
 
+// GitInstallRun installs git when the base image lacks it.
+const GitInstallRun = "RUN (command -v git >/dev/null || (apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*))"
+
 // Dockerfile writes the environment's Dockerfile from the commands that
 // succeeded. The agent never writes it. The repository is copied at
 // Workdir; env carries the time pinning (UV_EXCLUDE_NEWER and the like).
@@ -28,6 +31,9 @@ func Dockerfile(baseImage string, env []string, commands []string) string {
 	fmt.Fprintf(&b, "# Written by Heimdall's issue builder from the commands that succeeded.\n")
 	fmt.Fprintf(&b, "FROM %s\n", baseImage)
 	fmt.Fprintf(&b, "SHELL [\"/bin/bash\", \"-lc\"]\n")
+	// Validation applies the test and fix patches with git apply; slim
+	// Python images have no git (every run said patch_failed without it).
+	fmt.Fprintf(&b, "%s\n", GitInstallRun)
 	for _, e := range env {
 		k, v, ok := strings.Cut(e, "=")
 		if !ok || k == "" {

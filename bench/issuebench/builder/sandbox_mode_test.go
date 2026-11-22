@@ -70,3 +70,13 @@ func TestExecSendsCommandOnStdin(t *testing.T) {
 		t.Fatalf("stdin %d bytes, args %v", len(gotStdin), gotArgs)
 	}
 }
+
+// The environment image must have git: validation applies the PR's test and
+// fix patches with git apply, and python:3.x-slim has none (real hosted run:
+// patch_failed for every issue).
+func TestDockerfileInstallsGit(t *testing.T) {
+	df := Dockerfile("python:3.13-slim", nil, []string{"pip install -e ."})
+	if !strings.Contains(df, "apt-get install -y --no-install-recommends git") || strings.Index(df, GitInstallRun) > strings.Index(df, "pip install -e .") {
+		t.Fatalf("Dockerfile has no git install before the steps:\n%s", df)
+	}
+}
