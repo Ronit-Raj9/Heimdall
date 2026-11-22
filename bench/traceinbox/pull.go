@@ -30,6 +30,7 @@ const (
 	FlagBudget    = "budget"
 	FlagPushed    = "pushed"
 	FlagEvaluator = "evaluator" // maxim: an online evaluator failed the trace
+	FlagGolden    = "golden"    // a passing session sampled as a golden (regression) candidate
 )
 
 // Flagged is one session a source flagged, before redaction.
@@ -40,6 +41,9 @@ type Flagged struct {
 	Reasons []string          // why, in words
 	Kinds   []string          // flag kinds
 	Extra   map[string]string // more link template values, e.g. row_id
+	// Golden marks a passing session sampled as a golden candidate: the
+	// source's golden_per_day caps how many become items each day.
+	Golden bool
 }
 
 // Batch is what one fetch of a source returned.
@@ -282,6 +286,7 @@ type takeResult struct {
 	Created  bool // a new item
 	Counted  bool // an occurrence added to an existing item
 	Recurred bool // the item was accepted earlier: its failure came back
+	Skipped  bool // a golden over the source's daily sample, not kept
 }
 
 // take redacts one flagged session, computes its signature and records it:
@@ -355,6 +360,20 @@ func (ib *Inbox) take(s *Source, fl Flagged) (takeResult, error) {
 			it.Updated = now
 			return items, nil
 		}
+		if fl.Golden {
+			limit := s.GoldenLimit()
+			day := now.Format(time.DateOnly)
+			n := 0
+			for _, it := range items {
+				if it.Golden && it.Source == s.Name && it.FirstSeen.UTC().Format(time.DateOnly) == day {
+					n++
+				}
+			}
+			if n >= limit {
+				out.Skipped = true
+				return items, nil
+			}
+		}
 		if n := OpenItems(items); n >= MaxItems {
 			return nil, fmt.Errorf("the inbox holds %d open items, the cap; reject or accept old items first", n)
 		}
@@ -370,6 +389,7 @@ func (ib *Inbox) take(s *Source, fl Flagged) (takeResult, error) {
 			Signature: sig, SignatureParts: parts, Occurrences: 1, FirstSeen: at, LastSeen: at, Traces: []TraceRef{ref},
 			SuggestedKind: kind, SuggestedSuite: ib.suggestSuite(s, kind), Tools: toolNames(sess), Model: sess.Model,
 			Outcome: sess.Outcome.Status, Redacted: map[string]int(r.Report()), Updated: now, Flagged: []string{},
+			Golden: fl.Golden,
 		}
 		if len(it.Redacted) == 0 {
 			it.Redacted = nil

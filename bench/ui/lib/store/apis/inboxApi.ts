@@ -2,6 +2,8 @@ import type {
 	InboxAcceptRequest,
 	InboxAcceptResponse,
 	InboxActionResponse,
+	InboxBulkAcceptRequest,
+	InboxBulkAcceptResult,
 	InboxItemDetailResponse,
 	InboxListParams,
 	InboxListResponse,
@@ -32,6 +34,14 @@ export const inboxApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchInbox"] 
 			invalidatesTags: (_result, _error, { id }) => [
 				{ type: "BenchInbox", id: "LIST" },
 				{ type: "BenchInbox", id },
+				{ type: "BenchSuites", id: "LIST" },
+			],
+		}),
+		bulkAcceptInboxItems: builder.mutation<InboxBulkAcceptResult, InboxBulkAcceptRequest>({
+			query: (body) => ({ url: "/inbox/accept", method: "POST", body }),
+			invalidatesTags: (_result, _error, { ids }) => [
+				{ type: "BenchInbox", id: "LIST" },
+				...ids.map((id) => ({ type: "BenchInbox" as const, id })),
 				{ type: "BenchSuites", id: "LIST" },
 			],
 		}),
@@ -78,6 +88,7 @@ export const {
 	useGetInboxQuery,
 	useGetInboxItemQuery,
 	useAcceptInboxItemMutation,
+	useBulkAcceptInboxItemsMutation,
 	useRejectInboxItemMutation,
 	useSnoozeInboxItemMutation,
 } = inboxApi;

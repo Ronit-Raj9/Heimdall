@@ -57,6 +57,11 @@ func Signature(s *traceimport.Session, flagKinds []string) (string, SignaturePar
 			}
 		}
 	}
+	if slices.Contains(flagKinds, FlagGolden) {
+		// A passing session kept as a golden is its own item, never merged
+		// with a failure of the same request.
+		parts.Tool, parts.Error = "", "golden"
+	}
 	if parts.Error == "" && len(flagKinds) > 0 {
 		kinds := slices.Clone(flagKinds)
 		slices.Sort(kinds)

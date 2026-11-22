@@ -22,8 +22,8 @@
     "description": {"type": "string"},
     "environment": {"$ref": "#/$defs/part_name", "description": "Environment part name, e.g. docker_workspace."},
     "grader": {
-      "enum": ["hidden_tests", "verifier_command", "answer_match", "judge", "visual"],
-      "description": "Grader part name. hidden_tests: pytest JUnit at /grader/out/junit.xml, the original Python grader. verifier_command: any language, reporting as junit, reward or exit_code (docs/verifiers.md). answer_match and judge: answer tasks (docs/scenarios-design.md). visual: output.visual, images the bench captures (X1, docs/visual-grading.md)."
+      "enum": ["hidden_tests", "verifier_command", "answer_match", "judge", "visual", "checks"],
+      "description": "Grader part name. hidden_tests: pytest JUnit at /grader/out/junit.xml, the original Python grader. verifier_command: any language, reporting as junit, reward or exit_code (docs/verifiers.md). answer_match and judge: answer tasks (docs/scenarios-design.md). visual: output.visual, images the bench captures (X1, docs/visual-grading.md). checks: each task's declarative verifier/checks.yaml (tool calls, arguments, call order, final state, reply rubric; docs/declarative-checks.md); a task without one is graded by the verifier command."
     },
     "base_image": {"$ref": "#/$defs/image"},
     "workdir": {"type": "string", "pattern": "^/", "description": "Absolute workspace path inside containers."},

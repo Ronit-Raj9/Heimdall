@@ -56,7 +56,7 @@ func (w *draftWriter) tools(shape draftShape, opts DraftOptions, reqs []string) 
 		}
 		svc = ReplayServiceID
 		if res.Template == KindToolUse && len(shape.Sessions) == 0 {
-			w.put(shape.Instruction, instructionDraft(reqs[0], len(reqs), replayHTTPHint), true)
+			w.instruction(shape.Instruction, reqs[0], len(reqs), replayHTTPHint)
 		}
 	case opts.Replay:
 		res.Warnings = append(res.Warnings, fmt.Sprintf("service %s is not seeded through files:, so it is kept; %s is a fixture only", svc, ObservedToolsFile))

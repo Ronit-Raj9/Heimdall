@@ -70,7 +70,8 @@ describe("buildTab helpers", () => {
 		expect(graderChoice({ grader: "verifier_command", output: "state" })).toBe("state");
 		expect(graderChoice({ grader: "hidden_tests", output: undefined })).toBe("tests");
 		expect(sourcesFor({ output: "answer" })).toEqual(["rows", "tickets", "traces"]);
-		expect(sourcesFor({ output: "state" })).toEqual(["traces"]);
+		expect(sourcesFor({ output: "state" })).toEqual(["mock", "traces"]);
+		expect(sourcesFor({ output: "state", track: "support" })).toEqual(["scenarios", "mock", "traces"]);
 		expect(formatOfFile("faq.CSV")).toBe("csv");
 		expect(formatOfFile("rows.jsonl")).toBe("jsonl");
 		expect(formatOfFile("notes.txt")).toBeNull();

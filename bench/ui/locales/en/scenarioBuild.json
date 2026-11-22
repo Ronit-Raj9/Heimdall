@@ -1,0 +1,60 @@
+{
+	"source": {
+		"scenarios": "Support conversations",
+		"mock": "Your API (OpenAPI)"
+	},
+	"scenarios": {
+		"help": "One row per conversation: opening_message, persona_goal, facts, account_seed (the customer's account, merged into the starting data), expected_actions and forbidden_actions (tool calls), reply_rubric. Each row becomes a task with a simulated customer, graded by its own checks: no code to write.",
+		"placeholder": "{\"opening_message\": \"I was charged twice for order B-3001\", \"persona_goal\": \"Get the duplicate charge refunded\", \"expected_actions\": [{\"tool\": \"issue_refund\", \"args\": {\"order_id\": \"B-3001\"}}], \"forbidden_actions\": [\"apply_credit\"]}",
+		"file": "File",
+		"format": "Format",
+		"shape": "Copy the setup of task (optional)",
+		"shapeAuto": "first task with a simulated customer",
+		"switchGrader": "Grade this benchmark by its checks",
+		"switchGraderHint": "Needed when the benchmark grades another way. Its other tasks keep their own checks and need their readiness checks again.",
+		"judgeProvider": "Reply judge provider (for reply rubrics)",
+		"judgeModel": "Reply judge model",
+		"heldOut": "Keep these tasks private (held out)",
+		"preview": "Preview",
+		"import_one": "Add {{count}} task",
+		"import_other": "Add {{count}} tasks",
+		"importIdle": "Add tasks",
+		"previewSummary": "{{ok}} rows become tasks, {{bad}} rows have problems.",
+		"copies": "Tasks copy the setup of {{shape}}.",
+		"checks_one": "{{count}} check",
+		"checks_other": "{{count}} checks",
+		"done_one": "Added {{count}} task.",
+		"done_other": "Added {{count}} tasks.",
+		"graderChanged": "The benchmark is now graded by its checks.",
+		"line": "Row {{line}}"
+	},
+	"mock": {
+		"help": "Upload your API's OpenAPI file to get a stand-in service: the same routes over HTTP and one tool per operation, over starting data each task seeds, with the final data exported for the checks. Calls recorded in a run can be added as fixed answers with bifrost-bench mock fixtures.",
+		"id": "Service name",
+		"idHint": "Lowercase letters, digits, - or _; tasks name the service by it.",
+		"file": "OpenAPI file",
+		"paste": "OpenAPI file (YAML or JSON)",
+		"replace": "Replace the service if it exists (drops its recorded answers)",
+		"preview": "Preview",
+		"create": "Create the service",
+		"operations_one": "{{count}} operation over {{collections}}",
+		"operations_other": "{{count}} operations over {{collections}}",
+		"noCollections": "no stored data",
+		"method": "Method",
+		"path": "Path",
+		"tool": "Tool",
+		"kind": "Does",
+		"kinds": {
+			"list": "list",
+			"get": "read one",
+			"create": "create",
+			"update": "update",
+			"delete": "delete",
+			"action": "action"
+		},
+		"warnings": "Notes",
+		"serviceYaml": "Add this to each task that uses the service (task.yaml, under services:)",
+		"seed": "And its starting data, in the task's seed file",
+		"done": "Wrote {{folder}}."
+	}
+}

@@ -6,6 +6,7 @@ import {
 	type InboxAcceptRequest,
 	type InboxItem,
 	type InboxRejectRequest,
+	type InboxSession,
 	type InboxSnoozeRequest,
 	type InboxSuite,
 	type Mode,
@@ -33,6 +34,8 @@ import {
 	type RejectFormValues,
 } from "./inbox.utils";
 import { formatInboxTime, useKindLabel } from "./inboxBadges";
+import { GuideFields } from "./inboxGuide";
+import { guideDefaults, guideFormErrors, guideFrom, isToolKind, type GuideFormValues } from "./inboxGuide.utils";
 
 const FIELD =
 	"placeholder:text-muted-foreground/70 dark:bg-input/30 border-input focus-visible:border-primary bg-card w-full min-w-0 rounded-md border px-3 py-2 text-sm shadow-xs outline-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive";
@@ -45,7 +48,9 @@ const ACTIONS: readonly InboxAction[] = ["accept", "reject", "snooze"];
 // ---------------------------------------------------------------------------------------------
 
 export interface AcceptFormProps {
-	item: Pick<InboxItem, "id" | "suggested_kind" | "suggested_suite">;
+	item: Pick<InboxItem, "id" | "suggested_kind" | "suggested_suite" | "golden">;
+	/** The recorded session; without it only a draft accept is offered. */
+	session?: InboxSession;
 	suites: readonly InboxSuite[];
 	disabled?: boolean;
 	submitting?: boolean;
@@ -56,13 +61,15 @@ export interface AcceptFormProps {
 }
 
 /** Accept: the suite the task goes into, the task kind (suggested kind first) and an optional task id. */
-export function AcceptForm({ item, suites, disabled, submitting, initialValues, showErrors, onSubmit }: AcceptFormProps) {
+export function AcceptForm({ item, session, suites, disabled, submitting, initialValues, showErrors, onSubmit }: AcceptFormProps) {
 	const { t } = useTranslation("bench");
 	const kindLabel = useKindLabel();
 	const ids = useId();
 	const [values, setValues] = useState<AcceptFormValues>(() => ({ ...acceptDefaults(item, suites), ...initialValues }));
 	const [touched, setTouched] = useState(Boolean(showErrors));
+	const [guide, setGuide] = useState<GuideFormValues>(() => guideDefaults(session, Boolean(item.golden)));
 	const errors = acceptFormErrors(values);
+	const guideErrors = guideFormErrors(guide, values.kind);
 	const shown = touched ? errors : [];
 	const set = (patch: Partial<AcceptFormValues>) => setValues((v) => ({ ...v, ...patch }));
 	const off = disabled || submitting || suites.length === 0;
@@ -75,8 +82,10 @@ export function AcceptForm({ item, suites, disabled, submitting, initialValues, 
 			onSubmit={(e) => {
 				e.preventDefault();
 				setTouched(true);
-				if (off || errors.length > 0) return;
-				onSubmit(acceptRequestFrom(values));
+				if (off || errors.length > 0 || guideErrors.length > 0) return;
+				const body = acceptRequestFrom(values);
+				const g = guideFrom(guide, values.kind);
+				onSubmit(g ? { ...body, guide: g, ...(isToolKind(values.kind) && guide.switchGrader ? { switch_grader: true } : {}) } : body);
 			}}
 		>
 			{suites.length === 0 && (
@@ -141,6 +150,15 @@ export function AcceptForm({ item, suites, disabled, submitting, initialValues, 
 					data-testid="inbox-accept-task-id"
 				/>
 			</Field>
+			<GuideFields
+				kind={values.kind}
+				session={session}
+				golden={item.golden}
+				values={guide}
+				errors={touched ? guideErrors : []}
+				disabled={off}
+				onChange={(patch) => setGuide((g) => ({ ...g, ...patch }))}
+			/>
 			<Button type="submit" disabled={off} isLoading={submitting} dataTestId="inbox-accept-submit">
 				{t("inbox.actions.acceptForm.submit")}
 			</Button>
@@ -288,6 +306,8 @@ export function SnoozeForm({ disabled, submitting, initialDays, showErrors, onSu
 
 export interface InboxActionsProps {
 	item: InboxItem;
+	/** The recorded session, for the "what should have happened" part of the accept form. */
+	session?: InboxSession;
 	suites: readonly InboxSuite[];
 	/** The server mode; only live takes changes, so the forms are read-only otherwise. */
 	mode: Mode | undefined;
@@ -368,6 +388,7 @@ export function InboxActions(props: InboxActionsProps) {
 						<AcceptForm
 							key={`accept-${item.id}`}
 							item={item}
+							session={props.session}
 							suites={props.suites}
 							disabled={!writable}
 							submitting={props.submitting}

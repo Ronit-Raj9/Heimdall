@@ -75,6 +75,7 @@ const INBOX_TYPES = {
 		duplicate_of: "optional",
 		snoozed_until: "optional",
 		updated: "required",
+		golden: "optional",
 	} satisfies KeySpec<InboxItem>,
 	InboxSignatureParts: { request: "required", tool: "optional", error: "optional" } satisfies KeySpec<InboxSignatureParts>,
 	InboxTraceRef: { id: "required", source: "required", at: "required", link: "optional" } satisfies KeySpec<InboxTraceRef>,
@@ -101,18 +102,19 @@ const INBOX_TYPES = {
 		pulled: "optional",
 	} satisfies KeySpec<InboxSourceStatus>,
 	InboxSuite: { id: "required", template: "required" } satisfies KeySpec<InboxSuite>,
-	InboxItemDetail: { item: "required", preview: "required" } satisfies KeySpec<InboxItemDetail>,
+	InboxItemDetail: { item: "required", preview: "required", session: "optional" } satisfies KeySpec<InboxItemDetail>,
 	InboxDraft: {
 		task: "required",
 		dir: "required",
 		template: "required",
 		edit_me: "required",
+		finished: "required",
 		next: "required",
 		warnings: "optional",
 	} satisfies KeySpec<InboxDraft>,
 	InboxAcceptResult: { item: "required", draft: "required" } satisfies KeySpec<InboxAcceptResult>,
 	InboxActionResult: { item: "required" } satisfies KeySpec<InboxActionResult>,
-	InboxIngestResult: { item_id: "required", created: "required", occurrences: "required" } satisfies KeySpec<InboxIngestResult>,
+	InboxIngestResult: { item_id: "required", created: "required", occurrences: "required", skipped: "optional" } satisfies KeySpec<InboxIngestResult>,
 } as const;
 
 type JsonObject = Record<string, unknown>;
