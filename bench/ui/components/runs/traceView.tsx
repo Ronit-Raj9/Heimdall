@@ -74,12 +74,15 @@ export function RunTraceView({
   arm,
   live = false,
   canFork = false,
+  initialStep,
 }: {
   runId: string;
   arm: string;
   live?: boolean;
   /** X20b: offer Fork from this step (a sealed run without a fault). */
   canFork?: boolean;
+  /** N51: the step a link asked for (?step=), selected and scrolled into view once. */
+  initialStep?: number;
 }) {
   const { t } = useTranslation("bench");
   const poll = {
@@ -111,6 +114,7 @@ export function RunTraceView({
       calls={calls.data?.calls}
       firstDivergence={calls.data?.first_divergence?.call}
       canFork={canFork}
+      initialStep={initialStep}
     />
   );
 }
@@ -126,6 +130,8 @@ export interface TraceViewProps {
   calls?: readonly RunCall[];
   firstDivergence?: number;
   canFork?: boolean;
+  /** N51: select this step on open (all steps shown) and scroll it into view once; a seq not in the trace is ignored. */
+  initialStep?: number;
 }
 
 /**
@@ -143,11 +149,12 @@ export function TraceView({
   calls,
   firstDivergence,
   canFork = true,
+  initialStep,
 }: TraceViewProps) {
   const { t } = useTranslation("runTrace");
   const { t: tb } = useTranslation("bench");
   const { t: td } = useTranslation("runDebug");
-  const [filter, setFilter] = useState<TraceFilter>(initialFilter);
+  const [filter, setFilter] = useState<TraceFilter>(initialStep ? "all" : initialFilter);
   const [query, setQuery] = useState("");
   const [autoScroll, setAutoScroll] = useState(true);
   const counts = useMemo(() => filterCounts(data.steps), [data.steps]);
@@ -157,7 +164,13 @@ export function TraceView({
   );
   const usage = useMemo(() => usageByRequest(events), [events]);
   const callMap = useMemo(() => callsByRequest(calls), [calls]);
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(initialStep ?? null);
+  const scrolledRef = useRef(false);
+  useEffect(() => {
+    if (scrolledRef.current || initialStep === undefined || !visible.some((s) => s.seq === initialStep)) return;
+    scrolledRef.current = true;
+    document.querySelector(`[data-testid="trace-row-${arm}-${initialStep}"]`)?.scrollIntoView?.({ block: "center" });
+  }, [initialStep, visible, arm]);
   const selIndex = selected === null ? -1 : visible.findIndex((s) => s.seq === selected);
   const selStep = selIndex >= 0 ? visible[selIndex] : null;
   useEffect(() => {

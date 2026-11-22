@@ -107,10 +107,10 @@ func (s indexSearchSource) RunFile(runID, name string) ([]byte, error) {
 // SearchRouteDoc describes GET /search for the OpenAPI document.
 var SearchRouteDoc = RouteDoc{
 	Method: "GET", Path: APIPrefix + "/search", Tag: "runs",
-	Summary:  "Search sealed runs by the text of their steps, tool calls, answer, gate reasons and grade reason (words, \"phrases\", tool:NAME)",
+	Summary:  "Search sealed runs by the text of their steps, tool calls and their arguments, trace events, model error messages, answer or final message, gate reasons and grade reason (words, \"phrases\", tool:NAME; a plain word that is a tool name also matches like tool:)",
 	Response: resultsindex.SearchResult{},
 	Query: []QueryDoc{
-		{Name: "q", Description: "Words (all must match), \"quoted phrases\", tool:NAME; agent:, version:, benchmark:, outcome: also accepted inline"},
+		{Name: "q", Description: "Words (all must match; a word that is a called tool's name matches that tool), \"quoted phrases\", tool:NAME; agent:, version:, benchmark:, outcome: also accepted inline"},
 		{Name: "agent", Description: "Agent config id"},
 		{Name: "version", Description: "Agent version"},
 		{Name: "benchmark", Description: "Benchmark (suite) id; a version suffix is ignored"},

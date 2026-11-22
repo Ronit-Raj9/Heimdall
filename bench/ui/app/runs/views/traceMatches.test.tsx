@@ -86,3 +86,24 @@ describe("TraceMatchList", () => {
 		expect(html).toContain("No trace matches");
 	});
 });
+
+describe("trace search fields (N49)", () => {
+	it("labels model error and event matches", () => {
+		const hit = data.hits[0];
+		const withErrors: SearchResponse = {
+			...data,
+			hits: [
+				{
+					...hit,
+					matches: [
+						{ field: "error", label: "gpt-6-luna", text: "The server is overloaded", highlights: [[15, 25]] },
+						{ field: "event", text: "compaction", highlights: [] },
+					],
+				},
+			],
+		};
+		const html = renderToStaticMarkup(<TraceMatchList data={withErrors} onOpen={() => {}} />);
+		expect(html).toContain(">Error<");
+		expect(html).toContain(">Event<");
+	});
+});

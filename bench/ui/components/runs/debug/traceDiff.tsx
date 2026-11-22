@@ -17,7 +17,7 @@ export function TraceDiff({ runId, otherRunId }: { runId: string; otherRunId?: s
 	const left = useGetRunStepsQuery(runId);
 	const right = useGetRunStepsQuery(other, { skip: !other });
 	return (
-		<section className="flex min-w-0 flex-col gap-3" data-testid="trace-diff">
+		<section id="trace-diff" className="flex min-w-0 scroll-mt-4 flex-col gap-3" data-testid="trace-diff">
 			<div className="flex flex-wrap items-end gap-3">
 				<div className="flex flex-col gap-0.5">
 					<h3 className="text-sm font-semibold">{t("diff.title")}</h3>

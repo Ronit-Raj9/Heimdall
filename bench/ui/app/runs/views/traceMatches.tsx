@@ -9,7 +9,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { FileSearch, SearchX } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { benchmarkParam, hitAgentLabel, splitHighlights } from "./traceMatches.utils";
+import { benchmarkParam, hitAgentLabel, hitTarget, splitHighlights } from "./traceMatches.utils";
 
 const PILL = {
 	pass: "bg-chart-success/12 text-chart-success-ink",
@@ -146,7 +146,10 @@ export function TraceMatches({ query, agent, outcome, suite }: TraceMatchesProps
 	if (!res.data) return null;
 	return (
 		<div className={cn(res.isFetching && "opacity-70 transition-opacity")}>
-			<TraceMatchList data={res.data} onOpen={(h) => void navigate({ to: "/runs/$runId", params: { runId: h.run_id } } as never)} />
+			<TraceMatchList
+				data={res.data}
+				onOpen={(h) => void navigate({ to: "/runs/$runId", params: { runId: h.run_id }, search: hitTarget(h) } as never)}
+			/>
 		</div>
 	);
 }

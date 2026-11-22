@@ -253,7 +253,7 @@ export function RunTable({ rows, showExperiment = true }: { rows: readonly RunLi
 							{formatShortTime(row.started, locale)}
 						</TableCell>
 						<TableCell className="text-right">
-							{row.pair_id && (
+							{row.pair_id && row.paired && (
 								<Link
 									to="/compare"
 									search={compareSearch(row.pair_id, row.exp_id) as never}
@@ -321,7 +321,7 @@ function RunCards({ rows, showExperiment }: { rows: readonly RunListRow[]; showE
 						<span className="tabular-nums">{formatShortTime(row.started, locale)}</span>
 						<span className="ml-auto flex items-center gap-2">
 							<ValueCell value={row.cost_usd} kind="usd" />
-							{row.pair_id && (
+							{row.pair_id && row.paired && (
 								<Link
 									to="/compare"
 									search={compareSearch(row.pair_id, row.exp_id) as never}

@@ -2,7 +2,7 @@
 	"search": {
 		"placeholder": "Search inside traces",
 		"label": "Search inside run traces",
-		"help": "All words must match. Use quotes for a phrase and field terms such as tool:, agent:, outcome:, benchmark:, version:. Example: tool:refund_order \"all tests pass\"",
+		"help": "All words must match, in steps, tool calls and their arguments, model errors, the answer and the grade. Use quotes for a phrase and field terms such as tool:, agent:, outcome:, benchmark:, version:. Example: tool:refund_order \"all tests pass\"",
 		"heading": "Trace matches",
 		"total_one": "{{count}} run matches",
 		"total_other": "{{count}} runs match",
@@ -17,7 +17,9 @@
 			"tool_call": "Tool call",
 			"answer": "Answer",
 			"gate": "Gate",
-			"grade": "Grade"
+			"grade": "Grade",
+			"event": "Event",
+			"error": "Error"
 		},
 		"seq": "#{{seq}}",
 		"more_one": "{{count}} more match",

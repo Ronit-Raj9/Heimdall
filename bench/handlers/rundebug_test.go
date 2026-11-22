@@ -172,3 +172,85 @@ func TestHoldsAndRelease(t *testing.T) {
 		t.Fatalf("debug spec = %+v", d)
 	}
 }
+
+// N133: a replay of a run under a model (gateway layer) fault is exact: the
+// cassette carries the faulted answers. It is allowed, the child keeps the
+// clean condition (no second fault is armed) and records the source one.
+func TestReplayAllowedForModelFaultRun(t *testing.T) {
+	l := &fakeLauncher{}
+	r := debugServer(t, Services{Index: debugIndex(true, schemas.GenericProbeModelBrownout, ""), Launcher: l})
+	ctx := dbgDo(r, "POST", "/runs/r_1/replay", "")
+	if ctx.Response.StatusCode() != fasthttp.StatusCreated {
+		t.Fatalf("replay of a model-fault run: %d %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	exp := l.planned
+	if len(exp.Conditions) != 1 || exp.Conditions[0].ID != schemas.ConditionClean || exp.Primary.Condition != schemas.ConditionClean {
+		t.Fatalf("child conditions = %+v, primary %+v; want clean only", exp.Conditions, exp.Primary)
+	}
+	if exp.Debug == nil || exp.Debug.FromCondition != schemas.GenericProbeModelBrownout {
+		t.Fatalf("debug spec = %+v; want from_condition %s", exp.Debug, schemas.GenericProbeModelBrownout)
+	}
+}
+
+// N133: Fork and Debug go live after the fork point and plan the clean
+// condition, so they would not repeat a fault: refused with the reason.
+func TestForkRefusedForFaultRun(t *testing.T) {
+	l := &fakeLauncher{}
+	r := debugServer(t, Services{Index: debugIndex(true, schemas.GenericProbeModelBrownout, ""), Launcher: l, Holds: &fakeHolds{}})
+	for _, c := range []struct{ path, body string }{{"/runs/r_1/fork", `{"call":1,"message":"x"}`}, {"/runs/r_1/debug", `{"breakpoints":{"every":true}}`}} {
+		ctx := dbgDo(r, "POST", c.path, c.body)
+		if ctx.Response.StatusCode() != fasthttp.StatusConflict {
+			t.Fatalf("%s: %d %s", c.path, ctx.Response.StatusCode(), ctx.Response.Body())
+		}
+		if body := string(ctx.Response.Body()); !strings.Contains(body, "Fork and Debug need a run without a fault") || !strings.Contains(body, "model-brownout") {
+			t.Fatalf("%s: reason %s", c.path, body)
+		}
+	}
+	if l.planned != nil {
+		t.Fatalf("a refused fork planned %+v", l.planned)
+	}
+}
+
+// N133: tool faults are not in the cassette, so a replay would diverge.
+func TestReplayRefusedForToolFaultRun(t *testing.T) {
+	r := debugServer(t, Services{Index: debugIndex(true, schemas.GenericProbeBrokenTool, ""), Launcher: &fakeLauncher{}})
+	ctx := dbgDo(r, "POST", "/runs/r_1/replay", "")
+	if ctx.Response.StatusCode() != fasthttp.StatusConflict {
+		t.Fatalf("replay of a tool-fault run: %d %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	if body := string(ctx.Response.Body()); !strings.Contains(body, "Replay needs a run without a fault or with a model fault") {
+		t.Fatalf("reason %s", body)
+	}
+}
+
+// N133: the run detail says which debug actions the run allows, by the same rule.
+func TestRunDetailDebugAllowed(t *testing.T) {
+	for _, c := range []struct {
+		cond          string
+		replay, fork  bool
+		reasonContain string
+	}{
+		{schemas.ConditionClean, true, true, ""},
+		{schemas.GenericProbeModelBrownout, true, false, "Fork and Debug need a run without a fault. This run ran under model-brownout."},
+		{schemas.GenericProbeBrokenTool, false, false, "Replay needs a run without a fault or with a model fault"},
+	} {
+		idx := debugIndex(true, c.cond, "")
+		r := router.New()
+		NewRunsHandler(testMode, idx).RegisterRoutes(r)
+		ctx := &fasthttp.RequestCtx{}
+		ctx.Request.SetRequestURI(APIPrefix + "/runs/r_1")
+		ctx.Request.Header.SetMethod(fasthttp.MethodGet)
+		r.Handler(ctx)
+		if ctx.Response.StatusCode() != 200 {
+			t.Fatalf("%s: %d %s", c.cond, ctx.Response.StatusCode(), ctx.Response.Body())
+		}
+		var got struct {
+			DebugAllowed *RunDebugAllowed `json:"debug_allowed"`
+		}
+		_ = json.Unmarshal(ctx.Response.Body(), &got)
+		a := got.DebugAllowed
+		if a == nil || a.Replay != c.replay || a.Fork != c.fork || !strings.Contains(a.Reason, c.reasonContain) || (c.reasonContain == "" && a.Reason != "") {
+			t.Fatalf("%s: debug_allowed = %+v", c.cond, a)
+		}
+	}
+}

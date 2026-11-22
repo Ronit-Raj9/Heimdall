@@ -20,3 +20,4 @@ artifacts?
 evidence_contract?
 canonical?
 adapter_fault?
+debug_allowed?

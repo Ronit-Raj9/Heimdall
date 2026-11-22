@@ -75,7 +75,8 @@ describe("run debug actions", () => {
 		expect(html).toContain("run-replay");
 		expect(html).toContain("run-debug");
 		expect(render(<RunDebugActions detail={detail({ sealed: false })} />)).not.toContain("run-replay");
-		expect(render(<RunDebugActions detail={detail({ condition: "p_outage" })} />)).toBe("");
+		// N133: a fault run never hides the actions silently; debugActions.test.tsx covers the rule.
+		expect(render(<RunDebugActions detail={detail({ condition: "p_outage" })} />)).toContain("run-debug-reason");
 	});
 });
 
