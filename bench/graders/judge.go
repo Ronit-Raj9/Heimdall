@@ -387,7 +387,7 @@ func (g *judge) call(ctx context.Context, key *schemas.RunKey, spec schemas.Judg
 	}
 	body, err := json.Marshal(chatRequest{
 		Model:       spec.Provider + "/" + spec.Model,
-		Messages:    []chatMessage{{Role: "system", Content: judgeGuardSystem}, {Role: "user", Content: prompt}},
+		Messages:    []chatMessage{{Role: "system", Content: judgeSystem(spec.PromptVersion)}, {Role: "user", Content: prompt}},
 		Temperature: 0,
 		MaxTokens:   maxTokens,
 	})
