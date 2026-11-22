@@ -1,0 +1,20 @@
+# AppArmor profile for the shared worker's rootless BuildKit container.
+#
+# Ubuntu 23.10 and later set kernel.apparmor_restrict_unprivileged_userns=1,
+# which stops rootlesskit inside the buildkitd container from creating the
+# user namespace it runs in ("fork/exec /proc/self/exe: permission denied").
+# This profile keeps the container unconfined as before and grants only the
+# userns permission, for this one container. The rest of the host keeps the
+# restriction.
+#
+# Install with deploy/hosted/install-buildkit-apparmor.sh, then set
+# HEIMDALL_BUILDKIT_APPARMOR=heimdall-buildkitd in deploy/hosted/.env.
+
+abi <abi/4.0>,
+include <tunables/global>
+
+profile heimdall-buildkitd flags=(unconfined) {
+  userns,
+
+  include if exists <local/heimdall-buildkitd>
+}

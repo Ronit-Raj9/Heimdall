@@ -318,9 +318,12 @@ services:
     labels: *labels
     <<: *logging
     # Rootless BuildKit: no Docker socket, no host paths, its own network.
-    # It needs an unconfined seccomp/apparmor profile for its user
-    # namespaces, but holds no privilege over the host daemon.
-    security_opt: ["seccomp=unconfined", "apparmor=unconfined", "systempaths=unconfined"]
+    # It needs an unconfined seccomp profile and an AppArmor profile that
+    # allows user namespaces, but holds no privilege over the host daemon.
+    # Hosts that restrict unprivileged user namespaces (Ubuntu 23.10 and
+    # later) need the heimdall-buildkitd profile: install it with
+    # install-buildkit-apparmor.sh and set HEIMDALL_BUILDKIT_APPARMOR.
+    security_opt: ["seccomp=unconfined", "apparmor=${HEIMDALL_BUILDKIT_APPARMOR:-unconfined}", "systempaths=unconfined"]
     command: ["--addr", "tcp://0.0.0.0:1234", "--oci-worker-no-process-sandbox"]
     volumes:
       - buildkit-state:/home/user/.local/share/buildkit
