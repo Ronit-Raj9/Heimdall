@@ -253,6 +253,10 @@ type BudgetSpec struct {
 	// cap), BENCH_DEADLINE (RFC 3339) and BENCH_MAX_TOOL_CALLS when the
 	// arm sets them (stream.go). omitempty keeps recorded hashes.
 	Disclose bool `json:"disclose,omitempty" yaml:"disclose,omitempty"`
+	// RequestsPerMinute, when > 0, is the request rate limit Bifrost enforces
+	// on the whole evaluation (C06, gateways/bifrost/evalbudget.go).
+	// omitempty keeps recorded hashes.
+	RequestsPerMinute int `json:"requests_per_minute,omitempty" yaml:"requests_per_minute,omitempty"`
 }
 
 // VerdictSpec configures the verdict policy.
