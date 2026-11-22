@@ -196,6 +196,9 @@ func (p *Pipeline) execOnce(ctx context.Context, st *runState, sess *schemas.Ses
 		return nil, err
 	}
 	defer restore()
+	if err := p.routePluginFaults(ctx, st); err != nil { // C04: model faults through the heimdall Bifrost plugin (pluginfaults.go)
+		return nil, err
+	}
 	var plan *schemas.RunPlan
 	if runner, ok := st.adapter.(schemas.AdapterRunner); ok {
 		plan, err = runner.BuildExecutionPlan(ctx, st.rc)
