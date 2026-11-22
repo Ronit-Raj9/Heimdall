@@ -18,24 +18,28 @@ import (
 // first owner of a closed-signup server and for password recovery.
 
 func init() {
-	register("user", "hosted-mode accounts from the shell: user create|set-password (password read from stdin)", runUser)
+	register("user", "hosted-mode accounts from the shell: user create|set-password (password read from stdin)|verify", runUser)
 }
 
 const userUsage = `usage: bifrost-bench user create       -email <email> -org <id|slug|new name> [-role owner] [-name <name>] [-config deploy/bench.yaml] < password
        bifrost-bench user set-password -email <email> [-config deploy/bench.yaml] < password
+       bifrost-bench user verify       -email <email> [-config deploy/bench.yaml]
 The password is the first line of standard input, never a flag (flags show in
 process lists and shell history): for example
   read -rs PW && echo "$PW" | bifrost-bench user create -email a@example.com -org acme -role owner
 create makes the organization when no org has that id or slug, and works on an
 empty install: it is how a server with auth.signup closed gets its first owner.
-set-password also ends every session of the user. Both are audited as system.`
+set-password also ends every session of the user. verify marks the account's
+email as verified without a link (accounts made by create already are); use it
+when the server sends no email and you know the address is the user's. All are
+audited as system.`
 
 func runUser(args []string) int {
 	return userMain(args, os.Stdin, os.Stdout, os.Stderr)
 }
 
 func userMain(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	if len(args) == 0 || (args[0] != "create" && args[0] != "set-password") {
+	if len(args) == 0 || (args[0] != "create" && args[0] != "set-password" && args[0] != "verify") {
 		fmt.Fprintln(stderr, userUsage)
 		return exitUsage
 	}
@@ -56,10 +60,12 @@ func userMain(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "%v\n%s\n", err, userUsage)
 		return exitUsage
 	}
-	password, err := readPassword(stdin)
-	if err != nil {
-		fmt.Fprintf(stderr, "%v\n%s\n", err, userUsage)
-		return exitUsage
+	password := ""
+	if sub != "verify" {
+		if password, err = readPassword(stdin); err != nil {
+			fmt.Fprintf(stderr, "%v\n%s\n", err, userUsage)
+			return exitUsage
+		}
 	}
 	cfg, err := loadConfig(*config)
 	if err != nil {
@@ -89,6 +95,12 @@ func userMain(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			verb = "created"
 		}
 		fmt.Fprintf(stdout, "user %s (%s) created; organization %s (%s) %s, role %s\n", c.User.Email, c.User.ID, c.Org.Slug, c.Org.ID, verb, c.Role)
+	case "verify":
+		u, err := auth.MarkEmailVerified(ctx, d, *email)
+		if err != nil {
+			return fail("%v", err)
+		}
+		fmt.Fprintf(stdout, "email %s of %s verified\n", u.Email, u.ID)
 	default:
 		u, err := auth.SetPassword(ctx, d, nil, *email, password)
 		if err != nil {

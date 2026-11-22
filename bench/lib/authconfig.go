@@ -18,6 +18,10 @@ const (
 	SignupInvite = "invite" // default: new accounts only through an invitation
 	SignupOpen   = "open"   // anyone may sign up and gets an organization of their own
 	SignupClosed = "closed" // no web signup; accounts come from the CLI
+	// SignupAllowlist admits an invitation, or a self-serve signup from an
+	// address at one of auth.signup_domains (which gets an organization of
+	// its own). With no domains it is the same as invite.
+	SignupAllowlist = "allowlist"
 )
 
 // Auth defaults.
@@ -34,7 +38,8 @@ const (
 //	  public_url: https://heimdall.example.com
 //	  session_ttl_h: 168
 //	  session_idle_h: 24
-//	  signup: invite              # invite | open | closed
+//	  signup: invite              # invite | allowlist | open | closed
+//	  signup_domains: [acme.com]  # allowlist: who may sign up without an invitation
 //	  invite_ttl_h: 168
 //	  github:
 //	    client_id_env: HEIMDALL_GITHUB_CLIENT_ID
@@ -47,6 +52,10 @@ type AuthConfig struct {
 	SessionTTLH  int    `yaml:"session_ttl_h" json:"session_ttl_h,omitempty"`
 	SessionIdleH int    `yaml:"session_idle_h" json:"session_idle_h,omitempty"`
 	Signup       string `yaml:"signup" json:"signup,omitempty"`
+	// SignupDomains are the email domains that may sign up without an
+	// invitation under signup allowlist (exact match, case-insensitive).
+	// BENCH_AUTH_SIGNUP_DOMAINS, comma-separated.
+	SignupDomains []string `yaml:"signup_domains" json:"signup_domains,omitempty"`
 	InviteTTLH   int    `yaml:"invite_ttl_h" json:"invite_ttl_h,omitempty"`
 	// TrustedProxies are the IPs or CIDRs of reverse proxies in front of
 	// the server (Caddy in deploy/hosted). Only a request arriving from one
@@ -102,11 +111,37 @@ func (a AuthConfig) Validate() error {
 		}
 	}
 	switch a.SignupPolicy() {
-	case SignupInvite, SignupOpen, SignupClosed:
+	case SignupInvite, SignupAllowlist, SignupOpen, SignupClosed:
 	default:
-		return fmt.Errorf("auth.signup must be invite, open or closed, got %q", a.Signup)
+		return fmt.Errorf("auth.signup must be invite, allowlist, open or closed, got %q", a.Signup)
+	}
+	for _, d := range a.SignupDomains {
+		if !ValidSignupDomain(d) {
+			return fmt.Errorf("auth.signup_domains: %q is not a domain such as acme.com", d)
+		}
 	}
 	return nil
+}
+
+// ValidSignupDomain reports whether d is a plain domain name with a dot,
+// such as acme.com: letters, digits, hyphens and inner dots, at most 253
+// bytes. Leading "@" is allowed and ignored.
+func ValidSignupDomain(d string) bool {
+	d = NormalizeSignupDomain(d)
+	if len(d) < 3 || len(d) > 253 || !strings.Contains(d, ".") || strings.HasPrefix(d, ".") || strings.HasSuffix(d, ".") || strings.Contains(d, "..") {
+		return false
+	}
+	for _, c := range d {
+		if !(c >= 'a' && c <= 'z') && !(c >= '0' && c <= '9') && c != '-' && c != '.' {
+			return false
+		}
+	}
+	return true
+}
+
+// NormalizeSignupDomain trims, lowercases and drops a leading "@".
+func NormalizeSignupDomain(d string) string {
+	return strings.TrimPrefix(strings.ToLower(strings.TrimSpace(d)), "@")
 }
 
 // ParseIPOrCIDR parses "10.0.0.0/8" or a single address ("10.0.0.5", which

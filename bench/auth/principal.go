@@ -111,6 +111,14 @@ type Principal struct {
 	// scopes.go). Empty for every other principal and for tokens made
 	// before scopes existed, which their role alone limits.
 	Scopes []string `json:"scopes,omitempty"`
+	// EmailVerified is true for a signed-in user whose current email is
+	// verified (verify.go). Unverified users can not create API tokens,
+	// invite, create organizations or be server admins.
+	EmailVerified bool `json:"email_verified,omitempty"`
+
+	// serverAdmin is set when the session was read and the user is a server
+	// admin by grant or verified listed email (serveradmin.go).
+	serverAdmin bool
 
 	// sessionID is the sha256 (hex) of the session cookie, set only for
 	// session principals; logout and switch-org use it.

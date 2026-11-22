@@ -80,6 +80,11 @@ func CreateUser(ctx context.Context, d *db.DB, hasher *Hasher, email, name, pass
 			return err
 		}
 		out.Org = o
+		// The operator typed this address on the server: it counts as
+		// verified (verify.go), like `bifrost-bench user verify`.
+		if err := st.markVerified(ctx, tx, u.ID, u.Email, VerifiedByOperator); err != nil {
+			return err
+		}
 		return st.grantMembership(ctx, tx, o.ID, u.ID, role)
 	})
 	if err != nil {

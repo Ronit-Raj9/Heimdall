@@ -166,6 +166,10 @@ func newHostedFixtureWith(t *testing.T, realLauncher bool) *hostedFixture {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// Verified, as the accounts these tests drive need (Wave A).
+		if _, err := auth.MarkEmailVerified(ctx, d, u.Email); err != nil {
+			t.Fatal(err)
+		}
 		f.users[n] = u
 	}
 	mk := func(slug, owner string, public bool) *db.Org {
@@ -196,10 +200,10 @@ func newHostedFixtureWith(t *testing.T, realLauncher bool) *hostedFixture {
 	f.bRuns, f.bPair = runsOf(t, f.env.layout, f.beta.ID, f.bExp)
 
 	f.as = map[string]*auth.Principal{
-		"alice":   {Kind: auth.KindUser, UserID: f.users["alice"].ID, OrgID: f.acme.ID, Role: auth.RoleOwner},
-		"vera":    {Kind: auth.KindUser, UserID: f.users["vera"].ID, OrgID: f.acme.ID, Role: auth.RoleViewer},
-		"bob":     {Kind: auth.KindUser, UserID: f.users["bob"].ID, OrgID: f.beta.ID, Role: auth.RoleOwner},
-		"mallory": {Kind: auth.KindUser, UserID: f.users["mallory"].ID},
+		"alice":   {Kind: auth.KindUser, UserID: f.users["alice"].ID, OrgID: f.acme.ID, Role: auth.RoleOwner, EmailVerified: true},
+		"vera":    {Kind: auth.KindUser, UserID: f.users["vera"].ID, OrgID: f.acme.ID, Role: auth.RoleViewer, EmailVerified: true},
+		"bob":     {Kind: auth.KindUser, UserID: f.users["bob"].ID, OrgID: f.beta.ID, Role: auth.RoleOwner, EmailVerified: true},
+		"mallory": {Kind: auth.KindUser, UserID: f.users["mallory"].ID, EmailVerified: true},
 		"tokA":    {Kind: auth.KindToken, TokenID: "tok_a", OrgID: f.acme.ID, Role: auth.RoleMember},
 		"runA":    {Kind: auth.KindRunner, TokenID: "rnr_a", OrgID: f.acme.ID},
 	}
@@ -983,7 +987,7 @@ func hostedSignup(t *testing.T, f *hostedFixture, email, org string) string {
 		t.Fatalf("%s's orgs %+v %v", email, orgs, err)
 	}
 	name, _, _ := strings.Cut(email, "@")
-	f.as[name] = &auth.Principal{Kind: auth.KindUser, UserID: u.ID, OrgID: orgs[0].ID, Role: auth.RoleOwner}
+	f.as[name] = &auth.Principal{Kind: auth.KindUser, UserID: u.ID, OrgID: orgs[0].ID, Role: auth.RoleOwner, EmailVerified: true}
 	return orgs[0].ID
 }
 
@@ -1306,5 +1310,20 @@ func TestHostedShareLinksWithoutLogin(t *testing.T) {
 	}
 	if r := f.do("GET", "/api/bench/shared/"+made.Token, "", nil, nil); r.status != 410 {
 		t.Errorf("revoked share: %d %s, want 410", r.status, trim(r.body))
+	}
+}
+
+// TestHostedUnverifiedUserCanNotCreateOrg: creating an organization needs a
+// verified email (Wave A, audit B1); the same user can once verified.
+func TestHostedUnverifiedUserCanNotCreateOrg(t *testing.T) {
+	f := newHostedFixture(t)
+	f.as["mallory"].EmailVerified = false
+	r := f.do("POST", "/api/bench/orgs", "mallory", nil, map[string]any{"slug": "unverified-co"})
+	if r.status != 403 || !strings.Contains(r.body, "verify your email") {
+		t.Fatalf("unverified create org: %d %s", r.status, trim(r.body))
+	}
+	f.as["mallory"].EmailVerified = true
+	if r := f.do("POST", "/api/bench/orgs", "mallory", nil, map[string]any{"slug": "unverified-co"}); r.status != 201 {
+		t.Fatalf("verified create org: %d %s", r.status, trim(r.body))
 	}
 }

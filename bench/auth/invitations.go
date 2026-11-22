@@ -45,6 +45,9 @@ func (s *Service) CreateInvitation(ctx context.Context, inviter *Principal, orgI
 	if inviter == nil || inviter.OrgID != orgID || !inviter.Can(RoleAdmin) || inviter.Kind == KindRunner {
 		return nil, errForbidden("inviting members needs role admin in the organization")
 	}
+	if err := RequireVerified(inviter); err != nil {
+		return nil, err
+	}
 	if role.Valid() && !inviter.Role.AtLeast(role) {
 		return nil, errForbidden("you can not invite with a role above yours (%s)", inviter.Role)
 	}
@@ -167,7 +170,7 @@ func (s *Service) InvitationInfo(ctx context.Context, raw, ip string) (*Invitati
 	}
 	_, uerr := s.st.userByEmail(ctx, s.st.d.SQL(), in.Email)
 	return &InvitationInfo{OrgName: o.Name, OrgSlug: o.Slug, Email: in.Email, Role: in.Role, ExpiresAt: in.ExpiresAt,
-		AccountExists: uerr == nil, SignupAllowed: s.cfg.Signup != SignupClosed}, nil
+		AccountExists: uerr == nil, SignupAllowed: s.signupMode(ctx) != SignupClosed}, nil
 }
 
 // AcceptInvitation adds the signed-in user to the invitation's org with

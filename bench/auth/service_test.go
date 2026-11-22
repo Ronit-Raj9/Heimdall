@@ -36,7 +36,18 @@ var bg = context.Background()
 
 const goodPassword = "violet-tractor-umbrella"
 
+// signup creates an account and verifies its email, the state most tests
+// need; signupUnverified leaves it unverified (verify_test.go).
 func (e *testEnv) signup(t *testing.T, email string) (*User, *NewSession) {
+	t.Helper()
+	u, s := e.signupUnverified(t, email)
+	if _, err := MarkEmailVerified(bg, e.d, email); err != nil {
+		t.Fatalf("verify %s: %v", email, err)
+	}
+	return u, s
+}
+
+func (e *testEnv) signupUnverified(t *testing.T, email string) (*User, *NewSession) {
 	t.Helper()
 	u, s, err := e.svc.Signup(bg, SignupRequest{Email: email, Password: goodPassword, Name: strings.Split(email, "@")[0]}, "10.0.0.1", "test", "")
 	if err != nil {
@@ -532,6 +543,9 @@ func (e *testEnv) signup2(t *testing.T, _ *testEnv, email string) (*User, *NewSe
 		t.Fatal(err)
 	}
 	if err := e.svc.st.grantMembership(bg, e.d.SQL(), o.ID, u.ID, RoleOwner); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.st.markVerified(bg, e.d.SQL(), u.ID, u.Email, VerifiedByOperator); err != nil {
 		t.Fatal(err)
 	}
 	s, err := e.svc.createSession(bg, e.d.SQL(), u.ID, o.ID, "", "", "")

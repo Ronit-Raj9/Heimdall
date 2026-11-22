@@ -45,6 +45,9 @@ func (s *Service) CreateToken(ctx context.Context, p *Principal, req TokenCreate
 	if p.OrgID == "" || !p.Can(RoleAdmin) {
 		return nil, errForbidden("creating API tokens needs role admin in the current organization")
 	}
+	if err := RequireVerified(p); err != nil {
+		return nil, err
+	}
 	name := strings.TrimSpace(req.Name)
 	if name == "" || len(name) > 100 {
 		return nil, errBadRequest("name is required, at most 100 characters")

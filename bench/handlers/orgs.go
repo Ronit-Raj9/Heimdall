@@ -213,6 +213,10 @@ func (h *OrgsHandler) createOrg(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, "only a signed-in user can create an organization")
 		return
 	}
+	if err := auth.RequireVerified(p); err != nil {
+		auth.SendError(ctx, h.mode, err)
+		return
+	}
 	var req CreateOrgRequest
 	if !decodeStrict(ctx, h.mode, &req, "create organization") {
 		return

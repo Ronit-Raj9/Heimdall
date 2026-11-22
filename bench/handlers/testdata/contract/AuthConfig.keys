@@ -6,3 +6,5 @@ github
 bootstrap?
 captcha?
 captcha_site_key?
+signup_domains?
+email_delivery?
