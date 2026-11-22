@@ -497,6 +497,81 @@ func ensureOrgNetwork(ctx context.Context, d utils.Docker, name, org, gateway, a
 	return nil
 }
 
+// gatewayRelinkEvery is how often an org's loop checks that the gateway is
+// still on the org network.
+const gatewayRelinkEvery = 15 * time.Second
+
+// keepGateway keeps the gateway on the org network while the org is served.
+// ensureOrgNetwork links it once, and a gateway container recreated after
+// that (an upgrade, a new plugin image) comes back without the link: every
+// agent then dials a gateway name that no longer resolves and times out.
+func (h *sharedHost) keepGateway(ctx context.Context, network, org string) {
+	t := time.NewTicker(gatewayRelinkEvery)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		gw := h.currentGateway(ctx)
+		if gw == "" {
+			continue
+		}
+		linked, err := relinkGateway(ctx, h.base.docker, network, gw, h.gatewayHost)
+		switch {
+		case err != nil && ctx.Err() == nil:
+			h.base.logger.Warn("shared runner: gateway not linked to the org network", "org", org, "network", network, "error", err.Error())
+		case linked:
+			h.base.logger.Warn("shared runner: the gateway was not on the org network (recreated?); linked it again", "org", org, "network", network)
+		}
+	}
+}
+
+// currentGateway is the gateway container now: -gateway-container as given,
+// else the compose project's bifrost service looked up again, since an
+// upgrade recreates that container under a new id.
+func (h *sharedHost) currentGateway(ctx context.Context) string {
+	if h.f.gateway != "" {
+		return h.f.gateway
+	}
+	if id := findGateway(ctx, h.base.docker); id != "" {
+		return id
+	}
+	return h.gateway
+}
+
+// relinkGateway connects gateway to network under alias when it is not on
+// it; linked reports whether it had to.
+func relinkGateway(ctx context.Context, d utils.Docker, network, gateway, alias string) (linked bool, err error) {
+	res, err := d.Run(ctx, "inspect", "--format", "{{json .NetworkSettings.Networks}}", gateway)
+	if err != nil {
+		return false, err
+	}
+	if res.ExitCode != 0 {
+		return false, fmt.Errorf("inspect gateway %s: %s", gateway, strings.TrimSpace(string(res.Stderr)))
+	}
+	var nets map[string]json.RawMessage
+	if err := json.Unmarshal(res.Stdout, &nets); err != nil {
+		return false, fmt.Errorf("inspect gateway %s: %w", gateway, err)
+	}
+	if _, ok := nets[network]; ok {
+		return false, nil
+	}
+	args := []string{"network", "connect"}
+	if alias != "" {
+		args = append(args, "--alias", alias)
+	}
+	res, err = d.Run(ctx, append(args, network, gateway)...)
+	if err != nil {
+		return false, err
+	}
+	if res.ExitCode != 0 && !strings.Contains(string(res.Stderr), "already exists") {
+		return false, fmt.Errorf("connect gateway %s to %s: %s", gateway, network, strings.TrimSpace(string(res.Stderr)))
+	}
+	return true, nil
+}
+
 // removeOrgNetwork disconnects the gateway and removes the org's network
 // (best effort: a network still in use stays).
 func removeOrgNetwork(ctx context.Context, d utils.Docker, name, gateway string) {
@@ -675,7 +750,10 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 		a.logger.Error("shared runner: org network", "org", org, "error", err.Error())
 		return
 	}
-	defer removeOrgNetwork(context.Background(), a.docker, network, h.gateway)
+	defer func() {
+		removeOrgNetwork(context.Background(), a.docker, network, h.currentGateway(context.Background()))
+	}()
+	go h.keepGateway(ctx, network, org)
 	proj := &orgProject{server: h.f.server, token: claim.Token, dst: root, client: h.client}
 	if err := proj.refresh(ctx); err != nil {
 		a.logger.Warn("shared runner: org project not downloaded; built-in suites only until it is", "org", org, "error", err.Error())

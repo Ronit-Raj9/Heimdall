@@ -64,6 +64,14 @@ describe("TaskDetailBody", () => {
 		const html = renderToStaticMarkup(<TaskDetailBody detail={d} suiteVersion="1.0.0" />);
 		expect(html).toContain(`Showing the first ${d.files.length} of 900 files.`);
 	});
+
+	it("renders a task with no repo folder, whose lists arrive as null", () => {
+		const base = detail("t01");
+		const d = { ...base, files: null, protected: null, files_total: 0, task: { ...base.task, checks: null } } as unknown as SuiteTaskDetail;
+		const html = renderToStaticMarkup(<TaskDetailBody detail={d} suiteVersion="1.0.0" />);
+		expect(block(html, "suites-task-files")).toContain("suites-task-files");
+		expect(html).not.toContain("ledger/invoice.py");
+	});
 });
 describe("TaskDetailBody scenario", () => {
 	it("shows the scenario block before the instruction for a scenario task", () => {

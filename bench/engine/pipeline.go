@@ -180,6 +180,11 @@ func (p *Pipeline) RunSlot(ctx context.Context, in SlotInput) (*SlotResult, erro
 		st.rc.Run.Outcome = o
 		st.rc.Run.Failures = append(st.rc.Run.Failures, *pf)
 	}
+	if o, pf := gatewayOutcome(st.rc, st.ev, st.rc.Run.Outcome); pf != nil { // a gateway the agent could not reach is never the agent's score (gatewayinfra.go)
+		st.rc.Run.Outcome = o
+		st.rc.Run.Failures = append(st.rc.Run.Failures, *pf)
+		p.logger.Warn("no model call reached the gateway; run excluded from scores", "run", st.rc.Run.RunID, "slot", st.rc.Slot.SlotID)
+	}
 	p.ownerAbort(ctx, st)
 	st.rc.Run.Y = scoreOf(st.rc.Run.Outcome)
 	p.reconcileMetrics(sctx, st)

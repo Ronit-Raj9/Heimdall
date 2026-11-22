@@ -92,7 +92,7 @@ export function TaskDetailPanel({
 
 /** The task's scenario, instruction, provenance, admission checklist, hidden counts, protected paths and files. */
 export function TaskDetailBody({
-	detail,
+	detail: raw,
 	suiteVersion,
 	suiteOutput,
 	suiteArtifacts,
@@ -104,6 +104,7 @@ export function TaskDetailBody({
 }) {
 	const { t } = useTranslation("bench");
 	const locale = getLocale();
+	const detail = withLists(raw);
 	const task = detail.task;
 	return (
 		<div className="flex min-w-0 flex-col gap-5">
@@ -217,6 +218,16 @@ export function TaskDetailBody({
 			</DetailBlock>
 		</div>
 	);
+}
+
+/** The detail with its lists never null: a Go nil slice arrives as null (a task with no repo/ folder has no files). */
+function withLists(detail: SuiteTaskDetail): SuiteTaskDetail {
+	return {
+		...detail,
+		files: detail.files ?? [],
+		protected: detail.protected ?? [],
+		task: { ...detail.task, checks: detail.task.checks ?? [] },
+	};
 }
 
 function DetailBlock({ title, hint, children, testId }: { title: string; hint?: string; children: React.ReactNode; testId: string }) {

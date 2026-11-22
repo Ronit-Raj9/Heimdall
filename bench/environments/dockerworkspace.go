@@ -318,6 +318,11 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 	obs := e.startObservers(ctx, rc, plan, expID, runID)
 	defer obs.finish(ctx, rc, nil)
 	args := agentCreateArgsView(name, utils.LabelArgs(expID, runID), agentPlan, rc.Handle, network, envFile, l, mounts, snapshotMode(rc) || root, view) // Eval integrity area (S2): view
+	faultNet := ""
+	if rc.FaultRuntime != nil {
+		faultNet = rc.FaultRuntime.Network
+	}
+	args = e.sandboxHosts(ctx, args, network, svcNet, faultNet) // gVisor: the gateway, tool proxy and services by /etc/hosts (gvisorhosts.go)
 	_, cerr := e.cfg.Docker.MustRun(ctx, args...)
 	if rerr := os.Remove(envFile); rerr != nil {
 		e.cfg.Logger.Warn("remove env file", "path", envFile, "error", rerr)
