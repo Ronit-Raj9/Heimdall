@@ -28,6 +28,7 @@ export interface Schedule {
 	fail_on?: string[];
 	alerts?: AlertConfig[];
 	job?: string;
+	paused?: boolean;
 }
 
 export interface SchedulesFile {

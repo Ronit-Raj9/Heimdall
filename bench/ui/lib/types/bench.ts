@@ -4612,6 +4612,7 @@ export interface CanaryTarget {
 export interface CanaryScheduleSpec {
 	cron: string;
 	timezone?: string;
+	paused?: boolean;
 }
 
 export interface CanaryBudget {
@@ -4824,6 +4825,7 @@ export interface CanarySummary {
 	baseline: CanaryBaseline | null;
 	last_look: CanaryRecord | null;
 	looks: number;
+	paused?: boolean;
 }
 
 export interface CanaryDefinitionLoad {

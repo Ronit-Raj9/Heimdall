@@ -399,8 +399,9 @@ As built (UI U1, 18 Nov; the code wins):
 - Mode: `GET /auth/me` decides. `auth_mode: local` or a 404 (an older server)
   is local mode, exactly as before (write-token boxes, `Authorization:
   Bearer`). Hosted: the session cookie, `X-Heimdall-CSRF` (from `me.csrf`) on
-  every mutation, no token boxes. A 401 from `/auth/me` is a visitor who is
-  not signed in: the UI reads `GET /auth/config` (sign-up policy, GitHub) and
+  every mutation, no token boxes. A 200 with kind `anonymous` from
+  `/auth/me` (no credential at all) or a 401 (a session cookie that names no
+  live session) is a visitor who is not signed in: the UI reads `GET /auth/config` (sign-up policy, GitHub) and
   makes one anonymous read (`GET /experiments`); when that answers, the
   server serves a public demo and the visitor reads it under a "Public demo,
   read only" banner with no write controls; otherwise `/login?return_to=`.

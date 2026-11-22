@@ -215,6 +215,9 @@ func (d *Daemon) entries() ([]*entry, error) {
 	now := d.o.Clock.Now()
 	out := make([]*entry, 0, len(d.file.Schedules))
 	for _, s := range d.file.Schedules {
+		if s.Paused {
+			continue
+		}
 		c, err := ParseCron(s.Cron)
 		if err != nil {
 			return nil, fmt.Errorf("schedule %s: %w", s.Name, err)

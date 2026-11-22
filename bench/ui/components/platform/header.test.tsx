@@ -52,6 +52,13 @@ describe("OrgSwitcher", () => {
 	it("shows a demo visitor no organization picker", () => {
 		expect(render(<OrgSwitcher />, demoSession())).not.toContain("org-switcher");
 	});
+	// G1.console: GET /auth/me answers a visitor with no credential 200 and kind anonymous.
+	it("renders no organization and no account menu for an anonymous /auth/me answer", () => {
+		const anonymous = sessionFromMe({ me: { auth_mode: "hosted", kind: "anonymous", orgs: [] }, meLoading: false });
+		expect(render(<OrgSwitcher />, anonymous)).toBe("");
+		expect(render(<OrgSwitcher defaultOpen />, anonymous)).toBe("");
+		expect(render(<UserMenu />, anonymous)).toBe("");
+	});
 	// Audit qc2-17-02: after leaving the current org the session has memberships but no current
 	// org; the picker is offered, and the remaining membership is not shown as the current one.
 	for (const orgs of [[ME_OWNER.orgs[1]], ME_OWNER.orgs]) {
