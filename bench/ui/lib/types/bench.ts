@@ -875,8 +875,12 @@ export interface Experiment {
 	requirements?: CapabilityRequirements;
 	smoke?: boolean;
 	scripted_upstream?: boolean;
+	/** Lets the suite's model judges call their real provider in a smoke or scripted_upstream experiment. */
+	paid_judge?: boolean;
 	/** live | record | replay: overrides every external API's mode for this experiment's runs. */
 	external?: string;
+	/** offline | replay | live-allowlisted: overrides every egress service's mode (recorded internet). */
+	egress?: string;
 	fairness?: string;
 	attribution?: Record<string, unknown>;
 	matrix?: Record<string, unknown>;

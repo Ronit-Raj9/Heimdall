@@ -29,6 +29,9 @@ vi.mock("@/lib/store/apis/referenceApi", async (orig) => ({
 vi.mock("@/components/redteam/redTeamPanel", () => ({
 	RedTeamPanel: () => null, // Z04 panel needs the store; covered by its own test
 }));
+vi.mock("./ownTasks", () => ({
+	OwnTasksCard: () => null, // Y13 own-tasks card needs the store; covered by its own test
+}));
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({ children, ...p }: { children: React.ReactNode; "data-testid"?: string }) => <a data-testid={p["data-testid"]}>{children}</a>,
 }));

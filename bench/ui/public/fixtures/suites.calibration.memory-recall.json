@@ -9,6 +9,7 @@
 	"prompt_sha256": "4d2c3ab1e0f7aa31c0de9bb1f1e2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4",
 	"state": "calibrated",
 	"detail": "agreement 0.950 [0.831, 0.994] (38/40) (lower bound must be at least 0.75), TNR 0.944 [0.727, 0.999] (17/18) (lower bound must be at least 0.60), false-positive rate at most 27.3%, kappa 0.90",
+	"caps": false,
 	"set_sha256": "9a1f0c3e5b7d2a4c6e8f0a1b3c5d7e9f1a3b5c7d9e1f3a5b7c9d1e3f5a7b9c1d",
 	"labels": 46,
 	"human_labels": 40,
