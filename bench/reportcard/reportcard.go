@@ -185,6 +185,9 @@ type Report struct {
 	// squeezed budget and converted spend into success; nil when no run
 	// reported any of it.
 	Persistence []PersistenceRow `json:"persistence,omitempty"`
+	// Bifrost is the Through Bifrost section (bifrost.go): per arm, what
+	// the Bifrost gateway did across the runs; nil when no arm has a run.
+	Bifrost []BifrostRow `json:"bifrost,omitempty"`
 }
 
 // LearningRow is one arm's learning summary on one benchmark.
@@ -404,6 +407,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	rep.Alignment = alignment(children, labels)
 	rep.Learning = learningRows(children, labels)
 	rep.Persistence = persistence(children, labels)
+	rep.Bifrost = bifrostRows(children, labels)
 	return rep, nil
 }
 

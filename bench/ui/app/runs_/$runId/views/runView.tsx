@@ -8,6 +8,7 @@ import { RunGatewayPolicy } from "@/components/routing/gatewayPolicyCard"; // W9
 import { AgentsPanel } from "@/components/runs/agents/agentsSection";
 import { ClaimVsResult } from "@/components/runs/claimVsResult";
 import { GatewayLane } from "@/components/runs/gatewayLane";
+import { RunThroughBifrost } from "@/components/runs/bifrost/throughBifrost"; // C09 Through Bifrost
 import { MetricStrip } from "@/components/runs/metricStrip";
 import { OutcomeBadge } from "@/components/runs/outcomeBadge";
 import { RunRemoteCoverage } from "@/components/runs/remoteCoverage";
@@ -571,7 +572,20 @@ function TimelineTab({ detail }: { detail: RunDetail }) {
           </CardContent>
         )}
       </Section>
+      <ThroughBifrostSection runId={detail.run.run_id} arm={arm} />
     </div>
+  );
+}
+
+/** C09: what Bifrost did for this run's model calls, from GET /runs/{id}/bifrost. */
+function ThroughBifrostSection({ runId, arm }: { runId: string; arm: string }) {
+  const { t } = useTranslation("throughBifrost");
+  return (
+    <Section title={t("title")} description={t("description")} testId="run-through-bifrost">
+      <CardContent className="rounded-sm border px-4 py-4">
+        <RunThroughBifrost runId={runId} arm={arm} />
+      </CardContent>
+    </Section>
   );
 }
 

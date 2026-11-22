@@ -1,0 +1,45 @@
+{
+	"title": "Through Bifrost",
+	"description": "What the Bifrost gateway did for this run's model calls: which provider and model answered, fallbacks, cache hits, faults applied, tokens, cost and time per call.",
+	"loadError": "Could not load the Bifrost facts for this run",
+	"empty": "This run has no Bifrost records. Its model calls did not go through Bifrost, or the run is not finished yet.",
+	"incomplete": "Bifrost did not return every call of this run, so the numbers below may be low.",
+	"source": {
+		"bifrost_logs": "From Bifrost's request logs",
+		"plugin_usage": "From the Heimdall Bifrost plugin",
+		"both": "From Bifrost's request logs and the Heimdall Bifrost plugin"
+	},
+	"stat": {
+		"calls": "Model calls",
+		"providers": "Providers",
+		"models": "Models served",
+		"fallbacks": "Fallbacks used",
+		"cacheHits": "Cache hits",
+		"faults": "Faults applied",
+		"errors": "Failed calls",
+		"tokens": "Tokens",
+		"cost": "Cost",
+		"latency": "Average time per call"
+	},
+	"costUnknown": "not reported",
+	"costPartial": "{{known}} of {{calls}} calls reported a cost",
+	"col": {
+		"n": "#",
+		"model": "Provider and model",
+		"status": "Result",
+		"fallback": "Fallback",
+		"cache": "Cache",
+		"fault": "Fault",
+		"tokens": "Tokens",
+		"cost": "Cost",
+		"latency": "Time"
+	},
+	"yes": "yes",
+	"no": "no",
+	"none": "none",
+	"ok": "ok",
+	"failed": "failed {{status}}",
+	"fallbackN": "fallback {{n}}",
+	"hit": "hit",
+	"requested": "asked for {{model}}"
+}
