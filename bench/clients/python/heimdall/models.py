@@ -644,6 +644,7 @@ class AgentSkills(TypedDict, total=False):
     dir: str
     enabled: Optional[bool]
     extra: List[str]
+    set: str
 
 
 class AgentSkillsResponse(TypedDict):
