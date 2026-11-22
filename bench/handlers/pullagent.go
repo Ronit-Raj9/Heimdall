@@ -50,6 +50,7 @@ type PullAgentHandler struct {
 	hosted bool
 	origin string // origin of signed repository links; "" uses the request's
 	write  lib.Middleware
+	voice  *voiceDriver // text runs of voice platform agents (pullvoice.go)
 }
 
 // NewPullAgentHandler serves broker with signer. hosted reads the caller's
@@ -58,7 +59,7 @@ type PullAgentHandler struct {
 // agent-side writes in local mode (the write token); nil in hosted mode,
 // where the tenancy policy does.
 func NewPullAgentHandler(mode schemas.Mode, broker *pullagent.Broker, signer *pullagent.Signer, hosted bool, origin string, write lib.Middleware) *PullAgentHandler {
-	return &PullAgentHandler{mode: mode, broker: broker, signer: signer, hosted: hosted, origin: strings.TrimRight(origin, "/"), write: write}
+	return &PullAgentHandler{mode: mode, broker: broker, signer: signer, hosted: hosted, origin: strings.TrimRight(origin, "/"), write: write, voice: newVoiceDriver(hosted)}
 }
 
 // RegisterRoutes implements the route registrar of both servers: the
@@ -270,7 +271,15 @@ func (h *PullAgentHandler) runSubmit(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "body: want {\"payload\": {...}}")
 		return
 	}
-	t, err := h.broker.Submit(c, req.Payload, time.Duration(req.TimeoutS)*time.Second)
+	var t *pullagent.Turn
+	var err error
+	if c.Voice != nil {
+		// A voice platform agent's text run: this server answers (pullvoice.go).
+		key := string(ctx.Request.Header.Peek(VoiceKeyHeader))
+		t, err = h.broker.SubmitServed(c, req.Payload, time.Duration(req.TimeoutS)*time.Second, h.voice.serve(c, key))
+	} else {
+		t, err = h.broker.Submit(c, req.Payload, time.Duration(req.TimeoutS)*time.Second)
+	}
 	switch {
 	case errors.Is(err, pullagent.ErrNoPuller):
 		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, pullagent.NoPullerReason(c.Agent))

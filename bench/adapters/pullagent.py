@@ -48,6 +48,12 @@ SECRET_RE = re.compile(r"(?i)(sk-[A-Za-z0-9_-]{8,}|bearer\s+[A-Za-z0-9._~+/=-]{8
 NAME_RE = re.compile(r"[^A-Za-z0-9_-]")
 SESSION_INDEX = int(os.environ.get("BENCH_PULL_SESSION_INDEX", "1") or "1")
 SEQ = [0]
+# A voice platform agent's text run (adapters/voiceplatform.go): the server
+# answers each turn through the platform's chat API; its key goes with the
+# turn, and a platform or network failure is infrastructure, never the
+# agent's answer (exit EXIT_UNREACHABLE, engine/endpointinfra.go).
+VOICE_KEY_HEADER = "X-Heimdall-Voice-Key"
+EXIT_UNREACHABLE = 75
 REPORT = {"type": "pull_report", "turns": 0, "tool_calls": 0}
 
 
@@ -85,6 +91,14 @@ def fail(code, message):
     event("error", summary=clean(message), status="error", is_error=True)
     log(message)
     sys.exit(code)
+
+
+def unreachable(reason):
+    REPORT["error"] = reason
+    emit(REPORT)
+    emit({"type": "endpoint_unreachable", "reason": reason, "attempts": 1, "answered": max(REPORT["turns"] - 1, 0)})
+    log("the voice platform did not answer: " + reason)
+    sys.exit(EXIT_UNREACHABLE)
 
 
 # ---- tools ------------------------------------------------------------------
@@ -183,6 +197,8 @@ class Agent:
             answer = res.get("answer")
             if not isinstance(answer, dict):
                 fail(1, "the agent's answer is not a JSON object")
+            if answer.get("infra_error"):
+                unreachable(clean(answer["infra_error"], 500))
             usage = answer.get("usage") if isinstance(answer.get("usage"), dict) else None
             tokens = None
             if usage:
@@ -247,6 +263,8 @@ def main():
         server = hc.Server(os.environ["BENCH_PULL_URL"].rstrip("/"), os.environ.get("BENCH_PULL_TOKEN", ""), os.environ.get("BENCH_PULL_CONNECT", ""))
     except (KeyError, ValueError) as e:
         fail(2, "no pull endpoint: %s" % e)
+    if os.environ.get("BENCH_VOICE_PLATFORM_KEY"):
+        server.extra[VOICE_KEY_HEADER] = os.environ["BENCH_VOICE_PLATFORM_KEY"]
     with open(os.environ["BENCH_PULL_INSTRUCTION"], encoding="utf-8") as f:
         instruction = f.read()
     output = os.environ.get("BENCH_PULL_OUTPUT", "answer")

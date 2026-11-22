@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/compat"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -139,6 +140,9 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		ServiceGateway: environments.ServiceGatewayConfig{Gateway: gw, AgentURL: cfg.Gateway.AgentURL, Fault: fault, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref()}, // W3 customer support: a service's own gateway key (servicegateway.go)
 	}
 	a.dockerCfg = dockerCfg
+	// Text benchmarks of voice platform agents run through the pull
+	// launcher, so they need an address runs reach this server at.
+	compat.VoicePlatformText = cfg.PullRunURL() != ""
 	a.reg = &schemas.Registry{
 		Loaders:      suite.Builtin(cfg.Path(cfg.BenchmarksRoot)),
 		Environments: []schemas.Environment{environments.NewDockerDriver(dockerCfg)}, // X3: the Docker driver, today's docker_workspace behind the driver seam (environments/driver.go)

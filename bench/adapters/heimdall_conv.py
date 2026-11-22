@@ -337,6 +337,8 @@ class Server:
             host, _, p = connect.rpartition(":")
             self.addr = (host, int(p))
         self.token = token
+        # Extra headers on every request (a voice platform run's key).
+        self.extra = {}
 
     def _conn(self, timeout):
         http, socket, addr = self._http, self._socket, self.addr
@@ -366,6 +368,7 @@ class Server:
         transport failure."""
         conn = self._conn(timeout)
         headers = {"Authorization": "Bearer " + self.token, "Accept": "application/json"}
+        headers.update(self.extra)
         if body is not None:
             if not isinstance(body, (bytes, bytearray)):
                 body = json.dumps(body).encode("utf-8")

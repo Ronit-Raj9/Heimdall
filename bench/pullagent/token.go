@@ -29,6 +29,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/maximhq/bifrost/bench/schemas"
 )
 
 // EnvSigningKey holds the key run tokens and repository URLs are signed
@@ -43,6 +45,12 @@ type Claims struct {
 	Agent string `json:"a"`
 	Run   string `json:"r"`
 	Exp   int64  `json:"e"` // unix seconds
+	// Voice is set on the token of a voice platform agent's text run
+	// (adapters/voiceplatform.go): this server answers the run's turns
+	// itself through the platform's chat API (handlers/pullvoice.go), so
+	// no process serves the agent. Signed, so a run cannot point the
+	// server at another platform or agent.
+	Voice *schemas.VoicePlatformAgent `json:"v,omitempty"`
 }
 
 // Signer signs and verifies run tokens and repository URLs.

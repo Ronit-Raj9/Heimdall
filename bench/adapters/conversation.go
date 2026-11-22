@@ -36,9 +36,9 @@ func withConvHelper(plan *schemas.RunPlan) {
 
 // pullToken signs the run's pull token for agent: it names cfg's org, the
 // agent and the run, and expires with the run's wall budget plus a margin.
-func pullToken(cfg CommandConfig, rc *schemas.RunContext, agent string, wallS int) (string, error) {
+func pullToken(cfg CommandConfig, rc *schemas.RunContext, agent string, wallS int, voice *schemas.VoicePlatformAgent) (string, error) {
 	exp := time.Now().Add(time.Duration(max(wallS, 60))*time.Second + pullTokenMargin)
-	return pullagent.DefaultSigner().RunToken(pullagent.Claims{Org: cfg.OrgID, Agent: agent, Run: rc.Run.RunID, Exp: exp.Unix()})
+	return pullagent.DefaultSigner().RunToken(pullagent.Claims{Org: cfg.OrgID, Agent: agent, Run: rc.Run.RunID, Exp: exp.Unix(), Voice: voice})
 }
 
 // NoPullURLReason refuses a pull or repo-tarball run on a server that has
@@ -50,6 +50,12 @@ const NoPullURLReason = "this server has no address its runs can reach it at: se
 // plan.json) and the forwarder it connects through (BENCH_PULL_CONNECT),
 // one more egress destination of the plan.
 func pullEnv(cfg CommandConfig, rc *schemas.RunContext, plan *schemas.RunPlan, env map[string]string, agent string) error {
+	return pullEnvVoice(cfg, rc, plan, env, agent, nil)
+}
+
+// pullEnvVoice is pullEnv for a voice platform agent's text run: the token
+// also names the agent's voice_platform block (handlers/pullvoice.go).
+func pullEnvVoice(cfg CommandConfig, rc *schemas.RunContext, plan *schemas.RunPlan, env map[string]string, agent string, voice *schemas.VoicePlatformAgent) error {
 	if cfg.PullURL == "" {
 		return fmt.Errorf("%s", NoPullURLReason)
 	}
@@ -57,7 +63,7 @@ func pullEnv(cfg CommandConfig, rc *schemas.RunContext, plan *schemas.RunPlan, e
 	if err != nil {
 		return fmt.Errorf("pull.url: %w", err)
 	}
-	tok, err := pullToken(cfg, rc, agent, plan.WallS)
+	tok, err := pullToken(cfg, rc, agent, plan.WallS, voice)
 	if err != nil {
 		return fmt.Errorf("sign the run's pull token: %w", err)
 	}
