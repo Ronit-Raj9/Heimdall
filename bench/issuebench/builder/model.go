@@ -80,6 +80,9 @@ type GatewayConfig struct {
 	KeyName string
 	ExpID   string
 	Logger  schemas.Logger
+	// Key is a key minted elsewhere, by the server for a worker. It is used
+	// as is and never revoked here (the server revokes it).
+	Key *schemas.RunKey
 }
 
 // GatewayModel is a Model that calls the org's model through Bifrost.
@@ -110,6 +113,10 @@ func (m *GatewayModel) ensureKey(ctx context.Context) (*schemas.RunKey, error) {
 	if m.key != nil {
 		return m.key, nil
 	}
+	if m.cfg.Key != nil {
+		m.key = m.cfg.Key
+		return m.key, nil
+	}
 	if m.cfg.Gateway == nil {
 		return nil, errors.New("no gateway is wired to the builder")
 	}
@@ -132,7 +139,7 @@ func (m *GatewayModel) Close(ctx context.Context) {
 	key := m.key
 	m.key, m.done = nil, true
 	m.mu.Unlock()
-	if key == nil {
+	if key == nil || m.cfg.Key != nil {
 		return
 	}
 	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), revokeTimeout)
