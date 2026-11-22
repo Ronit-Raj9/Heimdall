@@ -99,9 +99,20 @@ func set(out map[string]issuebench.TestStatus, id string, s issuebench.TestStatu
 }
 
 // NormalizeID turns a pytest node id into the form used everywhere: forward
-// slashes, no leading "./", no surrounding space.
+// slashes in the file path, no leading "./", no surrounding space. Only the
+// path before the first "::" changes: a parameter id keeps pytest's escapes
+// (user@m\xfcnchen.de), which is how the verifier's log reads it.
 func NormalizeID(id string) string {
-	id = strings.TrimSpace(strings.ReplaceAll(id, `\`, "/"))
+	id = strings.TrimSpace(id)
+	path, rest, found := strings.Cut(id, "::")
+	if i := strings.Index(path, "["); !found && i >= 0 {
+		path, rest = path[:i], path[i:]
+		id = strings.ReplaceAll(path, `\`, "/") + rest
+	} else if found {
+		id = strings.ReplaceAll(path, `\`, "/") + "::" + rest
+	} else {
+		id = strings.ReplaceAll(id, `\`, "/")
+	}
 	for strings.HasPrefix(id, "./") {
 		id = id[2:]
 	}

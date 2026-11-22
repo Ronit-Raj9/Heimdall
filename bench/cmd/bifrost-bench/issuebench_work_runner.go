@@ -194,7 +194,11 @@ func (x *ibWorkExecutor) RunJob(ctx context.Context, job *schemas.JobLease, log 
 	case len(raw) > issuebench.MaxWorkResultBytes:
 		return run, fmt.Errorf("the work result is %d bytes, over the %d byte cap", len(raw), issuebench.MaxWorkResultBytes)
 	}
-	run.Result = json.RawMessage(redact(string(raw)))
+	// The result is task content (test ids, the Dockerfile): only the lease's
+	// own secret values come out. The pattern scrub of log lines would
+	// rewrite a test id such as test_url[http://user:pass@example.com], and
+	// that task's reference answer could then never pass.
+	run.Result = json.RawMessage(issuebench.RedactValues(string(raw), sec))
 	if runErr != nil {
 		return run, errors.New(redact(runErr.Error()))
 	}

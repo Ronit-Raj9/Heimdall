@@ -6060,6 +6060,7 @@ class _ItemRequired(TypedDict):
 
 
 class Item(_ItemRequired, total=False):
+    cost_usd: float
     fix: str
     instruction: str
     job_id: str

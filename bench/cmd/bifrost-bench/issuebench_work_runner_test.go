@@ -262,3 +262,26 @@ func TestIssuebenchWorkStdinSecrets(t *testing.T) {
 func b64(s string) string { return base64.StdEncoding.EncodeToString([]byte(s)) }
 
 func ibwDocker() utils.Docker { return utils.Docker{} }
+
+// The result carries test ids verbatim: the log scrub's URL userinfo rule
+// turned test_url[http://user:pass@example.com] into [redacted], and the
+// emitted task could then never pass (real hosted run). Lease secret values
+// still never leave.
+func TestIssuebenchWorkResultKeepsTestIDs(t *testing.T) {
+	id := "tests/test_validate.py::test_url_absolute_valid[http://user:pass@example.com]"
+	x := ibwExecutor("", func(ctx context.Context, d work.Deps, r issuebench.WorkRequest, s map[string]string) (issuebench.WorkResult, error) {
+		return issuebench.WorkResult{Mode: r.Mode, Validation: &issuebench.Validation{PassToPass: []string{id}}, Stop: "x " + s[issuebench.SecretGitHubToken]}, nil
+	})
+	run, err := x.RunJob(context.Background(), ibwLease(t, ibwRequest("org-a")), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer run.Cleanup()
+	var res issuebench.WorkResult
+	if err := json.Unmarshal(run.Result, &res); err != nil || len(res.Validation.PassToPass) != 1 || res.Validation.PassToPass[0] != id {
+		t.Fatalf("test id changed: %v %+v", err, res.Validation)
+	}
+	if strings.Contains(string(run.Result), ibwFakeToken) {
+		t.Fatal("the lease's token leaked into the result")
+	}
+}

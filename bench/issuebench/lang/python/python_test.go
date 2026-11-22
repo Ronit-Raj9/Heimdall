@@ -225,3 +225,19 @@ func contains(xs []string, s string) bool {
 	}
 	return false
 }
+
+// pytest escapes non-ASCII parameter ids (user@m\xfcnchen.de); turning that
+// backslash into "/" made the emitted ids miss the verifier's log, so the
+// reference answer failed admission (marshmallow #2936, real hosted run).
+func TestNormalizeIDKeepsParameterEscapes(t *testing.T) {
+	cases := map[string]string{
+		`tests\test_validate.py::test_email_idn_invalid[user@m\xfcnchen.de]`: `tests/test_validate.py::test_email_idn_invalid[user@m\xfcnchen.de]`,
+		`./tests/test_validate.py::test_url[https://example.org\n]`:          `tests/test_validate.py::test_url[https://example.org\n]`,
+		` tests\a.py `: `tests/a.py`,
+	}
+	for in, want := range cases {
+		if got := NormalizeID(in); got != want {
+			t.Errorf("NormalizeID(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
