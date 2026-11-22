@@ -12,6 +12,7 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	useGetVerdictQuery: () => okQuery({ verdict: { decision: "improved", action: "ship" } }),
 	useGetClustersQuery: () => okQuery({ clusters: [{ signature: "sig_timeout", title: "Agent timed out", count: 3 }] }),
 	useGetAgentsQuery: () => okQuery({ agents: [{ id: "stub", path: "agents/stub.yaml" }] }),
+	useGetExperimentQuery: () => okQuery({ exp_id: "e_x", arms: ["A", "B"], multi_agent: true }),
 }));
 vi.mock("@/lib/store/apis/integrityApi", () => ({
 	useGetAwarenessQuery: () =>
@@ -33,7 +34,7 @@ describe("AnalysisTab", () => {
 	it("offers one job button per analysis kind and shows the refreshed views", () => {
 		const html = render(<AnalysisTab expId="e_x" />);
 		for (const spec of ANALYSIS_JOBS) expect(html).toContain(`data-testid="job-run-${spec.kind}"`);
-		expect(html).toContain("Verdict improved, action ship");
+		expect(html).toContain("B is better than A. Ready to release.");
 		expect(html).toContain("Setup A: 1 of 4 scanned runs with signals (2 signals)");
 		expect(html).toContain("sig_timeout");
 		expect(html).toContain('data-testid="analysis-link-cost-explain"');

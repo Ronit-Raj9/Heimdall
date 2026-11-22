@@ -29,7 +29,6 @@
 		"tamperHint": "Each record carries a fingerprint of the one before it, so any later edit, deletion or reordering is detected.",
 		"overrideHint": "Someone approved this release even though the result or the release rules said not to. Their reason is shown below.",
 		"shipped": "Released",
-		"held": "Not released",
 		"recordId": "Record id",
 		"replaces": "{{name}} replaces {{prev}}",
 		"first": "{{name}} is the first release",
@@ -42,6 +41,15 @@
 			"falseCompletion": "False completion",
 			"faultSurvival": "Solved under faults",
 			"noBaseline": "No earlier version to compare with."
+		},
+		"disabled": {
+			"pick": "Pick a comparison.",
+			"loading": "Loading the comparison's result...",
+			"error": "Could not load this comparison's result: {{error}}",
+			"approver": "Write who approves this release.",
+			"blocked": "The result or the release rules say not to release. Tick Release anyway and give a reason to continue.",
+			"reason": "Write why you release anyway.",
+			"noneListed": "No comparison of two versions of your agent has finished yet. Model-only comparisons are not listed: switch models from a comparison's Model switch tab."
 		}
 	},
 	"policies": {
@@ -137,6 +145,10 @@
 			"weekly": "Runs again every Monday at 02:00."
 		},
 		"viewSchedules": "Schedules",
-		"verdictButton": "Promote this version"
+		"verdictButton": "Promote this version",
+		"useModel": "Use model {{model}}",
+		"useModelUnknown": "Use setup B's model",
+		"useModelHint": "Only the model differs between the two setups, so there is no agent version to promote. Open Model switch to apply the model.",
+		"exception": "No clear winner yet. Promoting now records the release as an exception to your release rules."
 	}
 }

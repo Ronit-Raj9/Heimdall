@@ -12,7 +12,14 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import "@/app/experiments/views/experimentsI18n";
 import { humanExperimentName } from "@/components/experiments/experiments.utils";
-import { EMPTY_RELEASE_FORM, canRelease, releaseBlockers, releaseRequestFrom, type ReleaseFormValues } from "./releases.utils";
+import {
+	EMPTY_RELEASE_FORM,
+	canRelease,
+	releaseBlockers,
+	releaseDisabledReason,
+	releaseRequestFrom,
+	type ReleaseFormValues,
+} from "./releases.utils";
 
 /** The verdict the release would cite. */
 export interface ReleaseVerdict {
@@ -56,12 +63,25 @@ export function ExperimentOption({ experiment }: { experiment: ExperimentStatus 
  */
 export function ReleaseForm(props: ReleaseFormProps) {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("u14");
 	const { experiments, expId, verdict, policy } = props;
 	const [values, setValues] = useState<ReleaseFormValues>({ ...EMPTY_RELEASE_FORM, ...props.initialValues });
 	const [token, setToken] = useState(readWriteToken);
 	const set = (patch: Partial<ReleaseFormValues>) => setValues((v) => ({ ...v, ...patch }));
 	const blockers = verdict ? releaseBlockers(verdict.action, policy) : [];
 	const enabled = canRelease(Boolean(verdict), verdict?.action, policy, values) && !props.submitting;
+	// Why the button is off, in words (N170): never a silent disabled button.
+	const disabledReason = props.submitting
+		? null
+		: releaseDisabledReason({
+				expId,
+				verdictLoading: Boolean(props.verdictLoading),
+				verdictError: props.verdictError,
+				verdictLoaded: Boolean(verdict),
+				action: verdict?.action,
+				policy,
+				values,
+			});
 	const session = useSession();
 
 	// Hosted: releases need the member role; a viewer sees why, a demo visitor sees no form.
@@ -167,6 +187,13 @@ export function ReleaseForm(props: ReleaseFormProps) {
 			<Button type="submit" disabled={!enabled} isLoading={props.submitting} dataTestId="release-submit">
 				{t("releases.panel.submit")}
 			</Button>
+			{!enabled && disabledReason && (
+				<p className="text-muted-foreground text-xs" data-testid="release-disabled-reason">
+					{disabledReason.key === "error"
+						? tu("releases.disabled.error", { error: disabledReason.error })
+						: tu(`releases.disabled.${disabledReason.key}`)}
+				</p>
+			)}
 			{props.submitError && (
 				<p role="alert" className="text-chart-error-ink text-sm break-words" data-testid="release-submit-error">
 					{t("releases.panel.error", { error: props.submitError })}

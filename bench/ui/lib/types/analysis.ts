@@ -13,7 +13,10 @@ export interface CheckRunResult {
 	grade_source: string;
 	decision: string;
 	action: string;
+	/** The release rule set's decision, when one applies (never on a one-setup score run). */
 	policy?: string;
+	/** The rule set's file name without .yaml, as Releases > Rules lists it. */
+	policy_file?: string;
 }
 
 /** codescan.run's result. */
@@ -32,6 +35,8 @@ export interface BlameRunResult {
 	exp_id: string;
 	runs: number;
 	failed: number;
+	/** Runs that were not scored (infrastructure or grader problem), not counted in failed. */
+	not_scored?: number;
 	blamed: number;
 	skipped: number;
 }

@@ -22,20 +22,24 @@ export function VarianceCard({ verdict, className }: VarianceCardProps) {
 	const { t } = useTranslation("bench");
 	const locale = getLocale();
 	const v = verdict.variance;
-	const source = v?.source ?? (verdict.mde_assumed_sd ? "assumed" : "measured_aa");
+	// Without a variance card the analysis only says whether the SD was assumed; "not assumed" is not
+	// proof of an A/A measurement (N68), so no source is claimed then.
+	const source = v?.source ?? (verdict.mde_assumed_sd ? "assumed" : null);
 	const noise = isHarnessNoise(v?.aa_decision);
 	const sourceTone = noise ? "bad" : source === "assumed" ? "warn" : "good";
 
 	return (
-		<Card className={cn("gap-4", className)} data-testid="variance-card" data-source={source}>
+		<Card className={cn("gap-4", className)} data-testid="variance-card" data-source={source ?? undefined}>
 			<CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
 				<div className="flex flex-col gap-1.5">
 					<CardTitle>{t("integrity.variance.title")}</CardTitle>
 					<CardDescription>{t("integrity.variance.description")}</CardDescription>
 				</div>
-				<Badge variant="outline" className={TONE_CLASS[sourceTone]} data-testid="variance-source">
-					{t(`integrity.variance.source.${source}`)}
-				</Badge>
+				{source && (
+					<Badge variant="outline" className={TONE_CLASS[sourceTone]} data-testid="variance-source">
+						{t(`integrity.variance.source.${source}`)}
+					</Badge>
+				)}
 			</CardHeader>
 			<CardContent className="flex flex-col gap-5">
 				<NoiseBand

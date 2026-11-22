@@ -69,3 +69,28 @@ describe("ReleaseCards", () => {
 		expect(renderToStaticMarkup(<ReleaseCards releases={[r]} chainOk />)).toContain("support-bot v1 is the first release");
 	});
 });
+
+describe("ReleaseCards: a record always reads Released (N171)", () => {
+	it("shows Released and Released despite the rules on an overridden release, never Not released", () => {
+		const r = { ...fixture.releases[0], action: "hold" as const, override: "hotfix for a customer", approver: "ana" };
+		const html = renderToStaticMarkup(<ReleaseCards releases={[r]} chainOk />);
+		expect(html).toContain(">Released<");
+		expect(html).toContain("Released despite the rules");
+		expect(html).toContain("The result said hold; ana released it anyway: hotfix for a customer");
+		expect(html).not.toContain("Not released");
+	});
+	it("shows only Released on a ship record", () => {
+		const r = { ...fixture.releases[0], action: "ship" as const, override: undefined };
+		const html = renderToStaticMarkup(<ReleaseCards releases={[r]} chainOk />);
+		expect(html).toContain(">Released<");
+		expect(html).not.toContain("The result said");
+		expect(html).not.toContain("Released despite the rules");
+	});
+	it("names the advice on an older record released without an override", () => {
+		const r = { ...fixture.releases[0], action: "no_decision" as const, override: undefined };
+		const html = renderToStaticMarkup(<ReleaseCards releases={[r]} chainOk />);
+		expect(html).toContain(">Released<");
+		expect(html).toContain("The result said no decision");
+		expect(html).not.toContain("Not released");
+	});
+});

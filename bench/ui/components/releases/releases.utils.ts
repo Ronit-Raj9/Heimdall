@@ -1,7 +1,20 @@
 import { isAutoName, isPracticeExperiment, systemExperiment } from "@/components/experiments/experiments.utils";
 import type { Action, ExperimentStatus, ReleasePolicyDecision, ReleaseRecord } from "@/lib/types/bench";
 
-type ReleaseCandidate = Pick<ExperimentStatus, "state" | "exp_id"> & { name?: string; suite?: string; arms?: string[] };
+/**
+ * What the release list reads of an experiment. `arms_differ` and `debug` come from the server's
+ * experiment status (fix wave 2, lane G04); an older server leaves them out.
+ */
+type ReleaseCandidate = Pick<ExperimentStatus, "state" | "exp_id"> & {
+	name?: string;
+	suite?: string;
+	arms?: string[];
+	arms_differ?: "model" | "none" | "agent";
+	debug?: string;
+};
+
+/** Ids of the debug copies of a run (replay, fork, step): they are never a release candidate. */
+const DEBUG_RUN_ID = /^e_(replay|fork|step)_r_/;
 
 /** A finished comparison of two versions that a person started: not a check or a practice run. */
 function citable(e: ReleaseCandidate): boolean {
@@ -10,6 +23,10 @@ function citable(e: ReleaseCandidate): boolean {
 	if (e.state !== "done") return false;
 	// Only comparisons of two versions: a one-arm run has no candidate to release.
 	if (e.arms !== undefined && e.arms.length < 2) return false;
+	// Only comparisons of two agent versions: a model-only or A/A comparison has no version to release.
+	if (e.arms_differ !== undefined && e.arms_differ !== "agent") return false;
+	// Never a debug copy of a run.
+	if (e.debug || DEBUG_RUN_ID.test(e.exp_id)) return false;
 	return systemExperiment(e) === null && !isPracticeExperiment(e);
 }
 
@@ -96,6 +113,40 @@ export function canRelease(
 	if (!verdictLoaded || values.approver.trim() === "") return false;
 	if (releaseBlockers(action, policy).length === 0) return true;
 	return values.override && values.overrideReason.trim() !== "";
+}
+
+/** Why the release button is disabled, as a key under `releases.disabled` in the u14 namespace. */
+export type ReleaseDisabledReason =
+	| { key: "pick" }
+	| { key: "loading" }
+	| { key: "error"; error: string }
+	| { key: "approver" }
+	| { key: "blocked" }
+	| { key: "reason" };
+
+/**
+ * The first thing that keeps the release button disabled, or null when nothing does. It follows
+ * canRelease, so a reason is shown exactly when the button is off.
+ */
+export function releaseDisabledReason(state: {
+	expId: string | undefined;
+	verdictLoading: boolean;
+	verdictError: string | undefined;
+	verdictLoaded: boolean;
+	action: Action | undefined;
+	policy: ReleasePolicyDecision | undefined;
+	values: ReleaseFormValues;
+}): ReleaseDisabledReason | null {
+	if (!state.expId) return { key: "pick" };
+	if (!state.verdictLoaded) {
+		if (state.verdictError) return { key: "error", error: state.verdictError };
+		return { key: "loading" };
+	}
+	if (state.values.approver.trim() === "") return { key: "approver" };
+	if (releaseBlockers(state.action, state.policy).length === 0) return null;
+	if (!state.values.override) return { key: "blocked" };
+	if (state.values.overrideReason.trim() === "") return { key: "reason" };
+	return null;
 }
 
 /** The request for the form; the override reason is sent only when the release needs and has one. */
