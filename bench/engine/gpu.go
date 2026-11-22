@@ -30,6 +30,17 @@ func WithoutGPUCheck() PlannerOption {
 	return func(p *Planner) { p.skipGPU = true }
 }
 
+// WithDeclaredGPUs plans GPU tasks on a machine without GPUs (the hosted
+// server) from the GPUs the organization's workers declare: registered
+// remote GPU workers and a GPU sandbox platform (Z05, sandbox/gpu.go). A
+// task that no declared GPU can take is refused with the reason; the
+// coordinator then leases its slots only to a worker that registered such
+// GPUs. Without the option a machine without a GPU pool refuses every GPU
+// task, as before.
+func WithDeclaredGPUs(f func() []schemas.GPUInfo) PlannerOption {
+	return func(p *Planner) { p.declaredGPUs = f }
+}
+
 // checkGPU refuses, at plan time and with the reason, every selected task
 // whose GPU request this machine cannot meet: no GPU pool, no GPU, too few
 // GPUs, or too little memory. It also refuses what GPU tasks cannot be
@@ -52,6 +63,12 @@ func (p *Planner) checkGPU(e *schemas.Experiment, suite *schemas.Suite, conds []
 			problems = append(problems, fmt.Sprintf("task %s needs a GPU and runs on the Docker driver only, not %s", id, e.Environment.Driver))
 		case len(t.Team) > 0 || armTeamOn(t, arms):
 			problems = append(problems, fmt.Sprintf("task %s needs a GPU and declares a team; GPU team runs are not supported", id))
+		case p.reg.GPUs == nil && p.declaredGPUs != nil:
+			if devs := p.declaredGPUs(); len(devs) == 0 {
+				problems = append(problems, fmt.Sprintf("task %s needs a GPU and no worker of this organization offers one (connect Modal as the default worker, or start a runner on a machine with an NVIDIA GPU)", id))
+			} else if pickRemoteGPUs(devs, nil, t.Resources.GPU) == nil {
+				problems = append(problems, fmt.Sprintf("task %s needs %d GPU(s) with %d MiB each and no worker of this organization offers that", id, t.GPUCount(), t.Resources.GPU.MinVRAMMB))
+			}
 		case p.reg.GPUs == nil:
 			problems = append(problems, fmt.Sprintf("task %s needs a GPU but no GPU pool was built on this machine (gpu.mode: off, no NVIDIA driver, or gpu.devices names a GPU this host lacks; the WARN log at startup and bifrost-bench gpu check say which)", id))
 		default:

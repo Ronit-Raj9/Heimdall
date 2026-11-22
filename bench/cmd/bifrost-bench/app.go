@@ -56,6 +56,7 @@ type app struct {
 	releasesRoot string                          // the org's release log; empty uses release.DefaultRoot
 	planGuard    func(*schemas.Experiment) error // confines experiment paths to the org's project
 	planConfine  string                          // agent config files (notes) must resolve inside it (hosted)
+	declaredGPUs func() []schemas.GPUInfo        // Z05: GPUs the org's workers declare (hosted: gpuplan_hosted.go)
 	deferGateway bool                            // the gateway preflight is the runners' (hosted: deferred_to_runner)
 	results      resultsindex.Source             // the org's database index (db.OrgIndex); nil uses the JSONL index
 	library      string                          // the server's built-in benchmark library (suite.LibraryDir); "" for none
@@ -219,6 +220,9 @@ func (a *app) newPlanner() *engine.Planner {
 	}
 	if a.deferGateway {
 		opts = append(opts, engine.WithGatewayDeferredToRunner()) // Tenancy area: a hosted server has no gateway; runners preflight theirs (servetenancy.go)
+	}
+	if a.declaredGPUs != nil {
+		opts = append(opts, engine.WithDeclaredGPUs(a.declaredGPUs)) // Z05: no GPU here; plan from the org's GPU workers (engine/gpu.go)
 	}
 	if a.reg.Secrets != nil {
 		opts = append(opts, engine.WithSecretCheck(a.reg.Secrets)) // G01: a missing org secret is a plan error (engine/secrets.go)

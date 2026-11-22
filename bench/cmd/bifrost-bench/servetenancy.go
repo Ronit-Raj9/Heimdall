@@ -195,6 +195,7 @@ func orgBuilder(env *hostedEnv) tenancy.Builder {
 		if err != nil {
 			return nil, err
 		}
+		oa.declaredGPUs = hostedDeclaredGPUs(env, oa) // Z05: plan GPU tasks from the org's GPU workers and GPU platform (gpuplan_hosted.go)
 		if env.db != nil {
 			oa.results = env.db.OrgIndex(org.ID, oa.store, oa.logger) // the org's rows of the database index
 		}

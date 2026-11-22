@@ -277,6 +277,8 @@ func ResolveBifrostProvider(id string) (name string, spec BifrostProviderSpec, c
 		id = "openai"
 	case "google":
 		id = "gemini"
+	case "sglang": // Z05: the engine's own name; Bifrost calls the provider sgl
+		id = "sgl"
 	}
 	if p, ok := LookupBifrostProvider(id); ok {
 		return p.ID, p, false

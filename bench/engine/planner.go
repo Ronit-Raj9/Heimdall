@@ -114,6 +114,7 @@ type Planner struct {
 	guard        func(*schemas.Experiment) error // Tenancy area: hosted orgs confine experiment paths to the org's project (experimentguard.go)
 	deferGateway bool                            // Tenancy area: a hosted server records the gateway preflight as the runners' (experimentguard.go)
 	skipGPU      bool                            // X7: a remote worker's replan skips the GPU check (gpu.go)
+	declaredGPUs func() []schemas.GPUInfo        // Z05: GPUs the org's workers declare when this machine has none (gpu.go)
 	secrets      schemas.SecretSource            // G01: org secrets the plan's runs name must resolve (secrets.go)
 	library      string                          // built-in library root: agents/<file> missing from the project resolve there, read-only (experimentguard.go)
 

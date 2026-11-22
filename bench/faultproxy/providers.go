@@ -98,6 +98,11 @@ func DefaultProviders() []ProviderSpec {
 			Message: paths, Models: []string{"GET /v1/models", "GET /v1/models/*"},
 		}
 	}
+	selfHosted := func(name, base, env string) ProviderSpec {
+		p := compat(name, base, env, append(append([]string{}, openAIChatPaths...), "POST /v1/messages")...)
+		p.Keyless, p.PerSlotBase = true, true
+		return p
+	}
 	out := []ProviderSpec{
 		{
 			Name: ProviderAnthropic, BaseURL: "https://api.anthropic.com", KeyEnv: "ANTHROPIC_API_KEY",
@@ -138,6 +143,14 @@ func DefaultProviders() []ProviderSpec {
 			p.Keyless = true
 			return p
 		}(),
+		// Z05: self-hosted open models (Qwen, DeepSeek, Llama) on vLLM or
+		// SGLang, under the same outage and stream-cut faults as any
+		// provider. The default hosts are an in-network server the operator
+		// runs (compose service vllm or sglang); an organization key brings
+		// its own https base URL (an open model Heimdall serves on the
+		// org's Modal account, package openmodel), which replaces it.
+		selfHosted("vllm", "http://vllm:8000", "VLLM_API_KEY"),
+		selfHosted("sgl", "http://sglang:30000", "SGL_API_KEY"),
 	}
 	return append(out, catalogProviders(out)...)
 }
