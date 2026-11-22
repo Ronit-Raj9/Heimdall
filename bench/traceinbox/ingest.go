@@ -27,6 +27,10 @@ type IngestRequest struct {
 	Link    string          `json:"link,omitempty"`     // back to the trace in the pushing tool
 	Source  string          `json:"source,omitempty"`   // the pushing tool's own name, shown as a reason
 	TraceID string          `json:"trace_id,omitempty"` // the session to take when the trace holds several
+	// Passed says the session went well: it is kept as a golden candidate
+	// (a regression task from a good session), sampled up to the source's
+	// golden_per_day, instead of as a failure.
+	Passed bool `json:"passed,omitempty"`
 }
 
 // IngestResult is what a push did.
@@ -35,6 +39,9 @@ type IngestResult struct {
 	Created     bool     `json:"created"`
 	Occurrences int      `json:"occurrences"`
 	Items       []string `json:"-"` // every item touched, when the push held several sessions
+	// Skipped counts passing sessions not kept: the day's golden sample
+	// was full.
+	Skipped int `json:"-"`
 }
 
 // Ingest takes one pushed trace through the same path as a pull: parse,
@@ -84,12 +91,21 @@ func (ib *Inbox) Ingest(ctx context.Context, src *Source, req IngestRequest) (*I
 			return nil, ctx.Err()
 		}
 		rs := append([]string(nil), reasons...)
-		if len(rs) == 0 {
+		fl := Flagged{Session: s, TraceID: s.ID, At: now, Kinds: []string{FlagPushed}, Extra: extra}
+		if req.Passed {
+			fl.Golden, fl.Kinds = true, []string{FlagGolden}
+			rs = append([]string{"passing session, kept as a golden candidate"}, rs...)
+		} else if len(rs) == 0 {
 			rs = append(rs, "pushed to the inbox; outcome "+s.Summary())
 		}
-		out, err := ib.take(src, Flagged{Session: s, TraceID: s.ID, At: now, Reasons: rs, Kinds: []string{FlagPushed}, Extra: extra})
+		fl.Reasons = rs
+		out, err := ib.take(src, fl)
 		if err != nil {
 			return nil, err
+		}
+		if out.Skipped {
+			res.Skipped++
+			continue
 		}
 		if res.ItemID == "" {
 			res.ItemID, res.Created = out.ItemID, out.Created

@@ -245,7 +245,7 @@ var APIRoutes = []RouteDoc{
 	{Method: "GET", Path: APIPrefix + "/inbox", Tag: "inbox", Summary: "Failure inbox: production failures pulled from observability tools, with counts by state, sources and suites",
 		Query: []QueryDoc{{Name: "state", Description: "new, accepted, rejected, duplicate or snoozed"}, {Name: "source", Description: "Keep only items from this source"}}, Response: schemas.InboxList{}},
 	{Method: "GET", Path: APIPrefix + "/inbox/{id}", Tag: "inbox", Summary: "One inbox item with its redacted transcript preview", Response: schemas.InboxItemDetail{}},
-	{Method: "POST", Path: APIPrefix + "/inbox/{id}/accept", Tag: "inbox", Summary: "Turn an item into a task draft (EDIT ME markers; still needs task validate and task admit)",
+	{Method: "POST", Path: APIPrefix + "/inbox/{id}/accept", Tag: "inbox", Summary: "Turn an item into a task: a draft with EDIT ME markers, or with a guide (what should have happened) a finished task that only needs its readiness check",
 		Auth: AuthWrite, Request: schemas.InboxAcceptRequest{}, Response: schemas.InboxAcceptResult{}},
 	{Method: "POST", Path: APIPrefix + "/inbox/{id}/reject", Tag: "inbox", Summary: "Reject an item with a reason, or mark it a duplicate of another",
 		Auth: AuthWrite, Request: schemas.InboxRejectRequest{}, Response: schemas.InboxActionResult{}},

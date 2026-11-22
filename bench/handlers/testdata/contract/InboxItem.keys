@@ -19,6 +19,7 @@ suggested_suite?
 tools?
 model?
 outcome
+golden?
 redacted?
 task?
 recurrences?

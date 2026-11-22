@@ -1,0 +1,50 @@
+# Sample task written by `bifrost-bench suite init -template knowledge-base`.
+# The agent searches the help-center documents through the kb service and
+# answers one question; the answer_match grader compares the answer with
+# verifier/answer.yaml. `bifrost-bench task init -suite [[.ID]] -id <task>`
+# copies this shape into a new task with EDIT ME markers.
+id: refund-window
+version: 1.0.0
+title: Refund window for opened items
+project: help-center
+kind: feature
+instruction: instruction.md
+# The workspace: a scratch folder. The documents are behind the kb service.
+repo_dir: repo
+services:
+  # The document search service: MCP over HTTP with search_docs and
+  # read_doc, over the documents baked into its image from services/kb/docs/.
+  # Built from services/kb/ in the suite folder; `suite admit` builds it when
+  # it is missing. It records every search and read in /state/reads.json.
+  - id: kb
+    role: mcp
+    image: bench/[[.ID]]-kb:1
+    port: 8000
+    mcp: {path: /mcp}
+    ready:
+      argv: ["python3", "-I", "/srv/server.py", "ready"]
+      timeout_s: 30
+    export:
+      - {id: reads.json, path: /state/reads.json}
+verifier:
+  # Hidden folder, mounted at /grader/tests; it holds the expected answer.
+  tests: verifier
+  required: []
+  answer: verifier/answer.yaml
+protected: []
+controls:
+  # Answer files: the reference must match, the empty answer and the mutants
+  # must not. The exploit is a script run in the agent's place.
+  reference: solution/answer.txt
+  empty: controls/empty.txt
+  mutants: [controls/unopened-window.txt]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 300
+capabilities: [retrieval, tool_use]
+difficulty: easy
+# split: held_out   # optional; default public. Held-out tasks never run under tasks: all (only when a condition sets split: held_out or names them) and are not served by the UI or API.
+provenance:
+  source: written by bifrost-bench suite init (template knowledge-base)
+  license: proprietary
+  created_by: suite init

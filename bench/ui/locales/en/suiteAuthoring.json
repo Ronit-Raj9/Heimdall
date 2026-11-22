@@ -38,7 +38,8 @@
 			"computer-use": "Agent operates a desktop app with screenshots",
 			"support": "Customer support with a simulated customer",
 			"research": "Web research with cited sources",
-			"voice": "Voice agent talking to a caller"
+			"voice": "Voice agent talking to a caller",
+			"knowledge-base": "Questions answered from your documents through search"
 		}
 	},
 	"edit": {

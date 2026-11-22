@@ -10,6 +10,7 @@ func TestBuiltin(t *testing.T) {
 		{VerifierCommandType, verifierCommandVersion},
 		{AnswerMatchType, answerMatchVersion}, {JudgeType, judgeVersion}, // answer tasks
 		{VisualType, visualVersion}, // X1 vision grading
+		{ChecksType, checksVersion}, // declarative checks.yaml
 	}
 	gs := Builtin(HiddenTestsConfig{})
 	if len(gs) != len(tests) {

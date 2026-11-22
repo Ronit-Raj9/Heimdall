@@ -17,6 +17,8 @@ the scaffold is `bifrost-bench suite init <id> -template external-api`, and
 [`examples/acme-external`](../examples/acme-external/README.md) is a complete
 project.
 
+For an internal API you would rather stand in for than replay, write a stateful mock from its OpenAPI file instead: see [openapi-mocks.md](openapi-mocks.md).
+
 ## Declaring an API
 
 `external:` is a list on the task (`task.yaml`) or the suite (`suite.yaml`,

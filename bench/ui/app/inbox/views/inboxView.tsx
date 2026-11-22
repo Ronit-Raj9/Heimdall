@@ -15,7 +15,8 @@ import { useGetInboxWebhookQuery, useGetPullReadinessQuery } from "@/lib/store/a
 import { InboxItemPanel } from "./inboxItemPanel";
 import TriageTab from "./triageTab";
 import { Collapsible } from "@/components/inbox/featureHero";
-import { Plug } from "lucide-react";
+import { InboxBulkAccept } from "@/components/inbox/inboxBulkAccept";
+import { ListChecks, Plug } from "lucide-react";
 
 /** The state the screen opens on: what still needs a decision. */
 const DEFAULT_FILTER: InboxFilter = "new";
@@ -51,6 +52,7 @@ export default function InboxView() {
 export function InboxTab() {
 	const { t } = useTranslation("bench");
 	const { t: u } = useTranslation("ux13");
+	const { t: g } = useTranslation("inboxGuide");
 	const [filter, setFilter] = useQueryState("state", parseAsStringLiteral(INBOX_FILTERS).withDefault(DEFAULT_FILTER));
 	const [source, setSource] = useQueryState("source", parseAsString);
 	const [itemId, setItemId] = useQueryState("item", parseAsString);
@@ -83,6 +85,11 @@ export function InboxTab() {
 						itemId ? <InboxItemPanel key={itemId} itemId={itemId} suites={data.suites ?? []} onClose={() => void setItemId(null)} /> : null
 					}
 				/>
+			)}
+			{data?.mode === "live" && (data.items ?? []).some((item) => item.state === "new" || item.state === "snoozed") && (
+				<Collapsible icon={ListChecks} title={g("bulk.title")} hint={g("bulk.hint")} testId="inbox-bulk">
+					<InboxBulkAccept items={data.items ?? []} suites={data.suites ?? []} />
+				</Collapsible>
 			)}
 			{data?.mode === "live" && (
 				<Collapsible

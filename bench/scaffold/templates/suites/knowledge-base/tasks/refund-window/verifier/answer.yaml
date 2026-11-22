@@ -1,0 +1,10 @@
+# Hidden expected answer of this task, read by the answer_match grader (no
+# model). match is exact, contains_all, regex, numeric, choice or json;
+# wrong_answers are plausible wrong answers that must fail.
+question: How many days does a customer have to return an opened item for a refund?
+match: numeric
+expected: ["14"]
+tolerance: 0
+category: policy-lookup
+# 30 is the window for unopened items, 90 the warranty period.
+wrong_answers: ["30", "90"]

@@ -90,6 +90,10 @@ const (
 	// TemplateVoice writes a voice agent suite: a helpdesk MCP server and a
 	// voice caller the agent talks to in audio (X8, docs/voice-agents.md).
 	TemplateVoice = "voice"
+	// TemplateKnowledgeBase writes a knowledge-base (RAG) suite: questions
+	// answered from the customer's documents behind a search service (MCP
+	// search_docs and read_doc), matched against a hidden answer (Y14).
+	TemplateKnowledgeBase = "knowledge-base"
 )
 
 // Grader part names the suite templates select.
@@ -108,7 +112,7 @@ func SuiteTemplates() []string {
 
 // ScenarioTemplates lists the scenario suite templates in a stable order.
 func ScenarioTemplates() []string {
-	return []string{TemplateToolUse, TemplateMCP, TemplateBrowser, TemplateMemory, TemplateQA, TemplateExternal, TemplateArtifact, TemplateComputerUse, TemplateSupport, TemplateResearch, TemplateVoice} // W4 research; X8 voice
+	return []string{TemplateToolUse, TemplateMCP, TemplateBrowser, TemplateMemory, TemplateQA, TemplateExternal, TemplateArtifact, TemplateComputerUse, TemplateSupport, TemplateResearch, TemplateVoice, TemplateKnowledgeBase} // W4 research; X8 voice; Y14 knowledge base
 }
 
 // IsScenarioTemplate reports whether tmpl is a scenario suite template.
@@ -135,6 +139,8 @@ var scenarioSamples = map[string]string{
 	TemplateResearch:    "ferry-start",      // W4 research with Tavily
 
 	TemplateVoice: "refund-in-policy", // X8 voice agents
+
+	TemplateKnowledgeBase: "refund-window", // Y14 knowledge base
 }
 
 // stateTemplate reports whether a scenario template grades a service's
@@ -226,6 +232,10 @@ var suiteAbout = map[string]string{
 	TemplateMemory: "Each task runs the agent once per session, resetting the workspace in between, so only the\n" +
 		"agent's memory carries facts forward. The last session's answer is matched against the\n" +
 		"task's hidden answer.yaml by the answer_match grader, with no model.",
+	TemplateKnowledgeBase: "Each task asks one question the agent answers from your documents, which are not in its\n" + // Y14 knowledge base
+		"workspace but behind a search service (services/kb/: MCP search_docs and read_doc over\n" +
+		"services/kb/docs/, part of the suite's lock). The answer is matched against the task's hidden\n" +
+		"answer.yaml by the answer_match grader, with no model; the searches and reads are exported.",
 	TemplateQA: "Each task asks one question about the documents in the workspace. The answer is matched\n" +
 		"against the task's hidden answer.yaml by the answer_match grader, with no model.",
 	TemplateArtifact: "Each task's result is files the agent writes in its workspace. After the agent exits the\n" +

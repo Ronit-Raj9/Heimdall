@@ -63,6 +63,10 @@ type DraftOptions struct {
 	// calls, when the copied service is seeded through files:. False keeps
 	// the suite's own service and writes the observed calls as a fixture.
 	Replay bool
+	// Guide is what should have happened, from the accept form: with it the
+	// draft is written finished (no EDIT ME markers) from the person's
+	// answer instead of the recorded one.
+	Guide *Guide
 }
 
 // DraftResult is what WriteDraft wrote.
@@ -94,6 +98,9 @@ func WriteDraft(opts DraftOptions) (*DraftResult, error) {
 	if opts.Kind != "" && !slices.Contains(Kinds(), opts.Kind) {
 		return nil, fmt.Errorf("-kind %q: want one of %s", opts.Kind, strings.Join(Kinds(), ", "))
 	}
+	if err := opts.Guide.normalize(); err != nil {
+		return nil, err
+	}
 	suitePath := filepath.Join(opts.SuiteDir, "suite.yaml")
 	suiteYAML, err := os.ReadFile(suitePath)
 	if err != nil {
@@ -120,6 +127,9 @@ func WriteDraft(opts DraftOptions) (*DraftResult, error) {
 	}
 	if !slices.Contains(Kinds(), base.Template) {
 		return rollback(fmt.Errorf("the suite is a %s suite; task from-trace drafts %s tasks", base.Template, strings.Join(Kinds(), ", ")))
+	}
+	if err := opts.Guide.check(base.Template, opts.Session); err != nil {
+		return rollback(err)
 	}
 	if err := fill(opts, res); err != nil {
 		return rollback(fmt.Errorf("draft from trace: %w", err))
@@ -163,11 +173,11 @@ func fill(opts DraftOptions, res *DraftResult) error {
 	if len(reqs) == 0 {
 		return errors.New("the session has no user request to draft an instruction from")
 	}
-	w := &draftWriter{dir: res.Dir, res: res, s: s}
+	w := &draftWriter{dir: res.Dir, res: res, s: s, guide: opts.Guide}
 	if len(shape.Sessions) > 0 {
 		w.sessions(shape, reqs)
 	} else {
-		w.put(shape.Instruction, instructionDraft(reqs[0], len(reqs), ""), true)
+		w.instruction(shape.Instruction, reqs[0], len(reqs), "")
 	}
 	switch res.Template {
 	case KindQA, KindMemory:
@@ -175,6 +185,10 @@ func fill(opts DraftOptions, res *DraftResult) error {
 		answer := shape.Verifier.Answer
 		if answer == "" {
 			answer = path.Join(shape.Verifier.Tests, "answer.yaml")
+		}
+		if w.guide != nil {
+			w.guidedAnswer(shape, answer, reqs[len(reqs)-1])
+			break
 		}
 		w.put(answer, answerDraft(reqs[len(reqs)-1], s.FinalAnswer, failed), true)
 		if strings.HasSuffix(shape.Controls.Reference, ".txt") {
@@ -188,9 +202,16 @@ func fill(opts DraftOptions, res *DraftResult) error {
 		if err := w.tools(shape, opts, reqs); err != nil {
 			return err
 		}
+		if w.guide != nil {
+			w.guidedTools(shape)
+		}
 	}
 	if _, err := os.Stat(filepath.Join(res.Dir, "verifier", "requirements.md")); err == nil {
-		w.put("verifier/requirements.md", requirementsDraft(opts.ID, s, opts.Source, res.Template), true)
+		if w.guide != nil {
+			w.put("verifier/requirements.md", w.guidedRequirements(opts.ID, opts.Source), false)
+		} else {
+			w.put("verifier/requirements.md", requirementsDraft(opts.ID, s, opts.Source, res.Template), true)
+		}
 	}
 	w.put(TranscriptFile, transcript(s, opts.Source), false)
 	replaced := ""
@@ -207,10 +228,13 @@ func fill(opts DraftOptions, res *DraftResult) error {
 
 // draftWriter writes draft files and records them, keeping the first error.
 type draftWriter struct {
-	dir string
-	res *DraftResult
-	s   *Session
-	err error
+	dir   string
+	res   *DraftResult
+	s     *Session
+	guide *Guide
+	err   error
+	// checks is the guided checks.yaml summary, for the requirements map.
+	checks []string
 }
 
 func (w *draftWriter) put(rel string, data []byte, editMe bool) {
@@ -268,7 +292,7 @@ func (w *draftWriter) sessions(shape draftShape, reqs []string) {
 	}
 	for i, sess := range shape.Sessions {
 		if assign[i] != "" {
-			w.put(sess.Instruction, instructionDraft(assign[i], 0, ""), true)
+			w.instruction(sess.Instruction, assign[i], 0, "")
 		}
 	}
 	if files := shape.Sessions[0].Files; files != "" && n > 1 && len(reqs) > 1 {

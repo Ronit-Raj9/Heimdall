@@ -277,7 +277,7 @@ func TestLintScenario(t *testing.T) {
 		}, "votes: 2 is even", ""},
 		{"answer with hidden_tests", func(_ *schemas.Suite, tk *schemas.Task) {
 			tk.Output = &schemas.OutputSpec{Kind: schemas.OutputAnswer}
-		}, "output: answer needs grader answer_match, judge or verifier_command", ""},
+		}, "output: answer needs grader answer_match, judge, verifier_command or checks", ""},
 		{"answer_match without answer file", func(s *schemas.Suite, tk *schemas.Task) {
 			s.Grader = "answer_match"
 			tk.Output = &schemas.OutputSpec{Kind: schemas.OutputAnswer}

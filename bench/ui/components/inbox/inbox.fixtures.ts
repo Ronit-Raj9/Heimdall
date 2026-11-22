@@ -37,6 +37,7 @@ export const INBOX_ACCEPT_FIXTURE: InboxAcceptResponse = {
 		dir: "benchmarks/support/tasks/refund-timeout",
 		template: "mcp",
 		edit_me: ["instruction.md", "verifier/tests/checks.py"],
+		finished: false,
 		next: [
 			"edit instruction.md and verifier/tests/checks.py where they say EDIT ME",
 			"bifrost-bench task validate support/refund-timeout",
