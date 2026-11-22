@@ -50,6 +50,9 @@ type RemoteOptions struct {
 	// Book records hosted runners outside the coordinator's memory (the
 	// runners table); nil records nothing. Never called in local mode.
 	Book RunnerBook
+	// Meter is told how long each lease of a hosted runner held a slot
+	// (lane Y16, billing: shared worker minutes); nil meters nothing.
+	Meter LeaseMeter
 	// StaleAfter marks a worker with no lease that has not called for this
 	// long as lost in the list. Leases use the attached scheduler's own
 	// stale threshold and heartbeat interval, the same as its local slots.
@@ -117,8 +120,10 @@ type remoteLease struct {
 	gpus              int      // X7: GPUs the slot's task holds on the worker (gpu.go)
 	gpuIDs            []string // the worker's devices (UUIDs) set aside for it (2-C-06)
 	received          int64
-	uploading         bool // a chunk is being written
-	closing           bool // complete or release in progress; the sweep leaves it alone
+	uploading         bool      // a chunk is being written
+	closing           bool      // complete or release in progress; the sweep leaves it alone
+	started           time.Time // when the lease was handed out (lane Y16 metering)
+	metered           bool      // its time was handed to RemoteOptions.Meter
 }
 
 // NewCoordinator returns a coordinator over reg's store. The token must be
@@ -317,7 +322,7 @@ func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.Work
 			continue
 		}
 		l := &remoteLease{id: id, worker: workerID, owner: owner, r: r, slot: slot, attempt: attempt, est: est,
-			lastBeat: c.now(), archive: filepath.Join(c.opts.StagingDir, id+".tar.gz")}
+			lastBeat: c.now(), started: c.now(), archive: filepath.Join(c.opts.StagingDir, id+".tar.gz")}
 		l.gpus = r.suite.TaskByID(slot.Task).GPUCount() // X7
 		c.mu.Lock()
 		if !c.attachedLocked(r) {
@@ -1062,6 +1067,10 @@ func (c *Coordinator) endLocked(l *remoteLease, why string) {
 	delete(c.leases, l.id)
 	c.ended[l.id] = why
 	w := c.workers[l.worker]
+	if !l.metered {
+		l.metered = true
+		c.meterLocked(w, l.started, 1, "run")
+	}
 	if w == nil {
 		return
 	}

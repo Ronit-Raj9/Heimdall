@@ -142,6 +142,9 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 		if !d.c.Limits.allow(ctx, d.c.Mode, p, o) {
 			return
 		}
+		if !passGate(ctx, d.c.Mode, o, method, pat) { // plan limits (gate.go)
+			return
+		}
 		if o != nil {
 			SetOrg(ctx, o)
 		}
@@ -184,6 +187,9 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	if !d.c.Limits.allow(ctx, d.c.Mode, p, o) {
+		return
+	}
+	if !passGate(ctx, d.c.Mode, o, method, pat) { // plan limits (gate.go)
 		return
 	}
 	actx, cancel := workContext()

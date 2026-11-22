@@ -78,6 +78,8 @@ type jobLease struct {
 	received   int64
 	uploading  bool
 	closing    bool
+	started    time.Time // when the lease was handed out (lane Y16 metering)
+	metered    bool
 }
 
 // runnerJobs is the coordinator's job table, guarded by Coordinator.mu.
@@ -225,6 +227,10 @@ func (c *Coordinator) endJobLocked(l *jobLease, why string) {
 		l.q.lease = nil
 	}
 	w := c.workers[l.worker]
+	if !l.metered {
+		l.metered = true
+		c.meterLocked(w, l.started, 1, "job")
+	}
 	if w == nil {
 		return
 	}
@@ -258,7 +264,7 @@ func (c *Coordinator) leaseJobLocked(w *remoteWorker) *schemas.WorkerLease {
 		}
 		rj.queue = append(rj.queue[:i:i], rj.queue[i+1:]...)
 		id := utils.NewID("j", 12)
-		l := &jobLease{id: id, worker: w.info.ID, q: q, lastBeat: now, archive: filepath.Join(c.opts.StagingDir, id+".zip")}
+		l := &jobLease{id: id, worker: w.info.ID, q: q, lastBeat: now, started: now, archive: filepath.Join(c.opts.StagingDir, id+".zip")}
 		q.lease = l
 		rj.leases[id] = l
 		w.info.Running = append(w.info.Running, "job:"+q.job.JobID)

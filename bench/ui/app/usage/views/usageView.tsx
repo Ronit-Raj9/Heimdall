@@ -1,3 +1,4 @@
+import { BillingUsageSection } from "@/components/billing/billingUsageSection";
 import { EmptyState, PageHeader } from "@/components/shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -98,6 +99,7 @@ export default function UsageView() {
 			) : (
 				<UsageBody data={org.data} loading={org.isLoading} error={org.error} onRetry={() => void org.refetch()} />
 			)}
+			{!platform && session.authMode !== "local" && <BillingUsageSection from={range.from} to={range.to} />}
 		</div>
 	);
 }

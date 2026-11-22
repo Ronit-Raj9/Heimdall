@@ -448,7 +448,46 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_API_RATE_LIMITS` | API rate limits per token and per organization (`cred_burst,cred_per_sec,org_burst,org_per_sec`, or `off`); empty is the default. |
 | `HEIMDALL_RUNNER_IMAGE` | Runner image Heimdall starts for an organization's own worker on Fly Machines or Kubernetes; empty is the published default. |
 | `HEIMDALL_GATEWAY_LOGS_URL` | The shared gateway's log API the server lists, deletes and expires one organization's prompt logs through; empty with the shared worker on is `http://bifrost:8080`, `off` disables it. |
+| `HEIMDALL_BILLING` | `on` enforces plan limits and sells Team through Stripe; empty meters and shows limits only (section 10, Billing). |
+| `HEIMDALL_STRIPE_SECRET_KEY`, `HEIMDALL_STRIPE_WEBHOOK_SECRET`, `HEIMDALL_STRIPE_TEAM_PRICE` | Stripe secret key, webhook signing secret and Team price id; a live key needs `HEIMDALL_STRIPE_ALLOW_LIVE=1`. |
 | `HEIMDALL_BACKUP_PASSPHRASE_FILE` | Passphrase file kept away from the backups; `backup.sh` then writes an encrypted copy of `.env` beside each dump. |
+
+### Billing
+
+Plans and billing (lane Y16) are off by default. Off, Heimdall still meters
+each organization's shared worker minutes (the time its leases hold a slot
+on the shared worker), runs, evaluations and storage per UTC day, and
+Settings, Billing and Settings, Usage show them against the plan's limits;
+nothing is enforced or charged.
+
+| Plan | Seats | Shared worker minutes a month | Includes |
+|---|---|---|---|
+| Free | 3 | 300 | library benchmarks with the org's own key |
+| Team, $39 per seat a month | 50 | 3000 | private benchmarks, the CI gate, scheduled checks and alerts |
+| Enterprise (contact) | no limit | no limit | everything, own worker support, invoice billing |
+
+To turn it on, in Stripe test mode first:
+
+1. In the Stripe dashboard (test mode), create a product "Heimdall Team" with
+   a recurring monthly price of $39 per unit; copy its `price_...` id.
+2. Add a webhook endpoint `https://<domain>/api/bench/billing/webhook` for
+   `checkout.session.completed`, `customer.subscription.created`,
+   `customer.subscription.updated` and `customer.subscription.deleted`; copy
+   its signing secret (`whsec_...`).
+3. Turn on the customer portal (Settings, Billing, Customer portal).
+4. In `deploy/hosted/.env`: `HEIMDALL_BILLING=on`,
+   `HEIMDALL_STRIPE_SECRET_KEY=sk_test_...`,
+   `HEIMDALL_STRIPE_WEBHOOK_SECRET=whsec_...`,
+   `HEIMDALL_STRIPE_TEAM_PRICE=price_...`, optionally
+   `HEIMDALL_SALES_CONTACT`. Then `upgrade.sh --no-pull`.
+5. Live mode later: the live key, price and webhook secret, plus
+   `HEIMDALL_STRIPE_ALLOW_LIVE=1`.
+
+A server admin sets an organization's plan by hand (Enterprise contracts)
+with `PUT /api/bench/admin/billing/{org_id}` and `{"plan":"enterprise"}`.
+Paid seats follow the member count every hour (and on "Sync seats"),
+prorated. `GET /api/public/pricing` serves the plans to the pricing page
+without sign-in.
 
 `HEIMDALL_DEV` turns on the practice suite and examples for tests and
 development; a production install never sets it.

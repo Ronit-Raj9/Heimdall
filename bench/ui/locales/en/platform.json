@@ -138,7 +138,8 @@
 			"audit": "Activity log",
 			"org": "Organization",
 			"account": "Account",
-			"admin": "Server admin"
+			"admin": "Server admin",
+			"billing": "Billing"
 		},
 		"members": {
 			"title": "Members",

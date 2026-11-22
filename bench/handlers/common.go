@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/billing"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
@@ -67,6 +68,8 @@ func sendDepError(ctx *fasthttp.RequestCtx, mode schemas.Mode, what string, err 
 		lib.SendError(ctx, mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, what+": "+err.Error())
 	case errors.Is(err, ErrKeyOverBudget), errors.Is(err, ErrModelKeyMissing): // G10 budgets, X01 own keys (keybudget.go)
 		lib.SendErrorLink(ctx, mode, fasthttp.StatusConflict, lib.ErrTypeConflict, what+": "+err.Error(), ModelKeysLink)
+	case errors.Is(err, billing.ErrPlanLimit): // Y16: the org's plan does not cover it (billing on)
+		SendPlanLimit(ctx, mode, err)
 	case errors.Is(err, ErrKeyStoreUnavailable), errors.Is(err, ErrDailyCap): // X01: fail closed; daily caps
 		lib.SendError(ctx, mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable, what+": "+err.Error())
 	case errors.Is(err, schemas.ErrExists):

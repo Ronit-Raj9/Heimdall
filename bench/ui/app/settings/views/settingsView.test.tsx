@@ -166,8 +166,13 @@ describe("SettingsView", () => {
 		expect(html).toContain("local mode");
 		for (const tab of ["keys", "runners", "usage", "files", "jobs", "integrations", "operations", "secrets"])
 			expect(html).toContain(`data-testid="settings-tab-${tab}"`);
-		for (const tab of ["members", "tokens", "github", "audit", "org", "account", "admin"])
+		for (const tab of ["members", "tokens", "github", "audit", "org", "account", "admin", "billing"])
 			expect(html).not.toContain(`data-testid="settings-tab-${tab}"`);
+	});
+	it("lists Billing in hosted mode only (Y16)", () => {
+		expect(settingsTabsFor(hostedSession("viewer"))).toContain("billing");
+		expect(settingsTabsFor(LOCAL_SESSION)).not.toContain("billing");
+		expect(settingsTab("billing")).toBe("billing");
 	});
 	it("lists Server admin only for server admins", () => {
 		const tabs = (session: Parameters<typeof settingsTabsFor>[0]) => settingsTabsFor(session);

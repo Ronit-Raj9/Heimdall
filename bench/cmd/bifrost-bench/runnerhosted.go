@@ -69,7 +69,7 @@ func runnersOf(env *hostedEnv) *hostedRunners {
 	}
 	svc := runners.New(env.db, runners.Options{PublicURL: env.base.cfg.Auth.PublicURL, Logger: env.base.logger,
 		Repo: os.Getenv(runnerRepoEnv), Ref: buildRevision()})
-	hub := engine.NewRemoteHub(engine.RemoteOptions{Logger: env.base.logger, Book: svc})
+	hub := engine.NewRemoteHub(engine.RemoteOptions{Logger: env.base.logger, Book: svc, Meter: billingMeter{env: env}}) // Y16: shared worker minutes (billing_hosted.go)
 	svc.SetLive(hub)
 	v, loaded := runnerEnvs.LoadOrStore(env, &hostedRunners{hub: hub, svc: svc})
 	rs := v.(*hostedRunners)

@@ -99,6 +99,9 @@ type gatedWorkers struct {
 	// caps refuses new leases once the org reached a daily cap (X01); nil:
 	// no cap check.
 	caps func(ctx context.Context) error
+	// shared refuses new shared worker leases once the org used its plan's
+	// shared worker minutes (Y16, billing_hosted.go); nil: no check.
+	shared func(ctx context.Context) error
 }
 
 // OrgID keeps the hosted worker API's runner token authentication.
@@ -115,6 +118,11 @@ func (g gatedWorkers) Lease(ctx context.Context, workerID string) (*schemas.Work
 	}
 	if g.caps != nil && g.caps(ctx) != nil {
 		return nil, nil // X01: the org reached a daily cap; leases resume tomorrow or when the cap is raised
+	}
+	if g.shared != nil {
+		if sc, ok := schemas.RunnerScopeFrom(ctx); ok && sc.Pool == schemas.SharedRunnerPool && g.shared(ctx) != nil {
+			return nil, nil // Y16: the plan's shared worker minutes are used up; the Billing tab shows it
+		}
 	}
 	return g.WorkerAPI.Lease(ctx, workerID)
 }
@@ -171,10 +179,16 @@ func init() {
 			if ix != nil {
 				caps = dailyCaps(q, oa.orgID, indexAdapter{ix: ix, root: oa.store.Root()}, time.Now)
 			}
-			if ll, ok := l.(*launcher); ok && caps != nil {
-				ll.caps = caps
+			launch := withSharedMinutes(env, oa.orgID, caps) // Y16: launches also check the plan's shared worker minutes (billing_hosted.go)
+			if ll, ok := l.(*launcher); ok && launch != nil {
+				ll.caps = launch
 			}
-			return l, gateWorkers(api, q, caps)
+			gated := gateWorkers(api, q, caps)
+			if g, ok := gated.(gatedWorkers); ok {
+				g.shared = sharedMinutesGate(env, oa.orgID)
+				gated = g
+			}
+			return l, gated
 		}
 	}
 	serviceHooks = append(serviceHooks, func(a *app, s *handlers.Services) {
