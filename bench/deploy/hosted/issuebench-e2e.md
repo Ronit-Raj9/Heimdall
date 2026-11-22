@@ -55,7 +55,7 @@ deploy/hosted/issuebench-e2e.sh
 | `ISSUEBENCH_PROVIDER_KEY` | none | Key for that provider, added to the org on the models route |
 | `GITHUB_TOKEN` | none | Token for the scan |
 | `ISSUEBENCH_REPO` | `marshmallow-code/marshmallow` | Repository to scan |
-| `ISSUEBENCH_LIMIT` | `3` | Issues to scan |
+| `ISSUEBENCH_LIMIT` | `25` | Merged pull requests to scan (most have no linked issue, so 25 or more usually yields a candidate) |
 | `ISSUEBENCH_MAX_USD` | `3` | Dollar cap per build (`BENCH_ISSUEBENCH_MAX_USD`) |
 | `ISSUEBENCH_TIMEOUT` | `4h` | Whole run (`3600`, `90m`, `4h`) |
 | `HEIMDALL_SHARED_ALLOW_RUNC` | empty | `1` on a dev box without gVisor |

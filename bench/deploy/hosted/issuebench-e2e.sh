@@ -30,7 +30,7 @@
 #   ISSUEBENCH_PROVIDER_KEY                 that provider's key (required unless --check-only)
 #   GITHUB_TOKEN                            GitHub token for the scan (required unless --check-only)
 #   ISSUEBENCH_REPO      default marshmallow-code/marshmallow
-#   ISSUEBENCH_LIMIT     issues to scan, default 3
+#   ISSUEBENCH_LIMIT     merged pull requests to scan (not issues), default 25
 #   ISSUEBENCH_MAX_USD   dollar cap per build, default 3
 #   ISSUEBENCH_TIMEOUT   whole run, e.g. 90m or 4h, default 4h
 #   HEIMDALL_SHARED_ALLOW_RUNC=1  a dev box without gVisor: the shared
@@ -71,7 +71,7 @@ seconds_of() {
 }
 
 repo=${ISSUEBENCH_REPO:-marshmallow-code/marshmallow}
-limit=${ISSUEBENCH_LIMIT:-3}
+limit=${ISSUEBENCH_LIMIT:-25}
 max_usd=${ISSUEBENCH_MAX_USD:-3}
 timeout_s=$(seconds_of "${ISSUEBENCH_TIMEOUT:-4h}")
 provider=${ISSUEBENCH_PROVIDER:-}
