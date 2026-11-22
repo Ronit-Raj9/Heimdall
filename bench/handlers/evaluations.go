@@ -446,6 +446,14 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 	default:
 		return badf("mode %q is not one of score, versions, models, opponent", spec.Mode)
 	}
+	if spec.BifrostCache {
+		if spec.Mode != schemas.EvaluationModeScore {
+			return badf("Bifrost cache on vs off takes one agent (mode score): the server adds the cache-on arm")
+		}
+		if spec.Stream != nil {
+			return badf("Bifrost cache on vs off cannot be combined with memory carried from task to task")
+		}
+	}
 	for i := range spec.Arms {
 		a := &spec.Arms[i]
 		if a.Label == "" {
@@ -801,6 +809,11 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 		}
 		f.Stream = &st
 	}
+	if spec.BifrostCache && len(spec.Arms) == 1 {
+		// Bifrost cache on vs off: the same arm again with a semantic cache
+		// key on every model request; the spec's arm is the cache-off arm.
+		f.Arms[schemas.EvaluationCacheArm] = cacheOnArm(f.Arms[spec.Arms[0].Label])
+	}
 	if _, _, err := s.Projects.Read(work, projectfs.AreaPolicies, strings.TrimPrefix(quickRunPolicy, "policies/")); err == nil {
 		f.Policy = quickRunPolicy
 	}
@@ -892,6 +905,9 @@ func evalStreamControl(spec schemas.EvaluationSpec) bool {
 // evalArmCount is the experiment arms one benchmark of spec runs: one per
 // spec arm, plus the no-memory control when there is one.
 func evalArmCount(spec schemas.EvaluationSpec) int {
+	if spec.BifrostCache && len(spec.Arms) == 1 {
+		return 2
+	}
 	if evalStreamControl(spec) {
 		return len(spec.Arms) + 1
 	}
@@ -905,6 +921,23 @@ func streamControlArm(base schemas.ArmSpec) schemas.ArmSpec {
 	ctl := withSet(base, map[string]any{"env." + schemas.StreamControlEnv: "1"})
 	ctl.Label = base.Label + schemas.StreamControlSuffix
 	return ctl
+}
+
+// cacheOnArm is base with Bifrost's semantic cache engaged: direct mode
+// (exact request match), keyed per task so one task's answers are never
+// served to another, entries kept 1 hour. The planner refuses the arm when
+// the gateway is not Bifrost or its semantic_cache plugin is not loaded
+// without a default_cache_key (engine/bifrostfeatures.go).
+func cacheOnArm(base schemas.ArmSpec) schemas.ArmSpec {
+	on := withSet(base, map[string]any{"gateway.bifrost": map[string]any{
+		"semantic_cache": map[string]any{
+			"mode":  schemas.SemanticCacheDirect,
+			"scope": schemas.SemanticCacheScopeTask,
+			"ttl":   "1h",
+		},
+	}})
+	on.Label = base.Label + schemas.EvaluationCacheSuffix
+	return on
 }
 
 // evaluationPoolResolver resolves the worker an evaluation runs on (hosted

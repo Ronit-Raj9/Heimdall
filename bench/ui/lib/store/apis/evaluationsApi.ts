@@ -119,6 +119,8 @@ export interface EvaluationSpec {
 	stream?: { memory: "carry" | "fresh"; order?: "suite" | "seeded"; replay?: number; threshold?: number };
 	/** Tell the agent its budget and deadline (BENCH_BUDGET_USD, BENCH_DEADLINE). */
 	disclose_budget?: boolean;
+	/** Bifrost cache on vs off (score mode): the server adds a second arm that is the same agent with Bifrost's semantic cache on. */
+	bifrost_cache?: boolean;
 }
 
 /** What an evaluation must show to pass. Scores are fractions (0 to 1). */

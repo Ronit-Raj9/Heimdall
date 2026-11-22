@@ -30,6 +30,8 @@ export interface EvaluateDraft {
 	budgetUsd: number | null;
 	/** The worker the evaluation runs on; "" is the org's default worker. */
 	worker?: string;
+	/** Bifrost cache on vs off (score mode only). */
+	bifrostCache?: boolean;
 	/** Arms dropped by a mode change (for example arm B in "score"), so going back restores their models. */
 	stashedArms?: EvaluationArm[];
 }
@@ -103,6 +105,7 @@ export function draftToSpec(d: EvaluateDraft): EvaluationSpec {
 		faults,
 		...(d.budgetUsd != null ? { budget_usd: d.budgetUsd } : {}),
 		...(d.worker ? { worker: d.worker } : {}),
+		...(d.bifrostCache && d.mode === "score" ? { bifrost_cache: true } : {}),
 	};
 }
 
@@ -117,6 +120,7 @@ export function specToPatch(spec: EvaluationSpec): Partial<EvaluateDraft> {
 		faults: spec.faults,
 		budgetUsd: spec.budget_usd ?? null,
 		worker: spec.worker ?? "",
+		bifrostCache: Boolean(spec.bifrost_cache),
 	};
 }
 

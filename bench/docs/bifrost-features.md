@@ -178,6 +178,31 @@ miss row of the same run stored), and `bifrost-bench bifrost cache-replays
 and counts hits in the same run, in another trial or arm of the same task,
 and in another task (a cross-task replay, printed with a warning).
 
+#### Bifrost cache on vs off (evaluation option)
+
+An evaluation in score mode can make the cache its test variable:
+`"bifrost_cache": true` on `POST /api/bench/evaluations` (the "Bifrost cache
+on vs off" box in the wizard's setup step). Each benchmark's experiment then
+has two arms: the spec's own arm with the cache off, and arm `cache`
+(label `<arm label> (Bifrost cache on)`), identical except for
+`gateway.bifrost.semantic_cache: {mode: direct, scope: task, ttl: 1h}`
+(handlers/evaluations.go, `cacheOnArm`). Both arms run the same tasks,
+trials and faults, and the estimate counts both. The planner still refuses
+the cache arm unless the gateway is Bifrost with the `semantic_cache` plugin
+loaded and no `default_cache_key`, so the child is skipped with that reason
+on a gateway without the cache. The option cannot be combined with memory
+carried from task to task, nor with an A/B mode.
+
+`bifrost-bench bifrost cache-ab -exp <child experiment id> [-json]`
+(bifrostfeatures.CacheAB) compares the two arms on the clean tasks both
+ran: model requests, cache hits and hit rate, mean latency per model
+request, cost (the run's `cost_usd`, else the rows' Bifrost price), cost
+saved (cache-off cost per run minus cache-on cost per run, times the
+cache-on runs), and the change in verified success, with a one-line
+summary that flags a success drop as possible stale replies. The paired
+verdict on `verified_success` between the arms is the significance test for
+the quality change.
+
 ### Complexity router
 
 The classifier is gateway-wide; a routing rule that reads `complexity_tier`

@@ -74,6 +74,12 @@ describe("evaluateDraft", () => {
 		expect(spec.name).toBe("codex score");
 	});
 
+	it("sends bifrost_cache in score mode only", () => {
+		expect(draftToSpec({ ...withAgent(), bifrostCache: true }).bifrost_cache).toBe(true);
+		expect(draftToSpec({ ...withAgent(), bifrostCache: true, mode: "models" }).bifrost_cache).toBeUndefined();
+		expect(draftToSpec(withAgent()).bifrost_cache).toBeUndefined();
+	});
+
 	it("gates steps", () => {
 		expect(maxReachable(EMPTY_DRAFT)).toBe(1);
 		const d = applyPatch(withAgent(), { benchmarks: ["x"] });

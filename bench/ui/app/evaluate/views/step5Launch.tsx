@@ -34,6 +34,8 @@ export function summaryLines(spec: EvaluationSpec): string[] {
 	const faults = FAULTS.filter((f) => spec.faults.includes(f.id)).map((f) => f.label.toLowerCase());
 	lines.push(faults.length ? `Run clean, then again with: ${faults.join(", ")}.` : "Run clean only, with no faults.");
 
+	if (spec.bifrost_cache) lines.push("Run each task with the Bifrost cache off and again with it on, and compare the two.");
+
 	if (spec.budget_usd && spec.budget_usd > 0) lines.push(`Stop when spending reaches $${spec.budget_usd}.`);
 	return lines;
 }

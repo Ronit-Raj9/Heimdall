@@ -353,6 +353,30 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 				))}
 			</section>
 
+			{spec.mode === "score" ? (
+				<section className="flex flex-col gap-2">
+					<h3 className="text-base font-semibold">Bifrost cache</h3>
+					<label className="flex items-start gap-2 text-sm" data-testid="step4-bifrost-cache">
+						<input
+							type="checkbox"
+							className="mt-1"
+							checked={Boolean(spec.bifrost_cache)}
+							onChange={(e) => {
+								const { bifrost_cache: _old, ...rest } = spec;
+								onChange(e.target.checked ? { ...rest, bifrost_cache: true } : rest);
+							}}
+						/>
+						<span>
+							<span className="font-medium">Bifrost cache on vs off</span>
+							<span className="text-muted-foreground block">
+								Runs your agent twice, identical except that Bifrost&apos;s semantic cache is on for the second copy. The report shows the cache hit
+								rate, the latency and cost saved, and any change in success. Doubles the runs.
+							</span>
+						</span>
+					</label>
+				</section>
+			) : null}
+
 			<GateSettings
 				gate={spec.gate}
 				onChange={(gate) => {
