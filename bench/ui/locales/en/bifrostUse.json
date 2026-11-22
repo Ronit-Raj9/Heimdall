@@ -20,5 +20,15 @@
 		"available": "Available",
 		"off": "Off",
 		"unknown": "Unknown"
+	},
+	"cache": {
+		"title": "Bifrost cache on vs off",
+		"none": "No benchmark has finished runs on both the cache-off and cache-on arms yet.",
+		"benchmark": "Benchmark",
+		"tasks": "Tasks",
+		"hitRate": "Cache hit rate (on)",
+		"latency": "Latency change per call",
+		"costSaved": "Cost saved",
+		"success": "Success change"
 	}
 }

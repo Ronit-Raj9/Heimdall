@@ -62,7 +62,7 @@ flowchart LR
 
 The evaluation page and **Settings, Integrations** show which of these Bifrost features an organization uses. Every touchpoint, with file paths and sequence diagrams: [`bench/docs/bifrost-integration.md`](bench/docs/bifrost-integration.md). What each Bifrost feature does under test: [`bench/docs/bifrost-features.md`](bench/docs/bifrost-features.md).
 
-Status note: the plugin, per-evaluation budget keys, failover and cache tests, MCP gateway routing, the Bifrost panel and routing export are being merged from the Wave C branches; anything that is not yet on `main` is in its feature branch.
+The stock Bifrost image has no heimdall plugin, so the default stack leaves it out; a custom Bifrost build with the plugin is opt-in ([`bench/docs/hosting.md`](bench/docs/hosting.md), "Custom Bifrost build with the Heimdall plugin").
 
 ## Run it yourself with Docker Compose
 

@@ -1,0 +1,68 @@
+{
+  "$schema": "https://www.getbifrost.ai/schema",
+  "disable_onboarding": true,
+  "setup_token": "env.BIFROST_SETUP_TOKEN",
+  "client": {
+    "enable_logging": true,
+    "disable_content_logging": false,
+    "enforce_auth_on_inference": true,
+    "mcp_disable_auto_tool_inject": true,
+    "allow_direct_keys": false,
+    "log_retention_days": 30,
+    "a2a_external_client_url": "http://bifrost:8080"
+  },
+  "framework": {
+    "pricing": {
+      "pricing_url": "file:///app/datasheet/pricing.json",
+      "model_parameters_url": "file:///app/datasheet/model-parameters.json",
+      "pricing_sync_interval": 86400,
+      "mcp_library_sync_interval": 0,
+      "live_models_sync_interval": 0
+    }
+  },
+  "config_store": {
+    "enabled": true,
+    "type": "postgres",
+    "config": {
+      "host": "postgres",
+      "port": "5432",
+      "user": "bifrost",
+      "password": "env.BIFROST_PG_PASSWORD",
+      "db_name": "bifrost",
+      "ssl_mode": "disable"
+    }
+  },
+  "logs_store": {
+    "enabled": true,
+    "type": "postgres",
+    "config": {
+      "host": "postgres",
+      "port": "5432",
+      "user": "bifrost",
+      "password": "env.BIFROST_PG_PASSWORD",
+      "db_name": "bifrost",
+      "ssl_mode": "disable"
+    },
+    "writer": {
+      "batch_interval": "500ms"
+    }
+  },
+  "plugins": [
+    {
+      "name": "heimdall",
+      "enabled": true,
+      "config": {
+        "enabled": true,
+        "allow_inline_plans": true,
+        "usage": {
+          "url": "http://heimdall:8090",
+          "secret": "env.HEIMDALL_GATEWAY_USAGE_SECRET",
+          "batch_size": 50,
+          "flush_ms": 1000,
+          "timeout_ms": 5000,
+          "queue_limit": 5000
+        }
+      }
+    }
+  ]
+}

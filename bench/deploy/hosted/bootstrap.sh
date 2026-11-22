@@ -71,6 +71,9 @@ fi
 # Pull-mode agents (docs/pull-agents.md): run tokens and repository links
 # are signed with this key, shared by the server and the shared worker.
 [ -n "$(env_get HEIMDALL_PULL_SIGNING_KEY)" ] || env_set HEIMDALL_PULL_SIGNING_KEY "$(random_hex)"
+# Shared by the server and Bifrost (heimdall plugin usage export). Older env
+# files get one too; an existing value is kept.
+[ -n "$(env_get HEIMDALL_GATEWAY_USAGE_SECRET)" ] || env_set HEIMDALL_GATEWAY_USAGE_SECRET "$(random_hex)"
 [ -n "$(env_get HEIMDALL_BENCH_DIR)" ] || env_set HEIMDALL_BENCH_DIR "$BENCH_DIR"
 [ -z "$domain" ] || env_set HEIMDALL_DOMAIN "$domain"
 [ -z "$email" ] || env_set HEIMDALL_ACME_EMAIL "$email"

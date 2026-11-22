@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import type { BifrostUse } from "@/lib/types/bifrostUse";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { BifrostFeatureList, BifrostGatewayLine, bifrostUseStatus } from "./bifrostUse";
+import { BifrostFeatureList, BifrostGatewayLine, CacheABTable, bifrostUseStatus } from "./bifrostUse";
 
 const use: BifrostUse = {
 	gateway_configured: true,
@@ -37,4 +37,22 @@ describe("Bifrost use", () => {
 		expect(bifrostUseStatus({ ...use, reachable: false })).toEqual({ tone: "warn", count: 1 });
 		expect(bifrostUseStatus(undefined)).toEqual({ tone: "idle", count: 0 });
 	});
+	it("shows the cache on vs off report per benchmark", () => {
+		const arm = { arm: "A", runs: 2, requests: 4, cache_hits: 0, hit_rate: 0, mean_latency_ms: 100, cost_usd: 0.04, cost_runs: 2, successes: 2, success_runs: 2, success_rate: 1 };
+		const html = renderToStaticMarkup(
+			<CacheABTable
+				report={{
+					evaluation_id: "ev_x",
+					enabled: true,
+					children: [{ benchmark: "swe", experiment_id: "e1", report: { off: arm, on: { ...arm, arm: "cache", cache_hits: 2, hit_rate: 0.5 }, tasks: 2, latency_delta_ms: -40, cost_saved_usd: 0.01, success_delta: 0, summary: "s" } }],
+				}}
+			/>,
+		);
+		expect(html).toContain("Bifrost cache on vs off");
+		expect(html).toContain("50%");
+		expect(html).toContain("-40 ms");
+		expect(html).toContain("$0.0100");
+		expect(renderToStaticMarkup(<CacheABTable report={{ evaluation_id: "ev_x", enabled: true, children: [] }} />)).toContain("No benchmark has finished");
+	});
 });
+

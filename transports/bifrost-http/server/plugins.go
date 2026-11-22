@@ -9,6 +9,7 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/plugins/compat"
 	"github.com/maximhq/bifrost/plugins/governance"
+	"github.com/maximhq/bifrost/plugins/heimdall"
 	"github.com/maximhq/bifrost/plugins/logging"
 	"github.com/maximhq/bifrost/plugins/maxim"
 	"github.com/maximhq/bifrost/plugins/modelcatalogresolver"
@@ -203,6 +204,9 @@ func loadBuiltinPlugin(ctx context.Context, name string, pluginConfig any, bifro
 	case modelcatalogresolver.PluginName:
 		return modelcatalogresolver.Init(bifrostConfig.ModelCatalog, logger)
 
+	case heimdall.PluginName:
+		return initHeimdallPlugin(ctx, pluginConfig)
+
 	default:
 		return nil, fmt.Errorf("unknown built-in plugin: %s", name)
 	}
@@ -357,7 +361,17 @@ func (s *BifrostHTTPServer) loadBuiltinPlugins(ctx context.Context) error {
 	}
 	s.Config.SetPluginOrderInfo(maxim.PluginName, builtinPlacement, schemas.Ptr(9))
 
-	// 10. ModelCatalogResolver (last routing layer — fills req.Provider from catalog only when
+	// 10. Heimdall (agent benchmark fault injection and run tagging). Off unless a
+	// PluginConfigs entry named "heimdall" has enabled=true, so stock deployments are unchanged.
+	heimdallConfig := s.getPluginConfig(heimdall.PluginName)
+	if heimdallConfig != nil && heimdallConfig.Enabled {
+		s.registerPluginWithStatus(ctx, heimdall.PluginName, nil, heimdallConfig.Config, false)
+	} else {
+		s.markPluginDisabled(heimdall.PluginName)
+	}
+	s.Config.SetPluginOrderInfo(heimdall.PluginName, builtinPlacement, schemas.Ptr(10))
+
+	// 11. ModelCatalogResolver (last routing layer — fills req.Provider from catalog only when
 	// no earlier routing plugin (governance routing rules, governance VK LB, enterprise LB)
 	// already set one. CEL rules can still match on provider == "" because this runs last.
 	// Requires a model catalog; only register when one is configured.

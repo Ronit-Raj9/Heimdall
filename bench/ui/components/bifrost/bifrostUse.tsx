@@ -1,6 +1,6 @@
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
-import { useGetBifrostUseQuery, useGetEvaluationBifrostUseQuery } from "@/lib/store/apis/bifrostUseApi";
-import type { BifrostFeature, BifrostFeatureState, BifrostUse } from "@/lib/types/bifrostUse";
+import { useGetBifrostUseQuery, useGetEvaluationBifrostCacheQuery, useGetEvaluationBifrostUseQuery } from "@/lib/store/apis/bifrostUseApi";
+import type { BifrostFeature, BifrostFeatureState, BifrostUse, EvaluationCacheAB } from "@/lib/types/bifrostUse";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
@@ -107,7 +107,57 @@ export function EvaluationBifrostSection({ evaluationId }: { evaluationId: strin
 				) : (
 					<p className="text-muted-foreground text-sm">{t("nothing")}</p>
 				)}
+				{q.data.uses.some((f) => f.id === "semantic_cache") && <EvaluationCacheABBlock evaluationId={evaluationId} />}
 			</div>
 		</Section>
+	);
+}
+
+function EvaluationCacheABBlock({ evaluationId }: { evaluationId: string }) {
+	const q = useGetEvaluationBifrostCacheQuery(evaluationId);
+	if (!q.data || !q.data.enabled) return null;
+	return <CacheABTable report={q.data} />;
+}
+
+const pct = (v: number) => `${Math.round(v * 100)}%`;
+const signed = (v: number, unit: string, digits = 0) => `${v > 0 ? "+" : ""}${v.toFixed(digits)}${unit}`;
+
+/** The cache on vs off report, one row per benchmark (bifrostfeatures.CacheAB). Pure. */
+export function CacheABTable({ report }: { report: EvaluationCacheAB }) {
+	const { t } = useTranslation("bifrostUse");
+	return (
+		<div className="flex flex-col gap-2" data-testid="evaluation-bifrost-cache">
+			<h4 className="text-sm font-medium">{t("cache.title")}</h4>
+			{report.children.length === 0 ? (
+				<p className="text-muted-foreground text-sm">{t("cache.none")}</p>
+			) : (
+				<div className="overflow-x-auto">
+					<table className="w-full text-sm">
+						<thead className="text-muted-foreground text-left text-xs">
+							<tr>
+								<th className="py-1 pr-3 font-normal">{t("cache.benchmark")}</th>
+								<th className="py-1 pr-3 font-normal">{t("cache.tasks")}</th>
+								<th className="py-1 pr-3 font-normal">{t("cache.hitRate")}</th>
+								<th className="py-1 pr-3 font-normal">{t("cache.latency")}</th>
+								<th className="py-1 pr-3 font-normal">{t("cache.costSaved")}</th>
+								<th className="py-1 font-normal">{t("cache.success")}</th>
+							</tr>
+						</thead>
+						<tbody>
+							{report.children.map((c) => (
+								<tr key={c.experiment_id} className="border-t" data-testid={`evaluation-bifrost-cache-${c.benchmark}`} title={c.report.summary}>
+									<td className="py-1 pr-3">{c.benchmark}</td>
+									<td className="py-1 pr-3">{c.report.tasks}</td>
+									<td className="py-1 pr-3">{pct(c.report.on.hit_rate)}</td>
+									<td className="py-1 pr-3">{signed(c.report.latency_delta_ms, " ms")}</td>
+									<td className="py-1 pr-3">${c.report.cost_saved_usd.toFixed(4)}</td>
+									<td className="py-1">{signed(c.report.success_delta * 100, " pts")}</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+			)}
+		</div>
 	);
 }

@@ -1,10 +1,9 @@
 # How Heimdall uses Bifrost
 
-Status: written 22 Nov 2026 (Wave C, lane C13) against branch `r-merge`.
-Every touchpoint below names the file that implements it. Rows marked
-**Wave C** are being built in parallel lanes on top of `r-merge` and are not
-on `r-merge` yet; their names follow the work in progress and may still move.
-Rows marked **Z21** are on branch `z-21`, not yet merged.
+Status: updated 22 Nov 2026. Every touchpoint below names the file that
+implements it. The Wave C features (heimdall plugin, usage export, plugin
+faults, per-evaluation budgets, failover, cache on vs off, MCP route, the
+Through Bifrost panel) are merged.
 
 Heimdall compares two setups of an AI agent on the same tasks and ends in a
 verdict. Bifrost is not an add-on here: every model call an agent makes goes
@@ -29,7 +28,7 @@ experiments are in [routing-experiments.md](routing-experiments.md).
 | Rate limits | A routing policy's limits become the routed key's `rate_limit` | virtual key `rate_limit` | `routing.go` (`routedKeyBody`) |
 | Key cleanup | Revokes the run key at the end; a janitor revokes leftovers whose names match run ids only | `DELETE /api/governance/virtual-keys/{id}` | `keys.go` (`RevokeKey`, `RevokeStale`), `bench/engine/janitor.go` |
 | Routing rules | A routing policy under test becomes one routing rule scoped to the run's key | `/api/governance/routing-rules` | `routing.go` (`applyRouteRule`, `revokeStaleRules`) |
-| Routing export (Z21) | Turns a model switch evaluation into a Bifrost routing config fragment, or applies it to the org's own Bifrost | routing rules, `config.json` | `bench/modelswitch/routing.go`, `apply.go`, `bench/handlers/modelswitch.go` (branch `z-21`) |
+| Routing export | Turns a model switch evaluation into a Bifrost routing config fragment, or applies it to the org's own Bifrost | routing rules, `config.json` | model switch evaluation (lane Z21) |
 | Logs as the trace | Reads the run's rows, joins them call for call with the fault proxy ledger | `GET /api/logs`, `/api/logs/{id}`, `/api/logs/dropped` | `logs.go` (`FetchRequests`), `detail.go`, `detailopenai.go`, `join.go` |
 | Gateway overhead | Splits every call's latency into gateway time and provider time | detail row `overhead_latency`, `upstream_latency`, `overhead_breakdown` | `bifrostfeatures.go` (`featureFields`) |
 | Prompt cache | An arm can turn Bifrost's auto prompt caching on per request | header `x-bf-prompt-cache-auto-inject`, provider `prompt_cache` block | `bench/adapters/bifrostfeatures.go`, `bench/engine/bifrostfeatures.go`, `bifrostcache.go` (`PromptCacheConfigured`) |
@@ -41,11 +40,11 @@ experiments are in [routing-experiments.md](routing-experiments.md).
 | Prompt log policy | Per org, sets whether Bifrost stores prompt content on the run key | virtual key log fields | `orglogs.go` (`SetExperimentLogPolicy`, `addLogFields`) |
 | Failure inbox | Reads Bifrost logs as one source of failed traces to turn into tasks | `GET /api/logs` | `bench/traceinbox/bifrostsrc.go` |
 | Gateway config | The stock gateway's config: auth on inference, logging on, no direct keys, Postgres stores, local pricing sheet | `config.json` | `bench/deploy/bifrost/config.json`, `bench/deploy/bifrost/datasheet/` |
-| Heimdall plugin (Wave C) | A real Bifrost plugin: reads Heimdall run headers, injects faults in PreHook, tags responses in PostHook | Bifrost plugin interface (`core/schemas`) | `plugins/heimdall/` (lane C01), loading in `transports/bifrost-http/server/plugins.go` (lane C02) |
-| Usage export (Wave C) | The plugin posts per-request usage to Heimdall | `POST /api/bench/gateway/usage` | `plugins/heimdall/usage.go`, `bench/handlers/gatewayusage.go` (lane C03) |
-| Per-evaluation keys (Wave C) | One virtual key per evaluation with the evaluation's budget as a hard Bifrost budget | governance virtual keys | lane C06 |
-| Fallbacks (Wave C) | "Provider failover" option: Bifrost fallbacks plus an injected primary outage | request `fallbacks` | lane C07 |
-| Cache as a variable (Wave C) | "Bifrost cache on vs off" with two arms that differ only in the cache | `semantic_cache` plugin | lane C08 |
+| Heimdall plugin | A real Bifrost plugin: reads Heimdall run headers, injects faults in PreHook, tags responses in PostHook | Bifrost plugin interface (`core/schemas`) | `plugins/heimdall/` loading in `transports/bifrost-http/server/plugins.go` and `plugin_heimdall.go`, opt-in config `bench/deploy/bifrost/config.plugin.json` |
+| Usage export | The plugin posts per-request usage to Heimdall | `POST /api/bench/gateway/usage` | `plugins/heimdall/usage.go`, `bench/handlers/gatewayusage.go` |
+| Per-evaluation keys | One virtual key per evaluation with the evaluation's budget as a hard Bifrost budget | governance virtual keys | `bench/gateways/bifrost/evalbudget.go` |
+| Fallbacks | "Provider failover" option: Bifrost fallbacks plus an injected primary outage | request `fallbacks` | `bench/failover/`, `bench/handlers/evalfailover.go`, `bench/reportcard/failover.go` |
+| Cache as a variable | "Bifrost cache on vs off" with two arms that differ only in the cache | `semantic_cache` plugin | `bench/bifrostfeatures/cacheab.go`, `bench/handlers/evalcacheab.go` (`GET /evaluations/{id}/bifrost/cache`) |
 
 ## 1. The call path
 
@@ -163,17 +162,29 @@ as the provider base URL. Plan modes (`bench/faultproxy/plan.go`): `none`,
 and `budget_squeeze`, with fields such as `status`, `retry_after_s`,
 `from_call`, `calls`, `until_s`, `fail_prob`, `delay_ms` and `model`.
 
-**Wave C: the heimdall plugin.** Lane C01 is building `plugins/heimdall`, a
+**The heimdall plugin.** `plugins/heimdall` is a
 Bifrost plugin module like `plugins/governance` or `plugins/mocker`. It reads
 Heimdall's per-request context from headers (`x-heimdall-run-id`,
 `x-heimdall-eval-id`, `x-heimdall-org`, `x-heimdall-arm`,
 `x-heimdall-fault-plan-id`, plan in `x-heimdall-fault-plan`), applies the
 same fault modes in PreHook, and in PostHook marks the response with
-`x-heimdall-fault-applied` and the Heimdall ids. Lane C02 registers it in
-`transports/bifrost-http` and in `bench/deploy/bifrost/config.json`,
-disabled by default. Lane C04 adds a fault mode `plugin` in the bench that
-sends plans as headers instead of writing them to the proxy; the proxy stays
-as the fallback.
+`x-heimdall-fault-applied` and the Heimdall ids. It is registered as a
+built-in plugin in `transports/bifrost-http/server/plugins.go`
+(`plugin_heimdall.go`). The bench's fault mode `plugin`
+(`bench/gateways/bifrost/pluginfaults.go`, `HEIMDALL_FAULT_MODE`) sends plans
+as headers instead of writing them to the proxy, for agents known to carry
+the headers; the proxy stays as the fallback.
+
+**Custom Bifrost build with the Heimdall plugin.** The stock
+`maximhq/bifrost` image has no heimdall plugin, so the default
+`bench/deploy/bifrost/config.json` has no heimdall entry. The plugin is
+opt-in: `bench/deploy/bifrost/config.plugin.json` is the same config with
+the `heimdall` plugin enabled, `allow_inline_plans` on and usage posted to
+`http://heimdall:8090` with `env.HEIMDALL_GATEWAY_USAGE_SECRET`, and
+`bench/deploy/hosted/docker-compose.bifrost-plugin.yml` builds Bifrost from
+this repo (`transports/Dockerfile`, context the repo root) and mounts it
+(`docs/hosting.md`, same heading). A local end to end check is in
+`bench/deploy/bifrost/e2e/`.
 
 ```mermaid
 sequenceDiagram
@@ -202,12 +213,13 @@ only place that holds real provider keys and writes the spend ledger, which
 is why the proxy path remains the default until the plugin path has passed
 the same ledger join.
 
-**Wave C: usage export.** Lane C03 adds `plugins/heimdall/usage.go`, which
+**Usage export.** `plugins/heimdall/usage.go`
 batches one record per request (run id, provider, model, tokens, cost,
 latency, cache hit, fallback used, fault applied) and posts it with a shared
 secret to `POST /api/bench/gateway/usage` (`bench/handlers/gatewayusage.go`).
-Lane C09 shows those records and the log rows on the run page as "Through
-Bifrost".
+The run page's "Through Bifrost" panel (`GET /runs/{id}/bifrost`,
+`bench/handlers/runbifrost.go`) shows those records, preferring them when
+present, next to the log rows; the report card has a short Bifrost section.
 
 ## 5. Caching and MCP as arms
 
@@ -222,14 +234,16 @@ adapter (`bench/adapters/bifrostfeatures.go`):
   because Bifrost would silently ignore the header.
 - `semantic_cache`: header `x-bf-cache-key` built from the run, so entries
   are not shared across runs by accident. Hits are read back from
-  `cache_debug` in the log. Lane C08 (Wave C) packages this as the
-  evaluation option "Bifrost cache on vs off".
+  `cache_debug` in the log. The evaluation option "Bifrost cache on vs off"
+  (`EvaluationSpec.bifrost_cache`) adds a cache-on copy of the one arm;
+  `GET /evaluations/{id}/bifrost/cache` reports hit rate, latency and cost
+  saved and success change per benchmark, shown on the evaluation page.
 - `mcp`: `ServeMCP` in `bifrostmcp.go` creates one Bifrost MCP client per
   task MCP server, pointed at the run's tool proxy, grants it to a separate
   MCP key (`hm-mcp-<run>`) only, and removes both at cleanup. Tool calls are
   then read from `GET /api/mcp-logs` as a second witness next to the tool
-  proxy ledger (`MCPCalls`). Lane C11 (Wave C) extends this as an option for
-  any task.
+  proxy ledger (`MCPCalls`). The evaluation option `mcp_route` (`bifrost`
+  or `bifrost_code_mode`) routes every arm's MCP tools this way.
 
 ```mermaid
 sequenceDiagram
@@ -256,21 +270,18 @@ sequenceDiagram
   model of the policy on its one slot, the policy's governance limits
   (`rate_limit`, budget), and one routing rule scoped to that key
   (`scope: virtual_key`). Stale rules are removed by name prefix.
-- Routing export (Z21, branch `z-21`): a model switch evaluation runs one
-  agent on several models; `bench/modelswitch/routing.go` writes the winning
-  choice as Bifrost routing config, `GET /evaluations/{id}/model-switch/bifrost-config`
-  downloads it as a `config.json` fragment, and
-  `POST /evaluations/{id}/model-switch/apply` writes the rules to the org's
-  own Bifrost (`bench/modelswitch/apply.go`). This is how a result in
+- Routing export (Z21): a model switch evaluation runs one agent on several
+  models and writes the winning choice as Bifrost routing config, downloadable
+  as a `config.json` fragment or applied to the org's own Bifrost. This is how a result in
   Heimdall becomes a change in production Bifrost.
 
-## 7. Budgets per evaluation and failover (Wave C)
+## 7. Budgets per evaluation and failover
 
-- Lane C06: one Bifrost virtual key per evaluation with the evaluation's
+- Per-evaluation budget (`bench/gateways/bifrost/evalbudget.go`): one Bifrost virtual key per evaluation with the evaluation's
   budget as a hard Bifrost budget (and a rate limit); runs use it or per-run
   keys under it; revoked at the end. A run stopped by Bifrost's budget shows
   as "stopped by Bifrost budget".
-- Lane C07: the "Provider failover" option configures Bifrost fallbacks for
+- Provider failover (`bench/failover/`, `bench/handlers/evalfailover.go`): the "Provider failover" option configures Bifrost fallbacks for
   the agent's model and injects an outage on the primary (through the
   heimdall plugin when present, else the fault proxy). The report says
   whether failover worked, the extra latency, the cost change, and task
