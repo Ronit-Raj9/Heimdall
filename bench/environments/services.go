@@ -799,26 +799,22 @@ func (e *dockerWorkspace) exportArgv(ctx context.Context, container string, argv
 
 // exportPath copies a file or folder out of the service container. A regular
 // file is stored as its content, anything else as the tar stream docker cp
-// produces. The stream is spooled to a temporary file first, capped.
+// produces. The stream is spooled to a temporary file first, capped. When
+// docker cp cannot see the path (a file written inside a gVisor sandbox),
+// the same stream is taken with docker exec tar (copyout.go).
 func (e *dockerWorkspace) exportPath(ctx context.Context, container, src, out string, limit int64) (int64, string, error) {
 	spool := out + ".tar"
 	defer os.Remove(spool)
-	fh, err := os.OpenFile(spool, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	res, err := e.copyToSpool(ctx, container, src, spool, limit+1<<20)
 	if err != nil {
-		return 0, "", fmt.Errorf("open %s: %w", spool, err)
-	}
-	w := &cappedWriter{w: fh, limit: limit + 1<<20}
-	var errBuf strings.Builder
-	cmd := exec.CommandContext(ctx, dockerBinary(e.cfg.Docker), "cp", container+":"+src, "-")
-	cmd.Stdout, cmd.Stderr = w, &errBuf
-	runErr := cmd.Run()
-	if err := errors.Join(w.err, fh.Close()); err != nil {
 		return 0, "", fmt.Errorf("write %s: %w", spool, err)
 	}
 	switch {
-	case runErr != nil:
-		return 0, fmt.Sprintf("copy %s failed: %s", src, truncate(strings.TrimSpace(errBuf.String()), 300)), nil
-	case w.truncated:
+	case res.failed && res.fellBack:
+		return 0, fmt.Sprintf("copy %s failed: docker cp could not see the file and docker exec tar failed: %s", src, truncate(res.execStderr, 300)), nil
+	case res.failed:
+		return 0, fmt.Sprintf("copy %s failed: %s", src, truncate(res.cpStderr, 300)), nil
+	case res.truncated:
 		return 0, fmt.Sprintf("export is over its %d byte cap", limit), nil
 	}
 	return unpackExport(spool, out, limit)

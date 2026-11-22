@@ -126,7 +126,8 @@ func (c *adapterFaultController) Freeze(ctx context.Context, rc *schemas.RunCont
 		return err
 	}
 	for _, name := range []string{"adapter.fault.json", "adapter.fault.jsonl"} {
-		if _, err := c.env.cfg.Docker.MustRun(ctx, "cp", hookContainer(id)+":/ledger/"+name, filepath.Join(rc.Dir, name)); err != nil {
+		// docker cp, with the docker exec tar fallback under gVisor (copyout.go).
+		if err := c.env.copyFileOut(ctx, hookContainer(id), "/ledger/"+name, filepath.Join(rc.Dir, name), utils.AdapterFaultMaxLedger+(4<<20)); err != nil {
 			return err
 		}
 		// Controller export is bounded before it is served or sealed.
