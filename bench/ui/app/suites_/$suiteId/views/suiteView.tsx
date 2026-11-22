@@ -14,7 +14,8 @@ import { FingerprintDriftNotice } from "@/components/suites/suiteLockKind";
 import { healthState } from "@/components/suites/suiteHealth.utils";
 import { leaderboardSuite } from "@/components/suites/suites.utils";
 import { Button } from "@/components/ui/button";
-import { useGetSuiteHealthQuery, useGetSuitesQuery } from "@/lib/store";
+import { getBenchErrorMessage, useGetSuiteHealthQuery, useGetSuitesQuery, useListRunsQuery } from "@/lib/store";
+import "@/app/failure-tests/views/gw07I18n";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, Boxes, CircleCheck, History, ListChecks, type LucideIcon, Radar, Trophy } from "lucide-react";
@@ -121,7 +122,23 @@ function SuiteBody({
 		{ id: "edit", label: tu("tabs.edit"), hidden: builtin }, // L10 suite authoring; a built-in library suite is read-only
 		{ id: "export", label: tu("tabs.export") },
 	];
-	const runs = health.state === "ready" ? health.health.runs : null;
+	const { t: tg } = useTranslation("gw07");
+	// Runs so far comes from the run list (GET /runs total), not the health report: the health report can be slow or
+	// fail on a big benchmark, and "None yet" must only mean there are no runs (fix wave 2, N164).
+	const runList = useListRunsQuery({ benchmark: suite.id, limit: 1 }, { skip: Boolean(suite.error) });
+	const runsValue = runList.data ? (
+		runList.data.total === 0 ? (
+			tu("stats.never")
+		) : (
+			runList.data.total
+		)
+	) : runList.isError ? (
+		<span title={getBenchErrorMessage(runList.error)} data-testid="suite-runs-error">
+			-
+		</span>
+	) : (
+		<span className="text-muted-foreground text-base font-normal">{tg("suite.counting")}</span>
+	);
 
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="suite-screen">
@@ -183,13 +200,14 @@ function SuiteBody({
 						})}
 						tone={suite.task_count > 0 && suite.admitted_count === suite.task_count ? "good" : "warn"}
 					/>
-					<StatTile icon={Radar} label={tu("stats.probes")} hint={tu("stats.probesHint")} value={suite.probes.length} />
 					<StatTile
-						icon={History}
-						label={tu("stats.lastRun")}
-						hint={tu("stats.lastRunHint")}
-						value={runs === null || runs === 0 ? tu("stats.never") : runs}
+						icon={Radar}
+						label={tu("stats.probes")}
+						hint={tu("stats.probesHint")}
+						value={suite.probes.length}
+						note={tg("suite.probesHint")}
 					/>
+					<StatTile icon={History} label={tu("stats.lastRun")} hint={tu("stats.lastRunHint")} value={runsValue} />
 				</div>
 			)}
 			{requestedVersion && requestedVersion !== suite.version && (
@@ -223,6 +241,11 @@ function SuiteBody({
 					{builtin && <SuiteReferenceScores suiteId={suite.id} />}
 					<SuiteDriftNotice suite={suite} />
 					<FingerprintDriftNotice suite={suite} />
+					{health.state === "loading" && (
+						<p className="text-muted-foreground text-sm" role="status" data-testid="suite-health-loading">
+							{tg("suite.healthLoading")}
+						</p>
+					)}
 					<RouteTabs tabs={tabs} defaultTab="tasks" label={t("suites.tabs.label")} testId="suite-tabs">
 						{(active) =>
 							active === "settings" ? (
@@ -266,6 +289,7 @@ function StatTile({
 	value,
 	tone,
 	hint,
+	note,
 }: {
 	icon: LucideIcon;
 	label: string;
@@ -273,6 +297,8 @@ function StatTile({
 	tone?: "good" | "warn";
 	/** Plain explanation shown on hover. */
 	hint?: string;
+	/** A short line under the value, always shown. */
+	note?: string;
 }) {
 	return (
 		<div className="bg-card flex min-w-0 flex-col gap-2 rounded-xl border p-5" title={hint}>
@@ -289,6 +315,7 @@ function StatTile({
 			>
 				{value}
 			</span>
+			{note && <span className="text-muted-foreground text-xs">{note}</span>}
 		</div>
 	);
 }
