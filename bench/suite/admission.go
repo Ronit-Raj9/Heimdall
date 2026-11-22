@@ -44,7 +44,20 @@ const (
 	GotFail             = "fail"
 	GotInvalidEvaluator = "invalid_evaluator"
 	GotError            = "error"
+	// WantPassOrFail is the Want of a control that is run and recorded but
+	// may go either way: the null refusal of an abstention task, where
+	// declining to answer can be the right behaviour. An evaluator error
+	// still fails it.
+	WantPassOrFail = "pass_or_fail"
 )
+
+// wantMet reports whether got satisfies want.
+func wantMet(want, got string) bool {
+	if want == WantPassOrFail {
+		return got == GotPass || got == GotFail
+	}
+	return got == want
+}
 
 // Wanted values of the static admission checks.
 const (
@@ -503,7 +516,7 @@ func (a *admitter) grade(ctx context.Context, rc *schemas.RunContext, diff *sche
 		return failed(check, errors.New("grade: grader returned no grade"))
 	}
 	check.Got = gradeOutcome(g)
-	check.Passed = check.Got == check.Want
+	check.Passed = wantMet(check.Want, check.Got)
 	check.Detail = joinDetail(detail, gradeSummary(g))
 	a.deps.Logger.Info("admission check", "task", a.t.ID, "check", check.Name, "want", check.Want, "got", check.Got)
 	return check

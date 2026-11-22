@@ -535,3 +535,62 @@ func TestAdmitReferenceWallClock(t *testing.T) {
 		t.Errorf("reference_1 wall %d, want 7200 (walls %v)", env.walls["admission-reference_1"], env.walls)
 	}
 }
+
+// abstainGrader passes an answer that says the answer is not known, as an
+// abstention judge (qa-v1-abstain) does, which a bare refusal also does.
+type abstainGrader struct{}
+
+func (abstainGrader) GetName() string         { return "answer_match" }
+func (abstainGrader) GetVersion() string      { return "0.0.0" }
+func (abstainGrader) VerifierNetwork() string { return "none" }
+func (abstainGrader) Grade(_ context.Context, rc *schemas.RunContext, _ *schemas.Diff) (*schemas.Grade, error) {
+	b, _ := os.ReadFile(filepath.Join(rc.Dir, answerFile))
+	a := strings.ToLower(string(b))
+	return &schemas.Grade{Passed: strings.Contains(a, "not known") || strings.Contains(a, "can't")}, nil
+}
+
+// On an abstention task the null refusal is recorded but is not a must-fail
+// control: declining can be the right answer there. Elsewhere it must fail.
+func TestAdmitAbstainTaskRefusalMayPass(t *testing.T) {
+	benchRoot, pack := copyPack(t)
+	task := filepath.Join(pack, "tasks", "m01")
+	writeFiles(t, task, map[string]string{
+		"controls/answer.txt":        "That is not known from the conversation.\n",
+		"controls/empty.txt":         "",
+		"controls/wrong.txt":         "It was 8.\n",
+		"verifier/tests/answer.yaml": "match: exact\nabstain: true\nwrong_answers: [\"It was 9.\"]\n",
+	})
+	s := loadMini(t, benchRoot)
+	s.Grader = "answer_match"
+	tk := s.Tasks[0]
+	tk.Output = &schemas.OutputSpec{Kind: schemas.OutputAnswer}
+	tk.Controls = schemas.TaskControls{Reference: "controls/answer.txt", Empty: "controls/empty.txt", Mutants: []string{"controls/wrong.txt"}, Exploit: "controls/exploit.sh"}
+	env := newScenarioAdmitEnv()
+	// The refusal control writes its words as the answer, as a run kernel
+	// using the final message would.
+	rec, err := Admit(context.Background(), AdmitDeps{Env: &refusalAnswerEnv{env}, Grader: abstainGrader{}}, s, tk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := checksByName(rec)["null_refuse"]
+	if c.Want != WantPassOrFail || c.Got != GotPass || !c.Passed {
+		t.Fatalf("null_refuse %+v", c)
+	}
+	if !rec.Admitted {
+		t.Fatalf("abstention task not admitted: %+v", rec.Checks)
+	}
+	if !wantMet(GotFail, GotFail) || wantMet(GotFail, GotPass) || !wantMet(WantPassOrFail, GotFail) || wantMet(WantPassOrFail, GotInvalidEvaluator) {
+		t.Fatal("wantMet")
+	}
+}
+
+// refusalAnswerEnv writes the null refusal's words as the workspace answer.
+type refusalAnswerEnv struct{ *scenarioAdmitEnv }
+
+func (e *refusalAnswerEnv) Exec(ctx context.Context, rc *schemas.RunContext, plan *schemas.RunPlan) (*schemas.ExecResult, error) {
+	res, err := e.scenarioAdmitEnv.Exec(ctx, rc, plan)
+	if err == nil && len(plan.Argv) == 3 && strings.Contains(plan.Argv[2], refuseMessage) {
+		e.answer[rc.Run.RunID] = refuseMessage + "\n"
+	}
+	return res, err
+}
