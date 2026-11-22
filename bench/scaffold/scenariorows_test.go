@@ -130,6 +130,10 @@ func (l *ledgerProxy) handler(server, target string) http.Handler {
 		_ = json.Unmarshal(body, &msg)
 		req, _ := http.NewRequest(r.Method, u.String(), bytes.NewReader(body))
 		req.Header = r.Header.Clone()
+		// One connection per call: the Python servers close a connection after
+		// a 202 to a notification, and a reused one would read EOF.
+		req.Header.Del("Connection")
+		req.Close = true
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			http.Error(w, err.Error(), 502)

@@ -1,0 +1,35 @@
+# template: knowledge-base
+# Written by `bifrost-bench suite init`. A knowledge-base suite tests an agent
+# that answers from your documents, as a help-center bot does: the documents
+# are not in its workspace but behind a search service (services/kb/, an MCP
+# server with search_docs and read_doc over the files in services/kb/docs/).
+# The service folder is part of the suite's lock, so changing a document
+# changes the suite version. The agent writes its answer to answer.txt; the
+# answer_match grader checks it against the task's hidden
+# verifier/answer.yaml with no model, and the documents the agent searched
+# and read are exported as kb/reads.json for review. Add your documents
+# (Markdown, text or HTML; convert PDFs to text first) to services/kb/docs/,
+# by copying them there or uploading them on the benchmark's Edit tab, then
+# run the readiness checks so the search image is rebuilt. Add tasks with
+# `bifrost-bench task init -suite [[.ID]] -id <task>`.
+id: [[.ID]]
+version: 0.1.0
+description: Questions answered from your documents through a search service, matched against a hidden expected answer.
+track: qa
+environment: docker_workspace
+grader: answer_match
+base_image:
+[[- if .Dockerfile]]
+  dockerfile: base/Dockerfile
+[[- end]]
+  tag: [[.Image]]
+workdir: /workspace
+output:
+  kind: answer
+  answer_path: answer.txt
+# answer_match grades without running a command; the schema still wants one.
+verifier:
+  command: ["true"]
+  timeout_s: 60
+tasks: [refund-window]
+probes: [model-outage]

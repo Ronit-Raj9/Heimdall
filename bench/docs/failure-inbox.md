@@ -278,6 +278,24 @@ order: live mode (403 otherwise), token (401), body size (413), rate (429
 with `Retry-After`). With no webhook source, or an empty token variable, the
 endpoint answers 503. It is one global bucket, not per caller.
 
+### Passing sessions (goldens)
+
+A push with `"passed": true` is a session that went well. It becomes an item
+marked `golden` (its own signature, never merged with a failure of the same
+request), so a good answer or a good tool path can be kept as a regression
+task. Only a sample is kept: at most `golden_per_day` items per source per
+day (UTC), default 5, 0 to keep none:
+
+```yaml
+- name: hook
+  kind: webhook
+  token_env: HEIMDALL_INBOX_TOKEN
+  golden_per_day: 20
+```
+
+A passing push over the day's sample creates nothing and answers
+`"skipped": 1`. The hosted per-org ingest route takes the same field.
+
 ## Signatures and dedupe
 
 A signature is three parts, hashed:
@@ -329,6 +347,53 @@ provenance:
 `-kind` must match the suite's template (default: the suite's). The task id
 defaults to the item id. The item becomes accepted and links to the task;
 `inbox list` shows whether the task is admitted yet.
+
+### What should have happened (guided accept)
+
+The accept form on the Inbox page asks what a correct agent does, and the
+task is written finished instead of as an EDIT ME draft (the response says
+`"finished": true`; only the readiness check is left). Over the API it is
+`guide` on `POST /api/bench/inbox/{id}/accept`:
+
+```json
+{"suite": "support", "switch_grader": true,
+ "guide": {"keep_turns": true,
+           "calls": [{"tool": "issue_refund", "args": {"order": "A-1"}}],
+           "forbidden": [{"tool": "apply_credit", "args": {"order": "A-1"}}],
+           "ordered": false, "reply_rubric": "Says the refund takes 5 days"}}
+```
+
+- **qa and memory:** `answers` (one fact per entry), `match` (exact,
+  contains_all, regex, numeric, choice), `wrong_answers`, and
+  `recorded_wrong: true` to make the recorded answer a wrong answer that must
+  fail. The answer file is written without markers.
+- **tool-use and mcp:** the recorded calls marked right go to `calls`, the
+  wrong ones to `forbidden`, and a missing call is added to `calls`. They
+  become `checks.yaml` (docs/declarative-checks.md), a reference that makes
+  the right calls through the replay tool server, a mutant that skips the
+  last right call and, when a forbidden call has arguments, a mutant that
+  also makes it. Such a task is graded by its checks, so the benchmark must
+  use `grader: checks`; `switch_grader: true` moves it (its other tasks keep
+  their verifier and need their readiness checks again), otherwise the
+  accept answers 409. A `reply_rubric` needs a pinned judge: the benchmark's,
+  or `judge: {provider, model}` with the switch.
+- `instruction` replaces the first request; `keep_turns: true` adds the
+  user's later messages to the instruction, in order, so a multi-turn failure
+  keeps every request.
+- `use_recorded: true` takes the recorded answer or the recorded calls that
+  did not fail as the expected ones: the accept of a golden.
+
+`GET /api/bench/inbox/{id}` returns `session` (the redacted requests, tool
+calls with their arguments, and the final answer) for the form.
+
+### Bulk accept
+
+`POST /api/bench/inbox/accept` takes `{"ids": [...], "suite", "kind"?,
+"guide"?, "switch_grader"?, "judge"?}` (at most 100 items) and accepts each
+into the benchmark with the same guide, for example `{"use_recorded": true}`
+for a day's goldens or one shared `reply_rubric`. One item failing does not
+stop the others: the answer lists `accepted` and `failed` with the reason.
+The Inbox page has the same as "Accept several at once".
 
 ## Closing the loop
 
