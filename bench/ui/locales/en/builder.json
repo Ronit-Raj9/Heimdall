@@ -85,6 +85,9 @@
 	"link": {
 		"agentMissing": "Agent {{id}} is not one of your agents, so the comparison starts with {{first}}."
 	},
+	"ready": {
+		"pending": "Checking which tasks are ready. The benchmark and task count update when that is known."
+	},
 	"errors": {
 		"nameRequired": "Give the experiment a name.",
 		"suiteRequired": "Pick a benchmark.",

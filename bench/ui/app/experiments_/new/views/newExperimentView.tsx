@@ -56,10 +56,12 @@ export default function NewExperimentView() {
 		return { yours: yours.map((a) => a.id), baselines: baselines.map((a) => a.id) };
 	}, [agentsList.data]);
 	// Ready tasks per benchmark (N39, N42): the full list, since the light list has no per-task status.
-	// A failed list leaves every task counted, as before.
+	// A failed list leaves every task counted, as before. The form does not wait for it: it shows at
+	// once and starts again with the ready-task defaults when the list arrives.
 	const suites = useGetSuitesQuery();
 	const ready = useMemo(() => (catalog.data ? readyTaskMap(catalog.data, suites.data?.suites) : undefined), [catalog.data, suites.data]);
-	const sideLoading = agentsList.isLoading || modelKeys.isLoading || suites.isLoading;
+	const readyPending = suites.isLoading;
+	const sideLoading = agentsList.isLoading || modelKeys.isLoading;
 	const health = useGetHealthQuery();
 	const defaultsOptions = useMemo<BuilderDefaultsOptions>(
 		() => ({
@@ -151,10 +153,23 @@ export default function NewExperimentView() {
 								{tb("link.agentMissing", { id: agentParam?.trim(), first: startId })}
 							</p>
 						)}
+						{readyPending && (
+							<p className="text-muted-foreground text-xs" data-testid="new-experiment-ready-pending">
+								{tb("ready.pending")}
+							</p>
+						)}
 						{abMode || !builderDefaults ? (
-							<ExperimentForm catalog={catalog.data} defaults={defaults} ready={ready} agentGroups={agentGroups} onStarted={onStarted} />
+							<ExperimentForm
+								key={readyPending ? "ready-pending" : "ready-known"}
+								catalog={catalog.data}
+								defaults={defaults}
+								ready={ready}
+								agentGroups={agentGroups}
+								onStarted={onStarted}
+							/>
 						) : (
 							<MatrixBuilder
+								key={readyPending ? "ready-pending" : "ready-known"}
 								catalog={catalog.data}
 								defaults={builderDefaults}
 								agentGroups={agentGroups}

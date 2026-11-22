@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
 import { Input } from "@/components/ui/input";
 import { useGetAgentConfigQuery } from "@/lib/store/apis/agentBuilderApi";
-import { getBenchErrorMessage, useGetAgentsQuery, useGetSuitesQuery } from "@/lib/store/apis/benchApi";
+import { getBenchErrorMessage, useGetAgentsQuery } from "@/lib/store/apis/benchApi";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import { type ImprovementSpecBody, useCreateImprovementMutation } from "@/lib/store/apis/improveApi";
 import { useNavigate } from "@tanstack/react-router";
 import { Check, Copy } from "lucide-react";
@@ -291,7 +292,8 @@ export function NewImprovementDialog({ onClose }: { onClose(): void }) {
 	const navigate = useNavigate();
 	const [form, setForm] = useState<ImprovementForm>(EMPTY_FORM);
 	const agentsQ = useGetAgentsQuery();
-	const suitesQ = useGetSuitesQuery();
+	// The picker needs only each benchmark id and version: the light list never waits for a pack load.
+	const suitesQ = useGetSuitesLightQuery();
 	const config = useGetAgentConfigQuery(form.agent, { skip: !form.agent });
 	const [create, state] = useCreateImprovementMutation();
 	useEffect(() => {
