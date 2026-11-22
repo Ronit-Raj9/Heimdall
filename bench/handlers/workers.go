@@ -108,6 +108,7 @@ func (h *WorkersHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Mid
 	r.POST(p+"/leases/{lease_id}/upload", lib.ChainMiddlewares(h.auth(h.upload), middlewares...))
 	r.POST(p+"/leases/{lease_id}/complete", lib.ChainMiddlewares(h.auth(h.complete), middlewares...))
 	r.POST(p+"/leases/{lease_id}/release", lib.ChainMiddlewares(h.auth(h.release), middlewares...))
+	r.POST(p+"/leases/{lease_id}/live-frame", lib.ChainMiddlewares(h.auth(h.liveFrame), middlewares...)) // Z03: live screen (workerlive.go)
 }
 
 // list handles GET /api/bench/workers: every registered worker, for the UI.

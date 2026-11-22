@@ -135,7 +135,7 @@ func SyntheticArms(ctx context.Context, m *schemas.Manifest, runs []schemas.Seal
 		if out[sr.Slot.Arm] || len(sr.Problems) > 0 {
 			continue
 		}
-		if sr.Run.Practice { // X01: labelled practice in run.json
+		if sr.Run.Practice || sr.Run.HumanAssisted { // X01: labelled practice in run.json; Z03: a person took control
 			out[sr.Slot.Arm] = true
 			continue
 		}

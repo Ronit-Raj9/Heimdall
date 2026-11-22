@@ -225,6 +225,7 @@ func (e *dockerWorkspace) ExportState(ctx context.Context, rc *schemas.RunContex
 		e.copyFrames(ctx, runID, rc.Dir) // screen replay frames (frames.go)
 	}
 	e.captureServiceLogs(ctx, runID, rc.Dir, svcs)           // X2: compose services' output as services/<id>.log (compose.go)
+	e.exportRecordings(ctx, runID, rc.Dir, svcs)             // Z03: video, HAR and console as recordings/<id>/, never mounted for the verifier (recordings.go)
 	e.copyAgentEvents(ctx, runID, rc.Dir)                    // Agent events area: the collector's ledger (eventcollector.go)
 	if err := e.exportExternal(ctx, rc, runID); err != nil { // External APIs area: record mode cassettes
 		return files, fmt.Errorf("export state for run %s: %w", runID, err)
@@ -304,7 +305,7 @@ func checkService(s schemas.ServiceSpec) error {
 		}
 		seen[x.ID] = true
 	}
-	return nil
+	return checkRecordings(s) // Z03: recordings and live screen (recordings.go)
 }
 
 // proxied reports whether the agent reaches the service through the tool

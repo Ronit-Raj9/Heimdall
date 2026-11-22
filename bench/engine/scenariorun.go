@@ -83,6 +83,7 @@ func notReady(results []schemas.ServiceResult) string {
 // before scenarios, or once per session in order. A suite with verifier mode
 // snapshot then freezes the agent's container file system.
 func (p *Pipeline) runAgent(ctx context.Context, st *runState) error {
+	stopLive := p.startLive(ctx, st) // Z03: live screen and takeover while the agent runs (livescreen.go)
 	var err error
 	switch {
 	case len(utils.TeamOf(st.rc)) > 0: // Multi-agent area: one container per team member (team.go)
@@ -92,6 +93,7 @@ func (p *Pipeline) runAgent(ctx context.Context, st *runState) error {
 	default:
 		err = p.runSessions(ctx, st)
 	}
+	stopLive()
 	if err != nil {
 		return err
 	}

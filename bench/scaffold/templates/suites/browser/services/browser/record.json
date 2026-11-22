@@ -1,0 +1,9 @@
+{
+  "browser": {
+    "contextOptions": {
+      "viewport": {"width": 1280, "height": 720},
+      "recordVideo": {"dir": "/tmp/rec/raw", "size": {"width": 1280, "height": 720}},
+      "recordHar": {"path": "/tmp/rec/har/session.har", "content": "omit"}
+    }
+  }
+}

@@ -30,6 +30,26 @@ services:
     port: 8931
     mcp: {path: /mcp}
     argv: ["--isolated", "--host", "0.0.0.0", "--port", "8931", "--allowed-hosts", "browser:8931", "--allowed-origins", "http://webapp:8000", "--block-service-workers"]
+    # Recordings: the browser's video (one webm per page), its HAR and its
+    # console messages, which the image's launcher writes under /tmp/rec.
+    # After the agent exits and the database is exported, the stop command
+    # closes the browser (so the video and HAR are complete) and stops the
+    # service; the files are then copied into the run at
+    # recordings/browser/, sealed with it, and shown on the run page next to
+    # the trace. The verifier never sees them: grades read only the export.
+    recordings:
+      stop: ["sh", "-c", "kill -TERM 1; sleep 60"]
+      files:
+        - {id: video, path: /tmp/rec/video, kind: video}
+        - {id: har, path: /tmp/rec/har, kind: har}
+        - {id: console, path: /tmp/rec/console.jsonl, kind: console}
+    # Live view: while the agent works, the run page shows the page it uses
+    # (a JPEG every 2 s, display only). In a debug run a person may take
+    # control with the input command; the run is then marked human
+    # assisted and never counted.
+    live:
+      frame: ["node", "/opt/heimdall/record.js", "frame"]
+      input: ["node", "/opt/heimdall/record.js", "input"]
   # The web application. Hidden: it sits only on a network the agent is not
   # on, so the agent cannot reach it except through the browser. Its id is
   # its host name; keep it a name no browser upgrades to HTTPS (not app, dev,

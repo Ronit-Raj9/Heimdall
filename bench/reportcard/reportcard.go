@@ -575,7 +575,7 @@ func practiceArms(ctx context.Context, src leaderboard.Source, m *schemas.Manife
 		if !r.Sealed || out[r.Slot.Arm] {
 			continue
 		}
-		if r.Run.Practice {
+		if r.Run.Practice || r.Run.HumanAssisted { // Z03: a person took control of the run
 			out[r.Slot.Arm] = true
 			continue
 		}

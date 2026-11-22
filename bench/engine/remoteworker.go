@@ -357,7 +357,8 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		}
 		return nil
 	}
-	in := SlotInput{Manifest: runM, Suite: exp.suite, Slot: slot, Attempt: lease.Attempt, Secrets: leaseSecrets, Emit: live.add}
+	in := SlotInput{Manifest: runM, Suite: exp.suite, Slot: slot, Attempt: lease.Attempt, Secrets: leaseSecrets, Emit: live.add,
+		Live: workerLiveSink{w: w, leaseID: lease.LeaseID}} // Z03: live screen frames and takeover inputs (livescreen.go)
 	if len(lease.GPUs) > 0 { // QC2-10-09: the devices the coordinator reserved, not the pool's first fit
 		a, release, why := w.leasedGPUs(sctx, lease.GPUs)
 		if why != "" {

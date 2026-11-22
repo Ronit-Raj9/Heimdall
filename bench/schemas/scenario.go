@@ -141,6 +141,13 @@ type ServiceSpec struct {
 	// gateway on its own virtual key, never the agent's (servicegateway.go).
 	Gateway *ServiceGateway `json:"gateway,omitempty" yaml:"gateway"`
 	Compose *ComposeService `json:"compose,omitempty" yaml:"-"` // X2: settings only a compose file sets (compose.go)
+
+	// Z03: Recordings are files the service writes for people to watch
+	// (video, HAR, console), sealed with the run but never mounted for the
+	// verifier; Live is how the run page shows its screen while the agent
+	// runs (schemas/recordings.go).
+	Recordings *RecordingsSpec `json:"recordings,omitempty" yaml:"recordings"`
+	Live       *LiveSpec       `json:"live,omitempty" yaml:"live"`
 }
 
 // W3 customer support: service gateway access and the user simulator.
