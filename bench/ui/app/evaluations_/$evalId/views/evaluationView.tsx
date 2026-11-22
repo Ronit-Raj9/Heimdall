@@ -20,6 +20,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { DeleteAction } from "@/components/platform/deleteAction";
 import { useDeleteEvaluationMutation } from "@/lib/store/apis/dataOpsApi";
 import { useState } from "react";
+import { childSpendText, childStoppedText, RaiseBudgetPanel } from "./raiseBudget";
 import { useTranslation } from "react-i18next";
 
 /** /evaluations/$evalId: live progress per benchmark, then the report card. */
@@ -100,6 +101,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 					</ul>
 				)}
 			</Section>
+			<RaiseBudgetPanel evaluation={evaluation} />
 			{skipped.length > 0 && (
 				<Section title={t("detail.skippedTitle")} description={t("detail.skippedDescription")} testId="evaluation-skipped">
 					<ul className="flex flex-col gap-1 text-sm">
@@ -166,6 +168,15 @@ export function ChildRow({ child, score = false }: { child: EvaluationChild; sco
 			<span className="text-muted-foreground tabular-nums" data-testid={`evaluation-child-runs-${child.benchmark}`}>
 				{slots ? t("detail.runs", { done: slots.done, total: slots.total }) : t("detail.runsUnknown")}
 			</span>
+			{childStoppedText(child) ? (
+				<span className="text-chart-warning-ink text-xs font-medium" data-testid={`evaluation-child-budget-stopped-${child.benchmark}`}>
+					{childStoppedText(child)}
+				</span>
+			) : childSpendText(child) ? (
+				<span className="text-muted-foreground text-xs tabular-nums" data-testid={`evaluation-child-spend-${child.benchmark}`}>
+					{childSpendText(child)}
+				</span>
+			) : null}
 			<span className="ml-auto flex gap-3">
 				<Link
 					to="/experiments/$expId"

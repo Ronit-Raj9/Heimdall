@@ -31,7 +31,10 @@ type Store interface {
 // with the organization's own model keys. The runtime is gVisor (G3 B8):
 // no org gets runc unless a server admin sets it, and a shared worker
 // serves runc orgs only under the operator's HEIMDALL_SHARED_ALLOW_RUNC.
-var DefaultLimits = Limits{MaxConcurrentRuns: 2, MaxRunsPerDay: 0, MaxSpendUSDPerDay: 0,
+// Four runs at once (G4-04) lets a first evaluation of a few benchmarks
+// finish inside an hour; the org's limits are shown on Settings > Workers
+// and in every estimate.
+var DefaultLimits = Limits{MaxConcurrentRuns: 4, MaxRunsPerDay: 0, MaxSpendUSDPerDay: 0,
 	MaxImageBytes: 2 << 30, Runtime: "runsc"}
 
 // NewStub returns the Phase 0 stub store.

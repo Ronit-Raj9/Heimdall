@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { EvaluationWorkerPicker } from "@/components/workers/whereRunsGo";
-import { type EvaluationArm, type EvaluationSpec, useCreateEvaluationMutation } from "@/lib/store/apis/evaluationsApi";
+import { type EvaluationArm, type EvaluationSpec, useCreateEvaluationMutation, useEstimateEvaluationQuery } from "@/lib/store/apis/evaluationsApi";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { BudgetAdvice } from "./budgetAdvice";
 import { OWN_MODEL_LABEL, useOwnModelAgents } from "./ownModel";
 import { FAULTS, specReady } from "./step4Setup";
 
@@ -35,8 +36,12 @@ export function summaryLines(spec: EvaluationSpec): string[] {
 	lines.push(faults.length ? `Run clean, then again with: ${faults.join(", ")}.` : "Run clean only, with no faults.");
 
 	if (spec.budget_usd && spec.budget_usd > 0) lines.push(`Stop when spending reaches $${spec.budget_usd}.`);
+	else lines.push(`Stop each benchmark when its spending reaches $${DEFAULT_BENCHMARK_BUDGET} (the default budget).`);
 	return lines;
 }
+
+/** The server's spend cap per benchmark when an evaluation sets no budget (EvaluationDefaultBenchmarkBudget). */
+export const DEFAULT_BENCHMARK_BUDGET = 5;
 
 /** Budget box text to a spec value: blank or not a positive number means no budget. */
 export function parseBudget(text: string): number | undefined {
@@ -67,6 +72,20 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 	const [create, state] = useCreateEvaluationMutation();
 	const [budget, setBudget] = useState(spec.budget_usd ? String(spec.budget_usd) : "");
 	const ready = specReady(spec, useOwnModelAgents());
+	const estimate = useEstimateEvaluationQuery(spec, { skip: !ready });
+	const advice = estimate.data?.budget;
+	const setBudgetUsd = (n: number | undefined) => {
+		setBudget(n ? String(n) : "");
+		onChange({ ...spec, budget_usd: n });
+	};
+	// Start the budget box from the suggestion (it covers the expected cost), once, when none is set.
+	const [seeded, setSeeded] = useState(Boolean(spec.budget_usd));
+	useEffect(() => {
+		if (seeded || !advice || !(advice.suggested_usd > 0)) return;
+		setSeeded(true);
+		setBudgetUsd(advice.suggested_usd);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [seeded, advice]);
 
 	const launch = async () => {
 		const body: EvaluationSpec = { ...spec, name: spec.name.trim() || summaryLines(spec)[0].replace(/\.$/, "") };
@@ -87,7 +106,7 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 
 			<section className="flex flex-col gap-1.5">
 				<label htmlFor="step5-budget" className="text-sm font-medium">
-					Budget (USD, optional)
+					Budget (USD)
 				</label>
 				<input
 					id="step5-budget"
@@ -96,15 +115,21 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 					step="0.5"
 					inputMode="decimal"
 					className="border-input bg-background h-8 w-32 rounded-md border px-2 text-sm"
-					placeholder="No limit"
+					placeholder={`$${DEFAULT_BENCHMARK_BUDGET} per benchmark`}
 					value={budget}
 					onChange={(e) => {
+						setSeeded(true);
 						setBudget(e.target.value);
 						onChange({ ...spec, budget_usd: parseBudget(e.target.value) });
 					}}
 					data-testid="step5-budget"
 				/>
-				<span className="text-muted-foreground text-xs">The evaluation stops when model spending reaches this amount.</span>
+				<span className="text-muted-foreground text-xs" data-testid="step5-budget-help">
+					{spec.budget_usd
+						? "Split evenly over the benchmarks; each one stops starting runs when its share is spent."
+						: `Empty means the default: each benchmark stops at $${DEFAULT_BENCHMARK_BUDGET}.`}
+				</span>
+				{advice && <BudgetAdvice budget={advice} onSet={(n) => (setSeeded(true), setBudgetUsd(n))} />}
 			</section>
 
 			<EvaluationWorkerPicker value={spec.worker ?? ""} onChange={(worker) => onChange({ ...spec, worker: worker || undefined })} />

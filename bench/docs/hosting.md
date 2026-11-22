@@ -303,7 +303,7 @@ on, which is every organization without its own quota row.
 | `HEIMDALL_SHARED_GATEWAY_CONTAINER` | `shared-runner` | The gateway container every org network joins. Empty finds the compose project's `bifrost` service. |
 | `HEIMDALL_GATEWAY_PUBLIC_URL`, `HEIMDALL_TOOLS_PUBLIC_URL` | server and `shared-runner` | Where deployed agents (HTTP, OpenAI-compatible, A2A) and cloud sandboxes (Modal, Daytona, E2B) reach the shared worker's model gateway and live runs' tool gates. Default `https://$HEIMDALL_DOMAIN/gw` and `https://$HEIMDALL_DOMAIN/rt`: Caddy forwards both to the worker's public ingress, which answers only for live runs, with the run's own key or token, rate limited per run (docs/remote-execution.md, "Published through the server"). Leave them at the default. |
 | `HEIMDALL_RTGATE_NETWORK` | `shared-runner` | Internal network the worker reaches its runs' tool gates on (default `heimdall-rtgate`). |
-| `HEIMDALL_SHARED_SLOTS` | `shared-runner` | Slots per organization, capped by its max concurrent runs. |
+| `HEIMDALL_SHARED_SLOTS` | `shared-runner` | Slots per organization, capped by its max concurrent runs. Default 4, the default max concurrent runs of an org. |
 
 2. Build the task and agent images the built-in benchmarks use, e.g.
    `docker build -t bench/coding-core-base:1 benchmarks/coding-core/base`.
@@ -464,10 +464,12 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_SHARED_RUNNER_SECRET` | Secret of the shared worker (assignments and per-org token claims); empty turns the shared worker off. |
 | `HEIMDALL_SHARED_RUNTIME` | Container runtime of the shared worker: `auto` or `runsc` (gVisor, required). |
 | `HEIMDALL_SHARED_ALLOW_RUNC` | Operator override: `1` lets the shared worker run under runc without gVisor, for orgs set to runc only. Leave empty. |
-| `HEIMDALL_SHARED_SLOTS` | Runs at once per organization on the shared worker, capped by its own limit. |
+| `HEIMDALL_SHARED_SLOTS` | Runs at once per organization on the shared worker, capped by its own limit (default 4). |
 | `HEIMDALL_BUILD_NETWORK` | Network of the shared worker's image build sessions and read-only registry (default `heimdall-buildnet`). |
 | `HEIMDALL_SHARED_REGISTRY` | The read-only private image registry (`registry:5000`) that org builds take bench and platform base images from, pinned by digest. |
 | `HEIMDALL_REGISTRY_AUTH_DIR` | Folder outside the checkout with that registry's credentials and digest manifest; empty picks one and writes it here. |
+| `HEIMDALL_LIBRARY_RUNS_ROOT` | Run store of the platform org whose reference runs give a new organization's first estimate its cost and time (docs/evaluations.md); empty uses each organization's own runs only. |
+| `HEIMDALL_EVAL_BUDGET_MAX_USD` | Largest budget the evaluation wizard suggests (default 100 USD, lowered to an org's daily spend cap when one is set); a person can still type more. |
 | `HEIMDALL_REGISTRY_DIR` | Host folder (on the data disk) for that registry's images; empty is a Docker volume. |
 | `HEIMDALL_RUNNER_DIR` | Host folder of the shared worker's runs, releases and org projects; empty is `/var/lib/heimdall-shared-runner`. |
 | `HEIMDALL_SHARED_PLATFORM_IMAGES` | Images every organization may pull, comma-separated. |

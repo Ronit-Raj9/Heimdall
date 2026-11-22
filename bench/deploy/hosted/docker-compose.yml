@@ -211,6 +211,12 @@ services:
       HEIMDALL_MASTER_KEY: ${HEIMDALL_MASTER_KEY:-}
       HEIMDALL_SHARED_RUNNER_SECRET: ${HEIMDALL_SHARED_RUNNER_SECRET:-}
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
+      # First estimates (docs/evaluations.md, Budget and estimates): the run
+      # store of the platform org that runs reference agents on the library
+      # (a path in heimdall-data; empty: each org's own runs only), and the
+      # largest budget the wizard suggests (empty: 100 USD).
+      HEIMDALL_LIBRARY_RUNS_ROOT: ${HEIMDALL_LIBRARY_RUNS_ROOT:-}
+      HEIMDALL_EVAL_BUDGET_MAX_USD: ${HEIMDALL_EVAL_BUDGET_MAX_USD:-}
       # Prometheus metrics on the compose network only (docs/hosting.md,
       # Operating it); empty: off. Never publish this port.
       BENCH_SERVER_METRICS_LISTEN: ${HEIMDALL_METRICS_LISTEN:-}
@@ -440,7 +446,7 @@ services:
       # Operator override, logged on every start: run under runc when the
       # host has no gVisor, serving only orgs a server admin set to runc.
       HEIMDALL_SHARED_ALLOW_RUNC: ${HEIMDALL_SHARED_ALLOW_RUNC:-}
-      HEIMDALL_SHARED_SLOTS: ${HEIMDALL_SHARED_SLOTS:-1}
+      HEIMDALL_SHARED_SLOTS: ${HEIMDALL_SHARED_SLOTS:-4}
       HEIMDALL_BENCH_DIR: ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}
       BENCH_RUNS_ROOT: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}/runs
       BENCH_RELEASES_ROOT: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}/releases

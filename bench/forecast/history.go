@@ -58,6 +58,19 @@ func (h *History) Notes() []string {
 // runs whose outcome does not score. An experiment on another suite is
 // never opened beyond its manifest.
 func LoadHistory(ctx context.Context, st Store, m *schemas.Manifest, read leaderboard.RunFileReader) (*History, error) {
+	return loadHistory(ctx, st, m, read, false)
+}
+
+// LoadLibrary reads every sealed run on the planned manifest's suite
+// version, whatever agent or model made it, with the same exclusions as
+// LoadHistory. It is the library a first estimate rests on when no arm has
+// history of its own (Input.Library): real runs of other agents on the same
+// tasks, never a guess.
+func LoadLibrary(ctx context.Context, st Store, m *schemas.Manifest, read leaderboard.RunFileReader) (*History, error) {
+	return loadHistory(ctx, st, m, read, true)
+}
+
+func loadHistory(ctx context.Context, st Store, m *schemas.Manifest, read leaderboard.RunFileReader, all bool) (*History, error) {
 	ids, err := st.ListExperiments(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("forecast history: %w", err)
@@ -73,7 +86,7 @@ func LoadHistory(ctx context.Context, st Store, m *schemas.Manifest, read leader
 		if err != nil {
 			return nil, fmt.Errorf("forecast history: %s: %w", id, err)
 		}
-		if past.SuiteID+"@"+past.SuiteVersion != suite || !(judged || relevant(m, past)) {
+		if past.SuiteID+"@"+past.SuiteVersion != suite || !(all || judged || relevant(m, past)) {
 			continue
 		}
 		runs, err := st.SealedRuns(ctx, id, schemas.GradeSourceOriginal)

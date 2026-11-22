@@ -1,4 +1,4 @@
-import type { EvaluationArm, EvaluationMode, EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
+import type { EvaluationArm, EvaluationMode, EvaluationPresetId, EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 /**
@@ -28,14 +28,23 @@ export interface EvaluateDraft {
 	trials: number;
 	faults: string[];
 	budgetUsd: number | null;
+	/** Runs of one benchmark at once; null is the server default (4). */
+	concurrency?: number | null;
+	/** The size preset the numbers came from, if any. */
+	preset?: EvaluationPresetId | null;
 	/** The worker the evaluation runs on; "" is the org's default worker. */
 	worker?: string;
 	/** Arms dropped by a mode change (for example arm B in "score"), so going back restores their models. */
 	stashedArms?: EvaluationArm[];
 }
 
-export const DEFAULT_TASKS_PER_BENCHMARK = 8;
-export const DEFAULT_TRIALS = 2;
+/** The Quick look preset: 10 tasks once each (the server's defaults too). */
+export const DEFAULT_TASKS_PER_BENCHMARK = 10;
+export const DEFAULT_TRIALS = 1;
+export const DEFAULT_CONCURRENCY = 4;
+
+/** The shipped bare-model baseline (agents/bare-model.yaml): the model alone, no tools. */
+export const BARE_MODEL_AGENT = "bare-model";
 
 export const EMPTY_DRAFT: EvaluateDraft = {
 	name: "",
@@ -51,6 +60,7 @@ export const EMPTY_DRAFT: EvaluateDraft = {
 	trials: DEFAULT_TRIALS,
 	faults: ["clean"],
 	budgetUsd: null,
+	preset: "quick",
 };
 
 /**
@@ -95,7 +105,7 @@ export function draftToSpec(d: EvaluateDraft): EvaluationSpec {
 	return {
 		name: d.name || defaultName(d),
 		mode: d.mode,
-		arms: d.arms,
+		arms: withBareModel(d.arms),
 		benchmarks: d.benchmarks,
 		...(d.pack ? { pack: d.pack } : {}),
 		tasks_per_benchmark: d.tasksPerBenchmark,
@@ -103,7 +113,20 @@ export function draftToSpec(d: EvaluateDraft): EvaluationSpec {
 		faults,
 		...(d.budgetUsd != null ? { budget_usd: d.budgetUsd } : {}),
 		...(d.worker ? { worker: d.worker } : {}),
+		...(d.concurrency ? { concurrency: d.concurrency } : {}),
+		...(d.preset ? { preset: d.preset } : {}),
 	};
+}
+
+/** The bare-model baseline always runs on arm A's model: that is the comparison it stands for. */
+export function withBareModel(arms: EvaluationArm[]): EvaluationArm[] {
+	const a = arms[0];
+	if (!a) return arms;
+	return arms.map((x, i) => {
+		if (i === 0 || x.agent !== BARE_MODEL_AGENT) return x;
+		const { provider: _p, ...rest } = x;
+		return { ...rest, model: a.model, ...(a.provider ? { provider: a.provider } : {}) };
+	});
 }
 
 /** The draft fields a step that edits an EvaluationSpec (steps 4 and 5) changes. The name stays the draft's. */
@@ -117,6 +140,8 @@ export function specToPatch(spec: EvaluationSpec): Partial<EvaluateDraft> {
 		faults: spec.faults,
 		budgetUsd: spec.budget_usd ?? null,
 		worker: spec.worker ?? "",
+		concurrency: spec.concurrency ?? null,
+		preset: spec.preset ?? null,
 	};
 }
 
@@ -128,7 +153,7 @@ export function defaultName(d: EvaluateDraft): string {
 		case "models":
 			return `${who}: two models`;
 		case "opponent":
-			return `${who} vs ${d.opponent ?? "baseline"}`;
+			return d.opponent === BARE_MODEL_AGENT ? `${who} vs the bare model` : `${who} vs ${d.opponent ?? "baseline"}`;
 		default:
 			return `${who} score`;
 	}

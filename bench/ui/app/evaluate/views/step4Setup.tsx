@@ -9,6 +9,7 @@ import {
 	useGetBenchFaultsQuery,
 } from "@/lib/store/apis/evaluationsApi";
 import { armHasModel, useOwnModelAgents } from "./ownModel";
+import { CONCURRENCY_CHOICES, PresetPicker, slotsText } from "./presetPicker";
 
 /**
  * Wizard step 4: the model for each arm, how many tasks per benchmark, trials and faults, with a
@@ -16,7 +17,7 @@ import { armHasModel, useOwnModelAgents } from "./ownModel";
  * the wizard state; this step only reads and writes the spec it is given).
  */
 
-export const TASK_CHOICES = [3, 5, 8, 10, 20] as const;
+export const TASK_CHOICES = [3, 5, 8, 10, 20, 30, 50] as const;
 export const TRIAL_CHOICES = [1, 2, 3, 5] as const;
 
 /** Shown while GET /faults loads or when it fails. */
@@ -88,9 +89,10 @@ export function defaultEvaluationSpec(): EvaluationSpec {
 		mode: "score",
 		arms: [{ label: "A", agent: "", model: "" }],
 		benchmarks: [],
-		tasks_per_benchmark: 8,
-		trials: 2,
+		tasks_per_benchmark: 10,
+		trials: 1,
 		faults: ["clean"],
+		preset: "quick",
 	};
 }
 
@@ -167,9 +169,15 @@ export function EstimateSummary({ estimate, updating }: { estimate: EvaluationEs
 	const est = estimateText(estimate);
 	const notes = estimateNotes(estimate);
 	const power = powerText(estimate);
+	const slots = slotsText(estimate);
 	const skipped = notes.filter((n) => n.skipped).length;
 	return (
 		<div className="flex flex-col gap-2">
+			{estimate.from_library && (
+				<span className="text-chart-info-ink text-xs font-medium" data-testid="step4-from-library">
+					First run, estimate from library data: other agents on the same tasks. Your agent may differ.
+				</span>
+			)}
 			<span>
 				About <strong data-testid="step4-est-runs">{est.runs}</strong>, <strong data-testid="step4-est-cost">{est.cost}</strong>,{" "}
 				<strong data-testid="step4-est-minutes">{est.minutes}</strong>.
@@ -179,6 +187,11 @@ export function EstimateSummary({ estimate, updating }: { estimate: EvaluationEs
 				<span data-testid="step4-power">
 					{power.line}
 					{power.advice && <span className="text-muted-foreground"> {power.advice}</span>}
+				</span>
+			)}
+			{slots && (
+				<span className="text-muted-foreground" data-testid="step4-slots">
+					{slots}
 				</span>
 			)}
 			{notes.length > 0 && (
@@ -250,7 +263,7 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 	const owns = useOwnModelAgents();
 	const [picking, setPicking] = useState<Set<string>>(() => new Set());
 	const ready = specReady(spec, owns);
-	const estimate = useEstimateEvaluationQuery(spec, { skip: !ready });
+	const estimate = useEstimateEvaluationQuery({ ...spec, presets: true }, { skip: !ready });
 	const catalog = useGetBenchFaultsQuery();
 	const faultGroups = groupFaults(catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS);
 	const setArm = (i: number, provider: string, model: string) =>
@@ -305,20 +318,33 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 				))}
 			</section>
 
+			<PresetPicker
+				spec={spec}
+				presets={estimate.data?.presets ?? []}
+				onPick={(p) => onChange({ ...spec, tasks_per_benchmark: p.tasks_per_benchmark, trials: p.trials, faults: p.faults, preset: p.id })}
+			/>
+
 			<section className="flex flex-wrap gap-8">
 				<Choices
 					label="Tasks per benchmark"
 					value={spec.tasks_per_benchmark}
 					options={TASK_CHOICES}
-					onPick={(n) => onChange({ ...spec, tasks_per_benchmark: n })}
+					onPick={(n) => onChange({ ...spec, tasks_per_benchmark: n, preset: undefined })}
 					testId="step4-tasks"
 				/>
 				<Choices
 					label="Trials per task"
 					value={spec.trials}
 					options={TRIAL_CHOICES}
-					onPick={(n) => onChange({ ...spec, trials: n })}
+					onPick={(n) => onChange({ ...spec, trials: n, preset: undefined })}
 					testId="step4-trials"
+				/>
+				<Choices
+					label="Runs at once per benchmark"
+					value={spec.concurrency ?? 4}
+					options={CONCURRENCY_CHOICES}
+					onPick={(n) => onChange({ ...spec, concurrency: n })}
+					testId="step4-concurrency"
 				/>
 			</section>
 
@@ -340,6 +366,7 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 										onChange({
 											...spec,
 											faults: toggleFault(spec.faults, f.id, e.target.checked),
+											preset: undefined,
 										})
 									}
 								/>

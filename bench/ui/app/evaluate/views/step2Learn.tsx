@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { BarChart3, Check, Cpu, GitCompare, Swords } from "lucide-react";
 import type { ComponentType } from "react";
 import { useTranslation } from "react-i18next";
-import { useEvaluateDraft } from "./evaluateDraft";
+import { BARE_MODEL_AGENT, useEvaluateDraft } from "./evaluateDraft";
 import { LEARN_MODES, opponentChoices, type AgentWithCaps } from "./evaluate.utils";
 import { VersionPicker } from "./step1Agent";
 
@@ -23,7 +23,7 @@ export function Step2Learn() {
 	const agents = useGetAgentsQuery();
 	const versions = useGetAgentVersionsQuery(draft.agent ?? "", { skip: !draft.agent });
 	const versionCount = versions.data?.versions?.length ?? 0;
-	const opponents = opponentChoices((agents.data?.agents ?? []) as AgentWithCaps[], draft.agent);
+	const opponents = opponentChoices((agents.data?.agents ?? []) as AgentWithCaps[], draft.agent).filter((a) => a.id !== BARE_MODEL_AGENT);
 
 	return (
 		<div className="flex flex-col gap-6" data-testid="evaluate-step-2">
@@ -94,7 +94,13 @@ export function Step2Learn() {
 								{a.id}
 							</option>
 						))}
+						{draft.agent !== BARE_MODEL_AGENT && <option value={BARE_MODEL_AGENT}>{t("learn.bareModel")}</option>}
 					</select>
+					{draft.opponent === BARE_MODEL_AGENT && (
+						<span className="text-muted-foreground max-w-xl text-xs" data-testid="evaluate-bare-model-help">
+							{t("learn.bareModelHelp")}
+						</span>
+					)}
 				</label>
 			)}
 

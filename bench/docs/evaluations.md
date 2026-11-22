@@ -19,10 +19,12 @@ What you choose:
 | `arms` | The setups. One arm for `score`, two for the A/B modes. Each arm has a `label` (A, B), an `agent`, an optional `version`, a `model` and an optional `provider`. | none |
 | `benchmarks` | Benchmark ids to run. You can give a `pack` instead, or both (the pack's benchmarks are added). | none |
 | `pack` | A ready-made group of benchmarks for one skill (see below). | none |
-| `tasks_per_benchmark` | How many tasks to take from each benchmark. Only ready (admitted) tasks are used, chosen to be different from each other. At least 6 are needed before any A/B gap can be called real; 8 leaves room for the correction across benchmarks. | 8 |
-| `trials` | How many times each task is repeated per arm. | 2 |
+| `tasks_per_benchmark` | How many tasks to take from each benchmark. Only ready (admitted) tasks are used, chosen to be different from each other. At least 6 are needed before any A/B gap can be called real; more tasks detect smaller changes (see Presets). | 10 (Quick look) |
+| `trials` | How many times each task is repeated per arm. More tasks narrow the margin faster than more trials. | 1 |
 | `faults` | Fault conditions to add. Normal conditions (`clean`) are always included. | `["clean"]` |
-| `budget_usd` | A spending cap for the whole evaluation, split evenly over its benchmarks. | $5 per benchmark when not set |
+| `budget_usd` | A spending cap for the whole evaluation, split evenly over its benchmarks. The wizard fills in a budget that covers the expected cost (see Budget). | $5 per benchmark when not set |
+| `concurrency` | Runs of one benchmark that go at once, 1 to 16. Your organization's worker slots still bound what runs side by side. | 4 |
+| `preset` | The size preset the wizard started from (`quick`, `standard`, `thorough`); the numbers above are what runs. | none |
 
 Status of an evaluation is one of `queued`, `running`, `done`, `failed` or `cancelled`. While it runs, its status is worked out live from its children (one child per benchmark, each with its own comparison id and status). A benchmark that could not run is still listed, with a `skipped` reason, so you always see what was left out and why.
 
@@ -118,7 +120,7 @@ Faults cost runs: each fault adds as many runs as the normal condition.
 
 Runs per benchmark = arms x tasks x trials x conditions, where tasks is the smaller of `tasks_per_benchmark` and the benchmark's ready tasks. For example, 2 arms, 8 tasks, 2 trials, clean plus `model-down` is 2 x 8 x 2 x 2 = 64 runs per benchmark.
 
-The estimate forecasts exactly the tasks the launch will pick (the same spread over the ready tasks). When there is no sealed history for a setup the time is "not known" rather than zero.
+The estimate forecasts exactly the tasks the launch will pick (the same spread over the ready tasks). When there is no sealed history for a setup or the benchmark, the time is "not known" rather than zero (see First estimates).
 
 In `score` mode there is exactly one arm, and nothing else runs: 1 arm, 8 tasks, 2 trials, clean plus `model-down` is 1 x 8 x 2 x 2 = 32 runs per benchmark. The estimate counts the same runs the launch plans, so the cost and time you approve are the ones you pay for. (Evaluations created before one-arm runs existed also ran a hidden repeat of the arm; the report card ignores it and the leaderboards leave it out.) One exception adds runs, visibly: a score evaluation with `"stream": {"memory": "carry"}` also runs `<agent> (no memory)`, the same agent on the same tasks in the same order with empty memory, as the control for the gain from memory. It doubles the runs, the estimate counts it, and it is never on a leaderboard. Stream `replay: k` adds k runs at the end of every chain, also counted.
 
@@ -247,13 +249,45 @@ A report card looks like this (trimmed):
 
 Each child is an ordinary comparison, so every CLI command that reads comparisons works on it: for example `bifrost-bench leaderboard` and the comparison pages in the app.
 
+## Presets
+
+The wizard offers three sizes of the same setup, each with its runs, time, cost range and the smallest change it can detect (in points, from the power check):
+
+| Preset | Tasks per benchmark | Trials | Faults | Smallest change it can see on one benchmark |
+|---|---|---|---|---|
+| Quick look (default) | 10 | 1 | clean only | about 30 points |
+| Standard | 30 | 1 | clean only | about 16 points |
+| Thorough | 50 | 2 | clean, model down, broken tool | about 12 points |
+
+A benchmark with fewer ready tasks runs all of them. `POST /evaluations/estimate` with `"presets": true` returns the three sizes in `presets`.
+
+## Budget
+
+Every benchmark runs under a spend cap, and the cap is always shown. With no `budget_usd` the cap is $5 per benchmark. The wizard does not leave it empty: it fills in the estimate's `budget.suggested_usd`, which covers the high cost estimate with 25% headroom, never less than the $5 per benchmark default and never more than the organization's maximum (`HEIMDALL_EVAL_BUDGET_MAX_USD` on the server, default $100, lowered to the organization's daily spend cap when a server admin set one). You can type any budget up to $1000.
+
+The estimate's `budget` block says which cap applies (`budget_usd`, `per_benchmark_usd`, `default`), whether the cost fits it (`fit`: `fits`, `may_exceed`, `exceeds` or `unknown`) and how many runs the cap would leave unstarted at the low and the high cost estimate (`runs_skipped_low`, `runs_skipped_high`).
+
+When the cap stops a benchmark, its row on the evaluation page says so, with its spend, its cap and the runs it never started (`budget_stopped`, `spent_usd`, `budget_usd`, `not_started` on each child). "Raise budget and continue" (`POST /evaluations/{id}/raise-budget` with `{"budget_usd": <new total>}`) gives every benchmark that is still running or was stopped an equal share of the new budget, raises the live cap of the running ones, and continues the stopped ones from their finished runs; nothing that already ran runs again.
+
+## First estimates
+
+A brand-new agent has no runs, so its estimate rests on the library: sealed runs of other agents on the same benchmark version (your organization's own, plus the platform's reference runs when the server sets `HEIMDALL_LIBRARY_RUNS_ROOT`). Time is their wall time; cost is their recorded cost repriced from the model each run used to your model with the pinned price list. Your agent may differ, so the range is widened by half each way and the estimate says "First run, estimate from library data" (`from_library: true`). After your first evaluation the estimate uses your own runs instead. A run on a model without a price is left out of the cost, never guessed.
+
+## Bare-model baseline
+
+"Compare with the bare model" adds the same model with no agent scaffolding as the opponent: `agents/bare-model.yaml`, one model call with the task text, no tools and no loop, on your agent's model. It answers "does my agent add anything over the model?". It can only answer in text, so it runs on benchmarks graded on an answer (question sets, research answers) and is left out, with the reason, on benchmarks that grade a code change, a tool's state or files.
+
+## Worker slots and images
+
+On the shared worker an organization runs up to 4 runs at once by default (its max concurrent runs, set by a server admin); every estimate shows the slots it assumes (`slots`). Benchmarks of one evaluation run side by side within those slots. On a server that runs evaluations itself, the images a benchmark needs are pulled or built in the background as soon as the evaluation is created, so the first runs do not each wait for them; the shared worker makes every task image of a benchmark present when it first plans it.
+
 ## Agent leaderboard
 
 `GET /api/bench/leaderboard/agents?capability=&model=` lists agents (each agent, version and model is one row) with their scores per skill, ranked by the chosen skill (`capability=`); without one they are listed by name, since scores on different skills are never averaged into one number. Each row has cost and the last evaluation. Only your organization's real runs count (practice examples and practice-model runs never appear). A skill score is ranked only once it has at least 10 runs over 5 tasks (`min_runs`, `min_tasks`); smaller samples are shown with "not enough runs" and no rank. Its 95% range is the same task-clustered bootstrap as the report card. A row's cost is "not known" (with the count of unpriced runs) unless every run's cost is known. Built-in agents (codex, claude-code, mini-swe-agent, opencode, gemini-cli) are marked as baselines, so you can see where your agent stands against well-known ones. In the app this is the "Agents" tab of `/leaderboard`, which opens by default.
 
 ## Limits
 
-- Eight tasks per benchmark (the default) is enough to spot a big gap, not a small one. Most A/B results on few tasks will be "no clear winner yet". That is correct, not a bug.
+- Ten tasks per benchmark (the default) is enough to spot a big gap, not a small one. Most A/B results on few tasks will be "no clear winner yet". That is correct, not a bug.
 - A pack only includes benchmarks that are present and ready in your library or organization.
 - `misleading-instruction` only runs where the benchmark has that stress test.
 - Cost is only shown when every model's price is known.

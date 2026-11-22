@@ -1,11 +1,11 @@
-import { mutation, render, tagOf } from "@/lib/testing/render";
+import { mutation, okQuery, render, tagOf } from "@/lib/testing/render";
 import type { EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultEvaluationSpec } from "./step4Setup";
 import { Step5Launch, parseBudget, summaryLines } from "./step5Launch";
 
-const q = vi.hoisted(() => ({ create: [] as unknown as readonly [unknown, Record<string, unknown>] }));
-vi.mock("@/lib/store/apis/evaluationsApi", () => ({ useCreateEvaluationMutation: () => q.create }));
+const q = vi.hoisted(() => ({ create: [] as unknown as readonly [unknown, Record<string, unknown>], estimate: {} as Record<string, unknown> }));
+vi.mock("@/lib/store/apis/evaluationsApi", () => ({ useCreateEvaluationMutation: () => q.create, useEstimateEvaluationQuery: () => q.estimate }));
 vi.mock("@/lib/store/apis/modelsApi", () => ({ useGetModelsQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
 	...(await orig<typeof import("@/lib/store/apis/benchApi")>()),
@@ -26,6 +26,7 @@ const spec = (over: Partial<EvaluationSpec> = {}): EvaluationSpec => ({
 
 beforeEach(() => {
 	q.create = mutation();
+	q.estimate = {};
 });
 
 describe("summaryLines", () => {
@@ -34,7 +35,7 @@ describe("summaryLines", () => {
 	});
 
 	it("describes a score evaluation in plain sentences", () => {
-		expect(summaryLines(spec({ faults: ["clean", "model-down", "broken-tool"], budget_usd: 25 }))).toEqual([
+		expect(summaryLines(spec({ faults: ["clean", "model-down", "broken-tool"], budget_usd: 25, tasks_per_benchmark: 8, trials: 2 }))).toEqual([
 			"Score codex v2 on openai/gpt-4o-mini.",
 			"Run 2 benchmarks: hd-harbor-tb2, tau2.",
 			"Use 8 tasks from each benchmark and try each task 2 times.",
@@ -53,6 +54,7 @@ describe("summaryLines", () => {
 		expect(lines[1]).toBe("Run the coding pack of benchmarks.");
 		expect(lines[2]).toContain("try each task once");
 		expect(lines[3]).toBe("Run clean only, with no faults.");
+		expect(lines[4]).toBe("Stop each benchmark when its spending reaches $5 (the default budget).");
 		expect(summaryLines(spec({ mode: "opponent", arms }))[0]).toContain("against the baseline");
 	});
 });
@@ -71,6 +73,9 @@ describe("Step5Launch", () => {
 		const html = render(<Step5Launch spec={spec()} onChange={() => undefined} />);
 		expect(html).toContain("Score codex v2 on openai/gpt-4o-mini.");
 		expect(html).toContain('data-testid="step5-budget"');
+		expect(html).toContain('placeholder="$5 per benchmark"');
+		expect(html).not.toContain("No limit");
+		expect(html).toContain("Empty means the default: each benchmark stops at $5.");
 		expect(tagOf(html, "step5-launch-button")).not.toContain('disabled=""');
 		expect(html).toContain("Launch evaluation");
 	});
@@ -90,5 +95,34 @@ describe("Step5Launch", () => {
 		expect(html).toContain("this organization has no working openai key");
 		expect(tagOf(html, "step5-error-link")).toContain('href="/models"');
 		expect(html).toContain("Add a model key");
+	});
+});
+
+describe("Step5Launch budget check", () => {
+	const budget = (over: Record<string, unknown>) => ({
+		budget_usd: 10,
+		per_benchmark_usd: 5,
+		default: true,
+		default_per_benchmark_usd: 5,
+		suggested_usd: 23,
+		max_usd: 100,
+		fit: "exceeds",
+		runs_skipped_low: 6,
+		runs_skipped_high: 13,
+		...over,
+	});
+
+	it("warns how many runs the default cap leaves unstarted and offers the suggested budget", () => {
+		q.estimate = okQuery({ runs: 32, budget: budget({}) });
+		const html = render(<Step5Launch spec={spec()} onChange={() => undefined} />);
+		expect(html).toContain("With the default cap of $5 per benchmark, about 6 to 13 runs would not start.");
+		expect(html).toContain("Set budget to $23");
+	});
+
+	it("says when the budget covers the expected cost", () => {
+		q.estimate = okQuery({ runs: 8, budget: budget({ fit: "fits", default: false, budget_usd: 30, per_benchmark_usd: 15, suggested_usd: 30, runs_skipped_low: 0, runs_skipped_high: 0 }) });
+		const html = render(<Step5Launch spec={spec({ budget_usd: 30 })} onChange={() => undefined} />);
+		expect(html).toContain('data-testid="step5-budget-fits"');
+		expect(html).not.toContain("would not start");
 	});
 });

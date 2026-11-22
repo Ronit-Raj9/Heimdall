@@ -199,15 +199,17 @@ describe("Step4Setup", () => {
 		const html = render(<Step4Setup spec={spec({ faults: ["clean", "broken-tool"] })} onChange={() => undefined} />);
 		expect(html).toContain("deepseek-chat  [open]");
 		expect(html).toContain('data-testid="step4-model-A-open"');
-		expect(tagOf(html, "step4-tasks-8")).toContain('aria-checked="true"');
-		expect(tagOf(html, "step4-trials-2")).toContain('aria-checked="true"');
+		expect(tagOf(html, "step4-tasks-10")).toContain('aria-checked="true"');
+		expect(tagOf(html, "step4-trials-1")).toContain('aria-checked="true"');
+		expect(tagOf(html, "step4-concurrency-4")).toContain('aria-checked="true"');
+		expect(html).toContain('data-testid="step4-tasks-50"');
 		expect(html).toMatch(/data-testid="step4-fault-broken-tool"><input type="checkbox" class="mt-1" checked=""/);
 		expect(html).not.toMatch(/data-testid="step4-fault-model-down"><input type="checkbox" class="mt-1" checked=""/);
 		expect(html).toContain("Some tool calls return errors");
 		expect(html).toContain("20 runs");
 		expect(html).toContain("$1.20 to $3.40");
 		expect(html).toContain("10 to 25 min");
-		expect(q.estimateArgs[0]).toEqual([expect.objectContaining({ benchmarks: ["hd-harbor-tb2"] }), { skip: false }]);
+		expect(q.estimateArgs[0]).toEqual([expect.objectContaining({ benchmarks: ["hd-harbor-tb2"], presets: true }), { skip: false }]);
 	});
 
 	it("warns with a keys link when the chosen provider has no working key", () => {
@@ -240,7 +242,7 @@ describe("Step4Setup", () => {
 		expect(html).toContain('data-testid="step4-own-model-A"');
 		expect(html).toContain("Its own model.");
 		expect(html).not.toContain('data-testid="step4-model-A"');
-		expect(q.estimateArgs[0]).toEqual([own, { skip: false }]);
+		expect(q.estimateArgs[0]).toEqual([{ ...own, presets: true }, { skip: false }]);
 	});
 
 	it("shows one picker per arm and skips the estimate until ready", () => {
@@ -261,7 +263,7 @@ describe("Step4Setup", () => {
 		expect(html).toContain('data-testid="step4-arm-A"');
 		expect(html).toContain('data-testid="step4-arm-B"');
 		expect(html).toContain("Pick benchmarks and a model");
-		expect(q.estimateArgs[0]).toEqual([two, { skip: true }]);
+		expect(q.estimateArgs[0]).toEqual([{ ...two, presets: true }, { skip: true }]);
 	});
 
 	it("says price not known when the estimate has no price", () => {
@@ -430,5 +432,45 @@ describe("Step4Setup", () => {
 			"These settings have too few tasks to detect a change.",
 		);
 		expect(powerText({})).toBeUndefined();
+	});
+});
+describe("Step4Setup presets and slots", () => {
+	const preset = (id: "quick" | "standard" | "thorough", tasks: number, trials: number, faults: string[], mde: number | null) => ({
+		id,
+		label: { quick: "Quick look", standard: "Standard", thorough: "Thorough" }[id],
+		summary: "",
+		tasks_per_benchmark: tasks,
+		trials,
+		faults,
+		runs: tasks * trials * faults.length,
+		est_cost_usd: { low: 1, high: 3, known: true },
+		est_minutes: { low: 10, high: 25, known: true },
+		mde_pp: mde,
+		mde_per_benchmark_pp: mde,
+	});
+
+	it("shows the three sizes with runs, time, cost and power, the slots line and the library note", () => {
+		q.estimate = okQuery({
+			runs: 10,
+			est_cost_usd: { low: 1, high: 3, known: true },
+			est_minutes: { low: 10, high: 25, known: true },
+			per_benchmark: [],
+			from_library: true,
+			slots: { concurrency: 4, org_slots: 4, parallel: 4 },
+			presets: [
+				preset("quick", 10, 1, ["clean"], 30.2),
+				preset("standard", 30, 1, ["clean"], 16),
+				preset("thorough", 50, 2, ["clean", "model-down", "broken-tool"], null),
+			],
+		});
+		const html = render(<Step4Setup spec={{ ...defaultEvaluationSpec(), arms: [{ label: "A", agent: "codex", model: "gpt-4o-mini" }], benchmarks: ["x"] }} onChange={() => undefined} />);
+		expect(tagOf(html, "step4-preset-quick")).toContain('aria-checked="true"');
+		expect(tagOf(html, "step4-preset-standard")).toContain('aria-checked="false"');
+		expect(html).toContain("10 runs, about 10 min to 25 min, $1.00 to $3.00");
+		expect(html).toContain("sees a change of about 30 points");
+		expect(html).toContain("too few tasks to see a change");
+		expect(html).toContain("2 faults");
+		expect(html).toContain("Up to 4 runs at once (4 per benchmark; your organization has 4 worker slots).");
+		expect(html).toContain('data-testid="step4-from-library"');
 	});
 });

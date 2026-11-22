@@ -39,19 +39,36 @@ func TaskOK(agent *schemas.AgentConfig, s *schemas.Suite, t *schemas.Task) (bool
 		return remoteTaskOK(utils.A2ARemoteView(agent.A2A), s, t, kind, "an A2A agent", "a2a")
 	case agent.Adapter == "remote_http" || agent.Remote != nil:
 		return remoteTaskOK(agent.Remote, s, t, kind, "your endpoint", "remote")
+	case utils.IsBareModel(agent): // G4-21: one model call, no tools; it can only answer in text
+		if kind != schemas.OutputAnswer {
+			return false, "it grades a " + outputWords(kind) + ", and the bare model only answers in text"
+		}
 	}
 	return true, ""
 }
 
+// outputWords names an output kind in plain words.
+func outputWords(kind string) string {
+	switch kind {
+	case schemas.OutputDiff:
+		return "code change"
+	case schemas.OutputState:
+		return "change to the task's tools"
+	case schemas.OutputArtifact:
+		return "file the agent writes"
+	}
+	return kind + " output"
+}
+
 // ChecksTasks reports whether TaskOK can refuse a task for agent: only an
 // agent outside the workspace (an OpenAI-compatible endpoint, an A2A agent,
-// a remote_http endpoint) has output rules. Callers that read only a
+// a remote_http endpoint) or the bare-model baseline has output rules. Callers that read only a
 // benchmark's head use it to know when the tasks must be loaded.
 func ChecksTasks(agent *schemas.AgentConfig) bool {
 	if agent == nil {
 		return false
 	}
-	return utils.IsOpenAIAgent(agent) || utils.IsA2A(agent) || agent.Adapter == "remote_http" || agent.Remote != nil
+	return utils.IsOpenAIAgent(agent) || utils.IsA2A(agent) || agent.Adapter == "remote_http" || agent.Remote != nil || utils.IsBareModel(agent)
 }
 
 func remoteTaskOK(r *schemas.RemoteAgent, s *schemas.Suite, t *schemas.Task, kind, who, block string) (bool, string) {

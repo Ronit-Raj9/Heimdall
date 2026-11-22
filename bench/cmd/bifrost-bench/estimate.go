@@ -103,6 +103,7 @@ func (a *app) forecast(ctx context.Context, m *schemas.Manifest) (*schemas.Forec
 	}
 	return forecast.Estimate(forecast.Input{
 		Manifest: m, History: h.Runs, Priced: a.priced, PriceRef: a.prices.Ref(), Concurrency: concurrency, Notes: h.Notes(), Now: time.Now(),
+		Library: a.libraryRuns(ctx, m), Reprice: a.reprice,
 	}), nil
 }
 

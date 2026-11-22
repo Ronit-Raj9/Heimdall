@@ -23,7 +23,7 @@ func init() {
 			Summary: "Cancel every experiment of the evaluation that still runs",
 			Auth:    AuthWrite, Status: fasthttp.StatusAccepted, Response: schemas.Evaluation{}},
 		RouteDoc{Method: "POST", Path: p + "/estimate", Tag: "evaluations",
-			Summary: "Estimate runs, cost and minutes of an evaluation spec before launching it; unknown prices stay unknown",
+			Summary: "Estimate runs, cost and minutes of an evaluation spec before launching it, with the budget that applies, the runs a smaller budget would leave unstarted and, on request, the Quick look, Standard and Thorough sizes; a first run is estimated from library runs of other agents; unknown prices stay unknown",
 			Auth:    AuthWrite, Request: EvalEstimateRequest{}, Response: EvalEstimate{}},
 		RouteDoc{Method: "GET", Path: APIPrefix + "/evaluation-packs", Tag: "evaluations",
 			Summary:  "Evaluation packs (coding, support, memory, ...) with the benchmarks of each present on this server and their ready task counts",

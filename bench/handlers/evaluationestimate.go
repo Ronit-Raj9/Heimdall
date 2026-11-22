@@ -32,8 +32,8 @@ import (
 
 // Evaluation estimate defaults and limits.
 const (
-	EvalDefaultTasks  = 8
-	EvalDefaultTrials = 2
+	EvalDefaultTasks  = EvaluationDefaultTasks
+	EvalDefaultTrials = EvaluationDefaultTrials
 	EvalMaxTasks      = 100
 	EvalMaxTrials     = 20
 	EvalMaxArms       = 2
@@ -66,6 +66,15 @@ type EvalEstimateRequest struct {
 	// In score mode with memory carried the launch adds a no-memory control
 	// arm, and replay runs go at the end of every chain: both are counted.
 	Stream *schemas.StreamSpec `json:"stream,omitempty"`
+	// Concurrency is the runs of one benchmark that go at once (the spec's
+	// concurrency; 0 is EvaluationDefaultConcurrency).
+	Concurrency int `json:"concurrency,omitempty"`
+	// Presets asks for the Quick look, Standard and Thorough sizes of the
+	// same setup too (evaluationpresets.go).
+	Presets bool `json:"presets,omitempty"`
+
+	orgSlots int     // the org's worker slots (0: not bounded here)
+	dailyCap float64 // the org's daily spend cap (0: none)
 }
 
 // streamControl reports whether the launch adds the no-memory control arm
@@ -114,6 +123,11 @@ type EvalBenchmarkEstimate struct {
 	Skipped     string           `json:"skipped,omitempty"` // the benchmark cannot run at all
 	Notes       []string         `json:"notes"`
 	Concurrency int              `json:"concurrency,omitempty"`
+	// FromLibrary is true when some arm has no history of its own and its
+	// cost and time come from other agents' runs on this benchmark.
+	FromLibrary bool `json:"from_library,omitempty"`
+
+	agentLow, agentHigh float64 // summed agent seconds, for the evaluation's wall time
 }
 
 // EvalEstimate is the answer of POST /evaluations/estimate.
@@ -127,6 +141,27 @@ type EvalEstimate struct {
 	// UnpricedModels are the arm models the price snapshot does not list:
 	// the estimate has no cost for them (never $0).
 	UnpricedModels []string `json:"unpriced_models"`
+	// Budget is the cap that applies, the suggested one and the runs a cap
+	// below the expected cost would leave unstarted (evaluationbudget.go).
+	Budget EvalBudget `json:"budget"`
+	// Slots says how many runs go side by side and why.
+	Slots EvalSlots `json:"slots"`
+	// FromLibrary is true when some benchmark's estimate comes from library
+	// runs (a first run of this agent); it is refined from the org's own
+	// runs once they exist.
+	FromLibrary bool `json:"from_library,omitempty"`
+	// Presets are the preset sizes of the same setup, when asked for.
+	Presets []EvalPresetEstimate `json:"presets,omitempty"`
+}
+
+// EvalSlots is how many runs of the evaluation go at once: Concurrency per
+// benchmark, Parallel over all its benchmarks, bounded by OrgSlots (the
+// org's worker slots on the shared worker, 0 when this server does not
+// bound them).
+type EvalSlots struct {
+	Concurrency int `json:"concurrency"`
+	OrgSlots    int `json:"org_slots"`
+	Parallel    int `json:"parallel"`
 }
 
 // Power check settings: the assumed per-task SD of the paired difference
@@ -254,6 +289,7 @@ func (h *evalEstimateHandler) post(ctx *fasthttp.RequestCtx) {
 	} else if h.env.Cfg != nil {
 		root = h.env.Cfg.Root
 	}
+	req.orgSlots, req.dailyCap = orgSlotsAndCap(work, h.env.Services)
 	est, err := estimateEvaluation(work, h.env.Services.Suites, src, &req, agents, root, h.cache)
 	if err != nil {
 		if errors.Is(err, errQuickBad) {
@@ -346,6 +382,8 @@ func estimateEvaluation(ctx context.Context, suites SuiteSource, src ForecastSou
 	}
 	wg.Wait()
 	allKnown, timeKnown, ran := true, true, false
+	var agentLow, agentHigh float64
+	running := 0
 	for _, be := range per {
 		if be.Skipped == "" {
 			ran = true
@@ -360,8 +398,9 @@ func estimateEvaluation(ctx context.Context, suites SuiteSource, src ForecastSou
 			out.Runs += be.Runs
 			out.EstCostUSD.Low += be.EstCostUSD.Low
 			out.EstCostUSD.High += be.EstCostUSD.High
-			out.EstMinutes.Low += be.EstMinutes.Low
-			out.EstMinutes.High += be.EstMinutes.High
+			agentLow, agentHigh = agentLow+be.agentLow, agentHigh+be.agentHigh
+			out.FromLibrary = out.FromLibrary || be.FromLibrary
+			running++
 		}
 		out.PerBenchmark = append(out.PerBenchmark, be)
 	}
@@ -380,7 +419,18 @@ func estimateEvaluation(ctx context.Context, suites SuiteSource, src ForecastSou
 		out.EstCostUSD.Reason = "some benchmarks have no run history to estimate from"
 	}
 	out.Power = evalPower(out.PerBenchmark, req.Trials)
+	out.Slots = evalSlots(req, running)
+	if p := float64(max(1, out.Slots.Parallel)); ran {
+		out.EstMinutes.Low, out.EstMinutes.High = agentLow/p/60, agentHigh/p/60
+	}
 	out.EstMinutes.Known = ran && timeKnown
+	if out.FromLibrary {
+		out.Notes = append(out.Notes, "First run, estimate from library data: other agents' finished runs on the same tasks, repriced for your model. Your agent may differ, so the range is wide; it narrows from your own runs after this evaluation.")
+	}
+	out.Budget = estimateBudget(out, req.BudgetUSD, req.dailyCap)
+	if req.Presets {
+		out.Presets = estimatePresets(ctx, suites, src, req, agents, root, cache)
+	}
 	if !ran {
 		out.Notes = append(out.Notes, "no benchmark of this evaluation can run")
 	}
@@ -426,6 +476,9 @@ func normalizeEvalRequest(req *EvalEstimateRequest) error {
 	}
 	if req.BudgetUSD < 0 {
 		return badf("budget_usd must not be negative")
+	}
+	if req.Concurrency < 0 || req.Concurrency > EvaluationMaxConcurrency {
+		return badf("concurrency must be between 1 and %d (0 is the default, %d)", EvaluationMaxConcurrency, EvaluationDefaultConcurrency)
 	}
 	if len(req.Benchmarks) == 0 && strings.TrimSpace(req.Pack) == "" {
 		return badf("pick at least one benchmark or a pack")
@@ -560,7 +613,7 @@ func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSour
 		be.Notes = append(be.Notes, "no forecast: "+err.Error())
 		return be
 	}
-	applyForecast(&be, f, req.armCount())
+	applyForecast(&be, f, req.armCount(), req.orgSlots)
 	return be
 }
 
@@ -589,6 +642,9 @@ func evalExperiment(st *schemas.Suite, req *EvalEstimateRequest, tasks, conds []
 			base = agent
 		}
 		arm := evalArmFor(a.Provider, a.Model)
+		if id := strings.TrimSuffix(strings.TrimPrefix(a.Agent, "agents/"), ".yaml"); id == utils.BareModelAgent {
+			arm = bareModelArm(arm, id, a.Provider, a.Model)
+		}
 		arm.Agent = agent
 		if a.Label != "" {
 			arm.Label = a.Label
@@ -619,7 +675,7 @@ func evalExperiment(st *schemas.Suite, req *EvalEstimateRequest, tasks, conds []
 		Conditions:   cs,
 		Budget:       schemas.BudgetSpec{TotalUSD: req.BudgetUSD},
 		Verdict:      schemas.VerdictSpec{Policy: "paired_signflip"},
-		Concurrency:  2,
+		Concurrency:  evalConcurrency(schemas.EvaluationSpec{Concurrency: req.Concurrency}),
 		ManifestMode: "agent_exposure",
 		Stream:       stream,
 	}
@@ -627,13 +683,16 @@ func evalExperiment(st *schemas.Suite, req *EvalEstimateRequest, tasks, conds []
 
 // applyForecast reads the spec arms' ranges out of f. Cost and time are
 // known only when every spec arm has a history range.
-func applyForecast(be *EvalBenchmarkEstimate, f *schemas.Forecast, nArms int) {
+func applyForecast(be *EvalBenchmarkEstimate, f *schemas.Forecast, nArms, slots int) {
 	if f == nil {
 		be.Notes = append(be.Notes, "the forecast returned nothing")
 		return
 	}
 	be.Basis = f.Basis
 	be.Concurrency = max(1, f.Concurrency)
+	if slots > 0 {
+		be.Concurrency = min(be.Concurrency, slots)
+	}
 	be.Notes = append(be.Notes, f.Notes...)
 	want := evalArmIDs[:nArms]
 	costKnown, timeKnown, found := true, true, 0
@@ -643,6 +702,10 @@ func applyForecast(be *EvalBenchmarkEstimate, f *schemas.Forecast, nArms int) {
 			continue
 		}
 		found++
+		if a.Basis == schemas.BasisLibrary {
+			be.FromLibrary = true
+			be.Notes = append(be.Notes, fmt.Sprintf("arm %s: %s", a.Arm, a.BasisText))
+		}
 		lo, hi, ok := rangeBounds(a.CostUSD)
 		be.EstCostUSD.Low += lo
 		be.EstCostUSD.High += hi
@@ -661,6 +724,7 @@ func applyForecast(be *EvalBenchmarkEstimate, f *schemas.Forecast, nArms int) {
 	}
 	be.EstCostUSD.Known = costKnown
 	c := float64(be.Concurrency)
+	be.agentLow, be.agentHigh = agentLow, agentHigh
 	be.EstMinutes = EvalMinutesRange{Low: agentLow / c / 60, High: agentHigh / c / 60, Known: timeKnown}
 }
 

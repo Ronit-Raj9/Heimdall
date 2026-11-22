@@ -42,17 +42,17 @@ func TestEstimateEvaluationKnown(t *testing.T) {
 	if !slices.Equal(cc.Conditions, []string{"clean", "model-outage", "stale-notes"}) || len(cc.FaultsSkip) != 1 || cc.FaultsSkip[0].Fault != "broken-tool" {
 		t.Fatalf("coding-core conditions %v skip %v", cc.Conditions, cc.FaultsSkip)
 	}
-	if cc.Runs != 1*2*3*2 || cc.Tasks != 2 {
+	if cc.Runs != 1*2*3*EvalDefaultTrials || cc.Tasks != 2 {
 		t.Fatalf("coding-core runs %d tasks %d", cc.Runs, cc.Tasks)
 	}
 	pl := est.PerBenchmark[1]
-	if !slices.Equal(pl.Conditions, []string{"clean", schemas.GenericProbeModelDown}) || pl.Runs != 1*1*2*2 {
+	if !slices.Equal(pl.Conditions, []string{"clean", schemas.GenericProbeModelDown}) || pl.Runs != 1*1*2*EvalDefaultTrials {
 		t.Fatalf("plain %v runs %d", pl.Conditions, pl.Runs)
 	}
 	if est.PerBenchmark[2].Skipped == "" {
 		t.Fatal("missing benchmark must be skipped")
 	}
-	if est.Runs != 12+4 || !est.EstCostUSD.Known || est.EstCostUSD.Low != 2 || est.EstCostUSD.High != 6 {
+	if est.Runs != (6+2)*EvalDefaultTrials || !est.EstCostUSD.Known || est.EstCostUSD.Low != 2 || est.EstCostUSD.High != 6 {
 		t.Fatalf("totals %+v", est)
 	}
 	// The experiment the forecast saw: the one arm only (no hidden repeat).
@@ -86,7 +86,7 @@ func TestEstimateEvaluationUnpricedNeverGuesses(t *testing.T) {
 	}
 	// Nil forecast: runs only.
 	est, err = EstimateEvaluation(context.Background(), estimateSuites(), nil, &EvalEstimateRequest{Arms: []EvalEstimateArm{{Agent: "codex", Model: "gpt-x"}}, Pack: "all-compatible"})
-	if err != nil || est.EstCostUSD.Known || len(est.PerBenchmark) != 2 || est.Runs != 3*2+1*2 {
+	if err != nil || est.EstCostUSD.Known || len(est.PerBenchmark) != 2 || est.Runs != (3+1)*EvalDefaultTrials {
 		t.Fatalf("nil forecast %+v %v", est, err)
 	}
 }
