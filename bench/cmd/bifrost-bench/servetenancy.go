@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/mail"
 	"os"
 
 	"github.com/maximhq/bifrost/bench/adapters"
@@ -132,7 +133,17 @@ func newHostedEnv(ctx context.Context, a *app, offline bool) (*hostedEnv, func()
 		d.Close()
 		return nil, nil, err
 	}
-	svc, err := auth.New(authCfg, auth.Deps{DB: d, Logger: a.logger})
+	// Verification emails go through the same transport as notifications
+	// (bench/mail, HEIMDALL_SMTP_URL or a Resend or Postmark key). With
+	// none, SendMail stays nil: auth writes the links to the server log and
+	// tells the user to check with their admin.
+	var sendMail auth.MailSender
+	if sender, merr := mail.FromEnv(a.logger); merr != nil {
+		a.logger.Error("email is not configured correctly; verification links go to the server log only", "error", merr.Error())
+	} else if mail.Delivers(sender) {
+		sendMail = mail.Func(sender)
+	}
+	svc, err := auth.New(authCfg, auth.Deps{DB: d, Logger: a.logger, SendMail: sendMail})
 	if err != nil {
 		d.Close()
 		return nil, nil, err
