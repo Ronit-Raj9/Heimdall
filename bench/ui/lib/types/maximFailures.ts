@@ -113,3 +113,9 @@ export interface MaximTaskResult {
 	task: MaximTaskDraft;
 	message?: string;
 }
+
+declare module "@/lib/i18n/resources" {
+	interface LaneResources {
+		maximFailures: typeof import("@/locales/en/maximFailures.json");
+	}
+}
