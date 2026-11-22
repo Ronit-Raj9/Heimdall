@@ -1,29 +1,109 @@
-# Heimdall: the release gate for AI agents, built on Bifrost
+# Heimdall: agent benchmarking for your own agents, built on Bifrost
 
-> **Hackathon submission (PS2, agent benchmarking).** Heimdall decides whether a change to an AI agent (a new model, prompt, notes file, tool or gateway rule) made it better, worse, or whether we cannot tell yet. It runs agents on the same tasks, repeatedly, clean and under injected failures, with every model call going through Bifrost, and turns that record into a verdict (improved, regressed, inconclusive or evaluation invalid) with the evidence one click away. It lives in [`bench/`](bench/) (code name `bifrost-bench`). Start with [`bench/README.md`](bench/README.md); run `make bench-up`, `make bench-smoke` and `make bench-serve` from the repo root.
->
-> A team can also benchmark its own agent on tasks cut from its own repositories, in any language and without Go code: [`bench/docs/bring-your-own.md`](bench/docs/bring-your-own.md).
->
-> In Norse myth Heimdall guards Bifrost, the bridge to Asgard: nothing crosses without passing him. Heimdall is built inside a fork of [Bifrost](https://github.com/maximhq/bifrost) (Apache-2.0); everything after the next horizontal rule is upstream Bifrost's own README.
+Heimdall tests a team's own AI agent and tells them whether a change (a new model, prompt, tool or gateway rule) made it better, worse, or whether it is too early to tell.
+It runs the agent on the same tasks many times, clean and under injected failures, with every model call going through Bifrost, and turns that record into a verdict with the evidence one click away.
+Its library holds 1,000+ ready tasks across 30+ real open-source benchmarks, and a team can add tasks cut from its own repositories.
+
+**Live site: https://20-70-160-61.sslip.io**
+
+> **Hackathon submission (PS2, agent benchmarking).** Heimdall lives in [`bench/`](bench/) of this fork of [Bifrost](https://github.com/maximhq/bifrost) (Apache-2.0), with its own Bifrost plugin in [`plugins/heimdall/`](plugins/heimdall/). In Norse myth Heimdall guards Bifrost, the bridge to Asgard: nothing crosses without passing him. Everything after the "Upstream Bifrost README" divider below is upstream Bifrost's own README, unchanged.
 
 ## Try it as a judge
 
-No install, no CLI. Everything below happens in the browser, in an organization of your own.
+No install and no CLI. Everything happens in the browser, in an organization of your own.
 
-- **Public URL:** `https://<HEIMDALL_PUBLIC_URL>` (placeholder: the submission form carries the live address).
-- **Sign up:** open the URL, press **Create one** under "No account yet?", and enter an email and a password (or press **Continue with GitHub**). Your account gets its own organization with you as owner.
-- **A shared report card:** `<REPORT_CARD_SHARE_LINK>` (placeholder: a read-only link to a finished report card, filled in before submission).
+1. **Sign up:** open https://20-70-160-61.sslip.io, press **Create one** under "No account yet?", and enter an email and a password (or press **Continue with GitHub**). You get your own organization with you as owner.
+2. **Add a model key** under **Settings, API keys**: paste a key for the provider you want to test with and press **Test**. Runs use only your organization's own keys.
+3. **Connect your agent** on **Agents**: pick a built-in agent (Codex, Claude Code, mini-swe-agent and others) or connect your own endpoint, and choose its model.
+4. **Evaluate** from the agent's page: pick benchmarks or a pack and, if you like, faults (the model goes down, a tool breaks, a misleading instruction). The estimate shows runs, cost and time before you launch.
+5. **Read the report card** when it finishes: score per capability with its interval, cost, how the agent holds up under each fault, and every run one click away. **Share** gives a read-only link.
 
-Once signed in:
-
-1. **Add a model key** under **Settings, API keys**: paste a key for the provider you want to test with and press **Test**. Runs use only your organization's own keys.
-2. **Connect your agent** on **Agents**: pick a built-in agent (Codex, Claude Code, mini-swe-agent, ...) or connect your own endpoint, and choose its model.
-3. **Evaluate** from the agent's page: pick benchmarks or a pack and, if you like, faults (the model goes down, a tool breaks, a misleading instruction). The estimate shows the runs, cost and time before you launch. Runs go to the shared worker unless you chose another place on **Settings, Workers**.
-4. **Read the report card** when it finishes: score per capability with its interval, cost, how the agent holds up under each fault, and every run one click away. **Share** gives a read-only link like the one above.
+A finished, shared report card: `TODO: shared report card link` (filled in before submission).
 
 Guides ship inside the app under **Docs**; the same files are in [`bench/docs/`](bench/docs/web-quickstart.md). Every CLI command and its website button: [`bench/docs/CLI_WEB_PARITY.md`](bench/docs/CLI_WEB_PARITY.md).
 
+## How Heimdall uses Bifrost
+
+Bifrost is not a side dependency here: every model call an agent makes during an evaluation crosses Bifrost, and Heimdall uses Bifrost's own features to control, break and measure that traffic.
+
+```mermaid
+flowchart LR
+    subgraph H[Heimdall server and worker]
+        E[Evaluation] --> R[Run in a sandbox]
+        GC[Bifrost gateway client<br/>bench/gateways/bifrost]
+        RC[Report card]
+    end
+    R -- "model calls with a per-run virtual key<br/>and Heimdall headers" --> BF
+    subgraph BF[Bifrost]
+        GOV[Governance<br/>virtual keys and budgets]
+        HP[heimdall plugin<br/>faults and tagging]
+        FB[Fallbacks]
+        SC[Semantic cache plugin]
+        MCP[MCP gateway]
+        LOG[Logs]
+    end
+    GOV --> HP --> SC --> FB --> P[Model providers]
+    R -- "tool calls (optional)" --> MCP
+    GC -- "create and revoke keys,<br/>set budgets and fallbacks" --> GOV
+    LOG -- "per-call provider, tokens, cost,<br/>latency, cache hits, fallbacks" --> GC
+    HP -- "usage records tagged with<br/>run and evaluation ids" --> GC
+    GC --> RC
+    GC -- "routing export" --> RX[Bifrost routing rules]
+```
+
+- **Per-run virtual keys.** Each run gets its own Bifrost governance virtual key, minted before the run and revoked after it, so every call is attributed to exactly one run and no run can use another's key ([`bench/gateways/bifrost/keys.go`](bench/gateways/bifrost/keys.go)).
+- **Governance budgets.** The evaluation budget becomes a hard Bifrost budget (and rate limit) on the evaluation's keys. When Bifrost refuses a call for budget, the evaluation shows "stopped by Bifrost budget" instead of a vague failure.
+- **The heimdall Bifrost plugin** ([`plugins/heimdall/`](plugins/heimdall/)): a real Bifrost plugin, loaded like the built-in ones and off unless enabled. It reads the run id, evaluation id, organization, arm and fault plan from request headers, injects the planned model faults inside Bifrost (error status codes, 429 with Retry-After, timeouts and latency, seeded flaky failures, outage windows) and tags every response and log row with Heimdall's ids. It can also send per-call usage records (provider, model, tokens, cost, latency, cache hit, fallback used, fault applied) back to Heimdall. The separate fault proxy ([`bench/faultproxy/`](bench/faultproxy/)) stays as the fallback when the plugin is not loaded.
+- **Fallbacks failover test.** The "Provider failover" option configures Bifrost fallbacks for the agent's model, takes the primary provider down, and reports whether failover worked, the extra latency, the cost change and task success with and without the outage.
+- **Cache on vs off.** The "Bifrost cache on vs off" option runs two arms that differ only in Bifrost's semantic cache plugin and reports cache hit rate, latency and cost saved, and any change in quality.
+- **MCP gateway.** A task's MCP tool servers can be routed through Bifrost's MCP gateway so tool calls appear in Bifrost's logs next to model calls, granted per virtual key.
+- **Logs.** Heimdall reads Bifrost's logs for every run: the "Through Bifrost" panel on the run page lists provider and model used, fallbacks triggered, cache hits, faults applied, tokens, cost and latency per call.
+- **Routing export.** A routing policy that won an experiment can be exported as Bifrost routing rules, so the tested setting is what goes to production.
+
+The evaluation page and **Settings, Integrations** show which of these Bifrost features an organization uses. Every touchpoint, with file paths and sequence diagrams: [`bench/docs/bifrost-integration.md`](bench/docs/bifrost-integration.md). What each Bifrost feature does under test: [`bench/docs/bifrost-features.md`](bench/docs/bifrost-features.md).
+
+Status note: the plugin, per-evaluation budget keys, failover and cache tests, MCP gateway routing, the Bifrost panel and routing export are being merged from the Wave C branches; anything that is not yet on `main` is in its feature branch.
+
+## Run it yourself with Docker Compose
+
+The hosted stack (Caddy, the Heimdall server with the UI embedded, Postgres, Bifrost) is in [`bench/deploy/hosted/`](bench/deploy/hosted/):
+
+```sh
+cd bench
+deploy/hosted/bootstrap.sh --domain heimdall.example.com --email ops@example.com \
+    --owner-email you@example.com --owner-name "Your Name"
+```
+
+`bootstrap.sh` creates `deploy/hosted/.env` with random secrets, builds the server image, migrates the database, creates the first owner and starts the stack; it is safe to run again. Full guide: [`bench/docs/hosting.md`](bench/docs/hosting.md).
+
+For a local developer stack instead: `make bench-up` (gateway stack), `make bench-smoke` (a no-key run end to end through real Bifrost) and `make bench-serve` (web UI and API), from the repo root.
+
+## Where the code lives
+
+| Path | What |
+|---|---|
+| [`bench/`](bench/) | Heimdall: server, worker, runners, graders, statistics, web UI ([`bench/ui/`](bench/ui/)) and docs ([`bench/docs/`](bench/docs/)). Start with [`bench/README.md`](bench/README.md). |
+| [`bench/gateways/bifrost/`](bench/gateways/bifrost/) | Heimdall's Bifrost client: virtual keys, budgets, logs, routing, MCP. |
+| [`plugins/heimdall/`](plugins/heimdall/) | The heimdall Bifrost plugin: fault injection, tagging, usage export. |
+| [`bench/faultproxy/`](bench/faultproxy/), [`bench/toolproxy/`](bench/toolproxy/) | Fault proxy for model calls (fallback to the plugin) and the tool proxy for tool faults. |
+| [`bench/deploy/`](bench/deploy/) | Local and hosted Docker Compose stacks, Bifrost config. |
+| `core/`, `transports/`, `plugins/`, `framework/`, `ui/` | Upstream Bifrost. |
+
+## Tests and CI
+
+- `make bench-test`: `go vet` and unit tests for Heimdall, no Docker and no network. `make bench-test-integration` runs the tests that use real Docker.
+- The heimdall plugin has its own Go module with unit tests: `cd plugins/heimdall && go test ./...`.
+- [`.github/workflows/bench-check.yml`](.github/workflows/bench-check.yml) runs Heimdall's release gate on every pull request that touches an agent, experiment, policy, benchmark or bench code: it replays a sealed, checked-in experiment with no Docker, gateway, provider key or secret, and fails the build on a blocking verdict ([`bench/docs/ci.md`](bench/docs/ci.md)).
+
+## History
+
+Heimdall development started on 14 Nov 2026. Earlier commits in this repository are upstream Bifrost's own history.
+
 ---
+
+<!-- Upstream Bifrost README below this line, unchanged. -->
+
+**Upstream Bifrost README**
 
 # Bifrost AI Gateway
 
