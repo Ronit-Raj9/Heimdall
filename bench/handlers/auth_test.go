@@ -3,11 +3,11 @@ package handlers_test
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/url"
 	"regexp"
-	"sync"
-	"net"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 

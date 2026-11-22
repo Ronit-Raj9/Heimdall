@@ -881,7 +881,7 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 		created(m.ExpID)
 	}
 	child.ExperimentID, child.Status = m.ExpID, string(schemas.ExperimentCreatedState)
-	prewarmImages(s.Launcher, m) // G4-04: pull or build the images now, not at the first run
+	prewarmImages(s.Launcher, m)                   // G4-04: pull or build the images now, not at the first run
 	reportcard.ChildDatasetFromManifest(&child, m) // Y07: the benchmark version and tasks this child ran
 	if err := s.Launcher.Start(start, m.ExpID); err != nil {
 		child.Status, child.Skipped = string(schemas.ExperimentFailed), "start experiment (it was created; start it from its page): "+err.Error()
