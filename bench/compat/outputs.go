@@ -56,6 +56,8 @@ func TaskOK(agent *schemas.AgentConfig, s *schemas.Suite, t *schemas.Task) (bool
 		}
 	case isVoicePlatform(agent): // voiceplatform.go
 		return voicePlatformTaskOK(agent, t)
+	case isVoiceRTC(agent): // voicertc.go
+		return voiceRTCTaskOK(t)
 	}
 	return true, ""
 }
@@ -81,7 +83,7 @@ func ChecksTasks(agent *schemas.AgentConfig) bool {
 	if agent == nil {
 		return false
 	}
-	return utils.IsOpenAIAgent(agent) || utils.IsA2A(agent) || utils.IsPullAgent(agent) || agent.Adapter == "remote_http" || agent.Remote != nil || utils.IsBareModel(agent) || isVoicePlatform(agent)
+	return utils.IsOpenAIAgent(agent) || utils.IsA2A(agent) || utils.IsPullAgent(agent) || agent.Adapter == "remote_http" || agent.Remote != nil || utils.IsBareModel(agent) || isVoicePlatform(agent) || isVoiceRTC(agent)
 }
 
 func remoteTaskOK(r *schemas.RemoteAgent, s *schemas.Suite, t *schemas.Task, kind, who, block string) (bool, string) {

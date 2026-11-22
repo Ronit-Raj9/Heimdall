@@ -484,11 +484,19 @@ func inlineAgentYAML(t AgentTemplate, id string, params map[string]string) ([]by
 		if err != nil {
 			return nil, err
 		}
-		if vp == nil {
+		rtc, err := connectRTCBlock(t.ID, params) // real-time voice agents (agentconnectrtc.go)
+		if err != nil {
+			return nil, err
+		}
+		switch {
+		case vp != nil:
+			cfg["voice_platform"] = vp
+		case rtc != nil:
+			cfg["voice_rtc"] = rtc
+		default:
 			return nil, fmt.Errorf("template %s has no inline form", t.ID)
 		}
 		cfg["image"] = "bench/coding-core-base:1"
-		cfg["voice_platform"] = vp
 	}
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)

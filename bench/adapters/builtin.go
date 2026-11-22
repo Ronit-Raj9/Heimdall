@@ -13,6 +13,7 @@ func Builtin(cfg CommandConfig) []schemas.AgentAdapter {
 		newOpenAIAgentAdapter(cfg),   // A08: OpenAI-compatible endpoint agents (openaiagent.go)
 		newPullAdapter(cfg),          // Y11: agents in the customer's own process, heimdall.serve (pull.go)
 		newVoicePlatformAdapter(cfg), // voice agents hosted on Vapi, ElevenLabs or a call WebSocket (voiceplatform.go)
+		newVoiceRTCAdapter(cfg),      // real-time voice agents over LiveKit or SIP (voicertc.go)
 	}
 }
 

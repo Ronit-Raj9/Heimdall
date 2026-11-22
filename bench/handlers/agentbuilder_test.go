@@ -60,6 +60,8 @@ func TestEveryTemplateRendersAndValidates(t *testing.T) {
 		"retell-agent":     {"agent_id": "agent_1", "api_key_secret": "RETELL_KEY"},
 		"elevenlabs-agent": {"agent_id": "agent_1"},
 		"voice-websocket":  {"url": "wss://voice.example.com/twilio"},
+		"livekit-agent":    {"dispatch": "agent", "agent_name": "support-agent"},
+		"phone-number":     {"number": "+14155550100", "trunk_address": "acme.pstn.twilio.com", "from_number": "+14155550199"},
 	}
 	if len(agentTemplates) < 15 {
 		t.Fatalf("want at least 15 templates, got %d", len(agentTemplates))

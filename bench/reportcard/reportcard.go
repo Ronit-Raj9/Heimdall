@@ -199,6 +199,10 @@ type Report struct {
 	// Voice is each arm's call quality on the voice benchmarks (voice.go);
 	// nil when no run was a voice call.
 	Voice []VoiceRow `json:"voice,omitempty"`
+	// VoiceCalls is each arm's task success and call quality per condition
+	// of the voice benchmarks (caller personas, voice probes); nil without
+	// a voice run under a condition other than clean (voicecalls.go).
+	VoiceCalls []VoiceCallRow `json:"voice_calls,omitempty"`
 }
 
 // LearningRow is one arm's learning summary on one benchmark.
@@ -460,6 +464,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	rep.Learning = learningRows(children, labels)
 	rep.Persistence = persistence(children, labels)
 	rep.Voice = voiceRows(children, labels)
+	rep.VoiceCalls = voiceCallRows(children, labels)
 	return rep, nil
 }
 

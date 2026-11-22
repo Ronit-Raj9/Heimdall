@@ -1,0 +1,17 @@
+{
+  "note": "Caller personas of the voice caller (bench/voice/personas.go, docs/voice-realtime.md). Voices are Piper voices: en_US-ljspeech-medium (LJ Speech, public domain) and en_GB-vctk-medium (VCTK, CC BY 4.0), whose speaker ids carry the accents listed in VCTK's speaker-info.txt.",
+  "personas": [
+    {"id": "calm-us", "label": "Calm caller, US English", "accent": "American", "voice": "en_US-ljspeech-medium", "speed": 1.0, "reply_delay_ms": 300, "patience": 2},
+    {"id": "indian-english", "label": "Indian English", "accent": "Indian", "voice": "en_GB-vctk-medium", "speaker": "p248", "speed": 1.0, "reply_delay_ms": 350, "patience": 2},
+    {"id": "scottish-english", "label": "Scottish English (Fife)", "accent": "Scottish", "voice": "en_GB-vctk-medium", "speaker": "p237", "speed": 1.0, "reply_delay_ms": 300, "patience": 2},
+    {"id": "irish-english", "label": "Irish English (Dublin)", "accent": "Irish", "voice": "en_GB-vctk-medium", "speaker": "p245", "speed": 1.0, "reply_delay_ms": 300, "patience": 2},
+    {"id": "australian-english", "label": "Australian English (Sydney)", "accent": "Australian", "voice": "en_GB-vctk-medium", "speaker": "p326", "speed": 1.0, "reply_delay_ms": 300, "patience": 2},
+    {"id": "south-african-english", "label": "South African English (Cape Town)", "accent": "South African", "voice": "en_GB-vctk-medium", "speaker": "p314", "speed": 1.0, "reply_delay_ms": 300, "patience": 2},
+    {"id": "southern-us", "label": "Southern US English (Tennessee)", "accent": "American", "voice": "en_GB-vctk-medium", "speaker": "p310", "speed": 0.95, "reply_delay_ms": 450, "patience": 2},
+    {"id": "hurried", "label": "In a hurry, talks over long answers", "accent": "American", "voice": "en_GB-vctk-medium", "speaker": "p297", "speed": 1.2, "reply_delay_ms": 120, "interruption_rate": 0.5, "interrupt_after_ms": 1500, "patience": 1},
+    {"id": "elderly-slow", "label": "Slow speaker, hesitates", "accent": "American", "voice": "en_US-ljspeech-medium", "speed": 0.85, "reply_delay_ms": 1200, "filler_rate": 0.5, "patience": 3},
+    {"id": "noisy-street", "label": "Calling from a busy street", "accent": "American", "voice": "en_GB-vctk-medium", "speaker": "p294", "speed": 1.0, "reply_delay_ms": 300, "noise_snr_db": 8, "channel": "phone", "patience": 2},
+    {"id": "phone-line", "label": "Narrowband phone line", "accent": "Canadian", "voice": "en_GB-vctk-medium", "speaker": "p302", "speed": 1.0, "reply_delay_ms": 300, "noise_snr_db": 20, "channel": "phone", "patience": 2},
+    {"id": "interrupter", "label": "Interrupts every long answer", "accent": "American", "voice": "en_GB-vctk-medium", "speaker": "p360", "speed": 1.05, "reply_delay_ms": 200, "interruption_rate": 1.0, "interrupt_after_ms": 700, "patience": 2}
+  ]
+}

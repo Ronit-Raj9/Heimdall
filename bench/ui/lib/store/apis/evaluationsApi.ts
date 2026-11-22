@@ -596,6 +596,22 @@ export interface ReportVoiceRow {
 	voice_cost_per_minute?: ReportRate;
 }
 
+/** One agent on the voice benchmarks under one simulated caller (a persona or an audio test); absent fields were not measured. */
+export interface ReportVoiceCallRow {
+	arm: string;
+	/** "clean" for the plain caller, else the persona or audio test id. */
+	condition: string;
+	runs: number;
+	successes: number;
+	success_rate: number;
+	time_to_first_audio_ms?: ReportRate;
+	turn_latency_p95_ms?: ReportRate;
+	barge_in_handled?: ReportRate;
+	audio_jitter_p95_ms?: ReportRate;
+	/** Word error rate of the agent's speech recognition against what the caller said (0 to 1, lower is better). */
+	stt_wer?: ReportRate;
+}
+
 /** GET /evaluations/{id}/report and GET /agents/{id}/report-card */
 export interface Report {
 	evaluation: string;
@@ -626,6 +642,8 @@ export interface Report {
 	persistence?: ReportPersistenceRow[];
 	/** Only when some runs were voice calls. */
 	voice?: ReportVoiceRow[];
+	/** Only when voice calls ran with personas or audio tests besides the plain caller. */
+	voice_calls?: ReportVoiceCallRow[];
 }
 
 /** One arm's numbers over the whole evaluation; absent fields are unknown. */

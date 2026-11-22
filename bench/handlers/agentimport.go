@@ -85,7 +85,7 @@ func init() {
 	})
 	APIRoutes = append(APIRoutes,
 		RouteDoc{Method: "GET", Path: APIPrefix + "/agents/platforms", Tag: "agents",
-			Summary: "Agent platforms an agent can be imported from by id (Vapi, Retell, ElevenLabs, Bedrock AgentCore, Agentforce, Copilot Studio, Vertex AI, LangGraph Platform), with the inputs and secrets each needs",
+			Summary:  "Agent platforms an agent can be imported from by id (Vapi, Retell, ElevenLabs, Bedrock AgentCore, Agentforce, Copilot Studio, Vertex AI, LangGraph Platform), with the inputs and secrets each needs",
 			Response: AgentPlatformList{}},
 		RouteDoc{Method: "POST", Path: APIPrefix + "/agents/import-platform", Tag: "agents",
 			Summary: "Read an agent's definition from its platform by id with org secrets, and create agents/<id>.yaml wired to the platform's endpoint preset (dry_run returns it without saving)",

@@ -1,0 +1,21 @@
+# Heimdall's real-time voice gateway (bench/voice/rtcgateway.py, compose
+# service voice-rtc, profile voice; docs/voice-realtime.md). It joins
+# LiveKit rooms as the simulated caller and carries a run's call audio
+# between the run's bridge (rtcbridge.py) and the agent: a LiveKit Agents
+# worker, a Pipecat or other bot in the room, or a phone number dialled
+# through LiveKit SIP.
+#
+#   docker build -f deploy/voice/Dockerfile.rtcgateway -t heimdall/voice-rtc:local .   (from bench/)
+#
+# The LiveKit Python SDK (livekit 1.2.0, livekit-api 1.2.2, Apache-2.0)
+# comes from PyPI at build time.
+FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+RUN pip install --no-cache-dir livekit==1.2.0 livekit-api==1.2.2 \
+ && useradd -m -u 1000 svc
+COPY voice/rtcgateway.py voice/wsproto.py /srv/
+ENV PORT=8790
+USER 1000
+EXPOSE 8790
+HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD ["python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8790/healthz', timeout=2).status == 200 else 1)"]
+CMD ["python3", "-I", "/srv/rtcgateway.py", "serve"]
