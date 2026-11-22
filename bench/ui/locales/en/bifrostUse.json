@@ -1,0 +1,24 @@
+{
+	"title": "How Heimdall uses Bifrost",
+	"orgDesc": "The Bifrost features your runs use: virtual keys, budgets, fallbacks, cache, the Heimdall plugin and request logs.",
+	"evalTitle": "How this evaluation uses Bifrost",
+	"evalDesc": "The Bifrost features this evaluation's runs go through.",
+	"tab": "Bifrost",
+	"desc": "Gateway features in use for this org",
+	"gateway": "Gateway",
+	"noGateway": "No Bifrost gateway is set for this org, so runs call models directly.",
+	"notReachable": "Bifrost could not be asked which plugins are loaded: {{error}}",
+	"plugins": "Loaded plugins",
+	"noPlugins": "none",
+	"docs": "Docs",
+	"code": "Code",
+	"routing": "Each experiment's routing card shows which target served each call.",
+	"loadError": "Could not load the Bifrost summary",
+	"nothing": "This evaluation does not use Bifrost.",
+	"state": {
+		"on": "In use",
+		"available": "Available",
+		"off": "Off",
+		"unknown": "Unknown"
+	}
+}

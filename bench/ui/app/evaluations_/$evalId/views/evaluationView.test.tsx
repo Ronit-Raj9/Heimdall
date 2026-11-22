@@ -34,6 +34,11 @@ vi.mock("@/lib/store/apis/runControlApi", async (orig) => ({
 	useRerunEvaluationFailuresMutation: vi.fn(() => [() => undefined, { isLoading: false }]),
 }));
 
+vi.mock("@/lib/store/apis/bifrostUseApi", async (orig) => ({
+	...(await orig<object>()),
+	useGetEvaluationBifrostUseQuery: vi.fn(() => ({ data: undefined })),
+}));
+
 const { EvaluationBody } = await import("./evaluationView");
 
 const base: Evaluation = {
