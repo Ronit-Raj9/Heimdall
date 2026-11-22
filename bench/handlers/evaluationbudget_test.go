@@ -164,6 +164,35 @@ func TestBudgetFacts(t *testing.T) {
 	})
 }
 
+// capLauncher answers Controls with a live spend cap.
+type capLauncher struct {
+	budgetLauncher
+	live float64
+}
+
+func (l *capLauncher) Controls(context.Context, string) (*runctl.State, []runctl.Entry, error) {
+	return &runctl.State{Settings: runctl.Settings{Mode: runctl.ModeRunning, TotalUSD: l.live}}, nil, nil
+}
+
+// TestBudgetFactsReadsRaisedControlCap: a cap raised in a comparison's run
+// controls (PATCH /experiments/{id}/controls) is the child's budget; a live
+// cap below the child's own does not lower it.
+func TestBudgetFactsReadsRaisedControlCap(t *testing.T) {
+	l := &capLauncher{live: 1.10}
+	h := &evaluationsHandler{env: OrgEnv{Services: Services{Launcher: l}}}
+	m := &schemas.Manifest{Experiment: schemas.Experiment{Budget: schemas.BudgetSpec{TotalUSD: 1}}}
+	st := schemas.ExperimentStatus{State: schemas.ExperimentRunning, Slots: schemas.SlotProgress{Total: 5, Running: 1}}
+	c := &schemas.EvaluationChild{ExperimentID: "e_1", BudgetUSD: 1}
+	if !h.budgetFacts(c, m, st) || c.BudgetUSD != 1.10 {
+		t.Fatalf("raised cap not read: %+v", c)
+	}
+	l.live = 0.5
+	h.budgetFacts(c, m, st)
+	if c.BudgetUSD != 1.10 {
+		t.Fatalf("lower live cap changed the budget: %+v", c)
+	}
+}
+
 func TestEvaluationRaiseBudget(t *testing.T) {
 	l := &budgetLauncher{}
 	r, dir := evalServer(t, Services{Launcher: l, Suites: evalSuites()})

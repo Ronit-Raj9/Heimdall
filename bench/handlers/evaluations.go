@@ -162,6 +162,7 @@ func (h *evaluationsHandler) list(ctx *fasthttp.RequestCtx) {
 			continue
 		}
 		h.refresh(ev)
+		h.livePaused(ev)
 		out.Evaluations = append(out.Evaluations, ev)
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
@@ -173,6 +174,7 @@ func (h *evaluationsHandler) get(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	h.refresh(ev)
+	h.livePaused(ev)
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, ev)
 }
 

@@ -87,3 +87,104 @@ export function formatCreated(iso: string | undefined, locale?: string): string 
 	const d = new Date(iso);
 	return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
 }
+/** The status to show: "paused" while a running evaluation has every running benchmark paused. */
+export function displayStatus(evaluation: Evaluation): string {
+	return evaluation.status === "running" && evaluation.paused ? "paused" : evaluation.status;
+}
+
+/** Why each benchmark did not run: its skip reason, else its status. */
+export function childReasons(children: readonly EvaluationChild[] | null | undefined): { benchmark: string; reason: string }[] {
+	return (children ?? []).map((c) => ({ benchmark: c.benchmark, reason: c.skipped || c.status }));
+}
+
+/** The evaluation's budget: the sum of its launched benchmarks' caps (raised anywhere), else the spec's. */
+export function evaluationBudget(evaluation: Evaluation): number {
+	let total = 0;
+	for (const c of evaluation.children ?? []) {
+		if (c.experiment_id && c.status !== "skipped") total += c.budget_usd ?? 0;
+	}
+	return total > 0 ? total : (evaluation.spec.budget_usd ?? 0);
+}
+
+/** The benchmarks of an evaluation: its children, else the requested list. */
+export function evaluationBenchmarks(evaluation: Evaluation): string[] {
+	const children = evaluation.children ?? [];
+	return children.length > 0 ? children.map((c) => c.benchmark) : [...(evaluation.spec.benchmarks ?? [])];
+}
+
+export const EVALUATION_STATUS_FILTERS = ["all", "running", "done", "failed", "cancelled"] as const;
+export const EVALUATION_SORTS = ["newest", "oldest", "name", "spend"] as const;
+export type EvaluationStatusFilter = (typeof EVALUATION_STATUS_FILTERS)[number];
+export type EvaluationSort = (typeof EVALUATION_SORTS)[number];
+
+/** The list's search, filters and sort, kept in the URL (`q`, `status`, `mode`, `sort`). */
+export interface EvaluationFilters {
+	q: string;
+	status: EvaluationStatusFilter;
+	/** "all" or a mode id. */
+	mode: string;
+	sort: EvaluationSort;
+}
+
+function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
+	return typeof value === "string" && (allowed as readonly string[]).includes(value) ? (value as T) : fallback;
+}
+
+/** Reads the filters from URL search values; unknown values fall back to the defaults. */
+export function parseEvaluationFilters(search: Record<string, unknown> | null | undefined): EvaluationFilters {
+	const s = search ?? {};
+	return {
+		q: typeof s.q === "string" ? s.q.trim() : "",
+		status: oneOf(s.status, EVALUATION_STATUS_FILTERS, "all"),
+		mode: typeof s.mode === "string" && s.mode !== "" ? s.mode : "all",
+		sort: oneOf(s.sort, EVALUATION_SORTS, "newest"),
+	};
+}
+
+/** The URL search values of the filters, leaving out the defaults. */
+export function evaluationFiltersSearch(f: EvaluationFilters): Record<string, string | undefined> {
+	return {
+		q: f.q || undefined,
+		status: f.status === "all" ? undefined : f.status,
+		mode: f.mode === "all" ? undefined : f.mode,
+		sort: f.sort === "newest" ? undefined : f.sort,
+	};
+}
+
+function spentOf(evaluation: Evaluation): number {
+	return (evaluation.children ?? []).reduce((s, c) => s + (c.spent_usd ?? 0), 0);
+}
+
+function matchesStatus(evaluation: Evaluation, status: EvaluationStatusFilter): boolean {
+	if (status === "all") return true;
+	if (status === "running") return isActiveStatus(evaluation.status);
+	return evaluation.status === status;
+}
+
+/** Search (name, id, agent, benchmark), status and mode filters, then the sort. */
+export function filterEvaluations(list: readonly Evaluation[], f: EvaluationFilters): Evaluation[] {
+	const q = f.q.toLowerCase();
+	const out = list.filter((ev) => {
+		if (!matchesStatus(ev, f.status)) return false;
+		if (f.mode !== "all" && ev.spec.mode !== f.mode) return false;
+		if (!q) return true;
+		const hay = [
+			ev.spec.name ?? "",
+			ev.id,
+			...evaluationAgents(ev),
+			...(ev.spec.arms ?? []).map((a) => a.agent),
+			...evaluationBenchmarks(ev),
+		];
+		return hay.some((h) => h.toLowerCase().includes(q));
+	});
+	switch (f.sort) {
+		case "oldest":
+			return sortNewestFirst(out).reverse();
+		case "name":
+			return out.sort((a, b) => (a.spec.name || a.id).localeCompare(b.spec.name || b.id));
+		case "spend":
+			return sortNewestFirst(out).sort((a, b) => spentOf(b) - spentOf(a));
+		default:
+			return sortNewestFirst(out);
+	}
+}

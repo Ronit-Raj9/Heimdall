@@ -30,6 +30,19 @@ import { ArrowRight, Pause, Play, RotateCcw, ShieldCheck, ShieldAlert } from "lu
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+/** GET /controls with the display names the hosted server adds (name, else email); ids stay when absent. */
+type NamedRunControls = RunControls & { paused_by_name?: string; actor_names?: Record<string, string> };
+
+/** The display text of a run control actor: the name the server sent, else the id. */
+export function actorName(c: RunControls, id: string): string {
+	return (c as NamedRunControls).actor_names?.[id] || id;
+}
+
+/** Who paused: the name the server sent, else the id. */
+export function pausedByName(c: RunControls): string {
+	return (c as NamedRunControls).paused_by_name || c.state.paused_by || "";
+}
+
 function ErrorLine({ error, title, testId }: { error: unknown; title: string; testId: string }) {
 	return (
 		<p role="alert" className="text-chart-error-ink w-full text-xs" data-testid={testId}>
@@ -53,7 +66,12 @@ export function PauseControls({ expId }: { expId: string }) {
 		<>
 			{c.paused ? (
 				<>
-					<Badge variant="outline" className="gap-1" data-testid="experiment-paused-chip" title={c.state.paused_by ? t("pausedBy", { who: c.state.paused_by }) : undefined}>
+					<Badge
+						variant="outline"
+						className="gap-1"
+						data-testid="experiment-paused-chip"
+						title={c.state.paused_by ? t("pausedBy", { who: pausedByName(c) }) : undefined}
+					>
 						<Pause className="size-3" aria-hidden="true" />
 						{c.in_flight > 0 ? t("draining", { count: c.in_flight }) : t("pausedBadge")}
 					</Badge>
@@ -144,7 +162,9 @@ function ControlLog({ c }: { c: RunControls }) {
 							<time className="text-muted-foreground tabular-nums" dateTime={e.at}>
 								{new Date(e.at).toLocaleString()}
 							</time>
-							<span className="font-medium">{e.actor}</span>
+							<span className="font-medium" title={e.actor} data-testid="control-log-actor">
+								{actorName(c, e.actor)}
+							</span>
 							<span>{t(`log.actions.${e.action}`, { defaultValue: e.action })}</span>
 							{e.target && <span className="text-muted-foreground font-mono">{e.target}</span>}
 							<span className="text-muted-foreground">{e.reason || t("log.noReason")}</span>
@@ -230,7 +250,9 @@ function LiveSettings({ c, live }: { c: RunControls; live: boolean }) {
 						onChange={(e) => setCap(e.target.value)}
 						data-testid="live-cap"
 					/>
-					<span className="text-muted-foreground">{t("panel.capHint", { value: c.total_usd > 0 ? c.total_usd.toFixed(2) : t("panel.capNone") })}</span>
+					<span className="text-muted-foreground">
+						{t("panel.capHint", { value: c.total_usd > 0 ? c.total_usd.toFixed(2) : t("panel.capNone") })}
+					</span>
 				</label>
 				{c.models.length > 0 && (
 					<fieldset className="flex flex-col gap-1 text-xs sm:col-span-2" data-testid="live-models">
@@ -289,7 +311,11 @@ export function RerunFailuresButton({ expId }: { expId: string }) {
 				{res && (
 					<span className="flex flex-wrap items-center gap-2 text-xs" role="status" data-testid="rerun-failures-started">
 						{t("rerun.started", { id: res.experiment_id, tasks: res.tasks })}
-						<Link to="/experiments/$expId" params={{ expId: res.experiment_id }} className="text-primary inline-flex items-center gap-1 font-medium hover:underline">
+						<Link
+							to="/experiments/$expId"
+							params={{ expId: res.experiment_id }}
+							className="text-primary inline-flex items-center gap-1 font-medium hover:underline"
+						>
 							{t("rerun.open")}
 							<ArrowRight className="size-3" aria-hidden="true" />
 						</Link>
@@ -350,7 +376,19 @@ export function RunControlsPanel({ expId, state }: { expId: string; state: strin
  * Cancel or requeue one run, for the run page. Cancel while the run is going; requeue when it
  * finished as aborted_infra or infra_error. A requeued run shows as replaced.
  */
-export function RunActions({ expId, runId, sealed, outcome, superseded }: { expId: string; runId: string; sealed: boolean; outcome?: string; superseded?: boolean }) {
+export function RunActions({
+	expId,
+	runId,
+	sealed,
+	outcome,
+	superseded,
+}: {
+	expId: string;
+	runId: string;
+	sealed: boolean;
+	outcome?: string;
+	superseded?: boolean;
+}) {
 	const { t } = useTranslation("runControl");
 	const [cancel, cancelState] = useCancelRunMutation();
 	const [requeue, requeueState] = useRequeueRunMutation();
@@ -462,7 +500,11 @@ export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation })
 				{res && (
 					<span className="flex items-center gap-2 text-xs" role="status" data-testid="evaluation-rerun-started">
 						{t("rerun.evalStarted", { id: res.evaluation.id, count: res.children.length })}
-						<Link to="/evaluations/$evalId" params={{ evalId: res.evaluation.id }} className="text-primary inline-flex items-center gap-1 font-medium hover:underline">
+						<Link
+							to="/evaluations/$evalId"
+							params={{ evalId: res.evaluation.id }}
+							className="text-primary inline-flex items-center gap-1 font-medium hover:underline"
+						>
 							{t("rerun.open")}
 							<ArrowRight className="size-3" aria-hidden="true" />
 						</Link>

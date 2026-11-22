@@ -1,6 +1,16 @@
 import { EvaluationRunActions } from "@/components/experiments/runControls"; // run control: pause, resume, rerun failures
+import "./fw08I18n";
 import { EvaluationStatusPill, ModeLabel } from "@/app/evaluations/views/evaluationWords";
-import { EVALUATION_POLL_MS, armAgentLabel, formatCreated, isActiveStatus, splitChildren } from "@/app/evaluations/views/evaluation.utils";
+import { EvaluationLivePill } from "@/app/evaluations/views/evaluationLivePill";
+import {
+	EVALUATION_POLL_MS,
+	armAgentLabel,
+	childReasons,
+	evaluationBudget,
+	formatCreated,
+	isActiveStatus,
+	splitChildren,
+} from "@/app/evaluations/views/evaluation.utils";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { EvaluationReportCard } from "@/components/reportcard/evaluationReportCard";
 import { ModelSwitchReportView } from "@/components/modelswitch/modelSwitchReport"; // Z21 model switch report
@@ -50,7 +60,9 @@ export default function EvaluationView({ evalId }: { evalId: string }) {
 /** The loaded evaluation. Exported for tests. */
 export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 	const { t, i18n } = useTranslation("evaluations");
+	const { t: tf } = useTranslation("fw08");
 	const { run, skipped } = splitChildren(evaluation.children);
+	const budget = evaluationBudget(evaluation);
 	const active = isActiveStatus(evaluation.status);
 	const spec = evaluation.spec;
 	const faults = (spec.faults ?? []).filter((f) => f !== "clean");
@@ -60,7 +72,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 				title={spec.name || evaluation.id}
 				subtitle={t("detail.subtitle")}
 				breadcrumbs={[{ label: t("detail.crumb"), to: "/evaluations" }, { label: spec.name || evaluation.id }]}
-				meta={<EvaluationStatusPill status={evaluation.status} testId="evaluation-status" />}
+				meta={<EvaluationLivePill evaluation={evaluation} testId="evaluation-status" />}
 				actions={
 					<div className="flex flex-wrap items-center gap-2">
 						<ShareButton kind="evaluation" target={evaluation.id} evaluationId={evaluation.id} />
@@ -81,6 +93,11 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 							? t("detail.faults", { faults: faults.map((f) => t(`fault.${f}` as never, { defaultValue: f })).join(", ") })
 							: t("detail.noFaults")}
 					</span>
+					{budget > 0 && (
+						<span className="text-muted-foreground tabular-nums" data-testid="evaluation-budget">
+							{tf("budget", { amount: `$${budget.toFixed(2)}` })}
+						</span>
+					)}
 					<span className="text-muted-foreground ml-auto text-xs tabular-nums">{formatCreated(evaluation.created_at, i18n.language)}</span>
 				</div>
 				{spec.preset === "first_look" && <FirstLookNote />}
@@ -96,7 +113,18 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 				testId="evaluation-progress"
 			>
 				{run.length === 0 ? (
-					<EmptyNote testId="evaluation-no-benchmarks">{t("detail.noBenchmarks")}</EmptyNote>
+					<EmptyNote testId="evaluation-no-benchmarks">
+						{t("detail.noBenchmarks")}
+						{skipped.length > 0 && (
+							<span className="mt-2 flex flex-col gap-1" data-testid="evaluation-no-benchmarks-reasons">
+								{childReasons(skipped).map((r) => (
+									<span key={r.benchmark} className="block break-words" data-testid={`evaluation-no-benchmarks-reason-${r.benchmark}`}>
+										{tf("childReason", { benchmark: r.benchmark, reason: r.reason })}
+									</span>
+								))}
+							</span>
+						)}
+					</EmptyNote>
 				) : (
 					<ul className="flex flex-col divide-y rounded-xl border">
 						{run.map((child) => (
@@ -105,9 +133,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 					</ul>
 				)}
 			</Section>
-			<RaiseBudgetPanel evaluation={evaluation} />
-			<EvaluationBifrostSection evaluationId={evaluation.id} />
-			{skipped.length > 0 && (
+			{run.length > 0 && skipped.length > 0 && (
 				<Section title={t("detail.skippedTitle")} description={t("detail.skippedDescription")} testId="evaluation-skipped">
 					<ul className="flex flex-col gap-1 text-sm">
 						{skipped.map((child) => (
@@ -119,6 +145,8 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 					</ul>
 				</Section>
 			)}
+			<RaiseBudgetPanel evaluation={evaluation} />
+			<EvaluationBifrostSection evaluationId={evaluation.id} />
 			{evaluation.status === "done" ? (
 				<>
 					{evaluation.gate_result && <GateResultCard gate={evaluation.gate_result} />}
@@ -154,7 +182,13 @@ function ArmCard({ arm, single }: { arm: EvaluationArm; single: boolean }) {
 						: t("detail.latestVersion")}
 				</dd>
 				<dt className="text-muted-foreground">{t("detail.armModel")}</dt>
-				<dd className="break-all">{!arm.model ? t("detail.ownModel", { defaultValue: "The agent's own model" }) : arm.provider ? `${arm.provider}/${arm.model}` : arm.model}</dd>
+				<dd className="break-all">
+					{!arm.model
+						? t("detail.ownModel", { defaultValue: "The agent's own model" })
+						: arm.provider
+							? `${arm.provider}/${arm.model}`
+							: arm.model}
+				</dd>
 			</dl>
 			<span className="sr-only">{armAgentLabel(arm)}</span>
 		</div>

@@ -167,14 +167,18 @@ export const runControlApi = benchApi.enhanceEndpoints({ addTagTypes: ["RunContr
 		}),
 		pauseEvaluation: builder.mutation<Evaluation, { evalId: string; reason?: string }>({
 			query: ({ evalId, reason }) => ({ url: `/evaluations/${enc(evalId)}/pause`, method: "POST", body: reason ? { reason } : {} }),
-			invalidatesTags: (_r, _e, { evalId }) => [{ type: "Evaluations", id: evalId }, "RunControls"],
+			invalidatesTags: (_r, _e, { evalId }) => [{ type: "Evaluations", id: evalId }, { type: "Evaluations", id: "LIST" }, "RunControls"],
 		}),
 		resumeEvaluation: builder.mutation<Evaluation, { evalId: string; reason?: string }>({
 			query: ({ evalId, reason }) => ({ url: `/evaluations/${enc(evalId)}/resume`, method: "POST", body: reason ? { reason } : {} }),
-			invalidatesTags: (_r, _e, { evalId }) => [{ type: "Evaluations", id: evalId }, "RunControls"],
+			invalidatesTags: (_r, _e, { evalId }) => [{ type: "Evaluations", id: evalId }, { type: "Evaluations", id: "LIST" }, "RunControls"],
 		}),
 		rerunEvaluationFailures: builder.mutation<EvaluationRerunResult, { evalId: string; reason?: string }>({
-			query: ({ evalId, reason }) => ({ url: `/evaluations/${enc(evalId)}/rerun-failures`, method: "POST", body: reason ? { reason } : {} }),
+			query: ({ evalId, reason }) => ({
+				url: `/evaluations/${enc(evalId)}/rerun-failures`,
+				method: "POST",
+				body: reason ? { reason } : {},
+			}),
 			invalidatesTags: [{ type: "Evaluations", id: "LIST" }],
 		}),
 	}),

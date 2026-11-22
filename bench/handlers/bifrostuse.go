@@ -26,6 +26,7 @@ import (
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/evalstore"
+	bifrostgw "github.com/maximhq/bifrost/bench/gateways/bifrost"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
@@ -123,7 +124,7 @@ func (h *bifrostUseHandler) evaluation(ctx *fasthttp.RequestCtx) {
 	work, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
 	sum := h.summary(work)
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, EvaluationBifrostUse{BifrostUse: sum, EvaluationID: ev.ID, Uses: EvaluationBifrostFeatures(ev, sum)})
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, EvaluationBifrostUse{BifrostUse: sum, EvaluationID: ev.ID, Uses: withFaultSplit(EvaluationBifrostFeatures(ev, sum), h.evaluationFaultPaths(ev))})
 }
 
 func (h *bifrostUseHandler) root() string {
@@ -262,7 +263,7 @@ func BifrostFeatures(s BifrostUse) []BifrostFeature {
 			Detail: "With the semantic cache plugin loaded, an evaluation can compare cache on and cache off and report hit rate and cost saved.",
 			Docs:   bifrostDocsBase + "/features/semantic-caching", Code: "bench/gateways/bifrost/bifrostcache.go"},
 		{ID: "heimdall_plugin", Name: "Heimdall plugin", State: optional(pluginState(s, HeimdallPluginName)),
-			Detail: "A Bifrost plugin that injects model faults inside the gateway and tags each call with the run and evaluation ids.",
+			Detail: "A Bifrost plugin that tags each call with the run and evaluation ids and, in the plugin fault mode, injects model faults inside the gateway.",
 			Docs:   bifrostDocsBase + "/plugins/writing-go-plugin", Code: "plugins/heimdall"},
 		{ID: "logs", Name: "Request logs", State: optional(pluginState(s, "logging")),
 			Detail: "Heimdall reads Bifrost's request logs after each run for the run's calls, cost, cache hits and fallbacks.",
@@ -311,8 +312,8 @@ func EvaluationBifrostFeatures(ev *schemas.Evaluation, s BifrostUse) []BifrostFe
 	}
 	add("gateway", gw)
 	add("virtual_keys", "One virtual key per run, revoked when the run ends.")
-	if sp.BudgetUSD > 0 {
-		add("budgets", fmt.Sprintf("Budget $%.2f for this evaluation, enforced by Bifrost on the run keys.", sp.BudgetUSD))
+	if b := evaluationBudget(ev); b > 0 {
+		add("budgets", fmt.Sprintf("Budget $%.2f for this evaluation, enforced by Bifrost on the run keys.", b))
 	}
 	if fo := sp.Failover; fo != nil && fo.Enabled { // C07 provider failover option
 		var fbs []string
@@ -340,20 +341,103 @@ func EvaluationBifrostFeatures(ev *schemas.Evaluation, s BifrostUse) []BifrostFe
 		}
 	}
 	if len(gwFaults) > 0 {
-		how := "through the fault proxy behind Bifrost"
-		if byID["heimdall_plugin"].State == BifrostFeatureOn {
-			how = "inside Bifrost by the Heimdall plugin"
+		// H2: the plugin injects faults only in the plugin fault mode
+		// (HEIMDALL_FAULT_MODE=plugin) with the plugin loaded; otherwise
+		// the fault proxy behind Bifrost does, plugin loaded or not.
+		list := strings.Join(gwFaults, ", ")
+		plugin := byID["heimdall_plugin"]
+		if plugin.State == BifrostFeatureOn && bifrostFaultMode() == bifrostgw.FaultModePlugin {
+			plugin.Detail = "Model faults (" + list + ") are injected inside Bifrost by the Heimdall plugin."
+			out = append(out, plugin)
+		} else {
+			out = append(out, BifrostFeature{ID: "model_faults", Name: "Model faults", State: BifrostFeatureOn,
+				Detail: "Model faults (" + list + ") are injected by Heimdall's fault proxy behind Bifrost.",
+				Docs:   bifrostDocsBase + "/features/retries-and-fallbacks", Code: "bench/faultproxy"})
+			if plugin.State == BifrostFeatureOn {
+				plugin.State = BifrostFeatureAvailable
+				plugin.Detail = "Loaded. Faults go through the fault proxy because the fault mode is proxy."
+				out = append(out, plugin)
+			}
 		}
-		f := byID["heimdall_plugin"]
-		if f.State != BifrostFeatureOn {
-			f.ID, f.Name, f.Docs, f.Code = "model_faults", "Model faults", bifrostDocsBase+"/features/retries-and-fallbacks", "bench/faultproxy"
-		}
-		f.State = BifrostFeatureOn
-		f.Detail = "Model faults (" + strings.Join(gwFaults, ", ") + ") are injected " + how + "."
-		out = append(out, f)
 	}
 	if lf := byID["logs"]; lf.State != BifrostFeatureOff {
 		add("logs", "Each run's calls, tokens and cost are read from Bifrost's logs.")
 	}
 	return out
+}
+
+// bifrostFaultMode is the server's fault mode (HEIMDALL_FAULT_MODE); empty
+// means the default, the fault proxy.
+var bifrostFaultMode = func() string {
+	return strings.TrimSpace(strings.ToLower(os.Getenv(bifrostgw.FaultModeEnv)))
+}
+
+// withFaultSplit appends to the row that says how model faults are
+// injected the path each run's faults actually took (the runs'
+// gateway.fault_path): "Applied by the plugin in 4 runs, by the proxy in 2
+// runs." Runs with no recorded path are not counted.
+func withFaultSplit(uses []BifrostFeature, paths []string) []BifrostFeature {
+	n := map[string]int{}
+	for _, p := range paths {
+		if p != "" {
+			n[p]++
+		}
+	}
+	runs := func(k int) string {
+		if k == 1 {
+			return "1 run"
+		}
+		return fmt.Sprintf("%d runs", k)
+	}
+	var parts []string
+	for _, k := range []struct{ path, by string }{{"plugin", "by the plugin"}, {"proxy", "by the proxy"}, {"mixed", "partly by each"}} {
+		if n[k.path] > 0 {
+			parts = append(parts, k.by+" in "+runs(n[k.path]))
+		}
+	}
+	if len(parts) == 0 {
+		return uses
+	}
+	for i := range uses {
+		f := &uses[i]
+		if (f.ID == "model_faults" || f.ID == "heimdall_plugin") && f.State == BifrostFeatureOn {
+			f.Detail += " Applied " + strings.Join(parts, ", ") + "."
+		}
+	}
+	return uses
+}
+
+// evaluationFaultPaths lists the recorded fault path of every run of the
+// evaluation's children.
+func (h *bifrostUseHandler) evaluationFaultPaths(ev *schemas.Evaluation) []string {
+	ix := h.env.Services.Index
+	if ix == nil {
+		return nil
+	}
+	var out []string
+	for _, c := range ev.Children {
+		if c.ExperimentID == "" {
+			continue
+		}
+		for _, rv := range ix.Runs(c.ExperimentID) {
+			out = append(out, rv.Run.Gateway.FaultPath)
+		}
+	}
+	return out
+}
+
+// evaluationBudget is the sum of the launched children's caps (raised on
+// the evaluation or on a benchmark's run controls, evaluationbudget.go),
+// else the budget typed at launch.
+func evaluationBudget(ev *schemas.Evaluation) float64 {
+	total := 0.0
+	for _, c := range ev.Children {
+		if c.ExperimentID != "" && c.Status != schemas.EvaluationChildSkipped {
+			total += c.BudgetUSD
+		}
+	}
+	if total > 0 {
+		return total
+	}
+	return ev.Spec.BudgetUSD
 }
