@@ -5,6 +5,7 @@ import { CalibrationCard, LabelForm, LabelsTable } from "@/components/calibratio
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
 import { useAddCalibrationLabelMutation, useGetCalibrationLabelsQuery, useGetCalibrationQuery } from "@/lib/store/apis/calibrationApi";
 import type { SuiteSummary } from "@/lib/types/bench";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -16,6 +17,7 @@ import { useTranslation } from "react-i18next";
  */
 export function SuiteCalibrationTab({ suite }: { suite: SuiteSummary }) {
 	const { t } = useTranslation("bench");
+	const { t: ta } = useTranslation("annotation");
 	const status = useGetCalibrationQuery(suite.id);
 	const labels = useGetCalibrationLabelsQuery(suite.id);
 	const [addLabel, added] = useAddCalibrationLabelMutation();
@@ -27,6 +29,12 @@ export function SuiteCalibrationTab({ suite }: { suite: SuiteSummary }) {
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="calibration-screen">
 			<p className="text-muted-foreground max-w-3xl text-sm">{t("calibration.subtitle")}</p>
+			<p className="text-muted-foreground max-w-3xl text-sm" data-testid="calibration-labelling-link">
+				{ta("fromCalibration")}{" "}
+				<Link to="/annotation" className="text-primary underline-offset-4 hover:underline">
+					{ta("fromCalibrationLink")}
+				</Link>
+			</p>
 			{status.isLoading ? (
 				<BlockSkeleton rows={6} testId="calibration-status-loading" />
 			) : status.error || !status.data ? (

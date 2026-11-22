@@ -56,9 +56,9 @@ Add the platform's keys under Settings, Secrets first. Default secret names:
 | Platform | Secrets | `dataset` | `project` |
 |---|---|---|---|
 | LangSmith | `LANGSMITH_API_KEY` | dataset name or id | project for traces |
-| Langfuse | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | dataset name | (traces of the whole project) |
+| Langfuse | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | dataset name | not needed: the keys name the project |
 | Braintrust | `BRAINTRUST_API_KEY` | dataset id | project id for logs |
-| Datadog LLM Observability | `DD_API_KEY`, `DD_APP_KEY` | (none) | ml app |
+| Datadog LLM Observability | `DD_API_KEY`, `DD_APP_KEY` | dataset name or id | LLM Observability project (datasets); span search query (traces, optional) |
 
 `secrets` maps a role (`api_key`, `public_key`, `secret_key`, `app_key`) to another secret name when yours differ. `target: "benchmark"` turns records into tasks of `benchmark` (the same rules and personal data policy as `POST /tasks`); `target: "inbox"` puts traces in the failure inbox for triage. `mapping` picks the input, expected and rubric fields by dotted path when the guess is wrong. `GET /api/bench/imports/platforms` lists the platforms and which secrets the organization has. Always start with `dry_run: true`: it reads the records and shows a preview without writing anything.
 
