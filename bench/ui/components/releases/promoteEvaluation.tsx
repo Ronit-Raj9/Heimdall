@@ -104,7 +104,14 @@ export function gateCheckDetail(c: GateCheck, t: (k: string, o?: Record<string, 
 /** The headline of a preview: "codex v4 replaces v3" or "codex v4 becomes the first release". */
 export function previewTitle(p: EvaluationReleasePreview, t: (k: string, o?: Record<string, unknown>) => string): string {
 	return releaseTitle(
-		{ agent_id: p.agent, version: p.version, replaces_version: p.replaces_version, compared_version: p.baseline?.version, agent_config_id: "", arm: p.candidate },
+		{
+			agent_id: p.agent,
+			version: p.version,
+			replaces_version: p.replaces_version,
+			compared_version: p.baseline?.version,
+			agent_config_id: "",
+			arm: p.candidate,
+		},
 		t,
 	);
 }

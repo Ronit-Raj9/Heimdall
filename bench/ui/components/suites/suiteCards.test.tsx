@@ -40,7 +40,9 @@ describe("SuiteCards", () => {
 	const html = renderToStaticMarkup(<SuiteCards suites={list.suites} />);
 
 	it("links every row to its benchmark's page by a human name, with the id only in the hover title", () => {
-		expect(html).toMatch(/href="\/suites\/coding-core"[^>]*title="coding-core@[^"]*"[^>]*data-testid="suites-row-coding-core-link"[^>]*>Coding basics</);
+		expect(html).toMatch(
+			/href="\/suites\/coding-core"[^>]*title="coding-core@[^"]*"[^>]*data-testid="suites-row-coding-core-link"[^>]*>Coding basics</,
+		);
 		expect(card(html, "coding-core")).toContain("Fix small Python projects so their hidden tests pass.");
 		expect(card(html, "coding-core")).not.toContain("font-mono");
 		// C1.name: a benchmark the team added with no curated name reads as its id, as typed.
@@ -118,6 +120,4 @@ describe("scenario facts", () => {
 		expect(html).toContain("never ranked against, or compared with, a verified benchmark");
 		expect(html).toMatch(/data-testid="suites-imported".*?recall-example@1/);
 	});
-
-
 });
