@@ -184,7 +184,7 @@ func (g *judge) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas
 		return grade, nil
 	}
 	grade.Category = ans.Category
-	tmplName, tmpl, err := judgeTemplate(spec.PromptVersion, ans)
+	tmplName, tmpl, err := judgeTemplateFor(rc.Suite, spec, ans)
 	if err != nil {
 		grade.InvalidEvaluator = true
 		grade.Reason = err.Error()
@@ -224,7 +224,21 @@ func (g *judge) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas
 		grade.InvalidEvaluator, grade.Reason = true, NoPaidJudgeReason
 		return grade, nil
 	}
-	rec, replies, err := g.voteReplies(ctx, rc, spec, renderJudgePromptCap(tmpl, ans, answer, limit))
+	prompt := renderJudgePromptCap(tmpl, ans, answer, limit)
+	var sc scorer
+	if spec.PromptVersion == PromptCustomV1 { // judgecustom.go: per-criterion JSON, weighted pass
+		transcript := ""
+		if strings.Contains(tmpl, "{{transcript}}") {
+			transcript, _, _ = readTrajectory(rc)
+		}
+		if prompt, err = renderCustomPrompt(tmpl, ans, answer, transcript, limit); err != nil {
+			grade.InvalidEvaluator, grade.Reason = true, err.Error()
+			return grade, nil
+		}
+		crit, _ := parseCriteria(ans.Rubric)
+		sc = customScorer(crit, passAt(spec))
+	}
+	rec, replies, err := g.voteReplies(ctx, rc, spec, prompt, sc)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", JudgeType, err)
 	}
@@ -232,12 +246,15 @@ func (g *judge) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas
 	rec.Provider = spec.Provider                                                                // calibration identity (QC2-25-05)
 	rec.Calibration = calibrationRef(rc.Suite, calibration.GradeJudgeID(rec), rec.PromptSHA256) // W8 judge calibration: the record in force (judgecalibration.go)
 	if spec.Auditor != nil {                                                                    // W8 judge calibration: the auditor never decides
-		rec.Audit = g.audit(ctx, rc, spec, renderJudgePromptCap(tmpl, ans, answer, limit), rec.Votes)
+		rec.Audit = g.audit(ctx, rc, spec, prompt, rec.Votes, sc)
 	}
 	grade.Judged, grade.Judge = true, rec
 	grade.Passed, grade.InvalidEvaluator, grade.Reason = tally(rec.Votes, tmplName)
 	if spec.PromptVersion == PromptBigFinanceV1 {
 		applyRubricScore(grade, ans, replies)
+	}
+	if spec.PromptVersion == PromptCustomV1 {
+		applyCriteria(grade, rec, ans, replies, passAt(spec))
 	}
 	return grade, nil
 }
@@ -271,13 +288,16 @@ func (g *judge) check(rc *schemas.RunContext) (schemas.JudgeSpec, error) {
 	case spec.MaxTokens < 0:
 		return spec, fmt.Errorf("judge max_tokens %d is negative", spec.MaxTokens)
 	case !knownPromptVersion(spec.PromptVersion):
-		return spec, fmt.Errorf("judge prompt_version %q is not shipped (want %s, %s, %s, %s or %s)", spec.PromptVersion, PromptQAv1, PromptLongMemEvalV1, PromptAgentVistaV1, PromptBigFinanceV1, PromptCheatBenchV1)
+		return spec, fmt.Errorf("judge prompt_version %q is not shipped (want %s, %s, %s, %s, %s or %s with your own prompt file)", spec.PromptVersion, PromptQAv1, PromptLongMemEvalV1, PromptAgentVistaV1, PromptBigFinanceV1, PromptCheatBenchV1, PromptCustomV1)
 	case g.cfg.Gateway == nil || g.cfg.URL == "":
 		return spec, errors.New("judge grader is not wired to the gateway (register graders.NewJudge with the gateway and its URL)")
 	case rc.Run == nil || !judgeKeyNameRe.MatchString(rc.Run.RunID):
 		return spec, errors.New("run context has no usable run id for the judge's key name")
 	}
 	if err := checkAuditor(spec); err != nil { // W8 judge calibration (judgecalibration.go)
+		return spec, err
+	}
+	if err := checkCustomSpec(spec); err != nil { // judgecustom.go
 		return spec, err
 	}
 	return spec, nil
@@ -291,14 +311,19 @@ const NoPaidJudgeReason = "model judge skipped: no-paid-traffic run (scripted ch
 
 // vote mints the judge's key, casts every vote and revokes the key, also
 // when a call fails or ctx is cancelled.
-func (g *judge) vote(ctx context.Context, rc *schemas.RunContext, spec schemas.JudgeSpec, prompt string) (*schemas.JudgeRecord, error) {
-	rec, _, err := g.voteReplies(ctx, rc, spec, prompt)
+func (g *judge) vote(ctx context.Context, rc *schemas.RunContext, spec schemas.JudgeSpec, prompt string, sc scorer) (*schemas.JudgeRecord, error) {
+	rec, _, err := g.voteReplies(ctx, rc, spec, prompt, sc)
 	return rec, err
 }
 
+// scorer decides one reply's vote; nil reads the reply by its prompt
+// version (replyVerdict). A custom prompt's scorer knows the task's
+// criteria and pass_at (judgecustom.go).
+type scorer func(reply string) string
+
 // voteReplies is vote that also returns each vote's raw reply, which the
 // rubric prompt (bigfinancebench-v1) scores after the tally.
-func (g *judge) voteReplies(ctx context.Context, rc *schemas.RunContext, spec schemas.JudgeSpec, prompt string) (*schemas.JudgeRecord, []string, error) {
+func (g *judge) voteReplies(ctx context.Context, rc *schemas.RunContext, spec schemas.JudgeSpec, prompt string, sc scorer) (*schemas.JudgeRecord, []string, error) {
 	if rc.NoPaidTraffic { // also the auditor (judgecalibration.go)
 		return nil, nil, errors.New(NoPaidJudgeReason)
 	}
@@ -322,7 +347,7 @@ func (g *judge) voteReplies(ctx context.Context, rc *schemas.RunContext, spec sc
 	priced, unpriced := true, ""
 	var replies []string
 	for i := 0; i < spec.Votes; i++ {
-		verdict, tok, served, reply, err := g.call(ctx, key, spec, prompt)
+		verdict, tok, served, reply, err := g.call(ctx, key, spec, prompt, sc)
 		if err != nil {
 			return nil, nil, fmt.Errorf("judge vote %d of %d: %w", i+1, spec.Votes, err)
 		}
@@ -396,10 +421,13 @@ type chatResponse struct {
 // response has none), the model id the response named and the reply text. A transport
 // failure, a non-2xx status, a body that is not a chat completion, or a
 // response from another model than the pinned one is an error.
-func (g *judge) call(ctx context.Context, key *schemas.RunKey, spec schemas.JudgeSpec, prompt string) (string, *schemas.Tokens, string, string, error) {
+func (g *judge) call(ctx context.Context, key *schemas.RunKey, spec schemas.JudgeSpec, prompt string, sc scorer) (string, *schemas.Tokens, string, string, error) {
 	maxTokens := spec.MaxTokens
 	if maxTokens == 0 {
 		maxTokens = defaultJudgeTokens
+		if spec.PromptVersion == PromptCustomV1 {
+			maxTokens = customJudgeTokens
+		}
 	}
 	body, err := json.Marshal(chatRequest{
 		Model:       spec.Provider + "/" + spec.Model,
@@ -441,7 +469,11 @@ func (g *judge) call(ctx context.Context, key *schemas.RunKey, spec schemas.Judg
 	verdict, reply := VoteUnparsable, ""
 	if len(out.Choices) > 0 {
 		reply = contentText(out.Choices[0].Message.Content)
-		verdict = replyVerdict(spec.PromptVersion, reply)
+		if sc != nil {
+			verdict = sc(reply)
+		} else {
+			verdict = replyVerdict(spec.PromptVersion, reply)
+		}
 	}
 	var tok *schemas.Tokens
 	if u := out.Usage; u != nil {
@@ -487,7 +519,7 @@ func tally(votes []string, tmpl string) (passed, invalid bool, reason string) {
 
 // knownPromptVersion reports whether version is shipped.
 func knownPromptVersion(version string) bool {
-	return version == PromptQAv1 || version == PromptLongMemEvalV1 || version == PromptAgentVistaV1 || version == PromptBigFinanceV1 || version == PromptCheatBenchV1
+	return version == PromptQAv1 || version == PromptLongMemEvalV1 || version == PromptAgentVistaV1 || version == PromptBigFinanceV1 || version == PromptCheatBenchV1 || version == PromptCustomV1
 }
 
 // judgeTemplate picks the template of version for ans and returns its name

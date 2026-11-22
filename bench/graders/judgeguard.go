@@ -59,7 +59,7 @@ func judgeSystemFor(version string) string {
 	switch version {
 	case PromptCheatBenchV1:
 		return cheatBenchGuardSystem
-	case PromptBigFinanceV1:
+	case PromptBigFinanceV1, PromptCustomV1:
 		return judgeGuardSystemJSON
 	}
 	return judgeGuardSystem
