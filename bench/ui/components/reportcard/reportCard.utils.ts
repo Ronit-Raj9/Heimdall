@@ -15,7 +15,7 @@ const CAPABILITY_NAMES: Record<string, string> = {
 	terminal: "Terminal",
 	coding: "Coding",
 	memory: "Memory",
-	support: "Customer support",
+	support: "Support and tool use",
 	research: "Research",
 	voice: "Voice",
 	safety: "Safety",
@@ -281,8 +281,15 @@ export function headline(report: Report): Headline {
 		wins[key]++;
 	}
 	const counted = report.overall?.wins ?? wins;
-	let winner = report.overall?.winner;
-	if (!winner) winner = wins[b.label] > wins[a.label] ? b.label : wins[a.label] > wins[b.label] ? a.label : "tie";
+	let winner = report.overall
+		? report.overall.winner
+		: wins[b.label] > wins[a.label]
+			? b.label
+			: wins[a.label] > wins[b.label]
+				? a.label
+				: "tie";
+	// A server winner that is not one of the two arms ("unclear", empty or unknown) reads as a tie.
+	if (winner !== a.label && winner !== b.label) winner = "tie";
 	const loser = winner === a.label ? b.label : a.label;
 	const name = armName(report, winner);
 	const title =
@@ -386,9 +393,7 @@ export function judgeBadge(row: ReportBenchmark): JudgeBadge | undefined {
 	const j = row.judge;
 	if (!j) return undefined;
 	const counts =
-		j.human_labels > 0 || j.control_items > 0
-			? ` ${j.human_labels} human labels, ${j.control_items} admission-control answers.`
-			: "";
+		j.human_labels > 0 || j.control_items > 0 ? ` ${j.human_labels} human labels, ${j.control_items} admission-control answers.` : "";
 	const title = `Graded by a model judge${j.model ? ` (${j.model})` : ""}: ${j.label}.${counts}${j.trusted ? "" : " Verdicts on it are not decisions until the judge is calibrated."}`;
 	if (j.state === "calibrated") return { tone: "success", text: "Judge: human-calibrated", title };
 	if (j.trusted) return { tone: "warning", text: `Judge: ${j.label}`, title };

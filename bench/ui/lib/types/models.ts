@@ -73,6 +73,17 @@ export interface ModelRefView {
 	provider: ProviderId;
 	model: string;
 	key_id?: string;
+	/** The model's price per 1M tokens and where it comes from; absent when neither a key nor the price list knows it. */
+	price?: ModelPriceView;
+}
+
+/** A model's price per 1M tokens (USD): from one of the org's keys (key_label names it) or the server's price list. */
+export interface ModelPriceView {
+	input_per_mtok: number;
+	output_per_mtok: number;
+	cache_per_mtok: number;
+	source: "key" | "price_list";
+	key_label?: string;
 }
 
 export interface ModelsCatalogResponse {

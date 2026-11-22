@@ -71,6 +71,9 @@
 			"fix_harness": "Open runs"
 		},
 		"costUnknown": "Not known: this model has no price set",
+		"metricsLoading": "Loading...",
+		"metricsError": "Could not load the costs.",
+		"notKnownReason": "Not known: {{reason}}",
 		"inconclusiveHint": "Not enough evidence to pick a winner. Run more tasks.",
 		"invalidHint": "Something went wrong while measuring (not the agent's fault). Fix it and re-check."
 	},

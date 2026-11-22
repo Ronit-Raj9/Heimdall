@@ -1,3 +1,4 @@
+import { DEFAULT_BENCHMARK_BUDGET, parseBudget } from "@/app/evaluate/views/step5Launch";
 import { AgentPicker } from "@/components/agents/agentPicker";
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
 import { faultName, points, usd } from "@/components/reportcard/reportCard.utils";
@@ -13,17 +14,19 @@ import {
 	useGetAgentVersionsQuery,
 	useGetEvaluationReportQuery,
 	useListEvaluationsQuery,
+	type Estimate,
 	type Evaluation,
 	type EvaluationFault,
 	type EvaluationSpec,
 } from "@/lib/store/apis/evaluationsApi";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import "@/lib/types/agentFirstI18n";
+import type { AgentSummary } from "@/lib/types/bench";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ShieldAlert } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** The PS2 faults a failure test can inject, in display order (EvaluationFault is any catalog id since X22). */
@@ -42,10 +45,31 @@ export interface FailureTestForm {
 	faults: FailureFault[];
 	tasks: number;
 	trials: number;
+	/** The Budget (USD) box as typed; empty leaves the server's per-benchmark default. */
+	budgetText?: string;
+	/** The model picker was used: choosing an agent then keeps model and provider. */
+	modelTouched?: boolean;
+}
+
+/** The model a failure test runs: the one picked, else the agent's default (fromDefault). */
+export function resolvedModel(
+	f: FailureTestForm,
+	agent?: Pick<AgentSummary, "model" | "gateway"> | null,
+): { model: string; provider: string; fromDefault: boolean } {
+	if (f.modelTouched || f.model) return { model: f.model, provider: f.provider, fromDefault: false };
+	if (agent?.model) return { model: agent.model, provider: agent.gateway?.provider ?? "", fromDefault: true };
+	return { model: "", provider: "", fromDefault: false };
+}
+
+/** The form after choosing an agent: a model the user picked stays, otherwise the new agent's default applies. */
+export function pickAgentForm(f: FailureTestForm, id: string): FailureTestForm {
+	return { ...f, agent: id, version: 0, ...(f.modelTouched ? {} : { model: "", provider: "" }) };
 }
 
 /** The evaluation a failure test launches: one arm, a clean baseline plus the chosen faults. */
-export function failureTestSpec(f: FailureTestForm): EvaluationSpec {
+export function failureTestSpec(f: FailureTestForm, agent?: Pick<AgentSummary, "model" | "gateway"> | null): EvaluationSpec {
+	const { model, provider } = resolvedModel(f, agent);
+	const budget = parseBudget(f.budgetText ?? "");
 	return {
 		name: `Failure test: ${f.agent}${f.version ? ` v${f.version}` : ""}`,
 		mode: "score",
@@ -54,24 +78,54 @@ export function failureTestSpec(f: FailureTestForm): EvaluationSpec {
 				label: "A",
 				agent: f.agent,
 				...(f.version ? { version: f.version } : {}),
-				model: f.model,
-				...(f.provider ? { provider: f.provider } : {}),
+				model,
+				...(provider ? { provider } : {}),
 			},
 		],
 		benchmarks: f.benchmarks,
 		tasks_per_benchmark: f.tasks,
 		trials: f.trials,
 		faults: ["clean", ...FAILURE_FAULTS.filter((x) => f.faults.includes(x))],
+		...(budget !== undefined ? { budget_usd: budget } : {}),
 	};
 }
 
 /** Why Launch is off, or null when the form is complete. */
-export function formProblem(f: FailureTestForm): "agent" | "model" | "benchmarks" | "faults" | null {
+export function formProblem(
+	f: FailureTestForm,
+	agent?: Pick<AgentSummary, "model" | "gateway"> | null,
+): "agent" | "model" | "benchmarks" | "faults" | "budget" | null {
 	if (!f.agent) return "agent";
-	if (!f.model) return "model";
+	if (!resolvedModel(f, agent).model) return "model";
 	if (f.benchmarks.length === 0) return "benchmarks";
 	if (f.faults.length === 0) return "faults";
+	if ((f.budgetText ?? "").trim() !== "" && parseBudget(f.budgetText ?? "") === undefined) return "budget";
 	return null;
+}
+
+/** Faults chosen for a past test that did not apply to one of its benchmarks. */
+export function skippedFaultCount(ev: Pick<Evaluation, "children">): number {
+	return (ev.children ?? []).reduce((n, c) => n + (c.faults_skipped?.length ?? 0), 0);
+}
+
+/** Before launch: the chosen faults a benchmark cannot take, which add no runs. */
+export function SkippedFaultsNote({ estimate }: { estimate: Estimate }) {
+	const { t } = useTranslation("agentFirst");
+	const lines = (estimate.per_benchmark ?? []).flatMap((b) => {
+		const byReason = new Map<string, string[]>();
+		for (const s of b.faults_skipped ?? []) byReason.set(s.reason, [...(byReason.get(s.reason) ?? []), faultName(s.fault)]);
+		return [...byReason].map(([reason, faults]) => ({ key: `${b.benchmark}-${reason}`, benchmark: b.benchmark, reason, faults }));
+	});
+	if (lines.length === 0) return null;
+	return (
+		<ul className="text-muted-foreground flex flex-col gap-1 text-xs" data-testid="ft-faults-skipped">
+			{lines.map((l) => (
+				<li key={l.key}>
+					{t("ft.faultsSkipped", { count: l.faults.length, faults: l.faults.join(", "), benchmark: l.benchmark, reason: l.reason })}
+				</li>
+			))}
+		</ul>
+	);
 }
 
 /** Evaluations that injected at least one fault, newest first, for one agent when given. */
@@ -112,18 +166,15 @@ export default function FailureTestsView() {
 	});
 	const versions = useGetAgentVersionsQuery(form.agent || skipToken);
 	const [create, createState] = useCreateEvaluationMutation();
-	const problem = formProblem(form);
-	const spec = failureTestSpec(form);
-	const estimate = useEstimateEvaluationQuery(problem === null ? spec : skipToken);
 	const summary = (agents.data?.agents ?? []).find((a) => a.id === form.agent);
-
-	// A new agent pre-fills its default model.
-	useEffect(() => {
-		if (summary?.model) setForm((f) => (f.model ? f : { ...f, model: summary.model, provider: summary.gateway?.provider ?? "" }));
-	}, [summary?.model, summary?.gateway?.provider]);
+	// The agent's default model applies only while the user has not picked one, and the form says so.
+	const chosen = resolvedModel(form, summary);
+	const problem = formProblem(form, summary);
+	const spec = failureTestSpec(form, summary);
+	const estimate = useEstimateEvaluationQuery(problem === null ? spec : skipToken);
 
 	const pickAgent = (id: string) => {
-		setForm((f) => ({ ...f, agent: id, version: 0, model: "", provider: "" }));
+		setForm((f) => pickAgentForm(f, id));
 		void setAgentParam(id || null);
 	};
 	const toggle = <T,>(list: T[], item: T, on: boolean) => (on ? [...list, item] : list.filter((x) => x !== item));
@@ -164,10 +215,15 @@ export default function FailureTestsView() {
 						<div className="flex min-w-64 flex-col gap-1 text-xs font-medium">
 							{t("ft.model")}
 							<GroupedModelPicker
-								value={form.model || form.provider ? { provider: form.provider, model: form.model } : null}
-								onChange={(v) => setForm((f) => ({ ...f, provider: v.provider, model: v.model }))}
+								value={chosen.model || chosen.provider ? { provider: chosen.provider, model: chosen.model } : null}
+								onChange={(v) => setForm((f) => ({ ...f, provider: v.provider, model: v.model, modelTouched: true }))}
 								testId="ft-model"
 							/>
+							{chosen.fromDefault && form.agent && (
+								<span className="text-muted-foreground font-normal" data-testid="ft-model-default">
+									{t("ft.modelDefault", { agent: form.agent, model: chosen.model })}
+								</span>
+							)}
 						</div>
 					</div>
 
@@ -240,6 +296,21 @@ export default function FailureTestsView() {
 							onPick={(n) => setForm((f) => ({ ...f, trials: n }))}
 							testId="ft-trials"
 						/>
+						<label className="flex max-w-56 flex-col gap-1 text-xs font-medium">
+							{t("ft.budget")}
+							<input
+								type="number"
+								inputMode="decimal"
+								min={0}
+								step={0.01}
+								className="border-input bg-background h-9 w-32 rounded-md border px-2 text-sm"
+								value={form.budgetText ?? ""}
+								onChange={(e) => setForm((f) => ({ ...f, budgetText: e.target.value }))}
+								aria-invalid={problem === "budget" || undefined}
+								data-testid="ft-budget"
+							/>
+							<span className="text-muted-foreground font-normal">{t("ft.budgetHint", { amount: DEFAULT_BENCHMARK_BUDGET })}</span>
+						</label>
 						<div className="text-muted-foreground ml-auto text-sm" data-testid="ft-estimate">
 							{problem !== null
 								? t(`ft.need.${problem}`)
@@ -261,6 +332,7 @@ export default function FailureTestsView() {
 							</Button>
 						)}
 					</div>
+					{problem === null && estimate.data && <SkippedFaultsNote estimate={estimate.data} />}
 					{createState.isError && (
 						<p role="alert" className="text-destructive text-sm" data-testid="ft-launch-error">
 							{getBenchErrorMessage(createState.error)}
@@ -325,13 +397,14 @@ function NumberChoice({
 }
 
 /** One past failure test: who, when, status, and the drop per fault once it finished. */
-function PastTest({ ev }: { ev: Evaluation }) {
+export function PastTest({ ev }: { ev: Evaluation }) {
 	const { t } = useTranslation("agentFirst");
 	const finished = ev.status === "done" || ev.status === "cancelled" || ev.status === "failed";
 	const report = useGetEvaluationReportQuery(finished ? ev.id : skipToken);
 	const label = report.data?.arms?.[0]?.label;
 	const rows = (report.data?.reliability ?? []).filter((r) => label && r.arms?.[label]);
 	const arm = ev.spec?.arms?.[0];
+	const skipped = skippedFaultCount(ev);
 	return (
 		<li className="bg-card flex min-w-0 flex-col gap-3 rounded-xl border p-4" data-testid={`ft-past-${ev.id}`}>
 			<div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -347,6 +420,11 @@ function PastTest({ ev }: { ev: Evaluation }) {
 					{t(`ft.status.${ev.status}`, { defaultValue: ev.status })}
 				</span>
 			</div>
+			{skipped > 0 && (
+				<p className="text-muted-foreground text-xs" data-testid={`ft-past-${ev.id}-skipped`}>
+					{t("ft.pastSkipped", { count: skipped })}
+				</p>
+			)}
 			{!finished ? (
 				<p className="text-muted-foreground text-xs">{t("ft.running")}</p>
 			) : report.isLoading ? (

@@ -281,3 +281,39 @@ describe("provider catalog", () => {
 		expect(rows.find((r) => r.family.id === "qwen")?.providers.map((p) => p.models)).toEqual([["qwen/qwen3-coder"]]);
 	});
 });
+describe("default model price hint (F1.price)", () => {
+	const withDefault = (price?: NonNullable<ModelsCatalogResponse["default"]>["price"]) =>
+		okQuery({ ...CATALOG, default: { provider: "openai" as const, model: "gpt-6.2-sol", key_id: "key_1", ...(price ? { price } : {}) } });
+	const hint = (html: string) => html.match(/data-testid="models-price-hint"[^>]*>([^<]*)</)?.[1];
+
+	it("names the key the price comes from", () => {
+		api.q = {
+			models: withDefault({ input_per_mtok: 2, output_per_mtok: 10, cache_per_mtok: 0.1, source: "key", key_label: "ronit-biforst" }),
+		};
+		expect(hint(render(<ModelsView />))).toBe("Price per 1M tokens: $2.00 in, $10.00 out, $0.10 cached (from your key ronit-biforst)");
+	});
+
+	it("names the price list", () => {
+		api.q = { models: withDefault({ input_per_mtok: 0.15, output_per_mtok: 0.6, cache_per_mtok: 0.075, source: "price_list" }) };
+		expect(hint(render(<ModelsView />))).toBe("Price per 1M tokens: $0.15 in, $0.60 out, $0.075 cached (from the price list)");
+	});
+
+	it("says not set only when nothing prices the model", () => {
+		api.q = { models: withDefault() };
+		expect(hint(render(<ModelsView />))).toBe("Price per 1M tokens: not set (costs will show as unknown)");
+	});
+
+	it("explains in the key form that an empty model list prices every model", () => {
+		routerState.location.search = { add: "openai" };
+		try {
+			const html = render(<ModelsView />);
+			const fieldset = html.slice(html.indexOf('data-testid="model-key-price"'), html.indexOf("</fieldset>"));
+			expect(fieldset).toContain("With no models listed, this price applies to every model of this provider.");
+			// The key form's own hint, not the default model's "not set" line (both used the key priceHint).
+			expect(fieldset).toContain("What you pay on this key.");
+			expect(fieldset).not.toContain("not set");
+		} finally {
+			routerState.location.search = {};
+		}
+	});
+});

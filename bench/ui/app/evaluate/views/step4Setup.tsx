@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import "./fw26I18n";
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
 import { FailoverSettings, failoverProblem } from "@/components/evaluations/failoverSettings";
 import { GateSettings } from "@/components/releases/gateSettings";
 import {
 	type EvaluationEstimate,
 	type EvaluationMCPRoute,
+	type EstimateRequest,
 	type EvaluationSpec,
 	type FaultCatalogItem,
 	useEstimateEvaluationQuery,
@@ -12,6 +15,7 @@ import {
 } from "@/lib/store/apis/evaluationsApi";
 import { armHasModel, useOwnModelAgents } from "./ownModel";
 import { CONCURRENCY_CHOICES, PresetPicker, slotsText } from "./presetPicker";
+import { useDebounced } from "./useDebounced";
 
 /**
  * Wizard step 4: the model for each arm, how many tasks per benchmark, trials and faults, with a
@@ -192,25 +196,89 @@ export function estimateFailed(error: unknown): boolean {
 	return Boolean(error && typeof error === "object" && "status" in error && typeof (error as { status: unknown }).status === "number");
 }
 
-/** The estimate result: runs, cost and time, then the per-benchmark notes collapsed. */
+/**
+ * Chosen faults that apply to none of the benchmarks that run, with the first reason. A benchmark
+ * skipped as a whole does not count; with no benchmark left nothing is flagged.
+ */
+export function faultsNotApplying(e: Pick<EvaluationEstimate, "per_benchmark"> | undefined): Map<string, string> {
+	const out = new Map<string, string>();
+	const running = (e?.per_benchmark ?? []).filter((b) => !b.skipped);
+	if (running.length === 0) return out;
+	const first = running[0].faults_skipped ?? [];
+	for (const f of first) {
+		if (out.has(f.fault)) continue;
+		if (running.every((b) => (b.faults_skipped ?? []).some((x) => x.fault === f.fault))) out.set(f.fault, f.reason);
+	}
+	return out;
+}
+
+/** Why nothing can run when the estimate plans no runs ("<benchmark>: <reason>", the first one); null otherwise. */
+export function nothingRunsReason(e: Pick<EvaluationEstimate, "runs" | "per_benchmark" | "notes"> | undefined): string | null {
+	if (!e || Number(e.runs) > 0) return null;
+	const b = (e.per_benchmark ?? []).find((x) => x.skipped);
+	if (b) return `${b.benchmark}: ${b.skipped}`;
+	return (e.notes ?? []).find(Boolean) ?? "no run is planned";
+}
+
+/**
+ * The request for the preset sizes. Tasks, trials, the preset and the name are left at fixed values,
+ * so changing them never asks for the presets again (each preset is a full estimate on the server).
+ */
+export function presetsRequest(spec: EvaluationSpec): EstimateRequest {
+	const { name: _n, tasks_per_benchmark: _t, trials: _r, preset: _p, budget_usd: _b, gate: _g, ...rest } = spec;
+	return { ...rest, name: "", tasks_per_benchmark: 10, trials: 1, presets: true };
+}
+
+/** How long step 4 waits after the last change before it asks for a new estimate. */
+export const ESTIMATE_DEBOUNCE_MS = 400;
+
+/**
+ * Step 4's estimate: the spec held back 400 ms, the main estimate without presets and a second
+ * one for the preset sizes keyed on what changes them. `pending` is true while a change waits.
+ * The wizard calls it too (same arguments, so the same cached request) to block Next.
+ */
+export function useStep4Estimate(spec: EvaluationSpec, skip: boolean) {
+	const settled = useDebounced(spec, ESTIMATE_DEBOUNCE_MS);
+	const main = useEstimateEvaluationQuery(settled, { skip });
+	const presets = useEstimateEvaluationQuery(presetsRequest(settled), { skip });
+	const pending = JSON.stringify(settled) !== JSON.stringify(spec);
+	return { main, presets, pending };
+}
+
+/** The estimate result: runs, cost and time, what it is based on, why nothing runs, then every note. */
 export function EstimateSummary({ estimate, updating }: { estimate: EvaluationEstimate; updating?: boolean }) {
+	const { t } = useTranslation("fw26");
 	const est = estimateText(estimate);
 	const notes = estimateNotes(estimate);
 	const power = powerText(estimate);
 	const slots = slotsText(estimate);
-	const skipped = notes.filter((n) => n.skipped).length;
+	const none = Number(estimate.runs) > 0 ? [] : notes.filter((n) => n.skipped);
 	return (
 		<div className="flex flex-col gap-2">
-			{estimate.from_library && (
-				<span className="text-chart-info-ink text-xs font-medium" data-testid="step4-from-library">
-					First run, estimate from library data: other agents on the same tasks. Your agent may differ.
-				</span>
-			)}
 			<span>
 				About <strong data-testid="step4-est-runs">{est.runs}</strong>, <strong data-testid="step4-est-cost">{est.cost}</strong>,{" "}
 				<strong data-testid="step4-est-minutes">{est.minutes}</strong>.
 				{updating && <span className="text-muted-foreground"> Updating...</span>}
 			</span>
+			<span
+				className={estimate.from_library ? "text-chart-info-ink text-xs font-medium" : "text-muted-foreground text-xs"}
+				data-testid="step4-basis"
+			>
+				{estimate.from_library ? t("step4.basisLibrary") : t("step4.basisOwn")}
+			</span>
+			{none.length > 0 && (
+				<div className="border-chart-warning/40 bg-chart-warning/10 rounded-md border px-3 py-2" data-testid="step4-nothing-runs">
+					<span className="font-medium">{t("step4.nothingRuns")}</span>
+					<ul className="mt-1 flex flex-col gap-1">
+						{none.map((n) => (
+							<li key={n.benchmark}>
+								<span className="font-medium">{n.benchmark}: </span>
+								{n.skipped}
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
 			{power && (
 				<span data-testid="step4-power">
 					{power.line}
@@ -223,12 +291,8 @@ export function EstimateSummary({ estimate, updating }: { estimate: EvaluationEs
 				</span>
 			)}
 			{notes.length > 0 && (
-				<details data-testid="step4-est-notes">
-					<summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs select-none">
-						Details
-						{skipped > 0 ? ` (${skipped} ${skipped === 1 ? "benchmark" : "benchmarks"} skipped)` : ""}
-					</summary>
-					<ul className="mt-1.5 flex flex-col gap-1.5 text-xs">
+				<div data-testid="step4-est-notes">
+					<ul className="flex flex-col gap-1.5 text-xs">
 						{notes.map((n) => (
 							<li key={n.benchmark || "_all"} data-testid={`step4-est-note-${n.benchmark || "all"}`}>
 								{n.benchmark && <span className="font-medium">{n.benchmark}: </span>}
@@ -237,7 +301,7 @@ export function EstimateSummary({ estimate, updating }: { estimate: EvaluationEs
 							</li>
 						))}
 					</ul>
-				</details>
+				</div>
 			)}
 		</div>
 	);
@@ -288,12 +352,18 @@ export interface Step4SetupProps {
 }
 
 export function Step4Setup({ spec, onChange }: Step4SetupProps) {
+	const { t } = useTranslation("fw26");
 	const owns = useOwnModelAgents();
 	const [picking, setPicking] = useState<Set<string>>(() => new Set());
 	const ready = specReady(spec, owns);
-	const estimate = useEstimateEvaluationQuery({ ...spec, presets: true }, { skip: !ready });
+	const { main: estimate, presets, pending } = useStep4Estimate(spec, !ready);
 	const catalog = useGetBenchFaultsQuery();
-	const faultGroups = groupFaults(catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS);
+	const faultList = catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS;
+	const faultGroups = groupFaults(faultList);
+	const notApplying = faultsNotApplying(estimate.data);
+	const chosenNotApplying = spec.faults
+		.filter((f) => f !== "clean" && notApplying.has(f))
+		.map((f) => faultList.find((x) => x.id === f)?.label ?? f);
 	const setArm = (i: number, provider: string, model: string) =>
 		onChange({
 			...spec,
@@ -312,12 +382,20 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 							{arm.version ? ` v${arm.version}` : ""} uses
 						</span>
 						{owns.has(arm.agent) && !arm.model && !picking.has(arm.label) ? (
-							<div className="bg-muted/40 flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm" data-testid={`step4-own-model-${arm.label}`}>
+							<div
+								className="bg-muted/40 flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+								data-testid={`step4-own-model-${arm.label}`}
+							>
 								<span>
 									<span className="font-medium">Its own model.</span>{" "}
 									<span className="text-muted-foreground">This agent picks its model itself; cost is what the agent reports.</span>
 								</span>
-								<button type="button" className="text-primary text-xs hover:underline" onClick={() => setPicking((p) => new Set(p).add(arm.label))} data-testid={`step4-pick-model-${arm.label}`}>
+								<button
+									type="button"
+									className="text-primary text-xs hover:underline"
+									onClick={() => setPicking((p) => new Set(p).add(arm.label))}
+									data-testid={`step4-pick-model-${arm.label}`}
+								>
 									Pick a model instead
 								</button>
 							</div>
@@ -329,14 +407,19 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 									testId={`step4-model-${arm.label}`}
 								/>
 								{owns.has(arm.agent) && (
-									<button type="button" className="text-primary w-fit text-xs hover:underline" onClick={() => {
+									<button
+										type="button"
+										className="text-primary w-fit text-xs hover:underline"
+										onClick={() => {
 											setPicking((p) => {
 												const n = new Set(p);
 												n.delete(arm.label);
 												return n;
 											});
 											setArm(i, "", "");
-										}} data-testid={`step4-use-own-${arm.label}`}>
+										}}
+										data-testid={`step4-use-own-${arm.label}`}
+									>
 										Use the agent's own model
 									</button>
 								)}
@@ -348,7 +431,7 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 
 			<PresetPicker
 				spec={spec}
-				presets={estimate.data?.presets ?? []}
+				presets={presets.data?.presets ?? []}
 				onPick={(p) => onChange({ ...spec, tasks_per_benchmark: p.tasks_per_benchmark, trials: p.trials, faults: p.faults, preset: p.id })}
 			/>
 
@@ -381,6 +464,14 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 				<p className="text-muted-foreground text-sm">
 					Every evaluation runs clean. Add faults to see how the agent copes when things go wrong.
 				</p>
+				{chosenNotApplying.length > 0 && (
+					<p
+						className="border-chart-warning/40 bg-chart-warning/10 text-chart-warning-ink rounded-md border px-3 py-2 text-sm"
+						data-testid="step4-faults-na"
+					>
+						{t("step4.faultsNotApplying", { faults: chosenNotApplying.join(", ") })}
+					</p>
+				)}
 				{faultGroups.map((g) => (
 					<fieldset key={g.group} className="flex flex-col gap-2" data-testid={`step4-fault-group-${g.group}`}>
 						<legend className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">{g.group}</legend>
@@ -401,6 +492,11 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 								<span>
 									<span className="font-medium">{f.label}</span>
 									<span className="text-muted-foreground block">{f.help}</span>
+									{notApplying.has(f.id) && (
+										<span className="text-chart-warning-ink block text-xs" data-testid={`step4-fault-na-${f.id}`}>
+											{t("step4.faultNotApplying", { reason: notApplying.get(f.id) })}
+										</span>
+									)}
 								</span>
 							</label>
 						))}
@@ -424,8 +520,8 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 						<span>
 							<span className="font-medium">Bifrost cache on vs off</span>
 							<span className="text-muted-foreground block">
-								Runs your agent twice, identical except that Bifrost&apos;s semantic cache is on for the second copy. The report shows the cache hit
-								rate, the latency and cost saved, and any change in success. Doubles the runs.
+								Runs your agent twice, identical except that Bifrost&apos;s semantic cache is on for the second copy. The report shows the
+								cache hit rate, the latency and cost saved, and any change in success. Doubles the runs.
 							</span>
 						</span>
 					</label>
@@ -480,7 +576,7 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 				) : estimate.isError && estimateFailed(estimate.error) ? (
 					<span className="text-muted-foreground">Could not estimate this evaluation right now.</span>
 				) : estimate.data ? (
-					<EstimateSummary estimate={estimate.data} updating={estimate.isFetching} />
+					<EstimateSummary estimate={estimate.data} updating={estimate.isFetching || pending} />
 				) : estimate.isError ? (
 					<span className="text-muted-foreground">No estimate yet.</span>
 				) : (

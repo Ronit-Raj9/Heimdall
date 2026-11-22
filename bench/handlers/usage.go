@@ -8,12 +8,16 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"io/fs"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/auth"
+	"github.com/maximhq/bifrost/bench/evidence"
 	"github.com/maximhq/bifrost/bench/keystore"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -41,6 +45,9 @@ type UsageBucket struct {
 	Tokens          float64 `json:"tokens"`
 	Runs            int     `json:"runs"`
 	UnknownCostRuns int     `json:"unknown_cost_runs"`
+	// NoModelCallRuns counts runs that ended before any model call (an
+	// infrastructure abort with no metrics and no cost rows): $0, known.
+	NoModelCallRuns int `json:"no_model_call_runs,omitempty"`
 }
 
 // UsageKeySpend is one provider key's recorded spend. Never carries the secret.
@@ -62,6 +69,7 @@ type UsageReport struct {
 	TotalTokens     float64         `json:"total_tokens"`
 	Runs            int             `json:"runs"`
 	UnknownCostRuns int             `json:"unknown_cost_runs"`
+	NoModelCallRuns int             `json:"no_model_call_runs,omitempty"`
 	Experiments     int             `json:"experiments"`
 	Buckets         []UsageBucket   `json:"buckets"`
 	Keys            []UsageKeySpend `json:"keys"`
@@ -150,9 +158,14 @@ func runUsageTime(rv RunView) time.Time {
 }
 
 // ComputeUsage builds the usage report of one org over index and its keys.
-// Only sealed runs inside [From, To] count. A run whose cost is unknown is
+// Only sealed runs inside [From, To] count. A run whose cost is unknown only
+// for want of a price is costed at read time from the org's key prices or
+// the server's price list (keyprices.go); the sealed run is never changed. A
+// run with no metrics.json and no cost rows never reached a model and costs
+// a known $0 (NoModelCallRuns). Any other run whose cost is unknown is
 // counted in UnknownCostRuns and adds nothing to the cost total.
 func ComputeUsage(index ReadIndex, keys []keystore.Key, q UsageQuery) UsageReport {
+	lookup := priceLookup(keys)
 	rep := UsageReport{From: q.From.Format(usageDateLayout), To: q.To.Format(usageDateLayout), GroupBy: q.GroupBy,
 		Buckets: []UsageBucket{}, Keys: []UsageKeySpend{}}
 	end := q.To.AddDate(0, 0, 1)
@@ -183,8 +196,11 @@ func ComputeUsage(index ReadIndex, keys []keystore.Key, q UsageQuery) UsageRepor
 			m, _ := index.Manifest(expID)
 			metrics := runMetrics(index, inRange)
 			for _, rv := range inRange {
-				cost, costKnown, tokens := usageOfRun(metrics[rv.Run.RunID])
+				cost, costKnown, tokens, noCall := usageOfRunPriced(index, rv.Run.RunID, metrics[rv.Run.RunID], lookup)
 				rep.Runs++
+				if noCall {
+					rep.NoModelCallRuns++
+				}
 				rep.TotalCostUSD += cost
 				rep.TotalTokens += tokens
 				if !costKnown {
@@ -202,6 +218,9 @@ func ComputeUsage(index ReadIndex, keys []keystore.Key, q UsageQuery) UsageRepor
 				b.CostUSD += cost
 				b.Tokens += tokens
 				b.Runs++
+				if noCall {
+					b.NoModelCallRuns++
+				}
 				if !costKnown {
 					b.UnknownCostRuns++
 				}
@@ -237,6 +256,39 @@ func ComputeUsage(index ReadIndex, keys []keystore.Key, q UsageQuery) UsageRepor
 		return a.Key < b.Key
 	})
 	return rep
+}
+
+// usageOfRunPriced is usageOfRun plus the read-time fixes of ComputeUsage:
+// an unpriced cost repriced with lookup, and a run that never called a model
+// (no metrics.json, no cost rows) costed at a known $0 with noCall true.
+func usageOfRunPriced(index ReadIndex, runID string, mr runMetricsRead, lookup func(model string) (evidence.ModelPrice, bool)) (cost float64, known bool, tokens float64, noCall bool) {
+	readCost := func() ([]byte, error) {
+		data, found, err := readRunFile(index, runID, FileCost)
+		if err == nil && !found {
+			err = fs.ErrNotExist
+		}
+		return data, err
+	}
+	if !mr.err && !mr.found {
+		data, err := readCost()
+		if errors.Is(err, fs.ErrNotExist) || (err == nil && emptyCostRows(data)) {
+			return 0, true, 0, true
+		}
+		return 0, false, 0, false
+	}
+	cost, known, tokens = usageOfRun(mr)
+	if !known && mr.found {
+		if v, ok := repricedCost(mr.values, readCost, lookup); ok && v.V != nil {
+			cost, known = *v.V, true
+		}
+	}
+	return cost, known, tokens, false
+}
+
+// emptyCostRows reports whether a cost.json holds no rows.
+func emptyCostRows(data []byte) bool {
+	var rows []schemas.CostRow
+	return json.Unmarshal(data, &rows) == nil && len(rows) == 0
 }
 
 // usageOfRun reads cost and tokens from one run's metrics.

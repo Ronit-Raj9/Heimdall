@@ -60,6 +60,18 @@ func (h *evaluationsHandler) markPaused(op RunOperator, ev *schemas.Evaluation) 
 	}
 }
 
+// livePaused sets ev.Paused from the children's run controls, the same
+// source pause and resume use, so a pause made on a comparison's run
+// controls shows here too. A server with no run controls leaves it false.
+func (h *evaluationsHandler) livePaused(ev *schemas.Evaluation) {
+	op, ok := h.env.Services.Launcher.(RunOperator)
+	if !ok || op == nil {
+		ev.Paused = false
+		return
+	}
+	h.markPaused(op, ev)
+}
+
 // pause handles POST /evaluations/{id}/pause: every running child drains.
 func (h *evaluationsHandler) pause(ctx *fasthttp.RequestCtx) {
 	h.control(ctx, true)

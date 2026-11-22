@@ -1,0 +1,10 @@
+{
+	"step4": {
+		"basisLibrary": "Estimated from other agents' runs of these benchmarks. Your own runs will make it more exact.",
+		"basisOwn": "Estimated from past runs of this agent and model.",
+		"faultNotApplying": "Does not apply here: {{reason}}",
+		"faultsNotApplying": "These faults do not apply to the chosen benchmarks and add no runs: {{faults}}.",
+		"nothingRuns": "No benchmark can run with this setup:",
+		"nothingRunsHint": "Nothing can run with this setup: {{reason}}"
+	}
+}

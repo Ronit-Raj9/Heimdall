@@ -1,11 +1,21 @@
 import { mutation, okQuery, render, tagOf } from "@/lib/testing/render";
 import type { EvaluationSpec } from "@/lib/store/apis/evaluationsApi";
+import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { EvaluateDraftProvider } from "./evaluateDraft";
 import { defaultEvaluationSpec } from "./step4Setup";
-import { Step5Launch, parseBudget, summaryLines } from "./step5Launch";
+import { NameField, Step5Launch, draftNameSetter, parseBudget, summaryLines } from "./step5Launch";
 
-const q = vi.hoisted(() => ({ create: [] as unknown as readonly [unknown, Record<string, unknown>], estimate: {} as Record<string, unknown> }));
-vi.mock("@/lib/store/apis/evaluationsApi", () => ({ useCreateEvaluationMutation: () => q.create, useEstimateEvaluationQuery: () => q.estimate }));
+const q = vi.hoisted(() => ({
+	create: [] as unknown as readonly [unknown, Record<string, unknown>],
+	estimate: {} as Record<string, unknown>,
+	faults: {} as Record<string, unknown>,
+}));
+vi.mock("@/lib/store/apis/evaluationsApi", () => ({
+	useCreateEvaluationMutation: () => q.create,
+	useEstimateEvaluationQuery: () => q.estimate,
+	useGetBenchFaultsQuery: () => q.faults,
+}));
 vi.mock("@/lib/store/apis/modelsApi", () => ({ useGetModelsQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
 	...(await orig<typeof import("@/lib/store/apis/benchApi")>()),
@@ -27,14 +37,56 @@ const spec = (over: Partial<EvaluationSpec> = {}): EvaluationSpec => ({
 beforeEach(() => {
 	q.create = mutation();
 	q.estimate = {};
+	q.faults = {};
 });
+
+const CATALOG = [
+	{ id: "clean", label: "Clean", help: "", layer: "none", group: "" },
+	{ id: "model-brownout", label: "Model brownout", help: "", layer: "model", group: "Model" },
+	{ id: "model-flaky", label: "Model flaky", help: "", layer: "model", group: "Model" },
+	{ id: "broken-tool", label: "Broken tool", help: "", layer: "tool", group: "Tools" },
+];
 
 describe("summaryLines", () => {
 	it("says when the Bifrost cache is the test variable", () => {
-		expect(summaryLines(spec({ bifrost_cache: true }))).toContain(
-			"Run each task with the Bifrost cache off and again with it on, and compare the two.",
+		expect(summaryLines(spec({ bifrost_cache: true }))).toContain("Also runs a second setup with Bifrost's cache on.");
+		expect(summaryLines(spec()).join(" ")).not.toMatch(/cache/);
+	});
+
+	it("lists every chosen fault by its catalog name, model faults included (A2.summary)", () => {
+		const lines = summaryLines(spec({ faults: ["clean", "model-brownout", "model-flaky", "broken-tool"] }), CATALOG);
+		expect(lines).toContain("Run clean, then again with: model brownout, model flaky, broken tool.");
+	});
+
+	it("prints an unknown fault id as the id instead of dropping it", () => {
+		expect(summaryLines(spec({ faults: ["clean", "model-brownout"] }))).toContain("Run clean, then again with: model-brownout.");
+	});
+
+	it("names the MCP route (D7.summary)", () => {
+		expect(summaryLines(spec({ mcp_route: "bifrost" }))).toContain("MCP tool calls go through Bifrost's MCP gateway.");
+		expect(summaryLines(spec({ mcp_route: "bifrost_code_mode" }))).toContain(
+			"MCP tool calls go through Bifrost's MCP gateway, with Code Mode.",
 		);
-		expect(summaryLines(spec()).join(" ")).not.toMatch(/Bifrost cache/);
+		expect(summaryLines(spec({ mcp_route: "direct" })).join(" ")).not.toMatch(/MCP/);
+	});
+
+	it("names the failover fallbacks (D6.est)", () => {
+		const failover = { enabled: true, fallbacks: [{ provider: "openai", model: "gpt-6.2-sol" }, { model: "gpt-6-luna" }] };
+		expect(summaryLines(spec({ failover }))).toContain(
+			"Also runs a second setup with Bifrost fallbacks (openai/gpt-6.2-sol, gpt-6-luna) while the main model is down.",
+		);
+		expect(summaryLines(spec({ failover: { ...failover, enabled: false } })).join(" ")).not.toMatch(/fallbacks/);
+	});
+
+	it("says the release rules are checked when a gate is set", () => {
+		expect(summaryLines(spec({ gate: { max_regression: 0.05 } }))).toContain("Checks the release rules when it finishes.");
+		expect(summaryLines(spec()).join(" ")).not.toMatch(/release rules/);
+	});
+
+	it("uses the fault catalog in the rendered step", () => {
+		q.faults = okQuery(CATALOG);
+		const html = render(<Step5Launch spec={spec({ faults: ["clean", "model-brownout", "broken-tool"] })} onChange={() => undefined} />);
+		expect(html).toContain("Run clean, then again with: model brownout, broken tool.");
 	});
 
 	it("says an own-model arm runs on its own model", () => {
@@ -42,7 +94,9 @@ describe("summaryLines", () => {
 	});
 
 	it("describes a score evaluation in plain sentences", () => {
-		expect(summaryLines(spec({ faults: ["clean", "model-down", "broken-tool"], budget_usd: 25, tasks_per_benchmark: 8, trials: 2 }))).toEqual([
+		expect(
+			summaryLines(spec({ faults: ["clean", "model-down", "broken-tool"], budget_usd: 25, tasks_per_benchmark: 8, trials: 2 })),
+		).toEqual([
 			"Score codex v2 on openai/gpt-4o-mini.",
 			"Run 2 benchmarks: hd-harbor-tb2, tau2.",
 			"Use 8 tasks from each benchmark and try each task 2 times.",
@@ -96,7 +150,10 @@ describe("Step5Launch", () => {
 
 	it("links to Models & keys when the org has no key for the model's provider", () => {
 		q.create = mutation({
-			error: { status: 409, data: { error: { message: "this organization has no working openai key", type: "conflict", link: "/models" } } },
+			error: {
+				status: 409,
+				data: { error: { message: "this organization has no working openai key", type: "conflict", link: "/models" } },
+			},
 		});
 		const html = render(<Step5Launch spec={spec()} onChange={() => undefined} />);
 		expect(html).toContain("this organization has no working openai key");
@@ -127,9 +184,114 @@ describe("Step5Launch budget check", () => {
 	});
 
 	it("says when the budget covers the expected cost", () => {
-		q.estimate = okQuery({ runs: 8, budget: budget({ fit: "fits", default: false, budget_usd: 30, per_benchmark_usd: 15, suggested_usd: 30, runs_skipped_low: 0, runs_skipped_high: 0 }) });
+		q.estimate = okQuery({
+			runs: 8,
+			budget: budget({
+				fit: "fits",
+				default: false,
+				budget_usd: 30,
+				per_benchmark_usd: 15,
+				suggested_usd: 30,
+				runs_skipped_low: 0,
+				runs_skipped_high: 0,
+			}),
+		});
 		const html = render(<Step5Launch spec={spec({ budget_usd: 30 })} onChange={() => undefined} />);
 		expect(html).toContain('data-testid="step5-budget-fits"');
 		expect(html).not.toContain("would not start");
 	});
+
+	it("compares the typed budget with the expected cost, not the per-benchmark cap (A1.text)", () => {
+		q.estimate = okQuery({
+			runs: 5,
+			est_cost_usd: { low: 0.06, high: 0.29, known: true },
+			budget: budget({
+				fit: "fits",
+				default: false,
+				budget_usd: 1,
+				per_benchmark_usd: 5,
+				suggested_usd: 1,
+				runs_skipped_low: 0,
+				runs_skipped_high: 0,
+			}),
+		});
+		const html = render(<Step5Launch spec={spec({ budget_usd: 1 })} onChange={() => undefined} />);
+		expect(html).toContain("Your $1.00 budget covers the expected cost ($0.06 to $0.29).");
+		expect(html).not.toContain("$5 per benchmark)");
+	});
+
+	it("says Updating... while the estimate refetches", () => {
+		q.estimate = { ...okQuery({ runs: 5, est_cost_usd: { low: 0.06, high: 0.29, known: true }, budget: budget({}) }), isFetching: true };
+		const html = render(<Step5Launch spec={spec({ budget_usd: 1 })} onChange={() => undefined} />);
+		expect(html).toContain("Updating...");
+		expect(html).not.toContain("would not start");
+	});
 });
+
+describe("step 5 estimate basis (D8.est)", () => {
+	it("says the estimate comes from other agents' runs when from_library", () => {
+		q.estimate = okQuery({ runs: 5, est_cost_usd: { low: 0.06, high: 0.29, known: true }, from_library: true });
+		const html = render(<Step5Launch spec={spec()} onChange={() => undefined} />);
+		expect(tagOf(html, "step5-estimate-basis")).toBeTruthy();
+		expect(html).toContain("Estimated from other agents&#x27; runs of these benchmarks. Your own runs will make it more exact.");
+	});
+
+	it("says the estimate comes from this agent's runs otherwise", () => {
+		q.estimate = okQuery({ runs: 5, est_cost_usd: { low: 0.01, high: 0.05, known: true } });
+		const html = render(<Step5Launch spec={spec()} onChange={() => undefined} />);
+		expect(html).toContain("Estimated from past runs of this agent and model.");
+	});
+});
+
+describe("step 5 name (D8.name)", () => {
+	it("renders a Name input with the default name as placeholder", () => {
+		const html = render(
+			<EvaluateDraftProvider initial={{ agent: "codex", version: 2, name: "" }}>
+				<Step5Launch spec={spec({ name: "codex v2 score" })} onChange={() => undefined} />
+			</EvaluateDraftProvider>,
+		);
+		const tag = tagOf(html, "step5-name");
+		expect(tag).toContain('placeholder="codex v2 score"');
+		expect(tag).toContain('maxLength="80"');
+	});
+
+	it("shows the typed name from the draft", () => {
+		const html = render(
+			<EvaluateDraftProvider initial={{ agent: "codex", name: "zz-test-compare" }}>
+				<Step5Launch spec={spec({ name: "zz-test-compare" })} onChange={() => undefined} />
+			</EvaluateDraftProvider>,
+		);
+		expect(tagOf(html, "step5-name")).toContain('value="zz-test-compare"');
+	});
+
+	it("sends a typed name to the setter, cut to 80 characters", () => {
+		const onName = vi.fn();
+		const input = findByTestId(NameField({ value: "", placeholder: "codex score", onName }), "step5-name");
+		expect(input).toBeTruthy();
+		const change = (input!.props as { onChange(e: { target: { value: string } }): void }).onChange;
+		change({ target: { value: "my run" } });
+		expect(onName).toHaveBeenCalledWith("my run");
+		change({ target: { value: "x".repeat(100) } });
+		expect(onName).toHaveBeenLastCalledWith("x".repeat(80));
+	});
+
+	it("wires the input to useEvaluateDraft().update({ name })", () => {
+		const update = vi.fn();
+		draftNameSetter({ update })("zz-test-compare");
+		expect(update).toHaveBeenCalledWith({ name: "zz-test-compare" });
+	});
+});
+
+function findByTestId(node: unknown, id: string): ReactElement | undefined {
+	if (!node || typeof node !== "object") return undefined;
+	if (Array.isArray(node)) {
+		for (const n of node) {
+			const hit = findByTestId(n, id);
+			if (hit) return hit;
+		}
+		return undefined;
+	}
+	const el = node as ReactElement<{ children?: unknown; "data-testid"?: string }>;
+	if (el.props?.["data-testid"] === id) return el;
+	return findByTestId(el.props?.children, id);
+}

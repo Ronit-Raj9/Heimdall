@@ -24,6 +24,7 @@ import (
 	"github.com/maximhq/bifrost/bench/gates"
 	"github.com/maximhq/bifrost/bench/gateways/bifrost"
 	"github.com/maximhq/bifrost/bench/graders"
+	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/metrics"
 	"github.com/maximhq/bifrost/bench/policy"
@@ -126,6 +127,7 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		return nil, fmt.Errorf("load prices: %w", err)
 	}
 	a.prices = prices
+	handlers.SetPriceList(prices.Lookup) // F1.price: usage, report card and the default model's hint read the same price list
 	parsers := adapters.BuiltinParsers()
 	adapterFaults := environments.NewAdapterFaultController(environments.DockerWorkspaceConfig{Docker: a.docker, Logger: logger, HelperImage: cfg.Images.Helper, ToolProxyImage: cfg.Images.ToolProxy})
 	helper := cfg.Images.Helper

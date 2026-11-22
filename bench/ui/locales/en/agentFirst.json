@@ -171,7 +171,8 @@
 			"agent": "Choose an agent.",
 			"model": "Choose a model.",
 			"benchmarks": "Choose at least one benchmark.",
-			"faults": "Choose at least one fault."
+			"faults": "Choose at least one fault.",
+			"budget": "Enter a budget above $0, or leave it empty."
 		},
 		"estimate": "{{runs}} runs, about {{cost}}",
 		"costUnknown": "cost unknown",
@@ -190,6 +191,15 @@
 			"cancelled": "Cancelled"
 		},
 		"running": "Still running. Results show here when it finishes.",
-		"noResults": "No fault results in this evaluation."
+		"noResults": "No fault results in this evaluation.",
+		"budget": "Budget (USD)",
+		"budgetHint": "Empty: each benchmark may spend up to ${{amount}}.",
+		"modelDefault": "Model set to {{agent}}'s default: {{model}}.",
+		"faultsSkipped_one": "{{faults}} does not apply to {{benchmark}} ({{reason}}) and adds no runs.",
+		"faultsSkipped_other": "{{faults}} do not apply to {{benchmark}} ({{reason}}) and add no runs.",
+		"pastSkipped_one": "{{count}} fault did not apply",
+		"pastSkipped_other": "{{count}} faults did not apply",
+		"droppedTitle": "Faults that did not run",
+		"droppedRow": "{{fault}} on {{benchmark}}: {{reason}}"
 	}
 }

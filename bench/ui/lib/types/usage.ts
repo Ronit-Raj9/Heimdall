@@ -9,6 +9,8 @@ export interface UsageBucket {
 	tokens: number;
 	runs: number;
 	unknown_cost_runs: number;
+	/** Runs that ended before any model call (no metrics, no cost rows): counted at $0. */
+	no_model_call_runs?: number;
 }
 
 export interface UsageKeySpend {
@@ -28,6 +30,8 @@ export interface UsageReport {
 	total_tokens: number;
 	runs: number;
 	unknown_cost_runs: number;
+	/** Runs that ended before any model call, counted at $0. */
+	no_model_call_runs?: number;
 	experiments: number;
 	buckets: UsageBucket[];
 	keys: UsageKeySpend[];

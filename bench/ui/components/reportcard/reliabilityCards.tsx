@@ -1,4 +1,7 @@
 import type { Report, ReportCurvePoint, ReportReliabilityCard, ReportResilienceArm } from "@/lib/store/apis/evaluationsApi";
+import { useContext } from "react";
+import { ReactReduxContext } from "react-redux";
+import { DroppedFaults } from "./droppedFaults";
 import { duration, faultName, isAB, pct, ratio, reliabilityCards, usd } from "./reportCard.utils";
 
 const W = 300;
@@ -156,8 +159,29 @@ function DegradationBar({ m }: { m: ReportResilienceArm }) {
 	);
 }
 
-/** One bar per fault and agent: how much success is kept, recovery rate, cost change and time to recover. */
+/**
+ * One bar per fault and agent: how much success is kept, recovery rate, cost change and time to recover.
+ * Under it, the chosen faults that did not apply to a benchmark and so have no row.
+ */
 export function ResilienceCard({ report }: { report: Report }) {
+	return (
+		<div className="flex flex-col gap-3">
+			<ResilienceRows report={report} />
+			<StoreDroppedFaults evaluationId={report.evaluation} />
+		</div>
+	);
+}
+
+/**
+ * The dropped faults read the evaluation from the store; a card drawn without one (a static
+ * render) shows nothing here.
+ */
+export function StoreDroppedFaults({ evaluationId }: { evaluationId: string }) {
+	const store = useContext(ReactReduxContext);
+	return store ? <DroppedFaults evaluationId={evaluationId} /> : null;
+}
+
+function ResilienceRows({ report }: { report: Report }) {
 	const rows = report.resilience ?? [];
 	const ab = isAB(report);
 	return (

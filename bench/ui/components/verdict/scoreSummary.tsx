@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { ArrowRight, Ban, Gauge } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { formatScoreValue, isRateMetric, scoreBounds } from "./verdict.utils";
+import { notKnown } from "./verdictSummary";
 
 export interface ScoreSummaryProps {
 	verdict: Verdict & { score: Score };
@@ -35,7 +36,7 @@ export function ScoreSummary({ verdict, naive, armMetrics, onCompare, className 
 	const metric = (name: string, kind: "usd" | "tokens") => {
 		const v = metrics?.[name];
 		if (v && v.state === "observed" && typeof v.v === "number") return formatValueNumber(v.v, kind, locale);
-		return kind === "usd" ? t("summary.costUnknown") : t("summary.unknown");
+		return notKnown(v?.reason, t);
 	};
 	const pct = s.mean === undefined ? null : Math.min(100, Math.max(0, s.mean * 100));
 	const rate = isRateMetric(s.metric);
@@ -61,7 +62,9 @@ export function ScoreSummary({ verdict, naive, armMetrics, onCompare, className 
 						{value(s.mean)}
 					</span>
 					<span className="text-muted-foreground text-sm tabular-nums" data-testid="score-summary-interval">
-						{s.interval ? t("summary.score.interval", { lo: value(s.interval[0]), hi: value(s.interval[1]) }) : t("summary.score.noInterval")}
+						{s.interval
+							? t("summary.score.interval", { lo: value(s.interval[0]), hi: value(s.interval[1]) })
+							: t("summary.score.noInterval")}
 					</span>
 				</div>
 			</div>

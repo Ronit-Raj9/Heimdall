@@ -118,7 +118,10 @@ export function VerdictTab({ expId }: { expId: string }) {
 						</span>
 					)}
 					<details className="group text-xs" data-testid="verdict-details">
-						<summary className="text-muted-foreground hover:text-foreground cursor-pointer list-none select-none" title={tPage("header.detailsHint")}>
+						<summary
+							className="text-muted-foreground hover:text-foreground cursor-pointer list-none select-none"
+							title={tPage("header.detailsHint")}
+						>
 							{tPage("header.details")}
 						</summary>
 						<div className="mt-2">
@@ -173,6 +176,7 @@ export function VerdictTab({ expId }: { expId: string }) {
 					arms={arms}
 					naive={payload.naive}
 					armMetrics={diagnostics.data?.arm_metrics}
+					metricsStatus={diagnostics.isError ? "error" : diagnostics.isLoading ? "loading" : undefined}
 					onNext={onNext}
 				/>
 			)}
@@ -190,8 +194,13 @@ export function VerdictTab({ expId }: { expId: string }) {
 					</Disclosure>
 				)}
 
-				<Disclosure title={tPage("sections.gates")}
-					description={tPage("sectionHints.gates")} icon={ListChecks} action={tag("verdict-gates-source", true)} testId="verdict-gates">
+				<Disclosure
+					title={tPage("sections.gates")}
+					description={tPage("sectionHints.gates")}
+					icon={ListChecks}
+					action={tag("verdict-gates-source", true)}
+					testId="verdict-gates"
+				>
 					<GateChecklist gates={payload.gates} />
 				</Disclosure>
 
@@ -205,21 +214,29 @@ export function VerdictTab({ expId }: { expId: string }) {
 					{diagnosticsBody("conditions")}
 				</Disclosure>
 
-				<Disclosure title={tPage("sections.meters")}
-					description={tPage("sectionHints.meters")} icon={Gauge} testId="verdict-meters">
+				<Disclosure title={tPage("sections.meters")} description={tPage("sectionHints.meters")} icon={Gauge} testId="verdict-meters">
 					{diagnosticsBody("meters")}
 				</Disclosure>
 
 				{!scored && (
-					<Disclosure title={tPage("sections.statistics")}
-						description={tPage("sectionHints.statistics")} icon={Sigma} action={tag("verdict-card-source")} testId="verdict-statistics">
+					<Disclosure
+						title={tPage("sections.statistics")}
+						description={tPage("sectionHints.statistics")}
+						icon={Sigma}
+						action={tag("verdict-card-source")}
+						testId="verdict-statistics"
+					>
 						<VerdictCard verdict={payload.verdict} metricLabel={metrics[payload.verdict.primary.metric]?.label} showGuards={false} />
 					</Disclosure>
 				)}
 
 				{!scored && (
-					<Disclosure title={tPage("sections.changes")}
-						description={tPage("sectionHints.changes")} icon={GitCompare} testId="verdict-config-diff">
+					<Disclosure
+						title={tPage("sections.changes")}
+						description={tPage("sectionHints.changes")}
+						icon={GitCompare}
+						testId="verdict-config-diff"
+					>
 						<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
 							<ConfigDiff changes={payload.config_diff} armLabels={arms.length === 2 ? { a: arms[0], b: arms[1] } : undefined} />
 							<div className="flex flex-col gap-2">
@@ -230,8 +247,13 @@ export function VerdictTab({ expId }: { expId: string }) {
 					</Disclosure>
 				)}
 
-				<Disclosure title={tPage("sections.policy")}
-					description={tPage("sectionHints.policy")} icon={Scale} action={tag("verdict-policy-source")} testId="verdict-policy">
+				<Disclosure
+					title={tPage("sections.policy")}
+					description={tPage("sectionHints.policy")}
+					icon={Scale}
+					action={tag("verdict-policy-source")}
+					testId="verdict-policy"
+				>
 					<PolicyScorecard policy={payload.policy} expId={payload.exp_id} metrics={metrics} runPairs={runPairs} onOpenPair={openPair} />
 				</Disclosure>
 
@@ -239,8 +261,13 @@ export function VerdictTab({ expId }: { expId: string }) {
 				{payload.judge_calibration && <VerdictCalibration jc={payload.judge_calibration} />}
 
 				{/* The grid shows each run's sealed outcome; a regrade does not change it, and the tag says so. */}
-				<Disclosure title={tPage("sections.tasks")}
-					description={tPage("sectionHints.tasks")} icon={Table2} action={tag("verdict-grid-source", true)} testId="verdict-grid">
+				<Disclosure
+					title={tPage("sections.tasks")}
+					description={tPage("sectionHints.tasks")}
+					icon={Table2}
+					action={tag("verdict-grid-source", true)}
+					testId="verdict-grid"
+				>
 					{grid.isLoading ? (
 						<TableSkeleton testId="verdict-grid-loading" />
 					) : grid.isError || !grid.data ? (

@@ -1,0 +1,7 @@
+{
+	"step3": {
+		"otherArmCannot": "{{agent}} (setup {{setup}}) cannot run this: {{reason}}",
+		"otherArmCannotGeneric": "{{agent}} (setup {{setup}}) cannot run this benchmark",
+		"checkingArms": "Checking whether every setup can run it..."
+	}
+}

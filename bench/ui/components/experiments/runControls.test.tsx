@@ -4,13 +4,15 @@ import { hostedSession } from "@/lib/testing/platformFixtures";
 import { mutation, render } from "@/lib/testing/render";
 import type { RunControls } from "@/lib/store/apis/runControlApi";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EvaluationRunActions, RunActions, RunControlsPanel } from "./runControls";
+import { EvaluationRunActions, PauseControls, RunActions, RunControlsPanel } from "./runControls";
 
 const api = vi.hoisted(() => ({ controls: undefined as unknown }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/runControlApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/runControlApi")>()),
 	useGetRunControlsQuery: () => ({ data: api.controls }),
+	usePauseExperimentMutation: () => mutation({}),
+	useUnpauseExperimentMutation: () => mutation({}),
 	usePatchRunControlsMutation: () => mutation({}),
 	useCancelRunMutation: () => mutation({}),
 	useRequeueRunMutation: () => mutation({}),
@@ -29,10 +31,30 @@ const controls = (over: Partial<RunControls> = {}): RunControls => ({
 	concurrency: 2,
 	total_usd: 10,
 	policy: [
-		{ class: "aborted_infra", retry: "auto", max_attempts: 3, uses_attempt: true, grade: "not_graded", counts: false, editable: true, note: "" },
-		{ class: "infra_error", retry: "manual", max_attempts: 0, uses_attempt: false, grade: "unknown", counts: true, editable: true, note: "" },
+		{
+			class: "aborted_infra",
+			retry: "auto",
+			max_attempts: 3,
+			uses_attempt: true,
+			grade: "not_graded",
+			counts: false,
+			editable: true,
+			note: "",
+		},
+		{
+			class: "infra_error",
+			retry: "manual",
+			max_attempts: 0,
+			uses_attempt: false,
+			grade: "unknown",
+			counts: true,
+			editable: true,
+			note: "",
+		},
 	],
-	log: [{ seq: 1, at: "2026-11-21T10:00:00Z", actor: "ana", action: "pause", reason: "outage", before: {}, after: {}, prev: "", hash: "h" }],
+	log: [
+		{ seq: 1, at: "2026-11-21T10:00:00Z", actor: "ana", action: "pause", reason: "outage", before: {}, after: {}, prev: "", hash: "h" },
+	],
 	log_entries: 1,
 	log_verified: true,
 	exploratory: false,
@@ -66,7 +88,9 @@ describe("RunControlsPanel", () => {
 	});
 	it("flags a change log that does not verify", () => {
 		api.controls = controls({ log_verified: false, log_problem: "entry 2 hash mismatch" });
-		expect(render(<RunControlsPanel expId="e_1" state="running" />, hostedSession("member"))).toContain("does not verify: entry 2 hash mismatch");
+		expect(render(<RunControlsPanel expId="e_1" state="running" />, hostedSession("member"))).toContain(
+			"does not verify: entry 2 hash mismatch",
+		);
 	});
 	it("hides settings from viewers", () => {
 		api.controls = controls();
@@ -87,12 +111,44 @@ describe("RunActions", () => {
 
 describe("EvaluationRunActions", () => {
 	const ev = (status: string, extra: object = {}) =>
-		({ id: "ev_1", status, spec: { name: "n", mode: "score", arms: [], benchmarks: [], tasks_per_benchmark: 8, trials: 2, faults: [] }, children: [], created_at: "", ...extra }) as never;
+		({
+			id: "ev_1",
+			status,
+			spec: { name: "n", mode: "score", arms: [], benchmarks: [], tasks_per_benchmark: 8, trials: 2, faults: [] },
+			children: [],
+			created_at: "",
+			...extra,
+		}) as never;
 	it("pauses a running evaluation, resumes a paused one, reruns failures of a finished one", () => {
 		const m = hostedSession("member");
 		expect(render(<EvaluationRunActions evaluation={ev("running")} />, m)).toContain('data-testid="evaluation-pause"');
 		expect(render(<EvaluationRunActions evaluation={ev("running", { paused: true })} />, m)).toContain('data-testid="evaluation-unpause"');
 		expect(render(<EvaluationRunActions evaluation={ev("done")} />, m)).toContain('data-testid="evaluation-rerun-failures"');
 		expect(render(<EvaluationRunActions evaluation={ev("done", { rerun_of: "ev_0" })} />, m)).not.toContain("evaluation-rerun-failures");
+	});
+});
+
+describe("run control names (J6.log-user)", () => {
+	it("prints the actor's name in the change log and keeps the id in a title", () => {
+		api.controls = {
+			...controls({
+				log: [{ seq: 1, at: "2026-11-21T10:00:00Z", actor: "usr_01m7", action: "pause", before: {}, after: {}, prev: "", hash: "h" }],
+			}),
+			actor_names: { usr_01m7: "Ana Lima" },
+		};
+		const html = render(<RunControlsPanel expId="e_1" state="running" />, hostedSession("member"));
+		expect(html).toMatch(/title="usr_01m7"[^>]*>Ana Lima</);
+	});
+	it("keeps the id when the server sent no name", () => {
+		api.controls = controls({
+			log: [{ seq: 1, at: "2026-11-21T10:00:00Z", actor: "usr_01m7", action: "pause", before: {}, after: {}, prev: "", hash: "h" }],
+		});
+		expect(render(<RunControlsPanel expId="e_1" state="running" />, hostedSession("member"))).toMatch(/title="usr_01m7"[^>]*>usr_01m7</);
+	});
+	it("names who paused on the paused chip", () => {
+		api.controls = { ...controls({ paused: true, state: { mode: "paused", seq: 2, paused_by: "usr_01m7" } }), paused_by_name: "Ana Lima" };
+		const html = render(<PauseControls expId="e_1" />, hostedSession("member"));
+		expect(html).toContain('title="Paused by Ana Lima"');
+		expect(html).not.toContain("Paused by usr_01m7");
 	});
 });

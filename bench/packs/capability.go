@@ -33,8 +33,10 @@ var idCapability = []struct {
 	{[]string{"gpu", "cuda", "kernel"}, CapGPU},
 	{[]string{"longmem", "locomo", "memory", "recall"}, CapMemory},
 	{[]string{"browsecomp", "gaia", "research", "search"}, CapResearch},
-	{[]string{"tau2", "tau-bench", "taubench", "support", "helpdesk", "customer", "mcpmark"}, CapSupport},
-	{[]string{"harbor", "terminal", "shell", "bash"}, CapTerminal},
+	{[]string{"tau2", "tau-bench", "taubench", "support", "helpdesk", "customer", "mcpmark", "bfcl", "function-call"}, CapSupport},
+	// "harbor" is only the importer: only these harbor benchmarks are
+	// terminal tasks; any other harbor import goes by its track.
+	{[]string{"hd-harbor-tb2", "hd-harbor-tb41-cpu", "hd-harbor-skills", "terminal", "shell", "bash"}, CapTerminal},
 	{[]string{"swe-", "swebench", "coding", "humaneval", "livecodebench"}, CapCoding},
 }
 
