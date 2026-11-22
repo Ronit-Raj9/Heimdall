@@ -19,7 +19,7 @@ import {
   SessionsTimeline,
   ToolCallTable,
 } from "@/components/runs/runScenario";
-import { stripMetricKinds } from "@/components/runs/runs.utils";
+import { stripMetricKinds, wallText } from "@/components/runs/runs.utils";
 import {
   BlockSkeleton,
   LoadError,
@@ -32,7 +32,6 @@ import { canReplay, RunDebugActions } from "@/components/runs/debug/debugActions
 import { DebugBanner } from "@/components/runs/debug/debugBanner";
 import { HoldPanel } from "@/components/runs/debug/holdPanel";
 import { TraceDiff } from "@/components/runs/debug/traceDiff";
-import { formatDuration } from "@/components/runs/traceView.utils";
 import { ScreenReplay, useRunFrames } from "@/components/runs/screenReplay"; // U08 screen replay
 import { LiveScreen } from "@/components/runs/liveScreen"; // Z03 live screen and takeover
 import { RecordingTab, useRunRecordings } from "@/components/runs/recordingPlayer"; // Z03 recordings
@@ -347,7 +346,7 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
           <StatCard
             icon={Timer}
             label={tt("overview.time")}
-            value={wallText(detail.metrics)}
+            value={wallText(detail.metrics, detail.run.timing)}
             testId="run-stat-time"
           />
         </div>
@@ -496,17 +495,6 @@ function metricText(value: Value | undefined, unit?: "usd"): string {
   return unit === "usd"
     ? `$${value.v.toFixed(value.v < 1 ? 4 : 2)}`
     : value.v.toLocaleString();
-}
-
-function wallText(metrics: Record<string, Value>): string {
-  const ms =
-    metrics.wall_ms?.state === "observed" &&
-    typeof metrics.wall_ms.v === "number"
-      ? metrics.wall_ms.v
-      : typeof metrics.wall_s?.v === "number"
-        ? metrics.wall_s.v * 1000
-        : null;
-  return typeof ms === "number" ? formatDuration(ms) : "-";
 }
 
 function StatCard({

@@ -263,3 +263,70 @@ func TestRunListMetricsModelVersionAndFault(t *testing.T) {
 		t.Errorf("agent filter total = %d, want 2 across pages", got.Total)
 	}
 }
+
+// runIDs lists the run ids of a page in order.
+func runIDs(out RunList) []string {
+	ids := []string{}
+	for _, row := range out.Runs {
+		ids = append(ids, row.RunID)
+	}
+	return ids
+}
+
+func TestListRunsSortByCost(t *testing.T) {
+	idx := runListIndex()
+	costs := map[string]string{"r_t01_A": "0.30", "r_t01_B": "0.10", "r_t02_B": "0.20"}
+	for id, files := range idx.files {
+		if c, ok := costs[id]; ok {
+			files[FileMetrics] = []byte(`{"cost_usd":{"state":"observed","v":` + c + `,"evidence":"gateway"},"tokens":{"state":"observed","v":` + c[2:] + `,"evidence":"gateway"}}`)
+		} else {
+			// No observed cost or tokens: always sorted last.
+			files[FileMetrics] = []byte(`{}`)
+		}
+	}
+	c := runListClient(t, idx, runListSuites())
+	cases := []struct {
+		query string
+		want  []string
+	}{
+		{"?sort=cost&dir=asc", []string{"r_t01_B", "r_t02_B", "r_t01_A", "r_t02_A"}},
+		{"?sort=cost&dir=desc", []string{"r_t01_A", "r_t02_B", "r_t01_B", "r_t02_A"}},
+		{"?sort=cost", []string{"r_t01_A", "r_t02_B", "r_t01_B", "r_t02_A"}},
+		// Paging comes after the sort: the second page of the ascending order.
+		{"?sort=cost&dir=asc&limit=2&offset=2", []string{"r_t01_A", "r_t02_A"}},
+		{"?sort=cost&dir=asc&limit=1&offset=1", []string{"r_t02_B"}},
+		{"?sort=tokens&dir=asc&arm=B", []string{"r_t01_B", "r_t02_B"}},
+		{"?sort=task&dir=asc", []string{"r_t01_B", "r_t01_A", "r_t02_B", "r_t02_A"}},
+		{"?sort=started&dir=asc", []string{"r_t01_A", "r_t01_B", "r_t02_A", "r_t02_B"}},
+		{"?sort=outcome&dir=asc", []string{"r_t01_A", "r_t02_B", "r_t02_A", "r_t01_B"}},
+	}
+	for _, tc := range cases {
+		out := getRunList(t, c, tc.query)
+		if got := runIDs(out); !slices.Equal(got, tc.want) {
+			t.Errorf("%s = %v, want %v", tc.query, got, tc.want)
+		}
+		if out.Total == 0 {
+			t.Errorf("%s total = 0", tc.query)
+		}
+	}
+	// The page still carries the cost of every row it shows.
+	out := getRunList(t, c, "?sort=cost&dir=asc&limit=1")
+	if r := out.Runs[0]; r.CostUSD == nil || r.CostUSD.V == nil || *r.CostUSD.V != 0.10 {
+		t.Errorf("first row cost = %+v, want 0.10", r.CostUSD)
+	}
+}
+
+func TestListRunsBadSort(t *testing.T) {
+	c := runListClient(t, runListIndex(), nil)
+	for _, query := range []string{"?sort=price", "?sort=cost&dir=up", "?dir=sideways"} {
+		resp := c.do(t, "GET", APIPrefix+"/runs"+query, nil, nil)
+		if resp.StatusCode() != fasthttp.StatusBadRequest {
+			t.Errorf("%s = %d, want 400", query, resp.StatusCode())
+			continue
+		}
+		body := string(resp.Body())
+		if query == "?sort=price" && !strings.Contains(body, "sort must be one of") {
+			t.Errorf("%s body = %s, want the allowed values", query, body)
+		}
+	}
+}

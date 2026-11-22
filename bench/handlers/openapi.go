@@ -144,11 +144,13 @@ var APIRoutes = []RouteDoc{
 	}},
 
 	// UI regroup (U2): the run list across experiments (handlers/runlist.go).
-	{Method: "GET", Path: APIPrefix + "/runs", Tag: "runs", Summary: "Every run across experiments, newest first, with filters, paging and the values each filter can take", Response: RunList{}, Query: []QueryDoc{
+	{Method: "GET", Path: APIPrefix + "/runs", Tag: "runs", Summary: "Every run across experiments, newest first unless sort says otherwise, with filters, sorting, paging and the values each filter can take", Response: RunList{}, Query: []QueryDoc{
 		{Name: "exp", Description: "Experiment id"}, {Name: "suite", Description: "Suite id"}, {Name: "arm", Description: "Arm id"},
 		{Name: "task", Description: "Task id"}, {Name: "condition", Description: "clean or a probe id"}, {Name: "outcome", Description: "Run outcome"},
 		{Name: "track", Description: "Suite track"}, {Name: "agent", Description: "Agent config id"}, {Name: "benchmark", Description: "Suite id with or without its version"},
 		{Name: "fault", Description: "Fault name (model-down, broken-tool, misleading-instruction, ...) or clean"}, {Name: "model", Description: "Arm model"},
+		{Name: "sort", Description: "Sort key, applied before paging: started (default), duration, outcome, cost, tokens, steps, task or agent; rows without a value go last"},
+		{Name: "dir", Description: "Sort direction: asc or desc (default desc)"},
 		{Name: "limit", Description: "Page size; default 100, at most 500"}, {Name: "offset", Description: "Rows to skip"},
 	}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}", Tag: "runs", Summary: "One run with seal, grade, metrics, gates and receipts", Response: schemas.RunDetail{}},

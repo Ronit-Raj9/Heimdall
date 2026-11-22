@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { RunListRow } from "@/lib/types/bench";
-import { agentOptions, agentVersionLabel, formatDuration, orderRuns, runAgent, runDuration, runsRequest } from "./runsTable";
+import {
+	agentOptions,
+	agentVersionLabel,
+	ariaSortOf,
+	formatDuration,
+	nextRunSort,
+	orderRuns,
+	runAgent,
+	runDuration,
+	runsRequest,
+} from "./runsTable";
 
 const row = (id: string, sealed: boolean, task = "t", arm = "a", config_id = ""): RunListRow =>
 	({ run_id: id, sealed, task, arm, config_id, suite: "s@1", outcome: "pass" }) as RunListRow;
@@ -40,5 +50,25 @@ describe("runsTable utils", () => {
 		expect(runDuration({ started: "2026-01-01T00:00:00Z", sealed_at: "2026-01-01T00:01:05Z" })).toBe(65);
 		expect(formatDuration(65)).toBe("1m 5s");
 		expect(formatDuration(null)).toBe("-");
+	});
+	it("a header click sets the sort in the URL state and the request", () => {
+		// First click on Cost: largest first; second click flips it.
+		const first = nextRunSort({}, "cost");
+		expect(first).toEqual({ sort: "cost", dir: "desc" });
+		const second = nextRunSort(first, "cost");
+		expect(second).toEqual({ sort: "cost", dir: "asc" });
+		// A text column starts A to Z.
+		expect(nextRunSort(second, "task")).toEqual({ sort: "task", dir: "asc" });
+		// Back to the default order (newest first) clears the URL.
+		expect(nextRunSort({ sort: "started", dir: "asc" }, "started")).toEqual({ sort: null, dir: null });
+		expect(runsRequest(second, 2)).toEqual({ limit: 50, sort: "cost", dir: "asc", offset: 50 });
+		expect(runsRequest({ sort: "price", dir: "up" }, 1)).toEqual({ limit: 50 });
+		expect(ariaSortOf(second, "cost")).toBe("ascending");
+		expect(ariaSortOf(second, "task")).toBe("none");
+		expect(ariaSortOf({}, "started")).toBe("descending");
+	});
+	it("keeps the server's order when a sort is chosen", () => {
+		const out = orderRuns([row("1", true), row("2", false)], null, null, true);
+		expect(out.map((r) => r.run_id)).toEqual(["1", "2"]);
 	});
 });

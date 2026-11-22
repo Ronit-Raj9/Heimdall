@@ -1755,6 +1755,8 @@ export interface RunListParams {
 	model?: string;
 	limit?: number;
 	offset?: number;
+	sort?: "started" | "duration" | "outcome" | "cost" | "tokens" | "steps" | "task" | "agent";
+	dir?: "asc" | "desc";
 }
 
 /** One server-sent event on GET /experiments/{id}/events. */

@@ -276,3 +276,31 @@ func TestRunDetailSealError(t *testing.T) {
 		})
 	}
 }
+
+func TestRunDetailEvidenceContract(t *testing.T) {
+	idx := testIndex()
+	idx.files["r_t01_A"][FileEvidence] = []byte(`{"requests":{"complete":true},` +
+		`"gateway_rows":[{"body":"sk-secret-row"}],` +
+		`"evidence_contract":{"required":["trace","grade"],"available":["trace","grade"],"quality":"complete"},` +
+		`"adapter_fault":{"version":"1","run_id":"r_t01_A","rule_hash":"sha256:r","complete":true,"ledger_hash":"sha256:l"}}`)
+	d := fullDeps()
+	d.index = idx
+	resp := newTestClient(t, d).do(t, "GET", "/api/bench/runs/r_t01_A", nil, nil)
+	if resp.StatusCode() != 200 {
+		t.Fatalf("status %d: %s", resp.StatusCode(), resp.Body())
+	}
+	var detail schemas.RunDetail
+	if err := json.Unmarshal(resp.Body(), &detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail.Evidence == nil || detail.Evidence.Quality != schemas.EvidenceQualityComplete || len(detail.Evidence.Available) != 2 {
+		t.Fatalf("evidence contract = %+v, want the quality from evidence.json", detail.Evidence)
+	}
+	if detail.AdapterFault == nil || detail.AdapterFault.RuleHash != "sha256:r" {
+		t.Errorf("adapter fault = %+v, want the one from evidence.json", detail.AdapterFault)
+	}
+	// Only the contract and the adapter fault leave the server.
+	if strings.Contains(string(resp.Body()), "sk-secret-row") {
+		t.Errorf("run detail leaks the gateway rows of evidence.json")
+	}
+}
