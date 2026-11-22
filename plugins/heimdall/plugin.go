@@ -28,12 +28,16 @@ type Config struct {
 	// x-heimdall-fault-plan. Only turn this on when the callers are trusted
 	// (Heimdall's own workers behind the gateway).
 	AllowInlinePlans bool `json:"allow_inline_plans,omitempty"`
+	// Usage exports one usage row per call to Heimdall (usage.go). Off when
+	// Usage.URL is empty.
+	Usage UsageConfig `json:"usage,omitempty"`
 }
 
 // Plugin implements schemas.LLMPlugin and schemas.HTTPTransportPlugin.
 type Plugin struct {
 	config  Config
 	tracker *tracker
+	usage   *UsageExporter
 	sleep   func(ctx *schemas.BifrostContext, d time.Duration) bool
 }
 
@@ -49,14 +53,19 @@ func Init(config Config) (*Plugin, error) {
 			return nil, fmt.Errorf("heimdall plan %q: %w", id, err)
 		}
 	}
-	return &Plugin{config: config, tracker: newTracker(), sleep: ctxSleep}, nil
+	usage, err := NewUsageExporter(config.Usage, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &Plugin{config: config, tracker: newTracker(), usage: usage, sleep: ctxSleep}, nil
 }
 
 // GetName returns the plugin name.
 func (p *Plugin) GetName() string { return PluginName }
 
-// Cleanup drops the per-run call counters.
+// Cleanup sends queued usage rows and drops the per-run call counters.
 func (p *Plugin) Cleanup() error {
+	p.usage.Close()
 	p.tracker.mu.Lock()
 	p.tracker.slots = map[string]*slot{}
 	p.tracker.mu.Unlock()
@@ -189,10 +198,14 @@ func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostReq
 func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostResponse, bifrostErr *schemas.BifrostError) (*schemas.BifrostResponse, *schemas.BifrostError, error) {
 	if info, _ := ctx.Value(ContextKeyInfo).(*RequestInfo); info != nil {
 		fault := ""
-		if d, ok := ctx.Value(ContextKeyFault).(*Decision); ok && d != nil {
+		d, _ := ctx.Value(ContextKeyFault).(*Decision)
+		if d != nil {
 			fault = d.Mode
 		}
 		tagContext(ctx, info, fault)
+		if rec, ok := usageRecord(info, d, resp, bifrostErr, time.Now()); ok {
+			p.usage.Add(rec)
+		}
 	}
 	return resp, bifrostErr, nil
 }
