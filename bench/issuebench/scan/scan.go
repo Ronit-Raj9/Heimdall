@@ -237,7 +237,7 @@ func (s *scanner) one(ctx context.Context, pr *ghPR) error {
 		s.drop(cd, ReasonTooManyFiles)
 		return nil
 	}
-	fixLines := 0
+	fixLines, testAdds := 0, 0
 	for _, f := range pr.Files.Nodes {
 		if binaryPath(f.Path) {
 			s.drop(cd, ReasonBinary)
@@ -245,6 +245,7 @@ func (s *scanner) one(ctx context.Context, pr *ghPR) error {
 		}
 		if s.isTest(f.Path) {
 			cd.TestFiles = append(cd.TestFiles, f.Path)
+			testAdds += f.Additions
 			continue
 		}
 		cd.CodeFiles = append(cd.CodeFiles, f.Path)
@@ -252,7 +253,9 @@ func (s *scanner) one(ctx context.Context, pr *ghPR) error {
 			fixLines += f.Additions + f.Deletions
 		}
 	}
-	if len(cd.TestFiles) == 0 {
+	// A PR that only deletes tests (a refactor dropping a case) has no test
+	// that fails before the fix.
+	if len(cd.TestFiles) == 0 || testAdds == 0 {
 		s.drop(cd, ReasonNoTests)
 		return nil
 	}

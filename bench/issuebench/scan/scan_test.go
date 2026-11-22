@@ -269,3 +269,21 @@ func TestScanSinceStops(t *testing.T) {
 		t.Errorf("since: %+v truncated=%v calls=%d", res.Funnel, res.Truncated, f.calls)
 	}
 }
+
+// marshmallow PR #3024 only deleted a test; the build then found no test
+// that fails before the fix (first real hosted run). Such a PR is dropped.
+func TestScanDropsTestDeletionsOnly(t *testing.T) {
+	p := pr(10, human, "", []map[string]any{issue(1, longBody, t0)}, []string{"src/pkg/mod.py", "tests/test_mod.py"}, 1)
+	p["files"].(map[string]any)["nodes"].([]map[string]any)[1]["additions"] = 0
+	f := &fakeGitHub{t: t, pages: [][]map[string]any{{p}}, parents: map[string]string{"m10": "b10"},
+		diffs: map[string]string{"b10...m10": diff(map[string]string{"src/pkg/mod.py": "+    return {}\n"})}}
+	srv := httptest.NewServer(f)
+	defer srv.Close()
+	res, err := Scan(context.Background(), &Client{APIURL: srv.URL, Token: "tok"}, Options{Repo: "o/r"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Funnel.Qualified != 0 || res.Funnel.Reasons[ReasonNoTests] != 1 {
+		t.Fatalf("funnel %+v", res.Funnel)
+	}
+}
