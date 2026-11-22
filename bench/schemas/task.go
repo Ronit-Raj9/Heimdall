@@ -76,6 +76,11 @@ type Task struct {
 	// Provenance.Generated lists a field a model drafted, which makes it
 	// pending. A decision in the suite's review sidecar overrides it.
 	Review string `json:"review,omitempty" yaml:"review,omitempty"`
+	// LintWaivers turn chosen static-validation errors of an imported task
+	// into warnings (suite.ApplyLintWaivers): only the instruction-words rule
+	// and the high-entropy *_KEY/*_TOKEN secret heuristic, only on a task with
+	// provenance.imported_from, each naming the exact match and a reason.
+	LintWaivers []LintWaiver `json:"lint_waivers,omitempty" yaml:"lint_waivers,omitempty"`
 
 	Voice *VoiceSpec `json:"voice,omitempty" yaml:"voice"` // X8 voice agents: the task is a phone call with a voice caller (voice.go)
 	// Team runs the task with a multi-container team (agents.go) when the
@@ -221,4 +226,19 @@ type ApproverRule struct {
 type ApproverAnswer struct {
 	Words  []string `json:"words" yaml:"words"`
 	Answer string   `json:"answer" yaml:"answer"`
+}
+
+// Lint rules a LintWaiver may name.
+const (
+	LintRuleInstructionTerm = "instruction-term"    // the instruction mentions a word such as "grader" or "hidden test"
+	LintRuleHighEntropy     = "secret-high-entropy" // a high-entropy *_KEY or *_TOKEN value (masked)
+)
+
+// LintWaiver is one waived static-validation error of an imported task.
+type LintWaiver struct {
+	Rule   string `json:"rule" yaml:"rule"`                     // LintRuleInstructionTerm or LintRuleHighEntropy
+	Path   string `json:"path,omitempty" yaml:"path,omitempty"` // task-relative file (secret rule)
+	Line   int    `json:"line,omitempty" yaml:"line,omitempty"` // line in Path (secret rule)
+	Match  string `json:"match" yaml:"match"`                   // the term, or the masked finding (name=****)
+	Reason string `json:"reason" yaml:"reason"`
 }

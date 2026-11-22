@@ -18,6 +18,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 )
 
 // Paths inside an imported task folder.
@@ -68,8 +69,10 @@ func writeTask(dir, id string, t *upstreamTask, p *taskPlan, up upstream) error 
 	if err := copyTree(t.TestsDir, filepath.Join(dir, filepath.FromSlash(upstreamTests)), nil); err != nil {
 		return err
 	}
-	if err := copyTree(t.SolutionDir, filepath.Join(dir, solutionDir), nil); err != nil {
-		return err
+	if isDir(t.SolutionDir) {
+		if err := copyTree(t.SolutionDir, filepath.Join(dir, solutionDir), nil); err != nil {
+			return err
+		}
 	}
 	files := map[string]string{
 		"instruction.md":         t.Instruction,
@@ -94,7 +97,71 @@ func writeTask(dir, id string, t *upstreamTask, p *taskPlan, up upstream) error 
 			return err
 		}
 	}
-	return writeYAML(filepath.Join(dir, "task.yaml"), taskRecord(id, t, p, up))
+	rec := taskRecord(id, t, p, up)
+	if p.waive {
+		ws, err := lintWaivers(dir, t)
+		if err != nil {
+			return err
+		}
+		rec.LintWaivers = ws
+		if len(ws) > 0 {
+			if err := appendFile(filepath.Join(dir, "IMPORT.md"), waiverNotes(ws)); err != nil {
+				return err
+			}
+		}
+	}
+	return writeYAML(filepath.Join(dir, "task.yaml"), rec)
+}
+
+// waiverReason is the reason every import waiver gives.
+const waiverReason = "verbatim upstream instruction, no test content"
+
+// lintWaivers (-set lint_waivers=upstream) are the waivers of a library task
+// whose upstream text trips the two heuristic checks: each leak word of the
+// verbatim instruction, and each high-entropy *_KEY/*_TOKEN finding in the
+// written task folder. Real secret patterns are never waived.
+func lintWaivers(dir string, t *upstreamTask) ([]schemas.LintWaiver, error) {
+	var out []schemas.LintWaiver
+	for _, term := range suite.InstructionLeakTerms(t.Instruction) {
+		out = append(out, schemas.LintWaiver{Rule: schemas.LintRuleInstructionTerm, Path: "instruction.md", Match: term, Reason: waiverReason})
+	}
+	found, err := suite.ScanSecrets(dir)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range found {
+		if strings.HasPrefix(f.Kind, "high-entropy ") {
+			out = append(out, schemas.LintWaiver{Rule: schemas.LintRuleHighEntropy, Path: f.Path, Line: f.Line, Match: f.Masked,
+				Reason: "verbatim upstream file, an identifier and not a secret; no test content"})
+		}
+	}
+	return out, nil
+}
+
+// waiverNotes is the IMPORT.md section listing the waivers.
+func waiverNotes(ws []schemas.LintWaiver) string {
+	var b strings.Builder
+	b.WriteString("\n## Lint waivers\n\nRecorded in `task.yaml` (`lint_waivers`, -set lint_waivers=upstream); each turns one static-validation error into a warning:\n\n")
+	for _, w := range ws {
+		where := w.Path
+		if w.Line > 0 {
+			where = fmt.Sprintf("%s line %d", w.Path, w.Line)
+		}
+		fmt.Fprintf(&b, "- `%s` in %s, matched `%s`: %s.\n", w.Rule, where, w.Match, w.Reason)
+	}
+	return b.String()
+}
+
+func appendFile(path, text string) error {
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := f.WriteString(text); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 // taskRecord is the task.yaml of a converted task.
@@ -146,6 +213,12 @@ func taskRecord(id string, t *upstreamTask, p *taskPlan, up upstream) *schemas.T
 	if p.honeypot {
 		task.Protected = []string{"admin/**"}
 		task.Tags = dedupe(append(task.Tags, "hack-verifiable"))
+	}
+	if t.ContinueUntilTimeout {
+		task.Tags = dedupe(append(task.Tags, "continue-until-timeout"))
+	}
+	if p.draft != "" {
+		task.Tags = dedupe(append(task.Tags, "draft"))
 	}
 	return task
 }
@@ -258,6 +331,9 @@ exit $code
 // embedded as a tar, unpacked where Harbor uploads it, then solve.sh run from
 // the task's working directory with the solution environment.
 func referenceScript(t *upstreamTask, p *taskPlan) string {
+	if p.draft != "" {
+		return draftReference(p.draft)
+	}
 	var env strings.Builder
 	for _, k := range sortedEnvKeys(t.SolutionEnv) {
 		fmt.Fprintf(&env, "export %s=%s\n", k, shellQuote(t.SolutionEnv[k]))
@@ -337,6 +413,14 @@ done
 exit 0
 `
 
+// draftReference is the reference control of a draft task: it fails with
+// the reason, so admission refuses the task and the reason shows in its
+// admission record.
+func draftReference(reason string) string {
+	return "#!/bin/sh\n# Draft task (bifrost-bench import harbor -set unrunnable=draft): the bench\n# cannot admit it, so this control fails on purpose. See IMPORT.md.\necho " +
+		shellQuote("draft: "+reason) + " >&2\nexit 1\n"
+}
+
 // importNotes is IMPORT.md: where the task came from and every change the
 // import made to it, so a reader can judge the converted task.
 func importNotes(id string, t *upstreamTask, p *taskPlan, up upstream) string {
@@ -346,6 +430,10 @@ func importNotes(id string, t *upstreamTask, p *taskPlan, up upstream) string {
 		fmt.Fprintf(&b, " at %s", up.Revision)
 	}
 	fmt.Fprintf(&b, "), upstream folder `%s`, %s layout. License: %s.\n\n", t.ID, t.Layout, up.License)
+	if p.draft != "" {
+		b.WriteString("## Draft\n\nThis task is in the suite as a draft, and admission refuses it: " + p.draft +
+			". The reference control fails with that reason on purpose; `solution/` is the upstream folder when there is one, unused.\n\n")
+	}
 	b.WriteString("## Changes made by the import\n\n")
 	b.WriteString("- The verifier runs `verifier/tests/harbor/verify.sh` in a snapshot of the agent's container (verifier mode snapshot). " +
 		"It copies `verifier/tests/upstream` to " + t.TestsMount + ", replaces `test.sh` with `verifier/tests/harbor/test.sh` and copies the reward to `/grader/out/reward.json`.\n")
@@ -355,7 +443,29 @@ func importNotes(id string, t *upstreamTask, p *taskPlan, up upstream) string {
 	for _, c := range p.tests.Changes {
 		fmt.Fprintf(&b, "- test.sh, %s\n", c)
 	}
+	if p.passThreshold > 0 {
+		fmt.Fprintf(&b, "- The suite passes a grade at reward >= %g (`-set pass_threshold`), not Harbor's 1; the raw reward is kept on every grade (partial credit). Long-Horizon Terminal-Bench's paper counts a task solved at >= 0.95, so a pass here between %g and 0.95 is not a paper solve.\n", p.passThreshold, p.passThreshold)
+	}
+	for _, n := range p.sepNotes {
+		b.WriteString("- " + n + "\n")
+	}
+	for _, c := range p.solveChanges {
+		fmt.Fprintf(&b, "- %s. `solution/` is upstream's; the reference control embeds the rewritten solve.sh.\n", c)
+	}
 	b.WriteString("- The agent, the reference script and the verifier run as root (`environment.user: root`), as Harbor runs them.\n")
+	if t.AgentUser != "" && t.AgentUser != "root" {
+		fmt.Fprintf(&b, "- Upstream runs the agent as `%s` (`[agent] user`), not root; the bench runs it as root, so anything that relied on the agent being unprivileged (root-only files, a root daemon it cannot restart) no longer holds.\n", t.AgentUser)
+	}
+	if t.Healthcheck != "" {
+		fmt.Fprintf(&b, "- Upstream runs `%s` (`[environment.healthcheck]`) before the agent starts; the bench does not, so whatever it starts is started on first use instead.\n", t.Healthcheck)
+	}
+	if p.agentS != seconds(t.AgentTimeoutS, defaultAgentS) {
+		fmt.Fprintf(&b, "- The agent budget is %d s (`-set agent_timeout`, Harbor's override_timeout_sec), not task.toml's %.0f s.\n", p.agentS, t.AgentTimeoutS)
+	}
+	if t.ContinueUntilTimeout {
+		b.WriteString("- `continue_until_timeout = true` (Long-Horizon Terminal-Bench): its modified Harbor runs the verifier when the agent stops and, unless it passed, resumes the agent with a bare rejection until the timeout. " +
+			"The bench runs the agent once, up to `timeouts.agent_s`, and grades once, as stock Harbor does; an agent that stops early is not resumed, so scores can be lower than the paper's. The reward is kept on the grade (partial credit).\n")
+	}
 	b.WriteString("- The appended Dockerfile section also copies root's git settings to /etc/gitconfig and trusts every repository, because Harbor's agent is root and the bench's is uid 1000.\n")
 	if p.skillCopy > 0 {
 		fmt.Fprintf(&b, "- The Dockerfile copied the skills folder into the image (%d line(s)); those lines are disabled, and the skills are installed by the bench from `skills/` only when skills are enabled.\n", p.skillCopy)
@@ -384,7 +494,11 @@ func importNotes(id string, t *upstreamTask, p *taskPlan, up upstream) string {
 			b.WriteString("- " + n + "\n")
 		}
 	}
-	b.WriteString("- The reference control embeds `solution/` and runs `solve.sh`; the empty control does nothing; the exploit control plants a fake reward.\n")
+	if p.draft == "" {
+		b.WriteString("- The reference control embeds `solution/` and runs `solve.sh`; the empty control does nothing; the exploit control plants a fake reward.\n")
+	} else {
+		b.WriteString("- The reference control fails on purpose (draft); the empty control does nothing; the exploit control plants a fake reward.\n")
+	}
 	return b.String()
 }
 
@@ -417,7 +531,7 @@ func checkExistingSuite(dir, id string, up upstream) error {
 
 // writeSuite writes suite.yaml, or extends the one already there with the
 // new tasks, and the suite's small base image.
-func writeSuite(dir, id string, up upstream, track string, tasks []*converted, now time.Time) error {
+func writeSuite(dir, id string, up upstream, track string, tasks []*converted, passThreshold float64, now time.Time) error {
 	s := &schemas.Suite{}
 	path := filepath.Join(dir, "suite.yaml")
 	if b, err := os.ReadFile(path); err == nil {
@@ -460,6 +574,9 @@ func writeSuite(dir, id string, up upstream, track string, tasks []*converted, n
 	}
 	if s.Track != schemas.TrackSkills {
 		s.Track = track
+	}
+	if passThreshold > 0 {
+		s.Verifier.PassThreshold = passThreshold
 	}
 	s.Imported = &schemas.ImportRecord{Importer: Name, Benchmark: up.Benchmark, Source: up.Source, Revision: up.Revision, License: up.License, At: now.UTC().Truncate(time.Second)}
 	if err := os.MkdirAll(filepath.Join(dir, "base"), 0o755); err != nil {
@@ -657,7 +774,11 @@ func inside(root, p string) bool {
 // tarGz packs the regular files and folders under dir into a gzip tar with
 // fixed times and owners, so the same folder always packs to the same bytes
 // and the suite lock hash of the reference control is stable.
-func tarGz(dir string) ([]byte, error) {
+func tarGz(dir string) ([]byte, error) { return tarGzWith(dir, nil) }
+
+// tarGzWith is tarGz with the content of some files (by slash path relative
+// to dir) replaced, for a solve.sh the import rewrote.
+func tarGzWith(dir string, override map[string][]byte) ([]byte, error) {
 	var paths []string
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -693,6 +814,9 @@ func tarGz(dir string) ([]byte, error) {
 			h.Typeflag, h.Name, h.Mode = tar.TypeDir, h.Name+"/", 0o755
 		default:
 			h.Typeflag, h.Size, h.Mode = tar.TypeReg, info.Size(), 0o644
+			if b, ok := override[h.Name]; ok {
+				h.Size = int64(len(b))
+			}
 			if info.Mode()&0o111 != 0 {
 				h.Mode = 0o755
 			}
@@ -701,9 +825,11 @@ func tarGz(dir string) ([]byte, error) {
 			return nil, err
 		}
 		if h.Typeflag == tar.TypeReg {
-			b, err := os.ReadFile(p)
-			if err != nil {
-				return nil, err
+			b, ok := override[h.Name]
+			if !ok {
+				if b, err = os.ReadFile(p); err != nil {
+					return nil, err
+				}
 			}
 			if _, err := tw.Write(b); err != nil {
 				return nil, err

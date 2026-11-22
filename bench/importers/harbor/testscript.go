@@ -64,8 +64,9 @@ func planTestScriptKeep(src string, keepNetworked bool) (*testPlan, error) {
 		case lineKeep:
 			out = append(out, orig...)
 		case lineAptOrPip:
-			plan.Bake = append(plan.Bake, code)
-			plan.Changes = append(plan.Changes, "baked at build: "+code)
+			step := stripLogRedirects(code)
+			plan.Bake = append(plan.Bake, step)
+			plan.Changes = append(plan.Changes, "baked at build: "+step)
 			out = append(out, disabled(ll.text))
 		case lineUVInstall:
 			url := uvURLRE.FindString(code)
@@ -120,11 +121,14 @@ var (
 	uvURLRE     = regexp.MustCompile(`https://astral\.sh/uv/([0-9][0-9.]*/)?install\.sh`)
 	uvInstallRE = regexp.MustCompile(`^(curl|wget)\s.*https://astral\.sh/uv/([0-9][0-9.]*/)?install\.sh.*\|\s*(sh|bash)\b`)
 	uvEnvRE     = regexp.MustCompile(`^(source|\.)\s+"?\$(HOME|\{HOME\})/\.(local/bin|cargo)/env"?$`)
-	redirectRE  = regexp.MustCompile(`\s*(\d?>>?\s*/dev/null|\d?>&\d|\|\|\s*true)\s*`)
-	uvxRE       = regexp.MustCompile(`(^|[\s;(&|!])uvx\s`)
-	uvProjectRE = regexp.MustCompile(`(^|[\s;&|])uv\s+(init|add|run|sync|venv|pip|python|tool)\b`)
-	urlRE       = regexp.MustCompile(`https?://([^/\s"'$]+)`)
-	fetchRE     = regexp.MustCompile(`(^|[\s;&|(])(` +
+	// fileRedirectRE is an output redirection to a file (an install log);
+	// the log is not kept when the install moves to the build.
+	fileRedirectRE = regexp.MustCompile(`\s\d?>>?\s*[^\s&|;]+(\s+2>&1)?`)
+	redirectRE     = regexp.MustCompile(`\s*(\d?>>?\s*/dev/null|\d?>&\d|\|\|\s*true)\s*`)
+	uvxRE          = regexp.MustCompile(`(^|[\s;(&|!])uvx\s`)
+	uvProjectRE    = regexp.MustCompile(`(^|[\s;&|])uv\s+(init|add|run|sync|venv|pip|python|tool)\b`)
+	urlRE          = regexp.MustCompile(`https?://([^/\s"'$]+)`)
+	fetchRE        = regexp.MustCompile(`(^|[\s;&|(])(` +
 		`(apt-get|apt|apk|yum|dnf|conda|mamba|gem|brew)\s+(-\S+\s+)*(install|add|update)\b|` +
 		`pip3?\s+(install|download)\b|` +
 		`git\s+(clone|fetch|pull|submodule)\b|` +
@@ -164,6 +168,7 @@ func classifyTestLine(code string) string {
 // least one real install. Anything else on the line (a condition, a pipe, a
 // reference to the test files) keeps it from being moved to the build.
 func allSegments(code string, res ...*regexp.Regexp) bool {
+	code = stripLogRedirects(code)
 	if strings.Contains(code, "/tests") || strings.Contains(code, "/verifier") || strings.Contains(code, "$") || strings.Contains(code, "`") {
 		return false
 	}
@@ -405,4 +410,16 @@ func isLocalHost(host string) bool {
 		h = h[:i]
 	}
 	return h == "localhost" || h == "127.0.0.1" || h == "0.0.0.0" || h == "[::1]" || strings.HasPrefix(h, "${") || h == ""
+}
+
+// stripLogRedirects drops output redirections to a log file (not /dev/null):
+// the install moves to the build, where the log folder may not exist.
+func stripLogRedirects(code string) string {
+	out := fileRedirectRE.ReplaceAllStringFunc(code, func(m string) string {
+		if strings.Contains(m, "/dev/null") {
+			return m
+		}
+		return ""
+	})
+	return strings.TrimSpace(out)
 }

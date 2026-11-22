@@ -41,6 +41,23 @@ type upstreamTask struct {
 	AgentTimeoutS    float64
 	VerifierTimeoutS float64
 
+	// Long-Horizon Terminal-Bench (LHTB) additions to [agent] and
+	// [environment]: its modified Harbor resumes the agent after a failed
+	// verifier pass until the timeout (continue_until_timeout), runs the
+	// agent as a named user, and starts daemons from a healthcheck command
+	// before the agent's first turn.
+	ContinueUntilTimeout bool
+
+	// Separate verifier ([verifier] environment_mode = "separate",
+	// sepverify.go): the artifacts Harbor copies into it, its healthcheck
+	// and a prebuilt verifier image, if any.
+	Artifacts           []artifact
+	VerifierHealthcheck string
+	VerifierImage       string
+	verifierCollect     []any
+	AgentUser           string
+	Healthcheck         string
+
 	DockerImage   string // prebuilt image upstream also publishes
 	Workdir       string // workdir override from the task file (task.md sandbox.workdir)
 	GPUs          int64
@@ -124,9 +141,24 @@ func (t *upstreamTask) readHarbor() error {
 	t.Category = tomlString(meta, "category")
 	t.Tags = dedupe(append(tomlStrings(meta, "tags"), tomlStrings(task, "keywords")...))
 	verifier := tomlTable(doc, "verifier")
-	t.AgentTimeoutS = tomlNumber(tomlTable(doc, "agent"), "timeout_sec")
+	agent := tomlTable(doc, "agent")
+	t.AgentTimeoutS = tomlNumber(agent, "timeout_sec")
 	t.VerifierTimeoutS = tomlNumber(verifier, "timeout_sec")
-	_, hasEnv := verifier["environment"].(map[string]any)
+	t.ContinueUntilTimeout = tomlBool(agent, "continue_until_timeout")
+	t.AgentUser = tomlString(agent, "user")
+	t.Healthcheck = tomlString(tomlTable(env, "healthcheck"), "command")
+	venv, hasEnv := verifier["environment"].(map[string]any)
+	t.VerifierHealthcheck = tomlString(tomlTable(venv, "healthcheck"), "command")
+	t.VerifierImage = tomlString(venv, "docker_image")
+	t.verifierCollect = tomlList(verifier, "collect")
+	for _, a := range tomlList(doc, "artifacts") {
+		switch v := a.(type) {
+		case string:
+			t.Artifacts = append(t.Artifacts, artifact{Source: v})
+		case map[string]any:
+			t.Artifacts = append(t.Artifacts, artifact{Source: tomlString(v, "source"), RegularFileOnly: tomlBool(v, "regular_file_only"), MaxBytes: int64(tomlNumber(v, "max_bytes"))})
+		}
+	}
 	t.SeparateVerifier = tomlString(verifier, "environment_mode") == "separate" || hasEnv || len(tomlList(verifier, "collect")) > 0
 	t.DockerImage = tomlString(env, "docker_image")
 	t.GPUs = int64(tomlNumber(env, "gpus"))

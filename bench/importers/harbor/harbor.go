@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +33,11 @@ const (
 	SetKeepNetworked = "keep_networked"  // true imports tasks whose reference or test script downloads at run time (they fail admission: drafts)
 	SetImage         = "image"           // build (default) builds the upstream Dockerfile; prebuilt starts FROM the image task.toml names
 	SetHackVerify    = "hack_verifiable" // skip (default) or keep tasks with a planted honeypot (Hack-Verifiable Terminal-Bench)
+	SetAgentTimeout  = "agent_timeout"   // seconds: every task's agent budget (Harbor's override_timeout_sec); default task.toml's
+	SetPassThreshold = "pass_threshold"  // lowest passing reward, for partial-credit benchmarks; default 1
+	SetMaxSolution   = "max_solution_mb" // largest packed solution+skills the reference control embeds, in MiB; default 2
+	SetLintWaivers   = "lint_waivers"    // none (default) or upstream: waive the instruction-words and high-entropy-identifier checks on verbatim upstream text (task.yaml lint_waivers)
+	SetUnrunnable    = "unrunnable"      // skip (default) or draft: import tasks the bench cannot admit as drafts with the reason
 )
 
 const (
@@ -135,6 +141,9 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 		}
 		written = append(written, c)
 		res.Tasks = append(res.Tasks, c.id)
+		if c.draft != "" {
+			res.Notes = append(res.Notes, fmt.Sprintf("draft %s (admission will refuse it): %s", c.id, c.draft))
+		}
 	}
 	if len(written) == 0 {
 		return res, errors.New("harbor: no task was imported; see the skipped list")
@@ -148,7 +157,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 			}
 		}
 	}
-	if err := writeSuite(suiteDir, opts.SuiteID, up, track, written, im.now()); err != nil {
+	if err := writeSuite(suiteDir, opts.SuiteID, up, track, written, cfg.passThreshold, im.now()); err != nil {
 		return nil, err
 	}
 	res.Notes = append(res.Notes, notes(opts.SuiteID)...)
@@ -173,6 +182,11 @@ type settings struct {
 	tasksDir, track, agent, image        string
 	keepNetworked, keepHoneypots         bool
 	egress                               bool // -set egress=record (egress.go)
+	agentTimeoutS                        int
+	passThreshold                        float64
+	drafts                               bool
+	maxSolutionBytes                     int
+	waive                                bool
 }
 
 func readSettings(extra map[string]string) (settings, error) {
@@ -213,8 +227,36 @@ func readSettings(extra map[string]string) (settings, error) {
 				return cfg, fmt.Errorf("harbor: -set image=%s: want build or prebuilt", v)
 			}
 			cfg.image = v
+		case SetAgentTimeout:
+			n, err := strconv.Atoi(v)
+			if err != nil || n <= 0 {
+				return cfg, fmt.Errorf("harbor: -set agent_timeout=%s: want a positive number of seconds", v)
+			}
+			cfg.agentTimeoutS = n
+		case SetPassThreshold:
+			f, err := strconv.ParseFloat(v, 64)
+			if err != nil || f <= 0 || f > 1 {
+				return cfg, fmt.Errorf("harbor: -set pass_threshold=%s: want a reward above 0 and at most 1", v)
+			}
+			cfg.passThreshold = f
+		case SetMaxSolution:
+			n, err := strconv.Atoi(v)
+			if err != nil || n <= 0 || n > 256 {
+				return cfg, fmt.Errorf("harbor: -set max_solution_mb=%s: want a whole number of MiB from 1 to 256", v)
+			}
+			cfg.maxSolutionBytes = n << 20
+		case SetLintWaivers:
+			if v != "none" && v != "upstream" {
+				return cfg, fmt.Errorf("harbor: -set lint_waivers=%s: want none or upstream", v)
+			}
+			cfg.waive = v == "upstream"
+		case SetUnrunnable:
+			if v != "skip" && v != "draft" {
+				return cfg, fmt.Errorf("harbor: -set unrunnable=%s: want skip or draft", v)
+			}
+			cfg.drafts = v == "draft"
 		default:
-			return cfg, fmt.Errorf("harbor: unknown setting %q (known: benchmark, source, revision, license, tasks_dir, track, agent, keep_networked, image, hack_verifiable, egress)", k)
+			return cfg, fmt.Errorf("harbor: unknown setting %q (known: benchmark, source, revision, license, tasks_dir, track, agent, keep_networked, image, hack_verifiable, egress, agent_timeout, pass_threshold, max_solution_mb, lint_waivers, unrunnable)", k)
 		}
 	}
 	return cfg, nil
@@ -280,6 +322,7 @@ type converted struct {
 	workdir   string
 	verifierS int
 	skills    bool
+	draft     string // why admission will refuse it (-set unrunnable=draft); empty for a runnable task
 }
 
 // importTask reads, checks and writes one task. It returns a skip reason
@@ -295,9 +338,14 @@ func (im *importer) importTask(dir, suiteDir string, up upstream, cfg settings, 
 		return nil, fmt.Sprintf("folder name %q cannot be made a task id", t.ID), nil
 	}
 	p, reason := plan(t, cfg)
-	if reason != "" {
+	if reason != "" && cfg.drafts {
+		p = draftPlan(t, cfg, reason)
+	}
+	if p == nil {
 		return nil, reason, nil
 	}
+	p.waive = cfg.waive
+	p.passThreshold = cfg.passThreshold
 	taskDir := filepath.Join(suiteDir, "tasks", id)
 	if _, err := os.Stat(taskDir); err == nil {
 		if !force {
@@ -317,7 +365,7 @@ func (im *importer) importTask(dir, suiteDir string, up upstream, cfg settings, 
 		}
 		return nil, "", fmt.Errorf("harbor: write task %s: %w", id, err)
 	}
-	return &converted{id: id, workdir: p.workdir, verifierS: p.verifierS, skills: p.skills}, "", nil
+	return &converted{id: id, workdir: p.workdir, verifierS: p.verifierS, skills: p.skills, draft: p.draft}, "", nil
 }
 
 // taskPlan is everything decided about one task before it is written.
@@ -336,6 +384,16 @@ type taskPlan struct {
 	compose        *composePlan // X2: the task's compose file, mapped (compose.go); nil without one
 	egressFetch    string       // recorded internet: the first download line; set when the task gets an egress service (egress.go)
 	egressVerifier bool         // recorded internet: test.sh downloads too, so the verifier reaches the egress service
+	// draft is why the bench cannot admit the task (-set unrunnable=draft):
+	// it is written with a reference control that fails with this reason,
+	// so admission refuses it and it stays a draft in the suite.
+	draft string
+	// solveChanges are the IMPORT.md lines of a solve.sh made offline
+	// (offline.go).
+	solveChanges  []string
+	waive         bool // -set lint_waivers=upstream
+	sepNotes      []string
+	passThreshold float64 // -set pass_threshold, for the IMPORT.md note
 }
 
 // plan checks t against what the bench can run and prepares the rewritten
@@ -347,8 +405,12 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 	switch {
 	case t.GPUs > 0:
 		return nil, fmt.Sprintf("needs %d GPU(s); the bench schedules none", t.GPUs)
-	case t.SeparateVerifier:
-		return nil, "grades in a separate verifier container ([verifier] environment_mode, [verifier.environment] or [[verifier.collect]]), which the importer does not map; it grades in a snapshot of the agent's container"
+	case t.SeparateVerifier && len(t.verifierCollect) > 0:
+		return nil, "grades in a separate verifier container with [[verifier.collect]], which the importer does not map"
+	case t.SeparateVerifier && t.VerifierImage != "":
+		return nil, "grades in a separate verifier container from a prebuilt image ([verifier.environment] docker_image), which the importer does not map"
+	case t.SeparateVerifier && !isFile(filepath.Join(t.TestsDir, "Dockerfile")):
+		return nil, "grades in a separate verifier container whose image is not built from tests/Dockerfile (none there), which the importer does not map"
 	case t.MCPServers > 0:
 		return nil, "declares MCP servers in task.toml; the importer does not map them to services"
 	case !hasDockerfile && (cfg.image != "prebuilt" || t.DockerImage == ""):
@@ -372,18 +434,35 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 		return nil, "cannot read solve.sh: " + err.Error()
 	}
 	fetch := solutionFetch(string(solve))
-	if fetch != "" && !cfg.keepNetworked && !cfg.egress {
-		return nil, "the reference solution downloads at run time (" + fetch + "); runs have no network, so the agent could not do it either; -set egress=record imports it with a recorded internet"
+	var solveSrc string
+	var solveBake, solveChanges []string
+	if fetch != "" && !cfg.keepNetworked && !cfg.egress { // with -set egress=record the recorded internet serves the download (egress.go)
+		line := fetch
+		var bad string
+		solveSrc, solveBake, solveChanges, bad = planSolveScript(string(solve), buildRequires(t.EnvDir))
+		if bad != "" || solveSrc == "" {
+			if bad != "" {
+				line = bad
+			}
+			return nil, "the reference solution downloads at run time (" + line + "); runs have no network, so the agent could not do it either; -set egress=record imports it with a recorded internet"
+		}
 	}
 	testSrc, err := os.ReadFile(filepath.Join(t.TestsDir, "test.sh"))
 	if err != nil {
 		return nil, "cannot read test.sh: " + err.Error()
 	}
-	tests, err := planTestScriptKeep(string(testSrc), cfg.keepNetworked || cfg.egress)
-	if err != nil {
+	var sep *sepPlan
+	var tests *testPlan
+	if t.SeparateVerifier {
+		var reason string
+		if sep, reason = planSeparate(t); reason != "" {
+			return nil, reason
+		}
+		tests = &testPlan{Script: separateTestScript(t, sep), Changes: []string{"replaced by the separate-verifier driver: upstream test.sh runs unchanged, chrooted in the verifier image's file system (" + verifierRoot + ")"}}
+	} else if tests, err = planTestScriptKeep(string(testSrc), cfg.keepNetworked || cfg.egress); err != nil {
 		return nil, err.Error()
 	}
-	p := &taskPlan{tests: tests, agentS: seconds(t.AgentTimeoutS, defaultAgentS), verifierS: seconds(t.VerifierTimeoutS, defaultVerifierS)}
+	p := &taskPlan{tests: tests, agentS: agentSeconds(t, cfg), verifierS: seconds(t.VerifierTimeoutS, defaultVerifierS), solveChanges: solveChanges}
 	var src string
 	if hasDockerfile {
 		b, err := os.ReadFile(dockerfile)
@@ -422,17 +501,25 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 	if p.skills {
 		dirs = append(dirs, defaultSkillRoot)
 	}
+	if sep != nil {
+		src = sep.stage + "\n" + strings.TrimRight(src, "\n") + "\n# The separate verifier's file system (sepverify.go).\nCOPY --from=harbor-verifier / " + verifierRoot + "/\n"
+		p.sepNotes = sep.notes
+	}
 	if cfg.egress && (fetch != "" || len(tests.Networked) > 0) { // recorded internet (egress.go)
 		if reason := planEgress(p, t, fetch, cfg.keepNetworked); reason != "" {
 			return nil, reason
 		}
 		src = strings.TrimRight(src, "\n") + "\n" + egressDockerfile()
 	}
-	p.dockerfile = strings.TrimRight(src, "\n") + "\n" + bakeSection(tests.Bake, dirs, t.EnvEnv, info.User)
+	p.dockerfile = strings.TrimRight(src, "\n") + "\n" + bakeSection(append(append([]string{}, tests.Bake...), solveBake...), dirs, t.EnvEnv, info.User)
 	if p.egressFetch != "" {
 		p.dockerfile += egressTail(info.User) // recorded internet: no build-date apt lists (egress.go)
 	}
-	if p.solution, err = tarGz(t.SolutionDir); err != nil {
+	var override map[string][]byte
+	if solveSrc != "" {
+		override = map[string][]byte{"solve.sh": []byte(solveSrc)}
+	}
+	if p.solution, err = tarGzWith(t.SolutionDir, override); err != nil {
 		return nil, "cannot pack the solution folder: " + err.Error()
 	}
 	if p.skills {
@@ -441,8 +528,12 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 		}
 		p.skillRoots = skillRoots(t.SolutionDir)
 	}
-	if n := len(p.solution) + len(p.skillsTar); n > maxSolutionBytes {
-		return nil, fmt.Sprintf("the solution and skills folders pack to %d bytes, over the %d the reference control embeds", n, maxSolutionBytes)
+	limit := maxSolutionBytes
+	if cfg.maxSolutionBytes > 0 {
+		limit = cfg.maxSolutionBytes
+	}
+	if n := len(p.solution) + len(p.skillsTar); n > limit {
+		return nil, fmt.Sprintf("the solution and skills folders pack to %d bytes, over the %d the reference control embeds (-set max_solution_mb raises it)", n, limit)
 	}
 	return p, ""
 }
@@ -509,6 +600,66 @@ func taskID(name string) string {
 		}
 	}
 	return b.String()
+}
+
+// agentSeconds is the task's agent budget: -set agent_timeout when given
+// (Harbor's override_timeout_sec), else task.toml's.
+func agentSeconds(t *upstreamTask, cfg settings) int {
+	if cfg.agentTimeoutS > 0 {
+		return cfg.agentTimeoutS
+	}
+	return seconds(t.AgentTimeoutS, defaultAgentS)
+}
+
+// draftPlan prepares a task plan() refused, so it can be written as a draft
+// under -set unrunnable=draft: the environment and the tests as upstream has
+// them (download lines in test.sh kept), no compose services, and a reference
+// control that fails with the reason. It returns nil when not even that can
+// be written (no Dockerfile or prebuilt image, no test.sh, no workspace path).
+func draftPlan(t *upstreamTask, cfg settings, reason string) *taskPlan {
+	dockerfile := filepath.Join(t.EnvDir, "Dockerfile")
+	var src string
+	if b, err := os.ReadFile(dockerfile); err == nil {
+		src = string(b)
+	} else if cfg.image != "prebuilt" || t.DockerImage == "" {
+		return nil
+	}
+	testSrc, err := os.ReadFile(filepath.Join(t.TestsDir, "test.sh"))
+	if err != nil {
+		return nil
+	}
+	tests, err := planTestScriptKeep(string(testSrc), true)
+	if err != nil {
+		tests = &testPlan{Script: string(testSrc), Changes: []string{"left as upstream wrote it (" + err.Error() + ")"}}
+	}
+	info := parseDockerfile(src)
+	workdir := info.Workdir
+	if t.Workdir != "" {
+		workdir = t.Workdir
+	}
+	if workdir == "" || workdir == "/" {
+		return nil
+	}
+	if cfg.image == "prebuilt" && t.DockerImage != "" {
+		src = fmt.Sprintf("# Upstream's prebuilt image, as task.toml names it (bifrost-bench import harbor -set image=prebuilt).\nFROM %s\nWORKDIR %s\n", t.DockerImage, workdir)
+		info.User = ""
+	}
+	src, skillCopy := stripSkillCopies(src)
+	p := &taskPlan{
+		workdir:   workdir,
+		tests:     tests,
+		skillCopy: skillCopy,
+		skills:    hasSkills(filepath.Join(t.EnvDir, "skills")),
+		agentS:    agentSeconds(t, cfg),
+		verifierS: seconds(t.VerifierTimeoutS, defaultVerifierS),
+		draft:     reason,
+	}
+	dirs := []string{"/logs/verifier", t.TestsMount, t.SolutionMount}
+	if p.skills {
+		dirs = append(dirs, defaultSkillRoot)
+	}
+	p.dockerfile = strings.TrimRight(src, "\n") + "\n" + bakeSection(tests.Bake, dirs, t.EnvEnv, info.User)
+	return p
 }
 
 // seconds rounds a timeout up to whole seconds, with a default for none.

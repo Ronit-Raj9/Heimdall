@@ -532,6 +532,10 @@ func (m *mapper) environment(ws *Service, env *schemas.TaskEnvironment, hasImage
 		if m.p.opts.Conventions != ConventionsHarbor {
 			m.add(LevelChanged, at, "the workspace image comes from task.yaml's environment; the service's image and build are not used")
 		}
+	case hasImage:
+		// The workspace image comes from task.yaml's environment (under
+		// Harbor conventions, main is built from environment/Dockerfile
+		// whether or not the compose file says so).
 	case ws.Build != nil:
 		out.Dockerfile, out.Context = ws.Build.Dockerfile, ws.Build.Context
 	case ws.Image != "":

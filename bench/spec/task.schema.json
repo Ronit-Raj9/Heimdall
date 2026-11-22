@@ -40,6 +40,22 @@
         }
       }
     },
+    "lint_waivers": {
+      "type": "array",
+      "description": "Waived static-validation errors of an imported task (instruction-term, secret-high-entropy only).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rule", "match", "reason"],
+        "properties": {
+          "rule": {"enum": ["instruction-term", "secret-high-entropy"]},
+          "path": {"type": "string"},
+          "line": {"type": "integer", "minimum": 1},
+          "match": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1}
+        }
+      }
+    },
     "protected": {
       "type": "array",
       "items": {"type": "string", "minLength": 1},

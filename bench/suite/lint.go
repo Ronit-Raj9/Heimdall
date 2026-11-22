@@ -157,7 +157,7 @@ func LintTask(s *schemas.Suite, t *schemas.Task) []Problem {
 		}
 		add(rel(root, repo), sev, "no visible tests (test_*.py, *_test.py, *.test.js, *_test.go, ...) in the repo")
 	}
-	return out
+	return ApplyLintWaivers(root, t, out)
 }
 
 // lintInstruction checks the instruction for words that reveal how the work
