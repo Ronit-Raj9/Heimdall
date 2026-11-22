@@ -8,9 +8,10 @@ func Builtin(cfg CommandConfig) []schemas.AgentAdapter {
 	return []schemas.AgentAdapter{
 		newCommandAdapter(cfg),
 		newScriptedAdapter(cfg),
-		newRemoteHTTPAdapter(cfg),  // Remote area: agents that are deployed services (remotehttp.go)
-		newA2AAdapter(cfg),         // B1: A2A agents through Bifrost's agent gateway (a2a.go)
-		newOpenAIAgentAdapter(cfg), // A08: OpenAI-compatible endpoint agents (openaiagent.go)
+		newRemoteHTTPAdapter(cfg),    // Remote area: agents that are deployed services (remotehttp.go)
+		newA2AAdapter(cfg),           // B1: A2A agents through Bifrost's agent gateway (a2a.go)
+		newOpenAIAgentAdapter(cfg),   // A08: OpenAI-compatible endpoint agents (openaiagent.go)
+		newVoicePlatformAdapter(cfg), // voice agents hosted on Vapi, ElevenLabs or a call WebSocket (voiceplatform.go)
 	}
 }
 

@@ -462,6 +462,19 @@ export interface ReportPersistenceRow {
 	cost_normalized_success?: ReportRate;
 }
 
+/** Call quality of one agent on the voice benchmarks; a field no call measured is absent. */
+export interface ReportVoiceRow {
+	arm: string;
+	time_to_first_audio_ms?: ReportRate;
+	turn_latency_p50_ms?: ReportRate;
+	turn_latency_p95_ms?: ReportRate;
+	barge_in_handled?: ReportRate;
+	dead_air_s?: ReportRate;
+	talk_overs?: ReportRate;
+	stt_wer?: ReportRate;
+	voice_cost_per_minute?: ReportRate;
+}
+
 /** GET /evaluations/{id}/report and GET /agents/{id}/report-card */
 export interface Report {
 	evaluation: string;
@@ -490,6 +503,8 @@ export interface Report {
 	learning?: ReportLearningRow[];
 	/** Only when runs reported resume, budget or success per dollar numbers. */
 	persistence?: ReportPersistenceRow[];
+	/** Only when some runs were voice calls. */
+	voice?: ReportVoiceRow[];
 }
 
 /** One arm's numbers over the whole evaluation; absent fields are unknown. */

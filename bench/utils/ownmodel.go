@@ -25,6 +25,8 @@ func OwnsModel(a *schemas.AgentConfig) bool {
 		return true
 	case a.Adapter == "remote_http" || a.Remote != nil:
 		return true
+	case a.Adapter == "voice_platform" || a.VoicePlatform != nil: // the platform runs the agent's model
+		return true
 	}
 	return false
 }

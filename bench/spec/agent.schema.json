@@ -8,7 +8,7 @@
   "required": ["id", "adapter"],
   "properties": {
     "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},
-    "adapter": {"enum": ["command", "scripted", "remote_http", "a2a", "openai_agent"]},
+    "adapter": {"enum": ["command", "scripted", "remote_http", "a2a", "openai_agent", "voice_platform"]},
     "image": {"type": "string", "minLength": 1},
     "build": {"$ref": "#/$defs/image"},
     "argv": {"type": "array", "items": {"type": "string"}},
@@ -118,6 +118,20 @@
         "tool_allow": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "With tools expose: only these tool and MCP service ids (and external API ids) are sent to the deployment. Empty sends every one."}
       }
     },
+    "voice_platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform"],
+      "description": "A voice agent hosted on Vapi, Retell, ElevenLabs Agents or the team's own call WebSocket, read by the voice_platform adapter and the conversation driver. Mirrors schemas.VoicePlatformAgent (docs/voice-platforms.md).",
+      "properties": {
+        "platform": {"enum": ["vapi", "retell", "elevenlabs", "websocket"]},
+        "agent_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$", "description": "The platform's assistant or agent id; not used by websocket."},
+        "api_key_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Org secret (Settings > Secrets) holding the platform API key or the endpoint's bearer token."},
+        "url": {"type": "string", "pattern": "^(https?|wss?)://", "description": "API base override, or the wss:// endpoint of a websocket platform."},
+        "framing": {"enum": ["twilio", "vapi", "elevenlabs"], "description": "Audio framing of a websocket endpoint; default twilio."},
+        "timeout_s": {"type": "integer", "minimum": 0, "maximum": 3600}
+      }
+    },
     "openai": {
       "type": "object",
       "additionalProperties": false,
@@ -197,6 +211,10 @@
     {
       "if": {"required": ["adapter"], "properties": {"adapter": {"const": "openai_agent"}}},
       "then": {"required": ["openai"]}
+    },
+    {
+      "if": {"required": ["adapter"], "properties": {"adapter": {"const": "voice_platform"}}},
+      "then": {"required": ["voice_platform"]}
     }
   ],
   "$defs": {

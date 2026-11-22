@@ -184,6 +184,8 @@ func DefaultCapabilities(cfg *AgentConfig) CapabilitySet {
 		set = append(set, AllCapabilities...)
 	case "remote_http", "a2a", "openai_agent":
 		set = CapabilitySet{CapTools, CapSessions}
+	case "voice_platform": // a hosted voice agent: calls, and text turns through the conversation driver
+		set = CapabilitySet{CapVoice, CapSessions}
 	default:
 		switch {
 		case containsAny(names, voiceHint):

@@ -39,6 +39,8 @@ func TaskOK(agent *schemas.AgentConfig, s *schemas.Suite, t *schemas.Task) (bool
 		return remoteTaskOK(utils.A2ARemoteView(agent.A2A), s, t, kind, "an A2A agent", "a2a")
 	case agent.Adapter == "remote_http" || agent.Remote != nil:
 		return remoteTaskOK(agent.Remote, s, t, kind, "your endpoint", "remote")
+	case isVoicePlatform(agent): // voiceplatform.go
+		return voicePlatformTaskOK(agent, t)
 	}
 	return true, ""
 }
@@ -51,7 +53,7 @@ func ChecksTasks(agent *schemas.AgentConfig) bool {
 	if agent == nil {
 		return false
 	}
-	return utils.IsOpenAIAgent(agent) || utils.IsA2A(agent) || agent.Adapter == "remote_http" || agent.Remote != nil
+	return utils.IsOpenAIAgent(agent) || utils.IsA2A(agent) || agent.Adapter == "remote_http" || agent.Remote != nil || isVoicePlatform(agent)
 }
 
 func remoteTaskOK(r *schemas.RemoteAgent, s *schemas.Suite, t *schemas.Task, kind, who, block string) (bool, string) {

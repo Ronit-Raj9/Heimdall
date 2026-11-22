@@ -470,7 +470,15 @@ func inlineAgentYAML(t AgentTemplate, id string, params map[string]string) ([]by
 			"AGENT_MODEL": "{{model}}", "AGENT_SESSION_ID": "{{run.session}}",
 		}
 	default:
-		return nil, fmt.Errorf("template %s has no inline form", t.ID)
+		vp, err := connectVoiceBlock(t.ID, params) // voice platforms (agentconnectvoice.go)
+		if err != nil {
+			return nil, err
+		}
+		if vp == nil {
+			return nil, fmt.Errorf("template %s has no inline form", t.ID)
+		}
+		cfg["image"] = "bench/coding-core-base:1"
+		cfg["voice_platform"] = vp
 	}
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)

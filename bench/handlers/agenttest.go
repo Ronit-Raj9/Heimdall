@@ -201,6 +201,8 @@ func (h *agentTestHandler) run(ctx context.Context, cfg *schemas.AgentConfig) *E
 		return h.runOpenAI(ctx, cfg, res, step, fail, start)
 	case cfg.Remote != nil && (cfg.Adapter == "remote_http" || cfg.Adapter == ""):
 		return h.runRemote(ctx, cfg.Remote, res, step, fail, start)
+	case cfg.VoicePlatform != nil: // agenttestvoice.go
+		return h.runVoicePlatform(ctx, cfg.VoicePlatform, res, step, fail, start)
 	case utils.IsA2A(cfg):
 		res.Adapter = "a2a"
 		return fail("an A2A agent is reached through Bifrost's agent gateway, so this test cannot call it directly: run Check on the agent's page instead")

@@ -163,26 +163,29 @@ type Reported struct {
 
 // Analysis is what the voice metrics and the run page read from a timeline.
 type Analysis struct {
-	Protocol       string      `json:"protocol"`
-	WallStartMS    int64       `json:"wall_start_ms"`
-	CallMS         float64     `json:"call_ms"`
-	EndedBy        string      `json:"ended_by"`
-	FirstAudioMS   *float64    `json:"first_audio_ms,omitempty"`
-	Turns          []Turn      `json:"turns"`
-	BargeIns       []BargeIn   `json:"barge_ins"`
-	DeadAirMS      float64     `json:"dead_air_ms"`
-	Lines          []Line      `json:"lines"`
-	Utterances     []Utterance `json:"utterances"`
-	Reported       []Reported  `json:"reported,omitempty"`
-	CallerFrames   int         `json:"caller_frames"`
-	AgentFrames    int         `json:"agent_frames"`
-	Clears         int         `json:"clears"`
-	ProtocolErrors int         `json:"protocol_errors"`
-	CallerAudio    *AudioRef   `json:"caller_audio,omitempty"`
-	AgentAudio     *AudioRef   `json:"agent_audio,omitempty"`
-	BargeInBoundMS int         `json:"barge_in_bound_ms"`
-	DeadAirBoundMS int         `json:"dead_air_bound_ms"`
-	Complete       bool        `json:"complete"` // the timeline has its call_end
+	Protocol     string      `json:"protocol"`
+	WallStartMS  int64       `json:"wall_start_ms"`
+	CallMS       float64     `json:"call_ms"`
+	EndedBy      string      `json:"ended_by"`
+	FirstAudioMS *float64    `json:"first_audio_ms,omitempty"`
+	Turns        []Turn      `json:"turns"`
+	BargeIns     []BargeIn   `json:"barge_ins"`
+	DeadAirMS    float64     `json:"dead_air_ms"`
+	Lines        []Line      `json:"lines"`
+	Utterances   []Utterance `json:"utterances"`
+	Reported     []Reported  `json:"reported,omitempty"`
+	CallerFrames int         `json:"caller_frames"`
+	AgentFrames  int         `json:"agent_frames"`
+	Clears       int         `json:"clears"`
+	// TalkOvers counts the times the agent started speaking while the
+	// caller was talking (the caller's overlap events, by agent).
+	TalkOvers      int       `json:"talk_overs"`
+	ProtocolErrors int       `json:"protocol_errors"`
+	CallerAudio    *AudioRef `json:"caller_audio,omitempty"`
+	AgentAudio     *AudioRef `json:"agent_audio,omitempty"`
+	BargeInBoundMS int       `json:"barge_in_bound_ms"`
+	DeadAirBoundMS int       `json:"dead_air_bound_ms"`
+	Complete       bool      `json:"complete"` // the timeline has its call_end
 }
 
 // Analyze reads a timeline under spec's thresholds.
@@ -241,6 +244,10 @@ func Analyze(events []Event, spec *schemas.VoiceSpec) (*Analysis, error) {
 				StoppedAfterMS: e.StoppedAfterMS, By: e.By, Handled: e.StoppedAfterMS <= float64(spec.BargeInBoundMS)})
 		case "agent_clear":
 			a.Clears++
+		case "overlap":
+			if e.By == "agent" {
+				a.TalkOvers++
+			}
 		case "protocol_error":
 			a.ProtocolErrors++
 		case "agent_reported":
