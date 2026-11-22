@@ -269,6 +269,20 @@ func (s *dockerSandbox) create(ctx context.Context, image string) error {
 	return nil
 }
 
+// chmodTree sets file to 0644 and every folder from root down to it to
+// 0755, whatever the umask.
+func chmodTree(root, file string) error {
+	if err := os.Chmod(file, 0o644); err != nil {
+		return err
+	}
+	for d := filepath.Dir(file); len(d) > len(root); d = filepath.Dir(d) {
+		if err := os.Chmod(d, 0o755); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // copyFiles copies cfg.Files into the created container through a temp
 // folder laid out like the container's root.
 func (s *dockerSandbox) copyFiles(ctx context.Context) error {
@@ -291,6 +305,12 @@ func (s *dockerSandbox) copyFiles(ctx context.Context) error {
 			return err
 		}
 		if err := os.WriteFile(dst, b, 0o644); err != nil {
+			return err
+		}
+		// docker cp keeps modes, and the caller's umask (077 on the shared
+		// worker) would make these 0600 files in 0700 folders, which a
+		// non-root user in the container (or /etc itself) would then lose.
+		if err := chmodTree(tmp, dst); err != nil {
 			return err
 		}
 		tops[strings.SplitN(strings.TrimPrefix(clean, "/"), "/", 2)[0]] = true

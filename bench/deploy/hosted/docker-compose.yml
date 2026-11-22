@@ -58,6 +58,11 @@ networks:
   upstream:
     enable_ipv6: false
     labels: *labels
+  # The server and the fault proxy's control port only (no route out).
+  faultctl:
+    internal: true
+    enable_ipv6: false
+    labels: *labels
   # The server reaches the shared gateway's log API on this network only
   # (per-organization prompt log list, delete and retention; lane X03).
   gatewaylogs:
@@ -299,6 +304,10 @@ services:
       # with the shared pool on means http://bifrost:8080; "off" disables it.
       HEIMDALL_GATEWAY_LOGS_URL: ${HEIMDALL_GATEWAY_LOGS_URL:-}
       BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
+      # The server registers an org's own key at the fault proxy (PUT
+      # /orgslots on faultctl) before it mints a gateway key for that org's
+      # From issues builds and model checks.
+      BENCH_FAULTPROXY_TOKEN: ${BENCH_FAULTPROXY_TOKEN:-}
       # Where deployed agents reach the shared worker's gateway and tools
       # (Caddy's /gw and /rt). The planner refuses a run whose agent could
       # not reach them; same values as the shared runner's below.
@@ -317,7 +326,7 @@ services:
       - ${HEIMDALL_LIBRARY_DIR:-/dev/null}:${HEIMDALL_LIBRARY_DIR:-/dev/null}:ro
     tmpfs:
       - /tmp
-    networks: [edge, backend, gatewaylogs]
+    networks: [edge, backend, gatewaylogs, faultctl]
     depends_on:
       postgres:
         condition: service_healthy
@@ -376,7 +385,9 @@ services:
       - faultproxy-ledger:/var/lib/heimdall
     tmpfs:
       - /tmp
-    networks: [upstream]
+    # faultctl: the server reaches the control port (token protected) to
+    # register org keys; it has no other way onto upstream.
+    networks: [upstream, faultctl]
     healthcheck:
       disable: true
     restart: unless-stopped

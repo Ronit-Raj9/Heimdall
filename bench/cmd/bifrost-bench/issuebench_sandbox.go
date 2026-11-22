@@ -144,6 +144,12 @@ func ibEgressSandboxWith(ctx context.Context, o ibEgressOptions, req issuebench.
 	if err := os.WriteFile(caFile, caPEM, 0o644); err != nil {
 		return fail("write the proxy CA", err)
 	}
+	// docker cp keeps the file's mode and owner: the shared worker runs with
+	// umask 077 as uid 10001, and the proxy (root with no capabilities)
+	// could not read a 0600 file it does not own.
+	if err := os.Chmod(caFile, 0o644); err != nil {
+		return fail("write the proxy CA", err)
+	}
 	if _, err := call(ctx, time.Minute, "cp", caFile, proxy+":"+egress.ServiceCAPath); err != nil {
 		return fail("copy the CA into the proxy", err)
 	}

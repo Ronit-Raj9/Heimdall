@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -19,6 +20,7 @@ type ibFakeDocker struct {
 	mu    sync.Mutex
 	calls [][]string
 	cps   map[string]string // container path -> content of cp into the proxy
+	modes map[string]os.FileMode
 	ps    string
 }
 
@@ -36,6 +38,12 @@ func (f *ibFakeDocker) run(ctx context.Context, stdin []byte, args ...string) ([
 			f.cps = map[string]string{}
 		}
 		f.cps[args[2]] = string(b)
+		if fi, err := os.Stat(args[1]); err == nil {
+			if f.modes == nil {
+				f.modes = map[string]os.FileMode{}
+			}
+			f.modes[args[2]] = fi.Mode().Perm()
+		}
 	case "ps", "network", "image":
 		if args[0] == "ps" || (len(args) > 1 && args[1] == "ls") {
 			return []byte(f.ps), nil
@@ -323,5 +331,23 @@ print("denied", get("https://example.com/"))
 	t.Logf("exit %d err %v\n%s", code, err, out)
 	if err != nil || !strings.Contains(out, "hi\n") || !strings.Contains(out, "allowed 200") || strings.Contains(out, "denied 200") || !strings.Contains(out, "direct blocked") {
 		t.Fatalf("egress confinement wrong:\n%s", out)
+	}
+}
+
+// The shared worker runs with umask 077 as uid 10001 and docker cp keeps
+// the file's mode: a 0600 CA was unreadable to the proxy (root with no
+// capabilities), so every HTTPS CONNECT got 403 (first real hosted run).
+func TestIssuebenchEgressCAReadableUnderUmask077(t *testing.T) {
+	old := syscall.Umask(0o077)
+	defer syscall.Umask(old)
+	f := &ibFakeDocker{}
+	_, cleanup, err := ibEgressSandboxWith(context.Background(), ibEgressOptions{Public: "pubnet", Image: "bench/egress:1"}, ibTestRequest(), f.run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	dst := "heimdall-ib-job_abc-1234-egress:" + egress.ServiceCAPath
+	if m := f.modes[dst]; m != 0o644 {
+		t.Fatalf("proxy CA copied with mode %o, want 644", m)
 	}
 }
