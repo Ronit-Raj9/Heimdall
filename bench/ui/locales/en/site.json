@@ -106,6 +106,8 @@
 		"none": "This server has no built-in benchmark library yet.",
 		"noMatch": "No benchmark matches this search.",
 		"totals": "{{benchmarks}} benchmarks, {{tasks}} tasks, {{ready}} ready",
+		"totalsFiltered": "Showing {{shown}} of {{benchmarks}} benchmarks: {{tasks}} tasks, {{ready}} ready",
+		"signInToOpen": "Sign in to open",
 		"readyHint": "Ready tasks passed the readiness checks and still match their locked files.",
 		"cta": "Evaluate your agent on these"
 	},

@@ -24,6 +24,22 @@ export function filterBenchmarks(lib: PublicLibrary, pack: string, query: string
 	);
 }
 
+/** The header numbers: the whole library, or with a pack or a search the benchmarks shown, summed. */
+export function libraryTotals(
+	lib: PublicLibrary,
+	shown: PublicBenchmark[],
+	filtered: boolean,
+): { filtered: boolean; shown: number; benchmarks: number; tasks: number; ready: number } {
+	if (!filtered) return { filtered, shown: shown.length, ...lib.totals };
+	return {
+		filtered,
+		shown: shown.length,
+		benchmarks: lib.totals.benchmarks,
+		tasks: shown.reduce((n, b) => n + b.task_count, 0),
+		ready: shown.reduce((n, b) => n + b.ready_count, 0),
+	};
+}
+
 /**
  * /library (lane Y08, audit G4-03): the built-in benchmark library, read-only and without sign-in.
  * Descriptions, task and ready counts, licences and packs, as this server reports them; task
@@ -37,13 +53,18 @@ export default function LibraryView() {
 	const [query, setQuery] = useState("");
 	const shown = useMemo(() => (lib.data ? filterBenchmarks(lib.data, pack, query) : []), [lib.data, pack, query]);
 	const cta = session.signedIn || session.authMode !== "hosted" ? "/evaluate" : signupOffered(session) ? "/signup" : "/login";
+	// N149: a signed-in user (or a local server) opens the benchmark; a hosted visitor signs in first and comes back to it.
+	const canOpen = session.signedIn || session.authMode !== "hosted";
+	const totals = lib.data ? libraryTotals(lib.data, shown, !!pack || !!query.trim()) : null;
 
 	return (
 		<section className="flex min-w-0 flex-col" data-testid="library-view">
 			<SiteHeader title={t("library.title")} subtitle={t("library.subtitle")} testId="library-header">
-				{lib.data?.available && (
+				{lib.data?.available && totals && (
 					<p className="text-muted-foreground font-mono text-xs" data-testid="library-totals">
-						{t("library.totals", { benchmarks: lib.data.totals.benchmarks, tasks: lib.data.totals.tasks.toLocaleString(), ready: lib.data.totals.ready.toLocaleString() })}
+						{totals.filtered
+							? t("library.totalsFiltered", { shown: totals.shown, benchmarks: totals.benchmarks, tasks: totals.tasks.toLocaleString(), ready: totals.ready.toLocaleString() })
+							: t("library.totals", { benchmarks: totals.benchmarks, tasks: totals.tasks.toLocaleString(), ready: totals.ready.toLocaleString() })}
 					</p>
 				)}
 			</SiteHeader>
@@ -95,7 +116,7 @@ export default function LibraryView() {
 					) : (
 						<ul className="grid gap-4 md:grid-cols-2" data-testid="library-list">
 							{shown.map((b) => (
-								<BenchmarkCard key={b.id} b={b} packs={lib.data?.packs ?? []} />
+								<BenchmarkCard key={b.id} b={b} packs={lib.data?.packs ?? []} canOpen={canOpen} />
 							))}
 						</ul>
 					)}
@@ -111,7 +132,7 @@ export default function LibraryView() {
 	);
 }
 
-function BenchmarkCard({ b, packs }: { b: PublicBenchmark; packs: PublicLibrary["packs"] }) {
+function BenchmarkCard({ b, packs, canOpen }: { b: PublicBenchmark; packs: PublicLibrary["packs"]; canOpen: boolean }) {
 	const { t } = useTranslation("site");
 	const packName = (id: string) => packs.find((p) => p.id === id)?.name ?? id;
 	const grading = b.grading === "verified" ? t("library.verified") : b.grading === "judged" ? t("library.judged") : undefined;
@@ -119,7 +140,20 @@ function BenchmarkCard({ b, packs }: { b: PublicBenchmark; packs: PublicLibrary[
 		<li className="bg-card flex flex-col gap-4 rounded-xl border p-5" data-testid={`library-benchmark-${b.id}`}>
 			<div className="flex flex-col gap-1">
 				<div className="flex flex-wrap items-baseline justify-between gap-2">
-					<h2 className="font-semibold">{b.title}</h2>
+					<h2 className="font-semibold">
+						{canOpen ? (
+							<Link to="/suites/$suiteId" params={{ suiteId: b.id }} className="hover:underline" data-testid={`library-open-${b.id}`}>
+								{b.title}
+							</Link>
+						) : (
+							<>
+								<Link to="/login" search={{ return_to: `/suites/${b.id}` }} className="hover:underline" data-testid={`library-open-${b.id}`}>
+									{b.title}
+								</Link>
+								<span className="text-muted-foreground ml-2 text-xs font-normal">{t("library.signInToOpen")}</span>
+							</>
+						)}
+					</h2>
 					<span className="text-muted-foreground font-mono text-xs">{b.id}</span>
 				</div>
 				{b.description && <p className="text-muted-foreground line-clamp-3 text-sm leading-relaxed">{b.description}</p>}

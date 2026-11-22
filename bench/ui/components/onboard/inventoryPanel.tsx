@@ -2,9 +2,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MAP_FIELDS, MappingStep } from "@/app/suites_/$suiteId/views/rowMapper";
+import { suggestSuiteId, suiteIdBlocks, suiteIdCheck, type SuiteIdCheck } from "@/components/onboard/onboard.utils";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import type { OnboardInventory, OnboardMatch, OnboardPlan } from "@/lib/types/onboard";
 import type { RowColumn, RowMapping } from "@/lib/types/suiteBuild";
 import { AlertTriangle } from "lucide-react";
+import { useEffect, useId } from "react";
 import { useTranslation } from "react-i18next";
 
 const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
@@ -54,6 +57,21 @@ export function MatchChips({ matches, active, onPick }: { matches: OnboardMatch[
 	);
 }
 
+/** The line under the Benchmark id box: the rule, a refusal, or what drafting into this id does. */
+function suiteIdLine(check: SuiteIdCheck, id: string, tx: (k: string, o?: Record<string, unknown>) => string): { text: string; error: boolean } {
+	switch (check.state) {
+		case "invalid":
+		case "empty":
+			return { text: tx("plan.suiteInvalid"), error: check.state === "invalid" };
+		case "builtin":
+			return { text: tx("plan.suiteBuiltin", { id }), error: true };
+		case "existing":
+			return { text: tx("plan.suiteExisting", { id, count: check.count }), error: false };
+		default:
+			return { text: tx("plan.suiteNew", { id }), error: false };
+	}
+}
+
 /** Step 2: what was found, and the plan the person edits before drafting. */
 export function InventoryPanel({
 	inv,
@@ -75,6 +93,19 @@ export function InventoryPanel({
 	const sampleKeys = Array.from(new Set(inv.samples.flatMap((s) => Object.keys(s.fields)))).slice(0, 4);
 	const mappable = rows && (inv.columns?.length ?? 0) > 0;
 	const set = (patch: Partial<OnboardPlan>) => onPlan({ ...plan, ...patch });
+	// N46: the id is checked as it is typed, against the server's rule and the benchmarks already listed.
+	const suitesLight = useGetSuitesLightQuery();
+	const known = suitesLight.data?.suites ?? [];
+	const idCheck = suiteIdCheck(plan.suite, known);
+	const idLine = suiteIdLine(idCheck, plan.suite, tx);
+	const idLineId = useId();
+	// An empty box on first show gets a free id made from the source name.
+	useEffect(() => {
+		if (plan.suite) return;
+		const id = suggestSuiteId(inv.title, known);
+		if (id) onPlan({ ...plan, suite: id });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [inv.title, suitesLight.data]);
 	return (
 		<div className="flex min-w-0 flex-col gap-4" data-testid="onboard-inventory">
 			<div className="flex flex-wrap items-center gap-2 text-sm">
@@ -135,7 +166,8 @@ export function InventoryPanel({
 				</p>
 			)}
 			<p className="text-muted-foreground text-xs" data-testid="onboard-estimate">
-				{tx("found.estimate", { tasks: inv.estimate.tasks, runs: inv.estimate.readiness_runs, judge: inv.estimate.judge_calls })}
+				{tx("found.estimate", { tasks: inv.estimate.tasks, runs: inv.estimate.readiness_runs })}
+				{inv.estimate.judge_calls > 0 && <> {tx("found.estimateJudge", { judge: inv.estimate.judge_calls })}</>}
 			</p>
 			{!inv.can_draft && mappable && (
 				<p role="note" className="text-sm" data-testid="onboard-map-first">
@@ -151,8 +183,21 @@ export function InventoryPanel({
 					<div className="flex flex-wrap gap-3">
 						<label className="flex flex-col gap-1 text-xs">
 							<span className="font-medium">{t("plan.suite")}</span>
-							<Input value={plan.suite} onChange={(e) => set({ suite: e.target.value.toLowerCase() })} data-testid="onboard-plan-suite" />
-							<span className="text-muted-foreground max-w-xs">{t("plan.suiteHint")}</span>
+							<Input
+								value={plan.suite}
+								onChange={(e) => set({ suite: e.target.value.toLowerCase() })}
+								aria-invalid={idLine.error || undefined}
+								aria-describedby={idLineId}
+								data-testid="onboard-plan-suite"
+							/>
+							<span
+								id={idLineId}
+								className={idLine.error ? "text-destructive max-w-xs" : "text-muted-foreground max-w-xs"}
+								data-state={idCheck.state}
+								data-testid="onboard-plan-suite-check"
+							>
+								{idLine.text}
+							</span>
 						</label>
 						{rows && (
 							<label className="flex flex-col gap-1 text-xs">
@@ -248,7 +293,13 @@ export function InventoryPanel({
 						</div>
 					)}
 					<div className="flex flex-wrap items-center gap-3">
-						<Button onClick={onDraft} isLoading={busy} disabled={busy || !plan.suite} dataTestId="onboard-draft">
+						<Button
+							onClick={onDraft}
+							isLoading={busy}
+							disabled={busy || suiteIdBlocks(idCheck)}
+							aria-describedby={suiteIdBlocks(idCheck) ? idLineId : undefined}
+							dataTestId="onboard-draft"
+						>
 							{t("plan.draft")}
 						</Button>
 						<span className="text-muted-foreground text-xs">{t("plan.draftHint")}</span>
