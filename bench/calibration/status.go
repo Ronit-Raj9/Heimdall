@@ -58,7 +58,7 @@ func Status(s *schemas.Suite, j *StatusJudge, th schemas.JudgeCalibrationThresho
 	st.Problems = append(st.Problems, recs.Problems...)
 	st.Records = len(recs.Valid)
 	as := assess(judgeGroup{id: j.ID, templates: used}, recs, th, false)
-	st.State, st.Detail = as.state, as.detail
+	st.State, st.Detail, st.Caps = as.state, as.detail, as.caps
 	if as.rec == nil {
 		st.Detail += fmt.Sprintf("; judged verdicts are capped at INCONCLUSIVE until `judge calibrate %s` runs", s.ID)
 		if st.HumanLabels < th.MinLabels {

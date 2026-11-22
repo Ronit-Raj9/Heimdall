@@ -17,6 +17,7 @@ import (
 	"math"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/stats"
@@ -75,6 +76,19 @@ type BenchmarkVerdict struct {
 	SuccessB    float64   `json:"success_b"`            // B's success rate on paired tasks
 	ScoreDelta  float64   `json:"score_delta"`          // descriptive: mean Score B minus A on paired tasks
 	TaskDiffs   []float64 `json:"task_diffs,omitempty"` // per-task B minus A, for pooling
+
+	// BootLow and BootHigh are the 95% paired bootstrap interval of Delta
+	// (tasks resampled with replacement); MDE is the smallest change this
+	// many paired tasks can detect (PairedChange).
+	BootLow  *float64 `json:"boot_low,omitempty"`
+	BootHigh *float64 `json:"boot_high,omitempty"`
+	MDE      *float64 `json:"mde,omitempty"`
+
+	// JudgeCapped marks a verdict taken back because the benchmark is
+	// judge-graded and its judge is not calibrated: CappedFrom is the
+	// winner before. A capped verdict never counts in the overall verdict.
+	JudgeCapped bool   `json:"judge_capped,omitempty"`
+	CappedFrom  string `json:"capped_from,omitempty"`
 }
 
 // OverallVerdict pools benchmark verdicts. Wins counts benchmark winners
@@ -133,6 +147,12 @@ func Compare(a, b []TaskOutcome) BenchmarkVerdict {
 	if ok {
 		out.CILow, out.CIHigh = &lo, &hi
 	}
+	if pc := Paired(out.TaskDiffs); pc.OK {
+		out.BootLow, out.BootHigh = &pc.Lo, &pc.Hi
+	}
+	if m := MDE(out.Tasks); !math.IsInf(m, 0) && !math.IsNaN(m) {
+		out.MDE = &m
+	}
 
 	switch verdict.EffectDecision(eff, Alpha) {
 	case schemas.DecisionImproved:
@@ -168,7 +188,7 @@ func Holm(vs []BenchmarkVerdict) []BenchmarkVerdict {
 	var idx []int
 	var ps []float64
 	for i, v := range out {
-		if v.PValue != nil {
+		if v.PValue != nil && !v.JudgeCapped { // a capped verdict is not a test
 			idx = append(idx, i)
 			ps = append(ps, *v.PValue)
 		}
@@ -217,11 +237,36 @@ func holm(p []float64) []float64 {
 	return out
 }
 
+// JudgeCap takes back a verdict whose benchmark is judge-graded by a judge
+// that is not calibrated, the rule the experiment verdict applies: a winner
+// or a tie becomes unclear, nothing is significant, and why ends the
+// summary. The numbers stay for reading.
+func JudgeCap(v BenchmarkVerdict, why string) BenchmarkVerdict {
+	if v.Winner != WinnerUnclear {
+		v.CappedFrom = v.Winner
+	}
+	v.JudgeCapped, v.Winner, v.Significant = true, WinnerUnclear, false
+	v.Summary = strings.TrimSpace(v.Summary + " " + why)
+	return v
+}
+
+// forOverall drops what a judge-capped verdict would add to the pooled
+// test: its p-value and its paired tasks.
+func forOverall(vs []BenchmarkVerdict) []BenchmarkVerdict {
+	out := slices.Clone(vs)
+	for i := range out {
+		if out[i].JudgeCapped {
+			out[i].PValue, out[i].TaskDiffs = nil, nil
+		}
+	}
+	return out
+}
+
 // Overall pools benchmark verdicts into one. Wins count the benchmark
 // winners after Holm, so the tally never shows more significant wins than
 // the correction allows; pass verdicts from Compare (Holm is applied here).
 func Overall(vs []BenchmarkVerdict) OverallVerdict {
-	vs = Holm(vs)
+	vs = Holm(forOverall(vs))
 	out := OverallVerdict{Winner: WinnerUnclear, Wins: map[string]int{WinnerA: 0, WinnerB: 0, WinnerTie: 0, WinnerUnclear: 0}, Benchmarks: len(vs)}
 	var diffs []float64
 	for _, v := range vs {

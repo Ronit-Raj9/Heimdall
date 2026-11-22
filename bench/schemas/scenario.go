@@ -279,6 +279,25 @@ type JudgeSpec struct {
 	MaxTokens     int    `json:"max_tokens,omitempty" yaml:"max_tokens"`
 
 	Auditor *JudgeAuditorSpec `json:"auditor,omitempty" yaml:"auditor"` // W8 judge calibration: optional second judge from another provider; disagreement marks a run contested, never overrules
+
+	// Custom judge prompt (prompt_version custom-v1): the org's prompt file
+	// in the suite folder, pinned by its sha256 (a changed file refuses to
+	// grade until the pin is updated), and the weighted share of the task's
+	// criteria a pass needs (default 1: every criterion).
+	PromptFile   string   `json:"prompt_file,omitempty" yaml:"prompt_file"`
+	PromptSHA256 string   `json:"prompt_sha256,omitempty" yaml:"prompt_sha256"`
+	PassAt       *float64 `json:"pass_at,omitempty" yaml:"pass_at"`
+}
+
+// JudgeCriterion is one criterion of a custom judge prompt's verdict
+// (JudgeRecord.Criteria): its weight from the task's rubric, whether the
+// majority of parsable votes found it met, and the judge's reason.
+type JudgeCriterion struct {
+	ID     string  `json:"id"`
+	Text   string  `json:"text"`
+	Weight float64 `json:"weight"`
+	Met    bool    `json:"met"`
+	Reason string  `json:"reason,omitempty"`
 }
 
 // JudgeRecord is what one judged grade rested on (Grade.Judge).
@@ -306,6 +325,12 @@ type JudgeRecord struct {
 	Provider  string  `json:"provider,omitempty"`
 	Aggregate string  `json:"aggregate,omitempty"`
 	PassScore float64 `json:"pass_score,omitempty"`
+
+	// Criteria is a custom judge prompt's per-criterion verdict, with
+	// Score the weighted share met and PassAt the share a pass needs.
+	Criteria []JudgeCriterion `json:"criteria,omitempty"`
+	Score    *float64         `json:"score,omitempty"`
+	PassAt   float64          `json:"pass_at,omitempty"`
 }
 
 // ImportRecord says where an imported suite came from (Suite.Imported).

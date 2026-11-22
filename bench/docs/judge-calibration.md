@@ -225,6 +225,21 @@ labels with 27 matched (0.90) give an agreement interval of about [0.73,
 0.98]: just under 0.75, so the judge is not yet shown reliable. Label more
 items rather than lowering a threshold.
 
+### Calibrated on controls
+
+Before anyone labels answers, a judge can be **calibrated on controls**: the admission-control items of a calibration record (reference answers labelled correct; wrong answers, the injection answer and the refusal labelled incorrect) are measured like human labels. When there are at least `min_controls` of them (default 20), both labels are present, every template the verdicts use is covered and the bounds pass `min_agreement` and `min_tnr`, the state is `calibrated_on_controls`. Verdicts and report cards may use it, always with the visible label "calibrated on controls". Human labels that pass upgrade it to "human-calibrated" (`calibrated`). On an abstention task (`qa-v1-abstain`) a refusal is the right answer, so the refusal control is not required to fail there.
+
+```yaml
+judge_calibration:
+  min_controls: 20      # fewest admission-control items for "calibrated on controls"
+```
+
+### Gates on judge-graded benchmarks
+
+The report card and the CI comment show which benchmarks a model judge grades and its calibration state. A/B verdicts on a judge that is neither human-calibrated nor calibrated on controls are capped (shown as unclear), and a `min_score` gate on such a benchmark is inconclusive instead of passing or failing, unless the gate sets `allow_uncalibrated_judge`.
+
+`max_regression` is decided on the paired tasks only (tasks both versions ran, on the same benchmark version): a 95% paired bootstrap interval of the change, failing only when the drop is beyond the limit and the interval excludes zero. A drop over the limit that could be noise is inconclusive, and the check shows the smallest change its number of tasks can detect. Tasks only one side ran, or a baseline on another benchmark version, are listed in the check's notes and never pooled. `fail_on_inconclusive` makes an inconclusive gate block a release.
+
 ### Drift reminders
 
 A reminder is a warning; it never changes a decision.

@@ -110,6 +110,9 @@ type evalResolution struct {
 	Baseline         *schemas.GateBaseline
 	Live             LiveVersion
 	Note             string
+	// failOnInconclusive is the gate's fail_on_inconclusive: an
+	// inconclusive gate blocks a release.
+	failOnInconclusive bool
 }
 
 // gateEnv is what a resolution reads: the org's services and root.
@@ -171,6 +174,7 @@ func (g gateEnv) resolve(ctx context.Context, ev *schemas.Evaluation, evals []*s
 	want := 0
 	if ev.Spec.Gate != nil {
 		want = ev.Spec.Gate.BaselineVersion
+		res.failOnInconclusive = ev.Spec.Gate.FailOnInconclusive
 	}
 	pick := func(cand, base schemas.EvaluationArm) {
 		res.Candidate, res.CandidateVersion = cand.Label, g.armVersion(cand)
@@ -309,6 +313,10 @@ func (r *evalResolution) blocked(gate *schemas.EvaluationGateResult) []string {
 		switch gate.State {
 		case schemas.GateFail:
 			out = append(out, strings.TrimSuffix(gate.Summary, "."))
+		case schemas.GateInconclusive:
+			if r.failOnInconclusive {
+				out = append(out, strings.TrimSuffix(gate.Summary, "."))
+			}
 		case schemas.GateNoBaseline:
 			if r.Live.Version > 0 {
 				out = append(out, fmt.Sprintf("the gate could not compare with the live version v%d", r.Live.Version))

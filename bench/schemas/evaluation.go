@@ -88,6 +88,13 @@ type EvaluationGate struct {
 	// MaxRegression is the largest score drop from the baseline allowed on
 	// any capability, as a fraction (0.05 is 5 points). 0 is no check.
 	MaxRegression float64 `json:"max_regression,omitempty"`
+	// AllowUncalibratedJudge lets a min_score rule count a judge-graded
+	// benchmark whose judge is not calibrated (on human labels or on its
+	// controls). Off, such a rule is inconclusive instead of passing.
+	AllowUncalibratedJudge bool `json:"allow_uncalibrated_judge,omitempty"`
+	// FailOnInconclusive makes an inconclusive gate block a release like a
+	// failed one. Off, it is shown and does not block.
+	FailOnInconclusive bool `json:"fail_on_inconclusive,omitempty"`
 }
 
 // Gate states.
@@ -95,6 +102,11 @@ const (
 	GatePass       = "pass"
 	GateFail       = "fail"
 	GateNoBaseline = "no_baseline" // a regression limit is set but no baseline run exists to compare with
+	// GateInconclusive is a gate no rule failed but at least one could not
+	// decide: a drop over the limit that the paired interval cannot tell
+	// from noise, too few paired tasks, or a min_score on a judge that is
+	// not calibrated.
+	GateInconclusive = "inconclusive"
 )
 
 // GateCheck is one rule of a gate and its outcome.
@@ -106,6 +118,21 @@ type GateCheck struct {
 	Baseline   *float64 `json:"baseline,omitempty"`
 	Pass       bool     `json:"pass"`
 	Summary    string   `json:"summary"`
+
+	// Inconclusive marks a rule that could not decide (Pass is false).
+	Inconclusive bool `json:"inconclusive,omitempty"`
+	// A max_regression rule is judged on the paired change, candidate minus
+	// baseline, over the tasks both sides ran (Tasks): Change and its paired
+	// bootstrap interval (95%), and MDE, the smallest change this many
+	// paired tasks can detect (alpha 0.05, power 0.8, per-task SD 0.30).
+	Tasks      int      `json:"tasks,omitempty"`
+	Change     *float64 `json:"change,omitempty"`
+	ChangeLow  *float64 `json:"change_low,omitempty"`
+	ChangeHigh *float64 `json:"change_high,omitempty"`
+	MDE        *float64 `json:"mde,omitempty"`
+	// Notes say what was left out of the comparison: tasks only one side
+	// ran, benchmarks run at another version.
+	Notes []string `json:"notes,omitempty"`
 }
 
 // GateBaseline names what the candidate was compared with.
@@ -120,7 +147,7 @@ type GateBaseline struct {
 // EvaluationGateResult is the gate's decision, written once when the
 // evaluation finishes.
 type EvaluationGateResult struct {
-	State            string        `json:"state"` // pass | fail | no_baseline
+	State            string        `json:"state"` // pass | fail | inconclusive | no_baseline
 	Agent            string        `json:"agent"`
 	Candidate        string        `json:"candidate"` // the arm label judged
 	CandidateVersion int           `json:"candidate_version,omitempty"`

@@ -81,6 +81,43 @@ describe("GateResultCard and RepeatEvaluation", () => {
 		expect(html).toContain('data-testid="evaluation-gate-check-max_regression-terminal"');
 	});
 
+	it("shows an inconclusive check with its paired interval and detectable size", () => {
+		const html = render(
+			<GateResultCard
+				gate={{
+					state: "inconclusive",
+					agent: "codex",
+					candidate: "B",
+					checks: [
+						{
+							capability: "support",
+							rule: "max_regression",
+							threshold: 0.05,
+							observed: 0.5,
+							baseline: 0.62,
+							pass: false,
+							inconclusive: true,
+							tasks: 8,
+							change: -0.12,
+							change_low: -0.38,
+							change_high: 0.12,
+							mde: 0.35,
+							notes: ["support: the baseline ran 8 of these 10 tasks; 2 new tasks not compared"],
+							summary: "support fell from 62% to 50% on 8 paired tasks, over the 5% allowed, but the drop could be noise",
+						},
+					],
+					summary: "Gate inconclusive",
+					decided_at: "2026-11-20T11:00:00Z",
+				}}
+			/>,
+		);
+		expect(html).toContain('data-state="inconclusive"');
+		expect(html).toContain("Inconclusive");
+		expect(html).toContain("Change -12 pts on 8 paired tasks (95% interval -38 pts to +12 pts)");
+		expect(html).toContain("this size can detect about 35 points");
+		expect(html).toContain("2 new tasks not compared");
+	});
+
 	it("offers nightly and weekly repeats", () => {
 		const html = render(<RepeatEvaluation evaluationId="ev_1" />);
 		expect(html).toContain('data-testid="evaluation-repeat-nightly"');

@@ -20,6 +20,7 @@ export function stateTone(state: CalibrationState): "good" | "warn" | "bad" | "n
 	switch (state) {
 		case "calibrated":
 			return "good";
+		case "calibrated_on_controls":
 		case "few_labels":
 		case "allowed_uncalibrated":
 			return "warn";

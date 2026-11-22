@@ -42,6 +42,7 @@ import { RouteTabs, type RouteTab } from "@/components/shell/routeTabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
+import { JudgeCriteria } from "@/components/review/judgeCriteria";
 import { formatDateTime, shortHash } from "@/components/verdict/verdict.utils";
 import { RunVisualPanel } from "@/components/visual/runVisualPanel"; // X1 vision grading
 import { RunVoicePanel } from "@/components/voice/runVoicePanel"; // X8 voice agents
@@ -349,6 +350,7 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
             },
           ]}
         />
+        {grade?.judged && <JudgeCriteria judge={grade.judge} testId="run-judge-criteria" />}
       </Section>
 
       <details className="group rounded-xl border" data-testid="run-details">

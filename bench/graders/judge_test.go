@@ -493,7 +493,7 @@ func TestJudgeRefusesNoPaidRun(t *testing.T) {
 	if got.Passed || !got.InvalidEvaluator || got.Judged || got.Reason != NoPaidJudgeReason {
 		t.Fatalf("grade %+v", got)
 	}
-	if _, err := j.vote(context.Background(), rc, *spec, "p"); err == nil { // the auditor's path
+	if _, err := j.vote(context.Background(), rc, *spec, "p", nil); err == nil { // the auditor's path
 		t.Fatal("vote on a no-paid run did not refuse")
 	}
 	if len(fj.requests) != 0 || len(gw.minted) != 0 {

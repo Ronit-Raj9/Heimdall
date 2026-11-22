@@ -74,6 +74,7 @@ type PlannedItem struct {
 	Template  string
 	Prompt    string
 	Perturbed map[string]string // perturbation -> prompt
+	score     scorer            // custom prompt: the task's criteria decide each vote
 }
 
 // PlanCalibration resolves each labelled item of suite s to its task's
@@ -85,7 +86,7 @@ func PlanCalibration(s *schemas.Suite, items []calibration.Labelled, price func(
 	if err != nil {
 		return nil, err
 	}
-	tmpls, err := PromptTemplates(spec.PromptVersion)
+	tmpls, err := PromptTemplatesFor(spec)
 	if err != nil {
 		return nil, err
 	}
@@ -124,15 +125,26 @@ func PlanCalibration(s *schemas.Suite, items []calibration.Labelled, price func(
 			p.Skipped = append(p.Skipped, fmt.Sprintf("item %s: task %s: answer spec: %v", it.Item.ID, t.ID, err))
 			continue
 		}
-		name, tmpl, err := judgeTemplate(spec.PromptVersion, ans)
+		name, tmpl, err := judgeTemplateFor(s, spec, ans)
 		if err != nil {
 			p.Skipped = append(p.Skipped, fmt.Sprintf("item %s: task %s: %v", it.Item.ID, t.ID, err))
 			continue
 		}
-		pi := PlannedItem{Item: it, Category: ans.Category, Template: name, Prompt: renderJudgePrompt(tmpl, ans, it.Item.Answer), Perturbed: map[string]string{}}
+		render := func(answer string) string { return renderJudgePrompt(tmpl, ans, answer) }
+		if spec.PromptVersion == PromptCustomV1 { // judgecustom.go; a calibration item has no trajectory
+			render = func(answer string) string {
+				out, _ := renderCustomPrompt(tmpl, ans, answer, "", maxJudgeAnswerRunes)
+				return out
+			}
+		}
+		pi := PlannedItem{Item: it, Category: ans.Category, Template: name, Prompt: render(it.Item.Answer), Perturbed: map[string]string{}}
+		if spec.PromptVersion == PromptCustomV1 {
+			crit, _ := parseCriteria(ans.Rubric)
+			pi.score = customScorer(crit, passAt(spec))
+		}
 		prompts := []string{pi.Prompt, pi.Prompt}
 		for _, name := range calibration.Perturbations {
-			pi.Perturbed[name] = renderJudgePrompt(tmpl, ans, calibration.Perturb(name, it.Item.Answer))
+			pi.Perturbed[name] = render(calibration.Perturb(name, it.Item.Answer))
 			prompts = append(prompts, pi.Perturbed[name])
 		}
 		for _, pr := range prompts {
@@ -213,10 +225,10 @@ func RunCalibration(ctx context.Context, cfg JudgeConfig, plan *CalibrationPlan,
 	served := map[string]bool{}
 	var usd float64
 	priced, unpriced := true, ""
-	cast := func(prompt string) ([]string, error) {
+	cast := func(prompt string, sc scorer) ([]string, error) {
 		votes := make([]string, 0, plan.Spec.Votes)
 		for i := 0; i < plan.Spec.Votes; i++ {
-			v, tok, model, _, err := g.call(ctx, key, plan.Spec, prompt)
+			v, tok, model, _, err := g.call(ctx, key, plan.Spec, prompt, sc)
 			if err != nil {
 				return nil, err
 			}
@@ -243,14 +255,14 @@ func RunCalibration(ctx context.Context, cfg JudgeConfig, plan *CalibrationPlan,
 	out := make([]calibration.ItemRun, 0, len(plan.Items))
 	for n, it := range plan.Items {
 		r := calibration.ItemRun{Item: it.Item, Category: it.Category, Template: it.Template, Perturbed: map[string][]string{}}
-		if r.Votes, err = cast(it.Prompt); err != nil {
+		if r.Votes, err = cast(it.Prompt, it.score); err != nil {
 			return nil, nil, fmt.Errorf("item %s: %w", it.Item.Item.ID, err)
 		}
-		if r.Repeat, err = cast(it.Prompt); err != nil {
+		if r.Repeat, err = cast(it.Prompt, it.score); err != nil {
 			return nil, nil, fmt.Errorf("item %s repeat: %w", it.Item.Item.ID, err)
 		}
 		for _, name := range calibration.Perturbations {
-			if r.Perturbed[name], err = cast(it.Perturbed[name]); err != nil {
+			if r.Perturbed[name], err = cast(it.Perturbed[name], it.score); err != nil {
 				return nil, nil, fmt.Errorf("item %s %s: %w", it.Item.Item.ID, name, err)
 			}
 		}
@@ -306,14 +318,15 @@ func checkAuditor(spec schemas.JudgeSpec) error {
 // audit asks the auditor the same prompt on its own key and records
 // whether its majority agrees with the judge's. It never changes the grade;
 // a failed audit is recorded with its error and the grade stands.
-func (g *judge) audit(ctx context.Context, rc *schemas.RunContext, spec schemas.JudgeSpec, prompt string, judgeVotes []string) *schemas.JudgeAudit {
+func (g *judge) audit(ctx context.Context, rc *schemas.RunContext, spec schemas.JudgeSpec, prompt string, judgeVotes []string, sc scorer) *schemas.JudgeAudit {
 	a := spec.Auditor
-	aspec := schemas.JudgeSpec{Provider: a.Provider, Model: a.Model, PromptVersion: spec.PromptVersion, Votes: a.Votes, MaxTokens: spec.MaxTokens}
+	aspec := schemas.JudgeSpec{Provider: a.Provider, Model: a.Model, PromptVersion: spec.PromptVersion, Votes: a.Votes, MaxTokens: spec.MaxTokens,
+		PromptFile: spec.PromptFile, PromptSHA256: spec.PromptSHA256, PassAt: spec.PassAt}
 	if aspec.Votes == 0 {
 		aspec.Votes = 1
 	}
 	out := &schemas.JudgeAudit{Provider: a.Provider, Model: a.Model}
-	rec, err := g.vote(ctx, rc, aspec, prompt)
+	rec, err := g.vote(ctx, rc, aspec, prompt, sc)
 	if err != nil {
 		out.Error = err.Error()
 		out.USD = schemas.Unknown("the audit did not complete", schemas.EvidenceGateway)
@@ -335,14 +348,14 @@ func StatusJudge(s *schemas.Suite) *calibration.StatusJudge {
 	}
 	if j := s.Judge; j != nil {
 		sj := &calibration.StatusJudge{ID: calibration.JudgeID{Provider: j.Provider, Model: j.Model, Votes: max(j.Votes, 1)}, PromptVersion: j.PromptVersion}
-		sj.Templates, _ = PromptTemplates(j.PromptVersion)
+		sj.Templates, _ = PromptTemplatesFor(*j)
 		used := map[string]bool{}
 		for _, t := range s.Tasks {
 			ans, err := LoadAnswerSpec(t)
 			if err != nil {
 				continue
 			}
-			name, _, err := judgeTemplate(j.PromptVersion, ans)
+			name, _, err := judgeTemplateFor(s, *j, ans)
 			if err != nil {
 				continue
 			}

@@ -22,6 +22,10 @@ const (
 	DefaultMinTNR       = 0.60
 	DefaultMinLabels    = 30
 	DefaultMaxAgeDays   = 90
+	// DefaultMinControls is the fewest admission-control items (reference
+	// answers, wrong answers, the injection and the refusal) a record needs
+	// before its controls alone can calibrate the judge.
+	DefaultMinControls = 20
 )
 
 // scenarioJudgeKey is the manifest scenario input a judged suite freezes
@@ -32,7 +36,7 @@ const scenarioJudgeKey = "suite.judge"
 // section (nil: all defaults). source names where they came from.
 func Thresholds(p *schemas.JudgeCalibrationPolicy, source string) schemas.JudgeCalibrationThresholds {
 	t := schemas.JudgeCalibrationThresholds{
-		MinAgreement: DefaultMinAgreement, MinTNR: DefaultMinTNR, MinLabels: DefaultMinLabels, MaxAgeDays: DefaultMaxAgeDays, Source: "defaults",
+		MinAgreement: DefaultMinAgreement, MinTNR: DefaultMinTNR, MinLabels: DefaultMinLabels, MaxAgeDays: DefaultMaxAgeDays, MinControls: DefaultMinControls, Source: "defaults",
 	}
 	if p == nil {
 		return t
@@ -51,6 +55,9 @@ func Thresholds(p *schemas.JudgeCalibrationPolicy, source string) schemas.JudgeC
 	}
 	if p.MaxAgeDays > 0 {
 		t.MaxAgeDays = p.MaxAgeDays
+	}
+	if p.MinControls > 0 {
+		t.MinControls = p.MinControls
 	}
 	return t
 }
@@ -144,6 +151,10 @@ func Apply(an *schemas.Analysis, in Input) {
 	if in.Records != nil && len(in.Records.Problems) > 0 {
 		jc.Reminders = append(jc.Reminders, fmt.Sprintf("%d calibration record problem(s): %s", len(in.Records.Problems), in.Records.Problems[0]))
 	}
+	if jc.State == schemas.CalibrationStateControls && majority != nil && majority.Seed != nil {
+		a, t, f := majority.Seed.Agreement, majority.Seed.TNR, majority.Seed.FPR
+		jc.Agreement, jc.TNR, jc.FPR, jc.Kappa = &a, &t, &f, majority.Seed.Kappa // the controls' numbers: the only evidence
+	}
 	unreliable := jc.State == schemas.CalibrationStateUnreliable
 	jc.Caps = capVerdict && !allowed && !unreliable
 	if capVerdict && allowed && !unreliable {
@@ -169,6 +180,8 @@ func Apply(an *schemas.Analysis, in Input) {
 		if len(jc.Reminders) > 0 {
 			check.Status = schemas.InstrumentWarn
 		}
+	case schemas.CalibrationStateControls:
+		check.Status = schemas.InstrumentWarn // stands, labelled: no human evidence yet
 	case schemas.CalibrationStateUnreliable:
 		check.Status = schemas.InstrumentFail
 	case schemas.CalibrationStateUncalibrated:
@@ -279,7 +292,7 @@ func severity(state string) int {
 		return 3
 	case schemas.CalibrationStateUncalibrated:
 		return 2
-	case schemas.CalibrationStateFewLabels:
+	case schemas.CalibrationStateFewLabels, schemas.CalibrationStateControls:
 		return 1
 	}
 	return 0
@@ -310,8 +323,12 @@ func assess(g judgeGroup, recs *RecordSet, th schemas.JudgeCalibrationThresholds
 		}
 		return assessment{state: schemas.CalibrationStateUncalibrated, detail: d, caps: true}
 	case rec.HumanLabels == 0:
+		if as, ok := onControls(rec, g.templates, th, who, ""); ok {
+			return as
+		}
+		_, why := controlsEvidence(rec, g.templates, th)
 		return assessment{state: schemas.CalibrationStateUncalibrated, caps: true, rec: rec,
-			detail: fmt.Sprintf("%sjudge not calibrated: record %s has no human labels (%d admission-control seeds only)", who, rec.RecordID, rec.SeedItems)}
+			detail: fmt.Sprintf("%sjudge not calibrated: record %s has no human labels, and its %d admission-control items do not calibrate it: %s", who, rec.RecordID, rec.SeedItems, why)}
 	}
 	as := assessment{rec: rec}
 	bounds, pass := boundsText(&rec.Human, th)
@@ -320,6 +337,9 @@ func assess(g judgeGroup, recs *RecordSet, th schemas.JudgeCalibrationThresholds
 		as.state = schemas.CalibrationStateFewLabels
 		as.detail = fmt.Sprintf("%sjudge calibrated on %d human labels, fewer than %d: %s", who, rec.HumanLabels, th.MinLabels, bounds)
 		if !pass {
+			if c, ok := onControls(rec, g.templates, th, who, fmt.Sprintf("; %d human labels so far, too few to show it reliable on their own", rec.HumanLabels)); ok {
+				return c
+			}
 			as.detail += "; too few labels to show the judge reliable"
 			as.caps = true
 		}
@@ -357,10 +377,84 @@ func assess(g judgeGroup, recs *RecordSet, th schemas.JudgeCalibrationThresholds
 	return as
 }
 
+// onControls is the "calibrated on controls" assessment of a record whose
+// human evidence is missing or too thin: its admission-control items are
+// enough (MinControls), include both answers labelled correct and labelled
+// incorrect, cover every template the judge used, and their agreement, TNR
+// and TPR lower bounds pass the thresholds. ok is false otherwise. The
+// verdict is not capped; it is labelled. extra is appended to the detail.
+func onControls(rec *schemas.CalibrationRecord, templates []string, th schemas.JudgeCalibrationThresholds, who, extra string) (assessment, bool) {
+	bounds, why := controlsEvidence(rec, templates, th)
+	if why != "" {
+		return assessment{}, false
+	}
+	return assessment{state: schemas.CalibrationStateControls, rec: rec,
+		detail: fmt.Sprintf("%sjudge calibrated on controls: %d admission-control items (reference answers, wrong answers, injection, refusal) agree with their labels: %s (record %s); no human labels pass yet, label answers to make it human-calibrated%s",
+			who, rec.SeedItems, bounds, rec.RecordID, extra)}, true
+}
+
+// controlsEvidence checks a record's admission-control items for the
+// controls state: it returns the bounds text and "" when they calibrate
+// the judge, else why not.
+func controlsEvidence(rec *schemas.CalibrationRecord, templates []string, th schemas.JudgeCalibrationThresholds) (string, string) {
+	min := th.MinControls
+	if min <= 0 {
+		min = DefaultMinControls
+	}
+	if rec == nil || rec.Seed == nil || rec.SeedItems == 0 {
+		return "", "it has no admission-control items"
+	}
+	h := rec.Seed
+	if rec.SeedItems < min {
+		return "", fmt.Sprintf("%d admission-control items, fewer than the %d needed", rec.SeedItems, min)
+	}
+	if h.Positives == 0 || h.Negatives == 0 {
+		return "", "its admission controls need answers labelled correct and answers labelled incorrect"
+	}
+	bounds, pass := boundsText(h, th)
+	if h.TPR.Lo == nil || *h.TPR.Lo < th.MinTNR {
+		pass = false
+	}
+	bounds += fmt.Sprintf(", TPR %s (lower bound must be at least %.2f)", rateText(h.TPR), th.MinTNR)
+	if !pass {
+		return bounds, "the judge disagrees with its controls: " + bounds
+	}
+	if missing := controlsUncovered(rec, templates); len(missing) > 0 {
+		return bounds, "no admission-control item used " + shortList(missing)
+	}
+	return bounds, ""
+}
+
+// controlsUncovered lists the templates no admission-control item of the
+// record was judged with.
+func controlsUncovered(rec *schemas.CalibrationRecord, templates []string) []string {
+	used := map[string]bool{}
+	for _, it := range rec.Items {
+		if it.Source != schemas.CalibrationSourceControl {
+			continue
+		}
+		h := rec.Templates[it.Template]
+		if h == "" {
+			h = it.Template
+		}
+		used[h] = true
+	}
+	if len(used) == 0 && len(rec.Items) == 0 {
+		return nil // a record summary without items (status card): trust the pooled counts
+	}
+	var out []string
+	for _, t := range templates {
+		if !used[t] {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
 func fillRecord(jc *schemas.JudgeCalibrationVerdict, rec *schemas.CalibrationRecord) {
 	at := rec.CreatedAt
 	jc.RecordID, jc.RecordHash, jc.RecordAt = rec.RecordID, rec.Hash, &at
-	jc.HumanLabels = rec.HumanLabels
+	jc.HumanLabels, jc.ControlItems = rec.HumanLabels, rec.SeedItems
 	a, t, f := rec.Human.Agreement, rec.Human.TNR, rec.Human.FPR
 	jc.Agreement, jc.TNR, jc.FPR, jc.Kappa = &a, &t, &f, rec.Human.Kappa
 }
@@ -403,8 +497,8 @@ func rateText(r schemas.CalibrationRate) string {
 }
 
 func thresholdText(t schemas.JudgeCalibrationThresholds) string {
-	return fmt.Sprintf("a record for the exact judge and prompt; agreement lower bound >= %.2f, TNR lower bound >= %.2f; %d+ human labels (%s)",
-		t.MinAgreement, t.MinTNR, t.MinLabels, t.Source)
+	return fmt.Sprintf("a record for the exact judge and prompt; agreement lower bound >= %.2f, TNR lower bound >= %.2f; %d+ human labels, or %d+ admission-control items for calibrated on controls (%s)",
+		t.MinAgreement, t.MinTNR, t.MinLabels, t.MinControls, t.Source)
 }
 
 func shortList(hashes []string) string {

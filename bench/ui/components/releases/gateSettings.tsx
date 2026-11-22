@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { EvaluationGate } from "@/lib/store/apis/evaluationsApi";
 import { Plus, Trash2 } from "lucide-react";
+import { tasksFor } from "./gateSize";
 
 /** Capabilities a minimum score can name; "all" is every benchmark pooled. */
 export const GATE_CAPABILITIES = ["all", "terminal", "coding", "memory", "support", "research", "voice", "safety"];
@@ -11,6 +12,15 @@ const DEFAULT_GATE: EvaluationGate = { max_regression: 0.05 };
 /** Percent text for a fraction, "" for none. */
 const pctText = (x: number | undefined) => (x === undefined ? "" : String(Math.round(x * 1000) / 10));
 const fromPct = (s: string) => (s.trim() === "" ? undefined : Math.min(1, Math.max(0, Number(s) / 100)));
+
+/** How many paired tasks a drop limit needs before a drop that size can be told from noise. */
+export function sizeHint(limit: number | undefined): string {
+	if (!limit) return "";
+	const pts = Math.round(limit * 1000) / 10;
+	const n = tasksFor(limit);
+	const need = n ? `about ${n} tasks` : "more tasks than any benchmark has";
+	return `The gate fails only on a real drop larger than ${pts} points. Telling a ${pts} point drop from noise needs ${need} per capability; with fewer, a drop that size reads as inconclusive.`;
+}
 
 /**
  * The release gate of an evaluation: compared with the live version (or a picked one), no capability
@@ -59,6 +69,11 @@ export function GateSettings({ gate, onChange }: { gate?: EvaluationGate; onChan
 							/>
 						</label>
 					</div>
+					{sizeHint(gate.max_regression) && (
+						<p className="text-muted-foreground text-xs" data-testid="gate-size-hint">
+							{sizeHint(gate.max_regression)}
+						</p>
+					)}
 					<div className="flex flex-col gap-2">
 						<span className="text-muted-foreground text-xs">Lowest score needed per capability</span>
 						{mins.map(([cap, v], i) => (
@@ -105,6 +120,36 @@ export function GateSettings({ gate, onChange }: { gate?: EvaluationGate; onChan
 							</Button>
 						)}
 					</div>
+					<label className="flex items-start gap-2 text-sm">
+						<input
+							type="checkbox"
+							className="mt-1"
+							checked={Boolean(gate.allow_uncalibrated_judge)}
+							onChange={(e) => onChange({ ...gate, allow_uncalibrated_judge: e.target.checked || undefined })}
+							data-testid="gate-allow-uncalibrated"
+						/>
+						<span>
+							Count minimum scores on benchmarks graded by a judge that is not calibrated
+							<span className="text-muted-foreground block text-xs">
+								Off: such a minimum is inconclusive until the judge is calibrated on its controls or on human labels.
+							</span>
+						</span>
+					</label>
+					<label className="flex items-start gap-2 text-sm">
+						<input
+							type="checkbox"
+							className="mt-1"
+							checked={Boolean(gate.fail_on_inconclusive)}
+							onChange={(e) => onChange({ ...gate, fail_on_inconclusive: e.target.checked || undefined })}
+							data-testid="gate-fail-inconclusive"
+						/>
+						<span>
+							Block promoting when the gate is inconclusive
+							<span className="text-muted-foreground block text-xs">
+								Inconclusive: a drop over the limit that could be noise at this size, or a minimum on an uncalibrated judge.
+							</span>
+						</span>
+					</label>
 				</div>
 			)}
 		</section>

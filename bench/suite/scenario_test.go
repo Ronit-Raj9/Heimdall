@@ -655,3 +655,28 @@ func TestLintServicesFoldedIDs(t *testing.T) {
 		t.Fatalf("want one folded-id problem, got %d: %+v", n, probs)
 	}
 }
+
+func TestLintCustomJudgePrompt(t *testing.T) {
+	root := t.TempDir()
+	prompt := "Grade this reply:\n{{response}}\n"
+	if err := os.WriteFile(filepath.Join(root, "judge.md"), []byte(prompt), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pin := utils.SHA256Bytes([]byte(prompt))
+	s := &schemas.Suite{Root: root, Judge: &schemas.JudgeSpec{PromptVersion: "custom-v1", PromptFile: "judge.md", PromptSHA256: pin}}
+	if msg := lintCustomJudgePrompt(s); msg != "" {
+		t.Fatalf("pinned prompt: %s", msg)
+	}
+	s.Judge.PromptSHA256 = strings.Repeat("0", 64)
+	if msg := lintCustomJudgePrompt(s); !strings.Contains(msg, "not the pinned") {
+		t.Fatalf("changed prompt: %q", msg)
+	}
+	s.Judge.PromptFile = "../outside.md"
+	if msg := lintCustomJudgePrompt(s); msg == "" {
+		t.Fatal("prompt outside the suite accepted")
+	}
+	s.Judge = &schemas.JudgeSpec{PromptVersion: "qa-v1"}
+	if lintCustomJudgePrompt(s) != "" {
+		t.Fatal("shipped prompt linted")
+	}
+}

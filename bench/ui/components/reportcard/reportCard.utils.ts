@@ -367,3 +367,38 @@ export function formatProcess(p: ReportProcess | undefined): string {
 
 export const PROCESS_NOTE =
 	"Process scores compare the agent's tool calls with the task's reference path. They are report only and never change the score.";
+
+/** How a judge-graded benchmark's badge reads: tone and words (G4-06). */
+export interface JudgeBadge {
+	tone: "success" | "warning" | "destructive" | "neutral";
+	text: string;
+	title: string;
+}
+
+/**
+ * The judge badge of a benchmark row, undefined when a check (not a model judge) grades it.
+ * Human-calibrated is good; calibrated on controls and few human labels are usable with the label;
+ * anything else is not trusted, so A/B verdicts on it are capped and min_score gates are not applied.
+ */
+export function judgeBadge(row: ReportBenchmark): JudgeBadge | undefined {
+	const j = row.judge;
+	if (!j) return undefined;
+	const counts =
+		j.human_labels > 0 || j.control_items > 0
+			? ` ${j.human_labels} human labels, ${j.control_items} admission-control answers.`
+			: "";
+	const title = `Graded by a model judge${j.model ? ` (${j.model})` : ""}: ${j.label}.${counts}${j.trusted ? "" : " Verdicts on it are not decisions until the judge is calibrated."}`;
+	if (j.state === "calibrated") return { tone: "success", text: "Judge: human-calibrated", title };
+	if (j.trusted) return { tone: "warning", text: `Judge: ${j.label}`, title };
+	if (j.state === "unreliable") return { tone: "destructive", text: "Judge: unreliable", title };
+	return { tone: "neutral", text: j.state === "unchecked" ? "Judge: not checked" : "Judge: not calibrated", title };
+}
+
+/** The paired change line of an A/B verdict: interval and smallest detectable change. */
+export function pairedChangeText(v: ReportBenchmark["verdict"]): string | undefined {
+	if (!v) return undefined;
+	const parts: string[] = [];
+	if (v.boot_low != null && v.boot_high != null) parts.push(`95% interval ${points(v.boot_low)} to ${points(v.boot_high)}`);
+	if (v.mde != null && v.tasks) parts.push(`${v.tasks} paired tasks can detect about ${Math.round(v.mde * 100)} points`);
+	return parts.length ? parts.join("; ") : undefined;
+}

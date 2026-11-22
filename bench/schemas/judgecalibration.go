@@ -43,6 +43,12 @@ const (
 	CalibrationStateUncalibrated = "uncalibrated"         // no record for the exact judge model and prompt hash: verdict at most INCONCLUSIVE
 	CalibrationStateAllowed      = "allowed_uncalibrated" // uncalibrated, and the experiment set allow_uncalibrated_judge: labelled, not capped
 	CalibrationStateUnreliable   = "unreliable"           // a bound below its threshold: INVALID "judge unreliable"
+	// CalibrationStateControls is a record with too little human evidence
+	// whose admission-control items (reference answers, wrong answers, an
+	// injection and a refusal) are enough and agree with their labels above
+	// the thresholds: verdicts stand, labelled "calibrated on controls".
+	// Human labels that pass upgrade it to calibrated ("human-calibrated").
+	CalibrationStateControls = "calibrated_on_controls"
 )
 
 // CalibrationItem is one labelled answer: a line of labels.jsonl. ID is
@@ -177,6 +183,7 @@ type JudgeCalibrationPolicy struct {
 	MinTNR       *float64 `json:"min_tnr,omitempty" yaml:"min_tnr"`             // lowest lower bound of the true negative rate; default 0.60
 	MinLabels    int      `json:"min_labels,omitempty" yaml:"min_labels"`       // fewer human labels warn; default 30
 	MaxAgeDays   int      `json:"max_age_days,omitempty" yaml:"max_age_days"`   // older records get a reminder; default 90
+	MinControls  int      `json:"min_controls,omitempty" yaml:"min_controls"`   // fewest admission-control items for "calibrated on controls"; default 20
 }
 
 // JudgeCalibrationThresholds are the thresholds in force, defaults applied.
@@ -185,6 +192,7 @@ type JudgeCalibrationThresholds struct {
 	MinTNR       float64 `json:"min_tnr"`
 	MinLabels    int     `json:"min_labels"`
 	MaxAgeDays   int     `json:"max_age_days"`
+	MinControls  int     `json:"min_controls"`
 	Source       string  `json:"source"` // "defaults" or the policy file
 }
 
@@ -211,6 +219,7 @@ type JudgeCalibrationVerdict struct {
 	RecordHash      string                      `json:"record_hash,omitempty"`
 	RecordAt        *time.Time                  `json:"record_at,omitempty"`
 	HumanLabels     int                         `json:"human_labels"`
+	ControlItems    int                         `json:"control_items,omitempty"` // admission-control items of the record
 	Agreement       *CalibrationRate            `json:"agreement,omitempty"`
 	TNR             *CalibrationRate            `json:"tnr,omitempty"`
 	FPR             *CalibrationRate            `json:"fpr,omitempty"`
@@ -257,8 +266,9 @@ type CalibrationStatus struct {
 	Model         string                     `json:"model,omitempty"`
 	PromptVersion string                     `json:"prompt_version,omitempty"`
 	PromptSHA256  string                     `json:"prompt_sha256,omitempty"`
-	State         string                     `json:"state"` // calibrated | few_labels | uncalibrated | unreliable | not_judged
+	State         string                     `json:"state"` // calibrated | calibrated_on_controls | few_labels | uncalibrated | unreliable | not_judged
 	Detail        string                     `json:"detail"`
+	Caps          bool                       `json:"caps"` // judged verdicts are capped at INCONCLUSIVE in this state
 	SetSHA256     string                     `json:"set_sha256,omitempty"`
 	Labels        int                        `json:"labels"`       // rows in labels.jsonl
 	HumanLabels   int                        `json:"human_labels"` // distinct items labelled by people

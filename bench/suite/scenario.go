@@ -255,6 +255,9 @@ func lintScenarioSuite(s *schemas.Suite) []Problem {
 	if a := lintJudgeAuditor(s.Judge); a != "" { // W8 judge calibration: the auditor comes from another vendor
 		add(SeverityError, "%s", a)
 	}
+	if msg := lintCustomJudgePrompt(s); msg != "" { // custom judge prompt (graders/judgecustom.go)
+		add(SeverityError, "%s", msg)
+	}
 	seen := map[string]string{}
 	out = append(out, lintServices(SuiteFile, "services", s.Root, s.Services, seen)...)
 	out = append(out, lintExternalSuite(s)...)  // External APIs area (external.go)
@@ -597,4 +600,31 @@ func scenarioLoadErrors(t *schemas.Task, file string) []error {
 // repository the agent sees.
 func repoInImage(t *schemas.Task) bool {
 	return t.Environment != nil && t.Environment.WorkspacePath != ""
+}
+
+// lintCustomJudgePrompt checks a custom-v1 judge: its prompt file is in the
+// suite folder, hashes to the pinned prompt_sha256 and shows the judge the
+// response.
+func lintCustomJudgePrompt(s *schemas.Suite) string {
+	j := s.Judge
+	if j == nil || j.PromptVersion != "custom-v1" {
+		return ""
+	}
+	switch {
+	case j.PromptFile == "":
+		return "judge.prompt_file: custom-v1 needs the prompt file in the suite folder"
+	case j.PromptSHA256 == "":
+		return "judge.prompt_sha256: custom-v1 pins its prompt file by sha256"
+	}
+	b, err := utils.ReadFileInside(s.Root, j.PromptFile)
+	if err != nil {
+		return fmt.Sprintf("judge.prompt_file: %v", err)
+	}
+	if got := utils.SHA256Bytes(b); got != j.PromptSHA256 {
+		return fmt.Sprintf("judge.prompt_sha256: %s hashes to %s, not the pinned %s; review the change and update the pin", j.PromptFile, got, j.PromptSHA256)
+	}
+	if !strings.Contains(string(b), "{{response}}") {
+		return fmt.Sprintf("judge.prompt_file: %s has no {{response}}, so the judge would never see the answer", j.PromptFile)
+	}
+	return ""
 }

@@ -115,8 +115,11 @@
 		"gate": {
 			"pass": "Passed",
 			"fail": "Failed",
+			"inconclusive": "Inconclusive",
 			"no_baseline": "No baseline"
 		},
+		"gateChange": "Change {{change}} on {{tasks}} paired tasks (95% interval {{low}} to {{high}})",
+		"gateMde": "this size can detect about {{mde}} points",
 		"compared": "compared with {{name}}",
 		"comparedLive": "compared with the live version {{name}}",
 		"repeat": {

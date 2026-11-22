@@ -8,6 +8,7 @@ prompt_version?
 prompt_sha256?
 state
 detail
+caps
 set_sha256?
 labels
 human_labels

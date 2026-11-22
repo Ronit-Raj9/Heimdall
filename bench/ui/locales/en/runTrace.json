@@ -38,6 +38,13 @@
     "jsonl": "Agent log (JSONL)",
     "jsonlNote": "One step per line"
   },
+  "judgeCriteria": {
+    "title": "Judge criteria",
+    "score": "{{score}} of the weight met, {{need}} needed",
+    "weight": "weight {{weight}}",
+    "met": "Met",
+    "notMet": "Not met"
+  },
   "overview": {
     "agentSaid": "What the agent said vs what the grader found",
     "steps": "Steps",

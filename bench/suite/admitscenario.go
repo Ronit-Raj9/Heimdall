@@ -89,10 +89,15 @@ func (a *admitter) admitScenario(ctx context.Context, rec *schemas.AdmissionReco
 	for i, m := range paths.mutants {
 		controls = append(controls, mk(fmt.Sprintf("mutant_%d", i+1), GotFail, m))
 	}
+	abstain := false
 	if kind == utils.ControlAnswer {
-		wrong, err := a.wrongAnswers()
+		spec, err := a.answerSpec()
 		if err != nil {
 			return nil, err
+		}
+		var wrong []string
+		if spec != nil {
+			wrong, abstain = spec.WrongOnes, spec.Abstain
 		}
 		for i, w := range wrong {
 			controls = append(controls, a.answerControl(fmt.Sprintf("wrong_answer_%d", i+1), GotFail, w, "wrong answer from the answer spec"))
@@ -105,7 +110,7 @@ func (a *admitter) admitScenario(ctx context.Context, rec *schemas.AdmissionReco
 	controls = append(controls, exploit)
 	controls = append(controls,
 		control{name: "null_noop", want: GotFail, argv: []string{"true"}, files: map[string]string{}, detail: "noop"},
-		control{name: "null_refuse", want: GotFail, argv: []string{"sh", "-c", "echo \"" + refuseMessage + "\""}, files: map[string]string{}, detail: "refuse"},
+		nullRefuse(abstain),
 	)
 	image, err := a.controlImage(ctx)
 	for _, c := range controls {
@@ -159,10 +164,22 @@ func (a *admitter) answerControl(name, want, text, detail string) control {
 		files: map[string]string{controlAnswerPath: text}}
 }
 
-// wrongAnswers reads the wrong answers of the task's hidden AnswerSpec
-// (verifier.answer, else answer.yaml in the verifier tests folder). A task
-// without an answer file has none.
-func (a *admitter) wrongAnswers() ([]string, error) {
+// nullRefuse is the null refusal control. It must fail, except on an
+// abstention task (answer spec abstain: true, judged with qa-v1-abstain or
+// matched as "not known"): there declining is close to the right answer, so
+// the control runs and is recorded but either outcome admits.
+func nullRefuse(abstain bool) control {
+	c := control{name: "null_refuse", want: GotFail, argv: []string{"sh", "-c", "echo \"" + refuseMessage + "\""}, files: map[string]string{}, detail: "refuse"}
+	if abstain {
+		c.want, c.detail = WantPassOrFail, "refuse (abstention task: a refusal may pass)"
+	}
+	return c
+}
+
+// answerSpec reads the task's hidden AnswerSpec (verifier.answer, else
+// answer.yaml in the verifier tests folder). A task without an answer file
+// has none (nil).
+func (a *admitter) answerSpec() (*schemas.AnswerSpec, error) {
 	rp := a.t.Verifier.Answer
 	if rp == "" {
 		rp = path.Join(filepath.ToSlash(a.t.Verifier.Tests), defaultAnswerSpec)
@@ -180,7 +197,7 @@ func (a *admitter) wrongAnswers() ([]string, error) {
 	if err := dec.Decode(&spec); err != nil {
 		return nil, fmt.Errorf("admit task %s: answer spec %s: %w", a.t.ID, rp, err)
 	}
-	return spec.WrongOnes, nil
+	return &spec, nil
 }
 
 // controlImage is the image a control runs in: the task's own image when it
@@ -277,7 +294,7 @@ func (a *admitter) runControl(ctx context.Context, c control, image string) (che
 		// The grader's input is the agent's own result and it is incomplete:
 		// a fail, decided without running the verifier, as in a real run.
 		check.Got, check.Detail = GotFail, joinDetail(detail, fail)
-		check.Passed = check.Got == check.Want
+		check.Passed = wantMet(check.Want, check.Got)
 		a.deps.Logger.Info("admission check", "task", a.t.ID, "check", check.Name, "want", check.Want, "got", check.Got)
 		return check
 	}
