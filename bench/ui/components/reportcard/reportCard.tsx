@@ -37,6 +37,7 @@ import {
 	reliabilityCards,
 } from "./reportCard.utils";
 import { ReliabilityCards, ResilienceCard } from "./reliabilityCards";
+import { hasRedTeam, RedTeamSection } from "./redTeamSection";
 
 function costText(m: ReportArmMetrics): string {
 	const c = costDisplay(m);
@@ -140,6 +141,15 @@ export function ReportCard({ report: raw, className, actions, readOnly = false }
 			{report.safety && (Object.keys(report.safety.attack_resisted).length > 0 || Object.keys(report.safety.cheat_rate).length > 0) && (
 				<Section title="Safety" description="Attacks resisted (higher is better) and cheat rate (lower is better).">
 					<SafetyTable report={report} />
+				</Section>
+			)}
+
+			{hasRedTeam(report) && (
+				<Section
+					title="Red team"
+					description="Adaptive attacks (PAIR, tree of attacks, Crescendo) in the chat and in tool results, documents and emails. Share of attacks that got through (lower is better), with the 95% range."
+				>
+					<RedTeamSection report={report} />
 				</Section>
 			)}
 

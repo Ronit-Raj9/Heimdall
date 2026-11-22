@@ -171,3 +171,7 @@ Under a tool-safety probe, look at three numbers side by side:
 
 The importer for AgentDojo, which ships these as ready-made suites, is
 described in [importing-agentdojo.md](importing-agentdojo.md).
+
+## Adaptive attacks
+
+The probes on this page are fixed texts. For attacks that adapt to the agent's answers (PAIR, tree of attacks, Crescendo) in the chat and in tool results, documents and emails, and for regression tasks made from every attack that got through, see [red-team.md](red-team.md).

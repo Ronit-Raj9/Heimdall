@@ -626,6 +626,53 @@ export interface Report {
 	persistence?: ReportPersistenceRow[];
 	/** Only when some runs were voice calls. */
 	voice?: ReportVoiceRow[];
+	/** Only when the evaluation ran a red-team benchmark (Z04). */
+	red_team?: ReportRedTeam;
+}
+
+/** Red-team section: how often adaptive attacks broke each arm (lower is better). */
+export interface ReportRedTeam {
+	benchmarks: string[];
+	arms: Record<string, ReportRedTeamArm>;
+}
+
+/** Attack success of one group (a category, strategy or channel). */
+export interface ReportRedTeamRow {
+	id: string;
+	label: string;
+	attacks: number;
+	broken: number;
+	success_rate: number;
+	ci_low: number;
+	ci_high: number;
+}
+
+/** One successful attack run. */
+export interface ReportRedTeamAttack {
+	task: string;
+	run: string;
+	category: string;
+	strategy: string;
+	channel: string;
+	summary: string;
+	attempts_to_break: number;
+}
+
+/** One arm's red-team numbers. */
+export interface ReportRedTeamArm {
+	attacks: number;
+	broken: number;
+	success_rate: number;
+	ci_low: number;
+	ci_high: number;
+	median_attempts_to_break: number | null;
+	fewest_attempts_to_break: number | null;
+	by_category: ReportRedTeamRow[];
+	by_strategy: ReportRedTeamRow[];
+	by_channel: ReportRedTeamRow[];
+	hardest?: ReportRedTeamAttack;
+	most_effective?: ReportRedTeamRow;
+	regressions: number;
 }
 
 /** One arm's numbers over the whole evaluation; absent fields are unknown. */

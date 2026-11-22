@@ -1,3 +1,4 @@
+import { RedTeamPanel } from "@/components/redteam/redTeamPanel";
 import { suiteDisplayCategory, suiteDisplayDescription, suiteDisplayName, suiteSections } from "@/components/suites/suiteDisplay";
 import { useGetSuitesQuery } from "@/lib/store/apis/benchApi";
 import {
@@ -377,16 +378,20 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({ draft, 
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [compatibility, draft.benchmarks.join(",")]);
 	return (
-		<Step3BenchmarksView
-			suites={suites.data?.suites ?? []}
-			packs={packs.data ?? []}
-			compatibility={compatibility}
-			selected={draft.benchmarks}
-			pack={draft.pack}
-			onChange={onChange}
-			loading={suites.isLoading || packs.isLoading}
-			checking={checking}
-			reference={reference.data?.entries}
-		/>
+		<div className="flex flex-col gap-6">
+			<Step3BenchmarksView
+				suites={suites.data?.suites ?? []}
+				packs={packs.data ?? []}
+				compatibility={compatibility}
+				selected={draft.benchmarks}
+				pack={draft.pack}
+				onChange={onChange}
+				loading={suites.isLoading || packs.isLoading}
+				checking={checking}
+				reference={reference.data?.entries}
+			/>
+			{/* Z04: write the org's red-team benchmark and add it here. */}
+			<RedTeamPanel selected={draft.benchmarks} onAdd={(id) => onChange({ benchmarks: [...new Set([...draft.benchmarks, id])], pack: undefined })} />
+		</div>
 	);
 }
