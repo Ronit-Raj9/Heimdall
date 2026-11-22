@@ -2,9 +2,12 @@ import { CompareRefsForm } from "@/components/experiments/compareRefsForm";
 import { FollowUpJob } from "@/components/experiments/followUpJob";
 import { MigrateForm } from "@/components/experiments/migrateForm";
 import { ActionCard } from "@/components/experiments/compareActionCard";
+import { groupFaults } from "@/app/evaluate/views/step4Setup";
 import { Input } from "@/components/ui/input";
 import { useGetExperimentAdaptiveQuery } from "@/lib/store/apis/adaptiveApi";
-import { useGetSuitesQuery } from "@/lib/store/apis/benchApi";
+import { getBenchErrorMessage, useGetExperimentQuery, useGetSuitesQuery } from "@/lib/store/apis/benchApi";
+import { useGetBenchFaultsQuery } from "@/lib/store/apis/evaluationsApi";
+import type { ExperimentStatus } from "@/lib/types/bench";
 import { EXTEND_MAX_TASKS, EXTEND_MAX_TRIALS, type ExtendJobParams, type ProbeJobParams } from "@/lib/types/experimentActions";
 import { GitBranch, GitCompareArrows, Layers, Radar } from "lucide-react";
 import { useId, useState } from "react";
@@ -17,33 +20,56 @@ export interface ActionsTabProps {
 	suiteVersion?: string;
 }
 
+/** One setup of the experiment (fix wave 2, N66): read through a local type until ExperimentStatus carries it. */
+export interface ArmSetup {
+	arm: string;
+	agent: string;
+	agent_file: string;
+	model: string;
+}
+type StatusWithSetups = ExperimentStatus & { setups?: ArmSetup[] };
+
+const DECISIONS = ["score", "improved", "regressed", "inconclusive", "invalid"] as const;
+
+/** Plain words for a verdict decision (fix wave 2, N66); an unknown decision reads as is. */
+export function decisionText(decision: string, words: Record<(typeof DECISIONS)[number], string>): string {
+	const key = decision.toLowerCase();
+	return (DECISIONS as readonly string[]).includes(key) ? words[key as (typeof DECISIONS)[number]] : decision;
+}
+
 /**
  * The experiment's follow-up actions (web parity L14): extend (more tasks or trials, combined with
- * this analysis), a probe sweep over the suite's fault probes, and a model comparison. Each queues
- * a job that writes, freezes and starts a new experiment, then links it.
+ * this analysis), a fault test over the fault catalog and the suite's own probes, and a model
+ * comparison. Each queues a job that writes, freezes and starts a new experiment, then links it.
+ * Compare models and Compare two git refs start from setup A's agent and model.
  */
 export function ActionsTab({ expId, suite, suiteVersion }: ActionsTabProps) {
 	const { t } = useTranslation("experimentActions");
 	const { t: tu } = useTranslation("compareUx");
+	const status = useGetExperimentQuery(expId);
+	const setups = (status.data as StatusWithSetups | undefined)?.setups ?? [];
+	const first = setups.find((s) => s.arm === "A") ?? setups[0];
 	const suiteRef = suite ? (suiteVersion ? `${suite}@${suiteVersion}` : suite) : "";
+	// The forms read their initial values once: wait for the experiment so the prefill is not lost.
+	const formKey = first ? `${first.agent_file}|${first.model}` : "none";
 	return (
 		<div className="flex flex-col gap-3" data-testid="experiment-actions">
 			<p className="text-muted-foreground text-sm">{tu("actions.intro")}</p>
 			<ExtendCard expId={expId} />
 			<ProbeCard expId={expId} suite={suite} />
 			<ActionCard icon={GitCompareArrows} title={t("migrate.title")} description={t("migrate.description")} testId="actions-migrate">
-				<MigrateForm suite={suiteRef} testId="actions-migrate-form" />
+				<MigrateForm key={formKey} suite={suiteRef} initialAgent={first?.agent_file} initialFrom={first?.model} testId="actions-migrate-form" />
 			</ActionCard>
-			<CompareRefsCard suite={suiteRef} />
+			<CompareRefsCard key={formKey} suite={suiteRef} initialAgent={first?.agent_file} />
 		</div>
 	);
 }
 
-function CompareRefsCard({ suite }: { suite: string }) {
+function CompareRefsCard({ suite, initialAgent }: { suite: string; initialAgent?: string }) {
 	const { t } = useTranslation("refCompare");
 	return (
 		<ActionCard icon={GitBranch} title={t("compare.title")} description={t("compare.description")} testId="actions-compare-refs">
-			<CompareRefsForm suite={suite} testId="actions-compare-refs-form" />
+			<CompareRefsForm suite={suite} initialAgent={initialAgent} testId="actions-compare-refs-form" />
 		</ActionCard>
 	);
 }
@@ -62,7 +88,8 @@ function ExtendCard({ expId }: { expId: string }) {
 	const decision = adaptive.data?.decision ?? "";
 	const more = adaptive.data?.more_evidence;
 	const parent = adaptive.data?.extends;
-	const inconclusive = decision.toLowerCase() === "inconclusive";
+	// A one-setup score run has no verdict to firm up or overturn: extending it is always allowed.
+	const open = ["inconclusive", "score"].includes(decision.toLowerCase());
 	const params: ExtendJobParams | null = parent
 		? null
 		: {
@@ -76,11 +103,19 @@ function ExtendCard({ expId }: { expId: string }) {
 			title={t("extend.title")}
 			description={t("extend.description")}
 			testId="actions-extend"
-			defaultOpen={inconclusive && !parent}
+			defaultOpen={open && !parent}
 			status={
 				decision ? (
 					<span className="bg-muted text-muted-foreground mt-1 w-fit rounded-full px-2 py-0.5 text-xs" data-testid="actions-extend-decision">
-						{t("extend.decision", { decision })}
+						{t("extend.decision", {
+							decision: decisionText(decision, {
+								score: t("decisionWords.score"),
+								improved: t("decisionWords.improved"),
+								regressed: t("decisionWords.regressed"),
+								inconclusive: t("decisionWords.inconclusive"),
+								invalid: t("decisionWords.invalid"),
+							}),
+						})}
 					</span>
 				) : undefined
 			}
@@ -131,7 +166,7 @@ function ExtendCard({ expId }: { expId: string }) {
 								data-testid="actions-extend-count"
 							/>
 						</label>
-						{decision && !inconclusive && (
+						{decision && !open && (
 							<label className="flex items-center gap-2 text-sm">
 								<input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} data-testid="actions-extend-force" />
 								{t("extend.force")}
@@ -141,7 +176,7 @@ function ExtendCard({ expId }: { expId: string }) {
 				)}
 				<FollowUpJob
 					kind="experiment.extend"
-					params={params && (inconclusive || force || !decision) ? params : null}
+					params={params && (open || force || !decision) ? params : null}
 					label={t("extend.run")}
 					confirm={t("extend.confirm", { expId })}
 					missing={parent ? undefined : t("extend.notInconclusive")}
@@ -152,42 +187,82 @@ function ExtendCard({ expId }: { expId: string }) {
 	);
 }
 
+/**
+ * The fault test: the shared fault catalog (GET /faults, the same faults an evaluation offers),
+ * grouped, and below it the benchmark's own failure tests from its suite.yaml. Run stays off until
+ * one fault or failure test is ticked.
+ */
 function ProbeCard({ expId, suite }: { expId: string; suite?: string }) {
 	const { t } = useTranslation("experimentActions");
 	const uid = useId();
 	const suites = useGetSuitesQuery();
+	const catalog = useGetBenchFaultsQuery();
+	const [faults, setFaults] = useState<string[]>([]);
 	const [picked, setPicked] = useState<string[]>([]);
 	const [trials, setTrials] = useState(1);
 	const probes = suites.data?.suites.find((s) => s.id === suite)?.probes ?? [];
-	const toggle = (id: string) => setPicked((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+	const groups = groupFaults(catalog.data ?? []);
+	const flip = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 	const params: ProbeJobParams | null =
-		probes.length > 0
+		faults.length + picked.length > 0
 			? {
 					exp_id: expId,
 					trials: clamp(trials, EXTEND_MAX_TRIALS),
+					...(faults.length ? { faults } : {}),
 					...(picked.length ? { probes: picked } : {}),
 				}
 			: null;
+	const chip = "hover:bg-muted flex items-center gap-2 rounded-full border px-3 py-1";
 	return (
 		<ActionCard icon={Radar} title={t("probe.title")} description={t("probe.description")} testId="actions-probe">
 			<div className="flex flex-col gap-3">
-				{suites.isLoading ? (
+				{catalog.isLoading || suites.isLoading ? (
 					<div className="bg-muted h-16 animate-pulse rounded-lg" aria-label={t("probe.loading")} />
-				) : probes.length === 0 ? (
-					<p className="text-muted-foreground text-sm" data-testid="actions-probe-none">
-						{t("probe.none")}
-					</p>
 				) : (
 					<>
-						<fieldset className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-							<legend className="mb-1 text-sm font-medium">{t("probe.pick")}</legend>
-							{probes.map((p) => (
-								<label key={p.id} className="hover:bg-muted flex items-center gap-2 rounded-full border px-3 py-1">
-									<input type="checkbox" checked={picked.includes(p.id)} onChange={() => toggle(p.id)} data-testid={`actions-probe-${p.id}`} />
-									<span className="font-mono text-xs">{p.id}</span>
-								</label>
-							))}
-						</fieldset>
+						{catalog.isError ? (
+							<p role="alert" className="text-destructive text-sm" data-testid="actions-probe-catalog-error">
+								{t("probe.catalogError", { error: getBenchErrorMessage(catalog.error) })}
+							</p>
+						) : (
+							<fieldset className="flex flex-col gap-2 text-sm" data-testid="actions-probe-catalog">
+								<legend className="mb-1 text-sm font-medium">{t("probe.catalog")}</legend>
+								{groups.map((g) => (
+									<div key={g.group} className="flex flex-col gap-1" data-testid={`actions-probe-group-${g.group}`}>
+										<span className="text-muted-foreground text-xs font-medium">{g.group}</span>
+										<div className="flex flex-wrap gap-x-4 gap-y-2">
+											{g.faults.map((f) => (
+												<label key={f.id} className={chip} title={f.help}>
+													<input
+														type="checkbox"
+														checked={faults.includes(f.id)}
+														onChange={() => setFaults((cur) => flip(cur, f.id))}
+														data-testid={`actions-fault-${f.id}`}
+													/>
+													<span className="text-xs">{f.label}</span>
+												</label>
+											))}
+										</div>
+									</div>
+								))}
+							</fieldset>
+						)}
+						{probes.length > 0 && (
+							<fieldset className="flex flex-wrap gap-x-4 gap-y-2 text-sm" data-testid="actions-probe-own">
+								<legend className="mb-1 text-sm font-medium">{t("probe.own")}</legend>
+								{probes.map((p) => (
+									<label key={p.id} className={chip}>
+										<input
+											type="checkbox"
+											checked={picked.includes(p.id)}
+											onChange={() => setPicked((cur) => flip(cur, p.id))}
+											data-testid={`actions-probe-${p.id}`}
+										/>
+										<span className="font-mono text-xs">{p.id}</span>
+									</label>
+								))}
+							</fieldset>
+						)}
 						<label className="flex max-w-40 flex-col gap-1 text-sm" htmlFor={`${uid}-trials`}>
 							{t("probe.trials")}
 							<Input
@@ -201,7 +276,14 @@ function ProbeCard({ expId, suite }: { expId: string; suite?: string }) {
 						</label>
 					</>
 				)}
-				<FollowUpJob kind="probe.run" params={params} label={t("probe.run")} confirm={t("probe.confirm", { expId })} testId="actions-probe-job" />
+				<FollowUpJob
+					kind="probe.run"
+					params={params}
+					label={t("probe.run")}
+					confirm={t("probe.confirm", { expId })}
+					missing={t("probe.tickOne")}
+					testId="actions-probe-job"
+				/>
 			</div>
 		</ActionCard>
 	);
