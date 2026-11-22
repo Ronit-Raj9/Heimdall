@@ -79,6 +79,9 @@ describe("frameFor", () => {
 		expect(frameFor(LOCAL_SESSION, "/login")).toBe("auth");
 		expect(frameFor(signedOutSession(), "/verdict")).toBe("login");
 		expect(frameFor(signedOutSession(), "/invite/tok")).toBe("auth");
+		// G4-03: the public reference board never asks for a sign-in.
+		expect(frameFor(signedOutSession(), "/reference")).toBe("share");
+		expect(frameFor(signedOutSession(), "/references")).toBe("login");
 		expect(frameFor(signedOutSession(), "/s/org_a.shr_1.sig")).toBe("share");
 		expect(frameFor({ ...signedOutSession(), status: "error" }, "/s/org_a.shr_1.sig")).toBe("share");
 		expect(frameFor(demoSession(), "/verdict")).toBe("login");
