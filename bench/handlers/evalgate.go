@@ -231,7 +231,7 @@ func (g gateEnv) resolve(ctx context.Context, ev *schemas.Evaluation, evals []*s
 				cmp, shared := reportcard.CompareDatasets(src, ev, prev)
 				o := opt
 				o.Arms = []string{label}
-				o.Tasks = shared // nil when the benchmark did not change
+				o.Tasks = shared // nil when both ran the same tasks of the same versions
 				if br, err := reportcard.Build(ctx, src, prev, o); err == nil {
 					res.BaselineArm, res.BaselineVersion, res.BaselineReport = label, want, br
 					res.Baseline = &schemas.GateBaseline{Agent: res.Agent, Version: want, EvaluationID: prev.ID}

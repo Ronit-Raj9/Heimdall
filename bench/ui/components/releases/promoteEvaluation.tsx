@@ -16,7 +16,7 @@ import { Link } from "@tanstack/react-router";
 import { AlertTriangle, CalendarClock, CheckCircle2, Lock, Rocket, ShieldAlert, ShieldQuestion } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { DatasetChange, ReleaseEvidence, versionName } from "./releaseEvidence";
+import { DatasetChange, ReleaseEvidence, releaseTitle, versionName } from "./releaseEvidence";
 import "@/app/experiments_/$expId/views/fw11I18n";
 
 /** The gate's pass or fail as a badge with its summary and each check. Shown on the report card. */
@@ -103,8 +103,10 @@ export function gateCheckDetail(c: GateCheck, t: (k: string, o?: Record<string, 
 
 /** The headline of a preview: "codex v4 replaces v3" or "codex v4 becomes the first release". */
 export function previewTitle(p: EvaluationReleasePreview, t: (k: string, o?: Record<string, unknown>) => string): string {
-	const name = versionName(p.agent, p.version);
-	return p.replaces_version ? t("releases.replaces", { name, prev: `v${p.replaces_version}` }) : t("releases.first", { name });
+	return releaseTitle(
+		{ agent_id: p.agent, version: p.version, replaces_version: p.replaces_version, compared_version: p.baseline?.version, agent_config_id: "", arm: p.candidate },
+		t,
+	);
 }
 
 /**

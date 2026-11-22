@@ -31,7 +31,7 @@ type ReportDoc struct {
 }
 
 var capabilityNames = map[string]string{
-	"terminal": "Terminal", "coding": "Coding", "memory": "Memory", "support": "Customer support",
+	"terminal": "Terminal", "coding": "Coding", "memory": "Memory", "support": "Support and tool use",
 	"research": "Research", "voice": "Voice", "safety": "Safety", "team": "Teamwork", "gpu": "GPU",
 }
 
