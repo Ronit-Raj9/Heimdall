@@ -25,6 +25,7 @@ import (
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/auth"
+	"github.com/maximhq/bifrost/bench/benchcatalog"
 	"github.com/maximhq/bifrost/bench/connect"
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/keystore"
@@ -667,6 +668,10 @@ func (h *connectHandler) benchmarkInfos(ctx context.Context, cfg *schemas.AgentC
 	if err != nil {
 		return nil
 	}
+	hosted := h.env.Services.Hosted
+	examples := benchcatalog.ExampleSuiteIDs(benchcatalog.SourceRoot())
+	// A hidden practice suite is not this org's to run; drop it before the cap.
+	ids = slices.DeleteFunc(slices.Clone(ids), func(id string) bool { return benchcatalog.HidePracticeSuite(hosted, id) })
 	if len(ids) > 120 {
 		ids = ids[:120]
 	}
@@ -676,7 +681,8 @@ func (h *connectHandler) benchmarkInfos(ctx context.Context, cfg *schemas.AgentC
 		if err != nil || s == nil {
 			continue
 		}
-		info := connect.BenchmarkInfo{ID: id, Tasks: len(s.TaskIDs)}
+		// Practice examples (acme-*, coding-core) are the fallback only (B8.task).
+		info := connect.BenchmarkInfo{ID: id, Tasks: len(s.TaskIDs), Practice: PracticeBenchmark(id) || examples[id]}
 		ok, _, reason := evalCompat(cfg, s)
 		info.Compatible, info.Reason = ok, reason
 		info.NeedsModel = s.Judge != nil || s.Simulator != nil || s.Grading == "judged"
