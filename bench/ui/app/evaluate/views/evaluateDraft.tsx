@@ -141,7 +141,7 @@ export function specToPatch(spec: EvaluationSpec): Partial<EvaluateDraft> {
 		budgetUsd: spec.budget_usd ?? null,
 		worker: spec.worker ?? "",
 		concurrency: spec.concurrency ?? null,
-		preset: spec.preset ?? null,
+		preset: spec.preset === "first_look" ? null : (spec.preset ?? null), // first_look (Connect box) is not a wizard size preset
 	};
 }
 

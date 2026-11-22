@@ -13,7 +13,8 @@ func TestVoicePlatformTemplates(t *testing.T) {
 	for _, tpl := range agentTemplates {
 		order += tpl.ID + ","
 	}
-	if !strings.Contains(order, "openai-endpoint,vapi-assistant,retell-agent,elevenlabs-agent,voice-websocket,wrap-app,") {
+	// Real-time voice (lane Z08) sits before the hosted voice platforms.
+	if !strings.Contains(order, "openai-endpoint,livekit-agent,phone-number,vapi-assistant,retell-agent,elevenlabs-agent,voice-websocket,wrap-app,") {
 		t.Fatalf("gallery order %s", order)
 	}
 	cases := []struct {
