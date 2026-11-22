@@ -1,4 +1,7 @@
+import type { DatasetComparison } from "@/lib/types/bench";
 import { benchApi } from "./benchApi";
+
+export type { DatasetBenchmark, DatasetComparison } from "@/lib/types/bench";
 
 /**
  * Agent-first benchmarking (audit/AGENTFIRST_CONTRACT.md, lanes A01-A19): capabilities, agent
@@ -185,6 +188,8 @@ export interface EvaluationGateResult {
 	checks: GateCheck[];
 	summary: string;
 	decided_at: string;
+	/** Set when the baseline comes from another evaluation: did the benchmark change since. */
+	dataset?: DatasetComparison;
 }
 
 export interface EvaluationSkippedTask {
@@ -208,6 +213,11 @@ export interface EvaluationChild {
 	/** The spend cap stopped it with runs left; `not_started` counts them. */
 	budget_stopped?: boolean;
 	not_started?: number;
+	/** The benchmark version this child ran, fixed at launch. */
+	suite_version?: string;
+	lock_hash?: string;
+	tasks?: string[];
+	task_hashes?: Record<string, string>;
 }
 
 export interface Evaluation {

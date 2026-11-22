@@ -113,6 +113,20 @@ type evalResolution struct {
 	// failOnInconclusive is the gate's fail_on_inconclusive: an
 	// inconclusive gate blocks a release.
 	failOnInconclusive bool
+	// Dataset compares the benchmark versions of a baseline from another
+	// evaluation (Y07). When they differ, CompareReport and BaselineReport
+	// are both built over the tasks the two share, and every comparison
+	// reads those; Report stays the candidate's full report card.
+	Dataset       *schemas.DatasetComparison
+	CompareReport *reportcard.Report
+}
+
+// compareReport is the candidate report a comparison reads.
+func (r *evalResolution) compareReport() *reportcard.Report {
+	if r.CompareReport != nil {
+		return r.CompareReport
+	}
+	return r.Report
 }
 
 // gateEnv is what a resolution reads: the org's services and root.
@@ -214,11 +228,23 @@ func (g gateEnv) resolve(ctx context.Context, ev *schemas.Evaluation, evals []*s
 		}
 		if want > 0 {
 			if prev, label := previousRun(evals, ev, res.Agent, want); prev != nil {
+				cmp, shared := reportcard.CompareDatasets(src, ev, prev)
 				o := opt
 				o.Arms = []string{label}
+				o.Tasks = shared // nil when the benchmark did not change
 				if br, err := reportcard.Build(ctx, src, prev, o); err == nil {
 					res.BaselineArm, res.BaselineVersion, res.BaselineReport = label, want, br
 					res.Baseline = &schemas.GateBaseline{Agent: res.Agent, Version: want, EvaluationID: prev.ID}
+					res.Dataset = cmp
+					if shared != nil {
+						co := opt
+						co.Tasks = shared
+						cr, err := reportcard.Build(ctx, src, ev, co)
+						if err != nil {
+							return nil, err
+						}
+						res.CompareReport = cr
+					}
 				}
 			}
 		}
@@ -261,21 +287,27 @@ func (g gateEnv) judge(ev *schemas.Evaluation, r *evalResolution) *schemas.Evalu
 	}
 	return reportcard.JudgeGate(reportcard.GateInput{
 		Gate: *ev.Spec.Gate, Agent: r.Agent, Candidate: r.Candidate, CandidateVersion: r.CandidateVersion,
-		Report: r.Report, Baseline: r.Baseline, BaselineArm: r.BaselineArm, BaselineReport: r.BaselineReport, Now: g.now(),
+		Report: r.Report, CompareReport: r.CompareReport, Baseline: r.Baseline, BaselineArm: r.BaselineArm, BaselineReport: r.BaselineReport,
+		Dataset: r.Dataset, Now: g.now(),
 	})
 }
 
 // summary is the release summary of a resolution: the candidate and the
 // baseline with their numbers, and the per-capability scores.
 func (r *evalResolution) summary() *schemas.ReleaseSummary {
-	out := &schemas.ReleaseSummary{Candidate: reportcard.Side(r.Report, r.Candidate), Note: r.Note}
+	cand := r.compareReport() // the shared tasks only when the benchmark changed since the baseline
+	out := &schemas.ReleaseSummary{Candidate: reportcard.Side(cand, r.Candidate), Note: r.Note, Dataset: r.Dataset}
 	out.Candidate.Version = r.CandidateVersion
 	if r.BaselineReport != nil {
 		b := reportcard.Side(r.BaselineReport, r.BaselineArm)
 		b.Version = r.BaselineVersion
 		out.Baseline = &b
 	}
-	out.Capabilities = reportcard.CapabilityScores(r.Report, r.Candidate, r.BaselineReport, r.BaselineArm)
+	out.Capabilities = reportcard.CapabilityScores(cand, r.Candidate, r.BaselineReport, r.BaselineArm)
+	if r.Dataset != nil && r.Dataset.Changed {
+		out.Note = strings.TrimSpace(strings.TrimSuffix(out.Note+". "+r.Dataset.Summary, ". "))
+		out.Note = strings.TrimPrefix(out.Note, ". ")
+	}
 	return out
 }
 

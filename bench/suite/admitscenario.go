@@ -1,12 +1,10 @@
 package suite
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -14,7 +12,6 @@ import (
 
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
-	"gopkg.in/yaml.v3"
 )
 
 // Paths and limits of script and answer controls.
@@ -97,7 +94,7 @@ func (a *admitter) admitScenario(ctx context.Context, rec *schemas.AdmissionReco
 		}
 		var wrong []string
 		if spec != nil {
-			wrong, abstain = spec.WrongOnes, spec.Abstain
+			wrong, abstain = spec.AllWrong(), spec.Abstain
 		}
 		for i, w := range wrong {
 			controls = append(controls, a.answerControl(fmt.Sprintf("wrong_answer_%d", i+1), GotFail, w, "wrong answer from the answer spec"))
@@ -180,24 +177,11 @@ func nullRefuse(abstain bool) control {
 // answer.yaml in the verifier tests folder). A task without an answer file
 // has none (nil).
 func (a *admitter) answerSpec() (*schemas.AnswerSpec, error) {
-	rp := a.t.Verifier.Answer
-	if rp == "" {
-		rp = path.Join(filepath.ToSlash(a.t.Verifier.Tests), defaultAnswerSpec)
-	}
-	b, err := utils.ReadFileInside(a.t.Dir, rp)
-	if errors.Is(err, os.ErrNotExist) && a.t.Verifier.Answer == "" {
-		return nil, nil
-	}
+	spec, err := utils.TaskAnswerSpec(a.t)
 	if err != nil {
-		return nil, fmt.Errorf("admit task %s: answer spec: %w", a.t.ID, err)
+		return nil, fmt.Errorf("admit task %s: %w", a.t.ID, err)
 	}
-	var spec schemas.AnswerSpec
-	dec := yaml.NewDecoder(bytes.NewReader(b))
-	dec.KnownFields(true)
-	if err := dec.Decode(&spec); err != nil {
-		return nil, fmt.Errorf("admit task %s: answer spec %s: %w", a.t.ID, rp, err)
-	}
-	return &spec, nil
+	return spec, nil
 }
 
 // controlImage is the image a control runs in: the task's own image when it

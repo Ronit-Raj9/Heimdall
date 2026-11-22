@@ -1174,13 +1174,17 @@ func (p *Planner) checkUpstreams(ctx context.Context, m *schemas.Manifest, extra
 	if p.upstreams == nil {
 		return nil
 	}
-	if m.Experiment.NoPaidTraffic() {
+	if !m.Experiment.JudgeMayCall() {
 		// Every model call of a smoke or scripted_upstream experiment is
 		// answered by the scripted model, so no real provider has to be
-		// reachable (QC2-15-03).
+		// reachable (QC2-15-03). With paid_judge the judges' providers (in
+		// extra) still must be.
 		return nil
 	}
-	used := armProviders(m)
+	used := map[string][]string{}
+	if !m.Experiment.NoPaidTraffic() { // paid_judge: the arms stay scripted, only the judges call
+		used = armProviders(m)
+	}
 	for _, prov := range sortedKeys(extra) {
 		used[prov] = append(used[prov], extra[prov]...)
 	}
@@ -1248,9 +1252,10 @@ func armProviders(m *schemas.Manifest) map[string][]string {
 // on a real provider: judges are skipped and services are scripted.
 func evaluatorProviders(e *schemas.Experiment, suite *schemas.Suite, all []condPlan) map[string][]string {
 	out := map[string][]string{}
-	if e == nil || suite == nil || e.NoPaidTraffic() {
+	if e == nil || suite == nil || !e.JudgeMayCall() {
 		return out
 	}
+	judgesOnly := e.NoPaidTraffic() // paid_judge: the judges call, services stay scripted
 	seen := map[string]bool{}
 	add := func(prov, who string) {
 		if prov == "" || seen[prov+"\x00"+who] {
@@ -1272,7 +1277,7 @@ func evaluatorProviders(e *schemas.Experiment, suite *schemas.Suite, all []condP
 		}
 	}
 	for _, s := range suite.Services {
-		if g := simuser.GatewayFor(s, sim); g != nil {
+		if g := simuser.GatewayFor(s, sim); g != nil && !judgesOnly {
 			add(g.Provider, "service "+s.ID)
 		}
 	}
@@ -1287,7 +1292,7 @@ func evaluatorProviders(e *schemas.Experiment, suite *schemas.Suite, all []condP
 		}
 		visual(out, "vision judge (task "+id+")")
 		for _, s := range t.Services {
-			if g := simuser.GatewayFor(s, sim); g != nil {
+			if g := simuser.GatewayFor(s, sim); g != nil && !judgesOnly {
 				add(g.Provider, "service "+s.ID+" (task "+id+")")
 			}
 		}

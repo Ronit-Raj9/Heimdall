@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -27,17 +29,35 @@ type planBridgeLauncher struct {
 func (f *planBridgeLauncher) Plan(_ context.Context, e *schemas.Experiment) (*schemas.Manifest, error) {
 	f.planned = append(f.planned, e)
 	m := &schemas.Manifest{ExpID: "e_hostedtest"}
+	if len(f.planned) > 1 {
+		m.ExpID = fmt.Sprintf("e_hostedtest%d", len(f.planned))
+	}
 	for _, id := range e.Conditions[0].Tasks.IDs {
-		for _, arm := range []string{admitArmOracle, admitArmNoop} {
+		for _, arm := range sortedArmIDs(e) {
 			m.Slots = append(m.Slots, schemas.Slot{Task: id, Arm: arm, Counted: true})
 		}
 	}
 	return m, nil
 }
 
+func sortedArmIDs(e *schemas.Experiment) []string {
+	ids := make([]string, 0, len(e.Arms))
+	for id := range e.Arms {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+// isReferenceArm is an arm that runs the reference (wants a pass).
+func isReferenceArm(arm string) bool {
+	return arm == admitArmOracle || strings.HasPrefix(arm, "reference_")
+}
+
 // hostedBridgeEnv builds an org-like job env over the project initQuickRepo
-// wrote, with the runner check and sealed-run read stubbed: every oracle run
-// ends oracle and every noop run ends noop.
+// wrote, with the runner check and sealed-run read stubbed: every reference
+// run ends oracle and every other control (empty, mutants, wrong answers,
+// exploit, noop, refuse) ends noop.
 func hostedBridgeEnv(t *testing.T, oracle, noop schemas.Outcome) (jobEnv, *planBridgeLauncher) {
 	t.Helper()
 	a, err := newApp(context.Background(), defaultConfig, appOptions{})
@@ -60,10 +80,23 @@ func hostedBridgeEnv(t *testing.T, oracle, noop schemas.Outcome) (jobEnv, *planB
 	bridgeRequireRunner = func(handlers.Launcher) error { return nil }
 	bridgeSealedRuns = func(_ context.Context, _ jobEnv, expID string) ([]bridgeRun, error) {
 		var out []bridgeRun
-		for _, e := range l.planned {
+		for i, e := range l.planned {
+			if want := "e_hostedtest"; i > 0 {
+				want = fmt.Sprintf("e_hostedtest%d", i+1)
+				if want != expID {
+					continue
+				}
+			} else if expID != want {
+				continue
+			}
 			for _, id := range e.Conditions[0].Tasks.IDs {
-				out = append(out, bridgeRun{Task: id, Arm: admitArmOracle, Outcome: string(oracle), RunID: expID + "-a"},
-					bridgeRun{Task: id, Arm: admitArmNoop, Outcome: string(noop), RunID: expID + "-b"})
+				for _, arm := range sortedArmIDs(e) {
+					o := noop
+					if isReferenceArm(arm) {
+						o = oracle
+					}
+					out = append(out, bridgeRun{Task: id, Arm: arm, Outcome: string(o), RunID: expID + "-" + arm})
+				}
 			}
 		}
 		return out, nil
@@ -115,8 +148,23 @@ func TestHostedSuiteAdmitWritesLock(t *testing.T) {
 		t.Fatalf("lock does not admit %s: %+v", id, s.Lock)
 	}
 	rec := s.Lock.Tasks[id].Admission
-	if rec.Fingerprint == "" || len(rec.Checks) != 3 || !strings.Contains(rec.Checks[1].Detail, "e_hostedtest") {
+	names := map[string]bool{}
+	for _, c := range rec.Checks {
+		names[c.Name] = true
+		if !c.Passed {
+			t.Errorf("check %s failed: %+v", c.Name, c)
+		}
+	}
+	for _, n := range []string{suite.StaticValidationCheck, "reference_1", "reference_2", "reference_3", "empty_patch", "exploit", "null_noop", "null_refuse", "instruction_edited", "secret_scan", "verifier_no_network"} {
+		if !names[n] {
+			t.Errorf("record has no %s check: %+v", n, rec.Checks)
+		}
+	}
+	if rec.Fingerprint == "" || rec.ReferenceRepeats != 3 || len(rec.ReferenceResults) != 3 || !strings.Contains(rec.Checks[1].Detail, "e_hostedtest") {
 		t.Fatalf("record %+v", rec)
+	}
+	if e := l.planned[0]; e.PaidJudge || len(e.Arms) < 7 {
+		t.Fatalf("a tests benchmark's check needs every control arm and no paid judge: %+v", e.Arms)
 	}
 	if ok, err := admissionCurrent(context.Background(), env.App, "lib", id); err != nil || !ok {
 		t.Fatalf("admission not current after a re-lock: %v %v", ok, err)
@@ -146,8 +194,16 @@ func TestHostedSuiteAdmitRecordsRefusal(t *testing.T) {
 		t.Fatal(err)
 	}
 	tl := s.Lock.Tasks[id]
-	if tl.Status != schemas.TaskDraft || tl.Admission == nil || tl.Admission.Admitted || tl.Admission.Checks[2].Passed {
+	if tl.Status != schemas.TaskDraft || tl.Admission == nil || tl.Admission.Admitted {
 		t.Fatalf("lock entry %+v", tl)
+	}
+	for _, c := range tl.Admission.Checks {
+		if c.Name == "null_noop" && (c.Passed || c.Got != suite.GotPass) {
+			t.Fatalf("noop check %+v", c)
+		}
+	}
+	if r := out.(*hostedAdmitReport).Tasks[0].Reason; !strings.Contains(r, "passed: the check accepts") {
+		t.Fatalf("reason %q", r)
 	}
 }
 

@@ -172,7 +172,7 @@ func (g *visualGrader) Grade(ctx context.Context, rc *schemas.RunContext, diff *
 			return nil, fmt.Errorf("visual: %w", err)
 		}
 	}
-	if spec.Rubric != "" && rc.NoPaidTraffic {
+	if spec.Rubric != "" && rc.JudgeBlocked() {
 		// A no-paid-traffic run (agent check, smoke, scripted_upstream)
 		// never mints an unscripted judge key: the rubric is not judged.
 		grade.InvalidEvaluator, grade.Reason = true, NoPaidJudgeReason

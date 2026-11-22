@@ -42,8 +42,28 @@ From a repository (**Ops** tab, needs a GitHub connection or a local folder):
 ## Admit
 
 **Ops** tab, **Checks and admission**: **Lint**, **Lock**, **Admit all
-tasks**. Admission proves each task: the reference solution passes and the
-untouched repo fails. Hosted: admission runs as an experiment on a runner.
+tasks**. Admission proves each task: the reference solution passes three
+times; the empty answer, every near miss and every wrong answer fail; a
+gaming attempt scores nothing; doing nothing and refusing fail. Hosted:
+the same controls run as one experiment on the organization's worker, and
+the record holds the same check names as a local `suite admit`. Two checks
+only run locally (the honest solution of an impossible task, stale project
+notes); hosted records them as "not run on this worker".
+
+Judged benchmarks: the judge must grade the controls, so hosted readiness
+checks call the pinned judge model on the organization's own key. The Build
+tab shows about how many calls (three reference runs plus each near miss and
+wrong answer that reaches the judge, times the votes) and asks for consent
+first; the job refuses without it (`judge_consent`).
+
+Judged rows need a wrong answer the judge actually sees: an empty answer, a
+refusal or text aimed at the grader fails before the judge is asked. When a
+row names no wrong answers, the import writes some from the row
+(`generated_wrong_answers` in `verifier/answer.yaml`): the reference with a
+number changed, a statement negated, yes and no flipped, another row's
+answer, and for a rubric one reply per criterion that misses it. A task
+written from your rows without one is a lint error; any other judged task
+gets a warning, so library benchmarks keep their admissions.
 
 ## Quarantine
 

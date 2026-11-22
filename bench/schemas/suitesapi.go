@@ -94,10 +94,26 @@ type SuiteSummary struct {
 	LockKind         string             `json:"lock_kind,omitempty"`
 	FingerprintDrift []FingerprintDrift `json:"fingerprint_drift,omitempty"`
 
+	// Judge is the pinned judge of a judged suite, with what its readiness
+	// check costs in judge calls (Y07: the Build tab asks for consent with
+	// that number); nil for a verified suite.
+	Judge *SuiteJudge `json:"judge,omitempty"`
+
 	// U3: the suite's tiers (docs/suite-tiers.md), pr, nightly and headroom
 	// first, then the others by name. nightly is listed even when suite.yaml
 	// does not define it, as every task.
 	Tiers []SuiteTier `json:"tiers,omitempty"`
+}
+
+// SuiteJudge is a judged suite's pinned judge on the suites API.
+type SuiteJudge struct {
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+	Votes    int    `json:"votes"` // calls per judged grade (votes, doubled with an auditor)
+	// ReadinessCalls is about how many judge calls the readiness check of
+	// every task makes: three reference runs plus every near miss and wrong
+	// answer that reaches the judge, times Votes.
+	ReadinessCalls int `json:"readiness_calls"`
 }
 
 // SuiteTier is one tier of a suite: a named task subset an experiment can

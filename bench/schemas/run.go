@@ -234,6 +234,10 @@ type RunContext struct {
 	// scripted_upstream). Parts that would mint their own gateway keys (model
 	// judges) refuse instead of calling.
 	NoPaidTraffic bool
+	// PaidJudge is set with NoPaidTraffic when the experiment lets its model
+	// judges call their real provider anyway (Experiment.PaidJudge): the
+	// agent's calls stay scripted, the judges' do not.
+	PaidJudge bool
 
 	// Scenario state (scenario.go), set by the engine as the run proceeds.
 	Services     []ServiceHandle // started services, including the tool proxy's view of them
@@ -300,4 +304,11 @@ func ReconcileOutcomeMetric(metric string, v Value, outcome Outcome) Value {
 		return v
 	}
 	return Unknown("run outcome "+string(outcome)+" does not score", v.Evidence)
+}
+
+// JudgeBlocked reports whether a model judge of this run must refuse to call
+// its provider: a no-paid-traffic run whose experiment does not allow paid
+// judges (Experiment.PaidJudge).
+func (rc *RunContext) JudgeBlocked() bool {
+	return rc != nil && rc.NoPaidTraffic && !rc.PaidJudge
 }

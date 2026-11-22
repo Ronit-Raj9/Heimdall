@@ -37,8 +37,15 @@ type Experiment struct {
 	// ScriptedUpstream makes the fault proxy answer every model call of the
 	// experiment's runs from its scripted model, as Smoke does, without
 	// relaxing the lock checks. A run that cannot be held to it is refused.
-	ScriptedUpstream bool   `json:"scripted_upstream,omitempty" yaml:"scripted_upstream"`
-	External         string `json:"external,omitempty" yaml:"external"` // live | record | replay: overrides every external API's mode for this experiment's runs
+	ScriptedUpstream bool `json:"scripted_upstream,omitempty" yaml:"scripted_upstream"`
+	// PaidJudge lets the suite's model judges (the text judge, its auditor
+	// and vision judges) call their real provider on the organization's own
+	// key in a smoke or scripted_upstream experiment, whose every other model
+	// call stays scripted. The hosted readiness check of a judged benchmark
+	// sets it after the organization agreed to the judge calls; without it
+	// such a judge refuses and grades invalid_evaluator.
+	PaidJudge bool   `json:"paid_judge,omitempty" yaml:"paid_judge"`
+	External  string `json:"external,omitempty" yaml:"external"` // live | record | replay: overrides every external API's mode for this experiment's runs
 	// Fairness is a comparison rule the planner and the verdict enforce
 	// (agents.go): equal_budget, or empty for none.
 	Fairness string `json:"fairness,omitempty" yaml:"fairness"`
@@ -650,4 +657,11 @@ type MemberManifest struct {
 // or one that sets scripted_upstream.
 func (e *Experiment) NoPaidTraffic() bool {
 	return e != nil && (e.Smoke || e.ScriptedUpstream)
+}
+
+// JudgeMayCall reports whether a model judge of the experiment's runs may
+// call its real provider: always outside no-paid-traffic, and inside it only
+// with PaidJudge.
+func (e *Experiment) JudgeMayCall() bool {
+	return e == nil || !e.NoPaidTraffic() || e.PaidJudge
 }

@@ -218,7 +218,7 @@ func (g *judge) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas
 			return grade, nil
 		}
 	}
-	if rc.NoPaidTraffic {
+	if rc.JudgeBlocked() {
 		// The judge's own key is not bound to the scripted model, so on a
 		// run promised to cost nothing the model judge refuses to call.
 		grade.InvalidEvaluator, grade.Reason = true, NoPaidJudgeReason
@@ -324,7 +324,7 @@ type scorer func(reply string) string
 // voteReplies is vote that also returns each vote's raw reply, which the
 // rubric prompt (bigfinancebench-v1) scores after the tally.
 func (g *judge) voteReplies(ctx context.Context, rc *schemas.RunContext, spec schemas.JudgeSpec, prompt string, sc scorer) (*schemas.JudgeRecord, []string, error) {
-	if rc.NoPaidTraffic { // also the auditor (judgecalibration.go)
+	if rc.JudgeBlocked() { // also the auditor (judgecalibration.go)
 		return nil, nil, errors.New(NoPaidJudgeReason)
 	}
 	name := rc.Run.RunID + "j" + strings.TrimPrefix(utils.NewID("j", judgeKeySuffixLen), "j_")

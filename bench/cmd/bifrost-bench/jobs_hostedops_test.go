@@ -108,31 +108,11 @@ func TestBridgeCheckVerdict(t *testing.T) {
 	}
 }
 
-func TestBridgeAdmitVerdict(t *testing.T) {
-	runs := []bridgeRun{
-		{Task: "t01", Arm: "A", Outcome: "pass"}, {Task: "t01", Arm: "B", Outcome: "fail"},
-		{Task: "t02", Arm: "A", Outcome: "fail"}, {Task: "t02", Arm: "B", Outcome: "fail"},
-		{Task: "t03", Arm: "A", Outcome: "pass"}, {Task: "t03", Arm: "B", Outcome: "pass"},
-	}
-	got := admitVerdict(runs, []string{"t01", "t02", "t03", "t04"})
-	want := map[string]bool{"t01": true, "t02": false, "t03": false, "t04": false}
-	if len(got) != 4 {
-		t.Fatalf("got %d tasks", len(got))
-	}
-	for _, g := range got {
-		if g.Admitted != want[g.Task] {
-			t.Errorf("%s admitted=%v (%s)", g.Task, g.Admitted, g.Reason)
-		}
-		if !g.Admitted && g.Reason == "" {
-			t.Errorf("%s refused without a reason", g.Task)
-		}
-	}
-}
-
 func TestBridgeExperimentsArePlannable(t *testing.T) {
+	s, tasks := readinessFixture(t)
 	for _, e := range []*schemas.Experiment{
 		checkExperiment("agents/my-agent.yaml", "coding-core@1.0.0", "t01"),
-		admitExperiment(hostedSuiteAdmitParams{Suite: "coding-core", Oracle: bridgeOracleAgent, Noop: bridgeNoopAgent}),
+		readinessExperiment("qa", bridgeOracleAgent, bridgeNoopAgent, s, tasks, schemas.SplitPublic, false),
 	} {
 		if !e.NoPaidTraffic() || !e.Smoke {
 			t.Errorf("%s: must be a scripted smoke experiment", e.Name)
@@ -140,11 +120,6 @@ func TestBridgeExperimentsArePlannable(t *testing.T) {
 		if _, ok := e.Arms["A"]; !ok {
 			t.Errorf("%s: no arm A", e.Name)
 		}
-	}
-	// The admission compares oracle (A) and noop (B); the agent check is
-	// one arm scored on its own, with no hidden repeat.
-	if e := admitExperiment(hostedSuiteAdmitParams{Suite: "coding-core", Oracle: bridgeOracleAgent, Noop: bridgeNoopAgent}); len(e.Arms) != 2 {
-		t.Errorf("admit arms %v", e.Arms)
 	}
 	if e := checkExperiment("agents/my-agent.yaml", "coding-core", "t01"); len(e.Arms) != 1 {
 		t.Errorf("check arms %v, want one", e.Arms)

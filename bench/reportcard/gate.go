@@ -28,10 +28,16 @@ type GateInput struct {
 	Candidate        string // arm label in Report
 	CandidateVersion int
 	Report           *Report
-	Baseline         *schemas.GateBaseline // nil: no baseline found
-	BaselineArm      string                // arm label in BaselineReport
-	BaselineReport   *Report
-	Now              time.Time
+	// CompareReport is the candidate over the tasks it shares with the
+	// baseline when the benchmark changed since (CompareDatasets); the
+	// regression checks read it. nil uses Report.
+	CompareReport *Report
+	// Dataset is what CompareDatasets found; it is recorded on the result.
+	Dataset        *schemas.DatasetComparison
+	Baseline       *schemas.GateBaseline // nil: no baseline found
+	BaselineArm    string                // arm label in BaselineReport
+	BaselineReport *Report
+	Now            time.Time
 }
 
 // scoreOf returns an arm's clean score on a capability ("all" is the pooled
@@ -76,7 +82,11 @@ func pts(x float64) string { return fmt.Sprintf("%.0f%%", x*100) }
 func JudgeGate(in GateInput) *schemas.EvaluationGateResult {
 	res := &schemas.EvaluationGateResult{
 		Agent: in.Agent, Candidate: in.Candidate, CandidateVersion: in.CandidateVersion,
-		Baseline: in.Baseline, Checks: []schemas.GateCheck{}, DecidedAt: in.Now.UTC(),
+		Baseline: in.Baseline, Checks: []schemas.GateCheck{}, DecidedAt: in.Now.UTC(), Dataset: in.Dataset,
+	}
+	cand := in.Report
+	if in.CompareReport != nil {
+		cand = in.CompareReport
 	}
 	caps := make([]string, 0, len(in.Gate.MinScore))
 	for c := range in.Gate.MinScore {
@@ -109,7 +119,9 @@ func JudgeGate(in GateInput) *schemas.EvaluationGateResult {
 		if in.Baseline == nil || in.BaselineReport == nil {
 			noBaseline = true
 		} else {
-			res.Checks = append(res.Checks, regressionChecks(in)...)
+			rin := in
+			rin.Report = cand // Y07: the tasks both sides share when the benchmark changed
+			res.Checks = append(res.Checks, regressionChecks(rin)...)
 		}
 	}
 	var failed, unsure []string
@@ -137,6 +149,9 @@ func JudgeGate(in GateInput) *schemas.EvaluationGateResult {
 		if len(res.Checks) == 0 {
 			res.Summary = "Gate passed: no rule set"
 		}
+	}
+	if in.Dataset != nil && in.Dataset.Changed && in.Gate.MaxRegression > 0 && res.State != schemas.GateNoBaseline {
+		res.Summary += ". " + in.Dataset.Summary // the regression checks read the shared tasks only
 	}
 	return res
 }

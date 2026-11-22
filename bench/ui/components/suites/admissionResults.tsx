@@ -50,7 +50,7 @@ function checksOf(v: unknown): ReadinessCheck[] {
 /**
  * The per-task results of a suite.admit job, from either result shape: local admission
  * ({tasks: {id: record}, order, problems}) or hosted admission on a worker
- * ({tasks: [{task, oracle, noop, admitted, reason}]}). Null when the result holds neither.
+ * ({tasks: [{task, oracle, noop, admitted, reason, checks}]}). Null when the result holds neither.
  */
 export function readinessReport(result: unknown): ReadinessReport | null {
 	if (!isObj(result)) return null;
@@ -64,14 +64,19 @@ export function readinessReport(result: unknown): ReadinessReport | null {
 			tasks: tasks.filter(isObj).map((t) => {
 				const right = str(t.oracle);
 				const blank = str(t.noop);
+				const full = checksOf(t.checks);
 				return {
 					task: str(t.task),
 					ready: t.admitted === true,
 					reason: str(t.reason) || undefined,
-					checks: [
-						{ name: "reference_0", want: "pass", got: right, passed: right === "pass" },
-						{ name: "empty_control", want: "fail", got: blank, passed: blank !== "" && blank !== "pass" },
-					],
+					// A worker that ran the full control set reports every check by name; an older one
+					// reported the right answer and the do-nothing control only.
+					checks: full.length
+						? full
+						: [
+								{ name: "reference_0", want: "pass", got: right, passed: right === "pass" },
+								{ name: "empty_control", want: "fail", got: blank, passed: blank !== "" && blank !== "pass" },
+							],
 				};
 			}),
 		};
@@ -90,6 +95,9 @@ export function readinessReport(result: unknown): ReadinessReport | null {
 	}
 	return problems.length ? { tasks: [], problems } : null;
 }
+
+/** The got value of a check the worker could not run (cmd/bifrost-bench jobs_hostedreadiness.go). */
+const NOT_RUN = "not_run";
 
 /** A check's name in plain words: "Wrong answer 2 is caught", "The right answer passes". */
 /** A translate function, loose enough for any namespace's t. */
@@ -171,7 +179,7 @@ export function ReadinessResults({ report }: { report: ReadinessReport }) {
 												</td>
 												<td className="py-0.5 pr-3 align-top">{checkLabel(c.name, t as unknown as LabelT)}</td>
 												<td className="text-muted-foreground py-0.5 align-top">
-													{c.got ? t("readiness.got", { got: c.got, want: c.want }) : null}
+													{c.got === NOT_RUN ? t("readiness.notRun") : c.got ? t("readiness.got", { got: c.got, want: c.want }) : null}
 													{c.detail ? <span className="block break-words">{c.detail}</span> : null}
 												</td>
 											</tr>

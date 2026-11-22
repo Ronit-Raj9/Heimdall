@@ -23,7 +23,18 @@ const (
 	ScriptedTeam      = "team"      // every team member runs teamcontrol.py: the lead sends tasks through the mailbox, workers write files and reply
 	ScriptedSubagents = "subagents" // one container reporting a planner, two parallel workers, a handoff and a reviewer as native events
 	ScriptedMCPLoop   = "mcploop"   // B2 Bifrost features: a real tool loop over the run's MCP servers, driven by a scripted model upstream (mcploopagent.py)
+	// Readiness controls of the hosted check (cmd/bifrost-bench
+	// jobs_hostedreadiness.go): each runs one of the task's own controls in
+	// the agent's place, as local admission does (suite/admitscenario.go).
+	ScriptedEmpty       = "empty"        // the task's empty control (controls.empty)
+	ScriptedMutant      = "mutant"       // mutant number scripted.index (controls.mutants)
+	ScriptedWrongAnswer = "wrong_answer" // wrong answer number scripted.index of the hidden answer spec
 )
+
+// ScriptedNoControl is what a mutant or wrong_answer control prints when the
+// task has no control with its index (the hosted check runs every index on
+// every task; the extra runs are not graded as checks).
+const ScriptedNoControl = "no such control on this task"
 
 // RefusalText is what the refuse control prints.
 const RefusalText = "I can't complete this task."
@@ -39,6 +50,7 @@ const (
 	teamControlFile     = "/tmp/bench/teamcontrol.py"
 	subagentsFile       = "/tmp/bench/subagentscontrol.py"
 	mcpLoopFile         = "/tmp/bench/mcploopagent.py" // B2
+	controlFile         = "/tmp/bench/control"         // readiness controls: the control's patch, script or answer
 )
 
 // writeAnswer copies the reference answer ($2) to the answer path ($1),
@@ -179,6 +191,12 @@ func (a *scriptedAdapter) Plan(ctx context.Context, rc *schemas.RunContext) (*sc
 			return nil, fmt.Errorf("plan run %s: mcploop: %w", rc.Run.RunID, err)
 		}
 		argv = []string{"python3", "-I", mcpLoopFile}
+	case ScriptedEmpty, ScriptedMutant, ScriptedWrongAnswer:
+		var err error
+		argv, err = controlPlan(rc, kind, rc.Agent.Scripted.Index, files)
+		if err != nil {
+			return nil, fmt.Errorf("plan run %s: %s: %w", rc.Run.RunID, kind, err)
+		}
 	default:
 		return nil, fmt.Errorf("plan run %s: unknown scripted kind %q", rc.Run.RunID, kind)
 	}

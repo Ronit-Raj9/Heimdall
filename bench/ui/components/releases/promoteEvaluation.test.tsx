@@ -61,6 +61,32 @@ describe("PromoteEvaluation", () => {
 });
 
 describe("GateResultCard and RepeatEvaluation", () => {
+	it("says when the benchmark changed since the baseline and what was compared", () => {
+		const gate = {
+			state: "pass" as const,
+			agent: "codex",
+			candidate: "B",
+			checks: [],
+			summary: "Gate passed",
+			decided_at: "2026-11-20T11:00:00Z",
+			dataset: {
+				changed: true,
+				summary: "Benchmark changed since baseline",
+				benchmarks: [
+					{ benchmark: "support", changed: true, compared: 40, new_tasks: 15, dropped_tasks: 0 },
+					{ benchmark: "faq", changed: false, compared: 10, new_tasks: 0, dropped_tasks: 0 },
+					{ benchmark: "billing", changed: true, compared: 0, new_tasks: 5, dropped_tasks: 0, not_compared: true },
+				],
+			},
+		};
+		const html = render(<GateResultCard gate={gate} />);
+		expect(html).toContain("Benchmark changed since baseline");
+		expect(html).toContain("compared on the 40 tasks both ran (15 new or changed, 0 no longer run)");
+		expect(html).toContain('data-testid="evaluation-gate-dataset-billing"');
+		expect(html).not.toContain('data-testid="evaluation-gate-dataset-faq"');
+		const same = render(<GateResultCard gate={{ ...gate, dataset: { ...gate.dataset, changed: false } }} />);
+		expect(same).not.toContain("Benchmark changed since baseline");
+	});
 	it("shows pass or fail with each check", () => {
 		const html = render(
 			<GateResultCard

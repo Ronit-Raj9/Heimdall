@@ -366,6 +366,7 @@ export function RowPreview({ result, t }: { result: RowImportResult; t: T }) {
 								<th className="px-2 py-1.5 font-medium">{t("rows.col.task")}</th>
 								<th className="px-2 py-1.5 font-medium">{t("rows.col.question")}</th>
 								<th className="px-2 py-1.5 font-medium">{result.grader === "judge" ? t("rows.col.rubric") : t("rows.col.answer")}</th>
+								<th className="px-2 py-1.5 font-medium">{t("rows.col.wrong")}</th>
 							</tr>
 						</thead>
 						<tbody className="divide-border divide-y">
@@ -378,6 +379,16 @@ export function RowPreview({ result, t }: { result: RowImportResult; t: T }) {
 									</td>
 									<td className="px-2 py-1">{r.question}</td>
 									<td className="px-2 py-1">{r.check}</td>
+									<td className="px-2 py-1" data-testid={`suite-build-preview-wrong-${r.id}`}>
+										{(r.wrong_answers ?? []).length > 0 ? (
+											<ul className="flex flex-col gap-0.5">
+												{(r.wrong_answers ?? []).map((w, i) => (
+													<li key={`${i}-${w}`}>{w}</li>
+												))}
+											</ul>
+										) : null}
+										{r.generated_wrong && <span className="text-muted-foreground mt-0.5 block">{t("rows.generatedWrong")}</span>}
+									</td>
 								</tr>
 							))}
 						</tbody>
@@ -463,12 +474,18 @@ function ReadinessSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: b
 		},
 		[dispatch, suite.id],
 	);
-	const params = task ? { suite: suite.id, task } : { suite: suite.id };
+	const [judgeConsent, setJudgeConsent] = useState(false);
+	const judge = suite.judge;
+	const askJudge = hosted && !!judge;
+	const calls = judgeCalls(suite, task);
+	const params = { suite: suite.id, ...(task ? { task } : {}), ...(askJudge && judgeConsent ? { judge_consent: true } : {}) };
 	const confirm = task
 		? t("readiness.confirmOne", { task })
-		: hosted
-			? t("readiness.confirmHosted", { count: suite.tasks.length })
-			: t("readiness.confirm", { count: suite.tasks.length });
+		: askJudge
+			? t("readiness.confirmHostedJudged", { count: suite.tasks.length, calls })
+			: hosted
+				? t("readiness.confirmHosted", { count: suite.tasks.length })
+				: t("readiness.confirm", { count: suite.tasks.length });
 	return (
 		<Section title={t("readiness.title")} description={t("readiness.description")} testId="suite-build-readiness">
 			<div className="flex min-w-0 flex-col gap-3">
@@ -490,8 +507,22 @@ function ReadinessSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: b
 								))}
 							</select>
 						</Field>
-						<JobRunButton key={task} kind={SUITE_OPS_KINDS.admit} params={params} label={t("readiness.run")} confirm={confirm} onDone={onDone} />
+						<JobRunButton
+							key={task}
+							kind={SUITE_OPS_KINDS.admit}
+							params={params}
+							label={t("readiness.run")}
+							confirm={confirm}
+							disabled={askJudge && !judgeConsent}
+							onDone={onDone}
+						/>
 					</div>
+				)}
+				{askJudge && judge && suite.tasks.length > 0 && (
+					<label className="flex items-start gap-2 text-sm" data-testid="suite-build-readiness-judge-consent">
+						<input type="checkbox" className="mt-1" checked={judgeConsent} onChange={(e) => setJudgeConsent(e.target.checked)} />
+						<span>{t("readiness.judgeConsent", { calls, provider: judge.provider, model: judge.model })}</span>
+					</label>
 				)}
 				{job && !report && job.error && (
 					<p role="alert" className="text-chart-error-ink text-sm" data-testid="suite-build-readiness-error">
@@ -502,6 +533,16 @@ function ReadinessSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: b
 			</div>
 		</Section>
 	);
+}
+
+/**
+ * About how many judge calls the readiness check of a judged benchmark makes:
+ * the suites API total for every task, or one task's share of it.
+ */
+export function judgeCalls(suite: Pick<SuiteSummary, "judge" | "tasks">, task: string): number {
+	const total = suite.judge?.readiness_calls ?? 0;
+	if (!task || suite.tasks.length === 0) return total;
+	return Math.max(1, Math.round(total / suite.tasks.length));
 }
 
 export default BuildTab;

@@ -36,6 +36,29 @@ describe("readinessReport", () => {
 		expect(r.tasks[1]).toMatchObject({ task: "b", ready: false, reason: "the right answer failed" });
 		expect(r.tasks[1].checks.map((c) => c.passed)).toEqual([false, true]);
 	});
+	it("reads every named check of a full hosted readiness run", () => {
+		const r = readinessReport({
+			suite: "s",
+			tasks: [
+				{
+					task: "a",
+					oracle: "pass",
+					noop: "fail",
+					admitted: false,
+					checks: [
+						{ name: "reference_0", want: "pass", got: "pass", passed: true },
+						{ name: "wrong_answer_1", want: "fail", got: "fail", passed: true },
+						{ name: "reference_stale_notes", want: "pass", got: "not_run", passed: false, detail: "checked on your own machine" },
+					],
+				},
+			],
+		})!;
+		expect(r.tasks[0].checks.map((c) => c.name)).toEqual(["reference_0", "wrong_answer_1", "reference_stale_notes"]);
+		const html = render(<ReadinessResults report={r} />);
+		expect(html).toContain("Wrong answer 1 is caught");
+		expect(html).toContain("not run on this worker");
+		expect(html).not.toContain("got not_run");
+	});
 	it("returns null for other results", () => {
 		expect(readinessReport(undefined)).toBeNull();
 		expect(readinessReport({ exp_id: "x" })).toBeNull();

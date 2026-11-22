@@ -96,6 +96,12 @@
 		"falseAlarm": "at {{fpr}} false alarms",
 		"back": "All monitors"
 	},
+	"dataset": {
+		"changed": "Benchmark changed since baseline",
+		"compared_one": "compared on the 1 task both ran ({{added}} new or changed, {{dropped}} no longer run)",
+		"compared_other": "compared on the {{count}} tasks both ran ({{added}} new or changed, {{dropped}} no longer run)",
+		"notCompared": "not compared: no task in common with the baseline"
+	},
 	"promote": {
 		"title": "Promote this version",
 		"button": "Promote this version",

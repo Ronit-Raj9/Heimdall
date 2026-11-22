@@ -22,6 +22,10 @@ export interface RowTask {
 	held_out?: boolean;
 	question: string;
 	check: string;
+	/** Wrong answers the readiness check grades (previews). */
+	wrong_answers?: string[];
+	/** The import wrote the wrong answers because the row named none (judged rows). */
+	generated_wrong?: boolean;
 }
 
 export interface RowProblem {

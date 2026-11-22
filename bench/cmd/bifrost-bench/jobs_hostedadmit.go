@@ -17,7 +17,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/projectfs"
@@ -27,64 +26,11 @@ import (
 	"github.com/maximhq/bifrost/bench/suite"
 )
 
-// Admission check names of a hosted admission record.
-const (
-	hostedCheckOracle = "oracle_control"
-	hostedCheckNoop   = "noop_control"
-)
-
 // Test seams: the runner check and the sealed-run read of a bridge job.
 var (
 	bridgeRequireRunner = requireRunner
 	bridgeSealedRuns    = sealedRuns
 )
-
-// admitExperimentIDs is admitExperiment over an explicit task list (empty:
-// every task of the suite).
-func admitExperimentIDs(suiteRef, oracle, noop string, ids []string) *schemas.Experiment {
-	e := admitExperiment(hostedSuiteAdmitParams{Suite: suiteRef, Oracle: oracle, Noop: noop})
-	if len(ids) > 0 {
-		e.Conditions[0].Tasks = schemas.TaskSelector{IDs: append([]string(nil), ids...)}
-	}
-	return e
-}
-
-// hostedAdmissionRecord is the admission record of one task proved on a
-// runner: static validation (run in process before the experiment), then the
-// oracle control (want pass) and the noop control (want not pass).
-func hostedAdmissionRecord(s *schemas.Suite, t hostedAdmitTask, expID string) *schemas.AdmissionRecord {
-	where := "proved on a runner in experiment " + expID
-	oracle := schemas.AdmissionCheck{Name: hostedCheckOracle, Want: suite.GotPass, Got: t.Oracle,
-		Passed: t.Oracle == string(schemas.OutcomePass), Detail: where}
-	noop := schemas.AdmissionCheck{Name: hostedCheckNoop, Want: suite.GotFail, Got: t.Noop, Detail: where}
-	switch schemas.Outcome(t.Noop) {
-	case "", schemas.OutcomePass, schemas.OutcomeInfraError, schemas.OutcomeAbortedInfra, schemas.OutcomeInvalidEvaluator:
-	default:
-		noop.Passed = true
-	}
-	if !t.Admitted && t.Reason != "" {
-		// Name the failing control in its check, as local admission does.
-		if !oracle.Passed {
-			oracle.Detail = t.Reason + "; " + where
-		} else {
-			noop.Passed, noop.Detail = false, t.Reason+"; "+where
-		}
-	}
-	rec := &schemas.AdmissionRecord{
-		Admitted: t.Admitted && oracle.Passed && noop.Passed,
-		At:       time.Now().UTC(),
-		Grader:   s.Grader,
-		Checks: []schemas.AdmissionCheck{
-			{Name: suite.StaticValidationCheck, Want: "clean", Got: "clean", Passed: true},
-			oracle, noop,
-		},
-		ReferenceRepeats: 1,
-	}
-	if t.Oracle != "" {
-		rec.ReferenceResults = []string{t.Oracle}
-	}
-	return rec
-}
 
 // hostedSuiteState is a suite as a hosted admission found it before its
 // experiment: suite.yaml bytes and the fingerprints the proofs ran against.
@@ -135,7 +81,7 @@ func recordHostedAdmissions(ctx context.Context, env jobEnv, st *hostedSuiteStat
 		if _, ok := st.fps.Tasks[t.Task]; !ok {
 			continue
 		}
-		proofs[t.Task] = proof{rec: hostedAdmissionRecord(st.suite, t, expID), fp: st.fps.Tasks[t.Task], suite: st.fps.Suite}
+		proofs[t.Task] = proof{rec: admissionRecordOf(st.suite, t), fp: st.fps.Tasks[t.Task], suite: st.fps.Suite}
 	}
 	s, lock, dropped, err := buildProofLock(ctx, env.App, st.suite.ID, st.before, proofs)
 	if err != nil {
@@ -229,7 +175,7 @@ func runHostedTasksMine(ctx context.Context, env jobEnv, j *jobs.Job, p tasksMin
 	}
 	log.Printf("looked at %d commits: %d candidates, %d skipped (suite %s, template %s)", len(cands)+len(skipped), len(cands), len(skipped), p.Suite, tmpl)
 	rep := &hostedMineReport{Suite: p.Suite, Proved: []string{}, Dropped: []hostedMineDrop{},
-		Note: "hosted mining proves the oracle and noop controls on a runner; the full local admission (mutants, exploit, 3 reference runs) still runs with bifrost-bench suite admit"}
+		Note: "hosted mining runs every readiness control of each candidate on a worker (the reference three times, the empty patch, each mutant, the exploit, doing nothing and refusing) and keeps only the candidates that pass all of them"}
 	testCmd := ""
 	if pf, _ := quickstart.LoadProjectFile(env.App.cfg.Root); pf != nil {
 		testCmd = pf.Tests.Command
@@ -338,27 +284,37 @@ func runHostedTasksMine(ctx context.Context, env jobEnv, j *jobs.Job, p tasksMin
 		return rep, restore(nil)
 	}
 
-	m, err := l.Plan(ctx, admitExperimentIDs(p.Suite, bridgeOracleAgent, bridgeNoopAgent, prove))
+	var proveTasks []*schemas.Task
+	for _, id := range prove {
+		if t := st.suite.TaskByID(id); t != nil {
+			proveTasks = append(proveTasks, t)
+		}
+	}
+	m, err := l.Plan(ctx, readinessExperiment(p.Suite, bridgeOracleAgent, bridgeNoopAgent, st.suite, proveTasks, schemas.SplitPublic, false))
 	if err != nil {
 		return rep, errors.Join(fmt.Errorf("plan the proving run: %w", err), restore(nil))
 	}
 	rep.ExpID = m.ExpID
 	log.Printf("proving %d tasks on a runner: experiment %s (open it on the Experiments page)", len(prove), m.ExpID)
-	if err := runExperiment(ctx, l, m, timeout, log); err != nil {
+	if err := runExperiment(ctx, l, m, max(timeout, readinessTimeout(len(m.Slots))), log); err != nil {
 		return rep, errors.Join(err, restore(nil))
 	}
 	runs, err := bridgeSealedRuns(ctx, env, m.ExpID)
 	if err != nil {
 		return rep, errors.Join(err, restore(nil))
 	}
-	rep.Tasks = admitVerdict(runs, prove)
+	expOf := map[string]string{}
+	for _, id := range prove {
+		expOf[id] = m.ExpID
+	}
+	rep.Tasks = readinessVerdict(st.suite, proveTasks, runs, expOf, readinessFileChecks(env.App, st.suite))
 	keep := map[string]bool{}
 	var proved []hostedAdmitTask
 	for _, t := range rep.Tasks {
 		if t.Admitted {
 			keep[t.Task] = true
 			proved = append(proved, t)
-			log.Printf("PROVED  %s (oracle %s, noop %s)", t.Task, t.Oracle, t.Noop)
+			log.Printf("PROVED  %s (%d checks passed)", t.Task, len(t.Checks))
 		} else {
 			rep.Dropped = append(rep.Dropped, hostedMineDrop{Task: t.Task, Commit: commitOf[t.Task], Reason: "not proven: " + t.Reason})
 			log.Warnf("DROP    %s: %s", t.Task, t.Reason)
