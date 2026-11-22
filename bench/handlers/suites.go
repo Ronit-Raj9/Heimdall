@@ -460,7 +460,7 @@ func taskDetail(s *schemas.Suite, t *schemas.Task, sum schemas.SuiteSummary) (*s
 	if len(files) > FilesLimit {
 		files, out.FilesTruncated = files[:FilesLimit], true
 	}
-	out.Files = files
+	out.Files = append(out.Files, files...) // stays [] (never null) when repo/ has no files
 	return out, nil
 }
 

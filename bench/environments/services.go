@@ -584,9 +584,10 @@ func (e *dockerWorkspace) readyOnce(ctx context.Context, name string, spec schem
 	case spec.Ready != nil && len(spec.Ready.Argv) > 0:
 		args = append([]string{"exec", name}, spec.Ready.Argv...)
 	case spec.Ready != nil && spec.Ready.HTTP != "":
-		args = []string{"exec", probe, "python3", "-c", readyScript, "http", upstreamURL(spec) + spec.Ready.HTTP}
+		host := e.readyHost(ctx, name, probe, spec.ID) // gVisor: by address (gvisorhosts.go)
+		args = []string{"exec", probe, "python3", "-c", readyScript, "http", "http://" + host + ":" + strconv.Itoa(spec.Port) + spec.Ready.HTTP}
 	case spec.Port > 0:
-		args = []string{"exec", probe, "python3", "-c", readyScript, "tcp", spec.ID, strconv.Itoa(spec.Port)}
+		args = []string{"exec", probe, "python3", "-c", readyScript, "tcp", e.readyHost(ctx, name, probe, spec.ID), strconv.Itoa(spec.Port)}
 	default:
 		return ""
 	}
@@ -663,6 +664,11 @@ func (e *dockerWorkspace) startToolProxy(ctx context.Context, rc *schemas.RunCon
 	args = append(args, "--entrypoint", "bifrost-bench", image,
 		"toolproxy", "-listen", ":"+strconv.Itoa(ToolProxyPort), "-routes", toolProxyCfg+"/routes.json",
 		"-fault", toolProxyCfg+"/fault.json", "-ledger", toolProxyLedger)
+	if upstreams {
+		args = e.sandboxHosts(ctx, args, serviceNetwork(runID), hiddenNetwork(runID)) // gVisor: the proxied services by /etc/hosts (gvisorhosts.go)
+	} else {
+		args = e.sandboxHosts(ctx, args, serviceNetwork(runID))
+	}
 	if _, err := e.cfg.Docker.MustRunEnv(ctx, externalProxySecretEnv(rc, ext), args...); err != nil { // G01: org secrets reach the CLI's env only
 		return fmt.Errorf("create tool proxy: %w", err)
 	}
