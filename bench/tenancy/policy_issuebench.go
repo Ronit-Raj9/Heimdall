@@ -11,6 +11,7 @@ func init() {
 // provider, so start needs explicit consent in the body (checked by the
 // pipeline).
 func init() {
+	OrgPolicy[key("GET", api+"/issuebench/readiness")] = org(viewer)
 	OrgPolicy[key("GET", api+"/issuebench/runs")] = org(viewer)
 	OrgPolicy[key("POST", api+"/issuebench/runs")] = org(member)
 	OrgPolicy[key("GET", api+"/issuebench/runs/{id}")] = org(viewer)
