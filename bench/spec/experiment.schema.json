@@ -116,6 +116,7 @@
     },
     "fairness": {"enum": ["equal_budget"], "description": "equal_budget: every arm must have the same total USD cap (budgets.usd) enforced at the gateway; the planner refuses otherwise and the verdict is INVALID when a run exceeded its cap (docs/multi-agent.md)."},
     "external": {"enum": ["live", "record", "replay"], "description": "Overrides every external API's mode for this experiment's runs. live and record call the real hosts: the results are not repeatable, and reports and the leaderboard label or exclude them (docs/external-apis.md)."},
+    "egress": {"enum": ["offline", "replay", "live-allowlisted"], "description": "Recorded internet (docs/egress.md): overrides the mode of every egress service. offline refuses every request, replay answers from the cache recorded at admission, live-allowlisted forwards allowlisted hosts to the real internet (not repeatable, labelled like external: live)."},
     "simulator": {"$ref": "suite.schema.json#/$defs/simulator", "description": "W3 customer support: overrides the suite's user simulator mode, provider and model for every arm (docs/customer-support.md)."},
     "tier": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "description": "W7 suite tiers: the suite tier whose tasks `tasks: all` means (docs/suite-tiers.md)."},
     "trials": {

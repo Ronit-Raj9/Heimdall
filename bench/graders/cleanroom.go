@@ -563,6 +563,9 @@ func applyScenario(rc *schemas.RunContext, in *gradeInputs) error {
 	if err := composeVerifier(rc, in); err != nil { // X2: environment and service networks of a compose task's verifier (compose.go)
 		return err
 	}
+	if err := egressVerifier(rc, in); err != nil { // recorded internet: a verifier that downloads reaches the egress service (egress.go)
+		return err
+	}
 	if rc.Dir == "" {
 		return nil
 	}

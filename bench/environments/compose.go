@@ -222,7 +222,7 @@ func (e *dockerWorkspace) captureServiceLog(ctx context.Context, runID, dir, id 
 // changed.
 func withTaskEnv(rc *schemas.RunContext, plan *schemas.RunPlan) *schemas.RunPlan {
 	if rc == nil || rc.Task == nil || rc.Task.Environment == nil || len(rc.Task.Environment.Env) == 0 || plan == nil {
-		return plan
+		return withEgressEnv(rc, plan) // recorded internet: proxy variables when the run has an egress service (egress.go)
 	}
 	cp := *plan
 	cp.Env = make(map[string]string, len(plan.Env)+len(rc.Task.Environment.Env))
@@ -232,5 +232,5 @@ func withTaskEnv(rc *schemas.RunContext, plan *schemas.RunPlan) *schemas.RunPlan
 	for k, v := range plan.Env {
 		cp.Env[k] = v
 	}
-	return &cp
+	return withEgressEnv(rc, &cp) // recorded internet (egress.go)
 }

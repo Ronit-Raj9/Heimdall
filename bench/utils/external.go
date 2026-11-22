@@ -215,7 +215,8 @@ func RunExternalMode(rc *schemas.RunContext, r ExternalRef) (string, error) {
 // external hosts (external: live or record): their results cannot be
 // repeated, and reports and the leaderboard label or exclude them.
 func ExternalUnrepeatable(m *schemas.Manifest) bool {
-	return m != nil && (m.Experiment.External == schemas.ExternalLive || m.Experiment.External == schemas.ExternalRecord)
+	return m != nil && (m.Experiment.External == schemas.ExternalLive || m.Experiment.External == schemas.ExternalRecord ||
+		m.Experiment.Egress == schemas.EgressLive) // recorded internet: live-allowlisted reaches real hosts too
 }
 
 // ExternalURL is where the agent reaches external API id.
