@@ -48,7 +48,12 @@ func runBifrostCmd(args []string) int {
 		if err != nil {
 			return fail("cache on vs off: %v", err)
 		}
-		return printCacheAB(os.Stdout, *exp, bifrostfeatures.CacheAB(runs, cacheOffArm(runs), schemas.EvaluationCacheArm), *asJSON)
+		m, err := a.store.LoadManifest(ctx, *exp)
+		if err != nil {
+			return fail("cache on vs off: %v", err)
+		}
+		off, on := cacheArms(m, runs)
+		return printCacheAB(os.Stdout, *exp, bifrostfeatures.CacheAB(runs, off, on), *asJSON)
 	}
 	runs, err := experimentRows(ctx, a.store, *exp)
 	if err != nil {
@@ -96,15 +101,21 @@ func experimentCacheRuns(ctx context.Context, st *store.FSStore, expID string) (
 	return out, nil
 }
 
-// cacheOffArm is the arm of runs that is not the cache-on arm (the
-// evaluation's own arm, "A" by default).
-func cacheOffArm(runs []bifrostfeatures.CacheRun) string {
+// cacheArms are the cache-off and cache-on arms of an experiment: the
+// cache-on arm by its label (B in new evaluations, "cache" in older ones),
+// the cache-off arm the other arm of runs (the evaluation's own arm, "A" by
+// default).
+func cacheArms(m *schemas.Manifest, runs []bifrostfeatures.CacheRun) (off, on string) {
+	on = schemas.VariantArmID(m, schemas.EvaluationCacheSuffix)
+	if on == "" {
+		on = schemas.EvaluationCacheArm
+	}
 	for _, r := range runs {
-		if r.Arm != schemas.EvaluationCacheArm {
-			return r.Arm
+		if r.Arm != on {
+			return r.Arm, on
 		}
 	}
-	return "A"
+	return "A", on
 }
 
 func printCacheAB(w io.Writer, expID string, rep bifrostfeatures.CacheABReport, asJSON bool) int {

@@ -64,8 +64,16 @@ func BuildEvaluationCacheAB(src leaderboard.Source, ev *schemas.Evaluation) Eval
 		if len(runs) == 0 {
 			continue
 		}
+		// The cache-on arm by its label: B in new evaluations, "cache" in
+		// older ones (withVariantArms).
+		onArm := schemas.EvaluationCacheArm
+		if m, ok := src.Manifest(c.ExperimentID); ok {
+			if id := schemas.VariantArmID(m, schemas.EvaluationCacheSuffix); id != "" {
+				onArm = id
+			}
+		}
 		out.Children = append(out.Children, EvaluationCacheChild{Benchmark: c.Benchmark, ExperimentID: c.ExperimentID,
-			Report: bifrostfeatures.CacheAB(runs, offArm, schemas.EvaluationCacheArm)})
+			Report: bifrostfeatures.CacheAB(runs, offArm, onArm)})
 	}
 	return out
 }

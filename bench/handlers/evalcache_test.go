@@ -23,7 +23,7 @@ func TestEvaluationBifrostCacheArm(t *testing.T) {
 		t.Fatalf("spec lost bifrost_cache: %+v", ev.Spec)
 	}
 	exp := l.planned[ev.Children[0].ExperimentID]
-	off, on := exp.Arms["A"], exp.Arms[schemas.EvaluationCacheArm]
+	off, on := exp.Arms["A"], exp.Arms["B"] // the cache-on copy is arm B (withVariantArms)
 	if len(exp.Arms) != 2 || on.Label != off.Label+schemas.EvaluationCacheSuffix {
 		t.Fatalf("arms %+v", exp.Arms)
 	}
