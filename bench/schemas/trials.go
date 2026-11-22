@@ -172,8 +172,8 @@ type AdaptiveLook struct {
 // experiment needs to detect TargetPP and what they would cost.
 type MoreEvidence struct {
 	TargetPP    float64  `json:"target_pp"`
-	Tasks       int      `json:"tasks"`       // more tasks, on top of those already run
-	TasksTotal  int      `json:"tasks_total"` // tasks the new experiment needs in all
+	Tasks       int      `json:"tasks"`          // more tasks, on top of those already run
+	TasksTotal  int      `json:"tasks_total"`    // tasks the new experiment needs in all
 	Over        bool     `json:"over,omitempty"` // more than TasksTotal (the sizing cap) tasks needed; Tasks, Runs and CostUSD are then not estimated
 	SD          float64  `json:"sd"`
 	SDAssumed   bool     `json:"sd_assumed"`

@@ -244,9 +244,9 @@ type calibrateOptions struct {
 	judgeCfg func() (graders.JudgeConfig, error) // the wired judge, built only after consent
 
 	// G06 web calibrate (jobs_cli_calibrate.go). All optional.
-	sample       int                                    // judge at most this many items, human labels first; 0 = all
-	judge        *schemas.JudgeSpec                     // provider and model to calibrate instead of the suite's pinned ones
-	forecastOnly bool                                   // print the forecast and stop: no call, no consent needed
+	sample       int                                       // judge at most this many items, human labels first; 0 = all
+	judge        *schemas.JudgeSpec                        // provider and model to calibrate instead of the suite's pinned ones
+	forecastOnly bool                                      // print the forecast and stop: no call, no consent needed
 	checkPlan    func(plan *graders.CalibrationPlan) error // refuses a plan before anything is spent (caps, key budget)
 }
 

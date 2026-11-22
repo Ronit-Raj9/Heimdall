@@ -113,9 +113,9 @@ type MatrixPair struct {
 	Tasks       int      `json:"tasks"`     // common tasks
 	NNonzero    int      `json:"n_nonzero"` // common tasks where the rates differ
 	MeanDiff    float64  `json:"mean_diff"`
-	P           *float64 `json:"p"`          // raw two-sided sign-flip p; nil without common tasks
+	P           *float64 `json:"p"`                 // raw two-sided sign-flip p; nil without common tasks
 	PDraws      int      `json:"p_draws,omitempty"` // Monte Carlo sign vectors behind P; 0 when P is exact (audit 1-B-07)
-	PAdjusted   *float64 `json:"p_adjusted"` // Holm-adjusted across all pairs; nil without common tasks
+	PAdjusted   *float64 `json:"p_adjusted"`        // Holm-adjusted across all pairs; nil without common tasks
 	Significant bool     `json:"significant"`
 	Reason      string   `json:"reason"` // plain words, e.g. "cannot separate: too few differing tasks (2 of 6)"
 }

@@ -317,12 +317,12 @@ type policyCheckYAML struct {
 }
 
 type policyYAML struct {
-	PolicyVersion    int                             `yaml:"policy_version"`
-	Name             string                          `yaml:"name"`
-	Description      string                          `yaml:"description,omitempty"`
-	OnUnknown        string                          `yaml:"on_unknown,omitempty"`
-	Checks           []policyCheckYAML               `yaml:"checks"`
-	JudgeCalibration map[string]any                  `yaml:"judge_calibration,omitempty"`
+	PolicyVersion    int               `yaml:"policy_version"`
+	Name             string            `yaml:"name"`
+	Description      string            `yaml:"description,omitempty"`
+	OnUnknown        string            `yaml:"on_unknown,omitempty"`
+	Checks           []policyCheckYAML `yaml:"checks"`
+	JudgeCalibration map[string]any    `yaml:"judge_calibration,omitempty"`
 }
 
 func renderPolicyYAML(p *schemas.Policy) ([]byte, error) {

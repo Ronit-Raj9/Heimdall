@@ -24,7 +24,6 @@ const ProjectManifestPath = APIPrefix + "/project/manifest"
 // so a sync never works from a truncated list.
 const MaxManifestFiles = 20000
 
-
 // ManifestFile is one file of the project manifest.
 type ManifestFile struct {
 	Area   string `json:"area"`

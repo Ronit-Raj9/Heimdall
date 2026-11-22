@@ -15,10 +15,13 @@ import (
 // lineLog is a jobs.Logger that keeps the lines.
 type lineLog struct{ lines []string }
 
-func (l *lineLog) Printf(f string, a ...any)   { l.lines = append(l.lines, fmt.Sprintf(f, a...)) }
-func (l *lineLog) Warnf(f string, a ...any)    { l.Printf(f, a...) }
-func (l *lineLog) Errorf(f string, a ...any)   { l.Printf(f, a...) }
-func (l *lineLog) Write(p []byte) (int, error) { l.lines = append(l.lines, string(p)); return len(p), nil }
+func (l *lineLog) Printf(f string, a ...any) { l.lines = append(l.lines, fmt.Sprintf(f, a...)) }
+func (l *lineLog) Warnf(f string, a ...any)  { l.Printf(f, a...) }
+func (l *lineLog) Errorf(f string, a ...any) { l.Printf(f, a...) }
+func (l *lineLog) Write(p []byte) (int, error) {
+	l.lines = append(l.lines, string(p))
+	return len(p), nil
+}
 
 func TestAnalysisJobKindsValidate(t *testing.T) {
 	a, _ := jobsProject(t)
