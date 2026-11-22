@@ -120,12 +120,61 @@ export function armsFor(d: EvaluateDraft, defaultModel = ""): EvaluationArm[] {
 	}
 }
 
-/** True when step 2 has what its mode needs. */
-export function learnStepReady(d: EvaluateDraft): boolean {
+/**
+ * True when step 2 has what its mode needs. `latest` is the agent's highest saved version: "Latest" (version null)
+ * runs it, so comparing Latest with that version compares a version with itself (N95).
+ */
+export function learnStepReady(d: EvaluateDraft, latest?: number): boolean {
 	if (!d.agent) return false;
-	if (d.mode === "versions") return d.compareVersion != null && d.compareVersion !== d.version;
+	if (d.mode === "versions") return d.compareVersion != null && d.compareVersion !== (d.version ?? latest ?? null);
 	if (d.mode === "opponent") return Boolean(d.opponent) && d.opponent !== d.agent;
 	return true;
+}
+
+const EVALUATION_MODES: readonly EvaluationMode[] = ["score", "versions", "models", "opponent"];
+
+/** Whether a value (for example a link's ?mode=) is one of the evaluation modes. */
+export function isEvaluationMode(m: unknown): m is EvaluationMode {
+	return typeof m === "string" && (EVALUATION_MODES as readonly string[]).includes(m);
+}
+
+/** What a link to /evaluate names (N154, N112): ?agent=, ?mode=, ?suite= and ?opponent=. */
+export interface DraftLink {
+	agent?: string | null;
+	mode?: string | null;
+	suite?: string | null;
+	opponent?: string | null;
+}
+
+/**
+ * The new draft a link starts: the agent on its own default model, the linked mode (Its score for a missing or
+ * unknown one, then `badMode` names it), only the linked benchmark, and the opponent in opponent mode only.
+ */
+export function draftFromLink(p: DraftLink, agentRow?: { model?: string } | null): { draft: EvaluateDraft; badMode?: string } {
+	const agent = p.agent || null;
+	const mode: EvaluationMode = isEvaluationMode(p.mode) ? p.mode : "score";
+	const base: EvaluateDraft = {
+		...EMPTY_DRAFT,
+		agent,
+		mode,
+		opponent: mode === "opponent" ? p.opponent || null : null,
+		benchmarks: p.suite ? [p.suite] : [],
+		pack: null,
+	};
+	const draft = { ...base, arms: armsFor({ ...base, arms: [], stashedArms: [] }, agentRow?.model ?? "") };
+	return p.mode && !isEvaluationMode(p.mode) ? { draft, badMode: p.mode } : { draft };
+}
+
+/** The patch picking an agent applies (a click on its card, or the return from Register your agent): its own model. */
+export function agentPickPatch(d: EvaluateDraft, a: { id: string; model?: string }): Partial<EvaluateDraft> {
+	const next = { ...d, agent: a.id, version: null, compareVersion: null, arms: [] };
+	return {
+		agent: a.id,
+		version: null,
+		compareVersion: null,
+		opponent: d.opponent === a.id ? null : d.opponent,
+		arms: armsFor(next, a.model ?? ""),
+	};
 }
 
 /** The POST /evaluations body. */
@@ -237,6 +286,8 @@ export interface EvaluateDraftContextValue {
 	draft: EvaluateDraft;
 	/** Merge fields into the draft. */
 	update(patch: Partial<EvaluateDraft>): void;
+	/** Swap the whole draft (a link starts a new one; Go back to my draft restores the earlier one). */
+	replace(d: EvaluateDraft): void;
 	reset(): void;
 }
 
@@ -252,8 +303,9 @@ export function EvaluateDraftProvider({ children, initial }: { children: ReactNo
 		}
 	}, [draft]);
 	const update = useCallback((patch: Partial<EvaluateDraft>) => setDraft((d) => applyPatch(d, patch)), []);
+	const replace = useCallback((d: EvaluateDraft) => setDraft(d), []);
 	const reset = useCallback(() => setDraft(EMPTY_DRAFT), []);
-	const value = useMemo(() => ({ draft, update, reset }), [draft, update, reset]);
+	const value = useMemo(() => ({ draft, update, replace, reset }), [draft, update, replace, reset]);
 	return <EvaluateDraftContext.Provider value={value}>{children}</EvaluateDraftContext.Provider>;
 }
 

@@ -283,19 +283,39 @@ function DraftForm({ report, request }: { report: McpReport; request: McpInspect
 								{t("draft.open")}
 							</Link>
 						</Button>
-						<Button asChild size="sm">
-							<Link
-								to="/evaluate"
-								search={{ suite: done.suite, agent: done.reference_agents[0] } as never}
-								data-testid="mcp-draft-evaluate"
-							>
-								{t("draft.evaluate")}
-							</Link>
-						</Button>
+						<DraftEvaluateLink done={done} />
 					</div>
 				</div>
 			)}
 		</Section>
+	);
+}
+
+/**
+ * The Evaluate button under a drafted benchmark (N113): only reference agents the organization has a model key for.
+ * Two keyed agents compare head to head (mode=opponent), one runs alone, none explains which key to add.
+ */
+export function DraftEvaluateLink({ done }: { done: McpDraftResponse }) {
+	const { t } = useTranslation("mcptest");
+	const keyed = done.reference_agents_keyed ?? [];
+	if (keyed.length === 0) {
+		return (
+			<p className="text-chart-warning-ink flex flex-wrap items-center gap-2 text-sm" data-testid="mcp-draft-no-key">
+				{t("draft.noKeyedAgent")}
+				<Link to={"/models" as never} className="text-primary underline" data-testid="mcp-draft-models-link">
+					{t("draft.modelsKeys")}
+				</Link>
+			</p>
+		);
+	}
+	const [a, b] = keyed;
+	const search = b ? { suite: done.suite, agent: a, mode: "opponent", opponent: b } : { suite: done.suite, agent: a };
+	return (
+		<Button asChild size="sm">
+			<Link to="/evaluate" search={search as never} data-testid="mcp-draft-evaluate">
+				{b ? t("draft.evaluateWithTwo", { a, b }) : t("draft.evaluateWith", { agent: a })}
+			</Link>
+		</Button>
 	);
 }
 

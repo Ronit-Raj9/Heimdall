@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { BARE_MODEL_AGENT, EMPTY_DRAFT, applyPatch, defaultName, draftToSpec, specToPatch, withBareModel } from "./evaluateDraft";
+import {
+	BARE_MODEL_AGENT,
+	EMPTY_DRAFT,
+	agentPickPatch,
+	applyPatch,
+	defaultName,
+	draftFromLink,
+	draftToSpec,
+	learnStepReady,
+	specToPatch,
+	withBareModel,
+} from "./evaluateDraft";
 
 describe("draftToSpec", () => {
 	it("starts from the Quick look size and carries concurrency and preset", () => {
@@ -58,5 +69,62 @@ describe("draft round trip (F26)", () => {
 		const dflt = applyPatch(base, specToPatch(draftToSpec(base), base));
 		expect(dflt.name).toBe("");
 		expect(draftToSpec(applyPatch(dflt, { mode: "models" })).name).toBe("codex: two models");
+	});
+});
+describe("draftFromLink (N154, N112)", () => {
+	it("starts versions mode with no old benchmarks and the agent's own model", () => {
+		const { draft, badMode } = draftFromLink({ agent: "zz-test-loop", mode: "versions" }, { model: "gpt-5.4-mini" });
+		expect(badMode).toBeUndefined();
+		expect(draft.mode).toBe("versions");
+		expect(draft.agent).toBe("zz-test-loop");
+		expect(draft.benchmarks).toEqual([]);
+		expect(draft.pack).toBeNull();
+		expect(draft.version).toBeNull();
+		expect(draft.compareVersion).toBeNull();
+		expect(draft.arms.map((a) => [a.label, a.agent, a.model])).toEqual([
+			["A", "zz-test-loop", "gpt-5.4-mini"],
+			["B", "zz-test-loop", "gpt-5.4-mini"],
+		]);
+	});
+
+	it("falls back to Its score for an unknown mode and says so", () => {
+		const { draft, badMode } = draftFromLink({ agent: "codex", mode: "duel" }, { model: "gpt-5.6-terra" });
+		expect(draft.mode).toBe("score");
+		expect(badMode).toBe("duel");
+	});
+
+	it("takes only the linked benchmark and the linked agent's own model", () => {
+		const { draft } = draftFromLink({ agent: "claude-code", suite: "zz-test-mcp" }, { model: "claude-sonnet-4-5" });
+		expect(draft.benchmarks).toEqual(["zz-test-mcp"]);
+		expect(draft.arms).toEqual([{ label: "A", agent: "claude-code", model: "claude-sonnet-4-5" }]);
+	});
+
+	it("sets the opponent only in opponent mode", () => {
+		const o = draftFromLink({ agent: "codex", mode: "opponent", opponent: "claude-code", suite: "zz-test-mcp" }, { model: "m" }).draft;
+		expect(o.opponent).toBe("claude-code");
+		expect(o.arms.map((a) => a.agent)).toEqual(["codex", "claude-code"]);
+		expect(learnStepReady(o)).toBe(true);
+		expect(draftFromLink({ agent: "codex", opponent: "claude-code" }, { model: "m" }).draft.opponent).toBeNull();
+	});
+});
+
+describe("agentPickPatch", () => {
+	it("gives the picked agent its own model, not the previous agent's", () => {
+		const old = applyPatch(EMPTY_DRAFT, { agent: "zz-test-loop", arms: [{ label: "A", agent: "zz-test-loop", model: "gpt-5.4-mini" }] });
+		const d = applyPatch(old, agentPickPatch(old, { id: "claude-code", model: "claude-sonnet-4-5" }));
+		expect(d.agent).toBe("claude-code");
+		expect(d.version).toBeNull();
+		expect(d.arms).toEqual([{ label: "A", agent: "claude-code", model: "claude-sonnet-4-5" }]);
+	});
+});
+
+describe("learnStepReady with the latest version (N95)", () => {
+	const v = (version: number | null, compareVersion: number | null) =>
+		applyPatch(EMPTY_DRAFT, { agent: "zz-test-loop", mode: "versions", version, compareVersion });
+	it("treats Latest as the highest version", () => {
+		expect(learnStepReady(v(null, 2), 2)).toBe(false);
+		expect(learnStepReady(v(null, 1), 2)).toBe(true);
+		expect(learnStepReady(v(1, 2), 2)).toBe(true);
+		expect(learnStepReady(v(2, 2), 2)).toBe(false);
 	});
 });
