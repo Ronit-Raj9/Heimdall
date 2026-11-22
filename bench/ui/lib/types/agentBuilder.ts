@@ -100,6 +100,10 @@ export interface AgentConfigDoc {
 	yaml: string;
 	sha256: string;
 	fields: AgentConfigFields;
+	/** A save's answer only: the agent version current after the save. */
+	version?: number;
+	/** A save's answer only: true when the save made a new version. */
+	version_created?: boolean;
 }
 
 export interface AgentConfigPut {
@@ -107,6 +111,8 @@ export interface AgentConfigPut {
 	yaml?: string;
 	fields?: AgentConfigFields;
 	if_match?: string;
+	/** Refuse the save (409) when the agent already exists: a new agent never overwrites one. */
+	create_only?: boolean;
 }
 
 export interface AgentConfigValidateRequest {

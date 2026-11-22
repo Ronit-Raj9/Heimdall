@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useGetAgentConfigQuery, usePutAgentConfigMutation, useValidateAgentConfigMutation } from "@/lib/store/apis/agentBuilderApi";
 import { CAPABILITIES } from "@/lib/store/apis/evaluationsApi";
-import type { AgentBehaviorFields, AgentConfigDoc, AgentConfigFields } from "@/lib/types/agentBuilder";
+import type { AgentBehaviorFields, AgentConfigDoc, AgentConfigFields, AgentConfigValidateResponse } from "@/lib/types/agentBuilder";
 import "@/lib/types/agentFirstI18n";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
@@ -53,7 +53,11 @@ interface FormTexts {
 }
 
 export function textsOf(fields: AgentConfigFields): FormTexts {
-	return { env: formatEnv(fields.env), memory: formatList(fields.behavior?.memory_paths), fallbacks: formatList(fields.behavior?.fallbacks, ", ") };
+	return {
+		env: formatEnv(fields.env),
+		memory: formatList(fields.behavior?.memory_paths),
+		fallbacks: formatList(fields.behavior?.fallbacks, ", "),
+	};
 }
 
 /**
@@ -69,6 +73,23 @@ export function buildFields(fields: AgentConfigFields, texts: FormTexts): AgentC
 	return out;
 }
 
+/**
+ * The cache key of an agent's settings save. The tab and its editor share the save's answer, so
+ * the "Saved as version n" line survives the editor's remount on the new file.
+ */
+export function saveKey(agentId: string): string {
+	return `agent-config-save:${agentId}`;
+}
+
+/** The Check settings line for a validate call: the server's verdict, or its error text. */
+export function checkOf(res: { data?: Pick<AgentConfigValidateResponse, "ok" | "error">; error?: unknown }): {
+	ok: boolean;
+	error?: string;
+} {
+	if (res.data) return { ok: res.data.ok, error: res.data.error };
+	return { ok: false, error: getBenchErrorMessage(res.error) };
+}
+
 function isConflict(error: unknown): boolean {
 	return typeof error === "object" && error !== null && "status" in error && (error as { status: unknown }).status === 409;
 }
@@ -81,6 +102,7 @@ function isConflict(error: unknown): boolean {
 export function ConfigTab({ agentId }: { agentId?: string } & Record<string, unknown>) {
 	const { t } = useTranslation("agentBuilder");
 	const query = useGetAgentConfigQuery(agentId ?? "", { skip: !agentId });
+	const [, saved] = usePutAgentConfigMutation({ fixedCacheKey: saveKey(agentId ?? "") });
 	if (!agentId) return null;
 	if (query.isLoading) return <BlockSkeleton rows={6} testId="config-loading" />;
 	if (query.isError || !query.data) {
@@ -97,7 +119,28 @@ export function ConfigTab({ agentId }: { agentId?: string } & Record<string, unk
 		}
 		return <LoadError title={t("config.loadError")} error={query.error} onRetry={() => void query.refetch()} testId="config-error" />;
 	}
-	return <ConfigEditor key={query.data.sha256} doc={query.data} onReload={() => void query.refetch()} />;
+	// The answer of the last save, shown while the file is still the one it saved.
+	const last = saved.data && saved.data.id === agentId && saved.data.sha256 === query.data.sha256 ? saved.data : null;
+	return (
+		<div className="flex min-w-0 flex-col gap-4">
+			{last && <SavedNotice doc={last} />}
+			<ConfigEditor key={query.data.sha256} doc={query.data} onReload={() => void query.refetch()} />
+		</div>
+	);
+}
+
+/** "Saved as version n", or why the save kept the version. */
+function SavedNotice({ doc }: { doc: AgentConfigDoc }) {
+	const { t } = useTranslation("agentBuilder");
+	const n = doc.version ?? 0;
+	const text =
+		n <= 0 ? t("config.savedNoVersion") : doc.version_created ? t("config.savedVersion", { n }) : t("config.savedSameVersion", { n });
+	return (
+		<p role="status" className="text-chart-success-ink flex items-start gap-2 text-sm" data-testid="config-saved">
+			<CheckCircle2 className="mt-0.5 size-4" aria-hidden="true" />
+			{text}
+		</p>
+	);
 }
 
 /** One titled group of the config form. */
@@ -121,12 +164,15 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 	const [fields, setFields] = useState<AgentConfigFields>(doc.fields);
 	const [texts, setTexts] = useState<FormTexts>(() => textsOf(doc.fields));
 	const [yamlText, setYamlText] = useState(doc.yaml);
-	const [save, saveState] = usePutAgentConfigMutation();
+	const [save, saveState] = usePutAgentConfigMutation({ fixedCacheKey: saveKey(doc.id) });
+	// The save is shared with the tab; only a save this editor sent shows its error here.
+	const [sent, setSent] = useState(false);
 	const [validate, validateState] = useValidateAgentConfigMutation();
 	const [check, setCheck] = useState<{ ok: boolean; error?: string } | null>(null);
 
 	const formFields = (): AgentConfigFields => buildFields(fields, texts);
-	const dirty = view === "yaml" ? yamlText !== doc.yaml : JSON.stringify(formFields()) !== JSON.stringify(buildFields(doc.fields, textsOf(doc.fields)));
+	const dirty =
+		view === "yaml" ? yamlText !== doc.yaml : JSON.stringify(formFields()) !== JSON.stringify(buildFields(doc.fields, textsOf(doc.fields)));
 	const setText = (k: keyof FormTexts, v: string) => setTexts((cur) => ({ ...cur, [k]: v }));
 	const behavior = fields.behavior;
 	const setBehavior = <K extends keyof AgentBehaviorFields>(k: K, v: AgentBehaviorFields[K]) =>
@@ -154,11 +200,12 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 
 	const onValidate = async () => {
 		const res = await validate(view === "yaml" ? { yaml: yamlText } : { yaml: doc.yaml, fields: formFields() });
-		if ("data" in res && res.data) setCheck({ ok: res.data.ok, error: res.data.error });
+		setCheck(checkOf(res));
 	};
 
 	const onSave = async () => {
 		setCheck(null);
+		setSent(true);
 		if (view === "form" && yamlText !== doc.yaml) {
 			// The YAML view was edited before switching back: keep those edits, apply the form on top.
 			const res = await validate({ yaml: yamlText, fields: formFields() });
@@ -169,14 +216,23 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 			await save({ id: doc.id, yaml: res.data.yaml, if_match: doc.sha256 });
 			return;
 		}
-		await save(view === "yaml" ? { id: doc.id, yaml: yamlText, if_match: doc.sha256 } : { id: doc.id, fields: formFields(), if_match: doc.sha256 });
+		await save(
+			view === "yaml" ? { id: doc.id, yaml: yamlText, if_match: doc.sha256 } : { id: doc.id, fields: formFields(), if_match: doc.sha256 },
+		);
 	};
 
 	const set = <K extends keyof AgentConfigFields>(k: K, v: AgentConfigFields[K]) => setFields((cur) => ({ ...cur, [k]: v }));
 	const num = (k: "wall_s" | "cpus" | "mem_gb" | "turns", label: string) => (
 		<label className="flex flex-col gap-1 text-sm">
 			<span className="font-medium">{label}</span>
-			<Input type="number" min={0} step="any" value={fields[k] || ""} onChange={(e) => set(k, Number(e.target.value) || 0)} data-testid={`field-${k}`} />
+			<Input
+				type="number"
+				min={0}
+				step="any"
+				value={fields[k] || ""}
+				onChange={(e) => set(k, Number(e.target.value) || 0)}
+				data-testid={`field-${k}`}
+			/>
 		</label>
 	);
 	const text = (k: "model" | "provider" | "image" | "remote_url" | "a2a_card_url", label: string) => (
@@ -199,14 +255,19 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 							aria-selected={view === v}
 							disabled={v === "form" && !fileValid && view === "yaml" && yamlText === doc.yaml}
 							onClick={() => void switchTo(v)}
-							className={cn("rounded-md px-3 py-1 text-sm transition", view === v ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}
+							className={cn(
+								"rounded-md px-3 py-1 text-sm transition",
+								view === v ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
+							)}
 							data-testid={`config-view-${v}`}
 						>
 							{t(`config.${v}`)}
 						</button>
 					))}
 				</div>
-				<span className="text-muted-foreground ml-auto font-mono text-xs" title={doc.path}>{doc.path}</span>
+				<span className="text-muted-foreground ml-auto font-mono text-xs" title={doc.path}>
+					{doc.path}
+				</span>
 			</div>
 			{!fileValid && <p className="text-chart-warning-ink text-sm">{t("config.invalidFile")}</p>}
 
@@ -224,10 +285,28 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 						</label>
 						{behavior && (
 							<>
-								<BehaviorText label={ta("setup.notesProjectFile")} help={ta("setup.notesProjectFileHelp")} value={behavior.notes_project_file} onChange={(v) => setBehavior("notes_project_file", v)} testId="field-notes_project_file" />
-								<BehaviorText label={ta("setup.notesUserFile")} help={ta("setup.notesUserFileHelp")} value={behavior.notes_user_file} onChange={(v) => setBehavior("notes_user_file", v)} testId="field-notes_user_file" />
+								<BehaviorText
+									label={ta("setup.notesProjectFile")}
+									help={ta("setup.notesProjectFileHelp")}
+									value={behavior.notes_project_file}
+									onChange={(v) => setBehavior("notes_project_file", v)}
+									testId="field-notes_project_file"
+								/>
+								<BehaviorText
+									label={ta("setup.notesUserFile")}
+									help={ta("setup.notesUserFileHelp")}
+									value={behavior.notes_user_file}
+									onChange={(v) => setBehavior("notes_user_file", v)}
+									testId="field-notes_user_file"
+								/>
 								{behavior.notes_user_file && (
-									<BehaviorText label={ta("setup.notesUserPath")} help={ta("setup.notesUserPathHelp")} value={behavior.notes_user_path} onChange={(v) => setBehavior("notes_user_path", v)} testId="field-notes_user_path" />
+									<BehaviorText
+										label={ta("setup.notesUserPath")}
+										help={ta("setup.notesUserPathHelp")}
+										value={behavior.notes_user_path}
+										onChange={(v) => setBehavior("notes_user_path", v)}
+										testId="field-notes_user_path"
+									/>
 								)}
 							</>
 						)}
@@ -238,7 +317,12 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 						{behavior && (
 							<label className="flex flex-col gap-1 text-sm md:col-span-2">
 								<span className="font-medium">{ta("setup.fallbacks")}</span>
-								<Input value={texts.fallbacks} onChange={(e) => setText("fallbacks", e.target.value)} placeholder="gpt-4.1-mini, claude-haiku-4-5" data-testid="field-fallbacks" />
+								<Input
+									value={texts.fallbacks}
+									onChange={(e) => setText("fallbacks", e.target.value)}
+									placeholder="gpt-4.1-mini, claude-haiku-4-5"
+									data-testid="field-fallbacks"
+								/>
 								<span className="text-muted-foreground text-xs">{ta("setup.fallbacksHelp")}</span>
 							</label>
 						)}
@@ -273,9 +357,24 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 					<FormSection title={ta("setup.limits")} hint={ta("setup.limitsHint")} testId="setup-limits">
 						{behavior && (
 							<>
-								<BehaviorNumber label={ta("setup.maxRetries")} value={behavior.max_retries} onChange={(v) => setBehavior("max_retries", v)} testId="field-max_retries" />
-								<BehaviorNumber label={ta("setup.maxToolCalls")} value={behavior.max_tool_calls} onChange={(v) => setBehavior("max_tool_calls", v)} testId="field-max_tool_calls" />
-								<BehaviorNumber label={ta("setup.providerRetries")} value={behavior.provider_retries} onChange={(v) => setBehavior("provider_retries", v)} testId="field-provider_retries" />
+								<BehaviorNumber
+									label={ta("setup.maxRetries")}
+									value={behavior.max_retries}
+									onChange={(v) => setBehavior("max_retries", v)}
+									testId="field-max_retries"
+								/>
+								<BehaviorNumber
+									label={ta("setup.maxToolCalls")}
+									value={behavior.max_tool_calls}
+									onChange={(v) => setBehavior("max_tool_calls", v)}
+									testId="field-max_tool_calls"
+								/>
+								<BehaviorNumber
+									label={ta("setup.providerRetries")}
+									value={behavior.provider_retries}
+									onChange={(v) => setBehavior("provider_retries", v)}
+									testId="field-provider_retries"
+								/>
 							</>
 						)}
 						{num("turns", t("config.fields.turns"))}
@@ -299,7 +398,12 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 												type="checkbox"
 												checked={on}
 												onChange={(e) =>
-													setBehavior("capabilities", e.target.checked ? CAPABILITIES.filter((c) => c === cap || behavior.capabilities.includes(c)) : behavior.capabilities.filter((c) => c !== cap))
+													setBehavior(
+														"capabilities",
+														e.target.checked
+															? CAPABILITIES.filter((c) => c === cap || behavior.capabilities.includes(c))
+															: behavior.capabilities.filter((c) => c !== cap),
+													)
 												}
 												data-testid={`field-capability-${cap}`}
 											/>
@@ -364,12 +468,16 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 			)}
 
 			{check && (
-				<p role={check.ok ? "status" : "alert"} className={cn("flex items-start gap-2 text-sm", check.ok ? "text-chart-success-ink" : "text-destructive")} data-testid="config-check">
+				<p
+					role={check.ok ? "status" : "alert"}
+					className={cn("flex items-start gap-2 text-sm", check.ok ? "text-chart-success-ink" : "text-destructive")}
+					data-testid="config-check"
+				>
 					{check.ok && <CheckCircle2 className="mt-0.5 size-4" aria-hidden="true" />}
-					{check.ok ? t("config.valid") : check.error}
+					{check.ok ? t("config.checkValid") : check.error}
 				</p>
 			)}
-			{saveState.error && (
+			{sent && saveState.error && (
 				<div role="alert" className="text-destructive flex flex-wrap items-center gap-2 text-sm" data-testid="config-save-error">
 					{isConflict(saveState.error) ? t("config.conflict") : getBenchErrorMessage(saveState.error)}
 					{isConflict(saveState.error) && (
@@ -382,9 +490,9 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 			<RoleNote min="member" />
 			<div className="flex flex-wrap gap-2">
 				<RoleGate min="member" fallback={null}>
-				<Button onClick={() => void onSave()} disabled={!dirty || saveState.isLoading} data-testid="config-save">
-					{saveState.isLoading ? t("config.saving") : t("config.save")}
-				</Button>
+					<Button onClick={() => void onSave()} disabled={!dirty || saveState.isLoading} data-testid="config-save">
+						{saveState.isLoading ? t("config.saving") : t("config.save")}
+					</Button>
 				</RoleGate>
 				<Button variant="outline" onClick={() => void onValidate()} disabled={validateState.isLoading} data-testid="config-validate">
 					{t("config.validate")}
@@ -407,7 +515,19 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 }
 
 /** A text field of the behavior group, with one line of help. */
-function BehaviorText({ label, help, value, onChange, testId }: { label: string; help: string; value: string; onChange: (v: string) => void; testId: string }) {
+function BehaviorText({
+	label,
+	help,
+	value,
+	onChange,
+	testId,
+}: {
+	label: string;
+	help: string;
+	value: string;
+	onChange: (v: string) => void;
+	testId: string;
+}) {
 	return (
 		<label className="flex flex-col gap-1 text-sm">
 			<span className="font-medium">{label}</span>
@@ -418,11 +538,28 @@ function BehaviorText({ label, help, value, onChange, testId }: { label: string;
 }
 
 /** A whole-number field of the behavior group; empty or 0 means no limit. */
-function BehaviorNumber({ label, value, onChange, testId }: { label: string; value: number; onChange: (v: number) => void; testId: string }) {
+function BehaviorNumber({
+	label,
+	value,
+	onChange,
+	testId,
+}: {
+	label: string;
+	value: number;
+	onChange: (v: number) => void;
+	testId: string;
+}) {
 	return (
 		<label className="flex flex-col gap-1 text-sm">
 			<span className="font-medium">{label}</span>
-			<Input type="number" min={0} step={1} value={value || ""} onChange={(e) => onChange(Math.max(0, Math.trunc(Number(e.target.value) || 0)))} data-testid={testId} />
+			<Input
+				type="number"
+				min={0}
+				step={1}
+				value={value || ""}
+				onChange={(e) => onChange(Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
+				data-testid={testId}
+			/>
 		</label>
 	);
 }

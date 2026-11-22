@@ -14,9 +14,9 @@ import { benchApi } from "./benchApi";
 
 /**
  * Agent builder routes (web parity L08): the template catalog, create from a template, and the
- * config editor. Creating or saving an agent refreshes the agents list.
+ * config editor. Creating or saving an agent refreshes the agents list and its versions.
  */
-export const agentBuilderApi = benchApi.enhanceEndpoints({ addTagTypes: ["AgentConfig"] }).injectEndpoints({
+export const agentBuilderApi = benchApi.enhanceEndpoints({ addTagTypes: ["AgentConfig", "AgentVersions"] }).injectEndpoints({
 	endpoints: (builder) => ({
 		getAgentTemplates: builder.query<AgentTemplateList, void>({
 			query: () => "/agents/templates",
@@ -31,7 +31,8 @@ export const agentBuilderApi = benchApi.enhanceEndpoints({ addTagTypes: ["AgentC
 		}),
 		putAgentConfig: builder.mutation<AgentConfigDoc, AgentConfigPut>({
 			query: ({ id, ...body }) => ({ url: `/agents/${encodeURIComponent(id)}/config`, method: "PUT", body }),
-			invalidatesTags: (_r, _e, arg) => [{ type: "AgentConfig", id: arg.id }, "BenchAgents"],
+			// A save can make a new agent version, so the Versions tab reloads too.
+			invalidatesTags: (_r, _e, arg) => [{ type: "AgentConfig", id: arg.id }, { type: "AgentVersions", id: arg.id }, "BenchAgents"],
 		}),
 		/** Sends one sample task to an endpoint agent (J3); waits up to about two minutes. */
 		testEndpoint: builder.mutation<EndpointTestResult, EndpointTestRequest>({
