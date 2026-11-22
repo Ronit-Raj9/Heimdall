@@ -42,6 +42,12 @@ type CommandConfig struct {
 	// GatewayPublicURL is how a remote agent on another machine reaches
 	// Bifrost (gateway.public_url); remote_http only. Empty uses GatewayAgentURL.
 	GatewayPublicURL string
+
+	// Y11 pull-mode agents (adapters/pull.go): OrgID is the organization
+	// whose runs this registry plans ("" in local mode), PullURL the base
+	// URL a run's launcher reaches the pull routes at (lib.Config.PullRunURL).
+	OrgID   string
+	PullURL string
 }
 
 type commandAdapter struct {

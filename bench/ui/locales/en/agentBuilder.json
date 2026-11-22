@@ -198,5 +198,33 @@
 		"copy": "Copy",
 		"copied": "Copied",
 		"previewError": "Could not make the workflow file"
+	},
+	"pull": {
+		"form": {
+			"intro": "Your agent runs in your own process and asks Heimdall for each turn. After you create it, the Setup tab shows the code that serves it.",
+			"benchDrives": "Heimdall drives the chat",
+			"benchDrivesHelp": "Heimdall plays the user and sends your agent one message per turn.",
+			"history": "Chat history",
+			"historyClient": "Send the whole chat each turn",
+			"historyServer": "Agent keeps its own history",
+			"repo": "Coding tasks: send the repository, take a patch back",
+			"repoHelp": "Your agent gets a link to the task's files and answers with a diff.",
+			"nameTaken": "An agent with this name already exists. Pick another name."
+		},
+		"panel": {
+			"title": "Serve this agent from your code",
+			"checking": "Checking",
+			"connected": "Connected",
+			"offline": "Not connected",
+			"processes": "Processes",
+			"lastSeen": "Last seen",
+			"never": "Never",
+			"queued": "Waiting turns",
+			"queuedValue": "{{queued}} waiting, {{inFlight}} answering",
+			"help": "Run one of these in your code with an API token in HEIMDALL_TOKEN. It serves the agent named \"{{name}}\".",
+			"python": "Python code that serves this agent",
+			"typescript": "TypeScript code that serves this agent",
+			"refuse": "Evaluations refuse to start a run while no process serves this agent."
+		}
 	}
 }

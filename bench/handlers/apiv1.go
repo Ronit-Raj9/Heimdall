@@ -83,6 +83,11 @@ var V1Routes = []V1Route{
 
 	v1("GET", "/leaderboard/agents", "/leaderboard/agents"),
 
+	// Y11 pull-mode agents: what heimdall.serve calls.
+	v1("POST", "/pull/next", "/pull/next"),
+	v1("POST", "/pull/turns/{id}/answer", "/pull/turns/{id}/answer"),
+	v1("GET", "/pull/agents", "/pull/agents"),
+
 	v1("GET", "/runs", "/runs"),
 	v1("GET", "/runs/{id}", "/runs/{id}"),
 	v1("GET", "/runs/{id}/steps", "/runs/{id}/steps"),

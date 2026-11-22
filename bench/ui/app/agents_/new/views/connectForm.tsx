@@ -51,7 +51,7 @@ export function defaultParams(tpl: AgentTemplate): Params {
 
 /** Whether the model picker is hidden: the agent picks its own model (an A2A agent, or an HTTP endpoint whose model calls do not go through Heimdall). */
 export function picksOwnModel(tpl: AgentTemplate, params: Params): boolean {
-	if (tpl.adapter === "a2a") return true;
+	if (tpl.adapter === "a2a" || tpl.adapter === "pull") return true;
 	if (tpl.adapter === "remote_http") return params.model_traffic !== "true";
 	return false;
 }
@@ -504,6 +504,90 @@ export function EndpointPreviewView({ data, error, loading }: { data?: { ok: boo
 				</p>
 			)}
 			{!data && !error && !loading && <p className="text-muted-foreground text-xs">{t("new.endpointPreview.empty")}</p>}
+
+/**
+ * "Your own code (pull mode)": the agent runs in the customer's process (heimdall.serve) and
+ * takes each turn from Heimdall. The server has no template for it, so the form writes the YAML
+ * itself through the config route.
+ */
+export const PULL_TEMPLATE: AgentTemplate = {
+	id: "pull",
+	name: "Your own code (pull mode)",
+	category: "bring-your-own",
+	description: "Your agent runs in your own process and asks Heimdall for work. Nothing has to reach your network.",
+	adapter: "pull",
+	providers: [],
+	default_model: "",
+	builds: false,
+	params: [],
+};
+
+/** The gallery's templates with the pull option added once, after the bring-your-own ones. */
+export function withPullTemplate(templates: readonly AgentTemplate[]): AgentTemplate[] {
+	return templates.some((x) => x.adapter === "pull") ? [...templates] : [...templates, PULL_TEMPLATE];
+}
+
+export interface PullOptions {
+	/** Heimdall drives the chat (conversation.driver bench). */
+	benchDrives: boolean;
+	history: "client" | "server";
+	/** Coding tasks: send the repository, take a patch back (repo tarball). */
+	repo: boolean;
+}
+
+export const DEFAULT_PULL_OPTIONS: PullOptions = { benchDrives: false, history: "client", repo: false };
+
+/** The YAML of a new pull agent; pull.name is the agent id, which heimdall.serve registers under. */
+export function pullAgentYAML(id: string, o: PullOptions, notes?: string): string {
+	// Notes go in as comments: the YAML's notes key is the agent's instructions file, not free text.
+	const lines = (notes ?? "").trim() ? notes!.trim().split("\n").map((l) => `# ${l}`) : [];
+	lines.push(`id: ${id}`, "adapter: pull", "image: bench/coding-core-base:1");
+	lines.push("budgets:", "  wall_s: 900", "  cpus: 1", "  mem_gb: 2", "pull:", `  name: ${id}`);
+	if (o.repo) lines.push("  repo: tarball");
+	if (o.benchDrives) lines.push("  conversation:", "    driver: bench", `    history: ${o.history}`);
+	return lines.join("\n") + "\n";
+}
+
+/** The pull agent's options: who drives the chat, and whether coding tasks send the repository. */
+export function PullOptionsFields({ value, onChange }: { value: PullOptions; onChange(v: PullOptions): void }) {
+	const { t } = useTranslation("agentBuilder");
+	return (
+		<div className="flex flex-col gap-4" data-testid="pull-fields">
+			<p className="text-muted-foreground text-xs">{t("pull.form.intro")}</p>
+			<label className="flex items-start gap-2 text-sm">
+				<input
+					type="checkbox"
+					className="mt-1"
+					checked={value.benchDrives}
+					onChange={(e) => onChange({ ...value, benchDrives: e.target.checked })}
+					data-testid="pull-bench-drives"
+				/>
+				<span className="flex flex-col gap-0.5">
+					<span className="font-medium">{t("pull.form.benchDrives")}</span>
+					<span className="text-muted-foreground text-xs">{t("pull.form.benchDrivesHelp")}</span>
+				</span>
+			</label>
+			{value.benchDrives && (
+				<label className="flex flex-col gap-1 text-sm">
+					<span className="font-medium">{t("pull.form.history")}</span>
+					<select
+						className="border-input bg-card h-9 rounded-md border px-3 text-sm"
+						value={value.history}
+						onChange={(e) => onChange({ ...value, history: e.target.value === "server" ? "server" : "client" })}
+						data-testid="pull-history"
+					>
+						<option value="client">{t("pull.form.historyClient")}</option>
+						<option value="server">{t("pull.form.historyServer")}</option>
+					</select>
+				</label>
+			)}
+			<label className="flex items-start gap-2 text-sm">
+				<input type="checkbox" className="mt-1" checked={value.repo} onChange={(e) => onChange({ ...value, repo: e.target.checked })} data-testid="pull-repo" />
+				<span className="flex flex-col gap-0.5">
+					<span className="font-medium">{t("pull.form.repo")}</span>
+					<span className="text-muted-foreground text-xs">{t("pull.form.repoHelp")}</span>
+				</span>
+			</label>
 		</div>
 	);
 }

@@ -29,6 +29,13 @@ their filename (relative, no "..", no hidden segments). One a2a_report line
 on stdout sums what was sent and received; the bench joins it with
 Bifrost's agent log.
 
+Conversation (lane Y11, BENCH_CONV_USERS set): the bench drives a chat
+task. Each simulated customer message is one SendMessage in the same
+contextId (with the taskId while the task is input-required); the agent's
+reply is the task's status message when it asks for input, else its text
+artifacts or direct message. The first message's metadata carries the task
+instruction (heimdall.instruction).
+
 BENCH_A2A_FAULT (set by the a2a probe layer) perturbs the client side of the
 stream: {"stream": "drop", "after_events": n} closes the stream after n
 events, {"stream": "delay", "delay_ms": n} stops reading for n ms after the
@@ -443,6 +450,68 @@ def follow_stream(gw, resp, conn, op, task, fault, deadline):
     return "early"
 
 
+def a2a_turn(gw, text, meta, context_id, task_id, deadline):
+    """One conversation turn over SendMessage: the customer's message in the
+    conversation's context (and the task, while it waits for input); follows
+    the task until it ends or asks for input. Returns the Task."""
+    message = {"messageId": str(uuid.uuid4()), "role": "ROLE_USER", "parts": [{"text": text}], "metadata": {"heimdall": meta}}
+    if context_id:
+        message["contextId"] = context_id
+    if task_id:
+        message["taskId"] = task_id
+    task = Task()
+    op, result = gw.call("SendMessage", {"message": message})
+    task.take_event(result)
+    op["task_id"] = task.id
+    polls = 0
+    while task.id and task.state and task.state not in TERMINAL and task.state not in STOPPED:
+        if time.time() + 1 > deadline:
+            finish(1, "the task was still %s at the timeout (%d polls)" % (task.state, polls))
+        time.sleep(1.0 if polls < 30 else 3.0)
+        polls += 1
+        pop, snap = gw.call("GetTask", {"id": task.id})
+        pop["task_id"] = task.id
+        task.take_task(snap)
+    return task
+
+
+def converse(gw, instruction, meta, deadline, output, answer_path):
+    """Y11: the bench drives the conversation (heimdall_conv.drive). Every
+    customer message goes to the same A2A context; a task that asks for input
+    is continued with the next message, as A2A multi-turn works. The first
+    message also carries the task instruction as a second text part."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import heimdall_conv  # noqa: E402
+    state = {"context": "", "task": ""}
+    meta = dict(meta, conversation=True)
+
+    def agent_turn(user_text, _messages, turn):
+        m = dict(meta, turn=turn)
+        if turn == 1:
+            m["instruction"] = instruction
+        task = a2a_turn(gw, user_text, m, state["context"], state["task"], deadline)
+        state["context"] = task.context_id or state["context"]
+        state["task"] = task.id if task.state == "TASK_STATE_INPUT_REQUIRED" else ""
+        if task.state in ("TASK_STATE_FAILED", "TASK_STATE_REJECTED", "TASK_STATE_CANCELED", "TASK_STATE_AUTH_REQUIRED"):
+            REPORT["final_state"] = task.state
+            return ""
+        if task.state == "TASK_STATE_INPUT_REQUIRED":
+            return task.status_text or task.answer() or task.message_text
+        return task.answer() or task.message_text
+
+    try:
+        summary, last, _ = heimdall_conv.drive(agent_turn, emit, deadline)
+    except heimdall_conv.ConversationError as e:
+        finish(1, str(e))
+    REPORT["conversation"] = {k: summary[k] for k in ("agent_turns", "ended_by", "user_server")}
+    REPORT["context_id"] = state["context"]
+    if output == "answer":
+        write_answer(answer_path, last or "")
+    FINAL["text"] = last
+    emit({"type": "result", "answer_bytes": len((last or "").encode("utf-8"))})
+    finish(0)
+
+
 def main():
     started = time.time()
     timeout = float(os.environ.get("BENCH_A2A_TIMEOUT_S", "600"))
@@ -467,6 +536,8 @@ def main():
             entry = dict(entry)
             entry["token"] = gate_auth
             meta["tools"][name] = entry
+    if os.environ.get("BENCH_CONV_USERS"):
+        converse(gw, instruction, meta, deadline, output, answer_path)
     parts = [{"text": instruction}]
     if files_root and os.path.isdir(files_root):
         files = workspace_files(files_root, os.path.abspath(answer_path))

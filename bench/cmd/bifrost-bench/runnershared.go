@@ -689,6 +689,7 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 	}); ok { // G3 B7: free the org's fault proxy slots when its claim ends
 		defer func() { _ = rel.ReleaseOrgCredentials(context.WithoutCancel(ctx), org) }()
 	}
+	reg = withPullOrg(reg, oa, planRoot, org) // Y11: pull agents' run tokens name the org
 	labels := []string{"shared", "runtime=" + h.runtime}
 	if claim.Platform != nil { // X19a: the org's own sandbox platform runs its runs
 		pr, err := sandboxRegistry(ctx, oa, reg, claim.Platform)

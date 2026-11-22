@@ -35,6 +35,17 @@ func TaskOK(agent *schemas.AgentConfig, s *schemas.Suite, t *schemas.Task) (bool
 			return false, "it checks the state of the task's tools, and its tasks have no MCP tools an OpenAI-compatible endpoint could call"
 		}
 		return true, ""
+	case utils.IsPullAgent(agent): // Y11
+		if ok, why := utils.PullOutputAllowed(agent.Pull, kind); !ok {
+			if kind == schemas.OutputDiff || kind == schemas.OutputState {
+				return false, why
+			}
+			return false, outsideReason(kind, "a pull agent")
+		}
+		if kind == schemas.OutputState && !hasMCP(s, t) {
+			return false, "it checks the state of the task's tools, and its tasks have no MCP tools a pull agent could call"
+		}
+		return true, ""
 	case utils.IsA2A(agent):
 		return remoteTaskOK(utils.A2ARemoteView(agent.A2A), s, t, kind, "an A2A agent", "a2a")
 	case agent.Adapter == "remote_http" || agent.Remote != nil:
@@ -68,7 +79,7 @@ func ChecksTasks(agent *schemas.AgentConfig) bool {
 	if agent == nil {
 		return false
 	}
-	return utils.IsOpenAIAgent(agent) || utils.IsA2A(agent) || agent.Adapter == "remote_http" || agent.Remote != nil || utils.IsBareModel(agent)
+	return utils.IsOpenAIAgent(agent) || utils.IsA2A(agent) || utils.IsPullAgent(agent) || agent.Adapter == "remote_http" || agent.Remote != nil || utils.IsBareModel(agent)
 }
 
 func remoteTaskOK(r *schemas.RemoteAgent, s *schemas.Suite, t *schemas.Task, kind, who, block string) (bool, string) {
@@ -83,6 +94,10 @@ func remoteTaskOK(r *schemas.RemoteAgent, s *schemas.Suite, t *schemas.Task, kin
 		return false, fmt.Sprintf("it checks the state of the task's tools, and %s does not get Heimdall's tools: turn on tool access (%s.tools: expose)", who, block)
 	case schemas.OutputArtifact:
 		return false, fmt.Sprintf("it grades files the agent produces, and %s does not return files in its answer: turn on file answers (%s.artifacts: inline)", who, block)
+	case schemas.OutputDiff:
+		if block == "remote" { // Y11: repo in, patch out
+			return false, fmt.Sprintf("it grades changes to a code workspace, and %s runs outside that workspace: turn on repo in, patch out (remote.repo: tarball)", who)
+		}
 	}
 	return false, outsideReason(kind, who)
 }

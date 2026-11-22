@@ -22,6 +22,9 @@ import (
 func remoteCoverageEnv(rc *schemas.RunContext, spec *schemas.RemoteAgent, env map[string]string) error {
 	if utils.RemoteToolsExposed(rc.Agent) && rc.RemoteTools != nil {
 		urls := utils.AllowedRemoteTools(utils.RemoteToolURLs(rc.RemoteTools), spec.ToolAllow)
+		if spec.Conversation.BenchDriven() { // Y11: the bench speaks to the customer, not the agent
+			urls = utils.DropServices(urls, utils.UserOnlyServices(rc.Services))
+		}
 		if len(urls) > 0 {
 			raw, err := json.Marshal(urls)
 			if err != nil {

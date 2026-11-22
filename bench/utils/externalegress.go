@@ -128,7 +128,7 @@ func (e *ExternalEgress) Stop(ctx context.Context) {
 		return
 	}
 	for _, n := range e.names {
-		r := &RemoteEgress{d: e.d, name: n, logger: e.logger}
+		r := &RemoteEgress{d: e.d, names: []string{n}, logger: e.logger}
 		r.Stop(ctx)
 	}
 }

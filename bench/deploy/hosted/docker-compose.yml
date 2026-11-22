@@ -215,6 +215,7 @@ services:
       HEIMDALL_SERVER_ADMIN_IDS: ${HEIMDALL_SERVER_ADMIN_IDS:-}
       HEIMDALL_MASTER_KEY: ${HEIMDALL_MASTER_KEY:-}
       HEIMDALL_SHARED_RUNNER_SECRET: ${HEIMDALL_SHARED_RUNNER_SECRET:-}
+      HEIMDALL_PULL_SIGNING_KEY: ${HEIMDALL_PULL_SIGNING_KEY:-} # pull-mode agents (docs/pull-agents.md)
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
       # First estimates (docs/evaluations.md, Budget and estimates): the run
       # store of the platform org that runs reference agents on the library
@@ -453,6 +454,8 @@ services:
     environment:
       HOME: /tmp
       HEIMDALL_SHARED_RUNNER_SECRET: ${HEIMDALL_SHARED_RUNNER_SECRET:-}
+      HEIMDALL_PULL_SIGNING_KEY: ${HEIMDALL_PULL_SIGNING_KEY:-} # pull-mode agents: the same key as the server
+      BENCH_PULL_URL: ${HEIMDALL_PUBLIC_URL:-https://${HEIMDALL_DOMAIN}} # where a pull run's launcher reaches the server
       HEIMDALL_SHARED_RUNTIME: ${HEIMDALL_SHARED_RUNTIME:-auto}
       # Operator override, logged on every start: run under runc when the
       # host has no gVisor, serving only orgs a server admin set to runc.

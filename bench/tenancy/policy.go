@@ -210,12 +210,29 @@ var PlatformPolicy = map[string]Rule{
 	key("POST", "/mcp"):   public(),
 	key("GET", "/mcp"):    public(), // 405: no server-sent stream
 	key("DELETE", "/mcp"): public(), // 405: no sessions to end
+	// Y11 pull-mode agents (handlers/pullagent.go, platform routes): the agent's own process
+	// takes and answers turns with an org API token; a run's launcher uses
+	// its signed run token (checked by the handler), and a repository link
+	// carries its own signature and expiry.
+	key("POST", api+"/pull/next"):              org(member),
+	key("POST", api+"/pull/turns/{id}/answer"): org(member),
+	key("GET", api+"/pull/agents"):             org(viewer),
+	key("POST", api+"/pull/run/turns"):         public(),
+	key("GET", api+"/pull/run/turns/{id}"):     public(),
+	key("POST", api+"/pull/run/repos"):         public(),
+	key("GET", api+"/pull/repos/{id}"):         public(),
 }
 
 // OrgPolicy covers the org-scoped bench API: the routes every org's router
 // registers (server.Deps handlers). GET = viewer; POST that starts or
 // records work = member; worker routes = runner of the org.
 var OrgPolicy = map[string]Rule{
+	// Y11 pull-mode agents, the serving process's side: also platform
+	// routes (PlatformPolicy), which the dispatcher matches first.
+	key("POST", api+"/pull/next"):              org(member),
+	key("POST", api+"/pull/turns/{id}/answer"): org(member),
+	key("GET", api+"/pull/agents"):             org(viewer),
+
 	key("GET", api+"/health"):       org(viewer),
 	key("GET", api+"/doctor"):       deny("preflight checks describe the hosting server, not an org"),
 	key("GET", api+"/catalog"):      org(viewer),

@@ -68,6 +68,7 @@ func (p *Planner) checkScenario(suite *schemas.Suite, conds, compatConds []condP
 			errs = append(errs, remoteTaskErrs(suite, t, remote, remoteCfg)...) // Remote coverage (scenarioremote.go)
 			errs = append(errs, a2aTaskErrs(suite, t, arms, nil)...)            // B1: a2a arms (a2a.go)
 			errs = append(errs, openaiTaskErrs(suite, t, arms, nil)...)         // A08: openai_agent arms (openaiagent.go)
+			errs = append(errs, pullTaskErrs(suite, t, arms, nil)...)           // Y11: pull arms (pullagent.go)
 		}
 	}
 	if compat != nil {
@@ -76,6 +77,7 @@ func (p *Planner) checkScenario(suite *schemas.Suite, conds, compatConds []condP
 				errs = append(errs, remoteTaskErrs(suite, t, compatRemote, remoteCfg)...)
 				errs = append(errs, a2aTaskErrs(suite, t, nil, compat)...)
 				errs = append(errs, openaiTaskErrs(suite, t, nil, compat)...)
+				errs = append(errs, pullTaskErrs(suite, t, nil, compat)...)
 			}
 		}
 	}

@@ -48,14 +48,22 @@ func CheckRemoteAgent(r *schemas.RemoteAgent) error {
 	default:
 		return fmt.Errorf("remote.artifacts %q: want inline or none", r.Artifacts)
 	}
+	if err := CheckRepoMode(r.Repo, "remote"); err != nil { // Y11: repo in, patch out
+		return err
+	}
+	if err := CheckConversation(r.Conversation, "remote"); err != nil {
+		return err
+	}
 	return remotemap.Check(r) // Y10: request and response mapping, auth
 }
 
 // RemoteOutputAllowed says whether a remote agent can run a task with output
 // kind kind, and why not when it cannot. Answer always; state only with tools
 // exposed (it changes the services through the published tool proxy);
-// artifact only when it returns files inline; diff never, since the
-// workspace is not beside it. It is pure.
+// artifact only when it returns files inline; diff only with repo tarball
+// (Y11: the agent gets the workspace as a signed tarball URL and returns a
+// patch, which is applied to the workspace), since the workspace is not
+// beside it. It is pure.
 func RemoteOutputAllowed(r *schemas.RemoteAgent, kind string) (bool, string) {
 	switch kind {
 	case schemas.OutputAnswer:
@@ -70,6 +78,11 @@ func RemoteOutputAllowed(r *schemas.RemoteAgent, kind string) (bool, string) {
 			return true, ""
 		}
 		return false, "an artifact task needs remote.artifacts inline: a remote agent is not beside the workspace, so its files arrive only inline in its response"
+	case schemas.OutputDiff:
+		if r != nil && r.Repo == schemas.RepoTarball {
+			return true, ""
+		}
+		return false, "a coding task needs remote.repo tarball: a remote agent is not beside the workspace, so it gets the repository as a tarball and returns a patch"
 	default:
 		return false, "a remote agent is not beside the workspace, so it cannot produce a " + kind + " output"
 	}

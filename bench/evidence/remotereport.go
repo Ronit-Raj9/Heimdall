@@ -34,6 +34,17 @@ var remoteSecretRe = regexp.MustCompile(`(?i)(sk-[A-Za-z0-9_-]{8,}|bearer\s+[A-Z
 // A stream that cannot be read leaves the self-report channel off: the
 // report is optional and its absence is not an error.
 func CollectRemote(rc *schemas.RunContext, ev *schemas.Evidence) {
+	if rc != nil && ev != nil && rc.Agent != nil && rc.Agent.Remote == nil && rc.Agent.Pull != nil {
+		// Y11: a pull agent's tool calls run in the bench's launcher, through
+		// the run's tool proxy, so they are always on the tool ledger.
+		p := rc.Agent.Pull
+		view := &schemas.RemoteAgent{Tools: schemas.RemoteToolsExpose, Conversation: p.Conversation, Repo: p.Repo}
+		if p.Tools == schemas.OpenAIToolsOff {
+			view.Tools = schemas.RemoteToolsOff
+		}
+		ev.Remote = RemoteSummary(view, view.Tools == schemas.RemoteToolsExpose, nil)
+		return
+	}
 	if rc == nil || ev == nil || rc.Agent == nil || rc.Agent.Remote == nil {
 		return
 	}
@@ -71,6 +82,12 @@ func RemoteSummary(r *schemas.RemoteAgent, toolsPublished bool, rep *schemas.Rem
 	default:
 		out.Channels.Tools = schemas.RemoteChannelMissing
 		out.Unknown = append(out.Unknown, "tool calls (remote.tools expose, but nothing was published)")
+	}
+	if r.Conversation.BenchDriven() { // Y11
+		out.Trusted = append(out.Trusted, "the conversation (the bench drove every turn; the simulated user wrote the transcript)")
+	}
+	if r.Repo == schemas.RepoTarball { // Y11: remote_patch
+		out.Unknown = append(out.Unknown, "how a coding task's patch was made (remote_patch: the agent worked in its own sandbox; only the patch and its grade are the bench's)")
 	}
 	out.Channels.SelfReport = schemas.RemoteChannelOff
 	if rep != nil {

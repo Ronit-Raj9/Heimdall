@@ -157,30 +157,40 @@ type EgressRecord struct {
 	Started   time.Time `json:"started"`
 }
 
-// RemoteEgress is a started forwarder.
+// RemoteEgress is a started forwarder, or two.
 type RemoteEgress struct {
 	d      Docker
-	name   string
+	names  []string
 	logger schemas.Logger
 }
+
+// MaxRemoteEgress is how many destinations a plan may ask for: the agent's
+// own endpoint, the token endpoints its auth needs (Y10) and, for a remote
+// coding agent (Y11 repo in, patch out), Heimdall's pull endpoint that
+// keeps the workspace tarball. Each gets its own forwarder.
+const MaxRemoteEgress = 4
 
 // RemoteEgressName is the forwarder container's and its outbound network's
 // name for a run.
 func RemoteEgressName(runID string) string { return "bench-eg-" + runID }
+
+// remoteEgressNameN is the name of the run's forwarder for destination i.
+func remoteEgressNameN(runID string, i int) string {
+	if i == 0 {
+		return RemoteEgressName(runID)
+	}
+	return RemoteEgressName(runID) + "-" + strconv.Itoa(i+1)
+}
 
 // RemoteEgressAddr is where a run's launcher reaches its forwarder.
 func RemoteEgressAddr(runID string) string {
 	return RemoteEgressName(runID) + ":" + strconv.Itoa(RemoteEgressPort)
 }
 
-// MaxRemoteEgress caps the destinations of one plan: the agent's host and
-// the token endpoints its auth needs.
-const MaxRemoteEgress = 4
-
-// RemoteEgressAddrN is where a run's launcher reaches the forwarder port of
-// its i-th egress destination (0 is RemoteEgressAddr).
+// RemoteEgressAddrN is where a run's launcher reaches the forwarder of the
+// plan's destination i (0 is RemoteEgressAddr).
 func RemoteEgressAddrN(runID string, i int) string {
-	return RemoteEgressName(runID) + ":" + strconv.Itoa(RemoteEgressPort+i)
+	return remoteEgressNameN(runID, i) + ":" + strconv.Itoa(RemoteEgressPort)
 }
 
 // RemoteEgressTarget returns the host:port an http or https URL connects to.
@@ -199,13 +209,12 @@ func RemoteEgressTarget(raw string) (string, error) {
 	return net.JoinHostPort(u.Hostname(), port), nil
 }
 
-// StartRemoteEgress starts the forwarder a plan's Egress asks for, attached
-// to the agent's network, and records it in the run folder. A plan without
-// Egress gets nil and no forwarder. Up to MaxRemoteEgress destinations, each
-// on its own forwarder port.
-// The forwarder runs as nobody with every capability dropped, a read-only
-// root and small limits; it carries the run's labels, so the janitor removes
-// a leftover.
+// StartRemoteEgress starts the forwarders a plan's Egress asks for, one per
+// destination (at most MaxRemoteEgress), attached to the agent's network,
+// and records them in the run folder. A plan without Egress gets nil and no
+// forwarder. Each forwarder runs as nobody with every capability dropped, a
+// read-only root and small limits, and forwards to its one destination only;
+// it carries the run's labels, so the janitor removes a leftover.
 func StartRemoteEgress(ctx context.Context, d Docker, rc *schemas.RunContext, plan *schemas.RunPlan, network string) (*RemoteEgress, error) {
 	if plan == nil || len(plan.Egress) == 0 {
 		return nil, nil
@@ -216,9 +225,11 @@ func StartRemoteEgress(ctx context.Context, d Docker, rc *schemas.RunContext, pl
 	if len(plan.Egress) > MaxRemoteEgress {
 		return nil, fmt.Errorf("remote egress: %d destinations; at most %d are supported", len(plan.Egress), MaxRemoteEgress)
 	}
-	target := plan.Egress[0]
-	for _, t := range plan.Egress {
-		if err := checkHostPort(t); err != nil {
+	for _, target := range plan.Egress {
+		if err := checkHostPort(target); err != nil {
+			return nil, fmt.Errorf("remote egress: %w", err)
+		}
+		if err := checkEgressHost(target); err != nil { // G3 B6: public destinations only on the shared worker
 			return nil, fmt.Errorf("remote egress: %w", err)
 		}
 	}
@@ -231,27 +242,31 @@ func StartRemoteEgress(ctx context.Context, d Docker, rc *schemas.RunContext, pl
 	if network == "" || network == "none" || network == "host" || network == "bridge" {
 		return nil, fmt.Errorf("remote egress: agent network %q cannot be joined", network)
 	}
-	e := &RemoteEgress{d: d, name: RemoteEgressName(rc.Run.RunID), logger: rc.Logger}
+	e := &RemoteEgress{d: d, logger: rc.Logger}
 	if e.logger == nil {
 		e.logger = schemas.NoopLogger{}
 	}
 	labels := LabelArgs(rc.Run.ExpID, rc.Run.RunID)
-	steps := [][]string{
-		append(append([]string{"network", "create"}, labels...), e.name),
-		append(append(append(append([]string{"create", "--name", e.name}, labels...),
-			"--user", "65534", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only",
-			"--pids-limit", "64", "--memory", "64m", "--network", e.name, "-e", "BENCH_EGRESS_TARGET="+target, "-e", "BENCH_EGRESS_EXTRA="+extra),
-			egressGuardArgs()...), "--entrypoint", "python3", plan.Image, "-I", "-c", remoteForwarder),
-		{"network", "connect", network, e.name},
-		{"start", e.name},
-	}
-	for _, args := range steps {
-		if _, err := d.MustRun(ctx, args...); err != nil {
-			e.Stop(context.WithoutCancel(ctx))
-			return nil, fmt.Errorf("remote egress to %s: %w", target, err)
+	for i, target := range plan.Egress {
+		name := remoteEgressNameN(rc.Run.RunID, i)
+		e.names = append(e.names, name)
+		steps := [][]string{
+			append(append([]string{"network", "create"}, labels...), name),
+			append(append(append(append([]string{"create", "--name", name}, labels...),
+				"--user", "65534", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only",
+				"--pids-limit", "64", "--memory", "64m", "--network", name, "-e", "BENCH_EGRESS_TARGET="+target),
+				egressGuardArgs()...), "--entrypoint", "python3", plan.Image, "-I", "-c", remoteForwarder),
+			{"network", "connect", network, name},
+			{"start", name},
+		}
+		for _, args := range steps {
+			if _, err := d.MustRun(ctx, args...); err != nil {
+				e.Stop(context.WithoutCancel(ctx))
+				return nil, fmt.Errorf("remote egress to %s: %w", target, err)
+			}
 		}
 	}
-	rec := EgressRecord{Allowed: append([]string(nil), plan.Egress...), Forwarder: e.name, Joined: network, Started: time.Now().UTC()}
+	rec := EgressRecord{Allowed: append([]string(nil), plan.Egress...), Forwarder: strings.Join(e.names, ","), Joined: network, Started: time.Now().UTC()}
 	if rc.Dir != "" {
 		b, err := json.MarshalIndent(rec, "", "  ")
 		if err == nil {
@@ -265,23 +280,25 @@ func StartRemoteEgress(ctx context.Context, d Docker, rc *schemas.RunContext, pl
 	return e, nil
 }
 
-// Stop removes the forwarder and its outbound network. It is safe on nil and
-// after a partial start, where some of them do not exist; a removal that
+// Stop removes the forwarders and their outbound networks. It is safe on nil
+// and after a partial start, where some of them do not exist; a removal that
 // fails otherwise is logged and left to the janitor.
 func (e *RemoteEgress) Stop(ctx context.Context) {
 	if e == nil {
 		return
 	}
-	for _, args := range [][]string{{"rm", "-f", e.name}, {"network", "rm", e.name}} {
-		res, err := e.d.Run(ctx, args...)
-		if err == nil && res != nil && res.ExitCode != 0 {
-			msg := strings.TrimSpace(string(res.Stderr))
-			if low := strings.ToLower(msg); !strings.Contains(low, "no such") && !strings.Contains(low, "not found") {
-				err = fmt.Errorf("exit %d: %s", res.ExitCode, msg)
+	for _, name := range e.names {
+		for _, args := range [][]string{{"rm", "-f", name}, {"network", "rm", name}} {
+			res, err := e.d.Run(ctx, args...)
+			if err == nil && res != nil && res.ExitCode != 0 {
+				msg := strings.TrimSpace(string(res.Stderr))
+				if low := strings.ToLower(msg); !strings.Contains(low, "no such") && !strings.Contains(low, "not found") {
+					err = fmt.Errorf("exit %d: %s", res.ExitCode, msg)
+				}
 			}
-		}
-		if err != nil {
-			e.logger.Warn("remove remote egress forwarder; the janitor removes it later", "name", e.name, "step", args[0], "error", err.Error())
+			if err != nil {
+				e.logger.Warn("remove remote egress forwarder; the janitor removes it later", "name", name, "step", args[0], "error", err.Error())
+			}
 		}
 	}
 }
@@ -289,6 +306,9 @@ func (e *RemoteEgress) Stop(ctx context.Context) {
 // RemoteEgressNote is what the egress gate records for a remote_http run: the
 // one destination its launcher could reach. It is "" for every other run.
 func RemoteEgressNote(rc *schemas.RunContext) string {
+	if rc != nil && IsPullAgent(rc.Agent) { // Y11
+		return "pull agent: outbound traffic allowed only to Heimdall's pull endpoint through a per-run forwarder (" + RemoteEgressFile + " in the run folder); every other destination stays blocked"
+	}
 	if rc == nil || rc.Agent == nil || rc.Agent.Remote == nil {
 		return ""
 	}
@@ -298,6 +318,9 @@ func RemoteEgressNote(rc *schemas.RunContext) string {
 	}
 	note := "remote_http agent: outbound traffic allowed to exactly " + target +
 		" through a per-run forwarder (" + RemoteEgressFile + " in the run folder); every other destination stays blocked"
+	if rc.Agent.Remote.Repo == schemas.RepoTarball {
+		note += "; for coding tasks also to Heimdall's pull endpoint, which keeps the workspace tarball the agent downloads"
+	}
 	if RemoteToolsExposed(rc.Agent) {
 		note += "; inbound, the run's tool proxy may be published to the agent through a per-run gate behind a bearer token (" + schemas.RemoteToolsFile + " in the run folder when it was)"
 	}
@@ -324,6 +347,10 @@ const ExternalTrafficReason = "the remote agent's model calls do not go through 
 // from the gateway are unknown: the endpoint's model calls are its own.
 const OpenAIExternalReason = "the agent is an OpenAI-compatible endpoint whose model calls do not go through this gateway, so gateway tokens, cost and steps cannot be observed (the endpoint's own reported usage is in the agent trace)"
 
+// PullExternalReason is why a pull agent's run has no gateway tokens, cost
+// or steps: the customer's process calls its models itself.
+const PullExternalReason = "the agent runs in your own process (pull mode) and calls its models itself, so gateway tokens, cost and steps cannot be observed (the usage it reports is in the agent trace)"
+
 // MarkExternalTraffic marks the gateway request log of a run whose agent is
 // a remote_http service with external model traffic (the default) as
 // incomplete, with ExternalTrafficReason. Every metric built on the log
@@ -335,6 +362,11 @@ func MarkExternalTraffic(rc *schemas.RunContext, log *schemas.RequestLog) {
 			log.Complete = false
 			log.Reason = A2ANoCredentialReason
 		}
+		return
+	}
+	if rc != nil && IsPullAgent(rc.Agent) && log != nil { // Y11: a pull agent's process calls its models out of sight
+		log.Complete = false
+		log.Reason = PullExternalReason
 		return
 	}
 	if rc != nil && rc.Agent != nil && rc.Agent.OpenAI != nil && log != nil { // A08: an openai_agent endpoint calls its models out of sight

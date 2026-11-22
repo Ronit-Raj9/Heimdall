@@ -101,7 +101,7 @@ func TestStartRemoteEgress(t *testing.T) {
 	if !strings.Contains(strings.Join(got, "\n"), "BENCH_EGRESS_EXTRA=login.example.com:443") {
 		t.Fatalf("docker calls:\n%s", strings.Join(got, "\n"))
 	}
-	if RemoteEgressAddrN("r_1", 1) != "bench-eg-r_1:9301" {
+	if RemoteEgressAddrN("r_1", 1) != "bench-eg-r_1-2:9300" {
 		t.Fatal(RemoteEgressAddrN("r_1", 1))
 	}
 
@@ -121,6 +121,36 @@ func TestStartRemoteEgress(t *testing.T) {
 		if _, err := StartRemoteEgress(ctx, d, rc, tc.plan, tc.network); err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Fatalf("%v on %s: %v, want %q", tc.plan.Egress, tc.network, err, tc.want)
 		}
+	}
+}
+
+// Y11: a remote coding agent's run reaches its endpoint and Heimdall's pull
+// endpoint, each through its own forwarder.
+func TestStartRemoteEgressTwoDestinations(t *testing.T) {
+	d, log := fakeDocker(t, "")
+	rc := &schemas.RunContext{Run: &schemas.Run{RunID: "r_3", ExpID: "e_1"}, Dir: t.TempDir()}
+	e, err := StartRemoteEgress(context.Background(), d, rc, &schemas.RunPlan{Image: "img", Egress: []string{"agent.example.com:443", "heimdall.example.com:443"}}, "eval")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.Join(calls(t, log), "\n")
+	for _, want := range []string{"BENCH_EGRESS_TARGET=agent.example.com:443", "BENCH_EGRESS_TARGET=heimdall.example.com:443", "start bench-eg-r_3\n", "start bench-eg-r_3-2"} {
+		if !strings.Contains(got+"\n", want) {
+			t.Fatalf("calls lack %q:\n%s", want, got)
+		}
+	}
+	if RemoteEgressAddrN("r_3", 1) != "bench-eg-r_3-2:9300" || RemoteEgressAddrN("r_3", 0) != RemoteEgressAddr("r_3") {
+		t.Fatal("forwarder addresses")
+	}
+	var rec EgressRecord
+	b, _ := os.ReadFile(filepath.Join(rc.Dir, RemoteEgressFile))
+	if err := json.Unmarshal(b, &rec); err != nil || len(rec.Allowed) != 2 {
+		t.Fatalf("record %s %v", b, err)
+	}
+	e.Stop(context.Background())
+	got = strings.Join(calls(t, log), "\n")
+	if !strings.Contains(got, "rm -f bench-eg-r_3-2") || !strings.Contains(got, "network rm bench-eg-r_3\n") {
+		t.Fatalf("stop calls %s", got)
 	}
 }
 

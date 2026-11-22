@@ -22,6 +22,7 @@ import (
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/packs"
 	"github.com/maximhq/bifrost/bench/reference"
+	"github.com/maximhq/bifrost/bench/pullagent"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/taskhealth"
 	"github.com/valyala/fasthttp"
@@ -148,6 +149,8 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	handlers.NewWorkerTargetHandler(mode, nil, nil).RegisterRoutes(r, common...) // where runs go: hosted only; local mode answers 503 (handlers/workertarget.go)
 	// G4-03: the public reference board (handlers/reference.go).
 	handlers.NewReferenceHandler(mode, reference.Open(cfg.Path(cfg.RunsRoot))).RegisterRoutes(r, common...)
+	// Y11 pull-mode agents: the local runs' launchers (handlers/pullagent.go); the agent side is an org route (registerOrgRoutes).
+	handlers.NewPullAgentHandler(mode, pullagent.Shared(), pullagent.DefaultSigner(), false, cfg.PullPublicOrigin(), write).RegisterRunRoutes(r, common...)
 	if deps.UI != nil {
 		NewUIHandler(mode, deps.UI).RegisterRoutes(r)
 	}
@@ -185,6 +188,9 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	handlers.NewReadinessHandler(mode, deps.Version, deps.Ready).RegisterRoutes(r, common...) // Deploy area: GET /healthz and /readyz at the site root (handlers/readiness.go)
 	handlers.NewCatalogHandler(mode, deps.Catalog).RegisterRoutes(r, common...)
 	experiments.RegisterRoutes(r, common...)
+	// Y11 pull-mode agents, the serving process's side (handlers/pullagent.go). On a hosted
+	// server the platform router serves these routes first (cmd/bifrost-bench/pullagent_hosted.go).
+	handlers.NewPullAgentHandler(mode, pullagent.Shared(), pullagent.DefaultSigner(), false, cfg.PullPublicOrigin(), write).RegisterAgentRoutes(r, common...)
 	// Held-out tasks: a held-out task's run content needs held_out.visible too.
 	handlers.NewRunsHandler(mode, deps.Index).WithSuites(deps.Suites).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...)
 	handlers.NewRunListHandler(mode, deps.Index, deps.Suites).WithRoot(cfg.Root).RegisterRoutes(r, common...) // UI regroup (U2): GET /runs (handlers/runlist.go)

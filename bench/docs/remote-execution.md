@@ -159,7 +159,7 @@ Which tasks a remote agent can run (`utils.RemoteOutputAllowed`, checked when th
 | `answer` | always | the answer comes back in the response |
 | `state` | `tools: expose` and the task has a proxied service or external API | the deployment changes the services only through the published tool proxy |
 | `artifact` | `artifacts: inline` | the files arrive only inline in the response; a response without them leaves the artifact missing, which the grade reports |
-| `diff` | never | the workspace is not beside a remote agent |
+| `diff` | `repo: tarball` (repo in, patch out) | the workspace is not beside a remote agent, so it gets a signed, expiring link to a tarball of the base tree and returns a unified diff, which the bench applies and grades (docs/pull-agents.md, Repo in, patch out) |
 
 `agent check` with a remote agent adds a row, "remote agent: measured channels", that names which channels were active in the check run and what is therefore trusted, agent-reported or unknown; `evidence.json` carries the same summary under `remote`.
 
@@ -182,7 +182,9 @@ Content-Type: application/json
                                                              (only with tools expose)
 ```
 
-and waits up to `timeout_s` (default: the wall budget less 5 s). `session_id` is the session's id in a multi-session task (the run id otherwise) and `session_index` is 1-based. `output` is the task's output kind. `files` holds up to 100 small UTF-8 files of the workspace (256 KiB in all, hidden folders skipped); past those caps it is left out.
+With `remote.conversation: {driver: bench}` a chat task is driven turn by turn instead: one request per customer message, with `"output": "conversation"` and `"conversation": {"turn", "message", "history", "messages"?}` (docs/conversations.md). With `remote.repo: tarball` a coding task's request also carries `"repo": {"url", "format": "tar.gz", "sha256", "bytes", "expires_at", "files"}` and the answer may carry `"patch"`.
+
+The launcher waits up to `timeout_s` (default: the wall budget less 5 s). `session_id` is the session's id in a multi-session task (the run id otherwise) and `session_index` is 1-based. `output` is the task's output kind. `files` holds up to 100 small UTF-8 files of the workspace (256 KiB in all, hidden folders skipped); past those caps it is left out.
 
 **Request signing.** With `remote.sign_env` naming a host environment variable (at least 16 characters), every request carries `X-Heimdall-Timestamp` and `X-Heimdall-Signature: sha256=<hex HMAC-SHA256 of "<timestamp>.<raw body>">`. The deployment recomputes the HMAC over the exact bytes it received, compares in constant time and refuses a timestamp more than a few minutes old. That proves the caller holds the secret; it does not hide the body, so keep TLS on the URL.
 

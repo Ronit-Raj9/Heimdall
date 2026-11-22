@@ -75,6 +75,9 @@ type Config struct {
 	// GC, build cache prune, free disk floor; lib/runnerconfig.go).
 	Runner RunnerConfig `yaml:"runner" json:"runner,omitzero"`
 
+	// Pull is how pull-mode agents reach this server (lane Y11, lib/pullconfig.go).
+	Pull PullConfig `yaml:"pull" json:"pull,omitzero"`
+
 	Root string `yaml:"-" json:"-"` // bench root that relative paths resolve against
 }
 

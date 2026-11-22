@@ -443,6 +443,11 @@ type RemoteAgent struct {
 	// mutual TLS auth. nil keeps Heimdall's shape and the token above.
 	Mapping *RemoteMapping `json:"mapping,omitempty" yaml:"mapping"`
 	Auth    *RemoteAuth    `json:"auth,omitempty" yaml:"auth"`
+	// Lane Y11 (schemas/conversation.go). Conversation has the bench drive
+	// chat tasks turn by turn; Repo tarball lets the deployment run coding
+	// tasks (repo in, patch out).
+	Conversation *ConversationSpec `json:"conversation,omitempty" yaml:"conversation"`
+	Repo         string            `json:"repo,omitempty" yaml:"repo"` // tarball | none (default)
 }
 
 // ToolCall is one tool invocation recorded by the per-run tool proxy

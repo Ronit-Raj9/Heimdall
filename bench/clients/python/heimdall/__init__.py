@@ -8,6 +8,12 @@
 
 Every response carries the server ``mode`` (live, recorded or synthetic).
 
+To benchmark an agent that runs in your own process (pull mode), serve it:
+
+    import heimdall
+    heimdall.serve("support-bot", lambda turn: my_agent(turn.instruction),
+                   url="https://heimdall.example.com", token=os.environ["HEIMDALL_TOKEN"])
+
 For the public, versioned API (``/api/v1``) use :class:`heimdall.v1.V1Client`:
 
     from heimdall import V1Client
@@ -33,6 +39,8 @@ from .client import (
 )
 from .v1 import AgentReportCard, EvaluationResult, ReportCard, V1Client
 from .faults import FaultSession, FaultControlError, InjectedFaultError, InjectedTimeoutError, hook
+from .serve import Answer, ToolCall, Turn
+from .serve import serve  # heimdall.serve(agent, fn): run your own agent function (pull mode, docs/pull-agents.md)
 
 __version__ = "0.2.0"
 
@@ -55,4 +63,5 @@ __all__ = [
     "EvaluationResult",
     "__version__",
     "FaultSession", "FaultControlError", "InjectedFaultError", "InjectedTimeoutError", "hook",
+    "serve", "Answer", "ToolCall", "Turn",
 ]

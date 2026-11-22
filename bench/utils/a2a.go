@@ -75,7 +75,7 @@ func CheckA2AAgent(s *schemas.A2AAgent) error {
 		}
 		seen[m.ID] = true
 	}
-	return nil
+	return CheckConversation(s.Conversation, "a2a") // Y11
 }
 
 // A2AOutputAllowed says whether an a2a agent can produce a task's output
