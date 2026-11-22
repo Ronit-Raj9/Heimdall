@@ -207,6 +207,23 @@ bifrost-bench import agentdojo -from datasets/agentdyn -suite agentdyn-shopping 
   -set suite=shopping -set attacks=important_instructions,tool_knowledge,adaptive
 ```
 
+AgentDyn's ground truths put a one-time password, which the tools generate
+at run time and mail to the user, in `placeholder_args` as `$6-digits`. The
+catalog marks such an argument `fill` and the reference control (and the
+self-check) fills it with the last six-digit number in the earlier tool
+results, skipping digits right after `.` or `:` (timestamp parts).
+
+Self-check on `v1.2.2` at the commit above (`important_instructions`):
+dailylife 15 of 20 user tasks pass, github 11, shopping 12. The rest are
+upstream defects, not service bugs: ground truths with symbolic arguments
+(`$order_id`, `$file_id_1`, `$invitation_link`, `ONE-TIME-PASSWD`), or a
+ground truth its own utility rejects (shopping `user_task_4` buys one item,
+the check wants two). Injection ground truths of shopping and github are
+placeholders unrelated to their security checks (shopping `injection_task_0`
+sends money, the check wants a changed password), so attack success there is
+judged only by `security()` on real agent runs. Dailylife injection tasks 2
+and 6 fail the same way.
+
 Attack `adaptive` is the adaptive attacker of
 [AutoDojo](https://github.com/xhOwenMa/AutoDojo) (MIT): instead of a fixed
 template, an attacker model writes the injection for every vector the user

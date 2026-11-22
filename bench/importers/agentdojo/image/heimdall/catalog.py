@@ -26,7 +26,14 @@ from agentdojo.functions_runtime import FunctionsRuntime  # noqa: E402
 
 
 def calls(function_calls):
-    return [{"function": c.function, "args": json.loads(json.dumps(dict(c.args), default=str))} for c in function_calls]
+    out = []
+    for c in function_calls:
+        d = {"function": c.function, "args": json.loads(json.dumps(dict(c.args), default=str))}
+        fills = common.runtime_fills(c)
+        if fills:
+            d["fill"] = fills  # control.py reads these from earlier results
+        out.append(d)
+    return out
 
 
 def near_miss_passes(suite, task, start, calls_):
@@ -38,8 +45,10 @@ def near_miss_passes(suite, task, start, calls_):
     pre = start.model_copy(deep=True)
     post = start.model_copy(deep=True)
     runtime = FunctionsRuntime(suite.tools)
+    results = []
     for c in calls_:
-        runtime.run_function(post, c.function, c.args)
+        result, _ = runtime.run_function(post, c.function, common.fill_args(c.args, common.runtime_fills(c), results))
+        results.append(str(result))
     return common.check_utility(task, "", pre, post, list(calls_))
 
 

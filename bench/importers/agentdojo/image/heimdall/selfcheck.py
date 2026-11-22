@@ -55,8 +55,10 @@ def run(version, suite_name, user_task, calls, answer, attack="", injection_task
             # Upstream's ground truth for the environment as served, attack included.
             calls = svc.user_task.ground_truth(svc.pre.model_copy(deep=True))
         errors = []
+        results = []
         for c in calls:
-            text, is_error = svc.call(c.function, dict(c.args))
+            text, is_error = svc.call(c.function, common.fill_args(c.args, common.runtime_fills(c), results))
+            results.append(text)
             if is_error:
                 errors.append(f"{c.function}: {text[:200]}")
         with open(env["AGENTDOJO_STATE"], encoding="utf-8") as f:
