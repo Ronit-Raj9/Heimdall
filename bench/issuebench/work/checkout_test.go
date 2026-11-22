@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-const fakeToken = "ghp_FAKEtokenForCheckoutTests0123456789"
+const checkoutToken = "ghp_FAKEtokenForCheckoutTests0123456789"
 
 type gitCall struct {
 	env  []string
@@ -112,14 +112,14 @@ func TestCheckoutAtSHA(t *testing.T) {
 func TestCheckoutTokenOnlyInEnv(t *testing.T) {
 	s, first, _ := newServed(t)
 	dir := filepath.Join(t.TempDir(), "repo")
-	if err := (Checkouter{Git: s.git}).Checkout(context.Background(), s.repo, first, dir, fakeToken); err != nil {
+	if err := (Checkouter{Git: s.git}).Checkout(context.Background(), s.repo, first, dir, checkoutToken); err != nil {
 		t.Fatalf("checkout: %v", err)
 	}
-	header := base64.StdEncoding.EncodeToString([]byte("x-access-token:" + fakeToken))
+	header := base64.StdEncoding.EncodeToString([]byte("x-access-token:" + checkoutToken))
 	sawEnv := false
 	for _, c := range s.calls {
 		for _, a := range c.args {
-			if strings.Contains(a, fakeToken) || strings.Contains(a, header) {
+			if strings.Contains(a, checkoutToken) || strings.Contains(a, header) {
 				t.Fatalf("token in argv: %v", c.args)
 			}
 		}
@@ -140,7 +140,7 @@ func TestCheckoutTokenOnlyInEnv(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read %s: %v", f, err)
 		}
-		if strings.Contains(string(b), fakeToken) || strings.Contains(string(b), header) || strings.Contains(string(b), "extraheader") {
+		if strings.Contains(string(b), checkoutToken) || strings.Contains(string(b), header) || strings.Contains(string(b), "extraheader") {
 			t.Fatalf("%s holds the token:\n%s", f, b)
 		}
 	}
@@ -183,7 +183,7 @@ func TestCheckoutMissingCommit(t *testing.T) {
 	s, _, _ := newServed(t)
 	missing := strings.Repeat("0", 39) + "1"
 	dir := filepath.Join(t.TempDir(), "repo")
-	err := (Checkouter{Git: s.git}).Checkout(context.Background(), s.repo, missing, dir, fakeToken)
+	err := (Checkouter{Git: s.git}).Checkout(context.Background(), s.repo, missing, dir, checkoutToken)
 	if err == nil {
 		t.Fatal("missing commit checked out")
 	}
@@ -191,25 +191,25 @@ func TestCheckoutMissingCommit(t *testing.T) {
 	if !strings.Contains(msg, "could not fetch commit "+missing+" of acme/widget") {
 		t.Fatalf("not a plain error: %s", msg)
 	}
-	header := base64.StdEncoding.EncodeToString([]byte("x-access-token:" + fakeToken))
-	if strings.Contains(msg, fakeToken) || strings.Contains(msg, header) {
+	header := base64.StdEncoding.EncodeToString([]byte("x-access-token:" + checkoutToken))
+	if strings.Contains(msg, checkoutToken) || strings.Contains(msg, header) {
 		t.Fatalf("error holds the token: %s", msg)
 	}
 }
 
 func TestCheckoutErrorRedactsToken(t *testing.T) {
-	header := base64.StdEncoding.EncodeToString([]byte("x-access-token:" + fakeToken))
+	header := base64.StdEncoding.EncodeToString([]byte("x-access-token:" + checkoutToken))
 	git := func(_ context.Context, _ []string, args ...string) ([]byte, error) {
 		if contains(args, "fetch") {
-			return []byte("fatal: bad header Authorization: Basic " + header + " token " + fakeToken), errors.New("exit status 128")
+			return []byte("fatal: bad header Authorization: Basic " + header + " token " + checkoutToken), errors.New("exit status 128")
 		}
 		return nil, nil
 	}
-	err := (Checkouter{Git: git}).Checkout(context.Background(), "acme/widget", strings.Repeat("b", 40), t.TempDir(), fakeToken)
+	err := (Checkouter{Git: git}).Checkout(context.Background(), "acme/widget", strings.Repeat("b", 40), t.TempDir(), checkoutToken)
 	if err == nil {
 		t.Fatal("want an error")
 	}
-	if strings.Contains(err.Error(), fakeToken) || strings.Contains(err.Error(), header) || !strings.Contains(err.Error(), "[redacted]") {
+	if strings.Contains(err.Error(), checkoutToken) || strings.Contains(err.Error(), header) || !strings.Contains(err.Error(), "[redacted]") {
 		t.Fatalf("token not redacted: %s", err)
 	}
 }
@@ -231,11 +231,11 @@ func TestTokenEnv(t *testing.T) {
 	if TokenEnv("") != nil {
 		t.Fatal("empty token gives env")
 	}
-	env := TokenEnv(fakeToken)
+	env := TokenEnv(checkoutToken)
 	want := []string{
 		"GIT_CONFIG_COUNT=1",
 		"GIT_CONFIG_KEY_0=http.https://github.com/.extraheader",
-		"GIT_CONFIG_VALUE_0=Authorization: Basic " + base64.StdEncoding.EncodeToString([]byte("x-access-token:"+fakeToken)),
+		"GIT_CONFIG_VALUE_0=Authorization: Basic " + base64.StdEncoding.EncodeToString([]byte("x-access-token:"+checkoutToken)),
 	}
 	if strings.Join(env, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("TokenEnv = %v", env)

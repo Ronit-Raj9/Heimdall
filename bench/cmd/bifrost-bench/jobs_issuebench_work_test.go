@@ -163,7 +163,7 @@ func ibwFixture(t *testing.T, exec *ibwExec, public bool, github bool) (jobEnv, 
 	return env, ks, key, gw
 }
 
-func ibwRequest(mode string) issuebench.WorkRequest {
+func ibwServerRequest(mode string) issuebench.WorkRequest {
 	r := issuebench.WorkRequest{
 		Mode: mode, OrgID: "someone-else", Repo: "acme/widgets", Version: "2026-10",
 		Candidate: issuebench.Candidate{Repo: "acme/widgets", Issue: 42, BaseSHA: strings.Repeat("a", 40), TestPatch: "diff test", FixPatch: "diff fix"},
@@ -177,7 +177,7 @@ func ibwRequest(mode string) issuebench.WorkRequest {
 
 func ibwParams(t *testing.T, env jobEnv, mode string) json.RawMessage {
 	t.Helper()
-	raw, _ := json.Marshal(issuebench.WorkParams{Request: ibwRequest(mode), Consent: true})
+	raw, _ := json.Marshal(issuebench.WorkParams{Request: ibwServerRequest(mode), Consent: true})
 	norm, target, err := validateIssuebenchWork(context.Background(), env, raw)
 	if err != nil {
 		t.Fatal(err)
@@ -380,9 +380,9 @@ func TestIssuebenchWorkFailureRedacted(t *testing.T) {
 func TestIssuebenchWorkValidate(t *testing.T) {
 	env := jobEnv{OrgID: "org1", Hosted: true}
 	bad := []issuebench.WorkParams{
-		{Request: ibwRequest(issuebench.WorkModeBuild)}, // no consent
+		{Request: ibwServerRequest(issuebench.WorkModeBuild)}, // no consent
 		{Request: issuebench.WorkRequest{Mode: "x"}, Consent: true},
-		{Request: func() issuebench.WorkRequest { r := ibwRequest(issuebench.WorkModeValidate); r.Env = nil; return r }(), Consent: true},
+		{Request: func() issuebench.WorkRequest { r := ibwServerRequest(issuebench.WorkModeValidate); r.Env = nil; return r }(), Consent: true},
 	}
 	for _, p := range bad {
 		raw, _ := json.Marshal(p)
@@ -390,7 +390,7 @@ func TestIssuebenchWorkValidate(t *testing.T) {
 			t.Fatalf("%+v: %v", p, err)
 		}
 	}
-	raw, _ := json.Marshal(issuebench.WorkParams{Request: ibwRequest(issuebench.WorkModeBuild), Consent: true})
+	raw, _ := json.Marshal(issuebench.WorkParams{Request: ibwServerRequest(issuebench.WorkModeBuild), Consent: true})
 	norm, _, err := validateIssuebenchWork(context.Background(), env, raw)
 	if err != nil {
 		t.Fatal(err)
