@@ -171,7 +171,13 @@ func (t *tracker) decide(key string, p Plan, model string) Decision {
 func flakyFails(seed string, call int, prob float64) bool {
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(seed + ":" + strconv.Itoa(call)))
-	u := float64(h.Sum64()>>11) / float64(1<<53)
+	x := h.Sum64() // splitmix64 finalizer: FNV alone leaves the high bits correlated for near-identical inputs
+	x ^= x >> 30
+	x *= 0xbf58476d1ce4e5b9
+	x ^= x >> 27
+	x *= 0x94d049bb133111eb
+	x ^= x >> 31
+	u := float64(x>>11) / float64(1<<53)
 	return u < prob
 }
 
