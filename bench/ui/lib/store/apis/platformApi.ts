@@ -58,12 +58,22 @@ export const RUNNER_INSTALL_SCRIPT = `${BENCH_API_BASE}/runners/install.sh`;
 /** The runner guide in the repository. */
 export const RUNNER_INSTALL_DOC = "https://github.com/maximhq/bifrost/blob/main/bench/docs/runners.md";
 
-
 /** GET /orgs/{org}/audit request: empty filters left out so the server defaults apply. */
 export function auditLogRequest({ orgId, ...params }: AuditLogParams): string | { url: string; params: Record<string, string | number> } {
 	const url = `/orgs/${encodeURIComponent(orgId)}/audit`;
 	const search = Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined && value !== "" && value !== 0));
 	return Object.keys(search).length > 0 ? { url, params: search as Record<string, string | number> } : url;
+}
+
+/** POST /orgs body (handlers/orgs.go CreateOrgRequest): the caller becomes the owner. */
+export interface CreateOrgBody {
+	slug: string;
+	name: string;
+}
+
+/** The POST /orgs request for a new organization. */
+export function createOrgRequest({ slug, name }: CreateOrgBody) {
+	return { url: "/orgs", method: "POST", body: { name: name.trim(), slug: slug.trim() } };
 }
 
 /**
@@ -127,6 +137,12 @@ export const platformApi = benchApi.injectEndpoints({
 				const { data } = await queryFulfilled.catch(() => ({ data: undefined }));
 				if (data) switchedOrg(dispatch, data.id);
 			},
+		}),
+		// A new organization owned by the caller. The membership list comes from /auth/me, so that
+		// answer is refetched; the caller switches to the new org itself.
+		createOrg: builder.mutation<OrgResponse, CreateOrgBody>({
+			query: createOrgRequest,
+			invalidatesTags: ["AuthMe"],
 		}),
 		getInvitation: builder.query<InvitationPreviewResponse, string>({
 			query: (token) => `/auth/invitations/${id(token)}`,
@@ -275,6 +291,7 @@ export const {
 	useLogoutMutation,
 	useChangePasswordMutation,
 	useSwitchOrgMutation,
+	useCreateOrgMutation,
 	useGetInvitationQuery,
 	useAcceptInvitationMutation,
 	useListMembersQuery,
