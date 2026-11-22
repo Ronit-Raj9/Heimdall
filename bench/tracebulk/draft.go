@@ -128,7 +128,7 @@ func draftOne(ctx context.Context, ib *traceinbox.Inbox, c *Cluster, item string
 	dir := acc.Draft.Dir
 	taskID := filepath.Base(dir)
 	rubric := SuggestedRubric(sess, c)
-	checks, ids, err := ChecksYAML(taskID, sess, c, rubric, "")
+	checks, ids, err := ChecksYAML(taskID, sess, c, rubric, "", SuiteJudged(filepath.Join(ib.BenchmarksRoot, o.Suite)))
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func draftOne(ctx context.Context, ib *traceinbox.Inbox, c *Cluster, item string
 	if err != nil {
 		return nil, err
 	}
-	if err := writeFile(dir, ChecksFile, checks); err != nil {
+	if err := writeChecks(dir, checks); err != nil {
 		return nil, err
 	}
 	if err := writeFile(dir, ScenarioFile, scen); err != nil {
@@ -249,11 +249,11 @@ func Accept(benchRoot string, ib *traceinbox.Inbox, b *Batch, t *TaskDraft, r Re
 			}
 		}
 	}
-	checks, ids, err := ChecksYAML(t.ID, sess, c, rubric, who)
+	checks, ids, err := ChecksYAML(t.ID, sess, c, rubric, who, SuiteJudged(filepath.Dir(filepath.Dir(dir))))
 	if err != nil {
 		return err
 	}
-	if err := writeFile(dir, ChecksFile, checks); err != nil {
+	if err := writeChecks(dir, checks); err != nil {
 		return err
 	}
 	scen, err := ScenarioJSON(t.ID, sess, c, rubric, who)
@@ -546,4 +546,16 @@ func RefreshReadiness(benchRoot string, b *Batch, jobDone func(id string) bool) 
 			t.Readiness.Status = ReadyNotReady
 		}
 	}
+}
+
+// writeChecks writes the drafted checks.yaml, or removes it when there is
+// nothing to check (ChecksYAML returned no body).
+func writeChecks(dir string, checks []byte) error {
+	if checks == nil {
+		if err := os.Remove(filepath.Join(dir, filepath.FromSlash(ChecksFile))); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+		return nil
+	}
+	return writeFile(dir, ChecksFile, checks)
 }

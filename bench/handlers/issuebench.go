@@ -73,7 +73,11 @@ const issueBenchPrefix = APIPrefix + "/issuebench/runs"
 
 func init() {
 	RegisterOrgArea("issuebench", func(env OrgEnv, r *router.Router) {
-		h := &issueBenchHandler{mode: env.Mode, m: IssueBenchManager(env.Cfg.Root, func() pipeline.Stages {
+		root := "" // no config (handler tests that mount every org area): runs under ./issuebench
+		if env.Cfg != nil {
+			root = env.Cfg.Root
+		}
+		h := &issueBenchHandler{mode: env.Mode, m: IssueBenchManager(root, func() pipeline.Stages {
 			if IssueBenchStages == nil {
 				return pipeline.Stages{}
 			}

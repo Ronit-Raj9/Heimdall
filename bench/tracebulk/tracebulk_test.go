@@ -112,6 +112,18 @@ func newProject(t *testing.T) (*traceinbox.Inbox, string) {
 			t.Fatal(err)
 		}
 	}
+	// The tool-use benchmark is judged with a pinned judge, so its drafts
+	// carry the reply rubric check; the question and answer one is not, so
+	// its drafts leave the rubric out of checks.yaml (SuiteJudged).
+	sy := filepath.Join(bench, "tools", "suite.yaml")
+	cur, err := os.ReadFile(sy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cur = append(cur, []byte("grading: judged\njudge:\n  provider: openai\n  model: gpt-4o-mini\n  prompt_version: judge-v1\n")...)
+	if err := os.WriteFile(sy, cur, 0o644); err != nil {
+		t.Fatal(err)
+	}
 	ib := traceinbox.New(filepath.Join(root, traceinbox.Dir), nil, bench)
 	ib.ProjectRoot = root
 	ib.Now = func() time.Time { return testNow }
@@ -248,8 +260,10 @@ func TestPullClustersDraftReview(t *testing.T) {
 	if meta := read(t, filepath.Join(qdir, "task.yaml")); strings.Contains(meta, TagPendingReview) || !strings.Contains(meta, TagMaxim) {
 		t.Fatalf("reviewed task.yaml tags:\n%s", meta)
 	}
-	if c := read(t, filepath.Join(qdir, ChecksFile)); !strings.Contains(c, "reviewed and accepted by ana") {
-		t.Fatalf("reviewed checks:\n%s", c)
+	// The question and answer benchmark is not judged and no tool failed, so
+	// there is nothing for checks.yaml: the answer grader decides.
+	if _, err := os.Stat(filepath.Join(qdir, ChecksFile)); !os.IsNotExist(err) {
+		t.Fatalf("reviewed qa task has a checks.yaml (%v)", err)
 	}
 	if s, tk, err := suite.LoadTask(ib.BenchmarksRoot, "answers", qa.ID); err != nil {
 		t.Fatal(err)

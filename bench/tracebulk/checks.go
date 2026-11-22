@@ -9,7 +9,10 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/traceimport"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // Files a drafted task gets beside the inbox draft, in its hidden verifier
@@ -76,8 +79,13 @@ func SuggestedRubric(s *traceimport.Session, c *Cluster) string {
 
 // ChecksYAML writes checks.yaml for a session: every tool that failed in
 // production must now return a result without an error, and the reply must
-// meet the rubric. reviewed says whether a person confirmed it.
-func ChecksYAML(taskID string, s *traceimport.Session, c *Cluster, rubric string, reviewedBy string) ([]byte, []string, error) {
+// meet the rubric. reviewed says whether a person confirmed it. judged says
+// whether the benchmark is graded by a pinned judge (SuiteJudged): a
+// reply_rubric check needs one, so without it the rubric is left out of the
+// checks (it stays in scenario.json and requirements.md) and the header says
+// so. With nothing to check (no failed tool and no judged rubric) it returns
+// no body and the caller writes no checks.yaml.
+func ChecksYAML(taskID string, s *traceimport.Session, c *Cluster, rubric string, reviewedBy string, judged bool) ([]byte, []string, error) {
 	tools, errs := failedTools(s)
 	var list []checkYAML
 	used := map[string]bool{}
@@ -94,8 +102,12 @@ func ChecksYAML(taskID string, s *traceimport.Session, c *Cluster, rubric string
 		list = append(list, checkYAML{ID: id, Required: true, Description: desc,
 			ToolCalled: map[string]any{"tool": t, "succeeded": true}})
 	}
-	if strings.TrimSpace(rubric) != "" {
+	noJudge := strings.TrimSpace(rubric) != "" && !judged
+	if strings.TrimSpace(rubric) != "" && judged {
 		list = append(list, checkYAML{ID: "reply", Description: "what should have happened", ReplyRubric: strings.TrimSpace(rubric)})
+	}
+	if len(list) == 0 {
+		return nil, nil, nil // nothing to check: the caller writes no checks.yaml (an empty one fails lint)
 	}
 	ids := make([]string, 0, len(list))
 	for _, ch := range list {
@@ -122,8 +134,23 @@ func ChecksYAML(taskID string, s *traceimport.Session, c *Cluster, rubric string
 	} else {
 		h.WriteString("\n# Generated, then reviewed and accepted by " + oneLine(reviewedBy, 80) + ".")
 	}
+	if noJudge {
+		h.WriteString("\n# No reply rubric check: the benchmark does not declare grading: judged")
+		h.WriteString("\n# with a pinned judge, so the suggested rubric is only in scenario.json.")
+	}
 	h.WriteString("\n# The checks grader reads this file (docs/declarative-checks.md).\n")
 	return append([]byte(h.String()), body...), ids, nil
+}
+
+// SuiteJudged reports whether the benchmark in suiteDir declares grading:
+// judged and pins its judge (provider and model), which a reply_rubric
+// check needs (suite/checkslint.go). An unreadable suite.yaml is not judged.
+func SuiteJudged(suiteDir string) bool {
+	s, err := suite.LoadHead(suiteDir)
+	if err != nil {
+		return false
+	}
+	return utils.Grading(s) == schemas.GradingJudged && s.Judge != nil && s.Judge.Provider != "" && s.Judge.Model != ""
 }
 
 // scenarioRow is the Y14 scenario row shape (scaffold.ScenarioRow).
