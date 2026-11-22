@@ -125,6 +125,11 @@ func presetRequest(req *EvalEstimateRequest, p EvalPreset) *EvalEstimateRequest 
 		st := *req.Stream
 		r.Stream = &st
 	}
+	if req.Failover != nil { // normalizeFailover trims the fallbacks in place
+		f := *req.Failover
+		f.Fallbacks = slices.Clone(req.Failover.Fallbacks)
+		r.Failover = &f
+	}
 	r.Faults = slices.Clone(req.Faults)
 	for _, f := range p.Faults {
 		if !slices.Contains(r.Faults, f) {

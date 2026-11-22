@@ -148,9 +148,10 @@ func (a *app) cachedHistory(ctx context.Context, st forecast.Store, m *schemas.M
 	return h, hit && err == nil, err
 }
 
-// cachedLibraryRuns is libraryRuns (forecastlibrary.go) through
-// historyCache: every sealed run on m's suite version in the org's store
-// and the operator's library store. hit is true when no store was scanned.
+// cachedLibraryRuns is every sealed run on m's suite version in the org's
+// store and the operator's library store, through historyCache. A store that
+// cannot be read gives no runs: the estimate then says it cannot estimate.
+// hit is true when no store was scanned.
 func (a *app) cachedLibraryRuns(ctx context.Context, m *schemas.Manifest) ([]forecast.HistoryRun, bool) {
 	var out []forecast.HistoryRun
 	hit := true

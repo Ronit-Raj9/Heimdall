@@ -9,13 +9,11 @@ package main
 // summed into a range; no run, task output or org data of it is shown.
 
 import (
-	"context"
 	"os"
 	"strings"
 	"sync"
 
 	"github.com/maximhq/bifrost/bench/forecast"
-	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/store"
 )
 
@@ -43,25 +41,6 @@ func (a *app) operatorLibrary() forecast.Store {
 		libraryStore = st
 	})
 	return libraryStore
-}
-
-// libraryRuns is every sealed run on m's suite version in the org's store
-// and the operator's library store. A store that cannot be read gives no
-// runs: the estimate then says it cannot estimate, as before.
-func (a *app) libraryRuns(ctx context.Context, m *schemas.Manifest) []forecast.HistoryRun {
-	var out []forecast.HistoryRun
-	for _, st := range []forecast.Store{a.store, a.operatorLibrary()} {
-		if st == nil {
-			continue
-		}
-		h, err := forecast.LoadLibrary(ctx, st, m, sealedRunFile)
-		if err != nil {
-			a.logger.Warn("library runs not read", "experiment", m.ExpID, "error", err.Error())
-			continue
-		}
-		out = append(out, h.Runs...)
-	}
-	return out
 }
 
 // reprice is the price ratio from model from to model to, per input and

@@ -50,3 +50,24 @@ func TestEstimatePresetsConcurrent(t *testing.T) {
 		t.Fatalf("request changed: %+v", req)
 	}
 }
+
+// TestEstimatePresetsFailoverCopied: presets estimated side by side each get
+// their own copy of the failover option, whose fallbacks the estimate
+// normalizes in place; run with -race.
+func TestEstimatePresetsFailoverCopied(t *testing.T) {
+	src := &bothArmsForecast{}
+	req := &EvalEstimateRequest{Mode: "score", Arms: []EvalEstimateArm{{Label: "A", Agent: "codex", Model: "openai/gpt-4o"}}, Benchmarks: []string{"plain"},
+		Failover: &schemas.FailoverOption{Enabled: true, Fallbacks: []schemas.RouteTarget{{Model: " openai/gpt-4o-mini "}}}}
+	out := estimatePresets(context.Background(), estimateSuites(), src, req, nil, "", nil)
+	if len(out) != 3 {
+		t.Fatalf("presets %d, want 3", len(out))
+	}
+	if fb := req.Failover.Fallbacks[0]; fb.Model != " openai/gpt-4o-mini " || fb.Provider != "" {
+		t.Fatalf("caller's failover option changed: %+v", fb)
+	}
+	for _, p := range out {
+		if !slices.Contains(p.Faults, "primary-outage") {
+			t.Fatalf("preset %s faults %v, want the primary outage", p.ID, p.Faults)
+		}
+	}
+}
