@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/evidence"
+	"github.com/maximhq/bifrost/bench/modelid"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -371,7 +372,7 @@ func gatewayIntegrityEvents(rc *schemas.RunContext, log *schemas.RequestLog) []s
 // row was served by one of the declared fallback models.
 func declaredFallback(agent *schemas.AgentConfig, req schemas.GatewayRequest) bool {
 	same := func(m string) bool {
-		return m == req.ModelServed || strings.HasSuffix(req.ModelServed, "/"+m) || strings.HasSuffix(m, "/"+req.ModelServed)
+		return modelid.SameModel(m, req.ModelServed) // fix wave 3, N200: the one "same model" rule (a dated snapshot of a declared model is that model)
 	}
 	pol := agent.Gateway.Routing
 	if pol == nil {
