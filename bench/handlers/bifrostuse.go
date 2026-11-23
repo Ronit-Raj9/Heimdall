@@ -312,8 +312,12 @@ func EvaluationBifrostFeatures(ev *schemas.Evaluation, s BifrostUse) []BifrostFe
 	}
 	add("gateway", gw)
 	add("virtual_keys", "One virtual key per run, revoked when the run ends.")
-	if b := evaluationBudget(ev); b > 0 {
-		add("budgets", fmt.Sprintf("Budget $%.2f for this evaluation, enforced by Bifrost on the run keys.", b))
+	if b := evaluationBudget(ev); b > 0 { // N190: say so only when a cap reached the run keys
+		if budgetReachedKeys(ev) {
+			add("budgets", fmt.Sprintf("Budget %s for this evaluation, enforced by Bifrost on the run keys.", formatUSD(b)))
+		} else {
+			add("budgets", "No budget reached the run keys for this evaluation.")
+		}
 	}
 	if fo := sp.Failover; fo != nil && fo.Enabled { // C07 provider failover option
 		var fbs []string

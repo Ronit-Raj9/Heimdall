@@ -7,7 +7,7 @@ import type { QuickRunRequest, QuickRunResponse } from "@/lib/types/quickrun";
 import "@/lib/types/wizardI18n";
 import { Link } from "@tanstack/react-router";
 import { CircleCheck, Play, SlidersHorizontal, X, Zap } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 export const QUICKRUN_DEFAULT_TASKS = 5;
@@ -45,6 +45,30 @@ export function buildQuickRunRequest(v: {
 	return req;
 }
 
+/** The limits of the three numbers (the server refuses more than 50 tasks), fix wave 3, N229. */
+export const QUICKRUN_LIMITS = { tasks: [1, 50], trials: [1, 5], budget: [0.5, 100] } as const;
+
+/** What is wrong with each typed number, as a quickrun key; an empty object when all three are fine. */
+export function quickRunProblems(v: { tasks: string; trials: string; budget: string }): { tasks?: string; trials?: string; budget?: string } {
+	const out: { tasks?: string; trials?: string; budget?: string } = {};
+	const whole = (text: string, [lo, hi]: readonly [number, number]) => {
+		const n = Number(text);
+		return text.trim() !== "" && Number.isInteger(n) && n >= lo && n <= hi;
+	};
+	if (!whole(v.tasks, QUICKRUN_LIMITS.tasks)) out.tasks = "limits.tasks";
+	if (!whole(v.trials, QUICKRUN_LIMITS.trials)) out.trials = "limits.trials";
+	const b = Number(v.budget);
+	if (v.budget.trim() === "" || !Number.isFinite(b) || b < QUICKRUN_LIMITS.budget[0] || b > QUICKRUN_LIMITS.budget[1]) out.budget = "limits.budget";
+	return out;
+}
+
+/** Escape closes the dialog, as GovDialog does (fix wave 3, N229). */
+export function closeOnEscape(onClose: () => void): (e: { key: string }) => void {
+	return (e) => {
+		if (e.key === "Escape") onClose();
+	};
+}
+
 function formatCost(res: QuickRunResponse): string | null {
 	const c = res.estimate?.cost_usd;
 	if (!c || c.median == null) return null;
@@ -66,12 +90,23 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 	const [modelV, setModel] = useState<ModelRef | null>(model ?? null);
 	const [compareOn, setCompareOn] = useState(false);
 	const [compareV, setCompare] = useState<ModelRef | null>(null);
-	const [tasksV, setTasks] = useState(tasks ?? QUICKRUN_DEFAULT_TASKS);
-	const [trialsV, setTrials] = useState(1);
-	const [budgetV, setBudget] = useState(5);
+	const [tasksT, setTasks] = useState(String(tasks ?? QUICKRUN_DEFAULT_TASKS));
+	const [trialsT, setTrials] = useState("1");
+	const [budgetT, setBudget] = useState("5");
 	const [missingModel, setMissingModel] = useState(false);
+	const problems = quickRunProblems({ tasks: tasksT, trials: trialsT, budget: budgetT });
+	const invalid = Object.keys(problems).length > 0;
+	const tasksV = Number(tasksT);
+	const trialsV = Number(trialsT);
+	const budgetV = Number(budgetT);
+	useEffect(() => {
+		const onKey = closeOnEscape(onClose);
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [onClose]);
 
 	const submit = () => {
+		if (invalid) return;
 		const req = buildQuickRunRequest({
 			suite: suiteV,
 			agent: agentV,
@@ -215,18 +250,23 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 						<div className="grid grid-cols-3 gap-2 border-t p-3">
 							<label className="space-y-1 text-sm">
 								<span className="font-medium">{t("tasks")}</span>
-								<Input type="number" min={1} max={50} value={tasksV} onChange={(e) => setTasks(Math.max(1, Number(e.target.value) || 1))} data-testid="quickrun-tasks" />
+								<Input type="number" min={1} max={50} value={tasksT} onChange={(e) => setTasks(e.target.value)} aria-invalid={!!problems.tasks} data-testid="quickrun-tasks" />
 							</label>
 							<label className="space-y-1 text-sm">
 								<span className="font-medium">{t("trials")}</span>
-								<Input type="number" min={1} max={5} value={trialsV} onChange={(e) => setTrials(Math.max(1, Number(e.target.value) || 1))} />
+								<Input type="number" min={1} max={5} value={trialsT} onChange={(e) => setTrials(e.target.value)} aria-invalid={!!problems.trials} data-testid="quickrun-trials" />
 							</label>
 							<label className="space-y-1 text-sm">
 								<span className="font-medium">{t("budget")}</span>
-								<Input type="number" min={0.5} max={100} step={0.5} value={budgetV} onChange={(e) => setBudget(Math.max(0.5, Number(e.target.value) || 5))} />
+								<Input type="number" min={0.5} max={100} step={0.5} value={budgetT} onChange={(e) => setBudget(e.target.value)} aria-invalid={!!problems.budget} data-testid="quickrun-budget" />
 							</label>
 						</div>
 						</details>
+						{invalid && (
+							<div className="space-y-1 text-sm" role="alert" data-testid="quickrun-limits">
+								{(["tasks", "trials", "budget"] as const).map((k) => problems[k] && <p key={k} className="text-destructive">{t(problems[k] as "limits.tasks")}</p>)}
+							</div>
+						)}
 						{missingModel && (
 							<p className="text-destructive text-sm" role="alert">
 								{t("modelRequired")}
@@ -237,11 +277,16 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 								{t("failed", { message: quickRunError(state.error) })}
 							</p>
 						)}
+						{!invalid && (
+							<p className="text-muted-foreground text-right text-xs tabular-nums" data-testid="quickrun-estimate">
+								{t("startEstimate", { runs: tasksV * trialsV * 2, budget: budgetV })}
+							</p>
+						)}
 						<div className="flex justify-end gap-2 pt-2">
 							<Button type="button" variant="outline" onClick={onClose}>
 								{t("cancel")}
 							</Button>
-							<Button type="submit" disabled={state.isLoading} className="min-w-32 shadow-sm" data-testid="quickrun-submit">
+							<Button type="submit" disabled={state.isLoading || invalid} className="min-w-32 shadow-sm" data-testid="quickrun-submit">
 								<Play className={state.isLoading ? "size-4 animate-pulse" : "size-4"} aria-hidden="true" />
 								{state.isLoading ? t("submitting") : t("submit")}
 							</Button>

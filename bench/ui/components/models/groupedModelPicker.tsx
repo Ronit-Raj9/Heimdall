@@ -111,6 +111,8 @@ export interface GroupedModelPickerProps {
 	 * An empty list means the provider is not known yet: the picker is disabled and says so.
 	 */
 	providers?: readonly string[];
+	/** The name of the model select for screen readers and tests (fix wave 3, N189); "Model" by default. */
+	label?: string;
 }
 
 /** The provider of the first group that lists model (one with a working key first), or "". */
@@ -125,7 +127,14 @@ export function modelOptionLabel(providerName: string, model: string): string {
 	return providerName ? `${providerName}: ${model}` : model;
 }
 
-export function GroupedModelPicker({ value, onChange, disabled: disabledProp, testId, providers }: GroupedModelPickerProps) {
+export function GroupedModelPicker({
+	value,
+	onChange,
+	disabled: disabledProp,
+	testId,
+	providers,
+	label = "Model",
+}: GroupedModelPickerProps) {
 	const id = useId();
 	const tid = testId ?? "grouped-model-picker";
 	const models = useGetModelsQuery();
@@ -168,7 +177,7 @@ export function GroupedModelPicker({ value, onChange, disabled: disabledProp, te
 		<div className="flex flex-col gap-1.5" data-testid={tid}>
 			<div className="flex flex-wrap items-center gap-2">
 				<label className="sr-only" htmlFor={`${id}-search`}>
-					Search models
+					{label === "Model" ? "Search models" : `Search ${label}`}
 				</label>
 				<input
 					id={`${id}-search`}
@@ -180,7 +189,7 @@ export function GroupedModelPicker({ value, onChange, disabled: disabledProp, te
 					data-testid={`${tid}-search`}
 				/>
 				<label className="sr-only" htmlFor={`${id}-model`}>
-					Model
+					{label}
 				</label>
 				<select
 					id={`${id}-model`}

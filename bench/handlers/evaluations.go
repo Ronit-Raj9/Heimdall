@@ -674,7 +674,7 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 			a.Label = string(rune('A' + i))
 		}
 		if !evalArmIDRe.MatchString(a.Label) {
-			return badf("arm label %q must start with a capital letter and hold only letters and digits", a.Label)
+			return badf("setup label %q is not allowed: use a capital letter followed by letters or digits, for example A or B", a.Label)
 		}
 		if i == 1 && a.Label == spec.Arms[0].Label {
 			return badf("the two arms have the same label %q", a.Label)
@@ -749,6 +749,9 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 	}
 	if spec.BudgetUSD < 0 || spec.BudgetUSD > EvaluationMaxBudget {
 		return badf("budget_usd must be between 0 and %v", EvaluationMaxBudget)
+	}
+	if n := max(len(spec.Benchmarks), 1); spec.BudgetUSD > 0 && spec.BudgetUSD < EvaluationMinBenchmarkBudget*float64(n)-1e-9 {
+		return badf("%s", budgetFloorMessage(n)) // N190: a share under a cent was rounded to 0, which meant no cap
 	}
 	if spec.Concurrency < 0 || spec.Concurrency > EvaluationMaxConcurrency {
 		return badf("concurrency must be between 1 and %d (0 is the default, %d)", EvaluationMaxConcurrency, EvaluationDefaultConcurrency)
@@ -904,7 +907,7 @@ func childBudget(spec schemas.EvaluationSpec) float64 {
 	if spec.BudgetUSD <= 0 || len(spec.Benchmarks) == 0 {
 		return QuickRunDefaultBudget
 	}
-	return float64(int(spec.BudgetUSD/float64(len(spec.Benchmarks))*100)) / 100
+	return microDollars(spec.BudgetUSD / float64(len(spec.Benchmarks))) // N190: never rounded down to a 0 cap
 }
 
 // agentConfigs maps agents/<id>.yaml to its decoded config, when the server
@@ -1014,13 +1017,14 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 	slug := strings.NewReplacer(".", "-", "_", "-").Replace(suiteID)
 	name := "eval-" + strings.TrimPrefix(ev.ID, "ev_") + "-" + slug
 	name = strings.ReplaceAll(name, "_", "-")
+	reserve := h.childReserve(work, spec, bench, agents, budget, evalArmCount(spec)*len(tasks.IDs)*spec.Trials*len(conds)) // N190: one run's expected cost
 	f := quickFile{
 		Name: name, Suite: suiteRef, Base: "agents/" + spec.Arms[0].Agent + ".yaml",
 		Arms:        evalArms(spec),
 		Primary:     schemas.Endpoint{Condition: schemas.ConditionClean, Metric: "verified_success"},
 		Guards:      []schemas.GuardSpec{{Rule: "no_new_integrity_violation"}},
 		Conditions:  conds,
-		Budget:      schemas.BudgetSpec{TotalUSD: budget, ReserveUSD: quickReserve(budget, evalArmCount(spec)*len(tasks.IDs)*spec.Trials*len(conds))},
+		Budget:      schemas.BudgetSpec{TotalUSD: budget, ReserveUSD: reserve},
 		Verdict:     quickVerdict{Policy: "paired_signflip"},
 		Seed:        ev.CreatedAt.Unix(),
 		Concurrency: evaluationConcurrency(spec), ManifestMode: "agent_exposure",

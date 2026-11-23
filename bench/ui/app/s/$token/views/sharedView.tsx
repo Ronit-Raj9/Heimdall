@@ -12,6 +12,8 @@ import { Download, EyeOff, FileCode2 } from "lucide-react";
 import { usePageTitle } from "@/lib/routing/pageTitle";
 import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { formatUsd } from "@/lib/money";
+import "./hw16I18n";
 
 /** GET /agents/{id}/report-card as the server sends it: the report, or null before any evaluation. */
 interface AgentReportCard {
@@ -286,7 +288,7 @@ function AgentBoardPart({ board }: { board: AgentLeaderboardResponse | null }) {
 					{caps.map((c) => (
 						<TableHead key={c}>{capabilityName(c)}</TableHead>
 					))}
-					<TableHead>{t("page.cost")}</TableHead>
+					<TableHead>{t("leaderboard.costPerRun", { ns: "hw16" })}</TableHead>
 				</TableRow>
 			</TableHeader>
 			<TableBody>
@@ -303,7 +305,7 @@ function AgentBoardPart({ board }: { board: AgentLeaderboardResponse | null }) {
 								{r.capabilities[c] ? pct(r.capabilities[c].score) : "-"}
 							</TableCell>
 						))}
-						<TableCell className="tabular-nums">{r.cost_usd === null ? "-" : usd(r.cost_usd)}</TableCell>
+						<TableCell className="tabular-nums">{formatUsd(r.cost_usd)}</TableCell>
 					</TableRow>
 				))}
 			</TableBody>

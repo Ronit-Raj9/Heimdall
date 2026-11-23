@@ -10,6 +10,7 @@ package handlers
 // raises the caps and continues the stopped benchmarks from their sealed runs.
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -40,7 +41,76 @@ const (
 	// person can still type a larger budget, up to EvaluationMaxBudget.
 	EvaluationBudgetMaxEnv     = "HEIMDALL_EVAL_BUDGET_MAX_USD"
 	EvaluationBudgetMaxDefault = 100.0
+	// EvaluationMinBenchmarkBudget is the least budget per benchmark (fix
+	// wave 3, N190): a smaller share was rounded down to 0, which meant no
+	// cap at all; create and raise-budget refuse a budget below it.
+	EvaluationMinBenchmarkBudget = 0.01
 )
+
+// budgetFloorMessage is the refusal of a budget below
+// EvaluationMinBenchmarkBudget for n benchmarks.
+func budgetFloorMessage(n int) string {
+	what := "1 benchmark"
+	if n != 1 {
+		what = fmt.Sprintf("%d benchmarks", n)
+	}
+	return fmt.Sprintf("The budget must be at least $0.01 per benchmark: at least $%.2f for %s.", EvaluationMinBenchmarkBudget*float64(n), what)
+}
+
+// BudgetStopReporter is optionally implemented by a Launcher (fix wave 3,
+// N190): whether the experiment's newest run ended with the scheduler's
+// budget stop (the budget_stop event, Summary.BudgetStopped) and the
+// expected cost of the run that stop refused (0 when the spend itself
+// reached the cap). known is false when no finished run job is recorded.
+type BudgetStopReporter interface {
+	BudgetStop(expID string) (stopped bool, nextRunUSD float64, known bool)
+}
+
+// childReserve is one run's expected cost for a benchmark's budget.reserve_usd
+// (fix wave 3, N190): the estimate's per-run high cost of that benchmark when
+// it is known, so the scheduler starts no run whose expected cost does not
+// fit; else the even split of quickReserve.
+func (h *evaluationsHandler) childReserve(ctx context.Context, spec schemas.EvaluationSpec, bench string, agents map[string]*schemas.AgentConfig, budget float64, runs int) float64 {
+	fallback := quickReserve(budget, runs)
+	s := h.env.Services
+	if budget <= 0 || s.Suites == nil || evalRunCostSource == nil {
+		return fallback
+	}
+	src := evalRunCostSource(h.env)
+	if src == nil {
+		return fallback
+	}
+	req := &EvalEstimateRequest{Name: spec.Name, Mode: spec.Mode, Benchmarks: []string{bench}, TasksPerBenchmark: spec.TasksPerBenchmark,
+		Trials: spec.Trials, Faults: spec.Faults, Stream: spec.Stream, Concurrency: spec.Concurrency, BifrostCache: spec.BifrostCache,
+		Failover: spec.Failover, MCPRoute: spec.MCPRoute}
+	for _, a := range spec.Arms {
+		req.Arms = append(req.Arms, EvalEstimateArm{Label: a.Label, Agent: a.Agent, Version: a.Version, Model: a.Model, Provider: a.Provider})
+	}
+	root := ""
+	if s.Projects != nil {
+		root = s.Projects.Root()
+	}
+	be := estimateBenchmark(ctx, s.Suites, src, req, bench, agents, root, childReserveCache)
+	if be.Skipped != "" || be.Runs <= 0 || !be.EstCostUSD.Known || !(be.EstCostUSD.High > 0) {
+		return fallback
+	}
+	return microDollars(be.EstCostUSD.High / float64(be.Runs))
+}
+
+// evalRunCostSource gives childReserve its forecast source; nil (tests)
+// keeps the even split.
+var evalRunCostSource = func(env OrgEnv) ForecastSource {
+	if env.Cfg == nil {
+		return nil
+	}
+	return quickRunForecast(env.Cfg.Root)
+}
+
+// childReserveCache keeps the forecasts childReserve asked for.
+var childReserveCache = newForecastCache()
+
+// microDollars rounds down to whole micro-dollars.
+func microDollars(v float64) float64 { return math.Floor(v*1e6+1e-6) / 1e6 }
 
 // EvalBudget is the budget part of the estimate: which cap applies, the
 // suggested default, and what a cap below the expected cost would do.
@@ -130,7 +200,7 @@ func estimateBudget(est *EvalEstimate, requested, dailyCap float64) EvalBudget {
 		return b
 	}
 	if requested > 0 {
-		b.BudgetUSD, b.PerBenchmarkUSD = requested, cents(requested/float64(n))
+		b.BudgetUSD, b.PerBenchmarkUSD = requested, microDollars(requested/float64(n)) // N190: the uncut share, so fit is right for small budgets
 	} else {
 		b.Default, b.PerBenchmarkUSD = true, EvaluationDefaultBenchmarkBudget
 		b.BudgetUSD = EvaluationDefaultBenchmarkBudget * float64(n)
@@ -198,19 +268,37 @@ func (h *evaluationsHandler) budgetFacts(c *schemas.EvaluationChild, m *schemas.
 	}
 	c.BudgetUSD = capUSD
 	spent, _ := st.SpentUSD.Float()
-	c.SpentUSD = cents(spent)
+	c.SpentUSD = microDollars(spent)
 	notStarted := max(0, st.Slots.Total-st.Slots.Done-st.Slots.Failed-st.Slots.Running)
+	c.NotStarted, c.NextRunUSD = 0, 0
+	if rep, ok := h.env.Services.Launcher.(BudgetStopReporter); ok && c.ExperimentID != "" {
+		// N190: the scheduler's own budget stop, which also covers a stop
+		// before a run whose expected cost did not fit (spent below the cap).
+		if stopped, next, known := rep.BudgetStop(c.ExperimentID); known {
+			c.BudgetStopped = stopped && notStarted > 0 && terminalChild(string(st.State))
+			if c.BudgetStopped {
+				c.NotStarted, c.NextRunUSD = notStarted, next
+			}
+			return budgetFactsChanged(before, *c)
+		}
+	}
 	ran := st.Slots.Done + st.Slots.Failed
 	avg := 0.0
 	if ran > 0 {
 		avg = spent / float64(ran)
 	}
+	// No run job is recorded (a server without the job runner): the guess
+	// from the spend.
 	c.BudgetStopped = st.State == schemas.ExperimentFailed && notStarted > 0 && capUSD > 0 && spent+avg >= capUSD
-	c.NotStarted = 0
 	if c.BudgetStopped {
 		c.NotStarted = notStarted
 	}
-	return before.BudgetUSD != c.BudgetUSD || before.SpentUSD != c.SpentUSD || before.BudgetStopped != c.BudgetStopped || before.NotStarted != c.NotStarted
+	return budgetFactsChanged(before, *c)
+}
+
+func budgetFactsChanged(before, c schemas.EvaluationChild) bool {
+	return before.BudgetUSD != c.BudgetUSD || before.SpentUSD != c.SpentUSD || before.BudgetStopped != c.BudgetStopped ||
+		before.NotStarted != c.NotStarted || before.NextRunUSD != c.NextRunUSD
 }
 
 // liveCap is the spend cap set in the experiment's run controls, 0 when
@@ -226,7 +314,7 @@ func (h *evaluationsHandler) liveCap(expID string) float64 {
 	if (err != nil && !errors.Is(err, runctl.ErrBrokenLog)) || st == nil {
 		return 0
 	}
-	return cents(st.TotalUSD)
+	return microDollars(st.TotalUSD)
 }
 
 // raiseBudget handles POST /evaluations/{id}/raise-budget: every benchmark
@@ -265,13 +353,17 @@ func (h *evaluationsHandler) raiseBudget(ctx *fasthttp.RequestCtx) {
 		h.fail(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("budget_usd must be more than the current %s and at most %s", usd(current), usd(EvaluationMaxBudget)))
 		return
 	}
-	share := cents(req.BudgetUSD / float64(len(kids)))
+	if req.BudgetUSD < EvaluationMinBenchmarkBudget*float64(len(kids))-1e-9 { // N190: the same floor as create
+		h.fail(ctx, fasthttp.StatusBadRequest, budgetFloorMessage(len(kids)))
+		return
+	}
+	share := microDollars(req.BudgetUSD / float64(len(kids)))
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
 	wctx := withPrincipal(work, ctx)
 	var errs []string
 	for _, c := range kids {
-		next := max(share, cents(c.SpentUSD+0.01))
+		next := max(share, microDollars(c.SpentUSD+EvaluationMinBenchmarkBudget))
 		if _, err := op.PatchControls(wctx, c.ExperimentID, runctl.Patch{TotalUSD: &next}); err != nil {
 			errs = append(errs, c.Benchmark+": "+err.Error())
 			continue
@@ -286,7 +378,7 @@ func (h *evaluationsHandler) raiseBudget(ctx *fasthttp.RequestCtx) {
 		}
 		c.BudgetStopped, c.NotStarted, c.Status = false, 0, string(schemas.ExperimentRunning)
 	}
-	ev.Spec.BudgetUSD = cents(req.BudgetUSD)
+	ev.Spec.BudgetUSD = microDollars(req.BudgetUSD)
 	ev.Status = evaluationStatus(&schemas.Evaluation{Status: schemas.EvaluationRunning, Children: ev.Children})
 	if err := h.store().Save(ev); err != nil {
 		h.fail(ctx, fasthttp.StatusInternalServerError, "save evaluation: "+err.Error())
@@ -318,5 +410,50 @@ func budgetChildren(ev *schemas.Evaluation) []*schemas.EvaluationChild {
 // cents rounds down to whole cents.
 func cents(v float64) float64 { return math.Floor(v*100+1e-9) / 100 }
 
-// usd writes dollars with cents.
-func usd(v float64) string { return fmt.Sprintf("$%.2f", v) }
+// usd writes dollars in the one money format (formatUSD).
+func usd(v float64) string { return formatUSD(v) }
+
+// formatUSD is the Go twin of the UI's formatUsd (ui/lib/money.ts, fix wave
+// 3, N190): "$0" for zero, 4 decimals under $0.01, 2 decimals under $10 and
+// whole dollars with separators from $10.
+func formatUSD(v float64) string {
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return "-"
+	}
+	if v == 0 {
+		return "$0"
+	}
+	sign, a := "", v
+	if v < 0 {
+		sign, a = "-", -v
+	}
+	switch {
+	case a < 0.01:
+		return fmt.Sprintf("%s$%.4f", sign, a)
+	case a < 10:
+		return fmt.Sprintf("%s$%.2f", sign, a)
+	}
+	d := strconv.FormatInt(int64(math.Round(a)), 10)
+	for i := len(d) - 3; i > 0; i -= 3 {
+		d = d[:i] + "," + d[i:]
+	}
+	return sign + "$" + d
+}
+
+// budgetReachedKeys reports whether the evaluation's budget reached its
+// runs (fix wave 3, N190): some launched child carries a cap, or no child
+// is launched yet. An evaluation made before the floor could have a budget
+// that was rounded down to no cap at all.
+func budgetReachedKeys(ev *schemas.Evaluation) bool {
+	launched := false
+	for _, c := range ev.Children {
+		if c.ExperimentID == "" || c.Status == schemas.EvaluationChildSkipped {
+			continue
+		}
+		launched = true
+		if c.BudgetUSD > 0 {
+			return true
+		}
+	}
+	return !launched
+}

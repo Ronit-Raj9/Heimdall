@@ -99,7 +99,8 @@ func TestBifrostUsePluginsAndEvaluation(t *testing.T) {
 	if featureState(e.Uses, "budgets") != BifrostFeatureOn || featureState(e.Uses, "heimdall_plugin") != BifrostFeatureOn {
 		t.Fatalf("uses: %+v", e.Uses)
 	}
-	if !strings.Contains(body, "$12.50") || !strings.Contains(body, "inside Bifrost by the Heimdall plugin") || !strings.Contains(body, "openai/gpt-x") {
+	// Fix wave 3: formatUSD prints whole dollars from $10, so $12.50 reads $13.
+	if !strings.Contains(body, "Budget $13 for this evaluation") || !strings.Contains(body, "inside Bifrost by the Heimdall plugin") || !strings.Contains(body, "openai/gpt-x") {
 		t.Fatalf("details: %s", body)
 	}
 

@@ -25,5 +25,11 @@
 	"savedAs": "Saved as {{path}}",
 	"open": "Open the comparison",
 	"failed": "Could not start the test: {{message}}",
-	"close": "Close"
+	"close": "Close",
+	"limits": {
+		"tasks": "Pick 1 to 50 tasks.",
+		"trials": "Pick 1 to 5 tries per task.",
+		"budget": "Set a budget from $0.50 to $100."
+	},
+	"startEstimate": "About {{runs}} runs, up to ${{budget}}."
 }

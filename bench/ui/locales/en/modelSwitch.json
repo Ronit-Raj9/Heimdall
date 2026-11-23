@@ -24,7 +24,9 @@
 		"error": "Could not start the comparison: {{message}}",
 		"estimateCost": "Estimated cost {{low}} to {{high}} USD.",
 		"estimateCostUnknown": "Cost is unknown until the models are priced.",
-		"estimateMinutes": "About {{low}} to {{high}} minutes."
+		"estimateMinutes": "About {{low}} to {{high}} minutes.",
+		"currentModel": "Current model",
+		"modelN": "Model {{n}}"
 	},
 	"report": {
 		"title": "Model switch report",

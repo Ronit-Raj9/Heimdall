@@ -36,6 +36,7 @@ import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "./gw07I18n";
+import { evalArmLabel } from "@/lib/evaluationArms";
 
 /** A fault a failure test can inject: any id of the fault catalog (GET /faults). */
 export type FailureFault = string;
@@ -84,7 +85,7 @@ export function failureTestSpec(f: FailureTestForm, agent?: Pick<AgentSummary, "
 		mode: "score",
 		arms: [
 			{
-				label: "A",
+				label: evalArmLabel(0),
 				agent: f.agent,
 				...(f.version ? { version: f.version } : {}),
 				model,

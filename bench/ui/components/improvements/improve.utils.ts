@@ -1,5 +1,6 @@
 import type { StatusTone } from "@/components/ui/statusPill";
 import type { ControlBand, CurvePoint, ImprovementStatus, ImprovementVerdictState, LineageNode, LineageStatus } from "@/lib/types/improve";
+import { formatUsd } from "@/lib/money";
 
 /** The three task sets in curve order, with their stroke tokens. */
 export const SERIES = [
@@ -70,8 +71,7 @@ export function points(v: number | undefined | null): string {
 
 /** Dollars with enough precision for small spends. */
 export function usd(v: number | undefined | null): string {
-	if (v === undefined || v === null || !Number.isFinite(v)) return "-";
-	return v < 1 ? `$${v.toFixed(4)}` : `$${v.toFixed(2)}`;
+	return formatUsd(v);
 }
 
 /** The short label of a version ref: agents/x.yaml@v3 as "v3". */

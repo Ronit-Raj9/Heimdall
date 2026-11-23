@@ -17,6 +17,7 @@ import { fw05 } from "./fw05I18n";
 import { armHasModel, useOwnModelAgents } from "./ownModel";
 import { CONCURRENCY_CHOICES, PresetPicker, slotsText } from "./presetPicker";
 import { useDebounced } from "./useDebounced";
+import { evalArmLabel } from "@/lib/evaluationArms";
 
 /**
  * Wizard step 4: the model for each arm, how many tasks per benchmark, trials and faults, with a
@@ -94,7 +95,7 @@ export function defaultEvaluationSpec(): EvaluationSpec {
 	return {
 		name: "",
 		mode: "score",
-		arms: [{ label: "A", agent: "", model: "" }],
+		arms: [{ label: evalArmLabel(0), agent: "", model: "" }],
 		benchmarks: [],
 		tasks_per_benchmark: 10,
 		trials: 1,
@@ -166,7 +167,10 @@ function money(n: number): string {
 }
 
 function range(low: number, high: number, fmt: (n: number) => string): string {
-	return low === high ? fmt(low) : `${fmt(low)} to ${fmt(high)}`;
+	// Compared after formatting, so 0.6 to 1.4 minutes reads "1 min", never "1 to 1" (N211).
+	const a = fmt(low);
+	const b = fmt(high);
+	return a === b ? a : `${a} to ${b}`;
 }
 
 /**
@@ -427,6 +431,7 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 									value={arm.model || arm.provider ? { provider: arm.provider ?? "", model: arm.model } : null}
 									onChange={(v) => setArm(i, v.provider, v.model)}
 									testId={`step4-model-${arm.label}`}
+									label={`Setup ${arm.label} (${arm.agent || "no agent"}) model`}
 								/>
 								{owns.has(arm.agent) && (
 									<button
