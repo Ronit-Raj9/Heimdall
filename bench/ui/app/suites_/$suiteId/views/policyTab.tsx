@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { isPicked, LabeledModelPicker, splitModelRef } from "@/components/models/labeledModelPicker";
+import { isPicked, LabeledModelPicker, splitModelRef, usePickedKeyState } from "@/components/models/labeledModelPicker";
+import { ConfirmButton } from "@/components/platform/badges";
 import type { PickedModel } from "@/components/models/groupedModelPicker";
 import { useConfirm, type ConfirmFn } from "@/components/platform/confirmDialog";
 import { Input } from "@/components/ui/input";
@@ -218,11 +219,31 @@ function str(v: JsonValue | undefined): string {
 	return v === undefined || v === null ? "" : String(v);
 }
 
-function GenerateSection({ suite, doc, onDone, blocked = false }: { suite: string; doc: string; onDone: () => void; blocked?: boolean }) {
+/** The model of the document's last generation ("provider/model"), or null (N275). */
+export function lastGenerationModel(doc: PolicyDocView["doc"]): PickedModel | null {
+	const gens = (doc as PolicyDocView["doc"] & { generations?: { model?: string }[] | null }).generations ?? [];
+	return splitModelRef(gens[gens.length - 1]?.model);
+}
+
+function GenerateSection({
+	suite,
+	doc,
+	initial,
+	onDone,
+	blocked = false,
+}: {
+	suite: string;
+	doc: string;
+	initial: PickedModel | null;
+	onDone: () => void;
+	blocked?: boolean;
+}) {
 	const { t } = useTranslation("policyDocs");
-	const [provider, setProvider] = useState("");
-	const [model, setModel] = useState("");
-	const [budget, setBudget] = useState("1");
+	const [picked, setPicked] = useState<PickedModel | null>(initial);
+	const keyState = usePickedKeyState(picked);
+	const provider = picked?.provider ?? "";
+	const model = picked?.model ?? "";
+	const [budget, setBudget] = useState("0.30");
 	const [jobId, setJobId] = useState("");
 	const [create, state] = useCreateJobMutation();
 	const job = useGetJobQuery(jobId, { skip: !jobId, pollingInterval: 2000 });
@@ -235,32 +256,21 @@ function GenerateSection({ suite, doc, onDone, blocked = false }: { suite: strin
 		const r = await create({ kind: "policy.generate", params: generateParams({ suite, doc, provider, model, budget }, estimate) });
 		if ("data" in r && r.data) setJobId(r.data.id);
 	};
-	const ready = !blocked && provider.trim() && model.trim() && !state.isLoading && (!jobId || terminal);
+	const keyOk = isPicked(picked) && keyState === "ok";
+	const ready = !blocked && keyOk && !state.isLoading && (!jobId || terminal);
 	const res = j?.result;
 	return (
 		<section className="flex flex-col gap-2" data-testid="policy-generate">
 			<h3 className="text-sm font-medium">{t("generate.title")}</h3>
 			<div className="flex flex-wrap items-end gap-2">
-				<label className="flex flex-col gap-1 text-sm">
-					<span className="text-muted-foreground">{t("generate.provider")}</span>
-					<Input
-						className="h-9 w-40"
-						value={provider}
-						disabled={blocked}
-						onChange={(e) => setProvider(e.target.value)}
-						data-testid="policy-generate-provider"
-					/>
-				</label>
-				<label className="flex flex-col gap-1 text-sm">
-					<span className="text-muted-foreground">{t("generate.model")}</span>
-					<Input
-						className="h-9 w-56"
-						value={model}
-						disabled={blocked}
-						onChange={(e) => setModel(e.target.value)}
-						data-testid="policy-generate-model"
-					/>
-				</label>
+				<LabeledModelPicker
+					label={t("generate.model")}
+					hint={keyOk || blocked ? undefined : t("generate.pickHint")}
+					value={picked}
+					disabled={blocked}
+					onChange={setPicked}
+					testId="policy-generate-model"
+				/>
 				<label className="flex flex-col gap-1 text-sm">
 					<span className="text-muted-foreground">{t("generate.budget")}</span>
 					<Input
@@ -275,14 +285,16 @@ function GenerateSection({ suite, doc, onDone, blocked = false }: { suite: strin
 				<Button variant="outline" disabled={!ready} onClick={() => void start(true)} dataTestId="policy-generate-estimate">
 					{t("generate.estimate")}
 				</Button>
-				<Button
+				<ConfirmButton
+					label={t("generate.start")}
+					question={t("generate.confirm", { provider, model, budget })}
+					confirmLabel={t("generate.start")}
+					cancelLabel={t("generate.cancel")}
+					variant="outline"
 					disabled={!ready}
-					onClick={() => void start(false)}
-					dataTestId="policy-generate-start"
-					title={t("generate.confirm", { budget, model })}
-				>
-					{t("generate.start")}
-				</Button>
+					onConfirm={() => void start(false)}
+					testId="policy-generate-start"
+				/>
 			</div>
 			<p className="text-muted-foreground text-xs">{t("generate.budgetHint")}</p>
 			<ErrorLine error={state.error} />
@@ -550,7 +562,7 @@ function DocDetail({
 							</Button>
 						</div>
 					)}
-					<GenerateSection suite={suite} doc={doc} onDone={refetch} blocked={blocked} />
+					<GenerateSection suite={suite} doc={doc} initial={lastGenerationModel(view.data.doc)} onDone={refetch} blocked={blocked} />
 					<DraftsSection suite={suite} view={view.data} taskCount={taskCount} />
 				</>
 			)}

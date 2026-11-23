@@ -1,4 +1,5 @@
 import "@/lib/i18n";
+import i18n from "i18next";
 
 import { benchApi } from "@/lib/store/apis/benchApi";
 import { hostedSession } from "@/lib/testing/platformFixtures";
@@ -185,7 +186,7 @@ describe("policy tab", () => {
 		expect(html).toContain(
 			"Policy tasks are support conversations: this benchmark has no task with a simulated customer. Use a support benchmark (Benchmarks &gt; New, template support).",
 		);
-		for (const id of ["policy-upload-file", "policy-generate-estimate", "policy-generate-start", "policy-generate-provider"]) {
+		for (const id of ["policy-upload-file", "policy-generate-estimate", "policy-generate-start", "policy-generate-model-model"]) {
 			expect(tagOf(html, id) ?? "", id).toContain(' disabled=""');
 		}
 		pol.list = okQuery({ ...noShape, next: undefined, shape: "refund-in-policy" });
@@ -245,5 +246,31 @@ describe("policy tab", () => {
 		expect(tagOf(html, "policy-drafts-accept-all") ?? "").toContain(' disabled=""');
 		expect(tagOf(html, "policy-draft-accept-t1") ?? "").toContain(' disabled=""');
 		expect(html).toContain("Pick the reply judge first. Policy tasks are graded by a judge model.");
+	});
+	it("drafts scenarios with a picked model, a $0.30 default and a question naming both (N275)", () => {
+		const suite = { id: "desk", task_count: 1 } as unknown as SuiteSummary;
+		pol.list = okQuery({ suite: "desk", docs: [{ id: "refunds", title: "Refunds", uploaded_at: "" }], shape: "refund-in-policy" });
+		pol.view = okQuery({
+			suite: "desk",
+			doc: {
+				id: "refunds",
+				title: "Refunds",
+				clauses: [{ number: "1", text: "x" }],
+				drafts: [],
+				generations: [{ model: "openai/gpt-6-luna", at: "" }],
+			},
+			counts: {},
+			grader: "checks",
+			judged: true,
+			next: "",
+		});
+		const html = render(<PolicyTab suite={suite} />, hostedSession("member"));
+		expect(html).not.toContain('data-testid="policy-generate-provider"');
+		expect(tagOf(html, "policy-generate-model-model") ?? "").toContain('data-model="openai/gpt-6-luna"');
+		expect(tagOf(html, "policy-generate-budget") ?? "").toContain('value="0.30"');
+		expect(tagOf(html, "policy-generate-start") ?? "").not.toContain("title=");
+		expect(i18n.getFixedT("en", "policyDocs")("generate.confirm", { provider: "openai", model: "gpt-6-luna", budget: "0.30" })).toBe(
+			"Draft scenarios with openai/gpt-6-luna on your own key, up to $0.30?",
+		);
 	});
 });
