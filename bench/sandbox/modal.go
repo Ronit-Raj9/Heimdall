@@ -12,8 +12,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/maximhq/bifrost/bench/registrycreds"
+	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // Modal (https://modal.com/docs/guide/sandboxes). Modal has no public REST
@@ -54,6 +60,15 @@ type Modal struct {
 	environment string
 	python      string
 	extraEnv    []string // tests
+	// registry is the org's own image registry login (fix wave 3, N216):
+	// Modal pulls an image of that registry with it.
+	registry *ImageRegistry
+}
+
+// UseRegistry makes Create pass the org's registry login to Modal for every
+// image of that registry, so Modal can pull Heimdall's images from it.
+func (m *Modal) UseRegistry(r ImageRegistry) {
+	m.registry = &r
 }
 
 // NewModal returns a Modal client. The token is "<token id>:<token secret>"
@@ -138,7 +153,7 @@ func (m *Modal) call(ctx context.Context, op string, timeout time.Duration, req 
 	}
 	var me modalError
 	if json.Unmarshal(stdout.Bytes(), &me) == nil && me.Error != "" {
-		msg := scrub(me.Message, []string{m.id, m.secret})
+		msg := scrub(me.Message, m.hidden())
 		switch me.Error {
 		case "unauthorized":
 			return fmt.Errorf("Modal %s: %w (%s)", op, ErrUnauthorized, msg)
@@ -151,7 +166,7 @@ func (m *Modal) call(ctx context.Context, op string, timeout time.Duration, req 
 	}
 	if runErr != nil {
 		return fmt.Errorf("Modal %s: helper failed (%s with %s; is the modal package installed? set %s): %s", op,
-			scrub(runErr.Error(), []string{m.id, m.secret}), m.python, ModalPythonEnv, scrub(tail(stdout.Bytes(), 300), []string{m.id, m.secret}))
+			scrub(runErr.Error(), m.hidden()), m.python, ModalPythonEnv, scrub(tail(stdout.Bytes(), 300), m.hidden()))
 	}
 	if out != nil {
 		if err := json.Unmarshal(stdout.Bytes(), out); err != nil {
@@ -159,6 +174,15 @@ func (m *Modal) call(ctx context.Context, op string, timeout time.Duration, req 
 		}
 	}
 	return nil
+}
+
+// hidden lists the secrets an answer must never carry.
+func (m *Modal) hidden() []string {
+	out := []string{m.id, m.secret}
+	if m.registry != nil && m.registry.Token != "" {
+		out = append(out, m.registry.Token)
+	}
+	return out
 }
 
 // capBuffer keeps at most max bytes.
@@ -209,6 +233,9 @@ func (m *Modal) Create(ctx context.Context, s Spec) (*Box, error) {
 	}
 	if s.GPU != "" {
 		in["gpu"] = s.GPU // Z05: GPU sandboxes run on gVisor, Modal's default runtime
+	}
+	if m.registry != nil && m.registry.Holds(s.Image) {
+		in["registry_auth"] = map[string]string{"username": m.registry.Username, "password": m.registry.Token}
 	}
 	var out struct {
 		SandboxID string `json:"sandbox_id"`
@@ -292,3 +319,153 @@ func (m *Modal) Destroy(ctx context.Context, b *Box) error {
 	}
 	return err
 }
+
+// ImageRegistry is an organization's own image registry login (fix wave 3,
+// N216 fix 2): Registry is the path images go under (ghcr.io/team/heimdall),
+// Token a token with push and pull rights. A sandbox platform in the cloud
+// cannot pull images that exist only on Heimdall's machines, so they are
+// pushed there first and pulled from there with the same login.
+type ImageRegistry struct {
+	Registry string `json:"registry"`
+	Username string `json:"username"`
+	Token    string `json:"token,omitempty"`
+}
+
+// Host is the registry's host name (with its port, if any).
+func (r ImageRegistry) Host() string {
+	h, _, _ := strings.Cut(r.Registry, "/")
+	return h
+}
+
+// Holds reports whether image lives under the registry's path.
+func (r ImageRegistry) Holds(image string) bool {
+	return r.Registry != "" && strings.HasPrefix(image, r.Registry+"/")
+}
+
+// DockerRunner runs the docker CLI (utils.Docker under the org's Docker
+// policy on the shared runner).
+type DockerRunner interface {
+	MustRunEnv(ctx context.Context, env []string, args ...string) (*utils.DockerResult, error)
+}
+
+// RegistryImages pushes local images to an org's own registry so a sandbox
+// platform can pull them (DriverConfig.RemoteImage). Each local image is
+// tagged <registry>/<repo>:<first 12 hex of its image id>, pushed with the
+// org's login through a temporary Docker config, and returned as
+// <registry>/<repo>@<digest>. A pushed image is remembered by its local
+// image id, so it is pushed once per process.
+type RegistryImages struct {
+	Login  ImageRegistry
+	Docker DockerRunner
+
+	mu    sync.Mutex
+	cache map[string]string // local image id -> remote reference
+}
+
+var (
+	pushDigestRe = regexp.MustCompile(`digest: (sha256:[0-9a-f]{64})`)
+	repoBadRe    = regexp.MustCompile(`[^a-z0-9._-]+`)
+	repoSepRe    = regexp.MustCompile(`[._-]{2,}`)
+)
+
+// remoteRepo is the repository name of a local image under the org's
+// registry: its path without tag or digest, with "/" as "-", lower case.
+func remoteRepo(ref string) string {
+	if i := strings.Index(ref, "@"); i >= 0 {
+		ref = ref[:i]
+	}
+	if i := strings.LastIndex(ref, ":"); i > strings.LastIndex(ref, "/") {
+		ref = ref[:i]
+	}
+	repo := repoBadRe.ReplaceAllString(strings.ToLower(strings.ReplaceAll(ref, "/", "-")), "-")
+	repo = strings.Trim(repoSepRe.ReplaceAllString(repo, "-"), "._-")
+	if repo == "" {
+		repo = "image"
+	}
+	return repo
+}
+
+// Remote implements DriverConfig.RemoteImage.
+func (r *RegistryImages) Remote(ctx context.Context, ref string) (string, error) {
+	if r.Docker == nil || r.Login.Registry == "" {
+		return "", errors.New(modalRegistryNeeded)
+	}
+	res, err := r.Docker.MustRunEnv(ctx, nil, "image", "inspect", "--format", "{{.Id}}", ref)
+	if err != nil {
+		return "", fmt.Errorf("image %s: %w", ref, err)
+	}
+	id := strings.TrimSpace(string(res.Stdout))
+	hexID := strings.TrimPrefix(id, "sha256:")
+	if len(hexID) < 12 {
+		return "", fmt.Errorf("image %s: unreadable image id %q", ref, id)
+	}
+	r.mu.Lock()
+	if out, ok := r.cache[id]; ok {
+		r.mu.Unlock()
+		return out, nil
+	}
+	r.mu.Unlock()
+	repo := r.Login.Registry + "/" + remoteRepo(ref)
+	target := repo + ":" + hexID[:12]
+	out, err := r.push(ctx, ref, repo, target)
+	if err != nil {
+		return "", r.pushError(err)
+	}
+	r.mu.Lock()
+	if r.cache == nil {
+		r.cache = map[string]string{}
+	}
+	r.cache[id] = out
+	r.mu.Unlock()
+	return out, nil
+}
+
+func (r *RegistryImages) push(ctx context.Context, ref, repo, target string) (string, error) {
+	if _, err := r.Docker.MustRunEnv(ctx, nil, "tag", ref, target); err != nil {
+		return "", err
+	}
+	defer func() { _, _ = r.Docker.MustRunEnv(context.WithoutCancel(ctx), nil, "image", "rm", target) }()
+	dir, err := os.MkdirTemp("", "heimdall-push-")
+	if err != nil {
+		return "", fmt.Errorf("temporary Docker config: %w", err)
+	}
+	defer os.RemoveAll(dir)
+	if err := os.Chmod(dir, 0o700); err != nil {
+		return "", fmt.Errorf("temporary Docker config: %w", err)
+	}
+	auth := schemas.RegistryAuth{Host: r.Login.Host(), Username: r.Login.Username, Password: r.Login.Token}
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), registrycreds.DockerConfig(auth), 0o600); err != nil {
+		return "", fmt.Errorf("temporary Docker config: %w", err)
+	}
+	res, err := r.Docker.MustRunEnv(ctx, []string{"DOCKER_CONFIG=" + dir}, "push", target)
+	if err != nil {
+		return "", err
+	}
+	if m := pushDigestRe.FindSubmatch(res.Stdout); m != nil {
+		return repo + "@" + string(m[1]), nil
+	}
+	ins, err := r.Docker.MustRunEnv(ctx, nil, "image", "inspect", "--format", "{{json .RepoDigests}}", target)
+	if err != nil {
+		return "", err
+	}
+	var digests []string
+	_ = json.Unmarshal(bytes.TrimSpace(ins.Stdout), &digests)
+	for _, dg := range digests {
+		if strings.HasPrefix(dg, repo+"@") {
+			return dg, nil
+		}
+	}
+	return "", errors.New("the push did not report a digest")
+}
+
+// pushError is a failed push in plain words, without the token.
+func (r *RegistryImages) pushError(err error) error {
+	msg := strings.TrimSpace(err.Error())
+	if r.Login.Token != "" {
+		msg = strings.ReplaceAll(msg, r.Login.Token, "[hidden]")
+	}
+	return fmt.Errorf("Heimdall could not push to %s: %s.", r.Login.Registry, strings.TrimSuffix(tail([]byte(msg), 300), "."))
+}
+
+// modalRegistryNeeded is the refusal of a platform without an image registry.
+const modalRegistryNeeded = "Modal needs an image registry it can pull from. Add one on the Modal card."

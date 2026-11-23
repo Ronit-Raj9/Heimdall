@@ -60,7 +60,8 @@ func sandboxRegistry(ctx context.Context, a *app, reg *schemas.Registry, pa *sha
 		Platform: p, Local: environments.NewDockerDriver(a.dockerCfg),
 		AgentGatewayURL: a.cfg.Gateway.AgentURL, PublicGatewayURL: a.cfg.Gateway.PublicURL,
 		HelperImage: a.cfg.Images.Helper, Install: k8s.InstallID(a.cfg.Root), Docker: a.docker, Logger: a.logger,
-		GPUType: strings.TrimSpace(os.Getenv(sandbox.GPUEnv)),
+		GPUType:     strings.TrimSpace(os.Getenv(sandbox.GPUEnv)),
+		RemoteImage: platformRemoteImage(pa, p, a.docker), // fix wave 3 (N216): images go through the org's registry
 	})
 	if err != nil {
 		return nil, err

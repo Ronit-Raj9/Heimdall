@@ -5,10 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/keystore"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // Connections keeps each organization's platform connections in its
@@ -22,12 +27,18 @@ type Connections struct {
 	// Build builds a client; nil uses New.
 	Build func(name string, c Credentials) (Platform, error)
 	Now   func() time.Time
+	// RegistryClient signs in to an image registry when its login is
+	// saved; nil uses a client that reaches public addresses only.
+	RegistryClient *http.Client
 }
 
 // Keystore markers.
 const (
 	providerPrefix  = "worker-platform:"
 	providerDefault = "worker-platform-default"
+	// providerRegistry marks a platform's image registry login (fix wave
+	// 3, N216): one per platform, beside its token.
+	providerRegistry = "worker-platform-registry:"
 	// Actor is the audit actor of keystore writes this package makes for
 	// itself (clearing a default).
 	Actor = "heimdall:worker-platforms"
@@ -49,6 +60,18 @@ type ConnectionView struct {
 	LastTestedAt *time.Time `json:"last_tested_at,omitempty"`
 	ConnectedAt  *time.Time `json:"connected_at,omitempty"`
 	ConnectedBy  string     `json:"connected_by,omitempty"`
+	// Registry is the image registry the platform pulls Heimdall's images
+	// from (fix wave 3, N216); nil when none is saved. Its token is never
+	// returned.
+	Registry *RegistryView `json:"registry,omitempty"`
+}
+
+// RegistryView is a saved image registry login without its token.
+type RegistryView struct {
+	Registry   string     `json:"registry"`
+	Username   string     `json:"username"`
+	TokenLast4 string     `json:"token_last4,omitempty"`
+	TestedAt   *time.Time `json:"tested_at,omitempty"`
 }
 
 // ConnectionsList is the settings answer: every platform, and the org's
@@ -62,6 +85,9 @@ type ConnectionsList struct {
 type Resolved struct {
 	Platform    string
 	Credentials Credentials
+	// Registry is the platform's image registry login, nil when none is
+	// saved (fix wave 3, N216).
+	Registry *ImageRegistry
 }
 
 type storedValue struct {
@@ -124,6 +150,9 @@ func (s *Connections) List(ctx context.Context, org string) (*ConnectionsList, e
 			v.Endpoint = s.endpointOf(ctx, org, &k)
 			v.TokenLast4 = labelLast4(k.Label)
 			v.Default = out.Default == info.Name
+			if rk, ok := byProvider[providerRegistry+info.Name]; ok {
+				v.Registry = s.registryView(ctx, org, &rk)
+			}
 		}
 		out.Platforms = append(out.Platforms, v)
 	}
@@ -327,6 +356,9 @@ func (s *Connections) Disconnect(ctx context.Context, org, name, actor string) (
 	if err := s.Keys.Delete(ctx, org, k.ID, actor); err != nil && !errors.Is(err, keystore.ErrNotFound) {
 		return nil, err
 	}
+	if err := s.RemoveRegistry(ctx, org, name, actor); err != nil && !errors.Is(err, ErrNotConnected) {
+		return nil, err
+	}
 	return s.List(ctx, org)
 }
 
@@ -345,13 +377,18 @@ func (s *Connections) Resolve(ctx context.Context, org string) (*Resolved, error
 	if err != nil {
 		return nil, err
 	}
-	return &Resolved{Platform: l.Default, Credentials: c}, nil
+	reg, err := s.RegistryOf(ctx, org, l.Default)
+	if err != nil {
+		return nil, err
+	}
+	return &Resolved{Platform: l.Default, Credentials: c, Registry: reg}, nil
 }
 
 // IsPlatformSecret reports whether a keystore secret belongs to this
 // package (the secrets screen may hide or label it).
 func IsPlatformSecret(provider string) bool {
-	return strings.HasPrefix(provider, providerPrefix) || strings.HasPrefix(provider, providerDefault+":")
+	return strings.HasPrefix(provider, providerPrefix) || strings.HasPrefix(provider, providerDefault+":") ||
+		strings.HasPrefix(provider, providerRegistry)
 }
 
 // actorPrefix marks keystore rows this package writes for an admin.
@@ -388,4 +425,309 @@ func (s *Connections) CredentialsOf(ctx context.Context, org, name string) (Cred
 		return Credentials{}, fmt.Errorf("%s: %w", name, ErrNotConnected)
 	}
 	return s.credentials(ctx, org, k)
+}
+
+// Image registry logins (fix wave 3, N216 fix 2). A sandbox platform in the
+// cloud pulls Heimdall's images from the org's own registry: the shared
+// runner pushes each image there with this login and the platform pulls it
+// with the same login. The server only signs in to the registry's v2 API
+// when the login is saved; it never runs docker and never pushes, so push
+// rights are proven on first use.
+
+// Registry login errors.
+var (
+	// ErrRegistryPath refuses a registry that is not host/path.
+	ErrRegistryPath = errors.New("Use a registry path like ghcr.io/team/heimdall.")
+	// ErrRegistryInput refuses a login without a user name or token, or for
+	// a platform that does not pull from a registry with a login.
+	ErrRegistryInput = errors.New("registry login")
+)
+
+// RegistrySignInError is a registry that refused or could not check the
+// login, in plain words.
+type RegistrySignInError struct {
+	Registry, Reason string
+}
+
+func (e *RegistrySignInError) Error() string {
+	return "Heimdall could not sign in to " + e.Registry + ": " + e.Reason + "."
+}
+
+var (
+	registryHostRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*(:[0-9]{1,5})?$`)
+	registryPathRe = regexp.MustCompile(`^[a-z0-9]+([._-][a-z0-9]+)*$`)
+)
+
+// NormalizeRegistryPath checks a registry path as a person typed it
+// (ghcr.io/team/heimdall): a host with a dot or a port, then one or more
+// lower case path parts. A scheme and a trailing slash are dropped.
+func NormalizeRegistryPath(raw string) (string, error) {
+	p := strings.TrimSpace(raw)
+	p = strings.TrimPrefix(strings.TrimPrefix(p, "https://"), "http://")
+	p = strings.Trim(p, "/")
+	host, rest, ok := strings.Cut(p, "/")
+	if !ok || rest == "" || len(p) > 200 || !registryHostRe.MatchString(host) || !strings.ContainsAny(host, ".:") {
+		return "", ErrRegistryPath
+	}
+	for _, part := range strings.Split(rest, "/") {
+		if !registryPathRe.MatchString(part) {
+			return "", ErrRegistryPath
+		}
+	}
+	return p, nil
+}
+
+func registryLabel(title, token string) string {
+	if l4 := last4(token); l4 != "" {
+		return title + " image registry token ending " + l4
+	}
+	return title + " image registry token"
+}
+
+// registryView reads a stored login without returning its token.
+func (s *Connections) registryView(ctx context.Context, org string, k *keystore.Key) *RegistryView {
+	r, err := s.registryValue(ctx, org, k)
+	if err != nil {
+		return nil
+	}
+	return &RegistryView{Registry: r.Registry, Username: r.Username, TokenLast4: labelLast4(k.Label), TestedAt: k.LastTestedAt}
+}
+
+func (s *Connections) registryValue(ctx context.Context, org string, k *keystore.Key) (*ImageRegistry, error) {
+	raw, err := s.Keys.Reveal(ctx, org, k.ID)
+	if err != nil {
+		return nil, err
+	}
+	var r ImageRegistry
+	if err := json.Unmarshal([]byte(raw), &r); err != nil || r.Registry == "" || r.Token == "" {
+		return nil, errors.New("stored image registry login is unreadable; save it again")
+	}
+	return &r, nil
+}
+
+// RegistryOf returns a platform's saved image registry login with its
+// token, or nil when none is saved. Server internal only.
+func (s *Connections) RegistryOf(ctx context.Context, org, name string) (*ImageRegistry, error) {
+	if !IsPlatform(name) {
+		return nil, fmt.Errorf("%w %q", ErrUnknownPlatform, name)
+	}
+	k, err := s.find(ctx, org, providerRegistry+name)
+	if err != nil || k == nil {
+		return nil, err
+	}
+	return s.registryValue(ctx, org, k)
+}
+
+// SaveRegistry signs in to the registry with the login and, when the
+// registry accepts it, stores it beside the platform's token (replacing an
+// earlier one). Only a connected Modal takes a registry login.
+func (s *Connections) SaveRegistry(ctx context.Context, org, name, registry, username, token, actor string) (*RegistryView, error) {
+	info, ok := Lookup(name)
+	if !ok {
+		return nil, fmt.Errorf("%w %q", ErrUnknownPlatform, name)
+	}
+	if name != PlatformModal {
+		return nil, fmt.Errorf("%w: %s does not pull images from your registry", ErrRegistryInput, info.Title)
+	}
+	path, err := NormalizeRegistryPath(registry)
+	if err != nil {
+		return nil, err
+	}
+	username, token = strings.TrimSpace(username), strings.TrimSpace(token)
+	if username == "" || token == "" {
+		return nil, fmt.Errorf("%w: the user name and the token are required", ErrRegistryInput)
+	}
+	pk, err := s.find(ctx, org, providerPrefix+name)
+	if err != nil {
+		return nil, err
+	}
+	if pk == nil {
+		return nil, ErrNotConnected
+	}
+	login := ImageRegistry{Registry: path, Username: username, Token: token}
+	cctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	if err := CheckRegistrySignIn(cctx, s.RegistryClient, login); err != nil {
+		return nil, err
+	}
+	raw, err := json.Marshal(login)
+	if err != nil {
+		return nil, err
+	}
+	old, err := s.find(ctx, org, providerRegistry+name)
+	if err != nil {
+		return nil, err
+	}
+	put := keystore.Put{Provider: providerRegistry + name, Label: registryLabel(info.Title, token), Value: string(raw)}
+	var k *keystore.Key
+	if old != nil {
+		k, err = s.Keys.Update(ctx, org, old.ID, put, actorPrefix+actor)
+	} else {
+		k, err = s.Keys.Create(ctx, org, keystore.KindSecret, put, actorPrefix+actor)
+	}
+	if err != nil {
+		return nil, err
+	}
+	now := s.now()
+	_ = s.Keys.SetStatus(ctx, org, k.ID, keystore.StatusOK, now)
+	return &RegistryView{Registry: path, Username: username, TokenLast4: last4(token), TestedAt: &now}, nil
+}
+
+// RemoveRegistry deletes a platform's image registry login;
+// ErrNotConnected when none is saved.
+func (s *Connections) RemoveRegistry(ctx context.Context, org, name, actor string) error {
+	if !IsPlatform(name) {
+		return fmt.Errorf("%w %q", ErrUnknownPlatform, name)
+	}
+	k, err := s.find(ctx, org, providerRegistry+name)
+	if err != nil {
+		return err
+	}
+	if k == nil {
+		return ErrNotConnected
+	}
+	if err := s.Keys.Delete(ctx, org, k.ID, actor); err != nil && !errors.Is(err, keystore.ErrNotFound) {
+		return err
+	}
+	return nil
+}
+
+// registrySignInClient reaches public addresses only (utils.GuardedTransport).
+func registrySignInClient() *http.Client {
+	return &http.Client{Transport: utils.GuardedTransport(), Timeout: 30 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+}
+
+// CheckRegistrySignIn signs in to the registry's v2 API with the login:
+// GET https://<host>/v2/ with basic auth and, when the registry answers 401
+// with a Bearer challenge, the token flow at its realm. 200 means signed in.
+// A nil client reaches public addresses only. Errors are
+// *RegistrySignInError in plain words and never carry the token.
+func CheckRegistrySignIn(ctx context.Context, client *http.Client, r ImageRegistry) error {
+	if client == nil {
+		client = registrySignInClient()
+	}
+	fail := func(reason string) error { return &RegistrySignInError{Registry: r.Registry, Reason: reason} }
+	host := r.Host()
+	if host == "docker.io" {
+		host = "registry-1.docker.io"
+	}
+	base := "https://" + host + "/v2/"
+	resp, err := registryGet(ctx, client, base, func(req *http.Request) { req.SetBasicAuth(r.Username, r.Token) })
+	if err != nil {
+		return fail("it could not be reached")
+	}
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+	default:
+		return fail(fmt.Sprintf("it answered HTTP %d", resp.StatusCode))
+	}
+	realm, params := bearerChallenge(resp.Header.Get("WWW-Authenticate"))
+	if realm == "" {
+		return fail("the user name or token was refused")
+	}
+	ru, err := url.Parse(realm)
+	if err != nil || ru.Scheme != "https" {
+		return fail("its sign-in address is not https")
+	}
+	q := ru.Query()
+	if v := params["service"]; v != "" {
+		q.Set("service", v)
+	}
+	scope := params["scope"]
+	if scope == "" {
+		if _, repo, ok := strings.Cut(r.Registry, "/"); ok {
+			scope = "repository:" + repo + "/heimdall-check:push,pull"
+		}
+	}
+	if scope != "" {
+		q.Set("scope", scope)
+	}
+	ru.RawQuery = q.Encode()
+	tr, err := registryGet(ctx, client, ru.String(), func(req *http.Request) { req.SetBasicAuth(r.Username, r.Token) })
+	if err != nil {
+		return fail("its sign-in service could not be reached")
+	}
+	if tr.StatusCode == http.StatusUnauthorized || tr.StatusCode == http.StatusForbidden {
+		return fail("the user name or token was refused")
+	}
+	if tr.StatusCode != http.StatusOK {
+		return fail(fmt.Sprintf("its sign-in service answered HTTP %d", tr.StatusCode))
+	}
+	var tok struct {
+		Token       string `json:"token"`
+		AccessToken string `json:"access_token"`
+	}
+	if json.Unmarshal(tr.body, &tok) != nil || tok.Token == "" && tok.AccessToken == "" {
+		return fail("its sign-in service gave no token")
+	}
+	bearer := tok.Token
+	if bearer == "" {
+		bearer = tok.AccessToken
+	}
+	again, err := registryGet(ctx, client, base, func(req *http.Request) { req.Header.Set("Authorization", "Bearer "+bearer) })
+	if err != nil {
+		return fail("it could not be reached")
+	}
+	switch again.StatusCode {
+	case http.StatusOK:
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return fail("the user name or token was refused")
+	}
+	return fail(fmt.Sprintf("it answered HTTP %d", again.StatusCode))
+}
+
+type registryAnswer struct {
+	StatusCode int
+	Header     http.Header
+	body       []byte
+}
+
+func registryGet(ctx context.Context, client *http.Client, u string, set func(*http.Request)) (*registryAnswer, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	set(req)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+	return &registryAnswer{StatusCode: resp.StatusCode, Header: resp.Header, body: b}, nil
+}
+
+// bearerChallenge parses `Bearer realm="...",service="...",scope="..."`.
+func bearerChallenge(h string) (string, map[string]string) {
+	h = strings.TrimSpace(h)
+	if len(h) < 7 || !strings.EqualFold(h[:7], "bearer ") {
+		return "", nil
+	}
+	params := map[string]string{}
+	rest := h[7:]
+	for rest != "" {
+		rest = strings.TrimLeft(rest, " ,")
+		k, v, ok := strings.Cut(rest, "=")
+		if !ok {
+			break
+		}
+		k = strings.ToLower(strings.TrimSpace(k))
+		v = strings.TrimSpace(v)
+		if strings.HasPrefix(v, `"`) {
+			end := strings.Index(v[1:], `"`)
+			if end < 0 {
+				params[k] = v[1:]
+				break
+			}
+			params[k], rest = v[1:end+1], v[end+2:]
+			continue
+		}
+		val, next, _ := strings.Cut(v, ",")
+		params[k], rest = strings.TrimSpace(val), next
+	}
+	return params["realm"], params
 }

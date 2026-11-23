@@ -55,6 +55,95 @@ func (h *WorkerPlatformsHandler) RegisterRoutes(r *router.Router, middlewares ..
 	r.POST(p+"/{platform}/connect", lib.ChainMiddlewares(h.admin(h.connect), middlewares...))
 	r.POST(p+"/{platform}/test", lib.ChainMiddlewares(h.admin(h.test), middlewares...))
 	r.POST(p+"/{platform}/disconnect", lib.ChainMiddlewares(h.admin(h.disconnect), middlewares...))
+	r.POST(p+"/{platform}/registry", lib.ChainMiddlewares(h.admin(h.saveRegistry), middlewares...))
+	r.POST(p+"/{platform}/registry/remove", lib.ChainMiddlewares(h.admin(h.removeRegistry), middlewares...))
+}
+
+// WorkerPlatformRegistries is the image registry half of the platform API
+// (fix wave 3, N216): the org's own registry a platform pulls Heimdall's
+// images from. sandbox.Connections implements it; an api without it
+// answers 503 on the registry routes.
+type WorkerPlatformRegistries interface {
+	SaveRegistry(ctx context.Context, org, name, registry, username, token, actor string) (*sandbox.RegistryView, error)
+	RemoveRegistry(ctx context.Context, org, name, actor string) error
+}
+
+// PlatformRegistryRequest is the registry login body: the registry path
+// images go under, a user name and a token with push and pull rights.
+type PlatformRegistryRequest struct {
+	Registry string `json:"registry"`
+	Username string `json:"username"`
+	Token    string `json:"token"`
+}
+
+func (h *WorkerPlatformsHandler) registries(ctx *fasthttp.RequestCtx) (WorkerPlatformRegistries, bool) {
+	r, ok := h.api.(WorkerPlatformRegistries)
+	if !ok {
+		lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable, "image registries are not available on this server")
+	}
+	return r, ok
+}
+
+// saveRegistry signs in to the registry with the login and keeps it when
+// the registry accepts it. The token is never returned.
+func (h *WorkerPlatformsHandler) saveRegistry(ctx *fasthttp.RequestCtx) {
+	name, ok := h.platform(ctx)
+	if !ok {
+		return
+	}
+	regs, ok := h.registries(ctx)
+	if !ok {
+		return
+	}
+	var req PlatformRegistryRequest
+	if err := decodeJSONStrict(bytes.TrimSpace(ctx.PostBody()), &req); err != nil {
+		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "parse request: "+err.Error())
+		return
+	}
+	work, cancel := workContext(ctx, platformCheckTimeout)
+	defer cancel()
+	org := platformOrg(ctx)
+	out, err := regs.SaveRegistry(work, org, name, req.Registry, req.Username, req.Token, auth.PrincipalFrom(ctx).ActorID())
+	var signIn *sandbox.RegistrySignInError
+	switch {
+	case err == nil:
+	case errors.Is(err, sandbox.ErrRegistryPath), errors.Is(err, sandbox.ErrRegistryInput):
+		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, err.Error())
+		return
+	case errors.As(err, &signIn):
+		lib.SendError(ctx, h.mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, signIn.Error())
+		return
+	default:
+		h.sendErr(ctx, "save the image registry of "+name, err)
+		return
+	}
+	h.write(ctx, org, "worker_platform.registry", name, map[string]any{"registry": out.Registry, "username": out.Username, "token_last4": out.TokenLast4})
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+}
+
+// removeRegistry deletes the platform's image registry login.
+func (h *WorkerPlatformsHandler) removeRegistry(ctx *fasthttp.RequestCtx) {
+	name, ok := h.platform(ctx)
+	if !ok {
+		return
+	}
+	regs, ok := h.registries(ctx)
+	if !ok {
+		return
+	}
+	work, cancel := workContext(ctx, readTimeout)
+	defer cancel()
+	org := platformOrg(ctx)
+	if err := regs.RemoveRegistry(work, org, name, auth.PrincipalFrom(ctx).ActorID()); err != nil {
+		if errors.Is(err, sandbox.ErrNotConnected) {
+			lib.SendError(ctx, h.mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, name+" has no image registry")
+			return
+		}
+		h.sendErr(ctx, "remove the image registry of "+name, err)
+		return
+	}
+	h.write(ctx, org, "worker_platform.registry_remove", name, nil)
+	ctx.SetStatusCode(fasthttp.StatusNoContent)
 }
 
 const platformsOrgValue = "heimdall.platforms.org"
