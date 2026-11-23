@@ -34,6 +34,11 @@ vi.mock("@/lib/store/apis/runControlApi", async (orig) => ({
 	useRerunEvaluationFailuresMutation: vi.fn(() => [() => undefined, { isLoading: false }]),
 }));
 
+vi.mock("@/lib/store/apis/agentopsApi", async (orig) => ({
+	...(await orig<object>()),
+	useScanAgentSkillMutation: vi.fn(() => [() => undefined, { isLoading: false }]),
+}));
+
 vi.mock("@/lib/store/apis/bifrostUseApi", async (orig) => ({
 	...(await orig<object>()),
 	useGetEvaluationBifrostUseQuery: vi.fn(() => ({ data: undefined })),
@@ -147,7 +152,7 @@ describe("EvaluationBody budget (G4-01)", () => {
 				}}
 			/>,
 		);
-		expect(html).toContain("Stopped at the $5.00 budget: 13 runs not started");
+		expect(html).toContain("Stopped by the budget: spent $4.60 of $5.00. 13 runs did not start.");
 		expect(html).toContain("$2.10 of $5.00 spent");
 		expect(html).toContain("The budget stopped 1 benchmark: 13 runs not started.");
 		expect(html).toContain("Raise budget and continue");
@@ -231,5 +236,127 @@ describe("EvaluationBody finished progress (N142)", () => {
 		vi.mocked(useGetExperimentQuery).mockReturnValue(
 			okQuery({ exp_id: "e1", slots: { total: 20, done: 7, running: 2, failed: 0 } }) as never,
 		);
+	});
+});
+describe("EvaluationBody why runs did not start (fix wave 3, H14)", () => {
+	it("shows the child's run problem and the job log instead of Waiting to start (N180, N216)", async () => {
+		const { useGetExperimentQuery } = await import("@/lib/store/apis/benchApi");
+		vi.mocked(useGetExperimentQuery).mockReturnValue(
+			okQuery({
+				exp_id: "e1",
+				slots: { total: 3, done: 0, running: 0, failed: 0 },
+				problem: "worker shared could not take this run: Modal refused the sandbox",
+				run_job_id: "job_9",
+			}) as never,
+		);
+		const queued: Evaluation = { ...base, children: [{ benchmark: "hd-harbor-tb2", experiment_id: "e1", status: "queued" }] };
+		const html = render(<EvaluationBody evaluation={queued} />);
+		expect(html).toContain("Runs could not start: worker shared could not take this run: Modal refused the sandbox");
+		expect(html).toContain('href="/jobs/job_9"');
+		expect(html).toContain("Open the job log");
+		expect(html).not.toContain("Waiting to start");
+		vi.mocked(useGetExperimentQuery).mockReturnValue(
+			okQuery({ exp_id: "e1", slots: { total: 20, done: 7, running: 2, failed: 0 } }) as never,
+		);
+	});
+
+	const skippedBy = (skipped: string): Evaluation => ({
+		...base,
+		status: "failed",
+		children: [{ benchmark: "hd-harbor-bfcl", experiment_id: "", status: "skipped", skipped }],
+	});
+	const noScan = "plan experiment: skill pdf-tools in agents/zz-loop/skills has no passing scan: open the agent's Tools tab and press Scan";
+	const changed =
+		"plan experiment: skill pdf-tools in agents/zz-loop/skills changed after its scan: open the agent's Tools tab and press Scan";
+
+	it("turns a skill gate refusal into a next step with Scan it now and the agent's tools (L5)", async () => {
+		const { hostedSession } = await import("@/lib/testing/platformFixtures");
+		const html = render(<EvaluationBody evaluation={skippedBy(noScan)} />, hostedSession("member"));
+		expect(html).toContain("Skill pdf-tools of agent zz-loop has not passed a safety scan, so runs of this agent are refused.");
+		expect(html).toContain('data-testid="evaluation-skill-scan-hd-harbor-bfcl"');
+		expect(html).toContain("Scan it now");
+		expect(html).toContain('href="/agents/zz-loop?tab=tools"');
+		const html2 = render(<EvaluationBody evaluation={skippedBy(changed)} />, hostedSession("member"));
+		expect(html2).toContain("Skill pdf-tools changed after its last scan, so runs of this agent are refused.");
+	});
+
+	it("shows the scan result: admitted, then blocked with its findings (L5)", async () => {
+		const { hostedSession } = await import("@/lib/testing/platformFixtures");
+		const { useScanAgentSkillMutation } = await import("@/lib/store/apis/agentopsApi");
+		const result = (decision: string, findings: object[] = []) =>
+			[() => undefined, { isLoading: false, data: { installed: true, skill: {}, record: { decision, counts: {}, findings } } }] as never;
+		vi.mocked(useScanAgentSkillMutation).mockReturnValue(result("admitted"));
+		expect(render(<EvaluationBody evaluation={skippedBy(noScan)} />, hostedSession("member"))).toContain(
+			"Passed the scan. Start the evaluation again to run this benchmark.",
+		);
+		vi.mocked(useScanAgentSkillMutation).mockReturnValue(
+			result("blocked", [{ rule: "exfil", severity: "block", file: "run.sh", line: 3, detail: "sends files to a remote host" }]),
+		);
+		const blocked = render(<EvaluationBody evaluation={skippedBy(noScan)} />, hostedSession("member"));
+		expect(blocked).toContain("sends files to a remote host");
+		expect(blocked).toContain("Remove the skill on the Tools tab");
+		vi.mocked(useScanAgentSkillMutation).mockReturnValue([() => undefined, { isLoading: false }] as never);
+	});
+
+	it("puts the rerun notice below the header, full width (N193)", async () => {
+		const { hostedSession } = await import("@/lib/testing/platformFixtures");
+		const { useRerunEvaluationFailuresMutation } = await import("@/lib/store/apis/runControlApi");
+		vi.mocked(useRerunEvaluationFailuresMutation).mockReturnValue([
+			() => undefined,
+			{ isLoading: false, data: { evaluation: { id: "ev_2" }, children: [{}, {}] } },
+		] as never);
+		const done = { ...base, status: "done", failed_runs: 2 } as Evaluation;
+		const html = render(<EvaluationBody evaluation={done} />, hostedSession("member"));
+		const notice = html.indexOf('data-testid="evaluation-rerun-started"');
+		expect(notice).toBeGreaterThan(-1);
+		const header = html.slice(html.indexOf('data-testid="page-header"'), html.indexOf("</header>"));
+		expect(header).not.toContain("evaluation-rerun-started");
+		expect(html).toContain("Started ev_2 with 2 benchmarks");
+		vi.mocked(useRerunEvaluationFailuresMutation).mockReturnValue([() => undefined, { isLoading: false }] as never);
+	});
+
+	it("says which benchmark is starting while the launch runs, and the evaluation's problem (N182)", () => {
+		const starting = { ...base, status: "queued", children: [], launch: { started: 1, of: 3, current: "hd-harbor-bfcl" } } as Evaluation;
+		expect(render(<EvaluationBody evaluation={starting} />)).toContain("Starting benchmark 2 of 3: hd-harbor-bfcl...");
+		const broken = {
+			...base,
+			status: "failed",
+			children: [],
+			problem: "The server restarted while this evaluation was starting. Start it again.",
+		} as Evaluation;
+		const html = render(<EvaluationBody evaluation={broken} />);
+		expect(html).toMatch(/data-testid="evaluation-problem"[^>]*>[^<]*The server restarted while this evaluation was starting/);
+		expect(html).not.toContain("Starting benchmark");
+	});
+
+	it("prints the budget stop with the next run's expected cost (N190)", () => {
+		const stopped = {
+			...base,
+			status: "done",
+			children: [
+				{
+					benchmark: "hd-harbor-tb2",
+					experiment_id: "e1",
+					status: "done",
+					budget_usd: 0.01,
+					spent_usd: 0.0094,
+					budget_stopped: true,
+					not_started: 4,
+					next_run_usd: 0.003,
+				},
+			],
+		} as unknown as Evaluation;
+		const html = render(<EvaluationBody evaluation={stopped} />);
+		expect(html).toContain(
+			"Stopped by the budget: spent $0.0094 of $0.01; the next run was expected to cost about $0.0030. 4 runs did not start.",
+		);
+		expect(html).toContain("Raise budget and continue");
+	});
+
+	it("marks a scheduled repeat (N297)", () => {
+		const html = render(<EvaluationBody evaluation={{ ...base, schedule: "nightly" }} />);
+		expect(html).toContain('data-testid="evaluation-scheduled"');
+		expect(html).toContain(">Scheduled<");
+		expect(html).toContain("Repeat of Codex v1 vs v2 by schedule nightly, ");
 	});
 });

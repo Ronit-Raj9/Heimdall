@@ -1,3 +1,4 @@
+import { formatCost } from "@/components/leaderboard/agentBoard.utils";
 import { Button } from "@/components/ui/button";
 import { type Evaluation, type EvaluationChild, useRaiseEvaluationBudgetMutation } from "@/lib/store/apis/evaluationsApi";
 import { useState } from "react";
@@ -18,11 +19,20 @@ export function childSpendText(c: EvaluationChild): string | undefined {
 	return `${dollars(c.spent_usd ?? 0)} of ${dollars(c.budget_usd)} spent`;
 }
 
-/** "Stopped at the $5.00 budget: 13 runs not started" for a child the cap stopped. */
+/** A child with the expected cost of the run the budget did not start (fix wave 3, N190); absent on an older server. */
+type ChildWithNextRun = EvaluationChild & { next_run_usd?: number };
+
+/**
+ * "Stopped by the budget: spent $0.0094 of $0.01; the next run was expected to cost about $0.0030. 4 runs did
+ * not start." for a child the cap stopped (fix wave 3, N190). Money keeps 4 decimals under one cent.
+ */
 export function childStoppedText(c: EvaluationChild): string | undefined {
 	if (!c.budget_stopped) return undefined;
 	const n = c.not_started ?? 0;
-	return `Stopped at the ${dollars(c.budget_usd ?? 0)} budget: ${n} ${n === 1 ? "run" : "runs"} not started`;
+	const next = (c as ChildWithNextRun).next_run_usd;
+	const spent = `Stopped by the budget: spent ${formatCost(c.spent_usd ?? 0)} of ${formatCost(c.budget_usd ?? 0)}`;
+	const est = next && next > 0 ? `; the next run was expected to cost about ${formatCost(next)}` : "";
+	return `${spent}${est}. ${n} ${n === 1 ? "run" : "runs"} did not start.`;
 }
 
 const TERMINAL = new Set(["done", "failed", "cancelled", "skipped"]);

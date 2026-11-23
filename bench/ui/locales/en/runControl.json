@@ -70,7 +70,12 @@
 			"requeue_run": "requeued a run",
 			"supersede": "retried a run (error policy)"
 		},
-		"noReason": "no reason given"
+		"noReason": "no reason given",
+		"held": "held {{models}}",
+		"released": "released {{models}}",
+		"concurrency": "set runs at once from {{a}} to {{b}}",
+		"spendCap": "set the spend cap from {{a}} to {{b}}",
+		"frozen": "the frozen value"
 	},
 	"run": {
 		"cancel": "Cancel run",
@@ -90,6 +95,7 @@
 		"open": "Open",
 		"error": "Could not rerun failures",
 		"configChanged": "The agent setup changed since this comparison for {{arms}}.",
-		"evalStarted": "Started {{id}} with {{count}} benchmarks"
+		"evalStarted": "Started {{id}} with {{count}} benchmarks",
+		"close": "Close"
 	}
 }

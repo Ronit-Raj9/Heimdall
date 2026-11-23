@@ -102,3 +102,17 @@ describe("EvaluationTable result and spend (N161)", () => {
 		expect(html).not.toContain("Score one agent");
 	});
 });
+describe("EvaluationTable scheduled repeats (fix wave 3, N297)", () => {
+	it("marks a scheduled repeat and adds the start date when two rows share a name", () => {
+		const first = { ...ev, id: "ev_a", status: "done", created_at: "2026-11-21T10:00:00Z" } as Evaluation;
+		const repeat = { ...ev, id: "ev_b", status: "done", schedule: "nightly", created_at: "2026-11-22T10:00:00Z" } as Evaluation;
+		const other = { ...ev, id: "ev_c", status: "done", spec: { ...ev.spec, name: "Alone" } } as Evaluation;
+		const html = render(<EvaluationTable evaluations={[first, repeat, other]} />);
+		expect(html).toContain('data-testid="evaluation-scheduled-ev_b"');
+		expect(html).not.toContain('data-testid="evaluation-scheduled-ev_a"');
+		expect(html).toContain('data-testid="evaluation-name-date-ev_a"');
+		expect(html).toContain('data-testid="evaluation-name-date-ev_b"');
+		expect(html).not.toContain('data-testid="evaluation-name-date-ev_c"');
+		expect(html).toContain(">Scheduled<");
+	});
+});

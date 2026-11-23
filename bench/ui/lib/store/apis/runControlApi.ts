@@ -78,6 +78,7 @@ export interface RunControls {
 	log_problem?: string;
 	rerun_of?: string;
 	exploratory: boolean;
+	rerun_failures?: { allowed: boolean; reason?: string };
 }
 
 /** PATCH /experiments/{id}/controls body. Leave a field out to keep it; 0 clears an override. */

@@ -84,7 +84,23 @@
 		"deleteKeep": "Keep",
 		"deleteBusy": "Cancel the evaluation or wait for it to finish before deleting it.",
 		"deleteAdminOnly": "Only admins can delete an evaluation.",
-		"deleteError": "Could not delete: {{error}}"
+		"deleteError": "Could not delete: {{error}}",
+		"childProblem": "Runs could not start: {{problem}}",
+		"childProblemLog": "Open the job log",
+		"starting": "Starting benchmark {{n}} of {{m}}: {{name}}...",
+		"startingNoName": "Starting benchmark {{n}} of {{m}}...",
+		"scheduled": "Scheduled",
+		"scheduledLine": "Repeat of {{name}} by schedule {{schedule}}, {{date}}"
+	},
+	"skill": {
+		"notScanned": "Skill {{skill}} of agent {{agent}} has not passed a safety scan, so runs of this agent are refused.",
+		"changed": "Skill {{skill}} changed after its last scan, so runs of this agent are refused.",
+		"scan": "Scan it now",
+		"tools": "Open the agent's tools",
+		"admitted": "Passed the scan. Start the evaluation again to run this benchmark.",
+		"blocked": "The scan blocked this skill:",
+		"remove": "Remove the skill on the Tools tab",
+		"error": "Could not scan: {{error}}"
 	},
 	"fault": {
 		"clean": "normal run",
