@@ -50,6 +50,7 @@ vi.mock("./toolsTab", () => ({ default: () => null }));
 vi.mock("./versionsTab", () => ({ default: () => null }));
 vi.mock("@/components/sharedpool/imageRequests", () => ({ AgentImageApproval: () => null }));
 vi.mock("../../new/views/connectForm", () => ({ SavedEndpointTest: () => null }));
+vi.mock("@/components/agents/skillScanBar", () => ({ SkillScanBar: () => null })); // L5 scan bar has its own test
 
 function page(search: string, session: SessionInfo = LOCAL_SESSION) {
 	return render(
