@@ -68,7 +68,7 @@ export function ReviewQueueTable({ items, selectedRunId, onSelect }: ReviewQueue
 							<TableCell>
 								<div className="flex flex-wrap gap-1">
 									{item.reasons.map((reason) => (
-										<ReasonBadge key={reason} reason={reason} testId={`review-queue-reason-${item.run_id}-${reason}`} />
+										<ReasonBadge key={reason} reason={reason} detail={(item as typeof item & { thrown_out_by?: string[] }).thrown_out_by} testId={`review-queue-reason-${item.run_id}-${reason}`} />
 									))}
 								</div>
 							</TableCell>

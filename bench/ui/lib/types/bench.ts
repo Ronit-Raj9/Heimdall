@@ -2156,7 +2156,7 @@ export type ReviewDecision = "pass" | "fail" | "invalid" | "flag_only";
 export const REVIEW_DECISIONS: readonly ReviewDecision[] = ["pass", "fail", "invalid", "flag_only"];
 
 /** Why a run is in the review queue. */
-export type ReviewReason = "split_votes" | "unparsable_votes" | "invalid_evaluator" | "veto" | "false_completion" | "flagged" | "contested"; // W8 judge calibration: contested
+export type ReviewReason = "split_votes" | "unparsable_votes" | "invalid_evaluator" | "veto" | "false_completion" | "flagged" | "contested" | "invalidated"; // W8 judge calibration: contested; fix wave 3: invalidated
 
 /** Every queue reason, in display order (schemas.ReviewReasons). */
 export const REVIEW_REASONS: readonly ReviewReason[] = [
@@ -2167,6 +2167,7 @@ export const REVIEW_REASONS: readonly ReviewReason[] = [
 	"false_completion",
 	"flagged",
 	"contested", // W8 judge calibration
+	"invalidated", // fix wave 3: a safety check threw the run out
 ];
 
 /** One review record (schemas.Review): <exp>/reviews/<review_id>/review.json. */

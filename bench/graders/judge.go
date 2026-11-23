@@ -90,9 +90,6 @@ var judgePromptFS embed.FS
 // found and revoked by the janitor.
 var judgeKeyNameRe = regexp.MustCompile(`^r_[a-z0-9]+$`)
 
-// modelDateRe is a release date suffix a provider may add to a model alias.
-var modelDateRe = regexp.MustCompile(`^[-@](\d{8}|\d{4}-\d{2}-\d{2})$`)
-
 // JudgeConfig wires the judge grader to the gateway. Gateway mints and
 // revokes the judge's own virtual key, URL is the gateway's inference base
 // URL as the bench host sees it (bench.yaml gateway.url), and Price prices a
