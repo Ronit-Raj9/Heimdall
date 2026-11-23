@@ -312,6 +312,9 @@ type EvaluationChild struct {
 	// NotStarted counts the runs it never started.
 	BudgetStopped bool `json:"budget_stopped,omitempty"`
 	NotStarted    int  `json:"not_started,omitempty"`
+	// NextRunUSD is the expected cost of the run the cap refused, from the
+	// scheduler's budget stop (fix wave 3, N190); 0 when unknown.
+	NextRunUSD float64 `json:"next_run_usd,omitempty"`
 	// The dataset version the child ran, fixed at launch from its manifest
 	// (Y07): the suite version, the suite.lock hash, the task ids it ran
 	// and each task's content hash. A comparison with another evaluation

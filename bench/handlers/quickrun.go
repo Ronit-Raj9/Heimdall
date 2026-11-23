@@ -192,7 +192,7 @@ func (h *quickRunHandler) post(ctx *fasthttp.RequestCtx) {
 
 	data, rel, err := h.build(work, &req)
 	if err != nil {
-		h.fail(ctx, statusOf(err), err.Error())
+		h.fail(ctx, statusOf(err), plainErr(err)) // N211: no internal "bad quickrun request" prefix
 		return
 	}
 	{ // G10 budgets, X01 own keys: refused before anything is written
@@ -268,7 +268,7 @@ func (h *quickRunHandler) post(ctx *fasthttp.RequestCtx) {
 	}
 	if _, err := s.Projects.Write(work, projectfs.Area("experiments"), strings.TrimPrefix(rel, "experiments/"), data,
 		projectfs.WriteOpts{Actor: who, Note: "quickrun"}); err != nil {
-		h.fail(ctx, statusOf(err), "save "+rel+": "+err.Error())
+		h.fail(ctx, statusOf(err), "save "+rel+": "+plainErr(err))
 		return
 	}
 	if err := s.Launcher.Create(work, m); err != nil {
