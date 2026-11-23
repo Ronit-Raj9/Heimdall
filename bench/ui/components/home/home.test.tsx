@@ -238,7 +238,8 @@ describe("Running now and Recent comparisons", () => {
 	const experimentsNow = [
 		exp("e_admit_acme_voice_desk_1a2b", "admit-acme-voice-desk", "running", { suite: "acme-voice-desk@1.0.0", arms: ["oracle", "noop"] }),
 		exp("e_child", "codex score tau2", "running", { arms: ["A"], evaluation_id: "ev_4" }),
-		exp("e_practice", "try coding", "running", { suite: "coding-core@1.0.0" }),
+		// A quick run on the practice benchmark (generated name); a named comparison of two setups there is listed (N202).
+		exp("e_practice", "quick-20261122-100000-ab12", "running", { suite: "coding-core@1.0.0" }),
 		exp("e_mine", "prompt v2 vs v1", "running"),
 	];
 	it("lists every active evaluation, then running comparisons, cut to 4 after filtering", () => {
