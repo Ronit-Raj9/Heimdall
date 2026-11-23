@@ -6,7 +6,7 @@
 		"noBudget": "No budget set: each benchmark may spend up to {{cap}}.",
 		"updating": "Updating...",
 		"belowOneRun": "This budget is less than one run costs (about {{run}} per run), so no run would start. Set at least {{min}}.",
-		"unknownRunCost": "The cost of a run is not known yet, so this budget can be passed by up to one run's cost before it stops."
+		"unknownRunCost": "The cost of a run is not known yet, so the budget is split evenly across the runs. A run can cost more than its share, so the total can pass the budget a little before it stops."
 	},
 	"summary": {
 		"faults": "Run clean, then again with: {{faults}}.",

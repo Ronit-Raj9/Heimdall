@@ -93,9 +93,9 @@ describe("one run's cost (fix wave 3, N190)", () => {
 		expect(html).toContain("Set budget to");
 	});
 
-	it("says an unknown run cost can pass the budget by one run, and nothing when a run fits", () => {
+	it("says an unknown run cost splits the budget evenly across the runs, and nothing when a run fits", () => {
 		expect(runWarning(budget(), undefined, 1)).toBe(
-			"The cost of a run is not known yet, so this budget can be passed by up to one run's cost before it stops.",
+			"The cost of a run is not known yet, so the budget is split evenly across the runs. A run can cost more than its share, so the total can pass the budget a little before it stops.",
 		);
 		expect(runWarning(budget(), 0.02, 1)).toBeUndefined();
 		expect(runWarning(budget({ default: true }), undefined, 1)).toBeUndefined();
