@@ -240,7 +240,11 @@ function ReasonFilter({
 			{reasons.map((r) =>
 				chip(
 					r,
-					r === "invalidated" ? tHw07("review.reason.invalidated") : isReviewReason(r) ? t(`review.reason.${r as Exclude<typeof r, "invalidated">}`) : r,
+					r === "invalidated"
+						? tHw07("review.reason.invalidated")
+						: isReviewReason(r)
+							? t(`review.reason.${r as Exclude<typeof r, "invalidated">}`)
+							: r,
 					counts[r] ?? 0,
 					value === r,
 					() => onChange(r),
