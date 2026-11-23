@@ -52,8 +52,19 @@ export function AdminSignupPanel() {
 	return <SignupForm key={`${q.data.mode}|${q.data.domains.join(",")}|${q.data.source}`} settings={q.data} />;
 }
 
+/** The signup settings with the names the server adds for the admin who changed them (fix wave 3, L3). */
+type NamedSignupSettings = SignupSettings & { updated_by_name?: string; updated_by_email?: string };
+
+/** Who changed the signup settings: the name, never a raw user id. */
+export function updaterName(settings: NamedSignupSettings): string {
+	if (settings.updated_by_name) return settings.updated_by_name;
+	const by = settings.updated_by ?? "";
+	return by.startsWith("usr_") ? "" : by;
+}
+
 export function SignupForm({ settings }: { settings: SignupSettings }) {
 	const { t } = useTranslation("identity");
+	const named = settings as NamedSignupSettings;
 	const confirm = useConfirm();
 	const [save, state] = useSetSignupSettingsMutation();
 	const [mode, setMode] = useState<SignupPolicy>(settings.mode);
@@ -119,9 +130,9 @@ export function SignupForm({ settings }: { settings: SignupSettings }) {
 							</span>
 						</label>
 					)}
-					<p className="text-muted-foreground text-xs" data-testid="admin-signup-source">
+					<p className="text-muted-foreground text-xs" title={named.updated_by_email || undefined} data-testid="admin-signup-source">
 						{settings.source === "admin"
-							? t("admin.sourceAdmin", { who: settings.updated_by ?? "", when, mode: t(`admin.modes.${settings.config_mode}`) })
+							? t("admin.sourceAdmin", { who: updaterName(named), when, mode: t(`admin.modes.${settings.config_mode}`) })
 							: t("admin.sourceConfig")}
 					</p>
 					{state.error && <p className="text-destructive text-sm">{getBenchErrorMessage(state.error)}</p>}
