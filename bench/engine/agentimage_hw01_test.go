@@ -2,10 +2,13 @@ package engine
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // inspectImageEnv is a task image env that also inspects images, as the
@@ -42,5 +45,28 @@ func TestAgentImageFallbackRefusedOnSharedWorker(t *testing.T) {
 	}
 	if got := NewPlanner(b.reg, b.root, nil, WithAgentImageBuilder(fb), WithoutHostAgentBuilds()).AgentImageBuilder(b.suite); got != AgentImageBuilder(fb) {
 		t.Fatalf("AgentImageBuilder %T", got)
+	}
+}
+
+// A failed agent build names its last output lines, so a refused lease says
+// why (N180).
+func TestDockerAgentImagesFailureNamesLastLines(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "docker")
+	script := "#!/bin/sh\ni=1\nwhile [ $i -le 30 ]; do echo \"step $i\"; i=$((i+1)); done\necho 'ERROR: pip install failed' >&2\nexit 1\n"
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	df := filepath.Join(dir, "Dockerfile")
+	if err := os.WriteFile(df, []byte("FROM scratch\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := DockerAgentImages{Docker: utils.Docker{Binary: bin}}.BuildAgentImage(context.Background(), AgentImage{Tag: "bench/agent-x:1", Dockerfile: df, Context: dir})
+	if err == nil {
+		t.Fatal("build did not fail")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "ERROR: pip install failed") || !strings.Contains(msg, "step 30") || strings.Contains(msg, "step 16\n") || strings.Contains(msg, "step 1\n") {
+		t.Fatalf("error does not carry the last 15 lines: %q", msg)
 	}
 }

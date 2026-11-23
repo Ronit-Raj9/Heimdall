@@ -30,13 +30,19 @@ func (d DockerAgentImages) BuildAgentImage(ctx context.Context, img AgentImage) 
 	if img.Dockerfile == "" {
 		return "", fmt.Errorf("agent image %s has no Dockerfile to build", img.Tag)
 	}
-	out := d.Out
-	if out == nil {
-		out = io.Discard
+	tail := utils.NewTailWriter(utils.DefaultTailLines)
+	var out io.Writer = tail
+	if d.Out != nil {
+		out = io.MultiWriter(d.Out, tail)
 	}
 	info, err := environments.BuildImage(ctx, d.Docker, environments.ImageBuild{Dockerfile: img.Dockerfile, Context: img.Context,
 		Tag: img.Tag, Args: img.BuildArgs, Labels: map[string]string{utils.LabelBench: "1"}}, out)
 	if err != nil {
+		// The last build lines say why (a pinned package, a missing base
+		// image), so a refused lease or a failed job can show them (N180).
+		if last := tail.String(); last != "" {
+			return "", fmt.Errorf("%w; last build output:\n%s", err, last)
+		}
 		return "", err
 	}
 	return info.ID, nil
