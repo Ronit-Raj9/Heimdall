@@ -508,12 +508,32 @@ func checkRelease(m *schemas.Manifest, ev *evidence, override string) error {
 		return err
 	}
 	a := ev.analysis
+	if why := notReleasable(m, a); why != "" {
+		return &RefusedError{Reason: why}
+	}
 	var blocked []string
 	if a.Verdict.Action != schemas.ActionShip {
 		blocked = append(blocked, fmt.Sprintf("verdict action is %s, not ship", a.Verdict.Action))
 	}
 	blocked = append(blocked, policyBlocks(m, ev)...)
 	return checkOverride(blocked, override, "action is ship and the policy does not block")
+}
+
+// notReleasable says why an experiment can never be released, whatever an
+// override says, or "" (fix wave 3, N244 and N247): a debug run (replay,
+// fork or breakpoints) and a readiness check (admit-) measure the harness,
+// not a version to ship, and a leader verdict ranks three or more setups
+// with no candidate against a baseline (D12).
+func notReleasable(m *schemas.Manifest, a *schemas.Analysis) string {
+	switch {
+	case m.Experiment.Debug != nil:
+		return fmt.Sprintf("%s is a debug run, which is never scored or released", m.ExpID)
+	case strings.HasPrefix(m.Experiment.Name, "admit-") || strings.HasPrefix(m.ExpID, "e_admit_"):
+		return fmt.Sprintf("%s is a readiness check, not a comparison; it is never released", m.ExpID)
+	case a != nil && a.Verdict.Decision == schemas.DecisionLeader:
+		return "the verdict ranks three or more setups (leader found); a release needs a comparison of one version against another"
+	}
+	return ""
 }
 
 // checkIntegrity refuses an analysis that does not match the frozen

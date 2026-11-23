@@ -59,6 +59,9 @@ func (l *Log) createEvaluation(ctx context.Context, r schemas.ReleaseRequest, e 
 			}
 			return nil, err
 		}
+		if m.Experiment.Debug != nil || strings.HasPrefix(m.Experiment.Name, "admit-") || strings.HasPrefix(m.ExpID, "e_admit_") {
+			return nil, &RefusedError{Reason: c.Benchmark + ": " + notReleasable(m, nil)} // fix wave 3: a debug run or readiness check is never released
+		}
 		if _, ok := m.Arms[e.CandidateArm]; !ok {
 			return nil, &RefusedError{Reason: fmt.Sprintf("%s: experiment %s has no arm %s", c.Benchmark, m.ExpID, e.CandidateArm)}
 		}
