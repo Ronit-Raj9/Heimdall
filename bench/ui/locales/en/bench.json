@@ -3515,7 +3515,7 @@
 		"never": "never",
 		"thresholds": "Thresholds",
 		"thresholdsValue": "agreement >= {{agreement}}, TNR >= {{tnr}} (lower bounds), {{labels}}+ labels",
-		"runHint": "Measure the judge on the labels with: heimdall judge calibrate {{suite}} (it forecasts the cost and asks first).",
+		"runHint": "Use Run the check below. It shows the cost first.",
 		"contested_one": "{{count}} contested",
 		"contested_other": "{{count}} contested",
 		"capped": "capped from {{decision}}",

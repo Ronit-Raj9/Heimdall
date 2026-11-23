@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/calibration"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -109,13 +110,14 @@ func (h *CalibrationHandler) getLabels(ctx *fasthttp.RequestCtx) {
 		}
 		l.Items = kept
 	}
+	nameLabellers(ctx, l.Items, func(named []schemas.CalibrationItem) { l.Items = named })
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, l)
 }
 
 // postLabel handles POST /api/bench/suites/{id}/calibration/labels: a
 // CalibrationLabelRequest in, the appended item out with 201. It is a
-// write, so it needs the write token, and it is refused with 403 outside
-// live mode, like a review.
+// write: the write token in local mode, a member's session on the hosted
+// server; it is refused with 403 outside live mode, like a review.
 func (h *CalibrationHandler) postLabel(ctx *fasthttp.RequestCtx) {
 	id, ok := h.suiteID(ctx)
 	if !ok {
@@ -133,6 +135,16 @@ func (h *CalibrationHandler) postLabel(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "parse label: "+err.Error())
 		return
 	}
+	// A signed-in caller labels as themselves: a body labeller is ignored
+	// (fix wave 3, N286). Local mode keeps the self-declared name.
+	if !isLocalCaller(ctx) {
+		who, ok := calibrationLabeller(ctx)
+		if !ok {
+			lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, "sign in to label answers under your name")
+			return
+		}
+		req.Labeller = who
+	}
 	switch {
 	case strings.TrimSpace(req.Task) == "":
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "task is required")
@@ -148,7 +160,41 @@ func (h *CalibrationHandler) postLabel(ctx *fasthttp.RequestCtx) {
 		h.sendError(ctx, "label for suite "+id, err)
 		return
 	}
+	nameLabellers(ctx, []schemas.CalibrationItem{*it}, func(named []schemas.CalibrationItem) { *it = named[0] })
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, it)
+}
+
+// calibrationLabeller is the labeller recorded for a signed-in caller: the
+// user id (a token acts for its creator), else "token <id>". ok is false
+// for a caller with no identity (fix wave 3, N286).
+func calibrationLabeller(ctx *fasthttp.RequestCtx) (string, bool) {
+	p := auth.PrincipalFrom(ctx)
+	switch {
+	case p == nil:
+		return "", false
+	case (p.Kind == auth.KindUser || p.Kind == auth.KindToken) && p.UserID != "":
+		return p.UserID, true
+	case p.Kind == auth.KindToken && p.TokenID != "":
+		return "token " + p.TokenID, true
+	}
+	return "", false
+}
+
+// nameLabellers gives each label its labeller's display name and leaves
+// out an email the caller may not see (members), for a signed-in caller
+// only: local mode shows the stored labeller as it is (fix wave 3, N286 and
+// N33). set receives the named copy.
+func nameLabellers(ctx *fasthttp.RequestCtx, items []schemas.CalibrationItem, set func([]schemas.CalibrationItem)) {
+	names := callerNames(ctx)
+	if names == nil || len(items) == 0 {
+		return
+	}
+	out := make([]schemas.CalibrationItem, len(items))
+	for i, it := range items {
+		it.Labeller, it.LabellerName = names.show(it.Labeller)
+		out[i] = it
+	}
+	set(out)
 }
 
 // suiteID reads the {id} path parameter, answering 503 without a source

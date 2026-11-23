@@ -80,6 +80,10 @@ type PolicyDocView struct {
 	Grader string             `json:"grader"`
 	Judged bool               `json:"judged"`
 	Next   string             `json:"next"`
+	// UploadedByName is the display name of the person who uploaded the
+	// document; the raw email in doc.uploaded_by is left out for a caller
+	// who is not an org admin (fix wave 3, N33).
+	UploadedByName string `json:"uploaded_by_name,omitempty"`
 }
 
 // PolicyClausesRequest is the body of PUT /suites/{id}/policy-docs/{doc}/clauses.
@@ -169,6 +173,37 @@ func (h *policyDocs) docParam(ctx *fasthttp.RequestCtx) (string, string, *policy
 	return id, dir, d, true
 }
 
+// namedPolicyDoc is the document as a caller sees it (fix wave 3, N33): a
+// copy whose uploader, deciders and generation actors are left out when
+// they are emails the caller may not see (a decider then reads as the
+// name). nil names (local mode) returns d itself.
+func namedPolicyDoc(names *actorNames, d *policybench.Doc) *policybench.Doc {
+	if names == nil || d == nil {
+		return d
+	}
+	c := *d
+	c.UploadedBy, _ = names.show(d.UploadedBy)
+	if len(d.Drafts) > 0 {
+		c.Drafts = make([]policybench.Draft, len(d.Drafts))
+		for i, dr := range d.Drafts {
+			if keep, name := names.show(dr.DecidedBy); keep == "" && dr.DecidedBy != "" {
+				dr.DecidedBy = name
+			}
+			c.Drafts[i] = dr
+		}
+	}
+	if len(d.Generations) > 0 {
+		c.Generations = make([]policybench.Generation, len(d.Generations))
+		for i, g := range d.Generations {
+			if keep, name := names.show(g.By); keep == "" && g.By != "" {
+				g.By = name
+			}
+			c.Generations[i] = g
+		}
+	}
+	return &c
+}
+
 // gradingOf reads the benchmark's grader and whether its reply judge is pinned.
 func gradingOf(dir string) (string, bool) {
 	raw, err := os.ReadFile(filepath.Join(dir, suite.SuiteFile))
@@ -182,8 +217,10 @@ func gradingOf(dir string) (string, bool) {
 	return s.Grader, s.Grading == "judged" && s.Judge != nil && s.Judge.Provider != "" && s.Judge.Model != ""
 }
 
-func (h *policyDocs) view(id, dir string, d *policybench.Doc) *PolicyDocView {
-	v := &PolicyDocView{Suite: id, Doc: d, Counts: d.Counts()}
+func (h *policyDocs) view(ctx *fasthttp.RequestCtx, id, dir string, d *policybench.Doc) *PolicyDocView {
+	names := callerNames(ctx)
+	v := &PolicyDocView{Suite: id, Doc: namedPolicyDoc(names, d), Counts: d.Counts()}
+	_, v.UploadedByName = names.show(d.UploadedBy)
 	v.Grader, v.Judged = gradingOf(dir)
 	if sh, _, err := policybench.SuiteShape(dir, ""); err == nil {
 		v.Shape = sh.From
@@ -296,7 +333,7 @@ func (h *policyDocs) upload(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	if req.DryRun {
-		v := h.view(id, dir, d)
+		v := h.view(ctx, id, dir, d)
 		v.DryRun = true
 		v.Next = "Check the clauses, then upload."
 		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, v)
@@ -311,7 +348,7 @@ func (h *policyDocs) upload(ctx *fasthttp.RequestCtx) {
 		h.sendStoreError(ctx, "save the policy document", err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, h.view(id, dir, d))
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, h.view(ctx, id, dir, d))
 }
 
 func (h *policyDocs) get(ctx *fasthttp.RequestCtx) {
@@ -322,7 +359,7 @@ func (h *policyDocs) get(ctx *fasthttp.RequestCtx) {
 	if !ok {
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, h.view(id, dir, d))
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, h.view(ctx, id, dir, d))
 }
 
 func (h *policyDocs) remove(ctx *fasthttp.RequestCtx) {
@@ -355,7 +392,7 @@ func (h *policyDocs) setClauses(ctx *fasthttp.RequestCtx) {
 		h.sendStoreError(ctx, "save the clauses", err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, h.view(id, dir, d))
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, h.view(ctx, id, dir, d))
 }
 
 func (h *policyDocs) draft(ctx *fasthttp.RequestCtx) {

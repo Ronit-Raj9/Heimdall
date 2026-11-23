@@ -59,13 +59,17 @@ type CalibrationItem struct {
 	Task     string    `json:"task"`
 	Answer   string    `json:"answer"`
 	Label    string    `json:"label"`    // correct | incorrect
-	Labeller string    `json:"labeller"` // self-declared name; there is no login
+	Labeller string    `json:"labeller"` // local mode: a self-declared name; hosted: the signed-in member's user id (fix wave 3, N286)
 	Note     string    `json:"note,omitempty"`
 	Source   string    `json:"source"`        // human_review | label | import | admission_control
 	Ref      string    `json:"ref,omitempty"` // review id, run id or file the label came from
 	At       time.Time `json:"at"`
 
 	Image string `json:"image,omitempty"` // X1 vision grading: sha256 of the labelled image, calibration/images/<sha256>.png; Answer may then be empty
+
+	// LabellerName is the labeller's display name, filled by the API for a
+	// hosted caller and never stored (fix wave 3, N286 and N33).
+	LabellerName string `json:"labeller_name,omitempty"`
 }
 
 // CalibrationRate is K of N with its exact (Clopper-Pearson) two-sided 95%

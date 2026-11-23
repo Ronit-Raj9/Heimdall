@@ -24,6 +24,16 @@ import type { AdminLimits, AdminOrg, AdminUsageRow } from "@/lib/types/admin";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+/** An image request with the names the server adds for the person who asked (fix wave 3, L3). */
+type NamedImageRequest = { requested_by?: string; requested_by_name?: string; requested_by_email?: string };
+
+/** Who asked for an image: the name, never a raw user id. */
+export function requesterName(img: NamedImageRequest): string {
+	if (img.requested_by_name) return img.requested_by_name;
+	const by = img.requested_by ?? "";
+	return by.startsWith("usr_") ? "" : by;
+}
+
 const GIB = 1 << 30;
 
 function fmtDate(value?: string): string {
@@ -422,8 +432,8 @@ export function AdminImagesPanel() {
 											{statusLabel(img.status)}
 										</Badge>
 									</TableCell>
-									<TableCell>
-										{img.requested_by} {fmtDate(img.created_at)}
+									<TableCell title={(img as NamedImageRequest).requested_by_email || undefined} data-testid="admin-image-requested-by">
+										{requesterName(img)} {fmtDate(img.created_at)}
 									</TableCell>
 									<TableCell>
 										{img.status === "pending" &&

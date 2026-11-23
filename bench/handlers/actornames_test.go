@@ -32,7 +32,7 @@ func TestActorNamesShow(t *testing.T) {
 		{member, "usr_1", "usr_1", "Ada"},
 		{member, "ada@example.com", "", "Ada"},
 		{member, "Cy@Other.io", "", "Cy"},
-		{member, "usr_9", "usr_9", ""},
+		{member, "usr_9", "", "a former member"}, // fix wave 3, N221
 		{member, "", "", ""},
 		{admin, "ada@example.com", "ada@example.com", "Ada"},
 		{admin, "cy@other.io", "cy@other.io", "cy"},

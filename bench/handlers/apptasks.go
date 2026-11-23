@@ -45,6 +45,12 @@ type AppTasksDraftView struct {
 	Operations  []scaffold.MockOperation `json:"operations"`
 	Collections []string                 `json:"collections"`
 	Next        string                   `json:"next"`
+	// ApprovedByName and CreatedByName are the display names of the person
+	// who approved the rules and who made the draft; the raw email in the
+	// draft is left out for a caller who is not an org admin (fix wave 3,
+	// N33).
+	ApprovedByName string `json:"approved_by_name,omitempty"`
+	CreatedByName  string `json:"created_by_name,omitempty"`
 }
 
 // AppTasksDraftSummary is one row of GET /app-tasks.
@@ -133,8 +139,22 @@ func (h *appTasksArea) sendErr(ctx *fasthttp.RequestCtx, err error) {
 	}
 }
 
-func (h *appTasksArea) view(st apptasks.Store, d *apptasks.Draft) *AppTasksDraftView {
-	v := &AppTasksDraftView{Draft: d, Operations: []scaffold.MockOperation{}, Collections: []string{}}
+func (h *appTasksArea) view(ctx *fasthttp.RequestCtx, st apptasks.Store, d *apptasks.Draft) *AppTasksDraftView {
+	shown := *d // a copy: the stored draft keeps its actors
+	names := callerNames(ctx)
+	var approvedName, createdName string
+	shown.ApprovedBy, approvedName = names.show(d.ApprovedBy)
+	shown.CreatedBy, createdName = names.show(d.CreatedBy)
+	if len(d.Written) > 0 {
+		shown.Written = make([]apptasks.Written, len(d.Written))
+		for i, w := range d.Written {
+			if keep, name := names.show(w.ReviewedBy); keep == "" && w.ReviewedBy != "" {
+				w.ReviewedBy = name // a member reads the reviewer's name, never the email
+			}
+			shown.Written[i] = w
+		}
+	}
+	v := &AppTasksDraftView{Draft: &shown, Operations: []scaffold.MockOperation{}, Collections: []string{}, ApprovedByName: approvedName, CreatedByName: createdName}
 	if m, _, err := st.Mock(d); err == nil {
 		v.Operations, v.Collections = m.Operations, m.Collections()
 	}
@@ -196,7 +216,7 @@ func (h *appTasksArea) create(ctx *fasthttp.RequestCtx) {
 		h.sendErr(ctx, err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, h.view(st, d))
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, h.view(ctx, st, d))
 }
 
 // list handles GET /app-tasks.
@@ -248,7 +268,7 @@ func (h *appTasksArea) get(ctx *fasthttp.RequestCtx) {
 		h.sendErr(ctx, err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, h.view(st, d))
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, h.view(ctx, st, d))
 }
 
 // edit loads a draft under its lock, runs fn and saves it.
@@ -282,7 +302,7 @@ func (h *appTasksArea) edit(ctx *fasthttp.RequestCtx, fn func(st apptasks.Store,
 		return
 	}
 	if out == nil {
-		out = h.view(st, d)
+		out = h.view(ctx, st, d)
 	}
 	lib.SendJSON(ctx, h.mode, status, out)
 }
