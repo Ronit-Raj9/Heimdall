@@ -168,7 +168,7 @@ const httpBaseQuery: BenchBaseQuery = async (args, api, extraOptions) => {
 	const type = writeType(api.type, args);
 	const url = typeof args === "string" ? args : args.url;
 	if (type === "mutation" && !url.startsWith("/auth/")) await whenAuthKnown();
-	const send = (sent: string | FetchArgs) => fetchBenchQuery(sent, type === api.type ? api : { ...api, type }, extraOptions);
+	const send = async (sent: string | FetchArgs) => await fetchBenchQuery(sent, type === api.type ? api : { ...api, type }, extraOptions);
 	// Fix wave 3, N186: a POST with a JSON or empty body carries an Idempotency-Key, and an
 	// identical POST already in flight shares its answer (lib/store/idempotency.ts).
 	const bodyText = typeof args !== "string" && (args.method ?? "GET").toUpperCase() === "POST" ? jsonBodyText(args.body) : undefined;
