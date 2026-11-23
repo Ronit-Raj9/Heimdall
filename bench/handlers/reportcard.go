@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/faults"
@@ -47,6 +48,25 @@ type AgentReportCard struct {
 	// Models are the models this agent's done or running evaluations used
 	// (at Version when given): the choices of the report card's Model filter.
 	Models []string `json:"models,omitempty"`
+	// EvaluationID, EvaluationName and EvaluationCreatedAt name the one
+	// evaluation the card was built from; the card never mixes evaluations
+	// (fix wave 3, N206).
+	EvaluationID        string     `json:"evaluation_id,omitempty"`
+	EvaluationName      string     `json:"evaluation_name,omitempty"`
+	EvaluationCreatedAt *time.Time `json:"evaluation_created_at,omitempty"`
+	// MatchingEvaluations counts the done evaluations that ran the agent
+	// (at Version and Model when given); Evaluations lists them newest
+	// first for the card's evaluation picker.
+	MatchingEvaluations int                         `json:"matching_evaluations,omitempty"`
+	Evaluations         []AgentReportCardEvaluation `json:"evaluations,omitempty"`
+}
+
+// AgentReportCardEvaluation is one choice of the agent card's evaluation
+// picker.
+type AgentReportCardEvaluation struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // fileEvaluations reads <root>/.heimdall/evaluations/*.json.
@@ -222,9 +242,10 @@ func (h *reportCardHandler) getReport(ctx *fasthttp.RequestCtx) {
 }
 
 // getAgentReportCard handles GET
-// /api/bench/agents/{id}/report-card?version=N&model=M: the report of the
-// newest done evaluation that ran the agent (at that version and model when
-// given), limited to the agent's arms.
+// /api/bench/agents/{id}/report-card?version=N&model=M&evaluation=ID: the
+// report of the newest done evaluation that ran the agent (at that version
+// and model when given), or of the evaluation ID when it ran the agent,
+// limited to the agent's arms.
 func (h *reportCardHandler) getAgentReportCard(ctx *fasthttp.RequestCtx) {
 	agent, ok := idParam(ctx, h.env.Mode, "id", "agent")
 	if !ok || !h.ready(ctx) {
@@ -249,8 +270,18 @@ func (h *reportCardHandler) getAgentReportCard(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	out := AgentReportCard{Agent: agent, Version: version, Model: model, Models: reportcard.ModelsForAgent(evals, agent, version)}
-	ev, labels := reportcard.SelectForAgent(evals, agent, version, model)
+	for _, m := range reportcard.MatchingEvaluations(evals, agent, version, model) {
+		out.Evaluations = append(out.Evaluations, AgentReportCardEvaluation{ID: m.ID, Name: strings.TrimSpace(m.Spec.Name), CreatedAt: m.CreatedAt})
+	}
+	out.MatchingEvaluations = len(out.Evaluations)
+	evaluationID := strings.TrimSpace(string(args.Peek("evaluation")))
+	ev, labels := reportcard.SelectForAgentEvaluation(evals, agent, version, model, evaluationID)
 	if ev != nil {
+		out.EvaluationID, out.EvaluationName = ev.ID, strings.TrimSpace(ev.Spec.Name)
+		if !ev.CreatedAt.IsZero() {
+			at := ev.CreatedAt
+			out.EvaluationCreatedAt = &at
+		}
 		opt := h.options(work)
 		opt.Arms = labels
 		if out.Report, err = reportcard.Build(work, h.source(ctx, work), ev, opt); err != nil {

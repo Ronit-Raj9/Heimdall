@@ -3,7 +3,10 @@ import { ReportFailures } from "@/components/reportcard/reportFailures";
 import { ShareButton, shareQuery } from "@/components/share/shareDialog";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
-import { useGetAgentReportCardQuery, useGetAgentVersionsQuery, type ReportCardResponse } from "@/lib/store/apis/evaluationsApi";
+import { formatWhen } from "@/components/platform/platform.utils";
+import { getLocale } from "@/lib/i18n";
+import { useGetAgentCardQuery, type AgentCard } from "@/lib/store/apis/agentCardApi";
+import { useGetAgentVersionsQuery, type ReportCardResponse } from "@/lib/store/apis/evaluationsApi";
 import "@/components/agents/gw17I18n";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { Gauge } from "lucide-react";
@@ -25,14 +28,66 @@ export function modelOptions(models: readonly string[] | undefined, selected: st
 	return selected && !list.includes(selected) ? [selected, ...list] : list;
 }
 
+/** Runs the card counts: every shown arm's runs over every benchmark. */
+export function cardRuns(card: AgentCard): number {
+	return Object.values(card.totals ?? {}).reduce((sum, row) => sum + (row?.runs ?? 0), 0);
+}
+
 /**
- * The Report card tab: pick a version and a model, see the latest report card for that pair. Both live in the
- * address (?version=&model=), so a link from the leaderboard opens on its row and a pick can be shared.
+ * The line above the card that names the one evaluation it shows and how many other done evaluations
+ * match (N206): the card never mixes evaluations, so "Any model" is not all of the agent's runs.
+ */
+function CardSource({ card, onPick }: { card: AgentCard; onPick: (id: string) => void }) {
+	const { t } = useTranslation("gw17");
+	const locale = getLocale();
+	if (!card.evaluation_id) return null;
+	const list = card.evaluations ?? [];
+	const matching = card.matching_evaluations ?? list.length;
+	const newest = list.length === 0 || list[0].id === card.evaluation_id;
+	const facts = {
+		name: card.evaluation_name || card.evaluation_id,
+		date: formatWhen(card.evaluation_created_at, locale) ?? "",
+		runs: cardRuns(card),
+	};
+	const head =
+		matching <= 1 ? t("reportCard.sourceOnly", facts) : newest ? t("reportCard.sourceNewest", facts) : t("reportCard.sourcePicked", facts);
+	const others = matching - 1;
+	const tail = others < 1 ? "" : newest ? t("reportCard.olderMatch", { count: others }) : t("reportCard.otherMatch", { count: others });
+	return (
+		<div className="flex flex-col gap-2" data-testid="agent-report-card-source">
+			<p className="text-muted-foreground text-xs">{tail ? `${head} ${tail}` : head}</p>
+			{list.length > 1 && (
+				<label className="flex flex-col gap-1 text-xs font-medium">
+					{t("reportCard.evaluation")}
+					<select
+						className="border-input bg-background h-9 max-w-md rounded-md border px-2 text-sm"
+						value={card.evaluation_id}
+						onChange={(e) => onPick(e.target.value === list[0].id ? "" : e.target.value)}
+						aria-label={t("reportCard.evaluation")}
+						data-testid="agent-report-card-evaluation"
+					>
+						{list.map((ev) => (
+							<option key={ev.id} value={ev.id}>
+								{ev.name || ev.id}
+								{ev.created_at ? ` · ${formatWhen(ev.created_at, locale) ?? ""}` : ""}
+							</option>
+						))}
+					</select>
+				</label>
+			)}
+		</div>
+	);
+}
+
+/**
+ * The Report card tab: pick a version and a model, see the latest report card for that pair, or pick one of the
+ * matching evaluations. All three live in the address (?version=&model=&evaluation=), so a link from the
+ * leaderboard opens on its row and a pick can be shared.
  */
 export default function ReportCardTab({ agentId }: { agentId: string }) {
 	const { t } = useTranslation("agentBuilder");
 	const { t: tg } = useTranslation("gw17");
-	const search = useSearch({ strict: false }) as { version?: unknown; model?: unknown };
+	const search = useSearch({ strict: false }) as { version?: unknown; model?: unknown; evaluation?: unknown };
 	const navigate = useNavigate();
 	const versions = useGetAgentVersionsQuery(agentId);
 	const versionList = [...(versions.data?.versions ?? [])].sort((x, y) => y.version - x.version);
@@ -41,17 +96,25 @@ export default function ReportCardTab({ agentId }: { agentId: string }) {
 	const versionMissing = urlVersion > 0 && versions.data !== undefined && !versionList.some((v) => v.version === urlVersion);
 	const version = versionMissing ? 0 : urlVersion;
 	const model = typeof search.model === "string" ? search.model : "";
-	const setFilter = (next: { version?: number; model?: string }) =>
+	const evaluation = typeof search.evaluation === "string" ? search.evaluation : "";
+	// A new version or model starts again from the newest matching evaluation.
+	const setFilter = (next: { version?: number; model?: string; evaluation?: string }) =>
 		void navigate({
 			to: ".",
 			search: ((prev: Record<string, unknown>) => ({
 				...prev,
 				version: (next.version ?? version) || undefined,
 				model: (next.model ?? model) || undefined,
+				evaluation: next.evaluation || undefined,
 			})) as never,
 			replace: true,
 		});
-	const report = useGetAgentReportCardQuery({ agent: agentId, version: version || undefined, model: model || undefined });
+	const report = useGetAgentCardQuery({
+		agent: agentId,
+		version: version || undefined,
+		model: model || undefined,
+		evaluation: evaluation || undefined,
+	});
 	const modelList = modelOptions(report.data?.models, model);
 	const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
 	const empty = isEmptyReport(report.data, report.error);
@@ -124,6 +187,7 @@ export default function ReportCardTab({ agentId }: { agentId: string }) {
 				/>
 			) : (
 				<>
+					<CardSource card={report.data} onPick={(id) => setFilter({ evaluation: id })} />
 					<ReportCard
 						report={report.data}
 						actions={

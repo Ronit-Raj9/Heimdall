@@ -1,12 +1,14 @@
 import type { ExperimentStatus } from "@/lib/types/bench";
 import { describe, expect, it } from "vitest";
 import {
+	experimentKind,
 	experimentPickerOptions,
 	exportPickerGroups,
 	humanExperimentName,
 	isAutoName,
 	isDebugExperiment,
 	isHiddenByDefault,
+	isUserComparison,
 	newestExperiment,
 	readWriteToken,
 	saveWriteToken,
@@ -101,5 +103,38 @@ describe("experiment names and pickers (fix wave 2)", () => {
 		expect(groups.evaluations.map((o) => o.id)).toEqual(["e_eval_child", "e_eval_single"]);
 		expect(groups.comparisons.map((o) => o.id)).toEqual(["e_real"]);
 		expect(groups.other.map((o) => o.id)).toEqual(["e_replay_r_n697kiewjt_x4qq", "e_admit_acme_safety_5e8q"]);
+	});
+});
+describe("comparison kinds and practice rule (fix wave 3)", () => {
+	const tx = (k: string, o?: Record<string, string>) => `${k}|${Object.values(o ?? {}).join("|")}`;
+	const base = (over: Partial<StatusWithDebug>): StatusWithDebug => ({ ...status("e_x", "2026-11-22T20:00:00Z"), ...over });
+
+	it("lists a named comparison of two setups on a practice benchmark (N202)", () => {
+		const c10 = base({ exp_id: "e_zz_test_c10_matrix_gsz9", name: "zz-test-c10-matrix", suite: "coding-core@1.0.0", arms: ["A", "B"] });
+		expect(isUserComparison(c10)).toBe(true);
+		expect(isHiddenByDefault(c10)).toBe(false);
+		// A quick run on the practice benchmark (generated name) and a one-setup run stay hidden.
+		expect(isHiddenByDefault({ ...c10, name: "quick-20261122-201443-ab12" })).toBe(true);
+		expect(isHiddenByDefault({ ...c10, arms: ["A"] })).toBe(true);
+		// Checks, debug runs and evaluation benchmarks are never user comparisons.
+		expect(isUserComparison({ ...c10, evaluation_id: "ev_1" })).toBe(false);
+		expect(isUserComparison({ ...c10, debug: "fork" })).toBe(false);
+	});
+	it("names the kind of a check or debug run (N253, N247)", () => {
+		expect(experimentKind(base({ name: "admit-acme-safety" }))).toBe("readiness");
+		expect(experimentKind(base({ name: "check-codex" }))).toBe("agent");
+		expect(experimentKind(base({ name: "canary-nightly" }))).toBe("drift");
+		expect(experimentKind(base({ exp_id: "e_fork_r_n697kiewjt_at_call_1_rqq1", name: "fork" }))).toBe("debug");
+		expect(experimentKind(base({ name: "Prompt v2 vs v1" }))).toBeNull();
+	});
+	it("labels a drift monitor's runs (deleted) once the monitor is gone (N257)", () => {
+		const drift = base({ exp_id: "e_canary_nightly_ab12", name: "canary-nightly", suite: "swe-lite@1.0.0" });
+		expect(humanExperimentName(drift, tx, undefined, new Set(["nightly"]))).toBe("system.drift|nightly");
+		expect(humanExperimentName(drift, tx, undefined, new Set(["other"]))).toBe("system.driftDeleted|nightly");
+		// Unknown monitors (the list did not load) never read as deleted.
+		expect(humanExperimentName(drift, tx)).toBe("system.drift|nightly");
+		const options = experimentPickerOptions([drift], tx, undefined, { showHidden: true, monitors: new Set() });
+		expect(options[0].label).toBe("system.driftDeleted|nightly");
+		expect(exportPickerGroups([drift], tx, undefined, true, new Set()).other[0].label).toBe("system.driftDeleted|nightly");
 	});
 });

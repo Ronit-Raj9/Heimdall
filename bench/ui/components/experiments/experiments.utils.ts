@@ -106,6 +106,7 @@ export type ExperimentNameKey =
 	| "system.readiness"
 	| "system.agent"
 	| "system.drift"
+	| "system.driftDeleted"
 	| "evaluationChild"
 	| "debug.replay"
 	| "debug.fork"
@@ -113,6 +114,12 @@ export type ExperimentNameKey =
 
 /** Evaluation id to evaluation name, from `useEvaluationNames`. */
 export type EvaluationNames = ReadonlyMap<string, string>;
+
+/**
+ * The names of the drift monitors that exist (GET /canaries), from `useDriftMonitorNames`. Undefined
+ * while unknown, so a monitor is never called deleted before the list arrived.
+ */
+export type DriftMonitorNames = ReadonlySet<string>;
 
 /**
  * The label shown for an experiment. Heimdall's own checks and debug runs say what they are. A
@@ -129,9 +136,12 @@ export function humanExperimentName(
 	},
 	t: (key: ExperimentNameKey, opts?: Record<string, string>) => string,
 	evalNames?: EvaluationNames,
+	monitors?: DriftMonitorNames,
 ): string {
 	// Heimdall's own checks (admit-*, check-*, canary-*) read as what they are, not as comparisons.
 	const sys = systemExperiment(e);
+	// A drift monitor that was deleted keeps its runs (history); its name says it is gone (N257).
+	if (sys?.kind === "drift" && monitors && !monitors.has(sys.subject)) return t("system.driftDeleted", { name: sys.subject });
 	if (sys) return t(`system.${sys.kind}`, { name: sys.subject });
 	const dbg = debugExperiment(e);
 	if (dbg) return t(`debug.${dbg.mode}`, { run: dbg.run || e.exp_id });
@@ -149,8 +159,47 @@ export function humanExperimentName(
 }
 
 /**
+ * True for a comparison somebody set up on purpose: a typed name, two or more setups, not a
+ * benchmark of an evaluation, not a check and not a debug run. Such a comparison is listed even on
+ * a practice benchmark, since somebody acts on it (N202). Pure.
+ */
+export function isUserComparison(e: { name?: string; exp_id: string; evaluation_id?: string; arms?: string[]; debug?: string }): boolean {
+	return (
+		!isAutoName(e) &&
+		(e.arms ?? []).filter(Boolean).length >= 2 &&
+		!e.evaluation_id &&
+		systemExperiment(e) === null &&
+		!isDebugExperiment(e)
+	);
+}
+
+/** A practice run nobody acts on: on a practice benchmark and not a user comparison. Pure. */
+function isPracticeOnly(e: {
+	name?: string;
+	exp_id: string;
+	suite?: string;
+	evaluation_id?: string;
+	arms?: string[];
+	debug?: string;
+}): boolean {
+	return isPracticeExperiment(e) && !isUserComparison(e);
+}
+
+/** What an experiment is when it is not a comparison: a readiness, agent or drift check, or a debug run. */
+export type ExperimentKind = SystemExperimentKind | "debug";
+
+/**
+ * The kind of a check or debug run, else null. Lists and the page header show the kind instead of
+ * a verdict for these: none of them compares two setups (N253, N247). Pure.
+ */
+export function experimentKind(e: { name?: string; exp_id: string; debug?: string; debug_from_run?: string }): ExperimentKind | null {
+	return systemExperiment(e)?.kind ?? (isDebugExperiment(e) ? "debug" : null);
+}
+
+/**
  * What the Comparisons list and Home hide by default: Heimdall's own checks, practice runs, debug
- * runs and the single-setup benchmarks of an evaluation (they live on the evaluation page). Pure.
+ * runs and the single-setup benchmarks of an evaluation (they live on the evaluation page). A named
+ * comparison of two setups on a practice benchmark is listed (N202). Pure.
  */
 export function isHiddenByDefault(e: {
 	name?: string;
@@ -160,15 +209,22 @@ export function isHiddenByDefault(e: {
 	arms?: string[];
 	debug?: string;
 }): boolean {
-	return systemExperiment(e) !== null || isPracticeExperiment(e) || isDebugExperiment(e) || isSingleSetupEvaluationRun(e);
+	return systemExperiment(e) !== null || isPracticeOnly(e) || isDebugExperiment(e) || isSingleSetupEvaluationRun(e);
 }
 
 /**
  * Not a result anybody reads in a picker unless asked: Heimdall's own checks, practice runs and
  * debug runs. Unlike `isHiddenByDefault`, one-setup benchmarks of an evaluation stay listed. Pure.
  */
-export function isCheckPracticeOrDebug(e: { name?: string; exp_id: string; suite?: string; debug?: string }): boolean {
-	return systemExperiment(e) !== null || isPracticeExperiment(e) || isDebugExperiment(e);
+export function isCheckPracticeOrDebug(e: {
+	name?: string;
+	exp_id: string;
+	suite?: string;
+	evaluation_id?: string;
+	arms?: string[];
+	debug?: string;
+}): boolean {
+	return systemExperiment(e) !== null || isPracticeOnly(e) || isDebugExperiment(e);
 }
 
 /** One choice of an experiment picker: the readable label and the raw id as grey secondary text. */
@@ -188,8 +244,9 @@ function pickerOption(
 	e: StatusWithDebug,
 	t: Parameters<typeof humanExperimentName>[1],
 	evalNames?: EvaluationNames,
+	monitors?: DriftMonitorNames,
 ): ExperimentPickerOption {
-	return { id: e.exp_id, label: humanExperimentName(e, t, evalNames), secondary: e.exp_id, state: e.state };
+	return { id: e.exp_id, label: humanExperimentName(e, t, evalNames, monitors), secondary: e.exp_id, state: e.state };
 }
 
 /**
@@ -200,12 +257,12 @@ export function experimentPickerOptions(
 	experiments: readonly StatusWithDebug[],
 	t: Parameters<typeof humanExperimentName>[1],
 	evalNames?: EvaluationNames,
-	opts: { showHidden?: boolean } = {},
+	opts: { showHidden?: boolean; monitors?: DriftMonitorNames } = {},
 ): ExperimentPickerOption[] {
 	return [...experiments]
 		.sort((x, y) => startedOrFrozen(y) - startedOrFrozen(x))
 		.filter((e) => opts.showHidden || !isCheckPracticeOrDebug(e))
-		.map((e) => pickerOption(e, t, evalNames));
+		.map((e) => pickerOption(e, t, evalNames, opts.monitors));
 }
 
 /**
@@ -218,6 +275,7 @@ export function exportPickerGroups(
 	t: Parameters<typeof humanExperimentName>[1],
 	evalNames?: EvaluationNames,
 	showHidden = false,
+	monitors?: DriftMonitorNames,
 ): { evaluations: ExperimentPickerOption[]; comparisons: ExperimentPickerOption[]; other: ExperimentPickerOption[]; hiddenCount: number } {
 	const out = {
 		evaluations: [] as ExperimentPickerOption[],
@@ -228,12 +286,12 @@ export function exportPickerGroups(
 	for (const e of [...experiments].sort((x, y) => startedOrFrozen(y) - startedOrFrozen(x))) {
 		if (systemExperiment(e) !== null || isDebugExperiment(e)) {
 			out.hiddenCount++;
-			if (showHidden) out.other.push(pickerOption(e, t, evalNames));
-		} else if (e.evaluation_id) out.evaluations.push(pickerOption(e, t, evalNames));
-		else if (isPracticeExperiment(e)) {
+			if (showHidden) out.other.push(pickerOption(e, t, evalNames, monitors));
+		} else if (e.evaluation_id) out.evaluations.push(pickerOption(e, t, evalNames, monitors));
+		else if (isPracticeOnly(e)) {
 			out.hiddenCount++;
-			if (showHidden) out.other.push(pickerOption(e, t, evalNames));
-		} else out.comparisons.push(pickerOption(e, t, evalNames));
+			if (showHidden) out.other.push(pickerOption(e, t, evalNames, monitors));
+		} else out.comparisons.push(pickerOption(e, t, evalNames, monitors));
 	}
 	return out;
 }

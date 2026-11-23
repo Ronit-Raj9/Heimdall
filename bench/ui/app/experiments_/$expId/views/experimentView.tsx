@@ -1,5 +1,13 @@
 import { ExperimentTrialsPanel, hasContent } from "@/components/adaptive/trialsPanel"; // W7 adaptive trials and suite tiers
-import { TERMINAL_STATES, humanExperimentName, systemExperiment } from "@/components/experiments/experiments.utils";
+import {
+	TERMINAL_STATES,
+	experimentKind,
+	humanExperimentName,
+	suiteName,
+	systemExperiment,
+	type ExperimentKind,
+} from "@/components/experiments/experiments.utils";
+import { useDriftMonitorNames } from "@/components/experiments/useDriftMonitorNames";
 import { ExperimentExportMenu } from "@/components/export/exportMenu"; // W10 export
 import { ExperimentRunActions, RegradeAction } from "@/components/platform/experimentActions";
 import { RunControlsPanel } from "@/components/experiments/runControls"; // run control
@@ -21,7 +29,10 @@ import {
 	useGetExperimentQuery,
 	useGetGridQuery,
 	useGetVerdictQuery,
+	useListRunsQuery,
 } from "@/lib/store/apis/benchApi";
+import { useGetEvaluationQuery } from "@/lib/store/apis/evaluationsApi";
+import type { ExperimentStatus } from "@/lib/types/bench";
 import { useGetExperimentResearchQuery } from "@/lib/store/apis/researchApi";
 import { useGetExperimentRoutingQuery } from "@/lib/store/apis/routingApi";
 import { errorStatus } from "@/lib/store/apis/session";
@@ -30,7 +41,7 @@ import { compareSearch } from "@/components/experiments/legacyRoutes";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { DeleteAction } from "@/components/platform/deleteAction";
 import { useDeleteExperimentMutation } from "@/lib/store/apis/dataOpsApi";
-import { Bot, Download, GitCompareArrows, Hourglass, Layers, SearchX } from "lucide-react";
+import { Bot, CornerUpLeft, Download, GitCompareArrows, Hourglass, Layers, ListChecks, SearchX } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
@@ -47,6 +58,42 @@ import { ReceiptsTab } from "./receiptsTab";
 import { ScorecardsTab } from "./scorecardsTab";
 import { VerdictTab } from "./verdictTab";
 import "./fw11I18n";
+import "./hw12I18n";
+
+/**
+ * Status and verdict facts other lanes add in fix wave 3, read through local types (D15): the comparison a
+ * follow-up extends (`extends`) and whether a verdict was computed while runs were still going (`partial`).
+ */
+type StatusFacts = ExperimentStatus & { extends?: string };
+type VerdictFacts = { partial?: boolean };
+
+/** The header's tag for what a check or a debug run is, shown instead of a verdict (N253, N247). */
+function HeaderTag({ children, testId, title }: { children: React.ReactNode; testId: string; title?: string }) {
+	return (
+		<span
+			className="border-border bg-muted/50 text-muted-foreground inline-flex h-5 shrink-0 items-center gap-1 rounded-[5px] border px-1.5 text-xs leading-4 font-medium whitespace-nowrap"
+			data-testid={testId}
+			title={title}
+		>
+			{children}
+		</span>
+	);
+}
+
+/** "Solved" or "Not solved" for a debug run's single sealed run, else null. Pure. */
+export function debugOutcome(runs: readonly { outcome?: string; sealed?: boolean }[] | undefined): "solved" | "notSolved" | null {
+	if (!runs || runs.length !== 1 || !runs[0].sealed) return null;
+	return runs[0].outcome === "pass" ? "solved" : "notSolved";
+}
+
+/** Where a readiness check's ready tasks are listed: the benchmark's Build tab, or Add benchmark for a draft. */
+function readyTasksLink(
+	suite: string | undefined,
+): { to: string; params?: Record<string, string>; search?: Record<string, string> } | null {
+	const id = suiteName(suite);
+	if (!id) return null;
+	return id.startsWith("draft-") ? { to: "/suites/add" } : { to: "/suites/$suiteId", params: { suiteId: id }, search: { tab: "build" } };
+}
 
 /**
  * /experiments/$expId: one experiment. The header carries its status, verdict and actions; the tabs
@@ -59,6 +106,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	const { t: tPage } = useTranslation("experimentPage");
 	const { t: tx } = useTranslation("experimentsUx");
 	const { t: tf } = useTranslation("fw11");
+	const { t: th } = useTranslation("hw12");
 	const [tabParam, setTab] = useQueryState("tab", parseAsString);
 	const status = useGetExperimentQuery(expId);
 	const live = status.data ? !TERMINAL_STATES.has(status.data.state) && status.data.state !== "created" : false;
@@ -82,6 +130,15 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	const support = useGetExperimentSupportQuery(expId, { skip: !status.data });
 	const research = useGetExperimentResearchQuery(expId, { skip: !status.data });
 	const routing = useGetExperimentRoutingQuery(expId, { skip: !status.data });
+	// Fix wave 3 header facts: the evaluation that made it (N203), the comparison it extends (N246), the run of a
+	// debug experiment (N247) and the drift monitors that still exist (N257).
+	const current = status.data && status.data.exp_id === expId ? (status.data as StatusFacts) : undefined;
+	const parentId = current?.extends ?? "";
+	const parent = useGetExperimentQuery(parentId, { skip: !parentId });
+	const evaluationOf = useGetEvaluationQuery(current?.evaluation_id ?? "", { skip: !current?.evaluation_id });
+	const kind: ExperimentKind | null = current ? experimentKind(current) : null;
+	const debugRuns = useListRunsQuery({ exp: expId }, { skip: kind !== "debug" });
+	const monitors = useDriftMonitorNames();
 
 	// RTK keeps the last result in data while a new argument loads; only a response for this id may
 	// drive the header and its write actions (QC2-28-04).
@@ -126,18 +183,40 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	}));
 	tabs.push({ id: ANALYSIS_TAB_ID, label: <AnalysisTabLabel />, testId: `experiment-tab-${ANALYSIS_TAB_ID}` });
 	const decision = verdict.data?.verdict.decision;
+	// A verdict worked out while runs are still going is not final (N197): no decision until the end.
+	const partial = live || Boolean((verdict.data as VerdictFacts | undefined)?.partial);
 	// Lead with a human title ("codex on coding-core", "Readiness check for acme-safety"); the raw id stays small below.
 	const system = systemExperiment(st);
-	const title = humanExperimentName({ ...st, arms }, (k, o) => String(tx(k as never, (o ?? {}) as never)));
 	// The evaluation that made this experiment (GET /experiments/{id} carries it once the server sends it).
 	const evaluationId = st.evaluation_id || undefined;
+	const evaluationName =
+		evaluationId && evaluationOf.data?.id === evaluationId ? evaluationOf.data.spec?.name?.trim() || evaluationId : undefined;
+	const evalNames = evaluationId && evaluationName ? new Map([[evaluationId, evaluationName]]) : undefined;
+	const nameOf = (k: string, o?: Record<string, string>) => String(tx(k as never, (o ?? {}) as never));
+	const title = humanExperimentName({ ...st, arms }, nameOf, evalNames, monitors);
+	const parentStatus = parentId && parent.data?.exp_id === parentId ? parent.data : undefined;
+	const parentTitle = parentStatus ? humanExperimentName(parentStatus, nameOf, undefined, monitors) : parentId;
+	const outcome = kind === "debug" ? debugOutcome(debugRuns.data?.runs) : null;
+	const readyLink = kind === "readiness" ? readyTasksLink(st.suite) : null;
 	const bannerKey =
 		system?.kind === "agent" ? "header.systemBannerAgent" : system?.kind === "drift" ? "header.systemBannerDrift" : "header.systemBanner";
 
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="experiment-screen" data-exp-id={expId}>
 			<PageHeader
-				breadcrumbs={[{ label: t("experiments.list.title"), to: "/experiments" }, { label: title }]}
+				breadcrumbs={[
+					{ label: t("experiments.list.title"), to: "/experiments" },
+					...(evaluationId
+						? [
+								{
+									label: th("header.evaluationCrumb", { name: evaluationName ?? evaluationId }),
+									to: "/evaluations/$evalId",
+									params: { evalId: evaluationId },
+								},
+							]
+						: []),
+					{ label: title },
+				]}
 				title={
 					<span className="flex min-w-0 items-center gap-2.5">
 						<SuiteGlyph suite={st.suite} />
@@ -149,7 +228,20 @@ export default function ExperimentView({ expId }: { expId: string }) {
 				meta={
 					<>
 						<StatusBadge state={st.state} testId="experiment-state" />
-						{decision && <StatusBadge decision={decision} testId="experiment-decision" />}
+						{kind ? (
+							<>
+								<HeaderTag testId="experiment-kind">{tx(`kind.${kind}`)}</HeaderTag>
+								{outcome && <HeaderTag testId="experiment-debug-outcome">{th(`header.${outcome}`)}</HeaderTag>}
+							</>
+						) : partial ? (
+							decision && (
+								<HeaderTag testId="experiment-partial" title={th("header.partialHint")}>
+									{th("header.partial")}
+								</HeaderTag>
+							)
+						) : (
+							decision && <StatusBadge decision={decision} testId="experiment-decision" />
+						)}
 					</>
 				}
 				subtitle={
@@ -157,6 +249,27 @@ export default function ExperimentView({ expId }: { expId: string }) {
 						<span className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid="experiment-facts">
 							{st.suite && <EntityLink kind="suite" id={st.suite} />}
 							{arms.length > 0 && !system && <span>{t("experiments.page.arms", { arms: arms.join(" vs "), count: arms.length })}</span>}
+							{parentId && (
+								<span className="inline-flex items-center gap-1" data-testid="experiment-follow-up">
+									<CornerUpLeft className="size-3" aria-hidden="true" />
+									{th("header.followUp")}
+									<Link to="/experiments/$expId" params={{ expId: parentId }} className="text-primary font-medium hover:underline">
+										{parentTitle}
+									</Link>
+								</span>
+							)}
+							{readyLink && (
+								<Link
+									to={readyLink.to as never}
+									params={readyLink.params as never}
+									search={readyLink.search as never}
+									className="text-primary inline-flex items-center gap-1 font-medium hover:underline"
+									data-testid="experiment-ready-tasks"
+								>
+									<ListChecks className="size-3" aria-hidden="true" />
+									{th("header.readyTasks")}
+								</Link>
+							)}
 							<EntityLink kind="experiment" id={expId} className="text-[10px] opacity-50" />
 						</span>
 					</span>

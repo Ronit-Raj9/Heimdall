@@ -1,7 +1,8 @@
+import { activeNavItem } from "@/lib/constants/navigation";
 import { cn } from "@/lib/utils";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
-import { Fragment, isValidElement, type ComponentType, type ReactNode } from "react";
+import { isValidElement, type ComponentType, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useEmbedded } from "./embedded";
 
@@ -29,6 +30,28 @@ export interface PageHeaderProps {
 	testId?: string;
 }
 
+/** The path of the section the top bar shows for this page (its nav entry), or null without a router. */
+function useSectionPath(): string | null {
+	try {
+		const pathname = useRouterState({ select: (state) => state.location.pathname });
+		return activeNavItem(pathname)?.to ?? null;
+	} catch {
+		// Rendered without a router (an isolated component test): keep every crumb.
+		return null;
+	}
+}
+
+/**
+ * The crumbs the page shows: a leading crumb that links to the section the top bar already shows is
+ * dropped, and a trail left with only the current page is not shown (N203). Pure.
+ */
+export function pageCrumbs(crumbs: readonly Crumb[] | undefined, sectionPath: string | null): Crumb[] {
+	if (!crumbs || crumbs.length === 0) return [];
+	const [first, ...rest] = crumbs;
+	if (sectionPath && first.to === sectionPath && rest.length > 0) return rest.length > 1 ? rest : [];
+	return [...crumbs];
+}
+
 /**
  * The top of every page: an optional breadcrumb trail, the title with its badges, a one-line
  * subtitle and the page's actions. Pages use it instead of their own h1 block so every page
@@ -39,16 +62,19 @@ export function PageHeader({ title, subtitle, actions, meta, breadcrumbs, icon, 
 	const iconNode = renderIcon(icon);
 	// Inside another page's tab the title is a section heading, not the page's h1.
 	const Heading = useEmbedded() ? "h2" : "h1";
+	const trail = pageCrumbs(breadcrumbs, useSectionPath());
 	return (
 		<header className={cn("mb-2 flex min-w-0 flex-col gap-2", className)} data-testid={testId ?? "page-header"}>
-			{breadcrumbs && breadcrumbs.length > 0 && (
+			{trail.length > 0 && (
 				<nav aria-label={t("shell.breadcrumbs")} className="min-w-0">
 					<ol className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-1 text-xs">
-						{breadcrumbs.map((crumb, index) => {
-							const last = index === breadcrumbs.length - 1;
+						{trail.map((crumb, index) => {
+							const last = index === trail.length - 1;
+							// The chevron sits inside the item after the first, so it is only ever between two items.
 							return (
-								<Fragment key={index}>
-									<li className="min-w-0 truncate">
+								<li key={index} className="flex min-w-0 items-center gap-1">
+									{index > 0 && <ChevronRight aria-hidden="true" className="size-3 shrink-0 opacity-60" />}
+									<span className="min-w-0 truncate">
 										{crumb.to && !last ? (
 											<Link
 												to={crumb.to as never}
@@ -63,13 +89,8 @@ export function PageHeader({ title, subtitle, actions, meta, breadcrumbs, icon, 
 												{crumb.label}
 											</span>
 										)}
-									</li>
-									{!last && (
-										<li aria-hidden="true" className="flex items-center">
-											<ChevronRight className="size-3 opacity-60" />
-										</li>
-									)}
-								</Fragment>
+									</span>
+								</li>
 							);
 						})}
 					</ol>

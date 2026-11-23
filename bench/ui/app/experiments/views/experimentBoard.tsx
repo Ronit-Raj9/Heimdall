@@ -2,12 +2,15 @@ import "./experimentsI18n";
 
 import { filterExperiments } from "@/components/experiments/experimentList";
 import {
+	experimentKind,
 	humanExperimentName,
 	isDebugExperiment,
 	isHiddenByDefault,
 	suiteName,
 	systemExperiment,
+	type ExperimentKind,
 } from "@/components/experiments/experiments.utils";
+import { useDriftMonitorNames } from "@/components/experiments/useDriftMonitorNames";
 import { useEvaluationNames } from "@/components/experiments/useEvaluationNames";
 import { formatRelative, formatWhen } from "@/components/platform/platform.utils";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
@@ -74,12 +77,15 @@ const TONE: Record<Tone, string> = {
 
 /** Verdict words and color for a decision. Unknown values read as pending. Pure. */
 export function verdictTone(decision: string | undefined): {
-	key: "improved" | "regressed" | "inconclusive" | "invalid" | "score" | "pending";
+	key: "improved" | "regressed" | "inconclusive" | "invalid" | "score" | "leader" | "pending";
 	tone: Tone;
 } {
 	switch (decision) {
 		case "improved":
 			return { key: "improved", tone: "green" };
+		// Three or more setups: one leads (fix wave 3, N244).
+		case "leader":
+			return { key: "leader", tone: "green" };
 		case "regressed":
 			return { key: "regressed", tone: "red" };
 		case "inconclusive":
@@ -168,6 +174,20 @@ function VerdictPill({ decision, testId }: { decision: string | undefined; testI
 	);
 }
 
+/** What a check or debug run is, in place of a verdict: none of them compares two setups (N253, N247). */
+function KindPill({ kind, testId }: { kind: ExperimentKind; testId?: string }) {
+	const { t } = useTranslation("experimentsUx");
+	return (
+		<span
+			className="bg-muted text-muted-foreground inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap"
+			data-testid={testId}
+			data-kind={`kind-${kind}`}
+		>
+			{t(`kind.${kind}`)}
+		</span>
+	);
+}
+
 function RunsProgress({ e }: { e: ExperimentStatus }) {
 	const { t } = useTranslation("experimentsUx");
 	const done = e.slots.done + e.slots.failed;
@@ -203,10 +223,25 @@ export function ExperimentBoard() {
 	const systemCount = useMemo(() => everything.filter(isHiddenByDefault).length, [everything]);
 	const all = useMemo(() => (showSystem ? everything : everything.filter((e) => !isHiddenByDefault(e))), [everything, showSystem]);
 	const evalNames = useEvaluationNames();
+	const monitors = useDriftMonitorNames();
+	// Every row is named, hidden ones too, so a search can say it matched rows that are hidden.
 	const named = useMemo(
 		() =>
-			new Map(all.map((e) => [e.exp_id, humanExperimentName(e, (k, o) => String(t(k as never, (o ?? {}) as never)), evalNames)] as const)),
-		[all, t, evalNames],
+			new Map(
+				everything.map(
+					(e) => [e.exp_id, humanExperimentName(e, (k, o) => String(t(k as never, (o ?? {}) as never)), evalNames, monitors)] as const,
+				),
+			),
+		[everything, t, evalNames, monitors],
+	);
+	const query = filters.q?.trim().toLowerCase() ?? "";
+	const matchesQuery = useMemo(
+		() => (e: ExperimentStatus) =>
+			e.exp_id.toLowerCase().includes(query) ||
+			e.name.toLowerCase().includes(query) ||
+			(named.get(e.exp_id) ?? "").toLowerCase().includes(query) ||
+			(e.suite ?? "").toLowerCase().includes(query),
+		[query, named],
 	);
 	// The suite filter applies first, so each status choice can say how many it would show.
 	const inSuite = useMemo(() => filterExperiments(all, { suite: filters.suite }), [all, filters.suite]);
@@ -215,19 +250,15 @@ export function ExperimentBoard() {
 		[inSuite],
 	);
 	const shown = useMemo(() => {
-		const q = filters.q?.trim().toLowerCase() ?? "";
 		// The id and typed name match in filterExperiments; the readable name and the suite match here.
 		const base = inSuite.filter((e) => stateMatches(e.state, filters.state));
-		return q
-			? base.filter(
-					(e) =>
-						e.exp_id.toLowerCase().includes(q) ||
-						e.name.toLowerCase().includes(q) ||
-						(named.get(e.exp_id) ?? "").toLowerCase().includes(q) ||
-						(e.suite ?? "").toLowerCase().includes(q),
-				)
-			: base;
-	}, [inSuite, filters.q, filters.state, named]);
+		return query ? base.filter(matchesQuery) : base;
+	}, [inSuite, filters.state, query, matchesQuery]);
+	// A search that finds only hidden rows says so, with a button that shows them (N202).
+	const hiddenMatches = useMemo(
+		() => (!query || showSystem || shown.length > 0 ? 0 : everything.filter((e) => isHiddenByDefault(e) && matchesQuery(e)).length),
+		[query, showSystem, shown.length, everything, matchesQuery],
+	);
 	const suites = useMemo(() => [...new Set(all.map((e) => e.suite).filter((s): s is string => Boolean(s)))].sort(), [all]);
 	const clear = () => void setFilters({ q: null, state: null, suite: null });
 	const statusKey = STATUSES.find((c) => c.states[0] === filters.state)?.key;
@@ -313,6 +344,23 @@ export function ExperimentBoard() {
 				<FilterTokens tokens={tokens} onClear={clear} testId="experiment-tokens" />
 			</div>
 
+			{hiddenMatches > 0 && (
+				<p
+					className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm"
+					role="status"
+					data-testid="experiment-hidden-matches"
+				>
+					{t("hiddenMatches", { count: hiddenMatches })}
+					<button
+						type="button"
+						className="text-primary font-medium hover:underline"
+						onClick={() => void setFilters({ all: "1" })}
+						data-testid="experiment-show-hidden-matches"
+					>
+						{t("showHiddenMatches")}
+					</button>
+				</p>
+			)}
 			{shown.length === 0 ? (
 				<EmptyState
 					icon={Search}
@@ -339,6 +387,7 @@ export function ExperimentBoard() {
 							const Icon = suiteIcon(e.suite);
 							const when = e.started_at ?? e.frozen_at;
 							const title = named.get(e.exp_id) ?? e.exp_id;
+							const kind = experimentKind(e);
 							return (
 								<li
 									key={e.exp_id}
@@ -376,7 +425,15 @@ export function ExperimentBoard() {
 											<StatePill state={e.state} testId={`experiment-row-${e.exp_id}-state`} />
 										</span>
 										<span>
-											<VerdictPill decision={e.decision} testId={`experiment-row-${e.exp_id}-decision`} />
+											{kind ? (
+												<KindPill kind={kind} testId={`experiment-row-${e.exp_id}-kind`} />
+											) : (
+												// A running comparison has no result yet: an analysis of its first runs is not final (N197).
+												<VerdictPill
+													decision={e.state === "running" || e.state === "analyzing" ? undefined : e.decision}
+													testId={`experiment-row-${e.exp_id}-decision`}
+												/>
+											)}
 										</span>
 										<span className="ml-auto md:ml-0 md:flex md:justify-end">
 											<RunsProgress e={e} />
