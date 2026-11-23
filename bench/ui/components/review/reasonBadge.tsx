@@ -8,13 +8,14 @@ import { isReviewReason } from "./review.utils";
  * `detail` names the safety checks that threw an `invalidated` run out (the queue item's `thrown_out_by`).
  */
 export function ReasonBadge({ reason, testId, detail }: { reason: string; testId?: string; detail?: string[] }) {
-	const { t } = useTranslation(["bench", "hw07"]);
+	const { t } = useTranslation("bench");
+	const { t: tHw07 } = useTranslation("hw07");
 	let label = reason;
 	if (reason === "invalidated") {
 		label =
 			detail && detail.length > 0
-				? t("hw07:review.reason.invalidatedBy", { detail: detail.join("; ") })
-				: t("hw07:review.reason.invalidated");
+				? tHw07("review.reason.invalidatedBy", { detail: detail.join("; ") })
+				: tHw07("review.reason.invalidated");
 	} else if (isReviewReason(reason)) {
 		label = t(`review.reason.${reason}`);
 	}
