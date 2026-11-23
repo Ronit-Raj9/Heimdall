@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/adapters"
 	"github.com/maximhq/bifrost/bench/agents"
 	agenttemplates "github.com/maximhq/bifrost/bench/agents/templates"
 	"github.com/maximhq/bifrost/bench/auth"
@@ -1080,6 +1081,10 @@ func (h *agentBuilder) putConfig(ctx *fasthttp.RequestCtx) {
 	}
 	if cfg.ID != id {
 		h.badRequest(ctx, fmt.Sprintf("id in the YAML (%s) must stay %s: create a new agent to rename it", cfg.ID, id))
+		return
+	}
+	if err := adapters.CheckSkillsExtra(cfg); err != nil {
+		h.badRequest(ctx, err.Error())
 		return
 	}
 	if req.CreateOnly {

@@ -27,10 +27,14 @@ import { SettingsSection, TableFrame, When } from "./settingsBits";
 import { WorkerPlatformsSection } from "./workerPlatformsSection";
 import { ConnectedWorkers } from "@/components/workers/connectedWorkers";
 import { WhereRunsGo } from "@/components/workers/whereRunsGo";
+import "@/components/workers/hw05I18n";
+
+/** The one file the save, start and install lines use for a runner token (N225; the server's runners.TokenFile). */
+export const RUNNER_TOKEN_FILE = "~/.heimdall-runner-token";
 
 /** Where the start command reads the token from: its -token-file, or the default path. */
 export function tokenFileOf(command: string): string {
-	return /-token-file\s+(\S+)/.exec(command)?.[1] ?? "~/.heimdall/runner-token";
+	return /-token-file\s+(\S+)/.exec(command)?.[1] ?? RUNNER_TOKEN_FILE;
 }
 
 /** The shell line that saves a runner token where the start command reads it, readable only by its owner. */
@@ -169,6 +173,7 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 function RunnerTokensSection() {
 	const { t } = useTranslation("platform");
 	const session = useSession();
+	const { t: th } = useTranslation("hw05");
 	const formId = useId();
 	const tokens = useListRunnerTokensQuery();
 	const [create, createState] = useCreateRunnerTokenMutation();
@@ -237,8 +242,8 @@ function RunnerTokensSection() {
 						</li>
 						{created.install && (
 							<li className="flex flex-col gap-1.5">
-								<span className="text-muted-foreground">{t("settings.runners.installLine")}</span>
-								<CopyBlock value={created.install} label={t("settings.runners.installLine")} testId="runner-token-install" />
+								<span className="text-muted-foreground">{th("runners.installLine")}</span>
+								<CopyBlock value={created.install} label={th("runners.installLine")} testId="runner-token-install" />
 							</li>
 						)}
 					</ol>

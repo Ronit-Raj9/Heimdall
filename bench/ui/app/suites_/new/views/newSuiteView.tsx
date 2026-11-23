@@ -1,9 +1,12 @@
+import "@/components/agents/hw02I18n";
 import { PageHeader } from "@/components/shell";
+import { isBuiltinSuite } from "@/components/suites/suiteDisplay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { authoringError, useCreateSuiteMutation, useGetSuiteTemplatesQuery } from "@/lib/store/apis/suiteAuthoringApi";
-import { useNavigate } from "@tanstack/react-router";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -17,14 +20,15 @@ export type StartingPoint = "questions" | "code" | "other";
 const STARTS: StartingPoint[] = ["questions", "code", "other"];
 
 /** /suites/new: create benchmarks/<id>/ from a template, then open its Edit tab. */
-export default function NewSuiteView() {
+export default function NewSuiteView({ initialId = "" }: { initialId?: string } = {}) {
 	const { t } = useTranslation("suiteAuthoring");
+	const { t: th } = useTranslation("hw02");
 	const session = useSession();
 	const writable = canUse(session, "member");
 	const templatesQuery = useGetSuiteTemplatesQuery();
 	const [createSuite, { isLoading, error }] = useCreateSuiteMutation();
 	const navigate = useNavigate();
-	const [id, setId] = useState("");
+	const [id, setId] = useState(initialId);
 	const [start, setStart] = useState<StartingPoint>("questions");
 	const [template, setTemplate] = useState("");
 	const [image, setImage] = useState("");
@@ -33,7 +37,11 @@ export default function NewSuiteView() {
 	const templates = start === "code" ? allTemplates.filter((tpl) => CODE_TEMPLATES.has(tpl.id)) : allTemplates;
 	const fallback = templatesQuery.data?.default || "python-pytest";
 	const chosen = start === "questions" ? "qa" : templates.some((tpl) => tpl.id === template) ? template : fallback;
-	const idOk = ID_RE.test(id);
+	// Fix wave 3, N265: an id another benchmark (of the organization or built in) already has is taken.
+	const light = useGetSuitesLightQuery();
+	const existing = light.data?.suites?.find((s) => s.id === id);
+	const taken = existing ? (isBuiltinSuite(existing) ? "builtin" : "org") : null;
+	const idOk = ID_RE.test(id) && taken === null;
 
 	const submit = async (e: FormEvent) => {
 		e.preventDefault();
@@ -67,7 +75,21 @@ export default function NewSuiteView() {
 						aria-invalid={id !== "" && !idOk}
 						data-testid="suites-new-id"
 					/>
-					<span className="text-muted-foreground text-xs font-normal">{id !== "" && !idOk ? t("new.invalidId") : t("new.idHint")}</span>
+					{taken === "builtin" ? (
+						<span className="text-destructive text-xs font-normal" data-testid="suites-new-id-taken">
+							{th("newSuite.builtin", { id })}
+						</span>
+					) : taken === "org" ? (
+						<span className="text-destructive text-xs font-normal" data-testid="suites-new-id-taken">
+							{th("newSuite.taken", { id })}{" "}
+							<Link to="/suites/$suiteId" params={{ suiteId: id }} className="underline">
+								{th("newSuite.open", { id })}
+							</Link>
+							.
+						</span>
+					) : (
+						<span className="text-muted-foreground text-xs font-normal">{id !== "" && !idOk ? t("new.invalidId") : t("new.idHint")}</span>
+					)}
 				</label>
 				<fieldset className="flex flex-col gap-2">
 					<legend className="mb-1.5 text-sm font-medium">{t("new.start.title")}</legend>

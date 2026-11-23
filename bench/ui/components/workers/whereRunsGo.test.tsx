@@ -1,10 +1,10 @@
-import "@/lib/i18n";
-
 import { hostedSession } from "@/lib/testing/platformFixtures";
 import { mutation, okQuery, render } from "@/lib/testing/render";
 import type { WorkerTargetView } from "@/lib/store/apis/workerTargetApi";
 import { describe, expect, it, vi } from "vitest";
-import { EvaluationWorkerPicker, WhereRunsGo } from "./whereRunsGo";
+import { createConfirmStore } from "@/components/platform/confirmDialog";
+import i18n from "@/lib/i18n";
+import { changeTarget, confirmTarget, EvaluationWorkerPicker, WhereRunsGo } from "./whereRunsGo";
 
 const q = vi.hoisted(() => ({ target: {} as Record<string, unknown> }));
 
@@ -88,5 +88,54 @@ describe("EvaluationWorkerPicker", () => {
 			/<option value="platform:e2b" disabled="">E2B \(a fresh sandbox per run\) \(set it as where runs go on the Workers page\)<\/option>/,
 		);
 		expect(html).toMatch(/<option value="shared" disabled=""/);
+	});
+});
+describe("where runs go asks first (N217)", () => {
+	const t = i18n.getFixedT("en", "hw05");
+	// As the server answers with the shared worker as the target: a platform takes the org's queue only as a whole.
+	const shared: WorkerTargetView = {
+		...view,
+		target: "shared",
+		choices: view.choices.map((c) => ({ ...c, current: c.target === "shared", per_evaluation: c.kind !== "platform" })),
+	};
+
+	it("opens the dialog; Cancel sends nothing and Confirm sends one change", async () => {
+		const pending: { message: string; opts: { title?: string; confirmLabel?: string; cancelLabel?: string } }[] = [];
+		const store = createConfirmStore((p) => {
+			if (p) pending.push({ message: p.message, opts: p.opts });
+		});
+		const save = vi.fn(() => Promise.resolve());
+		const ask = (target: string) => confirmTarget((m, o) => store.ask(m, o), shared, target, t);
+
+		const cancelled = changeTarget(ask, save, "platform:modal");
+		expect(pending).toHaveLength(1);
+		expect(pending[0].opts.title).toBe("Change where runs go?");
+		expect(pending[0].message).toBe(
+			"New evaluations of this organization will run on Modal. Runs not started yet also move. Each run starts a Modal sandbox billed to your Modal account.",
+		);
+		expect(pending[0].opts.confirmLabel).toBe("Send runs to Modal");
+		expect(pending[0].opts.cancelLabel).toBe("Keep Shared worker");
+		store.settle(false);
+		expect(await cancelled).toBe(false);
+		expect(save).not.toHaveBeenCalled();
+
+		const confirmed = changeTarget(ask, save, "worker:gpu");
+		expect(pending).toHaveLength(2);
+		expect(pending[1].message).toBe(
+			"New evaluations of this organization will run on gpu (Fly Machines). Evaluations already started keep running where they are.",
+		);
+		store.settle(true);
+		expect(await confirmed).toBe(true);
+		expect(save).toHaveBeenCalledTimes(1);
+		expect(save).toHaveBeenCalledWith("worker:gpu");
+	});
+
+	it("says queued runs move when leaving a platform that takes the shared queue", async () => {
+		const asked: string[] = [];
+		await confirmTarget((m) => (asked.push(m), Promise.resolve(true)), view, "shared", t);
+		expect(asked[0]).toBe("New evaluations of this organization will run on Shared worker. Runs not started yet also move.");
+		const none: string[] = [];
+		expect(await confirmTarget((m) => (none.push(m), Promise.resolve(false)), view, "platform:modal", t)).toBe(true);
+		expect(none).toHaveLength(0);
 	});
 });

@@ -54,8 +54,13 @@ type Version struct {
 	At     time.Time `json:"at"`
 }
 
-// WriteOpts carry the actor, a note and an optimistic-lock hash.
-type WriteOpts struct{ Actor, Note, IfMatch string } // IfMatch = expected sha256 ("" = any)
+// WriteOpts carry the actor, a note and an optimistic-lock hash. System
+// marks a write by Heimdall itself (the skill scan and the agent copy): only
+// such a write may touch a reserved path (IsReserved).
+type WriteOpts struct {
+	Actor, Note, IfMatch string // IfMatch = expected sha256 ("" = any)
+	System               bool
+}
 
 // Store is the confined project file store.
 type Store interface {
@@ -78,7 +83,38 @@ var (
 	ErrConflict       = errors.New("projectfs: file changed since it was read")
 	ErrNotFound       = errors.New("projectfs: not found")
 	ErrNotImplemented = errors.New("projectfs: not implemented")
+	// ErrReserved refuses a write, delete or zip entry under a reserved path
+	// (IsReserved) that is not a System write.
+	ErrReserved = errors.New("projectfs: scan records are written by Heimdall only")
 )
+
+// ScanRecordsDir is the folder under agents/<id>/ that holds the skill scan
+// records (adapters.SkillScansDir). A record admits an uploaded skill to
+// runs, so only Heimdall's own scan writes it (fix wave 3, SEC-B).
+const ScanRecordsDir = "skill-scans"
+
+// IsReserved reports whether rel in area a is agents/<id>/skill-scans or a
+// path inside it, after cleaning. The agent folder itself is not reserved:
+// deleting a whole agent takes its records with it.
+func IsReserved(a Area, rel string) bool {
+	if a != AreaAgents {
+		return false
+	}
+	c, err := cleanRel(rel)
+	if err != nil {
+		return false
+	}
+	parts := strings.Split(c, "/")
+	return len(parts) >= 2 && parts[1] == ScanRecordsDir
+}
+
+// checkReserved refuses a non-System change of a reserved path.
+func checkReserved(a Area, rel string, o WriteOpts) error {
+	if !o.System && IsReserved(a, rel) {
+		return ErrReserved
+	}
+	return nil
+}
 
 // Limits.
 const (

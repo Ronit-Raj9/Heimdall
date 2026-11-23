@@ -144,15 +144,34 @@ type PlatformAssignment struct {
 	// Stamp changes when the token or endpoint does (a short hash, never the
 	// token), so a runner restarts the org's loop on a rotated credential.
 	Stamp string `json:"stamp,omitempty"`
+	// Registry is the org's own image registry the platform pulls
+	// Heimdall's images from (fix wave 3, N216); nil when none is saved.
+	// Its token is only in a ClaimedToken.
+	Registry *RegistryLogin `json:"registry,omitempty"`
 }
 
-// publicView is p without its token, stamped.
+// RegistryLogin is an org's image registry login: the registry path images
+// are pushed under (ghcr.io/team/heimdall), a user name and a token with
+// push and pull rights.
+type RegistryLogin struct {
+	Registry string `json:"registry"`
+	Username string `json:"username"`
+	Token    string `json:"token,omitempty"` // only in a ClaimedToken
+}
+
+// publicView is p without its tokens, stamped.
 func (p *PlatformAssignment) publicView() *PlatformAssignment {
 	if p == nil {
 		return nil
 	}
-	sum := sha256.Sum256([]byte(p.Token + "\x00" + p.Endpoint))
-	return &PlatformAssignment{Name: p.Name, Endpoint: p.Endpoint, Stamp: hex.EncodeToString(sum[:8])}
+	seed := p.Token + "\x00" + p.Endpoint
+	var reg *RegistryLogin
+	if p.Registry != nil {
+		seed += "\x00" + p.Registry.Registry + "\x00" + p.Registry.Username + "\x00" + p.Registry.Token
+		reg = &RegistryLogin{Registry: p.Registry.Registry, Username: p.Registry.Username}
+	}
+	sum := sha256.Sum256([]byte(seed))
+	return &PlatformAssignment{Name: p.Name, Endpoint: p.Endpoint, Stamp: hex.EncodeToString(sum[:8]), Registry: reg}
 }
 
 // Assignments is the answer of GET /api/bench/admin/pool/assignments.

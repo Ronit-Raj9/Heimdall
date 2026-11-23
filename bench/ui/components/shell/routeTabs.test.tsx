@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import { render, tagOf } from "@/lib/testing/render";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { describe, expect, it } from "vitest";
-import { RouteTabs, resolveTab, type RouteTab } from "./routeTabs";
+import { aliasTarget, RouteTabs, resolveTab, unknownTab, type RouteTab } from "./routeTabs";
 
 const tabs: RouteTab[] = [
 	{ id: "report-card", label: "Report card" },
@@ -65,5 +65,35 @@ describe("unknown tab in the address (N76)", () => {
 		for (const search of ["?tab=runs", "?tab=secret", "?tab=checks", ""]) {
 			expect(page(search)).not.toContain('data-testid="route-tabs-unknown"');
 		}
+	});
+});
+describe("tab aliases (N271)", () => {
+	const aliased: RouteTab[] = [
+		{ id: "tasks", label: "Tasks" },
+		{ id: "edit", label: "Edit files", aliases: ["files"] },
+	];
+	const page = (search: string) =>
+		render(
+			<NuqsTestingAdapter searchParams={search}>
+				<RouteTabs tabs={aliased} label="Benchmark views">
+					{(active) => <p data-testid="panel">{active}</p>}
+				</RouteTabs>
+			</NuqsTestingAdapter>,
+		);
+
+	it("opens the tab an alias names, without the unknown-tab note", () => {
+		const html = page("?tab=files");
+		expect(html).toContain('data-active="edit"');
+		expect(html).toContain('<p data-testid="panel">edit</p>');
+		expect(html).not.toContain('data-testid="route-tabs-unknown"');
+	});
+
+	it("rewrites the address to the real tab id", () => {
+		expect(aliasTarget(aliased, "files")).toBe("edit");
+		expect(aliasTarget(aliased, "edit")).toBeNull();
+		expect(aliasTarget(aliased, "bogus")).toBeNull();
+		expect(resolveTab(aliased, "files")).toBe("edit");
+		expect(unknownTab(aliased, "files")).toBeNull();
+		expect(unknownTab(aliased, "bogus")).toBe("bogus");
 	});
 });

@@ -523,10 +523,13 @@ func (h *uploadsHandler) postAgent(ctx *fasthttp.RequestCtx) {
 			}
 			h.sendFiles(ctx, &rep)
 			return
-		case !errors.Is(err, projectfs.ErrNotImplemented):
+		case !errors.Is(err, projectfs.ErrNotImplemented) && !errors.Is(err, projectfs.ErrReserved):
 			h.zipError(ctx, err)
 			return
 		}
+		// ErrReserved: the zip carries scan records. Nothing was written;
+		// the file-by-file path below lists them under refused and writes
+		// the rest.
 	}
 	for _, e := range entries {
 		rep.add(ctx, ps, projectfs.AreaAgents, name+"/"+e.name, e, opts)
@@ -544,7 +547,11 @@ func (r *UploadFilesReport) add(ctx context.Context, ps projectfs.Store, a proje
 			return
 		}
 	}
-	r.Refused = append(r.Refused, UploadedFile{Area: string(a), Path: rel, Error: err.Error()})
+	msg := err.Error()
+	if errors.Is(err, projectfs.ErrReserved) {
+		msg = scanRecordRefusal
+	}
+	r.Refused = append(r.Refused, UploadedFile{Area: string(a), Path: rel, Error: msg})
 }
 
 // sendFiles answers 200 when at least one file was written, 422 when every

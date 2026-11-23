@@ -44,7 +44,11 @@ func platformAssignment(c *sandbox.Connections) func(context.Context, string) (*
 		if err != nil || r == nil {
 			return nil, err
 		}
-		return &sharedpool.PlatformAssignment{Name: r.Platform, Token: r.Credentials.Token, Endpoint: r.Credentials.Endpoint}, nil
+		pa := &sharedpool.PlatformAssignment{Name: r.Platform, Token: r.Credentials.Token, Endpoint: r.Credentials.Endpoint}
+		if r.Registry != nil { // fix wave 3 (N216): the runner pushes images there and the platform pulls them
+			pa.Registry = &sharedpool.RegistryLogin{Registry: r.Registry.Registry, Username: r.Registry.Username, Token: r.Registry.Token}
+		}
+		return pa, nil
 	}
 }
 

@@ -19,6 +19,22 @@ export interface WorkerPlatform {
 	last_tested_at?: string;
 	connected_at?: string;
 	connected_by?: string;
+	/** The image registry the platform pulls Heimdall's images from (fix wave 3, N216); its token is never returned. */
+	registry?: PlatformRegistry;
+}
+
+export interface PlatformRegistry {
+	registry: string;
+	username: string;
+	token_last4?: string;
+	tested_at?: string;
+}
+
+export interface SavePlatformRegistryRequest {
+	platform: string;
+	registry: string;
+	username: string;
+	token: string;
 }
 
 export interface WorkerPlatformsList {
@@ -71,6 +87,21 @@ export const workerPlatformsApi = benchApi.injectEndpoints({
 			}),
 			invalidatesTags: ["Runners", "WorkerTarget", "AuditLog"],
 		}),
+		savePlatformRegistry: builder.mutation<PlatformRegistry, SavePlatformRegistryRequest>({
+			query: ({ platform, registry, username, token }) => ({
+				url: `/worker-platforms/${id(platform)}/registry`,
+				method: "POST",
+				body: { registry, username, token },
+			}),
+			invalidatesTags: ["Runners", "WorkerTarget", "AuditLog"],
+		}),
+		removePlatformRegistry: builder.mutation<void, string>({
+			query: (platform) => ({
+				url: `/worker-platforms/${id(platform)}/registry/remove`,
+				method: "POST",
+			}),
+			invalidatesTags: ["Runners", "WorkerTarget", "AuditLog"],
+		}),
 	}),
 });
 
@@ -80,6 +111,8 @@ export const {
 	useTestWorkerPlatformMutation,
 	useSetWorkerPlatformDefaultMutation,
 	useDisconnectWorkerPlatformMutation,
+	useSavePlatformRegistryMutation,
+	useRemovePlatformRegistryMutation,
 } = workerPlatformsApi;
 
 /** The test answer of a connect or test call: the server's reason when the platform refused. */

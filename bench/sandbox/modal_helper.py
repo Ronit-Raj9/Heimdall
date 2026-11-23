@@ -7,7 +7,7 @@ on stdin, one JSON answer on stdout:
     {"op": "check"}                                              -> {"ok": true}
     {"op": "create", "name", "image", "env", "tags", "cpu",
      "memory_mb", "gpu", "timeout_s", "block_network",
-     "allow_hosts", "allow_cidrs"}                                              -> {"sandbox_id"}
+     "allow_hosts", "allow_cidrs", "registry_auth"}             -> {"sandbox_id"}
     {"op": "exec", "sandbox_id", "argv", "env", "cwd",
      "timeout_s"}                                                -> {"exit_code", "output" (base64)}
     {"op": "upload", "sandbox_id", "path", "data" (base64)}      -> {}
@@ -17,6 +17,9 @@ on stdin, one JSON answer on stdout:
 Errors: {"error": "<kind>", "message": "..."} with kind unauthorized,
 not_found, too_large or failed, and exit code 1. The organization's token
 comes in MODAL_TOKEN_ID and MODAL_TOKEN_SECRET; it is never printed.
+"registry_auth" ({"username", "password"}) is the organization's own image
+registry login: the image is pulled with it as a Modal secret. It is never
+printed either.
 """
 
 import base64
@@ -31,6 +34,16 @@ def answer(obj, code=0):
     sys.stdout.write(json.dumps(obj))
     sys.stdout.flush()
     sys.exit(code)
+
+
+def registry_image(modal, req):
+    """The sandbox image: pulled with the org's registry login when the
+    request carries one (registry_auth), else as a public image."""
+    auth = req.get("registry_auth") or {}
+    if auth.get("username") and auth.get("password"):
+        secret = modal.Secret.from_dict({"REGISTRY_USERNAME": auth["username"], "REGISTRY_PASSWORD": auth["password"]})
+        return modal.Image.from_registry(req["image"], secret=secret)
+    return modal.Image.from_registry(req["image"])
 
 
 def main():
@@ -52,7 +65,7 @@ def main():
         if op == "create":
             kw = {
                 "app": modal.App.lookup(APP_NAME, create_if_missing=True),
-                "image": modal.Image.from_registry(req["image"]),
+                "image": registry_image(modal, req),
                 "timeout": int(req.get("timeout_s") or 3600),
             }
             if req.get("name"):

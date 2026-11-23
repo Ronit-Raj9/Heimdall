@@ -20,9 +20,9 @@ func skippedZipEntry(name string) bool {
 
 // ExtractZip unpacks the archive r into dir of area a. Every entry name is
 // checked before anything is written (absolute paths, "..", .git,
-// .heimdall, symlinks and symlink escapes refuse the whole archive), and the
-// archive is bounded by MaxZipBytes (compressed and uncompressed) and
-// MaxZipEntries. YAML files go through the registered validators. Files up
+// .heimdall, symlinks, symlink escapes and reserved paths refuse the whole
+// archive with nothing written), and the archive is bounded by MaxZipBytes
+// (compressed and uncompressed) and MaxZipEntries. YAML files go through the registered validators. Files up
 // to MaxFileBytes are versioned like Write.
 func (s *store) ExtractZip(ctx context.Context, a Area, dir string, r io.ReaderAt, size int64, o WriteOpts) ([]Entry, error) {
 	if size > MaxZipBytes {
@@ -61,6 +61,9 @@ func (s *store) ExtractZip(ctx context.Context, a Area, dir string, r io.ReaderA
 			return nil, fmt.Errorf("%w: %s", ErrOutside, f.Name)
 		}
 		rel := path.Join(cdir, name)
+		if err := checkReserved(a, rel, o); err != nil {
+			return nil, fmt.Errorf("%w: %s", err, f.Name)
+		}
 		full, err := s.Resolve(a, rel)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s", err, f.Name)

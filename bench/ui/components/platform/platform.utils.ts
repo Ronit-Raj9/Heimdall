@@ -210,5 +210,5 @@ export function looksLikeEmail(value: string): boolean {
  */
 export function runnerStartCommand(origin: string, pool: string, serverCommand?: string): string {
 	if (serverCommand && serverCommand.trim()) return serverCommand.trim();
-	return `heimdall runner start -server ${origin} -token-file ~/.heimdall/runner-token -pool ${pool}`;
+	return `heimdall runner start -server ${origin} -token-file ~/.heimdall-runner-token -pool ${pool}`;
 }

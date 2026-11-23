@@ -153,6 +153,11 @@ func (w workerTargets) SetTarget(ctx context.Context, org, actor, target string)
 		if w.platforms == nil || !platformConnected(pl, name) {
 			return nil, fmt.Errorf("%w: %s is not a connected sandbox platform (connect it on the Workers page first)", handlers.ErrWorkerTarget, name)
 		}
+		// Fix wave 3 (N216): a platform that cannot pull Heimdall's images
+		// would refuse every run; it cannot become where runs go (409).
+		if !platformImagesReady(ctx, targetImagesEnv.Load(), org, name) {
+			return nil, errPlatformImages{msg: sandbox.NeedsRegistry(name)}
+		}
 	case schemas.WorkerTargetWorker:
 		if w.workers == nil || !workerConnected(wl, name) {
 			return nil, fmt.Errorf("%w: no worker named %s (connect it on the Workers page first)", handlers.ErrWorkerTarget, name)

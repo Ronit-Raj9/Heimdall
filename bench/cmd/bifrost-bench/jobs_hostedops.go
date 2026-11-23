@@ -495,6 +495,9 @@ func checkVerdict(runs []bridgeRun, want int) (string, string) {
 	if len(runs) < want {
 		return checkError, fmt.Sprintf("%d of %d runs sealed; see the experiment for what stopped it", len(runs), want)
 	}
+	if why, ok := noRunStarted(runs); ok { // N180: say why no run started
+		return checkError, why
+	}
 	worst, detail := checkPass, "the agent ran on the runner and exited by itself"
 	rank := map[string]int{checkPass: 0, checkWarn: 1, checkFail: 2, checkError: 3}
 	for _, r := range runs {

@@ -1,6 +1,7 @@
 {
 	"checks": {
 		"loading": "Loading agent...",
+		"openLog": "Open the log",
 		"noAgent": "No agent \"{{id}}\" in this project. Create it first.",
 		"newAgent": "New agent",
 		"check": {
@@ -19,13 +20,14 @@
 			"hintPerSuite": "This agent needs one container per benchmark: name the benchmark.",
 			"hintDockerfile": "Builds {{image}} from {{dockerfile}}.",
 			"hintPrebuilt": "This agent uses a ready-made container image. Nothing to prepare.",
-			"hosted": "Hosted servers do not prepare containers. Push your image to a registry, pin it with @sha256: in the agent settings, and use Run test above.",
 			"nothing": "Nothing to prepare. Add a build section in the Settings tab to prepare a container here.",
 			"suiteRequired": "Benchmark (required)",
 			"suiteOptional": "Benchmark (optional)",
-			"needSuite": "Name the benchmark this container is for.",
 			"run": "Prepare container",
-			"runnerNote": "On hosted servers the container is prepared on your worker (Settings > Workers), never on the server. It stays on that machine, which also runs this agent."
+			"runnerNote": "Prepares the container on a worker (the shared worker or your own), never on the server. Runs also prepare it the first time they need it, so this step is optional; use it to see the build log before an evaluation.",
+			"pickFirst": "Pick a benchmark first",
+			"pickPlaceholder": "Pick a benchmark",
+			"ready": "Ready: {{tag}}"
 		},
 		"diff": {
 			"title": "Compare versions",

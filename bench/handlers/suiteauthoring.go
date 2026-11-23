@@ -8,6 +8,7 @@ package handlers
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -24,12 +25,14 @@ import (
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/auth"
+	"github.com/maximhq/bifrost/bench/evalstore"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/scaffold"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/valyala/fasthttp"
+	"gopkg.in/yaml.v3"
 )
 
 // Suite authoring limits.
@@ -142,11 +145,14 @@ type suiteAuthoring struct {
 	projects projectfs.Store
 	suites   SuiteSource
 	benchDir string // the benchmarks folder of the server config; "" when unknown
+	index    ReadIndex
+	launcher Launcher
 }
 
 func init() {
 	RegisterOrgArea("suiteauthoring", func(env OrgEnv, r *router.Router) {
-		h := &suiteAuthoring{mode: env.Mode, projects: env.Services.Projects, suites: env.Services.Suites}
+		h := &suiteAuthoring{mode: env.Mode, projects: env.Services.Projects, suites: env.Services.Suites,
+			index: env.Services.Index, launcher: env.Services.Launcher}
 		if env.Cfg != nil {
 			h.benchDir = env.Cfg.BenchmarksRoot
 			if h.benchDir != "" && !filepath.IsAbs(h.benchDir) && env.Cfg.Root != "" {
@@ -162,6 +168,7 @@ func init() {
 		r.GET(APIPrefix+"/suites/{id}/files/{path:*}", env.R(h.readFile))
 		r.PUT(APIPrefix+"/suites/{id}/files/{path:*}", env.W(refuseBuiltin(env.Mode, h.suites, h.writeFile)))
 		r.DELETE(APIPrefix+"/suites/{id}/files/{path:*}", env.W(refuseBuiltin(env.Mode, h.suites, h.deleteFile)))
+		r.DELETE(APIPrefix+"/suites/{id}", env.W(h.deleteSuite))
 	})
 }
 
@@ -244,7 +251,8 @@ func (h *suiteAuthoring) createSuite(ctx *fasthttp.RequestCtx) {
 	}
 	req.ID = strings.TrimSpace(req.ID)
 	if isBuiltinSuite(h.suites, req.ID) {
-		sendBuiltinReadOnly(ctx, h.mode, req.ID)
+		// Fix wave 3, N265: a taken id is a conflict, said plainly.
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, req.ID+" is a built-in benchmark. Pick another id.")
 		return
 	}
 	if req.Template == "" {
@@ -281,7 +289,7 @@ func (h *suiteAuthoring) createSuite(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	if _, err := os.Lstat(dir); err == nil {
-		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, "suite "+req.ID+" already exists; pick another id or open it from Suites")
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, "A benchmark named "+req.ID+" already exists. Pick another id.")
 		return
 	}
 	if err := writeTreeAtomic(dir, files); err != nil {
@@ -303,6 +311,196 @@ func (h *suiteAuthoring) createSuite(ctx *fasthttp.RequestCtx) {
 		out.Next = "Add a task, upload its repo and hidden tests, then run Lint and Lock."
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, &out)
+}
+
+// deleteSuite handles DELETE /suites/{id} (fix wave 3, N288): the
+// benchmark's folder goes (tasks, suite.lock, policy documents, labels);
+// comparisons, evaluations, runs, report cards and dataset versions stay
+// readable. Refused, in this order: a built-in library pack (409), a
+// benchmark the project does not have (404), one that a comparison or an
+// evaluation still running uses (409), and one a schedule repeats (409).
+func (h *suiteAuthoring) deleteSuite(ctx *fasthttp.RequestCtx) {
+	if !h.needProjects(ctx) {
+		return
+	}
+	id := pathParam(ctx, "id")
+	if isBuiltinSuite(h.suites, id) {
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, id+" is a built-in benchmark and cannot be deleted.")
+		return
+	}
+	notFound := func() {
+		lib.SendError(ctx, h.mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, "Benchmark "+id+" not found.")
+	}
+	if !scaffold.ValidID(id) {
+		notFound()
+		return
+	}
+	dir, err := h.projects.Resolve(projectfs.AreaBenchmarks, id)
+	if err != nil {
+		notFound()
+		return
+	}
+	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+		notFound()
+		return
+	}
+	evs, err := evalstore.Open(h.projects.Root()).List()
+	if err != nil {
+		lib.SendError(ctx, h.mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "list evaluations: "+err.Error())
+		return
+	}
+	if h.suiteRunning(id, evs) {
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict,
+			id+" has comparisons or evaluations still running. Stop them first, then delete it.")
+		return
+	}
+	if name := h.suiteSchedule(id, evs); name != "" {
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict,
+			"Schedule "+name+" repeats an evaluation that uses "+id+". Remove or change the schedule first.")
+		return
+	}
+	if name := h.suiteExperimentSchedule(id); name != "" {
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict,
+			"Schedule "+name+" runs a comparison that uses "+id+". Remove or change the schedule first.")
+		return
+	}
+	work, cancel := workContext(ctx, readTimeout)
+	defer cancel()
+	if err := h.projects.Delete(work, projectfs.AreaBenchmarks, id, projectfs.WriteOpts{Actor: actorName(ctx), Note: "delete benchmark " + id}); err != nil {
+		if errors.Is(err, projectfs.ErrNotFound) {
+			notFound()
+			return
+		}
+		h.sendStoreError(ctx, "delete benchmark "+id, err)
+		return
+	}
+	ctx.SetStatusCode(fasthttp.StatusNoContent)
+}
+
+// suiteOf is the pack id of a suite reference ("id" or "id@version").
+func suiteOf(ref string) string {
+	id, _, _ := strings.Cut(ref, "@")
+	return id
+}
+
+// evaluationUses reports whether evaluation ev lists benchmark id.
+func evaluationUses(ev *schemas.Evaluation, id string) bool {
+	if ev == nil {
+		return false
+	}
+	if slices.Contains(ev.Spec.Benchmarks, id) {
+		return true
+	}
+	for _, c := range ev.Children {
+		if suiteOf(c.Benchmark) == id {
+			return true
+		}
+	}
+	return false
+}
+
+// suiteRunning reports whether a comparison of benchmark id is executing or
+// has a run still going, or an evaluation that lists it is queued or running.
+func (h *suiteAuthoring) suiteRunning(id string, evs []*schemas.Evaluation) bool {
+	for _, ev := range evs {
+		if ev != nil && (ev.Status == schemas.EvaluationQueued || ev.Status == schemas.EvaluationRunning) && evaluationUses(ev, id) {
+			return true
+		}
+	}
+	if h.index == nil {
+		return false
+	}
+	ar, _ := h.launcher.(ActivityReporter)
+	for _, expID := range h.index.Experiments() {
+		m, ok := h.index.Manifest(expID)
+		if !ok || m == nil || suiteOf(cmp.Or(m.SuiteID, m.Experiment.Suite)) != id {
+			continue
+		}
+		if ar != nil && ar.Active(expID) {
+			return true
+		}
+		for _, rv := range h.index.Runs(expID) {
+			if !rv.Sealed && !rv.Superseded {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// suiteSchedule is the name of the first web schedule that repeats an
+// evaluation listing benchmark id ("" when none does).
+func (h *suiteAuthoring) suiteSchedule(id string, evs []*schemas.Evaluation) string {
+	f, err := LoadWebSchedules(h.projects.Root())
+	if err != nil || f == nil {
+		return ""
+	}
+	byID := map[string]*schemas.Evaluation{}
+	for _, ev := range evs {
+		if ev != nil {
+			byID[ev.ID] = ev
+		}
+	}
+	for _, sc := range f.Schedules {
+		ref := strings.TrimSpace(sc.Evaluation)
+		if ref == "" {
+			continue
+		}
+		if ev, ok := byID[ref]; ok {
+			if evaluationUses(ev, id) {
+				return sc.Name
+			}
+			continue
+		}
+		// A spec file relative to the project root.
+		full := filepath.Join(h.projects.Root(), filepath.FromSlash(ref))
+		if !within(h.projects.Root(), full) {
+			continue
+		}
+		data, err := os.ReadFile(full)
+		if err != nil {
+			continue
+		}
+		var spec schemas.EvaluationSpec
+		if yaml.Unmarshal(data, &spec) == nil && slices.Contains(spec.Benchmarks, id) {
+			return sc.Name
+		}
+	}
+	return ""
+}
+
+// suiteExperimentSchedule is the name of the first web schedule whose
+// experiment file runs benchmark id ("" when none does).
+func (h *suiteAuthoring) suiteExperimentSchedule(id string) string {
+	f, err := LoadWebSchedules(h.projects.Root())
+	if err != nil || f == nil {
+		return ""
+	}
+	for _, sc := range f.Schedules {
+		ref := strings.TrimSpace(sc.Experiment)
+		if ref == "" {
+			continue
+		}
+		full := filepath.Join(h.projects.Root(), filepath.FromSlash(ref))
+		if !within(h.projects.Root(), full) {
+			continue
+		}
+		data, err := os.ReadFile(full)
+		if err != nil {
+			continue
+		}
+		var exp struct {
+			Suite string `yaml:"suite"`
+		}
+		if yaml.Unmarshal(data, &exp) != nil {
+			continue
+		}
+		suiteID, _, _ := strings.Cut(strings.TrimSpace(exp.Suite), "@")
+		if suiteID == id {
+			return sc.Name
+		}
+	}
+	return ""
 }
 
 // visible reports whether dir is in the folder the suite loader reads.

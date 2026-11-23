@@ -281,8 +281,8 @@ func TestCreateSuiteRefusesBuiltinID(t *testing.T) {
 	c := &authoringClient{client: &fasthttp.Client{Dial: func(string) (net.Conn, error) { return ln.Dial() }}, root: root}
 
 	code, body := c.do(t, "POST", "/suites", []byte(`{"id":"coding-core","template":"qa","blank":true}`), nil)
-	if code != 403 || !strings.Contains(string(body), "coding-core") {
-		t.Fatalf("create built-in id: %d %s, want 403 naming the id", code, body)
+	if code != 409 || !strings.Contains(string(body), "coding-core") { // fix wave 3, N265: a taken id is 409
+		t.Fatalf("create built-in id: %d %s, want 409 naming the id", code, body)
 	}
 	err = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
 		if err == nil && strings.Contains(p, "coding-core") {

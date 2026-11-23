@@ -86,6 +86,9 @@ func prewarmAgentImages(m *schemas.Manifest, s *schemas.Suite, root string) []en
 	seen := map[string]bool{}
 	for _, arm := range m.Arms {
 		cfg := arm.Config
+		if cfg.Build != nil && cfg.Build.BaseArg != "" {
+			cfg.Image = cfg.Build.Tag // the manifest records the derived per-suite tag
+		}
 		img, err := engine.ResolveAgentImage(&cfg, s, root)
 		if err != nil || img.Tag == "" || seen[img.Tag] {
 			continue

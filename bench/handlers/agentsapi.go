@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/adapters"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/valyala/fasthttp"
@@ -78,6 +79,10 @@ func (h *agentsAPI) create(ctx *fasthttp.RequestCtx) {
 	doc := []byte(req.YAML)
 	cfg, err := decodeAgent(doc, "agents/agent.yaml")
 	if err != nil {
+		h.b.badRequest(ctx, err.Error())
+		return
+	}
+	if err := adapters.CheckSkillsExtra(cfg); err != nil {
 		h.b.badRequest(ctx, err.Error())
 		return
 	}
