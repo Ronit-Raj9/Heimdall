@@ -32,7 +32,8 @@
 		"tokens": "Tokens",
 		"runs": "Runs",
 		"unknown": "Cost not known",
-		"noModelCall": "{{count}} with no model call",
+		"noModelCall_one": "{{count}} run with no model call",
+		"noModelCall_other": "{{count}} runs with no model call",
 		"label": "Usage by {{group}}"
 	},
 	"keys": {

@@ -172,6 +172,8 @@ func init() {
 	})
 
 	// monitor.certify scores sealed runs through the monitor, which may start
-	// containers, so it runs only on a local server (hosted: not registered).
+	// containers. This variant runs on a local server; the hosted server
+	// registers a worker variant instead (jobs_runnerjob.go), which runs it on
+	// the org's worker through a job lease. It calls no model.
 	registerJobKind(cliJob("monitor.certify", true, false, monitorCertifyArgs))
 }

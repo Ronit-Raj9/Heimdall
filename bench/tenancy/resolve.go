@@ -27,10 +27,20 @@ type Directory interface {
 	MemberRole(ctx context.Context, orgID, userID string) (auth.Role, error)
 }
 
+// ShareIndex finds the org of an opaque share token (fix wave 3, N293). A
+// Directory that also implements it lets s_ tokens resolve; without it (local
+// mode) they answer 404.
+type ShareIndex interface {
+	// ShareByToken returns the org and share id token opens, or an error
+	// wrapping ErrShareNotFound.
+	ShareByToken(ctx context.Context, token string) (orgID, shareID string, err error)
+}
+
 // Lookup errors.
 var (
-	ErrOrgNotFound = errors.New("organization not found")
-	ErrNotMember   = errors.New("not a member of the organization")
+	ErrOrgNotFound   = errors.New("organization not found")
+	ErrNotMember     = errors.New("not a member of the organization")
+	ErrShareNotFound = errors.New("share link not indexed")
 )
 
 // FindOrg resolves ref, an org id or slug, through dir: the id first, then
@@ -137,18 +147,53 @@ func Resolve(ctx context.Context, dir Directory, rule Rule, p *auth.Principal, p
 // token in.
 const SharePathParam = "token"
 
-// ShareTokenOrg returns the org id a share token names (the part before its
-// first dot), without checking the token: the org's own share store does.
+// shareV2Prefix starts an opaque share token (sharelinks.TokenV2Prefix).
+const shareV2Prefix = "s_"
+
+// IsShareTokenV2 reports whether token is an opaque (s_) share token.
+func IsShareTokenV2(token string) bool { return strings.HasPrefix(token, shareV2Prefix) }
+
+// ShareTokenOrg returns the org id an old-form share token names (the part
+// before its first dot), without checking the token: the org's own share
+// store does. An opaque (s_) token names no org.
 func ShareTokenOrg(token string) (string, bool) {
+	if IsShareTokenV2(token) {
+		return "", false
+	}
 	org, _, ok := strings.Cut(token, ".")
 	return org, ok && ValidOrgID(org) == nil
 }
 
-// resolveShare resolves an AccessShare route: the org the token names, and
+// shareTokenOrg finds the org a share token opens: an opaque token through
+// the directory's share index (no org is opened when it is not indexed), an
+// old one from its text.
+func shareTokenOrg(ctx context.Context, dir Directory, token string) (string, bool, error) {
+	if !IsShareTokenV2(token) {
+		orgID, ok := ShareTokenOrg(token)
+		return orgID, ok, nil
+	}
+	ix, ok := dir.(ShareIndex)
+	if !ok || len(token) > 128 {
+		return "", false, nil
+	}
+	orgID, _, err := ix.ShareByToken(ctx, token)
+	if errors.Is(err, ErrShareNotFound) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return orgID, true, nil
+}
+
+// resolveShare resolves an AccessShare route: the org the token opens, and
 // an anonymous reader in it, whoever the caller is. A token naming no org
 // answers 404, as a bad signature does later.
 func resolveShare(ctx context.Context, dir Directory, token string) (*Org, *auth.Principal, error) {
-	orgID, ok := ShareTokenOrg(token)
+	orgID, ok, err := shareTokenOrg(ctx, dir, token)
+	if err != nil {
+		return nil, nil, err
+	}
 	if !ok {
 		return nil, nil, notFound("this share link does not exist")
 	}

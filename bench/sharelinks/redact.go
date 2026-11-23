@@ -19,10 +19,18 @@ var secretKeys = map[string]bool{
 	"access_key": true, "secret_key": true, "private_key": true, "bearer": true,
 	"cookie": true, "cookies": true, "created_by": true, "revoked_by": true, "actor": true,
 	"key_value": true, "value_hash": true, "webhook_url": true,
+	// Fix wave 3 (N293): gateway keys, people, worker names and hosts. A
+	// person's display name (*_name) stays.
+	"virtual_key_id": true, "uploaded_by": true, "requested_by": true, "updated_by": true,
+	"started_by": true, "approved_by": true, "reviewed_by": true, "labeller": true, "author": true,
+	"email": true, "worker": true, "worker_id": true, "host": true, "by": true,
 }
 
 // secretSuffixes catch prefixed variants (OPENAI_API_KEY, x_secret).
-var secretSuffixes = []string{"_secret", "_password", "_token", "_api_key", "_apikey", "_private_key", "_access_key", "_secret_key", "_credentials"}
+var secretSuffixes = []string{"_secret", "_password", "_token", "_api_key", "_apikey", "_private_key", "_access_key", "_secret_key", "_credentials",
+	// Fix wave 3 (N293): every *_path field (stdout_path and the like) holds
+	// a file path on a worker or the server.
+	"_path"}
 
 // promptKeys are fields that hold prompts, instructions, agent text or tool
 // arguments, blanked when a link hides prompts.

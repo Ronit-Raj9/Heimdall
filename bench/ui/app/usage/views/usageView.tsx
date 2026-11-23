@@ -438,9 +438,9 @@ function UsageTable({ buckets, group, groupBy }: { buckets: UsageBucket[]; group
 						<TableRow key={b.key} data-testid={`usage-row-${b.key}`}>
 							<TableCell className="font-mono text-xs">
 								{b.key}
-								{b.label && <span className="text-muted-foreground ml-2 font-sans">{b.label}</span>}
+								{b.label && <span className="text-muted-foreground block font-sans">{b.label}</span>}
 								{!!b.no_model_call_runs && (
-									<span className="text-muted-foreground ml-2 font-sans" data-testid={`usage-no-call-${b.key}`}>
+									<span className="text-muted-foreground block font-sans text-xs" data-testid={`usage-no-call-${b.key}`}>
 										{t("table.noModelCall", { count: b.no_model_call_runs })}
 									</span>
 								)}

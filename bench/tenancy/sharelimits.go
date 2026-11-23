@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/auth"
+	"github.com/maximhq/bifrost/bench/db"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
 )
 
 // Share link traffic (audit B4 and B9). Anyone holding a share link reads it
-// without signing in, and the org id is visible in every link and badge. So
+// without signing in, and old-form links show the org id. So
 // share routes are limited by buckets of their own, one per link and one per
 // client IP, and never by the org's bucket: a flood on a public badge can
 // slow that badge, never the org's members, sessions or CI tokens. Each
@@ -45,8 +46,12 @@ func (rl *RateLimits) allowShare(ctx *fasthttp.RequestCtx, mode schemas.Mode, to
 }
 
 // shareLinkID is the org and link id of a share token (org.id.signature),
-// without the signature, so the bucket key stays short.
+// without the signature, so the bucket key stays short. An opaque (s_) token
+// is keyed by "s_" and the first 16 hex of its hash (fix wave 3, N293).
 func shareLinkID(token string) string {
+	if IsShareTokenV2(token) {
+		return shareV2Prefix + db.ShareTokenHash(token)[:16]
+	}
 	parts := strings.SplitN(token, ".", 3)
 	if len(parts) < 2 {
 		return clipKey(token)
@@ -125,6 +130,15 @@ func (d *Dispatcher) auditShareView(ctx *fasthttp.RequestCtx, orgID, pattern, to
 	}
 	if !d.views.first(id+"|"+ip+"|"+kind, now) {
 		return
+	}
+	if IsShareTokenV2(token) {
+		// The row names the share id from the index, never the token.
+		shareID = ""
+		if ix, ok := d.c.Dir.(ShareIndex); ok {
+			lctx, cancel := workContext()
+			_, shareID, _ = ix.ShareByToken(lctx, token)
+			cancel()
+		}
 	}
 	details := map[string]any{"route": "GET " + pattern, "kind": kind, "dedupe": "one row per link, address and route an hour"}
 	if ua := string(ctx.UserAgent()); ua != "" {

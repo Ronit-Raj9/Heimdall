@@ -7,7 +7,7 @@ func init() {
 	formats := []QueryDoc{{Name: "format", Description: "html (default, standalone page with a print stylesheet for Save as PDF), md or json"}, {Name: "inline", Description: "1 shows the document instead of downloading it"}}
 	APIRoutes = append(APIRoutes,
 		RouteDoc{Method: "POST", Path: APIPrefix + "/shares", Tag: "sharing",
-			Summary: "Create a read-only share link to a report card, evaluation, verdict, run trace or leaderboard view (expires_in_days 0 means never, default 30)",
+			Summary: "Create a read-only share link to a report card, evaluation, verdict, run trace or leaderboard view (expires_in_days 0 means never, default 30). On the hosted server the token is opaque (s_...) and names no organization",
 			Auth:    AuthWrite, Request: sharelinks.NewShare{}, Status: 201, Response: ShareView{}},
 		RouteDoc{Method: "GET", Path: APIPrefix + "/shares", Tag: "sharing",
 			Summary: "List this organization's share links with their state", Response: ShareList{},
@@ -15,7 +15,7 @@ func init() {
 		RouteDoc{Method: "POST", Path: APIPrefix + "/shares/{id}/revoke", Tag: "sharing",
 			Summary: "Turn a share link off at once", Auth: AuthWrite, Response: ShareView{}},
 		RouteDoc{Method: "GET", Path: APIPrefix + "/shared/{token}", Tag: "sharing",
-			Summary: "Open a share link: the item, with secrets removed (and prompts, when the link hides them). 410 when expired or revoked", Response: SharedItem{}},
+			Summary: "Open a share link: the item, with secrets, file paths and people removed (and prompts, when the link hides them). An old token that names the organization still opens and answers canonical_token, the link's new token. 410 when expired or revoked", Response: SharedItem{}},
 		RouteDoc{Method: "GET", Path: APIPrefix + "/shared/{token}/badge.svg", Tag: "sharing",
 			Summary: "A badge with the shared report card's score or the verdict's action, embeddable anywhere", Raw: "image/svg+xml"},
 		RouteDoc{Method: "GET", Path: APIPrefix + "/shared/{token}/export", Tag: "sharing",

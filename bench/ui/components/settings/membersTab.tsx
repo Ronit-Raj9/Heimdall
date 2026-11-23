@@ -25,6 +25,7 @@ import { UserPlus } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { RoleSelect, SettingsSection, TableFrame, When, grantableRoles, mayManage } from "./settingsBits";
+import "./hw03I18n";
 
 /** The link an invitation token opens, on this site. */
 export function invitationLink(origin: string, token: string): string {
@@ -247,6 +248,7 @@ function MemberRow({
 /** Invite by email with a role; the link is shown once. Then the open invitations, revocable. */
 function InviteSection({ org }: { org: OrgSummary }) {
 	const { t } = useTranslation("platform");
+	const { t: h } = useTranslation("hw03");
 	const session = useSession();
 	const formId = useId();
 	const roles = grantableRoles(session.role);
@@ -365,16 +367,16 @@ function InviteSection({ org }: { org: OrgSummary }) {
 											<When value={invite.expires_at} />
 										</TableCell>
 										<TableCell className="text-right">
-											<Button
-												variant="outline"
-												size="sm"
-												className="h-7 px-2.5 text-xs"
+											<ConfirmButton
+												label={t("settings.invite.revoke")}
+												question={h("invite.revokeQuestion", { email: invite.email })}
+												confirmLabel={h("invite.revokeConfirm")}
+												cancelLabel={h("invite.revokeCancel")}
+												variant="destructive"
 												isLoading={revokeState.isLoading && revokeState.originalArgs?.invitationId === invite.id}
-												onClick={() => void revoke({ orgId: org.id, invitationId: invite.id })}
-												dataTestId={`invitation-revoke-${invite.id}`}
-											>
-												{t("settings.invite.revoke")}
-											</Button>
+												onConfirm={() => void revoke({ orgId: org.id, invitationId: invite.id })}
+												testId={`invitation-revoke-${invite.id}`}
+											/>
 										</TableCell>
 									</TableRow>
 								))}

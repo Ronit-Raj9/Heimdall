@@ -10,7 +10,7 @@ import type { Leaderboard, RunDetail, VerdictPayload } from "@/lib/types/bench";
 import "@/lib/types/shareI18n";
 import { Download, EyeOff, FileCode2 } from "lucide-react";
 import { usePageTitle } from "@/lib/routing/pageTitle";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 /** GET /agents/{id}/report-card as the server sends it: the report, or null before any evaluation. */
@@ -44,10 +44,29 @@ function formatDate(iso?: string): string {
 			});
 }
 
+/**
+ * Moves the address bar to /s/<canonical> without a reload when the link was opened with an old
+ * token that names the organization (fix wave 3, N293), so a link copied from the browser no
+ * longer carries the org id. Exported for tests.
+ */
+export function replaceShareAddress(
+	canonical: string,
+	win: Pick<Window, "history" | "location"> | undefined = typeof window === "undefined" ? undefined : window,
+) {
+	if (!win || !canonical) return;
+	const path = `/s/${encodeURIComponent(canonical)}`;
+	if (win.location.pathname === path) return;
+	win.history.replaceState(win.history.state, "", `${path}${win.location.search}${win.location.hash}`);
+}
+
 /** /s/<token>: the shared item, read-only. */
 export default function SharedView({ token }: { token: string }) {
 	const { t } = useTranslation("share");
 	const shared = useGetSharedQuery(token);
+	const canonical = shared.data?.canonical_token;
+	useEffect(() => {
+		if (canonical && canonical !== token) replaceShareAddress(canonical);
+	}, [canonical, token]);
 
 	usePageTitle(`${shared.data?.share.label || t("page.shared")} · Heimdall`);
 

@@ -221,10 +221,11 @@ export function activeNavGroup(pathname: string): BenchNavGroupId | null {
  * Pages that have their own browser tab title although the sidebar highlights another entry for
  * them (through `also`) or none: path to its fw23 locale key.
  */
-const PAGE_TITLES: Readonly<Record<string, "titles.maxim" | "titles.docs" | "titles.jobs">> = {
+const PAGE_TITLES: Readonly<Record<string, "titles.maxim" | "titles.docs" | "titles.jobs" | "titles.monitors">> = {
 	"/maxim": "titles.maxim",
 	"/docs": "titles.docs",
 	"/jobs": "titles.jobs",
+	"/monitors": "titles.monitors",
 };
 
 /** Path prefixes with their own title, checked in order after the exact paths: an object page below a list. */
