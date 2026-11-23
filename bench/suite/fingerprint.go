@@ -254,6 +254,44 @@ func AdmissionFingerprint(f *schemas.LockFingerprints, taskID string) string {
 	return sum
 }
 
+// carryIgnored are the suite.yaml settings that do not change how a task is
+// graded: a staged Add benchmark draft and the benchmark it publishes into
+// differ in them (id, description, the canary publish writes, and the task
+// list). Probes stay bound: the admission checks run them. The canary step
+// at publish writes only suite.yaml, which is not part of the suite's files
+// hash.
+var carryIgnored = map[string]bool{"id": true, "description": true, "canary": true, "tasks": true, "lock_hash": true}
+
+// CarryFingerprint is the sha256 of what grades taskID under f: the task's
+// settings and files, the suite's files and every suite setting except the
+// ones in carryIgnored (fix wave 3, N252). Two benchmarks with the same
+// value grade the task the same way, so an admission record carries from a
+// staged draft into the benchmark it is published to. Empty when f is nil,
+// does not pin the task, or has no per-setting hashes.
+func CarryFingerprint(f *schemas.LockFingerprints, taskID string) string {
+	if f == nil || len(f.Suite.Fields) == 0 {
+		return ""
+	}
+	t, ok := f.Tasks[taskID]
+	if !ok {
+		return ""
+	}
+	fields := make(map[string]string, len(f.Suite.Fields))
+	for k, v := range f.Suite.Fields {
+		if !carryIgnored[k] {
+			fields[k] = v
+		}
+	}
+	sum, err := utils.HashJSON(map[string]any{
+		"suite.fields": fields, "suite.files": f.Suite.Files,
+		"task.settings": t.Settings, "task.files": t.Files,
+	})
+	if err != nil {
+		return ""
+	}
+	return sum
+}
+
 // AdmissionCurrent reports whether rec still admits taskID under l: a
 // record without a fingerprint (written before fingerprints existed) is
 // taken as it is; one with a fingerprint must match the lock's.

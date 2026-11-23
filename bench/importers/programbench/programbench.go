@@ -195,7 +195,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 		staged++
 	}
 	if staged == 0 {
-		return &importers.Result{Suite: opts.SuiteID, SuiteDir: opts.SuiteDir(), Skipped: skipped}, errors.New("programbench: no task was staged; see the skipped list")
+		return &importers.Result{Suite: opts.SuiteID, SuiteDir: opts.SuiteDir(), Skipped: skipped}, importers.NoTaskError("programbench", skipped)
 	}
 	rev := cfg.revision
 	if rev == "" {

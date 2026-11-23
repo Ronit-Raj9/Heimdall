@@ -161,6 +161,33 @@ func ReadRecords(format string, data []byte) ([]map[string]any, []int, error) {
 	return recs, lines, nil
 }
 
+// RecordUnit names what ReadRecords numbers in data of format, for messages
+// that point at one record: "row" for a CSV (the file row, header included,
+// as a spreadsheet shows it), "item" for a JSON array or an object holding
+// one, "line" for JSON Lines and pasted tickets.
+func RecordUnit(format string, data []byte) string {
+	if format == RowFormatCSV {
+		return "row"
+	}
+	t := bytes.TrimSpace(bytes.TrimPrefix(data, []byte("\xef\xbb\xbf")))
+	if len(t) > 0 && t[0] == '[' {
+		return "item"
+	}
+	if len(t) > 0 && t[0] == '{' && !bytes.Contains(t, []byte("}\n{")) && !bytes.Contains(t, []byte("}\r\n{")) {
+		// One object holding the records (as jsonRecords reads it); a
+		// single plain object is line 1 of JSON Lines.
+		var m map[string]json.RawMessage
+		if json.Unmarshal(t, &m) == nil {
+			for _, k := range []string{"rows", "tickets", "items", "data", "examples"} {
+				if v := bytes.TrimSpace(m[k]); len(v) > 0 && v[0] == '[' {
+					return "item"
+				}
+			}
+		}
+	}
+	return "line"
+}
+
 // csvRecords reads a CSV file with a header row.
 func csvRecords(data []byte) ([]map[string]any, []int, error) {
 	rd := csv.NewReader(bytes.NewReader(data))

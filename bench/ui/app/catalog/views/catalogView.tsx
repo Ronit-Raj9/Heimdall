@@ -9,6 +9,7 @@ import { SuiteRunButton } from "@/components/suites/suiteRunButton";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useGetSuitesQuery } from "@/lib/store";
 import { useAddCatalogEntryMutation, useGetBenchCatalogQuery, useUploadCatalogDatasetMutation } from "@/lib/store/apis/catalogApi";
+import type { Job } from "@/lib/types/bench";
 import type { CatalogAddRequest, CatalogAddResponse, CatalogEntry } from "@/lib/types/catalog";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
@@ -91,8 +92,27 @@ export interface CatalogBodyProps {
 	lastAdded?: CatalogAddResponse | null;
 	error?: string | null;
 	jobPanel?: ReactNode;
+	/** A failed import job: its error and the tasks it skipped (fix wave 3, N263). */
+	importFailure?: ImportFailure | null;
 	/** Suite ids the server's built-in library serves: such entries show Built in and Run, listed first. */
 	builtinSuites?: ReadonlySet<string>;
+}
+
+/** A failed catalog import: the job's error and every task it skipped with the reason. */
+export interface ImportFailure {
+	error: string;
+	skipped: { id: string; reason: string }[];
+}
+
+/** The failure of a finished catalog.import job, or null when it did not fail. */
+export function importFailureOf(job: Job | null | undefined): ImportFailure | null {
+	if (!job || job.kind !== "catalog.import" || job.status !== "failed") return null;
+	const raw = job.result?.skipped;
+	const skipped = (Array.isArray(raw) ? raw : []).flatMap((s) => {
+		const o = s as { id?: unknown; reason?: unknown } | null;
+		return o && typeof o.id === "string" ? [{ id: o.id, reason: typeof o.reason === "string" ? o.reason : "" }] : [];
+	});
+	return { error: job.error ?? "", skipped };
 }
 
 /** The built-in library suite an entry stands for, or undefined. */
@@ -411,6 +431,23 @@ export function CatalogBody(props: CatalogBodyProps) {
 					)}
 				</div>
 			)}
+			{props.importFailure && (
+				<div className="border-chart-error/50 bg-chart-error/5 flex flex-col gap-2 rounded-xl border p-4 text-sm" data-testid="catalog-import-failed">
+					<p className="text-chart-error-ink">{t("importFailed", { message: props.importFailure.error })}</p>
+					{props.importFailure.skipped.length > 0 && (
+						<div>
+							<p className="font-medium">{t("skippedTasks", { count: props.importFailure.skipped.length })}</p>
+							<ul className="mt-1 flex flex-col gap-0.5 pl-4" data-testid="catalog-import-skipped">
+								{props.importFailure.skipped.map((s) => (
+									<li key={s.id} className="list-disc">
+										<span className="font-mono text-xs">{s.id}</span>: {s.reason}
+									</li>
+								))}
+							</ul>
+						</div>
+					)}
+				</div>
+			)}
 			{props.jobPanel}
 			{shown.length === 0 ? (
 				<EmptyState icon={Library} message={t("empty")} testId="catalog-empty" action={{ label: t("clearFilters"), onClick: () => props.onFilters(NO_FILTERS) }} />
@@ -497,6 +534,7 @@ export default function CatalogView() {
 	const [lastAdded, setLastAdded] = useState<CatalogAddResponse | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [jobId, setJobId] = useState<string | null>(null);
+	const [importFailure, setImportFailure] = useState<ImportFailure | null>(null);
 	const entries = useMemo(() => data?.entries ?? [], [data]);
 
 	if (isLoading) return <CatalogSkeleton />;
@@ -517,6 +555,7 @@ export default function CatalogView() {
 			}
 			const res = await addEntry({ id: e.id, ...body }).unwrap();
 			setLastAdded(res);
+			setImportFailure(null);
 			if (res.job) setJobId(res.job.id);
 			setImportFor(null);
 		} catch (err) {
@@ -563,7 +602,20 @@ export default function CatalogView() {
 			}}
 			lastAdded={lastAdded}
 			error={error}
-			jobPanel={jobId ? <JobLogPanel jobId={jobId} onClose={() => setJobId(null)} /> : null}
+			importFailure={importFailure}
+			jobPanel={
+				jobId ? (
+					<JobLogPanel
+						jobId={jobId}
+						onClose={() => setJobId(null)}
+						onFinished={(job) => {
+							const failed = importFailureOf(job);
+							setImportFailure(failed);
+							if (failed) setLastAdded(null); // "Import started" no longer holds
+						}}
+					/>
+				) : null
+			}
 		/>
 	);
 }

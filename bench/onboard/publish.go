@@ -157,11 +157,6 @@ func Publish(ctx context.Context, env *Env, set *DraftSet, o PublishOptions) (*P
 		undo()
 		return res, err
 	}
-	if v, err := recordDatasetVersion(env, set, target, res.Tasks, o.Actor); err != nil {
-		res.Warnings = append(res.Warnings, "the published tasks were not recorded as a dataset version: "+err.Error())
-	} else if v != nil {
-		res.DatasetVersion = v.N
-	}
 	if res.HeldOut > 0 {
 		want, err := draftCanaryOwn(set)
 		if err != nil {
@@ -182,6 +177,12 @@ func Publish(ctx context.Context, env *Env, set *DraftSet, o PublishOptions) (*P
 				}
 			}
 		}
+	}
+	// After the canary stamp, so the recorded rows hash the published files.
+	if v, err := dataset.SyncSuite(datasetRoot(env), set.Suite, target, o.Actor, "Add benchmark draft "+set.ID, now()); err != nil {
+		res.Warnings = append(res.Warnings, "the published tasks were not recorded as a dataset version: "+err.Error())
+	} else if v != nil {
+		res.DatasetVersion = v.N
 	}
 	res.Recipe = filepath.ToSlash(filepath.Join(set.Suite, RecipeFile))
 	if err := appendRecipe(target, set, res.Tasks); err != nil {
@@ -280,74 +281,13 @@ func writeSuiteYAML(ctx context.Context, env *Env, id, target string, data, befo
 	return os.WriteFile(filepath.Join(target, suite.SuiteFile), data, 0o644)
 }
 
-// recordDatasetVersion records the published tasks as a new version of the
-// benchmark's rows (the version log the dataset API and the Data tab read):
-// one stored row per task with its id, title, instruction and the content
-// hash of its published folder.
-func recordDatasetVersion(env *Env, set *DraftSet, target string, ids []string, actor string) (*dataset.Version, error) {
-	root := env.Root
+// datasetRoot is the project folder whose dataset store holds the
+// benchmark's version log.
+func datasetRoot(env *Env) string {
 	if env.Store != nil && env.Store.Root() != "" {
-		root = env.Store.Root()
+		return env.Store.Root()
 	}
-	if root == "" {
-		return nil, errors.New("no project folder")
-	}
-	byID := map[string]DraftTask{}
-	for _, t := range set.Tasks {
-		byID[t.ID] = t
-	}
-	store := dataset.Open(root)
-	unlock := store.Lock(set.Suite)
-	defer unlock()
-	cur, err := store.Snapshot(set.Suite, 0)
-	if err != nil {
-		return nil, err
-	}
-	rows := map[string]string{}
-	var added, updated []string
-	for _, id := range ids {
-		sum, err := folderSHA(filepath.Join(target, "tasks", id))
-		if err != nil {
-			return nil, fmt.Errorf("hash task %s: %w", id, err)
-		}
-		t := byID[id]
-		r := dataset.Row{ID: id, Title: t.Title, Input: t.Instruction, HeldOut: t.HeldOut,
-			Metadata: map[string]any{"source": "add benchmark", "draft": set.ID, "files_sha256": sum}}
-		sha, data, err := dataset.RowSHA(r)
-		if err != nil {
-			return nil, err
-		}
-		if err := store.PutRow(set.Suite, sha, data); err != nil {
-			return nil, err
-		}
-		rows[id] = sha
-		if _, ok := cur.Tasks[id]; ok {
-			updated = append(updated, id)
-		} else {
-			added = append(added, id)
-		}
-	}
-	return store.Record(set.Suite, rows, added, updated, nil, actor, "Add benchmark draft "+set.ID, now())
-}
-
-// folderSHA is the content hash of a task folder: every regular file's
-// slash path and content hash, in path order.
-func folderSHA(dir string) (string, error) {
-	h := sha256.New()
-	for _, rel := range listFiles(dir, 100000) {
-		p := filepath.Join(dir, filepath.FromSlash(rel))
-		st, err := os.Lstat(p)
-		if err != nil || !st.Mode().IsRegular() {
-			continue
-		}
-		data, err := os.ReadFile(p)
-		if err != nil {
-			return "", err
-		}
-		fh := sha256.Sum256(data)
-		fmt.Fprintf(h, "%s %s\n", rel, hex.EncodeToString(fh[:]))
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
+	return env.Root
 }
 
 func appendRecipe(target string, set *DraftSet, tasks []string) error {

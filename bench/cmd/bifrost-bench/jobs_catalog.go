@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/benchcatalog"
+	"github.com/maximhq/bifrost/bench/dataset"
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/projectfs"
@@ -41,12 +43,28 @@ func init() {
 				benchmarks = env.App.cfg.Path(env.App.cfg.BenchmarksRoot)
 			}
 			res, err := benchcatalog.Import(ctx, importer, env.ProjectRoot, benchmarks, from, p, jobSchemaLogger{log})
+			if res != nil {
+				// Every skip is logged, also when nothing was imported, and
+				// the result stays on the failed job so the import dialog
+				// can list the skipped tasks (fix wave 3, N263).
+				for _, s := range res.Skipped {
+					log.Printf("skipped %s: %s", s.ID, s.Reason)
+				}
+			}
 			if err != nil {
-				return nil, err
+				if res == nil {
+					return nil, err
+				}
+				return res, err
 			}
 			log.Printf("suite %s: %d task(s) written", res.Suite, len(res.Tasks))
-			for _, s := range res.Skipped {
-				log.Printf("skipped %s: %s", s.ID, s.Reason)
+			// The Data tab's version log, once per import (fix wave 3, N268).
+			source := "Catalog import " + p.Entry
+			if importer == "harbor" {
+				source = "Harbor import"
+			}
+			if _, err := dataset.SyncSuite(env.ProjectRoot, res.Suite, res.SuiteDir, jobActor(j), source, time.Now()); err != nil {
+				log.Warnf("the imported tasks were not recorded as a dataset version: %v", err)
 			}
 			for i, n := range res.Notes {
 				log.Printf("next %d: %s", i+1, n)

@@ -384,6 +384,9 @@ func runOnboardPublish(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Lo
 	for _, id := range recheck {
 		log.Printf("CHECK   %s: run the readiness checks on the benchmark", id)
 	}
+	if pres.HeldOut > 0 {
+		log.Printf("%d held out (the plan holds out %d%%)", pres.HeldOut, set.Plan.Hold.Pct)
+	}
 	if len(recheck) > 0 {
 		out.Next = fmt.Sprintf("Published. %d tasks need the readiness checks on the benchmark's Build tab before evaluations use them.", len(recheck))
 	}
@@ -398,6 +401,22 @@ func runOnboardPublish(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Lo
 		}
 	}
 	return out, nil
+}
+
+// carriesInto reports whether the draft's admission record of tid still
+// holds in the published benchmark with fingerprints f. A record with a
+// carry fingerprint is compared by what grades the task (fix wave 3, N252):
+// the staged draft and the published benchmark differ in suite.yaml's id,
+// description and canary, which the full admission fingerprint binds, so
+// nothing carried before. An older record keeps the full comparison.
+func carriesInto(rec *schemas.AdmissionRecord, f *schemas.LockFingerprints, tid string) bool {
+	if rec == nil || !rec.Admitted || rec.Fingerprint == "" {
+		return false
+	}
+	if rec.CarryFingerprint != "" {
+		return suite.CarryFingerprint(f, tid) == rec.CarryFingerprint
+	}
+	return suite.AdmissionFingerprint(f, tid) == rec.Fingerprint
 }
 
 // carryReadiness writes the draft's admission records of the published
@@ -417,7 +436,7 @@ func carryReadiness(ctx context.Context, env jobEnv, id string, pres *onboard.Pu
 	}
 	for _, tid := range pres.Tasks {
 		rec := pres.Records[tid]
-		if rec == nil || !rec.Admitted || rec.Fingerprint == "" || suite.AdmissionFingerprint(lock.Fingerprints, tid) != rec.Fingerprint {
+		if !carriesInto(rec, lock.Fingerprints, tid) {
 			recheck = append(recheck, tid)
 			continue
 		}
