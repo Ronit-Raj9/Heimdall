@@ -58,7 +58,8 @@ const rows: ExperimentStatus[] = [
 	},
 	{
 		exp_id: "e_practice",
-		name: "my practice run",
+		// A quick run on the practice benchmark (generated name): hidden, unlike a named comparison (N202).
+		name: "quick-20261118-101500-ab12",
 		state: "done",
 		manifest_hash: "h",
 		frozen_at: "2026-11-18T10:15:00Z",
@@ -84,6 +85,7 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useListExperimentsQuery: () => okQuery({ experiments: [...rows, ...url.extra] }),
 }));
+vi.mock("@/lib/store/apis/canaryApi", () => ({ useGetCanariesQuery: () => okQuery({ canaries: [{ name: "other" }] }) }));
 vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
 	useListEvaluationsQuery: () => okQuery([{ id: "ev_two", spec: { name: "codex: two models" } }]),
@@ -202,5 +204,61 @@ describe("ExperimentBoard", () => {
 		expect(every).toContain("experiment-row-e_replay_r_n697kiewjt_x4qq");
 		expect(every).toContain("Replay of run r_n697kiewjt");
 		expect(every).toContain(" · debug run<");
+	});
+});
+describe("ExperimentBoard kinds, practice rule and hidden matches (fix wave 3)", () => {
+	const named = (over: Partial<ExperimentStatus>): ExperimentStatus => ({ ...rows[1], decision: undefined, ...over });
+	it("labels checks and debug runs by kind, never with a verdict (N253, N247)", () => {
+		url.extra = [
+			named({ exp_id: "e_admit_draft_x_d7wy", name: "admit-draft-x", decision: "inconclusive", arms: ["A", "B", "empty"] }),
+			named({ exp_id: "e_fork_r_n697kiewjt_at_call_1_rqq1", name: "fork r_n697kiewjt", decision: "invalid", arms: ["A"] }),
+			named({ exp_id: "e_check_codex_ab12", name: "check-codex", decision: "invalid" }),
+		];
+		url.all = "1";
+		const html = render(<ExperimentBoard />);
+		url.all = null;
+		url.extra = [];
+		expect(tagOf(html, "experiment-row-e_admit_draft_x_d7wy-kind")).toContain("kind-readiness");
+		expect(html).toContain(">Readiness check<");
+		expect(html).toContain(">Debug run (not scored)<");
+		expect(html).toContain(">Agent check<");
+		expect(html).not.toContain("No clear winner yet");
+		expect(html).not.toContain("Test was broken");
+		expect(html).not.toContain("experiment-row-e_admit_draft_x_d7wy-decision");
+	});
+	it("shows no result for a comparison that is still running (N197)", () => {
+		url.extra = [named({ exp_id: "e_live", name: "Live one", state: "running", decision: "invalid" })];
+		const html = render(<ExperimentBoard />);
+		url.extra = [];
+		expect(tagOf(html, "experiment-row-e_live-decision")).toBeNull();
+		expect(html).toContain("Waiting for result");
+		expect(html).not.toContain("Test was broken");
+	});
+	it("lists a named comparison of two setups on coding-core (N202)", () => {
+		url.extra = [named({ exp_id: "e_zz_test_c10_matrix_gsz9", name: "zz-test-c10-matrix", suite: "coding-core@1.0.0" })];
+		url.q = "c10";
+		const html = render(<ExperimentBoard />);
+		url.q = null;
+		url.extra = [];
+		expect(html).toContain("experiment-row-e_zz_test_c10_matrix_gsz9");
+	});
+	it("says when a search matches only hidden rows and offers to show them (N202)", () => {
+		url.extra = [named({ exp_id: "e_c10_quick", name: "quick-20261122-201443-ab12", suite: "coding-core@1.0.0" })];
+		url.q = "c10";
+		const html = render(<ExperimentBoard />);
+		url.q = null;
+		url.extra = [];
+		expect(html).not.toContain("experiment-row-e_c10_quick");
+		expect(html).toContain("1 match is hidden (checks, practice runs and single benchmarks of evaluations).");
+		expect(html).toContain('data-testid="experiment-show-hidden-matches"');
+	});
+	it("labels a deleted drift monitor's runs and reads leader as a found leader (N257, N244)", () => {
+		url.extra = [named({ exp_id: "e_canary_nightly_ab12", name: "canary-nightly" })];
+		url.all = "1";
+		const html = render(<ExperimentBoard />);
+		url.all = null;
+		url.extra = [];
+		expect(html).toContain("Drift monitor nightly (deleted)");
+		expect(verdictTone("leader")).toEqual({ key: "leader", tone: "green" });
 	});
 });
