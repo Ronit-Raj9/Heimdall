@@ -204,7 +204,7 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	// server the platform router serves these routes first (cmd/bifrost-bench/pullagent_hosted.go).
 	handlers.NewPullAgentHandler(mode, pullagent.Shared(), pullagent.DefaultSigner(), false, cfg.PullPublicOrigin(), write).RegisterAgentRoutes(r, common...)
 	// Held-out tasks: a held-out task's run content needs held_out.visible too.
-	handlers.NewRunsHandler(mode, deps.Index).WithSuites(deps.Suites).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...)
+	handlers.NewRunsHandler(mode, deps.Index).WithSuites(deps.Suites).WithHeldOutVisible(cfg.HeldOut.Visible).WithBreakpoints(deps.Services.Holds != nil).RegisterRoutes(r, common...)
 	handlers.NewRunListHandler(mode, deps.Index, deps.Suites).WithRoot(cfg.Root).RegisterRoutes(r, common...) // UI regroup (U2): GET /runs (handlers/runlist.go)
 	handlers.NewPairsHandler(mode, deps.Index).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...)
 	handlers.NewTriageHandler(mode, deps.Index, deps.Catalog).RegisterRoutes(r, common...)
