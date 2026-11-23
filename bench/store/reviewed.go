@@ -114,6 +114,9 @@ func (s *FSStore) ReviewQueue(ctx context.Context, expID, reason string) (*schem
 			Condition: sr.Slot.Condition, Trial: sr.Slot.Trial, Reasons: reasons,
 			SealedOutcome: sr.Run.Outcome, Outcome: sr.Run.Outcome, Reviews: len(reviews),
 		}
+		if slices.Contains(reasons, schemas.ReviewReasonInvalidated) {
+			item.ThrownOutBy = ThrownOutBy(sr.Gates)
+		}
 		if rv != nil {
 			item.Outcome, _ = rv.Decision.Outcome()
 			item.Decision = rv.Decision
@@ -194,8 +197,9 @@ func (s *FSStore) ReviewLog(ctx context.Context, expID string) (*schemas.ReviewL
 // QueueReasons returns why a sealed run (read with its sealed grade) needs
 // a person to look at it, in schemas.ReviewReasons order: a judged grade
 // whose judge calls disagreed or could not be read, a grader that could not
-// decide, a fired veto gate, a success claim on a failed run, or a flag_only
-// review among reviews (the run's valid reviews).
+// decide, a fired veto gate, a success claim on a failed run, a flag_only
+// review among reviews (the run's valid reviews), a contested grade, or a
+// fired invalidate gate (the run was thrown out by a safety check).
 func QueueReasons(sr *schemas.SealedRun, reviews []schemas.Review) []string {
 	var out []string
 	g := sr.Grade
@@ -232,6 +236,9 @@ func QueueReasons(sr *schemas.SealedRun, reviews []schemas.Review) []string {
 	}
 	if calibration.Contested(sr, reviews) { // W8 judge calibration: split votes, auditor or a review disagreeing with the judge
 		out = append(out, schemas.ReviewReasonContested)
+	}
+	if invalidateFired(sr.Gates) { // fix wave 3 (N257): a run a safety check threw out
+		out = append(out, schemas.ReviewReasonInvalidated)
 	}
 	return out
 }
@@ -417,6 +424,43 @@ func overruleVetoes(gates []schemas.GateResult, reviewID string) []schemas.GateR
 		if out[i].Fired && out[i].Effect == schemas.GateVeto {
 			out[i].Fired = false
 			out[i].Detail = strings.TrimSpace(out[i].Detail + " (fired; overruled by human review " + reviewID + ")")
+		}
+	}
+	return out
+}
+
+// invalidateFired reports whether any gate with effect invalidate fired.
+func invalidateFired(gates []schemas.GateResult) bool {
+	return slices.ContainsFunc(gates, func(g schemas.GateResult) bool { return g.Fired && g.Effect == schemas.GateInvalidate })
+}
+
+// thrownOutWords are the plain words for the invalidate gates people meet in
+// Needs review; any other gate shows its name and its own detail.
+var thrownOutWords = map[string]string{
+	"model_fidelity": "model check: served by another model",
+	"fault_delivery": "fault delivery check: the fault plan never reached the gateway",
+}
+
+// ThrownOutBy names each fired invalidate gate in plain words, in gate
+// order, for the "Thrown out by a safety check" reason.
+func ThrownOutBy(gates []schemas.GateResult) []string {
+	var out []string
+	for _, g := range gates {
+		if !g.Fired || g.Effect != schemas.GateInvalidate {
+			continue
+		}
+		if w, ok := thrownOutWords[g.Gate]; ok {
+			out = append(out, w)
+			continue
+		}
+		detail := strings.TrimSpace(g.Detail)
+		if len(detail) > 120 {
+			detail = detail[:120] + "..."
+		}
+		if detail == "" {
+			out = append(out, g.Gate)
+		} else {
+			out = append(out, g.Gate+": "+detail)
 		}
 	}
 	return out
