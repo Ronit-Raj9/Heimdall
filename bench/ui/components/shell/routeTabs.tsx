@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { parseAsString, useQueryState } from "nuqs";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import "./gw20I18n";
 
@@ -16,6 +16,8 @@ export interface RouteTab {
 	 * default; while it is active the strip shows it at its end so the user sees where they are.
 	 */
 	addressable?: boolean;
+	/** Other ids that open this tab (an old or a natural name, for example "files" for "edit"); the address is then rewritten to id. */
+	aliases?: readonly string[];
 	/** A count or mark after the label. */
 	badge?: ReactNode;
 	testId?: string;
@@ -27,9 +29,19 @@ export interface RouteTab {
  */
 export function resolveTab(tabs: readonly RouteTab[], requested: string | null | undefined, defaultTab?: string): string | null {
 	const visible = tabs.filter((tab) => !tab.hidden);
-	if (requested && tabs.some((tab) => tab.id === requested && (!tab.hidden || tab.addressable))) return requested;
+	const want = aliasTarget(tabs, requested) ?? requested;
+	if (want && tabs.some((tab) => tab.id === want && (!tab.hidden || tab.addressable))) return want;
 	if (defaultTab && visible.some((tab) => tab.id === defaultTab)) return defaultTab;
 	return visible[0]?.id ?? null;
+}
+
+/**
+ * The tab id an alias in the address stands for (fix wave 3, N271: "?tab=files" opens Edit files), or
+ * null when requested is no alias. A real tab id always wins over another tab's alias.
+ */
+export function aliasTarget(tabs: readonly RouteTab[], requested: string | null | undefined): string | null {
+	if (!requested || tabs.some((tab) => tab.id === requested)) return null;
+	return tabs.find((tab) => tab.aliases?.includes(requested))?.id ?? null;
 }
 
 /**
@@ -37,7 +49,7 @@ export function resolveTab(tabs: readonly RouteTab[], requested: string | null |
  * hidden tab that exists is not unknown: the page has its own note for it. Exported for tests.
  */
 export function unknownTab(tabs: readonly RouteTab[], requested: string | null | undefined): string | null {
-	if (!requested || tabs.some((tab) => tab.id === requested)) return null;
+	if (!requested || tabs.some((tab) => tab.id === requested) || aliasTarget(tabs, requested)) return null;
 	return requested;
 }
 
@@ -51,6 +63,11 @@ export function useRouteTab(tabs: readonly RouteTab[], opts: { defaultTab?: stri
 	const active = resolveTab(tabs, requested, opts.defaultTab);
 	const fallback = resolveTab(tabs, null, opts.defaultTab);
 	const select = (id: string) => void setRequested(id === fallback ? null : id);
+	// An alias in the address is replaced by the tab's own id, so the address names the real tab.
+	const alias = aliasTarget(tabs, requested);
+	useEffect(() => {
+		if (alias) void setRequested(alias === fallback ? null : alias);
+	}, [alias, fallback, setRequested]);
 	return [active, select, requested] as const;
 }
 
