@@ -991,6 +991,7 @@ export interface Verdict {
 	tie_rule: string;
 	guards: GuardResult[];
 	invalid_reasons?: string[];
+	invalid_scope?: "runs" | "experiment";
 	/** Measured instrument checks; a failed one is also an invalid reason. Absent on an audit verdict. */
 	instruments?: InstrumentCheck[];
 	/** "unknown" or "" on an audit verdict: a published table says nothing about veto gates. */

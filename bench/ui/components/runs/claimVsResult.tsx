@@ -2,6 +2,7 @@ import type { Grade, Run } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import "@/components/reportcard/hw08I18n";
 import { OutcomeBadge } from "./outcomeBadge";
 import { outcomeTone } from "./runs.utils";
 
@@ -86,11 +87,17 @@ function ClaimRowView({ row }: { row: ClaimRow }) {
 
 function GradeDetail({ grade, state }: { grade: Grade | undefined; state: ClaimRow["gradeState"] }) {
 	const { t } = useTranslation("bench");
+	const { t: t08 } = useTranslation("hw08");
 	if (state === "loading") return <span className="bg-accent h-4 w-40 animate-pulse rounded-sm" />;
 	if (state === "error") return <p className="text-muted-foreground text-xs">{t("runs.claim.gradeError")}</p>;
 	if (!grade) return <p className="text-muted-foreground text-xs">{t("runs.claim.noGrade")}</p>;
 	return (
 		<div className="flex flex-col gap-1.5 text-xs">
+			{grade.invalid_evaluator && grade.reason && (
+				<p className="text-chart-error-ink break-words" data-testid="grade-invalid-reason">
+					{t08("graderCouldNot", { reason: grade.reason })}
+				</p>
+			)}
 			<p className="text-muted-foreground">
 				{t("runs.claim.tests", { ran: grade.tests_ran, failures: grade.failures, errors: grade.errors })}
 			</p>

@@ -25,7 +25,8 @@ func failoverSection(ctx context.Context, src leaderboard.Source, ev *schemas.Ev
 		if c.ExperimentID == "" {
 			continue
 		}
-		if d, ok := src.LatestDecision(c.ExperimentID); ok && d == schemas.DecisionInvalid {
+		scope, _ := childInvalid(src, c) // N215: the same rule as the benchmark rows
+		if scope == invalidExperiment {
 			continue
 		}
 		// The fallback arm by its label: B in new evaluations, failover.ArmID
@@ -67,6 +68,15 @@ func failoverSection(ctx context.Context, src leaderboard.Source, ev *schemas.Ev
 				cell = &without
 			default:
 				continue
+			}
+			if scope == invalidRuns {
+				_, invalidated, err := readGates(src, r.Run.RunID)
+				if err != nil {
+					return nil, err
+				}
+				if len(invalidated) > 0 {
+					continue
+				}
 			}
 			m, err := readMetrics(src, r.Run.RunID)
 			if err != nil {

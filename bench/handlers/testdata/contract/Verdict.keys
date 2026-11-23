@@ -14,6 +14,7 @@ randomization_unit
 tie_rule
 guards
 invalid_reasons?
+invalid_scope?
 instruments?
 integrity
 manifest_hash

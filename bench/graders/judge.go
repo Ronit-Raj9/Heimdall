@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -65,8 +66,8 @@ const (
 
 const (
 	judgeVersion         = "1.0.0"
-	defaultJudgeTokens   = 16
-	defaultJudgeVotes    = 3 // a suite that sets no votes: majority of three
+	defaultJudgeTokens   = 1024 // fix wave 3, N273: a reasoning model spends replies on reasoning first; a non-reasoning one still writes one word
+	defaultJudgeVotes    = 3    // a suite that sets no votes: majority of three
 	maxJudgeVotes        = 9
 	maxJudgeAnswerRunes  = 16000
 	maxJudgeResponseBody = 1 << 20
@@ -251,6 +252,9 @@ func (g *judge) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas
 	}
 	grade.Judged, grade.Judge = true, rec
 	grade.Passed, grade.InvalidEvaluator, grade.Reason = tally(rec.Votes, tmplName)
+	if grade.InvalidEvaluator && slices.Contains(replies, replyCutByLength) {
+		grade.Reason = lengthCutReason(judgeMaxTokens(spec)) // N273: say why there was no answer
+	}
 	if spec.PromptVersion == PromptBigFinanceV1 {
 		applyRubricScore(grade, ans, replies)
 	}
@@ -348,9 +352,12 @@ func (g *judge) voteReplies(ctx context.Context, rc *schemas.RunContext, spec sc
 	priced, unpriced := true, ""
 	var replies []string
 	for i := 0; i < spec.Votes; i++ {
-		verdict, tok, served, reply, err := g.call(ctx, key, spec, prompt, sc)
+		verdict, tok, served, reply, cut, err := g.callReply(ctx, key, spec, prompt, sc)
 		if err != nil {
 			return nil, nil, fmt.Errorf("judge vote %d of %d: %w", i+1, spec.Votes, err)
+		}
+		if cut {
+			reply = replyCutByLength
 		}
 		rec.Votes = append(rec.Votes, verdict)
 		replies = append(replies, reply)
@@ -408,6 +415,7 @@ type chatResponse struct {
 		Message struct {
 			Content json.RawMessage `json:"content"`
 		} `json:"message"`
+		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
 	Usage *struct {
 		PromptTokens        int64 `json:"prompt_tokens"`
@@ -415,7 +423,33 @@ type chatResponse struct {
 		PromptTokensDetails *struct {
 			CachedTokens int64 `json:"cached_tokens"`
 		} `json:"prompt_tokens_details"`
+		CompletionTokensDetails *struct {
+			ReasoningTokens int64 `json:"reasoning_tokens"`
+		} `json:"completion_tokens_details"`
 	} `json:"usage"`
+}
+
+// replyCutByLength stands in voteReplies for the reply of a vote whose
+// model answered nothing because the reply cap ran out (finish_reason
+// length); no scorer reads it as a verdict (fix wave 3, N273).
+const replyCutByLength = "\x00judge reply cut by max_tokens"
+
+// lengthCutReason is the grade reason when the judge gave no answer within
+// max reply tokens.
+func lengthCutReason(max int) string {
+	return fmt.Sprintf("judge: the judge model gave no answer within %d reply tokens (it spent them on reasoning). Raise judge max_tokens in suite.yaml or pin a non-reasoning model.", max)
+}
+
+// judgeMaxTokens is the reply cap of a judge call: the suite's
+// judge.max_tokens, else the default of its prompt version.
+func judgeMaxTokens(spec schemas.JudgeSpec) int {
+	if spec.MaxTokens > 0 {
+		return spec.MaxTokens
+	}
+	if spec.PromptVersion == PromptCustomV1 {
+		return customJudgeTokens
+	}
+	return defaultJudgeTokens
 }
 
 // call sends one vote and returns its verdict, token usage (nil when the
@@ -423,25 +457,26 @@ type chatResponse struct {
 // failure, a non-2xx status, a body that is not a chat completion, or a
 // response from another model than the pinned one is an error.
 func (g *judge) call(ctx context.Context, key *schemas.RunKey, spec schemas.JudgeSpec, prompt string, sc scorer) (string, *schemas.Tokens, string, string, error) {
-	maxTokens := spec.MaxTokens
-	if maxTokens == 0 {
-		maxTokens = defaultJudgeTokens
-		if spec.PromptVersion == PromptCustomV1 {
-			maxTokens = customJudgeTokens
-		}
-	}
+	verdict, tok, model, reply, _, err := g.callReply(ctx, key, spec, prompt, sc)
+	return verdict, tok, model, reply, err
+}
+
+// callReply is call that also reports whether the reply was empty because
+// the reply cap ran out (finish_reason length), as a reasoning model's is
+// when it spends every allowed token on reasoning (fix wave 3, N273).
+func (g *judge) callReply(ctx context.Context, key *schemas.RunKey, spec schemas.JudgeSpec, prompt string, sc scorer) (string, *schemas.Tokens, string, string, bool, error) {
 	body, err := json.Marshal(chatRequest{
 		Model:       spec.Provider + "/" + spec.Model,
 		Messages:    []chatMessage{{Role: "system", Content: judgeSystemFor(spec.PromptVersion)}, {Role: "user", Content: prompt}},
 		Temperature: 0,
-		MaxTokens:   maxTokens,
+		MaxTokens:   judgeMaxTokens(spec),
 	})
 	if err != nil {
-		return "", nil, "", "", fmt.Errorf("encode request: %w", err)
+		return "", nil, "", "", false, fmt.Errorf("encode request: %w", err)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.cfg.URL+chatCompletionsPath, bytes.NewReader(body))
 	if err != nil {
-		return "", nil, "", "", fmt.Errorf("build request: %w", err)
+		return "", nil, "", "", false, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(virtualKeyHeader, key.Value)
@@ -452,26 +487,27 @@ func (g *judge) call(ctx context.Context, key *schemas.RunKey, spec schemas.Judg
 	}
 	resp, err := g.cfg.HTTP.Do(req)
 	if err != nil {
-		return "", nil, "", "", fmt.Errorf("call gateway: %w", err)
+		return "", nil, "", "", false, fmt.Errorf("call gateway: %w", err)
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxJudgeResponseBody))
 	if err != nil {
-		return "", nil, "", "", fmt.Errorf("read response: %w", err)
+		return "", nil, "", "", false, fmt.Errorf("read response: %w", err)
 	}
 	if resp.StatusCode/100 != 2 {
-		return "", nil, "", "", fmt.Errorf("gateway answered %d: %s", resp.StatusCode, quote(string(raw)))
+		return "", nil, "", "", false, fmt.Errorf("gateway answered %d: %s", resp.StatusCode, quote(string(raw)))
 	}
 	var out chatResponse
 	if err := json.Unmarshal(raw, &out); err != nil {
-		return "", nil, "", "", fmt.Errorf("decode response: %w", err)
+		return "", nil, "", "", false, fmt.Errorf("decode response: %w", err)
 	}
 	if !sameModel(out.Model, spec.Model) {
-		return "", nil, "", "", fmt.Errorf("gateway served model %s, the judge is pinned to %s", out.Model, spec.Model)
+		return "", nil, "", "", false, fmt.Errorf("gateway served model %s, the judge is pinned to %s", out.Model, spec.Model)
 	}
-	verdict, reply := VoteUnparsable, ""
+	verdict, reply, cut := VoteUnparsable, "", false
 	if len(out.Choices) > 0 {
 		reply = contentText(out.Choices[0].Message.Content)
+		cut = strings.TrimSpace(reply) == "" && out.Choices[0].FinishReason == "length"
 		if sc != nil {
 			verdict = sc(reply)
 		} else {
@@ -486,7 +522,7 @@ func (g *judge) call(ctx context.Context, key *schemas.RunKey, spec schemas.Judg
 		}
 		tok = &schemas.Tokens{Fresh: max(u.PromptTokens-cached, 0), CacheRead: cached, Out: u.CompletionTokens}
 	}
-	return verdict, tok, out.Model, reply, nil
+	return verdict, tok, out.Model, reply, cut, nil
 }
 
 // ParseVerdict reads a judge reply strictly: after trimming spaces, one
