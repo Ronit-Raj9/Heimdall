@@ -294,6 +294,9 @@ export interface Evaluation {
 	/** Run control: every running benchmark is paused. */
 	paused?: boolean;
 	result?: EvaluationResult;
+	launch?: { started: number; of: number; current?: string };
+	failed_runs?: number;
+	problem?: string;
 }
 
 /** One arm of a stored evaluation result: its clean score and runs over every benchmark. */
