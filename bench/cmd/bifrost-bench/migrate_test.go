@@ -89,8 +89,8 @@ func TestMigrateReportRecorded(t *testing.T) {
 	if p.Recommendation.Action != migration.ActionNotEnough || p.Overall.Result != migration.ResultCannotTell {
 		t.Errorf("recommendation %s overall %s, want not enough evidence and cannot tell", p.Recommendation.Action, p.Overall.Result)
 	}
-	if rep.Policy != "enterprise-default" || p.Recommendation.Policy == nil {
-		t.Errorf("policy %q %+v, want the experiment's enterprise-default policy evaluated", rep.Policy, p.Recommendation.Policy)
+	if rep.Policy != "default" || p.Recommendation.Policy == nil {
+		t.Errorf("policy %q %+v, want the experiment's frozen rule set, named by its file default", rep.Policy, p.Recommendation.Policy)
 	}
 	if !strings.Contains(strings.Join(rep.Notes, " "), "different agent configs") {
 		t.Errorf("notes %v, want the harness note (codex against custom-python)", rep.Notes)

@@ -57,6 +57,20 @@ type PolicyResult struct {
 	Decision    PolicyDecision      `json:"decision"`
 	Checks      []PolicyCheckResult `json:"checks"`
 	EvaluatedAt time.Time           `json:"evaluated_at"`
+	// PolicyFile names the rule set by its file, without .yaml or .yml, as
+	// Releases > Rules lists it; PolicyName is the name inside the file,
+	// which a copied template keeps. Results saved before it existed leave
+	// it empty.
+	PolicyFile string `json:"policy_file,omitempty"`
+}
+
+// RuleSetName is the name every message prints for the rule set: its file
+// name, else (a result saved before PolicyFile existed) the name inside it.
+func (r *PolicyResult) RuleSetName() string {
+	if r.PolicyFile != "" {
+		return r.PolicyFile
+	}
+	return r.PolicyName
 }
 
 // PolicyCheckResult is one check's result with its evidence.

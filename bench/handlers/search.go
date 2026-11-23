@@ -15,8 +15,11 @@ import (
 	"strconv"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/agentversions"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/resultsindex"
+	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/valyala/fasthttp"
 )
 
@@ -59,7 +62,11 @@ func (h *searchHandler) search(ctx *fasthttp.RequestCtx) {
 	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	res, err := h.ix.Search(work, indexSearchSource{h.env.Services.Index}, q)
+	root := ""
+	if h.env.Cfg != nil {
+		root = h.env.Cfg.Root
+	}
+	res, err := h.ix.Search(work, indexSearchSource{ix: h.env.Services.Index, root: root}, q)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			lib.SendError(ctx, h.env.Mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable, "search took too long; add a filter or a tool: term")
@@ -72,10 +79,15 @@ func (h *searchHandler) search(ctx *fasthttp.RequestCtx) {
 }
 
 // indexSearchSource lists the read index's sealed runs of public tasks.
-type indexSearchSource struct{ ix ReadIndex }
+// root is the org project root, where the agents' saved versions live.
+type indexSearchSource struct {
+	ix   ReadIndex
+	root string
+}
 
 func (s indexSearchSource) SearchRuns(ctx context.Context) ([]resultsindex.SearchRun, error) {
 	var out []resultsindex.SearchRun
+	versions := newVersionIndex(s.root, suite.LibraryDir())
 	for _, exp := range s.ix.Experiments() {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -84,6 +96,7 @@ func (s indexSearchSource) SearchRuns(ctx context.Context) ([]resultsindex.Searc
 		if !ok || m == nil {
 			continue
 		}
+		armVersion := searchArmVersions(versions, m)
 		for _, rv := range s.ix.Runs(exp) {
 			if !rv.Sealed || slices.Contains(m.HeldOutTasks, rv.Slot.Task) {
 				continue
@@ -94,10 +107,34 @@ func (s indexSearchSource) SearchRuns(ctx context.Context) ([]resultsindex.Searc
 			if arm, ok := m.Arms[rv.Slot.Arm]; ok {
 				r.Agent, r.Model = cmp.Or(arm.Config.ID, r.Agent), arm.Config.Model
 			}
+			if v := armVersion[rv.Slot.Arm]; v != "" {
+				r.Version = v
+			}
 			out = append(out, r)
 		}
 	}
 	return out, nil
+}
+
+// searchArmVersions is each arm's saved agent version, "v{N}", as the
+// agent's Versions tab and the run page show it (N291): the version the
+// evaluation recorded for the arm, else the saved version whose agent hash
+// matches the arm's config. An arm with neither is left out, and its runs
+// keep the config's own agent_version.
+func searchArmVersions(v *versionIndex, m *schemas.Manifest) map[string]string {
+	out := map[string]string{}
+	for id, arm := range m.Arms {
+		n, ok := v.fromEvaluation(m, id)
+		if !ok {
+			if ah, err := agentversions.AgentHash(arm.Config); err == nil {
+				n = v.lookup(arm.Config.ID, ah)
+			}
+		}
+		if n > 0 {
+			out[id] = "v" + strconv.Itoa(n)
+		}
+	}
+	return out
 }
 
 func (s indexSearchSource) RunFile(runID, name string) ([]byte, error) {
@@ -112,7 +149,7 @@ var SearchRouteDoc = RouteDoc{
 	Query: []QueryDoc{
 		{Name: "q", Description: "Words (all must match; a word that is a called tool's name matches that tool), \"quoted phrases\", tool:NAME; agent:, version:, benchmark:, outcome: also accepted inline"},
 		{Name: "agent", Description: "Agent config id"},
-		{Name: "version", Description: "Agent version"},
+		{Name: "version", Description: "Agent version as the agent's Versions tab shows it; v1, V1 and 1 are the same"},
 		{Name: "benchmark", Description: "Benchmark (suite) id; a version suffix is ignored"},
 		{Name: "outcome", Description: "Run outcome, e.g. fail"},
 		{Name: "limit", Description: "Hits returned, default 50, at most 200"},

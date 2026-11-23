@@ -9,7 +9,8 @@
 		"failed": "Could not start the debug run",
 		"forkNeedsClean": "Fork and Debug need a run without a fault. This run ran under {{fault}}.",
 		"replayNeedsClean": "Replay, Fork and Debug need a run without a fault or with a model fault. This run ran under {{fault}}, which a replay cannot repeat.",
-		"compareSource": "Compare with source"
+		"compareSource": "Compare with source",
+		"breakpointsNeedWorker": "Pausing before model calls needs a worker this server controls. On this server, use Replay or Fork from a step."
 	},
 	"banner": {
 		"replay": "Replay of run {{run}}",
@@ -63,6 +64,7 @@
 		"divergence": "If the agent's request differs from the recording before this call",
 		"divergenceLive": "Continue live from there",
 		"divergenceStop": "Stop the run",
+		"cost": "Calls before call {{call}} replay from the recording for free; later calls go to the model and cost money.",
 		"submit": "Start fork",
 		"cancel": "Cancel",
 		"close": "Close"
@@ -75,6 +77,7 @@
 		"every": "Pause before every model call",
 		"tools": "Pause right after these tools ran",
 		"toolsPlaceholder": "For example: bash, edit",
+		"cost": "Every model call of the rerun goes to the model and costs money.",
 		"submit": "Start rerun",
 		"invalid": "Enter call numbers as whole numbers above 0, separated by commas.",
 		"needOne": "Choose at least one place to pause."

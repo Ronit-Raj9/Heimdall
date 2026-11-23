@@ -190,8 +190,9 @@ func runMigrateReport(args []string) int {
 
 // migrationReport builds the report of one experiment from its sealed runs,
 // the suite's tasks and the release policy. policyFile "" takes the
-// experiment's own policy, else policies/default.yaml when it exists;
-// "none" evaluates none. A From left empty is arm A.
+// rule set effectivePolicyFile chooses (the experiment's own, else the
+// server default, else none); "none" evaluates none. A From left empty is
+// arm A.
 func (a *app) migrationReport(ctx context.Context, expID, gradeSource, policyFile string, withTasks bool, q migration.Query) (*migration.Report, error) {
 	m, err := a.store.LoadManifest(ctx, expID)
 	if err != nil {
@@ -212,7 +213,7 @@ func (a *app) migrationReport(ctx context.Context, expID, gradeSource, policyFil
 	if withTasks {
 		in.Tasks = a.suiteTasks(ctx, m)
 	}
-	if in.Policy, in.PolicyHash, in.PolicyFrozen, err = a.migrationPolicy(m, policyFile); err != nil {
+	if in.Policy, in.PolicyHash, in.PolicyFile, in.PolicyFrozen, err = a.migrationPolicy(m, policyFile); err != nil {
 		return nil, err
 	}
 	if in.Invalid, in.Vetoes, err = a.releaseInvalid(ctx, m, runs); err != nil {
@@ -270,36 +271,29 @@ func (a *app) suiteTasks(ctx context.Context, m *schemas.Manifest) map[string]*s
 	return out
 }
 
-// migrationPolicy loads the release policy the recommendation follows and
-// says whether it is the one the experiment froze. Audit 5-C-02: a policy
-// that was asked for (an explicit file, or the one the experiment names)
-// and cannot be read is an error, never a silent statistics-only report;
-// only the implicit policies/default.yaml may be absent, and "none" is the
-// explicit statistics-only choice.
-func (a *app) migrationPolicy(m *schemas.Manifest, file string) (*schemas.Policy, string, bool, error) {
-	implicit := false
-	switch {
-	case file == "none":
-		return nil, "", false, nil
-	case file == "" && m.Experiment.Policy != "":
-		file = m.Experiment.Policy
-	case file == "":
-		file, implicit = "policies/default.yaml", true
+// migrationPolicy loads the release rule set the recommendation follows,
+// chosen by effectivePolicyFile exactly as analysis chooses it (N280: no
+// implicit policies/default.yaml), with its hash, its file name and whether
+// it is the one the experiment froze. Audit 5-C-02: a rule set that was
+// asked for (an explicit file, the one the experiment names or the server
+// default) and cannot be read is an error, never a silent statistics-only
+// report; "none" is the explicit statistics-only choice.
+func (a *app) migrationPolicy(m *schemas.Manifest, override string) (p *schemas.Policy, hash, name string, frozen bool, err error) {
+	file, frozen := a.effectivePolicyFile(m, override)
+	if file == "" {
+		return nil, "", "", false, nil
 	}
 	path := file
-	if !filepath.IsAbs(path) {
+	// The server default is a path as its owner gave it; an override and a
+	// frozen file are relative to the bench root.
+	if (override != "" || m.Experiment.Policy != "") && !filepath.IsAbs(path) {
 		path = filepath.Join(a.cfg.Root, file)
 	}
 	p, raw, err := policy.Load(path)
-	switch {
-	case err != nil && implicit && errors.Is(err, os.ErrNotExist):
-		a.logger.Warn("no release policy; the recommendation follows the statistics alone", "policy", file)
-		return nil, "", false, nil
-	case err != nil:
-		return nil, "", false, fmt.Errorf("release policy %s: %w (pass -policy none for a statistics-only report)", file, err)
+	if err != nil {
+		return nil, "", "", false, fmt.Errorf("release rule set %s: %w (pass -policy none for a statistics-only report)", policy.FileName(file), err)
 	}
-	frozen := m.Experiment.Policy != "" && filepath.Clean(file) == filepath.Clean(m.Experiment.Policy)
-	return p, policy.Hash(raw), frozen, nil
+	return p, policy.Hash(raw), policy.FileName(file), frozen, nil
 }
 
 // writeMigrationReport writes report.md and report.json into dir.
@@ -393,14 +387,46 @@ type serveW6 struct {
 }
 
 var (
-	_ handlers.MigrationSource   = serveW6{}
-	_ handlers.CostExplainSource = serveW6{}
+	_ handlers.MigrationSource       = serveW6{}
+	_ handlers.MigrationPolicySource = serveW6{}
+	_ handlers.CostExplainSource     = serveW6{}
 )
 
-// Migration implements handlers.MigrationSource with the experiment's own
-// release policy (else policies/default.yaml) and the suite's tasks.
+// Migration implements handlers.MigrationSource with the rule set
+// effectivePolicyFile chooses (the experiment's own, else none) and the
+// suite's tasks.
 func (s serveW6) Migration(ctx context.Context, expID, gradeSource string, q migration.Query) (*migration.Report, error) {
 	return s.a.migrationReport(ctx, expID, gradeSource, "", true, q)
+}
+
+// MigrationWithPolicy implements handlers.MigrationPolicySource: name is a
+// rule set file stem from the project's policies/ folder, "none" or "" (the
+// comparison's own choice). Anything else wraps handlers.ErrNoRuleSet.
+func (s serveW6) MigrationWithPolicy(ctx context.Context, expID, gradeSource, name string, q migration.Query) (*migration.Report, error) {
+	file, err := s.a.ruleSetFile(name)
+	if err != nil {
+		return nil, err
+	}
+	return s.a.migrationReport(ctx, expID, gradeSource, file, true, q)
+}
+
+// ruleSetFile turns a rule set name from a request into the path
+// migrationReport takes: "" and "none" pass through, a stem becomes
+// policies/<stem>.yaml (or .yml) when that file exists under the bench
+// root. A path, a name with an extension or an absent file is refused.
+func (a *app) ruleSetFile(name string) (string, error) {
+	if name == "" || name == policyNone {
+		return name, nil
+	}
+	if handlers.ValidRuleSetName(name) {
+		for _, ext := range []string{".yaml", ".yml"} {
+			rel := filepath.Join("policies", name+ext)
+			if st, err := os.Stat(filepath.Join(a.cfg.Root, rel)); err == nil && st.Mode().IsRegular() {
+				return rel, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("%w: %s", handlers.ErrNoRuleSet, name)
 }
 
 // CostExplain implements handlers.CostExplainSource.

@@ -184,6 +184,11 @@ type RunDebugAllowed struct {
 	Replay bool   `json:"replay"`
 	Fork   bool   `json:"fork"`
 	Reason string `json:"reason,omitempty"`
+	// Breakpoints says Debug (a fork that pauses before model calls) can
+	// work: the run allows Fork and this server can hold model calls (N212).
+	// BreakpointsReason says why not when Fork is allowed.
+	Breakpoints       bool   `json:"breakpoints"`
+	BreakpointsReason string `json:"breakpoints_reason,omitempty"`
 }
 
 // RunDiff is GET /runs/{id}/diff. Patch is inert text.

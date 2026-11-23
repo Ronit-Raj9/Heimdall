@@ -17,6 +17,9 @@ describe("migrationParams", () => {
 		const target = legacyExperimentTarget("/migration", { exp: "e1", alpha: 0.01, grade_source: "reviewed" });
 		expect(migrationParams("e1", target.search ?? {})).toMatchObject({ alpha: "0.01", grade_source: "reviewed" });
 	});
+	it("forwards the chosen release rule set (N280)", () => {
+		expect(migrationParams("e1", { policy: "none" })).toEqual({ expId: "e1", policy: "none" });
+	});
 	it("leaves defaults to the server", () => {
 		expect(migrationParams("e1", {})).toEqual({ expId: "e1" });
 	});

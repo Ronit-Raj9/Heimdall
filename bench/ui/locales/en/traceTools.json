@@ -56,5 +56,9 @@
 		"send": "Send to Maxim",
 		"sending": "Sending",
 		"sendFailed": "Last send failed: {{error}}"
+	},
+	"mismatches": {
+		"chip": "Mismatches",
+		"hint": "Steps where two records of the run disagree, such as the agent's own stream and the gateway log. They are not errors of the agent: hover a row to read the difference."
 	}
 }

@@ -1,3 +1,4 @@
+import { faultName } from "@/components/reportcard/reportCard.utils";
 import { EmptyState } from "@/components/shell/emptyState";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { outcomeTone } from "@/components/runs/runs.utils";
@@ -134,6 +135,15 @@ function agentTitle(r: RunListRow): string {
 }
 
 /** Seconds between start and seal, or null while either is missing. */
+/**
+ * A run's fault as the run list names it (N291): the fault catalog's name, the same one the report
+ * cards use, else the id in sentence case. The product prefix of a probe id is left out.
+ */
+export function runFaultLabel(fault: string): string {
+	const name = faultName(fault.replace(/^heimdall-/, ""));
+	return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
 export function runDuration(row: Pick<RunListRow, "started" | "sealed_at">): number | null {
 	if (!row.started || !row.sealed_at) return null;
 	const s = (new Date(row.sealed_at).getTime() - new Date(row.started).getTime()) / 1000;
@@ -229,7 +239,7 @@ export function RunsTable() {
 	const setTraceQuery = useCallback((v: string) => void setSearch({ tq: v.trim() ? v : null }), [setSearch]);
 	const traceQuery = (search.tq ?? "").trim();
 	const outcomeLabel = (o: string) => tb(`runs.outcome.${o}`, { defaultValue: o });
-	const faultLabel = (f: string) => tu(`runs.faultName.${f}`, { defaultValue: f.replace(/-/g, " ") });
+	const faultLabel = runFaultLabel;
 	const tokens = (
 		[
 			search.outcome && {

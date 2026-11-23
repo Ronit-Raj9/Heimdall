@@ -553,7 +553,7 @@ func checkIntegrity(m *schemas.Manifest, ev *evidence) error {
 func policyBlocks(m *schemas.Manifest, ev *evidence) []string {
 	var blocked []string
 	if ev.policy != nil && ev.policy.Decision == schemas.PolicyBlock {
-		blocked = append(blocked, fmt.Sprintf("policy %s decision is block", ev.policy.PolicyName))
+		blocked = append(blocked, fmt.Sprintf("policy %s decision is block", ev.policy.RuleSetName()))
 	}
 	if reason := frozenPolicySkipped(m, ev.policy); reason != "" {
 		blocked = append(blocked, reason)

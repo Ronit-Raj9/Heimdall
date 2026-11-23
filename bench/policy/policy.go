@@ -22,6 +22,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -125,6 +127,7 @@ func Hash(raw []byte) string {
 func LoadFailure(path, frozenHash string, err error) *schemas.PolicyResult {
 	return &schemas.PolicyResult{
 		PolicyName: path,
+		PolicyFile: FileName(path),
 		PolicyHash: frozenHash,
 		Decision:   schemas.PolicyBlock,
 		Checks: []schemas.PolicyCheckResult{{
@@ -199,4 +202,15 @@ func armOf(c schemas.PolicyCheck) string {
 		return DefaultArm
 	}
 	return c.Arm
+}
+
+// FileName is the rule set name Releases > Rules shows for a policy path:
+// its base name without a .yaml or .yml extension. Every message names a
+// rule set this way, never by the name inside the file.
+func FileName(path string) string {
+	if path == "" {
+		return ""
+	}
+	base := filepath.Base(path)
+	return strings.TrimSuffix(strings.TrimSuffix(base, ".yaml"), ".yml")
 }
