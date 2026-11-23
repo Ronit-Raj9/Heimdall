@@ -1,8 +1,8 @@
 import "@/lib/i18n";
 
 import type { ExperimentStatus } from "@/lib/types/bench";
-import { render, tagOf } from "@/lib/testing/render";
-import { describe, expect, it } from "vitest";
+import { okQuery, render, tagOf } from "@/lib/testing/render";
+import { describe, expect, it, vi } from "vitest";
 import { ExperimentSelect, defaultPickerExperiment, useExperimentPicker } from "./experimentSelect";
 
 function exp(exp_id: string, name: string, at: string, extra: Partial<ExperimentStatus> = {}): ExperimentStatus {
@@ -24,7 +24,10 @@ const list = [
 	exp("e_admit_zz_test_rows_ab12", "admit-zz-test-rows", "2026-11-23T10:00:00Z", { suite: "zz-test-rows@1.0.0" }),
 	exp("e_replay_r_n697kiewjt_x4qq", "replay r_n697kiewjt", "2026-11-23T09:00:00Z", { arms: ["A"] }),
 	exp("e_real", "Prompt v2 vs v1", "2026-11-20T09:00:00Z"),
+	exp("e_canary_gone_ab12", "canary-gone", "2026-11-19T09:00:00Z"),
 ];
+
+vi.mock("@/lib/store/apis/canaryApi", () => ({ useGetCanariesQuery: () => okQuery({ canaries: [{ name: "nightly" }] }) }));
 
 function Probe({ showHidden, value }: { showHidden: boolean; value?: string }) {
 	const picker = useExperimentPicker(list, showHidden, new Map());
@@ -46,12 +49,16 @@ describe("ExperimentSelect (N5)", () => {
 		expect(html).toContain("Prompt v2 vs v1");
 		expect(html).not.toContain("admit-zz-test-rows");
 		expect(tagOf(html, "review-experiment-picker-show-hidden")).not.toContain("checked");
-		expect(html).toContain("Also show checks, practice runs and debug runs (2)");
+		expect(html).toContain("Also show checks, practice runs and debug runs (3)");
 	});
 	it("keeps a URL choice and lists hidden ones when the box is ticked", () => {
 		const html = render(<Probe showHidden value="e_admit_zz_test_rows_ab12" />);
 		expect(html).toContain("Readiness check for zz-test-rows");
 		expect(tagOf(html, "review-experiment-picker-show-hidden")).toContain("checked");
+	});
+	it("labels a deleted drift monitor's runs (deleted) (N257)", () => {
+		const html = render(<Probe showHidden value="e_canary_gone_ab12" />);
+		expect(html).toContain("Drift monitor gone (deleted)");
 	});
 	it("picks the URL value first, else the first listed option", () => {
 		const options = [{ id: "e_real", label: "x", secondary: "e_real" }];

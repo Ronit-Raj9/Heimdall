@@ -11,6 +11,7 @@ func init() {
 		RouteDoc{Method: "GET", Path: APIPrefix + "/agents/{id}/report-card", Tag: "agents",
 			Summary:  "An agent's report card from its newest done evaluation",
 			Response: AgentReportCard{},
-			Query:    []QueryDoc{{Name: "version", Description: "Agent version number"}, {Name: "model", Description: "Model id"}}},
+			Query: []QueryDoc{{Name: "version", Description: "Agent version number"}, {Name: "model", Description: "Model id"},
+				{Name: "evaluation", Description: "Evaluation id to show; falls back to the newest matching done evaluation"}}},
 	)
 }

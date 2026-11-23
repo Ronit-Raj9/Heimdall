@@ -45,6 +45,7 @@ import { useGetMaximQuery } from "@/lib/store/apis/traceToolsApi";
 import { useTranslation } from "react-i18next";
 import "@/app/experiments/views/experimentsI18n";
 import { exportPickerGroups, type ExperimentPickerOption } from "@/components/experiments/experiments.utils";
+import { useDriftMonitorNames } from "@/components/experiments/useDriftMonitorNames";
 import { useEvaluationNames } from "@/components/experiments/useEvaluationNames";
 
 declare module "@/lib/i18n/resources" {
@@ -691,6 +692,7 @@ export function ExportsPanel({ showHiddenAtStart = false }: { showHiddenAtStart?
 	const { t } = useTranslation("integrations");
 	const { t: tx } = useTranslation("experimentsUx");
 	const evalNames = useEvaluationNames();
+	const monitors = useDriftMonitorNames();
 	const [showHidden, setShowHidden] = useState(showHiddenAtStart);
 	const confirm = useConfirm();
 	const exps = useListExperimentsQuery();
@@ -705,7 +707,7 @@ export function ExportsPanel({ showHiddenAtStart = false }: { showHiddenAtStart?
 	const [message, setMessage] = useState<string | null>(null);
 	const params = exportParams(format, expId, suite, payloads, allowSynthetic);
 	const experiments = exps.data?.experiments ?? [];
-	const groups = exportPickerGroups(experiments, (k, o) => String(tx(k as never, (o ?? {}) as never)), evalNames, showHidden);
+	const groups = exportPickerGroups(experiments, (k, o) => String(tx(k as never, (o ?? {}) as never)), evalNames, showHidden, monitors);
 	const optionText = (o: ExperimentPickerOption) => `${o.label} · ${o.state ? tx(`status.${o.state}`, { defaultValue: o.state }) : ""}`;
 
 	return (
