@@ -65,7 +65,7 @@ func (f *fakePusher) count(sub string) int {
 // registry with the org's login and pulled by digest from there.
 func TestResolveImagePushesToOrgRegistry(t *testing.T) {
 	fp := &fakePusher{}
-	reg := &RegistryImages{Login: ImageRegistry{Registry: "ghcr.io/acme/heimdall", Username: "acme-bot", Token: "ghp_SECRET_TOKEN_1234"}, Docker: fp}
+	reg := &RegistryImages{Login: ImageRegistry{Registry: "ghcr.io/acme/heimdall", Username: "acme-bot", Token: "ghp_SECRET_TOKEN_1234"}, Docker: fp, HostCheck: publicForTest}
 	d := testDriver(t, newFakePlatform())
 	d.cfg.RemoteImage = reg.Remote
 	got, err := d.resolveImage(context.Background(), testRun(t), "bench/agent-codex-task:1-coding-core", &record{})
@@ -96,7 +96,7 @@ func TestResolveImagePushesToOrgRegistry(t *testing.T) {
 		t.Fatalf("second resolve = %q %v, pushes %d", again, err, fp.count("push"))
 	}
 	// A failed push names the registry in plain words and never the token.
-	bad := &RegistryImages{Login: reg.Login, Docker: &fakePusher{pushErr: "docker push: exit 1: denied: ghp_SECRET_TOKEN_1234 has no write access"}}
+	bad := &RegistryImages{Login: reg.Login, HostCheck: publicForTest, Docker: &fakePusher{pushErr: "docker push: exit 1: denied: ghp_SECRET_TOKEN_1234 has no write access"}}
 	_, err = bad.Remote(context.Background(), "bench/coding-core-base:1")
 	if err == nil || !strings.HasPrefix(err.Error(), "Heimdall could not push to ghcr.io/acme/heimdall: ") || strings.Contains(err.Error(), "SECRET") {
 		t.Fatalf("failed push = %v", err)

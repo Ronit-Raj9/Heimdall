@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -357,6 +358,10 @@ type DockerRunner interface {
 type RegistryImages struct {
 	Login  ImageRegistry
 	Docker DockerRunner
+	// HostCheck is checked before every push with the registry's host name
+	// (no port); an error refuses the push. nil uses PublicRegistryHost, the
+	// guard the login was saved under.
+	HostCheck func(ctx context.Context, host string) error
 
 	mu    sync.Mutex
 	cache map[string]string // local image id -> remote reference
@@ -405,6 +410,16 @@ func (r *RegistryImages) Remote(ctx context.Context, ref string) (string, error)
 		return out, nil
 	}
 	r.mu.Unlock()
+	// The login was checked against public addresses when it was saved, but
+	// the name may resolve elsewhere now: check again before every push, so
+	// the worker's Docker daemon never pushes to an internal address.
+	check := r.HostCheck
+	if check == nil {
+		check = PublicRegistryHost
+	}
+	if err := check(ctx, registryHostOf(r.Login.Registry)); err != nil {
+		return "", fmt.Errorf("Heimdall could not push to %s: the address is not public.", r.Login.Registry)
+	}
 	repo := r.Login.Registry + "/" + remoteRepo(ref)
 	target := repo + ":" + hexID[:12]
 	out, err := r.push(ctx, ref, repo, target)
@@ -469,3 +484,43 @@ func (r *RegistryImages) pushError(err error) error {
 
 // modalRegistryNeeded is the refusal of a platform without an image registry.
 const modalRegistryNeeded = "Modal needs an image registry it can pull from. Add one on the Modal card."
+
+// registryHostOf is the host name of a registry path, without its port.
+func registryHostOf(registry string) string {
+	host := ImageRegistry{Registry: registry}.Host()
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		return h
+	}
+	return host
+}
+
+// PublicRegistryHost refuses a registry host that is not a public internet
+// address, with the guard the registry sign-in uses when a login is saved:
+// the name rules of utils.CheckPublicHost, then every address the public
+// resolver returns for it must be public (utils.BlockedIP).
+func PublicRegistryHost(ctx context.Context, host string) error {
+	if host == "docker.io" {
+		host = "registry-1.docker.io"
+	}
+	if err := utils.CheckPublicHost(host); err != nil {
+		return err
+	}
+	if net.ParseIP(host) != nil {
+		return nil // a literal address: CheckPublicHost checked it
+	}
+	cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	addrs, err := utils.PublicResolver().LookupIPAddr(cctx, host)
+	if err != nil {
+		return fmt.Errorf("%s could not be resolved", host)
+	}
+	if len(addrs) == 0 {
+		return fmt.Errorf("%s has no address", host)
+	}
+	for _, a := range addrs {
+		if utils.BlockedIP(a.IP) {
+			return utils.ErrBlockedAddress
+		}
+	}
+	return nil
+}
