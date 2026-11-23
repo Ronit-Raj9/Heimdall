@@ -1,5 +1,6 @@
 import { DraftPreview, PublishPanel, ReadinessPanel } from "@/components/onboard/draftPanel";
 import { InventoryPanel, MatchChips } from "@/components/onboard/inventoryPanel";
+import { ConfirmButton } from "@/components/platform/badges";
 import { type SourceChoice, SourceBox } from "@/components/onboard/sourceBox";
 import { BlockSkeleton, Section } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell";
@@ -165,11 +166,16 @@ function DraftList({ current, onOpen }: { current: string | null; onOpen(id: str
 	const { t } = useTranslation("onboard");
 	const tx = (k: string, o?: Record<string, unknown>) => t(k as never, o as never) as unknown as string;
 	const q = useListOnboardDraftsQuery();
-	const [remove] = useDeleteOnboardDraftMutation();
+	const [remove, removeState] = useDeleteOnboardDraftMutation();
 	const drafts = q.data?.drafts ?? [];
 	if (drafts.length === 0) return null;
 	return (
 		<Section title={t("drafts.title")} testId="onboard-drafts">
+			{removeState.error !== undefined && (
+				<p role="alert" className="text-chart-error-ink text-sm" data-testid="onboard-draft-delete-error">
+					{tx("drafts.deleteFailed", { message: getBenchErrorMessage(removeState.error) })}
+				</p>
+			)}
 			<ul className="flex flex-col divide-y rounded-lg border text-sm">
 				{drafts.map((d) => (
 					<li key={d.id} className="flex flex-wrap items-center gap-2 px-3 py-2" data-testid={`onboard-draft-${d.id}`}>
@@ -183,9 +189,16 @@ function DraftList({ current, onOpen }: { current: string | null; onOpen(id: str
 								{t("drafts.open")}
 							</Button>
 						)}
-						<Button size="sm" variant="ghost" onClick={() => void remove(d.id)}>
-							{t("drafts.delete")}
-						</Button>
+						<ConfirmButton
+							label={t("drafts.delete")}
+							question={tx("drafts.deleteAsk", { suite: d.suite, tasks: d.tasks })}
+							confirmLabel={t("drafts.deleteYes")}
+							cancelLabel={t("drafts.keep")}
+							onConfirm={() => void remove(d.id)}
+							isLoading={removeState.isLoading && removeState.originalArgs === d.id}
+							variant="ghost"
+							testId={`onboard-draft-delete-${d.id}`}
+						/>
 					</li>
 				))}
 			</ul>
