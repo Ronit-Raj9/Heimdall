@@ -16,6 +16,10 @@ drift
 lock_error?
 task_count
 admitted_count
+# Light list readiness (fix wave 3, N194) and head entries (N281).
+ready_task_ids?
+ready_known?
+partial?
 probes
 tasks
 error?

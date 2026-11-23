@@ -74,16 +74,44 @@ export function guessProvider(model: string): ProviderId | undefined {
  */
 export type ReadyTasks = ReadonlyMap<string, { ids: readonly string[]; total: number }>;
 
-/** Ready tasks per catalog benchmark from GET /suites; undefined while the list is not known. */
+/**
+ * Ready tasks per catalog benchmark from GET /suites; undefined while the list is not known. The light list
+ * (fields=light) names them in ready_task_ids; ready_known false means the server cannot tell, so the benchmark
+ * gets no entry (unknown, never zero). An entry without ready_known (the full list) is read from its tasks.
+ */
 export function readyTaskMap(catalog: Catalog, suites: readonly SuiteSummary[] | undefined): ReadyTasks | undefined {
 	if (!suites) return undefined;
 	const out = new Map<string, { ids: readonly string[]; total: number }>();
 	for (const s of catalog.suites ?? []) {
 		const summary = suites.find((x) => x.id === s.id && x.version === s.version);
-		if (!summary) continue;
-		const ok = new Set((summary.tasks ?? []).filter((t) => t.status === "admitted" && !t.stale && !t.quarantine).map((t) => t.id));
+		if (!summary || summary.ready_known === false) continue;
+		const ok = new Set(
+			summary.ready_known
+				? (summary.ready_task_ids ?? [])
+				: (summary.tasks ?? []).filter((t) => t.status === "admitted" && !t.stale && !t.quarantine).map((t) => t.id),
+		);
 		const tasks = s.tasks ?? [];
 		out.set(suiteRef(s), { ids: tasks.filter((id) => ok.has(id)), total: tasks.length });
+	}
+	return out;
+}
+
+/**
+ * True when the ready tasks of suite cannot be known: the list arrived (ready is set) but has no entry for it.
+ * The forms then block Plan instead of sending tasks that may be drafts (N195).
+ */
+export function readyUnknown(suite: CatalogSuite | undefined, ready: ReadyTasks | undefined): boolean {
+	return suite !== undefined && ready !== undefined && !ready.has(suiteRef(suite));
+}
+
+/**
+ * The values with every field the person has not touched taken from next (L2): when the defaults change (the
+ * ready list arrived) the form keeps what was typed and fills the rest, without starting again.
+ */
+export function fillUntouched<T extends object>(current: T, next: T, touched: (key: keyof T) => boolean): T {
+	const out = { ...current };
+	for (const key of Object.keys(next) as (keyof T)[]) {
+		if (!touched(key)) out[key] = next[key];
 	}
 	return out;
 }

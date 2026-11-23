@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 )
 
 // Suite list cache. A full suite summary loads every task file and rehashes
@@ -188,15 +189,25 @@ func (c *summaryCache) refreshLocked(slot *summarySlot, stamp string, load summa
 // when src has no stamper or nothing was ready within wait. Library packs
 // load in their own slot.
 func (h *SuitesHandler) cachedSummary(id string, wait time.Duration) (schemas.SuiteSummary, bool) {
-	st, ok := h.suites.(suiteStamper)
+	dir, stamp, ok := h.summaryKey(id)
 	if !ok {
 		return schemas.SuiteSummary{}, false
 	}
-	dir, stamp := st.SuiteStamp(id)
+	return suiteSummaries.get(dir, stamp, h.fullSummary(id), wait, isBuiltinSuite(h.suites, id))
+}
+
+// summaryKey is the cache key of suite id's full summary: its folder and
+// stamp. ok is false when the source has no stamper.
+func (h *SuitesHandler) summaryKey(id string) (dir, stamp string, ok bool) {
+	st, ok := h.suites.(suiteStamper)
+	if !ok {
+		return "", "", false
+	}
+	dir, stamp = st.SuiteStamp(id)
 	if h.heldOutVisible { // held-out tasks are redacted unless visible: a separate entry
 		dir += "\x00held-out-visible"
 	}
-	return suiteSummaries.get(dir, stamp, h.fullSummary(id), wait, isBuiltinSuite(h.suites, id))
+	return dir, stamp, true
 }
 
 // fullSummary loads suite id and summarizes it, the slow path the cache
@@ -226,6 +237,12 @@ func headSummary(src SuiteSource, id string) schemas.SuiteSummary {
 	if err != nil {
 		return brokenSuite(id, err)
 	}
+	return headOf(s)
+}
+
+// headOf is the head entry of a suite loaded by SuiteHead. It is marked
+// Partial: tasks, probes and drift come with the full summary.
+func headOf(s *schemas.Suite) schemas.SuiteSummary {
 	out := schemas.SuiteSummary{
 		ID: s.ID, Version: s.Version, Description: s.Description,
 		Environment: s.Environment, Grader: s.Grader,
@@ -239,6 +256,7 @@ func headSummary(src SuiteSource, id string) schemas.SuiteSummary {
 		Probes:           []schemas.SuiteProbe{},
 		Tasks:            []schemas.SuiteTask{},
 		TaskCount:        len(s.TaskIDs),
+		Partial:          true,
 	}
 	scenarioSummary(s, &out) // track, grading, output: the wizard filters on them
 	if s.Lock != nil {
@@ -261,9 +279,10 @@ func headSummary(src SuiteSource, id string) schemas.SuiteSummary {
 	return out
 }
 
-// WarmCache starts building the full summary of every pack in the
-// background, so the first GET /suites after start serves the large library
-// packs from the cache instead of waiting on them. It returns at once.
+// WarmCache warms the full summary of every pack in the background
+// (WarmSuites: one pack at a time), so the first GET /suites after start
+// serves the large library packs from the cache instead of waiting on them.
+// It returns at once.
 func (h *SuitesHandler) WarmCache() *SuitesHandler {
 	if _, ok := h.suites.(suiteStamper); !ok {
 		return h
@@ -275,9 +294,193 @@ func (h *SuitesHandler) WarmCache() *SuitesHandler {
 		if err != nil {
 			return
 		}
-		for _, id := range ids {
-			h.cachedSummary(id, 0)
-		}
+		<-WarmSuites(context.Background(), h, ids, nil)
 	}()
 	return h
+}
+
+// WarmSuites fills the full summary cache for ids in the background and
+// returns at once; the channel closes when the warm ends. Packs load one at
+// a time, in the order given: the next starts only after the previous one
+// landed, so the warm never holds more than one load slot and a request
+// queued for a slot is served before the warm's next pack. A pack that
+// fails to load is logged and skipped. When ctx ends no further pack
+// starts (a load already running finishes in the background, as any cache
+// refresh does). At the end it logs "warmed N benchmark summaries in T".
+// logger may be nil.
+func WarmSuites(ctx context.Context, h *SuitesHandler, ids []string, logger schemas.Logger) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		start, n := time.Now(), 0
+		for _, id := range ids {
+			if ctx.Err() != nil {
+				return
+			}
+			if h.warmOne(ctx, id) {
+				n++
+			} else if ctx.Err() == nil && logger != nil {
+				logger.Warn("warm benchmark summary %s: the load did not finish; skipped", id)
+			}
+		}
+		if logger != nil {
+			logger.Info("warmed %d benchmark summaries in %s", n, time.Since(start).Round(time.Millisecond))
+		}
+	}()
+	return done
+}
+
+// warmOne starts the full summary of suite id unless it is cached and
+// waits for it to land or ctx to end. It reports whether the summary is in
+// the cache.
+func (h *SuitesHandler) warmOne(ctx context.Context, id string) bool {
+	dir, stamp, ok := h.summaryKey(id)
+	if !ok {
+		return false
+	}
+	done, have := suiteSummaries.start(dir, stamp, h.fullSummary(id), isBuiltinSuite(h.suites, id))
+	if have {
+		return true
+	}
+	select {
+	case <-done:
+	case <-ctx.Done():
+		return false
+	}
+	return suiteSummaries.has(dir, stamp)
+}
+
+// start begins (or joins) the refresh of dir at stamp and returns its end
+// channel; have is true, with no channel, when a summary of stamp is
+// already cached.
+func (c *summaryCache) start(dir, stamp string, load summaryLoad, heavy bool) (done chan struct{}, have bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	slot := c.slots[dir]
+	if slot == nil {
+		slot = &summarySlot{}
+		c.slots[dir] = slot
+	}
+	if slot.have && slot.stamp == stamp {
+		return nil, true
+	}
+	return c.refreshLocked(slot, stamp, load, heavy), false
+}
+
+// has reports whether a summary of dir at stamp is cached.
+func (c *summaryCache) has(dir, stamp string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	slot := c.slots[dir]
+	return slot != nil && slot.have && slot.stamp == stamp
+}
+
+// readyHeadSlot is a cached head entry with the ready tasks read from the lock.
+type readyHeadSlot struct {
+	stamp string
+	sum   schemas.SuiteSummary
+	ready []string
+	known bool
+}
+
+// suiteHeadCache caches head entries process-wide, keyed by pack folder and
+// checked against the pack's stamp, so the light list reads suite.yaml and
+// suite.lock once per change, not once per request.
+var suiteHeadCache = struct {
+	mu sync.Mutex
+	m  map[string]readyHeadSlot
+}{m: map[string]readyHeadSlot{}}
+
+// readyHead is suite id's head entry (headOf) with its ready task ids from
+// the lock (readyFromLock). known is false when the head could not be read;
+// the entry is then the broken-suite entry and is not cached.
+func (h *SuitesHandler) readyHead(id string) (sum schemas.SuiteSummary, ready []string, known bool) {
+	st, ok := h.suites.(suiteStamper)
+	if !ok {
+		return headSummary(h.suites, id), nil, false
+	}
+	dir, stamp := st.SuiteStamp(id)
+	suiteHeadCache.mu.Lock()
+	e, hit := suiteHeadCache.m[dir]
+	suiteHeadCache.mu.Unlock()
+	if hit && e.stamp == stamp {
+		return e.sum, e.ready, e.known
+	}
+	s, err := st.SuiteHead(id)
+	if err != nil {
+		return brokenSuite(id, err), nil, false
+	}
+	e = readyHeadSlot{stamp: stamp, sum: headOf(s), ready: readyFromLock(s), known: true}
+	suiteHeadCache.mu.Lock()
+	suiteHeadCache.m[dir] = e
+	suiteHeadCache.mu.Unlock()
+	return e.sum, e.ready, e.known
+}
+
+// readyFromLock lists the tasks of s a plan accepts, in suite order, from
+// suite.yaml, suite.lock and the quarantine sidecar only: admitted, with an
+// admission recorded for the current lock fingerprints (the planner's
+// checkLock), and not quarantined. An unlocked suite has none.
+func readyFromLock(s *schemas.Suite) []string {
+	out := []string{}
+	if s.Lock == nil {
+		return out
+	}
+	var quarantined map[string]schemas.TaskQuarantine
+	if s.Root != "" {
+		quarantined, _ = readQuarantineFile(s.Root) // an unreadable sidecar quarantines nothing here; the planner still checks
+	}
+	order := s.TaskIDs
+	if len(order) == 0 {
+		for _, t := range s.Tasks {
+			order = append(order, t.ID)
+		}
+	}
+	for _, id := range order {
+		tl, ok := s.Lock.Tasks[id]
+		if !ok || tl.Status != schemas.TaskAdmitted || !suite.AdmissionCurrent(s.Lock, id, tl.Admission) {
+			continue
+		}
+		if _, q := quarantined[id]; q {
+			continue
+		}
+		out = append(out, id)
+	}
+	return out
+}
+
+// readySummary sets the light entry's ready tasks: the lock's ready ids,
+// less the tasks the full summary (when cached) found changed since the
+// lock. Without a readable lock a cached full summary answers from its own
+// task list; else readiness stays unknown.
+func readySummary(out *schemas.SuiteSummary, full bool, ready []string, known bool) {
+	switch {
+	case known && full:
+		stale := map[string]bool{}
+		for _, t := range out.Tasks {
+			if t.Stale {
+				stale[t.ID] = true
+			}
+		}
+		ids := make([]string, 0, len(ready))
+		for _, id := range ready {
+			if !stale[id] {
+				ids = append(ids, id)
+			}
+		}
+		out.ReadyTaskIDs, out.ReadyKnown = ids, true
+	case known:
+		out.ReadyTaskIDs, out.ReadyKnown = append([]string(nil), ready...), true
+	case full && out.Error == "":
+		ids := []string{}
+		for _, t := range out.Tasks {
+			if t.Status == string(schemas.TaskAdmitted) && !t.Stale && t.Quarantine == nil {
+				ids = append(ids, t.ID)
+			}
+		}
+		out.ReadyTaskIDs, out.ReadyKnown = ids, true
+	}
+	if len(out.ReadyTaskIDs) == 0 {
+		out.ReadyTaskIDs = nil // known and none: ready_known true, no list
+	}
 }

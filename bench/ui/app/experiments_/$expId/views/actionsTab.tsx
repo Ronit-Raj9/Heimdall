@@ -12,6 +12,7 @@ import { EXTEND_MAX_TASKS, EXTEND_MAX_TRIALS, type ExtendJobParams, type ProbeJo
 import { GitBranch, GitCompareArrows, Layers, Radar } from "lucide-react";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { usePartialSuiteRefetch } from "@/app/experiments_/new/views/partialRefetch";
 
 export interface ActionsTabProps {
 	expId: string;
@@ -199,13 +200,18 @@ function ExtendCard({ expId }: { expId: string }) {
  */
 function ProbeCard({ expId, suite }: { expId: string; suite?: string }) {
 	const { t } = useTranslation("experimentActions");
+	const { t: th } = useTranslation("hw17");
 	const uid = useId();
 	const suites = useGetSuitesQuery();
 	const catalog = useGetBenchFaultsQuery();
 	const [faults, setFaults] = useState<string[]>([]);
 	const [picked, setPicked] = useState<string[]>([]);
 	const [trials, setTrials] = useState(1);
-	const probes = suites.data?.suites.find((s) => s.id === suite)?.probes ?? [];
+	const entry = suites.data?.suites.find((s) => s.id === suite);
+	const probes = entry?.probes ?? [];
+	// N281: a partial entry (the server is still loading the benchmark) has no probes yet: say so and read again.
+	const partial = entry?.partial === true;
+	usePartialSuiteRefetch(partial, suites.refetch);
 	const groups = groupFaults(catalog.data ?? []);
 	const flip = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 	const params: ProbeJobParams | null =
@@ -251,6 +257,11 @@ function ProbeCard({ expId, suite }: { expId: string; suite?: string }) {
 									</div>
 								))}
 							</fieldset>
+						)}
+						{partial && probes.length === 0 && (
+							<p className="text-muted-foreground text-xs" data-testid="actions-probe-own-loading">
+								{th("probe.ownLoading")}
+							</p>
 						)}
 						{probes.length > 0 && (
 							<fieldset className="flex flex-wrap gap-x-4 gap-y-2 text-sm" data-testid="actions-probe-own">

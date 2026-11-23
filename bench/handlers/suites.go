@@ -162,8 +162,10 @@ func (h *SuitesHandler) ListSummaries(work context.Context) ([]schemas.SuiteSumm
 
 // listSummaries is ListSummaries; light (GET /suites?fields=light, for
 // pickers) never waits for a pack load: each entry is the cached full
-// summary of any stamp, else the head summary, without per-task lists
-// (lightSummary). A missing or stale entry starts a background refresh.
+// summary of any stamp, else the head summary (marked partial), without
+// per-task lists (lightSummary) but with the ready task ids read from the
+// lock (ready_task_ids, ready_known). A missing or stale entry starts a
+// background refresh.
 func (h *SuitesHandler) listSummaries(work context.Context, light bool) ([]schemas.SuiteSummary, error) {
 	if h.suites == nil {
 		return nil, errors.New("suite loader is not available")
@@ -208,8 +210,14 @@ func (h *SuitesHandler) listSummaries(work context.Context, light bool) ([]schem
 			go func() {
 				defer wg.Done()
 				sum, ok := h.cachedSummary(id, wait)
-				if !ok {
-					sum = headSummary(h.suites, id)
+				if !ok || light {
+					head, ready, known := h.readyHead(id)
+					if !ok {
+						sum = head
+					}
+					if light { // N194: ready ids from the lock, so pickers need no task list
+						readySummary(&sum, ok, ready, known)
+					}
 				}
 				out.Suites[i] = sum
 			}()

@@ -119,6 +119,6 @@ describe("ExperimentForm benchmark and agent menus (N39)", () => {
 		const ref = `${catalog.suites[0].id}@${catalog.suites[0].version}`;
 		const ready = new Map([[ref, { ids: catalog.suites[0].tasks.slice(0, 2), total: catalog.suites[0].tasks.length }]]);
 		const html = render(<ExperimentForm catalog={catalog} defaults={defaults} ready={ready} onStarted={() => undefined} />);
-		expect(html).toContain("All 2 ready tasks");
+		expect(html).toContain("All ready tasks (2)");
 	});
 });
