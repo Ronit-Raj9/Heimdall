@@ -85,11 +85,16 @@ export function GraderSection({ suite, writable, t }: { suite: SuiteSummary; wri
 	const current = graderChoice(suite);
 	const answer = isAnswerSuite(suite);
 	const [choice, setChoice] = useState<GraderChoice>(current);
-	const [provider, setProvider] = useState("");
-	const [model, setModel] = useState("");
-	const [votes, setVotes] = useState(1);
+	const pinned = suite.judge;
+	const [provider, setProvider] = useState(pinned?.provider ?? "");
+	const [model, setModel] = useState(pinned?.model ?? "");
+	const [votes, setVotes] = useState(pinned?.votes || 1);
 	const [save, saved] = useSetSuiteGraderMutation();
-	const changed = choice !== current || (choice === "judge" && (provider.trim() !== "" || model.trim() !== ""));
+	// N267: the picker starts on the pinned judge, so only a different pick (or votes) is a change.
+	const changed =
+		choice !== current ||
+		(choice === "judge" &&
+			(provider.trim() !== (pinned?.provider ?? "") || model.trim() !== (pinned?.model ?? "") || votes !== (pinned?.votes || 1)));
 	const judgeReady = choice !== "judge" || (provider.trim() !== "" && model.trim() !== "");
 	const enabled = (c: GraderChoice) => (answer ? c === "exact" || c === "judge" : c === current);
 	const submit = () => {
