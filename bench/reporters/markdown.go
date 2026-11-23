@@ -55,6 +55,14 @@ func (r *markdownReporter) Write(ctx context.Context, a *schemas.Analysis, m *sc
 	writeSupport(bw, m)  // W3 customer support: the simulated user's label (support.go)
 	if a.Verdict.Score != nil {
 		writeScore(bw, &a.Verdict) // one-arm experiment: a score with an interval, no comparison (score.go)
+	} else if a.Verdict.Setups != nil {
+		// Three or more setups (fix wave 3): the setups result decides; the
+		// B-against-A effect is descriptive only, so it is not shown as the result.
+		writeSetups(bw, a.Verdict.Setups)
+		if len(a.Verdict.Guards) > 0 {
+			bw.WriteString("Guards below compare setup B against setup A only; the setups result above is the result.\n\n")
+		}
+		writeGuards(bw, a.Verdict.Guards)
 	} else {
 		writePrimary(bw, &a.Verdict)
 		writeNoiseFloor(bw, &a.Verdict) // Eval integrity area (S2): the variance card behind the MDE
@@ -634,4 +642,49 @@ func orDash(s string) string {
 		return "-"
 	}
 	return s
+}
+
+// writeSetups writes the result of a comparison of three or more setups: the
+// leader, the setups that cannot be told apart from it, the setups behind it,
+// the leader against every other setup, and safety rules broken per setup.
+func writeSetups(w *bufio.Writer, s *schemas.SetupsVerdict) {
+	w.WriteString("## Setups\n\n| Field | Value |\n|---|---|\n")
+	row(w, "Leader", orUnknown(s.Leader))
+	row(w, "Top group", orDash(strings.Join(s.TopGroup, ", ")))
+	row(w, "Behind the leader", orDash(strings.Join(s.Behind, ", ")))
+	if !s.Separable {
+		row(w, "Separable", "no: no pair could reach alpha whatever the results")
+	}
+	w.WriteString("\n")
+	if s.Note != "" {
+		w.WriteString(cell(s.Note) + "\n\n")
+	}
+	if len(s.Pairs) > 0 {
+		w.WriteString("| Leader | Other | Common tasks | Differing tasks | Mean difference | Holm p | Significant | Reason |\n|---|---|---|---|---|---|---|---|\n")
+		for _, p := range s.Pairs {
+			padj := unknownText
+			if p.PAdjusted != nil {
+				padj = fixed(*p.PAdjusted, 4)
+			}
+			sig := "no"
+			if p.Significant {
+				sig = "yes"
+			}
+			fmt.Fprintf(w, "| %s | %s | %d | %d | %s | %s | %s | %s |\n", cell(p.ArmX), cell(p.ArmY), p.Tasks, p.NNonzero,
+				ppText(p.MeanDiff*100, true), padj, sig, cell(orDash(p.Reason)))
+		}
+		w.WriteString("\n")
+	}
+	if len(s.Safety) > 0 {
+		arms := make([]string, 0, len(s.Safety))
+		for arm := range s.Safety {
+			arms = append(arms, arm)
+		}
+		slices.Sort(arms)
+		w.WriteString("| Setup | Tasks where a safety rule broke |\n|---|---|\n")
+		for _, arm := range arms {
+			fmt.Fprintf(w, "| %s | %s |\n", cell(arm), cell(strings.Join(s.Safety[arm], ", ")))
+		}
+		w.WriteString("\n")
+	}
 }
