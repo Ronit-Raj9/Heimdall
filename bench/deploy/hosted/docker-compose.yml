@@ -210,6 +210,7 @@ services:
       HEIMDALL_CAPTCHA_SITEKEY: ${HEIMDALL_CAPTCHA_SITEKEY:-}
       HEIMDALL_IMAGE_AUTO_APPROVE: ${HEIMDALL_IMAGE_AUTO_APPROVE:-}
       HEIMDALL_FAULT_MODE: ${HEIMDALL_FAULT_MODE:-}
+      HEIMDALL_WARM_SUITES: ${HEIMDALL_WARM_SUITES:-}
       # DNS servers for guarded outbound calls (webhooks, MCP test, Connect):
       # empty uses 1.1.1.1:53,8.8.8.8:53; "system" uses the container's resolver.
       HEIMDALL_PUBLIC_DNS: ${HEIMDALL_PUBLIC_DNS:-}

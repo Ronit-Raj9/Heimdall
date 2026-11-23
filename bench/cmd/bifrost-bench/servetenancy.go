@@ -112,6 +112,7 @@ func serveHosted(ctx context.Context, a *app, offline bool) int {
 		return fail("server: %v", err)
 	}
 	a.logger.Info("heimdall hosted platform on http://%s (public url %s, mode %s)", a.cfg.Server.Listen, a.cfg.Auth.PublicURL, a.cfg.Server.Mode)
+	go warmLibrary(ctx, a, env) // L1: library suite summaries, one pack at a time beside the listener (warmlibrary_hosted.go)
 	if err := srv.ListenAndServe(ctx); err != nil && ctx.Err() == nil {
 		return fail("serve: %v", err)
 	}
