@@ -193,7 +193,7 @@ On the worker machine (Ubuntu or Debian, Docker installed):
 
 ```sh
 curl -fsSLO https://heimdall.example.com/api/bench/runners/install.sh
-sudo bash install.sh --server https://heimdall.example.com --token-file ./runner-token \
+sudo bash install.sh --server https://heimdall.example.com --token-file ~/.heimdall-runner-token \
     --ref <the server's commit or tag> --repo <repository URL> --pool default --slots 2
 ```
 

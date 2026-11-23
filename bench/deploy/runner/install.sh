@@ -52,7 +52,7 @@ fi
 # with a new --ref is the upgrade. See README.md next to this file.
 #
 # Usage (as root):
-#   bash install.sh --server https://heimdall.example.com --token-file ./runner-token
+#   bash install.sh --server https://heimdall.example.com --token-file ~/.heimdall-runner-token
 #   bash install.sh --help
 set -euo pipefail
 

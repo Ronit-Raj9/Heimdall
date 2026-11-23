@@ -192,7 +192,7 @@ answers 503.
 // RunnerTokenCreated: the only answer that holds the token
 {"token": "hmr_ab12cd34_...", "info": RunnerTokenView,
  "command": "bifrost-bench runner start -server https://heimdall.example.com -token-file ~/.heimdall-runner-token -pool gpu -name box-01",
- "install": "curl -fsSLo install.sh https://heimdall.example.com/api/bench/runners/install.sh && sudo bash install.sh --server https://heimdall.example.com --token-file ./runner-token --pool gpu --name box-01"}
+ "install": "curl -fsSLo install.sh https://heimdall.example.com/api/bench/runners/install.sh && sudo bash install.sh --server https://heimdall.example.com --token-file ~/.heimdall-runner-token --pool gpu --name box-01"}
 ```
 
 Removing a runner drops its row and registration and loses its leases at

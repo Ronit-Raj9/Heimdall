@@ -27,8 +27,8 @@ a systemd service.
 
 ```sh
 curl -fsSLo install.sh https://heimdall.example.com/api/bench/runners/install.sh
-sudo bash install.sh --dry-run --server https://heimdall.example.com --token-file ./runner-token   # preview
-sudo bash install.sh --server https://heimdall.example.com --token-file ./runner-token
+sudo bash install.sh --dry-run --server https://heimdall.example.com --token-file ~/.heimdall-runner-token   # preview
+sudo bash install.sh --server https://heimdall.example.com --token-file ~/.heimdall-runner-token
 ```
 
 By default everything comes from the Heimdall server itself, at the commit

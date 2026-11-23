@@ -36,7 +36,7 @@ ssh -N -L 8090:127.0.0.1:8090 coordinator-host &     # see "Reaching the coordin
 bifrost-bench worker -server http://127.0.0.1:8090 -token-file ~/.bench-worker-token -slots 2
 ```
 
-A worker of a hosted server is installed with the server's own script instead (`deploy/runner/README.md`): `curl -fsSLo install.sh https://<server>/api/bench/runners/install.sh && sudo bash install.sh --server https://<server> --token-file ./runner-token`. It downloads the project bundle and the CLI binary of the commit the server runs from the server itself (`GET /downloads/bench-<commit>.tar.gz` and `GET /downloads/bifrost-bench-linux-<arch>`, each checked against its `.sha256`), so no git repository has to be reachable. `--repo URL` clones and builds from source instead.
+A worker of a hosted server is installed with the server's own script instead (`deploy/runner/README.md`): `curl -fsSLo install.sh https://<server>/api/bench/runners/install.sh && sudo bash install.sh --server https://<server> --token-file ~/.heimdall-runner-token`. It downloads the project bundle and the CLI binary of the commit the server runs from the server itself (`GET /downloads/bench-<commit>.tar.gz` and `GET /downloads/bifrost-bench-linux-<arch>`, each checked against its `.sha256`), so no git repository has to be reachable. `--repo URL` clones and builds from source instead.
 
 `-slots` is how many slots the worker runs at once (default 1), `-id` names the worker (default a random id), `-config` is the worker's own bench config. The worker refuses a token file that others can read. Runs are sealed in the worker's own runs folder first, then uploaded.
 
