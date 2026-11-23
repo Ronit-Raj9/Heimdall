@@ -280,6 +280,23 @@ describe("EvaluationBody why runs did not start (fix wave 3, H14)", () => {
 		expect(html2).toContain("Skill pdf-tools changed after its last scan, so runs of this agent are refused.");
 	});
 
+	it("offers Scan it now for both skill gate sentences adapters/skillgate.go writes (fix wave 3 integration)", async () => {
+		const { hostedSession } = await import("@/lib/testing/platformFixtures");
+		// The exact sentences pinned by adapters/skillgate_test.go, bare and as the planner wraps them.
+		const pinned = [
+			"skill review in agents/codex/skills has no passing scan: open the agent's Tools tab and press Scan",
+			"skill review in agents/codex/skills changed after its scan: open the agent's Tools tab and press Scan",
+		];
+		for (const sentence of pinned) {
+			for (const skipped of [sentence, `plan experiment: ${sentence}`]) {
+				const html = render(<EvaluationBody evaluation={skippedBy(skipped)} />, hostedSession("member"));
+				expect(html).toContain('data-testid="evaluation-skill-scan-hd-harbor-bfcl"');
+				expect(html).toContain("Scan it now");
+				expect(html).toContain('href="/agents/codex?tab=tools"');
+			}
+		}
+	});
+
 	it("shows the scan result: admitted, then blocked with its findings (L5)", async () => {
 		const { hostedSession } = await import("@/lib/testing/platformFixtures");
 		const { useScanAgentSkillMutation } = await import("@/lib/store/apis/agentopsApi");
