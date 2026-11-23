@@ -30,12 +30,16 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	useGetCatalogQuery: () => okQuery(catalog),
 	useGetAgentsQuery: () => okQuery({ agents: [] }),
 	useGetHealthQuery: () => okQuery({ status: "ok", version: "dev" }),
-	useGetSuitesQuery: () => api.suites,
 	useGetExperimentQuery: () => ({}),
 	usePlanExperimentMutation: () => mutation(),
 	useCreateExperimentMutation: () => mutation(),
 	useStartExperimentMutation: () => mutation(),
 	useEstimateExperimentMutation: () => mutation(),
+}));
+// N194: the page reads the light list only.
+vi.mock("@/lib/store/apis/suitesLightApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/suitesLightApi")>()),
+	useGetSuitesLightQuery: () => api.suites,
 }));
 
 beforeEach(() => {

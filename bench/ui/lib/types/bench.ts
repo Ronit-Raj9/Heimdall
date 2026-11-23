@@ -2532,6 +2532,9 @@ export interface SuiteSummary {
 	task_count: number;
 	/** Tasks admitted whose files still match the lock. */
 	admitted_count: number;
+	ready_task_ids?: string[] | null;
+	ready_known?: boolean;
+	partial?: boolean;
 	probes: SuiteProbe[];
 	tasks: SuiteTask[];
 	error?: string;

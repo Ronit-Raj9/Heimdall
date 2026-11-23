@@ -61,3 +61,40 @@ export function SuiteMenuItems({
 		</>
 	);
 }
+/** SuiteMenuItems for a native select (N233): the same groups as option and optgroup elements. */
+export function SuiteNativeOptions({
+	catalog,
+	ready,
+	testIdPrefix,
+}: {
+	catalog: Catalog;
+	ready: ReadyTasks | undefined;
+	testIdPrefix: string;
+}) {
+	const { t } = useTranslation("builder");
+	const groups = suiteMenuGroups(catalog, ready);
+	return (
+		<>
+			{groups.ready.map((s) => (
+				<option key={suiteRef(s)} value={suiteRef(s)} data-testid={`${testIdPrefix}-${s.id}`}>
+					{suiteOptionText(s, ready, t)}
+				</option>
+			))}
+			{groups.notReady.length > 0 && (
+				<optgroup label={t("fields.notReadyGroup")} data-testid={`${testIdPrefix}-not-ready`}>
+					{groups.notReady.map((s) => (
+						<option
+							key={suiteRef(s)}
+							value={suiteRef(s)}
+							disabled
+							title={t("fields.notReadyTitle")}
+							data-testid={`${testIdPrefix}-${s.id}`}
+						>
+							{suiteOptionText(s, ready, t)}
+						</option>
+					))}
+				</optgroup>
+			)}
+		</>
+	);
+}
