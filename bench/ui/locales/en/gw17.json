@@ -5,6 +5,15 @@
 		"start": "Start with a lowercase letter or a digit."
 	},
 	"reportCard": {
-		"versionMissing": "Version {{version}} of this agent was not found. Showing the latest version."
+		"versionMissing": "Version {{version}} of this agent was not found. Showing the latest version.",
+		"sourceNewest": "From the newest matching evaluation, {{name}} ({{date}}): {{runs}} runs.",
+		"sourcePicked": "From the evaluation {{name}} ({{date}}): {{runs}} runs.",
+		"sourceOnly": "From the only matching evaluation, {{name}} ({{date}}): {{runs}} runs.",
+		"olderMatch_one": "{{count}} older evaluation matches; pick it below.",
+		"olderMatch_other": "{{count}} older evaluations match; pick one below.",
+		"otherMatch_one": "{{count}} other evaluation matches; pick it below.",
+		"otherMatch_other": "{{count}} other evaluations match; pick one below.",
+		"evaluation": "Evaluation",
+		"newest": "Newest matching"
 	}
 }

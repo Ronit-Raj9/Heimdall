@@ -30,6 +30,15 @@ vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 	},
 }));
 
+// The Report card tab reads the agent card through agentCardApi (fix wave 3, N206).
+vi.mock("@/lib/store/apis/agentCardApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/agentCardApi")>()),
+	useGetAgentCardQuery: (arg: unknown) => {
+		state.reportArgs.push(arg);
+		return { data: state.report, error: state.reportError, isLoading: false, isError: Boolean(state.reportError) };
+	},
+}));
+
 vi.mock("@/lib/store/apis/failurePatternsApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/failurePatternsApi")>()),
 	useGetEvaluationFailurePatternsQuery: () => ({

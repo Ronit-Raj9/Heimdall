@@ -72,6 +72,54 @@ func SelectForAgent(evals []schemas.Evaluation, agent string, version int, model
 	})
 }
 
+// matchingLabels lists the labels of ev's arms that run agent at version
+// (0: any) with model ("": any).
+func matchingLabels(ev schemas.Evaluation, agent string, version int, model string) []string {
+	var labels []string
+	for _, a := range ev.Spec.Arms {
+		if ArmMatches(a, agent, version, model) {
+			labels = append(labels, a.Label)
+		}
+	}
+	return labels
+}
+
+// SelectForAgentEvaluation is SelectForAgent with the evaluation the page
+// asked for (?evaluation=): that evaluation when it is done, or running
+// with a child, and has an arm that matches; otherwise the evaluation
+// SelectForAgent picks (fix wave 3, N206).
+func SelectForAgentEvaluation(evals []schemas.Evaluation, agent string, version int, model, evaluationID string) (*schemas.Evaluation, []string) {
+	if evaluationID != "" {
+		for i := range evals {
+			ev := evals[i]
+			if ev.ID != evaluationID {
+				continue
+			}
+			usable := ev.Status == StatusDone || (ev.Status == StatusRunning &&
+				slices.ContainsFunc(ev.Children, func(c schemas.EvaluationChild) bool { return c.ExperimentID != "" }))
+			if labels := matchingLabels(ev, agent, version, model); usable && len(labels) > 0 {
+				return &evals[i], labels
+			}
+			break
+		}
+	}
+	return SelectForAgent(evals, agent, version, model)
+}
+
+// MatchingEvaluations lists the done evaluations with an arm that runs
+// agent at version (0: any) with model ("": any), newest first: the
+// choices of the agent card's evaluation picker (fix wave 3, N206).
+func MatchingEvaluations(evals []schemas.Evaluation, agent string, version int, model string) []schemas.Evaluation {
+	var out []schemas.Evaluation
+	for _, ev := range evals {
+		if ev.Status == StatusDone && len(matchingLabels(ev, agent, version, model)) > 0 {
+			out = append(out, ev)
+		}
+	}
+	slices.SortStableFunc(out, func(a, b schemas.Evaluation) int { return b.CreatedAt.Compare(a.CreatedAt) })
+	return out
+}
+
 // ModelsForAgent lists the models an agent's report card can be filtered
 // by: the distinct non-empty models of every arm that runs agent (at
 // version, 0: any) in a done or running evaluation, sorted.
