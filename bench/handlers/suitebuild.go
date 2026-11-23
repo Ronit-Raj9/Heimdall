@@ -322,6 +322,7 @@ func (h *suiteBuild) importRows(ctx *fasthttp.RequestCtx) {
 		}
 		return
 	}
+	syncDatasetVersion(h.projects.Root(), id, dir, actorName(ctx), "Rows import")
 	out.Next = "Run the readiness checks: each new task must prove its check passes the right answer and fails wrong ones before evaluations use it."
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, &out)
 }

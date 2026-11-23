@@ -193,6 +193,7 @@ func (h *suiteBuild) importScenarioRows(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	_ = os.Chmod(filepath.Join(dir, suite.SuiteFile), 0o644)
+	syncDatasetVersion(h.projects.Root(), id, dir, actorName(ctx), "Scenario rows")
 	out.Next = "Run the readiness checks: each new task must prove its reference passes every check and its mutants fail before evaluations use it."
 	if changed {
 		out.Next += " The benchmark now uses grader checks, so its earlier tasks need their readiness checks again too."

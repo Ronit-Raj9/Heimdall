@@ -176,6 +176,7 @@ func (h *redTeamHandler) benchmark(ctx *fasthttp.RequestCtx) {
 	for _, c := range out.Cells {
 		out.Tasks = append(out.Tasks, redteam.TaskID(c))
 	}
+	syncDatasetVersion(h.env.Services.Projects.Root(), plan.Suite, dir, actorName(ctx), "Red team")
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusCreated, out)
 }
 

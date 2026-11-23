@@ -35,6 +35,7 @@ import (
 	"github.com/maximhq/bifrost/bench/datapolicy"
 	"github.com/maximhq/bifrost/bench/pii"
 	"github.com/maximhq/bifrost/bench/scaffold"
+	"gopkg.in/yaml.v3"
 )
 
 // Limits of one row.
@@ -570,4 +571,199 @@ func nonNil(s []string) []string {
 	}
 	sort.Strings(s)
 	return s
+}
+
+// syncStateFile holds, per task, the row and folder hash of the last
+// SyncSuite, so a task the dataset API recorded (a full row without a folder
+// hash) is compared by its folder from then on. An entry counts only while
+// the snapshot still holds the same row; a later dataset API write starts a
+// new baseline.
+const syncStateFile = "folders.json"
+
+type syncSeen struct {
+	Row   string `json:"row"`
+	Files string `json:"files"`
+}
+
+// SyncSuite records the benchmark's current tasks as a new version when they
+// differ from the latest one: every path that writes task folders or
+// suite.yaml outside the dataset API calls it once after its write (rows
+// import, scenario rows, policy and review accept, imports, the file editor
+// and others), so the Data tab lists each change with source. The tasks are
+// the ids suite.yaml lists (the folders under tasks/ when it lists none);
+// each becomes one row with its title, instruction (clipped to 4 KiB), held
+// out flag and the content hash of its folder. A task whose folder hash did
+// not change keeps its stored row. Nothing is written when nothing changed;
+// the first call on a benchmark with no version records every task as added.
+func SyncSuite(root, suiteID, suiteDir, actor, source string, now time.Time) (*Version, error) {
+	if root == "" {
+		return nil, errors.New("no project folder")
+	}
+	ids, err := suiteTaskIDs(suiteDir)
+	if err != nil {
+		return nil, err
+	}
+	store := Open(root)
+	unlock := store.Lock(suiteID)
+	defer unlock()
+	cur, err := store.Snapshot(suiteID, 0)
+	if err != nil {
+		return nil, err
+	}
+	state := map[string]syncSeen{}
+	if b, err := os.ReadFile(filepath.Join(store.bdir(suiteID), syncStateFile)); err == nil {
+		_ = json.Unmarshal(b, &state)
+	}
+	next := map[string]syncSeen{}
+	rows := map[string]string{}
+	var added, updated, removed []string
+	for _, id := range ids {
+		tdir := filepath.Join(suiteDir, "tasks", id)
+		sum, err := taskFolderSHA(tdir)
+		if err != nil {
+			return nil, fmt.Errorf("hash task %s: %w", id, err)
+		}
+		old, had := cur.Tasks[id]
+		next[id] = syncSeen{Row: old, Files: sum}
+		if had {
+			seen, known := state[id]
+			base := seen.Files
+			if known && seen.Row != old {
+				known = false
+			}
+			if !known {
+				if r, err := store.Row(suiteID, old); err == nil {
+					if s, ok := r.Metadata["files_sha256"].(string); ok {
+						base, known = s, true
+					}
+				}
+			}
+			// A row recorded elsewhere with no folder hash is taken as the
+			// folder it has now.
+			if !known || base == sum {
+				continue
+			}
+		}
+		r := taskRow(tdir, id, sum)
+		sha, data, err := RowSHA(r)
+		if err != nil {
+			return nil, err
+		}
+		if had && sha == old {
+			continue
+		}
+		if err := store.PutRow(suiteID, sha, data); err != nil {
+			return nil, err
+		}
+		rows[id] = sha
+		next[id] = syncSeen{Row: sha, Files: sum}
+		if had {
+			updated = append(updated, id)
+		} else {
+			added = append(added, id)
+		}
+	}
+	for id := range cur.Tasks {
+		if _, ok := next[id]; !ok {
+			removed = append(removed, id)
+		}
+	}
+	v, err := store.Record(suiteID, rows, added, updated, removed, actor, source, now)
+	if err != nil {
+		return nil, err
+	}
+	if b, err := json.Marshal(next); err == nil {
+		_ = datapolicy.WriteAtomic(store.bdir(suiteID), filepath.Join(store.bdir(suiteID), syncStateFile), b, 0o600)
+	}
+	return v, nil
+}
+
+// suiteTaskIDs is the task list of suite.yaml, or the folders under tasks/
+// when it lists none (as suite.LoadHead reads it).
+func suiteTaskIDs(dir string) ([]string, error) {
+	raw, err := os.ReadFile(filepath.Join(dir, "suite.yaml"))
+	if err != nil {
+		return nil, err
+	}
+	var head struct {
+		Tasks []string `yaml:"tasks"`
+	}
+	if err := yaml.Unmarshal(raw, &head); err != nil {
+		return nil, fmt.Errorf("suite.yaml: %w", err)
+	}
+	if len(head.Tasks) > 0 {
+		return head.Tasks, nil
+	}
+	entries, err := os.ReadDir(filepath.Join(dir, "tasks"))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
+	var ids []string
+	for _, e := range entries {
+		if e.IsDir() && !strings.HasPrefix(e.Name(), ".") {
+			ids = append(ids, e.Name())
+		}
+	}
+	return ids, nil
+}
+
+// taskRow is the stored row of a task folder.
+func taskRow(dir, id, sum string) Row {
+	var t struct {
+		Title       string `yaml:"title"`
+		Instruction string `yaml:"instruction"`
+		Split       string `yaml:"split"`
+	}
+	if raw, err := os.ReadFile(filepath.Join(dir, "task.yaml")); err == nil {
+		_ = yaml.Unmarshal(raw, &t)
+	}
+	name := t.Instruction
+	if name == "" || !filepath.IsLocal(name) {
+		name = "instruction.md"
+	}
+	in, _ := os.ReadFile(filepath.Join(dir, filepath.FromSlash(name)))
+	if len(in) > 4<<10 {
+		in = in[:4<<10]
+		for len(in) > 0 && !utf8.Valid(in) {
+			in = in[:len(in)-1]
+		}
+	}
+	return Row{ID: id, Title: t.Title, Input: string(in), HeldOut: t.Split == "held_out",
+		Metadata: map[string]any{"files_sha256": sum}}
+}
+
+// taskFolderSHA is the content hash of a task folder: every regular file's
+// slash path and content hash, in path order. A missing folder hashes as
+// empty.
+func taskFolderSHA(dir string) (string, error) {
+	h := sha256.New()
+	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			if p == dir && errors.Is(err, fs.ErrNotExist) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			if n := d.Name(); p != dir && (n == ".git" || n == "node_modules" || n == "__MACOSX") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !d.Type().IsRegular() {
+			return nil
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(dir, p)
+		fh := sha256.Sum256(data)
+		fmt.Fprintf(h, "%s %s\n", filepath.ToSlash(rel), hex.EncodeToString(fh[:]))
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,6 +14,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/maximhq/bifrost/bench/dataset"
 	"github.com/maximhq/bifrost/bench/scaffold"
 )
 
@@ -136,6 +138,11 @@ func WriteBenchmark(suiteDir string, st Store, d *Draft, judge *scaffold.JudgeCo
 	}
 	d.Written = append(d.Written, written...)
 	d.Status = StatusWritten
+	// The Data tab's version log (fix wave 3, N268); suiteDir is
+	// <root>/benchmarks/<id>. A failure never fails the write.
+	if _, err := dataset.SyncSuite(filepath.Dir(filepath.Dir(suiteDir)), d.Suite, suiteDir, d.CreatedBy, "Tasks from your API", time.Now()); err != nil {
+		slog.Warn("dataset version not recorded", "benchmark", d.Suite, "err", err)
+	}
 	return written, nil
 }
 
@@ -254,5 +261,12 @@ func Review(suiteDir string, d *Draft, taskID, decision, by string) error {
 		return fmt.Errorf("decision %q must be accepted or rejected", decision)
 	}
 	w.Review, w.ReviewedBy, w.ReviewedAt = decision, by, time.Now().UTC()
+	source := "Review accept"
+	if decision == ReviewRejected {
+		source = "Task deleted"
+	}
+	if _, err := dataset.SyncSuite(filepath.Dir(filepath.Dir(suiteDir)), d.Suite, suiteDir, by, source, time.Now()); err != nil {
+		slog.Warn("dataset version not recorded", "benchmark", d.Suite, "err", err)
+	}
 	return nil
 }

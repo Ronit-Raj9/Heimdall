@@ -428,6 +428,7 @@ func (h *suiteAuthoring) createTask(ctx *fasthttp.RequestCtx) {
 			}
 		}
 		out.Files = listRel(taskDir)
+		syncDatasetVersion(h.projects.Root(), id, dir, actorName(ctx), "File editor")
 		lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, &out)
 		return
 	}
@@ -477,6 +478,7 @@ func (h *suiteAuthoring) createTask(ctx *fasthttp.RequestCtx) {
 		out.Files = append(out.Files, f.Path)
 	}
 	out.Warnings = append(out.Warnings, "Upload the repository into repo/ and the hidden tests into verifier/tests/, then run Lint.")
+	syncDatasetVersion(h.projects.Root(), id, dir, actorName(ctx), "File editor")
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, &out)
 }
 
@@ -642,6 +644,7 @@ func (h *suiteAuthoring) writeFile(ctx *fasthttp.RequestCtx) {
 	}
 	fixMode(h.projects, rel)
 	ent.Path = strings.TrimPrefix(ent.Path, id+"/")
+	syncEditedSuite(h.projects, id, p, actorName(ctx))
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &ent)
 }
 
@@ -662,7 +665,7 @@ func fixMode(ps projectfs.Store, rel string) {
 // deleteFile handles DELETE /suites/{id}/files/{path}. suite.yaml itself
 // cannot be deleted here.
 func (h *suiteAuthoring) deleteFile(ctx *fasthttp.RequestCtx) {
-	_, p, rel, ok := h.filePath(ctx)
+	id, p, rel, ok := h.filePath(ctx)
 	if !ok {
 		return
 	}
@@ -678,6 +681,7 @@ func (h *suiteAuthoring) deleteFile(ctx *fasthttp.RequestCtx) {
 		h.sendStoreError(ctx, p, err)
 		return
 	}
+	syncEditedSuite(h.projects, id, p, actorName(ctx))
 	ctx.SetStatusCode(fasthttp.StatusNoContent)
 }
 
@@ -722,6 +726,7 @@ func (h *suiteAuthoring) upload(ctx *fasthttp.RequestCtx) {
 		e.Path = strings.TrimPrefix(e.Path, id+"/")
 		out.Files = append(out.Files, e)
 	}
+	syncEditedSuite(h.projects, id, sub, actorName(ctx))
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
 }
 
