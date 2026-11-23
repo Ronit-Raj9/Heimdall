@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 )
 
@@ -121,6 +122,23 @@ func (d Docker) Pipe(ctx context.Context, from, to []string) ([]byte, error) {
 		return nil, fmt.Errorf("docker %s: %w: %s", firstArg(to), derr, strings.TrimSpace(dstErr.String()))
 	}
 	return dstOut.Bytes(), nil
+}
+
+// dockerFound caches Available per binary.
+var dockerFound sync.Map // binary -> bool
+
+// Available reports whether this process can run its docker binary: found
+// on PATH (or, for a path, an executable file). The answer is looked up once
+// per binary and cached (fix wave 3, N218: the hosted server image has no
+// docker, so it builds no janitor).
+func (d Docker) Available() bool {
+	b := d.bin()
+	if v, ok := dockerFound.Load(b); ok {
+		return v.(bool)
+	}
+	_, err := exec.LookPath(b)
+	dockerFound.Store(b, err == nil)
+	return err == nil
 }
 
 // bin is the docker binary to run.

@@ -58,6 +58,7 @@ func TestWorkerTargetsOneSetting(t *testing.T) {
 	}}}
 	ws := &fakePools{l: schemas.WorkerConnectionsList{Connections: []schemas.WorkerConnection{{Name: "gpu", Pool: "gpu", PlatformTitle: "Fly Machines", Status: "online"}}}}
 	tg := workerTargets{platforms: pl, workers: ws}
+	withImagesReady(t, true) // fix wave 3: a platform needs an image registry to become where runs go
 
 	v, err := tg.Target(ctx, "org")
 	if err != nil || v.Target != "shared" || len(v.Choices) != 3 {

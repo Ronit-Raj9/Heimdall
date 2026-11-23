@@ -1,8 +1,16 @@
+import { type ConfirmFn, type ConfirmOptions, useConfirm } from "@/components/platform/confirmDialog";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { type WorkerTargetChoice, useGetWorkerTargetQuery, useSetWorkerTargetMutation } from "@/lib/store/apis/workerTargetApi";
-import { useId, useState } from "react";
+import {
+	type WorkerTargetChoice,
+	type WorkerTargetView,
+	useGetWorkerTargetQuery,
+	useSetWorkerTargetMutation,
+} from "@/lib/store/apis/workerTargetApi";
+import type { TFunction } from "i18next";
+import { useCallback, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "./hw05I18n";
 
 function errorStatus(error: unknown): number | undefined {
 	const s = (error as { status?: unknown } | undefined)?.status;
@@ -12,6 +20,70 @@ function errorStatus(error: unknown): number | undefined {
 /** "Modal (a fresh sandbox per run)", "gpu-box (Fly Machines)", "Shared worker"; sandbox is the localized "a fresh sandbox per run". */
 export function choiceLabel(c: WorkerTargetChoice, sandbox: string): string {
 	return c.kind === "platform" ? `${c.title} (${sandbox})` : c.title;
+}
+
+/** The name a confirmation uses for a target: the choice's title ("Modal", "Shared worker"), else the raw target. */
+function targetTitle(view: WorkerTargetView | undefined, target: string): string {
+	return view?.choices.find((c) => c.target === target)?.title ?? target;
+}
+
+/**
+ * The confirmation before a change of where runs go (N217). The body says whether runs not started
+ * yet move too: they do unless the chosen platform (or, leaving a platform, the shared worker) takes
+ * one evaluation on its own (`per_evaluation`); a platform adds that each run is billed to its account.
+ */
+export function targetConfirm(
+	view: WorkerTargetView | undefined,
+	target: string,
+	t: TFunction<"hw05">,
+): { message: string; opts: ConfirmOptions } {
+	const chosen = view?.choices.find((c) => c.target === target);
+	const current = view?.choices.find((c) => c.current) ?? view?.choices.find((c) => c.target === view?.target);
+	const name = targetTitle(view, target);
+	let perEvaluation = true;
+	if (chosen?.kind === "platform") perEvaluation = chosen.per_evaluation;
+	else if (current?.kind === "platform") perEvaluation = view?.choices.find((c) => c.kind === "shared")?.per_evaluation ?? false;
+	const lines = [t(perEvaluation ? "target.confirmBodyPerEvaluation" : "target.confirmBody", { target: name })];
+	if (chosen?.kind === "platform") lines.push(t("target.confirmBilled", { platform: chosen.title }));
+	return {
+		message: lines.join(" "),
+		opts: {
+			title: t("target.confirmTitle"),
+			confirmLabel: t("target.confirmOk", { target: name }),
+			cancelLabel: t("target.confirmKeep", { current: current ? current.title : targetTitle(view, view?.target ?? "") }),
+		},
+	};
+}
+
+/** Asks before a change of where runs go; true when the person confirmed. Choosing the current target asks nothing. */
+export function confirmTarget(
+	confirm: ConfirmFn,
+	view: WorkerTargetView | undefined,
+	target: string,
+	t: TFunction<"hw05">,
+): Promise<boolean> {
+	if (view && view.target === target) return Promise.resolve(true);
+	const { message, opts } = targetConfirm(view, target, t);
+	return confirm(message, opts);
+}
+
+/** Saves target only after ask confirmed it; true when it was saved. */
+export async function changeTarget(
+	ask: (target: string) => Promise<boolean>,
+	save: (target: string) => Promise<unknown>,
+	target: string,
+): Promise<boolean> {
+	if (!(await ask(target))) return false;
+	await save(target);
+	return true;
+}
+
+/** The one confirmation every "where runs go" control uses: the Runs go to select, a platform card and an own worker card. */
+export function useConfirmTarget(): (target: string) => Promise<boolean> {
+	const { t } = useTranslation("hw05");
+	const confirm = useConfirm();
+	const { data } = useGetWorkerTargetQuery();
+	return useCallback((target: string) => confirmTarget(confirm, data, target, t), [confirm, data, t]);
 }
 
 /**
@@ -25,13 +97,15 @@ export function WhereRunsGo() {
 	const [save, state] = useSetWorkerTargetMutation();
 	const [error, setError] = useState("");
 	const fieldId = useId();
+	const ask = useConfirmTarget();
 	const status = query.isError ? errorStatus(query.error) : undefined;
 	if (status === 503 || status === 404) return null;
 	const data = query.data;
 	const choose = async (target: string) => {
 		setError("");
 		try {
-			await save(target).unwrap();
+			// N217: nothing changes until the person confirms; on Cancel the controlled select shows the current target again.
+			await changeTarget(ask, (x) => save(x).unwrap(), target);
 		} catch (e) {
 			setError(getBenchErrorMessage(e));
 		}

@@ -18,6 +18,7 @@ vi.mock("@/lib/store/apis/workerConnectionsApi", async (importOriginal) => ({
 vi.mock("@/lib/store/apis/workerTargetApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/workerTargetApi")>()),
 	useSetWorkerTargetMutation: () => mutation(),
+	useGetWorkerTargetQuery: () => ({ data: undefined, isLoading: false }),
 }));
 
 const now = new Date().toISOString();

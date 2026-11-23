@@ -493,7 +493,7 @@ func (r scheduleRunner) execute(ctx context.Context, m *schemas.Manifest) (*engi
 			}
 		}
 	}()
-	janitor := engine.NewJanitor(a.reg.Gateway, a.docker, a.logger)
+	janitor := serverJanitor(a.reg.Gateway, a.docker, a.logger) // fix wave 3, N218: nil without Docker
 	sched := engine.NewScheduler(a.reg, a.cfg.Root, a.logger, janitor)
 	sum, err := sched.Run(ctx, m, engine.RunOptions{Resume: true, Events: events})
 	close(events)

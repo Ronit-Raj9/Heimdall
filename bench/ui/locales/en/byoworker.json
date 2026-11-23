@@ -34,7 +34,7 @@
 		"start": "Start",
 		"stop": "Stop",
 		"remove": "Remove",
-		"confirmRemove": "Remove {{name}}? Heimdall stops it, and its token stops working.",
+		"confirmRemove": "Remove the worker {{name}}? Runs stop going to it; its token stops working.",
 		"makeDefault": "Send runs here",
 		"install": "Show install command",
 		"working": "Working..."

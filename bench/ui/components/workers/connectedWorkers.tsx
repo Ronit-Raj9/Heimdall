@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 import { Boxes, Cloud, Plus, Server, Ship } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { useSetWorkerTargetMutation } from "@/lib/store/apis/workerTargetApi";
+import { useConfirm } from "@/components/platform/confirmDialog";
+import { useConfirmTarget } from "./whereRunsGo";
 import { useTranslation } from "react-i18next";
 
 import type byoworkerEn from "@/locales/en/byoworker.json";
@@ -111,15 +113,30 @@ export function ConnectionCard({ conn }: { conn: WorkerConnection }) {
 	const [act, actState] = useWorkerConnectionActionMutation();
 	const [reveal, revealState] = useWorkerInstallCommandMutation();
 	const [setTarget] = useSetWorkerTargetMutation();
+	const { t: th } = useTranslation("hw05");
+	const confirm = useConfirm();
+	const askTarget = useConfirmTarget();
 	const locale = getLocale();
 	const Icon = PLATFORM_ICON[conn.platform] ?? Boxes;
 	const runner = conn.runner;
 	const seen = runner ? formatRelative(runner.last_seen, locale) : null;
 	const starts = conn.platform !== "vm";
 	const running = conn.instance && (conn.instance.state === "starting" || conn.instance.state === "running");
-	const run = (action: WorkerAction) => {
-		if (action === "remove" && !window.confirm(t("actions.confirmRemove", { name: conn.name }))) return;
+	const run = async (action: WorkerAction) => {
+		if (
+			action === "remove" &&
+			!(await confirm(t("actions.confirmRemove", { name: conn.name }), {
+				confirmLabel: th("remove.confirmOk"),
+				cancelLabel: th("remove.confirmKeep"),
+				destructive: true,
+			}))
+		)
+			return;
 		void act({ id: conn.id, action });
+	};
+	const sendHere = async () => {
+		const target = `worker:${conn.pool}`;
+		if (await askTarget(target)) void setTarget(target);
 	};
 	const capacity = runner ? t("card.slots", { used: runner.running_slots, total: runner.slots }) : (conn.health?.capacity ?? null);
 	return (
@@ -187,7 +204,7 @@ export function ConnectionCard({ conn }: { conn: WorkerConnection }) {
 						size="sm"
 						variant="outline"
 						disabled={actState.isLoading}
-						onClick={() => run("check")}
+						onClick={() => void run("check")}
 						data-testid={`byo-card-${conn.name}-check`}
 					>
 						{t("actions.check")}
@@ -199,13 +216,13 @@ export function ConnectionCard({ conn }: { conn: WorkerConnection }) {
 							size="sm"
 							variant="outline"
 							disabled={actState.isLoading}
-							onClick={() => run("stop")}
+							onClick={() => void run("stop")}
 							data-testid={`byo-card-${conn.name}-stop`}
 						>
 							{t("actions.stop")}
 						</Button>
 					) : (
-						<Button size="sm" disabled={actState.isLoading} onClick={() => run("start")} data-testid={`byo-card-${conn.name}-start`}>
+						<Button size="sm" disabled={actState.isLoading} onClick={() => void run("start")} data-testid={`byo-card-${conn.name}-start`}>
 							{t("actions.start")}
 						</Button>
 					))}
@@ -221,12 +238,7 @@ export function ConnectionCard({ conn }: { conn: WorkerConnection }) {
 					</Button>
 				)}
 				{!conn.default && (
-					<Button
-						size="sm"
-						variant="ghost"
-						onClick={() => void setTarget(`worker:${conn.pool}`)}
-						data-testid={`byo-card-${conn.name}-default`}
-					>
+					<Button size="sm" variant="ghost" onClick={() => void sendHere()} data-testid={`byo-card-${conn.name}-default`}>
 						{t("actions.makeDefault")}
 					</Button>
 				)}
@@ -235,7 +247,7 @@ export function ConnectionCard({ conn }: { conn: WorkerConnection }) {
 					variant="ghost"
 					className="text-chart-error-ink"
 					disabled={actState.isLoading}
-					onClick={() => run("remove")}
+					onClick={() => void run("remove")}
 					data-testid={`byo-card-${conn.name}-remove`}
 				>
 					{t("actions.remove")}

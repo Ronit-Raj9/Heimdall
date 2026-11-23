@@ -74,8 +74,10 @@ func (w *Worker) applyLeaseCredentials(ctx context.Context, lease *schemas.Worke
 	var gw OrgCredentialGateway
 	var lg OrgLogPolicyGateway
 	if w.reg != nil && w.reg.Gateway != nil {
-		gw, _ = w.reg.Gateway.(OrgCredentialGateway)
-		lg, _ = w.reg.Gateway.(OrgLogPolicyGateway)
+		// Fix wave 3 (N216): look through wrappers such as sandbox.Gateway,
+		// which promote only the schemas.Gateway methods of the inner gateway.
+		gw, _ = schemas.GatewayAs[OrgCredentialGateway](w.reg.Gateway)
+		lg, _ = schemas.GatewayAs[OrgLogPolicyGateway](w.reg.Gateway)
 	}
 	var out schemas.LeaseCredentials
 	err := w.call(ctx, http.MethodGet, workerAPI+"/leases/"+url.PathEscape(lease.LeaseID)+"/credentials", nil, &out)

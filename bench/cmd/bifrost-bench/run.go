@@ -284,7 +284,7 @@ func (a *app) executeOpts(ctx context.Context, m *schemas.Manifest, opts engine.
 			indexOnSeal(ctx, a, m.ExpID, ev) // Index and trends area: results index update when a run seals (index.go)
 		}
 	}()
-	janitor := engine.NewJanitor(a.reg.Gateway, a.docker, a.logger)
+	janitor := serverJanitor(a.reg.Gateway, a.docker, a.logger) // fix wave 3, N218: nil without Docker
 	sched := engine.NewScheduler(a.reg, a.cfg.Root, a.logger, janitor)
 	rctx, stopRun := runContext(ctx)
 	defer stopRun()

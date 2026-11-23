@@ -247,7 +247,7 @@ func TestDriverRefusesOpenSandbox(t *testing.T) {
 
 func TestDriverImageAndRefusals(t *testing.T) {
 	d, _ := NewDriver(DriverConfig{Platform: newFakePlatform(), Local: fakeLocal{}})
-	if _, err := d.resolveImage(context.Background(), nil, "local-only:1", &record{}); err == nil || !strings.Contains(err.Error(), "push it to a registry") {
+	if _, err := d.resolveImage(context.Background(), nil, "local-only:1", &record{}); err == nil || !strings.Contains(err.Error(), "needs an image registry it can pull from") {
 		t.Fatalf("local image = %v", err)
 	}
 	why := d.Refusals(environments.DriverSlot{Task: &schemas.Task{Sessions: []schemas.SessionSpec{{}}}, Probe: &schemas.ProbeSpec{Layer: schemas.LayerFixture},

@@ -222,11 +222,17 @@ func (s *Service) CreateToken(ctx context.Context, orgID, createdBy string, req 
 	return &schemas.RunnerTokenCreated{Token: token, Info: *view, Command: s.StartCommand(pool, name), Install: s.InstallCommand(pool, name)}, nil
 }
 
-// StartCommand is the `bifrost-bench runner start` line for a token of pool,
+// TokenFile is the one file a runner token is saved in (mode 0600) and read
+// from by the start and install lines (fix wave 3, N225). It stays unquoted
+// in the lines so the shell expands ~ before sudo, to the home of the person
+// who saved it.
+const TokenFile = "~/.heimdall-runner-token"
+
+// StartCommand is the `heimdall runner start` line for a token of pool,
 // run from the bench folder of the runner's checkout with the token saved in
-// ~/.heimdall-runner-token (mode 0600).
+// TokenFile.
 func (s *Service) StartCommand(pool, name string) string {
-	cmd := "heimdall runner start -server " + shellQuote(s.serverURL()) + " -token-file ~/.heimdall-runner-token -pool " + shellQuote(pool)
+	cmd := "heimdall runner start -server " + shellQuote(s.serverURL()) + " -token-file " + TokenFile + " -pool " + shellQuote(pool)
 	if n := runnerName(name); n != "" {
 		cmd += " -name " + shellQuote(n)
 	}
@@ -234,10 +240,10 @@ func (s *Service) StartCommand(pool, name string) string {
 }
 
 // InstallCommand is the install script line for a fresh Ubuntu or Debian box
-// (deploy/runner/install.sh), reading the token from ./runner-token.
+// (deploy/runner/install.sh), reading the token from TokenFile.
 func (s *Service) InstallCommand(pool, name string) string {
 	cmd := "curl -fsSLo install.sh " + shellQuote(s.serverURL()+"/api/bench/runners/install.sh") +
-		" && sudo bash install.sh --server " + shellQuote(s.serverURL()) + " --token-file ./runner-token --pool " + shellQuote(pool)
+		" && sudo bash install.sh --server " + shellQuote(s.serverURL()) + " --token-file " + TokenFile + " --pool " + shellQuote(pool)
 	if n := runnerName(name); n != "" {
 		cmd += " --name " + shellQuote(n)
 	}

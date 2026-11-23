@@ -398,7 +398,7 @@ func (l *launcher) execute(ctx context.Context, m *schemas.Manifest, run *liveRu
 	defer stopRun()
 
 	l.applyLocalOrgKeys(ctx, m, log) // G10: local serve delivers Models page keys to its gateway (keybudget.go)
-	janitor := engine.NewJanitor(l.a.reg.Gateway, l.a.docker, l.a.logger)
+	janitor := serverJanitor(l.a.reg.Gateway, l.a.docker, l.a.logger)
 	sched := engine.NewScheduler(l.a.reg, l.a.cfg.Root, l.a.logger, janitor)
 	sum, err := sched.Run(rctx, m, engine.RunOptions{Resume: true, Events: events, Remote: l.coord, RemoteOnly: l.remoteOnly})
 	close(events)

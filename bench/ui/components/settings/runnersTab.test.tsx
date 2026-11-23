@@ -3,7 +3,8 @@ import "@/lib/i18n";
 import { RUNNERS, hostedSession } from "@/lib/testing/platformFixtures";
 import { okQuery, render } from "@/lib/testing/render";
 import { describe, expect, it, vi } from "vitest";
-import { RunnersTab } from "./runnersTab";
+import { runnerStartCommand } from "@/components/platform/platform.utils";
+import { RunnersTab, tokenFileOf } from "./runnersTab";
 
 const api = vi.hoisted(() => ({ runners: {} as unknown }));
 
@@ -93,5 +94,14 @@ describe("RunnersTab shared worker (N12, N13)", () => {
 		expect(html).toContain("This server&#x27;s shared worker runs 2 at a time for all organizations together.");
 		api.runners = okQuery({ mode: "live", runners: [{ ...shared, labels: ["shared"] }] });
 		expect(render(<RunnersTab org={org} />, hostedSession("admin"))).not.toContain("for all organizations together");
+	});
+
+	it("saves the token in the file the start and install lines read (N225)", () => {
+		const start = "heimdall runner start -server 'https://h.dev' -token-file ~/.heimdall-runner-token -pool gpu";
+		const install =
+			"curl -fsSLo install.sh 'https://h.dev/api/bench/runners/install.sh' && sudo bash install.sh --server 'https://h.dev' --token-file ~/.heimdall-runner-token --pool gpu";
+		expect(tokenFileOf(start)).toBe(tokenFileOf(install));
+		expect(tokenFileOf("heimdall runner start")).toBe("~/.heimdall-runner-token");
+		expect(tokenFileOf(runnerStartCommand("https://h.dev", "gpu"))).toBe("~/.heimdall-runner-token");
 	});
 });

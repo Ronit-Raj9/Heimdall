@@ -1,0 +1,17 @@
+{
+	"target": {
+		"confirmTitle": "Change where runs go?",
+		"confirmBody": "New evaluations of this organization will run on {{target}}. Runs not started yet also move.",
+		"confirmBodyPerEvaluation": "New evaluations of this organization will run on {{target}}. Evaluations already started keep running where they are.",
+		"confirmBilled": "Each run starts a {{platform}} sandbox billed to your {{platform}} account.",
+		"confirmOk": "Send runs to {{target}}",
+		"confirmKeep": "Keep {{current}}"
+	},
+	"remove": {
+		"confirmOk": "Remove worker",
+		"confirmKeep": "Keep it"
+	},
+	"runners": {
+		"installLine": "Or install on a fresh Linux box in one line (after step 1):"
+	}
+}
