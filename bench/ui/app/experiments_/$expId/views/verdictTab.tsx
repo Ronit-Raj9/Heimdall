@@ -1,6 +1,6 @@
 import { VerdictCalibration } from "@/components/calibration/calibrationPanel"; // W8 judge calibration
 import { ConfigDiff } from "@/components/configDiff";
-import { TERMINAL_STATES, suiteName, systemExperiment, type SystemExperimentKind } from "@/components/experiments/experiments.utils";
+import { TERMINAL_STATES, isDebugExperiment, suiteName, systemExperiment, type SystemExperimentKind } from "@/components/experiments/experiments.utils";
 import { compareHref, compareSearch } from "@/components/experiments/legacyRoutes";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -148,13 +148,16 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 	const [, setTab] = useQueryState("tab", parseAsString);
 	const status = useGetExperimentQuery(expId);
 	const live = status.data ? !TERMINAL_STATES.has(status.data.state) && status.data.state !== "created" : false;
+	// A debug experiment is not analysed (D13): the server answers 404 for its verdict, so nothing is asked (N247).
+	const debug = Boolean(status.data && status.data.exp_id === expId && isDebugExperiment(status.data));
 	// While the comparison runs, the Result tab re-reads the verdict at the status interval so the partial numbers move (N197).
 	const verdict = useGetVerdictQuery(grade ? { expId, gradeSource: grade } : expId, {
 		pollingInterval: live ? EXPERIMENT_POLL_MS : 0,
 		skipPollingIfUnfocused: true,
+		skip: debug,
 	});
 	// The diagnostics come from the same analysis as the verdict, so they read the same grade source.
-	const diagnostics = useGetDiagnosticsQuery(grade ? { expId, gradeSource: grade } : expId);
+	const diagnostics = useGetDiagnosticsQuery(grade ? { expId, gradeSource: grade } : expId, { skip: debug });
 	const grid = useGetGridQuery(expId);
 	const catalog = useGetCatalogQuery();
 
@@ -183,6 +186,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 		[navigate, setTab, expId],
 	);
 
+	if (debug) return <DebugNotScored />;
 	if (verdict.isLoading) return <VerdictSkeleton />;
 	if (verdict.isError || !verdict.data) {
 		return (
@@ -422,6 +426,16 @@ function setupNames(setups: ExperimentStatus["setups"], t: THw09): Record<string
  * that the result is not final (N197); for a check Heimdall ran itself, that it is not a
  * comparison, with a link to the benchmark's Build tab for a readiness check (N253).
  */
+/** The Result tab of a debug experiment: its runs are not scored, so there is no verdict and no error (N247). */
+export function DebugNotScored() {
+	const { t } = useTranslation("experimentsUx");
+	return (
+		<p className="text-muted-foreground rounded-sm border px-4 py-3 text-sm" data-testid="verdict-debug-not-scored">
+			{t("kind.debug")}
+		</p>
+	);
+}
+
 export function VerdictTabNotes({
 	partial,
 	system,

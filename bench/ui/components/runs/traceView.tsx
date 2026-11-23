@@ -23,6 +23,7 @@ import {
 	isErrorStep,
 	isMismatchStep,
 	stepIO,
+	stepParamSelection,
 	tokenizeJson,
 	traceKind,
 	usageByRequest,
@@ -155,6 +156,16 @@ export function TraceView({
 	const callMap = useMemo(() => callsByRequest(calls), [calls]);
 	const [selected, setSelected] = useState<number | null>(initialStep ?? null);
 	const scrolledRef = useRef(false);
+	// "Show that step" changes ?step= while the trace is already open: select and scroll to the new step.
+	const stepParamRef = useRef(initialStep);
+	useEffect(() => {
+		const prev = stepParamRef.current;
+		stepParamRef.current = initialStep;
+		if (initialStep === undefined || initialStep === prev) return;
+		setSelected((current) => stepParamSelection(prev, initialStep, current));
+		setFilter("all");
+		scrolledRef.current = false;
+	}, [initialStep]);
 	useEffect(() => {
 		if (scrolledRef.current || initialStep === undefined || !visible.some((s) => s.seq === initialStep)) return;
 		scrolledRef.current = true;

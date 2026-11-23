@@ -224,3 +224,12 @@ export function runTraceUrl(
 ): string {
   return `${base}/runs/${encodeURIComponent(runId)}/trace?format=${format}`;
 }
+
+/**
+ * The selected step after the page's ?step= value changes from `prev` to `next` while the trace is open
+ * ("Show that step" on another tab): a newly asked-for step is selected; an unchanged or removed value
+ * keeps the current selection. Pure.
+ */
+export function stepParamSelection(prev: number | undefined, next: number | undefined, current: number | null): number | null {
+	return next !== undefined && next !== prev ? next : current;
+}
