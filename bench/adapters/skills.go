@@ -96,7 +96,9 @@ func SkillsDir(cfg *schemas.AgentConfig) (string, error) {
 // root after symlinks are resolved, and two skills may not share a name.
 // A skill an agent uploaded (agents/<id>/skills/<name>) must have a passing
 // scan of its current files (skillgate.go); an upload collection that is
-// missing or empty installs nothing. skills.enabled false returns none.
+// missing or empty installs nothing. While RestrictSkillsExtra is on (hosted
+// server, shared worker), skills.extra may name only upload collections
+// (skillextra.go). skills.enabled false returns none.
 func ResolveSkills(benchRoot string, cfg *schemas.AgentConfig, task *schemas.Task) ([]Skill, error) {
 	if !SkillsEnabled(cfg) {
 		return nil, nil
@@ -127,12 +129,19 @@ func ResolveSkills(benchRoot string, cfg *schemas.AgentConfig, task *schemas.Tas
 	from := map[string]string{} // skill name -> source field
 	var out []Skill
 	for _, src := range sources {
+		restricted := src.extra && SkillsExtraRestricted()
+		if restricted && !extraEntryAllowed(src.rel) {
+			return nil, fmt.Errorf("%s %q: %w", src.field, src.rel, errSkillsExtra)
+		}
 		if src.extra && emptyUploadCollection(src.root, src.rel) {
 			continue
 		}
 		dir, err := resolveInside(src.root, src.rel)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", src.field, err)
+		}
+		if restricted && !extraDirAllowed(src.root, dir) {
+			return nil, fmt.Errorf("%s %q: %w", src.field, src.rel, errSkillsExtra)
 		}
 		found, err := skillsIn(dir)
 		if err != nil {

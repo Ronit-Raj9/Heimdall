@@ -225,7 +225,10 @@ func agentCopyDir(ctx context.Context, ps projectfs.Store, from, to string, opts
 			return "read agents/" + e.Path, err
 		}
 		dst := path.Join(to, strings.TrimPrefix(e.Path, from+"/"))
-		if _, err := ps.Write(ctx, projectfs.AreaAgents, dst, data, opts); err != nil {
+		o := opts
+		// A copied scan record stays bound to the identical copied files.
+		o.System = projectfs.IsReserved(projectfs.AreaAgents, dst)
+		if _, err := ps.Write(ctx, projectfs.AreaAgents, dst, data, o); err != nil {
 			return "write agents/" + dst, err
 		}
 	}

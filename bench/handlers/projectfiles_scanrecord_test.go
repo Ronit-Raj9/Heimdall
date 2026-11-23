@@ -17,7 +17,7 @@ func TestProjectFilesRefuseScanRecordWrites(t *testing.T) {
 		t.Fatal(err)
 	}
 	record := []byte(`{"decision":"blocked","tree_sha256":"abc"}`)
-	if _, err := store.Write(context.Background(), projectfs.AreaAgents, "x/skill-scans/y.json", record, projectfs.WriteOpts{}); err != nil {
+	if _, err := store.Write(context.Background(), projectfs.AreaAgents, "x/skill-scans/y.json", record, projectfs.WriteOpts{System: true}); err != nil {
 		t.Fatal(err)
 	}
 	c := newProjectFilesClient(t, store)

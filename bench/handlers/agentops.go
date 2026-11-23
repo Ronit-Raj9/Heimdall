@@ -197,6 +197,8 @@ func actor(ctx *fasthttp.RequestCtx) string {
 // fsError maps a projectfs error to a status and message.
 func (h *agentOpsHandler) fsError(ctx *fasthttp.RequestCtx, what string, err error) {
 	switch {
+	case errors.Is(err, projectfs.ErrReserved):
+		h.fail(ctx, fasthttp.StatusForbidden, lib.ErrTypeForbidden, scanRecordRefusal)
 	case errors.Is(err, projectfs.ErrNotFound):
 		h.fail(ctx, fasthttp.StatusNotFound, lib.ErrTypeNotFound, what+": not found")
 	case errors.Is(err, projectfs.ErrOutside):
@@ -510,7 +512,10 @@ func (h *agentOpsHandler) scanAndApply(ctx *fasthttp.RequestCtx, ps projectfs.St
 	}
 	data, err := json.MarshalIndent(adapters.SkillScanFile{Decision: decision, TreeSHA256: sum, ScannedAt: time.Now().UTC(), Record: rec}, "", "  ")
 	if err == nil {
-		_, err = ps.Write(ctx, projectfs.AreaAgents, skillScanRel(ref.ID, name), append(data, '\n'), o)
+		// The only writer of scan records (projectfs refuses every other one).
+		sys := o
+		sys.System = true
+		_, err = ps.Write(ctx, projectfs.AreaAgents, skillScanRel(ref.ID, name), append(data, '\n'), sys)
 	}
 	if err != nil {
 		h.fsError(ctx, "save the scan of skill "+name, err)
@@ -578,7 +583,9 @@ func moveSkillFolder(ctx context.Context, ps projectfs.Store, from, to string, o
 // to delete.
 func removeSkill(ctx context.Context, ps projectfs.Store, id, name string, o projectfs.WriteOpts) (found bool, err error) {
 	for _, rel := range []string{skillsDir(id) + "/" + name, pendingSkillsDir(id) + "/" + name, skillScanRel(id, name)} {
-		err := ps.Delete(ctx, projectfs.AreaAgents, rel, o)
+		do := o
+		do.System = projectfs.IsReserved(projectfs.AreaAgents, rel) // the record goes with its skill
+		err := ps.Delete(ctx, projectfs.AreaAgents, rel, do)
 		switch {
 		case err == nil:
 			found = found || !strings.HasSuffix(rel, ".json")

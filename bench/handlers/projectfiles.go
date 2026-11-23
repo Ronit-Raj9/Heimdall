@@ -105,9 +105,14 @@ func (h *projectFilesHandler) refuseScanRecordPath(ctx *fasthttp.RequestCtx, a p
 	if !isScanRecordPath(a, rel) {
 		return false
 	}
-	lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, "Scan records are written by Heimdall only.")
+	lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, scanRecordRefusal)
 	return true
 }
+
+// scanRecordRefusal is the answer to any write, delete or zip entry under
+// agents/<id>/skill-scans/ that is not Heimdall's own scan
+// (projectfs.ErrReserved, fix wave 3, SEC-B).
+const scanRecordRefusal = "Scan records are written by Heimdall only."
 
 // isScanRecordPath reports whether rel in area a is under
 // agents/<id>/skill-scans/ (the folder itself included), after cleaning.
@@ -179,6 +184,8 @@ func (h *projectFilesHandler) pathParams(ctx *fasthttp.RequestCtx) (projectfs.Ar
 // sendStoreError maps projectfs errors to statuses with a next step.
 func (h *projectFilesHandler) sendStoreError(ctx *fasthttp.RequestCtx, rel string, err error) {
 	switch {
+	case errors.Is(err, projectfs.ErrReserved):
+		lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, scanRecordRefusal)
 	case errors.Is(err, projectfs.ErrOutside):
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest,
 			fmt.Sprintf("path %q is outside the project area: use a relative path without \"..\", .git or .heimdall", rel))

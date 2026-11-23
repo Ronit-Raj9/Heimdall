@@ -78,6 +78,9 @@ func (s *store) Write(ctx context.Context, a Area, rel string, data []byte, o Wr
 	if c == "" || c == "." {
 		return Entry{}, ErrInvalid
 	}
+	if err := checkReserved(a, c, o); err != nil {
+		return Entry{}, err
+	}
 	if st, err := os.Stat(full); err == nil && st.IsDir() {
 		return Entry{}, ErrInvalid
 	}
@@ -110,6 +113,9 @@ func (s *store) Delete(ctx context.Context, a Area, rel string, o WriteOpts) err
 	c, _ := cleanRel(rel)
 	if c == "" || c == "." {
 		return ErrInvalid
+	}
+	if err := checkReserved(a, c, o); err != nil {
+		return err
 	}
 	unlock := s.lock()
 	defer unlock()
