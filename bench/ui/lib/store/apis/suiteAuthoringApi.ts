@@ -71,6 +71,14 @@ export const suiteAuthoringApi = benchApi.enhanceEndpoints({ addTagTypes: ["Suit
 				{ type: "BenchSuites", id: "LIST" },
 			],
 		}),
+		// Fix wave 3, N288: delete a benchmark of the organization (204); its comparisons and runs stay.
+		deleteSuite: builder.mutation<void, string>({
+			query: (suite) => ({ url: `/suites/${seg(suite)}`, method: "DELETE" }),
+			invalidatesTags: (_r, _e, suite) => [
+				{ type: "BenchSuites", id: "LIST" },
+				{ type: "SuiteAuthoring", id: suite },
+			],
+		}),
 		getSuiteLint: builder.query<SuiteLintReport, string>({
 			query: (suite) => `/suites/${seg(suite)}/lint`,
 			providesTags: (_r, _e, suite) => [{ type: "SuiteAuthoring", id: `${suite}/lint` }],
@@ -94,4 +102,5 @@ export const {
 	useDeleteSuiteFileMutation,
 	useUploadSuiteZipMutation,
 	useGetSuiteLintQuery,
+	useDeleteSuiteMutation,
 } = suiteAuthoringApi;

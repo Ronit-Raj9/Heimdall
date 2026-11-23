@@ -28,6 +28,7 @@ import { DataTab } from "./dataTab";
 import { OpsTab } from "./opsTab";
 import { EditTab } from "./editTab";
 import { SuiteExportTab, SuiteHealthTab, SuiteTiersTab } from "./suiteTabs";
+import { SuiteDeleteSection } from "./suiteDeleteSection";
 import { SuiteTasksTab } from "./tasksTab";
 import { ReviewTab } from "./reviewTab";
 
@@ -119,7 +120,7 @@ function SuiteBody({
 		},
 		{ id: "calibration", label: tu("tabs.calibration"), hidden: !judged },
 		{ id: "ops", label: tu("tabs.ops") },
-		{ id: "edit", label: tu("tabs.edit"), hidden: builtin }, // L10 suite authoring; a built-in library suite is read-only
+		{ id: "edit", label: tu("tabs.edit"), hidden: builtin, aliases: ["files"] }, // L10 suite authoring; a built-in library suite is read-only; N271: ?tab=files opens it
 		{ id: "export", label: tu("tabs.export") },
 	];
 	const { t: tg } = useTranslation("gw07");
@@ -251,6 +252,7 @@ function SuiteBody({
 							active === "settings" ? (
 								<div className="bg-card min-w-0 rounded-xl border p-5" data-testid="suite-settings">
 									<SuiteFacts suite={suite} showLeaderboard={false} showImported={false} />
+									<SuiteDeleteSection suiteId={suite.id} builtin={builtin} />
 								</div>
 							) : active === "health" ? (
 								<SuiteHealthTab suite={suite} health={health} />
