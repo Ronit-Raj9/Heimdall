@@ -97,6 +97,10 @@ type Summary struct {
 	Pending       int    `json:"pending"`        // slots not leased because of the spend cap or cancellation
 	Errors        int    `json:"errors"`         // slots that hit a store or seal error
 	BudgetStopped bool   `json:"budget_stopped"` // the spend cap stopped leasing
+	// NextRunUSD is the expected cost of the run the cap refused, when the
+	// stop came from the rule that a run starts only when its expected cost
+	// fits (fix wave 3, N190); 0 when the spend itself reached the cap.
+	NextRunUSD float64 `json:"next_run_usd,omitempty"`
 	// SpentUSD is the bench's modeled spend: token usage priced at the
 	// pinned price table, plus the per-run estimate for unknown costs. It is
 	// never the provider's bill; SpendBasis says what it was priced from.
@@ -318,8 +322,12 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 	if stopped && !out.GatewayBudgetStopped { // C06: a gateway budget stop has its own event (evalbudget.go)
 		r.s.logger.Warn("spend cap stopped leasing", "experiment", m.ExpID, "cap_usd", r.capUSD(),
 			"spent_usd", out.SpentUSD, "pending", out.Pending, "unknown_cost_runs", out.UnknownCostRuns)
-		r.emit(Event{Kind: EventBudgetStop, Message: fmt.Sprintf("spend cap %.2f USD reached at %.4f USD; %d slots not leased; %d runs had an unknown cost, counted at the per-run estimate; raise the cap with run -resume %s -total-usd <usd>",
-			r.capUSD(), out.SpentUSD, out.Pending, out.UnknownCostRuns, m.ExpID)})
+		next := ""
+		if out.NextRunUSD > 0 { // N190: stopped before a run whose expected cost did not fit
+			next = fmt.Sprintf("; the next run was expected to cost about %.4f USD", out.NextRunUSD)
+		}
+		r.emit(Event{Kind: EventBudgetStop, Message: fmt.Sprintf("spend cap %.2f USD reached at %.4f USD%s; %d slots not leased; %d runs had an unknown cost, counted at the per-run estimate; raise the cap with run -resume %s -total-usd <usd>",
+			r.capUSD(), out.SpentUSD, next, out.Pending, out.UnknownCostRuns, m.ExpID)})
 	}
 	r.emit(Event{Kind: EventDone, Message: fmt.Sprintf("sealed %d, skipped %d, pending %d", out.Sealed, out.Skipped, out.Pending)})
 	r.mu.Lock()
@@ -860,8 +868,14 @@ func (r *schedRun) tryReserve() (est float64, ok, wait bool) {
 }
 
 // reserveLocked is one pass of the reservation rule under mu: at or past the
-// cap stop for good; below it reserve when nothing is in flight or the spend
-// plus every in-flight reservation is below the cap; else report wait.
+// cap stop for good. When a run's expected cost is known (an observed cost
+// or budget.reserve_usd), a run starts only when the spend plus every
+// in-flight reservation plus its own expected cost fits the cap; when it
+// does not fit, it waits for in-flight runs, and with nothing in flight the
+// scheduler stops for good and records that run's expected cost (fix wave
+// 3, N190: a budget below one run's cost starts nothing). When the cost is
+// not known yet, runs go one at a time with the whole remaining budget
+// reserved, so only that first run can pass the cap.
 func (r *schedRun) reserveLocked() (est float64, ok, wait bool) {
 	limit := r.capUSD()
 	if !r.stopped && r.sum.SpentUSD >= limit {
@@ -870,11 +884,21 @@ func (r *schedRun) reserveLocked() (est float64, ok, wait bool) {
 	if r.stopped {
 		return 0, false, false
 	}
-	if r.inflight == 0 || r.sum.SpentUSD+r.reserved < limit {
-		est = r.estimateLocked()
+	est = r.estimateLocked()
+	known := (r.observed && r.maxCost > 0) || r.m.Experiment.Budget.ReserveUSD > 0
+	fits := r.inflight == 0 || r.sum.SpentUSD+r.reserved < limit
+	if known {
+		fits = r.sum.SpentUSD+r.reserved+est <= limit+1e-9
+	}
+	if fits {
 		r.reserved += est
 		r.inflight++
 		return est, true, false
+	}
+	if r.inflight == 0 {
+		r.sum.NextRunUSD = est
+		r.stopLocked()
+		return 0, false, false
 	}
 	return 0, false, true
 }

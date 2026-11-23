@@ -109,7 +109,7 @@ func TestSchedulerSpendCap(t *testing.T) {
 	b := newBench(t)
 	b.w.cost = 0.6
 	e := testExperiment()
-	e.Budget.TotalUSD = 1.0
+	e.Budget.TotalUSD = 1.2 // fix wave 3 (N190): a run starts only when its expected 0.6 fits, so two fit
 	m := b.plan(t, e)
 	ctx := context.Background()
 	events := make(chan Event, 256)
@@ -144,7 +144,7 @@ func TestSchedulerResumeRaisedCap(t *testing.T) {
 	b := newBench(t)
 	b.w.cost = 0.6
 	e := testExperiment()
-	e.Budget.TotalUSD = 1.0
+	e.Budget.TotalUSD = 1.2 // fix wave 3 (N190): two runs of 0.6 fit
 	m := b.plan(t, e)
 	hash := m.Hash
 	ctx := context.Background()
@@ -156,12 +156,12 @@ func TestSchedulerResumeRaisedCap(t *testing.T) {
 		t.Fatalf("first run %+v", sum)
 	}
 	events := make(chan Event, 256)
-	raised, err := NewScheduler(b.reg, b.root, nil, nil).Run(ctx, m, RunOptions{Resume: true, Concurrency: 1, TotalUSD: 1.5, Events: events})
+	raised, err := NewScheduler(b.reg, b.root, nil, nil).Run(ctx, m, RunOptions{Resume: true, Concurrency: 1, TotalUSD: 1.8, Events: events})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if raised.Skipped != 2 || raised.Sealed != 1 || raised.Pending != 1 || !raised.BudgetStopped || b.w.count("exec") != 3 {
-		t.Fatalf("raised cap 1.5 should admit exactly one more run: %+v, exec %d", raised, b.w.count("exec"))
+		t.Fatalf("raised cap 1.8 should admit exactly one more run: %+v, exec %d", raised, b.w.count("exec"))
 	}
 	var stopMsg string
 	for len(events) > 0 {
@@ -169,7 +169,7 @@ func TestSchedulerResumeRaisedCap(t *testing.T) {
 			stopMsg = ev.Message
 		}
 	}
-	if !strings.Contains(stopMsg, "spend cap 1.50 USD") || !strings.Contains(stopMsg, "-total-usd") {
+	if !strings.Contains(stopMsg, "spend cap 1.80 USD") || !strings.Contains(stopMsg, "-total-usd") {
 		t.Fatalf("budget_stop event should name the raised cap and how to raise it: %q", stopMsg)
 	}
 	done, err := NewScheduler(b.reg, b.root, nil, nil).Run(ctx, m, RunOptions{Resume: true, Concurrency: 1, TotalUSD: 10})
@@ -179,7 +179,7 @@ func TestSchedulerResumeRaisedCap(t *testing.T) {
 	if done.Sealed != 1 || done.Skipped != 3 || done.BudgetStopped || b.w.count("exec") != 4 {
 		t.Fatalf("cap 10 should finish the last slot: %+v", done)
 	}
-	if m.Hash != hash || m.Experiment.Budget.TotalUSD != 1.0 {
+	if m.Hash != hash || m.Experiment.Budget.TotalUSD != 1.2 {
 		t.Fatalf("manifest changed: hash %s (was %s), total_usd %v", m.Hash, hash, m.Experiment.Budget.TotalUSD)
 	}
 }

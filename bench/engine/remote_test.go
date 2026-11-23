@@ -427,7 +427,7 @@ func TestRemoteHeartbeatLostStopsWorker(t *testing.T) {
 
 func TestRemoteSpendCapAcrossWorkers(t *testing.T) {
 	e := testExperiment()
-	e.Budget.TotalUSD = 1.0
+	e.Budget.TotalUSD = 1.2 // fix wave 3 (N190): the second run starts only when its expected 0.6 fits
 	rw := newRemoteWorld(t, e, RemoteOptions{})
 	done := rw.attach(t)
 	ctx := context.Background()
