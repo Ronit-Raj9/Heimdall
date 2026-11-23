@@ -387,6 +387,7 @@ class _AdmissionRecordRequired(TypedDict):
 
 
 class AdmissionRecord(_AdmissionRecordRequired, total=False):
+    carry_fingerprint: str
     fingerprint: str
     grader: str
     reference_repeats: int
@@ -880,9 +881,23 @@ class _AgentReportCardRequired(TypedDict):
 
 
 class AgentReportCard(_AgentReportCardRequired, total=False):
+    evaluation_created_at: Optional[str]
+    evaluation_id: str
+    evaluation_name: str
+    evaluations: List[AgentReportCardEvaluation]
+    matching_evaluations: int
     model: str
     models: List[str]
     version: int
+
+
+class _AgentReportCardEvaluationRequired(TypedDict):
+    created_at: str
+    id: str
+
+
+class AgentReportCardEvaluation(_AgentReportCardEvaluationRequired, total=False):
+    name: str
 
 
 class _AgentSkillRequired(TypedDict):
@@ -1423,7 +1438,9 @@ class _AppTasksDraftViewRequired(TypedDict):
 
 class AppTasksDraftView(_AppTasksDraftViewRequired, total=False):
     approved_by: str
+    approved_by_name: str
     created_by: str
+    created_by_name: str
     model: Optional[Pinned]
     seed: Dict[str, List[Any]]
     title: str
@@ -1836,25 +1853,6 @@ class Baseline(_BaselineRequired, total=False):
     smoke: bool
 
 
-class _BatchRequired(TypedDict):
-    clusters: List[Cluster_tracebulk]
-    counts: Counts_tracebulk
-    created: str
-    filter: Filter
-    id: str
-    repo: str
-    source: str
-    tasks: List[TaskDraft]
-    updated: str
-    workspace: str
-
-
-class Batch(_BatchRequired, total=False):
-    created_by: str
-    truncated: bool
-    warnings: List[str]
-
-
 class Behaviour(TypedDict):
     conditions: List[ConditionDiff]
     fallbacks_per_run: Change
@@ -1902,6 +1900,7 @@ class Benchmark(_BenchmarkRequired, total=False):
     judge: Optional[JudgeState]
     lock_hash: str
     suite_version: str
+    thrown_out: Dict[str, ThrownOut]
     verdict: Optional[BenchmarkVerdict]
 
 
@@ -2268,6 +2267,7 @@ class _CalibrationItemRequired(TypedDict):
 
 class CalibrationItem(_CalibrationItemRequired, total=False):
     image: str
+    labeller_name: str
     note: str
     ref: str
 
@@ -3310,6 +3310,7 @@ class ConnectionView(_ConnectionViewRequired, total=False):
     endpoint_label: str
     endpoint_required: bool
     last_tested_at: Optional[str]
+    registry: Optional[RegistryView]
     status: str
     token_last4: str
 
@@ -3555,10 +3556,14 @@ class DatasetTasksResult(TypedDict):
     version: Optional[Version_dataset]
 
 
-class DatasetVersionDetail(TypedDict):
+class _DatasetVersionDetailRequired(TypedDict):
     benchmark: str
     tasks: Dict[str, str]
     version: Version_dataset
+
+
+class DatasetVersionDetail(_DatasetVersionDetailRequired, total=False):
+    actor_name: str
 
 
 class DatasetVersionList(TypedDict):
@@ -4454,10 +4459,13 @@ class _EvaluationRequired(TypedDict):
 
 class Evaluation(_EvaluationRequired, total=False):
     created_by: str
+    failed_runs: int
     gate_result: Optional[EvaluationGateResult]
+    launch: Optional[EvaluationLaunch]
     notified_at: Optional[str]
     org: str
     paused: bool
+    problem: str
     rerun_of: str
     result: Optional[EvaluationResult]
     schedule: str
@@ -4522,6 +4530,7 @@ class EvaluationChild(_EvaluationChildRequired, total=False):
     fault_of: Dict[str, str]
     faults_skipped: List[FaultSkip]
     lock_hash: str
+    next_run_usd: float
     not_started: int
     skipped: str
     skipped_tasks: List[EvaluationSkippedTask]
@@ -4553,6 +4562,15 @@ class EvaluationGateResult(_EvaluationGateResultRequired, total=False):
     baseline: Optional[GateBaseline]
     candidate_version: int
     dataset: Optional[DatasetComparison]
+
+
+class _EvaluationLaunchRequired(TypedDict):
+    of: int
+    started: int
+
+
+class EvaluationLaunch(_EvaluationLaunchRequired, total=False):
+    current: str
 
 
 class EvaluationList(TypedDict):
@@ -4609,6 +4627,7 @@ class _EvaluationResultRequired(TypedDict):
 
 
 class EvaluationResult(_EvaluationResultRequired, total=False):
+    analyses: Dict[str, str]
     cost_usd: Optional[float]
 
 
@@ -4840,8 +4859,11 @@ class ExperimentStatus(_ExperimentStatusRequired, total=False):
     debug_from_run: str
     decision: str
     evaluation_id: str
+    extends: str
     finished_at: Optional[str]
     multi_agent: bool
+    paused: bool
+    paused_models: List[str]
     problem: str
     run_job_id: str
     setups: List[ArmSetup]
@@ -6644,7 +6666,7 @@ class Leaderboard(_LeaderboardRequired, total=False):
     split: str
 
 
-class LeaderboardEntry(TypedDict):
+class _LeaderboardEntryRequired(TypedDict):
     agent: str
     config_hash: str
     experiments: List[str]
@@ -6663,6 +6685,10 @@ class LeaderboardEntry(TypedDict):
     tier: int
     tier_reason: str
     trials: int
+
+
+class LeaderboardEntry(_LeaderboardEntryRequired, total=False):
+    tasks_solved: int
 
 
 class LeaderboardExclusion(TypedDict):
@@ -6984,7 +7010,7 @@ class MatrixPair(_MatrixPairRequired, total=False):
     p_draws: int
 
 
-class MatrixRow(TypedDict):
+class _MatrixRowRequired(TypedDict):
     agent: str
     arm: str
     config_hash: str
@@ -7007,6 +7033,10 @@ class MatrixRow(TypedDict):
     trials: int
 
 
+class MatrixRow(_MatrixRowRequired, total=False):
+    tasks_solved: int
+
+
 class MatrixSpec(TypedDict, total=False):
     agents: List[str]
     allow_unpriced: bool
@@ -7020,6 +7050,26 @@ class MaximBatchCreate(TypedDict):
 class MaximBatchList(TypedDict):
     batches: List[Summary_tracebulk]
     connected: bool
+
+
+class _MaximBatchViewRequired(TypedDict):
+    clusters: List[Cluster_tracebulk]
+    counts: Counts_tracebulk
+    created: str
+    filter: Filter
+    id: str
+    repo: str
+    source: str
+    tasks: List[MaximTaskView]
+    updated: str
+    workspace: str
+
+
+class MaximBatchView(_MaximBatchViewRequired, total=False):
+    created_by: str
+    created_by_name: str
+    truncated: bool
+    warnings: List[str]
 
 
 class _MaximConnectionRequired(TypedDict):
@@ -7060,8 +7110,8 @@ class MaximDraftRequest(_MaximDraftRequestRequired, total=False):
 
 
 class MaximDraftResult(TypedDict):
-    batch: Optional[Batch]
-    tasks: List[TaskDraft]
+    batch: Optional[MaximBatchView]
+    tasks: List[MaximTaskView]
     warnings: List[str]
 
 
@@ -7077,11 +7127,34 @@ class MaximReviewRequest(TypedDict, total=False):
 
 
 class _MaximTaskResultRequired(TypedDict):
-    task: TaskDraft
+    task: MaximTaskView
 
 
 class MaximTaskResult(_MaximTaskResultRequired, total=False):
     message: str
+
+
+class _MaximTaskViewRequired(TypedDict):
+    cluster: str
+    drafted: str
+    generated: List[str]
+    id: str
+    item: str
+    kind: str
+    readiness: Readiness
+    recorded: str
+    request: str
+    state: str
+    suggested_rubric: str
+    suite: str
+
+
+class MaximTaskView(_MaximTaskViewRequired, total=False):
+    edit_me: List[str]
+    note: str
+    reviewed: Optional[str]
+    reviewed_by: str
+    reviewed_by_name: str
 
 
 class _MaximTestResultRequired(TypedDict):
@@ -8297,6 +8370,12 @@ class PlatformImportResult(_PlatformImportResultRequired, total=False):
     inbox: Optional[PlatformImportInbox]
 
 
+class PlatformRegistryRequest(TypedDict):
+    registry: str
+    token: str
+    username: str
+
+
 class Platform_connect(TypedDict):
     help: str
     id: str
@@ -8424,6 +8503,7 @@ class PolicyDocView(_PolicyDocViewRequired, total=False):
     dry_run: bool
     shape: str
     tools: List[Tool]
+    uploaded_by_name: str
 
 
 class _PolicyDocumentRequired(TypedDict):
@@ -8454,12 +8534,16 @@ class PolicyList(TypedDict):
     policies: List[PolicySummary]
 
 
-class PolicyResult(TypedDict):
+class _PolicyResultRequired(TypedDict):
     checks: List[PolicyCheckResult]
     decision: str
     evaluated_at: str
     policy_hash: str
     policy_name: str
+
+
+class PolicyResult(_PolicyResultRequired, total=False):
+    policy_file: str
 
 
 class PolicyReviewRequest(TypedDict, total=False):
@@ -9325,6 +9409,16 @@ class RegistryCredentialList(TypedDict):
     max: int
 
 
+class _RegistryViewRequired(TypedDict):
+    registry: str
+    username: str
+
+
+class RegistryView(_RegistryViewRequired, total=False):
+    tested_at: Optional[str]
+    token_last4: str
+
+
 class RegradeRequest(TypedDict, total=False):
     id: str
     note: str
@@ -9730,6 +9824,7 @@ class _Report_reportcardRequired(TypedDict):
 class Report_reportcard(_Report_reportcardRequired, total=False):
     alignment: Optional[Alignment]
     bifrost: List[BifrostRow]
+    done_runs: int
     failover: Optional[Report_failover]
     learning: List[LearningRow]
     mcp_route: str
@@ -9737,10 +9832,12 @@ class Report_reportcard(_Report_reportcardRequired, total=False):
     note: str
     overall: Optional[OverallVerdict]
     persistence: List[PersistenceRow]
+    planned_runs: int
     practice_runs: int
     red_team: Optional[RedTeam]
     slices: List[Slice]
     status: str
+    thrown_out_runs: int
     totals: Dict[str, Totals]
     voice: List[VoiceRow]
     voice_calls: List[VoiceCallRow]
@@ -9762,6 +9859,14 @@ class Reported(TypedDict):
     role: str
     t_ms: float
     text: str
+
+
+class _RerunAllowedRequired(TypedDict):
+    allowed: bool
+
+
+class RerunAllowed(_RerunAllowedRequired, total=False):
+    reason: str
 
 
 class RerunFailuresRequest(TypedDict, total=False):
@@ -9910,6 +10015,7 @@ class RetentionInfo(_RetentionInfoRequired, total=False):
     last_sweep_at: Optional[str]
     updated_at: Optional[str]
     updated_by: str
+    updated_by_name: str
 
 
 class RetentionRequest(TypedDict):
@@ -10001,6 +10107,7 @@ class _ReviewQueueItemRequired(TypedDict):
 
 class ReviewQueueItem(_ReviewQueueItemRequired, total=False):
     decision: str
+    thrown_out_by: List[str]
 
 
 class _ReviewRequestRequired(TypedDict):
@@ -10481,6 +10588,7 @@ class RunControls(_RunControlsRequired, total=False):
     actor_names: Dict[str, str]
     log_problem: str
     paused_by_name: str
+    rerun_failures: Optional[RerunAllowed]
     rerun_of: str
 
 
@@ -10490,6 +10598,7 @@ class _RunDebugRequired(TypedDict):
 
 class RunDebug(_RunDebugRequired, total=False):
     call: int
+    edit: str
     from_condition: str
     from_exp: str
     from_run: str
@@ -10497,11 +10606,13 @@ class RunDebug(_RunDebugRequired, total=False):
 
 
 class _RunDebugAllowedRequired(TypedDict):
+    breakpoints: bool
     fork: bool
     replay: bool
 
 
 class RunDebugAllowed(_RunDebugAllowedRequired, total=False):
+    breakpoints_reason: str
     reason: str
 
 
@@ -11388,6 +11499,19 @@ class SetSummary(_SetSummaryRequired, total=False):
     readiness: str
 
 
+class _SetupsVerdictRequired(TypedDict):
+    behind: List[str]
+    leader: str
+    note: str
+    pairs: List[MatrixPair]
+    separable: bool
+    top_group: List[str]
+
+
+class SetupsVerdict(_SetupsVerdictRequired, total=False):
+    safety: Dict[str, List[str]]
+
+
 class ShareList(TypedDict):
     shares: List[ShareView]
 
@@ -11413,9 +11537,13 @@ class ShareView(_ShareViewRequired, total=False):
     url: str
 
 
-class SharedItem(TypedDict):
+class _SharedItemRequired(TypedDict):
     data: Dict[str, Any]
     share: SharedMeta
+
+
+class SharedItem(_SharedItemRequired, total=False):
+    canonical_token: str
 
 
 class _SharedMetaRequired(TypedDict):
@@ -12049,7 +12177,10 @@ class SuiteSummary(_SuiteSummaryRequired, total=False):
     lock_error: str
     lock_kind: str
     output: str
+    partial: bool
     quarantined_count: int
+    ready_known: bool
+    ready_task_ids: List[str]
     services: List[str]
     source: str
     tiers: List[SuiteTier]
@@ -12456,6 +12587,15 @@ class _TestAlertResponseRequired(TypedDict):
 
 class TestAlertResponse(_TestAlertResponseRequired, total=False):
     error: str
+
+
+class _ThrownOutRequired(TypedDict):
+    runs: int
+
+
+class ThrownOut(_ThrownOutRequired, total=False):
+    checks: Dict[str, int]
+    reasons: List[str]
 
 
 class TierPlan(TypedDict):
@@ -12908,12 +13048,15 @@ class _VerdictRequired(TypedDict):
 
 class Verdict(_VerdictRequired, total=False):
     adaptive: Optional[AdaptiveReport]
+    basis: str
     effect: Optional[Effect]
     fairness: Optional[FairnessReport]
     instruments: List[InstrumentCheck]
     invalid_reasons: List[str]
+    invalid_scope: str
     more_evidence: Optional[MoreEvidence]
     score: Optional[Score]
+    setups: Optional[SetupsVerdict]
     tasks_needed: int
     tasks_needed_over: int
     tier: str
@@ -12933,6 +13076,7 @@ class _VerdictPayloadRequired(TypedDict):
 
 class VerdictPayload(_VerdictPayloadRequired, total=False):
     judge_calibration: Optional[JudgeCalibrationVerdict]
+    partial: bool
     policy: Optional[PolicyResult]
     review_changed_runs: int
     reviewed_runs: int
@@ -13819,10 +13963,6 @@ class AwarenessReportResponse(AwarenessReport):
     mode: Mode
 
 
-class BatchResponse(Batch):
-    mode: Mode
-
-
 class BenchCatalogAddedResponse(BenchCatalogAdded):
     mode: Mode
 
@@ -14239,6 +14379,10 @@ class MaximBatchListResponse(MaximBatchList):
     mode: Mode
 
 
+class MaximBatchViewResponse(MaximBatchView):
+    mode: Mode
+
+
 class MaximConnectionResponse(MaximConnection):
     mode: Mode
 
@@ -14476,6 +14620,10 @@ class RegistryCredentialDeletedResponse(RegistryCredentialDeleted):
 
 
 class RegistryCredentialListResponse(RegistryCredentialList):
+    mode: Mode
+
+
+class RegistryViewResponse(RegistryView):
     mode: Mode
 
 
@@ -14985,6 +15133,7 @@ __all__ = [
     'AgentPlatformList',
     'AgentReport',
     'AgentReportCard',
+    'AgentReportCardEvaluation',
     'AgentSkill',
     'AgentSkills',
     'AgentSkillsResponse',
@@ -15067,7 +15216,6 @@ __all__ = [
     'AwarenessReport',
     'BargeIn',
     'Baseline',
-    'Batch',
     'Behaviour',
     'BenchCatalogAdd',
     'BenchCatalogAdded',
@@ -15308,6 +15456,7 @@ __all__ = [
     'EvaluationChild',
     'EvaluationGate',
     'EvaluationGateResult',
+    'EvaluationLaunch',
     'EvaluationList',
     'EvaluationReleaseChild',
     'EvaluationReleasePreview',
@@ -15526,6 +15675,7 @@ __all__ = [
     'MatrixSpec',
     'MaximBatchCreate',
     'MaximBatchList',
+    'MaximBatchView',
     'MaximConnection',
     'MaximConnectionPut',
     'MaximDraftRequest',
@@ -15533,6 +15683,7 @@ __all__ = [
     'MaximRejectRequest',
     'MaximReviewRequest',
     'MaximTaskResult',
+    'MaximTaskView',
     'MaximTestResult',
     'Me',
     'MeOrg',
@@ -15645,6 +15796,7 @@ __all__ = [
     'PlatformImportPreview',
     'PlatformImportRequest',
     'PlatformImportResult',
+    'PlatformRegistryRequest',
     'Platform_connect',
     'Point',
     'Policy',
@@ -15750,6 +15902,7 @@ __all__ = [
     'RegistryCredential',
     'RegistryCredentialDeleted',
     'RegistryCredentialList',
+    'RegistryView',
     'RegradeRequest',
     'Regression',
     'Related',
@@ -15784,6 +15937,7 @@ __all__ = [
     'Report_reportcard',
     'Report_taskgates',
     'Reported',
+    'RerunAllowed',
     'RerunFailuresRequest',
     'RerunFailuresResult',
     'ResearchArm',
@@ -15921,6 +16075,7 @@ __all__ = [
     'SessionResult',
     'SessionSpec',
     'SetSummary',
+    'SetupsVerdict',
     'ShareList',
     'ShareView',
     'SharedItem',
@@ -16009,6 +16164,7 @@ __all__ = [
     'TemplateParam',
     'TestAlertRequest',
     'TestAlertResponse',
+    'ThrownOut',
     'TierPlan',
     'TokenCreateRequest',
     'TokenCreated',
@@ -16150,7 +16306,6 @@ __all__ = [
     'ApplyResultResponse',
     'AuthInfoResponse',
     'AwarenessReportResponse',
-    'BatchResponse',
     'BenchCatalogAddedResponse',
     'BenchCatalogDatasetResponse',
     'BenchCatalogListResponse',
@@ -16256,6 +16411,7 @@ __all__ = [
     'MCPServerReportResponse',
     'ManifestResponse',
     'MaximBatchListResponse',
+    'MaximBatchViewResponse',
     'MaximConnectionResponse',
     'MaximDraftResultResponse',
     'MaximTaskResultResponse',
@@ -16316,6 +16472,7 @@ __all__ = [
     'RegistryCredentialResponse',
     'RegistryCredentialDeletedResponse',
     'RegistryCredentialListResponse',
+    'RegistryViewResponse',
     'ReleaseListResponse',
     'ReleaseRecordResponse',
     'ReportResponse',
