@@ -97,6 +97,12 @@ func NewHosted(cfg *lib.Config, h Hosted) (*Server, error) {
 		Mode: mode, Policy: h.Policy, Dir: h.Directory, Registry: h.Registry,
 		Platform: platform.Handler, PlatformRoutes: platform.List(), OrgRoutes: OrgRoutes(cfg),
 		Fallback: fallback, Audit: h.Audit, Logger: logger, ClientIP: h.ClientIP, Limits: h.Limits,
+		// fix wave 3, N186: Idempotency-Key on every POST under /api/, scoped to
+		// caller and org (idempotency/idempotency.go). Inside the dispatcher,
+		// after the policy check, so a stored answer is replayed only to a
+		// caller who still has access (a removed member, a lowered role or a
+		// revoked token is refused first).
+		Serve: idempotency.Middleware(mode, idempotency.NewStore()),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("new hosted server: %w", err)
@@ -108,8 +114,7 @@ func NewHosted(cfg *lib.Config, h Hosted) (*Server, error) {
 		lib.HostGuard(mode, hostedAllowedHosts(cfg)),
 		lib.CORS(cfg.Server.CORSOrigins),
 		h.Auth,
-		handlers.V1Alias(mode, h.Version, true),              // Public API v1: rewritten before the dispatcher, so policy and token scopes apply (handlers/apiv1.go)
-		idempotency.Middleware(mode, idempotency.NewStore()), // fix wave 3, N186: Idempotency-Key on every POST under /api/, scoped to caller and org (idempotency/idempotency.go)
+		handlers.V1Alias(mode, h.Version, true), // Public API v1: rewritten before the dispatcher, so policy and token scopes apply (handlers/apiv1.go)
 	)
 	s.server = &fasthttp.Server{
 		Handler:               selfmetrics.Default.Middleware(telemetry.Middleware(s.handler)), // N9: API latency for /metrics; Z14: a server span per request

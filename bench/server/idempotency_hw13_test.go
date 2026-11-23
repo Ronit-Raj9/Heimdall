@@ -4,9 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/maximhq/bifrost/bench/auth"
-	"github.com/maximhq/bifrost/bench/lib"
-	"github.com/maximhq/bifrost/bench/tenancy"
 	"github.com/valyala/fasthttp"
 )
 
@@ -36,21 +33,10 @@ func TestIdempotencyMiddlewareInLocalChain(t *testing.T) {
 }
 
 func TestIdempotencyMiddlewareInHostedChain(t *testing.T) {
-	cfg := testConfig()
-	cfg.Auth = lib.AuthConfig{Mode: lib.AuthModeHosted, PublicURL: "https://heimdall.test"}
-	reg := tenancy.NewRegistry(tenancy.Layout{Hosted: true, StorageRoot: t.TempDir()}, nil, tenancy.Options{})
-	signIn := func(h fasthttp.RequestHandler) fasthttp.RequestHandler {
-		return func(ctx *fasthttp.RequestCtx) {
-			auth.SetPrincipal(ctx, &auth.Principal{Kind: auth.KindUser, UserID: "u1", OrgID: "org1", Role: auth.RoleOwner})
-			h(ctx)
-		}
-	}
-	s, err := NewHosted(cfg, Hosted{Auth: signIn, Directory: noOrgs{}, Registry: reg})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.closeHandlers()
-	ctx := postWithKey(s.Handler(), "heimdall.test", "bad key")
+	// The hosted middleware runs inside the dispatcher, after the policy
+	// check, so the request must reach an org the caller belongs to.
+	f := newReplayFixture(t, false)
+	ctx := f.post("sess-u1", "bad key")
 	if ctx.Response.StatusCode() != 400 || !strings.Contains(string(ctx.Response.Body()), "Idempotency-Key must be 16 to 64") {
 		t.Fatalf("hosted: %d %s", ctx.Response.StatusCode(), ctx.Response.Body())
 	}

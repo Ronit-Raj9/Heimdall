@@ -183,7 +183,10 @@ func actor(p *auth.Principal) string {
 // Middleware honours Idempotency-Key on POST requests under /api/ that carry
 // a signed-in principal; every other request passes through untouched. Put
 // it after the auth middleware (it reads the principal) and after any path
-// rewrite, as the last entry of the server chain.
+// rewrite. On the hosted server it must also run after the tenancy
+// authorization (tenancy.DispatcherConfig.Serve), so a stored answer is never
+// replayed to a caller who has since lost access; on the local server it is
+// the last entry of the server chain.
 func Middleware(mode schemas.Mode, s *Store) lib.Middleware {
 	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 		return func(ctx *fasthttp.RequestCtx) {
