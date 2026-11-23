@@ -12,6 +12,8 @@
 # Without arguments it copies bench/coding-core-base:1 and every entry of
 # HEIMDALL_SHARED_PLATFORM_IMAGES (a prefix ending in "/" or ":" stands for
 # every host image it starts). Images missing on the host are pulled first.
+# An agent built per task (build.base_arg) on a library task image needs that
+# image here too: pass it by name (registry-sync.sh bench/task-<suite>-<task>:<hash>).
 # Entries pinned by digest or naming a registry host are skipped: BuildKit
 # pulls those itself. Run it again whenever one of these images is rebuilt.
 #

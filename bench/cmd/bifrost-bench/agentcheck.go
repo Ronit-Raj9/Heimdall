@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -556,4 +557,34 @@ func skippedRows(ids []string, why string) []checkRow {
 
 func shortID(id string) string {
 	return short(id)
+}
+
+// noSuchImage finds the image a "No such image" docker error names.
+var noSuchImage = regexp.MustCompile(`No such image: ([^\s()]+)`)
+
+// noRunStarted reports, for a hosted agent check, whether none of its runs
+// started (every run aborted_infra) and then the plain reason the first run
+// gives: "The test run could not start: ..." (N180). A missing agent
+// container is named as such; any other reason is shown as recorded, cut
+// to 300 characters.
+func noRunStarted(runs []bridgeRun) (string, bool) {
+	if len(runs) == 0 {
+		return "", false
+	}
+	for _, r := range runs {
+		if schemas.Outcome(r.Outcome) != schemas.OutcomeAbortedInfra {
+			return "", false
+		}
+	}
+	why := strings.TrimSpace(runs[0].Detail)
+	if m := noSuchImage.FindStringSubmatch(why); m != nil {
+		return "The test run could not start: the agent container " + m[1] + " does not exist on the worker yet.", true
+	}
+	if why == "" {
+		why = "the worker gave no reason; open the check's experiment"
+	}
+	if len(why) > 300 {
+		why = why[:300] + "..."
+	}
+	return "The test run could not start: " + why, true
 }

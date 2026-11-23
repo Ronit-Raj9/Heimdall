@@ -3,6 +3,8 @@ import { EmptyState } from "@/components/shell/emptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { useSession } from "@/lib/session/sessionContext";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
+import type { Job } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { CheckCircle2, ChevronRight, Circle, CircleMinus, Loader2, XCircle } from "lucide-react";
@@ -55,8 +57,12 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 	}
 	const checkParams = { agent: agent.path, suite: suite.trim(), ...(task.trim() ? { task: task.trim() } : {}), ...(noBuild ? { no_build: true } : {}) };
 	const buildParams = { agent: agent.path, ...(buildSuite.trim() ? { suite: buildSuite.trim() } : {}) };
-	const checkState: StepState = agent.error ? "broken" : jobState(lastJobFor(jobs, "agent.check", agent.path, agent.id));
-	const buildState: StepState = agent.dockerfile ? jobState(lastJobFor(jobs, "agent.build", agent.path, agent.id)) : "skipped";
+	const checkJob = lastJobFor(jobs, "agent.check", agent.path, agent.id);
+	const buildJob = lastJobFor(jobs, "agent.build", agent.path, agent.id);
+	const checkState: StepState = agent.error ? "broken" : jobState(checkJob);
+	const buildState: StepState = agent.dockerfile ? jobState(buildJob) : "skipped";
+	const needBuildSuite = !!agent.per_suite_build && !buildSuite.trim();
+	const builtTag = buildState === "passed" && typeof buildJob?.result?.tag === "string" ? buildJob.result.tag : "";
 	const diffState: StepState = jobState(lastJobFor(jobs, "agent.diff", agent.path, agent.id));
 
 	return (
@@ -73,6 +79,7 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 					detail={t("checks.check.hint")}
 					state={checkState}
 					testId="agent-check-section"
+					problem={checkState === "failed" ? <StepProblem job={checkJob} testId="agent-check-section-error" /> : undefined}
 					action={
 						suite.trim() === "" ? (
 							<p className="text-destructive text-xs">{t("checks.check.needSuite", { suite: DEFAULT_SUITE })}</p>
@@ -121,11 +128,25 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 					}
 					state={buildState}
 					testId="agent-build-section"
+					problem={
+						buildState === "failed" ? (
+							<StepProblem job={buildJob} testId="agent-build-section-error" />
+						) : builtTag ? (
+							<p className="text-xs" data-testid="agent-build-ready">
+								{t("checks.build.ready", { tag: builtTag })}
+							</p>
+						) : undefined
+					}
 					action={
-						agent.dockerfile && !(agent.per_suite_build && !buildSuite.trim()) ? (
-							<JobRunButton kind="agent.build" params={buildParams} label={t("checks.build.run")} variant="outline" />
-						) : agent.dockerfile ? (
-							<p className="text-destructive text-xs">{t("checks.build.needSuite")}</p>
+						agent.dockerfile ? (
+							<div className="flex flex-col items-end gap-1">
+								<JobRunButton kind="agent.build" params={buildParams} label={t("checks.build.run")} variant="outline" disabled={needBuildSuite} />
+								{needBuildSuite && (
+									<p className="text-muted-foreground text-xs" data-testid="agent-build-pick-first">
+										{t("checks.build.pickFirst")}
+									</p>
+								)}
+							</div>
 						) : null
 					}
 				>
@@ -136,8 +157,12 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 					)}
 					{!agent.dockerfile ? (
 						<p className="text-muted-foreground text-xs">{t("checks.build.nothing")}</p>
+					) : agent.per_suite_build ? (
+						<Field label={t("checks.build.suiteRequired")}>
+							<BuildSuiteSelect value={buildSuite} onChange={setBuildSuite} placeholder={t("checks.build.pickPlaceholder")} />
+						</Field>
 					) : (
-						<Field label={agent.per_suite_build ? t("checks.build.suiteRequired") : t("checks.build.suiteOptional")}>
+						<Field label={t("checks.build.suiteOptional")}>
 							<Input value={buildSuite} onChange={(e) => setBuildSuite(e.target.value)} data-testid="agent-build-suite" />
 						</Field>
 					)}
@@ -164,6 +189,42 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 	);
 }
 
+/** The org's benchmarks from the light list, for the per-benchmark container build (N181). */
+function BuildSuiteSelect({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+	const { data } = useGetSuitesLightQuery();
+	const ids = (data?.suites ?? []).map((s) => s.id).sort();
+	return (
+		<select
+			className="border-input bg-card h-9 rounded-md border px-2 text-sm"
+			value={value}
+			onChange={(e) => onChange(e.target.value)}
+			data-testid="agent-build-suite-select"
+		>
+			<option value="">{placeholder}</option>
+			{ids.map((id) => (
+				<option key={id} value={id}>
+					{id}
+				</option>
+			))}
+		</select>
+	);
+}
+
+/** Why a readiness step failed: the job's error (first 300 characters) and its log (N180). */
+function StepProblem({ job, testId }: { job: Job | undefined; testId: string }) {
+	const { t } = useTranslation("agentops");
+	if (!job) return null;
+	const error = (job.error ?? "").trim();
+	return (
+		<div className="flex flex-col gap-1 text-xs" data-testid={testId}>
+			{error && <p className="text-destructive break-words">{error.length > 300 ? `${error.slice(0, 300)}...` : error}</p>}
+			<Link to="/jobs/$jobId" params={{ jobId: job.id }} className="text-primary hover:underline">
+				{t("checks.openLog")}
+			</Link>
+		</div>
+	);
+}
+
 const ICON: Record<StepState, { icon: typeof Circle; cls: string }> = {
 	passed: { icon: CheckCircle2, cls: "text-emerald-600 dark:text-emerald-400" },
 	failed: { icon: XCircle, cls: "text-red-600 dark:text-red-400" },
@@ -183,6 +244,7 @@ function CheckStep({
 	action,
 	children,
 	testId,
+	problem,
 }: {
 	n: number;
 	title: string;
@@ -192,6 +254,7 @@ function CheckStep({
 	action?: ReactNode;
 	children?: ReactNode;
 	testId: string;
+	problem?: ReactNode;
 }) {
 	const { t } = useTranslation("agentsUx");
 	const { icon: Icon, cls } = ICON[state];
@@ -210,6 +273,7 @@ function CheckStep({
 					<span className={cn("text-xs font-medium", cls.replace("animate-spin", ""))} data-testid={`${testId}-state`}>
 						{t(`checks.state.${state}`)}
 					</span>
+					{problem}
 				</div>
 				{action && <div className="shrink-0">{action}</div>}
 			</div>
