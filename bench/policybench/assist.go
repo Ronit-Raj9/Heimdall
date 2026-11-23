@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/modelid"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
@@ -327,21 +328,11 @@ func contentText(raw json.RawMessage) string {
 	return ""
 }
 
-var dateSuffixRe = regexp.MustCompile(`-\d{4}-?\d{2}-?\d{2}$`)
-
-// sameModel is true when the served id is the pinned one, maybe with a
-// provider prefix or a release date suffix.
+// sameModel is modelid.SameModel, the one "same model" rule: an empty served
+// model is accepted, a provider prefix is ignored, a dated snapshot of the
+// pinned alias matches, another date of a pinned snapshot does not.
 func sameModel(served, pinned string) bool {
-	if served == "" {
-		return true
-	}
-	if i := strings.LastIndex(served, "/"); i >= 0 {
-		served = served[i+1:]
-	}
-	if served == pinned {
-		return true
-	}
-	return dateSuffixRe.ReplaceAllString(served, "") == dateSuffixRe.ReplaceAllString(pinned, "")
+	return modelid.SameModel(pinned, served)
 }
 
 func clip(s string, n int) string {

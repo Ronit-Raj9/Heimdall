@@ -1,0 +1,19 @@
+{
+	"gates": {
+		"model_fidelity": "the model check (the provider answered with a different model than the one asked for)",
+		"egress": "the network check (the run reached a site it was not allowed to)",
+		"default": "the {{gate}} check"
+	},
+	"thrownOut": {
+		"checks_one": "Thrown out: {{count}} run failed {{checks}}. Not counted in the score.",
+		"checks_other": "Thrown out: {{count}} runs failed {{checks}}. Not counted in the score.",
+		"whole_one": "Thrown out: {{count}} run, because a safety check found this test broken. Not counted in the score.",
+		"whole_other": "Thrown out: {{count}} runs, because a safety check found this test broken. Not counted in the score.",
+		"setup": "Setup {{arm}}: {{text}}",
+		"why": "Why: {{reasons}}",
+		"openComparison": "Open the comparison"
+	},
+	"notTested": "Not tested in this evaluation",
+	"graderCouldNot": "The grader could not grade this run: {{reason}}",
+	"noCapabilities": "No results yet."
+}

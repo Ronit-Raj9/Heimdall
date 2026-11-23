@@ -27,6 +27,7 @@ func Builtin() []schemas.Gate {
 		newImpossiblePassGate(), // impossible_pass (SWE importer and impossible tasks)
 		newFalseCompletionGate(),
 		newModelFidelityGate(),
+		newFaultDeliveryGate(), // fault_delivery: a plugin path fault plan reached the gateway (fix wave 3, L4)
 		newDestroyedWorkGate(),
 		newProtectedProbeGate(),
 		newInjectionGate(),

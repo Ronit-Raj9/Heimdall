@@ -12,9 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/maximhq/bifrost/bench/attribution"
 	"github.com/maximhq/bifrost/bench/clusters"
@@ -22,6 +20,7 @@ import (
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/ops"
+	"github.com/maximhq/bifrost/bench/policy"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/store"
 )
@@ -168,21 +167,12 @@ type checkRunResult struct {
 // evaluates for m with no override: the one the experiment froze, else the
 // server's default policy.
 func (a *app) releasePolicyFile(m *schemas.Manifest) string {
-	if m.Experiment.Policy != "" {
-		return policyFileName(m.Experiment.Policy)
-	}
-	return policyFileName(a.defaultPolicy)
+	file, _ := a.effectivePolicyFile(m, "")
+	return policy.FileName(file)
 }
 
-// policyFileName is the rule set name Releases > Rules shows for a policy
-// path: its base name without a .yaml or .yml extension.
-func policyFileName(path string) string {
-	if path == "" {
-		return ""
-	}
-	base := filepath.Base(path)
-	return strings.TrimSuffix(strings.TrimSuffix(base, ".yaml"), ".yml")
-}
+// policyFileName is policy.FileName, kept for callers in this package.
+func policyFileName(path string) string { return policy.FileName(path) }
 
 // checkRunJob re-analyzes a frozen experiment and saves a new analysis, the
 // web form of `check -exp`. The verdict is the result; a regressed verdict

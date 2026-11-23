@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import "@/components/verdict/hw09I18n";
 import { observedNumber, resilienceTone, successBar, tierOf } from "./leaderboard.utils";
 
 // Cells of one leaderboard row. Every measured number goes through ValueCell or the same
@@ -86,14 +87,33 @@ export function AgentCell({
 	);
 }
 
-/** Verified success as a bar with its 95% interval whiskers, the percent, and passes over graded runs. */
-export function SuccessCell({ entry }: { entry: Pick<LeaderboardEntry, "rank" | "success" | "passes"> }) {
+/**
+ * Tasks solved under the task mean, on the same basis as the percent (fix wave 3, N295): null when the
+ * entry does not say (an older server sends no tasks_solved; it is left out when 0, which only a
+ * pass count of 0 makes certain).
+ */
+export function tasksSolved(entry: Partial<Pick<LeaderboardEntry, "tasks" | "tasks_solved" | "passes">>): number | null {
+	if (entry.tasks === undefined) return null;
+	if (entry.tasks_solved !== undefined) return entry.tasks_solved;
+	return entry.passes?.num === 0 ? 0 : null;
+}
+
+/** Verified success as a bar with its 95% interval whiskers, the percent (mean over tasks), and the tasks solved. */
+export function SuccessCell({
+	entry,
+}: {
+	entry: Pick<LeaderboardEntry, "rank" | "success" | "passes"> & Partial<Pick<LeaderboardEntry, "tasks" | "tasks_solved">>;
+}) {
 	const { t } = useTranslation("bench");
+	const { t: t9 } = useTranslation("hw09");
 	const locale = getLocale();
 	const bar = successBar(entry.success);
+	const solved = tasksSolved(entry);
 	const passes = (
-		<span className="text-muted-foreground text-xs tabular-nums">
-			{t("leaderboard.cell.passes", { num: entry.passes.num, den: entry.passes.den })}
+		<span className="text-muted-foreground text-xs tabular-nums" title={t9("leaderboard.successHint")}>
+			{solved !== null && entry.tasks !== undefined
+				? t9("leaderboard.tasksSolved", { solved, tasks: entry.tasks })
+				: t("leaderboard.cell.passes", { num: entry.passes.num, den: entry.passes.den })}
 			{entry.passes.unknown > 0 && (
 				<span className="bench-hatched ml-1 rounded-sm border border-dashed px-1">
 					{t("leaderboard.cell.passesUnknown", { count: entry.passes.unknown })}
@@ -142,13 +162,32 @@ export function SuccessCell({ entry }: { entry: Pick<LeaderboardEntry, "rank" | 
 	);
 }
 
-/** pass^k with k = trials. Unknown (fewer than 2 trials) is hatched with its reason. */
+/**
+ * pass^k with k = trials. Fewer than 2 tries per task measures no reliability: "Not measured", hatched,
+ * with how many tries ran (fix wave 3, N245 and N295); "solved all k tries" only under a known value.
+ */
 export function ReliabilityCell({ entry }: { entry: Pick<LeaderboardEntry, "rank" | "reliability" | "trials"> }) {
 	const { t } = useTranslation("bench");
+	const { t: t9 } = useTranslation("hw09");
+	const known = observedNumber(entry.reliability) !== null;
+	if (entry.trials < 2) {
+		return (
+			<div className="flex flex-col items-end gap-0.5" data-testid={`leaderboard-reliability-${entry.rank}`}>
+				<span
+					className="bench-hatched text-muted-foreground rounded-sm border border-dashed px-1 text-xs"
+					data-state="unknown"
+					title={entry.reliability.reason}
+				>
+					{t9("reliability.notMeasured")}
+				</span>
+				<span className="text-muted-foreground text-[11px]">{t9("reliability.needsTries", { k: entry.trials })}</span>
+			</div>
+		);
+	}
 	return (
 		<div className="flex flex-col items-end gap-0.5" data-testid={`leaderboard-reliability-${entry.rank}`}>
 			<ValueCell value={entry.reliability} kind="rate" />
-			<span className="text-muted-foreground font-mono text-[11px]">{t("leaderboard.cell.passK", { k: entry.trials })}</span>
+			{known && <span className="text-muted-foreground font-mono text-[11px]">{t("leaderboard.cell.passK", { k: entry.trials })}</span>}
 		</div>
 	);
 }

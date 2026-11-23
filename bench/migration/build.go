@@ -48,6 +48,10 @@ type Input struct {
 	// hash is checked against Manifest.PolicyHash; a policy chosen for
 	// this report only is evaluated without that check.
 	PolicyFrozen bool
+	// PolicyFile names Policy by its file (policy.FileName), the name the
+	// report and every message print; empty falls back to the name inside
+	// the file.
+	PolicyFile string
 	// Synthetic marks synthetic arms (leaderboard.SyntheticArms).
 	Synthetic map[string]bool
 	// Invalid are the experiment's release verdict invalid reasons
@@ -107,6 +111,9 @@ func Build(ctx context.Context, in Input, q Query) (*Report, error) {
 	}
 	if in.Policy != nil {
 		rep.Policy = in.Policy.Name
+		if in.PolicyFile != "" {
+			rep.Policy = in.PolicyFile
+		}
 	}
 	if heldOut {
 		rep.Notes = append(rep.Notes, HeldOutNote)
@@ -154,6 +161,7 @@ func Build(ctx context.Context, in Input, q Query) (*Report, error) {
 		var pr *schemas.PolicyResult
 		if in.Policy != nil {
 			pr = evaluatePolicy(in.Policy, in.PolicyHash, in.PolicyFrozen, m, in.Runs, p[0], p[1])
+			pr.PolicyFile = in.PolicyFile
 		}
 		// The release verdict checks coverage on A and B only; this pair
 		// is checked on its own arms over the frozen required slots, held
@@ -777,7 +785,7 @@ func recommend(p Pair, pr *schemas.PolicyResult, synthetic bool, invalid, vetoes
 	case len(worseStrata) > 0:
 		r.Action, r.Reason = ActionDoNotMigrate, "regresses on "+strings.Join(worseStrata, "; ")
 	case len(failed) > 0:
-		r.Action, r.Reason = ActionDoNotMigrate, fmt.Sprintf("release policy %s blocks: %s", pr.PolicyName, strings.Join(failed, "; "))
+		r.Action, r.Reason = ActionDoNotMigrate, fmt.Sprintf("release rule set %s blocks: %s", pr.RuleSetName(), strings.Join(failed, "; "))
 	case p.Overall.Result == ResultBetter && (pr == nil || pr.Decision != schemas.PolicyBlock):
 		r.Action, r.Reason = ActionMigrate, "overall on "+p.Overall.Condition+": "+p.Overall.Reason
 		if pr == nil {
@@ -792,11 +800,11 @@ func recommend(p Pair, pr *schemas.PolicyResult, synthetic bool, invalid, vetoes
 			r.Reason += fmt.Sprintf("; the test needs at least %d differing tasks to decide at all", p.Overall.MinTasks)
 		}
 		if pr != nil && pr.Decision == schemas.PolicyBlock {
-			r.Reason += fmt.Sprintf("; release policy %s blocks on unknowns (%s)", pr.PolicyName, strings.Join(unknown, ", "))
+			r.Reason += fmt.Sprintf("; release rule set %s blocks on unknowns (%s)", pr.RuleSetName(), strings.Join(unknown, ", "))
 		}
 	}
 	if pr != nil && pr.Decision == schemas.PolicyWarn && r.Action != ActionDoNotMigrate {
-		r.Caveats = append(r.Caveats, fmt.Sprintf("release policy %s warns: %s", pr.PolicyName, strings.Join(unknown, ", ")))
+		r.Caveats = append(r.Caveats, fmt.Sprintf("release rule set %s warns: %s", pr.RuleSetName(), strings.Join(unknown, ", ")))
 	}
 	for _, s := range p.Strata {
 		if s.Result == ResultBetter && r.Action != ActionMigrate {

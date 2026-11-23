@@ -264,7 +264,7 @@ func (s Schedule) Validate(root string, load ExperimentLoader) error {
 	}
 	for _, d := range s.FailOn {
 		switch schemas.Decision(d) {
-		case schemas.DecisionRegressed, schemas.DecisionInconclusive, schemas.DecisionInvalid, schemas.DecisionImproved:
+		case schemas.DecisionRegressed, schemas.DecisionInconclusive, schemas.DecisionInvalid, schemas.DecisionImproved, schemas.DecisionLeader:
 		default:
 			return wrap("fail_on %q is not a verdict decision", d)
 		}

@@ -416,13 +416,34 @@ func (a *app) releaseVerdict(ctx context.Context, m *schemas.Manifest, runs []sc
 // policyNone is the -policy value that turns release policy evaluation off.
 const policyNone = "none"
 
-func (a *app) releasePolicy(m *schemas.Manifest, an *schemas.Analysis, runs []schemas.SealedRun, override string) (*schemas.PolicyResult, error) {
-	if override == policyNone {
-		// An explicit "none" turns the release policy off for this check,
-		// including the one the experiment froze.
-		return nil, nil
+// effectivePolicyFile is the release rule set that applies to m, the one
+// choice analysis (releasePolicy) and the model switch report
+// (migrationPolicy) both make: override "none" applies none; any other
+// override applies that file; otherwise the rule set the experiment froze;
+// otherwise the server's default policy when its owner set one; otherwise
+// none. There is no implicit policies/default.yaml (N280). frozen says the
+// file is the one the experiment froze, so its frozen hash applies.
+func (a *app) effectivePolicyFile(m *schemas.Manifest, override string) (file string, frozen bool) {
+	switch {
+	case override == policyNone:
+		return "", false
+	case override != "":
+		return override, m.Experiment.Policy != "" && filepath.Clean(override) == filepath.Clean(m.Experiment.Policy)
+	case m.Experiment.Policy != "":
+		return m.Experiment.Policy, true
+	default:
+		return a.defaultPolicy, false
 	}
-	if override != "" {
+}
+
+func (a *app) releasePolicy(m *schemas.Manifest, an *schemas.Analysis, runs []schemas.SealedRun, override string) (*schemas.PolicyResult, error) {
+	file, _ := a.effectivePolicyFile(m, override)
+	switch {
+	case file == "":
+		// No rule set chosen, or an explicit "none" that turns the frozen
+		// one off for this check.
+		return nil, nil
+	case override != "":
 		p, raw, err := policy.Load(override)
 		if err != nil {
 			return nil, err
@@ -432,24 +453,29 @@ func (a *app) releasePolicy(m *schemas.Manifest, an *schemas.Analysis, runs []sc
 		// The result records the override's own hash in PolicyHash.
 		mm := *m
 		mm.PolicyHash = ""
-		return policy.Evaluate(p, policy.Hash(raw), &mm, an, runs), nil
-	}
-	if m.Experiment.Policy == "" {
-		if a.defaultPolicy == "" {
-			return nil, nil
-		}
-		p, raw, err := policy.Load(a.defaultPolicy)
+		return withPolicyFile(policy.Evaluate(p, policy.Hash(raw), &mm, an, runs), file), nil
+	case m.Experiment.Policy == "":
+		p, raw, err := policy.Load(file)
 		if err != nil {
 			return nil, err
 		}
-		return policy.Evaluate(p, policy.Hash(raw), m, an, runs), nil
+		return withPolicyFile(policy.Evaluate(p, policy.Hash(raw), m, an, runs), file), nil
 	}
-	p, raw, err := policy.Load(a.cfg.Path(m.Experiment.Policy))
+	p, raw, err := policy.Load(a.cfg.Path(file))
 	if err != nil {
-		a.logger.Warn("release policy could not be loaded; the release is blocked", "experiment", m.ExpID, "policy", m.Experiment.Policy, "error", err.Error())
-		return policy.LoadFailure(m.Experiment.Policy, m.PolicyHash, err), nil
+		a.logger.Warn("release policy could not be loaded; the release is blocked", "experiment", m.ExpID, "policy", file, "error", err.Error())
+		return policy.LoadFailure(file, m.PolicyHash, err), nil
 	}
-	return policy.Evaluate(p, policy.Hash(raw), m, an, runs), nil
+	return withPolicyFile(policy.Evaluate(p, policy.Hash(raw), m, an, runs), file), nil
+}
+
+// withPolicyFile sets the result's rule set file name from the path it was
+// loaded from, the name every message prints.
+func withPolicyFile(r *schemas.PolicyResult, file string) *schemas.PolicyResult {
+	if r != nil {
+		r.PolicyFile = policy.FileName(file)
+	}
+	return r
 }
 
 // validatePolicy loads the policy an experiment names before anything is

@@ -3,8 +3,8 @@ package gates
 import (
 	"context"
 	"fmt"
-	"strings"
 
+	"github.com/maximhq/bifrost/bench/modelid"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -23,8 +23,13 @@ type modelFidelityGate struct{}
 // GetName implements schemas.Part.
 func (g *modelFidelityGate) GetName() string { return ModelFidelity }
 
+// modelFidelityVersion is 1.1.0 since fix wave 3 (N200): a dated snapshot
+// of the requested alias is the same model. The bump makes Re-score check
+// stored runs again from their sealed gateway rows.
+const modelFidelityVersion = "1.1.0"
+
 // GetVersion implements schemas.Part.
-func (g *modelFidelityGate) GetVersion() string { return version }
+func (g *modelFidelityGate) GetVersion() string { return modelFidelityVersion }
 
 // Effect implements schemas.Gate.
 func (g *modelFidelityGate) Effect() schemas.GateEffect { return schemas.GateInvalidate }
@@ -36,8 +41,10 @@ func (g *modelFidelityGate) Effect() schemas.GateEffect { return schemas.GateInv
 func (g *modelFidelityGate) Baseline() bool { return true }
 
 // Check implements schemas.Gate. Per message row it flags a served model that
-// differs from the requested one (after trimming a provider prefix such as
-// "anthropic/"; a date suffix is a different model and is not trimmed), a
+// differs from the requested one (modelid.SameModel: a provider prefix such
+// as "anthropic/" is ignored, and the provider's dated snapshot or stable
+// revision of the requested alias, gpt-5.4-mini-2026-03-17 for gpt-5.4-mini,
+// is the same model; another date or a longer family name is not), a
 // fallback taken without a declared fallback, and a cache hit. A different
 // served model is accepted only when the row is a fallback attempt and the
 // served model is one the agent's gateway policy declared. Rows without a
@@ -110,16 +117,12 @@ func newModelFidelityGate() *modelFidelityGate {
 	return &modelFidelityGate{}
 }
 
-// sameModel compares two model ids, ignoring one leading provider segment on
-// either side ("anthropic/claude-x" equals "claude-x"). Only the first segment
-// is dropped, so "org/model-a" and "org/model-b" still differ.
+// sameModel is modelid.SameModel, the one "same model" rule.
 func sameModel(requested, served string) bool {
 	if requested == served {
 		return true
 	}
-	r, rOK := dropProvider(requested)
-	s, sOK := dropProvider(served)
-	return (rOK && r == served) || (sOK && requested == s) || (rOK && sOK && r == s)
+	return modelid.SameModel(requested, served)
 }
 
 // declaredFallback reports whether r was served by a fallback the gateway
@@ -134,12 +137,6 @@ func declaredFallback(r schemas.GatewayRequest, fallbacks []string) bool {
 		}
 	}
 	return false
-}
-
-// dropProvider removes the first "/"-separated segment, if any.
-func dropProvider(m string) (string, bool) {
-	_, rest, ok := strings.Cut(m, "/")
-	return rest, ok
 }
 
 // declaredModel reports whether model is one of the agent's declared extra

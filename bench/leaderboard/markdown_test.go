@@ -32,7 +32,7 @@ func TestMarkdown(t *testing.T) {
 			want: []string{
 				"# Leaderboard: s@2, condition clean",
 				"| Rank | Tier | Agent | Label |",
-				"| 1 | 1 | agent-h_a | alpha two | model-h_a | `h_a` | 66.7% [0.0, 100.0] | 4/5 | unknown | 3 | 5 | $0.1250 | - | leader |",
+				"| 1 | 1 | agent-h_a | alpha two | model-h_a | `h_a` | 66.7% [0.0, 100.0] | 2/3 | not measured (needs 2 or more tries per task; this ran 1) | 3 | 5 | $0.1250 | - | leader |",
 				"| 2 | 1 | agent-h_b | beta |",
 				"too few common tasks (2) to separate",
 				"| model-outage |",
@@ -50,12 +50,12 @@ func TestMarkdown(t *testing.T) {
 		{
 			name: "reliability states its k",
 			lb:   repeated,
-			want: []string{"| 6/7 | 62.5% (pass^3) | 2 | 7 |"},
+			want: []string{"| 1/2 | 62.5% (pass^3) | 2 | 7 |"},
 		},
 		{
 			name: "unknown reliability still states its k",
 			lb:   short,
-			want: []string{"| 6/7 | unknown (pass^4) |"},
+			want: []string{"| 1/2 | unknown (pass^4) |"},
 		},
 		{
 			name: "grade source latest lists each experiment",

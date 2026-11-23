@@ -1,3 +1,4 @@
+import i18n from "@/lib/i18n";
 import type { Decision, ExperimentStatus, GridRow, GuardStatus, Outcome, Ratio, Score, Value, Verdict, VerdictPayload } from "@/lib/types/bench";
 
 // Pure helpers for the verdict screen, so the formatting and ordering rules are tested without
@@ -12,6 +13,7 @@ export const DECISION_TONE = {
 	inconclusive: "warn",
 	invalid: "neutral",
 	score: "neutral",
+	leader: "good",
 } as const satisfies Record<Decision, Tone>;
 
 export const GUARD_TONE = {
@@ -135,9 +137,10 @@ export function formatDateTime(iso: string | undefined, locale: string): string 
 	return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
-/** Arm A then arm B: from the primary effect when present, else the naive keys in order. */
+/** Arm A then arm B: from the primary effect when present, else the naive keys in order. Every setup of a setups verdict. */
 export function armOrder(payload: Pick<VerdictPayload, "verdict" | "naive">): string[] {
 	const effect = payload.verdict.effect;
+	if (payload.verdict.setups) return Object.keys(payload.naive).sort();
 	if (effect) return [effect.arm_a, effect.arm_b];
 	return Object.keys(payload.naive).sort();
 }
@@ -238,4 +241,37 @@ export function scoreBounds(score: Score): [number, number] | null {
 /** True when the verdict is a one-setup score (no comparison). */
 export function isScoreVerdict(verdict: Verdict): verdict is Verdict & { score: Score } {
 	return verdict.score !== undefined && verdict.score !== null;
+}
+
+/**
+ * An invalid reason in plain words (fix wave 3, N200): the model check, graded coverage and any
+ * other gate, as the server writes them; any other reason is returned as it is.
+ */
+export function plainInvalidReason(reason: string): string {
+	const ns = "experimentPage" as const;
+	let m = /^gate model_fidelity fired in (\d+) of (\d+) runs .* of arm (\w+)/.exec(reason);
+	if (m) return i18n.t("summary.why.fidelity", { ns, n: m[1], m: m[2], arm: m[3] });
+	m = /^graded coverage [\d.]+ \((\d+) of (\d+) runs\) in arm (\w+)/.exec(reason);
+	if (m) return i18n.t("summary.why.coverage", { ns, o: m[1], n: m[2], arm: m[3] });
+	m = /^gate (\S+) fired in (\d+) of (\d+) runs/.exec(reason);
+	if (m) return i18n.t("summary.why.gate", { ns, gate: m[1], n: m[2], m: m[3] });
+	return reason;
+}
+
+/** True when the verdict covers three or more setups (verdict.setups), so there is no B against A story. */
+export function isSetupsVerdict(verdict: Verdict): verdict is Verdict & { setups: NonNullable<Verdict["setups"]> } {
+	return verdict.setups !== undefined && verdict.setups !== null;
+}
+
+/** "A", "A and B", "A, B and C": setup letters joined for a headline. */
+export function joinSetups(arms: readonly string[]): string {
+	if (arms.length <= 1) return arms[0] ?? "";
+	const and = i18n.t("summary.and", { ns: "experimentPage" });
+	return `${arms.slice(0, -1).join(", ")} ${and} ${arms[arms.length - 1]}`;
+}
+
+/** The tasks a failed integrity guard names ("veto gate fired in arm B on t02, t05 where arm A has none"), else null. */
+export function guardTasks(detail: string | undefined): string | null {
+	const m = /\bon (.+?) where arm\b/.exec(detail ?? "");
+	return m ? m[1] : null;
 }

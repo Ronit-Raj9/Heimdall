@@ -71,19 +71,68 @@ func (h *evaluationsHandler) resultOnHold(id string, now time.Time) bool {
 	return ok && now.Sub(at) < evalResultRetryAfter
 }
 
-// needsResult is true for a finished evaluation with no stored result.
+// needsResult is true for a finished evaluation with no stored result, or
+// with one stored before results recorded their analyses (refilled once,
+// fix wave 3, N215).
 func needsResult(ev *schemas.Evaluation) bool {
-	return ev.Status == schemas.EvaluationDone && ev.Result == nil
+	if ev.Status != schemas.EvaluationDone {
+		return false
+	}
+	return ev.Result == nil || (ev.Result.Analyses == nil && len(childExperiments(ev)) > 0)
+}
+
+// childExperiments are the experiment ids of the evaluation's children.
+func childExperiments(ev *schemas.Evaluation) []string {
+	var out []string
+	for _, c := range ev.Children {
+		if c.ExperimentID != "" {
+			out = append(out, c.ExperimentID)
+		}
+	}
+	return out
+}
+
+// resultAnalyses is each child experiment's newest analysis id, "" when it
+// has none or the index cannot say.
+func (h *evaluationsHandler) resultAnalyses(ev *schemas.Evaluation) map[string]string {
+	ai, _ := h.env.Services.Index.(AnalysisIndex)
+	out := map[string]string{}
+	for _, id := range childExperiments(ev) {
+		out[id] = ""
+		if ai != nil {
+			out[id], _ = ai.LatestAnalysis(id)
+		}
+	}
+	return out
+}
+
+// resultStale is true when a child of a finished evaluation has a newer
+// analysis than the one its stored result was built from (fix wave 3,
+// N215): a re-score after a gate fix changes the score the list shows.
+func (h *evaluationsHandler) resultStale(ev *schemas.Evaluation) bool {
+	if ev.Status != schemas.EvaluationDone || ev.Result == nil || ev.Result.Analyses == nil {
+		return false
+	}
+	if _, ok := h.env.Services.Index.(AnalysisIndex); !ok {
+		return false
+	}
+	for id, a := range h.resultAnalyses(ev) {
+		if ev.Result.Analyses[id] != a {
+			return true
+		}
+	}
+	return false
 }
 
 // fillResult stores the headline numbers of a finished evaluation once
 // (fix wave 2, N161): each arm's clean score and runs from the report card
-// totals and the clean spend summed over the arms. It reports whether the
+// totals and the clean spend summed over the arms. A child's newer analysis
+// fills it again (fix wave 3, N215). It reports whether the
 // evaluation changed; a failure is logged and remembered, so the list
 // backfill skips it for evalResultRetryAfter (a single read still tries).
 func (h *evaluationsHandler) fillResult(ev *schemas.Evaluation) bool {
 	s := h.env.Services
-	if !needsResult(ev) || s.Index == nil {
+	if s.Index == nil || (!needsResult(ev) && !h.resultStale(ev)) {
 		return false
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), readTimeout)
@@ -96,7 +145,7 @@ func (h *evaluationsHandler) fillResult(ev *schemas.Evaluation) bool {
 		slog.Warn("evaluation result not stored", "evaluation", ev.ID, "err", err)
 		return false
 	}
-	res := &schemas.EvaluationResult{Arms: make([]schemas.EvaluationArmResult, 0, len(rep.Arms)), At: now.UTC()}
+	res := &schemas.EvaluationResult{Arms: make([]schemas.EvaluationArmResult, 0, len(rep.Arms)), At: now.UTC(), Analyses: h.resultAnalyses(ev)}
 	sum, known := 0.0, len(rep.Arms) > 0
 	for _, a := range rep.Arms {
 		t := rep.Totals[a.Label]

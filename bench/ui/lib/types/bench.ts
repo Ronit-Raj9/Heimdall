@@ -917,7 +917,7 @@ export interface Experiment {
 // ---------------------------------------------------------------------------------------------
 
 /** score: a one-setup experiment, scored on its own with no comparison (Verdict.score). */
-export type Decision = "improved" | "regressed" | "inconclusive" | "invalid" | "score";
+export type Decision = "improved" | "regressed" | "inconclusive" | "invalid" | "score" | "leader";
 
 export type Action = "ship" | "hold" | "no_decision" | "fix_harness";
 
@@ -977,6 +977,8 @@ export interface Verdict {
 	decision: Decision;
 	action: Action;
 	effect?: Effect;
+	basis?: "effect" | "guard";
+	setups?: SetupsVerdict;
 	alpha: number;
 	/** Minimal detectable effect in percentage points. */
 	mde: number;
@@ -991,6 +993,7 @@ export interface Verdict {
 	tie_rule: string;
 	guards: GuardResult[];
 	invalid_reasons?: string[];
+	invalid_scope?: "runs" | "experiment";
 	/** Measured instrument checks; a failed one is also an invalid reason. Absent on an audit verdict. */
 	instruments?: InstrumentCheck[];
 	/** "unknown" or "" on an audit verdict: a published table says nothing about veto gates. */
@@ -1002,6 +1005,8 @@ export interface Verdict {
 	/** Set (and decision is score or invalid) when the experiment has one setup: its score with an interval, no comparison. */
 	score?: Score;
 }
+
+export interface SetupsVerdict { leader: string; top_group: string[]; behind: string[]; separable: boolean; note: string; pairs: MatrixPair[]; safety?: Record<string, string[]> }
 
 /** schemas.Score: the primary metric of a one-setup experiment's only arm. Rates are fractions (0.62 = 62%). */
 export interface Score {
@@ -1273,6 +1278,7 @@ export interface PolicyResult {
 	decision: PolicyDecision;
 	checks: PolicyCheckResult[];
 	evaluated_at: string;
+	/** The rule set's file name without .yaml, as Releases > Rules lists it. */ policy_file?: string;
 }
 
 /** GET /experiments/{id}/diagnostics */
@@ -1361,7 +1367,7 @@ export interface RunDetail {
 	sealed: boolean;
 	/** Empty until the run is sealed. */
 	seal_hash: string;
-	debug_allowed?: { replay: boolean; fork: boolean; reason?: string };
+	debug_allowed?: { replay: boolean; fork: boolean; reason?: string; breakpoints?: boolean; breakpoints_reason?: string };
 	/** Run control: requeued by an operator; kept, never counted. */
 	superseded?: boolean;
 	grade: Grade | null;
@@ -2047,6 +2053,7 @@ export interface LeaderboardEntry {
 	experiments: string[];
 	/** Distinct tasks with at least one graded run. */
 	tasks: number;
+	tasks_solved?: number;
 	/** Graded runs counted. */
 	runs: number;
 	/** The k of reliability: min(3, the fewest trials per task among its experiments that repeat tasks), unless the query sets k. */
@@ -2150,7 +2157,7 @@ export type ReviewDecision = "pass" | "fail" | "invalid" | "flag_only";
 export const REVIEW_DECISIONS: readonly ReviewDecision[] = ["pass", "fail", "invalid", "flag_only"];
 
 /** Why a run is in the review queue. */
-export type ReviewReason = "split_votes" | "unparsable_votes" | "invalid_evaluator" | "veto" | "false_completion" | "flagged" | "contested"; // W8 judge calibration: contested
+export type ReviewReason = "split_votes" | "unparsable_votes" | "invalid_evaluator" | "veto" | "false_completion" | "flagged" | "contested" | "invalidated"; // W8 judge calibration: contested; fix wave 3: invalidated
 
 /** Every queue reason, in display order (schemas.ReviewReasons). */
 export const REVIEW_REASONS: readonly ReviewReason[] = [
@@ -2161,6 +2168,7 @@ export const REVIEW_REASONS: readonly ReviewReason[] = [
 	"false_completion",
 	"flagged",
 	"contested", // W8 judge calibration
+	"invalidated", // fix wave 3: a safety check threw the run out
 ];
 
 /** One review record (schemas.Review): <exp>/reviews/<review_id>/review.json. */

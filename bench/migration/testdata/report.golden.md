@@ -1,6 +1,6 @@
 # Model migration report: e_mig
 
-Suite s@1. Old model: old-model (arm A, agent agent). Overall verdicts on condition clean, alpha 0.05. Release policy: none.
+Suite s@1. Old model: old-model (arm A, agent agent). Overall verdicts on condition clean, alpha 0.05. Release rule set: none.
 
 ## Recommendation
 

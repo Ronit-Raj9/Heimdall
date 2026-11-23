@@ -23,6 +23,32 @@ type MigrationSource interface {
 	Migration(ctx context.Context, expID, gradeSource string, q migration.Query) (*migration.Report, error)
 }
 
+// MigrationPolicySource is a MigrationSource that can also build the report
+// under a release rule set named in the request (the policy query): a file
+// stem from the project's policies/ folder, "none" or "" for the
+// comparison's own choice. A name that is not a rule set file wraps
+// ErrNoRuleSet.
+type MigrationPolicySource interface {
+	MigrationWithPolicy(ctx context.Context, expID, gradeSource, policy string, q migration.Query) (*migration.Report, error)
+}
+
+// ErrNoRuleSet is a policy query that names no release rule set file.
+var ErrNoRuleSet = errors.New("no release rule set")
+
+// ValidRuleSetName says name can be a rule set file stem: letters, digits,
+// dots, dashes and underscores, no path and no leading dot.
+func ValidRuleSetName(name string) bool {
+	if name == "" || len(name) > 100 || name[0] == '.' {
+		return false
+	}
+	for _, c := range name {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '.' || c == '-' || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+
 // MigrationHandler serves the migration report.
 type MigrationHandler struct {
 	mode   schemas.Mode
@@ -41,7 +67,8 @@ func (h *MigrationHandler) RegisterRoutes(r *router.Router, middlewares ...lib.M
 
 // getMigration handles GET /experiments/{id}/migration with the query
 // parameters from (model or arm; default arm A), to (comma-separated),
-// condition, alpha and grade_source.
+// condition, alpha, grade_source and policy (a rule set file stem or none;
+// default the comparison's own choice).
 func (h *MigrationHandler) getMigration(ctx *fasthttp.RequestCtx) {
 	if h.source == nil {
 		sendUnavailable(ctx, h.mode, "migration report")
@@ -77,9 +104,28 @@ func (h *MigrationHandler) getMigration(ctx *fasthttp.RequestCtx) {
 	if gradeSource == "" {
 		gradeSource = schemas.GradeSourceOriginal
 	}
+	ruleSet := strings.TrimSpace(string(args.Peek("policy")))
+	noRuleSet := func() {
+		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, fmt.Sprintf("No release rule set named %s.", ruleSet))
+	}
+	ps, withPolicy := h.source.(MigrationPolicySource)
+	if ruleSet != "" && (!withPolicy || !ValidRuleSetName(ruleSet)) {
+		noRuleSet()
+		return
+	}
 	work, cancel := workContext(ctx, analyzeTimeout)
 	defer cancel()
-	rep, err := h.source.Migration(work, id, gradeSource, q)
+	var rep *migration.Report
+	var err error
+	if ruleSet != "" {
+		rep, err = ps.MigrationWithPolicy(work, id, gradeSource, ruleSet, q)
+	} else {
+		rep, err = h.source.Migration(work, id, gradeSource, q)
+	}
+	if errors.Is(err, ErrNoRuleSet) {
+		noRuleSet()
+		return
+	}
 	if errors.Is(err, migration.ErrBadQuery) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, err.Error())
 		return

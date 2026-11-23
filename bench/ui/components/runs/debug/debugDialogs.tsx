@@ -34,16 +34,44 @@ export function StartedNote({ started }: { started: DebugRunResponse | null }) {
 	);
 }
 
+/**
+ * Starts a debug run from a dialog (N214). On success the dialog hands the started run up and closes,
+ * so the page shows the result line and the next Fork opens a fresh dialog; a refused start keeps the
+ * dialog open with its error. Answers whether the run started.
+ */
+export async function startDebugRun(
+	run: () => Promise<{ data?: DebugRunResponse; error?: unknown }>,
+	onStarted: ((res: DebugRunResponse) => void) | undefined,
+	onClose: () => void,
+): Promise<boolean> {
+	const res = await run();
+	if (!res.data) return false;
+	onStarted?.(res.data);
+	onClose();
+	return true;
+}
+
 type ForkChange = "response" | "message" | "none";
 
-/** Fork from model call N: replay before it, apply an edit at it, then continue live. */
-export function ForkDialog({ runId, call, open, onClose }: { runId: string; call: number; open: boolean; onClose(): void }) {
+/** Fork from model call N: replay before it, apply an edit at it, then continue live. Start states the cost and is the confirmation. */
+export function ForkDialog({
+	runId,
+	call,
+	open,
+	onClose,
+	onStarted,
+}: {
+	runId: string;
+	call: number;
+	open: boolean;
+	onClose(): void;
+	onStarted?(res: DebugRunResponse): void;
+}) {
 	const { t } = useTranslation("runDebug");
 	const [change, setChange] = useState<ForkChange>("message");
 	const [text, setText] = useState("");
 	const [divergence, setDivergence] = useState<DivergencePolicy>("live");
 	const [start, state] = useStartDebugRunMutation();
-	const [started, setStarted] = useState<DebugRunResponse | null>(null);
 	const needsText = change !== "none" && text.trim() === "";
 	const submit = async () => {
 		const body = {
@@ -51,11 +79,17 @@ export function ForkDialog({ runId, call, open, onClose }: { runId: string; call
 			on_divergence: divergence,
 			...(change === "response" ? { response: text } : change === "message" ? { message: text } : {}),
 		};
-		const res = await start({ runId, mode: "fork", body });
-		if ("data" in res && res.data) setStarted(res.data);
+		await startDebugRun(() => start({ runId, mode: "fork", body }), onStarted, onClose);
 	};
 	return (
-		<GovDialog open={open} onClose={onClose} title={t("fork.title", { call })} description={t("fork.description")} closeLabel={t("fork.close")} testId="fork-dialog">
+		<GovDialog
+			open={open}
+			onClose={onClose}
+			title={t("fork.title", { call })}
+			description={`${t("fork.description")} ${t("fork.cost", { call })}`}
+			closeLabel={t("fork.close")}
+			testId="fork-dialog"
+		>
 			<div className="flex flex-col gap-4">
 				<fieldset className="flex flex-col gap-1.5 text-sm">
 					<legend className="mb-1 text-xs font-medium">{t("fork.mode")}</legend>
@@ -92,12 +126,11 @@ export function ForkDialog({ runId, call, open, onClose }: { runId: string; call
 						{errorText(state.error) ?? t("actions.failed")}
 					</p>
 				) : null}
-				<StartedNote started={started} />
 				<div className="flex justify-end gap-2">
 					<Button variant="outline" onClick={onClose}>
 						{t("fork.cancel")}
 					</Button>
-					<Button onClick={() => void submit()} disabled={needsText || state.isLoading || Boolean(started)} isLoading={state.isLoading} dataTestId="fork-submit">
+					<Button onClick={() => void submit()} disabled={needsText || state.isLoading} isLoading={state.isLoading} dataTestId="fork-submit">
 						{t("fork.submit")}
 					</Button>
 				</div>
@@ -111,11 +144,13 @@ export function BreakpointDialog({
 	runId,
 	open,
 	onClose,
+	onStarted,
 	initialCalls = "",
 }: {
 	runId: string;
 	open: boolean;
 	onClose(): void;
+	onStarted?(res: DebugRunResponse): void;
 	initialCalls?: string;
 }) {
 	const { t } = useTranslation("runDebug");
@@ -123,7 +158,6 @@ export function BreakpointDialog({
 	const [every, setEvery] = useState(false);
 	const [tools, setTools] = useState("");
 	const [start, state] = useStartDebugRunMutation();
-	const [started, setStarted] = useState<DebugRunResponse | null>(null);
 	const parsed = parseCallList(calls);
 	const names = parseNames(tools);
 	const invalid = parsed === null;
@@ -135,11 +169,17 @@ export function BreakpointDialog({
 			...(every ? { every: true } : {}),
 			...(names.length ? { after_tools: names } : {}),
 		};
-		const res = await start({ runId, mode: "step", body: { breakpoints } });
-		if ("data" in res && res.data) setStarted(res.data);
+		await startDebugRun(() => start({ runId, mode: "step", body: { breakpoints } }), onStarted, onClose);
 	};
 	return (
-		<GovDialog open={open} onClose={onClose} title={t("debugDialog.title")} description={t("debugDialog.description")} closeLabel={t("fork.close")} testId="breakpoint-dialog">
+		<GovDialog
+			open={open}
+			onClose={onClose}
+			title={t("debugDialog.title")}
+			description={`${t("debugDialog.description")} ${t("debugDialog.cost")}`}
+			closeLabel={t("fork.close")}
+			testId="breakpoint-dialog"
+		>
 			<div className="flex flex-col gap-4">
 				<label className="flex flex-col gap-1.5 text-xs font-medium">
 					{t("debugDialog.calls")}
@@ -163,12 +203,11 @@ export function BreakpointDialog({
 						{errorText(state.error) ?? t("actions.failed")}
 					</p>
 				) : null}
-				<StartedNote started={started} />
 				<div className="flex justify-end gap-2">
 					<Button variant="outline" onClick={onClose}>
 						{t("fork.cancel")}
 					</Button>
-					<Button onClick={() => void submit()} disabled={invalid || empty || state.isLoading || Boolean(started)} isLoading={state.isLoading} dataTestId="breakpoint-submit">
+					<Button onClick={() => void submit()} disabled={invalid || empty || state.isLoading} isLoading={state.isLoading} dataTestId="breakpoint-submit">
 						{t("debugDialog.submit")}
 					</Button>
 				</div>

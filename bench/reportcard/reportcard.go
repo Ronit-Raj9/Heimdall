@@ -143,9 +143,24 @@ type Benchmark struct {
 	// Judge is set when a model judge grades the benchmark: its
 	// calibration state and whether verdicts and min_score gates may use it.
 	Judge *JudgeState `json:"judge,omitempty"`
+	// ThrownOut counts, per arm label, the runs a safety check threw out of
+	// the score (fix wave 3, N215): every run of a finished child whose
+	// analysis is invalid for the whole experiment, or only the runs an
+	// invalidate gate fired on when it is invalid in scope "runs".
+	ThrownOut map[string]ThrownOut `json:"thrown_out,omitempty"`
 
 	// tasks is each arm's clean per-task tally, for paired gates.
 	tasks map[string][]TaskTally
+}
+
+// ThrownOut is one arm's runs thrown out of a benchmark's score by a safety
+// check. Checks counts them per gate id when a gate fired on the run (empty
+// when the whole experiment was thrown out); Reasons are the analysis's
+// invalid reasons.
+type ThrownOut struct {
+	Runs    int            `json:"runs"`
+	Checks  map[string]int `json:"checks,omitempty"`
+	Reasons []string       `json:"reasons,omitempty"`
 }
 
 // FaultScore is one arm's score under a fault and its change from clean
@@ -227,6 +242,14 @@ type Report struct {
 	// RedTeam is the attack success of every red-team benchmark (redteam.go);
 	// nil when the evaluation ran none.
 	RedTeam *RedTeam `json:"red_team,omitempty"`
+
+	// ThrownOutRuns is the sum of every benchmark's ThrownOut runs (fix wave
+	// 3, N215). PlannedRuns is the counted slots of the shown arms over every
+	// child and DoneRuns those with a finished run, so a running evaluation
+	// can say "n of m runs done" (N182).
+	ThrownOutRuns int `json:"thrown_out_runs,omitempty"`
+	PlannedRuns   int `json:"planned_runs,omitempty"`
+	DoneRuns      int `json:"done_runs,omitempty"`
 }
 
 // LearningRow is one arm's learning summary on one benchmark.
@@ -318,6 +341,11 @@ type childRuns struct {
 	judged                 bool
 	// meta is the child's task metadata from its manifest (slices.go).
 	meta map[string]map[string]string
+	// thrownOut is each arm label's runs a safety check threw out (N215);
+	// planned and done count the shown arms' counted slots and the ones
+	// with a finished run (N182).
+	thrownOut     map[string]*ThrownOut
+	planned, done int
 }
 
 // Build computes the report of ev over src. A child with no experiment or
@@ -401,6 +429,8 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 		}
 		children = append(children, cr)
 		rep.PracticeRuns += cr.practice
+		rep.PlannedRuns += cr.planned
+		rep.DoneRuns += cr.done
 	}
 	if rep.PracticeRuns > 0 {
 		rep.Note = fmt.Sprintf("%d practice runs were left out: the scripted practice model answered them, so they are not findings.", rep.PracticeRuns)
@@ -428,6 +458,13 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 			for _, c := range clustersOf(clean, "") {
 				b.tasks[l] = append(b.tasks[l], TaskTally{Key: c.key, Succ: c.succ, Runs: c.runs})
 			}
+		}
+		for l, to := range cr.thrownOut {
+			if b.ThrownOut == nil {
+				b.ThrownOut = map[string]ThrownOut{}
+			}
+			b.ThrownOut[l] = *to
+			rep.ThrownOutRuns += to.Runs
 		}
 		if ab {
 			v := compare(filter(cr.arms[labels[0]], schemas.ConditionClean), filter(cr.arms[labels[1]], schemas.ConditionClean))
@@ -513,7 +550,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 // leaderboard counts it: the slot's first sealed run whose outcome is not
 // aborted_infra, with an outcome that scores; compatibility runs never count.
 func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.EvaluationArm, c schemas.EvaluationChild, where map[string]string) (childRuns, error) {
-	cr := childRuns{child: c, arms: map[string][]graded{}, excluded: map[string]map[string]int{}, replays: map[string][]graded{}}
+	cr := childRuns{child: c, arms: map[string][]graded{}, excluded: map[string]map[string]int{}, replays: map[string][]graded{}, thrownOut: map[string]*ThrownOut{}}
 	if c.ExperimentID == "" {
 		return cr, nil
 	}
@@ -521,11 +558,23 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 	if !ok || m == nil {
 		return cr, nil
 	}
-	if d, ok := src.LatestDecision(c.ExperimentID); ok && d == schemas.DecisionInvalid {
-		return cr, nil
-	}
+	scope, invalidReasons := childInvalid(src, c)
 	cr.suiteVersion, cr.lockHash, cr.judged = m.SuiteVersion, m.SuiteLockHash, m.Scenario[scenarioJudgeKey] != ""
 	armLabel := mapArms(arms, m)
+	throwOut := func(label, gate string) {
+		to := cr.thrownOut[label]
+		if to == nil {
+			to = &ThrownOut{Reasons: invalidReasons}
+			cr.thrownOut[label] = to
+		}
+		to.Runs++
+		if gate != "" {
+			if to.Checks == nil {
+				to.Checks = map[string]int{}
+			}
+			to.Checks[gate]++
+		}
+	}
 	cr.meta = m.TaskMetadata
 	practice, err := practiceArms(ctx, src, m, c.ExperimentID)
 	if err != nil {
@@ -549,6 +598,12 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 		slots = append(slots, s)
 	}
 	slices.Sort(slots)
+	for _, sl := range m.Slots {
+		_, mapped := armLabel[sl.Arm]
+		if sl.Counted && sl.Arm != "compat" && (mapped || (freshID != "" && sl.Arm == freshID)) {
+			cr.planned++
+		}
+	}
 	for _, s := range slots {
 		if err := ctx.Err(); err != nil {
 			return cr, fmt.Errorf("reportcard: %w", err)
@@ -570,6 +625,7 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 		if (!ok && !isFresh) || r.Slot.Arm == "compat" {
 			continue
 		}
+		cr.done++
 		if _, scores := r.Run.Outcome.Score(); !scores {
 			if why := schemas.ExcludedReason(&r.Run); why != "" && cmp.Or(r.Slot.Condition, schemas.ConditionClean) == schemas.ConditionClean {
 				if cr.excluded[label] == nil {
@@ -583,13 +639,25 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 			cr.practice++
 			continue
 		}
+		if scope == invalidExperiment { // N215: the whole experiment is untrustworthy
+			if ok {
+				throwOut(label, "")
+			}
+			continue
+		}
 		metrics, err := readMetrics(src, r.Run.RunID)
 		if err != nil {
 			return cr, err
 		}
-		gates, err := readGates(src, r.Run.RunID)
+		gates, invalidated, err := readGates(src, r.Run.RunID)
 		if err != nil {
 			return cr, err
+		}
+		if scope == invalidRuns && len(invalidated) > 0 { // N215: only this run is untrustworthy
+			if ok {
+				throwOut(label, invalidated[0])
+			}
+			continue
 		}
 		y, _ := leaderboard.VerifiedSuccess(r.Run.Outcome, metrics)
 		cond := cmp.Or(r.Slot.Condition, schemas.ConditionClean)
@@ -605,7 +673,50 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 			cr.arms[label] = append(cr.arms[label], g)
 		}
 	}
+	cr.planned = max(cr.planned, cr.done) // a manifest without slots plans what ran
 	return cr, nil
+}
+
+// Invalid scopes of a child's newest analysis (fix wave 3, N215).
+const (
+	invalidExperiment = "experiment"
+	invalidRuns       = "runs"
+)
+
+// childInvalid is the invalid scope of a finished child whose newest
+// analysis decided INVALID, with its reasons: "experiment" (every run is
+// thrown out; also an analysis stored without a scope or a source that
+// cannot say) or "runs" (only the runs an invalidate gate fired on). It is
+// "" for a child that is not invalid, and for a child still running (fix
+// wave 3, N182): an analysis written while it runs is invalid by coverage,
+// so its runs are kept whatever the stored decision.
+func childInvalid(src leaderboard.Source, c schemas.EvaluationChild) (string, []string) {
+	if !childFinished(c.Status) {
+		return "", nil
+	}
+	if d, ok := src.LatestDecision(c.ExperimentID); !ok || d != schemas.DecisionInvalid {
+		return "", nil
+	}
+	if as, ok := src.(leaderboard.AnalysisSource); ok {
+		if scope, reasons, ok := as.LatestInvalid(c.ExperimentID); ok {
+			if scope != invalidRuns {
+				scope = invalidExperiment
+			}
+			return scope, reasons
+		}
+	}
+	return invalidExperiment, nil
+}
+
+// childFinished is true for a child experiment in a final state, and for a
+// child with no recorded state (an evaluation stored before children kept
+// one).
+func childFinished(status string) bool {
+	switch schemas.ExperimentState(status) {
+	case "", schemas.ExperimentDone, schemas.ExperimentFailed, schemas.ExperimentCancelled:
+		return true
+	}
+	return false
 }
 
 // practiceArms marks the experiment's arms whose runs are practice data, by
@@ -693,23 +804,28 @@ func readMetrics(src leaderboard.Source, runID string) (map[string]schemas.Value
 
 // readGates reads a run's gates.json as gate name -> fired; a missing or
 // unreadable file is no gates (the safety section then reads "not tested").
-func readGates(src leaderboard.Source, runID string) (map[string]bool, error) {
+// invalidated names the invalidate gates that fired, in file order (fix wave
+// 3, N215).
+func readGates(src leaderboard.Source, runID string) (fired map[string]bool, invalidated []string, err error) {
 	data, err := src.RunFile(runID, fileGates)
 	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, schemas.ErrNotFound) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("reportcard: read %s of run %s: %w", fileGates, runID, err)
+		return nil, nil, fmt.Errorf("reportcard: read %s of run %s: %w", fileGates, runID, err)
 	}
 	var results []schemas.GateResult
 	if json.Unmarshal(data, &results) != nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	out := make(map[string]bool, len(results))
 	for _, g := range results {
 		out[g.Gate] = out[g.Gate] || g.Fired
+		if g.Fired && g.Effect == schemas.GateInvalidate && !slices.Contains(invalidated, g.Gate) {
+			invalidated = append(invalidated, g.Gate)
+		}
 	}
-	return out, nil
+	return out, invalidated, nil
 }
 
 func filter(runs []graded, condition string) []graded {

@@ -81,6 +81,15 @@ type Source interface {
 	LatestDecision(expID string) (schemas.Decision, bool)
 }
 
+// AnalysisSource is optionally implemented by a Source (fix wave 3, N215).
+// LatestInvalid returns, for an experiment whose newest analysis decided
+// INVALID, the verdict's invalid scope ("runs" or "experiment"; an analysis
+// stored without one reads as "experiment") and its invalid reasons. ok is
+// false when the newest analysis is not invalid or cannot be read.
+type AnalysisSource interface {
+	LatestInvalid(expID string) (scope string, reasons []string, ok bool)
+}
+
 // Query selects one board. Zero fields take the defaults: the newest suite
 // with runs, the clean condition, scope all, live runs only, original
 // grades, each entry's default k, alpha 0.05 and the current time.

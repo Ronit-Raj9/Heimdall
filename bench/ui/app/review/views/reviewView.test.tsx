@@ -35,4 +35,18 @@ describe("QueueBody", () => {
 		expect(html).toContain('data-testid="review-queue-problems"');
 		expect(html).toContain("parent seal differs");
 	});
+
+	it("names a run a safety check threw out in the filter and the queue (fix wave 3, N257)", () => {
+		const item = {
+			...queueFixture.items[0],
+			run_id: "r_thrown",
+			reasons: ["invalidated"],
+			thrown_out_by: ["model check: served by another model"],
+		};
+		const data = { ...queueFixture, items: [...queueFixture.items, item], reasons: [...(queueFixture.reasons ?? []), "invalidated"] };
+		const html = renderToStaticMarkup(<QueueBody data={data} reason={null} onReason={noop} runId={null} onRun={noop} />);
+		expect(html).toMatch(/data-testid="review-reason-option-invalidated"[^>]*>[^<]*Thrown out by a safety check/);
+		expect(html).toContain("Thrown out by a safety check: model check: served by another model");
+		expect(html).not.toContain(">invalidated<");
+	});
 });

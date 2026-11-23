@@ -299,7 +299,7 @@ func writePolicy(w *bufio.Writer, p *schemas.PolicyResult) {
 		return
 	}
 	fmt.Fprintf(w, "Policy `%s`, hash `%s`: **%s**. A policy only adds requirements; the baseline gates always run.\n\n",
-		cell(orUnknown(p.PolicyName)), cell(shortHash(p.PolicyHash)), strings.ToUpper(orUnknown(string(p.Decision))))
+		cell(orUnknown(p.RuleSetName())), cell(shortHash(p.PolicyHash)), strings.ToUpper(orUnknown(string(p.Decision))))
 	if len(p.Checks) == 0 {
 		w.WriteString("No checks.\n\n")
 		return

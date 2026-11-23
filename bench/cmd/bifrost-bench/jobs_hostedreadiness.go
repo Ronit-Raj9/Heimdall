@@ -249,6 +249,7 @@ func readinessVerdict(s *schemas.Suite, tasks []*schemas.Task, runs []bridgeRun,
 	out := make([]hostedAdmitTask, 0, len(tasks))
 	for _, t := range tasks {
 		ht := hostedAdmitTask{Task: t.ID, Admitted: true}
+		gradeWhy := map[string]string{} // check name -> why the grader could not grade its run (N273)
 		where := "on a worker in experiment " + expOf[t.ID]
 		for _, c := range readinessTaskChecks(s, t) {
 			chk := schemas.AdmissionCheck{Name: c.Name, Want: c.Want}
@@ -266,6 +267,10 @@ func readinessVerdict(s *schemas.Suite, tasks []*schemas.Task, runs []bridgeRun,
 				}
 				if r.Detail != "" && !chk.Passed {
 					chk.Detail += " (" + r.Detail + ")"
+				}
+				if chk.Got == suite.GotInvalidEvaluator && r.GradeReason != "" {
+					gradeWhy[c.Name] = r.GradeReason
+					chk.Detail += "; grade: " + r.GradeReason
 				}
 			}
 			switch c.Name {
@@ -287,6 +292,9 @@ func readinessVerdict(s *schemas.Suite, tasks []*schemas.Task, runs []bridgeRun,
 				ht.Admitted = false
 				if ht.Reason == "" {
 					ht.Reason = readinessReason(c)
+					if why := gradeWhy[c.Name]; why != "" && c.Got == suite.GotInvalidEvaluator {
+						ht.Reason = readinessGradeReason(c, why)
+					}
 				}
 			}
 		}
@@ -326,6 +334,17 @@ func readinessReason(c schemas.AdmissionCheck) string {
 		return what + " did not pass: the reference answer or the check is broken" + detailSuffix(c.Detail)
 	}
 	return what + " passed: the check accepts an answer it should fail" + detailSuffix(c.Detail)
+}
+
+// readinessGradeReason is the refusal of a control the grader could not
+// grade, naming the grade's own reason (fix wave 3, N273): "the right answer
+// (reference 1) could not be graded: judge: ...".
+func readinessGradeReason(c schemas.AdmissionCheck, why string) string {
+	r := readinessReason(c)
+	if i := strings.Index(r, " could not be graded"); i >= 0 {
+		return r[:i] + " could not be graded: " + why
+	}
+	return r + ": " + why
 }
 
 func detailSuffix(d string) string {

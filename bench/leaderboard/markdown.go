@@ -62,7 +62,7 @@ func Markdown(lb *schemas.Leaderboard) string {
 
 // writeRanking writes the main table.
 func writeRanking(b *strings.Builder, entries []schemas.LeaderboardEntry) {
-	b.WriteString("| Rank | Tier | Agent | Label | Model | Config | Success [95% interval] | Passes | Reliability | Tasks | Runs | Cost per success | p vs leader | Tier reason |\n")
+	b.WriteString("| Rank | Tier | Agent | Label | Model | Config | Success [95% interval] | Tasks solved | Reliability | Tasks | Runs | Cost per success | p vs leader | Tier reason |\n")
 	b.WriteString("|---:|---:|---|---|---|---|---|---:|---|---:|---:|---:|---:|---|\n")
 	for _, e := range entries {
 		p := "-"
@@ -70,12 +70,16 @@ func writeRanking(b *strings.Builder, entries []schemas.LeaderboardEntry) {
 			p = formatP(*e.PVsLeader)
 		}
 		reliability := percent(e.Reliability)
-		if e.Trials >= 2 {
+		switch _, known := e.Reliability.Float(); {
+		case !known && e.Trials < 2:
+			// fix wave 3, N295: one try per task measures no reliability.
+			reliability = fmt.Sprintf("not measured (needs 2 or more tries per task; this ran %d)", e.Trials)
+		case e.Trials >= 2:
 			reliability += fmt.Sprintf(" (pass^%d)", e.Trials)
 		}
 		fmt.Fprintf(b, "| %d | %d | %s | %s | %s | `%s` | %s | %d/%d | %s | %d | %d | %s | %s | %s |\n",
 			e.Rank, e.Tier, cell(e.Agent), cell(e.Label), cell(e.Model), short(e.ConfigHash), success(e.Success),
-			e.Passes.Num, e.Passes.Den, reliability, e.Tasks, e.Runs, usd(e.Metrics[MetricCostPerSuccess]), p, cell(e.TierReason))
+			e.TasksSolved, e.Tasks, reliability, e.Tasks, e.Runs, usd(e.Metrics[MetricCostPerSuccess]), p, cell(e.TierReason))
 	}
 	b.WriteString("\n")
 }

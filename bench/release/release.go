@@ -494,7 +494,7 @@ func frozenPolicySkipped(m *schemas.Manifest, p *schemas.PolicyResult) string {
 		return fmt.Sprintf("the analysis did not evaluate the frozen policy %s", m.Experiment.Policy)
 	}
 	if m.PolicyHash != "" && p.PolicyHash != m.PolicyHash {
-		return fmt.Sprintf("the analysis evaluated policy %s (%s), not the frozen policy %s (%s)", p.PolicyName, p.PolicyHash, m.Experiment.Policy, m.PolicyHash)
+		return fmt.Sprintf("the analysis evaluated policy %s (%s), not the frozen policy %s (%s)", p.RuleSetName(), p.PolicyHash, m.Experiment.Policy, m.PolicyHash)
 	}
 	return ""
 }
@@ -508,12 +508,32 @@ func checkRelease(m *schemas.Manifest, ev *evidence, override string) error {
 		return err
 	}
 	a := ev.analysis
+	if why := notReleasable(m, a); why != "" {
+		return &RefusedError{Reason: why}
+	}
 	var blocked []string
 	if a.Verdict.Action != schemas.ActionShip {
 		blocked = append(blocked, fmt.Sprintf("verdict action is %s, not ship", a.Verdict.Action))
 	}
 	blocked = append(blocked, policyBlocks(m, ev)...)
 	return checkOverride(blocked, override, "action is ship and the policy does not block")
+}
+
+// notReleasable says why an experiment can never be released, whatever an
+// override says, or "" (fix wave 3, N244 and N247): a debug run (replay,
+// fork or breakpoints) and a readiness check (admit-) measure the harness,
+// not a version to ship, and a leader verdict ranks three or more setups
+// with no candidate against a baseline (D12).
+func notReleasable(m *schemas.Manifest, a *schemas.Analysis) string {
+	switch {
+	case m.Experiment.Debug != nil:
+		return fmt.Sprintf("%s is a debug run, which is never scored or released", m.ExpID)
+	case strings.HasPrefix(m.Experiment.Name, "admit-") || strings.HasPrefix(m.ExpID, "e_admit_"):
+		return fmt.Sprintf("%s is a readiness check, not a comparison; it is never released", m.ExpID)
+	case a != nil && a.Verdict.Decision == schemas.DecisionLeader:
+		return "the verdict ranks three or more setups (leader found); a release needs a comparison of one version against another"
+	}
+	return ""
 }
 
 // checkIntegrity refuses an analysis that does not match the frozen
@@ -553,7 +573,7 @@ func checkIntegrity(m *schemas.Manifest, ev *evidence) error {
 func policyBlocks(m *schemas.Manifest, ev *evidence) []string {
 	var blocked []string
 	if ev.policy != nil && ev.policy.Decision == schemas.PolicyBlock {
-		blocked = append(blocked, fmt.Sprintf("policy %s decision is block", ev.policy.PolicyName))
+		blocked = append(blocked, fmt.Sprintf("policy %s decision is block", ev.policy.RuleSetName()))
 	}
 	if reason := frozenPolicySkipped(m, ev.policy); reason != "" {
 		blocked = append(blocked, reason)
@@ -606,7 +626,7 @@ func newRecord(m *schemas.Manifest, ev *evidence, r schemas.ReleaseRequest, now 
 		CreatedAt:     now,
 	}
 	if ev.policy != nil {
-		rec.PolicyName, rec.PolicyHash, rec.PolicyDecision = ev.policy.PolicyName, ev.policy.PolicyHash, ev.policy.Decision
+		rec.PolicyName, rec.PolicyHash, rec.PolicyDecision = ev.policy.RuleSetName(), ev.policy.PolicyHash, ev.policy.Decision
 	}
 	return rec, nil
 }

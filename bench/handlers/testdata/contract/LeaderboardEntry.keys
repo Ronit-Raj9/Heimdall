@@ -11,6 +11,7 @@ label
 synthetic
 experiments
 tasks
+tasks_solved?
 runs
 trials
 success

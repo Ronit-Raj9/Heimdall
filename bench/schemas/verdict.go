@@ -18,6 +18,10 @@ const (
 	// DecisionScore is a one-arm experiment's result: one setup scored on
 	// its own, with no comparison and so no release verdict (Verdict.Score).
 	DecisionScore Decision = "score"
+	// DecisionLeader is a comparison of three or more setups where one setup
+	// is significantly ahead of every other (Verdict.Setups). It names no
+	// release candidate, so it is never releasable (fix wave 3, N244).
+	DecisionLeader Decision = "leader"
 )
 
 // Action is the single action a verdict ends in (DESIGN.md 9.4).
@@ -132,6 +136,8 @@ type Verdict struct {
 	Decision          Decision          `json:"decision"`
 	Action            Action            `json:"action"`
 	Effect            *Effect           `json:"effect,omitempty"`
+	Basis             string            `json:"basis,omitempty"`  // what decided a regressed or improved verdict: "effect" or "guard" (fix wave 3, N244)
+	Setups            *SetupsVerdict    `json:"setups,omitempty"` // set for a comparison of three or more setups; it decides, Effect (B against A) is then descriptive only
 	Alpha             float64           `json:"alpha"`
 	MDE               float64           `json:"mde"` // percentage points
 	MDEAssumedSD      bool              `json:"mde_assumed_sd"`
@@ -142,6 +148,7 @@ type Verdict struct {
 	TieRule           string            `json:"tie_rule"`
 	Guards            []GuardResult     `json:"guards"`
 	InvalidReasons    []string          `json:"invalid_reasons,omitempty"`
+	InvalidScope      string            `json:"invalid_scope,omitempty"`
 	Instruments       []InstrumentCheck `json:"instruments,omitempty"` // measured instrument checks; a failed one is also an invalid reason
 	Integrity         IntegrityStatus   `json:"integrity"`
 	ManifestHash      string            `json:"manifest_hash"`
@@ -304,4 +311,19 @@ type Analysis struct {
 type Reporter interface {
 	Part
 	Write(ctx context.Context, a *Analysis, m *Manifest, w io.Writer) error
+}
+
+// SetupsVerdict is the verdict of a comparison of three or more setups (not
+// counting an A/A copy): the matrix of every setup against the leader, with
+// Holm-adjusted p-values, instead of a B-against-A effect (fix wave 3, N244).
+type SetupsVerdict struct {
+	Leader    string       `json:"leader"`    // the setup ranked first
+	TopGroup  []string     `json:"top_group"` // setups that cannot be told apart from the leader, the leader first
+	Behind    []string     `json:"behind"`    // setups significantly behind the leader
+	Separable bool         `json:"separable"` // false when no pair could reach alpha whatever the results
+	Note      string       `json:"note"`      // the matrix note in plain words
+	Pairs     []MatrixPair `json:"pairs"`     // the leader against every other setup
+	// Safety maps a setup to the tasks where a veto gate fired in one of
+	// its runs; a setup without such a task is absent.
+	Safety map[string][]string `json:"safety,omitempty"`
 }

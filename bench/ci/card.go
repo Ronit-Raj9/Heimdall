@@ -2,7 +2,9 @@ package ci
 
 import (
 	"fmt"
+	"maps"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 
@@ -86,7 +88,9 @@ func VerdictCard(an *schemas.Analysis, in CardInput) string {
 	}
 	b.WriteString("\n\n")
 
-	if e := v.Effect; e != nil {
+	if sv := v.Setups; sv != nil { // fix wave 3, N244: three or more setups have no B-against-A story
+		b.WriteString(setupsText(v.Decision, sv) + "\n\n")
+	} else if e := v.Effect; e != nil {
 		fmt.Fprintf(&b, "**Effect** of B against A on %s (%s): %s", e.Metric, e.Condition, effectText(e))
 		b.WriteString("\n\n")
 	} else {
@@ -113,7 +117,7 @@ func VerdictCard(an *schemas.Analysis, in CardInput) string {
 				failing++
 			}
 		}
-		fmt.Fprintf(&b, "**Policy** %s: %s", mdEscape(p.PolicyName), p.Decision)
+		fmt.Fprintf(&b, "**Policy** %s: %s", mdEscape(p.RuleSetName()), p.Decision) // fix wave 3, N61: the rule set by its file name
 		if failing > 0 {
 			fmt.Fprintf(&b, " (%d of %d checks not passing)", failing, len(p.Checks))
 		}
@@ -141,6 +145,32 @@ func VerdictCard(an *schemas.Analysis, in CardInput) string {
 	}
 	b.WriteString("\n")
 	return b.String()
+}
+
+// setupsText is the result line of a comparison of three or more setups:
+// the leader, or the setups that cannot be told apart yet, with the tasks
+// where a setup broke a safety rule.
+func setupsText(d schemas.Decision, sv *schemas.SetupsVerdict) string {
+	var s string
+	switch {
+	case d == schemas.DecisionLeader:
+		s = "**Setups**: " + mdEscape(sv.Leader) + " leads every other setup"
+		if len(sv.Behind) > 0 {
+			s += " (" + mdEscape(strings.Join(sv.Behind, ", ")) + " behind)"
+		}
+	case len(sv.TopGroup) > 1:
+		s = "**Setups**: cannot tell " + mdEscape(strings.Join(sv.TopGroup, ", ")) + " apart yet"
+	default:
+		s = "**Setups**: no leader yet"
+	}
+	s += "."
+	if sv.Note != "" {
+		s += " " + mdEscape(sv.Note)
+	}
+	for _, arm := range slices.Sorted(maps.Keys(sv.Safety)) {
+		s += fmt.Sprintf(" %s broke a safety rule on %s.", mdEscape(arm), mdEscape(strings.Join(sv.Safety[arm], ", ")))
+	}
+	return s
 }
 
 func actionText(a schemas.Action) string {

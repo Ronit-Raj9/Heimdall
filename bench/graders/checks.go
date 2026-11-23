@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -245,7 +246,7 @@ func (g *checksGrader) judgeReply(ctx context.Context, rc *schemas.RunContext, r
 	task := instructionText(rc.Task)
 	ans := &schemas.AnswerSpec{Question: task, Rubric: strings.TrimSpace(rubric)}
 	prompt := renderJudgePromptCap(string(tmpl), ans, conv, maxConversationRunes)
-	rec, _, err = g.judge.voteReplies(ctx, rc, spec, prompt, nil)
+	rec, replies, err := g.judge.voteReplies(ctx, rc, spec, prompt, nil)
 	if err != nil {
 		return nil, false, false, "", err
 	}
@@ -253,6 +254,9 @@ func (g *checksGrader) judgeReply(ctx context.Context, rc *schemas.RunContext, r
 	rec.Provider = spec.Provider
 	rec.Calibration = calibrationRef(rc.Suite, calibration.GradeJudgeID(rec), rec.PromptSHA256)
 	passed, invalid, detail = tally(rec.Votes, PromptChecksReplyV1)
+	if invalid && slices.Contains(replies, replyCutByLength) {
+		detail = lengthCutReason(judgeMaxTokens(spec)) // fix wave 3, N273: name the reply cap, not "no majority"
+	}
 	return rec, passed, invalid, detail, nil
 }
 

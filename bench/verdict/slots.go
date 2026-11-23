@@ -78,6 +78,7 @@ func Invalidate(a *schemas.Analysis, reasons ...string) {
 	a.Verdict.InvalidReasons = append(a.Verdict.InvalidReasons, reasons...)
 	a.Verdict.Decision = schemas.DecisionInvalid
 	a.Verdict.Action = schemas.ActionFixHarness
+	a.Verdict.InvalidScope = "experiment" // fix wave 3, N215: a reason added after the policy decided is never per run
 }
 
 // evidenceReasons returns one invalid reason per evidence problem the store

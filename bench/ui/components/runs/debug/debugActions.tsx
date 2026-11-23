@@ -12,12 +12,16 @@ import { BreakpointDialog, StartedNote, errorText } from "./debugDialogs";
  * The debug actions a run allows (N133). The server computes them with the rule its debug routes apply
  * (`debug_allowed`): a clean run allows everything, a run under a model fault allows Replay only (the
  * recording holds the faulted answers), any other fault allows nothing. An older server sends nothing:
- * then only a clean run allows them.
+ * then only a clean run allows them. Breakpoints (Debug) also need a server that can hold model calls
+ * (N212); a server that does not say allows them wherever Fork is allowed.
  */
-export function debugAllowed(d: RunDetail): { replay: boolean; fork: boolean } {
-	if (d.debug_allowed) return { replay: d.debug_allowed.replay, fork: d.debug_allowed.fork };
+export function debugAllowed(d: RunDetail): { replay: boolean; fork: boolean; breakpoints: boolean } {
+	if (d.debug_allowed) {
+		const { replay, fork, breakpoints } = d.debug_allowed;
+		return { replay, fork, breakpoints: fork && breakpoints !== false };
+	}
 	const clean = d.slot.condition === "clean";
-	return { replay: clean, fork: clean };
+	return { replay: clean, fork: clean, breakpoints: clean };
 }
 
 /** Whether a run can be replayed: sealed, allowed by its fault, and not itself a replay. */
@@ -28,6 +32,11 @@ export function canReplay(d: RunDetail): boolean {
 /** Whether a run can be forked from a step or rerun with breakpoints: sealed, without a fault, not itself a replay. */
 export function canFork(d: RunDetail): boolean {
 	return Boolean(d.sealed) && debugAllowed(d).fork && d.run.debug?.mode !== "replay";
+}
+
+/** Whether a run can be rerun with breakpoints: it can be forked and this server can hold its model calls. */
+export function canBreak(d: RunDetail): boolean {
+	return canFork(d) && debugAllowed(d).breakpoints;
 }
 
 /** The readable name of a run's fault condition ("heimdall-model-brownout" reads "Model partly down"). */
@@ -70,14 +79,14 @@ export function RunDebugActions({ detail }: { detail: RunDetail }) {
 						title={t("actions.replayHint")}
 						onClick={() => void replay()}
 						isLoading={state.isLoading}
-						disabled={state.isLoading || Boolean(started)}
+						disabled={state.isLoading}
 						dataTestId="run-replay"
 					>
 						<Rewind aria-hidden="true" />
 						{t("actions.replay")}
 					</Button>
 				)}
-				{allowed.fork && (
+				{allowed.fork && allowed.breakpoints && (
 					<Button variant="outline" size="sm" title={t("actions.debugHint")} onClick={() => setDebugOpen(true)} dataTestId="run-debug">
 						<Bug aria-hidden="true" />
 						{t("actions.debug")}
@@ -85,13 +94,18 @@ export function RunDebugActions({ detail }: { detail: RunDetail }) {
 				)}
 			</div>
 			<DebugFaultReason detail={detail} />
+			{allowed.fork && !allowed.breakpoints && (
+				<p className="text-muted-foreground max-w-sm text-right text-xs" data-testid="run-debug-breakpoints-reason">
+					{t("actions.breakpointsNeedWorker")}
+				</p>
+			)}
 			{state.error ? (
 				<p className="text-chart-error-ink text-xs" role="alert" data-testid="run-replay-error">
 					{errorText(state.error) ?? t("actions.failed")}
 				</p>
 			) : null}
 			<StartedNote started={started} />
-			{debugOpen && <BreakpointDialog runId={runId} open onClose={() => setDebugOpen(false)} />}
+			{debugOpen && <BreakpointDialog runId={runId} open onClose={() => setDebugOpen(false)} onStarted={setStarted} />}
 		</div>
 	);
 }

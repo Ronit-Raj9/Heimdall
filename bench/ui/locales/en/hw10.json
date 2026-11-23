@@ -1,0 +1,11 @@
+{
+	"ruleSet": {
+		"label": "Check against rule set",
+		"own": "The comparison's choice",
+		"none": "None",
+		"applied": "Release rule set: {{file}}",
+		"noneApplied": "No release rule set applied: this comparison did not choose one.",
+		"noneChosen": "No release rule set applied: you chose none."
+	},
+	"routingNote": "A Bifrost routing file is made from an evaluation's model comparison. Use Actions > Compare models to make one."
+}

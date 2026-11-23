@@ -12,3 +12,4 @@ sealed_outcome
 outcome
 reviews
 decision?
+thrown_out_by?

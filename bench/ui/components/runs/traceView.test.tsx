@@ -55,6 +55,7 @@ describe("traceView.utils", () => {
 			tools: 1,
 			commands: 1,
 			errors: 1,
+			mismatches: 0,
 		});
 		expect(filterTrace(steps, "errors", "").map((s) => s.seq)).toEqual([3]);
 		expect(filterTrace(steps, "all", "PYTEST").map((s) => s.seq)).toEqual([3]);

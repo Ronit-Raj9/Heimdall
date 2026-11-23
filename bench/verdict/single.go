@@ -51,14 +51,20 @@ func decideSingle(m *schemas.Manifest, cfg settings, idx runIndex, runs, execute
 	invalid := evidenceReasons(executed)
 	invalid = append(invalid, singleCoverageReasons(idx, pc, pm, arm)...)
 	invalid = append(invalid, egressReasons(executed)...)
-	invalid = append(invalid, invalidateGateReasons(idx)...)
+	gates := invalidateGateReasons(idx)
+	invalid = append(invalid, gates...)
 	invalid = append(invalid, versionReasons(idx)...)
 	invalid = append(invalid, manifestReasons(m, runs)...)
 	invalid = append(invalid, instrumentReasons(checks)...)
 	decision := schemas.DecisionScore
 	action := schemas.ActionNoDecision
+	scope := ""
 	if len(invalid) > 0 {
 		decision, action = schemas.DecisionInvalid, schemas.ActionFixHarness
+		scope = "experiment"
+		if len(gates) > 0 && len(invalid) == len(gates) {
+			scope = "runs" // fix wave 3, N215: as verdictFor, only the runs an invalidate gate fired on are untrustworthy
+		}
 	}
 	return schemas.Verdict{
 		Primary:           cfg.primary,
@@ -68,6 +74,7 @@ func decideSingle(m *schemas.Manifest, cfg settings, idx runIndex, runs, execute
 		RandomizationUnit: randomizationUnit,
 		Guards:            []schemas.GuardResult{},
 		InvalidReasons:    invalid,
+		InvalidScope:      scope,
 		Instruments:       checks,
 		Integrity:         integrityStatus(idx),
 		ManifestHash:      m.Hash,

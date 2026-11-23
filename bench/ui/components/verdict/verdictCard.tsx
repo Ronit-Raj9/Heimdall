@@ -4,9 +4,10 @@ import { getLocale } from "@/lib/i18n";
 import type { Action, Decision, Effect, GuardResult, Verdict } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import type { TFunction } from "i18next";
-import { Ban, CircleCheck, CircleHelp, CircleX, Gauge, type LucideIcon } from "lucide-react";
+import { Ban, CircleCheck, CircleHelp, CircleX, Gauge, Trophy, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import "./hw09I18n";
 import { MethodHint } from "./methodHint";
 import {
 	DECISION_TONE,
@@ -40,6 +41,7 @@ const DECISION_ICON = {
 	inconclusive: CircleHelp,
 	invalid: Ban,
 	score: Gauge,
+	leader: Trophy,
 } as const satisfies Record<Decision, LucideIcon>;
 
 // Hero surface per tone: a faint wash of the status hue behind the decision and the action.
@@ -73,9 +75,11 @@ export interface VerdictCardProps {
  */
 export function VerdictCard({ verdict, metricLabel, showGuards = true, className }: VerdictCardProps) {
 	const { t } = useTranslation("bench");
+	const { t: t9 } = useTranslation("hw09");
 	const locale = getLocale();
 	const tone = DECISION_TONE[verdict.decision];
 	const effect = verdict.effect;
+	const decision = verdict.decision;
 	const tasksNeeded = tasksNeededView(verdict);
 	const integrity = integrityView(verdict.integrity);
 
@@ -97,7 +101,7 @@ export function VerdictCard({ verdict, metricLabel, showGuards = true, className
 							data-tone={tone}
 						>
 							<DecisionIcon decision={verdict.decision} />
-							{t(`verdict.card.decision.${verdict.decision}`)}
+							{decision === "leader" ? t9("decision.leader") : t(`verdict.card.decision.${decision}`)}
 						</span>
 						<span className="flex flex-col gap-0.5" data-testid="verdict-effect">
 							<span className="text-foreground text-2xl leading-none font-semibold tabular-nums">

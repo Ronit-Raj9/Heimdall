@@ -73,6 +73,12 @@ describe("PolicyScorecard", () => {
 		expect(html).toContain("enterprise-default, sha256 5c1e0f9a…e6f7");
 	});
 
+	it("names the rule set by its file, not the name inside it (fix wave 3, N61)", () => {
+		const html = renderToStaticMarkup(<PolicyScorecard policy={{ ...fixturePolicy, policy_file: "strict-release" }} expId="e_x" />);
+		expect(html).toContain("strict-release, sha256 5c1e0f9a");
+		expect(html).not.toContain("enterprise-default");
+	});
+
 	it("says so when no policy applies", () => {
 		expect(renderToStaticMarkup(<PolicyScorecard policy={undefined} expId="e_x" />)).toContain('data-testid="policy-scorecard-none"');
 	});

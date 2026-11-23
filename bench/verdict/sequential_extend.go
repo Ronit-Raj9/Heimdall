@@ -230,7 +230,7 @@ func ExtensionStageHolds(an *schemas.Analysis) []string {
 		out = append(out, fmt.Sprintf("stage %s action is hold", an.ExpID))
 	}
 	if p := an.Policy; p != nil && p.Decision == schemas.PolicyBlock {
-		out = append(out, fmt.Sprintf("stage %s release policy %s blocks", an.ExpID, p.PolicyName))
+		out = append(out, fmt.Sprintf("stage %s release policy %s blocks", an.ExpID, p.RuleSetName()))
 	}
 	return out
 }

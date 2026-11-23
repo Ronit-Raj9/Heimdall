@@ -126,6 +126,7 @@ var APIRoutes = []RouteDoc{
 	{Method: "GET", Path: APIPrefix + "/experiments/{id}/migration", Tag: "analysis", Summary: "Model migration report: verdict per model pair overall and per stratum (exact sign-flip, Holm), cost per verified success and why it moved, behaviour differences, flipped tasks, a recommendation that follows the release policy", Response: migration.Report{}, Query: []QueryDoc{
 		{Name: "from", Description: "Old model or arm id; default arm A"}, {Name: "to", Description: "New models or arm ids, comma-separated; default every other arm of the same agent"},
 		{Name: "condition", Description: "Condition of the overall verdict; default the experiment's primary condition"}, {Name: "alpha", Description: "Significance level; default 0.05"}, gradeSourceQuery,
+		{Name: "policy", Description: "Release rule set to check against: a file name from policies/ without .yaml, or none; default the rule set the comparison chose (none when it chose none). An unknown name answers 400"},
 	}},
 	{Method: "GET", Path: APIPrefix + "/experiments/{id}/cost-explain", Tag: "analysis", Summary: "Why arm B cost more than arm A: additive parts of the difference in cost per run and per verified success, measuring costs apart, silent cache breaks with their likely cause", Response: costexplain.Explanation{}, Query: []QueryDoc{
 		{Name: "a", Description: "Baseline arm; default the first arm"}, {Name: "b", Description: "Arm to explain; default the second arm"},

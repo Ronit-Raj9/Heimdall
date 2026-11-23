@@ -1,5 +1,6 @@
 import { filterQueue, isReviewReason } from "@/components/review/review.utils";
 import { ReviewQueueTable } from "@/components/review/reviewQueueTable";
+import "@/components/review/hw07I18n";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shell";
@@ -205,6 +206,7 @@ function ReasonFilter({
 }) {
 	const { t } = useTranslation("bench");
 	const { t: tu } = useTranslation("u14");
+	const { t: tHw07 } = useTranslation("hw07");
 	const chip = (key: string, label: string, count: number | undefined, active: boolean, onClick: () => void, testId?: string) => (
 		<button
 			key={key}
@@ -238,7 +240,11 @@ function ReasonFilter({
 			{reasons.map((r) =>
 				chip(
 					r,
-					isReviewReason(r) ? t(`review.reason.${r}`) : r,
+					r === "invalidated"
+						? tHw07("review.reason.invalidated")
+						: isReviewReason(r)
+							? t(`review.reason.${r as Exclude<typeof r, "invalidated">}`)
+							: r,
 					counts[r] ?? 0,
 					value === r,
 					() => onChange(r),

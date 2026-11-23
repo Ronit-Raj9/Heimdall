@@ -4,11 +4,11 @@ import { clipText } from "@/components/runs/stepTimeline.utils";
 import { Button } from "@/components/ui/button";
 import { useGetRunCallQuery } from "@/lib/store/apis/runDebugApi";
 import type { StepRecord } from "@/lib/types/bench";
-import type { RunCall } from "@/lib/types/runDebug";
+import type { DebugRunResponse, RunCall } from "@/lib/types/runDebug";
 import { GitFork, Pause, X } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BreakpointDialog, ForkDialog } from "./debugDialogs";
+import { BreakpointDialog, ForkDialog, StartedNote } from "./debugDialogs";
 import { ReplayBadge } from "./replayBadge";
 
 /**
@@ -20,17 +20,22 @@ export function StepInspector({
 	step,
 	call,
 	canFork,
+	canBreak = true,
 	onClose,
 }: {
 	runId: string;
 	step: StepRecord | null;
 	call?: RunCall;
 	canFork: boolean;
+	/** N212: Pause here needs a server that can hold model calls. */
+	canBreak?: boolean;
 	onClose(): void;
 }) {
 	const { t } = useTranslation("runDebug");
 	const [forkOpen, setForkOpen] = useState(false);
 	const [bpOpen, setBpOpen] = useState(false);
+	// N214: the dialog closes when its run starts; the result line stays here, under the buttons.
+	const [started, setStarted] = useState<DebugRunResponse | null>(null);
 	if (!step) {
 		return (
 			<aside className="text-muted-foreground rounded-xl border p-4 text-xs" data-testid="step-inspector-empty">
@@ -64,12 +69,15 @@ export function StepInspector({
 							{t("inspector.fork")}
 						</Button>
 					)}
-					<Button size="sm" variant="outline" onClick={() => setBpOpen(true)} dataTestId="inspector-breakpoint">
-						<Pause aria-hidden="true" />
-						{t("inspector.breakpoint")}
-					</Button>
+					{canBreak && (
+						<Button size="sm" variant="outline" onClick={() => setBpOpen(true)} dataTestId="inspector-breakpoint">
+							<Pause aria-hidden="true" />
+							{t("inspector.breakpoint")}
+						</Button>
+					)}
 				</div>
 			)}
+			<StartedNote started={started} />
 			{step.request_id ? (
 				<RawCall runId={runId} requestId={step.request_id} />
 			) : (
@@ -79,8 +87,10 @@ export function StepInspector({
 				</div>
 			)}
 			<p className="text-muted-foreground text-[11px]">{t("inspector.keys")}</p>
-			{forkOpen && call && <ForkDialog runId={runId} call={call.call} open onClose={() => setForkOpen(false)} />}
-			{bpOpen && call && <BreakpointDialog runId={runId} open initialCalls={String(call.call)} onClose={() => setBpOpen(false)} />}
+			{forkOpen && call && <ForkDialog runId={runId} call={call.call} open onClose={() => setForkOpen(false)} onStarted={setStarted} />}
+			{bpOpen && call && (
+				<BreakpointDialog runId={runId} open initialCalls={String(call.call)} onClose={() => setBpOpen(false)} onStarted={setStarted} />
+			)}
 		</aside>
 	);
 }

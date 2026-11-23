@@ -431,3 +431,34 @@ describe("Download JSON (N59)", () => {
 		expect(revoke).toHaveBeenCalledWith("blob:x");
 	});
 });
+describe("ReportCard thrown-out runs (fix wave 3, N215)", () => {
+	const empty = { score: 0, ci_low: 0, ci_high: 0, runs: 0, cost_usd: null, tokens: null, steps: 0, tool_calls: 0, wall_s: 0 };
+	const thrown = {
+		...scoreReport,
+		status: "done",
+		mode: "score",
+		capabilities: [{ capability: "support", benchmarks: ["hd-harbor-bfcl"], arms: { A: empty } }],
+		benchmarks: [
+			{
+				benchmark: "hd-harbor-bfcl",
+				capability: "support",
+				experiment_id: "e_eval_5rcc",
+				arms: { A: empty },
+				thrown_out: { A: { runs: 24, checks: { model_fidelity: 24 }, reasons: ["gate model_fidelity fired in 24 of 24 runs"] } },
+			},
+		],
+		reliability: [],
+		thrown_out_runs: 24,
+	};
+
+	it("shows no score, the thrown-out row with its check and a link to the comparison", () => {
+		const html = renderToStaticMarkup(<ReportCard report={thrown} />);
+		expect(html).toContain("No score: every run was thrown out by a safety check");
+		expect(html).toContain(
+			"Thrown out: 24 runs failed the model check (the provider answered with a different model than the one asked for). Not counted in the score.",
+		);
+		expect(html).toContain('data-testid="report-card-thrown-out-link"');
+		expect(html).toContain('href="/experiments/e_eval_5rcc"');
+		expect(html).not.toContain(">0%<");
+	});
+});

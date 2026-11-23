@@ -189,7 +189,10 @@ func parseDetail(raw []byte) (*parsedRow, error) {
 	r.ToolCalls = d.toolCalls()
 	r.ToolResultIDs = toolResultIDs(d.RawRequest)
 	r.AgentLabel = agentLabel(d.Metadata) // Multi-agent area: a declared agent header (team.go)
-	featureFields(&r, d, raw)             // B2 Bifrost features: overhead split, complexity tier, cache hit type (bifrostfeatures.go)
+	if id, ok := d.Metadata["heimdall_fault_plan_id"].(string); ok {
+		r.FaultPlanID = id // the heimdall plugin's tag, stored as log metadata (L4: fault_delivery gate)
+	}
+	featureFields(&r, d, raw) // B2 Bifrost features: overhead split, complexity tier, cache hit type (bifrostfeatures.go)
 	p := &parsedRow{Req: r, Upstream: len(d.AttemptTrail) > 0, KeyID: d.VirtualKeyID, Object: d.Object}
 	if d.RawRequest != "" && !d.LargeRequest {
 		p.ReqSHA256 = utils.SHA256Bytes([]byte(d.RawRequest))

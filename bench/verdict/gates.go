@@ -19,8 +19,13 @@ import (
 // leaked. Evidence problems and egress read executed, every run supplied
 // (uncounted and superseded attempts, and counted runs the adaptive rule left
 // out of the statistics), not only the analysed population.
-func instrumentGates(m *schemas.Manifest, cfg settings, idx runIndex, runs, executed []schemas.SealedRun) []string {
-	reasons := evidenceReasons(executed)
+//
+// gateOnly is true when there is at least one reason and every reason came
+// from invalidateGateReasons (fix wave 3, N215): the runs the gate fired on
+// are the problem, not the experiment, so a report can still count the
+// other runs.
+func instrumentGates(m *schemas.Manifest, cfg settings, idx runIndex, runs, executed []schemas.SealedRun) (reasons []string, gateOnly bool) {
+	reasons = evidenceReasons(executed)
 	for _, ep := range decisionEndpoints(cfg) {
 		got := coverageReasons(idx, ep.Condition, ep.Metric)
 		if ep.Metric != cfg.primary.Metric {
@@ -31,11 +36,12 @@ func instrumentGates(m *schemas.Manifest, cfg settings, idx runIndex, runs, exec
 		reasons = append(reasons, got...)
 	}
 	reasons = append(reasons, egressReasons(executed)...)
-	reasons = append(reasons, invalidateGateReasons(idx)...)
+	gates := invalidateGateReasons(idx)
+	reasons = append(reasons, gates...)
 	reasons = append(reasons, trialReasons(idx)...)
 	reasons = append(reasons, versionReasons(idx)...)
 	reasons = append(reasons, manifestReasons(m, runs)...)
-	return reasons
+	return reasons, len(gates) > 0 && len(reasons) == len(gates)
 }
 
 // decisionEndpoints returns the primary endpoint followed by every
@@ -165,6 +171,15 @@ func invalidateGateReasons(idx runIndex) []string {
 		}
 	}
 	return reasons
+}
+
+// IsGateRateReason reports whether an invalid reason is invalidateGateReasons'
+// "gate X fired in n of m runs ... of arm A" (fix wave 3, N215). A reader
+// of a stored verdict whose scope is "runs" checks every reason with it, so
+// a reason added after the policy decided (Invalidate) keeps the whole
+// experiment invalid.
+func IsGateRateReason(reason string) bool {
+	return strings.HasPrefix(reason, "gate ") && strings.Contains(reason, " fired in ") && strings.Contains(reason, " runs (")
 }
 
 // trialReasons fires when trials per arm differ within a (task, condition):

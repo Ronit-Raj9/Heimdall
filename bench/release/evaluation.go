@@ -59,6 +59,9 @@ func (l *Log) createEvaluation(ctx context.Context, r schemas.ReleaseRequest, e 
 			}
 			return nil, err
 		}
+		if m.Experiment.Debug != nil || strings.HasPrefix(m.Experiment.Name, "admit-") || strings.HasPrefix(m.ExpID, "e_admit_") {
+			return nil, &RefusedError{Reason: c.Benchmark + ": " + notReleasable(m, nil)} // fix wave 3: a debug run or readiness check is never released
+		}
 		if _, ok := m.Arms[e.CandidateArm]; !ok {
 			return nil, &RefusedError{Reason: fmt.Sprintf("%s: experiment %s has no arm %s", c.Benchmark, m.ExpID, e.CandidateArm)}
 		}
@@ -155,9 +158,9 @@ func newEvaluationRecord(children []childEvidence, e *schemas.ReleaseEvaluation,
 			ManifestHash: c.m.Hash, SealsDigest: SealsDigest(hashes), Runs: len(c.ev.runs),
 		}
 		if p := c.ev.policy; p != nil {
-			ch.PolicyName, ch.PolicyDecision = p.PolicyName, p.Decision
+			ch.PolicyName, ch.PolicyDecision = p.RuleSetName(), p.Decision
 			if policyRank(p.Decision) > policyRank(rec.PolicyDecision) {
-				rec.PolicyName, rec.PolicyHash, rec.PolicyDecision = p.PolicyName, p.PolicyHash, p.Decision
+				rec.PolicyName, rec.PolicyHash, rec.PolicyDecision = p.RuleSetName(), p.PolicyHash, p.Decision
 			}
 		}
 		rec.Children = append(rec.Children, ch)
