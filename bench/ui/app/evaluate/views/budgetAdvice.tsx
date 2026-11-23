@@ -1,4 +1,4 @@
-import type { EstimateBudget, Range } from "@/lib/store/apis/evaluationsApi";
+import type { EstimateBenchmark, EstimateBudget, Range } from "@/lib/store/apis/evaluationsApi";
 import { fw05 } from "./fw05I18n";
 import { formatUsd } from "@/lib/money";
 
@@ -71,9 +71,7 @@ export function runWarning(b: EstimateBudget, perRunLow: number | undefined, ben
 }
 
 /** The highest per-run low cost over the estimate's benchmarks; undefined when no benchmark's cost is known. */
-export function perRunLowCost(
-	per: { runs?: number; skipped?: string; est_cost_usd?: { low: number; known?: boolean } }[] | undefined,
-): number | undefined {
+export function perRunLowCost(per: readonly EstimateBenchmark[] | undefined): number | undefined {
 	let out: number | undefined;
 	for (const b of per ?? []) {
 		if (b.skipped || !b.runs || !b.est_cost_usd?.known) continue;
