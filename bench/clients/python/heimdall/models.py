@@ -4861,6 +4861,7 @@ class ExperimentStatus(_ExperimentStatusRequired, total=False):
     evaluation_id: str
     extends: str
     finished_at: Optional[str]
+    latest_regrade: Optional[RegradeRef]
     multi_agent: bool
     paused: bool
     paused_models: List[str]
@@ -9417,6 +9418,15 @@ class _RegistryViewRequired(TypedDict):
 class RegistryView(_RegistryViewRequired, total=False):
     tested_at: Optional[str]
     token_last4: str
+
+
+class _RegradeRefRequired(TypedDict):
+    created_at: str
+    id: str
+
+
+class RegradeRef(_RegradeRefRequired, total=False):
+    note: str
 
 
 class RegradeRequest(TypedDict, total=False):
@@ -15903,6 +15913,7 @@ __all__ = [
     'RegistryCredentialDeleted',
     'RegistryCredentialList',
     'RegistryView',
+    'RegradeRef',
     'RegradeRequest',
     'Regression',
     'Related',

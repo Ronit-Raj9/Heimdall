@@ -1696,6 +1696,14 @@ export interface ExperimentStatus {
 	paused?: boolean;
 	paused_models?: string[];
 	extends?: string;
+	latest_regrade?: RegradeRef; // the newest committed re-score, on GET /experiments/{id} only
+}
+
+/** One committed re-score of an experiment (ExperimentStatus.latest_regrade). */
+export interface RegradeRef {
+	id: string;
+	created_at: string;
+	note?: string;
 }
 
 /** GET /experiments */
