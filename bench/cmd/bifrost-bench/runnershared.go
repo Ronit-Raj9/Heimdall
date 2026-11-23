@@ -828,7 +828,7 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 		reg = pr
 		labels = append(labels, "platform="+claim.Platform.Name)
 	}
-	plan := engine.NewPlanner(reg, planRoot, oa.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck(), engine.WithAgentLibrary(suite.LibraryDir())).Plan
+	plan := engine.NewPlanner(reg, planRoot, oa.logger, sharedPlannerOptions(docker, nil)...).Plan // SEC-A: agent images only under the org's policy
 	w, err := engine.NewWorker(reg, engine.NewPipeline(reg, planRoot, oa.logger),
 		sharedEnsureImages(oa, reg, planRoot, proj.refresh, plan),
 		engine.WorkerOptions{Server: h.f.server, Token: claim.Token, WorkerID: name, Host: h.host, Version: benchVersion,

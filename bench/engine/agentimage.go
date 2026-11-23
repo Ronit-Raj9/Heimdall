@@ -50,9 +50,51 @@ func WithAgentImageBuilder(b AgentImageBuilder) PlannerOption {
 	return func(p *Planner) { p.agentImages = b }
 }
 
-// agentImageBuilder picks the builder for suite (see WithAgentImageBuilder).
+// WithoutHostAgentBuilds makes the planner refuse, instead of building with
+// a docker CLI that has no Docker policy, an agent image no explicit builder
+// (WithAgentImageBuilder) or environment builder covers. The shared worker
+// sets it: an org-written agent Dockerfile must never build on the host
+// daemon outside the org's policy (fix wave 3, SEC-A). The local CLI keeps
+// the docker fallback. An explicit builder wins in either option order.
+func WithoutHostAgentBuilds() PlannerOption {
+	return func(p *Planner) {
+		if p.agentImages == nil {
+			p.agentImages = noHostAgentBuilds{}
+		}
+	}
+}
+
+// noHostAgentBuilds marks a planner made WithoutHostAgentBuilds that has no
+// explicit builder (it is never used as a builder itself).
+type noHostAgentBuilds struct{}
+
+func (noHostAgentBuilds) BuildAgentImage(_ context.Context, img AgentImage) (string, error) {
+	return "", refuseHostAgentBuild(img)
+}
+
+// refusedHostAgentBuilds is the fallback of a planner made
+// WithoutHostAgentBuilds: it refuses every build.
+type refusedHostAgentBuilds struct{}
+
+func (refusedHostAgentBuilds) BuildAgentImage(_ context.Context, img AgentImage) (string, error) {
+	return "", refuseHostAgentBuild(img)
+}
+
+func refuseHostAgentBuild(img AgentImage) error {
+	return fmt.Errorf("agent image %s: no image builder for this worker", img.Tag)
+}
+
+// AgentImageBuilder is the builder the planner uses for the per-task agent
+// images of suite, or nil when it builds none.
+func (p *Planner) AgentImageBuilder(suite *schemas.Suite) AgentImageBuilder {
+	return p.agentImageBuilder(suite)
+}
+
+// agentImageBuilder picks the builder for suite (see WithAgentImageBuilder
+// and WithoutHostAgentBuilds).
 func (p *Planner) agentImageBuilder(suite *schemas.Suite) AgentImageBuilder {
-	if p.agentImages != nil {
+	_, noHost := p.agentImages.(noHostAgentBuilds)
+	if p.agentImages != nil && !noHost {
 		return p.agentImages
 	}
 	env, ok := findPart(p.reg.Environments, suite.Environment)
@@ -63,6 +105,9 @@ func (p *Planner) agentImageBuilder(suite *schemas.Suite) AgentImageBuilder {
 		return b
 	}
 	if _, ok := any(env).(ImageInspector); ok {
+		if noHost {
+			return refusedHostAgentBuilds{}
+		}
 		return DockerAgentImages{}
 	}
 	return nil
