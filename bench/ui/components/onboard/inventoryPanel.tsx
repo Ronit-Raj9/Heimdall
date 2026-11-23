@@ -24,6 +24,13 @@ export const ONBOARD_MAP_FIELDS = [
 	"split",
 ] as const satisfies readonly (typeof MAP_FIELDS)[number][];
 
+/** How many of total tasks a held-out share of pct percent keeps private, as the draft picks them (onboard ApplySplit): rounded, at least one. */
+export function heldOutCount(pct: number, total: number): { n: number; total: number } {
+	if (pct <= 0 || total <= 0) return { n: 0, total };
+	const n = Math.max(1, Math.floor((total * Math.min(pct, 100) + 50) / 100));
+	return { n, total };
+}
+
 /** The inventory's column paths as row mapper columns, with an example from the first sample that has one. */
 export function onboardColumns(inv: Pick<OnboardInventory, "columns" | "samples">): RowColumn[] {
 	return (inv.columns ?? []).map((path) => {
@@ -294,6 +301,14 @@ export function InventoryPanel({
 								data-testid="onboard-plan-heldout"
 							/>
 							<span className="text-muted-foreground max-w-xs">{t("plan.heldOutHint")}</span>
+							{(plan.held_out?.pct ?? 0) > 0 && inv.estimate.tasks > 0 && (
+								<span className="max-w-xs" data-testid="onboard-plan-heldout-line">
+									{t("plan.heldOutLine", {
+										pct: plan.held_out.pct,
+										...heldOutCount(plan.held_out.pct, Math.min(plan.limit || inv.estimate.tasks, inv.estimate.tasks)),
+									})}
+								</span>
+							)}
 						</label>
 					</div>
 					{rows && (inv.columns?.length ?? 0) > 0 && (

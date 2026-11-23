@@ -55,6 +55,11 @@ type SignupSettings struct {
 	ConfigDomains []string     `json:"config_domains"`
 	UpdatedBy     string       `json:"updated_by,omitempty"`
 	UpdatedAt     *time.Time   `json:"updated_at,omitempty"`
+	// UpdatedByName and UpdatedByEmail name the admin who changed the
+	// settings (ActorDisplay); the page prints the name and keeps the email
+	// as a tooltip (fix wave 3, L3).
+	UpdatedByName  string `json:"updated_by_name,omitempty"`
+	UpdatedByEmail string `json:"updated_by_email,omitempty"`
 	// EmailDelivery is email when the server sends verification mail, log
 	// when the links only go to the server log.
 	EmailDelivery string `json:"email_delivery"`
@@ -155,6 +160,9 @@ func (s *Service) SignupSettings(ctx context.Context) SignupSettings {
 		out.Mode, out.Domains, out.Source, out.UpdatedBy = st.mode, nonNil(st.domains), "admin", st.by
 		at := st.at
 		out.UpdatedAt = &at
+		if st.by != "" && s.st != nil && s.st.d != nil {
+			out.UpdatedByName, out.UpdatedByEmail = ActorDisplay(ctx, s.st.d, st.by)
+		}
 	}
 	return out
 }

@@ -22,11 +22,14 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fasthttp/router"
@@ -77,6 +80,60 @@ type SharedMeta struct {
 type SharedItem struct {
 	Share SharedMeta     `json:"share"`
 	Data  map[string]any `json:"data"`
+	// CanonicalToken is the link's opaque token (s_...) when the visitor
+	// opened it with an old token that names the organization; the page
+	// moves its address to /s/<canonical_token> (fix wave 3, N293).
+	CanonicalToken string `json:"canonical_token,omitempty"`
+}
+
+// ShareIndexWriter records a hosted link's opaque token in the platform's
+// share index, which is how the hosted server finds the org of an s_ token
+// (fix wave 3, N293). Writing a recorded token again changes nothing.
+type ShareIndexWriter interface {
+	PutShareToken(ctx context.Context, token, orgID, shareID string) error
+}
+
+// shareIndexes maps a hosted server's projects folder (the parent of every
+// org's project root) to its share index.
+var shareIndexes sync.Map
+
+// RegisterShareIndex makes the orgs whose project roots sit in projectsDir
+// hand out opaque tokens recorded in w. Local mode registers none and keeps
+// the org.id.signature form.
+func RegisterShareIndex(projectsDir string, w ShareIndexWriter) {
+	if abs, err := filepath.Abs(projectsDir); err == nil {
+		projectsDir = abs
+	}
+	shareIndexes.Store(filepath.Clean(projectsDir), w)
+}
+
+// shareIndex is the share index of this org, nil in local mode.
+func (h *shareHandler) shareIndex() ShareIndexWriter {
+	if h.env.Cfg == nil || h.env.Cfg.Root == "" {
+		return nil
+	}
+	root := h.env.Cfg.Root
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
+	if w, ok := shareIndexes.Load(filepath.Dir(filepath.Clean(root))); ok {
+		return w.(ShareIndexWriter)
+	}
+	return nil
+}
+
+// indexedToken returns the opaque token of share id, recorded in ix.
+func (h *shareHandler) indexedToken(ctx *fasthttp.RequestCtx, st *sharelinks.Store, ix ShareIndexWriter, id string) (string, error) {
+	tok, err := st.TokenV2(id)
+	if err != nil {
+		return "", err
+	}
+	work, cancel := workContext(ctx, readTimeout)
+	defer cancel()
+	if err := ix.PutShareToken(work, tok, shareOrgID(ctx), id); err != nil {
+		return "", err
+	}
+	return tok, nil
 }
 
 type shareHandler struct {
@@ -121,7 +178,13 @@ func (h *shareHandler) view(ctx *fasthttp.RequestCtx, st *sharelinks.Store, sh s
 	if v.State != sharelinks.StateActive {
 		return v
 	}
-	tok, err := st.Token(shareOrgID(ctx), sh.ID)
+	var tok string
+	var err error
+	if h.shareIndex() != nil {
+		tok, err = st.TokenV2(sh.ID) // hosted: opaque, no org id (N293)
+	} else {
+		tok, err = st.Token(shareOrgID(ctx), sh.ID)
+	}
 	if err != nil {
 		return v
 	}
@@ -175,6 +238,13 @@ func (h *shareHandler) create(ctx *fasthttp.RequestCtx) {
 	case err != nil:
 		sendDepError(ctx, h.env.Mode, "share links", err)
 		return
+	}
+	if ix := h.shareIndex(); ix != nil {
+		if _, err := h.indexedToken(ctx, st, ix, sh.ID); err != nil {
+			_, _ = st.Revoke(sh.ID, p.ActorID()) // a link nobody can open is not left behind
+			sendDepError(ctx, h.env.Mode, "share links", err)
+			return
+		}
 	}
 	tenancy.SetCreated(ctx, sh.ID)
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusCreated, h.view(ctx, st, *sh))
@@ -327,6 +397,24 @@ func (h *shareHandler) meta(ctx *fasthttp.RequestCtx, sh *sharelinks.Share) Shar
 	return m
 }
 
+// serverRoots are the server folders a shared answer must not name: the
+// org's project root and runs root and, on the hosted server, the folder
+// that holds every org's projects and evidence (fix wave 3, N293 review).
+func (h *shareHandler) serverRoots() []string {
+	if h.env.Cfg == nil || h.env.Cfg.Root == "" {
+		return nil
+	}
+	root := h.env.Cfg.Root
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
+	roots := []string{root, h.env.Cfg.Path(h.env.Cfg.RunsRoot)}
+	if h.shareIndex() != nil {
+		roots = append(roots, filepath.Dir(filepath.Dir(filepath.Clean(root))))
+	}
+	return roots
+}
+
 // open handles GET /shared/{token}.
 func (h *shareHandler) open(ctx *fasthttp.RequestCtx) {
 	sh, ok := h.verify(ctx)
@@ -334,6 +422,15 @@ func (h *shareHandler) open(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	out := SharedItem{Share: h.meta(ctx, sh), Data: map[string]any{}}
+	if token, _ := ctx.UserValue("token").(string); !sharelinks.IsTokenV2(token) {
+		if ix := h.shareIndex(); ix != nil {
+			// An old link names the org: hand the visitor its opaque
+			// address, indexed first so it opens.
+			if tok, err := h.indexedToken(ctx, h.store(), ix, sh.ID); err == nil {
+				out.CanonicalToken = tok
+			}
+		}
+	}
 	for i, p := range sharedParts(sh.Kind, sh.Target, sh.Query) {
 		status, body, _ := h.sub(ctx, p.path)
 		if status != fasthttp.StatusOK {
@@ -344,7 +441,7 @@ func (h *shareHandler) open(ctx *fasthttp.RequestCtx) {
 			out.Data[p.name] = nil
 			continue
 		}
-		out.Data[p.name] = sharelinks.RedactJSON(body, sh.HidePrompts)
+		out.Data[p.name] = sharelinks.HideServerText(sharelinks.RedactJSON(body, sh.HidePrompts), h.serverRoots()...)
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
 }
@@ -423,6 +520,7 @@ func (h *shareHandler) export(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, "the shared item no longer exists")
 		return
 	}
+	body = []byte(sharelinks.HideServerString(string(body), h.serverRoots()...))
 	sendDocument(ctx, ctype, sh.Target+"-report-card."+format, body)
 }
 

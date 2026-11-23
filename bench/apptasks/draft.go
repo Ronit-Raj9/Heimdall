@@ -89,13 +89,43 @@ type planFile struct {
 	ChecksYAML string `json:"checks_yaml"`
 }
 
+// normalize gives every list of the draft a value, so a draft is never
+// stored or served with a null list (fix wave 3, N237: a draft approved with
+// no plans was saved as "plans": null and crashed the page).
+func (d *Draft) normalize() {
+	if d.Rules == nil {
+		d.Rules = []Rule{}
+	}
+	for i := range d.Rules {
+		if d.Rules[i].Operations == nil {
+			d.Rules[i].Operations = []string{}
+		}
+	}
+	if d.Plans == nil {
+		d.Plans = []*Plan{}
+	}
+	if d.Dropped == nil {
+		d.Dropped = []Dropped{}
+	}
+	if d.Written == nil {
+		d.Written = []Written{}
+	}
+	if d.Calls == nil {
+		d.Calls = []CallRecord{}
+	}
+	if d.Warnings == nil {
+		d.Warnings = []string{}
+	}
+}
+
 // MarshalJSON keeps the checks with each plan.
 func (d *Draft) store() ([]byte, error) {
+	d.normalize()
 	type alias Draft
 	aux := struct {
 		*alias
 		Plans []planFile `json:"plans"`
-	}{alias: (*alias)(d)}
+	}{alias: (*alias)(d), Plans: []planFile{}}
 	for _, p := range d.Plans {
 		aux.Plans = append(aux.Plans, planFile{Plan: p, ChecksYAML: string(p.Checks)})
 	}
@@ -120,6 +150,7 @@ func loadDraft(b []byte) (*Draft, error) {
 		pf.Plan.Checks = []byte(pf.ChecksYAML)
 		d.Plans = append(d.Plans, pf.Plan)
 	}
+	d.normalize()
 	return &d, nil
 }
 

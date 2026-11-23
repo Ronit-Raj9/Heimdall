@@ -11,3 +11,5 @@ ref?
 at
 # X1 vision grading: sha256 of a labelled image (calibration/images/<sha256>.png).
 image?
+# Fix wave 3, N286: the labeller's display name, filled by the API for a signed-in caller.
+labeller_name?

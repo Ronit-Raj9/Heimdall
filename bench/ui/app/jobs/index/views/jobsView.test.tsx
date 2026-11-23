@@ -49,3 +49,13 @@ describe("JobsView", () => {
 		expect(render(<JobsView />, LOCAL_SESSION)).toContain('data-testid="jobs-error"');
 	});
 });
+
+describe("JobsView cost estimates (N275)", () => {
+	it("marks an estimate job in the list", () => {
+		const estimate = { ...RUNNING_JOB, id: "job_est", kind: "policy.generate", target: "desk", params: { estimate: true } };
+		api.list = okQuery({ mode: "live", jobs: [estimate, FAILED_JOB], kinds: ["policy.generate"] });
+		const html = render(<JobsView />, hostedSession("member"));
+		expect(html).toContain("(Cost estimate) of desk");
+		expect(html.match(/\(Cost estimate\)/g)).toHaveLength(1);
+	});
+});

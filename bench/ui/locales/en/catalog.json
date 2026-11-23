@@ -74,5 +74,7 @@
 	"openSuites": "Open benchmarks",
 	"importStarted": "Import started. The benchmark appears when the job below finishes.",
 	"addFailed": "Could not add: {{message}}",
+	"importFailed": "The import failed: {{message}}",
+	"skippedTasks": "Skipped tasks ({{count}})",
 	"builtIn": "Built in"
 }

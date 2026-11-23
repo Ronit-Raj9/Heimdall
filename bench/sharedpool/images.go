@@ -46,9 +46,13 @@ type ImageRequest struct {
 	Note        string `json:"note,omitempty"`
 	Status      string `json:"status"`
 	RequestedBy string `json:"requested_by,omitempty"`
-	DecidedBy   string `json:"decided_by,omitempty"`
-	Decision    string `json:"decision,omitempty"`
-	Approval    string `json:"approval,omitempty"` // automatic | admin, for approved requests
+	// RequestedByName and RequestedByEmail name the person who asked, on
+	// the server admin's list only (fix wave 3, L3).
+	RequestedByName  string `json:"requested_by_name,omitempty"`
+	RequestedByEmail string `json:"requested_by_email,omitempty"`
+	DecidedBy        string `json:"decided_by,omitempty"`
+	Decision         string `json:"decision,omitempty"`
+	Approval         string `json:"approval,omitempty"` // automatic | admin, for approved requests
 	// NextStep tells the org what happens next, in plain words.
 	NextStep  string     `json:"next_step,omitempty"`
 	CreatedAt time.Time  `json:"created_at"`

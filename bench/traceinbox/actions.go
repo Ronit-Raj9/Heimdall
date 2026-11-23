@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -16,6 +17,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/maximhq/bifrost/bench/dataset"
 	"github.com/maximhq/bifrost/bench/scaffold"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/traceimport"
@@ -264,6 +266,11 @@ func (ib *Inbox) Accept(ctx context.Context, id string, opts AcceptOptions) (*Ac
 		return nil, errors.Join(err, rollback())
 	}
 	_ = ib.Store.Log(LogEvent{At: now, Event: "accept", Item: id, Detail: opts.Suite + "/" + taskID})
+	// The Data tab's version log (fix wave 3, N268); a failure never fails
+	// the accept.
+	if _, err := dataset.SyncSuite(ib.ProjectRoot, opts.Suite, suiteDir, "", "Failure inbox", now); err != nil && ib.ProjectRoot != "" {
+		slog.Warn("dataset version not recorded", "benchmark", opts.Suite, "err", err)
+	}
 	return &AcceptResult{Item: accepted, Draft: res, Task: opts.Suite + "/" + taskID}, nil
 }
 

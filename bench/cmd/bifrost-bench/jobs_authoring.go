@@ -134,10 +134,13 @@ func parseAssistParams(raw json.RawMessage) (assistParams, []authoring.Op, error
 	return p, ops, nil
 }
 
-func validateAuthoringAssist(_ context.Context, _ jobEnv, raw json.RawMessage) (any, string, error) {
+func validateAuthoringAssist(ctx context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
 	p, _, err := parseAssistParams(raw)
 	if err != nil {
 		return nil, "", fmt.Errorf("%w: %v", jobs.ErrInvalidParams, err)
+	}
+	if err := orgModelKeyAtCreate(ctx, env, p.Provider, p.KeyID); err != nil {
+		return nil, "", err
 	}
 	return p, p.Suite, nil
 }
@@ -317,7 +320,7 @@ func runAuthoringAssist(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.L
 			res.Pending++
 		}
 		spent, _ := asst.Spent()
-		log.Printf("task %s: %d field(s) drafted, $%.4f spent of $%.2f", t.ID, len(d.Generated), spent, res.BudgetUSD)
+		log.Printf("task %s: %d field(s) drafted for $%.4f ($%.4f of $%.2f spent so far)", t.ID, len(d.Generated), d.CostUSD, spent, res.BudgetUSD)
 		if progress != nil {
 			progress(map[string]any{"done": i + 1, "total": len(tasks), "spent_usd": spent})
 		}

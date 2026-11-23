@@ -1,3 +1,4 @@
+import { ConfirmButton } from "@/components/platform/badges";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -55,8 +56,7 @@ export function DraftPreview({ set }: { set: OnboardDraftSet }) {
 	return (
 		<div className="flex min-w-0 flex-col gap-3" data-testid="onboard-preview">
 			<p className="text-sm">
-				{tx("preview.count", { count: set.tasks.length, id: set.id, suite: set.suite })}
-				{set.new_suite && <Badge variant="outline" className="ml-2">{tx("preview.newSuite")}</Badge>}
+				{tx(set.new_suite ? "preview.countNew" : "preview.count", { count: set.tasks.length, id: set.id, suite: set.suite })}
 			</p>
 			{set.public && <p className="text-muted-foreground text-xs">{tx("preview.public")}</p>}
 			{set.tasks.length === 0 && <p className="text-sm">{tx("preview.empty")}</p>}
@@ -110,15 +110,16 @@ export function DraftPreview({ set }: { set: OnboardDraftSet }) {
 										>
 											{tx("preview.heldOut")}
 										</Button>
-										<Button
-											size="sm"
-											variant="ghost"
+										<ConfirmButton
+											label={tx("preview.drop")}
+											question={tx("preview.dropAsk", { task: t.title || t.id })}
+											confirmLabel={tx("preview.dropYes")}
+											cancelLabel={tx("preview.keep")}
+											onConfirm={() => void edit({ set: set.id, task: t.id, drop: true })}
 											disabled={editState.isLoading}
-											onClick={() => void edit({ set: set.id, task: t.id, drop: true })}
-											dataTestId={`onboard-drop-${t.id}`}
-										>
-											{tx("preview.drop")}
-										</Button>
+											variant="ghost"
+											testId={`onboard-drop-${t.id}`}
+										/>
 									</span>
 								)}
 							</div>
@@ -290,6 +291,20 @@ export function ReadinessPanel({ set }: { set: OnboardDraftSet }) {
 	);
 }
 
+/** The tasks a publish copies: the accepted ones, only the ready ones unless unready is set. */
+function publishTasks(set: OnboardDraftSet, unready: boolean): OnboardDraftTask[] {
+	const accepted = set.tasks.filter((t) => t.review === "accepted");
+	return unready ? accepted : accepted.filter((t) => t.readiness?.admitted);
+}
+
+/** The publish confirmation: how many tasks go where, and how many of them are held out. */
+export function publishQuestion(set: OnboardDraftSet, unready: boolean, tx: TX): string {
+	const tasks = publishTasks(set, unready);
+	const q = tx("publish.confirm", { count: tasks.length, suite: set.suite });
+	const held = tasks.filter((t) => t.held_out).length;
+	return held > 0 ? `${q} ${tx("publish.confirmHeldOut", { n: held })}` : q;
+}
+
 /** Step 5: publish the ready, accepted tasks privately; then open the benchmark or evaluate. */
 export function PublishPanel({ set }: { set: OnboardDraftSet }) {
 	const tx = useTx();
@@ -304,10 +319,27 @@ export function PublishPanel({ set }: { set: OnboardDraftSet }) {
 		return (
 			<div className="flex min-w-0 flex-col gap-2 text-sm" data-testid="onboard-published">
 				<p className="font-medium">{tx("publish.done", { count: p.tasks.length, suite: p.suite })}</p>
-				{p.held_out > 0 && <p>{tx("publish.heldOut", { count: p.held_out })}</p>}
+				{p.held_out > 0 && (
+					<p>
+						{set.plan.held_out?.pct
+							? tx("publish.heldOutPlan", { count: p.held_out, pct: set.plan.held_out.pct })
+							: tx("publish.heldOut", { count: p.held_out })}
+					</p>
+				)}
 				{!p.job_id && <p className="text-muted-foreground">{tx("publish.working")}</p>}
 				{(p.recheck?.length ?? 0) > 0 && <p className="text-chart-warning-ink">{tx("publish.recheck", { count: p.recheck?.length })}</p>}
 				<div className="flex flex-wrap gap-2">
+					{(p.recheck?.length ?? 0) > 0 && (
+						<Link
+							to="/suites/$suiteId"
+							params={{ suiteId: p.suite }}
+							search={{ tab: "build" } as never}
+							className={buttonVariants({ size: "sm" })}
+							data-testid="onboard-run-readiness"
+						>
+							{tx("publish.runReadiness")}
+						</Link>
+					)}
 					<Link to="/suites/$suiteId" params={{ suiteId: p.suite }} className={buttonVariants({ variant: "outline", size: "sm" })} data-testid="onboard-open-suite">
 						{tx("publish.open")}
 					</Link>
@@ -319,7 +351,7 @@ export function PublishPanel({ set }: { set: OnboardDraftSet }) {
 		);
 	}
 	const run = async () => {
-		if (!(await confirm(tx("publish.confirm", { count, suite: set.suite })))) return;
+		if (!(await confirm(publishQuestion(set, unready, tx)))) return;
 		void publish({ set: set.id, include_unready: unready || undefined });
 	};
 	return (

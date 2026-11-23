@@ -14,10 +14,64 @@ import {
 	useTestAlertMutation,
 } from "@/lib/store/apis/schedulesApi";
 import type { AlertConfig, Schedule, ScheduleRow, SchedulesFile, SchedulesResponse } from "@/lib/types/schedules";
-import { useListEvaluationsQuery } from "@/lib/store/apis/evaluationsApi";
+import { type Evaluation, useListEvaluationsQuery } from "@/lib/store/apis/evaluationsApi";
+import { ConfirmButton } from "@/components/platform/badges";
+import { type ConfirmFn, useConfirm } from "@/components/platform/confirmDialog";
 import { cn } from "@/lib/utils";
+import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+
+/**
+ * Run now starts the schedule's evaluation or comparison again and spends money, so it asks first
+ * (fix wave 3, N231). Resolves true when the person confirmed. Exported for tests.
+ */
+export function confirmRunNow(confirm: ConfirmFn, t: TFunction<"schedules">, r: ScheduleRow): Promise<boolean> {
+	const what = r.evaluation || r.experiment || r.job || r.name;
+	const limit = r.max_usd_per_day ?? 0;
+	const message =
+		limit > 0
+			? t("runNowAsk", { name: r.name, evaluation: what, left: Math.max(0, limit - r.spent_today_usd).toFixed(2), limit: limit.toFixed(2) })
+			: t("runNowAskNoLimit", { name: r.name, evaluation: what });
+	return confirm(message, { title: t("runNowTitle"), confirmLabel: t("runNow"), cancelLabel: t("runNowCancel") });
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "22 Nov 20:07" in local time, "" for a missing date. */
+function shortDate(iso: string): string {
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return "";
+	const pad = (n: number) => String(n).padStart(2, "0");
+	return `${d.getDate()} ${MONTHS[d.getMonth()]} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * The evaluation picker's options (fix wave 3, N231): "{name} · {benchmarks} · {date}", newest
+ * first, with the status of evaluations that are not done; cancelled and failed ones come last,
+ * under "Stopped". Two evaluations with one name read differently. Exported for tests.
+ */
+export function evaluationOptions(
+	evaluations: Evaluation[],
+	t: TFunction<"schedules">,
+): { active: { id: string; label: string }[]; stopped: { id: string; label: string }[] } {
+	const sorted = [...evaluations].sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+	const label = (ev: Evaluation) => {
+		const parts = {
+			name: ev.spec?.name || ev.id,
+			benchmarks: (ev.spec?.benchmarks ?? []).join(", ") || "-",
+			date: shortDate(ev.created_at) || ev.id,
+		};
+		return ev.status === "done"
+			? t("add.evaluationOption", parts)
+			: t("add.evaluationOptionStatus", { ...parts, status: t(`add.status.${ev.status}` as never, { defaultValue: ev.status }) });
+	};
+	const stopped = (ev: Evaluation) => ev.status === "cancelled" || ev.status === "failed";
+	return {
+		active: sorted.filter((ev) => !stopped(ev)).map((ev) => ({ id: ev.id, label: label(ev) })),
+		stopped: sorted.filter(stopped).map((ev) => ({ id: ev.id, label: label(ev) })),
+	};
+}
 
 /**
  * Schedules: /schedules. Web schedules live in policies/schedules.yaml; scheduled canaries are
@@ -234,6 +288,7 @@ function ScheduleTable({
 }) {
 	const { t } = useTranslation("schedules");
 	const { t: u } = useTranslation("ux13");
+	const confirm = useConfirm();
 	const [run, runState] = useRunScheduleMutation();
 	const [setPaused, pauseState] = useSetSchedulePausedMutation();
 	const [note, setNote] = useState<string | null>(null);
@@ -242,7 +297,9 @@ function ScheduleTable({
 		const res = await setPaused({ name, paused });
 		if ("error" in res && res.error) setNote(errorMessage(res.error, "not changed"));
 	};
-	const runNow = async (name: string) => {
+	const runNow = async (row: ScheduleRow) => {
+		if (!(await confirmRunNow(confirm, t, row))) return;
+		const name = row.name;
 		setNote(null);
 		const res = await run(name);
 		if ("data" in res && res.data) setNote(t("queued", { id: res.data.job_id }));
@@ -314,7 +371,7 @@ function ScheduleTable({
 											size="sm"
 											variant="outline"
 											disabled={runState.isLoading}
-											onClick={() => void runNow(r.name)}
+											onClick={() => void runNow(r)}
 											data-testid={`schedule-run-${r.name}`}
 										>
 											{t("runNow")}
@@ -339,15 +396,16 @@ function ScheduleTable({
 												>
 													{t("canary.edit")}
 												</Button>
-												<Button
-													size="sm"
-													variant="ghost"
+												<ConfirmButton
+													label={t("remove")}
+													question={t("removeAsk", { name: r.name })}
+													confirmLabel={t("removeConfirm")}
+													cancelLabel={t("removeCancel")}
+													onConfirm={() => onRemove(r.name)}
 													disabled={busy}
-													onClick={() => onRemove(r.name)}
-													data-testid={`schedule-remove-${r.name}`}
-												>
-													{t("remove")}
-												</Button>
+													variant="destructive"
+													testId={`schedule-remove-${r.name}`}
+												/>
 											</>
 										) : (
 											<span className="text-muted-foreground self-center text-xs whitespace-nowrap">{t("fromCanary")}</span>
@@ -392,6 +450,7 @@ function AddScheduleForm({ busy, onAdd, initial }: { busy: boolean; onAdd(s: Sch
 	const { t } = useTranslation("schedules");
 	const { t: u } = useTranslation("ux13");
 	const evaluations = useListEvaluationsQuery();
+	const options = evaluationOptions(evaluations.data ?? [], t);
 	const [what, setWhat] = useState<"evaluation" | "experiment">(initial?.experiment ? "experiment" : "evaluation");
 	const [s, setS] = useState({
 		name: initial?.name ?? "",
@@ -452,11 +511,20 @@ function AddScheduleForm({ busy, onAdd, initial }: { busy: boolean; onAdd(s: Sch
 								data-testid="schedule-add-evaluation"
 							>
 								<option value="">{t("add.evaluationPlaceholder")}</option>
-								{(evaluations.data ?? []).map((ev) => (
-									<option key={ev.id} value={ev.id}>
-										{ev.spec.name || ev.id}
+								{options.active.map((o) => (
+									<option key={o.id} value={o.id}>
+										{o.label}
 									</option>
 								))}
+								{options.stopped.length > 0 && (
+									<optgroup label={t("add.stopped")}>
+										{options.stopped.map((o) => (
+											<option key={o.id} value={o.id}>
+												{o.label}
+											</option>
+										))}
+									</optgroup>
+								)}
 							</select>
 						</Field>
 					) : (

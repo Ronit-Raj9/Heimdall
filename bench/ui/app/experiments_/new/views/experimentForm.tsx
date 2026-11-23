@@ -9,12 +9,11 @@ import { LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateExperimentMutation, usePlanExperimentMutation, useStartExperimentMutation } from "@/lib/store/apis/benchApi";
 import type { Catalog, CatalogAgent, Experiment, ExperimentPlan } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
 	Controller,
 	useFieldArray,
@@ -37,15 +36,25 @@ import {
 	type ExperimentFormValues,
 	type ValidationKey,
 } from "./experimentFormSchema";
-import { builderAgentGroups, readyIds, someNotReady, type BuilderAgentIds, type ReadyTasks } from "./matrixBuilderSchema";
+import {
+	builderAgentGroups,
+	fillUntouched,
+	readyIds,
+	readyUnknown,
+	someNotReady,
+	type BuilderAgentIds,
+	type ReadyTasks,
+} from "./matrixBuilderSchema";
 import { PlanInvalidAlert, invalidFields, type FormFieldName } from "./planInvalid";
-import { SuiteMenuItems } from "./suiteOptions";
+import { SuiteNativeOptions } from "./suiteOptions";
 
 export interface ExperimentFormProps {
 	catalog: Catalog;
 	defaults: ExperimentFormValues;
-	/** Ready tasks per benchmark (GET /suites): "all tasks" sends only these (N42). Absent counts every task. */
+	/** Ready tasks per benchmark (GET /suites?fields=light): "all tasks" sends only these (N42). Absent counts every task. */
 	ready?: ReadyTasks;
+	/** The ready list is still loading: Plan and Create wait for it (N195). */
+	readyPending?: boolean;
 	/** The agent ids My agents lists (GET /agents split by splitAgents); absent lists every catalog agent. */
 	agentGroups?: BuilderAgentIds;
 	/** Called once the experiment is created and started, with its id and spend cap. */
@@ -69,12 +78,30 @@ interface Planned {
 }
 
 /** The experiment form, the planner and the create-and-start action. */
-export function ExperimentForm({ catalog, defaults, ready, agentGroups, onStarted }: ExperimentFormProps) {
+export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGroups, onStarted }: ExperimentFormProps) {
 	const { t } = useTranslation("bench");
 	const { t: tf } = useTranslation("fw11");
+	const { t: tb } = useTranslation("builder");
 	const form = useForm<ExperimentFormValues>({ resolver: zodResolver(experimentFormSchema), defaultValues: defaults, mode: "onTouched" });
-	const { control, register, handleSubmit, setValue, setFocus, formState } = form;
+	const { control, register, handleSubmit, setValue, setFocus, getValues, formState } = form;
+	const { dirtyFields } = formState;
 	const values = useWatch({ control });
+	// L2: new defaults (the ready list arrived) fill only the fields nobody touched; the form never starts again.
+	const shownDefaults = useRef(defaults);
+	useEffect(() => {
+		if (shownDefaults.current === defaults) return;
+		shownDefaults.current = defaults;
+		const current = getValues();
+		const suiteTouched = touchedField(dirtyFields.suite);
+		const touched = (k: keyof ExperimentFormValues) =>
+			touchedField(dirtyFields[k]) || (suiteTouched && (k === "conditions" || k === "primaryCondition"));
+		const next = fillUntouched(current, defaults, touched);
+		for (const k of Object.keys(next) as (keyof ExperimentFormValues)[]) {
+			if (JSON.stringify(next[k]) !== JSON.stringify(current[k])) {
+				setValue(k, next[k] as never, { shouldDirty: false, shouldValidate: formState.isSubmitted });
+			}
+		}
+	}, [defaults, dirtyFields, getValues, setValue, formState.isSubmitted]);
 	const [token, setToken] = useState(readWriteToken);
 	// Hosted mode has no token box: the session cookie and its CSRF header authorise the writes.
 	const tokenBox = usesWriteToken(useSession());
@@ -92,15 +119,24 @@ export function ExperimentForm({ catalog, defaults, ready, agentGroups, onStarte
 	const busy = createState.isLoading || startState.isLoading;
 	// Local mode: plan, estimate, create and start are all writes behind the token, so it is asked first.
 	const needsToken = tokenBox && !token.trim();
+	const suite = catalog.suites.find((s) => suiteRef(s) === values.suite);
+	// N195: tasks are sent from the ready list only, so Plan waits for it and stops when it cannot be known.
+	const readyBlock = readyPending
+		? tb("ready.checking")
+		: readyUnknown(suite, ready)
+			? tb("ready.unknown", { benchmark: suite?.id })
+			: null;
 	const blockReason = needsToken
 		? t("experiments.new.actions.needsToken")
-		: !planned
-			? t("experiments.new.actions.needsPlan")
-			: stale
-				? t("experiments.new.actions.planStale")
-				: planBlocksStart(planned.plan)
-					? t("experiments.new.actions.blocked")
-					: null;
+		: readyBlock
+			? readyBlock
+			: !planned
+				? t("experiments.new.actions.needsPlan")
+				: stale
+					? t("experiments.new.actions.planStale")
+					: planBlocksStart(planned.plan)
+						? t("experiments.new.actions.blocked")
+						: null;
 
 	const onInvalid = (errors: FieldErrors<ExperimentFormValues>) => {
 		const first = invalidFields(errors)[0];
@@ -108,7 +144,7 @@ export function ExperimentForm({ catalog, defaults, ready, agentGroups, onStarte
 	};
 
 	const onPlan = handleSubmit(async (formValues) => {
-		if (needsToken) return;
+		if (needsToken || readyBlock) return;
 		const experiment = toExperiment(formValues, ready);
 		setActionError(null);
 		setPlanned(null);
@@ -141,7 +177,6 @@ export function ExperimentForm({ catalog, defaults, ready, agentGroups, onStarte
 		setPlanned(null);
 	};
 
-	const suite = catalog.suites.find((s) => suiteRef(s) === values.suite);
 	// The base agent menu lists what My agents shows (the org's own, then built-in); a chosen agent stays listed.
 	const agentMenu = (() => {
 		const g = builderAgentGroups(catalog, agentGroups);
@@ -150,9 +185,9 @@ export function ExperimentForm({ catalog, defaults, ready, agentGroups, onStarte
 		return { yours: [...g.yours, ...extra], builtIn: g.builtIn };
 	})();
 	const agentItem = (agent: CatalogAgent) => (
-		<SelectItem key={agent.path} value={agent.path} data-testid={`experiment-base-option-${agent.id}`}>
+		<option key={agent.path} value={agent.path} data-testid={`experiment-base-option-${agent.id}`}>
 			{t("experiments.new.fields.baseOption", { id: agent.id, model: agent.model })}
-		</SelectItem>
+		</option>
 	);
 
 	return (
@@ -186,22 +221,24 @@ export function ExperimentForm({ catalog, defaults, ready, agentGroups, onStarte
 									control={control}
 									name="suite"
 									render={({ field }) => (
-										<Select
+										// N233: native selects take every input method (mouse, keyboard, form-filling tools).
+										<select
+											ref={field.ref}
+											id={id}
+											className={NATIVE_SELECT}
 											value={field.value}
-											onValueChange={(next) => {
+											onChange={(e) => {
+												const next = e.target.value;
 												field.onChange(next);
 												const nextSuite = catalog.suites.find((s) => suiteRef(s) === next);
 												setValue("conditions", conditionsFor(nextSuite), { shouldValidate: formState.isSubmitted });
 												setValue("primaryCondition", "clean");
 											}}
+											data-testid="experiment-suite-select"
 										>
-											<SelectTrigger ref={field.ref} id={id} className="w-full" data-testid="experiment-suite-select">
-												<SelectValue />
-											</SelectTrigger>
-											<SelectContent>
-												<SuiteMenuItems catalog={catalog} ready={ready} testIdPrefix="experiment-suite-option" />
-											</SelectContent>
-										</Select>
+											{!field.value && <option value="" disabled />}
+											<SuiteNativeOptions catalog={catalog} ready={ready} testIdPrefix="experiment-suite-option" />
+										</select>
 									)}
 								/>
 							)}
@@ -212,29 +249,26 @@ export function ExperimentForm({ catalog, defaults, ready, agentGroups, onStarte
 									control={control}
 									name="base"
 									render={({ field }) => (
-										<Select value={field.value} onValueChange={field.onChange}>
-											<SelectTrigger ref={field.ref} id={id} className="w-full" data-testid="experiment-base-select">
-												<SelectValue />
-											</SelectTrigger>
-											<SelectContent>
-												{agentGroups ? (
-													<>
-														<SelectGroup>
-															<SelectLabel>{tf("builder.yourAgents")}</SelectLabel>
-															{agentMenu.yours.map(agentItem)}
-														</SelectGroup>
-														{agentMenu.builtIn.length > 0 && (
-															<SelectGroup>
-																<SelectLabel>{tf("builder.builtInAgents")}</SelectLabel>
-																{agentMenu.builtIn.map(agentItem)}
-															</SelectGroup>
-														)}
-													</>
-												) : (
-													agentMenu.yours.map(agentItem)
-												)}
-											</SelectContent>
-										</Select>
+										<select
+											ref={field.ref}
+											id={id}
+											className={NATIVE_SELECT}
+											value={field.value}
+											onChange={(e) => field.onChange(e.target.value)}
+											data-testid="experiment-base-select"
+										>
+											{!field.value && <option value="" disabled />}
+											{agentGroups ? (
+												<>
+													<optgroup label={tf("builder.yourAgents")}>{agentMenu.yours.map(agentItem)}</optgroup>
+													{agentMenu.builtIn.length > 0 && (
+														<optgroup label={tf("builder.builtInAgents")}>{agentMenu.builtIn.map(agentItem)}</optgroup>
+													)}
+												</>
+											) : (
+												agentMenu.yours.map(agentItem)
+											)}
+										</select>
 									)}
 								/>
 							)}
@@ -323,30 +357,24 @@ export function ExperimentForm({ catalog, defaults, ready, agentGroups, onStarte
 									control={control}
 									name="primaryCondition"
 									render={({ field }) => (
-										<Select value={field.value} onValueChange={field.onChange}>
-											<SelectTrigger
-												ref={field.ref}
-												id={id}
-												aria-describedby={describedBy}
-												className="w-full font-mono"
-												data-testid="experiment-primary-condition-select"
-											>
-												<SelectValue />
-											</SelectTrigger>
-											<SelectContent>
-												{(values.conditions ?? []).map((c) =>
-													c?.condition ? (
-														<SelectItem
-															key={c.condition}
-															value={c.condition}
-															data-testid={`experiment-primary-condition-option-${c.condition}`}
-														>
-															{c.condition}
-														</SelectItem>
-													) : null,
-												)}
-											</SelectContent>
-										</Select>
+										<select
+											ref={field.ref}
+											id={id}
+											aria-describedby={describedBy}
+											className={cn(NATIVE_SELECT, "font-mono")}
+											value={field.value}
+											onChange={(e) => field.onChange(e.target.value)}
+											data-testid="experiment-primary-condition-select"
+										>
+											{!field.value && <option value="" disabled />}
+											{(values.conditions ?? []).map((c) =>
+												c?.condition ? (
+													<option key={c.condition} value={c.condition} data-testid={`experiment-primary-condition-option-${c.condition}`}>
+														{c.condition}
+													</option>
+												) : null,
+											)}
+										</select>
 									)}
 								/>
 							)}
@@ -357,18 +385,21 @@ export function ExperimentForm({ catalog, defaults, ready, agentGroups, onStarte
 									control={control}
 									name="primaryMetric"
 									render={({ field }) => (
-										<Select value={field.value} onValueChange={field.onChange}>
-											<SelectTrigger ref={field.ref} id={id} className="w-full" data-testid="experiment-primary-metric-select">
-												<SelectValue />
-											</SelectTrigger>
-											<SelectContent>
-												{catalog.metrics.map((m) => (
-													<SelectItem key={m.name} value={m.name} data-testid={`experiment-primary-metric-option-${m.name}`}>
-														{m.label}
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
+										<select
+											ref={field.ref}
+											id={id}
+											className={NATIVE_SELECT}
+											value={field.value}
+											onChange={(e) => field.onChange(e.target.value)}
+											data-testid="experiment-primary-metric-select"
+										>
+											{!field.value && <option value="" disabled />}
+											{catalog.metrics.map((m) => (
+												<option key={m.name} value={m.name} data-testid={`experiment-primary-metric-option-${m.name}`}>
+													{m.label}
+												</option>
+											))}
+										</select>
 									)}
 								/>
 							)}
@@ -384,7 +415,7 @@ export function ExperimentForm({ catalog, defaults, ready, agentGroups, onStarte
 							catalog={catalog}
 							suite={values.suite}
 							tasks={readyIds(suite, ready)}
-							partlyReady={someNotReady(suite, ready)}
+							partlyReady={someNotReady(suite, ready) || Boolean(suite && ready?.has(suiteRef(suite)))}
 						/>
 						{formState.errors.conditions?.message && (
 							<ErrorText message={formState.errors.conditions.message} testId="experiment-conditions-error" />
@@ -489,7 +520,7 @@ export function ExperimentForm({ catalog, defaults, ready, agentGroups, onStarte
 								type="submit"
 								variant="outline"
 								size="sm"
-								disabled={needsToken}
+								disabled={needsToken || readyBlock !== null}
 								isLoading={planState.isLoading}
 								dataTestId="experiment-plan-button"
 							>
@@ -543,7 +574,7 @@ function ConditionsEditor({
 	suite: string | undefined;
 	/** The tasks that can run (the ready ones when known). */
 	tasks: readonly string[];
-	/** Some tasks of the suite are not ready, so the counts say "ready tasks". */
+	/** The ready tasks of the suite are known, so the counts say "ready tasks" (N195). */
 	partlyReady: boolean;
 }) {
 	const { t } = useTranslation("bench");
@@ -698,6 +729,16 @@ function TaskSelection({
 			)}
 		</div>
 	);
+}
+
+/** The look of the form's native selects (N233), as the Workers page's select. */
+const NATIVE_SELECT = "border-input bg-background h-9 w-full min-w-0 rounded-md border px-2 text-sm";
+
+/** True when a react-hook-form dirtyFields entry marks any part of a field as changed. */
+function touchedField(dirty: unknown): boolean {
+	if (Array.isArray(dirty)) return dirty.some(touchedField);
+	if (dirty && typeof dirty === "object") return Object.values(dirty).some(touchedField);
+	return dirty === true;
 }
 
 function FormSection({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {

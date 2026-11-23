@@ -226,6 +226,7 @@ func RecordAdmission(l *schemas.SuiteLock, taskID string, rec *schemas.Admission
 	}
 	if rec != nil && l.Fingerprints != nil {
 		rec.Fingerprint = AdmissionFingerprint(l.Fingerprints, taskID)
+		rec.CarryFingerprint = CarryFingerprint(l.Fingerprints, taskID)
 	}
 	tl.Admission = rec
 	tl.Status = schemas.TaskDraft

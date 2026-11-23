@@ -28,6 +28,16 @@ vi.mock("@/lib/store/apis/suiteBuildApi", () => ({
 vi.mock("@/lib/store/apis/suiteOpsApi", () => ({ useQuarantineTaskMutation: () => mutation(), useRestoreTaskMutation: () => mutation() }));
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => mutation() }));
 vi.mock("@/lib/store/hooks", () => ({ useAppDispatch: () => vi.fn() }));
+vi.mock("@/lib/store/apis/modelsApi", async (orig) => ({
+	...(await orig<typeof import("@/lib/store/apis/modelsApi")>()),
+	useGetModelsQuery: () => ({ data: { providers: [], keys: [] } }),
+}));
+vi.mock("@/components/models/groupedModelPicker", async (orig) => ({
+	...(await orig<typeof import("@/components/models/groupedModelPicker")>()),
+	GroupedModelPicker: ({ value, testId }: { value: { provider: string; model: string } | null; testId?: string }) => (
+		<select data-testid={`${testId}-model`} data-model={value ? `${value.provider}/${value.model}` : ""} />
+	),
+}));
 
 const qa = {
 	id: "support-faq",
@@ -307,5 +317,11 @@ describe("tool-use benchmarks and private tasks (N118, N119)", () => {
 		} finally {
 			mockSplit.state = {};
 		}
+	});
+	it("picks the judge with the shared model picker, prefilled from the pinned judge (N267)", () => {
+		const judged = { ...qa, grader: "judge", judge: { provider: "openai", model: "gpt-x", votes: 1 } } as unknown as SuiteSummary;
+		const html = render(<BuildTab suite={judged} />, { ...LOCAL_SESSION, role: "member" });
+		expect(html).not.toContain('data-testid="suite-build-judge-provider"');
+		expect(html).toMatch(/data-testid="suite-build-judge-model-model" data-model="openai\/gpt-x"/);
 	});
 });

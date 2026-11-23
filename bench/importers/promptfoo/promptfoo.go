@@ -200,7 +200,7 @@ func (importer) Import(ctx context.Context, opts importers.Options) (*importers.
 		res.Tasks = append(res.Tasks, t.ID)
 	}
 	if len(res.Tasks) == 0 {
-		return res, errors.New("promptfoo: no task was imported; see the skipped list")
+		return res, importers.NoTaskError("promptfoo", res.Skipped)
 	}
 	if err := os.WriteFile(filepath.Join(suiteDir, suite.SuiteFile), edited, 0o644); err != nil {
 		return nil, fmt.Errorf("promptfoo: %w", err)

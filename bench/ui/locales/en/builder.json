@@ -43,7 +43,7 @@
 		"practiceOption": "{{option}} (practice)",
 		"notReadyGroup": "Not ready yet",
 		"notReadyTitle": "Run its readiness check on the benchmark page first.",
-		"tasksAllReady": "All {{count}} ready tasks",
+		"tasksAllReady": "All ready tasks ({{count}})",
 		"tasksFirstSuffixReady": "ready tasks of {{count}}"
 	},
 	"preview": {
@@ -86,7 +86,9 @@
 		"agentMissing": "Agent {{id}} is not one of your agents, so the comparison starts with {{first}}."
 	},
 	"ready": {
-		"pending": "Checking which tasks are ready. The benchmark and task count update when that is known."
+		"pending": "Checking which tasks are ready. The benchmark and task count update when that is known.",
+		"checking": "Checking which tasks are ready...",
+		"unknown": "Heimdall cannot tell which tasks of {{benchmark}} are ready. Run the readiness checks on its page first."
 	},
 	"errors": {
 		"nameRequired": "Give the experiment a name.",

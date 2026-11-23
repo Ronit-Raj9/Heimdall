@@ -210,6 +210,12 @@ type AdmissionRecord struct {
 	// lock fingerprints existed. A record whose fingerprint no longer matches
 	// the lock admits nothing.
 	Fingerprint string `json:"fingerprint,omitempty"`
+	// CarryFingerprint is suite.CarryFingerprint at the time of the checks:
+	// only what grades the task, without the suite's id, description,
+	// canary and task list. An Add benchmark publish carries the record into
+	// the published benchmark when it still matches there (fix wave 3,
+	// N252). Empty in records written before it existed.
+	CarryFingerprint string `json:"carry_fingerprint,omitempty"`
 }
 
 // AdmissionCheck is one admission control (reference passes, empty patch

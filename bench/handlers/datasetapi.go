@@ -104,6 +104,10 @@ type DatasetVersionDetail struct {
 	Benchmark string            `json:"benchmark"`
 	Version   dataset.Version   `json:"version"`
 	Tasks     map[string]string `json:"tasks"` // task id -> row sha256
+	// ActorName is how version.actor is shown; an email actor is left out
+	// of version.actor for a caller who is not an org admin (fix wave 3,
+	// group D review: every authoring path now records versions).
+	ActorName string `json:"actor_name,omitempty"`
 }
 
 // DatasetTaskDeleted answers DELETE /suites/{id}/dataset/tasks/{task}.
@@ -600,5 +604,7 @@ func (h *datasetAPI) version(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "read version "+strconv.Itoa(n)+": "+err.Error())
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, DatasetVersionDetail{Benchmark: id, Version: vs[i], Tasks: snap.Tasks})
+	out := DatasetVersionDetail{Benchmark: id, Version: vs[i], Tasks: snap.Tasks}
+	out.Version.Actor, out.ActorName = newActorNames(ctx).show(out.Version.Actor)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
 }

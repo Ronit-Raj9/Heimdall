@@ -130,12 +130,39 @@ func parseCalibrateParams(raw json.RawMessage) (calibrateParams, error) {
 	return p, nil
 }
 
-func validateCalibrateRun(_ context.Context, _ jobEnv, raw json.RawMessage) (any, string, error) {
+func validateCalibrateRun(ctx context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
 	p, err := parseCalibrateParams(raw)
 	if err != nil {
 		return nil, "", fmt.Errorf("%w: %v", jobs.ErrInvalidParams, err)
 	}
+	if calibrateHasNoLabels(ctx, env, p) {
+		return nil, "", fmt.Errorf("%w: %s", jobs.ErrInvalidParams, errCalibrateNoLabels)
+	}
 	return p, p.Suite, nil
+}
+
+// errCalibrateNoLabels refuses a check with nothing to check, in the web
+// app's words (fix wave 3, N286); the CLI keeps its own message.
+const errCalibrateNoLabels = "This benchmark has no labelled answers yet. Add labels on the Grader accuracy tab first."
+
+// calibrateHasNoLabels reports whether the check would have no labelled
+// answer at all: none stored, and neither the benchmark's own answers
+// (seed_controls) nor reviews asked for. A suite that cannot be read is
+// left to the job, which says why.
+func calibrateHasNoLabels(ctx context.Context, env jobEnv, p calibrateParams) bool {
+	if p.SeedControls || len(p.FromReviews) > 0 || env.App == nil {
+		return false
+	}
+	s, err := calibrateLoadSuite(ctx, env.App, p.Suite)
+	if err != nil || s == nil {
+		return false
+	}
+	set, err := calibration.LoadSet(s.Root)
+	if err != nil {
+		return false
+	}
+	human, seed, _ := calibration.Resolve(set.Items)
+	return len(human)+len(seed) == 0
 }
 
 // calibrateLoadSuite loads the suite to calibrate; a var for tests.

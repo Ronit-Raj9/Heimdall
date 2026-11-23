@@ -139,8 +139,12 @@ func DraftTask(ctx context.Context, a *Assistant, s *schemas.Suite, t *schemas.T
 			return false
 		}
 		r.Status, r.Fields = StatusDrafted, fields
-		for _, f := range fields {
-			d.Generated = append(d.Generated, call.Field(f))
+		for i, f := range fields {
+			g := call.Field(f)
+			if i > 0 {
+				g.CostUSD = 0 // one call is counted once, on the first field it wrote (fix wave 3, N278)
+			}
+			d.Generated = append(d.Generated, g)
 		}
 		d.Ops = append(d.Ops, r)
 		return true

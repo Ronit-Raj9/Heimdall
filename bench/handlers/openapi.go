@@ -260,7 +260,7 @@ var APIRoutes = []RouteDoc{
 		Auth: AuthInbox, Request: traceinbox.IngestRequest{}, Status: fasthttp.StatusCreated, Response: schemas.InboxIngestResult{}},
 
 	{Method: "GET", Path: APIPrefix + "/suites", Tag: "suites", Summary: "Suites with their tasks", Response: schemas.SuiteList{},
-		Query: []QueryDoc{{Name: "fields", Description: "light: no per-task lists, never waits for a load (pickers); full: the default"}}},
+		Query: []QueryDoc{{Name: "fields", Description: "light: no per-task lists, never waits for a load (pickers); each entry carries ready_task_ids (the tasks a plan accepts, in suite order, from suite.lock) and ready_known (false when the lock cannot be read: readiness unknown, not zero); full: the default. An entry with partial true is a head entry (suite.yaml and suite.lock only) whose tasks, probes and drift are still loading: read the list again"}}},
 	{Method: "GET", Path: APIPrefix + "/suites/{id}/tasks/{task}", Tag: "suites", Summary: "One task of a suite", Response: schemas.SuiteTaskDetail{}},
 	{Method: "GET", Path: APIPrefix + "/suites/{id}/health", Tag: "suites", Summary: "Task health of a suite: verifier flakiness, agent variance, infra, observed difficulty", Response: schemas.SuiteHealth{}}, // Suite health area (suitehealth.go)
 	// W8 judge calibration (calibration.go, docs/judge-calibration.md).

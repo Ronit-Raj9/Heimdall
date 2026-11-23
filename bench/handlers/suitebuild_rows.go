@@ -162,6 +162,7 @@ func (h *suiteBuild) startImport(id, dir, source, actor string, tasks []scaffold
 func (h *suiteBuild) runImport(root, id, dir, source, actor string, tasks []scaffold.RowTask, st *RowImportStatus) {
 	ctx := context.Background()
 	finish := func(status, msg string) {
+		syncDatasetVersion(root, id, dir, actor, "Rows import")
 		rowImports.mu.Lock()
 		now := time.Now().UTC()
 		st.Status, st.Error, st.FinishedAt = status, msg, &now

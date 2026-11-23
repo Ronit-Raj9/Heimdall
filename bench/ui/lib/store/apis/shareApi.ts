@@ -56,6 +56,8 @@ export interface SharedMeta {
 export interface SharedItem {
 	share: SharedMeta;
 	data: Record<string, unknown>;
+	/** The link's opaque token (s_...) when it was opened with an old token that names the organization. */
+	canonical_token?: string;
 }
 
 const enc = encodeURIComponent;

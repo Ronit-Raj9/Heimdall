@@ -41,13 +41,14 @@ describe("AdminSignupPanel", () => {
 	it("shows the allowed domains and who changed the setting", () => {
 		const html = render(
 			<SignupForm
-				settings={{ ...CONFIG, mode: "allowlist", domains: ["acme.dev"], source: "admin", updated_by: "usr_ada", updated_at: "2026-11-20T09:00:00Z", email_delivery: "email" }}
+				settings={{ ...CONFIG, mode: "allowlist", domains: ["acme.dev"], source: "admin", updated_by: "usr_ada", updated_by_name: "Ada", updated_at: "2026-11-20T09:00:00Z", email_delivery: "email" } as SignupSettings}
 			/>,
 			admin(),
 		);
 		expect(html).toContain('data-testid="admin-signup-domains"');
 		expect(html).toContain("acme.dev");
-		expect(html).toContain("Set here by usr_ada");
+		expect(html).toContain("Set here by Ada"); // fix wave 3, L3: the name, never the user id
+		expect(html).not.toContain("usr_ada");
 		expect(html).toContain('data-testid="admin-signup-reset"');
 		expect(html).toContain("Verification links are emailed.");
 	});

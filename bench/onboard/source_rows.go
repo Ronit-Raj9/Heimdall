@@ -103,6 +103,7 @@ func (rowsSource) data(ctx context.Context, env *Env, in Input) (string, []byte,
 // rowsPlan is the parsed rows of a file and what they suggest.
 type rowsPlan struct {
 	format   string
+	unit     string // what a row reference counts: row, line or item (scaffold.RecordUnit)
 	columns  []string
 	records  int
 	rows     []scaffold.Row
@@ -115,12 +116,19 @@ func parseRowsPlan(name string, data []byte, plan Plan) (*rowsPlan, error) {
 	if err != nil {
 		return nil, err
 	}
-	rp := &rowsPlan{format: format, columns: columnsOf(recs), records: len(recs)}
+	rp := &rowsPlan{format: format, unit: scaffold.RecordUnit(format, data), columns: columnsOf(recs), records: len(recs)}
 	if len(recs) > scaffold.MaxImportRows {
 		recs = recs[:scaffold.MaxImportRows]
 	}
 	input, inFormat := data, format
+	// lines maps a mapped record (numbered 1, 2, ... in the JSON written
+	// below) back to where it starts in the file, so a mapping does not
+	// renumber the rows.
+	var lines []int
 	if len(plan.Mapping) > 0 || len(recs) < rp.records {
+		if _, ls, err := scaffold.ReadRecords(format, data); err == nil && len(ls) == rp.records {
+			lines = ls
+		}
 		mapped, err := applyMapping(recs, plan.Mapping)
 		if err != nil {
 			return nil, err
@@ -143,8 +151,33 @@ func parseRowsPlan(name string, data []byte, plan Plan) (*rowsPlan, error) {
 			rows, problems = r2, p2
 		}
 	}
+	if lines != nil {
+		at := func(n int) int {
+			if n >= 1 && n <= len(lines) {
+				return lines[n-1]
+			}
+			return n
+		}
+		for i := range rows {
+			rows[i].Line = at(rows[i].Line)
+		}
+		for i := range problems {
+			problems[i].Line = at(problems[i].Line)
+		}
+	}
 	rp.rows, rp.problems = rows, problems
 	return rp, nil
+}
+
+// ref is the reference of the record at n: "row 2" in a CSV (the row a
+// spreadsheet shows), "line 3" in JSON Lines or pasted text, "item 1" in a
+// JSON array.
+func (rp *rowsPlan) ref(n int) string {
+	unit := rp.unit
+	if unit == "" {
+		unit = "row"
+	}
+	return fmt.Sprintf("%s %d", unit, n)
 }
 
 func hasTicketColumns(cols []string) bool {
@@ -372,7 +405,7 @@ func inspectRows(name string, data []byte, plan Plan, public bool) (*Inventory, 
 			if len(r.Wrong) > 0 {
 				f["wrong_answers"] = strings.Join(r.Wrong, " | ")
 			}
-			inv.Samples = append(inv.Samples, Sample{Ref: fmt.Sprintf("row %d", r.Line), Fields: f})
+			inv.Samples = append(inv.Samples, Sample{Ref: rp.ref(r.Line), Fields: f})
 		}
 	}
 	for _, p := range rp.problems {
@@ -380,7 +413,7 @@ func inspectRows(name string, data []byte, plan Plan, public bool) (*Inventory, 
 			inv.Warnings = append(inv.Warnings, fmt.Sprintf("%d more rows have problems; the draft lists them all", len(rp.problems)-7))
 			break
 		}
-		inv.Warnings = append(inv.Warnings, fmt.Sprintf("row %d: %s", p.Line, p.Message))
+		inv.Warnings = append(inv.Warnings, rp.ref(p.Line)+": "+p.Message)
 	}
 	plan.Format = rp.format
 	plan.Suite = slug(inv.Title)
@@ -450,7 +483,7 @@ func draftRows(env *Env, set *DraftSet, plan Plan, name string, data []byte, lab
 	tasks, more := scaffold.ImportRows(rows, scaffold.RowTaskOptions{Grader: grader, Match: plan.Match, Source: label,
 		Taken: func(id string) bool { return existing[id] }})
 	for _, p := range append(rp.problems, more...) {
-		set.Problems = append(set.Problems, Problem{Ref: fmt.Sprintf("row %d", p.Line), Message: p.Message})
+		set.Problems = append(set.Problems, Problem{Ref: rp.ref(p.Line), Message: p.Message})
 	}
 	wrongFrom := map[int]bool{}
 	for _, r := range rows {
@@ -472,7 +505,7 @@ func draftRows(env *Env, set *DraftSet, plan Plan, name string, data []byte, lab
 		if wrongFrom[t.Line] {
 			mutant = "source"
 		}
-		set.Tasks = append(set.Tasks, DraftTask{ID: t.ID, Origin: Origin{Source: label, Ref: fmt.Sprintf("row %d", t.Line)},
+		set.Tasks = append(set.Tasks, DraftTask{ID: t.ID, Origin: Origin{Source: label, Ref: rp.ref(t.Line)},
 			Controls: []ControlInfo{
 				{Kind: "reference", Path: "solution/answer.txt", Origin: "source"},
 				{Kind: "empty", Path: "controls/empty.txt", Origin: "rule"},

@@ -10,10 +10,12 @@ package importers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -128,4 +130,23 @@ func Finish(suiteDir string) error {
 		return fmt.Errorf("importers: write .gitignore: %w", err)
 	}
 	return nil
+}
+
+// NoTaskError is the error of an import that wrote no task: it names the
+// first three skipped tasks with their reasons, so the reason reaches the
+// person even where the skip list is not shown (fix wave 3, N263).
+func NoTaskError(name string, skipped []Skip) error {
+	msg := name + ": no task was imported"
+	if len(skipped) == 0 {
+		return errors.New(msg)
+	}
+	parts := make([]string, 0, 4)
+	for i, s := range skipped {
+		if i == 3 {
+			parts = append(parts, fmt.Sprintf("and %d more (listed in the job log)", len(skipped)-3))
+			break
+		}
+		parts = append(parts, s.ID+": "+s.Reason)
+	}
+	return errors.New(msg + ". " + strings.Join(parts, "; "))
 }

@@ -335,6 +335,12 @@ func (h *SharedPoolHandler) listAllImages(ctx *fasthttp.RequestCtx) {
 		h.internal(ctx, "list image requests", err)
 		return
 	}
+	// Server admins see who asked by name, the email beside it (fix wave 3, L3).
+	if h.images.DB != nil {
+		for i := range list {
+			list[i].RequestedByName, list[i].RequestedByEmail = auth.ActorDisplay(work, h.images.DB, list[i].RequestedBy)
+		}
+	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, ImageRequestList{Images: list})
 }
 

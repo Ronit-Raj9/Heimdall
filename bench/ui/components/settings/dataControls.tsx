@@ -13,6 +13,7 @@ import { Check, TriangleAlert } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsSection, When } from "./settingsBits";
+import "@/components/calibration/hw04I18n";
 
 /** The preset retention choices in days; 0 keeps everything forever. */
 export const RETENTION_PRESETS = [0, 30, 90, 180, 365] as const;
@@ -62,6 +63,7 @@ export function RetentionSection() {
 /** The retention form for a loaded policy. Exported for tests. */
 export function RetentionForm({ policy }: { policy: RetentionPolicy }) {
 	const { t } = useTranslation("platform");
+	const { t: tHw04 } = useTranslation("hw04");
 	const session = useSession();
 	const formId = useId();
 	const canEdit = canUse(session, "admin");
@@ -93,6 +95,17 @@ export function RetentionForm({ policy }: { policy: RetentionPolicy }) {
 			<p className="text-foreground text-sm" data-testid="retention-current">
 				{policy.run_days === 0 ? t("settings.org.retentionCurrentForever") : t("settings.org.retentionCurrent", { count: policy.run_days })}
 			</p>
+			{(policy.updated_by_name || policy.updated_by) && (
+				<p className="text-muted-foreground text-xs" title={policy.updated_by || undefined} data-testid="retention-changed-by">
+					{tHw04("retention.changedBy", { who: policy.updated_by_name || policy.updated_by })}
+					{policy.updated_at && (
+						<>
+							{" "}
+							<When value={policy.updated_at} />
+						</>
+					)}
+				</p>
+			)}
 			{policy.last_sweep_at && (
 				<p className="text-muted-foreground text-xs" data-testid="retention-last-sweep">
 					{t("settings.org.retentionLastSweepAt")} <When value={policy.last_sweep_at} />.{" "}

@@ -15,8 +15,8 @@ import {
 	useGetCatalogQuery,
 	useGetExperimentQuery,
 	useGetHealthQuery,
-	useGetSuitesQuery,
 } from "@/lib/store/apis/benchApi";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
 import { launchAvailable, type ExperimentStatus } from "@/lib/types/bench";
 import { parseAsString, useQueryState } from "nuqs";
@@ -55,10 +55,10 @@ export default function NewExperimentView() {
 		const { yours, baselines } = splitAgents(agentsList.data.agents);
 		return { yours: yours.map((a) => a.id), baselines: baselines.map((a) => a.id) };
 	}, [agentsList.data]);
-	// Ready tasks per benchmark (N39, N42): the full list, since the light list has no per-task status.
-	// A failed list leaves every task counted, as before. The form does not wait for it: it shows at
-	// once and starts again with the ready-task defaults when the list arrives.
-	const suites = useGetSuitesQuery();
+	// Ready tasks per benchmark (N39, N42, N194): the light list names them (ready_task_ids), so the page never
+	// downloads the full list. A failed list leaves every task counted, as before. The form shows at once; Plan
+	// waits for the list (N195), and its arrival fills only the fields nobody touched (L2), with no remount.
+	const suites = useGetSuitesLightQuery();
 	const ready = useMemo(() => (catalog.data ? readyTaskMap(catalog.data, suites.data?.suites) : undefined), [catalog.data, suites.data]);
 	const readyPending = suites.isLoading;
 	const sideLoading = agentsList.isLoading || modelKeys.isLoading;
@@ -160,20 +160,20 @@ export default function NewExperimentView() {
 						)}
 						{abMode || !builderDefaults ? (
 							<ExperimentForm
-								key={readyPending ? "ready-pending" : "ready-known"}
 								catalog={catalog.data}
 								defaults={defaults}
 								ready={ready}
+								readyPending={readyPending}
 								agentGroups={agentGroups}
 								onStarted={onStarted}
 							/>
 						) : (
 							<MatrixBuilder
-								key={readyPending ? "ready-pending" : "ready-known"}
 								catalog={catalog.data}
 								defaults={builderDefaults}
 								agentGroups={agentGroups}
 								ready={ready}
+								readyPending={readyPending}
 								onStarted={onStarted}
 							/>
 						)}

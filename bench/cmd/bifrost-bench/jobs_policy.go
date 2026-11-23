@@ -107,10 +107,13 @@ func parsePolicyParams(raw json.RawMessage) (policyParams, error) {
 	return p, nil
 }
 
-func validatePolicyGenerate(_ context.Context, _ jobEnv, raw json.RawMessage) (any, string, error) {
+func validatePolicyGenerate(ctx context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
 	p, err := parsePolicyParams(raw)
 	if err != nil {
 		return nil, "", fmt.Errorf("%w: %v", jobs.ErrInvalidParams, err)
+	}
+	if err := orgModelKeyAtCreate(ctx, env, p.Provider, p.KeyID); err != nil {
+		return nil, "", err
 	}
 	return p, p.Suite, nil
 }

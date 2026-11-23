@@ -22,6 +22,11 @@ export interface JobRunButtonProps {
 	variant?: VariantProps<typeof buttonVariants>["variant"];
 }
 
+/** A job start error without the server's fixed "create job: invalid job parameters: " lead (fix wave 3, N238; wave 2 D3). */
+export function plainJobError(msg: string): string {
+	return msg.replace(/^create job: invalid job parameters: /, "");
+}
+
 /**
  * Queues a job through POST /jobs and opens its live log with Cancel beneath the button. Viewers
  * see the button disabled; a refused or invalid request shows the server's message.
@@ -49,8 +54,8 @@ export function JobRunButton({ kind, params, label, confirm, disabled, onDone, v
 				</Button>
 			</div>
 			{error !== undefined && (
-				<p role="alert" className="text-chart-error-ink text-xs" data-testid={`job-run-${kind}-error`}>
-					{t("panel.startError")}: {getBenchErrorMessage(error)}
+				<p role="alert" className="text-chart-error-ink text-xs" data-testid={`job-run-${kind}-error`} title={getBenchErrorMessage(error)}>
+					{t("panel.startError")}: {plainJobError(getBenchErrorMessage(error))}
 				</p>
 			)}
 			{jobId && <JobLogPanel jobId={jobId} onClose={() => setJobId(null)} onFinished={finished} />}

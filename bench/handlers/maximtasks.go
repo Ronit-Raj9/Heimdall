@@ -59,9 +59,48 @@ type MaximDraftRequest struct {
 
 // MaximDraftResult answers a draft.
 type MaximDraftResult struct {
-	Batch    *tracebulk.Batch      `json:"batch"`
-	Tasks    []tracebulk.TaskDraft `json:"tasks"`
-	Warnings []string              `json:"warnings"`
+	Batch    *MaximBatchView `json:"batch"`
+	Tasks    []MaximTaskView `json:"tasks"`
+	Warnings []string        `json:"warnings"`
+}
+
+// MaximTaskView is a drafted task as the API shows it: the reviewer's
+// display name beside the stored reviewer, whose email only an org admin
+// reads (fix wave 3, N33).
+type MaximTaskView struct {
+	tracebulk.TaskDraft
+	ReviewedBy     string `json:"reviewed_by,omitempty"`
+	ReviewedByName string `json:"reviewed_by_name,omitempty"`
+}
+
+// MaximBatchView is an import as the API shows it: tasks and the person who
+// pulled it named as in MaximTaskView (fix wave 3, N33).
+type MaximBatchView struct {
+	*tracebulk.Batch
+	Tasks         []MaximTaskView `json:"tasks"`
+	CreatedBy     string          `json:"created_by,omitempty"`
+	CreatedByName string          `json:"created_by_name,omitempty"`
+}
+
+// maximTaskView names the reviewer of one task.
+func maximTaskView(names *actorNames, t tracebulk.TaskDraft) MaximTaskView {
+	v := MaximTaskView{TaskDraft: t}
+	v.ReviewedBy, v.ReviewedByName = names.show(t.ReviewedBy)
+	return v
+}
+
+// maximBatchView names the people of an import for the caller.
+func maximBatchView(ctx *fasthttp.RequestCtx, b *tracebulk.Batch) *MaximBatchView {
+	if b == nil {
+		return nil
+	}
+	names := callerNames(ctx)
+	v := &MaximBatchView{Batch: b, Tasks: make([]MaximTaskView, 0, len(b.Tasks))}
+	v.CreatedBy, v.CreatedByName = names.show(b.CreatedBy)
+	for _, t := range b.Tasks {
+		v.Tasks = append(v.Tasks, maximTaskView(names, t))
+	}
+	return v
 }
 
 // MaximReviewRequest is POST .../accept.
@@ -83,7 +122,7 @@ type MaximRejectRequest struct {
 
 // MaximTaskResult answers accept, reject and readiness.
 type MaximTaskResult struct {
-	Task tracebulk.TaskDraft `json:"task"`
+	Task MaximTaskView `json:"task"`
 	// Message says what happened to the readiness check, in words.
 	Message string `json:"message,omitempty"`
 }
@@ -194,7 +233,7 @@ func (h *maximTasksHandler) create(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.env.Mode, "maxim imports", err)
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusCreated, b)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusCreated, maximBatchView(ctx, b))
 }
 
 func (h *maximTasksHandler) get(ctx *fasthttp.RequestCtx) {
@@ -216,7 +255,7 @@ func (h *maximTasksHandler) get(ctx *fasthttp.RequestCtx) {
 			return
 		}
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, b)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, maximBatchView(ctx, b))
 }
 
 func readinessOf(b *tracebulk.Batch) string {
@@ -261,7 +300,12 @@ func (h *maximTasksHandler) draft(ctx *fasthttp.RequestCtx) {
 		h.sendErr(ctx, err)
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, MaximDraftResult{Batch: b, Tasks: res.Tasks, Warnings: res.Warnings})
+	names := callerNames(ctx)
+	tasks := make([]MaximTaskView, 0, len(res.Tasks))
+	for _, t := range res.Tasks {
+		tasks = append(tasks, maximTaskView(names, t))
+	}
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, MaximDraftResult{Batch: maximBatchView(ctx, b), Tasks: tasks, Warnings: res.Warnings})
 }
 
 func (h *maximTasksHandler) accept(ctx *fasthttp.RequestCtx) {
@@ -348,6 +392,7 @@ func (h *maximTasksHandler) queue(ctx *fasthttp.RequestCtx, t *tracebulk.TaskDra
 func (h *maximTasksHandler) onTask(ctx *fasthttp.RequestCtx, fn func(*tracebulk.Batch, *tracebulk.TaskDraft) (string, error)) {
 	key := pathParam(ctx, "suite") + "/" + pathParam(ctx, "task")
 	var out MaximTaskResult
+	var task tracebulk.TaskDraft
 	_, err := h.store().Update(pathParam(ctx, "id"), func(b *tracebulk.Batch) error {
 		t, ok := b.Task(key)
 		if !ok {
@@ -357,13 +402,14 @@ func (h *maximTasksHandler) onTask(ctx *fasthttp.RequestCtx, fn func(*tracebulk.
 		if err != nil {
 			return err
 		}
-		out = MaximTaskResult{Task: *t, Message: msg}
+		task, out.Message = *t, msg
 		return nil
 	})
 	if err != nil {
 		h.sendErr(ctx, err)
 		return
 	}
+	out.Task = maximTaskView(callerNames(ctx), task) // names are looked up outside the batch lock
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
 }
 

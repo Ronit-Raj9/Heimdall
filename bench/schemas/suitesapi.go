@@ -69,6 +69,18 @@ type SuiteSummary struct {
 	Builtin bool   `json:"builtin,omitempty"`
 	Source  string `json:"source,omitempty"`
 
+	// Light list only (GET /suites?fields=light): ReadyTaskIDs are the tasks
+	// a plan accepts, in suite order (admitted under the current lock
+	// fingerprints, not quarantined, files unchanged when that is known).
+	// ReadyKnown is false when the lock could not be read; then
+	// ReadyTaskIDs is left out and readiness is unknown, never zero.
+	ReadyTaskIDs []string `json:"ready_task_ids,omitempty"`
+	ReadyKnown   bool     `json:"ready_known,omitempty"`
+	// Partial marks a head entry (suite.yaml and suite.lock only): its full
+	// summary is still loading, so tasks, probes and drift are not listed
+	// yet. Read the list again for them.
+	Partial bool `json:"partial,omitempty"`
+
 	// Scenario fields (scenario.go).
 	Track    string        `json:"track,omitempty"`    // coding when the suite sets none
 	Grading  string        `json:"grading,omitempty"`  // verified | judged

@@ -107,12 +107,14 @@ func serveHosted(ctx context.Context, a *app, offline bool) int {
 	// Lane X16: org deletions, retention and the webhook outbox (dataops.go).
 	startHostedDataOps(ctx, env)
 	startEvidenceMirror(ctx, a)                             // Evidence storage area (P6): mirror and sweeper over runs/orgs/*; seals notify through evidenceOnSeal (evidence.go)
+	go backfillShareIndex(ctx, env)                         // fix wave 3, N293: opaque share tokens for links made before (sharebackfill_hosted.go)
 	serveMetrics(ctx, a.cfg.Server.MetricsListen, a.logger) // N9: Prometheus on the admin address (servemetrics.go)
 	srv, err := newHostedServer(env)
 	if err != nil {
 		return fail("server: %v", err)
 	}
 	a.logger.Info("heimdall hosted platform on http://%s (public url %s, mode %s)", a.cfg.Server.Listen, a.cfg.Auth.PublicURL, a.cfg.Server.Mode)
+	go warmLibrary(ctx, a, env) // L1: library suite summaries, one pack at a time beside the listener (warmlibrary_hosted.go)
 	if err := srv.ListenAndServe(ctx); err != nil && ctx.Err() == nil {
 		return fail("serve: %v", err)
 	}

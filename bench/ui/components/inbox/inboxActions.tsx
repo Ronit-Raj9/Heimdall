@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useSession, usesWriteToken } from "@/lib/session/sessionContext";
 import { readWriteToken, saveWriteToken } from "@/lib/store/apis/benchApi";
 import {
 	INBOX_TASK_KINDS,
@@ -330,7 +331,9 @@ export function InboxActions(props: InboxActionsProps) {
 	const { t } = useTranslation("bench");
 	const ids = useId();
 	const [action, setAction] = useState<InboxAction>(props.initialAction ?? "accept");
-	const [token, setToken] = useState(readWriteToken);
+	// The write-token box is local mode only: the hosted server uses the session (fix wave 3, N286).
+	const local = usesWriteToken(useSession());
+	const [token, setToken] = useState(() => (local ? readWriteToken() : ""));
 	const writable = canWriteInbox(props.mode);
 	const { item } = props;
 	const stateLabel = isInboxState(item.state) ? t(`inbox.state.${item.state}`).toLowerCase() : item.state;
@@ -369,21 +372,23 @@ export function InboxActions(props: InboxActionsProps) {
 							</Button>
 						))}
 					</div>
-					<Field label={t("inbox.actions.token")} htmlFor={`${ids}-token`} hint={t("inbox.actions.tokenHint")}>
-						<Input
-							id={`${ids}-token`}
-							type="password"
-							autoComplete="off"
-							placeholder={t("inbox.actions.tokenPlaceholder")}
-							value={token}
-							onChange={(e) => {
-								setToken(e.target.value);
-								saveWriteToken(e.target.value);
-							}}
-							disabled={!writable}
-							data-testid="inbox-token-input"
-						/>
-					</Field>
+					{local && (
+						<Field label={t("inbox.actions.token")} htmlFor={`${ids}-token`} hint={t("inbox.actions.tokenHint")}>
+							<Input
+								id={`${ids}-token`}
+								type="password"
+								autoComplete="off"
+								placeholder={t("inbox.actions.tokenPlaceholder")}
+								value={token}
+								onChange={(e) => {
+									setToken(e.target.value);
+									saveWriteToken(e.target.value);
+								}}
+								disabled={!writable}
+								data-testid="inbox-token-input"
+							/>
+						</Field>
+					)}
 					{action === "accept" && (
 						<AcceptForm
 							key={`accept-${item.id}`}

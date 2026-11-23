@@ -1,0 +1,11 @@
+{
+	"calibration": {
+		"labelledAs": "Labelled as {{name}}",
+		"needLabel": "Add at least one label above, or tick \"Also add the benchmark's expected and wrong answers as weak example labels\", before checking the grader.",
+		"sampleAll": "All {{count}}",
+		"sampleHint": "People's labels come first. Leave it empty to check all {{count}} labelled answer(s)."
+	},
+	"retention": {
+		"changedBy": "Last changed by {{who}}"
+	}
+}

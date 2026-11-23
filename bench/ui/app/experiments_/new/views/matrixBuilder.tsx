@@ -20,16 +20,18 @@ import {
 import type { Catalog, CatalogAgent, Experiment, ExperimentPlan } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { ChevronDown, Plus, X } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { suiteRef } from "./experimentFormSchema";
 import {
 	builderAgentGroups,
 	builderPlanIsStale,
 	catalogAgent,
+	fillUntouched,
 	guessProvider,
 	matrixPreview,
 	readyIds,
+	readyUnknown,
 	someNotReady,
 	toMatrixExperiment,
 	validateBuilder,
@@ -45,17 +47,36 @@ export interface MatrixBuilderProps {
 	defaults: BuilderValues;
 	/** The agent ids My agents lists (GET /agents split by splitAgents); absent lists every catalog agent. */
 	agentGroups?: BuilderAgentIds;
-	/** Ready tasks per benchmark (GET /suites): task counts and the tasks sent use only these (N42). */
+	/** Ready tasks per benchmark (GET /suites?fields=light): task counts and the tasks sent use only these (N42). */
 	ready?: ReadyTasks;
+	/** The ready list is still loading: Estimate, Plan and Run wait for it (N195). */
+	readyPending?: boolean;
 	/** Called once the experiment is created and started (or created with a failed start), with its id and cap. */
 	onStarted: (expId: string, capUsd: number) => void;
 }
 
 /** The no-YAML builder: agents x models x suite, adaptive toggle, preview, estimate, plan and run. */
-export function MatrixBuilder({ catalog, defaults, agentGroups, ready, onStarted }: MatrixBuilderProps) {
+export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPending, onStarted }: MatrixBuilderProps) {
 	const { t } = useTranslation("builder");
 	const { t: tf } = useTranslation("fw11");
 	const [v, setV] = useState<BuilderValues>(defaults);
+	// L2: the fields the person changed. New defaults (the ready list arrived) fill only the others; no remount.
+	const touchedKeys = useRef(new Set<keyof BuilderValues>());
+	const shownDefaults = useRef(defaults);
+	useEffect(() => {
+		if (shownDefaults.current === defaults) return;
+		shownDefaults.current = defaults;
+		const touched = touchedKeys.current;
+		setV((prev) => {
+			const out = fillUntouched(prev, defaults, (k) => touched.has(k) || (touched.has("suite") && k === "probes"));
+			if (touched.has("suite") && !touched.has("taskCount")) {
+				// A benchmark picked by hand keeps its own size: up to 5 of its ready tasks.
+				const s = catalog.suites.find((x) => suiteRef(x) === out.suite);
+				out.taskCount = Math.min(5, Math.max(1, readyIds(s, ready).length));
+			}
+			return out;
+		});
+	}, [defaults, catalog, ready]);
 	const [touched, setTouched] = useState(false);
 	const [token, setToken] = useState(readWriteToken);
 	const tokenBox = usesWriteToken(useSession());
@@ -79,11 +100,15 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, onStarted
 	const shown = touched ? errors : {};
 	const preview = useMemo(() => matrixPreview(v, suite, ready), [v, suite, ready]);
 	const runnable = readyIds(suite, ready).length;
-	const partlyReady = someNotReady(suite, ready);
+	// Ready tasks known (N195): the counts say "ready tasks", since only those are sent.
+	const partlyReady = someNotReady(suite, ready) || Boolean(suite && ready?.has(suiteRef(suite)));
 	const [extrasOpen, setExtrasOpen] = useState(false);
 	// A field error inside the collapsed Extras opens it, so the message is never hidden.
 	const extrasError = Boolean(shown.adaptiveMin || shown.concurrency || shown.seed);
-	const set = <K extends keyof BuilderValues>(k: K, value: BuilderValues[K]) => setV((prev) => ({ ...prev, [k]: value }));
+	const set = <K extends keyof BuilderValues>(k: K, value: BuilderValues[K]) => {
+		touchedKeys.current.add(k);
+		setV((prev) => ({ ...prev, [k]: value }));
+	};
 
 	// The agents My agents shows: the org's own, then the built-in ones; a chosen agent stays listed.
 	const listed = useMemo(() => {
@@ -113,6 +138,8 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, onStarted
 		);
 	};
 	const needsToken = tokenBox && !token.trim();
+	// N195: tasks are sent from the ready list only, so the actions wait for it and stop when it cannot be known.
+	const readyBlock = readyPending ? t("ready.checking") : readyUnknown(suite, ready) ? t("ready.unknown", { benchmark: suite?.id }) : null;
 	const stale = planned !== null && builderPlanIsStale(planned.experiment, v, catalog, ready);
 	const estimateFresh = estimated !== null && !builderPlanIsStale(estimated, v, catalog, ready);
 	// N43: after a Plan or Estimate press on an invalid form, how many fields to fix, next to the buttons.
@@ -120,15 +147,17 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, onStarted
 	const busy = createState.isLoading || startState.isLoading;
 	const blockReason = needsToken
 		? t("actions.needsToken")
-		: !valid && touched
-			? t("actions.invalid")
-			: !planned
-				? t("actions.needsPlan")
-				: stale
-					? t("actions.planStale")
-					: planBlocksStart(planned.plan)
-						? t("actions.blocked")
-						: null;
+		: readyBlock
+			? readyBlock
+			: !valid && touched
+				? t("actions.invalid")
+				: !planned
+					? t("actions.needsPlan")
+					: stale
+						? t("actions.planStale")
+						: planBlocksStart(planned.plan)
+							? t("actions.blocked")
+							: null;
 
 	const experimentOrNull = (): Experiment | null => {
 		setTouched(true);
@@ -140,7 +169,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, onStarted
 					?.scrollIntoView({ block: "center", behavior: "smooth" });
 			}, 0);
 		}
-		if (!valid || needsToken) return null;
+		if (!valid || needsToken || readyBlock) return null;
 		return toMatrixExperiment(v, catalog, ready);
 	};
 
@@ -212,6 +241,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, onStarted
 									value={v.suite}
 									onValueChange={(next) => {
 										const s = catalog.suites.find((x) => suiteRef(x) === next);
+										touchedKeys.current.add("suite");
 										setV((prev) => ({
 											...prev,
 											suite: next,
@@ -555,7 +585,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, onStarted
 								type="button"
 								variant="outline"
 								size="sm"
-								disabled={needsToken}
+								disabled={needsToken || readyBlock !== null}
 								isLoading={estimateState.isLoading}
 								onClick={() => void onEstimate()}
 								dataTestId="builder-estimate"
@@ -566,7 +596,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, onStarted
 								type="button"
 								variant="outline"
 								size="sm"
-								disabled={needsToken}
+								disabled={needsToken || readyBlock !== null}
 								isLoading={planState.isLoading}
 								onClick={() => void onPlan()}
 								dataTestId="builder-plan"

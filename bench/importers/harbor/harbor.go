@@ -147,7 +147,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 		}
 	}
 	if len(written) == 0 {
-		return res, errors.New("harbor: no task was imported; see the skipped list")
+		return res, importers.NoTaskError("harbor", res.Skipped)
 	}
 	track := cfg.track
 	if track == "" {
@@ -431,7 +431,7 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 	case t.MCPServers > 0:
 		return nil, "declares MCP servers in task.toml; the importer does not map them to services"
 	case !hasDockerfile && (cfg.image != "prebuilt" || t.DockerImage == ""):
-		return nil, "no environment/Dockerfile"
+		return nil, "no environment/Dockerfile: a Harbor task needs the Dockerfile its container is built from"
 	case cfg.image == "prebuilt" && t.DockerImage == "":
 		return nil, "-set image=prebuilt, but task.toml names no docker_image"
 	case !isFile(filepath.Join(t.SolutionDir, "solve.sh")):

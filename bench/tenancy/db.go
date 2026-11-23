@@ -14,7 +14,10 @@ import (
 // memberships tables.
 type DBDirectory struct{ DB *db.DB }
 
-var _ Directory = DBDirectory{}
+var (
+	_ Directory  = DBDirectory{}
+	_ ShareIndex = DBDirectory{}
+)
 
 func orgOf(o *db.Org) Org {
 	return Org{ID: o.ID, Slug: o.Slug, Name: o.Name, PublicRead: o.PublicRead}
@@ -57,6 +60,15 @@ func (d DBDirectory) MemberRole(ctx context.Context, orgID, userID string) (auth
 		return "", err
 	}
 	return auth.Role(r), nil
+}
+
+// ShareByToken implements ShareIndex over share_tokens (fix wave 3, N293).
+func (d DBDirectory) ShareByToken(ctx context.Context, token string) (string, string, error) {
+	orgID, shareID, err := d.DB.ShareToken(ctx, token)
+	if errors.Is(err, db.ErrNotFound) {
+		return "", "", ErrShareNotFound
+	}
+	return orgID, shareID, err
 }
 
 // DBAudit is the AuditSink over audit_log.

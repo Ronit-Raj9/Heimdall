@@ -89,8 +89,24 @@ describe("UsageBody runs without a cost (F1.price)", () => {
 		expect(html).toMatch(
 			/data-testid="usage-unknown-note"[^>]*>1 run\(s\) have no known cost and are left out of the total\. Set a price on the provider key in Settings &gt; API keys to include them\.</,
 		);
-		expect(html).toMatch(/data-testid="usage-no-call-2026-11-10"[^>]*>3 with no model call</);
+		expect(html).toMatch(/data-testid="usage-no-call-2026-11-10"[^>]*>3 runs with no model call</);
 		expect(html).not.toContain('data-testid="usage-no-call-2026-11-12"');
+	});
+
+	// Fix wave 3, N184: the note sits on its own line (a block element), so the date and the count
+	// never read as one number, and it names what it counts ("run" or "runs").
+	it("puts the no-model-call note on its own line with a plural noun", () => {
+		const one: UsageReport = {
+			...report,
+			buckets: report.buckets.map((b) => (b.key === "2026-11-10" ? { ...b, no_model_call_runs: 1 } : b)),
+		};
+		const html = renderToStaticMarkup(<UsageBody data={one} />);
+		expect(html).toMatch(/<span class="[^"]*\bblock\b[^"]*" data-testid="usage-no-call-2026-11-10">1 run with no model call<\/span>/);
+		const many: UsageReport = {
+			...report,
+			buckets: report.buckets.map((b) => (b.key === "2026-11-10" ? { ...b, no_model_call_runs: 19 } : b)),
+		};
+		expect(renderToStaticMarkup(<UsageBody data={many} />)).toContain(">19 runs with no model call<");
 	});
 });
 // N75: /usage?from=... (and /settings?tab=usage&from=...) opens on the dates, grouping and scope in the link.

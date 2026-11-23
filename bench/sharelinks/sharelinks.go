@@ -12,6 +12,11 @@
 // token is accepted only while its record exists, is not revoked and has
 // not expired: revoking is immediate, and deleting the key file revokes
 // every link of the organization at once.
+//
+// The hosted server hands out the opaque form instead (fix wave 3, N293):
+// s_<HMAC-SHA256 of "v2|<share id>" under the same key>, which names no
+// organization. The platform's share index maps a hash of it to the org and
+// the share id. Old links keep working and are moved to the opaque form.
 package sharelinks
 
 import (
@@ -326,6 +331,32 @@ func (s *Store) Token(orgID, id string) (string, error) {
 	return orgID + "." + id + "." + sign(k, orgID, id), nil
 }
 
+// TokenV2Prefix starts every opaque (v2) token.
+const TokenV2Prefix = "s_"
+
+// IsTokenV2 reports whether token has the opaque form.
+func IsTokenV2(token string) bool {
+	return strings.HasPrefix(token, TokenV2Prefix) && len(token) == len(TokenV2Prefix)+43 && !strings.Contains(token, ".")
+}
+
+func signV2(key []byte, id string) string {
+	m := hmac.New(sha256.New, key)
+	m.Write([]byte("v2|" + id))
+	return TokenV2Prefix + base64.RawURLEncoding.EncodeToString(m.Sum(nil))
+}
+
+// TokenV2 returns the opaque token of share id: it holds no organization
+// id and is the same every time for one link.
+func (s *Store) TokenV2(id string) (string, error) {
+	unlock := s.lock()
+	defer unlock()
+	k, err := s.key(true)
+	if err != nil {
+		return "", err
+	}
+	return signV2(k, id), nil
+}
+
 // Create stores a new link for orgID made by actor.
 func (s *Store) Create(n NewShare, actor string) (*Share, error) {
 	sh, err := n.Validate()
@@ -444,8 +475,12 @@ func (s *Store) Revoke(id, actor string) (*Share, error) {
 
 // Verify checks a visitor's token for orgID: well formed, signed with this
 // organization's key, and naming an active link. It returns ErrBadToken,
-// ErrNotFound, ErrExpired or ErrRevoked otherwise.
+// ErrNotFound, ErrExpired or ErrRevoked otherwise. An opaque (v2) token is
+// matched against every link of the store.
 func (s *Store) Verify(orgID, token string) (*Share, error) {
+	if strings.HasPrefix(token, TokenV2Prefix) {
+		return s.verifyV2(token)
+	}
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 || parts[0] != orgID || !idRe.MatchString(parts[1]) || len(parts[2]) != 43 {
 		return nil, ErrBadToken
@@ -475,4 +510,43 @@ func (s *Store) Verify(orgID, token string) (*Share, error) {
 		return nil, ErrExpired
 	}
 	return sh, nil
+}
+
+// verifyV2 finds the link whose opaque token is token, comparing every
+// link's token in constant time, then checks its state as Verify does.
+func (s *Store) verifyV2(token string) (*Share, error) {
+	if !IsTokenV2(token) {
+		return nil, ErrBadToken
+	}
+	unlock := s.lock()
+	k, err := s.key(false)
+	if err != nil {
+		unlock()
+		if errors.Is(err, ErrNotFound) {
+			return nil, ErrBadToken
+		}
+		return nil, err
+	}
+	shares, err := s.read()
+	unlock()
+	if err != nil {
+		return nil, err
+	}
+	var found *Share
+	for i := range shares {
+		if subtle.ConstantTimeCompare([]byte(signV2(k, shares[i].ID)), []byte(token)) == 1 {
+			found = &shares[i]
+		}
+	}
+	if found == nil {
+		return nil, ErrBadToken
+	}
+	switch found.State(s.now()) {
+	case StateRevoked:
+		return nil, ErrRevoked
+	case StateExpired:
+		return nil, ErrExpired
+	}
+	sh := *found
+	return &sh, nil
 }

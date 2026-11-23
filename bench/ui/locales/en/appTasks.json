@@ -41,7 +41,8 @@
 		"title": "Model",
 		"description": "The model is pinned: every call goes through the gateway on your own model key, and the job stops at the cost cap.",
 		"provider": "Provider",
-		"model": "Model",
+		"model": "Drafting model",
+		"pick": "Pick a model from your model keys.",
 		"maxUsd": "Cost cap (USD)",
 		"maxUsdHelp": "Leave empty for the default cap."
 	},
@@ -57,6 +58,10 @@
 		"confirm": "Drafting the rules calls the pinned model once or a few times and costs money. Go ahead?",
 		"approve": "Approve these rules",
 		"approved": "Approved by {{who}}",
+		"approveAgainTitle": "Approve the rules again?",
+		"approveAgain": "Approve the rules again? The {{count}} drafted tasks are discarded and must be drafted again (this costs money).",
+		"approveAgainConfirm": "Approve and discard tasks",
+		"keep": "Keep the tasks",
 		"kind": "Kind",
 		"operations": "Operations (comma separated)",
 		"kinds": {
@@ -84,8 +89,11 @@
 	"write": {
 		"title": "Write into the benchmark",
 		"description": "Tasks go in as pending review. Run the readiness checks on the benchmark next: they build the app copy and prove each task on a real worker.",
-		"judgeProvider": "Judge provider",
 		"judgeModel": "Judge model",
+		"confirmTitle": "Write into the benchmark?",
+		"confirm": "Add {{count}} tasks to {{suite}}? They are written to the benchmark's files.",
+		"confirmLabel": "Write {{count}} tasks",
+		"cancel": "Cancel",
 		"heldOut": "Keep these tasks held out (private)",
 		"submit": "Write {{count}} tasks",
 		"done": "Written into {{suite}}.",
@@ -96,6 +104,9 @@
 		"description": "Accept a task to mark it reviewed, or reject it to take it out of the benchmark.",
 		"accept": "Accept",
 		"reject": "Reject",
+		"rejectQuestion": "Reject {{task}}? It is not added to the benchmark.",
+		"rejectConfirm": "Reject",
+		"rejectCancel": "Keep it",
 		"state": {
 			"pending": "Pending review",
 			"accepted": "Accepted",

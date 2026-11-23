@@ -605,7 +605,7 @@ func exportHarborCmd(ctx context.Context, config, ref, tasks, out string, includ
 		fmt.Fprintf(stderr, "skipped %s: %s\n", sk.ID, sk.Reason)
 	}
 	if len(res.Tasks) == 0 {
-		return failTo(stderr, "export harbor: no task exported; see the skipped list")
+		return failTo(stderr, "export harbor: no task exported; every task was skipped, with the reason on its line above")
 	}
 	if err := export.WriteHarborDir(out, trees, res, force); err != nil {
 		return failTo(stderr, "export harbor: %v", err)
