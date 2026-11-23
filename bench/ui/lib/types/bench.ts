@@ -1278,6 +1278,7 @@ export interface PolicyResult {
 	decision: PolicyDecision;
 	checks: PolicyCheckResult[];
 	evaluated_at: string;
+	/** The rule set's file name without .yaml, as Releases > Rules lists it. */ policy_file?: string;
 }
 
 /** GET /experiments/{id}/diagnostics */

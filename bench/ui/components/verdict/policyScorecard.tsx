@@ -87,7 +87,7 @@ export function PolicyScorecard({ policy, expId, metrics, runPairs, onOpenPair, 
 			</div>
 			<div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs" data-testid="policy-meta">
 				<span className="font-mono" title={policy.policy_hash}>
-					{t("policy.meta", { name: policy.policy_name, hash: shortHash(policy.policy_hash) })}
+					{t("policy.meta", { name: policy.policy_file || policy.policy_name, hash: shortHash(policy.policy_hash) })}
 				</span>
 				<span>{t("policy.counts", counts)}</span>
 			</div>

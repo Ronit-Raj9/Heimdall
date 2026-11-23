@@ -421,7 +421,7 @@ func printPolicy(r *schemas.PolicyResult) {
 	for _, c := range r.Checks {
 		counts[c.Status]++
 	}
-	fmt.Printf("policy %s (%s): %s, %d checks: %d pass, %d fail, %d unknown\n", r.PolicyName, short(r.PolicyHash),
+	fmt.Printf("policy %s (%s): %s, %d checks: %d pass, %d fail, %d unknown\n", r.RuleSetName(), short(r.PolicyHash), // fix wave 3, N61: the file name
 		r.Decision, len(r.Checks), counts[schemas.PolicyPass], counts[schemas.PolicyFail], counts[schemas.PolicyUnknown])
 	for _, c := range r.Checks {
 		if c.Status == schemas.PolicyPass {

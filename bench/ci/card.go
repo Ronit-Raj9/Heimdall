@@ -113,7 +113,7 @@ func VerdictCard(an *schemas.Analysis, in CardInput) string {
 				failing++
 			}
 		}
-		fmt.Fprintf(&b, "**Policy** %s: %s", mdEscape(p.PolicyName), p.Decision)
+		fmt.Fprintf(&b, "**Policy** %s: %s", mdEscape(p.RuleSetName()), p.Decision) // fix wave 3, N61: the rule set by its file name
 		if failing > 0 {
 			fmt.Fprintf(&b, " (%d of %d checks not passing)", failing, len(p.Checks))
 		}
