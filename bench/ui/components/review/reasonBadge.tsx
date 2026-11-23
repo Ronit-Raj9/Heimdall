@@ -17,7 +17,7 @@ export function ReasonBadge({ reason, testId, detail }: { reason: string; testId
 				? tHw07("review.reason.invalidatedBy", { detail: detail.join("; ") })
 				: tHw07("review.reason.invalidated");
 	} else if (isReviewReason(reason)) {
-		label = t(`review.reason.${reason}`);
+		label = t(`review.reason.${reason as Exclude<typeof reason, "invalidated">}`);
 	}
 	return (
 		<Badge variant={reason === "veto" ? "destructive" : "warning"} data-testid={testId} data-reason={reason}>
