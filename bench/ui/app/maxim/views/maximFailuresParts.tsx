@@ -85,6 +85,14 @@ export function needsAnswer(kind: string): boolean {
 }
 
 /** Clusters that already have a drafted task in this import. */
+/**
+ * Who reviewed a drafted task: the display name the server adds (fix wave 3, N33), else the stored reviewer, which the
+ * server leaves out for a member when it is an email.
+ */
+export function maximReviewer(task: MaximTaskDraft & { reviewed_by_name?: string }): string {
+	return task.reviewed_by_name || task.reviewed_by || "";
+}
+
 export function draftedClusters(tasks: readonly MaximTaskDraft[]): Set<string> {
 	return new Set(tasks.filter((t) => t.state !== "rejected").map((t) => t.cluster));
 }
@@ -225,7 +233,11 @@ export function TaskReviewCard({ task, busy = false, message = null, onAccept, o
 					{t("tasks.editMe", { files: task.edit_me.join(", ") })}
 				</p>
 			)}
-			{task.reviewed_by && <p className="text-muted-foreground text-xs">{t("tasks.reviewedBy", { who: task.reviewed_by })}</p>}
+			{maximReviewer(task) && (
+				<p className="text-muted-foreground text-xs" title={task.reviewed_by || undefined} data-testid="maxim-task-reviewed-by">
+					{t("tasks.reviewedBy", { who: maximReviewer(task) })}
+				</p>
+			)}
 			{task.state === "pending_review" && (
 				<form
 					className="flex flex-col gap-3"
