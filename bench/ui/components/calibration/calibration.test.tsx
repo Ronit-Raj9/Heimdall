@@ -66,7 +66,7 @@ describe("CalibrationCard", () => {
 		expect(html).toContain("40 human-labelled, 6 seeds, 0 disputed (46 rows)");
 		expect(html).toContain("2026-11-17 (cr_7k2m9q4w1z)");
 		expect(tag(html, "calibration-reminders")).toBeTruthy();
-		expect(html).toContain("heimdall judge calibrate longmem-s");
+		expect(html).toContain("Use Run the check below. It shows the cost first.");
 	});
 
 	it("says never and not calibrated without a record", () => {

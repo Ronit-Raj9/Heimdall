@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useSession, usesWriteToken, type SessionInfo } from "@/lib/session/sessionContext";
 import { readWriteToken, saveWriteToken } from "@/lib/store/apis/benchApi";
 import type { CalibrationItem, CalibrationLabelRequest, CalibrationStatus, JudgeCalibrationVerdict, Mode } from "@/lib/types/bench";
 import { useId, useState, type ReactNode } from "react";
@@ -15,9 +16,13 @@ import {
 	stateTone,
 	type LabelFormValues,
 } from "./calibration.utils";
+import "./hw04I18n";
 
 // W8 judge calibration (docs/judge-calibration.md): the calibration card of a judged suite, the
 // labelling form, the label list and the contested badge.
+
+/** A label as the API answers it to a signed-in caller: the labeller's display name beside the stored labeller. */
+type NamedCalibrationItem = CalibrationItem & { labeller_name?: string };
 
 const TONE_VARIANT = { good: "success", warn: "warning", bad: "destructive", neutral: "secondary" } as const;
 
@@ -185,15 +190,30 @@ export interface LabelFormProps {
 	onSubmit: (req: CalibrationLabelRequest) => void;
 }
 
-/** The labelling view: task, answer, correct or incorrect, labeller, note, behind the write token. */
+/** The display name of the signed-in user: the name, else the part of the email before "@". */
+function sessionName(session: SessionInfo): string {
+	const user = session.user;
+	return user?.name?.trim() || user?.email?.split("@")[0] || "";
+}
+
+/**
+ * The labelling view: task, answer, correct or incorrect, note. Local mode also asks for the labeller and the write
+ * token; on the hosted server the labeller is the signed-in member and there is no token (fix wave 3, N286).
+ */
 export function LabelForm({ tasks, mode, submitting, submitError, initial, onSubmit }: LabelFormProps) {
 	const { t } = useTranslation("bench");
+	const { t: th } = useTranslation("hw04");
 	const ids = useId();
+	const session = useSession();
+	const local = usesWriteToken(session);
 	const [values, setValues] = useState<LabelFormValues>(initial ?? EMPTY_LABEL_FORM);
 	const [showErrors, setShowErrors] = useState(false);
-	const [token, setToken] = useState(readWriteToken);
+	const [token, setToken] = useState(() => (local ? readWriteToken() : ""));
 	const writable = canLabel(mode);
-	const errors = showErrors ? labelFormErrors(values) : {};
+	const signedName = sessionName(session);
+	// Hosted: the server records the signed-in member whatever the body says; the name only fills the required field.
+	const effective = local ? values : { ...values, labeller: signedName || "me" };
+	const errors = showErrors ? labelFormErrors(effective) : {};
 	const set = (k: keyof LabelFormValues) => (v: string) => setValues((cur) => ({ ...cur, [k]: v }));
 	const field = "border-input bg-background w-full rounded-md border px-2 py-1.5 text-sm";
 	return (
@@ -202,7 +222,7 @@ export function LabelForm({ tasks, mode, submitting, submitError, initial, onSub
 			data-testid="calibration-label-form"
 			onSubmit={(e) => {
 				e.preventDefault();
-				const req = labelRequestFrom(values);
+				const req = labelRequestFrom(effective);
 				if (!req) {
 					setShowErrors(true);
 					return;
@@ -268,17 +288,25 @@ export function LabelForm({ tasks, mode, submitting, submitError, initial, onSub
 					</span>
 				)}
 			</fieldset>
-			<label className="flex flex-col gap-1 text-sm" htmlFor={`${ids}-labeller`}>
-				{t("calibration.labeller")}
-				<Input
-					id={`${ids}-labeller`}
-					value={values.labeller}
-					onChange={(e) => set("labeller")(e.target.value)}
-					disabled={!writable}
-					aria-invalid={errors.labeller ? true : undefined}
-					data-testid="calibration-label-labeller"
-				/>
-			</label>
+			{local ? (
+				<label className="flex flex-col gap-1 text-sm" htmlFor={`${ids}-labeller`}>
+					{t("calibration.labeller")}
+					<Input
+						id={`${ids}-labeller`}
+						value={values.labeller}
+						onChange={(e) => set("labeller")(e.target.value)}
+						disabled={!writable}
+						aria-invalid={errors.labeller ? true : undefined}
+						data-testid="calibration-label-labeller"
+					/>
+				</label>
+			) : (
+				signedName && (
+					<p className="text-muted-foreground text-sm" data-testid="calibration-labelled-as">
+						{th("calibration.labelledAs", { name: signedName })}
+					</p>
+				)
+			)}
 			<label className="flex flex-col gap-1 text-sm" htmlFor={`${ids}-note`}>
 				{t("calibration.note")}
 				<Input
@@ -289,21 +317,23 @@ export function LabelForm({ tasks, mode, submitting, submitError, initial, onSub
 					data-testid="calibration-label-note"
 				/>
 			</label>
-			<label className="flex flex-col gap-1 text-sm" htmlFor={`${ids}-token`}>
-				{t("calibration.token")}
-				<Input
-					id={`${ids}-token`}
-					type="password"
-					autoComplete="off"
-					value={token}
-					onChange={(e) => {
-						setToken(e.target.value);
-						saveWriteToken(e.target.value);
-					}}
-					disabled={!writable}
-					data-testid="calibration-token-input"
-				/>
-			</label>
+			{local && (
+				<label className="flex flex-col gap-1 text-sm" htmlFor={`${ids}-token`}>
+					{t("calibration.token")}
+					<Input
+						id={`${ids}-token`}
+						type="password"
+						autoComplete="off"
+						value={token}
+						onChange={(e) => {
+							setToken(e.target.value);
+							saveWriteToken(e.target.value);
+						}}
+						disabled={!writable}
+						data-testid="calibration-token-input"
+					/>
+				</label>
+			)}
 			<div>
 				<Button type="submit" size="sm" disabled={!writable || submitting} dataTestId="calibration-label-submit">
 					{t("calibration.submit")}
@@ -353,7 +383,7 @@ export function LabelsTable({ items }: { items: readonly CalibrationItem[] }) {
 							{it.answer.length > 80 ? `${it.answer.slice(0, 80)}...` : it.answer}
 						</td>
 						<td className="py-1">{t(`calibration.labels.${it.label}`)}</td>
-						<td className="py-1">{it.labeller}</td>
+						<td className="py-1">{(it as NamedCalibrationItem).labeller_name || it.labeller}</td>
 						<td className="py-1">
 							{it.source === "admission_control" ? (
 								<Badge variant="secondary" data-testid="calibration-seed">

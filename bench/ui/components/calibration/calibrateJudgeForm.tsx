@@ -6,6 +6,7 @@ import type { CalibrationStatus, Job } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "./hw04I18n";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
@@ -59,6 +60,7 @@ const pct = (r: Rate | undefined, none: string) => (r?.value == null ? none : `$
  */
 export function CalibrateJudgeForm({ status, onDone }: { status: CalibrationStatus; onDone?(): void }) {
 	const { t } = useTranslation("calibrate");
+	const { t: th } = useTranslation("hw04");
 	const session = useSession();
 	const hosted = session.authMode === "hosted";
 	const models = useGetModelsQuery();
@@ -77,6 +79,8 @@ export function CalibrateJudgeForm({ status, onDone }: { status: CalibrationStat
 	const keys = models.data?.keys ?? [];
 	const hasKey = keys.some((k) => judgeProvider(k.provider) === judgeProvider(provider) && k.status !== "invalid" && !k.over_budget);
 	const noKey = hosted && models.isSuccess && !hasKey;
+	// Nothing to check: no label and the benchmark's own answers not asked for (fix wave 3, N286).
+	const nothingToCheck = labels === 0 && !seed;
 
 	const params = {
 		suite: status.suite,
@@ -122,12 +126,13 @@ export function CalibrateJudgeForm({ status, onDone }: { status: CalibrationStat
 					type="number"
 					min={0}
 					max={500}
-					value={sample}
+					value={sample > 0 ? sample : ""}
+					placeholder={th("calibration.sampleAll", { count: labels })}
 					onChange={(e) => setSample(Math.max(0, Math.min(500, Math.floor(Number(e.target.value) || 0))))}
 					className="border-input bg-background h-8 w-28 rounded-md border px-2 text-sm"
 					data-testid="calibrate-judge-sample"
 				/>
-				<span className="text-muted-foreground font-normal">{t("sampleHint", { count: labels })}</span>
+				<span className="text-muted-foreground font-normal">{th("calibration.sampleHint", { count: labels })}</span>
 			</label>
 			<label className="flex items-center gap-2 text-xs">
 				<input type="checkbox" checked={seed} onChange={(e) => setSeed(e.target.checked)} data-testid="calibrate-judge-seed" />
@@ -137,7 +142,11 @@ export function CalibrateJudgeForm({ status, onDone }: { status: CalibrationStat
 				{t("approxCalls", { calls })}
 				{hosted && <span className="text-muted-foreground"> {t("hostedCap", { calls: HOSTED_CAP_CALLS, usd: HOSTED_CAP_USD })}</span>}
 			</p>
-			{labels === 0 && !seed && <p className="text-muted-foreground text-sm">{t("noLabels")}</p>}
+			{nothingToCheck && (
+				<p className="text-muted-foreground text-sm" data-testid="calibrate-judge-need-label">
+					{th("calibration.needLabel")}
+				</p>
+			)}
 			{noKey ? (
 				<p className="text-sm" data-testid="calibrate-judge-nokey">
 					{t("noKey", { provider })}{" "}
@@ -147,7 +156,7 @@ export function CalibrateJudgeForm({ status, onDone }: { status: CalibrationStat
 				</p>
 			) : (
 				<div className="flex flex-col gap-3">
-					<JobRunButton kind="calibrate.run" params={{ ...params, estimate: true }} label={t("estimate")} variant="outline" onDone={onEstimate} />
+					<JobRunButton kind="calibrate.run" params={{ ...params, estimate: true }} label={t("estimate")} variant="outline" disabled={nothingToCheck} onDone={onEstimate} />
 					{forecast && (
 						<p className="text-sm" data-testid="calibrate-judge-forecast">
 							{t("forecast", {
@@ -162,6 +171,7 @@ export function CalibrateJudgeForm({ status, onDone }: { status: CalibrationStat
 						params={{ ...params, yes: true }}
 						label={t("run")}
 						confirm={t("confirm", { calls: forecast?.calls ?? calls })}
+						disabled={nothingToCheck}
 						onDone={onRun}
 					/>
 				</div>
