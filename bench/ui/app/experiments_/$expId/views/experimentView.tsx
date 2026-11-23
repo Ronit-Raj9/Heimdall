@@ -49,6 +49,7 @@ import { ActionsTab } from "./actionsTab";
 import { ANALYSIS_TAB_ID, AnalysisTab, AnalysisTabLabel } from "./analysisTab"; // L15 analysis jobs
 import { CostTab } from "./costTab";
 import { EXPERIMENT_TABS, defaultExperimentTab, hiddenExperimentTabs, type ExperimentTabId } from "./experimentTabs";
+import { RegradeNotice, useGradeChoice } from "./gradeChoice";
 import { IntegrityTab } from "./integrityTab";
 import { LiveProgress } from "./liveProgress";
 import { suiteIcon } from "./suiteIcon";
@@ -102,7 +103,8 @@ function readyTasksLink(
 export default function ExperimentView({ expId }: { expId: string }) {
 	const { t } = useTranslation("bench");
 	const { t: tActions } = useTranslation("experimentActions");
-	const [grade] = useQueryState("grade", parseAsString);
+	// The newest re-score by default, ?grade=original for the original (gradeChoice.tsx).
+	const { grade } = useGradeChoice(expId);
 	const { t: tPage } = useTranslation("experimentPage");
 	const { t: tx } = useTranslation("experimentsUx");
 	const { t: tf } = useTranslation("fw11");
@@ -306,6 +308,8 @@ export default function ExperimentView({ expId }: { expId: string }) {
 					{tPage(bannerKey)}
 				</p>
 			)}
+
+			{!notStarted && kind !== "debug" && <RegradeNotice expId={expId} />}
 
 			{evaluationId && arms.length === 1 && (
 				<p

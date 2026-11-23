@@ -1,0 +1,12 @@
+{
+	"regradeNotice": {
+		"showing": "Showing re-score {{id}} from {{date}}.",
+		"showingNote": "Showing re-score {{id}} from {{date}}: {{note}}.",
+		"showOriginal": "Show original result",
+		"original": "Showing the original result. A newer re-score {{id}} from {{date}} exists.",
+		"showLatest": "Show re-score"
+	},
+	"gradeNote": {
+		"reading": "Reading grade source {{source}}. The task grid still shows saved outcomes."
+	}
+}

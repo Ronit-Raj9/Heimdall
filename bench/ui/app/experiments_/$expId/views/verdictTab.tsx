@@ -33,6 +33,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { parseAsString, useQueryState } from "nuqs";
 import { useCallback, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { useGradeChoice } from "./gradeChoice";
 import { VerdictHeaderStrip } from "./verdictHeaderStrip";
 
 /** What the two setups of a comparison differ in (the experiment status `arms_differ`); an older server leaves it out. */
@@ -149,8 +150,10 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 	const { t } = useTranslation("bench");
 	const { t: tPage } = useTranslation("experimentPage");
 	const { t: tPage9 } = useTranslation("hw09");
+	const { t: tHx } = useTranslation("hx01");
 	const navigate = useNavigate();
-	const [grade, setGrade] = useQueryState("grade", parseAsString);
+	// The newest re-score by default; the header's line says so and links the original (gradeChoice.tsx).
+	const { grade, latest, setGrade } = useGradeChoice(expId);
 	const [, setTab] = useQueryState("tab", parseAsString);
 	const status = useGetExperimentQuery(expId);
 	const live = status.data ? !TERMINAL_STATES.has(status.data.state) && status.data.state !== "created" : false;
@@ -259,12 +262,12 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 				</div>
 				<GradeSourcePicker value={grade} judged={judged} onChange={(next) => void setGrade(next)} />
 			</div>
-			{grade && (
+			{grade && grade !== latest?.id && (
 				<p
 					className="border-chart-info/40 bg-chart-info/5 text-foreground flex flex-wrap items-center gap-2 rounded-sm border px-3 py-2 text-xs"
 					data-testid="verdict-grade-note"
 				>
-					{t("verdict.source.reading", { source: grade })}
+					{tHx("gradeNote.reading", { source: grade })}
 					<Button
 						variant="link"
 						size="sm"
@@ -325,7 +328,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 					title={tPage("sections.gates")}
 					description={tPage("sectionHints.gates")}
 					icon={ListChecks}
-					action={tag("verdict-gates-source", true)}
+					action={tag("verdict-gates-source")}
 					testId="verdict-gates"
 				>
 					<GateChecklist gates={payload.gates} />

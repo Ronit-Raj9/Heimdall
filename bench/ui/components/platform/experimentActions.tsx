@@ -6,7 +6,8 @@ import { ForbiddenNote, isRoleRefusal } from "@/components/platform/forbiddenNot
 import { RegradeDialog } from "@/components/platform/regradeDialog";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/lib/session/sessionContext";
-import { getBenchErrorMessage, useGetHealthQuery, useRegradeMutation, useStartExperimentMutation } from "@/lib/store/apis/benchApi";
+import { useAppDispatch } from "@/lib/store";
+import { benchApi, getBenchErrorMessage, useGetHealthQuery, useRegradeMutation, useStartExperimentMutation } from "@/lib/store/apis/benchApi";
 import { useCancelExperimentMutation, useResumeExperimentMutation } from "@/lib/store/apis/platformApi";
 import { launchAvailable, type ExperimentStatus, type Job, type Role } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
@@ -104,6 +105,18 @@ export function RegradeAction({ expId, defaultOpen = false }: { expId: string; d
 	const close = useCallback(() => setOpen(false), []);
 	const job = state.data && state.originalArgs?.exp_id === expId ? state.data : null;
 	const regradeId = job ? regradeIdOf(job) : null;
+	// The mutation's job is the queued row; the log panel reports the finished one. A finished re-score
+	// re-reads the status, whose latest_regrade the page then shows by default (gradeChoice.tsx).
+	const [finished, setFinished] = useState<Job | null>(null);
+	const dispatch = useAppDispatch();
+	const onFinished = useCallback(
+		(done: Job) => {
+			setFinished(done);
+			if (done.status === "succeeded") dispatch(benchApi.util.invalidateTags([{ type: "BenchExperiment", id: expId }]));
+		},
+		[dispatch, expId],
+	);
+	const succeeded = Boolean(job && (job.status === "succeeded" || (finished?.id === job.id && finished.status === "succeeded")));
 	return (
 		<RoleGate min="member" fallback={null}>
 			<div className="flex min-w-0 flex-col items-end gap-2" data-testid="regrade-action">
@@ -138,8 +151,8 @@ export function RegradeAction({ expId, defaultOpen = false }: { expId: string; d
 				{state.error && <ActionError error={state.error} title={t("experimentActions.regradeError")} testId="regrade-error" />}
 				{job && showLog && (
 					<div className="w-full max-w-xl text-left" data-testid="regrade-log">
-						<JobLogPanel jobId={job.id} onClose={() => setShowLog(false)} />
-						{regradeId && job.status === "succeeded" && (
+						<JobLogPanel jobId={job.id} onClose={() => setShowLog(false)} onFinished={onFinished} />
+						{regradeId && succeeded && (
 							<Link
 								to="/experiments/$expId"
 								params={{ expId }}

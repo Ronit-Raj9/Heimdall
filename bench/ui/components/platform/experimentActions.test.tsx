@@ -14,10 +14,16 @@ const api = vi.hoisted(() => ({
 	start: {} as Record<string, unknown>,
 	health: undefined as unknown,
 	controls: undefined as unknown,
+	finished: undefined as unknown,
+	dispatched: [] as unknown[],
 }));
 vi.mock("@/components/jobs/jobLogPanel", () => ({
-	JobLogPanel: ({ jobId }: { jobId: string }) => <div data-testid="job-log-panel">{jobId}</div>,
+	JobLogPanel: ({ jobId, onFinished }: { jobId: string; onFinished?: (job: unknown) => void }) => {
+		if (api.finished) onFinished?.(api.finished);
+		return <div data-testid="job-log-panel">{jobId}</div>;
+	},
 }));
+vi.mock("@/lib/store", () => ({ useAppDispatch: () => (action: unknown) => api.dispatched.push(action) }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/platformApi")>()),
@@ -121,6 +127,17 @@ describe("RegradeAction", () => {
 		expect(html).toContain('data-testid="regrade-open-verdict"');
 		expect(html).toContain("rg_42");
 		expect(regradeIdOf({ ...REGRADE_JOB, params: { exp_id: "e" } })).toBe("rg_42");
+	});
+	it("re-reads the comparison's status once the re-score succeeded, so the page shows it", () => {
+		api.regrade = { data: { ...REGRADE_JOB, status: "queued" }, originalArgs: { exp_id: "e_nightly" } };
+		api.dispatched = [];
+		api.finished = { ...REGRADE_JOB, status: "failed" };
+		render(<RegradeAction expId="e_nightly" />, hostedSession("member"));
+		expect(api.dispatched).toEqual([]);
+		api.finished = { ...REGRADE_JOB, status: "succeeded" };
+		render(<RegradeAction expId="e_nightly" />, hostedSession("member"));
+		expect(JSON.stringify(api.dispatched)).toContain('"type":"BenchExperiment","id":"e_nightly"');
+		api.finished = undefined;
 	});
 });
 

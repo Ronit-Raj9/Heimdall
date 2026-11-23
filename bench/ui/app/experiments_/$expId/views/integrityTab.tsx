@@ -8,13 +8,15 @@ import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
 import { armOrder } from "@/components/verdict/verdict.utils";
 import { useGetVerdictQuery } from "@/lib/store/apis/benchApi";
 import { useTranslation } from "react-i18next";
+import { useGradeChoice } from "./gradeChoice";
 import { Section } from "./verdictTab";
 
 /** The Integrity tab (eval integrity area, S2): the noise floor, eval awareness, monitor certifications and the compliance pack. */
 export function IntegrityTab({ expId }: { expId: string }) {
 	const { t } = useTranslation("bench");
-	// The same request as the Verdict tab (sealed grades), so it is read from the cache.
-	const verdict = useGetVerdictQuery(expId);
+	// The same request as the Verdict tab (the grade source the page shows), so it is read from the cache.
+	const { grade } = useGradeChoice(expId);
+	const verdict = useGetVerdictQuery(grade ? { expId, gradeSource: grade } : expId);
 	const arms = verdict.data ? armOrder(verdict.data) : [];
 	return (
 		<div className="flex flex-col gap-6" data-testid="integrity-screen">

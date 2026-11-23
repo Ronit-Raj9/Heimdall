@@ -10,6 +10,11 @@ vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/route
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useGetVerdictQuery: () => api.verdict,
+	useGetExperimentQuery: (id: string) => ({ data: { exp_id: id, state: "done" } }),
+}));
+vi.mock("nuqs", async (importOriginal) => ({
+	...(await importOriginal<typeof import("nuqs")>()),
+	useQueryState: () => [null, () => undefined],
 }));
 vi.mock("@/lib/store/apis/integrityApi", () => ({
 	useGetAwarenessQuery: () =>
