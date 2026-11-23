@@ -180,7 +180,11 @@ type GatewayRequest struct {
 	ErrorMessage   string    `json:"error_message,omitempty"`
 	// BudgetRefused marks a call Bifrost refused because a governance
 	// budget was used up (gateways/bifrost.IsBifrostBudgetStop).
-	BudgetRefused bool            `json:"budget_refused,omitempty"`
+	BudgetRefused bool `json:"budget_refused,omitempty"`
+	// FaultPlanID is the heimdall plugin's fault plan id for this request
+	// (log metadata heimdall_fault_plan_id), empty when the plugin did not
+	// see the x-heimdall-* headers (fix wave 3, L4: the fault_delivery gate).
+	FaultPlanID   string          `json:"fault_plan_id,omitempty"`
 	Attempts      []Attempt       `json:"attempts,omitempty"`
 	ToolCalls     []ToolCallRef   `json:"tool_calls,omitempty"`      // tool calls in the response
 	ToolResultIDs []string        `json:"tool_result_ids,omitempty"` // tool results in the request input

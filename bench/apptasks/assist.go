@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/modelid"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
@@ -349,16 +350,9 @@ func decodeStrict(reply string, out any) error {
 	return nil
 }
 
-// sameModel accepts the pinned model id or a dated alias of it, or a
-// provider/model form.
+// sameModel is modelid.SameModel, the one "same model" rule: a provider
+// prefix is ignored and a dated snapshot of the pinned alias matches, but a
+// longer family name (gpt-5.4-mini for gpt-5.4) does not.
 func sameModel(served, pinned string) bool {
-	served = strings.ToLower(served)
-	pinned = strings.ToLower(pinned)
-	if i := strings.LastIndex(served, "/"); i >= 0 {
-		served = served[i+1:]
-	}
-	if i := strings.LastIndex(pinned, "/"); i >= 0 {
-		pinned = pinned[i+1:]
-	}
-	return served == pinned || strings.HasPrefix(served, pinned+"-") || strings.HasPrefix(served, pinned+"@")
+	return modelid.SameModel(pinned, served)
 }

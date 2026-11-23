@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/modelid"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
@@ -384,26 +385,11 @@ func contentText(raw json.RawMessage) string {
 	return ""
 }
 
-var modelDateRe = regexp.MustCompile(`^[-@](\d{8}|\d{4}-\d{2}-\d{2})$`)
-
-// sameModel is graders.sameModel: an empty served model is accepted, a
-// provider prefix is ignored, a dated alias of the pinned model matches.
+// sameModel is modelid.SameModel, the one "same model" rule: an empty served
+// model is accepted, a provider prefix is ignored, a dated snapshot of the
+// pinned alias matches.
 func sameModel(served, pinned string) bool {
-	if served == "" {
-		return true
-	}
-	strip := func(m string) string {
-		if i := strings.LastIndex(m, "/"); i >= 0 {
-			return m[i+1:]
-		}
-		return m
-	}
-	served, pinned = strip(served), strip(pinned)
-	if served == pinned {
-		return true
-	}
-	rest, ok := strings.CutPrefix(served, pinned)
-	return ok && modelDateRe.MatchString(rest)
+	return modelid.SameModel(pinned, served)
 }
 
 func clip(s string, n int) string {

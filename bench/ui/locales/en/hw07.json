@@ -1,0 +1,8 @@
+{
+	"review": {
+		"reason": {
+			"invalidated": "Thrown out by a safety check",
+			"invalidatedBy": "Thrown out by a safety check: {{detail}}"
+		}
+	}
+}

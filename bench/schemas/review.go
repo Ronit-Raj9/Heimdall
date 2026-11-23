@@ -102,6 +102,7 @@ const (
 	ReviewReasonFalseCompletion  = "false_completion"  // the agent claimed success on a failed run
 	ReviewReasonFlagged          = "flagged"           // a flag_only review asked for a look
 	ReviewReasonContested        = "contested"         // W8 judge calibration: split votes, an auditor or a human review disagreeing with the judge
+	ReviewReasonInvalidated      = "invalidated"       // fix wave 3 (N257): a safety check threw the run out (a fired gate with effect invalidate)
 )
 
 // ReviewReasons lists the queue reasons in display order.
@@ -109,6 +110,7 @@ var ReviewReasons = []string{
 	ReviewReasonSplitVotes, ReviewReasonUnparsableVotes, ReviewReasonInvalidEvaluator,
 	ReviewReasonVeto, ReviewReasonFalseCompletion, ReviewReasonFlagged,
 	ReviewReasonContested, // W8 judge calibration
+	ReviewReasonInvalidated,
 }
 
 // ReviewQueueItem is one run the queue asks a person to look at.
@@ -125,6 +127,10 @@ type ReviewQueueItem struct {
 	Outcome       Outcome        `json:"outcome"`            // the outcome in effect: the newest valid decision review's, else the sealed one
 	Reviews       int            `json:"reviews"`            // valid reviews of the run, flags included
 	Decision      ReviewDecision `json:"decision,omitempty"` // the newest valid decision review's, empty when none
+	// ThrownOutBy names, in plain words, each safety check that threw the
+	// run out ("model check: served by another model"); set with the
+	// invalidated reason only.
+	ThrownOutBy []string `json:"thrown_out_by,omitempty"`
 }
 
 // ReviewQueue is GET /experiments/{id}/reviews/queue and `review list`.
