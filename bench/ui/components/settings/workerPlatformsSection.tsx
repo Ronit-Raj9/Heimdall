@@ -17,6 +17,7 @@ import { CheckCircle2, Cloud, ExternalLink, PlugZap } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { useSetWorkerTargetMutation } from "@/lib/store/apis/workerTargetApi";
 import { useTranslation } from "react-i18next";
+import { PlatformRegistryBlock, takesRegistry } from "./platformRegistry";
 import { SettingsSection, When } from "./settingsBits";
 
 declare module "@/lib/i18n/resources" {
@@ -102,6 +103,11 @@ export function PlatformCard({ platform: p, busy, error, notice, onConnect, onTe
 				<p className="text-muted-foreground text-xs">
 					{t("lastTested")} <When value={p.last_tested_at} />
 					{p.endpoint ? <span className="font-mono"> · {p.endpoint}</span> : null}
+				</p>
+			)}
+			{takesRegistry(p) && (
+				<p className="text-muted-foreground text-xs" data-testid={`platform-${p.name}-capability`}>
+					{t("capability.runs")} {t("capability.notRuns")}
 				</p>
 			)}
 			{showForm ? (
@@ -206,6 +212,7 @@ export function PlatformCard({ platform: p, busy, error, notice, onConnect, onTe
 					/>
 				</div>
 			)}
+			{takesRegistry(p) && <PlatformRegistryBlock platform={p} />}
 			{notice && (
 				<p className="text-chart-success-ink flex items-center gap-1.5 text-xs" role="status" data-testid={`platform-${p.name}-notice`}>
 					<CheckCircle2 className="size-3.5" aria-hidden="true" />

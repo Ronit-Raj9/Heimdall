@@ -32,5 +32,29 @@
   "error": "Could not update {{platform}}",
   "loadError": "Could not load worker platforms",
   "defaultNote": "Tasks with services, teams, sessions or faults outside the model gateway stay on the shared worker's Docker and are refused on a platform, with the reason.",
-  "off": "Worker platforms need the hosted server with a keystore master key."
+  "off": "Worker platforms need the hosted server with a keystore master key.",
+  "registry": {
+    "title": "Image registry",
+    "needed": "Modal needs an image registry it can pull from. Add one on the Modal card.",
+    "help": "Heimdall pushes each image your runs use to this registry and Modal pulls it from there with the same login. Use a private registry you own and a token that can push and pull.",
+    "path": "Registry path",
+    "pathPlaceholder": "ghcr.io/team/heimdall",
+    "username": "User name",
+    "token": "Token with push and pull rights",
+    "tokenPlaceholder": "Paste the token",
+    "save": "Sign in and save",
+    "saved": "Signed in. Images go to {{registry}}.",
+    "savedAs": "{{registry}} as {{username}}",
+    "tokenEnding": "token ending {{last4}}",
+    "change": "Change",
+    "remove": "Remove",
+    "confirmRemove": "Remove the image registry of {{platform}}? Runs cannot go to {{platform}} until you add one again.",
+    "cancel": "Cancel",
+    "needAll": "Fill in the registry path, the user name and the token.",
+    "error": "Could not save the image registry"
+  },
+  "capability": {
+    "runs": "Runs on Modal: repository tasks graded on the code change, with gateway faults.",
+    "notRuns": "Not on Modal: snapshot-graded benchmarks (for example BFCL), tasks with their own image, services or several sessions, teams, GPU tasks."
+  }
 }
