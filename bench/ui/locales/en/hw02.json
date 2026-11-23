@@ -1,0 +1,26 @@
+{
+	"scanBar": {
+		"notPassed_one": "{{count}} skill has not passed a scan: runs of this agent are refused until it does.",
+		"notPassed_other": "{{count}} skills have not passed a scan: runs of this agent are refused until they do.",
+		"scanNow": "Scan now",
+		"scanning": "Scanning {{name}}...",
+		"openTools": "Open the tools",
+		"admitted": "{{name}} passed its scan and is installed.",
+		"blocked": "{{name}} was blocked by its scan and stays out of runs. Remove it on the Tools tab.",
+		"failed": "{{name}} could not be scanned: {{error}}"
+	},
+	"suiteDelete": {
+		"title": "Delete this benchmark",
+		"body": "Its tasks and files go. Comparisons, evaluations and runs that used it stay readable.",
+		"button": "Delete benchmark",
+		"question": "Delete {{id}}? Its tasks and files go. Comparisons, evaluations and runs that used it stay readable. This cannot be undone.",
+		"confirm": "Delete benchmark",
+		"cancel": "Keep it",
+		"failed": "The benchmark was not deleted."
+	},
+	"newSuite": {
+		"taken": "A benchmark with this id already exists. Pick another id, or",
+		"open": "open {{id}}",
+		"builtin": "{{id}} is a built-in benchmark. Pick another id."
+	}
+}

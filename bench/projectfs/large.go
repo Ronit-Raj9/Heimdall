@@ -46,6 +46,9 @@ func (s *store) WriteLarge(ctx context.Context, a Area, rel string, data []byte,
 	if int64(len(data)) > LargeFileCap(a) {
 		return Entry{}, ErrTooLarge
 	}
+	if err := checkReserved(a, rel, o); err != nil {
+		return Entry{}, err
+	}
 	if len(data) <= MaxFileBytes {
 		return s.Write(ctx, a, rel, data, o)
 	}

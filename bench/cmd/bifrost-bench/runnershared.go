@@ -672,6 +672,7 @@ func runSharedRunner(args []string) int {
 		fmt.Fprintf(os.Stderr, "runner start -shared: %v\n%s\n", err, sharedRunnerUsage)
 		return exitUsage
 	}
+	adapters.RestrictSkillsExtra(true) // fix wave 3, SEC-B: skills.extra only names agents' upload collections
 	secret, err := readTokenFile(f.secretFile)
 	if err != nil {
 		return fail("%v", err)

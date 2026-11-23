@@ -2,6 +2,7 @@ import { CopyAgentDialog } from "@/components/agents/copyAgentDialog";
 import { DeleteAgentDialog } from "@/components/agents/deleteAgentDialog";
 import "@/components/agents/fw13I18n";
 import { OverflowMenu } from "@/components/agents/overflowMenu";
+import { SkillScanBar } from "@/components/agents/skillScanBar";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import "@/lib/types/agentFirstI18n";
@@ -54,6 +55,7 @@ export default function AgentDetailView() {
 	const canDelete = writable && config.isSuccess;
 	const [deleteParam, setDeleteParam] = useQueryState("delete", parseAsString.withOptions({ history: "replace" }));
 	const [copyParam, setCopyParam] = useQueryState("copy", parseAsString.withOptions({ history: "replace" }));
+	const [, setTabParam] = useQueryState("tab", parseAsString.withOptions({ history: "replace" }));
 	const copyMode = copyParam === "rename" ? "rename" : copyParam === "duplicate" ? "duplicate" : null;
 	const { agent } = useAgentSummary(agentId);
 	const jobs = useAgentJobs();
@@ -237,6 +239,8 @@ export default function AgentDetailView() {
 				/>
 			)}
 			{agent?.adapter === "command" && agent.image && <AgentImageApproval image={agent.image} />}
+			{/* Fix wave 3, L5: runs are refused while an uploaded skill has not passed a scan. */}
+			{writable && <SkillScanBar agentId={agentId} onOpenTools={() => void setTabParam("tools")} />}
 			{agent && (agent.adapter === "remote_http" || agent.adapter === "openai_agent") && <SavedEndpointTest agentId={agentId} />}
 			<RouteTabs tabs={tabs} defaultTab="report-card" label={tb("detail.tabs.label")} testId="agent-detail-tabs">
 				{(active) =>
