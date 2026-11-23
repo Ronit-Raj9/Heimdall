@@ -224,6 +224,12 @@ func (h *ExperimentsHandler) getVerdict(ctx *fasthttp.RequestCtx) {
 	if !ok {
 		return
 	}
+	if m.Experiment.Debug != nil {
+		// A debug run is not scored: no analysis runs for it, so no old
+		// "invalid" verdict on zero counted runs can show (N247).
+		lib.SendError(ctx, h.mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, "Debug run (not scored): "+m.ExpID+" has no verdict.")
+		return
+	}
 	a, ok := h.analyze(ctx, m.ExpID)
 	if !ok {
 		return

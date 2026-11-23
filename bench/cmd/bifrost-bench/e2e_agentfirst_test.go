@@ -214,14 +214,16 @@ func TestE2EAgentFirst(t *testing.T) {
 	if sp, _ := ev["spec"].(map[string]any); sp == nil || sp["mode"] != "versions" {
 		t.Errorf("evaluation spec mode not versions: %v", ev["spec"])
 	}
-	if ch, _ := ev["children"].([]any); len(ch) != 2 {
-		t.Errorf("evaluation has %d children, want one per benchmark (2): %v", len(ch), ev["children"])
-	}
 	list := c.must("GET", "/evaluations", nil, 200)
 	if !strings.Contains(fmt.Sprint(list), id) {
 		t.Errorf("GET /evaluations does not list %s", id)
 	}
+	// The create answer comes before the benchmarks start (N182): the
+	// children are on the evaluation once it ran.
 	ev = e2eWait(t, c, id)
+	if ch, _ := ev["children"].([]any); len(ch) != 2 {
+		t.Errorf("evaluation has %d children, want one per benchmark (2): %v", len(ch), ev["children"])
+	}
 	if ev["status"] != "done" {
 		t.Fatalf("evaluation %s ended %v: %v", id, ev["status"], ev)
 	}
