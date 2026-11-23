@@ -2150,15 +2150,7 @@ export type ReviewDecision = "pass" | "fail" | "invalid" | "flag_only";
 export const REVIEW_DECISIONS: readonly ReviewDecision[] = ["pass", "fail", "invalid", "flag_only"];
 
 /** Why a run is in the review queue. */
-export type ReviewReason =
-	| "split_votes"
-	| "unparsable_votes"
-	| "invalid_evaluator"
-	| "veto"
-	| "false_completion"
-	| "flagged"
-	| "contested"
-	| "invalidated"; // W8 judge calibration: contested; fix wave 3: invalidated
+export type ReviewReason = "split_votes" | "unparsable_votes" | "invalid_evaluator" | "veto" | "false_completion" | "flagged" | "contested"; // W8 judge calibration: contested
 
 /** Every queue reason, in display order (schemas.ReviewReasons). */
 export const REVIEW_REASONS: readonly ReviewReason[] = [
