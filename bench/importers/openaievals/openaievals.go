@@ -214,7 +214,7 @@ func (importer) Import(ctx context.Context, opts importers.Options) (*importers.
 		}
 	}
 	if len(res.Tasks) == 0 {
-		return res, errors.New("openai-evals: no task was imported; see the skipped list")
+		return res, importers.NoTaskError("openai-evals", res.Skipped)
 	}
 	if err := os.WriteFile(suitePath, edited, 0o644); err != nil {
 		return nil, fmt.Errorf("openai-evals: %w", err)
