@@ -53,7 +53,7 @@ vi.mock("@/lib/store/apis/onboardApi", () => {
 });
 vi.mock("@/lib/store/apis/suitesLightApi", () => ({ useGetSuitesLightQuery: () => ({ data: { mode: "live", suites: [] } }) }));
 
-const tx = (k: string, o?: Record<string, unknown>) => i18n.t(k, { ns: "onboard", ...o }) as string;
+const tx = (k: string, o?: Record<string, unknown>) => i18n.t(k as never, { ns: "onboard", ...o } as never) as unknown as string;
 
 const set: OnboardDraftSet = {
 	id: "20261122-204611-197a49",
