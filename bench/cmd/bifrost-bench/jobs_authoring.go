@@ -134,10 +134,13 @@ func parseAssistParams(raw json.RawMessage) (assistParams, []authoring.Op, error
 	return p, ops, nil
 }
 
-func validateAuthoringAssist(_ context.Context, _ jobEnv, raw json.RawMessage) (any, string, error) {
+func validateAuthoringAssist(ctx context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
 	p, _, err := parseAssistParams(raw)
 	if err != nil {
 		return nil, "", fmt.Errorf("%w: %v", jobs.ErrInvalidParams, err)
+	}
+	if err := orgModelKeyAtCreate(ctx, env, p.Provider, p.KeyID); err != nil {
+		return nil, "", err
 	}
 	return p, p.Suite, nil
 }
