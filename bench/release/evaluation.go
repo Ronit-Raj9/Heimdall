@@ -158,9 +158,9 @@ func newEvaluationRecord(children []childEvidence, e *schemas.ReleaseEvaluation,
 			ManifestHash: c.m.Hash, SealsDigest: SealsDigest(hashes), Runs: len(c.ev.runs),
 		}
 		if p := c.ev.policy; p != nil {
-			ch.PolicyName, ch.PolicyDecision = p.PolicyName, p.Decision
+			ch.PolicyName, ch.PolicyDecision = p.RuleSetName(), p.Decision
 			if policyRank(p.Decision) > policyRank(rec.PolicyDecision) {
-				rec.PolicyName, rec.PolicyHash, rec.PolicyDecision = p.PolicyName, p.PolicyHash, p.Decision
+				rec.PolicyName, rec.PolicyHash, rec.PolicyDecision = p.RuleSetName(), p.PolicyHash, p.Decision
 			}
 		}
 		rec.Children = append(rec.Children, ch)

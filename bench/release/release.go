@@ -494,7 +494,7 @@ func frozenPolicySkipped(m *schemas.Manifest, p *schemas.PolicyResult) string {
 		return fmt.Sprintf("the analysis did not evaluate the frozen policy %s", m.Experiment.Policy)
 	}
 	if m.PolicyHash != "" && p.PolicyHash != m.PolicyHash {
-		return fmt.Sprintf("the analysis evaluated policy %s (%s), not the frozen policy %s (%s)", p.PolicyName, p.PolicyHash, m.Experiment.Policy, m.PolicyHash)
+		return fmt.Sprintf("the analysis evaluated policy %s (%s), not the frozen policy %s (%s)", p.RuleSetName(), p.PolicyHash, m.Experiment.Policy, m.PolicyHash)
 	}
 	return ""
 }
@@ -626,7 +626,7 @@ func newRecord(m *schemas.Manifest, ev *evidence, r schemas.ReleaseRequest, now 
 		CreatedAt:     now,
 	}
 	if ev.policy != nil {
-		rec.PolicyName, rec.PolicyHash, rec.PolicyDecision = ev.policy.PolicyName, ev.policy.PolicyHash, ev.policy.Decision
+		rec.PolicyName, rec.PolicyHash, rec.PolicyDecision = ev.policy.RuleSetName(), ev.policy.PolicyHash, ev.policy.Decision
 	}
 	return rec, nil
 }

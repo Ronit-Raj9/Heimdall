@@ -54,3 +54,23 @@ func TestNeverReleasable(t *testing.T) {
 		})
 	}
 }
+
+// Fix wave 3, N61 (group B): a release record names the rule set by its
+// file, as Releases > Rules lists it, not by the name inside the file.
+func TestReleaseRecordNamesRuleSetByFile(t *testing.T) {
+	f := newFixture(t, schemas.ActionShip, schemas.PolicyAllow)
+	a := &schemas.Analysis{AnalysisID: "a_two", ExpID: testExp, CreatedAt: time.Date(2026, 11, 14, 11, 0, 0, 0, time.UTC), GradeSource: schemas.GradeSourceOriginal,
+		Verdict: schemas.Verdict{Decision: schemas.DecisionImproved, Action: schemas.ActionShip, ManifestHash: f.m.Hash, Effect: &schemas.Effect{ArmA: "A", ArmB: "B"}},
+		Policy:  &schemas.PolicyResult{PolicyName: "team", PolicyFile: "strict-release", PolicyHash: "sha256:pol", Decision: schemas.PolicyAllow}}
+	f.digest(a)
+	if err := f.st.WriteAnalysis(context.Background(), a, nil); err != nil {
+		t.Fatal(err)
+	}
+	rec, err := f.log.Create(context.Background(), request("ana", ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec.PolicyName != "strict-release" {
+		t.Fatalf("record policy name %q, want the file name strict-release", rec.PolicyName)
+	}
+}
