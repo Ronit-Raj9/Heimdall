@@ -336,7 +336,7 @@ describe("RunnersTab", () => {
 	it("saves the token where the start command reads it", () => {
 		const command = "bifrost-bench runner start -server https://h.dev -token-file /etc/heimdall/token -pool gpu";
 		expect(tokenFileOf(command)).toBe("/etc/heimdall/token");
-		expect(tokenFileOf("bifrost-bench runner start")).toBe("~/.heimdall/runner-token");
+		expect(tokenFileOf("bifrost-bench runner start")).toBe("~/.heimdall-runner-token");
 		expect(saveTokenCommand("hmr_x", "/etc/heimdall/token")).toBe(
 			"mkdir -p /etc/heimdall && (umask 077 && printf '%s\\n' 'hmr_x' > /etc/heimdall/token)",
 		);
