@@ -107,12 +107,30 @@ func parseAppTasksParams(raw json.RawMessage) (appTasksParams, error) {
 	return p, nil
 }
 
-func validateAppTasksGenerate(_ context.Context, _ jobEnv, raw json.RawMessage) (any, string, error) {
+func validateAppTasksGenerate(ctx context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
 	p, err := parseAppTasksParams(raw)
 	if err != nil {
 		return nil, "", fmt.Errorf("%w: %v", jobs.ErrInvalidParams, err)
 	}
+	if env.Hosted {
+		if err := appTasksOrgKey(ctx, env, p); err != nil {
+			return nil, "", fmt.Errorf("%w: %v", jobs.ErrInvalidParams, err)
+		}
+	}
 	return p, p.Draft, nil
+}
+
+// appTasksOrgKey checks, when the job is created on the hosted server, that
+// the organization has a working key for the drafting model's provider, so
+// a missing key is refused at once instead of when the job runs (fix wave
+// 3, N238). It wraps calibrateOrgKey and rewords only its "no usable key"
+// refusal, which names the judge although this is the drafting model.
+func appTasksOrgKey(ctx context.Context, env jobEnv, p appTasksParams) error {
+	_, err := calibrateOrgKey(ctx, env.Services.Keys, env.OrgID, p.Provider, p.KeyID)
+	if err != nil && p.KeyID == "" && strings.HasPrefix(err.Error(), "the org has no usable ") {
+		return fmt.Errorf("Your organization has no working %s model key. Add one on the Models page.", p.Provider)
+	}
+	return err
 }
 
 // appTasksStore is the project's draft folder.
