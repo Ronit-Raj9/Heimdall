@@ -79,12 +79,20 @@
 	},
 	"monitors": {
 		"certifyTitle": "Test a monitor",
-		"certifyHint": "Replays saved runs (some good, some caught cheating) through your monitor and records how many bad runs it flags. Works on a local server only.",
-		"monitorPath": "Monitor settings file (path in the project)",
-		"expIds": "Comparison ids to replay (comma separated)",
+		"certifyHint": "Replays saved runs (some good, some caught cheating) through your monitor and records how many bad runs it flags. Runs on your worker; it calls no model.",
+		"monitorFile": "Monitor settings file",
+		"monitorFilePick": "Pick a monitor settings file",
+		"monitorFilesEmpty": "No monitor settings file yet. Add one under policies/monitors/ in Settings > Files.",
+		"comparisons": "Finished comparisons to replay (1 to {{max}})",
+		"comparisonsSearch": "Search comparisons by name or id",
+		"comparisonsEmpty": "No finished comparison yet.",
+		"comparisonsMore_one": "{{count}} more: search to narrow the list.",
+		"comparisonsMore_other": "{{count}} more: search to narrow the list.",
+		"comparisonsTooMany": "Pick at most {{max}} comparisons.",
+		"loading": "Loading...",
 		"fpr": "Allowed false alarm rates on good runs",
 		"gradeSource": "Which scores to use",
 		"certify": "Run the test",
-		"needInput": "Fill in a monitor settings file and at least one comparison id."
+		"needInput": "Pick a monitor settings file and at least one comparison."
 	}
 }

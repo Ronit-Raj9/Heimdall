@@ -5,7 +5,7 @@ import { errorQuery, okQuery, render } from "@/lib/testing/render";
 import { signedOutSession } from "@/lib/testing/platformFixtures";
 import type { SharedItem } from "@/lib/store/apis/shareApi";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import SharedView, { SharedItemView } from "./sharedView";
+import SharedView, { replaceShareAddress, SharedItemView } from "./sharedView";
 
 const api = vi.hoisted(() => ({ shared: {} as Record<string, unknown> }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
@@ -93,5 +93,22 @@ describe("SharedView", () => {
 		expect(html).toContain('data-testid="shared-agent-board"');
 		expect(html).toContain("codex v2");
 		expect(html).toContain("50%");
+	});
+});
+describe("replaceShareAddress (fix wave 3, N293)", () => {
+	it("moves an old token's address to the opaque token, keeping query and hash", () => {
+		const replaceState = vi.fn();
+		const win = { history: { state: { k: 1 }, replaceState }, location: { pathname: "/s/org_a.shr_x.sig", search: "?x=1", hash: "#top" } };
+		replaceShareAddress("s_abc", win as unknown as Window);
+		expect(replaceState).toHaveBeenCalledWith({ k: 1 }, "", "/s/s_abc?x=1#top");
+	});
+
+	it("does nothing when the address is already the opaque one", () => {
+		const replaceState = vi.fn();
+		replaceShareAddress("s_abc", {
+			history: { state: null, replaceState },
+			location: { pathname: "/s/s_abc", search: "", hash: "" },
+		} as unknown as Window);
+		expect(replaceState).not.toHaveBeenCalled();
 	});
 });

@@ -24,7 +24,8 @@
 		"maxim": "Maxim failures",
 		"docs": "Guides",
 		"jobs": "Jobs",
-		"job": "Job"
+		"job": "Job",
+		"monitors": "Safety monitors"
 	},
 	"webhooks": {
 		"httpsOnly": "Only https addresses are allowed on this server."
