@@ -122,7 +122,7 @@ describe("MigrationTab release rule set (N280)", () => {
 		const html = render(<MigrationTab expId="e1" arms={["A", "B"]} />);
 		expect(html).toContain('data-testid="migration-routing-note"');
 		expect(html).toContain(
-			"A Bifrost routing file is made from an evaluation's model comparison. Use Actions &gt; Compare models to make one.",
+			"A Bifrost routing file is made from an evaluation&#x27;s model comparison. Use Actions &gt; Compare models to make one.",
 		);
 		ms.config = { data: { ready: true, config: { governance: { routing_rules: [{}] } } }, isLoading: false };
 		expect(render(<MigrationTab expId="e1" arms={["A", "B"]} evaluationId="ev_1" />)).not.toContain("migration-routing-note");

@@ -219,9 +219,9 @@ describe("fork and breakpoint dialogs (N214)", () => {
 		expect(onClose).not.toHaveBeenCalled();
 	});
 	it("the dialogs state what the start costs", () => {
-		expect(i18n.t("runDebug:fork.cost", { call: 4 })).toBe(
+		expect(i18n.t("fork.cost", { ns: "runDebug", call: 4 })).toBe(
 			"Calls before call 4 replay from the recording for free; later calls go to the model and cost money.",
 		);
-		expect(i18n.t("runDebug:debugDialog.cost")).toContain("costs money");
+		expect(i18n.t("debugDialog.cost", { ns: "runDebug" })).toContain("costs money");
 	});
 });
