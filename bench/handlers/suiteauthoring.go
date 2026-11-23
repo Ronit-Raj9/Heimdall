@@ -359,6 +359,11 @@ func (h *suiteAuthoring) deleteSuite(ctx *fasthttp.RequestCtx) {
 			"Schedule "+name+" repeats an evaluation that uses "+id+". Remove or change the schedule first.")
 		return
 	}
+	if name := h.suiteExperimentSchedule(id); name != "" {
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict,
+			"Schedule "+name+" runs a comparison that uses "+id+". Remove or change the schedule first.")
+		return
+	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
 	if err := h.projects.Delete(work, projectfs.AreaBenchmarks, id, projectfs.WriteOpts{Actor: actorName(ctx), Note: "delete benchmark " + id}); err != nil {
@@ -458,6 +463,40 @@ func (h *suiteAuthoring) suiteSchedule(id string, evs []*schemas.Evaluation) str
 		}
 		var spec schemas.EvaluationSpec
 		if yaml.Unmarshal(data, &spec) == nil && slices.Contains(spec.Benchmarks, id) {
+			return sc.Name
+		}
+	}
+	return ""
+}
+
+// suiteExperimentSchedule is the name of the first web schedule whose
+// experiment file runs benchmark id ("" when none does).
+func (h *suiteAuthoring) suiteExperimentSchedule(id string) string {
+	f, err := LoadWebSchedules(h.projects.Root())
+	if err != nil || f == nil {
+		return ""
+	}
+	for _, sc := range f.Schedules {
+		ref := strings.TrimSpace(sc.Experiment)
+		if ref == "" {
+			continue
+		}
+		full := filepath.Join(h.projects.Root(), filepath.FromSlash(ref))
+		if !within(h.projects.Root(), full) {
+			continue
+		}
+		data, err := os.ReadFile(full)
+		if err != nil {
+			continue
+		}
+		var exp struct {
+			Suite string `yaml:"suite"`
+		}
+		if yaml.Unmarshal(data, &exp) != nil {
+			continue
+		}
+		suiteID, _, _ := strings.Cut(strings.TrimSpace(exp.Suite), "@")
+		if suiteID == id {
 			return sc.Name
 		}
 	}
