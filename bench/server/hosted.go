@@ -28,6 +28,7 @@ import (
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/handlers"
+	"github.com/maximhq/bifrost/bench/idempotency"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/tenancy"
@@ -107,7 +108,8 @@ func NewHosted(cfg *lib.Config, h Hosted) (*Server, error) {
 		lib.HostGuard(mode, hostedAllowedHosts(cfg)),
 		lib.CORS(cfg.Server.CORSOrigins),
 		h.Auth,
-		handlers.V1Alias(mode, h.Version, true), // Public API v1: rewritten before the dispatcher, so policy and token scopes apply (handlers/apiv1.go)
+		handlers.V1Alias(mode, h.Version, true),              // Public API v1: rewritten before the dispatcher, so policy and token scopes apply (handlers/apiv1.go)
+		idempotency.Middleware(mode, idempotency.NewStore()), // fix wave 3, N186: Idempotency-Key on every POST under /api/, scoped to caller and org (idempotency/idempotency.go)
 	)
 	s.server = &fasthttp.Server{
 		Handler:               selfmetrics.Default.Middleware(telemetry.Middleware(s.handler)), // N9: API latency for /metrics; Z14: a server span per request
