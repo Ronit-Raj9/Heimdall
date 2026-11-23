@@ -3,9 +3,19 @@ import { Button } from "@/components/ui/button";
 import { getLocale } from "@/lib/i18n";
 import type { Action, Decision, Ratio, Value, Verdict } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { ArrowRight, Ban, CircleCheck, CircleHelp, CircleX, Gauge, type LucideIcon } from "lucide-react";
+import { ArrowRight, Ban, CircleCheck, CircleHelp, CircleX, Gauge, Hourglass, Trophy, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { DECISION_TONE, formatPp, metricUnit, formatSignedEffect, type Tone } from "./verdict.utils";
+import {
+	DECISION_TONE,
+	formatPp,
+	guardTasks,
+	isSetupsVerdict,
+	joinSetups,
+	metricUnit,
+	formatSignedEffect,
+	plainInvalidReason,
+	type Tone,
+} from "./verdict.utils";
 
 const ICON = {
 	improved: CircleCheck,
@@ -13,6 +23,7 @@ const ICON = {
 	inconclusive: CircleHelp,
 	invalid: Ban,
 	score: Gauge,
+	leader: Trophy,
 } as const satisfies Record<Decision, LucideIcon>;
 
 const SURFACE = {
@@ -29,12 +40,16 @@ const INK = {
 	neutral: "text-foreground",
 } as const satisfies Record<Tone, string>;
 
-const BAR = ["bg-chart-cat-1", "bg-chart-cat-2"] as const;
+const BAR = ["bg-chart-cat-1", "bg-chart-cat-2", "bg-chart-cat-3"] as const;
 
 export interface VerdictSummaryProps {
 	verdict: Verdict;
-	/** Arm A then arm B. */
+	/** Arm A then arm B; every setup of a setups verdict. */
 	arms: string[];
+	/** arm -> the setup's display name ("codex on gpt-6.2-sol"); a name equal to the letter is not repeated. */
+	names?: Record<string, string>;
+	/** True while the comparison still runs (the verdict payload's partial): no decision is shown yet. */
+	partial?: boolean;
 	/** arm -> raw passes over runs. */
 	naive: Record<string, Ratio>;
 	/** arm -> metric -> median per run, from the diagnostics; cost and tokens come from here. */
@@ -46,40 +61,60 @@ export interface VerdictSummaryProps {
 	className?: string;
 }
 
-/** The verdict in five seconds: one headline, A vs B pass rates, cost and tokens, and what to do next. */
-export function VerdictSummary({ verdict, arms, naive, armMetrics, metricsStatus, onNext, className }: VerdictSummaryProps) {
+/** The verdict in five seconds: one headline, A vs B pass rates (every setup's for three or more), cost and tokens, and what to do next. */
+export function VerdictSummary({
+	verdict,
+	arms,
+	names,
+	partial,
+	naive,
+	armMetrics,
+	metricsStatus,
+	onNext,
+	className,
+}: VerdictSummaryProps) {
 	const { t } = useTranslation("experimentPage");
 	const locale = getLocale();
-	const tone = DECISION_TONE[verdict.decision];
-	const Icon = ICON[verdict.decision];
-	const [a, b] = arms;
+	const tone: Tone = partial ? "neutral" : (DECISION_TONE[verdict.decision] ?? "neutral");
+	const Icon = partial ? Hourglass : (ICON[verdict.decision] ?? CircleHelp);
+	const setups = isSetupsVerdict(verdict);
+	const panels = setups ? arms : arms.slice(0, 2);
+	const safety = !partial && setups ? safetyLines(verdict, t) : [];
 
 	return (
 		<section
 			className={cn("flex flex-col gap-6 rounded-xl border p-6", SURFACE[tone], className)}
 			data-testid="verdict-summary"
-			data-decision={verdict.decision}
+			data-decision={partial ? "partial" : verdict.decision}
 		>
 			<div className="flex items-start gap-3">
 				<Icon className={cn("mt-0.5 size-8 shrink-0", INK[tone])} strokeWidth={2.25} aria-hidden="true" />
 				<div className="flex flex-col gap-1">
 					<h2 className={cn("text-2xl font-semibold tracking-tight sm:text-3xl", INK[tone])} data-testid="verdict-summary-headline">
-						{headline(verdict, a, b, locale, t)}
+						{headline(verdict, arms, { names, partial }, locale, t)}
 					</h2>
-					{(verdict.decision === "inconclusive" || verdict.decision === "invalid") && (
+					{safety.map((line) => (
+						<p key={line} className="text-chart-error-ink text-sm font-medium" data-testid="verdict-summary-safety">
+							{line}
+						</p>
+					))}
+					{hint(verdict, partial, t) && (
 						<p className="text-muted-foreground text-sm" data-testid="verdict-summary-hint">
-							{t(verdict.decision === "inconclusive" ? "summary.inconclusiveHint" : "summary.invalidHint")}
+							{hint(verdict, partial, t)}
 						</p>
 					)}
 				</div>
 			</div>
 
-			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2" data-testid="verdict-summary-arms">
-				{arms.slice(0, 2).map((arm, index) => (
+			<div
+				className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2", panels.length > 2 && "lg:grid-cols-3")}
+				data-testid="verdict-summary-arms"
+			>
+				{panels.map((arm, index) => (
 					<ArmPanel
 						key={arm}
 						arm={arm}
-						colour={BAR[index]}
+						colour={BAR[index % BAR.length]}
 						ratio={naive[arm]}
 						metrics={armMetrics?.[arm]}
 						status={armMetrics ? undefined : metricsStatus}
@@ -91,8 +126,8 @@ export function VerdictSummary({ verdict, arms, naive, armMetrics, metricsStatus
 				className="bg-card flex flex-col gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
 				data-testid="verdict-summary-next"
 			>
-				<p className="text-sm">{nextLine(verdict, a, b, t)}</p>
-				{onNext && (
+				<p className="text-sm">{nextLine(verdict, arms, { names, partial }, t)}</p>
+				{onNext && !partial && (
 					<Button size="sm" onClick={() => onNext(verdict.action)} dataTestId="verdict-summary-next-button">
 						{t(`summary.button.${verdict.action}`)}
 						<ArrowRight aria-hidden="true" />
@@ -191,33 +226,91 @@ function magnitude(verdict: Verdict, locale: string): string | null {
 	return metricUnit(effect.metric) === null ? `${formatPp(size * 100, locale)} pp` : formatSignedEffect(effect.metric, size, locale);
 }
 
-export function headline(verdict: Verdict, a: string | undefined, b: string | undefined, locale: string, t: TFn): string {
-	const arm = b ?? "B";
+/** How a setup is named in a sentence: "B (codex on gpt-6.2-sol)", or only the letter when the name is the letter or unknown. */
+function setupLabel(arm: string, names: Record<string, string> | undefined, t: TFn): string {
+	const name = names?.[arm]?.trim();
+	return name && name !== arm ? t("summary.setupLabel", { arm, name }) : arm;
+}
+
+type HeadlineOptions = { names?: Record<string, string>; partial?: boolean };
+
+/** One line per setup that broke a safety rule in a setups verdict: "B broke a safety rule on t02." */
+function safetyLines(verdict: Verdict, t: TFn): string[] {
+	const safety = verdict.setups?.safety ?? {};
+	return Object.keys(safety)
+		.sort()
+		.filter((arm) => (safety[arm] ?? []).length > 0)
+		.map((arm) => t("summary.safetyLine", { setup: arm, tasks: safety[arm].join(", ") }));
+}
+
+function hint(verdict: Verdict, partial: boolean | undefined, t: TFn): string | null {
+	if (partial) return t("summary.partialHint");
+	if (isSetupsVerdict(verdict)) return verdict.decision === "invalid" ? t("summary.invalidHint") : verdict.setups.note || null;
+	if (verdict.decision === "inconclusive") return t("summary.inconclusiveHint");
+	if (verdict.decision === "invalid" && !verdict.invalid_reasons?.length) return t("summary.invalidHint");
+	return null;
+}
+
+/**
+ * The headline. Two setups: "B (name) is better by 12 pp", or "B broke a safety rule on t02" when a
+ * guard, not a significant effect, decided a regression (basis guard). Three or more: "Cannot tell
+ * A, B and C apart yet" or "A is ahead of every other setup". While running: "Still running: no
+ * result yet". A broken test names why.
+ */
+export function headline(verdict: Verdict, arms: readonly string[], opts: HeadlineOptions, locale: string, t: TFn): string {
+	if (opts.partial) return t("summary.headline.partial");
+	const b = arms[1];
+	const setup = setupLabel(b ?? "B", opts.names, t);
 	const pp = magnitude(verdict, locale);
+	if (verdict.decision === "invalid") {
+		const why = verdict.invalid_reasons?.[0];
+		return why ? t("summary.headline.invalidWhy", { why: plainInvalidReason(why) }) : t("summary.headline.invalid");
+	}
+	if (isSetupsVerdict(verdict)) {
+		const s = verdict.setups;
+		if (verdict.decision === "leader") return t("summary.headline.setupsLeader", { leader: setupLabel(s.leader, opts.names, t) });
+		return t("summary.headline.setupsTied", { setups: joinSetups(arms.length > 0 ? arms : s.top_group) });
+	}
 	switch (verdict.decision) {
 		case "improved":
-			return pp ? t("summary.headline.improved", { arm, pp }) : t("summary.headline.improvedNoEffect", { arm });
-		case "regressed":
-			return pp ? t("summary.headline.regressed", { arm, pp }) : t("summary.headline.regressedNoEffect", { arm });
+			return pp ? t("summary.headline.improved", { setup, pp }) : t("summary.headline.improvedNoEffect", { setup });
+		case "regressed": {
+			if (verdict.basis === "guard") {
+				const failed = verdict.guards.find((g) => g.status === "fail");
+				const tasks = guardTasks(failed?.detail);
+				if (tasks) return t("summary.headline.regressedGuard", { setup, tasks });
+				return t("summary.headline.regressedGuardDetail", { setup, detail: failed?.detail ?? "" });
+			}
+			return pp ? t("summary.headline.regressed", { setup, pp }) : t("summary.headline.regressedNoEffect", { setup });
+		}
 		case "inconclusive":
 			return t("summary.headline.inconclusive");
-		case "invalid":
-			return t("summary.headline.invalid");
 		case "score":
 			return t("summary.score.title");
 	}
-	return a ?? "";
+	return arms[0] ?? "";
 }
 
-function nextLine(verdict: Verdict, a: string | undefined, b: string | undefined, t: TFn): string {
+function nextLine(verdict: Verdict, arms: readonly string[], opts: HeadlineOptions, t: TFn): string {
+	if (opts.partial) return t("summary.next.partial");
+	if (isSetupsVerdict(verdict) && verdict.decision !== "invalid") {
+		const s = verdict.setups;
+		if (verdict.decision !== "leader") return t("summary.next.setupsTied");
+		const leader = setupLabel(s.leader, opts.names, t);
+		const flagged = s.safety?.[s.leader]?.length ?? 0;
+		return flagged > 0 ? t("summary.next.setupsLeaderFlagged", { leader, count: flagged }) : t("summary.next.setupsLeader", { leader });
+	}
 	switch (verdict.action) {
 		case "ship":
-			return t("summary.next.ship", { arm: b ?? "B" });
+			return t("summary.next.ship", { arm: setupLabel(arms[1] ?? "B", opts.names, t) });
 		case "hold":
-			return verdict.decision === "regressed" ? t("summary.next.holdRegressed", { arm: a ?? "A" }) : t("summary.next.holdViolations");
+			return verdict.decision === "regressed" && verdict.basis !== "guard"
+				? t("summary.next.holdRegressed", { arm: setupLabel(arms[0] ?? "A", opts.names, t) })
+				: t("summary.next.holdViolations");
 		case "no_decision":
 			return t("summary.next.no_decision");
 		case "fix_harness":
 			return t("summary.next.fix_harness");
 	}
+	return "";
 }

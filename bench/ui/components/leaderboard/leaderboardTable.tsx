@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
+import "@/components/verdict/hw09I18n";
 import { METRIC_COLUMNS, RESILIENCE_PREFIX, tierGroupStarts, tierOf, type LeaderboardSort, type SortKey } from "./leaderboard.utils";
 import { AgentCell, ExperimentLinks, ReliabilityCell, ResilienceCell, SuccessCell, TierBadge } from "./leaderboardCells";
 
@@ -32,6 +33,7 @@ export const COMPACT_METRICS = ["cost_per_success", "tokens"] as const;
  */
 export function LeaderboardTable({ rows, faults, sort, onSort, alpha, compact = false }: LeaderboardTableProps) {
 	const { t } = useTranslation("bench");
+	const { t: t9 } = useTranslation("hw09");
 	const locale = getLocale();
 	const groupStarts = sort.key === "rank" ? tierGroupStarts(rows) : new Map<number, 1 | 2>();
 	const metricColumns = compact ? METRIC_COLUMNS.filter((c) => (COMPACT_METRICS as readonly string[]).includes(c.id)) : METRIC_COLUMNS;
@@ -123,7 +125,11 @@ export function LeaderboardTable({ rows, faults, sort, onSort, alpha, compact = 
 									</TableCell>
 								))}
 								<TableCell className="text-right align-top tabular-nums" data-testid={`leaderboard-tasks-${entry.rank}`}>
-									{t("leaderboard.cell.tasksRuns", { tasks: formatCount(entry.tasks, locale), runs: formatCount(entry.runs, locale) })}
+									{t9("leaderboard.tasksRunsPassed", {
+										tasks: formatCount(entry.tasks, locale),
+										runs: formatCount(entry.runs, locale),
+										passed: formatCount(entry.passes.num, locale),
+									})}
 								</TableCell>
 								{!compact && (
 									<TableCell className="align-top">

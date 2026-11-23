@@ -58,7 +58,10 @@ describe("LeaderboardTable", () => {
 		const custom = row(html, 4);
 		expect(custom).toMatch(/data-testid="leaderboard-reliability-4".*?data-state="unknown"/);
 		expect(custom).toContain("bench-hatched");
-		expect(custom).toContain(">solved all 1 tries<");
+		// One try per task measures no reliability (fix wave 3, N245, N295): never "solved all 1 tries".
+		expect(custom).toContain(">Not measured<");
+		expect(custom).toContain("needs 2 or more tries per task; this ran 1");
+		expect(custom).not.toContain("solved all 1 tries");
 		const mini = row(html, 5);
 		expect(mini).toMatch(/data-testid="leaderboard-metric-5-cost_per_success".*?data-state="not_applicable"/);
 		expect(mini).toMatch(/data-testid="leaderboard-metric-5-tool_calls".*?data-state="unknown"/);

@@ -21,7 +21,7 @@ const (
 )
 
 // ExitCode maps a decision to the check exit code: 0 when the decision is not
-// in failOn, otherwise 1 regressed, 2 inconclusive, 3 invalid. A listed
+// in failOn, otherwise 1 regressed, 2 inconclusive or leader, 3 invalid. A listed
 // decision with no code of its own (improved, or an unrecognized value) is a
 // failure the caller asked for, reported as 1.
 func ExitCode(d schemas.Decision, failOn []schemas.Decision) int {
@@ -29,7 +29,7 @@ func ExitCode(d schemas.Decision, failOn []schemas.Decision) int {
 		return ExitOK
 	}
 	switch d {
-	case schemas.DecisionInconclusive:
+	case schemas.DecisionInconclusive, schemas.DecisionLeader: // a leader of three or more setups releases nothing (fix wave 3, D12)
 		return ExitInconclusive
 	case schemas.DecisionInvalid:
 		return ExitInvalid

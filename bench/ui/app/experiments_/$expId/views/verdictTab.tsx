@@ -1,5 +1,6 @@
 import { VerdictCalibration } from "@/components/calibration/calibrationPanel"; // W8 judge calibration
 import { ConfigDiff } from "@/components/configDiff";
+import { TERMINAL_STATES, suiteName, systemExperiment, type SystemExperimentKind } from "@/components/experiments/experiments.utils";
 import { compareHref, compareSearch } from "@/components/experiments/legacyRoutes";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,11 +14,13 @@ import { NaiveScoreboard } from "@/components/verdict/naiveScoreboard";
 import { PolicyScorecard } from "@/components/verdict/policyScorecard";
 import { TaskGrid } from "@/components/verdict/taskGrid";
 import { ScoreSummary } from "@/components/verdict/scoreSummary";
-import { armOrder, isScoreVerdict } from "@/components/verdict/verdict.utils";
+import "@/components/verdict/hw09I18n";
+import { SetupsTable } from "@/components/verdict/setupsTable";
+import { armOrder, isScoreVerdict, isSetupsVerdict } from "@/components/verdict/verdict.utils";
 import { GuardList, VerdictCard } from "@/components/verdict/verdictCard";
 import { VerdictSummary } from "@/components/verdict/verdictSummary";
 import { getBenchErrorMessage, useGetCatalogQuery, useGetDiagnosticsQuery, useGetGridQuery, useGetVerdictQuery } from "@/lib/store";
-import { useGetExperimentQuery } from "@/lib/store/apis/benchApi";
+import { EXPERIMENT_POLL_MS, useGetExperimentQuery } from "@/lib/store/apis/benchApi";
 import type { Action, ExperimentStatus, MetricDescriptor } from "@/lib/types/bench";
 import { Activity, Gauge, GitCompare, ListChecks, Rocket, Scale, Shield, Sigma, Table2 } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -139,10 +142,17 @@ export function ExperimentVerdictPromote({
 export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationId?: string }) {
 	const { t } = useTranslation("bench");
 	const { t: tPage } = useTranslation("experimentPage");
+	const { t: tPage9 } = useTranslation("hw09");
 	const navigate = useNavigate();
 	const [grade, setGrade] = useQueryState("grade", parseAsString);
 	const [, setTab] = useQueryState("tab", parseAsString);
-	const verdict = useGetVerdictQuery(grade ? { expId, gradeSource: grade } : expId);
+	const status = useGetExperimentQuery(expId);
+	const live = status.data ? !TERMINAL_STATES.has(status.data.state) && status.data.state !== "created" : false;
+	// While the comparison runs, the Result tab re-reads the verdict at the status interval so the partial numbers move (N197).
+	const verdict = useGetVerdictQuery(grade ? { expId, gradeSource: grade } : expId, {
+		pollingInterval: live ? EXPERIMENT_POLL_MS : 0,
+		skipPollingIfUnfocused: true,
+	});
 	// The diagnostics come from the same analysis as the verdict, so they read the same grade source.
 	const diagnostics = useGetDiagnosticsQuery(grade ? { expId, gradeSource: grade } : expId);
 	const grid = useGetGridQuery(expId);
@@ -184,8 +194,12 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 		);
 	}
 
-	const payload = verdict.data;
+	// partial: set by the server while the experiment is not finished (fix wave 3, N197); an older server leaves it out.
+	const payload = verdict.data as NonNullable<typeof verdict.data> & { partial?: boolean };
 	const arms = armOrder(payload);
+	const partial = payload.partial === true || live;
+	const names = setupNames(status.data?.setups, tPage9);
+	const system = status.data ? systemExperiment({ name: status.data.name, exp_id: status.data.exp_id }) : null;
 	// One setup: a score with a range, no comparison, so the A against B blocks (guards, statistics, changes) do not apply.
 	const scored = isScoreVerdict(payload.verdict);
 	const source = payload.grade_source;
@@ -255,6 +269,12 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 
 			<ExperimentVerdictPromote expId={payload.exp_id} arms={arms} evaluationId={evaluationId} decision={payload.verdict.decision} />
 
+			<VerdictTabNotes
+				partial={partial ? { done: status.data?.slots.done ?? 0, total: status.data?.slots.total ?? 0 } : undefined}
+				system={system?.kind}
+				suite={payload.suite}
+			/>
+
 			{isScoreVerdict(payload.verdict) ? (
 				<ScoreSummary
 					verdict={payload.verdict}
@@ -266,11 +286,16 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 				<VerdictSummary
 					verdict={payload.verdict}
 					arms={arms}
+					names={names}
+					partial={partial}
 					naive={payload.naive}
 					armMetrics={diagnostics.data?.arm_metrics}
 					metricsStatus={diagnostics.isError ? "error" : diagnostics.isLoading ? "loading" : undefined}
 					onNext={onNext}
 				/>
+			)}
+			{!partial && isSetupsVerdict(payload.verdict) && (
+				<SetupsTable setups={payload.verdict.setups} arms={arms} naive={payload.naive} names={names} />
 			)}
 
 			<div className="flex flex-col gap-3">
@@ -378,6 +403,74 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 }
 
 const SEALED = "original";
+
+type THw09 = ReturnType<typeof useTranslation<"hw09">>["t"];
+
+/** arm -> "codex on gpt-6.2-sol", from the experiment status; undefined until it loads. */
+function setupNames(setups: ExperimentStatus["setups"], t: THw09): Record<string, string> | undefined {
+	if (!setups?.length) return undefined;
+	const out: Record<string, string> = {};
+	for (const s of setups) {
+		if (s.agent && s.model) out[s.arm] = t("setups.name", { agent: s.agent, model: s.model });
+		else if (s.agent || s.model) out[s.arm] = s.agent || s.model;
+	}
+	return out;
+}
+
+/**
+ * The notes above the result (fix wave 3): while the comparison runs, how many runs are done and
+ * that the result is not final (N197); for a check Heimdall ran itself, that it is not a
+ * comparison, with a link to the benchmark's Build tab for a readiness check (N253).
+ */
+export function VerdictTabNotes({
+	partial,
+	system,
+	suite,
+}: {
+	partial?: { done: number; total: number };
+	system?: SystemExperimentKind;
+	suite?: string;
+}) {
+	const { t } = useTranslation("hw09");
+	const suiteId = suiteName(suite);
+	return (
+		<>
+			{partial && (
+				<p
+					role="status"
+					className="border-chart-info/40 bg-chart-info/5 text-foreground rounded-sm border px-3 py-2 text-sm"
+					data-testid="verdict-partial-note"
+				>
+					{t("result.partial", { done: partial.done, total: partial.total })}
+				</p>
+			)}
+			{system && (
+				<p
+					className="border-border bg-muted/50 text-foreground flex flex-wrap items-center gap-2 rounded-sm border px-3 py-2 text-sm"
+					data-testid="verdict-system-note"
+				>
+					{t(`result.system.${system}`)}
+					{system === "readiness" && suiteId && suiteId.startsWith("draft-") && (
+						<Link to="/suites/add" className="text-primary hover:underline" data-testid="verdict-system-link">
+							{t("result.system.open")}
+						</Link>
+					)}
+					{system === "readiness" && suiteId && !suiteId.startsWith("draft-") && (
+						<Link
+							to="/suites/$suiteId"
+							params={{ suiteId }}
+							search={{ tab: "build" } as never}
+							className="text-primary hover:underline"
+							data-testid="verdict-system-link"
+						>
+							{t("result.system.open")}
+						</Link>
+					)}
+				</p>
+			)}
+		</>
+	);
+}
 
 /** Guard counts for the closed Guards row: "2 pass, 1 fail". */
 function guardMeta(guards: { status: string }[]): string | undefined {

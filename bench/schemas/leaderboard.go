@@ -61,19 +61,20 @@ type Leaderboard struct {
 
 // LeaderboardEntry is one agent configuration on the board.
 type LeaderboardEntry struct {
-	Rank        int      `json:"rank"`        // 1-based position by Success, ties broken by lower cost per success, then more runs
-	Tier        int      `json:"tier"`        // 1: cannot be told apart from the leader; 2: significantly behind the leader
-	PVsLeader   *float64 `json:"p_vs_leader"` // Holm-adjusted two-sided exact sign-flip p against the leader on common tasks; nil for the leader
-	TierReason  string   `json:"tier_reason"` // plain words, e.g. "leader", "p 0.62 on 8 common tasks", "too few common tasks (3) to separate"
-	ConfigHash  string   `json:"config_hash"` // sha256 of the resolved agent config (manifest arm config_hash)
-	Agent       string   `json:"agent"`       // agent config id, e.g. codex
-	Model       string   `json:"model"`       // model the config requests
-	Label       string   `json:"label"`       // arm label from the newest contributing experiment
-	Synthetic   bool     `json:"synthetic"`   // scripted agent or scripted model: numbers are not findings
-	Experiments []string `json:"experiments"` // experiment ids that contributed runs, newest first
-	Tasks       int      `json:"tasks"`       // distinct tasks with at least one graded run
-	Runs        int      `json:"runs"`        // graded runs counted
-	Trials      int      `json:"trials"`      // the k of Reliability: min(3, trials per task its experiments ran) unless the query sets k
+	Rank        int      `json:"rank"`                   // 1-based position by Success, ties broken by lower cost per success, then more runs
+	Tier        int      `json:"tier"`                   // 1: cannot be told apart from the leader; 2: significantly behind the leader
+	PVsLeader   *float64 `json:"p_vs_leader"`            // Holm-adjusted two-sided exact sign-flip p against the leader on common tasks; nil for the leader
+	TierReason  string   `json:"tier_reason"`            // plain words, e.g. "leader", "p 0.62 on 8 common tasks", "too few common tasks (3) to separate"
+	ConfigHash  string   `json:"config_hash"`            // sha256 of the resolved agent config (manifest arm config_hash)
+	Agent       string   `json:"agent"`                  // agent config id, e.g. codex
+	Model       string   `json:"model"`                  // model the config requests
+	Label       string   `json:"label"`                  // arm label from the newest contributing experiment
+	Synthetic   bool     `json:"synthetic"`              // scripted agent or scripted model: numbers are not findings
+	Experiments []string `json:"experiments"`            // experiment ids that contributed runs, newest first
+	Tasks       int      `json:"tasks"`                  // distinct tasks with at least one graded run
+	TasksSolved int      `json:"tasks_solved,omitempty"` // tasks whose every graded run passed (fix wave 3, N295)
+	Runs        int      `json:"runs"`                   // graded runs counted
+	Trials      int      `json:"trials"`                 // the k of Reliability: min(3, trials per task its experiments ran) unless the query sets k
 
 	// Success is the mean over tasks of the per-task verified success rate.
 	// Bounds is a descriptive 95% t interval over tasks (stats.PairedT on the
