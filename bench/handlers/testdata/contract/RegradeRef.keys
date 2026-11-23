@@ -1,0 +1,5 @@
+# Keys of bench.ts `RegradeRef` (ExperimentStatus.latest_regrade), one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and schemas/api.go.
+id
+created_at
+note?

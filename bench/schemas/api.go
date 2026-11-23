@@ -310,6 +310,18 @@ type ExperimentStatus struct {
 	// experiment's newest run job, so the page can link its log (N151).
 	Problem  string `json:"problem,omitempty"`
 	RunJobID string `json:"run_job_id,omitempty"`
+	// LatestRegrade is the experiment's newest committed re-score (a regrade
+	// or regate), on GET /experiments/{id} only, so the comparison page can
+	// show it by default and offer the original. The verdict route still
+	// answers the original unless grade_source names a re-score.
+	LatestRegrade *RegradeRef `json:"latest_regrade,omitempty"`
+}
+
+// RegradeRef names one committed re-score of an experiment.
+type RegradeRef struct {
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	Note      string    `json:"note,omitempty"` // why it was made, as given when it was queued
 }
 
 // ArmSetup is one arm's setup on ExperimentStatus.

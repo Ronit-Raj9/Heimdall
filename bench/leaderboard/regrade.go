@@ -30,7 +30,12 @@ type RegradeSource interface {
 type Regrade struct {
 	ID        string
 	CreatedAt time.Time
+	Note      string // why it was made, from regrade.json; "" when none was given
 }
+
+// NewestRegrade is newestRegrade for callers outside the package (the
+// comparison page's default re-score).
+func NewestRegrade(rs []Regrade) (Regrade, bool) { return newestRegrade(rs) }
 
 // newestRegrade returns the regrade with the latest CreatedAt, ties broken by
 // the larger id so the choice never depends on listing order, and false for

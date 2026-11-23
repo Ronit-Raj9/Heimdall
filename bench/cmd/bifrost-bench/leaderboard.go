@@ -203,7 +203,7 @@ func (x indexAdapter) Regrades(ctx context.Context, expID string) ([]leaderboard
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, leaderboard.Regrade{ID: e.Name(), CreatedAt: info.CreatedAt})
+		out = append(out, leaderboard.Regrade{ID: e.Name(), CreatedAt: info.CreatedAt, Note: info.Note})
 	}
 	return out, nil
 }

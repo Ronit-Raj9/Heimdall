@@ -25,3 +25,4 @@ run_job_id?
 paused?
 paused_models?
 extends?
+latest_regrade?

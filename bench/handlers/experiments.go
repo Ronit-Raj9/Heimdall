@@ -16,6 +16,7 @@ import (
 	"sync"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/leaderboard"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/stats"
@@ -211,7 +212,30 @@ func (h *ExperimentsHandler) getExperiment(ctx *fasthttp.RequestCtx) {
 		// one experiment's status, so a list never reads every controls log.
 		st.Paused, st.PausedModels = h.pausedFacts(m.ExpID)
 	}
+	st.LatestRegrade = h.latestRegrade(m.ExpID)
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, st)
+}
+
+// latestRegrade is the experiment's newest committed re-score, nil when it
+// has none or the index cannot list them. Only one experiment's status reads
+// it, so a list never reads every regrades folder. A listing error leaves it
+// out: the page then shows the original, as it does without re-scores.
+func (h *ExperimentsHandler) latestRegrade(expID string) *schemas.RegradeRef {
+	ri, ok := h.index.(RegradeIndex)
+	if !ok {
+		return nil
+	}
+	work, cancel := context.WithTimeout(context.Background(), analyzeTimeout)
+	defer cancel()
+	rs, err := ri.Regrades(work, expID)
+	if err != nil {
+		return nil
+	}
+	r, ok := leaderboard.NewestRegrade(rs)
+	if !ok {
+		return nil
+	}
+	return &schemas.RegradeRef{ID: r.ID, CreatedAt: r.CreatedAt.UTC(), Note: r.Note}
 }
 
 // getVerdict handles GET /api/bench/experiments/{id}/verdict?grade_source=.
@@ -238,7 +262,11 @@ func (h *ExperimentsHandler) getVerdict(ctx *fasthttp.RequestCtx) {
 	if h.catalog != nil {
 		catalog = h.catalog.Catalog()
 	}
-	gates, err := GateSummaries(h.index, runs, catalog)
+	// The checks list reads the same grade source as the verdict, so a
+	// re-score's recomputed gates never sit under the original's counts.
+	work, cancel := workContext(ctx, analyzeTimeout)
+	defer cancel()
+	gates, err := GateSummariesFor(work, h.index, m.ExpID, a.GradeSource, runs, catalog)
 	if err != nil {
 		sendDepError(ctx, h.mode, "summarize gates of "+m.ExpID, err)
 		return
