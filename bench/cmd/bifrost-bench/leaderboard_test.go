@@ -149,7 +149,7 @@ func regradeStore(t *testing.T) (*store.FSStore, map[string]time.Time) {
 		}
 		// Pin created_at: rewrite the committed regrade.json.
 		dir := filepath.Join(root, "e_rg", "regrades", id)
-		info, err := json.Marshal(store.RegradeInfo{RegradeID: id, ExpID: "e_rg", SuiteVersion: "1", GateVersions: versions, CreatedAt: at, Runs: []string{"r_t1"}})
+		info, err := json.Marshal(store.RegradeInfo{RegradeID: id, ExpID: "e_rg", SuiteVersion: "1", GateVersions: versions, CreatedAt: at, Runs: []string{"r_t1"}, Note: "note of " + id})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -177,6 +177,9 @@ func TestIndexAdapterRegrades(t *testing.T) {
 	got := map[string]time.Time{}
 	for _, r := range list {
 		got[r.ID] = r.CreatedAt.UTC()
+		if r.Note != "note of "+r.ID { // the comparison page's re-score line shows it (latest_regrade)
+			t.Errorf("regrade %s note = %q", r.ID, r.Note)
+		}
 	}
 	if !reflect.DeepEqual(got, created) {
 		t.Errorf("regrades = %v, want %v (rg_partial has no regrade.json)", got, created)
