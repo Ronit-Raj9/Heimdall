@@ -59,8 +59,12 @@
 		"accept": "Accept",
 		"reject": "Reject",
 		"acceptAll": "Accept all pending",
-		"judgeProvider": "Reply judge provider",
-		"judgeModel": "Reply judge model",
+		"judgeLabel": "Reply judge (grades these tasks)",
+		"judgeHint": "Pick the reply judge first. Policy tasks are graded by a judge model.",
+		"switchTitle": "Switch this benchmark to judged checks?",
+		"switchBody": "Accepting moves {{suite}} to checks graded by {{provider}}/{{model}}. Its other {{count}} task(s) need their readiness checks again.",
+		"switchConfirm": "Switch and accept",
+		"switchCancel": "Cancel",
 		"switchNote": "This benchmark does not use grader checks with a pinned reply judge yet. Accepting switches it; its other tasks then need their readiness checks again."
 	},
 	"report": {
