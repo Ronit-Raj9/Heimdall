@@ -128,7 +128,7 @@ func TestCreateModelSwitchEvaluationFromFormLabels(t *testing.T) {
 	}
 }
 
-func TestCreateEvaluationBadArmLabelPlainText(t *testing.T) {
+func TestCreateModelSwitchBadArmLabelMessage(t *testing.T) {
 	r, _ := evalServer(t, Services{Launcher: &evalLauncher{}, Suites: evalSuites()})
 	body := `{"mode":"model_switch","arms":[{"label":"current","agent":"scripted","model":"m1"},{"label":"B","agent":"scripted","model":"m2"}],"benchmarks":["longmemeval"],"tasks_per_benchmark":1}`
 	got := evalCall(r, "POST", APIPrefix+"/evaluations", body)
@@ -137,9 +137,9 @@ func TestCreateEvaluationBadArmLabelPlainText(t *testing.T) {
 	if got.Response.StatusCode() != fasthttp.StatusBadRequest || !strings.Contains(b, want) {
 		t.Fatalf("label current: %d %s", got.Response.StatusCode(), b)
 	}
-	// create sends the error through plainErr once lane H13 switches its two
-	// send sites; the helper itself drops the internal prefix.
-	if p := plainErr(badf("setup label %q is not allowed", "current")); strings.Contains(p, "quickrun") {
-		t.Fatalf("plainErr kept the prefix: %q", p)
+	// create sends the error through plainErr, so the internal prefix never
+	// reaches the person.
+	if strings.Contains(b, "quickrun") {
+		t.Fatalf("label current kept the internal prefix: %s", b)
 	}
 }
