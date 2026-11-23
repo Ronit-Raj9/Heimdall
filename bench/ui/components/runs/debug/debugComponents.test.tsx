@@ -2,6 +2,7 @@ import "@/lib/i18n";
 
 import { errorQuery, loadingQuery, mutation, okQuery, render, tagOf } from "@/lib/testing/render";
 import type { RunDetail, StepRecord } from "@/lib/types/bench";
+import type { DebugRunResponse } from "@/lib/types/runDebug";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n";
 import { RunDebugActions, canBreak, canReplay } from "./debugActions";
@@ -198,7 +199,7 @@ describe("debug on a server that cannot hold model calls (N212)", () => {
 });
 
 describe("fork and breakpoint dialogs (N214)", () => {
-	const started = { exp_id: "e_dbg", run_id: "r_dbg", mode: "fork" };
+	const started: DebugRunResponse = { exp_id: "e_dbg", mode: "fork", from_run: "r_1", started: true };
 	it("a successful start hands the run up and closes the dialog, so the next fork opens a fresh one", async () => {
 		const onStarted = vi.fn();
 		const onClose = vi.fn();
