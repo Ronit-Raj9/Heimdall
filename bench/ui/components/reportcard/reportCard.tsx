@@ -12,6 +12,7 @@ import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { BifrostTable, hasBifrost } from "./bifrostSection";
 import "./fw09I18n";
+import "./hw08I18n";
 import { hasLearning, hasPersistence, LearningTable, PersistenceTable } from "./learningSections";
 import { hasVoice, VoiceTable } from "./voiceSection";
 import { hasVoiceCalls, VoiceCallsTable } from "./voiceCallsSection";
@@ -42,6 +43,7 @@ import {
 	reliabilityCards,
 	downloadReportJSON,
 	faultChange,
+	thrownOutBenchmarks,
 } from "./reportCard.utils";
 import { ReliabilityCards, ResilienceCard, StoreDroppedFaults } from "./reliabilityCards";
 import { ReportFilterBar, ReportSlices } from "./reportSlices";
@@ -64,11 +66,21 @@ export interface ReportCardProps {
 	onWhere?: (where: Record<string, string> | undefined) => void;
 }
 
+/** A gate id in plain words for a sentence, from the hw08 locale (fix wave 3, N215). */
+function useCheckName(): (gate: string) => string {
+	const { t } = useTranslation("hw08");
+	return (gate) =>
+		gate === "model_fidelity" || gate === "egress" ? t(`gates.${gate}`) : t("gates.default", { gate: gate.replace(/_/g, " ") });
+}
+
 /** The report card of one evaluation: headline answer, capabilities, benchmarks, reliability, safety. */
 export function ReportCard({ report: raw, className, actions, readOnly = false, onWhere }: ReportCardProps) {
 	const report = visibleReport(raw);
 	const ab = isAB(report);
-	const head = headline(report);
+	const checkName = useCheckName();
+	const { t: t08 } = useTranslation("hw08");
+	const head = headline(report, checkName);
+	const brokenChild = (report.thrown_out_runs ?? 0) > 0 ? thrownOutBenchmarks(report)[0] : undefined;
 	return (
 		<article data-testid="report-card" aria-labelledby="report-card-title" className={cn("flex min-w-0 flex-col gap-8", className)}>
 			<header className="flex flex-wrap items-start justify-between gap-4">
@@ -84,6 +96,17 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 					<p data-testid="report-card-verdict" className="text-muted-foreground max-w-prose text-sm">
 						{head.detail}
 					</p>
+					{brokenChild?.experiment_id && !readOnly && (
+						<Link
+							to="/experiments/$expId"
+							params={{ expId: brokenChild.experiment_id }}
+							data-testid="report-card-thrown-out-link"
+							className="text-primary inline-flex w-fit items-center gap-1 text-sm font-medium underline-offset-4 hover:underline"
+						>
+							{t08("thrownOut.openComparison")}
+							<ArrowUpRight className="size-3.5" aria-hidden="true" />
+						</Link>
+					)}
 					{report.split === "held_out" && (
 						<p data-testid="report-card-split" className="text-muted-foreground text-xs">
 							Held-out tasks only
@@ -237,7 +260,7 @@ export function CiBar({ metrics }: { metrics: ReportArmMetrics }) {
 }
 
 function ScoreCell({ metrics }: { metrics?: ReportArmMetrics }) {
-	if (!metrics) return <span className="text-muted-foreground">-</span>;
+	if (!metrics || !metrics.runs) return <span className="text-muted-foreground">-</span>; // no runs is no score, never 0%
 	return (
 		<span className="flex items-center gap-2">
 			<span className="text-foreground w-10 font-medium tabular-nums">{pct(metrics.score)}</span>
@@ -311,6 +334,9 @@ function CapabilityTable({ report }: { report: Report }) {
 	const ab = isAB(report);
 	const [a, b] = report.arms;
 	const rows = capabilityRows(report);
+	const { t } = useTranslation("hw08");
+	const firstUntested = rows.findIndex((r) => !r.tested);
+	if (rows.length === 0) return <p className="text-muted-foreground text-sm">{t("noCapabilities")}</p>;
 	return (
 		<Table data-testid="report-capabilities" aria-label="Score by capability">
 			<TableHeader>
@@ -327,18 +353,31 @@ function CapabilityTable({ report }: { report: Report }) {
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{rows.map(({ capability, data }) => {
+				{rows.map(({ capability, data, tested }, i) => {
 					const name = capabilityName(capability);
-					if (!data) {
+					if (!data || !tested) {
 						return (
-							<TableRow key={capability} data-testid={`capability-${capability}`}>
-								<TableHead scope="row" className="text-muted-foreground font-normal">
-									{name}
-								</TableHead>
-								<TableCell colSpan={METRIC_HEADS.length + (ab ? 3 : 0)} className="text-muted-foreground text-xs">
-									Not tested
-								</TableCell>
-							</TableRow>
+							<React.Fragment key={capability}>
+								{i === firstUntested && firstUntested > 0 && (
+									<TableRow data-testid="capabilities-not-tested">
+										<TableHead
+											scope="rowgroup"
+											colSpan={1 + METRIC_HEADS.length + (ab ? 3 : 0)}
+											className="text-muted-foreground text-xs font-medium"
+										>
+											{t("notTested")}
+										</TableHead>
+									</TableRow>
+								)}
+								<TableRow data-testid={`capability-${capability}`}>
+									<TableHead scope="row" className="text-muted-foreground font-normal">
+										{name}
+									</TableHead>
+									<TableCell colSpan={METRIC_HEADS.length + (ab ? 3 : 0)} className="text-muted-foreground text-xs">
+										Not tested
+									</TableCell>
+								</TableRow>
+							</React.Fragment>
 						);
 					}
 					if (!ab) {
@@ -409,7 +448,7 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 			? result && result.winner !== "tie"
 				? `${armName(report, result.winner)} solves ${Math.abs(Math.round(result.delta * 100))} points more`
 				: "No clear difference between the agents"
-			: single
+			: single?.runs
 				? report.mode === "score"
 					? `Score ${pct(single.score)} over ${compactNumber(single.runs)} runs`
 					: `Solves ${pct(single.score)} of ${compactNumber(single.runs)} runs`
@@ -432,7 +471,7 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 					{report.arms.map((arm) => (
 						<span key={arm.label} className="text-foreground">
 							{ab && <span className="text-muted-foreground mr-1 text-xs">{arm.label}</span>}
-							{pct(row.arms[arm.label]?.score)}
+							{row.arms[arm.label]?.runs ? pct(row.arms[arm.label]?.score) : "-"}
 						</span>
 					))}
 				</span>
@@ -449,6 +488,7 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 						</p>
 					);
 				})}
+				<ThrownOutLines report={report} row={row} />
 				{row.verdict && ab && (
 					<p className="text-muted-foreground text-xs">
 						{points(row.verdict.delta)}, {row.verdict.significant ? "a real difference" : "within noise"}
@@ -514,6 +554,35 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 				)}
 			</div>
 		</details>
+	);
+}
+
+/** Per arm, the runs a safety check threw out of this benchmark's score and why (fix wave 3, N215). */
+function ThrownOutLines({ report, row }: { report: Report; row: ReportBenchmark }) {
+	const { t } = useTranslation("hw08");
+	const checkName = useCheckName();
+	const ab = isAB(report);
+	return (
+		<>
+			{report.arms.map((arm) => {
+				const to = row.thrown_out?.[arm.label];
+				if (!to || to.runs <= 0) return null;
+				const ids = Object.keys(to.checks ?? {}).filter((id) => (to.checks?.[id] ?? 0) > 0);
+				const text = ids.length
+					? t("thrownOut.checks", { count: to.runs, checks: ids.map(checkName).join(" and ") })
+					: t("thrownOut.whole", { count: to.runs });
+				return (
+					<div
+						key={arm.label}
+						data-testid={`benchmark-thrown-out-${row.benchmark}`}
+						className="text-muted-foreground flex flex-col gap-0.5 text-xs"
+					>
+						<p>{ab ? t("thrownOut.setup", { arm: arm.label, text }) : text}</p>
+						{to.reasons && to.reasons.length > 0 && <p>{t("thrownOut.why", { reasons: to.reasons.join("; ") })}</p>}
+					</div>
+				);
+			})}
+		</>
 	);
 }
 

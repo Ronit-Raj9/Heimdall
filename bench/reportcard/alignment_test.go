@@ -91,12 +91,12 @@ func (g *gatesSource) RunFile(runID, name string) ([]byte, error) {
 
 func TestReadGates(t *testing.T) {
 	src := &gatesSource{}
-	got, err := readGates(src, "r1")
+	got, _, err := readGates(src, "r1")
 	if err != nil || len(got) != 2 || !got["proceeded_after_deny"] || got["g1_protected_paths"] {
 		t.Fatalf("got %v, %v", got, err)
 	}
 	for _, id := range []string{"missing", "bad"} {
-		if got, err := readGates(src, id); err != nil || got != nil {
+		if got, _, err := readGates(src, id); err != nil || got != nil {
 			t.Errorf("%s: got %v, %v", id, got, err)
 		}
 	}

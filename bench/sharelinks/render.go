@@ -176,6 +176,95 @@ func OverallScore(r *reportcard.Report, label string) (score float64, runs int, 
 	return sum / float64(runs), runs, true
 }
 
+// Headline is the report card's headline rule in plain words (fix wave 3,
+// N182 and N215), the same as the card page's: a running evaluation says how
+// many runs are done, a card whose every run a safety check threw out has
+// no score, and one where some were thrown out says so. "" when none
+// applies.
+func Headline(r *reportcard.Report) string {
+	if r == nil {
+		return ""
+	}
+	counted := 0
+	for _, b := range r.Benchmarks {
+		for _, m := range b.Arms {
+			counted += m.Runs
+		}
+	}
+	switch {
+	case r.Status == schemas.EvaluationQueued || r.Status == schemas.EvaluationRunning:
+		done := r.DoneRuns
+		if done == 0 {
+			done = counted
+		}
+		if r.PlannedRuns > 0 {
+			return fmt.Sprintf("Still running: %d of %d runs done. The score is final when every run has finished.", done, r.PlannedRuns)
+		}
+		return fmt.Sprintf("Still running: %s done. The score is final when every run has finished.", runsWord(done))
+	case r.ThrownOutRuns > 0 && counted == 0:
+		return "No score: every run was thrown out by a safety check. " + thrownOutDetail(r) + " This is a problem with the test setup, not with your agent."
+	case r.ThrownOutRuns > 0:
+		verb := "were"
+		if r.ThrownOutRuns == 1 {
+			verb = "was"
+		}
+		are := "are"
+		if r.ThrownOutRuns == 1 {
+			are = "is"
+		}
+		return fmt.Sprintf("%s %s thrown out by a safety check and %s not in the score.", runsWord(r.ThrownOutRuns), verb, are)
+	}
+	return ""
+}
+
+// thrownOutDetail names the benchmarks and checks behind thrown-out runs.
+func thrownOutDetail(r *reportcard.Report) string {
+	var names []string
+	checks := map[string]bool{}
+	for _, b := range r.Benchmarks {
+		n := 0
+		for _, t := range b.ThrownOut {
+			n += t.Runs
+			for id, c := range t.Checks {
+				if c > 0 {
+					checks[id] = true
+				}
+			}
+		}
+		if n > 0 {
+			names = append(names, b.Benchmark)
+		}
+	}
+	what := "a safety check"
+	if len(checks) > 0 {
+		ids := make([]string, 0, len(checks))
+		for id := range checks {
+			ids = append(ids, checkName(id))
+		}
+		sort.Strings(ids)
+		what = strings.Join(ids, " and ")
+	}
+	return fmt.Sprintf("%s on %s failed %s.", runsWord(r.ThrownOutRuns), strings.Join(names, ", "), what)
+}
+
+// checkName is a gate id in plain words, as the card page's hw08 locale.
+func checkName(gate string) string {
+	switch gate {
+	case "model_fidelity":
+		return "the model check (the provider answered with a different model than the one asked for)"
+	case "egress":
+		return "the network check (the run reached a site it was not allowed to)"
+	}
+	return "the " + strings.ReplaceAll(gate, "_", " ") + " check"
+}
+
+func runsWord(n int) string {
+	if n == 1 {
+		return "1 run"
+	}
+	return fmt.Sprintf("%d runs", n)
+}
+
 func armTitle(a reportcard.Arm) string {
 	v := ""
 	if a.Version > 0 {
@@ -299,6 +388,9 @@ func (d ReportDoc) sections() []struct {
 		if multi {
 			row = append(row, armCol(label))
 		}
+		if m.Runs == 0 { // N215: a row without runs has no score, never 0%
+			return append(row, "-", "-", "0", usd(m.CostUSD, m.Runs), secs(m.WallS))
+		}
 		return append(row, pct(m.Score), pct(m.CILow)+" to "+pct(m.CIHigh), fmt.Sprint(m.Runs), usd(m.CostUSD, m.Runs), secs(m.WallS))
 	}
 	head := func(first string) []string {
@@ -319,9 +411,12 @@ func (d ReportDoc) sections() []struct {
 		}
 		ov.rows = append(ov.rows, []string{a.Label, armTitle(a), score, fmt.Sprint(n)})
 	}
-	note := ""
+	note := Headline(r)
 	if r.Overall != nil {
-		note = "Overall: " + winnerText(r.Overall.Winner, r.Overall.Delta, r.Overall.Significant)
+		if note != "" {
+			note += " "
+		}
+		note += "Overall: " + winnerText(r.Overall.Winner, r.Overall.Delta, r.Overall.Significant)
 		if r.Overall.Benchmarks > 0 {
 			wins := make([]string, 0, len(r.Overall.Wins))
 			for _, l := range labels {

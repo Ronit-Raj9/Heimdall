@@ -131,9 +131,19 @@ func verdictFor(m *schemas.Manifest, cfg settings, idx runIndex, runs, executed 
 	checks := append(instrumentChecks(m, idx), slotCoverage(m, runs), aaCheck)
 	fair, fairChecks := fairnessFor(m, idx) // Multi-agent area: equal-budget fairness (fairness.go)
 	checks = append(checks, fairChecks...)
-	invalid := append(instrumentGates(m, cfg, idx, runs, executed), instrumentReasons(checks)...)
+	invalid, gateOnly := instrumentGates(m, cfg, idx, runs, executed)
+	failedChecks := instrumentReasons(checks)
+	invalid = append(invalid, failedChecks...)
 	integrity := integrityStatus(idx)
 	decision := decide(invalid, primary, guards, cfg.primaryAlpha()) // W7: alpha of the primary decision (sequential_verdict.go)
+
+	scope := ""
+	if decision == schemas.DecisionInvalid {
+		scope = "experiment"
+		if gateOnly && len(failedChecks) == 0 {
+			scope = "runs" // fix wave 3, N215: only the runs an invalidate gate fired on are untrustworthy
+		}
+	}
 
 	sd := variance.SD
 	variance.MDE = mdePP(pairedTasks(primary), sd, cfg.alpha)
@@ -152,6 +162,7 @@ func verdictFor(m *schemas.Manifest, cfg settings, idx runIndex, runs, executed 
 		TieRule:           tieRule,
 		Guards:            guards,
 		InvalidReasons:    invalid,
+		InvalidScope:      scope,
 		Instruments:       checks,
 		Integrity:         integrity,
 		ManifestHash:      m.Hash,

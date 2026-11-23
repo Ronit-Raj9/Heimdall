@@ -388,6 +388,11 @@ type EvaluationResult struct {
 	Arms    []EvaluationArmResult `json:"arms"`
 	CostUSD *float64              `json:"cost_usd,omitempty"`
 	At      time.Time             `json:"at"`
+	// Analyses maps each child experiment to the id of its newest analysis
+	// when the result was filled ("" when it had none); a newer analysis,
+	// such as a re-score after a gate fix, refills the result (fix wave 3,
+	// N215).
+	Analyses map[string]string `json:"analyses,omitempty"`
 }
 
 // EvaluationArmResult is one arm of an EvaluationResult.

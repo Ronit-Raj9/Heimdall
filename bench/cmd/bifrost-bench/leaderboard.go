@@ -15,6 +15,7 @@ import (
 	"github.com/maximhq/bifrost/bench/leaderboard"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/store"
+	"github.com/maximhq/bifrost/bench/verdict"
 )
 
 const leaderboardUsage = `usage: bifrost-bench leaderboard [-config deploy/bench.yaml] [-suite id@version] [-condition clean] [-scope all|common] [-synthetic exclude|only] [-grade-source original|latest|reviewed] [-k n] [-format md|json] [-out file]
@@ -151,6 +152,27 @@ func (x indexAdapter) LatestDecision(expID string) (schemas.Decision, bool) {
 		return "", false
 	}
 	return a.Verdict.Decision, true
+}
+
+// LatestInvalid implements leaderboard.AnalysisSource (fix wave 3, N215):
+// the invalid scope and reasons of the newest analysis when it decided
+// INVALID. An analysis stored before the scope existed reads as
+// "experiment"; an unreadable one is not reported here (LatestDecision
+// already fails closed on it).
+func (x indexAdapter) LatestInvalid(expID string) (string, []string, bool) {
+	a, err := x.latestAnalysis(expID)
+	if err != nil || a == nil || a.Verdict.Decision != schemas.DecisionInvalid {
+		return "", nil, false
+	}
+	scope := a.Verdict.InvalidScope
+	onlyGates := len(a.Verdict.InvalidReasons) > 0
+	for _, r := range a.Verdict.InvalidReasons {
+		onlyGates = onlyGates && verdict.IsGateRateReason(r)
+	}
+	if scope != "runs" || !onlyGates {
+		scope = "experiment" // a reason added after the policy decided keeps the whole experiment invalid
+	}
+	return scope, a.Verdict.InvalidReasons, true
 }
 
 // Regrades lists an experiment's regrades from its regrades/ folder, each

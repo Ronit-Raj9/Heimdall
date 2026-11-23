@@ -142,6 +142,7 @@ type Verdict struct {
 	TieRule           string            `json:"tie_rule"`
 	Guards            []GuardResult     `json:"guards"`
 	InvalidReasons    []string          `json:"invalid_reasons,omitempty"`
+	InvalidScope      string            `json:"invalid_scope,omitempty"`
 	Instruments       []InstrumentCheck `json:"instruments,omitempty"` // measured instrument checks; a failed one is also an invalid reason
 	Integrity         IntegrityStatus   `json:"integrity"`
 	ManifestHash      string            `json:"manifest_hash"`

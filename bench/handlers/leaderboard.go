@@ -216,6 +216,14 @@ func (s leaderboardSource) LatestDecision(expID string) (schemas.Decision, bool)
 	return "", false
 }
 
+// LatestInvalid implements leaderboard.AnalysisSource when the index does.
+func (s leaderboardSource) LatestInvalid(expID string) (string, []string, bool) {
+	if ai, ok := s.index.(leaderboard.AnalysisSource); ok {
+		return ai.LatestInvalid(expID)
+	}
+	return "", nil, false
+}
+
 // Regrades implements leaderboard.RegradeSource. An index without
 // RegradeIndex has no regrades.
 func (s leaderboardSource) Regrades(ctx context.Context, expID string) ([]leaderboard.Regrade, error) {

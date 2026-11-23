@@ -40,7 +40,7 @@ const PromptCustomV1 = "custom-v1"
 
 const (
 	maxCustomPromptBytes = 64 << 10
-	customJudgeTokens    = 1024 // default max_tokens: room for a reason per criterion
+	customJudgeTokens    = 2048 // default max_tokens: room for a reason per criterion, after a reasoning model's reasoning (fix wave 3, N273)
 )
 
 var sha256Re = regexp.MustCompile(`^[0-9a-f]{64}$`)

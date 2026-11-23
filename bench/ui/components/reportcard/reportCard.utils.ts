@@ -207,26 +207,58 @@ export function duration(seconds: number | undefined | null): string {
 	return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-/** Runs-weighted mean score of one arm across benchmarks (falls back to capabilities). */
+/**
+ * Runs-weighted mean score of one arm across benchmarks (falls back to capabilities). Undefined when no row has runs:
+ * a row without runs has no score, so it never reads as 0% (fix wave 3, N182 and N215).
+ */
 export function overallScore(report: Report, label: string): number | undefined {
 	const rows: Array<ReportArmMetrics | undefined> = (report.benchmarks.length > 0 ? report.benchmarks : report.capabilities).map(
 		(r) => r.arms[label],
 	);
 	let runs = 0;
 	let sum = 0;
-	let count = 0;
-	let plain = 0;
 	for (const m of rows) {
-		if (!m || !Number.isFinite(m.score)) continue;
-		count++;
-		plain += m.score;
-		if (m.runs > 0) {
-			runs += m.runs;
-			sum += m.score * m.runs;
+		if (!m || !Number.isFinite(m.score) || !(m.runs > 0)) continue;
+		runs += m.runs;
+		sum += m.score * m.runs;
+	}
+	return runs > 0 ? sum / runs : undefined;
+}
+
+/** Counted runs over every benchmark row and arm. */
+function countedRuns(report: Report): number {
+	return report.benchmarks.reduce((acc, r) => acc + Object.values(r.arms).reduce((n, m) => n + (m?.runs ?? 0), 0), 0);
+}
+
+/** "1 run", "24 runs". */
+function runsText(n: number): string {
+	return `${n.toLocaleString("en-US")} ${n === 1 ? "run" : "runs"}`;
+}
+
+/** Names a safety check for a sentence ("the model check (...)"); the card passes the hw08 locale text. */
+export type CheckName = (gate: string) => string;
+
+const defaultCheckName: CheckName = (gate) => `the ${gate.replace(/_/g, " ")} check`;
+
+/** The safety checks that threw runs out, by gate id, over every benchmark and arm. */
+export function thrownOutChecks(report: Report): string[] {
+	const ids = new Set<string>();
+	for (const b of report.benchmarks) {
+		for (const t of Object.values(b.thrown_out ?? {})) {
+			for (const [id, n] of Object.entries(t?.checks ?? {})) if (n > 0) ids.add(id);
 		}
 	}
-	if (count === 0) return undefined;
-	return runs > 0 ? sum / runs : plain / count;
+	return [...ids].sort();
+}
+
+/** The benchmarks with thrown-out runs. */
+export function thrownOutBenchmarks(report: Report): ReportBenchmark[] {
+	return report.benchmarks.filter((b) => Object.values(b.thrown_out ?? {}).some((t) => (t?.runs ?? 0) > 0));
+}
+
+function joinWords(parts: string[]): string {
+	if (parts.length <= 1) return parts[0] ?? "";
+	return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
 
 export interface ComparisonResult {
@@ -267,22 +299,48 @@ export interface Headline {
 	detail: string;
 }
 
-export function headline(report: Report): Headline {
+/**
+ * The card's headline (fix wave 3, N182 and N215): a running evaluation says how many runs are done; when a safety check threw
+ * out every run there is no score; when it threw out some, the detail says so. Otherwise the score or the A/B winner.
+ */
+export function headline(report: Report, checkName: CheckName = defaultCheckName): Headline {
 	const total = report.benchmarks.length;
-	const runs = report.benchmarks.reduce((acc, r) => acc + Object.values(r.arms).reduce((n, m) => n + (m?.runs ?? 0), 0), 0);
+	const runs = countedRuns(report);
 	const benchWord = total === 1 ? "benchmark" : "benchmarks";
+	const thrown = report.thrown_out_runs ?? 0;
+	if (report.status === "queued" || report.status === "running") {
+		const planned = report.planned_runs ?? 0;
+		const done = report.done_runs ?? runs;
+		return {
+			title: planned > 0 ? `Still running: ${done} of ${planned} runs done` : `Still running: ${runsText(done)} done`,
+			detail: `${total} ${benchWord}. The score is final when every run has finished.`,
+		};
+	}
+	if (thrown > 0 && runs === 0) {
+		const names = thrownOutBenchmarks(report).map((b) => b.benchmark);
+		const checks = thrownOutChecks(report).map(checkName);
+		return {
+			title: "No score: every run was thrown out by a safety check",
+			detail: `${runsText(thrown)} on ${joinWords(names)} failed ${checks.length ? joinWords(checks) : "a safety check"}. This is a problem with the test setup, not with your agent. Open the comparison to see the check.`,
+		};
+	}
+	const thrownNote =
+		thrown > 0
+			? ` ${runsText(thrown)} ${thrown === 1 ? "was" : "were"} thrown out by a safety check and ${thrown === 1 ? "is" : "are"} not in the score.`
+			: "";
+	const withNote = (h: Headline): Headline => ({ ...h, detail: h.detail + thrownNote });
 	if (!isAB(report)) {
 		const arm = report.arms[0];
 		const score = arm ? overallScore(report, arm.label) : undefined;
-		return {
+		return withNote({
 			title:
 				score === undefined
 					? "No results yet"
 					: report.mode === "score"
 						? `Your agent scores ${pct(score)} overall`
 						: `Your agent solves ${pct(score)} overall`,
-			detail: `${arm ? armDescription(arm) + ", " : ""}${total} ${benchWord}, ${runs.toLocaleString("en-US")} runs`,
-		};
+			detail: `${arm ? armDescription(arm) + ", " : ""}${total} ${benchWord}, ${runs.toLocaleString("en-US")} runs${thrownNote ? "." : ""}`,
+		});
 	}
 	const [a, b] = report.arms;
 	const wins: Record<string, number> = { [a.label]: 0, [b.label]: 0, tie: 0 };
@@ -312,25 +370,32 @@ export function headline(report: Report): Headline {
 		(winner === "tie"
 			? "Neither agent is clearly better overall."
 			: `Overall ${name} wins; worse on ${counted[loser] ?? 0}, tied on ${counted.tie ?? 0}.`);
-	return { title, detail: verdict };
+	return withNote({ title, detail: verdict });
 }
 
 export interface CapabilityRow {
 	capability: string;
 	data?: ReportCapability;
+	/** True when some arm has runs on it in this evaluation. */
+	tested: boolean;
 }
 
-/** Fixed capability rows first, then any extra capability the report carries. */
+/**
+ * Capability rows: the tested ones first, then the rest (shown under "Not tested in this evaluation"), each group in the fixed
+ * order with any extra capability after. A report with no runs at all has no rows: its headline says why (N185).
+ */
 export function capabilityRows(report: Report): CapabilityRow[] {
 	const byId = new Map(report.capabilities.map((c) => [c.capability, c]));
-	const rows: CapabilityRow[] = CAPABILITY_ORDER.map((id) => ({
-		capability: id,
-		data: byId.get(id),
-	}));
+	const ids: string[] = [...CAPABILITY_ORDER];
 	for (const c of report.capabilities) {
-		if (!(CAPABILITY_ORDER as readonly string[]).includes(c.capability)) rows.push({ capability: c.capability, data: c });
+		if (!ids.includes(c.capability)) ids.push(c.capability);
 	}
-	return rows;
+	const rows: CapabilityRow[] = ids.map((id) => {
+		const data = byId.get(id);
+		return { capability: id, data, tested: !!data && Object.values(data.arms).some((m) => (m?.runs ?? 0) > 0) };
+	});
+	if (!rows.some((r) => r.tested)) return [];
+	return [...rows.filter((r) => r.tested), ...rows.filter((r) => !r.tested)];
 }
 
 export function reportFileName(report: Report): string {

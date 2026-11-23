@@ -64,7 +64,7 @@ func TestInstrumentGates(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := testManifest(ArmBaseline, ArmCandidate)
 			cfg := settingsFor(m)
-			got := instrumentGates(m, cfg, newRunIndex(tt.runs), tt.runs, tt.runs)
+			got, _ := instrumentGates(m, cfg, newRunIndex(tt.runs), tt.runs, tt.runs)
 			if tt.reason == "" {
 				if len(got) != 0 {
 					t.Fatalf("unexpected reasons %q", got)

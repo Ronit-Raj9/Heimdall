@@ -445,6 +445,9 @@ type bridgeRun struct {
 	RunID     string `json:"run_id"`
 	Outcome   string `json:"outcome"`
 	Detail    string `json:"detail,omitempty"`
+	// GradeReason is the grade's reason of a run the grader could not
+	// grade (invalid_evaluator), so readiness can say why (fix wave 3, N273).
+	GradeReason string `json:"grade_reason,omitempty"`
 }
 
 // sealedRuns reads the counted sealed runs of an experiment, in task order.
@@ -462,6 +465,9 @@ func sealedRuns(ctx context.Context, env jobEnv, expID string) ([]bridgeRun, err
 		if len(sr.Run.Failures) > 0 {
 			f := sr.Run.Failures[0]
 			r.Detail = strings.TrimSpace(f.Part + ": " + f.Error)
+		}
+		if sr.Run.Outcome == schemas.OutcomeInvalidEvaluator && sr.Grade != nil {
+			r.GradeReason = sr.Grade.Reason
 		}
 		out = append(out, r)
 	}

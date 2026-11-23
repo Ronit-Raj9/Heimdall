@@ -519,6 +519,15 @@ export interface ReportBenchmarkRow {
 	lock_hash?: string;
 	/** Set when a model judge grades the benchmark. */
 	judge?: ReportJudgeState;
+	/** Per arm, runs a safety check threw out of the score (fix wave 3, N215). */
+	thrown_out?: Record<string, ReportThrownOut>;
+}
+
+/** Runs thrown out of one arm's score by a safety check: per gate id when a gate fired on the run, and the analysis's reasons. */
+export interface ReportThrownOut {
+	runs: number;
+	checks?: Record<string, number>;
+	reasons?: string[];
 }
 
 export interface ReportCurvePoint {
@@ -734,6 +743,11 @@ export interface Report {
 	failover?: FailoverReport;
 	/** Only when the evaluation ran a red-team benchmark (Z04). */
 	red_team?: ReportRedTeam;
+	/** Runs thrown out by a safety check over every benchmark (fix wave 3, N215). */
+	thrown_out_runs?: number;
+	/** Counted runs planned for the shown setups, and those finished (N182). */
+	planned_runs?: number;
+	done_runs?: number;
 }
 
 /** One metadata key and its values, each with per arm scores over the tasks with that value. */
