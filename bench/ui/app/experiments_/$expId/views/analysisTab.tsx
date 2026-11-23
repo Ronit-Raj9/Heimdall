@@ -29,6 +29,8 @@ import {
 	ShieldCheck,
 	type LucideIcon,
 } from "lucide-react";
+import "@/components/verdict/hw09I18n";
+import i18n from "@/lib/i18n";
 import type { TFunction } from "i18next";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
@@ -142,7 +144,7 @@ export function summarizeAnalysisResult(
 	}
 }
 
-const VERDICT_WORDS = ["score", "improved", "regressed", "inconclusive", "invalid"] as const;
+const VERDICT_WORDS = ["score", "improved", "regressed", "inconclusive", "invalid", "leader"] as const;
 const ACTION_WORDS = ["ship", "hold", "fix_harness"] as const;
 const POLICY_WORDS = ["allow", "warn", "block"] as const;
 
@@ -158,7 +160,8 @@ function wordsFor<T extends string>(known: readonly T[], value: string | undefin
  * decision, so only its sentence is said.
  */
 export function checkSummary(t: TFunction<"analysis">, c: Pick<CheckRunResult, "decision" | "action" | "policy" | "policy_file">): string {
-	const parts = [wordsFor(VERDICT_WORDS, c.decision, (d) => t(`result.verdict.${d}`))];
+	// leader: three or more setups, one leads (fix wave 3, H09); its words live in the hw09 namespace.
+	const parts = [wordsFor(VERDICT_WORDS, c.decision, (d) => (d === "leader" ? i18n.t("decision.leader", { ns: "hw09" }) : t(`result.verdict.${d}`)))];
 	if (c.decision !== "score") {
 		// no_decision adds nothing: the verdict sentence already says there is no clear answer.
 		if (c.action !== "no_decision") parts.push(wordsFor(ACTION_WORDS, c.action, (a) => t(`result.action.${a}`)));

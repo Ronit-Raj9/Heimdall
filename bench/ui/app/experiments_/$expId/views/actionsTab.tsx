@@ -12,6 +12,7 @@ import { EXTEND_MAX_TASKS, EXTEND_MAX_TRIALS, type ExtendJobParams, type ProbeJo
 import { GitBranch, GitCompareArrows, Layers, Radar } from "lucide-react";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "@/components/verdict/hw09I18n";
 import { usePartialSuiteRefetch } from "@/app/experiments_/new/views/partialRefetch";
 
 export interface ActionsTabProps {
@@ -24,7 +25,7 @@ export interface ActionsTabProps {
 /** One setup of the experiment (fix wave 2, N66), from the experiment status `setups`. */
 export type ArmSetup = NonNullable<ExperimentStatus["setups"]>[number];
 
-const DECISIONS = ["score", "improved", "regressed", "inconclusive", "invalid"] as const;
+const DECISIONS = ["score", "improved", "regressed", "inconclusive", "invalid", "leader"] as const;
 
 /** Plain words for a verdict decision (fix wave 2, N66); an unknown decision reads as is. */
 export function decisionText(decision: string, words: Record<(typeof DECISIONS)[number], string>): string {
@@ -100,6 +101,7 @@ function BrokenParentNote({ expId }: { expId: string }) {
 
 function ExtendCard({ expId }: { expId: string }) {
 	const { t } = useTranslation("experimentActions");
+	const { t: tHw09 } = useTranslation("hw09");
 	const uid = useId();
 	const adaptive = useGetExperimentAdaptiveQuery(expId);
 	const [mode, setMode] = useState<"trials" | "tasks">("trials");
@@ -139,6 +141,7 @@ function ExtendCard({ expId }: { expId: string }) {
 								regressed: t("decisionWords.regressed"),
 								inconclusive: t("decisionWords.inconclusive"),
 								invalid: t("decisionWords.invalid"),
+								leader: tHw09("decision.leader"),
 							}),
 						})}
 					</span>
