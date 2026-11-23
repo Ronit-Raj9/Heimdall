@@ -152,11 +152,16 @@ func (s *Store) claim(scope string, sum [sha256.Size]byte) (e *entry, owner bool
 // so a retry runs again. Waiting duplicates are released either way.
 func (s *Store) finish(e *entry, ok bool, status int, contentType string, body []byte) {
 	s.mu.Lock()
-	if ok && e.elem != nil {
+	switch {
+	case ok && e.elem != nil:
 		e.ok, e.status, e.contentType, e.body = true, status, contentType, body
 		s.bytes += len(body)
 		s.trimLocked()
-	} else {
+	case ok:
+		// Dropped from the store while it ran: the duplicates already
+		// waiting on it still get its answer, nothing is kept.
+		e.ok, e.status, e.contentType, e.body = true, status, contentType, body
+	default:
 		s.removeLocked(e)
 	}
 	s.mu.Unlock()
