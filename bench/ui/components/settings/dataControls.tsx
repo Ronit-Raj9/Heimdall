@@ -52,7 +52,12 @@ export function RetentionSection() {
 			{policy.isLoading ? (
 				<BlockSkeleton rows={2} testId="retention-loading" />
 			) : policy.isError || !policy.data ? (
-				<LoadError title={t("settings.org.retentionLoadError")} error={policy.error} onRetry={() => void policy.refetch()} testId="retention-error" />
+				<LoadError
+					title={t("settings.org.retentionLoadError")}
+					error={policy.error}
+					onRetry={() => void policy.refetch()}
+					testId="retention-error"
+				/>
 			) : (
 				<RetentionForm policy={policy.data} />
 			)}
@@ -172,7 +177,9 @@ export function RetentionForm({ policy }: { policy: RetentionPolicy }) {
 			{choice === "custom" && canEdit && (
 				<p className="text-muted-foreground text-xs">{t("settings.org.retentionRange", { min: policy.min_days, max: policy.max_days })}</p>
 			)}
-			{state.error && <WriteFailure error={state.error} title={t("settings.org.retentionError")} testId="retention-save-error" min="admin" />}
+			{state.error && (
+				<WriteFailure error={state.error} title={t("settings.org.retentionError")} testId="retention-save-error" min="admin" />
+			)}
 		</div>
 	);
 }
@@ -232,7 +239,10 @@ export function DeleteOrgDialog({ info, onClose }: { info: OrgInfo; onClose(): v
 			// Same as leaving: the session still names the deleted org, so make another membership
 			// current first. With none left the user lands on the empty app and its org picker.
 			const next = session.orgs.find((candidate) => candidate.id !== info.id);
-			if (next) await switchOrg({ org: next.id }).unwrap().catch(() => undefined);
+			if (next)
+				await switchOrg({ org: next.id })
+					.unwrap()
+					.catch(() => undefined);
 			window.location.assign("/");
 		} catch {
 			// state.error renders the failure.

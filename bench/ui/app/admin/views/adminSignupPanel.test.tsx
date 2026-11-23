@@ -41,7 +41,18 @@ describe("AdminSignupPanel", () => {
 	it("shows the allowed domains and who changed the setting", () => {
 		const html = render(
 			<SignupForm
-				settings={{ ...CONFIG, mode: "allowlist", domains: ["acme.dev"], source: "admin", updated_by: "usr_ada", updated_by_name: "Ada", updated_at: "2026-11-20T09:00:00Z", email_delivery: "email" } as SignupSettings}
+				settings={
+					{
+						...CONFIG,
+						mode: "allowlist",
+						domains: ["acme.dev"],
+						source: "admin",
+						updated_by: "usr_ada",
+						updated_by_name: "Ada",
+						updated_at: "2026-11-20T09:00:00Z",
+						email_delivery: "email",
+					} as SignupSettings
+				}
 			/>,
 			admin(),
 		);

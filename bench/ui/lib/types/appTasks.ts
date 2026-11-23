@@ -86,7 +86,10 @@ export interface AppTasksDraft {
 }
 
 /** A draft whose lists are never null (fix wave 3, N237: drafts saved before the fix carry "plans": null). */
-export type ListedAppTasksDraft = Omit<AppTasksDraft, "rules" | "plans" | "dropped" | "written" | "calls" | "warnings" | "operations" | "collections"> & {
+export type ListedAppTasksDraft = Omit<
+	AppTasksDraft,
+	"rules" | "plans" | "dropped" | "written" | "calls" | "warnings" | "operations" | "collections"
+> & {
 	rules: AppRule[];
 	plans: AppPlan[];
 	dropped: AppDropped[];

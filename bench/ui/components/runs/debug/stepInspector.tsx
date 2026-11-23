@@ -45,7 +45,12 @@ export function StepInspector({
 	}
 	const io = stepIO(step);
 	return (
-		<aside className="flex min-w-0 flex-col gap-3 rounded-xl border p-4" data-testid="step-inspector" data-seq={step.seq} aria-label={t("inspector.title", { seq: step.seq })}>
+		<aside
+			className="flex min-w-0 flex-col gap-3 rounded-xl border p-4"
+			data-testid="step-inspector"
+			data-seq={step.seq}
+			aria-label={t("inspector.title", { seq: step.seq })}
+		>
 			<div className="flex items-start gap-2">
 				<div className="flex min-w-0 flex-1 flex-col gap-0.5">
 					<h3 className="text-sm font-semibold">{t("inspector.title", { seq: step.seq })}</h3>
@@ -56,7 +61,12 @@ export function StepInspector({
 						{call?.replay && <ReplayBadge label={call.replay} />}
 					</span>
 				</div>
-				<button type="button" onClick={onClose} className="text-muted-foreground hover:bg-muted hover:text-foreground rounded-md p-1" aria-label={t("inspector.close")}>
+				<button
+					type="button"
+					onClick={onClose}
+					className="text-muted-foreground hover:bg-muted hover:text-foreground rounded-md p-1"
+					aria-label={t("inspector.close")}
+				>
 					<X className="size-4" aria-hidden="true" />
 				</button>
 			</div>
@@ -128,7 +138,10 @@ function RawBlock({ title, text, testId }: { title: string; text: string; testId
 	return (
 		<div className="flex min-w-0 flex-col gap-1">
 			<span className="text-muted-foreground text-[11px]">{title}</span>
-			<pre className="bg-muted/40 max-h-80 overflow-auto rounded-lg border p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-all" data-testid={testId}>
+			<pre
+				className="bg-muted/40 max-h-80 overflow-auto rounded-lg border p-3 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap"
+				data-testid={testId}
+			>
 				{text}
 			</pre>
 		</div>

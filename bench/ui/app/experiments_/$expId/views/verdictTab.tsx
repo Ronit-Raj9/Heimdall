@@ -1,6 +1,12 @@
 import { VerdictCalibration } from "@/components/calibration/calibrationPanel"; // W8 judge calibration
 import { ConfigDiff } from "@/components/configDiff";
-import { TERMINAL_STATES, isDebugExperiment, suiteName, systemExperiment, type SystemExperimentKind } from "@/components/experiments/experiments.utils";
+import {
+	TERMINAL_STATES,
+	isDebugExperiment,
+	suiteName,
+	systemExperiment,
+	type SystemExperimentKind,
+} from "@/components/experiments/experiments.utils";
 import { compareHref, compareSearch } from "@/components/experiments/legacyRoutes";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

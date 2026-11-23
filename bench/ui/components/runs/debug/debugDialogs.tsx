@@ -95,7 +95,13 @@ export function ForkDialog({
 					<legend className="mb-1 text-xs font-medium">{t("fork.mode")}</legend>
 					{(["message", "response", "none"] as const).map((m) => (
 						<label key={m} className="inline-flex items-center gap-2">
-							<input type="radio" name="fork-change" checked={change === m} onChange={() => setChange(m)} data-testid={`fork-change-${m}`} />
+							<input
+								type="radio"
+								name="fork-change"
+								checked={change === m}
+								onChange={() => setChange(m)}
+								data-testid={`fork-change-${m}`}
+							/>
 							{t(m === "message" ? "fork.modeMessage" : m === "response" ? "fork.modeResponse" : "fork.modeNone")}
 						</label>
 					))}
@@ -130,7 +136,12 @@ export function ForkDialog({
 					<Button variant="outline" onClick={onClose}>
 						{t("fork.cancel")}
 					</Button>
-					<Button onClick={() => void submit()} disabled={needsText || state.isLoading} isLoading={state.isLoading} dataTestId="fork-submit">
+					<Button
+						onClick={() => void submit()}
+						disabled={needsText || state.isLoading}
+						isLoading={state.isLoading}
+						dataTestId="fork-submit"
+					>
 						{t("fork.submit")}
 					</Button>
 				</div>
@@ -183,7 +194,13 @@ export function BreakpointDialog({
 			<div className="flex flex-col gap-4">
 				<label className="flex flex-col gap-1.5 text-xs font-medium">
 					{t("debugDialog.calls")}
-					<Input value={calls} onChange={(e) => setCalls(e.target.value)} placeholder={t("debugDialog.callsPlaceholder")} aria-invalid={invalid} data-testid="breakpoint-calls" />
+					<Input
+						value={calls}
+						onChange={(e) => setCalls(e.target.value)}
+						placeholder={t("debugDialog.callsPlaceholder")}
+						aria-invalid={invalid}
+						data-testid="breakpoint-calls"
+					/>
 				</label>
 				<label className="inline-flex items-center gap-2 text-sm">
 					<input type="checkbox" checked={every} onChange={(e) => setEvery(e.target.checked)} data-testid="breakpoint-every" />
@@ -191,7 +208,12 @@ export function BreakpointDialog({
 				</label>
 				<label className="flex flex-col gap-1.5 text-xs font-medium">
 					{t("debugDialog.tools")}
-					<Input value={tools} onChange={(e) => setTools(e.target.value)} placeholder={t("debugDialog.toolsPlaceholder")} data-testid="breakpoint-tools" />
+					<Input
+						value={tools}
+						onChange={(e) => setTools(e.target.value)}
+						placeholder={t("debugDialog.toolsPlaceholder")}
+						data-testid="breakpoint-tools"
+					/>
 				</label>
 				{(invalid || empty) && (
 					<p className={cn("text-xs", invalid ? "text-chart-error-ink" : "text-muted-foreground")} data-testid="breakpoint-hint">
@@ -207,7 +229,12 @@ export function BreakpointDialog({
 					<Button variant="outline" onClick={onClose}>
 						{t("fork.cancel")}
 					</Button>
-					<Button onClick={() => void submit()} disabled={invalid || empty || state.isLoading} isLoading={state.isLoading} dataTestId="breakpoint-submit">
+					<Button
+						onClick={() => void submit()}
+						disabled={invalid || empty || state.isLoading}
+						isLoading={state.isLoading}
+						dataTestId="breakpoint-submit"
+					>
 						{t("debugDialog.submit")}
 					</Button>
 				</div>

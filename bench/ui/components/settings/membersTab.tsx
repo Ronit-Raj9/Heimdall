@@ -216,28 +216,28 @@ function MemberRow({
 			{isAdmin && (
 				<TableCell className="text-right">
 					<div className="inline-flex items-center gap-2">
-					{canReset && onResetLink && (
-						<ConfirmButton
-							label={ts("resetLink.button")}
-							question={ts("resetLink.question", { email: member.email })}
-							confirmLabel={ts("resetLink.confirm")}
-							cancelLabel={ts("resetLink.cancel")}
-							onConfirm={onResetLink}
-							isLoading={resetBusy}
-							testId={`member-reset-${member.user_id}`}
-						/>
-					)}
-					{manageable && (
-						<ConfirmButton
-							label={t("settings.members.remove")}
-							question={t("settings.members.confirmRemove", { email: member.email, org: org.name })}
-							confirmLabel={t("settings.members.confirm")}
-							cancelLabel={t("settings.members.cancel")}
-							onConfirm={onRemove}
-							isLoading={busy}
-							testId={`member-remove-${member.user_id}`}
-						/>
-					)}
+						{canReset && onResetLink && (
+							<ConfirmButton
+								label={ts("resetLink.button")}
+								question={ts("resetLink.question", { email: member.email })}
+								confirmLabel={ts("resetLink.confirm")}
+								cancelLabel={ts("resetLink.cancel")}
+								onConfirm={onResetLink}
+								isLoading={resetBusy}
+								testId={`member-reset-${member.user_id}`}
+							/>
+						)}
+						{manageable && (
+							<ConfirmButton
+								label={t("settings.members.remove")}
+								question={t("settings.members.confirmRemove", { email: member.email, org: org.name })}
+								confirmLabel={t("settings.members.confirm")}
+								cancelLabel={t("settings.members.cancel")}
+								onConfirm={onRemove}
+								isLoading={busy}
+								testId={`member-remove-${member.user_id}`}
+							/>
+						)}
 					</div>
 				</TableCell>
 			)}

@@ -59,7 +59,11 @@ export default function NewSuiteView({ initialId = "" }: { initialId?: string } 
 
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="suites-new-screen">
-			<PageHeader title={t("new.title")} subtitle={t("new.subtitle")} breadcrumbs={[{ label: "Suites", to: "/suites" }, { label: t("new.title") }]} />
+			<PageHeader
+				title={t("new.title")}
+				subtitle={t("new.subtitle")}
+				breadcrumbs={[{ label: "Suites", to: "/suites" }, { label: t("new.title") }]}
+			/>
 			{!writable && (
 				<p role="note" className="text-muted-foreground text-sm" data-testid="suites-new-readonly">
 					{t("edit.readOnly")}
@@ -110,26 +114,26 @@ export default function NewSuiteView({ initialId = "" }: { initialId?: string } 
 					</div>
 				</fieldset>
 				{start !== "questions" && (
-				<fieldset className="flex flex-col gap-2">
-					<legend className="mb-1.5 text-sm font-medium">{t("new.template")}</legend>
-					<div className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="suites-new-templates">
-						{templates.map((tpl) => (
-							<label
-								key={tpl.id}
-								className={`flex cursor-pointer flex-col gap-0.5 rounded-md border px-3 py-2 text-sm ${chosen === tpl.id ? "border-primary bg-primary/5" : ""}`}
-							>
-								<span className="flex items-center gap-2">
-									<input type="radio" name="template" value={tpl.id} checked={chosen === tpl.id} onChange={() => setTemplate(tpl.id)} />
-									<span className="font-mono">{tpl.id}</span>
-								</span>
-								<span className="text-muted-foreground text-xs">
-									{t(`new.templates.${tpl.id}`, { defaultValue: "" })}
-									{tpl.scenario ? ` (${t("new.scenario")})` : ""}
-								</span>
-							</label>
-						))}
-					</div>
-				</fieldset>
+					<fieldset className="flex flex-col gap-2">
+						<legend className="mb-1.5 text-sm font-medium">{t("new.template")}</legend>
+						<div className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="suites-new-templates">
+							{templates.map((tpl) => (
+								<label
+									key={tpl.id}
+									className={`flex cursor-pointer flex-col gap-0.5 rounded-md border px-3 py-2 text-sm ${chosen === tpl.id ? "border-primary bg-primary/5" : ""}`}
+								>
+									<span className="flex items-center gap-2">
+										<input type="radio" name="template" value={tpl.id} checked={chosen === tpl.id} onChange={() => setTemplate(tpl.id)} />
+										<span className="font-mono">{tpl.id}</span>
+									</span>
+									<span className="text-muted-foreground text-xs">
+										{t(`new.templates.${tpl.id}`, { defaultValue: "" })}
+										{tpl.scenario ? ` (${t("new.scenario")})` : ""}
+									</span>
+								</label>
+							))}
+						</div>
+					</fieldset>
 				)}
 				<label className="flex flex-col gap-1.5 text-sm font-medium">
 					{t("new.image")}

@@ -231,8 +231,19 @@ function PValue({ effect }: { effect: Effect | undefined }) {
 	const locale = getLocale();
 	if (!effect || typeof effect.p_value !== "number") return <>{t("verdict.card.noEffect")}</>;
 	const sampled = effect.p_draws ? <> {t("verdict.card.pValueSampled", { draws: effect.p_draws })}</> : null;
-	if (effect.p_value < P_VALUE_FLOOR) return <>{t("verdict.card.pValueBelow", { p: formatPValue(P_VALUE_FLOOR, locale) })}{sampled}</>;
-	return <>{formatPValue(effect.p_value, locale)}{sampled}</>;
+	if (effect.p_value < P_VALUE_FLOOR)
+		return (
+			<>
+				{t("verdict.card.pValueBelow", { p: formatPValue(P_VALUE_FLOOR, locale) })}
+				{sampled}
+			</>
+		);
+	return (
+		<>
+			{formatPValue(effect.p_value, locale)}
+			{sampled}
+		</>
+	);
 }
 
 export function GuardList({ guards }: { guards: GuardResult[] }) {

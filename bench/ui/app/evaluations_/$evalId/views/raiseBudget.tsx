@@ -70,10 +70,14 @@ export function RaiseBudgetPanel({ evaluation }: { evaluation: Evaluation }) {
 	const value = Number(text);
 	const valid = Number.isFinite(value) && value > current && value <= 1000;
 	return (
-		<section className="border-chart-warning/40 bg-chart-warning/8 flex flex-col gap-3 rounded-xl border p-4 text-sm" data-testid="evaluation-budget-stopped">
+		<section
+			className="border-chart-warning/40 bg-chart-warning/8 flex flex-col gap-3 rounded-xl border p-4 text-sm"
+			data-testid="evaluation-budget-stopped"
+		>
 			<div className="flex flex-col gap-1">
 				<span className="font-medium">
-					The budget stopped {stopped.length} {stopped.length === 1 ? "benchmark" : "benchmarks"}: {notStarted} {notStarted === 1 ? "run" : "runs"} not started.
+					The budget stopped {stopped.length} {stopped.length === 1 ? "benchmark" : "benchmarks"}: {notStarted}{" "}
+					{notStarted === 1 ? "run" : "runs"} not started.
 				</span>
 				<span className="text-muted-foreground">
 					The report card only counts the runs that finished. Raise the budget to run the rest; finished runs are kept and never run again.

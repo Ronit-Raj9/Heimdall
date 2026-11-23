@@ -138,7 +138,13 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 					</div>
 				))}
 				{models.length < MODEL_SWITCH_MAX && (
-					<Button size="sm" variant="outline" className="w-fit" onClick={() => setModels((ms) => [...ms, { provider: "", model: "" }])} dataTestId="compare-models-add">
+					<Button
+						size="sm"
+						variant="outline"
+						className="w-fit"
+						onClick={() => setModels((ms) => [...ms, { provider: "", model: "" }])}
+						dataTestId="compare-models-add"
+					>
 						{t("form.addModel")}
 					</Button>
 				)}
@@ -193,7 +199,19 @@ export function estimateSentence(e: Parameters<typeof estimateText>[0]): string 
 	return `${p.runs}. ${p.cost[0].toUpperCase()}${p.cost.slice(1)}. ${minutes}`;
 }
 
-function NumberField({ label, value, min, onChange, testId }: { label: string; value: number; min: number; onChange(v: number): void; testId: string }) {
+function NumberField({
+	label,
+	value,
+	min,
+	onChange,
+	testId,
+}: {
+	label: string;
+	value: number;
+	min: number;
+	onChange(v: number): void;
+	testId: string;
+}) {
 	return (
 		<label className="flex flex-col gap-1">
 			<span className="font-medium">{label}</span>

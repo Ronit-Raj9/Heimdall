@@ -55,7 +55,12 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 			/>
 		);
 	}
-	const checkParams = { agent: agent.path, suite: suite.trim(), ...(task.trim() ? { task: task.trim() } : {}), ...(noBuild ? { no_build: true } : {}) };
+	const checkParams = {
+		agent: agent.path,
+		suite: suite.trim(),
+		...(task.trim() ? { task: task.trim() } : {}),
+		...(noBuild ? { no_build: true } : {}),
+	};
 	const buildParams = { agent: agent.path, ...(buildSuite.trim() ? { suite: buildSuite.trim() } : {}) };
 	const checkJob = lastJobFor(jobs, "agent.check", agent.path, agent.id);
 	const buildJob = lastJobFor(jobs, "agent.build", agent.path, agent.id);
@@ -105,7 +110,11 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 						<Field label={t("checks.check.task")}>
 							<Input value={task} onChange={(e) => setTask(e.target.value)} data-testid="agent-check-task" />
 						</Field>
-						{hosted && <p className="text-muted-foreground text-xs sm:col-span-3" data-testid="agent-check-try-real-hint">{t("checks.check.tryRealHint")}</p>}
+						{hosted && (
+							<p className="text-muted-foreground text-xs sm:col-span-3" data-testid="agent-check-try-real-hint">
+								{t("checks.check.tryRealHint")}
+							</p>
+						)}
 						{!hosted && (
 							<label className="flex items-center gap-2 self-end pb-2 text-xs">
 								<input type="checkbox" checked={noBuild} onChange={(e) => setNoBuild(e.target.checked)} data-testid="agent-check-nobuild" />
@@ -140,7 +149,13 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 					action={
 						agent.dockerfile ? (
 							<div className="flex flex-col items-end gap-1">
-								<JobRunButton kind="agent.build" params={buildParams} label={t("checks.build.run")} variant="outline" disabled={needBuildSuite} />
+								<JobRunButton
+									kind="agent.build"
+									params={buildParams}
+									label={t("checks.build.run")}
+									variant="outline"
+									disabled={needBuildSuite}
+								/>
 								{needBuildSuite && (
 									<p className="text-muted-foreground text-xs" data-testid="agent-build-pick-first">
 										{t("checks.build.pickFirst")}
@@ -178,7 +193,12 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 					action={
 						<div className="flex flex-wrap items-center gap-3">
 							{!hosted && <JobRunButton kind="agent.diff" params={{ agent: agent.id }} label={t("checks.diff.run")} variant="outline" />}
-							<Link to="/agents" search={{ tab: "diff", agent: agent.id }} className="text-primary text-sm hover:underline" data-testid="agent-diff-link">
+							<Link
+								to="/agents"
+								search={{ tab: "diff", agent: agent.id }}
+								className="text-primary text-sm hover:underline"
+								data-testid="agent-diff-link"
+							>
 								{t("checks.diff.open")}
 							</Link>
 						</div>

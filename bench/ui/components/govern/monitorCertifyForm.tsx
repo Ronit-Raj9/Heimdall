@@ -90,7 +90,12 @@ export function MonitorCertifyForm({ onDone }: { onDone?(): void }) {
 				</label>
 				<fieldset className="flex flex-col gap-2 text-xs" data-testid="monitor-certify-exps">
 					<legend className="mb-1">{t("monitors.comparisons", { max: MAX_PICKED })}</legend>
-					<Input value={search} placeholder={t("monitors.comparisonsSearch")} onChange={(e) => setSearch(e.target.value)} data-testid="monitor-certify-search" />
+					<Input
+						value={search}
+						placeholder={t("monitors.comparisonsSearch")}
+						onChange={(e) => setSearch(e.target.value)}
+						data-testid="monitor-certify-search"
+					/>
 					{shown.length === 0 ? (
 						<p className="text-muted-foreground" data-testid="monitor-certify-no-exps">
 							{experiments.isLoading ? t("monitors.loading") : t("monitors.comparisonsEmpty")}
@@ -100,7 +105,12 @@ export function MonitorCertifyForm({ onDone }: { onDone?(): void }) {
 							{shown.map((e) => (
 								<li key={e.exp_id}>
 									<label className="flex items-center gap-2">
-										<input type="checkbox" checked={picked.includes(e.exp_id)} onChange={() => toggle(e.exp_id)} data-testid={`monitor-certify-exp-${e.exp_id}`} />
+										<input
+											type="checkbox"
+											checked={picked.includes(e.exp_id)}
+											onChange={() => toggle(e.exp_id)}
+											data-testid={`monitor-certify-exp-${e.exp_id}`}
+										/>
 										<span className="min-w-0 truncate">{e.name || e.exp_id}</span>
 										<span className="text-muted-foreground ml-auto shrink-0">{(e.finished_at ?? e.frozen_at ?? "").slice(0, 10)}</span>
 									</label>
@@ -108,7 +118,9 @@ export function MonitorCertifyForm({ onDone }: { onDone?(): void }) {
 							))}
 						</ul>
 					)}
-					{candidates.length > shown.length && <p className="text-muted-foreground">{t("monitors.comparisonsMore", { count: candidates.length - shown.length })}</p>}
+					{candidates.length > shown.length && (
+						<p className="text-muted-foreground">{t("monitors.comparisonsMore", { count: candidates.length - shown.length })}</p>
+					)}
 					{picked.length > MAX_PICKED && <p className="text-destructive">{t("monitors.comparisonsTooMany", { max: MAX_PICKED })}</p>}
 				</fieldset>
 				<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

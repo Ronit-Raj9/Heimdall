@@ -26,11 +26,25 @@ export interface FailureForm {
 	limit: string;
 }
 
-export const DEFAULT_FAILURE_FORM: FailureForm = { evaluators: "", errors: true, scoreBelow: "", scoreEvaluators: "", days: "7", limit: "200" };
+export const DEFAULT_FAILURE_FORM: FailureForm = {
+	evaluators: "",
+	errors: true,
+	scoreBelow: "",
+	scoreEvaluators: "",
+	days: "7",
+	limit: "200",
+};
 
 /** Comma-separated names, trimmed, without blanks or repeats. */
 export function splitNames(s: string): string[] {
-	return [...new Set(s.split(",").map((x) => x.trim()).filter(Boolean))];
+	return [
+		...new Set(
+			s
+				.split(",")
+				.map((x) => x.trim())
+				.filter(Boolean),
+		),
+	];
 }
 
 /** The filter the form describes, or null when it names no rule. */
@@ -212,7 +226,11 @@ export function TaskReviewCard({ task, busy = false, message = null, onAccept, o
 					</StatusPill>
 				)}
 				{task.state !== "rejected" && (
-					<Link to="/suites/$suiteId" params={{ suiteId: task.suite }} className="text-primary ml-auto text-xs underline-offset-2 hover:underline">
+					<Link
+						to="/suites/$suiteId"
+						params={{ suiteId: task.suite }}
+						className="text-primary ml-auto text-xs underline-offset-2 hover:underline"
+					>
 						{t("tasks.openTask")}
 					</Link>
 				)}
@@ -227,7 +245,9 @@ export function TaskReviewCard({ task, busy = false, message = null, onAccept, o
 					<dd className="break-words">{task.recorded || "-"}</dd>
 				</div>
 			</dl>
-			{task.generated.length > 0 && <p className="text-muted-foreground text-xs">{t("tasks.generated", { ids: task.generated.join(", ") })}</p>}
+			{task.generated.length > 0 && (
+				<p className="text-muted-foreground text-xs">{t("tasks.generated", { ids: task.generated.join(", ") })}</p>
+			)}
 			{task.edit_me && task.edit_me.length > 0 && task.state === "needs_files" && (
 				<p className="text-xs text-amber-700 dark:text-amber-400" data-testid="maxim-task-editme">
 					{t("tasks.editMe", { files: task.edit_me.join(", ") })}
@@ -243,7 +263,11 @@ export function TaskReviewCard({ task, busy = false, message = null, onAccept, o
 					className="flex flex-col gap-3"
 					onSubmit={(e) => {
 						e.preventDefault();
-						onAccept({ answer: answer.trim() || undefined, rubric: rubric.trim() || undefined, instruction: instruction.trim() || undefined });
+						onAccept({
+							answer: answer.trim() || undefined,
+							rubric: rubric.trim() || undefined,
+							instruction: instruction.trim() || undefined,
+						});
 					}}
 				>
 					{qa && (
@@ -259,7 +283,12 @@ export function TaskReviewCard({ task, busy = false, message = null, onAccept, o
 					</label>
 					<label className="flex flex-col gap-1 text-sm">
 						<span className="font-medium">{t("tasks.instruction")}</span>
-						<textarea className={fieldClass} value={instruction} placeholder={task.request} onChange={(e) => setInstruction(e.target.value)} />
+						<textarea
+							className={fieldClass}
+							value={instruction}
+							placeholder={task.request}
+							onChange={(e) => setInstruction(e.target.value)}
+						/>
 						<span className="text-muted-foreground text-xs">{t("tasks.instructionHint")}</span>
 					</label>
 					<div className="flex flex-wrap items-center gap-2">
@@ -290,7 +319,14 @@ export function TaskReviewCard({ task, busy = false, message = null, onAccept, o
 						onChange={(e) => setReason(e.target.value)}
 						data-testid="maxim-task-reject-reason"
 					/>
-					<Button type="button" size="sm" variant="outline" disabled={busy || !reason.trim()} onClick={() => onReject(reason.trim())} data-testid="maxim-task-reject">
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						disabled={busy || !reason.trim()}
+						onClick={() => onReject(reason.trim())}
+						data-testid="maxim-task-reject"
+					>
 						{t("tasks.reject")}
 					</Button>
 				</div>

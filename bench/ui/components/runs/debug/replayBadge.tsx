@@ -25,10 +25,24 @@ export function editedText(label: ReplayLabel, edit: ForkEdit | undefined): stri
 }
 
 /** How a replayed model call was answered: from the recording, edited, or different from it. */
-export function ReplayBadge({ label, testId, edit, className }: { label: ReplayLabel; testId?: string; edit?: ForkEdit; className?: string }) {
+export function ReplayBadge({
+	label,
+	testId,
+	edit,
+	className,
+}: {
+	label: ReplayLabel;
+	testId?: string;
+	edit?: ForkEdit;
+	className?: string;
+}) {
 	const { t } = useTranslation("runDebug");
 	return (
-		<span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", TONE[label], className)} data-testid={testId} data-replay={label}>
+		<span
+			className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", TONE[label], className)}
+			data-testid={testId}
+			data-replay={label}
+		>
 			{editedText(label, edit) ?? t(`replay.${label}`)}
 		</span>
 	);

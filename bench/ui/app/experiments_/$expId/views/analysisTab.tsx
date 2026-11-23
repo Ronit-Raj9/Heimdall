@@ -161,7 +161,9 @@ function wordsFor<T extends string>(known: readonly T[], value: string | undefin
  */
 export function checkSummary(t: TFunction<"analysis">, c: Pick<CheckRunResult, "decision" | "action" | "policy" | "policy_file">): string {
 	// leader: three or more setups, one leads (fix wave 3, H09); its words live in the hw09 namespace.
-	const parts = [wordsFor(VERDICT_WORDS, c.decision, (d) => (d === "leader" ? i18n.t("decision.leader", { ns: "hw09" }) : t(`result.verdict.${d}`)))];
+	const parts = [
+		wordsFor(VERDICT_WORDS, c.decision, (d) => (d === "leader" ? i18n.t("decision.leader", { ns: "hw09" }) : t(`result.verdict.${d}`))),
+	];
 	if (c.decision !== "score") {
 		// no_decision adds nothing: the verdict sentence already says there is no clear answer.
 		if (c.action !== "no_decision") parts.push(wordsFor(ACTION_WORDS, c.action, (a) => t(`result.action.${a}`)));

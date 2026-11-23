@@ -68,7 +68,9 @@ export function JobLogPanel({ jobId, onClose, onFinished }: JobLogPanelProps) {
 			<header className="flex flex-wrap items-start gap-3">
 				<div className="flex min-w-0 flex-col gap-1">
 					<div className="flex flex-wrap items-center gap-2">
-						<span className="text-foreground text-base font-semibold tracking-tight">{data ? jobKindLabelFor(data.kind, data.params, kindName(data.kind)) : t("panel.title")}</span>
+						<span className="text-foreground text-base font-semibold tracking-tight">
+							{data ? jobKindLabelFor(data.kind, data.params, kindName(data.kind)) : t("panel.title")}
+						</span>
 						{data && <JobStatusBadge status={data.status} />}
 					</div>
 					<span className="text-muted-foreground/80 max-w-60 truncate font-mono text-[11px]" title={jobId}>

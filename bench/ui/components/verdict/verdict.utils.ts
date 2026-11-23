@@ -1,5 +1,16 @@
 import i18n from "@/lib/i18n";
-import type { Decision, ExperimentStatus, GridRow, GuardStatus, Outcome, Ratio, Score, Value, Verdict, VerdictPayload } from "@/lib/types/bench";
+import type {
+	Decision,
+	ExperimentStatus,
+	GridRow,
+	GuardStatus,
+	Outcome,
+	Ratio,
+	Score,
+	Value,
+	Verdict,
+	VerdictPayload,
+} from "@/lib/types/bench";
 
 // Pure helpers for the verdict screen, so the formatting and ordering rules are tested without
 // rendering. Numbers follow the UI locale; callers pass getLocale().

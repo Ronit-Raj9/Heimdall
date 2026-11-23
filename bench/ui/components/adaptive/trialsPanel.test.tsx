@@ -89,7 +89,15 @@ describe("TrialsPanel", () => {
 	it("says more than the cap, not zero tasks, when the sizing is over (audit 1-B-06)", () => {
 		const over = {
 			...seqView,
-			more_evidence: { ...seqView.more_evidence!, over: true, tasks: 0, tasks_total: 200, runs: 0, cost_usd: undefined, command: undefined },
+			more_evidence: {
+				...seqView.more_evidence!,
+				over: true,
+				tasks: 0,
+				tasks_total: 200,
+				runs: 0,
+				cost_usd: undefined,
+				command: undefined,
+			},
 		};
 		const html = renderToStaticMarkup(<TrialsPanel view={over} />);
 		expect(html).toContain("more than 200 tasks in all");

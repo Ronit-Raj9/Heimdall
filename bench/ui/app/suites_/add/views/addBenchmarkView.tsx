@@ -135,7 +135,8 @@ export function DraftSteps({ id }: { id: string }) {
 	const [poll, setPoll] = useState(0);
 	const q = useGetOnboardDraftQuery(id, { pollingInterval: poll });
 	const set = q.data;
-	const active = !!set && (set.readiness?.status === "queued" || set.readiness?.status === "running" || (!!set.published && !set.published.job_id));
+	const active =
+		!!set && (set.readiness?.status === "queued" || set.readiness?.status === "running" || (!!set.published && !set.published.job_id));
 	useEffect(() => setPoll(active ? DRAFT_POLL_MS : 0), [active]);
 	if (!set) {
 		return q.isError ? (

@@ -56,10 +56,8 @@ export const EXPERIMENT_POLL_MS = 2000;
  * Always false in a production build: __BENCH_FIXTURES__ is the literal false there, so the
  * fixture base query below is dead code the bundler drops.
  */
-export const IS_FIXTURE_MODE = __BENCH_FIXTURES__ && detectFixtureMode(
-	typeof window === "undefined" ? "" : window.location.search,
-	import.meta.env.VITE_BENCH_FIXTURE,
-);
+export const IS_FIXTURE_MODE =
+	__BENCH_FIXTURES__ && detectFixtureMode(typeof window === "undefined" ? "" : window.location.search, import.meta.env.VITE_BENCH_FIXTURE);
 
 /**
  * Whether a pair can be opened: always against a server; in fixture mode only the pairs with a
@@ -176,14 +174,21 @@ const httpBaseQuery: BenchBaseQuery = async (args, api, extraOptions) => {
 		typeof args !== "string" && bodyText !== undefined
 			? await sendIdempotent(
 					requestIdentity("POST", `${url}?${JSON.stringify(args.params ?? null)}`, bodyText),
-					(key) => send({ ...args, headers: { ...Object.fromEntries(new Headers(args.headers as HeadersInit | undefined).entries()), [IDEMPOTENCY_HEADER]: key } }),
+					(key) =>
+						send({
+							...args,
+							headers: { ...Object.fromEntries(new Headers(args.headers as HeadersInit | undefined).entries()), [IDEMPOTENCY_HEADER]: key },
+						}),
 					(r) => (r.error && (r.error.status === "FETCH_ERROR" || r.error.status === "TIMEOUT_ERROR") ? "network" : "answered"),
 				)
 			: await send(args);
 	if (result.error && errorStatus(result.error) === 401) notifyUnauthorized(typeof args === "string" ? args : args.url);
 	if (result.error && errorStatus(result.error) === 402) notifyPlanLimit(result.error); // Y16: upgrade prompt (lib/billing/planLimit.ts)
 	if (result.error && errorStatus(result.error) === 429) {
-		return { ...result, error: rateLimitedError((result.meta as { response?: Response } | undefined)?.response?.headers.get("Retry-After") ?? null) };
+		return {
+			...result,
+			error: rateLimitedError((result.meta as { response?: Response } | undefined)?.response?.headers.get("Retry-After") ?? null),
+		};
 	}
 	return result;
 };

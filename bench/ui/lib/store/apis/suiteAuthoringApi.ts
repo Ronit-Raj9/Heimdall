@@ -25,7 +25,10 @@ export const suiteAuthoringApi = benchApi.enhanceEndpoints({ addTagTypes: ["Suit
 		}),
 		createSuiteTask: builder.mutation<CreateTaskResponse, { suite: string } & CreateTaskRequest>({
 			query: ({ suite, ...body }) => ({ url: `/suites/${seg(suite)}/tasks`, method: "POST", body }),
-			invalidatesTags: (_r, _e, { suite }) => [{ type: "BenchSuites", id: "LIST" }, { type: "SuiteAuthoring", id: suite }],
+			invalidatesTags: (_r, _e, { suite }) => [
+				{ type: "BenchSuites", id: "LIST" },
+				{ type: "SuiteAuthoring", id: suite },
+			],
 		}),
 		getSuiteFiles: builder.query<SuiteFileList, string>({
 			query: (suite) => `/suites/${seg(suite)}/files`,

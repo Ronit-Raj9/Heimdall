@@ -98,17 +98,17 @@ export function PageHeader({ title, subtitle, actions, meta, breadcrumbs, icon, 
 			)}
 			<div className="flex min-w-0 flex-wrap items-start gap-x-3 gap-y-3">
 				{iconNode && (
-					<span
-						aria-hidden="true"
-						className="text-muted-foreground mt-1.5 flex shrink-0 items-center"
-						data-testid="page-header-icon"
-					>
+					<span aria-hidden="true" className="text-muted-foreground mt-1.5 flex shrink-0 items-center" data-testid="page-header-icon">
 						{iconNode}
 					</span>
 				)}
 				<div className="flex min-w-0 flex-1 flex-col gap-1">
 					<div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-						<Heading className={cn("text-foreground min-w-0 font-semibold tracking-tight break-words", Heading === "h1" ? "text-2xl" : "text-xl")}>{title}</Heading>
+						<Heading
+							className={cn("text-foreground min-w-0 font-semibold tracking-tight break-words", Heading === "h1" ? "text-2xl" : "text-xl")}
+						>
+							{title}
+						</Heading>
 						{meta && <div className="flex flex-wrap items-center gap-2">{meta}</div>}
 					</div>
 					{subtitle && <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">{subtitle}</p>}

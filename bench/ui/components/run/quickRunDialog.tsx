@@ -38,7 +38,12 @@ export function buildQuickRunRequest(v: {
 	budget: number;
 }): QuickRunRequest | null {
 	if (!v.model || !v.model.model.trim()) return null;
-	const req: QuickRunRequest = { model: { ...v.model, model: v.model.model.trim() }, tasks: v.tasks, trials: v.trials, budget_usd: v.budget };
+	const req: QuickRunRequest = {
+		model: { ...v.model, model: v.model.model.trim() },
+		tasks: v.tasks,
+		trials: v.trials,
+		budget_usd: v.budget,
+	};
 	if (v.suite) req.suite = v.suite;
 	if (v.agent) req.agent = v.agent;
 	if (v.compare && v.compare.model.trim()) req.compare_model = { ...v.compare, model: v.compare.model.trim() };
@@ -49,7 +54,11 @@ export function buildQuickRunRequest(v: {
 export const QUICKRUN_LIMITS = { tasks: [1, 50], trials: [1, 5], budget: [0.5, 100] } as const;
 
 /** What is wrong with each typed number, as a quickrun key; an empty object when all three are fine. */
-export function quickRunProblems(v: { tasks: string; trials: string; budget: string }): { tasks?: string; trials?: string; budget?: string } {
+export function quickRunProblems(v: { tasks: string; trials: string; budget: string }): {
+	tasks?: string;
+	trials?: string;
+	budget?: string;
+} {
 	const out: { tasks?: string; trials?: string; budget?: string } = {};
 	const whole = (text: string, [lo, hi]: readonly [number, number]) => {
 		const n = Number(text);
@@ -58,7 +67,8 @@ export function quickRunProblems(v: { tasks: string; trials: string; budget: str
 	if (!whole(v.tasks, QUICKRUN_LIMITS.tasks)) out.tasks = "limits.tasks";
 	if (!whole(v.trials, QUICKRUN_LIMITS.trials)) out.trials = "limits.trials";
 	const b = Number(v.budget);
-	if (v.budget.trim() === "" || !Number.isFinite(b) || b < QUICKRUN_LIMITS.budget[0] || b > QUICKRUN_LIMITS.budget[1]) out.budget = "limits.budget";
+	if (v.budget.trim() === "" || !Number.isFinite(b) || b < QUICKRUN_LIMITS.budget[0] || b > QUICKRUN_LIMITS.budget[1])
+		out.budget = "limits.budget";
 	return out;
 }
 
@@ -127,10 +137,14 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 	const done = state.data;
 	const suiteList = suites.data?.suites ?? [];
 	const agentList = agents.data?.agents ?? [];
-	const fieldCls = "border-input bg-background h-9 w-full rounded-lg border px-2.5 text-sm transition-shadow focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none";
+	const fieldCls =
+		"border-input bg-background h-9 w-full rounded-lg border px-2.5 text-sm transition-shadow focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none";
 
 	return (
-		<div className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm duration-200" data-testid="quickrun-backdrop">
+		<div
+			className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm duration-200"
+			data-testid="quickrun-backdrop"
+		>
 			<div
 				role="dialog"
 				aria-modal="true"
@@ -139,7 +153,10 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 				data-testid="quickrun-dialog"
 			>
 				<div className="flex items-start gap-3">
-					<span className="bg-primary text-primary-foreground flex size-10 shrink-0 items-center justify-center rounded-xl shadow-sm" aria-hidden="true">
+					<span
+						className="bg-primary text-primary-foreground flex size-10 shrink-0 items-center justify-center rounded-xl shadow-sm"
+						aria-hidden="true"
+					>
 						<Zap className="size-5" />
 					</span>
 					<div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -148,7 +165,12 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 						</h2>
 						<p className="text-muted-foreground text-sm">{tz("quick.intro")}</p>
 					</div>
-					<button type="button" onClick={onClose} className="text-muted-foreground hover:bg-accent hover:text-foreground -mt-1 -mr-1 rounded-lg p-1.5 transition-colors" aria-label={t("close")}>
+					<button
+						type="button"
+						onClick={onClose}
+						className="text-muted-foreground hover:bg-accent hover:text-foreground -mt-1 -mr-1 rounded-lg p-1.5 transition-colors"
+						aria-label={t("close")}
+					>
 						<X className="size-4" aria-hidden="true" />
 					</button>
 				</div>
@@ -160,7 +182,9 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 								<CircleCheck className="size-6" aria-hidden="true" />
 							</span>
 							<p className="text-base font-semibold">{done.started ? tz("quick.startedTitle") : tz("quick.createdTitle")}</p>
-							<p className="text-muted-foreground">{done.started ? t("started", { id: done.exp_id }) : t("created", { id: done.exp_id })}</p>
+							<p className="text-muted-foreground">
+								{done.started ? t("started", { id: done.exp_id }) : t("created", { id: done.exp_id })}
+							</p>
 						</div>
 						<p className="text-center">{formatCost(done) ? t("estimate", { cost: formatCost(done) }) : t("estimateUnknown")}</p>
 						<details className="text-muted-foreground text-xs">
@@ -230,7 +254,13 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 						)}
 						<div className="bg-muted/30 space-y-2 rounded-xl border p-3 text-sm">
 							<label className="flex cursor-pointer items-center gap-2 font-medium">
-								<input type="checkbox" className="accent-primary size-4" checked={compareOn} onChange={(e) => setCompareOn(e.target.checked)} data-testid="quickrun-compare-toggle" />
+								<input
+									type="checkbox"
+									className="accent-primary size-4"
+									checked={compareOn}
+									onChange={(e) => setCompareOn(e.target.checked)}
+									data-testid="quickrun-compare-toggle"
+								/>
 								<span>{t("compare")}</span>
 							</label>
 							{compareOn ? (
@@ -247,24 +277,56 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 									{tasksV} x {trialsV}, ${budgetV}
 								</span>
 							</summary>
-						<div className="grid grid-cols-3 gap-2 border-t p-3">
-							<label className="space-y-1 text-sm">
-								<span className="font-medium">{t("tasks")}</span>
-								<Input type="number" min={1} max={50} value={tasksT} onChange={(e) => setTasks(e.target.value)} aria-invalid={!!problems.tasks} data-testid="quickrun-tasks" />
-							</label>
-							<label className="space-y-1 text-sm">
-								<span className="font-medium">{t("trials")}</span>
-								<Input type="number" min={1} max={5} value={trialsT} onChange={(e) => setTrials(e.target.value)} aria-invalid={!!problems.trials} data-testid="quickrun-trials" />
-							</label>
-							<label className="space-y-1 text-sm">
-								<span className="font-medium">{t("budget")}</span>
-								<Input type="number" min={0.5} max={100} step={0.5} value={budgetT} onChange={(e) => setBudget(e.target.value)} aria-invalid={!!problems.budget} data-testid="quickrun-budget" />
-							</label>
-						</div>
+							<div className="grid grid-cols-3 gap-2 border-t p-3">
+								<label className="space-y-1 text-sm">
+									<span className="font-medium">{t("tasks")}</span>
+									<Input
+										type="number"
+										min={1}
+										max={50}
+										value={tasksT}
+										onChange={(e) => setTasks(e.target.value)}
+										aria-invalid={!!problems.tasks}
+										data-testid="quickrun-tasks"
+									/>
+								</label>
+								<label className="space-y-1 text-sm">
+									<span className="font-medium">{t("trials")}</span>
+									<Input
+										type="number"
+										min={1}
+										max={5}
+										value={trialsT}
+										onChange={(e) => setTrials(e.target.value)}
+										aria-invalid={!!problems.trials}
+										data-testid="quickrun-trials"
+									/>
+								</label>
+								<label className="space-y-1 text-sm">
+									<span className="font-medium">{t("budget")}</span>
+									<Input
+										type="number"
+										min={0.5}
+										max={100}
+										step={0.5}
+										value={budgetT}
+										onChange={(e) => setBudget(e.target.value)}
+										aria-invalid={!!problems.budget}
+										data-testid="quickrun-budget"
+									/>
+								</label>
+							</div>
 						</details>
 						{invalid && (
 							<div className="space-y-1 text-sm" role="alert" data-testid="quickrun-limits">
-								{(["tasks", "trials", "budget"] as const).map((k) => problems[k] && <p key={k} className="text-destructive">{t(problems[k] as "limits.tasks")}</p>)}
+								{(["tasks", "trials", "budget"] as const).map(
+									(k) =>
+										problems[k] && (
+											<p key={k} className="text-destructive">
+												{t(problems[k] as "limits.tasks")}
+											</p>
+										),
+								)}
 							</div>
 						)}
 						{missingModel && (

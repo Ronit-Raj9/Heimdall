@@ -151,7 +151,12 @@ export function SignupForm({ settings }: { settings: SignupSettings }) {
 							{t("admin.save")}
 						</Button>
 						{settings.source === "admin" && (
-							<Button variant="outline" disabled={state.isLoading} onClick={() => void submit({ mode: "", domains: [] })} dataTestId="admin-signup-reset">
+							<Button
+								variant="outline"
+								disabled={state.isLoading}
+								onClick={() => void submit({ mode: "", domains: [] })}
+								dataTestId="admin-signup-reset"
+							>
 								{t("admin.reset")}
 							</Button>
 						)}
@@ -167,7 +172,9 @@ export function SignupForm({ settings }: { settings: SignupSettings }) {
 					)}
 					<div className="flex min-w-0 flex-col gap-1 text-sm">
 						<span className="text-foreground font-medium">{t("admin.delivery")}</span>
-						<p className="text-muted-foreground">{settings.email_delivery === "email" ? t("admin.deliveryEmail") : t("admin.deliveryLog")}</p>
+						<p className="text-muted-foreground">
+							{settings.email_delivery === "email" ? t("admin.deliveryEmail") : t("admin.deliveryLog")}
+						</p>
 					</div>
 				</CardContent>
 			</Card>

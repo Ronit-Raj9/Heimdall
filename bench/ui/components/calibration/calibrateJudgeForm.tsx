@@ -156,13 +156,23 @@ export function CalibrateJudgeForm({ status, onDone }: { status: CalibrationStat
 				</p>
 			) : (
 				<div className="flex flex-col gap-3">
-					<JobRunButton kind="calibrate.run" params={{ ...params, estimate: true }} label={t("estimate")} variant="outline" disabled={nothingToCheck} onDone={onEstimate} />
+					<JobRunButton
+						kind="calibrate.run"
+						params={{ ...params, estimate: true }}
+						label={t("estimate")}
+						variant="outline"
+						disabled={nothingToCheck}
+						onDone={onEstimate}
+					/>
 					{forecast && (
 						<p className="text-sm" data-testid="calibrate-judge-forecast">
 							{t("forecast", {
 								calls: forecast.calls,
 								items: forecast.items,
-								usd: forecast.forecast_usd != null ? `$${forecast.forecast_usd.toFixed(4)}` : t("unpriced", { note: forecast.price_note ?? "" }),
+								usd:
+									forecast.forecast_usd != null
+										? `$${forecast.forecast_usd.toFixed(4)}`
+										: t("unpriced", { note: forecast.price_note ?? "" }),
 							})}
 						</p>
 					)}

@@ -143,7 +143,8 @@ function DataOptions({ e }: { e: CatalogEntry }) {
 				<span className="font-medium">{t("cardUpload")}</span> {e.upload_expects}
 			</div>
 			<div>
-				<span className="font-medium">{t("cardFetch")}</span> {e.fetch_allowed ? (e.fetch_url ? t("cardFetchKnown") : t("cardFetchAny")) : t("cardFetchNo")}
+				<span className="font-medium">{t("cardFetch")}</span>{" "}
+				{e.fetch_allowed ? (e.fetch_url ? t("cardFetchKnown") : t("cardFetchAny")) : t("cardFetchNo")}
 			</div>
 			{e.data_note && <div className="text-muted-foreground">{e.data_note}</div>}
 		</div>
@@ -190,7 +191,10 @@ function SidePanel({ e, onClose, children, testId }: { e: CatalogEntry; onClose(
 	return (
 		<div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={name}>
 			<button type="button" aria-label={t("close")} className="absolute inset-0 bg-black/30 backdrop-blur-[1px]" onClick={onClose} />
-			<aside className="bg-background border-border relative flex h-full w-full max-w-md flex-col gap-5 overflow-y-auto border-l p-6 shadow-xl" data-testid={testId}>
+			<aside
+				className="bg-background border-border relative flex h-full w-full max-w-md flex-col gap-5 overflow-y-auto border-l p-6 shadow-xl"
+				data-testid={testId}
+			>
 				<div className="flex items-start gap-3">
 					<div className="min-w-0 flex-1">
 						<div className="flex items-center gap-2">
@@ -226,7 +230,10 @@ function ImportPanel(props: CatalogBodyProps & { importFor: CatalogEntry; import
 						type="button"
 						role="tab"
 						aria-selected={f.mode === m}
-						className={cn("rounded-md px-3 py-1 text-sm transition-colors", f.mode === m ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground")}
+						className={cn(
+							"rounded-md px-3 py-1 text-sm transition-colors",
+							f.mode === m ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
+						)}
 						onClick={() => set({ mode: m })}
 						data-testid={`catalog-mode-${m}`}
 					>
@@ -237,8 +244,15 @@ function ImportPanel(props: CatalogBodyProps & { importFor: CatalogEntry; import
 			{f.mode === "upload" && (
 				<label className="flex flex-col gap-1.5 text-sm font-medium">
 					{t("uploadLabel")}
-					<Input type="file" accept=".zip,.jsonl,.json,.parquet,.csv,.tsv,.txt" onChange={(ev) => set({ file: ev.target.files?.[0] ?? null })} data-testid="catalog-import-file" />
-					<span className="text-muted-foreground text-xs font-normal">{t("uploadHelp", { expects: e.upload_expects ?? "", path: e.dataset_path ?? "uploads/datasets" })}</span>
+					<Input
+						type="file"
+						accept=".zip,.jsonl,.json,.parquet,.csv,.tsv,.txt"
+						onChange={(ev) => set({ file: ev.target.files?.[0] ?? null })}
+						data-testid="catalog-import-file"
+					/>
+					<span className="text-muted-foreground text-xs font-normal">
+						{t("uploadHelp", { expects: e.upload_expects ?? "", path: e.dataset_path ?? "uploads/datasets" })}
+					</span>
 				</label>
 			)}
 			{f.mode === "url" && (
@@ -258,7 +272,12 @@ function ImportPanel(props: CatalogBodyProps & { importFor: CatalogEntry; import
 			{e.data_note && (
 				<label className="flex flex-col gap-1.5 text-sm font-medium">
 					{t("refLabel")}
-					<Input value={f.ref} placeholder="40-hex commit" onChange={(ev) => set({ ref: ev.target.value })} data-testid="catalog-import-ref" />
+					<Input
+						value={f.ref}
+						placeholder="40-hex commit"
+						onChange={(ev) => set({ ref: ev.target.value })}
+						data-testid="catalog-import-ref"
+					/>
 				</label>
 			)}
 			<div className="flex gap-3">
@@ -268,7 +287,14 @@ function ImportPanel(props: CatalogBodyProps & { importFor: CatalogEntry; import
 				</label>
 				<label className="flex w-32 flex-col gap-1.5 text-sm font-medium">
 					{t("limitLabel")}
-					<Input type="number" min={1} max={500} value={f.limit} onChange={(ev) => set({ limit: Number(ev.target.value) || 1 })} data-testid="catalog-import-limit" />
+					<Input
+						type="number"
+						min={1}
+						max={500}
+						value={f.limit}
+						onChange={(ev) => set({ limit: Number(ev.target.value) || 1 })}
+						data-testid="catalog-import-limit"
+					/>
 				</label>
 			</div>
 			{props.error && (
@@ -288,7 +314,19 @@ function ImportPanel(props: CatalogBodyProps & { importFor: CatalogEntry; import
 	);
 }
 
-function CardAction({ e, busy, canWrite, onAdd, builtinSuite }: { e: CatalogEntry; busy: boolean; canWrite: boolean; onAdd(): void; builtinSuite?: string }) {
+function CardAction({
+	e,
+	busy,
+	canWrite,
+	onAdd,
+	builtinSuite,
+}: {
+	e: CatalogEntry;
+	busy: boolean;
+	canWrite: boolean;
+	onAdd(): void;
+	builtinSuite?: string;
+}) {
 	const { t } = useTranslation("catalog");
 	if (builtinSuite)
 		return (
@@ -313,7 +351,14 @@ function CardAction({ e, busy, canWrite, onAdd, builtinSuite }: { e: CatalogEntr
 		);
 	if (!canWrite) return <span className="text-muted-foreground text-xs">{t("memberOnly")}</span>;
 	return (
-		<Button size="sm" variant={e.kind === "importer" ? "outline" : "default"} disabled={busy} onClick={onAdd} data-testid={`catalog-add-${e.id}`} title={e.hint}>
+		<Button
+			size="sm"
+			variant={e.kind === "importer" ? "outline" : "default"}
+			disabled={busy}
+			onClick={onAdd}
+			data-testid={`catalog-add-${e.id}`}
+			title={e.hint}
+		>
 			{busy ? t("adding") : e.kind === "importer" ? t("import") : t("add")}
 		</Button>
 	);
@@ -324,7 +369,10 @@ function EntryCard({ e, props, canWrite }: { e: CatalogEntry; props: CatalogBody
 	const { title, example } = displayFor(e);
 	const cat = entryCategories(e)[0];
 	return (
-		<div className="border-border bg-card flex flex-col gap-4 rounded-lg border p-4 transition-colors hover:border-foreground/20" data-testid={`catalog-entry-${e.id}`}>
+		<div
+			className="border-border bg-card hover:border-foreground/20 flex flex-col gap-4 rounded-lg border p-4 transition-colors"
+			data-testid={`catalog-entry-${e.id}`}
+		>
 			<div className="min-w-0">
 				<div className="flex items-center gap-2">
 					<CategoryIcon category={cat} />
@@ -344,7 +392,13 @@ function EntryCard({ e, props, canWrite }: { e: CatalogEntry; props: CatalogBody
 				>
 					{t("details")}
 				</button>
-				<CardAction e={e} busy={props.busyId === e.id} canWrite={canWrite} onAdd={() => props.onAdd(e)} builtinSuite={builtinSuiteOf(e, props.builtinSuites)} />
+				<CardAction
+					e={e}
+					busy={props.busyId === e.id}
+					canWrite={canWrite}
+					onAdd={() => props.onAdd(e)}
+					builtinSuite={builtinSuiteOf(e, props.builtinSuites)}
+				/>
 			</div>
 		</div>
 	);
@@ -366,10 +420,16 @@ export function CatalogBody(props: CatalogBodyProps) {
 		return CATEGORIES.filter((c) => s.has(c));
 	}, [props.entries]);
 	const set = (patch: Partial<CatalogFilters>) => props.onFilters({ ...filters, ...patch });
-	const tokens = ([
-		filters.category !== "all" && { key: "category", label: `${t("category")}: ${t(`cat_${filters.category}`)}`, onRemove: () => set({ category: "all" }) },
-		filters.source !== "all" && { key: "source", label: t(SOURCE_KEY[filters.source]), onRemove: () => set({ source: "all" }) },
-	] as (FilterToken | false | "" | null | undefined)[]).filter((x): x is FilterToken => Boolean(x));
+	const tokens = (
+		[
+			filters.category !== "all" && {
+				key: "category",
+				label: `${t("category")}: ${t(`cat_${filters.category}`)}`,
+				onRemove: () => set({ category: "all" }),
+			},
+			filters.source !== "all" && { key: "source", label: t(SOURCE_KEY[filters.source]), onRemove: () => set({ source: "all" }) },
+		] as (FilterToken | false | "" | null | undefined)[]
+	).filter((x): x is FilterToken => Boolean(x));
 	const res = props.lastAdded?.result;
 	const grouped = SECTIONS.map((id) => ({ id, items: shown.filter((e) => sectionOf(e) === id) })).filter((g) => g.items.length > 0);
 	const details = props.detailsFor && !props.importFor ? props.detailsFor : null;
@@ -382,7 +442,13 @@ export function CatalogBody(props: CatalogBodyProps) {
 				</div>
 				<div className="flex flex-col gap-2">
 					<div className="flex flex-wrap items-center gap-2" role="toolbar" data-testid="catalog-toolbar">
-						<ToolbarSearch value={filters.query} onChange={(v) => set({ query: v })} placeholder={t("search")} label={t("search")} testId="catalog-search" />
+						<ToolbarSearch
+							value={filters.query}
+							onChange={(v) => set({ query: v })}
+							placeholder={t("search")}
+							label={t("search")}
+							testId="catalog-search"
+						/>
 						<FilterSelect
 							label={t("category")}
 							allLabel={t("filterAll")}
@@ -411,12 +477,18 @@ export function CatalogBody(props: CatalogBodyProps) {
 				</div>
 			)}
 			{props.error && !props.importFor && (
-				<div className="border-chart-error/50 bg-chart-error/5 text-chart-error-ink rounded-xl border p-4 text-sm" data-testid="catalog-error">
+				<div
+					className="border-chart-error/50 bg-chart-error/5 text-chart-error-ink rounded-xl border p-4 text-sm"
+					data-testid="catalog-error"
+				>
 					{t("addFailed", { message: props.error })}
 				</div>
 			)}
 			{props.lastAdded && (
-				<div className="border-chart-success/50 bg-chart-success/5 flex items-center gap-2 rounded-xl border p-4 text-sm" data-testid="catalog-added">
+				<div
+					className="border-chart-success/50 bg-chart-success/5 flex items-center gap-2 rounded-xl border p-4 text-sm"
+					data-testid="catalog-added"
+				>
 					<CheckCircle2 className="text-chart-success-ink size-4 shrink-0" aria-hidden />
 					{res ? (
 						<span>
@@ -432,7 +504,10 @@ export function CatalogBody(props: CatalogBodyProps) {
 				</div>
 			)}
 			{props.importFailure && (
-				<div className="border-chart-error/50 bg-chart-error/5 flex flex-col gap-2 rounded-xl border p-4 text-sm" data-testid="catalog-import-failed">
+				<div
+					className="border-chart-error/50 bg-chart-error/5 flex flex-col gap-2 rounded-xl border p-4 text-sm"
+					data-testid="catalog-import-failed"
+				>
 					<p className="text-chart-error-ink">{t("importFailed", { message: props.importFailure.error })}</p>
 					{props.importFailure.skipped.length > 0 && (
 						<div>
@@ -450,7 +525,12 @@ export function CatalogBody(props: CatalogBodyProps) {
 			)}
 			{props.jobPanel}
 			{shown.length === 0 ? (
-				<EmptyState icon={Library} message={t("empty")} testId="catalog-empty" action={{ label: t("clearFilters"), onClick: () => props.onFilters(NO_FILTERS) }} />
+				<EmptyState
+					icon={Library}
+					message={t("empty")}
+					testId="catalog-empty"
+					action={{ label: t("clearFilters"), onClick: () => props.onFilters(NO_FILTERS) }}
+				/>
 			) : (
 				grouped.map((g) => (
 					<section key={g.id} className="flex flex-col gap-3" data-testid={`catalog-section-${g.id}`}>

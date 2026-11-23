@@ -133,7 +133,12 @@ export default function JobsView() {
 
 			{list.data?.next && (
 				<div>
-					<Button variant="outline" size="sm" onClick={() => setLimit((n) => Math.min(500, n + JOBS_PAGE_SIZE))} dataTestId="jobs-load-more">
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => setLimit((n) => Math.min(500, n + JOBS_PAGE_SIZE))}
+						dataTestId="jobs-load-more"
+					>
 						{t("loadMore")}
 					</Button>
 				</div>
@@ -244,48 +249,50 @@ export function JobsTable({
 										{active && <JobProgressBar job={job} className="w-28" />}
 									</div>
 								</td>
-								<td className="text-muted-foreground px-4 py-3 text-xs whitespace-nowrap">{formatRelative(job.created_at, locale) ?? "-"}</td>
+								<td className="text-muted-foreground px-4 py-3 text-xs whitespace-nowrap">
+									{formatRelative(job.created_at, locale) ?? "-"}
+								</td>
 								<td className="px-4 py-3 text-right">
 									<div className="flex items-center justify-end gap-1.5">
-									{onOpenLog && (
-										<Button
-											variant="ghost"
-											size="sm"
-											className="h-7 gap-1 px-2 text-xs"
-											onClick={() => onOpenLog(job)}
-											dataTestId={`jobs-log-${job.id}`}
-										>
-											<SquareTerminal className="size-3.5" aria-hidden="true" />
-											{t("drawer.open")}
-										</Button>
-									)}
-									<RoleGate min="member" fallback={null}>
-										{active && !job.cancel_requested ? (
-											<ConfirmButton
-												label={t("cancel")}
-												question={t("confirmCancel")}
-												confirmLabel={t("confirm")}
-												cancelLabel={t("keep")}
-												onConfirm={() => onCancel(job)}
-												disabled={busy}
-												variant="destructive"
-												testId={`jobs-cancel-${job.id}`}
-											/>
-										) : !active ? (
+										{onOpenLog && (
 											<Button
-												variant="outline"
+												variant="ghost"
 												size="sm"
-												className="h-7 gap-1 px-2.5 text-xs"
-												title={t("retryTitle")}
-												disabled={busy}
-												onClick={() => onRetry(job)}
-												dataTestId={`jobs-retry-${job.id}`}
+												className="h-7 gap-1 px-2 text-xs"
+												onClick={() => onOpenLog(job)}
+												dataTestId={`jobs-log-${job.id}`}
 											>
-												<RotateCcw className="size-3.5" aria-hidden="true" />
-												{t("retry")}
+												<SquareTerminal className="size-3.5" aria-hidden="true" />
+												{t("drawer.open")}
 											</Button>
-										) : null}
-									</RoleGate>
+										)}
+										<RoleGate min="member" fallback={null}>
+											{active && !job.cancel_requested ? (
+												<ConfirmButton
+													label={t("cancel")}
+													question={t("confirmCancel")}
+													confirmLabel={t("confirm")}
+													cancelLabel={t("keep")}
+													onConfirm={() => onCancel(job)}
+													disabled={busy}
+													variant="destructive"
+													testId={`jobs-cancel-${job.id}`}
+												/>
+											) : !active ? (
+												<Button
+													variant="outline"
+													size="sm"
+													className="h-7 gap-1 px-2.5 text-xs"
+													title={t("retryTitle")}
+													disabled={busy}
+													onClick={() => onRetry(job)}
+													dataTestId={`jobs-retry-${job.id}`}
+												>
+													<RotateCcw className="size-3.5" aria-hidden="true" />
+													{t("retry")}
+												</Button>
+											) : null}
+										</RoleGate>
 									</div>
 								</td>
 							</tr>

@@ -10,7 +10,14 @@ vi.mock("@tanstack/react-router", async () => ({
 }));
 vi.mock("@/lib/store/apis/suiteAuthoringApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/suiteAuthoringApi")>()),
-	useGetSuiteTemplatesQuery: () => okQuery({ default: "python-pytest", templates: [{ id: "python-pytest", scenario: false }, { id: "qa", scenario: true, sample: "hotel-cap" }] }),
+	useGetSuiteTemplatesQuery: () =>
+		okQuery({
+			default: "python-pytest",
+			templates: [
+				{ id: "python-pytest", scenario: false },
+				{ id: "qa", scenario: true, sample: "hotel-cap" },
+			],
+		}),
 	useCreateSuiteMutation: () => mutation(),
 }));
 

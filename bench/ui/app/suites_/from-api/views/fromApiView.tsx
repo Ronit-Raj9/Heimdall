@@ -555,7 +555,11 @@ function WriteSection({ draft, onChanged }: { draft: ListedAppTasksDraft; onChan
 			cancelLabel: t("write.cancel"),
 		});
 		if (!ok) return;
-		const res = await write({ id: draft.id, held_out: heldOut, ...(draft.judged && judge ? { judge: { provider: judge.provider, model: judge.model } } : {}) });
+		const res = await write({
+			id: draft.id,
+			held_out: heldOut,
+			...(draft.judged && judge ? { judge: { provider: judge.provider, model: judge.model } } : {}),
+		});
 		if ("data" in res) onChanged();
 	};
 	return (
@@ -580,12 +584,7 @@ function WriteSection({ draft, onChanged }: { draft: ListedAppTasksDraft; onChan
 			)}
 			{data && <p className="text-sm">{t("write.done", { suite: data.suite })}</p>}
 			<div>
-				<Button
-					isLoading={isLoading}
-					disabled={!judgeOk}
-					onClick={() => void submit()}
-					dataTestId="from-api-write-submit"
-				>
+				<Button isLoading={isLoading} disabled={!judgeOk} onClick={() => void submit()} dataTestId="from-api-write-submit">
 					{t("write.submit", { count: draft.plans.length })}
 				</Button>
 			</div>
@@ -606,8 +605,13 @@ function ReviewSection({ draft, writable, onChanged }: { draft: ListedAppTasksDr
 			description={t("review.description")}
 			testId="from-api-review"
 			actions={
-				<Link to="/suites/$suiteId" params={{ suiteId: draft.suite }}
-					search={{ tab: "build" } as never} className="text-sm underline" data-testid="from-api-open-benchmark">
+				<Link
+					to="/suites/$suiteId"
+					params={{ suiteId: draft.suite }}
+					search={{ tab: "build" } as never}
+					className="text-sm underline"
+					data-testid="from-api-open-benchmark"
+				>
 					{t("write.openBenchmark")}
 				</Link>
 			}

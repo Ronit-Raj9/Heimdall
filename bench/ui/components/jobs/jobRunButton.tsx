@@ -49,7 +49,13 @@ export function JobRunButton({ kind, params, label, confirm, disabled, onDone, v
 	return (
 		<div className="flex min-w-0 flex-col gap-2" data-testid={`job-run-${kind}-wrap`}>
 			<div>
-				<Button variant={variant} disabled={!allowed || busy || !!disabled} isLoading={busy} onClick={() => void run()} dataTestId={`job-run-${kind}`}>
+				<Button
+					variant={variant}
+					disabled={!allowed || busy || !!disabled}
+					isLoading={busy}
+					onClick={() => void run()}
+					dataTestId={`job-run-${kind}`}
+				>
 					{label}
 				</Button>
 			</div>

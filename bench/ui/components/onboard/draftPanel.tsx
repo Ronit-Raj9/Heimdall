@@ -206,13 +206,24 @@ export function ReadinessPanel({ set }: { set: OnboardDraftSet }) {
 		<div className="flex min-w-0 flex-col gap-3" data-testid="onboard-readiness">
 			<div className="flex flex-wrap items-center gap-3">
 				{!set.published && (
-					<Button onClick={() => void run()} disabled={running || startState.isLoading || set.tasks.length === 0} isLoading={startState.isLoading} dataTestId="onboard-ready-run">
+					<Button
+						onClick={() => void run()}
+						disabled={running || startState.isLoading || set.tasks.length === 0}
+						isLoading={startState.isLoading}
+						dataTestId="onboard-ready-run"
+					>
 						{r ? tx("ready.rerun") : tx("ready.run")}
 					</Button>
 				)}
 				{r && (
 					<span className="text-sm" data-testid="onboard-ready-status">
-						{tx("ready.status", { status: tx(`ready.statusLabel.${r.status}`), where: r.where || "-", done: r.done, total: r.total, admitted: r.admitted })}
+						{tx("ready.status", {
+							status: tx(`ready.statusLabel.${r.status}`),
+							where: r.where || "-",
+							done: r.done,
+							total: r.total,
+							admitted: r.admitted,
+						})}
 					</span>
 				)}
 			</div>
@@ -340,10 +351,20 @@ export function PublishPanel({ set }: { set: OnboardDraftSet }) {
 							{tx("publish.runReadiness")}
 						</Link>
 					)}
-					<Link to="/suites/$suiteId" params={{ suiteId: p.suite }} className={buttonVariants({ variant: "outline", size: "sm" })} data-testid="onboard-open-suite">
+					<Link
+						to="/suites/$suiteId"
+						params={{ suiteId: p.suite }}
+						className={buttonVariants({ variant: "outline", size: "sm" })}
+						data-testid="onboard-open-suite"
+					>
 						{tx("publish.open")}
 					</Link>
-					<Link to="/evaluate" search={{ suite: p.suite } as never} className={buttonVariants({ size: "sm" })} data-testid="onboard-evaluate">
+					<Link
+						to="/evaluate"
+						search={{ suite: p.suite } as never}
+						className={buttonVariants({ size: "sm" })}
+						data-testid="onboard-evaluate"
+					>
 						{tx("publish.evaluate")}
 					</Link>
 				</div>
@@ -362,7 +383,12 @@ export function PublishPanel({ set }: { set: OnboardDraftSet }) {
 				{tx("publish.unready")}
 			</label>
 			<div>
-				<Button onClick={() => void run()} disabled={count === 0 || state.isLoading} isLoading={state.isLoading} dataTestId="onboard-publish-run">
+				<Button
+					onClick={() => void run()}
+					disabled={count === 0 || state.isLoading}
+					isLoading={state.isLoading}
+					dataTestId="onboard-publish-run"
+				>
 					{tx("publish.run")}
 				</Button>
 			</div>

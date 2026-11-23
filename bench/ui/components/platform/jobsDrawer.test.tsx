@@ -111,7 +111,10 @@ describe("JobsDrawer rows", () => {
 describe("JobsDrawer cost estimates (N275)", () => {
 	it("marks an estimate job so it does not read as the paid job", () => {
 		const estimate = { ...RUNNING_JOB, id: "job_est", kind: "policy.generate", params: { estimate: true } };
-		const html = render(<JobsDrawer jobs={[estimate]} isLoading={false} onRetry={() => undefined} onClose={() => undefined} />, hostedSession());
+		const html = render(
+			<JobsDrawer jobs={[estimate]} isLoading={false} onRetry={() => undefined} onClose={() => undefined} />,
+			hostedSession(),
+		);
 		expect(html).toContain("(Cost estimate)");
 	});
 });
