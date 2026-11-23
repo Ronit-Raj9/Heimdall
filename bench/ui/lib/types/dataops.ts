@@ -18,6 +18,11 @@ export interface RetentionPolicy {
 	max_days: number;
 	last_sweep_at?: string;
 	last_deleted?: number;
+	/** Who last changed the setting: an email only an org admin reads (fix wave 3, L3). */
+	updated_by?: string;
+	/** How updated_by reads (a member's display name); absent when it would only repeat it. */
+	updated_by_name?: string;
+	updated_at?: string;
 }
 
 /** GET /integrations/deliveries. */

@@ -73,3 +73,11 @@ describe("refetchOnLogEnd (N63)", () => {
 		expect(refetchOnLogEnd(true, undefined)).toBe(false);
 	});
 });
+describe("JobLogPanel cost estimates (N275)", () => {
+	it("titles an estimate job as a cost estimate", () => {
+		api.job = okQuery({ ...RUNNING_JOB, kind: "policy.generate", params: { estimate: true }, mode: "live" });
+		expect(render(<JobLogPanel jobId={RUNNING_JOB.id} />, hostedSession("member"))).toContain("(Cost estimate)");
+		api.job = okQuery({ ...RUNNING_JOB, kind: "policy.generate", params: { yes: true }, mode: "live" });
+		expect(render(<JobLogPanel jobId={RUNNING_JOB.id} />, hostedSession("member"))).not.toContain("(Cost estimate)");
+	});
+});

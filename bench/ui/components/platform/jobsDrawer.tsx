@@ -1,4 +1,4 @@
-import { jobKindLabel } from "@/components/jobs/jobKindLabels";
+import { jobKindLabel, jobKindLabelFor } from "@/components/jobs/jobKindLabels";
 import { JobStatusBadge } from "@/components/platform/badges";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
@@ -72,7 +72,7 @@ function JobRow({ job, onOpen }: { job: Job; onOpen: () => void }) {
 				data-testid={`jobs-drawer-row-${job.id}`}
 			>
 				<span className="flex items-center gap-2">
-					<span className="text-foreground truncate text-sm font-medium">{kindLabel(job.kind)}</span>
+					<span className="text-foreground truncate text-sm font-medium">{jobKindLabelFor(job.kind, job.params, kindLabel(job.kind))}</span>
 					<JobStatusBadge status={job.status} className="ml-auto" />
 					<ChevronRight
 						className="text-muted-foreground size-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"

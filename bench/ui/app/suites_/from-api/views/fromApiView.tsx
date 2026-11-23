@@ -330,6 +330,8 @@ function RulesSection({
 	onChanged(): void;
 }) {
 	const { t } = useTranslation("appTasks");
+	// For members the server leaves approved_by empty and sends only the display name (N33).
+	const approvedByName = (draft as ListedAppTasksDraft & { approved_by_name?: string }).approved_by_name;
 	const [rules, setRules] = useState<AppRule[]>(draft.rules);
 	const [approve, { isLoading, error }] = useApproveAppTaskRulesMutation();
 	const confirm = useConfirm();
@@ -412,9 +414,9 @@ function RulesSection({
 					))}
 				</ol>
 			)}
-			{draft.approved_by && (
-				<p className="text-muted-foreground text-xs">
-					{t("rules.approved", { who: (draft as ListedAppTasksDraft & { approved_by_name?: string }).approved_by_name || draft.approved_by })}
+			{(approvedByName || draft.approved_by) && (
+				<p className="text-muted-foreground text-xs" title={draft.approved_by || undefined} data-testid="from-api-rules-approved">
+					{t("rules.approved", { who: approvedByName || draft.approved_by })}
 				</p>
 			)}
 			{error !== undefined && (

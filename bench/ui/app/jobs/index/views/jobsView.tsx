@@ -1,4 +1,5 @@
 import { JobLogPanel } from "@/components/jobs/jobLogPanel";
+import { jobKindLabelFor } from "@/components/jobs/jobKindLabels";
 import { useJobKindName } from "@/components/jobs/useJobKindName";
 import { PageHeader } from "@/components/shell";
 import { RoleGate } from "@/components/platform/accessNotes";
@@ -226,7 +227,9 @@ export function JobsTable({
 							>
 								<td className="px-4 py-3">
 									<Link to="/jobs/$jobId" params={{ jobId: job.id }} className="text-foreground font-medium hover:underline">
-										{job.target ? t("jobOf", { kind: kindName(job.kind), target: job.target }) : kindName(job.kind)}
+										{job.target
+											? t("jobOf", { kind: jobKindLabelFor(job.kind, job.params, kindName(job.kind)), target: job.target })
+											: jobKindLabelFor(job.kind, job.params, kindName(job.kind))}
 									</Link>
 									<div className="text-muted-foreground/60 max-w-48 truncate font-mono text-[10px]" title={job.id}>
 										{job.id}

@@ -192,4 +192,26 @@ describe("FromApiView", () => {
 		expect(html).toContain('data-testid="from-api-reject-t1"');
 		expect(html).not.toContain('data-testid="from-api-reject-t1-confirm"');
 	});
+	it("names who approved the rules when the server sends only the name (N33)", () => {
+		const member = renderToStaticMarkup(
+			<DraftDetail
+				draft={{ ...base, approved_by: "", approved_by_name: "Ana" } as AppTasksDraft}
+				writable
+				onBack={() => undefined}
+				onChanged={() => undefined}
+			/>,
+		);
+		expect(member).toContain("Approved by Ana");
+		expect(member).not.toContain("ana@example.com");
+		const admin = renderToStaticMarkup(
+			<DraftDetail
+				draft={{ ...base, approved_by_name: "Ana" } as AppTasksDraft}
+				writable
+				onBack={() => undefined}
+				onChanged={() => undefined}
+			/>,
+		);
+		expect(admin).toContain("Approved by Ana");
+		expect(admin).toContain('title="ana@example.com"');
+	});
 });

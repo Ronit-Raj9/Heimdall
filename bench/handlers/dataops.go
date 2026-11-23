@@ -46,6 +46,17 @@ type RetentionInfo struct {
 	LastDeleted int        `json:"last_deleted"`
 	UpdatedBy   string     `json:"updated_by,omitempty"`
 	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
+	// UpdatedByName is how UpdatedBy reads (a member's display name); a
+	// member never gets the raw email, an org admin does (fix wave 3, L3).
+	// It is set on answers only, never stored.
+	UpdatedByName string `json:"updated_by_name,omitempty"`
+}
+
+// retentionView is r as the caller may see it: the editor named, the email
+// left out for a caller who is not an org admin.
+func retentionView(ctx *fasthttp.RequestCtx, r RetentionInfo) RetentionInfo {
+	r.UpdatedBy, r.UpdatedByName = callerNames(ctx).show(r.UpdatedBy)
+	return r
 }
 
 // RetentionRequest is the body of PUT /data/retention.
@@ -88,6 +99,7 @@ func WriteRetention(projectRoot string, r RetentionInfo) error {
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
 	}
+	r.UpdatedByName = "" // answers only
 	b, err := json.MarshalIndent(r, "", "  ")
 	if err != nil {
 		return err
@@ -206,7 +218,7 @@ func (h *dataOpsHandler) getRetention(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.env.Mode, "retention", err)
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, r)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, retentionView(ctx, r))
 }
 
 func (h *dataOpsHandler) putRetention(ctx *fasthttp.RequestCtx) {
@@ -238,5 +250,5 @@ func (h *dataOpsHandler) putRetention(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.env.Mode, "retention", err)
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, r)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, retentionView(ctx, r))
 }
