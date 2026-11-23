@@ -1,4 +1,8 @@
 import { JobRunButton } from "@/components/jobs/jobRunButton";
+import type { PickedModel } from "@/components/models/groupedModelPicker";
+import { isPicked, LabeledModelPicker, usePickedKeyState } from "@/components/models/labeledModelPicker";
+import { ConfirmButton } from "@/components/platform/badges";
+import { useConfirm } from "@/components/platform/confirmDialog";
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +18,9 @@ import {
 	useWriteAppTasksMutation,
 } from "@/lib/store/apis/appTasksApi";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import type { AppPlan, AppRule, AppTasksDraft, AppTasksDraftSummary, RuleKind } from "@/lib/types/appTasks";
+import type { AppPlan, AppRule, AppTasksDraft, AppTasksDraftSummary, ListedAppTasksDraft, RuleKind } from "@/lib/types/appTasks";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 declare module "@/lib/i18n/resources" {
@@ -206,9 +210,24 @@ function DraftPanel({ id, writable, onBack }: { id: string; writable: boolean; o
 	return <DraftDetail draft={q.data} writable={writable} onBack={onBack} onChanged={() => void q.refetch()} />;
 }
 
+/** The draft with every list present: a draft saved with no plans used to carry "plans": null (N237). */
+export function listedDraft(d: AppTasksDraft): ListedAppTasksDraft {
+	return {
+		...d,
+		rules: (d.rules ?? []).map((r) => ({ ...r, operations: r.operations ?? [] })),
+		plans: d.plans ?? [],
+		dropped: d.dropped ?? [],
+		written: d.written ?? [],
+		calls: d.calls ?? [],
+		warnings: d.warnings ?? [],
+		operations: d.operations ?? [],
+		collections: d.collections ?? [],
+	};
+}
+
 /** One draft, step by step: model, rules, tasks, write, review. */
 export function DraftDetail({
-	draft,
+	draft: raw,
 	writable,
 	onBack,
 	onChanged,
@@ -219,12 +238,20 @@ export function DraftDetail({
 	onChanged(): void;
 }) {
 	const { t } = useTranslation("appTasks");
-	const [provider, setProvider] = useState(draft.model?.provider ?? "openai");
-	const [model, setModel] = useState(draft.model?.model ?? "");
+	const draft = useMemo(() => listedDraft(raw), [raw]);
+	// N238: one shared picker, the draft's pinned model when it has one, else nothing picked (no "openai" prefill).
+	const [picked, setPicked] = useState<PickedModel | null>(draft.model ?? null);
+	const keyState = usePickedKeyState(picked);
 	const [maxUsd, setMaxUsd] = useState("");
 	const usd = Number(maxUsd);
-	const modelParams = { draft: draft.id, yes: true, provider, model, ...(maxUsd && usd > 0 ? { max_usd: usd } : {}) };
-	const modelOk = provider.trim() !== "" && model.trim() !== "";
+	const modelParams = {
+		draft: draft.id,
+		yes: true,
+		provider: picked?.provider ?? "",
+		model: picked?.model ?? "",
+		...(maxUsd && usd > 0 ? { max_usd: usd } : {}),
+	};
+	const modelOk = isPicked(picked) && keyState === "ok";
 	const calls = draft.calls.reduce((n, c) => n + c.attempts, 0);
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="from-api-draft">
@@ -262,14 +289,15 @@ export function DraftDetail({
 			{writable && draft.status !== "written" && (
 				<Section title={t("model.title")} description={t("model.description")} testId="from-api-model">
 					<div className="grid max-w-2xl gap-3 sm:grid-cols-3">
-						<label className="flex flex-col gap-1 text-sm">
-							{t("model.provider")}
-							<Input value={provider} onChange={(e) => setProvider(e.target.value.trim())} data-testid="from-api-provider" />
-						</label>
-						<label className="flex flex-col gap-1 text-sm">
-							{t("model.model")}
-							<Input value={model} onChange={(e) => setModel(e.target.value.trim())} data-testid="from-api-model-id" />
-						</label>
+						<div className="sm:col-span-2">
+							<LabeledModelPicker
+								label={t("model.model")}
+								hint={modelOk ? undefined : t("model.pick")}
+								value={picked}
+								onChange={setPicked}
+								testId="from-api-model-pick"
+							/>
+						</div>
 						<label className="flex flex-col gap-1 text-sm">
 							{t("model.maxUsd")}
 							<Input value={maxUsd} inputMode="decimal" onChange={(e) => setMaxUsd(e.target.value.trim())} data-testid="from-api-max-usd" />
@@ -295,7 +323,7 @@ function RulesSection({
 	params,
 	onChanged,
 }: {
-	draft: AppTasksDraft;
+	draft: ListedAppTasksDraft;
 	writable: boolean;
 	modelOk: boolean;
 	params: object;
@@ -304,15 +332,31 @@ function RulesSection({
 	const { t } = useTranslation("appTasks");
 	const [rules, setRules] = useState<AppRule[]>(draft.rules);
 	const [approve, { isLoading, error }] = useApproveAppTaskRulesMutation();
+	const confirm = useConfirm();
+	// Approving again discards drafted tasks (ApproveRules resets the plans): ask first when there are any.
+	const onApprove = async () => {
+		const n = draft.plans.length;
+		if (n > 0) {
+			const ok = await confirm(t("rules.approveAgain", { count: n }), {
+				title: t("rules.approveAgainTitle"),
+				confirmLabel: t("rules.approveAgainConfirm"),
+				cancelLabel: t("rules.keep"),
+				destructive: true,
+			});
+			if (!ok) return;
+		}
+		void approve({ id: draft.id, rules });
+	};
 	useEffect(() => setRules(draft.rules), [draft.rules]);
 	const edit = (i: number, patch: Partial<AppRule>) => setRules((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 	const canEdit = writable && draft.status !== "written";
 	return (
 		<Section title={t("rules.title")} description={t("rules.description")} testId="from-api-rules">
 			{canEdit && (draft.status === "new" || draft.status === "rules_drafted") && (
-				<div className={modelOk ? "" : "pointer-events-none opacity-50"}>
+				<div>
 					<JobRunButton
 						kind="apptasks.generate"
+						disabled={!modelOk}
 						params={{ ...params, stage: "rules" }}
 						label={draft.rules.length ? t("rules.redraft") : t("rules.draft")}
 						confirm={t("rules.confirm")}
@@ -368,7 +412,11 @@ function RulesSection({
 					))}
 				</ol>
 			)}
-			{draft.approved_by && <p className="text-muted-foreground text-xs">{t("rules.approved", { who: draft.approved_by })}</p>}
+			{draft.approved_by && (
+				<p className="text-muted-foreground text-xs">
+					{t("rules.approved", { who: (draft as ListedAppTasksDraft & { approved_by_name?: string }).approved_by_name || draft.approved_by })}
+				</p>
+			)}
 			{error !== undefined && (
 				<p role="alert" className="text-chart-error-ink text-xs" data-testid="from-api-rules-error">
 					{getBenchErrorMessage(error)}
@@ -379,7 +427,7 @@ function RulesSection({
 					<Button
 						variant={draft.status === "rules_drafted" ? "default" : "outline"}
 						isLoading={isLoading}
-						onClick={() => void approve({ id: draft.id, rules })}
+						onClick={() => void onApprove()}
 						dataTestId="from-api-approve"
 					>
 						{t("rules.approve")}
@@ -397,7 +445,7 @@ function TasksSection({
 	params,
 	onChanged,
 }: {
-	draft: AppTasksDraft;
+	draft: ListedAppTasksDraft;
 	writable: boolean;
 	modelOk: boolean;
 	params: object;
@@ -424,9 +472,10 @@ function TasksSection({
 						<input type="checkbox" checked={judged} onChange={(e) => setJudged(e.target.checked)} data-testid="from-api-judged" />
 						{t("tasks.judged")}
 					</label>
-					<div className={modelOk ? "" : "pointer-events-none opacity-50"}>
+					<div>
 						<JobRunButton
 							kind="apptasks.generate"
+							disabled={!modelOk}
 							params={{ ...params, stage: "tasks", per_rule: perRule, judged }}
 							label={t("tasks.draft")}
 							confirm={t("tasks.confirm")}
@@ -488,29 +537,35 @@ export function PlanTable({ plans }: { plans: AppPlan[] }) {
 	);
 }
 
-function WriteSection({ draft, onChanged }: { draft: AppTasksDraft; onChanged(): void }) {
+function WriteSection({ draft, onChanged }: { draft: ListedAppTasksDraft; onChanged(): void }) {
 	const { t } = useTranslation("appTasks");
 	const [write, { isLoading, error, data }] = useWriteAppTasksMutation();
-	const [jp, setJp] = useState(draft.model?.provider ?? "");
-	const [jm, setJm] = useState(draft.model?.model ?? "");
+	const confirm = useConfirm();
+	const [judge, setJudge] = useState<PickedModel | null>(draft.model ?? null);
+	const judgeKey = usePickedKeyState(judge);
+	const judgeOk = !draft.judged || (isPicked(judge) && judgeKey === "ok");
 	const [heldOut, setHeldOut] = useState(false);
 	const submit = async () => {
-		const res = await write({ id: draft.id, held_out: heldOut, ...(draft.judged ? { judge: { provider: jp, model: jm } } : {}) });
+		const n = draft.plans.length;
+		const ok = await confirm(t("write.confirm", { count: n, suite: draft.suite }), {
+			title: t("write.confirmTitle"),
+			confirmLabel: t("write.confirmLabel", { count: n }),
+			cancelLabel: t("write.cancel"),
+		});
+		if (!ok) return;
+		const res = await write({ id: draft.id, held_out: heldOut, ...(draft.judged && judge ? { judge: { provider: judge.provider, model: judge.model } } : {}) });
 		if ("data" in res) onChanged();
 	};
 	return (
 		<Section title={t("write.title")} description={t("write.description")} testId="from-api-write">
 			{draft.judged && (
-				<div className="grid max-w-xl gap-3 sm:grid-cols-2">
-					<label className="flex flex-col gap-1 text-sm">
-						{t("write.judgeProvider")}
-						<Input value={jp} onChange={(e) => setJp(e.target.value.trim())} data-testid="from-api-judge-provider" />
-					</label>
-					<label className="flex flex-col gap-1 text-sm">
-						{t("write.judgeModel")}
-						<Input value={jm} onChange={(e) => setJm(e.target.value.trim())} data-testid="from-api-judge-model" />
-					</label>
-				</div>
+				<LabeledModelPicker
+					label={t("write.judgeModel")}
+					hint={judgeOk ? undefined : t("model.pick")}
+					value={judge}
+					onChange={setJudge}
+					testId="from-api-judge-pick"
+				/>
 			)}
 			<label className="flex items-center gap-2 text-sm">
 				<input type="checkbox" checked={heldOut} onChange={(e) => setHeldOut(e.target.checked)} data-testid="from-api-held-out" />
@@ -525,7 +580,7 @@ function WriteSection({ draft, onChanged }: { draft: AppTasksDraft; onChanged():
 			<div>
 				<Button
 					isLoading={isLoading}
-					disabled={draft.judged && (!jp || !jm)}
+					disabled={!judgeOk}
 					onClick={() => void submit()}
 					dataTestId="from-api-write-submit"
 				>
@@ -536,7 +591,7 @@ function WriteSection({ draft, onChanged }: { draft: AppTasksDraft; onChanged():
 	);
 }
 
-function ReviewSection({ draft, writable, onChanged }: { draft: AppTasksDraft; writable: boolean; onChanged(): void }) {
+function ReviewSection({ draft, writable, onChanged }: { draft: ListedAppTasksDraft; writable: boolean; onChanged(): void }) {
 	const { t } = useTranslation("appTasks");
 	const [review, { isLoading, error }] = useReviewAppTaskMutation();
 	const decide = async (task: string, decision: "accepted" | "rejected") => {
@@ -577,15 +632,15 @@ function ReviewSection({ draft, writable, onChanged }: { draft: AppTasksDraft; w
 								>
 									{t("review.accept")}
 								</Button>
-								<Button
-									size="sm"
-									variant="outline"
+								<ConfirmButton
+									label={t("review.reject")}
+									question={t("review.rejectQuestion", { task: w.title || w.id })}
+									confirmLabel={t("review.rejectConfirm")}
+									cancelLabel={t("review.rejectCancel")}
 									isLoading={isLoading}
-									onClick={() => void decide(w.id, "rejected")}
-									dataTestId={`from-api-reject-${w.id}`}
-								>
-									{t("review.reject")}
-								</Button>
+									onConfirm={() => void decide(w.id, "rejected")}
+									testId={`from-api-reject-${w.id}`}
+								/>
 							</span>
 						)}
 					</li>
