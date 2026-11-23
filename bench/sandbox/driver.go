@@ -202,91 +202,24 @@ func gatewayHost(raw string) string {
 	return u.Hostname()
 }
 
-// Plan-time refusals: one agent process per run on a repository task graded
-// on its diff, clean or under a gateway fault. Each reason is a stable
-// sentence so the planner lists it once.
-const (
-	RefuseNoPublicGateway = "the gateway has no public URL (gateway.public_url), so an agent in a cloud sandbox cannot reach it"
-	RefuseServices        = "tasks with services, external APIs or a mailbox are not supported (services run as Docker containers beside the agent)"
-	RefuseTeam            = "multi-agent teams are not supported (one sandbox per run)"
-	RefuseSessions        = "multi-session tasks are not supported (no session reset between sandboxes)"
-	RefuseMemory          = "agent memory sections are not supported (no memory volume between sessions)"
-	RefuseSkills          = "agent skills folders are not supported (plan folders are copied into Docker volumes)"
-	RefuseSnapshot        = "snapshot grading is not supported (the sandbox's root file system is never committed)"
-	RefuseTaskImage       = "tasks with their own environment image, workspace path or user are not supported (the workspace is seeded from the task repo only)"
-	RefuseRemote          = "remote_http agents are not supported (they need the Docker egress forwarder)"
-	RefuseA2A             = "a2a agents are not supported (proven on the Docker driver only)"
-	RefuseNeutral         = "realism neutral is not supported (the neutral view renames Docker objects)"
-	RefuseProbeLayer      = "fault layer %s is not supported in a cloud sandbox (gateway faults are)"
-	RefuseGPU             = "GPU tasks are not supported (no GPU is requested from the platform)"
-	RefuseGPUFit          = "GPU task cannot be placed: %s"
-	RefuseCompose         = "compose tasks are not supported (their services run as Docker containers)"
-)
-
-// Refusals implements environments.Driver. It is pure.
+// Refusals implements environments.Driver. It is pure: the platform-free
+// refusals of Refuse plus the two that depend on this driver (a public
+// gateway URL and whether the platform can place a GPU task).
 func (d *Driver) Refusals(s environments.DriverSlot) []string {
-	var out []string
-	add := func(r string) { out = append(out, r) }
+	out := Refuse(s)
 	if strings.TrimSpace(d.cfg.PublicGatewayURL) == "" {
-		add(RefuseNoPublicGateway)
-	}
-	if s.Experiment != nil && schemas.EffectiveRealism(s.Experiment, s.Suite) == schemas.RealismNeutral {
-		add(RefuseNeutral)
-	} else if s.Experiment == nil && s.Suite != nil && s.Suite.Realism == schemas.RealismNeutral {
-		add(RefuseNeutral)
-	}
-	if s.Suite != nil && utils.VerifierMode(s.Suite) == schemas.VerifierSnapshot {
-		add(RefuseSnapshot)
+		out = append(out, RefuseNoPublicGateway)
 	}
 	if t := s.Task; t != nil {
-		if len(utils.TaskServices(s.Suite, t)) > 0 || len(utils.ExternalAPIs(s.Suite, t)) > 0 {
-			add(RefuseServices)
-		}
-		if len(t.Team) > 0 && (s.Agent == nil || (s.Agent.Topology != schemas.TopologySingle && s.Agent.Topology != schemas.TopologyBestOfN)) {
-			add(RefuseTeam)
-		}
-		if len(t.Sessions) > 0 {
-			add(RefuseSessions)
-		}
 		if n := t.GPUCount(); n > 0 {
 			if gc, ok := d.cfg.Platform.(GPUCapable); !ok {
-				add(RefuseGPU)
+				out = append(out, RefuseGPU)
 			} else if n > MaxGPUsPerSandbox {
-				add(fmt.Sprintf(RefuseGPUFit, fmt.Sprintf("the task asks for %d GPUs and one sandbox takes at most %d", n, MaxGPUsPerSandbox)))
+				out = append(out, fmt.Sprintf(RefuseGPUFit, fmt.Sprintf("the task asks for %d GPUs and one sandbox takes at most %d", n, MaxGPUsPerSandbox)))
 			} else if _, err := gpuTypeFor(gc.GPUTypes(), d.cfg.GPUType, nil, t.Resources.GPU); err != nil {
-				add(fmt.Sprintf(RefuseGPUFit, err.Error()))
+				out = append(out, fmt.Sprintf(RefuseGPUFit, err.Error()))
 			}
 		}
-		if t.Compose != "" {
-			add(RefuseCompose)
-		}
-		if t.Environment != nil {
-			rest := *t.Environment
-			rest.Env = nil
-			if !isZeroTaskEnv(rest) {
-				add(RefuseTaskImage)
-			}
-		}
-	}
-	if a := s.Agent; a != nil {
-		if len(a.Team) > 0 {
-			add(RefuseTeam)
-		}
-		if a.Memory != nil {
-			add(RefuseMemory)
-		}
-		if a.Skills != nil {
-			add(RefuseSkills)
-		}
-		if a.Adapter == "remote_http" || a.Remote != nil {
-			add(RefuseRemote)
-		}
-		if a.Adapter == "a2a" || a.A2A != nil {
-			add(RefuseA2A)
-		}
-	}
-	if p := s.Probe; p != nil && p.Layer != schemas.LayerGateway {
-		add(fmt.Sprintf(RefuseProbeLayer, p.Layer))
 	}
 	sort.Strings(out)
 	return dedupe(out)
@@ -613,7 +546,9 @@ func (d *Driver) resolveImage(ctx context.Context, rc *schemas.RunContext, ref s
 		rec.RemoteImage = digests[0]
 		return digests[0], nil
 	}
-	return "", fmt.Errorf("image %s exists only on this machine; push it to a registry the %s platform can pull (docker push), so it has a registry digest", ref, d.Driver())
+	// Fix wave 3 (N216): the image has no registry copy; this plain sentence
+	// is what the comparison page shows.
+	return "", errors.New(NeedsRegistry(d.Driver()))
 }
 
 // agentLaunch is the agent's argv and environment.
