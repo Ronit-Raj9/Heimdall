@@ -1,4 +1,5 @@
 import i18n from "@/lib/i18n";
+import { IDEMPOTENCY_HEADER, jsonBodyText, requestIdentity, sendIdempotent } from "@/lib/store/idempotency";
 import type {
 	AgentsResponse,
 	CatalogResponse,
@@ -167,7 +168,18 @@ const httpBaseQuery: BenchBaseQuery = async (args, api, extraOptions) => {
 	const type = writeType(api.type, args);
 	const url = typeof args === "string" ? args : args.url;
 	if (type === "mutation" && !url.startsWith("/auth/")) await whenAuthKnown();
-	const result = await fetchBenchQuery(args, type === api.type ? api : { ...api, type }, extraOptions);
+	const send = async (sent: string | FetchArgs) => await fetchBenchQuery(sent, type === api.type ? api : { ...api, type }, extraOptions);
+	// Fix wave 3, N186: a POST with a JSON or empty body carries an Idempotency-Key, and an
+	// identical POST already in flight shares its answer (lib/store/idempotency.ts).
+	const bodyText = typeof args !== "string" && (args.method ?? "GET").toUpperCase() === "POST" ? jsonBodyText(args.body) : undefined;
+	const result =
+		typeof args !== "string" && bodyText !== undefined
+			? await sendIdempotent(
+					requestIdentity("POST", `${url}?${JSON.stringify(args.params ?? null)}`, bodyText),
+					(key) => send({ ...args, headers: { ...Object.fromEntries(new Headers(args.headers as HeadersInit | undefined).entries()), [IDEMPOTENCY_HEADER]: key } }),
+					(r) => (r.error && (r.error.status === "FETCH_ERROR" || r.error.status === "TIMEOUT_ERROR") ? "network" : "answered"),
+				)
+			: await send(args);
 	if (result.error && errorStatus(result.error) === 401) notifyUnauthorized(typeof args === "string" ? args : args.url);
 	if (result.error && errorStatus(result.error) === 402) notifyPlanLimit(result.error); // Y16: upgrade prompt (lib/billing/planLimit.ts)
 	if (result.error && errorStatus(result.error) === 429) {

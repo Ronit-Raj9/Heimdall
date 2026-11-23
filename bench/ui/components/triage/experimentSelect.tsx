@@ -7,6 +7,7 @@ import {
 	type ExperimentPickerOption,
 	type StatusWithDebug,
 } from "@/components/experiments/experiments.utils";
+import { useDriftMonitorNames } from "@/components/experiments/useDriftMonitorNames";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ExperimentStatus } from "@/lib/types/bench";
 import { useId, useMemo } from "react";
@@ -38,14 +39,15 @@ export function useExperimentPicker(
 	evalNames?: EvaluationNames,
 ): ExperimentPicker {
 	const { t } = useTranslation("experimentsUx");
+	const monitors = useDriftMonitorNames();
 	return useMemo(() => {
 		const tx = (k: string, o?: Record<string, string>) => String(t(k as never, (o ?? {}) as never));
 		return {
-			options: experimentPickerOptions(experiments, tx, evalNames, { showHidden }),
-			all: experimentPickerOptions(experiments, tx, evalNames, { showHidden: true }),
+			options: experimentPickerOptions(experiments, tx, evalNames, { showHidden, monitors }),
+			all: experimentPickerOptions(experiments, tx, evalNames, { showHidden: true, monitors }),
 			hiddenCount: experiments.filter(isCheckPracticeOrDebug).length,
 		};
-	}, [experiments, showHidden, evalNames, t]);
+	}, [experiments, showHidden, evalNames, monitors, t]);
 }
 
 /** The experiment a picker page opens on: the URL value, else the first listed choice. Pure. */

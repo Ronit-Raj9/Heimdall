@@ -1,5 +1,7 @@
 import { BenchmarkChecklist } from "@/components/evaluations/benchmarkChecklist";
 import { RedTeamPanel } from "@/components/redteam/redTeamPanel";
+import { hw11 } from "@/components/runs/debug/hw11I18n";
+import { Button } from "@/components/ui/button";
 import { suiteDisplayCategory, suiteSections } from "@/components/suites/suiteDisplay";
 import { useGetSuitesQuery } from "@/lib/store/apis/benchApi";
 import {
@@ -431,17 +433,26 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({ draft, 
 	const compatibility = mergeArmCompatibility(compat.currentData, arms.answers, (agent, setup, reason) =>
 		reason ? t("step3.otherArmCannot", { agent, setup, reason }) : t("step3.otherArmCannotGeneric", { agent, setup }),
 	);
-	const checking = Boolean(draft.agent) && ((!compat.currentData && !compat.isError) || arms.checking);
+	// Fix wave 3, N187: a setup whose check failed is never read as runnable. Step 3 stays blocked
+	// (nothing selected, rows waiting) until a retry answers.
+	const failed = failedSetupChecks({ label: "A", agent: draft.agent, failed: Boolean(draft.agent) && compat.isError }, arms.failed);
+	const checking = Boolean(draft.agent) && ((!compat.currentData && !compat.isError) || arms.checking || failed.length > 0);
 	// Benchmarks picked before the answer came (or for another agent) that this agent cannot run
 	// leave the selection, so the launch never carries them.
-	const runnable = keepRunnable(draft.benchmarks, compatibility);
+	const runnable = failed.length > 0 ? [] : keepRunnable(draft.benchmarks, compatibility);
 	const answered = compatibility?.benchmarks.map((b) => `${b.id}:${b.ok}`).join(",");
 	useEffect(() => {
-		if (runnable.length !== draft.benchmarks.length) onChange({ benchmarks: runnable });
+		if (runnable.length !== draft.benchmarks.length) onChange({ benchmarks: runnable, ...(failed.length > 0 ? { pack: undefined } : {}) });
+		else if (failed.length > 0 && draft.pack) onChange({ pack: undefined });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [answered, draft.benchmarks.join(",")]);
+	}, [answered, draft.benchmarks.join(","), failed.length, draft.pack]);
+	const retry = () => {
+		if (compat.isError) void compat.refetch();
+		arms.retry();
+	};
 	return (
 		<div className="flex flex-col gap-6">
+			{failed.length > 0 && <SetupCheckFailed failed={failed} onRetry={retry} />}
 			<Step3BenchmarksView
 				suites={suites.data?.suites ?? []}
 				packs={packs.data ?? []}
@@ -461,7 +472,7 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({ draft, 
 				}
 			/>
 			{others.map((o) => (
-				<ArmCompatProbe key={o.agent} agent={o.agent} onAnswer={arms.report} />
+				<ArmCompatProbe key={o.agent} agent={o.agent} onAnswer={arms.report} retry={arms.retries} />
 			))}
 			{/* Z04: write the org's red-team benchmark and add it here. */}
 			<RedTeamPanel
@@ -484,21 +495,67 @@ interface ProbeAnswer {
  */
 export function useArmCompatibility(others: readonly { label: string; agent: string }[]) {
 	const [byAgent, setByAgent] = useState<Record<string, ProbeAnswer>>({});
+	const [retries, setRetries] = useState(0);
 	const report = (agent: string, answer: ProbeAnswer) =>
 		setByAgent((prev) =>
 			prev[agent]?.compatibility === answer.compatibility && prev[agent]?.failed === answer.failed ? prev : { ...prev, [agent]: answer },
 		);
 	const answers: ArmCompatibility[] = others.map((o) => ({ ...o, compatibility: byAgent[o.agent]?.compatibility }));
 	const checking = others.some((o) => !byAgent[o.agent]?.compatibility && !byAgent[o.agent]?.failed);
-	return { answers, checking, report };
+	// Fix wave 3, N187: setups whose check failed, and a retry that asks each probe again.
+	const failed = others.map((o) => ({ ...o, failed: Boolean(byAgent[o.agent]?.failed && !byAgent[o.agent]?.compatibility) }));
+	const retry = () => setRetries((n) => n + 1);
+	return { answers, checking, report, failed, retries, retry };
 }
 
-/** Queries one agent's compatibility and reports the answer; renders nothing. */
-function ArmCompatProbe({ agent, onAnswer }: { agent: string; onAnswer: (agent: string, answer: ProbeAnswer) => void }) {
+/** Queries one agent's compatibility and reports the answer; renders nothing. retry asks again when it grows. */
+function ArmCompatProbe({
+	agent,
+	onAnswer,
+	retry = 0,
+}: {
+	agent: string;
+	onAnswer: (agent: string, answer: ProbeAnswer) => void;
+	retry?: number;
+}) {
 	const q = useGetAgentCompatibilityQuery(agent);
 	useEffect(() => {
 		onAnswer(agent, { compatibility: q.currentData, failed: q.isError });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [agent, q.currentData, q.isError]);
+	useEffect(() => {
+		if (retry > 0 && q.isError) void q.refetch();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [retry]);
 	return null;
+}
+
+/** One setup and whether its compatibility check failed. */
+export interface SetupCheck {
+	label: string;
+	agent: string;
+	failed: boolean;
+}
+
+/** The setups whose compatibility check failed (fix wave 3, N187), setup A first; empty when all answered. */
+export function failedSetupChecks(primary: SetupCheck, others: readonly SetupCheck[]): { label: string; agent: string }[] {
+	return [primary, ...others].filter((s) => s.failed && s.agent).map(({ label, agent }) => ({ label, agent }));
+}
+
+/** Step 3 is blocked while a setup could not be checked: one line per setup and a Retry button. */
+export function SetupCheckFailed({ failed, onRetry }: { failed: readonly { label: string; agent: string }[]; onRetry: () => void }) {
+	return (
+		<div
+			className="border-chart-error/40 bg-chart-error/5 flex flex-col gap-2 rounded-md border px-3 py-2.5 text-sm"
+			role="alert"
+			data-testid="step3-setup-check-failed"
+		>
+			{failed.map((f) => (
+				<p key={`${f.label}-${f.agent}`}>{hw11("step3.setupCheckFailed", { label: f.label, agent: f.agent })}</p>
+			))}
+			<Button type="button" variant="outline" size="sm" className="w-fit" onClick={onRetry} data-testid="step3-setup-check-retry">
+				{hw11("step3.retry")}
+			</Button>
+		</div>
+	);
 }

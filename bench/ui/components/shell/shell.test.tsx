@@ -78,14 +78,16 @@ describe("PageHeader", () => {
 				title="Experiment e_1"
 				subtitle="One sentence."
 				actions={<button type="button">Export</button>}
-				breadcrumbs={[{ label: "Experiments", to: "/experiments" }, { label: "e_1" }]}
+				// The router mock sits on /verdict (the Comparisons section), so the trail starts in another section;
+				// a crumb that repeats the top bar's section is dropped (pageHeader.test.tsx, N203).
+				breadcrumbs={[{ label: "Runs", to: "/runs" }, { label: "e_1" }]}
 			/>,
 		);
 		expect(html).toContain("<h1");
 		expect(html).toContain("Experiment e_1");
 		expect(html).toContain("One sentence.");
 		expect(html).toContain('aria-label="Breadcrumb"');
-		expect(html).toContain('href="/experiments"');
+		expect(html).toContain('href="/runs"');
 		expect(html).toContain('aria-current="page"');
 		expect(html).toContain(">Export</button>");
 	});

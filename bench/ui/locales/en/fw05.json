@@ -4,7 +4,9 @@
 		"mayExceed": "The expected cost ({{low}} to {{high}}) may go over your {{budget}} budget. Runs stop when the budget is used up.",
 		"unknown": "The cost is not known yet. Runs stop when the {{budget}} budget is used up.",
 		"noBudget": "No budget set: each benchmark may spend up to {{cap}}.",
-		"updating": "Updating..."
+		"updating": "Updating...",
+		"belowOneRun": "This budget is less than one run costs (about {{run}} per run), so no run would start. Set at least {{min}}.",
+		"unknownRunCost": "The cost of a run is not known yet, so this budget can be passed by up to one run's cost before it stops."
 	},
 	"summary": {
 		"faults": "Run clean, then again with: {{faults}}.",
@@ -33,7 +35,8 @@
 		"budgetNotPositive": "Enter an amount above $0, or leave the box empty for the default of ${{cap}} per benchmark.",
 		"budgetTooHigh": "The most one evaluation can spend is ${{max}}.",
 		"budgetAboveSuggested": "This is above the suggested maximum of {{max}} for your organization.",
-		"latestVersion": " latest version"
+		"latestVersion": " latest version",
+		"budgetBelowFloor": "The budget must be at least $0.01 per benchmark: at least {{min}} for {{count}}."
 	},
 	"own": {
 		"noLetters": "Use letters or digits in the name.",

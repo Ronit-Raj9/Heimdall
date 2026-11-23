@@ -79,6 +79,35 @@ type RunControls struct {
 	// ActorNames maps each log actor that is a member of the organization
 	// to its display name (name, else email). Actors not in it stay ids.
 	ActorNames map[string]string `json:"actor_names,omitempty"`
+	// RerunFailures says whether POST /rerun-failures can work now and, when
+	// it cannot, why in one plain sentence (fix wave 3, N285).
+	RerunFailures *RerunAllowed `json:"rerun_failures,omitempty"`
+}
+
+// RerunAllowed is whether "Rerun failures" can work on an experiment.
+type RerunAllowed struct {
+	Allowed bool   `json:"allowed"`
+	Reason  string `json:"reason,omitempty"`
+}
+
+// rerunRefusal is why "Rerun failures" cannot work on m, or "" when it can:
+// a model matrix (the rerun keeps two setups), a comparison still running,
+// or one with no failed counted run.
+func rerunRefusal(m *schemas.Manifest, runs []RunView, running bool) string {
+	if ms := m.Experiment.Matrix; ms != nil {
+		n := len(ms.Models)
+		if n == 0 {
+			n = len(m.Arms)
+		}
+		return fmt.Sprintf("Rerun failures works on a comparison of two setups. For this comparison of %d models, start a new comparison with the failed tasks.", n)
+	}
+	if running {
+		return "This comparison is still running. Rerun its failures once it has finished."
+	}
+	if _, n := failedTasks(runs, nil); n == 0 {
+		return "Nothing failed in this comparison."
+	}
+	return ""
 }
 
 // RunControlRequest is the body of pause, resume, cancel and requeue.
@@ -175,6 +204,15 @@ func (h *ExperimentsHandler) controlsView(ctx context.Context, op RunOperator, m
 		if !rv.Sealed {
 			out.InFlight++
 		}
+	}
+	running := out.InFlight > 0
+	if ar, ok := op.(ActivityReporter); ok && ar.Active(m.ExpID) {
+		running = true
+	}
+	if why := rerunRefusal(m, runs, running); why != "" {
+		out.RerunFailures = &RerunAllowed{Reason: why}
+	} else {
+		out.RerunFailures = &RerunAllowed{Allowed: true}
 	}
 	nameControls(ctx, out) // J6.log-user: names next to the user ids (runcontrolnames.go)
 	return out, nil
@@ -513,7 +551,15 @@ func (h *ExperimentsHandler) rerunFailures(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, "experiment "+m.ExpID+" is still running: rerun its failures once it has finished")
 		return
 	}
+	if m.Experiment.Matrix != nil { // N285: the same plain sentence GET /controls shows
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, rerunRefusal(m, runs, false))
+		return
+	}
 	exp, n, err := RerunExperiment(m, runs, req.Outcomes, time.Now())
+	if errors.Is(err, runctl.ErrConflict) {
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, strings.TrimPrefix(plainErr(err), runctl.ErrConflict.Error()+": "))
+		return
+	}
 	if err != nil {
 		sendControlError(ctx, h.mode, "rerun failures of "+m.ExpID, err)
 		return

@@ -312,6 +312,9 @@ type EvaluationChild struct {
 	// NotStarted counts the runs it never started.
 	BudgetStopped bool `json:"budget_stopped,omitempty"`
 	NotStarted    int  `json:"not_started,omitempty"`
+	// NextRunUSD is the expected cost of the run the cap refused, from the
+	// scheduler's budget stop (fix wave 3, N190); 0 when unknown.
+	NextRunUSD float64 `json:"next_run_usd,omitempty"`
 	// The dataset version the child ran, fixed at launch from its manifest
 	// (Y07): the suite version, the suite.lock hash, the task ids it ran
 	// and each task's content hash. A comparison with another evaluation
@@ -379,6 +382,27 @@ type Evaluation struct {
 	// spend without building every report card. It is not rebuilt after a
 	// regrade; the evaluation's own report card is always live.
 	Result *EvaluationResult `json:"result,omitempty"`
+	// Launch is the progress of starting the children: POST /evaluations
+	// answers before they start and saves this after each one (fix wave 3,
+	// N182). Nil once nothing is starting any more or for older records.
+	Launch *EvaluationLaunch `json:"launch,omitempty"`
+	// FailedRuns counts the counted runs that did not pass plus the
+	// infra_error runs over every child (N183), so a page offers "Rerun
+	// failures" only when there is one.
+	FailedRuns int `json:"failed_runs,omitempty"`
+	// Problem is the plain reason an evaluation failed before any child
+	// started: the launch failed, or the server restarted while it was
+	// starting.
+	Problem string `json:"problem,omitempty"`
+}
+
+// EvaluationLaunch is how far starting an evaluation's children got: Started
+// of Of benchmarks were handed to the launcher; Current is the benchmark id
+// being started now.
+type EvaluationLaunch struct {
+	Started int    `json:"started"`
+	Of      int    `json:"of"`
+	Current string `json:"current,omitempty"`
 }
 
 // EvaluationResult is the stored headline of a finished evaluation: each

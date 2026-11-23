@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
 import { Input } from "@/components/ui/input";
+import { formatCost } from "@/components/leaderboard/agentBoard.utils";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
 	effectiveCap,
@@ -29,9 +30,56 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, Pause, Play, RotateCcw, ShieldCheck, ShieldAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 /** GET /controls with the display names the hosted server adds (name, else email); ids stay when absent. */
 type NamedRunControls = RunControls & { paused_by_name?: string; actor_names?: Record<string, string> };
+
+/** An evaluation with the failed run count the server adds (fix wave 3, N183); absent on an older server. */
+type EvaluationWithFailures = Evaluation & { failed_runs?: number };
+
+/**
+ * Whether an evaluation has a failed run to rerun: the server's failed_runs, else (an evaluation stored before
+ * the field existed) a stored result whose score is below 100% on some arm.
+ */
+export function hasFailedRuns(evaluation: Evaluation): boolean {
+	const n = (evaluation as EvaluationWithFailures).failed_runs;
+	if (typeof n === "number") return n > 0;
+	return (evaluation.result?.arms ?? []).some((a) => a.runs > 0 && a.score < 1);
+}
+
+type ControlSettings = { mode?: string; concurrency?: number; total_usd?: number; paused_models?: string[] };
+
+function settingsOf(v: unknown): ControlSettings {
+	return v && typeof v === "object" ? (v as ControlSettings) : {};
+}
+
+/**
+ * A "set" change log entry in plain words (fix wave 3, N199): "held gpt-5.4-mini", "released ...",
+ * "set runs at once from 2 to 4", "set the spend cap from $1.00 to $2.00", "paused" or "resumed", joined
+ * with "; ". Anything else reads "changed settings".
+ */
+export function describeControlChange(e: Pick<ControlLogEntry, "before" | "after">, t: TFunction<"runControl">): string {
+	const b = settingsOf(e.before);
+	const a = settingsOf(e.after);
+	const out: string[] = [];
+	const before = b.paused_models ?? [];
+	const after = a.paused_models ?? [];
+	const held = after.filter((m) => !before.includes(m));
+	const released = before.filter((m) => !after.includes(m));
+	if (held.length > 0) out.push(t("log.held", { models: held.join(", ") }));
+	if (released.length > 0) out.push(t("log.released", { models: released.join(", ") }));
+	if ((b.concurrency ?? 0) !== (a.concurrency ?? 0)) {
+		const n = (v?: number) => (v ? String(v) : t("log.frozen"));
+		out.push(t("log.concurrency", { a: n(b.concurrency), b: n(a.concurrency) }));
+	}
+	if ((b.total_usd ?? 0) !== (a.total_usd ?? 0)) {
+		const usd = (v?: number) => (v ? formatCost(v) : t("log.frozen"));
+		out.push(t("log.spendCap", { a: usd(b.total_usd), b: usd(a.total_usd) }));
+	}
+	if (b.mode && a.mode && b.mode !== a.mode) out.push(t(a.mode === "paused" ? "log.actions.pause" : "log.actions.resume"));
+	return out.length > 0 ? out.join("; ") : t("log.actions.set");
+}
 
 /** The display text of a run control actor: the name the server sent, else the id. */
 export function actorName(c: RunControls, id: string): string {
@@ -165,7 +213,9 @@ function ControlLog({ c }: { c: RunControls }) {
 							<span className="font-medium" title={e.actor} data-testid="control-log-actor">
 								{actorName(c, e.actor)}
 							</span>
-							<span>{t(`log.actions.${e.action}`, { defaultValue: e.action })}</span>
+							<span data-testid="control-log-action">
+								{e.action === "set" ? describeControlChange(e, t) : t(`log.actions.${e.action}`, { defaultValue: e.action })}
+							</span>
 							{e.target && <span className="text-muted-foreground font-mono">{e.target}</span>}
 							<span className="text-muted-foreground">{e.reason || t("log.noReason")}</span>
 						</li>
@@ -365,10 +415,26 @@ export function RunControlsPanel({ expId, state }: { expId: string; state: strin
 					)}
 					<PolicyTable rows={c.policy} />
 					<ControlLog c={c} />
-					{finished && !c.exploratory && <RerunFailuresButton expId={expId} />}
+					{!c.exploratory && <RerunFailuresSlot c={c} finished={finished} expId={expId} />}
 				</div>
 			</DetailsDisclosure>
 		</section>
+	);
+}
+
+/**
+ * Rerun failures where the server says it can work, else its reason as a muted line (fix wave 3, N285).
+ * An older server without rerun_failures keeps the old rule: the button once the comparison finished.
+ */
+function RerunFailuresSlot({ c, finished, expId }: { c: RunControls; finished: boolean; expId: string }) {
+	const rerun = c.rerun_failures; // absent on an older server
+	if (!rerun) return finished ? <RerunFailuresButton expId={expId} /> : null;
+	if (rerun.allowed) return <RerunFailuresButton expId={expId} />;
+	if (!rerun.reason) return null;
+	return (
+		<p className="text-muted-foreground text-xs" data-testid="rerun-failures-reason">
+			{rerun.reason}
+		</p>
 	);
 }
 
@@ -438,16 +504,57 @@ export function RunActions({
 	);
 }
 
+/** The mutation cache key the rerun button and the page's notice share, so the notice can sit below the header. */
+export function rerunCacheKey(evalId: string): string {
+	return `evaluation-rerun-${evalId}`;
+}
+
+/**
+ * "Started ev_... with n benchmarks. Open" after Rerun failures: a full-width notice below the evaluation's
+ * header (fix wave 3, N193), so the header keeps its width.
+ */
+export function EvaluationRerunNotice({ evalId }: { evalId: string }) {
+	const { t } = useTranslation("runControl");
+	const [, state] = useRerunEvaluationFailuresMutation({ fixedCacheKey: rerunCacheKey(evalId) });
+	const res = state.data;
+	if (!res) return null;
+	return (
+		<div
+			className="bg-muted/40 flex w-full flex-wrap items-center gap-2 rounded-lg border px-4 py-2 text-sm"
+			role="status"
+			data-testid="evaluation-rerun-started"
+		>
+			<span>{t("rerun.evalStarted", { id: res.evaluation.id, count: res.children.length })}</span>
+			<Link
+				to="/evaluations/$evalId"
+				params={{ evalId: res.evaluation.id }}
+				className="text-primary inline-flex items-center gap-1 font-medium hover:underline"
+			>
+				{t("rerun.open")}
+				<ArrowRight className="size-3" aria-hidden="true" />
+			</Link>
+			<Button
+				variant="ghost"
+				size="sm"
+				className="ml-auto h-7 px-2 text-xs"
+				onClick={() => state.reset?.()}
+				dataTestId="evaluation-rerun-started-close"
+			>
+				{t("rerun.close")}
+			</Button>
+		</div>
+	);
+}
+
 /** Pause, resume and "Rerun failures" for an evaluation, beside its Cancel. */
 export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation }) {
 	const { t } = useTranslation("runControl");
 	const [pause, pauseState] = usePauseEvaluationMutation();
 	const [resume, resumeState] = useResumeEvaluationMutation();
-	const [rerun, rerunState] = useRerunEvaluationFailuresMutation();
+	const [rerun, rerunState] = useRerunEvaluationFailuresMutation({ fixedCacheKey: rerunCacheKey(evaluation.id) });
 	const running = evaluation.status === "running";
 	const finished = evaluation.status === "done" || evaluation.status === "failed" || evaluation.status === "cancelled";
 	const paused = Boolean(evaluation.paused);
-	const res = rerunState.data;
 	return (
 		<RoleGate min="member" fallback={null}>
 			<div className="flex flex-wrap items-center gap-2" data-testid="evaluation-run-actions">
@@ -483,7 +590,7 @@ export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation })
 						</Button>
 					</>
 				)}
-				{finished && !evaluation.rerun_of && (
+				{finished && !evaluation.rerun_of && hasFailedRuns(evaluation) && (
 					<Button
 						variant="outline"
 						size="sm"
@@ -496,19 +603,6 @@ export function EvaluationRunActions({ evaluation }: { evaluation: Evaluation })
 						<RotateCcw className="size-3.5" aria-hidden="true" />
 						{t("rerun.button")}
 					</Button>
-				)}
-				{res && (
-					<span className="flex items-center gap-2 text-xs" role="status" data-testid="evaluation-rerun-started">
-						{t("rerun.evalStarted", { id: res.evaluation.id, count: res.children.length })}
-						<Link
-							to="/evaluations/$evalId"
-							params={{ evalId: res.evaluation.id }}
-							className="text-primary inline-flex items-center gap-1 font-medium hover:underline"
-						>
-							{t("rerun.open")}
-							<ArrowRight className="size-3" aria-hidden="true" />
-						</Link>
-					</span>
 				)}
 				{pauseState.error && <ErrorLine error={pauseState.error} title={t("pauseError")} testId="evaluation-pause-error" />}
 				{resumeState.error && <ErrorLine error={resumeState.error} title={t("resumeError")} testId="evaluation-unpause-error" />}

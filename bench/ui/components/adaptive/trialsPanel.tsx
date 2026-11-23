@@ -1,6 +1,8 @@
 import { ToneBadge } from "@/components/suites/suiteBadges";
+import { hw11 } from "@/components/runs/debug/hw11I18n";
 import { useGetExperimentAdaptiveQuery } from "@/lib/store/apis/adaptiveApi";
 import type { AdaptiveLook, AdaptiveView } from "@/lib/types/bench";
+import { Link } from "@tanstack/react-router";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 
@@ -43,11 +45,17 @@ export function TrialsPanel({ view }: { view: AdaptiveView }) {
 				) : null}
 				{view.extends ? (
 					<ToneBadge tone={view.extends.rule === "exploratory" ? "warn" : "neutral"}>
-						<span data-testid="trials-extends">
+						<Link
+							to="/experiments/$expId"
+							params={{ expId: view.extends.exp_id }}
+							className="underline underline-offset-2"
+							title={hw11("trials.openParent")}
+							data-testid="trials-extends"
+						>
 							{t(view.extends.rule === "exploratory" ? "adaptive.extendsExploratory" : "adaptive.extendsCombined", {
 								exp: view.extends.exp_id,
 							})}
-						</span>
+						</Link>
 					</ToneBadge>
 				) : null}
 			</div>

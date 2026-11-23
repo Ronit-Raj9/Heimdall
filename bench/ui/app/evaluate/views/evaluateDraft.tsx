@@ -8,6 +8,7 @@ import type {
 	EvaluationSpec,
 } from "@/lib/store/apis/evaluationsApi";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { evalArmLabel } from "@/lib/evaluationArms";
 
 /**
  * Wizard state for /evaluate, shared by every step (lanes A11, A12, A13). One object, kept in
@@ -92,7 +93,7 @@ export function armsFor(d: EvaluateDraft, defaultModel = ""): EvaluationArm[] {
 	if (!d.agent) return [];
 	const prev = (label: string) => d.arms.find((a) => a.label === label) ?? d.stashedArms?.find((a) => a.label === label);
 	const a: EvaluationArm = {
-		label: "A",
+		label: evalArmLabel(0),
 		agent: d.agent,
 		model: prev("A")?.model || defaultModel,
 		...(prev("A")?.provider ? { provider: prev("A")?.provider } : {}),
@@ -107,16 +108,19 @@ export function armsFor(d: EvaluateDraft, defaultModel = ""): EvaluationArm[] {
 			return [
 				a,
 				keepB({
-					label: "B",
+					label: evalArmLabel(1),
 					agent: d.agent,
 					model: b0?.model || a.model,
 					...(d.compareVersion != null ? { version: d.compareVersion } : {}),
 				}),
 			];
 		case "models":
-			return [a, keepB({ label: "B", agent: d.agent, model: b0?.model ?? "", ...(d.version != null ? { version: d.version } : {}) })];
+			return [
+				a,
+				keepB({ label: evalArmLabel(1), agent: d.agent, model: b0?.model ?? "", ...(d.version != null ? { version: d.version } : {}) }),
+			];
 		case "opponent":
-			return [a, keepB({ label: "B", agent: d.opponent ?? "", model: b0?.model || a.model })];
+			return [a, keepB({ label: evalArmLabel(1), agent: d.opponent ?? "", model: b0?.model || a.model })];
 	}
 }
 

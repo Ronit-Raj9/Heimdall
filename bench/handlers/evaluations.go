@@ -244,10 +244,14 @@ var evalRefreshChildren = true
 // evaluation's status; a changed status is saved.
 func (h *evaluationsHandler) refresh(ev *schemas.Evaluation) {
 	s := h.env.Services
+	if h.startingOrStuck(ev) { // N182: children still starting in the background, or a restart lost them
+		return
+	}
 	changed := false
 	prev := ev.Status
 	if s.Index != nil && evalRefreshChildren {
 		eh := &ExperimentsHandler{mode: h.env.Mode, index: s.Index, launcher: s.Launcher}
+		failed := 0
 		for i := range ev.Children {
 			c := &ev.Children[i]
 			if c.ExperimentID == "" || c.Status == schemas.EvaluationChildSkipped {
@@ -257,13 +261,18 @@ func (h *evaluationsHandler) refresh(ev *schemas.Evaluation) {
 			if !ok {
 				continue
 			}
-			st := eh.status(m, s.Index.Runs(c.ExperimentID), false)
+			runs := s.Index.Runs(c.ExperimentID)
+			failed += failedRunCount(runs)
+			st := eh.status(m, runs, false)
 			if string(st.State) != c.Status && !(c.Status == string(schemas.ExperimentCancelled) && !terminalChild(string(st.State))) {
 				c.Status, changed = string(st.State), true
 			}
 			if h.budgetFacts(c, m, st) { // G4-01: spend, cap and runs the cap left unstarted (evaluationbudget.go)
 				changed = true
 			}
+		}
+		if failed != ev.FailedRuns { // N183: Rerun failures is offered only when there is one
+			ev.FailedRuns, changed = failed, true
 		}
 	}
 	if next := evaluationStatus(ev); next != ev.Status {
@@ -282,6 +291,58 @@ func (h *evaluationsHandler) refresh(ev *schemas.Evaluation) {
 	if changed {
 		_ = h.store().Save(ev) // a failed save only delays the stored status
 	}
+}
+
+// evalStartLimit is how long an evaluation may stay queued with no child
+// experiment before refresh calls it lost (the launch itself is bounded by
+// evaluationLaunchTimeout).
+const evalStartLimit = 5 * time.Minute
+
+// evalRestartProblem is the problem of an evaluation whose background start
+// was lost.
+const evalRestartProblem = "The server restarted while this evaluation was starting. Start it again."
+
+// startingOrStuck handles a queued evaluation whose children are still
+// starting in the background (N182): it is left as it is (true) while the
+// start may still be running, and failed with evalRestartProblem (also
+// true) once it is older than evalStartLimit with no child experiment.
+func (h *evaluationsHandler) startingOrStuck(ev *schemas.Evaluation) bool {
+	if ev.Status != schemas.EvaluationQueued {
+		return false
+	}
+	for _, c := range ev.Children {
+		if c.ExperimentID != "" {
+			return false
+		}
+	}
+	now := time.Now
+	if h.now != nil {
+		now = h.now
+	}
+	if now().Sub(ev.CreatedAt) > evalStartLimit {
+		ev.Status, ev.Problem = schemas.EvaluationFailed, evalRestartProblem
+		if ev.Launch != nil {
+			ev.Launch.Current = ""
+		}
+		_ = h.store().Save(ev)
+		return true
+	}
+	return ev.Launch != nil && ev.Launch.Started < ev.Launch.Of
+}
+
+// failedRunCount counts an experiment's counted runs that did not pass,
+// plus its infra_error runs (N183).
+func failedRunCount(runs []RunView) int {
+	n := 0
+	for _, rv := range countedRuns(runs) {
+		if !rv.Sealed || rv.Run.Outcome == schemas.OutcomePass {
+			continue
+		}
+		if rv.Slot.Counted || rv.Run.Outcome == schemas.OutcomeInfraError {
+			n++
+		}
+	}
+	return n
 }
 
 // decideGate judges the gate of an evaluation that just finished (lane X12,
@@ -354,12 +415,18 @@ func (h *evaluationsHandler) create(ctx *fasthttp.RequestCtx) {
 	work, cancel := workContext(ctx, evaluationLaunchTimeout)
 	defer cancel()
 	if err := h.normalize(work, &spec); err != nil {
-		h.fail(ctx, statusOf(err), err.Error())
+		h.fail(ctx, statusOf(err), plainErr(err)) // N211: no internal "bad quickrun request" prefix
 		return
 	}
 	if err := resolveEvaluationWorker(work, quickOrgID(ctx, s.OrgID), &spec); err != nil {
-		h.fail(ctx, statusOf(err), err.Error())
+		h.fail(ctx, statusOf(err), plainErr(err))
 		return
+	}
+	if platformRefusal != nil {
+		if status, body, refused := platformRefusal(work, h, &spec); refused {
+			lib.SendJSON(ctx, h.env.Mode, status, body)
+			return
+		}
 	}
 	{ // G10 budgets, X01 own keys: refuse before anything is written
 		var provs []string
@@ -377,6 +444,11 @@ func (h *evaluationsHandler) create(ctx *fasthttp.RequestCtx) {
 			return
 		}
 	}
+	// N187: every setup against every benchmark, before anything is saved.
+	if why := h.checkArmsCompatible(work, &spec); why != "" {
+		h.fail(ctx, fasthttp.StatusBadRequest, why)
+		return
+	}
 	actor := auth.PrincipalFrom(ctx)
 	who := ""
 	if actor != nil {
@@ -385,43 +457,148 @@ func (h *evaluationsHandler) create(ctx *fasthttp.RequestCtx) {
 			who = actor.UserID
 		}
 	}
-	ev, err := h.launch(work, withPrincipal(work, ctx), func(id string) { tenancy.SetCreated(ctx, id) }, spec, who, "")
-	if err != nil {
-		h.fail(ctx, fasthttp.StatusInternalServerError, err.Error())
+	ev := h.newEvaluation(spec, who, "")
+	if err := h.store().Save(ev); err != nil {
+		h.fail(ctx, fasthttp.StatusInternalServerError, "save evaluation: "+err.Error())
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusAccepted, ev)
+	tenancy.SetCreated(ctx, ev.ID)
+	// N182: answer at once; the children start in the background under the
+	// caller's principal and the same launch timeout, and the evaluation is
+	// saved after each one (Launch shows how far it got).
+	bg, bgCancel := context.WithTimeout(context.WithoutCancel(context.Background()), evaluationLaunchTimeout)
+	bg = withPrincipal(bg, ctx)
+	answer := *ev
+	if ev.Launch != nil {
+		l := *ev.Launch // the background launch updates ev.Launch
+		answer.Launch = &l
+	}
+	if !evalCreateInBackground {
+		defer bgCancel()
+		h.launchInBackground(bg, ev)
+		answer = *ev
+	} else {
+		go func() {
+			defer bgCancel()
+			h.launchInBackground(bg, ev)
+		}()
+	}
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusAccepted, &answer)
+}
+
+// evalCreateInBackground makes POST /evaluations answer before the children
+// start (N182). The package's older tests read the children from the
+// answer and turn it off (evaluations_hw13_test.go TestMain).
+var evalCreateInBackground = true
+
+// launchInBackground starts the children of a saved evaluation; a failure
+// fails the evaluation with a plain problem, and a panic never takes the
+// server down.
+func (h *evaluationsHandler) launchInBackground(ctx context.Context, ev *schemas.Evaluation) {
+	defer func() {
+		if r := recover(); r != nil {
+			ev.Status, ev.Problem = schemas.EvaluationFailed, fmt.Sprintf("Starting the evaluation failed: %v", r)
+			_ = h.store().Save(ev)
+		}
+	}()
+	if err := h.launchChildren(ctx, ctx, nil, ev); err != nil {
+		ev.Status, ev.Problem = schemas.EvaluationFailed, plainErr(err)
+		_ = h.store().Save(ev)
+	}
+}
+
+// newEvaluation is a new queued evaluation of a normalized spec with no
+// child started yet.
+func (h *evaluationsHandler) newEvaluation(spec schemas.EvaluationSpec, who, scheduleName string) *schemas.Evaluation {
+	now := h.now().UTC()
+	return &schemas.Evaluation{
+		ID:  "ev_" + now.Format("20060102_150405") + "_" + randHex(3),
+		Org: h.env.Services.OrgID, Spec: spec, Status: schemas.EvaluationQueued,
+		Children: []schemas.EvaluationChild{}, CreatedAt: now, CreatedBy: who, Schedule: scheduleName,
+		Launch: &schemas.EvaluationLaunch{Of: len(spec.Benchmarks)},
+	}
 }
 
 // launch saves a new evaluation of a normalized spec and starts one
 // experiment per benchmark. start is the context experiments start under
 // (it carries the caller's principal); created is told each new experiment.
 func (h *evaluationsHandler) launch(work, start context.Context, created func(string), spec schemas.EvaluationSpec, who, scheduleName string) (*schemas.Evaluation, error) {
-	s := h.env.Services
-	now := h.now().UTC()
-	ev := &schemas.Evaluation{
-		ID:  "ev_" + now.Format("20060102_150405") + "_" + randHex(3),
-		Org: s.OrgID, Spec: spec, Status: schemas.EvaluationQueued,
-		Children: []schemas.EvaluationChild{}, CreatedAt: now, CreatedBy: who, Schedule: scheduleName,
-	}
+	ev := h.newEvaluation(spec, who, scheduleName)
 	if err := h.store().Save(ev); err != nil {
 		return nil, fmt.Errorf("save evaluation: %w", err)
 	}
+	if err := h.launchChildren(work, start, created, ev); err != nil {
+		return nil, err
+	}
+	return ev, nil
+}
+
+// launchChildren starts one experiment per benchmark of a saved evaluation,
+// saving the evaluation with its Launch progress before each child and
+// after the last. An evaluation cancelled meanwhile stops starting children
+// and cancels a child that started while it was cancelled.
+func (h *evaluationsHandler) launchChildren(work, start context.Context, created func(string), ev *schemas.Evaluation) error {
+	spec := ev.Spec
 	agents := h.agentConfigs(work)
 	budget := childBudget(spec)
-	for _, b := range spec.Benchmarks {
-		ev.Children = append(ev.Children, h.launchChild(work, start, created, ev, b, agents, budget, who))
+	if ev.Launch == nil {
+		ev.Launch = &schemas.EvaluationLaunch{}
+	}
+	ev.Launch.Of = len(spec.Benchmarks)
+	for i, b := range spec.Benchmarks {
+		if h.cancelledMeanwhile(ev) {
+			return h.stopLaunch(start, ev)
+		}
+		ev.Launch.Started, ev.Launch.Current = i, b
+		if err := h.store().Save(ev); err != nil {
+			return fmt.Errorf("save evaluation: %w", err)
+		}
+		ev.Children = append(ev.Children, h.launchChild(work, start, created, ev, b, agents, budget, ev.CreatedBy))
+	}
+	ev.Launch.Started, ev.Launch.Current = len(spec.Benchmarks), ""
+	if h.cancelledMeanwhile(ev) {
+		return h.stopLaunch(start, ev)
 	}
 	ev.Status = evaluationStatus(&schemas.Evaluation{Status: schemas.EvaluationRunning, Children: ev.Children})
 	if err := h.store().Save(ev); err != nil {
-		return nil, fmt.Errorf("save evaluation: %w", err)
+		return fmt.Errorf("save evaluation: %w", err)
 	}
-	return ev, nil
+	return nil
+}
+
+// cancelledMeanwhile reports whether the stored evaluation was cancelled
+// while its children were starting.
+func (h *evaluationsHandler) cancelledMeanwhile(ev *schemas.Evaluation) bool {
+	cur, err := h.store().Load(ev.ID)
+	return err == nil && cur.Status == schemas.EvaluationCancelled
+}
+
+// stopLaunch cancels the children started so far and saves the evaluation
+// cancelled.
+func (h *evaluationsHandler) stopLaunch(start context.Context, ev *schemas.Evaluation) error {
+	rc, _ := h.env.Services.Launcher.(RunController)
+	for i := range ev.Children {
+		c := &ev.Children[i]
+		if c.ExperimentID == "" || terminalChild(c.Status) {
+			continue
+		}
+		if rc != nil {
+			_ = rc.Cancel(start, c.ExperimentID)
+		}
+		c.Status = string(schemas.ExperimentCancelled)
+	}
+	ev.Status = schemas.EvaluationCancelled
+	ev.Launch.Current = ""
+	if err := h.store().Save(ev); err != nil {
+		return fmt.Errorf("save evaluation: %w", err)
+	}
+	return nil
 }
 
 // LaunchEvaluation starts an evaluation of spec for the org of env, as POST
 // /evaluations does, without a request: a schedule repeats evaluations with
 // it. who is recorded as the creator and scheduleName on the evaluation.
+// It stays synchronous: it returns once every child was handed over.
 func LaunchEvaluation(ctx context.Context, env OrgEnv, spec schemas.EvaluationSpec, who, scheduleName string) (*schemas.Evaluation, error) {
 	h := &evaluationsHandler{env: env, now: time.Now}
 	s := env.Services
@@ -497,7 +674,7 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 			a.Label = string(rune('A' + i))
 		}
 		if !evalArmIDRe.MatchString(a.Label) {
-			return badf("arm label %q must start with a capital letter and hold only letters and digits", a.Label)
+			return badf("setup label %q is not allowed: use a capital letter followed by letters or digits, for example A or B", a.Label)
 		}
 		if i == 1 && a.Label == spec.Arms[0].Label {
 			return badf("the two arms have the same label %q", a.Label)
@@ -572,6 +749,9 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 	}
 	if spec.BudgetUSD < 0 || spec.BudgetUSD > EvaluationMaxBudget {
 		return badf("budget_usd must be between 0 and %v", EvaluationMaxBudget)
+	}
+	if n := max(len(spec.Benchmarks), 1); spec.BudgetUSD > 0 && spec.BudgetUSD < EvaluationMinBenchmarkBudget*float64(n)-1e-9 {
+		return badf("%s", budgetFloorMessage(n)) // N190: a share under a cent was rounded to 0, which meant no cap
 	}
 	if spec.Concurrency < 0 || spec.Concurrency > EvaluationMaxConcurrency {
 		return badf("concurrency must be between 1 and %d (0 is the default, %d)", EvaluationMaxConcurrency, EvaluationDefaultConcurrency)
@@ -727,7 +907,7 @@ func childBudget(spec schemas.EvaluationSpec) float64 {
 	if spec.BudgetUSD <= 0 || len(spec.Benchmarks) == 0 {
 		return QuickRunDefaultBudget
 	}
-	return float64(int(spec.BudgetUSD/float64(len(spec.Benchmarks))*100)) / 100
+	return microDollars(spec.BudgetUSD / float64(len(spec.Benchmarks))) // N190: never rounded down to a 0 cap
 }
 
 // agentConfigs maps agents/<id>.yaml to its decoded config, when the server
@@ -837,13 +1017,14 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 	slug := strings.NewReplacer(".", "-", "_", "-").Replace(suiteID)
 	name := "eval-" + strings.TrimPrefix(ev.ID, "ev_") + "-" + slug
 	name = strings.ReplaceAll(name, "_", "-")
+	reserve := h.childReserve(work, spec, bench, agents, budget, evalArmCount(spec)*len(tasks.IDs)*spec.Trials*len(conds)) // N190: one run's expected cost
 	f := quickFile{
 		Name: name, Suite: suiteRef, Base: "agents/" + spec.Arms[0].Agent + ".yaml",
 		Arms:        evalArms(spec),
 		Primary:     schemas.Endpoint{Condition: schemas.ConditionClean, Metric: "verified_success"},
 		Guards:      []schemas.GuardSpec{{Rule: "no_new_integrity_violation"}},
 		Conditions:  conds,
-		Budget:      schemas.BudgetSpec{TotalUSD: budget, ReserveUSD: quickReserve(budget, evalArmCount(spec)*len(tasks.IDs)*spec.Trials*len(conds))},
+		Budget:      schemas.BudgetSpec{TotalUSD: budget, ReserveUSD: reserve},
 		Verdict:     quickVerdict{Policy: "paired_signflip"},
 		Seed:        ev.CreatedAt.Unix(),
 		Concurrency: evaluationConcurrency(spec), ManifestMode: "agent_exposure",

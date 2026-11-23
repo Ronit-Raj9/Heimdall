@@ -69,6 +69,19 @@ type DebugEdit struct {
 	Message  string `json:"message,omitempty" yaml:"message,omitempty"`
 }
 
+// Kind names what the edit changes: "response", "message", or "" for none.
+func (e *DebugEdit) Kind() string {
+	switch {
+	case e == nil:
+		return ""
+	case e.Response != "":
+		return "response"
+	case e.Message != "":
+		return "message"
+	}
+	return ""
+}
+
 // Breakpoints say which model requests the fault proxy holds until the
 // operator releases them. AfterTools holds the request that carries a
 // result of one of these tools, so the run pauses right after the tool ran.
@@ -182,6 +195,10 @@ type RunDebug struct {
 	// FromCondition is DebugSpec.FromCondition: the source run's fault
 	// condition, empty when it was clean.
 	FromCondition string `json:"from_condition,omitempty"`
+	// Edit is what a fork changed at its fork call: "message" (a message
+	// for the agent was added) or "response" (the model's answer was
+	// replaced); empty when nothing was changed (fix wave 3, N247).
+	Edit string `json:"edit,omitempty"`
 	// HeldMS is the time the run spent held at breakpoints; the agent's
 	// wall clock did not run during it.
 	HeldMS int64 `json:"held_ms,omitempty"`

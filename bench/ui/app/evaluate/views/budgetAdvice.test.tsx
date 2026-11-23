@@ -1,7 +1,7 @@
 import { render } from "@/lib/testing/render";
 import type { EstimateBudget } from "@/lib/store/apis/evaluationsApi";
 import { describe, expect, it } from "vitest";
-import { BudgetAdvice, budgetLine } from "./budgetAdvice";
+import { BudgetAdvice, budgetLine, perRunLowCost, runWarning } from "./budgetAdvice";
 
 const budget = (over: Partial<EstimateBudget> = {}): EstimateBudget => ({
 	budget_usd: 1,
@@ -77,5 +77,27 @@ describe("BudgetAdvice", () => {
 		expect(html).toContain("Updating...");
 		expect(html).not.toContain("would not start");
 		expect(html).not.toContain("Set budget to");
+	});
+});
+
+describe("one run's cost (fix wave 3, N190)", () => {
+	it("warns when the budget is less than one run costs, so no run would start", () => {
+		const small = budget({ budget_usd: 0.01, per_benchmark_usd: 0.01, suggested_usd: 5 });
+		const run = perRunLowCost([{ benchmark: "bfcl", runs: 5, est_cost_usd: { low: 0.1, high: 0.2, known: true } }]);
+		expect(run).toBeCloseTo(0.02);
+		expect(runWarning(small, run, 1)).toBe(
+			"This budget is less than one run costs (about $0.02 per run), so no run would start. Set at least $0.02.",
+		);
+		const html = render(<BudgetAdvice budget={small} cost={known} onSet={() => undefined} perRunLow={run} benchmarks={1} />);
+		expect(html).toContain('data-testid="step5-budget-one-run"');
+		expect(html).toContain("Set budget to");
+	});
+
+	it("says an unknown run cost can pass the budget by one run, and nothing when a run fits", () => {
+		expect(runWarning(budget(), undefined, 1)).toBe(
+			"The cost of a run is not known yet, so this budget can be passed by up to one run's cost before it stops.",
+		);
+		expect(runWarning(budget(), 0.02, 1)).toBeUndefined();
+		expect(runWarning(budget({ default: true }), undefined, 1)).toBeUndefined();
 	});
 });

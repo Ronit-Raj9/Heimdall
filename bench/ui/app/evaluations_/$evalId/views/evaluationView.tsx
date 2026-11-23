@@ -1,4 +1,4 @@
-import { EvaluationRunActions } from "@/components/experiments/runControls"; // run control: pause, resume, rerun failures
+import { EvaluationRerunNotice, EvaluationRunActions } from "@/components/experiments/runControls"; // run control: pause, resume, rerun failures
 import "./fw08I18n";
 import { EvaluationKindLabel, EvaluationStatusPill } from "@/app/evaluations/views/evaluationWords";
 import { EvaluationLivePill } from "@/app/evaluations/views/evaluationLivePill";
@@ -36,6 +36,19 @@ import { useState } from "react";
 import { childSpendText, childStoppedText, RaiseBudgetPanel } from "./raiseBudget";
 import { useTranslation } from "react-i18next";
 import { FirstLookNote } from "@/app/connect/views/firstLookLauncher"; // lane Z01: first look is too small for a verdict
+import { Badge } from "@/components/ui/badge";
+import { formatCost } from "@/components/leaderboard/agentBoard.utils";
+import { parseSkillRefusal, SkillScanProblem } from "./skillScanProblem";
+
+/** Fields the server adds to an evaluation in fix wave 3 (N182, N183), read here before the shared type has them. */
+type EvaluationLaunchFacts = Evaluation & { launch?: { started: number; of: number; current?: string }; problem?: string };
+
+/** "Starting benchmark 2 of 3: bfcl...": the benchmark the background launch is on, or null once every one started. */
+function startingLine(evaluation: Evaluation): { n: number; m: number; name?: string } | null {
+	const launch = (evaluation as EvaluationLaunchFacts).launch;
+	if (!launch || launch.of <= 0 || launch.started >= launch.of) return null;
+	return { n: Math.min(launch.started + 1, launch.of), m: launch.of, name: launch.current || undefined };
+}
 
 /** /evaluations/$evalId: live progress per benchmark, then the report card. */
 export default function EvaluationView({ evalId }: { evalId: string }) {
@@ -67,13 +80,24 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 	const active = isActiveStatus(evaluation.status);
 	const spec = evaluation.spec;
 	const faults = (spec.faults ?? []).filter((f) => f !== "clean");
+	const starting = startingLine(evaluation);
+	const problem = (evaluation as EvaluationLaunchFacts).problem;
 	return (
 		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6" data-testid="evaluation-screen" data-status={evaluation.status}>
 			<PageHeader
 				title={spec.name || evaluation.id}
 				subtitle={t("detail.subtitle")}
 				breadcrumbs={[{ label: t("detail.crumb"), to: "/evaluations" }, { label: spec.name || evaluation.id }]}
-				meta={<EvaluationLivePill evaluation={evaluation} testId="evaluation-status" />}
+				meta={
+					<span className="flex flex-wrap items-center gap-2">
+						<EvaluationLivePill evaluation={evaluation} testId="evaluation-status" />
+						{evaluation.schedule && (
+							<Badge variant="outline" data-testid="evaluation-scheduled">
+								{t("detail.scheduled")}
+							</Badge>
+						)}
+					</span>
+				}
 				actions={
 					<div className="flex flex-wrap items-center gap-2">
 						<ShareButton kind="evaluation" target={evaluation.id} evaluationId={evaluation.id} />
@@ -83,6 +107,23 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 					</div>
 				}
 			/>
+			<EvaluationRerunNotice evalId={evaluation.id} />
+			{problem && (
+				<p
+					className="border-chart-error/40 bg-chart-error/10 text-chart-error-ink rounded-lg border px-4 py-2 text-sm break-words"
+					role="alert"
+					data-testid="evaluation-problem"
+				>
+					{problem}
+				</p>
+			)}
+			{starting && !problem && (
+				<p className="text-muted-foreground text-sm" role="status" data-testid="evaluation-starting">
+					{starting.name
+						? t("detail.starting", { n: starting.n, m: starting.m, name: starting.name })
+						: t("detail.startingNoName", { n: starting.n, m: starting.m })}
+				</p>
+			)}
 			<section className="bg-card flex flex-col gap-4 rounded-xl border p-5" data-testid="evaluation-header">
 				<div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
 					<span className="font-medium" data-testid="evaluation-mode">
@@ -96,11 +137,20 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 					</span>
 					{budget > 0 && (
 						<span className="text-muted-foreground tabular-nums" data-testid="evaluation-budget">
-							{tf("budget", { amount: `$${budget.toFixed(2)}` })}
+							{tf("budget", { amount: formatCost(budget) })}
 						</span>
 					)}
 					<span className="text-muted-foreground ml-auto text-xs tabular-nums">{formatCreated(evaluation.created_at, i18n.language)}</span>
 				</div>
+				{evaluation.schedule && (
+					<p className="text-muted-foreground text-sm" data-testid="evaluation-schedule-line">
+						{t("detail.scheduledLine", {
+							name: spec.name || evaluation.id,
+							schedule: evaluation.schedule,
+							date: formatCreated(evaluation.created_at, i18n.language),
+						})}
+					</p>
+				)}
 				{spec.preset === "first_look" && <FirstLookNote />}
 				<div className="grid gap-3 sm:grid-cols-2">
 					{(spec.arms ?? []).map((arm) => (
@@ -129,7 +179,9 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 							</span>
 						)}
 					</EmptyNote>
-				) : (
+				) : null}
+				{run.length === 0 && <SkillScanProblems items={skipped} />}
+				{run.length === 0 ? null : (
 					<ul className="flex flex-col divide-y rounded-xl border">
 						{run.map((child) => (
 							<ChildRow key={child.benchmark} child={child} score={spec.mode === "score"} />
@@ -140,12 +192,16 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 			{run.length > 0 && skipped.length > 0 && (
 				<Section title={t("detail.skippedTitle")} description={t("detail.skippedDescription")} testId="evaluation-skipped">
 					<ul className="flex flex-col gap-1 text-sm">
-						{skipped.map((child) => (
-							<li key={child.benchmark} data-testid={`evaluation-skipped-${child.benchmark}`}>
-								<span className="font-medium">{child.benchmark}</span>
-								{child.skipped && <span className="text-muted-foreground">: {child.skipped}</span>}
-							</li>
-						))}
+						{skipped.map((child) => {
+							const refusal = parseSkillRefusal(child.skipped);
+							return (
+								<li key={child.benchmark} data-testid={`evaluation-skipped-${child.benchmark}`}>
+									<span className="font-medium">{child.benchmark}</span>
+									{child.skipped && <span className="text-muted-foreground">: {child.skipped}</span>}
+									{refusal && <SkillScanProblem refusal={refusal} testId={`evaluation-skill-scan-${child.benchmark}`} />}
+								</li>
+							);
+						})}
 					</ul>
 				</Section>
 			)}
@@ -199,19 +255,59 @@ function ArmCard({ arm, single }: { arm: EvaluationArm; single: boolean }) {
 	);
 }
 
+/** The next step for each benchmark the skill gate refused (fix wave 3, L5), when no benchmark ran. */
+function SkillScanProblems({ items }: { items: readonly EvaluationChild[] }) {
+	const rows = items.flatMap((c) => {
+		const refusal = parseSkillRefusal(c.skipped);
+		return refusal ? [{ benchmark: c.benchmark, refusal }] : [];
+	});
+	if (rows.length === 0) return null;
+	return (
+		<div className="mt-3 flex flex-col gap-3 rounded-xl border p-4" data-testid="evaluation-skill-problems">
+			{rows.map((r) => (
+				<SkillScanProblem key={r.benchmark} refusal={r.refusal} testId={`evaluation-skill-scan-${r.benchmark}`} />
+			))}
+		</div>
+	);
+}
+
 /** One benchmark: status, runs done of total (from its experiment, polled while running), links. */
 export function ChildRow({ child, score = false }: { child: EvaluationChild; score?: boolean }) {
 	const { t } = useTranslation("evaluations");
 	const active = isActiveStatus(child.status);
 	const exp = useGetExperimentQuery(child.experiment_id, { pollingInterval: active ? EVALUATION_POLL_MS : 0 });
 	const slots = exp.data?.slots;
+	// N180, N216: the worker refused the runs (for example an image it could not build) and none was counted.
+	const problem = exp.data?.problem && !(slots && slots.done > 0) ? exp.data.problem : undefined;
 	return (
 		<li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-sm" data-testid={`evaluation-child-${child.benchmark}`}>
 			<span className="min-w-40 font-medium">{child.benchmark}</span>
-			<EvaluationStatusPill status={child.status} testId={`evaluation-child-status-${child.benchmark}`} />
-			<span className="text-muted-foreground tabular-nums" data-testid={`evaluation-child-runs-${child.benchmark}`}>
-				{slots ? childRunsText((key, opts) => t(key, opts), slots, active) : t("detail.runsUnknown")}
-			</span>
+			{problem ? (
+				<span
+					className="text-chart-error-ink flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1"
+					role="status"
+					data-testid={`evaluation-child-problem-${child.benchmark}`}
+				>
+					<span className="min-w-0 break-words">{t("detail.childProblem", { problem })}</span>
+					{exp.data?.run_job_id && (
+						<Link
+							to="/jobs/$jobId"
+							params={{ jobId: exp.data.run_job_id }}
+							className="text-primary text-xs font-medium hover:underline"
+							data-testid={`evaluation-child-problem-log-${child.benchmark}`}
+						>
+							{t("detail.childProblemLog")}
+						</Link>
+					)}
+				</span>
+			) : (
+				<>
+					<EvaluationStatusPill status={child.status} testId={`evaluation-child-status-${child.benchmark}`} />
+					<span className="text-muted-foreground tabular-nums" data-testid={`evaluation-child-runs-${child.benchmark}`}>
+						{slots ? childRunsText((key, opts) => t(key, opts), slots, active) : t("detail.runsUnknown")}
+					</span>
+				</>
+			)}
 			{childStoppedText(child) ? (
 				<span className="text-chart-warning-ink text-xs font-medium" data-testid={`evaluation-child-budget-stopped-${child.benchmark}`}>
 					{childStoppedText(child)}

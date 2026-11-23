@@ -91,6 +91,30 @@ type DispatcherConfig struct {
 	// Limits are the per-credential and per-org API rate limits
 	// (ratelimit.go); nil limits nothing.
 	Limits *RateLimits
+	// Serve wraps the handler that serves a request the dispatcher has
+	// already authorized (platform router or org router), after the policy
+	// check, the rate limits and the plan gate. The hosted server puts the
+	// idempotency middleware here, so a stored answer is replayed only to a
+	// caller who still passes authentication and the route's authorization
+	// for that organization. Nil serves the handler as it is.
+	Serve lib.Middleware
+}
+
+// replayedHeader is idempotency.ReplayedHeader, repeated so this package does
+// not import idempotency (which imports tenancy). A replayed answer did no
+// work, so it writes no second audit row.
+const replayedHeader = "Idempotent-Replayed"
+
+func replayed(ctx *fasthttp.RequestCtx) bool {
+	return string(ctx.Response.Header.Peek(replayedHeader)) == "true"
+}
+
+// serve runs h through the configured Serve middleware.
+func (d *Dispatcher) serve(ctx *fasthttp.RequestCtx, h fasthttp.RequestHandler) {
+	if d.c.Serve != nil {
+		h = d.c.Serve(h)
+	}
+	h(ctx)
 }
 
 // Dispatcher is the hosted root handler behind the auth middleware: it
@@ -153,7 +177,7 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 			SetOrg(ctx, o)
 		}
 		auth.SetPrincipal(ctx, eff)
-		d.c.Platform(ctx)
+		d.serve(ctx, d.c.Platform)
 		if o != nil && rule.AuditRead && IsRead(method) && ctx.Response.StatusCode() < 400 {
 			d.auditRead(ctx, o.ID, method, pat)
 		}
@@ -225,8 +249,8 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 		}
 		return err == nil && ro != nil && ro.ID == o.ID
 	})
-	rt.Handler(ctx)
-	if !IsRead(method) && !rule.NoAudit && ctx.Response.StatusCode() < 400 {
+	d.serve(ctx, rt.Handler)
+	if !IsRead(method) && !rule.NoAudit && ctx.Response.StatusCode() < 400 && !replayed(ctx) {
 		d.audit(ctx, o.ID, method, pat)
 	}
 	if IsRead(method) && rule.AuditRead && ctx.Response.StatusCode() < 400 {

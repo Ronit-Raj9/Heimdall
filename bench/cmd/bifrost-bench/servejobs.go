@@ -424,8 +424,14 @@ func (l *launcher) execute(ctx context.Context, m *schemas.Manifest, run *liveRu
 	progress(prog)
 	actx := context.WithoutCancel(ctx)
 	_ = l.rebuild(actx) // Z10: seals refreshed the index slot by slot; the full rebuild runs at experiment end
-	an, _, aerr := l.a.analyze(actx, m.ExpID, "")
-	if aerr != nil {
+	var an *schemas.Analysis
+	var aerr error
+	if m.Experiment.Debug != nil {
+		// A debug run (replay, fork, step) is never counted, so a verdict
+		// would always read "invalid" on zero runs; it is not scored (N247).
+		run.publish(schemas.LiveEvent{Kind: "experiment_done", Message: "debug run: not scored", At: time.Now()})
+		log.Printf("debug run: not scored")
+	} else if an, _, aerr = l.a.analyze(actx, m.ExpID, ""); aerr != nil {
 		run.publish(schemas.LiveEvent{Kind: "error", Message: "analyze: " + aerr.Error(), At: time.Now()})
 		log.Errorf("analyze: %v", aerr)
 	} else {

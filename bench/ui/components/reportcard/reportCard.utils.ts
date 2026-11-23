@@ -7,6 +7,7 @@ import type {
 	ReportReliabilityCard,
 	ReportProcess,
 } from "@/lib/store/apis/evaluationsApi";
+import { formatUsd } from "@/lib/money";
 
 /** Capability rows, always shown in this order. Others found in the report follow. */
 export const CAPABILITY_ORDER = ["terminal", "coding", "memory", "support", "research", "voice", "safety"] as const;
@@ -187,8 +188,7 @@ export function faultChange(fs: { drop: number } | undefined | null): { text: st
 }
 
 export function usd(x: number | undefined | null): string {
-	if (x === undefined || x === null || !Number.isFinite(x)) return "-";
-	return x < 10 ? `$${x.toFixed(2)}` : `$${Math.round(x).toLocaleString("en-US")}`;
+	return formatUsd(x);
 }
 
 export function compactNumber(x: number | undefined | null): string {

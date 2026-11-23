@@ -31,8 +31,18 @@
 		"inconclusive": "No clear winner yet",
 		"invalid": "Test was broken",
 		"pending": "Waiting for result",
-		"score": "Scored"
+		"score": "Scored",
+		"leader": "Leader found"
 	},
+	"kind": {
+		"readiness": "Readiness check",
+		"agent": "Agent check",
+		"drift": "Drift check",
+		"debug": "Debug run (not scored)"
+	},
+	"hiddenMatches_one": "{{count}} match is hidden (checks, practice runs and single benchmarks of evaluations).",
+	"hiddenMatches_other": "{{count}} matches are hidden (checks, practice runs and single benchmarks of evaluations).",
+	"showHiddenMatches": "Show them",
 	"col": {
 		"experiment": "Comparison",
 		"status": "Status",
@@ -48,6 +58,7 @@
 		"readiness": "Readiness check for {{name}}",
 		"agent": "Agent check for {{name}}",
 		"drift": "Drift monitor: {{name}}",
+		"driftDeleted": "Drift monitor {{name}} (deleted)",
 		"tag": "automatic check",
 		"toggle": "Also show readiness checks, practice runs, debug runs and single benchmarks of evaluations ({{count}})",
 		"toggleHint": "Automatic checks Heimdall runs by itself (benchmark readiness checks, agent checks and drift monitors), runs on the practice benchmarks, and the one-setup benchmarks of an evaluation. Debug runs replay, fork or step through one recorded run and never count toward results. None of them compares two setups.",

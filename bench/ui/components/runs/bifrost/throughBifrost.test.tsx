@@ -80,7 +80,8 @@ describe("ThroughBifrost", () => {
 	it("formats and escapes", () => {
 		expect(tokenSum(undefined)).toBeUndefined();
 		expect(tokenSum(tok(3, 4))).toBe(7);
-		expect(usd(0.5)).toBe("$0.5000");
+		expect(usd(0.5)).toBe("$0.50"); // fix wave 3: the one money format (lib/money.ts)
+		expect(usd(0.0005)).toBe("$0.0005");
 		expect(ms(12.4)).toBe("12 ms");
 		expect(runBifrostPath("a/b")).toBe("/runs/a%2Fb/bifrost");
 	});

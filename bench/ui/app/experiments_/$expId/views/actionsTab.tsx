@@ -5,7 +5,7 @@ import { ActionCard } from "@/components/experiments/compareActionCard";
 import { groupFaults } from "@/app/evaluate/views/step4Setup";
 import { Input } from "@/components/ui/input";
 import { useGetExperimentAdaptiveQuery } from "@/lib/store/apis/adaptiveApi";
-import { getBenchErrorMessage, useGetExperimentQuery, useGetSuitesQuery } from "@/lib/store/apis/benchApi";
+import { getBenchErrorMessage, useGetExperimentQuery, useGetSuitesQuery, useGetVerdictQuery } from "@/lib/store/apis/benchApi";
 import { useGetBenchFaultsQuery } from "@/lib/store/apis/evaluationsApi";
 import type { ExperimentStatus } from "@/lib/types/bench";
 import { EXTEND_MAX_TASKS, EXTEND_MAX_TRIALS, type ExtendJobParams, type ProbeJobParams } from "@/lib/types/experimentActions";
@@ -78,6 +78,25 @@ function clamp(n: number, max: number): number {
 	return Math.min(max, Math.max(1, Math.floor(n) || 1));
 }
 
+/**
+ * Why Extend is off on a broken comparison (fix wave 3, N246): the first reason its test was broken,
+ * as in the sentence the extend job refuses with.
+ */
+export function brokenParentReason(reasons: readonly string[] | undefined): string {
+	return reasons?.find(Boolean) ?? "see its result";
+}
+
+/** The sentence on a broken comparison's Extend card, with the first reason from its verdict. */
+function BrokenParentNote({ expId }: { expId: string }) {
+	const { t } = useTranslation("experimentActions");
+	const verdict = useGetVerdictQuery(expId);
+	return (
+		<p className="text-chart-error-ink text-sm" role="note" data-testid="actions-extend-broken">
+			{t("extend.brokenParent", { reason: brokenParentReason(verdict.data?.verdict.invalid_reasons) })}
+		</p>
+	);
+}
+
 function ExtendCard({ expId }: { expId: string }) {
 	const { t } = useTranslation("experimentActions");
 	const uid = useId();
@@ -90,6 +109,8 @@ function ExtendCard({ expId }: { expId: string }) {
 	const parent = adaptive.data?.extends;
 	// A one-setup score run has no verdict to firm up or overturn: extending it is always allowed.
 	const open = ["inconclusive", "score"].includes(decision.toLowerCase());
+	// Fix wave 3, N246: a broken comparison is never extended, "anyway" or not; the server refuses too.
+	const broken = decision.toLowerCase() === "invalid";
 	const params: ExtendJobParams | null = parent
 		? null
 		: {
@@ -127,6 +148,7 @@ function ExtendCard({ expId }: { expId: string }) {
 				{more && !more.over && (
 					<p className="text-muted-foreground text-xs">{t("extend.sizing", { tasks: more.tasks, target: more.target_pp })}</p>
 				)}
+				{broken && !parent && <BrokenParentNote expId={expId} />}
 				{parent ? (
 					<p className="text-muted-foreground text-sm" data-testid="actions-extend-followup">
 						{t("extend.already", { expId: parent.exp_id })}
@@ -171,7 +193,7 @@ function ExtendCard({ expId }: { expId: string }) {
 								data-testid="actions-extend-count"
 							/>
 						</label>
-						{decision && !open && (
+						{decision && !open && !broken && (
 							<label className="flex items-center gap-2 text-sm">
 								<input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} data-testid="actions-extend-force" />
 								{t("extend.force")}
@@ -181,10 +203,10 @@ function ExtendCard({ expId }: { expId: string }) {
 				)}
 				<FollowUpJob
 					kind="experiment.extend"
-					params={params && (open || force || !decision) ? params : null}
+					params={params && !broken && (open || force || !decision) ? params : null}
 					label={t("extend.run")}
 					confirm={t("extend.confirm", { expId })}
-					missing={parent ? undefined : t("extend.notInconclusive")}
+					missing={parent || broken ? undefined : t("extend.notInconclusive")}
 					testId="actions-extend-job"
 				/>
 			</div>

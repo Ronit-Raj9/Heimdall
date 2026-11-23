@@ -103,7 +103,7 @@ var APIRoutes = []RouteDoc{
 	{Method: "POST", Path: APIPrefix + "/experiments/{id}/regrade", Tag: "analysis", Summary: "Queue an experiment.regate job: recompute the gates of the sealed runs as a new regrade (id in the job's params); nothing runs again",
 		Auth: AuthWrite, Request: RegradeRequest{}, OptionalBody: true, Status: fasthttp.StatusAccepted, Response: jobs.Job{}},
 	// Run control (handlers/runcontrol.go): pause (drain), live controls with a hash-chained log, run cancel and requeue, rerun failures.
-	{Method: "GET", Path: APIPrefix + "/experiments/{id}/controls", Tag: "experiments", Summary: "Run controls: paused or running, live concurrency, spend cap and paused models, the error policy table and the verified change log",
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/controls", Tag: "experiments", Summary: "Run controls: paused or running, live concurrency, spend cap and paused models, the error policy table, the verified change log and whether Rerun failures can work (rerun_failures, with the reason when not)",
 		Response: RunControls{}},
 	{Method: "PATCH", Path: APIPrefix + "/experiments/{id}/controls", Tag: "experiments", Summary: "Change live concurrency, spend cap or paused models of an experiment; the scheduler applies it from the next lease; logged in controls.jsonl",
 		Auth: AuthWrite, Request: runctl.Patch{}, Response: RunControls{}},
@@ -596,6 +596,9 @@ func buildOpenAPI(registered map[string][]string, version string, mode schemas.M
 				rd = RouteDoc{Method: method, Path: p, Tag: "undocumented", Summary: "Not yet described in handlers/openapi.go"}
 			}
 			op := g.operation(rd)
+			if method == "POST" {
+				g.documentIdempotencyKey(op) // fix wave 3, N186: every POST honours Idempotency-Key (idempotency_docs_hw13.go)
+			}
 			if rule != nil {
 				hostedSecurity(op, method, *rule)
 			}

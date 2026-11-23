@@ -29,6 +29,7 @@ const experiments = [
 		state: "running",
 	}),
 	exp("e_real", "Prompt v2 vs v1", "2026-11-20T10:00:00Z"),
+	exp("e_canary_gone_ab12", "canary-gone", "2026-11-19T10:00:00Z"),
 ];
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
@@ -41,6 +42,7 @@ vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
 	useListEvaluationsQuery: () => okQuery([{ id: "ev_1", spec: { name: "codex score" } }]),
 }));
+vi.mock("@/lib/store/apis/canaryApi", () => ({ useGetCanariesQuery: () => okQuery({ canaries: [{ name: "nightly" }] }) }));
 vi.mock("@/lib/store/apis/integrationsApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/integrationsApi")>()),
 	useListExportsQuery: () => okQuery({ exports: [] }),
@@ -64,5 +66,9 @@ describe("ExportsPanel (N19)", () => {
 		expect(html).toContain('<optgroup label="Checks, practice and debug runs">');
 		expect(html).toContain('value="e_admit_acme_safety_5e8q"');
 		expect(html).toContain("Readiness check for acme-safety · Finished");
+	});
+	it("labels a deleted drift monitor's runs (deleted) (N257)", () => {
+		const html = render(<ExportsPanel showHiddenAtStart />);
+		expect(html).toContain("Drift monitor gone (deleted) · Finished");
 	});
 });

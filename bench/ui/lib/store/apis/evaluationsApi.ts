@@ -257,6 +257,7 @@ export interface EvaluationChild {
 	experiment_id: string;
 	status: string;
 	skipped?: string;
+	next_run_usd?: number;
 	/** Tasks left out of this benchmark alone (quarantined); the rest runs. */
 	skipped_tasks?: EvaluationSkippedTask[];
 	/** Condition id to fault (or "attack"), fixed at launch. */
@@ -294,6 +295,9 @@ export interface Evaluation {
 	/** Run control: every running benchmark is paused. */
 	paused?: boolean;
 	result?: EvaluationResult;
+	launch?: { started: number; of: number; current?: string };
+	failed_runs?: number;
+	problem?: string;
 }
 
 /** One arm of a stored evaluation result: its clean score and runs over every benchmark. */

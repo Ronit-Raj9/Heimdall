@@ -1,0 +1,19 @@
+{
+	"banner": {
+		"forkMessage": "Fork of run {{run}}: your message was added before model call {{call}}.",
+		"forkResponse": "Fork of run {{run}}: the model's answer at call {{call}} was replaced.",
+		"forkNone": "Fork of run {{run}} from model call {{call}} (no change).",
+		"showStep": "Show that step"
+	},
+	"replay": {
+		"editedMessage": "Message added here",
+		"editedResponse": "Answer replaced here"
+	},
+	"trials": {
+		"openParent": "Open the comparison this one extends"
+	},
+	"step3": {
+		"setupCheckFailed": "Could not check Setup {{label}} ({{agent}}). Pick it again or retry.",
+		"retry": "Retry"
+	}
+}

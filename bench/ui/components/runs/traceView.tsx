@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { callsByRequest, stepIndex } from "./debug/debug.utils"; // X20b
 import { canBreak as runCanBreak } from "./debug/debugActions";
-import { ReplayBadge } from "./debug/replayBadge";
+import { EditedCallBadge, ReplayBadge } from "./debug/replayBadge";
 import { StepInspector } from "./debug/stepInspector";
 import { AgentEventsLine, ObserverStatusLine } from "./stepTimeline";
 import { clipText, stepTime } from "./stepTimeline.utils";
@@ -399,8 +399,9 @@ function TraceRow({
 						</span>
 					)}
 				</span>
+				{call?.replay === "edited" && <EditedCallBadge call={call.call} testId={`trace-row-${arm}-${step.seq}-replay`} />}
 				<span className="hidden shrink-0 items-center gap-1.5 sm:flex">
-					{call?.replay && <ReplayBadge label={call.replay} testId={`trace-row-${arm}-${step.seq}-replay`} />}
+					{call?.replay && call.replay !== "edited" && <ReplayBadge label={call.replay} testId={`trace-row-${arm}-${step.seq}-replay`} />}
 					{usage && usage.tokens > 0 && (
 						<Chip testId={`trace-row-${arm}-${step.seq}-tokens`}>{t("tokens", { value: usage.tokens.toLocaleString() })}</Chip>
 					)}

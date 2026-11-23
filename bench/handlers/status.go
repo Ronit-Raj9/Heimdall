@@ -60,6 +60,9 @@ func BuildStatus(m *schemas.Manifest, runs []RunView, f StatusFacts) schemas.Exp
 	if d := m.Experiment.Debug; d != nil { // N29: debug runs are told apart in lists
 		st.Debug, st.DebugFromRun = d.Mode, d.FromRun
 	}
+	if e := m.Experiment.Extends; e != nil { // N246: a follow-up links its parent
+		st.Extends = e.ExpID
+	}
 	counted := countedRuns(runs)
 	unsealed := map[string]bool{}
 	for _, rv := range runs {

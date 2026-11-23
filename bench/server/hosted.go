@@ -28,6 +28,7 @@ import (
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/handlers"
+	"github.com/maximhq/bifrost/bench/idempotency"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/tenancy"
@@ -96,6 +97,12 @@ func NewHosted(cfg *lib.Config, h Hosted) (*Server, error) {
 		Mode: mode, Policy: h.Policy, Dir: h.Directory, Registry: h.Registry,
 		Platform: platform.Handler, PlatformRoutes: platform.List(), OrgRoutes: OrgRoutes(cfg),
 		Fallback: fallback, Audit: h.Audit, Logger: logger, ClientIP: h.ClientIP, Limits: h.Limits,
+		// fix wave 3, N186: Idempotency-Key on every POST under /api/, scoped to
+		// caller and org (idempotency/idempotency.go). Inside the dispatcher,
+		// after the policy check, so a stored answer is replayed only to a
+		// caller who still has access (a removed member, a lowered role or a
+		// revoked token is refused first).
+		Serve: idempotency.Middleware(mode, idempotency.NewStore()),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("new hosted server: %w", err)

@@ -129,6 +129,9 @@ func validateExtendJob(ctx context.Context, env jobEnv, raw json.RawMessage) (an
 	if _, err := validateParentExp(ctx, env, p.ExpID); err != nil {
 		return nil, "", err
 	}
+	if err := storedExtendRefusal(ctx, env, p.ExpID); err != nil { // N246: never extend a broken comparison, force or not
+		return nil, "", invalid(err)
+	}
 	return p, expTarget(p.ExpID), nil
 }
 
@@ -146,6 +149,9 @@ func runExtendJob(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger,
 	an, _, err := a.analyze(ctx, p.ExpID, "")
 	if err != nil {
 		return nil, fmt.Errorf("analyze %s: %w", p.ExpID, err)
+	}
+	if err := extendParentRefusal(an); err != nil { // N246: the fresh analysis says the test was broken
+		return nil, err
 	}
 	if an.Verdict.Decision != schemas.DecisionInconclusive && !p.Force {
 		return nil, fmt.Errorf("%s is %s, not INCONCLUSIVE: there is nothing to buy more evidence for (tick \"extend anyway\" to run it regardless)", p.ExpID, an.Verdict.Decision)
