@@ -21,6 +21,7 @@ import (
 	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/benchcatalog"
 	"github.com/maximhq/bifrost/bench/handlers"
+	"github.com/maximhq/bifrost/bench/idempotency"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/packs"
 	"github.com/maximhq/bifrost/bench/pullagent"
@@ -170,8 +171,9 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 		lib.SecurityHeaders(),
 		lib.HostGuard(mode, cfg.Server.AllowedHosts),
 		lib.CORS(cfg.Server.CORSOrigins),
-		auth.Middleware(auth.Config{ServerMode: mode}, nil), // Auth area (P2): every local request carries the local-org owner principal (docs/auth.md)
-		handlers.V1Alias(mode, deps.Version, false),         // Public API v1: /api/v1 rewritten onto its bench routes (handlers/apiv1.go, docs/api-v1.md)
+		auth.Middleware(auth.Config{ServerMode: mode}, nil),  // Auth area (P2): every local request carries the local-org owner principal (docs/auth.md)
+		handlers.V1Alias(mode, deps.Version, false),          // Public API v1: /api/v1 rewritten onto its bench routes (handlers/apiv1.go, docs/api-v1.md)
+		idempotency.Middleware(mode, idempotency.NewStore()), // fix wave 3, N186: Idempotency-Key on every POST under /api/ (idempotency/idempotency.go)
 	)
 	s.server = &fasthttp.Server{
 		Handler:               selfmetrics.Default.Middleware(telemetry.Middleware(s.handler)), // N9: API latency for /metrics; Z14: a server span per request

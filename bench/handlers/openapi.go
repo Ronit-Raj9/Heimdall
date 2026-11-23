@@ -595,6 +595,9 @@ func buildOpenAPI(registered map[string][]string, version string, mode schemas.M
 				rd = RouteDoc{Method: method, Path: p, Tag: "undocumented", Summary: "Not yet described in handlers/openapi.go"}
 			}
 			op := g.operation(rd)
+			if method == "POST" {
+				g.documentIdempotencyKey(op) // fix wave 3, N186: every POST honours Idempotency-Key (idempotency_docs_hw13.go)
+			}
 			if rule != nil {
 				hostedSecurity(op, method, *rule)
 			}
