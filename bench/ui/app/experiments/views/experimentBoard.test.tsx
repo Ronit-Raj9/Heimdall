@@ -226,6 +226,17 @@ describe("ExperimentBoard kinds, practice rule and hidden matches (fix wave 3)",
 		expect(html).not.toContain("Test was broken");
 		expect(html).not.toContain("experiment-row-e_admit_draft_x_d7wy-decision");
 	});
+	it("does not say a debug run was only created with 0 runs (N247)", () => {
+		url.extra = [named({ exp_id: "e_fork_r_n697kiewjt_at_call_1_rqq1", name: "fork r_n697kiewjt", state: "created", arms: ["A"] })];
+		url.all = "1";
+		const html = render(<ExperimentBoard />);
+		url.all = null;
+		url.extra = [];
+		expect(html).toContain(">Debug run (not scored)<");
+		expect(tagOf(html, "experiment-row-e_fork_r_n697kiewjt_at_call_1_rqq1-state")).toBeNull();
+		const row = html.slice(html.indexOf('data-testid="experiment-row-e_fork_r_n697kiewjt_at_call_1_rqq1"'));
+		expect(row.slice(0, row.indexOf("</li>"))).not.toMatch(/aria-label="[^"]*runs/i);
+	});
 	it("shows no result for a comparison that is still running (N197)", () => {
 		url.extra = [named({ exp_id: "e_live", name: "Live one", state: "running", decision: "invalid" })];
 		const html = render(<ExperimentBoard />);

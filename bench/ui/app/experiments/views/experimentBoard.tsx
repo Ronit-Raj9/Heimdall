@@ -422,7 +422,10 @@ export function ExperimentBoard() {
 									</span>
 									<span className="flex flex-wrap items-center gap-2 md:contents">
 										<span>
-											<StatePill state={e.state} testId={`experiment-row-${e.exp_id}-state`} />
+											{/* The results index counts only scored runs, so a debug run reads "created, 0 runs" there (N247): its kind says enough. */}
+											{!(kind === "debug" && e.state === "created") && (
+												<StatePill state={e.state} testId={`experiment-row-${e.exp_id}-state`} />
+											)}
 										</span>
 										<span>
 											{kind ? (
@@ -435,9 +438,7 @@ export function ExperimentBoard() {
 												/>
 											)}
 										</span>
-										<span className="ml-auto md:ml-0 md:flex md:justify-end">
-											<RunsProgress e={e} />
-										</span>
+										<span className="ml-auto md:ml-0 md:flex md:justify-end">{kind !== "debug" && <RunsProgress e={e} />}</span>
 										<span className="text-right text-sm">
 											<ValueCell value={e.spent_usd} kind="usd" />
 										</span>
