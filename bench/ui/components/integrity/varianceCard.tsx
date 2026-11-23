@@ -200,7 +200,8 @@ function AADecision({ decision }: { decision: Decision }) {
 	const tone = isHarnessNoise(decision) ? "bad" : decision === "inconclusive" ? "good" : "neutral";
 	return (
 		<Badge variant="outline" className={TONE_CLASS[tone]} data-decision={decision}>
-			{t(`integrity.variance.aaDecisionValue.${decision}`)}
+			{/* An A/A check is never "leader" (three or more setups, fix wave 3); the word stands in for type safety. */}
+			{decision === "leader" ? decision : t(`integrity.variance.aaDecisionValue.${decision}`)}
 		</Badge>
 	);
 }

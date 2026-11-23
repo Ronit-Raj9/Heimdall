@@ -21,7 +21,7 @@ import { GuardList, VerdictCard } from "@/components/verdict/verdictCard";
 import { VerdictSummary } from "@/components/verdict/verdictSummary";
 import { getBenchErrorMessage, useGetCatalogQuery, useGetDiagnosticsQuery, useGetGridQuery, useGetVerdictQuery } from "@/lib/store";
 import { EXPERIMENT_POLL_MS, useGetExperimentQuery } from "@/lib/store/apis/benchApi";
-import type { Action, ExperimentStatus, MetricDescriptor, VerdictPayload } from "@/lib/types/bench";
+import type { Action, ExperimentStatus, MetricDescriptor } from "@/lib/types/bench";
 import { Activity, Gauge, GitCompare, ListChecks, Rocket, Scale, Shield, Sigma, Table2 } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { parseAsString, useQueryState } from "nuqs";
@@ -195,7 +195,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 	}
 
 	// partial: set by the server while the experiment is not finished (fix wave 3, N197); an older server leaves it out.
-	const payload = verdict.data as VerdictPayload & { partial?: boolean };
+	const payload = verdict.data as NonNullable<typeof verdict.data> & { partial?: boolean };
 	const arms = armOrder(payload);
 	const partial = payload.partial === true || live;
 	const names = setupNames(status.data?.setups, tPage9);
