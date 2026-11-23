@@ -2,11 +2,12 @@ import "@/lib/i18n";
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { CompareModelsForm, compareModelsProblem, compareModelsSpec, type CompareModelsInput } from "./compareModelsForm";
+import { CompareModelsForm, compareModelsProblem, compareModelsSpec, estimateSentence, prefillCurrent, type CompareModelsInput } from "./compareModelsForm";
 
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => () => {} }));
 vi.mock("@/app/evaluate/views/step1Agent", () => ({ VersionPicker: () => <select data-testid="compare-models-version" /> }));
 vi.mock("@/components/models/groupedModelPicker", () => ({ GroupedModelPicker: ({ testId }: { testId: string }) => <div data-testid={testId} /> }));
+vi.mock("@/lib/store/apis/benchApi", () => ({ useGetAgentsQuery: () => ({ data: { agents: [{ id: "bot", model: "gpt-a" }] } }) }));
 vi.mock("@/lib/store/apis/evaluationsApi", () => ({
 	useGetAgentCompatibilityQuery: () => ({ data: { agent: "bot", capabilities: [], benchmarks: [{ id: "tau-retail", ok: true }, { id: "swe", ok: false }] }, isLoading: false }),
 	useGetEvaluationEstimateQuery: () => ({ data: undefined }),
@@ -31,9 +32,13 @@ describe("compare models form", () => {
 		const s = compareModelsSpec(base);
 		expect(s.mode).toBe("model_switch");
 		expect(s.arms.map((a) => [a.label, a.agent, a.version, a.provider, a.model])).toEqual([
-			["current", "bot", 3, "openai", "gpt-a"],
-			["model-2", "bot", 3, "vllm", "qwen3-8b"],
+			["A", "bot", 3, "openai", "gpt-a"],
+			["B", "bot", 3, "vllm", "qwen3-8b"],
 		]);
+		// Every label passes the server rule (evalArmIDRe in handlers/evaluations.go), fix wave 3, N211.
+		const three = compareModelsSpec({ ...base, models: [...base.models, { provider: "openai", model: "gpt-c" }] });
+		expect(three.arms.map((a) => a.label)).toEqual(["A", "B", "C"]);
+		for (const a of three.arms) expect(a.label).toMatch(/^[A-Z][A-Za-z0-9]{0,15}$/);
 		expect(s.budget_usd).toBeUndefined();
 	});
 
@@ -50,5 +55,21 @@ describe("compare models form", () => {
 		expect(html).not.toContain(">swe<");
 		expect(html).toContain('data-testid="compare-models-picker-1"');
 		expect(html).toContain("Pick at least one benchmark.");
+	});
+
+	it("prefills the current model from the agent, only while row 0 is untouched (N211)", () => {
+		const empty = [
+			{ provider: "", model: "" },
+			{ provider: "", model: "" },
+		];
+		expect(prefillCurrent(empty, "gpt-a")[0]).toEqual({ provider: "", model: "gpt-a" });
+		expect(prefillCurrent([{ provider: "x", model: "m" }, empty[1]], "gpt-a")[0]).toEqual({ provider: "x", model: "m" });
+		expect(prefillCurrent(empty, undefined)).toBe(empty);
+	});
+
+	it("prints one minute once, never 1 to 1 minutes (N211)", () => {
+		expect(estimateSentence({ runs: 4, est_cost_usd: { low: 0.01, high: 0.02, known: true }, est_minutes: { low: 0.6, high: 1.4, known: true } })).toBe(
+			"4 runs. $0.01 to $0.02. About 1 min.",
+		);
 	});
 });

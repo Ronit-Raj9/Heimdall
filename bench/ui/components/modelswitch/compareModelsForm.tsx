@@ -1,5 +1,6 @@
 import "@/lib/types/modelSwitchI18n";
 import { VersionPicker } from "@/app/evaluate/views/step1Agent";
+import { estimateText } from "@/app/evaluate/views/step4Setup";
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,8 +9,10 @@ import {
 	useGetAgentCompatibilityQuery,
 	useGetEvaluationEstimateQuery,
 } from "@/lib/store/apis/evaluationsApi";
+import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
+import { evalArmLabel } from "@/lib/evaluationArms";
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** The most models one comparison takes (schemas.EvaluationModelSwitchMaxArms). */
@@ -45,7 +48,7 @@ export function compareModelsSpec(i: CompareModelsInput): EvaluationSpec {
 		name: "",
 		mode: "model_switch" as EvaluationSpec["mode"],
 		arms: i.models.map((m, n) => ({
-			label: n === 0 ? "current" : `model-${n + 1}`,
+			label: evalArmLabel(n), // N211: the server takes only A, B, C ... (evalArmIDRe)
 			agent: i.agent,
 			...(i.version ? { version: i.version } : {}),
 			model: m.model,
@@ -57,6 +60,16 @@ export function compareModelsSpec(i: CompareModelsInput): EvaluationSpec {
 		faults: ["clean"],
 		...(i.budget > 0 ? { budget_usd: i.budget } : {}),
 	};
+}
+
+/**
+ * Row 0 filled with the agent's default model (fix wave 3, N211), only while it is untouched; the
+ * same list when there is nothing to fill.
+ */
+export function prefillCurrent(models: PickedModel[], agentModel: string | undefined): PickedModel[] {
+	const first = models[0];
+	if (!agentModel || !first || first.model || first.provider) return models;
+	return [{ provider: "", model: agentModel }, ...models.slice(1)];
 }
 
 /**
@@ -74,6 +87,12 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 		{ provider: "", model: "" },
 		{ provider: "", model: "" },
 	]);
+	const agents = useGetAgentsQuery();
+	const agentModel = agents.data?.agents?.find((a) => a.id === agentId)?.model;
+	const [touched, setTouched] = useState(false);
+	useEffect(() => {
+		if (!touched) setModels((ms) => prefillCurrent(ms, agentModel));
+	}, [agentModel, touched]);
 	const [benchmarks, setBenchmarks] = useState<string[]>([]);
 	const [tasks, setTasks] = useState(5);
 	const [trials, setTrials] = useState(2);
@@ -83,7 +102,10 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 	const problem = compareModelsProblem(input);
 	const spec = compareModelsSpec(input);
 	const estimate = useGetEvaluationEstimateQuery(spec, { skip: problem !== null });
-	const setModel = (i: number, v: PickedModel) => setModels((ms) => ms.map((m, n) => (n === i ? v : m)));
+	const setModel = (i: number, v: PickedModel) => {
+		if (i === 0) setTouched(true);
+		setModels((ms) => ms.map((m, n) => (n === i ? v : m)));
+	};
 	const launch = async () => {
 		const res = await create(spec);
 		if ("data" in res && res.data) navigate({ to: "/evaluations/$evalId", params: { evalId: res.data.id } });
@@ -101,7 +123,12 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 				<span className="text-muted-foreground text-xs">{t("form.modelsHint", { max: MODEL_SWITCH_MAX - 1 })}</span>
 				{models.map((m, i) => (
 					<div key={i} className="flex items-center gap-2" data-testid={`compare-models-model-${i}`}>
-						<GroupedModelPicker value={m.model || m.provider ? m : null} onChange={(v) => setModel(i, v)} testId={`compare-models-picker-${i}`} />
+						<GroupedModelPicker
+							value={m.model || m.provider ? m : null}
+							onChange={(v) => setModel(i, v)}
+							testId={`compare-models-picker-${i}`}
+							label={i === 0 ? t("form.currentModel") : t("form.modelN", { n: i + 1 })}
+						/>
 						{i === 0 && <span className="text-muted-foreground text-xs">{t("form.current")}</span>}
 						{i >= 2 && (
 							<Button size="sm" variant="ghost" onClick={() => setModels((ms) => ms.filter((_, n) => n !== i))}>
@@ -143,11 +170,7 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 			) : (
 				estimate.data && (
 					<p className="text-sm" data-testid="compare-models-estimate">
-						{t("form.runs", { count: estimate.data.runs })}.{" "}
-						{estimate.data.est_cost_usd.known
-							? t("form.estimateCost", { low: estimate.data.est_cost_usd.low.toFixed(2), high: estimate.data.est_cost_usd.high.toFixed(2) })
-							: t("form.estimateCostUnknown")}{" "}
-						{t("form.estimateMinutes", { low: Math.round(estimate.data.est_minutes.low), high: Math.round(estimate.data.est_minutes.high) })}
+						{estimateSentence(estimate.data)}
 					</p>
 				)
 			)}
@@ -161,6 +184,13 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 			</Button>
 		</section>
 	);
+}
+
+/** The estimate as one sentence from the wizard's shared phrases (N211): "4 runs. $0.02. About 1 min." */
+export function estimateSentence(e: Parameters<typeof estimateText>[0]): string {
+	const p = estimateText(e);
+	const minutes = p.minutes === "time not known" ? "Time not known." : `About ${p.minutes}.`;
+	return `${p.runs}. ${p.cost[0].toUpperCase()}${p.cost.slice(1)}. ${minutes}`;
 }
 
 function NumberField({ label, value, min, onChange, testId }: { label: string; value: number; min: number; onChange(v: number): void; testId: string }) {

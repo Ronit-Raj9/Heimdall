@@ -257,6 +257,7 @@ export interface EvaluationChild {
 	experiment_id: string;
 	status: string;
 	skipped?: string;
+	next_run_usd?: number;
 	/** Tasks left out of this benchmark alone (quarantined); the rest runs. */
 	skipped_tasks?: EvaluationSkippedTask[];
 	/** Condition id to fault (or "attack"), fixed at launch. */

@@ -1,4 +1,5 @@
 import type { AgentLeaderboardRow } from "@/lib/store/apis/agentLeaderboardApi";
+import { formatUsd } from "@/lib/money";
 
 /** A share as whole percent, for example 0.415 -> "42%". */
 export function formatShare(v: number): string {
@@ -20,10 +21,7 @@ export function rowCost(row: AgentLeaderboardRow): { known: boolean; text: strin
 
 /** A cost per run in US dollars, "-" when never observed. */
 export function formatCost(v: number | null | undefined): string {
-	if (v === null || v === undefined || !Number.isFinite(v)) return "-";
-	if (v === 0) return "$0";
-	if (v < 0.01) return `$${v.toFixed(4)}`;
-	return `$${v.toFixed(2)}`;
+	return formatUsd(v);
 }
 
 /** The search of the agent page's report card for a row: version only when saved. */

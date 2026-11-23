@@ -10,7 +10,7 @@ import {
 } from "@/lib/store/apis/evaluationsApi";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BudgetAdvice } from "./budgetAdvice";
+import { BudgetAdvice, perRunLowCost } from "./budgetAdvice";
 import { defaultName, useEvaluateDraft, type EvaluateDraftContextValue } from "./evaluateDraft";
 import { fw05 } from "./fw05I18n";
 import { OWN_MODEL_LABEL, useOwnModelAgents } from "./ownModel";
@@ -75,15 +75,26 @@ export const DEFAULT_BENCHMARK_BUDGET = 5;
 export const MAX_BUDGET = 1000;
 
 /** What is wrong with the budget box text, in plain words; "" when it is blank (the default) or a valid amount. */
-export function budgetProblem(text: string): string {
+export function budgetProblem(text: string, benchmarks = 1): string {
 	const t = text.trim();
 	if (t === "") return "";
 	const n = Number(t);
 	if (!Number.isFinite(n)) return fw05("launch.budgetNotNumber");
 	if (n <= 0) return fw05("launch.budgetNotPositive", { cap: String(DEFAULT_BENCHMARK_BUDGET) });
 	if (n > MAX_BUDGET) return fw05("launch.budgetTooHigh", { max: String(MAX_BUDGET) });
+	const count = Math.max(1, benchmarks);
+	if (n < MIN_BENCHMARK_BUDGET * count - 1e-9) {
+		// The server refuses the same budget (fix wave 3, N190: EvaluationMinBenchmarkBudget).
+		return fw05("launch.budgetBelowFloor", {
+			min: `$${(MIN_BENCHMARK_BUDGET * count).toFixed(2)}`,
+			count: `${count} ${count === 1 ? "benchmark" : "benchmarks"}`,
+		});
+	}
 	return "";
 }
+
+/** The least budget per benchmark the server takes (EvaluationMinBenchmarkBudget). */
+export const MIN_BENCHMARK_BUDGET = 0.01;
 
 /** Budget box text to a spec value: blank or not a positive number means no budget. */
 export function parseBudget(text: string): number | undefined {
@@ -153,7 +164,7 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 	const [budget, setBudget] = useState(spec.budget_usd ? String(spec.budget_usd) : "");
 	const problem = specProblem(spec, useOwnModelAgents());
 	const ready = problem === "";
-	const budgetIssue = budgetProblem(budget);
+	const budgetIssue = budgetProblem(budget, spec.benchmarks.length);
 	const estimate = useEstimateEvaluationQuery(spec, { skip: !ready });
 	const catalog = useGetBenchFaultsQuery();
 	const faultCatalog = catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS;
@@ -240,7 +251,16 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 						? "Split evenly over the benchmarks; each one stops starting runs when its share is spent."
 						: `Empty means the default: each benchmark stops at $${DEFAULT_BENCHMARK_BUDGET}.`}
 				</span>
-				{advice && <BudgetAdvice budget={advice} cost={cost} isFetching={fetching} onSet={(n) => (setSeeded(true), setBudgetUsd(n))} />}
+				{advice && (
+					<BudgetAdvice
+						budget={advice}
+						cost={cost}
+						isFetching={fetching}
+						onSet={(n) => (setSeeded(true), setBudgetUsd(n))}
+						perRunLow={perRunLowCost(estimate.data?.per_benchmark)}
+						benchmarks={Math.max(1, spec.benchmarks.length)}
+					/>
+				)}
 				{basis && (
 					<span className="text-muted-foreground text-xs" data-testid="step5-estimate-basis">
 						{fw05(basis === "library" ? "basis.library" : "basis.own")}

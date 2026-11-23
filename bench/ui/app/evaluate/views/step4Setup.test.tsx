@@ -279,9 +279,18 @@ describe("Step4Setup", () => {
 		const html = render(<Step4Setup spec={two} onChange={() => undefined} />);
 		expect(html).toContain('data-testid="step4-arm-A"');
 		expect(html).toContain('data-testid="step4-arm-B"');
+		// N189: each setup's model select is named for its setup (the label element of the select).
+		expect(html).toMatch(/<label[^>]*for="[^"]+-model"[^>]*>Setup A \(codex\) model<\/label>/);
+		expect(html).toMatch(/<label[^>]*for="[^"]+-model"[^>]*>Setup B \(codex\) model<\/label>/);
 		expect(html).toContain("Pick at least one benchmark.");
 		expect(q.estimateArgs[0]).toEqual([two, { skip: true }]);
 		expect(q.estimateArgs[1]).toEqual([presetsRequest(two), { skip: true }]);
+	});
+
+	it("prints one minute once when low and high round to the same minute (N211)", () => {
+		expect(
+			estimateText({ runs: 2, est_cost_usd: { low: 0, high: 0, known: false }, est_minutes: { low: 0.6, high: 1.4, known: true } }).minutes,
+		).toBe("1 min");
 	});
 
 	it("says price not known when the estimate has no price", () => {

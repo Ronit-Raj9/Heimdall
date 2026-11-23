@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useGetRunBifrostQuery, type BifrostCall, type RunBifrost } from "@/lib/store/apis/runBifrostApi";
 import type { Tokens } from "@/lib/types/bench";
 import { useTranslation } from "react-i18next";
+import { formatUsd } from "@/lib/money";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
@@ -17,7 +18,7 @@ export function tokenSum(t?: Tokens): number | undefined {
 
 /** A dollar amount with four decimals, the run page's cost format. */
 export function usd(v: number): string {
-	return `$${v.toFixed(4)}`;
+	return formatUsd(v);
 }
 
 /** A latency in ms, shown in seconds from one second up. */

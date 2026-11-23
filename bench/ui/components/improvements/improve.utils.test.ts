@@ -22,7 +22,8 @@ describe("improve utils", () => {
 		expect(pct(undefined)).toBe("-");
 		expect(points(0.05)).toBe("+5.0 pts");
 		expect(points(-0.1)).toBe("-10.0 pts");
-		expect(usd(0.01234)).toBe("$0.0123");
+		expect(usd(0.01234)).toBe("$0.01"); // fix wave 3: the one money format (lib/money.ts)
+		expect(usd(0.00234)).toBe("$0.0023");
 		expect(usd(3)).toBe("$3.00");
 		expect(versionLabel("agents/x.yaml@v12")).toBe("v12");
 	});

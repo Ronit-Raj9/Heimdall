@@ -181,7 +181,7 @@ describe("Step5Launch budget check", () => {
 	it("warns how many runs the default cap leaves unstarted and offers the suggested budget", () => {
 		q.estimate = okQuery({ runs: 32, budget: budget({}) });
 		const html = render(<Step5Launch spec={spec()} onChange={() => undefined} />);
-		expect(html).toContain("With the default cap of $5 per benchmark, about 6 to 13 runs would not start.");
+		expect(html).toContain("With the default cap of $5.00 per benchmark, about 6 to 13 runs would not start.");
 		expect(html).toContain("Set budget to $23");
 	});
 
@@ -300,6 +300,10 @@ function findByTestId(node: unknown, id: string): ReactElement | undefined {
 describe("step 5 fix wave 2 (G10)", () => {
 	it("checks the budget text (N91)", () => {
 		expect(MAX_BUDGET).toBe(1000);
+		// Fix wave 3, N190: the server's floor of $0.01 per benchmark.
+		expect(budgetProblem("0.001")).toBe("The budget must be at least $0.01 per benchmark: at least $0.01 for 1 benchmark.");
+		expect(budgetProblem("0.02", 3)).toBe("The budget must be at least $0.01 per benchmark: at least $0.03 for 3 benchmarks.");
+		expect(budgetProblem("0.03", 3)).toBe("");
 		expect(budgetProblem("")).toBe("");
 		expect(budgetProblem("  ")).toBe("");
 		expect(budgetProblem("2.5")).toBe("");

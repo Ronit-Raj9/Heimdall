@@ -1,5 +1,6 @@
 import type { EstimateBudget, Range } from "@/lib/store/apis/evaluationsApi";
 import { fw05 } from "./fw05I18n";
+import { formatUsd } from "@/lib/money";
 
 /**
  * The budget check of wizard step 5 (G4-01): which cap applies and whether the expected cost fits
@@ -12,12 +13,12 @@ import { fw05 } from "./fw05I18n";
 export type EstimateCost = Range & { known?: boolean };
 
 function dollars(n: number): string {
-	return Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`;
+	return formatUsd(n);
 }
 
-/** Money with cents, so a $1 budget reads "$1.00"; amounts under a cent keep their digits. */
+/** Money in the one UI format (`formatUsd`): a $1 budget reads "$1.00"; amounts under a cent keep their digits. */
 export function usd(n: number): string {
-	return n > 0 && n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`;
+	return formatUsd(n);
 }
 
 function runs(n: number): string {
@@ -56,6 +57,32 @@ export function budgetLine(b: EstimateBudget, cost: EstimateCost | undefined, is
 	return cost.high <= b.budget_usd && !short ? fw05("budget.covers", { budget, ...range }) : fw05("budget.mayExceed", { budget, ...range });
 }
 
+/**
+ * The warning about one run's cost (fix wave 3, N190): the server starts a run only when its expected
+ * cost fits a benchmark's share, so a share below one run's low cost starts nothing; with no known
+ * cost the first run can pass the budget. `perRunLow` is the highest per-run low cost of a benchmark
+ * (undefined when no cost is known) and `benchmarks` how many benchmarks share the budget.
+ */
+export function runWarning(b: EstimateBudget, perRunLow: number | undefined, benchmarks: number, costKnown = false): string | undefined {
+	if (b.default) return undefined;
+	if (perRunLow === undefined || !(perRunLow > 0)) return b.budget_usd > 0 && !costKnown ? fw05("budget.unknownRunCost") : undefined;
+	if (b.per_benchmark_usd >= perRunLow) return undefined;
+	return fw05("budget.belowOneRun", { run: usd(perRunLow), min: usd(Math.ceil(perRunLow * Math.max(1, benchmarks) * 100) / 100) });
+}
+
+/** The highest per-run low cost over the estimate's benchmarks; undefined when no benchmark's cost is known. */
+export function perRunLowCost(
+	per: { runs?: number; skipped?: string; est_cost_usd?: { low: number; known?: boolean } }[] | undefined,
+): number | undefined {
+	let out: number | undefined;
+	for (const b of per ?? []) {
+		if (b.skipped || !b.runs || !b.est_cost_usd?.known) continue;
+		const run = b.est_cost_usd.low / b.runs;
+		out = out === undefined ? run : Math.max(out, run);
+	}
+	return out;
+}
+
 export interface BudgetAdviceProps {
 	budget: EstimateBudget;
 	/** The estimate's `est_cost_usd`. */
@@ -63,10 +90,15 @@ export interface BudgetAdviceProps {
 	/** True while the estimate refetches for a changed spec. */
 	isFetching?: boolean;
 	onSet(usd: number): void;
+	/** The highest per-run low cost of a benchmark (`perRunLowCost`); undefined when unknown. */
+	perRunLow?: number;
+	/** The benchmarks that share the budget. */
+	benchmarks?: number;
 }
 
-export function BudgetAdvice({ budget, cost, isFetching = false, onSet }: BudgetAdviceProps) {
+export function BudgetAdvice({ budget, cost, isFetching = false, onSet, perRunLow, benchmarks = 1 }: BudgetAdviceProps) {
 	const line = budgetLine(budget, cost, isFetching);
+	const oneRun = isFetching ? undefined : runWarning(budget, perRunLow, benchmarks, Boolean(cost?.known) || budget.fit !== "unknown");
 	if (isFetching) {
 		return (
 			<span className="text-muted-foreground text-xs" role="status" data-testid="step5-budget-updating">
@@ -76,7 +108,7 @@ export function BudgetAdvice({ budget, cost, isFetching = false, onSet }: Budget
 	}
 	const warn = budgetWarning(budget);
 	const offer = budget.suggested_usd > budget.budget_usd ? budget.suggested_usd : 0;
-	if (budget.fit === "fits") {
+	if (budget.fit === "fits" && !oneRun) {
 		return (
 			<span className="text-chart-success-ink text-xs" data-testid="step5-budget-fits">
 				{line}
@@ -91,6 +123,11 @@ export function BudgetAdvice({ budget, cost, isFetching = false, onSet }: Budget
 			{warn && (
 				<span className="text-chart-warning-ink" role="status" data-testid="step5-budget-warning">
 					{warn} A benchmark stops starting runs when its share is spent; you can raise the budget and continue later.
+				</span>
+			)}
+			{oneRun && (
+				<span className="text-chart-warning-ink" role="status" data-testid="step5-budget-one-run">
+					{oneRun}
 				</span>
 			)}
 			{budget.note && <span className="text-muted-foreground">{budget.note[0].toUpperCase() + budget.note.slice(1)}.</span>}

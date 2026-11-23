@@ -61,6 +61,15 @@ describe("duplicate model ids (N88)", () => {
 });
 
 describe("providers prop (N89)", () => {
+	it("names the model select with the label it is given, Model by default (N189)", () => {
+		const named = render(<GroupedModelPicker value={null} onChange={() => undefined} label="Setup A (codex) model" />);
+		expect(named).toMatch(/<label[^>]*for="[^"]+-model"[^>]*>Setup A \(codex\) model<\/label>/);
+		expect(named).toContain("Search Setup A (codex) model");
+		expect(render(<GroupedModelPicker value={null} onChange={() => undefined} />)).toMatch(
+			/<label[^>]*for="[^"]+-model"[^>]*>Model<\/label>/,
+		);
+	});
+
 	it("lists only the given providers", () => {
 		const html = render(<GroupedModelPicker value={null} onChange={() => undefined} providers={["openai"]} />);
 		expect(html).toContain('label="OpenAI"');
