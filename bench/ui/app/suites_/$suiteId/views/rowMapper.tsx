@@ -1,6 +1,6 @@
+import { LabeledModelPicker } from "@/components/models/labeledModelPicker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { benchApi, getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useGetRowImportQuery, useImportSuiteRowsMutation } from "@/lib/store/apis/suiteBuildApi";
 import { useAppDispatch } from "@/lib/store/hooks";
@@ -63,12 +63,15 @@ export function JudgeFields({
 }) {
 	return (
 		<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3" data-testid="suite-build-judge">
-			<Field label={t("grader.provider")}>
-				<Input value={provider} placeholder="openai" disabled={disabled} onChange={(e) => onChange({ provider: e.target.value })} data-testid="suite-build-judge-provider" />
-			</Field>
-			<Field label={t("grader.model")}>
-				<Input value={model} placeholder="gpt-4.1-mini" disabled={disabled} onChange={(e) => onChange({ model: e.target.value })} data-testid="suite-build-judge-model" />
-			</Field>
+			<div className="min-w-0 sm:col-span-2">
+				<LabeledModelPicker
+					label={t("grader.model")}
+					value={provider || model ? { provider, model } : null}
+					disabled={disabled}
+					onChange={(v) => onChange({ provider: v.provider, model: v.model })}
+					testId="suite-build-judge-model"
+				/>
+			</div>
 			<Field label={t("grader.votes")} hint={t("grader.votesHint")}>
 				<select className={selectClass} value={votes} disabled={disabled} onChange={(e) => onChange({ votes: Number(e.target.value) })}>
 					{[1, 3, 5].map((n) => (

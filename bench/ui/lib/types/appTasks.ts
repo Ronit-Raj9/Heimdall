@@ -71,19 +71,31 @@ export interface AppTasksDraft {
 	title?: string;
 	status: AppTasksStatus;
 	model?: { provider: string; model: string };
-	rules: AppRule[];
+	rules: AppRule[] | null;
 	approved_by?: string;
 	judged: boolean;
+	plans: AppPlan[] | null;
+	dropped: AppDropped[] | null;
+	written: AppWritten[] | null;
+	calls: AppCallRecord[] | null;
+	spent_usd: number;
+	warnings: string[] | null;
+	operations: AppOperation[] | null;
+	collections: string[] | null;
+	next: string;
+}
+
+/** A draft whose lists are never null (fix wave 3, N237: drafts saved before the fix carry "plans": null). */
+export type ListedAppTasksDraft = Omit<AppTasksDraft, "rules" | "plans" | "dropped" | "written" | "calls" | "warnings" | "operations" | "collections"> & {
+	rules: AppRule[];
 	plans: AppPlan[];
 	dropped: AppDropped[];
 	written: AppWritten[];
 	calls: AppCallRecord[];
-	spent_usd: number;
 	warnings: string[];
 	operations: AppOperation[];
 	collections: string[];
-	next: string;
-}
+};
 
 export interface AppTasksDraftSummary {
 	id: string;

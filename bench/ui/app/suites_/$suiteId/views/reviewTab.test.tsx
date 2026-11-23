@@ -1,7 +1,7 @@
 import "@/lib/i18n";
 
 import { LOCAL_SESSION } from "@/lib/session/sessionContext";
-import { mutation, render } from "@/lib/testing/render";
+import { mutation, render, tagOf } from "@/lib/testing/render";
 import type { GeneratedTaskList, QualityReport } from "@/lib/types/authoring";
 import type { SuiteSummary } from "@/lib/types/bench";
 import i18n from "i18next";
@@ -36,6 +36,18 @@ const generated: GeneratedTaskList = {
 
 const queue = vi.hoisted(() => ({ data: undefined as unknown }));
 queue.data = generated;
+
+const keys = vi.hoisted(() => ({ list: [] as { id: string; provider: string; status: string }[] }));
+vi.mock("@/lib/store/apis/modelsApi", async (orig) => ({
+	...(await orig<typeof import("@/lib/store/apis/modelsApi")>()),
+	useGetModelsQuery: () => ({ data: { providers: [], keys: keys.list } }),
+}));
+vi.mock("@/components/models/groupedModelPicker", async (orig) => ({
+	...(await orig<typeof import("@/components/models/groupedModelPicker")>()),
+	GroupedModelPicker: ({ value, testId }: { value: { provider: string; model: string } | null; testId?: string }) => (
+		<select data-testid={`${testId}-model`} data-model={value ? `${value.provider}/${value.model}` : ""} />
+	),
+}));
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => mutation() }));
@@ -123,5 +135,15 @@ describe("reviewTab helpers", () => {
 		} finally {
 			queue.data = generated;
 		}
+	});
+	it("picks the drafting model from the model keys, prefilled from the last assist model (N278)", () => {
+		let html = render(<ReviewTab suite={qa} />);
+		expect(html).not.toContain('data-testid="suite-review-provider"');
+		expect(tagOf(html, "suite-review-model-model") ?? "").toContain('data-model="openai/gpt-test"');
+		expect(html).toContain("Pick a model from your model keys.");
+		keys.list = [{ id: "k1", provider: "openai", status: "ok" }];
+		html = render(<ReviewTab suite={qa} />);
+		expect(html).not.toContain('data-testid="suite-review-need-model"');
+		keys.list = [];
 	});
 });

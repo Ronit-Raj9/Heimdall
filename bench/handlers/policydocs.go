@@ -21,6 +21,7 @@ import (
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/auth"
+	"github.com/maximhq/bifrost/bench/keystore"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/policybench"
 	"github.com/maximhq/bifrost/bench/projectfs"
@@ -131,6 +132,7 @@ const maxPolicyReportRuns = 20000
 func init() {
 	RegisterOrgArea("policydocs", func(env OrgEnv, r *router.Router) {
 		h := &policyDocs{suiteBuild: &suiteBuild{&suiteAuthoring{mode: env.Mode, projects: env.Services.Projects, suites: env.Services.Suites}}, index: env.Services.Index}
+		h.keys, h.orgID, h.hosted = env.Services.Keys, env.Services.OrgID, env.Services.Hosted
 		base := APIPrefix + "/suites/{id}/policy-docs"
 		r.GET(base, env.R(h.list))
 		r.POST(base, env.U(refuseBuiltin(env.Mode, h.suites, h.upload)))
@@ -146,6 +148,11 @@ func init() {
 type policyDocs struct {
 	*suiteBuild
 	index ReadIndex
+	// keys, orgID and hosted let review check the reply judge's model key
+	// before it switches the benchmark to judged checks (fix wave 3, N276).
+	keys   keystore.Store
+	orgID  string
+	hosted bool
 }
 
 func (h *policyDocs) docParam(ctx *fasthttp.RequestCtx) (string, string, *policybench.Doc, bool) {
@@ -465,7 +472,10 @@ func (h *policyDocs) review(ctx *fasthttp.RequestCtx) {
 		if grader != scaffold.ChecksGrader || !judged || (req.SwitchGrader && req.Judge != nil) {
 			if !req.SwitchGrader || (!judged && req.Judge == nil) {
 				lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict,
-					"benchmark "+id+" must use grader checks with a pinned reply judge: policy tasks are graded by their checks.yaml, whose clause rubric is read by the judge. Send switch_grader: true and judge {provider, model}; its other tasks then need their readiness checks again")
+					"Pick a reply judge before accepting: policy tasks are graded by a judge model, so accepting switches this benchmark to judged checks.")
+				return
+			}
+			if req.Judge != nil && !h.judgeKeyOK(ctx, req.Judge.Provider) {
 				return
 			}
 			judge := req.Judge
@@ -503,6 +513,29 @@ func (h *policyDocs) review(ctx *fasthttp.RequestCtx) {
 		out.Next = "Rejected drafts are dropped; draft their clauses again if you want new ones."
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
+}
+
+// judgeKeyOK checks the organization has a working model key for the reply
+// judge's provider before an accept pins it (fix wave 3, N276). A missing
+// key answers 422 in plain words; an over-budget key or an unreadable key
+// store answers as every other key check does. It reports false when it
+// answered.
+func (h *policyDocs) judgeKeyOK(ctx *fasthttp.RequestCtx, provider string) bool {
+	var keys KeySource
+	if h.keys != nil {
+		keys = h.keys
+	}
+	err := ModelKeyRefusal(ctx, keys, quickOrgID(ctx, h.orgID), []string{provider}, nil, h.hosted)
+	switch {
+	case err == nil:
+		return true
+	case errors.Is(err, ErrModelKeyMissing):
+		lib.SendError(ctx, h.mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest,
+			"No working "+provider+" key in this organization. Add one under Models, then accept again.")
+	case !SendModelKeyRefusal(ctx, h.mode, err):
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, err.Error())
+	}
+	return false
 }
 
 // policyRuns reads the counted, scored runs of the accepted tasks.

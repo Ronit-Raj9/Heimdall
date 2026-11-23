@@ -166,7 +166,7 @@ func TestPolicyDocsFlow(t *testing.T) {
 		t.Fatalf("draft files: %d %.400s", code, body)
 	}
 	code, body = c.do(t, "POST", "/suites/desk/policy-docs/"+docID+"/review", jsonBody(t, PolicyReviewRequest{Accept: []string{adv, norm}}), nil)
-	if code != 409 || !strings.Contains(string(body), "switch_grader") {
+	if code != 409 || !strings.Contains(string(body), "Pick a reply judge") {
 		t.Fatalf("accept without judge: %d %s", code, body)
 	}
 	req := PolicyReviewRequest{Accept: []string{adv, norm}, Reject: []string{edge}, SwitchGrader: true}

@@ -1,6 +1,7 @@
 import "@/lib/i18n";
 
 import type { AppTasksDraft } from "@/lib/types/appTasks";
+import { tagOf } from "@/lib/testing/render";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { DraftDetail, DraftList, PlanTable } from "./fromApiView";
@@ -27,6 +28,14 @@ vi.mock("@/lib/store/apis/appTasksApi", () => ({
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: mutation }));
 vi.mock("@/components/platform/confirmDialog", () => ({ useConfirm: () => async () => true }));
 vi.mock("@/lib/session/sessionContext", () => ({ useSession: () => ({}), canUse: () => true }));
+const keys = vi.hoisted(() => ({ list: [] as { id: string; provider: string; status: string }[] }));
+vi.mock("@/lib/store/apis/modelsApi", () => ({ useGetModelsQuery: () => ({ data: { providers: [], keys: keys.list } }) }));
+vi.mock("@/components/models/groupedModelPicker", async (orig) => ({
+	...(await orig<typeof import("@/components/models/groupedModelPicker")>()),
+	GroupedModelPicker: ({ value, testId }: { value: { provider: string; model: string } | null; testId?: string }) => (
+		<select data-testid={`${testId}-model`} data-model={value ? `${value.provider}/${value.model}` : ""} />
+	),
+}));
 
 const base: AppTasksDraft = {
 	id: "ag_0123456789ab",
@@ -131,6 +140,56 @@ describe("FromApiView", () => {
 	});
 
 	it("renders the plan table", () => {
-		expect(renderToStaticMarkup(<PlanTable plans={base.plans} />)).toContain("3: calls getOrder; never updateOrder");
+		expect(renderToStaticMarkup(<PlanTable plans={base.plans ?? []} />)).toContain("3: calls getOrder; never updateOrder");
+	});
+	it("opens a draft whose lists were saved as null (N237)", () => {
+		const html = renderToStaticMarkup(
+			<DraftDetail
+				draft={{ ...base, status: "rules_approved", plans: null, dropped: null, written: null, calls: null, warnings: null }}
+				writable
+				onBack={() => undefined}
+				onChanged={() => undefined}
+			/>,
+		);
+		expect(html).toContain('data-testid="from-api-tasks"');
+		expect(html).toContain("0 tasks passed");
+		expect(html).toContain("Draft the tasks");
+	});
+	it("picks the drafting model from the model keys and waits for a working key (N238)", () => {
+		const fresh = { ...base, status: "new" as const, model: undefined, rules: [], plans: [], dropped: [] };
+		let html = renderToStaticMarkup(<DraftDetail draft={fresh} writable onBack={() => undefined} onChanged={() => undefined} />);
+		expect(html).not.toContain('data-testid="from-api-provider"');
+		expect(html).toContain('data-testid="from-api-model-pick-model" data-model=""');
+		expect(html).toContain("Pick a model from your model keys.");
+		expect(tagOf(html, "job-run-apptasks.generate") ?? "").toContain(' disabled=""');
+		keys.list = [{ id: "k1", provider: "openai", status: "ok" }];
+		html = renderToStaticMarkup(
+			<DraftDetail
+				draft={{ ...fresh, model: { provider: "openai", model: "gpt-5" } }}
+				writable
+				onBack={() => undefined}
+				onChanged={() => undefined}
+			/>,
+		);
+		expect(html).toContain('data-model="openai/gpt-5"');
+		expect(tagOf(html, "job-run-apptasks.generate") ?? "disabled").not.toContain(' disabled=""');
+		keys.list = [];
+	});
+
+	it("asks before a task is rejected (N238 confirmations)", () => {
+		const html = renderToStaticMarkup(
+			<DraftDetail
+				draft={{
+					...base,
+					status: "written",
+					written: [{ id: "t1", title: "T1", rule_id: "R1", checks: 1, summary: "s", review: "pending" }],
+				}}
+				writable
+				onBack={() => undefined}
+				onChanged={() => undefined}
+			/>,
+		);
+		expect(html).toContain('data-testid="from-api-reject-t1"');
+		expect(html).not.toContain('data-testid="from-api-reject-t1-confirm"');
 	});
 });

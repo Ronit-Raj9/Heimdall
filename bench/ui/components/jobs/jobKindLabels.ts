@@ -71,3 +71,15 @@ export const JOB_KIND_LABELS: Readonly<Record<string, string>> = {
 export function jobKindLabel(kind: string): string {
 	return Object.prototype.hasOwnProperty.call(JOB_KIND_LABELS, kind) ? JOB_KIND_LABELS[kind] : kind;
 }
+/** Shown after the kind of a job that only estimated its cost (fix wave 3, N275). */
+export const ESTIMATE_JOB_LABEL = "Cost estimate";
+
+/**
+ * A job's kind in words, marked "(Cost estimate)" when its params ask for an estimate only, so
+ * an estimate and the real run of the same kind are told apart. label overrides the kind map
+ * (a caller with a locale catalog passes its own label).
+ */
+export function jobKindLabelFor(kind: string, params: Record<string, unknown> | null | undefined, label?: string): string {
+	const base = label ?? jobKindLabel(kind);
+	return params?.estimate === true ? `${base} (${ESTIMATE_JOB_LABEL})` : base;
+}
