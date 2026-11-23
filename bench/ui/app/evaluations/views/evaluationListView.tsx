@@ -1,6 +1,7 @@
 import "@/app/evaluations_/$evalId/views/fw08I18n";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -169,6 +170,13 @@ function EvaluationToolbar({
 	);
 }
 
+/** Names that more than one row shows, so those rows add their start date (fix wave 3, N297). */
+function repeatedNames(rows: readonly Evaluation[]): Set<string> {
+	const seen = new Map<string, number>();
+	for (const ev of rows) seen.set(ev.spec.name || ev.id, (seen.get(ev.spec.name || ev.id) ?? 0) + 1);
+	return new Set([...seen].filter(([, n]) => n > 1).map(([name]) => name));
+}
+
 /** The loaded list with its toolbar. Exported for tests. */
 export function EvaluationTable({
 	evaluations,
@@ -183,6 +191,7 @@ export function EvaluationTable({
 	const { t: tf } = useTranslation("fw08");
 	if (evaluations.length === 0) return <EmptyNote testId="evaluations-empty">{t("list.empty")}</EmptyNote>;
 	const rows = filterEvaluations(evaluations, filters);
+	const repeated = repeatedNames(rows);
 	return (
 		<div className="flex flex-col gap-3">
 			<EvaluationToolbar evaluations={evaluations} filters={filters} onChange={onFiltersChange} shown={rows.length} />
@@ -212,6 +221,28 @@ export function EvaluationTable({
 										<Link to="/evaluations/$evalId" params={{ evalId: ev.id }} className="hover:underline">
 											{ev.spec.name || ev.id}
 										</Link>
+										{repeated.has(ev.spec.name || ev.id) && (
+											<span
+												className="text-muted-foreground ml-2 text-xs font-normal tabular-nums"
+												data-testid={`evaluation-name-date-${ev.id}`}
+											>
+												{formatCreated(ev.created_at, i18n.language)}
+											</span>
+										)}
+										{ev.schedule && (
+											<Badge
+												variant="outline"
+												className="ml-2 text-xs font-normal"
+												title={t("detail.scheduledLine", {
+													name: ev.spec.name || ev.id,
+													schedule: ev.schedule,
+													date: formatCreated(ev.created_at, i18n.language),
+												})}
+												data-testid={`evaluation-scheduled-${ev.id}`}
+											>
+												{t("detail.scheduled")}
+											</Badge>
+										)}
 										<span
 											className="text-muted-foreground block max-w-80 truncate text-xs font-normal"
 											title={benches.join(", ")}

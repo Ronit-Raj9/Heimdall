@@ -123,8 +123,12 @@ describe("EvaluationRunActions", () => {
 		const m = hostedSession("member");
 		expect(render(<EvaluationRunActions evaluation={ev("running")} />, m)).toContain('data-testid="evaluation-pause"');
 		expect(render(<EvaluationRunActions evaluation={ev("running", { paused: true })} />, m)).toContain('data-testid="evaluation-unpause"');
-		expect(render(<EvaluationRunActions evaluation={ev("done")} />, m)).toContain('data-testid="evaluation-rerun-failures"');
-		expect(render(<EvaluationRunActions evaluation={ev("done", { rerun_of: "ev_0" })} />, m)).not.toContain("evaluation-rerun-failures");
+		expect(render(<EvaluationRunActions evaluation={ev("done", { failed_runs: 2 })} />, m)).toContain(
+			'data-testid="evaluation-rerun-failures"',
+		);
+		expect(render(<EvaluationRunActions evaluation={ev("done", { rerun_of: "ev_0", failed_runs: 2 })} />, m)).not.toContain(
+			"evaluation-rerun-failures",
+		);
 	});
 });
 
@@ -150,5 +154,69 @@ describe("run control names (J6.log-user)", () => {
 		const html = render(<PauseControls expId="e_1" />, hostedSession("member"));
 		expect(html).toContain('title="Paused by Ana Lima"');
 		expect(html).not.toContain("Paused by usr_01m7");
+	});
+});
+describe("Rerun failures only where it can work (fix wave 3, N183 and N285)", () => {
+	const ev = (status: string, extra: object = {}) =>
+		({
+			id: "ev_1",
+			status,
+			spec: { name: "n", mode: "score", arms: [], benchmarks: [], tasks_per_benchmark: 8, trials: 2, faults: [] },
+			children: [],
+			created_at: "",
+			...extra,
+		}) as never;
+	it("hides Rerun failures on an evaluation with no failed run (N183)", () => {
+		const m = hostedSession("member");
+		expect(render(<EvaluationRunActions evaluation={ev("cancelled", { failed_runs: 0 })} />, m)).not.toContain("evaluation-rerun-failures");
+		expect(render(<EvaluationRunActions evaluation={ev("cancelled")} />, m)).not.toContain("evaluation-rerun-failures");
+		expect(render(<EvaluationRunActions evaluation={ev("done", { failed_runs: 2 })} />, m)).toContain("evaluation-rerun-failures");
+	});
+	it("keeps the rerun notice out of the actions row (N193)", () => {
+		const html = render(<EvaluationRunActions evaluation={ev("done", { failed_runs: 2 })} />, hostedSession("member"));
+		expect(html).not.toContain("evaluation-rerun-started");
+	});
+	it("shows the server's reason instead of the button when a rerun cannot work (N285)", () => {
+		const reason =
+			"Rerun failures works on a comparison of two setups. For this comparison of 3 models, start a new comparison with the failed tasks.";
+		api.controls = { ...controls(), rerun_failures: { allowed: false, reason } };
+		const html = render(<RunControlsPanel expId="e_1" state="done" />, hostedSession("member"));
+		expect(html).not.toContain("rerun-failures-button");
+		expect(html).toContain(reason);
+		expect(html).toContain('data-testid="rerun-failures-reason"');
+		api.controls = { ...controls(), rerun_failures: { allowed: true } };
+		expect(render(<RunControlsPanel expId="e_1" state="done" />, hostedSession("member"))).toContain("rerun-failures-button");
+	});
+});
+
+describe("change log in plain words (fix wave 3, N199)", () => {
+	const entry = (before: object, after: object) => ({
+		seq: 2,
+		at: "2026-11-21T10:00:00Z",
+		actor: "ana",
+		action: "set",
+		before,
+		after,
+		prev: "",
+		hash: "h",
+	});
+	const logOf = (before: object, after: object) => {
+		api.controls = controls({ log: [entry(before, after)] });
+		return render(<RunControlsPanel expId="e_1" state="running" />, hostedSession("member"));
+	};
+	it("names the held and released model", () => {
+		expect(logOf({ mode: "running" }, { mode: "running", paused_models: ["gpt-5.4-mini"] })).toContain("held gpt-5.4-mini");
+		expect(logOf({ mode: "running", paused_models: ["gpt-5.4-mini"] }, { mode: "running" })).toContain("released gpt-5.4-mini");
+	});
+	it("names the concurrency and spend cap change", () => {
+		expect(logOf({ mode: "running", concurrency: 2 }, { mode: "running", concurrency: 4 })).toContain("set runs at once from 2 to 4");
+		const cap = logOf({ mode: "running", total_usd: 0.005 }, { mode: "running", total_usd: 2 });
+		expect(cap).toContain("set the spend cap from $0.0050 to $2.00");
+		expect(logOf({ mode: "running" }, { mode: "running" })).toContain("changed settings");
+	});
+	it("joins several changes", () => {
+		expect(logOf({ mode: "running", concurrency: 2 }, { mode: "running", concurrency: 3, paused_models: ["a"] })).toContain(
+			"held a; set runs at once from 2 to 3",
+		);
 	});
 });
