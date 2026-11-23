@@ -1361,7 +1361,7 @@ export interface RunDetail {
 	sealed: boolean;
 	/** Empty until the run is sealed. */
 	seal_hash: string;
-	debug_allowed?: { replay: boolean; fork: boolean; reason?: string };
+	debug_allowed?: { replay: boolean; fork: boolean; reason?: string; breakpoints?: boolean; breakpoints_reason?: string };
 	/** Run control: requeued by an operator; kept, never counted. */
 	superseded?: boolean;
 	grade: Grade | null;

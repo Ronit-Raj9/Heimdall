@@ -16,7 +16,7 @@ const maxFlippedListed = 20
 func Markdown(r *Report) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Model migration report: %s\n\n", r.ExpID)
-	fmt.Fprintf(&b, "Suite %s. Old model: %s (arm %s, agent %s). Overall verdicts on condition %s, alpha %s. Release policy: %s.\n\n",
+	fmt.Fprintf(&b, "Suite %s. Old model: %s (arm %s, agent %s). Overall verdicts on condition %s, alpha %s. Release rule set: %s.\n\n",
 		r.Suite, r.From.Model, r.From.Arm, r.From.Agent, r.Condition, fmtAlpha(r.Alpha), orNone(r.Policy))
 	if r.Synthetic {
 		b.WriteString("**Synthetic: scripted agent, scripted model or smoke experiment. The numbers are not findings.**\n\n")
@@ -48,7 +48,7 @@ func writePair(b *strings.Builder, p Pair) {
 		fmt.Fprintf(b, "- %s\n", c)
 	}
 	if pr := p.Recommendation.Policy; pr != nil {
-		fmt.Fprintf(b, "- release policy %s: %s", pr.PolicyName, pr.Decision)
+		fmt.Fprintf(b, "- release rule set %s: %s", pr.RuleSetName(), pr.Decision)
 		var checks []string
 		for _, c := range pr.Checks {
 			checks = append(checks, c.ID+" "+string(c.Status))

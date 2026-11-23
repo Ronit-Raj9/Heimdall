@@ -14,6 +14,8 @@ vi.mock("nuqs", async (importOriginal) => ({
 	useQueryState: (key: string) => [api.search[key] ?? null, () => undefined],
 }));
 vi.mock("@/lib/store/apis/migrationApi", () => ({ useGetMigrationQuery: () => api.query }));
+const gov = vi.hoisted(() => ({ policies: {} as unknown }));
+vi.mock("@/lib/store/apis/governApi", () => ({ useListPoliciesQuery: () => gov.policies }));
 vi.mock("@/components/migration/migrationReport", () => ({ MigrationReportView: () => <div data-testid="migration-report" /> }));
 const ms = vi.hoisted(() => ({ config: {} as unknown }));
 vi.mock("@/lib/store/apis/modelSwitchApi", () => ({ useGetModelSwitchConfigQuery: () => ms.config }));
@@ -69,5 +71,60 @@ describe("MigrationTab Apply to my Bifrost (D9.apply)", () => {
 		ms.config = { data: config, isLoading: false };
 		const html = render(<MigrationTab expId="e1" arms={["A", "B"]} />);
 		expect(html).not.toContain("apply-panel-stub");
+	});
+});
+describe("MigrationTab release rule set (N280)", () => {
+	const base = { ...MIGRATION_FIXTURE, alpha: 0.05, grade_source: "original" };
+	const policies = {
+		data: {
+			policies: [
+				{ file: "default.yaml", path: "policies/default.yaml", name: "enterprise-default", checks: 3, valid: true, sha256: "", size: 1 },
+				{ file: "my-release-policy.yml", path: "policies/my-release-policy.yml", checks: 1, valid: true, sha256: "", size: 1 },
+				{ file: "broken.yaml", path: "policies/broken.yaml", checks: 0, valid: false, sha256: "", size: 1 },
+			],
+		},
+		isLoading: false,
+	};
+	it("names the rule set by its file", () => {
+		api.search = {};
+		gov.policies = policies;
+		const report = { ...base, policy: "default" };
+		api.query = { data: report, currentData: report, isLoading: false };
+		const html = render(<MigrationTab expId="e1" arms={["A", "B"]} />);
+		expect(html).toContain("Release rule set: default");
+		expect(html).not.toContain("enterprise-default");
+	});
+	it("says when the comparison chose no rule set", () => {
+		api.search = {};
+		gov.policies = policies;
+		const report = { ...base, policy: "" };
+		api.query = { data: report, currentData: report, isLoading: false };
+		const html = render(<MigrationTab expId="e1" arms={["A", "B"]} />);
+		expect(html).toContain("No release rule set applied: this comparison did not choose one.");
+	});
+	it("offers a select of the rule set files, the comparison's choice first", () => {
+		api.search = { policy: "my-release-policy" };
+		gov.policies = policies;
+		const report = { ...base, policy: "my-release-policy" };
+		api.query = { data: report, currentData: report, isLoading: false };
+		const html = render(<MigrationTab expId="e1" arms={["A", "B"]} />);
+		const select = html.slice(html.indexOf('data-testid="migration-policy"'), html.indexOf("</select>"));
+		expect(select).toContain('value=""');
+		expect(select).toContain('value="none"');
+		expect(select).toContain('value="default"');
+		expect(select).toMatch(/value="my-release-policy" selected=""/);
+		expect(select).not.toContain('value="broken"');
+	});
+	it("explains where a routing file comes from outside an evaluation", () => {
+		api.search = {};
+		gov.policies = policies;
+		api.query = { data: base, currentData: base, isLoading: false };
+		const html = render(<MigrationTab expId="e1" arms={["A", "B"]} />);
+		expect(html).toContain('data-testid="migration-routing-note"');
+		expect(html).toContain(
+			"A Bifrost routing file is made from an evaluation's model comparison. Use Actions &gt; Compare models to make one.",
+		);
+		ms.config = { data: { ready: true, config: { governance: { routing_rules: [{}] } } }, isLoading: false };
+		expect(render(<MigrationTab expId="e1" arms={["A", "B"]} evaluationId="ev_1" />)).not.toContain("migration-routing-note");
 	});
 });

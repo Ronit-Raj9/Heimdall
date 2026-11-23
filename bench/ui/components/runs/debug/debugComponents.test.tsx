@@ -3,8 +3,10 @@ import "@/lib/i18n";
 import { errorQuery, loadingQuery, mutation, okQuery, render, tagOf } from "@/lib/testing/render";
 import type { RunDetail, StepRecord } from "@/lib/types/bench";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { RunDebugActions, canReplay } from "./debugActions";
+import i18n from "@/lib/i18n";
+import { RunDebugActions, canBreak, canReplay } from "./debugActions";
 import { DebugBanner } from "./debugBanner";
+import { startDebugRun } from "./debugDialogs";
 import { HoldCard, HoldPanel } from "./holdPanel";
 import { StepInspector } from "./stepInspector";
 import { DiffTable } from "./traceDiff";
@@ -150,5 +152,76 @@ describe("trace diff", () => {
 		expect(html).toContain("First difference at model call 1");
 		expect(tagOf(html, "trace-diff-row-1")).toContain('data-same="false"');
 		expect(render(<DiffTable left={left} right={left} />)).toContain("No difference");
+	});
+});
+describe("debug on a server that cannot hold model calls (N212)", () => {
+	const withAllowed = (allowed: RunDetail["debug_allowed"]) =>
+		({
+			sealed: true,
+			slot: { exp_id: "e_1", condition: "clean", arm: "A", task: "t1" },
+			run: { run_id: "r_1" },
+			debug_allowed: allowed,
+		}) as unknown as RunDetail;
+	it("hides Debug and says why, keeps Replay", () => {
+		const d = withAllowed({ replay: true, fork: true, breakpoints: false, breakpoints_reason: "x" });
+		expect(canBreak(d)).toBe(false);
+		const html = render(<RunDebugActions detail={d} />);
+		expect(html).toContain("run-replay");
+		expect(html).not.toContain('data-testid="run-debug"');
+		expect(tagOf(html, "run-debug-breakpoints-reason")).not.toBeNull();
+		expect(html).toContain(
+			"Pausing before model calls needs a worker this server controls. On this server, use Replay or Fork from a step.",
+		);
+	});
+	it("offers Debug where breakpoints work, and on an older server that does not say", () => {
+		for (const d of [withAllowed({ replay: true, fork: true, breakpoints: true }), withAllowed({ replay: true, fork: true })]) {
+			expect(canBreak(d)).toBe(true);
+			const html = render(<RunDebugActions detail={d} />);
+			expect(html).toContain('data-testid="run-debug"');
+			expect(html).not.toContain("run-debug-breakpoints-reason");
+		}
+	});
+	it("the step inspector hides Pause here when breakpoints cannot work", () => {
+		const html = render(
+			<StepInspector
+				runId="r_1"
+				step={step({ request_id: "q1" })}
+				call={{ call: 2, request_id: "q1", status: 200, action: "pass" }}
+				canFork
+				canBreak={false}
+				onClose={() => undefined}
+			/>,
+		);
+		expect(html).toContain("inspector-fork");
+		expect(html).not.toContain("inspector-breakpoint");
+	});
+});
+
+describe("fork and breakpoint dialogs (N214)", () => {
+	const started = { exp_id: "e_dbg", run_id: "r_dbg", mode: "fork" };
+	it("a successful start hands the run up and closes the dialog, so the next fork opens a fresh one", async () => {
+		const onStarted = vi.fn();
+		const onClose = vi.fn();
+		const run = vi.fn(async () => ({ data: started }));
+		expect(await startDebugRun(run, onStarted, onClose)).toBe(true);
+		expect(onStarted).toHaveBeenCalledWith(started);
+		expect(onClose).toHaveBeenCalledTimes(1);
+		// A second fork right after: the same path runs again, nothing stays disabled.
+		expect(await startDebugRun(run, onStarted, onClose)).toBe(true);
+		expect(run).toHaveBeenCalledTimes(2);
+		expect(onClose).toHaveBeenCalledTimes(2);
+	});
+	it("a refused start keeps the dialog open with its error", async () => {
+		const onStarted = vi.fn();
+		const onClose = vi.fn();
+		expect(await startDebugRun(async () => ({ error: { status: 409 } }), onStarted, onClose)).toBe(false);
+		expect(onStarted).not.toHaveBeenCalled();
+		expect(onClose).not.toHaveBeenCalled();
+	});
+	it("the dialogs state what the start costs", () => {
+		expect(i18n.t("runDebug:fork.cost", { call: 4 })).toBe(
+			"Calls before call 4 replay from the recording for free; later calls go to the model and cost money.",
+		);
+		expect(i18n.t("runDebug:debugDialog.cost")).toContain("costs money");
 	});
 });

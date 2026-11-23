@@ -59,7 +59,21 @@ type RunsHandler struct {
 	index          ReadIndex
 	suites         SuiteSource // optional: the task voice bounds of the Voice tab (runvoice.go)
 	heldOutVisible bool        // server config held_out.visible (WithHeldOutVisible)
+	breakpoints    bool        // this server can hold model calls (WithBreakpoints)
 }
+
+// WithBreakpoints sets whether this server can hold a run's model calls
+// (Services.Holds is set), which Debug with breakpoints needs. The default,
+// false, answers debug_allowed.breakpoints false with the reason, so the
+// page offers Replay and Fork only (N212).
+func (h *RunsHandler) WithBreakpoints(held bool) *RunsHandler {
+	h.breakpoints = held
+	return h
+}
+
+// breakpointsReason is the run page line where the Debug button would be on
+// a server that cannot hold model calls.
+const breakpointsReason = "Pausing before model calls needs a worker this server controls. On this server, use Replay or Fork from a step."
 
 // WithSuites lets the Voice tab read a run's task voice bounds from its suite.
 func (h *RunsHandler) WithSuites(s SuiteSource) *RunsHandler {
@@ -225,6 +239,12 @@ func (h *RunsHandler) withDebugAllowed(ctx context.Context, rv *RunView, out sch
 	}
 	probe := conditionProbe(ctx, h.suites, rv, m)
 	out.DebugAllowed = runDebugAllowed(rv.Slot.Condition, probe, rv.Sealed, out.Run.Debug)
+	if a := out.DebugAllowed; a != nil && a.Fork {
+		a.Breakpoints = h.breakpoints
+		if !h.breakpoints {
+			a.BreakpointsReason = breakpointsReason
+		}
+	}
 	return out
 }
 

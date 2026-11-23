@@ -30,6 +30,7 @@ import (
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/keystore"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/onboard"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
@@ -671,8 +672,12 @@ func (h *connectHandler) benchmarkInfos(ctx context.Context, cfg *schemas.AgentC
 	}
 	hosted := h.env.Services.Hosted
 	examples := benchcatalog.ExampleSuiteIDs(benchcatalog.SourceRoot())
-	// A hidden practice suite is not this org's to run; drop it before the cap.
-	ids = slices.DeleteFunc(slices.Clone(ids), func(id string) bool { return benchcatalog.HidePracticeSuite(hosted, id) })
+	// A hidden practice suite is not this org's to run, and an Add benchmark
+	// staging copy (draft-<set id>) is internal and never listed (N242);
+	// drop both before the cap.
+	ids = slices.DeleteFunc(slices.Clone(ids), func(id string) bool {
+		return benchcatalog.HidePracticeSuite(hosted, id) || onboard.IsStagingSuite(id)
+	})
 	if len(ids) > 120 {
 		ids = ids[:120]
 	}
@@ -683,7 +688,9 @@ func (h *connectHandler) benchmarkInfos(ctx context.Context, cfg *schemas.AgentC
 			continue
 		}
 		// Practice examples (acme-*, coding-core) are the fallback only (B8.task).
-		info := connect.BenchmarkInfo{ID: id, Tasks: len(s.TaskIDs), Practice: PracticeBenchmark(id) || examples[id]}
+		// Tasks counts the ready (admitted public) tasks only, so a benchmark
+		// with none is never picked (PickFirstLook skips Tasks == 0; N242).
+		info := connect.BenchmarkInfo{ID: id, Tasks: len(evalAdmittedTasks(s)), Practice: PracticeBenchmark(id) || examples[id]}
 		ok, _, reason := evalCompat(cfg, s)
 		info.Compatible, info.Reason = ok, reason
 		info.NeedsModel = s.Judge != nil || s.Simulator != nil || s.Grading == "judged"

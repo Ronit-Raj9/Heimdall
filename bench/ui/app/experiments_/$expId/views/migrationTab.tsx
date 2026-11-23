@@ -5,11 +5,13 @@ import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
 import { cn } from "@/lib/utils";
 import type { MigrationParams, MigrationResponse } from "@/lib/types/bench";
+import { useListPoliciesQuery } from "@/lib/store/apis/governApi";
 import { useGetMigrationQuery } from "@/lib/store/apis/migrationApi";
 import { useGetModelSwitchConfigQuery } from "@/lib/store/apis/modelSwitchApi";
 import { parseAsString, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
 import "./fw11I18n";
+import "./hw10I18n";
 
 /**
  * The Migration tab (docs/model-migration.md): moving from one arm to the others. ?from= is one arm
@@ -18,10 +20,18 @@ import "./fw11I18n";
 /** The migration request of the tab's URL state; empty values fall back to the server defaults. */
 export function migrationParams(
 	expId: string,
-	search: { from?: string | null; to?: string | null; condition?: string | null; alpha?: string | null; grade_source?: string | null },
-): MigrationParams {
-	const out: MigrationParams = { expId };
-	for (const key of ["from", "to", "condition", "alpha", "grade_source"] as const) {
+	search: {
+		from?: string | null;
+		to?: string | null;
+		condition?: string | null;
+		alpha?: string | null;
+		grade_source?: string | null;
+		policy?: string | null;
+	},
+): MigrationParams & { policy?: string } {
+	// N280: policy is a rule set file name from policies/ or "none"; left out, the comparison's own choice.
+	const out: MigrationParams & { policy?: string } = { expId };
+	for (const key of ["from", "to", "condition", "alpha", "grade_source", "policy"] as const) {
 		const value = search[key];
 		if (value) out[key] = value;
 	}
@@ -37,7 +47,8 @@ export function MigrationTab({ expId, arms, evaluationId }: { expId: string; arm
 	// server honours both, so the report must be the one the address bar names.
 	const [alpha] = useQueryState("alpha", parseAsString);
 	const [gradeSource] = useQueryState("grade_source", parseAsString);
-	const report = useGetMigrationQuery(migrationParams(expId, { from, to, condition, alpha, grade_source: gradeSource }));
+	const [policy, setPolicy] = useQueryState("policy", parseAsString);
+	const report = useGetMigrationQuery(migrationParams(expId, { from, to, condition, alpha, grade_source: gradeSource, policy }));
 	// Only the response to the current selection is shown: RTK keeps the previous one in data while a
 	// changed bookmark loads, and its settings would sit beside the new controls (QC2-27-07).
 	const current = report.currentData;
@@ -84,8 +95,10 @@ export function MigrationTab({ expId, arms, evaluationId }: { expId: string; arm
 						))}
 					</div>
 				</div>
+				<RuleSetSelect value={policy ?? ""} onChange={(v) => void setPolicy(v || null)} />
 				{current && <EffectiveSettings report={current} />}
 			</div>
+			{current && <RuleSetLine applied={current.policy} chosen={policy} />}
 			{pending ? (
 				<BlockSkeleton rows={6} testId="migration-report-loading" />
 			) : report.error || !current ? (
@@ -93,8 +106,64 @@ export function MigrationTab({ expId, arms, evaluationId }: { expId: string; arm
 			) : (
 				<MigrationReportView report={current} />
 			)}
-			{evaluationId && arms.length >= 2 && <MigrationApply evaluationId={evaluationId} />}
+			{evaluationId ? arms.length >= 2 && <MigrationApply evaluationId={evaluationId} /> : <RoutingNote />}
 		</div>
+	);
+}
+
+/** Rule set names from the policies folder: file names without .yaml, as Releases > Rules lists them. */
+export function ruleSetNames(files: readonly { file: string; valid: boolean }[]): string[] {
+	return files.filter((p) => p.valid).map((p) => p.file.replace(/\.ya?ml$/, ""));
+}
+
+/**
+ * N280 (D19): the rule set the advice is checked against. The first option is the comparison's own
+ * choice (the one it froze, else none); "none" gives the statistics alone.
+ */
+function RuleSetSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+	const { t } = useTranslation("hw10");
+	const list = useListPoliciesQuery();
+	const names = ruleSetNames(list.data?.policies ?? []);
+	if (value && value !== "none" && !names.includes(value)) names.push(value);
+	return (
+		<label className="flex flex-col gap-1">
+			<span className="text-muted-foreground text-xs">{t("ruleSet.label")}</span>
+			<select
+				className="border-input bg-background h-8 rounded-md border px-2 text-xs"
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				data-testid="migration-policy"
+			>
+				<option value="">{t("ruleSet.own")}</option>
+				<option value="none">{t("ruleSet.none")}</option>
+				{names.map((name) => (
+					<option key={name} value={name}>
+						{name}
+					</option>
+				))}
+			</select>
+		</label>
+	);
+}
+
+/** The rule set the report followed, named by its file, read from the response. */
+function RuleSetLine({ applied, chosen }: { applied: string; chosen: string | null }) {
+	const { t } = useTranslation("hw10");
+	const text = applied ? t("ruleSet.applied", { file: applied }) : chosen === "none" ? t("ruleSet.noneChosen") : t("ruleSet.noneApplied");
+	return (
+		<p className="text-muted-foreground text-sm" data-testid="migration-rule-set">
+			{text}
+		</p>
+	);
+}
+
+/** D23: where a routing file comes from, for a comparison no evaluation made. */
+function RoutingNote() {
+	const { t } = useTranslation("hw10");
+	return (
+		<p className="text-muted-foreground rounded-lg border px-4 py-3 text-sm" role="note" data-testid="migration-routing-note">
+			{t("routingNote")}
+		</p>
 	);
 }
 

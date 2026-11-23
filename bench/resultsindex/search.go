@@ -258,7 +258,29 @@ func (q SearchQuery) filters(r SearchRun) bool {
 	if i := strings.IndexByte(bench, '@'); i >= 0 {
 		bench = bench[:i]
 	}
-	return eq(q.Agent, r.Agent) && eq(q.Version, r.Version) && eq(bench, r.Benchmark) && eq(q.Outcome, r.Outcome)
+	return eq(q.Agent, r.Agent) && eq(searchVersion(q.Version), searchVersion(r.Version)) && eq(bench, r.Benchmark) && eq(q.Outcome, r.Outcome)
+}
+
+// searchVersion is the comparable form of an agent version: "1", "v1" and
+// "V1" are all saved version 1 and read "v1" (N291); any other value (a
+// config's free-form agent_version) is kept as written.
+func searchVersion(v string) string {
+	v = strings.TrimSpace(v)
+	n := strings.TrimPrefix(strings.TrimPrefix(v, "v"), "V")
+	if n == "" || len(n) > 9 {
+		return v
+	}
+	for _, c := range n {
+		if c < '0' || c > '9' {
+			return v
+		}
+	}
+	if t := strings.TrimLeft(n, "0"); t != "" {
+		n = t
+	} else {
+		n = "0"
+	}
+	return "v" + n
 }
 
 // doc returns the run's cached document, building it on first use or when

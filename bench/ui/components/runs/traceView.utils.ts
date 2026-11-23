@@ -10,6 +10,7 @@ export const TRACE_FILTERS = [
   "tools",
   "commands",
   "errors",
+  "mismatches",
 ] as const;
 export type TraceFilter = (typeof TRACE_FILTERS)[number];
 
@@ -35,15 +36,22 @@ export function traceKind(
   return "other";
 }
 
-/** True when a step is an error: flagged, non-zero exit, or a witness conflict. */
+/**
+ * True when a step is an error: flagged by its record or a non-zero exit. A witness conflict alone is
+ * a mismatch between two records of the run (isMismatchStep), not an error of the agent (N240).
+ */
 export function isErrorStep(step: StepRecord): boolean {
   return (
     Boolean(step.is_error) ||
     (step.exit_code !== undefined &&
       step.exit_code !== null &&
-      step.exit_code !== 0) ||
-    Boolean(step.conflict)
+      step.exit_code !== 0)
   );
+}
+
+/** True when two records of the run disagree about a step (a witness conflict). */
+export function isMismatchStep(step: StepRecord): boolean {
+  return Boolean(step.conflict);
 }
 
 /** Steps that pass the filter chip and the search text (case-insensitive over summary, tool, path, kind). */
@@ -59,6 +67,7 @@ export function filterTrace(
     if (filter === "tools" && kind !== "tool") return false;
     if (filter === "commands" && kind !== "command") return false;
     if (filter === "errors" && !isErrorStep(step)) return false;
+    if (filter === "mismatches" && !isMismatchStep(step)) return false;
     if (!q) return true;
     return [
       step.summary,
@@ -80,6 +89,7 @@ export function filterCounts(
     tools: 0,
     commands: 0,
     errors: 0,
+    mismatches: 0,
   };
   for (const step of steps) {
     const kind = traceKind(step);
@@ -87,6 +97,7 @@ export function filterCounts(
     if (kind === "tool") out.tools++;
     if (kind === "command") out.commands++;
     if (isErrorStep(step)) out.errors++;
+    if (isMismatchStep(step)) out.mismatches++;
   }
   return out;
 }

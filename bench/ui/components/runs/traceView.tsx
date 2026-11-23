@@ -1,6 +1,6 @@
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Input } from "@/components/ui/input";
-import { useGetRunEventsQuery } from "@/lib/store/apis/benchApi";
+import { useGetRunEventsQuery, useGetRunQuery } from "@/lib/store/apis/benchApi";
 import { useGetRunStepsQuery } from "@/lib/store/apis/runStepsApi";
 import { useGetRunCallsQuery } from "@/lib/store/apis/runDebugApi"; // X20b step inspector
 import type { RunCall } from "@/lib/types/runDebug";
@@ -10,6 +10,7 @@ import { Bot, ChevronRight, CircleDot, FilePen, Search, ShieldCheck, SquareTermi
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { callsByRequest, stepIndex } from "./debug/debug.utils"; // X20b
+import { canBreak as runCanBreak } from "./debug/debugActions";
 import { ReplayBadge } from "./debug/replayBadge";
 import { StepInspector } from "./debug/stepInspector";
 import { AgentEventsLine, ObserverStatusLine } from "./stepTimeline";
@@ -20,6 +21,7 @@ import {
 	filterTrace,
 	formatDuration,
 	isErrorStep,
+	isMismatchStep,
 	stepIO,
 	tokenizeJson,
 	traceKind,
@@ -60,6 +62,7 @@ export function RunTraceView({
 	arm,
 	live = false,
 	canFork = false,
+	canBreak,
 	initialStep,
 }: {
 	runId: string;
@@ -67,6 +70,8 @@ export function RunTraceView({
 	live?: boolean;
 	/** X20b: offer Fork from this step (a sealed run without a fault). */
 	canFork?: boolean;
+	/** N212: offer Pause here on a rerun; left out, read from the run's debug_allowed. */
+	canBreak?: boolean;
 	/** N51: the step a link asked for (?step=), selected and scrolled into view once. */
 	initialStep?: number;
 }) {
@@ -78,6 +83,8 @@ export function RunTraceView({
 	const steps = useGetRunStepsQuery(runId, poll);
 	const events = useGetRunEventsQuery(runId, poll);
 	const calls = useGetRunCallsQuery(runId, poll); // X20b: replay labels and the step inspector
+	const run = useGetRunQuery(runId); // N212: the page's own cached run detail
+	const breakpoints = canBreak ?? (run.data ? runCanBreak(run.data) : false);
 	if (steps.isLoading) return <BlockSkeleton rows={6} testId={`trace-${arm}-loading`} />;
 	if (steps.error || !steps.data) {
 		return (
@@ -94,6 +101,7 @@ export function RunTraceView({
 			calls={calls.data?.calls}
 			firstDivergence={calls.data?.first_divergence?.call}
 			canFork={canFork}
+			canBreak={breakpoints}
 			initialStep={initialStep}
 		/>
 	);
@@ -110,6 +118,8 @@ export interface TraceViewProps {
 	calls?: readonly RunCall[];
 	firstDivergence?: number;
 	canFork?: boolean;
+	/** N212: Pause here on a rerun needs a server that can hold model calls. */
+	canBreak?: boolean;
 	/** N51: select this step on open (all steps shown) and scroll it into view once; a seq not in the trace is ignored. */
 	initialStep?: number;
 }
@@ -129,10 +139,12 @@ export function TraceView({
 	calls,
 	firstDivergence,
 	canFork = true,
+	canBreak = true,
 	initialStep,
 }: TraceViewProps) {
 	const { t } = useTranslation("runTrace");
 	const { t: tb } = useTranslation("bench");
+	const { t: tt } = useTranslation("traceTools");
 	const { t: td } = useTranslation("runDebug");
 	const [filter, setFilter] = useState<TraceFilter>(initialStep ? "all" : initialFilter);
 	const [query, setQuery] = useState("");
@@ -190,19 +202,20 @@ export function TraceView({
 		<div className="flex min-w-0 flex-col gap-4" data-testid={`trace-${arm}`} data-live={live}>
 			<div className="flex flex-wrap items-center gap-2">
 				<div role="group" aria-label={t("filters.label")} className="bg-muted/60 flex flex-wrap gap-0.5 rounded-lg p-0.5">
-					{TRACE_FILTERS.map((id) => (
+					{TRACE_FILTERS.filter((id) => id !== "mismatches" || counts.mismatches > 0 || filter === id).map((id) => (
 						<button
 							key={id}
 							type="button"
 							aria-pressed={filter === id}
 							onClick={() => setFilter(id)}
+							title={id === "mismatches" ? tt("mismatches.hint") : undefined}
 							data-testid={`trace-filter-${id}`}
 							className={cn(
 								"focus-visible:ring-ring/50 inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
 								filter === id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
 							)}
 						>
-							{t(`filters.${id}`)}
+							{id === "mismatches" ? tt("mismatches.chip") : t(`filters.${id}`)}
 							<span className="text-muted-foreground tabular-nums">{counts[id]}</span>
 						</button>
 					))}
@@ -289,6 +302,7 @@ export function TraceView({
 								step={selStep}
 								call={selStep?.request_id ? callMap.get(selStep.request_id) : undefined}
 								canFork={canFork}
+								canBreak={canBreak}
 								onClose={() => setSelected(null)}
 							/>
 						</div>
@@ -330,6 +344,8 @@ function TraceRow({
 	const kind = traceKind(step);
 	const Icon = KIND_ICON[kind];
 	const error = isErrorStep(step);
+	// N240: a witness conflict reads as a warning with its text on hover, never as an error.
+	const mismatch = !error && isMismatchStep(step);
 	const label = tb(`runs.steps.kind.${step.kind}`, {
 		defaultValue: t(`kind.${kind}`),
 	});
@@ -340,12 +356,15 @@ function TraceRow({
 				"min-w-0",
 				fresh && "animate-in fade-in bg-chart-info/5",
 				error && "bg-chart-error/5",
+				mismatch && "bg-chart-warning/5",
 				selected && "bg-primary/5 ring-primary/40 ring-1 ring-inset",
 			)}
 			data-selected={selected}
 			data-testid={`trace-row-${arm}-${step.seq}`}
 			data-kind={kind}
 			data-error={error}
+			data-mismatch={mismatch || undefined}
+			title={step.conflict || undefined}
 		>
 			<button
 				type="button"
