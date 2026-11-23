@@ -501,6 +501,7 @@ func (h *policyDocs) review(ctx *fasthttp.RequestCtx) {
 			return
 		}
 		out.Accepted = done
+		syncDatasetVersion(h.projects.Root(), id, dir, actorName(ctx), "Policy document "+d.ID)
 	}
 	out.Counts = d.Counts()
 	switch {
