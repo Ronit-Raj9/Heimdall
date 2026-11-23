@@ -65,3 +65,31 @@ func TestHideServerTextRootBoundary(t *testing.T) {
 		t.Fatal("the root folder / must never hide every path")
 	}
 }
+
+// An id that is one part of a longer name (a gateway key slot is
+// "<org id>_<slot>") is hidden too.
+func TestHideServerStringIDInsideLongerName(t *testing.T) {
+	const org = "org_01m7yyh2wft8r2x5tjyxthksbj"
+	for _, in := range []string{org + "_fp-slot-3", "shared-runner-" + org, "x_" + org + "_y", "key " + org + "."} {
+		if got := HideServerString(in); strings.Contains(got, org) {
+			t.Fatalf("%q still names the organization: %q", in, got)
+		}
+	}
+	if got := HideServerString("organization_settings and tok_short stay"); got != "organization_settings and tok_short stay" {
+		t.Fatalf("plain words changed: %q", got)
+	}
+}
+
+// A shared run never carries the gateway key slot, which is named after
+// the organization.
+func TestRedactHidesGatewayKeySlot(t *testing.T) {
+	const org = "org_01m7yyh2wft8r2x5tjyxthksbj"
+	in := map[string]any{"run": map[string]any{"gateway": map[string]any{"key_slot": org + "_fp-slot-3", "model": "gpt-5"}}}
+	raw, err := json.Marshal(HideServerText(Redact(in, false)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), org) || !strings.Contains(string(raw), "gpt-5") {
+		t.Fatalf("shared payload: %s", raw)
+	}
+}

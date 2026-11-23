@@ -13,7 +13,10 @@ const HiddenPath = "[hidden path]"
 // platformIDRe matches the platform's own ids of orgs, people, invitations,
 // API tokens and runners (db.NewID: prefix, "_", 26 Crockford base32
 // digits). Error texts and reasons can carry them; a shared page never does.
-var platformIDRe = regexp.MustCompile(`\b(?:org|usr|inv|tok|rnr)_[0-9a-hjkmnp-tv-z]{26}\b`)
+// No word boundaries: an id is often one part of a longer name joined with
+// "_" or "-" (a gateway key slot is "<org id>_<slot>"), and "_" counts as a
+// word character.
+var platformIDRe = regexp.MustCompile(`(?:org|usr|inv|tok|rnr)_[0-9a-hjkmnp-tv-z]{26}`)
 
 // HideServerText returns v (decoded JSON, as Redact returns it) with every
 // string scrubbed of the server's own folders and of platform ids: a path

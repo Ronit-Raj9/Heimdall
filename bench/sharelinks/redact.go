@@ -24,6 +24,8 @@ var secretKeys = map[string]bool{
 	"virtual_key_id": true, "uploaded_by": true, "requested_by": true, "updated_by": true,
 	"started_by": true, "approved_by": true, "reviewed_by": true, "labeller": true, "author": true,
 	"email": true, "worker": true, "worker_id": true, "host": true, "by": true,
+	// The gateway key slot of a run is named after the organization.
+	"key_slot": true,
 }
 
 // secretSuffixes catch prefixed variants (OPENAI_API_KEY, x_secret).
