@@ -39,6 +39,12 @@ const (
 	EnvAnswerPath   = "BENCH_ANSWER_PATH"
 )
 
+// OutputFile is the output kind of a task whose test reads one fixed file
+// the agent writes (output: {kind: file, path: ...}), such as BFCL's
+// /app/result.json. Compatibility words name it "a file the agent writes"
+// (fix wave 3, N187).
+const OutputFile = "file"
+
 // OutputKind is the task's output kind: the task's own, else the suite's,
 // else diff.
 func OutputKind(s *schemas.Suite, t *schemas.Task) string {

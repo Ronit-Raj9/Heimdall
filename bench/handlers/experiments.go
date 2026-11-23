@@ -39,6 +39,7 @@ type ExperimentsHandler struct {
 	write    lib.Middleware
 	recorder *eventRecorder
 	analyses sync.Map // exp id -> id of the last original-grade analysis this server computed
+	paused   pausedCache
 }
 
 // NewExperimentsHandler creates the experiments handler. write guards the
@@ -104,7 +105,9 @@ func (h *ExperimentsHandler) listExperiments(ctx *fasthttp.RequestCtx) {
 		if m, ok := h.index.Manifest(id); ok {
 			st := h.status(m, h.index.Runs(id), false)
 			// UI regroup (U2): the newest analysis's decision, when the index can read it.
-			if vi, isVerdict := h.index.(VerdictIndex); isVerdict {
+			// A debug run is never scored: a decision stored before fix wave 3 is
+			// ignored, so it never reads "Test was broken" (N247).
+			if vi, isVerdict := h.index.(VerdictIndex); isVerdict && st.Debug == "" {
 				if d, found := vi.LatestDecision(id); found {
 					st.Decision = d
 				}
@@ -202,7 +205,13 @@ func (h *ExperimentsHandler) getExperiment(ctx *fasthttp.RequestCtx) {
 	if !ok {
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, h.status(m, runs, false))
+	st := h.status(m, runs, false)
+	if st.State != schemas.ExperimentDone {
+		// N199: the run controls' pause and held models, cached 1 s; only on
+		// one experiment's status, so a list never reads every controls log.
+		st.Paused, st.PausedModels = h.pausedFacts(m.ExpID)
+	}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, st)
 }
 
 // getVerdict handles GET /api/bench/experiments/{id}/verdict?grade_source=.
@@ -244,8 +253,19 @@ func (h *ExperimentsHandler) getVerdict(ctx *fasthttp.RequestCtx) {
 		ExpID: m.ExpID, AnalysisID: a.AnalysisID, GradeSource: a.GradeSource, Suite: m.Experiment.Suite,
 		Verdict: a.Verdict, Naive: a.Naive, Gates: gates, ConfigDiff: diff, Policy: a.Policy,
 		ReviewedRuns: a.ReviewedRuns, ReviewChangedRuns: a.ReviewChangedRuns, // human review counts (docs/human-review.md)
-		JudgeCalibration: a.JudgeCalibration, // W8 judge calibration (docs/judge-calibration.md)
+		JudgeCalibration: a.JudgeCalibration,                           // W8 judge calibration (docs/judge-calibration.md)
+		Partial:          partialState(h.status(m, runs, false).State), // N197: still running, not final
 	})
+}
+
+// partialState reports whether a verdict of an experiment in state is not
+// final: its state is not done, failed, cancelled or created (N197).
+func partialState(state schemas.ExperimentState) bool {
+	switch state {
+	case schemas.ExperimentDone, schemas.ExperimentFailed, schemas.ExperimentCancelled, schemas.ExperimentCreatedState:
+		return false
+	}
+	return true
 }
 
 // getDiagnostics handles GET /api/bench/experiments/{id}/diagnostics.

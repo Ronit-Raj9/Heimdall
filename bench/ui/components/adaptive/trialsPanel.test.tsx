@@ -5,8 +5,10 @@ import type { AdaptiveView } from "@/lib/types/bench";
 import fs from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { formatUSD, hasContent, TrialsPanel } from "./trialsPanel";
+
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 // Shaped after the $0 adaptive smoke (docs/adaptive-trials.md, "End to end"): a task-rule
 // experiment on the pr tier where concordant tasks stopped at the minimum.

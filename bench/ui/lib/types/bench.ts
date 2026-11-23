@@ -581,6 +581,7 @@ export interface RunDebugInfo {
 	held_ms?: number;
 	/** The source run's fault condition when it was not the clean one. */
 	from_condition?: string;
+	edit?: "message" | "response";
 }
 
 // X7: GPU benchmarking (schemas/gpu.go, docs/gpu-tasks.md).
@@ -1188,6 +1189,7 @@ export interface GateSummary {
 /** GET /experiments/{id}/verdict */
 export interface VerdictPayload {
 	exp_id: string;
+	partial?: boolean;
 	analysis_id: string;
 	grade_source: string;
 	suite: string;
@@ -1674,6 +1676,9 @@ export interface ExperimentStatus {
 	problem?: string;
 	run_job_id?: string;
 	arms_differ?: "model" | "none" | "agent";
+	paused?: boolean;
+	paused_models?: string[];
+	extends?: string;
 }
 
 /** GET /experiments */

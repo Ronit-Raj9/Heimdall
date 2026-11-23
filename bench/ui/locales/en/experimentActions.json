@@ -21,7 +21,8 @@
 		"force": "Extend anyway (the verdict is not inconclusive)",
 		"run": "Extend",
 		"confirm": "Start a follow-up experiment of {{expId}}? It spends model budget.",
-		"notInconclusive": "The verdict is not inconclusive: tick \"Extend anyway\" to run a follow-up regardless."
+		"notInconclusive": "The verdict is not inconclusive: tick \"Extend anyway\" to run a follow-up regardless.",
+		"brokenParent": "This comparison's test was broken ({{reason}}). Fix that first; a follow-up would be broken the same way."
 	},
 	"probe": {
 		"title": "Fault test",

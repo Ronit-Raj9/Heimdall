@@ -25,15 +25,18 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io/fs"
 	"strings"
 	"sync"
 
 	"github.com/fasthttp/router"
+	shipped "github.com/maximhq/bifrost/bench/agents"
 	"github.com/maximhq/bifrost/bench/compat"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
+	"github.com/maximhq/bifrost/bench/utils"
 	"github.com/valyala/fasthttp"
 	"gopkg.in/yaml.v3"
 )
@@ -298,7 +301,30 @@ func (h *agentCompatHandler) agentConfig(ctx *fasthttp.RequestCtx, id string) (*
 			return &cfg, nil
 		}
 	}
+	if id == utils.BareModelAgent {
+		// The bare-model baseline is written into the project only at its
+		// first launch (ensureBareModel); until then its compatibility is
+		// the shipped config's, so the wizard greys out what it cannot run
+		// before Launch (fix wave 3, N187).
+		return shippedBareModel()
+	}
 	return nil, fmt.Errorf("agent %q not found: create it first (Agents, New agent) or check agents/%s.yaml", id, id)
+}
+
+// shippedBareModel reads the bare-model config built into the server.
+func shippedBareModel() (*schemas.AgentConfig, error) {
+	data, err := fs.ReadFile(shipped.Files, utils.BareModelAgent+".yaml")
+	if err != nil {
+		return nil, fmt.Errorf("the bare-model baseline is not built into this server: %w", err)
+	}
+	var cfg schemas.AgentConfig
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("agent %q: could not read its config: %v", utils.BareModelAgent, err)
+	}
+	if cfg.ID == "" {
+		cfg.ID = utils.BareModelAgent
+	}
+	return &cfg, nil
 }
 
 func init() {

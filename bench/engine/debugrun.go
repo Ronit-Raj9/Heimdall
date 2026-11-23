@@ -39,7 +39,7 @@ func runDebugOf(m *schemas.Manifest) *schemas.RunDebug {
 		return nil
 	}
 	d := m.Experiment.Debug
-	return &schemas.RunDebug{Mode: d.Mode, FromRun: d.FromRun, FromExp: d.FromExp, Call: d.Call, FromCondition: d.FromCondition}
+	return &schemas.RunDebug{Mode: d.Mode, FromRun: d.FromRun, FromExp: d.FromExp, Call: d.Call, FromCondition: d.FromCondition, Edit: d.Edit.Kind()}
 }
 
 // debugPlan is the fault plan of a debug run: mode replay with the fork

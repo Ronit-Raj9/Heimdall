@@ -2,6 +2,7 @@ package compat
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
@@ -52,7 +53,7 @@ func TaskOK(agent *schemas.AgentConfig, s *schemas.Suite, t *schemas.Task) (bool
 		return remoteTaskOK(agent.Remote, s, t, kind, "your endpoint", "remote")
 	case utils.IsBareModel(agent): // G4-21: one model call, no tools; it can only answer in text
 		if kind != schemas.OutputAnswer {
-			return false, "it grades a " + outputWords(kind) + ", and the bare model only answers in text"
+			return false, "it grades a " + outputWords(answerFileKind(s, kind)) + ", and the bare model only answers in text"
 		}
 	case isVoicePlatform(agent): // voiceplatform.go
 		return voicePlatformTaskOK(agent, t, kind)
@@ -69,10 +70,24 @@ func outputWords(kind string) string {
 		return "code change"
 	case schemas.OutputState:
 		return "change to the task's tools"
-	case schemas.OutputArtifact:
+	case schemas.OutputArtifact, utils.OutputFile:
 		return "file the agent writes"
 	}
 	return kind + " output"
+}
+
+// bfclFamily is the id prefix of the Harbor BFCL benchmarks. Their test
+// reads a fixed file the agent writes (/app/result.json), but the Harbor
+// import sets no output kind, so it defaults to diff (fix wave 3, N187).
+const bfclFamily = "hd-harbor-bfcl"
+
+// answerFileKind is kind, except that a diff task of the BFCL family is a
+// file answer, until the library is re-imported with output.kind file.
+func answerFileKind(s *schemas.Suite, kind string) string {
+	if kind == schemas.OutputDiff && s != nil && (s.ID == bfclFamily || strings.HasPrefix(s.ID, bfclFamily+"-") || strings.HasPrefix(s.ID, bfclFamily+"@")) {
+		return utils.OutputFile
+	}
+	return kind
 }
 
 // ChecksTasks reports whether TaskOK can refuse a task for agent: only an
