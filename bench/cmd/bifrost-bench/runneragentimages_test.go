@@ -83,3 +83,88 @@ func TestSharedRunnerPlannerBuildsAgentImagesUnderPolicy(t *testing.T) {
 		t.Fatalf("org build not under the policy: %q (calls %q)", build, raw)
 	}
 }
+
+// perSuiteManifest is a manifest whose arm A runs a per-suite agent (build
+// with base_arg) on suite s, and whose arm B runs a plain image.
+func perSuiteManifest(df string) (*schemas.Manifest, *schemas.Suite) {
+	build := &schemas.ImageSpec{Dockerfile: df, Tag: "bench/agent-loop:1", BaseArg: "BASE_IMAGE"}
+	m := &schemas.Manifest{Arms: map[string]schemas.ArmManifest{
+		"A": {ConfigHash: "h1", Config: schemas.AgentConfig{ID: "loop", Image: "bench/agent-loop:1-s", Build: build}},
+		"B": {ConfigHash: "h2", Config: schemas.AgentConfig{ID: "plain", Image: "bench/agent-plain:1"}},
+	}, Slots: []schemas.Slot{{Arm: "A", Task: "t1"}, {Arm: "B", Task: "t1"}}}
+	return m, &schemas.Suite{ID: "s", BaseImage: schemas.ImageSpec{Tag: "bench/s-base:1"}}
+}
+
+// countCalls counts the calls whose arguments start with prefix.
+func countCalls(t *testing.T, calls, prefix string) int {
+	t.Helper()
+	raw, _ := os.ReadFile(calls)
+	n := 0
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.HasPrefix(line, prefix) {
+			n++
+		}
+	}
+	return n
+}
+
+// A per-benchmark agent image is built on the shared worker the first time
+// a leased experiment needs it, once per agent and benchmark (N180).
+func TestEnsureAgentImagesBuildsPerSuiteOnce(t *testing.T) {
+	bin, calls := fakeDockerBin(t, "")
+	project, df := orgAgentProject(t)
+	pol := &utils.DockerPolicy{OrgID: "org_a", Builder: "heimdall-org-builder", TagPrefix: utils.OrgImagePrefix("org_a"),
+		Trusted: []string{t.TempDir()}, Untrusted: []string{project}}
+	x := newSharedAgentImages(utils.Docker{Binary: bin, Policy: pol})
+	m, s := perSuiteManifest(df)
+	for i := 0; i < 2; i++ {
+		if err := x.ensure(context.Background(), m, s, project); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := countCalls(t, calls, "buildx build --builder heimdall-org-builder"); n != 1 {
+		t.Fatalf("%d builds, want 1", n)
+	}
+	if !strings.Contains(readTestFile(t, calls), "-t org-org-a/bench/agent-loop:1-s") || !strings.Contains(readTestFile(t, calls), "BASE_IMAGE=bench/s-base:1") {
+		t.Fatalf("build not on the suite base under the org namespace: %s", readTestFile(t, calls))
+	}
+	// An arm whose every task has a per-task image needs no per-suite image.
+	m2, s2 := perSuiteManifest(df)
+	s2.ID = "s2"
+	am := m2.Arms["A"]
+	am.TaskImages = map[string]string{"t1": "bench/agent-loop:1-s2-t1"}
+	m2.Arms["A"] = am
+	if err := x.ensure(context.Background(), m2, s2, project); err != nil {
+		t.Fatal(err)
+	}
+	if n := countCalls(t, calls, "buildx build"); n != 1 {
+		t.Fatalf("built a per-suite image no slot runs (%d builds)", n)
+	}
+}
+
+// A failed build refuses the lease with the agent, the benchmark and the
+// last build lines, so the slots end with that reason instead of waiting.
+func TestEnsureAgentImagesFailureRefusesLeaseWithReason(t *testing.T) {
+	bin, _ := fakeDockerBin(t, "case \"$1\" in buildx|build) echo 'Step 3/5 : RUN pip install -r requirements.txt'; echo 'ERROR: No matching distribution found for openai==3.50.0' >&2; exit 1;; esac")
+	project, df := orgAgentProject(t)
+	pol := &utils.DockerPolicy{OrgID: "org_a", Builder: "b", TagPrefix: utils.OrgImagePrefix("org_a"), Trusted: []string{t.TempDir()}, Untrusted: []string{project}}
+	x := newSharedAgentImages(utils.Docker{Binary: bin, Policy: pol})
+	m, s := perSuiteManifest(df)
+	err := x.ensure(context.Background(), m, s, project)
+	if err == nil {
+		t.Fatal("a failed build did not refuse the plan")
+	}
+	msg := err.Error()
+	if !strings.HasPrefix(msg, "prepare the agent container bench/agent-loop:1-s for s: ") || !strings.Contains(msg, "No matching distribution found for openai==3.50.0") {
+		t.Fatalf("reason %q", msg)
+	}
+}
+
+func readTestFile(t *testing.T, path string) string {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}

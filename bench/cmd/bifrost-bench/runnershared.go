@@ -840,9 +840,10 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 			HostSlot: h.orgHostSlot(org, slots),
 			Prefetch: runnerPrefetch(oa.logger, docker), // Z13 in the shared runner: under the org's Docker policy
 			Sync:     proj.refresh,                      // a benchmark emitted after the last download loads (ETag: cheap when unchanged)
-			// Only issuebench.work runs here, in process, under the org's
-			// Docker policy; every other job kind goes to the org's own workers.
-			Jobs: newSharedIssuebenchExecutor(h, oa, org, docker), JobKinds: []string{issuebench.WorkJobKind},
+			// Only issuebench.work and agent.build (N181) run here, in process,
+			// under the org's Docker policy; every other job kind goes to the
+			// org's own workers.
+			Jobs: newSharedJobExecutor(newSharedIssuebenchExecutor(h, oa, org, docker), newSharedAgentBuildExecutor(docker, reg, planRoot, proj.refresh)), JobKinds: []string{issuebench.WorkJobKind, kindAgentBuild},
 		})
 	if err != nil {
 		a.logger.Error("shared runner: worker not started", "org", org, "error", err.Error())
@@ -1060,34 +1061,48 @@ func mirrorSkip(rel string, isDir bool) (skip, dir bool) {
 // no other way to build them, and a missing image would otherwise fail
 // every run at prepare as a pull error. The org's Docker policy decides
 // where each build runs (utils/dockerpolicy.go): org Dockerfiles only on
-// the isolated builder, under the org's image namespace.
+// the isolated builder, under the org's image namespace. After the plan it
+// builds the per-benchmark agent images the arms start (sharedAgentImages,
+// N180); a failed build fails the plan with its reason, which refuses the
+// lease.
 func sharedEnsureImages(a *app, reg *schemas.Registry, root string, refresh func(context.Context) error, plan engine.Replanner) engine.Replanner {
 	var mu sync.Mutex
 	built := map[string]bool{}
+	agents := newSharedAgentImages(a.docker)
 	return func(ctx context.Context, e *schemas.Experiment) (*schemas.Manifest, error) {
 		if refresh != nil {
 			if err := refresh(ctx); err != nil {
 				a.logger.Warn("shared runner: org project not refreshed; planning with the last copy", "error", err.Error())
 			}
 		}
+		var s *schemas.Suite
 		if e != nil && e.Suite != "" {
+			if loaded, err := engine.LoadSuite(ctx, reg, e.Suite); err == nil {
+				s = loaded
+			}
 			mu.Lock()
 			done := built[e.Suite]
 			mu.Unlock()
-			if !done {
-				if s, err := engine.LoadSuite(ctx, reg, e.Suite); err == nil {
-					cfg := *a.cfg
-					cfg.Root = root
-					if err := ops.EnsureImages(ctx, &cfg, a.docker, s, io.Discard); err != nil {
-						a.logger.Warn("shared runner: build suite images", "suite", e.Suite, "error", err.Error())
-					} else {
-						mu.Lock()
-						built[e.Suite] = true
-						mu.Unlock()
-					}
+			if !done && s != nil {
+				cfg := *a.cfg
+				cfg.Root = root
+				if err := ops.EnsureImages(ctx, &cfg, a.docker, s, io.Discard); err != nil {
+					a.logger.Warn("shared runner: build suite images", "suite", e.Suite, "error", err.Error())
+				} else {
+					mu.Lock()
+					built[e.Suite] = true
+					mu.Unlock()
 				}
 			}
 		}
-		return plan(ctx, e)
+		m, err := plan(ctx, e)
+		if err != nil || m == nil || s == nil {
+			return m, err
+		}
+		if err := agents.ensure(ctx, m, s, root); err != nil {
+			a.logger.Warn("shared runner: agent container not prepared; the lease is refused", "suite", s.ID, "error", err.Error())
+			return nil, err
+		}
+		return m, nil
 	}
 }

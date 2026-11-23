@@ -243,11 +243,18 @@ func jobCoordinator(env jobEnv) *engine.Coordinator {
 	return nil
 }
 
+// jobRunnerOnline reports whether a live runner of c takes jobs of kind: an
+// org's own runner (every kind) or the shared worker, which takes only some
+// kinds (agent.build among them since fix wave 3, N181).
+func jobRunnerOnline(c *engine.Coordinator, kind string) bool {
+	return c != nil && c.HasJobRunnerFor(kind)
+}
+
 // runOnRunner runs argv as a runner job of the org and writes the files it
 // sent back into the org project.
 func runOnRunner(ctx context.Context, env jobEnv, j *jobs.Job, rk runnerKind, argv, collect []string, log jobs.Logger) (any, error) {
 	c := jobCoordinator(env)
-	if c == nil || !c.HasJobRunner() {
+	if !jobRunnerOnline(c, rk.kind) {
 		return nil, errNoJobRunner
 	}
 	snap, skipped, err := projectSnapshot(env.ProjectRoot, argv)
