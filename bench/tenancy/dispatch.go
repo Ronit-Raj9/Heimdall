@@ -180,6 +180,14 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 	shareRef := ""
 	if rule.Access == AccessShare {
 		shareRef = userString(ctx, SharePathParam)
+		// Share links have their own buckets, never the org's (audit B4).
+		// They are checked before the token is resolved, so a token that
+		// opens nothing is limited exactly like one that does: guessing
+		// links or org ids gets no unlimited lookups and no difference in
+		// answers (fix wave 3, N293 review).
+		if !d.c.Limits.allowShare(ctx, d.c.Mode, shareRef, ClientIP(ctx)) {
+			return
+		}
 	}
 	o, eff, ok := d.authorize(ctx, rule, method, pat, p, shareRef)
 	if !ok {
@@ -190,12 +198,7 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, d.c.Mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, "route has no organization")
 		return
 	}
-	if rule.Access == AccessShare {
-		// Share links have their own buckets, never the org's (audit B4).
-		if !d.c.Limits.allowShare(ctx, d.c.Mode, shareRef, ClientIP(ctx)) {
-			return
-		}
-	} else if !d.c.Limits.allow(ctx, d.c.Mode, p, o) {
+	if rule.Access != AccessShare && !d.c.Limits.allow(ctx, d.c.Mode, p, o) {
 		return
 	}
 	if !passGate(ctx, d.c.Mode, o, method, pat) { // plan limits (gate.go)

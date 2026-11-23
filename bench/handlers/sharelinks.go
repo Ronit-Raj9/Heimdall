@@ -397,6 +397,24 @@ func (h *shareHandler) meta(ctx *fasthttp.RequestCtx, sh *sharelinks.Share) Shar
 	return m
 }
 
+// serverRoots are the server folders a shared answer must not name: the
+// org's project root and runs root and, on the hosted server, the folder
+// that holds every org's projects and evidence (fix wave 3, N293 review).
+func (h *shareHandler) serverRoots() []string {
+	if h.env.Cfg == nil || h.env.Cfg.Root == "" {
+		return nil
+	}
+	root := h.env.Cfg.Root
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
+	roots := []string{root, h.env.Cfg.Path(h.env.Cfg.RunsRoot)}
+	if h.shareIndex() != nil {
+		roots = append(roots, filepath.Dir(filepath.Dir(filepath.Clean(root))))
+	}
+	return roots
+}
+
 // open handles GET /shared/{token}.
 func (h *shareHandler) open(ctx *fasthttp.RequestCtx) {
 	sh, ok := h.verify(ctx)
@@ -423,7 +441,7 @@ func (h *shareHandler) open(ctx *fasthttp.RequestCtx) {
 			out.Data[p.name] = nil
 			continue
 		}
-		out.Data[p.name] = sharelinks.RedactJSON(body, sh.HidePrompts)
+		out.Data[p.name] = sharelinks.HideServerText(sharelinks.RedactJSON(body, sh.HidePrompts), h.serverRoots()...)
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
 }
@@ -502,6 +520,7 @@ func (h *shareHandler) export(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, "the shared item no longer exists")
 		return
 	}
+	body = []byte(sharelinks.HideServerString(string(body), h.serverRoots()...))
 	sendDocument(ctx, ctype, sh.Target+"-report-card."+format, body)
 }
 
