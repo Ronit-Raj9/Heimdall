@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -553,10 +552,13 @@ func quickOrgID(ctx *fasthttp.RequestCtx, orgID string) string {
 // quickReserve is the per-run charge of a run whose cost the price table can
 // not compute (an unpriced model): the budget split over the planned runs,
 // so one unpriced run no longer uses the whole budget and stops the rest.
+// The split is rounded down to whole micro-dollars, never up: the scheduler
+// starts a run only when its expected cost fits the cap (fix wave 3, N190),
+// so a split rounded up to cents ($5 over 3 runs as $1.67) would refuse the
+// last planned run.
 func quickReserve(budget float64, runs int) float64 {
 	if budget <= 0 || runs <= 0 {
 		return 0
 	}
-	r := budget / float64(runs)
-	return math.Round(r*100) / 100
+	return microDollars(budget / float64(runs))
 }
