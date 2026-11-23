@@ -139,9 +139,7 @@ func (h *authoringGates) listGenerated(ctx *fasthttp.RequestCtx) {
 		if g.Generated == nil {
 			g.Generated = []schemas.GeneratedField{}
 		}
-		for _, x := range g.Generated {
-			g.CostUSD += x.CostUSD
-		}
+		g.CostUSD = generatedCost(g.Generated)
 		if d, ok := f.Decisions[t.ID]; ok {
 			if d.Generated == schemas.GeneratedFingerprint(t.GeneratedFields()) {
 				g.Decision = namedDecision(names, d)
@@ -351,4 +349,25 @@ func (h *authoringGates) heldOut(ctx *fasthttp.RequestCtx) {
 func namedDecision(names *actorNames, d schemas.TaskReviewDecision) *schemas.TaskReviewDecision {
 	d.By, d.ByName = names.show(d.By)
 	return &d
+}
+
+// generatedCost is what drafting a task's generated fields cost: each assist
+// call once (fix wave 3, N278). Fields written before the fix carry their
+// call's whole cost each, so fields of one call (same op, time and prompt)
+// are summed once; fields drafted since carry it on the first field only.
+func generatedCost(fields []schemas.GeneratedField) float64 {
+	seen := map[string]float64{}
+	sum := 0.0
+	for _, f := range fields {
+		if f.At == "" {
+			sum += f.CostUSD
+			continue
+		}
+		k := f.Op + "|" + f.At + "|" + f.PromptSHA
+		if f.CostUSD > seen[k] {
+			sum += f.CostUSD - seen[k]
+			seen[k] = f.CostUSD
+		}
+	}
+	return sum
 }

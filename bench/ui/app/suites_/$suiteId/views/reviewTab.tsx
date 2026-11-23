@@ -1,4 +1,7 @@
 import { JobRunButton } from "@/components/jobs/jobRunButton";
+import "@/components/models/hw15I18n";
+import type { PickedModel } from "@/components/models/groupedModelPicker";
+import { isPicked, LabeledModelPicker, splitModelRef, usePickedKeyState } from "@/components/models/labeledModelPicker";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
@@ -71,6 +74,17 @@ export function assistParams(suite: string, ops: AssistOp[], provider: string, m
 	};
 }
 
+/** The newest assist model recorded on the generated fields ("provider/model"), or null (N278). */
+export function lastAssistModel(tasks: readonly GeneratedTask[] | undefined): PickedModel | null {
+	let best: { model: string; at: string } | null = null;
+	for (const task of tasks ?? []) {
+		for (const g of task.generated ?? []) {
+			if (g.model && (!best || (g.at ?? "") >= best.at)) best = { model: g.model, at: g.at ?? "" };
+		}
+	}
+	return splitModelRef(best?.model);
+}
+
 /** The rejection note is required; accepting needs none. */
 export const canDecide = (decision: "accepted" | "rejected", note: string) => decision === "accepted" || note.trim().length > 0;
 
@@ -97,8 +111,14 @@ function DraftSection({ suite }: { suite: SuiteSummary }) {
 	const [ops, setOps] = useState<AssistOp[]>(
 		judged ? ["rubric", "criterion_wrong", "near_miss_wrong", "exploit"] : ["near_miss_wrong", "exploit"],
 	);
-	const [provider, setProvider] = useState("");
-	const [model, setModel] = useState("");
+	const { t: tm } = useTranslation("hw15");
+	const queue = useGetGeneratedTasksQuery(suite.id);
+	const [picked, setPicked] = useState<PickedModel | null>(null);
+	// N278: the picker starts on the last assist model recorded on the generated fields, until a person picks.
+	const choice = picked ?? lastAssistModel(queue.data?.tasks);
+	const keyState = usePickedKeyState(choice);
+	const provider = isPicked(choice) && keyState === "ok" ? choice.provider : "";
+	const model = isPicked(choice) && keyState === "ok" ? choice.model : "";
 	const [budget, setBudget] = useState(1);
 	const [result, setResult] = useState<AssistResult | null>(null);
 	const onDone = useCallback((job: Job) => setResult((job.result as unknown as AssistResult) ?? null), []);
@@ -140,12 +160,15 @@ function DraftSection({ suite }: { suite: SuiteSummary }) {
 				})}
 			</fieldset>
 			<div className="grid gap-3 sm:grid-cols-3">
-				<Field label={t("draft.provider")}>
-					<Input value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="openai" data-testid="suite-review-provider" />
-				</Field>
-				<Field label={t("draft.model")} hint={t("draft.modelHint")}>
-					<Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="gpt-4.1-mini" data-testid="suite-review-model" />
-				</Field>
+				<div className="sm:col-span-2">
+					<LabeledModelPicker
+						label={t("draft.model")}
+						hint={t("draft.modelHint")}
+						value={choice}
+						onChange={setPicked}
+						testId="suite-review-model"
+					/>
+				</div>
 				<Field label={t("draft.budget")} hint={t("draft.budgetHint")}>
 					<Input
 						type="number"
@@ -170,7 +193,7 @@ function DraftSection({ suite }: { suite: SuiteSummary }) {
 				</div>
 			) : (
 				<p className="text-muted-foreground text-xs" data-testid="suite-review-need-model">
-					{t("draft.needModel")}
+					{tm("pickModel")}
 				</p>
 			)}
 			{result && <AssistSummary result={result} t={t} />}
