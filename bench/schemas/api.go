@@ -35,6 +35,10 @@ type VerdictPayload struct {
 	Gates       []GateSummary    `json:"gates"`
 	ConfigDiff  []ConfigChange   `json:"config_diff"`
 	Policy      *PolicyResult    `json:"policy,omitempty"`
+	// Partial: the experiment is still running (its state is not done,
+	// failed, cancelled or created), so the verdict counts only finished
+	// runs and is not final (fix wave 3, N197).
+	Partial bool `json:"partial,omitempty"`
 
 	// Human review counts of the analysis (Analysis.ReviewedRuns).
 	ReviewedRuns      int `json:"reviewed_runs,omitempty"`
@@ -288,6 +292,14 @@ type ExperimentStatus struct {
 	// same agent version on another model or provider), "none" (an A/A
 	// check) or "agent" (N165). Empty for any other arm count.
 	ArmsDiffer string `json:"arms_differ,omitempty"`
+	// Paused: the experiment's run controls drain it (nothing new starts;
+	// the state stays running), and PausedModels the models whose runs are
+	// held, from GET /experiments/{id}/controls (fix wave 3, N199).
+	Paused       bool     `json:"paused,omitempty"`
+	PausedModels []string `json:"paused_models,omitempty"`
+	// Extends is the experiment this follow-up extends (the manifest's
+	// experiment.extends.exp_id), so its page links back (fix wave 3, N246).
+	Extends string `json:"extends,omitempty"`
 	// Problem is why no run could start (a worker refusal, a slot that
 	// failed before its run) while nothing sealed, and RunJobID the
 	// experiment's newest run job, so the page can link its log (N151).
