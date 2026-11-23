@@ -364,6 +364,7 @@ func (h *suiteAuthoring) deleteSuite(ctx *fasthttp.RequestCtx) {
 			"Schedule "+name+" runs a comparison that uses "+id+". Remove or change the schedule first.")
 		return
 	}
+	cached := suiteDirOf(h.suites, id) // read before the folder goes: the list cache key
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
 	if err := h.projects.Delete(work, projectfs.AreaBenchmarks, id, projectfs.WriteOpts{Actor: actorName(ctx), Note: "delete benchmark " + id}); err != nil {
@@ -374,6 +375,8 @@ func (h *suiteAuthoring) deleteSuite(ctx *fasthttp.RequestCtx) {
 		h.sendStoreError(ctx, "delete benchmark "+id, err)
 		return
 	}
+	forgetSuiteDir(cached)
+	forgetSuite(h.suites, id) // a shadowed library pack under the same id is listed fresh too
 	ctx.SetStatusCode(fasthttp.StatusNoContent)
 }
 

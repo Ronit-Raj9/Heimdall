@@ -484,3 +484,41 @@ func readySummary(out *schemas.SuiteSummary, full bool, ready []string, known bo
 		out.ReadyTaskIDs = nil // known and none: ready_known true, no list
 	}
 }
+
+// forgetSuite drops every cached list entry of suite id: its full summaries
+// (with and without held-out tasks) and its head entry. DELETE /suites/{id}
+// calls it with the folder the pack loaded from, read before the delete, so
+// the deleted pack is never served from memory and a pack created again
+// under the same id starts fresh (fix wave 3, N288 with the H17 cache).
+func forgetSuite(src SuiteSource, id string) {
+	st, ok := src.(suiteStamper)
+	if !ok {
+		return
+	}
+	dir, _ := st.SuiteStamp(id)
+	forgetSuiteDir(dir)
+}
+
+// forgetSuiteDir is forgetSuite for a pack folder already looked up.
+func forgetSuiteDir(dir string) {
+	if dir == "" {
+		return
+	}
+	suiteSummaries.mu.Lock()
+	delete(suiteSummaries.slots, dir)
+	delete(suiteSummaries.slots, dir+"\x00held-out-visible")
+	suiteSummaries.mu.Unlock()
+	suiteHeadCache.mu.Lock()
+	delete(suiteHeadCache.m, dir)
+	suiteHeadCache.mu.Unlock()
+}
+
+// suiteDirOf is the folder suite id loads from, "" when src has no cache side.
+func suiteDirOf(src SuiteSource, id string) string {
+	st, ok := src.(suiteStamper)
+	if !ok {
+		return ""
+	}
+	dir, _ := st.SuiteStamp(id)
+	return dir
+}
