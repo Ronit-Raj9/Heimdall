@@ -1,0 +1,38 @@
+{
+	"decision": {
+		"leader": "Leader found"
+	},
+	"reliability": {
+		"notMeasured": "Not measured",
+		"needsTries": "needs 2 or more tries per task; this ran {{k}}"
+	},
+	"leaderboard": {
+		"tasksSolved": "{{solved}} of {{tasks}} tasks solved",
+		"tasksRunsPassed": "{{tasks}} / {{runs}} ({{passed}} passed)",
+		"successHint": "Average over tasks of each task's share of solved runs. A task counts as solved when every one of its runs passed."
+	},
+	"result": {
+		"partial": "Still running: {{done}} of {{total}} runs done. The result below counts only finished runs and is not final.",
+		"system": {
+			"readiness": "This is a readiness check, not a comparison. Its result is on the benchmark's Build tab.",
+			"agent": "This is an automatic agent check, not a comparison.",
+			"drift": "This is an automatic drift monitor run, not a comparison.",
+			"open": "Open the Build tab"
+		}
+	},
+	"setups": {
+		"title": "Every setup",
+		"setup": "Setup",
+		"solved": "Solved",
+		"pVsLeader": "p vs leader",
+		"pHint": "Holm-adjusted sign-flip p-value against the leader, over the tasks both ran.",
+		"group": "Group",
+		"top": "Top group",
+		"leader": "Leader",
+		"behind": "Behind",
+		"safety": "Safety",
+		"safetyOk": "No rule broken",
+		"safetyBroken": "Broke a safety rule on {{tasks}}",
+		"name": "{{agent}} on {{model}}"
+	}
+}

@@ -917,7 +917,7 @@ export interface Experiment {
 // ---------------------------------------------------------------------------------------------
 
 /** score: a one-setup experiment, scored on its own with no comparison (Verdict.score). */
-export type Decision = "improved" | "regressed" | "inconclusive" | "invalid" | "score";
+export type Decision = "improved" | "regressed" | "inconclusive" | "invalid" | "score" | "leader";
 
 export type Action = "ship" | "hold" | "no_decision" | "fix_harness";
 
@@ -977,6 +977,8 @@ export interface Verdict {
 	decision: Decision;
 	action: Action;
 	effect?: Effect;
+	basis?: "effect" | "guard";
+	setups?: SetupsVerdict;
 	alpha: number;
 	/** Minimal detectable effect in percentage points. */
 	mde: number;
@@ -1002,6 +1004,8 @@ export interface Verdict {
 	/** Set (and decision is score or invalid) when the experiment has one setup: its score with an interval, no comparison. */
 	score?: Score;
 }
+
+export interface SetupsVerdict { leader: string; top_group: string[]; behind: string[]; separable: boolean; note: string; pairs: MatrixPair[]; safety?: Record<string, string[]> }
 
 /** schemas.Score: the primary metric of a one-setup experiment's only arm. Rates are fractions (0.62 = 62%). */
 export interface Score {
@@ -2047,6 +2051,7 @@ export interface LeaderboardEntry {
 	experiments: string[];
 	/** Distinct tasks with at least one graded run. */
 	tasks: number;
+	tasks_solved?: number;
 	/** Graded runs counted. */
 	runs: number;
 	/** The k of reliability: min(3, the fewest trials per task among its experiments that repeat tasks), unless the query sets k. */

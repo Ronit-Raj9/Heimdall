@@ -128,6 +128,9 @@ func newEntry(hash string, all, scoped []gradedRun, k int) *entryCalc {
 	for task, t := range tally {
 		c.rates[task] = float64(t.succ) / float64(t.n)
 		e.TaskPasses[task] = schemas.Ratio{Num: t.succ, Den: t.n}
+		if t.n > 0 && t.succ == t.n {
+			e.TasksSolved++ // fix wave 3, N295: solved on every graded run, the basis of the task mean
+		}
 	}
 	if k == 0 {
 		k = defaultK(scoped)

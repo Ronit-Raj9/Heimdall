@@ -66,7 +66,9 @@ func (p *pairedSignFlipPolicy) GetName() string { return PolicyPairedSignFlip }
 // GetVersion implements schemas.Part.
 func (p *pairedSignFlipPolicy) GetVersion() string { return pairedSignFlipVersion }
 
-// Decide compares arm B against arm A on the primary endpoint. Only counted
+// Decide compares arm B against arm A on the primary endpoint. With three or
+// more setups (not counting an A/A copy) it decides over all of them instead
+// (decideSetups): leader, inconclusive or invalid, never B against A. Only counted
 // runs enter, and every counted slot of the manifest enters: one without a
 // sealed run is added as an unknown (CompleteSlots), so it widens the
 // missingness bounds and lowers graded coverage instead of vanishing. The
@@ -99,6 +101,11 @@ func (p *pairedSignFlipPolicy) Decide(ctx context.Context, m *schemas.Manifest, 
 	idx := newRunIndex(runs)
 	v := verdictFor(m, cfg, idx, runs, raw, hasAAArm(m))
 	w7Verdict(m, cfg, raw, runs, idx, &v) // W7 adaptive report, tier, buy more evidence (sequential_verdict.go)
+	if setups := setupArms(m); len(setups) > 2 {
+		decideSetups(m, cfg, idx, runs, setups, &v) // fix wave 3, N244: one verdict for three or more setups (setups.go)
+	} else {
+		v.Basis = basisOf(&v, cfg.primaryAlpha()) // fix wave 3, N244: effect or guard (basis.go)
+	}
 	return &schemas.Analysis{
 		AnalysisID:  utils.NewID("a", 10),
 		ExpID:       m.ExpID,

@@ -34,12 +34,27 @@
 	},
 	"summary": {
 		"headline": {
-			"improved": "B ({{arm}}) is better by {{pp}}",
-			"regressed": "B ({{arm}}) is worse by {{pp}}",
-			"improvedNoEffect": "B ({{arm}}) is better",
-			"regressedNoEffect": "B ({{arm}}) is worse",
+			"improved": "{{setup}} is better by {{pp}}",
+			"regressed": "{{setup}} is worse by {{pp}}",
+			"improvedNoEffect": "{{setup}} is better",
+			"regressedNoEffect": "{{setup}} is worse",
+			"regressedGuard": "{{setup}} broke a safety rule on {{tasks}}",
+			"regressedGuardDetail": "{{setup}} broke a safety rule: {{detail}}",
 			"inconclusive": "No clear winner yet",
-			"invalid": "Test was broken: fix it and re-check"
+			"invalid": "Test was broken: fix it and re-check",
+			"invalidWhy": "Test was broken: {{why}}. This is not the agent's fault; fix it and press Re-check.",
+			"setupsTied": "Cannot tell {{setups}} apart yet",
+			"setupsLeader": "{{leader}} is ahead of every other setup",
+			"partial": "Still running: no result yet"
+		},
+		"setupLabel": "{{arm}} ({{name}})",
+		"and": "and",
+		"safetyLine": "{{setup}} broke a safety rule on {{tasks}}.",
+		"partialHint": "The result is worked out once every run has finished.",
+		"why": {
+			"fidelity": "the model gateway answered {{n}} of {{m}} runs of setup {{arm}} with a different model than the one asked for (model check)",
+			"coverage": "only {{o}} of {{n}} runs of setup {{arm}} were graded",
+			"gate": "the {{gate}} check fired in {{n}} of {{m}} runs"
 		},
 		"score": {
 			"title": "Score",
@@ -62,7 +77,12 @@
 			"holdRegressed": "Keep {{arm}}. Open the runs where the new setup failed.",
 			"holdViolations": "Hold off. A safety rule or safety check failed; review it below.",
 			"no_decision": "Not enough evidence yet. Compare the runs that differ, or add more tasks.",
-			"fix_harness": "The measurement broke, not the agent. Check the failed runs, fix the problem, then re-score."
+			"fix_harness": "The measurement broke, not the agent. Check the failed runs, fix the problem, then re-score.",
+			"setupsTied": "Not enough evidence to pick one setup. Add more tasks; more tries per task do not help.",
+			"setupsLeader": "Use {{leader}}.",
+			"setupsLeaderFlagged_one": "Hold off: {{leader}} broke a safety rule on {{count}} task.",
+			"setupsLeaderFlagged_other": "Hold off: {{leader}} broke a safety rule on {{count}} tasks.",
+			"partial": "Wait for the runs to finish; this page updates as they do."
 		},
 		"button": {
 			"ship": "Export report",

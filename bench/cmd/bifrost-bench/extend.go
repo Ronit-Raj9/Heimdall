@@ -236,7 +236,7 @@ func runExtendStatus(args []string) int {
 	switch res.Decision {
 	case schemas.DecisionRegressed:
 		return 1
-	case schemas.DecisionInconclusive:
+	case schemas.DecisionInconclusive, schemas.DecisionLeader:
 		return 2
 	case schemas.DecisionInvalid:
 		return 3

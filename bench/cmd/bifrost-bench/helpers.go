@@ -43,10 +43,10 @@ func parseDecisions(s string) ([]schemas.Decision, error) {
 			continue
 		}
 		switch d := schemas.Decision(part); d {
-		case schemas.DecisionImproved, schemas.DecisionRegressed, schemas.DecisionInconclusive, schemas.DecisionInvalid:
+		case schemas.DecisionImproved, schemas.DecisionRegressed, schemas.DecisionInconclusive, schemas.DecisionInvalid, schemas.DecisionLeader:
 			out = append(out, d)
 		default:
-			return nil, fmt.Errorf("-fail-on: unknown verdict %q (want improved, regressed, inconclusive or invalid)", part)
+			return nil, fmt.Errorf("-fail-on: unknown verdict %q (want improved, regressed, inconclusive, invalid or leader)", part)
 		}
 	}
 	return out, nil

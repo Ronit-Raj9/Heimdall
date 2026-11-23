@@ -1,7 +1,9 @@
 import { MatrixReport } from "@/components/matrix/matrixReport";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
+import { useGetVerdictQuery } from "@/lib/store";
 import { useGetModelMatrixQuery } from "@/lib/store/apis/benchApi";
+import type { ModelMatrix, SetupsVerdict } from "@/lib/types/bench";
 import { parseAsString, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
 
@@ -20,6 +22,11 @@ export function MatrixTab({ expId }: { expId: string }) {
 		grade_source: gradeSource ?? undefined,
 		alpha: alpha ?? undefined,
 	});
+	// The default view (no condition, grade source or alpha chosen) is the analysis's own matrix, so its
+	// tiers and note come from the verdict's setups result: the Result tab and this tab tell one story (N244).
+	const asAnalysed = !condition && !gradeSource && !alpha;
+	const verdict = useGetVerdictQuery(expId, { skip: !asAnalysed });
+	const setups = asAnalysed ? verdict.data?.verdict.setups : undefined;
 
 	if (matrix.isLoading) return <BlockSkeleton rows={6} testId="matrix-report-loading" />;
 	if (matrix.error || !matrix.data) {
@@ -30,7 +37,23 @@ export function MatrixTab({ expId }: { expId: string }) {
 			<div className="flex flex-wrap items-center gap-2">
 				<GradeSourceTag source={matrix.data.grade_source} testId="matrix-source" />
 			</div>
-			<MatrixReport matrix={matrix.data} onCondition={(next) => void setCondition(next)} />
+			<MatrixReport matrix={withSetups(matrix.data, setups)} onCondition={(next) => void setCondition(next)} />
 		</div>
 	);
+}
+
+/**
+ * The matrix with the tiers and note of the analysis's setups verdict (fix wave 3, N244): a setup in
+ * the top group is tier 1, one behind is tier 2. Without a setups verdict the matrix is unchanged.
+ */
+export function withSetups(matrix: ModelMatrix, setups: SetupsVerdict | undefined): ModelMatrix {
+	if (!setups) return matrix;
+	return {
+		...matrix,
+		note: setups.note || matrix.note,
+		separable: setups.separable,
+		rows: matrix.rows.map((row) =>
+			setups.behind.includes(row.arm) ? { ...row, tier: 2 } : setups.top_group.includes(row.arm) ? { ...row, tier: 1 } : row,
+		),
+	};
 }
