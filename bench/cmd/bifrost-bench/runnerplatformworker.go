@@ -24,5 +24,9 @@ func platformRemoteImage(pa *sharedpool.PlatformAssignment, p sandbox.Platform, 
 	if m, ok := p.(*sandbox.Modal); ok {
 		m.UseRegistry(login)
 	}
-	return (&sandbox.RegistryImages{Login: login, Docker: d}).Remote
+	return (&sandbox.RegistryImages{Login: login, Docker: d, HostCheck: registryHostCheck}).Remote
 }
+
+// registryHostCheck is checked before every push to an org's registry; nil
+// is sandbox.PublicRegistryHost. Tests replace it so they need no DNS.
+var registryHostCheck func(ctx context.Context, host string) error

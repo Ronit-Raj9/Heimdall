@@ -33,6 +33,9 @@ func TestPlatformImagesUseOrgRegistry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	old := registryHostCheck
+	registryHostCheck = func(context.Context, string) error { return nil } // no DNS in tests
+	t.Cleanup(func() { registryHostCheck = old })
 	d := &recordDocker{}
 	pa := &sharedpool.PlatformAssignment{Name: "modal", Token: "ak-1:as-2",
 		Registry: &sharedpool.RegistryLogin{Registry: "ghcr.io/acme/heimdall", Username: "bot", Token: "ghp_SECRET"}}
