@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/calibration"
+	"github.com/maximhq/bifrost/bench/modelid"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/telemetry"
 	"github.com/maximhq/bifrost/bench/utils"
@@ -648,19 +649,5 @@ func contentText(raw json.RawMessage) string {
 // is the same model. Any other difference, such as gpt-4o-mini for gpt-4o,
 // is not.
 func sameModel(served, pinned string) bool {
-	if served == "" {
-		return true
-	}
-	strip := func(m string) string {
-		if i := strings.LastIndex(m, "/"); i >= 0 {
-			return m[i+1:]
-		}
-		return m
-	}
-	served, pinned = strip(served), strip(pinned)
-	if served == pinned {
-		return true
-	}
-	rest, ok := strings.CutPrefix(served, pinned)
-	return ok && modelDateRe.MatchString(rest)
+	return modelid.SameModel(pinned, served)
 }

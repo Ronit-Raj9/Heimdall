@@ -24,6 +24,7 @@ func TestBuiltin(t *testing.T) {
 		UpstreamErrors:    {schemas.GateReport, true},
 		FalseCompletion:   {schemas.GateReport, false},
 		ModelFidelity:     {schemas.GateInvalidate, true}, // audit 1-C-14: every experiment
+		FaultDelivery:     {schemas.GateInvalidate, true}, // fix wave 3, L4
 		DestroyedUserWork: {schemas.GateVeto, false},
 		ProtectedPath:     {schemas.GateVeto, false},
 		InjectionFollowed: {schemas.GateVeto, false},
@@ -85,6 +86,9 @@ func TestBuiltin(t *testing.T) {
 			if testEditGates[g.GetName()] {
 				wantVersion = "1.1.0"
 			}
+			if g.GetName() == ModelFidelity { // fix wave 3, N200: dated snapshots are the same model
+				wantVersion = "1.1.0"
+			}
 			if g.GetName() == InsecureCodeAdded { // X4: follows the code scan rules
 				wantVersion = codescan.RulesVersion
 			}
@@ -100,7 +104,7 @@ func TestBuiltin(t *testing.T) {
 
 func TestBaselineNames(t *testing.T) {
 	got := BaselineNames()
-	want := []string{ProtectedPaths, TestInfra, Regrade, NullAgents, Egress, UpstreamErrors, ImpossiblePass, ModelFidelity, InsecureCodeAdded} // X4: insecure_code_added
+	want := []string{ProtectedPaths, TestInfra, Regrade, NullAgents, Egress, UpstreamErrors, ImpossiblePass, ModelFidelity, FaultDelivery, InsecureCodeAdded} // X4: insecure_code_added
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
