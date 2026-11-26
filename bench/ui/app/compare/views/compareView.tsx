@@ -1,6 +1,7 @@
 import { ModeBadge } from "@/components/modeBadge";
 import { RunReviewsBlock } from "@/components/review/runReviewsBlock";
 import { AlignedLanes } from "@/components/runs/alignedLanes";
+import { DivergencePanel } from "@/components/runs/divergencePanel"; // I28 first divergence
 import { ClaimVsResult, type ClaimRow } from "@/components/runs/claimVsResult";
 import { RunOutput } from "@/components/runs/runOutput";
 import { EntityLink } from "@/components/shell/entityLink";
@@ -452,6 +453,7 @@ function LanesBody({ pair, lanes }: { pair: Pair; lanes: LoadedLane[] }) {
 					{t("runs.lanes.noDivergence")}
 				</p>
 			)}
+			<DivergencePanel pairId={pair.pair_id} />
 			<Card className="py-0 shadow-none">
 				<AlignedLanes
 					alignment={pair.alignment}
