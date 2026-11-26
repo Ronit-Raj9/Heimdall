@@ -162,7 +162,7 @@ func (g *Gateway) ServeMCP(ctx context.Context, rc *schemas.RunContext, ups []sc
 		if clients[i].Tools == 0 {
 			return fail(fmt.Errorf("mcp client %s (service %s): bifrost discovered no tools at %s", clients[i].Name, clients[i].Service, clients[i].Upstream))
 		}
-		grants = append(grants, map[string]any{"mcp_client_name": clients[i].Name, "tools_to_execute": []string{"*"}})
+		grants = append(grants, map[string]any{"mcp_client_name": clients[i].Name, "tools_to_execute": toolGrant(rc, clients[i].Service)})
 	}
 	var out struct {
 		VirtualKey virtualKey `json:"virtual_key"`
