@@ -19,6 +19,7 @@ export function statusTone(s: ImprovementStatus): StatusTone {
 		case "running":
 			return "running";
 		case "awaiting_approval":
+		case "interrupted":
 			return "warn";
 		case "failed":
 			return "bad";
@@ -166,4 +167,72 @@ export function lineageRows(nodes: readonly LineageNode[]): TreeRow[] {
 	};
 	for (const r of roots.sort((a, b) => a.seq - b.seq)) walk(r, 0);
 	return out;
+}
+/** The verdict states a run of this wave ends in, in the order the list explains them (A2.5). */
+export const VERDICT_STATES = [
+	"supported",
+	"likely_better",
+	"insufficient_sample",
+	"no_evidence",
+	"worse",
+	"no_change",
+	"not_claimable",
+] as const satisfies readonly ImprovementVerdictState[];
+
+/** Tone of a verdict state of this wave; older states keep verdictTone. */
+export function stateTone(v: ImprovementVerdictState | undefined): StatusTone {
+	switch (v) {
+		case "supported":
+			return "ok";
+		case "likely_better":
+		case "insufficient_sample":
+			return "warn";
+		case "worse":
+		case "not_supported":
+			return "bad";
+		default:
+			return verdictTone(v);
+	}
+}
+
+/** The list badge key (w45imp badge.*) of a state; undefined for older states, which keep the gain pill. */
+export function badgeKey(v: ImprovementVerdictState | undefined): (typeof VERDICT_STATES)[number] | undefined {
+	return VERDICT_STATES.find((s) => s === v);
+}
+
+/** Unsigned points with the A2.12 rule: no decimals at 10 or more, one decimal below. 23.94 as "24", 4.25 as "4.3". */
+export function pointsValue(p: number): string {
+	if (!Number.isFinite(p)) return "-";
+	return Math.abs(p) >= 10 ? String(Math.round(p)) : p.toFixed(1);
+}
+
+/** Money with two decimals and no currency sign (the texts carry the "$"). */
+export function money(v: number | undefined | null): string {
+	return v === undefined || v === null || !Number.isFinite(v) ? "-" : v.toFixed(2);
+}
+
+/** Whole minutes. */
+export function minutes(v: number): string {
+	return Number.isFinite(v) ? String(Math.round(v)) : "-";
+}
+
+/**
+ * The smallest gain a held-out set can confirm, in points, or undefined when it cannot be estimated:
+ * the server stores 0 when there were fewer than 2 tasks, which must never read as "0".
+ */
+export function detectablePoints(mdeFraction: number | undefined, n: number | undefined): string | undefined {
+	if (mdeFraction === undefined || !Number.isFinite(mdeFraction) || mdeFraction <= 0 || (n !== undefined && n < 2)) return undefined;
+	return pointsValue(mdeFraction * 100);
+}
+
+/** The version number of a ref (agents/x.yaml@v3 as 3), or undefined. */
+export function versionNumber(ref: string | undefined): number | undefined {
+	const m = ref ? /@v(\d+)$/.exec(ref) : null;
+	return m ? Number(m[1]) : undefined;
+}
+
+/** The agent id of agents/<id>.yaml or agents/<id>.yaml@v<N>. */
+export function agentIdOf(ref: string): string {
+	const m = /^agents\/([^/@]+)\.ya?ml(@v\d+)?$/.exec(ref);
+	return m ? m[1] : ref;
 }

@@ -2,7 +2,8 @@ import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { FeatureHero } from "@/components/inbox/featureHero";
 import { StatusPill } from "@/components/ui/statusPill";
-import { points, statusTone, usd, verdictTone } from "@/components/improvements/improve.utils";
+import { badgeKey, points, stateTone, statusTone, usd, verdictTone } from "@/components/improvements/improve.utils";
+import "@/components/improvements/w45impI18n";
 import { ImprovementCli, NewImprovementDialog } from "@/components/improvements/newImprovementDialog";
 import { Button } from "@/components/ui/button";
 import { canUse, useSession } from "@/lib/session/sessionContext";
@@ -55,6 +56,7 @@ export default function ImprovementsView() {
 /** The loaded list, or the empty state. Exported for tests. */
 export function ImprovementsTable({ rows, admin = false }: { rows: ImprovementSummary[]; admin?: boolean }) {
 	const { t } = useTranslation("improve");
+	const { t: tw } = useTranslation("w45imp");
 	if (rows.length === 0) {
 		return (
 			<FeatureHero
@@ -102,11 +104,22 @@ export function ImprovementsTable({ rows, admin = false }: { rows: ImprovementSu
 							<td className="px-3 py-2 tabular-nums">{t("list.roundsValue", { done: r.rounds_done, total: r.rounds })}</td>
 							<td className="px-3 py-2 tabular-nums">{r.commits}</td>
 							<td className="px-3 py-2">
-								{r.verdict ? (
-									<StatusPill tone={verdictTone(r.verdict)}>{points(r.sealed_gain)}</StatusPill>
-								) : (
-									<span className="text-muted-foreground">-</span>
-								)}
+								<span className="flex flex-wrap items-center gap-1">
+									{badgeKey(r.verdict) ? (
+										<StatusPill tone={stateTone(r.verdict)} testId="improvement-badge">
+											{tw(`badge.${badgeKey(r.verdict)!}`)}
+										</StatusPill>
+									) : r.verdict ? (
+										<StatusPill tone={verdictTone(r.verdict)}>{points(r.sealed_gain)}</StatusPill>
+									) : (
+										<span className="text-muted-foreground">-</span>
+									)}
+									{badgeKey(r.verdict) && r.sealed_gain !== undefined && (
+										<span className="text-muted-foreground text-xs tabular-nums">{points(r.sealed_gain)}</span>
+									)}
+									{r.teacher && <StatusPill tone="neutral">{tw("badge.teacher")}</StatusPill>}
+									{r.status === "interrupted" && <StatusPill tone="warn">{tw("badge.interrupted")}</StatusPill>}
+								</span>
 							</td>
 							<td className="px-3 py-2 text-right tabular-nums">{usd(r.total_usd)}</td>
 						</tr>

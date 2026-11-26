@@ -1,10 +1,11 @@
 import "@/lib/i18n";
 
-import { IMPROVEMENT_FIXTURE } from "@/components/improvements/improve.fixtures";
+import { ESTIMATE_FIXTURE, IMPROVEMENT_FIXTURE } from "@/components/improvements/improve.fixtures";
 import {
 	NewImprovementForm,
 	improvementFormProblems,
 	improvementSpec,
+	newForm,
 	type ImprovementForm,
 } from "@/components/improvements/newImprovementDialog";
 import { hostedSession } from "@/lib/testing/platformFixtures";
@@ -20,12 +21,11 @@ vi.mock("@/lib/store/apis/improveApi", async (importOriginal) => ({
 }));
 
 const filled: ImprovementForm = {
+	...newForm(),
 	name: "notes-loop",
 	agent: "acme-agent",
 	suite: "hd-harbor-bfcl@1.0.0",
 	files: ["/home/agent/NOTES.md", "/home/agent/skills/"],
-	rounds: "3",
-	budget: "2.00",
 };
 
 describe("ImprovementsTable", () => {
@@ -72,41 +72,48 @@ describe("NewImprovementForm", () => {
 		suites: ["hd-harbor-bfcl@1.0.0"],
 	};
 
-	it("disables Create and says why when the agent has no files", () => {
-		const html = render(<NewImprovementForm {...props} form={{ ...filled, files: [] }} agentFiles={[]} />);
-		expect(html).toContain("This agent has no files Heimdall can change (its settings have no files section).");
-		expect(html).toMatch(
+	it("offers standing instructions when the agent has no files, so Create is not blocked by them", () => {
+		const html = render(<NewImprovementForm {...props} form={filled} agentFiles={[]} estimate={ESTIMATE_FIXTURE} />);
+		expect(html).not.toContain("This agent has no files Heimdall can change (its settings have no files section).");
+		expect(html).toContain("Standing instructions (added before every task)");
+		expect(html).not.toMatch(
 			/<button[^>]*disabled=""[^>]*data-testid="new-improvement-submit"|<button[^>]*data-testid="new-improvement-submit"[^>]*disabled=""/,
 		);
-		expect(improvementFormProblems({ ...filled, files: [] }, [])).toContain("noFiles");
+		expect(improvementFormProblems(filled)).toEqual([]);
 	});
 
 	it("lists the agent's files and enables Create when the form is complete", () => {
-		const html = render(<NewImprovementForm {...props} form={filled} agentFiles={["/home/agent/NOTES.md", "/home/agent/skills/"]} />);
+		const html = render(
+			<NewImprovementForm
+				{...props}
+				form={filled}
+				agentFiles={["/home/agent/NOTES.md", "/home/agent/skills/"]}
+				estimate={ESTIMATE_FIXTURE}
+			/>,
+		);
 		expect(html).toContain("/home/agent/NOTES.md");
 		expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*data-testid="new-improvement-submit"/);
-		expect(html).toContain("Each round runs the agent on practice, gate and held-out tasks");
-		expect(improvementFormProblems(filled, ["/home/agent/NOTES.md", "/home/agent/skills/"])).toEqual([]);
+		expect(improvementFormProblems(filled)).toEqual([]);
 	});
 
-	it("checks the name, rounds and budget rules", () => {
-		const files = ["/home/agent/NOTES.md"];
-		expect(improvementFormProblems({ ...filled, name: "Bad Name" }, files)).toContain("name");
-		expect(improvementFormProblems({ ...filled, rounds: "0" }, files)).toContain("rounds");
-		expect(improvementFormProblems({ ...filled, rounds: "21" }, files)).toContain("rounds");
-		expect(improvementFormProblems({ ...filled, budget: "0" }, files)).toContain("budget");
-		expect(improvementFormProblems({ ...filled, budget: "" }, files)).toContain("budget");
+	it("checks the name, size and spending limit rules", () => {
+		expect(improvementFormProblems({ ...filled, name: "Bad Name" })).toContain("name");
+		expect(improvementFormProblems({ ...filled, preset: "custom", rounds: "0" })).toContain("rounds");
+		expect(improvementFormProblems({ ...filled, preset: "custom", rounds: "21" })).toContain("rounds");
+		expect(improvementFormProblems({ ...filled, limit: "0" })).toContain("limit");
+		expect(improvementFormProblems({ ...filled, limit: "" })).toContain("limit");
 	});
 
-	it("posts the spec body: agent path, suite with version, files and folders apart, budget per round", () => {
+	it("posts the spec body: agent path, suite with version, files and folders apart, the preset and the limit", () => {
 		expect(improvementSpec(filled)).toEqual({
 			kind: "improvement",
 			name: "notes-loop",
 			agent: "agents/acme-agent.yaml",
 			suite: "hd-harbor-bfcl@1.0.0",
-			rounds: 3,
-			editable: { files: ["/home/agent/NOTES.md"], dirs: ["/home/agent/skills/"] },
-			improver: { budget_usd: 2 },
+			preset: "small",
+			editable: { instructions: true, files: ["/home/agent/NOTES.md"], dirs: ["/home/agent/skills/"] },
+			improver: { task: "heimdall-improver@1.1.0:reflect-edit" },
+			budget: { total_usd: 15 },
 		});
 	});
 });
