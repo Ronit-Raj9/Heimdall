@@ -258,6 +258,10 @@ type RunContext struct {
 	// requests when its fault plan runs in the heimdall Bifrost plugin (lane
 	// C04). Set by the engine before the agent's plan is built.
 	FaultHeaders map[string]string `json:"-"`
+	// GatewayHeaders are extra Bifrost request headers the agent sends for its
+	// arm's gateway.bifrost settings that only exist once the run is prepared,
+	// such as the run's prompt copy (x-bf-prompt-id). Never serialized.
+	GatewayHeaders map[string]string `json:"-"`
 
 	// Scenario state (scenario.go), set by the engine as the run proceeds.
 	Services     []ServiceHandle // started services, including the tool proxy's view of them

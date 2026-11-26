@@ -125,6 +125,10 @@ type Experiment struct {
 	// the previous one left (stream.go). nil keeps recorded manifests'
 	// hashes.
 	Stream *StreamSpec `json:"stream,omitempty" yaml:"stream,omitempty"`
+
+	// GatewayTest marks a Bifrost feature test (gatewaytest.go); nil for
+	// every other experiment, so recorded manifests keep their hashes.
+	GatewayTest *GatewayTest `json:"gateway_test,omitempty" yaml:"gateway_test,omitempty"`
 }
 
 // Exploratory reports an experiment whose result decides nothing: a rerun
