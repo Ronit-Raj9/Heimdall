@@ -422,6 +422,9 @@ type scheduleRunner struct {
 // Run implements schedule.Runner. After the freeze a failure still returns
 // the Result with the spend so far, so the daily cap counts it.
 func (r scheduleRunner) Run(ctx context.Context, s schedule.Schedule) (*schedule.Result, error) {
+	if s.Job == schedule.JobIssueSync {
+		return runIssueSyncSchedule(ctx, r.a, r.svc, s) // W4-48 weekly issue sync (issuesync_w448.go)
+	}
 	if s.Job == schedule.JobLivescorePull {
 		return runLivescoreSchedule(ctx, r.a, s) // X6 live scoring (livescore.go)
 	}

@@ -181,6 +181,7 @@ type State struct {
 	Envs      map[string]issuebench.BuildResult `json:"envs,omitempty"` // version -> build
 	Benchmark string                            `json:"benchmark,omitempty"`
 	CostUSD   float64                           `json:"cost_usd"`
+	CapUSD    float64                           `json:"cap_usd,omitempty"` // weekly sync: no new build once CostUSD reaches it
 	Created   time.Time                         `json:"created"`
 	Updated   time.Time                         `json:"updated"`
 	Log       []LogLine                         `json:"log,omitempty"`
@@ -494,6 +495,9 @@ func (m *Manager) Run(ctx context.Context, id string, extra func(string)) error 
 
 // step moves item i forward through build and validate.
 func (m *Manager) step(ctx context.Context, id string, i int, logf func(string, ...any)) {
+	if m.capReached(id, i) {
+		return // weekly sync spending cap (keep_w448.go)
+	}
 	s, err := m.Load(id)
 	if err != nil || i >= len(s.Items) {
 		return

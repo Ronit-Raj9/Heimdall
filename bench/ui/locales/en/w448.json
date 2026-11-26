@@ -1,0 +1,28 @@
+{
+	"sync": {
+		"heading": "Keep this benchmark fresh",
+		"intro": "Every week, merged fixes from {{repo}} become new tasks. Fixes already turned into tasks are skipped.",
+		"pickRepo": "Enter a repository above to turn on weekly tasks.",
+		"day": "Day",
+		"hour": "Hour (UTC)",
+		"maxIssues": "Most new tasks a week",
+		"weeklyCap": "Spending cap per week",
+		"model": "Model",
+		"modelPlaceholder": "provider/model, empty for the default",
+		"turnOn": "Turn on weekly tasks",
+		"runNow": "Run now",
+		"pause": "Pause",
+		"resume": "Resume",
+		"remove": "Remove",
+		"paused": "Paused",
+		"runRow": "{{date}}: {{started}} new issues started, {{skipped}} skipped, ${{spent}} spent",
+		"runReason": "{{date}}: {{reason}}",
+		"private": "This repository is private. Its code is read with your GitHub connection on a worker, sent only to your own model key, and stays in your organization. The benchmark is visible to your organization's members only.",
+		"days": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+	},
+	"jobs": {
+		"kinds": {
+			"twins.make": "Make impossible twins"
+		}
+	}
+}
