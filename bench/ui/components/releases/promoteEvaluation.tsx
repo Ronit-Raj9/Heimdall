@@ -16,7 +16,7 @@ import { Link } from "@tanstack/react-router";
 import { AlertTriangle, CalendarClock, CheckCircle2, Lock, Rocket, ShieldAlert, ShieldQuestion } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { DatasetChange, ReleaseEvidence, releaseTitle, versionName } from "./releaseEvidence";
+import { DatasetChange, ReleaseEvidence, releaseTitle, sharedTaskCount, versionName } from "./releaseEvidence";
 import "@/app/experiments_/$expId/views/fw11I18n";
 
 /** The gate's pass or fail as a badge with its summary and each check. Shown on the report card. */
@@ -109,6 +109,7 @@ export function previewTitle(p: EvaluationReleasePreview, t: (k: string, o?: Rec
 			version: p.version,
 			replaces_version: p.replaces_version,
 			compared_version: p.baseline?.version,
+			shared_tasks: sharedTaskCount(p.summary?.dataset),
 			agent_config_id: "",
 			arm: p.candidate,
 		},
