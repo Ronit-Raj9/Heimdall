@@ -180,6 +180,10 @@ type RunDetail struct {
 	// debug routes apply (fix wave 2, N133), so the page shows the reason
 	// instead of hiding Replay, Fork and Debug.
 	DebugAllowed *RunDebugAllowed `json:"debug_allowed,omitempty"`
+
+	// Output is the run's output kind (diff, answer, state, artifact), by
+	// the rule the run list uses; empty when the suite could not be read.
+	Output string `json:"output,omitempty"`
 }
 
 // RunDebugAllowed says which debug actions a run allows (RunDetail

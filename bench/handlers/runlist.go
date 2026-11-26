@@ -124,6 +124,8 @@ func (h *RunListHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Mid
 type runListFilter struct {
 	exp, suite, arm, task, condition, outcome, track string
 	agent, benchmark, fault, model                   string
+	// failed keeps only runs that did not pass (query failed=1).
+	failed bool
 }
 
 func (f runListFilter) match(row RunListRow) bool {
@@ -145,13 +147,16 @@ func (f runListFilter) match(row RunListRow) bool {
 	if f.fault != "" && f.fault != cmp.Or(row.Fault, faults.Clean) {
 		return false
 	}
+	if f.failed && row.Outcome == schemas.OutcomePass {
+		return false
+	}
 	return true
 }
 
 // rowAgent is the agent a run used: its config id, else its arm id.
 func rowAgent(row RunListRow) string { return cmp.Or(row.ConfigID, row.Arm) }
 
-// listRuns handles GET /api/bench/runs?exp=&suite=&benchmark=&arm=&agent=&model=&task=&condition=&fault=&outcome=&track=&sort=&dir=&limit=&offset=.
+// listRuns handles GET /api/bench/runs?exp=&suite=&benchmark=&arm=&agent=&model=&task=&condition=&fault=&outcome=&failed=&track=&sort=&dir=&limit=&offset=.
 // Every run of every experiment the index holds, attempts included, in the
 // order of sort and dir (default newest start first), sorted before paging.
 // A filter value that is not a valid id, or an unknown sort or dir, is a
@@ -175,6 +180,7 @@ func (h *RunListHandler) listRuns(ctx *fasthttp.RequestCtx) {
 		}
 		*dst = v
 	}
+	f.failed = string(args.Peek("failed")) == "1"
 	limit, ok := h.intArg(ctx, "limit", runListDefaultLimit)
 	if !ok {
 		return
@@ -473,20 +479,7 @@ func (h *RunListHandler) suiteInfo(ctx context.Context) map[string]suiteFacts {
 		if err != nil || s == nil {
 			continue
 		}
-		facts := suiteFacts{track: cmp.Or(s.Track, schemas.TrackCoding), output: "diff", grading: cmp.Or(s.Grading, "verified"), tasks: map[string]string{}, probes: map[string]string{}}
-		for _, p := range s.Probes {
-			if name := familyFault(p.PS2Family); name != "" {
-				facts.probes[p.ID] = name
-			}
-		}
-		if s.Output != nil && s.Output.Kind != "" {
-			facts.output = s.Output.Kind
-		}
-		for _, t := range s.Tasks {
-			if t != nil && t.Output != nil && t.Output.Kind != "" {
-				facts.tasks[t.ID] = t.Output.Kind
-			}
-		}
+		facts := suiteFactsOf(s)
 		out[cmp.Or(s.ID, id)] = facts
 	}
 	return out
@@ -522,7 +515,7 @@ func runListRow(rv RunView, suites map[string]suiteFacts) RunListRow {
 	if ok {
 		row.Track = facts.track
 		row.Grading = facts.grading
-		row.Output = cmp.Or(facts.tasks[rv.Slot.Task], facts.output)
+		row.Output = runOutputKindFor(facts, rv.Slot.Task)
 	}
 	return row
 }
