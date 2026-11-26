@@ -10,8 +10,8 @@ import {
 	useEditCanaryMutation,
 	type FieldProblem,
 } from "@/lib/store/apis/schedulesApi";
-import { useGetAgentsQuery, useGetSuitesQuery } from "@/lib/store/apis/benchApi";
-import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
+import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
+import { useGetSuiteQuery, useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import type { CanaryDefinition, SuiteSummary } from "@/lib/types/bench";
 import type { CanaryInitRequest } from "@/lib/types/schedules";
 import { Link } from "@tanstack/react-router";
@@ -193,7 +193,7 @@ export function suiteRefs(suites: readonly Pick<SuiteSummary, "id" | "version">[
 	return (suites ?? []).map((s) => (s.version ? `${s.id}@${s.version}` : s.id));
 }
 
-/** The task ids of the picked benchmark ("id" or "id@version") in the full list. Exported for tests. */
+/** The task ids of the picked benchmark ("id" or "id@version") in a list of full entries. Exported for tests. */
 export function suiteTaskIds(suites: readonly SuiteSummary[] | undefined, ref: string): string[] {
 	const [id, version] = ref.split("@");
 	const s = (suites ?? []).find((x) => x.id === id && (!version || x.version === version));
@@ -259,9 +259,9 @@ export function NewCanaryForm({
 	const [serverProblems, setServerProblems] = useState<FieldProblem[]>([]);
 	const [taskFilter, setTaskFilter] = useState("");
 	const [f, setF] = useState<CanaryFormFields>(() => (initial ? canaryFormFields(initial) : newCanaryFields()));
-	// The task list needs the full benchmark list (the light one carries no tasks): only fetched once
-	// the user asks to pick some tasks.
-	const full = useGetSuitesQuery(undefined, { skip: f.tasksAll || !f.suite });
+	// The task list needs the picked benchmark's full entry (the light list carries no tasks): one
+	// benchmark from GET /suites/{id} (N194), only fetched once the user asks to pick some tasks.
+	const full = useGetSuiteQuery(f.suite.split("@")[0], { skip: f.tasksAll || !f.suite });
 	const patch = (p: Partial<CanaryFormFields>) => setF((prev) => ({ ...prev, ...p }));
 	const set =
 		(k: "name" | "agent" | "suite" | "cron" | "perRun" | "perDay") => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -320,7 +320,7 @@ export function NewCanaryForm({
 	if (f.suite && !refs.includes(f.suite)) refs.unshift(f.suite);
 	const agentList = agents.data?.agents ?? [];
 	const agentPaths = agentList.map((a) => a.path);
-	const allTaskIds = suiteTaskIds(full.data?.suites, f.suite);
+	const allTaskIds = suiteTaskIds(full.currentData ? [full.currentData] : undefined, f.suite);
 	for (const id of f.taskIds) if (!allTaskIds.includes(id)) allTaskIds.unshift(id);
 	const filter = taskFilter.trim().toLowerCase();
 	const matching = filter ? allTaskIds.filter((id) => id.toLowerCase().includes(filter)) : allTaskIds;
@@ -392,7 +392,7 @@ export function NewCanaryForm({
 			{!f.tasksAll &&
 				(!f.suite ? (
 					<span className="text-muted-foreground">{t("canary.tasksPickSuite")}</span>
-				) : full.isLoading ? (
+				) : full.isLoading || (full.isFetching && !full.currentData) ? (
 					<span className="text-muted-foreground">{t("canary.tasksLoading")}</span>
 				) : allTaskIds.length === 0 ? (
 					<span className="text-muted-foreground">{t("canary.tasksNone")}</span>
