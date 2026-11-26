@@ -926,7 +926,9 @@ func TestHostedOrgsGetNoPracticeSuite(t *testing.T) {
 		t.Fatalf("API-created org got %s: %v", tenancy.DefaultSuite, err)
 	}
 	sue := hostedSignup(t, f, "sue@example.com", "Sue Co")
-	if r := f.do("GET", "/api/bench/suites", "sue", nil, nil); r.status != 200 || strings.Contains(r.body, `"`+tenancy.DefaultSuite+`"`) {
+	// The list may name the practice id under reserved_ids (wave 4, I10: a
+	// new benchmark cannot take it), but never serves the practice suite.
+	if r := f.do("GET", "/api/bench/suites", "sue", nil, nil); r.status != 200 || suitesListHas(t, r.body, tenancy.DefaultSuite) {
 		t.Fatalf("signup org suites: %d %s", r.status, trim(r.body))
 	}
 	if _, err := os.Stat(suiteOf(sue)); !errors.Is(err, fs.ErrNotExist) {

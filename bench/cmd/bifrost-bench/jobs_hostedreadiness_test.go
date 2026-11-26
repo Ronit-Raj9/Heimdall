@@ -205,7 +205,8 @@ func TestHostedSuiteAdmitJudgedConsent(t *testing.T) {
 	writeJudgedRowSuite(t, env.App.cfg.Path(env.App.cfg.BenchmarksRoot), true)
 	raw, _ := json.Marshal(hostedSuiteAdmitParams{Suite: "qa"})
 	_, err := runHostedSuiteAdmit(context.Background(), env, &jobs.Job{Params: raw}, &bridgeTestLog{}, nil)
-	if err == nil || !strings.Contains(err.Error(), "judge_consent") || len(l.planned) != 0 {
+	// The refusal names the consent box in plain words (wave 4, I16), not the param.
+	if err == nil || !strings.Contains(err.Error(), "Tick the box that agrees to the judge calls") || len(l.planned) != 0 {
 		t.Fatalf("no consent: err %v, planned %d", err, len(l.planned))
 	}
 	raw, _ = json.Marshal(hostedSuiteAdmitParams{Suite: "qa", JudgeConsent: true})
