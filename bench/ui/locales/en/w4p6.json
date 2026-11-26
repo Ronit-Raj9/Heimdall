@@ -1,0 +1,126 @@
+{
+	"page": {
+		"title": "Gateway report card",
+		"subtitle": "Every Bifrost feature you use, with its measured effect.",
+		"gateway": "Bifrost {{version}} at {{host}}",
+		"gatewayNoVersion": "Bifrost at {{host}}",
+		"unreachable": "Heimdall could not reach your gateway: {{error}}",
+		"loadError": "Could not load the gateway report card",
+		"checked": "Checked {{at}}"
+	},
+	"source": {
+		"connected": "Your Bifrost: connected to {{host}}",
+		"change": "Change",
+		"connect": "Connect your Bifrost",
+		"address": "Bifrost address",
+		"secret": "Secret that holds the admin credential",
+		"pickSecret": "Pick a secret",
+		"save": "Connect",
+		"remove": "Disconnect",
+		"cancel": "Cancel",
+		"adminOnly": "Only an admin can change the connection."
+	},
+	"line": {
+		"inUse": "In use",
+		"inUseState": {
+			"on": "On",
+			"off": "Off",
+			"unknown": "Unknown"
+		},
+		"result": {
+			"saved": "Saved",
+			"lost": "Lost",
+			"worked": "Worked",
+			"failed": "Failed"
+		},
+		"from": "From: {{source}}, {{date}}",
+		"fromNoDate": "From: {{source}}",
+		"unknown": "Unknown: {{reason}}",
+		"notEnough": "Not enough data yet",
+		"open": "Open the test",
+		"start": "Start a test"
+	},
+	"dialog": {
+		"title": "Bifrost feature test: {{name}}",
+		"benchmark": "Benchmark",
+		"agent": "Agent",
+		"pick": "Pick one",
+		"model": "Model (optional)",
+		"provider": "Provider (optional)",
+		"options": "Settings for this test",
+		"required": "required",
+		"budget": "Budget (USD)",
+		"budgetHint": "Required. At most 50 USD here; larger tests use the New comparison form.",
+		"trials": "Trials",
+		"prepare": "Prepare",
+		"preparing": "Preparing",
+		"notes": "Before you start",
+		"estimate": "Estimate: about {{usd}} USD and {{minutes}} minutes.",
+		"estimateUnknown": "Estimate: not known yet.",
+		"planErrors": "This test cannot start yet:",
+		"start": "Start",
+		"starting": "Starting",
+		"confirm": "Start this test? It can spend up to {{usd}} USD.",
+		"confirmYes": "Yes, start",
+		"cancel": "Cancel",
+		"needBudget": "Enter a budget above 0 and at most 50 USD.",
+		"needFields": "Pick a benchmark and an agent, and fill every required setting.",
+		"error": "Could not prepare the test: {{error}}"
+	},
+	"effect": {
+		"title": "Bifrost feature test",
+		"state": {
+			"measured": "Measured",
+			"not_enough_data": "Not enough data yet",
+			"not_applied": "The setting was not applied",
+			"unknown": "Unknown"
+		},
+		"setup": "Setup",
+		"runs": "Runs",
+		"tasks": "Tasks",
+		"solveRate": "Solve rate",
+		"costPerTask": "Cost per task",
+		"latency": "Latency",
+		"details": "Details",
+		"control": "setting as it is today",
+		"variant": "changed setting",
+		"judgeReused": "({{n}} votes reused)"
+	},
+	"use": {
+		"button": "Use this in Bifrost",
+		"where": "Where: {{where}}",
+		"copy": "Copy",
+		"copied": "Copied",
+		"fixed": "Heimdall does not change your Bifrost. Paste this where it says, review it, then switch it on.",
+		"close": "Close"
+	},
+	"watch": {
+		"title": "Watch for new models",
+		"text": "Heimdall checks Bifrost's model catalog {{schedule}}. When a model appears that Bifrost did not list before, Heimdall runs {{evaluation}} on it next to {{current}}, once, with a budget of {{usd}} USD that Bifrost enforces.",
+		"firstCheck": "The first check only records the models that exist today. Nothing runs until a new one appears.",
+		"none": "No new model watch is set up.",
+		"model": "Model",
+		"found": "Found",
+		"happened": "What happened",
+		"started": "Started",
+		"openEvaluation": "Open evaluation",
+		"failed": "Failed: {{reason}}",
+		"skipped": "Skipped: {{reason}}",
+		"claimed": "Starting",
+		"tryAgain": "Try again",
+		"startNow": "Start now",
+		"lastError": "Last check failed: {{error}}"
+	},
+	"agents": {
+		"title": "Agents registered in your Bifrost",
+		"none": "Bifrost lists no registered agents.",
+		"disabled": "Switched off in Bifrost",
+		"benchmark": "Benchmark this agent",
+		"model": "Model",
+		"provider": "Provider",
+		"go": "Import and open",
+		"cancel": "Cancel",
+		"error": "Could not import the agent: {{error}}"
+	},
+	"link": "Open the gateway report card"
+}
