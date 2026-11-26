@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/benchcatalog"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/onboard"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -73,6 +74,13 @@ func isBuiltinSuite(src SuiteSource, id string) bool {
 	return ok && id != "" && o.SuiteBuiltin(id)
 }
 
+// isReservedSuiteID reports that id is taken by a built-in benchmark: a
+// library pack src serves, or a bundled practice suite (coding-core) that a
+// hosted list hides but that stays a built-in name (N46, N100, N265).
+func isReservedSuiteID(src SuiteSource, id string) bool {
+	return isBuiltinSuite(src, id) || slices.Contains(benchcatalog.PracticeSuites, id)
+}
+
 // sendBuiltinReadOnly answers a change to a built-in library suite: 403.
 func sendBuiltinReadOnly(ctx *fasthttp.RequestCtx, mode schemas.Mode, id string) {
 	lib.SendError(ctx, mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden,
@@ -123,6 +131,7 @@ func NewSuitesHandler(mode schemas.Mode, suites SuiteSource) *SuitesHandler {
 // RegisterRoutes registers GET /suites and GET /suites/{id}/tasks/{task}.
 func (h *SuitesHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middleware) {
 	r.GET(APIPrefix+"/suites", lib.ChainMiddlewares(h.getSuites, middlewares...))
+	r.GET(APIPrefix+"/suites/{id}", lib.ChainMiddlewares(h.getSuite, middlewares...))
 	r.GET(APIPrefix+"/suites/{id}/tasks/{task}", lib.ChainMiddlewares(h.getSuiteTask, middlewares...))
 }
 
@@ -134,7 +143,11 @@ func (h *SuitesHandler) getSuites(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	var light bool
-	switch string(ctx.QueryArgs().Peek("fields")) {
+	fields := string(ctx.QueryArgs().Peek("fields"))
+	if fields == "" && ctx.QueryArgs().Has("light") {
+		fields = "light" // N194: ?light=1 is the light list too
+	}
+	switch fields {
 	case "", "full":
 	case "light":
 		light = true
@@ -151,6 +164,46 @@ func (h *SuitesHandler) getSuites(ctx *fasthttp.RequestCtx) {
 	}
 	out := schemas.SuiteList{Suites: list}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
+}
+
+// getSuite handles GET /api/bench/suites/{id}: one suite's full summary,
+// the entry GET /suites gives it, so a suite page never loads the whole list
+// (N194). A suite the list leaves out (hidden or staging) is 404.
+func (h *SuitesHandler) getSuite(ctx *fasthttp.RequestCtx) {
+	if h.suites == nil {
+		sendUnavailable(ctx, h.mode, "suite loader")
+		return
+	}
+	id, ok := idParam(ctx, h.mode, "id", "suite")
+	if !ok {
+		return
+	}
+	work, cancel := workContext(ctx, readTimeout)
+	defer cancel()
+	ids, err := h.suites.SuiteIDs(work)
+	if err != nil {
+		sendDepError(ctx, h.mode, "list suites", err)
+		return
+	}
+	if !slices.Contains(ids, id) || onboard.IsStagingSuite(id) || (h.hidden != nil && h.hidden(id)) {
+		sendNotFound(ctx, h.mode, "suite", id)
+		return
+	}
+	var sum schemas.SuiteSummary
+	if _, cached := h.suites.(suiteStamper); cached {
+		var hit bool
+		if sum, hit = h.cachedSummary(id, suiteListBudget); !hit {
+			sum, _, _ = h.readyHead(id)
+		}
+	} else if s, err := h.suites.LoadSuite(work, id); err != nil {
+		sum = brokenSuite(id, err)
+	} else {
+		sum = h.summarize(work, s)
+	}
+	if isBuiltinSuite(h.suites, id) {
+		sum.Builtin, sum.Source = true, "library"
+	}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &sum)
 }
 
 // ListSummaries is the GET /suites list: every pack with its summary, built-in

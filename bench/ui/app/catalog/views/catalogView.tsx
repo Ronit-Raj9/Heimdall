@@ -7,7 +7,7 @@ import { FilterSelect, FilterTokens, SegmentedControl, ToolbarSearch, type Filte
 import { isBuiltinSuite } from "@/components/suites/suiteDisplay";
 import { SuiteRunButton } from "@/components/suites/suiteRunButton";
 import { canUse, useSession } from "@/lib/session/sessionContext";
-import { useGetSuitesQuery } from "@/lib/store";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import { useAddCatalogEntryMutation, useGetBenchCatalogQuery, useUploadCatalogDatasetMutation } from "@/lib/store/apis/catalogApi";
 import type { Job } from "@/lib/types/bench";
 import type { CatalogAddRequest, CatalogAddResponse, CatalogEntry } from "@/lib/types/catalog";
@@ -599,7 +599,7 @@ function CatalogSkeleton() {
 export default function CatalogView() {
 	const { t } = useTranslation("catalog");
 	const { data, isLoading, isError, refetch } = useGetBenchCatalogQuery();
-	const suites = useGetSuitesQuery();
+	const suites = useGetSuitesLightQuery();
 	const builtinSuites = useMemo(
 		() => new Set((suites.data?.suites ?? []).filter((s) => isBuiltinSuite(s) && !s.error).map((s) => s.id)),
 		[suites.data],

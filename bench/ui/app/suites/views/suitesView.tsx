@@ -12,7 +12,7 @@ import {
 } from "@/components/suites/suites.utils";
 import { buttonVariants } from "@/components/ui/button";
 import { FilterSelect, FilterTokens, SegmentedControl, ToolbarSearch, type FilterToken } from "@/components/ui/toolbar";
-import { useGetSuitesQuery } from "@/lib/store";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
@@ -26,7 +26,7 @@ import { useTranslation } from "react-i18next";
 export default function SuitesView() {
 	const { t } = useTranslation("bench");
 	const { t: tu } = useTranslation("suitesUx");
-	const query = useGetSuitesQuery();
+	const query = useGetSuitesLightQuery();
 	const data = query.data;
 	const suites = data?.suites ?? [];
 	return (

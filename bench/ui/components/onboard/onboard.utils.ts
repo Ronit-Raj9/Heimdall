@@ -25,10 +25,14 @@ function isBuiltin(s: SuiteIdEntry): boolean {
 	return s.builtin === true || s.source === "library";
 }
 
-/** Checks id against the server's rule and the listed benchmarks (the id part before any "@version"). */
-export function suiteIdCheck(id: string, suites: readonly SuiteIdEntry[]): SuiteIdCheck {
+/**
+ * Checks id against the server's rule and the listed benchmarks (the id part before any "@version"). reserved holds the
+ * built-in ids the list hides (the suite list's reserved_ids, for example coding-core on a hosted server).
+ */
+export function suiteIdCheck(id: string, suites: readonly SuiteIdEntry[], reserved: readonly string[] = []): SuiteIdCheck {
 	if (!id) return { state: "empty" };
 	if (!SUITE_ID_RE.test(id)) return { state: "invalid" };
+	if (reserved.includes(id)) return { state: "builtin" };
 	const same = suites.filter((s) => s.id.split("@")[0] === id);
 	if (same.some(isBuiltin)) return { state: "builtin" };
 	if (same.length > 0) return { state: "existing", count: same[0].task_count ?? 0 };
