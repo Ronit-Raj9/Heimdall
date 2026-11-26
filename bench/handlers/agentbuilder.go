@@ -129,7 +129,7 @@ type AgentConfigFields struct {
 	RemoteURL   string            `json:"remote_url,omitempty"`
 	A2ACardURL  string            `json:"a2a_card_url,omitempty"`
 	OpenAIURL   string            `json:"openai_url,omitempty"` // A08: openai.url of an openai_agent
-	Description string            `json:"description,omitempty"`
+	Description string            `json:"description"`
 	// Behavior is what makes two agents on the same model differ: their
 	// instructions, memory, retries and limits, and capabilities. Nil (an
 	// older client) leaves those keys of the file alone.
@@ -697,13 +697,52 @@ func abFieldsOf(cfg *schemas.AgentConfig, doc []byte) AgentConfigFields {
 	}
 	var n yaml.Node
 	if yaml.Unmarshal(doc, &n) == nil && len(n.Content) == 1 {
-		c := n.HeadComment
-		if c == "" {
-			c = n.Content[0].HeadComment
-		}
-		f.Description = abStripComment(c)
+		f.Description = abStripComment(abHeadComment(&n))
 	}
 	return f
+}
+
+// abHeadComment is the agent's description: the file's head comment. yaml.v3
+// puts a comment directly above the first key on that key, so the document,
+// the mapping and the first key are read in that order.
+func abHeadComment(doc *yaml.Node) string {
+	if doc.HeadComment != "" {
+		return doc.HeadComment
+	}
+	if len(doc.Content) != 1 {
+		return ""
+	}
+	return abMappingHeadComment(doc.Content[0])
+}
+
+func abMappingHeadComment(root *yaml.Node) string {
+	if root.HeadComment != "" {
+		return root.HeadComment
+	}
+	if root.Kind == yaml.MappingNode && len(root.Content) > 0 {
+		return root.Content[0].HeadComment
+	}
+	return ""
+}
+
+// abSetHeadComment replaces the description on the mapping root: every
+// place abHeadComment reads is cleared first, so a save never stacks a
+// second comment. editAgentYAML has already moved a document comment onto
+// the mapping.
+func abSetHeadComment(root *yaml.Node, text string) {
+	root.HeadComment = ""
+	if root.Kind == yaml.MappingNode && len(root.Content) > 0 {
+		root.Content[0].HeadComment = ""
+	}
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return
+	}
+	lines := strings.Split(text, "\n")
+	for i, l := range lines {
+		lines[i] = "# " + strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(l), "#"))
+	}
+	root.HeadComment = strings.Join(lines, "\n")
 }
 
 func abStripComment(c string) string {
@@ -764,7 +803,7 @@ func abApplyFields(doc []byte, f AgentConfigFields) ([]byte, error) {
 		if f.Behavior != nil {
 			abApplyBehavior(root, *f.Behavior)
 		}
-		root.HeadComment = strings.TrimSpace(f.Description)
+		abSetHeadComment(root, f.Description)
 	})
 }
 
