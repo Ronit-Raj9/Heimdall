@@ -1,3 +1,4 @@
+import { withOrgParam } from "./orgParam";
 import type { DatasetComparison } from "@/lib/types/bench";
 import { benchApi } from "./benchApi";
 
@@ -784,7 +785,7 @@ export function evaluationReportUrl(arg: EvaluationReportArg): string {
 	const qs = Object.entries(where ?? {})
 		.map(([k, v]) => `where=${encodeURIComponent(`${k}:${v}`)}`)
 		.join("&");
-	return qs ? `${base}?${qs}` : base;
+	return withOrgParam(qs ? `${base}?${qs}` : base);
 }
 
 /** One arm's Bifrost numbers over every benchmark; an absent count was not observed by any run. */

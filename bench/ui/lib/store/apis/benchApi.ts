@@ -1,3 +1,4 @@
+import { withOrgParam } from "./orgParam";
 import i18n from "@/lib/i18n";
 import { IDEMPOTENCY_HEADER, jsonBodyText, requestIdentity, sendIdempotent } from "@/lib/store/idempotency";
 import type {
@@ -100,12 +101,12 @@ export function saveWriteToken(token: string): void {
 
 /** Server-sent events URL for live experiment status. Not an RTK Query endpoint: it streams. */
 export function experimentEventsUrl(expId: string): string {
-	return `${BENCH_API_BASE}/experiments/${encodeURIComponent(expId)}/events`;
+	return withOrgParam(`${BENCH_API_BASE}/experiments/${encodeURIComponent(expId)}/events`);
 }
 
 /** Download URL of a release's evidence pack (a zip). Not an RTK Query endpoint: the browser saves it. */
 export function releaseEvidenceUrl(releaseId: string): string {
-	return `${BENCH_API_BASE}/releases/${encodeURIComponent(releaseId)}/evidence`;
+	return withOrgParam(`${BENCH_API_BASE}/releases/${encodeURIComponent(releaseId)}/evidence`);
 }
 
 /** The message to show for a failed bench request. */

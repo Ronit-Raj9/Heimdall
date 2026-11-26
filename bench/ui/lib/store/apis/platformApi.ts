@@ -1,6 +1,7 @@
 // Hosted platform routes (docs/platform-design.md): auth, organizations, members, invitations,
 // API tokens, runners, the audit log and jobs. Injected into benchApi so they share its base query
 // (CSRF header, 401 handling) and its cache.
+import { withOrgParam } from "./orgParam";
 import type {
 	ApiTokenCreatedResponse,
 	ApiTokenListResponse,
@@ -34,7 +35,7 @@ import type {
 } from "@/lib/types/bench";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
-import { announceOrgSwitch, errorStatus, expectAuth, getAuthState, setAuthState } from "./session";
+import { announceOrgSwitch, errorStatus, expectAuth, getAuthState, noteOrgReset, setAuthState } from "./session";
 
 const id = (value: string) => encodeURIComponent(value);
 
@@ -50,13 +51,11 @@ export function githubStartUrl(returnTo: string): string {
 
 /** Server-sent events URL of a job's log. */
 export function jobLogStreamUrl(jobId: string, since = 0): string {
-	return `${BENCH_API_BASE}/jobs/${id(jobId)}/logs?since=${since}`;
+	return withOrgParam(`${BENCH_API_BASE}/jobs/${id(jobId)}/logs?since=${since}`);
 }
 
 /** The runner install script this server serves (GET /runners/install.sh), for a fresh Linux box. */
 export const RUNNER_INSTALL_SCRIPT = `${BENCH_API_BASE}/runners/install.sh`;
-/** The runner guide in the repository. */
-export const RUNNER_INSTALL_DOC = "https://github.com/maximhq/bifrost/blob/main/bench/docs/runners.md";
 
 /** GET /orgs/{org}/audit request: empty filters left out so the server defaults apply. */
 export function auditLogRequest({ orgId, ...params }: AuditLogParams): string | { url: string; params: Record<string, string | number> } {
@@ -104,6 +103,7 @@ export const platformApi = benchApi.injectEndpoints({
 					// The session moved to another org (a switch in another tab): every cached answer
 					// belongs to the old one, so drop the whole cache and let screens fetch again.
 					if (before && org && before !== org) dispatch(benchApi.util.resetApiState());
+					if (data.org_reset) noteOrgReset(data.current_org ?? "");
 				} catch (failure) {
 					const status = errorStatus((failure as { error?: unknown })?.error);
 					// Only a hosted server answers /auth/me with 401, and only a server without the platform

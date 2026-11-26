@@ -1,4 +1,5 @@
 import { BENCH_API_BASE } from "@/lib/store/apis/fixtures";
+import { withOrgParam } from "@/lib/store/apis/orgParam";
 import { Download } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -7,7 +8,7 @@ import { useTranslation } from "react-i18next";
  * id is encoded, so it can never add a path segment or a query.
  */
 export function otlpDownloadUrl(runId: string): string {
-	return `${BENCH_API_BASE}/runs/${encodeURIComponent(runId)}/otlp`;
+	return withOrgParam(`${BENCH_API_BASE}/runs/${encodeURIComponent(runId)}/otlp`);
 }
 
 export interface TraceDownloadLinkProps {

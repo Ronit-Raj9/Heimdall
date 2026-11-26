@@ -1,3 +1,4 @@
+import { withOrgParam } from "./orgParam";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
 
@@ -101,12 +102,12 @@ export const recordingsApi = benchApi.injectEndpoints({
 
 /** The URL of recording n of a run (served in byte ranges, so a video can seek). */
 export function recordingUrl(runId: string, n: number): string {
-	return `${BENCH_API_BASE}/runs/${enc(runId)}/recordings/${n}`;
+	return withOrgParam(`${BENCH_API_BASE}/runs/${enc(runId)}/recordings/${n}`);
 }
 
 /** The newest live frame of a run; at busts the browser cache per frame. */
 export function liveFrameUrl(runId: string, at?: string): string {
-	return `${BENCH_API_BASE}/runs/${enc(runId)}/live/frame${at ? `?at=${enc(at)}` : ""}`;
+	return withOrgParam(`${BENCH_API_BASE}/runs/${enc(runId)}/live/frame${at ? `?at=${enc(at)}` : ""}`);
 }
 
 export const { useGetRunRecordingsQuery, useGetRunLiveQuery, useTakeoverRunMutation } = recordingsApi;
