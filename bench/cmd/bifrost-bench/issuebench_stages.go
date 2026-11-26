@@ -24,6 +24,7 @@ import (
 	"github.com/maximhq/bifrost/bench/issuebench/pipeline"
 	"github.com/maximhq/bifrost/bench/issuebench/scan"
 	"github.com/maximhq/bifrost/bench/issuebench/validate"
+	"github.com/maximhq/bifrost/bench/issuesync"
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/keystore"
 )
@@ -446,6 +447,12 @@ func (a ibEmitter) Emit(ctx context.Context, repo string, tasks []issuebench.Val
 	s := a.s
 	if len(tasks) == 0 {
 		return "", errors.New("no accepted tasks to add")
+	}
+	// Before any task file: the benchmark is private for share links unless
+	// a worker proved the repository public (jobs_issuebench_work.go); this
+	// server reaches it with the organization's GitHub token.
+	if err := recordRepoSource(s.root, emit.SuiteID(repo), repo, issuesync.KnownPublic(s.root, emit.SuiteID(repo))); err != nil {
+		return "", err
 	}
 	work := s.dir("work", fmt.Sprintf("emit-%d", time.Now().UnixNano()))
 	var in []emit.Input

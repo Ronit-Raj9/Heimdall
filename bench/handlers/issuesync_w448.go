@@ -114,7 +114,7 @@ func benchmarkTaskIDs(root, id string) (map[string]bool, error) {
 func markPrivateSource(root string, r issuesync.Repo) error {
 	// Share links read this mark: nothing of the benchmark leaves the
 	// organization through a link (shareprivate_w448.go).
-	if err := issuesync.MarkPrivateSource(root, r.Benchmark, r.Repo, time.Now()); err != nil {
+	if err := issuesync.RecordSource(root, r.Benchmark, r.Repo, false, time.Now()); err != nil {
 		return err
 	}
 	_, err := datapolicy.Open(root).Set(r.Benchmark, datapolicy.Policy{Access: datapolicy.Access{Mode: datapolicy.AccessOrg}}, "issue-sync", time.Now())

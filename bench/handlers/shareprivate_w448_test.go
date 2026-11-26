@@ -3,6 +3,8 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -77,5 +79,72 @@ func TestFirstPrivateMarksShareRefusal(t *testing.T) {
 	list, err := issuesync.PrivateSources(root)
 	if err != nil || len(list) != 1 || list[0].Benchmark != "issues-acme-secret" || list[0].Repo != "acme/secret" {
 		t.Fatalf("private sources %+v %v", list, err)
+	}
+}
+
+// TestShareRecordedSources: a benchmark recorded private (by any path:
+// issue work job, issue emitter, task from a commit, find tasks, weekly
+// sync, all through issuesync.RecordSource) refuses create, open, export
+// and badge; a benchmark recorded public still shares; a record file that
+// cannot be read refuses every share.
+func TestShareRecordedSources(t *testing.T) {
+	want := "This cannot be shared outside your organization"
+
+	// Public record: shares, opens, exports and draws the badge.
+	r, root := shareRouter(t)
+	if err := issuesync.RecordSource(root, "coding-core", "acme/open", true, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	res := shareCall(r, "POST", APIPrefix+"/shares", map[string]any{"kind": "evaluation", "target": "ev_1"})
+	if res.StatusCode() != 201 {
+		t.Fatalf("public create: %d %s", res.StatusCode(), res.Body())
+	}
+	var sv ShareView
+	_ = json.Unmarshal(res.Body(), &sv)
+	paths := []string{"/shared/" + sv.Token, "/shared/" + sv.Token + "/export?format=md", "/shared/" + sv.Token + "/badge.svg"}
+	for _, p := range paths {
+		if res := shareCall(r, "GET", APIPrefix+p, nil); res.StatusCode() != 200 {
+			t.Fatalf("public %s: %d %s", p, res.StatusCode(), res.Body())
+		}
+	}
+
+	// The same benchmark recorded private later (the repository turned
+	// private): every route refuses.
+	if err := issuesync.RecordSource(root, "coding-core", "acme/open", false, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range paths {
+		if res := shareCall(r, "GET", APIPrefix+p, nil); res.StatusCode() != 403 || !bytes.Contains(res.Body(), []byte(want)) {
+			t.Fatalf("private %s: %d %s", p, res.StatusCode(), res.Body())
+		}
+	}
+	if res := shareCall(r, "POST", APIPrefix+"/shares", map[string]any{"kind": "evaluation", "target": "ev_1"}); res.StatusCode() != 403 {
+		t.Fatalf("private create: %d %s", res.StatusCode(), res.Body())
+	}
+	// Recording it public again does not undo private.
+	if err := issuesync.RecordSource(root, "coding-core", "acme/open", true, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if res := shareCall(r, "GET", APIPrefix+paths[0], nil); res.StatusCode() != 403 {
+		t.Fatalf("private turned public: %d", res.StatusCode())
+	}
+
+	// An unreadable record file refuses every share, made or opened.
+	r2, root2 := shareRouter(t)
+	res = shareCall(r2, "POST", APIPrefix+"/shares", map[string]any{"kind": "evaluation", "target": "ev_1"})
+	_ = json.Unmarshal(res.Body(), &sv)
+	if err := os.MkdirAll(filepath.Join(root2, "issuesync"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root2, filepath.FromSlash(issuesync.PrivateSourcesFile)), []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{"/shared/" + sv.Token, "/shared/" + sv.Token + "/export?format=md", "/shared/" + sv.Token + "/badge.svg"} {
+		if res := shareCall(r2, "GET", APIPrefix+p, nil); res.StatusCode() != 403 || !bytes.Contains(res.Body(), []byte(want)) {
+			t.Fatalf("unreadable %s: %d %s", p, res.StatusCode(), res.Body())
+		}
+	}
+	if res := shareCall(r2, "POST", APIPrefix+"/shares", map[string]any{"kind": "evaluation", "target": "ev_1"}); res.StatusCode() != 403 {
+		t.Fatalf("unreadable create: %d %s", res.StatusCode(), res.Body())
 	}
 }
