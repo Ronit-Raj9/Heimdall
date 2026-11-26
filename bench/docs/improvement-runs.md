@@ -1,6 +1,6 @@
 # Improvement runs
 
-An improvement run lets your agent improve its own prompt, notes and skills over N rounds (default 3), and measures the result so the gain can be trusted. Code: `bench/improve/`, CLI `bifrost-bench improve`, API `/api/bench/improvements`, page `/improvements/$id`.
+An improvement run lets your agent improve its own prompt, standing instructions, notes and skills over several rounds, and then tests the result on held-out tasks the loop never used, so the gain can be trusted. Code: `bench/improve/`, API `/api/bench/improvements`, page `/improvements/$id`.
 
 ## Spec
 
@@ -10,44 +10,81 @@ kind: improvement
 name: coder-notes
 agent: agents/coder.yaml          # version 0; a plain file is snapshotted first
 suite: coding-core@1.0.0          # the task pool
-rounds: 3
+preset: medium                    # small, medium, large or custom; explicit fields win
 seed: 41
-editable:                         # the bundle: container paths in the agent's files map
+editable:                         # what the improver may change
   files: [/home/agent/AGENTS.md]
   dirs: [/home/agent/.claude/skills/]
+  instructions: true              # the agent's standing instructions
 splits: {dev: 0.4, audit: 0.3, sealed: 0.3, honeypots: [t09-impossible]}
-improver:
-  task: improver@1.0.0:rewrite-bundle   # output kind artifact, leaves bundle.json
-  budget_usd: 2.00                       # per round, the run's gateway key cap
-  wall_s: 1800
-screen: {trials: 1}
-commit: {alpha: 0.05, min_pairs: 4, max_pairs: 60, trials: 3, audit_looks: 3}
-sealed: {trials: 2}
-controls: [budget_matched_v0, null_improver]
+budget: {total_usd: 60}           # the spending limit of the whole run
+claim: {alpha: 0.05, extension: true, extension_alpha: 0.02, target_gain: 0.05}
+controls: [null_improver, retries_v0]
 ```
 
-`frozen` defaults to adapter, image, build, argv, env, model, budgets, gateway, capabilities, limits and the adapter blocks; the improver can never change them.
+The three splits are the practice tasks (dev), the gate tasks (audit) and the held-out tasks (sealed). The preset fills rounds, ideas per round, the keep set, trials per phase, the gate alpha (0.10), whether a second look is reserved and the controls. `custom` fills only the gate alpha 0.10 and the two controls, and needs `budget.total_usd`.
 
 ## One round
 
-1. **Improve.** A normal sealed run of the incumbent on the improver task. Its agent config is the incumbent's plus `/heimdall/improve/bundle.json` (the current bundle) and `/heimdall/improve/evidence.json` (the incumbent's dev results: task, trial, outcome, success, veto gate names; never verifier content). The run's key is capped at `improver.budget_usd`. No verifier, audit or sealed task and no run store is mounted. The task's artifact `bundle.json` (`{"files": {"<path>": "<text>"}}`) is the new bundle.
-2. **Freeze.** The bundle is applied to the incumbent's YAML (only editable paths) and stored as an agent version with `parent`, `author: agent`, `improvement`, `round`, `produced_by_run` and `bundle_hash` (`agentversions.Derive`). The improvement's `lineage.jsonl` gets a hash-chained entry; rejected candidates stay in the lineage.
-3. **Integrity gates** on the bundle diff: `improver_answer_key` (gate or held-out task ids, 8-word overlaps with hidden tests, expected answers and required test names), `improver_canary` (the protected benchmark's canary GUID), `improver_frozen_field` (a path outside the bundle or a frozen field changed), `improver_eval_cue` (the bench's own cues: `BENCH_`, `toolproxy`, `/opt/bench`, canary wording, grader and verifier words), and after the screen `improver_monitor_parity` (the candidate stopped emitting an event channel its parent emits). Spend at 90% of the cap and an `egress` or `oversight_disabled` fire on the improver run are tripwires too. Any tripwire pauses the run at `awaiting_approval`; `approve` with a reason continues and the override is recorded and blocks a "supported" verdict.
-4. **Screen** on dev: incumbent vs candidate, paired. A significant regression (sign-flip p < 0.05) rejects cheaply.
-5. **Commit gate** on audit (plus honeypots): the paired per-(task, trial) differences, in task then trial order, feed the betting e-process in `stats/evalue.go` (the same one live scoring uses). The candidate is kept only when the e-value reaches `rounds / alpha` (alpha split over the rounds, so the chance of any false commit over the loop is at most alpha), no honeypot passed and vetoed runs did not rise by more than one. Every look uses one of `audit_looks`.
-6. **Held-out scoring.** The incumbent is scored on the sealed split every round. Nothing in the loop reads it; only the report does (tested: moving only the sealed scores changes no decision).
+1. **Ideas.** The improver proposes several candidates from the keep set (mutations and, when the preset turns them on, merges and restarts). It sees only practice results.
+2. **Checks** on each candidate's changes: answer keys of gate or held-out tasks, the benchmark's canary, fields it may not change, the benchmark's own cues, and after the screen whether it stopped emitting an event its parent emits. A fired check pauses the run for a person's approval; an approval is recorded and the result can then not be claimed.
+3. **Screen** on the practice tasks: the ideas are narrowed by halving until one is left. It goes to the gate only when it beat the current version there.
+4. **Gate** on the gate tasks: a one-sided exact sign-flip test of the per-task differences, at a level from an error budget spread over the run's gate looks. Over the whole run the chance that any kept version is no better than the one before it is at most the gate alpha.
 
-## Controls and verdict
+The loop stops when the rounds or gate looks are spent, when the improver found nothing more to change or no idea beat the current version for 2 rounds in a row, or at the spending limit.
 
-- `budget_matched_v0`: version 0 given the loop's own spend (improver + screen + audit) as extra trials on sealed; the report shows the band (mean plus or minus 1.96 SE over tasks) and best-of-k.
-- `null_improver`: the same rounds with no evidence, every edit kept, the last version scored on sealed.
+## The claim
 
-`supported` needs at least one commit, a positive sealed gain over version 0 with sign-flip p < alpha, a final sealed score above the band and the null improver, and no override. Otherwise `not_supported`, `inconclusive` or `no_change`. A single loop is noted; reruns of the whole loop are not built yet.
+After the last round, one experiment on the held-out tasks compares version 0 with the final version (and the null improver's final version). Its per-task differences give the verdict, the first rule that holds:
+
+| State | When |
+|---|---|
+| `no_change` | no round kept a new version |
+| `not_claimable` | a person approved a paused check |
+| `supported` | the one-sided p is at or below the claim level and the gain is positive |
+| `worse` | the same test the other way |
+| `insufficient_sample` | too few held-out tasks differ for any gain to be confirmed |
+| `likely_better` | a positive gain with p at or below 0.20 |
+| `no_evidence` | otherwise |
+
+The claim level is `claim.alpha` minus `claim.extension_alpha` when a second look is reserved (0.03 by default). The page shows a headline per state, then lines for the second look offer, the null improver, the retries control, a teacher model, the gate and a single loop, each only when it applies.
+
+Controls never change the state. The null improver makes edits without looking at failures over the same rounds and budget. The retries control retries version 0 when a run visibly failed (timeout, budget, crash or refusal), with up to the same money as the loop.
+
+## Second look (continue)
+
+A finished run that is `likely_better` or `insufficient_sample`, and that kept a reserve at creation, may buy one second look: more tries on the same held-out tasks, new held-out tasks from the benchmark (not in the pool, at most 200), or both, with a higher spending limit. It is tested at `claim.extension_alpha`, so the two looks together keep the claim's bound. The verdict then reads "First look: ... Second look, with {n} tasks: ...". A run can be continued only once.
+
+`POST /improvements/{id}/continue/estimate` with `{"extra_trials": 2, "new_tasks": true}` answers what the second look would run and cost and the gain it could confirm. `POST /improvements/{id}/continue` with the same body plus `extra_budget_usd` starts it (202).
+
+## Resume and restarts
+
+A run whose experiment failed is `failed`; a run a server restart left behind is `interrupted`, with the reason "The server restarted during this run. Press Resume to continue; nothing already paid for runs again." `POST /improvements/{id}/resume` continues a `planned`, `failed` or `interrupted` run from its saved stage (202). A running run answers 409 "This run is already running."; any other state answers 409 "This run is {status}; it cannot be resumed."
+
+On a local server, runs left running are driven again at start. On a hosted server they are marked interrupted and wait for an org admin to press Resume, since the spend goes on the organization's keys. An organization's runtime is never unloaded while one of its improvement loops runs.
+
+## Studies
+
+One run of the loop says little about whether the loop works. A study runs the whole loop 2 to 5 times from version 0 (`replicate: {loops: 3, repartition: true}`), one after another, on one shared held-out split; each loop draws its own practice and gate tasks when `repartition` is on. No loop runs its own final experiment. The study ends with one experiment on the held-out tasks holding version 0 and each loop's final version, and a pooled test at 0.05: per task, the mean over loops of final minus version 0, where a loop that kept nothing counts as version 0. It reads "Across {L} runs of the loop from version 0: {gain} points on {n} held-out tasks (95% interval {lo} to {hi}, p {p}). {k} of {L} runs ended better than version 0."
+
+Routes: `POST /improvement-studies` (the spec with `replicate.loops` 2 to 5, 202), `GET /improvement-studies`, `GET /improvement-studies/{id}`, `POST /improvement-studies/{id}/stop`.
+
+## Notifications
+
+`improvement.finished` (done, stopped or failed) and `improvement.paused` (waiting for approval) go to the organization's hooks like every other event (see notifications.md), with `{improvement_id, name, agent, suite, status, state, headline, gain_points, spent_usd, url}`.
+
+## What is never served
+
+The report never serves gate or held-out task ids, the task pool or the agent YAML. Only the practice screen's experiment id is served; the experiment ids of the gate, held-out, control, final and second look experiments are not. A fired answer-key check shows "a gate or held-out task" in place of the id it matched. Those experiments still appear in the organization's experiment list under names like `<improvement>-audit-r1`; the improvement page never links them.
 
 ## Storage
 
-`<runs root>/.improvements/<id>/improvement.json` (frozen spec and hash, partition and hash, rounds, controls, verdict), `protected.json` (0600, never served), `lineage.jsonl` (hash-chained). A failed experiment leaves status `failed`; `improve run <id>` resumes from the saved stage.
+`<runs root>/.improvements/<id>/improvement.json` (frozen spec and hash, partition and hash, rounds, controls, verdict), `protected.json` (0600, never served), `lineage.jsonl` (hash-chained). Studies: `<runs root>/.improvements/studies/<id>/study.json`.
 
-## API
+## API and roles
 
-`GET /improvements`, `POST /improvements` (spec as YAML or JSON, 202, starts in the background), `GET /improvements/{id}`, `GET /improvements/{id}/rounds/{k}`, `GET /improvements/{id}/lineage`, `POST /improvements/{id}/rounds/{k}/approve` (`{"reason": "..."}`), `POST /improvements/{id}/stop`. The report never serves audit or sealed task ids, the task pool, or the agent YAML. On a hosted server, create and approve are for org admins (they spend the organization's keys) and stop is open to any member. Every experiment of the run goes through the organization's launcher like any other run: it needs a working key of the organization for each provider (no fallback to server keys), counts against the daily caps when a server admin set them, and runs on the organization's default worker (the shared worker unless the organization chose its own).
+`GET /improvements`, `POST /improvements` (spec as YAML or JSON, 202), `GET /improvements/{id}`, `GET /improvements/{id}/rounds/{k}`, `GET /improvements/{id}/lineage`, `POST /improvements/{id}/rounds/{k}/approve` (`{"reason": "..."}`), `POST /improvements/{id}/stop`, and the resume, continue and study routes above. On a hosted server create, approve, resume, continue and starting a study are for org admins (they spend the organization's keys); stop and the continue estimate are open to any member; reads to every member. Every experiment of the run goes through the organization's launcher like any other run: it needs a working key of the organization for each provider, counts against the daily caps when a server admin set them, and runs on the organization's default worker.
+
+## From a terminal
+
+`bifrost-bench improve create -f improvements/x.yaml -run` creates and runs one; `bifrost-bench improve run <id>` resumes it from the saved stage.

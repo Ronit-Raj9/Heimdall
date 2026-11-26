@@ -1,6 +1,7 @@
 package improve
 
 import (
+	"strings"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/stats"
@@ -50,6 +51,72 @@ type Detail struct {
 	Error         string         `json:"error,omitempty"`
 	AuditLooks    int            `json:"audit_looks"`
 	AuditLooksMax int            `json:"audit_looks_max"`
+
+	// The run page's additions (WP6). No experiment id of an audit,
+	// sealed, final, retries or extension phase is ever among them.
+	Estimate    *Estimate  `json:"estimate,omitempty"`
+	SpentUSD    float64    `json:"spent_usd,omitempty"`
+	LimitUSD    float64    `json:"limit_usd,omitempty"`
+	Revision    int        `json:"revision,omitempty"`
+	CanResume   bool       `json:"can_resume,omitempty"`
+	CanContinue bool       `json:"can_continue,omitempty"`
+	Study       string     `json:"study,omitempty"`
+	Keep        []KeepView `json:"keep,omitempty"`
+	Final       *FinalView `json:"final,omitempty"`
+	Extension   *FinalView `json:"extension,omitempty"`
+}
+
+// KeepView is one member of the keep set as served.
+type KeepView struct {
+	Ref     string   `json:"ref"`
+	DevDiff float64  `json:"dev_diff"`
+	Led     []string `json:"led,omitempty"`
+}
+
+// FinalView is the final (or extension) claim's numbers, without its
+// experiment id.
+type FinalView struct {
+	N        int        `json:"n"`
+	NNonzero int        `json:"n_nonzero"`
+	Gain     float64    `json:"gain"`
+	CI80     [2]float64 `json:"ci80"`
+	CI95     [2]float64 `json:"ci95"`
+	PUpper   float64    `json:"p_upper"`
+	Trials   int        `json:"trials,omitempty"`
+}
+
+// CandidateView is one idea of a round as served.
+type CandidateView struct {
+	ID       string     `json:"id"`
+	Slot     int        `json:"slot"`
+	Kind     string     `json:"kind"`
+	Source   string     `json:"source,omitempty"`
+	Dropped  string     `json:"dropped,omitempty"`
+	DevDiff  float64    `json:"dev_diff"`
+	DevTasks int        `json:"dev_tasks"`
+	CostUSD  float64    `json:"cost_usd"`
+	Edits    []EditView `json:"edits,omitempty"`
+}
+
+// EditView is one edit of a candidate: what it asked and what was done.
+type EditView struct {
+	Op     string `json:"op"`
+	ID     string `json:"id,omitempty"`
+	Reason string `json:"reason"`
+	Result string `json:"result"`
+	Why    string `json:"why,omitempty"`
+}
+
+// CommitView is a round's gate decision as served.
+type CommitView struct {
+	P        float64 `json:"p"`
+	Level    float64 `json:"level"`
+	Mean     float64 `json:"mean"`
+	N        int     `json:"n"`
+	NNonzero int     `json:"n_nonzero"`
+	Missing  int     `json:"missing"`
+	Skipped  bool    `json:"skipped"`
+	Why      string  `json:"why"`
 }
 
 // SplitsView is the partition as served: dev task ids, audit and sealed
@@ -126,6 +193,11 @@ type RoundView struct {
 	Cost       RoundCost      `json:"cost"`
 	StartedAt  time.Time      `json:"started_at"`
 	FinishedAt *time.Time     `json:"finished_at,omitempty"`
+
+	Candidates []CandidateView `json:"candidates,omitempty"`
+	Commit     *CommitView     `json:"commit,omitempty"`
+	Winner     string          `json:"winner,omitempty"`
+	Stages     []StageResult   `json:"stages,omitempty"`
 }
 
 // LineageView is the lineage tree: one node per version with its last
@@ -190,8 +262,9 @@ func (r *Runner) View(rec *Record) *Detail {
 		d.Curve = append(d.Curve, CurvePoint{Round: 0, Dev: ptr(b.Dev.Mean), Sealed: ptr(b.Sealed.Mean), Event: NodeBase})
 		d.Cost.Baseline = b.CostUSD
 	}
+	hidden := hiddenTasks(rec)
 	for _, rd := range rec.Rounds {
-		d.Rounds = append(d.Rounds, roundView(rd))
+		d.Rounds = append(d.Rounds, roundView(rd, hidden))
 		d.Curve = append(d.Curve, curvePoint(rd))
 		d.Integrity = append(d.Integrity, integrityRow(rd))
 		d.Cost.Rounds = append(d.Cost.Rounds, rd.Cost)
@@ -213,7 +286,42 @@ func (r *Runner) View(rec *Record) *Detail {
 		d.Cost.Rounds = []RoundCost{}
 	}
 	d.Lineage = r.lineageView(rec.ID)
+	r.viewW4(d, rec)
 	return d
+}
+
+// viewW4 fills the run page's additions.
+func (r *Runner) viewW4(d *Detail, rec *Record) {
+	d.Estimate, d.SpentUSD, d.LimitUSD, d.Revision, d.Study = rec.Estimate, rec.SpentUSD, rec.Spec.Budget.TotalUSD, rec.Revision, rec.Study
+	d.CanResume = !d.Running && resumable(rec) == nil
+	d.CanContinue = CanContinue(rec) == nil
+	for _, k := range rec.Keep {
+		d.Keep = append(d.Keep, KeepView{Ref: k.Ref, DevDiff: k.DevDiff, Led: k.Led})
+	}
+	d.Final, d.Extension = finalView(rec.Final), finalView(rec.Extension)
+	if d.CanContinue && rec.Verdict != nil && rec.Verdict.Continue == nil {
+		v := *rec.Verdict
+		n := 0
+		if rec.Final != nil {
+			n = rec.Final.N
+		}
+		perRun := 0.0
+		if rec.Estimate != nil {
+			perRun = rec.Estimate.USD.PerRun
+		}
+		v.Continue = ContinueOfferFor(rec, ContinueRequest{ExtraTrials: 2, NewTasks: true}, max(0, TasksNeededForTarget(rec)-n), perRun)
+		if Wording != nil {
+			Wording(&v, rec)
+		}
+		d.Verdict = &v
+	}
+}
+
+func finalView(f *FinalClaim) *FinalView {
+	if f == nil {
+		return nil
+	}
+	return &FinalView{N: f.N, NNonzero: f.NNonzero, Gain: f.Gain, CI80: f.CI80, CI95: f.CI95, PUpper: f.PUpper, Trials: f.Trials}
 }
 
 // Lineage returns the lineage view of an improvement.
@@ -249,26 +357,84 @@ func (r *Runner) lineageView(id string) LineageView {
 	return lv
 }
 
-func roundView(rd *Round) RoundView {
+func roundView(rd *Round, hidden []string) RoundView {
 	v := RoundView{N: rd.N, Stage: rd.Stage, Decision: rd.Decision, Why: rd.Why, Parent: rd.Parent.Ref, Improver: rd.Improver,
-		Diff: rd.Diff, Gates: rd.Gates, Tripwires: rd.Tripwires, Approvals: rd.Approvals, Cost: rd.Cost, StartedAt: rd.StartedAt, FinishedAt: rd.FinishedAt}
+		Diff: rd.Diff, Gates: hideGateTasks(rd.Gates, hidden), Tripwires: rd.Tripwires, Approvals: rd.Approvals, Cost: rd.Cost, StartedAt: rd.StartedAt, FinishedAt: rd.FinishedAt}
 	if rd.Candidate != nil {
 		v.Candidate = rd.Candidate.Ref
 	}
-	v.Screen, v.Audit = compareView(rd.Screen), compareView(rd.Audit)
+	v.Screen, v.Audit = compareView(rd.Screen, PhaseScreen), compareView(rd.Audit, PhaseAudit)
 	if rd.Sealed != nil {
 		s := scoreView(*rd.Sealed)
 		v.Sealed = &s
 	}
+	v.Winner, v.Stages = rd.Winner, rd.Stages
+	for _, c := range rd.Candidates {
+		cv := CandidateView{ID: c.ID, Slot: c.Slot, Kind: c.Kind, Source: c.Source, Dropped: c.Dropped, DevDiff: c.DevDiff, DevTasks: c.DevTasks, CostUSD: c.CostUSD}
+		for _, e := range c.Edits {
+			cv.Edits = append(cv.Edits, EditView{Op: e.Op, ID: e.ID, Reason: e.Reason, Result: e.Result, Why: e.Why})
+		}
+		v.Candidates = append(v.Candidates, cv)
+	}
+	if c := rd.Commit; c != nil {
+		v.Commit = &CommitView{P: c.P, Level: c.Level, Mean: c.Mean, N: c.N, NNonzero: c.NNonzero, Missing: c.Missing, Skipped: c.Skipped, Why: c.Why}
+	}
 	return v
 }
 
-func compareView(c *Comparison) *CompareView {
+// compareView is a comparison as served. Only the practice screen keeps
+// its experiment id: an audit (gate) experiment would name the gate tasks
+// (A1.10).
+func compareView(c *Comparison, phase string) *CompareView {
 	if c == nil {
 		return nil
 	}
-	return &CompareView{ExpID: c.ExpID, A: scoreView(c.A), B: scoreView(c.B), MeanDiff: c.MeanDiff, Pairs: c.Pairs, P: c.P,
+	v := &CompareView{A: scoreView(c.A), B: scoreView(c.B), MeanDiff: c.MeanDiff, Pairs: c.Pairs, P: c.P,
 		EValue: c.EValue, Greedy: c.Greedy, HoneypotPasses: c.HoneypotPasses}
+	if phase == PhaseScreen {
+		v.ExpID = c.ExpID
+	}
+	return v
+}
+
+// hiddenTasks are the task ids a report never names: the gate and
+// held-out splits.
+func hiddenTasks(rec *Record) []string {
+	return append(append([]string(nil), rec.Splits.Audit...), rec.Splits.Sealed...)
+}
+
+// hiddenTaskText replaces a gate or held-out task id in served text.
+const hiddenTaskText = "a gate or held-out task"
+
+// hideGateTasks copies gates with every gate or held-out task id in their
+// detail and evidence replaced, so a fired answer-key gate does not serve
+// the id it matched.
+func hideGateTasks(gates []GateResult, hidden []string) []GateResult {
+	if len(gates) == 0 || len(hidden) == 0 {
+		return gates
+	}
+	out := make([]GateResult, len(gates))
+	for i, g := range gates {
+		g.Detail = hideIDs(g.Detail, hidden)
+		if g.Evidence != nil {
+			ev := make([]string, len(g.Evidence))
+			for j, e := range g.Evidence {
+				ev[j] = hideIDs(e, hidden)
+			}
+			g.Evidence = ev
+		}
+		out[i] = g
+	}
+	return out
+}
+
+func hideIDs(s string, hidden []string) string {
+	for _, id := range hidden {
+		if id != "" && strings.Contains(s, id) {
+			s = strings.ReplaceAll(s, id, hiddenTaskText)
+		}
+	}
+	return s
 }
 
 func scoreView(s ArmScore) ScoreView {

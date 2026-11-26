@@ -15,6 +15,8 @@ member who asked for it. A weekly digest sums up the week.
 | `release.blocked` | The evaluated version cannot be released without an override (its gate failed, or the release policy blocks it). | Slack, Teams |
 | `schedule.failed` | A scheduled check could not start (`refused`), could not finish (`error`) or ran and failed its check (`failed`). A trigger skipped because the previous run was still going is not a failure. | |
 | `worker.offline` | A connected worker of the organization stopped sending heartbeats (hosted servers, checked every minute). Sent once per drop; it fires again only after the worker came back. | |
+| `improvement.finished` | An improvement run ended: `done`, `stopped` or `failed`. Data `{improvement_id, name, agent, suite, status, state, headline, gain_points, spent_usd, url}`; Slack and Teams show the verdict's headline. | |
+| `improvement.paused` | An improvement run paused for a person's approval (a check fired on a candidate). Same data as `improvement.finished`. | |
 | `experiment.finished` | A single comparison ended (older event, kept for existing receivers). | signed JSON |
 | `job.failed` | Any other background job failed. | |
 | `ping` | The Send test button. Always delivered to the hook tested. | |
