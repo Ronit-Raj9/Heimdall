@@ -16,6 +16,8 @@ import (
 
 	"github.com/maximhq/bifrost/bench/dataset"
 	"github.com/maximhq/bifrost/bench/scaffold"
+	"github.com/maximhq/bifrost/bench/taskcat"
+	"github.com/maximhq/bifrost/bench/taskguard"
 )
 
 // WriteBenchmark writes a generated draft's tasks into suiteDir, pending
@@ -134,6 +136,18 @@ func WriteBenchmark(suiteDir string, st Store, d *Draft, judge *scaffold.JudgeCo
 		}
 		if err := writeFileAtomic(suitePath, y); err != nil {
 			return nil, err
+		}
+	}
+	// W4-44: the quality guard record and the kind of work of each written
+	// task. A failure never fails the write: admission then derives what the
+	// guard needs from the task files.
+	for _, t := range tasks {
+		dir := filepath.Join(suiteDir, "tasks", t.ID)
+		if err := taskguard.Write(dir, guardRecordOf(d, d.Plans[t.Line-1].Scenario)); err != nil {
+			slog.Warn("quality guard record not written", "task", t.ID, "err", err)
+		}
+		if err := taskcat.Set(suiteDir, t.ID, taskcat.Label{Category: taskcat.Policy, Source: taskcat.SourceRule, Sure: true, Why: "policy builder"}); err != nil {
+			slog.Warn("task category not written", "task", t.ID, "err", err)
 		}
 	}
 	d.Written = append(d.Written, written...)
@@ -269,4 +283,31 @@ func Review(suiteDir string, d *Draft, taskID, decision, by string) error {
 		slog.Warn("dataset version not recorded", "benchmark", d.Suite, "err", err)
 	}
 	return nil
+}
+
+// guardRecordOf is the quality guard record of one written task: the
+// reference reply and the reference call argument values of 12 characters
+// or more must not be in the instruction, except values the customer gives
+// in the scenario (opening message and facts), which the agent must be told.
+// The instruction is built from rules a person approved, so it is clear by
+// person.
+func guardRecordOf(d *Draft, sc Scenario) taskguard.Record {
+	given := strings.ToLower(sc.Opening + "\n" + strings.Join(sc.Facts, "\n"))
+	var leaks []string
+	add := func(v string) {
+		v = strings.TrimSpace(v)
+		if len([]rune(v)) >= 12 && !strings.Contains(given, strings.ToLower(v)) {
+			leaks = append(leaks, v)
+		}
+	}
+	add(sc.Reply)
+	for _, a := range sc.Expected {
+		for _, v := range a.Args {
+			if s, ok := v.(string); ok {
+				add(s)
+			}
+		}
+	}
+	return taskguard.Record{Builder: taskguard.BuilderAPI, Source: "app task draft " + d.ID, LeakTexts: leaks,
+		Clarity: &taskguard.Clarity{Verdict: taskguard.ClarityClear, Origin: taskguard.OriginPerson}}
 }
