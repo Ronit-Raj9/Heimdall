@@ -2,17 +2,36 @@ import { BlockSkeleton } from "@/components/runs/screenStates";
 import { useGetVersionExplainQuery } from "@/lib/store/apis/improveApi";
 import type { ExplainFile, RoundView, VersionExplain } from "@/lib/types/improve";
 import { cn } from "@/lib/utils";
+import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import "./w45impI18n";
 
 /** The bundle key of the standing instructions (improve.InstructionsKey). */
 export const INSTRUCTIONS_KEY = "@instructions";
 
+/** The agent id of a version ref "agents/<id>.yaml@v<n>", or "" for any other ref. */
+export function agentOfRef(ref: string): string {
+	const m = /^agents\/([A-Za-z0-9._-]+)\.yaml@v\d+$/.exec(ref);
+	return m ? m[1] : "";
+}
+
 /** What changed in a version and why (A4.3): each file's diff, then each edit with its reason and result. */
 export function VersionExplainView({ explain: x }: { explain: VersionExplain }) {
 	const { t } = useTranslation("w45imp");
+	const agent = agentOfRef(x.ref);
 	return (
 		<div className="flex flex-col gap-3 text-xs" data-testid="version-explain">
+			{agent && (
+				<Link
+					to="/agents/$agentId"
+					params={{ agentId: agent }}
+					search={{ tab: "versions" } as never}
+					className="text-primary w-fit underline-offset-2 hover:underline"
+					data-testid="version-explain-open"
+				>
+					{t("explain.open")}
+				</Link>
+			)}
 			{x.rationale && (
 				<div>
 					<p className="text-foreground font-medium">{t("explain.rationale")}</p>

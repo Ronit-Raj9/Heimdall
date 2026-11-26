@@ -98,7 +98,7 @@
 		"evidence": "from {{count}} practice runs",
 		"predicts": "expected to fix {{count}} practice tasks",
 		"result": "Result: {{result}}",
-		"open": "Open this version",
+		"open": "Open the agent's saved versions",
 		"rejected": "Ideas not kept",
 		"rejectedRow": "Round {{n}}: {{why}}",
 		"noLines": "No change to the text of this file."

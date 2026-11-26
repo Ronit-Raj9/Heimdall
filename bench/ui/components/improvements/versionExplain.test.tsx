@@ -1,9 +1,13 @@
 import "@/lib/i18n";
 
 import { render } from "@/lib/testing/render";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { EXPLAIN_FIXTURE } from "./improve.fixtures";
 import { VersionExplainView } from "./versionExplain";
+
+vi.mock("@tanstack/react-router", () => ({
+	Link: ({ children, ...p }: { children: React.ReactNode; "data-testid"?: string }) => <a data-testid={p["data-testid"]}>{children}</a>,
+}));
 
 describe("VersionExplainView", () => {
 	it("shows each changed file with its diff and each edit with its reason, evidence count and result", () => {
