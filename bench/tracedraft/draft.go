@@ -105,7 +105,45 @@ func Draft(ctx context.Context, c investigator.Caller, in Input) (*Proposal, err
 	p.Guide = fieldsFor(in.Kind, draft.Guide)
 	p.Dropped += keepKnownTools(&p.Guide, sess)
 	p.Reasons, p.Dropped = verified(draft.Reasons, src, p.Dropped)
+	scrubProposal(p)
 	return p, nil
+}
+
+// scrubProposal runs the session redactor over every text of the proposal
+// the model wrote, so a key, email or home folder name the model made up or
+// echoed is never stored or shown. Quotes were checked against the redacted
+// session already; redaction is idempotent, so they stay as checked.
+func scrubProposal(p *Proposal) {
+	r := traceimport.NewRedactor()
+	g := &p.Guide
+	g.Instruction, g.ReplyRubric = r.Text(g.Instruction), r.Text(g.ReplyRubric)
+	for i := range g.Answers {
+		g.Answers[i] = r.Text(g.Answers[i])
+	}
+	for i := range g.WrongAnswers {
+		g.WrongAnswers[i] = r.Text(g.WrongAnswers[i])
+	}
+	for _, calls := range [][]schemas.InboxGuideCall{g.Calls, g.Forbidden} {
+		for i := range calls {
+			if len(calls[i].Args) == 0 {
+				continue
+			}
+			raw, err := json.Marshal(calls[i].Args)
+			if err != nil {
+				continue
+			}
+			var args map[string]any
+			if json.Unmarshal(r.JSON(raw), &args) == nil {
+				calls[i].Args = args
+			}
+		}
+	}
+	for i := range p.Reasons {
+		p.Reasons[i].Text = r.Text(p.Reasons[i].Text)
+		for j := range p.Reasons[i].Quotes {
+			p.Reasons[i].Quotes[j].Text = r.Text(p.Reasons[i].Quotes[j].Text)
+		}
+	}
 }
 
 var errOtherModel = errors.New("other model")
