@@ -4,6 +4,8 @@ import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import "@/app/agents/views/w4m1I18n";
+import { canRetry } from "@/lib/requestErrors";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
 	type AgentVersion,
@@ -61,6 +63,9 @@ export default function VersionsTab({ agentId }: { agentId: string }) {
 	const [selected, setSelected] = useState<number | null>(null);
 	const [saved, setSaved] = useState<ReturnType<typeof saveOutcome>["message"] | null>(null);
 	const versions = sortVersions(versionsQuery.data?.versions ?? []);
+	// An agent known only from its runs has no settings file: no versions and nothing to save (p01-2).
+	const noFile = Boolean(versionsQuery.data?.no_file);
+	const { t: tm } = useTranslation("w4m1");
 
 	const save = async () => {
 		setSaved(null);
@@ -80,28 +85,30 @@ export default function VersionsTab({ agentId }: { agentId: string }) {
 				description={t("versions.description")}
 				testId="agent-versions-section"
 				actions={
-					<form
-						className="flex flex-wrap items-center gap-2"
-						onSubmit={(e) => {
-							e.preventDefault();
-							void save();
-						}}
-					>
-						<Input
-							value={note}
-							onChange={(e) => {
-								setNote(e.target.value);
-								setSaved(null);
+					noFile ? undefined : (
+						<form
+							className="flex flex-wrap items-center gap-2"
+							onSubmit={(e) => {
+								e.preventDefault();
+								void save();
 							}}
-							placeholder={t("versions.notePlaceholder")}
-							aria-label={t("versions.note")}
-							className="h-8 w-56"
-							data-testid="agent-versions-note"
-						/>
-						<Button type="submit" size="sm" disabled={createState.isLoading} data-testid="agent-versions-save">
-							{createState.isLoading ? t("versions.saving") : t("versions.save")}
-						</Button>
-					</form>
+						>
+							<Input
+								value={note}
+								onChange={(e) => {
+									setNote(e.target.value);
+									setSaved(null);
+								}}
+								placeholder={t("versions.notePlaceholder")}
+								aria-label={t("versions.note")}
+								className="h-8 w-56"
+								data-testid="agent-versions-note"
+							/>
+							<Button type="submit" size="sm" disabled={createState.isLoading} data-testid="agent-versions-save">
+								{createState.isLoading ? t("versions.saving") : t("versions.save")}
+							</Button>
+						</form>
+					)
 				}
 			>
 				{saved && (
@@ -120,9 +127,11 @@ export default function VersionsTab({ agentId }: { agentId: string }) {
 					<LoadError
 						title={t("versions.loadError")}
 						error={versionsQuery.error}
-						onRetry={() => void versionsQuery.refetch()}
+						onRetry={canRetry(versionsQuery.error) ? () => void versionsQuery.refetch() : undefined}
 						testId="agent-versions-error"
 					/>
+				) : noFile ? (
+					<EmptyNote testId="versions-no-file">{tm("versions.noFile")}</EmptyNote>
 				) : versions.length === 0 ? (
 					<EmptyNote testId="agent-versions-empty">{t("versions.empty")}</EmptyNote>
 				) : (

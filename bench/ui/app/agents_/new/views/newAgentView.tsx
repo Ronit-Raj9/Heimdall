@@ -19,7 +19,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Bot, Check, ChevronRight, Code2, Hammer, Layers, Plug, SquareTerminal, type LucideIcon } from "lucide-react";
 import { AgentAvatar, useAdapterLabel } from "../../../agents/views/agentDisplay";
 import { parseAsString, useQueryState } from "nuqs";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
 	DEFAULT_PULL_OPTIONS,
 	defaultParams,
@@ -146,6 +146,24 @@ export default function NewAgentView() {
 		const res = await dryRun({ ...body, dry_run: true });
 		if ("data" in res && res.data) setPreview(res.data.yaml);
 	};
+	// While the preview is open it follows the form: half a second after the last change it is
+	// fetched again (p02-2). previewOpen keeps the effect from running on its own setPreview.
+	const previewOpen = useRef(false);
+	previewOpen.current = preview !== null;
+	const bodyKey = JSON.stringify(body);
+	const pullKey = JSON.stringify(pullOpts);
+	useEffect(() => {
+		if (!previewOpen.current || !body) return;
+		const id = setTimeout(async () => {
+			if (isPull) setPreview(pullAgentYAML(name, pullOpts, notes));
+			else {
+				const res = await dryRun({ ...body, dry_run: true });
+				if ("data" in res && res.data && previewOpen.current) setPreview(res.data.yaml);
+			}
+		}, 500);
+		return () => clearTimeout(id);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [bodyKey, pullKey, notes, name]);
 	const onTest = () => {
 		if (body) void testEndpoint({ template: body });
 	};

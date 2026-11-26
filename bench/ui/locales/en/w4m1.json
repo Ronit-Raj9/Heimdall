@@ -1,0 +1,28 @@
+{
+	"agentDiff": {
+		"noBaseline": "No earlier version of {{agent}} ran a benchmark this version ran. Pick version A by hand."
+	},
+	"versions": {
+		"noFile": "This agent has no settings file, so it has no versions. Its runs still show on the Runs tab."
+	},
+	"runs": {
+		"noneFailed": "No run of this agent failed."
+	},
+	"compareModels": {
+		"estimate": "{{runs}}. {{cost}}. {{time}}",
+		"runs_one": "{{count}} run",
+		"runs_other": "{{count}} runs",
+		"about": "About {{minutes}}.",
+		"timeUnknown": "Time not known.",
+		"waiting": "Working out the cost...",
+		"error": "Could not estimate the cost. Change a setting to try again.",
+		"waitReason": "Wait for the cost estimate."
+	},
+	"tokens": {
+		"ingestPanel": "Ingest tokens are listed on the Inbox page, under Push failures in, where you can turn them off.",
+		"ingestAccess": "Ingest tokens for traces and failures are managed on the Inbox page."
+	},
+	"secrets": {
+		"nameHint": "Names use capital letters, digits and underscores. What you type is changed to fit."
+	}
+}

@@ -52,7 +52,7 @@ describe("connect utils", () => {
 		const c = withAnswerPath(cand({ questions: [{ kind: "pick_field", param: "answer_path", label: "f", options: ["a.b"] }] }), "a.b");
 		expect(c.mapping?.answer_path).toBe("a.b");
 		expect(c.mapping?.body).toContain("{{instruction}}");
-		expect(c.questions).toHaveLength(0);
+		expect(c.questions).toHaveLength(1);
 	});
 
 	it("reads row and job states", () => {

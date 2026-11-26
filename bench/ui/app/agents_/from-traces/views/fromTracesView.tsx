@@ -18,6 +18,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Radio } from "lucide-react";
 import { useEffect, useId, useState, type ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
+import "@/app/agents/views/w4m1I18n";
 
 const POLL_MS = 5000;
 
@@ -94,6 +95,7 @@ function CopyBlock({ label, text, testId }: { label: string; text: string; testI
 
 function EndpointSection({ info }: { info: TraceConnectInfo }) {
 	const { t } = useTranslation("connectTraces");
+	const { t: tm } = useTranslation("w4m1");
 	const session = useSession();
 	const [token, setToken] = useState<string | null>(null);
 	const [setupId, setSetupId] = useState(info.setup[0]?.id ?? "otel");
@@ -127,6 +129,11 @@ function EndpointSection({ info }: { info: TraceConnectInfo }) {
 							<span className="text-xs" data-testid="from-traces-token">
 								{t("endpoint.tokenShown")} <code className="bg-muted rounded px-1">{token}</code>
 							</span>
+						)}
+						{token && (
+							<a href="/inbox" className="text-primary text-xs underline-offset-4 hover:underline" data-testid="from-traces-ingest-note">
+								{tm("tokens.ingestPanel")}
+							</a>
 						)}
 						{tokenState.isError && <span className="text-destructive text-xs">{getBenchErrorMessage(tokenState.error)}</span>}
 					</div>
