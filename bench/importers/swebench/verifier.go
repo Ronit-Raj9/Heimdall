@@ -252,6 +252,7 @@ def parse_django(log):
 def junit_ids(classname, name, file):
     """Every pytest node id a JUnit testcase can stand for."""
     ids = set()
+    ids.add(classname + "::" + name)
     parts = [p for p in classname.split(".") if p]
     if file:
         file = file.replace("\\", "/")
