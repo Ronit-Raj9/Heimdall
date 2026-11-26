@@ -1,4 +1,4 @@
-name: Bench Check
+name: Heimdall gate
 
 # The agent release gate of Bifrost Bench (bench/docs/ci.md). Every pull
 # request that changes an agent (its config, prompt, notes file, model or
@@ -10,6 +10,8 @@ name: Bench Check
 # gateway, no provider key and no secret. The live job at the bottom runs a
 # real experiment on a self-hosted runner and is commented out.
 on:
+  push:
+    branches: [main, r-hw]
   pull_request:
     paths:
       - "bench/agents/**"

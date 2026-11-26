@@ -1,0 +1,11 @@
+# Lint for Heimdall's Go code. CI reports new issues only.
+version: "2"
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - ineffassign
+    - errcheck
+issues:
+  new: true
