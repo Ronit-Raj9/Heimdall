@@ -17,6 +17,8 @@ import (
 	"github.com/maximhq/bifrost/bench/importers/swebench"
 	"github.com/maximhq/bifrost/bench/issuebench"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/taskcat"
+	"github.com/maximhq/bifrost/bench/taskguard"
 )
 
 // Input is one validated candidate with its environment and a checkout of
@@ -336,7 +338,37 @@ func finishTask(dir string, p prepared, heldOut bool) error {
 	if err := enc.Close(); err != nil {
 		return err
 	}
-	return os.WriteFile(path, buf.Bytes(), 0o644)
+	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+		return err
+	}
+	// W4-44: the quality guard record and the kind of work, once the task
+	// folder is complete. A failure never fails the emit.
+	_ = taskguard.Write(dir, guardRecordOf(p.in.Validation))
+	_ = taskcat.Set(filepath.Dir(filepath.Dir(dir)), filepath.Base(dir), categoryOf(p.in.Validation))
+	return nil
+}
+
+// guardRecordOf is the quality guard record of an issue task: the commit
+// pair, the flaky tests validation dropped, and the model's clarity check.
+func guardRecordOf(v issuebench.Validation) taskguard.Record {
+	verdict := taskguard.ClarityUnclear
+	if v.Checks.Clear {
+		verdict = taskguard.ClarityClear
+	}
+	c := v.Candidate
+	return taskguard.Record{Builder: taskguard.BuilderIssue, Source: c.BaseSHA + ".." + c.MergeSHA, FlakyTests: v.Flaky,
+		Clarity: &taskguard.Clarity{Verdict: verdict, Origin: taskguard.OriginModel}}
+}
+
+// categoryOf labels an issue task by the rules: the files the fix changed
+// and the issue title.
+func categoryOf(v issuebench.Validation) taskcat.Label {
+	t := &schemas.Task{Provenance: &schemas.TaskProvenance{CreatedBy: "heimdall issuebench emit"}}
+	l, ok := taskcat.Rules(taskcat.Inputs{Task: t, ChangedFiles: v.Candidate.CodeFiles, CommitSubject: v.Candidate.IssueTitle})
+	if !ok {
+		return taskcat.Label{}
+	}
+	return l
 }
 
 func str(v string) *yaml.Node { return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: v} }

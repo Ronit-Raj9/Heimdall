@@ -40,6 +40,7 @@ import (
 	"github.com/maximhq/bifrost/bench/graders"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
+	"github.com/maximhq/bifrost/bench/taskguard"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
@@ -396,5 +397,6 @@ func admissionRecordOf(s *schemas.Suite, t hostedAdmitTask) *schemas.AdmissionRe
 			rec.Admitted = false
 		}
 	}
+	rec = taskguard.Apply(s, taskByID(s, t.Task), rec)
 	return rec
 }

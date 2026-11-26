@@ -1,7 +1,9 @@
+import "@/components/guard/w444I18n";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import i18n from "@/lib/i18n";
 import type { Report, ReportMetrics, ReportSlice } from "@/lib/store/apis/evaluationsApi";
 import { cn } from "@/lib/utils";
 import { Filter, X } from "lucide-react";
@@ -16,6 +18,17 @@ export function whereText(where: Record<string, string> | undefined): string {
 	return Object.entries(where ?? {})
 		.map(([k, v]) => `${k} = ${v}`)
 		.join(" and ");
+}
+
+/** The words for a segment key and its value: the task category key reads "By kind of work" and its values plain words ("bug_fix (unsure)" reads "Bug fix (unsure)"); every other key and value is shown as it is. */
+export function sliceLabel(key: string, value?: string): string {
+	if (key !== "category") return value ?? key;
+	if (value === undefined) return i18n.t("categories.heading", { ns: "w444" });
+	const unsure = value.endsWith(" (unsure)");
+	const cat = unsure ? value.slice(0, -" (unsure)".length) : value;
+	const names = i18n.t("categories.names", { ns: "w444", returnObjects: true }) as Record<string, string>;
+	const word = names[cat] ?? cat;
+	return unsure ? `${word} ${i18n.t("categories.unsure", { ns: "w444" })}` : word;
 }
 
 /** The segment keys worth showing: at least one value. */
@@ -89,15 +102,15 @@ export function ReportSlices({ report, onShowOnly }: ReportSlicesProps) {
 								onClick={() => setPicked(i)}
 								data-testid={`slice-key-${s.key}`}
 							>
-								{s.key}
+								{sliceLabel(s.key)}
 							</Button>
 						))}
 					</div>
 				)}
-				<Table aria-label={`Score by ${slice.key}`}>
+				<Table aria-label={`Score by ${sliceLabel(slice.key)}`}>
 					<TableHeader>
 						<TableRow>
-							<TableHead scope="col">{slice.key}</TableHead>
+							<TableHead scope="col">{sliceLabel(slice.key)}</TableHead>
 							<TableHead scope="col" className="text-right">
 								Tasks
 							</TableHead>
@@ -125,7 +138,7 @@ export function ReportSlices({ report, onShowOnly }: ReportSlicesProps) {
 								<TableRow key={v.value} data-testid={`slice-${slice.key}-${v.value}`} className={cn(v.small && "text-muted-foreground")}>
 									<TableHead scope="row" className="font-medium">
 										<span className="flex flex-col gap-0.5">
-											<span>{v.value}</span>
+											<span>{sliceLabel(slice.key, v.value)}</span>
 											{v.small && <span className="text-xs font-normal">Too few tasks to rank</span>}
 										</span>
 									</TableHead>
