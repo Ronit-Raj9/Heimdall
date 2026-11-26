@@ -114,6 +114,11 @@ export function VerdictPromote({
 }
 
 /** VerdictPromote with what the setups differ in, read from the experiment status. */
+/** Whether the "Use model" advice shows (p05-4): never while the comparison is still running. */
+export function showPromote(partial: boolean): boolean {
+	return !partial;
+}
+
 export function ExperimentVerdictPromote({
 	expId,
 	arms,
@@ -280,7 +285,9 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 				</p>
 			)}
 
-			<ExperimentVerdictPromote expId={payload.exp_id} arms={arms} evaluationId={evaluationId} decision={payload.verdict.decision} />
+			{showPromote(partial) && (
+				<ExperimentVerdictPromote expId={payload.exp_id} arms={arms} evaluationId={evaluationId} decision={payload.verdict.decision} />
+			)}
 
 			<VerdictTabNotes
 				partial={partial ? { done: status.data?.slots.done ?? 0, total: status.data?.slots.total ?? 0 } : undefined}

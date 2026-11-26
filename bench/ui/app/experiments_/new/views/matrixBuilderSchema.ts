@@ -388,3 +388,13 @@ export function builderAgentGroups(catalog: Catalog, ids: BuilderAgentIds | unde
 		builtIn: agents.filter((a) => ids.baselines.includes(a.id) && !ids.yours.includes(a.id)),
 	};
 }
+/**
+ * The model rows with the prefilled model names emptied, when the rows are still exactly the
+ * builder's defaults (p06-6): with two or more agents an untouched default model would override each
+ * agent's own model. Providers are kept. Rows the person changed come back unchanged.
+ */
+export function clearDefaultModels(models: ModelRef[], defaults: readonly ModelRef[]): ModelRef[] {
+	const same =
+		models.length === defaults.length && models.every((m, i) => m.provider === defaults[i].provider && m.model === defaults[i].model);
+	return same ? models.map((m) => ({ ...m, model: "" })) : models;
+}

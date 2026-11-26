@@ -738,7 +738,7 @@
 			}
 		},
 		"title": "Compare runs",
-		"subtitle": "The same task, run by Setup A and Setup B in the same way, side by side.",
+		"subtitle": "The same task, run by each setup in the same way, side by side.",
 		"trace": {
 			"download": "Download trace (OTLP)",
 			"downloadAria": "Download the OpenTelemetry trace of run {{run}} (setup {{arm}}) as OTLP/JSON",
@@ -2094,7 +2094,7 @@
 	"policy": {
 		"title": "Release policy",
 		"description": "Explicit rules the candidate must meet before it ships. A policy only adds requirements; the baseline gates always run.",
-		"none": "No release policy applies to this experiment. Name one in the experiment or pass -policy to check.",
+		"none": "No release rule set applies to this comparison. Pick one on the Releases page, under Rules.",
 		"decisionLabel": "Policy decision",
 		"decision": {
 			"allow": "ALLOW",

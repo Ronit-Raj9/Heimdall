@@ -1,0 +1,24 @@
+{
+	"errors": {
+		"offline": "Could not reach the server. Check your connection, then try again.",
+		"timeout": "The server took too long to answer. Try again.",
+		"tooLarge": "This file is larger than the server accepts.",
+		"unreadable": "The server sent an answer this page could not read (status {{status}}). Try again."
+	},
+	"inputs": {
+		"whole": "Enter a whole number from {{min}} to {{max}}.",
+		"idEmpty": "Enter the {{what}}.",
+		"idFormat": "The {{what}} can use lower-case letters, digits, dots, dashes and underscores, and must start with a letter or digit."
+	},
+	"session": {
+		"busy": "The server is busy right now. Wait a moment, then press Retry."
+	},
+	"shell": {
+		"details": "Technical details"
+	},
+	"titles": {
+		"newAgent": "New agent",
+		"fromTraces": "Agent from traces",
+		"connect": "Connect an agent"
+	}
+}

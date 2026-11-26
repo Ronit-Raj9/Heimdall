@@ -24,6 +24,7 @@ import { ChevronDown, Loader2, Plus, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { suiteRef } from "./experimentFormSchema";
+import "@/app/compare/views/w4m3I18n";
 import {
 	builderAgentGroups,
 	builderPlanIsStale,
@@ -40,6 +41,7 @@ import {
 	type ReadyTasks,
 	type BuilderErrorKey,
 	type BuilderValues,
+	clearDefaultModels,
 } from "./matrixBuilderSchema";
 import { SuiteMenuItems } from "./suiteOptions";
 
@@ -246,7 +248,13 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 			"models",
 			v.models.map((row, j) => (j === i ? m : row)),
 		);
-	const toggleAgent = (path: string, on: boolean) => set("agents", on ? [...v.agents, path] : v.agents.filter((p) => p !== path));
+	// p06-6: once two agents are ticked, an untouched prefilled model would override each agent's own model, so it is cleared.
+	const toggleAgent = (path: string, on: boolean) => {
+		const agents = on ? [...v.agents, path] : v.agents.filter((p) => p !== path);
+		set("agents", agents);
+		if (agents.length >= 2 && !touchedKeys.current.has("models"))
+			setV((prev) => ({ ...prev, models: clearDefaultModels(prev.models, defaults.models) }));
+	};
 	const toggleProbe = (id: string, on: boolean) => set("probes", on ? [...v.probes, id] : v.probes.filter((p) => p !== id));
 
 	return (
@@ -575,7 +583,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 							</div>
 						</dl>
 						<p className="text-muted-foreground text-[11px]" data-testid="builder-preview-runs">
-							{t("preview.arms", { count: preview.arms.length })}
+							{t("preview.arms", { ns: "w4m3", count: preview.arms.length })}
 							{", "}
 							{t("preview.runs", {
 								runs: preview.maxRuns,

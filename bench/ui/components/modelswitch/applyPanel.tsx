@@ -1,5 +1,7 @@
 import "@/lib/types/modelSwitchI18n";
+import "@/app/compare/views/w4m3I18n";
 import { Button } from "@/components/ui/button";
+import { WhyDisabled } from "@/components/ui/whyDisabled";
 import { type ModelSwitchApplyResult, useApplyModelSwitchMutation } from "@/lib/store/apis/modelSwitchApi";
 import { useListSecretsQuery } from "@/lib/store/apis/secretsApi";
 import { useState } from "react";
@@ -21,8 +23,16 @@ export function applyReady(url: string, scope: ApplyScope, scopeId: string, allo
 	return scope === "global" ? allowGlobal : scopeId.trim() !== "";
 }
 
+/** What still keeps Preview and Apply off (p06-4), or null when the form may send. */
+export function applyMissing(url: string, scope: ApplyScope, scopeId: string, allowGlobal: boolean): "url" | "scopeId" | "global" | null {
+	if (url.trim() === "") return "url";
+	if (scope === "global") return allowGlobal ? null : "global";
+	return scopeId.trim() === "" ? "scopeId" : null;
+}
+
 export function ApplyPanel({ evaluationId, ruleCount }: { evaluationId: string; ruleCount: number }) {
 	const { t } = useTranslation("modelSwitch");
+	const { t: tw } = useTranslation("w4m3");
 	const [url, setUrl] = useState("");
 	const [secret, setSecret] = useState("");
 	const [enable, setEnable] = useState(false);
@@ -51,6 +61,8 @@ export function ApplyPanel({ evaluationId, ruleCount }: { evaluationId: string; 
 	};
 	const err = state.error as { data?: { error?: { message?: string } } } | undefined;
 	const ready = applyReady(url, scope, scopeId, allowGlobal);
+	const missing = applyMissing(url, scope, scopeId, allowGlobal);
+	const why = missing === null ? null : missing === "scopeId" ? tw("apply.why.scopeId", { what: tw(`apply.why.${scope as "virtual_key" | "team" | "customer"}`) }) : tw(`apply.why.${missing}`);
 	return (
 		<div className="flex flex-col gap-2 rounded-lg border p-3 text-sm" data-testid="model-switch-apply">
 			<span className="font-medium">{t("export.apply.title")}</span>
@@ -103,13 +115,14 @@ export function ApplyPanel({ evaluationId, ruleCount }: { evaluationId: string; 
 				</label>
 			)}
 			<div className="flex gap-2">
-				<Button size="sm" variant="outline" disabled={!ready || state.isLoading} onClick={() => run(true)} dataTestId="model-switch-apply-preview">
+				<Button size="sm" variant="outline" disabled={!ready || state.isLoading} aria-describedby={why ? "model-switch-apply-why" : undefined} onClick={() => run(true)} dataTestId="model-switch-apply-preview">
 					{t("export.apply.dryRun")}
 				</Button>
-				<Button size="sm" disabled={!ready || state.isLoading} onClick={() => run(false)} dataTestId="model-switch-apply-run">
+				<Button size="sm" disabled={!ready || state.isLoading} aria-describedby={why ? "model-switch-apply-why" : undefined} onClick={() => run(false)} dataTestId="model-switch-apply-run">
 					{t("export.apply.run")}
 				</Button>
 			</div>
+			<WhyDisabled reason={state.isLoading ? null : why} testId="model-switch-apply-why" />
 			{err && (
 				<p className="text-destructive" role="alert">
 					{t("export.apply.error", { message: err.data?.error?.message ?? "" })}

@@ -26,6 +26,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"net"
 	"net/url"
 	"path/filepath"
 	"strings"
@@ -336,6 +338,43 @@ func (h *shareHandler) sub(ctx *fasthttp.RequestCtx, pathAndQuery string) (int, 
 	return sub.Response.StatusCode(), append([]byte(nil), sub.Response.Body()...), string(sub.Response.Header.ContentType())
 }
 
+// subSnapshot is what sub reads from the current request, copied once so
+// several sub-requests can run at the same time without touching ctx.
+type subSnapshot struct {
+	host   []byte
+	remote net.Addr
+	values []subUserValue
+}
+
+type subUserValue struct {
+	key   []byte
+	value any
+}
+
+func snapshotForSub(ctx *fasthttp.RequestCtx) subSnapshot {
+	s := subSnapshot{host: append([]byte(nil), ctx.Host()...), remote: ctx.RemoteAddr()}
+	ctx.VisitUserValues(func(k []byte, v any) {
+		s.values = append(s.values, subUserValue{key: append([]byte(nil), k...), value: v})
+	})
+	return s
+}
+
+// subSnap is sub over a snapshot of the request: the same request, built
+// from copied values, safe to call from several goroutines.
+func (h *shareHandler) subSnap(s subSnapshot, pathAndQuery string) (int, []byte, string) {
+	var req fasthttp.Request
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI(pathAndQuery)
+	req.Header.SetHostBytes(s.host)
+	var sub fasthttp.RequestCtx
+	sub.Init(&req, s.remote, nil)
+	for _, uv := range s.values {
+		sub.SetUserValueBytes(uv.key, uv.value)
+	}
+	h.self()(&sub)
+	return sub.Response.StatusCode(), append([]byte(nil), sub.Response.Body()...), string(sub.Response.Header.ContentType())
+}
+
 // errorMessage is the message of a bench error body, else the status text.
 func errorMessage(body []byte, status int) string {
 	var e struct {
@@ -431,8 +470,29 @@ func (h *shareHandler) open(ctx *fasthttp.RequestCtx) {
 			}
 		}
 	}
-	for i, p := range sharedParts(sh.Kind, sh.Target, sh.Query) {
-		status, body, _ := h.sub(ctx, p.path)
+	parts := sharedParts(sh.Kind, sh.Target, sh.Query)
+	// The parts are fetched together (p16-6): each sub-request builds its
+	// own request from one snapshot of this one, so no goroutine reads ctx.
+	snap := snapshotForSub(ctx)
+	type partAnswer struct {
+		status int
+		body   []byte
+	}
+	answers := make([]partAnswer, len(parts))
+	started := time.Now()
+	var wg sync.WaitGroup
+	for i, p := range parts {
+		wg.Add(1)
+		go func(i int, path string) {
+			defer wg.Done()
+			status, body, _ := h.subSnap(snap, path)
+			answers[i] = partAnswer{status, body}
+		}(i, p.path)
+	}
+	wg.Wait()
+	slog.Debug("shared page parts fetched", "parts", len(parts), "took", time.Since(started))
+	for i, p := range parts {
+		status, body := answers[i].status, answers[i].body
 		if status != fasthttp.StatusOK {
 			if i == 0 {
 				lib.SendError(ctx, h.env.Mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, "the shared item no longer exists")
@@ -488,7 +548,7 @@ func (h *shareHandler) badge(ctx *fasthttp.RequestCtx) {
 			svg = sharelinks.Badge("verdict", "pending", "")
 			break
 		}
-		svg = sharelinks.VerdictBadge(string(v.Verdict.Action), string(v.Verdict.Decision))
+		svg = verdictBadgeSVG(v)
 	default:
 		svg = sharelinks.Badge(label, sh.Kind, "")
 	}

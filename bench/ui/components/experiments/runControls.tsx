@@ -23,9 +23,11 @@ import {
 	type ControlLogEntry,
 	type ErrorPolicyRow,
 	type RunControls,
+	type RunControlsPatch,
 } from "@/lib/store/apis/runControlApi";
 import type { Evaluation } from "@/lib/store/apis/evaluationsApi";
 import "@/lib/types/runControl";
+import "@/app/compare/views/w4m3I18n";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Pause, Play, RotateCcw, ShieldCheck, ShieldAlert } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -188,6 +190,7 @@ function PolicyTable({ rows }: { rows: ErrorPolicyRow[] }) {
 
 function ControlLog({ c }: { c: RunControls }) {
 	const { t } = useTranslation("runControl");
+	const { t: tw } = useTranslation("w4m3");
 	return (
 		<div className="flex min-w-0 flex-col gap-2" data-testid="control-log">
 			<p className="flex items-center gap-1.5 text-sm font-medium">
@@ -198,7 +201,7 @@ function ControlLog({ c }: { c: RunControls }) {
 				)}
 				{t("log.title")}
 				<span className="text-muted-foreground font-normal">
-					{c.log_verified ? t("log.verified", { count: c.log_entries }) : t("log.broken", { problem: c.log_problem ?? "" })}
+					{c.log_verified ? tw("controls.verified", { count: c.log_entries }) : t("log.broken", { problem: c.log_problem ?? "" })}
 				</span>
 			</p>
 			{c.log.length === 0 ? (
@@ -233,6 +236,33 @@ function numberOrNull(s: string): number | null {
 	return Number.isFinite(n) && n >= 0 ? n : NaN;
 }
 
+/**
+ * The patch the live settings form sends (p05-3): a box that repeats the value in effect sends
+ * nothing, so the log never records a change that is not one. dirty is true only when the
+ * concurrency, the spend cap or the held models change; invalid when a box holds a bad number.
+ */
+export function controlsPatch(
+	c: RunControls,
+	conc: string,
+	cap: string,
+	held: string[],
+	reason: string,
+): { patch: RunControlsPatch; dirty: boolean; invalid: boolean } {
+	const concN = numberOrNull(conc);
+	const capN = numberOrNull(cap);
+	const invalid = Number.isNaN(concN) || Number.isNaN(capN) || (concN !== null && (!Number.isInteger(concN) || concN > 64));
+	const concChanged = concN !== null && !Number.isNaN(concN) && concN !== effectiveConcurrency(c);
+	const capChanged = capN !== null && !Number.isNaN(capN) && capN !== effectiveCap(c);
+	const heldChanged = held.join(",") !== (c.state.paused_models ?? []).join(",");
+	const patch: RunControlsPatch = {
+		...(concChanged && concN !== null ? { concurrency: concN } : {}),
+		...(capChanged && capN !== null ? { total_usd: capN } : {}),
+		...(heldChanged ? { paused_models: held } : {}),
+		...(reason.trim() ? { reason: reason.trim() } : {}),
+	};
+	return { patch, dirty: concChanged || capChanged || heldChanged, invalid };
+}
+
 /** The live settings form: runs at once, spend cap, held models, reason. Members and up. */
 function LiveSettings({ c, live }: { c: RunControls; live: boolean }) {
 	const { t } = useTranslation("runControl");
@@ -242,20 +272,11 @@ function LiveSettings({ c, live }: { c: RunControls; live: boolean }) {
 	const [held, setHeld] = useState<string[]>(c.state.paused_models ?? []);
 	const [reason, setReason] = useState("");
 	useEffect(() => setHeld(c.state.paused_models ?? []), [c.state.paused_models]);
-	const concN = numberOrNull(conc);
-	const capN = numberOrNull(cap);
-	const heldChanged = held.join(",") !== (c.state.paused_models ?? []).join(",");
-	const invalid = Number.isNaN(concN) || Number.isNaN(capN) || (concN !== null && (!Number.isInteger(concN) || concN > 64));
-	const dirty = concN !== null || capN !== null || heldChanged;
+	const { patch: body, dirty, invalid } = controlsPatch(c, conc, cap, held, reason);
 	const submit = () => {
 		void patch({
 			expId: c.exp_id,
-			patch: {
-				...(concN !== null ? { concurrency: concN } : {}),
-				...(capN !== null ? { total_usd: capN } : {}),
-				...(heldChanged ? { paused_models: held } : {}),
-				...(reason.trim() ? { reason: reason.trim() } : {}),
-			},
+			patch: body,
 		})
 			.unwrap()
 			.then(() => {
