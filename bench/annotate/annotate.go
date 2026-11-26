@@ -268,7 +268,7 @@ func (q *Queue) Normalize() error {
 	sort.Strings(rs)
 	q.Reviewers = rs
 	if q.Assignment == AssignFixed && len(rs) < q.ReviewersPerItem {
-		return fmt.Errorf("%w: fixed assignment needs at least %d reviewers named (one per label an item wants)", ErrInvalid, q.ReviewersPerItem)
+		return fmt.Errorf("%w: Name at least %d people under Only these people, one for each label an item wants, or lower People per item.", ErrInvalid, q.ReviewersPerItem)
 	}
 	return nil
 }
@@ -546,6 +546,15 @@ func (s *Store) Assign(id string) (int, error) {
 // when nothing is left for them. Items already assigned to the user come
 // first, then (open mode) the oldest item that still wants people.
 func (s *Store) Next(id, user string) (*Item, *Queue, error) {
+	return s.NextSkipping(id, user, nil)
+}
+
+// NextSkipping is Next without the items in skip (wave 4, p12-3). When it
+// finds another item, it releases the caller's own reservation on each
+// skipped item that was not assigned by the queue (a fixed assignment
+// stays). When nothing else is waiting, a skipped item still reserved for
+// the caller comes back, so the caller keeps it.
+func (s *Store) NextSkipping(id, user string, skip []string) (*Item, *Queue, error) {
 	var got *Item
 	f, err := s.Update(id, func(f *File, now time.Time) error {
 		q := &f.Queue
@@ -555,10 +564,11 @@ func (s *Store) Next(id, user string) (*Item, *Queue, error) {
 		if !q.MayLabel(user) {
 			return fmt.Errorf("%w: you are not a reviewer of this queue", ErrForbidden)
 		}
+		skipped := func(it *Item) bool { return slices.Contains(skip, it.ID) }
 		pick := -1
 		for i := range f.Items {
 			it := &f.Items[i]
-			if it.Resolution == nil && !it.labelledBy(user) && it.assignedTo(user, now) {
+			if !skipped(it) && it.Resolution == nil && !it.labelledBy(user) && it.assignedTo(user, now) {
 				pick = i
 				break
 			}
@@ -566,7 +576,7 @@ func (s *Store) Next(id, user string) (*Item, *Queue, error) {
 		if pick < 0 && q.Assignment == AssignOpen {
 			for i := range f.Items {
 				it := &f.Items[i]
-				if it.Resolution == nil && !it.labelledBy(user) && it.openSlots(q.ReviewersPerItem, now) > 0 {
+				if !skipped(it) && it.Resolution == nil && !it.labelledBy(user) && it.openSlots(q.ReviewersPerItem, now) > 0 {
 					pick = i
 					break
 				}
@@ -575,6 +585,21 @@ func (s *Store) Next(id, user string) (*Item, *Queue, error) {
 				it := &f.Items[pick]
 				it.Assigned = slices.DeleteFunc(it.Assigned, func(a Assignment) bool { return a.UserID == user })
 				it.Assigned = append(it.Assigned, Assignment{UserID: user, At: now.Truncate(time.Second)})
+			}
+		}
+		if pick >= 0 {
+			for i := range f.Items {
+				if it := &f.Items[i]; skipped(it) {
+					it.Assigned = slices.DeleteFunc(it.Assigned, func(a Assignment) bool { return a.UserID == user && !a.Fixed })
+				}
+			}
+		} else {
+			for i := range f.Items {
+				it := &f.Items[i]
+				if skipped(it) && it.Resolution == nil && !it.labelledBy(user) && it.assignedTo(user, now) {
+					pick = i
+					break
+				}
 			}
 		}
 		if pick >= 0 {
@@ -677,7 +702,7 @@ func (s *Store) Resolve(id, itemID string, r Resolution) (*Item, *Queue, error) 
 		}
 		it := &f.Items[i]
 		if len(it.Labels) == 0 {
-			return fmt.Errorf("%w: label the item before deciding it", ErrConflict)
+			return fmt.Errorf("%w: Label this item before deciding it.", ErrConflict)
 		}
 		r.Method, r.At = "decided", now.Truncate(time.Second)
 		it.Resolution = &r

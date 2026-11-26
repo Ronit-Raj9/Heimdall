@@ -96,12 +96,12 @@ describe("sources and empty state", () => {
 	});
 
 	it("says when no source is configured", () => {
-		expect(renderToStaticMarkup(<InboxSourcesTable sources={[]} />)).toContain("heimdall inbox pull");
+		expect(renderToStaticMarkup(<InboxSourcesTable sources={[]} />)).toContain("Nothing connected yet.");
 	});
 
 	it("explains how items get in", () => {
 		const html = renderToStaticMarkup(<InboxEmpty />);
-		expect(html).toContain("heimdall inbox pull");
+		expect(html).toContain("From a terminal");
 		expect(html).toContain("Connect a tool");
 	});
 

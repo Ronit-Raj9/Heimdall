@@ -73,7 +73,7 @@ func (s *Service) List(ctx context.Context, state, source string) (*schemas.Inbo
 	if err != nil {
 		return nil, err
 	}
-	for _, src := range s.Inbox.Config.Sources {
+	for _, src := range s.Inbox.Sources() {
 		st := schemas.InboxSourceStatus{Name: src.Name, Kind: src.Kind}
 		if c, ok := cursors[src.Name]; ok {
 			st.LastError, st.Pulled = c.LastError, c.Pulled

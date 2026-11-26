@@ -395,7 +395,7 @@ func InboxPullCheck(ctx context.Context, s Services, cfg *lib.Config) PullCheck 
 	}
 	if n == 0 {
 		c.Steps = append(c.Steps, PullStep{Problem: "no source to pull in inbox/sources.yaml",
-			Action: "Add a Bifrost, Langfuse, LangSmith or Maxim source", Link: PullLinkInboxSource})
+			Action: "Add a Bifrost, Langfuse or LangSmith source", Link: PullLinkInboxSource})
 		return c
 	}
 	c.Configured = true
