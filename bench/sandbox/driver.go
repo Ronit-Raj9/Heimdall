@@ -874,10 +874,7 @@ func (d *Driver) exitCode(ctx context.Context, box *Box) (int, bool, error) {
 // cap of each (cut inside the sandbox first), secrets removed.
 func (d *Driver) copyStreams(ctx context.Context, rc *schemas.RunContext, box *Box) (bool, error) {
 	stdoutPath, stderrPath, _ := environments.StreamPaths(rc)
-	var secrets []string
-	if rc.Key != nil {
-		secrets = append(secrets, rc.Key.Value)
-	}
+	secrets := utils.RunSecrets(rc)
 	limit := d.cfg.OutputCapBytes
 	truncated := false
 	for _, s := range []struct{ remote, local string }{{stdoutFile, stdoutPath}, {stderrFile, stderrPath}} {
