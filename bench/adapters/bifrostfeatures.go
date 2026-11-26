@@ -42,6 +42,9 @@ func BifrostHeaders(rc *schemas.RunContext) map[string]string {
 	for k, v := range rc.FaultHeaders { // C04: heimdall plugin fault plan and run tags
 		h[k] = v
 	}
+	for k, v := range rc.GatewayHeaders { // W4 feature 2: headers that exist once the run is prepared
+		h[k] = v
+	}
 	if rc.Agent == nil || rc.Agent.Gateway.Bifrost == nil {
 		if len(h) == 0 {
 			return nil

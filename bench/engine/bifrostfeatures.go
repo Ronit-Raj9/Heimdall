@@ -118,8 +118,21 @@ func (p *Planner) checkBifrostFeatures(ctx context.Context, m *schemas.Manifest,
 func (p *Planner) validateBifrost(ctx context.Context, cfg *schemas.AgentConfig, suite *schemas.Suite) error {
 	f := cfg.Gateway.Bifrost
 	var errs []error
-	if f.MCP == nil && f.PromptCache == "" && f.SemanticCache == nil {
+	if f.MCP == nil && f.PromptCache == "" && f.SemanticCache == nil && f.Prompt == nil {
 		errs = append(errs, errors.New("gateway.bifrost sets nothing: name mcp, prompt_cache or semantic_cache, or remove it"))
+	}
+	if pr := f.Prompt; pr != nil { // W4 feature 2: a Prompt Repository version copied into the arm
+		if !adapters.CarriesGatewayHeaders(cfg) {
+			errs = append(errs, errors.New("prompt: Bifrost applies a prompt version from request headers, and this agent does not send extra headers; supported are Claude Code, Codex with a model provider table, the MCP loop agent and agents that declare supports_gateway_headers"))
+		}
+		if len(cfg.Team) > 0 {
+			errs = append(errs, errors.New("prompt: team runs give every member its own key; a prompt version for a team is not built"))
+		}
+		if len(pr.Messages) == 0 {
+			errs = append(errs, fmt.Errorf("prompt: the copy of prompt %s v%d has no messages", pr.Name, pr.Version))
+		} else if h, err := utils.HashJSON(map[string]any{"messages": pr.Messages, "model_params": pr.ModelParams}); err != nil || h != pr.SHA256 {
+			errs = append(errs, fmt.Errorf("prompt: the copy of prompt %s v%d was changed after it was picked", pr.Name, pr.Version))
+		}
 	}
 	if f.MCP != nil {
 		errs = append(errs, validateBifrostMCP(cfg, suite)...)
