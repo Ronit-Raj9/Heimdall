@@ -1,6 +1,7 @@
 import { INBOX_ALL, INBOX_FILTERS, filterInboxItems, inboxCount, type InboxFilter } from "@/components/inbox/inbox.utils";
 import { InboxConnectAnotherLink, InboxEmpty, InboxIngestOffNote, InboxSourcesTable } from "@/components/inbox/inboxSources";
 import { InboxStateFilter } from "@/components/inbox/inboxStateFilter";
+import { SessionImport } from "@/components/inbox/sessionImport";
 import { InboxTable } from "@/components/inbox/inboxTable";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
@@ -203,6 +204,7 @@ export function InboxBody({
 								<span className="text-muted-foreground text-xs" data-testid="inbox-regression-tasks">
 									{t("inbox.regressionTasks", { count: data.regression_tasks ?? 0 })}
 								</span>
+								<SessionImport />
 							</div>
 						}
 					>

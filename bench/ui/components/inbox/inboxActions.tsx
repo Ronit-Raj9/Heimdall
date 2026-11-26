@@ -48,6 +48,33 @@ const ACTIONS: readonly InboxAction[] = ["accept", "reject", "snooze"];
 // Accept
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * Where a quoted step starts in the session preview text (traceinbox/preview.go): a call (seq above
+ * 0) is the line "{seq}. " under "## Tool calls"; a turn (seq 0) is the conversation. -1 when the
+ * preview has no such place.
+ */
+export function quoteOffset(text: string, seq: number): number {
+	if (seq > 0) {
+		const calls = text.indexOf("\n## Tool calls\n");
+		if (calls < 0) return -1;
+		const at = text.indexOf(`\n${seq}. `, calls);
+		return at < 0 ? -1 : at + 1;
+	}
+	const turns = text.indexOf("\n## Conversation\n");
+	return turns < 0 ? -1 : turns + 1;
+}
+
+/** Brings the session panel of the open item into view and scrolls it to the quoted step, when the page shows one. */
+export function scrollSessionTo(seq: number, root: ParentNode = document) {
+	const panel = root.querySelector<HTMLElement>('[data-testid="inbox-preview"]');
+	if (!panel) return;
+	panel.scrollIntoView?.({ block: "nearest" });
+	const text = panel.textContent ?? "";
+	const at = quoteOffset(text, seq);
+	if (at < 0 || text.length === 0) return;
+	panel.scrollTop = Math.max(0, Math.round((at / text.length) * panel.scrollHeight) - 16);
+}
+
 export interface AcceptFormProps {
 	item: Pick<InboxItem, "id" | "suggested_kind" | "suggested_suite" | "golden">;
 	/** The recorded session; without it only a draft accept is offered. */
@@ -159,6 +186,9 @@ export function AcceptForm({ item, session, suites, disabled, submitting, initia
 				errors={touched ? guideErrors : []}
 				disabled={off}
 				onChange={(patch) => setGuide((g) => ({ ...g, ...patch }))}
+				itemId={item.id}
+				suite={values.suite || undefined}
+				onQuote={scrollSessionTo}
 			/>
 			<Button type="submit" disabled={off} isLoading={submitting} dataTestId="inbox-accept-submit">
 				{t("inbox.actions.acceptForm.submit")}
