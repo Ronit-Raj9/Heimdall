@@ -50,3 +50,19 @@ claude mcp add --transport http heimdall https://heimdall.example.com/mcp \
 Errors come back as tool errors with Heimdall's own message, so a token whose scope is too narrow reads as "scope evaluate required" and the assistant can say so. Every answer keeps the server `mode`; only `live` is a real measurement.
 
 The server speaks MCP revisions 2025-06-18, 2025-03-26 and 2024-11-05 (`initialize`, `ping`, `tools/list`, `tools/call`). Tests: `cmd/bifrost-bench/mcpserve_test.go` drives it over pipes against a fake Heimdall.
+
+## Investigation tools
+
+Nine read-only tools answer small, exact questions about runs, costs and the Inbox, each computed by a fixed function over the API. Every answer is cut at 64 KB with the line "cut: {shown} of {total} bytes; ask for a smaller page".
+
+| Tool | Arguments (required in bold) | What it returns |
+|---|---|---|
+| `list_steps` | **run_id**, after_seq (0), limit (50, max 200), kind, agent_id, parent_seq | one page of the run's steps (`GET /runs/{id}/steps/page`), each summary cut at 300 characters; pass `next_after_seq` back as `after_seq` for the next page |
+| `get_step` | **run_id**, **seq** | one step with the steps that witnessed it, the step it witnesses and its child steps (`GET /runs/{id}/step/{seq}`) |
+| `list_agents_in_run` | **run_id** | the agents of a multi-agent run and how they were nested (`GET /runs/{id}/agents`), at most 200 |
+| `get_conversation` | **run_id**, after_call (0), limit (5, max 20) | the run's model calls in order: model, status, the last message sent and the answer (text and tool calls), each cut at 4 KB; `kept: false` and "The gateway kept no text for this call." when the gateway stored no body |
+| `get_retries` | **run_id** | per turn the count of retried attempts, the total retries, the total turns and the turns with any retry (at most 200 turns listed) |
+| `compare_commands` | **run_a**, **run_b**, limit (100, max 300) | the shell commands of both runs, normalized (lowercase, spaces collapsed, numbers as `#`) and lined up by longest common subsequence; rows `{a_seq, b_seq, command, side}` with side `both`, `only_a` or `only_b`, and `first_difference` (row index) |
+| `cost_per_task` | **exp_id**, group_by (`arm` or `condition`), top (20, max 100) | the experiment's cost explanation reduced to rows by cost, most expensive first, with the total when every row is priced. Grouping by task is not available yet: the cost explanation is kept per arm and condition |
+| `todays_failures` | since_hours (24, max 168), limit (20, max 100) | Inbox items first or last seen in the window that are new, and accepted items that came back in the window: id, title, source, occurrences, flagged reasons, task |
+| `get_inbox_item` | **id** | one Inbox item and its cleaned session preview, cut at 8 KB |
