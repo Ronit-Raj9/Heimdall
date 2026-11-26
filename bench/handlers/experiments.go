@@ -443,11 +443,11 @@ func tasksToDetect(sd, alpha float64, from int) int {
 }
 
 // FailedPlan is the plan answered when the planner refuses an experiment:
-// nothing sized, the planner's error in plain words (PlainPlanError) in
-// errors. It is pure.
+// nothing sized, the planner's error in plain words (PlainPlanErrors), one
+// entry per problem, in errors. It is pure.
 func FailedPlan(exp *schemas.Experiment, err error) schemas.ExperimentPlan {
 	p := emptyPlan(exp)
-	p.Errors = append(p.Errors, PlainPlanError(err))
+	p.Errors = append(p.Errors, PlainPlanErrors(err)...)
 	return p
 }
 

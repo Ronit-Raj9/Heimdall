@@ -12,6 +12,8 @@ export interface SessionInfo {
 	 * 401 nor a 404 before any answer, so the mode is unknown and the app offers a retry.
 	 */
 	status: "loading" | "ready" | "error";
+	/** With status error: the server answered 429 (busy), so it was reached (wave 4, p15-7). */
+	busy?: boolean;
 	authMode: AuthMode;
 	kind: PrincipalKind;
 	user?: PlatformUser;
@@ -117,7 +119,7 @@ export function sessionFromMe({ me, meError, meLoading, config }: SessionSources
 	// a 5xx) proves nothing about the mode: a hosted server would still want its session and CSRF
 	// headers, so no local controls are offered, only a retry.
 	if (meError === undefined || errorStatus(meError) === 404) return { ...LOCAL_SESSION };
-	return { ...LOCAL_SESSION, status: "error", authMode: "hosted", kind: "anonymous", role: undefined };
+	return { ...LOCAL_SESSION, status: "error", busy: errorStatus(meError) === 429, authMode: "hosted", kind: "anonymous", role: undefined };
 }
 
 /**

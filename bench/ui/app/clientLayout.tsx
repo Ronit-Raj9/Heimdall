@@ -77,10 +77,11 @@ function Frame({ children }: { children: React.ReactNode }) {
 // neither local nor hosted controls are shown, only a retry.
 function SessionError() {
 	const { t } = useTranslation("platform");
+	const { busy } = useSession();
 	return (
 		<div className="bg-background flex min-h-dvh items-center justify-center px-4" data-testid="session-error">
 			<div role="alert" className="flex max-w-sm flex-col items-center gap-3 text-center">
-				<p className="text-sm">{t("session.discoveryError")}</p>
+				<p className="text-sm">{busy ? t("session.busy", { ns: "w4m0" }) : t("session.discoveryError")}</p>
 				<button
 					type="button"
 					className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 text-sm"
