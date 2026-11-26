@@ -94,6 +94,7 @@ func (e *dockerWorkspace) ServeMCP(ctx context.Context, rc *schemas.RunContext, 
 		rc.Services[i].GatewayKey = key.Value
 	}
 	ev.Clients, ev.KeyID = clients, key.ID
+	ev.FilterChecks = checkForbidden(ctx, e.cfg.ServiceGateway.Gateway, rc, clients, key) // W4 feature 4: the tool filter check (bifrostmcp_filter.go)
 	return ev, nil
 }
 
