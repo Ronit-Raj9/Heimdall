@@ -155,7 +155,11 @@ jobs:
         run: docker buildx build -f bench/deploy/hosted/Dockerfile.server --target server bench
       - name: Build the plugin image (no push)
         run: docker build -f bench/deploy/bifrost/Dockerfile.plugin .
+      # The hosted compose file requires HEIMDALL_BENCH_DIR, which its
+      # deploy scripts normally set to the bench folder.
       - name: Check the compose files
+        env:
+          HEIMDALL_BENCH_DIR: ${{ github.workspace }}/bench
         run: |
           docker compose -f docker-compose.yml config -q
           docker compose -f bench/deploy/hosted/docker-compose.yml --env-file bench/deploy/hosted/.env.example config -q
