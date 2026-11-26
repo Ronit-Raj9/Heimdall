@@ -144,7 +144,7 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 				labelKey: "shell.nav.whyAgentsFail",
 				icon: SearchX,
 				testId: "nav-link-why-agents-fail",
-				also: ["/inbox", "/clusters", "/triage", "/maxim"],
+				also: ["/inbox", "/clusters", "/triage", "/maxim", "/replays"],
 			},
 			{
 				to: "/scheduled-checks",
