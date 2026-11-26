@@ -1,7 +1,9 @@
 import { ModelPicker, type ModelRef } from "@/components/models/modelPicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useGetAgentsQuery, useGetSuitesQuery } from "@/lib/store/apis/benchApi";
+import { SkillScanProblem, parseSkillRefusal } from "@/app/evaluations_/$evalId/views/skillScanProblem";
+import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import { useQuickRunMutation } from "@/lib/store/apis/quickrunApi";
 import type { QuickRunRequest, QuickRunResponse } from "@/lib/types/quickrun";
 import "@/lib/types/wizardI18n";
@@ -91,7 +93,7 @@ function formatCost(res: QuickRunResponse): string | null {
 export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRunDialogProps) {
 	const { t } = useTranslation("quickrun");
 	const { t: tz } = useTranslation("wizard");
-	const suites = useGetSuitesQuery(undefined, { skip: !!suite });
+	const suites = useGetSuitesLightQuery(undefined, { skip: !!suite });
 	const agents = useGetAgentsQuery(undefined, { skip: !!agent });
 	const [run, state] = useQuickRunMutation();
 
@@ -334,11 +336,18 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 								{t("modelRequired")}
 							</p>
 						)}
-						{state.error && (
-							<p className="text-destructive text-sm" role="alert" data-testid="quickrun-error">
-								{t("failed", { message: quickRunError(state.error) })}
-							</p>
-						)}
+						{state.error &&
+							(() => {
+								// wave 4, N22: a skill gate refusal offers the scan in place
+								const refusal = parseSkillRefusal(quickRunError(state.error));
+								return refusal ? (
+									<SkillScanProblem refusal={refusal} testId="quickrun-skill-problem" />
+								) : (
+									<p className="text-destructive text-sm" role="alert" data-testid="quickrun-error">
+										{t("failed", { message: quickRunError(state.error) })}
+									</p>
+								);
+							})()}
 						{!invalid && (
 							<p className="text-muted-foreground text-right text-xs tabular-nums" data-testid="quickrun-estimate">
 								{t("startEstimate", { runs: tasksV * trialsV * 2, budget: budgetV })}
