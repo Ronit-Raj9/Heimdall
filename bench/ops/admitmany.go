@@ -11,6 +11,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
+	"github.com/maximhq/bifrost/bench/taskguard"
 )
 
 // AdmitManyOptions choose the tasks SuiteAdmitMany admits and how many run
@@ -138,6 +139,7 @@ func admitOne(ctx context.Context, deps suite.AdmitDeps, s *schemas.Suite, t *sc
 	if err != nil {
 		return refusedRecord("admission run", "completes", "error", err.Error()), "error: " + err.Error()
 	}
+	rec = taskguard.Apply(s, t, rec)
 	if rec == nil {
 		return refusedRecord("admission run", "record", "none", "admission returned no record"), "error: no record"
 	}
