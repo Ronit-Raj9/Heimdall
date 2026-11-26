@@ -104,13 +104,13 @@ var spaRoots = map[string]bool{
 	"": true, "admin": true, "agents": true, "annotation": true, "calibration": true, "canaries": true,
 	"catalog": true, "clusters": true, "compare": true, "connect": true, "device": true, "docs": true,
 	"downloads": true, "evaluate": true, "evaluations": true, "experiments": true, "failure-tests": true,
-	"files": true, "imports": true, "improvements": true, "inbox": true, "integrations": true, "invite": true,
+	"files": true, "gateway": true, "imports": true, "improvements": true, "inbox": true, "integrations": true, "invite": true,
 	"jobs": true, "leaderboard": true, "library": true, "live": true, "login": true, "matrix": true,
 	"maxim": true, "mcp-test": true, "migration": true, "models": true, "monitors": true, "operate": true,
 	"policies": true, "pricing": true, "privacy": true, "quickstart": true, "receipts": true, "reference": true,
-	"releases": true, "reset-password": true, "review": true, "runs": true, "s": true, "scheduled-checks": true,
+	"releases": true, "replays": true, "reset-password": true, "review": true, "runs": true, "s": true, "scheduled-checks": true,
 	"schedules": true, "security": true, "settings": true, "signup": true, "status": true, "suites": true,
-	"terms": true, "trends": true, "triage": true, "upload": true, "usage": true, "verdict": true,
+	"terms": true, "trends": true, "triage": true, "upload": true, "usage": true, "validity": true, "verdict": true,
 	"verify-email": true, "welcome": true, "why-agents-fail": true, "workers": true,
 }
 
