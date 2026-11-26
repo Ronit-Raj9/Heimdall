@@ -17,7 +17,9 @@
 	"form": {
 		"title": "New replay",
 		"source": "Sessions from",
-		"sourceHint": "The name of a Bifrost source of your inbox",
+		"sourceHint": "A Bifrost source of your inbox",
+		"sourcePick": "Pick a source",
+		"sourceNone": "Your inbox has no Bifrost source yet. Add one on the Inbox page first.",
 		"window": "Time window",
 		"window24h": "Last 24 hours",
 		"window7d": "Last 7 days",

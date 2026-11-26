@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
+import { useGetInboxQuery } from "@/lib/store/apis/inboxApi";
 import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
 import {
 	REPLAY_STATES,
@@ -16,6 +17,7 @@ import {
 	type ReplaySession,
 	type ReplaySettings,
 } from "@/lib/store/apis/replaysApi";
+import type { InboxSourceStatus } from "@/lib/types/bench";
 import { parseAsString, useQueryState } from "nuqs";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -44,6 +46,11 @@ export function splitModel(v: string): { provider: string; model: string } | nul
 	const i = v.indexOf("/");
 	if (i <= 0 || i === v.length - 1) return null;
 	return { provider: v.slice(0, i).trim(), model: v.slice(i + 1).trim() };
+}
+
+/** The names of the organization's Bifrost inbox sources, the only sources a replay reads. */
+export function bifrostSourceNames(sources: readonly InboxSourceStatus[] | undefined): string[] {
+	return (sources ?? []).filter((s) => s.kind === "bifrost").map((s) => s.name);
 }
 
 /** The params of replay.run from the form. */
@@ -198,13 +205,38 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 /** The form that starts a replay job. */
-export function ReplayFormFields({ form, onChange }: { form: ReplayForm; onChange: (f: ReplayForm) => void }) {
+export function ReplayFormFields({
+	form,
+	onChange,
+	sources,
+}: {
+	form: ReplayForm;
+	onChange: (f: ReplayForm) => void;
+	/** The Bifrost source names of the organization's inbox; undefined while they load. */
+	sources?: readonly string[];
+}) {
 	const { t } = useTranslation("w447");
 	const set = <K extends keyof ReplayForm>(k: K, v: ReplayForm[K]) => onChange({ ...form, [k]: v });
 	return (
 		<div className="grid min-w-0 gap-3 sm:grid-cols-2" data-testid="replays-form">
-			<Field label={t("form.source")} hint={t("form.sourceHint")}>
-				{(id) => <Input id={id} value={form.source} onChange={(e) => set("source", e.target.value)} data-testid="replays-source" />}
+			<Field label={t("form.source")} hint={sources && sources.length === 0 ? t("form.sourceNone") : t("form.sourceHint")}>
+				{(id) => (
+					<select
+						id={id}
+						className="h-9 rounded-md border px-2 text-sm"
+						value={form.source}
+						onChange={(e) => set("source", e.target.value)}
+						disabled={!sources || sources.length === 0}
+						data-testid="replays-source"
+					>
+						<option value="">{t("form.sourcePick")}</option>
+						{(sources ?? []).map((name) => (
+							<option key={name} value={name}>
+								{name}
+							</option>
+						))}
+					</select>
+				)}
 			</Field>
 			<Field label={t("form.window")}>
 				{(id) => (
@@ -265,12 +297,14 @@ function NewReplay() {
 	const [form, setForm] = useState<ReplayForm>(emptyForm);
 	const [create, job] = useCreateJobMutation();
 	const settings = useGetReplaySettingsQuery();
+	const inbox = useGetInboxQuery();
+	const sources = inbox.data ? bifrostSourceNames(inbox.data.sources) : undefined;
 	const params = replayJobParams(form);
 	const enabled = settings.data?.enabled === true;
 	return (
 		<section className="flex flex-col gap-3 rounded-lg border p-4">
 			<h2 className="text-base font-semibold tracking-tight">{t("form.title")}</h2>
-			<ReplayFormFields form={form} onChange={setForm} />
+			<ReplayFormFields form={form} onChange={setForm} sources={sources} />
 			{form.candidate && !params && <p className="text-destructive text-sm">{t("form.badModel")}</p>}
 			<div className="flex items-center gap-3">
 				<Button
