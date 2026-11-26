@@ -182,7 +182,7 @@ func TestVerificationLinks(t *testing.T) {
 		t.Fatal(err)
 	}
 	fresh := lastToken(t, mails[len(mails)-1])
-	if _, err := e.d.SQL().Exec(`UPDATE users SET email = 'cy2@example.com' WHERE id = ?`, u.ID); err != nil {
+	if _, err := e.d.SQL().Exec(e.d.Rebind(`UPDATE users SET email = 'cy2@example.com' WHERE id = ?`), u.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := e.svc.VerifyEmail(bg, VerifyRequest{Token: fresh}, ""); !errors.Is(err, ErrInvalidVerification) {
