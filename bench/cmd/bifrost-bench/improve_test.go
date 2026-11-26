@@ -274,6 +274,8 @@ func TestCheckImproverMissingTask(t *testing.T) {
 		"deploy/bench.yaml": "runs_root: runs\nbenchmarks_root: benchmarks\nserver:\n  listen: 127.0.0.1:1\n  mode: live\n",
 		"agents/inc.yaml":   "id: inc\nadapter: command\nimage: img\nargv: [run]\nmodel: m\n",
 		"benchmarks/.keep":  "",
+		// The improver check reads the reflector agent before the task.
+		"agents/heimdall-reflector.yaml": "id: heimdall-reflector\nadapter: command\nimage: img\nargv: [run]\nmodel: m\n",
 	} {
 		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, p)), 0o755); err != nil {
 			t.Fatal(err)

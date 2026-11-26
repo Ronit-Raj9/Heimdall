@@ -23,6 +23,7 @@ import (
 	"github.com/maximhq/bifrost/bench/improve/improvetest"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/store"
+	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/utils"
 	"github.com/maximhq/bifrost/bench/webhooks"
 )
@@ -248,12 +249,15 @@ func TestEnsureImproverSuiteNotAdmitted(t *testing.T) {
 // any Score or Improve call, an agent that sets its own gateway spending
 // limit and a default improver whose benchmark was never admitted.
 func TestImproveCreateRefusesBeforeSpend(t *testing.T) {
+	const reflector = "id: heimdall-reflector\nadapter: command\nimage: img\nargv: [run]\nmodel: m\n"
+	const capped = "gateway:\n  routing:\n    limits:\n      budget_usd: 5\n"
 	for _, c := range []struct {
-		name, agent, doc string
-		want             error
+		name, agent, doc, reflector string
+		want                        error
 	}{
-		{"own limit", "agents/capped.yaml", "id: capped\nadapter: scripted\nmodel: m\ngateway:\n  routing:\n    limits:\n      budget_usd: 5\n", errOwnSpendLimit},
-		{"not admitted", "agents/scripted-improver.yaml", improvetest.AgentDoc, errImproverNotAdmitted},
+		{"own limit", "agents/capped.yaml", "id: capped\nadapter: scripted\nmodel: m\n" + capped, reflector, errOwnSpendLimit},
+		{"reflector limit", "agents/scripted-improver.yaml", improvetest.AgentDoc, reflector + capped, errReflectorSpendLimit},
+		{"not admitted", "agents/scripted-improver.yaml", improvetest.AgentDoc, reflector, errImproverNotAdmitted},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			if c.want == errImproverNotAdmitted {
@@ -263,13 +267,8 @@ func TestImproveCreateRefusesBeforeSpend(t *testing.T) {
 			}
 			h, root := iwihExecutor(t)
 			h.realCheck = true
-			p := filepath.Join(root, filepath.FromSlash(c.agent))
-			if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(p, []byte(c.doc), 0o644); err != nil {
-				t.Fatal(err)
-			}
+			writeIwihFile(t, root, c.agent, c.doc)
+			writeIwihFile(t, root, "agents/heimdall-reflector.yaml", c.reflector)
 			r := &improve.Runner{Root: filepath.Join(root, "runs", improve.DefaultDir), Exec: h}
 			spec := &improve.Spec{Name: "refused", Agent: c.agent, Suite: "scripted@1.0.0", Seed: 7,
 				Editable: improve.Editable{Files: []string{improvetest.NotesPath}}}
@@ -337,5 +336,35 @@ func TestPausedImprovementDispatchesItsEvent(t *testing.T) {
 	defer mu.Unlock()
 	if len(got) != 1 || !strings.Contains(got[0], `"improvement.paused"`) || !strings.Contains(got[0], rec.ID) {
 		t.Fatalf("events %q", got)
+	}
+}
+
+func writeIwihFile(t *testing.T, root, rel, body string) {
+	t.Helper()
+	p := filepath.Join(root, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Security review: a run whose improver agent is not installed is refused
+// at create, before any version is stored or any run is paid for.
+func TestImproveCreateRefusesMissingReflector(t *testing.T) {
+	t.Setenv(suite.LibraryEnv, "")
+	h, root := iwihExecutor(t)
+	h.realCheck = true
+	writeIwihFile(t, root, "agents/scripted-improver.yaml", improvetest.AgentDoc)
+	r := &improve.Runner{Root: filepath.Join(root, "runs", improve.DefaultDir), Exec: h}
+	spec := &improve.Spec{Name: "no-reflector", Agent: "agents/scripted-improver.yaml", Suite: "scripted@1.0.0", Seed: 7,
+		Editable: improve.Editable{Files: []string{improvetest.NotesPath}}}
+	_, err := r.Create(context.Background(), spec, "ana")
+	if !errors.Is(err, improve.ErrBadImprover) || !strings.Contains(err.Error(), "the improver agent heimdall-reflector is not installed") {
+		t.Fatalf("err %v", err)
+	}
+	if h.v0 != nil || len(h.Calls) != 0 {
+		t.Errorf("work done before the refusal: version %v calls %v", h.v0, h.Calls)
 	}
 }

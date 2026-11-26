@@ -691,6 +691,9 @@ func improverExperiment(req improve.ImproveRequest, suiteRef, task, rel string) 
 // replace the improver's cap on the run key (A1.5).
 var errOwnSpendLimit = errors.New("This agent sets its own gateway spending limit; remove gateway.routing.limits.budget_usd so the improver's cap can be enforced.")
 
+// errReflectorSpendLimit is the same refusal for the improver agent itself.
+var errReflectorSpendLimit = errors.New("The improver agent heimdall-reflector sets its own gateway spending limit; remove gateway.routing.limits.budget_usd from it so the improver's cap can be enforced.")
+
 // agentSetsSpendLimit reports whether an agent document sets
 // gateway.routing.limits.budget_usd.
 func agentSetsSpendLimit(doc []byte) bool {
@@ -714,6 +717,17 @@ func (x improveExecutor) CheckImprover(ctx context.Context, spec *improve.Spec) 
 	}
 	if agentSetsSpendLimit(doc) {
 		return errOwnSpendLimit
+	}
+	// The reflector (a project copy may replace the shipped one) must be
+	// installed and must leave the run key's limit to the improver's cap.
+	if spec.Improver.Agent != "self" {
+		ref, err := x.reflectorDoc()
+		if err != nil {
+			return err
+		}
+		if agentSetsSpendLimit(ref) {
+			return errReflectorSpendLimit
+		}
 	}
 	suiteRef, task, err := improverTask(spec)
 	if err != nil {

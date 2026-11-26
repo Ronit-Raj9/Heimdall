@@ -343,6 +343,21 @@ func (r *Runner) RunStudy(ctx context.Context, id string) (*Study, error) {
 		}
 		arms = append(arms, rec.Incumbent)
 	}
+	// The study's held-out check has a hard stop like every other scoring
+	// call (A2.10). Each loop runs under the spec's limit, so the study's
+	// whole limit is loops times that limit.
+	if lim := st.Spec.Budget.TotalUSD; lim > 0 && len(recs) > 0 {
+		spent := 0.0
+		for _, rec := range recs {
+			spent += totalUSD(rec)
+		}
+		next := float64(len(arms)*len(st.Sealed)*max(1, st.Spec.Sealed.Trials)) * perRunUSD(recs[0])
+		if total := lim * float64(len(recs)); spent+next > total {
+			st.Status, st.CostUSD = StatusStopped, spent
+			st.Reason = fmt.Sprintf("Stopped before the study's held-out check: the next step would pass the spending limit of $%.2f (spent $%.2f).", total, spent)
+			return st, r.saveStudy(st)
+		}
+	}
 	res, err := r.Exec.Score(ctx, ScoreRequest{ImprovementID: st.ID, Spec: &st.Spec, Phase: PhaseStudyFinal, Arms: arms,
 		Tasks: st.Sealed, Trials: max(1, st.Spec.Sealed.Trials)})
 	if err != nil {
