@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/maximhq/bifrost/bench/issuebench"
 )
 
 // filePatch is one file's part of a unified diff.
@@ -169,7 +171,7 @@ func docPath(p string) bool {
 	switch {
 	case strings.HasPrefix(p, "docs/") || strings.HasPrefix(p, "doc/") || strings.Contains(p, "/docs/"):
 		return true
-	case strings.HasSuffix(base, ".md") || strings.HasSuffix(base, ".rst") || (strings.HasSuffix(base, ".txt") && !strings.HasPrefix(base, "requirements")) || strings.HasSuffix(base, ".adoc"):
+	case strings.HasSuffix(base, ".md") || strings.HasSuffix(base, ".rst") || (strings.HasSuffix(base, ".txt") && !manifestPath(p)) || strings.HasSuffix(base, ".adoc"):
 		return true
 	}
 	for _, n := range []string{"changelog", "changes", "history", "news", "authors", "contributors", "readme"} {
@@ -323,4 +325,18 @@ func RankedAblations(patch string, isTest func(string) bool, limit int) []string
 		}
 	}
 	return out
+}
+
+// manifestPath says whether a changed path is a dependency manifest of
+// Python or of any registered language; patch ranking treats it as code.
+func manifestPath(p string) bool {
+	if (issuebench.PythonDefaults{}).ManifestFile(p) {
+		return true
+	}
+	for _, l := range issuebench.Languages() {
+		if issuebench.ToolchainOf(l).ManifestFile(p) {
+			return true
+		}
+	}
+	return false
 }

@@ -1,0 +1,9 @@
+ok  	example.com/m	0.01s
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+<testsuite name="./pkg">
+<testcase classname="./pkg" name="TestA"/>
+<testcase classname="./pkg" name="TestB"><failure/></testcase>
+<testcase classname="./pkg" name="TestB/sub"><failure/></testcase>
+</testsuite>
+</testsuites>

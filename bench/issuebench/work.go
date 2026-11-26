@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"sort"
@@ -141,12 +142,40 @@ func (r WorkRequest) Check() error {
 	return nil
 }
 
-// Hosts is the request's egress allowlist.
+// Hosts is the request's egress allowlist: the request's hosts (or
+// DefaultEgressHosts), the package hosts of the request's language and the
+// operator's EgressAllowEnv hosts, at most 32.
 func (r WorkRequest) Hosts() []string {
-	if len(r.EgressHosts) == 0 {
-		return append([]string(nil), DefaultEgressHosts...)
+	base := r.EgressHosts
+	if len(base) == 0 {
+		base = DefaultEgressHosts
 	}
-	return append([]string(nil), r.EgressHosts...)
+	lang := r.Candidate.Language
+	if r.Env != nil && r.Env.Language != "" {
+		lang = r.Env.Language
+	}
+	var out []string
+	seen := map[string]bool{}
+	add := func(h string) {
+		h = strings.ToLower(strings.TrimSpace(h))
+		if h == "" || seen[h] || len(out) >= 32 || !workHostRE.MatchString(h) {
+			return
+		}
+		seen[h] = true
+		out = append(out, h)
+	}
+	for _, h := range base {
+		add(h)
+	}
+	if l := LanguageFor(lang); l != nil {
+		for _, h := range ToolchainOf(l).EgressHosts() {
+			add(h)
+		}
+	}
+	for _, h := range strings.Split(os.Getenv(EgressAllowEnv), ",") {
+		add(h)
+	}
+	return out
 }
 
 // WorkResult is the job's result.json.

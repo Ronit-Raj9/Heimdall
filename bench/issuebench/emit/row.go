@@ -29,6 +29,8 @@ type Row struct {
 	TestCmds         []string `json:"test_cmds,omitempty"`
 	LicenseName      string   `json:"license_name"`
 	CreatedAt        string   `json:"created_at,omitempty"`
+	Language         string   `json:"heimdall_language,omitempty"`
+	Restore          []string `json:"heimdall_restore,omitempty"`
 }
 
 var idUnsafe = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
@@ -86,6 +88,11 @@ func RowOf(v issuebench.Validation, env issuebench.EnvSpec, base, image, license
 	if cmd := TestCmd(env, c); cmd != "" {
 		r.TestCmds = []string{cmd}
 	}
+	r.Language = env.Language
+	if r.Language == "" {
+		r.Language = c.Language
+	}
+	r.Restore = issuebench.ToolchainOf(issuebench.LanguageFor(r.Language)).ProtectedFiles()
 	if !c.IssueCreated.IsZero() {
 		r.CreatedAt = c.IssueCreated.UTC().Format(time.RFC3339)
 	}
