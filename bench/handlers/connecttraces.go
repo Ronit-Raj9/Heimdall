@@ -287,17 +287,40 @@ func (h *connectTracesHandler) localIngest(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusRequestEntityTooLarge, lib.ErrTypeTooLarge, "export larger than 4 MiB; lower the batch size")
 		return
 	}
-	acceptOTLP(ctx, h.env.Mode, h.store(), time.Now())
+	body, ok := decodeOTLPBody(ctx, h.env.Mode, OTLPMaxBytes)
+	if !ok {
+		return
+	}
+	acceptOTLP(ctx, h.env.Mode, body, h.store(), time.Now())
+}
+
+// decodeOTLPBody undoes the export's Content-Encoding (gzip is a common
+// exporter default) within limit decoded bytes. On failure it answers and
+// returns false.
+func decodeOTLPBody(ctx *fasthttp.RequestCtx, mode schemas.Mode, limit int64) ([]byte, bool) {
+	enc := string(ctx.Request.Header.Peek("Content-Encoding"))
+	body, err := agentevents.DecodeContent(ctx.PostBody(), enc, limit)
+	switch {
+	case err == nil:
+		return body, true
+	case errors.Is(err, agentevents.ErrDecodedTooLarge):
+		lib.SendError(ctx, mode, fasthttp.StatusRequestEntityTooLarge, lib.ErrTypeTooLarge, "export larger than 4 MiB once decompressed; lower the exporter's batch size")
+	case errors.Is(err, agentevents.ErrEncoding):
+		lib.SendError(ctx, mode, fasthttp.StatusUnsupportedMediaType, lib.ErrTypeUnsupportedMedia, "content encoding "+enc+" is not supported; send identity or gzip")
+	default:
+		lib.SendError(ctx, mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "the compressed export could not be read; send identity or gzip")
+	}
+	return nil, false
 }
 
 // acceptOTLP decodes one export, keeps its spans and answers as an OTLP
 // collector does: an empty protobuf ExportTraceServiceResponse for a
 // protobuf request, JSON otherwise.
-func acceptOTLP(ctx *fasthttp.RequestCtx, mode schemas.Mode, st agentinfer.Store, now time.Time) {
+func acceptOTLP(ctx *fasthttp.RequestCtx, mode schemas.Mode, body []byte, st agentinfer.Store, now time.Time) {
 	ct := string(ctx.Request.Header.ContentType())
-	spans, err := agentevents.DecodeSpans(ctx.PostBody(), ct)
+	spans, err := agentevents.DecodeSpans(body, ct)
 	if err != nil {
-		lib.SendError(ctx, mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, otlpFileError(ctx.PostBody(), err))
+		lib.SendError(ctx, mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, otlpFileError(body, err))
 		return
 	}
 	if len(spans) > 0 {
@@ -413,7 +436,11 @@ func (h *OTLPIngestHandler) ingest(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.mode, "open the org's project", err)
 		return
 	}
-	acceptOTLP(ctx, h.mode, agentinfer.NewStore(root), h.now())
+	body, ok := decodeOTLPBody(ctx, h.mode, h.MaxBytes)
+	if !ok {
+		return
+	}
+	acceptOTLP(ctx, h.mode, body, agentinfer.NewStore(root), h.now())
 }
 
 func (h *OTLPIngestHandler) gate(orgID string) *traceinbox.Gate {
