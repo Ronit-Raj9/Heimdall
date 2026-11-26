@@ -6,6 +6,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useId, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { isToolKind, parseArgs, type GuideCallRow, type GuideFormError, type GuideFormValues } from "./inboxGuide.utils";
+import { ProposalBar } from "./proposalBar";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
@@ -26,6 +27,11 @@ export interface GuideFieldsProps {
 	errors: readonly GuideFormError[];
 	disabled?: boolean;
 	onChange: (patch: Partial<GuideFormValues>) => void;
+	/** The inbox item and the benchmark it joins: with both, the review bar (draft with a model, approve) is shown on top. */
+	itemId?: string;
+	suite?: string;
+	/** Scrolls the session panel to a quoted turn (seq 0) or call (seq n). */
+	onQuote?: (seq: number) => void;
 }
 
 /**
@@ -33,7 +39,7 @@ export interface GuideFieldsProps {
  * right and which were wrong (and adds a missing one), so the accept writes a finished task with
  * its checks, reference and mutants instead of a draft to finish by hand.
  */
-export function GuideFields({ kind, session, golden, values, errors, disabled, onChange }: GuideFieldsProps) {
+export function GuideFields({ kind, session, golden, values, errors, disabled, onChange, itemId, suite, onQuote }: GuideFieldsProps) {
 	const { t } = useTranslation("inboxGuide");
 	const ids = useId();
 	const tools = isToolKind(kind);
@@ -44,6 +50,7 @@ export function GuideFields({ kind, session, golden, values, errors, disabled, o
 	return (
 		<fieldset className="border-border flex flex-col gap-3 rounded-md border px-3 py-3" disabled={disabled} data-testid="inbox-guide">
 			<legend className="px-1 text-sm font-medium">{t("title")}</legend>
+			{itemId && suite && <ProposalBar itemId={itemId} suite={suite} kind={kind} values={values} onChange={onChange} onQuote={onQuote} />}
 			<div role="radiogroup" aria-label={t("mode.label")} className="flex flex-wrap gap-2" data-testid="inbox-guide-mode">
 				{(["guided", "draft"] as const).map((m) => (
 					<Button

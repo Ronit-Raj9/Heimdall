@@ -1,0 +1,9 @@
+{"id":"sess-cx-1","timestamp":"2026-11-21T09:00:00.000Z","instructions":"Be helpful."}
+{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>cwd here</environment_context>"}]}
+{"type":"message","role":"user","content":[{"type":"input_text","text":"Run the tests and fix the failing one."}]}
+{"type":"reasoning","summary":[]}
+{"type":"function_call","name":"shell","arguments":"{\"command\":[\"make\",\"test\"]}","call_id":"call_1"}
+{"type":"function_call_output","call_id":"call_1","output":"FAIL TestAdd\nexit code: 2"}
+{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch","call_id":"call_2"}
+{"type":"custom_tool_call_output","call_id":"call_2","output":"Done"}
+{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Fixed the add function."}]}

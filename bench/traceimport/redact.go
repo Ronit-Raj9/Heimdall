@@ -20,6 +20,7 @@ const (
 	RedactEmail       = "email"
 	RedactPhone       = "phone number"
 	RedactLongNumber  = "long digit run"
+	RedactPath        = "path" // the user name in a home folder path
 	redactionTemplate = "[REDACTED %s]"
 )
 
@@ -44,6 +45,10 @@ var rules = []rule{
 	{kind: RedactEmail, re: regexp.MustCompile(`[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}`)},
 	{kind: RedactPhone, re: regexp.MustCompile(`\+\d{1,3}[\s.-]?\(?\d{1,4}\)?(?:[\s.-]?\d{2,4}){2,4}\b|\(\d{3}\)\s?\d{3}[ -]\d{4}\b|\b\d{3}[ -]\d{3}[ -]\d{4}\b`)},
 	{kind: RedactLongNumber, re: regexp.MustCompile(`\b(?:\d{4}[ -]){3}\d{1,7}\b|\d{9,}`)},
+	// The user name of a home folder path: /home/<name> and /Users/<name>
+	// keep the prefix and the rest of the path. The placeholder holds a
+	// bracket and a space, so a second pass matches nothing.
+	{kind: RedactPath, keep: true, re: regexp.MustCompile(`(^|[^A-Za-z0-9_./-])(/home/|/Users/)([A-Za-z0-9._-]+)`)},
 }
 
 // sensitiveKey matches JSON keys whose value is replaced whole.
@@ -153,6 +158,12 @@ func (r *Redactor) Session(s *Session) {
 		c.Error = r.Text(c.Error)
 	}
 	s.FinalAnswer = r.Text(s.FinalAnswer)
+	if w := s.Workspace; w != nil {
+		w.Cwd = r.Text(w.Cwd)
+		w.Branch = r.Text(w.Branch)
+		w.Commit = r.ID(w.Commit)
+		w.RepoURL = r.Text(w.RepoURL)
+	}
 	for i := range s.Outcome.Hints {
 		s.Outcome.Hints[i] = r.Text(s.Outcome.Hints[i])
 	}

@@ -7,6 +7,7 @@ import { FeatureHero, revealAnchor } from "./featureHero";
 import { useTranslation } from "react-i18next";
 import { formatInboxTime } from "./inboxBadges";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
+import { SessionImport } from "./sessionImport";
 
 /**
  * Each trace source and how its last pull went: when, from where on, how many traces, the last error. With manage
@@ -130,6 +131,7 @@ export function InboxEmpty() {
 				<summary className="cursor-pointer">{u("inbox.cli")}</summary>
 				<code className="bg-muted text-foreground mt-2 inline-block rounded-md px-2 py-1 font-mono">heimdall inbox pull</code>
 			</details>
+			<SessionImport />
 		</FeatureHero>
 	);
 }

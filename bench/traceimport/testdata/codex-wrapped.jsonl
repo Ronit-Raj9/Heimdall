@@ -1,0 +1,11 @@
+{"timestamp":"2026-11-21T09:00:00.000Z","type":"session_meta","payload":{"id":"sess-cx-1","cwd":"/Users/tester/app","cli_version":"0.0.1","source":"cli","git":{"commit_hash":"abc123","branch":"main","repository_url":"https://example.com/app.git"}}}
+{"timestamp":"2026-11-21T09:00:01.000Z","type":"turn_context","payload":{"model":"gpt-test-1","cwd":"/Users/tester/app","turn_id":"t1"}}
+{"timestamp":"2026-11-21T09:00:02.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>cwd here</environment_context>"}]}}
+{"timestamp":"2026-11-21T09:00:03.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Run the tests and fix the failing one."}]}}
+{"timestamp":"2026-11-21T09:00:04.000Z","type":"response_item","payload":{"type":"reasoning","summary":[]}}
+{"timestamp":"2026-11-21T09:00:05.000Z","type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{\"command\":[\"make\",\"test\"]}","call_id":"call_1"}}
+{"timestamp":"2026-11-21T09:00:06.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_1","output":"FAIL TestAdd\nexit code: 2"}}
+{"timestamp":"2026-11-21T09:00:07.000Z","type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch","call_id":"call_2"}}
+{"timestamp":"2026-11-21T09:00:08.000Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"call_2","output":"Done"}}
+{"timestamp":"2026-11-21T09:00:09.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Fixed the add function."}]}}
+{"timestamp":"2026-11-21T09:00:10.000Z","type":"event_msg","payload":{"type":"task_complete","last_agent_message":"Fixed the add function."}}
