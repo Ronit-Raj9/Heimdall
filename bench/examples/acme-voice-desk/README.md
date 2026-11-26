@@ -64,13 +64,14 @@ calls are paid.
 
 All at $0 on 18 Nov 2026; they prove the plumbing, not any agent's quality.
 
+The committed lock is a draft (made on 22 Nov 2026 after the last admission). Admit the suite again on a machine with Docker before relying on it; the earlier results are below for reference.
+
 - **Admission** (`suite admit`, Docker, the bench's scripted controls): 6
   of 6 tasks admitted, every one of the 54 controls as expected (per task:
   the reference passed 3 of 3; the empty control, two mutants, the exploit,
   the null noop and the null refuse failed), 25 min. Two earlier full
   admissions of the previous caller build gave the same 54 results. `suite
-  lock` on a copy of the admitted suite reports no drift (6 admitted); lock
-  sha256 `0433e304ff5c`.
+  lock` on a copy of the admitted suite reports no drift (6 admitted).
 - **`voice-smoke`** on the live stack (scripted controls, anthropic slots
   only; no model was called): `e_voice_smoke_whw0`, oracle resolved 6 of 6,
   noop 0 of 6 (it never dials, the caller's exports say `no_call`); verdict

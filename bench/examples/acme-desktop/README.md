@@ -64,7 +64,7 @@ acme-desktop/
     claude-code.yaml                  Claude Code with mcp: {format: claude_json}
   benchmarks/acme-desktop/
     suite.yaml                        track computer_use, output state, verifier_command with a reward
-    suite.lock                        admission record of the three tasks
+    suite.lock                        lock of the three tasks (a draft, see Status)
     services/desktop/Dockerfile       the desktop image, heimdall-example/acme-desktop:1
     services/desktop/desktop.py       MCP server, session start, state dump, form app, notice dialog
     services/desktop/openbox.xml      window manager: maximized windows, no menu, no key bindings
@@ -145,6 +145,8 @@ GOWORK=off go test -tags integration ./scaffold/ -run TestIntegrationDesktop -v
 ## Status
 
 What was run, and what was not, on 15 Nov 2026:
+
+The committed lock is a draft (made on 22 Nov 2026 after the last admission). Admit the suite again on a machine with Docker before relying on it; the earlier results are below for reference.
 
 - **Admitted in Docker, through the tool proxy, twice.** `bifrost-bench
   suite admit acme-desktop` ran the whole suite two times in a row on one
