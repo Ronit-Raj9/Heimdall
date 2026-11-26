@@ -1,3 +1,4 @@
+import { withOrgParam } from "./orgParam";
 import { BENCH_API_BASE } from "./fixtures";
 import { benchApi } from "./benchApi";
 
@@ -82,11 +83,11 @@ export function badgeMarkdown(token: string, pageUrl: string, label = "Heimdall 
 
 /** Download URLs of the report card exports and the reproduce bundle (org members). */
 export function reportExportUrl(evaluationId: string, format: "html" | "md" | "json"): string {
-	return `${BENCH_API_BASE}/evaluations/${enc(evaluationId)}/report/export?format=${format}`;
+	return withOrgParam(`${BENCH_API_BASE}/evaluations/${enc(evaluationId)}/report/export?format=${format}`);
 }
 
 export function reproduceUrl(evaluationId: string): string {
-	return `${BENCH_API_BASE}/evaluations/${enc(evaluationId)}/reproduce`;
+	return withOrgParam(`${BENCH_API_BASE}/evaluations/${enc(evaluationId)}/reproduce`);
 }
 
 /** Export URL of a shared evaluation (anyone holding the link). */

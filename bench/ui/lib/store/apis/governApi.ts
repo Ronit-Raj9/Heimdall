@@ -1,3 +1,4 @@
+import { withOrgParam } from "./orgParam";
 import type { CompliancePackList, PolicyDocument, PolicyList, PolicySaveRequest, PolicyValidation } from "@/lib/types/govern";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
@@ -39,7 +40,7 @@ export const governApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchPolicy"
 
 /** The download URL of one compliance pack file (GET /compliance-packs/{name}). */
 export function compliancePackUrl(name: string): string {
-	return `${BENCH_API_BASE}/compliance-packs/${encodeURIComponent(name)}`;
+	return withOrgParam(`${BENCH_API_BASE}/compliance-packs/${encodeURIComponent(name)}`);
 }
 
 /** A policy file's path, escaped as one segment. */

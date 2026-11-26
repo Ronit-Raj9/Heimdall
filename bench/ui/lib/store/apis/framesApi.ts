@@ -1,3 +1,4 @@
+import { withOrgParam } from "./orgParam";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
 
@@ -30,7 +31,7 @@ export const framesApi = benchApi.injectEndpoints({
 
 /** The image URL of frame n of a run. */
 export function frameImageUrl(runId: string, n: number): string {
-	return `${BENCH_API_BASE}/runs/${encodeURIComponent(runId)}/frames/${n}`;
+	return withOrgParam(`${BENCH_API_BASE}/runs/${encodeURIComponent(runId)}/frames/${n}`);
 }
 
 export const { useGetRunFramesQuery } = framesApi;

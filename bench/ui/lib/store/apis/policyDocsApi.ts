@@ -1,3 +1,4 @@
+import { withOrgParam } from "./orgParam";
 import type { PolicyClause, PolicyDocList, PolicyDocUpload, PolicyDocView, PolicyReport, PolicyReviewRequest, PolicyReviewResult } from "@/lib/types/policyDocs";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
@@ -7,7 +8,7 @@ const docTags = (suite: string) => [{ type: "BenchSuites" as const, id: `${suite
 
 /** Download link of the compliance report (Markdown or PDF), served by the API as an attachment. */
 export function policyReportUrl(suite: string, doc: string, format: "markdown" | "pdf"): string {
-	return `${BENCH_API_BASE}/suites/${seg(suite)}/policy-docs/${seg(doc)}/report?format=${format}`;
+	return withOrgParam(`${BENCH_API_BASE}/suites/${seg(suite)}/policy-docs/${seg(doc)}/report?format=${format}`);
 }
 
 /** Policy documents of a benchmark (lane Z23). */

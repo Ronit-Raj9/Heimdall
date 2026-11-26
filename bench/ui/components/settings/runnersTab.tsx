@@ -11,7 +11,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
-	RUNNER_INSTALL_DOC,
 	useCreateRunnerTokenMutation,
 	useListRunnerTokensQuery,
 	useListRunnersQuery,
@@ -22,6 +21,7 @@ import type { OrgSummary, Runner, RunnerTokenCreated } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { BookOpen, Server, ServerCog } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
+import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { SettingsSection, TableFrame, When } from "./settingsBits";
 import { WorkerPlatformsSection } from "./workerPlatformsSection";
@@ -247,16 +247,16 @@ function RunnerTokensSection() {
 							</li>
 						)}
 					</ol>
-					<a
-						href={RUNNER_INSTALL_DOC}
-						target="_blank"
-						rel="noreferrer"
+					<Link
+						to="/docs"
+						search={{ doc: "runners" } as never}
+						hash="installing-a-runner"
 						className="text-primary inline-flex items-center gap-1.5 text-xs font-medium underline-offset-4 hover:underline"
 						data-testid="runner-install-doc"
 					>
 						<BookOpen className="size-3.5" aria-hidden="true" />
 						{t("settings.runners.installDoc")}
-					</a>
+					</Link>
 				</OneTimeSecret>
 			) : (
 				<form

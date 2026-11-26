@@ -1,6 +1,7 @@
 // Bring your own worker (handlers/workerconns.go, package byoworker): the workers an organization
 // connects on Runloop, Fly Machines, its own Kubernetes cluster or its own VM, and the worker its
 // evaluations run on by default. Hosted only; local servers answer 503.
+import { withOrgParam } from "./orgParam";
 import type { Runner } from "@/lib/types/bench";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
@@ -106,5 +107,5 @@ export const {
 
 /** The URL of the RBAC manifest for a namespace (GET /workers/kubernetes-manifest). */
 export function kubernetesManifestUrl(namespace: string): string {
-	return `${BENCH_API_BASE}/workers/kubernetes-manifest?namespace=${encodeURIComponent(namespace)}`;
+	return withOrgParam(`${BENCH_API_BASE}/workers/kubernetes-manifest?namespace=${encodeURIComponent(namespace)}`);
 }

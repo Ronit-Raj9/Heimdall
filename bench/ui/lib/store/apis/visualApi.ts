@@ -1,3 +1,4 @@
+import { withOrgParam } from "./orgParam";
 import type { RunResponse, VisualGrade } from "@/lib/types/bench";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
@@ -43,7 +44,7 @@ export function toRunVisual(detail: RunResponse): RunVisual {
 
 /** The URL of one image of a run's visual grade (GET /runs/{id}/visual/{name}, sealed runs only). */
 export function visualImageUrl(runId: string, name: VisualImageName): string {
-	return `${BENCH_API_BASE}/runs/${encodeURIComponent(runId)}/visual/${name}`;
+	return withOrgParam(`${BENCH_API_BASE}/runs/${encodeURIComponent(runId)}/visual/${name}`);
 }
 
 export const { useGetRunVisualQuery } = visualApi;

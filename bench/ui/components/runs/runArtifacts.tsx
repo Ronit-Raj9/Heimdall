@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { shortHash } from "@/components/verdict/verdict.utils";
 import { getLocale } from "@/lib/i18n";
 import { BENCH_API_BASE } from "@/lib/store/apis/fixtures";
+import { withOrgParam } from "@/lib/store/apis/orgParam";
 import type { ArtifactFile } from "@/lib/types/bench";
 import { Download } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -12,7 +13,9 @@ import { useTranslation } from "react-i18next";
  * is encoded, so a name can never add a path segment or a query.
  */
 export function artifactDownloadUrl(runId: string, file: Pick<ArtifactFile, "id" | "name">): string {
-	return `${BENCH_API_BASE}/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(file.id)}/${encodeURIComponent(file.name ?? "")}`;
+	return withOrgParam(
+		`${BENCH_API_BASE}/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(file.id)}/${encodeURIComponent(file.name ?? "")}`,
+	);
 }
 
 /** Whether a file was copied into the run folder and can be offered for download. */

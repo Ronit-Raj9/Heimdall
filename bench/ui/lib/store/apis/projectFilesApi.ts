@@ -1,3 +1,4 @@
+import { withOrgParam } from "./orgParam";
 import type { ProjectArea, ProjectFile, ProjectFileList, ProjectFileSaved, ProjectFileVersions } from "@/lib/types/projectfiles";
 import type { FetchArgs } from "@reduxjs/toolkit/query/react";
 import { benchApi } from "./benchApi";
@@ -102,7 +103,7 @@ export function projectExportUrl(): string {
 
 /** The raw download URL of one file, any size (the blobs route streams it). */
 export function projectRawUrl(area: ProjectArea, path: string): string {
-	return `${BENCH_API_BASE}/project/blobs/${area}/${encodeProjectPath(path)}`;
+	return withOrgParam(`${BENCH_API_BASE}/project/blobs/${area}/${encodeProjectPath(path)}`);
 }
 
 export const {

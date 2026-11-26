@@ -12,6 +12,7 @@ import (
 	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/tenancy"
 	"github.com/valyala/fasthttp"
 )
 
@@ -114,7 +115,7 @@ func (h *AuthHandler) getMe(ctx *fasthttp.RequestCtx) {
 	}
 	w, cancel := h.work()
 	defer cancel()
-	me, err := h.svc.Me(w, auth.PrincipalFrom(ctx))
+	me, err := h.svc.MeFor(w, auth.PrincipalFrom(ctx), string(ctx.Request.Header.Peek(tenancy.OrgHeader)))
 	if err != nil {
 		h.fail(ctx, err)
 		return

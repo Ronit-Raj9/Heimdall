@@ -5,6 +5,8 @@ import { OverflowMenu } from "@/components/agents/overflowMenu";
 import { SkillScanBar } from "@/components/agents/skillScanBar";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { Button } from "@/components/ui/button";
+import { EmptyNote } from "@/components/runs/screenStates";
+import "@/components/platform/w4b03I18n";
 import "@/lib/types/agentFirstI18n";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useGetAgentConfigQuery } from "@/lib/store/apis/agentBuilderApi";
@@ -46,6 +48,7 @@ export default function AgentDetailView() {
 	const { t } = useTranslation("agentFirst");
 	const { t: tb } = useTranslation("agentBuilder");
 	const { t: tf } = useTranslation("fw13");
+	const { t: tn } = useTranslation("w4b03");
 	const { agentId } = useParams({ from: "/agents_/$agentId" });
 	const navigate = useNavigate();
 	const session = useSession();
@@ -57,7 +60,7 @@ export default function AgentDetailView() {
 	const [copyParam, setCopyParam] = useQueryState("copy", parseAsString.withOptions({ history: "replace" }));
 	const [, setTabParam] = useQueryState("tab", parseAsString.withOptions({ history: "replace" }));
 	const copyMode = copyParam === "rename" ? "rename" : copyParam === "duplicate" ? "duplicate" : null;
-	const { agent } = useAgentSummary(agentId);
+	const { agent, isLoading: agentLoading } = useAgentSummary(agentId);
 	const jobs = useAgentJobs();
 	const adapterLabel = useAdapterLabel();
 	const compatibility = useGetAgentCompatibilityQuery(agentId);
@@ -77,6 +80,20 @@ export default function AgentDetailView() {
 	];
 	const Icon = agent ? adapterIcon(agent.adapter) : null;
 	const state = agent ? (agent.error ? "broken" : jobState(lastJobFor(jobs, "agent.check", agent.path, agent.id))) : null;
+	if (!agentLoading && !agent) {
+		return (
+			<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-4" data-testid="agent-detail-screen">
+				<EmptyNote testId="agent-not-found">{tn("agentNotFound.text", { id: agentId })}</EmptyNote>
+				<div>
+					<Button asChild size="sm" variant="outline">
+						<Link to="/agents" data-testid="agent-not-found-back">
+							{tn("agentNotFound.back")}
+						</Link>
+					</Button>
+				</div>
+			</section>
+		);
+	}
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="agent-detail-screen">
 			<PageHeader

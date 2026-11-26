@@ -1,3 +1,4 @@
+import { OrgResetBanner } from "./orgResetBanner";
 import { meIsAnonymous, SessionContext, sessionFromMe } from "@/lib/session/sessionContext";
 import { useAppDispatch } from "@/lib/store/hooks";
 import { benchApi } from "@/lib/store/apis/benchApi";
@@ -47,5 +48,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 		return () => window.removeEventListener("storage", onStorage);
 	}, [dispatch]);
 
-	return <SessionContext.Provider value={session}>{children}</SessionContext.Provider>;
+	return (
+		<SessionContext.Provider value={session}>
+			<OrgResetBanner />
+			{children}
+		</SessionContext.Provider>
+	);
 }
