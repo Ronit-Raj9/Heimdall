@@ -200,6 +200,9 @@ hc up -d --wait --remove-orphans
 undrain_quiet
 hc ps
 if [ -n "$shared" ]; then
-	"$HOSTED_DIR/registry-sync.sh" || log "registry-sync.sh failed: org Dockerfiles that build FROM a bench image fail until it succeeds"
+	"$HOSTED_DIR/registry-sync.sh" --library || log "registry-sync.sh failed: org Dockerfiles that build FROM a bench image wait for the image publisher until it succeeds"
+	# Warnings only: what the registry still lacks, and any platform-named
+	# image on this host that was pulled from outside the platform.
+	hc run --rm --no-deps -T --entrypoint bifrost-bench shared-runner registry check || true
 fi
 log "upgrade done ($before -> $(git -C "$repo" rev-parse HEAD)). Roll back: see the header of $0"
