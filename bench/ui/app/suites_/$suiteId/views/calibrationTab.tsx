@@ -75,6 +75,8 @@ export function SuiteCalibrationTab({ suite }: { suite: SuiteSummary }) {
 					}}
 				/>
 			)}
+			{/* The labels list is part of a loaded status; with the status in error the page shows only that error (p11-7e). */}
+			{status.data && (
 			<Section title={t("calibration.labelsTitle")} testId="calibration-labels-section">
 				{labels.data ? (
 					<LabelsTable items={labels.data.items} />
@@ -89,6 +91,7 @@ export function SuiteCalibrationTab({ suite }: { suite: SuiteSummary }) {
 					<BlockSkeleton rows={3} testId="calibration-labels-loading" />
 				)}
 			</Section>
+			)}
 		</div>
 	);
 }

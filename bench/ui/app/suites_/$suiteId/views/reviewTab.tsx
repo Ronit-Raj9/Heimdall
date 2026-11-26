@@ -6,6 +6,10 @@ import { useConfirm } from "@/components/platform/confirmDialog";
 import { Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { WhyDisabled } from "@/components/ui/whyDisabled";
+import i18n from "@/lib/i18n";
+import { wholeNumberProblem } from "@/lib/inputChecks";
+import "./w4m6I18n";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
@@ -398,23 +402,58 @@ export function QualityBody({ report, t }: { report: QualityReport; t: T }) {
 	);
 }
 
+/**
+ * What the held-out section shows (p11-5): the share's problem, the preview result (none after an
+ * error, so an old count never stays on screen) and whether Hold out may run.
+ */
+export function splitState(
+	raw: string,
+	result: HeldOutSplitResult | null,
+	error: unknown,
+): { problem: string | null; result: HeldOutSplitResult | null; canApply: boolean } {
+	const problem = wholeNumberProblem(raw, 1, 90) === null ? null : i18n.t("split.whole", { ns: "w4m6" });
+	const refusedBody = error && typeof error === "object" && "status" in error && error.status === 409;
+	const shown = error && !refusedBody ? null : result;
+	return {
+		problem,
+		result: shown,
+		canApply: problem === null && shown !== null && shown.held_out > 0 && (shown.refused?.length ?? 0) === 0,
+	};
+}
+
 function SplitSection({ suite }: { suite: SuiteSummary }) {
 	const { t } = useTranslation("authoring");
+	const { t: t6 } = useTranslation("w4m6");
 	const session = useSession();
 	const askConfirm = useConfirm();
-	const [share, setShare] = useState(25);
+	const [shareRaw, setShareRaw] = useState("25");
+	const [applied, setApplied] = useState<number | null>(null);
 	const [seed, setSeed] = useState(1);
 	const [stratify, setStratify] = useState("");
 	const [confirmPublic, setConfirmPublic] = useState(false);
 	const [result, setResult] = useState<HeldOutSplitResult | null>(null);
 	const [split, { isLoading, error, reset }] = useSplitHeldOutMutation();
 	if (!canUse(session, "member")) return null;
+	const share = Number(shareRaw);
+	const state = splitState(shareRaw, result, error);
 	const plan = { suite: suite.id, held_out_pct: share, seed, stratify_by: stratify || undefined, confirm: confirmPublic || undefined };
+	// Any change of the inputs drops the old preview: Hold out applies only what was just previewed.
+	const changed = () => {
+		setResult(null);
+		setApplied(null);
+		reset();
+	};
 	const go = async (dry: boolean) => {
 		reset();
+		setApplied(null);
+		if (state.problem) return;
 		if (!dry && result && !(await askConfirm(t("split.applyConfirm", { count: result.held_out })))) return;
 		const res = await split({ ...plan, dry_run: dry });
-		if ("data" in res && res.data) setResult(res.data);
+		if ("data" in res && res.data) {
+			setResult(dry ? res.data : null);
+			if (!dry) setApplied(res.data.held_out);
+		} else if ("error" in res && !(res.error && typeof res.error === "object" && "status" in res.error && res.error.status === 409))
+			setResult(null);
 		else if ("error" in res && res.error && typeof res.error === "object" && "data" in res.error) {
 			const body = (res.error as { data?: unknown }).data as HeldOutSplitResult | undefined;
 			if (body && Array.isArray(body.refused)) setResult(body);
@@ -428,19 +467,36 @@ function SplitSection({ suite }: { suite: SuiteSummary }) {
 						type="number"
 						min={1}
 						max={90}
-						value={share}
-						onChange={(e) => setShare(Number(e.target.value))}
+						value={shareRaw}
+						onChange={(e) => {
+							setShareRaw(e.target.value);
+							changed();
+						}}
+						aria-invalid={state.problem !== null || undefined}
+						aria-describedby={state.problem ? "suite-review-split-pct-why" : undefined}
 						data-testid="suite-review-split-pct"
 					/>
+					<WhyDisabled reason={state.problem} testId="suite-review-split-pct-why" className="text-destructive" />
 				</Field>
 				<Field label={t("split.seed")}>
-					<Input type="number" value={seed} onChange={(e) => setSeed(Number(e.target.value))} data-testid="suite-review-split-seed" />
+					<Input
+						type="number"
+						value={seed}
+						onChange={(e) => {
+							setSeed(Number(e.target.value));
+							changed();
+						}}
+						data-testid="suite-review-split-seed"
+					/>
 				</Field>
 				<Field label={t("split.stratify")}>
 					<select
 						className={selectClass}
 						value={stratify}
-						onChange={(e) => setStratify(e.target.value)}
+						onChange={(e) => {
+							setStratify(e.target.value);
+							changed();
+						}}
 						data-testid="suite-review-split-stratify"
 					>
 						<option value="">{t("split.stratifyNone")}</option>
@@ -456,32 +512,42 @@ function SplitSection({ suite }: { suite: SuiteSummary }) {
 				<input
 					type="checkbox"
 					checked={confirmPublic}
-					onChange={(e) => setConfirmPublic(e.target.checked)}
+					onChange={(e) => {
+						setConfirmPublic(e.target.checked);
+						changed();
+					}}
 					data-testid="suite-review-split-confirm"
 				/>
 				{t("split.confirmPublic")}
 			</label>
 			<div className="flex flex-wrap gap-2">
-				<Button size="sm" variant="outline" isLoading={isLoading} onClick={() => void go(true)} dataTestId="suite-review-split-preview">
-					{t("split.preview")}
-				</Button>
 				<Button
 					size="sm"
-					disabled={isLoading || !result || result.held_out === 0 || (result.refused?.length ?? 0) > 0}
-					onClick={() => void go(false)}
-					dataTestId="suite-review-split-apply"
+					variant="outline"
+					isLoading={isLoading}
+					disabled={state.problem !== null}
+					onClick={() => void go(true)}
+					dataTestId="suite-review-split-preview"
 				>
+					{t("split.preview")}
+				</Button>
+				<Button size="sm" disabled={isLoading || !state.canApply} onClick={() => void go(false)} dataTestId="suite-review-split-apply">
 					{t("split.apply")}
 				</Button>
 			</div>
-			{result && (
+			{state.result && (
 				<div className="flex flex-col gap-1 text-sm" data-testid="suite-review-split-result">
-					<span>{t("split.result", { held: result.held_out, public: result.public })}</span>
-					{(result.refused?.length ?? 0) > 0 && (
-						<span className="text-chart-warning-ink">{t("split.refused", { tasks: result.refused!.join(", ") })}</span>
+					<span>{t("split.result", { held: state.result.held_out, public: state.result.public })}</span>
+					{(state.result.refused?.length ?? 0) > 0 && (
+						<span className="text-chart-warning-ink">{t("split.refused", { tasks: state.result.refused!.join(", ") })}</span>
 					)}
-					<span className="text-muted-foreground">{result.next}</span>
+					<span className="text-muted-foreground">{state.result.next}</span>
 				</div>
+			)}
+			{applied !== null && (
+				<p role="status" className="text-sm" data-testid="suite-review-split-done">
+					{t6("split.done", { count: applied })}
+				</p>
 			)}
 			{!(error && typeof error === "object" && "status" in error && error.status === 409) && (
 				<ErrorLine error={error} testId="suite-review-split-error" />

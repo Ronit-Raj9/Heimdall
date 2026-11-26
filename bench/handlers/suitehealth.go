@@ -64,7 +64,7 @@ func (h *SuitesHandler) refuseHeldOut(ctx *fasthttp.RequestCtx, suiteID string, 
 		return false
 	}
 	lib.SendError(ctx, h.mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound,
-		"task "+suiteID+"/"+t.ID+" is held out; its instruction and files are not served (server config held_out.visible is false)")
+		"This task is held out: its instruction and files stay private.")
 	return true
 }
 

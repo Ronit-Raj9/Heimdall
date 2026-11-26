@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -222,7 +223,7 @@ func (h *suiteAuthoring) sendStoreError(ctx *fasthttp.RequestCtx, what string, e
 	case errors.Is(err, projectfs.ErrConflict):
 		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, what+": the file changed since you opened it; reload it and apply your edit again")
 	case errors.Is(err, projectfs.ErrInvalid):
-		lib.SendError(ctx, h.mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, what+": "+err.Error())
+		lib.SendError(ctx, h.mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest, "Could not save "+what+": "+projectfs.InvalidReason(err))
 	case errors.Is(err, projectfs.ErrNotImplemented):
 		lib.SendError(ctx, h.mode, fasthttp.StatusNotImplemented, lib.ErrTypeUnavailable, what+": not supported by this server yet; upload the files one by one")
 	default:
@@ -789,7 +790,13 @@ func (h *suiteAuthoring) filePath(ctx *fasthttp.RequestCtx) (string, string, str
 	if !ok {
 		return "", "", "", false
 	}
-	p := strings.Trim(pathParam(ctx, "path"), "/")
+	// The router hands the path over still escaped; store the real name.
+	p, err := url.PathUnescape(pathParam(ctx, "path"))
+	if err != nil {
+		h.bad(ctx, "the file name is not allowed")
+		return "", "", "", false
+	}
+	p = strings.Trim(p, "/")
 	if p == "" {
 		h.bad(ctx, "file path missing: /suites/{id}/files/<path inside the suite>")
 		return "", "", "", false

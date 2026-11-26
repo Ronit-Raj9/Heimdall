@@ -666,13 +666,26 @@ func (s serveExport) SuiteHarbor(ctx context.Context, suiteID string) ([]byte, e
 		return nil, err
 	}
 	if len(res.Tasks) == 0 {
-		return nil, fmt.Errorf("%w: no admitted public task of suite %s can be exported", handlers.ErrExportRefused, suiteID)
+		return nil, harborRefusal()
 	}
 	var buf bytes.Buffer
 	if err := export.WriteHarborTar(&buf, suiteID, trees, res); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// exportRefusal is an export refused for a reason a person can act on: its
+// text is the plain sentence alone, and it is still ErrExportRefused.
+type exportRefusal struct{ msg string }
+
+func (e exportRefusal) Error() string { return e.msg }
+
+func (e exportRefusal) Unwrap() error { return handlers.ErrExportRefused }
+
+// harborRefusal is the refusal of a suite export with nothing to export.
+func harborRefusal() error {
+	return exportRefusal{"Nothing to export yet: no task of this benchmark is both ready and public."}
 }
 
 // presetEndpoint gives a base -endpoint (no path) the preset's own traces
