@@ -169,7 +169,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 						})}
 					</p>
 				)}
-				{spec.preset === "first_look" && <FirstLookNote />}
+				{spec.preset === "first_look" && <FirstLookNote tasks={spec.tasks_per_benchmark || undefined} />}
 				<div className="grid gap-3 sm:grid-cols-2">
 					{(spec.arms ?? []).map((arm) => (
 						<ArmCard key={arm.label} arm={arm} single={(spec.arms ?? []).length < 2} />
