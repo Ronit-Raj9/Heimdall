@@ -47,6 +47,10 @@ type BifrostFeatures struct {
 	// x-bf-cache-threshold); nil sends none, and with no cache key Bifrost's
 	// semantic cache plugin skips the request.
 	SemanticCache *BifrostSemanticCache `json:"semantic_cache,omitempty" yaml:"semantic_cache,omitempty"`
+	// Prompt makes Bifrost's prompts plugin prepend one Prompt Repository
+	// version to every model request of the arm's runs (W4 feature 2); the
+	// bench creates a copy of it on the run's gateway per run.
+	Prompt *BifrostPrompt `json:"prompt,omitempty" yaml:"prompt,omitempty"`
 }
 
 // BifrostMCP is MCP through Bifrost for one arm.
@@ -55,6 +59,14 @@ type BifrostMCP struct {
 	// agent sees listToolFiles, readToolFile, getToolDocs and
 	// executeToolCode instead of the servers' own tools.
 	CodeMode bool `json:"code_mode" yaml:"code_mode"`
+	// Tools are, per service, the tools the run's MCP key may call:
+	// "<service id>/<tool>" or "<service id>/*"; empty grants every tool, as
+	// before.
+	Tools []string `json:"tools,omitempty" yaml:"tools,omitempty"`
+	// Forbidden are tools, "<service id>/<tool>", the bench itself calls
+	// through Bifrost before the agent starts, expecting a refusal: the
+	// filter check; none may be in Tools.
+	Forbidden []string `json:"forbidden,omitempty" yaml:"forbidden,omitempty"`
 }
 
 // BifrostSemanticCache is the semantic cache for one arm.
@@ -77,6 +89,8 @@ type BifrostMCPEvidence struct {
 	Calls    []BifrostMCPCall   `json:"calls"`
 	Complete bool               `json:"complete"`         // every page of the run's rows was read
 	Reason   string             `json:"reason,omitempty"` // why the rows are incomplete
+	// FilterChecks are the bench's own calls of the arm's forbidden tools.
+	FilterChecks []BifrostMCPFilterCheck `json:"filter_checks,omitempty"`
 }
 
 // BifrostMCPClient is one MCP client the bench created for a run.
@@ -123,4 +137,26 @@ type BifrostMCPEnvironment interface {
 	ServeMCP(ctx context.Context, rc *RunContext, codeMode bool) (*BifrostMCPEvidence, error)
 	RemoveMCP(ctx context.Context, rc *RunContext) error
 	CollectMCP(ctx context.Context, rc *RunContext, ev *BifrostMCPEvidence, ledger []ToolCall)
+}
+
+// BifrostPrompt is one Prompt Repository version under test, copied into the
+// arm when it was picked, so the run never depends on the source repository.
+type BifrostPrompt struct {
+	Name        string           `json:"name" yaml:"name"`                               // the prompt's name in the source repository
+	Version     int              `json:"version" yaml:"version"`                         // its version_number there
+	SourceID    string           `json:"source_id,omitempty" yaml:"source_id,omitempty"` // the prompt id in the source repository
+	Messages    []map[string]any `json:"messages" yaml:"messages"`                       // the version's messages[].message, in order_index order
+	ModelParams map[string]any   `json:"model_params,omitempty" yaml:"model_params,omitempty"`
+	SHA256      string           `json:"sha256" yaml:"sha256"` // hex sha256 of utils.HashJSON-canonical {"messages": Messages, "model_params": ModelParams}
+}
+
+// BifrostMCPFilterCheck is the bench's own call of one forbidden tool through
+// Bifrost, made with the run's MCP key before the agent started.
+type BifrostMCPFilterCheck struct {
+	Service string `json:"service"`
+	Tool    string `json:"tool"`
+	Listed  bool   `json:"listed"`  // tools/list through Bifrost showed the tool
+	Refused bool   `json:"refused"` // tools/call answered a JSON-RPC error or isError
+	Marker  string `json:"marker"`  // the value of the call's only argument, heimdall_filter_check; the tool proxy ledger shows it only if the call got through
+	Detail  string `json:"detail,omitempty"`
 }

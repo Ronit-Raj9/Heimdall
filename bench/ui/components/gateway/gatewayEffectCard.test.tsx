@@ -1,0 +1,68 @@
+import "@/lib/i18n";
+
+import { errorQuery, okQuery, render } from "@/lib/testing/render";
+import type { GwEffect } from "@/lib/types/gateway";
+import { describe, expect, it, vi } from "vitest";
+import { GatewayEffectCard, GatewayEffectView } from "./gatewayEffectCard";
+
+const state = vi.hoisted(() => ({ effect: undefined as unknown }));
+
+vi.mock("@/lib/store/apis/gatewayApi", () => ({
+	useGetGatewayEffectQuery: () => state.effect,
+	useGetBifrostSettingQuery: () => ({ data: undefined }),
+}));
+
+const effect: GwEffect = {
+	feature: "semantic_cache",
+	exp_id: "e1",
+	control: "A",
+	variant: "B",
+	state: "measured",
+	headline: "The cache saved 31% of cost with no loss in solve rate.",
+	result: "saved",
+	tasks: 40,
+	arms: [
+		{ arm: "A", label: "cache off", runs: 80, tasks: 40, solve_rate: 0.6, cost_per_run: 0.05, latency_ms: 900 },
+		{ arm: "B", label: "cache on at 0.80", runs: 80, tasks: 40, solve_rate: 0.6, cost_per_run: 0.0345 },
+	],
+	details: { wrong_hit_share: 0.01, best_threshold: "0.90" },
+	setting: { kind: "plugin_config", title: "Semantic cache threshold", where: "Bifrost dashboard, Plugins", body: "threshold: 0.90" },
+	source: { kind: "runs", runs: 160, rows: 900, raw_rows: 900, text: "160 runs of this comparison" },
+	fingerprint: "f",
+	computed_at: "2026-11-20T10:00:00Z",
+};
+
+describe("GatewayEffectCard", () => {
+	it("renders nothing when the comparison is not a feature test (404)", () => {
+		state.effect = errorQuery(404, "this comparison is not a Bifrost feature test");
+		expect(render(<GatewayEffectCard expId="e1" />)).toBe("");
+		state.effect = { data: undefined, isLoading: true };
+		expect(render(<GatewayEffectCard expId="e1" />)).toBe("");
+	});
+
+	it("shows state, headline, setups, details and the button", () => {
+		state.effect = okQuery(effect);
+		const html = render(<GatewayEffectCard expId="e1" />);
+		expect(html).toContain("Bifrost feature test");
+		expect(html).toContain("Measured");
+		expect(html).toContain("Saved");
+		expect(html).toContain("The cache saved 31% of cost");
+		expect(html).toContain("cache on at 0.80");
+		expect(html).toContain("setting as it is today");
+		expect(html).toContain("60%");
+		expect(html).toContain("$0.0345");
+		expect(html).toContain("wrong_hit_share");
+		expect(html).toContain("From: 160 runs of this comparison");
+		expect(html).toContain("Use this in Bifrost");
+	});
+
+	it("explains a test that measured nothing", () => {
+		const html = render(
+			<GatewayEffectView
+				effect={{ ...effect, state: "not_applied", result: undefined, reason: "the agent did not open the skill in any run" }}
+			/>,
+		);
+		expect(html).toContain("The setting was not applied");
+		expect(html).toContain("Unknown: the agent did not open the skill in any run");
+	});
+});

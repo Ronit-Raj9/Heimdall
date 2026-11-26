@@ -102,6 +102,9 @@ func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 	if err := p.serveBifrostMCP(ctx, st); err != nil { // B2 MCP through Bifrost: the run's MCP clients, granted to its key (bifrostfeatures.go)
 		return err
 	}
+	if err := p.serveBifrostPrompt(ctx, st); err != nil { // W4 feature 2: the run's prompt copy (bifrostprompt.go)
+		return err
+	}
 	if err := p.mintTeam(ctx, st); err != nil { // Multi-agent area: one key per team member (team.go)
 		return err
 	}
@@ -595,6 +598,9 @@ func clearGatewayRequestBodies(ev *schemas.Evidence) {
 func (p *Pipeline) cleanup(ctx context.Context, st *runState) error {
 	var errs []error
 	if err := p.removeBifrostMCP(ctx, st); err != nil { // B2 MCP through Bifrost: delete the run's MCP clients first (bifrostfeatures.go)
+		errs = append(errs, err)
+	}
+	if err := p.removeBifrostPrompt(ctx, st); err != nil { // W4 feature 2: delete the run's prompt copy (bifrostprompt.go)
 		errs = append(errs, err)
 	}
 	if p.reg.AdapterFaults != nil {

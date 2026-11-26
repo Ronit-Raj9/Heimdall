@@ -337,7 +337,7 @@
         "mcp": {
           "type": "object",
           "additionalProperties": false,
-          "properties": {"code_mode": {"type": "boolean", "description": "Code Mode clients: the agent sees listToolFiles, readToolFile, getToolDocs and executeToolCode."}},
+          "properties": {"code_mode": {"type": "boolean", "description": "Code Mode clients: the agent sees listToolFiles, readToolFile, getToolDocs and executeToolCode."}, "tools": {"type": "array", "items": {"type": "string", "minLength": 1}}, "forbidden": {"type": "array", "items": {"type": "string", "minLength": 1}}},
           "description": "Serve the task's MCP servers through Bifrost's MCP gateway (one client per server per run, granted to the run's key only)."
         },
         "prompt_cache": {"enum": ["auto_inject", "off"], "description": "Value of the x-bf-prompt-cache-auto-inject header the agent is asked to send."},
@@ -351,7 +351,8 @@
             "ttl": {"type": "string", "pattern": "^[1-9][0-9]*(s|m|h|d)$"},
             "threshold": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}
           }
-        }
+        },
+        "prompt": {"type": "object", "additionalProperties": false, "required": ["name", "version", "messages", "sha256"], "properties": {"name": {"type": "string", "minLength": 1}, "version": {"type": "integer", "minimum": 1}, "source_id": {"type": "string"}, "messages": {"type": "array", "items": {"type": "object"}}, "model_params": {"type": "object"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}}
       }
     },
     "routing": {

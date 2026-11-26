@@ -626,6 +626,7 @@ func newJobsHubSized(d *db.DB, logger schemas.Logger, hosted, launches bool, con
 		orgs: map[string]*launcher{}, sizing: sizing}
 	h.registerKinds()
 	registerJobMetrics(selfmetrics.Default, h.runner) // N9: /metrics job queue and statuses (servemetrics.go)
+	registerQualityMetrics(selfmetrics.Default, h)    // W4 feature 13 (qualitymetrics.go)
 	return h
 }
 

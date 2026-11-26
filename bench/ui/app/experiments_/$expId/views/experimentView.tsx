@@ -58,6 +58,7 @@ import { MigrationTab } from "./migrationTab";
 import { ReceiptsTab } from "./receiptsTab";
 import { ScorecardsTab } from "./scorecardsTab";
 import { VerdictTab } from "./verdictTab";
+import { GatewayEffectCard } from "@/components/gateway/gatewayEffectCard";
 import "./fw11I18n";
 import "./hw12I18n";
 
@@ -412,7 +413,12 @@ function ExperimentTab({
 }) {
 	switch (tab) {
 		case "verdict":
-			return <VerdictTab expId={expId} evaluationId={evaluationId} />;
+			return (
+				<>
+					<GatewayEffectCard expId={expId} />
+					<VerdictTab expId={expId} evaluationId={evaluationId} />
+				</>
+			);
 		case "runs":
 			return <RunList expId={expId} running={live} testId="experiment-runs" />;
 		case "matrix":

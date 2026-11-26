@@ -899,6 +899,7 @@ export interface Experiment {
 	realism?: string;
 	safety?: string;
 	codescan?: Record<string, unknown>;
+	gateway_test?: { feature: string; control: string; variants: string[]; options?: Record<string, string> };
 	environment?: Record<string, unknown>;
 	/** The evaluation that created this experiment, when one did. */
 	evaluation_id?: string;

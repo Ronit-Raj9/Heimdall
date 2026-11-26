@@ -1,0 +1,177 @@
+package gwfeature
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/maximhq/bifrost/bench/leaderboard"
+)
+
+// ErrNotFeatureTest is returned for a comparison without a gateway test.
+var ErrNotFeatureTest = errors.New("this comparison is not a Bifrost feature test")
+
+// now is the clock of ComputedAt; tests may replace it.
+var now = time.Now
+
+// EffectsDir is where the computed effects of an org root are saved.
+func EffectsDir(root string) string {
+	return filepath.Join(root, ".heimdall", "gateway", "effects")
+}
+
+// validExpID keeps an experiment id a plain file name.
+func validExpID(expID string) bool {
+	return expID != "" && expID != "." && expID != ".." && !strings.ContainsAny(expID, `/\`) && !strings.ContainsRune(expID, 0)
+}
+
+// writeFileAtomic writes data through a temp file and a rename, mode 0600.
+func writeFileAtomic(path string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp*")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := f.Chmod(0o600); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return nil
+}
+
+// Save writes one Effect, replacing the comparison's previous one.
+func Save(root string, e Effect) error {
+	if !validExpID(e.ExpID) {
+		return fmt.Errorf("gwfeature: bad comparison id %q", e.ExpID)
+	}
+	data, err := json.MarshalIndent(e, "", "  ")
+	if err != nil {
+		return err
+	}
+	return writeFileAtomic(filepath.Join(EffectsDir(root), e.ExpID+".json"), data)
+}
+
+// Load reads the saved Effect of a comparison; false when there is none.
+func Load(root, expID string) (Effect, bool, error) {
+	if !validExpID(expID) {
+		return Effect{}, false, nil
+	}
+	data, err := os.ReadFile(filepath.Join(EffectsDir(root), expID+".json"))
+	if errors.Is(err, os.ErrNotExist) {
+		return Effect{}, false, nil
+	}
+	if err != nil {
+		return Effect{}, false, err
+	}
+	var e Effect
+	if err := json.Unmarshal(data, &e); err != nil {
+		return Effect{}, false, err
+	}
+	return e, true, nil
+}
+
+// List returns every saved Effect, newest ComputedAt first. Unreadable files
+// are skipped.
+func List(root string) ([]Effect, error) {
+	entries, err := os.ReadDir(EffectsDir(root))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []Effect
+	for _, ent := range entries {
+		name := ent.Name()
+		if ent.IsDir() || !strings.HasSuffix(name, ".json") || strings.HasPrefix(name, ".") {
+			continue
+		}
+		if e, ok, err := Load(root, strings.TrimSuffix(name, ".json")); err == nil && ok {
+			out = append(out, e)
+		}
+	}
+	slices.SortStableFunc(out, func(a, b Effect) int { return b.ComputedAt.Compare(a.ComputedAt) })
+	return out, nil
+}
+
+// Compute returns the Effect of a Bifrost feature test: the saved one when
+// its runs did not change and refresh is false, else a fresh one from the
+// feature's Compute, saved. A comparison with no counted run is unknown and
+// not saved.
+func Compute(ctx context.Context, src leaderboard.Source, root, expID string, refresh bool) (Effect, error) {
+	m, ok := src.Manifest(expID)
+	if !ok || m == nil || m.Experiment.GatewayTest == nil {
+		return Effect{}, ErrNotFeatureTest
+	}
+	test := *m.Experiment.GatewayTest
+	unknown := func(reason string) Effect {
+		return Effect{Feature: test.Feature, ExpID: expID, Control: test.Control, State: StateUnknown, Reason: reason,
+			Headline: "Unknown: " + reason, Arms: []ArmResult{}, Source: Source{Kind: "experiment", ExpID: expID, Text: fmt.Sprintf("comparison %s: no runs read", expID)}, ComputedAt: now().UTC()}
+	}
+	f, ok := Lookup(test.Feature)
+	if !ok || f.Compute == nil {
+		return unknown(fmt.Sprintf("this Heimdall does not know the feature %s", test.Feature)), nil
+	}
+	for _, arm := range append([]string{test.Control}, test.Variants...) {
+		if _, ok := m.Arms[arm]; !ok {
+			return unknown(fmt.Sprintf("setup %s is not in this comparison", arm)), nil
+		}
+	}
+	runs, err := LoadRuns(src, expID, f.AllConditions)
+	if err != nil {
+		return Effect{}, err
+	}
+	if len(runs) == 0 {
+		return unknown("no finished runs yet"), nil
+	}
+	fp := Fingerprint(runs, test.Feature)
+	if !refresh {
+		if saved, ok, err := Load(root, expID); err == nil && ok && saved.Fingerprint == fp {
+			return saved, nil
+		}
+	}
+	e := f.Compute(ctx, Input{ExpID: expID, Manifest: m, Test: test, Runs: runs, Src: src})
+	e.Feature, e.ExpID, e.Control, e.Fingerprint, e.ComputedAt = test.Feature, expID, test.Control, fp, now().UTC()
+	if e.Arms == nil {
+		e.Arms = []ArmResult{}
+	}
+	e.Source.Kind, e.Source.ExpID, e.Source.Runs = "experiment", expID, len(runs)
+	e.Source.Rows, e.Source.RawRows = 0, 0
+	for _, r := range runs {
+		e.Source.Rows += len(r.Rows)
+		for _, row := range r.Rows {
+			if row.RawKnown {
+				e.Source.RawRows++
+			}
+		}
+	}
+	if e.Source.Text == "" {
+		e.Source.Text = fmt.Sprintf("comparison %s: %d runs, %d gateway calls", expID, e.Source.Runs, e.Source.Rows)
+	}
+	if err := Save(root, e); err != nil {
+		return e, err
+	}
+	return e, nil
+}
