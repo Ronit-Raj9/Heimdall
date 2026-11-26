@@ -182,6 +182,11 @@ func investigateInputs(env jobEnv, p investigateParams) []investigator.RunInput 
 		if raw, err := idx.RunFile(v.Run.RunID, schemas.StepsFile); err == nil {
 			in.Steps = parseStepLines(raw)
 		}
+		// The agent's final message is the claim the run recorded (run.json);
+		// Investigate redacts it before any prompt.
+		if v.Run.Claim != nil {
+			in.Final = v.Run.Claim.Text
+		}
 		out = append(out, in)
 	}
 	return out
