@@ -54,7 +54,7 @@ func TestAppTasksDraftNamesApprover(t *testing.T) {
 	installMembers(t, map[string]string{"usr_1": "Ada", adaEmail: "Ada"})
 	d := &apptasks.Draft{ID: "ag_1", Suite: "shop", Status: apptasks.StatusRulesApproved, ApprovedBy: adaEmail, CreatedBy: adaEmail,
 		Written: []apptasks.Written{{ID: "t1", ReviewedBy: adaEmail}}}
-	h := &appTasksArea{&suiteAuthoring{}}
+	h := &appTasksArea{suiteAuthoring: &suiteAuthoring{}}
 	checkNamed(t, "app tasks draft", func(ctx *fasthttp.RequestCtx) any {
 		return h.view(ctx, apptasks.Store{Dir: t.TempDir()}, d)
 	}, "approved_by_name")
