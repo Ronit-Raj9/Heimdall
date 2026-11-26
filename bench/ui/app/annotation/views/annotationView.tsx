@@ -6,6 +6,8 @@ import { StatusPill } from "@/components/ui/statusPill";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useCreateAnnotationQueueMutation, useGetAnnotationPeopleQuery, useGetAnnotationQueuesQuery } from "@/lib/store/apis/annotationApi";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
+import { WhyDisabled } from "@/components/ui/whyDisabled";
+import i18n from "@/lib/i18n";
 import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import type { AnnotationAssignment, AnnotationKind, AnnotationQueue, AnnotationQueueRequest } from "@/lib/types/annotation";
 import { Link } from "@tanstack/react-router";
@@ -47,6 +49,13 @@ export function parseLabellers(text: string): string[] {
  * is never clamped. */
 export function perItemProblem(n: number): boolean {
 	return !Number.isInteger(n) || n < 1 || n > 5;
+}
+
+/** Why a fixed queue cannot be created yet: fewer people named under Only these people than people per item (wave 4,
+ * p12-7). Null when nothing is wrong. */
+export function fixedProblem(mode: AnnotationAssignment, named: number, perItem: number): string | null {
+	if (mode !== "fixed" || named >= perItem) return null;
+	return i18n.t("labelling.fixedProblem", { ns: "w4m7", count: perItem });
 }
 
 /**
@@ -279,13 +288,14 @@ function CreateQueueForm({ onDone }: { onDone: () => void }) {
 	});
 	const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
 	const benchmarks = (suites.data?.suites ?? []).map((s) => s.id);
+	const fixedWhy = fixedProblem(form.assignment, new Set(form.labellers).size, form.reviewers);
 	return (
 		<Section title={t("create.title")} description={t("create.description")} testId="annotation-create">
 			<form
 				className="bg-card grid min-w-0 grid-cols-1 gap-4 rounded-xl border p-5 md:grid-cols-2"
 				onSubmit={(e) => {
 					e.preventDefault();
-					if (!form.name.trim() || perItemProblem(form.reviewers)) return;
+					if (!form.name.trim() || perItemProblem(form.reviewers) || fixedWhy) return;
 					void create(queueRequest(form))
 						.unwrap()
 						.then(onDone)
@@ -378,12 +388,14 @@ function CreateQueueForm({ onDone }: { onDone: () => void }) {
 					</Button>
 					<Button
 						type="submit"
-						disabled={created.isLoading || !form.name.trim() || perItemProblem(form.reviewers)}
+						disabled={created.isLoading || !form.name.trim() || perItemProblem(form.reviewers) || fixedWhy !== null}
+						aria-describedby={fixedWhy ? "annotation-create-why" : undefined}
 						data-testid="annotation-create-submit"
 					>
 						{t("create.submit")}
 					</Button>
 				</div>
+				<WhyDisabled reason={created.isLoading ? null : fixedWhy} testId="annotation-create-why" className="text-right md:col-span-2" />
 			</form>
 		</Section>
 	);

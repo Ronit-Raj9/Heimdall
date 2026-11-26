@@ -26,6 +26,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/jobs"
+	"github.com/maximhq/bifrost/bench/monitorcert"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
@@ -58,22 +59,22 @@ type runnerKind struct {
 	result  func(lines []string, res json.RawMessage) any
 	// inProcess, when set and it answers true for the params, runs the
 	// local variant in the server process instead (a static scan reads
-	// files only).
-	inProcess func(raw json.RawMessage) bool
+	// files only; a built-in monitor starts no container).
+	inProcess func(env jobEnv, raw json.RawMessage) bool
 }
 
 func init() {
 	for _, rk := range []runnerKind{
 		{kind: kindAgentBuild, args: agentBuildArgs, result: agentBuildResult},
 		{kind: "scan.mcp"},
-		{kind: "scan.skill", inProcess: func(raw json.RawMessage) bool {
+		{kind: "scan.skill", inProcess: func(_ jobEnv, raw json.RawMessage) bool {
 			var p struct {
 				Dynamic bool `json:"dynamic"`
 			}
 			_ = json.Unmarshal(raw, &p)
 			return !p.Dynamic
 		}},
-		{kind: "monitor.certify", collect: func([]string) []string { return []string{"monitor-certs"} }},
+		{kind: "monitor.certify", inProcess: monitorCertifyInProcess, collect: func([]string) []string { return []string{"monitor-certs"} }},
 		{kind: kindGPUCheck, args: gpuCheckArgs},
 		{kind: kindVoiceCheck},
 		{kind: kindVisualCapture, collect: func(argv []string) []string {
@@ -87,6 +88,23 @@ func init() {
 	} {
 		registerOrMergeJobKind(runnerJobKind(rk))
 	}
+}
+
+// monitorCertifyInProcess answers whether a monitor test runs in the server
+// process: only when the monitor file inside the project loads and is a
+// built-in monitor (wave 4, p13-3). HTTP and command monitors always go to
+// a worker.
+func monitorCertifyInProcess(env jobEnv, raw json.RawMessage) bool {
+	var p monitorCertifyParams
+	if err := json.Unmarshal(raw, &p); err != nil || env.ProjectRoot == "" {
+		return false
+	}
+	rel, err := confinedRel(p.Monitor)
+	if err != nil {
+		return false
+	}
+	cfg, err := monitorcert.LoadConfig(filepath.Join(env.ProjectRoot, filepath.FromSlash(rel)))
+	return err == nil && cfg.Config.Kind == schemas.MonitorKindBuiltin
 }
 
 // localSpec returns the registered local variant of kind.
@@ -128,7 +146,7 @@ func runnerJobKind(rk runnerKind) jobKindSpec {
 			if err != nil {
 				return nil, err
 			}
-			if rk.inProcess != nil && rk.inProcess(j.Params) {
+			if rk.inProcess != nil && rk.inProcess(env, j.Params) {
 				return runCLI(ctx, env, argv, log)
 			}
 			argv = withConfigFlag(argv)

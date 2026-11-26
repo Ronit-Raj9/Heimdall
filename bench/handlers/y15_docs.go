@@ -26,7 +26,7 @@ func init() {
 			Response: AnnotationItemList{}},
 		RouteDoc{Method: "POST", Path: q + "/{id}/assign", Tag: "annotation", Summary: "Assign every unresolved item to the queue's reviewers, round robin, so each gets its reviewers per item",
 			Auth: AuthWrite, OptionalBody: true, Response: AnnotationAssignResult{}},
-		RouteDoc{Method: "POST", Path: q + "/{id}/next", Tag: "annotation", Summary: "Reserve and return the next item for the signed-in caller to label (none when done)",
+		RouteDoc{Method: "POST", Path: q + "/{id}/next", Tag: "annotation", Summary: "Reserve and return the next item for the signed-in caller to label (none when done); an optional body {\"skip\": [item ids]} passes on those items and frees their reservations",
 			Auth: AuthWrite, OptionalBody: true, Response: AnnotationNext{}},
 		RouteDoc{Method: "POST", Path: q + "/{id}/items/{item}/labels", Tag: "annotation", Summary: "Label an item correct or incorrect as the signed-in caller; agreeing labels resolve it and write a calibration label",
 			Auth: AuthWrite, Request: AnnotationLabelRequest{}, Status: fasthttp.StatusCreated, Response: AnnotationLabelResult{}},

@@ -75,8 +75,12 @@ export const annotationApi = benchApi.enhanceEndpoints({ addTagTypes: ["Annotati
 			invalidatesTags: (_r, _e, id) => queueTags(id),
 		}),
 		// "Next" reserves an item for the caller, so it is a mutation, never cached.
-		nextAnnotationItem: builder.mutation<AnnotationNext, string>({
-			query: (id) => ({ url: `${queuePath(id)}/next`, method: "POST" }),
+		// With skip, the server passes on those items and frees their reservations (wave 4, p12-3).
+		nextAnnotationItem: builder.mutation<AnnotationNext, string | { id: string; skip?: string[] }>({
+			query: (arg) => {
+				const { id, skip } = typeof arg === "string" ? { id: arg, skip: undefined } : arg;
+				return { url: `${queuePath(id)}/next`, method: "POST", ...(skip && skip.length > 0 ? { body: { skip } } : {}) };
+			},
 		}),
 		labelAnnotationItem: builder.mutation<AnnotationLabelResult, { id: string; item: string; label: AnnotationLabel; note?: string }>({
 			query: ({ id, item, label, note }) => ({

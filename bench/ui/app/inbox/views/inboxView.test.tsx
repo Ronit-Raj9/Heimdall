@@ -65,7 +65,7 @@ describe("InboxBody", () => {
 		};
 		const html = renderToStaticMarkup(<InboxBody {...base} data={data} />);
 		expect(html).toContain('data-testid="inbox-empty"');
-		expect(html).toContain("heimdall inbox pull");
+		expect(html).toContain("From a terminal");
 		expect(html).toContain("docs/failure-inbox.md");
 		expect(html).toContain('data-testid="inbox-ingest-off"');
 		expect(html).toContain('data-testid="inbox-sources-none"');

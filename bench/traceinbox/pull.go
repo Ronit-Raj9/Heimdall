@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/traceimport"
@@ -96,6 +97,63 @@ type Inbox struct {
 	Results        TaskResults
 	// Fetchers overrides the fetcher of a kind (tests).
 	Fetchers map[string]Fetcher
+	// SourcesPath is the sources.yaml Config was loaded from. When set,
+	// Sources reads it again after it changes, so a source added or removed
+	// while the server runs shows without a restart (wave 4, p13-2).
+	SourcesPath string
+
+	mu         sync.Mutex
+	sourcesMod time.Time // modification time of the file the last reload read
+	reloaded   []Source  // the sources of the last reload; nil before one
+}
+
+// Sources returns the configured sources. With SourcesPath set it reloads
+// the file on the first call and whenever its modification time changed; a file that does not load
+// keeps the previous list. A reloaded source with the same name and kind as
+// one of Config keeps the URL and token variable Config gave it (the bench
+// config's gateway defaults of a Bifrost source).
+func (ib *Inbox) Sources() []Source {
+	ib.mu.Lock()
+	defer ib.mu.Unlock()
+	current := ib.Config.Sources
+	if ib.reloaded != nil {
+		current = ib.reloaded
+	}
+	if ib.SourcesPath == "" {
+		return slices.Clone(current)
+	}
+	var mod time.Time
+	if st, err := os.Stat(ib.SourcesPath); err == nil {
+		mod = st.ModTime()
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return slices.Clone(current)
+	}
+	if ib.reloaded != nil && mod.Equal(ib.sourcesMod) {
+		return slices.Clone(current)
+	}
+	cfg, err := LoadConfig(ib.SourcesPath)
+	if err != nil {
+		return slices.Clone(current)
+	}
+	for i := range cfg.Sources {
+		s := &cfg.Sources[i]
+		base, ok := ib.Config.Find(s.Name)
+		if !ok || base.Kind != s.Kind {
+			continue
+		}
+		if s.URL == "" {
+			s.URL = base.URL
+		}
+		if s.TokenEnv == "" {
+			s.TokenEnv = base.TokenEnv
+		}
+	}
+	ib.reloaded = cfg.Sources
+	if ib.reloaded == nil {
+		ib.reloaded = []Source{}
+	}
+	ib.sourcesMod = mod
+	return slices.Clone(ib.reloaded)
 }
 
 // New returns an inbox over the folder dir with the given configuration.
@@ -166,8 +224,9 @@ type PullResult struct {
 // selected source failed.
 func (ib *Inbox) Pull(ctx context.Context, opts PullOptions) ([]PullResult, error) {
 	var srcs []*Source
-	for i := range ib.Config.Sources {
-		s := &ib.Config.Sources[i]
+	all := ib.Sources()
+	for i := range all {
+		s := &all[i]
 		if len(opts.Sources) > 0 && !slices.Contains(opts.Sources, s.Name) {
 			continue
 		}
@@ -180,7 +239,7 @@ func (ib *Inbox) Pull(ctx context.Context, opts PullOptions) ([]PullResult, erro
 		srcs = append(srcs, s)
 	}
 	for _, name := range opts.Sources {
-		if _, ok := ib.Config.Find(name); !ok {
+		if !slices.ContainsFunc(all, func(s Source) bool { return s.Name == name }) {
 			return nil, fmt.Errorf("no source %q in %s", name, SourcesFile)
 		}
 	}

@@ -46,6 +46,6 @@
 		"integrations": "Integrations",
 		"integrationsHint": "Tools to pull failures from, and access tokens for tools that send them in",
 		"sources": "Where failures come from",
-		"cli": "Or from a terminal:"
+		"cli": "From a terminal"
 	}
 }
