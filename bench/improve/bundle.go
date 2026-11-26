@@ -3,6 +3,7 @@ package improve
 import (
 	"fmt"
 	"maps"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -25,31 +26,69 @@ func (b Bundle) Hash() string {
 // Clone copies the bundle.
 func (b Bundle) Clone() Bundle { return maps.Clone(b) }
 
-// ExtractBundle reads the editable files out of an agent YAML document.
+// ExtractBundle reads the editable content out of an agent YAML document:
+// editable paths of files and files_raw, and the standing instructions as
+// InstructionsKey when they are editable (an empty text when unset).
 func ExtractBundle(doc []byte, ed Editable) (Bundle, error) {
 	tree, err := parseTree(doc)
 	if err != nil {
 		return nil, err
 	}
 	out := Bundle{}
-	files, _ := tree["files"].(map[string]any)
-	for k, v := range files {
-		if !ed.Allows(k) {
-			continue
+	for _, field := range []string{"files", "files_raw"} {
+		m, _ := tree[field].(map[string]any)
+		for k, v := range m {
+			if !ed.Allows(k) {
+				continue
+			}
+			s, ok := v.(string)
+			if !ok {
+				return nil, fmt.Errorf("agent file %s is not text", k)
+			}
+			out[k] = s
 		}
-		s, ok := v.(string)
-		if !ok {
-			return nil, fmt.Errorf("agent file %s is not text", k)
+	}
+	if ed.Instructions {
+		s, ok := tree["instructions"].(string)
+		if !ok && tree["instructions"] != nil {
+			return nil, fmt.Errorf("agent instructions are not text")
 		}
-		out[k] = s
+		out[InstructionsKey] = s
 	}
 	return out, nil
 }
 
-// ApplyBundle writes b over the editable files of an agent YAML document:
-// editable files not in b are removed, every other key is kept as it is.
-// A path outside the editable set is refused, so a bundle can never reach a
-// frozen field.
+// templatePlaceholder matches a {{name}} placeholder as utils.Render does.
+var templatePlaceholder = regexp.MustCompile(`\{\{\s*([a-zA-Z0-9_.\-]+)\s*\}\}`)
+
+// placeholderCounts counts the template placeholders of a text by name.
+func placeholderCounts(s string) map[string]int {
+	out := map[string]int{}
+	for _, m := range templatePlaceholder.FindAllStringSubmatch(s, -1) {
+		out[m[1]]++
+	}
+	return out
+}
+
+// newPlaceholder is the first placeholder name whose count rises from old
+// to cur, or "".
+func newPlaceholder(old, cur string) string {
+	before, after := placeholderCounts(old), placeholderCounts(cur)
+	for _, name := range slices.Sorted(maps.Keys(after)) {
+		if after[name] > before[name] {
+			return name
+		}
+	}
+	return ""
+}
+
+// ApplyBundle writes b over the editable content of an agent YAML
+// document. Each path goes back to the map it came from in the parent: a
+// path of files stays templated, a path of files_raw stays raw, a new path
+// goes to files_raw, and InstructionsKey goes to instructions. Editable
+// paths of either map not in b are removed, every other key is kept as it
+// is. A path outside the editable set is refused, so a bundle can never
+// reach a frozen field, and a templated file may not gain a placeholder.
 func ApplyBundle(doc []byte, ed Editable, b Bundle) ([]byte, error) {
 	for k := range b {
 		if !ed.Allows(k) {
@@ -60,21 +99,45 @@ func ApplyBundle(doc []byte, ed Editable, b Bundle) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	files := map[string]any{}
-	if cur, ok := tree["files"].(map[string]any); ok {
-		for k, v := range cur {
-			if !ed.Allows(k) {
-				files[k] = v
-			}
+	curFiles, _ := tree["files"].(map[string]any)
+	curRaw, _ := tree["files_raw"].(map[string]any)
+	files, raw := map[string]any{}, map[string]any{}
+	for k, v := range curFiles {
+		if !ed.Allows(k) {
+			files[k] = v
 		}
 	}
-	for k, v := range b {
-		files[k] = v
+	for k, v := range curRaw {
+		if !ed.Allows(k) {
+			raw[k] = v
+		}
 	}
-	if len(files) == 0 {
-		delete(tree, "files")
-	} else {
-		tree["files"] = files
+	if ed.Instructions {
+		delete(tree, "instructions")
+	}
+	for _, k := range slices.Sorted(maps.Keys(b)) {
+		v := b[k]
+		switch old, templated := curFiles[k]; {
+		case k == InstructionsKey:
+			if v != "" {
+				tree["instructions"] = v
+			}
+		case templated:
+			oldText, _ := old.(string)
+			if name := newPlaceholder(oldText, v); name != "" {
+				return nil, fmt.Errorf("%s would gain the template placeholder {{%s}}; write it in a new file instead", k, name)
+			}
+			files[k] = v
+		default:
+			raw[k] = v
+		}
+	}
+	for field, m := range map[string]map[string]any{"files": files, "files_raw": raw} {
+		if len(m) == 0 {
+			delete(tree, field)
+		} else {
+			tree[field] = m
+		}
 	}
 	out, err := yaml.Marshal(tree)
 	if err != nil {
