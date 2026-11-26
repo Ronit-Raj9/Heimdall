@@ -185,11 +185,11 @@ func latestTwo(arms []*armRecord, agent, suite string) (resolved, resolved, erro
 		seen = append(seen, a)
 	}
 	if len(seen) < 2 {
-		where := ""
-		if suite != "" {
-			where = " on " + suite
+		plural := "s"
+		if len(seen) == 1 {
+			plural = ""
 		}
-		return resolved{}, resolved{}, fmt.Errorf("%w: agent %q has %d config hash(es)%s; two are needed", ErrBadQuery, agent, len(seen), where)
+		return resolved{}, resolved{}, fmt.Errorf("%w: %s has %d version%s with saved runs; two are needed. Run each version on a benchmark first, then compare them here.", ErrBadQuery, agent, len(seen), plural)
 	}
 	b := resolved{selector: seen[0].hash, hash: seen[0].hash, rec: seen[0]}
 	a := resolved{selector: seen[1].hash, hash: seen[1].hash, rec: seen[1]}
@@ -231,7 +231,7 @@ func pickSuite(arms []*armRecord, a, b resolved, suite string) (string, error) {
 		}
 	}
 	if best == "" {
-		return "", fmt.Errorf("%w: versions a and b never ran the same suite version; nothing to compare", ErrBadQuery)
+		return "", fmt.Errorf("%w: These two versions never ran the same benchmark, so there is nothing to compare. Pick another version A.", ErrBadQuery)
 	}
 	return best, nil
 }
