@@ -1,3 +1,5 @@
+import "@/app/experiments/views/experimentsI18n";
+
 import { ClusterDetailPanel, ClusterRunLink } from "@/components/clusters/clusterDetail";
 import { ClustersBanner } from "@/components/clusters/clustersBanner";
 import { ClustersFilters, type ClusterTextFilter } from "@/components/clusters/clustersFilters";
@@ -12,6 +14,7 @@ import {
 	parseExpList,
 	type ClusterQuery,
 } from "@/components/clusters/clusters.utils";
+import { isCheckPracticeOrDebug } from "@/components/experiments/experiments.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { runLocations, type RunLocation } from "@/components/triage/triage.utils";
 import { Button } from "@/components/ui/button";
@@ -28,8 +31,17 @@ import {
 import { cn } from "@/lib/utils";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { parseAsInteger, parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+/**
+ * The experiment choices of the Failure patterns filter: Heimdall's own checks, practice runs and
+ * debug runs are left out unless `showHidden` (N19), with how many were left out. Pure.
+ */
+export function clusterExperimentOptions(ids: readonly string[], showHidden: boolean): { options: string[]; hiddenCount: number } {
+	const hidden = ids.filter((exp_id) => isCheckPracticeOrDebug({ exp_id }));
+	return { options: showHidden ? [...ids] : ids.filter((exp_id) => !isCheckPracticeOrDebug({ exp_id })), hiddenCount: hidden.length };
+}
 
 /**
  * The Clusters tab of /inbox: ?tab=clusters&suite=&agent=&exp=&since=&min=&synthetic=&sig= (the
@@ -39,6 +51,8 @@ import { useTranslation } from "react-i18next";
  */
 export default function ClustersTab() {
 	const { t } = useTranslation("bench");
+	const { t: tx } = useTranslation("experimentsUx");
+	const [showHidden, setShowHidden] = useState(false);
 	const [suite, setSuite] = useQueryState("suite", parseAsString);
 	const [agent, setAgent] = useQueryState("agent", parseAsString);
 	const [exp, setExp] = useQueryState("exp", parseAsString);
@@ -51,6 +65,7 @@ export default function ClustersTab() {
 	const params = useMemo(() => clusterParams(query), [query]);
 	const list = useGetClustersQuery(params);
 	const data = list.data;
+	const experimentChoices = useMemo(() => clusterExperimentOptions(data?.experiments ?? [], showHidden), [data?.experiments, showHidden]);
 
 	const onText = (filter: ClusterTextFilter, value: string) => {
 		const next = value || null;
@@ -84,12 +99,24 @@ export default function ClustersTab() {
 				min={min ?? data?.filters?.min ?? 1}
 				synthetic={synthetic ?? syntheticOf(data?.filters?.synthetic)}
 				agentOptions={agentOptions}
-				experimentOptions={data?.experiments ?? []}
+				experimentOptions={experimentChoices.options}
 				onText={onText}
 				onMin={(next) => void setMin(next)}
 				onSynthetic={(next) => void setSynthetic(next)}
 				disabled={list.isLoading}
 			/>
+			{experimentChoices.hiddenCount > 0 && (
+				<label className="text-muted-foreground inline-flex items-center gap-2 text-xs" title={tx("picker.showHiddenHint")}>
+					<input
+						type="checkbox"
+						checked={showHidden}
+						onChange={(ev) => setShowHidden(ev.target.checked)}
+						className="accent-primary size-3.5"
+						data-testid="clusters-show-hidden"
+					/>
+					{tx("picker.showHidden", { count: experimentChoices.hiddenCount })}
+				</label>
+			)}
 
 			{list.isLoading ? (
 				<BlockSkeleton rows={6} testId="clusters-loading" />

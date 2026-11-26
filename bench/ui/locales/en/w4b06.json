@@ -1,0 +1,9 @@
+{
+	"cost": {
+		"model": "Model",
+		"answeredAs": "Answered as {{served}}"
+	},
+	"estimate": {
+		"estimating": "Estimating..."
+	}
+}
