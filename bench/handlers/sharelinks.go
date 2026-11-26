@@ -226,6 +226,10 @@ func (h *shareHandler) create(ctx *fasthttp.RequestCtx) {
 			return
 		}
 	}
+	if msg := h.privateSourceRefusal(ctx, strings.TrimSpace(req.Kind), strings.TrimSpace(req.Target), q); msg != "" {
+		lib.SendError(ctx, h.env.Mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, msg)
+		return
+	}
 	p := auth.PrincipalFrom(ctx)
 	sh, err := st.Create(req, p.ActorID())
 	switch {
@@ -418,7 +422,7 @@ func (h *shareHandler) serverRoots() []string {
 // open handles GET /shared/{token}.
 func (h *shareHandler) open(ctx *fasthttp.RequestCtx) {
 	sh, ok := h.verify(ctx)
-	if !ok {
+	if !ok || h.refusePrivateSource(ctx, sh) {
 		return
 	}
 	out := SharedItem{Share: h.meta(ctx, sh), Data: map[string]any{}}
@@ -451,7 +455,7 @@ func (h *shareHandler) open(ctx *fasthttp.RequestCtx) {
 // on any site (a README), so it is the one answer marked cross-origin.
 func (h *shareHandler) badge(ctx *fasthttp.RequestCtx) {
 	sh, ok := h.verify(ctx)
-	if !ok {
+	if !ok || h.refusePrivateSource(ctx, sh) {
 		return
 	}
 	label := "heimdall"
@@ -503,7 +507,7 @@ func (h *shareHandler) badge(ctx *fasthttp.RequestCtx) {
 // evaluation's report card as a standalone document.
 func (h *shareHandler) export(ctx *fasthttp.RequestCtx) {
 	sh, ok := h.verify(ctx)
-	if !ok {
+	if !ok || h.refusePrivateSource(ctx, sh) {
 		return
 	}
 	if sh.Kind != sharelinks.KindEvaluation {
