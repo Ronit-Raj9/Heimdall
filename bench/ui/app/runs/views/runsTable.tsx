@@ -14,6 +14,10 @@ import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, ListX } fro
 import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { useCallback, useMemo, type KeyboardEvent } from "react";
 import { TraceMatches, TraceSearchInput } from "./traceMatches";
+import { pastLastPage } from "@/components/runs/runList";
+import "./w4m4I18n";
+
+export { pastLastPage };
 import { useTranslation } from "react-i18next";
 import "./fw21I18n";
 
@@ -214,6 +218,7 @@ export function OutcomePill({ row }: { row: Pick<RunListRow, "sealed" | "outcome
 export function RunsTable() {
 	const { t: tu } = useTranslation("u12");
 	const { t: tb } = useTranslation("bench");
+	const { t: tw } = useTranslation("w4m4");
 	const locale = getLocale();
 	const navigate = useNavigate();
 	const [search, setSearch] = useQueryStates(parsers, { history: "replace" });
@@ -333,12 +338,38 @@ export function RunsTable() {
 				<FilterTokens tokens={tokens} onClear={clear} testId="runs-tokens" />
 			</div>
 
-			{traceQuery && <TraceMatches query={traceQuery} agent={search.agent} outcome={search.outcome} suite={search.suite} />}
+			{traceQuery && (
+				<TraceMatches
+					query={traceQuery}
+					agent={search.agent}
+					outcome={search.outcome}
+					suite={search.suite}
+					onClear={() => setTraceQuery("")}
+				/>
+			)}
 
 			{list.isLoading ? (
 				<BlockSkeleton rows={8} testId="runs-loading" />
 			) : list.error || !list.data ? (
 				<LoadError title={tu("runs.loadError")} error={list.error} onRetry={() => void list.refetch()} testId="runs-error" />
+			) : rows.length === 0 && pastLastPage(list.data.total, page, RUNS_PAGE) !== null ? (
+				<div className="flex flex-col gap-3" data-testid="runs-past-end">
+					<p className="text-muted-foreground text-sm">{tw("runs.pastEnd")}</p>
+					<div>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => {
+								const last = pastLastPage(list.data?.total ?? 0, page, RUNS_PAGE) ?? 1;
+								void setSearch({ page: last === 1 ? null : last });
+							}}
+							dataTestId="runs-last-page"
+						>
+							{tw("runs.lastPage")}
+						</Button>
+					</div>
+					<Pager page={page} total={list.data.total} onPage={(n) => void setSearch({ page: n === 1 ? null : n })} />
+				</div>
 			) : rows.length === 0 ? (
 				<EmptyState
 					icon={ListX}
