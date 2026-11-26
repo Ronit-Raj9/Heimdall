@@ -53,7 +53,7 @@ func (h *RunsHandler) getRunSteps(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.mode, "read step timeline of run "+rv.Run.RunID, err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(out))
 }
 
 // readRunSteps assembles the RunSteps of one run from its folder.

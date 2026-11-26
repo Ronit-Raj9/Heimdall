@@ -335,7 +335,7 @@ func (h *RunsHandler) getRunReceipts(ctx *fasthttp.RequestCtx) {
 	if receipts == nil {
 		receipts = []schemas.Receipt{}
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, schemas.RunReceipts{RunID: rv.Run.RunID, Receipts: receipts})
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(schemas.RunReceipts{RunID: rv.Run.RunID, Receipts: receipts}))
 }
 
 // getRunFile handles GET /api/bench/runs/{id}/files/{name} for allowlisted

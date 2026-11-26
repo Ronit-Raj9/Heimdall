@@ -370,7 +370,7 @@ func (h *maximTasksHandler) readiness(ctx *fasthttp.RequestCtx) {
 // job runner is reported in words, never as a failed accept.
 func (h *maximTasksHandler) queue(ctx *fasthttp.RequestCtx, t *tracebulk.TaskDraft) string {
 	if h.env.Services.Jobs == nil {
-		return "Accepted. This server runs no jobs; run the readiness check with `heimdall task admit`."
+		return "Accepted. This server runs no jobs; run the readiness check on your own machine."
 	}
 	params, _ := json.Marshal(map[string]string{"suite": t.Suite, "task": t.ID})
 	work, cancel := workContext(ctx, readTimeout)

@@ -159,7 +159,7 @@ func (h *JobsHandler) list(ctx *fasthttp.RequestCtx) {
 	if kinds == nil {
 		kinds = []string{}
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, JobList{Jobs: page.Jobs, Next: page.Next, Kinds: kinds})
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, JobList{Jobs: plainJobs(page.Jobs), Next: page.Next, Kinds: kinds})
 }
 
 // create handles POST /jobs with {"kind": ..., "params": {...}}: member role,
@@ -215,7 +215,7 @@ func (h *JobsHandler) get(ctx *fasthttp.RequestCtx) {
 		v.CreatedBy, v.CreatedByName = newActorNames(ctx).show(j.CreatedBy)
 		j = &v
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, j)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainJob(j))
 }
 
 // cancel handles POST /jobs/{id}/cancel: 202 with the job; a queued job is
@@ -286,7 +286,7 @@ func (h *JobsHandler) logs(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	if !bytes.Contains(ctx.Request.Header.Peek(fasthttp.HeaderAccept), []byte("text/event-stream")) {
-		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, page)
+		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainLogPage(page))
 		return
 	}
 	ctx.SetStatusCode(fasthttp.StatusOK)
@@ -296,7 +296,7 @@ func (h *JobsHandler) logs(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set(lib.ModeHeader, string(h.mode))
 	api, mode, stop, allowed := h.api, h.mode, h.stop, lib.StreamGuardOf(ctx)
 	ctx.SetBodyStreamWriter(func(w *bufio.Writer) {
-		streamJobLogs(w, mode, api, org, id, page, stop, allowed)
+		streamJobLogs(w, mode, plainLogsAPI{api}, org, id, plainLogPage(page), stop, allowed)
 	})
 }
 

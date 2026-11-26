@@ -178,7 +178,7 @@ func (r *Runner) Baseline(ctx context.Context, d *Definition, opts BaselineOptio
 	}
 	plan, err := r.Exec.Plan(ctx, d, "")
 	if err != nil {
-		return finish(OutcomeError, "plan: "+err.Error(), alerts.EventScheduleFailed)
+		return finish(OutcomeError, "Could not plan the check: "+err.Error(), alerts.EventScheduleFailed)
 	}
 	var x *Execution
 	if opts.From != "" {
@@ -254,7 +254,7 @@ func (r *Runner) look(ctx context.Context, d *Definition, base *Baseline, kind, 
 	}
 	plan, err := r.Exec.Plan(ctx, d, inject)
 	if err != nil {
-		return finish(OutcomeError, prevState, "plan: "+err.Error(), alerts.EventScheduleFailed)
+		return finish(OutcomeError, prevState, "Could not plan the check: "+err.Error(), alerts.EventScheduleFailed)
 	}
 	if plan.Fingerprint != base.Fingerprint {
 		return finish(OutcomeStale, StateBaselineStale, fmt.Sprintf("the frozen config changed since the baseline (fingerprint %s, baseline %s): the agent config, its image, the suite lock or the task selection moved; nothing was run. Record a new baseline once the change is intended.",

@@ -96,7 +96,7 @@ func WriteDraft(opts DraftOptions) (*DraftResult, error) {
 		return nil, errors.New("no session to draft from")
 	}
 	if opts.Kind != "" && !slices.Contains(Kinds(), opts.Kind) {
-		return nil, fmt.Errorf("-kind %q: want one of %s", opts.Kind, strings.Join(Kinds(), ", "))
+		return nil, fmt.Errorf("Unknown task type %s. Choose one of %s.", opts.Kind, strings.Join(Kinds(), ", "))
 	}
 	if err := opts.Guide.normalize(); err != nil {
 		return nil, err

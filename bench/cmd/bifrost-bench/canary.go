@@ -25,6 +25,7 @@ import (
 	"github.com/maximhq/bifrost/bench/canary"
 	"github.com/maximhq/bifrost/bench/clusters"
 	"github.com/maximhq/bifrost/bench/engine"
+	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schedule"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -487,7 +488,7 @@ func (x canaryExecutor) Plan(ctx context.Context, d *canary.Definition, inject s
 	}
 	m, err := a.newPlanner().PlanCanary(ctx, d.Experiment(tasks, inject))
 	if err != nil {
-		return nil, fmt.Errorf("plan: %w", err)
+		return nil, errors.New(handlers.PlainPlanError(err)) // wave 4, p13-8: one plain sentence, no "plan: " wraps
 	}
 	p := &canary.Plan{ExpID: m.ExpID, ManifestHash: m.Hash, Fingerprint: canary.Fingerprint(m, d.Rename(inject)),
 		Slots: canary.CountedSlots(m), Rename: d.Rename(inject), Manifest: m}

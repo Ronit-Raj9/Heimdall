@@ -17,6 +17,7 @@ import (
 	"time"
 
 	drainmode "github.com/maximhq/bifrost/bench/drain"
+	"github.com/maximhq/bifrost/bench/plaintext"
 	"github.com/maximhq/bifrost/bench/runctl"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/secrets"
@@ -518,7 +519,7 @@ func (c *Coordinator) publishLive(l *remoteLease, evs []schemas.WorkerEvent) {
 		if at.IsZero() || at.After(now) {
 			at = now
 		}
-		l.r.emit(Event{Kind: e.Kind, SlotID: l.slot.SlotID, RunID: e.RunID, Stage: e.Stage, Message: secrets.Redact(msg), At: at})
+		l.r.emit(Event{Kind: e.Kind, SlotID: l.slot.SlotID, RunID: e.RunID, Stage: e.Stage, Message: plaintext.Hosted(secrets.Redact(msg)), At: at})
 	}
 }
 

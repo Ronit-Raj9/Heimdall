@@ -307,7 +307,7 @@ func TestWriteDraftRefusals(t *testing.T) {
 		if _, err := WriteDraft(DraftOptions{SuiteDir: filepath.Join(root, "qa1"), ID: "x", Kind: KindMCP, Session: s, Source: src}); err == nil {
 			t.Error("a -kind other than the suite's template was accepted")
 		}
-		if _, err := WriteDraft(DraftOptions{SuiteDir: filepath.Join(root, "qa1"), ID: "x", Kind: "browser", Session: s, Source: src}); err == nil || !strings.Contains(err.Error(), "want one of") {
+		if _, err := WriteDraft(DraftOptions{SuiteDir: filepath.Join(root, "qa1"), ID: "x", Kind: "browser", Session: s, Source: src}); err == nil || !strings.Contains(err.Error(), "Choose one of") {
 			t.Errorf("err = %v", err)
 		}
 	})
