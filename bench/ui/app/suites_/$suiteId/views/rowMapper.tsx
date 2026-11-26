@@ -189,6 +189,7 @@ export function MappingStep({
 	disabled,
 	fields = MAP_FIELDS,
 	showMetadata = true,
+	help,
 	t,
 }: {
 	columns: readonly RowColumn[];
@@ -204,6 +205,8 @@ export function MappingStep({
 	/** The task fields offered; default every field the Build tab import reads. */
 	fields?: readonly (typeof MAP_FIELDS)[number][];
 	showMetadata?: boolean;
+	/** The line under the title; default the Build tab's text (the Add page has no live preview, wave 4 p10-2). */
+	help?: string;
 	t: T;
 }) {
 	const meta = new Set(mapping.metadata ?? []);
@@ -215,7 +218,7 @@ export function MappingStep({
 		<div className="flex min-w-0 flex-col gap-3 rounded-md border px-3 py-3" data-testid="suite-build-mapping">
 			<div>
 				<p className="text-sm font-medium">{t("rows.map.title")}</p>
-				<p className="text-muted-foreground text-xs">{t("rows.map.help")}</p>
+				<p className="text-muted-foreground text-xs">{help ?? t("rows.map.help")}</p>
 			</div>
 			<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
 				{fields.map((f) => (

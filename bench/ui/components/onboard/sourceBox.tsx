@@ -17,6 +17,11 @@ export function sourceGiven({ link, rows, file }: { link: string; rows: string; 
 	return Boolean(file) || link.trim() !== "" || rows.trim() !== "";
 }
 
+/** The hint under the box shows only while nothing is given (wave 4, p10-9c). */
+export function sourceHintShown(box: { link: string; rows: string; file: File | null }): boolean {
+	return !sourceGiven(box);
+}
+
 /**
  * Step 1 of Add benchmark: one box that takes a link, a dropped file or pasted rows. Look inside
  * stays disabled until one is given, and the hint under it always says what to give.
@@ -113,7 +118,7 @@ export function SourceBox({ busy, onSubmit, onClear }: { busy: boolean; onSubmit
 					isLoading={busy}
 					disabled={busy || !given}
 					dataTestId="onboard-inspect"
-					aria-describedby="onboard-source-hint"
+					aria-describedby={given ? undefined : "onboard-source-hint"}
 				>
 					{t("source.inspect")}
 				</Button>
@@ -135,9 +140,11 @@ export function SourceBox({ busy, onSubmit, onClear }: { busy: boolean; onSubmit
 					</Button>
 				)}
 			</div>
-			<p id="onboard-source-hint" className="text-muted-foreground text-xs" data-testid="onboard-source-hint">
-				{t("source.nothing")}
-			</p>
+			{sourceHintShown({ link, rows, file }) && (
+				<p id="onboard-source-hint" className="text-muted-foreground text-xs" data-testid="onboard-source-hint">
+					{t("source.nothing")}
+				</p>
+			)}
 		</div>
 	);
 }
