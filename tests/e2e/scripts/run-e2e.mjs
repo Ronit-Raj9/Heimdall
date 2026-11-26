@@ -275,6 +275,13 @@ function stopWorkers() {
   for (const c of children) if (c.exitCode === null) c.kill('SIGTERM')
 }
 
+// teardown ends a run: the workers stop and, unless --keep, the bifrost-e2e
+// Postgres project and its volumes are removed, so a normal run leaves nothing.
+function teardown(opts) {
+  stopWorkers()
+  if (!opts.keep) run('docker', [...COMPOSE, 'down', '-v'])
+}
+
 function down() {
   const root = join(WORK_DIR, 'workers')
   for (const name of existsSync(root) ? readdirSync(root) : []) {
@@ -290,8 +297,10 @@ function down() {
   log('stopped workers and removed the bifrost-e2e Postgres')
 }
 
+let opts = null
+
 async function main() {
-  const opts = parseArgs(process.argv.slice(2))
+  opts = parseArgs(process.argv.slice(2))
   acquireLock()
   if (opts.down) return down()
 
@@ -312,7 +321,7 @@ async function main() {
   build(opts.skipBuild)
   await startPostgres(workers)
 
-  const cleanup = () => { if (!opts.keep) stopWorkers() }
+  const cleanup = () => teardown(opts)
   process.on('SIGINT', () => { cleanup(); process.exit(130) })
   process.on('SIGTERM', () => { cleanup(); process.exit(143) })
 
@@ -320,7 +329,7 @@ async function main() {
     await Promise.all(workers.map(startWorker))
     await Promise.all(workers.map(seedLogs))
   } catch (err) {
-    stopWorkers()
+    teardown(opts)
     fail(err.message)
   }
 
@@ -356,7 +365,7 @@ async function main() {
     for (const w of workers) log(`  ${w.name}: http://localhost:${w.port}  login ${ADMIN_USERNAME} / ${loginHint}`)
     log('stop them with: make e2e-ui-down')
   } else {
-    stopWorkers()
+    teardown(opts)
   }
   log(`HTML report: cd tests/e2e && npx playwright show-report`)
   process.exit(pw.status ?? 1)
@@ -364,5 +373,6 @@ async function main() {
 
 main().catch((err) => {
   stopWorkers()
+  if (opts && !opts.keep) run('docker', [...COMPOSE, 'down', '-v'])
   fail(err.stack || String(err))
 })

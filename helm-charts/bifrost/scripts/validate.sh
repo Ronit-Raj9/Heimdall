@@ -36,6 +36,8 @@ print_banner() {
 # Set explicit chart directory (parent of scripts directory)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHART_DIR="$SCRIPT_DIR/.."
+# The chart requires image.tag on purpose; the checks render with a test tag.
+TEST_TAG="${BIFROST_TEST_IMAGE_TAG:-v1.0.0}"
 
 print_banner
 
@@ -58,7 +60,7 @@ fi
 
 # Template the chart with default values
 print_info "Templating chart with default values..."
-if helm template test-release "$CHART_DIR" > /dev/null; then
+if helm template test-release "$CHART_DIR" --set image.tag="$TEST_TAG" > /dev/null; then
     print_success "Default values template successful"
 else
     print_error "Default values template failed"
@@ -70,7 +72,7 @@ print_info "Testing example configurations..."
 for config in "$CHART_DIR"/values-examples/*.yaml; do
     config_name=$(basename "$config")
     print_info "  Testing $config_name..."
-    if helm template test-release "$CHART_DIR" -f "$config" > /dev/null; then
+    if helm template test-release "$CHART_DIR" -f "$config" --set image.tag="$TEST_TAG" > /dev/null; then
         print_success "  $config_name: OK"
     else
         print_error "  $config_name: FAILED"
@@ -80,7 +82,7 @@ done
 
 # Dry run install
 print_info "Performing dry-run installation..."
-if helm install test-release "$CHART_DIR" --dry-run --debug > /dev/null 2>&1; then
+if helm install test-release "$CHART_DIR" --set image.tag="$TEST_TAG" --dry-run --debug > /dev/null 2>&1; then
     print_success "Dry-run installation successful"
 else
     print_error "Dry-run installation failed"
