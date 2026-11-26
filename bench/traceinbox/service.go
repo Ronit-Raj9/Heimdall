@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -27,28 +28,69 @@ var ErrOff = errors.New("the inbox webhook is off: add a webhook source with tok
 // Service is the inbox as the HTTP API serves it (handlers/inbox.go).
 type Service struct {
 	Inbox *Inbox
-	gate  *Gate
-	hook  *Source
+
+	mu      sync.Mutex
+	gate    *Gate
+	hook    *Source
+	hookKey string
 }
 
 // NewService wraps an inbox for the API. The webhook gate is built from the
 // configured webhook source and its token variable; without both the
-// webhook stays off.
+// webhook stays off. When the sources file changes while the server runs
+// (Inbox.Sources rereads it), the gate is rebuilt on the next request.
 func NewService(ib *Inbox) *Service {
 	s := &Service{Inbox: ib}
 	if wh, ok := ib.Config.Webhook(); ok {
-		s.hook = wh
-		s.gate = NewGate(ib.getenv(wh.TokenEnv), wh.RatePerMinute, wh.MaxBytes)
+		s.setHook(wh)
 	}
 	return s
 }
 
+// webhookKey names the settings the gate is built from, so a changed
+// webhook source (added, removed, other token variable, rate or size)
+// rebuilds it and an unchanged one keeps its rate limiter.
+func webhookKey(wh *Source) string {
+	if wh == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s\x00%s\x00%d\x00%d", wh.Name, wh.TokenEnv, wh.RatePerMinute, wh.MaxBytes)
+}
+
+func (s *Service) setHook(wh *Source) {
+	s.hook, s.hookKey, s.gate = wh, webhookKey(wh), nil
+	if wh != nil {
+		s.gate = NewGate(s.Inbox.getenv(wh.TokenEnv), wh.RatePerMinute, wh.MaxBytes)
+	}
+}
+
+// current returns the gate and webhook source of the sources as they are
+// now, rebuilding the gate when the webhook source changed since the last
+// call.
+func (s *Service) current() (*Gate, *Source) {
+	var wh *Source
+	for _, src := range s.Inbox.Sources() {
+		if src.Kind == KindWebhook {
+			src := src
+			wh = &src
+			break
+		}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if webhookKey(wh) != s.hookKey {
+		s.setHook(wh)
+	}
+	return s.gate, s.hook
+}
+
 // Gate returns the webhook gate, or nil when the webhook is off.
 func (s *Service) Gate() *Gate {
-	if s.gate == nil || !s.gate.Enabled() {
+	g, _ := s.current()
+	if g == nil || !g.Enabled() {
 		return nil
 	}
-	return s.gate
+	return g
 }
 
 // List answers GET /inbox.
@@ -251,10 +293,11 @@ func (s *Service) Snooze(_ context.Context, id string, req schemas.InboxSnoozeRe
 
 // Ingest answers POST /inbox/ingest once the gate has let the push in.
 func (s *Service) Ingest(ctx context.Context, body []byte) (*schemas.InboxIngestResult, error) {
-	if s.Gate() == nil {
+	g, hook := s.current()
+	if g == nil || !g.Enabled() {
 		return nil, ErrOff
 	}
-	return PushBody(ctx, s.Inbox, s.hook, body)
+	return PushBody(ctx, s.Inbox, hook, body)
 }
 
 // PushBody decodes one pushed body strictly and ingests it into ib as src.
