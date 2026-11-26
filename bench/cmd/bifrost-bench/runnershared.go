@@ -425,6 +425,7 @@ func (h *sharedHost) orgPolicy(org string, approved []string, projectRoot string
 		p.Session = buildSessionArgv(h.exe, org, h.prefix, h.lockDir)
 	}
 	if h.registry != "" {
+		p.Publish = sharedImagePublisher(h)
 		host, client, cred := h.registry, h.regClient, h.regCred
 		if h.manifest != "" {
 			p.Pinned = utils.ManifestPins(h.manifest)

@@ -124,18 +124,19 @@ func TestPolicyBuildBaseContexts(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = p.Rewrite([]string{"build", "-t", "x:1", org})
-	if !errors.Is(err, ErrPolicy) || !strings.Contains(err.Error(), "python:3.12") || !strings.Contains(err.Error(), "registry-sync.sh") {
+	var nr *ImageNotReady
+	if !errors.Is(err, ErrPolicy) || !errors.As(err, &nr) || nr.Ref != "python:3.12" {
 		t.Fatalf("missing base image: %v", err)
 	}
 	// A pinned digest the registry no longer holds fails too.
 	p.Pinned = func(string) (string, error) { return digestA, nil }
 	p.RegistryHas = func(string) (bool, error) { return false, nil }
-	if _, err = p.Rewrite([]string{"build", "-t", "x:1", org}); !errors.Is(err, ErrPolicy) || !strings.Contains(err.Error(), digestA) {
+	if _, err = p.Rewrite([]string{"build", "-t", "x:1", org}); !errors.Is(err, ErrPolicy) || !errors.As(err, &nr) {
 		t.Fatalf("digest gone from the registry: %v", err)
 	}
 	// No manifest at all: never by tag.
 	p.Pinned = nil
-	if _, err = p.Rewrite([]string{"build", "-t", "x:1", org}); !errors.Is(err, ErrPolicy) || !strings.Contains(err.Error(), "manifest") {
+	if _, err = p.Rewrite([]string{"build", "-t", "x:1", org}); !errors.Is(err, ErrPolicy) || !errors.As(err, &nr) {
 		t.Fatalf("no manifest: %v", err)
 	}
 	// Without a registry FROM lines stay as written.

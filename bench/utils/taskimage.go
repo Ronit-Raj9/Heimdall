@@ -161,6 +161,9 @@ func (d Docker) EnsureImage(ctx context.Context, img LocalImage, out io.Writer) 
 		if err == nil && !ok {
 			err = fmt.Errorf("image %s is still missing after pulling %s", img.Tag, img.Pinned)
 		}
+		if err == nil && d.Policy != nil && d.Policy.Publish != nil && strings.HasPrefix(img.Tag, LocalBaseImagePrefix) && !strings.HasPrefix(img.Tag, d.Policy.TagPrefix) {
+			go func() { _, _ = d.Policy.Publish(context.WithoutCancel(ctx), img.Tag) }()
+		}
 		return id, err
 	}
 	args := []string{"pull", img.Tag}
@@ -177,6 +180,9 @@ func (d Docker) EnsureImage(ctx context.Context, img LocalImage, out io.Writer) 
 	id, ok, err := d.ImageID(ctx, img.Tag)
 	if err == nil && !ok {
 		err = fmt.Errorf("image %s is still missing after docker %s", img.Tag, args[0])
+	}
+	if err == nil && d.Policy != nil && d.Policy.Publish != nil && strings.HasPrefix(img.Tag, LocalBaseImagePrefix) && !strings.HasPrefix(img.Tag, d.Policy.TagPrefix) {
+		go func() { _, _ = d.Policy.Publish(context.WithoutCancel(ctx), img.Tag) }()
 	}
 	return id, err
 }
