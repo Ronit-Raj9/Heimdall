@@ -116,7 +116,7 @@ export function InventoryPanel({
 	// N46: the id is checked as it is typed, against the server's rule and the benchmarks already listed.
 	const suitesLight = useGetSuitesLightQuery();
 	const known = suitesLight.data?.suites ?? [];
-	const idCheck = suiteIdCheck(plan.suite, known);
+	const idCheck = suiteIdCheck(plan.suite, known, suitesLight.data?.reserved_ids);
 	const idLine = suiteIdLine(idCheck, plan.suite, tx);
 	const idLineId = useId();
 	// An empty box on first show gets a free id made from the source name.

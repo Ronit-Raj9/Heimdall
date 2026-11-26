@@ -22,7 +22,8 @@ import { Button } from "@/components/ui/button";
 import { formatValueNumber } from "@/components/valueCell.utils";
 import { getLocale } from "@/lib/i18n";
 import { canUse, useSession } from "@/lib/session/sessionContext";
-import { useGetAgentsQuery, useGetSuitesQuery, useListExperimentsQuery } from "@/lib/store";
+import { useGetAgentsQuery, useListExperimentsQuery } from "@/lib/store";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import "@/lib/types/agentFirstI18n";
 import { useListRunsQuery } from "@/lib/store/apis/benchApi";
 import { useListEvaluationsQuery, type Evaluation } from "@/lib/store/apis/evaluationsApi";
@@ -57,7 +58,7 @@ export default function HomeView() {
 	const locale = getLocale();
 	const agents = useGetAgentsQuery();
 	const list = useListExperimentsQuery(undefined, { pollingInterval: LIST_POLL_MS, skipPollingIfUnfocused: true });
-	const suites = useGetSuitesQuery();
+	const suites = useGetSuitesLightQuery();
 	const runs = useListRunsQuery({ limit: RUNS_PAGE }, { pollingInterval: LIST_POLL_MS, skipPollingIfUnfocused: true });
 	const evals = useListEvaluationsQuery(undefined, { pollingInterval: LIST_POLL_MS, skipPollingIfUnfocused: true });
 	const experiments = (list.data?.experiments ?? []) as ExperimentListItem[];
