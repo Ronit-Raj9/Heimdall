@@ -1,11 +1,14 @@
 import { Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { useGetModelWatchQuery, useRetryModelWatchMutation } from "@/lib/store/apis/gatewayApi";
-import { useGetSchedulesQuery } from "@/lib/store/apis/schedulesApi";
+import { useGetSchedulesQuery, useRunScheduleMutation } from "@/lib/store/apis/schedulesApi";
 import type { GwWatchItem, GwWatchState } from "@/lib/types/gateway";
 import type { ScheduleRow } from "@/lib/types/schedules";
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { NewModelWatchForm } from "./modelWatchForm";
+import "./w4intI18n";
 import "./w4p6I18n";
 
 /** The schedule's new model watch (schedule.NewModelWatch, D3 6.4), read through a local type. */
@@ -34,7 +37,18 @@ export function watchItems(state: GwWatchState): GwWatchItem[] {
 }
 
 /** One watch: its sentence, the first-check line and the table of models found. Pure. */
-export function ModelWatchView({ row, state, onRetry }: { row: WatchScheduleRow; state?: GwWatchState; onRetry(model: string): void }) {
+export function ModelWatchView({
+	row,
+	state,
+	onRetry,
+	onStartNow,
+}: {
+	row: WatchScheduleRow;
+	state?: GwWatchState;
+	onRetry(model: string): void;
+	/** "Start now" on a skipped model: clear it, then run the schedule now. Defaults to onRetry. */
+	onStartNow?(model: string): void;
+}) {
 	const { t } = useTranslation("w4p6");
 	const w = row.new_models as NewModelWatchFields;
 	const items = state ? watchItems(state) : [];
@@ -81,7 +95,13 @@ export function ModelWatchView({ row, state, onRetry }: { row: WatchScheduleRow;
 										{(it.state === "failed" || it.state === "skipped") && (
 											<span className="flex flex-wrap items-center gap-2">
 												{t(it.state === "failed" ? "watch.failed" : "watch.skipped", { reason: it.reason ?? "" })}
-												<Button type="button" size="sm" variant="outline" onClick={() => onRetry(key)}>
+												<Button
+													type="button"
+													size="sm"
+													variant="outline"
+													onClick={() => (it.state === "skipped" && onStartNow ? onStartNow(key) : onRetry(key))}
+													data-testid={`model-watch-retry-${key}`}
+												>
 													{it.state === "failed" ? t("watch.tryAgain") : t("watch.startNow")}
 												</Button>
 											</span>
@@ -97,15 +117,43 @@ export function ModelWatchView({ row, state, onRetry }: { row: WatchScheduleRow;
 	);
 }
 
+/** Start now: the model is cleared first, so the schedule's run picks it up (a skipped model stays seen until then). */
+export async function startNow(
+	retry: (arg: { schedule: string; model: string }) => Promise<unknown>,
+	run: (schedule: string) => Promise<unknown>,
+	schedule: string,
+	model: string,
+) {
+	await retry({ schedule, model });
+	await run(schedule);
+}
+
 function WatchFor({ row }: { row: WatchScheduleRow }) {
 	const q = useGetModelWatchQuery(row.name);
 	const [retry] = useRetryModelWatchMutation();
-	return <ModelWatchView row={row} state={q.data} onRetry={(model) => void retry({ schedule: row.name, model })} />;
+	const [run] = useRunScheduleMutation();
+	return (
+		<ModelWatchView
+			row={row}
+			state={q.data}
+			onRetry={(model) => void retry({ schedule: row.name, model })}
+			onStartNow={(model) =>
+				void startNow(
+					(a) => retry(a).unwrap(),
+					(s) => run(s).unwrap(),
+					row.name,
+					model,
+				).catch(() => undefined)
+			}
+		/>
+	);
 }
 
 /** Gateway page: "Watch for new models", one block per schedule with a new model watch. */
 export function ModelWatchCard() {
 	const { t } = useTranslation("w4p6");
+	const { t: ti } = useTranslation("w4int");
+	const [adding, setAdding] = useState(false);
 	const q = useGetSchedulesQuery();
 	const rows = ((q.data?.rows ?? []) as WatchScheduleRow[]).filter((r) => r.new_models);
 	return (
@@ -114,6 +162,15 @@ export function ModelWatchCard() {
 				<p className="text-muted-foreground text-sm">{t("watch.none")}</p>
 			) : (
 				rows.map((r) => <WatchFor key={r.name} row={r} />)
+			)}
+			{adding ? (
+				<NewModelWatchForm onDone={() => setAdding(false)} />
+			) : (
+				<div>
+					<Button size="sm" variant="outline" onClick={() => setAdding(true)} data-testid="model-watch-add">
+						{ti("watchForm.open")}
+					</Button>
+				</div>
 			)}
 		</Section>
 	);

@@ -1,0 +1,30 @@
+{
+	"watchForm": {
+		"open": "Set up a watch",
+		"providers": "Providers to watch",
+		"providersHint": "Up to five Bifrost provider ids, for example anthropic, openai",
+		"evaluation": "Evaluation to run",
+		"current": "Your current model (setup)",
+		"usdPerModel": "Budget for each new model (USD)",
+		"maxPerDay": "At most per day",
+		"match": "Only models whose name contains (optional)",
+		"check": "Check",
+		"daily": "Every day at 06:00",
+		"hourly": "Every hour",
+		"maxUsdPerDay": "Spending limit per day (USD)",
+		"maxUsdPerDayHint": "It must cover the budget for each new model times the most per day",
+		"pick": "Pick one",
+		"save": "Save the watch",
+		"cancel": "Cancel",
+		"saveFailed": "The watch was not saved.",
+		"problems": {
+			"needProviders": "Name at least one provider to watch.",
+			"tooManyProviders": "A watch can follow at most five providers.",
+			"needEvaluation": "Pick the saved evaluation to run on each new model.",
+			"needCurrent": "Pick the setup of that evaluation that is your current model.",
+			"needBudget": "Give a budget above 0 USD for each new model.",
+			"needDaily": "Give a spending limit per day above 0 USD.",
+			"dailyTooLow": "The spending limit per day must cover the budget for each new model times the most per day."
+		}
+	}
+}
