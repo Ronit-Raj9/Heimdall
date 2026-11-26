@@ -47,8 +47,8 @@ describe("promote preview title on shared tasks (w4m2, p04-6)", () => {
 					changed: false,
 					summary: "",
 					benchmarks: [
-						{ benchmark: "a", changed: false, compared: 2 },
-						{ benchmark: "b", changed: false, compared: 1 },
+						{ benchmark: "a", changed: false, compared: 2, new_tasks: 0, dropped_tasks: 0 },
+						{ benchmark: "b", changed: false, compared: 1, new_tasks: 0, dropped_tasks: 0 },
 					],
 				},
 			},

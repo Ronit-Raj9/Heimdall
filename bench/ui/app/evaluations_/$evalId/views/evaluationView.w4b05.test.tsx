@@ -56,6 +56,7 @@ const base: Evaluation = {
 		benchmarks: ["hd-harbor-tb2"],
 		tasks_per_benchmark: 2,
 		trials: 1,
+		faults: ["clean"],
 	},
 	status: "running",
 	children: [{ benchmark: "hd-harbor-tb2", experiment_id: "e1", status: "running" }],
