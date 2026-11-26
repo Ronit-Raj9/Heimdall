@@ -49,7 +49,7 @@ import { ActionsTab } from "./actionsTab";
 import { ANALYSIS_TAB_ID, AnalysisTab, AnalysisTabLabel } from "./analysisTab"; // L15 analysis jobs
 import { CostTab } from "./costTab";
 import { EXPERIMENT_TABS, defaultExperimentTab, hiddenExperimentTabs, type ExperimentTabId } from "./experimentTabs";
-import { RegradeNotice, useGradeChoice } from "./gradeChoice";
+import { RegradeNotice, gradeQuery, useGradeChoice } from "./gradeChoice";
 import { IntegrityTab } from "./integrityTab";
 import { LiveProgress } from "./liveProgress";
 import { suiteIcon } from "./suiteIcon";
@@ -116,7 +116,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	useGetExperimentQuery(expId, { pollingInterval: live ? EXPERIMENT_POLL_MS : 0, skipPollingIfUnfocused: true, skip: !live });
 	// An experiment that has not started has no runs to analyse, so nothing asks for its verdict.
 	const notStarted = status.data?.state === "created";
-	const verdict = useGetVerdictQuery(grade ? { expId, gradeSource: grade } : expId, { skip: !status.data || notStarted });
+	const verdict = useGetVerdictQuery(gradeQuery(expId, grade), { skip: !status.data || notStarted });
 	// The grid fills in while the experiment runs, so it polls alongside the status.
 	const grid = useGetGridQuery(expId, { skip: !status.data, pollingInterval: live ? EXPERIMENT_POLL_MS : 0, skipPollingIfUnfocused: true });
 	// When a running experiment stops, its verdict, diagnostics, grid and runs were computed from a
@@ -353,6 +353,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 							suite={st.suite}
 							suiteVersion={st.suite_version}
 							evaluationId={evaluationId}
+							live={live}
 						/>
 					)
 				}
@@ -399,6 +400,7 @@ function ExperimentTab({
 	suite,
 	suiteVersion,
 	evaluationId,
+	live,
 }: {
 	tab: ExperimentTabId;
 	expId: string;
@@ -406,12 +408,13 @@ function ExperimentTab({
 	suite?: string;
 	suiteVersion?: string;
 	evaluationId?: string;
+	live?: boolean;
 }) {
 	switch (tab) {
 		case "verdict":
 			return <VerdictTab expId={expId} evaluationId={evaluationId} />;
 		case "runs":
-			return <RunList expId={expId} testId="experiment-runs" />;
+			return <RunList expId={expId} running={live} testId="experiment-runs" />;
 		case "matrix":
 			return <MatrixTab expId={expId} />;
 		case "cost":

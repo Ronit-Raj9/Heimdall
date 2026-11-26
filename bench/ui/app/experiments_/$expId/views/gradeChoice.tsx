@@ -22,6 +22,14 @@ export function effectiveGrade(param: string | null | undefined, latest: Regrade
 	return latest?.id ?? null;
 }
 
+/**
+ * The verdict or diagnostics request for the grade the page shows. The server's default is the newest
+ * re-score (wave 4, N200), so the original (null) is asked for by name. Pure.
+ */
+export function gradeQuery(expId: string, grade: string | null): { expId: string; gradeSource: string } {
+	return { expId, gradeSource: grade ?? ORIGINAL_GRADE };
+}
+
 /** The ?grade= value for a grade source picked on the page: "original" (or null) asks for the original. Pure. */
 export function gradeParam(next: string | null, latest: RegradeRef | undefined): string | null {
 	if (next === null || next === ORIGINAL_GRADE) return latest ? ORIGINAL_GRADE : null;

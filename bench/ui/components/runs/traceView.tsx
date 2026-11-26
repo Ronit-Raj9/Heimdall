@@ -15,6 +15,7 @@ import { EditedCallBadge, ReplayBadge } from "./debug/replayBadge";
 import { StepInspector } from "./debug/stepInspector";
 import { AgentEventsLine, ObserverStatusLine } from "./stepTimeline";
 import { clipText, stepTime } from "./stepTimeline.utils";
+import "@/app/runs/views/w4m4I18n";
 import {
 	TRACE_FILTERS,
 	filterCounts,
@@ -147,6 +148,7 @@ export function TraceView({
 	const { t: tb } = useTranslation("bench");
 	const { t: tt } = useTranslation("traceTools");
 	const { t: td } = useTranslation("runDebug");
+	const { t: tw } = useTranslation("w4m4");
 	const [filter, setFilter] = useState<TraceFilter>(initialStep ? "all" : initialFilter);
 	const [query, setQuery] = useState("");
 	const [autoScroll, setAutoScroll] = useState(true);
@@ -219,7 +221,7 @@ export function TraceView({
 							type="button"
 							aria-pressed={filter === id}
 							onClick={() => setFilter(id)}
-							title={id === "mismatches" ? tt("mismatches.hint") : undefined}
+							title={id === "mismatches" ? tt("mismatches.hint") : id === "tools" ? tw("trace.toolsHint") : undefined}
 							data-testid={`trace-filter-${id}`}
 							className={cn(
 								"focus-visible:ring-ring/50 inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none",

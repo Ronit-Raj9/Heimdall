@@ -8,6 +8,9 @@
 		"replayOfReplay": "This run is itself a replay. To replay again, open the source run and replay that.",
 		"enterRunId": "Enter a run id to compare with this run."
 	},
+	"trace": {
+		"toolsHint": "Each tool use and its answer are listed"
+	},
 	"mcp": {
 		"headerNeeded": "Enter the header name the server reads the credential from.",
 		"pickTool": "Pick at least one tool."
