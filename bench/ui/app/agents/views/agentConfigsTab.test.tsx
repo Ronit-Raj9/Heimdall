@@ -8,6 +8,7 @@ import { AgentConfigsTab, configsCount, splitAgents } from "./agentConfigsTab";
 import { filterAgents, initials, isTestAgent, sortAgents } from "./agentDisplay";
 import { FrameworksTab } from "./frameworksTab";
 
+vi.mock("./agentRowDelete", () => ({ AgentRowDelete: () => null })); // row Delete has its own test (agentRowDelete.iwid.test.tsx)
 vi.mock("./agentJobs", () => ({
 	useAgentJobs: () => [{ id: "j1", kind: "agent.check", status: "succeeded", params: { agent: "agents/codex.yaml" } }],
 }));

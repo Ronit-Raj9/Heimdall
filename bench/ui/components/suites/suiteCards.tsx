@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { suiteDisplay, suiteSections } from "./suiteDisplay";
 import { SuiteStatusPill } from "./suiteIdentity";
+import { SuiteRowDelete } from "./suiteRowDelete";
 import { SuiteRunButton } from "./suiteRunButton";
 
 export interface SuiteCardsProps {
@@ -107,6 +108,7 @@ function SuiteRow({ suite }: { suite: SuiteSummary }) {
 						className="relative z-10 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
 					/>
 				)}
+				<SuiteRowDelete suite={suite} name={name} />
 			</div>
 		</li>
 	);

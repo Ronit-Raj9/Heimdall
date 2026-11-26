@@ -8,6 +8,7 @@ import { SuitesList } from "./suitesView";
 // C1.search: My benchmarks has the Catalog tab's search and filters. C1.name: a benchmark the team
 // added reads as its id, exactly as typed.
 
+vi.mock("@/components/suites/suiteRowDelete", () => ({ SuiteRowDelete: () => null })); // row Delete has its own test (suiteRowDelete.iwid.test.tsx)
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/components/suites/suiteRunButton", () => ({ SuiteRunButton: () => null }));
 

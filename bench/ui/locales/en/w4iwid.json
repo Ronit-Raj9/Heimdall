@@ -1,0 +1,12 @@
+{
+	"delete": {
+		"label": "Delete",
+		"confirm": "Delete",
+		"cancel": "Cancel",
+		"suite": "Delete the benchmark {{name}}? Its tasks and files are removed. Past results stay.",
+		"agent": "Delete the agent {{name}}? Past results stay.",
+		"suiteFailed": "The benchmark was not deleted.",
+		"agentFailed": "The agent was not deleted.",
+		"builtinAgent": "Built-in agents cannot be deleted."
+	}
+}
