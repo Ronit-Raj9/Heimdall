@@ -11,6 +11,7 @@ import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import ClustersTab from "./clustersTab";
+import FindingsTab from "./findingsTab";
 import { InboxPullButton, InboxPullSetup, InboxWebhook } from "./inboxConnect";
 import { useGetInboxWebhookQuery, useGetPullReadinessQuery } from "@/lib/store/apis/liveinboxApi";
 import { InboxItemPanel } from "./inboxItemPanel";
@@ -34,12 +35,23 @@ export default function InboxView() {
 		{ id: "inbox", label: t("inbox.tabs.inbox") },
 		{ id: "clusters", label: t("inbox.tabs.clusters") },
 		{ id: "triage", label: t("inbox.tabs.triage") },
+		{ id: "findings", label: t("tabs.findings", { ns: "w443" }) },
 	];
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="inbox-page">
 			<PageHeader title={t("inbox.title")} subtitle={t("inbox.pageSubtitle")} />
 			<RouteTabs tabs={tabs} defaultTab="inbox" label={t("inbox.tabs.label")} testId="inbox-tabs">
-				{(active) => (active === "clusters" ? <ClustersTab /> : active === "triage" ? <TriageTab /> : <InboxTab />)}
+				{(active) =>
+					active === "clusters" ? (
+						<ClustersTab />
+					) : active === "triage" ? (
+						<TriageTab />
+					) : active === "findings" ? (
+						<FindingsTab />
+					) : (
+						<InboxTab />
+					)
+				}
 			</RouteTabs>
 		</section>
 	);
