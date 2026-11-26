@@ -86,3 +86,46 @@ func (s Splits) Verify() error {
 	}
 	return nil
 }
+
+// PartitionWithSealed keeps sealed as given and splits the rest of the
+// pool into dev and audit by the spec's dev and audit shares renormalised,
+// with the same seeded hash order as Partition. Studies use it so every loop
+// shares one sealed split (A4.1). Dev and audit each get at least one task;
+// honeypots are kept out of the pool.
+func PartitionWithSealed(pool, sealed []string, spec *Spec) (Splits, error) {
+	isSealed := map[string]bool{}
+	for _, t := range sealed {
+		isSealed[t] = true
+	}
+	rest := []string{}
+	seen := map[string]bool{}
+	for _, t := range pool {
+		if t == "" || seen[t] || isSealed[t] || slices.Contains(spec.Splits.Honeypots, t) {
+			continue
+		}
+		seen[t] = true
+		rest = append(rest, t)
+	}
+	if len(rest) < 2 {
+		return Splits{}, fmt.Errorf("an improvement run needs at least 2 tasks outside the held-out split, the pool has %d", len(rest))
+	}
+	key := func(t string) string { return utils.SHA256Bytes(fmt.Appendf(nil, "%d\x00%s", spec.Seed, t)) }
+	slices.SortFunc(rest, func(a, b string) int { return strings.Compare(key(a), key(b)) })
+	n := len(rest)
+	share := 0.5
+	if tot := spec.Splits.Dev + spec.Splits.Audit; tot > 0 {
+		share = spec.Splits.Dev / tot
+	}
+	nd := min(n-1, max(1, int(math.Round(share*float64(n)))))
+	s := Splits{Dev: slices.Clone(rest[:nd]), Audit: slices.Clone(rest[nd:]), Sealed: slices.Clone(sealed),
+		Honeypots: slices.Clone(spec.Splits.Honeypots)}
+	for _, l := range [][]string{s.Dev, s.Audit, s.Sealed} {
+		slices.Sort(l)
+	}
+	h, err := utils.HashJSON([4][]string{s.Dev, s.Audit, s.Sealed, s.Honeypots})
+	if err != nil {
+		return Splits{}, err
+	}
+	s.Hash = h
+	return s, nil
+}
