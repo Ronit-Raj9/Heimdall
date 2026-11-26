@@ -1,5 +1,6 @@
 import "./builderI18n";
 import "@/app/experiments_/$expId/views/fw11I18n";
+import "@/components/migration/w4b06I18n";
 
 import { readWriteToken, saveWriteToken } from "@/components/experiments/experiments.utils";
 import { EstimateBox } from "@/components/experiments/estimateBox";
@@ -19,7 +20,7 @@ import {
 } from "@/lib/store/apis/benchApi";
 import type { Catalog, CatalogAgent, Experiment, ExperimentPlan } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { ChevronDown, Plus, X } from "lucide-react";
+import { ChevronDown, Loader2, Plus, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { suiteRef } from "./experimentFormSchema";
@@ -53,6 +54,21 @@ export interface MatrixBuilderProps {
 	readyPending?: boolean;
 	/** Called once the experiment is created and started (or created with a failed start), with its id and cap. */
 	onStarted: (expId: string, capUsd: number) => void;
+}
+
+/**
+ * Runs the estimate call and, when the server answers 503 (it is still reading a big benchmark's
+ * tasks and sends Retry-After: 5), waits 5 seconds and tries once more. Any other error, or a
+ * second 503, is thrown to the caller.
+ */
+export async function estimateWithOneRetry<T>(call: () => Promise<T>, wait: (ms: number) => Promise<void>): Promise<T> {
+	try {
+		return await call();
+	} catch (err) {
+		if ((err as { status?: unknown } | null)?.status !== 503) throw err;
+		await wait(5000);
+		return await call();
+	}
 }
 
 /** The no-YAML builder: agents x models x suite, adaptive toggle, preview, estimate, plan and run. */
@@ -91,6 +107,9 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 	} | null>(null);
 	const [plan, planState] = usePlanExperimentMutation();
 	const [estimate, estimateState] = useEstimateExperimentMutation();
+	const [estimateRetrying, setEstimateRetrying] = useState(false);
+	const { t: tw } = useTranslation("w4b06");
+	const estimating = estimateState.isLoading || estimateRetrying;
 	const [create, createState] = useCreateExperimentMutation();
 	const [start, startState] = useStartExperimentMutation();
 
@@ -178,7 +197,13 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 		if (!exp) return;
 		setEstimated(exp);
 		try {
-			await estimate(exp).unwrap();
+			await estimateWithOneRetry(
+				() => estimate(exp).unwrap(),
+				(ms) => {
+					setEstimateRetrying(true);
+					return new Promise<void>((resolve) => setTimeout(resolve, ms)).finally(() => setEstimateRetrying(false));
+				},
+			);
 		} catch {
 			// estimateState.error renders it.
 		}
@@ -585,12 +610,18 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 								type="button"
 								variant="outline"
 								size="sm"
-								disabled={needsToken || readyBlock !== null}
-								isLoading={estimateState.isLoading}
+								disabled={needsToken || readyBlock !== null || estimating}
 								onClick={() => void onEstimate()}
 								dataTestId="builder-estimate"
 							>
-								{t("actions.estimate")}
+								{estimating ? (
+									<>
+										<Loader2 className="size-4 animate-spin" aria-hidden="true" />
+										{tw("estimate.estimating")}
+									</>
+								) : (
+									t("actions.estimate")
+								)}
 							</Button>
 							<Button
 								type="button"
@@ -624,7 +655,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 								{blockReason}
 							</p>
 						)}
-						{estimateState.error && !estimateState.isLoading && (
+						{estimateState.error && !estimating && (
 							<LoadError title={t("actions.estimateError")} error={estimateState.error} testId="builder-estimate-error" />
 						)}
 						{estimated && estimateState.data && !estimateState.isLoading && (

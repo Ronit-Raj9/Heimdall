@@ -19,6 +19,7 @@ import (
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/gates"
 	"github.com/maximhq/bifrost/bench/handlers"
+	"github.com/maximhq/bifrost/bench/leaderboard"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/server"
 	"github.com/maximhq/bifrost/bench/store"
@@ -194,8 +195,13 @@ func (x indexAdapter) LatestAnalysis(expID string) (string, bool) {
 	return a.AnalysisID, true
 }
 
-// latestAnalysis reads the newest complete analysis through the store's
-// shared reader.
+// latestAnalysis reads, through the store's shared reader, the analysis a
+// comparison shows (N200, one rule everywhere): the newest complete analysis
+// of the newest re-score; with no re-score, or no complete analysis of it,
+// the newest analysis of the original grading. The comparisons list, the
+// leaderboard and every other reader of LatestDecision, LatestInvalid and
+// LatestAnalysis follow it. To revert to the original grading, read
+// GradeSourceOriginal only.
 func (x indexAdapter) latestAnalysis(expID string) (*schemas.Analysis, error) {
 	var st *store.FSStore
 	if x.ix != nil {
@@ -206,7 +212,22 @@ func (x indexAdapter) latestAnalysis(expID string) (*schemas.Analysis, error) {
 			return nil, err
 		}
 	}
-	return st.LatestAnalysis(context.Background(), expID)
+	ctx := context.Background()
+	rs, err := x.Regrades(ctx, expID)
+	if err != nil {
+		return nil, err
+	}
+	r, ok := leaderboard.NewestRegrade(rs)
+	if !ok {
+		// Every analysis is of the original grading, including old ones
+		// stored before analyses recorded their grade source.
+		return st.LatestAnalysis(ctx, expID)
+	}
+	a, err := st.LatestAnalysisFor(ctx, expID, r.ID)
+	if err != nil || a != nil {
+		return a, err
+	}
+	return st.LatestAnalysisFor(ctx, expID, schemas.GradeSourceOriginal)
 }
 
 func view(e store.RunEntry) handlers.RunView {

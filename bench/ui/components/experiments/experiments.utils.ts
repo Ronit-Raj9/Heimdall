@@ -4,11 +4,18 @@ import type { ExperimentState, ExperimentStatus } from "@/lib/types/bench";
 /** States after which an experiment's status no longer changes, so polling stops. */
 export const TERMINAL_STATES: ReadonlySet<ExperimentState> = new Set(["done", "failed", "cancelled"]);
 
-/** The most recently started experiment, else the most recently frozen one. Null for an empty list. */
-export function newestExperiment(experiments: readonly ExperimentStatus[]): ExperimentStatus | null {
+/**
+ * The most recently started experiment, else the most recently frozen one. Heimdall's own checks,
+ * practice runs and debug runs are skipped unless `skipHidden` is false (N5). Null when none is left.
+ */
+export function newestExperiment(
+	experiments: readonly ExperimentStatus[],
+	{ skipHidden = true }: { skipHidden?: boolean } = {},
+): ExperimentStatus | null {
 	let best: ExperimentStatus | null = null;
 	let bestAt = Number.NEGATIVE_INFINITY;
 	for (const exp of experiments) {
+		if (skipHidden && isCheckPracticeOrDebug(exp)) continue;
 		const at = Date.parse(exp.started_at ?? exp.frozen_at);
 		const when = Number.isFinite(at) ? at : Number.NEGATIVE_INFINITY;
 		if (best === null || when > bestAt) {

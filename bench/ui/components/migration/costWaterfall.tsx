@@ -1,7 +1,10 @@
+import "./w4b06I18n";
+
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { getLocale } from "@/lib/i18n";
 import { useGetCostExplainQuery } from "@/lib/store/apis/migrationApi";
 import type { CostArm, CostExplanation, CostWaterfall as Waterfall, Value } from "@/lib/types/bench";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { costText, formatShare, observed, signedUsd, waterfallBars } from "./pareto.utils";
 
@@ -15,9 +18,23 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 	const { t } = useTranslation("bench");
 	const locale = getLocale();
 	const { a, b } = explanation;
+	const { t: tw } = useTranslation("w4b06");
 	const unknown = t("migration.unknown");
-	const rows: [string, (arm: CostArm) => string][] = [
-		[t("migration.cost.row.model"), (arm) => (arm.served_models.length > 0 ? `${arm.model} (${arm.served_models.join(", ")})` : arm.model)],
+	// N200: the configured model, then the provider's own name for it on a second line only when it differs.
+	const modelCell = (arm: CostArm): ReactNode => {
+		const served = arm.served_models.filter((m) => m !== arm.model);
+		if (served.length === 0) return arm.model;
+		return (
+			<>
+				{arm.model}
+				<span className="text-muted-foreground block text-xs" data-testid="cost-answered-as">
+					{tw("cost.answeredAs", { served: served.join(", ") })}
+				</span>
+			</>
+		);
+	};
+	const rows: [string, (arm: CostArm) => ReactNode][] = [
+		[tw("cost.model"), modelCell],
 		[t("migration.cost.row.runs"), (arm) => t("migration.cost.runsValue", { runs: arm.runs, successes: arm.successes })],
 		[t("migration.cost.row.perRun"), (arm) => costText(arm.cost_per_run, locale) ?? valueReason(arm.cost_per_run, unknown)],
 		[t("migration.cost.row.perSuccess"), (arm) => costText(arm.cost_per_success, locale) ?? valueReason(arm.cost_per_success, unknown)],

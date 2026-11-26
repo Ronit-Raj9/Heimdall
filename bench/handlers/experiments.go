@@ -129,8 +129,9 @@ func (h *ExperimentsHandler) planExperiment(ctx *fasthttp.RequestCtx) {
 	}
 	m, err := h.planManifest(ctx, exp)
 	switch {
-	case errors.Is(err, context.DeadlineExceeded):
-		sendDepError(ctx, h.mode, "plan experiment", err)
+	case errors.Is(err, context.DeadlineExceeded): // p07-1: a cold load of a big benchmark; the page tries again
+		ctx.Response.Header.Set("Retry-After", "5")
+		lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable, "Still reading this benchmark's tasks. Trying again in a few seconds.")
 	case err != nil:
 		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, FailedPlan(exp, err))
 	default:
@@ -674,16 +675,19 @@ func (h *ExperimentsHandler) lookup(ctx *fasthttp.RequestCtx) (*schemas.Manifest
 	return m, h.index.Runs(id), true
 }
 
-// analyze runs the analyzer for expID with ?grade_source= (default
-// original), or answers the error.
+// analyze runs the analyzer for expID with ?grade_source= (default the
+// newest re-score, else original), or answers the error.
 func (h *ExperimentsHandler) analyze(ctx *fasthttp.RequestCtx, expID string) (*schemas.Analysis, bool) {
 	if h.analyzer == nil {
 		sendUnavailable(ctx, h.mode, "analyzer")
 		return nil, false
 	}
 	source := strings.TrimSpace(string(ctx.QueryArgs().Peek("grade_source")))
-	if source == "" {
+	if source == "" { // N200: the newest re-score when there is one, else the original
 		source = GradeSourceOriginal
+		if r := h.latestRegrade(expID); r != nil {
+			source = r.ID
+		}
 	}
 	if !validID(source) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "grade_source must be original or a regrade id")
