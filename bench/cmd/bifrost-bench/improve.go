@@ -281,9 +281,18 @@ func improveGateCmd(ctx context.Context, a *app, out io.Writer, suiteRef, tasks,
 	return 1
 }
 
+// improveOnEvent builds the runner's event hook (notifications); nil sends
+// nothing. Set by the file that sends improvement events.
+var improveOnEvent func(a *app) func(kind string, rec *improve.Record)
+
 // newImproveRunner wires the runner over the runs root.
 func newImproveRunner(a *app) *improve.Runner {
-	return &improve.Runner{Root: filepath.Join(a.store.Root(), improve.DefaultDir), Exec: improveExecutor{a: a}, Logger: a.logger}
+	r := &improve.Runner{Root: filepath.Join(a.store.Root(), improve.DefaultDir), Exec: improveExecutor{a: a}, Logger: a.logger,
+		Objects: improve.Objects{Root: filepath.Join(a.store.Root(), improve.DefaultDir, "objects")}}
+	if improveOnEvent != nil {
+		r.OnEvent = improveOnEvent(a)
+	}
+	return r
 }
 
 // improveExecutor implements improve.Executor with the agent version store,
@@ -374,18 +383,26 @@ func (x improveExecutor) Freeze(_ context.Context, parent improve.Version, doc [
 	if err != nil {
 		return improve.Version{}, err
 	}
-	ed := improve.Editable{}
-	if parent.Bundle != nil {
-		for k := range parent.Bundle {
-			ed.Files = append(ed.Files, k)
-		}
-	}
-	nv, err := improve.NewVersion(versionRef(id, v.Version), v.Version, b, ed)
+	nv, err := improve.NewVersion(versionRef(id, v.Version), v.Version, b, lin.Editable)
 	if err != nil {
 		return nv, err
 	}
-	nv.BundleHash = lin.BundleHash
+	if nv.BundleHash != lin.BundleHash {
+		return improve.Version{}, fmt.Errorf("frozen bundle %s does not match the applied bundle %s", nv.BundleHash, lin.BundleHash)
+	}
+	obj, err := improve.BundleObjectOf(b, nv.Bundle)
+	if err != nil {
+		return improve.Version{}, err
+	}
+	if nv.BundleObj, err = x.objects().Put(improve.ObjBundle, obj); err != nil {
+		return improve.Version{}, fmt.Errorf("store the bundle of %s: %w", nv.Ref, err)
+	}
 	return nv, nil
+}
+
+// objects is the improvement runs' content-addressed store.
+func (x improveExecutor) objects() improve.Objects {
+	return improve.Objects{Root: filepath.Join(x.a.store.Root(), improve.DefaultDir, "objects")}
 }
 
 // Tasks implements improve.Executor.

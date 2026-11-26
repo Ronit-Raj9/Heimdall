@@ -146,6 +146,26 @@ func ApplyBundle(doc []byte, ed Editable, b Bundle) ([]byte, error) {
 	return out, nil
 }
 
+// BundleObjectOf is the bundle object (A1.2) of a version's bundle, with
+// the paths its document delivers raw (files_raw) listed in Raw.
+func BundleObjectOf(doc []byte, b Bundle) (BundleObject, error) {
+	tree, err := parseTree(doc)
+	if err != nil {
+		return BundleObject{}, err
+	}
+	raw, _ := tree["files_raw"].(map[string]any)
+	obj := BundleObject{Files: maps.Clone(map[string]string(b)), Raw: []string{}}
+	if obj.Files == nil {
+		obj.Files = map[string]string{}
+	}
+	for _, k := range slices.Sorted(maps.Keys(b)) {
+		if _, ok := raw[k]; ok {
+			obj.Raw = append(obj.Raw, k)
+		}
+	}
+	return obj, nil
+}
+
 func parseTree(doc []byte) (map[string]any, error) {
 	var tree map[string]any
 	if err := yaml.Unmarshal(doc, &tree); err != nil {

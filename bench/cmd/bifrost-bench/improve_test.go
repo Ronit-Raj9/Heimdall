@@ -3,14 +3,18 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/improve"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/store"
+	"github.com/maximhq/bifrost/bench/utils"
 	"gopkg.in/yaml.v3"
 )
 
@@ -126,5 +130,44 @@ func TestCheckImproverRefusesOwnSpendLimit(t *testing.T) {
 	}
 	if !agentSetsSpendLimit([]byte(doc)) || agentSetsSpendLimit([]byte("id: a\n")) {
 		t.Error("agentSetsSpendLimit")
+	}
+}
+
+// Freeze keeps the whole applied bundle (a skill added under an editable
+// folder survives), stores the bundle object, and refuses a bundle whose
+// hash differs from the one the runner applied.
+func TestImproveFreezeKeepsWholeBundle(t *testing.T) {
+	root := t.TempDir()
+	st, err := store.NewFSStore(filepath.Join(root, "runs"), utils.NewStdLogger(io.Discard, false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	x := improveExecutor{a: &app{cfg: &lib.Config{Root: root}, store: st}}
+	ed := improve.Editable{Files: []string{"/home/agent/AGENTS.md"}, Dirs: []string{"/home/agent/skills/"}, Instructions: true}
+	parentDoc := []byte("id: fz\nadapter: command\nimage: img\nargv: [run]\nmodel: m\nfiles:\n  /home/agent/AGENTS.md: hi\n")
+	parent, err := x.snapshot("fz", parentDoc, ed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := improve.Bundle{"/home/agent/AGENTS.md": "hi", "/home/agent/skills/run/SKILL.md": "run {{model}} tests", improve.InstructionsKey: "Be brief."}
+	doc, err := improve.ApplyBundle(parent.Doc, ed, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nv, err := x.Freeze(context.Background(), parent, doc, improve.Lineage{ImprovementID: "imp_fz", Round: 1, BundleHash: b.Hash(), Editable: ed})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nv.Bundle["/home/agent/skills/run/SKILL.md"] != "run {{model}} tests" || nv.Bundle[improve.InstructionsKey] != "Be brief." || nv.BundleHash != b.Hash() {
+		t.Errorf("frozen bundle %v hash %s", nv.Bundle, nv.BundleHash)
+	}
+	var obj improve.BundleObject
+	objs := improve.Objects{Root: filepath.Join(st.Root(), improve.DefaultDir, "objects")}
+	if nv.BundleObj == "" || objs.Get(nv.BundleObj, improve.ObjBundle, &obj) != nil || obj.Files["/home/agent/skills/run/SKILL.md"] == "" || !slices.Contains(obj.Raw, "/home/agent/skills/run/SKILL.md") {
+		t.Errorf("bundle object %q %+v", nv.BundleObj, obj)
+	}
+	_, err = x.Freeze(context.Background(), parent, doc, improve.Lineage{ImprovementID: "imp_fz", Round: 1, BundleHash: "abc", Editable: ed})
+	if err == nil || !strings.HasPrefix(err.Error(), "frozen bundle ") || !strings.HasSuffix(err.Error(), " does not match the applied bundle abc") {
+		t.Errorf("mismatch: %v", err)
 	}
 }
