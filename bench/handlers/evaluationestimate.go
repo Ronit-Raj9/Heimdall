@@ -336,7 +336,7 @@ func (h *evalEstimateHandler) post(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.env.Mode, "estimate evaluation", err)
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, est)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(est))
 }
 
 // EstimateEvaluation validates req, resolves its benchmarks and estimates

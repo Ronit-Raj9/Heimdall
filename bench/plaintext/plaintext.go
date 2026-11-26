@@ -45,7 +45,9 @@ var (
 	orgIDRe = regexp.MustCompile(`org_(?:org)?[0-9a-z]{26}`)
 
 	flagHintRe = regexp.MustCompile(`pass -(\w[\w-]*) (\S+) or leave -(\w[\w-]*) out`)
-	flagWordRe = regexp.MustCompile(`\s?\b(?:pass|use|with|run) -[a-z][a-z-]+(?: \S+)?`)
+	// flagWordRe is a flag after pass, use, with or run, with its value and
+	// any flags that follow it ("run -resume e_x -total-usd 5").
+	flagWordRe = regexp.MustCompile(`\s?\b(?:pass|use|with|run) -[a-z][a-z-]+(?: [^\s-]\S*)?(?: -[a-z][a-z-]+(?: [^\s-]\S*)?)*`)
 	// commandRe is a command line; a word joined to the name by "-", "." or
 	// "/" (the compose key x-heimdall, a path) is not one.
 	commandRe = regexp.MustCompile(`(^|[^\w./-])(?:bifrost-bench|heimdall) [a-z-]+(?: [a-z-]+)*(?: -\S+)*`)

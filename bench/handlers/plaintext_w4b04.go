@@ -7,6 +7,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/plaintext"
+	"github.com/maximhq/bifrost/bench/schemas"
 )
 
 // Served text of jobs, receipts and run steps (wave 4, F1.3): on a hosted
@@ -81,9 +82,30 @@ func (a plainLogsAPI) Logs(ctx context.Context, orgID, id string, since int64, l
 	return plainLogPage(p), err
 }
 
-// plainTextFields names the JSON fields of receipts, run steps and job
-// progress that hold display text.
-var plainTextFields = map[string]bool{"message": true, "summary": true, "detail": true, "error": true, "last_error": true}
+// plainTextFields names the JSON fields of served answers that hold display
+// text from the engine, the planner or a worker: a string, or a list of
+// strings (notes, errors).
+var plainTextFields = map[string]bool{"message": true, "summary": true, "detail": true, "error": true, "last_error": true,
+	"skipped": true, "problem": true, "notes": true, "reason": true, "basis": true, "errors": true}
+
+// plainEvent is ev with its message cleaned for a browser (live events of
+// the experiment event poll and stream).
+func plainEvent(ev schemas.LiveEvent) schemas.LiveEvent {
+	ev.Message = plaintext.Hosted(ev.Message)
+	return ev
+}
+
+// plainEvents is events with every message cleaned for a browser.
+func plainEvents(events []schemas.LiveEvent) []schemas.LiveEvent {
+	if plaintext.DefaultRoots == nil {
+		return events
+	}
+	out := make([]schemas.LiveEvent, len(events))
+	for i, ev := range events {
+		out[i] = plainEvent(ev)
+	}
+	return out
+}
 
 // plainServed returns v with every message, summary, detail and error
 // string cleaned for a browser, as a JSON tree; v itself when nothing is
@@ -111,6 +133,16 @@ func plainTree(v any) any {
 		for k, x := range t {
 			if s, ok := x.(string); ok && plainTextFields[k] {
 				t[k] = plaintext.Hosted(s)
+				continue
+			}
+			if list, ok := x.([]any); ok && plainTextFields[k] {
+				for i, y := range list {
+					if s, ok := y.(string); ok {
+						list[i] = plaintext.Hosted(s)
+					} else {
+						list[i] = plainTree(y)
+					}
+				}
 				continue
 			}
 			t[k] = plainTree(x)

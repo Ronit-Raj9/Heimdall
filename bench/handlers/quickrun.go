@@ -286,7 +286,7 @@ func (h *quickRunHandler) post(ctx *fasthttp.RequestCtx) {
 			SpentUSD: schemas.Unknown("not_indexed", schemas.EvidenceGateway)}
 		resp.Status = &st
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusCreated, resp)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusCreated, plainServed(resp))
 }
 
 // errBad is a request error the user can fix (400); errMissing is a missing

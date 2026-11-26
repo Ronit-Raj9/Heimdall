@@ -163,7 +163,7 @@ func streamSSE(w *bufio.Writer, mode schemas.Mode, ch <-chan schemas.LiveEvent, 
 			if !allowed() {
 				return
 			}
-			data, err := sseData(ev, mode)
+			data, err := sseData(plainEvent(ev), mode) // wave 4, F1.3: hosted text names no server path
 			if err != nil {
 				continue
 			}

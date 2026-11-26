@@ -39,3 +39,15 @@ func TestCleanKeepsWhatToFix(t *testing.T) {
 		}
 	}
 }
+
+// TestCleanDropsChainedFlags: a command line hint with several flags loses
+// all of them, not only the first (group B review).
+func TestCleanDropsChainedFlags(t *testing.T) {
+	got := Clean("spend cap reached; raise the cap with run -resume e_x -total-usd 5")
+	if strings.Contains(got, "-resume") || strings.Contains(got, "-total-usd") || !strings.HasPrefix(got, "spend cap reached") {
+		t.Fatalf("Clean = %q", got)
+	}
+	if got := Clean("agents/x.yaml: field model: use -model or set it"); got != "agents/x.yaml: field model: set it" {
+		t.Fatalf("single flag: %q", got)
+	}
+}

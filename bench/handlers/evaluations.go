@@ -165,7 +165,7 @@ func (h *evaluationsHandler) list(ctx *fasthttp.RequestCtx) {
 		out.Evaluations = append(out.Evaluations, ev)
 	}
 	h.backfillResults(out.Evaluations) // N161: results of evaluations that finished before they were stored (evalresult.go)
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(out))
 }
 
 func (h *evaluationsHandler) get(ctx *fasthttp.RequestCtx) {
@@ -178,7 +178,7 @@ func (h *evaluationsHandler) get(ctx *fasthttp.RequestCtx) {
 		_ = h.store().Save(ev)
 	}
 	h.livePaused(ev)
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, ev)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(ev))
 }
 
 // cancel stops every child that still runs. A child that is not running is
@@ -221,7 +221,7 @@ func (h *evaluationsHandler) cancel(ctx *fasthttp.RequestCtx) {
 		h.fail(ctx, fasthttp.StatusBadGateway, "some experiments could not be cancelled: "+strings.Join(errs, "; "))
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusAccepted, ev)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusAccepted, plainServed(ev))
 }
 
 func terminalChild(s string) bool {
@@ -424,7 +424,7 @@ func (h *evaluationsHandler) create(ctx *fasthttp.RequestCtx) {
 	}
 	if platformRefusal != nil {
 		if status, body, refused := platformRefusal(work, h, &spec); refused {
-			lib.SendJSON(ctx, h.env.Mode, status, body)
+			lib.SendJSON(ctx, h.env.Mode, status, plainServed(body))
 			return
 		}
 	}
@@ -483,7 +483,7 @@ func (h *evaluationsHandler) create(ctx *fasthttp.RequestCtx) {
 			h.launchInBackground(bg, ev)
 		}()
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusAccepted, &answer)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusAccepted, plainServed(&answer))
 }
 
 // evalCreateInBackground makes POST /evaluations answer before the children
