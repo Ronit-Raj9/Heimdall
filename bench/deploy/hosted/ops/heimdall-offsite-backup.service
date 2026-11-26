@@ -1,0 +1,17 @@
+# Daily off-site backup of the hosted server (docs/operations.md).
+# Install as root: cp this file and heimdall-offsite-backup.timer to
+# /etc/systemd/system/, then systemctl enable --now heimdall-offsite-backup.timer
+[Unit]
+Description=Heimdall off-site backup
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/data/Heimdall/bench
+ExecStart=/data/Heimdall/bench/deploy/hosted/ops/offsite-backup.sh --dir /var/backups/heimdall
+# Failure alert: posts "Heimdall off-site backup failed on <host>" to the
+# webhook in /etc/heimdall/alert.env when the backup did not succeed.
+ExecStopPost=/bin/sh -c 'if [ "$SERVICE_RESULT" != success ]; then /data/Heimdall/bench/deploy/hosted/ops/offsite-backup.sh --notify-failure; fi'
+Nice=10
+IOSchedulingClass=idle
