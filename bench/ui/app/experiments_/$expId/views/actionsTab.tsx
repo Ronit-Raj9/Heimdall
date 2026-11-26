@@ -13,6 +13,8 @@ import { GitBranch, GitCompareArrows, Layers, Radar } from "lucide-react";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "@/components/verdict/hw09I18n";
+import "@/app/compare/views/w4m3I18n";
+import { wholeNumberProblem } from "@/lib/inputChecks";
 import { usePartialSuiteRefetch } from "@/app/experiments_/new/views/partialRefetch";
 
 export interface ActionsTabProps {
@@ -81,6 +83,15 @@ function clamp(n: number, max: number): number {
 }
 
 /**
+ * The extend job's params for the count typed (p06-2), or null when the count is not a whole number
+ * from 1 to max: no silent clamping, the card says what is wrong instead.
+ */
+export function extendParams(raw: string, max: number, mode: "trials" | "tasks", expId: string, force: boolean): ExtendJobParams | null {
+	if (wholeNumberProblem(raw, 1, max)) return null;
+	return { exp_id: expId, [mode]: Number(raw.trim()), ...(force ? { force: true } : {}) };
+}
+
+/**
  * Why Extend is off on a broken comparison (fix wave 3, N246): the first reason its test was broken,
  * as in the sentence the extend job refuses with.
  */
@@ -105,7 +116,8 @@ function ExtendCard({ expId }: { expId: string }) {
 	const uid = useId();
 	const adaptive = useGetExperimentAdaptiveQuery(expId);
 	const [mode, setMode] = useState<"trials" | "tasks">("trials");
-	const [count, setCount] = useState(2);
+	const { t: tw } = useTranslation("w4m3");
+	const [count, setCount] = useState("2");
 	const [force, setForce] = useState(false);
 	const decision = adaptive.data?.decision ?? "";
 	const more = adaptive.data?.more_evidence;
@@ -114,13 +126,9 @@ function ExtendCard({ expId }: { expId: string }) {
 	const open = ["inconclusive", "score"].includes(decision.toLowerCase());
 	// Fix wave 3, N246: a broken comparison is never extended, "anyway" or not; the server refuses too.
 	const broken = decision.toLowerCase() === "invalid";
-	const params: ExtendJobParams | null = parent
-		? null
-		: {
-				exp_id: expId,
-				[mode]: clamp(count, mode === "trials" ? EXTEND_MAX_TRIALS : EXTEND_MAX_TASKS),
-				...(force ? { force: true } : {}),
-			};
+	const max = mode === "trials" ? EXTEND_MAX_TRIALS : EXTEND_MAX_TASKS;
+	const problem = wholeNumberProblem(count, 1, max);
+	const params: ExtendJobParams | null = parent ? null : extendParams(count, max, mode, expId, force);
 	return (
 		<ActionCard
 			icon={Layers}
@@ -178,7 +186,7 @@ function ExtendCard({ expId }: { expId: string }) {
 									checked={mode === "tasks"}
 									onChange={() => {
 										setMode("tasks");
-										if (more?.tasks) setCount(more.tasks);
+										if (more?.tasks) setCount(String(more.tasks));
 									}}
 									data-testid="actions-extend-tasks"
 								/>
@@ -191,9 +199,10 @@ function ExtendCard({ expId }: { expId: string }) {
 								id={`${uid}-count`}
 								type="number"
 								min={1}
-								max={mode === "trials" ? EXTEND_MAX_TRIALS : EXTEND_MAX_TASKS}
+								max={max}
 								value={count}
-								onChange={(e) => setCount(Number(e.target.value))}
+								aria-invalid={problem ? true : undefined}
+								onChange={(e) => setCount(e.target.value)}
 								data-testid="actions-extend-count"
 							/>
 						</label>
@@ -209,8 +218,8 @@ function ExtendCard({ expId }: { expId: string }) {
 					kind="experiment.extend"
 					params={params && !broken && (open || force || !decision) ? params : null}
 					label={t("extend.run")}
-					confirm={t("extend.confirm", { expId })}
-					missing={parent || broken ? undefined : t("extend.notInconclusive")}
+					confirm={tw("extend.confirm", { count: Number(count), what: tw(mode === "trials" ? "extend.whatTrials" : "extend.whatTasks") })}
+					missing={parent || broken ? undefined : (problem ?? t("extend.notInconclusive"))}
 					testId="actions-extend-job"
 				/>
 			</div>

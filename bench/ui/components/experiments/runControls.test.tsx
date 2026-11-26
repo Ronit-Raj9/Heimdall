@@ -73,7 +73,7 @@ describe("RunControlsPanel", () => {
 		expect(html).toContain('data-testid="policy-row-aborted_infra"');
 		expect(html).toContain("Never reached the agent");
 		expect(html).toContain("by requeue");
-		expect(html).toContain("1 changes, verified");
+		expect(html).toContain("1 change, verified");
 		expect(html).toContain("outage");
 		expect(html).not.toContain("rerun-failures-button");
 	});

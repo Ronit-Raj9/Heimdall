@@ -11,6 +11,7 @@ import { MetricStrip } from "@/components/runs/metricStrip";
 import { PairPicker } from "@/components/runs/pairPicker";
 import { CompareLaunch } from "./compareLaunch";
 import { RunDiff } from "./runDiff";
+import { TwoRuns } from "./twoRuns";
 import { RunRemoteCoverage } from "@/components/runs/remoteCoverage";
 import { RunGatewayPolicy } from "@/components/routing/gatewayPolicyCard"; // W9 routing policy under test
 import { RunVisualPanel } from "@/components/visual/runVisualPanel"; // X1 vision grading
@@ -34,6 +35,7 @@ import { skipToken } from "@reduxjs/toolkit/query/react";
 import { ArrowLeft, Columns2 } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { cn } from "@/lib/utils";
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -45,6 +47,17 @@ export default function CompareView() {
 	const { t } = useTranslation("bench");
 	const [pairId, setPairId] = useQueryState("pair", parseAsString);
 	const [expParam] = useQueryState("exp", parseAsString);
+	// p06-1: ?a=<run>&b=<run> compares two runs of any pairs; one pair opens that pair (history replace).
+	const [runA, setRunA] = useQueryState("a", parseAsString.withOptions({ history: "replace" }));
+	const [runB, setRunB] = useQueryState("b", parseAsString.withOptions({ history: "replace" }));
+	const openPair = useCallback(
+		(id: string) => {
+			void setPairId(id, { history: "replace" });
+			void setRunA(null);
+			void setRunB(null);
+		},
+		[setPairId, setRunA, setRunB],
+	);
 
 	return (
 		<div className="flex flex-col gap-6" data-testid="runs-screen">
@@ -67,6 +80,8 @@ export default function CompareView() {
 			/>
 			{pairId ? (
 				<PairComparison pairId={pairId} onClear={() => void setPairId(null)} />
+			) : runA && runB ? (
+				<TwoRuns a={runA} b={runB} onPair={openPair} />
 			) : (
 				<PickOrLaunch expParam={expParam} onPick={(id) => void setPairId(id)} />
 			)}
