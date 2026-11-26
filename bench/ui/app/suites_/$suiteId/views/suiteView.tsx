@@ -14,7 +14,8 @@ import { FingerprintDriftNotice } from "@/components/suites/suiteLockKind";
 import { healthState } from "@/components/suites/suiteHealth.utils";
 import { leaderboardSuite } from "@/components/suites/suites.utils";
 import { Button } from "@/components/ui/button";
-import { getBenchErrorMessage, useGetSuiteHealthQuery, useGetSuitesQuery, useListRunsQuery } from "@/lib/store";
+import { getBenchErrorMessage, useGetSuiteHealthQuery, useListRunsQuery } from "@/lib/store";
+import { useGetSuiteQuery } from "@/lib/store/apis/suitesLightApi";
 import "@/app/failure-tests/views/gw07I18n";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
@@ -38,13 +39,15 @@ import { ReviewTab } from "./reviewTab";
  */
 export default function SuiteView({ suiteId }: { suiteId: string }) {
 	const { t } = useTranslation("bench");
-	const query = useGetSuitesQuery();
-	const data = query.data;
 	// A suite reference may carry its version ("coding-core@1.0.0"), as verdicts and runs do.
-	const suite = data?.suites.find((s) => s.id === suiteId || s.id === suiteIdOf(suiteId)) ?? null;
+	// N194: one benchmark from GET /suites/{id}, never the whole list; a 404 is a benchmark that is not listed.
+	const query = useGetSuiteQuery(suiteIdOf(suiteId));
+	const notListed = (query.error as { status?: unknown } | undefined)?.status === 404;
+	// currentData, not data: after a link to another benchmark the old one is never shown under the new id.
+	const suite = query.currentData ?? null;
 	const crumbs = [{ label: t("suites.title"), to: "/suites" }, { label: suiteDisplayName(suiteIdOf(suiteId), suite ?? undefined) }];
 
-	if (query.isLoading) {
+	if (query.isLoading || (!suite && query.isFetching)) {
 		return (
 			<section className="flex min-w-0 flex-col gap-6" data-testid="suite-screen">
 				<PageHeader title={suiteId} breadcrumbs={crumbs} />
@@ -52,7 +55,7 @@ export default function SuiteView({ suiteId }: { suiteId: string }) {
 			</section>
 		);
 	}
-	if (query.isError || !data) {
+	if (query.isError && !notListed) {
 		return (
 			<section className="flex min-w-0 flex-col gap-6" data-testid="suite-screen">
 				<PageHeader title={suiteId} breadcrumbs={crumbs} />
@@ -73,7 +76,7 @@ export default function SuiteView({ suiteId }: { suiteId: string }) {
 			</section>
 		);
 	}
-	return <SuiteBody suite={suite} mode={data.mode} crumbs={crumbs} requestedVersion={suiteVersionOf(suiteId)} />;
+	return <SuiteBody suite={suite} mode={suite.mode} crumbs={crumbs} requestedVersion={suiteVersionOf(suiteId)} />;
 }
 
 function SuiteBody({
