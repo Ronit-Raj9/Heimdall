@@ -16,6 +16,7 @@ export type FailurePhase = "start" | "agent" | "grade" | "finish";
 const PHASE: Record<Stage, FailurePhase> = {
   planned: "start",
   leased: "start",
+  image: "start",
   prepare: "start",
   arm: "start",
   run: "agent",

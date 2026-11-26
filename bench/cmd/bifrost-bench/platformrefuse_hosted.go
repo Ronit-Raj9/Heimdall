@@ -8,6 +8,7 @@ import (
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/server"
+	"github.com/maximhq/bifrost/bench/sharedpool"
 )
 
 // Fix wave 3 (N216): the hosted half of the refusal before launch. The
@@ -16,8 +17,8 @@ import (
 // go to" setting refuses a platform that cannot.
 
 // platformPoolPrefix starts the runner pool of one evaluation on a sandbox
-// platform ("shared/platform/<name>", lane H06's sharedpool.PlatformPool).
-const platformPoolPrefix = "shared/platform/"
+// platform (sharedpool.PlatformPool).
+var platformPoolPrefix = sharedpool.PlatformPool("")
 
 // targetImagesEnv is the hosted env SetTarget asks platformImagesReady
 // with; nil until the hosted areas are built (unit tests).
