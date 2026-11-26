@@ -13,14 +13,37 @@ import (
 // server every message a browser reads passes through plaintext.Hosted. The
 // stored records and files keep their full text.
 
-// plainJob is j with its error cleaned for a browser.
+// plainJob is j with its error, and the display text inside its progress
+// and result (the last error and last live event a comparison page shows),
+// cleaned for a browser.
 func plainJob(j *jobs.Job) *jobs.Job {
-	if j == nil || j.Error == "" || plaintext.DefaultRoots == nil {
+	if j == nil || plaintext.DefaultRoots == nil {
 		return j
 	}
 	v := *j
 	v.Error = plaintext.Hosted(j.Error)
+	v.Progress = plainRaw(j.Progress)
+	v.Result = plainRaw(j.Result)
 	return &v
+}
+
+// plainRaw is raw with its display text fields cleaned (plainTree); raw
+// itself when it is empty or does not decode.
+func plainRaw(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return raw
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	var tree any
+	if err := dec.Decode(&tree); err != nil {
+		return raw
+	}
+	out, err := json.Marshal(plainTree(tree))
+	if err != nil {
+		return raw
+	}
+	return out
 }
 
 // plainJobs is list with every job's error cleaned for a browser.
@@ -58,9 +81,9 @@ func (a plainLogsAPI) Logs(ctx context.Context, orgID, id string, since int64, l
 	return plainLogPage(p), err
 }
 
-// plainTextFields names the JSON fields of receipts and run steps that hold
-// display text.
-var plainTextFields = map[string]bool{"message": true, "summary": true, "detail": true, "error": true}
+// plainTextFields names the JSON fields of receipts, run steps and job
+// progress that hold display text.
+var plainTextFields = map[string]bool{"message": true, "summary": true, "detail": true, "error": true, "last_error": true}
 
 // plainServed returns v with every message, summary, detail and error
 // string cleaned for a browser, as a JSON tree; v itself when nothing is
