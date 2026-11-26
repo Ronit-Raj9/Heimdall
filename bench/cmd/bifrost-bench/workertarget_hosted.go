@@ -18,6 +18,7 @@ import (
 	"github.com/maximhq/bifrost/bench/sandbox"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/server"
+	"github.com/maximhq/bifrost/bench/sharedpool"
 )
 
 // workerPlatformStore is the platform half (sandbox.Connections).
@@ -78,7 +79,7 @@ func (w workerTargets) Target(ctx context.Context, org string) (*schemas.WorkerT
 	if err != nil {
 		return nil, err
 	}
-	v := targetView(pl, wl)
+	v := targetView(ctx, org, pl, wl)
 	w.fillSlots(ctx, org, v)
 	return v, nil
 }
@@ -102,8 +103,10 @@ func (w workerTargets) fillSlots(ctx context.Context, org string, v *schemas.Wor
 	}
 }
 
-// targetView lists the choices, the current one first among its kind.
-func targetView(pl *sandbox.ConnectionsList, wl *schemas.WorkerConnectionsList) *schemas.WorkerTargetView {
+// targetView lists the choices, the current one first among its kind. A
+// connected platform that can pull Heimdall's images takes one evaluation
+// in its own pool even when it is not where runs go (N208).
+func targetView(ctx context.Context, org string, pl *sandbox.ConnectionsList, wl *schemas.WorkerConnectionsList) *schemas.WorkerTargetView {
 	cur := current(pl, wl)
 	curKind, _, _ := schemas.ParseWorkerTarget(cur)
 	v := &schemas.WorkerTargetView{Target: cur, Choices: []schemas.WorkerTargetChoice{}}
@@ -120,9 +123,9 @@ func targetView(pl *sandbox.ConnectionsList, wl *schemas.WorkerConnectionsList) 
 			}
 			t := schemas.WorkerTargetOf(schemas.WorkerTargetPlatform, p.Name)
 			c := schemas.WorkerTargetChoice{Target: t, Kind: schemas.WorkerTargetPlatform, Name: p.Name, Title: p.Title, Status: p.Status,
-				Current: t == cur, PerEvaluation: t == cur}
+				Current: t == cur, PerEvaluation: platformImagesReady(ctx, targetImagesEnv.Load(), org, p.Name)}
 			if !c.PerEvaluation {
-				c.Note = "a sandbox platform takes an evaluation only while it is where runs go"
+				c.Note = "Add an image registry on the " + sandbox.PlatformTitle(p.Name) + " card first."
 			}
 			v.Choices = append(v.Choices, c)
 		}
@@ -220,7 +223,10 @@ func workerConnected(wl *schemas.WorkerConnectionsList, pool string) bool {
 
 // EvaluationPool routes an evaluation that names worker (a target, a
 // worker's pool, "shared" or "" for where runs go) to a runner pool; ""
-// is the shared worker's queue, which a platform target's runs also use.
+// is the shared worker's queue. An evaluation on a platform that can pull
+// Heimdall's images goes to the platform's own pool (N208), picked
+// explicitly or as where runs go; comparisons and other runs keep the
+// shared queue.
 func (w workerTargets) EvaluationPool(ctx context.Context, org, worker string) (string, error) {
 	pl, wl, err := w.halves(ctx, org)
 	if err != nil {
@@ -231,6 +237,9 @@ func (w workerTargets) EvaluationPool(ctx context.Context, org, worker string) (
 	if worker == "" {
 		if curKind == schemas.WorkerTargetWorker {
 			return curName, nil
+		}
+		if curKind == schemas.WorkerTargetPlatform && platformImagesReady(ctx, targetImagesEnv.Load(), org, curName) {
+			return sharedpool.PlatformPool(curName), nil
 		}
 		return "", nil
 	}
@@ -245,10 +254,13 @@ func (w workerTargets) EvaluationPool(ctx context.Context, org, worker string) (
 		}
 		return "", nil
 	case schemas.WorkerTargetPlatform:
-		if cur != schemas.WorkerTargetOf(kind, name) {
-			return "", fmt.Errorf("sandbox platform %s takes an evaluation only while it is where runs go: choose it on the Workers page", name)
+		if !platformConnected(pl, name) {
+			return "", fmt.Errorf("%s is not a connected sandbox platform (connect it on the Workers page first)", name)
 		}
-		return "", nil
+		if !platformImagesReady(ctx, targetImagesEnv.Load(), org, name) {
+			return "", fmt.Errorf("%s", sandbox.NeedsRegistry(name))
+		}
+		return sharedpool.PlatformPool(name), nil
 	}
 	if w.workers == nil {
 		return "", fmt.Errorf("no worker named %s", name)

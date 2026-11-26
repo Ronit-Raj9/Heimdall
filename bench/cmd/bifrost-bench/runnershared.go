@@ -326,7 +326,7 @@ func reconcileShared(loops map[string]*sharedLoop, as *sharedpool.Assignments, f
 			ended = true
 		default:
 		}
-		if ok && !ended && sharedSlots(a.MaxConcurrentRuns, flagSlots) == l.slots && platformKey(a.Platform) == l.platform {
+		if ok && !ended && sharedSlots(a.MaxConcurrentRuns, flagSlots) == l.slots && platformsKey(a) == l.platform {
 			if id := l.claimed(); id == "" || id == a.TokenID {
 				if l.policy != nil {
 					l.policy.SetApproved(a.Images)
@@ -735,7 +735,7 @@ func runSharedRunner(args []string) int {
 	var wg sync.WaitGroup
 	start := func(as sharedpool.Assignment, slots int) *sharedLoop {
 		lctx, cancel := context.WithCancel(ctx)
-		l := &sharedLoop{slots: slots, platform: platformKey(as.Platform), cancel: cancel, done: make(chan struct{})}
+		l := &sharedLoop{slots: slots, platform: platformsKey(as), cancel: cancel, done: make(chan struct{})}
 		root := filepath.Join(f.projectsDir, as.OrgID)
 		l.policy = h.orgPolicy(as.OrgID, as.Images, root)
 		wg.Add(1)
@@ -851,6 +851,10 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 		return
 	}
 	h.setWorker(org, w) // E5: the leftover sweep keeps this worker's runs
+	// N208: one worker per platform that takes single evaluations (runnerplatformworker.go).
+	for _, pc := range claim.Platforms {
+		go servePlatformPool(ctx, h, oa, reg, pc, slots, platformPoolEnv{org: org, name: name, planRoot: planRoot, docker: docker, refresh: proj.refresh})
+	}
 	defer h.setWorker(org, nil)
 	a.logger.Info("shared runner: serving org", "org", org, "slots", slots, "runtime", h.runtime, "network", network)
 	if err := w.Run(ctx); err != nil && ctx.Err() == nil {

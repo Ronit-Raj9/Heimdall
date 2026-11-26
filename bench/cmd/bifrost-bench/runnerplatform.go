@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -37,6 +38,25 @@ func platformKey(p *sharedpool.PlatformAssignment) string {
 		stamp = hex.EncodeToString(sum[:8])
 	}
 	return p.Name + ":" + stamp
+}
+
+// platformsKey identifies every platform of an assignment (N208): the
+// default platform's key and each per-evaluation platform's key, sorted
+// and joined by ",". A loop restarts when any of them is added, removed or
+// rotated. With no per-evaluation platform it equals platformKey.
+func platformsKey(a sharedpool.Assignment) string {
+	var keys []string
+	if k := platformKey(a.Platform); k != "" {
+		keys = append(keys, k)
+	}
+	var per []string
+	for _, p := range a.Platforms {
+		if k := platformKey(p); k != "" {
+			per = append(per, "+"+k)
+		}
+	}
+	sort.Strings(per)
+	return strings.Join(append(keys, per...), ",")
 }
 
 // sandboxRegistry is reg with its environment replaced by the sandbox
