@@ -132,7 +132,7 @@ func MockFromOpenAPI(name string, data []byte) (*MockSpec, []string, error) {
 	}
 	var doc openAPIDoc
 	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return nil, nil, fmt.Errorf("read the OpenAPI file: %v", err)
+		return nil, nil, errors.New("This is not an OpenAPI file Heimdall can read. It must be YAML or JSON with an openapi: 3.x field.")
 	}
 	switch {
 	case doc.Swagger != "":

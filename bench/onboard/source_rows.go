@@ -485,6 +485,9 @@ func draftRows(env *Env, set *DraftSet, plan Plan, name string, data []byte, lab
 	for _, p := range append(rp.problems, more...) {
 		set.Problems = append(set.Problems, Problem{Ref: rp.ref(p.Line), Message: p.Message})
 	}
+	if len(tasks) == 0 && len(set.Problems) == 0 {
+		set.Problems = append(set.Problems, Problem{Ref: name, Message: "No row has both a question and an answer. Blank rows are skipped."})
+	}
 	wrongFrom := map[int]bool{}
 	for _, r := range rows {
 		wrongFrom[r.Line] = len(r.Wrong) > 0
