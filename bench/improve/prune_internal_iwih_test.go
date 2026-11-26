@@ -1,6 +1,8 @@
 package improve
 
 import (
+	"slices"
+	"strings"
 	"testing"
 )
 
@@ -98,15 +100,78 @@ func TestUpdateCountersAfterScreen(t *testing.T) {
 	}
 }
 
-// The managed block's markers are not an eval cue; the improver's own
-// mention of the product in a rule still is.
+// The eval-cue gate has no exemption: the neutral markers pass it on a
+// normal edit, and a rule that names the product still trips it.
 func TestEvalCueIgnoresManagedBlockMarkers(t *testing.T) {
 	block := renderBlock([]PlaybookItem{{ID: "pb-0001", Section: "Checks", Text: "Run the tests before you finish."}})
 	if g := evalCueGate(block); g.Fired {
-		t.Errorf("markers fired the gate: %+v", g)
+		t.Errorf("a normal edit fired the gate: %+v", g)
 	}
 	cue := renderBlock([]PlaybookItem{{ID: "pb-0001", Section: "Checks", Text: "This is a Heimdall run, so be careful."}})
 	if g := evalCueGate(cue); !g.Fired {
 		t.Error("a rule that names the product did not fire the gate")
+	}
+	if g := evalCueGate("<!-- heimdall:rules begin -->\n1. [pb-0001] Read the code.\n<!-- heimdall:rules end -->\n"); !g.Fired {
+		t.Error("the old markers no longer fire the gate: an exemption is left")
+	}
+}
+
+// cueWords are the eval-cue gate's own list plus the words the markers and
+// every other text Heimdall writes into a bundle must never contain.
+func cueWords() []string {
+	return append(slices.Clone(evalCues), "bench", "eval", "test", "grader", "judge", "score")
+}
+
+// Text Heimdall adds to a bundle (markers, section headers, numbering, ids)
+// carries no cue: after ApplyEdits, the file with the parent's text and the
+// improver's own words taken out holds none of the cue words.
+func TestRenderedBundleCarriesNoCue(t *testing.T) {
+	notes := "/home/agent/AGENTS.md"
+	parent := "# Notes\n\nBe careful.\n"
+	ed := Editable{Files: []string{notes}}
+	edits := EditsFile{Edits: []Edit{
+		{Op: "add_item", File: notes, Section: "Strategies", Text: "Read the module before changing it.", Evidence: []string{"dev:t01#1/A"}, Reason: "r"},
+		{Op: "add_item", File: notes, Section: "Pitfalls", Text: "Keep the change small.", Evidence: []string{"dev:t02#1/A"}, Reason: "r"},
+	}}
+	nb, _, _, err := ApplyEdits(BundleObject{Files: map[string]string{notes: parent}, Raw: []string{}}, PlaybookObject{Items: []PlaybookItem{}}, edits, ed, DefaultLimits, "mutation", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	added := strings.Replace(nb.Files[notes], parent, "", 1)
+	if !strings.Contains(added, blockBegin) || !strings.Contains(added, blockEnd) {
+		t.Fatalf("no block: %q", added)
+	}
+	for _, e := range edits.Edits {
+		added = strings.ReplaceAll(added, e.Text, "")
+		added = strings.ReplaceAll(added, "## "+e.Section, "##")
+	}
+	low := strings.ToLower(added)
+	for _, w := range cueWords() {
+		if strings.Contains(low, strings.ToLower(w)) {
+			t.Errorf("text Heimdall wrote holds %q: %q", w, added)
+		}
+	}
+	if g := evalCueGate(nb.Files[notes]); g.Fired {
+		t.Errorf("the gate fired on a normal edit: %+v", g)
+	}
+}
+
+// A bundle written before the neutral markers is still read: its rules are
+// kept and the next render writes only the new markers.
+func TestLegacyMarkersAreReadAndRewritten(t *testing.T) {
+	notes := "/home/agent/AGENTS.md"
+	old := "# Notes\n\n<!-- heimdall:rules begin -->\n## Pitfalls\n1. [pb-0001] Keep the change small.\n<!-- heimdall:rules end -->\n"
+	pb := PlaybookObject{Next: 2, Items: []PlaybookItem{{ID: "pb-0001", File: notes, Section: "Pitfalls", Text: "Keep the change small."}}}
+	edits := EditsFile{Edits: []Edit{{Op: "add_item", File: notes, Section: "Strategies", Text: "Read the module first.", Evidence: []string{"dev:t01#1/A"}, Reason: "r"}}}
+	nb, npb, _, err := ApplyEdits(BundleObject{Files: map[string]string{notes: old}, Raw: []string{}}, pb, edits, Editable{Files: []string{notes}}, DefaultLimits, "mutation", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := nb.Files[notes]
+	if strings.Contains(got, "heimdall") || strings.Count(got, blockBegin) != 1 || strings.Count(got, blockEnd) != 1 {
+		t.Fatalf("file: %q", got)
+	}
+	if !strings.Contains(got, "[pb-0001] Keep the change small.") || len(npb.Items) != 2 {
+		t.Fatalf("old rule lost: %q %+v", got, npb.Items)
 	}
 }

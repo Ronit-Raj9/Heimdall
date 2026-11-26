@@ -11,11 +11,16 @@ import (
 
 func init() { DefaultEditApplier = ApplyEdits }
 
-// The managed block markers (A3.3).
+// The managed block markers (A3.3). They name neither the product nor
+// testing: the agent reads them on every task, so they must carry no cue.
 const (
-	blockBegin = "<!-- heimdall:rules begin -->"
-	blockEnd   = "<!-- heimdall:rules end -->"
+	blockBegin = "<!-- standing-rules:start -->"
+	blockEnd   = "<!-- standing-rules:end -->"
 )
+
+// legacyBlocks are the markers runs started before the neutral ones wrote.
+// A bundle with them is still read; the next render writes the new ones.
+var legacyBlocks = [][2]string{{"<!-- heimdall:rules begin -->", "<!-- heimdall:rules end -->"}}
 
 // Errors of a whole edit set.
 var (
@@ -367,17 +372,21 @@ func (st *editState) render(file string) {
 	}
 }
 
-// splitBlock cuts text around its managed block (markers excluded).
+// splitBlock cuts text around its managed block (markers excluded). The
+// current markers are looked for first, then the legacy ones.
 func splitBlock(text string) (before, block, after string, ok bool) {
-	i := strings.Index(text, blockBegin)
-	if i < 0 {
-		return text, "", "", false
+	for _, m := range append([][2]string{{blockBegin, blockEnd}}, legacyBlocks...) {
+		i := strings.Index(text, m[0])
+		if i < 0 {
+			continue
+		}
+		j := strings.Index(text[i:], m[1])
+		if j < 0 {
+			continue
+		}
+		return text[:i], text[i+len(m[0]) : i+j], text[i+j+len(m[1]):], true
 	}
-	j := strings.Index(text[i:], blockEnd)
-	if j < 0 {
-		return text, "", "", false
-	}
-	return text[:i], text[i+len(blockBegin) : i+j], text[i+j+len(blockEnd):], true
+	return text, "", "", false
 }
 
 // renderBlock is the managed block of a file: sections in first-use order,
