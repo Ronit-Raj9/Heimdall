@@ -1,0 +1,58 @@
+{
+	"tabs": { "findings": "Findings" },
+	"intro": "A finding is a failure you decided to track. It is marked fixed only when a rerun proves it, and it reopens by itself when one of its tasks fails again.",
+	"loadError": "Could not load the findings",
+	"empty": "No findings yet. Keep an investigation group as a finding to start.",
+	"states": { "open": "Open", "expected": "Expected", "fixed": "Fixed", "reopened": "Reopened" },
+	"sources": { "inbox": "Inbox", "cluster": "Cluster", "investigation": "Investigation", "check": "Behaviour check" },
+	"list": {
+		"title": "Title",
+		"state": "State",
+		"source": "Source",
+		"tasks": "Tasks",
+		"changed": "Last change"
+	},
+	"detail": {
+		"saw": "What we saw",
+		"runs": "Runs",
+		"tasks": "Tasks",
+		"cause": "Possible cause",
+		"hypothesisLabel": "Hypothesis written by a model. Quotes were checked against the recorded steps.",
+		"quotes": "Quotes",
+		"step": "step {{seq}}",
+		"history": "History",
+		"event": "{{date}}: {{from}} to {{to}}. {{reason}}",
+		"fixed": "Fixed: the fixed agent passed {{k}} of {{n}} runs; the old agent passed {{a}} of {{b}}.",
+		"close": "Close"
+	},
+	"actions": {
+		"checkFix": "Check the fix",
+		"expected": "Mark expected",
+		"reopen": "Reopen",
+		"reason": "Reason",
+		"save": "Save",
+		"cancel": "Cancel",
+		"judge": "Read the rerun results"
+	},
+	"checkFix": {
+		"experiment": "Experiment the failure came from",
+		"arm": "Arm that failed",
+		"trials": "Runs per task",
+		"confirm": "Reruns {{n}} tasks {{trials}} times with the old agent and the fixed agent. These runs are kept apart from your benchmark results.",
+		"start": "Start the rerun",
+		"started": "Rerun started. Read the results here once it has finished."
+	},
+	"investigations": {
+		"title": "Investigations",
+		"findOut": "Find out why",
+		"experiment": "Experiment",
+		"cap": "Spending cap in dollars",
+		"start": "Start the investigation",
+		"started": "Investigation started. Its report appears here when it is done.",
+		"empty": "No investigations yet.",
+		"keep": "Keep as a finding",
+		"kept": "Kept",
+		"runs": "{{count}} runs",
+		"note": "These are hypotheses written by a model. Each quote was checked against the run's recorded steps. The run results themselves come from the tasks' tests."
+	}
+}
