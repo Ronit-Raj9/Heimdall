@@ -180,3 +180,30 @@ func TestFailedSecondLookIsNotRetried(t *testing.T) {
 		t.Errorf("retry after a failed look: %v", err)
 	}
 }
+
+// refusingExec is the scripted executor whose improver cannot run.
+type refusingExec struct{ *improvetest.Exec }
+
+func (refusingExec) CheckImprover(context.Context, *improve.Spec) error {
+	return errors.New("The improver benchmark heimdall-improver has not been admitted on this server yet, so improvement runs cannot start.")
+}
+
+// Security review: a run started from the web whose improver cannot run is
+// refused with 422 bad_improver and the plain sentence, before any scoring
+// or improver call and with no record left behind.
+func TestCreateRefusesBadImproverBeforeSpend(t *testing.T) {
+	x := refusingExec{&improvetest.Exec{Behavior: improvetest.Honest, Base: 1, NTasks: 40}}
+	r := &improve.Runner{Root: filepath.Join(t.TempDir(), improve.DefaultDir), Exec: x}
+	c := newImproveClient(t, runnerSource{r: r})
+	resp := c.do(t, "POST", APIPrefix+"/improvements", []byte(webFormBody), authed("application/json"))
+	if resp.StatusCode() != 422 || !strings.Contains(string(resp.Body()), `"bad_improver"`) ||
+		!strings.Contains(string(resp.Body()), "has not been admitted on this server yet") {
+		t.Fatalf("create: %d %s", resp.StatusCode(), resp.Body())
+	}
+	if len(x.Calls) != 0 {
+		t.Errorf("calls before the refusal: %v", x.Calls)
+	}
+	if recs, _ := r.List(); len(recs) != 0 {
+		t.Errorf("records after the refusal: %d", len(recs))
+	}
+}
