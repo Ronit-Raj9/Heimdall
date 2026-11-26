@@ -63,8 +63,15 @@ export const FEATURE_OPTIONS: Record<string, FeatureOption[]> = {
 
 export const MAX_DRAFT_USD = 50;
 
+/** The suite reference the draft sends: "<id>@<version>", as the New comparison form sends it. */
+export function suiteOption(s: { id: string; version?: string }): string {
+	return s.version ? `${s.id}@${s.version}` : s.id;
+}
+
 export interface FeatureTestForm {
+	/** "<id>@<version>" (suiteOption). */
 	suite: string;
+	/** The agent file path, for example agents/codex.yaml: the planner and the budget and overhead drafts read it as a path. */
 	base: string;
 	model: string;
 	provider: string;
@@ -239,7 +246,7 @@ export function FeatureTestDialog({ feature, name, open, onClose }: { feature: s
 					<select className={field} value={form.suite} onChange={(e) => set({ suite: e.target.value })} data-testid="feature-test-suite">
 						<option value="">{t("dialog.pick")}</option>
 						{(suites.data?.suites ?? []).map((s) => (
-							<option key={s.id} value={s.id}>
+							<option key={s.id} value={suiteOption(s)}>
 								{s.id}
 							</option>
 						))}
@@ -250,7 +257,7 @@ export function FeatureTestDialog({ feature, name, open, onClose }: { feature: s
 					<select className={field} value={form.base} onChange={(e) => set({ base: e.target.value })} data-testid="feature-test-agent">
 						<option value="">{t("dialog.pick")}</option>
 						{(agents.data?.agents ?? []).map((a) => (
-							<option key={a.id} value={a.id}>
+							<option key={a.id} value={a.path}>
 								{a.id}
 							</option>
 						))}

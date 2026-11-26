@@ -8,14 +8,15 @@ import {
 	PreparedView,
 	draftRequest,
 	prepareFeatureTest,
+	suiteOption,
 	startFeatureTest,
 	type FeatureTestCalls,
 	type FeatureTestForm,
 } from "./featureTestDialog";
 
 const form: FeatureTestForm = {
-	suite: "swe-lite",
-	base: "codex",
+	suite: "swe-lite@1.0.0",
+	base: "agents/codex.yaml",
 	model: "",
 	provider: "",
 	budget: "5",
@@ -44,8 +45,8 @@ describe("Feature test dialog", () => {
 	it("builds the draft request and refuses a missing budget or required setting", () => {
 		expect(draftRequest("semantic_cache", form).req).toEqual({
 			feature: "semantic_cache",
-			suite: "swe-lite",
-			base: "codex",
+			suite: "swe-lite@1.0.0",
+			base: "agents/codex.yaml",
 			trials: 2,
 			budget_usd: 5,
 			options: { grid: "0.80,0.90" },
@@ -82,5 +83,10 @@ describe("Feature test dialog", () => {
 		);
 		expect(refused).toContain("This test cannot start yet:");
 		expect(refused).toContain("identical setups");
+	});
+
+	it("sends the suite as id@version and the agent as its file path, as the server reads them", () => {
+		expect(suiteOption({ id: "swe-lite", version: "1.0.0" })).toBe("swe-lite@1.0.0");
+		expect(suiteOption({ id: "swe-lite" })).toBe("swe-lite");
 	});
 });
