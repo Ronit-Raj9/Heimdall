@@ -149,12 +149,17 @@ func frozenGate(spec *Spec, out Bundle, parentDoc, candDoc []byte) GateResult {
 				g.Evidence = append(g.Evidence, "frozen field changed: "+f)
 			}
 		}
-		pf, _ := pt["files"].(map[string]any)
-		cf, _ := ct["files"].(map[string]any)
-		for k, v := range pf {
-			if !spec.Editable.Allows(k) && !reflect.DeepEqual(v, cf[k]) {
-				g.Evidence = append(g.Evidence, "non-editable file changed: "+k)
+		for _, field := range []string{"files", "files_raw"} {
+			pf, _ := pt[field].(map[string]any)
+			cf, _ := ct[field].(map[string]any)
+			for _, k := range slices.Sorted(maps.Keys(pf)) {
+				if !spec.Editable.Allows(k) && !reflect.DeepEqual(pf[k], cf[k]) {
+					g.Evidence = append(g.Evidence, "non-editable file changed: "+k)
+				}
 			}
+		}
+		if !spec.Editable.Instructions && !reflect.DeepEqual(pt["instructions"], ct["instructions"]) {
+			g.Evidence = append(g.Evidence, "standing instructions changed")
 		}
 	}
 	if len(g.Evidence) > 0 {

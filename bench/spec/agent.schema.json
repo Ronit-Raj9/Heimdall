@@ -19,6 +19,8 @@
       "additionalProperties": false,
       "description": "Container path to content template."
     },
+    "files_raw": {"type": "object", "patternProperties": {"^/": {"type": "string"}}, "additionalProperties": false, "description": "Container path to content delivered byte for byte, never rendered as a template."},
+    "instructions": {"type": "string", "description": "Standing instructions from the agent's owner, put before every task's instruction text."},
     "model": {"type": "string"},
     "notes": {
       "type": "object",
