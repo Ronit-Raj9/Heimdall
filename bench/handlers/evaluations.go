@@ -1098,10 +1098,10 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 		err = errors.New("the planner returned no manifest")
 	}
 	if err != nil {
-		return skip("plan experiment: %v", err)
+		return skip("%s", planSkipReason(err))
 	}
 	if plan := BuildPlan(m); len(plan.Errors) > 0 {
-		return skip("plan experiment: %s", strings.Join(plan.Errors, "; "))
+		return skip("%s", strings.Join(plainEach(plan.Errors), " "))
 	}
 	if err := os.MkdirAll(filepath.Join(s.Projects.Root(), "experiments"), 0o755); err != nil {
 		return skip("create the experiments folder: %v", err)
