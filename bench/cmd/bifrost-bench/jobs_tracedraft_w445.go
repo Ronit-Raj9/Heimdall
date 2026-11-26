@@ -14,8 +14,8 @@ import (
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/scaffold"
-	"github.com/maximhq/bifrost/bench/traceimport"
 	"github.com/maximhq/bifrost/bench/tracedraft"
+	"github.com/maximhq/bifrost/bench/traceimport"
 	"github.com/maximhq/bifrost/bench/traceinbox"
 )
 
