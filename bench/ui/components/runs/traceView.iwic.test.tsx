@@ -13,7 +13,16 @@ const data: RunSteps = {
 	available: true,
 	observers: [],
 	steps: [
-		{ seq: 1, ts: "2026-11-15T10:00:01Z", kind: "tool_request", source: "gateway", proof: "verified", turn: 1, summary: "", tool_name: "bash" },
+		{
+			seq: 1,
+			ts: "2026-11-15T10:00:01Z",
+			kind: "tool_request",
+			source: "gateway",
+			proof: "verified",
+			turn: 1,
+			summary: "",
+			tool_name: "bash",
+		},
 	],
 };
 

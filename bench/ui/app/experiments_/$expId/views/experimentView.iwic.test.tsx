@@ -53,7 +53,9 @@ vi.mock("@/lib/store/apis/supportApi", () => ({ useGetExperimentSupportQuery: ()
 vi.mock("@/lib/store/apis/researchApi", () => ({ useGetExperimentResearchQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/routingApi", () => ({ useGetExperimentRoutingQuery: () => ({}) }));
 vi.mock("./liveProgress", () => ({ LiveProgress: () => null, default: () => null }));
-vi.mock("@/components/shell/routeTabs", () => ({ RouteTabs: ({ children }: { children: (active: string) => unknown }) => children("runs") }));
+vi.mock("@/components/shell/routeTabs", () => ({
+	RouteTabs: ({ children }: { children: (active: string) => unknown }) => children("runs"),
+}));
 vi.mock("@/components/runs/runList", () => ({
 	RunList: ({ running }: { running?: boolean }) => <span data-testid="run-list-probe" data-running={String(Boolean(running))} />,
 }));
