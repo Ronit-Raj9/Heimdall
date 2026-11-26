@@ -272,3 +272,14 @@ func containsStr(l []string, s string) bool {
 	}
 	return false
 }
+
+func TestKeepKnownRefs(t *testing.T) {
+	b, pb, ed := editsBase()
+	e := EditsFile{Edits: []Edit{addItem("Run the tests."), addItem("Read the traceback.")}}
+	e.Edits[1].Evidence = []string{"dev:made-up#1/B"}
+	e = KeepKnownRefs(e, map[string]bool{"dev:t01#1/B": true})
+	_, _, ap, err := ApplyEdits(b, pb, e, ed, DefaultLimits, "mutation", 1)
+	if err != nil || ap[0].Result != "applied" || ap[1].Result != "refused" {
+		t.Fatalf("%v %+v", err, ap)
+	}
+}

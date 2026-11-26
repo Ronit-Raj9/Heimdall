@@ -553,3 +553,16 @@ func blockWords(items []PlaybookItem) map[string]int {
 	}
 	return out
 }
+
+// KeepKnownRefs drops every evidence ref that is not a run of this round's
+// evidence.json (known), so rule 2 refuses an edit that cites only runs the
+// improver made up. The caller, which holds the evidence document, runs it
+// before ApplyEdits.
+func KeepKnownRefs(e EditsFile, known map[string]bool) EditsFile {
+	out := EditsFile{Rationale: e.Rationale, NoEdits: e.NoEdits, Edits: make([]Edit, len(e.Edits))}
+	for i, x := range e.Edits {
+		x.Evidence = slices.DeleteFunc(slices.Clone(x.Evidence), func(r string) bool { return !known[r] })
+		out.Edits[i] = x
+	}
+	return out
+}
