@@ -50,7 +50,7 @@ import { Link, useSearch } from "@tanstack/react-router";
 import { Coins, Footprints, GitCompareArrows, SearchX, Timer, Wrench, type LucideIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { RUN_TABS, hiddenRunTabs, type RunTabId } from "./runTabs";
+import { RUN_TABS, hiddenRunTabs, runHasVoice, runTabFlags, type RunTabId } from "./runTabs";
 import { MaximRunButton } from "./maximRunButton";
 
 /**
@@ -68,7 +68,7 @@ export default function RunView({ runId }: { runId: string }) {
 	const sealedNow = detail.data?.sealed;
 	if (detail.data && live === Boolean(sealedNow)) setLive(!sealedNow);
 	const agents = useGetRunAgentsQuery(runId, { skip: !detail.data });
-	const voice = useGetRunVoiceQuery(runId, { skip: !detail.data });
+	const voice = useGetRunVoiceQuery(runId, { skip: !runHasVoice(detail.data) });
 	const { t: tReplay } = useTranslation("replay"); // U08
 	const frames = useRunFrames(runId, detail.data ? !detail.data.sealed : false); // U08
 	const { t: tRec } = useTranslation("recordings"); // Z03
@@ -91,10 +91,11 @@ export default function RunView({ runId }: { runId: string }) {
 
 	const d = detail.data;
 	const { slot, run } = d;
-	const output = runOutputKind(d);
+	const output = runOutputKind(d, d.output);
+	const flags = runTabFlags(agents, frames, recordings);
 	const hidden = hiddenRunTabs({
 		output,
-		agents: Boolean(agents.data?.available),
+		agents: flags.agents,
 		visual: Boolean(d.grade?.visual),
 		voice: Boolean(voice.data),
 		gpu: Boolean(run.hardware?.gpus?.length),
@@ -106,8 +107,8 @@ export default function RunView({ runId }: { runId: string }) {
 		hidden: hidden.has(id),
 		testId: `run-tab-${id}`,
 	}));
-	if (frames.data?.frames.length) tabs.splice(2, 0, { id: "replay", label: tReplay("tab"), testId: "run-tab-replay" }); // U08
-	if (recordings.data?.recordings.length) tabs.splice(2, 0, { id: "recording", label: tRec("tab"), testId: "run-tab-recording" }); // Z03
+	if (flags.replay) tabs.splice(2, 0, { id: "replay", label: tReplay("tab"), testId: "run-tab-replay" }); // U08
+	if (flags.recording) tabs.splice(2, 0, { id: "recording", label: tRec("tab"), testId: "run-tab-recording" }); // Z03
 
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="run-screen" data-run-id={runId} data-output={output}>
@@ -185,7 +186,7 @@ export default function RunView({ runId }: { runId: string }) {
 					) : active === "recording" ? (
 						<RecordingTab runId={runId} />
 					) : (
-						<RunTab tab={active as RunTabId} detail={d} agents={agents.data} />
+						<RunTab tab={active as RunTabId} detail={d} agents={agents} />
 					)
 				}
 			</RouteTabs>
@@ -193,7 +194,8 @@ export default function RunView({ runId }: { runId: string }) {
 	);
 }
 
-function RunTab({ tab, detail, agents }: { tab: RunTabId; detail: RunDetail; agents: ReturnType<typeof useGetRunAgentsQuery>["data"] }) {
+function RunTab({ tab, detail, agents }: { tab: RunTabId; detail: RunDetail; agents: ReturnType<typeof useGetRunAgentsQuery> }) {
+	const { t } = useTranslation("bench");
 	const arm = detail.slot.arm;
 	const runId = detail.run.run_id;
 	switch (tab) {
@@ -202,9 +204,19 @@ function RunTab({ tab, detail, agents }: { tab: RunTabId; detail: RunDetail; age
 		case "timeline":
 			return <TimelineTab detail={detail} />;
 		case "output":
-			return <RunOutput detail={detail} arm={arm} />;
+			return <RunOutput detail={detail} arm={arm} kind={runOutputKind(detail, detail.output)} />;
 		case "agents":
-			return agents ? <AgentsPanel data={agents} arm={arm} /> : null;
+			if (agents.isError) {
+				return (
+					<LoadError
+						title={t("runs.agents.loadError")}
+						error={agents.error}
+						onRetry={() => void agents.refetch()}
+						testId="run-agents-error"
+					/>
+				);
+			}
+			return agents.data ? <AgentsPanel data={agents.data} arm={arm} /> : null;
 		case "visual":
 			return <RunVisualPanel runId={runId} />;
 		case "voice":

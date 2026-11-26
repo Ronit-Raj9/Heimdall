@@ -63,8 +63,10 @@ type AnnotationQueueView struct {
 	CanManage bool `json:"can_manage"`
 	CanLabel  bool `json:"can_label"`
 	// CreatedByName is the creator's display name (annotationpeople.go);
-	// created_by_email is left out for a caller who is not an org admin.
-	CreatedByName string `json:"created_by_name,omitempty"`
+	// created_by_email is never sent, not even to an org admin (wave 4,
+	// N33): NoCreatorEmail is never set and hides the embedded queue's field.
+	CreatedByName  string `json:"created_by_name,omitempty"`
+	NoCreatorEmail string `json:"created_by_email,omitempty"`
 }
 
 // AnnotationQueueList answers GET /annotation/queues.

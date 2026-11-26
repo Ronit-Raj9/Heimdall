@@ -1,0 +1,19 @@
+{
+	"members": {
+		"person": "Member",
+		"someone": "Someone"
+	},
+	"unknown": {
+		"text": "No {{thing}} named {{name}} was found. Showing all {{things}} instead.",
+		"showAll": "Show all",
+		"benchmark": "benchmark",
+		"benchmarks": "benchmarks"
+	},
+	"delete": {
+		"label": "Delete",
+		"confirm": "Delete",
+		"cancel": "Cancel",
+		"suite": "Delete the benchmark {{name}}? Its tasks and files are removed. Past results stay.",
+		"agent": "Delete the agent {{name}}? Past results stay."
+	}
+}

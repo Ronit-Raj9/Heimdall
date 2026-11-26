@@ -12,8 +12,10 @@ import {
 	PackageCheck,
 	Plug,
 	Radio,
+	Rocket,
 	SearchX,
 	Settings,
+	ShieldAlert,
 	Tags,
 	Zap,
 	TrendingUp,
@@ -42,7 +44,9 @@ export interface BenchNavItem {
 		| "/scheduled-checks"
 		| "/live"
 		| "/releases"
-		| "/settings";
+		| "/settings"
+		| "/monitors"
+		| "/quickstart";
 	labelKey:
 		| "shell.nav.home"
 		| "shell.nav.agents"
@@ -59,7 +63,9 @@ export interface BenchNavItem {
 		| "shell.nav.scheduledChecks"
 		| "shell.nav.live"
 		| "shell.nav.releases"
-		| "shell.nav.settings";
+		| "shell.nav.settings"
+		| "shell.nav.monitors"
+		| "shell.nav.quickstart";
 	icon: LucideIcon;
 	testId: string;
 	/**
@@ -93,7 +99,10 @@ export interface BenchNavGroup {
 export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 	{
 		id: "home",
-		items: [{ to: "/", labelKey: "shell.nav.home", icon: House, testId: "nav-link-home", also: ["/quickstart", "/welcome"] }],
+		items: [
+			{ to: "/", labelKey: "shell.nav.home", icon: House, testId: "nav-link-home", also: ["/welcome"] },
+			{ to: "/quickstart", labelKey: "shell.nav.quickstart", icon: Rocket, testId: "nav-link-quickstart" },
+		],
 	},
 	{
 		id: "agents",
@@ -154,6 +163,7 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 				also: ["/canaries", "/schedules"],
 			},
 			{ to: "/live", labelKey: "shell.nav.live", icon: Radio, testId: "nav-link-live" },
+			{ to: "/monitors", labelKey: "shell.nav.monitors", icon: ShieldAlert, testId: "nav-link-monitors" },
 		],
 	},
 	{

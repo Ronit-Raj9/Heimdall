@@ -19,11 +19,12 @@ import { SkillScanProblem, parseSkillRefusal } from "@/app/evaluations_/$evalId/
 import type { Catalog, CatalogAgent, Experiment, ExperimentPlan } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ComponentProps } from "react";
 import {
 	Controller,
 	useFieldArray,
 	useForm,
+	useFormState,
 	useWatch,
 	type Control,
 	type FieldError,
@@ -594,6 +595,7 @@ function ConditionsEditor({
 	const { t } = useTranslation("bench");
 	const { fields } = useFieldArray({ control, name: "conditions" });
 	const conditions = useWatch({ control, name: "conditions" });
+	const { errors } = useFormState({ control, name: "conditions" });
 
 	return (
 		<ul className="flex flex-col divide-y rounded-sm border">
@@ -618,19 +620,12 @@ function ConditionsEditor({
 								<span className="font-mono text-sm">{field.condition}</span>
 								<span className="text-muted-foreground text-xs">{conditionLayerText(field.condition, probe, t)}</span>
 							</label>
-							<label className="flex items-center gap-2 text-xs">
-								<span className="text-muted-foreground">{t("experiments.new.fields.trials")}</span>
-								<Input
-									type="number"
-									inputMode="numeric"
-									min={1}
-									max={50}
-									disabled={!enabled}
-									className="h-8 w-20"
-									data-testid={`experiment-condition-${field.condition}-trials`}
-									{...register(`conditions.${index}.trials`, { valueAsNumber: true })}
-								/>
-							</label>
+							<TrialsField
+								condition={field.condition}
+								disabled={!enabled}
+								error={errors.conditions?.[index]?.trials?.message}
+								inputProps={register(`conditions.${index}.trials`, { valueAsNumber: true })}
+							/>
 						</div>
 						{enabled && (
 							<TaskSelection
@@ -797,6 +792,40 @@ function Field({
 				</p>
 			)}
 			{error?.message && <ErrorText id={errorId} message={error.message} />}
+		</div>
+	);
+}
+
+/** The tries box of one test row (p07-3): marked invalid, with its message below, when the schema refuses it. */
+export function TrialsField({
+	condition,
+	disabled,
+	error,
+	inputProps,
+}: {
+	condition: string;
+	disabled: boolean;
+	error?: string;
+	inputProps: ComponentProps<"input">;
+}) {
+	const { t } = useTranslation("bench");
+	return (
+		<div className="flex flex-col items-end gap-1">
+			<label className="flex items-center gap-2 text-xs">
+				<span className="text-muted-foreground">{t("experiments.new.fields.trials")}</span>
+				<Input
+					type="number"
+					inputMode="numeric"
+					min={1}
+					max={50}
+					disabled={disabled}
+					className="h-8 w-20"
+					data-testid={`experiment-condition-${condition}-trials`}
+					aria-invalid={error ? true : undefined}
+					{...inputProps}
+				/>
+			</label>
+			{error && <ErrorText message={error} testId={`experiment-condition-${condition}-trials-error`} />}
 		</div>
 	);
 }

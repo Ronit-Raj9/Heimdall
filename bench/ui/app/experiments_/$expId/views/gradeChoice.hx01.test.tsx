@@ -78,7 +78,8 @@ describe("the page's default grade source", () => {
 		page.query.grade = ORIGINAL_GRADE;
 		expect(tagOf(render(<Probe expId="e_x" />), "probe")).toContain('data-grade="original"');
 		render(<VerdictTab expId="e_x" />);
-		expect(page.verdictArgs.at(-1)).toBe("e_x");
+		// The server's default is the newest re-score (wave 4, N200), so the original is asked for by name.
+		expect(page.verdictArgs.at(-1)).toEqual({ expId: "e_x", gradeSource: ORIGINAL_GRADE });
 		page.query.grade = null;
 		page.latest = undefined;
 		expect(tagOf(render(<Probe expId="e_x" />), "probe")).toContain('data-grade="original"');

@@ -33,7 +33,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { parseAsString, useQueryState } from "nuqs";
 import { useCallback, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useGradeChoice } from "./gradeChoice";
+import { gradeQuery, useGradeChoice } from "./gradeChoice";
 import { VerdictHeaderStrip } from "./verdictHeaderStrip";
 
 /** What the two setups of a comparison differ in (the experiment status `arms_differ`); an older server leaves it out. */
@@ -114,6 +114,11 @@ export function VerdictPromote({
 }
 
 /** VerdictPromote with what the setups differ in, read from the experiment status. */
+/** Whether the "Use model" advice shows (p05-4): never while the comparison is still running. */
+export function showPromote(partial: boolean): boolean {
+	return !partial;
+}
+
 export function ExperimentVerdictPromote({
 	expId,
 	arms,
@@ -160,13 +165,13 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 	// A debug experiment is not analysed (D13): the server answers 404 for its verdict, so nothing is asked (N247).
 	const debug = Boolean(status.data && status.data.exp_id === expId && isDebugExperiment(status.data));
 	// While the comparison runs, the Result tab re-reads the verdict at the status interval so the partial numbers move (N197).
-	const verdict = useGetVerdictQuery(grade ? { expId, gradeSource: grade } : expId, {
+	const verdict = useGetVerdictQuery(gradeQuery(expId, grade), {
 		pollingInterval: live ? EXPERIMENT_POLL_MS : 0,
 		skipPollingIfUnfocused: true,
 		skip: debug,
 	});
 	// The diagnostics come from the same analysis as the verdict, so they read the same grade source.
-	const diagnostics = useGetDiagnosticsQuery(grade ? { expId, gradeSource: grade } : expId, { skip: debug });
+	const diagnostics = useGetDiagnosticsQuery(gradeQuery(expId, grade), { skip: debug });
 	const grid = useGetGridQuery(expId);
 	const catalog = useGetCatalogQuery();
 
@@ -280,7 +285,9 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 				</p>
 			)}
 
-			<ExperimentVerdictPromote expId={payload.exp_id} arms={arms} evaluationId={evaluationId} decision={payload.verdict.decision} />
+			{showPromote(partial) && (
+				<ExperimentVerdictPromote expId={payload.exp_id} arms={arms} evaluationId={evaluationId} decision={payload.verdict.decision} />
+			)}
 
 			<VerdictTabNotes
 				partial={partial ? { done: status.data?.slots.done ?? 0, total: status.data?.slots.total ?? 0 } : undefined}

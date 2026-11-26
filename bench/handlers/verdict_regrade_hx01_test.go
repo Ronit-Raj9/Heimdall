@@ -77,7 +77,7 @@ func TestVerdictGatesFollowRegradeSource(t *testing.T) {
 	d.index = idx
 	c := newTestClient(t, d)
 
-	orig := decodeBody(t, c.do(t, "GET", "/api/bench/experiments/e_test/verdict", nil, nil))
+	orig := decodeBody(t, c.do(t, "GET", "/api/bench/experiments/e_test/verdict?grade_source=original", nil, nil)) // N200: no grade_source reads the newest re-score
 	g := hx01Gate(t, orig, "model_fidelity")
 	fired, _ := g["fired"].(map[string]any)
 	if g["version"] != "1.0.0" || fired["num"] != 2.0 || fired["den"] != 4.0 {

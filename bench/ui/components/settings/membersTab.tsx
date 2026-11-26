@@ -26,6 +26,7 @@ import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { RoleSelect, SettingsSection, TableFrame, When, grantableRoles, mayManage } from "./settingsBits";
 import "./hw03I18n";
+import "@/components/shell/w4b07I18n";
 
 /** The link an invitation token opens, on this site. */
 export function invitationLink(origin: string, token: string): string {
@@ -57,6 +58,7 @@ export function MembersTab({ org }: { org: OrgSummary }) {
 	const isAdmin = canUse(session, "admin");
 	const isOwner = session.role === "owner";
 	const { t: ts } = useTranslation("accountSafety");
+	const { t: tw } = useTranslation("w4b07");
 	const [createResetLink, resetState] = useCreateResetLinkMutation();
 	const [resetLink, setResetLink] = useState<ResetLink | null>(null);
 	const onResetLink = async (userId: string) => {
@@ -104,7 +106,8 @@ export function MembersTab({ org }: { org: OrgSummary }) {
 						<Table>
 							<TableHeader>
 								<TableRow>
-									<TableHead>{t("settings.members.email")}</TableHead>
+									{/* Wave 4, N33: only admins see the members' addresses. */}
+									<TableHead>{isAdmin ? t("settings.members.email") : tw("members.person")}</TableHead>
 									<TableHead>{t("settings.members.role")}</TableHead>
 									<TableHead>{t("settings.members.since")}</TableHead>
 									{isAdmin && <TableHead className="text-right">{t("settings.members.actions")}</TableHead>}
@@ -179,6 +182,7 @@ function MemberRow({
 }) {
 	const { t } = useTranslation("platform");
 	const { t: ts } = useTranslation("accountSafety");
+	const { t: tw } = useTranslation("w4b07");
 	// The caller manages a member only when it holds at least the member's role; never itself here.
 	const manageable = isAdmin && !isSelf && mayManage(callerRole, member.role);
 	return (
@@ -186,14 +190,14 @@ function MemberRow({
 			<TableCell className="max-w-80">
 				<div className="flex min-w-0 flex-col">
 					<span className="text-foreground flex items-center gap-2 truncate font-medium">
-						{member.name || member.email}
+						{member.name || (isAdmin ? member.email : tw("members.someone"))}
 						{isSelf && (
 							<span className="bg-primary/10 text-primary rounded-sm px-1 py-px text-[10.5px] font-semibold tracking-wide uppercase">
 								{t("settings.members.you")}
 							</span>
 						)}
 					</span>
-					{member.name && <span className="text-muted-foreground truncate font-mono text-xs">{member.email}</span>}
+					{isAdmin && member.name && <span className="text-muted-foreground truncate font-mono text-xs">{member.email}</span>}
 				</div>
 			</TableCell>
 			<TableCell>

@@ -83,6 +83,9 @@ func (h *ForecastHandler) postEstimate(ctx *fasthttp.RequestCtx) {
 	switch {
 	case errors.Is(err, ErrPlanRefused):
 		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(RefusedForecast(exp, err, h.now())))
+	case errors.Is(err, context.DeadlineExceeded): // p07-1: a cold load of a big benchmark; the page tries again
+		ctx.Response.Header.Set("Retry-After", "5")
+		lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable, "Still reading this benchmark's tasks. Trying again in a few seconds.")
 	case err != nil:
 		sendDepError(ctx, h.mode, "estimate", err)
 	default:

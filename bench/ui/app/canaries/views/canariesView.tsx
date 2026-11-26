@@ -18,6 +18,7 @@ import {
 } from "@/lib/store/apis/schedulesApi";
 import { Badge } from "@/components/ui/badge";
 import { NewCanaryForm } from "./newCanaryForm";
+import { UnknownLinkNote } from "@/components/shell/unknownLinkNote";
 import type { CanaryDefinition, CanaryListResponse } from "@/lib/types/bench";
 import { parseAsString, useQueryState } from "nuqs";
 import { useState, type ReactNode } from "react";
@@ -122,17 +123,14 @@ export function unknownCanary(data: CanaryListResponse | undefined, name: string
 /** The notice for a link to a drift monitor that does not exist, with a way back to the list. Exported for tests. */
 export function UnknownCanaryNotice({ name, onShowAll }: { name: string; onShowAll(): void }) {
 	const { t } = useTranslation("schedules");
+	// Wave 4, N76: the shared unknown link note, with this page's own text and test ids.
 	return (
-		<div
-			role="status"
-			className="border-border bg-muted/40 flex flex-wrap items-center gap-3 rounded-md border px-3 py-2 text-sm"
-			data-testid="canary-unknown"
-		>
-			<span>{t("canary.unknown", { name })}</span>
-			<Button size="sm" variant="outline" onClick={onShowAll} data-testid="canary-unknown-show-all">
-				{t("canary.showAll")}
-			</Button>
-		</div>
+		<UnknownLinkNote
+			text={t("canary.unknown", { name })}
+			showAllLabel={t("canary.showAll")}
+			onShowAll={onShowAll}
+			testId="canary-unknown"
+		/>
 	);
 }
 

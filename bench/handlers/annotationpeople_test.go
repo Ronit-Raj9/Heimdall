@@ -88,8 +88,9 @@ func TestAnnotationHidesLabellerEmailsFromMembers(t *testing.T) {
 	if l := list.Items[0].Labels; len(l) != 1 || l[0].Name != "bo" || l[0].Email != "bo@example.com" {
 		t.Fatalf("admin labels %+v", l)
 	}
-	if list.Queue.CreatedByEmail != "ada@example.com" {
-		t.Fatalf("admin queue creator email %q", list.Queue.CreatedByEmail)
+	// Wave 4, N33: the queue creator's email is never sent, not even to an admin.
+	if list.Queue.NoCreatorEmail != "" || list.Queue.Queue.CreatedByEmail != "" {
+		t.Fatalf("admin queue creator email %q", list.Queue.NoCreatorEmail)
 	}
 	_, body = abCallAs(r, annAdmin, "GET", p+"/agreement", nil)
 	ag = AnnotationAgreement{}

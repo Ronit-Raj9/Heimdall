@@ -5,6 +5,7 @@ import type { StepRecord } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "@/app/runs/views/w4m4I18n";
 import { alignTraces, type DiffRow } from "./debug.utils";
 
 /**
@@ -13,6 +14,7 @@ import { alignTraces, type DiffRow } from "./debug.utils";
  */
 export function TraceDiff({ runId, otherRunId }: { runId: string; otherRunId?: string }) {
 	const { t } = useTranslation("runDebug");
+	const { t: tw } = useTranslation("w4m4");
 	const [other, setOther] = useState(otherRunId ?? "");
 	const left = useGetRunStepsQuery(runId);
 	const right = useGetRunStepsQuery(other, { skip: !other });
@@ -33,10 +35,14 @@ export function TraceDiff({ runId, otherRunId }: { runId: string; otherRunId?: s
 					/>
 				</label>
 			</div>
-			{right.error ? (
+			{!other.trim() ? (
+				<p className="text-muted-foreground text-xs" data-testid="trace-diff-hint">
+					{tw("debug.enterRunId")}
+				</p>
+			) : right.error ? (
 				<p className="text-chart-error-ink text-xs">{t("diff.loadError")}</p>
-			) : left.data && right.data ? (
-				<DiffTable left={left.data.steps} right={right.data.steps} />
+			) : left.data && right.currentData ? (
+				<DiffTable left={left.data.steps} right={right.currentData.steps} />
 			) : null}
 		</section>
 	);

@@ -30,6 +30,7 @@ import {
 	type LucideIcon,
 } from "lucide-react";
 import "@/components/verdict/hw09I18n";
+import "@/app/compare/views/w4m3I18n";
 import i18n from "@/lib/i18n";
 import type { TFunction } from "i18next";
 import { cn } from "@/lib/utils";
@@ -477,6 +478,7 @@ function AnalysisJobCard({
 			kind={spec.kind}
 			params={analysisJobParams(spec, expId)}
 			label={t(`jobs.${spec.key}.button`)}
+			confirm={i18n.t("jobs.confirm", { ns: "w4m3", title: t(`jobs.${spec.key}.title`) })}
 			variant="outline"
 			disabled={Boolean(unavailable)}
 			onDone={(j) => setJobId(j.id)}

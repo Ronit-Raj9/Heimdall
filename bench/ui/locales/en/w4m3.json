@@ -1,0 +1,32 @@
+{
+	"preview": {
+		"arms_one": "{{count}} setup",
+		"arms_other": "{{count}} setups"
+	},
+	"controls": {
+		"verified_one": "{{count}} change, verified",
+		"verified_other": "{{count}} changes, verified"
+	},
+	"extend": {
+		"confirm": "Add {{count}} more {{what}} as a follow-up comparison? It spends model budget.",
+		"whatTrials": "tries per task",
+		"whatTasks": "tasks"
+	},
+	"jobs": {
+		"confirm": "Start {{title}} now? It runs in the background and replaces the earlier result."
+	},
+	"apply": {
+		"why": {
+			"url": "Enter the gateway URL to preview or apply the rules.",
+			"scopeId": "Enter the {{what}} to preview or apply the rules.",
+			"global": "Tick the box above to allow rules for every request.",
+			"virtual_key": "virtual key id",
+			"team": "team id",
+			"customer": "customer id"
+		}
+	},
+	"twoRuns": {
+		"title": "Two runs, side by side",
+		"notFound": "There is no run {{id}} here."
+	}
+}

@@ -280,7 +280,8 @@ describe("labelling queues", () => {
 			exp({ exp_id: "e_running", name: "Running support run", state: "running" }),
 		];
 		expect(finishedRunsOf(list, "support-faq").map((e) => e.exp_id)).toEqual(["e_new", "e_old"]);
-		expect(finishedRunsOf(list, "").map((e) => e.exp_id)).toEqual(["e_other", "e_new", "e_old"]);
+		// N19: coding-core is a practice benchmark, so its runs are left out like readiness checks.
+		expect(finishedRunsOf(list, "").map((e) => e.exp_id)).toEqual(["e_new", "e_old"]);
 		exps.list = list;
 		const html = render(<AddItems queue={queue} />);
 		expect(html).toContain('data-testid="annotation-add-experiment"');

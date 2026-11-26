@@ -312,12 +312,17 @@ type serveForecast struct {
 
 var _ handlers.ForecastSource = serveForecast{}
 
-// Estimate implements handlers.ForecastSource. A planner error is a refusal.
+// Estimate implements handlers.ForecastSource. A planner error is a refusal,
+// except running out of time (a cold load of a big benchmark), which is
+// returned as it is so the handler asks the caller to try again.
 func (s serveForecast) Estimate(ctx context.Context, exp *schemas.Experiment) (*schemas.Forecast, error) {
 	if err := s.a.validatePolicy(exp); err != nil {
 		return nil, fmt.Errorf("%w: %w", handlers.ErrPlanRefused, err)
 	}
 	m, err := s.a.newPlanner().Plan(ctx, exp)
+	if errors.Is(err, context.DeadlineExceeded) {
+		return nil, err
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", handlers.ErrPlanRefused, err)
 	}

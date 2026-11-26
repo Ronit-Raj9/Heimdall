@@ -1,5 +1,5 @@
 import { Field, LabellerPicker, perItemProblem, selectClass } from "@/app/annotation/views/annotationView";
-import { humanExperimentName, suiteName } from "@/components/experiments/experiments.utils";
+import { humanExperimentName, isCheckPracticeOrDebug, suiteName } from "@/components/experiments/experiments.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -486,7 +486,7 @@ const endedAt = (e: ExperimentStatus) => e.finished_at || e.started_at || e.froz
 export function finishedRunsOf(experiments: readonly ExperimentStatus[], benchmark: string | undefined): ExperimentStatus[] {
 	const want = suiteName(benchmark);
 	return experiments
-		.filter((e) => e.state === "done" && (!want || suiteName(e.suite) === want))
+		.filter((e) => e.state === "done" && (!want || suiteName(e.suite) === want) && !isCheckPracticeOrDebug(e))
 		.sort((a, b) => endedAt(b).localeCompare(endedAt(a)));
 }
 

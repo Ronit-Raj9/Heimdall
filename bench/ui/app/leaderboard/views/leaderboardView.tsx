@@ -42,6 +42,8 @@ import TrendsTab from "./trendsTab";
 import { AgentBoardTab } from "@/components/leaderboard/agentBoard"; // A17: agent leaderboard, the default tab
 import { ReferenceBoardPanel } from "@/components/reference/referenceBoard"; // G4-03: the reference board
 import "@/lib/types/referenceI18n";
+import { UnknownLinkNote, isUnknownName } from "@/components/shell/unknownLinkNote"; // wave 4, N76
+import "@/components/shell/w4b07I18n";
 
 /**
  * Leaderboard: /leaderboard?tab=. Agents (default: one row per agent version and model), the
@@ -100,6 +102,7 @@ function LeaderboardShare() {
  */
 export function LeaderboardTab() {
 	const { t } = useTranslation("bench");
+	const { t: tw } = useTranslation("w4b07");
 	const [suite, setSuite] = useQueryState("suite", parseAsString);
 	const [condition, setCondition] = useQueryState("condition", parseAsString);
 	const [scope, setScope] = useQueryState("scope", parseAsStringLiteral(LEADERBOARD_SCOPES));
@@ -138,6 +141,8 @@ export function LeaderboardTab() {
 	};
 
 	const data = board.data;
+	// Wave 4, N76: a ?suite= the board does not list is said so, not silently swapped for another board.
+	const unknownSuite = isUnknownName(board.isFetching ? undefined : data?.suites, suite);
 	const showBanner = synthetic === "only" || data?.synthetic === "only" || data?.mode === "synthetic";
 	const trackGroups = useMemo(() => groupSuitesByTrack(data?.suites ?? [], facts), [data?.suites, facts]);
 	// The board's own grading provenance wins; today's suite catalog is only a fallback for older servers.
@@ -166,6 +171,17 @@ export function LeaderboardTab() {
 					testId="leaderboard-reviewed-badge"
 				/>
 			</div>
+			{unknownSuite && suite && (
+				<UnknownLinkNote
+					text={tw("unknown.text", { thing: tw("unknown.benchmark"), name: suite, things: tw("unknown.benchmarks") })}
+					showAllLabel={tw("unknown.showAll")}
+					onShowAll={() => {
+						void setSuite(null);
+						void setCondition(null);
+					}}
+					testId="unknown-link-benchmark"
+				/>
+			)}
 			{showBanner && <LeaderboardSyntheticBanner />}
 			{data?.split === "held_out" && <LeaderboardHeldOutBanner />}
 			{judged && (
