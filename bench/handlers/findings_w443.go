@@ -45,7 +45,6 @@ const (
 	findingsRebuiltNote  = "The old version was rebuilt from the settings saved with the first run; files it reads, such as skills, are today's."
 	findingsNoTasks      = "None of this finding's tasks ran in that experiment. Pick the experiment the failure came from."
 	findingsNoRerun      = "This finding has no rerun to check yet. Start one with Check the fix."
-	findingsNoCheck      = "Tracking a behaviour check as a finding is not available on this server yet."
 	findingsConfirm      = "Confirm the rerun first: it starts new runs."
 	findingsBadTrials    = "trials must be between 1 and 5"
 	findingsUnknownState = "state must be open, expected, fixed or reopened"
@@ -305,7 +304,7 @@ func (h *findingsHandler) add(ctx *fasthttp.RequestCtx) {
 	case "investigation":
 		f, status, msg = h.fromInvestigation(req.Ref)
 	case "check":
-		f, status, msg = nil, fasthttp.StatusUnprocessableEntity, findingsNoCheck
+		f, status, msg = h.fromCheck(req.Ref)
 	default:
 		h.bad(ctx, "source must be inbox, cluster, investigation or check")
 		return
