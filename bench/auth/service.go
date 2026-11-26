@@ -620,6 +620,12 @@ type Me struct {
 	Orgs       []MeOrg `json:"orgs"`
 	CurrentOrg string  `json:"current_org,omitempty"`
 	Role       Role    `json:"role,omitempty"`
+	// DefaultOrg is the session's default org, set when the tab asked for
+	// another org it may open (wave 4, organization per tab).
+	DefaultOrg string `json:"default_org,omitempty"`
+	// OrgReset is true when the tab asked for an org this user can no
+	// longer open; CurrentOrg is then the session's default.
+	OrgReset bool `json:"org_reset,omitempty"`
 	// CSRF is the value cookie-authenticated writes send in X-Heimdall-CSRF.
 	CSRF string `json:"csrf,omitempty"`
 	// ServerAdmin is true for a server admin (serveradmin.go): listed by

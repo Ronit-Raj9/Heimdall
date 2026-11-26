@@ -242,7 +242,7 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 	// A stream opened by this request re-authorizes the original caller
 	// while it lasts (membership removed, org made private): the check here
 	// ran once, at the start.
-	headerRef := string(ctx.Request.Header.Peek(OrgHeader))
+	headerRef := orgRef(ctx, method)
 	lib.SetStreamGuard(ctx, func() bool {
 		gctx, cancel := workContext()
 		defer cancel()
@@ -276,7 +276,7 @@ func workContext() (context.Context, context.CancelFunc) {
 func (d *Dispatcher) authorize(ctx *fasthttp.RequestCtx, rule Rule, method, pattern string, p *auth.Principal, pathRef string) (*Org, *auth.Principal, bool) {
 	rctx, cancel := workContext()
 	defer cancel()
-	o, eff, err := Resolve(rctx, d.c.Dir, rule, p, pathRef, string(ctx.Request.Header.Peek(OrgHeader)))
+	o, eff, err := Resolve(rctx, d.c.Dir, rule, p, pathRef, orgRef(ctx, method))
 	if err == nil {
 		err = Authorize(rule, method, eff, o)
 	}
@@ -473,4 +473,17 @@ func RequireOrgReader(mode schemas.Mode, orgID string) lib.Middleware {
 			next(ctx)
 		}
 	}
+}
+
+// orgRef is the org the request names: the X-Heimdall-Org header, else for
+// GET and HEAD only the heimdall_org query parameter, else "".
+// A write names its org only in the header: a query parameter on a POST could be planted by a link (CSRF).
+func orgRef(ctx *fasthttp.RequestCtx, method string) string {
+	if ref := string(ctx.Request.Header.Peek(OrgHeader)); ref != "" {
+		return ref
+	}
+	if IsRead(method) {
+		return string(ctx.QueryArgs().Peek(OrgQueryParam))
+	}
+	return ""
 }

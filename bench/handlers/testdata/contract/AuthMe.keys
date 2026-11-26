@@ -7,6 +7,8 @@ token_id?
 orgs
 current_org?
 role?
+default_org?
+org_reset?
 csrf?
 server_admin?
 email_verified?
