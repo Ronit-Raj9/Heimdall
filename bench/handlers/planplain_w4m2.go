@@ -41,3 +41,23 @@ func priceReason(unpriced []string) string {
 	}
 	return "no price for " + strings.Join(names, ", ")
 }
+
+// planSentence is s ending as a sentence: trimmed, with a final period when
+// it has no final punctuation, so a sentence that follows never runs on.
+func planSentence(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" || strings.HasSuffix(s, ".") || strings.HasSuffix(s, "?") || strings.HasSuffix(s, "!") {
+		return s
+	}
+	return s + "."
+}
+
+// planSentences is the planner errors in plain words, each ending as a
+// sentence, joined with spaces.
+func planSentences(errs []string) string {
+	each := plainEach(errs)
+	for i, s := range each {
+		each[i] = planSentence(s)
+	}
+	return strings.Join(each, " ")
+}

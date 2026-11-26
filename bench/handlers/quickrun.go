@@ -230,12 +230,12 @@ func (h *quickRunHandler) post(ctx *fasthttp.RequestCtx) {
 		if SendModelKeyRefusal(ctx, h.env.Mode, err) { // X01
 			return
 		}
-		h.fail(ctx, fasthttp.StatusBadRequest, PlainPlanError(err)+" Pick another benchmark, agent or model.")
+		h.fail(ctx, fasthttp.StatusBadRequest, planSentence(PlainPlanError(err))+" Pick another benchmark, agent or model.")
 		return
 	}
 	plan := BuildPlan(m)
 	if len(plan.Errors) > 0 {
-		h.fail(ctx, fasthttp.StatusBadRequest, strings.Join(plainEach(plan.Errors), " ")+" Pick another benchmark, agent or model.")
+		h.fail(ctx, fasthttp.StatusBadRequest, planSentences(plan.Errors)+" Pick another benchmark, agent or model.")
 		return
 	}
 

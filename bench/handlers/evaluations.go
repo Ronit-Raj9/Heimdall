@@ -1101,7 +1101,7 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 		return skip("%s", planSkipReason(err))
 	}
 	if plan := BuildPlan(m); len(plan.Errors) > 0 {
-		return skip("%s", strings.Join(plainEach(plan.Errors), " "))
+		return skip("%s", planSentences(plan.Errors))
 	}
 	if err := os.MkdirAll(filepath.Join(s.Projects.Root(), "experiments"), 0o755); err != nil {
 		return skip("create the experiments folder: %v", err)
