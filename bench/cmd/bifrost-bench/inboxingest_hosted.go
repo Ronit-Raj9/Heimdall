@@ -21,7 +21,7 @@ func init() {
 		if env.db != nil {
 			tokens, tokensErr = inboxtoken.Open(env.db), ""
 		}
-		return handlers.NewInboxTokensHandler(env.base.cfg.Server.Mode, tokens, tokensErr, env.dir, hostedOrgInbox(env)), nil
+		return handlers.NewFeedbackHandler(handlers.NewInboxTokensHandler(env.base.cfg.Server.Mode, tokens, tokensErr, env.dir, hostedOrgInbox(env))), nil
 	})
 }
 
