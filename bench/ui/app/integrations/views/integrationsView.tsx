@@ -8,7 +8,8 @@ import { EmptyState } from "@/components/shell/emptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useGetAgentsQuery, useGetSuitesQuery, useListExperimentsQuery } from "@/lib/store/apis/benchApi";
+import { useGetAgentsQuery, useListExperimentsQuery } from "@/lib/store/apis/benchApi";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import {
 	apiErrorMessage,
 	exportDownloadUrl,
@@ -706,7 +707,7 @@ export function ExportsPanel({ showHiddenAtStart = false }: { showHiddenAtStart?
 	const [showHidden, setShowHidden] = useState(showHiddenAtStart);
 	const confirm = useConfirm();
 	const exps = useListExperimentsQuery();
-	const suites = useGetSuitesQuery();
+	const suites = useGetSuitesLightQuery();
 	const files = useListExportsQuery(undefined, { pollingInterval: 5000 });
 	const { t: tm } = useTranslation("w4m8");
 	const [deleteExport] = useDeleteExportMutation();

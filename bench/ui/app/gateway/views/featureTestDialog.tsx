@@ -4,11 +4,11 @@ import { Input } from "@/components/ui/input";
 import {
 	useCreateExperimentMutation,
 	useGetAgentsQuery,
-	useGetSuitesQuery,
 	usePlanExperimentMutation,
 	useStartExperimentMutation,
 } from "@/lib/store/apis/benchApi";
 import { useDraftGatewayTestMutation } from "@/lib/store/apis/gatewayApi";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import { errorMessage } from "@/lib/store/apis/schedulesApi";
 import type { Experiment, ExperimentPlan } from "@/lib/types/bench";
 import type { GwDraftRequest, GwDraftResponse } from "@/lib/types/gateway";
@@ -181,7 +181,7 @@ const EMPTY: FeatureTestForm = { suite: "", base: "", model: "", provider: "", b
 export function FeatureTestDialog({ feature, name, open, onClose }: { feature: string; name: string; open: boolean; onClose(): void }) {
 	const { t } = useTranslation("w4p6");
 	const navigate = useNavigate();
-	const suites = useGetSuitesQuery(undefined, { skip: !open });
+	const suites = useGetSuitesLightQuery(undefined, { skip: !open });
 	const agents = useGetAgentsQuery(undefined, { skip: !open });
 	const [draft] = useDraftGatewayTestMutation();
 	const [plan] = usePlanExperimentMutation();

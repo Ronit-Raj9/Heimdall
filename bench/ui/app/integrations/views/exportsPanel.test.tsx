@@ -36,8 +36,8 @@ vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/route
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useListExperimentsQuery: () => okQuery({ experiments }),
-	useGetSuitesQuery: () => okQuery({ suites: [] }),
 }));
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({ useGetSuitesLightQuery: () => okQuery({ suites: [] }) }));
 vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
 	useListEvaluationsQuery: () => okQuery([{ id: "ev_1", spec: { name: "codex score" } }]),
