@@ -57,18 +57,18 @@ func TestHonestImproverCommitsAndReports(t *testing.T) {
 	if rec.Rounds[0].Decision != improve.DecisionCommitted || rec.Incumbent.Number < 2 {
 		t.Fatalf("round 1 not committed: %v", decisions(rec))
 	}
-	if rec.Rounds[0].Audit.EValue == nil || !rec.Rounds[0].Audit.EValue.Better {
-		t.Errorf("commit without an e-value crossing: %+v", rec.Rounds[0].Audit)
+	if c := rec.Rounds[0].Commit; c == nil || !c.Commit || c.P > c.Level {
+		t.Errorf("commit without a passing gate test: %+v", c)
 	}
 	v := rec.Verdict
 	if v == nil || v.Commits == 0 || v.SealedGain <= 0 || v.TotalUSD <= 0 {
 		t.Fatalf("verdict: %+v", v)
 	}
-	if rec.Controls == nil || rec.Controls.BudgetMatched == nil || rec.Controls.Null == nil {
+	if rec.Controls == nil || rec.Controls.Retries == nil || rec.Controls.Null == nil {
 		t.Fatalf("controls missing: %+v", rec.Controls)
 	}
-	if rec.Controls.BudgetMatched.Trials < 1 || rec.Controls.Null.Final.Number == rec.Base.Number {
-		t.Errorf("controls: %+v %+v", rec.Controls.BudgetMatched, rec.Controls.Null)
+	if rec.Controls.Retries.K < 1 || rec.Controls.Null.Final.Number == rec.Base.Number {
+		t.Errorf("controls: %+v %+v", rec.Controls.Retries, rec.Controls.Null)
 	}
 	// The improver read only dev results: never an audit or sealed task.
 	for i, ev := range x.Evidence {
@@ -131,7 +131,7 @@ func TestLazyImproverChangesNothing(t *testing.T) {
 		t.Fatalf("verdict %s screen %d audit %d", rec.Verdict.State, x.Count(improve.PhaseScreen), x.Count(improve.PhaseAudit))
 	}
 	for _, rd := range rec.Rounds {
-		if rd.Why != "the improver changed nothing" || rd.Sealed == nil {
+		if rd.Why != "the improver changed nothing" || rd.Sealed != nil {
 			t.Errorf("round %d: %s", rd.N, rd.Why)
 		}
 	}
@@ -258,7 +258,7 @@ func TestListAndBusy(t *testing.T) {
 		t.Fatalf("list %v %v", l, err)
 	}
 	s := improve.Summarize(rec, false)
-	if s.RoundsDone != 3 || s.Verdict != improve.VerdictNoChange {
+	if s.RoundsDone != 2 || s.Verdict != improve.VerdictNoChange {
 		t.Errorf("summary %+v", s)
 	}
 	if _, err := r.Get("imp_nope-x"); !errors.Is(err, improve.ErrNotFound) {
