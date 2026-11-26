@@ -1,8 +1,10 @@
 package traceinbox
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -57,5 +59,32 @@ func TestWebhookGateFollowsSourcesFile(t *testing.T) {
 	touch("sources: []\n", later.Add(time.Minute))
 	if svc.Gate() != nil {
 		t.Fatal("webhook source removed while running: the gate must be off")
+	}
+}
+
+// Group E security review (I18): the source list never serves a credential.
+// Sources name their secrets by variable; List answers no variable value and
+// no variable name, for a webhook and a pull source alike.
+func TestInboxListServesNoSecret(t *testing.T) {
+	cfg := &Config{Sources: []Source{
+		{Name: "hook", Kind: KindWebhook, TokenEnv: "HOOK_TOKEN_IWIE"},
+		{Name: "ls", Kind: KindLangSmith, Host: "https://api.smith.langchain.com", APIKeyEnv: "LS_KEY_IWIE", Project: "p1", Filters: Filters{Errors: true}},
+	}}
+	ib, _ := newTestInbox(t, cfg, map[string]string{"HOOK_TOKEN_IWIE": "hook-secret-value-1", "LS_KEY_IWIE": "ls-secret-value-2"})
+	list, err := NewService(ib).List(t.Context(), "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(list)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []string{"hook-secret-value-1", "ls-secret-value-2", "HOOK_TOKEN_IWIE", "LS_KEY_IWIE"} {
+		if strings.Contains(string(b), s) {
+			t.Errorf("GET /inbox serves %q: %s", s, b)
+		}
+	}
+	if len(list.Sources) != 2 {
+		t.Fatalf("sources %+v", list.Sources)
 	}
 }
