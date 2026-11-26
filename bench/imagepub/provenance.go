@@ -27,7 +27,9 @@ var ErrMissing = errors.New("not on this host")
 // HEIMDALL_SHARED_PLATFORM_IMAGES, exact or by a prefix ending in "/" or
 // ":"). Any other repository means the image was pulled from outside the
 // platform, for example by an organization that tagged its own image with a
-// platform name. d must carry no organization policy.
+// platform name. An image with no RepoDigests (a local build) must carry the
+// platform build mark (utils.LabelPlatformBuild = "1"). d must carry no
+// organization policy.
 func Qualify(ctx context.Context, d utils.Docker, ref string, set map[string]string, platform []string) error {
 	if !ValidRef(ref) {
 		return fmt.Errorf("%s: %w", ref, ErrNotPlatform)
@@ -51,6 +53,18 @@ func Qualify(ctx context.Context, d utils.Docker, ref string, set map[string]str
 	}
 	if repo := OutsideRepo(ref, digests, platform); repo != "" {
 		return fmt.Errorf("%s was pulled from %s: %w", ref, repo, ErrNotPlatform)
+	}
+	if len(digests) == 0 {
+		// A local build qualifies only with the mark the platform's own
+		// builds set (utils.LabelPlatformBuild); an org build always has it
+		// empty, so a retagged org image never passes as a platform build.
+		res, err := d.Run(ctx, "image", "inspect", "--format", `{{index .Config.Labels "`+utils.LabelPlatformBuild+`"}}`, ref)
+		if err != nil {
+			return fmt.Errorf("inspect %s: %w", ref, err)
+		}
+		if res.ExitCode != 0 || strings.TrimSpace(string(res.Stdout)) != "1" {
+			return fmt.Errorf("%s is a local image without the platform build mark: %w", ref, ErrNotPlatform)
+		}
 	}
 	return nil
 }

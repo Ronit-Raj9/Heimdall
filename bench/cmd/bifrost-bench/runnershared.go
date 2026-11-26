@@ -421,6 +421,9 @@ func (h *sharedHost) orgPolicy(org string, approved []string, projectRoot string
 		Trusted: h.trusted, Untrusted: []string{projectRoot}, Approved: append([]string(nil), approved...), Platform: h.platform,
 		Registry: h.registry,
 	}
+	if h.base != nil && h.base.cfg != nil { // SEC-C: a plain platform name only from the platform's own pin
+		p.PlatformPin = platformPinOf(h.base.cfg.Root, suite.LibraryDir())
+	}
 	if h.sessions {
 		p.Session = buildSessionArgv(h.exe, org, h.prefix, h.lockDir)
 	}

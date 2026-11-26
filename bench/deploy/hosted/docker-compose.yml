@@ -24,8 +24,9 @@
 #             read-only image registry, the shared worker and its image
 #             build sessions, whose egress rules allow only that registry
 #             and the public internet.
-#   registrysync  internal: the registry's write side and the registry-sync
-#             tool, only while registry-sync.sh copies images.
+#   registrysync  internal: the registry's write side (always up with the
+#             shared-runner profile), the image publisher and the
+#             registry-sync tool.
 #   evalnet   shared-runner profile only, internal, IPv6 off: Bifrost's
 #             default eval network (each org gets its own, see below).
 #
@@ -80,7 +81,7 @@ networks:
     enable_ipv6: false
     labels: *labels
   registrysync:
-    # registry-sync profile: the registry's write side and the sync tool.
+    # The registry's write side, the image publisher and the sync tool.
     # Nothing else joins it, and it has no route out.
     internal: true
     enable_ipv6: false

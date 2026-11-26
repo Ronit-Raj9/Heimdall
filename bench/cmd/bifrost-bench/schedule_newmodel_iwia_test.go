@@ -40,4 +40,9 @@ func TestWatchBudgetStopsSecondModel(t *testing.T) {
 	if !strings.Contains(res.Summary, "New model openai/gpt-old found; not started: "+why) {
 		t.Fatalf("summary %q", res.Summary)
 	}
+	// Run now alone never starts a model the watch already recorded; the
+	// reason names the retry action that does.
+	if !strings.Contains(it.Reason, "press Try again for this model on the Gateway page, then Run now") || strings.Contains(it.Reason, "; press Run now") {
+		t.Fatalf("reason %q does not name the retry action", it.Reason)
+	}
 }

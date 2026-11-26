@@ -20,7 +20,7 @@ func TestBuildArgs(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{"build", "-f", "/p/agents/images/x/Dockerfile", "-t", "acme/x:1-coding-core",
-		"--build-arg", "A=1", "--build-arg", "BASE_IMAGE=bench/coding-core-base:1", "--label", "bifrost-bench.agent=x", "/p/agents/images/x"}
+		"--build-arg", "A=1", "--build-arg", "BASE_IMAGE=bench/coding-core-base:1", "--label", "bifrost-bench.agent=x", "--label", "heimdall.platform-build=1", "/p/agents/images/x"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("args\n got %v\nwant %v", got, want)
 	}

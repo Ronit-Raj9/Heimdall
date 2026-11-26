@@ -116,3 +116,36 @@ func runRegistryPlatformImages(args []string) int {
 	}
 	return exitOK
 }
+
+// platformPinFuncs holds one cached PlatformPin per checkout and library.
+var platformPinFuncs sync.Map // checkout + "\x00" + library -> func(string) (string, bool)
+
+// platformPinOf is the PlatformPin of the Docker policies of a shared
+// runner (utils.DockerPolicy, SEC-C): whether a plain name is one of the
+// platform's own images and the pin the platform's own lock gives it, from
+// imagepub.PlatformPins of the read-only checkout and library, recomputed
+// at most once per platformSetTTL. A failed read keeps nothing plain.
+func platformPinOf(checkout, library string) func(string) (string, bool) {
+	key := checkout + "\x00" + library
+	if f, ok := platformPinFuncs.Load(key); ok {
+		return f.(func(string) (string, bool))
+	}
+	var mu sync.Mutex
+	var pins map[string]string
+	var at time.Time
+	f := func(ref string) (string, bool) {
+		mu.Lock()
+		defer mu.Unlock()
+		if pins == nil || time.Since(at) >= platformSetTTL {
+			p, err := imagepub.PlatformPins(checkout, library)
+			if err != nil {
+				return "", false
+			}
+			pins, at = p, time.Now()
+		}
+		pin, ok := pins[ref]
+		return pin, ok
+	}
+	actual, _ := platformPinFuncs.LoadOrStore(key, f)
+	return actual.(func(string) (string, bool))
+}

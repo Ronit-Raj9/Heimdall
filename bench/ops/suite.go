@@ -472,7 +472,7 @@ func EnsureImage(ctx context.Context, d utils.Docker, tag, dockerfile string, w 
 	// Command applies a shared runner's policy: an org-written Dockerfile
 	// builds on the isolated builder under the org's namespace, never on
 	// the host daemon (utils/dockerpolicy.go).
-	cmd := d.Command(ctx, "build", "-t", tag, "-f", dockerfile, filepath.Dir(dockerfile))
+	cmd := d.Command(ctx, "build", "-t", tag, "-f", dockerfile, "--label", utils.LabelPlatformBuild+"=1", filepath.Dir(dockerfile))
 	cmd.Stdout, cmd.Stderr = os.Stderr, os.Stderr
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("docker build %s: %w", tag, err)

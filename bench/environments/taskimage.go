@@ -30,6 +30,15 @@ func EnsureTaskImage(ctx context.Context, d utils.Docker, s *schemas.Suite, t *s
 		return "", "", err
 	}
 	img.Pinned = utils.SuiteLockedPin(s, t.ID, "task", img.Tag) // library registry: pulled by the lock's digest (bench/imagepin)
+	// SEC-C: the task image of a benchmark the org owns is always the org's
+	// own tag, whatever name its task file or lock asks for. A plain pull
+	// without a pin fetches the platform's image under that name, so only a
+	// pinned or built image is claimed (a build is namespaced anyway).
+	if d.Policy.OrgOwned(t.Dir) && (img.Pinned != "" || img.Dockerfile != "") {
+		if err := d.Policy.Claim(img.Tag); err != nil {
+			return "", "", fmt.Errorf("task %s image %s: %w", t.ID, img.Tag, err)
+		}
+	}
 	id, err := d.EnsureImage(ctx, img, out)
 	if err != nil {
 		return "", "", fmt.Errorf("task %s image %s: %w", t.ID, img.Tag, err)

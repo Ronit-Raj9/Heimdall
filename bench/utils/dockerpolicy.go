@@ -90,6 +90,12 @@ type DockerPolicy struct {
 	// Publish publishes a platform image to Registry and returns its digest;
 	// nil keeps today's refusal.
 	Publish PublishFunc
+	// PlatformPin reports whether ref is a plain name of the platform's own
+	// images (imagepub.PlatformImages of the read-only checkout and library)
+	// and the pinned reference the platform's own suite lock gives for it
+	// ("" when the platform builds it). A docker tag onto a plain platform
+	// name stays plain only from exactly that pin; nil keeps none plain.
+	PlatformPin func(ref string) (pinned string, ok bool)
 	// Session is the command an org build runs under instead of the docker
 	// CLI: its argv prefix, to which "-docker <bin> --" and the build's
 	// docker arguments are appended. The session picks the builder
@@ -106,6 +112,73 @@ func (p *DockerPolicy) SetApproved(images []string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.Approved = append([]string(nil), images...)
+}
+
+// LabelPlatformBuild marks an image the platform built from its own
+// checkout or library. An org build always gets it empty (rewriteBuild), so
+// the image publisher can tell a local platform build from a retagged one.
+const LabelPlatformBuild = "heimdall.platform-build"
+
+// OrgOwned reports whether dir (a task or benchmark folder) is the org's own
+// content: inside the org's project or outside every trusted folder.
+func (p *DockerPolicy) OrgOwned(dir string) bool {
+	if p == nil || p.TagPrefix == "" || dir == "" {
+		return false
+	}
+	return inside(dir, p.Untrusted) || !inside(dir, p.Trusted)
+}
+
+// Claim namespaces tag for this org before anything is pulled or built
+// under it, so every later docker call (pull and tag, inspect, run) uses the
+// org's own tag and the plain name is never written.
+func (p *DockerPolicy) Claim(tag string) error {
+	if p == nil || p.TagPrefix == "" || tag == "" || strings.HasPrefix(tag, p.TagPrefix) {
+		return nil
+	}
+	if err := p.foreign(tag); err != nil {
+		return err
+	}
+	if _, ok := p.Namespaced(tag); !ok {
+		p.remember(tag, p.TagPrefix+tag)
+	}
+	return nil
+}
+
+// tagDestination is the destination a `docker tag src dst` really writes
+// under the org's policy (SEC-C). A plain platform name stays plain only
+// when src is the platform's own pin for it; a name in a registry outside
+// the platform (the org's own registry, for a push) stays as it is; every
+// other plain name is namespaced and remembered.
+func (p *DockerPolicy) tagDestination(src, dst string) (string, error) {
+	if strings.HasPrefix(dst, p.TagPrefix) {
+		return dst, nil
+	}
+	if err := p.foreign(dst); err != nil {
+		return "", err
+	}
+	if ns, ok := p.Namespaced(dst); ok {
+		return ns, nil
+	}
+	pin, isPlatform := "", false
+	if p.PlatformPin != nil {
+		pin, isPlatform = p.PlatformPin(dst)
+	}
+	if isPlatform && pin != "" && src == pin {
+		return dst, nil
+	}
+	if !isPlatform && registryHost(dst) && !p.platformAllowed(dst) {
+		return dst, nil
+	}
+	ns := p.TagPrefix + dst
+	p.remember(dst, ns)
+	return ns, nil
+}
+
+// registryHost reports whether ref names a registry host in its first path
+// part (a "." or ":" in it, or localhost).
+func registryHost(ref string) bool {
+	first, _, ok := strings.Cut(ref, "/")
+	return ok && (strings.ContainsAny(first, ".:") || first == "localhost")
 }
 
 // Namespaced returns the namespaced tag of an image the org built, and
@@ -170,13 +243,11 @@ func (p *DockerPolicy) RewriteContext(ctx context.Context, args []string) ([]str
 			}
 		}
 		if len(pos) == 2 {
-			src, dst := rest[pos[0]], rest[pos[1]]
-			if p.approvedOnly(src) && !strings.HasPrefix(dst, p.TagPrefix) {
-				if err := p.foreign(dst); err != nil {
-					return nil, err
-				}
-				ns := p.TagPrefix + dst
-				p.remember(dst, ns)
+			ns, err := p.tagDestination(rest[pos[0]], rest[pos[1]])
+			if err != nil {
+				return nil, err
+			}
+			if ns != rest[pos[1]] {
 				rest = append([]string(nil), rest...)
 				rest[pos[1]] = ns
 			}
@@ -254,12 +325,6 @@ func (p *DockerPolicy) approved(ref string) bool {
 		}
 	}
 	return false
-}
-
-// approvedOnly reports whether ref is one of the org's approved images and
-// not a platform image.
-func (p *DockerPolicy) approvedOnly(ref string) bool {
-	return p.approved(ref) && !p.platformAllowed(ref)
 }
 
 // platformAllowed reports whether ref is one of the operator's platform
@@ -409,6 +474,10 @@ func (p *DockerPolicy) rewriteBuild(ctx context.Context, rest []string) ([]strin
 			if f.value != "none" && f.value != "default" {
 				return nil, fmt.Errorf("%w: docker build --network %s is not allowed for organization images", ErrPolicy, f.value)
 			}
+		case "--label":
+			if k, _, _ := strings.Cut(f.value, "="); k == LabelPlatformBuild {
+				continue // only the platform marks its own builds
+			}
 		}
 		if f.value == "" && !buildValueFlags[f.name] {
 			out = append(out, f.name)
@@ -416,7 +485,8 @@ func (p *DockerPolicy) rewriteBuild(ctx context.Context, rest []string) ([]strin
 			out = append(out, f.name, f.value)
 		}
 	}
-	return append(out, ctxDir), nil
+	// The command line label wins over any LABEL of the Dockerfile.
+	return append(out, "--label", LabelPlatformBuild+"=", ctxDir), nil
 }
 
 // sessionArgv returns the command line of an org build under the policy's

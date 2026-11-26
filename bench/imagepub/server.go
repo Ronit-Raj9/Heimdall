@@ -184,8 +184,9 @@ func (s *Server) push(r *http.Request, ref, tar string) (string, error) {
 	}
 	ctx := r.Context()
 	// crane keeps its login in DOCKER_CONFIG; the container's root file
-	// system is read-only, so it lives in the temp volume.
-	env := append(os.Environ(), "DOCKER_CONFIG="+filepath.Join(s.tempDir(), ".crane"))
+	// system is read-only, so it lives under the system temp folder (a tmpfs
+	// in the hosted compose), never in the upload volume at rest.
+	env := append(os.Environ(), "DOCKER_CONFIG="+filepath.Join(os.TempDir(), "heimdall-crane"))
 	login := exec.CommandContext(ctx, s.Crane, "auth", "login", s.Writer, "-u", user, "--password-stdin")
 	login.Stdin = strings.NewReader(pass)
 	login.Env = env

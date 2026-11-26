@@ -12,7 +12,9 @@ import (
 
 	"github.com/maximhq/bifrost/bench/imagepin"
 	"github.com/maximhq/bifrost/bench/ops"
+	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // CoreBase is the platform's own base image, always a platform image.
@@ -76,14 +78,44 @@ func PlatformImages(checkoutRoot, libraryRoot string) (map[string]string, error)
 			add(a.Image, "agent "+id)
 		}
 	}
+	err := eachPlatformSuite(benchDirs, func(s *schemas.Suite) {
+		note := "benchmark " + s.ID
+		for _, ref := range imagepin.SuiteImages(s, "") {
+			add(ref, note)
+		}
+		for _, b := range ops.ServiceBuilds(s) {
+			add(b.Tag, note)
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// platformBenchDirs are the benchmark folders of the checkout and the library.
+func platformBenchDirs(checkoutRoot, libraryRoot string) []string {
+	var dirs []string
+	if checkoutRoot != "" {
+		dirs = append(dirs, filepath.Join(checkoutRoot, "benchmarks"))
+	}
+	if libraryRoot != "" {
+		dirs = append(dirs, suite.LibraryBenchmarks(libraryRoot))
+	}
+	return dirs
+}
+
+// eachPlatformSuite calls fn with every benchmark that loads from roots; a
+// benchmark that fails to load is skipped with a warning.
+func eachPlatformSuite(roots []string, fn func(*schemas.Suite)) error {
 	ctx := context.Background()
-	for _, root := range benchDirs {
+	for _, root := range roots {
 		entries, err := os.ReadDir(root)
 		if os.IsNotExist(err) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("platform images: %w", err)
+			return fmt.Errorf("platform images: %w", err)
 		}
 		loader := suite.Builtin(root)[0]
 		for _, e := range entries {
@@ -99,14 +131,44 @@ func PlatformImages(checkoutRoot, libraryRoot string) (map[string]string, error)
 				slog.Warn("platform images: benchmark skipped", "folder", folder, "err", err)
 				continue
 			}
-			note := "benchmark " + s.ID
-			for _, ref := range imagepin.SuiteImages(s, "") {
-				add(ref, note)
-			}
-			for _, b := range ops.ServiceBuilds(s) {
-				add(b.Tag, note)
+			fn(s)
+		}
+	}
+	return nil
+}
+
+// PlatformPins maps every platform image name to the pinned reference the
+// platform's own suite locks give for it ("" for an image the platform
+// builds or that no lock pins). It covers PlatformImages and every tag a
+// platform lock pins (a service image such as postgres:16 too). Only the
+// checkout and the library are read, never an organization's project.
+func PlatformPins(checkoutRoot, libraryRoot string) (map[string]string, error) {
+	set, err := PlatformImages(checkoutRoot, libraryRoot)
+	if err != nil {
+		return nil, err
+	}
+	pins := make(map[string]string, len(set))
+	for ref := range set {
+		pins[ref] = ""
+	}
+	addFP := func(fp schemas.Fingerprint) {
+		for _, v := range fp.Images {
+			if tag, pinned, ok := utils.LockedPin(v); ok {
+				pins[tag] = pinned
 			}
 		}
 	}
-	return out, nil
+	err = eachPlatformSuite(platformBenchDirs(checkoutRoot, libraryRoot), func(s *schemas.Suite) {
+		if s.Lock == nil || s.Lock.Fingerprints == nil {
+			return
+		}
+		addFP(s.Lock.Fingerprints.Suite)
+		for _, fp := range s.Lock.Fingerprints.Tasks {
+			addFP(fp)
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+	return pins, nil
 }

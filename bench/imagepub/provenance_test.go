@@ -21,7 +21,8 @@ func fakeDocker(t *testing.T, out string) utils.Docker {
 	if out == "missing" {
 		script += "echo 'Error response from daemon: No such image: x' >&2\nexit 1\n"
 	} else {
-		script += "case \"$1\" in\n  image) printf '%s\\n' '" + out + "' ;;\n  save) printf 'TARDATA' ;;\nesac\n"
+		// The label inspect answers the platform build mark (a platform build).
+		script += "case \"$1\" in\n  image) case \"$*\" in *Labels*) echo 1 ;; *) printf '%s\\n' '" + out + "' ;; esac ;;\n  save) printf 'TARDATA' ;;\nesac\n"
 	}
 	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
 		t.Fatal(err)

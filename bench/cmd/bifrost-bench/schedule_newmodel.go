@@ -94,7 +94,7 @@ func runNewModelSchedule(ctx context.Context, a *app, svc *handlers.Services, s 
 	// never started again by itself.
 	for k, it := range st.Seen {
 		if it.State == schedule.WatchClaimed && now.Sub(it.ClaimedAt) > watchClaimStale {
-			it.State, it.Reason = schedule.WatchFailed, "the start was interrupted; press Run now to start it again"
+			it.State, it.Reason = schedule.WatchFailed, "the start was interrupted; press Try again for this model on the Gateway page, then Run now on the schedule"
 			st.Seen[k] = it
 		}
 	}
@@ -141,7 +141,7 @@ func runNewModelSchedule(ctx context.Context, a *app, svc *handlers.Services, s 
 			continue
 		}
 		st.Seen[k] = schedule.WatchItem{Provider: m.Provider, Model: m.Name, FirstSeen: now, State: schedule.WatchSkipped, ClaimedAt: now,
-			Reason: fmt.Sprintf("the watch had already started %d evaluations today; press Run now on the schedule to start this one", startedToday+len(toStart))}
+			Reason: fmt.Sprintf("the watch had already started %d evaluations today; press Try again for this model on the Gateway page, then Run now on the schedule", startedToday+len(toStart))}
 	}
 	// Claim before spend: the claims are on disk before any launch.
 	if err := schedule.SaveWatchState(root, st); err != nil {
@@ -162,7 +162,7 @@ func runNewModelSchedule(ctx context.Context, a *app, svc *handlers.Services, s 
 		spec2, reason := newModelSpec(spec, w, m)
 		if reason == "" {
 			if err := s.Approved.CheckCap(res.CostUSD + w.USDPerModel); err != nil {
-				reason = "the spending approved for this check is used up; press Run now on the schedule to start this one"
+				reason = "the spending approved for this check is used up; press Try again for this model on the Gateway page, then Run now on the schedule"
 			}
 		}
 		if reason == "" {

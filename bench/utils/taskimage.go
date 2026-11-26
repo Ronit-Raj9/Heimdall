@@ -168,7 +168,7 @@ func (d Docker) EnsureImage(ctx context.Context, img LocalImage, out io.Writer) 
 	}
 	args := []string{"pull", img.Tag}
 	if img.Dockerfile != "" {
-		args = []string{"build", "-f", img.Dockerfile, "-t", img.Tag, "--label", LabelBench + "=1"}
+		args = []string{"build", "-f", img.Dockerfile, "-t", img.Tag, "--label", LabelBench + "=1", "--label", LabelPlatformBuild + "=1"}
 		if !img.Network {
 			args = append(args, "--network", "none")
 		}

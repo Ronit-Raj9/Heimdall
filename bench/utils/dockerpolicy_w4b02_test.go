@@ -32,9 +32,18 @@ func TestOrgTagOfApprovedImageIsNamespaced(t *testing.T) {
 	}
 }
 
+// TestPlatformSourceTagStaysPlain (rewritten for SEC-C C2 by the group A
+// integrator): a platform source keeps the plain tag only for its own
+// platform name, the pin the platform's own lock gives that name.
 func TestPlatformSourceTagStaysPlain(t *testing.T) {
 	pin := "registry.example/library/task-a@sha256:" + "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	p := &DockerPolicy{OrgID: "o1", TagPrefix: OrgImagePrefix("o1"), Approved: []string{pin}, Platform: []string{"registry.example/library/"}}
+	p := &DockerPolicy{OrgID: "o1", TagPrefix: OrgImagePrefix("o1"), Approved: []string{pin}, Platform: []string{"registry.example/library/"},
+		PlatformPin: func(ref string) (string, bool) {
+			if ref == "bench/task-a:1" {
+				return pin, true
+			}
+			return "", false
+		}}
 	got, err := p.Rewrite([]string{"tag", pin, "bench/task-a:1"})
 	if err != nil {
 		t.Fatal(err)
