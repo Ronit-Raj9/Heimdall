@@ -325,6 +325,11 @@ func (s *Spec) Defaults() {
 	if s.Controls == nil {
 		s.Controls = []string{ControlBudgetMatched, ControlNullImprover}
 	}
+	for i, k := range s.Controls {
+		if k == ControlBudgetMatched {
+			s.Controls[i] = ControlRetries
+		}
+	}
 }
 
 // presetDefaults fills the preset's values into unset fields. Switches a
