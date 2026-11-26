@@ -88,7 +88,7 @@ var APIRoutes = []RouteDoc{
 	{Method: "POST", Path: APIPrefix + "/experiments/{id}/start", Tag: "experiments", Summary: "Start a created experiment",
 		Auth: AuthWrite, Status: fasthttp.StatusAccepted, Response: schemas.ExperimentStatus{}},
 	{Method: "GET", Path: APIPrefix + "/experiments/{id}", Tag: "experiments", Summary: "Experiment status, with the newest committed re-score in latest_regrade", Response: schemas.ExperimentStatus{}},
-	{Method: "GET", Path: APIPrefix + "/experiments/{id}/verdict", Tag: "analysis", Summary: "Release verdict, gate checklist, config diff and policy result; with grade_source set to a re-score, the gate checklist is that re-score's",
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/verdict", Tag: "analysis", Summary: "Verdict of the newest re-score, or of the original grading when there is none or grade_source=original: release verdict, gate checklist, config diff and policy result; with grade_source set to a re-score, the gate checklist is that re-score's",
 		Query: []QueryDoc{gradeSourceQuery}, Response: schemas.VerdictPayload{}},
 	{Method: "GET", Path: APIPrefix + "/experiments/{id}/diagnostics", Tag: "analysis", Summary: "Diagnostics table, meters and per-arm metrics",
 		Query: []QueryDoc{gradeSourceQuery}, Response: schemas.DiagnosticsPayload{}},

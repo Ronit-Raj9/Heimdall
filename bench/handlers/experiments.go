@@ -675,16 +675,19 @@ func (h *ExperimentsHandler) lookup(ctx *fasthttp.RequestCtx) (*schemas.Manifest
 	return m, h.index.Runs(id), true
 }
 
-// analyze runs the analyzer for expID with ?grade_source= (default
-// original), or answers the error.
+// analyze runs the analyzer for expID with ?grade_source= (default the
+// newest re-score, else original), or answers the error.
 func (h *ExperimentsHandler) analyze(ctx *fasthttp.RequestCtx, expID string) (*schemas.Analysis, bool) {
 	if h.analyzer == nil {
 		sendUnavailable(ctx, h.mode, "analyzer")
 		return nil, false
 	}
 	source := strings.TrimSpace(string(ctx.QueryArgs().Peek("grade_source")))
-	if source == "" {
+	if source == "" { // N200: the newest re-score when there is one, else the original
 		source = GradeSourceOriginal
+		if r := h.latestRegrade(expID); r != nil {
+			source = r.ID
+		}
 	}
 	if !validID(source) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "grade_source must be original or a regrade id")

@@ -33,3 +33,24 @@ func TestPlanDeadlineAnswers503(t *testing.T) {
 		t.Fatalf("body %s", resp.Body())
 	}
 }
+
+// TestVerdictDefaultsToNewestRegrade checks the verdict route without
+// grade_source reads the newest re-score, and grade_source=original still
+// reads the original grading.
+func TestVerdictDefaultsToNewestRegrade(t *testing.T) {
+	d := fullDeps()
+	d.index = regradeIndex{testIndex()}
+	c := newTestClient(t, d)
+	body := decodeBody(t, c.do(t, "GET", "/api/bench/experiments/e_test/verdict", nil, nil))
+	if body["grade_source"] != "rg_1" {
+		t.Fatalf("default grade_source = %v, want rg_1", body["grade_source"])
+	}
+	body = decodeBody(t, c.do(t, "GET", "/api/bench/experiments/e_test/verdict?grade_source=original", nil, nil))
+	if body["grade_source"] != "original" {
+		t.Fatalf("explicit original grade_source = %v", body["grade_source"])
+	}
+	plain := decodeBody(t, newTestClient(t, fullDeps()).do(t, "GET", "/api/bench/experiments/e_test/verdict", nil, nil))
+	if plain["grade_source"] != "original" {
+		t.Fatalf("without re-scores grade_source = %v, want original", plain["grade_source"])
+	}
+}
