@@ -715,12 +715,16 @@ func (x improveExecutor) CheckImprover(ctx context.Context, spec *improve.Spec) 
 	if agentSetsSpendLimit(doc) {
 		return errOwnSpendLimit
 	}
-	if err := ensureImproverSuite(x.a.cfg.Root); err != nil {
-		return err
-	}
 	suiteRef, task, err := improverTask(spec)
 	if err != nil {
 		return err
+	}
+	// The shipped suite matters only to a spec that uses it; a custom
+	// improver task in another benchmark is checked on its own below.
+	if id, _, _ := strings.Cut(suiteRef, "@"); id == path.Base(improverSuiteDir) {
+		if err := ensureImproverSuite(x.a.cfg.Root); err != nil {
+			return err
+		}
 	}
 	ref := spec.Improver.Task
 	missing := fmt.Errorf("The improver task %s does not exist.", ref)

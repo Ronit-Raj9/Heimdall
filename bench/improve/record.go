@@ -64,6 +64,17 @@ var ErrOffline = errors.New("this server cannot launch improvement runs (offline
 // ErrState reports an action the improvement's state does not allow.
 var ErrState = errors.New("not allowed in this state")
 
+// ErrBadImprover marks a spec refused at create because its improver
+// cannot run (A1.5, A1.6); the error's text is the executor's sentence.
+var ErrBadImprover = errors.New("the improver cannot run")
+
+// badImprover wraps an executor's refusal so it reads as its own sentence
+// and still matches ErrBadImprover.
+type badImprover struct{ err error }
+
+func (e badImprover) Error() string   { return e.err.Error() }
+func (e badImprover) Unwrap() []error { return []error{ErrBadImprover, e.err} }
+
 var idRe = regexp.MustCompile(`^imp_[a-z0-9-]{1,64}$`)
 
 // ValidID reports whether id is an improvement id.

@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -16,6 +16,11 @@ var improverSuiteFS fs.FS
 // improverSuiteDir is where the shipped improver suite lives in a project.
 const improverSuiteDir = "benchmarks/heimdall-improver"
 
+// errImproverNotAdmitted refuses an improvement run before any spend when
+// the shipped improver benchmark was never admitted (no suite.lock in the
+// build and none in the project).
+var errImproverNotAdmitted = errors.New("The improver benchmark heimdall-improver has not been admitted on this server yet, so improvement runs cannot start.")
+
 // ensureImproverSuite copies the shipped improver suite into the project
 // root when the folder is missing or its suite.lock differs from the
 // shipped one, so the default improver task needs no setup (A1.6).
@@ -26,7 +31,12 @@ func ensureImproverSuite(projectRoot string) error {
 	dst := filepath.Join(projectRoot, filepath.FromSlash(improverSuiteDir))
 	want, err := fs.ReadFile(improverSuiteFS, "suite.lock")
 	if err != nil {
-		return fmt.Errorf("the shipped improver suite has no suite.lock: %w", err)
+		// Not admitted in this build: a project copy that was admitted on
+		// its own is used as it is; otherwise nothing can run the improver.
+		if _, perr := os.Stat(filepath.Join(dst, "suite.lock")); perr == nil {
+			return nil
+		}
+		return errImproverNotAdmitted
 	}
 	if have, err := os.ReadFile(filepath.Join(dst, "suite.lock")); err == nil && bytes.Equal(have, want) {
 		return nil

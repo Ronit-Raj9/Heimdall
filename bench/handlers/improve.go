@@ -98,6 +98,8 @@ func (h *ImproveHandler) sendErr(ctx *fasthttp.RequestCtx, what string, err erro
 		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, what+": "+err.Error())
 	case errors.Is(err, improve.ErrOffline):
 		sendUnavailable(ctx, h.mode, "launching improvement runs")
+	case errors.Is(err, improve.ErrBadImprover): // A1.6: refused at create, before any spend
+		lib.SendError(ctx, h.mode, fasthttp.StatusUnprocessableEntity, "bad_improver", err.Error())
 	default:
 		sendDepError(ctx, h.mode, what, err)
 	}

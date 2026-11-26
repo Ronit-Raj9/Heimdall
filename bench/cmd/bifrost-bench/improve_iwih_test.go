@@ -5,11 +5,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"io"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 
 	"github.com/maximhq/bifrost/bench/agentversions"
 	"github.com/maximhq/bifrost/bench/improve"
@@ -31,6 +35,9 @@ const iwihSkillText = "---\nname: run\ndescription: run the tests\n---\nRun {{x}
 type iwihExec struct {
 	*improvetest.Exec
 	real improveExecutor
+
+	// realCheck runs the engine-backed CheckImprover at create.
+	realCheck bool
 
 	mu      sync.Mutex
 	v0      *improve.Version
@@ -60,6 +67,13 @@ func (h *iwihExec) Freeze(ctx context.Context, parent improve.Version, doc []byt
 		h.frozen = append(h.frozen, v)
 	}
 	return v, err
+}
+
+func (h *iwihExec) CheckImprover(ctx context.Context, spec *improve.Spec) error {
+	if h.realCheck {
+		return h.real.CheckImprover(ctx, spec)
+	}
+	return nil
 }
 
 // Improve adds the skill in round 1 (as a new path) on top of the scripted
@@ -136,5 +150,135 @@ func TestImproveTwoRoundsFreezeAndVerifyNewSkill(t *testing.T) {
 	again, err := improve.NewVersion(r2.Ref, r2.Number, doc, spec.Editable)
 	if err != nil || again.BundleHash != r2.BundleHash {
 		t.Errorf("re-read hash %s, frozen %s (%v)", again.BundleHash, r2.BundleHash, err)
+	}
+}
+
+// Item 2 (I41 to I39): the server build embeds the shipped improver suite.
+func TestImproverSuiteFSSet(t *testing.T) {
+	if improverSuiteFS == nil {
+		t.Fatal("improverSuiteFS is nil")
+	}
+	for _, p := range []string{"suite.yaml", "README.md", "tasks/reflect-edit/task.yaml", "tasks/reflect-edit/instruction.md", "tasks/reflect-edit/repo/.keep"} {
+		if _, err := fs.Stat(improverSuiteFS, p); err != nil {
+			t.Errorf("embedded suite misses %s: %v", p, err)
+		}
+	}
+}
+
+// withSuiteFS swaps the shipped suite for the test.
+func withSuiteFS(t *testing.T, f fs.FS) {
+	t.Helper()
+	old := improverSuiteFS
+	improverSuiteFS = f
+	t.Cleanup(func() { improverSuiteFS = old })
+}
+
+// admittedSuiteFS is the embedded suite plus a suite.lock, as the build is
+// once the lead commits the lock.
+func admittedSuiteFS(t *testing.T) fstest.MapFS {
+	t.Helper()
+	m := fstest.MapFS{"suite.lock": {Data: []byte("lock v1\n")}}
+	err := fs.WalkDir(improverSuiteFS, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		b, err := fs.ReadFile(improverSuiteFS, p)
+		m[p] = &fstest.MapFile{Data: b}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m
+}
+
+// Item 2: with an admitted build, a project that has never seen the
+// improver suite gets it on first use, with no setup.
+func TestEnsureImproverSuiteZeroSetup(t *testing.T) {
+	withSuiteFS(t, admittedSuiteFS(t))
+	root := t.TempDir()
+	if err := ensureImproverSuite(root); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(root, improverSuiteDir)
+	for _, p := range []string{"suite.lock", "suite.yaml", "tasks/reflect-edit/task.yaml", "tasks/reflect-edit/repo/.keep"} {
+		if _, err := os.Stat(filepath.Join(dst, filepath.FromSlash(p))); err != nil {
+			t.Errorf("not copied: %s", p)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dst, "embed.go")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("Go source copied into the project: %v", err)
+	}
+	if err := ensureImproverSuite(root); err != nil {
+		t.Errorf("second call: %v", err)
+	}
+}
+
+// Item 13: the build has no suite.lock until the lead admits the suite; the
+// improver check then refuses in plain words and copies nothing, unless the
+// project holds an admitted copy of its own.
+func TestEnsureImproverSuiteNotAdmitted(t *testing.T) {
+	root := t.TempDir()
+	if _, err := fs.Stat(improverSuiteFS, "suite.lock"); err == nil {
+		t.Skip("this build ships an admitted improver suite")
+	}
+	if err := ensureImproverSuite(root); !errors.Is(err, errImproverNotAdmitted) {
+		t.Fatalf("err %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, improverSuiteDir)); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("suite copied without a lock: %v", err)
+	}
+	own := filepath.Join(root, improverSuiteDir, "suite.lock")
+	if err := os.MkdirAll(filepath.Dir(own), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(own, []byte("admitted here\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureImproverSuite(root); err != nil {
+		t.Errorf("project copy refused: %v", err)
+	}
+}
+
+// Security review: create refuses, before any version is stored and before
+// any Score or Improve call, an agent that sets its own gateway spending
+// limit and a default improver whose benchmark was never admitted.
+func TestImproveCreateRefusesBeforeSpend(t *testing.T) {
+	for _, c := range []struct {
+		name, agent, doc string
+		want             error
+	}{
+		{"own limit", "agents/capped.yaml", "id: capped\nadapter: scripted\nmodel: m\ngateway:\n  routing:\n    limits:\n      budget_usd: 5\n", errOwnSpendLimit},
+		{"not admitted", "agents/scripted-improver.yaml", improvetest.AgentDoc, errImproverNotAdmitted},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if c.want == errImproverNotAdmitted {
+				if _, err := fs.Stat(improverSuiteFS, "suite.lock"); err == nil {
+					t.Skip("this build ships an admitted improver suite")
+				}
+			}
+			h, root := iwihExecutor(t)
+			h.realCheck = true
+			p := filepath.Join(root, filepath.FromSlash(c.agent))
+			if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(p, []byte(c.doc), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			r := &improve.Runner{Root: filepath.Join(root, "runs", improve.DefaultDir), Exec: h}
+			spec := &improve.Spec{Name: "refused", Agent: c.agent, Suite: "scripted@1.0.0", Seed: 7,
+				Editable: improve.Editable{Files: []string{improvetest.NotesPath}}}
+			_, err := r.Create(context.Background(), spec, "ana")
+			if !errors.Is(err, improve.ErrBadImprover) || !errors.Is(err, c.want) || err.Error() != c.want.Error() {
+				t.Fatalf("err %v, want %v", err, c.want)
+			}
+			if h.v0 != nil || len(h.Calls) != 0 {
+				t.Errorf("work done before the refusal: version %v calls %v", h.v0, h.Calls)
+			}
+			if recs, _ := r.List(); len(recs) != 0 {
+				t.Errorf("records after the refusal: %d", len(recs))
+			}
+		})
 	}
 }

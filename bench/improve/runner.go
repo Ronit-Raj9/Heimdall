@@ -24,6 +24,12 @@ func (r *Runner) Create(ctx context.Context, spec *Spec, actor string) (*Record,
 	if err := spec.Validate(); err != nil {
 		return nil, err
 	}
+	// A1.5, A1.6: an agent with its own gateway spending limit, a missing
+	// improver task or an improver benchmark that was never admitted is
+	// refused here, before any version is stored or any run is paid for.
+	if err := r.Exec.CheckImprover(ctx, spec); err != nil {
+		return nil, badImprover{err}
+	}
 	hash, err := spec.Hash()
 	if err != nil {
 		return nil, err
