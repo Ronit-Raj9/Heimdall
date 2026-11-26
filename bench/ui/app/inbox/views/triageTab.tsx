@@ -3,6 +3,7 @@ import { EmptyState, EntityLink } from "@/components/shell";
 import { TriageBanner } from "@/components/triage/triageBanner";
 import { TriageDrillDown, TriageRunEvidence } from "@/components/triage/triageDrillDown";
 import { TriageTable } from "@/components/triage/triageTable";
+import { ExperimentBehaviourChecks } from "@/components/runs/behaviourChecks"; // I28 behaviour checks
 import { runLocations, triageArms } from "@/components/triage/triage.utils";
 import { ExperimentSelect, defaultPickerExperiment, useExperimentPicker } from "@/components/triage/experimentSelect";
 import { useEvaluationNames } from "@/components/experiments/useEvaluationNames";
@@ -71,6 +72,7 @@ export default function TriageTab() {
 					/>
 				)
 			)}
+			{expId && <ExperimentBehaviourChecks key={`behaviour-${expId}`} expId={expId} />}
 		</div>
 	);
 }

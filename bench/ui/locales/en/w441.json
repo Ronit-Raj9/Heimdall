@@ -1,0 +1,73 @@
+{
+	"divergence": {
+		"title": "Where the runs first differed",
+		"loading": "Reading the steps of both runs.",
+		"error": "Could not read where the runs differed.",
+		"category": {
+			"command": "ran a different command",
+			"file_edit": "changed a different file",
+			"tool_call": "called a different tool",
+			"tool_result": "got a different tool result",
+			"retry": "the model call was retried",
+			"test_run": "ran the tests here, the other did not",
+			"ended": "one run stopped here"
+		},
+		"side": "{{arm}}, step {{seq}}: {{text}}",
+		"sideEnded": "{{arm}}: no more steps",
+		"after": "After this point",
+		"row": {
+			"turns": "Model turns",
+			"retries": "Retries",
+			"testRuns": "Test runs",
+			"edits": "Files changed",
+			"errors": "Errors",
+			"cost": "Cost"
+		},
+		"costUnknown": "not known",
+		"final": "Final result, checked by the task's tests: {{armA}} {{resultA}}, {{armB}} {{resultB}}.",
+		"passed": "Passed",
+		"failed": "Failed",
+		"note": "This is the first difference we saw, not a proven cause.",
+		"same": "The two runs did the same steps."
+	},
+	"behaviour": {
+		"title": "Behaviour checks",
+		"description": "These checks read the recorded steps. They do not change any score.",
+		"loading": "Reading the steps of this run.",
+		"error": "Could not run the behaviour checks.",
+		"seen": "Seen",
+		"notSeen": "Not seen",
+		"cannotTell": "Cannot tell",
+		"witnessed": "witnessed",
+		"none": "No checks yet.",
+		"perArm": "{{arm}}: {{fired}} of {{runs}} runs",
+		"split": "{{passed}} passed, {{failed}} failed",
+		"partial": "Only the first 500 runs were read.",
+		"edit": "Edit checks"
+	},
+	"editor": {
+		"title": "Edit behaviour checks",
+		"add": "Add a check",
+		"remove": "Remove",
+		"save": "Save checks",
+		"cancel": "Cancel",
+		"fieldTitle": "Title",
+		"fieldKind": "What to look for",
+		"kind": {
+			"present": "A step happens",
+			"absent": "A step never happens",
+			"sequence": "A step happens without a later step",
+			"before": "A step happens before another",
+			"repeat": "The same step repeats",
+			"after_error": "An error is ignored"
+		},
+		"command": "Command matches",
+		"tool": "Tool name",
+		"path": "File path",
+		"witnessed": "Only steps we saw happen",
+		"firstStep": "First step",
+		"laterStep": "Later step",
+		"empty": "No checks of your own yet.",
+		"saveError": "Could not save the checks."
+	}
+}
