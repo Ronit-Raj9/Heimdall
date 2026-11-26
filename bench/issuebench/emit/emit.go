@@ -148,7 +148,7 @@ func emitRepo(ctx context.Context, im importers.Importer, repo string, in []Inpu
 			out.Skipped = append(out.Skipped, importers.Skip{ID: id, Reason: err.Error()})
 			continue
 		}
-		build, err := writeBuildContext(filepath.Join(work, "images", id), x.RepoDir, layers)
+		build, err := writeBuildContext(filepath.Join(work, "images", id), x.RepoDir, layers, x.Env.Language)
 		if err != nil {
 			return nil, err
 		}
@@ -232,7 +232,7 @@ func emitRepo(ctx context.Context, im importers.Importer, repo string, in []Inpu
 
 // writeBuildContext lays out the three Dockerfiles beside a copy of the
 // scrubbed repository: Dockerfile.base, Dockerfile.env, Dockerfile (task).
-func writeBuildContext(dir, repoDir string, l Layers) (string, error) {
+func writeBuildContext(dir, repoDir string, l Layers, language string) (string, error) {
 	if err := os.RemoveAll(dir); err != nil {
 		return "", err
 	}
@@ -250,6 +250,11 @@ func writeBuildContext(dir, repoDir string, l Layers) (string, error) {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
 			return "", err
 		}
+	}
+	// The language's test result converters go in heimdall/ beside the
+	// repository (not inside it), for the image's /heimdall/ folder.
+	if _, err := issuebench.WriteSupportFiles(dir, issuebench.LanguageFor(language)); err != nil {
+		return "", err
 	}
 	b, _ := json.MarshalIndent(l, "", "  ")
 	if err := os.WriteFile(filepath.Join(dir, "layers.json"), append(b, '\n'), 0o644); err != nil {

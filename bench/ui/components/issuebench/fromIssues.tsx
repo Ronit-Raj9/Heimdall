@@ -17,6 +17,7 @@ import type { IssueFix, IssueItem, IssueReadiness, IssueRun, IssueStatus } from 
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "./w446I18n";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
@@ -156,6 +157,9 @@ export function FromIssues({ writable }: { writable: boolean }) {
 					{scanState.isLoading ? t("scanning") : t("scan")}
 				</Button>
 			</div>
+			<p className="text-muted-foreground text-xs" data-testid="issuebench-languages">
+				{t("fromIssues.languages", { ns: "w446" })}
+			</p>
 			{repo.trim() !== "" && !name && (
 				<p className="text-muted-foreground text-xs" data-testid="issuebench-repo-invalid">
 					{t("repoInvalid")}

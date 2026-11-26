@@ -52,6 +52,11 @@ func BuildEnvImage(ctx context.Context, docker issuebench.DockerFunc, env issueb
 	if strings.TrimSpace(env.Dockerfile) == "" {
 		return errors.New("the environment has no Dockerfile")
 	}
+	if names, err := issuebench.WriteSupportFiles(repoDir, issuebench.LanguageFor(env.Language)); err != nil {
+		return fmt.Errorf("the environment image did not build: %w", err)
+	} else if len(names) > 0 {
+		defer os.RemoveAll(filepath.Join(repoDir, issuebench.SupportFolder))
+	}
 	path := filepath.Join(scratch, "Dockerfile.env")
 	if err := os.WriteFile(path, []byte(env.Dockerfile), 0o600); err != nil {
 		return fmt.Errorf("write the environment Dockerfile: %w", err)

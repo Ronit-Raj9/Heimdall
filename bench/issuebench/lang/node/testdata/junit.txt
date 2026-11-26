@@ -1,0 +1,10 @@
+> jest --ci --json
+some runner noise
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+<testsuite name="src/a.test.ts">
+<testcase classname="src/a.test.ts" name="math &gt; add &gt; sums"/>
+<testcase classname="src/a.test.ts" name="math &gt; divides"><failure/></testcase>
+<testcase classname="src/a.test.ts" name="later"><skipped/></testcase>
+</testsuite>
+</testsuites>

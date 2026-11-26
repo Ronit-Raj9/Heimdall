@@ -637,7 +637,7 @@ func StopReasonText(stop issuebench.StopReason, detail string) (string, string) 
 	case issuebench.StopPrivateRegistry:
 		reason = "a dependency comes from a private package registry"
 	case issuebench.StopUnsupported:
-		reason = "this language is not supported yet (Python with pytest only)"
+		reason = "this language is not supported yet (supported: Python with pytest, JavaScript and TypeScript with jest or vitest, Go)"
 	case issuebench.StopLoop:
 		reason, fix = "the builder kept repeating the same steps", FixRetry
 	case issuebench.StopTimeout:

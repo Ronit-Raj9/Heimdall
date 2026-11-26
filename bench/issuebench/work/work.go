@@ -17,7 +17,9 @@ import (
 
 	"github.com/maximhq/bifrost/bench/issuebench"
 	"github.com/maximhq/bifrost/bench/issuebench/builder"
-	_ "github.com/maximhq/bifrost/bench/issuebench/lang/python" // registers the languages a worker builds
+	_ "github.com/maximhq/bifrost/bench/issuebench/lang/golang" // registers the languages a worker builds
+	_ "github.com/maximhq/bifrost/bench/issuebench/lang/node"
+	_ "github.com/maximhq/bifrost/bench/issuebench/lang/python"
 	"github.com/maximhq/bifrost/bench/issuebench/validate"
 	"github.com/maximhq/bifrost/bench/schemas"
 )

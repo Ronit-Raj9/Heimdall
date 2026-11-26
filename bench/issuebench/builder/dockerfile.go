@@ -1,9 +1,15 @@
 package builder
 
 import (
+	"context"
+	"encoding/base64"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
+	"time"
+
+	"github.com/maximhq/bifrost/bench/issuebench"
 )
 
 // readOnlyRe matches commands that only look around; they are not recorded
@@ -81,4 +87,78 @@ func dockerRunLine(cmd string) string {
 		return c
 	}
 	return "<<'HEIMDALL_STEP'\nset -e\n" + c + "\nHEIMDALL_STEP"
+}
+
+// SupportDir is the folder of the environment image that holds a
+// language's support files (result converters), and the folder of the
+// build context they are copied from.
+const SupportDir = issuebench.SupportFolder
+
+// stateChangingFor is stateChanging that also treats the language's
+// ReadOnlyCommands words as only looking around.
+func stateChangingFor(l issuebench.Language, cmd string) bool {
+	if !stateChanging(cmd) {
+		return false
+	}
+	c := strings.TrimSpace(cmd)
+	if strings.Contains(c, "\n") || strings.Contains(c, "<<") || strings.Contains(c, ">") {
+		return true
+	}
+	words := map[string]bool{}
+	for _, w := range issuebench.ToolchainOf(l).ReadOnlyCommands() {
+		words[w] = true
+	}
+	looked := false
+	for _, part := range splitRe.Split(c, -1) {
+		f := strings.Fields(part)
+		switch {
+		case len(f) == 0 || setupRe.MatchString(part):
+		case readOnlyRe.MatchString(part) || words[f[0]]:
+			looked = true
+		default:
+			return true
+		}
+	}
+	return !looked
+}
+
+// DockerfileFor is Dockerfile for one language. When the language has
+// support files, they are copied from the build context's heimdall/ folder
+// to /heimdall/ before the repository, and the copy the repository COPY
+// brings along is removed from the work folder.
+func DockerfileFor(l issuebench.Language, baseImage string, env, commands []string) string {
+	d := Dockerfile(baseImage, env, commands)
+	if len(issuebench.ToolchainOf(l).SupportFiles()) == 0 {
+		return d
+	}
+	repoCopy := fmt.Sprintf("COPY . %s\n", Workdir)
+	return strings.Replace(d, repoCopy, fmt.Sprintf("COPY %s/ /%s/\n", SupportDir, SupportDir)+repoCopy+fmt.Sprintf("RUN rm -rf %s/%s\n", Workdir, SupportDir), 1)
+}
+
+// installSupport writes the language's support files to /heimdall/ in a
+// build container, so the default test command runs there the way it runs
+// in the environment image. It is not an install step of the Dockerfile.
+func installSupport(ctx context.Context, sb Sandbox, l issuebench.Language) error {
+	files := issuebench.ToolchainOf(l).SupportFiles()
+	if len(files) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(files))
+	for n := range files {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	var b strings.Builder
+	b.WriteString("mkdir -p /" + SupportDir)
+	for _, n := range names {
+		fmt.Fprintf(&b, " && echo %s | base64 -d > /%s/%s", base64.StdEncoding.EncodeToString(files[n]), SupportDir, shellQuote(n))
+	}
+	exit, out, err := sb.Exec(ctx, b.String(), time.Minute)
+	if err != nil {
+		return err
+	}
+	if exit != 0 {
+		return fmt.Errorf("could not write the test result converter (exit %d): %s", exit, tail(out, 500))
+	}
+	return nil
 }
