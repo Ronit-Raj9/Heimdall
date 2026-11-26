@@ -235,6 +235,9 @@ func (ib *Inbox) Accept(ctx context.Context, id string, opts AcceptOptions) (*Ac
 	if err := markIncident(filepath.Join(res.Dir, "task.yaml"), incident); err != nil {
 		return nil, errors.Join(fmt.Errorf("mark the draft as an incident: %w", err), rollback())
 	}
+	if err := markReviewedWhenGuided(filepath.Join(res.Dir, "task.yaml"), opts.Guide != nil); err != nil {
+		return nil, errors.Join(fmt.Errorf("mark the instruction as reviewed: %w", err), rollback())
+	}
 	now := ib.now()
 	rel := res.Dir
 	if ib.ProjectRoot != "" {
