@@ -231,6 +231,23 @@ const PAGE_TITLES: Readonly<Record<string, "titles.maxim" | "titles.docs" | "tit
 /** Path prefixes with their own title, checked in order after the exact paths: an object page below a list. */
 const PAGE_TITLE_PREFIXES: readonly (readonly [string, "titles.job"])[] = [["/jobs/", "titles.job"]];
 
+/** Pages of wave 4 with their own title under another entry: path to its w4m0 locale key. */
+const W4_PAGE_TITLES: Readonly<Record<string, "titles.newAgent" | "titles.fromTraces" | "titles.connect">> = {
+	"/agents/new": "titles.newAgent",
+	"/agents/from-traces": "titles.fromTraces",
+	"/connect": "titles.connect",
+};
+
+/** The page's own title when the sidebar entry it sits under is another page (or none): "Jobs", "Job", "New agent", "Connect an agent". Null for a page that is its nav entry. */
+export function ownPageTitle(pathname: string): string | null {
+	const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+	const fw23 = PAGE_TITLES[path] ?? PAGE_TITLE_PREFIXES.find(([prefix]) => path.startsWith(prefix))?.[1];
+	if (fw23) return i18n.t(fw23, { ns: "fw23" });
+	const w4 = W4_PAGE_TITLES[path];
+	if (w4) return i18n.t(w4, { ns: "w4m0" });
+	return null;
+}
+
 /**
  * The browser tab title for a path: the title the page set for itself (usePageTitle), then the
  * page's own title (exact path, then prefix), else its nav entry's label, then the app name.
@@ -239,9 +256,8 @@ export function pageTitle(pathname: string): string {
 	const override = pageTitleOverride(pathname);
 	if (override) return override;
 	const app = i18n.t("app.name", { ns: "bench" });
-	const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-	const own = PAGE_TITLES[path] ?? PAGE_TITLE_PREFIXES.find(([prefix]) => path.startsWith(prefix))?.[1];
-	if (own) return `${i18n.t(own, { ns: "fw23" })} · ${app}`;
+	const own = ownPageTitle(pathname);
+	if (own) return `${own} · ${app}`;
 	const item = activeNavItem(pathname);
 	return item ? `${i18n.t(item.labelKey, { ns: "bench" })} · ${app}` : app;
 }
