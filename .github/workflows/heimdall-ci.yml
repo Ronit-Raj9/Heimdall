@@ -1,0 +1,185 @@
+name: Heimdall CI
+
+# Heimdall's own CI: the Go packages of bench/ in three shards, the heimdall
+# Bifrost plugin, the UI build and tests, lint on new code, the Docker builds
+# (never pushed) and a secret scan. Bifrost's upstream workflows live in
+# .github/workflows-upstream/ and do not run.
+on:
+  push:
+    branches: [main, r-hw]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: heimdall-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOWORK: "off"
+  GOFLAGS: -buildvcs=false
+
+jobs:
+  go:
+    name: Go (shard ${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        with:
+          egress-policy: audit
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version-file: bench/go.mod
+          cache: true
+          cache-dependency-path: bench/go.sum
+      - name: Vet
+        if: matrix.shard == 0
+        run: cd bench && go vet ./...
+      - name: Test
+        run: cd bench && go test -count=1 -p 4 $(go list ./... | awk -v s=${{ matrix.shard }} 'NR % 3 == s')
+
+  plugin:
+    name: Heimdall plugin
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        with:
+          egress-policy: audit
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version-file: plugins/heimdall/go.mod
+          cache: true
+          cache-dependency-path: plugins/heimdall/go.sum
+      - name: Vet and test
+        run: cd plugins/heimdall && go vet ./... && go test -count=1 ./...
+
+  ui:
+    name: UI
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        with:
+          egress-policy: audit
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: bench/ui/package-lock.json
+      # build generates the route tree and runs tsc.
+      - name: Install, build and test
+        run: cd bench/ui && npm ci && npm run build && npx vitest run
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        with:
+          egress-policy: audit
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version-file: bench/go.mod
+          cache: true
+          cache-dependency-path: bench/go.sum
+      - name: gofmt
+        run: test -z "$(gofmt -l bench plugins/heimdall)"
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8 # not pinned: no SHA in this repo
+        with:
+          working-directory: bench
+          only-new-issues: true
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: bench/ui/package-lock.json
+      # Changed UI files only; an empty list passes.
+      - name: oxfmt on changed UI files
+        run: |
+          cd bench/ui && npm ci
+          files=$(git diff --name-only --diff-filter=AM ${{ github.event.before || 'HEAD~1' }} -- 'app/**' 'components/**' 'lib/**' | sed 's#^bench/ui/##')
+          if [ -n "$files" ]; then npx oxfmt --check $files; fi
+
+  docker:
+    name: Docker builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        with:
+          egress-policy: audit
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3 # not pinned: no SHA in this repo
+      - name: Build the server image (no push)
+        run: docker buildx build -f bench/deploy/hosted/Dockerfile.server --target server bench
+      - name: Build the plugin image (no push)
+        run: docker build -f bench/deploy/bifrost/Dockerfile.plugin .
+      # The hosted compose file requires HEIMDALL_BENCH_DIR, which its
+      # deploy scripts normally set to the bench folder.
+      - name: Check the compose files
+        env:
+          HEIMDALL_BENCH_DIR: ${{ github.workspace }}/bench
+        run: |
+          docker compose -f docker-compose.yml config -q
+          docker compose -f bench/deploy/hosted/docker-compose.yml --env-file bench/deploy/hosted/.env.example config -q
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        with:
+          egress-policy: audit
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

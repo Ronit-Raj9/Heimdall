@@ -1,0 +1,7 @@
+# Heimdall secret scan: the default gitleaks rules, minus test fixtures and
+# the scanner rule files that hold sample secrets on purpose.
+[extend]
+useDefault = true
+
+[allowlist]
+paths = ['''bench/.*_test\.go''', '''bench/codescan/rules\.go''', '''bench/admitscan/sandbox\.go''', '''bench/testdata/.*''', '''plugins/heimdall/.*_test\.go''']
