@@ -115,6 +115,13 @@ type Model struct {
 	ModelCalls   int           `json:"model_calls"`
 	CallFailures int           `json:"call_failures"`
 	Fallbacks    int           `json:"fallbacks"` // calls a gateway fallback served
+	// ServedAsAsked is the share of model calls whose served model is known
+	// that were the model asked for; ServedUnknown counts the calls whose
+	// served model the gateway rows do not show, and ServedModels the
+	// distinct served ids (W4 feature 8).
+	ServedAsAsked schemas.Value  `json:"served_as_asked"`
+	ServedUnknown int            `json:"served_unknown,omitempty"`
+	ServedModels  map[string]int `json:"served_models,omitempty"`
 	// Excluded are clean runs left out of the score, by reason.
 	Excluded map[string]int `json:"excluded,omitempty"`
 	// Frontier says the model is on the cost Pareto frontier; LatencyFrontier
