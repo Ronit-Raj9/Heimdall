@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -8,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/improve"
+	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/schemas"
 	"gopkg.in/yaml.v3"
 )
 
@@ -83,5 +86,45 @@ func TestReadBundleArtifact(t *testing.T) {
 	b, err := readBundleArtifact(dir)
 	if err != nil || b["/a"] != "x" {
 		t.Fatalf("%v %v", b, err)
+	}
+}
+
+// The improver's spend cap is on its gateway key: the improver experiment
+// uses the equal budget rule, so the run key's USD limit is budgets.usd.
+func TestImproverExperimentCapsTheKey(t *testing.T) {
+	req := improve.ImproveRequest{ImprovementID: "imp_x", Spec: &improve.Spec{Seed: 3}, Round: 2, BudgetUSD: 1.25}
+	exp := improverExperiment(req, "heimdall-improver@1.1.0", "reflect-edit", ".heimdall/improve/imp_x/improver-r02.yaml")
+	if exp.Fairness != schemas.FairnessEqualBudget {
+		t.Errorf("fairness %q, want %q", exp.Fairness, schemas.FairnessEqualBudget)
+	}
+	if exp.Budget.TotalUSD != 1.25 || exp.Base != ".heimdall/improve/imp_x/improver-r02.yaml" {
+		t.Errorf("budget %v base %q", exp.Budget.TotalUSD, exp.Base)
+	}
+	if arm, ok := exp.Arms["A"]; !ok || arm.Label != "improver" {
+		t.Errorf("arms %v", exp.Arms)
+	}
+}
+
+// An agent that sets its own gateway spending limit is refused before any
+// experiment exists, since that limit would replace the improver's cap.
+func TestCheckImproverRefusesOwnSpendLimit(t *testing.T) {
+	root := t.TempDir()
+	doc := "id: capped\nadapter: scripted\nmodel: m\ngateway:\n  routing:\n    limits:\n      budget_usd: 5\n"
+	if err := os.MkdirAll(filepath.Join(root, "agents"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "agents", "capped.yaml"), []byte(doc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	x := improveExecutor{a: &app{cfg: &lib.Config{Root: root}}}
+	spec := &improve.Spec{Agent: "agents/capped.yaml", Suite: "s@1"}
+	spec.Defaults()
+	err := x.CheckImprover(context.Background(), spec)
+	want := "This agent sets its own gateway spending limit; remove gateway.routing.limits.budget_usd so the improver's cap can be enforced."
+	if err == nil || err.Error() != want {
+		t.Fatalf("err %v, want %q", err, want)
+	}
+	if !agentSetsSpendLimit([]byte(doc)) || agentSetsSpendLimit([]byte("id: a\n")) {
+		t.Error("agentSetsSpendLimit")
 	}
 }

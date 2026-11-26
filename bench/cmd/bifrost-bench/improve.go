@@ -22,6 +22,7 @@ import (
 	"io/fs"
 	"os"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -57,6 +58,10 @@ const improveUsage = `usage:
 // improverBundleFile is the artifact the improver task leaves: {"files":
 // {"<container path>": "<text>"}}, the full new bundle.
 const improverBundleFile = "bundle.json"
+
+// improverEditsFile is the artifact the default improver task leaves: the
+// edits of A3.3.
+const improverEditsFile = "edits.json"
 
 // Paths inside the improver's container: the current bundle and the dev
 // evidence, as files of its agent config.
@@ -294,24 +299,38 @@ type improveExecutor struct {
 // Load implements improve.Executor: a pinned ref reads its snapshot; a
 // plain agent file is snapshotted first, so version 0 is frozen.
 func (x improveExecutor) Load(_ context.Context, ref string, ed improve.Editable) (improve.Version, error) {
+	doc, id, n, err := x.readAgent(ref)
+	if err != nil {
+		return improve.Version{}, err
+	}
+	if n > 0 {
+		return improve.NewVersion(ref, n, doc, ed)
+	}
+	return x.snapshot(id, doc, ed)
+}
+
+// readAgent reads an agent reference's document without storing anything:
+// a pinned ref returns its version number, a plain file (or a library
+// agent not yet stored) returns 0.
+func (x improveExecutor) readAgent(ref string) ([]byte, string, int, error) {
 	root := x.a.cfg.Root
 	if _, id, n, ok := schemas.ParseAgentVersionRef(ref); ok {
 		doc, _, err := agentversions.Read(root, id, n)
 		if errors.Is(err, agentversions.ErrNotFound) && n == 1 {
 			if p := agentversions.LibraryFile(suite.LibraryDir(), id); p != "" {
 				if doc, err = os.ReadFile(p); err == nil {
-					return x.snapshot(id, doc, ed)
+					return doc, id, 0, nil
 				}
 			}
 		}
 		if err != nil {
-			return improve.Version{}, err
+			return nil, "", 0, err
 		}
-		return improve.NewVersion(ref, n, doc, ed)
+		return doc, id, n, nil
 	}
 	id, _, err := agentRef(ref)
 	if err != nil {
-		return improve.Version{}, err
+		return nil, "", 0, err
 	}
 	doc, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(ref)))
 	if errors.Is(err, fs.ErrNotExist) {
@@ -320,9 +339,9 @@ func (x improveExecutor) Load(_ context.Context, ref string, ed improve.Editable
 		}
 	}
 	if err != nil {
-		return improve.Version{}, fmt.Errorf("read %s: %w", ref, err)
+		return nil, "", 0, fmt.Errorf("read %s: %w", ref, err)
 	}
-	return x.snapshot(id, doc, ed)
+	return doc, id, 0, nil
 }
 
 func (x improveExecutor) snapshot(id string, doc []byte, ed improve.Editable) (improve.Version, error) {
@@ -484,6 +503,32 @@ func (x improveExecutor) Score(ctx context.Context, req improve.ScoreRequest) (*
 	return res, nil
 }
 
+// Runs implements improve.Executor: the counted runs of a scoring
+// experiment with their sealed folders, arms as indexes (A is 0).
+func (x improveExecutor) Runs(ctx context.Context, expID string) ([]improve.RunRef, error) {
+	runs, err := x.a.store.SealedRuns(ctx, expID, store.GradeSourceOriginal)
+	if err != nil {
+		return nil, fmt.Errorf("load sealed runs of %s: %w", expID, err)
+	}
+	out := []improve.RunRef{}
+	for _, sr := range runs {
+		arm := improveArmIndex(sr.Slot.Arm)
+		if !sr.Slot.Counted || arm < 0 {
+			continue
+		}
+		out = append(out, improve.RunRef{ExpID: expID, RunID: sr.Run.RunID, Task: sr.Slot.Task, Trial: sr.Slot.Trial, Arm: arm, Dir: sr.Dir})
+	}
+	return out, nil
+}
+
+// improveArmIndex is the index of arm letter A to F, or -1.
+func improveArmIndex(letter string) int {
+	if len(letter) != 1 || letter[0] < 'A' || int(letter[0]-'A') >= improve.MaxScoreArms {
+		return -1
+	}
+	return int(letter[0] - 'A')
+}
+
 // runChannels are the evidence channels a run emitted: event types from
 // events.jsonl, plus gateway when the run has gateway rows.
 func runChannels(sr schemas.SealedRun) []string {
@@ -541,10 +586,7 @@ func (x improveExecutor) Improve(ctx context.Context, req improve.ImproveRequest
 	if err := os.WriteFile(filepath.Join(x.a.cfg.Root, filepath.FromSlash(rel)), doc, 0o644); err != nil {
 		return nil, err
 	}
-	exp := improveExperiment(req.ImprovementID, "improve", req.Round, suiteRef, req.Spec.Seed, []string{task}, 1)
-	exp.Base = rel
-	exp.Arms[improveArm(0)] = schemas.ArmSpec{Label: "improver"}
-	exp.Budget = schemas.BudgetSpec{TotalUSD: req.BudgetUSD}
+	exp := improverExperiment(req, suiteRef, task, rel)
 	expID, cost, err := x.execute(ctx, exp)
 	res := &improve.ImproveResult{ExpID: expID, CostUSD: cost}
 	if err != nil {
@@ -567,6 +609,80 @@ func (x improveExecutor) Improve(ctx context.Context, req improve.ImproveRequest
 	}
 	res.Bundle = b
 	return res, nil
+}
+
+// improverExperiment is the one-run experiment of an improver phase. Its
+// fairness rule is equal_budget, so the run's gateway key carries the
+// improver's USD cap (budgets.usd of the improver document); the planner
+// refuses an improver agent that sets its own gateway spending limit.
+func improverExperiment(req improve.ImproveRequest, suiteRef, task, rel string) *schemas.Experiment {
+	exp := improveExperiment(req.ImprovementID, "improve", req.Round, suiteRef, req.Spec.Seed, []string{task}, 1)
+	exp.Base = rel
+	exp.Arms[improveArm(0)] = schemas.ArmSpec{Label: "improver"}
+	exp.Budget = schemas.BudgetSpec{TotalUSD: req.BudgetUSD}
+	exp.Fairness = schemas.FairnessEqualBudget
+	return exp
+}
+
+// errOwnSpendLimit refuses an agent whose own gateway spending limit would
+// replace the improver's cap on the run key (A1.5).
+var errOwnSpendLimit = errors.New("This agent sets its own gateway spending limit; remove gateway.routing.limits.budget_usd so the improver's cap can be enforced.")
+
+// agentSetsSpendLimit reports whether an agent document sets
+// gateway.routing.limits.budget_usd.
+func agentSetsSpendLimit(doc []byte) bool {
+	var cfg schemas.AgentConfig
+	if yaml.Unmarshal(doc, &cfg) != nil {
+		return false
+	}
+	r := cfg.Gateway.Routing
+	return r != nil && r.Limits != nil && r.Limits.BudgetUSD > 0
+}
+
+// CheckImprover implements improve.Executor (A1.5, A1.6): it refuses a
+// spec before any experiment exists when the agent sets its own gateway
+// spending limit, when the improver task does not exist, or when the task
+// leaves neither edits.json nor bundle.json. The shipped improver suite is
+// copied into the project first when this build embeds it.
+func (x improveExecutor) CheckImprover(ctx context.Context, spec *improve.Spec) error {
+	doc, _, _, err := x.readAgent(spec.Agent)
+	if err != nil {
+		return err
+	}
+	if agentSetsSpendLimit(doc) {
+		return errOwnSpendLimit
+	}
+	if err := ensureImproverSuite(x.a.cfg.Root); err != nil {
+		return err
+	}
+	suiteRef, task, err := improverTask(spec)
+	if err != nil {
+		return err
+	}
+	ref := spec.Improver.Task
+	missing := fmt.Errorf("The improver task %s does not exist.", ref)
+	s, err := engine.LoadSuite(ctx, x.a.reg, suiteRef)
+	if err != nil {
+		return missing
+	}
+	for _, t := range s.Tasks {
+		if t.ID != task {
+			continue
+		}
+		out := t.Output
+		if out == nil {
+			out = s.Output
+		}
+		if out != nil {
+			for _, art := range out.Artifacts {
+				if b := path.Base(art.Path); b == improverEditsFile || b == improverBundleFile {
+					return nil
+				}
+			}
+		}
+		return fmt.Errorf("The improver task %s does not leave edits.json or bundle.json, so its output cannot be read.", ref)
+	}
+	return missing
 }
 
 // improverTask is the improver task of a spec: "<task>" in the spec's
