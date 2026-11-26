@@ -1,12 +1,14 @@
 import { FileEditor } from "@/components/projectfs/fileEditor";
 import { FILES_NS } from "@/components/projectfs/i18n";
 import { SyncCard } from "@/components/projectfs/syncCard";
+import { LoadError } from "@/components/runs/screenStates";
+import "@/components/settings/w4m8I18n";
 import { EmptyState } from "@/components/shell/emptyState";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { projectExportUrl, useListProjectFilesQuery } from "@/lib/store/apis/projectFilesApi";
+import { canRetry } from "@/lib/requestErrors";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { PROJECT_AREAS, type ProjectArea, type ProjectEntry } from "@/lib/types/projectfiles";
 import { useNavigate, useSearch } from "@tanstack/react-router";
@@ -51,6 +53,7 @@ function formatSize(n: number): string {
 
 export default function FilesView() {
 	const { t } = useTranslation(FILES_NS);
+	const { t: tm } = useTranslation("w4m8");
 	const session = useSession();
 	const canWrite = canUse(session, "member");
 	const search = useSearch({ strict: false }) as { area?: string; dir?: string; path?: string };
@@ -169,9 +172,13 @@ export default function FilesView() {
 							</button>
 						)}
 						{list.error ? (
-							<p className="text-destructive p-2 text-sm" data-testid="files-error">
-								{t("loadError", { message: getBenchErrorMessage(list.error) })}
-							</p>
+							<LoadError
+								title={tm("loadErrors.files")}
+								error={list.error}
+								onRetry={canRetry(list.error) ? () => void list.refetch() : undefined}
+								testId="files-error"
+								className="m-1"
+							/>
 						) : list.isLoading ? (
 							<div className="flex flex-col gap-1.5 p-2">
 								{[0, 1, 2, 3].map((i) => (

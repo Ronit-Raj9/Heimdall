@@ -14,6 +14,7 @@ import { StatCard } from "@/app/operate/views/uxBits";
 import { parseAsString, useQueryStates } from "nuqs";
 import { useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import "@/components/settings/w4m8I18n";
 
 const GROUPS: UsageGroupBy[] = ["day", "model", "agent", "key"];
 const CHART_MAX_BARS = 31;
@@ -40,13 +41,13 @@ function realDay(v: string): boolean {
 
 /**
  * The range from the link's from and to (N75): a value counts only when it is a real YYYY-MM-DD day; a reversed range
- * is swapped; a missing or ignored from is 30 days before to, a missing or ignored to is today. invalid lists the
+ * is swapped (swapped is then true, so the page can say so); a missing or ignored from is 30 days before to, a missing or ignored to is today. invalid lists the
  * values that were ignored.
  */
 export function rangeFromSearch(
 	search: { from?: string | null; to?: string | null },
 	now = new Date(),
-): { from: string; to: string; invalid: string[] } {
+): { from: string; to: string; invalid: string[]; swapped?: boolean } {
 	const invalid: string[] = [];
 	const pick = (v?: string | null) => {
 		if (!v) return null;
@@ -59,7 +60,7 @@ export function rangeFromSearch(
 	if (!from && !to) return { ...defaultRange(now), invalid };
 	if (!from) return { ...defaultRange(new Date(`${to}T12:00:00Z`)), invalid };
 	const end = to ?? defaultRange(now).to;
-	return from <= end ? { from, to: end, invalid } : { from: end, to: from, invalid };
+	return from <= end ? { from, to: end, invalid } : { from: end, to: from, invalid, swapped: true };
 }
 
 export type UsageScope = "org" | "platform";
@@ -75,7 +76,7 @@ export function usageSearchState(
 	search: { from?: string | null; to?: string | null; group?: string | null; scope?: string | null },
 	now: Date,
 	serverAdmin: boolean,
-): { range: { from: string; to: string }; group: UsageGroupBy; scope: UsageScope; ignored: IgnoredParam[] } {
+): { range: { from: string; to: string }; group: UsageGroupBy; scope: UsageScope; ignored: IgnoredParam[]; swapped: boolean } {
 	const r = rangeFromSearch(search, now);
 	const ignored: IgnoredParam[] = r.invalid.map((value) => ({ key: value === search.from ? "from" : "to", value }));
 	let group: UsageGroupBy = "day";
@@ -88,17 +89,19 @@ export function usageSearchState(
 		if (search.scope === "org" || (search.scope === "platform" && serverAdmin)) scope = search.scope;
 		else ignored.push({ key: "scope", value: search.scope });
 	}
-	return { range: { from: r.from, to: r.to }, group, scope, ignored };
+	return { range: { from: r.from, to: r.to }, group, scope, ignored, swapped: r.swapped === true };
 }
 
 /** One line per link value that was ignored, so a shared link never shows other numbers silently. */
-export function UsageLinkNotes({ ignored }: { ignored: IgnoredParam[] }) {
+export function UsageLinkNotes({ ignored, swapped = false }: { ignored: IgnoredParam[]; swapped?: boolean }) {
 	const { t } = useTranslation("usage");
-	if (ignored.length === 0) return null;
+	const { t: tm } = useTranslation("w4m8");
+	if (ignored.length === 0 && !swapped) return null;
 	const groups = GROUPS.map((g) => t(`group.${g}`));
 	const list = `${groups.slice(0, -1).join(", ")} or ${groups[groups.length - 1]}`;
 	return (
 		<ul className="text-muted-foreground flex flex-col gap-1 text-xs" role="status" data-testid="usage-link-notes">
+			{swapped && <li data-testid="usage-link-swapped">{tm("usage.swapped")}</li>}
 			{ignored.map((p) => (
 				<li key={`${p.key}-${p.value}`} data-testid={`usage-link-ignored-${p.key}`}>
 					{p.key === "group"
@@ -130,10 +133,11 @@ export default function UsageView() {
 	const session = useSession();
 	const [search, setSearch] = useQueryStates(USAGE_QUERY, { history: "replace" });
 	const state = useMemo(() => usageSearchState(search, new Date(), session.serverAdmin === true), [search, session.serverAdmin]);
-	const { range, group: groupBy, scope, ignored } = state;
+	const { range, group: groupBy, scope, ignored, swapped } = state;
+	// The link always holds the sorted pair, so it agrees with the date boxes.
 	const setRange = (next: (r: { from: string; to: string }) => { from: string; to: string }) => {
 		const r = next(range);
-		void setSearch({ from: r.from, to: r.to });
+		void setSearch(r.from <= r.to ? { from: r.from, to: r.to } : { from: r.to, to: r.from });
 	};
 	const setGroupBy = (g: UsageGroupBy) => void setSearch({ group: g === "day" ? null : g });
 	const setScope = (sc: UsageScope) => void setSearch({ scope: sc === "org" ? null : sc });
@@ -187,7 +191,7 @@ export default function UsageView() {
 					/>
 				)}
 			</div>
-			<UsageLinkNotes ignored={ignored} />
+			<UsageLinkNotes ignored={ignored} swapped={swapped} />
 			{platform ? (
 				<AdminUsageBody data={admin.data} loading={admin.isLoading} error={admin.error} onRetry={() => void admin.refetch()} />
 			) : (

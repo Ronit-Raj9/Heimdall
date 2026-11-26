@@ -1,9 +1,11 @@
 import { ForbiddenNote, RoleNote, isRoleRefusal } from "@/components/platform/accessNotes";
 import { ConfirmButton } from "@/components/platform/badges";
+import { useConfirm, type ConfirmFn } from "@/components/platform/confirmDialog";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { CopyId } from "@/components/ui/copyId";
 import { Input } from "@/components/ui/input";
+import i18n from "@/lib/i18n";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useGetOrgQuery, useLeaveOrgMutation, useRenameOrgMutation, useSetPublicReadMutation, useSwitchOrgMutation } from "@/lib/store/apis/platformApi";
@@ -15,6 +17,20 @@ import { useTranslation } from "react-i18next";
 import { DeleteOrgRow, RetentionSection } from "./dataControls";
 import { PromptLogsSection } from "./promptLogsSection";
 import { SettingsSection, When } from "./settingsBits";
+import "./w4m8I18n";
+
+/** Turns public read on after a confirmation, or off without one. */
+export async function togglePublic(
+	confirm: ConfirmFn,
+	setPublic: (args: { orgId: string; publicRead: boolean }) => unknown,
+	info: Pick<OrgInfo, "id" | "name" | "public_read">,
+): Promise<void> {
+	if (!info.public_read) {
+		const ok = await confirm(i18n.t("org.makePublicConfirm", { ns: "w4m8", org: info.name }), { confirmLabel: i18n.t("org.makePublic", { ns: "w4m8" }) });
+		if (!ok) return;
+	}
+	setPublic({ orgId: info.id, publicRead: !info.public_read });
+}
 
 /** A failed write: the role refusal when it is one, the server's reason otherwise. */
 function WriteFailure({ error, title, testId, min }: { error: unknown; title: string; testId: string; min: "admin" | "owner" }) {
@@ -58,6 +74,7 @@ function OrgSettings({ info }: { info: OrgInfo }) {
 	useEffect(() => setName(info.name), [info.name]);
 	const [rename, renameState] = useRenameOrgMutation();
 	const [setPublic, publicState] = useSetPublicReadMutation();
+	const confirm = useConfirm();
 	const [leave, leaveState] = useLeaveOrgMutation();
 	const [switchOrg] = useSwitchOrgMutation();
 	const [saved, setSaved] = useState(false);
@@ -167,7 +184,7 @@ function OrgSettings({ info }: { info: OrgInfo }) {
 							variant={info.public_read ? "outline" : "default"}
 							size="sm"
 							isLoading={publicState.isLoading}
-							onClick={() => void setPublic({ orgId: info.id, publicRead: !info.public_read })}
+							onClick={() => void togglePublic(confirm, setPublic, info)}
 							dataTestId="org-public-toggle"
 						>
 							{info.public_read ? t("settings.org.makePrivate") : t("settings.org.makePublic")}
