@@ -62,7 +62,7 @@ func TestContinueOfferMatchesTheSecondLook(t *testing.T) {
 		Editable: improve.Editable{Files: []string{improvetest.NotesPath}},
 		Splits:   improve.SplitSpec{Dev: 0.48, Audit: 0.48, Sealed: 0.04},
 		Commit:   improve.CommitSpec{Alpha: 0.10, Trials: 2}, Sealed: improve.PhaseSpec{Trials: 2},
-		Claim:    improve.ClaimSpec{Extension: true}, Budget: improve.BudgetSpec{TotalUSD: 50}}
+		Claim: improve.ClaimSpec{Extension: true}, Budget: improve.BudgetSpec{TotalUSD: 50}}
 	rec, err := r.Create(context.Background(), spec, "ana")
 	if err != nil {
 		t.Fatal(err)
@@ -162,7 +162,7 @@ func TestFailedSecondLookIsNotRetried(t *testing.T) {
 		Editable: improve.Editable{Files: []string{improvetest.NotesPath}},
 		Splits:   improve.SplitSpec{Dev: 0.48, Audit: 0.48, Sealed: 0.04},
 		Commit:   improve.CommitSpec{Alpha: 0.10, Trials: 2}, Sealed: improve.PhaseSpec{Trials: 2},
-		Claim:    improve.ClaimSpec{Extension: true}, Budget: improve.BudgetSpec{TotalUSD: 50}}
+		Claim: improve.ClaimSpec{Extension: true}, Budget: improve.BudgetSpec{TotalUSD: 50}}
 	rec, err := r.Create(context.Background(), spec, "ana")
 	if err != nil {
 		t.Fatal(err)
