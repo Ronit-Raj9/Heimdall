@@ -17,6 +17,7 @@
 	"stage": {
 		"planned": "Waiting to start",
 		"leased": "Getting a worker",
+		"image": "Preparing the container image",
 		"prepare": "Setting up the workspace",
 		"arm": "Turning on safety checks",
 		"run": "Agent is working",
