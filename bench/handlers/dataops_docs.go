@@ -8,8 +8,13 @@ import "github.com/valyala/fasthttp"
 func init() {
 	OrgRouteDocs = append(OrgRouteDocs,
 		RouteDoc{Method: "POST", Path: APIPrefix + "/orgs/{org}/delete", Tag: "orgs", Summary: "Delete the organization and all its data (owner, signed in, typed slug); audit entries are kept", Request: DeleteOrgRequest{}, Status: fasthttp.StatusAccepted, Response: OrgDeletionInfo{}},
-		RouteDoc{Method: "GET", Path: APIPrefix + "/orgs/{org}/audit/export", Tag: "orgs", Summary: "Download the hash-chained audit log, ?format=jsonl (default) or csv (admin)",
-			Query: []QueryDoc{{Name: "format", Description: "jsonl or csv"}}},
+		RouteDoc{Method: "GET", Path: APIPrefix + "/orgs/{org}/audit/export", Tag: "orgs", Summary: "Download the hash-chained audit log, ?format=jsonl (default) or csv (admin); the optional filters keep only matching rows",
+			Query: []QueryDoc{
+				{Name: "format", Description: "jsonl or csv"},
+				{Name: "action", Description: "Only rows with exactly this action"},
+				{Name: "actor_type", Description: "Only rows by this kind of actor: user, token, runner, system or anonymous"},
+				{Name: "q", Description: "Only rows whose action, actor id, target type or target id contains this text (any case)"},
+			}},
 		RouteDoc{Method: "GET", Path: APIPrefix + "/orgs/{org}/audit/verify", Tag: "orgs", Summary: "Check every link of the audit log's hash chain (admin)", Response: AuditVerifyReport{}},
 	)
 	APIRoutes = append(APIRoutes,
