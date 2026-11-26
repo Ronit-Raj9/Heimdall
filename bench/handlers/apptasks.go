@@ -9,6 +9,7 @@ package handlers
 // filter. Drafts live in the project's uploads/app-tasks/ folder.
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -16,6 +17,8 @@ import (
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/apptasks"
+	"github.com/maximhq/bifrost/bench/auth"
+	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/scaffold"
@@ -94,6 +97,9 @@ type AppTasksWriteResult struct {
 	Created bool               `json:"created"`
 	Tasks   []apptasks.Written `json:"tasks"`
 	Next    string             `json:"next"`
+	// ReadinessJob is the readiness check queued right after the write
+	// (suite.admit); empty when this server runs no jobs or it could not start.
+	ReadinessJob string `json:"readiness_job,omitempty"`
 }
 
 // AppTasksReviewRequest is the body of POST /app-tasks/{id}/review.
@@ -110,11 +116,18 @@ type AppTasksReviewResult struct {
 	Rejected int              `json:"rejected"`
 }
 
-type appTasksArea struct{ *suiteAuthoring }
+type appTasksArea struct {
+	*suiteAuthoring
+	// jobs queues the readiness check after a write; nil when the server
+	// runs no jobs. org is the organization the job belongs to.
+	jobs JobsAPI
+	org  string
+}
 
 func init() {
 	RegisterOrgArea("apptasks", func(env OrgEnv, r *router.Router) {
-		h := &appTasksArea{&suiteAuthoring{mode: env.Mode, projects: env.Services.Projects, suites: env.Services.Suites}}
+		h := &appTasksArea{suiteAuthoring: &suiteAuthoring{mode: env.Mode, projects: env.Services.Projects, suites: env.Services.Suites},
+			jobs: env.Services.Jobs, org: maximOrg(env.Services)}
 		r.POST(APIPrefix+"/app-tasks", env.U(h.create))
 		r.GET(APIPrefix+"/app-tasks", env.R(h.list))
 		r.GET(APIPrefix+"/app-tasks/{id}", env.R(h.get))
@@ -356,6 +369,9 @@ func (h *appTasksArea) write(ctx *fasthttp.RequestCtx) {
 			Next: "Run the readiness checks on " + d.Suite + ": they build the app copy's image and prove each task's reference passes and its controls fail. Then accept or reject each pending task."}
 		if !h.visible(dir) {
 			out.Next += " Note: this server reads benchmarks from another folder, so the benchmark is not listed yet."
+		} else if id := h.queueReadiness(ctx, d.Suite); id != "" {
+			out.ReadinessJob = id
+			out.Next = "The readiness checks on " + d.Suite + " are queued as job " + id + ": they build the app copy's image and prove each task's reference passes and its controls fail. Then accept or reject each pending task."
 		}
 		return out, fasthttp.StatusCreated, nil
 	})
@@ -396,4 +412,22 @@ func (h *appTasksArea) review(ctx *fasthttp.RequestCtx) {
 		}
 		return out, fasthttp.StatusOK, nil
 	})
+}
+
+// queueReadiness queues the readiness check (suite.admit) of a benchmark the
+// write just changed, so the task quality guard runs without a second step.
+// It answers the job id, or "" when this server runs no jobs or the job could
+// not start (the write still stands and Next keeps the manual step).
+func (h *appTasksArea) queueReadiness(ctx *fasthttp.RequestCtx, suiteID string) string {
+	if h.jobs == nil {
+		return ""
+	}
+	params, _ := json.Marshal(map[string]string{"suite": suiteID})
+	work, cancel := workContext(ctx, readTimeout)
+	defer cancel()
+	j, err := h.jobs.Create(work, jobs.NewJob{OrgID: h.org, Kind: readinessJobKind, Params: params, CreatedBy: createdBy(auth.PrincipalFrom(ctx))})
+	if err != nil || j == nil {
+		return ""
+	}
+	return j.ID
 }

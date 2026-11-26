@@ -20,6 +20,7 @@ import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenState
 import { RunExportMenu } from "@/components/runs/runExportMenu";
 import { RunFailureCard } from "@/components/runs/runFailureCard";
 import { RunTraceView } from "@/components/runs/traceView";
+import { RunBehaviourChecks } from "@/components/runs/behaviourChecks"; // I28 behaviour checks
 import { canFork, RunDebugActions } from "@/components/runs/debug/debugActions"; // X20b run debugging
 import { DebugBanner } from "@/components/runs/debug/debugBanner";
 import { HoldPanel } from "@/components/runs/debug/holdPanel";
@@ -480,6 +481,7 @@ function TimelineTab({ detail }: { detail: RunDetail }) {
 			<RunGatewayPolicy runId={runId} />
 			{!detail.sealed && <HoldPanel runId={runId} />}
 			<RunTraceView runId={runId} arm={arm} live={!detail.sealed} canFork={canFork(detail)} initialStep={initialStep} />
+			<RunBehaviourChecks runId={runId} />
 			{detail.run.debug?.from_run && <TraceDiff runId={runId} otherRunId={detail.run.debug.from_run} />}
 			{detail.sessions && detail.sessions.length > 0 && <SessionsTimeline sessions={detail.sessions} arm={arm} />}
 			{detail.tool_calls && detail.tool_calls.length > 0 && <ToolCallTable calls={detail.tool_calls} arm={arm} />}

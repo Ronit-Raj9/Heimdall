@@ -522,9 +522,15 @@ func summarizeTask(s *schemas.Suite, t *schemas.Task, stale map[string]bool) sch
 		at := rec.At
 		out.AdmittedAt = &at
 		for _, c := range rec.Checks {
+			summary := checkSummary(c.Detail)
+			if strings.HasPrefix(c.Name, "guard_") {
+				// Task quality guard details are plain text made to be shown
+				// (counts only for personal data, a visible file for a leak).
+				summary = c.Detail
+			}
 			out.Checks = append(out.Checks, schemas.SuiteAdmissionCheck{
 				Name: c.Name, Control: controlOf(c.Name), Want: c.Want, Got: c.Got, Passed: c.Passed,
-				Summary: checkSummary(c.Detail),
+				Summary: summary,
 			})
 		}
 		out.Admitted = tl.Status == schemas.TaskAdmitted && rec.Admitted && !out.Stale

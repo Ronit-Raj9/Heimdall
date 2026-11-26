@@ -150,7 +150,7 @@ func TestMCPHandshakeAndTools(t *testing.T) {
 			t.Errorf("%s schema %v", tm["name"], tm["inputSchema"])
 		}
 	}
-	want := "connect_agent,draft_benchmark,estimate,explain_failure,first_look,get_report,get_trace,inspect_source,list_agents,list_benchmarks,publish_benchmark,run_evaluation,run_readiness,verify_agent"
+	want := "compare_commands,connect_agent,cost_per_task,draft_benchmark,estimate,explain_failure,first_look,get_conversation,get_inbox_item,get_report,get_retries,get_step,get_trace,inspect_source,list_agents,list_agents_in_run,list_benchmarks,list_steps,publish_benchmark,run_evaluation,run_readiness,todays_failures,verify_agent"
 	if strings.Join(names, ",") != want {
 		t.Errorf("tools = %v", names)
 	}

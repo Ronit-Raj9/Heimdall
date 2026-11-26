@@ -1,0 +1,41 @@
+{
+	"categories": {
+		"heading": "By kind of work",
+		"column": "Kind of work",
+		"unsure": "(unsure)",
+		"none": "Not labelled",
+		"change": "Change the kind of work of {{task}}",
+		"saveFailed": "The kind of work was not saved.",
+		"names": {
+			"bug_fix": "Bug fix",
+			"feature": "Feature",
+			"refactor": "Refactor",
+			"test_repair": "Test repair",
+			"dependency_update": "Dependency update",
+			"performance": "Performance",
+			"docs": "Docs",
+			"navigation": "Finding your way in code",
+			"tool_use": "Tool use",
+			"policy": "Policy",
+			"conversation": "Conversation"
+		}
+	},
+	"guard": {
+		"heading": "Quality checks for generated tasks",
+		"suggested": "Suggested by a model",
+		"notAdded_one": "Not added to the benchmark yet: {{count}} quality check failed.",
+		"notAdded_other": "Not added to the benchmark yet: {{count}} quality checks failed.",
+		"passed": "Passed",
+		"failed": "Failed",
+		"checks": {
+			"guard_noop_fails": "An agent that does nothing fails",
+			"guard_control_fails": "A near miss is caught",
+			"guard_no_answer_leak": "The answer is not given away",
+			"guard_not_flaky": "The reference passes every time",
+			"guard_deterministic": "The same code gets the same score",
+			"guard_instruction_clear": "The instruction is clear",
+			"guard_provenance": "Where the task came from is recorded",
+			"guard_privacy": "No personal data"
+		}
+	}
+}

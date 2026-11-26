@@ -1,0 +1,7 @@
+{
+	"jobs": {
+		"kinds": {
+			"findings_investigate": "Find out why runs failed"
+		}
+	}
+}

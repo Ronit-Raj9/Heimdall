@@ -86,6 +86,9 @@ func init() {
 type evaluationsHandler struct {
 	env OrgEnv
 	now func() time.Time
+	// prepare, when set, fills fields of a new evaluation before its first
+	// save (a cheat check's cheat_check_of), so no later write can lose them.
+	prepare func(*schemas.Evaluation)
 }
 
 // evalCompat is the compatibility check; tests replace it. An agent whose
@@ -524,6 +527,9 @@ func (h *evaluationsHandler) newEvaluation(spec schemas.EvaluationSpec, who, sch
 // (it carries the caller's principal); created is told each new experiment.
 func (h *evaluationsHandler) launch(work, start context.Context, created func(string), spec schemas.EvaluationSpec, who, scheduleName string) (*schemas.Evaluation, error) {
 	ev := h.newEvaluation(spec, who, scheduleName)
+	if h.prepare != nil {
+		h.prepare(ev)
+	}
 	if err := h.store().Save(ev); err != nil {
 		return nil, fmt.Errorf("save evaluation: %w", err)
 	}
@@ -600,7 +606,13 @@ func (h *evaluationsHandler) stopLaunch(start context.Context, ev *schemas.Evalu
 // it. who is recorded as the creator and scheduleName on the evaluation.
 // It stays synchronous: it returns once every child was handed over.
 func LaunchEvaluation(ctx context.Context, env OrgEnv, spec schemas.EvaluationSpec, who, scheduleName string) (*schemas.Evaluation, error) {
-	h := &evaluationsHandler{env: env, now: time.Now}
+	return LaunchEvaluationPrepared(ctx, env, spec, who, scheduleName, nil)
+}
+
+// LaunchEvaluationPrepared is LaunchEvaluation with prepare run on the new
+// evaluation before its first save.
+func LaunchEvaluationPrepared(ctx context.Context, env OrgEnv, spec schemas.EvaluationSpec, who, scheduleName string, prepare func(*schemas.Evaluation)) (*schemas.Evaluation, error) {
+	h := &evaluationsHandler{env: env, now: time.Now, prepare: prepare}
 	s := env.Services
 	if s.Projects == nil {
 		return nil, errors.New("the project file store is not available on this server: an evaluation needs it to save its experiment files")

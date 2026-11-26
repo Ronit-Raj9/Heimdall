@@ -16,6 +16,7 @@ import (
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/issuebench"
+	"github.com/maximhq/bifrost/bench/issuebench/emit"
 	"github.com/maximhq/bifrost/bench/issuebench/pipeline"
 	"github.com/maximhq/bifrost/bench/issuebench/work"
 	"github.com/maximhq/bifrost/bench/jobs"
@@ -137,6 +138,11 @@ func runIssuebenchWork(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Lo
 		secrets[issuebench.SecretGitHubToken] = tok
 	} else {
 		req.Private = false
+	}
+	// Share links read this record: tasks from a private repository never
+	// leave the organization through a link (issuesync.RecordSource).
+	if err := recordRepoSource(env.ProjectRoot, emit.SuiteID(req.Repo), req.Repo, !req.Private); err != nil {
+		return nil, err
 	}
 
 	// Build mode: one virtual key on the server's gateway, revoked at the end.

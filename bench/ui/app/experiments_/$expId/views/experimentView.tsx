@@ -61,6 +61,7 @@ import { VerdictTab } from "./verdictTab";
 import { GatewayEffectCard } from "@/components/gateway/gatewayEffectCard";
 import "./fw11I18n";
 import "./hw12I18n";
+import { FlipBanner } from "@/components/validity/flipBanner";
 
 /**
  * Status and verdict facts other lanes add in fix wave 3, read through local types (D15): the comparison a
@@ -206,6 +207,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="experiment-screen" data-exp-id={expId}>
+			<FlipBanner expId={expId} />
 			<PageHeader
 				breadcrumbs={[
 					{ label: t("experiments.list.title"), to: "/experiments" },

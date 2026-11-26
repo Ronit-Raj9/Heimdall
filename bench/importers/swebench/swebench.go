@@ -103,6 +103,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	workdir := prev.Workdir
 	impossible := false
 	var done []string
+	var restore []string // from the rows' heimdall_restore; nil keeps the default
 	for i, b := range raw {
 		if err := ctx.Err(); err != nil {
 			return nil, fmt.Errorf("import: %w", err)
@@ -138,12 +139,15 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 			workdir = t.Workspace
 		}
 		impossible = impossible || t.Impossible
+		if restore == nil && len(r.HeimdallRestore) > 0 {
+			restore = append([]string{}, r.HeimdallRestore...)
+		}
 		done = append(done, t.ID)
 	}
 	if workdir == "" {
 		workdir = defaultWorkspace
 	}
-	if err := writeSuite(suiteDir, opts.SuiteID, workdir, prev, done, st, impossible); err != nil {
+	if err := writeSuite(suiteDir, opts.SuiteID, workdir, prev, done, st, impossible, restore); err != nil {
 		return nil, err
 	}
 	if err := importers.Finish(suiteDir); err != nil {
@@ -300,7 +304,13 @@ func readSuite(dir string) (suiteDoc, error) {
 // tasks of earlier imports. The verifier runs verify.sh in each task's image
 // (clean room, the task image as verifier image); the base image is only the
 // helper the environment uses for trusted steps.
-func writeSuite(dir, id, workdir string, prev suiteDoc, tasks []string, st settings, impossible bool) error {
+func writeSuite(dir, id, workdir string, prev suiteDoc, tasks []string, st settings, impossible bool, restore []string) error {
+	if restore == nil {
+		restore = prev.Verifier.Restore
+	}
+	if len(restore) == 0 {
+		restore = []string{"conftest.py", "pytest.ini", "tox.ini", "sitecustomize.py", "usercustomize.py"}
+	}
 	all := slices.Clone(prev.Tasks)
 	for _, t := range tasks {
 		if !slices.Contains(all, t) {
@@ -338,7 +348,7 @@ func writeSuite(dir, id, workdir string, prev suiteDoc, tasks []string, st setti
 		Workdir:     workdir,
 		Verifier: suiteVerifierDoc{
 			Command:  []string{"bash", "/grader/tests/verify.sh"},
-			Restore:  []string{"conftest.py", "pytest.ini", "tox.ini", "sitecustomize.py", "usercustomize.py"},
+			Restore:  restore,
 			TimeoutS: defaultVerifyS,
 			Result:   schemas.VerifierResultJUnit,
 			Mode:     schemas.VerifierCleanRoom,

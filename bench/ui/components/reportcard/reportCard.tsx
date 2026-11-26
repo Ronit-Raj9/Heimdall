@@ -11,6 +11,7 @@ import { ArrowUpRight, Check, ChevronRight, Download, Equal, FileCode2, FileText
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { BifrostTable, hasBifrost } from "./bifrostSection";
+import { CheatRateRow } from "./cheatRateRow";
 import "./fw09I18n";
 import "./hw08I18n";
 import { hasLearning, hasPersistence, LearningTable, PersistenceTable } from "./learningSections";
@@ -211,6 +212,7 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 					<SafetyTable report={report} />
 				</Section>
 			)}
+			<CheatRateRow report={report} />
 
 			{hasRedTeam(report) && (
 				<Section

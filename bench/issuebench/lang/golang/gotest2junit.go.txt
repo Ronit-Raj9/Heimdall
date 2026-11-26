@@ -1,0 +1,82 @@
+// Command gotest2junit converts "go test -json" events on stdin to JUnit
+// XML on stdout. Each test is classname = "./" + the package path below the
+// module (or "./" for the module root), name = the test name. Standard
+// library only.
+package main
+
+import (
+	"bufio"
+	"encoding/json"
+	"encoding/xml"
+	"flag"
+	"fmt"
+	"os"
+	"sort"
+	"strings"
+)
+
+type event struct {
+	Action  string
+	Package string
+	Test    string
+}
+
+func main() {
+	module := flag.String("module", "", "the module path (go list -m)")
+	flag.Parse()
+	status := map[string]map[string]string{}
+	sc := bufio.NewScanner(os.Stdin)
+	sc.Buffer(make([]byte, 1<<20), 16<<20)
+	for sc.Scan() {
+		var e event
+		if json.Unmarshal(sc.Bytes(), &e) != nil || e.Test == "" {
+			continue
+		}
+		switch e.Action {
+		case "pass", "fail", "skip":
+		default:
+			continue
+		}
+		cls := "./"
+		if *module != "" && e.Package != *module {
+			cls = "./" + strings.TrimPrefix(e.Package, *module+"/")
+		}
+		if status[cls] == nil {
+			status[cls] = map[string]string{}
+		}
+		status[cls][e.Test] = e.Action
+	}
+	esc := func(s string) string {
+		var b strings.Builder
+		_ = xml.EscapeText(&b, []byte(s))
+		return strings.ReplaceAll(b.String(), `"`, "&#34;")
+	}
+	var classes []string
+	for c := range status {
+		classes = append(classes, c)
+	}
+	sort.Strings(classes)
+	fmt.Println(`<?xml version="1.0" encoding="UTF-8"?>`)
+	fmt.Println("<testsuites>")
+	for _, c := range classes {
+		fmt.Printf("<testsuite name=\"%s\">\n", esc(c))
+		var names []string
+		for n := range status[c] {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		for _, n := range names {
+			head := fmt.Sprintf("<testcase classname=\"%s\" name=\"%s\"", esc(c), esc(n))
+			switch status[c][n] {
+			case "fail":
+				fmt.Println(head + "><failure/></testcase>")
+			case "skip":
+				fmt.Println(head + "><skipped/></testcase>")
+			default:
+				fmt.Println(head + "/>")
+			}
+		}
+		fmt.Println("</testsuite>")
+	}
+	fmt.Println("</testsuites>")
+}

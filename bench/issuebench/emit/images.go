@@ -53,14 +53,25 @@ func LayersOf(env issuebench.EnvSpec, instanceID, base string) (Layers, error) {
 		return Layers{}, fmt.Errorf("%s: environment has no base image", env.Repo)
 	}
 	l := Layers{}
+	// A language with result converters (Go, JavaScript, TypeScript) is
+	// graded from their JUnit file by grade.py, which needs a python3 in the
+	// task image; slim Node and Go images have none. Python layers are
+	// unchanged byte for byte.
+	support := len(issuebench.ToolchainOf(issuebench.LanguageFor(env.Language)).SupportFiles()) > 0
 	l.BaseDockerfile = "FROM " + env.BaseImage + "\n" +
-		"RUN (command -v git >/dev/null || (apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*))\n" +
-		"WORKDIR " + Workspace + "\n"
+		"RUN (command -v git >/dev/null || (apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*))\n"
+	if support {
+		l.BaseDockerfile += "RUN (command -v python3 >/dev/null || (apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*))\n"
+	}
+	l.BaseDockerfile += "WORKDIR " + Workspace + "\n"
 	l.BaseRef = fmt.Sprintf("%s/base:%s-%s", ImageNamespace, tagSafe(env.BaseImage), shortHash(l.BaseDockerfile))
 
 	var b strings.Builder
 	b.WriteString("FROM " + l.BaseRef + "\n")
 	b.WriteString("COPY repo/ " + Workspace + "/\n")
+	if support {
+		b.WriteString("COPY heimdall/ /heimdall/\n")
+	}
 	b.WriteString("WORKDIR " + Workspace + "\n")
 	for _, c := range env.Commands {
 		c = strings.TrimSpace(c)

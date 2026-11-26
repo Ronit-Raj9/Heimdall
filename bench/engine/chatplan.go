@@ -42,17 +42,25 @@ func holdsConversation(cfg *schemas.AgentConfig) bool {
 // none does (so a plan without metadata hashes as before).
 func taskMetadata(suite *schemas.Suite, conds []condPlan) map[string]map[string]string {
 	var out map[string]map[string]string
+	cats := taskCategories(suite.Root) // W4-44: the category sidecar, read once
 	for _, id := range usedTasks(conds) {
 		t := suite.TaskByID(id)
-		if t == nil || len(t.Metadata) == 0 {
+		if t == nil {
+			continue
+		}
+		cat, labelled := cats[id]
+		if len(t.Metadata) == 0 && !labelled {
 			continue
 		}
 		if out == nil {
 			out = map[string]map[string]string{}
 		}
-		cp := make(map[string]string, len(t.Metadata))
+		cp := make(map[string]string, len(t.Metadata)+1)
 		for k, v := range t.Metadata {
 			cp[k] = v
+		}
+		if labelled {
+			cp["category"] = cat
 		}
 		out[id] = cp
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
+	"github.com/maximhq/bifrost/bench/taskguard"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
@@ -294,6 +295,7 @@ func SuiteAdmit(ctx context.Context, env AdmitEnv, ref, only string, w io.Writer
 		if err != nil {
 			return rep, fmt.Errorf("admit %s: %w", t.ID, err)
 		}
+		rec = taskguard.Apply(s, t, rec)
 		if err := suite.RecordAdmission(lock, t.ID, rec); err != nil {
 			return rep, err
 		}

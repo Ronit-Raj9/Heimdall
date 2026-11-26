@@ -1,5 +1,6 @@
 import ClustersTab from "@/app/inbox/views/clustersTab";
 import { AgentPicker } from "@/components/agents/agentPicker";
+import { ShadowReplayLink } from "@/components/replays/shadowReplayLink";
 import { PatternList } from "@/components/reportcard/reportFailures";
 import { pct } from "@/components/reportcard/reportCard.utils";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
@@ -165,7 +166,16 @@ export default function WhyAgentsFailView() {
 	];
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="why-agents-fail-screen">
-			<PageHeader title={t("why.title")} subtitle={t("why.subtitle")} actions={<MaximFailuresLink />} />
+			<PageHeader
+				title={t("why.title")}
+				subtitle={t("why.subtitle")}
+				actions={
+					<>
+						<MaximFailuresLink />
+						<ShadowReplayLink />
+					</>
+				}
+			/>
 			<RouteTabs tabs={tabs} defaultTab="patterns" label={t("why.tabs.label")} testId="why-tabs">
 				{(active) => (active === "groups" ? <ClustersTab /> : <PatternsTab />)}
 			</RouteTabs>

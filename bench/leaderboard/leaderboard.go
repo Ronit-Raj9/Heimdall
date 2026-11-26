@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/twins"
 )
 
 // Query values and defaults.
@@ -278,6 +279,9 @@ func collect(ctx context.Context, src Source) ([]*record, error) {
 		}
 		m, ok := src.Manifest(id)
 		if !ok || m == nil || m.Experiment.Exploratory() { // run control: a rerun of failures is exploratory and never ranks
+			continue
+		}
+		if strings.HasSuffix(m.SuiteID, twins.SuiteSuffix) { // a cheat check's impossible twins: a pass there is cheating, never a score
 			continue
 		}
 		exp := &expInfo{id: id, m: m, suite: m.SuiteID + "@" + m.SuiteVersion}

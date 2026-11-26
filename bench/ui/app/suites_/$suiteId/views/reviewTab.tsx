@@ -1,3 +1,4 @@
+import { GuardChecks } from "@/components/guard/guardChecks";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import "@/components/models/hw15I18n";
 import type { PickedModel } from "@/components/models/groupedModelPicker";
@@ -103,6 +104,7 @@ export function ReviewTab({ suite }: { suite: SuiteSummary }) {
 			<DraftSection suite={suite} />
 			<QueueSection suite={suite} />
 			<QualitySection suite={suite} />
+			<GuardChecks suite={suite} />
 			<SplitSection suite={suite} />
 		</div>
 	);

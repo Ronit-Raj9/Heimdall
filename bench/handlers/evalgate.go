@@ -261,7 +261,7 @@ func previousRun(evals []*schemas.Evaluation, ev *schemas.Evaluation, agent stri
 	sorted := slices.Clone(evals)
 	slices.SortStableFunc(sorted, func(a, b *schemas.Evaluation) int { return b.CreatedAt.Compare(a.CreatedAt) })
 	for _, e := range sorted {
-		if e == nil || e.ID == ev.ID || e.Status != schemas.EvaluationDone || e.CreatedAt.After(ev.CreatedAt) {
+		if e == nil || e.ID == ev.ID || e.Status != schemas.EvaluationDone || e.CreatedAt.After(ev.CreatedAt) || e.CheatCheckOf != "" || e.RerunOf != "" {
 			continue
 		}
 		if ev.Org != "" && e.Org != "" && e.Org != ev.Org {

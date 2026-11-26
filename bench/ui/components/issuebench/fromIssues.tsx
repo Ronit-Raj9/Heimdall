@@ -1,6 +1,7 @@
 // Build tab source "From issues" (lane G06): name any GitHub repository the connected account
 // can read (public ones included), scan it for merged pull requests that close an issue, then
 // build, check and review each one.
+import { WeeklySync } from "@/components/issuebench/weeklySync";
 import { JobLogPanel } from "@/components/jobs/jobLogPanel";
 import { Button } from "@/components/ui/button";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
@@ -17,6 +18,7 @@ import type { IssueFix, IssueItem, IssueReadiness, IssueRun, IssueStatus } from 
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "./w446I18n";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
@@ -156,6 +158,9 @@ export function FromIssues({ writable }: { writable: boolean }) {
 					{scanState.isLoading ? t("scanning") : t("scan")}
 				</Button>
 			</div>
+			<p className="text-muted-foreground text-xs" data-testid="issuebench-languages">
+				{t("fromIssues.languages", { ns: "w446" })}
+			</p>
 			{repo.trim() !== "" && !name && (
 				<p className="text-muted-foreground text-xs" data-testid="issuebench-repo-invalid">
 					{t("repoInvalid")}
@@ -172,6 +177,7 @@ export function FromIssues({ writable }: { writable: boolean }) {
 				</p>
 			)}
 			{runId && <RunView id={runId} writable={writable} readiness={readiness.data} t={t} />}
+			<WeeklySync repo={name} writable={writable} />
 		</div>
 	);
 }
