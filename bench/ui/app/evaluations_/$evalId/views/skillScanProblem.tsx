@@ -13,13 +13,14 @@ export interface SkillRefusal {
 	changed: boolean;
 }
 
-// The gate sentence may be wrapped ("plan experiment: ..."), so it is matched anywhere in the text.
-const GATE = /(?:^|[\s:])skill (\S+) in agents\/([^/\s]+)\/skills (has no passing scan|changed after its scan)/;
+// The gate sentence (adapters/skillgate.go) or its plain form (handlers/planerrors.go), matched anywhere in the text.
+const GATE =
+	/(?:^|[\s:])(?:skill (\S+) in agents\/([^/\s]+)\/skills (has no passing scan|changed after its scan)|Skill (\S+) of agent (\S+) (has no passing safety scan|changed after its safety scan))/;
 
 /** Parses a benchmark's skip reason; null when the skill gate did not refuse it (fix wave 3, L5). */
 export function parseSkillRefusal(text: string | undefined): SkillRefusal | null {
 	const m = GATE.exec(text ?? "");
-	return m ? { skill: m[1], agent: m[2], changed: m[3].startsWith("changed") } : null;
+	return m ? { skill: m[1] ?? m[4], agent: m[2] ?? m[5], changed: (m[3] ?? m[6]).startsWith("changed") } : null;
 }
 
 /**

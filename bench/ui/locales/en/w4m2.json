@@ -1,0 +1,17 @@
+{
+	"setupTasks_one": "{{count}} task per benchmark",
+	"setupTasks_other": "{{count}} tasks per benchmark",
+	"setupTrials_one": "each tried once",
+	"setupTrials_other": "each tried {{count}} times",
+	"benchmarksStarting": "The benchmarks show here as soon as they start.",
+	"leftOut_one": "Left out: this agent cannot run one of the benchmarks you picked.",
+	"leftOut_other": "Left out: this agent cannot run {{count}} of the benchmarks you picked.",
+	"leftOutItem": "{{benchmark}}: {{reason}}",
+	"listsFailed": "Could not load the benchmarks.",
+	"judgeUnknown": "Heimdall does not know this model name. Check the spelling: a wrong name makes every grade fail.",
+	"sharedTasks_one": "{{name}}, compared with an earlier evaluation of the same version, on the one task both ran",
+	"sharedTasks_other": "{{name}}, compared with an earlier evaluation of the same version, on the {{count}} tasks both ran",
+	"unknownAgent": "There is no agent named {{name}}. Choose an agent.",
+	"toSeeCostAgent": "To see the cost: choose an agent.",
+	"estimating": "Estimating..."
+}

@@ -251,7 +251,7 @@ function EvaluateWizard() {
 			setReplaced(plan.putAside);
 			setBadMode(plan.badMode ?? null);
 			replace(plan.draft);
-			if (plan.step) void setStepRaw(plan.step, { history: "replace" });
+			if (plan.step) void setStepRaw(plan.step, { history: stepHistoryMode("fix") });
 		}
 		void setLink({ agent: null, mode: null, suite: null, opponent: null, keep: null }, { history: "replace" });
 	}, [link, draft, agentList, stepRaw, update, replace, setLink, setStepRaw]);
@@ -268,7 +268,7 @@ function EvaluateWizard() {
 	const nothingRuns = wanted >= 4 && !step4Estimate.pending ? nothingRunsReason(step4Estimate.main.data) : null;
 	const reach = maxReachable(draft, owns, nothingRuns, ctx);
 	const step = (wanted > reach ? reach : wanted) as EvaluateStep;
-	const go = (s: EvaluateStep) => void setStepRaw(s === 1 ? null : s);
+	const go = (s: EvaluateStep) => void setStepRaw(s === 1 ? null : s, { history: stepHistoryMode("user") });
 	const failoverHint = step === 4 && !nothingRuns ? failoverNextProblem(draft) : "";
 
 	// N85: once the link params are applied and the agents list (and, from step 4 on, the estimate) has settled, the
@@ -277,7 +277,7 @@ function EvaluateWizard() {
 	const settled = !linkPending && !agentsQ.isLoading && estimateSettled;
 	const writeBack = stepWriteBack(stepRaw, step, settled);
 	useEffect(() => {
-		if (writeBack !== undefined) void setStepRaw(writeBack, { history: "replace" });
+		if (writeBack !== undefined) void setStepRaw(writeBack, { history: stepHistoryMode("fix") });
 	}, [writeBack, setStepRaw]);
 
 	return (
@@ -364,6 +364,15 @@ function EvaluateWizard() {
 }
 
 /** /evaluate: the agent-first wizard. Agent, what to learn, benchmarks, setup, launch. */
+/**
+ * How a step change is written to the URL: a step the person chose is pushed, so browser Back returns to the
+ * previous step; a correction of the URL (link params, the step clamp) replaces, so Back never lands on a step
+ * the page refuses.
+ */
+export function stepHistoryMode(reason: "user" | "fix"): "push" | "replace" {
+	return reason === "user" ? "push" : "replace";
+}
+
 export default function EvaluateView({ initial }: { initial?: Partial<EvaluateDraft> }) {
 	return (
 		<EvaluateDraftProvider initial={initial}>

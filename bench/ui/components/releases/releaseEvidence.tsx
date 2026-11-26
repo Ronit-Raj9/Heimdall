@@ -4,6 +4,7 @@ import i18n from "@/lib/i18n";
 import type { DatasetComparison, ReleaseRecord, ReleaseSide, ReleaseSummary, ScoreCI } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
+import "@/app/evaluations_/$evalId/views/w4m2I18n";
 
 /** "codex v4", or the agent alone when the version is unknown. */
 export function versionName(agent: string, version?: number): string {
@@ -16,14 +17,24 @@ export function versionName(agent: string, version?: number): string {
  * is the same version, the title says so instead of "codex v1 replaces v1".
  */
 export function releaseTitle(
-	r: Pick<ReleaseRecord, "agent_id" | "version" | "replaces_version" | "agent_config_id" | "arm"> & { compared_version?: number },
+	r: Pick<ReleaseRecord, "agent_id" | "version" | "replaces_version" | "agent_config_id" | "arm"> & {
+		compared_version?: number;
+		/** Tasks both evaluations ran, when the numbers cover only those (sharedTaskCount of the summary's dataset). */
+		shared_tasks?: number;
+	},
 	t: (k: string, o?: Record<string, unknown>) => string,
 ): string {
 	if (!r.agent_id) return r.agent_config_id || r.arm;
 	const name = versionName(r.agent_id, r.version);
 	const same = !!r.version && (r.replaces_version === r.version || r.compared_version === r.version);
+	if (same && r.shared_tasks) return i18n.t("sharedTasks", { ns: "w4m2", name, count: r.shared_tasks });
 	if (same) return i18n.t("release.sameVersion", { ns: "fw09", name });
 	return r.replaces_version ? t("releases.replaces", { name, prev: `v${r.replaces_version}` }) : t("releases.first", { name });
+}
+
+/** Tasks both evaluations ran with the same content, summed over the benchmarks; 0 when unknown. */
+export function sharedTaskCount(dataset: DatasetComparison | undefined): number {
+	return (dataset?.benchmarks ?? []).reduce((n, b) => n + (b.compared ?? 0), 0);
 }
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
