@@ -85,6 +85,14 @@ type AgentConfig struct {
 	Argv         []string          `json:"argv" yaml:"argv"`
 	Env          map[string]string `json:"env" yaml:"env"`
 	Files        map[string]string `json:"files,omitempty" yaml:"files"` // container path -> content template
+	// FilesRaw are container files delivered byte for byte, never rendered as
+	// templates: skill and notes text that may contain "{{" (improvement runs
+	// write here). A path may not be in both Files and FilesRaw.
+	FilesRaw map[string]string `json:"files_raw,omitempty" yaml:"files_raw"`
+	// Instructions are standing instructions from the agent's owner, put before
+	// every task's instruction text in the instruction file, delivered verbatim.
+	// Every agent reads its instruction file, so this works for any agent.
+	Instructions string `json:"instructions,omitempty" yaml:"instructions"`
 	Model        string            `json:"model" yaml:"model"`
 	Notes        AgentNotes        `json:"notes" yaml:"notes"`
 	Parser       string            `json:"parser,omitempty" yaml:"parser"` // empty = gateway-level evidence only

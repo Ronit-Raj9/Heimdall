@@ -189,7 +189,12 @@ func (a *commandAdapter) Plan(ctx context.Context, rc *schemas.RunContext) (*sch
 	if err != nil {
 		return nil, fmt.Errorf("plan run %s: files: %w", rc.Run.RunID, err)
 	}
-	if err := addFile(files, InstructionFile, instruction); err != nil {
+	for k, v := range rc.Agent.FilesRaw {
+		if err := addFile(files, k, v); err != nil {
+			return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+		}
+	}
+	if err := addFile(files, InstructionFile, instructionText(rc.Agent.Instructions, instruction)); err != nil {
 		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
 	}
 	if err := a.addUserNotes(files, rc.Agent.Notes); err != nil {
