@@ -265,3 +265,33 @@ func TestImproveRunScoreArmsAndStop(t *testing.T) {
 		t.Error("arm beyond the request accepted")
 	}
 }
+
+// A missing improver task is refused with the plain sentence before any
+// experiment exists.
+func TestCheckImproverMissingTask(t *testing.T) {
+	root := t.TempDir()
+	for p, body := range map[string]string{
+		"deploy/bench.yaml": "runs_root: runs\nbenchmarks_root: benchmarks\nserver:\n  listen: 127.0.0.1:1\n  mode: live\n",
+		"agents/inc.yaml":   "id: inc\nadapter: command\nimage: img\nargv: [run]\nmodel: m\n",
+		"benchmarks/.keep":  "",
+	} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, p)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, p), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	a, err := newApp(context.Background(), filepath.Join(root, "deploy", "bench.yaml"), appOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec := &improve.Spec{Agent: "agents/inc.yaml", Suite: "s@1", Improver: improve.ImproverSpec{Task: "nope@1.0.0:x"}}
+	err = improveExecutor{a: a}.CheckImprover(context.Background(), spec)
+	if err == nil || err.Error() != "The improver task nope@1.0.0:x does not exist." {
+		t.Fatalf("err %v", err)
+	}
+	if exps, err := a.store.ListExperiments(context.Background()); err == nil && len(exps) != 0 {
+		t.Errorf("experiments exist after the refusal: %d", len(exps))
+	}
+}
