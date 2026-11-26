@@ -135,14 +135,17 @@ type ImproveRequest struct {
 	BudgetUSD     float64
 	WallS         int
 	Null          bool
-	// The fields below are A3.3's. The evidence document of A3.1 is not a
-	// field yet: Evidence already names the item list above.
-	Kind     string // mutation | merge | restart | null
-	Second   *Version
-	Model    string
-	Provider string
-	Seed     int64
-	Limits   Limits
+	// The fields below are A3.3's. EvidenceDoc is the evidence document of
+	// A3.1 (the digest of failed practice runs and where the transcripts
+	// are); Evidence above stays the older item list until the runner stops
+	// using it.
+	EvidenceDoc *EvidenceDoc
+	Kind        string // mutation | merge | restart | null
+	Second      *Version
+	Model       string
+	Provider    string
+	Seed        int64
+	Limits      Limits
 }
 
 // ImproveResult is the improver's output: the full new bundle (every path
