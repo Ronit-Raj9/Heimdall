@@ -69,6 +69,7 @@ func (h *ImproveHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Mid
 	r.POST(APIPrefix+"/improvements/{id}/resume", lib.ChainMiddlewares(h.postResume, writeMW...))
 	r.POST(APIPrefix+"/improvements/{id}/continue", lib.ChainMiddlewares(h.postContinue, writeMW...))
 	r.POST(APIPrefix+"/improvements/{id}/continue/estimate", lib.ChainMiddlewares(h.postContinueEstimate, middlewares...))
+	h.RegisterStudyRoutes(r, middlewares...)
 }
 
 func (h *ImproveHandler) ready(ctx *fasthttp.RequestCtx) bool {

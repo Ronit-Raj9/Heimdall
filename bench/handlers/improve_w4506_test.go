@@ -107,7 +107,9 @@ func TestContinueRoutes(t *testing.T) {
 	if resp.StatusCode() != 501 || !strings.Contains(string(resp.Body()), "This build cannot continue improvement runs.") {
 		t.Errorf("no extend: %d %s", resp.StatusCode(), resp.Body())
 	}
-	improve.RunExtend = func(*improve.Runner, context.Context, string, int, bool, float64) (*improve.Record, error) { return nil, nil }
+	improve.RunExtend = func(*improve.Runner, context.Context, string, int, bool, float64) (*improve.Record, error) {
+		return nil, nil
+	}
 	if resp := c.do(t, "POST", APIPrefix+"/improvements/imp_c/continue", body, authed("")); resp.StatusCode() != 202 {
 		t.Errorf("continue: %d %s", resp.StatusCode(), resp.Body())
 	}
