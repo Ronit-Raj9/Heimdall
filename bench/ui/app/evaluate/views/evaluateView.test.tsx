@@ -27,6 +27,14 @@ vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
 		data: { suites: [{ id: "hd-harbor-tb2", description: "", admitted_count: 80, builtin: true }] },
 	}),
 }));
+// N194: step 3 reads the light benchmark list.
+vi.mock("@/lib/store/apis/suitesLightApi", async (orig) => ({
+	...(await orig<object>()),
+	useGetSuitesLightQuery: () => ({
+		isLoading: false,
+		data: { suites: [{ id: "hd-harbor-tb2", description: "", admitted_count: 80, builtin: true }] },
+	}),
+}));
 vi.mock("@/lib/store/apis/evaluationsApi", async (orig) => ({
 	...(await orig<object>()),
 	BASELINE_AGENTS: ["codex", "claude-code", "mini-swe-agent", "opencode", "gemini-cli"],

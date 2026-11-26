@@ -22,6 +22,8 @@ vi.mock("@/lib/store/apis/catalogApi", () => ({
 	useAddCatalogEntryMutation: () => [() => undefined],
 	useUploadCatalogDatasetMutation: () => [() => undefined],
 }));
+// N194: the catalog reads the light benchmark list.
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({ useGetSuitesLightQuery: () => ({ data: { suites: [] } }) }));
 vi.mock("@/lib/store", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store")>()),
 	useGetSuitesQuery: () => ({ data: { suites: [] } }),

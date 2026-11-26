@@ -100,7 +100,7 @@ const fx = vi.hoisted(() => {
 		if (n.includes("evaluation")) return data.evaluation;
 		if (n.includes("models")) return data.models;
 		if (/agentsquery$/.test(n)) return data.agents;
-		if (/suitesquery$/.test(n)) return data.suites;
+		if (/suites(light)?query$/.test(n)) return data.suites; // N194: step 3 reads the light list
 		return undefined;
 	};
 	// The value is picked when the hook runs, so fixtures set after the mocks load still count.
@@ -149,6 +149,7 @@ vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => fx.safeOrig
 vi.mock("@/lib/store/apis/modelsApi", async (importOriginal) => fx.safeOriginal(importOriginal));
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => fx.safeOriginal(importOriginal));
 vi.mock("@/lib/store/apis/agentBuilderApi", async (importOriginal) => fx.safeOriginal(importOriginal));
+vi.mock("@/lib/store/apis/suitesLightApi", async (importOriginal) => fx.safeOriginal(importOriginal));
 
 // The wizard: the first of these that exists (a views/ file named like the wizard, else the page).
 const candidates = {
