@@ -6,6 +6,7 @@ import { Info, Radar } from "lucide-react";
 import { FeatureHero, revealAnchor } from "./featureHero";
 import { useTranslation } from "react-i18next";
 import { formatInboxTime } from "./inboxBadges";
+import { SessionImport } from "./sessionImport";
 
 /** Each trace source and how its last pull went: when, from where on, how many traces, the last error. */
 export function InboxSourcesTable({ sources }: { sources: readonly InboxSourceStatus[] }) {
@@ -92,6 +93,7 @@ export function InboxEmpty() {
 		>
 			<span>{u("inbox.cli")}</span>
 			<code className="bg-muted text-foreground rounded-md px-2 py-1 font-mono">heimdall inbox pull</code>
+			<SessionImport />
 		</FeatureHero>
 	);
 }
