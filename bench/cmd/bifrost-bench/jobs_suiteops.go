@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -209,31 +210,53 @@ func (r suiteOpsRepo) checkout(ctx context.Context, env jobEnv, depth int, log j
 	args = append(args, "--", "https://github.com/"+r.GitHub+".git", dir)
 	cctx, cancel := context.WithTimeout(ctx, suiteOpsCloneTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(cctx, "git", args...)
-	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + tmp, "GIT_TERMINAL_PROMPT=0", "LC_ALL=C"}
-	if token != "" {
-		basic := base64.StdEncoding.EncodeToString([]byte("x-access-token:" + token))
-		cmd.Env = append(cmd.Env, "GIT_CONFIG_COUNT=1",
-			"GIT_CONFIG_KEY_0=http.https://github.com/.extraheader",
-			"GIT_CONFIG_VALUE_0=AUTHORIZATION: basic "+basic)
-		log.Printf("cloning github.com/%s with the connected GitHub token", r.GitHub)
-	} else {
-		log.Printf("cloning github.com/%s without a token (GitHub is not connected; only public repositories work)", r.GitHub)
-	}
-	out, err := cmd.CombinedOutput()
-	for _, line := range strings.Split(strings.TrimSpace(suiteOpsRedact(string(out), token)), "\n") {
-		if line != "" {
-			log.Printf("git: %s", line)
+	base := []string{"PATH=" + os.Getenv("PATH"), "HOME=" + tmp, "GIT_TERMINAL_PROMPT=0", "LC_ALL=C"}
+	clone := func(env []string) error {
+		err := suiteOpsGitClone(cctx, args, env)
+		if err != nil {
+			for _, line := range strings.Split(strings.TrimSpace(suiteOpsRedact(err.Error(), token)), "\n") {
+				if line != "" {
+					log.Printf("git: %s", line)
+				}
+			}
 		}
+		return err
 	}
-	if err != nil {
-		cleanup()
-		if token == "" {
+	if token == "" {
+		log.Printf("cloning github.com/%s without a token (GitHub is not connected; only public repositories work)", r.GitHub)
+		if err := clone(base); err != nil {
+			cleanup()
 			return "", nil, fmt.Errorf("clone github.com/%s failed: connect GitHub in Settings for a private repository, or check the name", r.GitHub)
 		}
-		return "", nil, fmt.Errorf("clone github.com/%s failed: check the name and that the connected GitHub account can read it", r.GitHub)
+		return dir, cleanup, nil
+	}
+	basic := base64.StdEncoding.EncodeToString([]byte("x-access-token:" + token))
+	withToken := append(slices.Clone(base), "GIT_CONFIG_COUNT=1",
+		"GIT_CONFIG_KEY_0=http.https://github.com/.extraheader",
+		"GIT_CONFIG_VALUE_0=AUTHORIZATION: basic "+basic)
+	log.Printf("cloning github.com/%s with the connected GitHub token", r.GitHub)
+	if err := clone(withToken); err != nil {
+		// A refused stored token must not block a public repository (p11-2).
+		log.Printf("the connected GitHub token was refused; trying without it (public repositories only)")
+		_ = os.RemoveAll(dir)
+		if err := clone(base); err != nil {
+			cleanup()
+			return "", nil, fmt.Errorf("Could not copy github.com/%s: the connected GitHub account was refused and the repository is not public. Reconnect GitHub in Settings > GitHub.", r.GitHub)
+		}
 	}
 	return dir, cleanup, nil
+}
+
+// suiteOpsGitClone runs git with args and env; its error carries git's
+// output. Tests replace it.
+var suiteOpsGitClone = func(ctx context.Context, args []string, env []string) error {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Env = env
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%w\n%s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 // suiteOpsGitHubToken is the org's connected GitHub token, "" when none.
