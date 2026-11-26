@@ -1,6 +1,7 @@
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import {
 	badgeMarkdown,
@@ -14,9 +15,10 @@ import {
 	type ShareKind,
 } from "@/lib/store/apis/shareApi";
 import "@/lib/types/shareI18n";
+import "@/components/settings/w4m8I18n";
 import { cn } from "@/lib/utils";
 import { Check, Copy, Download, FileCode2, FileText, Link2, Package, Printer, Share2, X } from "lucide-react";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 /** Expiry choices, in days; 0 is never. */
@@ -37,7 +39,29 @@ export function shareQuery(params: Record<string, string | number | undefined | 
 	for (const [k, v] of Object.entries(params)) {
 		if (v !== undefined && v !== null && String(v).trim() !== "") q.set(k, String(v));
 	}
+	q.sort();
 	return q.toString();
+}
+
+/** A query with its keys in sorted order, the way the server stores a link's query. */
+export function canonicalQuery(q?: string): string {
+	const p = new URLSearchParams(q ?? "");
+	p.sort();
+	return p.toString();
+}
+
+/** The line under the downloads: the PDF hint, or what to do when the PDF could not be prepared. */
+export function PdfHint({ failed }: { failed: boolean }) {
+	const { t } = useTranslation("share");
+	const { t: tm } = useTranslation("w4m8");
+	if (failed) {
+		return (
+			<p role="alert" className="text-destructive text-xs" data-testid="share-pdf-failed">
+				{tm("share.pdfFailed")}
+			</p>
+		);
+	}
+	return <p className="text-muted-foreground text-xs">{t("pdfHint")}</p>;
 }
 
 /** Loads an HTML export and opens the print dialog on it (Save as PDF), without leaving the page. */
@@ -140,23 +164,11 @@ export function ShareDialog({ kind, target, query, evaluationId, onClose }: Shar
 	const [create, createState] = useCreateShareMutation();
 	const [revoke] = useRevokeShareMutation();
 	// Only links with the same view filters belong to this exact view.
-	const mine = (links.data?.shares ?? []).filter((s) => (s.query ?? "") === (query ?? ""));
+	// The server stores the query with its keys sorted, so both sides are compared in that order.
+	const mine = (links.data?.shares ?? []).filter((s) => canonicalQuery(s.query) === canonicalQuery(query));
 
-	useEffect(() => {
-		const prev = document.activeElement as HTMLElement | null;
-		panelRef.current?.focus();
-		const onKey = (e: KeyboardEvent) => {
-			if (e.key === "Escape") {
-				e.stopPropagation();
-				onClose();
-			}
-		};
-		window.addEventListener("keydown", onKey, true);
-		return () => {
-			window.removeEventListener("keydown", onKey, true);
-			prev?.focus?.();
-		};
-	}, [onClose]);
+	// Bubble phase: Escape on an open confirm (which handles it in the capture phase) keeps this dialog open.
+	useDialogFocus(panelRef, onClose);
 
 	const submit = async () => {
 		const res = await create({
@@ -369,7 +381,7 @@ export function ShareDialog({ kind, target, query, evaluationId, onClose }: Shar
 									{t("pdf")}
 								</Button>
 							</Row>
-							<p className={cn("text-xs", pdfFailed ? "text-destructive" : "text-muted-foreground")}>{t("pdfHint")}</p>
+							<PdfHint failed={pdfFailed} />
 							<Row icon={<Package className="size-4" aria-hidden="true" />} title={t("reproduce")} help={t("reproduceHelp")}>
 								<Button asChild variant="outline" size="sm">
 									<a href={reproduceUrl(evaluationId)} download data-testid="share-download-reproduce">

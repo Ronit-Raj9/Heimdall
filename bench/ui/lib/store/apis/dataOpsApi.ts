@@ -18,9 +18,19 @@ const id = (value: string) => encodeURIComponent(value);
 /** How often the delivery log refreshes while a delivery is waiting for another attempt. */
 export const DELIVERY_POLL_MS = 10_000;
 
-/** Download URL of the organization's audit log (the server answers with an attachment). */
-export function auditExportUrl(orgId: string, format: AuditExportFormat): string {
-	return `${BENCH_API_BASE}/orgs/${id(orgId)}/audit/export?format=${format}`;
+/**
+ * Download URL of the organization's audit log (the server answers with an attachment). The
+ * optional filters (action, actor type, search text) keep only the rows that match.
+ */
+export function auditExportUrl(orgId: string, format: AuditExportFormat, f?: { action?: string; actor?: string; q?: string }): string {
+	const params = new URLSearchParams({ format });
+	const action = f?.action?.trim();
+	const actor = f?.actor?.trim();
+	const q = f?.q?.trim();
+	if (action) params.set("action", action);
+	if (actor) params.set("actor_type", actor);
+	if (q) params.set("q", q);
+	return `${BENCH_API_BASE}/orgs/${id(orgId)}/audit/export?${params.toString()}`;
 }
 
 export const dataOpsApi = benchApi
