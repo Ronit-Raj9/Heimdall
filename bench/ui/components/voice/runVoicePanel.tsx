@@ -1,4 +1,5 @@
 import { ToneBadge } from "@/components/suites/suiteBadges";
+import { withOrgParam } from "@/lib/store/apis/orgParam";
 import { useGetRunVoiceQuery } from "@/lib/store/apis/voiceApi";
 import type { VoiceAnalysis, VoiceCall } from "@/lib/types/bench";
 import { useTranslation } from "react-i18next";
@@ -99,7 +100,7 @@ export function VoicePanel({ data }: { data: VoiceCall }) {
 						<figure key={tr.track} className="flex flex-col gap-1">
 							<figcaption className="text-muted-foreground">{t(`voice.track.${tr.track}`)}</figcaption>
 							{/* biome-ignore lint/a11y/useMediaCaption: call audio has its transcript beside it */}
-							<audio controls preload="none" src={tr.url} data-testid={`voice-audio-${tr.track}`} />
+							<audio controls preload="none" src={withOrgParam(tr.url)} data-testid={`voice-audio-${tr.track}`} />
 						</figure>
 					))}
 				</div>

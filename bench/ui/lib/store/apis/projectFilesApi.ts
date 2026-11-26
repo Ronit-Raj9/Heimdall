@@ -98,7 +98,7 @@ export function saveProjectFileRequest({ area, path, content, ifMatch, note }: S
 
 /** The download URL of the whole project as a zip. */
 export function projectExportUrl(): string {
-	return `${BENCH_API_BASE}/project/export.zip`;
+	return withOrgParam(`${BENCH_API_BASE}/project/export.zip`);
 }
 
 /** The raw download URL of one file, any size (the blobs route streams it). */
