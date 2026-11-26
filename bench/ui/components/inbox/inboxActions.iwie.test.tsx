@@ -27,7 +27,7 @@ const noop = () => {};
 const item = INBOX_NEW_DETAIL_FIXTURE.item;
 const suites = INBOX_LIST_FIXTURE.suites;
 // Made-up session (never a real session file).
-const session: InboxSession = { requests: ["Refund order A-1 please"], final_answer: "I could not." };
+const session: InboxSession = { requests: ["Refund order A-1 please"], calls: [], final_answer: "I could not." };
 
 describe("AcceptForm review bar (group E integration, I32 snippet)", () => {
 	it("shows the review bar for an item once a benchmark is chosen", () => {
