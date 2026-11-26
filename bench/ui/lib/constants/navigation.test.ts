@@ -11,6 +11,7 @@ describe("navigation", () => {
 		expect(DEFAULT_CLOSED_GROUPS).toEqual([]);
 		expect(BENCH_NAV.map((item) => item.to)).toEqual([
 			"/",
+			"/quickstart",
 			"/agents",
 			"/leaderboard",
 			"/improvements",
@@ -24,6 +25,7 @@ describe("navigation", () => {
 			"/why-agents-fail",
 			"/scheduled-checks",
 			"/live",
+			"/monitors",
 			"/releases",
 			"/settings",
 		]);
@@ -34,7 +36,6 @@ describe("navigation", () => {
 		const routes = BENCH_NAV.map((item) => item.to as string);
 		for (const gone of [
 			"/welcome",
-			"/quickstart",
 			"/experiments/new",
 			"/catalog",
 			"/canaries",
@@ -55,7 +56,7 @@ describe("navigation", () => {
 		const cases: [string, string | null][] = [
 			["/", "/"],
 			["/welcome", "/"],
-			["/quickstart", "/"],
+			["/quickstart", "/quickstart"],
 			["/evaluations", "/evaluations"],
 			["/evaluations/ev_1", "/evaluations"],
 			["/evaluate", "/evaluations"],
