@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 
@@ -27,6 +28,14 @@ type ImproveSource interface {
 	// Approve overrides a round's tripwires and continues in the background.
 	Approve(ctx context.Context, id string, round int, actor, reason string) (*improve.Summary, error)
 	Stop(ctx context.Context, id, actor string) (*improve.Summary, error)
+}
+
+// ImproveSourceW4 resumes and continues improvement runs (D5 A1.7, A2.11).
+// A source without it answers 501 on those routes.
+type ImproveSourceW4 interface {
+	Resume(ctx context.Context, id, actor string) (*improve.Summary, error)
+	Continue(ctx context.Context, id, actor string, in improve.ContinueRequest) (*improve.Summary, error)
+	ContinueEstimate(ctx context.Context, id string, in improve.ContinueRequest) (*improve.ContinueOffer, error)
 }
 
 // ImproveApproveRequest is the body of POST .../rounds/{k}/approve.
@@ -57,6 +66,10 @@ func (h *ImproveHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Mid
 	r.GET(APIPrefix+"/improvements/{id}/lineage", lib.ChainMiddlewares(h.getLineage, middlewares...))
 	r.POST(APIPrefix+"/improvements/{id}/rounds/{k}/approve", lib.ChainMiddlewares(h.postApprove, writeMW...))
 	r.POST(APIPrefix+"/improvements/{id}/stop", lib.ChainMiddlewares(h.postStop, writeMW...))
+	r.POST(APIPrefix+"/improvements/{id}/resume", lib.ChainMiddlewares(h.postResume, writeMW...))
+	r.POST(APIPrefix+"/improvements/{id}/continue", lib.ChainMiddlewares(h.postContinue, writeMW...))
+	r.POST(APIPrefix+"/improvements/{id}/continue/estimate", lib.ChainMiddlewares(h.postContinueEstimate, middlewares...))
+	h.RegisterStudyRoutes(r, middlewares...)
 }
 
 func (h *ImproveHandler) ready(ctx *fasthttp.RequestCtx) bool {
@@ -85,6 +98,8 @@ func (h *ImproveHandler) sendErr(ctx *fasthttp.RequestCtx, what string, err erro
 		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, what+": "+err.Error())
 	case errors.Is(err, improve.ErrOffline):
 		sendUnavailable(ctx, h.mode, "launching improvement runs")
+	case errors.Is(err, improve.ErrBadImprover): // A1.6: refused at create, before any spend
+		lib.SendError(ctx, h.mode, fasthttp.StatusUnprocessableEntity, "bad_improver", err.Error())
 	default:
 		sendDepError(ctx, h.mode, what, err)
 	}
@@ -243,4 +258,110 @@ func (h *ImproveHandler) postStop(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, s)
+}
+
+// w4 is the source's resume and continue, or a 501 answer.
+func (h *ImproveHandler) w4(ctx *fasthttp.RequestCtx) (ImproveSourceW4, bool) {
+	src, ok := h.src.(ImproveSourceW4)
+	if !ok {
+		lib.SendError(ctx, h.mode, fasthttp.StatusNotImplemented, lib.ErrTypeUnavailable, "This server cannot resume or continue improvement runs.")
+		return nil, false
+	}
+	return src, true
+}
+
+// sendW4Err answers a resume or continue error. Refusals carry plain
+// sentences and are sent as they are, without the run's id.
+func (h *ImproveHandler) sendW4Err(ctx *fasthttp.RequestCtx, err error) {
+	switch {
+	case errors.Is(err, improve.ErrNoExtend):
+		lib.SendError(ctx, h.mode, fasthttp.StatusNotImplemented, lib.ErrTypeUnavailable, err.Error())
+	case errors.Is(err, improve.ErrBusy), errors.Is(err, improve.ErrState):
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, err.Error())
+	default:
+		h.sendErr(ctx, "improvement", err)
+	}
+}
+
+func (h *ImproveHandler) continueBody(ctx *fasthttp.RequestCtx) (improve.ContinueRequest, bool) {
+	var in improve.ContinueRequest
+	if b := ctx.PostBody(); len(b) > 0 {
+		if err := json.Unmarshal(b, &in); err != nil {
+			in.ExtraTrials = -1
+		}
+	}
+	if in.ExtraTrials < 0 || in.ExtraTrials > improve.MaxTrials || in.ExtraBudgetUSD < 0 || (in.ExtraTrials == 0 && !in.NewTasks) {
+		lib.SendError(ctx, h.mode, fasthttp.StatusUnprocessableEntity, lib.ErrTypeBadRequest,
+			fmt.Sprintf("Ask for 1 to %d more tries per task, new held-out tasks, or both; the extra budget cannot be negative.", improve.MaxTrials))
+		return in, false
+	}
+	return in, true
+}
+
+// postResume handles POST /api/bench/improvements/{id}/resume (202).
+func (h *ImproveHandler) postResume(ctx *fasthttp.RequestCtx) {
+	id, ok := h.id(ctx)
+	if !ok || !h.ready(ctx) {
+		return
+	}
+	src, ok := h.w4(ctx)
+	if !ok {
+		return
+	}
+	work, cancel := workContext(ctx, readTimeout)
+	defer cancel()
+	s, err := src.Resume(work, id, actorOf(ctx))
+	if err != nil {
+		h.sendW4Err(ctx, err)
+		return
+	}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusAccepted, s)
+}
+
+// postContinue handles POST /api/bench/improvements/{id}/continue (202).
+func (h *ImproveHandler) postContinue(ctx *fasthttp.RequestCtx) {
+	id, ok := h.id(ctx)
+	if !ok || !h.ready(ctx) {
+		return
+	}
+	src, ok := h.w4(ctx)
+	if !ok {
+		return
+	}
+	in, ok := h.continueBody(ctx)
+	if !ok {
+		return
+	}
+	work, cancel := workContext(ctx, readTimeout)
+	defer cancel()
+	s, err := src.Continue(work, id, actorOf(ctx), in)
+	if err != nil {
+		h.sendW4Err(ctx, err)
+		return
+	}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusAccepted, s)
+}
+
+// postContinueEstimate handles POST /api/bench/improvements/{id}/continue/estimate.
+func (h *ImproveHandler) postContinueEstimate(ctx *fasthttp.RequestCtx) {
+	id, ok := h.id(ctx)
+	if !ok || !h.ready(ctx) {
+		return
+	}
+	src, ok := h.w4(ctx)
+	if !ok {
+		return
+	}
+	in, ok := h.continueBody(ctx)
+	if !ok {
+		return
+	}
+	work, cancel := workContext(ctx, readTimeout)
+	defer cancel()
+	o, err := src.ContinueEstimate(work, id, in)
+	if err != nil {
+		h.sendW4Err(ctx, err)
+		return
+	}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, o)
 }

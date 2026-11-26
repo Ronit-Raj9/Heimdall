@@ -32,6 +32,9 @@ const (
 	StatusDone     = "done"
 	StatusStopped  = "stopped"
 	StatusFailed   = "failed"
+	// StatusInterrupted is a run the server restart left behind; Resume
+	// continues it from its last saved step.
+	StatusInterrupted = "interrupted"
 )
 
 // Round stages and outcomes (Round.Stage).
@@ -61,6 +64,17 @@ var ErrOffline = errors.New("this server cannot launch improvement runs (offline
 // ErrState reports an action the improvement's state does not allow.
 var ErrState = errors.New("not allowed in this state")
 
+// ErrBadImprover marks a spec refused at create because its improver
+// cannot run (A1.5, A1.6); the error's text is the executor's sentence.
+var ErrBadImprover = errors.New("the improver cannot run")
+
+// badImprover wraps an executor's refusal so it reads as its own sentence
+// and still matches ErrBadImprover.
+type badImprover struct{ err error }
+
+func (e badImprover) Error() string   { return e.err.Error() }
+func (e badImprover) Unwrap() []error { return []error{ErrBadImprover, e.err} }
+
 var idRe = regexp.MustCompile(`^imp_[a-z0-9-]{1,64}$`)
 
 // ValidID reports whether id is an improvement id.
@@ -87,6 +101,36 @@ type Record struct {
 	Controls   *Controls      `json:"controls,omitempty"`
 	Verdict    *Verdict       `json:"verdict,omitempty"`
 	Error      string         `json:"error,omitempty"`
+
+	// Looks are the gate looks whose test ran, in order (A2.2).
+	Looks []LookRecord `json:"looks,omitempty"`
+	// Keep is the keep set the next round's proposals draw from (A3.4).
+	Keep []KeepEntry `json:"keep,omitempty"`
+	// Estimate is the pre-run estimate stored at creation (A2.8), and
+	// EstimateHash its utils.HashJSON.
+	Estimate     *Estimate `json:"estimate,omitempty"`
+	EstimateHash string    `json:"estimate_hash,omitempty"`
+	// Final is the claim's final interleaved experiment (A2.4), and
+	// Extension the second look when it ran (A2.11).
+	Final     *FinalClaim `json:"final,omitempty"`
+	Extension *FinalClaim `json:"extension,omitempty"`
+	// SpentUSD is the whole run's spend so far, for the hard stop (A2.10).
+	SpentUSD float64 `json:"spent_usd,omitempty"`
+	// Revision counts continues (A2.11).
+	Revision int `json:"revision,omitempty"`
+	// Study is the study this run is a loop of; InStudy skips the final
+	// experiment and the controls (A4.1).
+	Study   string `json:"study,omitempty"`
+	InStudy bool   `json:"in_study,omitempty"`
+	// SkillsOpened maps each skill of the incumbent to the last round a
+	// practice run of the incumbent opened it (or the round it was first
+	// seen), for the retire_skill pruning edits of A3.3.
+	SkillsOpened map[string]int `json:"skills_opened,omitempty"`
+	// StudyLimitUSD is the total limit of the study this run is a loop of,
+	// and StudyPriorUSD what the study's earlier loops spent: the hard stop
+	// keeps the whole study under its total (Spec.Budget is the loop's share).
+	StudyLimitUSD float64 `json:"study_limit_usd,omitempty"`
+	StudyPriorUSD float64 `json:"study_prior_usd,omitempty"`
 }
 
 // Baseline is version 0 before round 1: dev (the first evidence) and
@@ -123,6 +167,105 @@ type Round struct {
 	ParentEvidence []EvidenceItem `json:"parent_evidence,omitempty"`
 	StartedAt      time.Time      `json:"started_at"`
 	FinishedAt     *time.Time     `json:"finished_at,omitempty"`
+
+	// ParentObj is the incumbent's candidate object; Measures maps a phase
+	// to its measure object, written before the experiment starts (A1.2).
+	ParentObj string            `json:"parent_obj,omitempty"`
+	Measures  map[string]string `json:"measures,omitempty"`
+	// Candidates are the round's ideas (A3.4), Stages the halving levels
+	// (A2.3), Winner the id of the candidate that went to the gate.
+	Candidates []CandidateRun `json:"candidates,omitempty"`
+	Stages     []StageResult  `json:"stages,omitempty"`
+	Winner     string         `json:"winner,omitempty"`
+	// Commit is the gate decision (A2.2).
+	Commit *CommitDecision `json:"commit,omitempty"`
+}
+
+// CandidateRun is one idea of a round: its slot, kind, the version it
+// froze as, its edits and how far it got.
+type CandidateRun struct {
+	ID        string        `json:"id"`
+	Slot      int           `json:"slot"`
+	Kind      string        `json:"kind"`             // mutation | merge | restart | null
+	Source    string        `json:"source,omitempty"` // the version edited
+	Version   *Version      `json:"version,omitempty"`
+	Obj       string        `json:"obj,omitempty"` // candidate object hash
+	Edits     []AppliedEdit `json:"edits,omitempty"`
+	Gates     []GateResult  `json:"gates,omitempty"`
+	Tripwires []string      `json:"tripwires,omitempty"`
+	Dropped   string        `json:"dropped,omitempty"` // plain reason it stopped
+	DevDiff   float64       `json:"dev_diff,omitempty"`
+	DevTasks  int           `json:"dev_tasks,omitempty"`
+	CostUSD   float64       `json:"cost_usd,omitempty"`
+}
+
+// StageResult is one level of the practice screen.
+type StageResult struct {
+	Level     int      `json:"level"`
+	Tasks     int      `json:"tasks"`
+	ExpID     string   `json:"exp_id,omitempty"`
+	Survivors []string `json:"survivors,omitempty"`
+}
+
+// KeepEntry is one member of the keep set.
+type KeepEntry struct {
+	Ref     string   `json:"ref"`
+	Obj     string   `json:"obj,omitempty"`
+	Led     []string `json:"led,omitempty"` // practice tasks where it beats the incumbent
+	DevDiff float64  `json:"dev_diff,omitempty"`
+}
+
+// FinalClaim is the final (or extension) experiment the claim reads.
+type FinalClaim struct {
+	ExpID    string     `json:"exp_id,omitempty"`
+	Arms     []string   `json:"arms,omitempty"`
+	Trials   int        `json:"trials,omitempty"`
+	N        int        `json:"n,omitempty"`
+	NNonzero int        `json:"n_nonzero,omitempty"`
+	Gain     float64    `json:"gain,omitempty"`
+	PUpper   float64    `json:"p_upper,omitempty"`
+	PLower   float64    `json:"p_lower,omitempty"`
+	MDE      float64    `json:"mde,omitempty"`
+	Level    float64    `json:"level,omitempty"`
+	CI80     [2]float64 `json:"ci80,omitempty"`
+	CI95     [2]float64 `json:"ci95,omitempty"`
+}
+
+// RetriesControl is version 0 retried on visible failures with up to the
+// loop's spend (A2.6).
+type RetriesControl struct {
+	K        int        `json:"k,omitempty"`
+	Attempts int        `json:"attempts,omitempty"`
+	LoopUSD  float64    `json:"loop_usd,omitempty"`
+	UsedUSD  float64    `json:"used_usd,omitempty"`
+	Score    float64    `json:"score,omitempty"`
+	Diff     float64    `json:"diff,omitempty"`
+	CI80     [2]float64 `json:"ci80,omitempty"`
+}
+
+// NullCursor is where the null improver stopped, so it resumes (A1.7).
+type NullCursor struct {
+	Round   int     `json:"round"`
+	Version Version `json:"version"`
+	CostUSD float64 `json:"cost_usd,omitempty"`
+}
+
+// ControlLine is one control as the verdict shows it.
+type ControlLine struct {
+	Score float64    `json:"score,omitempty"`
+	Diff  float64    `json:"diff,omitempty"`
+	CI80  [2]float64 `json:"ci80,omitempty"`
+	Note  string     `json:"note,omitempty"`
+}
+
+// ContinueOffer is the second look a done run may buy (A2.11).
+type ContinueOffer struct {
+	ExtraTrials int        `json:"extra_trials,omitempty"`
+	NewTasks    int        `json:"new_tasks,omitempty"`
+	Runs        int        `json:"runs,omitempty"`
+	USD         [2]float64 `json:"usd,omitempty"`
+	CanConfirm  float64    `json:"can_confirm,omitempty"` // points
+	Text        string     `json:"text,omitempty"`
 }
 
 // Approval is a person's override of a round's tripwires, recorded in red.
@@ -174,6 +317,9 @@ type Controls struct {
 	BudgetMatched *BudgetMatched `json:"budget_matched,omitempty"`
 	Null          *NullControl   `json:"null,omitempty"`
 	CostUSD       float64        `json:"cost_usd"`
+
+	Retries    *RetriesControl `json:"retries,omitempty"`
+	NullCursor *NullCursor     `json:"null_cursor,omitempty"`
 }
 
 // BudgetMatched is version 0 given the loop's spend as extra trials.
@@ -196,11 +342,15 @@ type NullControl struct {
 	Final   Version  `json:"final"`
 	Score   ArmScore `json:"score"`
 	CostUSD float64  `json:"cost_usd"`
+
+	// Diff is final minus the null final per task, with its 80% interval (A2.7).
+	Diff float64    `json:"diff,omitempty"`
+	CI80 [2]float64 `json:"ci80,omitempty"`
 }
 
 // Verdict is the claim the run supports.
 type Verdict struct {
-	State       string   `json:"state"` // supported | not_supported | inconclusive | no_change
+	State       string   `json:"state"` // a Verdict* state; not_supported and inconclusive are old states
 	Headline    string   `json:"headline"`
 	SealedGain  float64  `json:"sealed_gain"`
 	P           *float64 `json:"p,omitempty"`
@@ -214,6 +364,23 @@ type Verdict struct {
 	TotalUSD    float64  `json:"total_usd"`
 	GainPerUSD  *float64 `json:"gain_per_usd,omitempty"`
 	Notes       []string `json:"notes"`
+
+	// The claim's numbers (A2.5). SealedGain equals Gain and P points at
+	// PUpper, for old readers.
+	Gain      float64        `json:"gain,omitempty"`
+	CI80      [2]float64     `json:"ci80,omitempty"`
+	CI95      [2]float64     `json:"ci95,omitempty"`
+	PUpper    float64        `json:"p_upper,omitempty"`
+	PLower    float64        `json:"p_lower,omitempty"`
+	N         int            `json:"n,omitempty"`
+	NNonzero  int            `json:"n_nonzero,omitempty"`
+	MDE       float64        `json:"mde,omitempty"`
+	Level     float64        `json:"level,omitempty"`
+	Teacher   string         `json:"teacher,omitempty"`
+	Null      *ControlLine   `json:"null,omitempty"`
+	Retries   *ControlLine   `json:"retries,omitempty"`
+	Continue  *ContinueOffer `json:"continue,omitempty"`
+	Sentences []string       `json:"sentences,omitempty"`
 }
 
 // Verdict states.
@@ -222,6 +389,12 @@ const (
 	VerdictNotSupported = "not_supported"
 	VerdictInconclusive = "inconclusive"
 	VerdictNoChange     = "no_change"
+
+	VerdictLikelyBetter       = "likely_better"
+	VerdictInsufficientSample = "insufficient_sample"
+	VerdictNoEvidence         = "no_evidence"
+	VerdictWorse              = "worse"
+	VerdictNotClaimable       = "not_claimable"
 )
 
 func (r *Runner) dir(id string) string { return filepath.Join(r.Root, id) }
@@ -376,6 +549,52 @@ func taskDiffs(a, b ArmScore, tasks []string) []float64 {
 	for _, t := range tasks {
 		va, okA := a.PerTask[t]
 		vb, okB := b.PerTask[t]
+		if okA && okB {
+			out = append(out, vb-va)
+		}
+	}
+	return out
+}
+
+// TaskMeans are arm's per-task mean success (clamped to [0, 1]) over its
+// known runs, for the tasks listed; a task with no known run is left out.
+// The count is the tasks of the list that have no known run on this arm.
+func TaskMeans(runs []RunScore, arm int, tasks []string) (map[string]float64, int) {
+	want := make(map[string]bool, len(tasks))
+	for _, t := range tasks {
+		want[t] = true
+	}
+	sum := map[string]float64{}
+	cnt := map[string]int{}
+	for _, x := range runs {
+		if x.Arm != arm || !x.Known || !want[x.Task] {
+			continue
+		}
+		sum[x.Task] += clamp01(x.Success)
+		cnt[x.Task]++
+	}
+	out := make(map[string]float64, len(cnt))
+	missing := 0
+	for t := range want {
+		if n := cnt[t]; n > 0 {
+			out[t] = sum[t] / float64(n)
+		} else {
+			missing++
+		}
+	}
+	return out, missing
+}
+
+// TaskDiffs are b minus a per task, for the tasks both maps hold, in sorted
+// task order (A2.1).
+func TaskDiffs(a, b map[string]float64, tasks []string) []float64 {
+	ts := slices.Clone(tasks)
+	slices.Sort(ts)
+	ts = slices.Compact(ts)
+	out := []float64{}
+	for _, t := range ts {
+		va, okA := a[t]
+		vb, okB := b[t]
 		if okA && okB {
 			out = append(out, vb-va)
 		}

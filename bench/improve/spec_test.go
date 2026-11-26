@@ -11,7 +11,7 @@ func TestParseSpec(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Rounds != DefaultRounds || s.Commit.AuditLooks != DefaultRounds || len(s.Controls) != 2 || s.Kind != Kind {
+	if s.Rounds != DefaultRounds || s.Commit.AuditLooks != DefaultRounds || len(s.Controls) != 2 || s.Controls[0] != ControlRetries || s.Kind != Kind {
 		t.Errorf("defaults: %+v", s)
 	}
 	if a := s.RoundAlpha(); a != DefaultAlpha/3 {

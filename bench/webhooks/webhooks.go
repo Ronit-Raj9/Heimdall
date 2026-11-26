@@ -58,12 +58,14 @@ const (
 	EventReleaseBlocked      = "release.blocked"      // a finished evaluation's version cannot be released without an override
 	EventScheduleFailed      = "schedule.failed"      // a scheduled check could not run or failed its check
 	EventWorkerOffline       = "worker.offline"       // a connected worker stopped answering
+	EventImprovementFinished = "improvement.finished" // an improvement run ended: done, stopped or failed, with its headline
+	EventImprovementPaused   = "improvement.paused"   // an improvement run paused for a person's approval
 	EventPing                = "ping"                 // the Test button; always delivered to the hook tested
 )
 
 // Events lists the subscribable event types.
 var Events = []string{EventEvaluationFinished, EventEvaluationRegressed, EventReleaseBlocked, EventScheduleFailed, EventWorkerOffline,
-	EventExperimentFinished, EventJobFailed}
+	EventExperimentFinished, EventJobFailed, EventImprovementFinished, EventImprovementPaused}
 
 // Limits.
 const (

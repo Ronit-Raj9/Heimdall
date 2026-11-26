@@ -113,6 +113,7 @@ func serveHosted(ctx context.Context, a *app, offline bool) int {
 	startHostedDataOps(ctx, env)
 	startEvidenceMirror(ctx, a)                             // Evidence storage area (P6): mirror and sweeper over runs/orgs/*; seals notify through evidenceOnSeal (evidence.go)
 	go backfillShareIndex(ctx, env)                         // fix wave 3, N293: opaque share tokens for links made before (sharebackfill_hosted.go)
+	go markInterruptedImprovements(ctx, env)                // D5 WP6: runs a restart left running wait for Resume (improveresume.go)
 	serveMetrics(ctx, a.cfg.Server.MetricsListen, a.logger) // N9: Prometheus on the admin address (servemetrics.go)
 	srv, err := newHostedServer(env)
 	if err != nil {
@@ -261,6 +262,10 @@ func orgBuilder(env *hostedEnv) tenancy.Builder {
 		}}
 		if ar, ok := deps.Launcher.(interface{ Busy() bool }); ok {
 			rt.Busy = ar.Busy
+		}
+		if src, ok := deps.Improvements.(improveSource); ok { // D5 WP6: never evicted under a running improvement loop
+			launcherBusy := rt.Busy
+			rt.Busy = func() bool { return (launcherBusy != nil && launcherBusy()) || src.r.AnyRunning() }
 		}
 		rt.Value = deps.Launcher
 		return rt, nil

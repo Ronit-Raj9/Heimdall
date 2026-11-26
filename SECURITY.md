@@ -1,3 +1,5 @@
+Heimdall (the `bench/` folder): see `bench/SECURITY.md`.
+
 # Security Policy
 
   ## Reporting a Vulnerability

@@ -1,0 +1,129 @@
+{
+	"form": {
+		"surfaces": "What may change",
+		"instructions": "Standing instructions (added before every task)",
+		"folder": "(folder: the improver may add skills here)",
+		"fixed": "Kept fixed: model, tools, settings, budgets.",
+		"surfaceNone": "Tick at least one thing the improver may change.",
+		"size": "Size",
+		"limit": "Spending limit for the whole run",
+		"limitError": "The spending limit must be above 0.",
+		"ideas": "Ideas per round",
+		"ideasError": "Pick 1 to 8 ideas per round.",
+		"improver": "Improver: Heimdall reflect-edit 1.1.0, on the agent's own model"
+	},
+	"preset": {
+		"small": "Small",
+		"medium": "Medium",
+		"large": "Large",
+		"custom": "Custom",
+		"line": "{{rounds}} rounds, {{ideas}} ideas per round, about {{pool}} tasks",
+		"customLine": "Pick rounds, ideas per round and the spending limit"
+	},
+	"estimate": {
+		"title": "Estimate",
+		"studyLimit": "Total for {{loops}} loops: at most ${{total}} (${{each}} for each loop)",
+		"loading": "Estimating the cost and what this run can confirm",
+		"splits": "{{pool}} tasks: {{practice}} to practise on, {{gate}} to decide, {{held_out}} kept hidden until the end.",
+		"detectable": "Smallest gain this run can confirm: about {{held_out_points}} points.",
+		"notEnough": "Smallest gain this run can confirm: not enough tasks to estimate.",
+		"cost": "Estimated cost: ${{low}} to ${{high}}, about {{minutes_low}} to {{minutes_high}} minutes. Hard stop at ${{limit}}.",
+		"improver": "Improver: Heimdall reflect-edit 1.1.0, on {{model}}.",
+		"improverTeacher": "Improver: Heimdall reflect-edit 1.1.0, on {{teacher}}, teacher-assisted.",
+		"unavailable": "The estimate is not available: {{error}}",
+		"waiting": "The estimate appears when the form is complete."
+	},
+	"reason": {
+		"name": "Give the run a name.",
+		"agent": "Pick an agent.",
+		"suite": "Pick a benchmark.",
+		"surface": "Tick at least one thing the improver may change.",
+		"rounds": "Pick 1 to 20 rounds.",
+		"ideas": "Pick 1 to 8 ideas per round.",
+		"limit": "Set a spending limit above 0.",
+		"estimating": "Waiting for the estimate."
+	},
+	"verdict": {
+		"mde": "Smallest gain it can confirm",
+		"notEnough": "not enough tasks to estimate",
+		"continue": "Continue with more budget",
+		"pending": "The verdict appears when the run ends."
+	},
+	"continue": {
+		"title": "Continue with more budget",
+		"confirm": "Continue this run? It spends up to ${{usd}} more on {{runs}} runs. The result is tested again with a reserved part of the error budget.",
+		"loading": "Working out what a second look costs",
+		"submit": "Continue",
+		"cancel": "Cancel"
+	},
+	"status": {
+		"line": "Round {{r}} of {{total}}: {{stage}}. Spent ${{spent}} of ${{limit}}.",
+		"stage": {
+			"improve": "writing ideas",
+			"screen": "trying ideas on practice tasks",
+			"audit": "testing the best idea on gate tasks",
+			"final": "scoring the final version on hidden tasks",
+			"retries": "retrying version 0 for the comparison",
+			"other": "working"
+		}
+	},
+	"resume": {
+		"button": "Resume",
+		"confirm": "Resume this run? It continues from its last saved step; nothing already paid for runs again."
+	},
+	"timeline": {
+		"title": "Timeline",
+		"row": "Round {{n}}: {{ideas}} ideas tried, {{gate}} tested on the gate, {{decision}}.",
+		"rowP": "Round {{n}}: {{ideas}} ideas tried, {{gate}} tested on the gate, {{decision}} (p {{p}}).",
+		"kept": "kept",
+		"notKept": "not kept",
+		"inProgress": "in progress",
+		"source": {
+			"mutation": "edit of {{version}}",
+			"merge": "merge",
+			"restart": "restart from version 0",
+			"null": "made without feedback"
+		},
+		"practice": "practice difference {{v}}",
+		"stopped": "stopped: {{why}}",
+		"winner": "went to the gate"
+	},
+	"explain": {
+		"title": "What changed and why",
+		"description": "Each kept version against the one before it, up to the final version: each file the improver changed, each edit with its reason and result.",
+		"none": "No new version was kept, so nothing changed.",
+		"loading": "Reading what changed",
+		"error": "Could not read what changed in this version.",
+		"rationale": "The improver's reasoning",
+		"edit": "{{op}}: {{reason}}",
+		"evidence": "from {{count}} practice runs",
+		"predicts": "expected to fix {{count}} practice tasks",
+		"result": "Result: {{result}}",
+		"open": "Open the agent's saved versions",
+		"rejected": "Ideas not kept",
+		"rejectedRow": "Round {{n}}: {{why}}",
+		"noLines": "No change to the text of this file."
+	},
+	"cost": {
+		"practice": "Practice",
+		"gate": "Gate",
+		"hidden": "Hidden scoring",
+		"improver": "Improver",
+		"controls": "Comparisons",
+		"total": "Total",
+		"hardStop": "Hard stop",
+		"perDollar": "Gain per dollar",
+		"perDollarValue": "{{v}} points per dollar"
+	},
+	"badge": {
+		"supported": "Better",
+		"likely_better": "Likely better",
+		"insufficient_sample": "Not enough tasks",
+		"no_evidence": "No clear change",
+		"worse": "Worse",
+		"no_change": "No change",
+		"not_claimable": "Not claimable",
+		"teacher": "Teacher-assisted",
+		"interrupted": "Interrupted"
+	}
+}

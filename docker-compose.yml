@@ -1,0 +1,24 @@
+# Heimdall with recorded data: no keys, no Docker-in-Docker, nothing runs.
+#   docker compose up --build      then open http://localhost:8090
+name: heimdall-demo
+services:
+  heimdall:
+    build:
+      context: bench
+      dockerfile: deploy/hosted/Dockerfile.server
+      target: server
+    image: heimdall-demo:local
+    entrypoint: ["/bin/sh", "/srv/heimdall/demo/entrypoint.sh"]
+    volumes:
+      - heimdall-demo-data:/var/lib/heimdall
+      - ./bench/testdata/recorded:/srv/heimdall/seed:ro
+      - ./bench/deploy/demo:/srv/heimdall/demo:ro
+    ports:
+      - "127.0.0.1:8090:8090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+volumes:
+  heimdall-demo-data: {}

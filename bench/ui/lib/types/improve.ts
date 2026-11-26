@@ -1,7 +1,17 @@
 /** Improvement runs (bench/improve, GET /improvements). Mirrors improve.Summary, Detail and friends. */
 
-export type ImprovementStatus = "planned" | "running" | "awaiting_approval" | "done" | "stopped" | "failed";
-export type ImprovementVerdictState = "supported" | "not_supported" | "inconclusive" | "no_change";
+export type ImprovementStatus = "planned" | "running" | "awaiting_approval" | "done" | "stopped" | "failed" | "interrupted";
+/** Verdict states (improve/record.go). not_supported and inconclusive are states of older runs. */
+export type ImprovementVerdictState =
+	| "supported"
+	| "likely_better"
+	| "insufficient_sample"
+	| "no_evidence"
+	| "worse"
+	| "no_change"
+	| "not_claimable"
+	| "not_supported"
+	| "inconclusive";
 export type LineageStatus = "base" | "committed" | "rejected" | "tripped" | "control" | "pending";
 
 export interface ImprovementSummary {
@@ -22,6 +32,8 @@ export interface ImprovementSummary {
 	verdict?: ImprovementVerdictState;
 	sealed_gain?: number;
 	total_usd: number;
+	/** Set when the improver ran on a teacher model (A3.7). */
+	teacher?: string;
 }
 
 export interface ImprovementList {
@@ -72,7 +84,8 @@ export interface EValueTest {
 }
 
 export interface CompareView {
-	exp_id: string;
+	/** Served for the practice comparison only (A1.10). */
+	exp_id?: string;
 	a: ScoreView;
 	b: ScoreView;
 	mean_diff: number;
@@ -137,6 +150,10 @@ export interface RoundView {
 	cost: RoundCost;
 	started_at: string;
 	finished_at?: string;
+	candidates?: CandidateView[];
+	commit?: CommitView;
+	winner?: string;
+	stages?: StageView[];
 }
 
 export interface LineageNode {
@@ -194,12 +211,180 @@ export interface ImprovementVerdict {
 	total_usd: number;
 	gain_per_usd?: number;
 	notes: string[];
+	/** The claim's numbers (A2.5). Absent on older runs. */
+	gain?: number;
+	ci80?: [number, number];
+	ci95?: [number, number];
+	p_upper?: number;
+	p_lower?: number;
+	n?: number;
+	n_nonzero?: number;
+	/** Smallest gain the held-out tasks can confirm, as a fraction; 0 when there were fewer than 2 tasks. */
+	mde?: number;
+	level?: number;
+	teacher?: string;
+	null?: ControlLine;
+	retries?: ControlLine;
+	continue?: ContinueOffer;
+	/** The final wording (A2.12): the headline first, then the lines under it. */
+	sentences?: string[];
+}
+
+export interface ControlLine {
+	score?: number;
+	diff?: number;
+	ci80?: [number, number];
+	note?: string;
+}
+
+/** What a second look on more tasks or tries would cost and could confirm (A2.11). */
+export interface ContinueOffer {
+	extra_trials?: number;
+	new_tasks?: number;
+	runs?: number;
+	usd?: [number, number];
+	/** Points. */
+	can_confirm?: number;
+	text?: string;
+}
+
+/** The body of POST .../continue/estimate and, with extra_budget_usd, of POST .../continue. */
+export interface ContinueRequest {
+	extra_trials: number;
+	new_tasks: boolean;
+	extra_budget_usd?: number;
+}
+
+export interface EstimateNote {
+	code: string;
+	message: string;
+}
+
+/** The pre-run estimate (A2.8), answered by POST /improvements/estimate. */
+export interface ImprovementEstimate {
+	ok: boolean;
+	pool: number;
+	splits: { practice: number; gate: number; held_out: number; impossible: number };
+	runs: { baseline: number; improver: number; practice: number; gate: number; held_out_curve: number; final: number; total: number };
+	/** A study's limit is the total for all loops: loop_limit is each loop's share, limit_text says both. */
+	usd: {
+		low: number;
+		expected: number;
+		high: number;
+		limit: number;
+		per_run: number;
+		per_run_source: string;
+		loop_limit?: number;
+		limit_text?: string;
+	};
+	minutes: { low: number; high: number };
+	detectable: { gate_points: number; held_out_points: number };
+	assumed: string[] | null;
+	refusals: EstimateNote[] | null;
+	warnings: EstimateNote[] | null;
+	/** The number of whole loops of a study; absent for one run. */
+	loops?: number;
+}
+
+export interface AppliedEditView {
+	op: string;
+	id?: string;
+	reason: string;
+	result: string;
+	why?: string;
+}
+
+/** One idea of a round (A3.4). */
+export interface CandidateView {
+	id: string;
+	slot: number;
+	kind: "mutation" | "merge" | "restart" | "null" | string;
+	source?: string;
+	dropped?: string;
+	dev_diff?: number;
+	dev_tasks?: number;
+	cost_usd?: number;
+	edits?: AppliedEditView[];
+}
+
+/** The gate decision of a round (A2.2). */
+export interface CommitView {
+	p: number;
+	level: number;
+	mean: number;
+	n: number;
+	n_nonzero: number;
+	missing: number;
+	skipped: boolean;
+	why: string;
+}
+
+export interface StageView {
+	level: number;
+	tasks: number;
+	survivors?: string[];
+}
+
+export interface KeepView {
+	ref: string;
+	dev_diff?: number;
+	led?: string[];
+}
+
+export interface FinalView {
+	n: number;
+	n_nonzero: number;
+	gain: number;
+	ci80: [number, number];
+	ci95: [number, number];
+	p_upper: number;
+	trials: number;
+}
+
+/** One edit in the explain view, with counts in place of the evidence refs. */
+export interface ExplainEdit {
+	op: string;
+	id?: string;
+	reason: string;
+	evidence_count: number;
+	predicts_fixed: number;
+	result: string;
+}
+
+export interface ExplainFile {
+	path: string;
+	status: "added" | "removed" | "changed" | "unchanged";
+	lines: DiffLine[];
+	edits: ExplainEdit[];
+}
+
+/** GET /improvements/{id}/versions/{n}/explain (A4.3): what changed in a version and why. */
+export interface VersionExplain {
+	ref: string;
+	parent_ref: string;
+	round: number;
+	source: string;
+	improver: string;
+	model: string;
+	files: ExplainFile[];
+	rationale: string;
+	gates: GateResult[];
+	decision: string;
+	why: string;
 }
 
 export interface ImprovementDetail extends Omit<ImprovementSummary, "verdict"> {
 	verdict?: ImprovementVerdictState;
 	spec_hash: string;
-	spec: { rounds: number; editable: { files: string[]; dirs?: string[] }; improver: { budget_usd: number }; commit: { alpha: number } };
+	spec: {
+		rounds: number;
+		editable: { files: string[]; dirs?: string[]; instructions?: boolean };
+		improver: { budget_usd: number; candidates?: number; model?: string; task?: string };
+		commit: { alpha: number };
+		preset?: string;
+		sealed?: { trials: number; curve?: boolean };
+		budget?: { total_usd: number };
+	};
 	splits: { dev: string[]; audit: number; sealed: number; honeypots: number; hash: string };
 	base: { ref: string; number: number; config_hash: string; bundle_hash: string };
 	curve: CurvePoint[];
@@ -212,4 +397,14 @@ export interface ImprovementDetail extends Omit<ImprovementSummary, "verdict"> {
 	error?: string;
 	audit_looks: number;
 	audit_looks_max: number;
+	/** The WP6 additions; each is absent on a server without them. */
+	estimate?: ImprovementEstimate;
+	spent_usd?: number;
+	limit_usd?: number;
+	revision?: number;
+	can_resume?: boolean;
+	can_continue?: boolean;
+	study?: string;
+	keep?: KeepView[];
+	final?: FinalView;
 }

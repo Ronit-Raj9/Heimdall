@@ -1,0 +1,38 @@
+# Heimdall demo configuration for the root docker-compose.yml: recorded data
+# only, served from the seeded runs folder. A copy of deploy/bench.yaml with
+# the paths, listen address, mode and allowed hosts changed. Every key can be
+# overridden with an environment variable named BENCH_<SECTION>_<KEY>
+# (top-level keys: BENCH_<KEY>), for example BENCH_SERVER_MODE=recorded. List
+# values in the environment are comma-separated.
+runs_root: /var/lib/heimdall/runs
+benchmarks_root: /srv/heimdall/benchmarks
+pricing: /srv/heimdall/deploy/pricing-snapshot.json
+
+server:
+  # All interfaces inside the container; compose publishes it on loopback only.
+  listen: 0.0.0.0:8090
+  # live | recorded | synthetic. Every API response carries it.
+  mode: recorded
+  # Extra Host header values accepted besides loopback names (DNS rebinding guard).
+  allowed_hosts: [localhost, 127.0.0.1]
+  # Origins allowed to call the API from a browser. Empty keeps CORS off.
+  cors_origins: []
+
+gateway:
+  url: http://127.0.0.1:18080        # host side
+  agent_url: http://bifrost:8080     # from inside the evaluation network
+  admin_token_env: BIFROST_SETUP_TOKEN
+  provider: anthropic
+  # Runs that may use one provider at once: fp-slot-1..N (anthropic) and
+  # oa-slot-1..N (openai). Keep it equal to the proxy --slots-per-provider in
+  # docker-compose.yml. A team of N members holds N slots.
+  slots_per_provider: 24
+
+faultproxy:
+  control_url: http://127.0.0.1:19101
+
+networks:
+  eval: bench-evalnet
+
+images:
+  helper: bench/coding-core-base:1

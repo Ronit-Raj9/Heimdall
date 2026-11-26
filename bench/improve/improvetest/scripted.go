@@ -49,6 +49,8 @@ const (
 	Quiet   = "quiet"   // raises the level and switches off its tool-call logging
 	Frozen  = "frozen"  // raises the level and writes a non-editable file
 	Spender = "spender" // raises the level and spends its whole cap
+	Worse   = "worse"   // lowers the level: a regression
+	Noise   = "noise"   // adds a filler line; with Noise set, success is a coin
 )
 
 // Exec is the scripted executor. A version's notes carry "level: N"; a
@@ -65,6 +67,25 @@ type Exec struct {
 	// change any decision when it moves.
 	SealedBonus int
 	Step        int // levels an improving round adds (default 3)
+	// Slots gives the behavior of one idea slot of a round (slot from 1);
+	// a slot not listed uses Behavior.
+	Slots map[int]string
+	// Noise, when above 0, makes every run succeed with this chance,
+	// whatever the version: ideas that never matter. NoiseSeed varies it.
+	Noise     float64
+	NoiseSeed int64
+	// TimeoutTries makes the first TimeoutTries failing runs of version 1
+	// on each task, in the final and retries phases, visible failures
+	// (outcome and Stop "timeout").
+	TimeoutTries int
+	// Hold is a phase whose first Score closes Held and waits for Release.
+	Hold    string
+	Held    chan struct{}
+	Release chan struct{}
+
+	requests map[string]improve.ScoreRequest
+	attempts map[string]int
+	held     bool
 
 	mu       sync.Mutex
 	versions []string // doc of v1..vN
@@ -110,7 +131,9 @@ func (x *Exec) Tasks(_ context.Context, spec *improve.Spec) ([]improve.TaskInfo,
 	}
 	out := []improve.TaskInfo{}
 	for i := 1; i <= n; i++ {
-		out = append(out, improve.TaskInfo{ID: TaskID(i)})
+		if id := TaskID(i); len(spec.Tasks) == 0 || slices.Contains(spec.Tasks, id) {
+			out = append(out, improve.TaskInfo{ID: id})
+		}
 	}
 	out = append(out, improve.TaskInfo{ID: "task-impossible-1", Impossible: true})
 	return out, nil
@@ -136,7 +159,7 @@ func (x *Exec) Improve(_ context.Context, req improve.ImproveRequest) (*improve.
 	if cost == 0 {
 		cost = 0.1
 	}
-	res := &improve.ImproveResult{RunID: fmt.Sprintf("r_imp%d", req.Round), CostUSD: cost}
+	res := &improve.ImproveResult{RunID: fmt.Sprintf("r_imp%d_%d", req.Round, SlotOf(req)), CostUSD: cost}
 	if req.Null {
 		b[NotesPath] = b[NotesPath] + fmt.Sprintf("filler note %d\n", req.Round)
 		res.Bundle = b
@@ -147,8 +170,16 @@ func (x *Exec) Improve(_ context.Context, req improve.ImproveRequest) (*improve.
 		step = 3
 	}
 	up := strings.Replace(b[NotesPath], "level: "+strconv.Itoa(lvl), "level: "+strconv.Itoa(lvl+step), 1)
-	switch x.Behavior {
+	behavior := x.Behavior
+	if b, ok := x.Slots[SlotOf(req)]; ok {
+		behavior = b
+	}
+	switch behavior {
 	case Lazy:
+	case Worse:
+		b[NotesPath] = strings.Replace(b[NotesPath], "level: "+strconv.Itoa(lvl), "level: "+strconv.Itoa(lvl-step), 1)
+	case Noise:
+		b[NotesPath] = b[NotesPath] + fmt.Sprintf("idea %d.%d\n", req.Round, SlotOf(req))
 	case Cheat:
 		var sb strings.Builder
 		for i := 1; i <= max(20, x.NTasks); i++ {
@@ -174,6 +205,17 @@ func (x *Exec) Improve(_ context.Context, req improve.ImproveRequest) (*improve.
 func (x *Exec) Score(_ context.Context, req improve.ScoreRequest) (*improve.ScoreResult, error) {
 	x.mu.Lock()
 	x.count(req.Phase)
+	if x.requests == nil {
+		x.requests = map[string]improve.ScoreRequest{}
+	}
+	x.requests[req.Phase] = req
+	if x.Hold == req.Phase && !x.held {
+		x.held = true
+		x.mu.Unlock()
+		close(x.Held)
+		<-x.Release
+		x.mu.Lock()
+	}
 	if x.FailOn == req.Phase && !x.failed {
 		x.failed = true
 		x.mu.Unlock()
@@ -195,24 +237,64 @@ func (x *Exec) Score(_ context.Context, req improve.ScoreRequest) (*improve.Scor
 		for _, t := range req.Tasks {
 			for tr := 1; tr <= req.Trials; tr++ {
 				limit := lvl + x.Base
-				if req.Phase == improve.PhaseSealed || req.Phase == improve.PhaseControl {
+				switch req.Phase {
+				case improve.PhaseSealed, improve.PhaseControl, improve.PhaseFinal, improve.PhaseExtension, improve.PhaseRetries:
 					limit += x.SealedBonus
 				}
 				ok := bucket(t) < limit && !strings.HasPrefix(t, "task-impossible")
+				if x.Noise > 0 {
+					ok = x.coin(req, arm, t, tr) < x.Noise
+				}
 				s := 0.0
 				if ok {
 					s = 1
 				}
-				out := "failed"
+				out, stop := "failed", ""
 				if ok {
 					out = "passed"
 				}
-				res.Runs = append(res.Runs, improve.RunScore{Arm: ai, Task: t, Trial: tr, Success: s, Known: true, Outcome: out, CostUSD: usd})
+				if !ok && x.TimeoutTries > 0 && arm.Number == 1 && (req.Phase == improve.PhaseFinal || req.Phase == improve.PhaseRetries) {
+					x.mu.Lock()
+					if x.attempts == nil {
+						x.attempts = map[string]int{}
+					}
+					if x.attempts[t] < x.TimeoutTries && (tr == 1 || req.Phase == improve.PhaseRetries) {
+						out, stop = "timeout", "timeout"
+					}
+					if tr == 1 || req.Phase == improve.PhaseRetries {
+						x.attempts[t]++
+					}
+					x.mu.Unlock()
+				}
+				res.Runs = append(res.Runs, improve.RunScore{Arm: ai, Task: t, Trial: tr, Success: s, Known: true, Outcome: out, Stop: stop, CostUSD: usd})
 				res.CostUSD += usd
 			}
 		}
 	}
 	return res, nil
+}
+
+// Request is the last scoring request of a phase.
+func (x *Exec) Request(phase string) improve.ScoreRequest {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	return x.requests[phase]
+}
+
+// SlotOf reads the idea slot from an improver request's seed, which the
+// default proposer sets to spec seed x 1000 + round x 16 + slot.
+func SlotOf(req improve.ImproveRequest) int {
+	if req.Spec == nil || req.Seed == 0 {
+		return 1
+	}
+	return int(req.Seed - req.Spec.Seed*1000 - int64(req.Round*16))
+}
+
+// coin is a fixed pseudo random number in [0, 1) for one run.
+func (x *Exec) coin(req improve.ScoreRequest, arm improve.Version, task string, trial int) float64 {
+	h := fnv.New64a()
+	fmt.Fprintf(h, "%d|%s|%d|%s|%s|%d", x.NoiseSeed, req.Phase, req.Round, arm.ConfigHash, task, trial)
+	return float64(h.Sum64()>>11) / float64(1<<53)
 }
 
 // Count is how many calls a phase got.

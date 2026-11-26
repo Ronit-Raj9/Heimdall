@@ -11,6 +11,7 @@ vi.mock("@/lib/store/apis/improveApi", async (importOriginal) => ({
 	useGetImprovementQuery: () => api.one,
 	useApproveImprovementRoundMutation: () => mutation(),
 	useStopImprovementMutation: () => mutation(),
+	useResumeImprovementMutation: () => mutation(),
 }));
 
 describe("ImprovementView", () => {

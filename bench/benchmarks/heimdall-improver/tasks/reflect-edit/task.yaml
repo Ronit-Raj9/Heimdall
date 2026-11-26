@@ -1,0 +1,34 @@
+# reflect-edit: turn evidence of an agent's practice runs into an edit set
+# for its standing instructions, notes and skills. Graded on the form of
+# edits.json only.
+id: reflect-edit
+version: 1.1.0
+title: Improve an agent's instructions, notes and skills from practice runs
+project: heimdall-improver
+kind: feature
+instruction: instruction.md
+# The workspace starts empty; the agent writes edits.json there.
+repo_dir: repo
+output:
+  kind: artifact
+  artifacts:
+    # Mounted read-only for the verifier at /grader/artifacts/edits/edits.json.
+    - {id: edits, path: edits.json, required: true, max_bytes: 262144}
+verifier:
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  # The schema requires at least one mutant: nine edits, one over the cap.
+  mutants: [controls/mutant-too-many.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 900
+capabilities: [text_editing]
+difficulty: medium
+provenance:
+  source: bench/benchmarks/heimdall-improver (written for improvement runs)
+  license: MIT
+  created_by: hand-written

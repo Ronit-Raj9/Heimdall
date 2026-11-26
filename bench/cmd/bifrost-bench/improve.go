@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -58,12 +60,17 @@ const improveUsage = `usage:
 // {"<container path>": "<text>"}}, the full new bundle.
 const improverBundleFile = "bundle.json"
 
+// improverEditsFile is the artifact the default improver task leaves: the
+// edits of A3.3.
+const improverEditsFile = "edits.json"
+
 // Paths inside the improver's container: the current bundle and the dev
 // evidence, as files of its agent config.
 const (
 	improverDir          = "/heimdall/improve"
 	improverEvidencePath = improverDir + "/evidence.json"
 	improverBundlePath   = improverDir + "/bundle.json"
+	improverLimitsPath   = improverDir + "/limits.json"
 )
 
 func runImprove(args []string) int {
@@ -276,9 +283,18 @@ func improveGateCmd(ctx context.Context, a *app, out io.Writer, suiteRef, tasks,
 	return 1
 }
 
+// improveOnEvent builds the runner's event hook (notifications); nil sends
+// nothing. Set by the file that sends improvement events.
+var improveOnEvent func(a *app) func(kind string, rec *improve.Record)
+
 // newImproveRunner wires the runner over the runs root.
 func newImproveRunner(a *app) *improve.Runner {
-	return &improve.Runner{Root: filepath.Join(a.store.Root(), improve.DefaultDir), Exec: improveExecutor{a: a}, Logger: a.logger}
+	r := &improve.Runner{Root: filepath.Join(a.store.Root(), improve.DefaultDir), Exec: improveExecutor{a: a}, Logger: a.logger,
+		Objects: improve.Objects{Root: filepath.Join(a.store.Root(), improve.DefaultDir, "objects")}}
+	if improveOnEvent != nil {
+		r.OnEvent = improveOnEvent(a)
+	}
+	return r
 }
 
 // improveExecutor implements improve.Executor with the agent version store,
@@ -294,24 +310,38 @@ type improveExecutor struct {
 // Load implements improve.Executor: a pinned ref reads its snapshot; a
 // plain agent file is snapshotted first, so version 0 is frozen.
 func (x improveExecutor) Load(_ context.Context, ref string, ed improve.Editable) (improve.Version, error) {
+	doc, id, n, err := x.readAgent(ref)
+	if err != nil {
+		return improve.Version{}, err
+	}
+	if n > 0 {
+		return improve.NewVersion(ref, n, doc, ed)
+	}
+	return x.snapshot(id, doc, ed)
+}
+
+// readAgent reads an agent reference's document without storing anything:
+// a pinned ref returns its version number, a plain file (or a library
+// agent not yet stored) returns 0.
+func (x improveExecutor) readAgent(ref string) ([]byte, string, int, error) {
 	root := x.a.cfg.Root
 	if _, id, n, ok := schemas.ParseAgentVersionRef(ref); ok {
 		doc, _, err := agentversions.Read(root, id, n)
 		if errors.Is(err, agentversions.ErrNotFound) && n == 1 {
 			if p := agentversions.LibraryFile(suite.LibraryDir(), id); p != "" {
 				if doc, err = os.ReadFile(p); err == nil {
-					return x.snapshot(id, doc, ed)
+					return doc, id, 0, nil
 				}
 			}
 		}
 		if err != nil {
-			return improve.Version{}, err
+			return nil, "", 0, err
 		}
-		return improve.NewVersion(ref, n, doc, ed)
+		return doc, id, n, nil
 	}
 	id, _, err := agentRef(ref)
 	if err != nil {
-		return improve.Version{}, err
+		return nil, "", 0, err
 	}
 	doc, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(ref)))
 	if errors.Is(err, fs.ErrNotExist) {
@@ -320,9 +350,9 @@ func (x improveExecutor) Load(_ context.Context, ref string, ed improve.Editable
 		}
 	}
 	if err != nil {
-		return improve.Version{}, fmt.Errorf("read %s: %w", ref, err)
+		return nil, "", 0, fmt.Errorf("read %s: %w", ref, err)
 	}
-	return x.snapshot(id, doc, ed)
+	return doc, id, 0, nil
 }
 
 func (x improveExecutor) snapshot(id string, doc []byte, ed improve.Editable) (improve.Version, error) {
@@ -355,18 +385,26 @@ func (x improveExecutor) Freeze(_ context.Context, parent improve.Version, doc [
 	if err != nil {
 		return improve.Version{}, err
 	}
-	ed := improve.Editable{}
-	if parent.Bundle != nil {
-		for k := range parent.Bundle {
-			ed.Files = append(ed.Files, k)
-		}
-	}
-	nv, err := improve.NewVersion(versionRef(id, v.Version), v.Version, b, ed)
+	nv, err := improve.NewVersion(versionRef(id, v.Version), v.Version, b, lin.Editable)
 	if err != nil {
 		return nv, err
 	}
-	nv.BundleHash = lin.BundleHash
+	if nv.BundleHash != lin.BundleHash {
+		return improve.Version{}, fmt.Errorf("frozen bundle %s does not match the applied bundle %s", nv.BundleHash, lin.BundleHash)
+	}
+	obj, err := improve.BundleObjectOf(b, nv.Bundle)
+	if err != nil {
+		return improve.Version{}, err
+	}
+	if nv.BundleObj, err = x.objects().Put(improve.ObjBundle, obj); err != nil {
+		return improve.Version{}, fmt.Errorf("store the bundle of %s: %w", nv.Ref, err)
+	}
 	return nv, nil
+}
+
+// objects is the improvement runs' content-addressed store.
+func (x improveExecutor) objects() improve.Objects {
+	return improve.Objects{Root: filepath.Join(x.a.store.Root(), improve.DefaultDir, "objects")}
 }
 
 // Tasks implements improve.Executor.
@@ -442,6 +480,9 @@ func readSecrets(path string, budget int, out *[]string) int {
 // Score implements improve.Executor: one experiment, arms A (and B) on the
 // tasks, read back from the sealed runs.
 func (x improveExecutor) Score(ctx context.Context, req improve.ScoreRequest) (*improve.ScoreResult, error) {
+	if len(req.Arms) == 0 || len(req.Arms) > improve.MaxScoreArms {
+		return nil, fmt.Errorf("a scoring experiment holds 1 to %d versions, not %d", improve.MaxScoreArms, len(req.Arms))
+	}
 	exp := improveExperiment(req.ImprovementID, req.Phase, req.Round, req.Spec.Suite, req.Spec.Seed, req.Tasks, req.Trials)
 	for i, v := range req.Arms {
 		exp.Arms[improveArm(i)] = schemas.ArmSpec{Label: v.Ref, Agent: v.Ref}
@@ -457,31 +498,70 @@ func (x improveExecutor) Score(ctx context.Context, req improve.ScoreRequest) (*
 		return nil, fmt.Errorf("load sealed runs of %s: %w", expID, err)
 	}
 	for _, sr := range runs {
-		if !sr.Slot.Counted {
+		rs, ok := improveRunScore(sr, len(req.Arms))
+		if !ok {
 			continue
 		}
-		arm := slices.Index([]string{improveArm(0), improveArm(1)}, sr.Slot.Arm)
-		if arm < 0 || arm >= len(req.Arms) {
-			continue
-		}
-		rs := improve.RunScore{Arm: arm, Task: sr.Slot.Task, Trial: sr.Slot.Trial, Outcome: string(sr.Run.Outcome)}
-		if f, ok := sr.Run.Y.Float(); ok && len(sr.Problems) == 0 {
-			rs.Success, rs.Known = f, true
-		}
-		if v, ok := sr.Metrics["cost_usd"]; ok {
-			if f, ok := v.Float(); ok {
-				rs.CostUSD = f
-			}
-		}
-		for _, g := range sr.Gates {
-			if g.Fired && g.Effect == schemas.GateVeto {
-				rs.Vetoes = append(rs.Vetoes, g.Gate)
-			}
-		}
+		arm := rs.Arm
 		res.Runs = append(res.Runs, rs)
 		res.Channels[arm] = mergeChannels(res.Channels[arm], runChannels(sr))
 	}
 	return res, nil
+}
+
+// improveRunScore reads one counted run of an experiment with arms
+// letters A up to the n-th; ok is false for a run not counted or of
+// another arm.
+func improveRunScore(sr schemas.SealedRun, n int) (improve.RunScore, bool) {
+	arm := improveArmIndex(sr.Slot.Arm)
+	if !sr.Slot.Counted || arm < 0 || arm >= n {
+		return improve.RunScore{}, false
+	}
+	rs := improve.RunScore{Arm: arm, Task: sr.Slot.Task, Trial: sr.Slot.Trial, Outcome: string(sr.Run.Outcome), RunID: sr.Run.RunID}
+	switch sr.Run.Outcome {
+	case schemas.OutcomeTimeout, schemas.OutcomeBudget, schemas.OutcomeCrash, schemas.OutcomeRefusal:
+		rs.Stop = string(sr.Run.Outcome)
+	}
+	if f, ok := sr.Run.Y.Float(); ok && len(sr.Problems) == 0 {
+		rs.Success, rs.Known = f, true
+	}
+	if v, ok := sr.Metrics["cost_usd"]; ok {
+		if f, ok := v.Float(); ok {
+			rs.CostUSD = f
+		}
+	}
+	for _, g := range sr.Gates {
+		if g.Fired && g.Effect == schemas.GateVeto {
+			rs.Vetoes = append(rs.Vetoes, g.Gate)
+		}
+	}
+	return rs, true
+}
+
+// Runs implements improve.Executor: the counted runs of a scoring
+// experiment with their sealed folders, arms as indexes (A is 0).
+func (x improveExecutor) Runs(ctx context.Context, expID string) ([]improve.RunRef, error) {
+	runs, err := x.a.store.SealedRuns(ctx, expID, store.GradeSourceOriginal)
+	if err != nil {
+		return nil, fmt.Errorf("load sealed runs of %s: %w", expID, err)
+	}
+	out := []improve.RunRef{}
+	for _, sr := range runs {
+		arm := improveArmIndex(sr.Slot.Arm)
+		if !sr.Slot.Counted || arm < 0 {
+			continue
+		}
+		out = append(out, improve.RunRef{ExpID: expID, RunID: sr.Run.RunID, Task: sr.Slot.Task, Trial: sr.Slot.Trial, Arm: arm, Dir: sr.Dir})
+	}
+	return out, nil
+}
+
+// improveArmIndex is the index of arm letter A to F, or -1.
+func improveArmIndex(letter string) int {
+	if len(letter) != 1 || letter[0] < 'A' || int(letter[0]-'A') >= improve.MaxScoreArms {
+		return -1
+	}
+	return int(letter[0] - 'A')
 }
 
 // runChannels are the evidence channels a run emitted: event types from
@@ -520,17 +600,25 @@ func mergeChannels(a, b []string) []string {
 }
 
 // Improve implements improve.Executor: the improver is a normal sealed run
-// of the incumbent on the improver task. Its agent config is the
-// incumbent's plus the current bundle and the dev evidence as files under
-// /heimdall/improve, its per-run key capped at the round budget. The
-// container mounts no verifier, audit or sealed task and no run store; the
-// task's artifact bundle.json is the new bundle.
+// on the improver task. Its agent is the shipped reflector (on the
+// incumbent's model, or the spec's teacher) or, with improver.agent self,
+// the incumbent. The current bundle, the dev evidence and the limits go
+// into that agent's files_raw under /heimdall/improve, so text with "{{"
+// never breaks a run, and its run key is capped at the round budget. The
+// container mounts no verifier, audit or sealed task and no run store. The
+// task's artifact edits.json (or bundle.json with reasons) is the output.
 func (x improveExecutor) Improve(ctx context.Context, req improve.ImproveRequest) (*improve.ImproveResult, error) {
 	suiteRef, task, err := improverTask(req.Spec)
 	if err != nil {
 		return nil, err
 	}
-	doc, err := improverDoc(req)
+	base := req.Incumbent.Doc
+	if req.Spec.Improver.Agent != "self" {
+		if base, err = x.reflectorDoc(); err != nil {
+			return nil, err
+		}
+	}
+	doc, err := improverDoc(req, base, x.playbook(req.Incumbent))
 	if err != nil {
 		return nil, err
 	}
@@ -541,10 +629,7 @@ func (x improveExecutor) Improve(ctx context.Context, req improve.ImproveRequest
 	if err := os.WriteFile(filepath.Join(x.a.cfg.Root, filepath.FromSlash(rel)), doc, 0o644); err != nil {
 		return nil, err
 	}
-	exp := improveExperiment(req.ImprovementID, "improve", req.Round, suiteRef, req.Spec.Seed, []string{task}, 1)
-	exp.Base = rel
-	exp.Arms[improveArm(0)] = schemas.ArmSpec{Label: "improver"}
-	exp.Budget = schemas.BudgetSpec{TotalUSD: req.BudgetUSD}
+	exp := improverExperiment(req, suiteRef, task, rel)
 	expID, cost, err := x.execute(ctx, exp)
 	res := &improve.ImproveResult{ExpID: expID, CostUSD: cost}
 	if err != nil {
@@ -561,12 +646,124 @@ func (x improveExecutor) Improve(ctx context.Context, req improve.ImproveRequest
 			res.Flags = append(res.Flags, g.Gate)
 		}
 	}
-	b, err := readBundleArtifact(filepath.Join(sr.Dir, utils.ArtifactsDir))
-	if err != nil {
+	if err := readImproverOutput(filepath.Join(sr.Dir, utils.ArtifactsDir), req.Incumbent.Bundle, res); err != nil {
 		return res, err
 	}
-	res.Bundle = b
 	return res, nil
+}
+
+// reflectorAgentID is the shipped improver agent (agents/heimdall-reflector.yaml).
+const reflectorAgentID = "heimdall-reflector"
+
+// reflectorDoc reads the reflector agent like any library agent: the
+// project's agents folder first, then the built-in library.
+func (x improveExecutor) reflectorDoc() ([]byte, error) {
+	doc, _, _, err := x.readAgent("agents/" + reflectorAgentID + ".yaml")
+	if err != nil {
+		return nil, fmt.Errorf("the improver agent %s is not installed: %w", reflectorAgentID, err)
+	}
+	return doc, nil
+}
+
+// playbook is a version's playbook object, or an empty one.
+func (x improveExecutor) playbook(v improve.Version) improve.PlaybookObject {
+	pb := improve.PlaybookObject{Items: []improve.PlaybookItem{}}
+	if v.PlaybookObj != "" && x.a.store != nil {
+		_ = x.objects().Get(v.PlaybookObj, improve.ObjPlaybook, &pb)
+	}
+	return pb
+}
+
+// improverExperiment is the one-run experiment of an improver phase. Its
+// fairness rule is equal_budget, so the run's gateway key carries the
+// improver's USD cap (budgets.usd of the improver document); the planner
+// refuses an improver agent that sets its own gateway spending limit.
+func improverExperiment(req improve.ImproveRequest, suiteRef, task, rel string) *schemas.Experiment {
+	exp := improveExperiment(req.ImprovementID, "improve", req.Round, suiteRef, req.Spec.Seed, []string{task}, 1)
+	exp.Base = rel
+	exp.Arms[improveArm(0)] = schemas.ArmSpec{Label: "improver"}
+	exp.Budget = schemas.BudgetSpec{TotalUSD: req.BudgetUSD}
+	exp.Fairness = schemas.FairnessEqualBudget
+	return exp
+}
+
+// errOwnSpendLimit refuses an agent whose own gateway spending limit would
+// replace the improver's cap on the run key (A1.5).
+var errOwnSpendLimit = errors.New("This agent sets its own gateway spending limit; remove gateway.routing.limits.budget_usd so the improver's cap can be enforced.")
+
+// errReflectorSpendLimit is the same refusal for the improver agent itself.
+var errReflectorSpendLimit = errors.New("The improver agent heimdall-reflector sets its own gateway spending limit; remove gateway.routing.limits.budget_usd from it so the improver's cap can be enforced.")
+
+// agentSetsSpendLimit reports whether an agent document sets
+// gateway.routing.limits.budget_usd.
+func agentSetsSpendLimit(doc []byte) bool {
+	var cfg schemas.AgentConfig
+	if yaml.Unmarshal(doc, &cfg) != nil {
+		return false
+	}
+	r := cfg.Gateway.Routing
+	return r != nil && r.Limits != nil && r.Limits.BudgetUSD > 0
+}
+
+// CheckImprover implements improve.Executor (A1.5, A1.6): it refuses a
+// spec before any experiment exists when the agent sets its own gateway
+// spending limit, when the improver task does not exist, or when the task
+// leaves neither edits.json nor bundle.json. The shipped improver suite is
+// copied into the project first when this build embeds it.
+func (x improveExecutor) CheckImprover(ctx context.Context, spec *improve.Spec) error {
+	doc, _, _, err := x.readAgent(spec.Agent)
+	if err != nil {
+		return err
+	}
+	if agentSetsSpendLimit(doc) {
+		return errOwnSpendLimit
+	}
+	// The reflector (a project copy may replace the shipped one) must be
+	// installed and must leave the run key's limit to the improver's cap.
+	if spec.Improver.Agent != "self" {
+		ref, err := x.reflectorDoc()
+		if err != nil {
+			return err
+		}
+		if agentSetsSpendLimit(ref) {
+			return errReflectorSpendLimit
+		}
+	}
+	suiteRef, task, err := improverTask(spec)
+	if err != nil {
+		return err
+	}
+	// The shipped suite matters only to a spec that uses it; a custom
+	// improver task in another benchmark is checked on its own below.
+	if id, _, _ := strings.Cut(suiteRef, "@"); id == path.Base(improverSuiteDir) {
+		if err := ensureImproverSuite(x.a.cfg.Root); err != nil {
+			return err
+		}
+	}
+	ref := spec.Improver.Task
+	missing := fmt.Errorf("The improver task %s does not exist.", ref)
+	s, err := engine.LoadSuite(ctx, x.a.reg, suiteRef)
+	if err != nil {
+		return missing
+	}
+	for _, t := range s.Tasks {
+		if t.ID != task {
+			continue
+		}
+		out := t.Output
+		if out == nil {
+			out = s.Output
+		}
+		if out != nil {
+			for _, art := range out.Artifacts {
+				if b := path.Base(art.Path); b == improverEditsFile || b == improverBundleFile {
+					return nil
+				}
+			}
+		}
+		return fmt.Errorf("The improver task %s does not leave edits.json or bundle.json, so its output cannot be read.", ref)
+	}
+	return missing
 }
 
 // improverTask is the improver task of a spec: "<task>" in the spec's
@@ -582,34 +779,126 @@ func improverTask(spec *improve.Spec) (string, string, error) {
 	return spec.Suite, t, nil
 }
 
-// improverDoc is the incumbent's config with the bundle and evidence
-// added, budgets set to the round's cap.
-func improverDoc(req improve.ImproveRequest) ([]byte, error) {
+// Lines added to the improver's standing instructions for a restart slot
+// and for the null improver (A3.2).
+const (
+	improverRestartLine = "This is a restart: you may also rewrite a whole file with rewrite_file, starting from version 0."
+	improverNullLine    = "There is no evidence this time; propose the changes you think are best."
+)
+
+// improverDoc is the improver agent's config (base: the reflector, or the
+// incumbent for improver.agent self) with the improver inputs added as
+// files_raw under /heimdall/improve, the model and provider of the
+// incumbent (or the teacher) on the reflector, and budgets set to the
+// round's cap.
+func improverDoc(req improve.ImproveRequest, base []byte, pb improve.PlaybookObject) ([]byte, error) {
 	var tree map[string]any
-	if err := yaml.Unmarshal(req.Incumbent.Doc, &tree); err != nil {
+	if err := yaml.Unmarshal(base, &tree); err != nil {
 		return nil, err
 	}
 	if tree == nil {
 		tree = map[string]any{}
 	}
+	if req.Spec.Improver.Agent != "self" {
+		var inc schemas.AgentConfig
+		if err := yaml.Unmarshal(req.Incumbent.Doc, &inc); err != nil {
+			return nil, fmt.Errorf("read the incumbent's model: %w", err)
+		}
+		model, provider := inc.Model, inc.Gateway.Provider
+		if req.Model != "" {
+			model, provider = req.Model, req.Provider
+		}
+		if model != "" {
+			tree["model"] = model
+		}
+		if provider != "" {
+			gw, _ := tree["gateway"].(map[string]any)
+			if gw == nil {
+				gw = map[string]any{}
+			}
+			gw["provider"] = provider
+			tree["gateway"] = gw
+		}
+	}
+	raw, _ := tree["files_raw"].(map[string]any)
+	if raw == nil {
+		raw = map[string]any{}
+	}
 	files, _ := tree["files"].(map[string]any)
-	if files == nil {
-		files = map[string]any{}
+	put := func(rel string, v []byte) error {
+		p := improverDir + "/" + rel
+		if _, ok := files[p]; ok {
+			return fmt.Errorf("the improver agent already defines %s", p)
+		}
+		raw[p] = string(v)
+		return nil
 	}
-	ev := req.Evidence
-	if req.Null || ev == nil {
-		ev = []improve.EvidenceItem{}
+	lim := req.Limits
+	if lim == (improve.Limits{}) {
+		lim = improve.DefaultLimits
 	}
-	evb, err := json.MarshalIndent(map[string]any{"round": req.Round, "results": ev, "editable": req.Spec.Editable}, "", "  ")
+	limb, err := json.MarshalIndent(lim, "", "  ")
 	if err != nil {
 		return nil, err
 	}
-	bb, err := json.MarshalIndent(map[string]any{"files": req.Incumbent.Bundle}, "", "  ")
+	obj, err := improve.BundleObjectOf(req.Incumbent.Doc, req.Incumbent.Bundle)
 	if err != nil {
 		return nil, err
 	}
-	files[improverEvidencePath], files[improverBundlePath] = string(evb), string(bb)
-	tree["files"] = files
+	if pb.Items == nil {
+		pb.Items = []improve.PlaybookItem{}
+	}
+	bb, err := json.MarshalIndent(map[string]any{"files": obj.Files, "raw": obj.Raw, "items": pb.Items, "limits": lim}, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	var evb []byte
+	switch {
+	case req.Null:
+		evb, err = json.MarshalIndent(map[string]any{"split": "dev", "round": req.Round, "clusters": []any{}, "items": []any{}}, "", "  ")
+	case req.EvidenceDoc != nil && len(req.EvidenceDoc.EvidenceJSON) > 0:
+		evb = req.EvidenceDoc.EvidenceJSON
+	default:
+		ev := req.Evidence
+		if ev == nil {
+			ev = []improve.EvidenceItem{}
+		}
+		evb, err = json.MarshalIndent(map[string]any{"split": "dev", "round": req.Round, "results": ev, "editable": req.Spec.Editable}, "", "  ")
+	}
+	if err != nil {
+		return nil, err
+	}
+	for rel, v := range map[string][]byte{"bundle.json": bb, "evidence.json": evb, "limits.json": limb} {
+		if err := put(rel, v); err != nil {
+			return nil, err
+		}
+	}
+	if req.EvidenceDoc != nil && !req.Null {
+		for rel, v := range req.EvidenceDoc.Files {
+			clean := path.Clean(rel)
+			if strings.HasPrefix(clean, "/") || clean == "." || strings.HasPrefix(clean, "..") || slices.Contains([]string{"bundle.json", "evidence.json", "limits.json"}, clean) {
+				return nil, fmt.Errorf("evidence file %q is not a plain relative path", rel)
+			}
+			if err := put(clean, v); err != nil {
+				return nil, err
+			}
+		}
+	}
+	tree["files_raw"] = raw
+	var lines []string
+	if req.Kind == "restart" {
+		lines = append(lines, improverRestartLine)
+	}
+	if req.Null {
+		lines = append(lines, improverNullLine)
+	}
+	if len(lines) > 0 {
+		cur, _ := tree["instructions"].(string)
+		if cur = strings.TrimRight(cur, "\n"); cur != "" {
+			lines = append([]string{cur}, lines...)
+		}
+		tree["instructions"] = strings.Join(lines, "\n\n")
+	}
 	budgets, _ := tree["budgets"].(map[string]any)
 	if budgets == nil {
 		budgets = map[string]any{}
@@ -624,32 +913,81 @@ func improverDoc(req improve.ImproveRequest) ([]byte, error) {
 	return yaml.Marshal(tree)
 }
 
-// readBundleArtifact finds bundle.json among the run's exported artifacts.
-func readBundleArtifact(dir string) (improve.Bundle, error) {
+// readImproverOutput reads the improver's output into res: edits.json (the
+// default improver) leaves the bundle as the incumbent's for the edit
+// applier; bundle.json is the full new bundle, every changed path with a
+// reason.
+func readImproverOutput(dir string, incumbent improve.Bundle, res *improve.ImproveResult) error {
+	if p := findArtifact(dir, improverEditsFile); p != "" {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		var e improve.EditsFile
+		if err := json.Unmarshal(b, &e); err != nil {
+			return fmt.Errorf("the improver's %s is not valid: %w", improverEditsFile, err)
+		}
+		res.Edits = &e
+		res.Bundle = incumbent.Clone()
+		if res.Bundle == nil {
+			res.Bundle = improve.Bundle{}
+		}
+		return nil
+	}
+	files, reasons, summary, err := readBundleArtifact(dir)
+	if err != nil {
+		return err
+	}
+	for _, k := range slices.Sorted(maps.Keys(files)) {
+		if old, ok := incumbent[k]; (!ok || old != files[k]) && strings.TrimSpace(reasons[k]) == "" {
+			return fmt.Errorf("the improver gave no reason for %s", k)
+		}
+	}
+	for _, k := range slices.Sorted(maps.Keys(incumbent)) {
+		if _, ok := files[k]; !ok && strings.TrimSpace(reasons[k]) == "" {
+			return fmt.Errorf("the improver gave no reason for %s", k)
+		}
+	}
+	res.Bundle, res.Reasons, res.Summary = files, reasons, summary
+	return nil
+}
+
+// findArtifact is the first file named name among the run's exported
+// artifacts, or "".
+func findArtifact(dir, name string) string {
 	var found string
 	_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
-		if err == nil && d.Type().IsRegular() && d.Name() == improverBundleFile && found == "" {
+		if err == nil && d.Type().IsRegular() && d.Name() == name && found == "" {
 			found = p
 		}
 		return nil
 	})
+	return found
+}
+
+// readBundleArtifact reads bundle.json among the run's exported
+// artifacts: the full bundle, a reason per changed path and a summary.
+func readBundleArtifact(dir string) (improve.Bundle, map[string]string, string, error) {
+	found := findArtifact(dir, improverBundleFile)
 	if found == "" {
-		return nil, fmt.Errorf("the improver left no %s artifact", improverBundleFile)
+		return nil, nil, "", fmt.Errorf("the improver left no %s or %s artifact", improverEditsFile, improverBundleFile)
 	}
 	b, err := os.ReadFile(found)
 	if err != nil {
-		return nil, err
+		return nil, nil, "", err
 	}
 	var out struct {
-		Files map[string]string `json:"files"`
+		Files   map[string]string `json:"files"`
+		Reasons map[string]string `json:"reasons"`
+		Summary string            `json:"summary"`
 	}
 	if err := json.Unmarshal(b, &out); err != nil {
-		return nil, fmt.Errorf("the improver's %s is not a bundle: %w", improverBundleFile, err)
+		return nil, nil, "", fmt.Errorf("the improver's %s is not a bundle: %w", improverBundleFile, err)
 	}
 	if out.Files == nil {
 		out.Files = map[string]string{}
 	}
-	return out.Files, nil
+	return out.Files, out.Reasons, out.Summary, nil
 }
 
 func improveArm(i int) string { return string(rune('A' + i)) }

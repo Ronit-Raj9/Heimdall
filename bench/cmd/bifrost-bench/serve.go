@@ -93,6 +93,7 @@ func runServe(args []string) int {
 	// W5 drift canary: canary list, detail and run (canary.go).
 	deps.Canaries = serveCanaries(a, *offline)
 	deps.Improvements = serveImprovements(a, *offline) // improvement runs (improve.go)
+	go resumeImprovements(ctx, deps.Improvements.(improveSource))
 	// W8 judge calibration: calibration card and labels (judge.go).
 	deps.Calibration = judgeSvc{a: a}
 	deps.Export = serveExport{a: a} // W10 export downloads (export.go)

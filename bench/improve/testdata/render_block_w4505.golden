@@ -1,0 +1,7 @@
+<!-- standing-rules:start -->
+## Strategies
+1. [pb-0003] Before editing, run the failing test once and read the full traceback.
+2. [pb-0008] Read the module before changing it.
+## Pitfalls
+3. [pb-0007] `pytest -x` hides later failures; run the whole file before finishing.
+<!-- standing-rules:end -->
