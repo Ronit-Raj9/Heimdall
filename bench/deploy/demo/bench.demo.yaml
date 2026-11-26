@@ -1,9 +1,9 @@
 # Heimdall demo configuration for the root docker-compose.yml: recorded data
 # only, served from the seeded runs folder. A copy of deploy/bench.yaml with
-# the paths, listen address, mode and allowed hosts changed. Every key can be overridden with an environment
-# variable named BENCH_<SECTION>_<KEY> (top-level keys:
-# BENCH_<KEY>), for example BENCH_SERVER_MODE=recorded. List values in the
-# environment are comma-separated.
+# the paths, listen address, mode and allowed hosts changed. Every key can be
+# overridden with an environment variable named BENCH_<SECTION>_<KEY>
+# (top-level keys: BENCH_<KEY>), for example BENCH_SERVER_MODE=recorded. List
+# values in the environment are comma-separated.
 runs_root: /var/lib/heimdall/runs
 benchmarks_root: /srv/heimdall/benchmarks
 pricing: /srv/heimdall/deploy/pricing-snapshot.json
