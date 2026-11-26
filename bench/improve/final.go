@@ -26,9 +26,6 @@ const (
 	ExtensionRunsFile = "extension_runs.json"
 )
 
-// maxNewTasks caps the benchmark tasks a second look adds (A2.11).
-const maxNewTasks = 200
-
 // finish runs the end of the loop: the null improver, the final interleaved
 // experiment on the held-out tasks, the retries control, then the claim.
 // Nothing runs when no round kept a version (A2.4) or the run is a loop of a
@@ -260,15 +257,13 @@ func (r *Runner) extend(ctx context.Context, id string, extraTrials int, newTask
 		return nil, err
 	}
 	v := rec.Verdict
+	// One rule for the offer, the routes and the run (CanContinue): a done
+	// run with a held-out result, a reserve kept at creation, the right
+	// state, and no second look started before.
+	if err := CanContinue(rec); err != nil {
+		return rec, err
+	}
 	switch {
-	case rec.Status != StatusDone || v == nil || rec.Final == nil:
-		return rec, fmt.Errorf("only a finished run with a held-out result can be continued: %w", ErrState)
-	case v.State != VerdictLikelyBetter && v.State != VerdictInsufficientSample:
-		return rec, fmt.Errorf("a run whose result is %s cannot be continued: %w", v.State, ErrState)
-	case !rec.Spec.Claim.Extension:
-		return rec, fmt.Errorf("this run kept no reserve for a second look: %w", ErrState)
-	case rec.Extension != nil:
-		return rec, fmt.Errorf("this run already had its second look: %w", ErrState)
 	case extraTrials < 0 || extraTrials > MaxTrials || extraUSD < 0:
 		return rec, fmt.Errorf("extra tries must be 0 to %d and the extra budget must not be negative: %w", MaxTrials, ErrState)
 	case extraTrials == 0 && !newTasks:
@@ -349,7 +344,8 @@ func (r *Runner) extend(ctx context.Context, id string, extraTrials int, newTask
 }
 
 // extendFailed puts a run whose second look failed back to its first
-// verdict, so the second look can be tried again.
+// verdict. The run cannot be continued again (Revision stays raised): the
+// reserve is used once, so a failed look is never followed by a second test.
 func (r *Runner) extendFailed(rec *Record, first *Verdict, err error) (*Record, error) {
 	var hs *hardStopError
 	rec.Verdict, rec.Status, rec.Reason = first, StatusDone, first.Headline
@@ -362,7 +358,7 @@ func (r *Runner) extendFailed(rec *Record, first *Verdict, err error) (*Record, 
 }
 
 // freshTasks are benchmark tasks the run never used: not in any split, not
-// honeypots, not impossible, at most maxNewTasks, in id order.
+// honeypots, not impossible, at most MaxContinueNewTasks, in id order.
 func (r *Runner) freshTasks(ctx context.Context, rec *Record) ([]string, error) {
 	all := rec.Spec
 	all.Tasks = nil
@@ -378,8 +374,8 @@ func (r *Runner) freshTasks(ctx context.Context, rec *Record) ([]string, error) 
 		}
 	}
 	slices.Sort(out)
-	if len(out) > maxNewTasks {
-		out = out[:maxNewTasks]
+	if len(out) > MaxContinueNewTasks {
+		out = out[:MaxContinueNewTasks]
 	}
 	return out, nil
 }

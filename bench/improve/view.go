@@ -305,11 +305,7 @@ func (r *Runner) viewW4(d *Detail, rec *Record) {
 		if rec.Final != nil {
 			n = rec.Final.N
 		}
-		perRun := 0.0
-		if rec.Estimate != nil {
-			perRun = rec.Estimate.USD.PerRun
-		}
-		v.Continue = ContinueOfferFor(rec, ContinueRequest{ExtraTrials: 2, NewTasks: true}, max(0, TasksNeededForTarget(rec)-n), perRun)
+		v.Continue = ContinueOfferFor(rec, ContinueRequest{ExtraTrials: 2, NewTasks: true}, max(0, TasksNeededForTarget(rec)-n), perRunUSD(rec))
 		if Wording != nil {
 			Wording(&v, rec)
 		}

@@ -1,6 +1,7 @@
 package improve
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -35,6 +36,8 @@ func CanContinue(rec *Record) error {
 		return continueRefusal("This run already had its second look; it cannot be continued again.")
 	case rec.Status != StatusDone:
 		return continueRefusal(fmt.Sprintf("This run is %s; only a finished run can be continued.", rec.Status))
+	case rec.Final == nil:
+		return continueRefusal("This run has no held-out result, so there is nothing to look at again.")
 	case !rec.Spec.Claim.Extension:
 		return continueRefusal("This run kept no reserve for a second look.")
 	case rec.Verdict == nil || (rec.Verdict.State != VerdictLikelyBetter && rec.Verdict.State != VerdictInsufficientSample):
@@ -144,4 +147,27 @@ func (r *Runner) CheckContinue(id string) (*Record, error) {
 		return rec, ErrNoExtend
 	}
 	return rec, nil
+}
+
+// OfferContinue prices a second look exactly as RunExtend runs it: the same
+// new tasks (every benchmark task the run never used, at most
+// MaxContinueNewTasks), the same tries and the hard stop's cost per run.
+// A run with no reserve gets the "start a new run" offer.
+func (r *Runner) OfferContinue(ctx context.Context, id string, in ContinueRequest) (*ContinueOffer, error) {
+	rec, err := r.load(id)
+	if err != nil {
+		return nil, err
+	}
+	if err := CanContinue(rec); err != nil && rec.Spec.Claim.Extension {
+		return nil, err
+	}
+	fresh := 0
+	if in.NewTasks && rec.Spec.Claim.Extension && r.Exec != nil {
+		f, err := r.freshTasks(ctx, rec)
+		if err != nil {
+			return nil, err
+		}
+		fresh = len(f)
+	}
+	return ContinueOfferFor(rec, in, fresh, perRunUSD(rec)), nil
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"slices"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/auth"
@@ -51,33 +50,10 @@ func (s improveSource) Continue(_ context.Context, id, _ string, in improve.Cont
 	return &sum, nil
 }
 
-// ContinueEstimate is what a second look would run and cost.
+// ContinueEstimate is what a second look would run and cost, priced the
+// way the runner's second look runs it.
 func (s improveSource) ContinueEstimate(ctx context.Context, id string, in improve.ContinueRequest) (*improve.ContinueOffer, error) {
-	rec, err := s.r.Get(id)
-	if err != nil {
-		return nil, err
-	}
-	if err := improve.CanContinue(rec); err != nil && rec.Spec.Claim.Extension {
-		return nil, err
-	}
-	fresh := 0
-	if in.NewTasks && s.r.Exec != nil {
-		infos, err := s.r.Exec.Tasks(ctx, &rec.Spec)
-		if err != nil {
-			return nil, fmt.Errorf("list the benchmark's tasks: %w", err)
-		}
-		used := slices.Concat(rec.Splits.Dev, rec.Splits.Audit, rec.Splits.Sealed, rec.Splits.Honeypots)
-		for _, t := range infos {
-			if !t.Impossible && !slices.Contains(used, t.ID) {
-				fresh++
-			}
-		}
-	}
-	perRun := 0.0
-	if rec.Estimate != nil {
-		perRun = rec.Estimate.USD.PerRun
-	}
-	return improve.ContinueOfferFor(rec, in, fresh, perRun), nil
+	return s.r.OfferContinue(ctx, id, in)
 }
 
 // resumeImprovements drives again, on a local server's start, every run the
