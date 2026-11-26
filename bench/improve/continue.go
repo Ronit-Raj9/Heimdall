@@ -32,6 +32,8 @@ func (e continueRefusal) Unwrap() error { return ErrState }
 // second look ran yet, and the run is done. The error says why not.
 func CanContinue(rec *Record) error {
 	switch {
+	case rec.InStudy:
+		return continueRefusal("A loop of a study cannot be continued on its own.")
 	case rec.Extension != nil || rec.Revision > 0:
 		return continueRefusal("This run already had its second look; it cannot be continued again.")
 	case rec.Status != StatusDone:

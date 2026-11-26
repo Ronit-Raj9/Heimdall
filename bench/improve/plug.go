@@ -175,6 +175,8 @@ type Estimate struct {
 	Assumed    []string           `json:"assumed"`
 	Refusals   []EstimateNote     `json:"refusals"`
 	Warnings   []EstimateNote     `json:"warnings"`
+	// Loops is the number of whole loops of a study (absent for one run).
+	Loops int `json:"loops,omitempty"`
 }
 
 // EstimateRuns are the planned run counts of an estimate.
@@ -196,6 +198,10 @@ type EstimateUSD struct {
 	Limit        float64 `json:"limit"`
 	PerRun       float64 `json:"per_run"`
 	PerRunSource string  `json:"per_run_source"`
+	// A study's limit is the total for all loops; LoopLimit is each loop's
+	// share and LimitText says both in plain words.
+	LoopLimit float64 `json:"loop_limit,omitempty"`
+	LimitText string  `json:"limit_text,omitempty"`
 }
 
 // EstimateMinutes is the wall time range of an estimate.

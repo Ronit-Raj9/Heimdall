@@ -281,6 +281,10 @@ func (r *Runner) hardStop(rec *Record, phase string, next float64) error {
 	total := rec.Spec.Budget.TotalUSD
 	spent := totalUSD(rec)
 	rec.SpentUSD = spent
+	if lim := rec.StudyLimitUSD; lim > 0 && rec.StudyPriorUSD+spent+next > lim {
+		return &hardStopError{fmt.Sprintf("Stopped before %s: the next step would pass the study's total spending limit of $%.2f (spent $%.2f across its loops).",
+			phase, lim, rec.StudyPriorUSD+spent)}
+	}
 	if total <= 0 || spent+next <= total {
 		return nil
 	}

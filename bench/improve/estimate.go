@@ -27,6 +27,10 @@ const (
 	historyTaskFloor = 8
 )
 
+// AssumedNoiseText is the warning when the organization's own run history
+// gives no noise figure for this agent on this benchmark.
+const AssumedNoiseText = "This estimate assumes typical run-to-run noise because this agent has no past runs on this benchmark here; the real smallest detectable gain can differ."
+
 // formulaEstimator is the pre-run estimator of A2.8. It is pure: the route
 // fills its inputs.
 type formulaEstimator struct{}
@@ -111,6 +115,22 @@ func (formulaEstimator) Estimate(in EstimateInput) Estimate {
 	out.Runs.Final = (2 + b2i(nullOn)) * ns * tz
 	out.Runs.Improver = improverLoop + b2i(nullOn)*r
 	out.Runs.Total = out.Runs.Baseline + r*(screen+gate+curveRuns) + out.Runs.Final
+	// A study (A4.1) runs L whole loops, each without its own final check
+	// and controls, then one held-out experiment with version 0 and each
+	// loop's final.
+	loops := max(1, s.Replicate.Loops)
+	if loops >= 2 {
+		loopRuns := out.Runs.Baseline + r*(screen+gate+curveRuns)
+		out.Runs.Baseline *= loops
+		out.Runs.Practice *= loops
+		out.Runs.Gate *= loops
+		out.Runs.HeldOutCurve *= loops
+		out.Runs.Improver = loops * improverLoop
+		out.Runs.Final = (loops + 1) * ns * tz
+		out.Runs.Total = loops*loopRuns + out.Runs.Final
+		retriesOn = false
+		out.Loops = loops
+	}
 
 	// Money.
 	c, src := in.PerRunUSD, in.RunSource
@@ -131,6 +151,13 @@ func (formulaEstimator) Estimate(in EstimateInput) Estimate {
 	expected := money(improverSpendPart)
 	out.USD = EstimateUSD{Low: round2(0.7 * expected), Expected: round2(expected), High: round2(1.5 * money(1)),
 		Limit: s.Budget.TotalUSD, PerRun: c, PerRunSource: src}
+	if loops >= 2 && s.Budget.TotalUSD > 0 {
+		// The study's hard stops keep it under its total, so the high figure
+		// is at most the total.
+		out.USD.High = math.Min(out.USD.High, s.Budget.TotalUSD)
+		out.USD.LoopLimit = LoopShareUSD(s.Budget.TotalUSD, loops)
+		out.USD.LimitText = StudyLimitText(s.Budget.TotalUSD, loops)
+	}
 	if in.PerRunMin > 0 {
 		mins := in.PerRunMin * float64(out.Runs.Total)
 		out.Minutes = EstimateMinutes{Low: math.Round(0.7 * mins), High: math.Round(1.5 * mins)}
@@ -179,7 +206,16 @@ func (formulaEstimator) Estimate(in EstimateInput) Estimate {
 	if nd < 4 {
 		refuse("too_few_practice", fmt.Sprintf("The improver needs at least 4 practice tasks to learn from; this benchmark gives %d.", nd))
 	}
-	if s.Budget.TotalUSD > 0 && out.USD.High > s.Budget.TotalUSD {
+	if loops >= 2 && s.Budget.TotalUSD > 0 {
+		if share := out.USD.LoopLimit; share < s.Improver.BudgetUSD {
+			refuse("loop_share_small", fmt.Sprintf("A total of %s for %d loops leaves %s for each loop, less than one improver round may spend (%s). Raise the total or use fewer loops.",
+				formatUSD(s.Budget.TotalUSD), loops, formatUSD(share), formatUSD(s.Improver.BudgetUSD)))
+		}
+		if expected > s.Budget.TotalUSD {
+			refuse("over_limit", fmt.Sprintf("The expected cost of %s is above the study's total of %s. Raise the total, use fewer loops or pick a smaller preset.",
+				formatUSD(expected), formatUSD(s.Budget.TotalUSD)))
+		}
+	} else if s.Budget.TotalUSD > 0 && out.USD.High > s.Budget.TotalUSD {
 		refuse("over_limit", fmt.Sprintf("The estimate (%s to %s) is above your spending limit of %s. Raise the limit or pick a smaller preset.",
 			formatUSD(out.USD.Low), formatUSD(out.USD.High), formatUSD(s.Budget.TotalUSD)))
 	}
@@ -193,7 +229,7 @@ func (formulaEstimator) Estimate(in EstimateInput) Estimate {
 		warn("weak_gate", fmt.Sprintf("The gate tasks are few: a new version is kept only when it is about %.0f points better on them.", gateMDE))
 	}
 	if in.W <= 0 {
-		warn("assumed_noise", "No earlier runs of this agent on this benchmark: the detectable gains assume typical noise.")
+		warn("assumed_noise", AssumedNoiseText)
 	}
 	return out
 }

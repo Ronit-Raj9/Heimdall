@@ -35,13 +35,13 @@ func (x *countExec) CheckImprover(context.Context, *Spec) error     { return nil
 func (x *countExec) Runs(context.Context, string) ([]RunRef, error) { return nil, nil }
 
 // Security review (A2.10): the study's own held-out check stops before it
-// would pass the study's limit (loops times the spec's limit), like every
+// would pass the study's total limit, like every
 // other scoring call, and does not score.
 func TestStudyFinalHasAHardStop(t *testing.T) {
 	x := &countExec{}
 	r := &Runner{Root: t.TempDir(), Exec: x}
 	st := &Study{ID: "ims_cap-abc123", Name: "cap", Status: StatusRunning, Sealed: []string{"t1", "t2", "t3", "t4"},
-		Spec: Spec{Replicate: ReplicationPlan{Loops: 2}, Budget: BudgetSpec{TotalUSD: 10}, Sealed: PhaseSpec{Trials: 2}}}
+		Spec: Spec{Replicate: ReplicationPlan{Loops: 2}, Budget: BudgetSpec{TotalUSD: 20}, Sealed: PhaseSpec{Trials: 2}}}
 	for i, id := range []string{"imp_cap-loop-1", "imp_cap-loop-2"} {
 		rec := &Record{ID: id, Name: id, Status: StatusDone, Study: st.ID, InStudy: true, Rounds: []*Round{},
 			Base: Version{Ref: "agents/a.yaml@v1"}, Incumbent: Version{Ref: "agents/a.yaml@v" + string(rune('2'+i))},
@@ -62,7 +62,7 @@ func TestStudyFinalHasAHardStop(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Spent 19 of 20; the final would be 3 arms x 4 tasks x 2 trials x 0.10.
-	if x.scores != 0 || got.Status != StatusStopped || !strings.HasPrefix(got.Reason, "Stopped before the study's held-out check: the next step would pass the spending limit of $20.00 (spent $19.00).") {
+	if x.scores != 0 || got.Status != StatusStopped || !strings.HasPrefix(got.Reason, "Stopped before the study's held-out check: the next step would pass the study's total spending limit of $20.00 (spent $19.00).") {
 		t.Fatalf("scores %d status %s reason %q", x.scores, got.Status, got.Reason)
 	}
 }

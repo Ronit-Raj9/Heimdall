@@ -126,6 +126,11 @@ type Record struct {
 	// practice run of the incumbent opened it (or the round it was first
 	// seen), for the retire_skill pruning edits of A3.3.
 	SkillsOpened map[string]int `json:"skills_opened,omitempty"`
+	// StudyLimitUSD is the total limit of the study this run is a loop of,
+	// and StudyPriorUSD what the study's earlier loops spent: the hard stop
+	// keeps the whole study under its total (Spec.Budget is the loop's share).
+	StudyLimitUSD float64 `json:"study_limit_usd,omitempty"`
+	StudyPriorUSD float64 `json:"study_prior_usd,omitempty"`
 }
 
 // Baseline is version 0 before round 1: dev (the first evidence) and

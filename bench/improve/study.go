@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -85,6 +86,8 @@ type StudyView struct {
 	Final     *StudyVerdict `json:"final,omitempty"`
 	CostUSD   float64       `json:"cost_usd"`
 	Running   bool          `json:"running"`
+	// Limit says the study's total limit and each loop's share.
+	Limit string `json:"limit,omitempty"`
 }
 
 // StudyList is GET /improvement-studies.
@@ -94,9 +97,13 @@ type StudyList struct {
 
 // ViewStudy is a study as served.
 func (r *Runner) ViewStudy(st *Study) StudyView {
-	return StudyView{ID: st.ID, Name: st.Name, Agent: st.Spec.Agent, Suite: st.Spec.Suite, Status: st.Status, Reason: st.Reason,
+	v := StudyView{ID: st.ID, Name: st.Name, Agent: st.Spec.Agent, Suite: st.Spec.Suite, Status: st.Status, Reason: st.Reason,
 		Loops: append([]string{}, st.Loops...), LoopsMax: st.Spec.Replicate.Loops, HeldOut: len(st.Sealed), CreatedAt: st.CreatedAt,
 		UpdatedAt: st.UpdatedAt, CreatedBy: st.CreatedBy, Final: st.Final, CostUSD: st.CostUSD, Running: r.Running(st.ID)}
+	if st.Spec.Budget.TotalUSD > 0 {
+		v.Limit = StudyLimitText(st.Spec.Budget.TotalUSD, st.Spec.Replicate.Loops)
+	}
+	return v
 }
 
 func (r *Runner) studyDir(id string) string { return filepath.Join(r.Root, StudyDir, id) }
@@ -174,6 +181,12 @@ func (r *Runner) CreateStudy(ctx context.Context, spec *Spec, actor string) (*St
 	if err := spec.Validate(); err != nil {
 		return nil, err
 	}
+	if total := spec.Budget.TotalUSD; total > 0 {
+		if share := LoopShareUSD(total, spec.Replicate.Loops); share < spec.Improver.BudgetUSD {
+			return nil, fmt.Errorf("A total of %s for %d loops leaves %s for each loop, less than one improver round may spend (%s). Raise the total or use fewer loops.",
+				formatUSD(total), spec.Replicate.Loops, formatUSD(share), formatUSD(spec.Improver.BudgetUSD))
+		}
+	}
 	hash, err := spec.Hash()
 	if err != nil {
 		return nil, err
@@ -207,9 +220,25 @@ func (r *Runner) studyPool(ctx context.Context, spec *Spec) ([]string, error) {
 	return pool, nil
 }
 
+// LoopShareUSD is one loop's hard stop in a study whose spending limit is
+// total for all loops: an equal share, rounded down to the cent. A loop that
+// spends less does not pass the rest to later loops. 0 means no limit.
+func LoopShareUSD(total float64, loops int) float64 {
+	if total <= 0 || loops < 1 {
+		return 0
+	}
+	return math.Floor(total*100/float64(loops)+1e-9) / 100
+}
+
+// StudyLimitText says both limits of a study in plain words.
+func StudyLimitText(total float64, loops int) string {
+	return fmt.Sprintf("Total for %d loops: at most %s (%s for each loop)", loops, formatUSD(total), formatUSD(LoopShareUSD(total, loops)))
+}
+
 // loopSpec is loop l's spec: one loop, its own seed when repartitioning.
 func loopSpec(st *Study, l int) Spec {
 	s := st.Spec
+	s.Budget.TotalUSD = LoopShareUSD(st.Spec.Budget.TotalUSD, st.Spec.Replicate.Loops)
 	s.Replicate = ReplicationPlan{Loops: 1}
 	s.Name = fmt.Sprintf("%s-loop-%d", st.Name, l+1)
 	if st.Spec.Replicate.Repartition {
@@ -300,6 +329,14 @@ func (r *Runner) RunStudy(ctx context.Context, id string) (*Study, error) {
 				return fail(err)
 			}
 			rec.Study, rec.InStudy = st.ID, true
+			// The study's total limit binds every loop too: the loops before
+			// this one are done, so their spend is fixed.
+			rec.StudyLimitUSD = st.Spec.Budget.TotalUSD
+			for _, prev := range st.Loops {
+				if p, err := r.load(prev); err == nil {
+					rec.StudyPriorUSD += totalUSD(p)
+				}
+			}
 			if err := r.save(rec); err != nil {
 				return fail(err)
 			}
@@ -344,17 +381,16 @@ func (r *Runner) RunStudy(ctx context.Context, id string) (*Study, error) {
 		arms = append(arms, rec.Incumbent)
 	}
 	// The study's held-out check has a hard stop like every other scoring
-	// call (A2.10). Each loop runs under the spec's limit, so the study's
-	// whole limit is loops times that limit.
+	// call (A2.10), against the study's total limit.
 	if lim := st.Spec.Budget.TotalUSD; lim > 0 && len(recs) > 0 {
 		spent := 0.0
 		for _, rec := range recs {
 			spent += totalUSD(rec)
 		}
 		next := float64(len(arms)*len(st.Sealed)*max(1, st.Spec.Sealed.Trials)) * perRunUSD(recs[0])
-		if total := lim * float64(len(recs)); spent+next > total {
+		if spent+next > lim {
 			st.Status, st.CostUSD = StatusStopped, spent
-			st.Reason = fmt.Sprintf("Stopped before the study's held-out check: the next step would pass the spending limit of $%.2f (spent $%.2f).", total, spent)
+			st.Reason = fmt.Sprintf("Stopped before the study's held-out check: the next step would pass the study's total spending limit of $%.2f (spent $%.2f).", lim, spent)
 			return st, r.saveStudy(st)
 		}
 	}
