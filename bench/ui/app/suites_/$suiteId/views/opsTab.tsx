@@ -6,6 +6,7 @@ import { Section } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { WhyDisabled } from "@/components/ui/whyDisabled";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { benchApi, getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useQuarantineTaskMutation, useRestoreTaskMutation } from "@/lib/store/apis/suiteOpsApi";
@@ -22,6 +23,18 @@ declare module "@/lib/i18n/resources" {
 }
 
 type T = ReturnType<typeof useTranslation<"suiteops">>["t"];
+
+/** A job button that cannot run yet, with the reason as visible text under it (p11-7d). */
+export function DisabledRun({ label, reason, testId }: { label: string; reason: string; testId: string }) {
+	return (
+		<div className="flex flex-col gap-1">
+			<Button disabled aria-describedby={`${testId}-why`} data-testid={testId}>
+				{label}
+			</Button>
+			<WhyDisabled reason={reason} testId={`${testId}-why`} />
+		</div>
+	);
+}
 
 const splitList = (s: string) =>
 	s
@@ -333,9 +346,7 @@ export function FromCommitSection({ suite, hosted, t }: { suite: SuiteSummary; h
 					{params ? (
 						<JobRunButton kind={SUITE_OPS_KINDS.fromCommit} params={params} label={t("fromCommit.run")} />
 					) : (
-						<Button disabled title={t("fromCommit.missing")} data-testid="suite-ops-from-commit-disabled">
-							{t("fromCommit.run")}
-						</Button>
+						<DisabledRun label={t("fromCommit.run")} reason={t("fromCommit.missing")} testId="suite-ops-from-commit-disabled" />
 					)}
 				</div>
 			</div>
@@ -386,9 +397,7 @@ function MineSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: boolea
 					{params ? (
 						<JobRunButton kind={SUITE_OPS_KINDS.mine} params={params} label={label} onDone={preview ? undefined : refresh} />
 					) : (
-						<Button disabled title={t("mine.missing")} data-testid="suite-ops-mine-disabled">
-							{label}
-						</Button>
+						<DisabledRun label={label} reason={t("mine.missing")} testId="suite-ops-mine-disabled" />
 					)}
 				</div>
 			</div>

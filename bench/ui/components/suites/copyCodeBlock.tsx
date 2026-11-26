@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
+import i18n from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import "@/app/suites_/$suiteId/views/w4m6I18n";
 import { Check, ClipboardCopy, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,13 +14,20 @@ export interface CopyCodeBlockProps {
 	label: string;
 	testId: string;
 	className?: string;
+	/** command (the default) or code: what the copy status names. */
+	kind?: "command" | "code";
+}
+
+/** What the live region says after a copy: code blocks say "Code copied", commands "Command copied". */
+export function copiedAnnouncement(kind: "command" | "code" | undefined): string {
+	return kind === "code" ? i18n.t("copy.codeCopied", { ns: "w4m6" }) : i18n.t("suites.add.copiedAnnounce", { ns: "bench" });
 }
 
 /**
  * A command or file snippet with a copy button. The result is announced in a polite live region
  * that is always in the DOM, so screen readers hear "copied" without the focus moving.
  */
-export function CopyCodeBlock({ code, label, testId, className }: CopyCodeBlockProps) {
+export function CopyCodeBlock({ code, label, testId, className, kind }: CopyCodeBlockProps) {
 	const { t } = useTranslation("bench");
 	const [state, setState] = useState<CopyState>("idle");
 	const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -59,7 +68,7 @@ export function CopyCodeBlock({ code, label, testId, className }: CopyCodeBlockP
 				</span>
 			</Button>
 			<span className="sr-only" role="status" aria-live="polite" data-testid={`${testId}-status`}>
-				{state === "copied" ? t("suites.add.copiedAnnounce") : state === "failed" ? t("suites.add.copyFailedAnnounce") : ""}
+				{state === "copied" ? copiedAnnouncement(kind) : state === "failed" ? t("suites.add.copyFailedAnnounce") : ""}
 			</span>
 		</div>
 	);

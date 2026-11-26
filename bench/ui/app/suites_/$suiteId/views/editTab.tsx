@@ -5,6 +5,9 @@ import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { WhyDisabled } from "@/components/ui/whyDisabled";
+import i18n from "@/lib/i18n";
+import "./w4m6I18n";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import {
 	authoringError,
@@ -23,6 +26,34 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 const MAX_FILE = 1 << 20;
+
+type W4m6T = ReturnType<typeof useTranslation<"w4m6">>["t"];
+
+/**
+ * Why p cannot be a new file's path inside the benchmark, or null (p11-1): no leading "/", no "." or
+ * ".." part, no backslash, and only letters, digits, dots, dashes, underscores and "/".
+ */
+export function suitePathProblem(p: string): string | null {
+	const s = p.trim();
+	if (s === "") return null;
+	const parts = s.split("/");
+	if (s.startsWith("/") || s.includes("\\") || !/^[A-Za-z0-9._/-]+$/.test(s) || parts.some((part) => part === "." || part === ".."))
+		return i18n.t("edit.pathRule", { ns: "w4m6" });
+	return null;
+}
+
+/** The line under a failed save: the server's own "Could not save ..." sentence, else "Could not save: <reason>". */
+export function saveErrorText(t: W4m6T, error: unknown): string {
+	const reason = authoringError(error, "");
+	if (reason.startsWith("Could not save")) return reason;
+	return t("edit.saveFailed", { reason: reason || "?" });
+}
+
+/** Where uploaded files land (p11-4). */
+export function uploadTargetText(t: W4m6T, dir: string): string {
+	const d = dir.trim().replace(/^\/+|\/+$/g, "");
+	return d ? t("edit.target", { dir: d }) : t("edit.targetTop");
+}
 const ID_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 
 /** Edit tab: the suite's files with a text editor, add task, uploads, lint and lock. */
@@ -162,6 +193,7 @@ function FileList({ suiteId, selected, onSelect }: { suiteId: string; selected: 
 	const { t } = useTranslation("suiteAuthoring");
 	const files = useGetSuiteFilesQuery(suiteId);
 	const [newPath, setNewPath] = useState("");
+	const pathWhy = suitePathProblem(newPath);
 	const list = useMemo(() => (files.data?.files ?? []).filter((f) => !f.dir), [files.data]);
 	return (
 		<div className="flex min-w-0 flex-col gap-2 rounded-md border p-2" data-testid="suite-edit-files">
@@ -186,17 +218,24 @@ function FileList({ suiteId, selected, onSelect }: { suiteId: string; selected: 
 				className="flex flex-col gap-1 border-t pt-2"
 				onSubmit={(e) => {
 					e.preventDefault();
-					const p = newPath.trim().replace(/^\/+/, "");
-					if (p) {
+					const p = newPath.trim();
+					if (p && pathWhy === null) {
 						onSelect(p);
 						setNewPath("");
 					}
 				}}
 			>
 				<Input value={newPath} onChange={(e) => setNewPath(e.target.value)} placeholder={t("edit.newFileHint")} aria-label={t("edit.newFile")} />
-				<Button type="submit" size="sm" variant="outline" disabled={!newPath.trim()}>
+				<Button
+					type="submit"
+					size="sm"
+					variant="outline"
+					disabled={!newPath.trim() || pathWhy !== null}
+					aria-describedby={pathWhy ? "suite-edit-new-path-why" : undefined}
+				>
 					{t("edit.addFile")}
 				</Button>
+				<WhyDisabled reason={pathWhy} testId="suite-edit-new-path-why" />
 			</form>
 		</div>
 	);
@@ -204,6 +243,7 @@ function FileList({ suiteId, selected, onSelect }: { suiteId: string; selected: 
 
 function FileEditor({ suiteId, path, onDeleted }: { suiteId: string; path: string; onDeleted(): void }) {
 	const { t } = useTranslation("suiteAuthoring");
+	const { t: t6 } = useTranslation("w4m6");
 	const confirm = useConfirm();
 	const file = useGetSuiteFileQuery({ suite: suiteId, path });
 	const [put, putState] = usePutSuiteFileMutation();
@@ -257,13 +297,14 @@ function FileEditor({ suiteId, path, onDeleted }: { suiteId: string; path: strin
 					data-testid="suite-edit-textarea"
 				/>
 			)}
-			{putState.error && <p className="text-destructive text-sm">{authoringError(putState.error, t("edit.saveError"))}</p>}
+			{putState.error && <p className="text-destructive text-sm">{saveErrorText(t6, putState.error)}</p>}
 		</div>
 	);
 }
 
 function Uploads({ suiteId, defaultDir, onPicked }: { suiteId: string; defaultDir: string; onPicked(p: string): void }) {
 	const { t } = useTranslation("suiteAuthoring");
+	const { t: t6 } = useTranslation("w4m6");
 	const [dir, setDir] = useState(defaultDir);
 	const [put, putState] = usePutSuiteFileMutation();
 	const [upload, uploadState] = useUploadSuiteZipMutation();
@@ -279,13 +320,16 @@ function Uploads({ suiteId, defaultDir, onPicked }: { suiteId: string; defaultDi
 		}
 		const p = target ? `${target}/${f.name}` : f.name;
 		const res = await put({ suite: suiteId, path: p, content: f });
-		if (!("error" in res)) onPicked(p);
+		if (!("error" in res)) {
+			setMsg(t6("edit.uploadedFile", { path: p }));
+			onPicked(p);
+		}
 	};
 	const onZip = async (f: File | undefined) => {
 		if (!f || !target) return;
 		setMsg(null);
 		const res = await upload({ suite: suiteId, dir: target, file: f });
-		if ("data" in res && res.data) setMsg(t("edit.uploaded", { count: res.data.files.length }));
+		if ("data" in res && res.data) setMsg(t6("edit.uploaded", { count: res.data.files.length }));
 	};
 	const busy = putState.isLoading || uploadState.isLoading;
 	const err = putState.error ?? uploadState.error;
@@ -295,6 +339,9 @@ function Uploads({ suiteId, defaultDir, onPicked }: { suiteId: string; defaultDi
 				{t("edit.uploadDir")}
 				<Input value={dir} onChange={(e) => setDir(e.target.value)} placeholder="tasks/t01/repo" data-testid="suite-edit-upload-dir" />
 			</label>
+			<p className="text-muted-foreground text-xs" data-testid="suite-edit-upload-target">
+				{uploadTargetText(t6, dir)}
+			</p>
 			<div className="flex flex-wrap gap-3 text-sm">
 				<label className="flex flex-col gap-1">
 					{t("edit.uploadFile")}

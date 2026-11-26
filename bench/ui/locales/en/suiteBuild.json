@@ -87,7 +87,7 @@
 			"wrong": "Wrong answers tried",
 			"details": "Details"
 		},
-		"generatedWrong": "Written by Heimdall from your answer (the row named none). Edit them in verifier/answer.yaml.",
+		"generatedWrong": "Written by Heimdall from your answer, because the row has no wrong answer. Edit them in the task's verifier/answer.yaml file on the Edit files tab.",
 		"verbatim": "The agent gets each task's text exactly as written in your rows, with no prompt added around it.",
 		"previewMore": "Showing the first {{shown}} of {{total}} tasks.",
 		"tooBig": "This data is over 48 MiB. Split it into smaller files of up to 20000 rows.",

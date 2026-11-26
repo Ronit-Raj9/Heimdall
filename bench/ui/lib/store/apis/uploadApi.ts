@@ -1,4 +1,5 @@
 import type { UploadFilesReport, UploadRunsReport } from "@/lib/types/upload";
+import { transportErrorText } from "@/lib/requestErrors";
 import { benchApi } from "./benchApi";
 
 /** The upload size limit the server and Caddy enforce (lib.MaxUploadBytes). */
@@ -32,6 +33,7 @@ export const { useUploadRunsMutation, useUploadProjectMutation, useUploadAgentMu
 
 /** The server's error message from an RTK Query error, or a fallback. */
 export function uploadErrorMessage(error: unknown, fallback: string): string {
+	const transport = transportErrorText(error); if (transport) return transport;
 	const e = error as { status?: unknown; data?: { error?: { message?: string } } } | undefined;
 	return e?.data?.error?.message ?? fallback;
 }

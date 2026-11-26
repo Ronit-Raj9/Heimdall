@@ -368,6 +368,9 @@ func (h *suiteBuild) writeRowTasks(ctx context.Context, id, dir string, raw []by
 		return storeErr{"add the tasks to suite.yaml", err}
 	}
 	_ = os.Chmod(filepath.Join(dir, suite.SuiteFile), 0o644)
+	// The task count changed: drop the cached summary so the page shows the
+	// new tasks at once (both the direct import and each background batch).
+	forgetSuite(h.suites, id)
 	return nil
 }
 
@@ -423,6 +426,7 @@ func (h *suiteBuild) setGrader(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	_ = os.Chmod(filepath.Join(dir, suite.SuiteFile), 0o644)
+	forgetSuite(h.suites, id) // the Build tab reads the new grader at once
 	var after answerSuite
 	_ = yaml.Unmarshal(edited, &after)
 	out := SuiteGraderResult{Suite: id, Grader: after.Grader, Grading: after.Grading, Judge: after.Judge,

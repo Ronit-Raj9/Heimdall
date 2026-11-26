@@ -9,6 +9,7 @@ import type {
 	SuiteTemplateList,
 	SuiteUploadResult,
 } from "@/lib/types/suiteAuthoring";
+import { transportErrorText } from "@/lib/requestErrors";
 import { benchApi } from "./benchApi";
 
 const seg = (v: string) => encodeURIComponent(v);
@@ -91,6 +92,8 @@ export const suiteAuthoringApi = benchApi.enhanceEndpoints({ addTagTypes: ["Suit
 
 /** The server's error message of a failed request, or a fallback. */
 export function authoringError(error: unknown, fallback: string): string {
+	const transport = transportErrorText(error);
+	if (transport) return transport;
 	const e = error as { status?: unknown; data?: { error?: { message?: string } } } | undefined;
 	return e?.data?.error?.message || (e?.status ? `${fallback} (${String(e.status)})` : fallback);
 }
