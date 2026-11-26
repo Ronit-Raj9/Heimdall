@@ -14,6 +14,10 @@ const (
 	PhaseSealed   = "sealed"   // incumbent on sealed, read only by the report
 	PhaseControl  = "control"  // control arms on sealed
 	PhaseMonitor  = "monitor"  // channel parity reads the screen's runs
+
+	PhaseFinal     = "final"     // version 0, final and null final on sealed: the claim
+	PhaseExtension = "extension" // the second look of a continued run
+	PhaseRetries   = "retries"   // version 0 retried on visible failures
 )
 
 // Version is one agent version the loop runs: its pinned reference, the
@@ -26,6 +30,10 @@ type Version struct {
 	BundleHash string `json:"bundle_hash"`
 	Doc        []byte `json:"doc,omitempty"`
 	Bundle     Bundle `json:"bundle,omitempty"`
+	// BundleObj and PlaybookObj are the version's bundle and playbook
+	// objects (A1.2); BundleHash keeps its old meaning.
+	BundleObj   string `json:"bundle_obj,omitempty"`
+	PlaybookObj string `json:"playbook_obj,omitempty"`
 }
 
 // TaskInfo is one task of the pool.
@@ -52,6 +60,68 @@ type EvidenceItem struct {
 	Outcome string   `json:"outcome"`
 	Success float64  `json:"success"`
 	Gates   []string `json:"gates,omitempty"`
+
+	// The fields below are the evidence builder's (A3.1); all are optional.
+	RunRef         string             `json:"run_ref,omitempty"`
+	Arm            string             `json:"arm,omitempty"`
+	Version        int                `json:"version,omitempty"`
+	Instruction    string             `json:"instruction,omitempty"`
+	Checks         []EvidenceCheck    `json:"checks,omitempty"`
+	TestsRan       int                `json:"tests_ran,omitempty"`
+	TestsFailed    int                `json:"tests_failed,omitempty"`
+	StopReason     string             `json:"stop_reason,omitempty"`
+	Steps          int                `json:"steps,omitempty"`
+	CostUSD        float64            `json:"cost_usd,omitempty"`
+	Tokens         *EvidenceTokens    `json:"tokens,omitempty"`
+	WallS          float64            `json:"wall_s,omitempty"`
+	ToolCalls      []EvidenceToolCall `json:"tool_calls,omitempty"`
+	FailingStep    *EvidenceStep      `json:"failing_step,omitempty"`
+	Errors         []string           `json:"errors,omitempty"`
+	Final          *EvidenceFinal     `json:"final,omitempty"`
+	Opened         []string           `json:"opened,omitempty"`
+	ItemsInContext []string           `json:"items_in_context,omitempty"`
+	Cluster        string             `json:"cluster,omitempty"`
+	Noisy          bool               `json:"noisy,omitempty"`
+	Flip           string             `json:"flip,omitempty"`
+	Digest         string             `json:"digest,omitempty"`
+	Transcript     string             `json:"transcript,omitempty"`
+}
+
+// EvidenceCheck is one check name and whether it passed; never its feedback text.
+type EvidenceCheck struct {
+	Name   string `json:"name"`
+	Passed bool   `json:"passed"`
+}
+
+// EvidenceTokens are a run's token counts.
+type EvidenceTokens struct {
+	Input  int `json:"input"`
+	Output int `json:"output"`
+	Cached int `json:"cached"`
+}
+
+// EvidenceToolCall is one tool call of a run, args clipped.
+type EvidenceToolCall struct {
+	I     int     `json:"i"`
+	Tool  string  `json:"tool"`
+	Args  string  `json:"args,omitempty"`
+	Exit  int     `json:"exit,omitempty"`
+	S     float64 `json:"s,omitempty"`
+	Error bool    `json:"error,omitempty"`
+}
+
+// EvidenceStep is the step that produced the last error before the stop.
+type EvidenceStep struct {
+	I         int    `json:"i"`
+	Tool      string `json:"tool"`
+	Args      string `json:"args,omitempty"`
+	ErrorText string `json:"error_text,omitempty"`
+}
+
+// EvidenceFinal is a run's final diff or answer, clipped.
+type EvidenceFinal struct {
+	Kind string `json:"kind"` // diff | answer
+	Text string `json:"text"`
 }
 
 // ImproveRequest is one improver phase. Null asks for the null improver:
@@ -65,6 +135,17 @@ type ImproveRequest struct {
 	BudgetUSD     float64
 	WallS         int
 	Null          bool
+	// The fields below are A3.3's. EvidenceDoc is the evidence document of
+	// A3.1 (the digest of failed practice runs and where the transcripts
+	// are); Evidence above stays the older item list until the runner stops
+	// using it.
+	EvidenceDoc *EvidenceDoc
+	Kind        string // mutation | merge | restart | null
+	Second      *Version
+	Model       string
+	Provider    string
+	Seed        int64
+	Limits      Limits
 }
 
 // ImproveResult is the improver's output: the full new bundle (every path
@@ -76,10 +157,19 @@ type ImproveResult struct {
 	RunID   string   `json:"run_id,omitempty"`
 	ExpID   string   `json:"exp_id,omitempty"`
 	Flags   []string `json:"flags,omitempty"`
+	// Edits is the parsed edits.json when the improver wrote one; Reasons
+	// and Summary come with a bundle.json (A Part 0 D3).
+	Edits   *EditsFile        `json:"edits,omitempty"`
+	Reasons map[string]string `json:"reasons,omitempty"`
+	Summary string            `json:"summary,omitempty"`
 }
 
-// ScoreRequest is one scoring experiment: one or two arms (A, then B) on
-// tasks, trials each.
+// MaxScoreArms is how many versions one scoring experiment may hold
+// (letters A to F).
+const MaxScoreArms = 6
+
+// ScoreRequest is one scoring experiment: up to MaxScoreArms arms (A, B,
+// then C to F) on tasks, trials each.
 type ScoreRequest struct {
 	ImprovementID string
 	Spec          *Spec
@@ -100,6 +190,10 @@ type RunScore struct {
 	Outcome string   `json:"outcome"`
 	Vetoes  []string `json:"vetoes,omitempty"` // integrity gates that vetoed the run
 	CostUSD float64  `json:"cost_usd"`
+	// Stop is the run's outcome when it is a visible failure (timeout,
+	// budget, crash, refusal), else empty (A2.6).
+	Stop  string `json:"stop,omitempty"`
+	RunID string `json:"run_id,omitempty"`
 }
 
 // ScoreResult is a scoring experiment's counted runs, spend and the event
@@ -128,6 +222,10 @@ type Executor interface {
 	Improve(ctx context.Context, req ImproveRequest) (*ImproveResult, error)
 	// Score runs one scoring experiment.
 	Score(ctx context.Context, req ScoreRequest) (*ScoreResult, error)
+	// CheckImprover refuses a spec whose improver task cannot run (A1.6).
+	CheckImprover(ctx context.Context, spec *Spec) error
+	// Runs returns the run refs (with folders) of a scoring experiment.
+	Runs(ctx context.Context, expID string) ([]RunRef, error)
 }
 
 // Lineage is what Freeze records on a derived version.
@@ -137,6 +235,9 @@ type Lineage struct {
 	BundleHash    string
 	ProducedByRun string
 	Note          string
+	// Editable is the spec's editable set: Freeze reads the candidate's
+	// bundle from the derived document with it (A1.3).
+	Editable Editable
 }
 
 // NewVersion builds a Version from a frozen agent YAML document: its

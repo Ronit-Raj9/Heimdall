@@ -7,33 +7,12 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/stats"
 	"github.com/maximhq/bifrost/bench/utils"
 )
-
-// Runner creates, drives, pauses and stops improvement runs. A run resumes
-// from its last saved stage, so a crash or a failed experiment is retried
-// with another Run call.
-type Runner struct {
-	Root   string // <runs root>/.improvements
-	Exec   Executor
-	Now    func() time.Time
-	Logger schemas.Logger
-
-	mu      sync.Mutex
-	running map[string]context.CancelFunc
-}
-
-func (r *Runner) now() time.Time {
-	if r.Now != nil {
-		return r.Now().UTC()
-	}
-	return time.Now().UTC()
-}
 
 // Create freezes a spec: resolves version 0, partitions the task pool,
 // reads the protected material of the audit and sealed tasks, and writes

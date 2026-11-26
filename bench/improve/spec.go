@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"regexp"
 	"slices"
 	"strings"
@@ -47,11 +48,60 @@ const (
 	TripSpendShare = 0.9
 )
 
-// Control arm ids (Spec.Controls).
+// Control arm ids (Spec.Controls). ControlRetries replaces the
+// budget-matched band (A2.6); old specs may still name budget_matched_v0.
 const (
 	ControlBudgetMatched = "budget_matched_v0"
 	ControlNullImprover  = "null_improver"
+	ControlRetries       = "retries_v0"
 )
+
+// The improver task every run uses unless the spec names another, and the
+// short form people write for it (stored expanded).
+const (
+	DefaultImproverTask = "heimdall-improver@1.1.0:reflect-edit"
+	ImproverTaskAlias   = "improver@1.1.0:reflect-edit"
+)
+
+// InstructionsKey is the bundle key of the agent's standing instructions.
+const InstructionsKey = "@instructions"
+
+// EnvToolDescriptions switches on tool descriptions as an editable surface.
+const EnvToolDescriptions = "HEIMDALL_IMPROVE_TOOL_DESCRIPTIONS"
+
+// Limits of the new spec fields.
+const (
+	MaxCandidates     = 8
+	MaxRetryAttempts  = 32
+	MaxReplicateLoops = 5
+	DefaultGateAlpha  = 0.10 // the gate alpha of every preset
+)
+
+// Presets (Spec.Preset).
+const (
+	PresetSmall  = "small"
+	PresetMedium = "medium"
+	PresetLarge  = "large"
+	PresetCustom = "custom"
+)
+
+// presetValues are the counts and caps a preset fills into unset fields (A3.6).
+type presetValues struct {
+	rounds, candidates, keep int
+	merge                    bool
+	restart                  []int
+	screen, gate, sealed     int
+	curve                    bool
+	improverUSD              float64
+	extension                bool
+	limitUSD                 float64
+}
+
+var presets = map[string]presetValues{
+	PresetSmall:  {rounds: 3, candidates: 2, keep: 2, screen: 1, gate: 2, sealed: 2, improverUSD: 0.30, extension: true, limitUSD: 15},
+	PresetMedium: {rounds: 5, candidates: 4, keep: 4, merge: true, restart: []int{3, 5}, screen: 1, gate: 3, sealed: 2, curve: true, improverUSD: 0.60, extension: true, limitUSD: 60},
+	PresetLarge:  {rounds: 8, candidates: 8, keep: 8, merge: true, restart: []int{3, 6}, screen: 2, gate: 3, sealed: 3, curve: true, improverUSD: 1.50, limitUSD: 400},
+}
 
 // DefaultFrozen are the agent config fields the improver may never change.
 var DefaultFrozen = []string{"adapter", "image", "build", "argv", "env", "model", "budgets", "gateway", "capabilities", "limits", "remote", "a2a", "openai", "team", "scripted"}
@@ -73,6 +123,51 @@ type Spec struct {
 	Commit   CommitSpec   `json:"commit" yaml:"commit"`
 	Sealed   PhaseSpec    `json:"sealed" yaml:"sealed"`
 	Controls []string     `json:"controls" yaml:"controls"`
+
+	// Preset is small, medium, large or custom; it fills unset fields (A3.6).
+	Preset       string          `json:"preset,omitempty" yaml:"preset"`
+	Surfaces     Surfaces        `json:"surfaces" yaml:"surfaces"`
+	Claim        ClaimSpec       `json:"claim" yaml:"claim"`
+	Retries      RetriesSpec     `json:"retries" yaml:"retries"`
+	Budget       BudgetSpec      `json:"budget" yaml:"budget"`
+	Replicate    ReplicationPlan `json:"replicate" yaml:"replicate"`
+	BundleSource *BundleSource   `json:"bundle_source,omitempty" yaml:"bundle_source"`
+}
+
+// Surfaces are editable surfaces beyond files and instructions. Tool
+// descriptions are designed but switched off unless the server sets
+// EnvToolDescriptions (A3.8).
+type Surfaces struct {
+	ToolDescriptions bool `json:"tool_descriptions,omitempty" yaml:"tool_descriptions"`
+}
+
+// ClaimSpec is the claim on the held-out tasks (A2.5): its alpha, the part
+// of it reserved for one second look when Extension is on, and the gain the
+// run is sized to confirm.
+type ClaimSpec struct {
+	Alpha          float64 `json:"alpha" yaml:"alpha"`
+	ExtensionAlpha float64 `json:"extension_alpha" yaml:"extension_alpha"`
+	TargetGain     float64 `json:"target_gain" yaml:"target_gain"`
+	Extension      bool    `json:"extension" yaml:"extension"`
+}
+
+// RetriesSpec caps the retries control (A2.6).
+type RetriesSpec struct {
+	MaxAttempts int `json:"max_attempts" yaml:"max_attempts"`
+}
+
+// BudgetSpec is the whole run's hard stop in dollars; 0 means none (A2.10).
+type BudgetSpec struct {
+	TotalUSD float64 `json:"total_usd" yaml:"total_usd"`
+}
+
+// BundleSource names where version 0's bundle comes from (A4.4, designed
+// for a later wave).
+type BundleSource struct {
+	Kind     string   `json:"kind" yaml:"kind"` // bifrost_prompt | bifrost_skills
+	PromptID string   `json:"prompt_id,omitempty" yaml:"prompt_id"`
+	Skills   []string `json:"skills,omitempty" yaml:"skills"`
+	Publish  string   `json:"publish,omitempty" yaml:"publish"`
 }
 
 // Editable is the agent bundle the improver may change: container paths in
@@ -82,6 +177,9 @@ type Spec struct {
 type Editable struct {
 	Files []string `json:"files" yaml:"files"`
 	Dirs  []string `json:"dirs,omitempty" yaml:"dirs"`
+	// Instructions makes the agent's standing instructions editable, as
+	// the bundle key InstructionsKey.
+	Instructions bool `json:"instructions,omitempty" yaml:"instructions"`
 }
 
 // SplitSpec partitions the task pool: shares of dev (the improver and the
@@ -102,11 +200,25 @@ type ImproverSpec struct {
 	BudgetUSD float64 `json:"budget_usd" yaml:"budget_usd"`
 	WallS     int     `json:"wall_s" yaml:"wall_s"`
 	Task      string  `json:"task,omitempty" yaml:"task"`
+	// Agent is "" or reflector (the shipped reflector agent) or self (the
+	// incumbent runs the improver task). Model and Provider set a teacher.
+	Agent    string `json:"agent,omitempty" yaml:"agent"`
+	Model    string `json:"model,omitempty" yaml:"model"`
+	Provider string `json:"provider,omitempty" yaml:"provider"`
+	// Candidates are the ideas per round, Keep the keep set size, Merge
+	// adds a merge slot, RestartRounds are rounds with a restart slot (A3.4).
+	Candidates    int   `json:"candidates" yaml:"candidates"`
+	Keep          int   `json:"keep" yaml:"keep"`
+	Merge         bool  `json:"merge,omitempty" yaml:"merge"`
+	RestartRounds []int `json:"restart_rounds,omitempty" yaml:"restart_rounds"`
 }
 
 // PhaseSpec is how many trials per task a scoring phase runs.
 type PhaseSpec struct {
 	Trials int `json:"trials" yaml:"trials"`
+	// Curve scores the incumbent on sealed after each change (sealed only;
+	// descriptive, never read by a decision).
+	Curve bool `json:"curve,omitempty" yaml:"curve"`
 }
 
 // CommitSpec is the commit gate on the audit split: the family level alpha
@@ -139,10 +251,41 @@ func ParseSpec(data []byte) (*Spec, error) {
 	return &s, nil
 }
 
-// Defaults fills every unset field.
+// Defaults fills every unset field. A preset fills its values first, then
+// today's defaults fill the rest, so a spec without a preset behaves as
+// before (gate alpha 0.05, one idea per round, the held-out curve on, no
+// hard stop, no reserve).
 func (s *Spec) Defaults() {
 	if s.Kind == "" {
 		s.Kind = Kind
+	}
+	s.presetDefaults()
+	if s.Improver.Candidates == 0 {
+		s.Improver.Candidates = 1
+	}
+	if s.Improver.Keep == 0 {
+		s.Improver.Keep = 1
+	}
+	if s.Preset == "" {
+		s.Sealed.Curve = true
+	}
+	if t := strings.TrimSpace(s.Improver.Task); t == "" || t == ImproverTaskAlias {
+		s.Improver.Task = DefaultImproverTask
+	}
+	if s.Claim.Alpha == 0 {
+		s.Claim.Alpha = DefaultClaimAlpha
+	}
+	if s.Claim.ExtensionAlpha == 0 {
+		s.Claim.ExtensionAlpha = DefaultExtensionAlpha
+	}
+	if s.Claim.TargetGain == 0 {
+		s.Claim.TargetGain = DefaultTargetGain
+	}
+	if s.Retries.MaxAttempts == 0 {
+		s.Retries.MaxAttempts = MaxRetryAttempts
+	}
+	if s.Replicate.Loops == 0 {
+		s.Replicate.Loops = 1
 	}
 	if s.Rounds == 0 {
 		s.Rounds = DefaultRounds
@@ -184,6 +327,53 @@ func (s *Spec) Defaults() {
 	}
 }
 
+// presetDefaults fills the preset's values into unset fields. Switches a
+// preset turns on (merge, curve, the reserved second look) are turned on;
+// a spec that wants one off sets the preset to custom.
+func (s *Spec) presetDefaults() {
+	if s.Preset == "" {
+		return
+	}
+	if s.Commit.Alpha == 0 {
+		s.Commit.Alpha = DefaultGateAlpha
+	}
+	if s.Controls == nil {
+		s.Controls = []string{ControlNullImprover, ControlRetries}
+	}
+	p, ok := presets[s.Preset]
+	if !ok {
+		return
+	}
+	setInt := func(f *int, v int) {
+		if *f == 0 {
+			*f = v
+		}
+	}
+	setInt(&s.Rounds, p.rounds)
+	setInt(&s.Improver.Candidates, p.candidates)
+	setInt(&s.Improver.Keep, p.keep)
+	setInt(&s.Screen.Trials, p.screen)
+	setInt(&s.Commit.Trials, p.gate)
+	setInt(&s.Sealed.Trials, p.sealed)
+	s.Improver.Merge = s.Improver.Merge || p.merge
+	s.Sealed.Curve = s.Sealed.Curve || p.curve
+	s.Claim.Extension = s.Claim.Extension || p.extension
+	if s.Improver.RestartRounds == nil && p.restart != nil {
+		// Restart rounds past the run's last round are dropped.
+		for _, r := range p.restart {
+			if r <= s.Rounds {
+				s.Improver.RestartRounds = append(s.Improver.RestartRounds, r)
+			}
+		}
+	}
+	if s.Improver.BudgetUSD == 0 {
+		s.Improver.BudgetUSD = p.improverUSD
+	}
+	if s.Budget.TotalUSD == 0 {
+		s.Budget.TotalUSD = p.limitUSD
+	}
+}
+
 // Validate checks a spec after Defaults.
 func (s *Spec) Validate() error {
 	var errs []error
@@ -203,10 +393,13 @@ func (s *Spec) Validate() error {
 	if s.Rounds < 1 || s.Rounds > MaxRounds {
 		bad("rounds must be 1 to %d", MaxRounds)
 	}
-	if len(s.Editable.Files)+len(s.Editable.Dirs) == 0 {
+	if len(s.Editable.Files)+len(s.Editable.Dirs) == 0 && !s.Editable.Instructions {
 		bad("editable needs at least one file or folder")
 	}
 	for _, f := range s.Editable.Files {
+		if f == InstructionsKey {
+			continue
+		}
 		if !strings.HasPrefix(f, "/") || strings.HasSuffix(f, "/") || strings.Contains(f, "..") {
 			bad("editable file %q must be an absolute container path", f)
 		}
@@ -236,11 +429,69 @@ func (s *Spec) Validate() error {
 		bad("commit needs min_pairs >= 1, max_pairs >= min_pairs and audit_looks >= 1")
 	}
 	for _, k := range s.Controls {
-		if k != ControlBudgetMatched && k != ControlNullImprover {
-			bad("unknown control %q (budget_matched_v0, null_improver)", k)
+		if k != ControlBudgetMatched && k != ControlNullImprover && k != ControlRetries {
+			bad("unknown control %q (retries_v0, null_improver, budget_matched_v0)", k)
 		}
 	}
+	errs = append(errs, s.validateW4()...)
 	return errors.Join(errs...)
+}
+
+// validateW4 checks the fields of presets, ideas per round, the claim,
+// retries, replication, the improver agent and surfaces.
+func (s *Spec) validateW4() []error {
+	var errs []error
+	bad := func(f string, a ...any) { errs = append(errs, fmt.Errorf(f, a...)) }
+	switch s.Preset {
+	case "", PresetSmall, PresetMedium, PresetLarge, PresetCustom:
+	default:
+		bad("preset must be small, medium, large or custom")
+	}
+	im := s.Improver
+	if im.Candidates < 1 || im.Candidates > MaxCandidates || im.Keep < 1 || im.Keep > MaxCandidates {
+		bad("improver candidates and keep must be 1 to %d", MaxCandidates)
+	}
+	for _, r := range im.RestartRounds {
+		if r < 1 || r > s.Rounds {
+			bad("improver restart_rounds must be rounds 1 to %d", s.Rounds)
+			break
+		}
+	}
+	if s.Budget.TotalUSD < 0 || (s.Preset != "" && !(s.Budget.TotalUSD > 0)) {
+		bad("budget total_usd must be above 0 when a preset is set")
+	}
+	c := s.Claim
+	if !(c.Alpha > 0 && c.Alpha < 0.5) {
+		bad("claim alpha must be in (0, 0.5)")
+	}
+	if !(c.ExtensionAlpha > 0 && c.ExtensionAlpha < c.Alpha) {
+		bad("claim extension_alpha must be above 0 and below the claim alpha")
+	}
+	if !(c.TargetGain > 0 && c.TargetGain < 1) {
+		bad("claim target_gain must be in (0, 1)")
+	}
+	if s.Retries.MaxAttempts < 1 || s.Retries.MaxAttempts > MaxRetryAttempts {
+		bad("retries max_attempts must be 1 to %d", MaxRetryAttempts)
+	}
+	rp := s.Replicate
+	if rp.Loops < 1 || rp.Loops > MaxReplicateLoops {
+		bad("replicate loops must be 1 to %d", MaxReplicateLoops)
+	}
+	if tr := rp.Transfer; tr != nil && (tr.Suite == "") == (tr.Model == "") {
+		bad("replicate transfer needs exactly one of suite or model")
+	}
+	switch im.Agent {
+	case "", "reflector", "self":
+	default:
+		bad("improver agent must be reflector or self")
+	}
+	if (im.Model == "") != (im.Provider == "") {
+		bad("improver model and provider must be set together")
+	}
+	if s.Surfaces.ToolDescriptions && os.Getenv(EnvToolDescriptions) != "1" {
+		bad("Editing tool descriptions is not switched on on this server.")
+	}
+	return errs
 }
 
 // Hash is the spec's content hash, frozen in the improvement record.
@@ -253,6 +504,9 @@ func (s *Spec) RoundAlpha() float64 { return s.Commit.Alpha / float64(max(1, s.R
 
 // Allows reports whether a container path is in the bundle.
 func (e Editable) Allows(path string) bool {
+	if path == InstructionsKey {
+		return e.Instructions
+	}
 	if slices.Contains(e.Files, path) {
 		return true
 	}
