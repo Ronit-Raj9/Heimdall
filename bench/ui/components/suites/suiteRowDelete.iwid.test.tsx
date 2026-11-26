@@ -13,8 +13,8 @@ vi.mock("@/lib/store/apis/suiteAuthoringApi", async (importOriginal) => ({
 
 const { SuiteRowDelete, deleteSuiteRow, suiteRowDeletable } = await import("./suiteRowDelete");
 
-const own = { id: "faq-bench", builtin: false, source: "project" };
-const library = { id: "hd-swe-verified", builtin: true, source: "library" };
+const own = { id: "faq-bench", builtin: false };
+const library = { id: "hd-swe-verified", builtin: true, source: "library" as const };
 
 describe("benchmark row Delete (N288)", () => {
 	it("is hidden for members and viewers and on a built-in benchmark", () => {
@@ -23,7 +23,7 @@ describe("benchmark row Delete (N288)", () => {
 		expect(suiteRowDeletable(hostedSession("viewer"), own)).toBe(false);
 		expect(suiteRowDeletable(hostedSession("owner"), library)).toBe(false);
 		expect(suiteRowDeletable(hostedSession("owner"), { id: "x", source: "library" })).toBe(false);
-		expect(suiteRowDeletable(hostedSession("owner"), { id: "coding-core", builtin: false, source: "project" })).toBe(false);
+		expect(suiteRowDeletable(hostedSession("owner"), { id: "coding-core", builtin: false })).toBe(false);
 		mutation.state = { isLoading: false, error: undefined };
 		expect(render(<SuiteRowDelete suite={own} name="FAQ" />, hostedSession("member"))).toBe("");
 		expect(render(<SuiteRowDelete suite={library} name="SWE" />, hostedSession("owner"))).toBe("");
