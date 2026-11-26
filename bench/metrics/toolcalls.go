@@ -38,12 +38,28 @@ func (m *toolCallsMetric) Descriptor() schemas.MetricDescriptor {
 }
 
 // Compute implements schemas.Metric. The gateway's content log is the record
-// of what the model requested and wins when complete. Without it, the agent's
-// own stream is the next-best witness and the value says so with evidence
-// native. A tool call with no id cannot be deduplicated, so it counts once
-// where it appears.
+// of what the model requested and wins when complete and it saw tool calls.
+// A complete log with none does not prove there were none (tools that run
+// inside the agent never reach the gateway), so the agent's own stream is
+// read then too, and its count wins with evidence native when above 0.
+// Without a complete log the stream is the next-best witness. A tool call
+// with no id cannot be deduplicated, so it counts once where it appears.
 func (m *toolCallsMetric) Compute(_ context.Context, _ *schemas.RunContext, ev *schemas.Evidence) (schemas.Value, error) {
 	ev = orEmpty(ev)
+	streamCalls := func() int {
+		ids := make(map[string]struct{})
+		for i, e := range ev.Events {
+			if e.Type != schemas.EventToolCall || e.Source != schemas.SourceAgentStream {
+				continue
+			}
+			key := e.ToolCallID
+			if key == "" {
+				key = fmt.Sprintf("#%d", i)
+			}
+			ids[key] = struct{}{}
+		}
+		return len(ids)
+	}
 	gatewayGap, bad := requestLogProblem(ev.Requests)
 	if !bad {
 		ids := make(map[string]struct{})
@@ -59,21 +75,15 @@ func (m *toolCallsMetric) Compute(_ context.Context, _ *schemas.RunContext, ev *
 				ids[key] = struct{}{}
 			}
 		}
+		if len(ids) == 0 {
+			if n := streamCalls(); n > 0 {
+				return schemas.Observed(float64(n), schemas.EvidenceNative), nil
+			}
+		}
 		return schemas.Observed(float64(len(ids)), schemas.EvidenceGateway), nil
 	}
-	ids := make(map[string]struct{})
-	for i, e := range ev.Events {
-		if e.Type != schemas.EventToolCall || e.Source != schemas.SourceAgentStream {
-			continue
-		}
-		key := e.ToolCallID
-		if key == "" {
-			key = fmt.Sprintf("#%d", i)
-		}
-		ids[key] = struct{}{}
-	}
-	if len(ids) > 0 {
-		return schemas.Observed(float64(len(ids)), schemas.EvidenceNative), nil
+	if n := streamCalls(); n > 0 {
+		return schemas.Observed(float64(n), schemas.EvidenceNative), nil
 	}
 	return schemas.Unknown(gatewayGap.Reason+" and no agent_stream tool_call events", schemas.EvidenceGateway), nil
 }
