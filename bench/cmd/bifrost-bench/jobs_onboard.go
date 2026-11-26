@@ -234,6 +234,14 @@ func onboardReadyLocal(ctx context.Context, env jobEnv, set *onboard.DraftSet, t
 // stagingSuiteID is the benchmark id a hosted readiness run stages a draft as.
 func stagingSuiteID(set *onboard.DraftSet) string { return "draft-" + set.ID }
 
+// onboardAdmitParams are the suite.admit params of a draft's readiness run,
+// carrying the consent to judge calls the Add page gave.
+func onboardAdmitParams(j *jobs.Job, id, task string) hostedSuiteAdmitParams {
+	var rp handlers.OnboardReadyParams
+	_ = j.DecodeParams(&rp)
+	return hostedSuiteAdmitParams{Suite: id, Task: task, JudgeConsent: rp.JudgeConsent}
+}
+
 // onboardReadyHosted stages the draft as draft-<set> in the org's benchmarks,
 // runs the hosted suite.admit bridge on it and reads the records back.
 func onboardReadyHosted(ctx context.Context, env jobEnv, j *jobs.Job, set *onboard.DraftSet, task string, log jobs.Logger, progress func(any),
@@ -247,7 +255,7 @@ func onboardReadyHosted(ctx context.Context, env jobEnv, j *jobs.Job, set *onboa
 	}
 	defer os.RemoveAll(dst)
 	log.Printf("staged draft %s as benchmark %s for the readiness run (removed after)", set.ID, id)
-	params, _ := json.Marshal(hostedSuiteAdmitParams{Suite: id, Task: task})
+	params, _ := json.Marshal(onboardAdmitParams(j, id, task))
 	bj := *j
 	bj.Params = params
 	out, err := runHostedSuiteAdmit(ctx, env, &bj, log, progress)

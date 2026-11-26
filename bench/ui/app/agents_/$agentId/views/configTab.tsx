@@ -228,9 +228,13 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 			<Input
 				type="number"
 				min={0}
-				step="any"
+				step={k === "turns" || k === "wall_s" ? 1 : "any"}
 				value={fields[k] || ""}
-				onChange={(e) => set(k, Number(e.target.value) || 0)}
+				onChange={(e) => {
+					// Max steps and the time limit are whole numbers of at least 0; CPUs and memory may be fractions (p01-4).
+					const n = Number(e.target.value) || 0;
+					set(k, k === "turns" || k === "wall_s" ? Math.max(0, Math.trunc(n)) : Math.max(0, n));
+				}}
 				data-testid={`field-${k}`}
 			/>
 		</label>

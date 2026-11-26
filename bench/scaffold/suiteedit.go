@@ -73,6 +73,14 @@ func SetTaskSplit(src []byte, heldOut bool) ([]byte, error) {
 	})
 }
 
+// QAExactDescription is the qa template's description, true while the suite
+// is graded on the exact answer; QAJudgeDescription replaces it when the
+// suite switches to the rubric judge (and back again).
+const (
+	QAExactDescription = "Question-answering tasks matched against a hidden expected answer, no model in the grade."
+	QAJudgeDescription = "Question-answering tasks graded by a pinned judge model against a rubric."
+)
+
 // SetSuiteGrader sets a question-and-answer suite's grader: answer_match
 // (grading verified, no judge) or judge (grading judged, the judge pinned).
 // A judge's other keys (max_tokens, auditor) are kept when it stays judged.
@@ -91,6 +99,13 @@ func SetSuiteGrader(src []byte, grader string, judge *JudgeConfig) ([]byte, erro
 	}
 	return editMapping(src, func(m *yaml.Node) error {
 		setScalar(m, "grader", grader)
+		if d := mapValue(m, "description"); d != nil && d.Kind == yaml.ScalarNode {
+			if grader == RowGraderJudge && d.Value == QAExactDescription {
+				d.Value = QAJudgeDescription
+			} else if grader == RowGraderExact && d.Value == QAJudgeDescription {
+				d.Value = QAExactDescription
+			}
+		}
 		if grader == RowGraderExact {
 			deleteKey(m, "grading")
 			deleteKey(m, "judge")

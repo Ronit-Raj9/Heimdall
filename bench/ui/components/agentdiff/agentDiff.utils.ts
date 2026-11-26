@@ -130,14 +130,15 @@ export function newestFirst(versions: readonly AgentDiffVersionInfo[]): AgentDif
 
 /**
  * The baseline to compare B against when only B is chosen (a link from the leaderboard): the
- * next older version of the same agent id, or null when B is that agent's only version.
+ * newest older version of the same agent id that ran a benchmark B ran, or null when there is none.
  */
 export function suggestBaseline(versions: readonly AgentDiffVersionInfo[], b: string | null | undefined): AgentDiffVersionInfo | null {
 	const target = findVersion(versions, b);
 	if (!target) return null;
 	const sameAgent = newestFirst(versions.filter((v) => v.agent_id === target.agent_id));
 	const at = sameAgent.indexOf(target);
-	return sameAgent[at + 1] ?? null;
+	for (const v of sameAgent.slice(at + 1)) if (commonSuites(v, target).length > 0) return v;
+	return null;
 }
 
 /**

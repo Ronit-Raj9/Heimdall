@@ -45,8 +45,12 @@ export const onboardApi = benchApi.enhanceEndpoints({ addTagTypes: ["OnboardDraf
 			query: ({ set, task, ...body }) => ({ url: `/onboard/drafts/${seg(set)}/tasks/${seg(task)}`, method: "PATCH", body }),
 			invalidatesTags: (_r, _e, { set }) => [{ type: "OnboardDrafts", id: set }],
 		}),
-		startOnboardReadiness: builder.mutation<{ set: string; job: Job }, { set: string; task?: string }>({
-			query: ({ set, task }) => ({ url: `/onboard/drafts/${seg(set)}/ready`, method: "POST", body: task ? { task } : {} }),
+		startOnboardReadiness: builder.mutation<{ set: string; job: Job }, { set: string; task?: string; judge_consent?: boolean }>({
+			query: ({ set, task, judge_consent }) => ({
+				url: `/onboard/drafts/${seg(set)}/ready`,
+				method: "POST",
+				body: { ...(task ? { task } : {}), ...(judge_consent ? { judge_consent } : {}) },
+			}),
 			invalidatesTags: (_r, _e, { set }) => [{ type: "OnboardDrafts", id: set }],
 		}),
 		publishOnboardDraft: builder.mutation<{ set: string; job: Job }, { set: string; tasks?: string[]; include_unready?: boolean }>({

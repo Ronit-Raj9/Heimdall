@@ -2639,6 +2639,7 @@ export interface SuiteTier {
 /** GET /suites: every pack under the benchmarks root, sorted by id. */
 export interface SuiteList {
 	suites: SuiteSummary[];
+	reserved_ids?: string[];
 }
 
 /** One visible file of a task's repo/ folder. */

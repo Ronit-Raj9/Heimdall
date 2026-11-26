@@ -14,7 +14,8 @@ import { FingerprintDriftNotice } from "@/components/suites/suiteLockKind";
 import { healthState } from "@/components/suites/suiteHealth.utils";
 import { leaderboardSuite } from "@/components/suites/suites.utils";
 import { Button } from "@/components/ui/button";
-import { getBenchErrorMessage, useGetSuiteHealthQuery, useGetSuitesQuery, useListRunsQuery } from "@/lib/store";
+import { getBenchErrorMessage, useGetSuiteHealthQuery, useListRunsQuery } from "@/lib/store";
+import { useGetSuiteQuery } from "@/lib/store/apis/suitesLightApi";
 import "@/app/failure-tests/views/gw07I18n";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
@@ -38,13 +39,15 @@ import { ReviewTab } from "./reviewTab";
  */
 export default function SuiteView({ suiteId }: { suiteId: string }) {
 	const { t } = useTranslation("bench");
-	const query = useGetSuitesQuery();
-	const data = query.data;
 	// A suite reference may carry its version ("coding-core@1.0.0"), as verdicts and runs do.
-	const suite = data?.suites.find((s) => s.id === suiteId || s.id === suiteIdOf(suiteId)) ?? null;
+	// N194: one benchmark from GET /suites/{id}, never the whole list; a 404 is a benchmark that is not listed.
+	const query = useGetSuiteQuery(suiteIdOf(suiteId));
+	const notListed = (query.error as { status?: unknown } | undefined)?.status === 404;
+	// currentData, not data: after a link to another benchmark the old one is never shown under the new id.
+	const suite = query.currentData ?? null;
 	const crumbs = [{ label: t("suites.title"), to: "/suites" }, { label: suiteDisplayName(suiteIdOf(suiteId), suite ?? undefined) }];
 
-	if (query.isLoading) {
+	if (query.isLoading || (!suite && query.isFetching)) {
 		return (
 			<section className="flex min-w-0 flex-col gap-6" data-testid="suite-screen">
 				<PageHeader title={suiteId} breadcrumbs={crumbs} />
@@ -52,7 +55,7 @@ export default function SuiteView({ suiteId }: { suiteId: string }) {
 			</section>
 		);
 	}
-	if (query.isError || !data) {
+	if (query.isError && !notListed) {
 		return (
 			<section className="flex min-w-0 flex-col gap-6" data-testid="suite-screen">
 				<PageHeader title={suiteId} breadcrumbs={crumbs} />
@@ -73,7 +76,7 @@ export default function SuiteView({ suiteId }: { suiteId: string }) {
 			</section>
 		);
 	}
-	return <SuiteBody suite={suite} mode={data.mode} crumbs={crumbs} requestedVersion={suiteVersionOf(suiteId)} />;
+	return <SuiteBody suite={suite} mode={suite.mode} crumbs={crumbs} requestedVersion={suiteVersionOf(suiteId)} />;
 }
 
 function SuiteBody({
@@ -120,7 +123,7 @@ function SuiteBody({
 		},
 		{ id: "calibration", label: tu("tabs.calibration"), hidden: !judged },
 		{ id: "ops", label: tu("tabs.ops") },
-		{ id: "edit", label: tu("tabs.edit"), hidden: builtin, aliases: ["files"] }, // L10 suite authoring; a built-in library suite is read-only; N271: ?tab=files opens it
+		editTabEntry(tu("tabs.edit"), builtin), // L10 suite authoring; a built-in library suite is read-only; N271: ?tab=files opens it
 		{ id: "export", label: tu("tabs.export") },
 	];
 	const { t: tg } = useTranslation("gw07");
@@ -147,9 +150,8 @@ function SuiteBody({
 				title={
 					<span className="flex min-w-0 flex-col gap-0.5">
 						<span className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">{suiteDisplayName(suite.id, suite)}</span>
-						<span className="text-muted-foreground truncate font-mono text-xs font-normal">
-							{suite.id}
-							{suite.version && <span className="opacity-70">@{suite.version}</span>}
+						<span className="text-muted-foreground truncate font-mono text-xs font-normal" data-testid="suite-header-line">
+							{headerLine(suiteDisplayName(suite.id, suite), suite.id, suite.version)}
 						</span>
 					</span>
 				}
@@ -157,12 +159,14 @@ function SuiteBody({
 				subtitle={
 					<span className="flex flex-col gap-0.5" data-testid="suite-plain-subtitle">
 						<span>
-							{tu("pageSubtitle", {
-								count: suite.task_count,
-								skill: suiteSkill(suite) ?? tu("skillFallback"),
-							})}
+							{describedByOwnWords(suite) && suiteDisplayDescription(suite)
+								? suiteDisplayDescription(suite)
+								: tu("pageSubtitle", {
+										count: suite.task_count,
+										skill: suiteSkill(suite) ?? tu("skillFallback"),
+									})}
 						</span>
-						{suiteDisplayDescription(suite) && (
+						{!describedByOwnWords(suite) && suiteDisplayDescription(suite) && (
 							<span className="text-muted-foreground line-clamp-2 text-xs">{suiteDisplayDescription(suite)}</span>
 						)}
 					</span>
@@ -320,6 +324,29 @@ function StatTile({
 			{note && <span className="text-muted-foreground text-xs">{note}</span>}
 		</div>
 	);
+}
+
+/**
+ * The Edit files tab entry. A built-in benchmark hides it, but ?tab=edit still opens it, so the
+ * read-only note of the Edit tab is reachable (p12-8).
+ */
+export function editTabEntry(label: string, builtin: boolean): RouteTab {
+	return { id: "edit", label, hidden: builtin, addressable: builtin, aliases: ["files"] };
+}
+
+/** The small line under the title: "id@version", or only "@version" when the title already is the id (p10-7). */
+export function headerLine(name: string, id: string, version: string | undefined): string {
+	const at = version ? `@${version}` : "";
+	return name === id ? at : `${id}${at}`;
+}
+
+/**
+ * Voice and support benchmarks test a whole conversation, which task capabilities do not describe:
+ * their subtitle is the benchmark's own description (p10-7).
+ */
+export function describedByOwnWords(suite: Pick<SuiteSummary, "track">): boolean {
+	const track: string | undefined = suite.track;
+	return track === "voice" || track === "support";
 }
 
 /** The skills a suite tests, in plain words for the subtitle: its most common task capabilities. */

@@ -99,7 +99,7 @@ func refuseHeldOutBoard(ctx *fasthttp.RequestCtx, mode schemas.Mode, visible boo
 		return false
 	}
 	lib.SendError(ctx, mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound,
-		"the held-out board is not served (server config held_out.visible is false)")
+		"The held-out board stays private.")
 	return true
 }
 

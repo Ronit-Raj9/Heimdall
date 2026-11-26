@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -148,6 +149,11 @@ func (e *Env) Peek(ctx context.Context, in Input) (Peek, error) {
 		p := Peek{Name: filepath.Base(abs), Ext: strings.ToLower(filepath.Ext(abs)), Size: st.Size()}
 		if st.IsDir() {
 			p.Dir, p.Ext = abs, ""
+			// An unpacked zip lives in a timestamp folder: name it after the
+			// uploaded file, so the suggested id comes from that name.
+			if n := filepath.Base(strings.TrimSpace(in.Name)); n != "" && n != "." && n != "/" {
+				p.Name = strings.TrimSuffix(n, filepath.Ext(n))
+			}
 			p.Files = listFiles(abs, maxPeekFiles)
 			return p, nil
 		}
@@ -176,7 +182,7 @@ func (e *Env) Peek(ctx context.Context, in Input) (Peek, error) {
 	}
 	name, data, err := e.fetch(ctx, raw)
 	if err != nil {
-		p.FetchErr = err.Error()
+		p.FetchErr = plainFetchError(err)
 		return p, nil
 	}
 	if name != "" {
@@ -184,6 +190,25 @@ func (e *Env) Peek(ctx context.Context, in Input) (Peek, error) {
 	}
 	p.Data, p.Size = data, int64(len(data))
 	return p, nil
+}
+
+var httpStatusRE = regexp.MustCompile(`HTTP (\d{3})`)
+
+// plainFetchError is why a link could not be read, in words a person can
+// act on; the Go error chain (URLs, dial and lookup detail) stays out.
+func plainFetchError(err error) string {
+	var dns *net.DNSError
+	var ne net.Error
+	switch {
+	case errors.As(err, &dns):
+		return "the address does not exist; check the link"
+	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &ne) && ne.Timeout():
+		return "the site did not answer in time"
+	}
+	if m := httpStatusRE.FindStringSubmatch(err.Error()); m != nil {
+		return "the site answered " + m[1]
+	}
+	return "the site could not be reached"
 }
 
 func knownHost(h string) bool {

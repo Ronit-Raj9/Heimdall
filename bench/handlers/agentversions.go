@@ -42,6 +42,9 @@ type AgentVersionList struct {
 	// which rule gave it (release or saved_config).
 	Live       int    `json:"live,omitempty"`
 	LiveSource string `json:"live_source,omitempty"`
+	// NoFile is true when the agent has runs but no settings file, so it
+	// has no versions (wave 4, p01-2).
+	NoFile bool `json:"no_file,omitempty"`
 }
 
 // AgentVersionDoc is GET /agents/{id}/versions/{n}.
@@ -229,6 +232,26 @@ func (h *agentVersionsHandler) runsByHash() map[string]int {
 	return counts
 }
 
+// hasRuns reports whether any experiment has a run of an arm whose agent
+// config id is id (an agent known from its runs without a settings file).
+func (h *agentVersionsHandler) hasRuns(id string) bool {
+	if h.index == nil {
+		return false
+	}
+	for _, exp := range h.index.Experiments() {
+		m, _ := h.index.Manifest(exp)
+		if m == nil {
+			continue
+		}
+		for _, rv := range h.index.Runs(exp) {
+			if arm, ok := m.Arms[rv.Slot.Arm]; ok && arm.Config.ID == id {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (h *agentVersionsHandler) list(ctx *fasthttp.RequestCtx) {
 	id, ok := h.agentID(ctx)
 	if !ok || !h.ready(ctx) {
@@ -252,7 +275,13 @@ func (h *agentVersionsHandler) list(ctx *fasthttp.RequestCtx) {
 		if len(vs) == 0 {
 			doc, rel, ok := h.projectAgentFile(ctx, id)
 			if !ok {
-				lib.SendError(ctx, h.mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, "agent "+id+" not found")
+				if !h.hasRuns(id) {
+					lib.SendError(ctx, h.mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, "agent "+id+" not found")
+					return
+				}
+				// Known from its runs only: no settings file, so no versions.
+				out.NoFile = true
+				lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
 				return
 			}
 			// An agent saved before versioning: its versions come from the

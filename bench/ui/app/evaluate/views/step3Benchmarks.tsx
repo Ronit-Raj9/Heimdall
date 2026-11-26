@@ -3,9 +3,10 @@ import { RedTeamPanel } from "@/components/redteam/redTeamPanel";
 import { hw11 } from "@/components/runs/debug/hw11I18n";
 import { Button } from "@/components/ui/button";
 import { suiteDisplayCategory, suiteSections } from "@/components/suites/suiteDisplay";
-import { getBenchErrorMessage, useGetSuitesQuery } from "@/lib/store/apis/benchApi";
+import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { LoadError } from "@/components/runs/screenStates";
 import "@/app/evaluations_/$evalId/views/w4m2I18n";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import {
 	type AgentCompatibility,
 	type BenchmarkCompatibility,
@@ -429,7 +430,7 @@ export default Step3Benchmarks;
 
 /** Step 3 with an explicit draft slice: loads suites, packs and the agent's compatibility, then renders the view. */
 export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({ draft, onChange }: Step3BenchmarksProps<D>) {
-	const suites = useGetSuitesQuery();
+	const suites = useGetSuitesLightQuery();
 	const packs = useGetEvaluationPacksQuery();
 	const compat = useGetAgentCompatibilityQuery(draft.agent, { skip: !draft.agent });
 	const reference = useGetReferenceBoardQuery(); // a failure only hides the hints

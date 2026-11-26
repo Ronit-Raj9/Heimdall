@@ -1,4 +1,4 @@
-import type { SuitesResponse } from "@/lib/types/bench";
+import type { SuiteSummary, SuitesResponse, WithMode } from "@/lib/types/bench";
 import { benchApi } from "./benchApi";
 
 /**
@@ -12,7 +12,13 @@ export const suitesLightApi = benchApi.injectEndpoints({
 			query: () => "/suites?fields=light",
 			providesTags: [{ type: "BenchSuites", id: "LIST" }],
 		}),
+		// N194: GET /suites/{id}, one benchmark's full summary, so the benchmark page never loads the whole list.
+		// It shares the LIST tag, so every change that refreshes the list refreshes it too; 404 is a benchmark not listed.
+		getSuite: builder.query<WithMode<SuiteSummary>, string>({
+			query: (id) => `/suites/${encodeURIComponent(id)}`,
+			providesTags: [{ type: "BenchSuites", id: "LIST" }],
+		}),
 	}),
 });
 
-export const { useGetSuitesLightQuery } = suitesLightApi;
+export const { useGetSuitesLightQuery, useGetSuiteQuery } = suitesLightApi;

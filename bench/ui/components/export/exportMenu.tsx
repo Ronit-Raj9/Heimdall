@@ -1,7 +1,9 @@
 import { IS_FIXTURE_MODE, getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { experimentExportUrl, suiteHarborUrl, useGetExperimentRunTableQuery } from "@/lib/store/apis/exportApi";
 import { Download } from "lucide-react";
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
+import { downloadChecked } from "@/lib/downloadChecked";
+import "@/app/suites_/$suiteId/views/w4m6I18n";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -140,26 +142,80 @@ export function ExperimentExportMenu({
 	);
 }
 
-/** The suite Export menu: the admitted public tasks as Harbor task folders, verifiers withheld. */
-export function SuiteExportMenu({ suiteId, fixtureMode = IS_FIXTURE_MODE }: { suiteId: string; fixtureMode?: boolean }) {
+/**
+ * The suite Export menu: the admitted public tasks as Harbor task folders, verifiers withheld. The
+ * download is checked first (p12-1): a refusal shows its sentence here instead of saving an error
+ * file under the tar's name. inline renders the list with no disclosure, for a tab whose section
+ * already has the title (N70). The command line export sits in its own "From a terminal" block (N78).
+ */
+export function SuiteExportMenu({
+	suiteId,
+	inline = false,
+	fixtureMode = IS_FIXTURE_MODE,
+}: {
+	suiteId: string;
+	inline?: boolean;
+	fixtureMode?: boolean;
+}) {
 	const { t } = useTranslation("bench");
+	const { t: t6 } = useTranslation("w4m6");
+	const [problem, setProblem] = useState<string | null>(null);
+	const [busy, setBusy] = useState(false);
 	if (fixtureMode) return null;
+	const href = suiteHarborUrl(suiteId);
+	const filename = `${suiteId}.harbor.tar.gz`;
+	const onDownload = async (e: MouseEvent<HTMLAnchorElement>) => {
+		e.preventDefault();
+		if (busy) return;
+		setBusy(true);
+		setProblem(null);
+		setProblem(await downloadChecked(href, filename));
+		setBusy(false);
+	};
+	const list = (
+		<ul className={inline ? "flex flex-col gap-2" : "mt-2 flex flex-col gap-2"}>
+			<li className="flex min-w-0 flex-col gap-0.5">
+				<a
+					href={href}
+					download={filename}
+					rel="noopener noreferrer"
+					className={linkClass}
+					aria-disabled={busy || undefined}
+					onClick={(e) => void onDownload(e)}
+					data-testid="export-harbor"
+				>
+					<Download className="size-3.5" aria-hidden="true" />
+					{t("export.harbor")}
+				</a>
+				<span className="text-muted-foreground text-xs">{t("export.harborNote")}</span>
+				{problem && (
+					<p role="alert" className="text-destructive text-xs" data-testid="export-harbor-error">
+						{problem}
+					</p>
+				)}
+			</li>
+			<li className="text-muted-foreground">
+				<details data-testid="export-harbor-cli">
+					<summary className="cursor-pointer">{t6("export.terminal")}</summary>
+					<p className="mt-1">
+						{t("export.harborCli")}{" "}
+						<code className="font-mono">{`heimdall export harbor -suite ${suiteId} -out harbor/ -include-hidden`}</code>
+					</p>
+				</details>
+			</li>
+		</ul>
+	);
+	if (inline) {
+		return (
+			<div className="flex min-w-0 flex-col gap-2 text-xs" data-testid="suite-export-menu">
+				{list}
+			</div>
+		);
+	}
 	return (
 		<details className="flex min-w-0 flex-col gap-2 rounded-md border p-3 text-xs" data-testid="suite-export-menu">
 			<summary className="cursor-pointer text-sm font-medium">{t("export.title")}</summary>
-			<ul className="mt-2 flex flex-col gap-2">
-				<ExportLink
-					href={suiteHarborUrl(suiteId)}
-					download={`${suiteId}.harbor.tar.gz`}
-					label={t("export.harbor")}
-					note={t("export.harborNote")}
-					testId="export-harbor"
-				/>
-				<li className="text-muted-foreground" data-testid="export-harbor-cli">
-					{t("export.harborCli")}{" "}
-					<code className="font-mono">{`heimdall export harbor -suite ${suiteId} -out harbor/ -include-hidden`}</code>
-				</li>
-			</ul>
+			{list}
 		</details>
 	);
 }

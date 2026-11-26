@@ -144,6 +144,9 @@ func (s *DraftSet) dropTask(id string) error {
 		}
 	}
 	s.Tasks = out
+	if len(s.Tasks) == 0 {
+		s.Readiness = nil // the old result was for tasks that are gone
+	}
 	return nil
 }
 

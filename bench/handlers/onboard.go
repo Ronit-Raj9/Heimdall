@@ -68,6 +68,8 @@ type OnboardUploadResult struct {
 // OnboardReadyRequest is the optional body of POST /onboard/drafts/{set}/ready.
 type OnboardReadyRequest struct {
 	Task string `json:"task,omitempty"` // one task; empty: every task of the draft
+	// JudgeConsent agrees to the judge calls of a judge-graded draft's readiness checks.
+	JudgeConsent bool `json:"judge_consent,omitempty"`
 }
 
 // OnboardJobResult answers the ready and publish routes.
@@ -78,8 +80,9 @@ type OnboardJobResult struct {
 
 // OnboardReadyParams are the params of the onboard.ready job.
 type OnboardReadyParams struct {
-	Set  string `json:"set"`
-	Task string `json:"task,omitempty"`
+	Set          string `json:"set"`
+	Task         string `json:"task,omitempty"`
+	JudgeConsent bool   `json:"judge_consent,omitempty"`
 }
 
 // OnboardPublishParams are the params of the onboard.publish job.
@@ -288,7 +291,7 @@ func (h *onboardHandler) inspect(ctx *fasthttp.RequestCtx) {
 		h.sendOnboardError(ctx, err)
 		return
 	}
-	if inv.Suggest.Suite != "" && isBuiltinSuite(h.env.Services.Suites, inv.Suggest.Suite) {
+	if inv.Suggest.Suite != "" && isReservedSuiteID(h.env.Services.Suites, inv.Suggest.Suite) {
 		inv.Suggest.Suite += "-own"
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, inv)
@@ -317,8 +320,8 @@ func (h *onboardHandler) draft(ctx *fasthttp.RequestCtx) {
 		h.bad(ctx, `body must be {"input":{...},"plan":{"suite",...}}: `+err.Error())
 		return
 	}
-	if isBuiltinSuite(h.env.Services.Suites, strings.TrimSpace(req.Plan.Suite)) {
-		sendBuiltinReadOnly(ctx, h.env.Mode, req.Plan.Suite)
+	if isReservedSuiteID(h.env.Services.Suites, strings.TrimSpace(req.Plan.Suite)) {
+		sendReservedSuiteID(ctx, h.env.Mode, strings.TrimSpace(req.Plan.Suite))
 		return
 	}
 	work, cancel := workContext(ctx, onboardDraftTimeout)
@@ -470,7 +473,7 @@ func (h *onboardHandler) ready(ctx *fasthttp.RequestCtx) {
 	var req OnboardReadyRequest
 	if len(strings.TrimSpace(string(ctx.PostBody()))) > 0 {
 		if err := decodeAuthoring(ctx.PostBody(), &req); err != nil {
-			h.bad(ctx, `body must be {"task"?}: `+err.Error())
+			h.bad(ctx, `body must be {"task"?,"judge_consent"?}: `+err.Error())
 			return
 		}
 	}
@@ -490,7 +493,7 @@ func (h *onboardHandler) ready(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusConflict, lib.ErrTypeConflict, "readiness is already running on this draft")
 		return
 	}
-	j, ok := h.startJob(ctx, org, p, OnboardReadyKind, OnboardReadyParams{Set: set.ID, Task: req.Task})
+	j, ok := h.startJob(ctx, org, p, OnboardReadyKind, OnboardReadyParams{Set: set.ID, Task: req.Task, JudgeConsent: req.JudgeConsent})
 	if !ok {
 		return
 	}
@@ -529,8 +532,8 @@ func (h *onboardHandler) publish(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusConflict, lib.ErrTypeConflict, "this draft was published already")
 		return
 	}
-	if isBuiltinSuite(h.env.Services.Suites, set.Suite) {
-		sendBuiltinReadOnly(ctx, h.env.Mode, set.Suite)
+	if isReservedSuiteID(h.env.Services.Suites, set.Suite) {
+		sendReservedSuiteID(ctx, h.env.Mode, set.Suite)
 		return
 	}
 	if tasks, _ := set.Publishable(req.Tasks, req.IncludeUnready); len(tasks) == 0 {

@@ -7,11 +7,22 @@ import { Link } from "@tanstack/react-router";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "./hw04I18n";
+import "@/app/suites_/$suiteId/views/w4m6I18n";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
 		calibrate: typeof import("@/locales/en/calibrate.json");
 	}
+}
+
+type W4m6T = ReturnType<typeof useTranslation<"w4m6">>["t"];
+
+/**
+ * The grader calls a run makes, for its confirm (p11-6): null before Estimate cost, since the
+ * weak labels the box adds are only counted by the estimate.
+ */
+export function callsText(t: W4m6T, count: number | null): string {
+	return count === null ? t("calibrate.noForecast") : t("calibrate.calls", { count });
 }
 
 /** Mirrors the server caps in cmd/bifrost-bench/jobs_cli_calibrate.go. */
@@ -61,6 +72,7 @@ const pct = (r: Rate | undefined, none: string) => (r?.value == null ? none : `$
 export function CalibrateJudgeForm({ status, onDone }: { status: CalibrationStatus; onDone?(): void }) {
 	const { t } = useTranslation("calibrate");
 	const { t: th } = useTranslation("hw04");
+	const { t: t6 } = useTranslation("w4m6");
 	const session = useSession();
 	const hosted = session.authMode === "hosted";
 	const models = useGetModelsQuery();
@@ -139,7 +151,7 @@ export function CalibrateJudgeForm({ status, onDone }: { status: CalibrationStat
 				{t("seedControls")}
 			</label>
 			<p className="text-sm" data-testid="calibrate-judge-calls">
-				{t("approxCalls", { calls })}
+				{seed && !forecast ? t6("calibrate.noForecast") : t("approxCalls", { calls })}
 				{hosted && <span className="text-muted-foreground"> {t("hostedCap", { calls: HOSTED_CAP_CALLS, usd: HOSTED_CAP_USD })}</span>}
 			</p>
 			{nothingToCheck && (
@@ -180,7 +192,7 @@ export function CalibrateJudgeForm({ status, onDone }: { status: CalibrationStat
 						kind="calibrate.run"
 						params={{ ...params, yes: true }}
 						label={t("run")}
-						confirm={t("confirm", { calls: forecast?.calls ?? calls })}
+						confirm={callsText(t6, forecast ? forecast.calls : null)}
 						disabled={nothingToCheck}
 						onDone={onRun}
 					/>

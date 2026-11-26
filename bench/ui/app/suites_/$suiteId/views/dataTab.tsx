@@ -71,7 +71,7 @@ export function DataTab({ suite }: { suite: SuiteSummary }) {
 			{writable && <ImportSection suite={suite.id} t={t} />}
 			<VersionsSection suite={suite.id} t={t} />
 			<Section title={t("api.title")} description={t("api.description")} testId="suite-data-api">
-				<CopyCodeBlock code={apiSnippet(suite.id)} label={t("api.title")} testId="suite-data-api-code" />
+				<CopyCodeBlock code={apiSnippet(suite.id)} label={t("api.title")} kind="code" testId="suite-data-api-code" />
 			</Section>
 		</div>
 	);
@@ -79,8 +79,10 @@ export function DataTab({ suite }: { suite: SuiteSummary }) {
 
 export function apiSnippet(id: string): string {
 	return [
+		"import os",
 		"from heimdall import V1Client",
-		'hd = V1Client(HEIMDALL_URL, token=os.environ["HEIMDALL_TOKEN"])',
+		'hd = V1Client(os.environ["HEIMDALL_URL"], token=os.environ["HEIMDALL_TOKEN"])',
+		'commit = os.environ.get("GIT_COMMIT", "local")',
 		`hd.upsert_tasks("${id}", [{"id": "refund-window", "input": "How long do I have to ask for a refund?", "expected": ["30 days"]}], source="git:" + commit)`,
 		`print(hd.dataset_versions("${id}")["versions"][0])`,
 	].join("\n");
@@ -126,7 +128,9 @@ export function policyRequest(
 }
 
 export function PolicyForm({ view, writable, t }: { view: DataPolicyView; writable: boolean; t: T }) {
-	const [save, saved] = useSetDataPolicyMutation();
+	// The success state outlives the remount the refetch after a save causes (PolicySection keys
+	// the form on updated_at), so "Saved." stays on screen (p11-3).
+	const [save, saved] = useSetDataPolicyMutation({ fixedCacheKey: `data-policy-${view.benchmark}` });
 	const [mode, setMode] = useState<PIIMode>(view.policy.pii.mode || "warn");
 	const [kinds, setKinds] = useState<string[]>(view.policy.pii.kinds ?? []);
 	const [access, setAccess] = useState<AccessMode>(view.policy.access.mode || "org");

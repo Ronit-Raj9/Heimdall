@@ -3,18 +3,23 @@ import { EmptyState } from "@/components/shell/emptyState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { firstReason, WhyDisabled } from "@/components/ui/whyDisabled";
 import { FilterSelect, FilterTokens, SegmentedControl, ToolbarSearch, type FilterToken } from "@/components/ui/toolbar";
 import { isBuiltinSuite } from "@/components/suites/suiteDisplay";
 import { SuiteRunButton } from "@/components/suites/suiteRunButton";
 import { canUse, useSession } from "@/lib/session/sessionContext";
-import { useGetSuitesQuery } from "@/lib/store";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
+import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
+import { idProblem, wholeNumberProblem } from "@/lib/inputChecks";
+import { transportErrorText } from "@/lib/requestErrors";
 import { useAddCatalogEntryMutation, useGetBenchCatalogQuery, useUploadCatalogDatasetMutation } from "@/lib/store/apis/catalogApi";
 import type { Job } from "@/lib/types/bench";
 import type { CatalogAddRequest, CatalogAddResponse, CatalogEntry } from "@/lib/types/catalog";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { CheckCircle2, Library, X } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { parseAsString, useQueryState } from "nuqs";
+import { type ReactNode, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	CATEGORIES,
@@ -32,6 +37,7 @@ import {
 	sectionOf,
 } from "./catalogModel";
 import { displayFor } from "./catalogDisplay";
+import { w4m5Text } from "@/components/onboard/w4m5I18n";
 
 export { displayFor } from "./catalogDisplay";
 export { cleanTitle, entryCategories, filterEntries, installedHref, sectionOf } from "./catalogModel";
@@ -53,7 +59,8 @@ export interface ImportForm {
 	/** Upstream commit for repo zips without git history (set ref=...). */
 	ref: string;
 	suite: string;
-	limit: number;
+	/** The task count as typed (wave 4, p09-2): checked by importProblem, sent as a number. */
+	limit: number | string;
 }
 
 /** The form an importer entry opens with: upload by default, the known URL prefilled. */
@@ -66,6 +73,19 @@ export function importReady(f: ImportForm): boolean {
 	if (f.mode === "upload") return !!f.file;
 	if (f.mode === "url") return /^https:\/\/\S+$/.test(f.url.trim());
 	return !!f.from.trim();
+}
+
+/** Why Start import is disabled, or null when the form can start (wave 4, p09-2). */
+export function importProblem(f: ImportForm): string | null {
+	const url = f.url.trim();
+	const http = /^http:\/\//i.test(url);
+	return firstReason(
+		f.mode === "upload" && !f.file && w4m5Text("import.needFile"),
+		f.mode === "url" && !http && !/^https:\/\/\S+$/.test(url) && w4m5Text("import.needLink"),
+		f.mode === "url" && http && w4m5Text("import.httpLink"),
+		idProblem(f.suite, "benchmark id"),
+		wholeNumberProblem(f.limit, 1, 500),
+	);
 }
 
 const MODES: DataMode[] = ["upload", "url", "path"];
@@ -188,10 +208,14 @@ function SidePanel({ e, onClose, children, testId }: { e: CatalogEntry; onClose(
 	const { t } = useTranslation("catalog");
 	const { title: name, description, example } = displayFor(e);
 	const cat = entryCategories(e)[0];
+	const panel = useRef<HTMLElement | null>(null);
+	useDialogFocus(panel, onClose);
 	return (
 		<div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={name}>
 			<button type="button" aria-label={t("close")} className="absolute inset-0 bg-black/30 backdrop-blur-[1px]" onClick={onClose} />
 			<aside
+				ref={panel}
+				tabIndex={-1}
 				className="bg-background border-border relative flex h-full w-full max-w-md flex-col gap-5 overflow-y-auto border-l p-6 shadow-xl"
 				data-testid={testId}
 			>
@@ -220,6 +244,7 @@ function ImportPanel(props: CatalogBodyProps & { importFor: CatalogEntry; import
 	const e = props.importFor;
 	const f = props.importForm;
 	const set = (p: Partial<ImportForm>) => props.onImportForm?.({ ...f, ...p });
+	const why = importProblem(f);
 	return (
 		<SidePanel e={e} onClose={() => props.onCancelImport?.()} testId="catalog-import-form">
 			<DataOptions e={e} />
@@ -250,6 +275,11 @@ function ImportPanel(props: CatalogBodyProps & { importFor: CatalogEntry; import
 						onChange={(ev) => set({ file: ev.target.files?.[0] ?? null })}
 						data-testid="catalog-import-file"
 					/>
+					{f.file && (
+						<span className="text-xs font-normal" data-testid="catalog-import-chosen">
+							{w4m5Text("import.chosen", { name: f.file.name })}
+						</span>
+					)}
 					<span className="text-muted-foreground text-xs font-normal">
 						{t("uploadHelp", { expects: e.upload_expects ?? "", path: e.dataset_path ?? "uploads/datasets" })}
 					</span>
@@ -292,7 +322,7 @@ function ImportPanel(props: CatalogBodyProps & { importFor: CatalogEntry; import
 						min={1}
 						max={500}
 						value={f.limit}
-						onChange={(ev) => set({ limit: Number(ev.target.value) || 1 })}
+						onChange={(ev) => set({ limit: ev.target.value })}
 						data-testid="catalog-import-limit"
 					/>
 				</label>
@@ -306,10 +336,16 @@ function ImportPanel(props: CatalogBodyProps & { importFor: CatalogEntry; import
 				<Button variant="ghost" onClick={props.onCancelImport}>
 					{t("cancel")}
 				</Button>
-				<Button disabled={!importReady(f) || props.busyId === e.id} onClick={props.onStartImport} data-testid="catalog-import-start">
+				<Button
+					disabled={why !== null || !importReady(f) || props.busyId === e.id}
+					aria-describedby={why ? "catalog-import-why" : undefined}
+					onClick={props.onStartImport}
+					data-testid="catalog-import-start"
+				>
 					{props.busyId === e.id ? t("adding") : t("startImport")}
 				</Button>
 			</div>
+			<WhyDisabled reason={props.busyId === e.id ? null : why} testId="catalog-import-why" className="text-right" />
 		</SidePanel>
 	);
 }
@@ -574,6 +610,8 @@ export function CatalogBody(props: CatalogBodyProps) {
 }
 
 function errorMessage(err: unknown): string {
+	const transport = transportErrorText(err);
+	if (transport) return transport;
 	const e = err as { data?: { error?: { message?: string }; message?: string }; error?: string };
 	return e?.data?.error?.message ?? e?.data?.message ?? e?.error ?? "unknown error";
 }
@@ -599,14 +637,21 @@ function CatalogSkeleton() {
 export default function CatalogView() {
 	const { t } = useTranslation("catalog");
 	const { data, isLoading, isError, refetch } = useGetBenchCatalogQuery();
-	const suites = useGetSuitesQuery();
+	const suites = useGetSuitesLightQuery();
 	const builtinSuites = useMemo(
 		() => new Set((suites.data?.suites ?? []).filter((s) => isBuiltinSuite(s) && !s.error).map((s) => s.id)),
 		[suites.data],
 	);
 	const [addEntry] = useAddCatalogEntryMutation();
 	const [uploadDataset] = useUploadCatalogDatasetMutation();
-	const [filters, setFilters] = useState<CatalogFilters>(NO_FILTERS);
+	const [localFilters, setFilters] = useState<CatalogFilters>(NO_FILTERS);
+	// p12-2: the search term lives in the address (?q=), the other filters stay on the page.
+	const [q, setQ] = useQueryState("q", parseAsString.withDefault("").withOptions({ history: "replace" }));
+	const filters: CatalogFilters = { ...localFilters, query: q ?? "" };
+	const onFilters = (f: CatalogFilters) => {
+		setFilters(f);
+		if (f.query !== filters.query) void setQ(f.query === "" ? null : f.query);
+	};
 	const [busyId, setBusyId] = useState<string | null>(null);
 	const [detailsFor, setDetailsFor] = useState<CatalogEntry | null>(null);
 	const [importFor, setImportFor] = useState<CatalogEntry | null>(null);
@@ -651,7 +696,7 @@ export default function CatalogView() {
 			builtinSuites={builtinSuites}
 			sourceAvailable={data.source_available}
 			filters={filters}
-			onFilters={setFilters}
+			onFilters={onFilters}
 			busyId={busyId}
 			detailsFor={detailsFor}
 			onDetails={setDetailsFor}
@@ -670,7 +715,7 @@ export default function CatalogView() {
 			onStartImport={() => {
 				if (!importFor) return;
 				const f = importForm;
-				const body: Omit<CatalogAddRequest, "id"> = { suite: f.suite, limit: f.limit };
+				const body: Omit<CatalogAddRequest, "id"> = { suite: f.suite, limit: Number(f.limit) };
 				if (f.ref.trim()) body.set = { ref: f.ref.trim() };
 				if (f.mode === "url") body.url = f.url.trim();
 				if (f.mode === "path") body.from = f.from.trim();

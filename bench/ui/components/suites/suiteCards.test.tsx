@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SuiteCards } from "./suiteCards";
 import { BrokenSuite, SuiteDriftNotice, SuiteFacts } from "./suiteFacts";
 
+vi.mock("@/components/suites/suiteRowDelete", () => ({ SuiteRowDelete: () => null })); // row Delete has its own test (suiteRowDelete.iwid.test.tsx)
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({
 		to,

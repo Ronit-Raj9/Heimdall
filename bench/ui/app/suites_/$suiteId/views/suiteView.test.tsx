@@ -12,9 +12,25 @@ const fixture = vi.hoisted(() => ({ suites: [] as unknown[], runs: undefined as 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store")>()),
-	useGetSuitesQuery: () => okQuery({ mode: "live", suites: fixture.suites }),
 	useGetSuiteHealthQuery: () => fixture.health,
 	useListRunsQuery: () => fixture.runs ?? okQuery({ runs: [], total: 0, limit: 1 }),
+}));
+// N194: the page reads one benchmark from GET /suites/{id}; an id the fixture does not hold is a 404.
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({
+	useGetSuiteQuery: (id: string) => {
+		const s = (fixture.suites as { id: string }[]).find((x) => x.id === id);
+		if (s) return { ...okQuery({ mode: "live", ...s }), currentData: { mode: "live", ...s } };
+		return {
+			data: undefined,
+			currentData: undefined,
+			error: { status: 404 },
+			isLoading: false,
+			isFetching: false,
+			isError: true,
+			isSuccess: false,
+			refetch: () => undefined,
+		};
+	},
 }));
 vi.mock("./suiteTabs", () => ({ SuiteExportTab: () => null, SuiteHealthTab: () => null, SuiteTiersTab: () => null }));
 vi.mock("./calibrationTab", () => ({ SuiteCalibrationTab: () => null }));

@@ -7,7 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { usd } from "@/components/reportcard/reportCard.utils";
 import { getLocale } from "@/lib/i18n";
 import { useListRunsQuery } from "@/lib/store/apis/benchApi";
-import type { RunListRow } from "@/lib/types/bench";
+import type { RunListParams, RunListRow } from "@/lib/types/bench";
+import "@/app/agents/views/w4m1I18n";
 import "@/lib/types/agentFirstI18n";
 import { Link } from "@tanstack/react-router";
 import { Gauge } from "lucide-react";
@@ -22,6 +23,15 @@ export function visibleAgentRuns(rows: readonly RunListRow[], failedOnly: boolea
 	return failedOnly ? rows.filter((r) => r.outcome !== "pass") : [...rows];
 }
 
+/**
+ * The list query of one page of the tab. With failedOnly the server leaves out passed runs, so the
+ * total and the pager count failed runs only (p01-3). failed is read by GET /runs.
+ */
+export function agentRunsParams(agent: string, page: number, failedOnly: boolean): RunListParams & { failed?: boolean } {
+	const params = { agent, limit: AGENT_RUNS_PAGE, offset: page * AGENT_RUNS_PAGE };
+	return failedOnly ? { ...params, failed: true } : params;
+}
+
 /** A run's cost in dollars when the server measured it, else null. */
 export function runCost(row: Pick<RunListRow, "cost_usd">): number | null {
 	const v = row.cost_usd;
@@ -34,13 +44,37 @@ export default function AgentRunsTab({ agentId }: { agentId: string }) {
 	const locale = getLocale();
 	const [page, setPage] = useState(0);
 	const [failedOnly, setFailedOnly] = useState(false);
-	const query = useListRunsQuery({ agent: agentId, limit: AGENT_RUNS_PAGE, offset: page * AGENT_RUNS_PAGE });
+	const { t: tm } = useTranslation("w4m1");
+	const query = useListRunsQuery(agentRunsParams(agentId, page, failedOnly));
+	// The server already leaves out passed runs; the filter stays for a server that ignores failed.
 	const rows = visibleAgentRuns(query.data?.runs ?? [], failedOnly);
 	const total = query.data?.total ?? 0;
 	const pages = Math.max(1, Math.ceil(total / AGENT_RUNS_PAGE));
 
 	if (query.isLoading) return <BlockSkeleton rows={6} testId="agent-runs-loading" />;
 	if (query.isError) return <LoadError title={t("runs.loadError")} error={query.error} onRetry={() => void query.refetch()} testId="agent-runs-error" />;
+	const failedBox = (
+		<label className="ml-auto inline-flex items-center gap-2 text-sm">
+			<input
+				type="checkbox"
+				checked={failedOnly}
+				onChange={(e) => {
+					setFailedOnly(e.target.checked);
+					setPage(0);
+				}}
+				data-testid="agent-runs-failed-only"
+			/>
+			{t("runs.failedOnly")}
+		</label>
+	);
+	if (total === 0 && failedOnly) {
+		return (
+			<div className="flex min-w-0 flex-col gap-3" data-testid="agent-runs-tab">
+				<div className="flex flex-wrap items-center gap-3">{failedBox}</div>
+				<EmptyNote testId="agent-runs-none-failed">{tm("runs.noneFailed")}</EmptyNote>
+			</div>
+		);
+	}
 	if (total === 0) {
 		return (
 			<EmptyNote testId="agent-runs-empty">
@@ -60,10 +94,7 @@ export default function AgentRunsTab({ agentId }: { agentId: string }) {
 		<div className="flex min-w-0 flex-col gap-3" data-testid="agent-runs-tab">
 			<div className="flex flex-wrap items-center gap-3">
 				<p className="text-muted-foreground text-sm">{t("runs.summary", { count: total })}</p>
-				<label className="ml-auto inline-flex items-center gap-2 text-sm">
-					<input type="checkbox" checked={failedOnly} onChange={(e) => setFailedOnly(e.target.checked)} data-testid="agent-runs-failed-only" />
-					{t("runs.failedOnly")}
-				</label>
+				{failedBox}
 			</div>
 			<div className="min-w-0 overflow-x-auto rounded-lg border">
 				<Table data-testid="agent-runs-table">

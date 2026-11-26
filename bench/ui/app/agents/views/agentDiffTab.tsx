@@ -13,7 +13,9 @@ import { GateChanges, MetricDeltasTable } from "@/components/agentdiff/metricDel
 import { TaskFlipsTable } from "@/components/agentdiff/taskFlipsTable";
 import { VersionPicker } from "@/components/agentdiff/versionPicker";
 import "@/components/agentdiff/gw03I18n";
+import "./w4m1I18n";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
+import { canRetry } from "@/lib/requestErrors";
 import { useGetAgentDiffQuery, useGetAgentDiffVersionsQuery } from "@/lib/store/apis/agentDiffApi";
 import type { AgentDiffResponse } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
@@ -116,11 +118,17 @@ export default function AgentDiffTab() {
 					loading={versionsQuery.isLoading}
 					noVersions={versionsQuery.isSuccess && versions.length === 0}
 					onlyB={search.b && !search.a ? (findVersion(versions, search.b)?.agent_id ?? search.b) : null}
+					noBaseline={Boolean(search.b && !search.a && findVersion(versions, search.b))}
 				/>
 			) : diff.isLoading ? (
 				<BlockSkeleton rows={8} testId="agentdiff-loading" />
 			) : diff.isError || !report ? (
-				<LoadError title={t("agentDiff.loadError")} error={diff.error} onRetry={() => void diff.refetch()} testId="agentdiff-error" />
+				<LoadError
+					title={t("agentDiff.loadError")}
+					error={diff.error}
+					onRetry={canRetry(diff.error) ? () => void diff.refetch() : undefined}
+					testId="agentdiff-error"
+				/>
 			) : (
 				<Report report={report} isFetching={diff.isFetching} />
 			)}
@@ -129,10 +137,23 @@ export default function AgentDiffTab() {
 }
 
 /** Says what to do before there is anything to compare. */
-function NothingAsked({ loading, noVersions, onlyB }: { loading: boolean; noVersions: boolean; onlyB: string | null }) {
+function NothingAsked({
+	loading,
+	noVersions,
+	onlyB,
+	noBaseline,
+}: {
+	loading: boolean;
+	noVersions: boolean;
+	onlyB: string | null;
+	noBaseline: boolean;
+}) {
 	const { t } = useTranslation("bench");
+	const { t: tm } = useTranslation("w4m1");
 	if (loading) return <BlockSkeleton rows={4} testId="agentdiff-versions-loading" />;
 	if (noVersions) return <EmptyNote testId="agentdiff-no-versions">{t("agentDiff.noVersions")}</EmptyNote>;
+	// B is a known version but no earlier version of its agent ran one of its benchmarks.
+	if (onlyB && noBaseline) return <EmptyNote testId="agent-diff-no-baseline">{tm("agentDiff.noBaseline", { agent: onlyB })}</EmptyNote>;
 	if (onlyB) return <EmptyNote testId="agentdiff-pick-a">{t("agentDiff.pickA", { agent: onlyB })}</EmptyNote>;
 	return <EmptyNote testId="agentdiff-pick">{t("agentDiff.pick")}</EmptyNote>;
 }

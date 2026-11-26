@@ -1,0 +1,28 @@
+{
+	"calibrate": {
+		"noLabels": "This benchmark has no labels yet. Add labels on this page, or tick the box to use the benchmark's expected and wrong answers.",
+		"noForecast": "The number of grader calls is shown after Estimate cost.",
+		"calls_one": "This calls the grader model about once, billed to your key.",
+		"calls_other": "This calls the grader model about {{count}} times, billed to your key."
+	},
+	"edit": {
+		"pathRule": "Use letters, digits, dots, dashes, underscores and / only, with no .. parts.",
+		"saveFailed": "Could not save: {{reason}}",
+		"uploadedFile": "Uploaded {{path}}.",
+		"uploaded_one": "Uploaded 1 file.",
+		"uploaded_other": "Uploaded {{count}} files.",
+		"target": "Files go into {{dir}}.",
+		"targetTop": "Files go into the top folder of the benchmark."
+	},
+	"split": {
+		"whole": "Hold out a whole number from 1 to 90 percent of the tasks.",
+		"done_one": "Held out 1 task. It stays private from now on.",
+		"done_other": "Held out {{count}} tasks. They stay private from now on."
+	},
+	"copy": {
+		"codeCopied": "Code copied to the clipboard"
+	},
+	"export": {
+		"terminal": "From a terminal"
+	}
+}

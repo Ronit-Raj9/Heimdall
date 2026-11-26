@@ -26,6 +26,7 @@ import {
 	type AgentSort,
 } from "./agentDisplay";
 import { useAgentJobs } from "./agentJobs";
+import { AgentRowDelete } from "./agentRowDelete";
 /** What the agents tabs read of GET /agents. */
 export interface AgentsQuery {
 	data?: AgentsResponse;
@@ -255,6 +256,7 @@ function AgentListCard({ agent, jobs, selected }: { agent: AgentSummary; jobs?: 
 					)}
 					{lastRun && <span data-testid={`${testId}-last`}>{t("list.lastRun", { when: lastRun })}</span>}
 				</span>
+				<AgentRowDelete agent={agent} name={name} testId={testId} />
 				{!agent.error && (
 					<Button asChild size="sm" variant="outline" className="relative z-10">
 						<Link to={"/evaluate" as never} search={{ agent: key } as never} data-testid={`${testId}-run`}>

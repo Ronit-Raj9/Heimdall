@@ -139,7 +139,7 @@ describe("Draft preview (N235, draft task Drop)", () => {
 
 describe("Held out made visible (N252)", () => {
 	it("names the held-out count in the publish confirm", () => {
-		expect(publishQuestion(set, false, tx)).toBe("Add 2 tasks to zz-test-csv? 1 of them are held out (private, never in shared results).");
+		expect(publishQuestion(set, false, tx)).toBe("Add 2 tasks to zz-test-csv? 1 of them is held out (private, never in shared results).");
 		const none = { ...set, tasks: set.tasks.map((t) => ({ ...t, held_out: false })) };
 		expect(publishQuestion(none, false, tx)).toBe("Add 2 tasks to zz-test-csv?");
 	});

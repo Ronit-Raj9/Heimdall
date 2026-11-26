@@ -327,6 +327,20 @@ func runCalibrateJob(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logg
 			return nil, err
 		}
 	}
+	if p.Estimate && p.SeedControls {
+		// An estimate saves nothing: count the weak seed labels from a copy.
+		shadow, cleanup, err := calibrateSeedShadow(s)
+		if err != nil {
+			return nil, err
+		}
+		defer cleanup()
+		s = shadow
+	}
+	if set, err := calibration.LoadSet(s.Root); err == nil {
+		if human, seed, _ := calibration.Resolve(set.Items); len(human)+len(seed) == 0 {
+			return nil, errors.New(calibrateNoLabelsWeb)
+		}
+	}
 
 	res := &calibrateResult{Suite: s.ID, Estimate: p.Estimate}
 	meter := &spendMeter{base: http.DefaultTransport}
@@ -432,6 +446,44 @@ func runCalibrateJob(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logg
 		res.Human, res.Seed = &h, rec.Seed
 	}
 	return res, nil
+}
+
+// calibrateNoLabelsWeb is the web job's answer for a suite with no labels
+// (the command line keeps its own text, which names its commands).
+const calibrateNoLabelsWeb = "This benchmark has no labels yet. Add labels on this page, or tick the box to use the benchmark's expected and wrong answers."
+
+// calibrateSeedShadow is s with its labels copied to a temporary folder and
+// the weak seed labels added there, so an estimate counts them without
+// writing them into the suite. cleanup removes the folder.
+func calibrateSeedShadow(s *schemas.Suite) (*schemas.Suite, func(), error) {
+	tmp, err := os.MkdirTemp("", "calibrate-estimate-")
+	if err != nil {
+		return nil, nil, err
+	}
+	cleanup := func() { _ = os.RemoveAll(tmp) }
+	set, err := calibration.LoadSet(s.Root)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	if len(set.Raw) > 0 {
+		dst := calibration.LabelsPath(tmp)
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			cleanup()
+			return nil, nil, err
+		}
+		if err := os.WriteFile(dst, set.Raw, 0o644); err != nil {
+			cleanup()
+			return nil, nil, err
+		}
+	}
+	if _, err := calibration.Append(tmp, seedLabels(s)); err != nil {
+		cleanup()
+		return nil, nil, fmt.Errorf("seed labels: %w", err)
+	}
+	cp := *s
+	cp.Root = tmp
+	return &cp, cleanup, nil
 }
 
 // calibrateOrgSafe keeps an experiment id plain.

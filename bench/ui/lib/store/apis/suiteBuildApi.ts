@@ -7,6 +7,7 @@ import type {
 	TaskSplitResult,
 } from "@/lib/types/suiteBuild";
 import { benchApi } from "./benchApi";
+import { suitesLightApi } from "./suitesLightApi";
 
 const seg = (v: string) => encodeURIComponent(v);
 const suiteTags = (suite: string) => [
@@ -27,6 +28,30 @@ export const suiteBuildApi = benchApi.injectEndpoints({
 		setSuiteGrader: builder.mutation<SuiteGraderResult, { suite: string } & SuiteGraderRequest>({
 			query: ({ suite, ...body }) => ({ url: `/suites/${seg(suite)}/grader`, method: "PUT", body }),
 			invalidatesTags: (_r, _e, { suite }) => suiteTags(suite),
+			// p10-9e: show the new grader in the cached list as soon as the PUT succeeds (as setTaskSplit).
+			async onQueryStarted({ suite }, { dispatch, queryFulfilled }) {
+				try {
+					const { data } = await queryFulfilled;
+					dispatch(
+						benchApi.util.updateQueryData("getSuites", undefined, (draft) => {
+							const row = draft.suites.find((x) => x.id === suite);
+							if (row) {
+								row.grader = data.grader;
+								row.grading = data.grading as typeof row.grading;
+							}
+						}),
+					);
+					// The benchmark page reads GET /suites/{id} (N194): patch that entry too.
+					dispatch(
+						suitesLightApi.util.updateQueryData("getSuite", suite, (draft) => {
+							draft.grader = data.grader;
+							draft.grading = data.grading as typeof draft.grading;
+						}),
+					);
+				} catch {
+					// The error shows on the Build tab; the cache stays as it was.
+				}
+			},
 		}),
 		setTaskSplit: builder.mutation<TaskSplitResult, { suite: string; task: string; held_out: boolean }>({
 			query: ({ suite, task, held_out }) => ({ url: `/suites/${seg(suite)}/tasks/${seg(task)}/split`, method: "PUT", body: { held_out } }),
@@ -39,6 +64,12 @@ export const suiteBuildApi = benchApi.injectEndpoints({
 					dispatch(
 						benchApi.util.updateQueryData("getSuites", undefined, (draft) => {
 							const row = draft.suites.find((x) => x.id === suite)?.tasks.find((x) => x.id === task);
+							if (row) row.split = data.split;
+						}),
+					);
+					dispatch(
+						suitesLightApi.util.updateQueryData("getSuite", suite, (draft) => {
+							const row = draft.tasks.find((x) => x.id === task);
 							if (row) row.split = data.split;
 						}),
 					);

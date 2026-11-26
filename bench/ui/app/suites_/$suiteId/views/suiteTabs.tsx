@@ -72,7 +72,7 @@ export function SuiteExportTab({ suite }: { suite: SuiteSummary }) {
 				testId="suite-export-section"
 			>
 				{/* W10 export: the suite as Harbor task folders, verifiers withheld */}
-				<SuiteExportMenu suiteId={suite.id} />
+				<SuiteExportMenu suiteId={suite.id} inline />
 			</Section>
 		</div>
 	);

@@ -684,7 +684,7 @@ const admitArmOracle, admitArmNoop = "A", "B"
 // errJudgeConsent refuses a judged benchmark's readiness check without the
 // organization's consent to the judge calls.
 func errJudgeConsent(j readinessJudge) error {
-	return invalid(fmt.Errorf("the readiness checks of this benchmark call your judge model %s/%s about %d times on your own key: agree to the judge calls in the Build tab (judge_consent) and run them again", j.Provider, j.Model, j.Calls))
+	return invalid(fmt.Errorf("The readiness checks of this benchmark call your judge model %s/%s about %d times on your own key. Tick the box that agrees to the judge calls, next to the readiness button, and run them again.", j.Provider, j.Model, j.Calls))
 }
 
 func runHostedSuiteAdmit(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, progress func(any)) (any, error) {

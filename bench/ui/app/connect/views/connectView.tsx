@@ -1,10 +1,12 @@
 import { ImportFound, importedAgentName, importRequest, missingImportFields } from "@/app/agents_/new/views/platformImport";
 import { PlatformFields, suggestedPlatformSecrets } from "@/components/connect/platformFields";
+import { agentNameProblem } from "@/components/agents/agentName";
 import { Section } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { WhyDisabled, firstReason } from "@/components/ui/whyDisabled";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useGetAgentPlatformsQuery, useImportAgentFromPlatformMutation } from "@/lib/store/apis/agentImportApi";
@@ -129,6 +131,9 @@ export default function ConnectView() {
 	const [det, setDet] = useState<ConnectDetectResponse | undefined>();
 	const [cand, setCand] = useState<ConnectCandidate | undefined>();
 	const [name, setName] = useState("my-agent");
+	// Why the name cannot be saved, shown under the box and under Save (p02-3); "" when it can.
+	const nameProblem = agentNameProblem(name, new Set());
+	const saveWhy = firstReason(nameProblem);
 	const [save, saveState] = useSaveConnectedAgentMutation();
 	const [saved, setSaved] = useState<ConnectSaveResponse | undefined>();
 	const [startVerify, startState] = useStartVerifyMutation();
@@ -383,7 +388,13 @@ export default function ConnectView() {
 									<span className="text-sm font-medium">{t("mapping.pickField")}</span>
 									<div className="flex flex-wrap gap-1.5">
 										{(q.options ?? []).map((o) => (
-											<Button key={o} size="sm" variant="outline" onClick={() => onPick(o)}>
+											<Button
+												key={o}
+												size="sm"
+												variant={cand.mapping?.answer_path === o ? "default" : "outline"}
+												aria-pressed={cand.mapping?.answer_path === o}
+												onClick={() => onPick(o)}
+											>
 												<code className="text-xs">{o}</code>
 											</Button>
 										))}
@@ -404,16 +415,32 @@ export default function ConnectView() {
 						<div className="flex flex-wrap items-end gap-3">
 							<label className="flex flex-col gap-1 text-sm">
 								<span className="font-medium">{t("mapping.name")}</span>
-								<Input value={name} onChange={(e) => setName(e.target.value.toLowerCase())} className="w-64" data-testid="connect-name" />
+								<Input
+									value={name}
+									onChange={(e) => setName(e.target.value.toLowerCase())}
+									className="w-64"
+									aria-invalid={nameProblem !== "" || undefined}
+									aria-describedby={nameProblem ? "connect-name-problem" : undefined}
+									data-testid="connect-name"
+								/>
+								{nameProblem && (
+									<span id="connect-name-problem" className="text-chart-error-ink text-xs" data-testid="connect-name-problem">
+										{nameProblem}
+									</span>
+								)}
 							</label>
-							<Button
-								onClick={() => void doSave()}
-								disabled={!validAgentName(name) || !canSave(cand, userMapped)}
-								isLoading={saveState.isLoading}
-								data-testid="connect-save"
-							>
-								{saveState.isLoading ? t("mapping.saving") : t("mapping.save")}
-							</Button>
+							<div className="flex flex-col gap-1">
+								<Button
+									onClick={() => void doSave()}
+									disabled={!validAgentName(name) || !canSave(cand, userMapped)}
+									isLoading={saveState.isLoading}
+									aria-describedby={saveWhy ? "connect-save-why" : undefined}
+									data-testid="connect-save"
+								>
+									{saveState.isLoading ? t("mapping.saving") : t("mapping.save")}
+								</Button>
+								<WhyDisabled reason={saveState.isLoading ? null : saveWhy} testId="connect-save-why" />
+							</div>
 						</div>
 						{!canSave(cand, userMapped) && (
 							<p className="text-muted-foreground text-sm" data-testid="connect-save-needs-proof">

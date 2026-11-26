@@ -85,7 +85,8 @@ export function withAnswerPath(c: ConnectCandidate, path: string): ConnectCandid
 		mapping.body =
 			'{"instruction": "{{instruction}}", "session_id": "{{session_id}}", "session_index": "{{session_index}}", "output": "{{output}}"}';
 	mapping.answer_path = path;
-	return { ...c, mapping, questions: (c.questions ?? []).filter((q) => q.kind !== "pick_field") };
+	// The pick question stays, so the choice can be changed (p02-3); the view marks the picked field.
+	return { ...c, mapping };
 }
 
 /** Badge variant of a row status. */

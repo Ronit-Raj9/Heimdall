@@ -15,7 +15,20 @@ import type { ApiToken, ApiTokenScope, Role } from "@/lib/types/bench";
 import { KeyRound } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import "@/app/agents/views/w4m1I18n";
 import { RoleSelect, SettingsSection, TableFrame, When, grantableRoles } from "./settingsBits";
+
+/** Where ingest tokens live: they are not access tokens and are listed on the Inbox page (p02-7). */
+export function IngestTokensNote() {
+	const { t } = useTranslation("w4m1");
+	return (
+		<p className="text-muted-foreground text-xs" data-testid="tokens-ingest-note">
+			<a href="/inbox" className="text-primary underline-offset-4 hover:underline">
+				{t("tokens.ingestAccess")}
+			</a>
+		</p>
+	);
+}
 
 /** Expiry choices in days; 0 never expires. */
 export const TOKEN_EXPIRY_DAYS = ["7", "30", "90", "365", "0"] as const;
@@ -135,6 +148,7 @@ export function ApiTokensTab() {
 						</Table>
 					</TableFrame>
 				)}
+				<IngestTokensNote />
 				{revokeState.error &&
 					(isRoleRefusal(session, revokeState.error) ? (
 						<ForbiddenNote min="admin" error={revokeState.error} testId="token-revoke-error" />

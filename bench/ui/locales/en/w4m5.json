@@ -1,0 +1,28 @@
+{
+	"import": {
+		"chosen": "Chosen: {{name}}",
+		"needFile": "Pick a file to import.",
+		"needLink": "Enter a link that starts with https://.",
+		"httpLink": "Only https links can be fetched. Change http:// to https://."
+	},
+	"estimate": {
+		"judge": "About {{tasks}} tasks and {{runs}} readiness runs. A rubric judge grades the readiness runs, so they call your judge model on your own model key; the readiness step says how many calls before it starts. Drafting makes no model call."
+	},
+	"mapping": {
+		"help": "Choose which column feeds each part of a task. The mapping is used when you press Draft tasks."
+	},
+	"preview": {
+		"nothingLeft": "No task is left in this draft. Draft again from step 2 to start over."
+	},
+	"ready": {
+		"consent": "I agree: the readiness checks call my judge model {{provider}}/{{model}} on my own model key.",
+		"needConsent": "Tick the box above to agree to the judge calls."
+	},
+	"publish": {
+		"heldOut_one": "1 of them is held out (private, never in shared results).",
+		"heldOut_other": "{{count}} of them are held out (private, never in shared results)."
+	},
+	"imports": {
+		"addFile": "Add a benchmark from a file or link"
+	}
+}

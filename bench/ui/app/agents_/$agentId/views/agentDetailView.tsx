@@ -15,6 +15,7 @@ import { useGetAgentCompatibilityQuery, useGetAgentVersionsQuery } from "@/lib/s
 import { Activity, Bug, Copy, Cpu, FlaskConical, Gauge, GitCompare, ListChecks, PencilLine, ShieldAlert, Trash2 } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
+import { usePageTitle } from "@/lib/routing/pageTitle";
 import { AgentAvatar, CheckPill, adapterIcon, jobState, lastJobFor, useAdapterLabel } from "../../../agents/views/agentDisplay";
 import { useAgentJobs } from "../../../agents/views/agentJobs";
 import { AgentImageApproval } from "@/components/sharedpool/imageRequests";
@@ -61,6 +62,7 @@ export default function AgentDetailView() {
 	const [, setTabParam] = useQueryState("tab", parseAsString.withOptions({ history: "replace" }));
 	const copyMode = copyParam === "rename" ? "rename" : copyParam === "duplicate" ? "duplicate" : null;
 	const { agent, isLoading: agentLoading } = useAgentSummary(agentId);
+	usePageTitle(agent ? `${agentId} · ${t("app.name", { ns: "bench" })}` : undefined);
 	const jobs = useAgentJobs();
 	const adapterLabel = useAdapterLabel();
 	const compatibility = useGetAgentCompatibilityQuery(agentId);

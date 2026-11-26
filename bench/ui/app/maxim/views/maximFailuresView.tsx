@@ -2,7 +2,7 @@ import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useGetSuitesQuery } from "@/lib/store/apis/benchApi";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import { apiErrorMessage } from "@/lib/store/apis/integrationsApi";
 import {
 	useAcceptMaximTaskMutation,
@@ -180,7 +180,7 @@ function BatchPanel({ id }: { id: string }) {
 
 function BatchBody({ batch }: { batch: MaximFailureBatch }) {
 	const { t } = useTranslation("maximFailures");
-	const suites = useGetSuitesQuery();
+	const suites = useGetSuitesLightQuery();
 	const drafted = useMemo(() => draftedClusters(batch.tasks), [batch.tasks]);
 	const [selected, setSelected] = useState<Set<string>>(new Set());
 	const [suite, setSuite] = useState("");

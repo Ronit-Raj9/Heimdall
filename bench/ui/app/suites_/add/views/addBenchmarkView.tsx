@@ -23,6 +23,11 @@ import { useTranslation } from "react-i18next";
 /** How often a draft is read again while its readiness checks or publish run. */
 export const DRAFT_POLL_MS = 3000;
 
+/** What a new source clears: the recognised chips, the found result and the draft (wave 4, p10-4). */
+export function sourceReset(): { matches: OnboardMatch[]; inv: null; setId: null; error: string } {
+	return { matches: [], inv: null, setId: null, error: "" };
+}
+
 /**
  * /suites/add: drop anything, see what was found, preview each task with its checks and
  * controls, run the readiness checks live, publish privately. Rows of a dataset input are mapped
@@ -57,6 +62,7 @@ export default function AddBenchmarkView() {
 			setInv(found);
 			setPlan(found.suggest);
 		} catch (e) {
+			setMatches([]);
 			setError(getBenchErrorMessage(e));
 		} finally {
 			setBusy(false);
@@ -64,8 +70,11 @@ export default function AddBenchmarkView() {
 	};
 
 	const onSource = async (c: SourceChoice) => {
-		setSetId(null);
-		setInv(null);
+		const reset = sourceReset();
+		setMatches(reset.matches);
+		setSetId(reset.setId);
+		setInv(reset.inv);
+		setError(reset.error);
 		let inp = c.input;
 		if (c.file) {
 			setBusy(true);
