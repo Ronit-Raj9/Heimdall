@@ -1,0 +1,21 @@
+{
+	"schedules": {
+		"missing": {
+			"name": "a name",
+			"evaluation": "an evaluation",
+			"experiment": "a comparison file",
+			"cron": "when it runs",
+			"max": "a daily spending limit above 0"
+		},
+		"toAdd": "To add it: {{list}}.",
+		"limitHint": "Leave the limit empty only for a practice comparison file; any other comparison needs one.",
+		"alerts": {
+			"removeAsk": "Remove the alert that sends to {{name}}? Schedules stop sending to it.",
+			"removeConfirm": "Remove alert"
+		}
+	},
+	"policies": {
+		"savedAs": "It will be saved as {{file}}.",
+		"startEmpty": "Start empty"
+	}
+}
