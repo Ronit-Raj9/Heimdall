@@ -1,15 +1,19 @@
+import { LoadError } from "@/components/runs/screenStates";
+import "@/components/settings/w4m8I18n";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiErrorMessage, useGetEmailSettingsQuery, usePutEmailSettingsMutation, useTestEmailMutation } from "@/lib/store/apis/integrationsApi";
 import type { EmailEventType, EmailSettings } from "@/lib/types/integrations";
 import { Mail } from "lucide-react";
 import { useEffect, useState } from "react";
+import { canRetry } from "@/lib/requestErrors";
 import { useTranslation } from "react-i18next";
 
 /** The caller's own email notifications: weekly digest and per-event email (handlers/notifications.go). */
 export function EmailPanel() {
 	const { t } = useTranslation("integrations");
-	const { data, error, isLoading } = useGetEmailSettingsQuery();
+	const { t: tm } = useTranslation("w4m8");
+	const { data, error, isLoading, refetch } = useGetEmailSettingsQuery();
 	const [save, saving] = usePutEmailSettingsMutation();
 	const [sendTest, testing] = useTestEmailMutation();
 	const [events, setEvents] = useState<EmailEventType[]>([]);
@@ -25,9 +29,12 @@ export function EmailPanel() {
 	if (isLoading) return <Skeleton className="h-40 w-full" />;
 	if (error || !data) {
 		return (
-			<p className="text-chart-error-ink text-sm" role="alert">
-				{apiErrorMessage(error, t("errors.load"))}
-			</p>
+			<LoadError
+				title={tm("loadErrors.email")}
+				error={error}
+				onRetry={canRetry(error) ? () => void refetch() : undefined}
+				testId="email-load-error"
+			/>
 		);
 	}
 	return (

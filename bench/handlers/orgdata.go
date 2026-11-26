@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/fasthttp/router"
@@ -159,7 +160,10 @@ func (h *OrgsHandler) deleteOrg(ctx *fasthttp.RequestCtx) {
 }
 
 // exportAudit handles GET /orgs/{org}/audit/export?format=jsonl|csv: the
-// whole log in chain order as a download.
+// whole log in chain order as a download. The optional filters action,
+// actor_type and q (a case-insensitive substring of the action, actor id,
+// target type or target id) keep only the rows that match; they only ever
+// narrow the caller's own organization's log.
 func (h *OrgsHandler) exportAudit(ctx *fasthttp.RequestCtx) {
 	format := string(ctx.QueryArgs().Peek("format"))
 	if format == "" {
@@ -169,6 +173,10 @@ func (h *OrgsHandler) exportAudit(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "format: jsonl or csv")
 		return
 	}
+	args := ctx.QueryArgs()
+	fAction := string(args.Peek("action"))
+	fActor := string(args.Peek("actor_type"))
+	fQ := strings.ToLower(strings.TrimSpace(string(args.Peek("q"))))
 	svc, o, ok := h.dataService(ctx)
 	if !ok {
 		return
@@ -193,7 +201,19 @@ func (h *OrgsHandler) exportAudit(ctx *fasthttp.RequestCtx) {
 			return enc.Encode(r)
 		}
 	}
-	if err := svc.EachAuditEntry(wctx, o.ID, write); err != nil {
+	filtered := func(r AuditExportRow) error {
+		if fAction != "" && r.Action != fAction {
+			return nil
+		}
+		if fActor != "" && r.ActorType != fActor {
+			return nil
+		}
+		if fQ != "" && !strings.Contains(strings.ToLower(r.Action+"\n"+r.ActorID+"\n"+r.TargetType+"\n"+r.TargetID), fQ) {
+			return nil
+		}
+		return write(r)
+	}
+	if err := svc.EachAuditEntry(wctx, o.ID, filtered); err != nil {
 		h.sendErr(ctx, "audit export", err)
 		return
 	}

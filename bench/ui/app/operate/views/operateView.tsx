@@ -1,4 +1,6 @@
 import { JobRunButton } from "@/components/jobs/jobRunButton";
+import { useConfirm, type ConfirmFn } from "@/components/platform/confirmDialog";
+import "@/components/settings/w4m8I18n";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
@@ -10,6 +12,7 @@ import {
 	useGetOperateBackupsQuery,
 	useGetOperateStatusQuery,
 } from "@/lib/store/apis/operateApi";
+import i18n from "@/lib/i18n";
 import { useAppDispatch } from "@/lib/store/hooks";
 import type { OperateBackup, OperateStatus } from "@/lib/types/operate";
 import { Archive, Camera, Cpu, Download, HardDrive, Info, Server, ShieldCheck, Shuffle, Stethoscope, Trash2, Users } from "lucide-react";
@@ -132,6 +135,7 @@ function formatBytes(n: number): string {
 /** The backup zips list; exported for tests. */
 export function BackupRows({ backups, onDelete }: { backups: OperateBackup[]; onDelete?(name: string): void }) {
 	const { t } = useTranslation("operate");
+	const { t: tm } = useTranslation("w4m8");
 	if (backups.length === 0) {
 		return (
 			<p className="text-muted-foreground rounded-lg border border-dashed px-3 py-4 text-center text-sm" data-testid="operate-backups-empty">
@@ -161,8 +165,16 @@ export function BackupRows({ backups, onDelete }: { backups: OperateBackup[]; on
 							{t("evidence.download")}
 						</a>
 						{onDelete && (
-							<Button size="sm" variant="ghost" onClick={() => onDelete(b.name)} aria-label={`${t("evidence.delete")} ${b.name}`}>
+							<Button
+								size="sm"
+								variant="ghost"
+								className="gap-1"
+								onClick={() => onDelete(b.name)}
+								aria-label={`${t("evidence.delete")} ${b.name}`}
+								dataTestId={`operate-backup-delete-${b.name}`}
+							>
 								<Trash2 className="size-3.5" aria-hidden="true" />
+								{tm("operate.delete")}
 							</Button>
 						)}
 					</span>
@@ -172,10 +184,20 @@ export function BackupRows({ backups, onDelete }: { backups: OperateBackup[]; on
 	);
 }
 
+/** Deletes a backup copy only after the person confirms; a copy cannot be brought back. */
+export async function deleteBackup(confirm: ConfirmFn, remove: (name: string) => unknown, name: string): Promise<void> {
+	const ok = await confirm(i18n.t("operate.deleteConfirm", { ns: "w4m8", name }), {
+		destructive: true,
+		confirmLabel: i18n.t("operate.delete", { ns: "w4m8" }),
+	});
+	if (ok) remove(name);
+}
+
 function BackupsList() {
 	const { t } = useTranslation("operate");
 	const query = useGetOperateBackupsQuery();
 	const [remove] = useDeleteOperateBackupMutation();
+	const confirm = useConfirm();
 	return (
 		<div className="flex flex-col gap-2" data-testid="operate-backups-section">
 			<p className="flex items-center gap-2 text-sm font-medium">
@@ -190,7 +212,7 @@ function BackupsList() {
 					</Button>
 				</p>
 			) : (
-				<BackupRows backups={query.data?.backups ?? []} onDelete={(name) => void remove(name)} />
+				<BackupRows backups={query.data?.backups ?? []} onDelete={(name) => void deleteBackup(confirm, remove, name)} />
 			)}
 		</div>
 	);

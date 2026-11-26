@@ -4104,7 +4104,7 @@ export interface RunnerTokenCreated {
 /** One audit_log row (handlers/orgs.go AuditRow). */
 export interface AuditEntry {
 	id: string;
-	actor_type: "user" | "token" | "runner" | "system";
+	actor_type: "user" | "token" | "runner" | "system" | "anonymous";
 	actor_id?: string;
 	action: string;
 	target_type?: string;
