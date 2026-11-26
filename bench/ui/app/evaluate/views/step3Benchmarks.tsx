@@ -3,7 +3,9 @@ import { RedTeamPanel } from "@/components/redteam/redTeamPanel";
 import { hw11 } from "@/components/runs/debug/hw11I18n";
 import { Button } from "@/components/ui/button";
 import { suiteDisplayCategory, suiteSections } from "@/components/suites/suiteDisplay";
-import { useGetSuitesQuery } from "@/lib/store/apis/benchApi";
+import { getBenchErrorMessage, useGetSuitesQuery } from "@/lib/store/apis/benchApi";
+import { LoadError } from "@/components/runs/screenStates";
+import "@/app/evaluations_/$evalId/views/w4m2I18n";
 import {
 	type AgentCompatibility,
 	type BenchmarkCompatibility,
@@ -19,6 +21,7 @@ import "@/lib/types/referenceI18n";
 import "./fw06I18n";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 import { useEvaluateDraft } from "./evaluateDraft";
 import { OwnTasksCard } from "./ownTasks";
 import { fw05 } from "./fw05I18n";
@@ -275,6 +278,8 @@ export interface Step3BenchmarksViewProps {
 	reference?: readonly ReferenceEntry[];
 	/** The "Your own tasks" card, shown first (the container passes it; the pure view stays data-free). */
 	ownTasks?: ReactNode;
+	/** The note naming the picks this agent cannot run, shown above the summary. */
+	leftOut?: ReactNode;
 }
 
 /** Pure view: packs, grouped multi-select and the selected count. Data comes in through props. */
@@ -289,6 +294,7 @@ export function Step3BenchmarksView({
 	checking,
 	reference,
 	ownTasks,
+	leftOut,
 }: Step3BenchmarksViewProps) {
 	const { t: tr } = useTranslation("reference");
 	const compat = compatibilityMap(compatibility);
@@ -386,6 +392,7 @@ export function Step3BenchmarksView({
 				/>
 			</section>
 
+			{leftOut}
 			<div className="text-muted-foreground border-t pt-3 text-sm" data-testid="step3-summary" aria-live="polite">
 				{selected.length === 0 ? (
 					"No benchmarks selected"
@@ -441,7 +448,16 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({ draft, 
 	// leave the selection, so the launch never carries them.
 	const runnable = failed.length > 0 ? [] : keepRunnable(draft.benchmarks, compatibility);
 	const answered = compatibility?.benchmarks.map((b) => `${b.id}:${b.ok}`).join(",");
+	const [leftOut, setLeftOut] = useState<LeftOutItem[]>([]);
+	useEffect(() => setLeftOut([]), [draft.agent]);
 	useEffect(() => {
+		if (failed.length === 0 && runnable.length !== draft.benchmarks.length) {
+			const map = compatibilityMap(compatibility);
+			const dropped = draft.benchmarks
+				.filter((id) => !runnable.includes(id))
+				.map((id) => ({ id, reason: incompatibleReason(compatFor(map, id)) }));
+			setLeftOut((prev) => [...prev.filter((p) => !dropped.some((d) => d.id === p.id)), ...dropped]);
+		}
 		if (runnable.length !== draft.benchmarks.length) onChange({ benchmarks: runnable, ...(failed.length > 0 ? { pack: undefined } : {}) });
 		else if (failed.length > 0 && draft.pack) onChange({ pack: undefined });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -450,27 +466,37 @@ export function Step3BenchmarksWith<D extends EvaluateDraftBenchmarks>({ draft, 
 		if (compat.isError) void compat.refetch();
 		arms.retry();
 	};
+	const lists = listsState(suites, packs);
+	const retryLists = () => {
+		void suites.refetch();
+		void packs.refetch();
+	};
 	return (
 		<div className="flex flex-col gap-6">
-			{failed.length > 0 && <SetupCheckFailed failed={failed} onRetry={retry} />}
-			<Step3BenchmarksView
-				suites={suites.data?.suites ?? []}
-				packs={packs.data ?? []}
-				compatibility={compatibility}
-				selected={draft.benchmarks}
-				pack={draft.pack}
-				onChange={onChange}
-				loading={suites.isLoading || packs.isLoading}
-				checking={checking}
-				reference={reference.data?.entries}
-				ownTasks={
-					<OwnTasksCard
-						onAdd={(id) =>
-							onChange({ benchmarks: draft.benchmarks.includes(id) ? draft.benchmarks : [...draft.benchmarks, id], pack: undefined })
-						}
-					/>
-				}
-			/>
+			{failed.length > 0 && <SetupCheckFailed failed={failed} onRetry={retry} reason={setupCheckReason(compat.error)} />}
+			{lists === "error" ? (
+				<LoadError title={w4m2("listsFailed")} error={suites.error ?? packs.error} onRetry={retryLists} testId="step3-lists-error" />
+			) : (
+				<Step3BenchmarksView
+					suites={suites.data?.suites ?? []}
+					packs={packs.data ?? []}
+					compatibility={compatibility}
+					selected={draft.benchmarks}
+					pack={draft.pack}
+					onChange={onChange}
+					loading={suites.isLoading || packs.isLoading}
+					checking={checking}
+					reference={reference.data?.entries}
+					leftOut={<LeftOutNote items={leftOut} />}
+					ownTasks={
+						<OwnTasksCard
+							onAdd={(id) =>
+								onChange({ benchmarks: draft.benchmarks.includes(id) ? draft.benchmarks : [...draft.benchmarks, id], pack: undefined })
+							}
+						/>
+					}
+				/>
+			)}
 			{others.map((o) => (
 				<ArmCompatProbe key={o.agent} agent={o.agent} onAnswer={arms.report} retry={arms.retries} />
 			))}
@@ -543,7 +569,16 @@ export function failedSetupChecks(primary: SetupCheck, others: readonly SetupChe
 }
 
 /** Step 3 is blocked while a setup could not be checked: one line per setup and a Retry button. */
-export function SetupCheckFailed({ failed, onRetry }: { failed: readonly { label: string; agent: string }[]; onRetry: () => void }) {
+export function SetupCheckFailed({
+	failed,
+	onRetry,
+	reason,
+}: {
+	failed: readonly { label: string; agent: string }[];
+	onRetry: () => void;
+	/** The server's answer when it says why (too many requests, no connection). */
+	reason?: string;
+}) {
 	return (
 		<div
 			className="border-chart-error/40 bg-chart-error/5 flex flex-col gap-2 rounded-md border px-3 py-2.5 text-sm"
@@ -553,9 +588,53 @@ export function SetupCheckFailed({ failed, onRetry }: { failed: readonly { label
 			{failed.map((f) => (
 				<p key={`${f.label}-${f.agent}`}>{hw11("step3.setupCheckFailed", { label: f.label, agent: f.agent })}</p>
 			))}
+			{reason && (
+				<p className="text-muted-foreground text-xs" data-testid="step3-setup-check-reason">
+					{reason}
+				</p>
+			)}
 			<Button type="button" variant="outline" size="sm" className="w-fit" onClick={onRetry} data-testid="step3-setup-check-retry">
 				{hw11("step3.retry")}
 			</Button>
 		</div>
 	);
+}
+const w4m2 = (key: string, opts?: Record<string, unknown>): string => String(i18n.t(key as never, { ns: "w4m2", ...opts } as never));
+
+/** A benchmark taken out of the selection because this agent cannot run it. */
+export interface LeftOutItem {
+	id: string;
+	reason: string;
+}
+
+/** Says which picks were taken out of the selection and why; nothing when none were. */
+export function LeftOutNote({ items }: { items: readonly LeftOutItem[] }) {
+	if (items.length === 0) return null;
+	return (
+		<div className="text-muted-foreground flex flex-col gap-1 text-sm" role="status" data-testid="step3-left-out">
+			<p>{w4m2("leftOut", { count: items.length })}</p>
+			{items.map((it) => (
+				<p key={it.id} className="text-xs" data-testid={`step3-left-out-${it.id}`}>
+					{w4m2("leftOutItem", { benchmark: it.id, reason: it.reason })}
+				</p>
+			))}
+		</div>
+	);
+}
+
+/** Whether the benchmark and pack lists can be shown: an errored query is an error, never an empty list. */
+export function listsState(
+	suites: { isError?: boolean; isLoading?: boolean },
+	packs: { isError?: boolean; isLoading?: boolean },
+): "error" | "ready" | "loading" {
+	if (suites.isError || packs.isError) return "error";
+	if (suites.isLoading || packs.isLoading) return "loading";
+	return "ready";
+}
+
+/** The server's reason for a failed setup check, shown only for too many requests or no connection. */
+function setupCheckReason(error: unknown): string | undefined {
+	const status = (error as { status?: unknown } | undefined)?.status;
+	if (status === 429 || status === "FETCH_ERROR" || status === "TIMEOUT_ERROR") return getBenchErrorMessage(error);
+	return undefined;
 }

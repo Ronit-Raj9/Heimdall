@@ -426,7 +426,7 @@ func estimateEvaluation(ctx context.Context, suites SuiteSource, src ForecastSou
 			ran = true
 			if len(unpriced) > 0 {
 				be.EstCostUSD.Known = false
-				be.EstCostUSD.Reason = "no price for " + strings.Join(unpriced, ", ")
+				be.EstCostUSD.Reason = priceReason(unpriced)
 			} else if !be.EstCostUSD.Known {
 				be.EstCostUSD.Reason = "no run history to estimate from"
 			}
@@ -449,7 +449,7 @@ func estimateEvaluation(ctx context.Context, suites SuiteSource, src ForecastSou
 	case pricer == nil:
 		out.EstCostUSD.Reason = "no price snapshot on this server"
 	case len(unpriced) > 0:
-		out.EstCostUSD.Reason = "no price for " + strings.Join(unpriced, ", ")
+		out.EstCostUSD.Reason = priceReason(unpriced)
 	case !ran:
 		out.EstCostUSD.Reason = "no benchmark can run"
 	default:
@@ -653,7 +653,7 @@ func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSour
 	exp := evalExperiment(st, req, tasks, conds, sets)
 	f, err := cache.estimate(ctx, src, exp, forecastKey(root, st, exp, req, agents))
 	if err != nil {
-		be.Notes = append(be.Notes, "no forecast: "+err.Error())
+		be.Notes = append(be.Notes, estimateRefusedNote(err))
 		return be
 	}
 	applyForecast(&be, f, slices.Sorted(maps.Keys(exp.Arms)), req.orgSlots)

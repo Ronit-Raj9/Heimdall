@@ -138,6 +138,6 @@ func RefusedForecast(exp *schemas.Experiment, err error, now time.Time) *schemas
 		ExpID: exp.ID, Suite: exp.Suite, GeneratedAt: now.UTC(), Arms: []schemas.ArmForecast{},
 		CostUSD: unknown, AgentTimeS: unknown, WallClockS: unknown, Concurrency: max(1, exp.Concurrency),
 		BudgetUSD: exp.Budget.TotalUSD, Fit: schemas.FitUnknown, FitReason: "the plan was refused",
-		Basis: "No forecast: the experiment could not be planned.", Notes: []string{"plan experiment: " + err.Error()},
+		Basis: "No forecast: the experiment could not be planned.", Notes: []string{PlainPlanError(err)},
 	}
 }
