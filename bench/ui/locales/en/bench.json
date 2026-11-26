@@ -2632,7 +2632,7 @@
 		"probes": {
 			"title": "Failure tests",
 			"description": "Harder versions of the tasks this benchmark can run: a model outage, a broken tool, a trick instruction, a fake secret. The details of how each works stay on the server.",
-			"none": "This benchmark has no failure tests.",
+			"none": "No failure tests are built into this benchmark. You can add failure tests when you start an evaluation.",
 			"goalPreserving": "still solvable",
 			"goalPreservingHint": "A correct solution still passes under this failure test.",
 			"family": {
@@ -4043,7 +4043,9 @@
 			"scheduledChecks": "Scheduled checks",
 			"live": "Live sessions",
 			"releases": "Releases",
-			"settings": "Settings"
+			"settings": "Settings",
+			"monitors": "Safety monitors",
+			"quickstart": "Get started"
 		},
 		"backHome": "Go to Home",
 		"error": {
@@ -4067,7 +4069,9 @@
 			"scheduledChecks": "Small benchmarks re-run on a schedule to catch an agent or model getting worse.",
 			"live": "Quality scores for real agent sessions as they happen.",
 			"releases": "Which agent version shipped, the runs a person checked, and the rules a version must pass.",
-			"settings": "API keys, workers, usage, files, background jobs, integrations and members."
+			"settings": "API keys, workers, usage, files, background jobs, integrations and members.",
+			"monitors": "Rules that watch runs and flag problems",
+			"quickstart": "Set up Heimdall step by step"
 		},
 		"help": "Help: what do these words mean?"
 	},
