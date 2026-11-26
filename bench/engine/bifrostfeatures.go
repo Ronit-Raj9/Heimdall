@@ -193,6 +193,51 @@ func validateBifrostMCP(cfg *schemas.AgentConfig, suite *schemas.Suite) []error 
 	if suite != nil && !suiteHasMCP(suite) {
 		errs = append(errs, fmt.Errorf("mcp: no task of suite %s has a visible MCP service to serve through Bifrost", suite.ID))
 	}
+	// W4 feature 4: the arm's tool set and forbidden tools.
+	if m := cfg.Gateway.Bifrost; m != nil && m.MCP != nil && (len(m.MCP.Tools) > 0 || len(m.MCP.Forbidden) > 0) {
+		services := map[string]bool{}
+		if suite != nil {
+			for _, t := range suite.Tasks {
+				for _, s := range utils.TaskServices(suite, t) {
+					if s.Role == schemas.ServiceRoleMCP && !s.Hidden && utils.ServiceProxied(s) {
+						services[s.ID] = true
+					}
+				}
+			}
+		}
+		if len(m.MCP.Tools) > 50 {
+			errs = append(errs, fmt.Errorf("mcp: tools lists %d entries; at most 50", len(m.MCP.Tools)))
+		}
+		if len(m.MCP.Forbidden) > 50 {
+			errs = append(errs, fmt.Errorf("mcp: forbidden lists %d entries; at most 50", len(m.MCP.Forbidden)))
+		}
+		check := func(field, entry string, star bool) (string, string, bool) {
+			svc, tool, ok := strings.Cut(entry, "/")
+			switch {
+			case !ok || svc == "" || tool == "" || strings.Contains(tool, "/"):
+				errs = append(errs, fmt.Errorf("mcp: %s entry %q is not <service>/<tool>", field, entry))
+				return "", "", false
+			case tool == "*" && !star:
+				errs = append(errs, fmt.Errorf("mcp: forbidden entry %q may not be a whole service; name one tool", entry))
+				return "", "", false
+			case suite != nil && !services[svc]:
+				errs = append(errs, fmt.Errorf("mcp: %s entry %q names service %s, which is not a visible proxied MCP service of suite %s", field, entry, svc, suite.ID))
+				return "", "", false
+			}
+			return svc, tool, true
+		}
+		granted := map[string]bool{}
+		for _, e := range m.MCP.Tools {
+			if svc, tool, ok := check("tools", e, true); ok {
+				granted[svc+"/"+tool] = true
+			}
+		}
+		for _, e := range m.MCP.Forbidden {
+			if svc, tool, ok := check("forbidden", e, false); ok && (granted[svc+"/"+tool] || granted[svc+"/*"]) {
+				errs = append(errs, fmt.Errorf("mcp: forbidden tool %s is also granted by tools; a tool cannot be both", e))
+			}
+		}
+	}
 	return errs
 }
 
