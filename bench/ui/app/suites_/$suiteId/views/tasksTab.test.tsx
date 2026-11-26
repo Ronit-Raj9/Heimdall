@@ -15,6 +15,7 @@ vi.mock("nuqs", async (importOriginal) => ({
 }));
 vi.mock("@/components/suites/suiteTaskFilters", () => ({ SuiteTaskFilters: () => null }));
 vi.mock("@/components/suites/suiteTaskTable", () => ({ SuiteTaskTable: () => <table data-testid="task-table-stub" /> }));
+vi.mock("@/components/suites/taskCategoryCell", () => ({ useTaskCategories: () => ({ labels: undefined, canEdit: false }) }));
 vi.mock("@/components/suites/taskDetailPanel", () => ({
 	TaskDetailPanel: ({ taskId }: { taskId: string }) => <div data-testid={`task-detail-stub-${taskId}`} />,
 }));

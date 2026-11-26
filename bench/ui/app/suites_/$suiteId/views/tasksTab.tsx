@@ -14,6 +14,7 @@ import {
 	type TaskFilters,
 	type TaskSortKey,
 } from "@/components/suites/suites.utils";
+import { useTaskCategories } from "@/components/suites/taskCategoryCell";
 import { TaskDetailPanel } from "@/components/suites/taskDetailPanel";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
@@ -79,6 +80,7 @@ export function SuiteTasksTab({ suite, health }: { suite: SuiteSummary; health: 
 	);
 	// Expert columns (kind, skills tested, license, hidden checks) stay behind a toggle.
 	const [moreColumns, setMoreColumns] = useState(false);
+	const categories = useTaskCategories(suite, moreColumns);
 	const openTask = q.task && suite.tasks.some((task) => task.id === q.task) ? q.task : null;
 	// A ?task= the benchmark does not have (removed in this version) is named, not dropped silently.
 	const missingTask = q.task && !openTask ? q.task : null;
@@ -179,6 +181,7 @@ export function SuiteTasksTab({ suite, health }: { suite: SuiteSummary; health: 
 							onOpen={(id) => void setQ({ task: id === openTask ? null : id })}
 							health={health}
 							moreColumns={moreColumns}
+							categories={categories}
 						/>
 						{rows.length < suite.tasks.length && (
 							<p className="text-muted-foreground text-xs" data-testid="suites-tasks-showing">

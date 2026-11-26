@@ -7,6 +7,7 @@ import { AdmissionBadge } from "./suiteBadges";
 import { HeldOutBadge, TaskHealthCell } from "./suiteHealth";
 import { isHeldOut, isRedacted, type HealthState } from "./suiteHealth.utils";
 import { taskLicense, type TaskSort, type TaskSortKey } from "./suites.utils";
+import { TaskCategoryCell, type TaskCategories } from "./taskCategoryCell";
 
 export interface SuiteTaskTableProps {
 	suiteId: string;
@@ -21,6 +22,8 @@ export interface SuiteTaskTableProps {
 	health?: HealthState;
 	/** Also show the expert columns: kind, skills tested, license and hidden checks. Off by default. */
 	moreColumns?: boolean;
+	/** The kind of work of each task (W4-44); when given, the expert columns gain a "Kind of work" column. */
+	categories?: TaskCategories;
 }
 
 /**
@@ -34,8 +37,20 @@ const DIFFICULTY_PILL: Record<string, string> = {
 	hard: "bg-chart-error/10 text-chart-error-ink",
 };
 
-export function SuiteTaskTable({ suiteId, rows, sort, onSort, selected, onOpen, health, moreColumns = false }: SuiteTaskTableProps) {
+export function SuiteTaskTable({
+	suiteId,
+	rows,
+	sort,
+	onSort,
+	selected,
+	onOpen,
+	health,
+	moreColumns = false,
+	categories,
+}: SuiteTaskTableProps) {
 	const { t } = useTranslation("bench");
+	const { t: tc } = useTranslation("w444");
+	const kindOfWork = moreColumns && categories !== undefined;
 	const head = (key: TaskSortKey, label: string, align: "left" | "right" = "left") => (
 		<SortableHead sortKey={key} label={label} sort={sort} onSort={onSort} align={align} />
 	);
@@ -45,6 +60,7 @@ export function SuiteTaskTable({ suiteId, rows, sort, onSort, selected, onOpen, 
 				<TableRow className="hover:bg-transparent">
 					{head("id", t("suites.tasks.task"))}
 					{moreColumns && head("kind", t("suites.tasks.kind"))}
+					{kindOfWork && <TableHead data-testid="suites-head-category">{tc("categories.column")}</TableHead>}
 					{head("difficulty", t("suites.tasks.difficulty"))}
 					{moreColumns && <TableHead>{t("suites.tasks.capabilities")}</TableHead>}
 					{head("admission", t("suites.tasks.admission"))}
@@ -55,7 +71,8 @@ export function SuiteTaskTable({ suiteId, rows, sort, onSort, selected, onOpen, 
 			</TableHeader>
 			<TableBody>
 				{rows.map((task) => {
-					if (isRedacted(task)) return <RedactedRow key={task.id} task={task} health={health} moreColumns={moreColumns} />;
+					if (isRedacted(task))
+						return <RedactedRow key={task.id} task={task} health={health} moreColumns={moreColumns} kindOfWork={kindOfWork} />;
 					const license = taskLicense(task);
 					const passed = task.checks.filter((check) => check.passed).length;
 					return (
@@ -83,6 +100,11 @@ export function SuiteTaskTable({ suiteId, rows, sort, onSort, selected, onOpen, 
 								{isHeldOut(task) && <HeldOutBadge task={task} testId={`suites-task-held-out-${task.id}`} className="mt-1" />}
 							</TableCell>
 							{moreColumns && <TableCell className="align-top font-mono text-xs">{task.kind}</TableCell>}
+							{kindOfWork && (
+								<TableCell className="align-top text-xs">
+									<TaskCategoryCell suiteId={suiteId} taskId={task.id} label={categories.labels?.[task.id]} canEdit={categories.canEdit} />
+								</TableCell>
+							)}
 							<TableCell className="align-top text-xs">
 								{task.difficulty ? (
 									<span
@@ -161,7 +183,17 @@ export function SuiteTaskTable({ suiteId, rows, sort, onSort, selected, onOpen, 
  * A held-out task the server serves by id only: its id and a "held out" badge, no link to a detail
  * the server would refuse, its admission state, and one note where the withheld columns would be.
  */
-function RedactedRow({ task, health, moreColumns }: { task: SuiteTask; health?: HealthState; moreColumns: boolean }) {
+function RedactedRow({
+	task,
+	health,
+	moreColumns,
+	kindOfWork,
+}: {
+	task: SuiteTask;
+	health?: HealthState;
+	moreColumns: boolean;
+	kindOfWork: boolean;
+}) {
 	const { t } = useTranslation("bench");
 	return (
 		<TableRow data-testid={`suites-task-row-${task.id}`} data-redacted="true">
@@ -171,7 +203,7 @@ function RedactedRow({ task, health, moreColumns }: { task: SuiteTask; health?: 
 					<HeldOutBadge task={task} testId={`suites-task-held-out-${task.id}`} />
 				</span>
 			</TableCell>
-			<TableCell colSpan={moreColumns ? 3 : 1} className="text-muted-foreground align-top text-xs whitespace-normal">
+			<TableCell colSpan={moreColumns ? (kindOfWork ? 4 : 3) : 1} className="text-muted-foreground align-top text-xs whitespace-normal">
 				{t("suiteHealth.heldOutRow")}
 			</TableCell>
 			<TableCell className="align-top">
