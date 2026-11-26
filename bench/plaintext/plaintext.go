@@ -46,7 +46,9 @@ var (
 
 	flagHintRe = regexp.MustCompile(`pass -(\w[\w-]*) (\S+) or leave -(\w[\w-]*) out`)
 	flagWordRe = regexp.MustCompile(`\s?\b(?:pass|use|with|run) -[a-z][a-z-]+(?: \S+)?`)
-	commandRe  = regexp.MustCompile(`\b(?:bifrost-bench|heimdall) [a-z-]+(?: [a-z-]+)*(?: -\S+)*`)
+	// commandRe is a command line; a word joined to the name by "-", "." or
+	// "/" (the compose key x-heimdall, a path) is not one.
+	commandRe = regexp.MustCompile(`(^|[^\w./-])(?:bifrost-bench|heimdall) [a-z-]+(?: [a-z-]+)*(?: -\S+)*`)
 
 	stutterRe  = regexp.MustCompile(`^(\w[\w ]{0,30}): `)
 	planIDRe   = regexp.MustCompile(`^plan [^:]+: `)
@@ -76,7 +78,7 @@ func Clean(s string, roots ...string) string {
 		return "choose " + sub[2] + " or leave the setting on Automatic"
 	})
 	s = flagWordRe.ReplaceAllString(s, "")
-	s = commandRe.ReplaceAllString(s, "the command line tool")
+	s = commandRe.ReplaceAllString(s, "${1}the command line tool")
 	s = collapseStutter(s)
 	s = planIDRe.ReplaceAllString(s, "")
 	s = repeatOpRe.ReplaceAllStringFunc(s, func(m string) string {
