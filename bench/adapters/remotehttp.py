@@ -73,7 +73,8 @@ MAX_ARTIFACTS = 50
 MAX_ARTIFACT_BYTES = 16 << 20
 MAX_ATTACHMENT_BYTES = 8 << 20
 MAX_STR = 256
-PENDING = ("queued", "pending", "running")
+PENDING = ("queued", "pending", "running", "in_progress", "processing", "working", "submitted")
+FAILED = ("failed", "error", "cancelled", "canceled", "rejected", "expired")
 EVENT_PREFIX = "@@heimdall-event "
 SECRET_RE = re.compile(r"(?i)(sk-[A-Za-z0-9_-]{8,}|bearer\s+[A-Za-z0-9._~+/=-]{8,}|(?:api[_-]?key|token|secret|password)[\"']?\s*[:=]\s*[\"']?[^\s\"',}]{4,})")
 
@@ -426,8 +427,11 @@ def poll(remote, resp, raw, deadline, report):
         polls += 1
         resp, raw = remote.do("GET", path, None, {}, max(1.0, min(30.0, deadline - time.time())))
         doc = parse_json(raw)
-        pending = resp.status == 202 or (isinstance(doc, dict) and str(doc.get("status", "")).lower() in PENDING)
+        status = str(doc.get("status", "")).lower() if isinstance(doc, dict) else ""
+        pending = resp.status == 202 or status in PENDING
         if not pending:
+            if status in FAILED:
+                fail(1, "the agent's run ended %s" % status)
             emit({"type": "poll", "polls": polls, "status": resp.status})
             return resp, raw
 
@@ -1541,8 +1545,13 @@ def poll_mapped(pl, first, v, build, send, common, remaining, report):
         if not v.reply_id:
             fail(1, "the agent's answer has nothing at %s" % pl["reply_id_path"])
     segs = parse_path(render_text(pl["answer_path"], v))
+    status_segs = parse_path(render_text(pl["status_path"], v)) if pl.get("status_path") else None
+    complete_segs = parse_path(render_text(pl["complete_path"], v)) if pl.get("complete_path") else None
+    done_states = [str(x).strip().lower() for x in pl.get("done_states") or []]
+    fail_states = [str(x).strip().lower() for x in pl.get("fail_states") or []]
+    explicit = status_segs is not None or complete_segs is not None
     interval = max(int(pl.get("interval_s") or 1), 1)
-    settled, polls = "", 0
+    settled, polls, finished = "", 0, False
     for _ in range(MAX_POLLS):
         if remaining() <= interval:
             break
@@ -1555,16 +1564,38 @@ def poll_mapped(pl, first, v, build, send, common, remaining, report):
         if doc is None:
             continue
         text = matches_text(path_eval(segs, doc), "\n")
+        if explicit:
+            state, done = "", False
+            if status_segs is not None:
+                state = matches_text(path_eval(status_segs, doc), "").strip().lower()
+                if state and state in fail_states:
+                    fail(1, "the agent said %s" % state)
+                done = bool(state) and state in done_states
+            if complete_segs is not None and truthy(matches_text(path_eval(complete_segs, doc), "")):
+                done = True
+            if done and text:
+                settled, finished = text, True
+                report["terminal"] = {"state": state or "complete", "poll": polls}
+                break
+            continue
         if not text:
             continue
         if text == settled:
+            finished = True
             break
         settled = text
     report["polls"] = polls
     emit({"type": "poll", "polls": polls})
-    if not settled:
-        fail(1, "no answer at %s after %d polls" % (pl["answer_path"], polls))
+    if not finished:
+        # A timeout without a finished answer is an incomplete run, never a
+        # graded one: a half answer would count as a model failure.
+        fail(1, "incomplete answer: the agent did not finish within the time limit (%d polls)" % polls)
     return settled
+
+
+def truthy(s):
+    """The complete_path rule: true, or a non-empty string."""
+    return s.strip().lower() not in ("", "false", "null", "0")
 
 
 if __name__ == "__main__":

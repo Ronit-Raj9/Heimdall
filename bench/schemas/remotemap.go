@@ -100,6 +100,15 @@ type RemotePoll struct {
 	// to AnswerPath and URL as {{reply.id}} (Direct Line: the id of the
 	// posted activity, which the agent's replies name in replyToId).
 	ReplyIDPath string `json:"reply_id_path,omitempty" yaml:"reply_id_path"`
+	// StatusPath is where the poll answer says its state; the poll ends
+	// when that state is one of DoneStates and fails on one of FailStates
+	// (compared without case).
+	StatusPath string   `json:"status_path,omitempty" yaml:"status_path"`
+	DoneStates []string `json:"done_states,omitempty" yaml:"done_states"`
+	FailStates []string `json:"fail_states,omitempty" yaml:"fail_states"`
+	// CompletePath names a value that is true, or a non-empty string, once
+	// the message is complete (for example is_final).
+	CompletePath string `json:"complete_path,omitempty" yaml:"complete_path"`
 }
 
 // RemoteAuth signs or authorizes each request of a remote agent. Every

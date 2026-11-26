@@ -14,7 +14,7 @@ import { useExperimentEvents } from "./useExperimentEvents";
 
 const KNOWN_EVENTS = new Set(["slot_started", "stage", "slot_sealed", "budget_stop", "experiment_done", "error", "end"]);
 /** Stage ids the live feed sends, as plain words (live.json stage.*). */
-const KNOWN_STAGES = new Set(["planned", "leased", "prepare", "arm", "run", "disarm", "export", "collect", "grade", "gate", "measure", "receipt", "cleanup", "seal"]);
+const KNOWN_STAGES = new Set(["planned", "leased", "image", "prepare", "arm", "run", "disarm", "export", "collect", "grade", "gate", "measure", "receipt", "cleanup", "seal"]);
 
 /** Live progress of each running experiment, one card per experiment. */
 export function RunningExperiments({

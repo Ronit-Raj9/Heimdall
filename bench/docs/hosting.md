@@ -364,10 +364,14 @@ on, which is every organization without its own quota row.
 2. Build the task and agent images the built-in benchmarks use, e.g.
    `docker build -t bench/coding-core-base:1 benchmarks/coding-core/base`.
 3. `docker compose -f deploy/hosted/docker-compose.yml --env-file deploy/hosted/.env --profile shared-runner up -d`.
-4. `deploy/hosted/registry-sync.sh`: copies `bench/coding-core-base:1` and
-   the `HEIMDALL_SHARED_PLATFORM_IMAGES` into the private registry (below).
-   Run it again after rebuilding one of them; `upgrade.sh` runs it when the
-   shared worker is up. With arguments it copies those images instead.
+4. `deploy/hosted/registry-sync.sh`: copies `bench/coding-core-base:1`, the
+   build tag of every agent file in `agents/` and the
+   `HEIMDALL_SHARED_PLATFORM_IMAGES` into the private registry (below).
+   With `--library` it also copies the library's task and benchmark images
+   that are on this host and not yet in the registry. `upgrade.sh` runs it
+   with `--library` when the shared worker is up, then the registry check
+   (below). With image arguments it copies those images too. Anything still
+   missing is copied by the image publisher the first time a run needs it.
 
 Each run uses the keys of the organization it belongs to, delivered for that
 run only; the shared worker has no provider key of its own. The Docker
@@ -409,15 +413,37 @@ Isolation between orgs on the shared host:
   from the `registry` service on the build network: read only (its storage
   is mounted read-only, deletes are off), pull credentials required, no host
   port, `registry:2` pinned by digest, storage in `HEIMDALL_REGISTRY_DIR` or
-  the `registry-data` volume. Only `registry-sync.sh` writes: it starts
-  `registry-writer` (same storage, sync identity, on an internal network
-  nothing else joins) for the copy, removes it afterwards and records each
-  pushed image's digest in the manifest (`HEIMDALL_REGISTRY_AUTH_DIR/runner/manifest`).
+  the `registry-data` volume. Writes go through `registry-writer` (same
+  storage, sync identity), which runs with the shared worker on the internal
+  network `registrysync`. Only the image publisher and the `registry-sync.sh`
+  tool join that network: no build, no agent and no org container can reach
+  the writer. Each pushed image's digest is recorded in the manifest
+  (`HEIMDALL_REGISTRY_AUTH_DIR/runner/manifest`).
+- The image publisher (service `image-publisher`, the runner image with no
+  Docker socket) is the only service holding the write identity. When a run
+  needs a platform base image the registry lacks, the shared worker checks
+  the image on its host and streams it to the publisher over the internal
+  network `imagepublish` (only the shared worker and the publisher join it),
+  with the bearer token in `HEIMDALL_REGISTRY_AUTH_DIR/runner/publish.token`
+  (written once by the deploy scripts). The run page shows "Preparing the
+  container image" while it waits. The publisher accepts only platform
+  images: the core base image, the images of the agent files in the
+  checkout and the library, and the base, task and service images of their
+  benchmarks, all read from folders no organization can write. It refuses
+  any other name (403), and the worker refuses an image whose recorded
+  origin is a repository outside the platform, so an organization's own
+  image is never copied even if it carries a platform name.
+- `upgrade.sh` ends with a registry check (warnings only, the upgrade never
+  fails on it): one line per benchmark with images not yet in the registry,
+  one per agent base image missing, and one per platform-named image on
+  the host that was pulled from outside the platform. Remove such an image
+  and let the platform build it again.
   The worker points each such `FROM` at the registry with a named build
   context pinned by that digest (`registry:5000/bench/coding-core-base:1@sha256:...`),
   so org Dockerfiles stay unchanged and a moved tag cannot change what a
   build starts from; an image missing from the manifest or the registry
-  fails the build before it starts, naming the image and `registry-sync.sh`. Any other `FROM` must
+  is published on demand as above; without the publisher the build is
+  refused before it starts. Any other `FROM` must
   name an image BuildKit can pull itself. The built image is loaded into
   the host's Docker (`buildx --load`) for the run. Tags are
   namespaced per org (`org-<org id>/...`); an org cannot use or overwrite

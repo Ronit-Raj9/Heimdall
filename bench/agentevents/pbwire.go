@@ -314,3 +314,16 @@ func contains(xs []string, x string) bool {
 	}
 	return false
 }
+
+// appendVarintField appends field n with wire type varint and value v.
+func appendVarintField(b []byte, n int, v uint64) []byte {
+	b = binary.AppendUvarint(b, uint64(n)<<3|wireVarint)
+	return binary.AppendUvarint(b, v)
+}
+
+// appendBytesField appends field n as a length-delimited payload.
+func appendBytesField(b []byte, n int, v []byte) []byte {
+	b = binary.AppendUvarint(b, uint64(n)<<3|wireBytes)
+	b = binary.AppendUvarint(b, uint64(len(v)))
+	return append(b, v...)
+}

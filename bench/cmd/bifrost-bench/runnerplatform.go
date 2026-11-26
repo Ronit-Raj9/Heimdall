@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -37,6 +38,25 @@ func platformKey(p *sharedpool.PlatformAssignment) string {
 		stamp = hex.EncodeToString(sum[:8])
 	}
 	return p.Name + ":" + stamp
+}
+
+// platformsKey identifies every platform of an assignment (N208): the
+// default platform's key and each per-evaluation platform's key, sorted
+// and joined by ",". A loop restarts when any of them is added, removed or
+// rotated. With no per-evaluation platform it equals platformKey.
+func platformsKey(a sharedpool.Assignment) string {
+	var keys []string
+	if k := platformKey(a.Platform); k != "" {
+		keys = append(keys, k)
+	}
+	var per []string
+	for _, p := range a.Platforms {
+		if k := platformKey(p); k != "" {
+			per = append(per, "+"+k)
+		}
+	}
+	sort.Strings(per)
+	return strings.Join(append(keys, per...), ",")
 }
 
 // sandboxRegistry is reg with its environment replaced by the sandbox
@@ -76,9 +96,20 @@ func sandboxRegistry(ctx context.Context, a *app, reg *schemas.Registry, pa *sha
 		out.GPUs = pool
 	}
 	if reg.Gateway != nil {
-		out.Gateway = sandbox.WrapGateway(reg.Gateway, d)
+		out.Gateway = sandboxGateway(reg.Gateway, d)
 	}
 	return &out, nil
+}
+
+// sandboxGateway is gw with the egress probe of driver d. A probe gw
+// already carries (the org's default platform, when a platform worker for
+// single evaluations starts from the main registry) is replaced, so a
+// preflight probes egress once, from the platform that runs the runs.
+func sandboxGateway(gw schemas.Gateway, d *sandbox.Driver) schemas.Gateway {
+	if sg, ok := gw.(*sandbox.Gateway); ok {
+		gw = sg.UnwrapGateway()
+	}
+	return sandbox.WrapGateway(gw, d)
 }
 
 // sandboxGPUPool is the GPU pool a runner on a GPU-capable platform

@@ -118,6 +118,43 @@ func Check(r *schemas.RemoteAgent) error {
 				errs = append(errs, fmt.Errorf("mapping poll reply_id_path: %v", err))
 			}
 		}
+		errs = append(errs, checkPollTerminal(p))
+	}
+	return errors.Join(errs...)
+}
+
+// checkPollTerminal checks the explicit finished checks of a poll:
+// status_path and complete_path parse, states need status_path, and each
+// state list holds at most 20 states of 1 to 40 characters.
+func checkPollTerminal(p *schemas.RemotePoll) error {
+	var errs []error
+	for _, f := range []struct{ name, path string }{{"status_path", p.StatusPath}, {"complete_path", p.CompletePath}} {
+		if f.path == "" {
+			continue
+		}
+		if _, err := ParsePath(f.path); err != nil {
+			errs = append(errs, fmt.Errorf("mapping poll %s: %v", f.name, err))
+		}
+	}
+	for _, f := range []struct {
+		name   string
+		states []string
+	}{{"done_states", p.DoneStates}, {"fail_states", p.FailStates}} {
+		if len(f.states) == 0 {
+			continue
+		}
+		if p.StatusPath == "" {
+			errs = append(errs, fmt.Errorf("mapping poll %s needs status_path", f.name))
+		}
+		if len(f.states) > 20 {
+			errs = append(errs, fmt.Errorf("mapping poll %s: at most 20 states", f.name))
+		}
+		for _, st := range f.states {
+			if n := len(strings.TrimSpace(st)); n < 1 || n > 40 {
+				errs = append(errs, fmt.Errorf("mapping poll %s: each state is 1 to 40 characters", f.name))
+				break
+			}
+		}
 	}
 	return errors.Join(errs...)
 }

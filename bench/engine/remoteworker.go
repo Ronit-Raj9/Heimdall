@@ -390,6 +390,7 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 	track := &workRuns{w: w}
 	defer track.done()
 	sctx, stop := w.heartbeat(ctx, lease, live)
+	sctx = utils.WithImageProgress(sctx, func(msg string) { live.add(Event{Kind: EventStage, Stage: StageImage, Message: msg}) })
 	defer stop()
 	exp, reason, permanent := w.admit(sctx, lease) // QC2-08-02: preparation stops when the lease is lost
 	if reason != "" {

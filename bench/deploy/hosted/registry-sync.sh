@@ -2,25 +2,29 @@
 # Copy host images into the shared worker's private image registry
 # (docs/hosting.md, Shared worker):
 #
-#   deploy/hosted/registry-sync.sh [IMAGE...]
+#   deploy/hosted/registry-sync.sh [--library] [IMAGE...]
 #
 # Org Dockerfiles build on the isolated BuildKit, which cannot see images on
 # the host daemon. Their bench and platform base images (FROM
 # bench/coding-core-base:1, or an image in HEIMDALL_SHARED_PLATFORM_IMAGES)
 # are served from the registry service instead; this script puts them there.
 #
-# Without arguments it copies bench/coding-core-base:1 and every entry of
+# Without image arguments it copies bench/coding-core-base:1, the build tag
+# of every agents/*.yaml in the checkout, and every entry of
 # HEIMDALL_SHARED_PLATFORM_IMAGES (a prefix ending in "/" or ":" stands for
 # every host image it starts). Images missing on the host are pulled first.
-# An agent built per task (build.base_arg) on a library task image needs that
-# image here too: pass it by name (registry-sync.sh bench/task-<suite>-<task>:<hash>).
+# --library also copies every platform image of the library (task images,
+# benchmark base images) that is on this host and not yet in the manifest;
+# their tags carry a content hash, so a pinned one never needs a new copy.
+# The image publisher copies anything still missing the first time a run
+# needs it (docs/hosting.md, Shared worker).
 # Entries pinned by digest or naming a registry host are skipped: BuildKit
 # pulls those itself. Run it again whenever one of these images is rebuilt.
 #
 # The registry org builds read is read-only and needs credentials (G3 B2).
-# This script is the only writer: it starts registry-writer (same storage,
-# sync identity only, on the registrysync network that nothing else joins)
-# for the copy and removes it afterwards. Each image goes `docker save` ->
+# Writes go through registry-writer (same storage, sync identity only, on
+# the registrysync network that only the image publisher and the sync tool
+# join); it runs with the shared worker and this script leaves it running. Each image goes `docker save` ->
 # the registry-sync tool container (crane) -> registry-writer, so neither
 # registry needs a host port. The digest each push produced is recorded in
 # the registry manifest (HEIMDALL_REGISTRY_AUTH_DIR/runner/manifest); the
@@ -32,6 +36,11 @@ set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 case ${1:-} in -h | --help) header_help "${BASH_SOURCE[0]}"; exit 0 ;; esac
+library=''
+if [ "${1:-}" = --library ]; then
+	library=1
+	shift
+fi
 
 need docker
 require_configured
@@ -52,6 +61,11 @@ if [ $# -gt 0 ]; then
 	images=("$@")
 else
 	images=(bench/coding-core-base:1)
+	# Agent base images: the build tag of every agent file in the checkout.
+	for f in "$BENCH_DIR"/agents/*.yaml; do
+		[ -f "$f" ] || continue
+		mapfile -t -O "${#images[@]}" images < <(awk '/^build:/{b=1;next} b&&/^  tag:/{print $2; b=0}' "$f")
+	done
 	platform=${HEIMDALL_SHARED_PLATFORM_IMAGES:-$(env_get HEIMDALL_SHARED_PLATFORM_IMAGES)}
 	IFS=, read -r -a entries <<<"$platform"
 	for e in "${entries[@]}"; do
@@ -77,19 +91,37 @@ hc up -d --no-deps registry
 if [ -n "$registry_auth_changed" ]; then
 	hc restart registry >/dev/null # it reads its htpasswd at start
 fi
-log "starting the registry's write side for this copy"
+log "starting the registry's write side"
 hc up -d --no-deps registry-writer
-trap 'hc rm -sf registry-writer >/dev/null 2>&1 || true' EXIT
+
+# --library: the platform images of the library on this host that the
+# manifest lacks (the list comes from the shared worker's image, which
+# mounts the checkout and the library read-only).
+if [ -n "$library" ]; then
+	mapfile -t platform_refs < <(hc run --rm --no-deps -T --entrypoint bifrost-bench shared-runner registry platform-images) ||
+		log "could not list the library's platform images; copying agent bases only"
+	declare -A on_host=()
+	while IFS= read -r t; do on_host[$t]=1; done < <(docker image ls --format '{{.Repository}}:{{.Tag}}')
+	for ref in "${platform_refs[@]}"; do
+		[ -n "${on_host[$ref]:-}" ] || continue
+		[ -f "$manifest" ] && awk -v r="$ref" '$1 == r {f=1} END {exit !f}' "$manifest" && continue
+		images+=("$ref")
+	done
+fi
 
 # set_pin REF DIGEST records REF's digest in the manifest (replacing an
 # older line for REF), atomically: the shared worker reads it on every build.
+# The lock on "$manifest.lock" is the one the image publisher takes.
 set_pin() {
-	local tmp
-	tmp=$(mktemp "$manifest.XXXXXX")
-	{ [ -f "$manifest" ] && awk -v r="$1" '$1 != r' "$manifest"; printf '%s %s\n' "$1" "$2"; } >"$tmp"
-	chgrp "$(docker_gid)" "$tmp" 2>/dev/null || true
-	chmod 0640 "$tmp"
-	mv -f "$tmp" "$manifest"
+	(
+		flock 9
+		local tmp
+		tmp=$(mktemp "$manifest.XXXXXX")
+		{ [ -f "$manifest" ] && awk -v r="$1" '$1 != r' "$manifest"; printf '%s %s\n' "$1" "$2"; } >"$tmp"
+		chgrp "$(docker_gid)" "$tmp" 2>/dev/null || true
+		chmod 0640 "$tmp"
+		mv -f "$tmp" "$manifest"
+	) 9>>"$manifest.lock"
 }
 
 # The tool logs in with the sync identity (password on stdin, never on a

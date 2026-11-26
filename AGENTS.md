@@ -131,6 +131,8 @@ bifrost/
 
 Bifrost is a **multi-module Go workspace**. Each module has its own `go.mod`:
 
+Run `make work-init` once after cloning; go.work is generated, not committed.
+
 ```
 go.work
 ├── core/go.mod              # github.com/maximhq/bifrost/core

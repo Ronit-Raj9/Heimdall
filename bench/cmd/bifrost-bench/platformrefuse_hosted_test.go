@@ -8,6 +8,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/sandbox"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/sharedpool"
 )
 
 // withImagesReady sets platformImagesReady for one test.
@@ -67,7 +68,7 @@ func TestEvaluationPlatformResolver(t *testing.T) {
 	if name, _, _ := tg.evaluationPlatform(ctx, nil, "org", "gpu"); name != "" {
 		t.Fatalf("own worker: %q", name)
 	}
-	if name, _, _ := tg.evaluationPlatform(ctx, nil, "org", "shared/platform/modal"); !strings.EqualFold(name, "modal") {
+	if name, _, _ := tg.evaluationPlatform(ctx, nil, "org", sharedpool.PlatformPool("modal")); !strings.EqualFold(name, "modal") {
 		t.Fatalf("platform pool: %q", name)
 	}
 }

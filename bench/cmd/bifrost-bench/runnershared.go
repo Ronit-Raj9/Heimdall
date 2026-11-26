@@ -326,7 +326,7 @@ func reconcileShared(loops map[string]*sharedLoop, as *sharedpool.Assignments, f
 			ended = true
 		default:
 		}
-		if ok && !ended && sharedSlots(a.MaxConcurrentRuns, flagSlots) == l.slots && platformKey(a.Platform) == l.platform {
+		if ok && !ended && sharedSlots(a.MaxConcurrentRuns, flagSlots) == l.slots && platformsKey(a) == l.platform {
 			if id := l.claimed(); id == "" || id == a.TokenID {
 				if l.policy != nil {
 					l.policy.SetApproved(a.Images)
@@ -421,10 +421,14 @@ func (h *sharedHost) orgPolicy(org string, approved []string, projectRoot string
 		Trusted: h.trusted, Untrusted: []string{projectRoot}, Approved: append([]string(nil), approved...), Platform: h.platform,
 		Registry: h.registry,
 	}
+	if h.base != nil && h.base.cfg != nil { // SEC-C: a plain platform name only from the platform's own pin
+		p.PlatformPin = platformPinOf(h.base.cfg.Root, suite.LibraryDir())
+	}
 	if h.sessions {
 		p.Session = buildSessionArgv(h.exe, org, h.prefix, h.lockDir)
 	}
 	if h.registry != "" {
+		p.Publish = sharedImagePublisher(h)
 		host, client, cred := h.registry, h.regClient, h.regCred
 		if h.manifest != "" {
 			p.Pinned = utils.ManifestPins(h.manifest)
@@ -735,7 +739,7 @@ func runSharedRunner(args []string) int {
 	var wg sync.WaitGroup
 	start := func(as sharedpool.Assignment, slots int) *sharedLoop {
 		lctx, cancel := context.WithCancel(ctx)
-		l := &sharedLoop{slots: slots, platform: platformKey(as.Platform), cancel: cancel, done: make(chan struct{})}
+		l := &sharedLoop{slots: slots, platform: platformsKey(as), cancel: cancel, done: make(chan struct{})}
 		root := filepath.Join(f.projectsDir, as.OrgID)
 		l.policy = h.orgPolicy(as.OrgID, as.Images, root)
 		wg.Add(1)
@@ -803,7 +807,7 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 		a.logger.Warn("shared runner: org project not downloaded yet; it is downloaded again before each lease", "org", org, "error", err.Error())
 	}
 	docker := utils.Docker{Binary: a.docker.Binary, Policy: l.policy}
-	oa, err := newApp(ctx, h.f.config, appOptions{gateway: true, debug: h.f.debug, docker: &docker, evalNetwork: network})
+	oa, err := newApp(ctx, h.f.config, appOptions{gateway: true, debug: h.f.debug, docker: &docker, evalNetwork: network, sharedRunner: true})
 	if err != nil {
 		a.logger.Error("shared runner: org worker not started", "org", org, "error", err.Error())
 		return
@@ -820,6 +824,9 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 	}
 	reg = withPullOrg(reg, oa, planRoot, org) // Y11: pull agents' run tokens name the org
 	labels := h.sharedWorkerLabels()
+	// N208: platform workers for single evaluations start from the registry
+	// before the default platform's wrap (one egress probe, the right GPUs).
+	baseReg := reg
 	if claim.Platform != nil { // X19a: the org's own sandbox platform runs its runs
 		pr, err := sandboxRegistry(ctx, oa, reg, claim.Platform)
 		if err != nil {
@@ -851,6 +858,10 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 		return
 	}
 	h.setWorker(org, w) // E5: the leftover sweep keeps this worker's runs
+	// N208: one worker per platform that takes single evaluations (runnerplatformworker.go).
+	for _, pc := range claim.Platforms {
+		go servePlatformPool(ctx, h, oa, baseReg, pc, slots, platformPoolEnv{org: org, name: name, planRoot: planRoot, docker: docker, refresh: proj.refresh})
+	}
 	defer h.setWorker(org, nil)
 	a.logger.Info("shared runner: serving org", "org", org, "slots", slots, "runtime", h.runtime, "network", network)
 	if err := w.Run(ctx); err != nil && ctx.Err() == nil {

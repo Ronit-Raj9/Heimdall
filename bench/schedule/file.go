@@ -51,6 +51,9 @@ type Schedule struct {
 	// Paused keeps the schedule in the file but stops its cron triggers
 	// (the server ticker skips it); Run now still works.
 	Paused bool `json:"paused,omitempty" yaml:"paused,omitempty"`
+	// NewModels is W4 feature 3: start the evaluation only for a model
+	// Bifrost's catalog did not list before (newmodels.go).
+	NewModels *NewModelWatch `json:"new_models,omitempty" yaml:"new_models,omitempty"`
 
 	// Approved is what the daemon's cap check approved for this trigger; the
 	// daemon sets it on the copy it hands the Runner, never in the file. A

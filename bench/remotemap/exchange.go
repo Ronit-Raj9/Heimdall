@@ -501,11 +501,20 @@ func (c *Caller) poll(ctx context.Context, client *http.Client, base *url.URL, m
 	if err != nil {
 		return ex, fmt.Errorf("poll answer_path: %v", err)
 	}
+	statusPath, err := pollPath("status_path", p.StatusPath, v)
+	if err != nil {
+		return ex, err
+	}
+	completePath, err := pollPath("complete_path", p.CompletePath, v)
+	if err != nil {
+		return ex, err
+	}
+	explicit := statusPath != nil || completePath != nil
 	interval := time.Duration(max(p.IntervalS, 1)) * time.Second
 	settled := ""
 	for i := 0; i < MaxPolls; i++ {
 		if err := c.sleep(ctx, interval); err != nil {
-			return ex, errors.New("the answer did not arrive in time")
+			return ex, incompleteAnswer(ex.Polls)
 		}
 		req, err := renderRequest("poll", http.MethodGet, p.URL, base, m.Headers, nil, "", nil, v)
 		if err != nil {
@@ -525,6 +534,24 @@ func (c *Caller) poll(ctx context.Context, client *http.Client, base *url.URL, m
 			continue
 		}
 		text := Text(ap.Eval(doc), "\n")
+		if explicit {
+			done := false
+			if statusPath != nil {
+				state := strings.ToLower(strings.TrimSpace(Text(statusPath.Eval(doc), "")))
+				if hasState(p.FailStates, state) {
+					return ex, fmt.Errorf("the agent said %s", state)
+				}
+				done = hasState(p.DoneStates, state)
+			}
+			if completePath != nil && truthy(Text(completePath.Eval(doc), "")) {
+				done = true
+			}
+			if done && text != "" {
+				ex.Answer = text
+				return ex, nil
+			}
+			continue
+		}
 		if text == "" {
 			continue
 		}
@@ -534,11 +561,49 @@ func (c *Caller) poll(ctx context.Context, client *http.Client, base *url.URL, m
 		}
 		settled = text
 	}
-	if settled != "" {
-		ex.Answer = settled
-		return ex, nil
+	// Running out of polls without a finished answer is an incomplete run,
+	// never a graded one: a half answer would count as a model failure.
+	return ex, incompleteAnswer(ex.Polls)
+}
+
+// incompleteAnswer is the error of a poll that ran out of time.
+func incompleteAnswer(polls int) error {
+	return fmt.Errorf("incomplete answer: the agent did not finish within the time limit (%d polls)", polls)
+}
+
+// pollPath renders and parses an optional poll path; "" gives nil.
+func pollPath(name, raw string, v *Vars) (*Path, error) {
+	if raw == "" {
+		return nil, nil
 	}
-	return ex, fmt.Errorf("no answer at %s after %d polls", pathText, ex.Polls)
+	text, err := RenderText(raw, v, false, nil)
+	if err != nil {
+		return nil, err
+	}
+	pp, err := ParsePath(text)
+	if err != nil {
+		return nil, fmt.Errorf("poll %s: %v", name, err)
+	}
+	return pp, nil
+}
+
+// hasState reports whether state is one of states, without case.
+func hasState(states []string, state string) bool {
+	for _, s := range states {
+		if strings.EqualFold(strings.TrimSpace(s), state) {
+			return state != ""
+		}
+	}
+	return false
+}
+
+// truthy is the complete_path rule: true, or a non-empty string.
+func truthy(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "", "false", "null", "0":
+		return false
+	}
+	return true
 }
 
 type capWriter struct {

@@ -351,6 +351,10 @@ type JudgeRecord struct {
 	Votes         []string `json:"votes"` // each call's verdict: correct | incorrect | unparsable
 	USD           Value    `json:"usd"`   // judge cost; never added to the agent's cost
 
+	// CachedVotes counts the votes whose reply was reused from an identical
+	// earlier grading at no charge (W4 feature 7, graders/judgecache.go).
+	CachedVotes int `json:"cached_votes,omitempty"`
+
 	// PriceRef names the price snapshot USD was priced from.
 	PriceRef string `json:"price_ref,omitempty"`
 

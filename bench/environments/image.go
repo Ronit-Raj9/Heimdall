@@ -373,6 +373,8 @@ func buildArgs(b ImageBuild) ([]string, error) {
 	for _, k := range sortedKeys(b.Labels) {
 		args = append(args, "--label", k+"="+b.Labels[k])
 	}
+	// The platform build mark; an org build gets it empty (utils.DockerPolicy).
+	args = append(args, "--label", utils.LabelPlatformBuild+"=1")
 	return append(args, b.Context), nil
 }
 

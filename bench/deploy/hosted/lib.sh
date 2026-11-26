@@ -140,6 +140,7 @@ write_secret() {
 #   sync/push.auth      the sync tool's user:password
 #   runner/pull.auth    the shared worker's user:password (read-only pulls)
 #   runner/manifest     image digests registry-sync.sh pushed (it writes it)
+#   runner/publish.token  the bearer token of the image publisher
 # Existing files are kept; delete one identity's two files to rotate it.
 # Sets registry_auth_changed=1 when it wrote credentials. Needs the server
 # image (the hash comes from `bifrost-bench registry htpasswd`).
@@ -170,6 +171,8 @@ ensure_registry_auth() {
 		chgrp "$gid" "$dir/$sub" 2>/dev/null || log "could not give $dir/$sub to group $gid (the Docker socket's); the registry may not read it"
 		chmod 0750 "$dir/$sub"
 	done
+	# The image publisher (same group) writes the manifest and its lock here.
+	chmod 0770 "$dir/runner"
 	if [ ! -s "$dir/registry/htpasswd" ] || [ ! -s "$dir/runner/pull.auth" ]; then
 		bench_has registry || die "the server image has no 'registry' command: build it first (upgrade.sh)"
 		pw=$(random_hex)
@@ -189,5 +192,8 @@ ensure_registry_auth() {
 		log "generated the registry sync credentials"
 	fi
 	unset pw line
+	# The bearer token the shared worker sends to the image publisher
+	# (wave 4): 32 random bytes as hex, written once.
+	[ -s "$dir/runner/publish.token" ] || write_secret "$dir/runner/publish.token" "$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 	[ -f "$dir/runner/manifest" ] || write_secret "$dir/runner/manifest" "# image digest, one per line; written by deploy/hosted/registry-sync.sh"
 }

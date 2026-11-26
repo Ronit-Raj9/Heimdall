@@ -151,7 +151,7 @@ func TestPolicyBuildSession(t *testing.T) {
 	d := Docker{Binary: "/usr/bin/docker", Policy: p}
 	cmd := d.Command(context.Background(), "build", "-t", "x:1", "--network", "none", org)
 	got := strings.Join(cmd.Args, " ")
-	want := "/bin/session runner build-session -org a -docker /usr/bin/docker -- buildx build --load -t org-a/x:1 --network none " + org
+	want := "/bin/session runner build-session -org a -docker /usr/bin/docker -- buildx build --load -t org-a/x:1 --network none --label heimdall.platform-build= " + org
 	if cmd.Path != "/bin/session" || got != want || cmd.Err != nil {
 		t.Fatalf("org build under a session:\n got %s (%s, %v)\nwant %s", got, cmd.Path, cmd.Err, want)
 	}

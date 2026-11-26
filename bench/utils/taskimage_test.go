@@ -115,7 +115,7 @@ func TestEnsureImage(t *testing.T) {
 	for _, l := range lines {
 		if strings.HasPrefix(l, "build ") {
 			builds++
-			if l != "build -f /t/Dockerfile -t bench/task-s-t:0123456789ab --label bifrost-bench=1 --network none /t" {
+			if l != "build -f /t/Dockerfile -t bench/task-s-t:0123456789ab --label bifrost-bench=1 --label heimdall.platform-build=1 --network none /t" {
 				t.Fatalf("build line %q", l)
 			}
 		}

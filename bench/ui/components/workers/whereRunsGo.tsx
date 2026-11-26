@@ -11,6 +11,7 @@ import type { TFunction } from "i18next";
 import { useCallback, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "./hw05I18n";
+import "./w4510I18n";
 
 function errorStatus(error: unknown): number | undefined {
 	const s = (error as { status?: unknown } | undefined)?.status;
@@ -156,6 +157,7 @@ export const ADD_WORKER_HREF = "/settings?tab=runners";
  */
 export function EvaluationWorkerPicker({ value, onChange }: { value: string; onChange(worker: string): void }) {
 	const { t } = useTranslation("byoworker");
+	const { t: t4510 } = useTranslation("w4510");
 	const session = useSession();
 	const query = useGetWorkerTargetQuery();
 	const fieldId = useId();
@@ -183,6 +185,9 @@ export function EvaluationWorkerPicker({ value, onChange }: { value: string; onC
 		);
 	}
 	const current = data.choices.find((c) => c.current);
+	// N208: a platform picked for this evaluation (or where runs go) takes the evaluation only.
+	const picked = value ? data.choices.find((c) => c.target === value) : current;
+	const onPlatform = picked?.kind === "platform" && picked.per_evaluation ? picked : undefined;
 	return (
 		<section className="flex flex-col gap-1.5" data-testid="eval-worker">
 			<label htmlFor={fieldId} className="text-sm font-medium">
@@ -208,6 +213,11 @@ export function EvaluationWorkerPicker({ value, onChange }: { value: string; onC
 						</option>
 					))}
 			</select>
+			{onPlatform ? (
+				<p className="text-muted-foreground text-xs" data-testid="eval-worker-platform-line">
+					{t4510("perEvaluationLine", { platform: onPlatform.title })}
+				</p>
+			) : null}
 		</section>
 	);
 }

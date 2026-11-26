@@ -107,6 +107,21 @@ func (c *Collector) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("body over %d bytes; dropped", c.lim.MaxBody), http.StatusRequestEntityTooLarge)
 		return
 	}
+	body, err = DecodeContent(body, r.Header.Get("Content-Encoding"), c.lim.MaxBody)
+	switch {
+	case errors.Is(err, ErrDecodedTooLarge):
+		c.drop(1)
+		http.Error(w, fmt.Sprintf("body over %d bytes; dropped", c.lim.MaxBody), http.StatusRequestEntityTooLarge)
+		return
+	case errors.Is(err, ErrEncoding):
+		c.drop(1)
+		http.Error(w, fmt.Sprintf("content encoding %s is not supported; send identity or gzip", r.Header.Get("Content-Encoding")), http.StatusUnsupportedMediaType)
+		return
+	case err != nil:
+		c.drop(1)
+		http.Error(w, "read compressed body", http.StatusBadRequest)
+		return
+	}
 	now := c.now()
 	var recs []Record
 	var bad int
@@ -124,17 +139,14 @@ func (c *Collector) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	kept, dropped := c.append(recs)
 	c.drop(bad)
 	if r.URL.Path == PathOTLP {
-		// An OTLP exporter expects an ExportTraceServiceResponse; an empty
-		// one in the request's encoding means full success.
-		ct := r.Header.Get("Content-Type")
-		if strings.Contains(ct, "protobuf") {
-			w.Header().Set("Content-Type", ContentTypeOTLPProto)
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		w.Header().Set("Content-Type", ContentTypeOTLPJSON)
+		// An OTLP exporter expects an ExportTraceServiceResponse in the
+		// request's encoding; spans refused here are reported as a partial
+		// success so the exporter does not take them as delivered.
+		rejected := dropped + bad
+		ct, out := OTLPResponse(strings.Contains(r.Header.Get("Content-Type"), "protobuf"), rejected, fmt.Sprintf("%d spans over this run's limits were dropped", rejected))
+		w.Header().Set("Content-Type", ct)
 		w.WriteHeader(http.StatusOK)
-		_, _ = io.WriteString(w, "{}")
+		_, _ = w.Write(out)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

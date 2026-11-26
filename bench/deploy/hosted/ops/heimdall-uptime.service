@@ -1,0 +1,13 @@
+# One uptime check of the hosted site, from the owner's laptop
+# (docs/operations.md, Down alert). A user unit: copy this file and
+# heimdall-uptime.timer to ~/.config/systemd/user/, link the script to
+# ~/.local/bin/heimdall-uptime-probe, then
+# systemctl --user enable --now heimdall-uptime.timer
+[Unit]
+Description=Heimdall uptime check
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/heimdall-uptime-probe

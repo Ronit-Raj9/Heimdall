@@ -24,12 +24,27 @@ func init() {
 }
 
 const registryUsage = `usage:
-  bifrost-bench registry htpasswd -user <name>    (password on stdin; prints name:<bcrypt hash>)`
+  bifrost-bench registry htpasswd -user <name>    (password on stdin; prints name:<bcrypt hash>)
+  bifrost-bench registry publisher -auth-file <file> -manifest <file> -token-file <file> [-listen addr] [-writer host:port] [-crane path] [-checkout dir] [-library dir] [-temp dir]
+  bifrost-bench registry platform-images          (prints every platform image, one per line)
+  bifrost-bench registry check [-manifest file] [-docker path] [-strict]    (warns about images missing from the registry)`
 
 var registryUserRe = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,63}$`)
 
 func runRegistry(args []string) int {
-	if len(args) == 0 || args[0] != "htpasswd" {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, registryUsage)
+		return exitUsage
+	}
+	switch args[0] {
+	case "htpasswd":
+	case "publisher":
+		return runRegistryPublisher(args[1:])
+	case "platform-images":
+		return runRegistryPlatformImages(args[1:])
+	case "check":
+		return runRegistryCheck(args[1:])
+	default:
 		fmt.Fprintln(os.Stderr, registryUsage)
 		return exitUsage
 	}

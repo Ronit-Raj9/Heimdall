@@ -3,6 +3,7 @@ package deploy
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -74,10 +75,22 @@ func TestEnsureRegistryAuth(t *testing.T) {
 			t.Errorf("%s mode %o", f, m)
 		}
 	}
-	for _, d := range []string{"", "registry", "writer", "sync", "runner"} {
+	for _, d := range []string{"", "registry", "writer", "sync"} {
 		if m := mode(t, filepath.Join(auth, d)); m != 0o750 {
 			t.Errorf("%s/ mode %o", d, m)
 		}
+	}
+	// Wave 4: the image publisher (group of the Docker socket) writes the
+	// manifest and its lock in runner/; the shared worker mounts it read-only.
+	if m := mode(t, filepath.Join(auth, "runner")); m != 0o770 {
+		t.Errorf("runner/ mode %o", m)
+	}
+	tok, err := os.ReadFile(filepath.Join(auth, "runner", "publish.token"))
+	if err != nil || !regexp.MustCompile(`^[0-9a-f]{64}\n$`).Match(tok) {
+		t.Errorf("publish.token = %q %v, want 64 hex characters", tok, err)
+	}
+	if m := mode(t, filepath.Join(auth, "runner", "publish.token")); m != 0o640 {
+		t.Errorf("publish.token mode %o", m)
 	}
 	if _, err := os.Stat(filepath.Join(auth, "runner", "manifest")); err != nil {
 		t.Errorf("no manifest: %v", err)
@@ -89,6 +102,9 @@ func TestEnsureRegistryAuth(t *testing.T) {
 	// A second run keeps what exists.
 	if out := run(); strings.Contains(out, "changed=1") {
 		t.Fatalf("second run regenerated credentials:\n%s", out)
+	}
+	if again, _ := os.ReadFile(filepath.Join(auth, "runner", "publish.token")); string(again) != string(tok) {
+		t.Error("second run replaced publish.token")
 	}
 	// Never inside the checkout.
 	inside := backupEnv(t, "HEIMDALL_REGISTRY_AUTH_DIR="+filepath.Join(mustAbs(t, "."), "hosted", "auth")+"\n")
@@ -133,10 +149,14 @@ func TestRegistrySyncPinsDigests(t *testing.T) {
 	}
 	log, _ := os.ReadFile(logPath)
 	l := string(log)
-	for _, want := range []string{"up -d --no-deps registry-writer", "-e SYNC_REF=bench/coding-core-base:1 registry-sync", "rm -sf registry-writer"} {
+	for _, want := range []string{"up -d --no-deps registry-writer", "-e SYNC_REF=bench/coding-core-base:1 registry-sync"} {
 		if !strings.Contains(l, want) {
 			t.Errorf("docker log lacks %q:\n%s", want, l)
 		}
+	}
+	// Wave 4: the writer stays up for the image publisher.
+	if strings.Contains(l, "rm -sf registry-writer") {
+		t.Errorf("registry-sync removed the writer the image publisher needs:\n%s", l)
 	}
 	if strings.Contains(l, "registry:5000/bench") {
 		t.Error("pushed to the read-only registry")
