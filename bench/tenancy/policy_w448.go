@@ -10,3 +10,9 @@ func init() {
 	OrgPolicy[key("DELETE", api+"/issuesync/{id}")] = org(admin)
 	OrgPolicy[key("POST", api+"/issuesync/{id}/run")] = org(admin)
 }
+
+// The cheat check starts runs on the org's keys, like rerun failures: a
+// member action.
+func init() {
+	OrgPolicy[key("POST", api+"/evaluations/{id}/cheat-check")] = org(member)
+}

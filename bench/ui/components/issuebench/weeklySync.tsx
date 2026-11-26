@@ -11,8 +11,9 @@ import {
 	useRunIssueSyncMutation,
 	useUpdateIssueSyncMutation,
 } from "@/lib/store/apis/issueSyncApi";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ReactReduxContext } from "react-redux";
 import "./w448I18n";
 
 type T = ReturnType<typeof useTranslation<"w448">>["t"];
@@ -35,7 +36,12 @@ export function runLine(r: IssueSyncRun, t: T): string {
 	return t("sync.runReason", { date, reason: r.reason ?? r.status });
 }
 
-export function WeeklySync({ repo, writable }: { repo: string; writable: boolean }) {
+/** The section; it renders nothing outside a data store (static markup tests of the parent page). */
+export function WeeklySync(props: { repo: string; writable: boolean }) {
+	return useContext(ReactReduxContext) ? <WeeklySyncSection {...props} /> : null;
+}
+
+function WeeklySyncSection({ repo, writable }: { repo: string; writable: boolean }) {
 	const { t } = useTranslation("w448");
 	const list = useListIssueSyncsQuery();
 	const sync = (list.data?.repos ?? []).find((r) => r.repo.toLowerCase() === repo.toLowerCase());

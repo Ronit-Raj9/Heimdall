@@ -371,6 +371,10 @@ type Evaluation struct {
 	// children never join the parent's verdicts, report card or a
 	// leaderboard.
 	RerunOf string `json:"rerun_of,omitempty"`
+	// CheatCheckOf names the evaluation whose arms this one runs on the
+	// impossible twins of its benchmarks (W4-48 cheat check); such an
+	// evaluation is exploratory, one trial.
+	CheatCheckOf string `json:"cheat_check_of,omitempty"`
 	// Paused is true while every running child is paused (drain).
 	Paused bool `json:"paused,omitempty"`
 	// NotifiedAt is when the finish of this evaluation was sent to the

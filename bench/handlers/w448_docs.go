@@ -1,6 +1,9 @@
 package handlers
 
-import "github.com/maximhq/bifrost/bench/issuesync"
+import (
+	"github.com/maximhq/bifrost/bench/issuesync"
+	"github.com/maximhq/bifrost/bench/schemas"
+)
 
 // Wave 4 lane I35 (W4-48): weekly issue sync routes.
 func init() {
@@ -11,5 +14,14 @@ func init() {
 		RouteDoc{Method: "PUT", Path: APIPrefix + "/issuesync/{id}", Tag: tag, Auth: AuthWrite, Summary: "Change or pause a weekly issue sync (admin)", Request: IssueSyncRequest{}, Response: issuesync.Repo{}},
 		RouteDoc{Method: "DELETE", Path: APIPrefix + "/issuesync/{id}", Tag: tag, Auth: AuthWrite, Summary: "Remove a weekly issue sync and its schedule (admin); tasks already made stay", Status: 204, NoContent: true},
 		RouteDoc{Method: "POST", Path: APIPrefix + "/issuesync/{id}/run", Tag: tag, Auth: AuthWrite, Summary: "Run a weekly issue sync once now (admin); 409 while one runs", Request: IssueSyncRunRequest{}, Response: issuesync.RunRef{}},
+	)
+}
+
+// Wave 4 lane I35 (W4-48): the cheat check of an evaluation.
+func init() {
+	OrgRouteDocs = append(OrgRouteDocs,
+		RouteDoc{Method: "POST", Path: APIPrefix + "/evaluations/{id}/cheat-check", Tag: "evaluations", Auth: AuthWrite,
+			Summary: "Run the evaluation's arms once on the impossible twins of its benchmarks (exploratory); 409 when none has admitted twins",
+			Request: CheatCheckRequest{}, Status: 202, Response: schemas.Evaluation{}},
 	)
 }
