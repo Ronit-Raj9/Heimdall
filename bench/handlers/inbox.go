@@ -59,6 +59,8 @@ func (h *InboxHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middl
 	r.POST(APIPrefix+"/inbox/{id}/reject", lib.ChainMiddlewares(h.postReject, writeMW...))
 	r.POST(APIPrefix+"/inbox/{id}/snooze", lib.ChainMiddlewares(h.postSnooze, writeMW...))
 	r.POST(APIPrefix+"/inbox/ingest", lib.ChainMiddlewares(h.postIngest, middlewares...))
+	r.POST(InboxImportSessionPath, lib.ChainMiddlewares(h.postImportSession, h.uploadChain(middlewares)...)) // W4-45 session file upload (inboxsession_w445.go)
+	r.GET(InboxProposalPath, lib.ChainMiddlewares(h.getProposal, middlewares...))                            // W4-45 model draft (inboxproposal_w445.go)
 }
 
 // getList handles GET /api/bench/inbox?state=&source=.
