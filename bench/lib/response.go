@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/bytedance/sonic"
+	"github.com/maximhq/bifrost/bench/plaintext"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
 )
@@ -88,6 +89,7 @@ func WithMode(object []byte, mode schemas.Mode) ([]byte, error) {
 
 // SendError writes the error shape {"mode", "error": {"message", "type"}}.
 func SendError(ctx *fasthttp.RequestCtx, mode schemas.Mode, status int, errType, message string) {
+	message = plaintext.Hosted(message) // wave 4, F1.3: no server path, flag or org id reaches a hosted browser
 	// encoding/json cannot fail on this fixed struct of strings, and keeping
 	// the error path free of sonic keeps it usable when sonic itself failed.
 	body, err := json.Marshal(ErrorBody{Mode: mode, Error: ErrorField{Message: message, Type: errType}})
@@ -101,6 +103,7 @@ func SendError(ctx *fasthttp.RequestCtx, mode schemas.Mode, status int, errType,
 // SendErrorLink is SendError with a link to the app page that fixes the
 // error (ErrorField.Link).
 func SendErrorLink(ctx *fasthttp.RequestCtx, mode schemas.Mode, status int, errType, message, link string) {
+	message = plaintext.Hosted(message) // wave 4, F1.3
 	body, err := json.Marshal(ErrorBody{Mode: mode, Error: ErrorField{Message: message, Type: errType, Link: link}})
 	if err != nil {
 		ctx.Error("internal error", fasthttp.StatusInternalServerError)
