@@ -400,7 +400,11 @@ func draftNextSteps(res *traceinbox.AcceptResult) []string {
 		}
 	}
 	out = append(out, "", "The draft shows what happened in production, not what was right. next:")
-	for i, step := range traceinbox.AcceptSteps(res, "") {
+	// The last two accept steps name the web page's buttons; the command
+	// line says its own commands instead (wave 4, N78).
+	steps := traceinbox.AcceptSteps(res, "")
+	steps = append(steps[:max(len(steps)-2, 0)], "bifrost-bench task validate "+res.Task, "bifrost-bench task admit "+res.Task)
+	for i, step := range steps {
 		out = append(out, fmt.Sprintf("  %d. %s", i+1, step))
 	}
 	return out

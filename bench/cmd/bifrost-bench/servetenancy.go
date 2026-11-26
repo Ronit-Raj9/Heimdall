@@ -28,6 +28,7 @@ import (
 	"github.com/maximhq/bifrost/bench/db"
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/plaintext"
 	"github.com/maximhq/bifrost/bench/release"
 	"github.com/maximhq/bifrost/bench/resultsindex"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -96,6 +97,10 @@ func hostedLayout(cfg *lib.Config) tenancy.Layout {
 func serveHosted(ctx context.Context, a *app, offline bool) int {
 	go logPublicDNS(ctx, a.logger)
 	adapters.RestrictSkillsExtra(true) // fix wave 3, SEC-B: skills.extra only names agents' upload collections
+	plaintext.DefaultRoots = func() []string {
+		// wave 4, F1.3: text served to a browser names no server path
+		return []string{a.cfg.Path(a.cfg.RunsRoot), a.cfg.Root, os.TempDir()}
+	}
 	if offline {
 		a.logger.Warn("-offline changes nothing in hosted mode: the hosted server runs no agent and opens no gateway; runners do")
 	}

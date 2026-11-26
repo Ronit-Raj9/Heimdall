@@ -224,7 +224,7 @@ func AcceptSteps(res *AcceptResult, projectRoot string) []string {
 		out = append(out, "edit "+filepath.ToSlash(filepath.Join(dir, filepath.FromSlash(rel)))+" and delete its EDIT ME lines")
 	}
 	return append(out, "review the rest of "+filepath.ToSlash(dir)+" ("+traceimport.TranscriptFile+" has the whole session)",
-		"bifrost-bench task validate "+res.Task, "bifrost-bench task admit "+res.Task)
+		"Check the task on the benchmark's Build tab (Readiness check)", "Admit the task from the same tab")
 }
 
 func startsWithDotDot(p string) bool {

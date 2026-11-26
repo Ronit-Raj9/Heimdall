@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -118,6 +119,16 @@ func runTaskInit(args []string) int {
 	return exitOK
 }
 
+// scenarioTaskInitError is the command line's text for a failed scenario
+// task init: a task type mismatch gets back its flag hint (wave 4, N78).
+func scenarioTaskInitError(err error) string {
+	var km *scaffold.KindMismatchError
+	if errors.As(err, &km) {
+		return fmt.Sprintf("task init: %s was written from template %s, not %s; pass -kind %s or leave -kind out", km.Suite, km.Detected, km.Wanted, km.Detected)
+	}
+	return "task init: " + err.Error()
+}
+
 // runScenarioTaskInit writes a new task in a tool-use, mcp, memory or qa
 // suite from the shape of an existing task (scaffold.InitScenarioTask).
 func runScenarioTaskInit(fs *flag.FlagSet, config, suiteID string, opts scaffold.ScenarioTaskOptions) int {
@@ -131,7 +142,7 @@ func runScenarioTaskInit(fs *flag.FlagSet, config, suiteID string, opts scaffold
 	opts.SuiteDir = filepath.Join(root, suiteID)
 	res, err := scaffold.InitScenarioTask(opts)
 	if err != nil {
-		return fail("task init: %v", err)
+		return fail("%s", scenarioTaskInitError(err))
 	}
 	fmt.Printf("wrote %s (template %s, shape of %s)\n", res.Dir, res.Template, res.From)
 	if res.SuiteEdited {
