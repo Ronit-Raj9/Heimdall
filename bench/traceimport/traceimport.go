@@ -304,12 +304,13 @@ func decodeValues(data []byte) ([]any, error) {
 func detect(values []any) (string, error) {
 	// Coding session files first: their lines also carry a role or a
 	// message, which the chat check would take.
-	for _, v := range values {
+	lines := sessionLines(values)
+	for _, v := range lines {
 		if m := asMap(v); m != nil && looksClaudeCode(m) {
 			return FormatClaudeCode, nil
 		}
 	}
-	for _, v := range values {
+	for _, v := range lines {
 		if m := asMap(v); m != nil && looksCodex(m) {
 			return FormatCodex, nil
 		}

@@ -27,6 +27,7 @@ var claudeWrappers = regexp.MustCompile(`(?s)<system-reminder>.*?</system-remind
 // sessionId. Subagent lines, meta lines and bookkeeping lines are skipped;
 // thinking and images are dropped and counted.
 func parseClaudeCode(values []any) ([]*Session, error) {
+	values = sessionLines(values)
 	var out []*Session
 	byID := map[string]*claudeState{}
 	for _, v := range values {
@@ -157,4 +158,23 @@ func claudeResultText(v any) string {
 		}
 	}
 	return strings.Join(parts, "\n")
+}
+
+// sessionLines returns the lines of a coding session file. A file pushed as
+// one JSON array of its lines (an inbox push body holds one JSON value) is
+// read as those lines.
+func sessionLines(values []any) []any {
+	if len(values) != 1 {
+		return values
+	}
+	arr, ok := values[0].([]any)
+	if !ok {
+		return values
+	}
+	for _, v := range arr {
+		if m := asMap(v); m != nil && (looksClaudeCode(m) || looksCodex(m)) {
+			return arr
+		}
+	}
+	return values
 }

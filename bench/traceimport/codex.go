@@ -32,6 +32,7 @@ func looksCodex(v map[string]any) bool {
 
 // parseCodex reads one Codex rollout file as one session.
 func parseCodex(values []any) ([]*Session, error) {
+	values = sessionLines(values)
 	b := newBuilder("")
 	ws := &Workspace{}
 	for _, v := range values {

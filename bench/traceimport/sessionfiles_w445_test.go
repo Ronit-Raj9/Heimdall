@@ -170,3 +170,29 @@ func TestDetectNewFormats(t *testing.T) {
 		t.Errorf("Formats() = %s", formats)
 	}
 }
+
+// TestSessionFileAsJSONArray: the lines of a session file sent as one JSON
+// array (the inbox push body holds one JSON value) read the same way.
+func TestSessionFileAsJSONArray(t *testing.T) {
+	for _, name := range []string{"claudecode-small.jsonl", "codex-wrapped.jsonl"} {
+		var lines []json.RawMessage
+		for _, l := range strings.Split(strings.TrimSpace(string(readFixture(t, name))), "\n") {
+			lines = append(lines, json.RawMessage(l))
+		}
+		arr, _ := json.Marshal(lines)
+		direct, err := Parse(readFixture(t, name), "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		tr, err := Parse(arr, "")
+		if err != nil {
+			t.Fatalf("%s as array: %v", name, err)
+		}
+		if tr.Format != direct.Format || len(tr.Sessions[0].Turns) != len(direct.Sessions[0].Turns) || len(tr.Sessions[0].ToolCalls) != len(direct.Sessions[0].ToolCalls) {
+			t.Errorf("%s: array gives %+v, lines give %+v", name, tr.Sessions[0], direct.Sessions[0])
+		}
+		if _, err := Parse(arr, direct.Format); err != nil {
+			t.Errorf("%s with the format named: %v", name, err)
+		}
+	}
+}
