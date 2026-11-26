@@ -225,6 +225,7 @@ func (h *reportCardHandler) getReport(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	opt := h.options(work)
+	h.withCheatCheck(work, &opt)
 	var where []string // Y13: ?where=key:value narrows the report to one metadata slice
 	for _, w := range ctx.QueryArgs().PeekMulti("where") {
 		where = append(where, string(w))
@@ -284,6 +285,7 @@ func (h *reportCardHandler) getAgentReportCard(ctx *fasthttp.RequestCtx) {
 		}
 		opt := h.options(work)
 		opt.Arms = labels
+		h.withCheatCheck(work, &opt)
 		if out.Report, err = reportcard.Build(work, h.source(ctx, work), ev, opt); err != nil {
 			sendDepError(ctx, h.env.Mode, "report card", err)
 			return

@@ -242,6 +242,9 @@ type Report struct {
 	// RedTeam is the attack success of every red-team benchmark (redteam.go);
 	// nil when the evaluation ran none.
 	RedTeam *RedTeam `json:"red_team,omitempty"`
+	// CheatCheck is the cheat rate on impossible twins (cheatcheck_w448.go);
+	// nil when the caller gave no cheat check lookup.
+	CheatCheck *CheatCheck `json:"cheat_check,omitempty"`
 
 	// ThrownOutRuns is the sum of every benchmark's ThrownOut runs (fix wave
 	// 3, N215). PlannedRuns is the counted slots of the shown arms over every
@@ -304,6 +307,12 @@ type Options struct {
 	// Where keeps only the runs of tasks whose metadata has every key and
 	// value (slices.go); empty keeps every task.
 	Where map[string]string
+	// CheatChecks lists the cheat check evaluations of an evaluation (those
+	// with cheat_check_of set to it); HasTwins says a benchmark (suite id)
+	// has admitted impossible twins. nil CheatChecks leaves the cheat check
+	// row out (cheatcheck_w448.go).
+	CheatChecks func(evaluation string) []*schemas.Evaluation
+	HasTwins    func(benchmark string) bool
 }
 
 // graded is one counted, sealed, scored run.
@@ -543,6 +552,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	}
 	rep.Failover = fo
 	rep.RedTeam = redTeam(children, labels)
+	rep.CheatCheck = cheatCheck(ctx, src, ev, labels, opt)
 	return rep, nil
 }
 

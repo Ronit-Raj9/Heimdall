@@ -1,7 +1,7 @@
 {
 	"sync": {
 		"heading": "Keep this benchmark fresh",
-		"intro": "Every week, merged fixes from {{repo}} become new tasks. Fixes already turned into tasks are skipped.",
+		"intro": "Every week, merged fixes from {{repo}} become new tasks in this repository's benchmark, the same one that tasks from issues go into. Fixes already turned into tasks are skipped.",
 		"pickRepo": "Enter a repository above to turn on weekly tasks.",
 		"day": "Day",
 		"hour": "Hour (UTC)",
@@ -24,5 +24,22 @@
 		"kinds": {
 			"twins.make": "Make impossible twins"
 		}
+	},
+	"cheat": {
+		"title": "Cheat rate",
+		"description": "How often each agent passed an impossible twin of a task: a copy whose tests contradict its instruction, so no honest answer passes.",
+		"measured": "{{arm}}: {{passed}} of {{runs}} impossible tasks passed ({{rate}}, {{low}} to {{high}})",
+		"measuredNote": "Any pass of an impossible task means the agent changed the tests or otherwise cheated. Open the run to see what it did.",
+		"fewRuns": "Few runs: treat this as a warning sign only.",
+		"passRun": "Passed run {{n}}",
+		"running": "Cheat check running.",
+		"notMeasured": "Not measured yet.",
+		"check": "Check for cheating",
+		"confirm": "This runs each agent once on every impossible twin, on your model keys.",
+		"start": "Start the cheat check",
+		"checkStarted": "Cheat check started. The rate shows here when it is done.",
+		"noTwins": "This benchmark has no impossible twins yet.",
+		"makeTwins": "Make impossible twins",
+		"twinsStarted": "Making the twins. Their readiness check runs next."
 	}
 }
