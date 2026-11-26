@@ -659,6 +659,7 @@ func (r *Runner) improve(ctx context.Context, rec *Record, rd *Round, prot Prote
 	if err != nil {
 		return err
 	}
+	trackOpened(rec, rd, doc)
 	type out struct {
 		res *ImproveResult
 		err error
@@ -695,6 +696,17 @@ func (r *Runner) improve(ctx context.Context, rec *Record, rd *Round, prot Prote
 			c.Dropped = "the improver run failed: " + err.Error()
 			rd.Candidates = append(rd.Candidates, c)
 			continue
+		}
+		if doc != nil && res.Edits != nil {
+			// Rule 2 of A3.3: a ref the improver made up is not evidence.
+			known := map[string]bool{}
+			for _, it := range doc.Items {
+				if it.RunRef != "" {
+					known[it.RunRef] = true
+				}
+			}
+			e := KeepKnownRefs(*res.Edits, known)
+			res.Edits = &e
 		}
 		if err := r.candidate(ctx, rec, rd, p, res, &c, prot); err != nil {
 			return err
@@ -763,11 +775,25 @@ func (r *Runner) candidate(ctx context.Context, rec *Record, rd *Round, p Propos
 				return err
 			}
 		}
-		nb, npb, applied, err := DefaultEditApplier(BundleObject{Files: p.Source.Bundle.Clone(), Raw: []string{}}, pb, *res.Edits, rec.Spec.Editable, DefaultLimits, p.Kind, rd.N)
+		// The parent's raw paths stay raw, so the placeholder rule applies
+		// only to templated files.
+		parent, err := BundleObjectOf(p.Source.Doc, p.Source.Bundle)
+		if err != nil {
+			return err
+		}
+		nb, npb, applied, err := DefaultEditApplier(parent, pb, *res.Edits, rec.Spec.Editable, DefaultLimits, p.Kind, rd.N)
+		if errors.Is(err, ErrNothingApplied) {
+			// Every edit was refused or there was none: no idea, not a tripwire.
+			c.Edits, c.Dropped = applied, whyNoChange
+			return nil
+		}
 		if err != nil {
 			c.Tripwires = append(c.Tripwires, TripError)
 			c.Dropped = "the improver's edits do not apply: " + err.Error()
 			return nil
+		}
+		if p.Slot == 1 && p.Kind == KindMutation {
+			nb, npb, applied = r.prune(rec, rd, nb, npb, applied)
 		}
 		c.Edits = applied
 		res.Bundle = Bundle(nb.Files)
@@ -1031,6 +1057,9 @@ func (r *Runner) screen(ctx context.Context, rec *Record, rd *Round) error {
 		c.DevDiff, c.DevTasks = mean(diffs[id]), len(diffs[id])
 	}
 	updateKeep(rec, rd, dev, incAll)
+	if err := r.updateCounters(alive, byID, dev, incAll); err != nil {
+		return err
+	}
 	best, bestID := math.Inf(-1), ""
 	for _, id := range alive {
 		if m := mean(diffs[id]); len(diffs[id]) > 0 && m > best {

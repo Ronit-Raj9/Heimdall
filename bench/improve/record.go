@@ -122,6 +122,10 @@ type Record struct {
 	// experiment and the controls (A4.1).
 	Study   string `json:"study,omitempty"`
 	InStudy bool   `json:"in_study,omitempty"`
+	// SkillsOpened maps each skill of the incumbent to the last round a
+	// practice run of the incumbent opened it (or the round it was first
+	// seen), for the retire_skill pruning edits of A3.3.
+	SkillsOpened map[string]int `json:"skills_opened,omitempty"`
 }
 
 // Baseline is version 0 before round 1: dev (the first evidence) and

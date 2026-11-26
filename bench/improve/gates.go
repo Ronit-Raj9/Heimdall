@@ -172,6 +172,9 @@ func frozenGate(spec *Spec, out Bundle, parentDoc, candDoc []byte) GateResult {
 
 func evalCueGate(added string) GateResult {
 	g := GateResult{Name: GateEvalCue, Detail: "the added lines do not condition on benchmark cues"}
+	// The managed block's own markers (A3.3) are Heimdall's, not the
+	// improver's words: every edit set adds them with its first rule.
+	added = strings.NewReplacer(blockBegin, "", blockEnd, "").Replace(added)
 	low := strings.ToLower(added)
 	for _, c := range evalCues {
 		if strings.Contains(low, c) {
