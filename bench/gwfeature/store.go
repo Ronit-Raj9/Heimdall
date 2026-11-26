@@ -128,7 +128,7 @@ func Compute(ctx context.Context, src leaderboard.Source, root, expID string, re
 	test := *m.Experiment.GatewayTest
 	unknown := func(reason string) Effect {
 		return Effect{Feature: test.Feature, ExpID: expID, Control: test.Control, State: StateUnknown, Reason: reason,
-			Headline: "Unknown: " + reason, Arms: []ArmResult{}, Source: Source{Kind: "experiment", ExpID: expID}, ComputedAt: now().UTC()}
+			Headline: "Unknown: " + reason, Arms: []ArmResult{}, Source: Source{Kind: "experiment", ExpID: expID, Text: fmt.Sprintf("comparison %s: no runs read", expID)}, ComputedAt: now().UTC()}
 	}
 	f, ok := Lookup(test.Feature)
 	if !ok || f.Compute == nil {
