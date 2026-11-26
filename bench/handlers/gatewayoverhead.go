@@ -80,5 +80,5 @@ func (h *gatewayOverheadHandler) overhead(ctx *fasthttp.RequestCtx) {
 	if e.Source.Text == "" {
 		e.Source.Text = fmt.Sprintf("comparison %s: %d runs, %d gateway calls", id, e.Source.Runs, e.Source.Rows)
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, e)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(e))
 }

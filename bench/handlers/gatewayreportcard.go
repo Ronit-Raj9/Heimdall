@@ -102,7 +102,7 @@ var gatewayCardNow = time.Now
 func (h *gatewayTestsHandler) reportCard(ctx *fasthttp.RequestCtx) {
 	work, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, buildGatewayReportCard(work, h.env, h.root()))
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(buildGatewayReportCard(work, h.env, h.root())))
 }
 
 // cardRead is one gateway read: ok false when the gateway did not answer.

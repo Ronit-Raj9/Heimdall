@@ -89,7 +89,7 @@ func (h *investigationsHandler) list(ctx *fasthttp.RequestCtx) {
 	if len(out.Investigations) > investigationsListMax {
 		out.Investigations = out.Investigations[:investigationsListMax]
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(out))
 }
 
 func (h *investigationsHandler) get(ctx *fasthttp.RequestCtx) {
@@ -111,7 +111,7 @@ func (h *investigationsHandler) get(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusInternalServerError, "internal", "The investigation could not be read.")
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, rep)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(rep))
 }
 
 func (h *investigationsHandler) read(id string) (*investigator.Report, error) {

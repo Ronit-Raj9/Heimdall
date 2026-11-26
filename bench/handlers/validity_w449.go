@@ -161,7 +161,7 @@ func (h *validityHandler) list(ctx *fasthttp.RequestCtx) {
 			out.Entries = append(out.Entries, e)
 		}
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(out))
 }
 
 func (h *validityHandler) experiment(ctx *fasthttp.RequestCtx) {
@@ -198,7 +198,7 @@ func (h *validityHandler) experiment(ctx *fasthttp.RequestCtx) {
 			}
 		}
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(out))
 }
 
 func (h *validityHandler) seen(ctx *fasthttp.RequestCtx) {

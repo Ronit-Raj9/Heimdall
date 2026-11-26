@@ -86,7 +86,12 @@ func (a plainLogsAPI) Logs(ctx context.Context, orgID, id string, since int64, l
 // text from the engine, the planner or a worker: a string, or a list of
 // strings (notes, errors).
 var plainTextFields = map[string]bool{"message": true, "summary": true, "detail": true, "error": true, "last_error": true,
-	"skipped": true, "problem": true, "notes": true, "reason": true, "basis": true, "errors": true}
+	"skipped": true, "problem": true, "notes": true, "reason": true, "basis": true, "errors": true,
+	// The routes added later in wave 4: why an investigation or a replay
+	// stopped, why an improvement idea was dropped or a tripwire fired, a
+	// result's invalid reasons, why a weekly issue sync paused, and a
+	// headline that repeats one of them.
+	"stopped": true, "why": true, "dropped": true, "invalid_reasons": true, "paused_reason": true, "headline": true}
 
 // plainEvent is ev with its message cleaned for a browser (live events of
 // the experiment event poll and stream).

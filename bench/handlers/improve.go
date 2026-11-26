@@ -117,7 +117,7 @@ func (h *ImproveHandler) getList(ctx *fasthttp.RequestCtx) {
 		h.sendErr(ctx, "improvements", err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, l)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(l))
 }
 
 // postCreate handles POST /api/bench/improvements: a spec as JSON or YAML,
@@ -138,7 +138,7 @@ func (h *ImproveHandler) postCreate(ctx *fasthttp.RequestCtx) {
 		h.sendErr(ctx, "improvement", err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusAccepted, s)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusAccepted, plainServed(s))
 }
 
 // getOne handles GET /api/bench/improvements/{id}.
@@ -156,7 +156,7 @@ func (h *ImproveHandler) getOne(ctx *fasthttp.RequestCtx) {
 	}
 	out := *d
 	out.Rounds = namedApprovals(ctx, d.Rounds)
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(&out))
 }
 
 // namedApprovals is rounds with each approval's person shown by display name
@@ -199,7 +199,7 @@ func (h *ImproveHandler) getRound(ctx *fasthttp.RequestCtx) {
 		sendNotFound(ctx, h.mode, "round", pathParam(ctx, "k"))
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, namedApprovals(ctx, d.Rounds[k-1:k])[0])
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(namedApprovals(ctx, d.Rounds[k-1:k])[0]))
 }
 
 // getLineage handles GET /api/bench/improvements/{id}/lineage.
@@ -215,7 +215,7 @@ func (h *ImproveHandler) getLineage(ctx *fasthttp.RequestCtx) {
 		h.sendErr(ctx, "improvement "+id, err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, lv)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(lv))
 }
 
 // postApprove handles POST /api/bench/improvements/{id}/rounds/{k}/approve.
@@ -241,7 +241,7 @@ func (h *ImproveHandler) postApprove(ctx *fasthttp.RequestCtx) {
 		h.sendErr(ctx, "improvement "+id, err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusAccepted, s)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusAccepted, plainServed(s))
 }
 
 // postStop handles POST /api/bench/improvements/{id}/stop.
@@ -257,7 +257,7 @@ func (h *ImproveHandler) postStop(ctx *fasthttp.RequestCtx) {
 		h.sendErr(ctx, "improvement "+id, err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, s)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(s))
 }
 
 // w4 is the source's resume and continue, or a 501 answer.
@@ -315,7 +315,7 @@ func (h *ImproveHandler) postResume(ctx *fasthttp.RequestCtx) {
 		h.sendW4Err(ctx, err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusAccepted, s)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusAccepted, plainServed(s))
 }
 
 // postContinue handles POST /api/bench/improvements/{id}/continue (202).
@@ -339,7 +339,7 @@ func (h *ImproveHandler) postContinue(ctx *fasthttp.RequestCtx) {
 		h.sendW4Err(ctx, err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusAccepted, s)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusAccepted, plainServed(s))
 }
 
 // postContinueEstimate handles POST /api/bench/improvements/{id}/continue/estimate.
@@ -363,5 +363,5 @@ func (h *ImproveHandler) postContinueEstimate(ctx *fasthttp.RequestCtx) {
 		h.sendW4Err(ctx, err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, o)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(o))
 }

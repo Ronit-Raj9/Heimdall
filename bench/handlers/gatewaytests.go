@@ -173,7 +173,7 @@ func (h *gatewayTestsHandler) draft(ctx *fasthttp.RequestCtx) {
 	if notes == nil {
 		notes = []string{}
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, map[string]any{"experiment": exp, "notes": notes})
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(map[string]any{"experiment": exp, "notes": notes}))
 }
 
 func (h *gatewayTestsHandler) effect(ctx *fasthttp.RequestCtx) {
@@ -201,7 +201,7 @@ func (h *gatewayTestsHandler) effect(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "the feature report could not be built: "+err.Error())
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, e)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(e))
 }
 
 func (h *gatewayTestsHandler) effects(ctx *fasthttp.RequestCtx) {
@@ -231,7 +231,7 @@ func (h *gatewayTestsHandler) effects(ctx *fasthttp.RequestCtx) {
 		}
 		out = append(out, e)
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, map[string]any{"effects": out})
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(map[string]any{"effects": out}))
 }
 
 // sourceInfo is the answer of the source routes.

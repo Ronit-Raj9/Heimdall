@@ -172,7 +172,7 @@ func (h *issueSyncHandler) list(ctx *fasthttp.RequestCtx) {
 		h.fail(ctx, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, err.Error())
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, IssueSyncList{Repos: list})
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(IssueSyncList{Repos: list}))
 }
 
 func (h *issueSyncHandler) decode(ctx *fasthttp.RequestCtx, v any) bool {
@@ -253,7 +253,7 @@ func (h *issueSyncHandler) create(ctx *fasthttp.RequestCtx) {
 		h.fail(ctx, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "save the weekly schedule: "+err.Error())
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, r)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(r))
 }
 
 func (h *issueSyncHandler) change(ctx *fasthttp.RequestCtx) {
@@ -299,7 +299,7 @@ func (h *issueSyncHandler) change(ctx *fasthttp.RequestCtx) {
 		h.fail(ctx, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "save the weekly schedule: "+err.Error())
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(out))
 }
 
 func (h *issueSyncHandler) remove(ctx *fasthttp.RequestCtx) {
@@ -350,6 +350,6 @@ func (h *issueSyncHandler) run(ctx *fasthttp.RequestCtx) {
 	case err != nil:
 		h.fail(ctx, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, err.Error())
 	default:
-		lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, ref)
+		lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(ref))
 	}
 }

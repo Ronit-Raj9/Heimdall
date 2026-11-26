@@ -73,7 +73,7 @@ func (h *ImproveHandler) postStudy(ctx *fasthttp.RequestCtx) {
 		h.sendW4Err(ctx, err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusAccepted, s)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusAccepted, plainServed(s))
 }
 
 // getStudies handles GET /api/bench/improvement-studies.
@@ -89,7 +89,7 @@ func (h *ImproveHandler) getStudies(ctx *fasthttp.RequestCtx) {
 		h.sendErr(ctx, "studies", err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, l)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(l))
 }
 
 // getStudy handles GET /api/bench/improvement-studies/{id}.
@@ -109,7 +109,7 @@ func (h *ImproveHandler) getStudy(ctx *fasthttp.RequestCtx) {
 		h.sendErr(ctx, "study", err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, s)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(s))
 }
 
 // postStudyStop handles POST /api/bench/improvement-studies/{id}/stop.
@@ -129,5 +129,5 @@ func (h *ImproveHandler) postStudyStop(ctx *fasthttp.RequestCtx) {
 		h.sendW4Err(ctx, err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, s)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(s))
 }

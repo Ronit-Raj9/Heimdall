@@ -88,7 +88,7 @@ func (h *replaysHandler) list(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "list replays: "+err.Error())
 		return
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, ReplayList{Replays: rows})
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(ReplayList{Replays: rows}))
 }
 
 func (h *replaysHandler) report(ctx *fasthttp.RequestCtx, root string) (*shadowreplay.RunReport, bool) {
@@ -111,7 +111,7 @@ func (h *replaysHandler) get(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	if rep, ok := h.report(ctx, root); ok {
-		lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, rep)
+		lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, plainServed(rep))
 	}
 }
 

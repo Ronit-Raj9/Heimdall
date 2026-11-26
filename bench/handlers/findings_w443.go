@@ -601,7 +601,7 @@ func (h *findingsHandler) rerun(ctx *fasthttp.RequestCtx) {
 	if !fromVersion {
 		out.Note = findingsRebuiltNote
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusAccepted, out)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusAccepted, plainServed(out))
 }
 
 func cmpOr(a, b string) string {
