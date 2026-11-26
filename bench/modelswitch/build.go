@@ -214,11 +214,26 @@ func fillModel(m *Model, runs []run) {
 	m.Quality = quality(runs)
 	m.CostPerRun, m.CostPerSuccess, m.CostTotal = costs(runs)
 	var lat []float64
+	known, asAsked := 0, 0
 	for _, r := range runs {
 		lat = append(lat, r.latencies...)
 		m.ModelCalls += r.calls
 		m.CallFailures += r.failures
 		m.Fallbacks += r.fallbacks
+		known += r.servedKnown
+		asAsked += r.servedAsAsked
+		m.ServedUnknown += r.servedUnknown
+		for id, n := range r.servedModels {
+			if m.ServedModels == nil {
+				m.ServedModels = map[string]int{}
+			}
+			m.ServedModels[id] += n
+		}
+	}
+	if known > 0 {
+		m.ServedAsAsked = schemas.Observed(round(float64(asAsked)/float64(known)), schemas.EvidenceGateway)
+	} else {
+		m.ServedAsAsked = schemas.Unknown("no model call in the gateway rows names the model that answered", schemas.EvidenceGateway)
 	}
 	m.LatencyP50MS = percentileValue(lat, 0.5, "no answered model call with a latency in the gateway rows", schemas.EvidenceGateway)
 	m.LatencyP95MS = percentileValue(lat, 0.95, "no answered model call with a latency in the gateway rows", schemas.EvidenceGateway)

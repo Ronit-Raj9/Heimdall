@@ -120,7 +120,7 @@ func init() {
 			SolveDelta: &gwfeature.Interval{Point: 0.05, Low: &low, High: &high}, CostDelta: &gwfeature.Interval{Point: -0.01}, LatencyDelta: &gwfeature.Interval{Point: 3},
 			Arms:    []gwfeature.ArmResult{{Arm: "A", Label: "today", Runs: 6, Tasks: 6, SolveRate: &solve, CostPerRun: &cost, LatencyMS: &lat}},
 			Details: json.RawMessage(`{"points":[]}`), Setting: &gwfeature.BifrostSetting{Kind: "virtual_key", Title: "Key", Where: "Virtual keys", Body: "{}", Note: "n"},
-			Source:  gwfeature.Source{Gateway: "v2.5.1", Text: "comparison e_shape"}}
+			Source: gwfeature.Source{Gateway: "v2.5.1", Text: "comparison e_shape"}}
 	}})
 }
 

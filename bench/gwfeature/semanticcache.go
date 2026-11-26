@@ -156,6 +156,9 @@ func computeCache(ctx context.Context, in Input) Effect {
 	finish := func() Effect {
 		raw, _ := json.Marshal(det)
 		e.Details = raw
+		if det.UnknownSim > 0 && (e.State == StateMeasured || e.State == StateNotEnoughData) {
+			e.Headline = strings.TrimSpace(fmt.Sprintf("%s %d cache hits have no recorded similarity (Bifrost logs none for exact repeats), so they are left out of the threshold counts and not counted as wrong.", e.Headline, det.UnknownSim))
+		}
 		e.Result = p3Result(e, 0.03)
 		return e
 	}
@@ -350,5 +353,12 @@ func computeCache(ctx context.Context, in Input) Effect {
 		}
 	}
 	e.Headline = "Keep the cache to exact repeats: every threshold served wrong answers."
+	anyWrong := false
+	for _, th := range det.Thresholds {
+		anyWrong = anyWrong || th.Wrong > 0
+	}
+	if !anyWrong {
+		e.Headline = fmt.Sprintf("Keep the cache to exact repeats: no threshold has enough judged hits yet to show its share of wrong answers is at most %.0f%%.", target*100)
+	}
 	return finish()
 }
