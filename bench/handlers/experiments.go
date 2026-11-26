@@ -129,8 +129,9 @@ func (h *ExperimentsHandler) planExperiment(ctx *fasthttp.RequestCtx) {
 	}
 	m, err := h.planManifest(ctx, exp)
 	switch {
-	case errors.Is(err, context.DeadlineExceeded):
-		sendDepError(ctx, h.mode, "plan experiment", err)
+	case errors.Is(err, context.DeadlineExceeded): // p07-1: a cold load of a big benchmark; the page tries again
+		ctx.Response.Header.Set("Retry-After", "5")
+		lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable, "Still reading this benchmark's tasks. Trying again in a few seconds.")
 	case err != nil:
 		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, FailedPlan(exp, err))
 	default:

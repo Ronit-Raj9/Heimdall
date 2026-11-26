@@ -54,12 +54,16 @@ import (
 const (
 	// loadCacheMaxSuites and loadCacheMaxTasks bound the cache. The newest
 	// entry is always kept, even when it alone is over the task bound.
-	loadCacheMaxSuites = 8
+	loadCacheMaxSuites = 32
 	loadCacheMaxTasks  = 40000
 	// loadCacheTTL bounds how long an entry is served without a full load.
 	loadCacheTTL = 15 * time.Minute
 	// loadCacheLoadTimeout bounds one detached load.
 	loadCacheLoadTimeout = 10 * time.Minute
+	// loadCacheBigSuite is the task count from which a pack is evicted only
+	// when no smaller finished pack is left: a big pack is slow to load
+	// again, a small one is not.
+	loadCacheBigSuite = 1000
 )
 
 type loadCacheKey = string // absolute pack folder
@@ -186,13 +190,15 @@ func runCachedLoad(key loadCacheKey, e *loadCacheEntry, root string, deep bool, 
 	evictLocked(e)
 }
 
-// evictLocked drops least recently used finished entries other than keep
-// until the cache is within its bounds.
+// evictLocked drops finished entries other than keep until the cache is
+// within its bounds: the least recently used pack with fewer than
+// loadCacheBigSuite tasks first, and only when there is none the least
+// recently used of all.
 func evictLocked(keep *loadCacheEntry) {
 	for {
 		n, tasks := 0, 0
-		var oldKey loadCacheKey
-		var old *loadCacheEntry
+		var oldKey, smallKey loadCacheKey
+		var old, small *loadCacheEntry
 		for k, e := range loadCache.m {
 			n++
 			tasks += e.tasks
@@ -207,9 +213,15 @@ func evictLocked(keep *loadCacheEntry) {
 			if old == nil || e.used < old.used {
 				oldKey, old = k, e
 			}
+			if e.tasks < loadCacheBigSuite && (small == nil || e.used < small.used) {
+				smallKey, small = k, e
+			}
 		}
 		if (n <= loadCacheMaxSuites && tasks <= loadCacheMaxTasks) || old == nil {
 			return
+		}
+		if small != nil {
+			oldKey = smallKey
 		}
 		delete(loadCache.m, oldKey)
 	}
