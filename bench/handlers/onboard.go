@@ -321,7 +321,7 @@ func (h *onboardHandler) draft(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	if isReservedSuiteID(h.env.Services.Suites, strings.TrimSpace(req.Plan.Suite)) {
-		sendBuiltinReadOnly(ctx, h.env.Mode, req.Plan.Suite)
+		sendReservedSuiteID(ctx, h.env.Mode, strings.TrimSpace(req.Plan.Suite))
 		return
 	}
 	work, cancel := workContext(ctx, onboardDraftTimeout)
@@ -533,7 +533,7 @@ func (h *onboardHandler) publish(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	if isReservedSuiteID(h.env.Services.Suites, set.Suite) {
-		sendBuiltinReadOnly(ctx, h.env.Mode, set.Suite)
+		sendReservedSuiteID(ctx, h.env.Mode, set.Suite)
 		return
 	}
 	if tasks, _ := set.Publishable(req.Tasks, req.IncludeUnready); len(tasks) == 0 {

@@ -1,3 +1,4 @@
 # Keys of bench.ts `SuiteList` (GET /suites), one per line; a trailing ? marks an optional (Go omitempty) key.
 # The top-level response adds "mode". Change with bench.ts and schemas/suitesapi.go.
 suites
+reserved_ids?

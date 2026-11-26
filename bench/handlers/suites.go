@@ -81,6 +81,12 @@ func isReservedSuiteID(src SuiteSource, id string) bool {
 	return isBuiltinSuite(src, id) || slices.Contains(benchcatalog.PracticeSuites, id)
 }
 
+// sendReservedSuiteID answers a new benchmark, draft or publish that takes
+// a built-in id: 409 with the plain sentence of N46.
+func sendReservedSuiteID(ctx *fasthttp.RequestCtx, mode schemas.Mode, id string) {
+	lib.SendError(ctx, mode, fasthttp.StatusConflict, lib.ErrTypeConflict, id+" is the name of a built-in benchmark. Pick another id.")
+}
+
 // sendBuiltinReadOnly answers a change to a built-in library suite: 403.
 func sendBuiltinReadOnly(ctx *fasthttp.RequestCtx, mode schemas.Mode, id string) {
 	lib.SendError(ctx, mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden,
@@ -163,6 +169,13 @@ func (h *SuitesHandler) getSuites(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	out := schemas.SuiteList{Suites: list}
+	if h.hidden != nil {
+		for _, id := range benchcatalog.PracticeSuites {
+			if h.hidden(id) {
+				out.ReservedIDs = append(out.ReservedIDs, id)
+			}
+		}
+	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
 }
 

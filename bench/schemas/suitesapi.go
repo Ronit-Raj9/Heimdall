@@ -41,6 +41,9 @@ const (
 // empty, so one broken pack never hides the others.
 type SuiteList struct {
 	Suites []SuiteSummary `json:"suites"`
+	// ReservedIDs are built-in ids the list hides (the practice suite on a
+	// hosted server): a new benchmark cannot take them.
+	ReservedIDs []string `json:"reserved_ids,omitempty"`
 }
 
 // SuiteSummary is one pack: its suite.yaml, its lock state and its tasks.
