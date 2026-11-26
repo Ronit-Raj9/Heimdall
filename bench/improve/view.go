@@ -1,6 +1,7 @@
 package improve
 
 import (
+	"strings"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/stats"
@@ -190,8 +191,9 @@ func (r *Runner) View(rec *Record) *Detail {
 		d.Curve = append(d.Curve, CurvePoint{Round: 0, Dev: ptr(b.Dev.Mean), Sealed: ptr(b.Sealed.Mean), Event: NodeBase})
 		d.Cost.Baseline = b.CostUSD
 	}
+	hidden := hiddenTasks(rec)
 	for _, rd := range rec.Rounds {
-		d.Rounds = append(d.Rounds, roundView(rd))
+		d.Rounds = append(d.Rounds, roundView(rd, hidden))
 		d.Curve = append(d.Curve, curvePoint(rd))
 		d.Integrity = append(d.Integrity, integrityRow(rd))
 		d.Cost.Rounds = append(d.Cost.Rounds, rd.Cost)
@@ -249,13 +251,13 @@ func (r *Runner) lineageView(id string) LineageView {
 	return lv
 }
 
-func roundView(rd *Round) RoundView {
+func roundView(rd *Round, hidden []string) RoundView {
 	v := RoundView{N: rd.N, Stage: rd.Stage, Decision: rd.Decision, Why: rd.Why, Parent: rd.Parent.Ref, Improver: rd.Improver,
-		Diff: rd.Diff, Gates: rd.Gates, Tripwires: rd.Tripwires, Approvals: rd.Approvals, Cost: rd.Cost, StartedAt: rd.StartedAt, FinishedAt: rd.FinishedAt}
+		Diff: rd.Diff, Gates: hideGateTasks(rd.Gates, hidden), Tripwires: rd.Tripwires, Approvals: rd.Approvals, Cost: rd.Cost, StartedAt: rd.StartedAt, FinishedAt: rd.FinishedAt}
 	if rd.Candidate != nil {
 		v.Candidate = rd.Candidate.Ref
 	}
-	v.Screen, v.Audit = compareView(rd.Screen), compareView(rd.Audit)
+	v.Screen, v.Audit = compareView(rd.Screen, PhaseScreen), compareView(rd.Audit, PhaseAudit)
 	if rd.Sealed != nil {
 		s := scoreView(*rd.Sealed)
 		v.Sealed = &s
@@ -263,12 +265,59 @@ func roundView(rd *Round) RoundView {
 	return v
 }
 
-func compareView(c *Comparison) *CompareView {
+// compareView is a comparison as served. Only the practice screen keeps
+// its experiment id: an audit (gate) experiment would name the gate tasks
+// (A1.10).
+func compareView(c *Comparison, phase string) *CompareView {
 	if c == nil {
 		return nil
 	}
-	return &CompareView{ExpID: c.ExpID, A: scoreView(c.A), B: scoreView(c.B), MeanDiff: c.MeanDiff, Pairs: c.Pairs, P: c.P,
+	v := &CompareView{A: scoreView(c.A), B: scoreView(c.B), MeanDiff: c.MeanDiff, Pairs: c.Pairs, P: c.P,
 		EValue: c.EValue, Greedy: c.Greedy, HoneypotPasses: c.HoneypotPasses}
+	if phase == PhaseScreen {
+		v.ExpID = c.ExpID
+	}
+	return v
+}
+
+// hiddenTasks are the task ids a report never names: the gate and
+// held-out splits.
+func hiddenTasks(rec *Record) []string {
+	return append(append([]string(nil), rec.Splits.Audit...), rec.Splits.Sealed...)
+}
+
+// hiddenTaskText replaces a gate or held-out task id in served text.
+const hiddenTaskText = "a gate or held-out task"
+
+// hideGateTasks copies gates with every gate or held-out task id in their
+// detail and evidence replaced, so a fired answer-key gate does not serve
+// the id it matched.
+func hideGateTasks(gates []GateResult, hidden []string) []GateResult {
+	if len(gates) == 0 || len(hidden) == 0 {
+		return gates
+	}
+	out := make([]GateResult, len(gates))
+	for i, g := range gates {
+		g.Detail = hideIDs(g.Detail, hidden)
+		if g.Evidence != nil {
+			ev := make([]string, len(g.Evidence))
+			for j, e := range g.Evidence {
+				ev[j] = hideIDs(e, hidden)
+			}
+			g.Evidence = ev
+		}
+		out[i] = g
+	}
+	return out
+}
+
+func hideIDs(s string, hidden []string) string {
+	for _, id := range hidden {
+		if id != "" && strings.Contains(s, id) {
+			s = strings.ReplaceAll(s, id, hiddenTaskText)
+		}
+	}
+	return s
 }
 
 func scoreView(s ArmScore) ScoreView {
