@@ -64,11 +64,13 @@ func SelectForAgent(evals []schemas.Evaluation, agent string, version int, model
 		}
 		return nil, nil
 	}
-	if ev, labels := pick(func(e schemas.Evaluation) bool { return e.Status == StatusDone && e.CheatCheckOf == "" }); ev != nil {
+	if ev, labels := pick(func(e schemas.Evaluation) bool {
+		return e.Status == StatusDone && e.CheatCheckOf == "" && e.RerunOf == ""
+	}); ev != nil {
 		return ev, labels
 	}
 	return pick(func(e schemas.Evaluation) bool {
-		return e.Status == StatusRunning && e.CheatCheckOf == "" && slices.ContainsFunc(e.Children, func(c schemas.EvaluationChild) bool { return c.ExperimentID != "" })
+		return e.Status == StatusRunning && e.CheatCheckOf == "" && e.RerunOf == "" && slices.ContainsFunc(e.Children, func(c schemas.EvaluationChild) bool { return c.ExperimentID != "" })
 	})
 }
 
@@ -95,7 +97,8 @@ func SelectForAgentEvaluation(evals []schemas.Evaluation, agent string, version 
 			if ev.ID != evaluationID {
 				continue
 			}
-			usable := ev.CheatCheckOf == "" && ev.Status == StatusDone || (ev.CheatCheckOf == "" && ev.Status == StatusRunning &&
+			scored := ev.CheatCheckOf == "" && ev.RerunOf == ""
+			usable := scored && ev.Status == StatusDone || (scored && ev.Status == StatusRunning &&
 				slices.ContainsFunc(ev.Children, func(c schemas.EvaluationChild) bool { return c.ExperimentID != "" }))
 			if labels := matchingLabels(ev, agent, version, model); usable && len(labels) > 0 {
 				return &evals[i], labels
@@ -112,7 +115,7 @@ func SelectForAgentEvaluation(evals []schemas.Evaluation, agent string, version 
 func MatchingEvaluations(evals []schemas.Evaluation, agent string, version int, model string) []schemas.Evaluation {
 	var out []schemas.Evaluation
 	for _, ev := range evals {
-		if ev.Status == StatusDone && ev.CheatCheckOf == "" && len(matchingLabels(ev, agent, version, model)) > 0 {
+		if ev.Status == StatusDone && ev.CheatCheckOf == "" && ev.RerunOf == "" && len(matchingLabels(ev, agent, version, model)) > 0 {
 			out = append(out, ev)
 		}
 	}
