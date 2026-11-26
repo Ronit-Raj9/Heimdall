@@ -1,4 +1,12 @@
-import type { ImprovementDetail, ImprovementList, ImprovementSummary } from "@/lib/types/improve";
+import type {
+	ContinueOffer,
+	ContinueRequest,
+	ImprovementDetail,
+	ImprovementEstimate,
+	ImprovementList,
+	ImprovementSummary,
+	VersionExplain,
+} from "@/lib/types/improve";
 import type { FetchArgs } from "@reduxjs/toolkit/query/react";
 import { benchApi } from "./benchApi";
 
@@ -13,11 +21,22 @@ export interface ImprovementSpecBody {
 	agent: string;
 	/** <suite id>@<version> */
 	suite: string;
-	rounds: number;
-	/** Container paths of the agent's files map: exact files, and folders ending in "/". */
-	editable: { files: string[]; dirs?: string[] };
-	improver: { budget_usd: number };
+	rounds?: number;
+	/** small, medium, large or custom (A3.6): the preset fills every field the body leaves out. */
+	preset: string;
+	/** Container paths of the agent's files map (exact files, and folders ending in "/"), and the standing instructions. */
+	editable: { files: string[]; dirs?: string[]; instructions: boolean };
+	/** The improver task (the default reflect-edit task) and, for a custom size, its ideas per round. */
+	improver: { task: string; candidates?: number; keep?: number };
+	/** The whole run's hard stop in dollars (A2.10). */
+	budget: { total_usd: number };
 }
+
+/** Both the run and the list change when a run is resumed or continued. */
+const runAndList = (id: string) => [
+	{ type: "BenchImprovement" as const, id: "LIST" },
+	{ type: "BenchImprovement" as const, id },
+];
 
 /**
  * Improvement runs (bench/improve). Reads take no token; approve and stop are writes and carry the
@@ -37,6 +56,29 @@ export const improveApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchImprov
 		createImprovement: builder.mutation<ImprovementSummary, ImprovementSpecBody>({
 			query: (body) => ({ url: "/improvements", method: "POST", body }),
 			invalidatesTags: [{ type: "BenchImprovement", id: "LIST" }],
+		}),
+		// POST /improvements/estimate (viewers): the create body; no side effects (A2.9).
+		estimateImprovement: builder.mutation<ImprovementEstimate, ImprovementSpecBody>({
+			query: (body) => ({ url: "/improvements/estimate", method: "POST", body }),
+		}),
+		// POST /improvements/{id}/resume (admins): continues an interrupted, failed or planned run (202).
+		resumeImprovement: builder.mutation<ImprovementSummary, string>({
+			query: (id) => ({ url: `${improvementPath(id)}/resume`, method: "POST" }),
+			invalidatesTags: (_r, _e, id) => runAndList(id),
+		}),
+		// POST /improvements/{id}/continue (admins): one second look with more budget (202).
+		continueImprovement: builder.mutation<ImprovementSummary, { id: string } & ContinueRequest>({
+			query: ({ id, ...body }) => ({ url: `${improvementPath(id)}/continue`, method: "POST", body }),
+			invalidatesTags: (_r, _e, a) => runAndList(a.id),
+		}),
+		// POST /improvements/{id}/continue/estimate (viewers): what a second look costs; nothing is spent.
+		continueEstimate: builder.mutation<ContinueOffer, { id: string } & ContinueRequest>({
+			query: ({ id, ...body }) => ({ url: `${improvementPath(id)}/continue/estimate`, method: "POST", body }),
+		}),
+		// GET /improvements/{id}/versions/{n}/explain (viewers): what changed in version n and why (A4.3).
+		getVersionExplain: builder.query<VersionExplain, { id: string; n: number }>({
+			query: ({ id, n }) => `${improvementPath(id)}/versions/${n}/explain`,
+			providesTags: (_r, _e, a) => [{ type: "BenchImprovement", id: a.id }],
 		}),
 		approveImprovementRound: builder.mutation<ImprovementSummary, { id: string; round: number; reason: string }>({
 			query: (a) => approveRequest(a.id, a.round, a.reason),
@@ -71,4 +113,9 @@ export const {
 	useCreateImprovementMutation,
 	useApproveImprovementRoundMutation,
 	useStopImprovementMutation,
+	useEstimateImprovementMutation,
+	useResumeImprovementMutation,
+	useContinueImprovementMutation,
+	useContinueEstimateMutation,
+	useGetVersionExplainQuery,
 } = improveApi;

@@ -24,13 +24,19 @@
 		"awaiting_approval": "Needs approval",
 		"done": "Done",
 		"stopped": "Stopped",
-		"failed": "Failed"
+		"failed": "Failed",
+		"interrupted": "Interrupted"
 	},
 	"verdict": {
 		"supported": "Improvement supported",
 		"not_supported": "Not supported",
 		"inconclusive": "Inconclusive",
 		"no_change": "No change kept",
+		"likely_better": "Likely better",
+		"insufficient_sample": "Not enough tasks",
+		"no_evidence": "No clear change",
+		"worse": "Worse",
+		"not_claimable": "Not claimable",
 		"pending": "Still running"
 	},
 	"split": {

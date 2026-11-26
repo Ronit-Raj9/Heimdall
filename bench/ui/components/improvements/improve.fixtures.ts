@@ -1,4 +1,4 @@
-import type { ImprovementDetail } from "@/lib/types/improve";
+import type { ImprovementDetail, ImprovementEstimate, ImprovementVerdict, ImprovementVerdictState, VersionExplain } from "@/lib/types/improve";
 
 /** A finished two-round run (round 1 kept, round 2 paused then rejected), for tests only. */
 export const IMPROVEMENT_FIXTURE: ImprovementDetail = {
@@ -104,4 +104,76 @@ export const IMPROVEMENT_FIXTURE: ImprovementDetail = {
 	},
 	audit_looks: 2,
 	audit_looks_max: 2,
+};
+
+/** The headline each verdict state of this wave reads (A2.12), with numbers filled in. */
+export const HEADLINES: Record<string, string> = {
+	supported: "Version 2 is better: +20 points on 18 held-out tasks it never saw (95% interval 8.0 to 32 points, p 0.012).",
+	likely_better: "Likely better, not proven: +6.0 points on 18 held-out tasks (80% interval 0.5 to 12 points, p 0.11). This many tasks can confirm gains of about 24 points or more.",
+	insufficient_sample: "Not enough held-out tasks to tell: 6 tasks, 2 of them with different results for the two versions. Even a clear gain could not be confirmed with this many. Observed: +4.0 points.",
+	no_evidence: "No clear change on the held-out tasks: +1.0 points on 18 tasks (80% interval -4.0 to 6.0 points). Keep version 0 unless you have other reasons.",
+	worse: "Version 2 is worse: -15 points on 18 held-out tasks (95% interval -26 to -4.0 points, p 0.008). Keep version 0.",
+	no_change: "No new version was kept: none passed the gate. The agent stays at version 0.",
+	not_claimable: "A person approved a paused check in round 2, so this result cannot be claimed. Observed: +3.0 points on 18 held-out tasks.",
+};
+
+/** A verdict of state with its headline and, for the states that offer one, a continue offer. */
+export function verdictFixture(state: ImprovementVerdictState): ImprovementVerdict {
+	const offer = state === "likely_better" || state === "insufficient_sample";
+	return {
+		...IMPROVEMENT_FIXTURE.verdict_detail!,
+		state,
+		headline: HEADLINES[state],
+		gain: 0.06,
+		ci80: [0.005, 0.12],
+		ci95: [-0.02, 0.14],
+		p_upper: 0.11,
+		n: 18,
+		n_nonzero: 9,
+		mde: 0.24,
+		sentences: [HEADLINES[state], "One run of the loop. Run it twice more from version 0 to see whether the gain repeats."],
+		continue: offer ? { extra_trials: 2, new_tasks: 12, runs: 96, usd: [3.1, 6.4], can_confirm: 9, text: "To confirm a 5 point gain: about 30 more held-out tasks, or 4 more tries on each task, about $6.40." } : undefined,
+	};
+}
+
+/** The run in state, finished, with can_continue set for the states that offer a second look. */
+export function stateFixture(state: ImprovementVerdictState): ImprovementDetail {
+	const v = verdictFixture(state);
+	return { ...IMPROVEMENT_FIXTURE, verdict: state, verdict_detail: v, can_continue: v.continue !== undefined, can_resume: false, limit_usd: 15, spent_usd: 1.234 };
+}
+
+/** An estimate for a 60 task benchmark, as A2.8 shows it. */
+export const ESTIMATE_FIXTURE: ImprovementEstimate = {
+	ok: true,
+	pool: 60,
+	splits: { practice: 24, gate: 18, held_out: 18, impossible: 0 },
+	runs: { baseline: 24, improver: 9, practice: 144, gate: 216, held_out_curve: 0, final: 108, total: 492 },
+	usd: { low: 15.8, expected: 22.6, high: 33.9, limit: 45, per_run: 0.03, per_run_source: "forecast" },
+	minutes: { low: 80, high: 160 },
+	detectable: { gate_points: 23.5, held_out_points: 23.9 },
+	assumed: ["pass rate 50%"],
+	refusals: [],
+	warnings: [{ code: "weak_held_out", message: "With 18 held-out tasks only a gain of about 24 points or more can be confirmed. A smaller real gain will end as not proven yet." }],
+};
+
+/** What version 2 changed against version 1. */
+export const EXPLAIN_FIXTURE: VersionExplain = {
+	ref: "agents/coder.yaml@v2",
+	parent_ref: "agents/coder.yaml@v1",
+	round: 1,
+	source: "mutation",
+	improver: "heimdall-improver@1.1.0:reflect-edit",
+	model: "gpt-5-mini",
+	files: [
+		{
+			path: "/home/agent/AGENTS.md",
+			status: "changed",
+			lines: [{ op: "-", text: "level: 0" }, { op: "+", text: "level: 3" }],
+			edits: [{ op: "add_item", id: "pb-0001", reason: "Runs stopped before the tests ran", evidence_count: 3, predicts_fixed: 2, result: "applied" }],
+		},
+	],
+	rationale: "Most failures ended before the tests ran.",
+	gates: [{ name: "improver_answer_key", fired: false, detail: "ok" }],
+	decision: "committed",
+	why: "Kept: better on 18 gate tasks by 20 points (p 0.01, needed 0.033).",
 };

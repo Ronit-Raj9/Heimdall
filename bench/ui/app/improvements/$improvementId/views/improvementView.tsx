@@ -5,7 +5,16 @@ import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/ui/statusPill";
 import { ImprovementDetailBody } from "@/components/improvements/improvementDetail";
 import { statusTone } from "@/components/improvements/improve.utils";
-import { useApproveImprovementRoundMutation, useGetImprovementQuery, useStopImprovementMutation } from "@/lib/store/apis/improveApi";
+import { ContinueDialog } from "@/components/improvements/continueDialog";
+import "@/components/improvements/w45impI18n";
+import { canUse, useSession } from "@/lib/session/sessionContext";
+import {
+	useApproveImprovementRoundMutation,
+	useGetImprovementQuery,
+	useResumeImprovementMutation,
+	useStopImprovementMutation,
+} from "@/lib/store/apis/improveApi";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** /improvements/$improvementId: the improvement report, polled while the run is live. */
@@ -15,6 +24,11 @@ export default function ImprovementView({ id }: { id: string }) {
 	const q = useGetImprovementQuery(id, { pollingInterval: 5_000 });
 	const [approve, approveState] = useApproveImprovementRoundMutation();
 	const [stop, stopState] = useStopImprovementMutation();
+	const [resume, resumeState] = useResumeImprovementMutation();
+	const { t: tw } = useTranslation("w45imp");
+	// Resume and Continue spend the organization's keys, so only admins see them (policy org(admin)).
+	const admin = canUse(useSession(), "admin");
+	const [continuing, setContinuing] = useState(false);
 	const d = q.data;
 	const live = d && (d.status === "running" || d.status === "awaiting_approval" || d.status === "planned");
 	return (
@@ -31,7 +45,18 @@ export default function ImprovementView({ id }: { id: string }) {
 					)
 				}
 				actions={
-					live ? (
+					d?.can_resume && admin ? (
+						<Button
+							size="sm"
+							disabled={resumeState.isLoading}
+							onClick={async () => {
+								if (await confirm(tw("resume.confirm"))) void resume(id);
+							}}
+							data-testid="improvement-resume"
+						>
+							{tw("resume.button")}
+						</Button>
+					) : live ? (
 						<Button
 							size="sm"
 							variant="outline"
@@ -59,10 +84,12 @@ export default function ImprovementView({ id }: { id: string }) {
 			) : (
 				<ImprovementDetailBody
 					data={d}
+					onContinue={admin ? () => setContinuing(true) : undefined}
 					approving={approveState.isLoading}
 					onApprove={(round, reason) => void approve({ id, round, reason })}
 				/>
 			)}
+			{continuing && <ContinueDialog id={id} onClose={() => setContinuing(false)} />}
 		</section>
 	);
 }

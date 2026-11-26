@@ -1,9 +1,14 @@
 import "@/lib/i18n";
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { IMPROVEMENT_FIXTURE } from "./improve.fixtures";
 import { ImprovementDetailBody } from "./improvementDetail";
+
+vi.mock("@/lib/store/apis/improveApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/improveApi")>()),
+	useGetVersionExplainQuery: () => ({ isLoading: false, data: undefined, error: undefined }),
+}));
 
 describe("ImprovementDetailBody", () => {
 	it("renders the verdict, curve with band and control, rounds, lineage, integrity and spend", () => {

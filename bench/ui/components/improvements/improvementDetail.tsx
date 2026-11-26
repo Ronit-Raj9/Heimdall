@@ -7,26 +7,53 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ImprovementCurve } from "./improvementCurve";
-import { lineageRows, nodeTone, pct, points, usd, verdictTone, versionLabel } from "./improve.utils";
+import i18n from "@/lib/i18n";
+import { lineageRows, money, nodeTone, pct, pointsValue, usd, versionLabel, versionNumber } from "./improve.utils";
+import { RoundTimeline } from "./roundTimeline";
+import { VerdictCard } from "./verdictCard";
+import { VersionExplainSection } from "./versionExplain";
+import "./w45impI18n";
 
 export interface ImprovementDetailBodyProps {
 	data: ImprovementDetail;
+	/** Opens the continue dialog; undefined hides Continue (not an admin). */
+	onContinue?: () => void;
 	/** Approves a paused round with a reason; undefined hides the approval form. */
 	onApprove?: (round: number, reason: string) => void;
 	approving?: boolean;
 }
 
-/** The improvement report: verdict, learning curve, rounds, lineage, integrity and spend. */
-export function ImprovementDetailBody({ data, onApprove, approving }: ImprovementDetailBodyProps) {
+/**
+ * The improvement report (A4.5), top to bottom: verdict, status line, timeline, curve, what changed
+ * and why, spend, then the rounds in full, the lineage and the integrity strip.
+ */
+export function ImprovementDetailBody({ data, onApprove, approving, onContinue }: ImprovementDetailBodyProps) {
 	const { t } = useTranslation("improve");
+	const { t: tw } = useTranslation("w45imp");
+	const line = statusLine(data);
+	const kept = data.round_views.flatMap((r) => {
+		const n = r.decision === "committed" ? versionNumber(r.candidate) : undefined;
+		return n === undefined ? [] : [n];
+	});
 	return (
 		<div className="flex min-w-0 flex-col gap-8" data-testid="improvement-detail">
-			<VerdictCard data={data} />
+			<VerdictCard data={data} onContinue={onContinue} />
+			{line && (
+				<p className="text-foreground text-sm" data-testid="improvement-status-line">
+					{line}
+				</p>
+			)}
+			<Section title={tw("timeline.title")} testId="improvement-timeline-section">
+				<RoundTimeline rounds={data.round_views} />
+			</Section>
 			<Section title={t("curve.title")} description={t("curve.description")} testId="improvement-curve-section">
 				<ImprovementCurve curve={data.curve} band={data.control_band} rounds={data.spec.rounds} />
 			</Section>
-			<Section title={t("integrity.title")} description={t("integrity.description")} testId="improvement-integrity">
-				<IntegrityStrip data={data} />
+			<Section title={tw("explain.title")} description={tw("explain.description")} testId="improvement-explain-section">
+				<VersionExplainSection id={data.id} versions={kept} rounds={data.round_views} />
+			</Section>
+			<Section title={t("cost.title")} description={t("cost.description")} testId="improvement-cost">
+				<CostTable data={data} />
 			</Section>
 			<Section title={t("round.title")} testId="improvement-rounds">
 				<div className="flex flex-col gap-3">
@@ -44,59 +71,29 @@ export function ImprovementDetailBody({ data, onApprove, approving }: Improvemen
 			<Section title={t("lineage.title")} description={t("lineage.description")} testId="improvement-lineage">
 				<LineageTree data={data} />
 			</Section>
-			<Section title={t("cost.title")} description={t("cost.description")} testId="improvement-cost">
-				<CostTable data={data} />
+			<Section title={t("integrity.title")} description={t("integrity.description")} testId="improvement-integrity">
+				<IntegrityStrip data={data} />
 			</Section>
 		</div>
 	);
 }
 
-function VerdictCard({ data }: { data: ImprovementDetail }) {
-	const { t } = useTranslation("improve");
-	const v = data.verdict_detail;
-	const stats: [string, string][] = v
-		? [
-				[t("detail.sealedGain"), points(v.sealed_gain)],
-				[t("detail.devGain"), points(v.dev_gain)],
-				[t("detail.gap"), points(v.generalization_gap)],
-				[t("detail.kept"), String(v.commits)],
-				[t("detail.rejected"), String(v.rejects)],
-				[t("detail.spend"), usd(v.total_usd)],
-			]
-		: [[t("detail.spend"), usd(data.cost.total)]];
-	return (
-		<div className="bg-card flex flex-col gap-3 rounded-lg border p-4" data-testid="improvement-verdict">
-			<div className="flex flex-wrap items-center gap-2">
-				<StatusPill tone={verdictTone(v?.state)}>{t(`verdict.${v?.state ?? "pending"}`)}</StatusPill>
-				<span className="text-foreground text-sm font-medium">{v?.headline ?? data.reason}</span>
-			</div>
-			<dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-				{stats.map(([k, val]) => (
-					<div key={k} className="flex flex-col gap-0.5">
-						<dt className="text-muted-foreground text-xs">{k}</dt>
-						<dd className="text-foreground text-sm font-semibold tabular-nums">{val}</dd>
-					</div>
-				))}
-			</dl>
-			{v && v.notes.length > 0 && (
-				<ul className="text-muted-foreground list-disc pl-5 text-xs">
-					{v.notes.map((n) => (
-						<li key={n}>{n}</li>
-					))}
-				</ul>
-			)}
-			<p className="text-muted-foreground text-xs">
-				{t("detail.splits", {
-					dev: data.splits.dev.length,
-					audit: data.splits.audit,
-					sealed: data.splits.sealed,
-					looks: data.audit_looks,
-					max: data.audit_looks_max,
-				})}
-			</p>
-			{data.error && <p className="text-chart-error-ink text-xs">{t("detail.error", { error: data.error })}</p>}
-		</div>
-	);
+/** "Round 2 of 5: trying ideas on practice tasks. Spent $3.50 of $60.00." while the run is live (A4.5 item 2). */
+export function statusLine(data: ImprovementDetail): string | undefined {
+	if (data.status !== "running") return undefined;
+	const last = data.round_views[data.round_views.length - 1];
+	const r = last ? last.n : Math.min(data.rounds_done + 1, data.rounds);
+	const known = ["improve", "screen", "audit", "final", "retries"] as const;
+	type Stage = (typeof known)[number] | "other";
+	const stage: Stage = last && (known as readonly string[]).includes(last.stage) ? (last.stage as Stage) : "other";
+	return i18n.t("status.line", {
+		ns: "w45imp",
+		r,
+		total: data.rounds,
+		stage: i18n.t(`status.stage.${stage}`, { ns: "w45imp" }),
+		spent: money(data.spent_usd ?? data.cost.total),
+		limit: money(data.limit_usd ?? data.spec.budget?.total_usd),
+	});
 }
 
 function IntegrityStrip({ data }: { data: ImprovementDetail }) {
@@ -272,15 +269,21 @@ function LineageTree({ data }: { data: ImprovementDetail }) {
 
 function CostTable({ data }: { data: ImprovementDetail }) {
 	const { t } = useTranslation("improve");
+	const { t: tw } = useTranslation("w45imp");
 	const sum = (k: "improver" | "screen" | "audit" | "sealed") => data.cost.rounds.reduce((n, r) => n + r[k], 0);
-	const rows: [string, number][] = [
-		[t("cost.baseline"), data.cost.baseline],
-		[t("cost.improver"), sum("improver")],
-		[t("cost.screen"), sum("screen")],
-		[t("cost.audit"), sum("audit")],
-		[t("cost.sealed"), sum("sealed")],
-		[t("cost.controls"), data.cost.controls],
+	const rows: [string, string][] = [
+		[t("cost.baseline"), usd(data.cost.baseline)],
+		[tw("cost.practice"), usd(sum("screen"))],
+		[tw("cost.gate"), usd(sum("audit"))],
+		[tw("cost.hidden"), usd(sum("sealed"))],
+		[tw("cost.improver"), usd(sum("improver"))],
+		[tw("cost.controls"), usd(data.cost.controls)],
 	];
+	const limit = data.limit_usd ?? data.spec.budget?.total_usd;
+	const perDollar = data.verdict_detail?.gain_per_usd;
+	const tail: [string, string][] = [];
+	if (limit !== undefined && limit > 0) tail.push([tw("cost.hardStop"), usd(limit)]);
+	if (perDollar !== undefined) tail.push([tw("cost.perDollar"), tw("cost.perDollarValue", { v: pointsValue(perDollar * 100) })]);
 	return (
 		<div className="flex flex-col gap-2">
 			<table className="w-full max-w-md text-left text-xs tabular-nums">
@@ -288,13 +291,19 @@ function CostTable({ data }: { data: ImprovementDetail }) {
 					{rows.map(([k, v]) => (
 						<tr key={k} className="border-b">
 							<td className="text-muted-foreground py-1">{k}</td>
-							<td className="text-foreground py-1 text-right">{usd(v)}</td>
+							<td className="text-foreground py-1 text-right">{v}</td>
 						</tr>
 					))}
-					<tr>
-						<td className="text-foreground py-1 font-medium">{t("detail.spend")}</td>
+					<tr className="border-b">
+						<td className="text-foreground py-1 font-medium">{tw("cost.total")}</td>
 						<td className="text-foreground py-1 text-right font-semibold">{usd(data.cost.total)}</td>
 					</tr>
+					{tail.map(([k, v]) => (
+						<tr key={k} className="border-b last:border-0">
+							<td className="text-muted-foreground py-1">{k}</td>
+							<td className="text-foreground py-1 text-right">{v}</td>
+						</tr>
+					))}
 				</tbody>
 			</table>
 			<p className="text-muted-foreground text-xs">{t("cost.cap", { v: usd(data.cost.improver_cap_per_round) })}</p>

@@ -28,6 +28,7 @@ vi.mock("@/lib/store/apis/agentBuilderApi", async (importOriginal) => ({
 vi.mock("@/lib/store/apis/improveApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/improveApi")>()),
 	useCreateImprovementMutation: () => mutation(),
+	useEstimateImprovementMutation: () => mutation(),
 }));
 
 describe("NewImprovementDialog benchmark picker", () => {
