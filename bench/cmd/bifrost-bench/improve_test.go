@@ -232,3 +232,36 @@ func TestImproveFreezeKeepsWholeBundle(t *testing.T) {
 		t.Errorf("mismatch: %v", err)
 	}
 }
+
+// Scoring reads up to six arms (A to F), the run id and the visible stop.
+func TestImproveRunScoreArmsAndStop(t *testing.T) {
+	for _, c := range []struct {
+		arm     string
+		outcome schemas.Outcome
+		idx     int
+		stop    string
+	}{
+		{"A", schemas.OutcomePass, 0, ""},
+		{"C", schemas.OutcomeTimeout, 2, "timeout"},
+		{"F", schemas.OutcomeRefusal, 5, "refusal"},
+		{"E", schemas.OutcomeCrash, 4, "crash"},
+		{"B", schemas.OutcomeBudget, 1, "budget"},
+		{"D", schemas.OutcomeFail, 3, ""},
+		{"G", schemas.OutcomePass, -1, ""},
+	} {
+		sr := schemas.SealedRun{Slot: schemas.Slot{Arm: c.arm, Task: "t1", Trial: 2, Counted: true}, Run: schemas.Run{RunID: "r_" + c.arm, Outcome: c.outcome}}
+		rs, ok := improveRunScore(sr, 6)
+		if c.idx < 0 {
+			if ok {
+				t.Errorf("arm %s accepted", c.arm)
+			}
+			continue
+		}
+		if !ok || rs.Arm != c.idx || rs.Stop != c.stop || rs.RunID != "r_"+c.arm || rs.Task != "t1" || rs.Trial != 2 {
+			t.Errorf("arm %s: %+v %v", c.arm, rs, ok)
+		}
+	}
+	if _, ok := improveRunScore(schemas.SealedRun{Slot: schemas.Slot{Arm: "C", Counted: true}}, 2); ok {
+		t.Error("arm beyond the request accepted")
+	}
+}

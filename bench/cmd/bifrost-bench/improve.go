@@ -480,6 +480,9 @@ func readSecrets(path string, budget int, out *[]string) int {
 // Score implements improve.Executor: one experiment, arms A (and B) on the
 // tasks, read back from the sealed runs.
 func (x improveExecutor) Score(ctx context.Context, req improve.ScoreRequest) (*improve.ScoreResult, error) {
+	if len(req.Arms) == 0 || len(req.Arms) > improve.MaxScoreArms {
+		return nil, fmt.Errorf("a scoring experiment holds 1 to %d versions, not %d", improve.MaxScoreArms, len(req.Arms))
+	}
 	exp := improveExperiment(req.ImprovementID, req.Phase, req.Round, req.Spec.Suite, req.Spec.Seed, req.Tasks, req.Trials)
 	for i, v := range req.Arms {
 		exp.Arms[improveArm(i)] = schemas.ArmSpec{Label: v.Ref, Agent: v.Ref}
@@ -495,31 +498,44 @@ func (x improveExecutor) Score(ctx context.Context, req improve.ScoreRequest) (*
 		return nil, fmt.Errorf("load sealed runs of %s: %w", expID, err)
 	}
 	for _, sr := range runs {
-		if !sr.Slot.Counted {
+		rs, ok := improveRunScore(sr, len(req.Arms))
+		if !ok {
 			continue
 		}
-		arm := slices.Index([]string{improveArm(0), improveArm(1)}, sr.Slot.Arm)
-		if arm < 0 || arm >= len(req.Arms) {
-			continue
-		}
-		rs := improve.RunScore{Arm: arm, Task: sr.Slot.Task, Trial: sr.Slot.Trial, Outcome: string(sr.Run.Outcome)}
-		if f, ok := sr.Run.Y.Float(); ok && len(sr.Problems) == 0 {
-			rs.Success, rs.Known = f, true
-		}
-		if v, ok := sr.Metrics["cost_usd"]; ok {
-			if f, ok := v.Float(); ok {
-				rs.CostUSD = f
-			}
-		}
-		for _, g := range sr.Gates {
-			if g.Fired && g.Effect == schemas.GateVeto {
-				rs.Vetoes = append(rs.Vetoes, g.Gate)
-			}
-		}
+		arm := rs.Arm
 		res.Runs = append(res.Runs, rs)
 		res.Channels[arm] = mergeChannels(res.Channels[arm], runChannels(sr))
 	}
 	return res, nil
+}
+
+// improveRunScore reads one counted run of an experiment with arms
+// letters A up to the n-th; ok is false for a run not counted or of
+// another arm.
+func improveRunScore(sr schemas.SealedRun, n int) (improve.RunScore, bool) {
+	arm := improveArmIndex(sr.Slot.Arm)
+	if !sr.Slot.Counted || arm < 0 || arm >= n {
+		return improve.RunScore{}, false
+	}
+	rs := improve.RunScore{Arm: arm, Task: sr.Slot.Task, Trial: sr.Slot.Trial, Outcome: string(sr.Run.Outcome), RunID: sr.Run.RunID}
+	switch sr.Run.Outcome {
+	case schemas.OutcomeTimeout, schemas.OutcomeBudget, schemas.OutcomeCrash, schemas.OutcomeRefusal:
+		rs.Stop = string(sr.Run.Outcome)
+	}
+	if f, ok := sr.Run.Y.Float(); ok && len(sr.Problems) == 0 {
+		rs.Success, rs.Known = f, true
+	}
+	if v, ok := sr.Metrics["cost_usd"]; ok {
+		if f, ok := v.Float(); ok {
+			rs.CostUSD = f
+		}
+	}
+	for _, g := range sr.Gates {
+		if g.Fired && g.Effect == schemas.GateVeto {
+			rs.Vetoes = append(rs.Vetoes, g.Gate)
+		}
+	}
+	return rs, true
 }
 
 // Runs implements improve.Executor: the counted runs of a scoring
