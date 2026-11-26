@@ -32,6 +32,9 @@ func runEvaluationSchedule(ctx context.Context, a *app, svc *handlers.Services, 
 	if err != nil {
 		return nil, err
 	}
+	if s.NewModels != nil {
+		return runNewModelSchedule(ctx, a, svc, s, spec)
+	} // W4 feature 3 (schedule_newmodel.go)
 	capUSD := schedule.EvaluationCap(s, spec)
 	if err := s.Approved.CheckCap(capUSD); err != nil {
 		return nil, err

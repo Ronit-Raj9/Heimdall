@@ -804,7 +804,7 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 		a.logger.Warn("shared runner: org project not downloaded yet; it is downloaded again before each lease", "org", org, "error", err.Error())
 	}
 	docker := utils.Docker{Binary: a.docker.Binary, Policy: l.policy}
-	oa, err := newApp(ctx, h.f.config, appOptions{gateway: true, debug: h.f.debug, docker: &docker, evalNetwork: network})
+	oa, err := newApp(ctx, h.f.config, appOptions{gateway: true, debug: h.f.debug, docker: &docker, evalNetwork: network, sharedRunner: true})
 	if err != nil {
 		a.logger.Error("shared runner: org worker not started", "org", org, "error", err.Error())
 		return

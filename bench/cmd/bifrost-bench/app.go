@@ -79,6 +79,9 @@ type appOptions struct {
 	// org's docker policy and its own eval network.
 	docker      *utils.Docker // nil: the plain docker CLI
 	evalNetwork string        // "": networks.eval from the config
+	// sharedRunner turns the judge cache off: the shared worker serves
+	// many organizations from one config root (judgecache.go).
+	sharedRunner bool
 }
 
 // newApp loads the config and assembles the registry.
@@ -158,7 +161,7 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		Evidence: evidence.Builtin(evidence.Deps{
 			Gateway: gw, Fault: fault, Parsers: parsers, Docker: a.docker, HelperImage: helper, Prices: prices, Logger: logger,
 		}),
-		Graders:       append([]schemas.Grader{graders.NewJudge(graders.JudgeConfig{Gateway: gw, URL: cfg.Gateway.URL, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref(), Logger: logger})}, graders.Builtin(graders.HiddenTestsConfig{Image: helper, Logger: logger, Docker: a.docker})...), // Memory and answers: the wired judge, ahead of Builtin's unwired one
+		Graders:       append([]schemas.Grader{graders.NewJudge(graders.JudgeConfig{Gateway: gw, URL: cfg.Gateway.URL, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref(), Logger: logger, Cache: judgeCache(cfg, opts)})}, graders.Builtin(graders.HiddenTestsConfig{Image: helper, Logger: logger, Docker: a.docker})...), // Memory and answers: the wired judge, ahead of Builtin's unwired one
 		Gates:         gates.Builtin(),
 		Metrics:       append(metrics.Builtin(), graders.ProcessMetrics()...), // X23: report-only trajectory metrics (graders/process.go)
 		Policies:      verdict.Builtin(),
@@ -176,9 +179,9 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 	if fault == nil {
 		a.reg.Fault = nil // a typed nil would look non-nil to the engine
 	}
-	a.reg.Graders = withGrader(a.reg.Graders, graders.NewVisual(graders.VisualConfig{Inner: graders.HiddenTestsConfig{Image: helper, Logger: logger, Docker: a.docker}, Judge: graders.JudgeConfig{Gateway: gw, URL: cfg.Gateway.URL, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref(), Logger: logger}, Logger: logger})) // X1 vision grading: the wired visual grader replaces Builtin's unwired one (visual.go)
-	a.reg.Graders = withGrader(a.reg.Graders, graders.NewChecks(graders.ChecksConfig{Inner: graders.HiddenTestsConfig{Image: helper, Logger: logger, Docker: a.docker}, Judge: graders.JudgeConfig{Gateway: gw, URL: cfg.Gateway.URL, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref(), Logger: logger}, Logger: logger})) // declarative checks.yaml: the wired checks grader (graders/checks.go)
-	a.reg.GPUs = gpuAllocator(ctx, cfg, logger)                                                                                                                                                                                                                                                                                            // X7: this machine's GPU pool, nil without a usable GPU (gpu.go)
+	a.reg.Graders = withGrader(a.reg.Graders, graders.NewVisual(graders.VisualConfig{Inner: graders.HiddenTestsConfig{Image: helper, Logger: logger, Docker: a.docker}, Judge: graders.JudgeConfig{Gateway: gw, URL: cfg.Gateway.URL, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref(), Logger: logger, Cache: judgeCache(cfg, opts)}, Logger: logger})) // X1 vision grading: the wired visual grader replaces Builtin's unwired one (visual.go)
+	a.reg.Graders = withGrader(a.reg.Graders, graders.NewChecks(graders.ChecksConfig{Inner: graders.HiddenTestsConfig{Image: helper, Logger: logger, Docker: a.docker}, Judge: graders.JudgeConfig{Gateway: gw, URL: cfg.Gateway.URL, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref(), Logger: logger, Cache: judgeCache(cfg, opts)}, Logger: logger})) // declarative checks.yaml: the wired checks grader (graders/checks.go)
+	a.reg.GPUs = gpuAllocator(ctx, cfg, logger)                                                                                                                                                                                                                                                                                                                          // X7: this machine's GPU pool, nil without a usable GPU (gpu.go)
 	// G01: runs resolve org secrets from the key store; only local mode falls back to the environment (secrets_service.go).
 	a.reg.Secrets = orgSecretSource{keys: sharedKeyStore(a), orgID: auth.LocalOrgID, envFallback: !cfg.Auth.IsHosted()}
 	return a, nil

@@ -107,6 +107,10 @@ type JudgeConfig struct {
 	// sets a per-org id so the gateway binds the key to the org's own
 	// provider keys (G06).
 	CalibrationExpID string
+	// Cache reuses the reply of a vote already paid for with byte-identical
+	// inputs (W4 feature 7, judgecache.go); nil turns it off. Only
+	// voteReplies reads it, so a calibration always makes every call.
+	Cache JudgeCache
 }
 
 var _ schemas.Grader = (*judge)(nil)
@@ -330,29 +334,70 @@ func (g *judge) voteReplies(ctx context.Context, rc *schemas.RunContext, spec sc
 	if rc.JudgeBlocked() { // also the auditor (judgecalibration.go)
 		return nil, nil, errors.New(NoPaidJudgeReason)
 	}
-	name := rc.Run.RunID + "j" + strings.TrimPrefix(utils.NewID("j", judgeKeySuffixLen), "j_")
-	keyRC := &schemas.RunContext{
-		Run:   &schemas.Run{RunID: name, ExpID: rc.Run.ExpID},
-		Agent: &schemas.AgentConfig{ID: JudgeType, Model: spec.Model, Gateway: schemas.GatewayPolicy{Provider: spec.Provider}},
+	// W4 feature 7: look every vote up in the judge cache first; a cached
+	// reply made by another model than the pinned one is paid again.
+	system := judgeSystemFor(spec.PromptVersion)
+	cacheKeys := make([]string, spec.Votes)
+	hits := make([]*JudgeCacheEntry, spec.Votes)
+	missing := spec.Votes
+	if g.cfg.Cache != nil {
+		for i := range cacheKeys {
+			cacheKeys[i] = JudgeCacheKey(spec, system, prompt, i)
+			if e, ok := g.cfg.Cache.Get(cacheKeys[i]); ok && sameModel(e.Served, spec.Model) {
+				hits[i] = &e
+				missing--
+			}
+		}
 	}
-	key, err := g.cfg.Gateway.MintKey(ctx, keyRC)
-	if err != nil {
-		return nil, nil, fmt.Errorf("mint the judge's key: %w", err)
+	var key *schemas.RunKey
+	if missing > 0 {
+		name := rc.Run.RunID + "j" + strings.TrimPrefix(utils.NewID("j", judgeKeySuffixLen), "j_")
+		keyRC := &schemas.RunContext{
+			Run:   &schemas.Run{RunID: name, ExpID: rc.Run.ExpID},
+			Agent: &schemas.AgentConfig{ID: JudgeType, Model: spec.Model, Gateway: schemas.GatewayPolicy{Provider: spec.Provider}},
+		}
+		k, err := g.cfg.Gateway.MintKey(ctx, keyRC)
+		if err != nil {
+			return nil, nil, fmt.Errorf("mint the judge's key: %w", err)
+		}
+		if rc.Key != nil && (k.Value == rc.Key.Value || k.ID == rc.Key.ID) {
+			// Not revoked here: it is the run's key, which the run's cleanup owns.
+			return nil, nil, errors.New("gateway returned the run's own key for the judge")
+		}
+		key = k
+		defer g.revoke(ctx, key)
 	}
-	if rc.Key != nil && (key.Value == rc.Key.Value || key.ID == rc.Key.ID) {
-		// Not revoked here: it is the run's key, which the run's cleanup owns.
-		return nil, nil, errors.New("gateway returned the run's own key for the judge")
-	}
-	defer g.revoke(ctx, key)
 	ctx = utils.WithMaximHeaders(ctx, utils.MaximHeaders(rc, utils.MaximRoleJudge))
 	rec := &schemas.JudgeRecord{Model: spec.Model, PromptVersion: spec.PromptVersion, PriceRef: g.cfg.PriceRef}
 	var usd float64
 	priced, unpriced := true, ""
 	var replies []string
 	for i := 0; i < spec.Votes; i++ {
+		if e := hits[i]; e != nil {
+			// A cached reply is scored again with today's scorer, so a
+			// scorer change never reuses an old verdict. It costs nothing.
+			reply := e.Reply
+			verdict := replyVerdict(spec.PromptVersion, reply)
+			if sc != nil {
+				verdict = sc(reply)
+			}
+			if e.Cut {
+				reply = replyCutByLength
+			}
+			rec.Votes = append(rec.Votes, verdict)
+			replies = append(replies, reply)
+			if rec.ServedModel == "" {
+				rec.ServedModel = e.Served
+			}
+			rec.CachedVotes++
+			continue
+		}
 		verdict, tok, served, reply, cut, err := g.callReply(ctx, key, spec, prompt, sc)
 		if err != nil {
 			return nil, nil, fmt.Errorf("judge vote %d of %d: %w", i+1, spec.Votes, err)
+		}
+		if g.cfg.Cache != nil && (cut || strings.TrimSpace(reply) != "") {
+			g.cfg.Cache.Put(cacheKeys[i], JudgeCacheEntry{Reply: reply, Served: served, Cut: cut, Tokens: tok, At: time.Now()})
 		}
 		if cut {
 			reply = replyCutByLength
