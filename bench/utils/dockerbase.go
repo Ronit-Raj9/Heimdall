@@ -261,7 +261,7 @@ func ManifestPins(path string) func(ref string) (string, error) {
 // bench and platform base images at the registry, each pinned by the
 // digest of the registry manifest, or an error wrapping ErrPolicy that
 // names a base image the manifest or the registry lacks.
-func (p *DockerPolicy) baseContexts(dockerfile string, buildArgs map[string]string) ([]string, error) {
+func (p *DockerPolicy) baseContexts(ctx context.Context, dockerfile string, buildArgs map[string]string) ([]string, error) {
 	if p.Registry == "" {
 		return nil, nil
 	}
