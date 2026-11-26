@@ -78,13 +78,13 @@ type AgentEventRecord struct {
 // AgentConfig is the system under test, read from agents/<id>.yaml and then
 // modified by an arm's `set:` overrides. Its content hash identifies it.
 type AgentConfig struct {
-	ID           string            `json:"id" yaml:"id"`
-	Adapter      string            `json:"adapter" yaml:"adapter"` // command | scripted
-	Image        string            `json:"image" yaml:"image"`
-	Build        *ImageSpec        `json:"build,omitempty" yaml:"build"` // optional: how to build Image
-	Argv         []string          `json:"argv" yaml:"argv"`
-	Env          map[string]string `json:"env" yaml:"env"`
-	Files        map[string]string `json:"files,omitempty" yaml:"files"` // container path -> content template
+	ID      string            `json:"id" yaml:"id"`
+	Adapter string            `json:"adapter" yaml:"adapter"` // command | scripted
+	Image   string            `json:"image" yaml:"image"`
+	Build   *ImageSpec        `json:"build,omitempty" yaml:"build"` // optional: how to build Image
+	Argv    []string          `json:"argv" yaml:"argv"`
+	Env     map[string]string `json:"env" yaml:"env"`
+	Files   map[string]string `json:"files,omitempty" yaml:"files"` // container path -> content template
 	// FilesRaw are container files delivered byte for byte, never rendered as
 	// templates: skill and notes text that may contain "{{" (improvement runs
 	// write here). A path may not be in both Files and FilesRaw.
@@ -92,12 +92,12 @@ type AgentConfig struct {
 	// Instructions are standing instructions from the agent's owner, put before
 	// every task's instruction text in the instruction file, delivered verbatim.
 	// Every agent reads its instruction file, so this works for any agent.
-	Instructions string `json:"instructions,omitempty" yaml:"instructions"`
-	Model        string            `json:"model" yaml:"model"`
-	Notes        AgentNotes        `json:"notes" yaml:"notes"`
-	Parser       string            `json:"parser,omitempty" yaml:"parser"` // empty = gateway-level evidence only
-	AgentVersion string            `json:"agent_version,omitempty" yaml:"agent_version,omitempty"`
-	ImageDigest  string            `json:"image_digest,omitempty" yaml:"image_digest,omitempty"`
+	Instructions string     `json:"instructions,omitempty" yaml:"instructions"`
+	Model        string     `json:"model" yaml:"model"`
+	Notes        AgentNotes `json:"notes" yaml:"notes"`
+	Parser       string     `json:"parser,omitempty" yaml:"parser"` // empty = gateway-level evidence only
+	AgentVersion string     `json:"agent_version,omitempty" yaml:"agent_version,omitempty"`
+	ImageDigest  string     `json:"image_digest,omitempty" yaml:"image_digest,omitempty"`
 	// Capabilities is what the agent can do (shell, tools, mcp, sessions,
 	// browser, desktop, voice, gpu; capabilities.go). Empty uses the
 	// defaults of its adapter (DefaultCapabilities).
