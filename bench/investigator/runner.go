@@ -57,11 +57,12 @@ type Config struct {
 
 // Runner makes budgeted calls for one job. It implements Caller.
 type Runner struct {
-	cfg   Config
-	mu    sync.Mutex
-	key   *schemas.RunKey
-	spent float64
-	rows  []LedgerRow
+	cfg    Config
+	mu     sync.Mutex
+	key    *schemas.RunKey
+	closed bool // Close ran: no new key is minted
+	spent  float64
+	rows   []LedgerRow
 }
 
 var _ Caller = (*Runner)(nil)
@@ -127,6 +128,9 @@ func (r *Runner) Open(ctx context.Context) error {
 	if r.key != nil {
 		return nil
 	}
+	if r.closed {
+		return errors.New("the job's model key is closed")
+	}
 	expID := r.cfg.JobID
 	if expID == "" {
 		expID = AgentID
@@ -148,6 +152,7 @@ func (r *Runner) Close(ctx context.Context) error {
 	r.mu.Lock()
 	key := r.key
 	r.key = nil
+	r.closed = true
 	r.mu.Unlock()
 	if key == nil {
 		return nil
@@ -191,10 +196,8 @@ func (r *Runner) Call(ctx context.Context, req Request) (Reply, error) {
 		maxTok = r.cfg.MaxTokens
 	}
 	out := Reply{Model: r.ModelRef()}
-	if r.key == nil {
-		if err := r.Open(ctx); err != nil {
-			return out, err
-		}
+	if err := r.Open(ctx); err != nil { // a no-op once the key is minted
+		return out, err
 	}
 	var lastErr error
 	for attempt := 0; attempt <= Retries; attempt++ {

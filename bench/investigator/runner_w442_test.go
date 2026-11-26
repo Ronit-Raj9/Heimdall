@@ -199,6 +199,9 @@ func TestRunnerCloseRevokesOnce(t *testing.T) {
 	if gw.revoked != 1 {
 		t.Fatalf("revoked %d times, want 1", gw.revoked)
 	}
+	if _, err := r.Call(context.Background(), Request{Purpose: "findings", Messages: []Message{{Role: "user", Content: "hi"}}}); err == nil {
+		t.Fatal("a call after Close was made")
+	}
 	if len(gw.minted) != 1 || gw.minted[0].Agent.ID != "investigator" || gw.minted[0].Run.RunID != "r_iv_j1" {
 		t.Fatalf("minted %+v", gw.minted)
 	}
