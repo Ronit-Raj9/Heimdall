@@ -10,5 +10,6 @@ func init() {
 	OrgPolicy[key("GET", api+"/validity")] = org(viewer)
 	OrgPolicy[key("GET", api+"/experiments/{id}/validity")] = org(viewer)
 	OrgPolicy[key("POST", api+"/validity/{id}/seen")] = org(viewer)
+	selfWrites[key("POST", api+"/validity/{id}/seen")] = true          // dismissing an alert changes only the caller's own seen list
 	PlatformPolicy[key("POST", api+"/orgs/{org}/feedback")] = public() // the handler checks the org's ingest token, rate limited per org
 }
