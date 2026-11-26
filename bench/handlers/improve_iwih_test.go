@@ -103,6 +103,7 @@ func TestContinueOfferMatchesTheSecondLook(t *testing.T) {
 	if resp.StatusCode() != 200 || json.Unmarshal(resp.Body(), &offer) != nil {
 		t.Fatalf("estimate: %d %s", resp.StatusCode(), resp.Body())
 	}
+	pageShape(t, readTSInterfaces(t), "ContinueOffer", resp.Body())
 	if offer.ExtraTrials != 2 || offer.NewTasks != 20 || offer.Runs != 2*(len(rec.Splits.Sealed)*2+20*4) || offer.Text == "" || offer.CanConfirm <= 0 {
 		t.Fatalf("offer %+v", offer)
 	}

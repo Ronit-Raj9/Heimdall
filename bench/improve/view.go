@@ -26,6 +26,9 @@ type Summary struct {
 	Verdict    string    `json:"verdict,omitempty"`
 	SealedGain *float64  `json:"sealed_gain,omitempty"`
 	TotalUSD   float64   `json:"total_usd"`
+	// Teacher is the model the improver ran on when the spec names one
+	// (A3.7); the list shows the run as teacher-assisted.
+	Teacher string `json:"teacher,omitempty"`
 }
 
 // List is GET /improvements.
@@ -82,7 +85,7 @@ type FinalView struct {
 	CI80     [2]float64 `json:"ci80"`
 	CI95     [2]float64 `json:"ci95"`
 	PUpper   float64    `json:"p_upper"`
-	Trials   int        `json:"trials,omitempty"`
+	Trials   int        `json:"trials"`
 }
 
 // CandidateView is one idea of a round as served.
@@ -233,7 +236,7 @@ type CostView struct {
 func Summarize(rec *Record, running bool) Summary {
 	s := Summary{ID: rec.ID, Name: rec.Name, Agent: rec.Spec.Agent, Suite: rec.Spec.Suite, Status: rec.Status, Reason: rec.Reason,
 		Running: running, CreatedAt: rec.CreatedAt, UpdatedAt: rec.UpdatedAt, CreatedBy: rec.CreatedBy, Rounds: rec.Spec.Rounds,
-		Incumbent: rec.Incumbent.Ref, TotalUSD: totalUSD(rec)}
+		Incumbent: rec.Incumbent.Ref, TotalUSD: totalUSD(rec), Teacher: rec.Spec.Improver.Model}
 	for _, rd := range rec.Rounds {
 		if rd.Stage == StageDone {
 			s.RoundsDone++
