@@ -1,3 +1,4 @@
+import { withOrgParam } from "./orgParam";
 import type { AwarenessResponse, MonitorCertificationListResponse, MonitorCertificationResponse } from "@/lib/types/bench";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
@@ -24,12 +25,12 @@ export type PackFormat = "md" | "json";
 
 /** The download URL of an experiment's compliance pack (GET /experiments/{id}/compliance). */
 export function compliancePackUrl(expId: string, format: PackFormat): string {
-	return `${BENCH_API_BASE}/experiments/${encodeURIComponent(expId)}/compliance?format=${format}`;
+	return withOrgParam(`${BENCH_API_BASE}/experiments/${encodeURIComponent(expId)}/compliance?format=${format}`);
 }
 
 /** The Markdown report of a monitor certification. */
 export function monitorReportUrl(certId: string): string {
-	return `${BENCH_API_BASE}/monitors/certifications/${encodeURIComponent(certId)}/report.md`;
+	return withOrgParam(`${BENCH_API_BASE}/monitors/certifications/${encodeURIComponent(certId)}/report.md`);
 }
 
 export const { useGetAwarenessQuery, useListMonitorCertificationsQuery, useGetMonitorCertificationQuery } = integrityApi;

@@ -263,7 +263,7 @@ func SuiteAdmit(ctx context.Context, env AdmitEnv, ref, only string, w io.Writer
 		if n == 1 {
 			noun = "error"
 		}
-		return rep, fmt.Errorf("%w: static validation found %d %s; fix them (bifrost-bench task validate <suite>/<task> shows the same list) and admit again",
+		return rep, fmt.Errorf("%w: static validation found %d %s; fix them (the readiness check lists the same problems) and admit again",
 			ErrAdmitRefused, n, noun)
 	}
 	if err := EnsureImages(ctx, env.Config, env.Docker, s, w); err != nil {

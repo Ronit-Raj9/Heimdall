@@ -22,7 +22,7 @@ func TestConnectPickSkipsStagingAndUnready(t *testing.T) {
 		draft: {ID: draft, TaskIDs: []string{"a"}, Tasks: fast},
 		// Locked, but its one task never passed the readiness checks.
 		"unready": {ID: "unready", TaskIDs: []string{"a"}, Tasks: fast, Lock: &schemas.SuiteLock{Tasks: map[string]schemas.TaskLock{"a": {Status: "pending"}}}},
-		"realqa":  {ID: "realqa", TaskIDs: []string{"b"}, Tasks: slow},
+		"realqa":  {ID: "realqa", TaskIDs: []string{"b"}, Tasks: slow, Lock: w4b05Locked("b")},
 	}}
 	h := &connectHandler{env: OrgEnv{Mode: schemas.Mode("live"), Services: Services{Suites: suites}}}
 	cfg := &schemas.AgentConfig{ID: "bot"}

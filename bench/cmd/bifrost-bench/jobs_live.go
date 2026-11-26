@@ -218,7 +218,10 @@ func runLiveInit(_ context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, _ 
 	}
 	res := liveInitResult{Path: livescore.Dir + "/" + livescore.ConfigFile, Configured: p.BaselineKey != "" || p.TagHeader != ""}
 	if res.Configured {
-		res.Next = "set the read credential variable on the server, then pull"
+		res.Next = "Set the gateway read key on this server, then press Pull now."
+		if env.Hosted {
+			res.Next = "Add the gateway read key as an organization secret in Settings > Secrets, then press Pull now."
+		}
 	} else {
 		res.Next = "replace the EDIT ME virtual keys in livescore/config.yaml (Files page), then pull"
 	}

@@ -230,12 +230,12 @@ func (h *quickRunHandler) post(ctx *fasthttp.RequestCtx) {
 		if SendModelKeyRefusal(ctx, h.env.Mode, err) { // X01
 			return
 		}
-		h.fail(ctx, fasthttp.StatusBadRequest, "plan experiment: "+err.Error()+". Pick another suite, agent or model, or open the experiment builder for the full form.")
+		h.fail(ctx, fasthttp.StatusBadRequest, planSentence(PlainPlanError(err))+" Pick another benchmark, agent or model.")
 		return
 	}
 	plan := BuildPlan(m)
 	if len(plan.Errors) > 0 {
-		h.fail(ctx, fasthttp.StatusBadRequest, "plan experiment: "+strings.Join(plan.Errors, "; "))
+		h.fail(ctx, fasthttp.StatusBadRequest, planSentences(plan.Errors)+" Pick another benchmark, agent or model.")
 		return
 	}
 
@@ -286,7 +286,7 @@ func (h *quickRunHandler) post(ctx *fasthttp.RequestCtx) {
 			SpentUSD: schemas.Unknown("not_indexed", schemas.EvidenceGateway)}
 		resp.Status = &st
 	}
-	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusCreated, resp)
+	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusCreated, plainServed(resp))
 }
 
 // errBad is a request error the user can fix (400); errMissing is a missing

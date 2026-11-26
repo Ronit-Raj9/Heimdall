@@ -1,0 +1,10 @@
+{
+	"orgReset": {
+		"text": "This tab was showing an organization you can no longer open, so it now shows {{name}}.",
+		"close": "Close"
+	},
+	"agentNotFound": {
+		"text": "There is no agent named {{id}}.",
+		"back": "Back to agents"
+	}
+}

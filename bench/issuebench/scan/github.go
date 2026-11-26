@@ -33,7 +33,7 @@ type APIError struct {
 func (e *APIError) Error() string {
 	switch e.Status {
 	case http.StatusUnauthorized:
-		return "GitHub rejected the token (revoked, expired or wrong); reconnect GitHub in Settings > GitHub or check the token"
+		return "GitHub refused the connected account. Finding issues needs a working GitHub connection, even for public repositories: reconnect GitHub in Settings > GitHub."
 	case http.StatusNotFound:
 		return "repository not found on GitHub, or the token has no access to it"
 	}

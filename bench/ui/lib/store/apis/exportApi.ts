@@ -1,3 +1,4 @@
+import { withOrgParam } from "./orgParam";
 import type { ExportRunRow } from "@/lib/types/bench";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
@@ -27,12 +28,12 @@ export function experimentExportPath(expId: string, format: "eee" | "jsonl" | "c
 
 /** The download URL of an experiment export. */
 export function experimentExportUrl(expId: string, format: "eee" | "jsonl" | "csv", allowSynthetic = false): string {
-	return BENCH_API_BASE + experimentExportPath(expId, format, allowSynthetic);
+	return withOrgParam(BENCH_API_BASE + experimentExportPath(expId, format, allowSynthetic));
 }
 
 /** The download URL of a suite's Harbor tar (verifiers withheld). */
 export function suiteHarborUrl(suiteId: string): string {
-	return `${BENCH_API_BASE}/suites/${encodeURIComponent(suiteId)}/export?format=harbor`;
+	return withOrgParam(`${BENCH_API_BASE}/suites/${encodeURIComponent(suiteId)}/export?format=harbor`);
 }
 
 /** Parses JSON lines; a blank line is skipped, a line that does not parse throws. */

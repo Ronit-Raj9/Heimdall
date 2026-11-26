@@ -218,7 +218,7 @@ func TestInitArtifactTask(t *testing.T) {
 		t.Errorf("suite.yaml tasks not updated:\n%s", readFile(t, filepath.Join(dir, "suite.yaml")))
 	}
 	if _, err := InitScenarioTask(ScenarioTaskOptions{SuiteDir: dir, ID: "t03", Kind: TemplateQA}); err == nil ||
-		!strings.Contains(err.Error(), "written from template artifact") {
+		!strings.Contains(err.Error(), "holds artifact tasks") {
 		t.Errorf("a -kind that contradicts the suite: %v", err)
 	}
 }

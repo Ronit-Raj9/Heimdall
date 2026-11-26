@@ -93,7 +93,7 @@ func SuiteAdmitMany(ctx context.Context, env AdmitEnv, ref string, o AdmitManyOp
 		}
 	}
 	if valid == 0 {
-		return rep, fmt.Errorf("%w: static validation refused every chosen task; fix them (bifrost-bench task validate <suite>/<task> shows the same list) and admit again", ErrAdmitRefused)
+		return rep, fmt.Errorf("%w: static validation refused every chosen task; fix them (the readiness check lists the same problems) and admit again", ErrAdmitRefused)
 	}
 	if err := EnsureImages(ctx, env.Config, env.Docker, s, w); err != nil {
 		return rep, err

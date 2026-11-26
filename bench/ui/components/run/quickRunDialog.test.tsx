@@ -6,10 +6,12 @@ import { QuickRunDialog, closeOnEscape, quickRunProblems } from "./quickRunDialo
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/components/models/modelPicker", () => ({ ModelPicker: ({ testId }: { testId: string }) => <div data-testid={testId} /> }));
-vi.mock("@/lib/store/apis/benchApi", () => ({
-	useGetSuitesQuery: () => ({ data: { suites: [] }, isSuccess: true }),
+vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useGetAgentsQuery: () => ({ data: { agents: [] }, isSuccess: true }),
 }));
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({ useGetSuitesLightQuery: () => ({ data: { suites: [] }, isSuccess: true }) }));
+vi.mock("@/lib/store/apis/agentopsApi", () => ({ useScanAgentSkillMutation: () => [() => undefined, { isLoading: false }] }));
 vi.mock("@/lib/store/apis/quickrunApi", () => ({ useQuickRunMutation: () => [() => undefined, { isLoading: false }] }));
 
 describe("quick test dialog (fix wave 3, N229)", () => {

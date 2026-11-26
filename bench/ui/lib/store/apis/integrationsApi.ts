@@ -1,3 +1,4 @@
+import { withOrgParam } from "./orgParam";
 import type {
 	CIWorkflowParams,
 	CIWorkflowPreview,
@@ -74,7 +75,7 @@ export function ciWorkflowParams(args: CIWorkflowParams): Record<string, string>
 
 /** The download URL of an export file. */
 export function exportDownloadUrl(name: string): string {
-	return `${BENCH_API_BASE}/integrations/exports/${encodeURIComponent(name)}`;
+	return withOrgParam(`${BENCH_API_BASE}/integrations/exports/${encodeURIComponent(name)}`);
 }
 
 /** The message of an API error: the server's error.message, else a fallback. */

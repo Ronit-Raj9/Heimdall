@@ -18,8 +18,11 @@ const (
 	FirstLookConcurrency = 5
 )
 
-// FirstLookNote is the line every first-look report card shows.
-const FirstLookNote = "First look: 5 tasks. Too small for a verdict; run the full pack for one."
+// FirstLookNoteFor is the line every first-look report card shows, with
+// the number of tasks the pick runs.
+func FirstLookNoteFor(tasks int) string {
+	return fmt.Sprintf("First look: %d tasks. Too small for a verdict; run the full benchmark for one.", tasks)
+}
 
 // BenchmarkInfo is one benchmark the picker considers.
 type BenchmarkInfo struct {
@@ -130,7 +133,7 @@ func PickFirstLook(infos []BenchmarkInfo, hasOrgKey bool) (FirstLookPick, error)
 		ok = ok[:8]
 	}
 	return FirstLookPick{Benchmark: best.ID, Reason: reason, Tasks: tasks, Trials: FirstLookTrials, Concurrency: FirstLookConcurrency,
-		EstimateS: est, Note: FirstLookNote, Considered: ok, Practice: usePractice}, nil
+		EstimateS: est, Note: FirstLookNoteFor(tasks), Considered: ok, Practice: usePractice}, nil
 }
 
 func humanS(s float64) string {

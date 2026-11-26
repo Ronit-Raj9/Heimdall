@@ -9,6 +9,7 @@ import { formatRelative, isActiveJob } from "@/components/platform/platform.util
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Button } from "@/components/ui/button";
+import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
 import { getLocale } from "@/lib/i18n";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
@@ -18,7 +19,7 @@ import type { Job, JobStatus } from "@/lib/types/bench";
 import { JOB_STATUSES } from "@/lib/types/jobs";
 import { Link } from "@tanstack/react-router";
 import { ListTodo, RotateCcw, SquareTerminal } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** Jobs shown per step of "Load older jobs". */
@@ -148,18 +149,17 @@ export default function JobsView() {
 	);
 }
 
-/** The live log of one job in a panel that slides in from the right; Escape or the backdrop closes it. */
+/** The live log of one job in a panel that slides in from the right; it takes focus, Escape or the backdrop closes it, and focus goes back after. */
 export function JobLogDrawer({ jobId, onClose }: { jobId: string; onClose: () => void }) {
 	const { t } = useTranslation("jobs");
-	useEffect(() => {
-		const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [onClose]);
+	const panel = useRef<HTMLElement>(null);
+	useDialogFocus(panel, onClose);
 	return (
 		<div className="fixed inset-0 z-50 flex justify-end" data-testid="jobs-log-drawer">
 			<button type="button" aria-label={t("panel.close")} className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
 			<aside
+				ref={panel}
+				tabIndex={-1}
 				role="dialog"
 				aria-modal="true"
 				aria-label={t("drawer.title")}

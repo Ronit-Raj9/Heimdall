@@ -15,6 +15,20 @@ import { cn } from "@/lib/utils";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { fw05 } from "./fw05I18n";
+import type { CatalogProvider } from "@/components/models/groupedModelPicker";
+import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
+import "@/app/evaluations_/$evalId/views/w4m2I18n";
+
+/**
+ * True when the model catalog has loaded and no provider in it lists the typed model. A free-text model
+ * stays allowed (the card only warns): false while the catalog is not loaded or the model is empty.
+ */
+export function unknownModel(catalog: readonly CatalogProvider[] | undefined, provider: string, model: string): boolean {
+	const id = model.trim();
+	if (!catalog || id === "") return false;
+	void provider;
+	return !catalog.some((p) => (p.models ?? []).some((m) => m.id === id));
+}
 
 // Lane Y13: the "Your own tasks" card of wizard step 3. Creates a private question-and-answer
 // benchmark, imports the customer's rows through the Build tab's import form, runs the readiness
@@ -210,6 +224,7 @@ export function OwnTasksCard({ onAdd, initialOpen = false, initialSuite, initial
 							))}
 						</div>
 						{grader === "judge" && <JudgeFields {...judge} onChange={(p) => setJudge((j) => ({ ...j, ...p }))} t={tb as BuildT} />}
+						{grader === "judge" && judge.model.trim() !== "" && <JudgeUnknownWarning provider={judge.provider} model={judge.model} />}
 					</fieldset>
 					<div>
 						{checkName((problem) => (
@@ -296,5 +311,17 @@ export function OwnTasksCard({ onAdd, initialOpen = false, initialSuite, initial
 				</div>
 			)}
 		</section>
+	);
+}
+
+/** The warning under the judge picker when the model catalog does not list the typed model (it never blocks Create). */
+function JudgeUnknownWarning({ provider, model }: { provider: string; model: string }) {
+	const { t } = useTranslation("w4m2");
+	const models = useGetModelsQuery();
+	if (!unknownModel(models.data?.providers as unknown as CatalogProvider[] | undefined, provider, model)) return null;
+	return (
+		<p className="text-chart-warning-ink text-xs" role="status" data-testid="own-tasks-judge-unknown">
+			{t("judgeUnknown")}
+		</p>
 	);
 }

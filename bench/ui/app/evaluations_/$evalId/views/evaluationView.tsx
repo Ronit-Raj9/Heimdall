@@ -39,6 +39,7 @@ import { FirstLookNote } from "@/app/connect/views/firstLookLauncher"; // lane Z
 import { Badge } from "@/components/ui/badge";
 import { formatCost } from "@/components/leaderboard/agentBoard.utils";
 import { parseSkillRefusal, SkillScanProblem } from "./skillScanProblem";
+import "./w4m2I18n";
 
 /** Fields the server adds to an evaluation in fix wave 3 (N182, N183), read here before the shared type has them. */
 type EvaluationLaunchFacts = Evaluation & { launch?: { started: number; of: number; current?: string }; problem?: string };
@@ -72,6 +73,21 @@ export default function EvaluationView({ evalId }: { evalId: string }) {
 }
 
 /** The loaded evaluation. Exported for tests. */
+/**
+ * What the progress section says before any benchmark has a row: "starting" while the evaluation is still
+ * active and nothing was skipped, "none" when no benchmark could run, null once a benchmark runs.
+ */
+export function benchmarksNote(run: number, skipped: number, active: boolean): "starting" | "none" | null {
+	if (run > 0) return null;
+	if (active && skipped === 0) return "starting";
+	return "none";
+}
+
+/** "3 tasks per benchmark, each tried once", with plurals (namespace w4m2). */
+export function setupLine(t: (key: string, opts?: Record<string, unknown>) => string, tasks: number, trials: number): string {
+	return [t("setupTasks", { ns: "w4m2", count: tasks }), t("setupTrials", { ns: "w4m2", count: trials })].join(", ");
+}
+
 export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 	const { t, i18n } = useTranslation("evaluations");
 	const { t: tf } = useTranslation("fw08");
@@ -82,6 +98,8 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 	const faults = (spec.faults ?? []).filter((f) => f !== "clean");
 	const starting = startingLine(evaluation);
 	const problem = (evaluation as EvaluationLaunchFacts).problem;
+	const { t: tw } = useTranslation("w4m2");
+	const note = benchmarksNote(run.length, skipped.length, active);
 	return (
 		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6" data-testid="evaluation-screen" data-status={evaluation.status}>
 			<PageHeader
@@ -129,7 +147,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 					<span className="font-medium" data-testid="evaluation-mode">
 						<EvaluationKindLabel evaluation={evaluation} />
 					</span>
-					<span className="text-muted-foreground">{t("detail.setup", { tasks: spec.tasks_per_benchmark, trials: spec.trials })}</span>
+					<span className="text-muted-foreground">{setupLine(tw as never, spec.tasks_per_benchmark, spec.trials)}</span>
 					<span className="text-muted-foreground">
 						{faults.length > 0
 							? t("detail.faults", { faults: faults.map((f) => t(`fault.${f}` as never, { defaultValue: f })).join(", ") })
@@ -151,7 +169,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 						})}
 					</p>
 				)}
-				{spec.preset === "first_look" && <FirstLookNote />}
+				{spec.preset === "first_look" && <FirstLookNote tasks={spec.tasks_per_benchmark || undefined} />}
 				<div className="grid gap-3 sm:grid-cols-2">
 					{(spec.arms ?? []).map((arm) => (
 						<ArmCard key={arm.label} arm={arm} single={(spec.arms ?? []).length < 2} />
@@ -166,7 +184,9 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 				}
 				testId="evaluation-progress"
 			>
-				{run.length === 0 ? (
+				{note === "starting" ? (
+					<EmptyNote testId="evaluation-benchmarks-starting">{tw("benchmarksStarting")}</EmptyNote>
+				) : note === "none" ? (
 					<EmptyNote testId="evaluation-no-benchmarks">
 						{t("detail.noBenchmarks")}
 						{skipped.length > 0 && (

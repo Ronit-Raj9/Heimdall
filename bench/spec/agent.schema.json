@@ -8,7 +8,7 @@
   "required": ["id", "adapter"],
   "properties": {
     "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},
-    "adapter": {"enum": ["command", "scripted", "remote_http", "a2a", "openai_agent", "voice_platform", "voice_rtc"]},
+    "adapter": {"enum": ["command", "scripted", "remote_http", "a2a", "openai_agent", "voice_platform", "voice_rtc", "pull"]},
     "image": {"type": "string", "minLength": 1},
     "build": {"$ref": "#/$defs/image"},
     "argv": {"type": "array", "items": {"type": "string"}},
@@ -246,6 +246,30 @@
       }
     },
     "team": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/team_member"}, "description": "Multi-container team: one container per member on the run network, each on its own gateway virtual key, under the run-wide cap budgets.usd (docs/multi-agent.md)."},
+    "pull": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "An agent that runs in the customer's own process and takes each turn from Heimdall, read by the pull adapter. Mirrors schemas.PullAgent.",
+      "properties": {
+        "name": {"type": "string"},
+        "timeout_s": {"type": "integer", "minimum": 0},
+        "turn_timeout_s": {"type": "integer", "minimum": 0},
+        "tools": {"enum": ["", "auto", "off"]},
+        "max_tool_rounds": {"type": "integer", "minimum": 0},
+        "repo": {"enum": ["", "tarball", "none"]},
+        "conversation": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Mirrors schemas.ConversationSpec.",
+          "properties": {
+            "driver": {"enum": ["", "agent", "bench"]},
+            "history": {"enum": ["", "client", "server"]},
+            "max_turns": {"type": "integer", "minimum": 0, "maximum": 100},
+            "greeting": {"type": "string", "maxLength": 2000}
+          }
+        }
+      }
+    },
     "topology": {"enum": ["single", "best_of_n", "orchestrator_worker", "team", "swarm"], "description": "Labels the arm for topology comparisons and the equal_budget fairness report."},
     "limits": {
       "type": "object",

@@ -8,12 +8,14 @@ import { AgentPicker } from "@/components/agents/agentPicker";
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
 import { faultChange, faultName } from "@/components/reportcard/reportCard.utils";
 import "@/app/evaluations/views/gw08I18n";
+import "@/app/evaluations_/$evalId/views/w4m2I18n";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { useGetAgentsQuery, useGetSuitesQuery } from "@/lib/store";
+import { useGetAgentsQuery } from "@/lib/store";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import {
 	useCreateEvaluationMutation,
 	useEstimateEvaluationQuery,
@@ -113,6 +115,21 @@ export function formProblem(
 	return null;
 }
 
+/** True when the loaded agent list contains the agent id; false while the list has not loaded. */
+export function agentKnown(agents: readonly { id: string }[] | undefined, id: string): boolean {
+	return Boolean(id) && (agents ?? []).some((a) => a.id === id);
+}
+
+/** Said when the agent named in the link does not exist. */
+export function UnknownAgentNote({ name }: { name: string }) {
+	const { t } = useTranslation("w4m2");
+	return (
+		<p className="text-chart-warning-ink w-full text-xs" role="status" data-testid="ft-unknown-agent">
+			{t("unknownAgent", { name })}
+		</p>
+	);
+}
+
 /** Faults chosen for a past test that did not apply to one of its benchmarks. */
 export function skippedFaultCount(ev: Pick<Evaluation, "children">): number {
 	return (ev.children ?? []).reduce((n, c) => n + (c.faults_skipped?.length ?? 0), 0);
@@ -174,19 +191,19 @@ export function FailureTestEstimate({
 		<div className="flex min-w-0 flex-1 flex-col gap-1 text-sm" data-testid="ft-estimate" aria-live="polite">
 			{problem !== null ? (
 				<span className="text-muted-foreground">{tg("ft.toSeeCost", { need: t(`ft.need.${problem}`) })}</span>
+			) : estimate.isError && !estimate.isFetching ? (
+				<span className="text-muted-foreground" title={getBenchErrorMessage(estimate.error)} data-testid="ft-estimate-error">
+					{tg("ft.estimateFailed")}
+				</span>
 			) : estimate.data ? (
 				<span className="font-medium">
 					{tg("ft.estimateLine", estimateText(estimate.data))}
 					{updating && <span className="text-muted-foreground font-normal"> {tg("ft.updating")}</span>}
 				</span>
-			) : estimate.isError ? (
-				<span className="text-muted-foreground" title={getBenchErrorMessage(estimate.error)} data-testid="ft-estimate-error">
-					{tg("ft.estimateFailed")}
-				</span>
 			) : (
 				<span className="text-muted-foreground">{t("ft.estimating")}</span>
 			)}
-			{problem === null && budgetTyped && estimate.data?.budget && (
+			{problem === null && !estimate.isError && budgetTyped && estimate.data?.budget && (
 				<span className="text-muted-foreground text-xs" data-testid="ft-budget-line">
 					{budgetLine(estimate.data.budget, estimate.data.est_cost_usd, updating)}
 				</span>
@@ -207,7 +224,7 @@ export default function FailureTestsView() {
 	const mayRun = canUse(useSession(), "member");
 	const [agentParam, setAgentParam] = useQueryState("agent", parseAsString.withOptions({ history: "replace" }));
 	const agents = useGetAgentsQuery();
-	const suites = useGetSuitesQuery();
+	const suites = useGetSuitesLightQuery();
 	const evals = useListEvaluationsQuery();
 	const catalog = useGetBenchFaultsQuery();
 	const [form, setForm] = useState<FailureTestForm>({
@@ -220,8 +237,18 @@ export default function FailureTestsView() {
 		tasks: 3,
 		trials: 1,
 	});
-	const versions = useGetAgentVersionsQuery(form.agent || skipToken);
-	const compat = useGetAgentCompatibilityQuery(form.agent, { skip: !form.agent });
+	// The agent from the link is trusted only once the agent list has loaded and contains it.
+	const known = agentKnown(agents.data?.agents, form.agent);
+	const [unknownAgent, setUnknownAgent] = useState<string | null>(null);
+	useEffect(() => {
+		if (!agents.data || !form.agent || known) return;
+		setUnknownAgent(form.agent);
+		setForm((f) => ({ ...f, agent: "" }));
+		void setAgentParam(null);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [agents.data, form.agent, known]);
+	const versions = useGetAgentVersionsQuery(known ? form.agent : skipToken);
+	const compat = useGetAgentCompatibilityQuery(form.agent, { skip: !known });
 	const [create, createState] = useCreateEvaluationMutation();
 	const summary = (agents.data?.agents ?? []).find((a) => a.id === form.agent);
 	// The agent's default model applies only while the user has not picked one, and the form says so.
@@ -244,6 +271,7 @@ export default function FailureTestsView() {
 	}, [answered, form.benchmarks.join(",")]);
 
 	const pickAgent = (id: string) => {
+		setUnknownAgent(null);
 		setForm((f) => pickAgentForm(f, id));
 		void setAgentParam(id || null);
 	};
@@ -266,6 +294,7 @@ export default function FailureTestsView() {
 				<div className="bg-card flex min-w-0 flex-col gap-6 rounded-xl border p-5">
 					<div className="flex flex-wrap items-end gap-4">
 						<AgentPicker agents={agents.data?.agents ?? []} value={form.agent} onChange={pickAgent} testId="ft-agent" />
+						{unknownAgent && <UnknownAgentNote name={unknownAgent} />}
 						<label className="flex flex-col gap-1 text-xs font-medium">
 							{t("ft.version")}
 							<select
@@ -393,7 +422,12 @@ export default function FailureTestsView() {
 						</label>
 					</div>
 					<div className="bg-muted/40 flex flex-wrap items-center gap-4 rounded-lg border px-4 py-3">
-						<FailureTestEstimate problem={problem} estimate={estimate} pending={pending} budgetTyped={budgetTyped} />
+						<FailureTestEstimate
+							problem={problem}
+							estimate={{ data: estimate.currentData, isFetching: estimate.isFetching, isError: estimate.isError, error: estimate.error }}
+							pending={pending}
+							budgetTyped={budgetTyped}
+						/>
 						{mayRun && (
 							<Button onClick={() => void launch()} disabled={problem !== null || createState.isLoading} dataTestId="ft-launch">
 								<ShieldAlert aria-hidden="true" />

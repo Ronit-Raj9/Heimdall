@@ -178,6 +178,7 @@ func ParseConfig(data []byte, name string) (*Config, error) {
 func (c *Config) Validate() error {
 	var errs []error
 	add := func(format string, args ...any) { errs = append(errs, fmt.Errorf(format, args...)) }
+	placeholders := 0
 	if c.Source.URL != "" {
 		if err := checkHTTPURL(c.Source.URL); err != nil {
 			add("source.url: %v", err)
@@ -214,6 +215,7 @@ func (c *Config) Validate() error {
 				case strings.TrimSpace(s) == "" || strings.ContainsAny(s, ",\n"):
 					add("version %s: %s value %q is empty or holds a comma", v.Name, field, s)
 				case strings.Contains(s, "EDIT ME"):
+					placeholders++
 					add("version %s: %s is still the template's EDIT ME placeholder", v.Name, field)
 				}
 			}
@@ -308,8 +310,16 @@ func (c *Config) Validate() error {
 			add("judge.max_per_pull %d: want 1 to 1000", j.MaxPerPull)
 		}
 	}
+	if len(errs) > 0 && placeholders == len(errs) {
+		return fmt.Errorf("%w: %w", ErrUnedited, errors.Join(errs...))
+	}
 	return errors.Join(errs...)
 }
+
+// ErrUnedited marks settings whose only problems are the template's EDIT ME
+// placeholders: the file was written and never edited, which is "not set up
+// yet", not a broken file.
+var ErrUnedited = errors.New("live scoring settings still hold placeholders")
 
 // Find returns the version named name.
 func (c *Config) Find(name string) (*Version, bool) {

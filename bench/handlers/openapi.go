@@ -372,7 +372,7 @@ var APIRoutes = []RouteDoc{
 	{Method: "POST", Path: AuthPrefix + "/signup", Tag: "auth", Summary: "Create an account under the signup policy and sign in", Request: auth.SignupRequest{}, Status: fasthttp.StatusCreated, Response: auth.Me{}},
 	{Method: "POST", Path: AuthPrefix + "/login", Tag: "auth", Summary: "Sign in with email and password; sets the session cookie", Request: auth.LoginRequest{}, Response: auth.Me{}},
 	{Method: "POST", Path: AuthPrefix + "/logout", Tag: "auth", Summary: "End the session and clear the cookie", Status: fasthttp.StatusNoContent},
-	{Method: "POST", Path: AuthPrefix + "/switch-org", Tag: "auth", Summary: "Make one of the user's orgs the session's current org", Request: auth.SwitchOrgRequest{}, Response: auth.MeOrg{}},
+	{Method: "POST", Path: AuthPrefix + "/switch-org", Tag: "auth", Summary: "Make one of the user's orgs the default for new tabs", Request: auth.SwitchOrgRequest{}, Response: auth.MeOrg{}},
 	{Method: "POST", Path: AuthPrefix + "/password", Tag: "auth", Summary: "Change the password; ends the user's other sessions", Request: auth.PasswordChangeRequest{}, Status: fasthttp.StatusNoContent},
 	{Method: "GET", Path: AuthPrefix + "/github/start", Tag: "auth", Summary: "Redirect to GitHub sign-in", Query: []QueryDoc{{Name: "return_to", Description: "Same-site path to land on after sign-in"}}, Status: fasthttp.StatusFound},
 	{Method: "GET", Path: AuthPrefix + "/github/callback", Tag: "auth", Summary: "GitHub's redirect back; redirects to the return path or /login?error=", Status: fasthttp.StatusFound},

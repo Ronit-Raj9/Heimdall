@@ -15,6 +15,11 @@ import (
 // non-members' reads).
 const OrgHeader = "X-Heimdall-Org"
 
+// OrgQueryParam names the org of a GET or HEAD the browser opens directly
+// (a download, an image, an event stream), where no header can be sent
+// (wave 4, organization per tab). Writes name their org only in OrgHeader.
+const OrgQueryParam = "heimdall_org"
+
 // Directory looks orgs and memberships up. The database area implements it
 // (cmd/bifrost-bench adapts bench/db); tests use a map.
 type Directory interface {

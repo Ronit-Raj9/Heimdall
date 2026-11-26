@@ -11,6 +11,7 @@ import type {
 	EndpointTestResult,
 } from "@/lib/types/agentBuilder";
 import { benchApi } from "./benchApi";
+import { tagsOnSuccess } from "./tagsOnSuccess";
 
 /**
  * Agent builder routes (web parity L08): the template catalog, create from a template, and the
@@ -32,7 +33,11 @@ export const agentBuilderApi = benchApi.enhanceEndpoints({ addTagTypes: ["AgentC
 		putAgentConfig: builder.mutation<AgentConfigDoc, AgentConfigPut>({
 			query: ({ id, ...body }) => ({ url: `/agents/${encodeURIComponent(id)}/config`, method: "PUT", body }),
 			// A save can make a new agent version, so the Versions tab reloads too.
-			invalidatesTags: (_r, _e, arg) => [{ type: "AgentConfig", id: arg.id }, { type: "AgentVersions", id: arg.id }, "BenchAgents"],
+			invalidatesTags: tagsOnSuccess((_r, arg) => [
+				{ type: "AgentConfig" as const, id: arg.id },
+				{ type: "AgentVersions" as const, id: arg.id },
+				"BenchAgents" as const,
+			]),
 		}),
 		/** Sends one sample task to an endpoint agent (J3); waits up to about two minutes. */
 		testEndpoint: builder.mutation<EndpointTestResult, EndpointTestRequest>({

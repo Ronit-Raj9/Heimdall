@@ -7,12 +7,16 @@ import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { estimateMinutes } from "./connect.utils";
 
-/** The line every first-look evaluation shows: too small for a verdict, never a gate. */
-export function FirstLookNote() {
+/**
+ * The line every first-look evaluation shows: the picked task count, too small for a verdict, never a
+ * gate. Nothing is shown when the count is not known.
+ */
+export function FirstLookNote({ tasks }: { tasks?: number }) {
 	const { t } = useTranslation("connect");
+	if (tasks === undefined) return null;
 	return (
 		<p className="border-chart-info/30 bg-chart-info/5 rounded-lg border px-3 py-2 text-sm" data-testid="first-look-note">
-			{t("firstLook.note")} {t("firstLook.notGate")}
+			{t("firstLook.note", { count: tasks })} {t("firstLook.notGate")}
 		</p>
 	);
 }
@@ -115,7 +119,7 @@ export function FirstLookLauncher({ agent }: { agent: string }) {
 							{t("firstLook.reference", { agent: ref.agent ?? "", model: ref.model ?? "", score: Math.round(ref.score * 100) })}
 						</p>
 					)}
-					<FirstLookNote />
+					<FirstLookNote tasks={data.pick.tasks} />
 					<div>
 						<Button onClick={() => void start()} isLoading={createState.isLoading} data-testid="first-look-start">
 							{createState.isLoading ? t("firstLook.starting") : t("firstLook.start")}

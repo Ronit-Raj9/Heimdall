@@ -1,5 +1,6 @@
 // Pure helpers of the run trace view: step kind classes, filters, search, token and cost per
 // step, the input/output split of a row, and a JSON tokenizer for highlighting. Tested without a page.
+import { withOrgParam } from "@/lib/store/apis/orgParam";
 import type { BenchEvent, StepRecord } from "@/lib/types/bench";
 
 export type TraceKind = "model" | "tool" | "command" | "file" | "verifier" | "other";
@@ -178,7 +179,7 @@ export function formatDuration(ms: number): string {
 
 /** The run's trace download url for one format. */
 export function runTraceUrl(base: string, runId: string, format: "json" | "otlp" | "jsonl"): string {
-	return `${base}/runs/${encodeURIComponent(runId)}/trace?format=${format}`;
+	return withOrgParam(`${base}/runs/${encodeURIComponent(runId)}/trace?format=${format}`);
 }
 
 /**

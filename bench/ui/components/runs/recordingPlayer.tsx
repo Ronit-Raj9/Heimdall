@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { withOrgParam } from "@/lib/store/apis/orgParam";
 import { useGetRunRecordingsQuery, type RecordingView } from "@/lib/store/apis/recordingsApi";
 import { cn } from "@/lib/utils";
 import { Columns2, Download, Film, Pause, Play, UserRound, X } from "lucide-react";
@@ -98,7 +99,7 @@ export function RecordingPlayer({
 					<video
 						key={video.url}
 						ref={ref}
-						src={video.url}
+						src={withOrgParam(video.url ?? "")}
 						controls
 						preload="metadata"
 						className="bg-muted block aspect-video w-full rounded-xl border object-contain"
@@ -135,7 +136,7 @@ export function RecordingPlayer({
 						<span>{video.started_at ? t("started", { time: new Date(video.started_at).toLocaleTimeString() }) : t("noStart")}</span>
 						<span className="ml-auto tabular-nums">{formatSize(video.bytes)}</span>
 						<Button size="sm" variant="ghost" asChild>
-							<a href={video.url} download={video.file} aria-label={t("download")}>
+							<a href={withOrgParam(video.url ?? "")} download={video.file} aria-label={t("download")}>
 								<Download aria-hidden="true" />
 							</a>
 						</Button>
@@ -212,7 +213,7 @@ function RecordingFiles({ files }: { files: RecordingView[] }) {
 						</span>
 						<span className="text-muted-foreground">{f.kind}</span>
 						{f.url && !f.error ? (
-							<a className="text-primary underline-offset-2 hover:underline" href={f.url} download={f.file}>
+							<a className="text-primary underline-offset-2 hover:underline" href={withOrgParam(f.url)} download={f.file}>
 								{t("download")} {formatSize(f.bytes)}
 							</a>
 						) : (

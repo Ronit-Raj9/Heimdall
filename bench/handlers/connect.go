@@ -693,6 +693,10 @@ func (h *connectHandler) benchmarkInfos(ctx context.Context, cfg *schemas.AgentC
 		info := connect.BenchmarkInfo{ID: id, Tasks: len(evalAdmittedTasks(s)), Practice: PracticeBenchmark(id) || examples[id]}
 		ok, _, reason := evalCompat(cfg, s)
 		info.Compatible, info.Reason = ok, reason
+		if s.Lock == nil {
+			// The planner refuses a suite without a lock, so it is never picked.
+			info.Compatible, info.Reason = false, "it is not ready yet: run its readiness check on the benchmark page"
+		}
 		info.NeedsModel = s.Judge != nil || s.Simulator != nil || s.Grading == "judged"
 		var limits []float64
 		for _, t := range s.Tasks {

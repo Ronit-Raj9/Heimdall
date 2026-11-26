@@ -5,7 +5,7 @@ import { JobsIndicator } from "@/components/platform/jobsDrawer";
 import { UserMenu } from "@/components/platform/userMenu";
 import { ThemeToggle } from "@/components/themeToggle";
 import { Button } from "@/components/ui/button";
-import { BENCH_NAV_GROUPS, activeNavItem } from "@/lib/constants/navigation";
+import { BENCH_NAV_GROUPS, activeNavItem, ownPageTitle } from "@/lib/constants/navigation";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { IS_FIXTURE_MODE, useGetHealthQuery } from "@/lib/store";
 import { launchAvailable } from "@/lib/types/bench";
@@ -86,7 +86,7 @@ export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
  * Where the user is: the section, then the page (a link back to the page's list when deeper).
  * Below sm only the page shows. Paths no entry owns (an auth page) show nothing.
  */
-function HeaderCrumbs({ pathname }: { pathname: string }) {
+export function HeaderCrumbs({ pathname }: { pathname: string }) {
 	const { t } = useTranslation("bench");
 	const item = activeNavItem(pathname);
 	if (!item) return null;
@@ -97,6 +97,8 @@ function HeaderCrumbs({ pathname }: { pathname: string }) {
 	// The section crumb: skipped for Home (no heading) and where it would repeat the page (Settings).
 	const groupLabel = group?.labelKey ? t(group.labelKey) : null;
 	const showGroup = groupLabel !== null && groupLabel !== t(item.labelKey);
+	// A page under another entry (a job under Settings, Connect under My agents) ends with its own title.
+	const own = atEntry ? null : ownPageTitle(path);
 	return (
 		<nav aria-label={t("shell.breadcrumbs")} className="min-w-0" data-testid="header-breadcrumbs">
 			<ol className="flex min-w-0 items-center gap-1.5 text-sm">
@@ -124,6 +126,18 @@ function HeaderCrumbs({ pathname }: { pathname: string }) {
 						</Link>
 					)}
 				</li>
+				{own && (
+					<>
+						<li aria-hidden="true" className="text-muted-foreground/60">
+							<ChevronRight className="size-3.5" />
+						</li>
+						<li className="min-w-0">
+							<span aria-current="page" className="text-foreground block truncate font-medium">
+								{own}
+							</span>
+						</li>
+					</>
+				)}
 			</ol>
 		</nav>
 	);

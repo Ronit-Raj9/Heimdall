@@ -98,13 +98,26 @@ func InitScenarioTask(opts ScenarioTaskOptions) (*TaskInitResult, error) {
 	return res, nil
 }
 
+// KindMismatchError is a task type that does not match the template the
+// suite was written from (wave 4, N78). Its text is plain; the command line
+// adds its own flag hint.
+type KindMismatchError struct {
+	Suite    string // path of suite.yaml
+	Detected string // the suite's template
+	Wanted   string // the task type asked for
+}
+
+func (e *KindMismatchError) Error() string {
+	return fmt.Sprintf("This benchmark holds %s tasks, not %s tasks. Choose %s or leave the task type on Automatic.", e.Detected, e.Wanted, e.Detected)
+}
+
 // scenarioKind reconciles the suite's template with the -kind flag.
 func scenarioKind(detected, kind, suitePath string) (string, error) {
 	switch {
 	case kind != "" && !IsScenarioTemplate(kind):
 		return "", fmt.Errorf("-kind %q: want one of %s", kind, strings.Join(ScenarioTemplates(), ", "))
 	case kind != "" && detected != "" && detected != kind:
-		return "", fmt.Errorf("%s was written from template %s, not %s; pass -kind %s or leave -kind out", suitePath, detected, kind, detected)
+		return "", &KindMismatchError{Suite: suitePath, Detected: detected, Wanted: kind}
 	case kind != "":
 		return kind, nil
 	case IsScenarioTemplate(detected):

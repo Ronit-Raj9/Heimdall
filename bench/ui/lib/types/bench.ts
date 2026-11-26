@@ -3862,6 +3862,8 @@ export interface AuthMe {
 	orgs: MeOrg[];
 	/** Id of the organization requests act in. */
 	current_org?: string;
+	default_org?: string;
+	org_reset?: boolean;
 	/** The caller's role in current_org. */
 	role?: Role;
 	/** Session CSRF value: sent as X-Heimdall-CSRF on every cookie-authenticated write. */

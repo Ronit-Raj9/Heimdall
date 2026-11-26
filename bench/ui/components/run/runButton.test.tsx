@@ -10,8 +10,10 @@ vi.mock("@/components/models/modelPicker", async () => await import("@/lib/testi
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
-	useGetSuitesQuery: () => okQuery({ mode: "live", suites: [{ id: "coding-core", version: "1.0.0", task_count: 8 }] }),
 	useGetAgentsQuery: () => okQuery({ mode: "live", agents: [{ id: "codex", path: "agents/codex.yaml" }] }),
+}));
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({
+	useGetSuitesLightQuery: () => okQuery({ mode: "live", suites: [{ id: "coding-core", version: "1.0.0", task_count: 8 }] }),
 }));
 vi.mock("@/lib/store/apis/quickrunApi", () => ({ useQuickRunMutation: () => api.run }));
 

@@ -108,6 +108,11 @@ export function liveSetupCanSave(params: LiveInitParams | null, existing: boolea
 	return params !== null && (!existing || force);
 }
 
+/** "Decide later" writes no settings file: an unedited template is a trap, and "not set up yet" is the true state. */
+export function liveSetupStartsJob(split: LiveSplit): boolean {
+	return split !== "later";
+}
+
 const EMPTY = {
 	url: "",
 	token_env: "",
@@ -147,6 +152,10 @@ export function LiveSetup({ existing, hosted, onClose }: { existing?: boolean; h
 		</label>
 	);
 	const submit = async () => {
+		if (!liveSetupStartsJob(split)) {
+			onClose?.();
+			return;
+		}
 		if (!params) return;
 		const res = await createJob({ kind: "livescore.init", params });
 		if ("data" in res && res.data) {
@@ -232,7 +241,7 @@ export function LiveSetup({ existing, hosted, onClose }: { existing?: boolean; h
 					</label>
 					<div className="flex flex-wrap items-center gap-3">
 						<Button
-							disabled={!liveSetupCanSave(params, existing, force) || state.isLoading}
+							disabled={liveSetupStartsJob(split) && (!liveSetupCanSave(params, existing, force) || state.isLoading)}
 							onClick={() => void submit()}
 							data-testid="live-setup-submit"
 						>

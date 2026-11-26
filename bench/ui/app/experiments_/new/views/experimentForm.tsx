@@ -9,7 +9,13 @@ import { LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useCreateExperimentMutation, usePlanExperimentMutation, useStartExperimentMutation } from "@/lib/store/apis/benchApi";
+import {
+	getBenchErrorMessage,
+	useCreateExperimentMutation,
+	usePlanExperimentMutation,
+	useStartExperimentMutation,
+} from "@/lib/store/apis/benchApi";
+import { SkillScanProblem, parseSkillRefusal } from "@/app/evaluations_/$evalId/views/skillScanProblem";
 import type { Catalog, CatalogAgent, Experiment, ExperimentPlan } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -546,9 +552,17 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 								{blockReason}
 							</p>
 						)}
-						{planState.error && !planState.isLoading && (
-							<LoadError title={t("experiments.new.actions.planError")} error={planState.error} testId="experiment-plan-error" />
-						)}
+						{planState.error &&
+							!planState.isLoading &&
+							(() => {
+								// wave 4, N22: a skill gate refusal offers the scan in place
+								const refusal = parseSkillRefusal(getBenchErrorMessage(planState.error));
+								return refusal ? (
+									<SkillScanProblem refusal={refusal} testId="experiment-plan-skill-problem" />
+								) : (
+									<LoadError title={t("experiments.new.actions.planError")} error={planState.error} testId="experiment-plan-error" />
+								);
+							})()}
 						{actionError && <LoadError title={actionError.title} error={actionError.error} testId="experiment-action-error" />}
 						{planned && <PlanResult plan={planned.plan} estimateShown className={cn(stale && "opacity-60")} />}
 						{planned && <PlanEstimate experiment={planned.experiment} className={cn(stale && "opacity-60")} />}

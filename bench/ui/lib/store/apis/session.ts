@@ -16,6 +16,17 @@ export const ORG_HEADER = "X-Heimdall-Org";
 /** localStorage key written on an org switch: other tabs hear the storage event and re-ask /auth/me. */
 export const ORG_SWITCH_KEY = "heimdall.org-switch";
 
+/** sessionStorage key holding the organization this tab shows, so a reload keeps it (wave 4, organization per tab). */
+export const TAB_ORG_KEY = "heimdall.tab-org";
+
+function readTabOrg(): string {
+	try {
+		return window.sessionStorage.getItem(TAB_ORG_KEY) ?? "";
+	} catch {
+		return "";
+	}
+}
+
 interface AuthState {
 	mode: AuthMode;
 	csrf: string;
@@ -23,7 +34,7 @@ interface AuthState {
 	org: string;
 }
 
-let authState: AuthState = { mode: "local", csrf: "", org: "" };
+let authState: AuthState = { mode: "local", csrf: "", org: readTabOrg() };
 
 /** The auth mode and CSRF value the request layer uses. Local until /auth/me says otherwise. */
 export function getAuthState(): Readonly<AuthState> {
@@ -61,17 +72,58 @@ export function whenAuthKnown(waitMs = 8000): Promise<void> {
 /** Records the mode, CSRF value and displayed organization from /auth/me. */
 export function setAuthState(next: { mode: AuthMode; csrf?: string; org?: string }): void {
 	authState = { mode: next.mode, csrf: next.csrf ?? "", org: next.org ?? "" };
+	if (authState.org) {
+		try {
+			window.sessionStorage.setItem(TAB_ORG_KEY, authState.org);
+		} catch {
+			// Storage blocked: the tab keeps its org until a reload.
+		}
+	}
 	authPending = false;
 	markAuthKnown();
 }
 
-/** Tells other open tabs that this tab switched organization. Best effort: no storage, no signal. */
+/** Other tabs refresh their list of organizations; each keeps its own. Best effort: no storage, no signal. */
 export function announceOrgSwitch(orgId: string): void {
 	try {
 		window.localStorage.setItem(ORG_SWITCH_KEY, `${orgId}:${Date.now()}`);
 	} catch {
 		// Storage blocked: other tabs keep their org (their requests still carry it).
 	}
+}
+
+// The organization reset notice (wave 4): set when /auth/me says the org this tab asked for can no
+// longer be opened; OrgResetBanner reads it through subscribeOrgReset and getOrgReset.
+let orgResetNotice = "";
+const orgResetListeners = new Set<() => void>();
+
+function emitOrgReset(): void {
+	for (const listener of orgResetListeners) listener();
+}
+
+/** Records that this tab now shows org because the org it asked for is no longer open to the user. */
+export function noteOrgReset(org: string): void {
+	orgResetNotice = org;
+	emitOrgReset();
+}
+
+/** The org id of the pending reset notice, "" when none. */
+export function getOrgReset(): string {
+	return orgResetNotice;
+}
+
+/** Hides the reset notice. */
+export function clearOrgReset(): void {
+	orgResetNotice = "";
+	emitOrgReset();
+}
+
+/** Subscribes to changes of the reset notice; returns the unsubscribe function. */
+export function subscribeOrgReset(listener: () => void): () => void {
+	orgResetListeners.add(listener);
+	return () => {
+		orgResetListeners.delete(listener);
+	};
 }
 
 type UnauthorizedListener = () => void;

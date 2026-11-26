@@ -221,7 +221,7 @@ func (h *RunsHandler) getRun(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.mode, "read scenario evidence of run "+id, err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, h.withDebugAllowed(ctx, rv, out))
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(h.withDebugAllowed(ctx, rv, out)))
 }
 
 // withDebugAllowed adds debug_allowed, computed by the rule the debug routes
@@ -335,7 +335,7 @@ func (h *RunsHandler) getRunReceipts(ctx *fasthttp.RequestCtx) {
 	if receipts == nil {
 		receipts = []schemas.Receipt{}
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, schemas.RunReceipts{RunID: rv.Run.RunID, Receipts: receipts})
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(schemas.RunReceipts{RunID: rv.Run.RunID, Receipts: receipts}))
 }
 
 // getRunFile handles GET /api/bench/runs/{id}/files/{name} for allowlisted

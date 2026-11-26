@@ -144,8 +144,8 @@ func TestConnectFirstLookAndCatalog(t *testing.T) {
 	fast := []*schemas.Task{{ID: "a", Timeouts: schemas.TaskTimeouts{AgentS: 30}}}
 	suites := &fakeSuites{ids: []string{"hd-swe-verified", "slowqa", "fastqa"}, suites: map[string]*schemas.Suite{
 		"hd-swe-verified": {ID: "hd-swe-verified", TaskIDs: []string{"x"}},
-		"slowqa":          {ID: "slowqa", TaskIDs: []string{"t1", "t2"}, Tasks: tasks},
-		"fastqa":          {ID: "fastqa", TaskIDs: []string{"a"}, Tasks: fast},
+		"slowqa":          {ID: "slowqa", TaskIDs: []string{"t1", "t2"}, Tasks: tasks, Lock: w4b05Locked("t1", "t2")},
+		"fastqa":          {ID: "fastqa", TaskIDs: []string{"a"}, Tasks: fast, Lock: w4b05Locked("a")},
 	}}
 	r, st := connectRouter(t, suites)
 	_ = st
@@ -242,9 +242,9 @@ func TestConnectFirstLookSkipsPractice(t *testing.T) {
 	fast := []*schemas.Task{{ID: "a", Timeouts: schemas.TaskTimeouts{AgentS: 10}}}
 	slow := []*schemas.Task{{ID: "b", Timeouts: schemas.TaskTimeouts{AgentS: 300}}}
 	suites := &fakeSuites{ids: []string{"acme-memory", "coding-core", "realqa"}, suites: map[string]*schemas.Suite{
-		"acme-memory": {ID: "acme-memory", TaskIDs: []string{"a"}, Tasks: fast},
-		"coding-core": {ID: "coding-core", TaskIDs: []string{"a"}, Tasks: fast},
-		"realqa":      {ID: "realqa", TaskIDs: []string{"b"}, Tasks: slow},
+		"acme-memory": {ID: "acme-memory", TaskIDs: []string{"a"}, Tasks: fast, Lock: w4b05Locked("a")},
+		"coding-core": {ID: "coding-core", TaskIDs: []string{"a"}, Tasks: fast, Lock: w4b05Locked("a")},
+		"realqa":      {ID: "realqa", TaskIDs: []string{"b"}, Tasks: slow, Lock: w4b05Locked("b")},
 	}}
 	h := &connectHandler{env: OrgEnv{Mode: schemas.Mode("live"), Services: Services{Suites: suites}}}
 	cfg := &schemas.AgentConfig{ID: "bot"}

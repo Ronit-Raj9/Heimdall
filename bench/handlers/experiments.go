@@ -18,6 +18,7 @@ import (
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/leaderboard"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/plaintext"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/stats"
 	"github.com/maximhq/bifrost/bench/tenancy"
@@ -132,7 +133,7 @@ func (h *ExperimentsHandler) planExperiment(ctx *fasthttp.RequestCtx) {
 	case errors.Is(err, context.DeadlineExceeded):
 		sendDepError(ctx, h.mode, "plan experiment", err)
 	case err != nil:
-		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, FailedPlan(exp, err))
+		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(FailedPlan(exp, err)))
 	default:
 		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, BuildPlan(m))
 	}
@@ -352,7 +353,7 @@ func (h *ExperimentsHandler) getEvents(ctx *fasthttp.RequestCtx) {
 	h.recorder.follow(m.ExpID)
 	events, next, truncated := h.recorder.since(m.ExpID, since)
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, schemas.EventsPoll{
-		ExpID: m.ExpID, Events: events, Next: next, Truncated: truncated, Status: h.status(m, runs, false),
+		ExpID: m.ExpID, Events: plainEvents(events), Next: next, Truncated: truncated, Status: h.status(m, runs, false),
 	})
 }
 
@@ -443,11 +444,11 @@ func tasksToDetect(sd, alpha float64, from int) int {
 }
 
 // FailedPlan is the plan answered when the planner refuses an experiment:
-// nothing sized, the planner's error in plain words (PlainPlanError) in
-// errors. It is pure.
+// nothing sized, the planner's error in plain words (PlainPlanErrors), one
+// entry per problem, in errors. It is pure.
 func FailedPlan(exp *schemas.Experiment, err error) schemas.ExperimentPlan {
 	p := emptyPlan(exp)
-	p.Errors = append(p.Errors, PlainPlanError(err))
+	p.Errors = append(p.Errors, PlainPlanErrors(err)...)
 	return p
 }
 
@@ -511,7 +512,7 @@ func (h *ExperimentsHandler) status(m *schemas.Manifest, runs []RunView, started
 	}
 	return BuildStatus(m, runs, StatusFacts{Costs: costsOf(runs, metrics), Active: active, AnalysisID: h.latestAnalysis(m.ExpID),
 		Cancelled:   !active && h.cancelledFact(m.ExpID), // Jobs area: cancelled state (experimentjobs.go)
-		NotRequired: notRequiredSlots(m, runs, metrics), Problem: problem, RunJobID: jobID})
+		NotRequired: notRequiredSlots(m, runs, metrics), Problem: plaintext.Hosted(problem), RunJobID: jobID})
 }
 
 // anySealed reports whether any run is sealed. Only an experiment with no

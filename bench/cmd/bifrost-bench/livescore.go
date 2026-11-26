@@ -361,6 +361,10 @@ func serveLivescore(a *app, offline bool) handlers.LivescoreSource {
 
 func (l liveSource) scorer() (*livescore.Scorer, error) { return scorerFor(l.a) }
 
+// liveUneditedNote is the status note of a settings file that still holds
+// the template's placeholders.
+const liveUneditedNote = "The settings still have placeholder keys. Open Set up live scoring and choose how to tell the versions apart."
+
 // Status implements handlers.LivescoreSource.
 func (l liveSource) Status(_ context.Context) (*livescore.Status, error) {
 	s, err := l.scorer()
@@ -368,6 +372,11 @@ func (l liveSource) Status(_ context.Context) (*livescore.Status, error) {
 		// No settings file is not a problem, only "not set up yet" (N131):
 		// Problem means a file exists and did not load.
 		return &livescore.Status{Evidence: livescore.EvidenceClass, Note: livescore.StatusNote, Versions: []livescore.VersionView{},
+			Signals: livescore.SignalDefs(), Worst: []livescore.SessionRecord{}, Events: []livescore.LogEvent{}}, nil
+	}
+	if errors.Is(err, livescore.ErrUnedited) {
+		// An unedited template is "not set up yet" too, with what to do next.
+		return &livescore.Status{Evidence: livescore.EvidenceClass, Note: liveUneditedNote, Versions: []livescore.VersionView{},
 			Signals: livescore.SignalDefs(), Worst: []livescore.SessionRecord{}, Events: []livescore.LogEvent{}}, nil
 	}
 	if err != nil {

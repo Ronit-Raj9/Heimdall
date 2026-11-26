@@ -1,3 +1,4 @@
+import { withOrgParam } from "./orgParam";
 import type { OperateBackupList, OperateStatus } from "@/lib/types/operate";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
@@ -25,5 +26,5 @@ export const { useGetOperateStatusQuery, useGetOperateBackupsQuery, useDeleteOpe
 
 /** The download URL of an evidence backup zip. */
 export function operateBackupUrl(name: string): string {
-	return `${BENCH_API_BASE}/operate/backups/${encodeURIComponent(name)}`;
+	return withOrgParam(`${BENCH_API_BASE}/operate/backups/${encodeURIComponent(name)}`);
 }

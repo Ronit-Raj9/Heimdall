@@ -82,11 +82,11 @@ func (h *ForecastHandler) postEstimate(ctx *fasthttp.RequestCtx) {
 	f, err := h.source.Estimate(work, exp)
 	switch {
 	case errors.Is(err, ErrPlanRefused):
-		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, RefusedForecast(exp, err, h.now()))
+		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(RefusedForecast(exp, err, h.now())))
 	case err != nil:
 		sendDepError(ctx, h.mode, "estimate", err)
 	default:
-		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, f)
+		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(f))
 	}
 }
 
@@ -126,7 +126,7 @@ func (h *ForecastHandler) getMatrix(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.mode, "matrix", err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, mx)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(mx))
 }
 
 // RefusedForecast is the forecast answered when the planner refuses the
@@ -138,6 +138,6 @@ func RefusedForecast(exp *schemas.Experiment, err error, now time.Time) *schemas
 		ExpID: exp.ID, Suite: exp.Suite, GeneratedAt: now.UTC(), Arms: []schemas.ArmForecast{},
 		CostUSD: unknown, AgentTimeS: unknown, WallClockS: unknown, Concurrency: max(1, exp.Concurrency),
 		BudgetUSD: exp.Budget.TotalUSD, Fit: schemas.FitUnknown, FitReason: "the plan was refused",
-		Basis: "No forecast: the experiment could not be planned.", Notes: []string{"plan experiment: " + err.Error()},
+		Basis: "No forecast: the experiment could not be planned.", Notes: []string{PlainPlanError(err)},
 	}
 }

@@ -338,7 +338,7 @@ func TestInitScenarioTaskRefusals(t *testing.T) {
 	}{
 		{"bad id", ScenarioTaskOptions{SuiteDir: mcp, ID: "Bad Id"}, "task id"},
 		{"exists", ScenarioTaskOptions{SuiteDir: mcp, ID: "restock"}, "exists"},
-		{"kind mismatch", ScenarioTaskOptions{SuiteDir: mcp, ID: "t02", Kind: TemplateQA}, "written from template mcp"},
+		{"kind mismatch", ScenarioTaskOptions{SuiteDir: mcp, ID: "t02", Kind: TemplateQA}, "holds mcp tasks"},
 		{"unknown kind", ScenarioTaskOptions{SuiteDir: mcp, ID: "t02", Kind: "chat"}, "want one of"},
 		{"repo suite", ScenarioTaskOptions{SuiteDir: py, ID: "t02"}, "pass -repo"},
 		{"from itself", ScenarioTaskOptions{SuiteDir: mcp, ID: "t02", From: "t02"}, "another task"},

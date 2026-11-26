@@ -1,3 +1,4 @@
+import { withOrgParam } from "./orgParam";
 import type { ProjectArea, ProjectFile, ProjectFileList, ProjectFileSaved, ProjectFileVersions } from "@/lib/types/projectfiles";
 import type { FetchArgs } from "@reduxjs/toolkit/query/react";
 import { benchApi } from "./benchApi";
@@ -97,12 +98,12 @@ export function saveProjectFileRequest({ area, path, content, ifMatch, note }: S
 
 /** The download URL of the whole project as a zip. */
 export function projectExportUrl(): string {
-	return `${BENCH_API_BASE}/project/export.zip`;
+	return withOrgParam(`${BENCH_API_BASE}/project/export.zip`);
 }
 
 /** The raw download URL of one file, any size (the blobs route streams it). */
 export function projectRawUrl(area: ProjectArea, path: string): string {
-	return `${BENCH_API_BASE}/project/blobs/${area}/${encodeProjectPath(path)}`;
+	return withOrgParam(`${BENCH_API_BASE}/project/blobs/${area}/${encodeProjectPath(path)}`);
 }
 
 export const {
