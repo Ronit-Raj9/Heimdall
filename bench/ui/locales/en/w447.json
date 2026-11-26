@@ -1,0 +1,75 @@
+{
+	"nav": { "replays": "Shadow replay" },
+	"jobs": { "kinds": { "replay.run": "Shadow replay" } },
+	"page": {
+		"title": "Shadow replay",
+		"intro": "Replay recorded sessions against another model. Tools are answered from the recording and never run. This is a comparison, not a benchmark result."
+	},
+	"settings": {
+		"toggle": "Allow shadow replay for this organization",
+		"confirm": "Recorded sessions, cleaned of keys and personal data, will be sent to the model you pick, through your own model key. Tools are never run.",
+		"turnOn": "Turn on",
+		"cancel": "Cancel",
+		"off": "Shadow replay is off for this organization. An admin turns it on on the Replays page.",
+		"adminOnly": "Only an admin can change this.",
+		"saveError": "The setting was not saved."
+	},
+	"form": {
+		"title": "New replay",
+		"source": "Sessions from",
+		"sourceHint": "The name of a Bifrost source of your inbox",
+		"window": "Time window",
+		"window24h": "Last 24 hours",
+		"window7d": "Last 7 days",
+		"window14d": "Last 14 days",
+		"sessions": "How many sessions",
+		"onlyFailed": "Only sessions that failed",
+		"mode": "Mode",
+		"modeFixed": "Same inputs, one step at a time",
+		"modeTrajectory": "Let the new model carry on",
+		"candidate": "New model",
+		"candidateHint": "provider/model, for example openai/gpt-4o-mini",
+		"judge": "Judge for text answers (optional)",
+		"cap": "Spending cap",
+		"capHint": "In US dollars, shared by the new model and the judge",
+		"confirmCost": "I understand this replay makes paid model calls up to the spending cap",
+		"start": "Start replay",
+		"started": "Replay started. It shows below when it is done.",
+		"badModel": "Write the model as provider/model."
+	},
+	"list": {
+		"title": "Replays",
+		"empty": "No replays yet.",
+		"loadError": "The replays could not be loaded.",
+		"sessions": "{{count}} sessions",
+		"spent": "Spent ${{usd}}"
+	},
+	"run": {
+		"back": "All replays",
+		"loadError": "This replay could not be loaded.",
+		"equivalentShare": "Same answer in {{share}} of {{n}} compared steps (95% interval {{low}} to {{high}})",
+		"leftOut": "{{count}} steps left out: not sent or not enough recorded data",
+		"medians": "Median cost per step: {{new}} new, {{recorded}} recorded ({{paired}} steps with both). Median latency: {{newMs}} ms new, {{recordedMs}} ms recorded.",
+		"stoppedAt": "stopped at step {{n}}",
+		"toolAgreement": "tool agreement {{share}}",
+		"writeSame": "write calls the same",
+		"writeDifferent": "write calls differ",
+		"recorded": "Recorded",
+		"new": "New model",
+		"judgeNote": "A model's opinion",
+		"toInbox": "Send to Inbox",
+		"inInbox": "In the inbox",
+		"toInboxError": "The session was not sent to the inbox.",
+		"stopped": "The replay stopped early: {{why}}",
+		"session": "Session {{n}}"
+	},
+	"state": {
+		"equivalent_response": "Same answer",
+		"different_response": "Different answer",
+		"different_tool_call": "Different tool call",
+		"missing_recorded_tool_result": "Stopped: no recorded result for this tool call",
+		"redacted_input": "Not sent: the recorded input was cleaned of private data",
+		"insufficient_evidence": "Not enough recorded data",
+		"replay_infrastructure_failure": "The replay itself failed"
+	}
+}
