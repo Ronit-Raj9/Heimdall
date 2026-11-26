@@ -108,3 +108,7 @@ func (h *evaluationsHandler) cheatCheck(ctx *fasthttp.RequestCtx) {
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusAccepted, child)
 }
+
+// cheatCheckNotReleasable is the release preview's problem for a cheat check:
+// its runs are on impossible twins and decide nothing.
+const cheatCheckNotReleasable = "This is a cheat check on impossible tasks; it decides nothing and cannot be released."

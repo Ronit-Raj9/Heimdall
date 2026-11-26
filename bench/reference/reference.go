@@ -375,6 +375,8 @@ func Check(ev *schemas.Evaluation) error {
 		return fmt.Errorf("evaluation %s ran held-out tasks: publishing would expose them", ev.ID)
 	case ev.RerunOf != "":
 		return fmt.Errorf("evaluation %s reruns the failures of %s: it is not a score", ev.ID, ev.RerunOf)
+	case ev.CheatCheckOf != "":
+		return fmt.Errorf("evaluation %s is the cheat check of %s: it is not a score", ev.ID, ev.CheatCheckOf)
 	}
 	return nil
 }

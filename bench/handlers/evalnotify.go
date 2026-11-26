@@ -420,7 +420,7 @@ func scheduledRegression(score, ciHigh, prev, limit float64) string {
 func previousScheduledRun(evals []*schemas.Evaluation, ev *schemas.Evaluation, label string) (*schemas.Evaluation, string) {
 	var best *schemas.Evaluation
 	for _, e := range evals {
-		if e == nil || e.ID == ev.ID || e.Schedule != ev.Schedule || e.Status != schemas.EvaluationDone || e.RerunOf != "" || !e.CreatedAt.Before(ev.CreatedAt) {
+		if e == nil || e.ID == ev.ID || e.Schedule != ev.Schedule || e.Status != schemas.EvaluationDone || e.RerunOf != "" || e.CheatCheckOf != "" || !e.CreatedAt.Before(ev.CreatedAt) {
 			continue
 		}
 		if ev.Org != "" && e.Org != "" && e.Org != ev.Org {

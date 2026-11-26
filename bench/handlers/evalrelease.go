@@ -110,6 +110,10 @@ func (h *evalReleaseHandler) buildPreview(ctx context.Context, ev *schemas.Evalu
 		p.Problem = "the evaluation has not finished; a release needs its results"
 		return p, nil
 	}
+	if ev.CheatCheckOf != "" {
+		p.Problem = cheatCheckNotReleasable
+		return p, nil
+	}
 	if !slices.ContainsFunc(p.Children, func(c EvaluationReleaseChild) bool { return c.Included }) {
 		p.Problem = "no benchmark of this evaluation finished"
 		return p, nil
