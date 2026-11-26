@@ -11,7 +11,9 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/costexplain"
+	"github.com/maximhq/bifrost/bench/gwfeature"
 	"github.com/maximhq/bifrost/bench/leaderboard"
+	"github.com/maximhq/bifrost/bench/modelid"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -39,6 +41,13 @@ type run struct {
 	calls     int // model calls in the gateway rows
 	failures  int // calls the provider failed (5xx, 429, no status)
 	fallbacks int
+	// Served model counts of the run's model calls (W4 feature 8, from
+	// gwfeature.ReadRows): known and the model asked for, known, unknown,
+	// and the distinct served ids.
+	servedAsAsked int
+	servedKnown   int
+	servedUnknown int
+	servedModels  map[string]int
 }
 
 // benchRuns is one child experiment's clean graded runs by arm label.
@@ -138,6 +147,25 @@ func readBench(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 				case q.Status == "error" && providerFailure(q.ErrorStatus):
 					g.failures++
 				}
+			}
+		}
+		if rows, _, _, err := gwfeature.ReadRows(src, r.Run.RunID); err == nil {
+			for _, q := range rows {
+				if q.Kind != "" && q.Kind != "message" {
+					continue
+				}
+				if q.ModelServed == "" {
+					g.servedUnknown++
+					continue
+				}
+				g.servedKnown++
+				if modelid.SameModel(q.ModelAsked, q.ModelServed) {
+					g.servedAsAsked++
+				}
+				if g.servedModels == nil {
+					g.servedModels = map[string]int{}
+				}
+				g.servedModels[q.ModelServed]++
 			}
 		}
 		br.arms[label] = append(br.arms[label], g)
