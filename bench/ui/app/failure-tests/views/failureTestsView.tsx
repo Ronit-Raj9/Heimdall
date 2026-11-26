@@ -14,7 +14,8 @@ import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { useGetAgentsQuery, useGetSuitesQuery } from "@/lib/store";
+import { useGetAgentsQuery } from "@/lib/store";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import {
 	useCreateEvaluationMutation,
 	useEstimateEvaluationQuery,
@@ -223,7 +224,7 @@ export default function FailureTestsView() {
 	const mayRun = canUse(useSession(), "member");
 	const [agentParam, setAgentParam] = useQueryState("agent", parseAsString.withOptions({ history: "replace" }));
 	const agents = useGetAgentsQuery();
-	const suites = useGetSuitesQuery();
+	const suites = useGetSuitesLightQuery();
 	const evals = useListEvaluationsQuery();
 	const catalog = useGetBenchFaultsQuery();
 	const [form, setForm] = useState<FailureTestForm>({

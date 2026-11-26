@@ -65,8 +65,8 @@ vi.mock("@/components/models/groupedModelPicker", () => ({
 vi.mock("@/lib/store", async (importOriginal) => ({
 	...((await importOriginal()) as Record<string, unknown>),
 	useGetAgentsQuery: () => fx.ok(fx.agents),
-	useGetSuitesQuery: () => fx.ok(fx.suites),
 }));
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({ useGetSuitesLightQuery: () => fx.ok(fx.suites) }));
 
 vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 	...((await importOriginal()) as Record<string, unknown>),
