@@ -8,6 +8,8 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,11 +18,13 @@ import (
 	"testing/fstest"
 
 	"github.com/maximhq/bifrost/bench/agentversions"
+	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/improve"
 	"github.com/maximhq/bifrost/bench/improve/improvetest"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/store"
 	"github.com/maximhq/bifrost/bench/utils"
+	"github.com/maximhq/bifrost/bench/webhooks"
 )
 
 // iwihSkillPath is the skill the improver adds in round 1. Its "{{x}}" must
@@ -280,5 +284,58 @@ func TestImproveCreateRefusesBeforeSpend(t *testing.T) {
 				t.Errorf("records after the refusal: %d", len(recs))
 			}
 		})
+	}
+}
+
+// Item 3 (I42 to I39): the server's runner sends improvement.paused when a
+// real run pauses at a tripwire, through the hook improveOnEvent.
+func TestPausedImprovementDispatchesItsEvent(t *testing.T) {
+	if improveOnEvent == nil {
+		t.Fatal("improveOnEvent is not set")
+	}
+	var mu sync.Mutex
+	var got []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		got = append(got, string(b))
+		mu.Unlock()
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+	root := t.TempDir()
+	url := srv.URL
+	if _, err := webhookStore(auth.LocalOrgID, root, false).Create(webhooks.Input{URL: &url,
+		Events: &[]string{webhooks.EventImprovementFinished, webhooks.EventImprovementPaused}}, "u1", true); err != nil {
+		t.Fatal(err)
+	}
+	st, err := store.NewFSStore(filepath.Join(root, "runs"), utils.NewStdLogger(io.Discard, false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := newImproveRunner(&app{cfg: &lib.Config{Root: root}, store: st})
+	if r.OnEvent == nil {
+		t.Fatal("newImproveRunner left OnEvent nil")
+	}
+	x := &improvetest.Exec{Behavior: improvetest.Cheat, Base: 2, NTasks: 40}
+	r.Exec = x
+	spec := &improve.Spec{Name: "pause-ev", Agent: "agents/scripted-improver.yaml", Suite: "scripted@1.0.0", Seed: 7, Rounds: 2,
+		Editable: improve.Editable{Files: []string{improvetest.NotesPath}},
+		Commit:   improve.CommitSpec{Alpha: 0.10, Trials: 2}, Sealed: improve.PhaseSpec{Trials: 2}}
+	rec, err := r.Create(context.Background(), spec, "ana")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec, err = r.Run(context.Background(), rec.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec.Status != improve.StatusAwaiting {
+		t.Fatalf("status %s (%s), want a pause", rec.Status, rec.Reason)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(got) != 1 || !strings.Contains(got[0], `"improvement.paused"`) || !strings.Contains(got[0], rec.ID) {
+		t.Fatalf("events %q", got)
 	}
 }

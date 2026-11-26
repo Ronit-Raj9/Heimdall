@@ -68,7 +68,7 @@ func (h Hook) format() string {
 
 // pagingEvents are the events a PagerDuty hook takes: problems someone may
 // need to act on, never routine finishes.
-var pagingEvents = []string{EventEvaluationRegressed, EventReleaseBlocked, EventScheduleFailed, EventWorkerOffline, EventJobFailed, EventMonitorIncident}
+var pagingEvents = []string{EventEvaluationRegressed, EventReleaseBlocked, EventScheduleFailed, EventWorkerOffline, EventJobFailed, EventMonitorIncident, EventImprovementPaused}
 
 // EventsFor lists the events a hook of format f can subscribe to.
 func EventsFor(f string) []string {

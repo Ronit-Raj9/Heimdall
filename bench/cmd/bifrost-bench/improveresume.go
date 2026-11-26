@@ -186,3 +186,6 @@ func improvementNotifier(a *app) func(kind string, rec *improve.Record) {
 		emitOrgEvent(ctx, org, a.cfg.Root, hosted, ev)
 	}
 }
+
+// The runner of every app sends its improvement events through the org outbox.
+func init() { improveOnEvent = improvementNotifier }
