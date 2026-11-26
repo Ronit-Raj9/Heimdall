@@ -1,0 +1,23 @@
+{
+	"banner": {
+		"changed": "This result changed after a re-score on {{date}}: it was \"{{before}}\", it is now \"{{after}}\". {{note}}",
+		"seeWhat": "See what changed",
+		"gotIt": "Got it",
+		"stale": "A check this comparison used has been updated since it ran. Re-score it to see whether the result changes."
+	},
+	"page": {
+		"heading": "Changed results",
+		"comparison": "Comparison",
+		"rescoredOn": "Re-scored on",
+		"was": "Was",
+		"isNow": "Is now",
+		"why": "Why",
+		"empty": "No result has changed after a re-score.",
+		"scan": "Check which results a check update could change",
+		"scanStarted": "The check has started. Come back in a minute.",
+		"couldChange": "Could change if re-scored",
+		"noneStale": "No comparison uses a check that was updated since it ran.",
+		"updatedChecks": "Updated checks: {{gates}}"
+	},
+	"jobs": { "kinds": { "validity.scan": "Check which results a check update could change" } }
+}

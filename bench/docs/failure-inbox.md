@@ -584,3 +584,31 @@ The hosted server runs a pull in its own process (it only makes HTTP calls), fro
 - The paid live judge runs only when ticked for that pull, with the org's own provider key (Models & keys): a key labelled like `judge.key_env`, or one whose base URL has the judge URL's host. `otlp_dir` sources are local only.
 
 The page lists each missing step with a link (Settings > Secrets, or the setup form).
+
+## User feedback
+
+Your app can send one request when a user rates a session, for example with a thumbs down. The session lands in the Inbox as a failure to turn into a task (source "feedback"), and a thumbs up with a session becomes a golden candidate.
+
+The route is `POST /api/bench/orgs/{org}/feedback` on the hosted server, with one of the org's ingest tokens (Inbox page, Push failures in, Generate token) as the bearer. The checks run in this order: the token (401), the body size, at most 64 KiB (413), and the org's rate limit (429).
+
+The body:
+
+```json
+{"session_id": "s-123", "rating": "down", "score": null, "comment": "it said refunded but it was not",
+ "trace": null, "source": "support-widget", "user": "opaque-id"}
+```
+
+- `rating` is `down` or `up`. Instead you can send `score` from 0 to 10: 0 to 3 counts as down, 8 to 10 as up, anything between is only logged.
+- `comment` is at most 2000 characters and is cleaned of secrets and personal data before it is kept.
+- `user` is stored only as a short hash, never as sent.
+- `trace` is the session in any format the Inbox reads. Without it, the first Bifrost source of the Inbox is asked for the session (the last 7 days of gateway logs, at most 5000 rows).
+
+The answer is `{"item_id": "...", "created": true, "note": ""}`. When no trace was sent and no session could be found, the answer is 202 with the note "Saved. No session was found to attach: send the trace with the feedback, or add a Bifrost source." Every request is logged in `inbox/feedback.jsonl`.
+
+### From a terminal
+
+```sh
+curl -X POST https://heimdall.example.com/api/bench/orgs/acme/feedback \
+  -H "Authorization: Bearer $HEIMDALL_INBOX_TOKEN" -H "Content-Type: application/json" \
+  --data '{"session_id": "s-123", "rating": "down", "comment": "it said refunded but it was not"}'
+```
