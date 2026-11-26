@@ -39,7 +39,7 @@ func init() {
 }
 
 // cheatCheckLaunch is LaunchEvaluation; tests replace it.
-var cheatCheckLaunch = LaunchEvaluation
+var cheatCheckLaunch = LaunchEvaluationPrepared
 
 // twinBenchmarks returns, for each benchmark, its twin benchmark when that
 // exists and has at least one admitted twin.
@@ -96,14 +96,11 @@ func (h *evaluationsHandler) cheatCheck(ctx *fasthttp.RequestCtx) {
 	spec := ev.Spec
 	spec.Benchmarks, spec.Pack, spec.Trials = tw, "", 1
 	spec.Name = strings.TrimSuffix(ev.Spec.Name, cheatCheckSuffix) + cheatCheckSuffix
-	child, err := cheatCheckLaunch(ctx, h.env, spec, principalOf(ctx), "")
+	// cheat_check_of is set before the child's first save, in the same
+	// write that creates it: a status refresh can never drop it.
+	child, err := cheatCheckLaunch(ctx, h.env, spec, principalOf(ctx), "", func(e *schemas.Evaluation) { e.CheatCheckOf = ev.ID })
 	if err != nil {
 		h.fail(ctx, fasthttp.StatusServiceUnavailable, err.Error())
-		return
-	}
-	child.CheatCheckOf = ev.ID
-	if err := h.store().Save(child); err != nil {
-		h.fail(ctx, fasthttp.StatusInternalServerError, "save evaluation: "+err.Error())
 		return
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusAccepted, child)

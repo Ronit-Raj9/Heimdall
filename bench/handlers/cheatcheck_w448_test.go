@@ -60,9 +60,11 @@ func TestCheatCheckChildIsExploratory(t *testing.T) {
 	}
 	var got schemas.EvaluationSpec
 	old := cheatCheckLaunch
-	cheatCheckLaunch = func(ctx context.Context, env OrgEnv, spec schemas.EvaluationSpec, who, sched string) (*schemas.Evaluation, error) {
+	cheatCheckLaunch = func(ctx context.Context, env OrgEnv, spec schemas.EvaluationSpec, who, sched string, prepare func(*schemas.Evaluation)) (*schemas.Evaluation, error) {
 		got = spec
-		return &schemas.Evaluation{ID: "ev_20261127_000001_def456", Org: "", Spec: spec, Status: "running", CreatedAt: time.Now()}, nil
+		ev := &schemas.Evaluation{ID: "ev_20261127_000001_def456", Org: "", Spec: spec, Status: "running", CreatedAt: time.Now()}
+		prepare(ev) // the real launch runs it before the first save
+		return ev, evalstore.Open(root).Save(ev)
 	}
 	defer func() { cheatCheckLaunch = old }()
 	code, body := cheatCheckServe(t, root, id, `{"yes":true}`)
