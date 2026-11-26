@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/benchcatalog"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/onboard"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -71,6 +72,13 @@ type suiteOrigin interface {
 func isBuiltinSuite(src SuiteSource, id string) bool {
 	o, ok := src.(suiteOrigin)
 	return ok && id != "" && o.SuiteBuiltin(id)
+}
+
+// isReservedSuiteID reports that id is taken by a built-in benchmark: a
+// library pack src serves, or a bundled practice suite (coding-core) that a
+// hosted list hides but that stays a built-in name (N46, N100, N265).
+func isReservedSuiteID(src SuiteSource, id string) bool {
+	return isBuiltinSuite(src, id) || slices.Contains(benchcatalog.PracticeSuites, id)
 }
 
 // sendBuiltinReadOnly answers a change to a built-in library suite: 403.

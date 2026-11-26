@@ -288,7 +288,7 @@ func (h *onboardHandler) inspect(ctx *fasthttp.RequestCtx) {
 		h.sendOnboardError(ctx, err)
 		return
 	}
-	if inv.Suggest.Suite != "" && isBuiltinSuite(h.env.Services.Suites, inv.Suggest.Suite) {
+	if inv.Suggest.Suite != "" && isReservedSuiteID(h.env.Services.Suites, inv.Suggest.Suite) {
 		inv.Suggest.Suite += "-own"
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, inv)
@@ -317,7 +317,7 @@ func (h *onboardHandler) draft(ctx *fasthttp.RequestCtx) {
 		h.bad(ctx, `body must be {"input":{...},"plan":{"suite",...}}: `+err.Error())
 		return
 	}
-	if isBuiltinSuite(h.env.Services.Suites, strings.TrimSpace(req.Plan.Suite)) {
+	if isReservedSuiteID(h.env.Services.Suites, strings.TrimSpace(req.Plan.Suite)) {
 		sendBuiltinReadOnly(ctx, h.env.Mode, req.Plan.Suite)
 		return
 	}
@@ -529,7 +529,7 @@ func (h *onboardHandler) publish(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusConflict, lib.ErrTypeConflict, "this draft was published already")
 		return
 	}
-	if isBuiltinSuite(h.env.Services.Suites, set.Suite) {
+	if isReservedSuiteID(h.env.Services.Suites, set.Suite) {
 		sendBuiltinReadOnly(ctx, h.env.Mode, set.Suite)
 		return
 	}
