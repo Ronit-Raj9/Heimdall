@@ -8,6 +8,7 @@ import (
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/sandbox"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/sharedpool"
 )
 
 type fakePlatforms struct{ l sandbox.ConnectionsList }
@@ -67,14 +68,14 @@ func TestWorkerTargetsOneSetting(t *testing.T) {
 	if v, err = tg.SetTarget(ctx, "org", "alice", "platform:modal"); err != nil || v.Target != "platform:modal" || pl.l.Default != "modal" || ws.l.DefaultWorker != "" {
 		t.Fatalf("platform %+v %v", v, err)
 	}
-	// While modal takes the runs, neither the shared worker nor another
-	// platform can take one evaluation; own workers can.
+	// While modal takes the runs, the shared worker cannot take one
+	// evaluation; own workers and a platform with images can (N208).
 	for _, c := range v.Choices {
 		if want := c.Kind == schemas.WorkerTargetWorker || c.Target == "platform:modal"; c.PerEvaluation != want {
 			t.Errorf("choice %+v: per evaluation %v, want %v", c, c.PerEvaluation, want)
 		}
 	}
-	if pool, err := tg.EvaluationPool(ctx, "org", ""); err != nil || pool != "" {
+	if pool, err := tg.EvaluationPool(ctx, "org", ""); err != nil || pool != sharedpool.PlatformPool("modal") {
 		t.Fatalf("default with a platform: %q %v", pool, err)
 	}
 	if _, err := tg.EvaluationPool(ctx, "org", "shared"); err == nil {
@@ -91,8 +92,10 @@ func TestWorkerTargetsOneSetting(t *testing.T) {
 	if pool, err := tg.EvaluationPool(ctx, "org", ""); err != nil || pool != "gpu" {
 		t.Fatalf("default with a worker: %q %v", pool, err)
 	}
-	if _, err := tg.EvaluationPool(ctx, "org", "platform:modal"); err == nil {
-		t.Fatal("platform accepted while it is not where runs go")
+	// N208: a platform with an image registry takes one evaluation in its
+	// own pool even while it is not where runs go.
+	if pool, err := tg.EvaluationPool(ctx, "org", "platform:modal"); err != nil || pool != sharedpool.PlatformPool("modal") {
+		t.Fatalf("platform pick while not where runs go: %q %v", pool, err)
 	}
 	if pool, err := tg.EvaluationPool(ctx, "org", "shared"); err != nil || pool != "" {
 		t.Fatalf("shared with a worker target: %q %v", pool, err)

@@ -70,8 +70,9 @@ func sharedPoolService(env *hostedEnv, q quota.Store, images *sharedpool.ImageSt
 		return nil
 	}
 	d := env.db
-	return &sharedpool.Service{Quota: q, Keys: keys, Minter: runnersOf(env).svc, Images: images,
-		Platform: platformAssignment(platformConnections(env)), // X19a: an org's own sandbox platform (workerplatforms_hosted.go)
+	conns := platformConnections(env)
+	svc := &sharedpool.Service{Quota: q, Keys: keys, Minter: runnersOf(env).svc, Images: images,
+		Platform: platformAssignment(conns), // X19a: an org's own sandbox platform (workerplatforms_hosted.go)
 		Orgs: func(ctx context.Context) ([]string, error) {
 			rows, err := d.Query(ctx, `SELECT id FROM orgs ORDER BY id`)
 			if err != nil {
@@ -88,6 +89,35 @@ func sharedPoolService(env *hostedEnv, q quota.Store, images *sharedpool.ImageSt
 			}
 			return out, rows.Err()
 		}}
+	if conns != nil { // N208: every connected platform with a registry login takes single evaluations
+		svc.Platforms = func(ctx context.Context, org string) ([]*sharedpool.PlatformAssignment, error) {
+			l, err := conns.List(ctx, org)
+			if err != nil || l == nil {
+				return nil, err
+			}
+			var out []*sharedpool.PlatformAssignment
+			for _, p := range l.Platforms {
+				if !p.Connected {
+					continue
+				}
+				reg, err := conns.RegistryOf(ctx, org, p.Name)
+				if err != nil {
+					return nil, err
+				}
+				if reg == nil {
+					continue
+				}
+				c, err := conns.CredentialsOf(ctx, org, p.Name)
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, &sharedpool.PlatformAssignment{Name: p.Name, Token: c.Token, Endpoint: c.Endpoint,
+					Registry: &sharedpool.RegistryLogin{Registry: reg.Registry, Username: reg.Username, Token: reg.Token}})
+			}
+			return out, nil
+		}
+	}
+	return svc
 }
 
 // gatedWorkers is an org's worker API that hands out no lease while the
