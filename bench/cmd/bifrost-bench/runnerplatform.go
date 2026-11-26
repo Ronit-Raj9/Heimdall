@@ -96,9 +96,20 @@ func sandboxRegistry(ctx context.Context, a *app, reg *schemas.Registry, pa *sha
 		out.GPUs = pool
 	}
 	if reg.Gateway != nil {
-		out.Gateway = sandbox.WrapGateway(reg.Gateway, d)
+		out.Gateway = sandboxGateway(reg.Gateway, d)
 	}
 	return &out, nil
+}
+
+// sandboxGateway is gw with the egress probe of driver d. A probe gw
+// already carries (the org's default platform, when a platform worker for
+// single evaluations starts from the main registry) is replaced, so a
+// preflight probes egress once, from the platform that runs the runs.
+func sandboxGateway(gw schemas.Gateway, d *sandbox.Driver) schemas.Gateway {
+	if sg, ok := gw.(*sandbox.Gateway); ok {
+		gw = sg.UnwrapGateway()
+	}
+	return sandbox.WrapGateway(gw, d)
 }
 
 // sandboxGPUPool is the GPU pool a runner on a GPU-capable platform

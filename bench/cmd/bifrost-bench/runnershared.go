@@ -821,6 +821,9 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 	}
 	reg = withPullOrg(reg, oa, planRoot, org) // Y11: pull agents' run tokens name the org
 	labels := h.sharedWorkerLabels()
+	// N208: platform workers for single evaluations start from the registry
+	// before the default platform's wrap (one egress probe, the right GPUs).
+	baseReg := reg
 	if claim.Platform != nil { // X19a: the org's own sandbox platform runs its runs
 		pr, err := sandboxRegistry(ctx, oa, reg, claim.Platform)
 		if err != nil {
@@ -854,7 +857,7 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 	h.setWorker(org, w) // E5: the leftover sweep keeps this worker's runs
 	// N208: one worker per platform that takes single evaluations (runnerplatformworker.go).
 	for _, pc := range claim.Platforms {
-		go servePlatformPool(ctx, h, oa, reg, pc, slots, platformPoolEnv{org: org, name: name, planRoot: planRoot, docker: docker, refresh: proj.refresh})
+		go servePlatformPool(ctx, h, oa, baseReg, pc, slots, platformPoolEnv{org: org, name: name, planRoot: planRoot, docker: docker, refresh: proj.refresh})
 	}
 	defer h.setWorker(org, nil)
 	a.logger.Info("shared runner: serving org", "org", org, "slots", slots, "runtime", h.runtime, "network", network)
