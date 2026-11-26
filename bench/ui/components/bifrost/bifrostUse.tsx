@@ -2,6 +2,7 @@ import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenState
 import { useGetBifrostUseQuery, useGetEvaluationBifrostCacheQuery, useGetEvaluationBifrostUseQuery } from "@/lib/store/apis/bifrostUseApi";
 import type { BifrostFeature, BifrostFeatureState, BifrostUse, EvaluationCacheAB } from "@/lib/types/bifrostUse";
 import { cn } from "@/lib/utils";
+import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
 declare module "@/lib/i18n/resources" {
@@ -79,6 +80,7 @@ export function BifrostGatewayLine({ use }: { use: BifrostUse }) {
 /** Settings > Integrations: the org's Bifrost features. */
 export function BifrostUsePanel() {
 	const { t } = useTranslation("bifrostUse");
+	const { t: tg } = useTranslation("w4p6");
 	const q = useGetBifrostUseQuery();
 	if (q.isLoading) return <BlockSkeleton rows={4} testId="bifrost-use-loading" />;
 	if (q.error || !q.data) return <LoadError title={t("loadError")} error={q.error} onRetry={() => void q.refetch()} testId="bifrost-use-error" />;
@@ -88,6 +90,9 @@ export function BifrostUsePanel() {
 				<BifrostGatewayLine use={q.data} />
 				<BifrostFeatureList features={q.data.features} testId="bifrost-use-features" />
 				<p className="text-muted-foreground text-xs">{t("routing")}</p>
+				<Link to="/gateway" className="text-primary text-sm underline-offset-2 hover:underline" data-testid="bifrost-gateway-link">
+					{tg("link")}
+				</Link>
 			</div>
 		</Section>
 	);
