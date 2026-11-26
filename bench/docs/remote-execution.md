@@ -252,7 +252,32 @@ remote:
 | `answer_path` | Where the answer is, in a JSONPath subset: `a.b`, `[0]`, `[-1]`, `[*]`, `['key']`, `[?(@.type=='message')]`, `[?(@.x!='y')]`, `[?(@.x)]`. Several matches are joined with a newline. |
 | `stream`, `stream_path`, `stream_decode` | A streamed answer: `sse` (server-sent events) or `aws_eventstream` (Bedrock). `stream_path` picks each event's text; `stream_decode: base64` decodes it. |
 | `start`, `end` | A request before (open a session; `id_path` becomes `{{start.id}}`; 409 reuses the session) and after (close it, best effort). |
-| `poll` | Fetch the answer after the main request until `answer_path` matches twice in a row. `reply_id_path` reads an id from the main answer as `{{reply.id}}`. |
+| `poll` | Fetch the answer after the main request until it is finished (below). `reply_id_path` reads an id from the main answer as `{{reply.id}}`. |
+| `poll.status_path`, `poll.done_states`, `poll.fail_states` | Where the poll answer says its state, and which states mean finished or failed (compared without case; at most 20 states of 1 to 40 characters; both lists need `status_path`). A state in `fail_states` ends the run with "the agent said <state>". |
+| `poll.complete_path` | A value that is true, or a non-empty string, once the message is complete (for example `is_final`). |
+
+When is a polled answer finished? With `status_path` or `complete_path` set, only when the state is one of `done_states` or the `complete_path` value is true, and the answer at `answer_path` is not empty. With neither set, when `answer_path` gives the same text twice in a row. If the time limit passes before the answer is finished, the run fails with "incomplete answer: the agent did not finish within the time limit (<n> polls)" and no partial answer is written, so a half answer is never graded as if it were the agent's last word.
+
+A job API that reports its state:
+
+```yaml
+    poll:
+      url: /jobs/{{start.id}}
+      answer_path: result.text
+      status_path: status
+      done_states: [succeeded]
+      fail_states: [failed, cancelled]
+```
+
+Direct Line, where the bot's reply activity says when it is complete:
+
+```yaml
+    poll:
+      url: /v3/directline/conversations/{{start.id}}/activities
+      reply_id_path: id
+      answer_path: "activities[?(@.replyToId=='{{reply.id}}')].text"
+      complete_path: "activities[?(@.replyToId=='{{reply.id}}')].channelData.is_final"
+```
 
 Placeholders: `{{instruction}}`, `{{messages}}`, `{{tools}}`, `{{metadata}}`, `{{gateway}}`, `{{session_id}}`, `{{session_index}}`, `{{output}}`, `{{model}}`, `{{uuid}}`, `{{start.id}}`, `{{reply.id}}`. Every step stays on the URL's host.
 

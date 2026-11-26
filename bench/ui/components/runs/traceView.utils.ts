@@ -53,7 +53,10 @@ export function filterTrace(steps: readonly StepRecord[], filter: TraceFilter, q
 	});
 }
 
-/** Count of steps per filter chip. */
+/**
+ * Count of steps per filter chip. The tools chip counts tool uses: a tool answer (tool_result) is
+ * listed under the filter but not counted again, so the number matches the run's tool use count (N28).
+ */
 export function filterCounts(steps: readonly StepRecord[]): Record<TraceFilter, number> {
 	const out: Record<TraceFilter, number> = {
 		all: steps.length,
@@ -66,7 +69,7 @@ export function filterCounts(steps: readonly StepRecord[]): Record<TraceFilter, 
 	for (const step of steps) {
 		const kind = traceKind(step);
 		if (kind === "model") out.model++;
-		if (kind === "tool") out.tools++;
+		if (kind === "tool" && step.event_type !== "tool_result") out.tools++;
 		if (kind === "command") out.commands++;
 		if (isErrorStep(step)) out.errors++;
 		if (isMismatchStep(step)) out.mismatches++;
