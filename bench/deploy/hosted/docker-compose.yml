@@ -85,6 +85,11 @@ networks:
     internal: true
     enable_ipv6: false
     labels: *labels
+  imagepublish:
+    # shared-runner profile: the shared runner and image-publisher only.
+    internal: true
+    enable_ipv6: false
+    labels: *labels
   rtgate:
     # shared-runner profile, internal: the shared worker reaches its runs'
     # tool gates here by container name (remote_tools.ingress_network), so
@@ -110,6 +115,8 @@ networks:
 
 volumes:
   pgdata:
+    labels: *labels
+  publish-tmp:
     labels: *labels
   heimdall-data:
     labels: *labels
@@ -475,11 +482,12 @@ services:
         aliases: [registry]
     restart: unless-stopped
 
-  # The registry's write side: started by registry-sync.sh only while it
-  # copies images, stopped afterwards. On the registrysync network only,
-  # with the sync identity's credentials (registry/config-write.yml).
+  # The registry's write side. Only image-publisher and the registry-sync tool
+  # join registrysync; no build, no agent and no org container can reach it.
+  # It uses the sync identity's credentials (registry/config-write.yml).
   registry-writer:
-    profiles: [registry-sync]
+    profiles: [shared-runner]
+    restart: unless-stopped
     image: registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
     labels: *labels
     <<: [*hardening, *logging]
@@ -506,6 +514,34 @@ services:
     volumes:
       - ${HEIMDALL_REGISTRY_AUTH_DIR:-/var/lib/heimdall-registry-auth}/sync:/auth:ro
     networks: [registrysync]
+
+  # The image publisher (wave 4): the only holder of the registry's write
+  # identity. No Docker socket. The shared runner streams it a saved image
+  # over the internal imagepublish network; it accepts only platform images
+  # computed from the read-only checkout and library, pushes them to
+  # registry-writer and records their digests in the manifest.
+  image-publisher:
+    profiles: [shared-runner]
+    image: ${HEIMDALL_RUNNER_IMAGE:-heimdall/runner:local}
+    labels: *labels
+    <<: [*hardening, *logging]
+    group_add: ["${HEIMDALL_DOCKER_GID:-0}"]
+    command: ["bifrost-bench", "registry", "publisher", "-auth-file", "/auth/push.auth", "-manifest", "/manifest/manifest", "-token-file", "/manifest/publish.token", "-checkout", "${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}", "-library", "${HEIMDALL_LIBRARY_DIR:-}"]
+    environment:
+      HOME: /tmp
+    volumes:
+      - ${HEIMDALL_REGISTRY_AUTH_DIR:-/var/lib/heimdall-registry-auth}/sync:/auth:ro
+      - ${HEIMDALL_REGISTRY_AUTH_DIR:-/var/lib/heimdall-registry-auth}/runner:/manifest
+      - ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:ro
+      - ${HEIMDALL_LIBRARY_DIR:-/dev/null}:${HEIMDALL_LIBRARY_DIR:-/dev/null}:ro
+      - publish-tmp:/var/tmp/heimdall-publish
+    tmpfs:
+      - /tmp
+    networks: [registrysync, imagepublish]
+    depends_on:
+      registry-writer:
+        condition: service_started
+    restart: unless-stopped
 
   shared-runner:
     profiles: [shared-runner]
@@ -579,6 +615,9 @@ services:
       # registry-sync.sh into HEIMDALL_REGISTRY_AUTH_DIR/runner.
       HEIMDALL_SHARED_REGISTRY_AUTH: /run/heimdall-registry/pull.auth
       HEIMDALL_SHARED_REGISTRY_MANIFEST: /run/heimdall-registry/manifest
+      # Missing platform base images are published on demand (wave 4).
+      HEIMDALL_IMAGE_PUBLISHER_URL: http://image-publisher:8097
+      HEIMDALL_IMAGE_PUBLISHER_TOKEN: /run/heimdall-registry/publish.token
       HEIMDALL_SHARED_GATEWAY_CONTAINER: ${HEIMDALL_SHARED_GATEWAY_CONTAINER:-}
       HEIMDALL_SHARED_PLATFORM_IMAGES: ${HEIMDALL_SHARED_PLATFORM_IMAGES:-}
       HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
@@ -612,7 +651,7 @@ services:
       - ${HEIMDALL_REGISTRY_AUTH_DIR:-/var/lib/heimdall-registry-auth}/runner:/run/heimdall-registry:ro
     tmpfs:
       - /tmp
-    networks: [edge, upstream, buildnet, rtgate]
+    networks: [edge, upstream, buildnet, rtgate, imagepublish]
     depends_on:
       heimdall:
         condition: service_healthy
