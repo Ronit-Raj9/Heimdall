@@ -110,6 +110,11 @@ func (s Schedule) validateEvaluation(root string) error {
 	if spec.BudgetUSD > s.MaxUSDPerDay {
 		return wrap("the evaluation's budget %.2f USD is above max_usd_per_day %.2f USD, so it could never start", spec.BudgetUSD, s.MaxUSDPerDay)
 	}
+	if s.NewModels != nil {
+		if err := s.validateNewModels(spec); err != nil {
+			return wrap("%w", err)
+		}
+	}
 	return nil
 }
 
