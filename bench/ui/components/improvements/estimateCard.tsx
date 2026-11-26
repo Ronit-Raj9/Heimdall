@@ -46,6 +46,11 @@ export function EstimateCard({ estimate: e, loading, error, model, teacher, wait
 						limit: money(e.usd.limit),
 					})}
 				</p>
+				{(e.loops ?? 0) >= 2 && e.usd.limit > 0 && (
+					<p data-testid="estimate-study-limit">
+						{t("estimate.studyLimit", { loops: e.loops, total: money(e.usd.limit), each: money(e.usd.loop_limit) })}
+					</p>
+				)}
 				<p>{teacher ? t("estimate.improverTeacher", { teacher }) : t("estimate.improver", { model: model || "-" })}</p>
 				{(e.warnings ?? []).map((w) => (
 					<p key={w.code} className="text-chart-warning-ink" data-testid="estimate-warning">

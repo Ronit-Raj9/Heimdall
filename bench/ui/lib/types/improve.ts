@@ -266,12 +266,24 @@ export interface ImprovementEstimate {
 	pool: number;
 	splits: { practice: number; gate: number; held_out: number; impossible: number };
 	runs: { baseline: number; improver: number; practice: number; gate: number; held_out_curve: number; final: number; total: number };
-	usd: { low: number; expected: number; high: number; limit: number; per_run: number; per_run_source: string };
+	/** A study's limit is the total for all loops: loop_limit is each loop's share, limit_text says both. */
+	usd: {
+		low: number;
+		expected: number;
+		high: number;
+		limit: number;
+		per_run: number;
+		per_run_source: string;
+		loop_limit?: number;
+		limit_text?: string;
+	};
 	minutes: { low: number; high: number };
 	detectable: { gate_points: number; held_out_points: number };
 	assumed: string[] | null;
 	refusals: EstimateNote[] | null;
 	warnings: EstimateNote[] | null;
+	/** The number of whole loops of a study; absent for one run. */
+	loops?: number;
 }
 
 export interface AppliedEditView {

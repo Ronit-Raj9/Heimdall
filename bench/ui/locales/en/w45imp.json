@@ -22,6 +22,7 @@
 	},
 	"estimate": {
 		"title": "Estimate",
+		"studyLimit": "Total for {{loops}} loops: at most ${{total}} (${{each}} for each loop)",
 		"loading": "Estimating the cost and what this run can confirm",
 		"splits": "{{pool}} tasks: {{practice}} to practise on, {{gate}} to decide, {{held_out}} kept hidden until the end.",
 		"detectable": "Smallest gain this run can confirm: about {{held_out_points}} points.",
