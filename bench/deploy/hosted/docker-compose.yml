@@ -311,6 +311,9 @@ services:
       # Extra /status lines; the default probes the model gateway (the bifrost
       # service below, the address its own healthcheck uses).
       HEIMDALL_STATUS_PROBES: ${HEIMDALL_STATUS_PROBES:-gateway=http://bifrost:8080/health}
+      # Wave 4 (I26): per-model quality metrics on /metrics; "on" publishes
+      # them, with the organization's slug as a label. Empty: off.
+      HEIMDALL_QUALITY_METRICS: ${HEIMDALL_QUALITY_METRICS:-}
       # Per-token and per-org API rate limits (empty: the built-in defaults,
       # "off": none), and the runner image Heimdall starts for an org's own
       # worker on Fly Machines or Kubernetes (empty: the published default).

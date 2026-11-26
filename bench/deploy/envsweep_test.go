@@ -49,6 +49,7 @@ var localOnlyEnv = map[string]string{
 	"HEIMDALL_TEST_PG_DSN":                "tests",
 	"HEIMDALL_TEST_MINIO_IMAGE":           "tests",
 	"HEIMDALL_RUNNER_REPO":                "`runner install` script default on an organization's own worker",
+	"HEIMDALL_IMPROVE_TOOL_DESCRIPTIONS":  "improvement runs: tool descriptions as an editable surface are not built yet; leave unset",
 	"HEIMDALL_SHARED_BUILDER":             "shared worker flag default; compose passes the buildkit address",
 	"HEIMDALL_SHARED_BUILDKIT":            "shared worker flag default; compose passes the buildkit address",
 	"HEIMDALL_LIBRARY_REGISTRY_ISSUER":    "library-registry.compose.yml sets it",

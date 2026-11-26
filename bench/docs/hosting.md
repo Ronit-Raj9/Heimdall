@@ -661,6 +661,7 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_STATUS_PROBES` | Extra components on the public `/status` page: `id=url` pairs, comma separated. Empty uses `gateway=http://bifrost:8080/health` in the hosted compose file; `none` for no extra line. |
 | `HEIMDALL_OTEL_ENDPOINT`, `HEIMDALL_OTEL_SAMPLER`, `HEIMDALL_GRAFANA_PASSWORD`, `HEIMDALL_GRAFANA_PORT`, `HEIMDALL_PROMETHEUS_RETENTION` | Monitoring profile (docs/monitoring.md): where traces go (empty: no traces) and how many are kept, Grafana's admin password and loopback port, Prometheus retention. |
 | `HEIMDALL_LIBRARY_REGISTRY_TOKEN_DIR`, `HEIMDALL_LIBRARY_REGISTRY_ACCESS`, `HEIMDALL_LIBRARY_REGISTRY_DIR`, `HEIMDALL_LIBRARY_REGISTRY_PUBLISH` | Library registry override (docs/library-registry.md, "Library registry" below): token key folder, per-org access file, image folder and published address. |
+| `HEIMDALL_QUALITY_METRICS` | `on`: the server publishes per-model quality metrics (solve rate, cost and latency by provider, model and benchmark, at most 100 series) on its `/metrics`, labelled with each organization's slug. Empty: off. |
 | `HEIMDALL_VOICE_RTC_PUBLISH`, `HEIMDALL_VOICE_MAX_CALLS` | Voice gateway (profile `voice`): the host address its port is published on, where runs reach it (default `172.17.0.1:8790`) and calls at once (default 20). |
 
 ### Billing
