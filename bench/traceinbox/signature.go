@@ -71,9 +71,15 @@ func Signature(s *traceimport.Session, flagKinds []string) (string, SignaturePar
 	return "f_" + hex.EncodeToString(sum[:8]), parts
 }
 
-// ItemID is the inbox id of a signature: one item per signature.
+// ItemID is the inbox id of a signature: one item per signature. A
+// malformed signature still gets a stable id instead of a panic.
 func ItemID(signature string) string {
-	return "inc-" + strings.TrimPrefix(signature, "f_")[:12]
+	s := strings.TrimPrefix(signature, "f_")
+	if len(s) < 12 {
+		sum := sha256.Sum256([]byte(signature))
+		s = hex.EncodeToString(sum[:6])
+	}
+	return "inc-" + s[:12]
 }
 
 // RequestSketch returns "q_" and the hash of the request's shingle sketch,

@@ -261,7 +261,7 @@ func ManifestPins(path string) func(ref string) (string, error) {
 // bench and platform base images at the registry, each pinned by the
 // digest of the registry manifest, or an error wrapping ErrPolicy that
 // names a base image the manifest or the registry lacks.
-func (p *DockerPolicy) baseContexts(dockerfile string, buildArgs map[string]string) ([]string, error) {
+func (p *DockerPolicy) baseContexts(ctx context.Context, dockerfile string, buildArgs map[string]string) ([]string, error) {
 	if p.Registry == "" {
 		return nil, nil
 	}
@@ -275,26 +275,65 @@ func (p *DockerPolicy) baseContexts(dockerfile string, buildArgs map[string]stri
 			continue
 		}
 		if p.Pinned == nil {
-			return nil, fmt.Errorf("%w: base image %s: this worker has no registry manifest to pin it by digest (HEIMDALL_SHARED_REGISTRY_MANIFEST); ask the operator to run deploy/hosted/registry-sync.sh", ErrPolicy, ref)
+			return nil, &ImageNotReady{Ref: ref, Reason: ErrNotPinned}
 		}
 		digest, err := p.Pinned(ref)
-		switch {
-		case errors.Is(err, ErrNotPinned):
-			return nil, fmt.Errorf("%w: base image %s is not in the shared worker's image registry; ask the operator to copy it there (deploy/hosted/registry-sync.sh %s)", ErrPolicy, ref, ref)
-		case err != nil:
+		missing := errors.Is(err, ErrNotPinned)
+		if err != nil && !missing {
 			return nil, fmt.Errorf("%w: base image %s: %v", ErrPolicy, ref, err)
 		}
-		pinned := ref + "@" + digest
-		if p.RegistryHas != nil {
-			ok, err := p.RegistryHas(pinned)
+		if !missing && p.RegistryHas != nil {
+			ok, err := p.RegistryHas(ref + "@" + digest)
 			if err != nil {
 				return nil, fmt.Errorf("%w: base image %s: %v", ErrPolicy, ref, err)
 			}
-			if !ok {
-				return nil, fmt.Errorf("%w: base image %s (%s) is not in the shared worker's image registry any more; ask the operator to copy it there again (deploy/hosted/registry-sync.sh %s)", ErrPolicy, ref, digest, ref)
-			}
+			missing = !ok
 		}
+		if missing {
+			if p.Publish == nil {
+				return nil, &ImageNotReady{Ref: ref, Reason: ErrNotPinned}
+			}
+			ImageProgress(ctx)("Preparing the container image " + ref)
+			d, err := p.Publish(ctx, ref)
+			if err != nil {
+				return nil, &ImageNotReady{Ref: ref, Plain: publishReason(err), Reason: err}
+			}
+			digest = d
+		}
+		pinned := ref + "@" + digest
 		out = append(out, "--build-context", ref+"=docker-image://"+p.Registry+"/"+pinned)
 	}
 	return out, nil
+}
+
+// ImageNotReady is the refusal of an org build whose base image is not in
+// the shared worker's registry and could not be published there. It wraps
+// ErrPolicy, so the lease treats it as a permanent refusal, while its text
+// stays plain and never shows the internal image tag (wave 4, F1.1).
+type ImageNotReady struct {
+	Ref    string
+	Plain  string // the plain reason the publish failed; empty without a publisher
+	Reason error
+}
+
+func (e *ImageNotReady) Error() string {
+	if errors.Is(e.Reason, ErrNotPinned) && e.Plain == "" {
+		return "The container image this run starts from is not in the shared worker's image store yet. Tell the server admin to copy it there."
+	}
+	return "The container image this run starts from is not ready on the shared worker, and Heimdall could not prepare it: " + e.Plain + ". Try again in a few minutes. If it keeps failing, tell the server admin."
+}
+
+func (e *ImageNotReady) Unwrap() []error { return []error{ErrPolicy, e.Reason} }
+
+// publishReason maps a publish error to its plain reason. utils cannot
+// import imagepub, so it matches the texts of imagepub.ErrNotPlatform and
+// imagepub.ErrMissing.
+func publishReason(err error) string {
+	switch msg := err.Error(); {
+	case strings.Contains(msg, "not a platform image"):
+		return "it is not an image the platform built"
+	case strings.Contains(msg, "not on this host"):
+		return "it is not on the shared worker"
+	}
+	return "the image store did not answer"
 }

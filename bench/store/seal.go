@@ -202,13 +202,15 @@ func scanRunSecrets(dir string) error {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() || filepath.Base(path) == sealFile {
+		rel, _ := filepath.Rel(dir, path)
+		// Only the run's own top-level seal.json is skipped; a nested file of
+		// that name is scanned like any other.
+		if d.IsDir() || filepath.ToSlash(rel) == sealFile {
 			return nil
 		}
 		// Classify before any open: a symlink could read outside the run
 		// folder and a pipe could block while the chain lock is held.
 		if !d.Type().IsRegular() {
-			rel, _ := filepath.Rel(dir, path)
 			return fmt.Errorf("%s is not a regular file (%s)", filepath.ToSlash(rel), d.Type())
 		}
 		paths = append(paths, path)

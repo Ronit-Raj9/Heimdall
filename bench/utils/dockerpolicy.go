@@ -87,6 +87,9 @@ type DockerPolicy struct {
 	// RegistryHas reports whether Registry holds an image (ref@digest); nil
 	// skips the check (the build then fails in BuildKit instead).
 	RegistryHas func(ref string) (bool, error)
+	// Publish publishes a platform image to Registry and returns its digest;
+	// nil keeps today's refusal.
+	Publish PublishFunc
 	// Session is the command an org build runs under instead of the docker
 	// CLI: its argv prefix, to which "-docker <bin> --" and the build's
 	// docker arguments are appended. The session picks the builder
@@ -137,6 +140,12 @@ func lastPathPart(ref string) string {
 // error wrapping ErrPolicy when the call is refused. A nil policy returns
 // args unchanged.
 func (p *DockerPolicy) Rewrite(args []string) ([]string, error) {
+	return p.RewriteContext(context.Background(), args)
+}
+
+// RewriteContext is Rewrite with the context of the docker call, which an
+// org build uses to publish a missing base image (Publish).
+func (p *DockerPolicy) RewriteContext(ctx context.Context, args []string) ([]string, error) {
 	if p == nil || len(args) == 0 {
 		return args, nil
 	}
@@ -148,9 +157,30 @@ func (p *DockerPolicy) Rewrite(args []string) ([]string, error) {
 	}
 	switch sub {
 	case "build", "image build", "buildx build":
-		return p.rewriteBuild(rest)
+		return p.rewriteBuild(ctx, rest)
 	case "pull", "image pull":
 		return p.rewritePull(prefix, rest)
+	}
+	// An org's own image never gets a global tag on the shared host (SEC-C).
+	if (sub == "tag" || sub == "image tag") && p.TagPrefix != "" {
+		var pos []int
+		for i, a := range rest {
+			if !strings.HasPrefix(a, "-") {
+				pos = append(pos, i)
+			}
+		}
+		if len(pos) == 2 {
+			src, dst := rest[pos[0]], rest[pos[1]]
+			if p.approvedOnly(src) && !strings.HasPrefix(dst, p.TagPrefix) {
+				if err := p.foreign(dst); err != nil {
+					return nil, err
+				}
+				ns := p.TagPrefix + dst
+				p.remember(dst, ns)
+				rest = append([]string(nil), rest...)
+				rest[pos[1]] = ns
+			}
+		}
 	}
 	out := append([]string(nil), prefix...)
 	if (sub == "run" || sub == "create" || sub == "container run" || sub == "container create") && p.Runtime != "" && !hasFlag(rest, "--runtime") {
@@ -209,6 +239,13 @@ func (p *DockerPolicy) rewritePull(prefix, rest []string) ([]string, error) {
 }
 
 func (p *DockerPolicy) pullAllowed(ref string) bool {
+	if p.approved(ref) {
+		return true
+	}
+	return p.platformAllowed(ref)
+}
+
+func (p *DockerPolicy) approved(ref string) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for _, a := range p.Approved {
@@ -216,6 +253,20 @@ func (p *DockerPolicy) pullAllowed(ref string) bool {
 			return true
 		}
 	}
+	return false
+}
+
+// approvedOnly reports whether ref is one of the org's approved images and
+// not a platform image.
+func (p *DockerPolicy) approvedOnly(ref string) bool {
+	return p.approved(ref) && !p.platformAllowed(ref)
+}
+
+// platformAllowed reports whether ref is one of the operator's platform
+// images (an exact reference, or a prefix ending in "/" or ":").
+func (p *DockerPolicy) platformAllowed(ref string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	for _, a := range p.Platform {
 		a = strings.TrimSpace(a)
 		if a == "" {
@@ -295,7 +346,7 @@ func inside(path string, roots []string) bool {
 	return false
 }
 
-func (p *DockerPolicy) rewriteBuild(rest []string) ([]string, error) {
+func (p *DockerPolicy) rewriteBuild(ctx context.Context, rest []string) ([]string, error) {
 	flags, pos, err := parseBuild(rest)
 	if err != nil {
 		return nil, err
@@ -333,7 +384,7 @@ func (p *DockerPolicy) rewriteBuild(rest []string) ([]string, error) {
 			}
 		}
 	}
-	bases, err := p.baseContexts(dockerfile, buildArgs)
+	bases, err := p.baseContexts(ctx, dockerfile, buildArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -386,7 +437,11 @@ const sessionStopGrace = 30 * time.Second
 // command builds the exec.Cmd of `docker args...` under d's policy. A
 // refused call yields a command whose Start returns the refusal.
 func (d Docker) command(ctx context.Context, args []string) *exec.Cmd {
-	rewritten, err := d.Policy.Rewrite(args)
+	rctx := ctx
+	if rctx == nil {
+		rctx = context.Background()
+	}
+	rewritten, err := d.Policy.RewriteContext(rctx, args)
 	bin := d.bin()
 	session := false
 	if err == nil {

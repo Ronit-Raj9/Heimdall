@@ -469,6 +469,7 @@ export interface Slot {
 export type Stage =
 	| "planned"
 	| "leased"
+	| "image"
 	| "prepare"
 	| "arm"
 	| "run"

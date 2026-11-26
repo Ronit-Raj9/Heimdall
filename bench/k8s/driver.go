@@ -1109,7 +1109,8 @@ func imageMatches(got, frozen string, digests []string) bool {
 
 // attach starts the agent: it attaches to the gated agent container,
 // releases it with one line on stdin and copies stdout and stderr into the
-// run folder, capped and with the run key redacted, until the streams end.
+// run folder, capped and with every runtime credential redacted
+// (utils.RunSecrets), until the streams end.
 // The wall budget kills every process of the agent's uid on expiry.
 func (d *Driver) attach(ctx context.Context, rc *schemas.RunContext, r runRef, plan *schemas.RunPlan, uid int64) (*schemas.ExecResult, error) {
 	stdoutPath, stderrPath, _ := environments.StreamPaths(rc)
@@ -1124,10 +1125,7 @@ func (d *Driver) attach(ctx context.Context, rc *schemas.RunContext, r runRef, p
 		return nil, fmt.Errorf("open %s: %w", stderrPath, err)
 	}
 	defer errF.Close()
-	var secrets []string
-	if rc.Key != nil {
-		secrets = append(secrets, rc.Key.Value)
-	}
+	secrets := utils.RunSecrets(rc)
 	stdout := environments.NewOutputWriter(outF, d.cfg.OutputCapBytes, secrets...)
 	stderr := environments.NewOutputWriter(errF, d.cfg.OutputCapBytes, secrets...)
 	wall := time.Duration(plan.WallS) * time.Second
