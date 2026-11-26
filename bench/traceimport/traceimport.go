@@ -70,6 +70,16 @@ type Session struct {
 	Outcome     Outcome        `json:"outcome"`
 	Skipped     map[string]int `json:"skipped,omitempty"` // content not imported, by kind (image, audio, file, turns, tool calls)
 	Truncated   int            `json:"truncated,omitempty"`
+	Workspace   *Workspace     `json:"workspace,omitempty"` // coding sessions: where the agent worked
+}
+
+// Workspace is where a coding agent worked during a session (Claude Code and
+// Codex session files).
+type Workspace struct {
+	Cwd     string `json:"cwd,omitempty"`
+	Branch  string `json:"branch,omitempty"`
+	Commit  string `json:"commit,omitempty"`
+	RepoURL string `json:"repo_url,omitempty"`
 }
 
 // Turn is one message of the conversation.
