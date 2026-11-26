@@ -1,5 +1,8 @@
 import { useConfirm } from "@/components/platform/confirmDialog";
-import { PolicyForm, starterPolicy } from "@/components/govern/policyForm";
+import { PolicyForm, policyNameProblem, starterPolicy } from "@/components/govern/policyForm";
+import { WhyDisabled } from "@/components/ui/whyDisabled";
+import i18n from "@/lib/i18n";
+import "@/app/schedules/views/w4m7bI18n";
 import { RoleGate, RoleNote } from "@/components/platform/accessNotes";
 import { LoadError } from "@/components/runs/screenStates";
 import { canUse, useSession } from "@/lib/session/sessionContext";
@@ -175,6 +178,13 @@ export function freePolicyFile(taken: readonly string[]): string {
 	}
 }
 
+/** "It will be saved as bad-name.yaml." when the typed file name is changed to a valid one, else null (p14-1). */
+export function fileNameNote(input: string): string | null {
+	const target = normalizePolicyFile(input);
+	if (target === input.trim() || !isValidPolicyFile(target)) return null;
+	return i18n.t("policies.savedAs", { ns: "w4m7b", file: target });
+}
+
 interface PolicyEditorProps {
 	isNew?: boolean;
 	/** File names of the rule sets that exist: a new set may not take one (N6). */
@@ -203,9 +213,10 @@ export function PolicyEditor({
 	const { t } = useTranslation("govern");
 	const confirm = useConfirm();
 	const [mode, setMode] = useState<"form" | "yaml">(isNew || initialPolicy ? "form" : "yaml");
-	const [policy, setPolicy] = useState<ReleasePolicy>(initialPolicy ?? starterPolicy());
-	const [yaml, setYaml] = useState(initialYAML ?? "");
 	const [fileName, setFileName] = useState(file ?? freePolicyFile(taken));
+	// N6: a new set is named after the free file it will be saved as.
+	const [policy, setPolicy] = useState<ReleasePolicy>(initialPolicy ?? starterPolicy(fileName.replace(/\.ya?ml$/, "")));
+	const [yaml, setYaml] = useState(initialYAML ?? "");
 	const [savedPath, setSavedPath] = useState<string | null>(null);
 	const [save, saveState] = useSavePolicyMutation();
 	const [validate, validation] = useValidatePolicyMutation();
@@ -230,6 +241,9 @@ export function PolicyEditor({
 	const target = normalizePolicyFile(fileName);
 	const nameTaken = Boolean(isNew) && taken.includes(target);
 	const nameOk = isValidPolicyFile(target) && !nameTaken;
+	const savedAs = isNew ? fileNameNote(fileName) : null;
+	// p14-2: in the form, Save waits for a valid rule set name; the YAML tab is checked by the server.
+	const why = mode === "yaml" ? null : policyNameProblem(policy.name);
 	const doSave = async () => {
 		// A new set is saved with create_only, so the server refuses a name taken since the list loaded (409).
 		const res = await save({ file: target, body: { ...body(), ...(isNew ? { create_only: true } : { if_match: sha256 }) } });
@@ -255,6 +269,11 @@ export function PolicyEditor({
 							</span>
 						) : (
 							!nameOk && <span className="text-destructive text-xs">{t("policies.fileNameHint")}</span>
+						)}
+						{nameOk && savedAs && (
+							<span className="text-muted-foreground text-xs" data-testid="policy-file-normalized">
+								{savedAs}
+							</span>
 						)}
 					</label>
 				) : (
@@ -296,7 +315,21 @@ export function PolicyEditor({
 			</div>
 
 			{mode === "form" ? (
-				<PolicyForm value={policy} onChange={setPolicy} />
+				<div className="flex flex-col gap-3">
+					{isNew && policy.checks.length > 0 && (
+						<Button
+							type="button"
+							size="sm"
+							variant="outline"
+							className="w-fit"
+							onClick={() => setPolicy({ ...policy, checks: [] })}
+							data-testid="policy-start-empty"
+						>
+							{i18n.t("policies.startEmpty", { ns: "w4m7b" })}
+						</Button>
+					)}
+					<PolicyForm value={policy} onChange={setPolicy} />
+				</div>
 			) : (
 				<div className="flex flex-col gap-1">
 					<p className="text-muted-foreground text-xs">{t("policies.yamlHint")}</p>
@@ -360,17 +393,21 @@ export function PolicyEditor({
 							</Button>
 						)}
 					</div>
-					<div className="flex gap-2">
-						<Button variant="outline" disabled={validation.isLoading} onClick={() => void validate(body())} data-testid="policy-validate">
-							{t("policies.validate")}
-						</Button>
-						<Button
-							disabled={saveState.isLoading || !nameOk || (mode === "form" && policy.checks.length === 0)}
-							onClick={() => void doSave()}
-							data-testid="policy-save"
-						>
-							{saveState.isLoading ? t("policies.saving") : t("policies.save")}
-						</Button>
+					<div className="flex flex-col items-end gap-1">
+						<div className="flex gap-2">
+							<Button variant="outline" disabled={validation.isLoading} onClick={() => void validate(body())} data-testid="policy-validate">
+								{t("policies.validate")}
+							</Button>
+							<Button
+								disabled={saveState.isLoading || !nameOk || why !== null || (mode === "form" && policy.checks.length === 0)}
+								aria-describedby={why ? "policy-save-why" : undefined}
+								onClick={() => void doSave()}
+								data-testid="policy-save"
+							>
+								{saveState.isLoading ? t("policies.saving") : t("policies.save")}
+							</Button>
+						</div>
+						<WhyDisabled reason={saveState.isLoading ? null : why} testId="policy-save-why" />
 					</div>
 				</div>
 			</RoleGate>

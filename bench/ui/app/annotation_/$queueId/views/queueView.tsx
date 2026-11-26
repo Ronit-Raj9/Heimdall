@@ -119,6 +119,21 @@ export function keyAction(key: string): AnnotationLabel | "note" | "next" | null
 	}
 }
 
+/** What Enter in the note does: save with the last choice, or show the hint when no choice was made yet (wave 4, p12-4). */
+export function enterAction(lastChoice: AnnotationLabel | null): "save" | "hint" {
+	return lastChoice ? "save" : "hint";
+}
+
+/** True when Next item skipped an item and got the same one back or none: nothing else waits (wave 4, p12-3). */
+export function skipNote(skipped: string | null, got: string | null): boolean {
+	return skipped !== null && (got === null || got === skipped);
+}
+
+/** Decide is offered only on a row with at least one label that is not resolved yet (wave 4, p12-7). */
+export function decideShown(it: Pick<AnnotationItem, "label_count" | "resolution">): boolean {
+	return it.label_count > 0 && !it.resolution;
+}
+
 /**
  * The labeller: asks the server for the next item reserved for the caller, shows the input and
  * answer, and takes a label from the keyboard (1 correct, 2 incorrect, N note, J next). After a
@@ -126,6 +141,7 @@ export function keyAction(key: string): AnnotationLabel | "note" | "next" | null
  */
 export function Labeller({ queue }: { queue: AnnotationQueue }) {
 	const { t } = useTranslation("annotation");
+	const { t: w } = useTranslation("w4m7");
 	const session = useSession();
 	const writable = canUse(session, "member");
 	const [next, nextState] = useNextAnnotationItemMutation();
@@ -134,6 +150,9 @@ export function Labeller({ queue }: { queue: AnnotationQueue }) {
 	const [finished, setFinished] = useState(false);
 	const [note, setNote] = useState("");
 	const [last, setLast] = useState<AnnotationLabelResult | null>(null);
+	const [lastChoice, setLastChoice] = useState<AnnotationLabel | null>(null);
+	const [enterHint, setEnterHint] = useState(false);
+	const [noOther, setNoOther] = useState(false);
 	const noteRef = useRef<HTMLInputElement>(null);
 
 	const load = useCallback(() => {
@@ -143,13 +162,33 @@ export function Labeller({ queue }: { queue: AnnotationQueue }) {
 				setItem(r.item);
 				setFinished(!r.item);
 				setNote("");
+				setNoOther(false);
 			})
 			.catch(() => {});
 	}, [next, queue.id]);
 
+	// Next item (and J): pass on the item on screen; when nothing else waits, it stays and a note says so (wave 4, p12-3).
+	const skip = useCallback(() => {
+		const current = item?.id ?? null;
+		if (!current) return load();
+		void next({ id: queue.id, skip: [current] })
+			.unwrap()
+			.then((r) => {
+				const got = r.item?.id ?? null;
+				setNoOther(skipNote(current, got));
+				if (got && got !== current) {
+					setItem(r.item);
+					setNote("");
+				}
+			})
+			.catch(() => {});
+	}, [item, load, next, queue.id]);
+
 	const submit = useCallback(
 		(choice: AnnotationLabel) => {
 			if (!item || labelState.isLoading) return;
+			setLastChoice(choice);
+			setEnterHint(false);
 			void label({ id: queue.id, item: item.id, label: choice, note })
 				.unwrap()
 				.then((r) => {
@@ -171,12 +210,12 @@ export function Labeller({ queue }: { queue: AnnotationQueue }) {
 			if (!action) return;
 			e.preventDefault();
 			if (action === "note") noteRef.current?.focus();
-			else if (action === "next") load();
+			else if (action === "next") skip();
 			else submit(action);
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [item, load, submit]);
+	}, [item, skip, submit]);
 
 	if (!writable || !queue.can_label) return <EmptyNote testId="annotation-label-cannot">{t("label.cannotLabel")}</EmptyNote>;
 	if (queue.counts.total === 0)
@@ -257,10 +296,20 @@ export function Labeller({ queue }: { queue: AnnotationQueue }) {
 							onChange={(e) => setNote(e.target.value)}
 							onKeyDown={(e) => {
 								if (e.key === "Escape") (e.target as HTMLInputElement).blur();
+								if (e.key === "Enter" && !e.shiftKey) {
+									e.preventDefault();
+									if (enterAction(lastChoice) === "save" && lastChoice) submit(lastChoice);
+									else setEnterHint(true);
+								}
 							}}
 							data-testid="annotation-note"
 						/>
 					</Field>
+					{enterHint && (
+						<p className="text-muted-foreground text-xs" role="status" data-testid="annotation-enter-hint">
+							{w("labelling.enterHint")}
+						</p>
+					)}
 					<div className="flex flex-wrap items-center gap-2">
 						<Button onClick={() => submit("correct")} disabled={labelState.isLoading} data-testid="annotation-correct">
 							<Check className="size-4" aria-hidden="true" />
@@ -277,11 +326,16 @@ export function Labeller({ queue }: { queue: AnnotationQueue }) {
 							{choices.incorrect}
 							<kbd className="ml-1 rounded border px-1 text-[10px] opacity-70">2</kbd>
 						</Button>
-						<Button variant="ghost" onClick={load} disabled={nextState.isLoading} data-testid="annotation-skip">
+						<Button variant="ghost" onClick={skip} disabled={nextState.isLoading} data-testid="annotation-skip">
 							{t("label.next")}
 							<kbd className="ml-1 rounded border px-1 text-[10px] opacity-70">J</kbd>
 						</Button>
 					</div>
+					{noOther && (
+						<p className="text-muted-foreground text-xs" role="status" data-testid="annotation-no-other">
+							{w("labelling.noOtherItem")}
+						</p>
+					)}
 					<p className="text-muted-foreground text-xs" data-testid="annotation-keys">
 						{t("label.keys")}
 					</p>
@@ -441,26 +495,28 @@ export function ItemTable({ queue, items }: { queue: AnnotationQueue; items: Ann
 							</td>
 							{queue.can_manage && (
 								<td className="px-4 py-2.5 text-right whitespace-nowrap">
-									<div className="inline-flex gap-1">
-										<Button
-											size="sm"
-											variant="outline"
-											disabled={resolving.isLoading}
-											onClick={() => void resolve({ id: queue.id, item: it.id, label: "correct" })}
-											data-testid={`annotation-decide-correct-${it.id}`}
-										>
-											{t("items.decideCorrect")}
-										</Button>
-										<Button
-											size="sm"
-											variant="outline"
-											disabled={resolving.isLoading}
-											onClick={() => void resolve({ id: queue.id, item: it.id, label: "incorrect" })}
-											data-testid={`annotation-decide-incorrect-${it.id}`}
-										>
-											{t("items.decideIncorrect")}
-										</Button>
-									</div>
+									{decideShown(it) && (
+										<div className="inline-flex gap-1">
+											<Button
+												size="sm"
+												variant="outline"
+												disabled={resolving.isLoading}
+												onClick={() => void resolve({ id: queue.id, item: it.id, label: "correct" })}
+												data-testid={`annotation-decide-correct-${it.id}`}
+											>
+												{t("items.decideCorrect")}
+											</Button>
+											<Button
+												size="sm"
+												variant="outline"
+												disabled={resolving.isLoading}
+												onClick={() => void resolve({ id: queue.id, item: it.id, label: "incorrect" })}
+												data-testid={`annotation-decide-incorrect-${it.id}`}
+											>
+												{t("items.decideIncorrect")}
+											</Button>
+										</div>
+									)}
 								</td>
 							)}
 						</tr>

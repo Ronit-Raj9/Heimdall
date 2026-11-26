@@ -7,6 +7,25 @@ import { InboxItemDetailView, InboxPreview } from "./inboxDetail";
 import { InboxDraftResult } from "./inboxDraft";
 import { InboxEmpty, InboxIngestOffNote, InboxSourcesTable } from "./inboxSources";
 
+// The review bar and the session import call the API; these tests render without a store (group E integration).
+vi.mock("@/lib/store/apis/traceDraftApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/traceDraftApi")>()),
+	useGetInboxProposalQuery: () => ({ data: undefined, refetch: () => undefined }),
+	useImportInboxSessionMutation: () => [() => ({ unwrap: async () => ({}) }), { isLoading: false }],
+}));
+vi.mock("@/lib/store/apis/inboxApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/inboxApi")>()),
+	useAcceptInboxItemMutation: () => [() => ({ unwrap: async () => ({}) }), { isLoading: false }],
+}));
+vi.mock("@/lib/store/apis/jobRunApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/jobRunApi")>()),
+	useCreateJobMutation: () => [() => ({ unwrap: async () => ({ id: "j" }) }), { isLoading: false }],
+}));
+vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/platformApi")>()),
+	useGetJobQuery: () => ({ data: undefined }),
+}));
+
 // A plain anchor stands in for the router's Link, so the target URL is visible in the markup.
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
@@ -96,12 +115,12 @@ describe("sources and empty state", () => {
 	});
 
 	it("says when no source is configured", () => {
-		expect(renderToStaticMarkup(<InboxSourcesTable sources={[]} />)).toContain("heimdall inbox pull");
+		expect(renderToStaticMarkup(<InboxSourcesTable sources={[]} />)).toContain("Nothing connected yet.");
 	});
 
 	it("explains how items get in", () => {
 		const html = renderToStaticMarkup(<InboxEmpty />);
-		expect(html).toContain("heimdall inbox pull");
+		expect(html).toContain("From a terminal");
 		expect(html).toContain("Connect a tool");
 	});
 

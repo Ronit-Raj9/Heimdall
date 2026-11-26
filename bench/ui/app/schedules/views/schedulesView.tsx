@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import {
 	errorMessage,
 	isPaused,
+	plainScheduleError,
 	useGetSchedulesQuery,
 	useSetSchedulePausedMutation,
 	useRunScheduleMutation,
@@ -17,8 +18,10 @@ import type { AlertConfig, Schedule, ScheduleRow, SchedulesFile, SchedulesRespon
 import { type Evaluation, useListEvaluationsQuery } from "@/lib/store/apis/evaluationsApi";
 import { ConfirmButton } from "@/components/platform/badges";
 import { type ConfirmFn, useConfirm } from "@/components/platform/confirmDialog";
+import { WhyDisabled } from "@/components/ui/whyDisabled";
 import { cn } from "@/lib/utils";
 import type { TFunction } from "i18next";
+import "./w4m7bI18n";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -73,6 +76,26 @@ export function evaluationOptions(
 	};
 }
 
+/** Whether the add or edit form closes after a save: only when the save worked (p13-5). Exported for tests. */
+export function afterSave(ok: boolean): boolean {
+	return ok;
+}
+
+/** What the add form still needs, in plain words, in form order (p13-7). The server still decides. Exported for tests. */
+export function addScheduleMissing(
+	s: { name: string; cron: string; max: string },
+	what: "evaluation" | "experiment",
+	target: string,
+	t: TFunction<"w4m7b">,
+): string[] {
+	const out: string[] = [];
+	if (!s.name.trim()) out.push(t("schedules.missing.name"));
+	if (!target.trim()) out.push(t(what === "evaluation" ? "schedules.missing.evaluation" : "schedules.missing.experiment"));
+	if (!s.cron.trim()) out.push(t("schedules.missing.cron"));
+	if (what === "evaluation" && !(Number(s.max) > 0)) out.push(t("schedules.missing.max"));
+	return out;
+}
+
 /**
  * Schedules: /schedules. Web schedules live in policies/schedules.yaml; scheduled canaries are
  * listed read-only. A server ticker queues each schedule's job at its cron time.
@@ -83,12 +106,22 @@ export default function SchedulesView() {
 	const [save, saveState] = useSaveSchedulesMutation();
 	const [yamlMode, setYamlMode] = useState(false);
 	const [msg, setMsg] = useState<string | null>(null);
+	const [formError, setFormError] = useState<string | null>(null);
 
-	const persist = async (body: { file?: SchedulesFile; yaml?: string }) => {
+	// p13-5: resolves whether the save worked. A failed save from the add or edit form is shown in the
+	// form, which stays open with what was typed; other failures are shown above the page.
+	const persist = async (body: { file?: SchedulesFile; yaml?: string }, fromForm = false): Promise<boolean> => {
 		setMsg(null);
+		setFormError(null);
 		const res = await save(body);
-		if ("error" in res && res.error) setMsg(t("saveError", { error: errorMessage(res.error, "unknown error") }));
-		else setMsg(t("saved"));
+		if ("error" in res && res.error) {
+			const text = t("saveError", { error: plainScheduleError(errorMessage(res.error, "unknown error")) });
+			if (fromForm) setFormError(text);
+			else setMsg(text);
+			return false;
+		}
+		setMsg(t("saved"));
+		return true;
 	};
 
 	return (
@@ -97,7 +130,16 @@ export default function SchedulesView() {
 				title={t("title")}
 				subtitle={t("subtitle")}
 				actions={
-					<Button size="sm" variant="ghost" onClick={() => setYamlMode((v) => !v)} data-testid="schedules-yaml-toggle">
+					<Button
+						size="sm"
+						variant="ghost"
+						onClick={() => {
+							setMsg(null);
+							setFormError(null);
+							setYamlMode((v) => !v);
+						}}
+						data-testid="schedules-yaml-toggle"
+					>
 						<Code2 className="size-4" aria-hidden="true" />
 						{yamlMode ? t("yaml.hide") : t("yaml.show")}
 					</Button>
@@ -115,7 +157,13 @@ export default function SchedulesView() {
 			) : yamlMode ? (
 				<YamlEditor initial={q.data.yaml} busy={saveState.isLoading} onSave={(yaml) => void persist({ yaml })} />
 			) : (
-				<SchedulesBody data={q.data} busy={saveState.isLoading} onSave={(file) => void persist({ file })} />
+				<SchedulesBody
+					data={q.data}
+					busy={saveState.isLoading}
+					onSave={(file, fromForm) => persist({ file }, fromForm)}
+					formError={formError}
+					onFormOpen={() => setFormError(null)}
+				/>
 			)}
 		</section>
 	);
@@ -145,17 +193,23 @@ function YamlEditor({ initial, busy, onSave }: { initial: string; busy: boolean;
 export interface SchedulesBodyProps {
 	data: SchedulesResponse;
 	busy: boolean;
-	onSave(file: SchedulesFile): void;
+	/** Resolves whether the save worked; fromForm marks a save from the add or edit form (p13-5). */
+	onSave(file: SchedulesFile, fromForm?: boolean): Promise<boolean> | void;
+	/** The failed save of the open add or edit form, shown under its submit button. */
+	formError?: string | null;
+	onFormOpen?(): void;
 }
 
 /** The loaded schedules, the add form and the webhook alerts. Exported for tests. */
-export function SchedulesBody({ data, busy, onSave }: SchedulesBodyProps) {
+export function SchedulesBody({ data, busy, onSave, formError, onFormOpen }: SchedulesBodyProps) {
 	const { t } = useTranslation("schedules");
 	const { t: u } = useTranslation("ux13");
 	const [adding, setAdding] = useState(false);
 	const [editing, setEditing] = useState<Schedule | null>(null);
 	const file = data.file;
-	const saveWith = (patch: Partial<SchedulesFile>) => onSave({ alerts: file.alerts ?? [], schedules: file.schedules ?? [], ...patch });
+	const saveWith = (patch: Partial<SchedulesFile>, fromForm = false) =>
+		onSave({ alerts: file.alerts ?? [], schedules: file.schedules ?? [], ...patch }, fromForm);
+	const saveFromForm = async (patch: Partial<SchedulesFile>) => afterSave((await saveWith(patch, true)) !== false);
 	return (
 		<div className="flex min-w-0 flex-col gap-6">
 			{!data.ticker && (
@@ -181,7 +235,13 @@ export function SchedulesBody({ data, busy, onSave }: SchedulesBodyProps) {
 					message={u("schedules.heroMessage")}
 					testId="schedules-empty"
 					action={
-						<Button onClick={() => setAdding(true)} data-testid="schedules-hero-add">
+						<Button
+							onClick={() => {
+								onFormOpen?.();
+								setAdding(true);
+							}}
+							data-testid="schedules-hero-add"
+						>
 							{u("schedules.heroAction")}
 						</Button>
 					}
@@ -192,7 +252,14 @@ export function SchedulesBody({ data, busy, onSave }: SchedulesBodyProps) {
 						<div className="flex items-center justify-between gap-3">
 							<h2 className="text-foreground text-base font-semibold tracking-tight">{t("title")}</h2>
 							{!adding && (
-								<Button size="sm" onClick={() => setAdding(true)} data-testid="schedules-add-open">
+								<Button
+									size="sm"
+									onClick={() => {
+										onFormOpen?.();
+										setAdding(true);
+									}}
+									data-testid="schedules-add-open"
+								>
 									<Plus className="size-4" aria-hidden="true" />
 									{u("schedules.newAction")}
 								</Button>
@@ -203,6 +270,7 @@ export function SchedulesBody({ data, busy, onSave }: SchedulesBodyProps) {
 							onRemove={(name) => saveWith({ schedules: file.schedules.filter((s) => s.name !== name) })}
 							onEdit={(name) => {
 								setAdding(false);
+								onFormOpen?.();
 								setEditing(file.schedules.find((s) => s.name === name) ?? null);
 							}}
 							busy={busy}
@@ -223,9 +291,9 @@ export function SchedulesBody({ data, busy, onSave }: SchedulesBodyProps) {
 				>
 					<AddScheduleForm
 						busy={busy}
-						onAdd={(s) => {
-							saveWith({ schedules: [...(file.schedules ?? []), s] });
-							setAdding(false);
+						error={formError}
+						onAdd={async (s) => {
+							if (await saveFromForm({ schedules: [...(file.schedules ?? []), s] })) setAdding(false);
 						}}
 					/>
 				</SetupCard>
@@ -245,9 +313,9 @@ export function SchedulesBody({ data, busy, onSave }: SchedulesBodyProps) {
 						key={editing.name}
 						busy={busy}
 						initial={editing}
-						onAdd={(s) => {
-							saveWith({ schedules: (file.schedules ?? []).map((x) => (x.name === editing.name ? s : x)) });
-							setEditing(null);
+						error={formError}
+						onAdd={async (s) => {
+							if (await saveFromForm({ schedules: (file.schedules ?? []).map((x) => (x.name === editing.name ? s : x)) })) setEditing(null);
 						}}
 					/>
 				</SetupCard>
@@ -446,8 +514,19 @@ export function mergeScheduleEdit(initial: Schedule | undefined, next: Schedule)
 	return { ...base, ...next };
 }
 
-function AddScheduleForm({ busy, onAdd, initial }: { busy: boolean; onAdd(s: Schedule): void; initial?: Schedule }) {
+function AddScheduleForm({
+	busy,
+	onAdd,
+	initial,
+	error,
+}: {
+	busy: boolean;
+	onAdd(s: Schedule): void | Promise<void>;
+	initial?: Schedule;
+	error?: string | null;
+}) {
 	const { t } = useTranslation("schedules");
+	const { t: w } = useTranslation("w4m7b");
 	const { t: u } = useTranslation("ux13");
 	const evaluations = useListEvaluationsQuery();
 	const options = evaluationOptions(evaluations.data ?? [], t);
@@ -462,7 +541,9 @@ function AddScheduleForm({ busy, onAdd, initial }: { busy: boolean; onAdd(s: Sch
 	});
 	const set = (k: keyof typeof s) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setS({ ...s, [k]: e.target.value });
 	const target = what === "evaluation" ? s.evaluation : s.experiment;
-	const ok = s.name && target && s.cron && (what === "experiment" || Number(s.max) > 0);
+	const missing = addScheduleMissing(s, what, target, w);
+	const ok = missing.length === 0;
+	const why = ok ? null : w("schedules.toAdd", { list: missing.join(", ") });
 	return (
 		<form
 			className="flex flex-col"
@@ -470,7 +551,7 @@ function AddScheduleForm({ busy, onAdd, initial }: { busy: boolean; onAdd(s: Sch
 				e.preventDefault();
 				if (!ok) return;
 				const max = Number(s.max);
-				onAdd(
+				void onAdd(
 					mergeScheduleEdit(initial, {
 						name: s.name.trim(),
 						...(what === "evaluation" ? { evaluation: s.evaluation.trim() } : { experiment: s.experiment.trim() }),
@@ -557,10 +638,27 @@ function AddScheduleForm({ busy, onAdd, initial }: { busy: boolean; onAdd(s: Sch
 						<Input value={s.max} onChange={set("max")} inputMode="decimal" data-testid="schedule-add-max" />
 					</Field>
 				</div>
-				<div>
-					<Button type="submit" disabled={busy || !ok} data-testid="schedule-add-submit">
+				{what === "experiment" && s.max.trim() === "" && (
+					<p className="text-muted-foreground text-xs" data-testid="schedule-add-limit-hint">
+						{w("schedules.limitHint")}
+					</p>
+				)}
+				<div className="flex flex-col gap-1">
+					<Button
+						type="submit"
+						className="w-fit"
+						disabled={busy || !ok}
+						aria-describedby={why ? "schedule-add-why" : undefined}
+						data-testid="schedule-add-submit"
+					>
 						{initial ? t("canary.save") : t("add.submit")}
 					</Button>
+					<WhyDisabled reason={busy ? null : why} testId="schedule-add-why" />
+					{error && (
+						<p className="text-destructive text-xs" role="alert" data-testid="schedule-form-error">
+							{error}
+						</p>
+					)}
 				</div>
 			</Step>
 		</form>
@@ -578,6 +676,7 @@ export interface AlertsEditorProps {
 /** File-level webhook receivers with a test button. Exported for tests. */
 export function AlertsEditor({ alerts, events, secrets, busy, onChange }: AlertsEditorProps) {
 	const { t } = useTranslation("schedules");
+	const { t: w } = useTranslation("w4m7b");
 	const [test, testState] = useTestAlertMutation();
 	const [results, setResults] = useState<Record<string, string>>({});
 	const [draft, setDraft] = useState<AlertConfig>({ url_env: secrets[0] ?? "", format: "" });
@@ -616,9 +715,16 @@ export function AlertsEditor({ alerts, events, secrets, busy, onChange }: Alerts
 							>
 								{t("alerts.test")}
 							</Button>
-							<Button size="sm" variant="ghost" disabled={busy} onClick={() => onChange(alerts.filter((_, j) => j !== i))}>
-								{t("remove")}
-							</Button>
+							<ConfirmButton
+								label={t("remove")}
+								question={w("schedules.alerts.removeAsk", { name: a.url_env })}
+								confirmLabel={w("schedules.alerts.removeConfirm")}
+								cancelLabel={t("removeCancel")}
+								variant="destructive"
+								disabled={busy}
+								testId={`alert-remove-${i}`}
+								onConfirm={() => onChange(alerts.filter((_, j) => j !== i))}
+							/>
 							{results[a.url_env] && <span className="text-xs">{results[a.url_env]}</span>}
 						</li>
 					))}

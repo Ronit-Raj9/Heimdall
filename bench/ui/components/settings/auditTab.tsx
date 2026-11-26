@@ -6,17 +6,18 @@ import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { auditExportUrl, useVerifyAuditMutation } from "@/lib/store/apis/dataOpsApi";
 import { useGetAuditLogQuery, useListMembersQuery } from "@/lib/store/apis/platformApi";
 import type { AuditVerifyResult } from "@/lib/types/dataops";
-import type { AuditEntry, AuditList, OrgSummary } from "@/lib/types/bench";
+import type { AuditEntry, AuditList, Member, OrgSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Bot, ChevronLeft, ChevronRight, Cog, Download, KeyRound, Search, Server, ShieldAlert, ShieldCheck, UserRound, type LucideIcon } from "lucide-react";
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsSection, When } from "./settingsBits";
+import "./w4m8I18n";
 
 /** Rows per page of the audit log. */
 export const AUDIT_PAGE_SIZE = 50;
 
-const ACTOR_TYPES = ["user", "token", "runner", "system"] as const;
+const ACTOR_TYPES = ["user", "token", "runner", "system", "anonymous"] as const;
 type ActorFilter = "all" | AuditEntry["actor_type"];
 const ACTOR_ICON: Record<string, LucideIcon> = {
 	user: UserRound,
@@ -24,6 +25,24 @@ const ACTOR_ICON: Record<string, LucideIcon> = {
 	runner: Server,
 	system: Bot,
 };
+
+/** A translate function loose enough for keys built at run time. */
+type AuditT = (key: string, options?: { ns?: string; defaultValue?: string }) => string;
+
+/** The actor type in plain words: a server value the page does not know shows as itself, never as a key path. */
+export function actorTypeLabel(t: AuditT, type: string): string {
+	if (type === "anonymous") return t("audit.anonymous", { ns: "w4m8" });
+	return t(`settings.audit.actorTypes.${type}`, { ns: "platform", defaultValue: type });
+}
+
+/** Who did it: a user by their member name (never an address, "Someone" when unknown), anyone else by id or type. */
+export function auditActorName(t: AuditT, row: AuditEntry, members: readonly Pick<Member, "user_id" | "name">[]): string {
+	if (row.actor_type === "user") {
+		const name = members.find((member) => member.user_id === row.actor_id)?.name?.trim();
+		return name || t("audit.someone", { ns: "w4m8" });
+	}
+	return row.actor_id || actorTypeLabel(t, row.actor_type);
+}
 
 /**
  * The cursor= of the page after this one: the server's opaque next cursor, or null on the last page.
@@ -96,23 +115,25 @@ export function AuditVerifyNote({ result }: { result: AuditVerifyResult }) {
 }
 
 /** Export (JSONL, CSV) as plain downloads and the integrity check with its result inline. */
-function AuditTools({ org }: { org: OrgSummary }) {
+function AuditTools({ org, filters }: { org: OrgSummary; filters: { action?: string; actor?: string; q?: string } }) {
 	const { t } = useTranslation("platform");
+	const { t: tm } = useTranslation("w4m8");
+	const filtered = Boolean(filters.action || filters.actor || filters.q?.trim());
 	const [verify, state] = useVerifyAuditMutation();
 	return (
 		<div className="flex flex-col gap-3" data-testid="audit-tools">
 			<div className="flex flex-wrap items-center gap-2">
 				<span className="text-muted-foreground mr-1 text-[13px] font-medium">{t("settings.audit.export")}</span>
 				<Button asChild variant="outline" size="sm" className="gap-1">
-					<a href={auditExportUrl(org.id, "jsonl")} download data-testid="audit-export-jsonl">
+					<a href={auditExportUrl(org.id, "jsonl", filters)} download data-testid="audit-export-jsonl">
 						<Download className="size-3.5" aria-hidden="true" />
-						{t("settings.audit.exportJsonl")}
+						{filtered ? tm("audit.exportJsonlMatch") : t("settings.audit.exportJsonl")}
 					</a>
 				</Button>
 				<Button asChild variant="outline" size="sm" className="gap-1">
-					<a href={auditExportUrl(org.id, "csv")} download data-testid="audit-export-csv">
+					<a href={auditExportUrl(org.id, "csv", filters)} download data-testid="audit-export-csv">
 						<Download className="size-3.5" aria-hidden="true" />
-						{t("settings.audit.exportCsv")}
+						{filtered ? tm("audit.exportCsvMatch") : t("settings.audit.exportCsv")}
 					</a>
 				</Button>
 				<Button
@@ -159,13 +180,10 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 		cursor,
 		limit: AUDIT_PAGE_SIZE,
 	});
-	// Users read as their email: the member list maps ids (both are admin routes, like this tab).
+	// Users read as their member name, never their address (both are admin routes, like this tab).
 	const members = useListMembersQuery(org.id);
-	const people = useMemo(() => {
-		const byId: Record<string, string> = {};
-		for (const member of members.data?.members ?? []) byId[member.user_id] = member.email;
-		return byId;
-	}, [members.data]);
+	const people = members.data?.members ?? [];
+	const tl = t as unknown as AuditT;
 	const rows = audit.data?.entries ?? [];
 	const shown = useMemo(() => filterAuditRows(rows, actor, text), [rows, actor, text]);
 	const next = nextAuditCursor(audit.data);
@@ -185,7 +203,7 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 
 	return (
 		<SettingsSection title={t("settings.audit.title")} description={t("settings.audit.description", { org: org.name })} testId="settings-audit">
-			<AuditTools org={org} />
+			<AuditTools org={org} filters={{ action: action || undefined, actor: actor === "all" ? undefined : actor, q: text }} />
 			<form className="flex flex-wrap items-end gap-3" onSubmit={apply} data-testid="audit-filters">
 				<div className="flex min-w-48 flex-col gap-1.5">
 					<label htmlFor={`${formId}-action`} className="text-[13px] font-medium">
@@ -211,7 +229,7 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 							<SelectItem value="all">{t("settings.audit.allActors")}</SelectItem>
 							{ACTOR_TYPES.map((type) => (
 								<SelectItem key={type} value={type}>
-									{t(`settings.audit.actorTypes.${type}`)}
+									{actorTypeLabel(tl, type)}
 								</SelectItem>
 							))}
 						</SelectContent>
@@ -253,10 +271,7 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 				<ol className={cn("relative flex flex-col", audit.isFetching && "opacity-60")} data-testid="audit-table">
 					{shown.map((row, i) => {
 						const Icon = ACTOR_ICON[row.actor_type] ?? Cog;
-						const who =
-							row.actor_type === "user" && row.actor_id && people[row.actor_id]
-								? people[row.actor_id]
-								: row.actor_id || t(`settings.audit.actorTypes.${row.actor_type}`);
+						const who = auditActorName(tl, row, people);
 						const target = `${row.target_type ? `${row.target_type}:` : ""}${row.target_id || ""}`;
 						const details = detailsLine(row.details);
 						return (

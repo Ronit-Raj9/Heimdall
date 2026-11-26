@@ -6,11 +6,17 @@ import { Info, Radar } from "lucide-react";
 import { FeatureHero, revealAnchor } from "./featureHero";
 import { useTranslation } from "react-i18next";
 import { formatInboxTime } from "./inboxBadges";
+import { JobRunButton } from "@/components/jobs/jobRunButton";
+import { SessionImport } from "./sessionImport";
 
-/** Each trace source and how its last pull went: when, from where on, how many traces, the last error. */
-export function InboxSourcesTable({ sources }: { sources: readonly InboxSourceStatus[] }) {
+/**
+ * Each trace source and how its last pull went: when, from where on, how many traces, the last error. With manage
+ * (live mode), each row has Remove: the inbox.source job with remove, asked first (wave 4, p13-2).
+ */
+export function InboxSourcesTable({ sources, manage, onChanged }: { sources: readonly InboxSourceStatus[]; manage?: boolean; onChanged?: () => void }) {
 	const { t } = useTranslation("bench");
-	if (sources.length === 0) return <EmptyNote testId="inbox-sources-none">{t("inbox.sources.none")}</EmptyNote>;
+	const { t: w } = useTranslation("w4m7");
+	if (sources.length === 0) return <EmptyNote testId="inbox-sources-none">{w("sources.none")}</EmptyNote>;
 	return (
 		<div className="min-w-0 overflow-x-auto rounded-sm border">
 			<Table aria-label={t("inbox.sources.label")} data-testid="inbox-sources-table">
@@ -22,6 +28,7 @@ export function InboxSourcesTable({ sources }: { sources: readonly InboxSourceSt
 						<TableHead>{t("inbox.sources.columns.since")}</TableHead>
 						<TableHead className="text-right">{t("inbox.sources.columns.pulled")}</TableHead>
 						<TableHead>{t("inbox.sources.columns.lastError")}</TableHead>
+						{manage && <TableHead className="text-right">{w("sources.actions")}</TableHead>}
 					</TableRow>
 				</TableHeader>
 				<TableBody>
@@ -43,11 +50,41 @@ export function InboxSourcesTable({ sources }: { sources: readonly InboxSourceSt
 									<span className="text-muted-foreground">{t("inbox.sources.ok")}</span>
 								)}
 							</TableCell>
+							{manage && (
+								<TableCell className="text-right" data-testid={`inbox-source-remove-${source.name}`}>
+									<JobRunButton
+										kind="inbox.source"
+										params={{ name: source.name, remove: true }}
+										label={w("sources.remove")}
+										confirm={w("sources.removeAsk", { name: source.name })}
+										variant="outline"
+										onDone={onChanged}
+									/>
+								</TableCell>
+							)}
 						</TableRow>
 					))}
 				</TableBody>
 			</Table>
 		</div>
+	);
+}
+
+/** Scrolls to the existing add-source form (wave 4, p13-2). */
+export function InboxConnectAnotherLink() {
+	const { t } = useTranslation("w4m7");
+	return (
+		<a
+			href="#inbox-source-setup"
+			className="text-primary self-start text-sm underline-offset-2 hover:underline"
+			onClick={(e) => {
+				e.preventDefault();
+				revealAnchor("inbox-source-setup");
+			}}
+			data-testid="inbox-source-connect-another"
+		>
+			{t("sources.connectAnother")}
+		</a>
 	);
 }
 
@@ -66,7 +103,7 @@ export function InboxIngestOffNote() {
 	);
 }
 
-/** The empty inbox: one sentence, a "Connect a trace source" action that opens the setup, and the CLI command. */
+/** The empty inbox: one sentence, a "Connect a trace source" action that opens the setup, and the command inside a "From a terminal" block (wave 4, N78). */
 export function InboxEmpty() {
 	const { t: u } = useTranslation("ux13");
 	return (
@@ -90,8 +127,11 @@ export function InboxEmpty() {
 				</Button>
 			}
 		>
-			<span>{u("inbox.cli")}</span>
-			<code className="bg-muted text-foreground rounded-md px-2 py-1 font-mono">heimdall inbox pull</code>
+			<details data-testid="inbox-terminal">
+				<summary className="cursor-pointer">{u("inbox.cli")}</summary>
+				<code className="bg-muted text-foreground mt-2 inline-block rounded-md px-2 py-1 font-mono">heimdall inbox pull</code>
+			</details>
+			<SessionImport />
 		</FeatureHero>
 	);
 }

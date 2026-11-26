@@ -906,7 +906,22 @@ func (h *annotationHandler) next(ctx *fasthttp.RequestCtx) {
 	if !ok || !h.requireSignedIn(ctx, c) {
 		return
 	}
-	it, q, err := st.Next(f.Queue.ID, c.UserID)
+	// Optional body {"skip": ["<item id>"]}: the items the caller passes on
+	// (wave 4, p12-3). No body is the same as no skip.
+	var req struct {
+		Skip []string `json:"skip"`
+	}
+	if body := ctx.PostBody(); len(body) > 0 {
+		if err := decodeAuthoring(body, &req); err != nil {
+			h.bad(ctx, `body must be {"skip": ["<item id>"]} or empty: `+err.Error())
+			return
+		}
+	}
+	if len(req.Skip) > 100 {
+		h.bad(ctx, "skip lists at most 100 items")
+		return
+	}
+	it, q, err := st.NextSkipping(f.Queue.ID, c.UserID, req.Skip)
 	if err != nil {
 		h.sendErr(ctx, err)
 		return

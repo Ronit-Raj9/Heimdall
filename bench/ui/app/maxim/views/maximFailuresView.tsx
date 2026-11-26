@@ -24,6 +24,7 @@ import {
 	ClusterList,
 	DEFAULT_FAILURE_FORM,
 	FailureCounts,
+	ImportsEmpty,
 	TaskReviewCard,
 	draftedClusters,
 	filterFromForm,
@@ -77,7 +78,7 @@ export default function MaximFailuresView() {
 				) : list.isError ? (
 					<LoadError title={t("imports.title")} error={list.error} onRetry={() => void list.refetch()} testId="maxim-imports-error" />
 				) : !list.data?.batches.length ? (
-					<EmptyNote testId="maxim-imports-empty">{t("imports.empty")}</EmptyNote>
+					<ImportsEmpty connected={Boolean(conn.data?.connected)} />
 				) : (
 					<ul className="flex flex-wrap gap-2">
 						{list.data.batches.map((b) => (

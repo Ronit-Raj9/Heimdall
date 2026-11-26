@@ -1,3 +1,4 @@
+import { transportErrorText } from "@/lib/requestErrors";
 import type { CanaryDefinition } from "@/lib/types/bench";
 import type {
 	CanaryInitRequest,
@@ -103,6 +104,8 @@ export function errorProblems(err: unknown): FieldProblem[] {
 
 /** The server's error message from an RTK Query error, or a fallback. */
 export function errorMessage(err: unknown, fallback: string): string {
+	const transport = transportErrorText(err);
+	if (transport) return transport;
 	if (err && typeof err === "object" && "data" in err) {
 		const data = (err as { data?: unknown }).data;
 		if (data && typeof data === "object") {
@@ -113,4 +116,8 @@ export function errorMessage(err: unknown, fallback: string): string {
 		}
 	}
 	return fallback;
+}
+/** The server's schedule error without its leading "schedule <name>: ", which the form already shows. */
+export function plainScheduleError(msg: string): string {
+	return msg.replace(/^schedule [^:]*: /, "");
 }

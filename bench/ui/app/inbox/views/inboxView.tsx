@@ -1,16 +1,18 @@
 import { INBOX_ALL, INBOX_FILTERS, filterInboxItems, inboxCount, type InboxFilter } from "@/components/inbox/inbox.utils";
-import { InboxEmpty, InboxIngestOffNote, InboxSourcesTable } from "@/components/inbox/inboxSources";
+import { InboxConnectAnotherLink, InboxEmpty, InboxIngestOffNote, InboxSourcesTable } from "@/components/inbox/inboxSources";
 import { InboxStateFilter } from "@/components/inbox/inboxStateFilter";
+import { SessionImport } from "@/components/inbox/sessionImport";
 import { InboxTable } from "@/components/inbox/inboxTable";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { useGetInboxQuery } from "@/lib/store/apis/inboxApi";
-import type { InboxListResponse } from "@/lib/types/bench";
+import type { InboxItem, InboxListResponse, InboxSourceStatus } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
-import { useId, useMemo, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import ClustersTab from "./clustersTab";
+import FindingsTab from "./findingsTab";
 import { InboxPullButton, InboxPullSetup, InboxWebhook } from "./inboxConnect";
 import { useGetInboxWebhookQuery, useGetPullReadinessQuery } from "@/lib/store/apis/liveinboxApi";
 import { InboxItemPanel } from "./inboxItemPanel";
@@ -18,6 +20,7 @@ import TriageTab from "./triageTab";
 import { Collapsible } from "@/components/inbox/featureHero";
 import { InboxBulkAccept } from "@/components/inbox/inboxBulkAccept";
 import { ListChecks, Plug } from "lucide-react";
+import { UnknownLinkNote } from "@/components/shell/unknownLinkNote";
 
 /** The state the screen opens on: what still needs a decision. */
 const DEFAULT_FILTER: InboxFilter = "new";
@@ -33,12 +36,23 @@ export default function InboxView() {
 		{ id: "inbox", label: t("inbox.tabs.inbox") },
 		{ id: "clusters", label: t("inbox.tabs.clusters") },
 		{ id: "triage", label: t("inbox.tabs.triage") },
+		{ id: "findings", label: t("tabs.findings", { ns: "w443" }) },
 	];
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="inbox-page">
 			<PageHeader title={t("inbox.title")} subtitle={t("inbox.pageSubtitle")} />
 			<RouteTabs tabs={tabs} defaultTab="inbox" label={t("inbox.tabs.label")} testId="inbox-tabs">
-				{(active) => (active === "clusters" ? <ClustersTab /> : active === "triage" ? <TriageTab /> : <InboxTab />)}
+				{(active) =>
+					active === "clusters" ? (
+						<ClustersTab />
+					) : active === "triage" ? (
+						<TriageTab />
+					) : active === "findings" ? (
+						<FindingsTab />
+					) : (
+						<InboxTab />
+					)
+				}
 			</RouteTabs>
 		</section>
 	);
@@ -62,6 +76,12 @@ export function InboxTab() {
 	const data = list.data;
 	const ready = useGetPullReadinessQuery().data;
 	const hosted = useGetInboxWebhookQuery().data?.hosted ?? false;
+	// The bulk section stays once it was shown, so its result line survives accepting the last open items (wave 4, p13-1).
+	const hasOpen = (data?.items ?? []).some((item) => item.state === "new" || item.state === "snoozed");
+	const [bulkSeen, setBulkSeen] = useState(false);
+	useEffect(() => {
+		if (hasOpen) setBulkSeen(true);
+	}, [hasOpen]);
 
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="inbox-screen">
@@ -86,12 +106,14 @@ export function InboxTab() {
 					onSource={(next) => void setSource(next)}
 					itemId={itemId}
 					onItem={(next) => void setItemId(next)}
+					manageSources={data.mode === "live"}
+					onSourcesChanged={() => void list.refetch()}
 					panel={
 						itemId ? <InboxItemPanel key={itemId} itemId={itemId} suites={data.suites ?? []} onClose={() => void setItemId(null)} /> : null
 					}
 				/>
 			)}
-			{data?.mode === "live" && (data.items ?? []).some((item) => item.state === "new" || item.state === "snoozed") && (
+			{data?.mode === "live" && (hasOpen || bulkSeen) && (
 				<Collapsible icon={ListChecks} title={g("bulk.title")} hint={g("bulk.hint")} testId="inbox-bulk">
 					<InboxBulkAccept items={data.items ?? []} suites={data.suites ?? []} />
 				</Collapsible>
@@ -122,11 +144,35 @@ export interface InboxBodyProps {
 	onItem: (itemId: string | null) => void;
 	/** The open item's panel; null when no item is open. */
 	panel: ReactNode;
+	/** Live mode: each source row can be removed, and a link leads to the add form (wave 4, p13-2). */
+	manageSources?: boolean;
+	/** Called after a source was removed, to reload the list. */
+	onSourcesChanged?: () => void;
+}
+
+/** The names the "Comes from" filter offers: the configured sources and the source of every item, sorted and unique (wave 4, p12-6). */
+export function sourceNames(sources: readonly InboxSourceStatus[], items: readonly InboxItem[] | null | undefined): string[] {
+	const names = new Set<string>();
+	for (const s of sources) if (s.name) names.add(s.name);
+	for (const it of items ?? []) if (it.source) names.add(it.source);
+	return [...names].sort();
 }
 
 /** The loaded inbox: filters, the table or the empty state, the open item and the sources. Exported for tests. */
-export function InboxBody({ data, filter, onFilter, source, onSource, itemId, onItem, panel }: InboxBodyProps) {
+export function InboxBody({
+	data,
+	filter,
+	onFilter,
+	source,
+	onSource,
+	itemId,
+	onItem,
+	panel,
+	manageSources,
+	onSourcesChanged,
+}: InboxBodyProps) {
 	const { t } = useTranslation("bench");
+	const { t: w } = useTranslation("w4m7");
 	const items = useMemo(() => filterInboxItems(data.items, filter, source), [data.items, filter, source]);
 	const sources = data.sources ?? [];
 	const total = inboxCount(data.counts, INBOX_ALL);
@@ -136,7 +182,17 @@ export function InboxBody({ data, filter, onFilter, source, onSource, itemId, on
 		<div className="flex min-w-0 flex-col gap-6">
 			{!data.ingest_enabled && <InboxIngestOffNote />}
 			{empty ? (
-				<InboxEmpty />
+				<>
+					{itemId && (
+						<UnknownLinkNote
+							text={w("unknown.failure", { name: itemId })}
+							showAllLabel={w("unknown.showAll")}
+							onShowAll={() => onItem(null)}
+							testId="unknown-link-failure"
+						/>
+					)}
+					<InboxEmpty />
+				</>
 			) : (
 				<div className="grid min-w-0 grid-cols-1 items-start gap-6 2xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
 					<Section
@@ -148,13 +204,14 @@ export function InboxBody({ data, filter, onFilter, source, onSource, itemId, on
 								<span className="text-muted-foreground text-xs" data-testid="inbox-regression-tasks">
 									{t("inbox.regressionTasks", { count: data.regression_tasks ?? 0 })}
 								</span>
+								<SessionImport />
 							</div>
 						}
 					>
 						<div className="flex flex-col gap-4">
 							<div className="flex flex-wrap items-end justify-between gap-3">
 								<InboxStateFilter counts={data.counts} value={filter} onChange={onFilter} />
-								<SourceFilter names={sources.map((s) => s.name)} value={source} onChange={onSource} />
+								<SourceFilter names={sourceNames(sources, data.items)} value={source} onChange={onSource} />
 							</div>
 							{items.length === 0 ? (
 								<EmptyNote testId="inbox-empty-filtered">{source ? t("inbox.empty.filteredSource") : t("inbox.empty.filtered")}</EmptyNote>
@@ -169,7 +226,8 @@ export function InboxBody({ data, filter, onFilter, source, onSource, itemId, on
 				</div>
 			)}
 			<Section title={t("inbox.sources.title")} description={t("inbox.sources.description")} testId="inbox-sources">
-				<InboxSourcesTable sources={sources} />
+				<InboxSourcesTable sources={sources} manage={manageSources} onChanged={onSourcesChanged} />
+				{manageSources && sources.length > 0 && <InboxConnectAnotherLink />}
 			</Section>
 		</div>
 	);

@@ -1,3 +1,4 @@
+import { EmptyNote } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatCard } from "@/components/ui/statCard";
@@ -339,4 +340,11 @@ export function TaskReviewCard({ task, busy = false, message = null, onAccept, o
 			)}
 		</article>
 	);
+}
+
+/** The empty Imports list: points to the pull form above only when Maxim is connected, else to Settings (wave 4, p13-4). */
+export function ImportsEmpty({ connected }: { connected: boolean }) {
+	const { t } = useTranslation("maximFailures");
+	const { t: w } = useTranslation("w4m7");
+	return <EmptyNote testId="maxim-imports-empty">{connected ? t("imports.empty") : w("maxim.importsEmptyNotConnected")}</EmptyNote>;
 }

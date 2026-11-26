@@ -1,5 +1,8 @@
 import "@/components/platform/fw23I18n";
 import { useConfirm } from "@/components/platform/confirmDialog";
+import { LoadError } from "@/components/runs/screenStates";
+import "@/components/settings/w4m8I18n";
+import { canRetry } from "@/lib/requestErrors";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Badge } from "@/components/ui/badge";
@@ -293,6 +296,11 @@ function Section({ title, intro, children }: { title: string; intro?: string; ch
 	);
 }
 
+/** A panel that could not load: the title, the plain reason and Retry only when a retry can help. */
+export function PanelLoadError({ title, error, onRetry, testId }: { title: string; error: unknown; onRetry: () => void; testId: string }) {
+	return <LoadError title={title} error={error} onRetry={canRetry(error) ? onRetry : undefined} testId={testId} />;
+}
+
 function ErrorNote({ message, testId }: { message: string; testId?: string }) {
 	return (
 		<p className="text-chart-error-ink text-sm" role="alert" data-testid={testId ?? "integrations-error"}>
@@ -307,7 +315,8 @@ function ErrorNote({ message, testId }: { message: string; testId?: string }) {
 function WebhooksPanel() {
 	const { t } = useTranslation("integrations");
 	const confirm = useConfirm();
-	const { data, error, isLoading } = useListWebhooksQuery();
+	const { data, error, isLoading, refetch } = useListWebhooksQuery();
+	const { t: tm } = useTranslation("w4m8");
 	const [createHook, create] = useCreateWebhookMutation();
 	const [updateHook] = useUpdateWebhookMutation();
 	const [deleteHook] = useDeleteWebhookMutation();
@@ -429,7 +438,7 @@ function WebhooksPanel() {
 				</div>
 			)}
 			{error ? (
-				<ErrorNote message={apiErrorMessage(error, t("errors.load"))} />
+				<PanelLoadError title={tm("loadErrors.webhooks")} error={error} onRetry={() => void refetch()} testId="webhooks-load-error" />
 			) : isLoading ? null : (
 				<WebhookList
 					hooks={data?.webhooks ?? []}
@@ -549,7 +558,8 @@ function DeliveryLogPanel() {
 	const { t } = useTranslation("integrations");
 	const session = useSession();
 	const [polling, setPolling] = useState(false);
-	const { data, error, isLoading } = useListDeliveriesQuery(100, { pollingInterval: polling ? DELIVERY_POLL_MS : 0 });
+	const { data, error, isLoading, refetch } = useListDeliveriesQuery(100, { pollingInterval: polling ? DELIVERY_POLL_MS : 0 });
+	const { t: tm } = useTranslation("w4m8");
 	const hooks = useListWebhooksQuery();
 	const [retry] = useRetryDeliveryMutation();
 	const [message, setMessage] = useState<string | null>(null);
@@ -562,7 +572,7 @@ function DeliveryLogPanel() {
 		<Section title={t("deliveryLog.heading")} intro={t("deliveryLog.intro")}>
 			{message && <ErrorNote message={message} testId="delivery-error" />}
 			{error ? (
-				<ErrorNote message={apiErrorMessage(error, t("errors.load"))} />
+				<PanelLoadError title={tm("loadErrors.deliveries")} error={error} onRetry={() => void refetch()} testId="deliveries-load-error" />
 			) : isLoading ? (
 				<Skeleton className="h-24 w-full" />
 			) : (
@@ -698,6 +708,7 @@ export function ExportsPanel({ showHiddenAtStart = false }: { showHiddenAtStart?
 	const exps = useListExperimentsQuery();
 	const suites = useGetSuitesQuery();
 	const files = useListExportsQuery(undefined, { pollingInterval: 5000 });
+	const { t: tm } = useTranslation("w4m8");
 	const [deleteExport] = useDeleteExportMutation();
 	const [format, setFormat] = useState<IntegrationExportFormat>("otlp");
 	const [expId, setExpId] = useState("");
@@ -819,7 +830,12 @@ export function ExportsPanel({ showHiddenAtStart = false }: { showHiddenAtStart?
 			<Section title={t("exports.files")}>
 				{message && <ErrorNote message={message} />}
 				{files.error ? (
-					<ErrorNote message={apiErrorMessage(files.error, t("errors.load"))} />
+					<PanelLoadError
+						title={tm("loadErrors.exports")}
+						error={files.error}
+						onRetry={() => void files.refetch()}
+						testId="exports-load-error"
+					/>
 				) : (
 					<ExportTable
 						exports={files.data?.exports ?? []}

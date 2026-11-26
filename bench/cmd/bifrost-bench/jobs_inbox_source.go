@@ -36,6 +36,9 @@ type inboxSourceParams struct {
 	SecretKeyEnv string `json:"secret_key_env,omitempty"`
 	APIKeyEnv    string `json:"api_key_env,omitempty"`
 	Project      string `json:"project,omitempty"`
+	// Remove deletes the source named Name instead of adding one (wave 4,
+	// p13-2). Its items stay in the inbox.
+	Remove bool `json:"remove,omitempty"`
 }
 
 // source turns the params into a Source with the starter filter of its
@@ -63,6 +66,9 @@ func inboxSourcesPath(env jobEnv) string {
 // inboxSourceYAML returns sources.yaml with the new source appended, after
 // checking every rule a pull would.
 func inboxSourceYAML(env jobEnv, p inboxSourceParams) ([]byte, error) {
+	if p.Remove {
+		return inboxSourceRemoveYAML(env, p.Name)
+	}
 	if !hostedPullable(p.Kind) {
 		return nil, liveInvalid("kind must be bifrost, langfuse or langsmith")
 	}
@@ -93,10 +99,25 @@ func inboxSourceYAML(env jobEnv, p inboxSourceParams) ([]byte, error) {
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
+	doc, seq, err := inboxSourcesDoc(data)
+	if err != nil {
+		return nil, err
+	}
+	var n yaml.Node
+	if err := n.Encode(src); err != nil {
+		return nil, err
+	}
+	seq.Content = append(seq.Content, &n)
+	return inboxSourcesEncode(&doc)
+}
+
+// inboxSourcesDoc parses sources.yaml as a node tree (comments kept) and
+// returns it with its sources list, created when missing.
+func inboxSourcesDoc(data []byte) (yaml.Node, *yaml.Node, error) {
 	var doc yaml.Node
 	if len(bytes.TrimSpace(data)) > 0 {
 		if err := yaml.Unmarshal(data, &doc); err != nil {
-			return nil, liveInvalid("inbox/sources.yaml does not parse: %v", err)
+			return doc, nil, liveInvalid("inbox/sources.yaml does not parse: %v", err)
 		}
 	}
 	if doc.Kind == 0 {
@@ -104,7 +125,7 @@ func inboxSourceYAML(env jobEnv, p inboxSourceParams) ([]byte, error) {
 	}
 	root := doc.Content[0]
 	if root.Kind != yaml.MappingNode {
-		return nil, liveInvalid("inbox/sources.yaml is not a mapping")
+		return doc, nil, liveInvalid("inbox/sources.yaml is not a mapping")
 	}
 	var seq *yaml.Node
 	for i := 0; i+1 < len(root.Content); i += 2 {
@@ -120,18 +141,19 @@ func inboxSourceYAML(env jobEnv, p inboxSourceParams) ([]byte, error) {
 		if seq.Kind == yaml.ScalarNode && (seq.Value == "" || seq.Tag == "!!null") {
 			*seq = yaml.Node{Kind: yaml.SequenceNode}
 		} else {
-			return nil, liveInvalid("sources in inbox/sources.yaml is not a list")
+			return doc, nil, liveInvalid("sources in inbox/sources.yaml is not a list")
 		}
 	}
-	var n yaml.Node
-	if err := n.Encode(src); err != nil {
-		return nil, err
-	}
-	seq.Content = append(seq.Content, &n)
+	return doc, seq, nil
+}
+
+// inboxSourcesEncode writes the node tree back and checks that it loads
+// exactly as a pull would load it.
+func inboxSourcesEncode(doc *yaml.Node) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
-	if err := enc.Encode(&doc); err != nil {
+	if err := enc.Encode(doc); err != nil {
 		return nil, err
 	}
 	// The result must load exactly as a pull would load it.
@@ -149,6 +171,37 @@ func inboxSourceYAML(env jobEnv, p inboxSourceParams) ([]byte, error) {
 		return nil, liveInvalid("%v", err)
 	}
 	return buf.Bytes(), nil
+}
+
+// inboxSourceRemoveYAML returns sources.yaml without the source named name.
+func inboxSourceRemoveYAML(env jobEnv, name string) ([]byte, error) {
+	if !liveIdentRE.MatchString(name) {
+		return nil, liveInvalid("name is required (letters, digits, . _ - only)")
+	}
+	data, err := os.ReadFile(inboxSourcesPath(env))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	doc, seq, err := inboxSourcesDoc(data)
+	if err != nil {
+		return nil, err
+	}
+	at := -1
+	for i, n := range seq.Content {
+		if n.Kind != yaml.MappingNode {
+			continue
+		}
+		for k := 0; k+1 < len(n.Content); k += 2 {
+			if n.Content[k].Value == "name" && n.Content[k+1].Value == name {
+				at = i
+			}
+		}
+	}
+	if at < 0 {
+		return nil, liveInvalid("no source named %s in inbox/sources.yaml", name)
+	}
+	seq.Content = append(seq.Content[:at], seq.Content[at+1:]...)
+	return inboxSourcesEncode(&doc)
 }
 
 func validateInboxSource(_ context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
@@ -185,6 +238,10 @@ func runInboxSource(_ context.Context, env jobEnv, j *jobs.Job, log jobs.Logger,
 	if err := os.Rename(tmp, path); err != nil {
 		_ = os.Remove(tmp)
 		return nil, err
+	}
+	if p.Remove {
+		log.Printf("removed source %s", p.Name)
+		return map[string]string{"source": p.Name, "path": "inbox/sources.yaml", "removed": "true"}, nil
 	}
 	next := "store the credentials it names, then pull"
 	if env.Hosted {

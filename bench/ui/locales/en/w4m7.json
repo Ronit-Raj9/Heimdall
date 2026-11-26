@@ -1,0 +1,24 @@
+{
+	"sources": {
+		"none": "Nothing connected yet. Add a tool with Pull failures from your tools below, then press Pull now.",
+		"remove": "Remove",
+		"removeAsk": "Remove the source {{name}}? Its items stay in the inbox; nothing new is pulled from it.",
+		"connectAnother": "Connect another tool",
+		"actions": "Actions"
+	},
+	"bulk": {
+		"nothingLeft": "Nothing else is waiting to be accepted."
+	},
+	"maxim": {
+		"importsEmptyNotConnected": "No import yet. Connect Maxim in Settings first; the pull form then shows here."
+	},
+	"labelling": {
+		"noOtherItem": "No other item is waiting for you. This one stays yours.",
+		"enterHint": "Pick Correct or Incorrect once first. After that, Enter in the note saves it with that choice.",
+		"fixedProblem": "Name at least {{count}} people under Only these people (one for each label an item wants), or lower People per item."
+	},
+	"unknown": {
+		"failure": "No failure named {{name}} was found. Showing all failures instead.",
+		"showAll": "Show all"
+	}
+}

@@ -1,0 +1,33 @@
+{
+	"share": {
+		"pdfFailed": "Could not prepare the PDF. Download the HTML file and print it from your browser."
+	},
+	"audit": {
+		"anonymous": "Anonymous visitor",
+		"someone": "Someone",
+		"exportCsvMatch": "Download CSV (rows that match)",
+		"exportJsonlMatch": "Download JSONL (rows that match)"
+	},
+	"usage": {
+		"swapped": "From was after To, so the two dates were swapped."
+	},
+	"operate": {
+		"deleteConfirm": "Delete the copy {{name}}? It cannot be brought back.",
+		"delete": "Delete"
+	},
+	"github": {
+		"whyBase": "Pick a base branch.",
+		"whyFile": "Enter the agent settings file, for example agents/my-agent.yaml."
+	},
+	"org": {
+		"makePublicConfirm": "Make {{org}} public? Anyone signed in to this site can then read its results and evidence.",
+		"makePublic": "Make public"
+	},
+	"loadErrors": {
+		"files": "Could not load the files",
+		"webhooks": "Could not load webhooks",
+		"deliveries": "Could not load deliveries",
+		"exports": "Could not load exports",
+		"email": "Could not load email settings"
+	}
+}

@@ -45,6 +45,7 @@ export function bulkRequestFrom(v: BulkAcceptValues): InboxBulkAcceptRequest {
  */
 export function InboxBulkAccept({ items, suites, disabled }: { items: readonly InboxItem[]; suites: readonly InboxSuite[]; disabled?: boolean }) {
 	const { t } = useTranslation("inboxGuide");
+	const { t: w } = useTranslation("w4m7");
 	const ids = useId();
 	const open = useMemo(() => items.filter(isActionable), [items]);
 	const [values, setValues] = useState<BulkAcceptValues>({ ids: [], suite: "", recorded: false, rubric: "", switchGrader: false });
@@ -53,6 +54,29 @@ export function InboxBulkAccept({ items, suites, disabled }: { items: readonly I
 	const errors = bulkAcceptErrors(values);
 	const set = (patch: Partial<BulkAcceptValues>) => setValues((v) => ({ ...v, ...patch }));
 	const off = disabled || result.isLoading;
+	const resultLine = result.data && (
+		<div role="status" className="flex flex-col gap-1 text-sm" data-testid="inbox-bulk-result">
+			<p>{t("bulk.result", { accepted: result.data.accepted.length, failed: result.data.failed.length })}</p>
+			{result.data.failed.length > 0 && (
+				<ul className="text-muted-foreground list-disc pl-5 text-xs break-words" data-testid="inbox-bulk-failed">
+					{result.data.failed.map((f) => (
+						<li key={f.id}>{t("bulk.failed", { id: f.id, error: f.error })}</li>
+					))}
+				</ul>
+			)}
+		</div>
+	);
+
+	// Nothing open is left (the last items were just accepted): keep the result line, hide the fields (wave 4, p13-1).
+	if (open.length === 0)
+		return (
+			<div className="flex flex-col gap-3" data-testid="inbox-bulk-accept">
+				{resultLine}
+				<p className="text-muted-foreground text-sm" data-testid="inbox-bulk-nothing-left">
+					{w("bulk.nothingLeft")}
+				</p>
+			</div>
+		);
 
 	return (
 		<form
@@ -164,18 +188,7 @@ export function InboxBulkAccept({ items, suites, disabled }: { items: readonly I
 					{getBenchErrorMessage(result.error)}
 				</p>
 			)}
-			{result.data && (
-				<div role="status" className="flex flex-col gap-1 text-sm" data-testid="inbox-bulk-result">
-					<p>{t("bulk.result", { accepted: result.data.accepted.length, failed: result.data.failed.length })}</p>
-					{result.data.failed.length > 0 && (
-						<ul className="text-muted-foreground list-disc pl-5 text-xs break-words" data-testid="inbox-bulk-failed">
-							{result.data.failed.map((f) => (
-								<li key={f.id}>{t("bulk.failed", { id: f.id, error: f.error })}</li>
-							))}
-						</ul>
-					)}
-				</div>
-			)}
+			{resultLine}
 		</form>
 	);
 }

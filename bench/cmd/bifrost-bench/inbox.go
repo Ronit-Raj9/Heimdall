@@ -102,6 +102,7 @@ func inboxFor(a *app, results bool) (*traceinbox.Inbox, error) {
 		}
 	}
 	ib := traceinbox.New(dir, cfg, a.cfg.Path(a.cfg.BenchmarksRoot))
+	ib.SourcesPath = filepath.Join(dir, traceinbox.SourcesFile)
 	ib.ProjectRoot = a.cfg.Root
 	if results {
 		ib.Results = inboxResults{ix: resultsindex.New(a.store, a.logger), logger: a.logger}

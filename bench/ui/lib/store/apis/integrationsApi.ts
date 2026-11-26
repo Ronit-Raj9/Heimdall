@@ -12,6 +12,7 @@ import type {
 	WebhookInput,
 	WebhookList,
 } from "@/lib/types/integrations";
+import { transportErrorText } from "@/lib/requestErrors";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
 
@@ -80,6 +81,8 @@ export function exportDownloadUrl(name: string): string {
 
 /** The message of an API error: the server's error.message, else a fallback. */
 export function apiErrorMessage(error: unknown, fallback: string): string {
+	const transport = transportErrorText(error);
+	if (transport) return transport;
 	const e = error as { status?: number | string; data?: { error?: { message?: string } } } | undefined;
 	return e?.data?.error?.message ?? fallback;
 }

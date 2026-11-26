@@ -35,7 +35,9 @@ const (
 )
 
 // Formats lists the accepted formats in a stable order.
-func Formats() []string { return []string{FormatOTLP, FormatLangfuse, FormatChat} }
+func Formats() []string {
+	return []string{FormatOTLP, FormatLangfuse, FormatChat, FormatClaudeCode, FormatCodex}
+}
 
 // Size caps. A trace over a cap is refused with an error that names the cap,
 // or cut with the cut counted, never read without bound.
@@ -70,6 +72,16 @@ type Session struct {
 	Outcome     Outcome        `json:"outcome"`
 	Skipped     map[string]int `json:"skipped,omitempty"` // content not imported, by kind (image, audio, file, turns, tool calls)
 	Truncated   int            `json:"truncated,omitempty"`
+	Workspace   *Workspace     `json:"workspace,omitempty"` // coding sessions: where the agent worked
+}
+
+// Workspace is where a coding agent worked during a session (Claude Code and
+// Codex session files).
+type Workspace struct {
+	Cwd     string `json:"cwd,omitempty"`
+	Branch  string `json:"branch,omitempty"`
+	Commit  string `json:"commit,omitempty"`
+	RepoURL string `json:"repo_url,omitempty"`
 }
 
 // Turn is one message of the conversation.
@@ -202,6 +214,10 @@ func Parse(data []byte, format string) (tr *Trace, err error) {
 		tr.Sessions, err = parseLangfuse(values)
 	case FormatChat:
 		tr.Sessions, err = parseChat(values)
+	case FormatClaudeCode:
+		tr.Sessions, err = parseClaudeCode(values)
+	case FormatCodex:
+		tr.Sessions, err = parseCodex(values)
 	default:
 		return nil, fmt.Errorf("format %q: want one of %s", format, strings.Join(Formats(), ", "))
 	}
@@ -286,6 +302,19 @@ func decodeValues(data []byte) ([]any, error) {
 
 // detect tells the format from the decoded values' keys.
 func detect(values []any) (string, error) {
+	// Coding session files first: their lines also carry a role or a
+	// message, which the chat check would take.
+	lines := sessionLines(values)
+	for _, v := range lines {
+		if m := asMap(v); m != nil && looksClaudeCode(m) {
+			return FormatClaudeCode, nil
+		}
+	}
+	for _, v := range lines {
+		if m := asMap(v); m != nil && looksCodex(m) {
+			return FormatCodex, nil
+		}
+	}
 	for _, v := range values {
 		if f := detectOne(v); f != "" {
 			return f, nil

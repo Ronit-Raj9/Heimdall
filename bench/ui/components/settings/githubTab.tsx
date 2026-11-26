@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { WhyDisabled, firstReason } from "@/components/ui/whyDisabled";
 import { useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
@@ -20,6 +21,12 @@ import { ExternalLink, GitPullRequest, Github, Lock } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsSection } from "./settingsBits";
+import "./w4m8I18n";
+
+/** The base branch choices: the picked base first (the repository's default branch may be missing from the loaded refs), then each branch once. */
+export function branchItems(base: string, branches: readonly { name: string }[]): string[] {
+	return [...new Set([base, ...branches.map((b) => b.name)].filter(Boolean))];
+}
 
 /** The callback outcome the server put in the URL (github=connected or github_error=...), if any. */
 export function githubCallbackNotice(search: string): { ok: boolean; message: string } | null {
@@ -212,6 +219,7 @@ function ReposSection({ picked, onPick }: { picked: GithubRepo | null; onPick: (
 
 function CIInstallSection({ repo }: { repo: GithubRepo | null }) {
 	const { t } = useTranslation("github");
+	const { t: tm } = useTranslation("w4m8");
 	const refs = useGetGithubRefsQuery(repo ? { owner: repo.owner, repo: repo.name } : { owner: "", repo: "" }, { skip: !repo });
 	const [install, installState] = useInstallGithubCIMutation();
 	const [base, setBase] = useState("");
@@ -228,6 +236,7 @@ function CIInstallSection({ repo }: { repo: GithubRepo | null }) {
 	const branches = (refs.data?.refs ?? []).filter((r) => r.kind === "branch");
 	const result = installState.data;
 	const canSubmit = !!repo && !!base && (mode === "recorded" || validBaseAgent(baseAgent));
+	const why = repo ? firstReason(!base && tm("github.whyBase"), mode === "live" && !validBaseAgent(baseAgent) && tm("github.whyFile")) : null;
 
 	const submit = async (e: FormEvent) => {
 		e.preventDefault();
@@ -265,7 +274,7 @@ function CIInstallSection({ repo }: { repo: GithubRepo | null }) {
 								<SelectValue placeholder={refs.isLoading ? t("ci.refsLoading") : base} />
 							</SelectTrigger>
 							<SelectContent position="popper">
-								{(branches.length ? branches.map((b) => b.name) : [base]).filter(Boolean).map((name) => (
+								{branchItems(base, branches).map((name) => (
 									<SelectItem key={name} value={name}>
 										{name}
 									</SelectItem>
@@ -299,10 +308,18 @@ function CIInstallSection({ repo }: { repo: GithubRepo | null }) {
 						{t("ci.force")}
 					</label>
 					<div>
-						<Button type="submit" size="sm" disabled={!canSubmit} isLoading={installState.isLoading} dataTestId="github-ci-submit">
+						<Button
+							type="submit"
+							size="sm"
+							disabled={!canSubmit}
+							isLoading={installState.isLoading}
+							aria-describedby={why ? "github-ci-why" : undefined}
+							dataTestId="github-ci-submit"
+						>
 							<GitPullRequest className="size-3.5" aria-hidden="true" />
 							{t("ci.submit")}
 						</Button>
+						<WhyDisabled reason={installState.isLoading ? null : why} testId="github-ci-why" className="mt-1" />
 					</div>
 					{error && (
 						<p role="alert" className="text-destructive text-sm" data-testid="github-ci-error">
