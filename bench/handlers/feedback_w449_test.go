@@ -112,7 +112,7 @@ func TestFeedbackDownLooksUpBifrost(t *testing.T) {
 			}})
 		case "/api/logs/row-2":
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": "row-2", "status": "success", "provider": "openai", "model": "gpt-x", "session_id": sid,
-				"input_history": []any{map[string]any{"role": "user", "content": "Where is my parcel?"}},
+				"input_history":  []any{map[string]any{"role": "user", "content": "Where is my parcel?"}},
 				"output_message": map[string]any{"role": "assistant", "content": "It was delivered."}})
 		default:
 			http.NotFound(w, r)
