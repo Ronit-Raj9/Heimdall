@@ -2,6 +2,7 @@ import { withOrgParam } from "./orgParam";
 import type { CompliancePackList, PolicyDocument, PolicyList, PolicySaveRequest, PolicyValidation } from "@/lib/types/govern";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
+import { tagsOnSuccess } from "./tagsOnSuccess";
 
 /** Govern area (web parity lane L16): the release policy editor over handlers/policies.go. */
 export const governApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchPolicy", "CompliancePacks"] }).injectEndpoints({
@@ -16,10 +17,10 @@ export const governApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchPolicy"
 		}),
 		savePolicy: builder.mutation<PolicyDocument, { file: string; body: PolicySaveRequest }>({
 			query: ({ file, body }) => ({ url: policyPath(file), method: "PUT", body }),
-			invalidatesTags: (_r, _e, { file }) => [
-				{ type: "BenchPolicy", id: "LIST" },
-				{ type: "BenchPolicy", id: file },
-			],
+			invalidatesTags: tagsOnSuccess((_r, { file }: { file: string }) => [
+				{ type: "BenchPolicy" as const, id: "LIST" },
+				{ type: "BenchPolicy" as const, id: file },
+			]),
 		}),
 		validatePolicy: builder.mutation<PolicyValidation, PolicySaveRequest>({
 			query: (body) => ({ url: "/policies/validate", method: "POST", body }),

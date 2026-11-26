@@ -32,7 +32,7 @@
 	"source": {
 		"github": "GitHub repository",
 		"githubPlaceholder": "owner/name",
-		"githubHint": "Private repositories need GitHub connected in Settings. Public ones work without it.",
+		"githubHint": "Private repositories need GitHub connected in Settings. Public ones can be copied without it. Finding issues always needs a working GitHub connection.",
 		"branch": "Branch (optional)",
 		"local": "Local folder",
 		"localPlaceholder": ". (the project's own repository)",
