@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"os/signal"
 	"path"
@@ -69,6 +70,7 @@ const (
 	improverDir          = "/heimdall/improve"
 	improverEvidencePath = improverDir + "/evidence.json"
 	improverBundlePath   = improverDir + "/bundle.json"
+	improverLimitsPath   = improverDir + "/limits.json"
 )
 
 func runImprove(args []string) int {
@@ -582,17 +584,25 @@ func mergeChannels(a, b []string) []string {
 }
 
 // Improve implements improve.Executor: the improver is a normal sealed run
-// of the incumbent on the improver task. Its agent config is the
-// incumbent's plus the current bundle and the dev evidence as files under
-// /heimdall/improve, its per-run key capped at the round budget. The
-// container mounts no verifier, audit or sealed task and no run store; the
-// task's artifact bundle.json is the new bundle.
+// on the improver task. Its agent is the shipped reflector (on the
+// incumbent's model, or the spec's teacher) or, with improver.agent self,
+// the incumbent. The current bundle, the dev evidence and the limits go
+// into that agent's files_raw under /heimdall/improve, so text with "{{"
+// never breaks a run, and its run key is capped at the round budget. The
+// container mounts no verifier, audit or sealed task and no run store. The
+// task's artifact edits.json (or bundle.json with reasons) is the output.
 func (x improveExecutor) Improve(ctx context.Context, req improve.ImproveRequest) (*improve.ImproveResult, error) {
 	suiteRef, task, err := improverTask(req.Spec)
 	if err != nil {
 		return nil, err
 	}
-	doc, err := improverDoc(req)
+	base := req.Incumbent.Doc
+	if req.Spec.Improver.Agent != "self" {
+		if base, err = x.reflectorDoc(); err != nil {
+			return nil, err
+		}
+	}
+	doc, err := improverDoc(req, base, x.playbook(req.Incumbent))
 	if err != nil {
 		return nil, err
 	}
@@ -620,12 +630,32 @@ func (x improveExecutor) Improve(ctx context.Context, req improve.ImproveRequest
 			res.Flags = append(res.Flags, g.Gate)
 		}
 	}
-	b, err := readBundleArtifact(filepath.Join(sr.Dir, utils.ArtifactsDir))
-	if err != nil {
+	if err := readImproverOutput(filepath.Join(sr.Dir, utils.ArtifactsDir), req.Incumbent.Bundle, res); err != nil {
 		return res, err
 	}
-	res.Bundle = b
 	return res, nil
+}
+
+// reflectorAgentID is the shipped improver agent (agents/heimdall-reflector.yaml).
+const reflectorAgentID = "heimdall-reflector"
+
+// reflectorDoc reads the reflector agent like any library agent: the
+// project's agents folder first, then the built-in library.
+func (x improveExecutor) reflectorDoc() ([]byte, error) {
+	doc, _, _, err := x.readAgent("agents/" + reflectorAgentID + ".yaml")
+	if err != nil {
+		return nil, fmt.Errorf("the improver agent %s is not installed: %w", reflectorAgentID, err)
+	}
+	return doc, nil
+}
+
+// playbook is a version's playbook object, or an empty one.
+func (x improveExecutor) playbook(v improve.Version) improve.PlaybookObject {
+	pb := improve.PlaybookObject{Items: []improve.PlaybookItem{}}
+	if v.PlaybookObj != "" && x.a.store != nil {
+		_ = x.objects().Get(v.PlaybookObj, improve.ObjPlaybook, &pb)
+	}
+	return pb
 }
 
 // improverExperiment is the one-run experiment of an improver phase. Its
@@ -715,34 +745,126 @@ func improverTask(spec *improve.Spec) (string, string, error) {
 	return spec.Suite, t, nil
 }
 
-// improverDoc is the incumbent's config with the bundle and evidence
-// added, budgets set to the round's cap.
-func improverDoc(req improve.ImproveRequest) ([]byte, error) {
+// Lines added to the improver's standing instructions for a restart slot
+// and for the null improver (A3.2).
+const (
+	improverRestartLine = "This is a restart: you may also rewrite a whole file with rewrite_file, starting from version 0."
+	improverNullLine    = "There is no evidence this time; propose the changes you think are best."
+)
+
+// improverDoc is the improver agent's config (base: the reflector, or the
+// incumbent for improver.agent self) with the improver inputs added as
+// files_raw under /heimdall/improve, the model and provider of the
+// incumbent (or the teacher) on the reflector, and budgets set to the
+// round's cap.
+func improverDoc(req improve.ImproveRequest, base []byte, pb improve.PlaybookObject) ([]byte, error) {
 	var tree map[string]any
-	if err := yaml.Unmarshal(req.Incumbent.Doc, &tree); err != nil {
+	if err := yaml.Unmarshal(base, &tree); err != nil {
 		return nil, err
 	}
 	if tree == nil {
 		tree = map[string]any{}
 	}
+	if req.Spec.Improver.Agent != "self" {
+		var inc schemas.AgentConfig
+		if err := yaml.Unmarshal(req.Incumbent.Doc, &inc); err != nil {
+			return nil, fmt.Errorf("read the incumbent's model: %w", err)
+		}
+		model, provider := inc.Model, inc.Gateway.Provider
+		if req.Model != "" {
+			model, provider = req.Model, req.Provider
+		}
+		if model != "" {
+			tree["model"] = model
+		}
+		if provider != "" {
+			gw, _ := tree["gateway"].(map[string]any)
+			if gw == nil {
+				gw = map[string]any{}
+			}
+			gw["provider"] = provider
+			tree["gateway"] = gw
+		}
+	}
+	raw, _ := tree["files_raw"].(map[string]any)
+	if raw == nil {
+		raw = map[string]any{}
+	}
 	files, _ := tree["files"].(map[string]any)
-	if files == nil {
-		files = map[string]any{}
+	put := func(rel string, v []byte) error {
+		p := improverDir + "/" + rel
+		if _, ok := files[p]; ok {
+			return fmt.Errorf("the improver agent already defines %s", p)
+		}
+		raw[p] = string(v)
+		return nil
 	}
-	ev := req.Evidence
-	if req.Null || ev == nil {
-		ev = []improve.EvidenceItem{}
+	lim := req.Limits
+	if lim == (improve.Limits{}) {
+		lim = improve.DefaultLimits
 	}
-	evb, err := json.MarshalIndent(map[string]any{"round": req.Round, "results": ev, "editable": req.Spec.Editable}, "", "  ")
+	limb, err := json.MarshalIndent(lim, "", "  ")
 	if err != nil {
 		return nil, err
 	}
-	bb, err := json.MarshalIndent(map[string]any{"files": req.Incumbent.Bundle}, "", "  ")
+	obj, err := improve.BundleObjectOf(req.Incumbent.Doc, req.Incumbent.Bundle)
 	if err != nil {
 		return nil, err
 	}
-	files[improverEvidencePath], files[improverBundlePath] = string(evb), string(bb)
-	tree["files"] = files
+	if pb.Items == nil {
+		pb.Items = []improve.PlaybookItem{}
+	}
+	bb, err := json.MarshalIndent(map[string]any{"files": obj.Files, "raw": obj.Raw, "items": pb.Items, "limits": lim}, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	var evb []byte
+	switch {
+	case req.Null:
+		evb, err = json.MarshalIndent(map[string]any{"split": "dev", "round": req.Round, "clusters": []any{}, "items": []any{}}, "", "  ")
+	case req.EvidenceDoc != nil && len(req.EvidenceDoc.EvidenceJSON) > 0:
+		evb = req.EvidenceDoc.EvidenceJSON
+	default:
+		ev := req.Evidence
+		if ev == nil {
+			ev = []improve.EvidenceItem{}
+		}
+		evb, err = json.MarshalIndent(map[string]any{"split": "dev", "round": req.Round, "results": ev, "editable": req.Spec.Editable}, "", "  ")
+	}
+	if err != nil {
+		return nil, err
+	}
+	for rel, v := range map[string][]byte{"bundle.json": bb, "evidence.json": evb, "limits.json": limb} {
+		if err := put(rel, v); err != nil {
+			return nil, err
+		}
+	}
+	if req.EvidenceDoc != nil && !req.Null {
+		for rel, v := range req.EvidenceDoc.Files {
+			clean := path.Clean(rel)
+			if strings.HasPrefix(clean, "/") || clean == "." || strings.HasPrefix(clean, "..") || slices.Contains([]string{"bundle.json", "evidence.json", "limits.json"}, clean) {
+				return nil, fmt.Errorf("evidence file %q is not a plain relative path", rel)
+			}
+			if err := put(clean, v); err != nil {
+				return nil, err
+			}
+		}
+	}
+	tree["files_raw"] = raw
+	var lines []string
+	if req.Kind == "restart" {
+		lines = append(lines, improverRestartLine)
+	}
+	if req.Null {
+		lines = append(lines, improverNullLine)
+	}
+	if len(lines) > 0 {
+		cur, _ := tree["instructions"].(string)
+		if cur = strings.TrimRight(cur, "\n"); cur != "" {
+			lines = append([]string{cur}, lines...)
+		}
+		tree["instructions"] = strings.Join(lines, "\n\n")
+	}
 	budgets, _ := tree["budgets"].(map[string]any)
 	if budgets == nil {
 		budgets = map[string]any{}
@@ -757,32 +879,81 @@ func improverDoc(req improve.ImproveRequest) ([]byte, error) {
 	return yaml.Marshal(tree)
 }
 
-// readBundleArtifact finds bundle.json among the run's exported artifacts.
-func readBundleArtifact(dir string) (improve.Bundle, error) {
+// readImproverOutput reads the improver's output into res: edits.json (the
+// default improver) leaves the bundle as the incumbent's for the edit
+// applier; bundle.json is the full new bundle, every changed path with a
+// reason.
+func readImproverOutput(dir string, incumbent improve.Bundle, res *improve.ImproveResult) error {
+	if p := findArtifact(dir, improverEditsFile); p != "" {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		var e improve.EditsFile
+		if err := json.Unmarshal(b, &e); err != nil {
+			return fmt.Errorf("the improver's %s is not valid: %w", improverEditsFile, err)
+		}
+		res.Edits = &e
+		res.Bundle = incumbent.Clone()
+		if res.Bundle == nil {
+			res.Bundle = improve.Bundle{}
+		}
+		return nil
+	}
+	files, reasons, summary, err := readBundleArtifact(dir)
+	if err != nil {
+		return err
+	}
+	for _, k := range slices.Sorted(maps.Keys(files)) {
+		if old, ok := incumbent[k]; (!ok || old != files[k]) && strings.TrimSpace(reasons[k]) == "" {
+			return fmt.Errorf("the improver gave no reason for %s", k)
+		}
+	}
+	for _, k := range slices.Sorted(maps.Keys(incumbent)) {
+		if _, ok := files[k]; !ok && strings.TrimSpace(reasons[k]) == "" {
+			return fmt.Errorf("the improver gave no reason for %s", k)
+		}
+	}
+	res.Bundle, res.Reasons, res.Summary = files, reasons, summary
+	return nil
+}
+
+// findArtifact is the first file named name among the run's exported
+// artifacts, or "".
+func findArtifact(dir, name string) string {
 	var found string
 	_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
-		if err == nil && d.Type().IsRegular() && d.Name() == improverBundleFile && found == "" {
+		if err == nil && d.Type().IsRegular() && d.Name() == name && found == "" {
 			found = p
 		}
 		return nil
 	})
+	return found
+}
+
+// readBundleArtifact reads bundle.json among the run's exported
+// artifacts: the full bundle, a reason per changed path and a summary.
+func readBundleArtifact(dir string) (improve.Bundle, map[string]string, string, error) {
+	found := findArtifact(dir, improverBundleFile)
 	if found == "" {
-		return nil, fmt.Errorf("the improver left no %s artifact", improverBundleFile)
+		return nil, nil, "", fmt.Errorf("the improver left no %s or %s artifact", improverEditsFile, improverBundleFile)
 	}
 	b, err := os.ReadFile(found)
 	if err != nil {
-		return nil, err
+		return nil, nil, "", err
 	}
 	var out struct {
-		Files map[string]string `json:"files"`
+		Files   map[string]string `json:"files"`
+		Reasons map[string]string `json:"reasons"`
+		Summary string            `json:"summary"`
 	}
 	if err := json.Unmarshal(b, &out); err != nil {
-		return nil, fmt.Errorf("the improver's %s is not a bundle: %w", improverBundleFile, err)
+		return nil, nil, "", fmt.Errorf("the improver's %s is not a bundle: %w", improverBundleFile, err)
 	}
 	if out.Files == nil {
 		out.Files = map[string]string{}
 	}
-	return out.Files, nil
+	return out.Files, out.Reasons, out.Summary, nil
 }
 
 func improveArm(i int) string { return string(rune('A' + i)) }

@@ -36,19 +36,21 @@ func TestImproverTask(t *testing.T) {
 }
 
 func TestImproverDoc(t *testing.T) {
-	doc := []byte("id: a\nbudgets:\n  wall_s: 900\nfiles:\n  /home/agent/AGENTS.md: hi\n")
-	req := improve.ImproveRequest{Spec: &improve.Spec{Editable: improve.Editable{Files: []string{"/home/agent/AGENTS.md"}}}, Round: 2,
+	doc := []byte("id: a\nmodel: inc-model\ngateway:\n  provider: anthropic\nbudgets:\n  wall_s: 900\nfiles:\n  /home/agent/AGENTS.md: hi\n")
+	req := improve.ImproveRequest{Spec: &improve.Spec{Editable: improve.Editable{Files: []string{"/home/agent/AGENTS.md"}}, Improver: improve.ImproverSpec{Agent: "self"}}, Round: 2,
 		Incumbent: improve.Version{Doc: doc, Bundle: improve.Bundle{"/home/agent/AGENTS.md": "hi"}},
 		Evidence:  []improve.EvidenceItem{{Task: "t1", Outcome: "failed"}}, BudgetUSD: 1.5, WallS: 600}
 	for _, null := range []bool{false, true} {
 		req.Null = null
-		out, err := improverDoc(req)
+		out, err := improverDoc(req, doc, improve.PlaybookObject{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		var tree struct {
-			Budgets map[string]any    `yaml:"budgets"`
-			Files   map[string]string `yaml:"files"`
+			Budgets      map[string]any    `yaml:"budgets"`
+			Files        map[string]string `yaml:"files"`
+			FilesRaw     map[string]string `yaml:"files_raw"`
+			Instructions string            `yaml:"instructions"`
 		}
 		if err := yaml.Unmarshal(out, &tree); err != nil {
 			t.Fatal(err)
@@ -56,22 +58,65 @@ func TestImproverDoc(t *testing.T) {
 		if tree.Budgets["usd"] != 1.5 || tree.Budgets["wall_s"] != 600 || tree.Files["/home/agent/AGENTS.md"] != "hi" {
 			t.Errorf("doc %s", out)
 		}
-		ev := tree.Files[improverEvidencePath]
+		ev := tree.FilesRaw[improverEvidencePath]
 		if strings.Contains(ev, `"t1"`) == null {
 			t.Errorf("null %v evidence %s", null, ev)
+		}
+		if null != strings.Contains(tree.Instructions, improverNullLine) {
+			t.Errorf("null %v instructions %q", null, tree.Instructions)
 		}
 		var b struct {
 			Files map[string]string `json:"files"`
 		}
-		if err := json.Unmarshal([]byte(tree.Files[improverBundlePath]), &b); err != nil || b.Files["/home/agent/AGENTS.md"] != "hi" {
+		if err := json.Unmarshal([]byte(tree.FilesRaw[improverBundlePath]), &b); err != nil || b.Files["/home/agent/AGENTS.md"] != "hi" {
 			t.Errorf("bundle %v %v", b, err)
+		}
+		if tree.FilesRaw[improverLimitsPath] == "" {
+			t.Error("no limits.json")
 		}
 	}
 }
 
-func TestReadBundleArtifact(t *testing.T) {
+// The reflector runs on the incumbent's model and provider (or the
+// teacher's), and the evidence document's files reach it raw, "{{" and all.
+func TestImproverDocReflector(t *testing.T) {
+	inc := []byte("id: a\nmodel: inc-model\ngateway:\n  provider: anthropic\n")
+	reflector := []byte("id: heimdall-reflector\nmodel: gpt-x\ngateway:\n  provider: openai\nfiles:\n  /home/agent/x: y\n")
+	req := improve.ImproveRequest{Spec: &improve.Spec{}, Round: 1, Incumbent: improve.Version{Doc: inc, Bundle: improve.Bundle{}}, Kind: "restart",
+		EvidenceDoc: &improve.EvidenceDoc{EvidenceJSON: []byte(`{"split":"dev","items":[]}`), Files: map[string][]byte{"runs/t1/1/B/digest.md": []byte("saw {{model}}")}}}
+	out, err := improverDoc(req, reflector, improve.PlaybookObject{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tree schemas.AgentConfig
+	if err := yaml.Unmarshal(out, &tree); err != nil {
+		t.Fatal(err)
+	}
+	if tree.Model != "inc-model" || tree.Gateway.Provider != "anthropic" || tree.ID != "heimdall-reflector" {
+		t.Errorf("model %q provider %q id %q", tree.Model, tree.Gateway.Provider, tree.ID)
+	}
+	if tree.FilesRaw[improverDir+"/runs/t1/1/B/digest.md"] != "saw {{model}}" || tree.FilesRaw[improverEvidencePath] != `{"split":"dev","items":[]}` {
+		t.Errorf("files_raw %v", tree.FilesRaw)
+	}
+	if !strings.Contains(tree.Instructions, improverRestartLine) {
+		t.Errorf("instructions %q", tree.Instructions)
+	}
+	req.Model, req.Provider = "teacher", "openai"
+	out, _ = improverDoc(req, reflector, improve.PlaybookObject{})
+	if err := yaml.Unmarshal(out, &tree); err != nil || tree.Model != "teacher" || tree.Gateway.Provider != "openai" {
+		t.Errorf("teacher %q %q %v", tree.Model, tree.Gateway.Provider, err)
+	}
+	req.EvidenceDoc.Files = map[string][]byte{"../escape": nil}
+	if _, err := improverDoc(req, reflector, improve.PlaybookObject{}); err == nil {
+		t.Error("escaping evidence path accepted")
+	}
+}
+
+func TestReadImproverOutput(t *testing.T) {
 	dir := t.TempDir()
-	if _, err := readBundleArtifact(dir); err == nil {
+	inc := improve.Bundle{"/a": "x"}
+	res := &improve.ImproveResult{}
+	if err := readImproverOutput(dir, inc, res); err == nil {
 		t.Fatal("no artifact accepted")
 	}
 	p := filepath.Join(dir, "bundle", improverBundleFile)
@@ -81,15 +126,31 @@ func TestReadBundleArtifact(t *testing.T) {
 	if err := os.WriteFile(p, []byte("not json"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := readBundleArtifact(dir); err == nil {
+	if err := readImproverOutput(dir, inc, res); err == nil {
 		t.Fatal("bad json accepted")
 	}
-	if err := os.WriteFile(p, []byte(`{"files":{"/a":"x"}}`), 0o644); err != nil {
+	if err := os.WriteFile(p, []byte(`{"files":{"/a":"y"}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	b, err := readBundleArtifact(dir)
-	if err != nil || b["/a"] != "x" {
-		t.Fatalf("%v %v", b, err)
+	if err := readImproverOutput(dir, inc, res); err == nil || err.Error() != "the improver gave no reason for /a" {
+		t.Fatalf("no reason: %v", err)
+	}
+	if err := os.WriteFile(p, []byte(`{"files":{"/a":"y"},"reasons":{"/a":"tighter"},"summary":"one change"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := readImproverOutput(dir, inc, res); err != nil || res.Bundle["/a"] != "y" || res.Reasons["/a"] != "tighter" || res.Summary != "one change" {
+		t.Fatalf("%+v %v", res, err)
+	}
+	ep := filepath.Join(dir, "edits", improverEditsFile)
+	if err := os.MkdirAll(filepath.Dir(ep), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ep, []byte(`{"rationale":"r","edits":[{"op":"add_item","file":"@instructions","text":"t","reason":"why"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res = &improve.ImproveResult{}
+	if err := readImproverOutput(dir, inc, res); err != nil || res.Edits == nil || len(res.Edits.Edits) != 1 || res.Bundle["/a"] != "x" {
+		t.Fatalf("edits %+v %v", res, err)
 	}
 }
 
