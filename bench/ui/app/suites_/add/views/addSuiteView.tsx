@@ -5,7 +5,8 @@ import { PageHeader } from "@/components/shell";
 import { AddYourOwnPanel } from "@/components/suites/addYourOwnPanel";
 import { useGetImportsQuery } from "@/lib/store";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, FileCode2, ShieldAlert } from "lucide-react";
+import { w4m5Text } from "@/components/onboard/w4m5I18n";
+import { AlertTriangle, FileCode2, FilePlus2, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -51,6 +52,14 @@ export default function AddSuiteView() {
 					<ImporterList importers={data.importers} fetching={query.isFetching} />
 				)}
 			</Section>
+			<Link
+				to="/suites/add"
+				className="hover:bg-muted flex w-fit items-center gap-2 rounded-md border px-3 py-2 text-sm"
+				data-testid="imports-add-file"
+			>
+				<FilePlus2 className="size-4" aria-hidden="true" />
+				{w4m5Text("imports.addFile")}
+			</Link>
 			<Link
 				to="/suites/from-api"
 				className="hover:bg-muted flex w-fit items-center gap-2 rounded-md border px-3 py-2 text-sm"

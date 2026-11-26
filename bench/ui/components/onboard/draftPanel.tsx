@@ -2,6 +2,8 @@ import { ConfirmButton } from "@/components/platform/badges";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { WhyDisabled } from "@/components/ui/whyDisabled";
+import { w4m5Text } from "@/components/onboard/w4m5I18n";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useEditOnboardTaskMutation, usePublishOnboardDraftMutation, useStartOnboardReadinessMutation } from "@/lib/store/apis/onboardApi";
 import type { OnboardCheck, OnboardDraftSet, OnboardDraftTask } from "@/lib/types/onboard";
@@ -47,6 +49,16 @@ export function cellState(checks: OnboardCheck[] | undefined, group: string): "p
 	return mine.every((c) => c.passed) ? "pass" : "fail";
 }
 
+/** The line of a draft with no task: why nothing was drafted, or that every task was dropped (wave 4, p10-5). */
+export function emptyDraftText(tx: TX, set: Pick<OnboardDraftSet, "problems">): string {
+	return (set.problems?.length ?? 0) > 0 ? tx("preview.empty") : w4m5Text("preview.nothingLeft");
+}
+
+/** The readiness error without the job layer's prefix (wave 4, p10-6). */
+export function plainReadinessError(text: string): string {
+	return text.replace(/^(create job: )?invalid job parameters: /, "");
+}
+
 /** Step 3: the draft tasks, each with its instruction, checks and controls. */
 export function DraftPreview({ set }: { set: OnboardDraftSet }) {
 	const tx = useTx();
@@ -59,7 +71,7 @@ export function DraftPreview({ set }: { set: OnboardDraftSet }) {
 				{tx(set.new_suite ? "preview.countNew" : "preview.count", { count: set.tasks.length, id: set.id, suite: set.suite })}
 			</p>
 			{set.public && <p className="text-muted-foreground text-xs">{tx("preview.public")}</p>}
-			{set.tasks.length === 0 && <p className="text-sm">{tx("preview.empty")}</p>}
+			{set.tasks.length === 0 && <p className="text-sm">{emptyDraftText(tx, set)}</p>}
 			{editState.error !== undefined && (
 				<p role="alert" className="text-chart-error-ink text-xs">
 					{getBenchErrorMessage(editState.error)}
@@ -197,10 +209,14 @@ export function ReadinessPanel({ set }: { set: OnboardDraftSet }) {
 	const r = set.readiness;
 	const running = r?.status === "queued" || r?.status === "running";
 	const cols = matrixColumns(set.tasks);
+	// p10-6: a judge-graded draft needs the consent the readiness job asks for.
+	const judged = set.grader === "judge";
+	const [consent, setConsent] = useState(false);
+	const why = judged && !consent ? w4m5Text("ready.needConsent") : null;
 	const label = (g: string) => (GROUP_ORDER.includes(g) ? tx(`ready.check.${g}`) : tx("ready.check.other", { name: g }));
 	const run = async () => {
 		if (!(await confirm(tx("ready.confirm", { count: set.tasks.length })))) return;
-		void start({ set: set.id });
+		void start(judged ? { set: set.id, judge_consent: true } : { set: set.id });
 	};
 	return (
 		<div className="flex min-w-0 flex-col gap-3" data-testid="onboard-readiness">
@@ -208,7 +224,8 @@ export function ReadinessPanel({ set }: { set: OnboardDraftSet }) {
 				{!set.published && (
 					<Button
 						onClick={() => void run()}
-						disabled={running || startState.isLoading || set.tasks.length === 0}
+						disabled={running || startState.isLoading || set.tasks.length === 0 || why !== null}
+						aria-describedby={why ? "onboard-ready-why" : undefined}
 						isLoading={startState.isLoading}
 						dataTestId="onboard-ready-run"
 					>
@@ -227,14 +244,23 @@ export function ReadinessPanel({ set }: { set: OnboardDraftSet }) {
 					</span>
 				)}
 			</div>
+			{judged && !set.published && (
+				<div className="flex flex-col gap-1">
+					<label className="flex items-start gap-2 text-sm" data-testid="onboard-ready-consent">
+						<input type="checkbox" className="mt-1" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+						<span>{w4m5Text("ready.consent", { provider: set.plan.judge?.provider ?? "", model: set.plan.judge?.model ?? "" })}</span>
+					</label>
+					<WhyDisabled reason={running || startState.isLoading ? null : why} testId="onboard-ready-why" />
+				</div>
+			)}
 			{startState.error !== undefined && (
 				<p role="alert" className="text-chart-error-ink text-xs">
-					{getBenchErrorMessage(startState.error)}
+					{plainReadinessError(getBenchErrorMessage(startState.error))}
 				</p>
 			)}
 			{r?.error && (
 				<p role="alert" className="text-chart-error-ink text-xs" data-testid="onboard-ready-error">
-					{r.error}
+					{plainReadinessError(r.error)}
 				</p>
 			)}
 			{(r?.problems?.length ?? 0) > 0 && (
@@ -313,7 +339,7 @@ export function publishQuestion(set: OnboardDraftSet, unready: boolean, tx: TX):
 	const tasks = publishTasks(set, unready);
 	const q = tx("publish.confirm", { count: tasks.length, suite: set.suite });
 	const held = tasks.filter((t) => t.held_out).length;
-	return held > 0 ? `${q} ${tx("publish.confirmHeldOut", { n: held })}` : q;
+	return held > 0 ? `${q} ${w4m5Text("publish.heldOut", { count: held })}` : q;
 }
 
 /** Step 5: publish the ready, accepted tasks privately; then open the benchmark or evaluate. */

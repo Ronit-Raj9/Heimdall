@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { MAP_FIELDS, MappingStep } from "@/app/suites_/$suiteId/views/rowMapper";
 import { suggestSuiteId, suiteIdBlocks, suiteIdCheck, type SuiteIdCheck } from "@/components/onboard/onboard.utils";
 import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
+import { w4m5Text } from "@/components/onboard/w4m5I18n";
 import type { OnboardInventory, OnboardMatch, OnboardPlan } from "@/lib/types/onboard";
 import type { RowColumn, RowMapping } from "@/lib/types/suiteBuild";
 import { AlertTriangle } from "lucide-react";
@@ -29,6 +30,23 @@ export function heldOutCount(pct: number, total: number): { n: number; total: nu
 	if (pct <= 0 || total <= 0) return { n: 0, total };
 	const n = Math.max(1, Math.floor((total * Math.min(pct, 100) + 50) / 100));
 	return { n, total };
+}
+
+/**
+ * The cost line under what was found, for the grader chosen in the plan (wave 4, p10-1): a rubric
+ * judge calls the judge model, so the line never says the runs cost nothing. Empty when no task
+ * was found (p10-9c).
+ */
+export function estimateLine(
+	tx: (k: string, o?: Record<string, unknown>) => string,
+	inv: Pick<OnboardInventory, "estimate">,
+	grader: string | undefined,
+): string {
+	const { tasks, readiness_runs: runs, judge_calls: judge } = inv.estimate;
+	if (tasks === 0) return "";
+	if (grader === "judge") return w4m5Text("estimate.judge", { tasks, runs });
+	const line = tx("found.estimate", { tasks, runs });
+	return judge > 0 ? `${line} ${tx("found.estimateJudge", { judge })}` : line;
 }
 
 /** The inventory's column paths as row mapper columns, with an example from the first sample that has one. */
@@ -119,6 +137,7 @@ export function InventoryPanel({
 	const idCheck = suiteIdCheck(plan.suite, known, suitesLight.data?.reserved_ids);
 	const idLine = suiteIdLine(idCheck, plan.suite, tx);
 	const idLineId = useId();
+	const estimate = estimateLine(tx, inv, plan.grader);
 	// An empty box on first show gets a free id made from the source name.
 	useEffect(() => {
 		if (plan.suite) return;
@@ -185,10 +204,11 @@ export function InventoryPanel({
 					{t("found.needs")}: {inv.needs?.join("; ")}
 				</p>
 			)}
-			<p className="text-muted-foreground text-xs" data-testid="onboard-estimate">
-				{tx("found.estimate", { tasks: inv.estimate.tasks, runs: inv.estimate.readiness_runs })}
-				{inv.estimate.judge_calls > 0 && <> {tx("found.estimateJudge", { judge: inv.estimate.judge_calls })}</>}
-			</p>
+			{estimate && (
+				<p className="text-muted-foreground text-xs" data-testid="onboard-estimate">
+					{estimate}
+				</p>
+			)}
 			{!inv.can_draft && mappable && (
 				<p role="note" className="text-sm" data-testid="onboard-map-first">
 					{inv.next}
@@ -320,6 +340,7 @@ export function InventoryPanel({
 								showGradeOn={false}
 								fields={ONBOARD_MAP_FIELDS}
 								showMetadata={false}
+								help={w4m5Text("mapping.help")}
 								t={tb}
 							/>
 						</div>
