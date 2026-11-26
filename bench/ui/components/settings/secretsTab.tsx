@@ -17,11 +17,22 @@ import { MAX_SECRET_BYTES, normalizeSecretName, secretNameProblem, type OrgSecre
 import { LockKeyhole } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import "@/app/agents/views/w4m1I18n";
 import { RegistryLoginsSection } from "./registryLogins";
 import { SettingsSection, TableFrame, When } from "./settingsBits";
 
 function byteLength(v: string): number {
 	return new TextEncoder().encode(v).length;
+}
+
+/** The name rule, always shown under a secret name box: the box rewrites what is typed (p02-9). */
+export function SecretNameHint() {
+	const { t } = useTranslation("w4m1");
+	return (
+		<span className="text-muted-foreground text-xs" data-testid="secret-name-hint">
+			{t("secrets.nameHint")}
+		</span>
+	);
 }
 
 export interface SecretsTableProps {
@@ -64,7 +75,7 @@ export function SecretsTable({ secrets, canWrite, onRotate, onDelete, deletingId
 									{t("stored")}
 								</Badge>
 							</TableCell>
-							<TableCell className="text-muted-foreground" title={s.created_by || undefined}>
+							<TableCell className="text-muted-foreground" title={s.created_by_name || undefined}>
 								{s.created_by_name || s.created_by || ""}
 							</TableCell>
 							<TableCell className="text-muted-foreground">
@@ -289,6 +300,7 @@ function AddSecretSection({ taken }: { taken: string[] }) {
 						aria-invalid={Boolean(nameError) || undefined}
 						data-testid="secret-name"
 					/>
+					<SecretNameHint />
 					{nameError && <span className="text-chart-error-ink text-xs">{nameError}</span>}
 				</div>
 				<div className="flex min-w-0 flex-col gap-1.5">

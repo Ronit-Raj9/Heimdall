@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { ChevronRight, CircleCheck, CircleX, KeyRound, Loader2 } from "lucide-react";
 import { useEffect, useId, useState, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
+import "@/app/agents/views/w4m1I18n";
 
 /**
  * Connect your agent (lane X10, J3 and J4): the form fields of the bring-your-own templates by kind
@@ -174,6 +175,7 @@ function ParamField({ p, value, onChange }: { p: TemplateParam; value: string; o
  */
 export function NewSecretInline({ param, onSaved }: { param: string; onSaved(name: string): void }) {
 	const { t } = useTranslation("agentBuilder");
+	const { t: tm } = useTranslation("w4m1");
 	const { t: ts } = useTranslation("secrets");
 	const session = useSession();
 	const formId = useId();
@@ -260,6 +262,9 @@ export function NewSecretInline({ param, onSaved }: { param: string; onSaved(nam
 						aria-invalid={Boolean(nameError) || undefined}
 						data-testid={`new-secret-name-${param}`}
 					/>
+					<span className="text-muted-foreground text-xs" data-testid={`new-secret-name-hint-${param}`}>
+						{tm("secrets.nameHint")}
+					</span>
 					{nameError && <span className="text-destructive text-xs">{nameError}</span>}
 				</div>
 				<div className="flex min-w-0 flex-col gap-1">

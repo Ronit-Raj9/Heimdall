@@ -89,7 +89,7 @@ func (h *AgentDiffHandler) getDiff(ctx *fasthttp.RequestCtx) {
 	defer cancel()
 	report, err := agentdiff.Diff(work, src, h.contents, q)
 	if errors.Is(err, agentdiff.ErrBadQuery) {
-		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, err.Error())
+		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, strings.TrimPrefix(err.Error(), agentdiff.ErrBadQuery.Error()+": "))
 		return
 	}
 	if err != nil {

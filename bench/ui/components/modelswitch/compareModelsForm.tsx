@@ -1,4 +1,7 @@
 import "@/lib/types/modelSwitchI18n";
+import "@/app/agents/views/w4m1I18n";
+import i18n from "@/lib/i18n";
+import { WhyDisabled } from "@/components/ui/whyDisabled";
 import { VersionPicker } from "@/app/evaluate/views/step1Agent";
 import { estimateText } from "@/app/evaluate/views/step4Setup";
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
@@ -79,6 +82,7 @@ export function prefillCurrent(models: PickedModel[], agentModel: string | undef
  */
 export function CompareModelsForm({ agentId }: { agentId: string }) {
 	const { t } = useTranslation("modelSwitch");
+	const { t: tm } = useTranslation("w4m1");
 	const navigate = useNavigate();
 	const compat = useGetAgentCompatibilityQuery(agentId);
 	const runnable = (compat.data?.benchmarks ?? []).filter((b) => b.ok);
@@ -102,6 +106,8 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 	const problem = compareModelsProblem(input);
 	const spec = compareModelsSpec(input);
 	const estimate = useGetEvaluationEstimateQuery(spec, { skip: problem !== null });
+	// Launch waits for the estimate of the current settings, never an older one (p02-5).
+	const waiting = problem === null && estimate.isFetching;
 	const setModel = (i: number, v: PickedModel) => {
 		if (i === 0) setTouched(true);
 		setModels((ms) => ms.map((m, n) => (n === i ? v : m)));
@@ -174,20 +180,23 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 					{t(`form.${problem}`)}
 				</p>
 			) : (
-				estimate.data && (
-					<p className="text-sm" data-testid="compare-models-estimate">
-						{estimateSentence(estimate.data)}
-					</p>
-				)
+				<EstimateLine state={estimate} />
 			)}
 			{err && (
 				<p className="text-destructive text-sm" role="alert">
 					{t("form.error", { message: err.data?.error?.message ?? "" })}
 				</p>
 			)}
-			<Button className="w-fit" disabled={problem !== null || created.isLoading} onClick={launch} dataTestId="compare-models-launch">
+			<Button
+				className="w-fit"
+				disabled={problem !== null || created.isLoading || waiting}
+				aria-describedby={waiting ? "compare-models-launch-why" : undefined}
+				onClick={launch}
+				dataTestId="compare-models-launch"
+			>
 				{created.isLoading ? t("form.launching") : t("form.launch")}
 			</Button>
+			<WhyDisabled reason={waiting ? tm("compareModels.waitReason") : null} testId="compare-models-launch-why" />
 		</section>
 	);
 }
@@ -195,8 +204,41 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 /** The estimate as one sentence from the wizard's shared phrases (N211): "4 runs. $0.02. About 1 min." */
 export function estimateSentence(e: Parameters<typeof estimateText>[0]): string {
 	const p = estimateText(e);
-	const minutes = p.minutes === "time not known" ? "Time not known." : `About ${p.minutes}.`;
-	return `${p.runs}. ${p.cost[0].toUpperCase()}${p.cost.slice(1)}. ${minutes}`;
+	const time =
+		p.minutes === "time not known"
+			? i18n.t("compareModels.timeUnknown", { ns: "w4m1" })
+			: i18n.t("compareModels.about", { ns: "w4m1", minutes: p.minutes });
+	const runs = i18n.t("compareModels.runs", { ns: "w4m1", count: Number(e.runs) || 0 });
+	return i18n.t("compareModels.estimate", { ns: "w4m1", runs, cost: `${p.cost[0].toUpperCase()}${p.cost.slice(1)}`, time });
+}
+
+/** The estimate line: the waiting text while the current settings are estimated (never the old answer), the error, or the sentence. */
+export function EstimateLine({
+	state,
+}: {
+	state: { currentData?: Parameters<typeof estimateText>[0]; isFetching: boolean; isError: boolean };
+}) {
+	const { t } = useTranslation("w4m1");
+	if (state.isFetching) {
+		return (
+			<p className="text-muted-foreground text-sm" role="status" data-testid="compare-models-estimate-waiting">
+				{t("compareModels.waiting")}
+			</p>
+		);
+	}
+	if (state.isError) {
+		return (
+			<p className="text-chart-error-ink text-sm" data-testid="compare-models-estimate-error">
+				{t("compareModels.error")}
+			</p>
+		);
+	}
+	if (!state.currentData) return null;
+	return (
+		<p className="text-sm" data-testid="compare-models-estimate">
+			{estimateSentence(state.currentData)}
+		</p>
+	);
 }
 
 function NumberField({

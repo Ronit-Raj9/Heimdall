@@ -61,6 +61,8 @@ export interface AgentVersionList {
 	versions: AgentVersion[];
 	/** The version holding the saved config: what pull requests are compared with. */
 	live?: number;
+	/** True when the agent has no settings file, so it has no versions. */
+	no_file?: boolean;
 }
 
 /** GET /agents/{id}/versions/{n} */

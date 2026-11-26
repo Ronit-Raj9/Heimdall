@@ -31,7 +31,7 @@
 		},
 		"diff": {
 			"title": "Compare versions",
-			"hint": "What changed between this agent's two newest versions, and which tasks it now solves or fails, using saved runs.",
+			"hint": "What changed between two versions of this agent and which tasks it now solves or fails. Each version needs saved runs on the same benchmark first.",
 			"run": "Compare the newest two versions",
 			"open": "Open the comparison page"
 		}
