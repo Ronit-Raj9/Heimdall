@@ -1,0 +1,35 @@
+# heimdall-improver: the improver task improvement runs use. It is not a
+# benchmark of agents: the reflector agent runs it once per candidate to
+# turn evidence of practice runs into an edit set (edits.json).
+#
+# The agent reads the evidence mounted read-only under /heimdall/improve/
+# and writes /workspace/edits.json. After the agent exits the file is copied
+# out of the workspace and the hidden verifier (verifier/tests/verify.py,
+# Python standard library only) reads it at /grader/artifacts/edits/edits.json
+# and checks its form only. Whether each cited run exists is checked when
+# the edits are applied, since the verifier never sees the evidence.
+#
+# Versioning: any change to instruction.md, the verifier or the edits schema
+# bumps the minor version.
+id: heimdall-improver
+version: 1.1.0
+# The suite schema has no title or tags field, so the title is the
+# description and the suite is marked internal there.
+description: Heimdall improver (used by improvement runs). Internal; graded on the form of the edit set it writes.
+track: artifact
+environment: docker_workspace
+grader: verifier_command
+base_image:
+  tag: bench/coding-core-base:1
+workdir: /workspace
+output:
+  kind: artifact
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 60
+tasks: [reflect-edit]
+probes: []
