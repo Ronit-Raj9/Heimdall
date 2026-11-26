@@ -140,7 +140,7 @@ func init() {
 	add("cost_per_task", mcpTool{
 		description: "Cost of an experiment per task, arm or condition, most expensive first.",
 		schema: obj(map[string]any{"exp_id": str("Experiment id"),
-			"group_by": map[string]any{"type": "string", "enum": []string{"task", "arm", "condition"}, "description": "Group rows by task (default), arm or condition"},
+			"group_by": map[string]any{"type": "string", "enum": []string{"task", "arm", "condition"}, "description": "Group rows by arm or condition; grouping by task is not available yet"},
 			"top":      mcpInt("Rows shown, default 20, at most 100")}, "exp_id"),
 		run: mcpCostPerTask,
 	})
@@ -542,6 +542,10 @@ type mcpExplain struct {
 	}
 }
 
+// mcpCostPerTaskMissing answers cost_per_task grouped by task: the cost
+// explanation has no per-task rows yet (costexplain keeps arms and conditions).
+const mcpCostPerTaskMissing = "Cost per task is not available yet: the cost explanation is kept per arm and per condition. Ask again with group_by arm or condition."
+
 func mcpCostPerTask(ctx context.Context, s *mcpServer, raw json.RawMessage) (any, error) {
 	var a struct {
 		ExpID   string `json:"exp_id"`
@@ -551,6 +555,9 @@ func mcpCostPerTask(ctx context.Context, s *mcpServer, raw json.RawMessage) (any
 	if err := json.Unmarshal(raw, &a); err != nil || a.ExpID == "" {
 		return nil, errors.New("exp_id is required")
 	}
+	if a.GroupBy == "" || a.GroupBy == "task" {
+		return nil, errors.New(mcpCostPerTaskMissing)
+	}
 	top := mcpClamp(a.Top, 20, 100)
 	path := "/experiments/" + url.PathEscape(a.ExpID) + "/cost-explain"
 	var e mcpExplain
@@ -559,8 +566,6 @@ func mcpCostPerTask(ctx context.Context, s *mcpServer, raw json.RawMessage) (any
 	}
 	var rows []mcpCostRow
 	switch a.GroupBy {
-	case "", "task":
-		return nil, errors.New("cost per task is not available yet: the cost explanation is kept per arm and condition; use group_by arm or condition")
 	case "arm":
 		rows = []mcpCostRow{mcpArmTotal(e.A), mcpArmTotal(e.B)}
 	case "condition":

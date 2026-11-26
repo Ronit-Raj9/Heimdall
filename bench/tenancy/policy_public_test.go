@@ -46,6 +46,7 @@ func TestPublicRoutesAreExactlyTheSite(t *testing.T) {
 		"GET /api/bench/auth/reset/{token}",
 		"POST /api/bench/auth/reset/{token}",
 		"POST /api/bench/orgs/{org}/inbox/ingest",
+		"POST /api/bench/orgs/{org}/feedback",
 		"POST /api/bench/billing/webhook",           // Y16: Stripe signature
 		"POST /api/bench/pull/run/turns",            // Y11: signed run token
 		"GET /api/bench/pull/run/turns/{id}",        // Y11: signed run token
