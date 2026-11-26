@@ -153,7 +153,7 @@ var APIRoutes = []RouteDoc{
 		{Name: "sort", Description: "Sort key, applied before paging: started (default), duration, outcome, cost, tokens, steps, task or agent; rows without a value go last"},
 		{Name: "dir", Description: "Sort direction: asc or desc (default desc)"},
 		{Name: "limit", Description: "Page size; default 100, at most 500"}, {Name: "offset", Description: "Rows to skip"},
-		{Name: "failed", Description: "1: only runs that did not pass"},
+		{Name: "failed", Description: "1 or true: only runs that did not pass"},
 	}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}", Tag: "runs", Summary: "One run with seal, grade, metrics, gates and receipts", Response: schemas.RunDetail{}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/events", Tag: "runs", Summary: "Canonical event log of a run", Response: schemas.RunEvents{}},

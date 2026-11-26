@@ -124,7 +124,7 @@ func (h *RunListHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Mid
 type runListFilter struct {
 	exp, suite, arm, task, condition, outcome, track string
 	agent, benchmark, fault, model                   string
-	// failed keeps only runs that did not pass (query failed=1).
+	// failed keeps only runs that did not pass (query failed=1 or failed=true).
 	failed bool
 }
 
@@ -180,7 +180,14 @@ func (h *RunListHandler) listRuns(ctx *fasthttp.RequestCtx) {
 		}
 		*dst = v
 	}
-	f.failed = string(args.Peek("failed")) == "1"
+	switch strings.TrimSpace(string(args.Peek("failed"))) {
+	case "1", "true": // the runs page sends true
+		f.failed = true
+	case "", "0", "false":
+	default:
+		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "failed must be 1 or true")
+		return
+	}
 	limit, ok := h.intArg(ctx, "limit", runListDefaultLimit)
 	if !ok {
 		return
