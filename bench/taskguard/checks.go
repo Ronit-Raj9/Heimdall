@@ -174,7 +174,19 @@ func (c *checker) provenance() schemas.AdmissionCheck {
 	case BuilderTrace:
 		ok = sha256Source.MatchString(p.Source)
 	case BuilderIssue:
-		ok = hexCommit.MatchString(p.BaseCommit) && hexCommit.MatchString(p.ReferenceCommit) && strings.HasPrefix(p.Source, "https://github.com/")
+		// The issue import writes base_commit but no reference_commit; the
+		// emit writes the pair "base..merge" into guard.json, which fills
+		// either one when task.yaml lacks it.
+		base, ref := p.BaseCommit, p.ReferenceCommit
+		if b, r, found := strings.Cut(c.g.Source, ".."); found {
+			if base == "" {
+				base = b
+			}
+			if ref == "" {
+				ref = r
+			}
+		}
+		ok = hexCommit.MatchString(base) && hexCommit.MatchString(ref) && strings.HasPrefix(p.Source, "https://github.com/")
 	case BuilderAPI, BuilderPolicy:
 		ok = strings.TrimSpace(p.Source) != ""
 	}

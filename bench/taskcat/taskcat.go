@@ -214,7 +214,9 @@ var manifestFiles = map[string]bool{
 	"composer.json": true, "composer.lock": true, "setup.cfg": true,
 }
 
-func isManifestFile(p string) bool { return manifestFiles[strings.ToLower(path.Base(filepath.ToSlash(p)))] }
+func isManifestFile(p string) bool {
+	return manifestFiles[strings.ToLower(path.Base(filepath.ToSlash(p)))]
+}
 
 // Read reads the sidecar of suiteRoot. A missing file is an empty map.
 func Read(suiteRoot string) (map[string]Label, error) {

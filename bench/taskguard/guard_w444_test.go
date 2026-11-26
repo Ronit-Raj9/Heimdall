@@ -220,6 +220,13 @@ func TestApplyProvenanceIssue(t *testing.T) {
 	if c := check(t, Apply(s, task, okRec()), CheckProvenance); c.Passed {
 		t.Fatal("short base commit passed")
 	}
+	task.Provenance.BaseCommit, task.Provenance.ReferenceCommit = "", ""
+	if err := Write(task.Dir, Record{Builder: BuilderIssue, Source: sha + ".." + strings.Repeat("b", 40)}); err != nil {
+		t.Fatal(err)
+	}
+	if c := check(t, Apply(s, task, okRec()), CheckProvenance); !c.Passed {
+		t.Fatalf("commit pair from guard.json not used: %+v", c)
+	}
 }
 
 func TestApplyProvenanceAPI(t *testing.T) {

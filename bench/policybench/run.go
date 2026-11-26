@@ -12,6 +12,8 @@ import (
 
 	"github.com/maximhq/bifrost/bench/scaffold"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/taskcat"
+	"github.com/maximhq/bifrost/bench/taskguard"
 )
 
 // GenerateOptions say which clauses to draft and how.
@@ -291,6 +293,12 @@ func Accept(suiteRoot string, d *Doc, tasks []string, actor string, now time.Tim
 	for _, id := range done {
 		x := d.DraftByTask(id)
 		x.Status, x.DecidedBy, x.DecidedAt = StatusAccepted, actor, at
+		// W4-44: the quality guard record (clauses a person accepted, so the
+		// instruction is clear by person) and the kind of work. A failure
+		// never fails the accept: admission then derives what it needs.
+		_ = taskguard.Write(filepath.Join(suiteRoot, "tasks", id), taskguard.Record{Builder: taskguard.BuilderPolicy, Source: "policy document " + d.ID + ", clause " + x.Clause,
+			Clarity: &taskguard.Clarity{Verdict: taskguard.ClarityClear, Origin: taskguard.OriginPerson}})
+		_ = taskcat.Set(suiteRoot, id, taskcat.Label{Category: taskcat.Policy, Source: taskcat.SourceRule, Sure: true, Why: "policy builder"})
 	}
 	return done, Save(suiteRoot, d, "")
 }
