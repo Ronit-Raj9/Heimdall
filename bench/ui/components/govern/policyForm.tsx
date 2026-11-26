@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { idProblem } from "@/lib/inputChecks";
+import "@/lib/w4m0I18n";
 import type { PolicyCheck, ReleasePolicy } from "@/lib/types/govern";
 import { cn } from "@/lib/utils";
 import {
@@ -73,18 +75,26 @@ export function emptyCheck(n: number): PolicyCheck {
 	return { id: `check-${n}`, metric: "verified_success", condition: "clean", rule: "no_regression" };
 }
 
-/** The starter policy a first-time user creates: the shipped default rules, trimmed. */
-export function starterPolicy(): ReleasePolicy {
+/**
+ * The starter policy a new rule set opens with: the shipped default rules, trimmed. It takes the name
+ * of the free file it will be saved as, with no description, so a second set does not look copied (N6).
+ */
+export function starterPolicy(name = "my-release-policy"): ReleasePolicy {
 	return {
 		policy_version: 1,
-		name: "my-release-policy",
-		description: "No regression on clean runs, no integrity violations, a cost ceiling that warns.",
+		name,
+		description: "",
 		checks: [
 			{ id: "clean-no-regression", metric: "verified_success", condition: "clean", rule: "no_regression" },
 			{ id: "no-integrity-violations", metric: "integrity_violations", condition: "all", equals: 0 },
 			{ id: "cost-per-verified-success", metric: "cost_per_verified_success", condition: "clean", max: 2, severity: "warn" },
 		],
 	};
+}
+
+/** Why a rule set name is refused, or null (p14-2). */
+export function policyNameProblem(name: string): string | null {
+	return idProblem(name, "rule set name");
 }
 
 const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
@@ -121,12 +131,25 @@ export function PolicyForm({ value, onChange, disabled }: PolicyFormProps) {
 	const { t } = useTranslation("govern");
 	const { t: tu } = useTranslation("u14");
 	const setCheck = (i: number, c: PolicyCheck) => onChange({ ...value, checks: value.checks.map((x, j) => (j === i ? c : x)) });
+	// p14-2: the same rule as the server's name pattern, shown before Save.
+	const nameProblem = policyNameProblem(value.name);
 	return (
 		<fieldset className="flex flex-col gap-6" disabled={disabled} data-testid="policy-form">
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<label className="flex flex-col gap-1.5 text-sm font-medium">
 					{t("policies.name")}
-					<Input value={value.name} onChange={(e) => onChange({ ...value, name: e.target.value })} data-testid="policy-name" />
+					<Input
+						value={value.name}
+						onChange={(e) => onChange({ ...value, name: e.target.value })}
+						aria-invalid={nameProblem !== null}
+						aria-describedby={nameProblem ? "policy-name-problem" : undefined}
+						data-testid="policy-name"
+					/>
+					{nameProblem && (
+						<span id="policy-name-problem" className="text-destructive text-xs font-normal" data-testid="policy-name-problem">
+							{nameProblem}
+						</span>
+					)}
 				</label>
 				<label className="flex flex-col gap-1.5 text-sm font-medium">
 					{t("policies.onUnknown")}
