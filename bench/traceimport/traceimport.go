@@ -35,7 +35,9 @@ const (
 )
 
 // Formats lists the accepted formats in a stable order.
-func Formats() []string { return []string{FormatOTLP, FormatLangfuse, FormatChat} }
+func Formats() []string {
+	return []string{FormatOTLP, FormatLangfuse, FormatChat, FormatClaudeCode, FormatCodex}
+}
 
 // Size caps. A trace over a cap is refused with an error that names the cap,
 // or cut with the cut counted, never read without bound.
@@ -212,6 +214,10 @@ func Parse(data []byte, format string) (tr *Trace, err error) {
 		tr.Sessions, err = parseLangfuse(values)
 	case FormatChat:
 		tr.Sessions, err = parseChat(values)
+	case FormatClaudeCode:
+		tr.Sessions, err = parseClaudeCode(values)
+	case FormatCodex:
+		tr.Sessions, err = parseCodex(values)
 	default:
 		return nil, fmt.Errorf("format %q: want one of %s", format, strings.Join(Formats(), ", "))
 	}
@@ -296,6 +302,18 @@ func decodeValues(data []byte) ([]any, error) {
 
 // detect tells the format from the decoded values' keys.
 func detect(values []any) (string, error) {
+	// Coding session files first: their lines also carry a role or a
+	// message, which the chat check would take.
+	for _, v := range values {
+		if m := asMap(v); m != nil && looksClaudeCode(m) {
+			return FormatClaudeCode, nil
+		}
+	}
+	for _, v := range values {
+		if m := asMap(v); m != nil && looksCodex(m) {
+			return FormatCodex, nil
+		}
+	}
 	for _, v := range values {
 		if f := detectOne(v); f != "" {
 			return f, nil
