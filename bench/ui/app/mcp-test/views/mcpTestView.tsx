@@ -3,6 +3,10 @@ import { PageHeader } from "@/components/shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { WhyDisabled, firstReason } from "@/components/ui/whyDisabled";
+import { idProblem } from "@/lib/inputChecks";
+import "@/lib/w4m0I18n";
+import "@/app/runs/views/w4m4I18n";
 import { Section } from "@/components/ui/section";
 import { StatCard, StatGrid } from "@/components/ui/statCard";
 import { apiErrorMessage } from "@/lib/store/apis/integrationsApi";
@@ -13,6 +17,7 @@ import "@/lib/types/mcptestI18n";
 import {
 	scoreBand,
 	serverIdFrom,
+	type McpDraftRequest,
 	type McpDraftResponse,
 	type McpInspectRequest,
 	type McpReport,
@@ -45,6 +50,21 @@ export function requestFromForm(f: McpForm): McpInspectRequest {
 	if (f.mode === "bearer") req.auth_scheme = "Bearer";
 	if (f.mode === "header" && f.header.trim()) req.auth_header = f.header.trim();
 	return req;
+}
+
+/**
+ * What keeps the form from being checked: no address, or a credential sent in a custom header
+ * with no header name. Null when the form can be sent.
+ */
+export function formProblem(f: McpForm): "url" | "header" | null {
+	if (!f.url.trim()) return "url";
+	if (f.secret && f.mode === "header" && !f.header.trim()) return "header";
+	return null;
+}
+
+/** The draft request: the id trimmed and the server name normalised only when sending, so dashes can be typed. */
+export function draftRequest(request: McpInspectRequest, id: string, serverId: string, tools: string[]): McpDraftRequest {
+	return { ...request, id: id.trim(), server_id: serverIdFrom(serverId), tools };
 }
 
 /** A default server name from the report or the URL's host. */
@@ -227,12 +247,20 @@ function DraftForm({ report, request }: { report: McpReport; request: McpInspect
 	const [serverId, setServerId] = useState(server0);
 	const [id, setId] = useState(`${server0}-mcp`);
 	const [tools, setTools] = useState<string[]>(report.tools.map((x) => x.name));
+	const { t: tw0 } = useTranslation("w4m0");
+	const { t: tw } = useTranslation("w4m4");
 	const [draft, st] = useDraftMcpBenchmarkMutation();
 	const [done, setDone] = useState<McpDraftResponse | null>(null);
+	const idWhy = idProblem(id.trim(), "benchmark id");
+	const createWhy = firstReason(
+		idWhy,
+		!serverIdFrom(serverId) && tw0("inputs.idEmpty", { what: "server name" }),
+		tools.length === 0 && tw("mcp.pickTool"),
+	);
 	const toggle = (name: string) => setTools((cur) => (cur.includes(name) ? cur.filter((x) => x !== name) : [...cur, name]));
 	const create = async () => {
 		try {
-			setDone(await draft({ ...request, id: id.trim(), server_id: serverId, tools }).unwrap());
+			setDone(await draft(draftRequest(request, id, serverId, tools)).unwrap());
 		} catch {
 			// The error is shown from the mutation state.
 		}
@@ -242,11 +270,21 @@ function DraftForm({ report, request }: { report: McpReport; request: McpInspect
 			<div className="grid gap-3 sm:grid-cols-2">
 				<label className="flex flex-col gap-1.5 text-sm">
 					<span className="font-medium">{t("draft.id")}</span>
-					<Input value={id} onChange={(e) => setId(e.target.value)} data-testid="mcp-draft-id" />
+					<Input value={id} onChange={(e) => setId(e.target.value)} aria-invalid={idWhy !== null} data-testid="mcp-draft-id" />
+					{idWhy && (
+						<span className="text-destructive text-xs" data-testid="mcp-draft-id-problem">
+							{idWhy}
+						</span>
+					)}
 				</label>
 				<label className="flex flex-col gap-1.5 text-sm">
 					<span className="font-medium">{t("draft.serverName")}</span>
-					<Input value={serverId} onChange={(e) => setServerId(serverIdFrom(e.target.value))} data-testid="mcp-draft-server" />
+					<Input
+						value={serverId}
+						onChange={(e) => setServerId(e.target.value)}
+						onBlur={() => setServerId(serverIdFrom(serverId))}
+						data-testid="mcp-draft-server"
+					/>
 				</label>
 			</div>
 			<fieldset className="flex flex-col gap-1.5 text-sm">
@@ -261,11 +299,13 @@ function DraftForm({ report, request }: { report: McpReport; request: McpInspect
 			<div className="flex items-center gap-3">
 				<Button
 					onClick={() => void create()}
-					disabled={st.isLoading || tools.length === 0 || !id.trim() || !serverId}
+					disabled={st.isLoading || createWhy !== null}
+					aria-describedby={createWhy ? "mcp-draft-why" : undefined}
 					data-testid="mcp-draft-create"
 				>
 					{st.isLoading ? t("draft.creating") : t("draft.create")}
 				</Button>
+				<WhyDisabled reason={st.isLoading ? null : createWhy} testId="mcp-draft-why" />
 				{st.error != null && <span className="text-destructive text-sm">{apiErrorMessage(st.error, t("draft.failed"))}</span>}
 			</div>
 			{done && (
@@ -323,6 +363,7 @@ export function DraftEvaluateLink({ done }: { done: McpDraftResponse }) {
 export function McpTestView() {
 	const { t } = useTranslation("mcptest");
 	const { t: tf } = useTranslation("fw23");
+	const { t: tw } = useTranslation("w4m4");
 	const [form, setForm] = useState<McpForm>(EMPTY_FORM);
 	const session = useSession();
 	// Secret names are for members and above (J9.secrets); a viewer types a name instead.
@@ -332,6 +373,8 @@ export function McpTestView() {
 	const [report, setReport] = useState<McpReport | null>(null);
 	const [sent, setSent] = useState<McpInspectRequest | null>(null);
 	const set = (p: Partial<McpForm>) => setForm((f) => ({ ...f, ...p }));
+	const problem = formProblem(form);
+	const inspectWhy = problem === "header" ? tw("mcp.headerNeeded") : null;
 	const run = async () => {
 		const req = requestFromForm(form);
 		try {
@@ -419,9 +462,15 @@ export function McpTestView() {
 					</span>
 				</label>
 				<div className="flex items-center gap-3">
-					<Button onClick={() => void run()} disabled={st.isLoading || !form.url.trim()} data-testid="mcp-inspect">
+					<Button
+						onClick={() => void run()}
+						disabled={st.isLoading || problem !== null}
+						aria-describedby={inspectWhy ? "mcp-inspect-why" : undefined}
+						data-testid="mcp-inspect"
+					>
 						{st.isLoading ? t("form.inspecting") : t("form.inspect")}
 					</Button>
+					<WhyDisabled reason={st.isLoading ? null : inspectWhy} testId="mcp-inspect-why" />
 					{st.error != null && <span className="text-destructive text-sm">{apiErrorMessage(st.error, t("form.failed"))}</span>}
 				</div>
 			</Section>

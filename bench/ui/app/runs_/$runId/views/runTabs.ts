@@ -1,5 +1,5 @@
 // The run page's tabs and when each applies. Pure, so the rule is tested without a page.
-import type { OutputKind } from "@/lib/types/bench";
+import type { OutputKind, RunDetail } from "@/lib/types/bench";
 
 export const RUN_TABS = ["overview", "timeline", "output", "agents", "visual", "voice", "gpu", "services", "security", "evidence"] as const;
 
@@ -33,4 +33,31 @@ export function hiddenRunTabs(facts: RunFacts): ReadonlySet<RunTabId> {
 	if (!facts.services) hidden.add("services");
 	if (facts.output !== "diff") hidden.add("security");
 	return hidden;
+}
+
+/** Whether a run can have a voice call: the server serves /voice only for a run that exported timeline.jsonl. */
+export function runHasVoice(d: RunDetail | undefined): boolean {
+	return d?.state?.some((f) => f.id === "timeline.jsonl") ?? false;
+}
+
+/** The part of a query result the tab flags read. */
+interface TabQuery<T> {
+	data?: T;
+	isError?: boolean;
+}
+
+/**
+ * Which of the agents, replay and recording tabs to show. A tab whose request failed is shown too,
+ * so its body can say the load failed instead of the tab vanishing.
+ */
+export function runTabFlags(
+	agents: TabQuery<{ available?: boolean }>,
+	frames: TabQuery<{ frames: readonly unknown[] }>,
+	recordings: TabQuery<{ recordings: readonly unknown[] }>,
+): { agents: boolean; replay: boolean; recording: boolean } {
+	return {
+		agents: Boolean(agents.isError || agents.data?.available),
+		replay: Boolean(frames.isError || frames.data?.frames.length),
+		recording: Boolean(recordings.isError || recordings.data?.recordings.length),
+	};
 }

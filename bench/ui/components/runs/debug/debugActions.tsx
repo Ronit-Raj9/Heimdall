@@ -6,6 +6,7 @@ import type { DebugRunResponse } from "@/lib/types/runDebug";
 import { Bug, Rewind } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import "@/app/runs/views/w4m4I18n";
 import { BreakpointDialog, StartedNote, errorText } from "./debugDialogs";
 
 /**
@@ -47,8 +48,16 @@ export function conditionName(condition: string): string {
 /** Why a run under a fault offers fewer debug actions; null when it offers them all. */
 export function DebugFaultReason({ detail, testId = "run-debug-reason" }: { detail: RunDetail; testId?: string }) {
 	const { t } = useTranslation("runDebug");
+	const { t: tw } = useTranslation("w4m4");
 	const allowed = debugAllowed(detail);
 	if (allowed.replay && allowed.fork) return null;
+	if (detail.run.debug?.mode === "replay") {
+		return (
+			<p className="text-muted-foreground max-w-sm text-right text-xs" data-testid={testId}>
+				{tw("debug.replayOfReplay")}
+			</p>
+		);
+	}
 	const fault = conditionName(detail.slot.condition);
 	return (
 		<p className="text-muted-foreground max-w-sm text-right text-xs" data-testid={testId}>

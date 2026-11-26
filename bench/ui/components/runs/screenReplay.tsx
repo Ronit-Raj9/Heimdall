@@ -38,6 +38,12 @@ export function useRunFrames(runId: string, live: boolean) {
  * Screen replay of a computer-use or browser run: the screenshots the agent got, played like a
  * video, with a scrubber marked at each step and the step list beside it.
  */
+/** Play or pause; play on the last frame starts again from the first. The button and Space both use it. */
+export function playToggle(playing: boolean, index: number, last: number): { playing: boolean; index: number } {
+	if (!playing && index >= last) return { playing: true, index: 0 };
+	return { playing: !playing, index };
+}
+
 export function ScreenReplay({ runId, live = false }: { runId: string; live?: boolean }) {
 	const { t } = useTranslation("replay");
 	const q = useRunFrames(runId, live);
@@ -61,10 +67,16 @@ export function ScreenReplay({ runId, live = false }: { runId: string; live?: bo
 
 	const step = useCallback((d: number) => setCur((c) => Math.min(Math.max(c + d, 0), Math.max(last, 0))), [last]);
 
+	const toggle = () => {
+		const next = playToggle(playing, index, last);
+		setCur(next.index);
+		setPlaying(next.playing);
+	};
+
 	const onKey = (e: React.KeyboardEvent) => {
 		if (e.key === "ArrowRight") step(1);
 		else if (e.key === "ArrowLeft") step(-1);
-		else if (e.key === " ") setPlaying((p) => !p);
+		else if (e.key === " ") toggle();
 		else return;
 		e.preventDefault();
 	};
@@ -123,10 +135,7 @@ export function ScreenReplay({ runId, live = false }: { runId: string; live?: bo
 					</Button>
 					<Button
 						size="sm"
-						onClick={() => {
-							if (!playing && index >= last) setCur(0);
-							setPlaying((p) => !p);
-						}}
+						onClick={toggle}
 						aria-label={playing ? t("pause") : t("play")}
 						data-testid="replay-play"
 					>

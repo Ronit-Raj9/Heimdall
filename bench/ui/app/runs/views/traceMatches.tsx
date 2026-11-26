@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/shell/emptyState";
 import { apiErrorMessage } from "@/lib/store/apis/integrationsApi";
 import { useSearchTracesQuery } from "@/lib/store/apis/traceToolsApi";
 import type { SearchHit, SearchMatch, SearchResponse } from "@/lib/types/traceTools";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
 import { FileSearch, SearchX } from "lucide-react";
@@ -32,7 +33,12 @@ export function MatchSnippet({ match }: { match: SearchMatch }) {
 				{match.seq !== undefined && <span className="ml-1 tabular-nums">{t("search.seq", { seq: match.seq })}</span>}
 			</span>
 			<span className="text-foreground/90 min-w-0 break-words">
-				{match.label && <span className="text-muted-foreground mr-1.5 font-mono">{match.label}</span>}
+				{match.label && (
+					<span className="text-muted-foreground mr-1.5 font-mono">
+						{match.label}
+						{": "}
+					</span>
+				)}
 				{splitHighlights(match.text, match.highlights).map((s, i) =>
 					s.mark ? (
 						<mark key={i} className="bg-chart-warning/25 text-foreground rounded-sm px-0.5">
@@ -89,7 +95,7 @@ export function TraceHitRow({ hit, onOpen }: { hit: SearchHit; onOpen(hit: Searc
 }
 
 /** The result list for a trace search response; pure so it renders in tests. */
-export function TraceMatchList({ data, onOpen }: { data: SearchResponse; onOpen(hit: SearchHit): void }) {
+export function TraceMatchList({ data, onOpen, onClear }: { data: SearchResponse; onOpen(hit: SearchHit): void; onClear?: () => void }) {
 	const { t } = useTranslation("traceTools");
 	return (
 		<section className="bg-card flex flex-col rounded-xl border" aria-label={t("search.heading")} data-testid="trace-matches">
@@ -100,6 +106,7 @@ export function TraceMatchList({ data, onOpen }: { data: SearchResponse; onOpen(
 					{data.truncated && <> · {t("search.truncated", { count: data.hits.length })}</>}
 				</span>
 				<span className="text-muted-foreground ml-auto text-xs tabular-nums">{t("search.indexed", { count: data.indexed_runs })}</span>
+				{onClear && <ClearTraceSearch onClear={onClear} />}
 			</header>
 			<p className="text-muted-foreground border-b px-4 py-1.5 text-xs" data-testid="trace-matches-help">
 				{t("search.help")}
@@ -122,10 +129,22 @@ export interface TraceMatchesProps {
 	agent?: string | null;
 	outcome?: string | null;
 	suite?: string | null;
+	/** Empties the trace search box. */
+	onClear?: () => void;
+}
+
+/** The "Clear trace search" control, in the header, the empty and the error states. */
+function ClearTraceSearch({ onClear }: { onClear: () => void }) {
+	const { t } = useTranslation("traceTools");
+	return (
+		<Button variant="ghost" size="sm" onClick={onClear} dataTestId="trace-search-clear">
+			{t("search.clear")}
+		</Button>
+	);
 }
 
 /** "Trace matches" panel shown above the runs table while a trace search is set. */
-export function TraceMatches({ query, agent, outcome, suite }: TraceMatchesProps) {
+export function TraceMatches({ query, agent, outcome, suite, onClear }: TraceMatchesProps) {
 	const { t } = useTranslation("traceTools");
 	const navigate = useNavigate();
 	const res = useSearchTracesQuery({
@@ -138,9 +157,12 @@ export function TraceMatches({ query, agent, outcome, suite }: TraceMatchesProps
 	if (res.isLoading || (res.isFetching && !res.data)) return <BlockSkeleton rows={3} testId="trace-matches-loading" />;
 	if (res.error) {
 		return (
-			<p className="text-chart-error-ink rounded-xl border px-4 py-3 text-sm" role="alert" data-testid="trace-matches-error">
-				{apiErrorMessage(res.error, t("search.error"))}
-			</p>
+			<div className="flex flex-wrap items-center gap-2 rounded-xl border px-4 py-3">
+				<p className="text-chart-error-ink text-sm" role="alert" data-testid="trace-matches-error">
+					{apiErrorMessage(res.error, t("search.error"))}
+				</p>
+				{onClear && <ClearTraceSearch onClear={onClear} />}
+			</div>
 		);
 	}
 	if (!res.data) return null;
@@ -148,6 +170,7 @@ export function TraceMatches({ query, agent, outcome, suite }: TraceMatchesProps
 		<div className={cn(res.isFetching && "opacity-70 transition-opacity")}>
 			<TraceMatchList
 				data={res.data}
+				onClear={onClear}
 				onOpen={(h) => void navigate({ to: "/runs/$runId", params: { runId: h.run_id }, search: hitTarget(h) } as never)}
 			/>
 		</div>

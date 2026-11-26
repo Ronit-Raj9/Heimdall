@@ -110,7 +110,7 @@ func refuseHeldOutRun(ctx *fasthttp.RequestCtx, mode schemas.Mode, index ReadInd
 		return false
 	}
 	lib.SendError(ctx, mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound,
-		"run "+rv.Run.RunID+" is of a held-out task; its content is not served (server config held_out.visible is false)")
+		"This run is of a held-out task: its content stays private.")
 	return true
 }
 
@@ -221,6 +221,8 @@ func (h *RunsHandler) getRun(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.mode, "read scenario evidence of run "+id, err)
 		return
 	}
+	// The output kind by the run list's rule, so the page never guesses "diff".
+	out.Output = loadRunOutputKind(ctx, h.suites, rv.Slot)
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, h.withDebugAllowed(ctx, rv, out))
 }
 

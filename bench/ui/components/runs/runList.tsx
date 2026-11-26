@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import { OutcomeBadge } from "./outcomeBadge";
 import { INFRA_OUTCOMES, shortReason } from "./runFailure.utils";
 import { BlockSkeleton, LoadError } from "./screenStates";
+import "@/app/runs/views/w4m4I18n";
 
 /** A start time as month, day and time; the year is left out to keep the column narrow. */
 export function formatShortTime(iso: string | undefined, locale: string): string {
@@ -24,6 +25,16 @@ export function formatShortTime(iso: string | undefined, locale: string): string
 	const at = new Date(iso);
 	if (Number.isNaN(at.getTime())) return "";
 	return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(at);
+}
+
+/**
+ * The last page number when page is past the end of a list of total rows, else null (no rows at
+ * all, or the page has rows). A page past the end says so and offers the last page.
+ */
+export function pastLastPage(total: number, page: number, size: number): number | null {
+	if (total === 0) return null;
+	const last = Math.ceil(total / size);
+	return page > last ? last : null;
 }
 
 /** Rows per page of the run list. */
@@ -68,6 +79,8 @@ export function runListRequest(filters: Partial<Record<FilterParam, string | nul
 export interface RunListProps {
 	/** An experiment page passes its id: the experiment filter and column are then left out. */
 	expId?: string;
+	/** The comparison is still running: an empty list says runs are on their way, with no action. */
+	running?: boolean;
 	testId?: string;
 }
 
@@ -76,8 +89,9 @@ export interface RunListProps {
  * list can be shared; the menus offer the values the server has seen. Scores are each run's sealed
  * grade, and the header says so.
  */
-export function RunList({ expId, testId = "run-list" }: RunListProps) {
+export function RunList({ expId, running = false, testId = "run-list" }: RunListProps) {
 	const { t } = useTranslation("bench");
+	const { t: tw } = useTranslation("w4m4");
 	const [search, setSearch] = useQueryStates(searchParsers, { history: "replace" });
 	const filters = { ...search, exp: expId ?? search.exp };
 	const request = runListRequest(filters, search.page);
@@ -112,6 +126,26 @@ export function RunList({ expId, testId = "run-list" }: RunListProps) {
 				<BlockSkeleton rows={8} testId="run-list-loading" />
 			) : list.error || !list.data ? (
 				<LoadError title={t("runs.list.loadError")} error={list.error} onRetry={() => void list.refetch()} testId="run-list-error" />
+			) : list.data.runs.length === 0 && pastLastPage(list.data.total, page, RUN_LIST_PAGE) !== null ? (
+				<div className="flex flex-col gap-3" data-testid="run-list-past-end">
+					<p className="text-muted-foreground text-sm">{tw("runs.pastEnd")}</p>
+					<div>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => {
+								const last = pastLastPage(list.data?.total ?? 0, page, RUN_LIST_PAGE) ?? 1;
+								void setSearch({ page: last === 1 ? null : last });
+							}}
+							dataTestId="run-list-last-page"
+						>
+							{tw("runs.lastPage")}
+						</Button>
+					</div>
+					<Pager page={page} total={list.data.total} onPage={(next) => void setSearch({ page: next === 1 ? null : next })} />
+				</div>
+			) : list.data.runs.length === 0 && running && !active ? (
+				<EmptyState icon={ListX} message={tw("runs.running")} testId="run-list-running" />
 			) : list.data.runs.length === 0 ? (
 				<EmptyState
 					icon={ListX}

@@ -1396,6 +1396,8 @@ export interface RunDetail {
 	answer?: Answer;
 	/** Service state exported after the agent exited. */
 	state?: StateFile[];
+	/** The run's output kind (diff, answer, state, artifact); absent on older servers. */
+	output?: OutputKind;
 	/** Services that ran beside the agent. */
 	services?: ServiceResult[];
 	/** Files an artifact task's agent produced, copied into the sealed run folder. */
@@ -1784,6 +1786,7 @@ export interface RunListParams {
 	task?: string;
 	condition?: string;
 	outcome?: string;
+	failed?: boolean;
 	track?: string;
 	/** Agent config id; matched on the server across every page. */
 	agent?: string;
