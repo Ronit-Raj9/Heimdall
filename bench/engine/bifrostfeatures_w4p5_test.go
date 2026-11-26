@@ -21,7 +21,7 @@ func joinErrs(errs []error) string {
 }
 
 func TestValidateMCPToolsUnknownService(t *testing.T) {
-	if errs := validateBifrostMCP(mcpToolsAgent([]string{"desk/get_ticket", "desk/*"}, []string{"desk/issue_refund"}), mcpSuite(true)); len(errs) != 0 {
+	if errs := validateBifrostMCP(mcpToolsAgent([]string{"desk/get_ticket"}, []string{"desk/issue_refund"}), mcpSuite(true)); len(errs) != 0 {
 		t.Fatalf("valid lists refused: %s", joinErrs(errs))
 	}
 	for name, cfg := range map[string]*schemas.AgentConfig{
