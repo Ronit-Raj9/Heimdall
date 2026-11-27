@@ -11,20 +11,52 @@ const api = vi.hoisted(() => ({
 	experiment: {} as unknown,
 	faults: {
 		data: [
-			{ id: "model-down", label: "Model down", help: "h", layer: "model", group: "Model" },
-			{ id: "model-brownout", label: "Model brownout", help: "h", layer: "model", group: "Model" },
-			{ id: "tool-rate-limit", label: "Rate limit", help: "h", layer: "tool", group: "Tools" },
+			{
+				id: "model-down",
+				label: "Model down",
+				help: "h",
+				layer: "model",
+				group: "Model",
+			},
+			{
+				id: "model-brownout",
+				label: "Model brownout",
+				help: "h",
+				layer: "model",
+				group: "Model",
+			},
+			{
+				id: "tool-rate-limit",
+				label: "Rate limit",
+				help: "h",
+				layer: "tool",
+				group: "Tools",
+			},
 		],
 		isLoading: false,
 	} as unknown,
 }));
-vi.mock("@/lib/store/apis/adaptiveApi", () => ({ useGetExperimentAdaptiveQuery: () => api.adaptive }));
+vi.mock("@/lib/store/apis/adaptiveApi", () => ({
+	useGetExperimentAdaptiveQuery: () => api.adaptive,
+}));
+// M4-34: the Actions tab reads one benchmark (GET /suites/{id}); the list fixture answers it.
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({
+	useGetSuiteQuery: (id: unknown) => {
+		const q = api.suites as { data?: { suites?: { id: string }[] } };
+		return { ...(q as object), data: q.data?.suites?.find((s) => s.id === id) };
+	},
+}));
 vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
 	...((await orig()) as Record<string, unknown>),
 	useGetSuitesQuery: () => api.suites,
 	useGetExperimentQuery: () => api.experiment,
 	getBenchErrorMessage: () => "failed",
-	useGetAgentsQuery: () => ({ data: { agents: [{ id: "codex", path: "agents/codex.yaml", model: "gpt-5-mini" }] }, isSuccess: true }),
+	useGetAgentsQuery: () => ({
+		data: {
+			agents: [{ id: "codex", path: "agents/codex.yaml", model: "gpt-5-mini" }],
+		},
+		isSuccess: true,
+	}),
 }));
 vi.mock("@/lib/store/apis/evaluationsApi", async (orig) => ({
 	...((await orig()) as Record<string, unknown>),
@@ -140,7 +172,9 @@ describe("ActionsTab setups and Extend words (N66)", () => {
 		expect(html).toContain('data-testid="job-run-experiment.extend"');
 	});
 	it("names a decided verdict in plain words", () => {
-		api.adaptive = { data: { decision: "regressed", more_evidence: null, extends: null } };
+		api.adaptive = {
+			data: { decision: "regressed", more_evidence: null, extends: null },
+		};
 		api.experiment = {};
 		expect(render(<ActionsTab expId="e1" />)).toContain("Current result: B is worse");
 	});

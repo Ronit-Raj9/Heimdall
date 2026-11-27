@@ -5,9 +5,14 @@ import { ActionCard } from "@/components/experiments/compareActionCard";
 import { groupFaults } from "@/app/evaluate/views/step4Setup";
 import { Input } from "@/components/ui/input";
 import { useGetExperimentAdaptiveQuery } from "@/lib/store/apis/adaptiveApi";
-import { getBenchErrorMessage, useGetExperimentQuery, useGetSuitesQuery, useGetVerdictQuery } from "@/lib/store/apis/benchApi";
+import { getBenchErrorMessage, useGetExperimentQuery, useGetVerdictQuery } from "@/lib/store/apis/benchApi";
+import { useGetSuiteQuery } from "@/lib/store/apis/suitesLightApi";
+import { skipToken } from "@reduxjs/toolkit/query/react";
 import { useGetBenchFaultsQuery } from "@/lib/store/apis/evaluationsApi";
-import type { ExperimentStatus } from "@/lib/types/bench";
+import type { ExperimentStatus, MoreEvidence } from "@/lib/types/bench";
+import { formatUsd2 } from "@/components/verdict/armCost";
+import "@/components/verdict/uf4aI18n";
+import { getLocale } from "@/lib/i18n";
 import { EXTEND_MAX_TASKS, EXTEND_MAX_TRIALS, type ExtendJobParams, type ProbeJobParams } from "@/lib/types/experimentActions";
 import { GitBranch, GitCompareArrows, Layers, Radar } from "lucide-react";
 import { useId, useState } from "react";
@@ -55,7 +60,7 @@ export function ActionsTab({ expId, suite, suiteVersion, gradeSource }: ActionsT
 	return (
 		<div className="flex flex-col gap-3" data-testid="experiment-actions">
 			<p className="text-muted-foreground text-sm">{tu("actions.intro")}</p>
-			<ExtendCard expId={expId} gradeSource={gradeSource} />
+			<ExtendCard expId={expId} gradeSource={gradeSource} arms={setups.length || undefined} />
 			<ProbeCard expId={expId} suite={suite} />
 			<ActionCard icon={GitCompareArrows} title={t("migrate.title")} description={t("migrate.description")} testId="actions-migrate">
 				<MigrateForm
@@ -94,6 +99,26 @@ export function extendParams(raw: string, max: number, mode: "trials" | "tasks",
 }
 
 /**
+ * What an extend would start (M4-33): runs and their price, from the adaptive sizing. More tasks
+ * run trials x setups runs each (more.runs / more.tasks); more tries run once per task already
+ * run and per setup. The price is the sizing's cost per run times the runs; null when not known.
+ */
+export function extendEstimate(
+	mode: "trials" | "tasks",
+	count: number,
+	more: MoreEvidence | null | undefined,
+	arms: number | undefined,
+): { runs: number | null; cost: number | null } {
+	if (!Number.isFinite(count) || count < 1 || !more || more.over) return { runs: null, cost: null };
+	let runs: number | null = null;
+	if (mode === "tasks" && more.tasks > 0 && more.runs > 0) runs = Math.round((count * more.runs) / more.tasks);
+	const done = more.tasks_total - more.tasks;
+	if (mode === "trials" && arms && done > 0) runs = count * done * arms;
+	const perRun = more.cost_usd != null && more.runs > 0 ? more.cost_usd / more.runs : null;
+	return { runs, cost: runs != null && perRun != null ? runs * perRun : null };
+}
+
+/**
  * Why Extend is off on a broken comparison (fix wave 3, N246): the first reason its test was broken,
  * as in the sentence the extend job refuses with.
  */
@@ -112,14 +137,19 @@ function BrokenParentNote({ expId, gradeSource }: { expId: string; gradeSource?:
 	);
 }
 
-function ExtendCard({ expId, gradeSource }: { expId: string; gradeSource?: string }) {
+function ExtendCard({ expId, gradeSource, arms }: { expId: string; gradeSource?: string; arms?: number }) {
+	const { t: tf } = useTranslation("uf4a");
+	const locale = getLocale();
 	const { t } = useTranslation("experimentActions");
 	const { t: tHw09 } = useTranslation("hw09");
 	const uid = useId();
 	const adaptive = useGetExperimentAdaptiveQuery(expId);
-	const [mode, setMode] = useState<"trials" | "tasks">("trials");
+	// M4-33: more tasks by default (more tries per task do not help a test over tasks), sized by the adaptive suggestion.
+	const [mode, setMode] = useState<"trials" | "tasks">("tasks");
 	const { t: tw } = useTranslation("w4m3");
-	const [count, setCount] = useState("2");
+	const [typed, setCount] = useState<string | null>(null);
+	const suggested = adaptive.data?.more_evidence;
+	const count = typed ?? (suggested && !suggested.over && suggested.tasks > 0 ? String(suggested.tasks) : "2");
 	const [force, setForce] = useState(false);
 	const decision = adaptive.data?.decision ?? "";
 	const more = adaptive.data?.more_evidence;
@@ -131,6 +161,32 @@ function ExtendCard({ expId, gradeSource }: { expId: string; gradeSource?: strin
 	const max = mode === "trials" ? EXTEND_MAX_TRIALS : EXTEND_MAX_TASKS;
 	const problem = wholeNumberProblem(count, 1, max);
 	const params: ExtendJobParams | null = parent ? null : extendParams(count, max, mode, expId, force);
+	const estimate = extendEstimate(mode, Number(count), more, arms);
+	const what = tw(mode === "trials" ? "extend.whatTrials" : "extend.whatTasks");
+	const estimateText =
+		estimate.runs == null
+			? tf("extend.estimateUnknown")
+			: estimate.cost == null
+				? tf("extend.estimateNoPrice", { runs: estimate.runs })
+				: tf("extend.estimate", {
+						runs: estimate.runs,
+						cost: formatUsd2(estimate.cost, locale),
+					});
+	const confirmText =
+		estimate.runs == null
+			? tf("extend.confirmUnknown", { count: Number(count), what })
+			: estimate.cost == null
+				? tf("extend.confirmNoPrice", {
+						count: Number(count),
+						what,
+						runs: estimate.runs,
+					})
+				: tf("extend.confirmPriced", {
+						count: Number(count),
+						what,
+						runs: estimate.runs,
+						cost: formatUsd2(estimate.cost, locale),
+					});
 	return (
 		<ActionCard
 			icon={Layers}
@@ -220,10 +276,16 @@ function ExtendCard({ expId, gradeSource }: { expId: string; gradeSource?: strin
 					kind="experiment.extend"
 					params={params && !broken && (open || force || !decision) ? params : null}
 					label={t("extend.run")}
-					confirm={tw("extend.confirm", { count: Number(count), what: tw(mode === "trials" ? "extend.whatTrials" : "extend.whatTasks") })}
+					// Phase B of the fix wave swaps this plain confirm for the shared PaidButton.
+					confirm={confirmText}
 					missing={parent || broken ? undefined : (problem ?? t("extend.notInconclusive"))}
 					testId="actions-extend-job"
 				/>
+				{!parent && !broken && (
+					<p className="text-muted-foreground text-sm tabular-nums" data-testid="actions-extend-estimate">
+						{estimateText}
+					</p>
+				)}
 			</div>
 		</ActionCard>
 	);
@@ -238,12 +300,13 @@ function ProbeCard({ expId, suite }: { expId: string; suite?: string }) {
 	const { t } = useTranslation("experimentActions");
 	const { t: th } = useTranslation("hw17");
 	const uid = useId();
-	const suites = useGetSuitesQuery();
+	// M4-34: only this benchmark (GET /suites/{id}), never the whole 24 MB list.
+	const suites = useGetSuiteQuery(suite ?? skipToken);
 	const catalog = useGetBenchFaultsQuery();
 	const [faults, setFaults] = useState<string[]>([]);
 	const [picked, setPicked] = useState<string[]>([]);
 	const [trials, setTrials] = useState(1);
-	const entry = suites.data?.suites.find((s) => s.id === suite);
+	const entry = suites.data;
 	const probes = entry?.probes ?? [];
 	// N281: a partial entry (the server is still loading the benchmark) has no probes yet: say so and read again.
 	const partial = entry?.partial === true;

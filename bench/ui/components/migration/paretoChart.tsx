@@ -34,7 +34,8 @@ export function ParetoChart({ pareto, testId = "pareto-chart" }: ParetoChartProp
 					role="img"
 					aria-labelledby={`${titleId} ${descId}`}
 					viewBox={`0 0 ${frame.width} ${frame.height}`}
-					className="h-auto w-full max-w-3xl min-w-[420px]"
+					// M4-27: never drawn narrower than its 640-unit frame, so the 11 px labels stay 11 px; a phone swipes it.
+					className="h-auto w-full max-w-3xl min-w-[640px]"
 					data-testid={`${testId}-svg`}
 				>
 					<title id={titleId}>

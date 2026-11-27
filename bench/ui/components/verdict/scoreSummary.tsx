@@ -100,7 +100,10 @@ export function ScoreSummary({ verdict, naive, armMetrics, onCompare, className 
 					</dd>
 				</div>
 				<div>
-					<dt className="text-muted-foreground">{t("summary.cost")}</dt>
+					<dt className="text-muted-foreground">
+						{/* The diagnostics value is a median (M4-2): labelled as one until the server sends a mean. */}
+						{t("summary.costMedian")}
+					</dt>
 					<dd className="text-sm font-medium tabular-nums" data-testid="score-summary-cost">
 						{metric("cost_usd", "usd")}
 					</dd>

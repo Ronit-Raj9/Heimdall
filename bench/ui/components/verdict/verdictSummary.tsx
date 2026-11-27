@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { getLocale } from "@/lib/i18n";
 import type { Action, Decision, Ratio, Value, Verdict } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
+import { cheaperArm, formatUsd2, observedNumber } from "./armCost";
 import { ArrowRight, Ban, CircleCheck, CircleHelp, CircleX, Gauge, Hourglass, Trophy, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -52,8 +53,14 @@ export interface VerdictSummaryProps {
 	partial?: boolean;
 	/** arm -> raw passes over runs. */
 	naive: Record<string, Ratio>;
-	/** arm -> metric -> median per run, from the diagnostics; cost and tokens come from here. */
+	/** arm -> metric -> median per run, from the diagnostics; tokens (and the median cost) come from here. */
 	armMetrics?: Record<string, Record<string, Value>>;
+	/**
+	 * arm -> average (mean) cost per run, from the cost explanation. The one cost a setup is labelled
+	 * with: it multiplies to the bill. The median stays as a labelled second value; without the mean
+	 * the tile shows the median under its own label.
+	 */
+	armCost?: Record<string, Value>;
 	/** Where the diagnostics query is when armMetrics is absent: still loading, or failed. */
 	metricsStatus?: "loading" | "error";
 	/** The one next step; the page decides where the button goes. */
@@ -70,16 +77,21 @@ export function VerdictSummary({
 	naive,
 	armMetrics,
 	metricsStatus,
+	armCost,
 	onNext,
 	className,
 }: VerdictSummaryProps) {
 	const { t } = useTranslation("experimentPage");
 	const locale = getLocale();
-	const tone: Tone = partial ? "neutral" : (DECISION_TONE[verdict.decision] ?? "neutral");
+	// No clear winner is not a warning (M4-12): the panel stays grey.
+	const tone: Tone = partial || verdict.decision === "inconclusive" ? "neutral" : (DECISION_TONE[verdict.decision] ?? "neutral");
 	const Icon = partial ? Hourglass : (ICON[verdict.decision] ?? CircleHelp);
 	const setups = isSetupsVerdict(verdict);
 	const panels = setups ? arms : arms.slice(0, 2);
 	const safety = !partial && setups ? safetyLines(verdict, t) : [];
+	const costs = costNumbers(panels, armCost, armMetrics);
+	const cheaper = !partial && !setups ? cheaperArm(panels, costs) : null;
+	const detail = !partial && !setups ? headlineDetail(panels, naive, costs, names, locale, t) : null;
 
 	return (
 		<section
@@ -91,8 +103,13 @@ export function VerdictSummary({
 				<Icon className={cn("mt-0.5 size-8 shrink-0", INK[tone])} strokeWidth={2.25} aria-hidden="true" />
 				<div className="flex flex-col gap-1">
 					<h2 className={cn("text-2xl font-semibold tracking-tight sm:text-3xl", INK[tone])} data-testid="verdict-summary-headline">
-						{headline(verdict, arms, { names, partial }, locale, t)}
+						{headline(verdict, arms, { names, partial, costs, naive }, locale, t)}
 					</h2>
+					{detail && (
+						<p className="text-foreground text-sm" data-testid="verdict-summary-detail">
+							{detail}
+						</p>
+					)}
 					{safety.map((line) => (
 						<p key={line} className="text-chart-error-ink text-sm font-medium" data-testid="verdict-summary-safety">
 							{line}
@@ -107,13 +124,17 @@ export function VerdictSummary({
 			</div>
 
 			<div
-				className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2", panels.length > 2 && "lg:grid-cols-3")}
+				className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-0", panels.length > 2 && "lg:grid-cols-3")}
 				data-testid="verdict-summary-arms"
 			>
 				{panels.map((arm, index) => (
 					<ArmPanel
 						key={arm}
 						arm={arm}
+						label={setupLabel(arm, names, t)}
+						first={index === 0}
+						cheaper={cheaper?.arm === arm}
+						mean={armCost?.[arm]}
 						colour={BAR[index % BAR.length]}
 						ratio={naive[arm]}
 						metrics={armMetrics?.[arm]}
@@ -122,10 +143,7 @@ export function VerdictSummary({
 				))}
 			</div>
 
-			<div
-				className="bg-card flex flex-col gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-				data-testid="verdict-summary-next"
-			>
+			<div className="flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between" data-testid="verdict-summary-next">
 				<p className="text-sm">{nextLine(verdict, arms, { names, partial }, t)}</p>
 				{onNext && !partial && (
 					<Button size="sm" onClick={() => onNext(verdict.action)} dataTestId="verdict-summary-next-button">
@@ -140,12 +158,21 @@ export function VerdictSummary({
 
 function ArmPanel({
 	arm,
+	label,
+	first,
+	cheaper,
+	mean,
 	colour,
 	ratio,
 	metrics,
 	status,
 }: {
 	arm: string;
+	/** "A (codex on gpt-5.6-terra)": the one name of the setup on every tab (M4-4). */
+	label: string;
+	first: boolean;
+	cheaper: boolean;
+	mean?: Value;
 	colour: string;
 	ratio?: Ratio;
 	metrics?: Record<string, Value>;
@@ -166,11 +193,26 @@ function ArmPanel({
 		if (status === "error") return kind === "usd" ? t("summary.metricsError") : t("summary.unknown");
 		return notKnown(v?.reason, t);
 	};
+	const meanCost = observedNumber(mean);
+	const medianCost = observedNumber(metrics?.cost_usd);
+	// Without the mean (three or more setups, or the cost explanation is missing) the median shows under its own label.
+	const costLabel = meanCost === null && medianCost !== null ? t("summary.costMedian") : t("summary.cost");
+	const costText =
+		meanCost !== null
+			? formatUsd2(meanCost, locale)
+			: medianCost !== null
+				? formatUsd2(medianCost, locale)
+				: mean
+					? notKnown(mean.reason, t)
+					: value("cost_usd", "usd");
 	return (
-		<div className="bg-card flex flex-col gap-3 rounded-lg border p-4" data-testid={`verdict-summary-arm-${arm}`}>
+		<div
+			className={cn("flex flex-col gap-3 py-1 sm:px-4", first ? "sm:pl-0" : "border-t pt-4 sm:border-t-0 sm:border-l sm:pt-1")}
+			data-testid={`verdict-summary-arm-${arm}`}
+		>
 			<div className="flex items-baseline justify-between gap-2">
-				<span className="truncate font-mono text-sm font-semibold" title={arm}>
-					{arm}
+				<span className="min-w-0 text-sm font-semibold break-words" title={arm}>
+					{label}
 				</span>
 				<span className="text-2xl font-semibold tabular-nums">
 					{rate === null ? t("summary.unknown") : `${formatPp(rate * 100, locale)}%`}
@@ -194,10 +236,27 @@ function ArmPanel({
 			</span>
 			<dl className="grid grid-cols-2 gap-2 text-xs">
 				<div>
-					<dt className="text-muted-foreground">{t("summary.cost")}</dt>
-					<dd className="text-sm font-medium tabular-nums" data-testid={`verdict-summary-cost-${arm}`}>
-						{value("cost_usd", "usd")}
+					<dt className="text-muted-foreground">{costLabel}</dt>
+					<dd className="flex flex-wrap items-center gap-2">
+						<span className="text-lg font-semibold tabular-nums" data-testid={`verdict-summary-cost-${arm}`}>
+							{costText}
+						</span>
+						{cheaper && (
+							<span
+								className="bg-chart-success/10 text-chart-success-ink rounded-full px-2 py-0.5 text-xs font-medium"
+								data-testid={`verdict-summary-cheaper-${arm}`}
+							>
+								{t("summary.cheaper")}
+							</span>
+						)}
 					</dd>
+					{meanCost !== null && medianCost !== null && (
+						<dd className="text-muted-foreground mt-0.5 text-xs tabular-nums" data-testid={`verdict-summary-median-${arm}`}>
+							{t("summary.medianSecond", {
+								cost: formatUsd2(medianCost, locale),
+							})}
+						</dd>
+					)}
 				</div>
 				<div>
 					<dt className="text-muted-foreground">{t("summary.tokens")}</dt>
@@ -232,7 +291,58 @@ function setupLabel(arm: string, names: Record<string, string> | undefined, t: T
 	return name && name !== arm ? t("summary.setupLabel", { arm, name }) : arm;
 }
 
-type HeadlineOptions = { names?: Record<string, string>; partial?: boolean };
+type HeadlineOptions = {
+	names?: Record<string, string>;
+	partial?: boolean;
+	/** arm -> average cost per run (the mean, or the median when no mean is known). */
+	costs?: Record<string, number | null>;
+	naive?: Record<string, Ratio>;
+};
+
+/** Each setup's cost per run: the mean when known, else the diagnostics median. */
+export function costNumbers(
+	arms: readonly string[],
+	armCost: Record<string, Value> | undefined,
+	armMetrics: Record<string, Record<string, Value>> | undefined,
+): Record<string, number | null> {
+	const out: Record<string, number | null> = {};
+	for (const arm of arms) out[arm] = observedNumber(armCost?.[arm]) ?? observedNumber(armMetrics?.[arm]?.cost_usd);
+	return out;
+}
+
+/** The line under the headline: each setup's tasks solved and cost per run, or null when a pass count is missing. */
+export function headlineDetail(
+	arms: readonly string[],
+	naive: Record<string, Ratio>,
+	costs: Record<string, number | null>,
+	names: Record<string, string> | undefined,
+	locale: string,
+	t: TFn,
+): string | null {
+	if (arms.length !== 2) return null;
+	const parts: string[] = [];
+	for (const arm of arms) {
+		const ratio = naive[arm];
+		if (!ratio) return null;
+		const cost = costs[arm];
+		const setup = setupLabel(arm, names, t);
+		parts.push(
+			cost == null
+				? t("summary.headlineDetailNoCost", {
+						setup,
+						num: ratio.num,
+						den: ratio.den,
+					})
+				: t("summary.headlineDetail", {
+						setup,
+						num: ratio.num,
+						den: ratio.den,
+						cost: formatUsd2(cost, locale),
+					}),
+		);
+	}
+	return parts.join(" ");
+}
 
 /** One line per setup that broke a safety rule in a setups verdict: "B broke a safety rule on t02." */
 function safetyLines(verdict: Verdict, t: TFn): string[] {
@@ -283,8 +393,23 @@ export function headline(verdict: Verdict, arms: readonly string[], opts: Headli
 			}
 			return pp ? t("summary.headline.regressed", { setup, pp }) : t("summary.headline.regressedNoEffect", { setup });
 		}
-		case "inconclusive":
+		case "inconclusive": {
+			// Same score but one setup is much cheaper (M4-1): that is the news, not "no winner".
+			const cheap = cheaperArm(arms, opts.costs);
+			if (cheap) {
+				const ra = opts.naive?.[arms[0]];
+				const rb = opts.naive?.[arms[1]];
+				const same = Boolean(ra && rb && ra.den > 0 && rb.den > 0 && ra.num * rb.den === rb.num * ra.den);
+				const ratio = new Intl.NumberFormat(locale, {
+					maximumSignificantDigits: 2,
+				}).format(cheap.ratio);
+				return t(same ? "summary.headline.sameScoreCheaper" : "summary.headline.unclearScoreCheaper", {
+					setup: setupLabel(cheap.arm, opts.names, t),
+					ratio,
+				});
+			}
 			return t("summary.headline.inconclusive");
+		}
 		case "score":
 			return t("summary.score.title");
 	}

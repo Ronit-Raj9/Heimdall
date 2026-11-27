@@ -1,0 +1,38 @@
+{
+	"promote": {
+		"checkSwitch": "Check switching to {{model}}",
+		"checkSwitchUnknown": "Check switching to the cheaper model"
+	},
+	"extend": {
+		"estimate": "About {{cost}}, up to {{runs}} runs",
+		"estimateNoPrice": "Up to {{runs}} runs, price not known",
+		"estimateUnknown": "Number of runs and price not known",
+		"confirmPriced": "Add {{count}} more {{what}} as a follow-up comparison? This starts up to {{runs}} paid runs, about {{cost}}.",
+		"confirmNoPrice": "Add {{count}} more {{what}} as a follow-up comparison? This starts up to {{runs}} paid runs; the price is not known.",
+		"confirmUnknown": "Add {{count}} more {{what}} as a follow-up comparison? It starts paid runs; the number of runs and the price are not known."
+	},
+	"verdict": {
+		"slow": "Still computing the score. A large benchmark takes a while.",
+		"slowCount_one": "Still computing the score for {{count}} run.",
+		"slowCount_other": "Still computing the score for {{count}} runs.",
+		"stuck": "The score is taking too long to compute. Try again.",
+		"retry": "Retry",
+		"sectionsRead": "Every section below reads:",
+		"forStatisticians": "For statisticians",
+		"forStatisticiansHint": "Measurements per setup and the statistics behind the result."
+	},
+	"checks": {
+		"flaggedTitle_one": "Runs flagged: {{count}}",
+		"flaggedTitle_other": "Runs flagged: {{count}}",
+		"noneFlagged": "No run was flagged for cheating.",
+		"flaggedWhere": "Cheating detected: {{where}}.",
+		"onAll": "{{task}} on every setup",
+		"onSome": "{{task}} on {{setups}}",
+		"openRuns": "Open these runs"
+	},
+	"migration": {
+		"seeCost": "See the cost breakdown",
+		"openActions": "Open Actions",
+		"changeCompared": "Change what is compared"
+	}
+}

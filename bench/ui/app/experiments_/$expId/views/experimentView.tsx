@@ -15,6 +15,9 @@ import { RunList } from "@/components/runs/runList";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { EntityLink } from "@/components/shell/entityLink";
+import { CopyId } from "@/components/ui/copyId";
+import { activeNavItem } from "@/lib/constants/navigation";
+import { usePageTitle } from "@/lib/routing/pageTitle";
 import { ShareButton } from "@/components/share/shareDialog";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { RouteTabs, type RouteTab } from "@/components/shell/routeTabs";
@@ -41,14 +44,14 @@ import { compareSearch } from "@/components/experiments/legacyRoutes";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { DeleteAction } from "@/components/platform/deleteAction";
 import { useDeleteExperimentMutation } from "@/lib/store/apis/dataOpsApi";
-import { Bot, CornerUpLeft, Download, GitCompareArrows, Hourglass, Layers, ListChecks, SearchX } from "lucide-react";
+import { Bot, CornerUpLeft, Download, GitCompareArrows, Hourglass, Layers, ListChecks, MoreHorizontal, SearchX } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionsTab } from "./actionsTab";
 import { ANALYSIS_TAB_ID, AnalysisTab, AnalysisTabLabel } from "./analysisTab"; // L15 analysis jobs
 import { CostTab } from "./costTab";
-import { EXPERIMENT_TABS, defaultExperimentTab, hiddenExperimentTabs, type ExperimentTabId } from "./experimentTabs";
+import { EXPERIMENT_TABS, defaultExperimentTab, hiddenExperimentTabs, redirectExperimentTab, type ExperimentTabId } from "./experimentTabs";
 import { RegradeNotice, gradeQuery, useGradeChoice } from "./gradeChoice";
 import { IntegrityTab } from "./integrityTab";
 import { LiveProgress } from "./liveProgress";
@@ -111,16 +114,34 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	const { t: tx } = useTranslation("experimentsUx");
 	const { t: tf } = useTranslation("fw11");
 	const { t: th } = useTranslation("hw12");
+	const { t: tp } = useTranslation("platform");
 	const [tabParam, setTab] = useQueryState("tab", parseAsString);
+	// M4-15: an old ?tab=adaptive or ?tab=export link lands where that content lives now.
+	const redirect = redirectExperimentTab(tabParam);
+	// The export menu asks for the run list, so it mounts only once More is opened.
+	const [moreOpen, setMoreOpen] = useState(false);
+	useEffect(() => {
+		if (redirect) void setTab(redirect === "verdict" ? null : redirect);
+	}, [redirect, setTab]);
 	const status = useGetExperimentQuery(expId);
 	const live = status.data ? !TERMINAL_STATES.has(status.data.state) && status.data.state !== "created" : false;
 	// Poll while it runs, so the header, the progress card and the runs tab stay current.
-	useGetExperimentQuery(expId, { pollingInterval: live ? EXPERIMENT_POLL_MS : 0, skipPollingIfUnfocused: true, skip: !live });
+	useGetExperimentQuery(expId, {
+		pollingInterval: live ? EXPERIMENT_POLL_MS : 0,
+		skipPollingIfUnfocused: true,
+		skip: !live,
+	});
 	// An experiment that has not started has no runs to analyse, so nothing asks for its verdict.
 	const notStarted = status.data?.state === "created";
-	const verdict = useGetVerdictQuery(gradeQuery(expId, grade), { skip: !status.data || notStarted });
-	// The grid fills in while the experiment runs, so it polls alongside the status.
-	const grid = useGetGridQuery(expId, { skip: !status.data, pollingInterval: live ? EXPERIMENT_POLL_MS : 0, skipPollingIfUnfocused: true });
+	const verdict = useGetVerdictQuery(gradeQuery(expId, grade), {
+		skip: !status.data || notStarted,
+	});
+	// The grid fills in while the experiment runs, so it polls alongside the status. It needs only the id,
+	// so it starts with the status call, not after it (M4-6).
+	const grid = useGetGridQuery(expId, {
+		pollingInterval: live ? EXPERIMENT_POLL_MS : 0,
+		skipPollingIfUnfocused: true,
+	});
 	// When a running experiment stops, its verdict, diagnostics, grid and runs were computed from a
 	// partial experiment: refresh them once.
 	const dispatch = useAppDispatch();
@@ -130,10 +151,11 @@ export default function ExperimentView({ expId }: { expId: string }) {
 		wasLive.current = live;
 	}, [live, expId, dispatch]);
 	// The facts that decide the tabs. Each is the request its tab makes anyway, so nothing is fetched twice.
-	const adaptive = useGetExperimentAdaptiveQuery(expId, { skip: !status.data });
-	const support = useGetExperimentSupportQuery(expId, { skip: !status.data });
-	const research = useGetExperimentResearchQuery(expId, { skip: !status.data });
-	const routing = useGetExperimentRoutingQuery(expId, { skip: !status.data });
+	// They need only the id, so they start in parallel with the status call (M4-6).
+	const adaptive = useGetExperimentAdaptiveQuery(expId);
+	const support = useGetExperimentSupportQuery(expId);
+	const research = useGetExperimentResearchQuery(expId);
+	const routing = useGetExperimentRoutingQuery(expId);
 	// Fix wave 3 header facts: the evaluation that made it (N203), the comparison it extends (N246), the run of a
 	// debug experiment (N247) and the drift monitors that still exist (N257).
 	const current = status.data && status.data.exp_id === expId ? (status.data as StatusFacts) : undefined;
@@ -143,6 +165,12 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	const kind: ExperimentKind | null = current ? experimentKind(current) : null;
 	const debugRuns = useListRunsQuery({ exp: expId }, { skip: kind !== "debug" });
 	const monitors = useDriftMonitorNames();
+	// The browser tab names the comparison and its section (M1-8, M3-19); set once the title is known below.
+	const titleForTab = status.data && status.data.exp_id === expId ? status.data.name?.trim() || expId : undefined;
+	const section = tp(
+		((current?.evaluation_id ? "shell.nav.evaluations" : activeNavItem("/experiments")?.labelKey) ?? "shell.nav.experiments") as never,
+	);
+	usePageTitle(titleForTab ? `${titleForTab} · ${String(section)} · Heimdall` : undefined);
 
 	// RTK keeps the last result in data while a new argument loads; only a response for this id may
 	// drive the header and its write actions (QC2-28-04).
@@ -209,23 +237,33 @@ export default function ExperimentView({ expId }: { expId: string }) {
 		<div className="flex min-w-0 flex-col gap-6" data-testid="experiment-screen" data-exp-id={expId}>
 			<FlipBanner expId={expId} />
 			<PageHeader
-				breadcrumbs={[
-					{ label: t("experiments.list.title"), to: "/experiments" },
-					...(evaluationId
+				breadcrumbs={
+					// M1-7, M5-7: a benchmark of an evaluation sits under Evaluations; the first crumb is the sidebar's own label.
+					evaluationId
 						? [
 								{
-									label: th("header.evaluationCrumb", { name: evaluationName ?? evaluationId }),
+									label: String(tp("shell.nav.evaluations" as never)),
+									to: "/evaluations",
+								},
+								{
+									label: evaluationName ?? th("header.evaluationCrumb", { name: evaluationId }),
 									to: "/evaluations/$evalId",
 									params: { evalId: evaluationId },
 								},
+								{ label: title },
 							]
-						: []),
-					{ label: title },
-				]}
+						: [
+								{
+									label: String(tp((activeNavItem("/experiments")?.labelKey ?? "shell.nav.experiments") as never)),
+									to: "/experiments",
+								},
+								{ label: title },
+							]
+				}
 				title={
 					<span className="flex min-w-0 items-center gap-2.5">
 						<SuiteGlyph suite={st.suite} />
-						<span className="truncate" title={expId}>
+						<span className="min-w-0 break-words" title={expId}>
 							{title}
 						</span>
 					</span>
@@ -244,9 +282,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 									{th("header.partial")}
 								</HeaderTag>
 							)
-						) : (
-							decision && <StatusBadge decision={decision} testId="experiment-decision" />
-						)}
+						) : null}
 					</>
 				}
 				subtitle={
@@ -275,7 +311,6 @@ export default function ExperimentView({ expId }: { expId: string }) {
 									{th("header.readyTasks")}
 								</Link>
 							)}
-							<EntityLink kind="experiment" id={expId} className="text-[10px] opacity-50" />
 						</span>
 					</span>
 				}
@@ -283,20 +318,43 @@ export default function ExperimentView({ expId }: { expId: string }) {
 					<div className="flex flex-wrap items-center gap-1.5" data-testid="experiment-actions">
 						<ExperimentRunActions status={st} />
 						<ShareButton kind="verdict" target={expId} />
-						<div className="bg-muted/40 flex items-center gap-0.5 rounded-lg border p-0.5">
-							<RegradeAction expId={expId} />
-							<Button variant="ghost" size="sm" asChild>
-								<Link to="/compare" search={compareSearch(undefined, expId) as never} data-testid="experiment-compare">
-									<GitCompareArrows aria-hidden="true" />
-									{t("experiments.page.compare")}
-								</Link>
-							</Button>
-							<Button variant="ghost" size="sm" onClick={() => void setTab("export")} dataTestId="experiment-export">
-								<Download aria-hidden="true" />
-								{tPage("header.export")}
-							</Button>
-						</div>
-						<DeleteExperimentAction expId={expId} running={live} />
+						{/* M4-14: Re-score, Compare runs, Export, the id and, after a line, Delete in one More menu. */}
+						<details
+							className="group relative"
+							data-testid="experiment-more"
+							onToggle={(e) => setMoreOpen((e.currentTarget as HTMLDetailsElement).open)}
+						>
+							<summary
+								className="border-input bg-background hover:bg-muted inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-md border px-3 text-sm font-medium select-none [&::-webkit-details-marker]:hidden"
+								data-testid="experiment-more-trigger"
+							>
+								<MoreHorizontal className="size-4" aria-hidden="true" />
+								{tPage("header.more")}
+							</summary>
+							<div className="bg-popover text-popover-foreground absolute right-0 z-30 mt-1 flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-1 rounded-lg border p-2 shadow-md">
+								<RegradeAction expId={expId} />
+								<Button variant="ghost" size="sm" className="justify-start" asChild>
+									<Link to="/compare" search={compareSearch(undefined, expId) as never} data-testid="experiment-compare">
+										<GitCompareArrows aria-hidden="true" />
+										{t("experiments.page.compare")}
+									</Link>
+								</Button>
+								<div className="flex flex-col gap-1 px-2 py-1" data-testid="experiment-export">
+									<span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs font-medium">
+										<Download className="size-3.5" aria-hidden="true" />
+										{tPage("header.export")}
+									</span>
+									{moreOpen && <ExperimentExportMenu expId={expId} />}
+								</div>
+								<div className="flex items-center gap-2 px-2 py-1 text-xs">
+									<span className="text-muted-foreground shrink-0">{tPage("header.copyId")}</span>
+									<CopyId value={expId} className="min-w-0" testId="experiment-copy-id" />
+								</div>
+								<div className="border-t pt-1">
+									<DeleteExperimentAction expId={expId} running={live} />
+								</div>
+							</div>
+						</details>
 					</div>
 				}
 			/>

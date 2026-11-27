@@ -5,7 +5,7 @@ import { useGetExperimentParetoQuery, useGetLeaderboardParetoQuery } from "@/lib
 import type { LeaderboardParetoParams, MigrationPair, MigrationReport, MigrationVerdict, Value } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { CostExplanationView } from "./costWaterfall";
+import "@/components/verdict/uf4aI18n";
 import { costText, formatShare, observed } from "./pareto.utils";
 import { ParetoChart } from "./paretoChart";
 
@@ -106,6 +106,7 @@ export function MigrationReportView({ report }: { report: MigrationReport }) {
 
 function PairSection({ pair, expId }: { pair: MigrationPair; expId: string }) {
 	const { t } = useTranslation("bench");
+	const { t: tf } = useTranslation("uf4a");
 	const locale = getLocale();
 	const unknown = t("migration.unknown");
 	const bh = pair.behaviour;
@@ -250,11 +251,19 @@ function PairSection({ pair, expId }: { pair: MigrationPair; expId: string }) {
 					</ul>
 				</div>
 			)}
+			{/* M4-31: the Cost tab holds the full breakdown; the switch decision links it instead of repeating it. */}
 			{pair.cost && (
-				<div className="flex flex-col gap-2" data-testid="migration-cost">
-					<h3 className="text-foreground font-medium">{t("migration.cost.title")}</h3>
-					<CostExplanationView explanation={pair.cost} />
-				</div>
+				<p className="text-sm" data-testid="migration-cost">
+					<Link
+						to="/experiments/$expId"
+						params={{ expId }}
+						search={{ tab: "cost" } as never}
+						className="text-primary font-medium hover:underline"
+						data-testid="migration-cost-link"
+					>
+						{tf("migration.seeCost")}
+					</Link>
+				</p>
 			)}
 			<span className="sr-only">{expId}</span>
 		</section>
@@ -301,7 +310,7 @@ export function ExperimentParetoPanel({ expId, condition }: { expId: string; con
 	const query = useGetExperimentParetoQuery({ expId, condition });
 	return (
 		<section className="flex flex-col gap-3 rounded-md border p-4" data-testid="experiment-pareto-panel">
-			<h3 className="text-foreground text-base font-semibold">{t("migration.pareto.title")}</h3>
+			<h2 className="text-foreground text-base font-semibold">{t("migration.pareto.title")}</h2>
 			{query.isLoading ? (
 				<BlockSkeleton rows={4} testId="experiment-pareto-loading" />
 			) : query.error || !query.data ? (

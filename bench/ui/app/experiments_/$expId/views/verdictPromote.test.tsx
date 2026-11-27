@@ -24,11 +24,23 @@ describe("VerdictPromote (J7.promote)", () => {
 	});
 });
 describe("VerdictPromote follows what differs between the setups (N165)", () => {
-	it("offers the model, not a promote, on a model-only comparison", () => {
-		const html = render(<VerdictPromote expId="e1" arms={["A", "B"]} armsDiffer="model" decision="inconclusive" modelB="gpt-6-luna" />);
+	it("offers the model, not a promote, on a model-only comparison B wins", () => {
+		const html = render(<VerdictPromote expId="e1" arms={["A", "B"]} armsDiffer="model" decision="improved" modelB="gpt-6-luna" />);
 		expect(html).not.toContain('data-testid="verdict-promote"');
 		expect(html).toContain("Use model gpt-6-luna");
 		expect(tagOf(html, "verdict-use-model") ?? "").toContain("tab=migration");
+	});
+	it("offers no model on a no-winner, same-cost comparison (M4-3)", () => {
+		const html = render(<VerdictPromote expId="e1" arms={["A", "B"]} armsDiffer="model" decision="inconclusive" modelB="gpt-6-luna" />);
+		expect(html).not.toContain("verdict-use-model");
+		expect(html).not.toContain("verdict-check-switch");
+	});
+	it("offers a check of the switch when B is much cheaper at no clear difference (M4-3)", () => {
+		const html = render(
+			<VerdictPromote expId="e1" arms={["A", "B"]} armsDiffer="model" decision="inconclusive" modelB="gpt-6-luna" cheaperB />,
+		);
+		expect(html).toContain("Check switching to gpt-6-luna");
+		expect(tagOf(html, "verdict-check-switch") ?? "").toContain("tab=migration");
 	});
 	it("shows nothing on an A/A check", () => {
 		const html = render(<VerdictPromote expId="e1" arms={["A", "B"]} armsDiffer="none" decision="inconclusive" />);

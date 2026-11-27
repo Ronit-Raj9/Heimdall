@@ -17,6 +17,7 @@ vi.mock("@/lib/store", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store")>()),
 	useGetVerdictQuery: (arg: unknown) => (seen.verdict.push(arg), okQuery({ verdict: { decision: "invalid", invalid_reasons: ["r"] } })),
 }));
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({ useGetSuiteQuery: () => ({ data: undefined, isLoading: false }) }));
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useGetVerdictQuery: (arg: unknown) => (seen.verdict.push(arg), okQuery({ verdict: { decision: "invalid", invalid_reasons: ["r"] } })),

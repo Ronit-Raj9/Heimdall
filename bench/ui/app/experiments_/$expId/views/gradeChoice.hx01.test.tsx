@@ -30,6 +30,7 @@ vi.mock("@/lib/store", async (importOriginal) => ({
 	useGetGridQuery: () => ({ data: undefined, isLoading: true, isError: false }),
 	useGetCatalogQuery: () => ({ data: undefined, isLoading: true, isError: false }),
 }));
+vi.mock("@/lib/store/apis/migrationApi", () => ({ useGetCostExplainQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...((await importOriginal()) as Record<string, unknown>),
 	useGetExperimentQuery: (id: string) => ({

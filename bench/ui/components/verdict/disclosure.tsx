@@ -31,7 +31,7 @@ export function Disclosure({ title, description, icon: Icon, meta, action, defau
 				<ChevronRight className="text-muted-foreground size-4 shrink-0 transition-transform group-open:rotate-90" aria-hidden="true" />
 				{Icon && <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />}
 				<span className="flex min-w-0 flex-col">
-					<span className="text-sm font-semibold tracking-tight">{title}</span>
+					<h3 className="text-sm font-semibold tracking-tight">{title}</h3>
 					{description && <span className="text-muted-foreground text-xs font-normal">{description}</span>}
 				</span>
 				{meta && <span className="text-muted-foreground flex min-w-0 items-center gap-2 text-xs">{meta}</span>}

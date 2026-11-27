@@ -1,6 +1,8 @@
 {
 	"header": {
 		"export": "Export",
+		"more": "More",
+		"copyId": "Id",
 		"moreActions": "Actions",
 		"systemBanner": "This is an automatic readiness check Heimdall ran on the benchmark's tasks, not a comparison you started.",
 		"systemBannerAgent": "This is an automatic agent check Heimdall ran, not a comparison you started.",
@@ -25,11 +27,11 @@
 		"runs": "Runs",
 		"matrix": "Setups",
 		"cost": "Cost",
-		"migration": "Model switch",
+		"migration": "Switch decision",
 		"adaptive": "Extra trials",
 		"scorecards": "Scores",
 		"receipts": "Problems found",
-		"integrity": "Cheating checks",
+		"integrity": "Checks",
 		"export": "Export"
 	},
 	"summary": {
@@ -41,6 +43,8 @@
 			"regressedGuard": "{{setup}} broke a safety rule on {{tasks}}",
 			"regressedGuardDetail": "{{setup}} broke a safety rule: {{detail}}",
 			"inconclusive": "No clear winner yet",
+			"sameScoreCheaper": "No difference in score. {{setup}} costs {{ratio}} times less.",
+			"unclearScoreCheaper": "No clear difference in score. {{setup}} costs {{ratio}} times less.",
 			"invalid": "Test was broken: fix it and re-check",
 			"invalidWhy": "Test was broken: {{why}}. This is not the agent's fault; fix it and press Re-check.",
 			"setupsTied": "Cannot tell {{setups}} apart yet",
@@ -69,7 +73,12 @@
 		},
 		"passRate": "Share of tasks solved",
 		"passCount": "{{num}} of {{den}} tasks solved",
-		"cost": "Cost per run",
+		"cost": "Average cost per run",
+		"costMedian": "Median cost per run",
+		"medianSecond": "Median {{cost}}",
+		"cheaper": "Cheaper",
+		"headlineDetail": "{{setup}} solved {{num}} of {{den}} at {{cost}} a run.",
+		"headlineDetailNoCost": "{{setup}} solved {{num}} of {{den}}, cost not known.",
 		"tokens": "Tokens per run",
 		"unknown": "Not known",
 		"next": {

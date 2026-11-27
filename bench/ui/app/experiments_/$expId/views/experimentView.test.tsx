@@ -135,7 +135,8 @@ describe("ExperimentView header (fix wave 3)", () => {
 		api.status = okQuery(at({ state: "done" }));
 		api.verdict = verdict("improved");
 		const done = render(<ExperimentView expId="e_h" />);
-		expect(done).toContain('data-testid="experiment-decision"');
+		// X-29: the decision is said once, in the Result panel, not as a pill by the title.
+		expect(done).not.toContain('data-testid="experiment-decision"');
 		expect(done).not.toContain("Result not final");
 		api.verdict = {};
 	});
@@ -186,7 +187,9 @@ describe("ExperimentView header (fix wave 3)", () => {
 		const html = render(<ExperimentView expId="e_h" />);
 		api.evaluation = {};
 		expect(html).toContain("codex: two models · BFCL function calling");
-		expect(html).toContain("Evaluation: codex: two models");
+		// M1-7: crumbs Evaluations > the evaluation's name > the benchmark.
+		expect(html).toContain('href="/evaluations"');
+		expect(html).toContain(">codex: two models<");
 		expect(html).toContain('href="/evaluations/ev_two"');
 	});
 });

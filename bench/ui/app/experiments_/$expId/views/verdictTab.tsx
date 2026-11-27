@@ -24,14 +24,18 @@ import "@/components/verdict/hw09I18n";
 import { SetupsTable } from "@/components/verdict/setupsTable";
 import { armOrder, isScoreVerdict, isSetupsVerdict } from "@/components/verdict/verdict.utils";
 import { GuardList, VerdictCard } from "@/components/verdict/verdictCard";
-import { VerdictSummary } from "@/components/verdict/verdictSummary";
+import { VerdictSummary, costNumbers } from "@/components/verdict/verdictSummary";
+import { cheaperArm } from "@/components/verdict/armCost";
+import "@/components/verdict/uf4aI18n";
 import { getBenchErrorMessage, useGetCatalogQuery, useGetDiagnosticsQuery, useGetGridQuery, useGetVerdictQuery } from "@/lib/store";
 import { EXPERIMENT_POLL_MS, useGetExperimentQuery } from "@/lib/store/apis/benchApi";
+import { useGetCostExplainQuery } from "@/lib/store/apis/migrationApi";
+import { skipToken } from "@reduxjs/toolkit/query/react";
 import type { Action, ExperimentStatus, MetricDescriptor } from "@/lib/types/bench";
-import { Activity, Gauge, GitCompare, ListChecks, Rocket, Scale, Shield, Sigma, Table2 } from "lucide-react";
+import { Activity, GitCompare, ListChecks, Rocket, Scale, Shield, Sigma, Table2 } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { parseAsString, useQueryState } from "nuqs";
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { gradeQuery, useGradeChoice } from "./gradeChoice";
 import { VerdictHeaderStrip } from "./verdictHeaderStrip";
@@ -53,6 +57,7 @@ export function VerdictPromote({
 	armsDiffer,
 	decision,
 	modelB,
+	cheaperB,
 }: {
 	expId: string;
 	arms: readonly string[];
@@ -62,12 +67,28 @@ export function VerdictPromote({
 	decision?: string;
 	/** Setup B's model, for "Use model ..." on a model-only comparison. */
 	modelB?: string;
+	/** True when B scores no worse and costs 2 times less or more (M4-1): offers a check of the switch, not a recommendation. */
+	cheaperB?: boolean;
 }) {
 	const { t } = useTranslation("u14");
+	const { t: tf } = useTranslation("uf4a");
 	const toEvaluation = arms.length === 1 && Boolean(evaluationId);
 	if (arms.length !== 2 && !toEvaluation) return null;
 	if (!toEvaluation && armsDiffer === "none") return null;
 	if (!toEvaluation && armsDiffer === "model") {
+		// M4-3: "Use model" only when B wins; a much cheaper B at no clear difference gets "Check switching to".
+		if (decision !== "improved") {
+			if (!cheaperB || decision !== "inconclusive") return null;
+			return (
+				<div className="flex justify-end">
+					<Button size="sm" variant="outline" asChild>
+						<Link to="/experiments/$expId" params={{ expId }} search={{ tab: "migration" } as never} data-testid="verdict-check-switch">
+							{modelB ? tf("promote.checkSwitch", { model: modelB }) : tf("promote.checkSwitchUnknown")}
+						</Link>
+					</Button>
+				</div>
+			);
+		}
 		return (
 			<div className="flex justify-end">
 				<Button size="sm" variant="outline" asChild>
@@ -124,11 +145,13 @@ export function ExperimentVerdictPromote({
 	arms,
 	evaluationId,
 	decision,
+	cheaperB,
 }: {
 	expId: string;
 	arms: readonly string[];
 	evaluationId?: string;
 	decision: string;
+	cheaperB?: boolean;
 }) {
 	const experiment = useGetExperimentQuery(expId);
 	const status = experiment.data;
@@ -141,6 +164,7 @@ export function ExperimentVerdictPromote({
 			armsDiffer={status?.arms_differ}
 			decision={decision}
 			modelB={modelB}
+			cheaperB={cheaperB}
 		/>
 	);
 }
@@ -156,6 +180,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 	const { t: tPage } = useTranslation("experimentPage");
 	const { t: tPage9 } = useTranslation("hw09");
 	const { t: tHx } = useTranslation("hx01");
+	const { t: tf } = useTranslation("uf4a");
 	const navigate = useNavigate();
 	// The newest re-score by default; the header's line says so and links the original (gradeChoice.tsx).
 	const { grade, latest, setGrade } = useGradeChoice(expId);
@@ -173,6 +198,19 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 	// The diagnostics come from the same analysis as the verdict, so they read the same grade source.
 	const diagnostics = useGetDiagnosticsQuery(gradeQuery(expId, grade), { skip: debug });
 	const grid = useGetGridQuery(expId);
+	// The average (mean) cost per run of each of two setups (M4-2): the same query the Cost tab reads, so it is shared.
+	const pairArms =
+		verdict.data && !isSetupsVerdict(verdict.data.verdict) && !isScoreVerdict(verdict.data.verdict) ? armOrder(verdict.data) : [];
+	const costExplain = useGetCostExplainQuery(pairArms.length === 2 ? { expId } : skipToken);
+	const armCost = useMemo(() => {
+		const data = costExplain.data;
+		if (!data) return undefined;
+		// The explanation compares the experiment's own pair; only its arms get a mean.
+		return {
+			[data.a.arm]: data.a.cost_per_run,
+			[data.b.arm]: data.b.cost_per_run,
+		};
+	}, [costExplain.data]);
 	const catalog = useGetCatalogQuery();
 
 	const metrics = useMemo(() => {
@@ -193,15 +231,21 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 	const openPair = useCallback((pairId: string) => void navigate({ href: compareHref(pairId, expId) }), [navigate, expId]);
 	const onNext = useCallback(
 		(action: Action) => {
-			if (action === "ship") void setTab("export");
-			else if (action === "fix_harness") void setTab("runs");
+			// Export lives in the header's More menu now (M4-15, M4-25): open it.
+			if (action === "ship") {
+				const more = document.querySelector<HTMLDetailsElement>('[data-testid="experiment-more"]');
+				if (more) {
+					more.open = true;
+					more.scrollIntoView({ block: "nearest" });
+				}
+			} else if (action === "fix_harness") void setTab("runs");
 			else void navigate({ to: "/compare", search: compareSearch(undefined, expId) as never });
 		},
 		[navigate, setTab, expId],
 	);
 
 	if (debug) return <DebugNotScored />;
-	if (verdict.isLoading) return <VerdictSkeleton />;
+	if (verdict.isLoading) return <VerdictSkeleton tasks={status.data?.slots.total} onRetry={verdict.refetch} />;
 	if (verdict.isError || !verdict.data) {
 		return (
 			<ErrorState
@@ -286,7 +330,13 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 			)}
 
 			{showPromote(partial) && (
-				<ExperimentVerdictPromote expId={payload.exp_id} arms={arms} evaluationId={evaluationId} decision={payload.verdict.decision} />
+				<ExperimentVerdictPromote
+					expId={payload.exp_id}
+					arms={arms}
+					evaluationId={evaluationId}
+					decision={payload.verdict.decision}
+					cheaperB={cheaperArm(arms, costNumbers(arms, armCost, diagnostics.data?.arm_metrics))?.arm === arms[1]}
+				/>
 			)}
 
 			<VerdictTabNotes
@@ -311,6 +361,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 					naive={payload.naive}
 					armMetrics={diagnostics.data?.arm_metrics}
 					metricsStatus={diagnostics.isError ? "error" : diagnostics.isLoading ? "loading" : undefined}
+					armCost={armCost}
 					onNext={onNext}
 				/>
 			)}
@@ -319,6 +370,10 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 			)}
 
 			<div className="flex flex-col gap-3">
+				{/* M4-8: one line says which grades every section below reads, in place of a pill on each row. */}
+				<p className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs" data-testid="verdict-sections-source">
+					{tf("verdict.sectionsRead")} {tag("verdict-gates-source")}
+				</p>
 				{!scored && (
 					<Disclosure
 						title={tPage("sections.guards")}
@@ -331,13 +386,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 					</Disclosure>
 				)}
 
-				<Disclosure
-					title={tPage("sections.gates")}
-					description={tPage("sectionHints.gates")}
-					icon={ListChecks}
-					action={tag("verdict-gates-source")}
-					testId="verdict-gates"
-				>
+				<Disclosure title={tPage("sections.gates")} description={tPage("sectionHints.gates")} icon={ListChecks} testId="verdict-gates">
 					<GateChecklist gates={payload.gates} />
 				</Disclosure>
 
@@ -345,27 +394,10 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 					title={tPage("sections.diagnostics")}
 					description={tPage("sectionHints.diagnostics")}
 					icon={Activity}
-					action={tag("verdict-diagnostics-source")}
 					testId="verdict-diagnostics"
 				>
 					{diagnosticsBody("conditions")}
 				</Disclosure>
-
-				<Disclosure title={tPage("sections.meters")} description={tPage("sectionHints.meters")} icon={Gauge} testId="verdict-meters">
-					{diagnosticsBody("meters")}
-				</Disclosure>
-
-				{!scored && (
-					<Disclosure
-						title={tPage("sections.statistics")}
-						description={tPage("sectionHints.statistics")}
-						icon={Sigma}
-						action={tag("verdict-card-source")}
-						testId="verdict-statistics"
-					>
-						<VerdictCard verdict={payload.verdict} metricLabel={metrics[payload.verdict.primary.metric]?.label} showGuards={false} />
-					</Disclosure>
-				)}
 
 				{!scored && (
 					<Disclosure
@@ -384,13 +416,7 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 					</Disclosure>
 				)}
 
-				<Disclosure
-					title={tPage("sections.policy")}
-					description={tPage("sectionHints.policy")}
-					icon={Scale}
-					action={tag("verdict-policy-source")}
-					testId="verdict-policy"
-				>
+				<Disclosure title={tPage("sections.policy")} description={tPage("sectionHints.policy")} icon={Scale} testId="verdict-policy">
 					<PolicyScorecard policy={payload.policy} expId={payload.exp_id} metrics={metrics} runPairs={runPairs} onOpenPair={openPair} />
 				</Disclosure>
 
@@ -416,6 +442,27 @@ export function VerdictTab({ expId, evaluationId }: { expId: string; evaluationI
 					) : (
 						<TaskGrid grid={grid.data} onOpenPair={openPair} suite={payload.suite} />
 					)}
+				</Disclosure>
+
+				{/* M4-8, M4-16: Measurements and Advanced statistics in one section at the end, for statisticians. */}
+				<Disclosure
+					title={tf("verdict.forStatisticians")}
+					description={tf("verdict.forStatisticiansHint")}
+					icon={Sigma}
+					testId="verdict-statistics"
+				>
+					<div className="flex flex-col gap-6">
+						<div className="flex flex-col gap-2" data-testid="verdict-meters">
+							<h4 className="text-sm font-medium">{tPage("sections.meters")}</h4>
+							{diagnosticsBody("meters")}
+						</div>
+						{!scored && (
+							<div className="flex flex-col gap-2">
+								<h4 className="text-sm font-medium">{tPage("sections.statistics")}</h4>
+								<VerdictCard verdict={payload.verdict} metricLabel={metrics[payload.verdict.primary.metric]?.label} showGuards={false} />
+							</div>
+						)}
+					</div>
 				</Disclosure>
 			</div>
 		</div>
@@ -557,7 +604,9 @@ export function Section({
 	return (
 		<Card className="gap-4" data-testid={testId}>
 			<CardHeader>
-				<CardTitle>{title}</CardTitle>
+				<CardTitle role="heading" aria-level={2}>
+					{title}
+				</CardTitle>
 				{description && <CardDescription>{description}</CardDescription>}
 				{action && <CardAction>{action}</CardAction>}
 			</CardHeader>
@@ -593,9 +642,33 @@ function TableSkeleton({ testId }: { testId: string }) {
 	);
 }
 
-function VerdictSkeleton() {
+/** Which stage a slow verdict load is in (M4-5): quiet, then a still-working note at 8 s, then an error at 30 s. */
+export function slowStage(elapsedMs: number): "wait" | "slow" | "stuck" {
+	return elapsedMs >= 30_000 ? "stuck" : elapsedMs >= 8_000 ? "slow" : "wait";
+}
+
+function VerdictSkeleton({ tasks, onRetry }: { tasks?: number; onRetry: () => void }) {
+	const { t } = useTranslation("uf4a");
+	const [elapsed, setElapsed] = useState(0);
+	useEffect(() => {
+		const start = Date.now();
+		const timer = window.setInterval(() => setElapsed(Date.now() - start), 1000);
+		return () => window.clearInterval(timer);
+	}, []);
+	const stage = slowStage(elapsed);
+	if (stage === "stuck") {
+		return <ErrorState message={t("verdict.stuck")} onRetry={onRetry} testId="verdict-stuck" />;
+	}
 	return (
 		<div className="flex flex-col gap-6" data-testid="verdict-loading">
+			{stage === "slow" && (
+				<div className="flex flex-wrap items-center gap-3 text-sm" role="status" data-testid="verdict-slow">
+					<span>{tasks ? t("verdict.slowCount", { count: tasks }) : t("verdict.slow")}</span>
+					<Button variant="outline" size="sm" onClick={onRetry} dataTestId="verdict-slow-retry">
+						{t("verdict.retry")}
+					</Button>
+				</div>
+			)}
 			<Skeleton className="h-6 w-2/3" />
 			<Skeleton className="h-64 w-full" />
 			<div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
