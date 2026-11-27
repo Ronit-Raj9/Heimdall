@@ -1,12 +1,16 @@
 import { DEFAULT_BENCHMARK_BUDGET, parseBudget } from "@/app/evaluate/views/step5Launch";
 import { budgetLine } from "@/app/evaluate/views/budgetAdvice";
-import { keepRunnable } from "@/app/evaluate/views/step3Benchmarks";
+import { compatFor, compatibilityMap, incompatibleReason, keepRunnable } from "@/app/evaluate/views/step3Benchmarks";
+import { suiteDisplayName } from "@/components/suites/suiteDisplay";
+import { useConfirm } from "@/components/platform/confirmDialog";
+import "@/components/runs/uf5bI18n";
+import { ftFaultName } from "./gw07I18n";
 import { ESTIMATE_DEBOUNCE_MS, FAULTS, estimateText, groupFaults } from "@/app/evaluate/views/step4Setup";
 import { useDebounced } from "@/app/evaluate/views/useDebounced";
 import { BenchmarkChecklist } from "@/components/evaluations/benchmarkChecklist";
 import { AgentPicker } from "@/components/agents/agentPicker";
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
-import { faultChange, faultName } from "@/components/reportcard/reportCard.utils";
+import { faultChange } from "@/components/reportcard/reportCard.utils";
 import "@/app/evaluations/views/gw08I18n";
 import "@/app/evaluations_/$evalId/views/w4m2I18n";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
@@ -24,6 +28,7 @@ import {
 	useGetBenchFaultsQuery,
 	useGetEvaluationReportQuery,
 	useListEvaluationsQuery,
+	type AgentCompatibility,
 	type Estimate,
 	type Evaluation,
 	type EvaluationSpec,
@@ -37,8 +42,8 @@ import { ShieldAlert } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import "./gw07I18n";
 import { evalArmLabel } from "@/lib/evaluationArms";
+import { cn } from "@/lib/utils";
 
 /** A fault a failure test can inject: any id of the fault catalog (GET /faults). */
 export type FailureFault = string;
@@ -115,6 +120,63 @@ export function formProblem(
 	return null;
 }
 
+/** The most runs the form can start: every task once clean and once per fault, times repeats, per benchmark. */
+export function plannedRuns(f: Pick<FailureTestForm, "benchmarks" | "faults" | "tasks" | "trials">): number {
+	const faults = new Set(f.faults.filter((x) => x !== "clean")).size;
+	return f.benchmarks.length * f.tasks * f.trials * (1 + faults);
+}
+
+const usd = (n: number) => `$${n.toFixed(2)}`;
+
+/**
+ * The question asked before a failure test starts, with its locale key and values: the high cost
+ * estimate when the price is known, else the spending cap that stops it, else plain "price not known".
+ */
+export function launchConfirm(
+	estimate: Pick<Estimate, "runs" | "est_cost_usd" | "budget"> | undefined,
+	planned: number,
+	budgetText?: string,
+): { key: "ft.confirmKnown" | "ft.confirmCap" | "ft.confirmUnknown"; values: { runs: number; cost?: string; cap?: string } } {
+	const runs = estimate ? Number(estimate.runs) || 0 : planned;
+	const c = estimate?.est_cost_usd;
+	if (c?.known) return { key: "ft.confirmKnown", values: { runs, cost: usd(Math.max(c.high, c.low)) } };
+	const typed = parseBudget(budgetText ?? "");
+	const cap = typed ?? estimate?.budget?.budget_usd;
+	if (cap !== undefined && cap > 0) return { key: "ft.confirmCap", values: { runs, cap: usd(cap) } };
+	return { key: "ft.confirmUnknown", values: { runs } };
+}
+
+/** The benchmarks the checklist shows: matching the search, and only runnable ones when asked (once compatibility is known). */
+export function visibleSuites<S extends { id: string; description?: string }>(
+	suites: readonly S[],
+	q: string,
+	compatibility: AgentCompatibility | undefined,
+	onlyRunnable: boolean,
+	selected: readonly string[] = [],
+): S[] {
+	const needle = q.trim().toLowerCase();
+	const compat = compatibilityMap(compatibility);
+	return suites.filter((s) => {
+		if (selected.includes(s.id)) return true;
+		if (needle && !`${s.id} ${suiteDisplayName(s.id)} ${s.description ?? ""}`.toLowerCase().includes(needle)) return false;
+		if (onlyRunnable && compatibility && incompatibleReason(compatFor(compat, s.id))) return false;
+		return true;
+	});
+}
+
+/** True while the ticked faults are exactly the ones the page opens with. */
+export function isDefaultFaults(faults: readonly string[]): boolean {
+	return faults.length === FAILURE_FAULTS.length && FAILURE_FAULTS.every((f) => faults.includes(f));
+}
+
+/** Faults the estimate says apply to none of the picked benchmarks: the form greys them out (M5-48). */
+export function faultsNotApplicable(estimate: Pick<Estimate, "per_benchmark"> | undefined): Set<string> {
+	const per = estimate?.per_benchmark ?? [];
+	if (per.length === 0) return new Set();
+	const sets = per.map((b) => new Set((b.faults_skipped ?? []).map((s) => s.fault)));
+	return new Set([...sets[0]].filter((f) => sets.every((s) => s.has(f))));
+}
+
 /** True when the loaded agent list contains the agent id; false while the list has not loaded. */
 export function agentKnown(agents: readonly { id: string }[] | undefined, id: string): boolean {
 	return Boolean(id) && (agents ?? []).some((a) => a.id === id);
@@ -140,14 +202,21 @@ export function SkippedFaultsNote({ estimate }: { estimate: Estimate }) {
 	const { t } = useTranslation("agentFirst");
 	const lines = (estimate.per_benchmark ?? []).flatMap((b) => {
 		const byReason = new Map<string, string[]>();
-		for (const s of b.faults_skipped ?? []) byReason.set(s.reason, [...(byReason.get(s.reason) ?? []), faultName(s.fault)]);
-		return [...byReason].map(([reason, faults]) => ({ key: `${b.benchmark}-${reason}`, benchmark: b.benchmark, reason, faults }));
+		for (const s of b.faults_skipped ?? []) byReason.set(s.reason, [...(byReason.get(s.reason) ?? []), ftFaultName(s.fault)]);
+		// The benchmark by its display name, the raw id only as the row's title (M5-48).
+		return [...byReason].map(([reason, faults]) => ({
+			key: `${b.benchmark}-${reason}`,
+			id: b.benchmark,
+			benchmark: suiteDisplayName(b.benchmark),
+			reason,
+			faults,
+		}));
 	});
 	if (lines.length === 0) return null;
 	return (
 		<ul className="text-muted-foreground flex flex-col gap-1 text-xs" data-testid="ft-faults-skipped">
 			{lines.map((l) => (
-				<li key={l.key}>
+				<li key={l.key} title={l.id}>
 					{t("ft.faultsSkipped", { count: l.faults.length, faults: l.faults.join(", "), benchmark: l.benchmark, reason: l.reason })}
 				</li>
 			))}
@@ -186,10 +255,13 @@ export function FailureTestEstimate({
 }) {
 	const { t } = useTranslation("agentFirst");
 	const { t: tg } = useTranslation("gw07");
+	const { t: tw } = useTranslation("w4m2");
 	const updating = pending || Boolean(estimate.isFetching);
 	return (
 		<div className="flex min-w-0 flex-1 flex-col gap-1 text-sm" data-testid="ft-estimate" aria-live="polite">
-			{problem !== null ? (
+			{problem === "agent" ? (
+				<span className="text-muted-foreground">{tw("toSeeCostAgent")}</span>
+			) : problem !== null ? (
 				<span className="text-muted-foreground">{tg("ft.toSeeCost", { need: t(`ft.need.${problem}`) })}</span>
 			) : estimate.isError && !estimate.isFetching ? (
 				<span className="text-muted-foreground" title={getBenchErrorMessage(estimate.error)} data-testid="ft-estimate-error">
@@ -276,7 +348,20 @@ export default function FailureTestsView() {
 		void setAgentParam(id || null);
 	};
 	const toggle = <T,>(list: T[], item: T, on: boolean) => (on ? [...list, item] : list.filter((x) => x !== item));
+	const { t: tu } = useTranslation("uf5b");
+	const confirm = useConfirm();
+	const planned = plannedRuns(form);
+	const [query, setQuery] = useState("");
+	const [onlyRunnable, setOnlyRunnable] = useState(true);
+	// Run starts paid work: it always asks first, with the run count and the price or the cap (M5-44, M2-111).
 	const launch = async () => {
+		const ask = launchConfirm(problem === null && !estimate.isError ? estimate.currentData : undefined, planned, form.budgetText);
+		const ok = await confirm(tu(ask.key, ask.values), {
+			title: tu("ft.confirmTitle"),
+			confirmLabel: tu("ft.confirmOk"),
+			cancelLabel: tu("ft.confirmCancel"),
+		});
+		if (!ok) return;
 		const res = await create(spec);
 		if ("data" in res && res.data) void navigate({ href: `/evaluations/${encodeURIComponent(res.data.id)}` });
 	};
@@ -285,14 +370,18 @@ export default function FailureTestsView() {
 	const past = pastFailureTests(evals.data ?? [], form.agent);
 	const faultGroups = groupFaults(catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS);
 	const budgetTyped = (form.budgetText ?? "").trim() !== "";
+	const shownSuites = visibleSuites(suiteList, query, compatibility, onlyRunnable, form.benchmarks);
+	const notApplicable = faultsNotApplicable(problem === null ? estimate.currentData : undefined);
+	const budgetTotal = estimate.currentData?.budget?.budget_usd || undefined;
 
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="failure-tests-screen">
 			<PageHeader title={t("ft.title")} subtitle={t("ft.subtitle")} />
 
 			<Section title={t("ft.newTitle")} description={t("ft.newHint")} testId="ft-form">
-				<div className="bg-card flex min-w-0 flex-col gap-6 rounded-xl border p-5">
-					<div className="flex flex-wrap items-end gap-4">
+				{/* No nested card inside the section (BD-13): the fields sit on the page. */}
+				<div className="flex min-w-0 flex-col gap-6">
+					<div className="flex min-w-0 flex-wrap items-end gap-4">
 						<AgentPicker agents={agents.data?.agents ?? []} value={form.agent} onChange={pickAgent} testId="ft-agent" />
 						{unknownAgent && <UnknownAgentNote name={unknownAgent} />}
 						<label className="flex flex-col gap-1 text-xs font-medium">
@@ -313,7 +402,7 @@ export default function FailureTestsView() {
 								))}
 							</select>
 						</label>
-						<div className="flex min-w-64 flex-col gap-1 text-xs font-medium">
+						<div className="flex w-full min-w-0 flex-col gap-1 text-xs font-medium sm:w-auto sm:min-w-64">
 							{t("ft.model")}
 							<GroupedModelPicker
 								value={chosen.model || chosen.provider ? { provider: chosen.provider, model: chosen.model } : null}
@@ -328,42 +417,90 @@ export default function FailureTestsView() {
 						</div>
 					</div>
 
-					<fieldset className="flex flex-col gap-2">
-						<legend className="mb-2 text-sm font-semibold">{t("ft.faults")}</legend>
-						<div className="flex flex-col gap-3">
-							{faultGroups.map((g) => (
-								<div key={g.group} className="flex flex-col gap-1.5" data-testid={`ft-fault-group-${g.group}`}>
-									<span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{g.group}</span>
-									<div className="flex flex-wrap gap-2">
-										{g.faults.map((fault) => (
-											<label
-												key={fault.id}
-												className="inline-flex max-w-sm cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm"
+					<fieldset className="flex min-w-0 flex-col gap-2">
+						<legend className="mb-1 flex w-full flex-wrap items-baseline gap-x-3 text-base font-semibold">
+							{t("ft.faults")}
+							<span className="text-muted-foreground text-xs font-normal" data-testid="ft-faults-picked">
+								{tu("ft.faultsPicked", { count: form.faults.length })}
+							</span>
+						</legend>
+						{isDefaultFaults(form.faults) && (
+							<p className="text-muted-foreground text-xs" data-testid="ft-faults-defaults">
+								{tu("ft.defaultsTicked", { count: FAILURE_FAULTS.length })}
+							</p>
+						)}
+						<div className="flex flex-col gap-2">
+							{faultGroups.map((g) => {
+								const ids = g.faults.map((x) => x.id);
+								const all = ids.every((id) => form.faults.includes(id));
+								return (
+									<div key={g.group} className="flex min-w-0 flex-col gap-1 sm:flex-row sm:gap-3" data-testid={`ft-fault-group-${g.group}`}>
+										<div className="flex shrink-0 items-center gap-2 sm:w-24 sm:flex-col sm:items-start sm:gap-0 sm:pt-1.5">
+											<span className="text-muted-foreground text-xs font-medium">{g.group}</span>
+											<button
+												type="button"
+												className="text-primary text-xs underline-offset-4 hover:underline"
+												onClick={() =>
+													setForm((f) => ({
+														...f,
+														faults: all ? f.faults.filter((x) => !ids.includes(x)) : [...new Set([...f.faults, ...ids])],
+													}))
+												}
+												data-testid={`ft-fault-group-${g.group}-all`}
 											>
-												<input
-													type="checkbox"
-													className="mt-0.5"
-													checked={form.faults.includes(fault.id)}
-													onChange={(e) => setForm((f) => ({ ...f, faults: toggle(f.faults, fault.id, e.target.checked) }))}
-													data-testid={`ft-fault-${fault.id}`}
-												/>
-												<span className="flex flex-col">
-													<span className="font-medium">{fault.label}</span>
-													<span className="text-muted-foreground text-xs">{fault.help}</span>
-												</span>
-											</label>
-										))}
+												{all ? tu("ft.clearGroup") : tu("ft.selectAll")}
+											</button>
+										</div>
+										<div className="grid min-w-0 flex-1 grid-cols-1 gap-x-4 gap-y-1 min-[420px]:grid-cols-2 md:grid-cols-4">
+											{g.faults.map((fault) => {
+												const helpId = `ft-fault-help-${fault.id}`;
+												const off = notApplicable.has(fault.id);
+												return (
+													<label
+														key={fault.id}
+														title={fault.help}
+														className={cn(
+															"inline-flex min-h-7 min-w-0 cursor-pointer items-center gap-2 text-sm",
+															off && "text-muted-foreground opacity-60",
+														)}
+														data-not-applicable={off || undefined}
+													>
+														<input
+															type="checkbox"
+															className="accent-primary size-4 shrink-0"
+															checked={form.faults.includes(fault.id)}
+															onChange={(e) => setForm((f) => ({ ...f, faults: toggle(f.faults, fault.id, e.target.checked) }))}
+															aria-describedby={helpId}
+															data-testid={`ft-fault-${fault.id}`}
+														/>
+														<span className="truncate">{fault.label}</span>
+														<span id={helpId} className="sr-only">
+															{fault.help}
+														</span>
+													</label>
+												);
+											})}
+										</div>
 									</div>
-								</div>
-							))}
+								);
+							})}
 						</div>
 						<p className="text-muted-foreground text-xs">{t("ft.cleanNote")}</p>
 					</fieldset>
 
-					<fieldset className="flex flex-col gap-2">
-						<legend className="mb-2 text-sm font-semibold">{t("ft.benchmarks")}</legend>
+					<fieldset className="flex min-w-0 flex-col gap-2">
+						<legend className="mb-1 flex w-full flex-wrap items-baseline gap-x-3 text-base font-semibold">
+							{t("ft.benchmarks")}
+							{form.benchmarks.length > 0 && (
+								<span className="text-muted-foreground text-xs font-normal" data-testid="ft-benchmarks-picked">
+									{tu("ft.benchmarksPicked", { count: form.benchmarks.length })}
+								</span>
+							)}
+						</legend>
 						{suites.isLoading ? (
 							<BlockSkeleton rows={2} testId="ft-suites-loading" />
+						) : suites.isError ? (
+							<LoadError title={tu("ft.benchmarksLoadError")} error={suites.error} onRetry={() => void suites.refetch()} testId="ft-suites-error" />
 						) : suiteList.length === 0 ? (
 							<p className="text-muted-foreground text-sm">
 								{t("ft.noBenchmarks")}{" "}
@@ -371,26 +508,55 @@ export default function FailureTestsView() {
 									{t("ft.addBenchmark")}
 								</Link>
 							</p>
+						) : !form.agent ? (
+							// Benchmarks wait for an agent: which ones it can run decides the list (M5-46).
+							<p className="text-muted-foreground text-sm" data-testid="ft-benchmarks-pick-agent">
+								{tg("ft.pickAgentFirst")}
+							</p>
 						) : (
 							<>
-								{!form.agent && (
-									<p className="text-muted-foreground text-xs" data-testid="ft-benchmarks-pick-agent">
-										{tg("ft.pickAgentFirst")}
+								<div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+									<input
+										type="search"
+										value={query}
+										onChange={(e) => setQuery(e.target.value)}
+										placeholder={tu("ft.searchBenchmarks")}
+										aria-label={tu("ft.searchBenchmarks")}
+										className="border-input bg-background h-9 w-full max-w-md min-w-0 rounded-md border px-2 text-sm"
+										data-testid="ft-benchmark-search"
+									/>
+									<label className="inline-flex items-center gap-2 py-1 text-sm">
+										<input
+											type="checkbox"
+											className="accent-primary size-4"
+											checked={onlyRunnable}
+											onChange={(e) => setOnlyRunnable(e.target.checked)}
+											data-testid="ft-only-runnable"
+										/>
+										{tu("ft.onlyRunnable")}
+									</label>
+								</div>
+								{shownSuites.length === 0 ? (
+									<p className="text-muted-foreground text-sm" data-testid="ft-benchmarks-no-match">
+										{tu("ft.noMatch")}
 									</p>
+								) : (
+									<div className="max-h-[28rem] min-w-0 overflow-y-auto rounded-md border p-1" data-testid="ft-benchmark-list">
+										<BenchmarkChecklist
+											suites={shownSuites}
+											compatibility={compatibility}
+											checking={checking}
+											selected={form.benchmarks}
+											onToggle={(id) => setForm((f) => ({ ...f, benchmarks: toggle(f.benchmarks, id, !f.benchmarks.includes(id)) }))}
+											testIdPrefix="ft"
+										/>
+									</div>
 								)}
-								<BenchmarkChecklist
-									suites={suiteList}
-									compatibility={compatibility}
-									checking={checking}
-									selected={form.benchmarks}
-									onToggle={(id) => setForm((f) => ({ ...f, benchmarks: toggle(f.benchmarks, id, !f.benchmarks.includes(id)) }))}
-									testIdPrefix="ft"
-								/>
 							</>
 						)}
 					</fieldset>
 
-					<div className="flex flex-wrap items-end gap-4">
+					<div className="flex min-w-0 flex-wrap items-end gap-4">
 						<NumberChoice
 							label={t("ft.tasks")}
 							value={form.tasks}
@@ -405,23 +571,46 @@ export default function FailureTestsView() {
 							onPick={(n) => setForm((f) => ({ ...f, trials: n }))}
 							testId="ft-trials"
 						/>
-						<label className="flex max-w-56 flex-col gap-1 text-xs font-medium">
+						{planned > 0 && (
+							<span className="text-sm font-medium tabular-nums sm:pb-1.5" data-testid="ft-runs-planned" aria-live="polite">
+								{tu("ft.runsPlanned", { count: planned })}
+							</span>
+						)}
+						<label className="flex max-w-56 min-w-0 flex-col gap-1 text-xs font-medium">
 							{t("ft.budget")}
-							<input
-								type="number"
-								inputMode="decimal"
-								min={0}
-								step={0.01}
-								className="border-input bg-background h-9 w-32 rounded-md border px-2 text-sm"
-								value={form.budgetText ?? ""}
-								onChange={(e) => setForm((f) => ({ ...f, budgetText: e.target.value }))}
-								aria-invalid={problem === "budget" || undefined}
-								data-testid="ft-budget"
-							/>
-							<span className="text-muted-foreground font-normal">{t("ft.budgetHint", { amount: DEFAULT_BENCHMARK_BUDGET })}</span>
+							<span className="relative inline-flex w-32 items-center">
+								<span aria-hidden="true" className="text-muted-foreground pointer-events-none absolute left-2 text-sm">
+									$
+								</span>
+								<input
+									type="number"
+									inputMode="decimal"
+									min={0}
+									step={0.01}
+									className="border-input bg-background h-9 w-full rounded-md border pr-2 pl-5 text-sm"
+									value={form.budgetText ?? ""}
+									onChange={(e) => setForm((f) => ({ ...f, budgetText: e.target.value }))}
+									aria-invalid={problem === "budget" || undefined}
+									data-testid="ft-budget"
+								/>
+							</span>
+							<span className="text-muted-foreground font-normal">
+								{t("ft.budgetHint", { amount: DEFAULT_BENCHMARK_BUDGET })}
+								{budgetTotal !== undefined && <> {tu("ft.budgetTotal", { amount: usd(budgetTotal) })}</>}
+							</span>
 						</label>
 					</div>
-					<div className="bg-muted/40 flex flex-wrap items-center gap-4 rounded-lg border px-4 py-3">
+					{problem === null && estimate.data && <SkippedFaultsNote estimate={estimate.data} />}
+					{createState.isError && (
+						<p role="alert" className="text-destructive text-sm" data-testid="ft-launch-error">
+							{getBenchErrorMessage(createState.error)}
+						</p>
+					)}
+					{/* The estimate and Run stay in view while the long form scrolls (M5-44, M2-111). */}
+					<div
+						className="bg-background sticky bottom-0 z-10 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border px-4 py-3 shadow-sm"
+						data-testid="ft-launch-bar"
+					>
 						<FailureTestEstimate
 							problem={problem}
 							estimate={{ data: estimate.currentData, isFetching: estimate.isFetching, isError: estimate.isError, error: estimate.error }}
@@ -435,12 +624,6 @@ export default function FailureTestsView() {
 							</Button>
 						)}
 					</div>
-					{problem === null && estimate.data && <SkippedFaultsNote estimate={estimate.data} />}
-					{createState.isError && (
-						<p role="alert" className="text-destructive text-sm" data-testid="ft-launch-error">
-							{getBenchErrorMessage(createState.error)}
-						</p>
-					)}
 				</div>
 			</Section>
 
@@ -545,6 +728,7 @@ function noResultsKey(ev: Evaluation): "ft.emptyFailed" | "ft.emptyCancelled" | 
 export function PastTest({ ev }: { ev: Evaluation }) {
 	const { t } = useTranslation("agentFirst");
 	const { t: tg } = useTranslation("gw08");
+	const { t: tu } = useTranslation("uf5b");
 	const faults = (ev.spec?.faults ?? []).filter((f) => f !== "clean");
 	const finished = ev.status === "done" || ev.status === "cancelled" || ev.status === "failed";
 	const report = useGetEvaluationReportQuery(finished ? ev.id : skipToken);
@@ -555,21 +739,26 @@ export function PastTest({ ev }: { ev: Evaluation }) {
 	return (
 		<li className="bg-card flex min-w-0 flex-col gap-3 rounded-xl border p-4" data-testid={`ft-past-${ev.id}`}>
 			<div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-				<Link to="/evaluations/$evalId" params={{ evalId: ev.id }} className="text-sm font-semibold hover:underline">
-					{ev.spec?.name || ev.id}
+				{/* Titled by agent and date, the whole title a link to its evaluation (M5-47). */}
+				<Link
+					to="/evaluations/$evalId"
+					params={{ evalId: ev.id }}
+					className="text-sm font-semibold hover:underline"
+					title={ev.spec?.name || ev.id}
+				>
+					{tu("ft.pastTitle", {
+						agent: arm?.version ? `${arm.agent} v${arm.version}` : arm?.agent || ev.spec?.name || ev.id,
+						date: new Date(ev.created_at).toLocaleString(),
+					})}
 				</Link>
-				<span className="text-muted-foreground text-xs">
-					{[arm?.version ? `${arm.agent} v${arm.version}` : arm?.agent, arm?.model, new Date(ev.created_at).toLocaleString()]
-						.filter(Boolean)
-						.join(" · ")}
-				</span>
+				{arm?.model && <span className="text-muted-foreground text-xs">{arm.model}</span>}
 				<span className="bg-muted ml-auto rounded-full px-2 py-0.5 text-xs">
 					{t(`ft.status.${ev.status}`, { defaultValue: ev.status })}
 				</span>
 			</div>
 			{faults.length > 0 && (
 				<p className="text-muted-foreground text-xs" data-testid={`ft-past-${ev.id}-faults`}>
-					{tg("ft.faults", { faults: faults.map((f) => faultName(String(f))).join(", ") })}
+					{tg("ft.faults", { faults: faults.map((f) => ftFaultName(String(f))).join(", ") })}
 				</p>
 			)}
 			{skipped > 0 && (
@@ -586,22 +775,31 @@ export function PastTest({ ev }: { ev: Evaluation }) {
 					{tg(noResultsKey(ev))}
 				</p>
 			) : (
-				<ul className="flex flex-wrap gap-2" data-testid={`ft-past-${ev.id}-results`}>
-					{rows.map((r) => {
-						const s = r.arms[label as string];
-						const change = faultChange(s);
-						const tone = change.hurt ? "text-chart-error-ink" : change.helped ? "text-chart-success-ink" : "text-muted-foreground";
-						return (
-							<li key={r.fault} className="rounded-md border px-2.5 py-1.5 text-xs">
-								<span className="text-muted-foreground">{faultName(r.fault)}</span>{" "}
-								<span className="font-semibold tabular-nums">{Math.round(s.score * 100)}%</span>{" "}
-								<span className={`${tone} tabular-nums`} data-testid={`ft-past-${ev.id}-change-${r.fault}`}>
-									({change.hurt || change.helped ? tg("ft.vsClean", { change: change.text }) : tg("ft.noChange")})
-								</span>
-							</li>
-						);
-					})}
-				</ul>
+				<table className="w-full max-w-lg text-xs" data-testid={`ft-past-${ev.id}-results`}>
+					<thead className="text-muted-foreground text-left">
+						<tr>
+							<th className="py-1 pr-3 font-medium">{tu("ft.pastFault")}</th>
+							<th className="py-1 pr-3 text-right font-medium">{tu("ft.pastScore")}</th>
+							<th className="py-1 text-right font-medium">{tu("ft.pastChange")}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{rows.map((r) => {
+							const s = r.arms[label as string];
+							const change = faultChange(s);
+							const tone = change.hurt ? "text-chart-error-ink" : change.helped ? "text-chart-success-ink" : "text-muted-foreground";
+							return (
+								<tr key={r.fault} className="border-t">
+									<td className="py-1 pr-3">{ftFaultName(r.fault)}</td>
+									<td className="py-1 pr-3 text-right font-semibold tabular-nums">{Math.round(s.score * 100)}%</td>
+									<td className={`${tone} py-1 text-right tabular-nums`} data-testid={`ft-past-${ev.id}-change-${r.fault}`}>
+										{change.hurt || change.helped ? tg("ft.vsClean", { change: change.text }) : tg("ft.noChange")}
+									</td>
+								</tr>
+							);
+						})}
+					</tbody>
+				</table>
 			)}
 		</li>
 	);

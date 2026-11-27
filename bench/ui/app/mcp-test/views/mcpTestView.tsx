@@ -24,10 +24,12 @@ import {
 	type McpToolQuality,
 } from "@/lib/types/mcptest";
 import { cn } from "@/lib/utils";
+import { CopyId } from "@/components/ui/copyId";
+import "@/components/runs/uf5bI18n";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { Link } from "@tanstack/react-router";
-import { Check, Minus, Plug, X } from "lucide-react";
-import { useState } from "react";
+import { ArrowUpRight, Check, Minus, Plug, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 export type AuthMode = "bearer" | "raw" | "header";
@@ -60,6 +62,90 @@ export function formProblem(f: McpForm): "url" | "header" | null {
 	if (!f.url.trim()) return "url";
 	if (f.secret && f.mode === "header" && !f.header.trim()) return "header";
 	return null;
+}
+
+/** True when the address is a full http or https URL; checked on press, not by disabling the button (M5-50). */
+export function validUrl(raw: string): boolean {
+	try {
+		const u = new URL(raw.trim());
+		return (u.protocol === "https:" || u.protocol === "http:") && Boolean(u.hostname);
+	} catch {
+		return false;
+	}
+}
+
+/** This site's own hosted MCP address (X-36): the origin plus /mcp, empty without a window. */
+export function hostedMcpAddress(origin: string | undefined): string {
+	return origin ? `${origin.replace(/\/+$/, "")}/mcp` : "";
+}
+
+/** One past check in this browser's history (M5-49). */
+export interface McpCheck {
+	url: string;
+	at: string;
+	reached: boolean;
+	overall?: number;
+}
+
+/** Checks kept per endpoint. */
+export const MCP_HISTORY_PER_URL = 10;
+const HISTORY_KEY = "heimdall.mcpTest.history";
+
+/** The history after a new check: newest first, at most MCP_HISTORY_PER_URL per endpoint. */
+export function addCheck(list: readonly McpCheck[], c: McpCheck, perUrl = MCP_HISTORY_PER_URL): McpCheck[] {
+	const out: McpCheck[] = [];
+	const seen = new Map<string, number>();
+	for (const x of [c, ...list]) {
+		const n = seen.get(x.url) ?? 0;
+		if (n >= perUrl) continue;
+		seen.set(x.url, n + 1);
+		out.push(x);
+	}
+	return out;
+}
+
+function readHistory(): McpCheck[] {
+	try {
+		const raw = window.localStorage.getItem(HISTORY_KEY);
+		const v: unknown = raw ? JSON.parse(raw) : [];
+		return Array.isArray(v) ? (v as McpCheck[]) : [];
+	} catch {
+		return [];
+	}
+}
+
+function writeHistory(list: readonly McpCheck[]) {
+	try {
+		window.localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+	} catch {
+		// Storage blocked: the history lasts only for this page.
+	}
+}
+
+/** The last checks of the endpoint in the form (all endpoints when it is empty), newest first. */
+export function McpHistory({ checks, url }: { checks: readonly McpCheck[]; url: string }) {
+	const { t } = useTranslation("uf5b");
+	const shown = checks.filter((c) => !url.trim() || c.url === url.trim()).slice(0, MCP_HISTORY_PER_URL);
+	if (shown.length === 0) return null;
+	return (
+		<Section title={t("mcp.historyTitle")} as="h3" testId="mcp-history">
+			<ul className="flex flex-col gap-1 text-sm">
+				{shown.map((c) => (
+					<li key={c.url + c.at} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+						<span className="min-w-0 truncate font-mono text-xs" title={c.url}>
+							{c.url}
+						</span>
+						<span className="text-muted-foreground text-xs">{new Date(c.at).toLocaleString()}</span>
+						{c.reached && c.overall !== undefined ? (
+							<Score value={c.overall} />
+						) : (
+							<span className="text-chart-error-ink text-xs">{t("mcp.historyUnreached")}</span>
+						)}
+					</li>
+				))}
+			</ul>
+		</Section>
+	);
 }
 
 /** The draft request: the id trimmed and the server name normalised only when sending, so dashes can be typed. */
@@ -372,21 +458,56 @@ export function McpTestView() {
 	const [inspect, st] = useInspectMcpServerMutation();
 	const [report, setReport] = useState<McpReport | null>(null);
 	const [sent, setSent] = useState<McpInspectRequest | null>(null);
+	const [history, setHistory] = useState<McpCheck[]>([]);
+	useEffect(() => setHistory(readHistory()), []);
+	const remember = (r: McpReport) =>
+		setHistory((h) => {
+			const next = addCheck(h, { url: r.url || form.url.trim(), at: r.checked_at || new Date().toISOString(), reached: r.reached, overall: r.scores?.overall });
+			writeHistory(next);
+			return next;
+		});
 	const set = (p: Partial<McpForm>) => setForm((f) => ({ ...f, ...p }));
 	const problem = formProblem(form);
+	const { t: t5 } = useTranslation("uf5b");
+	const [pressed, setPressed] = useState(false);
+	// The button stays enabled; a press with a missing or broken address says what to type (M5-50).
+	const urlBad = pressed && !validUrl(form.url);
 	const inspectWhy = problem === "header" ? tw("mcp.headerNeeded") : null;
+	const address = hostedMcpAddress(typeof window !== "undefined" ? window.location.origin : undefined);
 	const run = async () => {
+		setPressed(true);
+		if (!validUrl(form.url) || problem !== null) return;
 		const req = requestFromForm(form);
 		try {
-			setReport(await inspect(req).unwrap());
+			const r = await inspect(req).unwrap();
+			setReport(r);
 			setSent(req);
+			remember(r);
 		} catch {
 			setReport(null);
 		}
 	};
 	return (
 		<section className="mx-auto flex w-full max-w-[1100px] min-w-0 flex-col gap-6" data-testid="mcp-test-screen">
-			<PageHeader title={t("title")} subtitle={t("subtitle")} icon={Plug} />
+			<PageHeader
+				title={t("title")}
+				subtitle={t("subtitle")}
+				icon={Plug}
+				actions={
+					<Button asChild variant="outline" size="sm">
+						<Link to={"/gateway" as never} data-testid="mcp-gateway-link">
+							{t5("mcp.gatewayLink")}
+							<ArrowUpRight aria-hidden="true" />
+						</Link>
+					</Button>
+				}
+			/>
+			{address && (
+				<p className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-2 text-sm" data-testid="mcp-hosted-address">
+					{t5("mcp.yourAddress")}
+					<CopyId value={address} className="text-foreground text-sm" testId="mcp-hosted-address-copy" />
+				</p>
+			)}
 			<Section title={t("form.heading")}>
 				<label className="flex flex-col gap-1.5 text-sm">
 					<span className="font-medium">{t("form.url")}</span>
@@ -394,9 +515,19 @@ export function McpTestView() {
 						value={form.url}
 						onChange={(e) => set({ url: e.target.value })}
 						placeholder="https://mcp.example.com/mcp"
+						className="max-w-xl"
+						type="url"
+						aria-invalid={urlBad || undefined}
+						aria-describedby={urlBad ? "mcp-url-problem" : undefined}
 						data-testid="mcp-url"
 					/>
-					<span className="text-muted-foreground text-xs">{t("form.urlHint")}</span>
+					{urlBad ? (
+						<span id="mcp-url-problem" className="text-destructive text-xs" role="alert" data-testid="mcp-url-problem">
+							{t5("mcp.badUrl")}
+						</span>
+					) : (
+						<span className="text-muted-foreground text-xs">{t("form.urlHint")}</span>
+					)}
 				</label>
 				<div className="grid gap-3 sm:grid-cols-3">
 					<label className="flex flex-col gap-1.5 text-sm">
@@ -425,7 +556,12 @@ export function McpTestView() {
 								data-testid="mcp-secret-name"
 							/>
 						)}
-						<span className="text-muted-foreground text-xs">{listSecrets ? t("form.secretHint") : tf("mcp.secretNameHint")}</span>
+						<span className="text-muted-foreground text-xs">
+							{listSecrets ? t("form.secretHint") : tf("mcp.secretNameHint")}{" "}
+							<Link to={"/settings" as never} search={{ tab: "secrets" } as never} className="text-primary underline-offset-4 hover:underline">
+								{t5("mcp.manageSecrets")}
+							</Link>
+						</span>
 					</label>
 					{form.secret && (
 						<label className="flex flex-col gap-1.5 text-sm">
@@ -461,10 +597,14 @@ export function McpTestView() {
 						<span className="text-muted-foreground block text-xs">{t("form.callReadOnlyHint")}</span>
 					</span>
 				</label>
-				<div className="flex items-center gap-3">
+				<p className="text-muted-foreground max-w-prose text-xs" data-testid="mcp-inspect-note">
+					{t("form.inspectNote")}
+					<span className="block">{t5("mcp.youGet")}</span>
+				</p>
+				<div className="flex flex-wrap items-center gap-3">
 					<Button
 						onClick={() => void run()}
-						disabled={st.isLoading || problem !== null}
+						disabled={st.isLoading}
 						aria-describedby={inspectWhy ? "mcp-inspect-why" : undefined}
 						data-testid="mcp-inspect"
 					>
@@ -474,6 +614,7 @@ export function McpTestView() {
 					{st.error != null && <span className="text-destructive text-sm">{apiErrorMessage(st.error, t("form.failed"))}</span>}
 				</div>
 			</Section>
+			<McpHistory checks={history} url={form.url} />
 			{report && <McpReportView report={report} />}
 			{report?.reached && report.tools.length > 0 && sent && <DraftForm key={report.checked_at} report={report} request={sent} />}
 		</section>

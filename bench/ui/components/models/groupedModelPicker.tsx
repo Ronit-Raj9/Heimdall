@@ -4,6 +4,8 @@ import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
 import type { ModelKey, ModelOption, ModelProviderInfo } from "@/lib/types/models";
 import { Link } from "@tanstack/react-router";
 import { useId, useState } from "react";
+import { useTranslation } from "react-i18next";
+import "@/components/runs/uf5bI18n";
 
 /**
  * A single searchable model dropdown grouped by provider, built on ModelPicker's modelChoices.
@@ -98,7 +100,33 @@ export function optionLabel(m: ModelGroupItem, g: Pick<ModelGroup, "name">, dup:
 	return `${m.id}${dup ? ` (${g.name})` : ""}${m.open ? "  [open]" : ""}`;
 }
 
+/** True for a provider reached through a custom base URL (OpenAI-compatible endpoints): it only mirrors native ids. */
+function isCompatible(p: Pick<CatalogProvider, "id" | "custom_base_url" | "needs_base_url">): boolean {
+	return Boolean(p.custom_base_url) || p.needs_base_url === true || p.id === "openai-compatible";
+}
+
+/**
+ * The same model id under a native provider and an OpenAI-compatible endpoint is listed once, under
+ * the native provider (M1-21). Groups keep their "Other ... model" entry even when emptied.
+ */
+export function preferNative(groups: readonly ModelGroup[], catalog: readonly CatalogProvider[]): ModelGroup[] {
+	const compat = new Set(catalog.filter(isCompatible).map((p) => p.id));
+	const native = new Set(groups.filter((g) => !compat.has(g.provider)).flatMap((g) => g.models.map((m) => m.id)));
+	return groups.map((g) => (compat.has(g.provider) ? { ...g, models: g.models.filter((m) => !native.has(m.id)) } : g));
+}
+
+/**
+ * The groups the closed list shows (M1-21): providers with a working key, plus the picked one. The
+ * rest wait behind "More providers (needs a key)", except while searching or when no key works at all.
+ */
+export function visibleGroups(groups: readonly ModelGroup[], picked: string, showAll: boolean): { shown: ModelGroup[]; hidden: number } {
+	if (showAll || !groups.some((g) => g.keyState === "ok")) return { shown: [...groups], hidden: 0 };
+	const shown = groups.filter((g) => g.keyState === "ok" || g.provider === picked);
+	return { shown, hidden: groups.length - shown.length };
+}
+
 const OTHER = "__other__:";
+const MORE = "__more__";
 const selectClass = "border-input bg-background h-8 rounded-md border px-2 text-sm disabled:opacity-50";
 
 export interface GroupedModelPickerProps {
@@ -133,9 +161,12 @@ export function GroupedModelPicker({
 	disabled: disabledProp,
 	testId,
 	providers,
-	label = "Model",
+	label,
 }: GroupedModelPickerProps) {
+	const { t } = useTranslation("uf5b");
 	const id = useId();
+	const name = label ?? t("picker.model");
+	const [showAll, setShowAll] = useState(false);
 	const tid = testId ?? "grouped-model-picker";
 	const models = useGetModelsQuery();
 	const loaded = Boolean(models.data);
@@ -144,13 +175,14 @@ export function GroupedModelPicker({
 	const [query, setQuery] = useState("");
 	const [typing, setTyping] = useState<string | null>(null);
 	const only = (list: ModelGroup[]) => (providers ? list.filter((g) => providers.includes(g.provider)) : list);
-	const groups = only(groupModels(catalog, keys, query));
-	const dup = duplicateIds(only(groupModels(catalog, keys)));
+	const all = only(preferNative(groupModels(catalog, keys, query), catalog));
+	const dup = duplicateIds(only(preferNative(groupModels(catalog, keys), catalog)));
 	const noProvider = providers !== undefined && providers.length === 0;
 	const disabled = disabledProp || noProvider;
 	const model = value?.model ?? "";
 	// A model given without its provider (an agent's default model) takes the catalog provider that lists it.
 	const provider = value?.provider || providerOfModel(groupModels(catalog, keys), model);
+	const { shown: groups, hidden } = visibleGroups(all, provider, showAll || query.trim() !== "");
 	const listed = groups.some((g) => g.provider === provider && g.models.some((m) => m.id === model));
 	const pickedItem = groupModels(catalog, keys)
 		.find((g) => g.provider === provider)
@@ -162,6 +194,10 @@ export function GroupedModelPicker({
 	const providerName = catalog.find((p) => p.id === provider)?.name ?? provider;
 
 	const pick = (v: string) => {
+		if (v === MORE) {
+			setShowAll(true);
+			return;
+		}
 		if (v.startsWith(OTHER)) {
 			const p = v.slice(OTHER.length);
 			setTyping(p);
@@ -177,60 +213,71 @@ export function GroupedModelPicker({
 		<div className="flex flex-col gap-1.5" data-testid={tid}>
 			<div className="flex flex-wrap items-center gap-2">
 				<label className="sr-only" htmlFor={`${id}-search`}>
-					{label === "Model" ? "Search models" : `Search ${label}`}
+					{label === undefined || label === t("picker.model") ? t("picker.search") : t("picker.searchFor", { label })}
 				</label>
 				<input
 					id={`${id}-search`}
-					className={`${selectClass} w-40`}
-					placeholder="Search models"
+					className={`${selectClass} w-full sm:w-40`}
+					placeholder={t("picker.search")}
 					value={query}
 					disabled={disabled}
 					onChange={(e) => setQuery(e.target.value)}
 					data-testid={`${tid}-search`}
 				/>
 				<label className="sr-only" htmlFor={`${id}-model`}>
-					{label}
+					{name}
 				</label>
 				<select
 					id={`${id}-model`}
-					className={`${selectClass} max-w-80 min-w-56`}
+					className={`${selectClass} w-full max-w-80 min-w-0 sm:w-auto sm:min-w-56`}
 					value={selected}
 					disabled={disabled}
 					onChange={(e) => pick(e.target.value)}
 					data-testid={`${tid}-model`}
 				>
 					<option value="" disabled>
-						{noProvider ? "Pick the agent's model first" : loaded ? "Choose a model" : "Loading models..."}
+						{noProvider ? t("picker.pickAgentFirst") : loaded ? t("picker.choose") : t("picker.loading")}
 					</option>
 					{model !== "" && !listed && !customFor && <option value={selected}>{modelOptionLabel(providerName, model)}</option>}
 					{groups.map((g) => (
 						<optgroup
 							key={g.provider}
-							label={g.keyState === "ok" ? g.name : `${g.name} (${g.keyState === "invalid" ? "key not working" : "no key"})`}
+							label={
+								g.keyState === "ok"
+									? g.name
+									: g.keyState === "invalid"
+										? t("picker.keyNotWorking", { name: g.name })
+										: t("picker.noKey", { name: g.name })
+							}
 						>
 							{g.models.map((m) => (
 								<option key={m.id} value={`${g.provider}\u0000${m.id}`}>
 									{optionLabel(m, g, dup.has(m.id))}
 								</option>
 							))}
-							<option value={`${OTHER}${g.provider}`}>Other {g.name} model...</option>
+							<option value={`${OTHER}${g.provider}`}>{t("picker.other", { name: g.name })}</option>
 						</optgroup>
 					))}
+					{hidden > 0 && (
+						<option value={MORE} data-testid={`${tid}-more`}>
+							{t("picker.more")}
+						</option>
+					)}
 				</select>
 				{pickedItem?.open && (
-					<Badge variant="neutral" data-testid={`${tid}-open`} title="Open-weight model">
-						open
+					<Badge variant="neutral" data-testid={`${tid}-open`} title={t("picker.openTitle")}>
+						{t("picker.open")}
 					</Badge>
 				)}
 				{customFor && (
 					<>
 						<label className="sr-only" htmlFor={`${id}-custom`}>
-							Model id
+							{t("picker.modelId")}
 						</label>
 						<input
 							id={`${id}-custom`}
-							className={`${selectClass} min-w-48`}
-							placeholder="Model id"
+							className={`${selectClass} w-full min-w-0 sm:w-auto sm:min-w-48`}
+							placeholder={t("picker.modelId")}
 							value={model}
 							disabled={disabled}
 							onChange={(e) => onChange({ provider: customFor, model: e.target.value })}
@@ -241,9 +288,9 @@ export function GroupedModelPicker({
 			</div>
 			{loaded && provider !== "" && keyState !== "ok" && (
 				<p className="text-chart-warning-ink text-xs" data-testid={`${tid}-no-key`}>
-					{keyState === "invalid" ? `The ${providerName} key does not work.` : `No ${providerName} key yet.`}{" "}
+					{keyState === "invalid" ? t("picker.keyBroken", { name: providerName }) : t("picker.keyNone", { name: providerName })}{" "}
 					<Link to="/models" search={{ add: provider } as never} className="text-primary underline">
-						Add one in Models &amp; keys
+						{t("picker.addKey")}
 					</Link>
 				</p>
 			)}

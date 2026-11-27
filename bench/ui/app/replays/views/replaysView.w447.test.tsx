@@ -7,6 +7,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { RunSummary, SessionRow, SettingsToggle, replayJobParams, splitModel, stateBar, type ReplayForm } from "./replaysView";
 
+vi.mock("@/components/models/groupedModelPicker", () => ({
+	GroupedModelPicker: ({ testId, value }: { testId?: string; value: { model: string } | null }) => (
+		<div data-testid={testId} data-model={value?.model ?? ""} />
+	),
+}));
+
+
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 const noop = () => undefined;
@@ -51,10 +58,18 @@ describe("shadow replay page", () => {
 			<SettingsToggle
 				settings={{ enabled: false, enabled_by: "", enabled_at: null, max_sessions_per_run: 50, max_usd_per_run: 10 }}
 				onSave={noop}
+				admin={false}
 			/>,
 		);
-		expect(html).toContain("Allow shadow replay for this organization");
-		expect(html).toContain("Shadow replay is off for this organization. An admin turns it on on the Replays page.");
+		expect(html).toContain("Shadow replay: Off");
+		expect(html).toContain("Shadow replay is off. Ask an org admin to turn it on.");
+		expect(html).not.toContain('role="switch"');
+		const asAdmin = renderToStaticMarkup(
+			<SettingsToggle settings={{ enabled: false, enabled_by: "", enabled_at: null, max_sessions_per_run: 50, max_usd_per_run: 10 }} onSave={noop} />,
+		);
+		expect(asAdmin).toMatch(/role="switch"[^>]*aria-checked="false"/);
+		expect(asAdmin).toContain("Allow shadow replay for this organization");
+		expect(asAdmin).toContain("Turn on");
 	});
 
 	it("puts the states in a fixed order with their words", () => {

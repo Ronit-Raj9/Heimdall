@@ -1,10 +1,11 @@
 {
 	"title": "Test my MCP server",
-	"subtitle": "Your MCP server is what gets tested here. Heimdall checks how it behaves, then standard agents use it on real tasks and the report shows which tools work for agents and which mislead them.",
+	"subtitle": "Heimdall checks how your MCP server behaves, then standard agents use it on real tasks. The report shows which tools help agents and which mislead them.",
 	"form": {
 		"heading": "Your server",
 		"url": "MCP endpoint",
-		"urlHint": "The streamable HTTP endpoint, for example https://mcp.example.com/mcp",
+		"urlHint": "The streamable HTTP endpoint of your server.",
+		"inspectNote": "Free: no model is used. Sends a small batch of requests, including some deliberately malformed ones, and takes under a minute.",
 		"secret": "Credential",
 		"secretNone": "No credential",
 		"secretHint": "An org secret. Add one under Settings, Secrets.",

@@ -1,7 +1,8 @@
 {
 	"runs": {
-		"title": "Runs",
-		"subtitle": "Every attempt an agent made at a task, newest first.",
+		"title": "Benchmark runs",
+		"subtitle": "Every attempt an agent made at a benchmark task. Production sessions are under Live sessions.",
+		"notRecorded": "Not recorded: this agent calls no model",
 		"search": "Search task or agent",
 		"searchLabel": "Search runs",
 		"filters": "Filters",

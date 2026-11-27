@@ -9,10 +9,12 @@ import { getLocale } from "@/lib/i18n";
 import { useGetAgentsQuery, useListRunsQuery } from "@/lib/store/apis/benchApi";
 import type { RunListParams, RunListRow } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "@tanstack/react-router";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, ListX } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { suiteDisplayName } from "@/components/suites/suiteDisplay";
+import "@/components/runs/uf5bI18n";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, ListX, SlidersHorizontal } from "lucide-react";
 import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
-import { useCallback, useMemo, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
 import { TraceMatches, TraceSearchInput } from "./traceMatches";
 import { pastLastPage } from "@/components/runs/runList";
 import "./w4m4I18n";
@@ -23,9 +25,14 @@ import "./fw21I18n";
 
 export const RUNS_PAGE = 50;
 
+/** While any run on the page is still running the list asks again this often (X-84). */
+export const RUNS_POLL_MS = 15_000;
+
 const parsers = {
 	outcome: parseAsString,
 	suite: parseAsString,
+	/** Older links and other pages say ?benchmark=: read as an alias of suite and rewritten (M5-40). */
+	benchmark: parseAsString,
 	arm: parseAsString,
 	agent: parseAsString,
 	fault: parseAsString,
@@ -148,6 +155,11 @@ export function runFaultLabel(fault: string): string {
 	return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
+/** The URL after reading ?benchmark= as the suite filter: an explicit suite wins, benchmark is dropped (M5-40). */
+export function benchmarkAlias(s: { suite?: string | null; benchmark?: string | null }): { suite: string | null; benchmark: null } {
+	return { suite: s.suite || s.benchmark || null, benchmark: null };
+}
+
 export function runDuration(row: Pick<RunListRow, "started" | "sealed_at">): number | null {
 	if (!row.started || !row.sealed_at) return null;
 	const s = (new Date(row.sealed_at).getTime() - new Date(row.started).getTime()) / 1000;
@@ -180,34 +192,55 @@ function formatNumber(n: number | undefined, locale: string): string {
 	return new Intl.NumberFormat(locale, { notation: n >= 10000 ? "compact" : "standard", maximumFractionDigits: 1 }).format(n);
 }
 
-const PILL = {
-	pass: "bg-chart-success/12 text-chart-success-ink",
-	zero: "bg-chart-error/12 text-chart-error-ink",
-	unknown: "bg-muted text-muted-foreground",
-	live: "bg-chart-info/12 text-chart-info-ink",
-} as const;
+/** Reference agents that call no model: their tokens and cost are not measured, not zero (M5-31). */
+const BASELINE_AGENTS = /^(oracle|noop)(?:$|[^a-z0-9])/i;
 
-const DOT = {
+/** True for a run of a reference agent (oracle, noop) that calls no model. */
+export function isBaselineRun(r: Pick<RunListRow, "config_id" | "arm">): boolean {
+	return BASELINE_AGENTS.test(runAgent(r));
+}
+
+/** Outcomes where the run itself does not count: the grader or the infrastructure broke (M5-38). */
+const WARN_OUTCOMES: readonly string[] = ["invalid_evaluator", "infra_error", "aborted_infra"];
+
+export type RunTone = "pass" | "zero" | "unknown" | "live" | "warn";
+
+/** The list's tone of a run: running, a broken grader or infrastructure (warn), else the outcome's tone. */
+export function runTone(row: Pick<RunListRow, "sealed" | "outcome">): RunTone {
+	if (!row.sealed) return "live";
+	if (WARN_OUTCOMES.includes(row.outcome)) return "warn";
+	return outcomeTone(row.outcome);
+}
+
+// The list shows a small dot and plain text, no tinted fill, so a page of failures does not read red (X-37).
+const DOT: Record<RunTone, string> = {
 	pass: "bg-chart-success",
 	zero: "bg-chart-error",
 	unknown: "bg-muted-foreground/60",
 	live: "bg-chart-info",
-} as const;
+	warn: "bg-chart-warning",
+};
 
-/** Outcome as a soft pill with a coloured dot; a running run pulses. */
+/** Outcome as a coloured dot and plain text; a running run pulses. */
 export function OutcomePill({ row }: { row: Pick<RunListRow, "sealed" | "outcome" | "run_id"> }) {
 	const { t: tu } = useTranslation("u12");
 	const { t: tb } = useTranslation("bench");
-	const tone = row.sealed ? outcomeTone(row.outcome) : "live";
+	const { t: t5 } = useTranslation("uf5b");
+	const tone = runTone(row);
 	return (
 		<span
-			className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap", PILL[tone])}
+			className={cn(
+				"inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap",
+				tone === "warn" ? "text-chart-warning-ink" : tone === "live" ? "text-chart-info-ink" : "text-foreground",
+			)}
+			title={tone === "warn" ? t5("runs.graderBroken") : undefined}
 			data-testid={`runs-outcome-${row.run_id}`}
 			data-outcome={row.sealed ? row.outcome : "running"}
+			data-tone={tone}
 		>
-			<span className="relative flex size-1.5">
+			<span className="relative flex size-2 shrink-0" aria-hidden="true">
 				{tone === "live" && <span className={cn("absolute inline-flex size-full animate-ping rounded-full opacity-75", DOT.live)} />}
-				<span className={cn("relative inline-flex size-1.5 rounded-full", DOT[tone])} />
+				<span className={cn("relative inline-flex size-2 rounded-full", DOT[tone])} />
 			</span>
 			{row.sealed ? tb(`runs.outcome.${row.outcome}`, { defaultValue: row.outcome }) : tu("runs.live")}
 		</span>
@@ -222,7 +255,15 @@ export function RunsTable() {
 	const locale = getLocale();
 	const navigate = useNavigate();
 	const [search, setSearch] = useQueryStates(parsers, { history: "replace" });
-	const list = useListRunsQuery(runsRequest(search, search.page));
+	// Poll while a run on the page is still running, like the evaluations list (X-84).
+	const [anyLive, setAnyLive] = useState(false);
+	const list = useListRunsQuery(runsRequest(search, search.page), { pollingInterval: anyLive ? RUNS_POLL_MS : 0 });
+	useEffect(() => setAnyLive((list.data?.runs ?? []).some((r) => !r.sealed)), [list.data]);
+	useEffect(() => {
+		if (search.benchmark) void setSearch(benchmarkAlias(search));
+	}, [search.benchmark]); // eslint-disable-line react-hooks/exhaustive-deps
+	const { t: t5 } = useTranslation("uf5b");
+	const [filtersOpen, setFiltersOpen] = useState(false);
 	const agentsQuery = useGetAgentsQuery();
 	const sorted = parseRunSort(search.sort, search.dir) !== null;
 	const rows = useMemo(() => orderRuns(list.data?.runs ?? [], search.q, search.agent, sorted), [list.data, search.q, search.agent, sorted]);
@@ -272,12 +313,37 @@ export function RunsTable() {
 		] as (FilterToken | false | "" | null | undefined)[]
 	).filter((x): x is FilterToken => Boolean(x));
 	const open = (row: RunListRow) => void navigate({ to: "/runs/$runId", params: { runId: row.run_id } } as never);
-	const onKey = (e: KeyboardEvent, row: RunListRow) => {
-		if (e.key === "Enter" || e.key === " ") {
-			e.preventDefault();
-			open(row);
-		}
+	// The task title is the real link (keyboard, middle click, new tab); a mouse click anywhere else on the row opens it too.
+	const onRowClick = (e: MouseEvent, row: RunListRow) => {
+		if ((e.target as HTMLElement).closest("a,button,input,select")) return;
+		open(row);
 	};
+	const filterCount = [search.outcome, search.suite, search.agent, search.fault, search.tq].filter(Boolean).length;
+	const pager = list.data ? <Pager page={page} total={list.data.total} onPage={(n) => void setSearch({ page: n === 1 ? null : n })} /> : null;
+
+	const sel = "h-10 w-full md:h-8 md:w-auto";
+	const runLink = (row: RunListRow, className?: string) => (
+		<Link
+			to="/runs/$runId"
+			params={{ runId: row.run_id }}
+			className={cn("focus-visible:outline-ring rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2", className)}
+			title={row.task}
+			aria-label={t5("runs.openRun", { task: row.task })}
+			data-testid={`runs-link-${row.run_id}`}
+		>
+			{row.task}
+		</Link>
+	);
+	const tokensCell = (row: RunListRow) =>
+		row.tokens === undefined || row.tokens === null || isBaselineRun(row) ? (
+			<span title={tu("runs.notRecorded")} data-testid={`runs-tokens-unrecorded-${row.run_id}`}>
+				-
+			</span>
+		) : (
+			formatNumber(row.tokens, locale)
+		);
+	const costCell = (row: RunListRow) =>
+		isBaselineRun(row) ? <span title={tu("runs.notRecorded")}>-</span> : <ValueCell value={row.cost_usd} kind="usd" />;
 
 	return (
 		<div className="flex min-w-0 flex-col gap-4" data-testid="runs-table-screen">
@@ -290,41 +356,70 @@ export function RunsTable() {
 						label={tu("runs.searchLabel")}
 						testId="runs-search"
 					/>
-					<TraceSearchInput value={search.tq ?? ""} onChange={setTraceQuery} />
-					<FilterSelect
-						label={tu("runs.outcome")}
-						allLabel={tu("runs.all")}
-						options={(facets?.outcomes ?? []).map((o) => ({ value: o, label: outcomeLabel(o) }))}
-						value={search.outcome}
-						onChange={(v) => void setSearch({ outcome: v, page: null })}
-						testId="runs-filter-outcome"
-					/>
-					<FilterSelect
-						label={tu("runs.suite")}
-						allLabel={tu("runs.all")}
-						options={(facets?.suites ?? []).map((v) => ({ value: v, label: v.replace(/@.*$/, "") }))}
-						value={search.suite}
-						onChange={(v) => void setSearch({ suite: v, page: null })}
-						testId="runs-filter-suite"
-					/>
-					<FilterSelect
-						label={tu("runs.agent")}
-						allLabel={tu("runs.all")}
-						options={agents.map((v) => ({ value: v, label: v }))}
-						value={search.agent}
-						onChange={(v) => void setSearch({ agent: v, page: null })}
-						testId="runs-filter-agent"
-					/>
-					{(facets?.faults ?? []).some((f) => f !== "clean") && (
+					{/* Phones: one search, the other filters behind "Filters (n)" (M5-32). */}
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-10 md:hidden"
+						aria-expanded={filtersOpen}
+						aria-controls="runs-filters"
+						onClick={() => setFiltersOpen((o) => !o)}
+						dataTestId="runs-filters-toggle"
+					>
+						<SlidersHorizontal aria-hidden="true" />
+						{filterCount > 0 ? t5("runs.filtersCount", { count: filterCount }) : t5("runs.filters")}
+					</Button>
+					<div
+						id="runs-filters"
+						className={cn("w-full flex-col gap-2 md:flex md:w-auto md:flex-row md:flex-wrap md:items-center", filtersOpen ? "flex" : "hidden")}
+						data-testid="runs-filters"
+					>
+						{/* The trace search hint shows while its field has focus (M5-39). */}
+						<div className="group/tq flex w-full flex-col gap-1 md:w-auto">
+							<TraceSearchInput value={search.tq ?? ""} onChange={setTraceQuery} />
+							<span className="text-muted-foreground hidden text-xs group-focus-within/tq:block" data-testid="runs-trace-hint">
+								{t5("runs.searchHint")}
+							</span>
+						</div>
 						<FilterSelect
-							label={tu("runs.fault")}
+							label={tu("runs.outcome")}
 							allLabel={tu("runs.all")}
-							options={(facets?.faults ?? []).map((v) => ({ value: v, label: faultLabel(v) }))}
-							value={search.fault}
-							onChange={(v) => void setSearch({ fault: v, page: null })}
-							testId="runs-filter-fault"
+							options={(facets?.outcomes ?? []).map((o) => ({ value: o, label: outcomeLabel(o) }))}
+							value={search.outcome}
+							onChange={(v) => void setSearch({ outcome: v, page: null })}
+							className={sel}
+							testId="runs-filter-outcome"
 						/>
-					)}
+						<FilterSelect
+							label={tu("runs.suite")}
+							allLabel={tu("runs.all")}
+							options={(facets?.suites ?? []).map((v) => ({ value: v, label: suiteDisplayName(v.replace(/@.*$/, "")) }))}
+							value={search.suite}
+							onChange={(v) => void setSearch({ suite: v, page: null })}
+							className={sel}
+							testId="runs-filter-suite"
+						/>
+						<FilterSelect
+							label={tu("runs.agent")}
+							allLabel={tu("runs.all")}
+							options={agents.map((v) => ({ value: v, label: v }))}
+							value={search.agent}
+							onChange={(v) => void setSearch({ agent: v, page: null })}
+							className={sel}
+							testId="runs-filter-agent"
+						/>
+						{(facets?.faults ?? []).some((f) => f !== "clean") && (
+							<FilterSelect
+								label={tu("runs.fault")}
+								allLabel={tu("runs.all")}
+								options={(facets?.faults ?? []).map((v) => ({ value: v, label: faultLabel(v) }))}
+								value={search.fault}
+								onChange={(v) => void setSearch({ fault: v, page: null })}
+								className={sel}
+								testId="runs-filter-fault"
+							/>
+						)}
+					</div>
 					{live > 0 && (
 						<span
 							className="text-chart-info-ink ml-auto inline-flex items-center gap-1.5 text-xs font-medium"
@@ -368,7 +463,7 @@ export function RunsTable() {
 							{tw("runs.lastPage")}
 						</Button>
 					</div>
-					<Pager page={page} total={list.data.total} onPage={(n) => void setSearch({ page: n === 1 ? null : n })} />
+					{pager}
 				</div>
 			) : rows.length === 0 ? (
 				<EmptyState
@@ -379,12 +474,39 @@ export function RunsTable() {
 				/>
 			) : (
 				<>
-					<div className="bg-card overflow-x-auto rounded-xl border">
-						<table className="w-full min-w-[960px] text-sm" data-testid="runs-table">
+					{/* The pager above the list too, so the next page is reachable without scrolling 50 rows (X-38). */}
+					<div data-testid="runs-pager-top">{pager}</div>
+					{/* Phones: stacked rows, task and result on line 1, agent, cost and when on line 2 (M5-28). */}
+					<ul className="bg-card divide-y rounded-xl border md:hidden" data-testid="runs-list-mobile">
+						{rows.map((row) => (
+							<li
+								key={row.run_id}
+								className={cn("hover:bg-muted/50 flex cursor-pointer flex-col gap-1 px-4 py-2", !row.sealed && "bg-chart-info/5")}
+								onClick={(e) => onRowClick(e, row)}
+								data-testid={`runs-mrow-${row.run_id}`}
+							>
+								<div className="flex min-w-0 items-center justify-between gap-3">
+									{runLink(row, "min-w-0 truncate text-sm font-medium")}
+									<OutcomePill row={row} />
+								</div>
+								<div className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs">
+									<span className="truncate" title={agentTitle(row)}>
+										{runAgent(row)}
+										{agentVersionLabel(row) && ` ${agentVersionLabel(row)}`}
+									</span>
+									<span aria-hidden="true">·</span>
+									<span className="tabular-nums">{costCell(row)}</span>
+									<span aria-hidden="true">·</span>
+									<span className="whitespace-nowrap">{timeAgo(row.started, locale)}</span>
+								</div>
+							</li>
+						))}
+					</ul>
+					<div className="bg-card hidden overflow-x-auto rounded-xl border md:block">
+						<table className="w-full text-sm" data-testid="runs-table">
 							<thead className="bg-card sticky top-0 z-10">
 								<tr className="text-muted-foreground border-b text-xs">
 									<SortHeader label={tu("runs.col.task")} sortKey="task" current={search} onSort={onSort} className="px-4 text-left" />
-									<SortHeader label={tu("runs.col.agent")} sortKey="agent" current={search} onSort={onSort} className="px-3 text-left" />
 									<SortHeader
 										label={tu("runs.col.outcome")}
 										sortKey="outcome"
@@ -392,13 +514,26 @@ export function RunsTable() {
 										onSort={onSort}
 										className="px-3 text-left"
 									/>
-									<SortHeader label={tu("runs.col.steps")} sortKey="steps" current={search} onSort={onSort} className="px-3 text-right" />
-									<th scope="col" className="px-3 py-2.5 text-right font-medium">
+									<SortHeader label={tu("runs.col.agent")} sortKey="agent" current={search} onSort={onSort} className="px-3 text-left" />
+									<SortHeader
+										label={tu("runs.col.steps")}
+										sortKey="steps"
+										current={search}
+										onSort={onSort}
+										className="hidden px-3 text-right xl:table-cell"
+									/>
+									<th scope="col" className="hidden px-3 py-2.5 text-right font-medium xl:table-cell">
 										{tu("runs.col.toolCalls")}
 									</th>
-									<SortHeader label={tu("runs.col.tokens")} sortKey="tokens" current={search} onSort={onSort} className="px-3 text-right" />
+									<SortHeader
+										label={tu("runs.col.tokens")}
+										sortKey="tokens"
+										current={search}
+										onSort={onSort}
+										className="hidden px-3 text-right xl:table-cell"
+									/>
 									<SortHeader label={tu("runs.col.cost")} sortKey="cost" current={search} onSort={onSort} className="px-3 text-right" />
-									<th scope="col" className="px-3 py-2.5 text-left font-medium">
+									<th scope="col" className="hidden px-3 py-2.5 text-left font-medium xl:table-cell">
 										{tu("runs.col.fault")}
 									</th>
 									<SortHeader
@@ -406,7 +541,7 @@ export function RunsTable() {
 										sortKey="duration"
 										current={search}
 										onSort={onSort}
-										className="px-3 text-right"
+										className="hidden px-3 text-right lg:table-cell"
 									/>
 									<SortHeader label={tu("runs.col.when")} sortKey="started" current={search} onSort={onSort} className="px-4 text-right" />
 								</tr>
@@ -415,47 +550,41 @@ export function RunsTable() {
 								{rows.map((row) => (
 									<tr
 										key={row.run_id}
-										tabIndex={0}
-										role="link"
-										aria-label={tu("runs.open", { run: row.run_id })}
-										onClick={() => open(row)}
-										onKeyDown={(e) => onKey(e, row)}
-										className={cn(
-											"hover:bg-muted/50 focus-visible:bg-muted/50 cursor-pointer border-b transition-colors last:border-0 focus-visible:outline-none",
-											!row.sealed && "bg-chart-info/5",
-										)}
+										onClick={(e) => onRowClick(e, row)}
+										className={cn("hover:bg-muted/50 cursor-pointer border-b transition-colors last:border-0", !row.sealed && "bg-chart-info/5")}
 										data-testid={`runs-row-${row.run_id}`}
 									>
-										<td className="max-w-64 px-4 py-3">
-											<div className="truncate font-medium" title={row.task}>
-												{row.task}
-											</div>
-											<div className="text-muted-foreground truncate font-mono text-[11px]" title={row.suite}>
-												{row.suite}
+										<td className="max-w-64 px-4 py-2">
+											<div className="truncate font-medium">{runLink(row)}</div>
+											<div className="text-muted-foreground truncate text-xs" title={row.suite}>
+												{suiteDisplayName(row.suite.replace(/@.*$/, ""))}
 											</div>
 										</td>
-										<td className="max-w-56 px-3 py-3">
+										<td className="px-3 py-2">
+											<OutcomePill row={row} />
+										</td>
+										<td className="max-w-56 px-3 py-2">
 											<span className="truncate" title={agentTitle(row)} data-testid={`runs-agent-${row.run_id}`}>
 												<span className="font-medium">{runAgent(row)}</span>
 												{agentVersionLabel(row) && <span className="text-muted-foreground"> {agentVersionLabel(row)}</span>}
 												{row.model && <span className="text-muted-foreground"> · {row.model}</span>}
 											</span>
 										</td>
-										<td className="px-3 py-3">
-											<OutcomePill row={row} />
-										</td>
-										<td className="px-3 py-3 text-right tabular-nums">{formatNumber(row.steps, locale)}</td>
-										<td className="px-3 py-3 text-right tabular-nums">{formatNumber(row.tool_calls, locale)}</td>
-										<td className="px-3 py-3 text-right tabular-nums">{formatNumber(row.tokens, locale)}</td>
-										<td className="px-3 py-3 text-right">
-											<ValueCell value={row.cost_usd} kind="usd" />
-										</td>
-										<td className="text-muted-foreground px-3 py-3 text-xs whitespace-nowrap" data-testid={`runs-fault-${row.run_id}`}>
+										<td className="hidden px-3 py-2 text-right tabular-nums xl:table-cell">{formatNumber(row.steps, locale)}</td>
+										<td className="hidden px-3 py-2 text-right tabular-nums xl:table-cell">{formatNumber(row.tool_calls, locale)}</td>
+										<td className="hidden px-3 py-2 text-right tabular-nums xl:table-cell">{tokensCell(row)}</td>
+										<td className="px-3 py-2 text-right">{costCell(row)}</td>
+										<td
+											className="text-muted-foreground hidden px-3 py-2 text-xs whitespace-nowrap xl:table-cell"
+											data-testid={`runs-fault-${row.run_id}`}
+										>
 											{row.fault ? faultLabel(row.fault) : "-"}
 										</td>
-										<td className="px-3 py-3 text-right tabular-nums">{row.sealed ? formatDuration(runDuration(row)) : "-"}</td>
+										<td className="hidden px-3 py-2 text-right tabular-nums lg:table-cell">
+											{row.sealed ? formatDuration(runDuration(row)) : "-"}
+										</td>
 										<td
-											className="text-muted-foreground px-4 py-3 text-right text-xs whitespace-nowrap"
+											className="text-muted-foreground px-4 py-2 text-right text-xs whitespace-nowrap"
 											title={row.started ? new Date(row.started).toLocaleString(locale) : undefined}
 										>
 											{timeAgo(row.started, locale)}
@@ -465,7 +594,7 @@ export function RunsTable() {
 							</tbody>
 						</table>
 					</div>
-					<Pager page={page} total={list.data.total} onPage={(n) => void setSearch({ page: n === 1 ? null : n })} />
+					{pager}
 				</>
 			)}
 		</div>
@@ -491,14 +620,15 @@ function SortHeader({
 	const Icon = state === "ascending" ? ArrowUp : state === "descending" ? ArrowDown : ArrowUpDown;
 	const right = className.includes("text-right");
 	return (
-		<th scope="col" aria-sort={state} className={cn("py-2.5 font-medium", className)}>
+		<th scope="col" aria-sort={state} className={cn("p-0 font-medium", className)}>
 			<button
 				type="button"
 				onClick={() => onSort(sortKey)}
 				aria-label={t("runs.sortBy", { column: label })}
 				className={cn(
-					"hover:text-foreground focus-visible:ring-ring inline-flex items-center gap-1 rounded-sm focus-visible:ring-2 focus-visible:outline-none",
-					right && "flex-row-reverse",
+					// The button fills the header cell, at least 36 px tall (M5-30).
+					"hover:text-foreground focus-visible:ring-ring inline-flex min-h-9 w-full items-center gap-1 rounded-sm py-2 focus-visible:ring-2 focus-visible:outline-none",
+					right && "flex-row-reverse justify-start",
 					state !== "none" && "text-foreground",
 				)}
 				data-testid={`runs-sort-${sortKey}`}

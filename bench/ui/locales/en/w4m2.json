@@ -9,9 +9,9 @@
 	"leftOutItem": "{{benchmark}}: {{reason}}",
 	"listsFailed": "Could not load the benchmarks.",
 	"judgeUnknown": "Heimdall does not know this model name. Check the spelling: a wrong name makes every grade fail.",
-	"sharedTasks_one": "{{name}}, compared with an earlier evaluation of the same version, on the one task both ran",
-	"sharedTasks_other": "{{name}}, compared with an earlier evaluation of the same version, on the {{count}} tasks both ran",
+	"sharedTasks_one": "Compared with the earlier run of {{name}}, on the one task both ran",
+	"sharedTasks_other": "Compared with the earlier run of {{name}}, on the {{count}} tasks both ran",
 	"unknownAgent": "There is no agent named {{name}}. Choose an agent.",
-	"toSeeCostAgent": "To see the cost: choose an agent.",
+	"toSeeCostAgent": "Pick an agent to see the cost.",
 	"estimating": "Estimating..."
 }

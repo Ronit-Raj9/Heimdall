@@ -175,7 +175,7 @@ describe("faults that do not apply", () => {
 		} as unknown as Estimate;
 		const html = render(<SkippedFaultsNote estimate={estimate} />);
 		expect(html).toContain('data-testid="ft-faults-skipped"');
-		expect(html).toContain("Broken tool, Misleading instruction do not apply to hd-harbor-bfcl (it has no tools) and add no runs.");
+		expect(html).toContain("Broken tool, Misleading instruction do not apply to BFCL function calling (it has no tools) and add no runs.");
 		expect(render(<SkippedFaultsNote estimate={{ ...estimate, per_benchmark: [] }} />)).toBe("");
 	});
 
@@ -225,7 +225,7 @@ describe("failure test faults from the catalog (N123)", () => {
 });
 
 describe("failure test benchmarks (N124)", () => {
-	it("greys out a benchmark the chosen agent cannot run, with the reason", () => {
+	it("hides a benchmark the chosen agent cannot run while the runnable filter is on (M5-42)", () => {
 		fx.suites = {
 			suites: [
 				{ id: "hd-harbor-bfcl", description: "", admitted_count: 10, builtin: true, source: "library", track: "terminal" },
@@ -238,9 +238,10 @@ describe("failure test benchmarks (N124)", () => {
 		};
 		fx.compat = { data: answer, currentData: answer, isError: false, isLoading: false };
 		const html = view("?agent=codex");
-		expect(html).toMatch(/data-testid="ft-benchmark-longmemeval-s" data-disabled="true"/);
-		expect(html).toContain("needs sessions");
+		expect(html).not.toContain('data-testid="ft-benchmark-longmemeval-s"');
+		expect(html).toContain('data-testid="ft-benchmark-hd-harbor-bfcl"');
 		expect(html).not.toMatch(/data-testid="ft-benchmark-hd-harbor-bfcl" data-disabled/);
+		expect(tagOf(html, "ft-only-runnable")).toContain('checked=""');
 		fx.compat = undefined;
 	});
 	it("asks for an agent first when none is chosen", () => {
