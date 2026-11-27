@@ -10,8 +10,11 @@ import { cn } from "@/lib/utils";
 import type { MigrationParams, MigrationResponse } from "@/lib/types/bench";
 import { useListPoliciesQuery } from "@/lib/store/apis/governApi";
 import { useGetCostExplainQuery, useGetMigrationQuery } from "@/lib/store/apis/migrationApi";
+import { useGetExperimentQuery } from "@/lib/store/apis/benchApi";
+import { paretoPointNames } from "@/components/migration/paretoChart";
 import { useGetModelSwitchConfigQuery } from "@/lib/store/apis/modelSwitchApi";
 import { parseAsString, useQueryState } from "nuqs";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import "./fw11I18n";
 import "./hw10I18n";
@@ -53,6 +56,10 @@ export function MigrationTab({ expId, arms, evaluationId }: { expId: string; arm
 	const [gradeSource] = useQueryState("grade_source", parseAsString);
 	const [policy, setPolicy] = useQueryState("policy", parseAsString);
 	const report = useGetMigrationQuery(migrationParams(expId, { from, to, condition, alpha, grade_source: gradeSource, policy }));
+	// M4-4: the chips name each setup as every tab does, "A (gpt-5.6-terra)" (the page's cached status).
+	const status = useGetExperimentQuery(expId);
+	const setups = status.data?.setups;
+	const names = useMemo(() => paretoPointNames((setups ?? []).map((s) => ({ id: s.arm, agent: s.agent, model: s.model }))), [setups]);
 	// M4-2: the average cost per run of the pair, the same query as the Cost tab (shared cache).
 	const costExplain = useGetCostExplainQuery(arms.length === 2 ? { expId } : skipToken);
 	const meanCost = costExplain.data
@@ -86,6 +93,7 @@ export function MigrationTab({ expId, arms, evaluationId }: { expId: string; arm
 								<ArmChip
 									key={arm}
 									arm={arm}
+									name={names.get(arm)}
 									active={arm === fromArm}
 									role="radio"
 									onClick={() => {
@@ -103,7 +111,7 @@ export function MigrationTab({ expId, arms, evaluationId }: { expId: string; arm
 						</span>
 						<div className="flex flex-wrap gap-1" role="group" aria-labelledby="migration-to-label">
 							{targets.map((arm) => (
-								<ArmChip key={arm} arm={arm} active={chosen.includes(arm)} onClick={() => toggle(arm)} testId={`migration-to-${arm}`} />
+								<ArmChip key={arm} arm={arm} name={names.get(arm)} active={chosen.includes(arm)} onClick={() => toggle(arm)} testId={`migration-to-${arm}`} />
 							))}
 						</div>
 					</div>
@@ -237,12 +245,15 @@ export function EffectiveSettings({ report }: { report: MigrationResponse }) {
 
 function ArmChip({
 	arm,
+	name,
 	active,
 	onClick,
 	role,
 	testId,
 }: {
 	arm: string;
+	/** The setup's display name; the arm id alone when the status has no setups. */
+	name?: string;
 	active: boolean;
 	onClick: () => void;
 	role?: "radio";
@@ -261,7 +272,7 @@ function ArmChip({
 				active ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent",
 			)}
 		>
-			{arm}
+			{name ?? arm}
 		</button>
 	);
 }

@@ -43,9 +43,11 @@ import {
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { parseAsString, useQueryStates } from "nuqs";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "@/app/leaderboard/views/uf4bI18n";
-import { useListExperimentsWithStatsQuery } from "./experimentListApi";
+import { cheaperArm } from "@/components/verdict/armCost";
+import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
+import type { ArmStat, ExperimentRow } from "@/lib/types/serverFields";
 import { useTranslation } from "react-i18next";
 
 const SUITE_ICONS: readonly [RegExp, LucideIcon][] = [
@@ -146,15 +148,62 @@ export function stateMatches(state: string, filter: string | null | undefined): 
 	return choice ? choice.states.includes(state as ExperimentState) : state === filter;
 }
 
-function VerdictPill({ decision, testId }: { decision: string | undefined; testId?: string }) {
+const ARM_STATS = { arm_stats: true } as const;
+
+/** True when a row is still running or analyzing, so the list is worth polling. Pure. */
+export function listHasRunning(rows: readonly Pick<ExperimentStatus, "state">[] | undefined): boolean {
+	return (rows ?? []).some((e) => e.state === "running" || e.state === "analyzing");
+}
+
+/**
+ * The cost news of a row with no score winner (M4-66): which setup is 2 times or more cheaper per
+ * run and whether both solved the same share, from the optional `arm_stats`. Uses the one cost
+ * rule of the verdict page (`cheaperArm`); null when a cost is missing or the gap is small. Pure.
+ */
+export function listCostNews(
+	arms: readonly string[],
+	stats: readonly ArmStat[] | undefined,
+): { arm: string; ratio: number; sameScore: boolean } | null {
+	if (!stats || arms.length !== 2) return null;
+	const by = new Map(stats.map((s) => [s.arm, s]));
+	const costs: Record<string, number | null> = {};
+	for (const a of arms) {
+		const s = by.get(a);
+		costs[a] = s && s.cost_usd != null && s.cost_runs > 0 ? s.cost_usd / s.cost_runs : null;
+	}
+	const cheap = cheaperArm(arms, costs);
+	if (!cheap) return null;
+	const [ra, rb] = arms.map((a) => by.get(a)?.pass_rate);
+	return { ...cheap, sameScore: ra != null && rb != null && ra === rb };
+}
+
+function VerdictPill({
+	decision,
+	testId,
+	arms = [],
+	stats,
+}: {
+	decision: string | undefined;
+	testId?: string;
+	arms?: readonly string[];
+	stats?: readonly ArmStat[];
+}) {
 	const { t } = useTranslation("experimentsUx");
+	const { t: tp } = useTranslation("experimentPage");
 	const v = verdictTone(decision);
 	if (v.key === "pending") return <span className="text-muted-foreground text-xs">{t("verdict.pending")}</span>;
-	// M4-66: no winner is not an alert: plain muted text, pills only for a result to act on.
+	// M4-66: no winner is not an alert: plain muted text, pills only for a result to act on. A much
+	// cheaper setup is the news then, in the same sentence as the verdict page.
 	if (v.key === "inconclusive") {
+		const news = listCostNews(arms, stats);
 		return (
 			<span className="text-muted-foreground text-sm" data-testid={testId}>
-				{t("verdict.inconclusive")}
+				{news
+					? tp(news.sameScore ? "summary.headline.sameScoreCheaper" : "summary.headline.unclearScoreCheaper", {
+							setup: news.arm,
+							ratio: new Intl.NumberFormat(getLocale(), { maximumSignificantDigits: 2 }).format(news.ratio),
+						})
+					: t("verdict.inconclusive")}
 			</span>
 		);
 	}
@@ -208,7 +257,11 @@ export function ExperimentBoard() {
 	const { t: tu } = useTranslation("uf4b");
 	const locale = getLocale();
 	// G3: ?arm_stats=1 adds per-setup numbers; a server without it answers the old list.
-	const list = useListExperimentsWithStatsQuery();
+	// M4-79, M1-62: refresh every 15 s while a row runs, never when nothing does.
+	const [anyRunning, setAnyRunning] = useState(false);
+	const list = useListExperimentsQuery(ARM_STATS, { pollingInterval: anyRunning ? 15_000 : 0, skipPollingIfUnfocused: true });
+	const runningNow = listHasRunning(list.data?.experiments);
+	useEffect(() => setAnyRunning(runningNow), [runningNow]);
 	const [filters, setFilters] = useQueryStates(
 		{
 			q: parseAsString,
@@ -495,6 +548,8 @@ export function ExperimentBoard() {
 												<VerdictPill
 													decision={e.state === "running" || e.state === "analyzing" ? undefined : e.decision}
 													testId={`experiment-row-${e.exp_id}-decision`}
+													arms={e.arms}
+													stats={(e as ExperimentRow).arm_stats}
 												/>
 											)}
 										</span>

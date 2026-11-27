@@ -87,16 +87,12 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useListExperimentsQuery: () => okQuery({ experiments: [...rows, ...url.extra] }),
 }));
-// The board reads the list with per-setup numbers (G3 arm_stats) through its own endpoint.
-vi.mock("./experimentListApi", () => ({
-	useListExperimentsWithStatsQuery: () => okQuery({ experiments: [...rows, ...url.extra] }),
-}));
 // The list page asks how many results changed (M4-97).
 vi.mock("@/lib/store/apis/validityApi", () => ({ useGetValidityQuery: () => okQuery({ entries: [], unseen: 0, stale: [] }) }));
 vi.mock("@/lib/store/apis/canaryApi", () => ({ useGetCanariesQuery: () => okQuery({ canaries: [{ name: "other" }] }) }));
 vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
-	useListEvaluationsQuery: () => okQuery([{ id: "ev_two", spec: { name: "codex: two models" } }]),
+	useListEvaluationsLightQuery: () => okQuery([{ id: "ev_two", spec: { name: "codex: two models" } }]),
 }));
 
 const t = (k: string, o?: Record<string, string>) => `${k}:${o?.arms ?? ""}:${o?.suite ?? ""}`;

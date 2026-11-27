@@ -29,6 +29,7 @@ export function AwarenessPanel({ report, arms, className }: AwarenessPanelProps)
 			.filter((a) => !arms.includes(a))
 			.sort(),
 	];
+	const showSignals = signalsColumnNeeded(order.map((a) => report.per_arm[a]));
 
 	return (
 		<div className={cn("flex flex-col gap-4", className)} data-testid="awareness-panel">
@@ -49,7 +50,7 @@ export function AwarenessPanel({ report, arms, className }: AwarenessPanelProps)
 						<TableHead>{t("integrity.awareness.arm")}</TableHead>
 						<TableHead className="text-right">{t("integrity.awareness.runs")}</TableHead>
 						<TableHead className="text-right">{t("integrity.awareness.runsWithSignals")}</TableHead>
-						<TableHead className="text-right">{t("integrity.awareness.signals")}</TableHead>
+						{showSignals && <TableHead className="text-right">{t("integrity.awareness.signals")}</TableHead>}
 					</TableRow>
 				</TableHeader>
 				<TableBody>
@@ -65,7 +66,7 @@ export function AwarenessPanel({ report, arms, className }: AwarenessPanelProps)
 								<TableCell className={cn("text-right tabular-nums", row.runs_with_signals > 0 && "text-chart-warning-ink font-semibold")}>
 									{row.runs_with_signals}
 								</TableCell>
-								<TableCell className="text-right tabular-nums">{row.signals}</TableCell>
+								{showSignals && <TableCell className="text-right tabular-nums">{row.signals}</TableCell>}
 							</TableRow>
 						);
 					})}
@@ -88,6 +89,14 @@ export function AwarenessPanel({ report, arms, className }: AwarenessPanelProps)
 			</section>
 		</div>
 	);
+}
+
+/**
+ * The "Signals" column only when it says more than "Runs with signals" (M4-43): on any arm with
+ * more matched sentences than flagged runs. Pure.
+ */
+export function signalsColumnNeeded(rows: readonly { runs_with_signals: number; signals: number }[]): boolean {
+	return rows.some((r) => r.signals !== r.runs_with_signals);
 }
 
 /**

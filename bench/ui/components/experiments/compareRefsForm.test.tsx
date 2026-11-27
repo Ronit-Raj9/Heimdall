@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import { render } from "@/lib/testing/render";
 import { compareRefsParams, compareRefsProblem } from "@/lib/types/refCompare";
 import { describe, expect, it, vi } from "vitest";
-import { CompareRefsForm } from "./compareRefsForm";
+import { CompareRefsForm, suiteChoices } from "./compareRefsForm";
 
 const gh = vi.hoisted(() => ({ status: {} as unknown, repos: {} as unknown }));
 vi.mock("@/lib/store/apis/benchApi", () => ({
@@ -13,6 +13,11 @@ vi.mock("@/lib/store/apis/githubApi", () => ({
 	useGetGithubStatusQuery: () => gh.status,
 	useListGithubReposQuery: () => gh.repos,
 	useGetGithubRefsQuery: () => ({}),
+}));
+// X-108: the jobs drawer asks for a running count; the form tests never need it.
+vi.mock("@/lib/store/apis/jobCountApi", () => ({ useCountRunningJobsQuery: () => ({ data: undefined }) }));
+vi.mock("@/lib/store/apis/suitesLightApi", () => ({
+	useGetSuitesLightQuery: () => ({ data: { suites: [{ id: "coding-core", version: "1.0.0" }, { id: "b" }] } }),
 }));
 vi.mock("@/lib/store/apis/platformApi", () => ({ useGetJobQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => [vi.fn(), { isLoading: false }] }));
@@ -107,5 +112,11 @@ describe("CompareRefsForm on a hosted server (N67)", () => {
 		const html = render(<CompareRefsForm initialAgent="agents/gone.yaml" />);
 		expect(html).not.toMatch(/<option value="agents\/codex.yaml" selected="">/);
 		expect(html).not.toContain("agents/gone.yaml");
+	});
+});
+
+describe("suiteChoices (M4-93)", () => {
+	it("lists each benchmark ref once, sorted", () => {
+		expect(suiteChoices([{ id: "z", version: "1" }, { id: "a" }, { id: "z", version: "1" }])).toEqual(["a", "z@1"]);
 	});
 });

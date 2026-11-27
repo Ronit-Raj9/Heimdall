@@ -14,6 +14,11 @@ vi.mock("nuqs", async (importOriginal) => ({
 	...(await importOriginal<typeof import("nuqs")>()),
 	useQueryState: (key: string) => [api.search[key] ?? null, () => undefined],
 }));
+// The chips name setups from the page's cached status (M4-4); none here, so arm ids show.
+vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
+	useGetExperimentQuery: () => ({ data: undefined }),
+}));
 vi.mock("@/lib/store/apis/migrationApi", () => ({ useGetMigrationQuery: () => api.query, useGetCostExplainQuery: () => ({}) }));
 const gov = vi.hoisted(() => ({ policies: {} as unknown }));
 vi.mock("@/lib/store/apis/governApi", () => ({ useListPoliciesQuery: () => gov.policies }));

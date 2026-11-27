@@ -10,6 +10,7 @@ vi.mock("@/lib/store/apis/adaptiveApi", () => ({
 }));
 // M4-34: the Actions tab reads one benchmark (GET /suites/{id}); the list fixture answers it.
 vi.mock("@/lib/store/apis/suitesLightApi", () => ({
+	useGetSuitesLightQuery: () => ({ data: undefined }),
 	useGetSuiteQuery: (id: unknown) => {
 		const q = api.suites as { data?: { suites?: { id: string }[] } };
 		return { ...(q as object), data: q.data?.suites?.find((s) => s.id === id) };
