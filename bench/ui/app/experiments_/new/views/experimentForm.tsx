@@ -4,6 +4,8 @@ import "@/app/experiments_/$expId/views/fw11I18n";
 import { readWriteToken, saveWriteToken } from "@/components/experiments/experiments.utils";
 import { useSession, usesWriteToken } from "@/lib/session/sessionContext";
 import { PlanResult, planBlocksStart } from "@/components/experiments/planResult";
+import { PaidButton } from "@/components/ui/paidButton";
+import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
 import { PlanEstimate } from "@/components/experiments/planEstimate";
 import { LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
@@ -124,6 +126,9 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 	const [plan, planState] = usePlanExperimentMutation();
 	const [create, createState] = useCreateExperimentMutation();
 	const [start, startState] = useStartExperimentMutation();
+	// M4-88: leaving with changes asks first; a started comparison has nothing left to lose.
+	const [started, setStarted] = useState(false);
+	useLeaveGuard(formState.isDirty && !started);
 
 	const stale = planned !== null && planIsStale(planned.experiment, values, ready);
 	// N43: after a Plan press, every field still to fix is named next to the button.
@@ -190,6 +195,7 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 			setActionError({ title: t("experiments.new.actions.startError", { id: expId }), error, createdId: expId });
 			return;
 		}
+		setStarted(true);
 		onStarted(expId, planned.experiment.budget.total_usd);
 	};
 
@@ -548,16 +554,18 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 							>
 								{t("experiments.new.actions.plan")}
 							</Button>
-							<Button
-								type="button"
+							{/* M1-51: the start spends money, so it names the cap and asks first. */}
+							<PaidButton
 								size="sm"
+								verb={t("experiments.new.actions.createAndStart")}
+								capUsd={planned ? planned.experiment.budget.total_usd : null}
+								estimateRuns={planned?.plan.slots}
+								confirm="always"
 								disabled={blockReason !== null || busy}
 								isLoading={busy}
-								onClick={() => void onCreateAndStart()}
-								dataTestId="experiment-create-start-button"
-							>
-								{t("experiments.new.actions.createAndStart")}
-							</Button>
+								onConfirm={onCreateAndStart}
+								testId="experiment-create-start-button"
+							/>
 						</div>
 						<PlanInvalidAlert fields={invalid} onFocus={focusField} />
 						{blockReason && (

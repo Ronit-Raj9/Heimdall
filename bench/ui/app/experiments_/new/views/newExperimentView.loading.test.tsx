@@ -20,7 +20,7 @@ vi.mock("@/components/experiments/experiments.utils", async (importOriginal) => 
 	...(await importOriginal<typeof import("@/components/experiments/experiments.utils")>()),
 	readWriteToken: () => "",
 }));
-vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+vi.mock("@tanstack/react-router", async () => ({ ...(await import("@/lib/testing/routerMock")).routerMock, useBlocker: () => undefined }));
 vi.mock("@/lib/store/apis/modelsApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/modelsApi")>()),
 	useGetModelsQuery: () => okQuery({ keys: [] }),

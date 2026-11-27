@@ -5,6 +5,8 @@ import "@/components/migration/w4b06I18n";
 import { readWriteToken, saveWriteToken } from "@/components/experiments/experiments.utils";
 import { EstimateBox } from "@/components/experiments/estimateBox";
 import { PlanResult, planBlocksStart } from "@/components/experiments/planResult";
+import { PaidButton } from "@/components/ui/paidButton";
+import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
 import { ModelPicker, type ModelRef } from "@/components/models/modelPicker";
 import { LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
@@ -119,6 +121,9 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 	const estimating = estimateState.isLoading || estimateRetrying;
 	const [create, createState] = useCreateExperimentMutation();
 	const [start, startState] = useStartExperimentMutation();
+	// M4-88: leaving with changes asks first; a started comparison has nothing left to lose.
+	const [started, setStarted] = useState(false);
+	useLeaveGuard(!started && builderDirty(v, defaults));
 
 	const suite = catalog.suites.find((s) => suiteRef(s) === v.suite);
 	const errors = useMemo(() => validateBuilder(v, suite, ready), [v, suite, ready]);
@@ -258,6 +263,7 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 			setActionError({ title: t("actions.startError", { id: expId }), error, createdId: expId });
 			return;
 		}
+		setStarted(true);
 		onStarted(expId, planned.experiment.budget.total_usd);
 	};
 
@@ -672,16 +678,18 @@ export function MatrixBuilder({ catalog, defaults, agentGroups, ready, readyPend
 							>
 								{t("actions.plan")}
 							</Button>
-							<Button
-								type="button"
+							{/* M1-51: the start spends money, so it names the cap and asks first. */}
+							<PaidButton
 								size="sm"
+								verb={t("actions.run")}
+								capUsd={planned ? planned.experiment.budget.total_usd : null}
+								estimateRuns={planned?.plan.slots}
+								confirm="always"
 								disabled={blockReason !== null || busy}
 								isLoading={busy}
-								onClick={() => void onRun()}
-								dataTestId="builder-run"
-							>
-								{t("actions.run")}
-							</Button>
+								onConfirm={onRun}
+								testId="builder-run"
+							/>
 						</div>
 						{invalidCount > 0 && (
 							<p role="alert" className="text-chart-error-ink text-xs" data-testid="builder-invalid">
@@ -857,4 +865,8 @@ function ErrorText({ code }: { code: BuilderErrorKey }) {
 			{t(`errors.${code}`)}
 		</p>
 	);
+}
+/** True when the builder differs from its defaults (M4-88: the leave guard asks first). */
+export function builderDirty(values: BuilderValues, defaults: BuilderValues): boolean {
+	return JSON.stringify(values) !== JSON.stringify(defaults);
 }

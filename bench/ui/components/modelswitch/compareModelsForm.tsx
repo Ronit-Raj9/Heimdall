@@ -6,6 +6,8 @@ import { VersionPicker } from "@/app/evaluate/views/step1Agent";
 import { estimateText } from "@/app/evaluate/views/step4Setup";
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
 import { Button } from "@/components/ui/button";
+import { PaidButton } from "@/components/ui/paidButton";
+import { notify } from "@/lib/notify";
 import {
 	type EvaluationSpec,
 	useCreateEvaluationMutation,
@@ -109,6 +111,7 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 	const [budget, setBudget] = useState(0);
 	const [budgetTouched, setBudgetTouched] = useState(false);
 	const { t: tu } = useTranslation("uf4b");
+	const { t: tt } = useTranslation("toast");
 	const [create, created] = useCreateEvaluationMutation();
 	const input: CompareModelsInput = { agent: agentId, version, models, benchmarks, tasks, trials, budget };
 	const problem = compareModelsProblem(input);
@@ -126,10 +129,18 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 		if (i === 0) setTouched(true);
 		setModels((ms) => ms.map((m, n) => (n === i ? v : m)));
 	};
+	// M1-51: only a launch the server accepted reports "started" and leaves the form; a failure shows its error here.
 	const launch = async () => {
-		const res = await create(spec);
-		if ("data" in res && res.data) navigate({ to: "/evaluations/$evalId", params: { evalId: res.data.id } });
+		let id: string;
+		try {
+			id = (await create(spec).unwrap()).id;
+		} catch {
+			return; // created.error renders it.
+		}
+		notify({ text: tt("started", { name: id }) });
+		navigate({ to: "/evaluations/$evalId", params: { evalId: id } });
 	};
+	const estCost = estimate.data?.est_cost_usd;
 	const err = created.error as { data?: { error?: { message?: string } } } | undefined;
 	return (
 		<section className="flex flex-col gap-4" data-testid="compare-models-form">
@@ -215,15 +226,19 @@ export function CompareModelsForm({ agentId }: { agentId: string }) {
 					{t("form.error", { message: err.data?.error?.message ?? "" })}
 				</p>
 			)}
-			<Button
+			<PaidButton
 				className="w-fit"
+				verb={t("form.launch")}
+				capUsd={budget > 0 ? budget : null}
+				estimateRuns={estimate.data ? Number(estimate.data.runs) || undefined : undefined}
+				estimateUsd={estCost?.known ? estCost.high : null}
+				confirm="always"
 				disabled={problem !== null || noBudget || created.isLoading || waiting}
+				isLoading={created.isLoading}
 				aria-describedby={waiting ? "compare-models-launch-why" : undefined}
-				onClick={launch}
-				dataTestId="compare-models-launch"
-			>
-				{created.isLoading ? t("form.launching") : t("form.launch")}
-			</Button>
+				onConfirm={launch}
+				testId="compare-models-launch"
+			/>
 			<WhyDisabled reason={waiting ? tm("compareModels.waitReason") : null} testId="compare-models-launch-why" />
 		</section>
 	);

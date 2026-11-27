@@ -7,6 +7,7 @@ import { TERMINAL_STATES } from "@/components/experiments/experiments.utils";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify";
 import { Card, CardContent } from "@/components/ui/card";
 import { splitAgents } from "@/app/agents/views/agentConfigsTab";
 import {
@@ -89,6 +90,8 @@ export default function NewExperimentView() {
 	const linkMissing = Boolean(agentGroups && startId && agentFromLinkMissing(agentParam, defaultsOptions.shownAgents ?? []));
 	const onStarted = (id: string, cap: number) => {
 		setCapUsd(cap);
+		// Only a start the server accepted reports "started"; a failed start stays on the form with its error.
+		notify({ text: t("started", { ns: "toast", name: id }) });
 		void setExpId(id);
 	};
 

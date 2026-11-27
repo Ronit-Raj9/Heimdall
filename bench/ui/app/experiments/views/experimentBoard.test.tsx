@@ -73,17 +73,23 @@ const url = vi.hoisted(() => ({
 	all: null as string | null,
 	q: null as string | null,
 	state: null as string | null,
+	tests: "1" as string | null,
 	extra: [] as import("@/lib/types/bench").ExperimentStatus[],
 }));
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("nuqs", () => ({
 	parseAsString: {},
-	useQueryStates: () => [{ q: url.q, state: url.state, suite: null, all: url.all }, () => undefined],
+	// tests=1: the fixtures use zz-test ids, which the test-object filter (M1-18) hides by default.
+	useQueryStates: () => [{ q: url.q, state: url.state, suite: null, all: url.all, tests: url.tests }, () => undefined],
 }));
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useListExperimentsQuery: () => okQuery({ experiments: [...rows, ...url.extra] }),
+}));
+// The board reads the list with per-setup numbers (G3 arm_stats) through its own endpoint.
+vi.mock("./experimentListApi", () => ({
+	useListExperimentsWithStatsQuery: () => okQuery({ experiments: [...rows, ...url.extra] }),
 }));
 // The list page asks how many results changed (M4-97).
 vi.mock("@/lib/store/apis/validityApi", () => ({ useGetValidityQuery: () => okQuery({ entries: [], unseen: 0, stale: [] }) }));
@@ -115,6 +121,15 @@ describe("experiment list helpers", () => {
 });
 
 describe("ExperimentBoard", () => {
+	it("hides zz-test comparisons behind Show test items (M1-18)", () => {
+		url.tests = null;
+		url.extra = [{ ...rows[0], exp_id: "e_zz-test-hidden", name: "zz-test-hidden" }];
+		const html = render(<ExperimentBoard />);
+		url.tests = "1";
+		url.extra = [];
+		expect(html).not.toContain("experiment-row-e_zz-test-hidden");
+		expect(html).toContain('data-testid="experiment-show-tests"');
+	});
 	it("renders readable names, status, verdict words, progress and the filter toolbar", () => {
 		const html = render(<ExperimentBoard />);
 		expect(html).toContain("Quick run on swe-lite");
@@ -126,7 +141,8 @@ describe("ExperimentBoard", () => {
 		expect(html).toContain('data-testid="experiment-filter-suite"');
 		expect(html).toContain(">terminal-ops</option>");
 		expect(html).not.toContain("experiment-chip-");
-		expect(html).toContain("animate-ping");
+		// M4-76: the shared StatusPill draws the running state (its own icon), no hand-made ping.
+		expect(html).toContain('data-state="running"');
 		expect(html).not.toContain(">quick-20261121-101500-ab12<");
 	});
 	it("hides checks, practice runs and single-setup evaluation benchmarks unless all=1", () => {

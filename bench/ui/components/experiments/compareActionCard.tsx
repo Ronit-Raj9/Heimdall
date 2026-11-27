@@ -39,7 +39,7 @@ export function ActionCard({ title, description, action, status, children, defau
 
 	if (!children) {
 		return (
-			<div className={cn(shell, "flex items-center gap-3 p-4")} data-testid={testId}>
+			<div className={cn(shell, "flex flex-col items-start gap-3 p-4 sm:flex-row sm:items-center")} data-testid={testId}>
 				{head}
 				{action && <span className="shrink-0">{action}</span>}
 			</div>

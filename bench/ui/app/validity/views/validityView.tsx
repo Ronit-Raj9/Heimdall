@@ -7,13 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { decisionTone, TONE_TEXT } from "@/components/verdict/verdict.utils";
-import { apiErrorMessage } from "@/lib/store/apis/integrationsApi";
 import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
 import { useGetJobQuery } from "@/lib/store/apis/platformApi";
 import { type ValidityEntry, type ValidityStale, useGetValidityQuery } from "@/lib/store/apis/validityApi";
 import { useSession } from "@/lib/session/sessionContext";
 import type { JobStatus } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify";
+import { EmptyState } from "@/components/shell/emptyState";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -40,11 +41,7 @@ function ChangedTable({ entries, user }: { entries: ValidityEntry[]; user?: stri
 	const { t: tg } = useTranslation("glossary");
 	const word = (d: string) => tg(`terms.${d}.label`, { defaultValue: d });
 	if (entries.length === 0) {
-		return (
-			<p className="text-muted-foreground px-3 py-2 text-sm" data-testid="validity-empty">
-				{t("page.empty")}
-			</p>
-		);
+		return <EmptyState compact body={t("page.empty")} testId="validity-empty" />;
 	}
 	return (
 		<Table data-testid="validity-table" stickyColumns={1}>
@@ -89,7 +86,7 @@ function ChangedTable({ entries, user }: { entries: ValidityEntry[]; user?: stri
 
 function StaleList({ stale }: { stale: ValidityStale[] }) {
 	const { t } = useTranslation("w449");
-	if (stale.length === 0) return <p className="text-muted-foreground px-3 py-2 text-sm">{t("page.noneStale")}</p>;
+	if (stale.length === 0) return <EmptyState compact body={t("page.noneStale")} testId="validity-none-stale" />;
 	return (
 		<ul className="divide-border flex flex-col divide-y text-sm" data-testid="validity-stale">
 			{stale.map((s) => (
@@ -116,7 +113,8 @@ export default function ValidityView() {
 	const data = validity.data;
 	const [createJob, create] = useCreateJobMutation();
 	const [jobId, setJobId] = useState<string | null>(null);
-	const [scanError, setScanError] = useState<string | null>(null);
+	// N4-1: the caught error of a failed scan (create refused or the job failed), shown as a LoadError.
+	const [scanError, setScanError] = useState<unknown>(null);
 	// The scan runs as a job: poll it, and reload the lists when it ends.
 	const job = useGetJobQuery(jobId ?? "", {
 		skip: !jobId,
@@ -128,7 +126,8 @@ export default function ValidityView() {
 	const { refetch } = validity;
 	useEffect(() => {
 		if (!ended) return;
-		if (status !== "succeeded") setScanError(job.data?.error || t("page.scanFailed"));
+		if (status !== "succeeded") setScanError(new Error(job.data?.error || t("page.scanFailed")));
+		else notify({ text: t("page.scanDone") });
 		setJobId(null);
 		void refetch();
 	}, [ended, status, job.data?.error, refetch, t]);
@@ -136,9 +135,11 @@ export default function ValidityView() {
 	const user = session.user?.id ?? "local";
 	const scan = async () => {
 		setScanError(null);
-		const res = await createJob({ kind: "validity.scan" });
-		if ("error" in res) setScanError(apiErrorMessage(res.error, t("page.scanFailed")));
-		else setJobId(res.data.id);
+		try {
+			setJobId((await createJob({ kind: "validity.scan" }).unwrap()).id);
+		} catch (error) {
+			setScanError(error);
+		}
 	};
 	const last = lastScanAt(data?.stale ?? []);
 	return (
@@ -183,10 +184,8 @@ export default function ValidityView() {
 								{t("page.scanHelp")}
 								{last ? ` ${t("page.lastScan", { date: flipDate(last) })}` : ""}
 							</p>
-							{scanError && (
-								<p role="alert" className="text-chart-error-ink text-sm" data-testid="validity-scan-error">
-									{scanError}
-								</p>
+							{scanError !== null && (
+								<LoadError title={t("page.scanFailed")} error={scanError} onRetry={() => void scan()} testId="validity-scan-error" />
 							)}
 						</div>
 					</section>

@@ -1,5 +1,6 @@
 import "@/app/validity/views/w449I18n";
 
+import { InlineError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import {
 	type ExperimentValidity,
@@ -8,6 +9,7 @@ import {
 	useMarkValiditySeenMutation,
 } from "@/lib/store/apis/validityApi";
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** The re-scored-on date, e.g. "23 Nov". */
@@ -68,5 +70,20 @@ export function FlipBannerView({ validity, onSeen }: FlipBannerViewProps) {
 export function FlipBanner({ expId }: { expId: string }) {
 	const { data } = useGetExperimentValidityQuery(expId);
 	const [markSeen] = useMarkValiditySeenMutation();
-	return <FlipBannerView validity={data} onSeen={(id) => void markSeen(id)} />;
+	// M1-44: a refused "Got it" says so next to the banner instead of failing silently.
+	const [err, setErr] = useState<unknown>(null);
+	const seen = async (id: string) => {
+		setErr(null);
+		try {
+			await markSeen(id).unwrap();
+		} catch (e) {
+			setErr(e);
+		}
+	};
+	return (
+		<>
+			<FlipBannerView validity={data} onSeen={(id) => void seen(id)} />
+			<InlineError error={err} testId="flip-banner-seen-error" />
+		</>
+	);
 }

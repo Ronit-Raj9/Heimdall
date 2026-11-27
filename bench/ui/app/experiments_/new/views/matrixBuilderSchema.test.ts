@@ -25,16 +25,16 @@ const catalog: Catalog = {
 const suite = catalog.suites[0];
 
 describe("defaultBuilderValues", () => {
-	it("starts on coding-core with the first agent, its own model and one empty row", () => {
+	it("starts with no benchmark (M4-91), the first agent, its own model and one empty row", () => {
 		const v = defaultBuilderValues(catalog, 20261121);
-		expect(v.suite).toBe(`coding-core@${suite.version}`);
+		expect(v.suite).toBe("");
 		expect(v.agents).toEqual(["agents/claude-code.yaml"]);
 		expect(v.models).toEqual([
 			{ provider: "anthropic", model: "claude-haiku-4-5" },
 			{ provider: "anthropic", model: "" },
 		]);
 		expect(v.trials).toBe(1);
-		expect(v.taskCount).toBe(Math.min(5, suite.tasks.length));
+		expect(v.taskCount).toBe(5);
 		// One filled model, one agent: one arm, so the form asks for a second model.
 		expect(validateBuilder(v, suite).models).toBe("tooFewArms");
 	});
@@ -44,6 +44,8 @@ describe("matrixPreview and toMatrixExperiment", () => {
 	it("crosses agents with models, agents first, labelled like the planner", () => {
 		const v = {
 			...defaultBuilderValues(catalog, 1),
+			suite: `coding-core@${suite.version}`,
+			taskCount: Math.min(5, suite.tasks.length),
 			agents: ["agents/claude-code.yaml", "agents/codex.yaml"],
 			models: [
 				{ provider: "openai" as const, model: "gpt-5.4" },
@@ -83,6 +85,7 @@ describe("matrixPreview and toMatrixExperiment", () => {
 	it("writes adaptive trials, task ids, probes and the runner pool", () => {
 		const v = {
 			...defaultBuilderValues(catalog, 1),
+			suite: `coding-core@${suite.version}`,
 			models: [
 				{ provider: "openai" as const, model: "a" },
 				{ provider: "openai" as const, model: "b" },
@@ -110,6 +113,8 @@ describe("matrixPreview and toMatrixExperiment", () => {
 describe("validateBuilder", () => {
 	const base = {
 		...defaultBuilderValues(catalog, 1),
+			suite: `coding-core@${suite.version}`,
+			taskCount: Math.min(5, suite.tasks.length),
 		models: [
 			{ provider: "openai" as const, model: "a" },
 			{ provider: "openai" as const, model: "b" },
@@ -230,7 +235,8 @@ describe("ready tasks (N39, N42)", () => {
 
 	it("defaults to the non-practice benchmark with the most ready tasks, skipping coding-core and acme-*", () => {
 		expect(defaultRunnableSuite(many, ready)?.id).toBe("hd-harbor-bfcl");
-		expect(defaultBuilderValues(many, 1, { ready }).suite).toBe("hd-harbor-bfcl@2.0.0");
+		// M4-91: the builder itself starts empty; the A/B form still starts on this benchmark.
+		expect(defaultBuilderValues(many, 1, { ready }).suite).toBe("");
 	});
 
 	it("falls back to the practice benchmark with the most ready tasks, then the first", () => {

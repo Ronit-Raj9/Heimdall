@@ -47,6 +47,9 @@
 	"models": {
 		"needBudget": "Set a budget: a comparison never runs without a spending cap."
 	},
+	"metrics": {
+		"sources": "Where the numbers come from: {{list}}"
+	},
 	"observer": {
 		"observerStartFailed": "The {{name}} could not start (container error).",
 		"details": "Details"

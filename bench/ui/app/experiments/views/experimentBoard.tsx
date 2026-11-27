@@ -16,15 +16,17 @@ import { formatRelative, formatWhen } from "@/components/platform/platform.utils
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { EntityLink } from "@/components/shell/entityLink";
-import { FilterSelect, FilterTokens, ToolbarSearch, type FilterToken } from "@/components/ui/toolbar";
+import { FilterSelect, FilterTokens, ShowTestsChip, ToolbarSearch, type FilterToken } from "@/components/ui/toolbar";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { Pager, pageSlice } from "@/components/ui/pager";
+import { StatusPill } from "@/components/ui/statusPill";
 import { ValueCell } from "@/components/valueCell";
+import { isTestObject, withoutTests } from "@/lib/testObjects";
 import { getLocale } from "@/lib/i18n";
-import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import type { ExperimentState, ExperimentStatus } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import {
 	Brain,
-	Check,
 	Code2,
 	Cpu,
 	FlaskConical,
@@ -38,12 +40,12 @@ import {
 	SquareTerminal,
 	Users,
 	Wrench,
-	X,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { parseAsString, useQueryStates } from "nuqs";
 import { useMemo } from "react";
 import "@/app/leaderboard/views/uf4bI18n";
+import { useListExperimentsWithStatsQuery } from "./experimentListApi";
 import { useTranslation } from "react-i18next";
 
 const SUITE_ICONS: readonly [RegExp, LucideIcon][] = [
@@ -69,12 +71,13 @@ export function suiteIcon(suite: string | undefined): LucideIcon {
 
 type Tone = "green" | "red" | "amber" | "blue" | "grey";
 
-const TONE: Record<Tone, string> = {
-	green: "bg-chart-success/10 text-chart-success-ink",
-	red: "bg-chart-error/10 text-chart-error-ink",
-	amber: "bg-chart-warning/10 text-chart-warning-ink",
-	blue: "bg-primary/10 text-primary",
-	grey: "bg-muted text-muted-foreground",
+// M4-76: verdict pills use the shared Badge tones; status pills are the shared StatusPill.
+const BADGE_TONE: Record<Tone, BadgeTone> = {
+	green: "success",
+	red: "danger",
+	amber: "warning",
+	blue: "info",
+	grey: "neutral",
 };
 
 /** Verdict words and color for a decision. Unknown values read as pending. Pure. */
@@ -103,15 +106,6 @@ export function verdictTone(decision: string | undefined): {
 
 /** The Result filter choices, in reading order. */
 const RESULT_KEYS = ["improved", "regressed", "inconclusive", "invalid", "leader", "score", "pending"] as const;
-
-const STATE_TONE: Record<ExperimentState, Tone> = {
-	running: "blue",
-	analyzing: "blue",
-	created: "grey",
-	done: "green",
-	failed: "red",
-	cancelled: "grey",
-};
 
 /**
  * Status choices. Each covers one or more experiment states; the URL keeps the first one as
@@ -152,39 +146,6 @@ export function stateMatches(state: string, filter: string | null | undefined): 
 	return choice ? choice.states.includes(state as ExperimentState) : state === filter;
 }
 
-function Pill({ tone, children, testId }: { tone: Tone; children: React.ReactNode; testId?: string }) {
-	return (
-		<span
-			className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap", TONE[tone])}
-			data-testid={testId}
-		>
-			{children}
-		</span>
-	);
-}
-
-function StatePill({ state, testId }: { state: ExperimentState; testId?: string }) {
-	const { t } = useTranslation("experimentsUx");
-	const live = state === "running" || state === "analyzing";
-	return (
-		<Pill tone={STATE_TONE[state] ?? "grey"} testId={testId}>
-			{live ? (
-				<span className="relative flex size-2" aria-hidden="true">
-					<span className="bg-primary absolute inline-flex size-full animate-ping rounded-full opacity-60" />
-					<span className="bg-primary relative inline-flex size-2 rounded-full" />
-				</span>
-			) : state === "done" ? (
-				<Check className="size-3" aria-hidden="true" />
-			) : state === "failed" ? (
-				<X className="size-3" aria-hidden="true" />
-			) : (
-				<span className="size-1.5 rounded-full bg-current opacity-60" aria-hidden="true" />
-			)}
-			{t(`status.${state}`, { defaultValue: state })}
-		</Pill>
-	);
-}
-
 function VerdictPill({ decision, testId }: { decision: string | undefined; testId?: string }) {
 	const { t } = useTranslation("experimentsUx");
 	const v = verdictTone(decision);
@@ -198,9 +159,9 @@ function VerdictPill({ decision, testId }: { decision: string | undefined; testI
 		);
 	}
 	return (
-		<Pill tone={v.tone} testId={testId}>
+		<Badge tone={BADGE_TONE[v.tone]} data-testid={testId}>
 			{t(`verdict.${v.key}`)}
-		</Pill>
+		</Badge>
 	);
 }
 
@@ -246,7 +207,8 @@ export function ExperimentBoard() {
 	const { t: tb } = useTranslation("bench");
 	const { t: tu } = useTranslation("uf4b");
 	const locale = getLocale();
-	const list = useListExperimentsQuery();
+	// G3: ?arm_stats=1 adds per-setup numbers; a server without it answers the old list.
+	const list = useListExperimentsWithStatsQuery();
 	const [filters, setFilters] = useQueryStates(
 		{
 			q: parseAsString,
@@ -256,10 +218,17 @@ export function ExperimentBoard() {
 			agent: parseAsString,
 			model: parseAsString,
 			result: parseAsString,
+			tests: parseAsString,
+			page: parseAsString,
 		},
 		{ history: "replace", throttleMs: 200 },
 	);
-	const everything = useMemo(() => list.data?.experiments ?? [], [list.data]);
+	// M1-18: comparisons the project's own checks made ("zz-test-...") hide behind "Show test items (n)".
+	const showTests = filters.tests === "1";
+	const { shown: everything, hidden: hiddenTests } = useMemo(
+		() => withoutTests(list.data?.experiments ?? [], (e) => isTestObject(e.exp_id) || isTestObject(e.name), showTests),
+		[list.data, showTests],
+	);
 	// Automatic checks, practice runs and the single-setup benchmarks of an evaluation are not
 	// comparisons: hidden unless asked for (URL all=1), so the list matches its subtitle.
 	const showSystem = filters.all === "1";
@@ -308,26 +277,30 @@ export function ExperimentBoard() {
 	const suites = useMemo(() => [...new Set(all.map((e) => e.suite).filter((s): s is string => Boolean(s)))].sort(), [all]);
 	const agents = useMemo(() => [...new Set(all.flatMap((e) => (e.setups ?? []).map((s) => s.agent)).filter(Boolean))].sort(), [all]);
 	const models = useMemo(() => [...new Set(all.flatMap((e) => (e.setups ?? []).map((s) => s.model)).filter(Boolean))].sort(), [all]);
-	const clear = () => void setFilters({ q: null, state: null, suite: null, agent: null, model: null, result: null });
+	const clear = () => void setFilters({ q: null, state: null, suite: null, agent: null, model: null, result: null, page: null });
+	// M1-59: 50 rows per page; any filter change goes back to page 1.
+	const slice = pageSlice(shown, Number(filters.page) || 1);
+	const setFilter = (patch: Partial<Record<"q" | "state" | "suite" | "agent" | "model" | "result" | "all" | "tests", string | null>>) =>
+		void setFilters({ ...patch, page: null });
 	const statusKey = STATUSES.find((c) => c.states[0] === filters.state)?.key;
 	const tokens = (
 		[
 			filters.state && {
 				key: "state",
 				label: `${t("col.status")}: ${statusKey ? t(`chips.${statusKey}`) : filters.state}`,
-				onRemove: () => void setFilters({ state: null }),
+				onRemove: () => setFilter({ state: null }),
 			},
 			filters.suite && {
 				key: "suite",
 				label: `${t("chips.benchmark")}: ${suiteName(filters.suite)}`,
-				onRemove: () => void setFilters({ suite: null }),
+				onRemove: () => setFilter({ suite: null }),
 			},
-			filters.agent && { key: "agent", label: `${tu("list.agent")}: ${filters.agent}`, onRemove: () => void setFilters({ agent: null }) },
-			filters.model && { key: "model", label: `${tu("list.model")}: ${filters.model}`, onRemove: () => void setFilters({ model: null }) },
+			filters.agent && { key: "agent", label: `${tu("list.agent")}: ${filters.agent}`, onRemove: () => setFilter({ agent: null }) },
+			filters.model && { key: "model", label: `${tu("list.model")}: ${filters.model}`, onRemove: () => setFilter({ model: null }) },
 			filters.result && {
 				key: "result",
 				label: `${t("col.verdict")}: ${RESULT_KEYS.includes(filters.result as never) ? t(`verdict.${filters.result as (typeof RESULT_KEYS)[number]}`) : filters.result}`,
-				onRemove: () => void setFilters({ result: null }),
+				onRemove: () => setFilter({ result: null }),
 			},
 		] as (FilterToken | false | "" | null | undefined)[]
 	).filter((x): x is FilterToken => Boolean(x));
@@ -365,7 +338,7 @@ export function ExperimentBoard() {
 				<div className="flex flex-wrap items-center gap-2" role="toolbar" data-testid="experiment-toolbar">
 					<ToolbarSearch
 						value={filters.q ?? ""}
-						onChange={(v) => void setFilters({ q: v || null })}
+						onChange={(v) => setFilter({ q: v || null })}
 						placeholder={t("searchPlaceholder")}
 						label={tb("experiments.list.search")}
 						testId="experiment-search"
@@ -375,7 +348,7 @@ export function ExperimentBoard() {
 						allLabel={t("chips.all")}
 						options={STATUSES.map((c) => ({ value: c.states[0], label: `${t(`chips.${c.key}`)} (${statusCounts.get(c.key) ?? 0})` }))}
 						value={filters.state}
-						onChange={(v) => void setFilters({ state: v })}
+						onChange={(v) => setFilter({ state: v })}
 						testId="experiment-filter-status"
 					/>
 					{(suites.length > 1 || filters.suite) && (
@@ -384,7 +357,7 @@ export function ExperimentBoard() {
 							allLabel={t("chips.all")}
 							options={suites.map((s) => ({ value: s, label: suiteName(s) }))}
 							value={filters.suite}
-							onChange={(v) => void setFilters({ suite: v })}
+							onChange={(v) => setFilter({ suite: v })}
 							testId="experiment-filter-suite"
 						/>
 					)}
@@ -394,7 +367,7 @@ export function ExperimentBoard() {
 							allLabel={t("chips.all")}
 							options={agents.map((a) => ({ value: a, label: a }))}
 							value={filters.agent}
-							onChange={(v) => void setFilters({ agent: v })}
+							onChange={(v) => setFilter({ agent: v })}
 							testId="experiment-filter-agent"
 						/>
 					)}
@@ -404,7 +377,7 @@ export function ExperimentBoard() {
 							allLabel={t("chips.all")}
 							options={models.map((m) => ({ value: m, label: m }))}
 							value={filters.model}
-							onChange={(v) => void setFilters({ model: v })}
+							onChange={(v) => setFilter({ model: v })}
 							testId="experiment-filter-model"
 						/>
 					)}
@@ -413,7 +386,7 @@ export function ExperimentBoard() {
 						allLabel={t("chips.all")}
 						options={RESULT_KEYS.map((k) => ({ value: k, label: t(`verdict.${k}`) }))}
 						value={filters.result}
-						onChange={(v) => void setFilters({ result: v })}
+						onChange={(v) => setFilter({ result: v })}
 						testId="experiment-filter-result"
 					/>
 					{systemCount > 0 && (
@@ -424,7 +397,7 @@ export function ExperimentBoard() {
 								role="switch"
 								aria-checked={showSystem}
 								checked={showSystem}
-								onChange={(ev) => void setFilters({ all: ev.target.checked ? "1" : null })}
+								onChange={(ev) => setFilter({ all: ev.target.checked ? "1" : null })}
 								className="bg-muted checked:bg-primary before:bg-background relative h-5 w-9 shrink-0 cursor-pointer appearance-none rounded-full border transition-colors before:absolute before:top-0.5 before:left-0.5 before:size-3.5 before:rounded-full before:shadow-sm before:transition-transform checked:before:translate-x-4"
 								data-testid="experiment-show-system"
 							/>
@@ -432,6 +405,7 @@ export function ExperimentBoard() {
 						</label>
 					)}
 				</div>
+				<ShowTestsChip count={hiddenTests} on={showTests} onChange={(on) => setFilter({ tests: on ? "1" : null })} testId="experiment-show-tests" />
 				<FilterTokens tokens={tokens} onClear={clear} testId="experiment-tokens" />
 			</div>
 
@@ -445,7 +419,7 @@ export function ExperimentBoard() {
 					<button
 						type="button"
 						className="text-primary font-medium hover:underline"
-						onClick={() => void setFilters({ all: "1" })}
+						onClick={() => setFilter({ all: "1" })}
 						data-testid="experiment-show-hidden-matches"
 					>
 						{t("showHiddenMatches")}
@@ -474,7 +448,7 @@ export function ExperimentBoard() {
 						<span className="text-right">{t("col.when")}</span>
 					</div>
 					<ul className="divide-y" data-testid="experiment-table" aria-label={tb("experiments.list.tableLabel")}>
-						{shown.map((e) => {
+						{slice.rows.map((e) => {
 							const when = e.started_at ?? e.frozen_at;
 							const title = named.get(e.exp_id) ?? e.exp_id;
 							const kind = experimentKind(e);
@@ -510,7 +484,7 @@ export function ExperimentBoard() {
 										<span>
 											{/* The results index counts only scored runs, so a debug run reads "created, 0 runs" there (N247): its kind says enough. */}
 											{!(kind === "debug" && e.state === "created") && (
-												<StatePill state={e.state} testId={`experiment-row-${e.exp_id}-state`} />
+												<StatusPill raw={e.state} testId={`experiment-row-${e.exp_id}-state`} />
 											)}
 										</span>
 										<span>

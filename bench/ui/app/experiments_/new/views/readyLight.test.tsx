@@ -138,7 +138,7 @@ vi.mock("nuqs", async (importOriginal) => ({
 	useQueryState: () => [null, () => undefined],
 }));
 vi.mock("@/components/models/modelPicker", async () => await import("@/lib/testing/modelPickerStub"));
-vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+vi.mock("@tanstack/react-router", async () => ({ ...(await import("@/lib/testing/routerMock")).routerMock, useBlocker: () => undefined }));
 vi.mock("@/lib/store/apis/modelsApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/modelsApi")>()),
 	useGetModelsQuery: () => okQuery({ keys: [] }),

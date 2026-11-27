@@ -1,4 +1,6 @@
+import { costSentence } from "@/components/platform/confirmDialog";
 import { Input } from "@/components/ui/input";
+import { paidLabel } from "@/components/ui/paidButton";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
 import { useGetGithubRefsQuery, useGetGithubStatusQuery, useListGithubReposQuery } from "@/lib/store/apis/githubApi";
 import { compareRefsParams, compareRefsProblem, REF_TRIALS_MAX, REF_TRIALS_MIN } from "@/lib/types/refCompare";
@@ -27,6 +29,7 @@ export function CompareRefsForm({
 }) {
 	const { t } = useTranslation("refCompare");
 	const { t: tu } = useTranslation("uf4b");
+	const { t: tp } = useTranslation("paid");
 	const uid = useId();
 	const agents = useGetAgentsQuery();
 	const status = useGetGithubStatusQuery();
@@ -204,8 +207,8 @@ export function CompareRefsForm({
 			<FollowUpJob
 				kind="experiment.compare-refs"
 				params={params}
-				label={t("compare.run")}
-				confirm={t("compare.confirm")}
+				label={paidLabel(tp as never, t("compare.run"), budget > 0 ? budget : null)}
+				confirm={`${t("compare.confirm")} ${costSentence(tp as never, budget > 0 ? budget : null)}`}
 				missing={needRepo ? t("compare.pickRepoFirst") : same ? t("compare.same") : t("compare.missing")}
 				testId={`${testId}-job`}
 			/>

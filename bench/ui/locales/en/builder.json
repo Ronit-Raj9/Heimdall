@@ -55,7 +55,7 @@
 	"actions": {
 		"estimate": "Estimate cost",
 		"plan": "Plan",
-		"run": "Start comparison (paid)",
+		"run": "Start comparison",
 		"needsToken": "Enter the write token to estimate, plan and run.",
 		"needsPlan": "Plan the experiment first: the plan checks it and shows its power.",
 		"planStale": "The form changed after planning. Plan again before running.",

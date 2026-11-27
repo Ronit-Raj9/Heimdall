@@ -30,6 +30,13 @@ describe("held-out board", () => {
 		expect(heldOutBoardOffered([])).toBe(false);
 	});
 
+	it("reads the light list's redacted_tasks count when the list has no tasks (M4-34)", () => {
+		expect(heldOutBoardOffered([{ held_out_count: 2, redacted_tasks: 0 }])).toBe(true);
+		expect(heldOutBoardOffered([{ held_out_count: 2, redacted_tasks: 2 }])).toBe(false);
+		expect(heldOutBoardOffered([{ held_out_count: 2, redacted_tasks: 0, tasks: [{ redacted: true }] as never }])).toBe(true);
+		expect(heldOutBoardOffered([{ held_out_count: 2, tasks: [] }])).toBe(true);
+	});
+
 	it("says why a server without held_out.visible answers 404", () => {
 		expect(isNotFoundError({ status: 404, data: {} })).toBe(true);
 		expect(isNotFoundError({ status: 500 })).toBe(false);

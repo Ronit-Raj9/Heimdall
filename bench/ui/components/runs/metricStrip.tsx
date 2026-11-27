@@ -1,6 +1,7 @@
 import { ValueCell } from "@/components/valueCell";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Value, ValueKind } from "@/lib/types/bench";
+import "@/app/leaderboard/views/uf4bI18n";
 import { useTranslation } from "react-i18next";
 import { type StripMetricName, visibleStripMetrics } from "./runs.utils";
 
@@ -16,8 +17,12 @@ export interface MetricStripProps {
  */
 export function MetricStrip({ lanes, kinds }: MetricStripProps) {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("uf4b");
+	// M4-58: one legend line names where the numbers come from, instead of a tag in every cell.
+	const sources = metricSources(lanes);
 	return (
-		<Table data-testid="run-metric-strip">
+		<div className="flex min-w-0 flex-col gap-1">
+		<Table data-testid="run-metric-strip" stickyColumns={1}>
 			<TableHeader>
 				<TableRow>
 					<TableHead>{t("runs.metrics.metric")}</TableHead>
@@ -43,10 +48,7 @@ export function MetricStrip({ lanes, kinds }: MetricStripProps) {
 								const value = metrics[name];
 								return (
 									<TableCell key={`${name}-${arm}`} className="text-right">
-										<span className="inline-flex items-baseline gap-2">
-											<ValueCell value={value} kind={kinds[name]} testId={`run-metric-${name}-${arm}`} />
-											{value?.evidence && <span className="text-muted-foreground font-mono text-[10px]">{value.evidence}</span>}
-										</span>
+										<ValueCell value={value} kind={kinds[name]} testId={`run-metric-${name}-${arm}`} />
 									</TableCell>
 								);
 							})}
@@ -55,5 +57,18 @@ export function MetricStrip({ lanes, kinds }: MetricStripProps) {
 				})}
 			</TableBody>
 		</Table>
+		{sources.length > 0 && (
+			<p className="text-muted-foreground text-xs" data-testid="run-metric-sources">
+				{tu("metrics.sources", { list: sources.join(", ") })}
+			</p>
+		)}
+		</div>
 	);
+}
+
+/** The distinct evidence sources of every shown number, in first-seen order. Pure. */
+export function metricSources(lanes: MetricStripProps["lanes"]): string[] {
+	const out: string[] = [];
+	for (const { metrics } of lanes) for (const v of Object.values(metrics)) if (v?.evidence && !out.includes(v.evidence)) out.push(v.evidence);
+	return out;
 }

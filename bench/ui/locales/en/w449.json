@@ -25,6 +25,7 @@
 		"scanHelp": "No model calls.",
 		"lastScan": "Last scan: {{date}}.",
 		"scanFailed": "The scan could not run.",
+		"scanDone": "Scan finished. The lists are up to date.",
 		"loadError": "Could not load the changed results.",
 		"wasIsNow": "Was, is now",
 		"became": "became",
