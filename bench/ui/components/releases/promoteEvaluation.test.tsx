@@ -12,7 +12,12 @@ vi.mock("@/lib/store/apis/evalReleaseApi", () => ({
 	useScheduleEvaluationMutation: () => mutation(),
 }));
 
-const { GateResultCard, PromoteEvaluation, RepeatEvaluation, previewTitle } = await import("./promoteEvaluation");
+vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/evaluationsApi")>()),
+	useGetEvaluationQuery: () => ({ data: { result: { arms: [], cost_usd: 0.4, at: "" } } }),
+}));
+
+const { GateResultCard, PromoteEvaluation, RepeatEvaluation, onlyLiveVersion, previewTitle, repeatAsk } = await import("./promoteEvaluation");
 const { releaseTitle } = await import("./releaseEvidence");
 
 const preview: EvaluationReleasePreview = {
@@ -168,6 +173,25 @@ describe("GateResultCard and RepeatEvaluation", () => {
 		const html = render(<RepeatEvaluation evaluationId="ev_1" />);
 		expect(html).toContain('data-testid="evaluation-repeat-nightly"');
 		expect(html).toContain("Repeat weekly");
+	});
+
+	it("asks before a repeat run with the time, the zone and the cost (M7-51)", async () => {
+		const i18n = (await import("@/lib/i18n")).default;
+		const t = i18n.getFixedT("en", "uf7b") as never;
+		const ask = repeatAsk("nightly", "Europe/Berlin", 0.4, t);
+		expect(ask.message).toBe("It runs again every night at 02:00 (Europe/Berlin). About $0.40 a run (what this run cost), up to $12.00 a month. Daily limit: $0.80.");
+		expect(ask.limit).toBe(0.8);
+		const unknown = repeatAsk("weekly", "UTC", undefined, t);
+		expect(unknown.message).toContain("every Monday at 02:00 (UTC)");
+		expect(unknown.message).toContain("Price per run not known");
+		expect(unknown.limit).toBeUndefined();
+	});
+
+	it("knows when the evaluated version is already live (M7-74)", () => {
+		expect(onlyLiveVersion({ problem: "codex v1 is already the live version", version: 1, live: { agent: "codex", version: 1 } })).toBe(true);
+		expect(onlyLiveVersion({ problem: "", version: 1, live: { agent: "codex", version: 1 } })).toBe(false);
+		expect(onlyLiveVersion({ problem: "x", version: 2, live: { agent: "codex", version: 1 } })).toBe(false);
+		expect(onlyLiveVersion({ problem: "x", problem_code: "same_as_live", version: 2, live: { agent: "codex", version: 1 } })).toBe(true);
 	});
 });
 

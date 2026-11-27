@@ -57,8 +57,12 @@ export function LiveBody({ status, actions, hosted }: LiveBodyProps) {
 	const { t: g } = useTranslation("gw16");
 	if (!status.configured || status.problem) {
 		// A settings file that did not load is named in plain words; the raw reason stays in the title.
+		// M7-64: on a live server the setup hero above already says scoring is not set up, so the
+		// same sentence is not repeated here; only a broken settings file or another mode shows it.
+		const repeatsHero = !status.problem && (status as { mode?: string }).mode === "live";
 		return (
 			<div className="flex min-w-0 flex-col gap-4">
+				{!repeatsHero && (
 				<EmptyNote testId="live-unconfigured">
 					{status.problem ? (
 						<span title={status.problem}>{t("live.problem")}</span>
@@ -69,6 +73,7 @@ export function LiveBody({ status, actions, hosted }: LiveBodyProps) {
 						</>
 					)}
 				</EmptyNote>
+				)}
 				<SimulatedTry />
 			</div>
 		);

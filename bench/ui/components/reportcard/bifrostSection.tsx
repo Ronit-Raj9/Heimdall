@@ -18,12 +18,12 @@ export function BifrostTable({ report }: { report: Report }) {
 			<TableHeader>
 				<TableRow>
 					<TableHead scope="col">Agent</TableHead>
-					<TableHead scope="col" className="text-right">Runs</TableHead>
+					<TableHead scope="col" className="text-right">Runs (all, normal and under fault)</TableHead>
 					<TableHead scope="col" className="text-right">Runs that used a fallback</TableHead>
 					<TableHead scope="col" className="text-right">Cache hits</TableHead>
 					<TableHead scope="col" className="text-right">Retries</TableHead>
 					<TableHead scope="col" className="text-right">Input tokens</TableHead>
-					<TableHead scope="col" className="text-right">Cost</TableHead>
+					<TableHead scope="col" className="text-right">Cost (all runs)</TableHead>
 				</TableRow>
 			</TableHeader>
 			<TableBody>

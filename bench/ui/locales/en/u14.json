@@ -1,6 +1,6 @@
 {
 	"releases": {
-		"subtitle": "Release records: who approved which agent version, based on which test results. The log is tamper-evident.",
+		"subtitle": "Who released which version, on what evidence.",
 		"new": "Record a release",
 		"newTitle": "Record a release",
 		"newHint": "Pick a finished comparison of two versions of your agent, check its result, then record who approved the new version.",
@@ -11,9 +11,9 @@
 		"chainBroken": "Log was changed after it was written",
 		"linked": "Linked to the previous record",
 		"unlinked": "Link to the previous record is broken",
-		"override": "Released despite the rules",
+		"override": "Released with an override",
 		"evidence": "Download evidence",
-		"details": "Details",
+		"details": "Audit details",
 		"empty": "No release recorded yet. Record the first one after a comparison finishes.",
 		"policy": "Release rules",
 		"noPolicy": "No release rules checked",
@@ -50,7 +50,13 @@
 			"blocked": "The result or the release rules say not to release. Tick Release anyway and give a reason to continue.",
 			"reason": "Write why you release anyway.",
 			"noneListed": "No comparison of two versions of your agent has finished yet. Model-only comparisons are not listed: switch models from a comparison's Model switch tab."
-		}
+		},
+		"emptyNoComparison": "A release records which version won a comparison. Evaluate two versions first.",
+		"linkedFirst": "First record in the log",
+		"overrideUnclear": "Released without a clear result",
+		"overrideLine": "Released although the result said {{action}}.",
+		"overrideLineUnclear": "Released although the test found no clear winner.",
+		"reason": "Reason: {{reason}}"
 	},
 	"policies": {
 		"subtitle": "Release rules: checks a new version must pass before it ships.",
@@ -89,7 +95,7 @@
 		"title": "Needs review"
 	},
 	"monitors": {
-		"subtitle": "Safety monitors: check whether a monitor catches bad behaviour, while rarely raising false alarms on good runs.",
+		"subtitle": "Test a safety rule on past runs: how many bad runs it catches and how many good runs it flags.",
 		"catchRate": "Bad runs caught",
 		"noAttacks": "No bad runs to test on",
 		"labelled": "{{honest}} good runs, {{attacks}} bad runs",
@@ -141,14 +147,15 @@
 			"weekly": "Repeat weekly"
 		},
 		"repeatDone": {
-			"nightly": "Runs again every night at 02:00.",
-			"weekly": "Runs again every Monday at 02:00."
+			"nightly": "Runs again every night at 02:00 ({{zone}}).",
+			"weekly": "Runs again every Monday at 02:00 ({{zone}})."
 		},
-		"viewSchedules": "Schedules",
+		"viewSchedules": "See repeat runs",
 		"verdictButton": "Promote this version",
 		"useModel": "Use model {{model}}",
 		"useModelUnknown": "Use setup B's model",
 		"useModelHint": "Only the model differs between the two setups, so there is no agent version to promote. Open Model switch to apply the model.",
-		"exception": "No clear winner yet. Promoting now records the release as an exception to your release rules."
+		"exception": "No clear winner yet. Promoting now records the release as an exception to your release rules.",
+		"checkSwitch": "Check switching to {{model}}"
 	}
 }

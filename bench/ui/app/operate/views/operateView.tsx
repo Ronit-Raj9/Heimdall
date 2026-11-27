@@ -19,6 +19,8 @@ import { Archive, Camera, Cpu, Download, HardDrive, Info, Server, ShieldCheck, S
 import type { LucideIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
+import "@/components/canaries/uf7bI18n";
 import { HealthTile, Panel } from "./uxBits";
 
 /** Drops empty strings so a job gets only the fields the user filled in. */
@@ -138,8 +140,16 @@ function formatBytes(n: number): string {
 	return `${(n / 1024 / 1024 / 1024).toFixed(2)} GiB`;
 }
 
+/** "Saved results, 21 Nov 2026, 2.0 KiB" for one backup copy (M8-29). Exported for tests. */
+export function backupLabel(b: OperateBackup, t: (k: string, o?: Record<string, unknown>) => string): string {
+	const d = new Date(b.mod_time);
+	const date = Number.isNaN(d.getTime()) ? "-" : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+	return t("operate.backupLabel", { date, size: formatBytes(b.size) });
+}
+
 /** The backup zips list; exported for tests. */
 export function BackupRows({ backups, onDelete }: { backups: OperateBackup[]; onDelete?(name: string): void }) {
+	const { t: m } = useTranslation("uf7b");
 	const { t } = useTranslation("operate");
 	const { t: tm } = useTranslation("w4m8");
 	if (backups.length === 0) {
@@ -161,8 +171,9 @@ export function BackupRows({ backups, onDelete }: { backups: OperateBackup[]; on
 				>
 					<span className="flex min-w-0 items-center gap-2">
 						<Archive className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
-						<span className="min-w-0 truncate font-mono text-xs" title={b.name}>
-							{b.name}
+						{/* M8-29: a readable line; the file name (with the org id) stays in the hover text. */}
+						<span className="min-w-0 truncate text-xs" title={b.name} data-testid={`operate-backup-label-${b.name}`}>
+							{backupLabel(b, m as never)}
 						</span>
 					</span>
 					<span className="flex items-center gap-2">
@@ -236,13 +247,17 @@ export function OperatePanels({
 	backups,
 	backupCount,
 	onBackupDone,
+	comparisons = [],
 }: {
 	status: OperateStatus;
 	backups?: ReactNode;
 	backupCount?: number;
 	onBackupDone?(): void;
+	/** Finished comparisons the evidence check can be limited to (M7-72); empty: only "All". */
+	comparisons?: readonly { id: string; label: string }[];
 }) {
 	const { t } = useTranslation("operate");
+	const { t: m } = useTranslation("uf7b");
 	const hosted = status.hosted;
 	const [days, setDays] = useState("");
 	const has = (kind: string) => status.kinds.includes(kind);
@@ -322,7 +337,22 @@ export function OperatePanels({
 						) : (
 							<Note testId="operate-no-mirror">{t("evidence.noMirror")}</Note>
 						)}
-						<Field label={t("evidence.exp")} value={exp} onChange={setExp} testId="operate-evidence-exp" />
+						{/* M7-72: pick a comparison by name (type to search); empty is all of them. */}
+						<label className="flex min-w-0 flex-col gap-1 text-xs">
+							<span className="text-muted-foreground">{m("operate.which")}</span>
+							<Input
+								value={exp}
+								onChange={(e) => setExp(e.target.value)}
+								list="operate-evidence-exps"
+								placeholder={m("operate.all")}
+								data-testid="operate-evidence-exp"
+							/>
+							<datalist id="operate-evidence-exps">
+								{comparisons.map((c) => (
+									<option key={c.id} value={c.id} label={c.label} />
+								))}
+							</datalist>
+						</label>
 						<div className="flex flex-wrap gap-4">
 							{status.mirror && <Check label={t("evidence.deep")} checked={deep} onChange={setDeep} testId="operate-evidence-deep" />}
 							{status.mirror && (
@@ -448,6 +478,7 @@ export default function OperateView() {
 	const dispatch = useAppDispatch();
 	const status = query.data;
 	const backupsQuery = useGetOperateBackupsQuery(undefined, { skip: !status?.hosted });
+	const experiments = useListExperimentsQuery();
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6 p-4 sm:p-6" data-testid="operate-screen">
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
@@ -463,6 +494,9 @@ export default function OperateView() {
 						backups={status.hosted ? <BackupsList /> : undefined}
 						backupCount={status.hosted ? backupsQuery.data?.backups.length : undefined}
 						onBackupDone={() => dispatch(operateApi.util.invalidateTags(["OperateBackups"]))}
+						comparisons={(experiments.data?.experiments ?? [])
+							.filter((e) => e.state === "done")
+							.map((e) => ({ id: e.exp_id, label: e.name || e.exp_id }))}
 					/>
 				</>
 			)}

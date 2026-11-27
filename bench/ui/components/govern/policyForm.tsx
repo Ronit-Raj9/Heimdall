@@ -251,14 +251,23 @@ function CheckRow({
 					<Icon className="size-4" aria-hidden="true" />
 				</span>
 				<span className="text-muted-foreground">{tu("policies.when")}</span>
-				<Input
-					list="policy-metrics"
+				{/* M7-69: the metric is picked from the known list, never typed; an unknown saved one stays shown. */}
+				<select
+					className={cn(chipSelect, "max-w-full min-w-0")}
 					aria-label={t("policies.metric")}
 					title={metricLabel(check.metric, tu)}
-					className="h-8 w-48 text-xs"
 					value={check.metric}
 					onChange={(e) => onChange({ ...check, metric: e.target.value })}
-				/>
+					data-testid={`policy-check-metric-${index}`}
+				>
+					{!check.metric && <option value="">{t("policies.metric")}</option>}
+					{check.metric && !(POLICY_METRICS as readonly string[]).includes(check.metric) && <option value={check.metric}>{check.metric}</option>}
+					{POLICY_METRICS.map((m) => (
+						<option key={m} value={m}>
+							{metricLabel(m, tu)}
+						</option>
+					))}
+				</select>
 				<select
 					className={chipSelect}
 					aria-label={t("policies.kind")}

@@ -1,7 +1,10 @@
 import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Collapsible, FeatureHero, Pill, SetupCard, Step, type PillTone } from "@/components/inbox/featureHero";
-import { BellRing, CalendarClock, Code2, Plus } from "lucide-react";
+import { CalendarClock, Code2, MoreHorizontal, Plus } from "lucide-react";
+import { checkCost, HowOften, howOftenCron, howOftenOf, newHowOften, usd, type HowOftenValue } from "@/components/canaries/howOften";
+import "@/components/canaries/uf7bI18n";
+import { cronProblem, runsPerDay } from "@/lib/utils/cron";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -76,6 +79,31 @@ export function evaluationOptions(
 	};
 }
 
+/**
+ * The repeat run picker's options (M7-52): finished evaluations only, grouped by agent, newest
+ * first, each "codex score, 22 Nov, 0.71". Exported for tests.
+ */
+export function finishedEvaluationGroups(evaluations: Evaluation[]): { agent: string; options: { id: string; label: string; cost?: number }[] }[] {
+	const done = [...evaluations].filter((ev) => ev.status === "done").sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+	const groups = new Map<string, { id: string; label: string; cost?: number }[]>();
+	for (const ev of done) {
+		const agent = ev.spec?.arms?.[0]?.agent || "-";
+		const d = new Date(ev.created_at);
+		const date = Number.isNaN(d.getTime()) ? "" : `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+		const score = ev.result?.arms?.[0]?.score;
+		const label = [ev.spec?.name || ev.id, date, score != null ? score.toFixed(2) : ""].filter(Boolean).join(", ");
+		const list = groups.get(agent) ?? [];
+		list.push({ id: ev.id, label, ...(ev.result?.cost_usd != null ? { cost: ev.result.cost_usd } : {}) });
+		groups.set(agent, list);
+	}
+	return [...groups.entries()].map(([agent, options]) => ({ agent, options }));
+}
+
+/** The plain label of an alert event id (M7-59); unknown ids read with spaces. Exported for tests. */
+export function alertEventLabel(id: string, t: TFunction<"uf7b">): string {
+	return t(`alerts.event.${id}` as never, { defaultValue: id.replace(/_/g, " ") });
+}
+
 /** Whether the add or edit form closes after a save: only when the save worked (p13-5). Exported for tests. */
 export function afterSave(ok: boolean): boolean {
 	return ok;
@@ -87,11 +115,14 @@ export function addScheduleMissing(
 	what: "evaluation" | "experiment",
 	target: string,
 	t: TFunction<"w4m7b">,
+	invalidCron?: string,
 ): string[] {
 	const out: string[] = [];
 	if (!s.name.trim()) out.push(t("schedules.missing.name"));
 	if (!target.trim()) out.push(t(what === "evaluation" ? "schedules.missing.evaluation" : "schedules.missing.experiment"));
-	if (!s.cron.trim()) out.push(t("schedules.missing.cron"));
+	const cronIssue = cronProblem(s.cron);
+	if (cronIssue === "empty") out.push(t("schedules.missing.cron"));
+	else if (cronIssue === "invalid") out.push(invalidCron ?? t("schedules.missing.cron"));
 	if (what === "evaluation" && !(Number(s.max) > 0)) out.push(t("schedules.missing.max"));
 	return out;
 }
@@ -102,6 +133,7 @@ export function addScheduleMissing(
  */
 export default function SchedulesView() {
 	const { t } = useTranslation("schedules");
+	const { t: m } = useTranslation("uf7b");
 	const q = useGetSchedulesQuery();
 	const [save, saveState] = useSaveSchedulesMutation();
 	const [yamlMode, setYamlMode] = useState(false);
@@ -130,19 +162,29 @@ export default function SchedulesView() {
 				title={t("title")}
 				subtitle={t("subtitle")}
 				actions={
-					<Button
-						size="sm"
-						variant="ghost"
-						onClick={() => {
-							setMsg(null);
-							setFormError(null);
-							setYamlMode((v) => !v);
-						}}
-						data-testid="schedules-yaml-toggle"
-					>
-						<Code2 className="size-4" aria-hidden="true" />
-						{yamlMode ? t("yaml.hide") : t("yaml.show")}
-					</Button>
+					// M7-62: the YAML editor is a rare tool, so it sits in a small "More" fold, not as the header action.
+					<details className="relative" data-testid="schedules-more">
+						<summary className="hover:bg-muted text-muted-foreground flex h-8 cursor-pointer list-none items-center gap-1 rounded-md px-2 text-sm [&::-webkit-details-marker]:hidden">
+							<MoreHorizontal className="size-4" aria-hidden="true" />
+							{m("schedules.more")}
+						</summary>
+						<div className="bg-card absolute right-0 z-10 mt-1 w-48 rounded-md border p-1 shadow-sm">
+							<Button
+								size="sm"
+								variant="ghost"
+								className="w-full justify-start"
+								onClick={() => {
+									setMsg(null);
+									setFormError(null);
+									setYamlMode((v) => !v);
+								}}
+								data-testid="schedules-yaml-toggle"
+							>
+								<Code2 className="size-4" aria-hidden="true" />
+								{yamlMode ? t("yaml.hide") : t("yaml.show")}
+							</Button>
+						</div>
+					</details>
 				}
 			/>
 			{msg && (
@@ -210,6 +252,12 @@ export function SchedulesBody({ data, busy, onSave, formError, onFormOpen }: Sch
 	const saveWith = (patch: Partial<SchedulesFile>, fromForm = false) =>
 		onSave({ alerts: file.alerts ?? [], schedules: file.schedules ?? [], ...patch }, fromForm);
 	const saveFromForm = async (patch: Partial<SchedulesFile>) => afterSave((await saveWith(patch, true)) !== false);
+	// X-48: the hosted limits in readable text, in the list header, with no Workers jargon.
+	const limitsLine = data.limits ? (
+		<p className="text-muted-foreground text-sm" data-testid="schedules-hosted-limits">
+			{t("hostedLimits", { max: data.limits.max_schedules, min: data.limits.min_interval_min, count: data.rows.length })}
+		</p>
+	) : null;
 	return (
 		<div className="flex min-w-0 flex-col gap-6">
 			{!data.ticker && (
@@ -220,14 +268,7 @@ export function SchedulesBody({ data, busy, onSave, formError, onFormOpen }: Sch
 					</a>
 				</p>
 			)}
-			{data.hosted && data.limits && (
-				<p className="text-muted-foreground text-xs" data-testid="schedules-hosted-limits">
-					{t("hostedLimits", { max: data.limits.max_schedules, min: data.limits.min_interval_min, count: data.rows.length })}{" "}
-					<a className="underline" href="/workers">
-						{t("hostedRunnersLink")}
-					</a>
-				</p>
-			)}
+			{data.hosted && data.rows.length === 0 && limitsLine}
 			{data.rows.length === 0 && !adding ? (
 				<FeatureHero
 					icon={CalendarClock}
@@ -249,8 +290,11 @@ export function SchedulesBody({ data, busy, onSave, formError, onFormOpen }: Sch
 			) : (
 				data.rows.length > 0 && (
 					<section className="flex flex-col gap-3" data-testid="schedules-list">
-						<div className="flex items-center justify-between gap-3">
-							<h2 className="text-foreground text-base font-semibold tracking-tight">{t("title")}</h2>
+						<div className="flex flex-wrap items-center justify-between gap-3">
+							<div className="flex min-w-0 flex-col gap-0.5">
+								<h2 className="text-foreground text-base font-semibold tracking-tight">{t("title")}</h2>
+								{data.hosted && limitsLine}
+							</div>
 							{!adding && (
 								<Button
 									size="sm"
@@ -290,6 +334,7 @@ export function SchedulesBody({ data, busy, onSave, formError, onFormOpen }: Sch
 					}
 				>
 					<AddScheduleForm
+						hosted={data.hosted}
 						busy={busy}
 						error={formError}
 						onAdd={async (s) => {
@@ -310,6 +355,7 @@ export function SchedulesBody({ data, busy, onSave, formError, onFormOpen }: Sch
 					}
 				>
 					<AddScheduleForm
+						hosted={data.hosted}
 						key={editing.name}
 						busy={busy}
 						initial={editing}
@@ -320,7 +366,7 @@ export function SchedulesBody({ data, busy, onSave, formError, onFormOpen }: Sch
 					/>
 				</SetupCard>
 			)}
-			<Collapsible icon={BellRing} title={u("schedules.integrations")} hint={u("schedules.integrationsHint")} testId="schedules-alerts">
+			<Collapsible id="alerts" title={t("alerts.title")} hint={u("schedules.integrationsHint")} testId="schedules-alerts">
 				<p className="text-muted-foreground text-sm">{t("alerts.description")}</p>
 				<AlertsEditor
 					alerts={file.alerts ?? []}
@@ -496,8 +542,8 @@ function ScheduleTable({
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
 	return (
-		<label className="flex flex-col gap-1 text-xs">
-			<span className="text-muted-foreground">{label}</span>
+		<label className="flex min-w-0 flex-col gap-1 text-xs">
+			<span className="text-foreground text-sm font-medium">{label}</span>
 			{children}
 		</label>
 	);
@@ -519,29 +565,40 @@ function AddScheduleForm({
 	onAdd,
 	initial,
 	error,
+	hosted = false,
 }: {
 	busy: boolean;
 	onAdd(s: Schedule): void | Promise<void>;
 	initial?: Schedule;
 	error?: string | null;
+	/** M7-61: on the hosted service a comparison file path means nothing to the user, so that choice is hidden. */
+	hosted?: boolean;
 }) {
 	const { t } = useTranslation("schedules");
 	const { t: w } = useTranslation("w4m7b");
 	const { t: u } = useTranslation("ux13");
+	const { t: m } = useTranslation("uf7b");
 	const evaluations = useListEvaluationsQuery();
-	const options = evaluationOptions(evaluations.data ?? [], t);
-	const [what, setWhat] = useState<"evaluation" | "experiment">(initial?.experiment ? "experiment" : "evaluation");
+	const groups = finishedEvaluationGroups(evaluations.data ?? []);
+	const allOptions = groups.flatMap((g) => g.options);
+	const [what, setWhat] = useState<"evaluation" | "experiment">(initial?.experiment && !hosted ? "experiment" : "evaluation");
+	const [how, setHow] = useState<HowOftenValue>(() =>
+		initial?.cron ? howOftenOf(initial.cron, initial.timezone) : newHowOften({ when: "daily", time: "06:00" }),
+	);
 	const [s, setS] = useState({
 		name: initial?.name ?? "",
 		experiment: initial?.experiment ?? "",
 		evaluation: initial?.evaluation ?? "",
-		cron: initial?.cron ?? "0 6 * * *",
-		timezone: initial?.timezone ?? "",
 		max: initial?.max_usd_per_day ? String(initial.max_usd_per_day) : "",
 	});
 	const set = (k: keyof typeof s) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setS({ ...s, [k]: e.target.value });
+	const cron = howOftenCron(how) ?? "";
 	const target = what === "evaluation" ? s.evaluation : s.experiment;
-	const missing = addScheduleMissing(s, what, target, w);
+	const missing = addScheduleMissing({ ...s, cron }, what, target, w, m("howOften.invalidShort"));
+	const perRun = what === "evaluation" ? allOptions.find((o) => o.id === s.evaluation)?.cost : undefined;
+	const runs = cron && !cronProblem(cron) ? runsPerDay(cron) : 0;
+	const max = Number(s.max);
+	const cost = perRun && perRun > 0 ? checkCost(runs, perRun, max) : null;
 	const ok = missing.length === 0;
 	const why = ok ? null : w("schedules.toAdd", { list: missing.join(", ") });
 	return (
@@ -555,8 +612,8 @@ function AddScheduleForm({
 					mergeScheduleEdit(initial, {
 						name: s.name.trim(),
 						...(what === "evaluation" ? { evaluation: s.evaluation.trim() } : { experiment: s.experiment.trim() }),
-						cron: s.cron.trim(),
-						...(s.timezone ? { timezone: s.timezone.trim() } : {}),
+						cron,
+						...(how.timezone ? { timezone: how.timezone } : {}),
 						...(max > 0 ? { max_usd_per_day: max } : {}),
 					}),
 				);
@@ -565,7 +622,7 @@ function AddScheduleForm({
 		>
 			<Step n={1} title={u("schedules.stepWhat")}>
 				<div className="bg-muted inline-flex w-fit rounded-lg p-1 text-xs" role="tablist">
-					{(["evaluation", "experiment"] as const).map((k) => (
+					{(hosted ? (["evaluation"] as const) : (["evaluation", "experiment"] as const)).map((k) => (
 						<button
 							key={k}
 							type="button"
@@ -592,20 +649,16 @@ function AddScheduleForm({
 								data-testid="schedule-add-evaluation"
 							>
 								<option value="">{t("add.evaluationPlaceholder")}</option>
-								{options.active.map((o) => (
-									<option key={o.id} value={o.id}>
-										{o.label}
-									</option>
-								))}
-								{options.stopped.length > 0 && (
-									<optgroup label={t("add.stopped")}>
-										{options.stopped.map((o) => (
+								{s.evaluation && !allOptions.some((o) => o.id === s.evaluation) && <option value={s.evaluation}>{s.evaluation}</option>}
+								{groups.map((g) => (
+									<optgroup key={g.agent} label={g.agent}>
+										{g.options.map((o) => (
 											<option key={o.id} value={o.id}>
 												{o.label}
 											</option>
 										))}
 									</optgroup>
-								)}
+								))}
 							</select>
 						</Field>
 					) : (
@@ -622,15 +675,8 @@ function AddScheduleForm({
 				{what === "evaluation" && <p className="text-muted-foreground text-xs">{t("add.evaluationHint")}</p>}
 			</Step>
 			<Step n={2} title={u("schedules.stepWhen")}>
-				<div className="grid gap-3 sm:grid-cols-2">
-					<Field label={t("add.cron")}>
-						<Input value={s.cron} onChange={set("cron")} className="font-mono" data-testid="schedule-add-cron" />
-					</Field>
-					<Field label={t("add.timezone")}>
-						<Input value={s.timezone} onChange={set("timezone")} placeholder={t("add.timezonePlaceholder")} />
-					</Field>
-				</div>
-				<p className="text-muted-foreground text-xs">{t("add.hint")}</p>
+				<HowOften value={how} onChange={setHow} testIdPrefix="schedule-add" allowManual={false} />
+				{what === "experiment" && <p className="text-muted-foreground text-xs">{t("add.hint")}</p>}
 			</Step>
 			<Step n={3} title={u("schedules.stepCap")} last>
 				<div className="grid gap-3 sm:grid-cols-2">
@@ -638,6 +684,13 @@ function AddScheduleForm({
 						<Input value={s.max} onChange={set("max")} inputMode="decimal" data-testid="schedule-add-max" />
 					</Field>
 				</div>
+				{what === "evaluation" && s.evaluation && max > 0 && (
+					<p className="text-muted-foreground text-xs" data-testid="schedule-add-cost">
+						{cost
+							? m("cost.lineLast", { count: cost.runs, perRun: usd(cost.perRun), day: usd(cost.day), month: usd(cost.month) })
+							: m("cost.unknown", { day: usd(max), month: usd(max * 30) })}
+					</p>
+				)}
 				{what === "experiment" && s.max.trim() === "" && (
 					<p className="text-muted-foreground text-xs" data-testid="schedule-add-limit-hint">
 						{w("schedules.limitHint")}
@@ -651,7 +704,7 @@ function AddScheduleForm({
 						aria-describedby={why ? "schedule-add-why" : undefined}
 						data-testid="schedule-add-submit"
 					>
-						{initial ? t("canary.save") : t("add.submit")}
+						{initial ? t("canary.save") : max > 0 ? m("repeat.createUpTo", { day: usd(cost ? cost.day : max) }) : t("add.submit")}
 					</Button>
 					<WhyDisabled reason={busy ? null : why} testId="schedule-add-why" />
 					{error && (
@@ -677,9 +730,11 @@ export interface AlertsEditorProps {
 export function AlertsEditor({ alerts, events, secrets, busy, onChange }: AlertsEditorProps) {
 	const { t } = useTranslation("schedules");
 	const { t: w } = useTranslation("w4m7b");
+	const { t: m } = useTranslation("uf7b");
 	const [test, testState] = useTestAlertMutation();
 	const [results, setResults] = useState<Record<string, string>>({});
-	const [draft, setDraft] = useState<AlertConfig>({ url_env: secrets[0] ?? "", format: "" });
+	// M7-59: nothing is picked for the user; the secret select starts at "Pick a secret".
+	const [draft, setDraft] = useState<AlertConfig>({ url_env: "", format: "" });
 	const sendTest = async (a: AlertConfig) => {
 		const res = await test({ url_env: a.url_env, secret_env: a.secret_env, format: a.format });
 		const out =
@@ -704,7 +759,8 @@ export function AlertsEditor({ alerts, events, secrets, busy, onChange }: Alerts
 						<li key={`${a.url_env}-${i}`} className="flex flex-wrap items-center gap-3 text-sm">
 							<span className="font-mono">{a.url_env}</span>
 							<span className="text-muted-foreground text-xs">
-								{a.format || "json"} · {a.events?.length ? a.events.join(", ") : "all events"}
+								{a.format === "slack" ? m("alerts.formatSlack") : m("alerts.formatHook")} ·{" "}
+								{a.events?.length ? a.events.map((e) => alertEventLabel(e, m)).join(", ") : m("alerts.allEvents")}
 							</span>
 							<Button
 								size="sm"
@@ -735,15 +791,34 @@ export function AlertsEditor({ alerts, events, secrets, busy, onChange }: Alerts
 					{t("alerts.noSecrets")}
 				</p>
 			)}
+			<p className="text-muted-foreground text-xs" data-testid="alerts-kinds">
+				{m("alerts.kinds")}
+			</p>
 			<div className="grid gap-3 md:grid-cols-3">
 				<Field label={t("alerts.urlEnv")}>
-					<Input
-						list="schedule-secret-names"
-						value={draft.url_env}
-						onChange={(e) => setDraft({ ...draft, url_env: e.target.value })}
-						placeholder={t("alerts.urlEnvPlaceholder")}
-						data-testid="alert-url-env"
-					/>
+					{secrets.length > 0 ? (
+						<select
+							className="bg-card h-9 w-full min-w-0 rounded-md border px-2 text-sm"
+							value={draft.url_env}
+							onChange={(e) => setDraft({ ...draft, url_env: e.target.value })}
+							data-testid="alert-url-env"
+						>
+							<option value="">{m("alerts.pickSecret")}</option>
+							{draft.url_env && !secrets.includes(draft.url_env) && <option value={draft.url_env}>{draft.url_env}</option>}
+							{secrets.map((x) => (
+								<option key={x} value={x}>
+									{x}
+								</option>
+							))}
+						</select>
+					) : (
+						<Input
+							value={draft.url_env}
+							onChange={(e) => setDraft({ ...draft, url_env: e.target.value })}
+							placeholder={t("alerts.urlEnvPlaceholder")}
+							data-testid="alert-url-env"
+						/>
+					)}
 				</Field>
 				<Field label={t("alerts.secretEnv")}>
 					<Input
@@ -758,8 +833,8 @@ export function AlertsEditor({ alerts, events, secrets, busy, onChange }: Alerts
 						value={draft.format ?? ""}
 						onChange={(e) => setDraft({ ...draft, format: e.target.value as AlertConfig["format"] })}
 					>
-						<option value="">json</option>
-						<option value="slack">slack</option>
+						<option value="">{m("alerts.formatHook")}</option>
+						<option value="slack">{m("alerts.formatSlack")}</option>
 					</select>
 				</Field>
 				<datalist id="schedule-secret-names">
@@ -773,7 +848,7 @@ export function AlertsEditor({ alerts, events, secrets, busy, onChange }: Alerts
 				{events.map((e) => (
 					<label key={e} className="flex items-center gap-1">
 						<input type="checkbox" checked={draft.events?.includes(e) ?? false} onChange={() => toggleEvent(e)} />
-						{e}
+						{alertEventLabel(e, m)}
 					</label>
 				))}
 			</fieldset>

@@ -18,6 +18,12 @@ import {
 } from "@/lib/store/apis/schedulesApi";
 import { Badge } from "@/components/ui/badge";
 import { NewCanaryForm } from "./newCanaryForm";
+import { CopyId } from "@/components/ui/copyId";
+import { usd } from "@/components/canaries/howOften";
+import "@/components/canaries/uf7bI18n";
+
+/** The terminal command that writes a drift monitor file, shown as a copyable chip. */
+const CANARY_INIT_COMMAND = "heimdall canary init";
 import { UnknownLinkNote } from "@/components/shell/unknownLinkNote";
 import type { CanaryDefinition, CanaryListResponse } from "@/lib/types/bench";
 import { parseAsString, useQueryState } from "nuqs";
@@ -96,6 +102,7 @@ export default function CanariesView() {
 						) : null
 					}
 					onCreate={formOpen ? undefined : () => setFormOpen(true)}
+					formOpen={formOpen}
 				/>
 			)}
 		</section>
@@ -112,6 +119,8 @@ export interface CanariesBodyProps {
 	onCreate?: () => void;
 	/** Names of the paused drift monitors. */
 	paused?: ReadonlySet<string>;
+	/** The new drift monitor form is open above: the empty state is hidden (M7-63). */
+	formOpen?: boolean;
 }
 
 /** Whether name is set and is neither a drift monitor nor a definition that failed to load. Exported for tests. */
@@ -144,10 +153,12 @@ export function pausedCanaries(rows: readonly { name: string; kind: string }[] |
 }
 
 /** The loaded list, definition errors, and the open canary. Exported for tests. */
-export function CanariesBody({ data, selected, onSelect, panel, onCreate, paused }: CanariesBodyProps) {
+export function CanariesBody({ data, selected, onSelect, panel, onCreate, paused, formOpen }: CanariesBodyProps) {
 	const { t } = useTranslation("bench");
 	const { t: u } = useTranslation("ux13");
+	const { t: c } = useTranslation("uf7b");
 	if (data.canaries.length === 0 && data.errors.length === 0) {
+		if (formOpen) return null;
 		return (
 			<FeatureHero
 				icon={Bird}
@@ -162,7 +173,10 @@ export function CanariesBody({ data, selected, onSelect, panel, onCreate, paused
 					)
 				}
 			>
-				<span>{u("canaries.cli")}</span>
+				<span className="flex flex-wrap items-center gap-2" data-testid="canaries-cli">
+					{c("canary.cliLead")}
+					<CopyId value={CANARY_INIT_COMMAND} display={CANARY_INIT_COMMAND} />
+				</span>
 			</FeatureHero>
 		);
 	}
@@ -240,7 +254,11 @@ export function CanaryActions({
 				kind="canary.baseline"
 				params={{ name }}
 				label={t("canary.baseline")}
-				confirm={t("canary.baselineConfirm")}
+				confirm={
+					definition?.smoke || !definition?.budget?.per_run_usd
+						? t("canary.baselineConfirmNoCap")
+						: t("canary.baselineConfirm", { usd: usd(definition.budget.per_run_usd).slice(1) })
+				}
 				variant="outline"
 			/>
 			<JobRunButton kind="canary.run" params={{ name }} label={t("canary.run")} variant="outline" />

@@ -12,6 +12,10 @@ import {
 } from "@/lib/store/apis/evalReleaseApi";
 import type { EvaluationGateResult, GateCheck } from "@/lib/store/apis/evaluationsApi";
 import { cn } from "@/lib/utils";
+import { browserZone } from "@/lib/utils/cron";
+import { useConfirm } from "@/components/platform/confirmDialog";
+import { useGetEvaluationQuery } from "@/lib/store/apis/evaluationsApi";
+import "@/components/canaries/uf7bI18n";
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, CalendarClock, CheckCircle2, Lock, Rocket, ShieldAlert, ShieldQuestion } from "lucide-react";
 import { useState } from "react";
@@ -118,12 +122,24 @@ export function previewTitle(p: EvaluationReleasePreview, t: (k: string, o?: Rec
 }
 
 /**
+ * Whether the preview cannot be released because the evaluated version is already the live one
+ * (the agent has one version only, M7-74). Uses `problem_code` when the server sends it, else the
+ * version numbers. Exported for tests.
+ */
+export function onlyLiveVersion(p: Pick<EvaluationReleasePreview, "problem" | "version" | "live"> & { problem_code?: string }): boolean {
+	if (!p.problem) return false;
+	if (p.problem_code) return p.problem_code === "same_as_live";
+	return Boolean(p.live.version) && p.live.version === p.version;
+}
+
+/**
  * "Promote this version" on a finished evaluation's report card: what the release would record
  * (agent version, the live version it replaces, before and after numbers, the gate), what blocks it,
  * and the approve form. One release covers every finished benchmark of the evaluation.
  */
 export function PromoteEvaluation({ evaluationId }: { evaluationId: string }) {
 	const { t } = useTranslation("u14");
+	const { t: m } = useTranslation("uf7b");
 	const { t: tf } = useTranslation("fw11");
 	const session = useSession();
 	const preview = useGetEvaluationReleasePreviewQuery(evaluationId);
@@ -166,11 +182,35 @@ export function PromoteEvaluation({ evaluationId }: { evaluationId: string }) {
 				)}
 			</div>
 			{p.summary && <ReleaseEvidence summary={p.summary} testId="evaluation-promote-numbers" />}
-			{p.problem && (
-				<p className="text-muted-foreground text-sm" data-testid="evaluation-promote-problem">
-					{p.problem}
-				</p>
-			)}
+			{p.problem &&
+				(onlyLiveVersion(p) ? (
+					<div className="flex flex-col gap-2 rounded-md border px-3 py-2 text-sm" data-testid="evaluation-promote-problem">
+						<p data-testid="evaluation-promote-next-step">
+							{m("promote.onlyOne", { agent: p.agent, name: versionName(p.agent, p.live.version) })}
+						</p>
+						<div className="flex flex-wrap gap-2">
+							<Button size="sm" asChild>
+								<Link
+									to="/agents/$agentId"
+									params={{ agentId: p.agent }}
+									search={{ tab: "versions" } as never}
+									data-testid="evaluation-promote-new-version"
+								>
+									{m("promote.newVersion")}
+								</Link>
+							</Button>
+							<Button size="sm" variant="outline" asChild>
+								<Link to="/evaluate" search={{ mode: "versions", agent: p.agent } as never} data-testid="evaluation-promote-evaluate">
+									{m("promote.evaluateNew")}
+								</Link>
+							</Button>
+						</div>
+					</div>
+				) : (
+					<p className="text-sm" data-testid="evaluation-promote-problem">
+						{p.problem}
+					</p>
+				))}
 			{!p.problem && blocked && (
 				<div
 					className="border-destructive/40 bg-destructive/5 flex flex-col gap-1 rounded-md border px-3 py-2 text-sm"
@@ -270,23 +310,58 @@ export function PromoteEvaluation({ evaluationId }: { evaluationId: string }) {
 	);
 }
 
-/** "Repeat nightly" and "Repeat weekly": schedule a new evaluation of the same spec. */
+/** Runs a month of each cadence, for the cost line of the confirm. */
+const RUNS_A_MONTH: Record<EvaluationCadence, number> = { nightly: 30, weekly: 30 / 7 };
+
+/**
+ * The confirm text of "Repeat nightly" and "Repeat weekly" (M7-51): when it runs, in which zone,
+ * the cost per run and per month (or that the price is not known), and the daily limit sent.
+ * Exported for tests.
+ */
+export function repeatAsk(
+	cadence: EvaluationCadence,
+	zone: string,
+	costPerRun: number | undefined,
+	t: (k: string, o?: Record<string, unknown>) => string,
+): { message: string; limit?: number } {
+	const when = t(`repeatAsk.when.${cadence}`, { zone });
+	if (costPerRun == null || !(costPerRun > 0)) return { message: `${when} ${t("repeatAsk.priceUnknown")}` };
+	const limit = Math.ceil(costPerRun * 2 * 100) / 100;
+	const money = (n: number) => `$${n.toFixed(2)}`;
+	return {
+		message: `${when} ${t("repeatAsk.price", { run: money(costPerRun), month: money(costPerRun * RUNS_A_MONTH[cadence]), limit: money(limit) })}`,
+		limit,
+	};
+}
+
+/** "Repeat nightly" and "Repeat weekly": schedule a new evaluation of the same spec, after a confirm. */
 export function RepeatEvaluation({ evaluationId }: { evaluationId: string }) {
 	const { t } = useTranslation("u14");
+	const { t: m } = useTranslation("uf7b");
 	const session = useSession();
+	const confirm = useConfirm();
+	const evaluation = useGetEvaluationQuery(evaluationId);
 	const [schedule, state] = useScheduleEvaluationMutation();
 	const [done, setDone] = useState<EvaluationCadence | null>(null);
 	if (!canUse(session, "member")) return null;
+	const zone = browserZone();
 	const go = async (cadence: EvaluationCadence) => {
-		const res = await schedule({ id: evaluationId, cadence });
+		const ask = repeatAsk(cadence, zone, evaluation.data?.result?.cost_usd, m as never);
+		const ok = await confirm(ask.message, {
+			title: m(`repeatAsk.title.${cadence}`),
+			confirmLabel: m("repeatAsk.confirm"),
+			cancelLabel: m("repeatAsk.cancel"),
+		});
+		if (!ok) return;
+		const res = await schedule({ id: evaluationId, cadence, timezone: zone, ...(ask.limit ? { max_usd_per_day: ask.limit } : {}) });
 		if ("data" in res && res.data) setDone(cadence);
 	};
 	return (
 		<span className="flex flex-wrap items-center gap-2" data-testid="evaluation-repeat">
 			{done ? (
 				<span className="text-muted-foreground text-xs" data-testid="evaluation-repeat-done">
-					{t(`promote.repeatDone.${done}` as never)}{" "}
-					<Link to="/schedules" className="text-primary hover:underline">
+					{String(t(`promote.repeatDone.${done}` as never, { zone } as never))}{" "}
+					<Link to="/scheduled-checks" search={{ tab: "schedules" } as never} className="text-primary hover:underline">
 						{t("promote.viewSchedules")}
 					</Link>
 				</span>

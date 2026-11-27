@@ -12,6 +12,7 @@ import type { MaximConnection, MaximConnectionUpdate, MaximTestResult } from "@/
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const MAXIM_LINK_PLACEHOLDER =
 	"https://app.getmaxim.ai/workspace/{workspace_id}/log-repository/{repo_id}/logs?traceId={trace_id}";
@@ -215,7 +216,9 @@ export function MaximPanel() {
 				<p className="text-chart-error-ink text-sm" role="alert" data-testid="maxim-load-error">
 					{apiErrorMessage(conn.error, t("maxim.loadError"))}
 				</p>
-			) : conn.isLoading ? null : (
+			) : conn.isLoading ? (
+				<Skeleton className="h-24 w-full rounded-md" data-testid="maxim-loading" />
+			) : (
 				<MaximForm
 					conn={conn.data}
 					draft={draft}
