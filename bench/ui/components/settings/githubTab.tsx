@@ -1,5 +1,6 @@
 import { ConfirmButton } from "@/components/platform/badges";
-import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
+import { BlockSkeleton, EmptyNote, InlineError, LoadError } from "@/components/runs/screenStates";
+import { notify } from "@/lib/notify";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +60,7 @@ export function withoutHere(message: string): string {
 /** Settings > GitHub: connect a GitHub account (repo scope), browse repositories, open the CI-install PR. */
 export function GithubTab() {
 	const { t } = useTranslation("github");
+	const { t: tl } = useTranslation("uf8a");
 	const session = useSession();
 	const isAdmin = roleAtLeast(session.role, "admin");
 	const isMember = roleAtLeast(session.role, "member");
@@ -85,6 +87,17 @@ export function GithubTab() {
 			if (res?.url) window.location.assign(res.url);
 		} catch (err) {
 			setNotice({ ok: false, message: getBenchErrorMessage(err) });
+		}
+	};
+
+	const [disconnectError, setDisconnectError] = useState<unknown>(null);
+	const onDisconnect = async () => {
+		setDisconnectError(null);
+		try {
+			await disconnect().unwrap();
+			notify({ text: tl("github.disconnected") });
+		} catch (err) {
+			setDisconnectError(err);
 		}
 	};
 
@@ -115,7 +128,7 @@ export function GithubTab() {
 									question={t("disconnectConfirm")}
 									confirmLabel={t("disconnect")}
 									cancelLabel={t("cancel")}
-									onConfirm={() => void disconnect()}
+									onConfirm={() => void onDisconnect()}
 									isLoading={disconnectState.isLoading}
 									testId="github-disconnect"
 								/>
@@ -124,6 +137,7 @@ export function GithubTab() {
 					) : undefined
 				}
 			>
+				<InlineError error={disconnectError} title={tl("github.disconnectError")} onRetry={() => void onDisconnect()} testId="github-disconnect-error" />
 				{notice && (
 					<p
 						role="status"

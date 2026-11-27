@@ -418,7 +418,7 @@ export function UsageBody({ data, loading, error, onRetry }: UsageBodyProps) {
 			{!hasRuns && data.group_by !== "key" ? (
 				<EmptyState
 					message={t("empty", { from: data.from, to: data.to })}
-					action={{ label: t("emptyAction"), to: "/experiments" }}
+					action={{ label: t("emptyAction"), to: "/evaluate" }}
 					testId="usage-empty"
 				/>
 			) : (

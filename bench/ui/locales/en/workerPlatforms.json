@@ -5,6 +5,8 @@
   "shared": "Shared worker",
   "sharedHint": "Runs on the Heimdall shared worker.",
   "connected": "Connected",
+  "toastConnected": "{{platform}} connected.",
+  "toastDisconnected": "{{platform}} disconnected.",
   "notConnected": "Not connected",
   "tokenEnding": "Token ending {{last4}}",
   "tokenLabel": "API token",

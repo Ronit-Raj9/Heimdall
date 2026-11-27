@@ -55,7 +55,8 @@ describe("PlatformCard", () => {
 		const html = card({ ...base, connected: true, status: "invalid" }, { error: "the platform refused the token" });
 		expect(html).toContain('data-testid="platform-modal-make-default"');
 		expect(html).toContain("Token refused");
-		expect(html).toContain("Could not update Modal: the platform refused the token");
+		expect(html).toContain("Could not update Modal");
+		expect(html).toContain('data-testid="platform-modal-error"');
 	});
 
 	it("uses plain words, no em dashes", () => {

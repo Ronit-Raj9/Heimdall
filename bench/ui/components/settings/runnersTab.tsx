@@ -1,4 +1,5 @@
 import { ForbiddenNote, isRoleRefusal } from "@/components/platform/accessNotes";
+import { notify } from "@/lib/notify";
 import { ConfirmButton, RunnerStatusBadge } from "@/components/platform/badges";
 import { CopyBlock, OneTimeSecret } from "@/components/platform/oneTimeSecret";
 import { isValidPool, runnerStartCommand } from "@/components/platform/platform.utils";
@@ -145,7 +146,12 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 											})}
 											confirmLabel={t("settings.runners.remove")}
 											cancelLabel={t("settings.runners.cancel")}
-											onConfirm={() => void removeRunner(runner.id)}
+											onConfirm={() =>
+												void removeRunner(runner.id)
+													.unwrap()
+													.then(() => notify({ text: t("deleted", { ns: "toast", name: runner.name }) }))
+													.catch(() => undefined)
+											}
 											isLoading={removeState.isLoading && removeState.originalArgs === runner.id}
 											testId={`runner-remove-${runner.id}`}
 										/>
@@ -371,7 +377,12 @@ function RunnerTokensSection() {
 													})}
 													confirmLabel={t("settings.runners.confirm")}
 													cancelLabel={t("settings.runners.cancel")}
-													onConfirm={() => void revoke(token.id)}
+													onConfirm={() =>
+														void revoke(token.id)
+															.unwrap()
+															.then(() => notify({ text: tl("toast.revoked", { name: token.pool }) }))
+															.catch(() => undefined)
+													}
 													isLoading={revokeState.isLoading && revokeState.originalArgs === token.id}
 													testId={`runner-token-revoke-${token.id}`}
 												/>

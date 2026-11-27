@@ -10,6 +10,10 @@ import { RetentionForm } from "./dataControls";
 
 // The unsaved-changes guard needs a router; static renders have none (M8-44).
 vi.mock("@tanstack/react-router", async () => ({ ...(await import("@/lib/testing/routerMock")).routerMock, useBlocker: () => undefined }));
+vi.mock("@/components/settings/retentionPreviewApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/components/settings/retentionPreviewApi")>()),
+	useLazyGetRetentionPreviewQuery: () => [() => ({ unwrap: () => Promise.reject(new Error("no preview")) })],
+}));
 vi.mock("@/lib/store/apis/dataOpsApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/dataOpsApi")>()),
 	useSetRetentionMutation: () => mutation(),

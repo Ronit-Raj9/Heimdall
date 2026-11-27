@@ -1,9 +1,9 @@
 import { ConfirmButton } from "@/components/platform/badges";
-import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
+import { BlockSkeleton, LoadError, InlineError } from "@/components/runs/screenStates";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
+import { notify } from "@/lib/notify";
 import {
 	platformStatusTone,
 	useConnectWorkerPlatformMutation,
@@ -37,7 +37,8 @@ export function platformsOff(error: unknown): boolean {
 export interface PlatformCardProps {
 	platform: WorkerPlatform;
 	busy?: boolean;
-	error?: string;
+	/** The caught error of the last action on this card. */
+	error?: unknown;
 	notice?: string;
 	/** Resolves true once the token is kept; the token box clears only then, so a refused token can be fixed. */
 	onConnect: (token: string, endpoint: string) => Promise<boolean> | void;
@@ -253,11 +254,7 @@ export function PlatformCard({ platform: p, busy, error, notice, onConnect, onTe
 					{notice}
 				</p>
 			)}
-			{error && (
-				<p role="alert" className="text-chart-error-ink text-xs break-words" data-testid={`platform-${p.name}-error`}>
-					{t("error", { platform: p.title })}: {error}
-				</p>
-			)}
+			<InlineError error={error || undefined} title={t("error", { platform: p.title })} testId={`platform-${p.name}-error`} />
 		</article>
 	);
 }
@@ -270,21 +267,22 @@ export function WorkerPlatformsSection() {
 	const [test, testState] = useTestWorkerPlatformMutation();
 	const [setTarget, defaultState] = useSetWorkerTargetMutation();
 	const [disconnect, disconnectState] = useDisconnectWorkerPlatformMutation();
-	const [errors, setErrors] = useState<Record<string, string>>({});
+	const [errors, setErrors] = useState<Record<string, unknown>>({});
 	const [notices, setNotices] = useState<Record<string, string>>({});
 	const [busy, setBusy] = useState("");
 	const askTarget = useConfirmTarget();
 
-	const run = async (name: string, action: () => Promise<unknown>, notice?: string): Promise<boolean> => {
+	const run = async (name: string, action: () => Promise<unknown>, notice?: string, toast?: string): Promise<boolean> => {
 		setBusy(name);
-		setErrors((e) => ({ ...e, [name]: "" }));
+		setErrors((e) => ({ ...e, [name]: undefined }));
 		setNotices((n) => ({ ...n, [name]: "" }));
 		try {
 			await action();
 			if (notice) setNotices((n) => ({ ...n, [name]: notice }));
+			if (toast) notify({ text: toast });
 			return true;
 		} catch (error) {
-			setErrors((e) => ({ ...e, [name]: getBenchErrorMessage(error) }));
+			setErrors((e) => ({ ...e, [name]: error }));
 			return false;
 		} finally {
 			setBusy("");
@@ -319,7 +317,9 @@ export function WorkerPlatformsSection() {
 								busy={busy === p.name}
 								error={errors[p.name] || undefined}
 								notice={notices[p.name] || undefined}
-								onConnect={(token, endpoint) => run(p.name, () => connect({ platform: p.name, token, endpoint }).unwrap())}
+								onConnect={(token, endpoint) =>
+									run(p.name, () => connect({ platform: p.name, token, endpoint }).unwrap(), undefined, t("toastConnected", { platform: p.title }))
+								}
 								onTest={() => void run(p.name, () => test(p.name).unwrap(), t("testOk"))}
 								onDefault={() =>
 									void (async () => {
@@ -327,7 +327,7 @@ export function WorkerPlatformsSection() {
 										if (await askTarget(`platform:${p.name}`)) await run(p.name, () => setTarget(`platform:${p.name}`).unwrap());
 									})()
 								}
-								onDisconnect={() => void run(p.name, () => disconnect(p.name).unwrap())}
+								onDisconnect={() => void run(p.name, () => disconnect(p.name).unwrap(), undefined, t("toastDisconnected", { platform: p.title }))}
 							/>
 						))}
 					</div>

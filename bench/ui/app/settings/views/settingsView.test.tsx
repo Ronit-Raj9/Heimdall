@@ -103,6 +103,10 @@ vi.mock("@/lib/store/apis/registryCredentialsApi", async () => {
 		useDeleteRegistryCredentialMutation: () => m({}),
 	}; // Y10: private registry logins on the secrets tab
 });
+vi.mock("@/components/settings/retentionPreviewApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/components/settings/retentionPreviewApi")>()),
+	useLazyGetRetentionPreviewQuery: () => [() => ({ unwrap: () => Promise.reject(new Error("no preview")) })],
+}));
 vi.mock("@/lib/store/apis/dataOpsApi", async (importOriginal) => {
 	const real = await importOriginal<typeof import("@/lib/store/apis/dataOpsApi")>();
 	const { mutation: m } = await import("@/lib/testing/render");

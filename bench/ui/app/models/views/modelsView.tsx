@@ -1,4 +1,5 @@
 import "@/components/settings/uf8aI18n";
+import { notify } from "@/lib/notify";
 import { PROVIDERS, type ProviderId } from "@/components/models/modelPicker";
 import { CredentialKinds } from "@/components/settings/credentialKinds";
 import {
@@ -14,10 +15,11 @@ import {
 	type ProviderKeyState,
 } from "@/components/models/providerCatalog";
 import { ConfirmButton } from "@/components/platform/badges";
-import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
+import { BlockSkeleton, InlineError, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
 import { Input } from "@/components/ui/input";
 import { canUse, useSession } from "@/lib/session/sessionContext";
@@ -42,8 +44,8 @@ import type {
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEmbedded } from "@/components/shell/embedded";
 import { cn } from "@/lib/utils";
-import { KeyRound, Pencil, Plus, Sparkles, X } from "lucide-react";
-import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
+import { KeyRound, Pencil, Plus, Sparkles } from "lucide-react";
+import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 
@@ -676,10 +678,16 @@ function KeyRow({
 								question={t("confirmDelete", { label: name })}
 								confirmLabel={t("delete")}
 								cancelLabel={t("cancel")}
-								onConfirm={() => void remove(k.id)}
+								onConfirm={() =>
+									void remove(k.id)
+										.unwrap()
+										.then(() => notify({ text: t("deleted", { ns: "toast", name }) }))
+										.catch(() => undefined)
+								}
 								isLoading={removeState.isLoading}
 								testId={`model-key-delete-${k.id}`}
 							/>
+							<InlineError error={removeState.error} title={tl("models.deleteError")} testId={`model-key-delete-error-${k.id}`} className="basis-full" />
 						</>
 					)}
 				</div>
@@ -738,43 +746,22 @@ function KeyRow({
 	);
 }
 
-/** A right-hand side panel over the page; Escape or the backdrop closes it. */
+/** A right-hand side panel over the page (the shared Dialog drawer); Escape or the backdrop closes it. */
 function SidePanel({ title, onClose, children }: { title: string; onClose(): void; children: ReactNode }) {
 	const { t: tu } = useTranslation("u11");
-	const titleId = useId();
-	useEffect(() => {
-		const onKey = (e: KeyboardEvent) => {
-			if (e.key === "Escape") onClose();
-		};
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [onClose]);
 	return (
-		<div className="fixed inset-0 z-50 flex justify-end" data-testid="model-key-panel">
-			<button
-				type="button"
-				className="absolute inset-0 cursor-default bg-black/40 backdrop-blur-[1px]"
-				aria-label={tu("models.close")}
-				onClick={onClose}
-				tabIndex={-1}
-			/>
-			<div
-				role="dialog"
-				aria-modal="true"
-				aria-labelledby={titleId}
-				className="bg-background relative flex h-full w-full max-w-md flex-col border-l shadow-xl"
-			>
-				<div className="flex items-center justify-between gap-3 border-b px-6 py-4">
-					<h2 id={titleId} className="text-base font-semibold">
-						{title}
-					</h2>
-					<Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={onClose} aria-label={tu("models.close")}>
-						<X className="size-4" aria-hidden="true" />
-					</Button>
-				</div>
-				<div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
-			</div>
-		</div>
+		<Dialog
+			open
+			onOpenChange={(open) => {
+				if (!open) onClose();
+			}}
+			side="right"
+			title={title}
+			closeLabel={tu("models.close")}
+			testId="model-key-panel"
+		>
+			{children}
+		</Dialog>
 	);
 }
 

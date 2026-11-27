@@ -6,7 +6,7 @@ import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { auditExportUrl, useVerifyAuditMutation } from "@/lib/store/apis/dataOpsApi";
 import { useGetAuditLogQuery, useListMembersQuery } from "@/lib/store/apis/platformApi";
 import type { AuditVerifyResult } from "@/lib/types/dataops";
-import type { AuditEntry, AuditList, Member, OrgSummary } from "@/lib/types/bench";
+import type { AuditEntry, AuditList, AuditLogParams, Member, OrgSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import {
 	Bot,
@@ -255,6 +255,13 @@ function AuditTime({ at }: { at: AuditEntry["at"] }) {
 	return <time title={abs}>{abs}</time>;
 }
 
+/** The audit list request: page, size and the trimmed search text as `q` when there is one. */
+export function auditParams(orgId: string, cursor: string | undefined, text: string): AuditLogParams {
+	const q = text.trim();
+	const params: AuditLogParams & { q?: string } = { orgId, cursor, limit: AUDIT_PAGE_SIZE, ...(q ? { q } : {}) };
+	return params;
+}
+
 /**
  * The organization's audit log, newest first: who did what to which target, when and from where,
  * as sentences with the raw action, route and address behind "Details". Changes only by default.
@@ -279,11 +286,9 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 	// Cursors of the pages seen so far: [undefined] is the newest page.
 	const [cursors, setCursors] = useState<(string | undefined)[]>([undefined]);
 	const cursor = cursors[cursors.length - 1];
-	const audit = useGetAuditLogQuery({
-		orgId: org.id,
-		cursor,
-		limit: AUDIT_PAGE_SIZE,
-	});
+	// The text also goes to the server (G1 `q`, M8-53), which searches the whole log; a server
+	// without it ignores `q` and the text still filters the page in view below.
+	const audit = useGetAuditLogQuery(auditParams(org.id, cursor, urlText));
 	// Users read as their member name, never their address (both are admin routes, like this tab).
 	const members = useListMembersQuery(org.id);
 	const people = members.data?.members ?? [];

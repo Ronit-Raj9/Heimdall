@@ -88,7 +88,7 @@ describe("UsageBody runs without a cost (F1.price)", () => {
 		};
 		const html = renderToStaticMarkup(<UsageBody data={data} />);
 		expect(html).toMatch(
-			/data-testid="usage-unknown-note"[^>]*>1 run\(s\) have no known cost and are left out of the total\. Set a price on the provider key in Settings &gt; API keys to include them\.</,
+			/data-testid="usage-unknown-note"[^>]*>1 run\(s\) have no known cost and are left out of the total\. Set a price on the provider key in Settings &gt; Model keys to include them\.</,
 		);
 		expect(html).toMatch(/data-testid="usage-no-call-2026-11-10"[^>]*>3 runs with no model call</);
 		expect(html).not.toContain('data-testid="usage-no-call-2026-11-12"');

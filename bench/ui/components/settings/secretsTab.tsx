@@ -1,4 +1,5 @@
 import { ForbiddenNote, RoleGate, isRoleRefusal } from "@/components/platform/accessNotes";
+import { notify } from "@/lib/notify";
 import { ConfirmButton } from "@/components/platform/badges";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
@@ -247,7 +248,12 @@ export function SecretsTab(_props: Record<string, unknown> = {}) {
 								return false;
 							}
 						}}
-						onDelete={(id) => void remove(id)}
+						onDelete={(id) =>
+							void remove(id)
+								.unwrap()
+								.then(() => notify({ text: t("deleted", { ns: "toast", name: secrets.find((s) => s.id === id)?.name ?? id }) }))
+								.catch(() => undefined)
+						}
 						deletingId={removeState.isLoading ? removeState.originalArgs : undefined}
 						rotatingId={rotateState.isLoading ? rotateState.originalArgs?.id : undefined}
 					/>

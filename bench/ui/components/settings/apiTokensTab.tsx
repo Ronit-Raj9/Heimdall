@@ -1,4 +1,5 @@
 import { ForbiddenNote, RoleGate, isRoleRefusal } from "@/components/platform/accessNotes";
+import { notify } from "@/lib/notify";
 import { ConfirmButton, RoleBadge } from "@/components/platform/badges";
 import { CopyBlock, OneTimeSecret } from "@/components/platform/oneTimeSecret";
 import { tokenState } from "@/components/platform/platform.utils";
@@ -153,7 +154,12 @@ export function ApiTokensTab() {
 																question={t("settings.tokens.confirmRevoke", { name: token.name })}
 																confirmLabel={t("settings.tokens.confirm")}
 																cancelLabel={t("settings.tokens.cancel")}
-																onConfirm={() => void revoke(token.id)}
+																onConfirm={() =>
+																void revoke(token.id)
+																	.unwrap()
+																	.then(() => notify({ text: tl("toast.revoked", { name: token.name }) }))
+																	.catch(() => undefined)
+																}
 																isLoading={revokeState.isLoading && revokeState.originalArgs === token.id}
 																testId={`token-revoke-${token.id}`}
 															/>

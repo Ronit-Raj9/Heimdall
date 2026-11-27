@@ -24,7 +24,7 @@
 		"tokens": "Tokens",
 		"runs": "Finished runs",
 		"keys": "Provider key spend this month",
-		"unknown": "{{count}} run(s) have no known cost and are left out of the total. Set a price on the provider key in Settings > API keys to include them."
+		"unknown": "{{count}} run(s) have no known cost and are left out of the total. Set a price on the provider key in Settings > Model keys to include them."
 	},
 	"table": {
 		"group": "Group",
@@ -43,7 +43,7 @@
 		"budget": "Monthly budget",
 		"spent": "Spent this month",
 		"noBudget": "No limit",
-		"empty": "No provider keys yet. Add one on Models & keys so runs use your own model account.",
+		"empty": "No provider keys yet. Add one in Settings > Model keys so runs use your own model account.",
 		"add": "Add a key"
 	},
 	"chart": {
@@ -51,7 +51,7 @@
 		"title": "Cost"
 	},
 	"empty": "No finished runs between {{from}} and {{to}}. Run a comparison, or pick a wider date range.",
-	"emptyAction": "Start a run",
+	"emptyAction": "Evaluate an agent",
 	"error": "Could not load usage: {{message}}",
 	"admin": {
 		"title": "Platform usage by organization",

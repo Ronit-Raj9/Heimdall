@@ -41,6 +41,7 @@
 		"here": "You are here"
 	},
 	"models": {
+		"deleteError": "Could not delete the key.",
 		"secretsHint": "Keys your agent's tools need, such as a web search key, are Secrets, not model keys.",
 		"yourKeys": "Your keys",
 		"browse": "Browse providers",
@@ -114,6 +115,12 @@
 	"billing": {
 		"sharedRuns": "Runs on the shared worker"
 	},
+	"toast": {
+		"revoked": "{{name}} revoked. It stops working now."
+	},
+	"dialog": {
+		"close": "Close"
+	},
 	"unsaved": {
 		"title": "Leave without saving?",
 		"body": "You have changes on this page that are not saved. They are lost if you leave.",
@@ -123,7 +130,9 @@
 	"retention": {
 		"confirm_one": "Delete comparisons older than {{count}} day now? Comparisons and their runs older than that are deleted. This cannot be undone.",
 		"confirm_other": "Delete comparisons older than {{count}} days now? Comparisons and their runs older than that are deleted. This cannot be undone.",
-		"confirmLabel": "Delete older data"
+		"confirmLabel": "Delete older data",
+		"confirmTitle": "Shorten data retention?",
+		"confirmCount": "Keep comparisons for {{days}} days? This deletes about {{runs}} runs in {{experiments}} comparisons at the next sweep. This cannot be undone."
 	},
 	"org": {
 		"dangerBody": "These settings delete data. Each one asks before it does."
@@ -145,7 +154,7 @@
 			"settings": "Settings"
 		},
 		"includeReads": "Include reads",
-		"pageOnly": "Filters apply to the page in view.",
+		"pageOnly": "Search covers the whole log. Type and group filters apply to the page in view.",
 		"noMatch": "No entries on this page match the filters.",
 		"clearFilters": "Clear filters",
 		"details": "Details",
@@ -187,7 +196,9 @@
 		"onlyReads": "This page has only reads. Include reads to see them."
 	},
 	"github": {
-		"reconnect": "Reconnect GitHub"
+		"reconnect": "Reconnect GitHub",
+		"disconnected": "GitHub disconnected.",
+		"disconnectError": "Could not disconnect GitHub."
 	},
 	"members": {
 		"inviteValid": "The link works once and expires"
