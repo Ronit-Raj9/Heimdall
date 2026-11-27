@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"github.com/maximhq/bifrost/bench/benchcatalog"
 	"github.com/maximhq/bifrost/bench/evalstore"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/sharelinks"
@@ -179,5 +180,18 @@ func TestRetentionPreview(t *testing.T) {
 	other.getRetention(ctx)
 	if !strings.Contains(string(ctx.Response.Body()), `"experiments":0`) {
 		t.Fatalf("other org %s", ctx.Response.Body())
+	}
+}
+
+func TestCatalogInternalFlag(t *testing.T) {
+	if v := catalogEntryView(benchcatalog.Entry{ID: "suite-heimdall-improver", SuiteID: "heimdall-improver"}); !v.Internal {
+		t.Fatal("improver suite must be internal")
+	}
+	if v := catalogEntryView(benchcatalog.Entry{ID: "example-x", Suites: []string{"a", "heimdall-improver"}}); !v.Internal {
+		t.Fatal("an example adding the improver suite is internal")
+	}
+	v := catalogEntryView(benchcatalog.Entry{ID: "suite-coding-core", SuiteID: "coding-core"})
+	if b := answerOf(t, v); v.Internal || strings.Contains(b, "internal") || !strings.Contains(b, `"id":"suite-coding-core"`) {
+		t.Fatalf("plain entry %s", b)
 	}
 }

@@ -67,7 +67,7 @@ func TestBenchCatalogUploadThenImport(t *testing.T) {
 	var card benchcatalog.Entry
 	for _, e := range list.Entries {
 		if e.ID == "import-fakeds" {
-			card = e
+			card = e.Entry
 		}
 	}
 	if card.UploadExpects == "" || card.DatasetPath != "uploads/datasets/import-fakeds" || !card.Available {
