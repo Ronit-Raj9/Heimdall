@@ -15,7 +15,7 @@ declare module "@/lib/i18n/resources" {
 }
 
 const FIELD =
-	"placeholder:text-muted-foreground/70 dark:bg-input/30 border-input focus-visible:border-primary bg-card w-full min-w-0 rounded-md border px-3 py-2 text-sm shadow-xs outline-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive";
+	"placeholder:text-neutral-500 dark:bg-input/30 border-input focus-visible:border-primary bg-card w-full min-w-0 rounded-md border px-3 py-2 text-sm shadow-xs outline-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive";
 
 const VERDICTS: readonly GuideCallRow["verdict"][] = ["right", "wrong", "skip"];
 
@@ -306,7 +306,7 @@ function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: str
 
 function FieldError({ children, testId }: { children: ReactNode; testId: string }) {
 	return (
-		<p className="text-chart-error-ink text-xs" role="alert" data-testid={testId}>
+		<p className="text-danger-ink text-xs" role="alert" data-testid={testId}>
 			{children}
 		</p>
 	);

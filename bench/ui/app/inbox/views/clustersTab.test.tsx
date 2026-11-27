@@ -69,7 +69,8 @@ describe("ClustersTab", () => {
 		state.list = { ...idle, isLoading: true };
 		const html = renderToStaticMarkup(<ClustersTab />);
 		expect(html).toContain('data-testid="clusters-loading"');
-		expect(html).toContain('data-testid="clusters-banner"');
+		// The caveat sits under the counts, so it shows once the list has loaded (M7-39).
+		expect(html).not.toContain('data-testid="clusters-banner"');
 	});
 
 	it("shows the server's message on failure, with a reset when filters are set", () => {

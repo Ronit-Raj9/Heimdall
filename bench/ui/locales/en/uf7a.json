@@ -1,0 +1,84 @@
+{
+	"accept": {
+		"primary": "Add task to {{benchmark}}",
+		"more": "More ways",
+		"draft": "Draft with a model (up to ${{budget}})",
+		"draftVerb": "Draft it"
+	},
+	"importOpen": "Open it",
+	"inbox": {
+		"search": "Search failures",
+		"searchPlaceholder": "Task, trace id, model or error",
+		"since": "Seen in",
+		"sinceOptions": {
+			"any": "Any time",
+			"24h": "Last day",
+			"7d": "Last 7 days",
+			"30d": "Last 30 days"
+		},
+		"openedOnAll": "No new failures. {{count}} already handled are shown.",
+		"emptyState": "No failures with status {{state}}.",
+		"showAll": "Show all ({{count}})",
+		"emptyFirst": "No production failures yet. Connect a source to pull them in, or send them in with an inbox token.",
+		"emptyFirstAction": "Connect a source",
+		"model": "Model",
+		"noModel": "-",
+		"sourcesLine_one": "{{count}} source, last pull {{last}}. Open to manage.",
+		"sourcesLine_other": "{{count}} sources, last pull {{last}}. Open to manage.",
+		"never": "never"
+	},
+	"source": {
+		"required": "(required)",
+		"stillNeeded": "Still needed: {{fields}}",
+		"notStored": "Not stored yet"
+	},
+	"ingest": {
+		"step1": "Generate an inbox token below (organization admins).",
+		"step2": "Store it where your tool runs as",
+		"step3": "Send failures with the request below: it sends the token as Authorization: Bearer.",
+		"howTo": "Each token is shown once. Store it where your tool runs as {{env}}."
+	},
+	"kept": {
+		"title": "What is kept",
+		"sentence": "Heimdall keeps the failed conversation: the request, the answer and the tool calls, with keys, tokens, email addresses, phone numbers, long numbers and home folder names removed. Names and street addresses are not removed.",
+		"kept": "Kept",
+		"keptList": "The request, the answer, the tool calls with their arguments, the model and the times.",
+		"removed": "Removed before storage",
+		"kinds": {
+			"secret": "Keys and tokens",
+			"email": "Email addresses",
+			"phone": "Phone numbers",
+			"number": "Long numbers such as card numbers",
+			"path": "Home folder names"
+		}
+	},
+	"sources": {
+		"blocked": "Blocked: key not stored",
+		"addKey": "Add key"
+	},
+	"clusters": {
+		"search": "Search failure groups",
+		"searchPlaceholder": "Task, agent or error",
+		"noMatch": "No failure group matches this search.",
+		"filtersButton": "Filters ({{count}})",
+		"hideNote": "Hide this note",
+		"kind": {
+			"agent": "Agent",
+			"tool": "Tool",
+			"infra": "Infrastructure"
+		},
+		"clearSearch": "Clear search",
+		"pageOf": "{{first}} to {{last}} of {{total}} groups"
+	},
+	"patterns": {
+		"openComparison": "Open comparison"
+	},
+	"why": {
+		"noAgents": "No agent yet. Connect one, evaluate it, and its failure patterns show here.",
+		"connect": "Connect an agent"
+	},
+	"bulk": {
+		"summary_one": "Turn {{count}} failure into a task in {{suite}}.",
+		"summary_other": "Turn {{count}} failures into tasks in {{suite}}."
+	}
+}

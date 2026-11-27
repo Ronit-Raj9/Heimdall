@@ -92,9 +92,9 @@ describe("review screen with a model draft (wave 4, trace to environment)", () =
 				suite="support"
 			/>,
 		);
-		expect(html).toContain("Draft with a model");
-		expect(html).toContain("Approve and add to the benchmark");
-		expect(html).toContain("Save without checking");
+		// One primary names the benchmark; drafting and saving without the check are in "More ways" (M7-4).
+		expect(html).toContain("Add task to support");
+		expect(html).toContain("More ways");
 		expect(html).toContain("Suggested by a model");
 		expect(html).toContain('data-testid="proposal-field-calls"');
 		expect(html).toContain("The refund call failed.");
@@ -145,8 +145,11 @@ describe("review screen with a model draft (wave 4, trace to environment)", () =
 	});
 
 	it("offers the session file import with its help text", () => {
-		const html = renderToStaticMarkup(<SessionImport />);
+		// The help, limits and file pick sit in a panel the button opens (M7-11).
+		expect(renderToStaticMarkup(<SessionImport />)).not.toContain('accept=".jsonl"');
+		const html = renderToStaticMarkup(<SessionImport defaultOpen />);
 		expect(html).toContain("Import a session file");
+		expect(html).toContain("up to 32 MB");
 		expect(html).toContain('accept=".jsonl"');
 		expect(html).toContain("The file is cleaned of keys, emails and home folder names before it is kept.");
 	});

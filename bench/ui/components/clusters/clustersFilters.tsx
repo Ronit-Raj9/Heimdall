@@ -1,7 +1,8 @@
 import { Input } from "@/components/ui/input";
 import type { ClusterSynthetic } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { useId } from "react";
+import { useId, useState } from "react";
+import "@/app/inbox/views/uf7aI18n";
 import { useTranslation } from "react-i18next";
 
 /** A text filter's URL param. */
@@ -27,18 +28,36 @@ export interface ClustersFiltersProps {
 	disabled?: boolean;
 }
 
+/** How many filters differ from their defaults, for the folded "Filters (n)" button on phones. Exported for tests. */
+export function activeClusterFilters(p: Pick<ClustersFiltersProps, "suite" | "agent" | "exp" | "since" | "synthetic">): number {
+	return [p.suite, p.agent, p.exp, p.since].filter((v) => v.trim() !== "").length + (p.synthetic !== "exclude" ? 1 : 0);
+}
+
 /**
- * Suite, agent, experiments and since as text fields, the minimum count, and the synthetic switch.
- * A field applies on Enter or when it loses focus, so typing does not refetch on every key.
+ * Suite and experiments as text fields (applied on Enter or when they lose focus, so typing does
+ * not refetch on every key), the agent as a select of the agents in the list, since as a date, the
+ * minimum count, and the synthetic switch. Below sm they fold behind "Filters (n)" (M7-37, M7-38).
  */
 export function ClustersFilters(props: ClustersFiltersProps) {
 	const { t } = useTranslation("bench");
+	const { t: f } = useTranslation("uf7a");
 	const { disabled, onText } = props;
 	const hintId = useId();
+	const [open, setOpen] = useState(false);
+	const count = activeClusterFilters(props);
 	return (
 		<div className="flex flex-col gap-1.5">
+			<button
+				type="button"
+				className="bg-card hover:bg-accent inline-flex h-9 w-fit items-center rounded-md border px-3 text-sm font-medium sm:hidden"
+				aria-expanded={open}
+				onClick={() => setOpen((o) => !o)}
+				data-testid="clusters-filters-toggle"
+			>
+				{f("clusters.filtersButton", { count })}
+			</button>
 			<div
-				className="flex flex-wrap items-end gap-4"
+				className={cn("flex-wrap items-end gap-4 sm:flex", open ? "flex" : "hidden")}
 				role="group"
 				aria-label={t("clusters.filters.label")}
 				aria-describedby={hintId}
@@ -52,11 +71,11 @@ export function ClustersFilters(props: ClustersFiltersProps) {
 					disabled={disabled}
 					testId="clusters-filter-suite"
 				/>
-				<TextField
+				<SelectField
 					label={t("clusters.filters.agent")}
 					value={props.agent}
-					placeholder={t("clusters.filters.agentPlaceholder")}
-					options={props.agentOptions}
+					allLabel={t("clusters.filters.agentPlaceholder")}
+					options={props.agentOptions ?? []}
 					onCommit={(value) => onText("agent", value)}
 					disabled={disabled}
 					testId="clusters-filter-agent"
@@ -69,16 +88,16 @@ export function ClustersFilters(props: ClustersFiltersProps) {
 					onCommit={(value) => onText("exp", value)}
 					disabled={disabled}
 					testId="clusters-filter-exp"
-					className="w-56"
+					className="sm:w-56"
 				/>
 				<TextField
 					label={t("clusters.filters.since")}
 					value={props.since}
-					placeholder={t("clusters.filters.sincePlaceholder")}
+					type="date"
 					onCommit={(value) => onText("since", value)}
 					disabled={disabled}
 					testId="clusters-filter-since"
-					className="w-36"
+					className="sm:w-40"
 				/>
 				<TextField
 					label={t("clusters.filters.min")}
@@ -90,7 +109,7 @@ export function ClustersFilters(props: ClustersFiltersProps) {
 					}}
 					disabled={disabled}
 					testId="clusters-filter-min"
-					className="w-24"
+					className="sm:w-24"
 				/>
 				<Segmented
 					label={t("clusters.filters.synthetic")}
@@ -105,7 +124,7 @@ export function ClustersFilters(props: ClustersFiltersProps) {
 					testId="clusters-synthetic"
 				/>
 			</div>
-			<p id={hintId} className="text-muted-foreground text-[11px]">
+			<p id={hintId} className="sr-only">
 				{t("clusters.filters.apply")}
 			</p>
 		</div>
@@ -116,7 +135,7 @@ interface TextFieldProps {
 	label: string;
 	value: string;
 	placeholder?: string;
-	type?: "text" | "number";
+	type?: "text" | "number" | "date";
 	/** Suggestions shown under the field while typing. */
 	options?: readonly string[];
 	onCommit: (value: string) => void;
@@ -137,7 +156,7 @@ function TextField({ label, value, placeholder, type = "text", options, onCommit
 	};
 	return (
 		<div className="flex flex-col gap-1">
-			<label htmlFor={id} className="text-muted-foreground text-xs">
+			<label htmlFor={id} className="text-muted-foreground text-sm">
 				{label}
 			</label>
 			<Input
@@ -150,10 +169,11 @@ function TextField({ label, value, placeholder, type = "text", options, onCommit
 				disabled={disabled}
 				list={options && options.length > 0 ? listId : undefined}
 				onBlur={(e) => commit(e.currentTarget.value)}
+				onChange={type === "date" ? (e) => commit(e.currentTarget.value) : undefined}
 				onKeyDown={(e) => {
 					if (e.key === "Enter") commit(e.currentTarget.value);
 				}}
-				className={cn("w-44 font-mono text-xs md:text-xs", className)}
+				className={cn("w-full font-mono text-xs sm:w-44 md:text-xs", className)}
 				data-testid={testId}
 			/>
 			{options && options.length > 0 && (
@@ -163,6 +183,50 @@ function TextField({ label, value, placeholder, type = "text", options, onCommit
 					))}
 				</datalist>
 			)}
+		</div>
+	);
+}
+
+/** A select of known values with an "every ..." first choice; a URL value not in the list stays selectable. */
+function SelectField({
+	label,
+	value,
+	allLabel,
+	options,
+	onCommit,
+	disabled,
+	testId,
+}: {
+	label: string;
+	value: string;
+	allLabel: string;
+	options: readonly string[];
+	onCommit: (value: string) => void;
+	disabled?: boolean;
+	testId: string;
+}) {
+	const id = useId();
+	const list = value && !options.includes(value) ? [...options, value] : options;
+	return (
+		<div className="flex flex-col gap-1">
+			<label htmlFor={id} className="text-muted-foreground text-sm">
+				{label}
+			</label>
+			<select
+				id={id}
+				value={value}
+				disabled={disabled}
+				onChange={(e) => onCommit(e.target.value)}
+				className="border-input bg-card dark:bg-input/20 h-9 w-full rounded-md border px-2 font-mono text-xs shadow-xs outline-none sm:w-44"
+				data-testid={testId}
+			>
+				<option value="">{allLabel}</option>
+				{list.map((o) => (
+					<option key={o} value={o}>
+						{o}
+					</option>
+				))}
+			</select>
 		</div>
 	);
 }
@@ -181,7 +245,7 @@ function Segmented<T extends string>({ label, value, options, onChange, disabled
 	const id = useId();
 	return (
 		<div className="flex flex-col gap-1">
-			<span id={id} className="text-muted-foreground text-xs">
+			<span id={id} className="text-muted-foreground text-sm">
 				{label}
 			</span>
 			<div

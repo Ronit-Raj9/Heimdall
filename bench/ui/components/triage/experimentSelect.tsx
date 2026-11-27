@@ -107,12 +107,12 @@ export function ExperimentSelect({ picker, value, onChange, showHidden, onShowHi
 				</SelectContent>
 			</Select>
 			{picker.hiddenCount > 0 && (
-				<label className="text-muted-foreground inline-flex items-center gap-2 text-xs" title={tx("picker.showHiddenHint")}>
+				<label className="text-muted-foreground inline-flex min-h-6 items-center gap-2 text-sm" title={tx("picker.showHiddenHint")}>
 					<input
 						type="checkbox"
 						checked={showHidden}
 						onChange={(ev) => onShowHidden(ev.target.checked)}
-						className="accent-primary size-3.5"
+						className="accent-primary size-4"
 						data-testid={`${testId}-show-hidden`}
 					/>
 					{tx("picker.showHidden", { count: picker.hiddenCount })}

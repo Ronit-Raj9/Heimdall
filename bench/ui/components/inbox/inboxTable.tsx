@@ -64,12 +64,20 @@ export function InboxTable({ items, selectedId, onSelect }: InboxTableProps) {
 								>
 									{item.title}
 								</button>
-								<span className="text-muted-foreground font-mono text-[11px]">{item.id}</span>
+								<span className="text-muted-foreground block font-mono text-xs">{item.id}</span>
 							</TableCell>
 							<TableCell>
 								<div className="flex flex-col">
 									<span className="font-mono text-xs">{item.source}</span>
-									<span className="text-muted-foreground text-[11px]">{item.source_kind}</span>
+									{/* The kind only when it says more than the name ("webhook webhook", M7-12); then the model the session used. */}
+									{item.source_kind && item.source_kind !== item.source && (
+										<span className="text-muted-foreground text-xs">{item.source_kind}</span>
+									)}
+									{item.model && (
+										<span className="text-muted-foreground font-mono text-xs" data-testid={`inbox-model-${item.id}`}>
+											{item.model}
+										</span>
+									)}
 								</div>
 							</TableCell>
 							<TableCell className="max-w-72" data-testid={`inbox-flagged-${item.id}`}>
@@ -112,11 +120,18 @@ export function InboxTable({ items, selectedId, onSelect }: InboxTableProps) {
 							<TableCell className="text-xs" data-testid={`inbox-task-${item.id}`}>
 								{item.task ? (
 									<div className="flex flex-col items-start gap-1">
-										<span className="font-mono">{t("inbox.table.acceptedAs", { suite: item.task.suite, task: item.task.id })}</span>
+										<span className="font-mono">
+											{t("inbox.table.acceptedAs", {
+												suite: item.task.suite,
+												task: item.task.id,
+											})}
+										</span>
 										<ReleaseBadge release={item.release} testId={`inbox-release-${item.id}`} />
 										{(item.recurrences ?? 0) > 0 && (
 											<span className="text-chart-warning-ink" data-testid={`inbox-recurrences-${item.id}`}>
-												{t("inbox.table.recurrences", { count: item.recurrences ?? 0 })}
+												{t("inbox.table.recurrences", {
+													count: item.recurrences ?? 0,
+												})}
 											</span>
 										)}
 									</div>

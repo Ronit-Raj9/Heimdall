@@ -4,7 +4,9 @@ import { ShadowReplayLink } from "@/components/replays/shadowReplayLink";
 import { PatternList } from "@/components/reportcard/reportFailures";
 import { pct } from "@/components/reportcard/reportCard.utils";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
-import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
+import { EmptyState, PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
+import { latestRunAgent } from "@/app/inbox/views/patternDefaults";
+import "@/app/inbox/views/uf7aI18n";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -18,9 +20,9 @@ import {
 } from "@/lib/store/apis/failurePatternsApi";
 import "@/lib/types/agentFirstI18n";
 import { Link } from "@tanstack/react-router";
-import { ShieldAlert } from "lucide-react";
+import { Bot, ShieldAlert } from "lucide-react";
 import { parseAsBoolean, parseAsInteger, parseAsString, useQueryState } from "nuqs";
-import { useId, useMemo } from "react";
+import { useEffect, useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 /** The value of a filter select that means "every one". Never a version or a benchmark id. */
@@ -191,7 +193,15 @@ function PatternsTab() {
 	const [version, setVersion] = useQueryState("version", parseAsInteger.withOptions({ history: "replace" }));
 	const [benchmark, setBenchmark] = useQueryState("benchmark", parseAsString.withOptions({ history: "replace" }));
 	const [practice, setPractice] = useQueryState("practice", parseAsBoolean.withOptions({ history: "replace" }));
+	const { t: f } = useTranslation("uf7a");
 	const agents = useGetAgentsQuery();
+	const agentList = agents.data?.agents;
+	// With no agent in the URL, open on the agent that ran last, so the view does not open on an empty picker (M7-41).
+	useEffect(() => {
+		if (agent || !agentList) return;
+		const first = latestRunAgent(agentList);
+		if (first) void setAgent(first);
+	}, [agent, agentList, setAgent]);
 	const args = useMemo(() => whyFilterArgs(agent ?? "", version, benchmark, practice), [agent, version, benchmark, practice]);
 	const query = useGetAgentFailurePatternsQuery(args, { skip: !agent });
 	const groups = query.data?.groups ?? [];
@@ -201,6 +211,12 @@ function PatternsTab() {
 		void setVersion(null);
 		void setBenchmark(null);
 	};
+	// No agent at all: nothing to pick, so say how to get one instead of an empty picker (X-109).
+	if (agents.data && (agentList ?? []).length === 0) {
+		return (
+			<EmptyState icon={Bot} message={f("why.noAgents")} action={{ label: f("why.connect"), to: "/connect" }} testId="why-no-agents" />
+		);
+	}
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="why-patterns">
 			<div className="flex flex-wrap items-end gap-3">

@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { DropdownMenu } from "@/components/ui/dropdownMenu";
 import { Input } from "@/components/ui/input";
 import { useSession, usesWriteToken } from "@/lib/session/sessionContext";
 import { readWriteToken, saveWriteToken } from "@/lib/store/apis/benchApi";
@@ -13,7 +14,7 @@ import {
 	type Mode,
 } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { Info } from "lucide-react";
+import { ChevronDown, Info } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -34,12 +35,13 @@ import {
 	type AcceptFormValues,
 	type RejectFormValues,
 } from "./inbox.utils";
+import "@/app/inbox/views/uf7aI18n";
 import { formatInboxTime, useKindLabel } from "./inboxBadges";
 import { GuideFields } from "./inboxGuide";
 import { guideDefaults, guideFormErrors, guideFrom, isToolKind, type GuideFormValues } from "./inboxGuide.utils";
 
 const FIELD =
-	"placeholder:text-muted-foreground/70 dark:bg-input/30 border-input focus-visible:border-primary bg-card w-full min-w-0 rounded-md border px-3 py-2 text-sm shadow-xs outline-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive";
+	"placeholder:text-neutral-500 dark:bg-input/30 border-input focus-visible:border-primary bg-card w-full min-w-0 rounded-md border px-3 py-2 text-sm shadow-xs outline-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive";
 
 export type InboxAction = "accept" | "reject" | "snooze";
 const ACTIONS: readonly InboxAction[] = ["accept", "reject", "snooze"];
@@ -359,6 +361,7 @@ export interface InboxActionsProps {
  */
 export function InboxActions(props: InboxActionsProps) {
 	const { t } = useTranslation("bench");
+	const { t: f } = useTranslation("uf7a");
 	const ids = useId();
 	const [action, setAction] = useState<InboxAction>(props.initialAction ?? "accept");
 	// The write-token box is local mode only: the hosted server uses the session (fix wave 3, N286).
@@ -387,20 +390,35 @@ export function InboxActions(props: InboxActionsProps) {
 							{t("inbox.actions.readOnly", { mode: props.mode ?? "unknown" })}
 						</p>
 					)}
+					{/* One primary (add the task); reject and snooze sit in "More ways" (M7-4). */}
 					<div role="group" aria-label={t("inbox.actions.label")} className="flex flex-wrap gap-2" data-testid="inbox-action-switch">
-						{ACTIONS.map((a) => (
-							<Button
-								key={a}
-								type="button"
-								size="sm"
-								variant={a === action ? "default" : "outline"}
-								aria-pressed={a === action}
-								onClick={() => setAction(a)}
-								dataTestId={`inbox-action-${a}`}
-							>
-								{t(`inbox.actions.${a}`)}
-							</Button>
-						))}
+						<Button
+							type="button"
+							size="sm"
+							variant={action === "accept" ? "default" : "outline"}
+							aria-pressed={action === "accept"}
+							onClick={() => setAction("accept")}
+							dataTestId="inbox-action-accept"
+						>
+							{t("inbox.actions.accept")}
+						</Button>
+						<DropdownMenu
+							label={f("accept.more")}
+							align="start"
+							testId="inbox-action-more"
+							trigger={(p) => (
+								<Button {...p} size="sm" variant={action === "accept" ? "outline" : "default"} dataTestId="inbox-action-more-button">
+									{action === "accept" ? f("accept.more") : t(`inbox.actions.${action}`)}
+									<ChevronDown className="size-3.5" aria-hidden="true" />
+								</Button>
+							)}
+							items={ACTIONS.filter((a) => a !== "accept").map((a) => ({
+								id: a,
+								label: t(`inbox.actions.${a}`),
+								onSelect: () => setAction(a),
+								testId: `inbox-action-${a}`,
+							}))}
+						/>
 					</div>
 					{local && (
 						<Field label={t("inbox.actions.token")} htmlFor={`${ids}-token`} hint={t("inbox.actions.tokenHint")}>
@@ -453,7 +471,7 @@ export function InboxActions(props: InboxActionsProps) {
 				</>
 			)}
 			{props.submitError && (
-				<p role="alert" className="text-chart-error-ink text-sm break-words" data-testid="inbox-action-error">
+				<p role="alert" className="text-danger-ink text-sm break-words" data-testid="inbox-action-error">
 					{t("inbox.actions.error", { error: props.submitError })}
 				</p>
 			)}
@@ -488,7 +506,7 @@ function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: str
 
 function FieldError({ children, testId }: { children: ReactNode; testId: string }) {
 	return (
-		<p className={cn("text-chart-error-ink text-xs")} role="alert" data-testid={testId}>
+		<p className={cn("text-danger-ink text-xs")} role="alert" data-testid={testId}>
 			{children}
 		</p>
 	);

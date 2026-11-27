@@ -112,9 +112,11 @@ describe("SnoozeForm", () => {
 });
 
 describe("InboxActions", () => {
-	it("offers accept, reject and snooze with the write token on a live server", () => {
+	it("offers accept as the one primary, reject and snooze under More ways, with the write token on a live server", () => {
 		const html = renderToStaticMarkup(<InboxActions {...base} />);
-		for (const a of ["accept", "reject", "snooze"]) expect(html).toContain(`data-testid="inbox-action-${a}"`);
+		// Reject and snooze are menu items (M7-4): only the accept button and the menu trigger render closed.
+		expect(html).toContain('data-testid="inbox-action-accept"');
+		expect(html).toContain('data-testid="inbox-action-more-button"');
 		expect(tag(html, "inbox-token-input")).toContain('type="password"');
 		expect(html).toContain('data-testid="inbox-accept-form"');
 		expect(html).not.toContain('data-testid="inbox-actions-read-only"');
