@@ -2,6 +2,9 @@ import { JobLogPanel } from "@/components/jobs/jobLogPanel";
 import { EmptyState } from "@/components/shell/emptyState";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import "@/components/suites/uf6bI18n";
+import "@/app/evaluate/views/ufd3I18n";
+import { importCommand } from "@/components/scenario/scenario.utils";
+import { CopyCodeBlock } from "@/components/suites/copyCodeBlock";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -210,7 +213,30 @@ function EntryFacts({ e }: { e: CatalogEntry }) {
 					<code className="text-xs break-all">{e.source}</code>
 				</Fact>
 			)}
+			{e.kind === "importer" && e.importer && <ImporterCommand importer={e.importer} />}
 		</dl>
+	);
+}
+
+/**
+ * Decision 5 (M6-49): the command line text that the old Import tab showed, closed by default under
+ * the importer's facts.
+ */
+function ImporterCommand({ importer }: { importer: string }) {
+	const { t } = useTranslation("ufd3");
+	const { t: tb } = useTranslation("bench");
+	return (
+		<details className="min-w-0 rounded-md border px-3 py-2" data-testid={`catalog-cli-${importer}`}>
+			<summary className="cursor-pointer text-sm font-medium">{t("suitesCli.summary")}</summary>
+			<div className="mt-2 flex min-w-0 flex-col gap-1.5">
+				<p className="text-muted-foreground text-xs">{t("suitesCli.intro")}</p>
+				<CopyCodeBlock
+					code={importCommand(importer)}
+					label={tb("imports.commandLabel", { name: importer })}
+					testId={`catalog-cli-${importer}-command`}
+				/>
+			</div>
+		</details>
 	);
 }
 

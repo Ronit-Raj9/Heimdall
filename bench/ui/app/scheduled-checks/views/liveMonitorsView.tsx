@@ -485,7 +485,8 @@ function MonitorActions({ d }: { d: MonitorDetailResponse }) {
 				verb={m("live.runConfirm")}
 				capUsd={known ? d.check_budget_usd : null}
 				estimateAt="title"
-				confirm="always"
+				confirm="auto"
+				kind="runNow"
 				confirmText={
 					known
 						? m("live.runAsk", { name: d.name, usd: usd2(d.check_budget_usd), left: usd2(Math.max(0, d.budget_usd_per_day - d.spent_today_usd)) })

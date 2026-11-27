@@ -92,7 +92,7 @@ export function BareModelCard({
 					variant="outline"
 					verb={t("firstLook.bareStart")}
 					capUsd={null}
-					confirm="always"
+					confirm="auto"
 					confirmText={tu("connect.bareConfirm")}
 					onConfirm={onStart}
 					isLoading={loading}
@@ -119,7 +119,7 @@ export function FirstLookLauncher({ agent }: { agent: string }) {
 	const data = planState.data;
 	const start = async () => {
 		if (!data) return;
-		// Real tasks on the user's model key: PaidButton asks first (confirm="always").
+		// Real tasks on the user's model key: PaidButton asks first (the cap is unknown, so auto always asks).
 		const res = await create(data.evaluation);
 		if ("data" in res && res.data) void navigate({ to: "/evaluations/$evalId", params: { evalId: res.data.id } });
 	};
@@ -174,7 +174,7 @@ export function FirstLookLauncher({ agent }: { agent: string }) {
 							verb={tu("connect.firstLookVerb")}
 							capUsd={null}
 							estimateUsd={firstLookUsd(rawUsd) ?? null}
-							confirm="always"
+							confirm="auto"
 							confirmText={tu("connect.firstLookConfirm")}
 							onConfirm={start}
 							isLoading={createState.isLoading}

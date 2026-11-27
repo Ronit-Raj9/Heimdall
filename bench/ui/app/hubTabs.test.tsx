@@ -32,13 +32,15 @@ function at(tab: string | null, Page: () => React.ReactElement) {
 }
 
 describe("hub tabs", () => {
-	it("Benchmarks: My benchmarks by default, Catalog and Import as tabs", () => {
+	it("Benchmarks: My benchmarks by default and Catalog as tabs; no Import tab (decision 5)", () => {
 		const html = at(null, SuitesPage);
-		for (const label of ["My benchmarks", "Catalog", "Import"]) expect(html).toContain(label);
+		for (const label of ["My benchmarks", "Catalog"]) expect(html).toContain(label);
+		expect(html).not.toContain(">Import<");
 		expect(html).toMatch(/<h1[^>]*>[^<]*Benchmarks/);
 		expect(html).toContain("inner-suites");
 		expect(at("catalog", SuitesPage)).toContain("inner-catalog");
-		expect(at("import", SuitesPage)).toContain("inner-import");
+		// The route redirects ?tab=import to the catalog (importTabRedirect); the page never mounts the old view.
+		expect(at("import", SuitesPage)).not.toContain("inner-import");
 	});
 
 	it("Scheduled checks: drift checks and schedules", () => {

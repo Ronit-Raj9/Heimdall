@@ -37,7 +37,6 @@
   },
   "all": "All",
   "defaultModel": "Default model",
-  "scripted": "Practice mode (no real model, free)",
   "keyReady": "Key works",
   "keyMissing": "No key",
   "keyBroken": "Key not working",
