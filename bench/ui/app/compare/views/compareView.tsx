@@ -1,3 +1,6 @@
+import "@/components/reportcard/ufrbI18n";
+import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
+import { runHasVoice } from "@/app/runs_/$runId/views/runTabs";
 import { RunReviewsBlock } from "@/components/review/runReviewsBlock";
 import { AlignedLanes } from "@/components/runs/alignedLanes";
 import { DivergencePanel } from "@/components/runs/divergencePanel"; // I28 first divergence
@@ -142,6 +145,7 @@ type LoadedLane = ReturnType<typeof useRunLane> & { pairRun: PairRun };
 function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => void }) {
 	const { t } = useTranslation("bench");
 	const { t: tu } = useTranslation("uf4b");
+	const { t: tr } = useTranslation("ufrb");
 	const pair = useGetPairQuery(pairId);
 	const catalog = useGetCatalogQuery();
 	// M4-60: one setup picker drives every section; the lane hooks load the picked setups (at most MAX_LANES).
@@ -202,6 +206,16 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 				</div>
 			)}
 
+			{/* Q-145: a setup whose run has no grade is named, with a way to another run of the task. */}
+			{data.runs.length > 1 &&
+				ungradedArms(data.runs).map((arm) => (
+					<div key={arm} className="flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm" data-testid={`compare-no-graded-${arm}`}>
+						<span className="min-w-0 flex-1">{tr("compare.noGraded", { arm })}</span>
+						<Button variant="outline" size="sm" onClick={onClear} dataTestId={`compare-no-graded-${arm}-other`}>
+							{tr("compare.pickOther")}
+						</Button>
+					</div>
+				))}
 			{/* M4-61: a pair with one graded setup says so and offers another pair. */}
 			{data.runs.length === 1 && (
 				<div className="flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm" data-testid="compare-one-side">
@@ -234,7 +248,10 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 				</Card>
 			</Section>
 
-			<Section title={t("runs.evidence.title")} description={t("runs.evidence.description")} testId="runs-evidence-section">
+			{/* Q-143, Q-144: proof and human reviews fold to one line each, so nine runs do not make a 6000 px page. */}
+			<DetailsDisclosure label={t("runs.evidence.title")} testId="runs-evidence-fold">
+			<div className="flex min-w-0 flex-col gap-3" data-testid="runs-evidence-section">
+				<p className="text-muted-foreground text-sm">{t("runs.evidence.description")}</p>
 				<div className="grid min-w-0 gap-6 xl:grid-cols-2">
 					{lanes.map((lane) => (
 						<Card key={lane.pairRun.arm} className="min-w-0 py-0 shadow-none">
@@ -249,13 +266,17 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 						</Card>
 					))}
 				</div>
-			</Section>
+			</div>
+
+			</DetailsDisclosure>
 
 			<Section title={t("runs.claim.title")} description={t("runs.claim.description")} testId="runs-claim-section">
 				<ClaimVsResult rows={lanes.map(toClaimRow)} />
 			</Section>
 
-			<Section title={t("review.runs.title")} description={t("review.runs.description")} testId="runs-reviews-section">
+			<DetailsDisclosure label={t("review.runs.title")} testId="runs-reviews-fold">
+			<div className="flex min-w-0 flex-col gap-3" data-testid="runs-reviews-section">
+				<p className="text-muted-foreground text-sm">{t("review.runs.description")}</p>
 				<div className="grid min-w-0 gap-6 2xl:grid-cols-2">
 					{lanes.map((lane) => (
 						<Card key={lane.pairRun.arm} className="min-w-0 py-0 shadow-none">
@@ -266,7 +287,8 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 						</Card>
 					))}
 				</div>
-			</Section>
+			</div>
+			</DetailsDisclosure>
 
 			<Section title={t("runs.lanes.title")} description={t("runs.lanes.description")} testId="runs-lanes-section">
 				<LanesBody pair={data} lanes={lanes} />
@@ -290,7 +312,7 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 							{/* X1 vision grading */}
 							<RunVisualPanel runId={lane.pairRun.run.run_id} />
 							{/* X8 voice agents */}
-							<RunVoicePanel runId={lane.pairRun.run.run_id} />
+							<RunVoicePanel runId={lane.pairRun.run.run_id} skip={!runHasVoice(lane.detail.data)} />
 							<HardwarePanel hardware={lane.pairRun.run.hardware} arm={lane.pairRun.arm} /> {/* X7: the GPUs a GPU run held */}
 							<RunStepTimeline runId={lane.pairRun.run.run_id} arm={lane.pairRun.arm} />
 						</>
@@ -354,6 +376,11 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 	);
 }
 
+/** Setups whose run carries no grade yet (Q-145). Exported for tests. */
+export function ungradedArms(runs: readonly { arm: string; run: { outcome?: string } }[]): string[] {
+	return runs.filter((r) => !r.run.outcome || r.run.outcome === "unknown" || r.run.outcome === "pending").map((r) => r.arm);
+}
+
 /** A comparison's name from its cached status, or undefined (no id, loading, failed, no name). */
 function useExperimentName(expId: string | null | undefined): string | undefined {
 	const status = useGetExperimentQuery(expId ?? skipToken);
@@ -387,7 +414,11 @@ function PairHeader({ pair, back }: { pair: PairResponse; back: React.ReactNode 
 				<span className="flex flex-wrap items-center gap-x-2">
 					{pair.runs.map((run) => (
 						<span key={run.run.run_id}>
-							{t("runs.arm", { arm: run.arm })} <EntityLink kind="run" id={run.run.run_id} testId={`runs-pair-run-${run.arm}`} />{" "}
+							{t("runs.arm", { arm: run.arm })}{" "}
+							{/* Q-162: the agent by name; the run id stays in the link's title and target. */}
+							<EntityLink kind="run" id={run.run.run_id} testId={`runs-pair-run-${run.arm}`}>
+								{run.run.agent?.config_id || undefined}
+							</EntityLink>{" "}
 							<ArmProvenance provenance={run.provenance} note={run.provenance_note} arm={run.arm} />
 						</span>
 					))}

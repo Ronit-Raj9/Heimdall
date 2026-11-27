@@ -9,6 +9,9 @@ import { useTranslation } from "react-i18next";
 import { ReportCard } from "./reportCard";
 import "./reportCardI18n";
 import { ReportFailures } from "./reportFailures";
+import { useListRunsQuery } from "@/lib/store/apis/benchApi";
+import type { RunListRow } from "@/lib/types/bench";
+import { evaluationTotals } from "./pageNumbers";
 
 /** Counted runs of a report: the server's done count, else the sum over benchmark rows. */
 export function reportDoneRuns(report: Report): number {
@@ -28,6 +31,19 @@ function useFailedRun(evaluationId: string): string | undefined {
 	return undefined;
 }
 
+/** The first solved normal run of a list of runs (Q-83), or undefined. Exported for tests. */
+export function firstSolvedRun(rows: readonly Pick<RunListRow, "run_id" | "outcome" | "condition">[] | undefined): string | undefined {
+	return (rows ?? []).find((r) => r.outcome === "pass" && (!r.condition || r.condition === "clean"))?.run_id
+		?? (rows ?? []).find((r) => r.outcome === "pass")?.run_id;
+}
+
+/** A solved run of the evaluation's first benchmark (one runs request, solved first), for "See a solved run". */
+function useSolvedRun(evaluation: Evaluation | undefined): string | undefined {
+	const exp = evaluation?.children?.find((c) => c.experiment_id && c.status !== "skipped")?.experiment_id;
+	const runs = useListRunsQuery(exp ? { exp, outcome: "pass", limit: 20 } : skipToken);
+	return firstSolvedRun(runs.data?.runs);
+}
+
 /**
  * Fetches GET /evaluations/{id}/report and shows it as a report card. With the evaluation, a budget stop leads the
  * headline and the raise budget panel sits right under it (M3-4); a link opens a failed run's timeline (M3-18).
@@ -37,6 +53,7 @@ export function EvaluationReportCard({ evaluationId, evaluation }: { evaluationI
 	const [where, setWhere] = React.useState<Record<string, string> | undefined>();
 	const report = useGetEvaluationReportQuery(where ? { id: evaluationId, where } : evaluationId);
 	const failedRun = useFailedRun(evaluationId);
+	const solvedRun = useSolvedRun(evaluation);
 	// The raise panel never waits for the report: a budget stop is shown even while it loads or fails (M3-4).
 	const panel = evaluation ? <RaiseBudgetPanel evaluation={evaluation} /> : null;
 	if (report.isLoading) {
@@ -64,9 +81,23 @@ export function EvaluationReportCard({ evaluationId, evaluation }: { evaluationI
 	}
 	const budgetStop = evaluation ? budgetStopOf(evaluation, reportDoneRuns(report.data)) : undefined;
 	const below =
-		budgetStop || failedRun ? (
+		budgetStop || failedRun || solvedRun ? (
 			<div className="flex flex-col gap-3">
 				{evaluation && budgetStop && <RaiseBudgetPanel evaluation={evaluation} />}
+				{(failedRun || solvedRun) && (
+					<span className="flex flex-wrap gap-x-4 gap-y-1">
+						{solvedRun && (
+							<Link
+								to="/runs/$runId"
+								params={{ runId: solvedRun }}
+								search={{ tab: "timeline" } as never}
+								className="text-primary inline-flex w-fit items-center gap-1 text-sm font-medium underline-offset-4 hover:underline"
+								data-testid="report-card-solved-run"
+							>
+								{t("links.solvedRun")}
+								<ArrowUpRight className="size-3.5" aria-hidden="true" />
+							</Link>
+						)}
 				{failedRun && (
 					<Link
 						to="/runs/$runId"
@@ -79,11 +110,16 @@ export function EvaluationReportCard({ evaluationId, evaluation }: { evaluationI
 						<ArrowUpRight className="size-3.5" aria-hidden="true" />
 					</Link>
 				)}
+					</span>
+				)}
 			</div>
 		) : undefined;
 	return (
 		<div className="flex min-w-0 flex-col gap-8">
-			<ReportCard report={report.data} onWhere={setWhere} headlineContext={{ budgetStop }} belowHeadline={below} />
+			<ReportCard
+				report={report.data}
+				totals={where ? undefined : evaluationTotals(evaluation, report.data)}
+				onWhere={setWhere} headlineContext={{ budgetStop }} belowHeadline={below} />
 			<ReportFailures report={report.data} />
 		</div>
 	);

@@ -28,7 +28,7 @@ import { GRADE_SOURCE_MODES, GradeSourcePicker } from "@/components/review/grade
 import { ReviewedBadge } from "@/components/review/reviewedBadge";
 import { GradingBadge, JudgedNotice } from "@/components/scenario/scenarioBadges";
 import { groupSuitesByTrack, isJudgedSuite, suiteFactsById } from "@/components/scenario/scenario.utils";
-import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
+import { EmptyNote, LoadError, Section, TableSkeleton } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { getLocale } from "@/lib/i18n";
 import { useGetLeaderboardQuery } from "@/lib/store";
@@ -253,7 +253,8 @@ export function LeaderboardTab() {
 				/>
 			)}
 			{board.isLoading ? (
-				<BlockSkeleton rows={6} testId="leaderboard-loading" />
+				// The table frame at once; the filters above never wait for the board.
+				<TableSkeleton rows={6} testId="leaderboard-loading" />
 			) : split === "held_out" && isNotFoundError(board.error) ? (
 				<HeldOutBoardOff onBack={() => void setSplit(null)} />
 			) : board.isError || !data ? (

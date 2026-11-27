@@ -65,10 +65,15 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 			t("migration.cost.row.tokensPerTurn"),
 			(arm) => `${Math.round(arm.input_tokens_per_turn)} / ${Math.round(arm.output_tokens_per_turn)}`,
 		],
-		[
-			t("migration.cost.row.attempts"),
-			(arm) => `${arm.retries_per_run.toFixed(2)} / ${arm.fallbacks_per_run.toFixed(2)} / ${arm.rejected_per_run.toFixed(2)}`,
-		],
+		// Q-157: the attempts row is left out when no setup retried, fell back or was rejected.
+		...(attemptsOf(a) + attemptsOf(b) > 0
+			? [
+					[
+						t("migration.cost.row.attempts"),
+						(arm: CostArm) => `${arm.retries_per_run.toFixed(2)} / ${arm.fallbacks_per_run.toFixed(2)} / ${arm.rejected_per_run.toFixed(2)}`,
+					] as [string, (arm: CostArm) => ReactNode],
+				]
+			: []),
 		// M4-24: a row that is 0 for both setups says nothing and is left out.
 		...(a.unpriced_rows + a.unattributed_rows + b.unpriced_rows + b.unattributed_rows > 0
 			? [
@@ -90,21 +95,16 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 				{t("migration.cost.lead")}
 			</p>
 			<FadeScroll pinStart>
-				<table className="w-full min-w-[420px] text-sm" data-testid="cost-arms">
+				{/* Q-156: no fixed width on a phone, so setup B stays in view at 390 px; the wide layout keeps its minimum. */}
+				<table className="w-full text-sm sm:min-w-[420px]" data-testid="cost-arms">
 					<thead>
 						<tr className="text-muted-foreground text-left text-xs">
 							<th className="py-1 pr-3 font-medium" scope="col" />
 							<th className="py-1 pr-3 font-medium" scope="col">
-								{t("migration.cost.arm", {
-									arm: a.arm,
-									label: a.label,
-								})}
+								{setupHead(a)}
 							</th>
 							<th className="py-1 pr-3 font-medium" scope="col">
-								{t("migration.cost.arm", {
-									arm: b.arm,
-									label: b.label,
-								})}
+								{setupHead(b)}
 							</th>
 						</tr>
 					</thead>
@@ -180,6 +180,21 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 	);
 }
 
+/** Retries, fallbacks and rejected calls per run, summed: 0 means the attempts row says nothing. */
+export function attemptsOf(arm: Pick<CostArm, "retries_per_run" | "fallbacks_per_run" | "rejected_per_run">): number {
+	return Math.abs(arm.retries_per_run) + Math.abs(arm.fallbacks_per_run) + Math.abs(arm.rejected_per_run);
+}
+
+/** "A (gpt-5.6-terra)": the setup letter and its model, the name every tab uses (Q-139); the label when no model. */
+export function setupHead(arm: Pick<CostArm, "arm" | "label" | "model">): string {
+	return arm.model ? `${arm.arm} (${arm.model})` : `${arm.arm} (${arm.label})`;
+}
+
+/** Waterfall parts worth a line: a part that is exactly $0 says nothing (Q-157, "Wasted attempts $0"). */
+export function shownParts<T extends { usd: Value }>(parts: readonly T[]): T[] {
+	return parts.filter((p) => observed(p.usd) !== 0);
+}
+
 function valueReason(v: Value, unknown: string): string {
 	if (v.state === "not_applicable") return v.reason ? `n/a (${v.reason})` : "n/a";
 	return v.reason ? `${unknown} (${v.reason})` : unknown;
@@ -198,7 +213,7 @@ function WaterfallView({ title, waterfall, testId }: { title: string; waterfall:
 			</div>
 		);
 	}
-	const bars = waterfallBars(waterfall.parts);
+	const bars = waterfallBars(shownParts(waterfall.parts));
 	const total = observed(waterfall.total);
 	return (
 		<div className="flex flex-col gap-2 text-sm" data-testid={testId}>

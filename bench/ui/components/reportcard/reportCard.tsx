@@ -55,6 +55,7 @@ import { ReliabilityCards, ResilienceCard, StoreDroppedFaults } from "./reliabil
 import { ReportFilterBar, ReportSlices } from "./reportSlices";
 import { FailoverSection } from "@/components/evaluations/failoverSettings";
 import { hasRedTeam, RedTeamSection } from "./redTeamSection";
+import { evaluationTotals, rateText, reportRunCounts, totalCostText, tooFewToRate } from "./pageNumbers";
 
 function costText(m: ReportArmMetrics): string {
 	const c = costDisplay(m);
@@ -74,15 +75,18 @@ export interface ReportCardProps {
 	headlineContext?: HeadlineContext;
 	/** Rendered right under the headline: the raise budget panel and the links to example runs. */
 	belowHeadline?: React.ReactNode;
+	/** The evaluation's run count and spend (evaluationTotals), so the cost line equals the page subtitle. */
+	totals?: { runs?: number; costUsd: number | null };
 }
 
-/** "$0.0090 for 6 runs" from the per arm totals of a one-arm report (M7-89); undefined when the cost is not known. */
-export function costLine(report: Report): string | undefined {
+/**
+ * "$0.0098 for 6 runs": the cost of every run of the evaluation, normal and with faults (M7-89, Q-15). One
+ * definition with the page subtitle (evaluationTotals); the page passes its totals, a shared view reads the report.
+ */
+export function costLine(report: Report, totals?: { runs?: number; costUsd: number | null }): string | undefined {
 	if (isAB(report)) return undefined;
-	const arm = report.arms[0];
-	const total = arm ? report.totals?.[arm.label] : undefined;
-	if (!total || !(total.runs > 0) || typeof total.cost_usd !== "number") return undefined;
-	return `${costDisplay({ runs: total.runs, cost_usd: total.cost_usd }).text} for ${total.runs} ${total.runs === 1 ? "run" : "runs"}`;
+	const t = totals ?? evaluationTotals(undefined, report);
+	return totalCostText({ runs: t.runs ?? reportRunCounts(report)?.all, costUsd: t.costUsd });
 }
 
 /** A gate id in plain words for a sentence, from the hw08 locale (fix wave 3, N215). */
@@ -93,7 +97,7 @@ function useCheckName(): (gate: string) => string {
 }
 
 /** The report card of one evaluation: headline answer, capabilities, benchmarks, reliability, safety. */
-export function ReportCard({ report: raw, className, actions, readOnly = false, onWhere, headlineContext, belowHeadline }: ReportCardProps) {
+export function ReportCard({ report: raw, className, actions, readOnly = false, onWhere, headlineContext, belowHeadline, totals }: ReportCardProps) {
 	const report = visibleReport(raw);
 	const ab = isAB(report);
 	const checkName = useCheckName();
@@ -101,7 +105,7 @@ export function ReportCard({ report: raw, className, actions, readOnly = false, 
 	const { t: tr } = useTranslation("reportCard");
 	const { t: tc } = useTranslation("ufc2");
 	const head = headline(report, checkName, headlineContext);
-	const cost = costLine(report);
+	const cost = costLine(report, totals);
 	const brokenChild = (report.thrown_out_runs ?? 0) > 0 ? thrownOutBenchmarks(report)[0] : undefined;
 	return (
 		<article data-testid="report-card" aria-labelledby="report-card-title" className={cn("flex min-w-0 flex-col gap-8", className)}>
@@ -306,6 +310,8 @@ export function CiBar({ metrics }: { metrics: ReportArmMetrics }) {
 
 function ScoreCell({ metrics }: { metrics?: ReportArmMetrics }) {
 	if (!metrics || !metrics.runs) return <span className="text-muted-foreground">-</span>; // no runs is no score, never 0%
+	// Under 10 runs a count, never a percent with a range (Q-14): the same words as the headline.
+	if (tooFewToRate(metrics.runs)) return <span className="text-foreground tabular-nums">{rateText(metrics)}</span>;
 	const range = scoreRange(metrics);
 	return (
 		<span className="flex items-center gap-2">
@@ -504,9 +510,11 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 				? `${armName(report, result.winner)} solves ${Math.abs(Math.round(result.delta * 100))} points more`
 				: "No clear difference between the agents"
 			: single?.runs
-				? report.mode === "score"
-					? `Score ${pct(single.score)} over ${compactNumber(single.runs)} runs`
-					: `Solves ${pct(single.score)} of ${compactNumber(single.runs)} runs`
+				? tooFewToRate(single.runs)
+					? `Solved ${rateText(single)}`
+					: report.mode === "score"
+						? `Score ${pct(single.score)} over ${compactNumber(single.runs)} runs`
+						: `Solves ${pct(single.score)} of ${compactNumber(single.runs)} runs`
 				: "No runs yet");
 	return (
 		<details data-testid={`benchmark-${row.benchmark}`} className="group/bench">
@@ -526,7 +534,11 @@ function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBe
 					{report.arms.map((arm) => (
 						<span key={arm.label} className="text-foreground">
 							{ab && <span className="text-muted-foreground mr-1 text-sm">{arm.label}</span>}
-							{row.arms[arm.label]?.runs ? pct(row.arms[arm.label]?.score) : "-"}
+							{row.arms[arm.label]?.runs
+									? tooFewToRate(row.arms[arm.label]?.runs)
+										? `${Math.round((row.arms[arm.label]?.score ?? 0) * (row.arms[arm.label]?.runs ?? 0))} of ${row.arms[arm.label]?.runs}`
+										: pct(row.arms[arm.label]?.score)
+									: "-"}
 						</span>
 					))}
 				</span>
@@ -656,7 +668,7 @@ function ReliabilityTable({ report }: { report: Report }) {
 	const unpaired = report.reliability.reduce((n, row) => n + Object.values(row.arms ?? {}).reduce((m, a) => m + (a?.unpaired ?? 0), 0), 0);
 	return (
 		<>
-			<Table data-testid="report-reliability" aria-label={tr("columns.faultTable")}>
+			<Table stack data-testid="report-reliability" aria-label={tr("columns.faultTable")}>
 				<TableHeader>
 					<TableRow>
 						<TableHead scope="col">{tr("columns.fault")}</TableHead>
@@ -682,8 +694,18 @@ function ReliabilityTable({ report }: { report: Report }) {
 								const m = row.arms[arm.label];
 								return (
 									<React.Fragment key={arm.label}>
-										<TableCell className="text-right tabular-nums">{pct(m?.score)}</TableCell>
-										<TableCell className="text-right tabular-nums">{m ? faultChange(m).text : "-"}</TableCell>
+										<TableCell
+											label={isAB(report) ? tr("columns.armScore", { arm: arm.label }) : tr("columns.score")}
+											className="text-right tabular-nums"
+										>
+											{!m ? "-" : m.runs ? rateText({ score: m.score, runs: m.runs }, { range: false }) : pct(m.score)}
+										</TableCell>
+										<TableCell
+											label={isAB(report) ? tr("columns.armChange", { arm: arm.label }) : tr("columns.changeFromNormal")}
+											className="text-right tabular-nums"
+										>
+											{m ? faultChange(m).text : "-"}
+										</TableCell>
 									</React.Fragment>
 								);
 							})}
@@ -866,8 +888,9 @@ export function ExportButtons({ report }: { report: Report }) {
 		window.setTimeout(() => setCopied(""), 2000);
 	};
 
+	// No shrink-0: a max-content row made the page 908 px wide on a phone (Q-24); it wraps inside its line.
 	return (
-		<div className="flex shrink-0 flex-wrap items-center gap-2" data-testid="report-export">
+		<div className="flex max-w-full min-w-0 flex-wrap items-center gap-2" data-testid="report-export">
 			<Button variant="outline" size="sm" onClick={download} data-testid="report-download-json">
 				<Download aria-hidden="true" />
 				Download JSON

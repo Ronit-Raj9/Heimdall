@@ -14,6 +14,10 @@ import type { EvaluationGateResult, GateCheck } from "@/lib/store/apis/evaluatio
 import { cn } from "@/lib/utils";
 import { browserZone } from "@/lib/utils/cron";
 import { PaidButton } from "@/components/ui/paidButton";
+import { repeatCost, repeatCostText, type RepeatCost } from "@/app/schedules/views/repeatCost";
+import "@/app/schedules/views/ufrjI18n";
+import { formatUsd } from "@/lib/money";
+import i18n from "@/lib/i18n";
 import { InlineError } from "@/components/runs/screenStates";
 import { notify } from "@/lib/notify";
 import { useGetEvaluationQuery } from "@/lib/store/apis/evaluationsApi";
@@ -341,20 +345,22 @@ export function repeatAsk(
 	costPerRun: number | undefined,
 	t: (k: string, o?: Record<string, unknown>) => string,
 	limit: number | undefined = defaultRepeatLimit(costPerRun),
-): { message: string; limit?: number } {
+): { message: string; limit?: number; cost: RepeatCost } {
 	const when = t(`repeatAsk.when.${cadence}`, { zone });
-	const money = (n: number) => `$${n.toFixed(2)}`;
-	if (costPerRun == null || !(costPerRun > 0)) {
-		const parts = [when, t("repeatAsk.priceUnknown")];
-		if (limit != null) parts.push(t("repeatAsk.limitOnly", { limit: money(limit) }));
-		return { message: parts.join(" "), ...(limit != null ? { limit } : {}) };
-	}
-	const month = money(costPerRun * RUNS_A_MONTH[cadence]);
-	if (limit == null) return { message: `${when} ${t("repeatAsk.priceNoLimit", { run: money(costPerRun), month })}` };
-	return {
-		message: `${when} ${t("repeatAsk.price", { run: money(costPerRun), month, limit: money(limit) })}`,
-		limit,
-	};
+	const cost = repeatAskCost(cadence, costPerRun, limit);
+	const text = repeatCostText(cost);
+	const sentence = i18n.t(text.key, { ns: "ufrj", ...text.values });
+	return { message: `${when} ${sentence}`, ...(limit != null ? { limit } : {}), cost };
+}
+
+/**
+ * The confirm's three labelled numbers from the shared repeat helper (lane RJ, R6-3): one run, the daily limit,
+ * the month's most. A weekly repeat starts at most one run a week, so its month is 30/7 days at the limit.
+ */
+export function repeatAskCost(cadence: EvaluationCadence, costPerRun: number | undefined, limit: number | undefined): RepeatCost {
+	const c = repeatCost(costPerRun, limit, 1);
+	if (cadence === "weekly" && limit != null && limit > 0) return { ...c, monthMax: formatUsd(limit * RUNS_A_MONTH.weekly) };
+	return c;
 }
 
 /**
@@ -425,8 +431,7 @@ export function RepeatEvaluation({ evaluationId }: { evaluationId: string }) {
 							variant="outline"
 							verb={t(`promote.repeat.${c}` as never)}
 							capUsd={badLimit ? null : (limit ?? null)}
-							estimateUsd={cost != null && cost > 0 ? cost : undefined}
-							estimateAt="title"
+							// The confirm says the expected cost of one run itself (repeatCost), so no second "About" line.
 							confirm="always"
 							kind="row"
 							confirmText={repeatAsk(c, zone, cost, m as never, badLimit ? undefined : limit).message}

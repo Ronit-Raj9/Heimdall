@@ -11,6 +11,10 @@ vi.mock("@/lib/store/apis/evaluationsApi", async (orig) => ({
 	useGetEvaluationReportQuery: vi.fn(() => okQuery(scoreReport)),
 	useRaiseEvaluationBudgetMutation: vi.fn(() => [() => ({ unwrap: () => Promise.resolve() }), { isLoading: false }]),
 }));
+vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
+	...(await orig<object>()),
+	useListRunsQuery: vi.fn(() => ({ data: undefined })),
+}));
 vi.mock("@/lib/store/apis/failurePatternsApi", async (orig) => ({
 	...(await orig<object>()),
 	useGetEvaluationFailurePatternsQuery: vi.fn(() => okQuery({ groups: [] })),

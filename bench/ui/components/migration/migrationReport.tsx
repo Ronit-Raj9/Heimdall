@@ -10,6 +10,13 @@ import { FadeScroll } from "./fadeScroll";
 import "@/components/verdict/uf4aI18n";
 import { costText, formatShare, observed } from "./pareto.utils";
 import { ParetoChart } from "./paretoChart";
+import { formatUsd2, observedNumber } from "@/components/verdict/armCost";
+
+/** Average cost per run in the Result tab's format (formatUsd2), so the cost table and this table agree. */
+export function meanCostText(v: Value | undefined, locale: string): string | null {
+	const x = observedNumber(v);
+	return x !== null ? formatUsd2(x, locale) : costText(v, locale);
+}
 
 /** The shared callout's tone per recommendation (X-98, M4-32): no side stripe. */
 const ACTION_TONE: Record<string, AlertTone> = {
@@ -85,6 +92,29 @@ export function MigrationReportView({
 					</li>
 				))}
 			</ul>
+			{/* Q-159: a phone gets one card per model with every value; the wide table starts at sm. */}
+			<ul className="flex flex-col gap-2 sm:hidden" data-testid="migration-models-cards">
+				{report.models.map((m) => (
+					<li key={m.arm} className="rounded-md border p-3 text-sm" data-testid={`migration-model-card-${m.arm}`}>
+						<p className="font-medium">
+							<span className="font-mono">{m.arm}</span> {m.model}
+						</p>
+						<dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+							<dt className="text-muted-foreground">{t("migration.models.success")}</dt>
+							<dd className="tabular-nums">{successText(m.success, locale, unknown)}</dd>
+							<dt className="text-muted-foreground">{t("migration.models.costPerSuccess")}</dt>
+							<dd className="font-mono tabular-nums">{costText(m.cost_per_success, locale) ?? naText(m.cost_per_success, unknown)}</dd>
+							<dt className="text-muted-foreground">{tu("cost.perRun")}</dt>
+							<dd className="font-mono tabular-nums">{meanCostText(meanCost?.[m.arm], locale) ?? unknown}</dd>
+							<dt className="text-muted-foreground">{t("migration.models.tokens")}</dt>
+							<dd className="tabular-nums">{numText(m.tokens, unknown)}</dd>
+							<dt className="text-muted-foreground">{t("migration.models.pareto")}</dt>
+							<dd className="text-xs">{m.pareto}</dd>
+						</dl>
+					</li>
+				))}
+			</ul>
+			<div className="hidden sm:block">
 			<FadeScroll>
 				<table className="w-full min-w-[640px] text-sm" data-testid="migration-models">
 					<thead>
@@ -108,7 +138,7 @@ export function MigrationReportView({
 								</td>
 								{/* M4-2: the average per run, the median of the server only as a labelled second value. */}
 								<td className="py-1 pr-3 tabular-nums" data-testid={`migration-cost-run-${m.arm}`}>
-									<span className="font-mono">{costText(meanCost?.[m.arm], locale) ?? unknown}</span>
+									<span className="font-mono">{meanCostText(meanCost?.[m.arm], locale) ?? unknown}</span>
 									{costText(m.cost_per_run, locale) && (
 										<span className="text-muted-foreground block text-xs">
 											{tu("cost.median", { cost: costText(m.cost_per_run, locale) })}
@@ -127,17 +157,24 @@ export function MigrationReportView({
 					</tbody>
 				</table>
 			</FadeScroll>
+			</div>
 			{report.pareto && <ParetoChart pareto={report.pareto} testId="migration-pareto" />}
 			{report.pairs.map((p) => (
 				<PairSection key={p.to.arm} pair={p} expId={report.exp_id} />
 			))}
 			<ul className="text-muted-foreground list-disc pl-5 text-xs" data-testid="migration-notes">
-				{report.notes.map((n) => (
+				{reportNotes(report).map((n) => (
 					<li key={n}>{n}</li>
 				))}
 			</ul>
 		</div>
 	);
+}
+
+/** The report notes that no pair already lists as a caveat, so a bullet is printed once (Q-178). */
+export function reportNotes(report: Pick<MigrationReport, "notes" | "pairs">): string[] {
+	const caveats = new Set(report.pairs.flatMap((p) => p.recommendation.caveats.map((c) => c.trim())));
+	return report.notes.filter((n) => !caveats.has(n.trim()));
 }
 
 function PairSection({ pair, expId }: { pair: MigrationPair; expId: string }) {

@@ -60,8 +60,8 @@ describe("agent board", () => {
 		expect(html).toContain("not measured");
 		expect(html).toContain("$0.12 per run");
 		expect(html).toContain("$0.12");
-		expect(html).toContain(">Terminal (solved)<");
-		expect(html).toContain(">Coding (solved)<");
+		expect(html).toContain(">Solved (Terminal)<");
+		expect(html).toContain(">Solved (Coding)<");
 		expect(html.match(/data-testid="agent-board-baseline"/g)?.length).toBe(1);
 		expect(html).toContain(">built-in<");
 		expect(html).toContain('title="A ready-made agent from the Heimdall library"');

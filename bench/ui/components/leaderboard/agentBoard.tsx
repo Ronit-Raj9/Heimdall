@@ -1,4 +1,6 @@
-import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
+import { EmptyState } from "@/components/shell/emptyState";
+import "@/components/reportcard/ufrbI18n";
+import { LoadError, TableSkeleton } from "@/components/runs/screenStates";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -131,11 +133,17 @@ export function AgentBoardTab() {
 					})}
 				</p>
 				{board.isLoading ? (
-					<BlockSkeleton className="h-64" testId="agent-board-loading" />
+					// The table frame shows at once while the board loads (it can take a few seconds); nothing else waits for it.
+					<TableSkeleton rows={6} testId="agent-board-loading" />
 				) : board.isError || !data ? (
 					<LoadError title={t("loadError")} error={board.error} onRetry={() => void board.refetch()} testId="agent-board-error" />
 				) : data.rows.length === 0 ? (
-					<EmptyNote testId="agent-board-empty">{hasFilters ? t("emptyFiltered") : t("empty")}</EmptyNote>
+					// Q-154, Q-311: filtered empty offers Clear filters; an empty board leads to the wizard.
+					hasFilters ? (
+						<EmptyState kind="filtered" body={t("emptyFiltered")} action={{ label: t("resetFilters"), onClick: reset }} testId="agent-board-empty" />
+					) : (
+						<EmptyState body={t("empty")} action={{ label: t("evaluateAgent", { ns: "ufrb" }), to: "/evaluate" }} testId="agent-board-empty" />
+					)
 				) : (
 					<div className={cn("bg-card min-w-0 overflow-x-auto rounded-xl border transition-opacity", board.isFetching && "opacity-60")}>
 						<AgentBoardTable
@@ -228,7 +236,7 @@ function CompactSelect({
 				{label}
 			</label>
 			<Select value={value} onValueChange={onChange} disabled={disabled}>
-				<SelectTrigger id={id} size="sm" className={cn("min-w-32 text-xs", mono && "font-mono")} data-testid={testId}>
+				<SelectTrigger id={id} size="sm" className={cn("min-w-32 text-xs", mono && value !== ALL && "font-mono")} data-testid={testId}>
 					<SelectValue />
 				</SelectTrigger>
 				<SelectContent>

@@ -4,6 +4,11 @@ import i18n from "@/lib/i18n";
 import type { DatasetComparison, ReleaseRecord, ReleaseSide, ReleaseSummary, ScoreCI } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
+import * as React from "react";
+import type { Report } from "@/lib/store/apis/evaluationsApi";
+import { rateText } from "@/components/reportcard/pageNumbers";
+import { faultSplit } from "@/components/reportcard/reportCard.utils";
+import "@/components/reportcard/ufrbI18n";
 import "@/components/canaries/uf7bI18n";
 import "@/app/evaluations_/$evalId/views/w4m2I18n";
 
@@ -41,10 +46,29 @@ export function sharedTaskCount(dataset: DatasetComparison | undefined): number 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const usd = (x: number) => (x >= 1 ? `$${x.toFixed(2)}` : `$${x.toFixed(3)}`);
 
-/** "41% (30-52%)". */
+/**
+ * The evaluation report the page already shows, so the release numbers read the same counts as the report card
+ * (Q-14): the faults score from its fault rows, not a second computation. Absent on the releases page.
+ */
+export const ReleaseReportContext = React.createContext<Report | undefined>(undefined);
+
+/** "41% (30%-52%)", or under 10 runs "2 of 3, too few runs to rate": the report card's rateText, one range rule. */
 export function scoreText(s: ScoreCI | undefined): string {
-	if (!s || s.runs === 0) return "-";
-	return `${pct(s.score)} (${Math.round(s.ci_low * 100)}-${pct(s.ci_high)})`;
+	if (!s || s.runs === 0) return none();
+	return rateText(s);
+}
+
+/** A number the server did not send: the word "none", never a bare dash. */
+function none(): string {
+	return i18n.t("evidence.none", { ns: "ufrb" });
+}
+
+/** The candidate's score under faults from the page's report (the headline's "2 of 3"), or undefined. Exported for tests. */
+export function reportFaultText(report: Report | undefined, side: { label: string; evaluation_id?: string }): string | undefined {
+	if (!report || (side.evaluation_id && report.evaluation && side.evaluation_id !== report.evaluation)) return undefined;
+	const split = faultSplit(report, side.label);
+	if (!split || split.faultRuns <= 0) return undefined;
+	return rateText({ score: split.faultSolved / split.faultRuns, runs: split.faultRuns }, { range: false });
 }
 
 type Row = { key: string; label: string; before?: string; after: string; better?: boolean | null };
@@ -55,7 +79,7 @@ function direction(before: number | undefined, after: number | undefined, higher
 	return higherIsBetter ? after > before : after < before;
 }
 
-function rows(s: ReleaseSummary, t: (k: string) => string): Row[] {
+function rows(s: ReleaseSummary, t: (k: string) => string, report?: Report): Row[] {
 	const b: ReleaseSide | undefined = s.baseline;
 	const c = s.candidate;
 	const out: Row[] = [];
@@ -75,7 +99,7 @@ function rows(s: ReleaseSummary, t: (k: string) => string): Row[] {
 		after: scoreText(c),
 		better: direction(b?.score, c.score, true),
 	});
-	const opt = (v: number | undefined, f: (x: number) => string) => (v === undefined ? "-" : f(v));
+	const opt = (v: number | undefined, f: (x: number) => string) => (v === undefined ? none() : f(v));
 	out.push({
 		key: "cost",
 		label: t("releases.ev.costPerSolved"),
@@ -93,8 +117,8 @@ function rows(s: ReleaseSummary, t: (k: string) => string): Row[] {
 	out.push({
 		key: "faults",
 		label: t("releases.ev.faultSurvival"),
-		before: b ? opt(b.fault_survival, pct) : undefined,
-		after: opt(c.fault_survival, pct),
+		before: b ? (reportFaultText(report, b) ?? opt(b.fault_survival, pct)) : undefined,
+		after: reportFaultText(report, c) ?? opt(c.fault_survival, pct),
 		better: direction(b?.fault_survival, c.fault_survival, true),
 	});
 	return out;
@@ -123,6 +147,7 @@ export function ReleaseEvidence({ summary, testId }: { summary: ReleaseSummary; 
 	const { t: m } = useTranslation("uf7b");
 	const b = summary.baseline;
 	const heads = evidenceHeads(summary, m as never);
+	const report = React.useContext(ReleaseReportContext);
 	return (
 		<div className="flex flex-col gap-2" data-testid={testId}>
 			<table className="w-full text-xs tabular-nums">
@@ -134,10 +159,10 @@ export function ReleaseEvidence({ summary, testId }: { summary: ReleaseSummary; 
 					</tr>
 				</thead>
 				<tbody>
-					{rows(summary, t as never).map((r) => (
+					{rows(summary, t as never, report).map((r) => (
 						<tr key={r.key} className="border-t" data-testid={testId ? `${testId}-${r.key}` : undefined}>
 							<td className="text-muted-foreground py-1.5 pr-3">{r.label}</td>
-							{b && <td className="py-1.5 pr-3">{r.before ?? "-"}</td>}
+							{b && <td className="py-1.5 pr-3">{r.before ?? none()}</td>}
 							<td
 								className={cn(
 									"py-1.5 font-medium",

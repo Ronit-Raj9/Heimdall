@@ -5,7 +5,7 @@ import "@/components/reportcard/reportCardI18n";
 import { DetailsDisclosure } from "@/components/ui/detailsDisclosure";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { usePageTitle } from "@/lib/routing/pageTitle";
-import { ServerCrash } from "lucide-react";
+import { ChevronRight, ServerCrash } from "lucide-react";
 import { EvaluationLivePill } from "@/app/evaluations/views/evaluationLivePill";
 import {
 	EVALUATION_POLL_MS,
@@ -43,13 +43,18 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { DeleteAction } from "@/components/platform/deleteAction";
 import { useDeleteEvaluationMutation } from "@/lib/store/apis/dataOpsApi";
 import { useState } from "react";
-import { childSpendText, childStoppedText, RAISE_BUDGET_ANCHOR, RaiseBudgetPanel } from "./raiseBudget";
+import { childStoppedText, RAISE_BUDGET_ANCHOR, RaiseBudgetPanel } from "./raiseBudget";
 import { useTranslation } from "react-i18next";
 import { FirstLookNote } from "@/app/connect/views/firstLookLauncher"; // lane Z01: first look is too small for a verdict
 import { Badge } from "@/components/ui/badge";
 import { formatCost } from "@/components/leaderboard/agentBoard.utils";
 import { parseSkillRefusal, SkillScanProblem } from "./skillScanProblem";
 import "./w4m2I18n";
+import "@/components/reportcard/ufrbI18n";
+import { evaluationTotals } from "@/components/reportcard/pageNumbers";
+import { useGetEvaluationReportQuery, type Report } from "@/lib/store/apis/evaluationsApi";
+import { useGetEvaluationReleasePreviewQuery } from "@/lib/store/apis/evalReleaseApi";
+import { ReleaseReportContext, versionName } from "@/components/releases/releaseEvidence";
 
 /** Fields the server adds to an evaluation in fix wave 3 (N182, N183), read here before the shared type has them. */
 type EvaluationLaunchFacts = Evaluation & { launch?: { started: number; of: number; current?: string }; problem?: string };
@@ -122,27 +127,43 @@ export function queuedReason(evaluation: Evaluation): { key: "noWorker" | "image
 	return null;
 }
 
-/** The subtitle by status (M3-5): progress while running, date, runs and spend once finished. */
+/**
+ * The subtitle by status (M3-5): progress while running, date, runs and spend once finished. The run count and the
+ * spend come from evaluationTotals, the same helper as the report card's cost line (Q-15): every run, normal and with
+ * faults, and every dollar the benchmarks spent. A stored result's time is when it was scored, so it says "Scored".
+ */
 export function evaluationSubtitle(
 	t: (key: string, opts?: Record<string, unknown>) => string,
 	evaluation: Evaluation,
 	locale?: string,
+	report?: Report,
+	tu: (key: string, opts?: Record<string, unknown>) => string = t,
 ): string {
 	const date = formatCreated(evaluation.result?.at || evaluation.created_at, locale);
 	if (isActiveStatus(evaluation.status)) return t("detail.subtitleRunning");
 	if (didNotStart(evaluation)) return t("detail.subtitleFailed");
 	if (evaluation.status === "cancelled") return t("detail.subtitleCancelled", { date });
 	if (evaluation.status === "done") {
-		const arms = evaluation.result?.arms ?? [];
-		const runs = arms.length ? arms.reduce((n, a) => n + (a.runs ?? 0), 0) : undefined;
+		const totals = evaluationTotals(evaluation, report);
 		const budget = evaluationBudget(evaluation);
-		const spent = formatCost(evaluationSpend(evaluation) ?? 0);
-		const runsText = typeof runs === "number" ? runs : "-";
+		const spent = formatCost(totals.costUsd ?? 0);
+		const runs = totals.runs;
+		if (typeof runs !== "number") {
+			return budget > 0
+				? tu("subtitle.scoredNoRuns", { ns: "ufrb", date, spent, budget: formatCost(budget) })
+				: tu("subtitle.scoredOnlyDate", { ns: "ufrb", date });
+		}
 		return budget > 0
-			? t("detail.subtitleDone", { date, runs: runsText, spent, budget: formatCost(budget) })
-			: t("detail.subtitleDoneNoBudget", { date, runs: runsText });
+			? tu("subtitle.scored", { ns: "ufrb", date, runs, spent, budget: formatCost(budget) })
+			: tu("subtitle.scoredNoBudget", { ns: "ufrb", date, runs });
 	}
 	return t("detail.subtitleRunning");
+}
+
+/** "$0.0098 of $5.00 spent" for one benchmark with a cap, money rounded as everywhere on the page (formatCost). */
+export function childSpendLine(c: EvaluationChild): string | undefined {
+	if (!c.budget_usd) return undefined;
+	return `${formatCost(c.spent_usd ?? 0)} of ${formatCost(c.budget_usd)} spent`;
 }
 
 /** The wizard link that starts the same evaluation again (M3-9): agent, mode and first benchmark in the URL. */
@@ -198,6 +219,9 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 	const starting = startingLine(evaluation);
 	const problem = (evaluation as EvaluationLaunchFacts).problem;
 	const { t: tw } = useTranslation("w4m2");
+	const { t: tu } = useTranslation("ufrb");
+	// The same cache entry the report card reads: no second request (Q-15).
+	const reportQ = useGetEvaluationReportQuery(evaluation.id, { skip: evaluation.status !== "done" });
 	const note = benchmarksNote(run.length, skipped.length, active);
 	const notStarted = didNotStart(evaluation);
 	const done = evaluation.status === "done";
@@ -209,7 +233,20 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 		<>
 			{evaluation.gate_result && <GateResultCard gate={evaluation.gate_result} />}
 			<EvaluationReportCard evaluationId={evaluation.id} evaluation={evaluation} />
-			{(spec.mode === "versions" || spec.mode === "score") && <PromoteEvaluation evaluationId={evaluation.id} />}
+			{(spec.mode === "versions" || spec.mode === "score") && (
+				// The full release block, folded; a one line summary sits above the report (Q-61).
+				<details id={RELEASE_ANCHOR} className="group/release min-w-0 scroll-mt-20" data-testid="evaluation-release-fold">
+					<summary className="text-foreground hover:bg-muted/40 inline-flex cursor-pointer list-none items-center gap-1 rounded-md text-base font-semibold [&::-webkit-details-marker]:hidden">
+						<ChevronRight className="size-4 transition-transform duration-150 group-open/release:rotate-90" aria-hidden="true" />
+						{tu("release.fold")}
+					</summary>
+					<div className="mt-3 min-w-0">
+						<ReleaseReportContext.Provider value={reportQ.data}>
+							<PromoteEvaluation evaluationId={evaluation.id} />
+						</ReleaseReportContext.Provider>
+					</div>
+				</details>
+			)}
 			{(spec.mode as string) === "model_switch" && <ModelSwitchReportView evaluationId={evaluation.id} />}
 		</>
 	);
@@ -217,7 +254,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6" data-testid="evaluation-screen" data-status={evaluation.status}>
 			<PageHeader
 				title={spec.name || evaluation.id}
-				subtitle={evaluationSubtitle(t as never, evaluation, i18n.language)}
+				subtitle={evaluationSubtitle(t as never, evaluation, i18n.language, reportQ.data, tu as never)}
 				breadcrumbs={[{ label: t("detail.crumb"), to: "/evaluations" }, { label: spec.name || evaluation.id }]}
 				meta={
 					<span className="flex flex-wrap items-center gap-2">
@@ -282,6 +319,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 						: t("detail.startingNoName", { n: starting.n, m: starting.m })}
 				</p>
 			)}
+			{done && (spec.mode === "versions" || spec.mode === "score") && <ReleaseSummaryLine evaluationId={evaluation.id} />}
 			{/* The result of a finished evaluation comes first, before setup and progress (M3-1). */}
 			{report}
 			{!done && <RaiseBudgetPanel evaluation={evaluation} />}
@@ -310,7 +348,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 						<div className="flex flex-col">
 							<dt className="text-muted-foreground text-xs">{t("detail.budgetLabel")}</dt>
 							<dd className="tabular-nums" data-testid="evaluation-budget">
-								{tf("budget", { amount: formatCost(budget) })}
+								{formatCost(budget)}
 							</dd>
 						</div>
 					)}
@@ -405,10 +443,38 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 	);
 }
 
+/** Where the folded release block sits, for the summary line's link. */
+export const RELEASE_ANCHOR = "evaluation-release";
+
+/**
+ * One line near the top (Q-61): what is live now and a link that opens the folded release block. Reads the same
+ * release preview the block reads (one request); nothing while it loads or when the server has none.
+ */
+function ReleaseSummaryLine({ evaluationId }: { evaluationId: string }) {
+	const { t: tu } = useTranslation("ufrb");
+	const preview = useGetEvaluationReleasePreviewQuery(evaluationId);
+	const p = preview.data;
+	if (!p || preview.isError) return null;
+	const live = p.live?.version ? tu("release.live", { name: versionName(p.agent, p.live.version) }) : tu("release.nothingLive", { agent: p.agent || "-" });
+	const open = () => {
+		const el = document.getElementById(RELEASE_ANCHOR) as HTMLDetailsElement | null;
+		if (el) el.open = true;
+	};
+	return (
+		<p className="bg-card flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-4 py-3 text-sm" data-testid="evaluation-release-line">
+			<span>{live}</span>
+			{(p.blocked?.length ?? 0) > 0 && <span className="text-chart-warning-ink">{tu("release.blocked")}</span>}
+			<a href={`#${RELEASE_ANCHOR}`} onClick={open} className="text-primary font-medium hover:underline" data-testid="evaluation-release-open">
+				{tu("release.open")}
+			</a>
+		</p>
+	);
+}
+
 function ArmCard({ arm, single }: { arm: EvaluationArm; single: boolean }) {
 	const { t } = useTranslation("evaluations");
 	return (
-		<div className="bg-muted/20 flex flex-col gap-1 rounded-lg border p-3 text-sm" data-testid={`evaluation-arm-${arm.label}`}>
+		<div className="flex flex-col gap-1 text-sm" data-testid={`evaluation-arm-${arm.label}`}>
 			{!single && <span className="text-muted-foreground text-xs font-medium">{t("detail.armTitle", { label: arm.label })}</span>}
 			<dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
 				<dt className="text-muted-foreground">{t("detail.armAgent")}</dt>
@@ -503,9 +569,9 @@ export function ChildRow({ child, score = false }: { child: EvaluationChild; sco
 						{t("detail.budgetStopLine")}
 					</a>
 				</span>
-			) : childSpendText(child) ? (
+			) : childSpendLine(child) ? (
 				<span className="text-muted-foreground text-xs tabular-nums" data-testid={`evaluation-child-spend-${child.benchmark}`}>
-					{childSpendText(child)}
+					{childSpendLine(child)}
 				</span>
 			) : null}
 			{!(problem || (slots && slots.done === 0 && !active)) && <span className="ml-auto flex gap-3">

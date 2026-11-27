@@ -19,6 +19,8 @@ vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
 vi.mock("@/lib/store/apis/evaluationsApi", async (orig) => ({
 	...(await orig<object>()),
 	useGetEvaluationQuery: vi.fn(),
+	// Lane RB: the page reads the report (subtitle totals) and the release preview (summary line).
+	useGetEvaluationReportQuery: vi.fn(() => ({ data: undefined })),
 	useCancelEvaluationMutation: vi.fn(() => [() => ({ unwrap: () => Promise.resolve() }), { isLoading: false }]),
 	useRaiseEvaluationBudgetMutation: vi.fn(() => [() => undefined, { isLoading: false }]),
 }));
@@ -29,6 +31,10 @@ vi.mock("@/components/releases/promoteEvaluation", () => ({
 	GateResultCard: ({ gate }: { gate: { state: string } }) => <div data-testid="gate-mock">{gate.state}</div>,
 }));
 
+vi.mock("@/lib/store/apis/evalReleaseApi", async (orig) => ({
+	...(await orig<object>()),
+	useGetEvaluationReleasePreviewQuery: vi.fn(() => ({ data: undefined })),
+}));
 vi.mock("@/lib/store/apis/dataOpsApi", () => ({ useDeleteEvaluationMutation: () => [() => ({ unwrap: () => Promise.resolve() }), {}] }));
 
 vi.mock("@/lib/store/apis/runControlApi", async (orig) => ({
@@ -224,7 +230,8 @@ describe("EvaluationBody (F08)", () => {
 				}}
 			/>,
 		);
-		expect(html).toContain("Budget $1.10");
+		// Q-135: the label says Budget once, the value is the amount alone.
+		expect(html).toMatch(/data-testid="evaluation-budget">\$1\.10</);
 	});
 });
 describe("EvaluationBody finished progress (N142)", () => {

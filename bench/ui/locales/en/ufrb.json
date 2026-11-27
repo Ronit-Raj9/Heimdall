@@ -1,0 +1,28 @@
+{
+	"subtitle": {
+		"scored": "Scored {{date}}, {{runs}} runs, {{spent}} of {{budget}} spent.",
+		"scoredNoBudget": "Scored {{date}}, {{runs}} runs.",
+		"scoredNoRuns": "Scored {{date}}, {{spent}} of {{budget}} spent.",
+		"scoredOnlyDate": "Scored {{date}}."
+	},
+	"release": {
+		"live": "Live now: {{name}}.",
+		"nothingLive": "No version of {{agent}} is live yet.",
+		"open": "Release this version?",
+		"blocked": "Release checks did not pass.",
+		"fold": "Release this evaluation"
+	},
+	"evidence": {
+		"none": "none"
+	},
+	"compare": {
+		"noGraded": "Setup {{arm}} has no graded run of this task.",
+		"pickOther": "Compare another run of this task",
+		"showEmpty_one": "Show {{count}} row with no data",
+		"showEmpty_other": "Show {{count}} rows with no data",
+		"hideEmpty": "Hide rows with no data",
+		"copyId": "Copy id",
+		"copied": "Copied"
+	},
+	"evaluateAgent": "Evaluate an agent"
+}

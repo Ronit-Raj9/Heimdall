@@ -35,8 +35,9 @@ export function ParetoChart({ pareto, testId = "pareto-chart" }: ParetoChartProp
 					role="img"
 					aria-labelledby={`${titleId} ${descId}`}
 					viewBox={`0 0 ${frame.width} ${frame.height}`}
-					// M4-27: never drawn narrower than its 640-unit frame, so the 11 px labels stay 11 px; a phone swipes it.
-					className="h-auto w-full max-w-3xl min-w-[640px]"
+					// Q-176: the chart scales to the screen so every point stays in view (a fixed 640 px width hid
+					// setup A off a phone); below sm the labels are drawn larger so they still read about 11 px.
+					className="h-auto w-full max-w-3xl"
 					data-testid={`${testId}-svg`}
 				>
 					<title id={titleId}>
@@ -45,7 +46,7 @@ export function ParetoChart({ pareto, testId = "pareto-chart" }: ParetoChartProp
 					<desc id={descId}>
 						{frontier.length > 0 ? t("migration.pareto.frontierList", { list: frontier.join(", ") }) : t("migration.pareto.noFrontier")}
 					</desc>
-					<g aria-hidden="true" className="text-muted-foreground" fontSize={11}>
+					<g aria-hidden="true" className="text-muted-foreground max-sm:text-[20px]" fontSize={11}>
 						{model.yTicks.map((tick) => (
 							<g key={`y-${tick.value}`}>
 								<line x1={frame.left} x2={right} y1={tick.pos} y2={tick.pos} stroke="var(--color-chart-track)" strokeWidth={1} />
@@ -167,7 +168,7 @@ function Point({ placed, locale, testId, name }: { placed: PlacedParetoPoint; lo
 			) : (
 				<circle cx={x} cy={y} r={4.5} fill="var(--color-background)" stroke={color} strokeWidth={1.5} />
 			)}
-			<text x={x + 8} y={y - 8} fontSize={11} fill="currentColor" className="text-foreground">
+			<text x={x + 8} y={y - 8} fontSize={11} fill="currentColor" className="text-foreground max-sm:text-[20px]">
 				{name}
 			</text>
 			<circle cx={x} cy={y} r={12} fill="transparent" />

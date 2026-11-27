@@ -73,10 +73,13 @@ function round(x: number): number {
 	return Math.round(x * 10) / 10;
 }
 
-/** US dollars with precision that keeps small costs readable: $0.00412, $0.032, $1.25. */
+/**
+ * US dollars, the rule of the Result and Cost tabs (Q-137): 2 decimals at or above $0.01 ($0.10, $1.25), 4 under a
+ * cent so a small cost stays readable ($0.0041).
+ */
 export function formatUsd(x: number, locale = "en"): string {
 	const abs = Math.abs(x);
-	const digits = abs === 0 ? 0 : abs < 0.01 ? 5 : abs < 1 ? 3 : 2;
+	const digits = abs === 0 ? 0 : abs < 0.01 ? 4 : 2;
 	const text = new Intl.NumberFormat(locale, {
 		style: "currency",
 		currency: "USD",
