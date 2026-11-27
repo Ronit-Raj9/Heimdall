@@ -194,6 +194,13 @@ func (h *gatewayTestsHandler) effect(ctx *fasthttp.RequestCtx) {
 	defer cancel()
 	e, err := gwfeature.Compute(work, src, h.root(), id, string(ctx.QueryArgs().Peek("refresh")) == "1")
 	if errors.Is(err, gwfeature.ErrNotFeatureTest) {
+		// ?optional=1 lets a page that shows this card on every comparison
+		// ask without a 404: a comparison that is no feature test answers
+		// 200 {"effect": null}. Without the parameter the answer is unchanged.
+		if string(ctx.QueryArgs().Peek("optional")) == "1" {
+			lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, map[string]any{"effect": nil})
+			return
+		}
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, err.Error())
 		return
 	}

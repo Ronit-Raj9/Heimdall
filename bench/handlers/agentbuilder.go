@@ -43,9 +43,12 @@ const (
 
 // TemplateParam is one extra field a template asks for (a URL, an image).
 type TemplateParam struct {
-	Name        string `json:"name"`
-	Label       string `json:"label"`
-	Help        string `json:"help,omitempty"`
+	Name  string `json:"name"`
+	Label string `json:"label"`
+	Help  string `json:"help,omitempty"`
+	// Details is the protocol detail behind Help, for a "How it works"
+	// fold: headers, payload fields, signing. Empty when Help says it all.
+	Details     string `json:"details,omitempty"`
 	Placeholder string `json:"placeholder,omitempty"`
 	Required    bool   `json:"required"`
 	// Kind is how the form shows it (J3): text (default), secret (a

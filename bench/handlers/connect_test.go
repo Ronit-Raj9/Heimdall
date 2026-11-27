@@ -162,6 +162,12 @@ func TestConnectFirstLookAndCatalog(t *testing.T) {
 	if fl.Pick.Benchmark != "fastqa" || fl.Evaluation.Preset != "first_look" || fl.Evaluation.Benchmarks[0] != "fastqa" || fl.Evaluation.TasksPerBenchmark != 1 {
 		t.Fatalf("pick %+v", fl)
 	}
+	if fl.EstimateUSD != nil {
+		t.Fatalf("estimate without ?estimate=1: %+v", fl.EstimateUSD)
+	}
+	if code, est := abCall(r, "POST", APIPrefix+"/connect/first-look?estimate=1", ConnectFirstLookRequest{Agent: "bot"}); code != 200 || !strings.Contains(string(est), `"estimate_usd":{`) {
+		t.Fatalf("first look estimate %d %s", code, est)
+	}
 	// H06: "Compare with the bare model" is a second card; the first look keeps its preset.
 	if fl.BareModel == nil || fl.BareModel.Arms[1].Model != fl.Evaluation.Arms[0].Model {
 		t.Fatalf("bare-model card on the agent's model: %+v %q", fl.BareModel, fl.BareModelReason)

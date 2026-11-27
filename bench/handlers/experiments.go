@@ -102,22 +102,33 @@ func (h *ExperimentsHandler) listExperiments(ctx *fasthttp.RequestCtx) {
 		sendUnavailable(ctx, h.mode, "run index")
 		return
 	}
+	// UI fix wave (G3): limit, offset, q and arm_stats answer a paged list
+	// (uifix_g3_experiments.go); without them the list is as before.
+	if h.listExperimentsPaged(ctx) {
+		return
+	}
 	out := schemas.ExperimentList{Experiments: []schemas.ExperimentStatus{}}
 	for _, id := range h.index.Experiments() {
 		if m, ok := h.index.Manifest(id); ok {
-			st := h.status(m, h.index.Runs(id), false)
-			// UI regroup (U2): the newest analysis's decision, when the index can read it.
-			// A debug run is never scored: a decision stored before fix wave 3 is
-			// ignored, so it never reads "Test was broken" (N247).
-			if vi, isVerdict := h.index.(VerdictIndex); isVerdict && st.Debug == "" {
-				if d, found := vi.LatestDecision(id); found {
-					st.Decision = d
-				}
-			}
-			out.Experiments = append(out.Experiments, st)
+			out.Experiments = append(out.Experiments, h.listRow(m, h.index.Runs(id)))
 		}
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+}
+
+// listRow is one experiment's row of GET /experiments: its status with the
+// newest analysis's decision.
+func (h *ExperimentsHandler) listRow(m *schemas.Manifest, runs []RunView) schemas.ExperimentStatus {
+	st := h.status(m, runs, false)
+	// UI regroup (U2): the newest analysis's decision, when the index can read it.
+	// A debug run is never scored: a decision stored before fix wave 3 is
+	// ignored, so it never reads "Test was broken" (N247).
+	if vi, isVerdict := h.index.(VerdictIndex); isVerdict && st.Debug == "" {
+		if d, found := vi.LatestDecision(m.ExpID); found {
+			st.Decision = d
+		}
+	}
+	return st
 }
 
 // planExperiment handles POST /api/bench/experiments/plan. Nothing runs. A
@@ -569,6 +580,10 @@ func runMetrics(index ReadIndex, runs []RunView) map[string]runMetricsRead {
 			continue
 		}
 		id := rv.Run.RunID
+		if r, hit := sealedMetrics.get(index, id, rv.SealHash); hit { // UI fix wave (G3): a sealed run's file never changes (uifix_g3_metricscache.go)
+			out[id] = r
+			continue
+		}
 		data, found, err := readRunFile(index, id, FileMetrics)
 		if err != nil {
 			out[id] = runMetricsRead{err: true}
@@ -576,6 +591,7 @@ func runMetrics(index ReadIndex, runs []RunView) map[string]runMetricsRead {
 		}
 		if !found {
 			out[id] = runMetricsRead{}
+			sealedMetrics.put(index, id, rv.SealHash, out[id])
 			continue
 		}
 		var metrics map[string]schemas.Value
@@ -584,6 +600,7 @@ func runMetrics(index ReadIndex, runs []RunView) map[string]runMetricsRead {
 			continue
 		}
 		out[id] = runMetricsRead{values: metrics, found: true}
+		sealedMetrics.put(index, id, rv.SealHash, out[id])
 	}
 	return out
 }

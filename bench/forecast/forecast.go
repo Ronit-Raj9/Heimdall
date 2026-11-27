@@ -68,6 +68,16 @@ type Input struct {
 	// mid, high), from the price snapshot; false when either is unpriced.
 	// Nil prices library runs only when they ran on the arm's own model.
 	Reprice func(from, to string) (lo, mid, hi float64, ok bool)
+	// AgentRuns is this server's sealed runs of any suite and model, read
+	// for the rough list-price estimate (tokens.go): an arm with no history
+	// and no usable library run is estimated from its agent's typical tokens
+	// per run times its model's list price. Nil, or a nil TokenPrice, keeps
+	// the old answer.
+	AgentRuns []HistoryRun
+	// TokenPrice is the list price of one token of a model (low, mid, high
+	// cover the input to output price spread), from the price snapshot;
+	// false when the model has no price.
+	TokenPrice func(model string) (lo, mid, hi float64, ok bool)
 }
 
 // Estimate forecasts every arm of a planned manifest and the total, and
@@ -141,8 +151,14 @@ func estimateArm(id string, arm schemas.ArmManifest, tasks []string, suite strin
 		if lib, ok := libraryArm(a, arm, tasks, suite, in); ok {
 			return lib
 		}
+		if tok, ok := agentTokensArm(a, arm, in); ok {
+			return tok
+		}
 		return boundArm(a, arm, in)
 	default:
+		if tok, ok := agentTokensArm(a, arm, in); ok {
+			return tok
+		}
 		return boundArm(a, arm, in)
 	}
 	a.HistoryRuns, a.Experiments = len(hist), experimentsOf(hist)
@@ -350,7 +366,7 @@ func basisSummary(arms []schemas.ArmForecast) string {
 	for _, a := range arms {
 		counts[a.Basis]++
 	}
-	if counts[schemas.BasisConfigHash]+counts[schemas.BasisAgentModel]+counts[schemas.BasisLibrary] == 0 {
+	if counts[schemas.BasisConfigHash]+counts[schemas.BasisAgentModel]+counts[schemas.BasisLibrary]+counts[BasisAgentTokens] == 0 {
 		if counts[schemas.BasisBudgetBound] > 0 {
 			return "No history for any arm: upper bounds from per-run usd budgets only, no estimate."
 		}
@@ -361,6 +377,7 @@ func basisSummary(arms []schemas.ArmForecast) string {
 		{schemas.BasisConfigHash, "sealed runs of the same config"},
 		{schemas.BasisAgentModel, "sealed runs of the same agent and model"},
 		{schemas.BasisLibrary, "library runs of other agents on these tasks (first run: your agent may differ)"},
+		{BasisAgentTokens, "a rough list-price estimate from the agent's typical tokens per run"},
 		{schemas.BasisBudgetBound, "a per-run usd budget bound only"},
 		{schemas.BasisNone, "no history (cannot estimate)"},
 	} {

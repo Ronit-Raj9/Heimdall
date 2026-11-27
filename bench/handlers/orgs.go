@@ -156,7 +156,9 @@ var OrgRouteDocs = []RouteDoc{
 	{Method: "GET", Path: APIPrefix + "/orgs/{org}", Tag: "orgs", Summary: "One organization", Response: OrgInfo{}},
 	{Method: "POST", Path: APIPrefix + "/orgs/{org}/rename", Tag: "orgs", Summary: "Rename an organization (admin)", Request: RenameOrgRequest{}, Response: OrgInfo{}},
 	{Method: "POST", Path: APIPrefix + "/orgs/{org}/public-read", Tag: "orgs", Summary: "Let signed-in users who are not members read the organization (owner); anonymous visitors never can", Request: PublicReadRequest{}, Response: OrgInfo{}},
-	{Method: "GET", Path: APIPrefix + "/orgs/{org}/audit", Tag: "orgs", Summary: "Audit log, newest first (admin)", Response: AuditList{}},
+	{Method: "GET", Path: APIPrefix + "/orgs/{org}/audit", Tag: "orgs", Summary: "Audit log, newest first (admin)", Response: AuditList{}, Query: []QueryDoc{
+		{Name: "cursor", Description: "Page: next of the previous page"},
+		{Name: "q", Description: "Only rows whose actor, action, target, address or details contain this text, any case; reads at most 20 pages from cursor, next continues the search"}}},
 	{Method: "POST", Path: APIPrefix + "/orgs/{org}/leave", Tag: "orgs", Summary: "Leave an organization (any member, for themselves; never the last owner)", Status: fasthttp.StatusNoContent},
 	{Method: "GET", Path: APIPrefix + "/orgs/{org}/members", Tag: "orgs", Summary: "Members and roles (admin)", Response: MemberList{}},
 	{Method: "POST", Path: APIPrefix + "/orgs/{org}/members/{user}/role", Tag: "orgs", Summary: "Change a member's role (admin; owner for owners)", Request: RoleRequest{}, Response: MemberInfo{}},
@@ -363,7 +365,14 @@ func (h *OrgsHandler) getAudit(ctx *fasthttp.RequestCtx) {
 	q.Cursor = string(ctx.QueryArgs().Peek("cursor"))
 	wctx, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	rows, next, err := h.orgs.Audit(wctx, o.ID, q)
+	var rows []AuditRow
+	var next string
+	var err error
+	if text := strings.TrimSpace(string(ctx.QueryArgs().Peek("q"))); text != "" {
+		rows, next, err = auditSearch(wctx, h.orgs, o.ID, q, text)
+	} else {
+		rows, next, err = h.orgs.Audit(wctx, o.ID, q)
+	}
 	if err != nil {
 		h.sendErr(ctx, "audit log", err)
 		return

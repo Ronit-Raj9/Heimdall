@@ -11,10 +11,12 @@ package handlers
 // lists every arm model; otherwise known is false and nothing is guessed.
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/forecast"
 	"maps"
 	"math"
 	"slices"
@@ -144,17 +146,21 @@ type EvalMinutesRange struct {
 
 // EvalBenchmarkEstimate is one benchmark's part of the estimate.
 type EvalBenchmarkEstimate struct {
-	Benchmark   string           `json:"benchmark"`
-	Runs        int              `json:"runs"`
-	Tasks       int              `json:"tasks"`
-	Conditions  []string         `json:"conditions"`
-	FaultsSkip  []faults.Skip    `json:"faults_skipped"`
-	EstCostUSD  EvalCostRange    `json:"est_cost_usd"`
-	EstMinutes  EvalMinutesRange `json:"est_minutes"`
-	Basis       string           `json:"basis,omitempty"`
-	Skipped     string           `json:"skipped,omitempty"` // the benchmark cannot run at all
-	Notes       []string         `json:"notes"`
-	Concurrency int              `json:"concurrency,omitempty"`
+	Benchmark  string           `json:"benchmark"`
+	Runs       int              `json:"runs"`
+	Tasks      int              `json:"tasks"`
+	Conditions []string         `json:"conditions"`
+	FaultsSkip []faults.Skip    `json:"faults_skipped"`
+	EstCostUSD EvalCostRange    `json:"est_cost_usd"`
+	EstMinutes EvalMinutesRange `json:"est_minutes"`
+	Basis      string           `json:"basis,omitempty"`
+	// EstimateBasis is "list_price" when some arm has no run history at all
+	// and its cost is a rough guess: its agent's typical tokens per run times
+	// the model's list price (forecast basis agent_tokens). Empty otherwise.
+	EstimateBasis string   `json:"estimate_basis,omitempty"`
+	Skipped       string   `json:"skipped,omitempty"` // the benchmark cannot run at all
+	Notes         []string `json:"notes"`
+	Concurrency   int      `json:"concurrency,omitempty"`
 	// FromLibrary is true when some arm has no history of its own and its
 	// cost and time come from other agents' runs on this benchmark.
 	FromLibrary bool `json:"from_library,omitempty"`
@@ -751,12 +757,16 @@ func applyForecast(be *EvalBenchmarkEstimate, f *schemas.Forecast, want []string
 			be.FromLibrary = true
 			be.Notes = append(be.Notes, fmt.Sprintf("arm %s: %s", a.Arm, a.BasisText))
 		}
+		if string(a.Basis) == forecast.BasisAgentTokens {
+			be.EstimateBasis = "list_price"
+			be.Notes = append(be.Notes, fmt.Sprintf("arm %s: %s", a.Arm, a.BasisText))
+		}
 		lo, hi, ok := rangeBounds(a.CostUSD)
 		be.EstCostUSD.Low += lo
 		be.EstCostUSD.High += hi
 		costKnown = costKnown && ok
 		if !ok && a.CostUSD.Reason != "" {
-			be.Notes = append(be.Notes, fmt.Sprintf("arm %s cost: %s", a.Arm, a.CostUSD.Reason))
+			be.Notes = append(be.Notes, fmt.Sprintf("arm %s cost: %s", cmp.Or(a.Label, a.Arm), a.CostUSD.Reason))
 		}
 		lo, hi, ok = rangeBounds(a.AgentTimeS)
 		agentLow += lo

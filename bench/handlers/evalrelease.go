@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/agentversions"
 	"slices"
 	"strings"
 	"time"
@@ -54,7 +55,23 @@ type EvaluationReleasePreview struct {
 	Blocked         []string                      `json:"blocked"`
 	Ready           bool                          `json:"ready"`             // can be released without an override
 	Problem         string                        `json:"problem,omitempty"` // why it cannot be released at all
+	// ProblemCode names the reason in Problem for the page: not_finished,
+	// cheat_check, no_benchmark_finished, results_unreadable, same_as_live
+	// (the evaluated version is live and another version exists) or
+	// only_one_version (the evaluated version is live and it is the agent's
+	// only version). Empty when Problem is empty.
+	ProblemCode string `json:"problem_code,omitempty"`
 }
+
+// Release preview problem codes (EvaluationReleasePreview.ProblemCode).
+const (
+	ReleaseProblemNotFinished       = "not_finished"
+	ReleaseProblemCheatCheck        = "cheat_check"
+	ReleaseProblemNoBenchmark       = "no_benchmark_finished"
+	ReleaseProblemResultsUnreadable = "results_unreadable"
+	ReleaseProblemSameAsLive        = "same_as_live"
+	ReleaseProblemOnlyOneVersion    = "only_one_version"
+)
 
 // EvaluationReleaseRequest is POST /evaluations/{id}/release.
 type EvaluationReleaseRequest struct {
@@ -107,21 +124,21 @@ func (h *evalReleaseHandler) buildPreview(ctx context.Context, ev *schemas.Evalu
 			Included: c.Status == string(schemas.ExperimentDone)})
 	}
 	if ev.Status != schemas.EvaluationDone {
-		p.Problem = "the evaluation has not finished; a release needs its results"
+		p.Problem, p.ProblemCode = "the evaluation has not finished; a release needs its results", ReleaseProblemNotFinished
 		return p, nil
 	}
 	if ev.CheatCheckOf != "" {
-		p.Problem = cheatCheckNotReleasable
+		p.Problem, p.ProblemCode = cheatCheckNotReleasable, ReleaseProblemCheatCheck
 		return p, nil
 	}
 	if !slices.ContainsFunc(p.Children, func(c EvaluationReleaseChild) bool { return c.Included }) {
-		p.Problem = "no benchmark of this evaluation finished"
+		p.Problem, p.ProblemCode = "no benchmark of this evaluation finished", ReleaseProblemNoBenchmark
 		return p, nil
 	}
 	evals, _ := h.store().List()
 	r, err := h.gates().resolve(ctx, ev, evals)
 	if err != nil {
-		p.Problem = "read the evaluation's results: " + err.Error()
+		p.Problem, p.ProblemCode = "read the evaluation's results: "+err.Error(), ReleaseProblemResultsUnreadable
 		return p, nil
 	}
 	p.Agent, p.Version, p.Candidate, p.Live = r.Agent, r.CandidateVersion, r.Candidate, r.Live
@@ -137,6 +154,10 @@ func (h *evalReleaseHandler) buildPreview(ctx context.Context, ev *schemas.Evalu
 	}
 	if p.Version > 0 && p.Version == r.Live.Version {
 		p.Problem = fmt.Sprintf("%s is already the live version", versionLabel(p.Agent, p.Version))
+		p.ProblemCode = ReleaseProblemSameAsLive
+		if vs, err := agentversions.List(h.root(), p.Agent); err == nil && len(vs) <= 1 {
+			p.ProblemCode = ReleaseProblemOnlyOneVersion
+		}
 		return p, r
 	}
 	p.Blocked = append(p.Blocked, r.blocked(p.Gate)...)

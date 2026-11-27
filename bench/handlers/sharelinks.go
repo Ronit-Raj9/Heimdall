@@ -53,6 +53,9 @@ type ShareView struct {
 	// (/s/<token>); URL is the same on auth.public_url when it is set.
 	Path string `json:"path,omitempty"`
 	URL  string `json:"url,omitempty"`
+	// CreatedByName is the display name of the member who made the link;
+	// empty in local mode or when it would only repeat created_by.
+	CreatedByName string `json:"created_by_name,omitempty"`
 }
 
 // ShareList is GET /shares.
@@ -176,7 +179,13 @@ func shareOrgID(ctx *fasthttp.RequestCtx) string {
 }
 
 func (h *shareHandler) view(ctx *fasthttp.RequestCtx, st *sharelinks.Store, sh sharelinks.Share) ShareView {
+	return h.viewNamed(ctx, st, sh, callerNames(ctx))
+}
+
+// viewNamed is view with the member names looked up once for a whole list.
+func (h *shareHandler) viewNamed(ctx *fasthttp.RequestCtx, st *sharelinks.Store, sh sharelinks.Share, names *actorNames) ShareView {
 	v := ShareView{Share: sh, State: sh.State(h.now())}
+	_, v.CreatedByName = names.show(sh.CreatedBy)
 	if v.State != sharelinks.StateActive {
 		return v
 	}
@@ -269,8 +278,9 @@ func (h *shareHandler) list(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	out := ShareList{Shares: make([]ShareView, 0, len(shares))}
+	names := callerNames(ctx)
 	for _, sh := range shares {
-		out.Shares = append(out.Shares, h.view(ctx, st, sh))
+		out.Shares = append(out.Shares, h.viewNamed(ctx, st, sh, names))
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
 }
@@ -505,7 +515,7 @@ func (h *shareHandler) open(ctx *fasthttp.RequestCtx) {
 			out.Data[p.name] = nil
 			continue
 		}
-		out.Data[p.name] = sharelinks.HideServerText(sharelinks.RedactJSON(body, sh.HidePrompts), h.serverRoots()...)
+		out.Data[p.name] = withoutNewSharedFields(p.name, sharelinks.HideServerText(sharelinks.RedactJSON(body, sh.HidePrompts), h.serverRoots()...))
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
 }

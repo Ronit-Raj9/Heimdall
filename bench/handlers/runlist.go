@@ -29,34 +29,40 @@ const (
 // Cost, steps, tool calls and tokens are read from metrics.json for the rows
 // of the page only; each is absent while the run has no observed value.
 type RunListRow struct {
-	RunID     string          `json:"run_id"`
-	ExpID     string          `json:"exp_id"`
-	PairID    string          `json:"pair_id"`
-	Suite     string          `json:"suite"`
-	Track     string          `json:"track,omitempty"`   // the suite's track; empty when the suite could not be loaded
-	Output    string          `json:"output,omitempty"`  // diff | answer | state | artifact; empty when the suite could not be loaded
-	Grading   string          `json:"grading,omitempty"` // verified | judged: who decided y; empty when the suite could not be loaded
-	Task      string          `json:"task"`
-	Arm       string          `json:"arm"`
-	Condition string          `json:"condition"`
-	Trial     int             `json:"trial"`
-	Attempt   int             `json:"attempt"`
-	Counted   bool            `json:"counted"`
-	Sealed    bool            `json:"sealed"`
-	Outcome   schemas.Outcome `json:"outcome"`
-	Y         schemas.Value   `json:"y"`
-	CostUSD   *schemas.Value  `json:"cost_usd,omitempty"`   // absent for a run with no metrics.json yet
-	Steps     *float64        `json:"steps,omitempty"`      // metrics.json steps; absent when not observed
-	ToolCalls *float64        `json:"tool_calls,omitempty"` // metrics.json tool_calls; absent when not observed
-	Tokens    *float64        `json:"tokens,omitempty"`     // metrics.json tokens; absent when not observed
-	ConfigID  string          `json:"config_id"`
-	Model     string          `json:"model,omitempty"`         // the arm's model from the experiment manifest
-	AgentVer  string          `json:"agent_version,omitempty"` // the agent's own version string, when it declares one
-	Version   int             `json:"version,omitempty"`       // the registered agent version (v1, v2) whose config hash matches; 0 when none
-	Fault     string          `json:"fault,omitempty"`         // the fault injected in this run (model-down, broken-tool, misleading-instruction or the probe family); empty for a clean run
-	Started   *time.Time      `json:"started,omitempty"`
-	SealedAt  *time.Time      `json:"sealed_at,omitempty"`
-	Error     string          `json:"error,omitempty"` // the first part failure's error of a non-pass run, cut to 600 bytes; empty when none
+	RunID     string `json:"run_id"`
+	ExpID     string `json:"exp_id"`
+	PairID    string `json:"pair_id"`
+	Suite     string `json:"suite"`
+	Track     string `json:"track,omitempty"`   // the suite's track; empty when the suite could not be loaded
+	Output    string `json:"output,omitempty"`  // diff | answer | state | artifact; empty when the suite could not be loaded
+	Grading   string `json:"grading,omitempty"` // verified | judged: who decided y; empty when the suite could not be loaded
+	Task      string `json:"task"`
+	TaskTitle string `json:"task_title,omitempty"` // the task's title from its suite; empty when the suite could not be loaded or the task has none
+	// SuiteTitle is the benchmark's catalog title; empty when the catalog has
+	// none. ExpName is the name of the evaluation or comparison the run
+	// belongs to (its frozen plan); empty when it has none.
+	SuiteTitle string          `json:"suite_title,omitempty"`
+	ExpName    string          `json:"exp_name,omitempty"`
+	Arm        string          `json:"arm"`
+	Condition  string          `json:"condition"`
+	Trial      int             `json:"trial"`
+	Attempt    int             `json:"attempt"`
+	Counted    bool            `json:"counted"`
+	Sealed     bool            `json:"sealed"`
+	Outcome    schemas.Outcome `json:"outcome"`
+	Y          schemas.Value   `json:"y"`
+	CostUSD    *schemas.Value  `json:"cost_usd,omitempty"`   // absent for a run with no metrics.json yet
+	Steps      *float64        `json:"steps,omitempty"`      // metrics.json steps; absent when not observed
+	ToolCalls  *float64        `json:"tool_calls,omitempty"` // metrics.json tool_calls; absent when not observed
+	Tokens     *float64        `json:"tokens,omitempty"`     // metrics.json tokens; absent when not observed
+	ConfigID   string          `json:"config_id"`
+	Model      string          `json:"model,omitempty"`         // the arm's model from the experiment manifest
+	AgentVer   string          `json:"agent_version,omitempty"` // the agent's own version string, when it declares one
+	Version    int             `json:"version,omitempty"`       // the registered agent version (v1, v2) whose config hash matches; 0 when none
+	Fault      string          `json:"fault,omitempty"`         // the fault injected in this run (model-down, broken-tool, misleading-instruction or the probe family); empty for a clean run
+	Started    *time.Time      `json:"started,omitempty"`
+	SealedAt   *time.Time      `json:"sealed_at,omitempty"`
+	Error      string          `json:"error,omitempty"` // the first part failure's error of a non-pass run, cut to 600 bytes; empty when none
 	// Paired marks a run whose experiment compares two or more setups and is
 	// not a debug run, so "Compare Setup A and B" has two sides to show.
 	Paired bool `json:"paired,omitempty"`
@@ -214,6 +220,9 @@ func (h *RunListHandler) listRuns(ctx *fasthttp.RequestCtx) {
 		for _, rv := range h.index.Runs(expID) {
 			row := runListRow(rv, suiteInfo)
 			armFacts(&row, rv, m, versions)
+			if m != nil {
+				row.ExpName = strings.TrimSpace(m.Experiment.Name)
+			}
 			all = append(all, row)
 			views[row.RunID] = rv
 		}
@@ -461,6 +470,7 @@ type suiteFacts struct {
 	grading string
 	tasks   map[string]string // task id -> output kind, only for tasks that set their own
 	probes  map[string]string // probe id -> fault name (runFault)
+	titles  map[string]string // task id -> task title, only for tasks that have one
 }
 
 // runListSuiteBudget is how long the runs list waits for one suite.
@@ -498,7 +508,7 @@ func runListRow(rv RunView, suites map[string]suiteFacts) RunListRow {
 		RunID: rv.Run.RunID, ExpID: cmp.Or(rv.Run.ExpID, rv.Slot.ExpID), PairID: cmp.Or(rv.Run.PairID, rv.Slot.PairID),
 		Suite: rv.Slot.Suite, Task: rv.Slot.Task, Arm: rv.Slot.Arm, Condition: rv.Slot.Condition, Trial: rv.Slot.Trial,
 		Attempt: rv.Run.Attempt, Counted: rv.Slot.Counted, Sealed: rv.Sealed, Outcome: rv.Run.Outcome, Y: rv.Run.Y,
-		ConfigID: rv.Run.Agent.ConfigID, SealedAt: rv.Run.Timing.Sealed,
+		ConfigID: rv.Run.Agent.ConfigID, SealedAt: rv.Run.Timing.Sealed, SuiteTitle: suiteTitle(rv.Slot.Suite),
 	}
 	if t := rv.Run.Timing.Started; !t.IsZero() {
 		row.Started = &t
@@ -523,6 +533,7 @@ func runListRow(rv RunView, suites map[string]suiteFacts) RunListRow {
 		row.Track = facts.track
 		row.Grading = facts.grading
 		row.Output = runOutputKindFor(facts, rv.Slot.Task)
+		row.TaskTitle = facts.titles[rv.Slot.Task]
 	}
 	return row
 }

@@ -130,6 +130,10 @@ type ConnectFirstLookResponse struct {
 	// Nil when it does not fit; BareModelReason says why.
 	BareModel       *schemas.EvaluationSpec `json:"bare_model,omitempty"`
 	BareModelReason string                  `json:"bare_model_reason,omitempty"`
+	// EstimateUSD is what the first look is expected to cost on the
+	// caller's key, by the evaluation estimate; sent only with ?estimate=1
+	// and when the estimate could be made.
+	EstimateUSD *EvalCostRange `json:"estimate_usd,omitempty"`
 }
 
 // ConnectExplainRequest is POST /connect/explain: a run or check error.
@@ -181,7 +185,8 @@ func init() {
 		RouteDoc{Method: "POST", Path: p + "/agents", Tag: "connect", Summary: "Save a detected candidate as agents/<id>.yaml (dry_run renders and validates only)", Request: ConnectSaveRequest{}, Status: fasthttp.StatusCreated, Response: AgentFromTemplateResponse{}},
 		RouteDoc{Method: "POST", Path: p + "/verify", Tag: "connect", Summary: "Start the agent.verify job: reach, sign-in, request, answer, latency, memory, isolation, version, tools, model calls, then one real task", Request: ConnectVerifyRequest{}, Status: fasthttp.StatusAccepted, Response: ConnectVerifyStatus{}},
 		RouteDoc{Method: "GET", Path: p + "/verify/{id}", Tag: "connect", Summary: "Rows so far and the result of a verification job", Response: ConnectVerifyStatus{}},
-		RouteDoc{Method: "POST", Path: p + "/first-look", Tag: "connect", Summary: "Pick the first-look benchmark for an agent (fastest compatible) and return the evaluation to start", Request: ConnectFirstLookRequest{}, Response: ConnectFirstLookResponse{}},
+		RouteDoc{Method: "POST", Path: p + "/first-look", Tag: "connect", Summary: "Pick the first-look benchmark for an agent (fastest compatible) and return the evaluation to start", Request: ConnectFirstLookRequest{}, Response: ConnectFirstLookResponse{},
+			Query: []QueryDoc{{Name: "estimate", Description: "1: add estimate_usd, the cost range of the first-look evaluation"}}},
 		RouteDoc{Method: "POST", Path: p + "/explain", Tag: "connect", Summary: "Map a run or check error to its connect failure catalog entry", Request: ConnectExplainRequest{}, Response: ConnectExplainResponse{}},
 	)
 }
@@ -757,6 +762,9 @@ func (h *connectHandler) firstLook(ctx *fasthttp.RequestCtx) {
 	out.BareModel, out.BareModelReason = h.bareModelCard(work, cfg, req, model, pick)
 	if FirstLookReference != nil {
 		out.Reference = FirstLookReference(work, pick.Benchmark, model)
+	}
+	if string(ctx.QueryArgs().Peek("estimate")) == "1" {
+		out.EstimateUSD = h.firstLookCost(work, ev)
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, out)
 }

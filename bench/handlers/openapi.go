@@ -77,10 +77,11 @@ type QueryDoc struct {
 var APIRoutes = []RouteDoc{
 	{Method: "GET", Path: APIPrefix + "/health", Tag: "health", Summary: "Liveness and server version", Response: schemas.Health{}},
 	{Method: "GET", Path: APIPrefix + "/doctor", Tag: "health", Summary: "Preflight checks", Response: schemas.Doctor{}},
-	{Method: "GET", Path: APIPrefix + "/catalog", Tag: "catalog", Summary: "Every registered suite, probe, agent and metric", Response: schemas.Catalog{}},
+	{Method: "GET", Path: APIPrefix + "/catalog", Tag: "catalog", Summary: "Every registered suite, probe, agent and metric; limit, offset and q page the suites only", Response: schemas.Catalog{}, Query: ListQueryDocs},
 	{Method: "GET", Path: OpenAPIPath, Tag: "meta", Summary: "This OpenAPI 3.1 description", Raw: "application/json"},
 
-	{Method: "GET", Path: APIPrefix + "/experiments", Tag: "experiments", Summary: "List experiments with their status", Response: schemas.ExperimentList{}},
+	{Method: "GET", Path: APIPrefix + "/experiments", Tag: "experiments", Summary: "List experiments with their status", Response: schemas.ExperimentList{}, Query: append(append([]QueryDoc{}, ListQueryDocs...),
+		QueryDoc{Name: "arm_stats", Description: "1: each row gets arm_stats, runs, passed, pass rate and cost per setup from the run index"})},
 	{Method: "POST", Path: APIPrefix + "/experiments", Tag: "experiments", Summary: "Plan, freeze and create an experiment; nothing runs until start",
 		Auth: AuthWrite, Request: schemas.Experiment{}, RequestAlso: experimentMediaTypes, Status: fasthttp.StatusCreated, Response: schemas.ExperimentCreated{}},
 	{Method: "POST", Path: APIPrefix + "/experiments/plan", Tag: "experiments", Summary: "Size an experiment without running anything; planner errors come back in errors with 200",
@@ -155,7 +156,8 @@ var APIRoutes = []RouteDoc{
 		{Name: "limit", Description: "Page size; default 100, at most 500"}, {Name: "offset", Description: "Rows to skip"},
 		{Name: "failed", Description: "1 or true: only runs that did not pass"},
 	}},
-	{Method: "GET", Path: APIPrefix + "/runs/{id}", Tag: "runs", Summary: "One run with seal, grade, metrics, gates and receipts", Response: schemas.RunDetail{}},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}", Tag: "runs", Summary: "One run with seal, grade, metrics, gates and receipts", Response: schemas.RunDetail{},
+		Query: []QueryDoc{{Name: "failure", Description: "1: a run that did not pass gets failure, its failure group in its own evaluation (signature, title, text, count)"}}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/events", Tag: "runs", Summary: "Canonical event log of a run", Response: schemas.RunEvents{}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/diff", Tag: "runs", Summary: "Patch the agent produced; ?format=text answers the raw patch",
 		Query: []QueryDoc{{Name: "format", Description: "text for the raw patch as text/plain"}}, Response: schemas.RunDiff{}, AlsoRaw: "text/plain"},
@@ -195,7 +197,7 @@ var APIRoutes = []RouteDoc{
 		{Name: "k", Description: "pass@k and pass^k depth, 2 or more"},
 	}},
 	// Failure clusters area (handlers/clusters.go).
-	{Method: "GET", Path: APIPrefix + "/clusters", Tag: "analysis", Summary: "Failed runs across experiments grouped by cause (docs/failure-clusters.md)", Response: clusters.Report{}, Query: ClusterQueryDocs},
+	{Method: "GET", Path: APIPrefix + "/clusters", Tag: "analysis", Summary: "Failed runs across experiments grouped by cause (docs/failure-clusters.md)", Response: clusters.Report{}, Query: append(append([]QueryDoc{}, ClusterQueryDocs...), ListQueryDocs...)},
 	{Method: "GET", Path: APIPrefix + "/clusters/{signature}", Tag: "analysis", Summary: "One failure cluster with its runs", Response: clusters.Detail{}, Query: ClusterQueryDocs},
 	// Index and trends area (handlers/trends.go).
 	TrendsRouteDoc,
@@ -261,15 +263,17 @@ var APIRoutes = []RouteDoc{
 		Auth: AuthInbox, Request: traceinbox.IngestRequest{}, Status: fasthttp.StatusCreated, Response: schemas.InboxIngestResult{}},
 
 	{Method: "GET", Path: APIPrefix + "/suites", Tag: "suites", Summary: "Suites with their tasks", Response: schemas.SuiteList{},
-		Query: []QueryDoc{{Name: "fields", Description: "light: no per-task lists, never waits for a load (pickers); each entry carries ready_task_ids (the tasks a plan accepts, in suite order, from suite.lock) and ready_known (false when the lock cannot be read: readiness unknown, not zero); full: the default. An entry with partial true is a head entry (suite.yaml and suite.lock only) whose tasks, probes and drift are still loading: read the list again"}, {Name: "light", Description: "any value: the same as fields=light"}}},
+		Query: []QueryDoc{{Name: "fields", Description: "light: no per-task lists, never waits for a load (pickers); each entry carries ready_task_ids (the tasks a plan accepts, in suite order, from suite.lock) and ready_known (false when the lock cannot be read: readiness unknown, not zero); full: the default. An entry with partial true is a head entry (suite.yaml and suite.lock only) whose tasks, probes and drift are still loading: read the list again"}, {Name: "light", Description: "any value: the same as fields=light"},
+			ListQueryDocs[0], ListQueryDocs[1], ListQueryDocs[2]}},
 	{Method: "GET", Path: APIPrefix + "/suites/{id}/tasks/{task}", Tag: "suites", Summary: "One task of a suite", Response: schemas.SuiteTaskDetail{}},
-	{Method: "GET", Path: APIPrefix + "/suites/{id}/health", Tag: "suites", Summary: "Task health of a suite: verifier flakiness, agent variance, infra, observed difficulty", Response: schemas.SuiteHealth{}}, // Suite health area (suitehealth.go)
+	{Method: "GET", Path: APIPrefix + "/suites/{id}/health", Tag: "suites", Summary: "Task health of a suite: verifier flakiness, agent variance, infra, observed difficulty", Response: schemas.SuiteHealth{},
+		Query: []QueryDoc{{Name: "tasks", Description: "Comma-separated task ids: tasks keeps only these; counts, runs and notes still cover the whole suite"}}}, // Suite health area (suitehealth.go)
 	// W8 judge calibration (calibration.go, docs/judge-calibration.md).
 	{Method: "GET", Path: APIPrefix + "/suites/{id}/calibration", Tag: "suites", Summary: "Judge calibration card of a suite: state, agreement, kappa, false-positive bound, label counts, newest record, drift reminders", Response: schemas.CalibrationStatus{}},
 	{Method: "GET", Path: APIPrefix + "/suites/{id}/calibration/labels", Tag: "suites", Summary: "Every row of the suite's calibration labels, oldest first", Response: schemas.CalibrationLabels{}},
 	{Method: "POST", Path: APIPrefix + "/suites/{id}/calibration/labels", Tag: "suites", Summary: "Append a human label (correct or incorrect) for an answer to a task; refused (403) outside live mode; the labeller name is self-declared",
 		Auth: AuthWrite, Request: schemas.CalibrationLabelRequest{}, Status: fasthttp.StatusCreated, Response: schemas.CalibrationItem{}},
-	{Method: "GET", Path: APIPrefix + "/agents", Tag: "agents", Summary: "Agent configs", Response: schemas.AgentList{}},
+	{Method: "GET", Path: APIPrefix + "/agents", Tag: "agents", Summary: "Agent configs", Response: schemas.AgentList{}, Query: ListQueryDocs},
 	AgentDiffRouteDoc, AgentDiffVersionsRouteDoc, // Agent diff area (agentdiff.go)
 	ComplianceRouteDoc, // Eval integrity area (S2): compliance pack (compliance.go)
 	AwarenessRouteDoc,  // Eval integrity area (S2): eval awareness scan (awareness.go)
@@ -355,7 +359,8 @@ var APIRoutes = []RouteDoc{
 	{Method: "GET", Path: APIPrefix + "/jobs", Tag: "jobs", Summary: "Jobs of the org, newest first, and the kinds POST /jobs accepts", Response: JobList{}, Query: []QueryDoc{
 		{Name: "kind", Description: "Only this kind"}, {Name: "status", Description: "queued, running, succeeded, failed or cancelled"},
 		{Name: "target", Description: "Only jobs on this target, e.g. exp:<id> or suite:<id>"}, {Name: "limit", Description: "1..500, default 50"},
-		{Name: "before", Description: "Page: jobs created before this job id (next of the previous page)"}}},
+		{Name: "before", Description: "Page: jobs created before this job id (next of the previous page)"},
+		{Name: "fields", Description: "count: answer only count (at most 1000, with more true past it) of the jobs the other filters match"}}},
 	{Method: "POST", Path: APIPrefix + "/jobs", Tag: "jobs", Summary: "Queue a job: suite.lint, suite.lock, suite.admit, agent.check, index.rebuild or experiment.regate, params validated per kind, paths inside the org's project folder (member)",
 		Auth: AuthWrite, Request: JobCreate{}, Status: fasthttp.StatusAccepted, Response: jobs.Job{}},
 	{Method: "GET", Path: APIPrefix + "/jobs/{id}", Tag: "jobs", Summary: "One job: status, params, progress, result, error, attempt", Response: jobs.Job{}},

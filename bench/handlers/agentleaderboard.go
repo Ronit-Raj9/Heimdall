@@ -153,9 +153,14 @@ func (h *LeaderboardHandler) buildAgentBoard(ctx context.Context, orgID, capFilt
 	if h.keys != nil {
 		keys = h.keys
 	}
-	src := PricedLeaderboardSource(h.index, KeyPriceLookup(ctx, keys, orgID))
+	// One request reads each run file and seal once, though Build runs per
+	// suite (UI fix wave G3, uifix_g3_leaderboard.go).
+	src := memoLeaderboardSource(PricedLeaderboardSource(h.index, KeyPriceLookup(ctx, keys, orgID)))
 	now := h.now()
-	first, err := leaderboard.Build(ctx, src, leaderboard.Query{Condition: schemas.ConditionClean, Now: now})
+	// One session per request: the runs are collected and classified once
+	// and every board below is built from them (leaderboard.Session).
+	sess := leaderboard.NewSession(src)
+	first, err := sess.Build(ctx, leaderboard.Query{Condition: schemas.ConditionClean, Now: now})
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +180,7 @@ func (h *LeaderboardHandler) buildAgentBoard(ctx context.Context, orgID, capFilt
 		if practice(id) {
 			continue
 		}
-		lb, err := leaderboard.Build(ctx, src, leaderboard.Query{Suite: sv, Condition: schemas.ConditionClean, Now: now})
+		lb, err := sess.Build(ctx, leaderboard.Query{Suite: sv, Condition: schemas.ConditionClean, Now: now})
 		if errors.Is(err, leaderboard.ErrBadQuery) {
 			continue
 		}
@@ -187,7 +192,7 @@ func (h *LeaderboardHandler) buildAgentBoard(ctx context.Context, orgID, capFilt
 		// Runs whose customer a model played rank on their own board per
 		// simulator pin, as separate "simulated customer" rows.
 		for _, pin := range leaderboard.SimulatorPins(src, sv) {
-			sim, err := leaderboard.Build(ctx, src, leaderboard.Query{Suite: sv, Condition: schemas.ConditionClean, Now: now,
+			sim, err := sess.Build(ctx, leaderboard.Query{Suite: sv, Condition: schemas.ConditionClean, Now: now,
 				Customer: leaderboard.CustomerSimulated, Simulator: pin})
 			if errors.Is(err, leaderboard.ErrBadQuery) {
 				continue

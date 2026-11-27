@@ -28,3 +28,6 @@ agent_version?
 version?
 fault?
 paired?
+task_title?
+suite_title?
+exp_name?

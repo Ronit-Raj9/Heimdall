@@ -20,7 +20,8 @@ func init() {
 	APIRoutes = append(APIRoutes,
 		RouteDoc{Method: "DELETE", Path: APIPrefix + "/experiments/{id}", Tag: "experiments", Summary: "Delete a comparison with its runs, traces and gateway logs (admin; 409 while running)", Response: DeletedInfo{}},
 		RouteDoc{Method: "DELETE", Path: APIPrefix + "/evaluations/{id}", Tag: "evaluations", Summary: "Delete a finished evaluation and its comparisons (admin)", Response: DeletedInfo{}},
-		RouteDoc{Method: "GET", Path: APIPrefix + "/data/retention", Tag: "data", Summary: "How long comparisons are kept before automatic deletion (0: forever)", Response: RetentionInfo{}},
+		RouteDoc{Method: "GET", Path: APIPrefix + "/data/retention", Tag: "data", Summary: "How long comparisons are kept before automatic deletion (0: forever)", Response: RetentionInfo{},
+			Query: []QueryDoc{{Name: "preview_days", Description: "1 to 3650 (admin): preview counts the comparisons and runs a retention of this many days would delete; read only"}}},
 		RouteDoc{Method: "PUT", Path: APIPrefix + "/data/retention", Tag: "data", Summary: "Set the retention in days, 0 to keep forever (admin)", Request: RetentionRequest{}, Response: RetentionInfo{}},
 		RouteDoc{Method: "POST", Path: APIPrefix + "/integrations/deliveries/{id}/retry", Tag: "integrations", Summary: "Queue a failed webhook delivery again (member)", Status: fasthttp.StatusAccepted, Response: WebhookDeliveryRetried{}},
 	)

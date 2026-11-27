@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/steprules"
 	"os"
 	"path/filepath"
 	"sort"
@@ -179,8 +180,13 @@ func investigateInputs(env jobEnv, p investigateParams) []investigator.RunInput 
 		for _, f := range v.Run.Failures {
 			in.Failed = append(in.Failed, strings.TrimSpace(f.Part+": "+f.Error))
 		}
-		if raw, err := idx.RunFile(v.Run.RunID, schemas.StepsFile); err == nil {
+		runID := v.Run.RunID
+		if raw, err := idx.RunFile(runID, schemas.StepsFile); err == nil {
 			in.Steps = parseStepLines(raw)
+		} else if steps, _, err := steprules.Load(func(name string) ([]byte, error) { return idx.RunFile(runID, name) }, 0); err == nil {
+			// No steps.jsonl: steprules.Load reads the steps from the run's
+			// evidence.json, as the Behaviour checks do.
+			in.Steps = steps
 		}
 		// The agent's final message is the claim the run recorded (run.json);
 		// Investigate redacts it before any prompt.

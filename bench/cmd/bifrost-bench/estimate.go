@@ -107,6 +107,9 @@ func (a *app) forecast(ctx context.Context, m *schemas.Manifest) (*schemas.Forec
 	f := forecast.Estimate(forecast.Input{
 		Manifest: m, History: h.Runs, Priced: a.priced, PriceRef: a.prices.Ref(), Concurrency: concurrency, Notes: h.Notes(), Now: time.Now(),
 		Library: library, Reprice: a.reprice,
+		// The rough list-price estimate for an arm with no history and no
+		// usable library run (forecast/tokens.go, UI fix wave M3-28).
+		AgentRuns: a.cachedAgentRuns(ctx, m), TokenPrice: a.tokenPrice,
 	})
 	a.logger.Debug("forecast", "experiment", m.ExpID, "suite", m.SuiteID+"@"+m.SuiteVersion,
 		"history_cache", hitText(hit), "library_cache", hitText(libraryHit), "took_ms", time.Since(start).Milliseconds())

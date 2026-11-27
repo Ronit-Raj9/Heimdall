@@ -23,9 +23,28 @@ const CatalogImportKind = "catalog.import"
 
 // BenchCatalogList is GET /benchmarks/catalog.
 type BenchCatalogList struct {
-	Entries    []benchcatalog.Entry `json:"entries"`
-	SourceRoot bool                 `json:"source_available"` // the server found its bench folder
-	Starter    []string             `json:"starter_agents"`
+	Entries    []BenchCatalogEntry `json:"entries"`
+	SourceRoot bool                `json:"source_available"` // the server found its bench folder
+	Starter    []string            `json:"starter_agents"`
+}
+
+// BenchCatalogEntry is one catalog entry as the list shows it. Internal
+// marks an entry that is Heimdall's own machinery, not a benchmark of
+// agents (the improver suite): the catalog page leaves it out.
+type BenchCatalogEntry struct {
+	benchcatalog.Entry
+	Internal bool `json:"internal,omitempty"`
+}
+
+// internalSuites are the suites the server runs for itself.
+var internalSuites = map[string]bool{"heimdall-improver": true}
+
+func catalogEntryView(e benchcatalog.Entry) BenchCatalogEntry {
+	internal := internalSuites[e.SuiteID]
+	for _, id := range e.Suites {
+		internal = internal || internalSuites[id]
+	}
+	return BenchCatalogEntry{Entry: e, Internal: internal}
 }
 
 // BenchCatalogAdd is the body of POST /benchmarks/catalog/{id}/add. Copy
@@ -88,9 +107,9 @@ func (h *benchCatalogHandler) project() string {
 
 func (h *benchCatalogHandler) list(ctx *fasthttp.RequestCtx) {
 	src := h.source()
-	entries := src.List(h.project())
-	if entries == nil {
-		entries = []benchcatalog.Entry{}
+	entries := []BenchCatalogEntry{}
+	for _, e := range src.List(h.project()) {
+		entries = append(entries, catalogEntryView(e))
 	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, BenchCatalogList{Entries: entries, SourceRoot: src.Root != "", Starter: benchcatalog.StarterAgents})
 }

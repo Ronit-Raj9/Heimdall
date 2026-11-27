@@ -20,7 +20,9 @@ func missing(err error) bool {
 
 // Load reads steps.jsonl through read (a RunFile-like func), keeping at most
 // maxRows rows (0 means 20000). It never reads more than 16 MiB. A missing
-// file answers nil, false, nil. Rows come back in Seq order.
+// file falls back to the steps of evidence.json (the same fallback the run
+// step timeline uses); when neither holds steps Load answers nil, false, nil.
+// Rows come back in Seq order.
 func Load(read func(name string) ([]byte, error), maxRows int) (steps []schemas.StepRecord, truncated bool, err error) {
 	if maxRows <= 0 {
 		maxRows = MaxRows
@@ -28,7 +30,7 @@ func Load(read func(name string) ([]byte, error), maxRows int) (steps []schemas.
 	data, err := read(schemas.StepsFile)
 	if err != nil {
 		if missing(err) {
-			return nil, false, nil
+			return loadEvidence(read, maxRows)
 		}
 		return nil, false, err
 	}
@@ -60,6 +62,35 @@ func Load(read func(name string) ([]byte, error), maxRows int) (steps []schemas.
 		return nil, false, err
 	}
 	sort.SliceStable(steps, func(i, j int) bool { return steps[i].Seq < steps[j].Seq })
+	return steps, truncated, nil
+}
+
+// evidenceFile is the sealed run evidence; its "steps" field holds the step
+// timeline of runs that have no steps.jsonl.
+const evidenceFile = "evidence.json"
+
+// loadEvidence reads the steps of evidence.json. A missing file, or one
+// without steps, answers nil, false, nil.
+func loadEvidence(read func(name string) ([]byte, error), maxRows int) ([]schemas.StepRecord, bool, error) {
+	data, err := read(evidenceFile)
+	if err != nil {
+		if missing(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	var ev struct {
+		Steps []schemas.StepRecord `json:"steps"`
+	}
+	if err := json.Unmarshal(data, &ev); err != nil {
+		return nil, false, err
+	}
+	steps := ev.Steps
+	sort.SliceStable(steps, func(i, j int) bool { return steps[i].Seq < steps[j].Seq })
+	truncated := false
+	if len(steps) > maxRows {
+		steps, truncated = steps[:maxRows], true
+	}
 	return steps, truncated, nil
 }
 

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/clusters"
 	"github.com/maximhq/bifrost/bench/evalstore"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/plaintext"
@@ -31,6 +32,7 @@ import (
 //	POST /evaluations/estimate                a refused benchmark's note
 //	POST /estimate                            a refused forecast's notes
 //	GET  /runs/{id}                           a run's part failures
+//	GET  /runs/{id}?failure=1                 the failure group's text and title (UI fix wave)
 //
 // Served elsewhere and covered by their own tests: GET /jobs, GET /jobs/{id},
 // GET /jobs/{id}/logs (jobs_w4b04_test.go, jobsorg_w4b04_test.go,
@@ -169,6 +171,22 @@ func TestServedEngineTextPlain(t *testing.T) {
 	}
 	for _, rt := range routes {
 		w4b04bClean(t, rt.name, rt.get())
+	}
+	// GET /runs/{id}?failure=1 (UI fix wave): the failure group's text and
+	// title come from the clusters normalizer, which lowercases and cuts the
+	// line, so only the gone half of w4b04bClean applies.
+	idx := newClusterIndex()
+	idx.files["r_t01_A"][clusters.FileStderr] = []byte("Traceback (most recent call last):\nValueError: " + w4b04bText + "\n")
+	d := fullDeps()
+	d.index = idx
+	body := string(newTestClient(t, d).do(t, "GET", "/api/bench/runs/r_t01_A?failure=1", nil, nil).Body())
+	if !strings.Contains(body, `"failure"`) || !strings.Contains(body, "could not start") {
+		t.Errorf("failure group missing: %s", body)
+	}
+	for _, gone := range []string{"/var/", "org_01m7", "org_org01m7", "-resume", "-total-usd"} {
+		if strings.Contains(body, gone) {
+			t.Errorf("GET /runs/{id}?failure=1: served %q: %s", gone, body)
+		}
 	}
 }
 

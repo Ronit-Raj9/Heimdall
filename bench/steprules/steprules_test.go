@@ -233,3 +233,38 @@ func TestLoadMissingAndTruncated(t *testing.T) {
 		t.Fatal("unknown cost kept")
 	}
 }
+
+func TestLoadFallsBackToEvidence(t *testing.T) {
+	read := func(name string) ([]byte, error) {
+		if name == "evidence.json" {
+			return []byte(`{"steps":[{"seq":3,"kind":"command"},{"seq":1,"kind":"command"},{"seq":2,"kind":"command"}]}`), nil
+		}
+		return nil, os.ErrNotExist
+	}
+	steps, trunc, err := Load(read, 2)
+	if err != nil || !trunc || len(steps) != 2 || steps[0].Seq != 1 || steps[1].Seq != 2 {
+		t.Fatalf("evidence: %v %v %v", steps, trunc, err)
+	}
+	steps, trunc, err = Load(read, 0)
+	if err != nil || trunc || len(steps) != 3 {
+		t.Fatalf("evidence full: %v %v %v", steps, trunc, err)
+	}
+	noSteps := func(name string) ([]byte, error) {
+		if name == "evidence.json" {
+			return []byte(`{"outcome":"fail"}`), nil
+		}
+		return nil, os.ErrNotExist
+	}
+	if steps, trunc, err := Load(noSteps, 0); steps != nil || trunc || err != nil {
+		t.Fatalf("evidence without steps: %v %v %v", steps, trunc, err)
+	}
+	stepsFirst := func(name string) ([]byte, error) {
+		if name == "evidence.json" {
+			t.Fatal("evidence read although steps.jsonl exists")
+		}
+		return []byte("{\"seq\":1,\"kind\":\"command\"}\n"), nil
+	}
+	if steps, _, err := Load(stepsFirst, 0); err != nil || len(steps) != 1 {
+		t.Fatalf("steps file: %v %v", steps, err)
+	}
+}

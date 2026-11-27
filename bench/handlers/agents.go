@@ -88,6 +88,10 @@ func (h *AgentsHandler) getAgents(ctx *fasthttp.RequestCtx) {
 		sendUnavailable(ctx, h.mode, "agent configs")
 		return
 	}
+	paging, ok := readListPaging(ctx, h.mode) // UI fix wave (G3): limit, offset, q (uifix_g3_lists.go)
+	if !ok {
+		return
+	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
 	files, err := h.agents.AgentConfigs(work)
@@ -105,6 +109,10 @@ func (h *AgentsHandler) getAgents(ctx *fasthttp.RequestCtx) {
 			continue
 		}
 		out.Agents = append(out.Agents, summarizeAgent(f, counts))
+	}
+	if paging.on {
+		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, pagedAgents(paging, out))
+		return
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
 }

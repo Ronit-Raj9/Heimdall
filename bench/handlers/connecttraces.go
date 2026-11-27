@@ -58,6 +58,10 @@ func OTLPOrgIngestURL(orgID string) string {
 	return strings.Replace(OTLPOrgIngestPath, "{org}", orgID, 1)
 }
 
+// IngestTokenEnv is the one environment variable name the trace setup uses
+// for the ingest token.
+const IngestTokenEnv = "HEIMDALL_INGEST_TOKEN"
+
 // TraceConnectInfo answers GET /connect/traces.
 type TraceConnectInfo struct {
 	// Endpoint is the full traces URL to export to; Base is the same
@@ -67,6 +71,9 @@ type TraceConnectInfo struct {
 	Hosted   bool   `json:"hosted"`
 	// TokenHint says which credential goes in the Authorization header.
 	TokenHint string `json:"token_hint"`
+	// TokenEnv names the environment variable the copy-ready setup reads
+	// the token from; always IngestTokenEnv.
+	TokenEnv string `json:"token_env,omitempty"`
 	// Setup is copy-ready configuration per instrumentation.
 	Setup []TraceSetup `json:"setup"`
 
@@ -158,7 +165,7 @@ func (h *connectTracesHandler) get(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	info := TraceConnectInfo{Hosted: h.env.Services.Hosted, Exports: st.Exports, SpansKept: len(st.Spans), SpansDropped: st.Dropped,
-		FirstReceived: st.FirstSeen, LastReceived: st.LastSeen}
+		FirstReceived: st.FirstSeen, LastReceived: st.LastSeen, TokenEnv: IngestTokenEnv}
 	base := strings.TrimSuffix(ingestURL(ctx), APIPrefix+"/inbox/ingest")
 	if info.Hosted && h.env.Services.OrgID != "" {
 		info.Endpoint = base + OTLPOrgIngestURL(h.env.Services.OrgID)
@@ -196,7 +203,7 @@ func draftOutputs(d agentinfer.Draft) (string, *agentinfer.FromTemplate) {
 // traceSetup is the copy-ready configuration of each instrumentation. The
 // token is a placeholder; the page fills it after creating one.
 func traceSetup(endpoint, base string) []TraceSetup {
-	tok := "$HEIMDALL_INGEST_TOKEN"
+	tok := "$" + IngestTokenEnv
 	otelEnv := "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=" + endpoint + "\n" +
 		"OTEL_EXPORTER_OTLP_TRACES_HEADERS=Authorization=Bearer%20" + tok + "\n" +
 		"OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=http/protobuf\n" +
