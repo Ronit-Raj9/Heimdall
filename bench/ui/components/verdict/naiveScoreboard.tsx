@@ -5,6 +5,7 @@ import type { Ratio } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { formatCount, naiveLeader } from "./verdict.utils";
+import { rateText, tooFewToRate } from "@/components/reportcard/pageNumbers";
 
 export interface NaiveScoreboardProps {
 	/** arm -> raw passes over runs. */
@@ -38,7 +39,11 @@ export function NaiveScoreboard({ naive, arms, className }: NaiveScoreboardProps
 								<dt className="text-muted-foreground font-mono text-sm">{arm}</dt>
 								<dd className="text-2xl font-semibold tabular-nums">
 									{ratio ? (
-										t("verdict.naive.ratio", { num: formatCount(ratio.num, locale), den: formatCount(ratio.den, locale) })
+										tooFewToRate(ratio.den) ? (
+											rateText({ score: ratio.num / ratio.den, runs: ratio.den })
+										) : (
+											t("verdict.naive.ratio", { num: formatCount(ratio.num, locale), den: formatCount(ratio.den, locale) })
+										)
 									) : (
 										<ValueCell value={undefined} kind="count" testId={`verdict-naive-missing-${arm}`} />
 									)}

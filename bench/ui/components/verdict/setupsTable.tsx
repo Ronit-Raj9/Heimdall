@@ -7,6 +7,7 @@ import "./hw09I18n";
 import "@/components/experiments/ufrcI18n";
 import { formatUsd2 } from "./armCost";
 import { formatPValue } from "./verdict.utils";
+import { rateText, tooFewToRate } from "@/components/reportcard/pageNumbers";
 
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -71,7 +72,7 @@ export function SetupsTable({
 									<span className="font-semibold">{arm}</span>
 									{names?.[arm] && names[arm] !== arm && <span className="text-muted-foreground ml-2 text-xs">{names[arm]}</span>}
 								</span>
-								<span className="shrink-0 tabular-nums">{ratio ? `${ratio.num} / ${ratio.den}` : "-"}</span>
+								<span className="shrink-0 tabular-nums">{solvedText(ratio)}</span>
 							</div>
 							{costs?.[arm] != null && (
 								<span className="text-muted-foreground text-xs tabular-nums" data-testid={`verdict-setups-card-${arm}-cost`}>
@@ -111,7 +112,7 @@ export function SetupsTable({
 									<span className="font-mono font-semibold">{arm}</span>
 									{names?.[arm] && names[arm] !== arm && <span className="text-muted-foreground ml-2 text-xs">{names[arm]}</span>}
 								</TableCell>
-								<TableCell className="text-right tabular-nums">{ratio ? `${ratio.num} / ${ratio.den}` : "-"}</TableCell>
+								<TableCell className="text-right tabular-nums">{solvedText(ratio)}</TableCell>
 								<TableCell className="text-right tabular-nums">{p === null ? "-" : formatPValue(p, locale)}</TableCell>
 								{!allTied && <TableCell>{group}</TableCell>}
 								<TableCell className={cn(broken.length > 0 ? "text-chart-error-ink font-medium" : "text-muted-foreground")}>
@@ -124,4 +125,10 @@ export function SetupsTable({
 			</Table>
 		</>
 	);
+}
+/** "k / n" solved; under 10 runs the shared "k of n, too few runs to rate" (lead's note on Q-14). Pure. */
+export function solvedText(ratio: Ratio | undefined): string {
+	if (!ratio) return "-";
+	if (tooFewToRate(ratio.den)) return rateText({ score: ratio.num / ratio.den, runs: ratio.den });
+	return `${ratio.num} / ${ratio.den}`;
 }

@@ -184,7 +184,7 @@ export function YourAgents({
 	return (
 		<div className="flex min-w-0 flex-col gap-3">
 			{withResults.length > 0 && (
-				<ul className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="home-agents-list">
+				<ul className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" data-testid="home-agents-list">
 					{withResults.map((a) => (
 						<AgentCard key={a.id} agent={a} evaluations={evaluations} mayRun={mayRun} />
 					))}

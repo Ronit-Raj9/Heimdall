@@ -31,14 +31,17 @@ export interface TaskGridProps {
 	onOpenPair: (pairId: string) => void;
 	/** The experiment's suite; with it each task id links to the task in its suite. */
 	suite?: string;
+	/** The suite was deleted: task ids render as plain text titled so (R0 Q-76). */
+	suiteGone?: boolean;
 	className?: string;
 }
 
 /** Task x condition rows, discordant first; one cell per arm and trial, coloured by outcome. */
-export function TaskGrid({ grid, onOpenPair, suite, className }: TaskGridProps) {
+export function TaskGrid({ grid, onOpenPair, suite, suiteGone, className }: TaskGridProps) {
 	const { t } = useTranslation("bench");
 	const rows = useMemo(() => sortGridRows(grid.rows), [grid.rows]);
 	const trials = useMemo(() => Array.from({ length: Math.max(grid.trials, 0) }, (_, i) => i + 1), [grid.trials]);
+	const bands = useMemo(() => taskBands(rows), [rows]);
 
 	if (rows.length === 0) {
 		return (
@@ -75,7 +78,7 @@ export function TaskGrid({ grid, onOpenPair, suite, className }: TaskGridProps) 
 					</TableRow>
 				</TableHeader>
 				<TableBody>
-					{rows.map((row) => (
+					{rows.map((row, i) => (
 						<GridRowView
 							key={`${row.task}:${row.condition}`}
 							row={row}
@@ -83,6 +86,8 @@ export function TaskGrid({ grid, onOpenPair, suite, className }: TaskGridProps) 
 							trials={trials}
 							onOpenPair={onOpenPair}
 							suite={suite}
+							suiteGone={suiteGone}
+							banded={bands[i]}
 						/>
 					))}
 				</TableBody>
@@ -110,22 +115,26 @@ function GridRowView({
 	trials,
 	onOpenPair,
 	suite,
+	suiteGone,
+	banded,
 }: {
 	row: GridRow;
 	arms: string[];
 	trials: number[];
 	onOpenPair: (pairId: string) => void;
 	suite?: string;
+	suiteGone?: boolean;
+	banded?: boolean;
 }) {
 	const { t } = useTranslation("bench");
 	const locale = getLocale();
 	const byArmTrial = useMemo(() => new Map(row.cells.map((cell) => [`${cell.arm}:${cell.trial}`, cell])), [row.cells]);
 
 	return (
-		<TableRow data-testid={`verdict-grid-row-${row.task}-${row.condition}`} data-discordant={row.discordant}>
+		<TableRow className={cn(banded && "bg-muted/40")} data-testid={`verdict-grid-row-${row.task}-${row.condition}`} data-discordant={row.discordant} data-banded={banded || undefined}>
 			<TableCell className="font-mono text-xs">
 				<span className="inline-flex items-center gap-2">
-					{suite ? <EntityLink kind="task" id={row.task} suite={suite} /> : row.task}
+					{suite ? <EntityLink kind="task" id={row.task} suite={suite} suiteGone={suiteGone} /> : row.task}
 					{row.discordant && (
 						<span className="border-chart-warning/60 text-chart-warning-ink rounded-sm border px-1 text-xs uppercase">
 							{t("verdict.grid.discordant")}
@@ -216,4 +225,12 @@ function OutcomeCell({
 			<Icon className="size-3.5" aria-hidden="true" />
 		</button>
 	);
+}
+/** Q-172: one band per task, so a task's condition rows read as one group; alternates by task. Pure. */
+export function taskBands(rows: readonly { task: string }[]): boolean[] {
+	let band = false;
+	return rows.map((row, i) => {
+		if (i > 0 && row.task !== rows[i - 1].task) band = !band;
+		return band;
+	});
 }

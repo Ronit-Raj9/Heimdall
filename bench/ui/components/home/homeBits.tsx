@@ -1,3 +1,6 @@
+import { useTranslation } from "react-i18next";
+import { Skeleton } from "@/components/ui/skeleton";
+import "@/components/home/ufw1I18n";
 import type { Track } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import {
@@ -124,10 +127,7 @@ export function StatCard({
 				</span>
 			</div>
 			{loading ? (
-				<div className="flex flex-col gap-2" aria-hidden="true">
-					<span className="bg-muted h-7 w-20 animate-pulse rounded-md" />
-					<span className="bg-muted h-3 w-28 animate-pulse rounded-md" />
-				</div>
+				<StatLoading testId={testId} />
 			) : (
 				<div className="flex min-w-0 flex-col gap-1">
 					<span className="text-foreground truncate text-2xl font-semibold tracking-tight tabular-nums" data-testid={`${testId}-value`}>
@@ -136,6 +136,19 @@ export function StatCard({
 					{hint && <span className="text-muted-foreground line-clamp-2 text-xs">{hint}</span>}
 				</div>
 			)}
+		</div>
+	);
+}
+
+/** A stat tile's body while its numbers load: the shared skeleton bar and a visible "Loading..." line. */
+function StatLoading({ testId }: { testId: string }) {
+	const { t } = useTranslation("ufw1");
+	return (
+		<div className="flex flex-col gap-2" aria-busy="true" data-testid={`${testId}-loading`}>
+			<Skeleton className="h-7 w-20" />
+			<span className="text-muted-foreground text-xs" aria-live="polite">
+				{t("home.loading")}
+			</span>
 		</div>
 	);
 }
