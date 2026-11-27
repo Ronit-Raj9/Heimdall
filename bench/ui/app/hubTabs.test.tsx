@@ -9,6 +9,11 @@ vi.mock("nuqs", async (importOriginal) => ({
 	...(await importOriginal<typeof import("nuqs")>()),
 	useQueryState: (key: string) => [url.search[key] ?? null, () => undefined],
 }));
+// The Checks header links to the gateway's model watch (Q-273); no router is mounted here.
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@tanstack/react-router")>()),
+	Link: ({ children, to }: { children?: React.ReactNode; to?: string }) => <a href={String(to)}>{children}</a>,
+}));
 // The hub header (X-42) lives in suitesView as SuitesPageHeader; keep it real, stub the list.
 vi.mock("@/app/suites/views/suitesView", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/app/suites/views/suitesView")>()),

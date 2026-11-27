@@ -120,7 +120,7 @@ describe("ReleaseCards", () => {
 		const id = r.release_id;
 		expect(html).toContain("codex v4 replaces v3");
 		expect(html).toContain(`data-testid="release-numbers-${id}-cap-terminal"`);
-		expect(html).toContain("60% (40-80%)");
+		expect(html).toContain("60% (40%-80%)");
 		expect(html).toContain("$0.420");
 		expect(html).toContain("Solved under faults");
 		expect(html).toContain("False completion");

@@ -17,6 +17,8 @@ vi.mock("@/components/models/groupedModelPicker", () => ({
 	GroupedModelPicker: ({ testId }: { testId: string }) => <div data-testid={testId} />,
 }));
 vi.mock("@/lib/store/apis/benchApi", () => ({ useGetAgentsQuery: () => ({ data: { agents: [{ id: "bot", model: "gpt-a" }] } }) }));
+// The key lines (armKeys) read GET /models; the list is still loading in these tests.
+vi.mock("@/lib/store/apis/modelsApi", () => ({ useGetModelsQuery: () => ({ data: undefined }) }));
 vi.mock("@/lib/store/apis/evaluationsApi", () => ({
 	useGetAgentCompatibilityQuery: () => ({
 		data: {
