@@ -93,7 +93,7 @@ export function ProbeList({ probes }: { probes: readonly SuiteProbe[] }) {
 	const { t } = useTranslation("bench");
 	const groups = probesByFamily(probes);
 	return (
-		<Section title={t("suites.probes.title")} description={t("suites.probes.description")} testId="suites-probes">
+		<Section title={t("suites.probes.title")} testId="suites-probes">
 			{groups.length === 0 ? (
 				<p className="text-muted-foreground text-xs">{t("suites.probes.none")}</p>
 			) : (

@@ -2635,7 +2635,7 @@
 		},
 		"probes": {
 			"title": "Fault cases",
-			"description": "Model outage, broken tool, trick instruction, fake secret.",
+			"description": "",
 			"none": "No built-in failure tests.",
 			"goalPreserving": "still solvable",
 			"goalPreservingHint": "A correct solution still passes.",
@@ -3127,7 +3127,7 @@
 	},
 	"imports": {
 		"title": "Imports",
-		"subtitle": "Import a public benchmark from a local copy.",
+		"subtitle": "",
 		"synthetic": "Synthetic fixture data. Example importers only.",
 		"loadError": "Could not load the importers.",
 		"empty": "This server links no importers.",

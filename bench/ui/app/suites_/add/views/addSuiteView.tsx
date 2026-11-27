@@ -28,7 +28,7 @@ export default function AddSuiteView() {
 				</div>
 			</div>
 			<AddChooser />
-			<Section title={t("imports.title")} description={t("imports.subtitle")} testId="imports-section">
+			<Section title={t("imports.title")} testId="imports-section">
 				{data?.mode === "synthetic" && (
 					<p
 						role="note"

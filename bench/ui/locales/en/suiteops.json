@@ -42,7 +42,7 @@
 	},
 	"fromCommit": {
 		"title": "Task from a commit",
-		"description": "The agent starts before a past bug fix. The fix becomes the solution and hidden checks.",
+		"description": "",
 		"id": "Task id",
 		"base": "Commit before the fix",
 		"reference": "Commit with the fix",
@@ -52,7 +52,7 @@
 	},
 	"mine": {
 		"title": "Find tasks in your history",
-		"description": "Makes ready tasks from recent bug-fix commits that changed tests.",
+		"description": "",
 		"since": "Since: commit, tag or YYYY-MM-DD",
 		"limit": "How many tasks",
 		"dryRun": "Preview only, write nothing",

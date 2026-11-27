@@ -80,7 +80,7 @@ export function DataTab({ suite }: { suite: SuiteSummary }) {
 					</div>
 				</details>
 			)}
-			<Section title={t("api.title")} description={t("api.description")} testId="suite-data-api">
+			<Section title={t("api.title")} testId="suite-data-api">
 				<CopyCodeBlock code={apiSnippet(suite.id)} label={t("api.title")} kind="code" testId="suite-data-api-code" />
 			</Section>
 		</div>
@@ -286,7 +286,7 @@ export function PolicyForm({ view, writable, t }: { view: DataPolicyView; writab
 function VersionsSection({ suite, t }: { suite: string; t: T }) {
 	const versions = useGetDatasetVersionsQuery(suite);
 	return (
-		<Section title={t("versions.title")} description={t("versions.description")} testId="suite-data-versions">
+		<Section title={t("versions.title")} testId="suite-data-versions">
 			{versions.isLoading ? (
 				<BlockSkeleton rows={3} testId="suite-data-versions-loading" />
 			) : versions.error ? (
@@ -427,7 +427,7 @@ export function ImportForm({
 			.catch(() => {});
 	const written = result.data && !result.data.benchmark?.dry_run ? result.data.benchmark : null;
 	return (
-		<Section title={t("import.title")} description={t("import.description")} testId="suite-data-import">
+		<Section title={t("import.title")} testId="suite-data-import">
 			<div className="bg-card flex min-w-0 flex-col gap-4 rounded-xl border p-5">
 				<div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-3">
 					<Field label={t("import.platform")}>

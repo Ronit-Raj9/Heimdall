@@ -38,7 +38,7 @@
 	},
 	"versions": {
 		"title": "Versions",
-		"description": "Newest first. Evaluations record their version.",
+		"description": "",
 		"empty": "No versions yet.",
 		"version": "Version",
 		"when": "When",
@@ -54,11 +54,11 @@
 	},
 	"api": {
 		"title": "Manage from code",
-		"description": "API v1, Python or TypeScript clients."
+		"description": ""
 	},
 	"import": {
 		"title": "Import from another platform",
-		"description": "LangSmith, Langfuse, Braintrust or Datadog. Previewed first.",
+		"description": "",
 		"platform": "Platform",
 		"kind": "What to import",
 		"kindDataset": "A dataset, as tasks of this benchmark",
