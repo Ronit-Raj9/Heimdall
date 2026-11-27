@@ -25,7 +25,7 @@ export interface LeaderboardTableProps {
 }
 
 /** The metric columns a compact table keeps. */
-export const COMPACT_METRICS = ["cost_per_success", "tokens"] as const;
+export const COMPACT_METRICS = ["cost_per_success"] as const;
 
 /**
  * One row per agent configuration. Rank and tier come from the server; a column click sorts on the
@@ -37,7 +37,9 @@ export function LeaderboardTable({ rows, faults, sort, onSort, alpha, compact = 
 	const locale = getLocale();
 	const groupStarts = sort.key === "rank" ? tierGroupStarts(rows) : new Map<number, 1 | 2>();
 	const metricColumns = compact ? METRIC_COLUMNS.filter((c) => (COMPACT_METRICS as readonly string[]).includes(c.id)) : METRIC_COLUMNS;
-	const columnCount = (compact ? 3 : 5) + metricColumns.length + faults.length + (compact ? 1 : 2);
+	// The compact table keeps one line per row: fault columns and the per-row notes wait for "More columns".
+	const shownFaults = compact ? [] : faults;
+	const columnCount = (compact ? 3 : 5) + metricColumns.length + shownFaults.length + (compact ? 1 : 2);
 	const head = (key: SortKey, label: string, hint?: string, align: "left" | "right" = "right") => (
 		<SortableHead key={key} sortKey={key} label={label} hint={hint} sort={sort} onSort={onSort} align={align} />
 	);
@@ -53,7 +55,7 @@ export function LeaderboardTable({ rows, faults, sort, onSort, alpha, compact = 
 					{head("success", t("leaderboard.table.success"), t("leaderboard.table.successHint"), "left")}
 					{head("reliability", t("leaderboard.table.reliability"), t("leaderboard.table.reliabilityHint"))}
 					{metricColumns.map((column) => head(column.id, t(`leaderboard.table.${column.id}`), t(`leaderboard.table.${column.id}Hint`)))}
-					{faults.map((fault) =>
+					{shownFaults.map((fault) =>
 						head(
 							`${RESILIENCE_PREFIX}${fault}`,
 							`${fault} ${t("leaderboard.table.resilienceVs")}`,
@@ -103,20 +105,20 @@ export function LeaderboardTable({ rows, faults, sort, onSort, alpha, compact = 
 									</TableCell>
 								)}
 								<TableCell className="align-top">
-									<AgentCell entry={entry} />
+									<AgentCell entry={entry} compact={compact} />
 								</TableCell>
 								<TableCell className="align-top">
 									<SuccessCell entry={entry} />
 								</TableCell>
 								<TableCell className="text-right align-top">
-									<ReliabilityCell entry={entry} />
+									<ReliabilityCell entry={entry} inline={compact} />
 								</TableCell>
 								{metricColumns.map((column) => (
 									<TableCell key={column.id} className="text-right align-top" data-testid={`leaderboard-metric-${entry.rank}-${column.id}`}>
 										<ValueCell value={entry.metrics?.[column.id]} kind={column.kind} />
 									</TableCell>
 								))}
-								{faults.map((fault) => (
+								{shownFaults.map((fault) => (
 									<TableCell key={fault} className="text-right align-top">
 										<ResilienceCell
 											value={entry.resilience?.[fault]}

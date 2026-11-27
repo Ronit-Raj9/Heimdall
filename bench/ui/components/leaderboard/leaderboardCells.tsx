@@ -58,9 +58,12 @@ export function TierBadge({ entry }: { entry: Pick<LeaderboardEntry, "rank" | "t
 export function AgentCell({
 	entry,
 	showHash = true,
+	compact = false,
 }: {
 	entry: Pick<LeaderboardEntry, "rank" | "agent" | "model" | "label" | "config_hash" | "synthetic">;
 	showHash?: boolean;
+	/** Two lines: name, then model and label; hash and "What differs" are left to the full table. */
+	compact?: boolean;
 }) {
 	const { t } = useTranslation("bench");
 	const { t: tc } = useTranslation("ufc3");
@@ -80,8 +83,15 @@ export function AgentCell({
 					</Badge>
 				)}
 			</div>
-			<span className="text-muted-foreground font-mono text-xs break-all">{entry.model}</span>
-			<div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+			{compact ? (
+				<span className="text-muted-foreground max-w-80 truncate text-xs" title={entry.label || entry.model}>
+					<span className="font-mono">{entry.model}</span>
+					{entry.label && entry.label !== entry.model && ` · ${entry.label}`}
+				</span>
+			) : (
+				<span className="text-muted-foreground font-mono text-xs break-all">{entry.model}</span>
+			)}
+			{!compact && <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
 				{entry.label && <span className="max-w-56 truncate">{entry.label}</span>}
 				{showHash && (
 					<CopyId
@@ -96,7 +106,7 @@ export function AgentCell({
 						{tc("matrix.whatDiffers")}
 					</Link>
 				</Button>
-			</div>
+			</div>}
 		</div>
 	);
 }

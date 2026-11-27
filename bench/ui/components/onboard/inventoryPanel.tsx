@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/select";
 import { WhyDisabled } from "@/components/ui/whyDisabled";
 import { LabeledModelPicker, isPicked } from "@/components/models/labeledModelPicker";
 import "@/components/home/uf2aI18n";
@@ -16,7 +17,6 @@ import { useEffect, useId, useState } from "react";
 import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
 
-const selectClass = "border-input bg-background h-9 rounded-md border px-2 text-sm";
 
 /** Row fields the onboard rows reader maps (onboard/source_rows.go mappingKeys), in the Build tab mapper's order. */
 export const ONBOARD_MAP_FIELDS = [
@@ -288,8 +288,8 @@ export function InventoryPanel({
 				</p>
 			) : (
 				<div className="flex flex-col gap-3 rounded-lg border p-3" data-testid="onboard-plan">
-					<div className="flex flex-wrap gap-3">
-						<label className="flex flex-col gap-1 text-xs">
+					<div className="flex flex-wrap items-start gap-3">
+						<label className="flex flex-col gap-1.5 text-xs">
 							<span className="font-medium">{t("plan.name")}</span>
 							<Input
 								value={plan.title ?? inv.title}
@@ -298,7 +298,7 @@ export function InventoryPanel({
 							/>
 							<span className="text-muted-foreground max-w-xs">{t("plan.nameHint")}</span>
 						</label>
-						<label className="flex flex-col gap-1 text-xs">
+						<label className="flex flex-col gap-1.5 text-xs">
 							<span className="font-medium">{t("plan.suite")}</span>
 							<Input
 								value={plan.suite}
@@ -322,17 +322,17 @@ export function InventoryPanel({
 							</span>
 						</label>
 						{rows && (
-							<label className="flex flex-col gap-1 text-xs">
+							<label className="flex flex-col gap-1.5 text-xs">
 								<span className="font-medium">{t("plan.grader")}</span>
-								<select
-									className={selectClass}
+								<NativeSelect
+									className="min-w-40"
 									value={plan.grader ?? "answer_match"}
 									onChange={(e) => set({ grader: e.target.value })}
 									data-testid="onboard-plan-grader"
 								>
 									<option value="answer_match">{t("plan.exact")}</option>
 									<option value="judge">{t("plan.judge")}</option>
-								</select>
+								</NativeSelect>
 							</label>
 						)}
 						{rows && plan.grader === "judge" && (
@@ -347,10 +347,10 @@ export function InventoryPanel({
 							</>
 						)}
 						{(inv.importers?.length ?? 0) > 0 && (
-							<label className="flex flex-col gap-1 text-xs">
+							<label className="flex flex-col gap-1.5 text-xs">
 								<span className="font-medium">{t("plan.importer")}</span>
-								<select
-									className={selectClass}
+								<NativeSelect
+									className="min-w-40"
 									value={plan.importer ?? ""}
 									onChange={(e) => set({ importer: e.target.value })}
 									data-testid="onboard-plan-importer"
@@ -361,14 +361,14 @@ export function InventoryPanel({
 											{n}
 										</option>
 									))}
-								</select>
+								</NativeSelect>
 							</label>
 						)}
 						{/* Q-119: how many tasks and the held-out share are extras, folded under More options. */}
 						<details className="w-full" data-testid="onboard-plan-more">
 							<summary className="text-primary min-h-11 cursor-pointer py-2 text-xs font-medium">{t("plan.more")}</summary>
 							<div className="flex flex-wrap gap-3 pt-1">
-								<label className="flex flex-col gap-1 text-xs">
+								<label className="flex flex-col gap-1.5 text-xs">
 									<span className="font-medium">{t("plan.limit")}</span>
 									<Input
 										type="number"
@@ -380,7 +380,7 @@ export function InventoryPanel({
 										data-testid="onboard-plan-limit"
 									/>
 								</label>
-								<label className="flex flex-col gap-1 text-xs">
+								<label className="flex flex-col gap-1.5 text-xs">
 									<span className="font-medium">{t("plan.heldOut")}</span>
 									<Input
 										type="number"

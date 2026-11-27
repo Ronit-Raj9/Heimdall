@@ -4,6 +4,7 @@ import { capabilityName, faultChange, faultName, pct, usd } from "@/components/r
 import "@/app/evaluations/views/gw08I18n";
 import { Button } from "@/components/ui/button";
 import { getLocale } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { useGetAgentVersionsQuery, type Evaluation, type Report } from "@/lib/store/apis/evaluationsApi";
 import { useGetAgentCardQuery } from "@/lib/store/apis/agentCardApi";
 import { isTestObject } from "@/lib/testObjects";
@@ -130,6 +131,7 @@ export function YourAgents({
 	const last = lastEvaluated(evaluations);
 	const withResults = own.filter((a) => last.has(a.id));
 	const without = own.filter((a) => !last.has(a.id));
+	const side = withResults.length === 1 && without.length > 0;
 	const builtins = SUGGESTED_BUILTINS.filter((id) => !last.has(id) && agents.some((a) => a.id === id));
 	const footer = (
 		<div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
@@ -183,8 +185,13 @@ export function YourAgents({
 	}
 	return (
 		<div className="flex min-w-0 flex-col gap-3">
+			{/* One agent card beside the not-yet-evaluated list on wide screens, so the card does not leave a blank row. */}
+			<div className={cn("flex min-w-0 flex-col gap-3", side && "lg:grid lg:grid-cols-[minmax(18rem,1fr)_2fr] lg:items-start lg:gap-4")}>
 			{withResults.length > 0 && (
-				<ul className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" data-testid="home-agents-list">
+				<ul
+					className={cn("grid min-w-0 grid-cols-1 gap-4", !side && "md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4")}
+					data-testid="home-agents-list"
+				>
 					{withResults.map((a) => (
 						<AgentCard key={a.id} agent={a} evaluations={evaluations} mayRun={mayRun} />
 					))}
@@ -224,6 +231,7 @@ export function YourAgents({
 					</ul>
 				</div>
 			)}
+			</div>
 			{footer}
 		</div>
 	);

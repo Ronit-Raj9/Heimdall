@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LeaderboardParetoPanel } from "@/components/migration/migrationReport"; // W6 cost against verified success
+import { LeaderboardPareto } from "./leaderboardPareto"; // W6 cost against verified success
 import TrendsTab from "./trendsTab";
 import { AgentBoardTab } from "@/components/leaderboard/agentBoard"; // A17: agent leaderboard, the default tab
 import { ReferenceBoardPanel } from "@/components/reference/referenceBoard"; // G4-03: the reference board
@@ -239,13 +239,17 @@ export function LeaderboardTab() {
 				trackGroups={trackGroups}
 				track={track}
 				onTrack={onTrack}
-			/>
-			<GradeSourcePicker
-				value={data?.grade_source ?? gradeSource ?? "original"}
-				onChange={(next) => void setGradeSource(next === "original" ? null : next)}
-				disabled={board.isLoading}
-				testId="leaderboard-grade-source"
-			/>
+			>
+				{/* Same row, same height and label gap as the switches beside it. */}
+				<div className="[&>div]:gap-1.5 [&_[role=group]]:h-(--control-h)">
+					<GradeSourcePicker
+						value={data?.grade_source ?? gradeSource ?? "original"}
+						onChange={(next) => void setGradeSource(next === "original" ? null : next)}
+						disabled={board.isLoading}
+						testId="leaderboard-grade-source"
+					/>
+				</div>
+			</LeaderboardFilters>
 			{(heldOutBoard || split === "held_out") && (
 				<HeldOutBoardToggle
 					heldOut={split === "held_out"}
@@ -280,7 +284,7 @@ export function LeaderboardTab() {
 					onResetFilters={hasFilters ? resetFilters : undefined}
 				/>
 			)}
-			{data && data.entries.length > 0 && <LeaderboardParetoPanel params={params} />} {/* W6 cost against verified success */}
+			{data && data.entries.length > 0 && <LeaderboardPareto params={params} />} {/* W6 cost against verified success */}
 		</section>
 	);
 }
