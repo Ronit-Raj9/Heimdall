@@ -6,6 +6,8 @@ import { PaidButton } from "@/components/ui/paidButton";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/select";
+import { fieldStackClass } from "@/components/ui/field";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useGetInboxQuery } from "@/lib/store/apis/inboxApi";
@@ -150,7 +152,7 @@ export function ReplaySetupSteps({ off, noSource }: { off: boolean; noSource: bo
 		</li>
 	);
 	return (
-		<section className="flex flex-col gap-2 rounded-lg border p-4 text-sm" data-testid="replays-setup">
+		<section className="flex max-w-4xl flex-col gap-2 rounded-lg border p-4 text-sm" data-testid="replays-setup">
 			<p>{t("setup.what")}</p>
 			<ol className="flex flex-col gap-1">
 				{step(!off, t("setup.turnOn"))}
@@ -185,9 +187,9 @@ export default function ReplaysView() {
 					{blocked && <ReplaySetupSteps {...missing} />}
 					<SettingsPanel />
 					{blocked ? (
-						<details className="rounded-lg border" data-testid="replays-form-folded">
+						<details className="max-w-4xl rounded-lg border" data-testid="replays-form-folded">
 							<summary className="text-muted-foreground cursor-pointer px-4 py-3 text-sm font-medium">{t("setup.formFolded")}</summary>
-							<div className="p-2">
+							<div className="border-t [&>section]:rounded-none [&>section]:border-0">
 								<NewReplay />
 							</div>
 						</details>
@@ -224,7 +226,7 @@ export function SettingsToggle({
 	const [asking, setAsking] = useState(false);
 	const on = settings.enabled;
 	return (
-		<div className="flex flex-col gap-2 rounded-lg border p-4" data-testid="replays-settings">
+		<div className="flex max-w-4xl flex-col gap-2 rounded-lg border p-4" data-testid="replays-settings">
 			<div className="flex flex-wrap items-center gap-3">
 				{admin && (
 					<button
@@ -306,7 +308,7 @@ function SettingsPanel() {
 function Field({ label, hint, children }: { label: string; hint?: string; children: (id: string) => React.ReactNode }) {
 	const id = useId();
 	return (
-		<div className="flex min-w-0 flex-col gap-1">
+		<div className={fieldStackClass}>
 			<label htmlFor={id} className="text-muted-foreground text-xs">
 				{label}
 			</label>
@@ -338,9 +340,9 @@ export function ReplayFormFields({
 			<div className="flex min-w-0 flex-col gap-2">
 				<Field label={t("form.source")} hint={sources && sources.length === 0 ? undefined : t("form.sourceHint")}>
 					{(id) => (
-						<select
+						<NativeSelect
 							id={id}
-							className="h-9 rounded-md border px-2 text-sm"
+							wrapperClassName="w-full"
 							value={form.source}
 							onChange={(e) => set("source", e.target.value)}
 							disabled={!sources || sources.length === 0}
@@ -352,7 +354,7 @@ export function ReplayFormFields({
 									{name}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 					)}
 				</Field>
 				{sources && sources.length === 0 && (
@@ -372,11 +374,11 @@ export function ReplayFormFields({
 			</div>
 			<Field label={t("form.window")}>
 				{(id) => (
-					<select id={id} className="h-9 rounded-md border px-2 text-sm" value={form.window} onChange={(e) => set("window", e.target.value)}>
+					<NativeSelect id={id} wrapperClassName="w-full" value={form.window} onChange={(e) => set("window", e.target.value)}>
 						<option value="24h">{t("form.window24h")}</option>
 						<option value="7d">{t("form.window7d")}</option>
 						<option value="14d">{t("form.window14d")}</option>
-					</select>
+					</NativeSelect>
 				)}
 			</Field>
 			<Field label={t("form.sessions")}>
@@ -396,20 +398,20 @@ export function ReplayFormFields({
 			</Field>
 			<Field label={t("form.mode")} hint={form.mode === "fixed" ? t("form.modeFixedHelp") : t("form.modeTrajectoryHelp")}>
 				{(id) => (
-					<select
+					<NativeSelect
 						id={id}
-						className="h-9 rounded-md border px-2 text-sm"
+						wrapperClassName="w-full"
 						value={form.mode}
 						onChange={(e) => set("mode", e.target.value as ReplayForm["mode"])}
 						data-testid="replays-mode"
 					>
 						<option value="fixed">{t("form.modeFixed")}</option>
 						<option value="trajectory">{t("form.modeTrajectory")}</option>
-					</select>
+					</NativeSelect>
 				)}
 			</Field>
 			{/* Model fields are the shared model picker, not free text (M5-57). */}
-			<div className="flex min-w-0 flex-col gap-1">
+			<div className={fieldStackClass}>
 				<span className="text-muted-foreground text-xs">{t("form.candidate")}</span>
 				<GroupedModelPicker
 					value={picked(form.candidate)}
@@ -419,7 +421,7 @@ export function ReplayFormFields({
 					testId="replays-candidate"
 				/>
 			</div>
-			<div className="flex min-w-0 flex-col gap-1">
+			<div className={fieldStackClass}>
 				<span className="text-muted-foreground text-xs">{t("form.judge")}</span>
 				<GroupedModelPicker
 					value={picked(form.judge)}
@@ -491,7 +493,7 @@ function NewReplay() {
 		k === "needSessions" ? t5("replays.needSessions", { max: settings.data?.max_sessions_per_run || MAX_REPLAY_SESSIONS }) : t5(`replays.${k}`),
 	);
 	return (
-		<section className="flex flex-col gap-3 rounded-lg border p-4">
+		<section className="flex max-w-4xl flex-col gap-3 rounded-lg border p-4">
 			<h2 className="text-base font-semibold tracking-tight">{t("form.title")}</h2>
 			<ReplayFormFields form={form} onChange={setForm} sources={sources} disabled={!enabled} />
 			{form.candidate && !params && <p className="text-destructive text-sm">{t("form.badModel")}</p>}
@@ -565,7 +567,7 @@ function ReplayList({ onOpen }: { onOpen: (id: string) => void }) {
 		return <LoadError title={t("list.loadError")} error={q.error} onRetry={() => void q.refetch()} testId="replays-list-error" />;
 	const rows = q.data?.replays ?? [];
 	return (
-		<section className="flex flex-col gap-3">
+		<section className="flex max-w-4xl flex-col gap-3">
 			<h2 className="text-base font-semibold tracking-tight">{t("list.title")}</h2>
 			{rows.length === 0 ? (
 				<EmptyState compact body={t("list.empty")} testId="replays-empty" />

@@ -18,7 +18,8 @@ import { RunOutput, runOutputKind } from "@/components/runs/runOutput";
 import { ServicesList, SessionsTimeline, ToolCallTable } from "@/components/runs/runScenario";
 import { stripMetricKinds, wallText } from "@/components/runs/runs.utils";
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
-import { RunExportMenu } from "@/components/runs/runExportMenu";
+import { runExportItems } from "@/components/runs/runExportMenu";
+import { OverflowMenu, type OverflowMenuItem } from "@/components/agents/overflowMenu";
 import { RunFailureCard } from "@/components/runs/runFailureCard";
 import type { RunFailureFields } from "@/lib/types/serverFields";
 import { failedToolCall, runReason } from "@/components/runs/runFailure.utils";
@@ -37,7 +38,7 @@ import { EmptyState } from "@/components/shell/emptyState";
 import { EntityLink } from "@/components/shell/entityLink";
 import { ShareButton } from "@/components/share/shareDialog";
 import { PageHeader } from "@/components/shell/pageHeader";
-import { ArchiveButton } from "@/components/ui/archiveAction";
+import { useArchiveItems } from "@/components/ui/archiveAction";
 import { RouteTabs, type RouteTab } from "@/components/shell/routeTabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -61,7 +62,7 @@ import { errorStatus } from "@/lib/store/apis/session";
 import { useGetRunVoiceQuery } from "@/lib/store/apis/voiceApi";
 import type { GateResult, Mode, PairRun, RunDetail, Value } from "@/lib/types/bench";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { AlertTriangle, Check, Coins, Copy, Ellipsis, Footprints, GitCompareArrows, RotateCcw, SearchX, Timer, Wrench, type LucideIcon } from "lucide-react";
+import { AlertTriangle, Check, Coins, Copy, Footprints, GitCompareArrows, RotateCcw, SearchX, Timer, Wrench, type LucideIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { RUN_TABS, hiddenRunTabs, runHasVoice, runTabFlags, type RunTabId } from "./runTabs";
@@ -91,7 +92,11 @@ export default function RunView({ runId }: { runId: string }) {
 	const { t: tRec } = useTranslation("recordings"); // Z03
 	const recordings = useRunRecordings(runId, !detail.data?.sealed); // Z03: recordings exist once the run is exported
 	const { t: tu } = useTranslation("uf5a");
-	const [moreOpen, setMoreOpen] = useState(false);
+	const { t: tTrace } = useTranslation("runTrace");
+	const { t: tDebug } = useTranslation("runDebug");
+	// Archive is a hook, so it is read before the loading and error returns.
+	const archiveName = (detail.data as { task_title?: string } | undefined)?.task_title || detail.data?.slot.task || runId;
+	const archive = useArchiveItems({ kind: "run", id: detail.data ? runId : "", name: archiveName, archivedAt: (detail.data as { archived_at?: string | null } | undefined)?.archived_at, testId: "run" });
 	const expId = detail.data?.slot.exp_id;
 	const exp = useGetExperimentQuery(expId ?? "", { skip: !expId });
 	const evaluationId = exp.data?.evaluation_id;
@@ -155,6 +160,16 @@ export default function RunView({ runId }: { runId: string }) {
 		runsSearch: savedRunsSearch(),
 	});
 
+	const compareItem = runCompareItem(d, exp.data?.arms?.length ?? 0, { compare: t("runs.page.compare"), source: tDebug("actions.compareSource") });
+	const moreItems: OverflowMenuItem[] = [
+		...(d.sealed && !run.debug
+			? [{ label: tu("page.rerun"), icon: RotateCcw, to: "/evaluate", search: rerunSearch(d, exp.data?.setups) as Record<string, unknown>, testId: "run-rerun" }]
+			: []),
+		...(compareItem ? [compareItem] : []),
+		...runExportItems(runId, Boolean(d.sealed), tTrace).map((item, i) => (i === 0 ? { ...item, separatorBefore: true } : item)),
+		...archive.items.map((item) => ({ ...item, separatorBefore: true })),
+	];
+
 	return (
 		<div className={cn(pageWidthClass("dash"), "flex flex-col gap-6")} data-page-width="dash" data-testid="run-screen" data-run-id={runId} data-output={output}>
 			<PageHeader
@@ -194,7 +209,7 @@ export default function RunView({ runId }: { runId: string }) {
 					</>
 				}
 				subtitle={
-					<span className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid="run-facts">
+					<span className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs [&_a]:no-underline" data-testid="run-facts">
 						<span>
 							{tu("page.facts", {
 								name: exp.data?.name ?? slot.exp_id,
@@ -216,38 +231,11 @@ export default function RunView({ runId }: { runId: string }) {
 					<div className="flex flex-wrap items-start gap-2">
 						<RunDebugActions detail={d} />
 						<RunActions expId={slot.exp_id} runId={runId} sealed={Boolean(d.sealed)} outcome={d.run?.outcome} superseded={d.superseded} />
-						{d.sealed && !run.debug && (
-							<Button variant="outline" size="sm" asChild>
-								<Link
-									to="/evaluate"
-									search={rerunSearch(d, exp.data?.setups) as never}
-									title={tu("page.rerunHint")}
-									data-testid="run-rerun"
-								>
-									<RotateCcw aria-hidden="true" />
-									{tu("page.rerun")}
-								</Link>
-							</Button>
-						)}
 						<ShareButton kind="run_trace" target={runId} />
-						{/* M5-12: on a phone, Export, Maxim and Compare sit behind More so the header keeps one row of actions. */}
-						<Button
-							variant="outline"
-							size="sm"
-							className="sm:hidden"
-							aria-expanded={moreOpen}
-							onClick={() => setMoreOpen((v) => !v)}
-							dataTestId="run-more"
-						>
-							<Ellipsis aria-hidden="true" />
-							{tu("page.more")}
-						</Button>
-						<div className={cn("flex-wrap items-start gap-2 sm:flex", moreOpen ? "flex w-full" : "hidden")} data-testid="run-more-actions">
-							<RunExportMenu runId={runId} sealed={Boolean(d.sealed)} />
-							<MaximRunButton runId={runId} sealed={Boolean(d.sealed)} />
-							<RunCompareButton detail={d} />
-							<ArchiveButton kind="run" id={runId} name={taskName} archivedAt={(d as { archived_at?: string | null }).archived_at} testId="run" />
-						</div>
+						<MaximRunButton runId={runId} sealed={Boolean(d.sealed)} />
+						{/* Run again, Compare, the trace downloads and Archive sit behind More, so the title keeps its width. */}
+						<OverflowMenu label={tu("page.more")} items={moreItems} testId="run-more" />
+						{archive.alert}
 					</div>
 				}
 			/>
@@ -392,7 +380,7 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
 			<RunBehaviourChecks runId={run.run_id} />
 
 			<details
-				className="group rounded-xl border"
+				className="group max-w-4xl rounded-xl border"
 				open={factsOpen}
 				onToggle={(e) => setFactsOpen((e.currentTarget as HTMLDetailsElement).open)}
 				data-testid="run-details"
@@ -429,7 +417,7 @@ function OverviewTab({ detail }: { detail: RunDetail }) {
 					</div>
 					<div className="flex flex-col gap-2" data-testid="run-metrics">
 						<span className="text-sm font-medium">{tt("overview.allMetrics")}</span>
-						<Card className="py-0 shadow-none">
+						<Card className="max-w-[40rem] py-0 shadow-none">
 							<MetricStrip lanes={[{ arm: slot.arm, metrics: detail.metrics }]} kinds={stripMetricKinds(undefined)} />
 						</Card>
 					</div>
@@ -526,7 +514,8 @@ export function RunStatCards({ detail, others = [] }: { detail: RunDetail; other
 	const { t: tt } = useTranslation("runTrace");
 	const { t: tu } = useTranslation("uf5a");
 	// M5-21: with the pair loaded, each number shows the other setups' value under it as a muted line.
-	const beside = (value: (o: PairRun) => string) => others.map((o) => tu("page.setupB", { arm: o.arm, value: value(o) }));
+	// Round 3 rule 9: setups with the same value share one line ("Setup B, C, D: 0"), so eight equal lines become one.
+	const beside = (value: (o: PairRun) => string) => groupBeside(others.map((o) => ({ arm: o.arm, value: value(o) }))).map((g) => tu("page.setupB", { arm: g.arms.join(", "), value: g.value }));
 	return (
 		<>
 			<StatCard
@@ -560,6 +549,17 @@ export function RunStatCards({ detail, others = [] }: { detail: RunDetail; other
 			/>
 		</>
 	);
+}
+
+/** Other setups' values grouped by value, in first-seen order. Pure. */
+export function groupBeside(rows: readonly { arm: string; value: string }[]): { arms: string[]; value: string }[] {
+	const out: { arms: string[]; value: string }[] = [];
+	for (const row of rows) {
+		const hit = out.find((g) => g.value === row.value);
+		if (hit) hit.arms.push(row.arm);
+		else out.push({ arms: [row.arm], value: row.value });
+	}
+	return out;
 }
 
 /**
@@ -599,6 +599,17 @@ export function RunCompareButton({ detail }: { detail: RunDetail }) {
 			</Link>
 		</Button>
 	);
+}
+
+/** The compare action as a More menu item: the same rule as RunCompareButton, or nothing. */
+export function runCompareItem(detail: RunDetail, armCount: number, labels: { compare: string; source: string }): OverflowMenuItem | null {
+	const { slot, run } = detail;
+	if (run.debug) {
+		if (!run.debug.from_run) return null;
+		return { label: labels.source, icon: GitCompareArrows, to: "/runs/$runId", params: { runId: run.run_id }, search: { tab: "timeline" }, testId: "run-compare-source" };
+	}
+	if (!slot.pair_id || armCount < 2) return null;
+	return { label: labels.compare, icon: GitCompareArrows, to: "/compare", search: compareSearch(slot.pair_id, slot.exp_id) as Record<string, unknown>, testId: "run-compare" };
 }
 
 /** One run number in the Overview strip: a plain dl item (X-40), not a card, since it does nothing on click. */

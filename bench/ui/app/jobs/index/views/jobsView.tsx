@@ -352,7 +352,7 @@ export function JobsTable({
 				))}
 			</ul>
 			<div className="bg-card hidden min-w-0 overflow-x-auto rounded-xl border md:block">
-				<table className="w-full min-w-[960px] text-sm" data-testid="jobs-table">
+				<table className="w-full text-sm" data-testid="jobs-table">
 					<thead className="bg-muted/40 text-muted-foreground sticky top-0 text-left text-xs">
 						<tr className="border-b">
 							{onSelect && (
@@ -363,7 +363,7 @@ export function JobsTable({
 							<th className="px-4 py-2.5 font-medium">{t("columns.kind")}</th>
 							<th className="px-4 py-2.5 font-medium">{t("columns.status")}</th>
 							<th className="min-w-28 px-4 py-2.5 font-medium whitespace-nowrap">{t("columns.created")}</th>
-							<th className="bg-muted sticky right-0 px-4 py-2.5 text-right font-medium">{t("columns.actions")}</th>
+							<th className="px-4 py-2.5 text-right font-medium">{t("columns.actions")}</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -378,28 +378,28 @@ export function JobsTable({
 									)}
 									data-testid={`jobs-row-${job.id}`}
 								>
-									{onSelect && <td className="px-3 py-3">{check(job, "jobs")}</td>}
-									<td className="px-4 py-3">
+									{onSelect && <td className="px-3 py-2">{check(job, "jobs")}</td>}
+									<td className="w-full max-w-0 px-4 py-2">
 										<Link
 											to="/jobs/$jobId"
 											params={{ jobId: job.id }}
 											title={job.id}
-											className="text-foreground font-medium after:absolute after:inset-0 hover:underline"
+											className="text-foreground block truncate font-medium after:absolute after:inset-0 hover:underline"
 										>
 											{title(job)}
 										</Link>
 									</td>
-									<td className="px-4 py-3">
+									<td className="px-4 py-2 whitespace-nowrap">
 										<div className="flex flex-col gap-1.5">
 											<JobStatusBadge status={job.status} />
 											{active && <JobProgressBar job={job} className="w-28" />}
 											<JobReason job={job} />
 										</div>
 									</td>
-									<td className="text-muted-foreground min-w-28 px-4 py-3 text-xs whitespace-nowrap">
+									<td className="text-muted-foreground min-w-28 px-4 py-2 text-xs whitespace-nowrap">
 										{formatRelative(job.created_at, locale) ?? "-"}
 									</td>
-									<td className="bg-card sticky right-0 z-10 px-4 py-3 text-right">
+									<td className="relative z-10 px-4 py-2 text-right whitespace-nowrap">
 										<div className="flex items-center justify-end gap-1.5">{actions(job, "jobs")}</div>
 									</td>
 								</tr>
