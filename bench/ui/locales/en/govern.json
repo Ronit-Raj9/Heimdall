@@ -1,5 +1,6 @@
 {
 	"policies": {
+		"notRuleSet": "This file is not a rule set (it holds schedules). Ignore it or fix it in Edit.",
 		"title": "Release rules",
 		"subtitle": "Release rules: checks a new version must pass before it ships.",
 		"new": "New rule set",
@@ -64,7 +65,7 @@
 		"verify": "Check the log has not been changed",
 		"verifyHint": "Recomputes the fingerprint of every record and evidence file. Use it before an audit.",
 		"compliance": "Write compliance report",
-		"complianceHint": "Writes a report (.md and .json) into exports/compliance in the project folder.",
+		"complianceHint": "Makes a report you can download below.",
 		"pickRelease": "Release record",
 		"noReleases": "Record a release first; then you can write its compliance report here.",
 		"packs": {

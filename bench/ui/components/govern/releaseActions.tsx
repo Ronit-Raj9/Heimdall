@@ -4,17 +4,21 @@ import type { ReleaseRecord } from "@/lib/types/bench";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CompliancePacks } from "./compliancePacks";
+import { releaseAgent } from "./releaseAgent";
 import { versionName } from "@/components/releases/releaseEvidence";
 
 /**
  * A release as a select option: "codex v1, 21 Nov 2026" (M7-85). Falls back to the release id
- * when the record names no agent. Exported for tests.
+ * when the record names no agent; a comparison release is named from its agent_config_id (Q-16). Exported for tests.
  */
-export function releaseOptionLabel(r: Pick<ReleaseRecord, "release_id" | "agent_id" | "version" | "created_at">): string {
+export function releaseOptionLabel(
+	r: Pick<ReleaseRecord, "release_id" | "agent_id" | "version" | "created_at"> & Partial<Pick<ReleaseRecord, "agent_config_id">>,
+): string {
 	const day = r.created_at ? new Date(r.created_at) : null;
 	const date =
 		day && !Number.isNaN(day.getTime()) ? day.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "";
-	const name = r.agent_id ? versionName(r.agent_id, r.version) : r.release_id;
+	const a = releaseAgent({ agent_id: r.agent_id, version: r.version, agent_config_id: r.agent_config_id ?? "" });
+	const name = a ? versionName(a.agent, a.version) : r.release_id;
 	return date ? `${name}, ${date}` : name;
 }
 

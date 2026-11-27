@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { decisionTone, TONE_TEXT } from "@/components/verdict/verdict.utils";
 import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
 import { useGetJobQuery } from "@/lib/store/apis/platformApi";
+import { useListExperimentsQuery } from "@/lib/store";
 import { type ValidityEntry, type ValidityStale, useGetValidityQuery } from "@/lib/store/apis/validityApi";
 import { useSession } from "@/lib/session/sessionContext";
 import type { JobStatus } from "@/lib/types/bench";
@@ -36,7 +37,27 @@ export function lastScanAt(stale: readonly ValidityStale[]): string | null {
 	return best;
 }
 
-function ChangedTable({ entries, user }: { entries: ValidityEntry[]; user?: string }) {
+/** Comparison names by id (Q-78): rows show the name, the id under it. Pure. */
+export function comparisonNames(experiments: readonly { exp_id: string; name?: string }[] | undefined): Map<string, string> {
+	const out = new Map<string, string>();
+	for (const e of experiments ?? []) if (e.name && e.name !== e.exp_id) out.set(e.exp_id, e.name);
+	return out;
+}
+
+/** A comparison as a link: its name when known, the id under it; the id alone otherwise. */
+function ComparisonLink({ id, names }: { id: string; names: Map<string, string> }) {
+	const name = names.get(id);
+	return (
+		<span className="flex min-w-0 flex-col">
+			<Link to="/experiments/$expId" params={{ expId: id }} className="text-primary break-words hover:underline">
+				{name ?? id}
+			</Link>
+			{name && <span className="text-muted-foreground font-mono text-xs break-all">{id}</span>}
+		</span>
+	);
+}
+
+function ChangedTable({ entries, user, names }: { entries: ValidityEntry[]; user?: string; names: Map<string, string> }) {
 	const { t } = useTranslation("w449");
 	const { t: tg } = useTranslation("glossary");
 	const word = (d: string) => tg(`terms.${d}.label`, { defaultValue: d });
@@ -57,10 +78,8 @@ function ChangedTable({ entries, user }: { entries: ValidityEntry[]; user?: stri
 				{entries.map((e) => (
 					<TableRow key={e.id} data-testid="validity-row">
 						<TableCell>
-							<div className="flex items-center gap-2">
-								<Link to="/experiments/$expId" params={{ expId: e.exp_id }} className="text-primary hover:underline">
-									{e.exp_id}
-								</Link>
+							<div className="flex min-w-0 items-center gap-2">
+								<ComparisonLink id={e.exp_id} names={names} />
 								{isUnseen(e, user) && (
 									<Badge variant="info" data-testid="validity-new">
 										{t("page.new")}
@@ -84,16 +103,14 @@ function ChangedTable({ entries, user }: { entries: ValidityEntry[]; user?: stri
 	);
 }
 
-function StaleList({ stale }: { stale: ValidityStale[] }) {
+function StaleList({ stale, names }: { stale: ValidityStale[]; names: Map<string, string> }) {
 	const { t } = useTranslation("w449");
 	if (stale.length === 0) return <EmptyState compact body={t("page.noneStale")} testId="validity-none-stale" />;
 	return (
 		<ul className="divide-border flex flex-col divide-y text-sm" data-testid="validity-stale">
 			{stale.map((s) => (
 				<li key={s.exp_id} className="flex min-h-8 flex-wrap items-center gap-x-2 px-3 py-2">
-					<Link to="/experiments/$expId" params={{ expId: s.exp_id }} className="text-primary hover:underline">
-						{s.exp_id}
-					</Link>
+					<ComparisonLink id={s.exp_id} names={names} />
 					<span className="text-muted-foreground">
 						{t("page.updatedChecks", {
 							gates: Object.keys(s.gates).join(", "),
@@ -110,6 +127,7 @@ export default function ValidityView() {
 	const { t } = useTranslation("w449");
 	const session = useSession();
 	const validity = useGetValidityQuery();
+	const names = comparisonNames(useListExperimentsQuery().data?.experiments);
 	const data = validity.data;
 	const [createJob, create] = useCreateJobMutation();
 	const [jobId, setJobId] = useState<string | null>(null);
@@ -154,13 +172,13 @@ export default function ValidityView() {
 					<section className="flex flex-col gap-2" data-testid="validity-changed">
 						<h2 className="text-base font-semibold">{t("page.changedHeading")}</h2>
 						<div className="bg-card min-w-0 overflow-hidden rounded-xl border">
-							<ChangedTable entries={data.entries} user={user} />
+							<ChangedTable entries={data.entries} user={user} names={names} />
 						</div>
 					</section>
 					<section className="flex flex-col gap-2" data-testid="validity-could-change">
 						<h2 className="text-base font-semibold">{t("page.couldChange")}</h2>
 						<div className="bg-card min-w-0 rounded-xl border">
-							<StaleList stale={data.stale} />
+							<StaleList stale={data.stale} names={names} />
 						</div>
 						<div className="flex flex-col gap-1">
 							<div className="flex flex-wrap items-center gap-3">

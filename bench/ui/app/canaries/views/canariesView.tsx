@@ -47,7 +47,9 @@ export default function CanariesView() {
 	const unknown = !list.isFetching && unknownCanary(data, name);
 	const open = unknown ? null : (name ?? (data ? (sortCanaries(data.canaries)[0]?.name ?? null) : null));
 	const { t: u } = useTranslation("ux13");
-	const [formOpen, setFormOpen] = useState(false);
+	// Q-50: "Watch this agent for drift" links here with ?agent=: the new monitor form opens with it picked.
+	const [agentParam] = useQueryState("agent", parseAsString);
+	const [formOpen, setFormOpen] = useState(Boolean(agentParam));
 	const [editing, setEditing] = useState<CanaryDefinition | null>(null);
 	const schedules = useGetSchedulesQuery();
 	const paused = pausedCanaries(schedules.data?.rows);
@@ -69,6 +71,7 @@ export default function CanariesView() {
 			/>
 			{formOpen && (
 				<NewCanaryForm
+					initialAgent={agentParam ?? undefined}
 					onClose={() => setFormOpen(false)}
 					onCreated={(n) => {
 						setFormOpen(false);

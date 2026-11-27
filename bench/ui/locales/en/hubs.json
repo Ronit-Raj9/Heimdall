@@ -13,7 +13,7 @@
 	"releases": {
 		"label": "Release views",
 		"history": "Releases",
-		"review": "Needs review",
+		"review": "Waiting for approval",
 		"rules": "Rules"
 	},
 	"quickRun": {
