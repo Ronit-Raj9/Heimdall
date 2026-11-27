@@ -122,6 +122,7 @@ type agentRunCounts struct {
 	sealed  int       // sealed (scored) runs
 	total   int       // every run of the config, any outcome: aborted and cancelled ones too
 	lastRun time.Time // the latest start of any run; zero when unknown
+	score   agentScoreAcc // versions and last score (fix wave M2-21, M2-26)
 }
 
 // sealedRuns counts the runs per agent config id over every experiment:
@@ -150,6 +151,7 @@ func (h *AgentsHandler) sealedRuns() map[string]*agentRunCounts {
 			if started := rv.Run.Timing.Started; started.After(c.lastRun) {
 				c.lastRun = started
 			}
+			c.score.add(exp, &rv)
 		}
 	}
 	return counts
@@ -211,6 +213,9 @@ func summarizeAgent(f AgentConfigFile, counts map[string]*agentRunCounts) schema
 			}
 		}
 		out.SealedRuns = &n
+		if rc := counts[c.ID]; rc != nil {
+			rc.score.fill(&out)
+		}
 	}
 	return out
 }
