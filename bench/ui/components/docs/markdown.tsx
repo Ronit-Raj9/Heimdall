@@ -1,3 +1,4 @@
+import { BENCH_NAV } from "@/lib/constants/navigation";
 import { DOCS_REPO_DIR, REPO_BLOB_URL } from "@/lib/constants/repo";
 import i18n from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,8 @@ import { useState, type ReactNode } from "react";
 export interface MarkdownProps {
 	source: string;
 	onDocLink?: (name: string, anchor?: string) => void;
+	/** guide name -> title: a link to another guide whose text is its file name shows the title instead. */
+	docTitles?: Record<string, string>;
 	className?: string;
 	testId?: string;
 }
@@ -200,9 +203,35 @@ export function hostedDocSource(markdown: string, origin: string): { text: strin
 	});
 	return { text, replaced };
 }
+/** First address parts of the app's own pages (the sidebar plus a few not in it). */
+const APP_ROUTES = new Set([...BENCH_NAV.map((n) => n.to.split("/")[1]).filter(Boolean), "docs", "settings", "jobs", "usage", "inbox", "files"]);
+
+/**
+ * The app address an inline code span names (`/settings?tab=keys`), or null when it is not one of
+ * the app's pages (an API path such as `/api/bench/docs` stays code). Exported for tests.
+ */
+export function appRoute(code: string): string | null {
+	const m = /^\/([a-z][a-z0-9-]*)(?:\/[\w./-]*)?(?:\?[\w=&.-]*)?$/.exec(code.trim());
+	return m && APP_ROUTES.has(m[1]) ? code.trim() : null;
+}
+
+/** A link label that is just the target's file name ("web-keys-secrets.md") reads as the guide title. Exported for tests. */
+export function docLinkLabel(label: string, name: string, titles?: Record<string, string>): string {
+	const title = titles?.[name];
+	if (!title) return label;
+	const bare = label.replace(/`/g, "").trim();
+	return bare === `${name}.md` || bare === name ? title : label;
+}
+
+interface InlineCtx {
+	onDocLink: MarkdownProps["onDocLink"];
+	titles?: Record<string, string>;
+}
+
 const INLINE = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\[[^\]]+\]\([^)\s]+\))|(\*[^*\s][^*]*\*)|(_[^_\s][^_]*_)/g;
 
-function renderInline(text: string, onDocLink: MarkdownProps["onDocLink"], keyBase: string): ReactNode[] {
+function renderInline(text: string, ctx: InlineCtx, keyBase: string): ReactNode[] {
+	const { onDocLink } = ctx;
 	const out: ReactNode[] = [];
 	let last = 0;
 	let n = 0;
@@ -211,14 +240,22 @@ function renderInline(text: string, onDocLink: MarkdownProps["onDocLink"], keyBa
 		if (at > last) out.push(text.slice(last, at));
 		const tok = m[0];
 		const key = `${keyBase}-${n++}`;
-		if (m[1]) {
+		const route = m[1] ? appRoute(tok.slice(1, -1)) : null;
+		if (route) {
+			// An app address in a guide opens that page.
+			out.push(
+				<a key={key} href={route} className="text-primary font-mono text-[0.85em] underline underline-offset-2" data-testid="doc-app-link">
+					{route}
+				</a>,
+			);
+		} else if (m[1]) {
 			out.push(
 				<code key={key} className="bg-muted rounded-md border px-1.5 py-0.5 font-mono text-[0.85em]">
 					{tok.slice(1, -1)}
 				</code>,
 			);
 		} else if (m[2]) {
-			out.push(<strong key={key}>{renderInline(tok.slice(2, -2), onDocLink, key)}</strong>);
+			out.push(<strong key={key}>{renderInline(tok.slice(2, -2), ctx, key)}</strong>);
 		} else if (m[3]) {
 			const lm = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(tok);
 			const label = lm?.[1] ?? tok;
@@ -255,7 +292,7 @@ function renderInline(text: string, onDocLink: MarkdownProps["onDocLink"], keyBa
 									: undefined
 							}
 						>
-							{label}
+							{docLinkLabel(label, outside, ctx.titles)}
 						</a>,
 					);
 				}
@@ -272,7 +309,7 @@ function renderInline(text: string, onDocLink: MarkdownProps["onDocLink"], keyBa
 							onDocLink(doc[1], doc[2]);
 						}}
 					>
-						{label}
+						{docLinkLabel(label, doc[1], ctx.titles)}
 					</a>,
 				);
 			} else if (href) {
@@ -322,10 +359,10 @@ const CALLOUT_WORDS: Record<string, CalloutKind> = {
 };
 
 const CALLOUT_STYLE: Record<CalloutKind, { icon: LucideIcon; box: string; ink: string }> = {
-	note: { icon: Info, box: "border-sky-500/30 bg-sky-500/5", ink: "text-sky-700 dark:text-sky-400" },
-	tip: { icon: Lightbulb, box: "border-emerald-500/30 bg-emerald-500/5", ink: "text-emerald-700 dark:text-emerald-400" },
-	warning: { icon: TriangleAlert, box: "border-amber-500/40 bg-amber-500/5", ink: "text-amber-700 dark:text-amber-400" },
-	danger: { icon: OctagonAlert, box: "border-red-500/30 bg-red-500/5", ink: "text-red-700 dark:text-red-400" },
+	note: { icon: Info, box: "border-chart-info/30 bg-chart-info/5", ink: "text-chart-info-ink" },
+	tip: { icon: Lightbulb, box: "border-chart-success/30 bg-chart-success/5", ink: "text-chart-success-ink" },
+	warning: { icon: TriangleAlert, box: "border-chart-warning/40 bg-chart-warning/5", ink: "text-chart-warning-ink" },
+	danger: { icon: OctagonAlert, box: "border-chart-error/30 bg-chart-error/5", ink: "text-chart-error-ink" },
 };
 
 /** A quote that opens with [!NOTE], **Note:** or Warning: becomes a callout. Exported for tests. */
@@ -368,8 +405,9 @@ function CodeBlock({ lang, text }: { lang: string; text: string }) {
 	);
 }
 
-export function Markdown({ source, onDocLink, className, testId = "markdown" }: MarkdownProps) {
+export function Markdown({ source, onDocLink, docTitles, className, testId = "markdown" }: MarkdownProps) {
 	const blocks = parseBlocks(source);
+	const ctx: InlineCtx = { onDocLink, titles: docTitles };
 	return (
 		<article className={cn("text-foreground/90 flex min-w-0 flex-col gap-4 text-[15px] leading-7", className)} data-testid={testId}>
 			{blocks.map((b, i) => {
@@ -379,7 +417,7 @@ export function Markdown({ source, onDocLink, className, testId = "markdown" }: 
 						const Tag = `h${b.level}` as "h1";
 						return (
 							<Tag key={k} id={slugify(b.text)} className={HEADING_CLASS[b.level - 1]}>
-								{renderInline(b.text, onDocLink, k)}
+								{renderInline(b.text, ctx, k)}
 							</Tag>
 						);
 					}
@@ -393,7 +431,7 @@ export function Markdown({ source, onDocLink, className, testId = "markdown" }: 
 								className={cn("marker:text-muted-foreground flex flex-col gap-1.5 pl-6", b.ordered ? "list-decimal" : "list-disc")}
 							>
 								{b.items.map((it, j) => (
-									<li key={j}>{renderInline(it, onDocLink, `${k}-${j}`)}</li>
+									<li key={j}>{renderInline(it, ctx, `${k}-${j}`)}</li>
 								))}
 							</Tag>
 						);
@@ -408,26 +446,26 @@ export function Markdown({ source, onDocLink, className, testId = "markdown" }: 
 									<Icon className={cn("mt-1 size-4 shrink-0", st.ink)} aria-hidden="true" />
 									<div className="min-w-0">
 										<p className={cn("text-xs font-semibold tracking-wide uppercase", st.ink)}>{c.label}</p>
-										<p>{renderInline(c.body, onDocLink, k)}</p>
+										<p>{renderInline(c.body, ctx, k)}</p>
 									</div>
 								</aside>
 							);
 						}
 						return (
 							<blockquote key={k} className="text-muted-foreground border-primary/40 border-l-4 py-0.5 pl-4 italic">
-								{renderInline(b.text, onDocLink, k)}
+								{renderInline(b.text, ctx, k)}
 							</blockquote>
 						);
 					}
 					case "table":
 						return (
 							<div key={k} className="overflow-x-auto rounded-lg border">
-								<table className="w-full text-left text-[13px]">
+								<table className="w-full min-w-[28rem] text-left text-sm">
 									<thead className="bg-muted/60 text-muted-foreground text-xs">
 										<tr>
 											{b.head.map((h, j) => (
 												<th key={j} className="px-3 py-2 font-medium">
-													{renderInline(h, onDocLink, `${k}-h${j}`)}
+													{renderInline(h, ctx, `${k}-h${j}`)}
 												</th>
 											))}
 										</tr>
@@ -437,7 +475,7 @@ export function Markdown({ source, onDocLink, className, testId = "markdown" }: 
 											<tr key={ri} className="hover:bg-muted/30 border-t transition-colors">
 												{r.map((c, ci) => (
 													<td key={ci} className="px-3 py-2 align-top">
-														{renderInline(c, onDocLink, `${k}-${ri}-${ci}`)}
+														{renderInline(c, ctx, `${k}-${ri}-${ci}`)}
 													</td>
 												))}
 											</tr>
@@ -449,7 +487,7 @@ export function Markdown({ source, onDocLink, className, testId = "markdown" }: 
 					case "rule":
 						return <hr key={k} className="my-4" />;
 					default:
-						return <p key={k}>{renderInline(b.text, onDocLink, k)}</p>;
+						return <p key={k}>{renderInline(b.text, ctx, k)}</p>;
 				}
 			})}
 		</article>

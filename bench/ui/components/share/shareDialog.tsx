@@ -1,7 +1,9 @@
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
+import { InlineError } from "@/components/runs/screenStates";
+import { notify } from "@/lib/notify";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import {
 	badgeMarkdown,
@@ -16,9 +18,11 @@ import {
 } from "@/lib/store/apis/shareApi";
 import "@/lib/types/shareI18n";
 import "@/components/settings/w4m8I18n";
+import "./uf8bI18n";
+import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { cn } from "@/lib/utils";
-import { Check, Copy, Download, FileCode2, FileText, Link2, Package, Printer, Share2, X } from "lucide-react";
-import { useId, useRef, useState, type ReactNode } from "react";
+import { Check, Copy, Download, FileCode2, FileText, Link2, Package, Printer, Share2 } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 /** Expiry choices, in days; 0 is never. */
@@ -48,6 +52,25 @@ export function canonicalQuery(q?: string): string {
 	const p = new URLSearchParams(q ?? "");
 	p.sort();
 	return p.toString();
+}
+
+/** The "what they will see" lines under the intro, in order (M8-69). Exported for tests. */
+export function shareAudienceLines(kind: ShareKind, hidePrompts: boolean): string[] {
+	return [`share.visible.${kind}`, hidePrompts ? "share.hiddenPrompts" : "share.hidden", "share.live", "share.pageUrl"];
+}
+
+/** Active links first; turned off and expired ones only when asked for (M8-30). Exported for tests. */
+export function splitLinks(shares: Share[]): { active: Share[]; off: Share[] } {
+	return { active: shares.filter((s) => s.state === "active"), off: shares.filter((s) => s.state !== "active") };
+}
+
+/** A link as the server may now send it: `created_by_name` is new and may be missing (G1, M8-72). */
+type ShareWithName = Share & { created_by_name?: string };
+
+/** Who made a link: the member's display name when the server sends it, else the stored id. Exported for tests. */
+export function creatorName(s: Share): string {
+	const name = (s as ShareWithName).created_by_name?.trim();
+	return name || s.created_by || "";
 }
 
 /** The line under the downloads: the PDF hint, or what to do when the PDF could not be prepared. */
@@ -94,6 +117,7 @@ function CopyButton({ text, testId }: { text: string; testId: string }) {
 		try {
 			await navigator.clipboard.writeText(text);
 			setState("ok");
+			notify({ text: t("copied", { ns: "toast" }) });
 		} catch {
 			setState("fail");
 		}
@@ -120,14 +144,14 @@ function formatDate(iso?: string): string {
 }
 
 /** The Share button that opens the dialog. Put it in a page header or toolbar. */
-export function ShareButton({ className, ...target }: ShareTarget & { className?: string }) {
+export function ShareButton({ className, label, ...target }: ShareTarget & { className?: string; /** Button text; default "Share" (M4-112). */ label?: string }) {
 	const { t } = useTranslation("share");
 	const [open, setOpen] = useState(false);
 	return (
 		<>
 			<Button type="button" variant="outline" size="sm" className={className} onClick={() => setOpen(true)} dataTestId="share-open">
 				<Share2 aria-hidden="true" />
-				{t("button")}
+				{label ?? t("button")}
 			</Button>
 			{open && <ShareDialog {...target} onClose={() => setOpen(false)} />}
 		</>
@@ -136,9 +160,10 @@ export function ShareButton({ className, ...target }: ShareTarget & { className?
 
 function Row({ icon, title, help, children }: { icon: ReactNode; title: string; help?: string; children: ReactNode }) {
 	return (
-		<div className="flex flex-wrap items-center gap-3 py-2.5">
+		<div className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5">
 			<span className="text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-lg border">{icon}</span>
-			<div className="min-w-0 flex-1">
+			{/* On a phone the title takes its own line, so the buttons wrap under it instead of into it (M8-76). */}
+			<div className="min-w-0 flex-1 basis-[calc(100%-3rem)] sm:basis-auto">
 				<p className="text-sm font-medium">{title}</p>
 				{help && <p className="text-muted-foreground text-xs">{help}</p>}
 			</div>
@@ -150,25 +175,25 @@ function Row({ icon, title, help, children }: { icon: ReactNode; title: string; 
 /** The share dialog: make a read-only link, list and turn off links to this item, downloads. */
 export function ShareDialog({ kind, target, query, evaluationId, onClose }: ShareTarget & { onClose(): void }) {
 	const { t } = useTranslation("share");
+	const { t: tu } = useTranslation("uf8b");
 	const session = useSession();
 	const confirm = useConfirm();
-	const titleId = useId();
-	const panelRef = useRef<HTMLDivElement>(null);
 	const canCreate = canUse(session, "member");
 	const [days, setDays] = useState<number>(30);
 	const [hidePrompts, setHidePrompts] = useState(false);
 	const [label, setLabel] = useState("");
 	const [created, setCreated] = useState<Share | null>(null);
 	const [pdfFailed, setPdfFailed] = useState(false);
+	const [showOff, setShowOff] = useState(false);
+	const [revokeError, setRevokeError] = useState<unknown>(null);
 	const links = useListSharesQuery({ kind, target });
 	const [create, createState] = useCreateShareMutation();
 	const [revoke] = useRevokeShareMutation();
 	// Only links with the same view filters belong to this exact view.
 	// The server stores the query with its keys sorted, so both sides are compared in that order.
 	const mine = (links.data?.shares ?? []).filter((s) => canonicalQuery(s.query) === canonicalQuery(query));
-
-	// Bubble phase: Escape on an open confirm (which handles it in the capture phase) keeps this dialog open.
-	useDialogFocus(panelRef, onClose);
+	const { active, off } = splitLinks(mine);
+	const listed = showOff ? [...active, ...off] : active;
 
 	const submit = async () => {
 		const res = await create({
@@ -183,50 +208,54 @@ export function ShareDialog({ kind, target, query, evaluationId, onClose }: Shar
 	};
 
 	const turnOff = async (s: Share) => {
+		const name = s.label || formatDate(s.created_at);
+		const expiry = s.expires_at ? t("expires", { when: formatDate(s.expires_at) }) : tu("share.neverExpiresLower");
 		if (
-			!(await confirm(t("revokeConfirm"), {
+			!(await confirm(tu("share.revokeConfirmNamed", { name, expiry }), {
 				destructive: true,
 				confirmLabel: t("revoke"),
 			}))
 		)
 			return;
-		await revoke(s.id);
-		if (created?.id === s.id) setCreated(null);
+		setRevokeError(null);
+		try {
+			await revoke(s.id).unwrap();
+			if (created?.id === s.id) setCreated(null);
+			notify({ text: t("revoked", { ns: "toast" }) });
+		} catch (e) {
+			setRevokeError(e);
+		}
 	};
 
 	const newUrl = created ? shareUrl(created) : "";
 	const showBadge = kind === "evaluation" || kind === "report_card" || kind === "verdict";
 
 	return (
-		<div
-			className="fixed inset-0 z-[90] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
-			data-testid="share-dialog-backdrop"
-			onMouseDown={(e) => {
-				if (e.target === e.currentTarget) onClose();
+		<Dialog
+			open
+			onOpenChange={(o) => {
+				if (!o) onClose();
 			}}
+			title={t("title", { what: kind === "verdict" ? tu("share.whatVerdict") : t(`what.${kind}`) })}
+			description={
+				<>
+					<p>{t("intro")}</p>
+					<ul className="mt-2 flex list-disc flex-col gap-1 pl-4 text-xs" data-testid="share-audience">
+						{shareAudienceLines(kind, hidePrompts).map((k) => (
+							<li key={k}>{tu(k as "share.live")}</li>
+						))}
+					</ul>
+				</>
+			}
+			closeLabel={t("close")}
+			testId="share-dialog"
+			footer={
+				<Button type="button" variant="outline" onClick={onClose} dataTestId="share-close-footer">
+					{tu("share.cancel")}
+				</Button>
+			}
 		>
-			<div
-				ref={panelRef}
-				role="dialog"
-				aria-modal="true"
-				aria-labelledby={titleId}
-				tabIndex={-1}
-				className="bg-card text-card-foreground flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-xl border shadow-lg outline-none sm:rounded-xl"
-				data-testid="share-dialog"
-			>
-				<header className="flex items-start justify-between gap-4 border-b px-5 py-4">
-					<div className="min-w-0">
-						<h2 id={titleId} className="text-base font-semibold">
-							{t("title", { what: t(`what.${kind}`) })}
-						</h2>
-						<p className="text-muted-foreground mt-1 text-sm">{t("intro")}</p>
-					</div>
-					<Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label={t("close")} dataTestId="share-close">
-						<X aria-hidden="true" />
-					</Button>
-				</header>
-
-				<div className="flex flex-col gap-5 overflow-y-auto px-5 py-4">
+				<div className="flex flex-col gap-5">
 					{canCreate ? (
 						<section className="flex flex-col gap-3" data-testid="share-create">
 							<fieldset className="flex flex-col gap-2">
@@ -280,7 +309,7 @@ export function ShareDialog({ kind, target, query, evaluationId, onClose }: Shar
 								</Button>
 								{createState.isError && (
 									<p role="alert" className="text-destructive text-sm">
-										{t("createError")}
+										{tu("share.createError", { message: getBenchErrorMessage(createState.error) })}
 									</p>
 								)}
 							</div>
@@ -325,39 +354,62 @@ export function ShareDialog({ kind, target, query, evaluationId, onClose }: Shar
 						{mine.length === 0 ? (
 							<p className="text-muted-foreground text-sm">{t("noLinks")}</p>
 						) : (
-							<ul className="divide-border/80 flex flex-col divide-y rounded-lg border">
-								{mine.map((s) => (
-									<li key={s.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm" data-testid={`share-link-${s.id}`}>
-										<span
-											className={cn(
-												"rounded-full px-2 py-0.5 text-xs font-medium",
-												s.state === "active"
-													? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-													: "bg-muted text-muted-foreground",
-											)}
-										>
-											{t(`state.${s.state}`)}
-										</span>
-										<span className="min-w-0 flex-1 truncate">{s.label || formatDate(s.created_at)}</span>
-										<span className="text-muted-foreground text-xs">
-											{s.expires_at ? t("expires", { when: formatDate(s.expires_at) }) : t("neverExpires")}
-										</span>
-										{s.state === "active" && shareUrl(s) && <CopyButton text={shareUrl(s)} testId={`share-copy-${s.id}`} />}
-										{s.state === "active" && canCreate && (
-											<Button type="button" variant="ghost" size="sm" onClick={() => void turnOff(s)} dataTestId={`share-revoke-${s.id}`}>
-												{t("revoke")}
-											</Button>
-										)}
-									</li>
-								))}
-							</ul>
+							<>
+								{listed.length > 0 && (
+									<ul className="divide-border/80 flex flex-col divide-y rounded-lg border">
+										{listed.map((s) => (
+											<li key={s.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm" data-testid={`share-link-${s.id}`}>
+												<span
+													className={cn(
+														"rounded-full px-2 py-0.5 text-xs font-medium",
+														s.state === "active" ? "bg-chart-success/10 text-chart-success-ink" : "bg-muted text-muted-foreground",
+													)}
+												>
+													{t(`state.${s.state}`)}
+												</span>
+												<span className="flex min-w-0 flex-1 flex-col">
+													<span className="truncate">{s.label || formatDate(s.created_at)}</span>
+													<span className="text-muted-foreground truncate text-xs" data-testid={`share-link-by-${s.id}`}>
+														{creatorName(s)
+															? tu("share.by", { name: creatorName(s), created: formatDate(s.created_at) })
+															: tu("share.created", { created: formatDate(s.created_at) })}
+													</span>
+												</span>
+												<span className="text-muted-foreground text-xs">
+													{s.expires_at ? t("expires", { when: formatDate(s.expires_at) }) : t("neverExpires")}
+												</span>
+												{s.state === "active" && shareUrl(s) && <CopyButton text={shareUrl(s)} testId={`share-copy-${s.id}`} />}
+												{s.state === "active" && canCreate && (
+													<Button type="button" variant="ghost" size="sm" onClick={() => void turnOff(s)} dataTestId={`share-revoke-${s.id}`}>
+														{t("revoke")}
+													</Button>
+												)}
+											</li>
+										))}
+									</ul>
+								)}
+								{off.length > 0 && (
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										className="w-fit"
+										onClick={() => setShowOff((v) => !v)}
+										aria-expanded={showOff}
+										dataTestId="share-show-off"
+									>
+										{showOff ? tu("share.hideOff") : tu("share.showOff", { count: off.length })}
+									</Button>
+								)}
+							</>
 						)}
+						<InlineError error={revokeError} title={tu("share.revokeFailed")} testId="share-revoke-error" />
 					</section>
 
 					{evaluationId && (
 						<section className="flex flex-col" data-testid="share-downloads">
 							<h3 className="text-sm font-medium">{t("downloads")}</h3>
-							<Row icon={<FileText className="size-4" aria-hidden="true" />} title={t("html")}>
+							<Row icon={<FileText className="size-4" aria-hidden="true" />} title={tu("share.reportCard")}>
 								<Button asChild variant="outline" size="sm">
 									<a href={reportExportUrl(evaluationId, "html")} download data-testid="share-download-html">
 										<Download aria-hidden="true" />
@@ -393,7 +445,6 @@ export function ShareDialog({ kind, target, query, evaluationId, onClose }: Shar
 						</section>
 					)}
 				</div>
-			</div>
-		</div>
+		</Dialog>
 	);
 }

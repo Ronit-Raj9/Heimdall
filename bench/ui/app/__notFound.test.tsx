@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import { routerState } from "@/lib/testing/routerMock";
 import { render, tagOf } from "@/lib/testing/render";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { NotFoundComponent } from "./__notFound";
+import { NotFoundComponent, suggestPages } from "./__notFound";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
@@ -35,5 +35,19 @@ describe("not-found page (N129, N73)", () => {
 	it("suggests nothing when no word matches", () => {
 		at("/zz-qq");
 		expect(render(<NotFoundComponent />)).not.toContain("not-found-suggestions");
+	});
+
+	// M8-78, M8-79, X-65: always a way on, a plain description, a primary Home button.
+	it("always offers four pages, a guide search and Home as the main button", () => {
+		at("/zz-qq");
+		const html = render(<NotFoundComponent />);
+		for (const k of ["evaluations", "agents", "runs", "docs"]) expect(html).toContain(`data-testid="not-found-go-${k}"`);
+		expect(html).toContain('data-testid="not-found-docs-search"');
+		expect(html).toContain("We could not find that page.");
+		expect(tagOf(html, "not-found-link-home")).toContain("bg-primary");
+	});
+
+	it("matches the start of a word", () => {
+		expect(suggestPages("/eval").map((s) => s.to)).toContain("/evaluations");
 	});
 });

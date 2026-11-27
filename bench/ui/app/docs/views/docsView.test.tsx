@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import { LOCAL_SESSION, hostedSession } from "@/lib/testing/platformFixtures";
 import { errorQuery, okQuery, render, tagOf } from "@/lib/testing/render";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import DocsView, { docsSearchTerm } from "./docsView";
+import DocsView, { docTitles, docsSearchTerm, groupDocs } from "./docsView";
 
 const api = vi.hoisted(() => ({
 	list: null as unknown,
@@ -15,7 +15,8 @@ const api = vi.hoisted(() => ({
 
 vi.mock("nuqs", async (importOriginal) => ({
 	...(await importOriginal<typeof import("nuqs")>()),
-	useQueryState: () => [api.selected, () => undefined],
+	// Only ?doc= is set in these tests; the ?q= filter is empty.
+	useQueryState: (key: string) => [key === "doc" ? api.selected : null, () => undefined],
 }));
 vi.mock("@/lib/store/apis/welcomeApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/welcomeApi")>()),
@@ -95,11 +96,11 @@ describe("DocsView", () => {
 	// N139: the tab names the guide.
 	it("titles the tab with the guide's name", () => {
 		render(<DocsView />);
-		expect(api.titles).toContain("Hosting · Guides · Heimdall");
+		expect(api.titles).toContain("Hosting · Docs · Heimdall");
 		api.doc = okQuery(undefined);
 		api.titles = [];
 		render(<DocsView />);
-		expect(api.titles).not.toContain("Hosting · Guides · Heimdall");
+		expect(api.titles).not.toContain("Hosting · Docs · Heimdall");
 	});
 
 	// N136: on a hosted server the samples point at this server, with a note saying so.
@@ -112,5 +113,18 @@ describe("DocsView", () => {
 		const local = render(<DocsView />, LOCAL_SESSION);
 		expect(local).toContain("http://127.0.0.1:8090/healthz");
 		expect(local).not.toContain("docs-local-note");
+	});
+
+	// M8-64: the guides come in groups; M8-62: with a guide open the article comes first on a phone.
+	it("groups the guides and puts the article first on a phone", () => {
+		expect(groupDocs([{ name: "zz" }, { name: "web-x" }, { name: "glossary" }]).map((g) => g.group)).toEqual(["start", "web", "other"]);
+		expect(docTitles([{ name: "a", title: "A" }])).toEqual({ a: "A" });
+		const html = render(<DocsView />);
+		expect(html).toContain('data-testid="docs-group-start"');
+		expect(html).toContain('data-testid="docs-list-toggle"');
+		expect(html).toContain("All guides (2)");
+		expect(html).toContain("order-first");
+		// M8-65: one h1, the guide's own title.
+		expect(html.match(/<h1/g)?.length).toBe(1);
 	});
 });

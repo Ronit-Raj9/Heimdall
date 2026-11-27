@@ -1,0 +1,75 @@
+{
+	"share": {
+		"whatVerdict": "this comparison result",
+		"visible": {
+			"evaluation": "They will see: scores, costs, task text, agent answers, model names and run ids.",
+			"report_card": "They will see: scores, costs, task text, agent answers, model names and run ids.",
+			"verdict": "They will see: the result, both scores, the effect, cost, the benchmark name and the safety checks.",
+			"run_trace": "They will see: the task, the agent, the outcome, the cost and every step the agent took.",
+			"leaderboard": "They will see: the ranking, agent and model names, scores and costs."
+		},
+		"hidden": "Never shown: secrets, keys, your organization id, file paths.",
+		"hiddenPrompts": "Never shown: secrets, keys, your organization id, file paths, prompts and agent text.",
+		"live": "This is a live page: if you re-score, rerun or delete this, they see the change. Turning the link off ends it.",
+		"pageUrl": "The address in your browser needs an account. Send this link instead.",
+		"createError": "Could not create the link: {{message}}",
+		"revokeError": "Could not turn the link off: {{message}}",
+		"revokeConfirmNamed": "Turn off the link {{name}} ({{expiry}})? Anyone who has it loses access at once.",
+		"by": "by {{name}}, {{created}}",
+		"created": "created {{created}}",
+		"showOff": "Show turned off and expired ({{count}})",
+		"hideOff": "Hide turned off and expired",
+		"reportCard": "Report card",
+		"neverExpiresLower": "never expires",
+		"cancel": "Cancel",
+		"revokeFailed": "Could not turn the link off."
+	},
+	"shared": {
+		"actions": {
+			"ship": "Ship",
+			"hold": "Hold",
+			"no_decision": "No decision",
+			"fix_harness": "Fix the test setup"
+		},
+		"setup": "Setup {{arm}}",
+		"tasksRuns": "{{num}} of {{den}} runs passed",
+		"unknownRuns": "{{count}} runs without a result",
+		"tasks": "Tasks compared",
+		"interval": "{{effect}} (range {{lo}} to {{hi}})"
+	},
+	"notFound": {
+		"description": "We could not find that page. It may have moved, or the link is wrong.",
+		"goTo": "Go to",
+		"searchDocs": "Search the guides",
+		"search": "Search",
+		"links": {
+			"evaluations": "Evaluations",
+			"agents": "My agents",
+			"runs": "Runs and traces",
+			"docs": "Guides"
+		}
+	},
+	"docs": {
+		"allGuides": "All guides ({{count}})",
+		"groups": {
+			"start": "Start here",
+			"web": "Using the website",
+			"other": "More guides"
+		}
+	},
+	"jobs": {
+		"statusTitle": {
+			"queued": "Waiting for a free worker to start.",
+			"running": "Working now.",
+			"succeeded": "Finished without errors.",
+			"failed": "Stopped with an error. Open the job to see why.",
+			"cancelled": "Stopped by a person before it finished."
+		}
+	},
+	"registry": {
+		"remove": "Remove",
+		"keep": "Keep",
+		"removeQuestion": "Remove the login for {{host}}? The secret stays.",
+		"pickSecret": "Pick a secret"
+	}
+}

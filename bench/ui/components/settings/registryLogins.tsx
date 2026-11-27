@@ -4,6 +4,8 @@ import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenSta
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import "@/components/share/uf8bI18n";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
@@ -14,6 +16,7 @@ import {
 } from "@/lib/store/apis/registryCredentialsApi";
 import { REGISTRY_KINDS, registryFormProblem, type RegistryCredential, type RegistryKind } from "@/lib/types/registryCredentials";
 import { useId, useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { SettingsSection, TableFrame } from "./settingsBits";
 
 export interface RegistryLoginsTableProps {
@@ -25,6 +28,7 @@ export interface RegistryLoginsTableProps {
 
 /** The org's registry logins: host, user name and the secret that holds the password. Never a password. */
 export function RegistryLoginsTable({ logins, canWrite, onDelete, deletingId }: RegistryLoginsTableProps) {
+	const { t } = useTranslation("uf8b");
 	if (logins.length === 0) {
 		return (
 			<EmptyNote testId="registry-logins-empty">
@@ -64,10 +68,10 @@ export function RegistryLoginsTable({ logins, canWrite, onDelete, deletingId }: 
 							{canWrite && (
 								<TableCell className="text-right">
 									<ConfirmButton
-										label="Remove"
-										question={`Remove the login for ${l.host}? The secret stays.`}
-										confirmLabel="Remove"
-										cancelLabel="Keep"
+										label={t("registry.remove")}
+										question={t("registry.removeQuestion", { host: l.host })}
+										confirmLabel={t("registry.remove")}
+										cancelLabel={t("registry.keep")}
 										onConfirm={() => onDelete?.(l.id)}
 										isLoading={deletingId === l.id}
 										testId={`registry-delete-${l.id}`}
@@ -83,6 +87,7 @@ export function RegistryLoginsTable({ logins, canWrite, onDelete, deletingId }: 
 }
 
 function AddRegistryLogin({ secretNames }: { secretNames: string[] }) {
+	const { t } = useTranslation("uf8b");
 	const session = useSession();
 	const formId = useId();
 	const [kind, setKind] = useState<RegistryKind>("ghcr");
@@ -116,19 +121,18 @@ function AddRegistryLogin({ secretNames }: { secretNames: string[] }) {
 				<label htmlFor={`${formId}-kind`} className={label}>
 					Registry
 				</label>
-				<select
-					id={`${formId}-kind`}
-					className="border-input bg-background h-9 rounded-md border px-2 text-sm"
-					value={kind}
-					onChange={(e) => setKind(e.target.value as RegistryKind)}
-					data-testid="registry-kind"
-				>
-					{(Object.keys(REGISTRY_KINDS) as RegistryKind[]).map((k) => (
-						<option key={k} value={k}>
-							{REGISTRY_KINDS[k].label}
-						</option>
-					))}
-				</select>
+				<Select value={kind} onValueChange={(v) => setKind(v as RegistryKind)}>
+					<SelectTrigger id={`${formId}-kind`} className="w-full" data-testid="registry-kind">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						{(Object.keys(REGISTRY_KINDS) as RegistryKind[]).map((k) => (
+							<SelectItem key={k} value={k}>
+								{REGISTRY_KINDS[k].label}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
 			</div>
 			<div className={field}>
 				<label htmlFor={`${formId}-host`} className={label}>
@@ -163,20 +167,19 @@ function AddRegistryLogin({ secretNames }: { secretNames: string[] }) {
 				<label htmlFor={`${formId}-secret`} className={label}>
 					Password from secret
 				</label>
-				<select
-					id={`${formId}-secret`}
-					className="border-input bg-background h-9 rounded-md border px-2 font-mono text-sm"
-					value={secretName}
-					onChange={(e) => setSecretName(e.target.value)}
-					data-testid="registry-secret"
-				>
-					<option value="">Pick a secret</option>
-					{secretNames.map((n) => (
-						<option key={n} value={n}>
-							{n}
-						</option>
-					))}
-				</select>
+				{/* No item for "none": an empty value shows the placeholder. */}
+				<Select value={secretName} onValueChange={setSecretName}>
+					<SelectTrigger id={`${formId}-secret`} className="w-full font-mono" data-testid="registry-secret">
+						<SelectValue placeholder={t("registry.pickSecret")} />
+					</SelectTrigger>
+					<SelectContent>
+						{secretNames.map((n) => (
+							<SelectItem key={n} value={n} className="font-mono">
+								{n}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
 				<span className="text-muted-foreground text-xs">Store {info.secretHint} as a secret above first.</span>
 			</div>
 			<div className="flex flex-wrap items-center gap-3 sm:col-span-2">

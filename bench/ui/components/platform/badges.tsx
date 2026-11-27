@@ -2,11 +2,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { JobStatus, Role, RunnerState } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { useState, type ReactNode } from "react";
+import "@/components/share/uf8bI18n";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 const ROLE_CLASS: Record<Role, string> = {
-	owner: "border-primary/40 bg-primary/10 text-primary",
+	// Neutral, not the primary button colour (X-61); the weight tells it apart.
+	owner: "border-border bg-muted text-foreground font-semibold",
 	admin: "border-chart-cat-2/45 bg-chart-cat-2/10 text-foreground",
 	member: "border-border bg-secondary text-secondary-foreground",
 	viewer: "border-border text-muted-foreground",
@@ -22,12 +24,13 @@ export function RoleBadge({ role, className }: { role: Role; className?: string 
 	);
 }
 
-const JOB_VARIANT: Record<JobStatus, "default" | "success" | "destructive" | "warning" | "outline"> = {
+const JOB_VARIANT: Record<JobStatus, "default" | "success" | "destructive" | "warning" | "outline" | "secondary"> = {
 	queued: "outline",
 	running: "default",
 	succeeded: "success",
 	failed: "destructive",
-	cancelled: "outline",
+	// A grey filled pill: an outline one read as a disabled control (X-63).
+	cancelled: "secondary",
 };
 
 // A dot per status, shaped so the badge reads without colour.
@@ -42,10 +45,12 @@ const JOB_DOT: Record<JobStatus, string> = {
 /** A job's status as a badge. */
 export function JobStatusBadge({ status, className }: { status: JobStatus; className?: string }) {
 	const { t } = useTranslation("platform");
+	const { t: tu } = useTranslation("uf8b");
 	return (
 		<Badge
 			variant={JOB_VARIANT[status]}
-			className={cn("gap-1.5", status === "cancelled" && "text-muted-foreground", className)}
+			className={cn("gap-1.5", className)}
+			title={tu(`jobs.statusTitle.${status}`)}
 			data-status={status}
 			data-testid={`job-status-${status}`}
 		>
@@ -99,9 +104,14 @@ export interface ConfirmButtonProps {
 	className?: string;
 }
 
+/** How long an armed ConfirmButton waits before it disarms by itself. */
+export const CONFIRM_DISARM_MS = 5000;
+
 /**
  * A destructive action that asks inline before it acts: the button turns into the question with
- * confirm and cancel, so there is no modal to manage and focus stays where the user is.
+ * confirm and cancel, so there is no modal to manage. Armed, focus moves to the confirm button;
+ * Escape, a click or focus outside, or 5 seconds of nothing disarm it and focus returns to the
+ * trigger (X-105).
  */
 export function ConfirmButton({
 	label,
@@ -116,9 +126,44 @@ export function ConfirmButton({
 	className,
 }: ConfirmButtonProps) {
 	const [asking, setAsking] = useState(false);
+	const groupRef = useRef<HTMLSpanElement>(null);
+	const triggerRef = useRef<HTMLButtonElement>(null);
+	const refocus = useRef(false);
+
+	const disarm = (focusTrigger: boolean) => {
+		refocus.current = focusTrigger;
+		setAsking(false);
+	};
+
+	useEffect(() => {
+		if (!asking && refocus.current) {
+			refocus.current = false;
+			triggerRef.current?.focus();
+		}
+		if (!asking) return;
+		const timer = window.setTimeout(() => disarm(false), CONFIRM_DISARM_MS);
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === "Escape") {
+				e.stopPropagation();
+				disarm(true);
+			}
+		};
+		const onDown = (e: PointerEvent) => {
+			if (groupRef.current && !groupRef.current.contains(e.target as Node)) disarm(false);
+		};
+		document.addEventListener("keydown", onKey, true);
+		document.addEventListener("pointerdown", onDown, true);
+		return () => {
+			window.clearTimeout(timer);
+			document.removeEventListener("keydown", onKey, true);
+			document.removeEventListener("pointerdown", onDown, true);
+		};
+	}, [asking]);
+
 	if (!asking) {
 		return (
 			<Button
+				ref={triggerRef}
 				type="button"
 				variant={variant}
 				size="sm"
@@ -134,7 +179,12 @@ export function ConfirmButton({
 	}
 	return (
 		<span
+			ref={groupRef}
 			className="inline-flex flex-wrap items-center justify-end gap-2"
+			onBlur={(e) => {
+				// Focus leaving the question (Tab away) disarms it.
+				if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) disarm(false);
+			}}
 			role="group"
 			aria-label={question}
 			data-testid={`${testId}-confirm`}
@@ -159,7 +209,7 @@ export function ConfirmButton({
 				variant="ghost"
 				size="sm"
 				className="h-7 px-2.5 text-xs"
-				onClick={() => setAsking(false)}
+				onClick={() => disarm(true)}
 				dataTestId={`${testId}-no`}
 			>
 				{cancelLabel}
