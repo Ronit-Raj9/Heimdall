@@ -47,6 +47,8 @@ export const JOB_KIND_LABELS: Readonly<Record<string, string>> = {
 	"livescore.init": "Set up live quality scoring",
 	"livescore.pull": "Fetch live quality scores",
 	"monitor.certify": "Monitor accuracy check",
+	"onboard.publish": "Publish a benchmark",
+	"onboard.ready": "Check a new benchmark",
 	"operate.doctor": "Server health check",
 	"org.import": "Import runs",
 	"policy.generate": "Benchmark from policy document",
@@ -76,6 +78,20 @@ export const JOB_KIND_LABELS: Readonly<Record<string, string>> = {
 export function jobKindLabel(kind: string): string {
 	return Object.prototype.hasOwnProperty.call(JOB_KIND_LABELS, kind) ? JOB_KIND_LABELS[kind] : kind;
 }
+/** Target prefixes that only repeat the job kind ("exp:e_1" on a comparison run). */
+const TARGET_PREFIXES = ["exp:", "suite:", "canary:", "onboard:"];
+
+/**
+ * A job's target in words for a job title: the id without its kind prefix, or "" when the
+ * target says nothing the kind does not ("index" on a search index refresh).
+ */
+export function targetLabel(target: string | null | undefined): string {
+	const t = (target ?? "").trim();
+	if (t === "" || t === "index") return "";
+	const prefix = TARGET_PREFIXES.find((p) => t.startsWith(p));
+	return prefix ? t.slice(prefix.length) : t;
+}
+
 /** Shown after the kind of a job that only estimated its cost (fix wave 3, N275). */
 export const ESTIMATE_JOB_LABEL = "Cost estimate";
 

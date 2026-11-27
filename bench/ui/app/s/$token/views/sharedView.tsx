@@ -14,6 +14,7 @@ import { type ReactNode, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { formatUsd } from "@/lib/money";
 import "./hw16I18n";
+import "@/components/share/uf8bI18n";
 
 /** GET /agents/{id}/report-card as the server sends it: the report, or null before any evaluation. */
 interface AgentReportCard {
@@ -198,31 +199,63 @@ function Facts({ items }: { items: Array<[string, ReactNode]> }) {
 	);
 }
 
-const ACTION_WORDS: Record<string, string> = {
-	ship: "Ship",
-	hold: "Hold",
-	no_decision: "No decision",
-	fix_harness: "Fix the harness",
-};
-const DECISION_WORDS: Record<string, string> = {
-	improved: "Better",
-	regressed: "Worse",
-	inconclusive: "No clear difference",
-	invalid: "Measurement problem",
-};
+const ACTIONS = ["ship", "hold", "no_decision", "fix_harness"] as const;
+const DECISIONS = ["improved", "regressed", "inconclusive", "invalid", "score"] as const;
+
+/** One setup's naive score: passes over runs, as a percent, or null with no runs. Exported for tests. */
+export function naiveScore(r: { num: number; den: number } | undefined): number | null {
+	return r && r.den > 0 ? r.num / r.den : null;
+}
+
+/** Points with a sign: 0.125 is "+13 pts". */
+function points(d: number): string {
+	return `${d > 0 ? "+" : ""}${Math.round(d * 100)} pts`;
+}
+
+/** The effect line: the change with its approximate range when the server sent one. Exported for tests. */
+export function effectText(effect: VerdictPayload["verdict"]["effect"], withRange: (e: string, lo: string, hi: string) => string): string {
+	if (!effect) return "-";
+	const e = points(effect.d_bar);
+	return effect.interval ? withRange(e, points(effect.interval[0]), points(effect.interval[1])) : e;
+}
 
 function VerdictPart({ verdict }: { verdict: VerdictPayload | null }) {
 	const { t } = useTranslation("share");
+	const { t: tu } = useTranslation("uf8b");
+	const { t: tg } = useTranslation("glossary");
 	if (!verdict) return <p className="text-muted-foreground text-sm">{t("page.noReport")}</p>;
 	const v = verdict.verdict;
-	const effect = v.effect ? `${v.effect.d_bar > 0 ? "+" : ""}${Math.round(v.effect.d_bar * 100)} pts` : "-";
+	const action = (ACTIONS as readonly string[]).includes(v.action) ? tu(`shared.actions.${v.action as (typeof ACTIONS)[number]}`) : v.action;
+	const decision = (DECISIONS as readonly string[]).includes(v.decision) ? tg(`terms.${v.decision as (typeof DECISIONS)[number]}.label`) : v.decision;
+	const effect = effectText(v.effect, (e, lo, hi) => tu("shared.interval", { effect: e, lo, hi }));
+	const arms = Object.keys(verdict.naive ?? {}).sort();
 	return (
 		<section className="flex flex-col gap-4" data-testid="shared-verdict">
-			<h2 className="text-2xl font-semibold tracking-tight">{ACTION_WORDS[v.action] ?? v.action}</h2>
+			<h2 className="text-2xl font-semibold tracking-tight">{action}</h2>
+			{/* The result card: each setup's score with how many runs it rests on (M8-68). */}
+			{arms.length > 0 && (
+				<div className="grid gap-3 sm:grid-cols-2" data-testid="shared-verdict-scores">
+					{arms.map((arm) => {
+						const r = verdict.naive[arm];
+						const score = naiveScore(r);
+						return (
+							<div key={arm} className="rounded-xl border p-4">
+								<p className="text-muted-foreground text-xs">{tu("shared.setup", { arm })}</p>
+								<p className="text-3xl font-semibold tabular-nums">{score === null ? "-" : pct(score)}</p>
+								<p className="text-muted-foreground text-xs tabular-nums">
+									{tu("shared.tasksRuns", { num: r.num, den: r.den })}
+									{r.unknown > 0 && ` · ${tu("shared.unknownRuns", { count: r.unknown })}`}
+								</p>
+							</div>
+						);
+					})}
+				</div>
+			)}
 			<Facts
 				items={[
-					[t("page.decision"), DECISION_WORDS[v.decision] ?? v.decision],
+					[t("page.decision"), decision],
 					[t("page.effect"), effect],
+					[tu("shared.tasks"), v.effect ? String(v.effect.n_tasks) : "-"],
 					[t("page.suite"), verdict.suite],
 					[t("page.guards"), String(v.guards?.length ?? 0)],
 				]}
