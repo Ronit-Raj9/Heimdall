@@ -15,7 +15,7 @@ const DOT: Record<"ready" | "attention" | "failed", string> = {
 
 /**
  * Benchmarks as a plain list: human name, task count and a small readiness dot in the Benchmarks
- * page's words ("Ready", "24 of 89 tasks ready", "Not ready yet" only when no task is). The
+ * page's words ("Ready", "24 of 89 ready", "Not ready yet" only when no task is). The
  * built-in library comes first, then what the org added; the practice examples sit collapsed below.
  */
 export function SuitesPanel({ suites, limit = 6 }: { suites: readonly SuiteSummary[]; limit?: number }) {

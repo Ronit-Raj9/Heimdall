@@ -171,7 +171,7 @@ describe("SuitesPanel", () => {
 		expect(tagOf(html, "home-suite-acme-broken")).toContain('data-ready="failed"');
 		expect(html).toContain("4 tasks");
 		expect(html).toContain("Coding basics");
-		expect(html).toContain("1 of 3 tasks ready");
+		expect(html).toContain("1 of 3 ready");
 		expect(html).not.toContain("admitted");
 	});
 	it("says how many tasks are ready, and Not ready yet only when none is", () => {
@@ -186,7 +186,7 @@ describe("SuitesPanel", () => {
 			/>,
 		);
 		expect(tagOf(html, "home-suite-state-hd-harbor-tb2")).toContain('data-readiness="needsAdmission"');
-		expect(html).toContain("24 of 89 tasks ready");
+		expect(html).toContain("24 of 89 ready");
 		expect(tagOf(html, "home-suite-state-hd-swe-verified")).toContain('data-readiness="notReady"');
 		expect(html).toContain("Not ready yet");
 	});

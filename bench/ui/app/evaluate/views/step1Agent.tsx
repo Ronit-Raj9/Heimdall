@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { ShowTestsChip } from "@/components/ui/toolbar";
+import { isTestAgent } from "@/app/agents/views/agentDisplay";
 import { isTestObject, withoutTests } from "@/lib/testObjects";
 import { Button } from "@/components/ui/button";
 import { useGetAgentsQuery } from "@/lib/store/apis/benchApi";
@@ -166,14 +167,15 @@ export function Step1Agent({ missingAgent, onPicked }: { missingAgent?: string |
 	const { draft, update } = useEvaluateDraft();
 	const q = useGetAgentsQuery();
 	const all = (q.data?.agents ?? []) as AgentWithCaps[];
-	const split = splitAgents(all);
+	// Test agents stay in the split so the chip below can show them and a picked one stays in view.
+	const split = splitAgents(all, true);
 	// The project's own test agents ("zz-test-...", stub agents) hide behind a chip (M1-18). The wizard keeps its URL
 	// for the draft, so the switch is page state here, not ?tests=1.
 	const [showTests, setShowTests] = useState(false);
 	const ownSplit = withoutTests(
 		split.own,
 		// The picked agent always stays in view, even a test agent a link or a stored draft chose.
-		(a) => a.id !== draft.agent && isTestObject(a.id, { description: (a as { description?: string }).description }),
+		(a) => a.id !== draft.agent && (isTestAgent(a) || isTestObject(a.id, { description: (a as { description?: string }).description })),
 		showTests,
 	);
 	const own = ownSplit.shown;

@@ -43,8 +43,8 @@ export function isBuiltinAgent(a: AgentWithCaps): boolean {
  * Org agents first, then built-in; alphabetical inside each group, baselines first among built-in. The agents are the
  * ones every other agent picker offers (`pickableAgents`, N97): test doubles, demo agents and broken files never.
  */
-export function splitAgents(agents: readonly AgentWithCaps[]): { own: AgentWithCaps[]; builtin: AgentWithCaps[] } {
-	const { yours, baselines } = pickableAgents(agents);
+export function splitAgents(agents: readonly AgentWithCaps[], keepTests = false): { own: AgentWithCaps[]; builtin: AgentWithCaps[] } {
+	const { yours, baselines } = pickableAgents(agents, keepTests);
 	const usable = [...yours, ...baselines] as AgentWithCaps[];
 	const byId = (x: AgentWithCaps, y: AgentWithCaps) => x.id.localeCompare(y.id);
 	return {

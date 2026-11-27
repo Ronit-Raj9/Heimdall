@@ -9,7 +9,11 @@ vi.mock("nuqs", async (importOriginal) => ({
 	...(await importOriginal<typeof import("nuqs")>()),
 	useQueryState: (key: string) => [url.search[key] ?? null, () => undefined],
 }));
-vi.mock("@/app/suites/views/suitesView", () => ({ default: () => <div data-testid="inner-suites" /> }));
+// The hub header (X-42) lives in suitesView as SuitesPageHeader; keep it real, stub the list.
+vi.mock("@/app/suites/views/suitesView", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/app/suites/views/suitesView")>()),
+	default: () => <div data-testid="inner-suites" />,
+}));
 vi.mock("@/app/catalog/views/catalogView", () => ({ default: () => <div data-testid="inner-catalog" /> }));
 vi.mock("@/app/suites_/add/views/addSuiteView", () => ({ default: () => <div data-testid="inner-import" /> }));
 vi.mock("@/app/canaries/views/canariesView", () => ({ default: () => <div data-testid="inner-drift" /> }));
@@ -31,6 +35,7 @@ describe("hub tabs", () => {
 	it("Benchmarks: My benchmarks by default, Catalog and Import as tabs", () => {
 		const html = at(null, SuitesPage);
 		for (const label of ["My benchmarks", "Catalog", "Import"]) expect(html).toContain(label);
+		expect(html).toMatch(/<h1[^>]*>[^<]*Benchmarks/);
 		expect(html).toContain("inner-suites");
 		expect(at("catalog", SuitesPage)).toContain("inner-catalog");
 		expect(at("import", SuitesPage)).toContain("inner-import");

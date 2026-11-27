@@ -3,9 +3,12 @@ import type { AgentSummary } from "@/lib/types/bench";
 import "@/lib/types/agentFirstI18n";
 import { useTranslation } from "react-i18next";
 
-/** Agents a picker offers: the org's own first, then baselines; test doubles and broken files never. */
-export function pickableAgents(agents: readonly AgentSummary[]): { yours: AgentSummary[]; baselines: AgentSummary[] } {
-	const ok = agents.filter((a) => a.id && !a.error && !isTestAgent(a));
+/**
+ * Agents a picker offers: the org's own first, then baselines; broken files never, test doubles
+ * only when keepTests is set (a caller that hides them behind its own "show test items" chip).
+ */
+export function pickableAgents(agents: readonly AgentSummary[], keepTests = false): { yours: AgentSummary[]; baselines: AgentSummary[] } {
+	const ok = agents.filter((a) => a.id && !a.error && (keepTests || !isTestAgent(a)));
 	return { yours: ok.filter((a) => !isBaselineAgent(a)), baselines: ok.filter((a) => isBaselineAgent(a)) };
 }
 
