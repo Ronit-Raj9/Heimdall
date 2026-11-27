@@ -5,11 +5,13 @@ import (
 	"github.com/maximhq/bifrost/bench/benchcatalog"
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/evalstore"
+	"github.com/maximhq/bifrost/bench/forecast"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/sharelinks"
 	"github.com/valyala/fasthttp"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -232,5 +234,19 @@ func TestFindingAddRecordsOrigin(t *testing.T) {
 	code, body := doAgentOps(r, "POST", APIPrefix+"/findings", "application/json", []byte(`{"source":"investigation","ref":"job1:0"}`))
 	if code != fasthttp.StatusCreated || body["experiment"] != "e_test" {
 		t.Fatalf("finding %d %v", code, body)
+	}
+}
+
+func TestApplyForecastListPrice(t *testing.T) {
+	var be EvalBenchmarkEstimate
+	f := &schemas.Forecast{Arms: []schemas.ArmForecast{{Arm: "A", Basis: forecast.BasisAgentTokens, BasisText: "rough: from tokens"}}}
+	applyForecast(&be, f, []string{"A"}, 0)
+	if be.EstimateBasis != "list_price" || !slices.Contains(be.Notes, "arm A: rough: from tokens") {
+		t.Fatalf("estimate %+v", be)
+	}
+	be = EvalBenchmarkEstimate{}
+	applyForecast(&be, &schemas.Forecast{Arms: []schemas.ArmForecast{{Arm: "A", Basis: schemas.BasisLibrary}}}, []string{"A"}, 0)
+	if be.EstimateBasis != "" {
+		t.Fatalf("library basis %+v", be)
 	}
 }
