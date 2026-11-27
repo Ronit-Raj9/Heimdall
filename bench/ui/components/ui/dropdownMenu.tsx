@@ -1,7 +1,16 @@
 import { cn } from "@/lib/utils";
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from "react";
+import {
+	useCallback,
+	useEffect,
+	useId,
+	useRef,
+	useState,
+	type KeyboardEvent as ReactKeyboardEvent,
+	type ReactNode,
+	type RefObject,
+} from "react";
 
 /**
  * The one dropdown menu of the app. A button opens a short list of actions or links; focus moves
@@ -28,14 +37,21 @@ export function menuKeyTarget(key: string, current: number, count: number): numb
 
 function menuItems(menu: HTMLElement | null): HTMLElement[] {
 	if (!menu) return [];
-	return Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"]), [role="menuitemradio"]:not([aria-disabled="true"])'));
+	return Array.from(
+		menu.querySelectorAll<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"]), [role="menuitemradio"]:not([aria-disabled="true"])'),
+	);
 }
 
 /**
  * Keyboard and focus handling for a hand-built menu (header menus keep their own markup). Focuses
  * the first item when it opens; returns the onKeyDown for the menu element.
  */
-export function useMenuKeyboard(open: boolean, menuRef: RefObject<HTMLElement | null>, onClose: () => void, triggerRef?: RefObject<HTMLElement | null>) {
+export function useMenuKeyboard(
+	open: boolean,
+	menuRef: RefObject<HTMLElement | null>,
+	onClose: () => void,
+	triggerRef?: RefObject<HTMLElement | null>,
+) {
 	useEffect(() => {
 		if (!open) return;
 		// After paint, so the items exist.
@@ -98,6 +114,8 @@ export interface DropdownMenuProps {
 	items: readonly DropdownMenuItem[];
 	align?: "start" | "end";
 	className?: string;
+	/** Classes for the list itself, for example "w-72" for items with a second line (X-42). */
+	contentClassName?: string;
 	testId?: string;
 }
 
@@ -110,11 +128,12 @@ export interface DropdownTriggerProps {
 	onClick: () => void;
 }
 
-export const dropdownContentClass = "bg-card text-card-foreground absolute z-50 mt-1 flex min-w-48 flex-col rounded-lg border p-1 shadow-(--shadow-pop)";
+export const dropdownContentClass =
+	"bg-card text-card-foreground absolute z-50 mt-1 flex min-w-48 flex-col rounded-lg border p-1 shadow-(--shadow-pop)";
 export const dropdownItemClass =
 	"hover:bg-muted focus-visible:bg-muted flex min-h-(--control-h) w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-(--focus) disabled:cursor-not-allowed disabled:opacity-60";
 
-export function DropdownMenu({ label, trigger, items, align = "end", className, testId }: DropdownMenuProps) {
+export function DropdownMenu({ label, trigger, items, align = "end", className, contentClassName, testId }: DropdownMenuProps) {
 	const [open, setOpen] = useState(false);
 	const root = useRef<HTMLDivElement>(null);
 	const button = useRef<HTMLButtonElement>(null);
@@ -153,7 +172,7 @@ export function DropdownMenu({ label, trigger, items, align = "end", className, 
 					role="menu"
 					aria-label={label}
 					onKeyDown={onKeyDown}
-					className={cn(dropdownContentClass, align === "end" ? "right-0" : "left-0")}
+					className={cn(dropdownContentClass, align === "end" ? "right-0" : "left-0", contentClassName)}
 					data-testid={testId ? `${testId}-list` : undefined}
 				>
 					{items.map((item, index) => {

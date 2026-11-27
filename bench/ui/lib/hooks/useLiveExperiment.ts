@@ -118,6 +118,7 @@ export function useLiveExperiment(expId: string | undefined, options: UseLiveExp
 	const runs = useListRunsQuery(expId ? { exp: expId, limit: 200 } : undefined, {
 		skip: !expId || !hasSlots,
 		pollingInterval: live ? RUN_LOOKUP_MS : 0,
+		skipPollingIfUnfocused: true,
 	});
 	const now = useNow(live);
 

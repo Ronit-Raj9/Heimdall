@@ -5,6 +5,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { getLocale } from "@/lib/i18n";
 import { addUnseenDone, clearUnseenDone, notify } from "@/lib/notify";
 import { useSession } from "@/lib/session/sessionContext";
+import { useCountRunningJobsQuery } from "@/lib/store/apis/jobCountApi";
 import { JOBS_POLL_MS, useListJobsQuery } from "@/lib/store/apis/platformApi";
 import { errorStatus } from "@/lib/store/apis/session";
 import type { Job } from "@/lib/types/bench";
@@ -119,11 +120,20 @@ export function JobsIndicator() {
 	const triggerRef = useRef<HTMLButtonElement>(null);
 	const skip = (session.authMode === "hosted" && !session.signedIn) || session.status === "loading";
 	const [busy, setBusy] = useState(false);
+	// X-108: while the drawer is closed and nothing runs, only the cheap count is polled. A server
+	// without the count route gives null, and the list keeps its idle poll as before.
+	const countQ = useCountRunningJobsQuery(undefined, { skip: skip || open || busy, pollingInterval: 30_000, skipPollingIfUnfocused: true });
+	const count = countQ.data?.count;
 	const jobs = useListJobsQuery(undefined, {
 		skip,
-		pollingInterval: open || busy ? JOBS_POLL_MS : IDLE_POLL_MS,
+		pollingInterval: open || busy ? JOBS_POLL_MS : typeof count === "number" ? 0 : IDLE_POLL_MS,
 		skipPollingIfUnfocused: true,
 	});
+	const refetchList = jobs.refetch;
+	// The count saw a running job: load the list, which then polls fast while busy.
+	useEffect(() => {
+		if (!skip && typeof count === "number" && count > 0) void refetchList();
+	}, [count, skip, refetchList]);
 	const list = jobs.data?.jobs ?? [];
 	const running = list.filter(isActiveJob).length;
 	useEffect(() => setBusy(running > 0), [running]);
@@ -216,7 +226,9 @@ export function JobsDrawer({ jobs, isLoading, error, onRetry, onClose }: JobsDra
 			onOpenChange={(next) => !next && onClose()}
 			side="right"
 			title={t("jobs.drawerTitle")}
-			description={<span className="text-xs">{session.org ? t("jobs.drawerSubtitle", { org: session.org.name }) : t("jobs.drawerSubtitleLocal")}</span>}
+			description={
+				<span className="text-xs">{session.org ? t("jobs.drawerSubtitle", { org: session.org.name }) : t("jobs.drawerSubtitleLocal")}</span>
+			}
 			closeLabel={t("jobs.close")}
 			testId="jobs-drawer"
 		>

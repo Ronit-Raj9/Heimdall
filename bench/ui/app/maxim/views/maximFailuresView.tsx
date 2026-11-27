@@ -179,10 +179,9 @@ function PullForm({ onPulled }: { onPulled(id: string): void }) {
 
 function BatchPanel({ id }: { id: string }) {
 	const { t } = useTranslation("maximFailures");
-	const q = useGetMaximBatchQuery(id, {
-		pollingInterval: 10000,
-		skipPollingIfUnfocused: true,
-	});
+	// A batch has no running state and every change to it is a mutation that refreshes its tag, so
+	// it is not polled (M1-62).
+	const q = useGetMaximBatchQuery(id);
 	if (q.isLoading) return <BlockSkeleton testId="maxim-batch-loading" rows={4} />;
 	if (q.isError || !q.data)
 		return <LoadError title={t("clusters.title")} error={q.error} onRetry={() => void q.refetch()} testId="maxim-batch-error" />;
