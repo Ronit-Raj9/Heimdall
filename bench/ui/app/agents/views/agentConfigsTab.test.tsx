@@ -4,7 +4,7 @@ import type { AgentSummary } from "@/lib/types/bench";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { AgentConfigsTab, configsCount, splitAgents } from "./agentConfigsTab";
+import { AgentConfigsTab, configsCount, splitAgents, visibleAgents } from "./agentConfigsTab";
 import { filterAgents, initials, isTestAgent, sortAgents } from "./agentDisplay";
 import { FrameworksTab } from "./frameworksTab";
 
@@ -209,5 +209,21 @@ describe("AgentConfigsTab", () => {
 		expect(html).toContain('data-testid="frameworks-tests-hidden"');
 		expect(html).toContain("2 test agents hidden");
 		expect(html).toContain("Show them");
+	});
+});
+describe("visibleAgents (M1-18)", () => {
+	const withTest = [...agents, { ...agents[1], id: "zz-test-bot", path: "agents/zz-test-bot.yaml" }] as AgentSummary[];
+	it("hides test objects unless asked and counts them", () => {
+		const off = visibleAgents(withTest, false);
+		expect(off.hidden).toBe(2); // zz-test-bot and the scripted oracle
+		expect(off.yours.map((a) => a.id)).not.toContain("zz-test-bot");
+		const on = visibleAgents(withTest, true);
+		expect(on.hidden).toBe(2); // still counted, so the chip can turn it off
+		expect(on.yours.map((a) => a.id)).toContain("zz-test-bot");
+	});
+	it("shows the show-tests chip on the list", () => {
+		const html = render(withTest);
+		expect(html).not.toContain("zz-test-bot");
+		expect(html).toMatch(/test items/i);
 	});
 });

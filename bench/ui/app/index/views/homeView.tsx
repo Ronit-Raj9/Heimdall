@@ -6,6 +6,7 @@ import {
 	homeUsageRange,
 	monthStartUTC,
 	newestEvaluations,
+	queryState,
 	recentComparisons,
 	runningNow,
 	setupSteps,
@@ -17,7 +18,7 @@ import { YourAgents, agentsWithResults, ownAgents } from "@/components/home/your
 import { RecentExperiments } from "@/components/home/recentExperiments";
 import { RunningExperiments } from "@/components/home/runningExperiments";
 import { SuitesPanel } from "@/components/home/suitesPanel";
-import { LoadError } from "@/components/runs/screenStates";
+import { CardGridSkeleton, LoadError, TableSkeleton } from "@/components/runs/screenStates";
 import { EmptyState, suiteIdOf } from "@/components/shell";
 import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
 import { useGetUsageQuery } from "@/lib/store/apis/usageApi";
@@ -30,6 +31,8 @@ import "@/lib/types/agentFirstI18n";
 import { useListRunsQuery } from "@/lib/store/apis/benchApi";
 import { useListEvaluationsQuery, type Evaluation } from "@/lib/store/apis/evaluationsApi";
 import "@/lib/types/homeI18n";
+import "@/components/home/uf2aI18n";
+import { isTestObject } from "@/lib/testObjects";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Award, Bot, Boxes, Check, CircleCheck, FlaskConical, Wallet } from "lucide-react";
@@ -57,6 +60,7 @@ function greetingKey(now: Date): "morning" | "afternoon" | "evening" {
 export default function HomeView() {
 	const { t } = useTranslation("home");
 	const { t: ta } = useTranslation("agentFirst");
+	const { t: tu } = useTranslation("uf2a");
 	const locale = getLocale();
 	// M2-14: lists poll only while something runs; a finished run is picked up by the next visit
 	// or by RunningNowList's onFinished refetch.
@@ -74,13 +78,17 @@ export default function HomeView() {
 	const experiments = (list.data?.experiments ?? []) as ExperimentListItem[];
 	const evaluations = evals.data ?? [];
 	const evStats = evaluationStats(evaluations);
-	const recentEvaluations = newestEvaluations(evaluations, EVALUATIONS_SHOWN);
+	// M1-18: Home's recent lists leave out test objects ("zz-test-..." names); the full lists have the chip.
+	const recentEvaluations = newestEvaluations(
+		evaluations.filter((ev) => !isTestObject(ev.spec?.name ?? ev.id)),
+		EVALUATIONS_SHOWN,
+	);
 	// Running now: active evaluations (what the Evaluations tile counts) plus running comparisons of no
 	// evaluation; checks and practice runs stay out of both lists.
 	const running = runningNow(evaluations, experiments);
 	const anyLive = running.total > 0;
 	if (list.isSuccess && evals.isSuccess && anyLive !== live) setLive(anyLive);
-	const recent = recentComparisons(experiments);
+	const recent = recentComparisons(experiments.filter((exp) => !isTestObject(exp.name ?? exp.exp_id)));
 	const empty = list.isSuccess && experiments.length === 0;
 	const session = useSession();
 	const mayRun = canUse(session, "member");
@@ -101,9 +109,14 @@ export default function HomeView() {
 		evaluation: evaluations.length > 0,
 		finished: hasFinishedEvaluation(evaluations),
 	});
+	// M2-8: each tile reads its own query state; a failed load says so, never "No scored runs yet" or $0.00.
+	const runsState = queryState(runs);
+	const evalsState = queryState(evals);
+	const usageState = queryState(usage);
+	const agentsState = queryState(agents);
 	const kpiError = (onRetry: () => void) => (
 		<span className="inline-flex flex-wrap items-center gap-1">
-			<span className="text-chart-error-ink">{t("kpi.loadError")}</span>
+			<span className="text-danger-ink">{t("kpi.loadError")}</span>
 			<button type="button" className="text-foreground relative z-10 font-medium underline underline-offset-4" onClick={onRetry}>
 				{t("kpi.retry")}
 			</button>
@@ -134,9 +147,15 @@ export default function HomeView() {
 					<StatCard
 						icon={Bot}
 						label={t("kpi.agents")}
-						value={evals.error || agents.error ? "-" : agents.data ? agentsWithResults(agentList, evaluations) : evStats.agents}
-						hint={evals.error ? kpiError(() => void evals.refetch()) : t("kpi.agentsHint")}
-						loading={evals.isLoading}
+						value={evalsState === "error" || agentsState === "error" ? "-" : agents.data ? agentsWithResults(agentList, evaluations) : evStats.agents}
+						hint={
+							evalsState === "error"
+								? kpiError(() => void evals.refetch())
+								: agentsState === "error"
+									? kpiError(() => void agents.refetch())
+									: t("kpi.agentsHint")
+						}
+						loading={evalsState === "loading"}
 						testId="home-kpi-agents"
 					/>
 				</KpiLink>
@@ -144,9 +163,9 @@ export default function HomeView() {
 					<StatCard
 						icon={Award}
 						label={t("kpi.evaluations")}
-						value={evals.error ? "-" : evStats.evaluations}
-						hint={evals.error ? kpiError(() => void evals.refetch()) : t("kpi.evaluationsHint", { count: evStats.active })}
-						loading={evals.isLoading}
+						value={evalsState === "error" ? "-" : evStats.evaluations}
+						hint={evalsState === "error" ? kpiError(() => void evals.refetch()) : t("kpi.evaluationsHint", { count: evStats.active })}
+						loading={evalsState === "loading"}
 						testId="home-kpi-evaluations"
 					/>
 				</KpiLink>
@@ -154,15 +173,17 @@ export default function HomeView() {
 					<StatCard
 						icon={CircleCheck}
 						label={t("kpi.passRate")}
-						value={runs.error || stats.passRate === null ? "-" : `${Math.round(stats.passRate * 100)}%`}
+						value={runsState !== "ready" || stats.passRate === null ? "-" : `${Math.round(stats.passRate * 100)}%`}
 						hint={
-							runs.error
+							runsState === "error"
 								? kpiError(() => void runs.refetch())
-								: stats.graded > 0
+								: runsState === "loading"
+									? undefined
+									: stats.graded > 0
 									? t("kpi.passRateHint", { pass: stats.passed, total: stats.graded })
-									: t("kpi.passRateNone")
+										: t("kpi.passRateNone")
 						}
-						loading={runs.isLoading}
+						loading={runsState === "loading"}
 						testId="home-kpi-pass"
 					/>
 				</KpiLink>
@@ -170,29 +191,26 @@ export default function HomeView() {
 					<StatCard
 						icon={Wallet}
 						label={t("kpi.spend")}
-						value={usage.error || !usage.data ? "-" : usd(usage.data.total_cost_usd)}
+						value={usageState !== "ready" || !usage.data ? "-" : usd(usage.data.total_cost_usd)}
 						hint={
-							usage.error
+							usageState === "error"
 								? kpiError(() => void usage.refetch())
 								: t("kpi.spendHint", {
 										date: monthStartUTC(now).toLocaleDateString(locale, { month: "short", day: "numeric", timeZone: "UTC" }),
 									})
 						}
-						loading={usage.isLoading}
+						loading={usageState === "loading"}
 						testId="home-kpi-spend"
 					/>
 				</KpiLink>
 			</div>
 
 			<HomeSection title={ta("home.title")} testId="home-section-agents" link={{ to: "/agents", label: ta("home.viewAll") }}>
-				{agents.isError ? (
+				{agentsState === "error" ? (
 					<LoadError title={ta("home.title")} error={agents.error} onRetry={agents.refetch} testId="home-agents-error" />
-				) : agents.isLoading ? (
-						<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="home-agents-loading" aria-hidden="true">
-							<div className="bg-muted h-44 animate-pulse rounded-xl" />
-							<div className="bg-muted hidden h-44 animate-pulse rounded-xl md:block" />
-						</div>
-					) : (
+				) : agentsState === "loading" ? (
+					<CardGridSkeleton count={3} columns={3} testId="home-agents-loading" />
+				) : (
 					<YourAgents agents={agentList} evaluations={evaluations} mayRun={mayRun} />
 				)}
 			</HomeSection>
@@ -203,12 +221,7 @@ export default function HomeView() {
 					badge={running.total > 0 ? <Pill tone="info">{running.total}</Pill> : undefined}
 					testId="home-section-running"
 				>
-					{list.isLoading || evals.isLoading ? (
-						<div className="grid gap-4 md:grid-cols-2" data-testid="home-running-loading" aria-hidden="true">
-							<div className="bg-muted h-44 animate-pulse rounded-xl" />
-							<div className="bg-muted hidden h-44 animate-pulse rounded-xl md:block" />
-						</div>
-					) : list.error || evals.error ? (
+					{list.isError || evals.isError ? (
 						<LoadError
 							title={t("running.title")}
 							error={list.error ?? evals.error}
@@ -218,6 +231,8 @@ export default function HomeView() {
 							}}
 							testId="home-running-error"
 						/>
+					) : queryState(list) === "loading" || evalsState === "loading" ? (
+						<CardGridSkeleton count={2} columns={2} testId="home-running-loading" />
 					) : (
 						<RunningNowList
 							running={running}
@@ -238,9 +253,9 @@ export default function HomeView() {
 					link={{ to: "/evaluations", label: t("evaluations.viewAll") }}
 				>
 					<div className="bg-card overflow-hidden rounded-xl border shadow-(--shadow-card)">
-						{evals.isLoading ? (
-							<ListSkeleton rows={3} testId="home-evaluations-loading" />
-						) : evals.error ? (
+						{evalsState === "loading" ? (
+							<TableSkeleton rows={3} testId="home-evaluations-loading" />
+						) : evalsState === "error" ? (
 							<LoadError
 								title={t("evaluations.title")}
 								error={evals.error}
@@ -268,9 +283,9 @@ export default function HomeView() {
 				{!empty && (
 					<HomeSection title={t("recent.title")} testId="home-section-recent" link={{ to: "/experiments", label: t("recent.viewAll") }}>
 						<div className="bg-card overflow-hidden rounded-xl border shadow-(--shadow-card)">
-							{list.isLoading ? (
-								<ListSkeleton rows={5} testId="home-recent-loading" />
-							) : list.error ? (
+							{queryState(list) === "loading" ? (
+								<TableSkeleton rows={5} testId="home-recent-loading" />
+							) : list.isError ? (
 								<LoadError title={t("recent.title")} error={list.error} onRetry={list.refetch} testId="home-recent-error" className="m-3" />
 							) : recent.length === 0 ? (
 								<EmptyState
@@ -294,14 +309,10 @@ export default function HomeView() {
 					link={{ to: "/suites", label: t("suites.viewAll") }}
 					className={cn(empty && "lg:col-span-2")}
 				>
-					{suites.isLoading ? (
-						<div className="grid gap-3 sm:grid-cols-2" data-testid="home-suites-loading" aria-hidden="true">
-							{[0, 1, 2, 3].map((i) => (
-								<div key={i} className="bg-muted h-16 animate-pulse rounded-xl" />
-							))}
-						</div>
-					) : suites.error ? (
+					{suites.isError ? (
 						<LoadError title={t("suites.title")} error={suites.error} onRetry={suites.refetch} testId="home-suites-error" />
+					) : queryState(suites) === "loading" ? (
+						<CardGridSkeleton count={4} columns={2} testId="home-suites-loading" />
 					) : (suites.data?.suites.length ?? 0) === 0 ? (
 						<EmptyState
 							icon={Boxes}
@@ -312,6 +323,15 @@ export default function HomeView() {
 						/>
 					) : (
 						<SuitesPanel suites={suites.data?.suites ?? []} />
+					)}
+					{mayRun && (
+						<Link
+							to={"/suites/add" as never}
+							className="text-muted-foreground hover:text-foreground w-fit text-sm font-medium underline-offset-4 hover:underline"
+							data-testid="home-add-tasks"
+						>
+							{tu("home.addTasks")}
+						</Link>
 					)}
 				</HomeSection>
 			</div>
@@ -383,7 +403,7 @@ function HomeSection({
 				{link && (
 					<Link
 						to={link.to as never}
-						className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/60 ml-auto inline-flex items-center gap-1 rounded-sm text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+						className="text-muted-foreground hover:text-foreground focus-visible:ring-(--focus) ml-auto inline-flex items-center gap-1 rounded-sm text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
 					>
 						{link.label}
 						<ArrowRight className="size-3.5" aria-hidden="true" />
@@ -395,30 +415,13 @@ function HomeSection({
 	);
 }
 
-function ListSkeleton({ rows, testId }: { rows: number; testId: string }) {
-	return (
-		<div className="flex flex-col divide-y" data-testid={testId} aria-hidden="true">
-			{Array.from({ length: rows }, (_, i) => (
-				<div key={i} className="flex items-center gap-3 px-5 py-3">
-					<span className="bg-muted size-8 animate-pulse rounded-lg" />
-					<span className="flex flex-1 flex-col gap-1.5">
-						<span className="bg-muted h-3.5 w-2/5 animate-pulse rounded" />
-						<span className="bg-muted h-3 w-1/4 animate-pulse rounded" />
-					</span>
-					<span className="bg-muted h-5 w-20 animate-pulse rounded-full" />
-				</div>
-			))}
-		</div>
-	);
-}
-
 /** A KPI tile as a link to the page behind its number (M2-13). */
 function KpiLink({ to, search, children }: { to: string; search?: Record<string, string>; children: ReactNode }) {
 	return (
 		<Link
 			to={to as never}
 			search={search as never}
-			className="focus-visible:ring-ring/60 block min-w-0 rounded-xl transition-colors focus-visible:ring-2 focus-visible:outline-none [&>div]:h-full [&>div]:hover:border-primary/40"
+			className="focus-visible:ring-(--focus) block min-w-0 rounded-xl transition-colors focus-visible:ring-2 focus-visible:outline-none [&>div]:h-full [&>div]:hover:border-primary/40"
 		>
 			{children}
 		</Link>
@@ -431,6 +434,7 @@ function KpiLink({ to, search, children }: { to: string; search?: Record<string,
  */
 export function SetupCard({ mayRun, steps }: { mayRun: boolean; steps: ReturnType<typeof setupSteps> }) {
 	const { t } = useTranslation("home");
+	const { t: tu } = useTranslation("uf2a");
 	const next = steps.find((s) => !s.done);
 	return (
 		<section className="bg-card flex flex-col gap-4 rounded-xl border p-5 sm:p-6" data-testid="home-welcome-card" aria-labelledby="home-setup-title">
@@ -439,6 +443,16 @@ export function SetupCard({ mayRun, steps }: { mayRun: boolean; steps: ReturnTyp
 					{t("onboarding.title")}
 				</h2>
 				<p className="text-muted-foreground max-w-xl text-sm">{mayRun ? t("onboarding.body") : t("onboarding.viewer")}</p>
+				{!mayRun && (
+					<Link
+						to={"/settings" as never}
+						search={{ tab: "members" } as never}
+						className="text-foreground w-fit text-sm font-medium underline underline-offset-4"
+						data-testid="home-setup-members"
+					>
+						{tu("home.members")}
+					</Link>
+				)}
 			</div>
 			{mayRun && (
 				<ol className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-4" data-testid="home-setup-steps">

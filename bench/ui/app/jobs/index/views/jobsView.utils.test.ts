@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canRetryJob, firstErrorLine, jobBudget, jobTargetLabel, parseJobStatus } from "./jobsView.utils";
+import { canRetryJob, firstErrorLine, isTestJob, jobBudget, jobBudgetUsd, jobTargetLabel, parseJobStatus } from "./jobsView.utils";
 
 describe("jobs list helpers (fix wave lane 2a)", () => {
 	it("offers Retry only on failed or cancelled jobs (N8-1)", () => {
@@ -30,5 +30,23 @@ describe("jobs list helpers (fix wave lane 2a)", () => {
 		expect(firstErrorLine(undefined)).toBe("");
 		expect(parseJobStatus("failed", ["failed", "running"] as const)).toBe("failed");
 		expect(parseJobStatus("bogus", ["failed", "running"] as const)).toBe("");
+	});
+});
+
+describe("jobBudgetUsd", () => {
+	it("returns the cap in dollars, or null without one", () => {
+		expect(jobBudgetUsd({ params: { budget_usd: 5 } })).toBe(5);
+		expect(jobBudgetUsd({ params: { budget_usd: 0 } })).toBeNull();
+		expect(jobBudgetUsd({ params: {} })).toBeNull();
+	});
+});
+
+describe("isTestJob", () => {
+	const isTest = (n: string) => n.startsWith("zz-test-");
+	it("checks the target without its prefix and the comparison name", () => {
+		expect(isTestJob({ target: "suite:zz-test-mcp", params: {} }, isTest)).toBe(true);
+		expect(isTestJob({ target: "exp:abc", params: { name: "zz-test-run" } }, isTest)).toBe(true);
+		expect(isTestJob({ target: "suite:bfcl", params: {} }, isTest)).toBe(false);
+		expect(isTestJob({ target: "index", params: {} }, isTest)).toBe(false);
 	});
 });

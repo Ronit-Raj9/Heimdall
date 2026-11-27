@@ -266,3 +266,14 @@ export function setupSteps(have: { keys: boolean; agent: boolean; evaluation: bo
 export function hasFinishedEvaluation(evaluations: readonly Pick<Evaluation, "status">[]): boolean {
 	return evaluations.some((ev) => ev.status === "done");
 }
+
+/**
+ * Where one Home query stands (M2-8): "error" on a failed load, "loading" while it loads or has no
+ * answer yet, else "ready". A failed or missing answer must never read as an empty org (for
+ * example "No scored runs yet").
+ */
+export function queryState(q: { isLoading?: boolean; isError?: boolean; data?: unknown }): "loading" | "error" | "ready" {
+	if (q.isError) return "error";
+	if (q.isLoading || q.data === undefined || q.data === null) return "loading";
+	return "ready";
+}

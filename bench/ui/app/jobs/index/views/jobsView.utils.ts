@@ -12,6 +12,18 @@ export function jobBudget(job: Pick<Job, "params">): string | null {
 	return typeof v === "number" && Number.isFinite(v) && v > 0 ? formatUsd(v) : null;
 }
 
+/** The spend cap stored with the job in dollars, or null when it has none (PaidButton cap, M2-1). */
+export function jobBudgetUsd(job: Pick<Job, "params">): number | null {
+	const v = job.params?.budget_usd;
+	return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
+}
+
+/** True for a job about a test object: its comparison name or target (prefix dropped) is a test name (M1-18). */
+export function isTestJob(job: Pick<Job, "target" | "params">, isTest: (name: string) => boolean): boolean {
+	const name = typeof job.params?.name === "string" ? job.params.name : "";
+	return (name !== "" && isTest(name)) || isTest(jobTargetLabel(job.target));
+}
+
 /**
  * The target without its internal prefix ("exp:", "suite:", "canary:", "onboard:"), and "" for
  * the search index, which needs no name (M8-58).

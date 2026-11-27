@@ -7,7 +7,9 @@
 		"scheduled": "Scheduled checks",
 		"builtin": "Built-in",
 		"noneEvaluated_one": "Your agent has no report card yet. Evaluate it to see its scores here.",
-		"noneEvaluated_other": "None of your {{count}} agents has a report card yet. Evaluate one to see its scores here."
+		"noneEvaluated_other": "None of your {{count}} agents has a report card yet. Evaluate one to see its scores here.",
+		"members": "See who is in this organization",
+		"addTasks": "Add your own tasks"
 	},
 	"agents": {
 		"empty": "No agents yet. Connect an agent or start from a template.",
@@ -34,7 +36,9 @@
 			"check": "Setup",
 			"actions": "Actions"
 		},
-		"more": "More actions for {{name}}"
+		"more": "More actions for {{name}}",
+		"emptyTitle": "No agents yet",
+		"emptyBody": "Connect an agent or start from a template."
 	},
 	"onboard": {
 		"builder": {

@@ -1,4 +1,4 @@
-import { INSTALL_STEP, QUICKSTART_STEPS, minedRows, reviewCommand } from "@/components/quickstart/quickstart.utils";
+import { INSTALL_STEP, QUICKSTART_STEPS, minedRows, reviewCommand, type SuiteMinedFacts } from "@/components/quickstart/quickstart.utils";
 import "@/lib/types/u19I18n";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
@@ -73,7 +73,7 @@ function StepTitle({ stepKey }: { stepKey: (typeof QUICKSTART_STEPS)[number]["ke
 }
 
 /** Per suite, the mined tasks and how many drafted instructions still need a human read. */
-export function MinedTasks({ suites }: { suites: readonly SuiteSummary[] }) {
+export function MinedTasks({ suites }: { suites: readonly (SuiteSummary & SuiteMinedFacts)[] }) {
 	const { t } = useTranslation("u19");
 	const { t: tb } = useTranslation("bench");
 	const rows = minedRows(suites).filter((r) => r.mined > 0 || r.unreviewed.length > 0);

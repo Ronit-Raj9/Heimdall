@@ -10,6 +10,7 @@ vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/route
 vi.mock("nuqs", async (importOriginal) => ({
 	...(await importOriginal<typeof import("nuqs")>()),
 	useQueryStates: () => [{ kind: "", status: "" }, () => undefined],
+	useQueryState: () => [null, () => undefined],
 }));
 vi.mock("@/lib/store/apis/jobsApi", () => ({ useListJobsFilteredQuery: () => api.list }));
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => mutation() }));

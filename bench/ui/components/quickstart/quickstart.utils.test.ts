@@ -67,3 +67,13 @@ describe("quickstart commands and test suites (fix wave lane 2a)", () => {
 		expect(rows([{ id: "zz-test-x", tasks: [] } as never]).length).toBe(0);
 	});
 });
+
+describe("minedRows from the light list (M2-20)", () => {
+	it("uses the light facts when present and says when they are", async () => {
+		const { minedRows: rows, lightHasMinedFacts } = await import("./quickstart.utils");
+		const light = [{ id: "bfcl", task_count: 4, mined_tasks: 2, mined_admitted_tasks: 1, unreviewed_tasks: [{ id: "c01", title: "Fix it" }] }];
+		expect(lightHasMinedFacts(light)).toBe(true);
+		expect(lightHasMinedFacts([{ id: "old" }])).toBe(false);
+		expect(rows(light)).toEqual([{ suite: "bfcl", tasks: 4, mined: 2, admittedMined: 1, unreviewed: [{ id: "c01", title: "Fix it" }] }]);
+	});
+});

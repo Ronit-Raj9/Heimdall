@@ -163,13 +163,13 @@ export function jobState(job: Job | undefined): CheckState {
 	return "failed";
 }
 
-// M2-112f: status tokens from globals.css instead of palette classes.
+// M2-112f: the shared status tokens of globals.css (lane S1).
 const PILL: Record<CheckState, { dot: string; cls: string }> = {
-	passed: { dot: "bg-chart-success", cls: "bg-chart-success/10 text-chart-success-ink" },
-	failed: { dot: "bg-chart-error", cls: "bg-chart-error/10 text-chart-error-ink" },
-	running: { dot: "bg-chart-info animate-pulse", cls: "bg-chart-info/10 text-chart-info-ink" },
-	never: { dot: "bg-muted-foreground", cls: "bg-muted text-muted-foreground" },
-	broken: { dot: "bg-chart-error", cls: "bg-chart-error/10 text-chart-error-ink" },
+	passed: { dot: "bg-success", cls: "bg-success-soft text-success-ink" },
+	failed: { dot: "bg-danger", cls: "bg-danger-soft text-danger-ink" },
+	running: { dot: "bg-info animate-pulse", cls: "bg-info-soft text-info-ink" },
+	never: { dot: "bg-unmeasured", cls: "bg-muted text-muted-foreground" },
+	broken: { dot: "bg-danger", cls: "bg-danger-soft text-danger-ink" },
 };
 
 /**

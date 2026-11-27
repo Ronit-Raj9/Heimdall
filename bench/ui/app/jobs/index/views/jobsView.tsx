@@ -10,9 +10,13 @@ import { JobProgressBar } from "@/components/platform/jobsDrawer";
 import { formatRelative, isActiveJob } from "@/components/platform/platform.utils";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
+import { Dialog } from "@/components/ui/dialog";
+import { PaidButton } from "@/components/ui/paidButton";
+import { ShowTestsChip } from "@/components/ui/toolbar";
+import { notify } from "@/lib/notify";
+import { isTestObject, useShowTests, withoutTests } from "@/lib/testObjects";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
 import { getLocale } from "@/lib/i18n";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useCreateJobMutation } from "@/lib/store/apis/jobRunApi";
@@ -22,11 +26,11 @@ import type { Job } from "@/lib/types/bench";
 import { JOB_STATUSES } from "@/lib/types/jobs";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { ListTodo, RotateCcw, SquareTerminal } from "lucide-react";
+import { ListTodo, SquareTerminal } from "lucide-react";
 import { parseAsString, useQueryStates } from "nuqs";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { canRetryJob, firstErrorLine, jobBudget, jobTargetLabel, parseJobStatus } from "./jobsView.utils";
+import { canRetryJob, firstErrorLine, isTestJob, jobBudgetUsd, jobTargetLabel, parseJobStatus } from "./jobsView.utils";
 
 /** Jobs shown per step of "Load older jobs". */
 export const JOBS_PAGE_SIZE = 50;
@@ -49,6 +53,7 @@ export default function JobsView() {
 	const kindName = useJobKindName();
 	const embedded = useEmbedded();
 	const confirm = useConfirm();
+	const [showTests, setShowTests] = useShowTests();
 	const [filters, setFilters] = useQueryStates(filterParsers, { history: "replace" });
 	const kind = filters.kind;
 	const status = parseJobStatus(filters.status, JOB_STATUSES);
@@ -64,6 +69,8 @@ export default function JobsView() {
 	const [actionError, setActionError] = useState<ActionError | null>(null);
 	const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
 	const filtered = kind !== "" || status !== "";
+	// M1-18: jobs of test objects (zz-test- benchmarks and agents) are hidden unless asked for.
+	const { shown: jobs, hidden: hiddenTests } = withoutTests(list.data?.jobs ?? [], (j) => isTestJob(j, isTestObject), showTests);
 	const kinds = [...new Set([...(list.data?.kinds ?? []), ...(kind ? [kind] : [])])].sort();
 	const title = (job: Job) => jobTitle(job, kindName, (k, target) => t("jobOf", { kind: k, target }));
 
@@ -71,21 +78,18 @@ export default function JobsView() {
 		setActionError(null);
 		const res = await cancel(job.id);
 		if ("error" in res && res.error !== undefined) setActionError({ jobTitle: title(job), error: res.error });
+		else notify({ text: t("stopped", { ns: "toast", name: title(job) }) });
 	};
 
-	// M2-1: Retry calls models again, so it asks first and names the spend cap when the job has one.
-	// Phase B of the fix wave swaps this for the shared PaidButton.
+	// M2-1, M1-51: Retry calls models again, so the shared PaidButton asks first (confirm="always")
+	// and names the spend cap when the job has one; this only sends the job.
 	const doRetry = async (job: Job) => {
-		const budget = jobBudget(job);
-		const question = budget
-			? t("retryConfirm", { kind: title(job), budget })
-			: t("retryConfirmNoBudget", { kind: title(job) });
-		if (!(await confirm(question, { confirmLabel: t("retryConfirmLabel") }))) return;
 		setRetried(null);
 		setActionError(null);
 		const res = await retry({ kind: job.kind, params: job.params ?? {} });
 		if ("data" in res && res.data) {
 			setRetried(res.data.id);
+			notify({ text: t("started", { ns: "toast", name: title(job) }), action: { label: t("openNew"), to: `/jobs/${res.data.id}` } });
 			void list.refetch();
 		} else if ("error" in res) {
 			setActionError({ jobTitle: title(job), error: res.error });
@@ -94,10 +98,10 @@ export default function JobsView() {
 
 	// M2-7: cancel several running jobs at once, after one confirm.
 	const cancelSelected = async () => {
-		const jobs = (list.data?.jobs ?? []).filter((j) => selected.has(j.id) && isActiveJob(j) && !j.cancel_requested);
-		if (jobs.length === 0) return;
-		if (!(await confirm(t("bulk.confirm", { count: jobs.length }), { confirmLabel: t("confirm"), cancelLabel: t("keep"), destructive: true }))) return;
-		for (const job of jobs) await doCancel(job);
+		const picked = jobs.filter((j) => selected.has(j.id) && isActiveJob(j) && !j.cancel_requested);
+		if (picked.length === 0) return;
+		if (!(await confirm(t("bulk.confirm", { count: picked.length }), { confirmLabel: t("confirm"), cancelLabel: t("keep"), destructive: true }))) return;
+		for (const job of picked) await doCancel(job);
 		setSelected(new Set());
 	};
 
@@ -153,6 +157,7 @@ export default function JobsView() {
 						</SelectContent>
 					</Select>
 				</div>
+				<ShowTestsChip count={hiddenTests} on={showTests} onChange={setShowTests} />
 				{filtered && (
 					<Button variant="ghost" size="sm" onClick={() => void setFilters({ kind: "", status: "" })} dataTestId="jobs-filter-clear">
 						{t("filters.clear")}
@@ -180,7 +185,7 @@ export default function JobsView() {
 			</div>
 
 			{actionError && (
-				<p role="alert" className="text-chart-error-ink text-sm" data-testid="jobs-action-error">
+				<p role="alert" className="text-danger-ink text-sm" data-testid="jobs-action-error">
 					{t("actionErrorFor", { job: actionError.jobTitle, message: getBenchErrorMessage(actionError.error) })}
 				</p>
 			)}
@@ -194,14 +199,14 @@ export default function JobsView() {
 			)}
 
 			<JobsTable
-				jobs={list.data?.jobs}
+				jobs={list.data ? jobs : undefined}
 				isLoading={list.isLoading}
 				error={list.isError ? list.error : undefined}
 				onRetryLoad={() => void list.refetch()}
 				filtered={filtered}
 				kindName={kindName}
 				onCancel={(job) => void doCancel(job)}
-				onRetry={(job) => void doRetry(job)}
+				onRetry={doRetry}
 				busy={cancelState.isLoading || retryState.isLoading}
 				onOpenLog={(job) => setLogId(job.id)}
 				openLogId={logId}
@@ -233,25 +238,22 @@ export function jobTitle(job: Job, kindName: (kind: string) => string, of: (kind
 	return name ? of(kindLabel, name) : kindLabel;
 }
 
-/** The live log of one job in a panel that slides in from the right; it takes focus, Escape or the backdrop closes it, and focus goes back after. */
+/** The live log of one job in the shared right-side Dialog: focus moves in, Escape or the backdrop closes it, focus goes back after (M1-37). */
 export function JobLogDrawer({ jobId, onClose }: { jobId: string; onClose: () => void }) {
 	const { t } = useTranslation("jobs");
-	const panel = useRef<HTMLElement>(null);
-	useDialogFocus(panel, onClose);
 	return (
-		<div className="fixed inset-0 z-50 flex justify-end" data-testid="jobs-log-drawer">
-			<button type="button" aria-label={t("panel.close")} className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
-			<aside
-				ref={panel}
-				tabIndex={-1}
-				role="dialog"
-				aria-modal="true"
-				aria-label={t("drawer.title")}
-				className="bg-background animate-in slide-in-from-right relative flex h-full w-full max-w-xl flex-col overflow-y-auto border-l p-4 shadow-2xl sm:p-5"
-			>
-				<JobLogPanel jobId={jobId} onClose={onClose} />
-			</aside>
-		</div>
+		<Dialog
+			open
+			onOpenChange={(open) => !open && onClose()}
+			title={t("drawer.title")}
+			closeLabel={t("panel.close")}
+			side="right"
+			size="lg"
+			hideClose
+			testId="jobs-log-drawer"
+		>
+			<JobLogPanel jobId={jobId} onClose={onClose} />
+		</Dialog>
 	);
 }
 
@@ -263,7 +265,7 @@ export interface JobsTableProps {
 	filtered: boolean;
 	kindName: (kind: string) => string;
 	onCancel: (job: Job) => void;
-	onRetry: (job: Job) => void;
+	onRetry: (job: Job) => Promise<unknown>;
 	busy: boolean;
 	onOpenLog?: (job: Job) => void;
 	openLogId?: string | null;
@@ -300,7 +302,7 @@ export function JobsTable({
 	const locale = getLocale();
 	const title = (job: Job) => jobTitle(job, kindName, (k, target) => t("jobOf", { kind: k, target }));
 	const actions = (job: Job, prefix: string) => (
-		<JobActions job={job} busy={busy} onCancel={onCancel} onRetry={onRetry} onOpenLog={onOpenLog} idPrefix={prefix} />
+		<JobActions job={job} busy={busy} onCancel={onCancel} onRetry={onRetry} onOpenLog={onOpenLog} idPrefix={prefix} title={title(job)} />
 	);
 	const check = (job: Job, prefix: string) =>
 		onSelect && isActiveJob(job) && !job.cancel_requested ? (
@@ -407,7 +409,7 @@ function JobReason({ job }: { job: Job }) {
 	const line = job.status === "failed" ? firstErrorLine(job.error) : "";
 	if (!line) return null;
 	return (
-		<p className="text-chart-error-ink line-clamp-2 max-w-64 text-xs" title={job.error} data-testid={`jobs-reason-${job.id}`}>
+		<p className="text-danger-ink line-clamp-2 max-w-64 text-xs" title={job.error} data-testid={`jobs-reason-${job.id}`}>
 			{line}
 		</p>
 	);
@@ -420,13 +422,16 @@ function JobActions({
 	onRetry,
 	onOpenLog,
 	idPrefix,
+	title,
 }: {
 	job: Job;
+	/** The job's list title, named in the Retry confirm. */
+	title: string;
 	busy: boolean;
 	/** "jobs" in the table, "jobs-m" in the phone list, so test ids stay unique on the page. */
 	idPrefix: string;
 	onCancel: (job: Job) => void;
-	onRetry: (job: Job) => void;
+	onRetry: (job: Job) => Promise<unknown>;
 	onOpenLog?: (job: Job) => void;
 }) {
 	const { t } = useTranslation("jobs");
@@ -458,18 +463,19 @@ function JobActions({
 						testId={`${idPrefix}-cancel-${job.id}`}
 					/>
 				) : canRetryJob(job) ? (
-					<Button
+					<PaidButton
+						verb={t("retry")}
+						capUsd={jobBudgetUsd(job)}
+						confirm="always"
+						confirmText={t("retryConfirmNoBudget", { kind: title })}
+						estimateAt="title"
 						variant="outline"
 						size="sm"
 						className="h-7 gap-1 px-2.5 text-xs"
-						title={t("retryTitle")}
 						disabled={busy}
-						onClick={() => onRetry(job)}
-						dataTestId={`${idPrefix}-retry-${job.id}`}
-					>
-						<RotateCcw className="size-3.5" aria-hidden="true" />
-						{t("retry")}
-					</Button>
+						onConfirm={() => onRetry(job)}
+						testId={`${idPrefix}-retry-${job.id}`}
+					/>
 				) : null}
 			</RoleGate>
 		</>

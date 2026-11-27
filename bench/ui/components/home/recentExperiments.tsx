@@ -46,7 +46,7 @@ function RecentRow({ exp, trackOf }: { exp: ExperimentListItem; trackOf?: (suite
 			>
 				<TrackBadge track={trackOf?.(suite)} />
 				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-					<span className="text-foreground truncate text-sm font-medium">{humanExperimentName(exp, { check: t("running.checkName"), untitled: t("running.untitled") })}</span>
+					<span className="text-foreground line-clamp-2 text-sm font-medium break-words">{humanExperimentName(exp, { check: t("running.checkName"), untitled: t("running.untitled") })}</span>
 					<span className="text-muted-foreground truncate text-xs" data-testid={`home-recent-suite-${exp.exp_id}`}>
 						{suite ? suiteIdOf(suite) : "-"}
 						<span className="sm:hidden">
@@ -80,7 +80,7 @@ function RecentRow({ exp, trackOf }: { exp: ExperimentListItem; trackOf?: (suite
 					)}
 				</span>
 				<ChevronRight
-					className="text-muted-foreground/60 size-4 shrink-0 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+					className="text-muted-foreground size-4 shrink-0 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
 					aria-hidden="true"
 				/>
 			</Link>

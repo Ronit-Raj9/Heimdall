@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasFinishedEvaluation, homeUsageRange, monthStartUTC, setupSteps } from "./home.utils";
+import { hasFinishedEvaluation, homeUsageRange, monthStartUTC, queryState, setupSteps } from "./home.utils";
 
 describe("Home set-up card and spend range (fix wave lane 2a)", () => {
 	it("ticks each set-up step from what the org has (M2-10)", () => {
@@ -19,5 +19,14 @@ describe("Home set-up card and spend range (fix wave lane 2a)", () => {
 		const now = new Date("2026-11-27T23:30:00-05:00");
 		expect(monthStartUTC(now).toISOString()).toBe("2026-11-01T00:00:00.000Z");
 		expect(homeUsageRange(now)).toEqual({ from: "2026-11-01", to: "2026-11-28" });
+	});
+});
+
+describe("Home query state (M2-8)", () => {
+	it("never reads a failed or missing answer as empty", () => {
+		expect(queryState({ isError: true, data: { runs: [] } })).toBe("error");
+		expect(queryState({ isLoading: false, data: undefined })).toBe("loading");
+		expect(queryState({ isLoading: true })).toBe("loading");
+		expect(queryState({ data: { runs: [] } })).toBe("ready");
 	});
 });

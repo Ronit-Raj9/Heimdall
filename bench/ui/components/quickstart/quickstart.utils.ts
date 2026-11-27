@@ -9,7 +9,25 @@ export interface MinedSuiteRow {
 	tasks: number;
 	mined: number;
 	admittedMined: number;
-	unreviewed: SuiteTask[];
+	unreviewed: Pick<SuiteTask, "id" | "title">[];
+}
+
+/**
+ * The mined-task facts the light suites list carries (G3, M2-20): optional, since an older server
+ * or a partial entry leaves them out.
+ */
+export interface SuiteMinedFacts {
+	task_count?: number;
+	mined_tasks?: number;
+	mined_admitted_tasks?: number;
+	unreviewed_tasks?: { id: string; title: string }[];
+}
+
+type MinedSource = Pick<SuiteSummary, "id"> & { tasks?: readonly SuiteTask[] | null } & SuiteMinedFacts;
+
+/** True when every light row carries the mined facts, so Quickstart needs no full suites list (M2-20, M4-34). */
+export function lightHasMinedFacts(suites: readonly MinedSource[]): boolean {
+	return suites.every((s) => typeof s.mined_tasks === "number" && Array.isArray(s.unreviewed_tasks));
 }
 
 /** A task whose instruction a tool drafted (tasks mine) and nobody has reviewed: instruction_reviewed is false. */
@@ -18,15 +36,25 @@ export function isUnreviewed(task: SuiteTask): boolean {
 }
 
 /** Per suite, the mined tasks and the unreviewed ones, suites with mined tasks first, then by id. */
-export function minedRows(suites: readonly SuiteSummary[]): MinedSuiteRow[] {
+export function minedRows(suites: readonly MinedSource[]): MinedSuiteRow[] {
 	const rows = suites.filter((s) => !isTestSuite(s.id)).map((s) => {
-		const mined = s.tasks.filter((t) => t.provenance?.created_by === MINED_BY);
+		if (typeof s.mined_tasks === "number" && Array.isArray(s.unreviewed_tasks)) {
+			return {
+				suite: s.id,
+				tasks: s.task_count ?? s.tasks?.length ?? 0,
+				mined: s.mined_tasks,
+				admittedMined: s.mined_admitted_tasks ?? 0,
+				unreviewed: s.unreviewed_tasks.map((t) => ({ id: t.id, title: t.title })),
+			};
+		}
+		const tasks = s.tasks ?? [];
+		const mined = tasks.filter((t) => t.provenance?.created_by === MINED_BY);
 		return {
 			suite: s.id,
-			tasks: s.tasks.length,
+			tasks: tasks.length,
 			mined: mined.length,
 			admittedMined: mined.filter((t) => t.admitted).length,
-			unreviewed: s.tasks.filter(isUnreviewed),
+			unreviewed: tasks.filter(isUnreviewed),
 		};
 	});
 	return rows.sort((a, b) => Number(b.mined > 0) - Number(a.mined > 0) || a.suite.localeCompare(b.suite));

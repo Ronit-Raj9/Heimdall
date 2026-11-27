@@ -2,7 +2,9 @@ import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { signupOffered, useSession, type SessionInfo } from "@/lib/session/sessionContext";
+import { lightHasMinedFacts } from "@/components/quickstart/quickstart.utils";
 import { useGetSuitesQuery } from "@/lib/store";
+import { useGetSuitesLightQuery } from "@/lib/store/apis/suitesLightApi";
 import "@/lib/types/u19I18n";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { Link } from "@tanstack/react-router";
@@ -76,7 +78,14 @@ export default function QuickstartView() {
 	const session = useSession();
 	const signedOut = isSignedOutVisitor(session);
 	// A visitor has no organization: the suites call would only answer 401.
-	const { data, error, isLoading, refetch } = useGetSuitesQuery(signedOut ? skipToken : undefined);
+	// M2-20, M4-34: the light list carries the mined-task facts now; the full list (every task of
+	// every suite) is read only when the server does not send them yet.
+	const light = useGetSuitesLightQuery(signedOut ? skipToken : undefined);
+	const needFull = light.isError || (light.data !== undefined && !lightHasMinedFacts(light.data.suites ?? []));
+	const full = useGetSuitesQuery(signedOut || !needFull ? skipToken : undefined);
+	const q = needFull ? full : light;
+	const { data, error, refetch } = q;
+	const isLoading = light.isLoading || (needFull && full.isLoading) || (!signedOut && !data && !error);
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="quickstart-view">
 			<PageHeader

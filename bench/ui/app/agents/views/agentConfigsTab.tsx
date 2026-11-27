@@ -1,5 +1,7 @@
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
-import { EmptyState } from "@/components/shell";
+import { EmptyState } from "@/components/shell/emptyState";
+import { ShowTestsChip } from "@/components/ui/toolbar";
+import { isTestObject, useShowTests, withoutTests } from "@/lib/testObjects";
 import { formatRelative } from "@/components/platform/platform.utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,9 +58,21 @@ export function splitAgents(agents: readonly AgentSummary[]): { yours: AgentSumm
 	return { yours: real.filter((a) => !isBaselineAgent(a)), baselines: real.filter((a) => isBaselineAgent(a)), tests };
 }
 
+/**
+ * The agents the list shows (M1-18): test agents and test objects ("zz-test-..." ids, test-double
+ * descriptions) are hidden unless "Show test items" is on; `hidden` is how many were left out.
+ */
+export function visibleAgents(
+	agents: readonly AgentSummary[],
+	showTests: boolean,
+): { yours: AgentSummary[]; baselines: AgentSummary[]; hidden: number } {
+	const { shown, hidden } = withoutTests(agents, (a) => isTestAgent(a) || isTestObject(a.id || a.path), showTests);
+	return { yours: shown.filter((a) => !isBaselineAgent(a)), baselines: shown.filter((a) => isBaselineAgent(a)), hidden };
+}
+
 /** How many agents the Configs tab shows (its own and the baselines; test agents are hidden): the tab badge. */
 export function configsCount(agents: readonly AgentSummary[]): number {
-	const { yours, baselines } = splitAgents(agents);
+	const { yours, baselines } = visibleAgents(agents, false);
 	return yours.length + baselines.length;
 }
 
@@ -77,6 +91,7 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 	const [sort, setSort] = useQueryState("sort", parseAsStringLiteral(AGENT_SORTS).withDefault("name"));
 	const [type, setType] = useQueryState("type", parseAsString.withDefault(""));
 	const { t: tf } = useTranslation("uf2a");
+	const [showTests, setShowTests] = useShowTests();
 	const jobs = useAgentJobs();
 	const jobsError = useAgentJobsError();
 	const data = query.data;
@@ -88,13 +103,15 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 		return (
 			<EmptyState
 				icon={Bot}
-				message={tf("agents.empty")}
+				title={tf("agents.emptyTitle")}
+				body={tf("agents.emptyBody")}
 				action={{ label: tf("agents.fromTemplate"), to: "/agents/new" }}
+				secondary={{ label: tf("agents.connect"), to: "/connect" }}
 				testId="agents-empty"
 			/>
 		);
 	const missing = wanted !== null && !data.agents.some((agent) => agentKey(agent) === wanted);
-	const all = splitAgents(data.agents);
+	const all = visibleAgents(data.agents, showTests);
 	const types = agentTypes([...all.yours, ...all.baselines]);
 	const ofType = (list: AgentSummary[]) => (type ? list.filter((a) => adapterKey(a.adapter) === type) : list);
 	const yours = sortAgents(ofType(filterAgents(all.yours, q)), sort);
@@ -111,16 +128,16 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 			{data.mode === "synthetic" && (
 				<p
 					role="note"
-					className="border-chart-warning/50 bg-chart-warning/10 text-foreground flex items-start gap-2 rounded-xl border px-4 py-2 text-sm"
+					className="border-warning bg-warning-soft text-foreground flex items-start gap-2 rounded-xl border px-4 py-2 text-sm"
 					data-testid="agents-synthetic-banner"
 				>
-					<AlertTriangle className="text-chart-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					<AlertTriangle className="text-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
 					{t("agents.synthetic")}
 				</p>
 			)}
 			{jobsError && (
 				<p role="note" className="text-muted-foreground flex items-start gap-2 text-sm" data-testid="agents-jobs-error">
-					<AlertTriangle className="text-chart-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					<AlertTriangle className="text-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
 					{tf("agents.jobsError")}
 				</p>
 			)}
@@ -153,6 +170,7 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 						<SelectItem value="runs">{tu("list.sortRuns")}</SelectItem>
 					</SelectContent>
 				</Select>
+				<ShowTestsChip count={all.hidden} on={showTests} onChange={setShowTests} />
 			</div>
 			{types.length > 1 && (
 				<div className="flex min-w-0 flex-wrap items-center gap-1.5" role="group" aria-label={tf("agents.typeLabel")} data-testid="agents-types">
@@ -163,8 +181,8 @@ export function AgentConfigsTab({ query }: { query: AgentsQuery }) {
 							aria-pressed={type === k}
 							onClick={() => void setType(k || null)}
 							className={cn(
-								"min-h-8 rounded-full border px-3 text-sm transition-colors",
-								type === k ? "border-primary bg-primary/5 text-foreground font-medium" : "text-muted-foreground hover:border-ring/50",
+								"min-h-8 rounded-full border px-3 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-(--focus) focus-visible:outline-none",
+								type === k ? "border-primary bg-primary/5 text-foreground font-medium" : "text-muted-foreground hover:border-input",
 							)}
 							data-testid={`agents-type-${k || "all"}`}
 						>
