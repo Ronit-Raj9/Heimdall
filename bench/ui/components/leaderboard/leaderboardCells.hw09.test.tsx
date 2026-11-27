@@ -37,7 +37,7 @@ describe("leaderboard cells say one thing each", () => {
 			/>,
 		);
 		expect(html).toContain(">Not measured<");
-		expect(html).toContain("needs 2 or more tries per task; this ran 1");
+		expect(html).toContain("needs 2+ tries per task, this ran 1");
 		expect(html).not.toContain("solved all");
 		expect(html).toContain('data-state="unknown"');
 	});

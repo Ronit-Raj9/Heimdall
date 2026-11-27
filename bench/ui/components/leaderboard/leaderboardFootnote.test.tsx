@@ -22,10 +22,10 @@ describe("LeaderboardFootnote", () => {
 		expect(html).toContain(">24 runs<");
 		expect(html).toContain(">1 run<");
 		expect(html).toContain('href="/experiments/e_synthetic-flaky"');
-		expect(html).toContain("Scope all: each entry is measured over its own tasks");
+		expect(html).toContain("Scope all: entries use their own tasks");
 		expect(html).toContain("Rank alone does not prove one agent beats another.");
-		expect(html).toContain("Resilience columns appear on the normal run board only");
-		expect(html).toContain("Sorted by verified_success; tiers split where the chance the gap is luck is below 0.05.");
+		expect(html).toContain("Resilience columns: success under a failure test minus normal");
+		expect(html).toContain("Sorted by verified_success. Tiers split at luck chance below 0.05.");
 	});
 
 	it("explains a common-scope board and says when nothing was left out", () => {
@@ -47,7 +47,7 @@ describe("LeaderboardSyntheticBanner", () => {
 	it("says the numbers are not findings", () => {
 		const html = renderToStaticMarkup(<LeaderboardSyntheticBanner />);
 		expect(html).toContain('data-testid="leaderboard-synthetic-banner"');
-		expect(html).toContain("they are not real results.");
+		expect(html).toContain("not real results.");
 	});
 });
 

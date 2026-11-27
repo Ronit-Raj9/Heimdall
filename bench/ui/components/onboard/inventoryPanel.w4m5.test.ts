@@ -11,8 +11,8 @@ describe("estimateLine (p10-1, p10-9c)", () => {
 	it("follows the chosen grader", () => {
 		const judge = estimateLine(tx, inv, "judge");
 		expect(judge).toContain("A rubric judge grades the readiness runs");
-		expect(judge).not.toContain("cost nothing");
-		expect(estimateLine(tx, inv, "answer_match")).toContain("so they cost nothing");
+		expect(judge).not.toContain("Both are free");
+		expect(estimateLine(tx, inv, "answer_match")).toContain("Both are free");
 	});
 	it("is empty when no task was found", () => {
 		expect(estimateLine(tx, { ...inv, estimate: { ...inv.estimate, tasks: 0 } }, "answer_match")).toBe("");

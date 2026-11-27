@@ -49,12 +49,6 @@ export default function TrendsTab() {
 
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="trends-screen">
-			<div className="flex flex-wrap items-center gap-3">
-				<p className="text-muted-foreground max-w-3xl text-sm" data-testid="trends-explainer">
-					{t("trends.subtitle")}
-				</p>
-			</div>
-
 			<TrendsFilters
 				suite={data?.suite ?? suite ?? ""}
 				suites={data?.suites ?? []}
@@ -89,10 +83,7 @@ export default function TrendsTab() {
 					className={cn("bg-card flex min-w-0 flex-col gap-4 rounded-xl border p-5 transition-opacity", trends.isFetching && "opacity-60")}
 					aria-busy={trends.isFetching}
 				>
-					<header className="flex flex-col gap-0.5">
-						<h2 className="text-base font-semibold tracking-tight">{tu("trends.title")}</h2>
-						<p className="text-muted-foreground text-sm">{tu("trends.subtitle")}</p>
-					</header>
+					<h2 className="text-base font-semibold tracking-tight">{tu("trends.title")}</h2>
 					<TrendsBoard data={data} onIncludeSynthetic={() => void setSynthetic("include")} />
 				</div>
 			)}

@@ -8,7 +8,16 @@ import { trendsFixture } from "./trends.fixture";
 const data = trendsFixture();
 
 describe("TrendsTable", () => {
-	const html = renderToStaticMarkup(<TrendsTable lineages={data.lineages} metric={data.metric} />);
+	const html = renderToStaticMarkup(<TrendsTable lineages={data.lineages} metric={data.metric} initialMore />);
+
+	it("starts compact: setup, fingerprint and tokens wait behind More columns", () => {
+		const compact = renderToStaticMarkup(<TrendsTable lineages={data.lineages} metric={data.metric} />);
+		expect(compact).toContain(">More columns<");
+		expect(compact).not.toContain(">Setup fingerprint</th>");
+		expect(compact).not.toContain(">Tokens</th>");
+		expect(compact).toContain(">Result</th>");
+		expect(compact.match(/data-testid="trends-row"/g)).toHaveLength(5);
+	});
 
 	it("has one row per point", () => {
 		expect(html.match(/data-testid="trends-row"/g)).toHaveLength(5);

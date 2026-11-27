@@ -54,7 +54,7 @@ describe("TrendsFilters", () => {
 		expect(html).toMatch(/aria-pressed="true"[^>]*data-testid="trends-synthetic-include"/);
 		expect(html).toMatch(/aria-pressed="false"[^>]*data-testid="trends-synthetic-exclude"/);
 		expect(html).toMatch(/aria-pressed="false"[^>]*data-testid="trends-synthetic-only"/);
-		expect(html).toContain('title="Scripted agent or scripted model runs only. Their numbers are not findings."');
+		expect(html).toContain('title="Scripted runs only. Not findings."');
 	});
 
 	it("disables the condition picker when there is nothing to pick", () => {

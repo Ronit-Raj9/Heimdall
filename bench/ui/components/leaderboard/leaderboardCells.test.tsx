@@ -15,7 +15,7 @@ describe("TierBadge", () => {
 		const html = renderToStaticMarkup(<TierBadge entry={{ rank: 1, tier: 1, tier_reason: "leader", p_vs_leader: null }} />);
 		expect(html).toContain('data-tier="1"');
 		expect(html).toContain('tabindex="0"');
-		expect(html).toContain("Leader: every other entry is compared with this one.");
+		expect(html).toContain("Leader. Others are compared with it.");
 	});
 
 	it("never shows an unexpected tier as tied", () => {
@@ -51,7 +51,7 @@ describe("SuccessCell", () => {
 		const html = renderToStaticMarkup(
 			<SuccessCell entry={{ rank: 1, success: { state: "observed", v: 0.5 }, passes: { num: 1, den: 2, unknown: 0 } }} />,
 		);
-		expect(html).toContain('aria-label="Verified success 50%, no interval with fewer than 2 tasks"');
+		expect(html).toContain('aria-label="Verified success 50%, no interval under 2 tasks"');
 		expect(html).not.toContain("leaderboard-interval-1");
 	});
 

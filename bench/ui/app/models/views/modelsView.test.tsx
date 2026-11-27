@@ -319,7 +319,7 @@ describe("default model price hint (F1.price)", () => {
 			const fieldset = html.slice(html.indexOf('data-testid="model-key-price"'), html.indexOf("</fieldset>"));
 			expect(fieldset).toContain("With no models listed, this price applies to every model of this provider.");
 			// The key form's own hint, not the default model's "not set" line (both used the key priceHint).
-			expect(fieldset).toContain("What you pay on this key.");
+			expect(fieldset).toContain("What you pay on this key, for models");
 			expect(fieldset).not.toContain("not set");
 		} finally {
 			routerState.location.search = {};
@@ -341,9 +341,9 @@ describe("Model keys, round 2 lane RK", () => {
 		try {
 			const html = render(<ModelsView />);
 			expect(html).toContain('data-testid="model-key-where"');
-			expect(html).toContain("A worker receives it only for the length of a run and keeps it in memory");
-			expect(html).toContain("only ever gets a per-run key");
-			expect(html).toContain("Test comes right after you save: it is free for most providers");
+			expect(html).toContain("A worker holds it in memory only during a run");
+			expect(html).toContain("gets a per-run key");
+			expect(html).toContain("Test runs after save, free for most providers");
 			expect(html).toContain('data-testid="model-key-where-doc"');
 			// Q-239: the provider is the shared combobox, not a native select.
 			expect(html).toContain('data-testid="model-key-provider"');
@@ -374,6 +374,6 @@ describe("Model keys, round 2 lane RK", () => {
 	});
 	it("names the free agent check when keys cannot be saved (Q-238)", () => {
 		api.q = { models: okQuery({ ...CATALOG, keys_ready: false }) };
-		expect(render(<ModelsView />)).toContain("with Check agent on its page");
+		expect(render(<ModelsView />)).toContain("Check agent on its page runs it for free");
 	});
 });

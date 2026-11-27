@@ -53,7 +53,7 @@ describe("draft panel wave 4 minors", () => {
 		const none = { ...set, tasks: [] };
 		expect(emptyDraftText(tx, none)).toBe("No task is left in this draft. Draft again from step 2 to start over.");
 		expect(emptyDraftText(tx, { ...none, problems: [{ ref: "row 2", message: "x" }] })).toBe(
-			"No task was drafted. The problems below say why.",
+			"No task drafted. See problems below.",
 		);
 	});
 

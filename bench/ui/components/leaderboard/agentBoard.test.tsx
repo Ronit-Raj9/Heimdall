@@ -53,7 +53,7 @@ describe("agent board", () => {
 		expect(html).toContain('data-testid="agent-board-row-codex"');
 		expect(html).toContain("v2");
 		expect(html).toContain(">version not recorded<");
-		expect(html).toContain('title="This run was not started from an evaluation, so its agent version was not recorded."');
+		expect(html).toContain('title="Not started from an evaluation. No version recorded."');
 		expect(html).toContain("gpt-5.4-mini");
 		expect(html).toContain("42%");
 		expect(html).toContain("30% to 52%");

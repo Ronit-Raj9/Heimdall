@@ -349,7 +349,7 @@
 	},
 	"leaderboard": {
 		"title": "Leaderboard",
-		"subtitle": "Ranked by tasks solved. Top group ties with the leader.",
+		"subtitle": "Ranked by tasks solved. Top group cannot be told apart from the leader.",
 		"banner": "Practice data. No real model, not real results.",
 		"bannerHint": "",
 		"loadError": "Could not load the leaderboard.",
@@ -379,7 +379,7 @@
 		},
 		"table": {
 			"title": "Ranking",
-			"description": "Unknown values sort last, never shown as 0.",
+			"description": "",
 			"label": "Agent setups ranked by solve rate",
 			"rank": "Rank",
 			"tier": "Group",
@@ -441,8 +441,8 @@
 		},
 		"footnote": {
 			"title": "About this board",
-			"generated": "Generated {{time}}. Sorted by {{metric}}. Tiers split where gap luck is below {{alpha}}.",
-			"rankClaim": "Rank alone proves nothing. Only Behind means clearly worse.",
+			"generated": "Generated {{time}}. Sorted by {{metric}}. Tiers split at luck chance below {{alpha}}.",
+			"rankClaim": "Rank alone does not prove one agent beats another. Only Behind means clearly worse.",
 			"scopeAll": "Scope all: entries use their own tasks. Tiers compare on shared tasks.",
 			"scopeCommon_one": "Scope common: every entry is measured over the same {{count}} common task only.",
 			"scopeCommon_other": "Scope common: every entry is measured over the same {{count}} common tasks only.",
@@ -1637,7 +1637,7 @@
 		"loadError": "Could not load the model matrix",
 		"condition": "Fault",
 		"gradeSource": "Grades: {{source}}",
-		"facts": "{{suite}}, {{tasks}} shared tasks, alpha {{alpha}}",
+		"facts": "{{suite}}, {{tasks}} shared tasks, luck chance below {{alpha}}",
 		"notSeparable": "Cannot separate",
 		"synthetic": "Synthetic data. These numbers are not findings.",
 		"openVerdict": "Open verdict",
@@ -2902,7 +2902,7 @@
 			"toggleHint": "Held-out tasks only. Never counted on the public board.",
 			"banner": "Held-out board",
 			"bannerHint": "Held-out tasks only. Never mixed into the public board.",
-			"off": "This server does not serve the held-out board.",
+			"off": "Held-out board off: server config sets held_out.visible to false.",
 			"backToPublic": "Show the public board"
 		},
 		"quarantine": {
@@ -3175,7 +3175,7 @@
 		}
 	},
 	"trends": {
-		"subtitle": "Each agent's results across comparisons.",
+		"subtitle": "",
 		"loadError": "Could not load the trends.",
 		"resetFilters": "Reset filters",
 		"unknown": "not measured",
@@ -3222,13 +3222,13 @@
 		},
 		"lineages": {
 			"title": "Latest change for each agent",
-			"description": "Newest point against the previous one, sign-flip test, alpha {{alpha}}.",
+			"description": "",
 			"points_one": "{{count}} point",
 			"points_other": "{{count}} points"
 		},
 		"chart": {
 			"title": "{{metric}} over time",
-			"description": "A gap means no value for that point.",
+			"description": "",
 			"summary_one": "{{metric}} over time: {{lineages}} lineages, {{count}} point.",
 			"summary_other": "{{metric}} over time: {{lineages}} lineages, {{count}} points.",
 			"latest": "Latest: {{latest}}.",
@@ -3630,7 +3630,7 @@
 		"pullError": "Could not read new sessions",
 		"evidenceLabel": "User traffic",
 		"unconfigured": "Not set up. Use Set up live scoring.",
-		"problem": "Settings file unreadable. Open Set up live scoring to replace it.",
+		"problem": "Live scoring is off: settings file unreadable. Open Set up live scoring to replace it.",
 		"result": {
 			"better": "Better",
 			"worse": "Worse",
@@ -3654,7 +3654,7 @@
 			"title": "New version {{candidate}} compared with current version {{baseline}}",
 			"description": "Result at score {{threshold}} and {{pairs}} pairs. False alarm under {{alpha}} over {{signals}} signals, any check rate.",
 			"counts": "{{candidate}} sessions on the new version, {{baseline}} on the current version.",
-			"restarts": "Restarted {{count}} times. Counts sessions after the last restart.",
+			"restarts": "Restarted {{count}} times. Each restart counts only sessions after it.",
 			"label": "Live comparison, one row per signal",
 			"needPairs": "needs {{count}} more pairs of sessions",
 			"columns": {

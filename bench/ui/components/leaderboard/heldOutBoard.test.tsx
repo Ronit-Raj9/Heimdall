@@ -10,7 +10,7 @@ describe("held-out board", () => {
 		expect(html).toContain('data-testid="leaderboard-held-out-banner"');
 		expect(html).toContain('role="note"');
 		expect(html).toContain("Held-out board");
-		expect(html).toContain("never mixed into the public board");
+		expect(html).toContain("Never mixed into the public board");
 	});
 
 	it("is a toggle button that reports whether the held-out board is shown", () => {

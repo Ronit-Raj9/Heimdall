@@ -23,8 +23,8 @@ describe("LiveBody", () => {
 		expect(html).toContain("no ground truth");
 		expect(html).toMatch(/data-testid="live-source-url"[^>]*>http:\/\/127\.0\.0\.1:18080/);
 		expect(html).toContain("read-only");
-		expect(html).toMatch(/data-testid="live-grouping"[^>]*>160 grouped by session id, 6 grouped by pauses between requests/);
-		expect(html).toContain("Only numbers and flags are kept");
+		expect(html).toMatch(/data-testid="live-grouping"[^>]*>160 by session id, 6 by pauses/);
+		expect(html).toContain("numbers and flags only");
 		expect(html).toContain('data-testid="live-judge"');
 		expect(html).toContain("never decide");
 	});
@@ -74,7 +74,7 @@ describe("LiveBody", () => {
 		expect(live).not.toContain('data-testid="live-unconfigured"');
 		expect(live).toContain('data-testid="live-simulate"');
 		expect(html).toContain('data-testid="live-unconfigured"');
-		expect(html).toContain("Live quality scoring is not set up yet. Use Set up live scoring above.");
+		expect(html).toContain("Not set up. Use Set up live scoring.");
 		expect(html).toContain("(Terminal: heimdall livescore init)");
 		expect(html).not.toContain("bifrost-bench");
 		const broken = renderToStaticMarkup(
@@ -85,7 +85,7 @@ describe("LiveBody", () => {
 				}}
 			/>,
 		);
-		expect(broken).toContain("Live quality scoring is off: the settings file could not be read. Open Set up live scoring to replace it.");
+		expect(broken).toContain("Live scoring is off: settings file unreadable. Open Set up live scoring to replace it.");
 		// The raw reason only in the title attribute, never in the text.
 		expect(broken).toContain('title="parse livescore/config.yaml: unknown key"');
 		expect(broken).not.toContain(">parse livescore/config.yaml");
@@ -104,7 +104,7 @@ describe("LiveBody", () => {
 				}}
 			/>,
 		);
-		expect(html).toContain("Live quality scoring is not set up yet.");
+		expect(html).toContain("Not set up.");
 		expect(html).not.toContain("livescore init");
 		expect(html).not.toContain("Terminal");
 	});
@@ -116,7 +116,7 @@ describe("LiveBody", () => {
 		expect(html).toContain('data-testid="live-simulate"');
 		expect(html).toContain('data-testid="job-run-livescore.compare"');
 		expect(html).toContain(`data-params="${JSON.stringify({ simulate: 200 }).replace(/"/g, "&quot;")}"`);
-		expect(html).toContain("Try with simulated traffic");
+		expect(html).toContain("Try simulated traffic (free)");
 		expect(html).toContain("Nothing is sent to your agents.");
 		const configured = renderToStaticMarkup(<LiveBody status={LIVE_STATUS_FIXTURE} />);
 		expect(configured).not.toContain('data-testid="live-simulate"');

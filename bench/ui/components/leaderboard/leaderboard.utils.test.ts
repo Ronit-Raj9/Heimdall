@@ -217,8 +217,8 @@ describe("leaderboardMarkdown", () => {
 	});
 
 	it("labels synthetic data and keeps the no-blended-score explainer", () => {
-		expect(md).toContain("> PRACTICE DATA: no real model was used.");
-		expect(md).toContain("No blended score.");
+		expect(md).toContain("> PRACTICE DATA: no real model.");
+		expect(md).toContain("Ranked by tasks solved.");
 	});
 
 	it("spells out unknown, n/a and not run instead of 0", () => {
