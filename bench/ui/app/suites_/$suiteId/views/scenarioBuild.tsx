@@ -171,8 +171,8 @@ export function ScenarioRowsImport({ suite, writable }: { suite: SuiteSummary; w
 					</Field>
 				</div>
 			)}
-			<label className="flex items-center gap-2 text-sm">
-				<input type="checkbox" checked={heldOut} onChange={(e) => (setHeldOut(e.target.checked), reset())} />
+			<label className="flex min-h-11 items-center gap-2 text-sm">
+				<input type="checkbox" className="size-4 shrink-0" checked={heldOut} onChange={(e) => (setHeldOut(e.target.checked), reset())} />
 				{t("scenarios.heldOut")}
 			</label>
 			<div className="flex flex-wrap gap-2">

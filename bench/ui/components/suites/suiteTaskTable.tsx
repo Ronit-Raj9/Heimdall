@@ -113,7 +113,9 @@ export function SuiteTaskTable({
 											: task.difficulty}
 									</span>
 								) : (
-									<span className="text-muted-foreground">{t("suites.tasks.unset")}</span>
+									<span className="text-muted-foreground" aria-label={t("suites.tasks.unset")}>
+										-
+									</span>
 								)}
 							</TableCell>
 							{moreColumns && (

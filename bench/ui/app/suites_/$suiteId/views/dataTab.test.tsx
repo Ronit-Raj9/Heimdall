@@ -51,6 +51,8 @@ describe("benchmark data tab", () => {
 			expect(html).toContain(`data-testid="${id}"`);
 		// M6-32: the import sits after the versions, under an #import anchor.
 		expect(html.indexOf('data-testid="suite-data-versions')).toBeLessThan(html.indexOf('data-testid="suite-data-import"'));
+		// Q-189: the import form sits in a closed fold, one line on the Settings tab.
+		expect(html).toMatch(/<details id="import"[^>]*data-testid="suite-data-import-fold"><summary/);
 		expect(html).toContain('id="import"');
 		expect(text(html)).not.toMatch(/sealed|suite |probe|canary|lease/i);
 	});
@@ -92,7 +94,8 @@ describe("benchmark data tab", () => {
 			),
 		);
 		expect(html).toContain("v2");
-		expect(html).toContain("+1 changed 2 -0");
+		expect(html).toContain("+1 added, 2 changed");
+		expect(html).not.toContain("-0");
 		expect(html).toContain("git:abc");
 	});
 

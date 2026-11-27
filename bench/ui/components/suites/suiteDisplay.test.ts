@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	isImporterText,
 	orderSuites,
 	plainDescription,
 	suiteDisplay,
@@ -83,5 +84,17 @@ describe("suite ordering", () => {
 		expect(suiteDisplayName("hd-swe-verified")).toBe("SWE-bench Verified");
 		expect(suiteDisplayDescription({ id: "voicebench", description: "" })).toBe("Spoken questions answered by a voice agent.");
 		expect(suiteDisplayDescription({ id: "kernelbench", description: "" })).toContain("needs a GPU worker");
+	});
+});
+describe("importer text with the real harbor description (Q-37)", () => {
+	it("hides the text the harbor importer writes, which starts with the benchmark name", () => {
+		const real =
+			"programbench imported by bifrost-bench import harbor from /data/programbench. Each task builds its own image; the upstream test script grades a snapshot of the agent's container.";
+		expect(isImporterText(real)).toBe(true);
+		expect(plainDescription(real)).toBe("");
+		expect(suiteDisplayDescription({ id: "programbench", description: real })).toBe("");
+	});
+	it("keeps ordinary descriptions", () => {
+		expect(plainDescription("CheatBench: does the agent cheat?")).toBe("CheatBench: does the agent cheat?");
 	});
 });

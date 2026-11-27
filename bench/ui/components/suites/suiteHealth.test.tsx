@@ -72,7 +72,7 @@ describe("health column", () => {
 		expect(p02).toContain("Runs out of time (19%)");
 		// Variance is a muted line, never a toned badge.
 		expect(p02).toMatch(
-			/<span class="text-muted-foreground text-\[11px\]"[^>]*data-testid="suites-task-health-p02-variance">Agents mixed on it: 1 of 2/,
+			/<span class="text-muted-foreground text-xs"[^>]*data-testid="suites-task-health-p02-variance">Agents mixed on it: 1 of 2/,
 		);
 	});
 
@@ -104,7 +104,7 @@ describe("held-out rows", () => {
 		const p09 = row(html, "p09");
 		expect(p09).toContain('data-redacted="true"');
 		expect(p09).toContain(">p09<");
-		expect(p09).toMatch(/data-testid="suites-task-held-out-p09"[^>]*>.*Held out/);
+		expect(p09).toMatch(/data-testid="suites-task-held-out-p09"[^>]*>.*Private/);
 		expect(p09).not.toContain("<button");
 		expect(p09).toContain("Title, files and checks are withheld for a held-out task.");
 		expect(p09).toContain("suites-task-admission-p09");
@@ -129,7 +129,7 @@ describe("SuiteHealthSummary", () => {
 		expect(html).toMatch(/data-testid="suites-health-quarantined".*?>1</);
 		expect(html).toMatch(/data-testid="suites-health-canary".*?>set</);
 		expect(html).toMatch(/data-testid="suites-health-count-flaky_verifier" data-tone="bad">.*Unreliable grader: 1/);
-		expect(html).toContain("from 74 saved runs across 4 experiments");
+		expect(html).toContain("from 74 saved runs across 4 comparisons");
 		expect(html).toContain("easy at or above a 80% pass rate, hard at or below 20%");
 		expect(html).toContain("Synthetic runs count toward infra and verifier checks only");
 	});
@@ -170,7 +170,7 @@ describe("TaskHealthBlock", () => {
 		expect(verifier).toContain("Flaky verifier: 3 pieces of evidence from 9 checks.");
 		expect(verifier).toMatch(/suites-task-health-kind-regrade_disagrees" data-tone="bad">Regrade disagrees: 1/);
 		expect(verifier).toMatch(/suites-task-health-kind-same_output_differs" data-tone="bad">Same output, different verdict: 2/);
-		expect(verifier).toContain("experiment e_7k2m; runs r_a1s2d3, r_z9x8c7");
+		expect(verifier).toContain("comparison e_7k2m; runs r_a1s2d3, r_z9x8c7");
 	});
 
 	it("highlights a difficulty mismatch with pass rate, interval, runs and configs", () => {

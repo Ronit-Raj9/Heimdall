@@ -222,7 +222,8 @@ export function plainDescription(raw: string | undefined | null): string {
 		const space = cut.lastIndexOf(" ");
 		text = `${(space > 40 ? cut.slice(0, space) : cut).replace(/[\s,;:.]+$/, "")}...`;
 	}
-	return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
+	if (!text || isImporterText(text)) return "";
+	return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /**
@@ -231,7 +232,9 @@ export function plainDescription(raw: string | undefined | null): string {
  */
 export function isImporterText(raw: string): boolean {
 	const text = raw.trim().toLowerCase();
-	return text.startsWith("imported by") || text.includes("importer");
+	// The real harbor text starts with the benchmark name: "programbench imported by bifrost-bench
+	// import harbor from /data/...". Match the words anywhere, not only at the start.
+	return /\bimported by\b|\bimporter\b|bifrost-bench import|\bimport harbor\b/.test(text);
 }
 
 /** One short human sentence for the benchmark: curated for known ids, cleaned up otherwise. */

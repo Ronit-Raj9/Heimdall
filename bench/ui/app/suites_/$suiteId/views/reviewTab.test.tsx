@@ -69,7 +69,10 @@ describe("ReviewTab", () => {
 			expect(html).toContain(`data-testid="${id}"`);
 		}
 		expect(html).toMatch(/data-testid="suite-review-op-rubric"[^>]*checked=""/);
-		expect(html).toContain('data-testid="suite-review-need-model"');
+		// Q-198: the sentence is said once, by the model field's hint; Q-193: 44px checkbox rows.
+		expect(html).not.toContain('data-testid="suite-review-need-model"');
+		expect(html.split("Pick a model from your model keys.").length).toBeLessThanOrEqual(2);
+		expect(html).toMatch(/<label class="flex min-h-11 items-center gap-2 text-sm[^"]*"><input type="checkbox" class="size-4 shrink-0"[^>]*data-testid="suite-review-op-rubric"/);
 		expect(html).toContain("1 waiting, 1 accepted, 0 rejected");
 		expect(html).toContain('data-testid="suite-review-accept-refund-window"');
 		expect(html).toContain("Accepted by ana@example.com: proof looked right");

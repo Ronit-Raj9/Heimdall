@@ -1,0 +1,5 @@
+{
+	"fromApi": {
+		"specUrlError": "Could not read the spec at {{url}}. Download it and pick the file, or paste it below."
+	}
+}

@@ -134,7 +134,7 @@ export function TaskHealthCell({ task, health }: { task: SuiteTask; health: Heal
 				</ToneBadge>
 			)}
 			{taskHealth && taskHealth.variance.configs > 0 && (
-				<span className="text-muted-foreground text-[11px]" title={t("suiteHealth.varianceHint")} data-testid={`${testId}-variance`}>
+				<span className="text-muted-foreground text-xs" title={t("suiteHealth.varianceHint")} data-testid={`${testId}-variance`}>
 					{t("suiteHealth.variance", { unstable: taskHealth.variance.unstable, configs: taskHealth.variance.configs })}
 				</span>
 			)}

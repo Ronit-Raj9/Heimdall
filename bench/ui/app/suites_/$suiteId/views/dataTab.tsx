@@ -70,17 +70,33 @@ export function DataTab({ suite }: { suite: SuiteSummary }) {
 			<p className="text-muted-foreground max-w-3xl text-sm">{t("intro")}</p>
 			<PolicySection suite={suite.id} writable={writable} t={t} />
 			<VersionsSection suite={suite.id} t={t} />
-			{/* M6-32: importing from another platform is a separate job; it sits after the tab's own data, with an anchor. */}
+			{/* M6-32, Q-189: importing from another platform is a separate job: one line here that opens the form. */}
 			{writable && (
-				<div id="import" className="scroll-mt-20">
-					<ImportSection suite={suite.id} t={t} />
-				</div>
+				<details id="import" className="scroll-mt-20" data-testid="suite-data-import-fold">
+					<summary className="text-primary min-h-11 cursor-pointer py-2 text-sm font-medium underline-offset-4 hover:underline">
+						{t("import.title")}
+					</summary>
+					<div className="pt-2">
+						<ImportSection suite={suite.id} t={t} />
+					</div>
+				</details>
 			)}
 			<Section title={t("api.title")} description={t("api.description")} testId="suite-data-api">
 				<CopyCodeBlock code={apiSnippet(suite.id)} label={t("api.title")} kind="code" testId="suite-data-api-code" />
 			</Section>
 		</div>
 	);
+}
+
+/** Q-202: the Changes cell from its non-zero parts only ("+3 added, 1 removed"); "-" when nothing changed. */
+export function versionChange(t: T, added: number, updated: number, removed: number): string {
+	const tx = t as unknown as (k: string, o: Record<string, unknown>) => string;
+	const parts = [
+		added > 0 ? tx("versions.added", { count: added }) : "",
+		updated > 0 ? tx("versions.changed", { count: updated }) : "",
+		removed > 0 ? tx("versions.removed", { count: removed }) : "",
+	].filter(Boolean);
+	return parts.length > 0 ? parts.join(", ") : "-";
 }
 
 export function apiSnippet(id: string): string {
@@ -317,7 +333,7 @@ export function VersionTable({ versions, t }: { versions: DatasetVersion[]; t: T
 								{v.source || "-"}
 							</td>
 							<td className="px-4 py-2 text-xs tabular-nums">
-								{t("versions.change", { added: v.added?.length ?? 0, updated: v.updated?.length ?? 0, removed: v.removed?.length ?? 0 })}
+								{versionChange(t, v.added?.length ?? 0, v.updated?.length ?? 0, v.removed?.length ?? 0)}
 							</td>
 							<td className="px-4 py-2 text-right tabular-nums">{v.tasks}</td>
 						</tr>

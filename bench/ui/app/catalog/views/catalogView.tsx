@@ -156,6 +156,11 @@ export function builtinSuiteOf(e: CatalogEntry, builtin: ReadonlySet<string> | u
 	return e.suites?.find((id) => builtin.has(id));
 }
 
+/** The Source cell key: a built-in benchmark has its data, so it never reads "Needs data" (Q-197). */
+export function sourceKeyOf(e: CatalogEntry, builtin: ReadonlySet<string> | undefined): "sourceReady" | "sourceNeedsData" {
+	return e.needs_data && !builtinSuiteOf(e, builtin) ? "sourceNeedsData" : "sourceReady";
+}
+
 /** Quiet text tag, e.g. "Example". */
 function QuietTag({ children }: { children: ReactNode }) {
 	return <span className="text-muted-foreground shrink-0 text-xs">{children}</span>;
@@ -458,7 +463,7 @@ function EntryRow({ e, props, canWrite }: { e: CatalogEntry; props: CatalogBodyP
 					<CategoryIcon category={cat} />
 					<button
 						type="button"
-						className="hover:text-foreground min-h-9 min-w-0 truncate text-left text-sm font-medium underline-offset-4 hover:underline"
+						className="hover:text-foreground min-h-9 min-w-0 line-clamp-2 text-left text-sm sm:line-clamp-1 font-medium underline-offset-4 hover:underline"
 						onClick={() => props.onDetails?.(e)}
 						aria-label={tu("catalog.detailsOf", { name: title })}
 						title={title}
@@ -472,7 +477,7 @@ function EntryRow({ e, props, canWrite }: { e: CatalogEntry; props: CatalogBodyP
 			</TableCell>
 			<TableCell priority="secondary" className="text-muted-foreground py-2 text-xs">{t(`cat_${cat}`)}</TableCell>
 			<TableCell priority="secondary" className="text-muted-foreground hidden py-2 text-xs md:table-cell">
-				{e.needs_data ? t("sourceNeedsData") : t("sourceReady")}
+				{t(sourceKeyOf(e, props.builtinSuites))}
 			</TableCell>
 			<TableCell priority="status" className="py-2 text-right">
 				<CardAction

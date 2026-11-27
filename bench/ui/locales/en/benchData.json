@@ -47,6 +47,9 @@
 		"changes": "Changes",
 		"tasks": "Tasks",
 		"change": "+{{added}} changed {{updated}} -{{removed}}",
+		"added": "+{{count}} added",
+		"changed": "{{count}} changed",
+		"removed": "{{count}} removed",
 		"loadError": "Could not load the versions"
 	},
 	"api": {

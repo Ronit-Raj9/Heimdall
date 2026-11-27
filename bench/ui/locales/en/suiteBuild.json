@@ -47,7 +47,7 @@
 			"traces": "Production failures"
 		},
 		"issuesHosted": "From issues needs a connected GitHub repository, available on the hosted website.",
-		"codeSuite": "Spreadsheets and tickets go into a question-and-answer benchmark. Create a question-and-answer benchmark with Add benchmark, Create your own, to add them.",
+		"codeSuite": "Spreadsheets and tickets go into a question-and-answer benchmark. Create one first.",
 		"traces": "Failures your agent had in production arrive in the inbox (from Langfuse, LangSmith, OpenTelemetry or the webhook). Open one and choose Turn into task to add it to this benchmark, then run the readiness checks here.",
 		"openInbox": "Open the inbox"
 	},
