@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -12,7 +13,9 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/investigator"
+	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
@@ -23,7 +26,10 @@ import (
 // project root. Read only; the job is started with POST /jobs.
 func init() {
 	RegisterOrgArea("investigations", func(env OrgEnv, r *router.Router) {
-		h := &investigationsHandler{mode: env.Mode}
+		h := &investigationsHandler{mode: env.Mode, jobs: env.Services.Jobs, org: env.Services.OrgID}
+		if h.org == "" && !env.Services.Hosted {
+			h.org = auth.LocalOrgID // local mode's single organization
+		}
 		if env.Cfg != nil {
 			h.root = env.Cfg.Root
 		}
@@ -46,7 +52,24 @@ type InvestigationSummary struct {
 // InvestigationList is GET /investigations.
 type InvestigationList struct {
 	Investigations []InvestigationSummary `json:"investigations"`
+	// Running lists this organization's findings.investigate jobs that are
+	// queued or running (fix wave M7-31), so the page can poll while one is
+	// not finished. A finished job is a row of Investigations instead.
+	// Absent when none runs or the server has no job runner.
+	Running []InvestigationRunning `json:"running,omitempty"`
 }
+
+// InvestigationRunning is one investigation job that has no report yet.
+type InvestigationRunning struct {
+	ID        string    `json:"id"` // the job id, later the report id
+	ExpID     string    `json:"exp_id"`
+	Status    string    `json:"status"` // queued | running
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// investigateJobKind is the job kind that writes the reports
+// (cmd/bifrost-bench/jobs_findings_w442.go).
+const investigateJobKind = "findings.investigate"
 
 const investigationsListMax = 50
 
@@ -55,6 +78,38 @@ var investigationIDRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)
 type investigationsHandler struct {
 	mode schemas.Mode
 	root string
+	jobs JobsAPI // nil: no running list
+	org  string  // the organization of this router; jobs are read for it only
+}
+
+// running lists the organization's unfinished investigation jobs for exp
+// ("" for every evaluation). A job runner error leaves the list empty: the
+// reports still answer.
+func (h *investigationsHandler) running(ctx context.Context, exp string) []InvestigationRunning {
+	if h.jobs == nil || h.org == "" {
+		return nil
+	}
+	var out []InvestigationRunning
+	for _, st := range []jobs.Status{jobs.StatusRunning, jobs.StatusQueued} {
+		page, err := h.jobs.List(ctx, h.org, jobs.Filter{Kind: investigateJobKind, Status: st, Limit: investigationsListMax})
+		if err != nil || page == nil {
+			continue
+		}
+		for _, j := range page.Jobs {
+			if j.OrgID != "" && j.OrgID != h.org {
+				continue
+			}
+			var p struct {
+				ExpID string `json:"exp_id"`
+			}
+			_ = json.Unmarshal(j.Params, &p)
+			if exp != "" && p.ExpID != exp {
+				continue
+			}
+			out = append(out, InvestigationRunning{ID: j.ID, ExpID: p.ExpID, Status: string(j.Status), CreatedAt: j.CreatedAt})
+		}
+	}
+	return out
 }
 
 func (h *investigationsHandler) dir() string { return filepath.Join(h.root, "investigations") }
@@ -89,6 +144,9 @@ func (h *investigationsHandler) list(ctx *fasthttp.RequestCtx) {
 	if len(out.Investigations) > investigationsListMax {
 		out.Investigations = out.Investigations[:investigationsListMax]
 	}
+	work, cancel := workContext(ctx, readTimeout)
+	out.Running = h.running(work, exp)
+	cancel()
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, plainServed(out))
 }
 

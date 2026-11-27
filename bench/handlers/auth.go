@@ -120,7 +120,29 @@ func (h *AuthHandler) getMe(ctx *fasthttp.RequestCtx) {
 		h.fail(ctx, err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, me)
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, withHasPassword(me))
+}
+
+// MeResponse is GET /auth/me: auth.Me plus HasPassword (fix wave M8-49),
+// set only for a signed-in user. It says whether the account has a password
+// at all (a GitHub-only account has none), so the Password tab can offer
+// "set" or "change". It carries nothing else about the password.
+type MeResponse struct {
+	auth.Me
+	HasPassword *bool `json:"has_password,omitempty"`
+}
+
+// withHasPassword wraps me for the wire.
+func withHasPassword(me *auth.Me) MeResponse {
+	if me == nil {
+		return MeResponse{}
+	}
+	out := MeResponse{Me: *me}
+	if me.Kind == string(auth.KindUser) && me.User != nil {
+		has := me.User.PasswordHash != ""
+		out.HasPassword = &has
+	}
+	return out
 }
 
 // postSignup handles POST /auth/signup and signs the new user in.
