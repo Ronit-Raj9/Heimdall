@@ -61,6 +61,46 @@
 	--color-chart-cat-other: var(--chart-cat-other);
 	--color-chart-track: var(--chart-track);
 	--color-ring: var(--ring);
+	--color-brand-panel: var(--brand-panel);
+	--color-brand-ink: var(--brand-ink);
+	--color-brand-muted: var(--brand-muted);
+	--color-brand-faint: var(--brand-faint);
+	--color-brand-glow: var(--brand-glow);
+	--color-brand-tick: var(--brand-tick);
+	--color-primary-hover: var(--primary-hover);
+	--color-primary-active: var(--primary-active);
+	--color-primary-soft: var(--primary-soft);
+	--color-on-primary: var(--on-primary);
+	--color-success: var(--success);
+	--color-success-ink: var(--success-ink);
+	--color-success-soft: var(--success-soft);
+	--color-warning: var(--warning);
+	--color-warning-ink: var(--warning-ink);
+	--color-warning-soft: var(--warning-soft);
+	--color-danger: var(--danger);
+	--color-danger-ink: var(--danger-ink);
+	--color-danger-soft: var(--danger-soft);
+	--color-info: var(--info);
+	--color-info-ink: var(--info-ink);
+	--color-info-soft: var(--info-soft);
+	--color-unmeasured: var(--unmeasured);
+	--color-focus: var(--focus);
+	--color-chart-1: var(--chart-1);
+	--color-chart-2: var(--chart-2);
+	--color-chart-3: var(--chart-3);
+	--color-chart-4: var(--chart-4);
+	--color-chart-5: var(--chart-5);
+	--color-chart-6: var(--chart-6);
+	--color-neutral-50: var(--neutral-50);
+	--color-neutral-100: var(--neutral-100);
+	--color-neutral-200: var(--neutral-200);
+	--color-neutral-300: var(--neutral-300);
+	--color-neutral-400: var(--neutral-400);
+	--color-neutral-500: var(--neutral-500);
+	--color-neutral-600: var(--neutral-600);
+	--color-neutral-700: var(--neutral-700);
+	--color-neutral-800: var(--neutral-800);
+	--color-neutral-900: var(--neutral-900);
 	--color-input: var(--input);
 	--color-border: var(--border);
 	--color-destructive: var(--destructive);
@@ -86,7 +126,7 @@
 	   exactly the topbar's height and gives the whole shell a second scrollbar.
 	   Full-viewport surfaces that sit outside the card — dialogs, portalled
 	   popovers, the sidebar, the auth-only MinimalShell — keep using 100dvh. */
-	--app-topbar-height: 3.25rem;
+	--app-topbar-height: 3rem;
 	/* Pages size themselves as
 	   `calc(var(--app-content-viewport) - var(--app-bottom-padding))` — a
 	   leftover from when the card carried my-2. It now has only mb-2, so add
@@ -135,7 +175,49 @@
 	   status hues below (pass, fail, warning, info) and one accent for links, focus and the
 	   active place in the app. Text pairs clear WCAG AA (4.5:1) on card and background. */
 	--radius: 0.625rem;
-	--color-cream-100: oklch(0.98 0 0);
+	/* The dark brand panel of the sign-in and landing pages (same in both themes, darker in dark). */
+	--brand-panel: oklch(0.2 0.035 272);
+	--brand-ink: oklch(0.96 0.01 272);
+	--brand-muted: oklch(0.82 0.03 272);
+	--brand-faint: oklch(0.74 0.03 272);
+	--brand-glow: oklch(0.55 0.18 272);
+	--brand-tick: oklch(0.8 0.12 160);
+	/* Primitives and status tokens (ui-review-2 colour proposal). Status ink sits on its own
+	   soft background or on the card; fills, dots and bars use the base hue. */
+	--neutral-50: oklch(0.985 0.002 264);
+	--neutral-100: oklch(0.967 0.004 264);
+	--neutral-200: oklch(0.93 0.005 264);
+	--neutral-300: oklch(0.885 0.006 264);
+	--neutral-400: oklch(0.64 0.012 264);
+	--neutral-500: oklch(0.52 0.014 264);
+	--neutral-600: oklch(0.47 0.016 264);
+	--neutral-700: oklch(0.37 0.014 264);
+	--neutral-800: oklch(0.27 0.012 264);
+	--neutral-900: oklch(0.2 0.012 264);
+	--primary-hover: oklch(0.45 0.17 272);
+	--primary-active: oklch(0.4 0.16 272);
+	--primary-soft: oklch(0.95 0.025 272);
+	--on-primary: oklch(0.99 0 0);
+	--success: oklch(0.63 0.11 175);
+	--success-ink: oklch(0.47 0.095 175);
+	--success-soft: oklch(0.96 0.03 175);
+	--warning: oklch(0.66 0.15 60);
+	--warning-ink: oklch(0.5 0.12 60);
+	--warning-soft: oklch(0.965 0.035 75);
+	--danger: oklch(0.56 0.2 27);
+	--danger-ink: oklch(0.48 0.17 27);
+	--danger-soft: oklch(0.96 0.025 20);
+	--info: oklch(0.62 0.11 240);
+	--info-ink: oklch(0.47 0.11 245);
+	--info-soft: oklch(0.96 0.02 240);
+	--unmeasured: oklch(0.52 0.014 264);
+	--focus: oklch(0.5 0.17 272);
+	--chart-1: #0072b2;
+	--chart-2: #b87400;
+	--chart-3: #b8578f;
+	--chart-4: #3d8fc2;
+	--chart-5: #008a64;
+	--chart-6: #6b6f78;
 	/* Page panel: a soft grey so white cards lift off it. The frame (sidebar, top bar) is one
 	   step darker. */
 	--background: oklch(0.982 0.002 264);
@@ -149,13 +231,13 @@
 	--secondary: oklch(0.955 0.004 264);
 	--secondary-foreground: oklch(0.25 0.012 264);
 	--muted: oklch(0.962 0.004 264);
-	--muted-foreground: oklch(0.49 0.016 264);
+	--muted-foreground: var(--neutral-600);
 	--accent: oklch(0.948 0.006 264);
 	--accent-foreground: oklch(0.2 0.012 264);
 	--destructive: oklch(0.56 0.2 27);
-	--border: oklch(0.92 0.004 264);
-	--input: oklch(0.885 0.006 264);
-	--ring: oklch(0.6 0.15 272);
+	--border: var(--neutral-300);
+	--input: var(--neutral-400);
+	--ring: var(--focus);
 	/* Elevation: one hairline plus a soft drop, never a glow. */
 	--shadow-card: 0 1px 2px oklch(0.2 0.02 264 / 0.04), 0 1px 3px oklch(0.2 0.02 264 / 0.03);
 	--shadow-hover: 0 4px 14px -4px oklch(0.2 0.02 264 / 0.1), 0 2px 4px oklch(0.2 0.02 264 / 0.04);
@@ -179,13 +261,13 @@
 	/* Icon ink on a --chart-success fill: white on the darker light-theme teal. */
 	--chart-success-on: oklch(1 0 0);
 	--chart-error-ink: oklch(0.48 0.16 27);
-	--chart-warning-ink: oklch(0.5 0.12 62);
+	--chart-warning-ink: var(--warning-ink);
 	--chart-info-ink: oklch(0.47 0.11 245);
-	--chart-seq-1: oklch(0.38 0.085 205);
-	--chart-seq-2: oklch(0.48 0.115 200);
-	--chart-seq-3: oklch(0.6 0.115 190);
-	--chart-seq-4: oklch(0.72 0.095 186);
-	--chart-seq-5: oklch(0.86 0.055 184);
+	--chart-seq-1: oklch(0.38 0.085 220);
+	--chart-seq-2: oklch(0.48 0.115 220);
+	--chart-seq-3: oklch(0.6 0.115 220);
+	--chart-seq-4: oklch(0.72 0.095 220);
+	--chart-seq-5: oklch(0.86 0.055 220);
 	--chart-token-input: oklch(0.48 0.115 200);
 	--chart-token-output: oklch(0.68 0.1 188);
 	--chart-token-cached: oklch(0.86 0.055 184);
@@ -213,7 +295,41 @@
 
 .dark {
 	color-scheme: dark;
-	--color-ink-900: oklch(0.141 0.005 285.823);
+	--brand-panel: oklch(0.17 0.03 272);
+	--neutral-50: oklch(0.155 0.006 264);
+	--neutral-100: oklch(0.19 0.007 264);
+	--neutral-200: oklch(0.235 0.008 264);
+	--neutral-300: oklch(0.3 0.009 264);
+	--neutral-400: oklch(0.5 0.012 264);
+	--neutral-500: oklch(0.62 0.014 264);
+	--neutral-600: oklch(0.74 0.014 264);
+	--neutral-700: oklch(0.84 0.008 264);
+	--neutral-800: oklch(0.91 0.005 264);
+	--neutral-900: oklch(0.955 0.004 264);
+	--primary-hover: oklch(0.82 0.1 275);
+	--primary-active: oklch(0.72 0.12 275);
+	--primary-soft: oklch(0.27 0.05 275);
+	--on-primary: oklch(0.17 0.03 275);
+	--success: oklch(0.72 0.115 175);
+	--success-ink: oklch(0.84 0.1 175);
+	--success-soft: oklch(0.26 0.04 175);
+	--warning: oklch(0.8 0.13 65);
+	--warning-ink: oklch(0.86 0.11 65);
+	--warning-soft: oklch(0.27 0.04 65);
+	--danger: oklch(0.66 0.19 25);
+	--danger-ink: oklch(0.82 0.12 27);
+	--danger-soft: oklch(0.27 0.05 25);
+	--info: oklch(0.72 0.1 240);
+	--info-ink: oklch(0.84 0.08 240);
+	--info-soft: oklch(0.26 0.04 240);
+	--unmeasured: oklch(0.62 0.014 264);
+	--focus: oklch(0.77 0.115 275);
+	--chart-1: #56a8e0;
+	--chart-2: #f0b43c;
+	--chart-3: #e0a0c4;
+	--chart-4: #8fd0f5;
+	--chart-5: #3cc49c;
+	--chart-6: #a3a7b0;
 	--background: oklch(0.155 0.006 264);
 	--foreground: oklch(0.955 0.004 264);
 	--card: oklch(0.19 0.007 264);
@@ -225,13 +341,13 @@
 	--secondary: oklch(0.235 0.008 264);
 	--secondary-foreground: oklch(0.955 0.004 264);
 	--muted: oklch(0.215 0.008 264);
-	--muted-foreground: oklch(0.72 0.014 264);
+	--muted-foreground: var(--neutral-600);
 	--accent: oklch(0.245 0.009 264);
 	--accent-foreground: oklch(0.97 0.003 264);
 	--destructive: oklch(0.66 0.19 25);
-	--border: oklch(1 0 0 / 8.5%);
-	--input: oklch(1 0 0 / 13%);
-	--ring: oklch(0.72 0.12 275);
+	--border: var(--neutral-300);
+	--input: var(--neutral-400);
+	--ring: var(--focus);
 	--shadow-card: 0 1px 2px oklch(0 0 0 / 0.4), 0 0 0 1px oklch(1 0 0 / 0.02);
 	--shadow-hover: 0 6px 18px -6px oklch(0 0 0 / 0.55), 0 2px 4px oklch(0 0 0 / 0.3);
 	--shadow-pop: 0 12px 32px -8px oklch(0 0 0 / 0.6), 0 2px 8px oklch(0 0 0 / 0.35);
@@ -246,13 +362,13 @@
 	/* Dark ink on the bright dark-theme teal: white falls below 3:1 there (6-B-06). */
 	--chart-success-on: oklch(0.2 0.03 182);
 	--chart-error-ink: oklch(0.82 0.12 27);
-	--chart-warning-ink: oklch(0.86 0.11 62);
+	--chart-warning-ink: var(--warning-ink);
 	--chart-info-ink: oklch(0.84 0.08 240);
-	--chart-seq-1: oklch(0.9 0.05 184);
-	--chart-seq-2: oklch(0.8 0.085 186);
-	--chart-seq-3: oklch(0.68 0.11 190);
-	--chart-seq-4: oklch(0.56 0.11 198);
-	--chart-seq-5: oklch(0.44 0.09 205);
+	--chart-seq-1: oklch(0.9 0.05 220);
+	--chart-seq-2: oklch(0.8 0.085 220);
+	--chart-seq-3: oklch(0.68 0.11 220);
+	--chart-seq-4: oklch(0.56 0.11 220);
+	--chart-seq-5: oklch(0.44 0.09 220);
 	--chart-token-input: oklch(0.8 0.085 186);
 	--chart-token-output: oklch(0.62 0.11 194);
 	--chart-token-cached: oklch(0.44 0.09 205);
@@ -280,7 +396,11 @@
 
 @layer base {
 	* {
-		@apply border-border outline-none;
+		@apply border-border;
+	}
+	/* No outline on mouse or touch focus; keyboard focus keeps the ring below. */
+	:where(*):focus:not(:focus-visible) {
+		outline: none;
 	}
 	html {
 		-webkit-text-size-adjust: 100%;
@@ -310,9 +430,28 @@
 	}
 	/* One visible focus treatment for anything focusable that has not styled its own. */
 	:where(a, button, [role="button"], [tabindex]:not([tabindex="-1"]), summary):focus-visible {
-		outline: 2px solid color-mix(in oklch, var(--ring) 80%, transparent);
+		outline: 2px solid var(--focus);
 		outline-offset: 2px;
 		border-radius: 6px;
+	}
+	/* Native checkboxes, radios, selects and text fields get the same ring; fields that draw their
+	   own focus-visible ring class keep it, and the outline sits just outside. */
+	:where(input, select, textarea):focus-visible {
+		outline: 2px solid var(--focus);
+		outline-offset: 2px;
+	}
+	/* Paragraphs avoid a single straggler word; short headings balance their lines. */
+	p {
+		text-wrap: pretty;
+	}
+	h1,
+	h2,
+	h3 {
+		text-wrap: balance;
+	}
+	/* Links inside running text are underlined; standalone action links are not. */
+	:where(p, li, dd) a:where(:not([data-slot])) {
+		text-decoration-line: underline;
 	}
 	/* Interactive surfaces ease their colour changes. Zero specificity: any utility wins. */
 	:where(a, button, [role="button"], summary, input, select, textarea) {
@@ -344,15 +483,7 @@
    gets it without per-page edits.
    --------------------------------------------------------------------------------------------- */
 
-/* Page title: one size and weight on every screen. Unlayered so it wins over the per-page
-   utility classes, which all ask for the same thing in a smaller size. */
-[data-bench-main] h1 {
-	font-size: 1.75rem;
-	line-height: 2.25rem;
-	font-weight: 650;
-	letter-spacing: -0.025em;
-	text-wrap: balance;
-}
+/* Page title size and weight are set once in components/shell/pageHeader.tsx. */
 [data-bench-main] h2 {
 	letter-spacing: -0.012em;
 }
@@ -448,18 +579,86 @@
 	*,
 	*::before,
 	*::after {
-		animation-duration: 0.01ms !important;
-		animation-iteration-count: 1 !important;
-		transition-duration: 0.01ms !important;
 		scroll-behavior: auto !important;
+	}
+	/* Looping and entrance animations stop; short colour transitions stay, because they are
+	   state feedback, and components opt out with motion-reduce: where needed. */
+	.animate-ping,
+	.animate-pulse,
+	.animate-in,
+	[data-motion="decor"] {
+		animation: none !important;
 	}
 }
 
-/* Small screens: page titles step down so they never wrap into three lines. */
-@media (max-width: 40rem) {
-	[data-bench-main] h1 {
-		font-size: 1.5rem;
-		line-height: 2rem;
+/* Density scale. Pages pick one with PageDensity (components/shell/pageDensity.tsx); the
+   shared controls read these tokens. */
+:root,
+[data-density="default"] {
+	--row-h: 40px;
+	--control-h: 32px;
+	--card-pad: 16px;
+	--gap: 8px;
+	--section-gap: 24px;
+	--font-body: 14px;
+	--font-meta: 12px;
+	--page-px: 32px;
+	--header-h: 48px;
+}
+[data-density="compact"] {
+	--row-h: 32px;
+	--control-h: 28px;
+	--card-pad: 12px;
+	--gap: 4px;
+	--section-gap: 16px;
+	--font-body: 13px;
+	--font-meta: 12px;
+	--page-px: 24px;
+}
+[data-density="comfortable"] {
+	--row-h: 48px;
+	--control-h: 40px;
+	--card-pad: 24px;
+	--gap: 12px;
+	--section-gap: 32px;
+	--font-body: 15px;
+	--font-meta: 13px;
+	--page-px: 40px;
+}
+
+/* Tab strips and wide tables that scroll sideways fade at the edge that has more content
+   (useScrollEdges sets the data attributes). */
+[data-overflow-start="true"]:not([data-overflow-end="true"]) {
+	mask-image: linear-gradient(to right, transparent, black 24px);
+}
+[data-overflow-end="true"]:not([data-overflow-start="true"]) {
+	mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+}
+[data-overflow-start="true"][data-overflow-end="true"] {
+	mask-image: linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent);
+}
+
+/* Print: content only, no frame, no buttons, no inner scroll box. */
+@media print {
+	[data-testid="bench-sidebar"],
+	[data-testid="bench-header"],
+	[data-shell-sidebar],
+	header[data-shell],
+	[role="tablist"],
+	button {
+		display: none !important;
+	}
+	[data-bench-content] {
+		overflow: visible !important;
+		height: auto !important;
+	}
+	body {
+		background: white;
+		color: black;
+	}
+	[data-bench-content] p a[href^="http"]::after {
+		content: " (" attr(href) ")";
+		font-size: 0.8em;
 	}
 }
 
