@@ -230,7 +230,7 @@ func (acc *rowAcc) addCost(e schemas.LeaderboardEntry) {
 	if unknown > 0 {
 		acc.costKnown = false
 		if acc.costNote == "" && e.Model != "" {
-			acc.costNote = "no price for model " + e.Model + ", or its usage was not recorded: set a price on its key in Models & keys"
+			acc.costNote = "no price for model " + e.Model + ", or its usage was not recorded: set a price on its key in Settings > Model keys"
 		} else if acc.costNote == "" {
 			acc.costNote = "usage or price not recorded"
 		}

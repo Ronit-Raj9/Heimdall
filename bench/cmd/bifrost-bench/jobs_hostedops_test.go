@@ -285,7 +285,7 @@ func TestHostedCanaryBaselineKind(t *testing.T) {
 }
 
 func TestHostedCanaryNoBaselineMessage(t *testing.T) {
-	if got := noBaselineMessage("zz"); got != "Drift monitor zz has no baseline yet: press Record baseline on Scheduled checks > Drift checks first." {
+	if got := noBaselineMessage("zz"); got != "Drift monitor zz has no baseline yet: press Record baseline on Checks > Drift monitors first." {
 		t.Fatalf("message %q", got)
 	}
 }

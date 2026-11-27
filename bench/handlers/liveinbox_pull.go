@@ -178,7 +178,7 @@ func OrgJudgeKey(ctx context.Context, s Services, judgeURL, keyEnv string) (stri
 		return "", fmt.Errorf("judge.url: %w", err)
 	}
 	if s.Keys == nil || s.OrgID == "" {
-		return "", errors.New("no key store on this server: add a provider key in Models & keys")
+		return "", errors.New("no key store on this server: add a provider key in Settings > Model keys")
 	}
 	ju, _ := url.Parse(judgeURL)
 	keys, err := s.Keys.List(ctx, s.OrgID, keystore.KindProvider)
@@ -215,7 +215,7 @@ func OrgJudgeKey(ctx context.Context, s Services, judgeURL, keyEnv string) (stri
 	}); v != "" {
 		return v, nil
 	}
-	return "", fmt.Errorf("no provider key of this org for the judge at %s: add one in Models & keys (label it %s or give it that base URL)", ju.Hostname(), keyEnv)
+	return "", fmt.Errorf("no provider key of this org for the judge at %s: add one in Settings > Model keys (label it %s or give it that base URL)", ju.Hostname(), keyEnv)
 }
 
 // PullStep is one thing to do before a pull works.

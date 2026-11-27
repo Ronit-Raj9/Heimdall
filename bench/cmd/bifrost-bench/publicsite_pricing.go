@@ -11,7 +11,7 @@ import (
 var featureWords = map[billing.Feature]string{
 	billing.FeaturePrivateBenchmarks: "Your own private benchmarks",
 	billing.FeatureCI:                "Pull request gate in CI",
-	billing.FeatureAlerts:            "Scheduled checks with alerts and webhooks",
+	billing.FeatureAlerts:            "Checks with alerts and webhooks",
 	billing.FeatureOwnWorker:         "Support for running on your own worker",
 	billing.FeatureInvoice:           "Pay by invoice",
 }

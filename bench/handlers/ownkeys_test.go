@@ -31,7 +31,7 @@ func TestModelKeyRefusal(t *testing.T) {
 		t.Fatalf("usable openai key refused: %v", err)
 	}
 	err := ModelKeyRefusal(ctx, ks, "org_a", []string{"openai", "anthropic"}, nil, true)
-	if !errors.Is(err, ErrModelKeyMissing) || !strings.Contains(err.Error(), "no working anthropic key") || !strings.Contains(err.Error(), "Models & keys") {
+	if !errors.Is(err, ErrModelKeyMissing) || !strings.Contains(err.Error(), "no working anthropic key") || !strings.Contains(err.Error(), "Settings > Model keys") {
 		t.Fatalf("missing anthropic key: %v", err)
 	}
 	if err := ModelKeyRefusal(ctx, ks, "org_a", []string{"anthropic"}, nil, false); err != nil {

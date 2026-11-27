@@ -94,7 +94,7 @@ var ErrKeyStoreUnavailable = errors.New("model key store unavailable")
 type missingKeyError struct{ provider string }
 
 func (e *missingKeyError) Error() string {
-	return fmt.Sprintf("this organization has no working %s key: add one on Models & keys, then start again (runs use only the organization's own model keys)", e.provider)
+	return fmt.Sprintf("this organization has no working %s key: add one in Settings > Model keys, then start again (runs use only the organization's own model keys)", e.provider)
 }
 func (e *missingKeyError) Unwrap() error { return ErrModelKeyMissing }
 

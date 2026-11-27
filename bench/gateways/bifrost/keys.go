@@ -277,7 +277,7 @@ func (g *Gateway) runProvider(rc *schemas.RunContext) (ProviderSetup, string, er
 		// fault proxy answers from the scripted model (a practice run, no
 		// paid traffic) may use the shared slots.
 		if org, bound := g.boundOrg(rc); bound && !noModelSpend(rc) {
-			return ProviderSetup{}, "", fmt.Errorf("%w: organization %s has no usable %s key on this runner; add a working %s key on Models & keys", ErrNoOrgKey, org, name, name)
+			return ProviderSetup{}, "", fmt.Errorf("%w: organization %s has no usable %s key on this runner; add a working %s key in Settings > Model keys", ErrNoOrgKey, org, name, name)
 		}
 		p, ok = g.provider(name)
 	}

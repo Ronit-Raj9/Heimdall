@@ -41,7 +41,7 @@ func TestOrgProviderBinding(t *testing.T) {
 	}
 	// X01: a bound experiment never falls back to the runner's own slots.
 	g.BindExperimentOrg("exp_3", "org_nokeys")
-	if _, _, err := g.runProvider(rc("exp_3", "anthropic")); !errors.Is(err, ErrNoOrgKey) || !strings.Contains(err.Error(), "Models & keys") {
+	if _, _, err := g.runProvider(rc("exp_3", "anthropic")); !errors.Is(err, ErrNoOrgKey) || !strings.Contains(err.Error(), "Settings > Model keys") {
 		t.Fatalf("bound run with no org key: %v, want ErrNoOrgKey", err)
 	}
 	practice := rc("exp_3", "anthropic")

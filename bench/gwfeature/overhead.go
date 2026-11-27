@@ -17,7 +17,7 @@ import (
 // not, and the test costs nothing.
 
 func init() {
-	Register(Feature{ID: schemas.GatewayFeatureOverhead, Name: "Gateway time per plugin", Draft: draftOverhead,
+	Register(Feature{ID: schemas.GatewayFeatureOverhead, Name: "Time each plugin adds", Draft: draftOverhead,
 		Compute: func(_ context.Context, in Input) Effect { return ComputeOverhead(in.Runs, in.Test.Options) }})
 }
 

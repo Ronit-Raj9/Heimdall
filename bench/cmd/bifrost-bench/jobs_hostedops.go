@@ -899,7 +899,7 @@ func runHostedCanaryRun(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.L
 
 // noBaselineMessage is the error of a look at a canary with no baseline.
 func noBaselineMessage(name string) string {
-	return "Drift monitor " + name + " has no baseline yet: press Record baseline on Scheduled checks > Drift checks first."
+	return "Drift monitor " + name + " has no baseline yet: press Record baseline on Checks > Drift monitors first."
 }
 
 // runHostedCanary runs one hosted look, or records a baseline when
