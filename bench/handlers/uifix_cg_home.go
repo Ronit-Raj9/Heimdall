@@ -55,13 +55,20 @@ func init() {
 // sub calls one GET route of this router with the caller's request and
 // decodes its body into out. false when it did not answer 200.
 func (h *homeHandler) sub(ctx *fasthttp.RequestCtx, uri string, out any) bool {
+	return subGet(h.r, ctx, uri, out)
+}
+
+// subGet calls one GET route of r in process with the caller's request
+// (headers, credentials and user values, so the same organization and role
+// checks apply) and decodes a 200 body into out.
+func subGet(r *router.Router, ctx *fasthttp.RequestCtx, uri string, out any) bool {
 	var s fasthttp.RequestCtx
 	ctx.Request.CopyTo(&s.Request)
 	s.Request.Header.SetMethod(fasthttp.MethodGet)
 	s.Request.SetRequestURI(uri)
 	s.Request.SetBody(nil)
 	ctx.VisitUserValuesAll(func(k, v any) { s.SetUserValue(k, v) })
-	h.r.Handler(&s)
+	r.Handler(&s)
 	if s.Response.StatusCode() != fasthttp.StatusOK {
 		return false
 	}
@@ -112,6 +119,6 @@ func (h *homeHandler) get(ctx *fasthttp.RequestCtx) {
 
 func init() {
 	APIRoutes = append(APIRoutes, RouteDoc{Method: "GET", Path: HomeSummaryPath, Tag: "home",
-		Summary: "The Home tiles in one call: counts of agents, benchmarks, comparisons and evaluations, the 5 newest evaluations (light) and comparisons, how many evaluations are queued or running, and this UTC month's spend as GET /usage sums it; a part whose route fails is left out",
+		Summary:  "The Home tiles in one call: counts of agents, benchmarks, comparisons and evaluations, the 5 newest evaluations (light) and comparisons, how many evaluations are queued or running, and this UTC month's spend as GET /usage sums it; a part whose route fails is left out",
 		Response: HomeSummary{}})
 }

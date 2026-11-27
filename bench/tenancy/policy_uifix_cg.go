@@ -5,3 +5,7 @@ package tenancy
 func init() {
 	OrgPolicy[key("GET", api+"/home/summary")] = org(viewer)
 }
+
+func init() {
+	OrgPolicy[key("GET", api+"/evaluations/{id}/card")] = org(viewer)
+}
