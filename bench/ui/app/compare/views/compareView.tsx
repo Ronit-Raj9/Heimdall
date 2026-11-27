@@ -411,7 +411,7 @@ export function ArmProvenance({ provenance, note, arm }: { provenance: RunProven
 	return (
 		<span
 			className={cn(
-				"rounded-sm border px-1 text-[10px] font-medium",
+				"rounded-sm border px-1 text-[11px] font-medium",
 				warn ? "border-chart-warning/60 text-chart-warning-ink" : "text-muted-foreground",
 			)}
 			data-testid={`runs-pair-provenance-${arm}`}

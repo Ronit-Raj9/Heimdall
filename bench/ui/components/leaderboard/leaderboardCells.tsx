@@ -72,7 +72,7 @@ export function AgentCell({
 				{entry.synthetic && (
 					<Badge
 						variant="warning"
-						className="px-1 py-0 text-[10px] tracking-wide uppercase"
+						className="px-1 py-0 text-[11px] tracking-wide uppercase"
 						title={t("leaderboard.cell.syntheticHint")}
 						data-testid={`leaderboard-synthetic-${entry.rank}`}
 					>

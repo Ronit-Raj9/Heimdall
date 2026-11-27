@@ -53,7 +53,7 @@ function EvidenceIds({ ids }: { ids: string[] | undefined }) {
 			{ids.map((id) => (
 				<li
 					key={id}
-					className="bg-muted/60 max-w-full rounded-sm border px-1.5 py-0.5 font-mono text-[10px] break-all"
+					className="bg-muted/60 max-w-full rounded-sm border px-1.5 py-0.5 font-mono text-[11px] break-all"
 					data-testid="receipt-evidence-id"
 				>
 					{id}

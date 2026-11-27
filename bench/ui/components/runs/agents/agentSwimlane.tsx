@@ -256,7 +256,7 @@ export function AgentSwimlane({ spans, members, wallMs, busyMs, criticalMs, hand
 							)}
 							<div className="grid grid-cols-[minmax(8rem,11rem)_1fr] gap-3 px-3 pt-1" aria-hidden="true">
 								<span />
-								<div className="text-muted-foreground relative h-4 font-mono text-[10px] tabular-nums">
+								<div className="text-muted-foreground relative h-4 font-mono text-[11px] tabular-nums">
 									{TICKS.map((tick) => (
 										<span
 											key={tick}

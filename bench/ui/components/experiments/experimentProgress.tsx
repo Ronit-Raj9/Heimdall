@@ -46,7 +46,7 @@ export function ExperimentProgressCard({ status: given, capUsd, onNew }: Experim
 					<h2 className="truncate text-lg font-semibold tracking-tight" title={status.name || status.exp_id}>
 						{humanExperimentName(status, { check: t("progress.checkName"), untitled: t("progress.untitled") })}
 					</h2>
-					<span className="text-muted-foreground/70 truncate font-mono text-[10px]" title={status.exp_id}>
+					<span className="text-muted-foreground/70 truncate font-mono text-[11px]" title={status.exp_id}>
 						{status.exp_id}
 					</span>
 				</div>

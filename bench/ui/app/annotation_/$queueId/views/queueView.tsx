@@ -320,7 +320,7 @@ export function Labeller({ queue }: { queue: AnnotationQueue }) {
 						<Button onClick={() => submit("correct")} disabled={labelState.isLoading} data-testid="annotation-correct">
 							<Check className="size-4" aria-hidden="true" />
 							{choices.correct}
-							<kbd className="ml-1 rounded border px-1 text-[10px] opacity-70">1</kbd>
+							<kbd className="ml-1 rounded border px-1 text-[11px] opacity-70">1</kbd>
 						</Button>
 						<Button
 							variant="outline"
@@ -330,11 +330,11 @@ export function Labeller({ queue }: { queue: AnnotationQueue }) {
 						>
 							<X className="size-4" aria-hidden="true" />
 							{choices.incorrect}
-							<kbd className="ml-1 rounded border px-1 text-[10px] opacity-70">2</kbd>
+							<kbd className="ml-1 rounded border px-1 text-[11px] opacity-70">2</kbd>
 						</Button>
 						<Button variant="ghost" onClick={skip} disabled={nextState.isLoading} data-testid="annotation-skip">
 							{t("label.next")}
-							<kbd className="ml-1 rounded border px-1 text-[10px] opacity-70">J</kbd>
+							<kbd className="ml-1 rounded border px-1 text-[11px] opacity-70">J</kbd>
 						</Button>
 					</div>
 					{noOther && (

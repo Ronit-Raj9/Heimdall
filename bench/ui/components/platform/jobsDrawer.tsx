@@ -183,7 +183,7 @@ export function JobsIndicator() {
 				<span className="hidden sm:inline">{t("jobs.indicator")}</span>
 				{running > 0 && (
 					<span
-						className="bg-primary text-primary-foreground flex h-4 min-w-4 items-center justify-center rounded-full px-1 font-mono text-[10px] leading-none font-semibold tabular-nums"
+						className="bg-primary text-primary-foreground flex h-4 min-w-4 items-center justify-center rounded-full px-1 font-mono text-[11px] leading-none font-semibold tabular-nums"
 						data-testid="jobs-indicator-count"
 					>
 						{running}
@@ -273,7 +273,7 @@ function DrawerSection({
 		<section className="flex flex-col gap-1" data-testid={testId}>
 			<h3 className="text-muted-foreground flex items-center gap-2 px-3 text-[11px] font-medium tracking-[0.06em] uppercase">
 				{title}
-				<span className="bg-muted text-muted-foreground rounded-full px-1.5 font-mono text-[10px] tabular-nums">{count}</span>
+				<span className="bg-muted text-muted-foreground rounded-full px-1.5 font-mono text-[11px] tabular-nums">{count}</span>
 			</h3>
 			{count === 0 ? <p className="text-muted-foreground px-3 py-2 text-sm">{empty}</p> : <ul className="flex flex-col">{children}</ul>}
 		</section>

@@ -285,7 +285,7 @@ function RunButton({
 			)}
 		>
 			<span className="font-semibold">{arm}</span>
-			{cell?.outcome && <OutcomeBadge outcome={cell.outcome} testId={`receipts-run-${runId}-outcome`} className="px-1 py-0 text-[10px]" />}
+			{cell?.outcome && <OutcomeBadge outcome={cell.outcome} testId={`receipts-run-${runId}-outcome`} className="px-1 py-0 text-[11px]" />}
 		</button>
 	);
 }

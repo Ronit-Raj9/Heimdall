@@ -82,7 +82,7 @@ export function BlamePanel({ blame, arm }: { blame: Blame; arm: string }) {
 						{t("runs.agents.blame.failed")}
 					</ToneBadge>
 				)}
-				<span className="text-muted-foreground ml-auto font-mono text-[10px]">
+				<span className="text-muted-foreground ml-auto font-mono text-[11px]">
 					{t("runs.agents.blame.version", { version: clipText(blame.version, 16) })}
 				</span>
 			</header>

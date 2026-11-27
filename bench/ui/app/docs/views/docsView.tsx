@@ -302,7 +302,7 @@ function DocList({
 						data-testid={`docs-item-${d.name}`}
 					>
 						{d.name === START_DOC && (
-							<span className="bg-primary/10 text-primary shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold">{startLabel}</span>
+							<span className="bg-primary/10 text-primary shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-semibold">{startLabel}</span>
 						)}
 						<span className="flex min-w-0 flex-col">
 							<span className="truncate">{d.title}</span>

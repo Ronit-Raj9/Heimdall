@@ -474,7 +474,7 @@ function TraceRow({
 						<Chip testId={`trace-row-${arm}-${step.seq}-cost`}>{t("cost", { value: usage.usd.toFixed(4) })}</Chip>
 					)}
 					<span
-						className="text-muted-foreground rounded-full border px-1.5 text-[10px] leading-4"
+						className="text-muted-foreground rounded-full border px-1.5 text-[11px] leading-4"
 						title={tb(`runs.steps.proofHint.${step.proof}`, { defaultValue: tb("runs.steps.proof", { level: step.proof }) })}
 						data-testid={`trace-row-${arm}-${step.seq}-proof`}
 					>
