@@ -56,7 +56,8 @@ export function AgentCell({
 }) {
 	const { t } = useTranslation("bench");
 	return (
-		<div className="flex min-w-48 flex-col gap-0.5" data-testid={`leaderboard-agent-${entry.rank}`}>
+		// M4-107: name, then model and version under it, narrow enough for a phone column.
+		<div className="flex min-w-0 flex-col gap-0.5 sm:min-w-48" data-testid={`leaderboard-agent-${entry.rank}`}>
 			<div className="flex items-center gap-1.5">
 				<EntityLink kind="agent" id={entry.agent} className="font-sans font-medium" />
 				{entry.synthetic && (
@@ -70,8 +71,8 @@ export function AgentCell({
 					</Badge>
 				)}
 			</div>
-			<span className="text-muted-foreground font-mono text-xs">{entry.model}</span>
-			<div className="text-muted-foreground flex items-center gap-2 text-xs">
+			<span className="text-muted-foreground font-mono text-xs break-all">{entry.model}</span>
+			<div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
 				{entry.label && <span className="max-w-56 truncate">{entry.label}</span>}
 				<CopyId
 					value={entry.config_hash}

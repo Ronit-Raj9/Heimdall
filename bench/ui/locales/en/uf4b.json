@@ -1,0 +1,57 @@
+{
+	"leaderboard": {
+		"noMatch": "No agent matches these filters.",
+		"clearFilters": "Clear filters"
+	},
+	"compare": {
+		"setupsLegend": "Setups shown: {{shown}} of {{total}}",
+		"showAll": "Show all {{count}}",
+		"showFirst": "Show the first {{count}}",
+		"maxSetups": "Up to {{count}} setups show at once.",
+		"practiceNote": "Practice runs: no model was called. These check the benchmark's grader, not an agent.",
+		"oneSide": "Only setup {{arm}} has a graded run of this task, so there is nothing to compare it with.",
+		"otherRun": "Compare with another run of this task"
+	},
+	"diff": {
+		"showEmpty_one": "Show {{count}} row with no data",
+		"showEmpty_other": "Show {{count}} rows with no data",
+		"hideEmpty_one": "Hide {{count}} row with no data",
+		"hideEmpty_other": "Hide {{count}} rows with no data"
+	},
+	"list": {
+		"agent": "Agent",
+		"model": "Model",
+		"cost": "Cost",
+		"runsMobile": "{{done}} of {{total}} runs",
+		"notPriced": "Not priced",
+		"notPricedHint": "No price is set for this model. Add one in Settings, API keys, price per 1M tokens.",
+		"compareVersions": "Compare two versions",
+		"useCommandLine": "Use the command line",
+		"changedResults": "Changed results ({{count}})"
+	},
+	"home": {
+		"counts": "{{solved}} done, {{failed}} failed, {{running}} running"
+	},
+	"form": {
+		"versionsHint": "Comparing two versions of one agent?",
+		"versionsLink": "Use Evaluate, Is my new version better.",
+		"openCreated": "Open the created comparison (not started)",
+		"mobileBar_one": "{{count}} setup, up to {{runs}} runs",
+		"mobileBar_other": "{{count}} setups, up to {{runs}} runs",
+		"mobileCap": "cap ${{usd}}"
+	},
+	"refs": {
+		"trials": "Trials must be a whole number from {{min}} to {{max}}.",
+		"budget": "Set a budget above $0."
+	},
+	"models": {
+		"needBudget": "Set a budget: a comparison never runs without a spending cap."
+	},
+	"metrics": {
+		"sources": "Where the numbers come from: {{list}}"
+	},
+	"observer": {
+		"observerStartFailed": "The {{name}} could not start (container error).",
+		"details": "Details"
+	}
+}

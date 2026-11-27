@@ -4,6 +4,8 @@ import "@/app/experiments_/$expId/views/fw11I18n";
 import { readWriteToken, saveWriteToken } from "@/components/experiments/experiments.utils";
 import { useSession, usesWriteToken } from "@/lib/session/sessionContext";
 import { PlanResult, planBlocksStart } from "@/components/experiments/planResult";
+import { PaidButton } from "@/components/ui/paidButton";
+import { useLeaveGuard } from "@/lib/hooks/useLeaveGuard";
 import { PlanEstimate } from "@/components/experiments/planEstimate";
 import { LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
@@ -34,6 +36,11 @@ import {
 import { catalogProbeFor, probeLayerLabel } from "@/components/receipts/receipts.utils";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import { Link } from "@tanstack/react-router";
+import "@/app/leaderboard/views/uf4bI18n";
+
+/** Agent config keys a catalog agent always has (CatalogAgent): offered on the override path. */
+export const OVERRIDE_KEYS = ["model", "adapter", "parser"] as const;
 import {
 	conditionsFor,
 	experimentFormSchema,
@@ -113,11 +120,15 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 	// Hosted mode has no token box: the session cookie and its CSRF header authorise the writes.
 	const tokenBox = usesWriteToken(useSession());
 	const [planned, setPlanned] = useState<Planned | null>(null);
-	const [actionError, setActionError] = useState<{ title: string; error: unknown } | null>(null);
+	const [actionError, setActionError] = useState<{ title: string; error: unknown; createdId?: string } | null>(null);
+	const { t: tu } = useTranslation("uf4b");
 	// benchApi attaches the write token saved below to every mutation.
 	const [plan, planState] = usePlanExperimentMutation();
 	const [create, createState] = useCreateExperimentMutation();
 	const [start, startState] = useStartExperimentMutation();
+	// M4-88: leaving with changes asks first; a started comparison has nothing left to lose.
+	const [started, setStarted] = useState(false);
+	useLeaveGuard(formState.isDirty && !started);
 
 	const stale = planned !== null && planIsStale(planned.experiment, values, ready);
 	// N43: after a Plan press, every field still to fix is named next to the button.
@@ -152,6 +163,8 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 
 	const onPlan = handleSubmit(async (formValues) => {
 		if (needsToken || readyBlock) return;
+		// M4-94: the token is saved on a submit (Plan), never on every keystroke; benchApi then sends it with each write.
+		if (tokenBox) saveWriteToken(token);
 		const experiment = toExperiment(formValues, ready);
 		setActionError(null);
 		setPlanned(null);
@@ -173,15 +186,17 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 			setActionError({ title: t("experiments.new.actions.createError"), error });
 			return;
 		}
+		// The plan is spent: a second experiment needs a new plan, so one click never creates two.
+		setPlanned(null);
 		try {
 			await start(expId).unwrap();
 		} catch (error) {
-			setActionError({ title: t("experiments.new.actions.startError", { id: expId }), error });
+			// M4-81: a failed start keeps the form and links to the created, not started comparison.
+			setActionError({ title: t("experiments.new.actions.startError", { id: expId }), error, createdId: expId });
+			return;
 		}
-		// Created is frozen either way, so show its status; a failed start shows as "created".
-		// The plan is spent: a second experiment needs a new plan, so one click never creates two.
+		setStarted(true);
 		onStarted(expId, planned.experiment.budget.total_usd);
-		setPlanned(null);
 	};
 
 	// The base agent menu lists what My agents shows (the org's own, then built-in); a chosen agent stays listed.
@@ -322,17 +337,26 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 							<div className="grid gap-3">
 								<Field label={t("experiments.new.fields.overridePath")} error={formState.errors.overridePath} name="overridePath">
 									{(id, describedBy) => (
-										<Input
-											id={id}
-											aria-describedby={describedBy}
-											aria-invalid={Boolean(formState.errors.overridePath)}
-											placeholder={t("experiments.new.fields.overridePathPlaceholder")}
-											className="font-mono"
-											autoComplete="off"
-											spellCheck={false}
-											data-testid="experiment-override-path-input"
-											{...register("overridePath")}
-										/>
+										<>
+											<Input
+												id={id}
+												aria-describedby={describedBy}
+												aria-invalid={Boolean(formState.errors.overridePath)}
+												placeholder={t("experiments.new.fields.overridePathPlaceholder")}
+												className="font-mono"
+												autoComplete="off"
+												spellCheck={false}
+												list={`${id}-keys`}
+												data-testid="experiment-override-path-input"
+												{...register("overridePath")}
+											/>
+											{/* M4-87: the config keys the catalog knows as suggestions; any other dotted path still types in. */}
+											<datalist id={`${id}-keys`} data-testid="experiment-override-path-keys">
+												{OVERRIDE_KEYS.map((k) => (
+													<option key={k} value={k} />
+												))}
+											</datalist>
+										</>
 									)}
 								</Field>
 								<Field label={t("experiments.new.fields.overrideValue")} error={formState.errors.overrideValue} name="overrideValue">
@@ -513,10 +537,7 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 										aria-describedby={describedBy}
 										placeholder={t("experiments.new.fields.tokenPlaceholder")}
 										value={token}
-										onChange={(e) => {
-											setToken(e.target.value);
-											saveWriteToken(e.target.value);
-										}}
+										onChange={(e) => setToken(e.target.value)}
 										data-testid="experiment-write-token-input"
 									/>
 								)}
@@ -533,16 +554,18 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 							>
 								{t("experiments.new.actions.plan")}
 							</Button>
-							<Button
-								type="button"
+							{/* M1-51: the start spends money, so it names the cap and asks first. */}
+							<PaidButton
 								size="sm"
+								verb={t("experiments.new.actions.createAndStart")}
+								capUsd={planned ? planned.experiment.budget.total_usd : null}
+								estimateRuns={planned?.plan.slots}
+								confirm="always"
 								disabled={blockReason !== null || busy}
 								isLoading={busy}
-								onClick={() => void onCreateAndStart()}
-								dataTestId="experiment-create-start-button"
-							>
-								{t("experiments.new.actions.createAndStart")}
-							</Button>
+								onConfirm={onCreateAndStart}
+								testId="experiment-create-start-button"
+							/>
 						</div>
 						<PlanInvalidAlert fields={invalid} onFocus={focusField} />
 						{blockReason && (
@@ -565,6 +588,16 @@ export function ExperimentForm({ catalog, defaults, ready, readyPending, agentGr
 								);
 							})()}
 						{actionError && <LoadError title={actionError.title} error={actionError.error} testId="experiment-action-error" />}
+						{actionError?.createdId && (
+							<Link
+								to="/experiments/$expId"
+								params={{ expId: actionError.createdId }}
+								className="text-primary text-sm hover:underline"
+								data-testid="experiment-created-link"
+							>
+								{tu("form.openCreated")}
+							</Link>
+						)}
 						{planned && <PlanResult plan={planned.plan} estimateShown className={cn(stale && "opacity-60")} />}
 						{planned && <PlanEstimate experiment={planned.experiment} className={cn(stale && "opacity-60")} />}
 					</CardContent>

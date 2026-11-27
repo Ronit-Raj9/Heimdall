@@ -2,7 +2,9 @@ import { outcomeTone } from "@/components/runs/runs.utils";
 import type { Outcome, Run, Value } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, CircleDashed, XCircle } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import "@/app/leaderboard/views/uf4bI18n";
 
 /** One arm in the side-by-side diff. */
 export interface DiffLane {
@@ -38,6 +40,11 @@ export function formatDiffValue(field: DiffField, v: number | null): string {
 	}
 }
 
+/** True when no setup has a value other than zero for the row: the row carries no data (M4-58). */
+export function rowEmpty(values: readonly (number | null)[]): boolean {
+	return values.every((v) => v === null || v === 0);
+}
+
 /** True when the cells of a row are not all the same. */
 export function rowDiffers(cells: readonly (string | number | null)[]): boolean {
 	return cells.some((c) => c !== cells[0]);
@@ -50,6 +57,10 @@ export function rowDiffers(cells: readonly (string | number | null)[]): boolean 
  */
 export function RunDiff({ lanes }: { lanes: readonly DiffLane[] }) {
 	const { t } = useTranslation("compareUx");
+	const { t: tu } = useTranslation("uf4b");
+	const [showEmpty, setShowEmpty] = useState(false);
+	const numeric = NUMERIC.map((row) => ({ ...row, values: lanes.map((l) => knownNumber(l.metrics[row.metric])) }));
+	const emptyCount = numeric.filter((row) => rowEmpty(row.values)).length;
 	const outcomes = lanes.map((l) => l.run.outcome);
 	const outputs = lanes.map((l) => l.run.claim?.text?.trim() ?? "");
 	const cols = {
@@ -57,12 +68,12 @@ export function RunDiff({ lanes }: { lanes: readonly DiffLane[] }) {
 	};
 
 	return (
-		<section className="flex flex-col gap-3" data-testid="compare-diff">
+		<section className="flex min-w-0 flex-col gap-3" data-testid="compare-diff">
 			<div className="flex flex-col gap-0.5">
 				<h2 className="text-foreground text-base font-semibold tracking-tight">{t("diff.title")}</h2>
 				<p className="text-muted-foreground text-sm">{t("diff.subtitle")}</p>
 			</div>
-			<div className="bg-card overflow-x-auto rounded-xl border">
+			<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
 				<div className="min-w-fit text-sm" role="table" aria-label={t("diff.title")}>
 					<div className="bg-muted/40 sticky top-0 grid border-b" style={cols} role="row">
 						<div className="text-muted-foreground px-4 py-2.5 text-xs font-medium" role="columnheader">
@@ -83,8 +94,8 @@ export function RunDiff({ lanes }: { lanes: readonly DiffLane[] }) {
 						))}
 					</DiffRow>
 
-					{NUMERIC.map(({ field, metric }) => {
-						const values = lanes.map((l) => knownNumber(l.metrics[metric]));
+					{numeric.map(({ field, values }) => {
+						if (!showEmpty && rowEmpty(values)) return null;
 						const max = Math.max(0, ...values.map((v) => v ?? 0));
 						return (
 							<DiffRow key={field} label={t(`diff.${field}`)} differs={rowDiffers(values)} cols={cols} testId={`compare-diff-${field}`}>
@@ -127,6 +138,16 @@ export function RunDiff({ lanes }: { lanes: readonly DiffLane[] }) {
 					</DiffRow>
 				</div>
 			</div>
+			{emptyCount > 0 && (
+				<button
+					type="button"
+					className="text-primary self-start text-sm hover:underline"
+					onClick={() => setShowEmpty((v) => !v)}
+					data-testid="compare-diff-empty-toggle"
+				>
+					{showEmpty ? tu("diff.hideEmpty", { count: emptyCount }) : tu("diff.showEmpty", { count: emptyCount })}
+				</button>
+			)}
 		</section>
 	);
 }
@@ -149,15 +170,19 @@ function DiffRow({
 	const { t } = useTranslation("compareUx");
 	return (
 		<div
-			className={cn("hover:bg-muted/30 grid transition-colors", !last && "border-b", differs && "bg-chart-warning/10 hover:bg-chart-warning/15")}
+			className={cn(
+				"hover:bg-muted/30 grid transition-colors",
+				!last && "border-b",
+				differs && "bg-chart-warning/10 hover:bg-chart-warning/15",
+			)}
 			style={cols}
 			role="row"
 			data-testid={testId}
 			data-differs={differs}
 		>
-			<div className={cn("flex flex-col gap-1 border-l-2 px-4 py-3", differs ? "border-chart-warning" : "border-transparent")} role="rowheader">
+			<div className="flex flex-col gap-1 px-4 py-3" role="rowheader">
 				<span className="text-muted-foreground text-xs font-medium">{label}</span>
-				{differs && <span className="text-chart-warning-ink text-[10px] font-medium uppercase tracking-wide">{t("diff.differs")}</span>}
+				{differs && <span className="text-chart-warning-ink text-xs font-medium">{t("diff.differs")}</span>}
 			</div>
 			{children}
 		</div>

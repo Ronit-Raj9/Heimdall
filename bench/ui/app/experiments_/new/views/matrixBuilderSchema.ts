@@ -201,12 +201,12 @@ export function agentFromLinkMissing(agentParam: string | null | undefined, show
 }
 
 /**
- * Builder defaults: the benchmark with the most ready tasks (defaultRunnableSuite), the agent ?agent= names (else the first listed agent), its own
+ * Builder defaults: no benchmark (M4-91, the person picks one), the agent ?agent= names (else the first listed agent), its own
  * model on a provider the org has a key for plus one empty row to fill in (a matrix needs two arms),
  * 5 tasks x 1 trial, clean only.
  */
 export function defaultBuilderValues(catalog: Catalog, seed: number, opts: BuilderDefaultsOptions = {}): BuilderValues {
-	const suite = defaultRunnableSuite(catalog, opts.ready);
+	// M4-91: no benchmark is picked for the person; the select says "Pick a benchmark".
 	const agent = startAgent(catalog, opts);
 	const keyed = opts.providersWithKey ?? [];
 	const models: ModelRef[] = [];
@@ -214,11 +214,11 @@ export function defaultBuilderValues(catalog: Catalog, seed: number, opts: Build
 	models.push({ provider: models[0]?.provider ?? keyed[0] ?? "openai", model: "" });
 	return {
 		name: `compare-${seed}`,
-		suite: suite ? suiteRef(suite) : "",
+		suite: "",
 		agents: agent ? [agent.path] : [],
 		models,
 		taskScope: "first",
-		taskCount: Math.min(5, Math.max(1, suite ? readyIds(suite, opts.ready).length : 5)),
+		taskCount: 5,
 		trials: 1,
 		adaptive: false,
 		adaptiveMin: 1,

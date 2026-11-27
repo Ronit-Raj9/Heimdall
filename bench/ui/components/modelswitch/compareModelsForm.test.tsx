@@ -66,6 +66,9 @@ describe("compare models form", () => {
 		expect(compareModelsProblem({ ...base, benchmarks: [] })).toBe("needBenchmark");
 		expect(compareModelsProblem({ ...base, models: base.models.slice(0, 1) })).toBe("needModels");
 		expect(compareModelsProblem({ ...base, models: [base.models[0], base.models[0]] })).toBe("duplicate");
+		// M4-82: empty rows never count as models.
+		expect(compareModelsProblem({ ...base, models: [base.models[0], { provider: "", model: "" }] })).toBe("needModels");
+		expect(compareModelsSpec({ ...base, models: [...base.models, { provider: "", model: " " }] }).arms).toHaveLength(2);
 	});
 
 	it("lists only the benchmarks the agent can run and blocks launch until one is picked", () => {

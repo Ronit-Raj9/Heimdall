@@ -29,7 +29,7 @@
 	"simulatedCustomerHint": "A model played the customer ({{simulator}}). Ranked on its own, never mixed with scripted customers.",
 	"noVersion": "version not recorded",
 	"noVersionHint": "This run was not started from an evaluation, so its agent version was not recorded.",
-	"noScore": "not run",
+	"noScore": "not measured",
 	"range": "95% range {{low}} to {{high}}, {{runs}} runs over {{tasks}} tasks",
 	"openReportCard": "Open the report card for {{agent}}",
 	"capability": {
@@ -63,5 +63,13 @@
 		"crash": "Crashed",
 		"budget": "Ran out of budget",
 		"refusal": "Refused the task"
-	}
+	},
+	"notMeasuredHint": "No run of this agent used this capability's benchmarks, so it has no score.",
+	"tooFew": "Too few runs ({{runs}})",
+	"rankAllHint": "Place by the All score: the share solved over every capability with enough runs",
+	"tieHint": "Its 95% range overlaps the row above, so the two are not clearly apart",
+	"best": "Best",
+	"scoreHeader": "{{capability}} (solved)",
+	"scoreHint": "Share of runs solved on this capability's benchmarks: higher is better",
+	"perRun": "{{cost}} per run"
 }

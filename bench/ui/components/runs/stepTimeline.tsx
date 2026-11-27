@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { AlertTriangle, CircleCheck, Eye, EyeOff, Megaphone } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "@/app/leaderboard/views/uf4bI18n";
 import {
 	CORROBORATION_TONE,
 	EXECUTION_TONE,
@@ -295,7 +296,11 @@ function StepRow({ step, arm, model = false, depth = 0 }: { step: StepRecord; ar
 					</ToneBadge>
 				)}
 				{step.corroboration && <CorroborationBadge value={step.corroboration} testId={`step-row-${arm}-${step.seq}-corroboration`} />}
-				<ToneBadge tone={PROOF_TONE[step.proof] ?? "neutral"} hint={t(`runs.steps.proofHint.${step.proof}`, { defaultValue: "" }) || undefined} testId={`step-row-${arm}-${step.seq}-proof`}>
+				<ToneBadge
+					tone={PROOF_TONE[step.proof] ?? "neutral"}
+					hint={t(`runs.steps.proofHint.${step.proof}`, { defaultValue: "" }) || undefined}
+					testId={`step-row-${arm}-${step.seq}-proof`}
+				>
 					{t("runs.steps.proof", { level: t(`runs.steps.proofLevel.${step.proof}`, { defaultValue: clipText(step.proof, 20) }) })}
 				</ToneBadge>
 				{step.kind === "tool_request" && step.execution && (
@@ -415,13 +420,46 @@ export function ObserverStatusLine({ observers, arm, locale }: { observers: read
 						<span>{t("runs.steps.observers.pids", { seen: status.pids_seen ?? 0, allocated: status.pids_allocated })}</span>
 					) : null}
 					{status.reason && (
-						<span className={status.state === "missing" ? "text-chart-error-ink" : undefined}>
-							{t("runs.steps.observers.reason")} <span>{clipText(status.reason, 160)}</span>
-						</span>
+						<ObserverReason
+							reason={status.reason}
+							name={t(`runs.steps.observers.name.${status.observer}`, { defaultValue: clipText(status.observer, 40) })}
+						/>
 					)}
 				</li>
 			))}
 		</ul>
+	);
+}
+
+/** Known observer failure reasons as plain words (M4-56); the raw text stays behind Details. Null for an unknown reason. */
+export function observerReasonKey(reason: string): "observerStartFailed" | null {
+	return /observer exited before it was ready/i.test(reason) ? "observerStartFailed" : null;
+}
+
+/**
+ * Why an observer is off or missing: a known reason in plain words, muted (a watcher that could
+ * not start does not fail the run), with the raw text, often a container error, in a Details
+ * disclosure. The reason is agent-influenced text: clipped, never a translation key.
+ */
+function ObserverReason({ reason, name }: { reason: string; name: string }) {
+	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("uf4b");
+	const key = observerReasonKey(reason);
+	if (!key) {
+		return (
+			<span>
+				{t("runs.steps.observers.reason")} <span>{clipText(reason, 160)}</span>
+			</span>
+		);
+	}
+	return (
+		<span className="inline-flex flex-wrap items-baseline gap-x-2">
+			<span>{tu(`observer.${key}`, { name })}</span>
+			<details className="inline">
+				<summary className="text-primary cursor-pointer">{tu("observer.details")}</summary>
+				<span className="font-mono break-all">{clipText(reason, 400)}</span>
+			</details>
+		</span>
 	);
 }
 

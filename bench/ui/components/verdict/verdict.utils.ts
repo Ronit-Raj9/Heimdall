@@ -286,3 +286,7 @@ export function guardTasks(detail: string | undefined): string | null {
 	const m = /\bon (.+?) where arm\b/.exec(detail ?? "");
 	return m ? m[1] : null;
 }
+/** The tone of a verdict decision word as sent by the server; a word this UI does not know is neutral. */
+export function decisionTone(decision: string | undefined): Tone {
+	return decision && decision in DECISION_TONE ? DECISION_TONE[decision as Decision] : "neutral";
+}

@@ -41,7 +41,18 @@ export interface BlameReplayResult {
 	replays: BlameReplayItem[];
 }
 
-/** The compare-refs params, or null while a required field is missing or the refs match. */
+/** Trials allowed per task in a compare-refs run. */
+export const REF_TRIALS_MIN = 1;
+export const REF_TRIALS_MAX = 50;
+
+/** What is wrong with the numbers of a compare-refs form (M4-93): trials out of range or no budget; null when fine. */
+export function compareRefsProblem(f: { trials: number; budget: number }): "trials" | "budget" | null {
+	if (!Number.isInteger(f.trials) || f.trials < REF_TRIALS_MIN || f.trials > REF_TRIALS_MAX) return "trials";
+	if (!(f.budget > 0)) return "budget";
+	return null;
+}
+
+/** The compare-refs params, or null while a required field is missing, a number is out of range, or the refs match. */
 export function compareRefsParams(f: {
 	agent: string;
 	suite: string;
@@ -55,12 +66,14 @@ export function compareRefsParams(f: {
 	const refA = f.refA.trim();
 	const refB = f.refB.trim();
 	if (!f.agent || !f.suite.trim() || !refA || !refB || refA === refB) return null;
+	// Trials are never clamped silently and a budget of 0 is never sent as "no cap".
+	if (compareRefsProblem(f)) return null;
 	const p: CompareRefsJobParams = {
 		agent: f.agent,
 		suite: f.suite.trim(),
 		ref_a: refA,
 		ref_b: refB,
-		trials: Math.max(1, Math.floor(f.trials) || 1),
+		trials: f.trials,
 	};
 	if (f.repo) p.repo = f.repo;
 	const tasks = [
@@ -72,6 +85,6 @@ export function compareRefsParams(f: {
 		),
 	];
 	if (tasks.length) p.tasks = tasks;
-	if (f.budget > 0) p.budget_usd = f.budget;
+	p.budget_usd = f.budget;
 	return p;
 }

@@ -8,6 +8,8 @@ import { describe, expect, it, vi } from "vitest";
 import { CatalogEmptyLinks } from "./catalogEmptyLinks";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+// The list page asks how many results changed (M4-97).
+vi.mock("@/lib/store/apis/validityApi", () => ({ useGetValidityQuery: () => ({ data: { entries: [], unseen: 0, stale: [] } }) }));
 vi.mock("@/app/experiments/views/experimentBoard", () => ({ ExperimentBoard: () => <div data-testid="experiment-list" /> }));
 
 describe("create links", () => {

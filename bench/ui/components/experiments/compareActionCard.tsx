@@ -3,9 +3,10 @@ import { ChevronDown, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export interface ActionCardProps {
-	icon: LucideIcon;
+	/** Kept for callers; the card no longer draws an icon tile (X-34). */
+	icon?: LucideIcon;
 	title: string;
-	/** One line; clamped. */
+	/** Shown in full, never clamped. */
 	description: string;
 	/** Shown at the right of the header instead of the open/hide toggle (for one-click actions). */
 	action?: React.ReactNode;
@@ -19,22 +20,17 @@ export interface ActionCardProps {
 }
 
 /**
- * A compact action card (lane U20): an icon, a title, one line and one button. The form or the
+ * A compact action card (lane U20): a title, a short description and one button. The form or the
  * results sit in a native disclosure panel, so they stay in the DOM (and in server renders) but
  * out of sight until opened.
  */
-export function ActionCard({ icon: Icon, title, description, action, status, children, defaultOpen, testId, className }: ActionCardProps) {
+export function ActionCard({ title, description, action, status, children, defaultOpen, testId, className }: ActionCardProps) {
 	const { t } = useTranslation("compareUx");
 	const head = (
 		<>
-			<span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg" aria-hidden="true">
-				<Icon className="size-4.5" />
-			</span>
 			<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 				<span className="text-foreground text-sm font-semibold">{title}</span>
-				<span className="text-muted-foreground line-clamp-1 text-xs" title={description}>
-					{description}
-				</span>
+				<span className="text-muted-foreground text-xs">{description}</span>
 				{status}
 			</span>
 		</>
@@ -43,7 +39,7 @@ export function ActionCard({ icon: Icon, title, description, action, status, chi
 
 	if (!children) {
 		return (
-			<div className={cn(shell, "flex items-center gap-3 p-4")} data-testid={testId}>
+			<div className={cn(shell, "flex flex-col items-start gap-3 p-4 sm:flex-row sm:items-center")} data-testid={testId}>
 				{head}
 				{action && <span className="shrink-0">{action}</span>}
 			</div>

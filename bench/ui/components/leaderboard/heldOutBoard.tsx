@@ -56,9 +56,14 @@ export function HeldOutBoardToggle({
  * the suites API shows: held-out tasks are listed redacted without it. So the toggle shows when some
  * suite has held-out tasks and none of them is redacted.
  */
-export function heldOutBoardOffered(suites: readonly Pick<SuiteSummary, "held_out_count" | "tasks">[]): boolean {
+export function heldOutBoardOffered(
+	suites: readonly (Pick<SuiteSummary, "held_out_count"> & { tasks?: SuiteSummary["tasks"]; redacted_tasks?: number })[],
+): boolean {
 	const withHeldOut = suites.filter((suite) => (suite.held_out_count ?? 0) > 0);
-	return withHeldOut.length > 0 && withHeldOut.every((suite) => suite.tasks.every((task) => !task.redacted));
+	// M4-34: the light list carries no tasks but counts the redacted ones (G3); the full list is read task by task.
+	const noneRedacted = (suite: (typeof suites)[number]) =>
+		typeof suite.redacted_tasks === "number" ? suite.redacted_tasks === 0 : (suite.tasks ?? []).every((task) => !task.redacted);
+	return withHeldOut.length > 0 && withHeldOut.every(noneRedacted);
 }
 
 /** An RTK Query error that is a 404 from the server. */

@@ -6,18 +6,34 @@
 		"stale": "A check this comparison used has been updated since it ran. Re-score it to see whether the result changes."
 	},
 	"page": {
-		"heading": "Changed results",
+		"heading": "Results affected by grader changes",
 		"comparison": "Comparison",
 		"rescoredOn": "Re-scored on",
 		"was": "Was",
 		"isNow": "Is now",
 		"why": "Why",
-		"empty": "No result has changed after a re-score.",
-		"scan": "Check which results a check update could change",
+		"empty": "No comparison was graded by a check that has changed since.",
+		"scan": "Scan for affected comparisons",
 		"scanStarted": "The check has started. Come back in a minute.",
 		"couldChange": "Could change if re-scored",
 		"noneStale": "No comparison uses a check that was updated since it ran.",
-		"updatedChecks": "Updated checks: {{gates}}"
+		"updatedChecks": "Updated checks: {{gates}}",
+		"intro": "When a grading check is fixed, old results can change. This page lists those comparisons.",
+		"changedHeading": "Changed after a re-score",
+		"scanning": "Scanning...",
+		"seeJobs": "See Jobs",
+		"scanHelp": "No model calls.",
+		"lastScan": "Last scan: {{date}}.",
+		"scanFailed": "The scan could not run.",
+		"scanDone": "Scan finished. The lists are up to date.",
+		"loadError": "Could not load the changed results.",
+		"wasIsNow": "Was, is now",
+		"became": "became",
+		"new": "New"
 	},
-	"jobs": { "kinds": { "validity.scan": "Check which results a check update could change" } }
+	"jobs": {
+		"kinds": {
+			"validity.scan": "Scan for affected comparisons"
+		}
+	}
 }

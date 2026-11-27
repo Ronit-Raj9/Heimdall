@@ -10,7 +10,7 @@ import { MatrixBuilder, estimateWithOneRetry } from "./matrixBuilder";
 import { defaultBuilderValues } from "./matrixBuilderSchema";
 
 vi.mock("@/components/models/modelPicker", async () => await import("@/lib/testing/modelPickerStub"));
-vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+vi.mock("@tanstack/react-router", async () => ({ ...(await import("@/lib/testing/routerMock")).routerMock, useBlocker: () => undefined }));
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	usePlanExperimentMutation: () => mutation(),

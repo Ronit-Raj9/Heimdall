@@ -11,7 +11,7 @@ import { dateSeed, defaultFormValues } from "./experimentFormSchema";
 const GATE =
 	"plan e_x: arm A: skills: skill zz-good in agents/zz-test-loop/skills changed after its scan: open the agent's Tools tab and press Scan";
 
-vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+vi.mock("@tanstack/react-router", async () => ({ ...(await import("@/lib/testing/routerMock")).routerMock, useBlocker: () => undefined }));
 vi.mock("@/lib/store/apis/agentopsApi", () => ({ useScanAgentSkillMutation: () => mutation() }));
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),

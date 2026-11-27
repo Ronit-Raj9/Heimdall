@@ -6,7 +6,8 @@ import type { ExperimentStatus, LiveEvent } from "@/lib/types/bench";
 import "@/lib/types/homeI18n";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { Activity, ArrowRight, CircleAlert } from "lucide-react";
+import { ArrowRight, CircleAlert } from "lucide-react";
+import "@/app/leaderboard/views/uf4bI18n";
 import { useTranslation } from "react-i18next";
 import { LiveDot, TrackBadge } from "./homeBits";
 import { humanExperimentName, slotShares } from "./home.utils";
@@ -46,15 +47,9 @@ export function RunningExperiments({
 	const { t } = useTranslation("home");
 	if (experiments.length === 0) {
 		return (
-			<div
-				className="text-muted-foreground flex items-center gap-3 rounded-xl border border-dashed px-5 py-4 text-sm"
-				data-testid="home-running-empty"
-			>
-				<span className="bg-muted flex size-8 items-center justify-center rounded-full">
-					<Activity className="size-4" aria-hidden="true" />
-				</span>
+			<p className="text-muted-foreground text-sm" data-testid="home-running-empty">
 				{t("running.empty")}
-			</div>
+			</p>
 		);
 	}
 	return (
@@ -88,6 +83,7 @@ export function RunningCardBody({
 }) {
 	const { t } = useTranslation("home");
 	const { t: tb } = useTranslation("bench");
+	const { t: tu } = useTranslation("uf4b");
 	const locale = getLocale();
 	const { total, done, running, failed } = status.slots;
 	const shares = slotShares(status.slots);
@@ -139,6 +135,10 @@ export function RunningCardBody({
 						{t("running.progress", { done: sealed, total })}
 					</span>
 				</div>
+				{/* M4-116: the bar's colours in words too. */}
+				<span className="text-muted-foreground text-xs tabular-nums" data-testid={`home-running-counts-${status.exp_id}`}>
+					{tu("home.counts", { solved: done, failed, running })}
+				</span>
 				<div
 					className="bg-chart-track flex h-2 w-full overflow-hidden rounded-full"
 					role="progressbar"

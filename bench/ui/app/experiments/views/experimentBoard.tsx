@@ -16,15 +16,17 @@ import { formatRelative, formatWhen } from "@/components/platform/platform.utils
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { EntityLink } from "@/components/shell/entityLink";
-import { FilterSelect, FilterTokens, ToolbarSearch, type FilterToken } from "@/components/ui/toolbar";
+import { FilterSelect, FilterTokens, ShowTestsChip, ToolbarSearch, type FilterToken } from "@/components/ui/toolbar";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { Pager, pageSlice } from "@/components/ui/pager";
+import { StatusPill } from "@/components/ui/statusPill";
 import { ValueCell } from "@/components/valueCell";
+import { isTestObject, withoutTests } from "@/lib/testObjects";
 import { getLocale } from "@/lib/i18n";
-import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import type { ExperimentState, ExperimentStatus } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import {
 	Brain,
-	Check,
 	Code2,
 	Cpu,
 	FlaskConical,
@@ -38,10 +40,12 @@ import {
 	SquareTerminal,
 	Users,
 	Wrench,
-	X,
 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { parseAsString, useQueryStates } from "nuqs";
 import { useMemo } from "react";
+import "@/app/leaderboard/views/uf4bI18n";
+import { useListExperimentsWithStatsQuery } from "./experimentListApi";
 import { useTranslation } from "react-i18next";
 
 const SUITE_ICONS: readonly [RegExp, LucideIcon][] = [
@@ -67,12 +71,13 @@ export function suiteIcon(suite: string | undefined): LucideIcon {
 
 type Tone = "green" | "red" | "amber" | "blue" | "grey";
 
-const TONE: Record<Tone, string> = {
-	green: "bg-chart-success/10 text-chart-success-ink",
-	red: "bg-chart-error/10 text-chart-error-ink",
-	amber: "bg-chart-warning/10 text-chart-warning-ink",
-	blue: "bg-primary/10 text-primary",
-	grey: "bg-muted text-muted-foreground",
+// M4-76: verdict pills use the shared Badge tones; status pills are the shared StatusPill.
+const BADGE_TONE: Record<Tone, BadgeTone> = {
+	green: "success",
+	red: "danger",
+	amber: "warning",
+	blue: "info",
+	grey: "neutral",
 };
 
 /** Verdict words and color for a decision. Unknown values read as pending. Pure. */
@@ -99,14 +104,8 @@ export function verdictTone(decision: string | undefined): {
 	}
 }
 
-const STATE_TONE: Record<ExperimentState, Tone> = {
-	running: "blue",
-	analyzing: "blue",
-	created: "grey",
-	done: "green",
-	failed: "red",
-	cancelled: "grey",
-};
+/** The Result filter choices, in reading order. */
+const RESULT_KEYS = ["improved", "regressed", "inconclusive", "invalid", "leader", "score", "pending"] as const;
 
 /**
  * Status choices. Each covers one or more experiment states; the URL keeps the first one as
@@ -123,6 +122,23 @@ const STATUSES: readonly {
 	{ key: "created", states: ["created"] },
 ];
 
+/** "agent model vs agent model" from the setups, else the arm ids; empty when neither is known (M4-67). */
+export function setupsLine(e: Pick<ExperimentStatus, "setups" | "arms">): string {
+	if (e.setups && e.setups.length > 0) return e.setups.map((s) => [s.agent, s.model].filter(Boolean).join(" ")).join(" vs ");
+	return e.arms && e.arms.length > 0 ? e.arms.join(" vs ") : "";
+}
+
+/** True when the row matches the Agent, Model and Result filters; an empty filter matches all. Pure. */
+export function setupMatches(
+	e: Pick<ExperimentStatus, "setups" | "decision">,
+	f: { agent?: string | null; model?: string | null; result?: string | null },
+): boolean {
+	if (f.agent && !(e.setups ?? []).some((s) => s.agent === f.agent)) return false;
+	if (f.model && !(e.setups ?? []).some((s) => s.model === f.model)) return false;
+	if (f.result && verdictTone(e.decision).key !== f.result) return false;
+	return true;
+}
+
 /** True when an experiment state matches a ?state= value: a status choice's states, else that exact state. Pure. */
 export function stateMatches(state: string, filter: string | null | undefined): boolean {
 	if (!filter) return true;
@@ -130,47 +146,22 @@ export function stateMatches(state: string, filter: string | null | undefined): 
 	return choice ? choice.states.includes(state as ExperimentState) : state === filter;
 }
 
-function Pill({ tone, children, testId }: { tone: Tone; children: React.ReactNode; testId?: string }) {
-	return (
-		<span
-			className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap", TONE[tone])}
-			data-testid={testId}
-		>
-			{children}
-		</span>
-	);
-}
-
-function StatePill({ state, testId }: { state: ExperimentState; testId?: string }) {
-	const { t } = useTranslation("experimentsUx");
-	const live = state === "running" || state === "analyzing";
-	return (
-		<Pill tone={STATE_TONE[state] ?? "grey"} testId={testId}>
-			{live ? (
-				<span className="relative flex size-2" aria-hidden="true">
-					<span className="bg-primary absolute inline-flex size-full animate-ping rounded-full opacity-60" />
-					<span className="bg-primary relative inline-flex size-2 rounded-full" />
-				</span>
-			) : state === "done" ? (
-				<Check className="size-3" aria-hidden="true" />
-			) : state === "failed" ? (
-				<X className="size-3" aria-hidden="true" />
-			) : (
-				<span className="size-1.5 rounded-full bg-current opacity-60" aria-hidden="true" />
-			)}
-			{t(`status.${state}`, { defaultValue: state })}
-		</Pill>
-	);
-}
-
 function VerdictPill({ decision, testId }: { decision: string | undefined; testId?: string }) {
 	const { t } = useTranslation("experimentsUx");
 	const v = verdictTone(decision);
 	if (v.key === "pending") return <span className="text-muted-foreground text-xs">{t("verdict.pending")}</span>;
+	// M4-66: no winner is not an alert: plain muted text, pills only for a result to act on.
+	if (v.key === "inconclusive") {
+		return (
+			<span className="text-muted-foreground text-sm" data-testid={testId}>
+				{t("verdict.inconclusive")}
+			</span>
+		);
+	}
 	return (
-		<Pill tone={v.tone} testId={testId}>
+		<Badge tone={BADGE_TONE[v.tone]} data-testid={testId}>
 			{t(`verdict.${v.key}`)}
-		</Pill>
+		</Badge>
 	);
 }
 
@@ -190,13 +181,17 @@ function KindPill({ kind, testId }: { kind: ExperimentKind; testId?: string }) {
 
 function RunsProgress({ e }: { e: ExperimentStatus }) {
 	const { t } = useTranslation("experimentsUx");
+	const { t: tu } = useTranslation("uf4b");
 	const done = e.slots.done + e.slots.failed;
 	const total = e.slots.total;
 	const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
 	return (
 		<span className="flex min-w-24 flex-col items-end gap-1" aria-label={t("runsAria", { done, total })}>
-			<span className="text-xs tabular-nums">{t("runs", { done, total })}</span>
-			<span className="bg-muted h-1 w-full overflow-hidden rounded-full">
+			<span className="text-xs tabular-nums">
+				<span className="md:hidden">{tu("list.runsMobile", { done, total })}</span>
+				<span className="hidden md:inline">{t("runs", { done, total })}</span>
+			</span>
+			<span className="bg-muted hidden h-1 w-full overflow-hidden rounded-full sm:block">
 				<span
 					className={cn("block h-full rounded-full", e.slots.failed > 0 ? "bg-chart-warning" : "bg-primary")}
 					style={{ width: `${pct}%` }}
@@ -210,13 +205,30 @@ function RunsProgress({ e }: { e: ExperimentStatus }) {
 export function ExperimentBoard() {
 	const { t } = useTranslation("experimentsUx");
 	const { t: tb } = useTranslation("bench");
+	const { t: tu } = useTranslation("uf4b");
 	const locale = getLocale();
-	const list = useListExperimentsQuery();
+	// G3: ?arm_stats=1 adds per-setup numbers; a server without it answers the old list.
+	const list = useListExperimentsWithStatsQuery();
 	const [filters, setFilters] = useQueryStates(
-		{ q: parseAsString, state: parseAsString, suite: parseAsString, all: parseAsString },
+		{
+			q: parseAsString,
+			state: parseAsString,
+			suite: parseAsString,
+			all: parseAsString,
+			agent: parseAsString,
+			model: parseAsString,
+			result: parseAsString,
+			tests: parseAsString,
+			page: parseAsString,
+		},
 		{ history: "replace", throttleMs: 200 },
 	);
-	const everything = useMemo(() => list.data?.experiments ?? [], [list.data]);
+	// M1-18: comparisons the project's own checks made ("zz-test-...") hide behind "Show test items (n)".
+	const showTests = filters.tests === "1";
+	const { shown: everything, hidden: hiddenTests } = useMemo(
+		() => withoutTests(list.data?.experiments ?? [], (e) => isTestObject(e.exp_id) || isTestObject(e.name), showTests),
+		[list.data, showTests],
+	);
 	// Automatic checks, practice runs and the single-setup benchmarks of an evaluation are not
 	// comparisons: hidden unless asked for (URL all=1), so the list matches its subtitle.
 	const showSystem = filters.all === "1";
@@ -251,33 +263,49 @@ export function ExperimentBoard() {
 	);
 	const shown = useMemo(() => {
 		// The id and typed name match in filterExperiments; the readable name and the suite match here.
-		const base = inSuite.filter((e) => stateMatches(e.state, filters.state));
+		const base = inSuite.filter(
+			(e) =>
+				stateMatches(e.state, filters.state) && setupMatches(e, { agent: filters.agent, model: filters.model, result: filters.result }),
+		);
 		return query ? base.filter(matchesQuery) : base;
-	}, [inSuite, filters.state, query, matchesQuery]);
+	}, [inSuite, filters.state, filters.agent, filters.model, filters.result, query, matchesQuery]);
 	// A search that finds only hidden rows says so, with a button that shows them (N202).
 	const hiddenMatches = useMemo(
 		() => (!query || showSystem || shown.length > 0 ? 0 : everything.filter((e) => isHiddenByDefault(e) && matchesQuery(e)).length),
 		[query, showSystem, shown.length, everything, matchesQuery],
 	);
 	const suites = useMemo(() => [...new Set(all.map((e) => e.suite).filter((s): s is string => Boolean(s)))].sort(), [all]);
-	const clear = () => void setFilters({ q: null, state: null, suite: null });
+	const agents = useMemo(() => [...new Set(all.flatMap((e) => (e.setups ?? []).map((s) => s.agent)).filter(Boolean))].sort(), [all]);
+	const models = useMemo(() => [...new Set(all.flatMap((e) => (e.setups ?? []).map((s) => s.model)).filter(Boolean))].sort(), [all]);
+	const clear = () => void setFilters({ q: null, state: null, suite: null, agent: null, model: null, result: null, page: null });
+	// M1-59: 50 rows per page; any filter change goes back to page 1.
+	const slice = pageSlice(shown, Number(filters.page) || 1);
+	const setFilter = (patch: Partial<Record<"q" | "state" | "suite" | "agent" | "model" | "result" | "all" | "tests", string | null>>) =>
+		void setFilters({ ...patch, page: null });
 	const statusKey = STATUSES.find((c) => c.states[0] === filters.state)?.key;
 	const tokens = (
 		[
 			filters.state && {
 				key: "state",
 				label: `${t("col.status")}: ${statusKey ? t(`chips.${statusKey}`) : filters.state}`,
-				onRemove: () => void setFilters({ state: null }),
+				onRemove: () => setFilter({ state: null }),
 			},
 			filters.suite && {
 				key: "suite",
 				label: `${t("chips.benchmark")}: ${suiteName(filters.suite)}`,
-				onRemove: () => void setFilters({ suite: null }),
+				onRemove: () => setFilter({ suite: null }),
+			},
+			filters.agent && { key: "agent", label: `${tu("list.agent")}: ${filters.agent}`, onRemove: () => setFilter({ agent: null }) },
+			filters.model && { key: "model", label: `${tu("list.model")}: ${filters.model}`, onRemove: () => setFilter({ model: null }) },
+			filters.result && {
+				key: "result",
+				label: `${t("col.verdict")}: ${RESULT_KEYS.includes(filters.result as never) ? t(`verdict.${filters.result as (typeof RESULT_KEYS)[number]}`) : filters.result}`,
+				onRemove: () => setFilter({ result: null }),
 			},
 		] as (FilterToken | false | "" | null | undefined)[]
 	).filter((x): x is FilterToken => Boolean(x));
 
-	if (list.isLoading) return <BlockSkeleton rows={6} testId="experiment-list-loading" />;
+	if (list.isLoading) return <BlockSkeleton rows={13} testId="experiment-list-loading" />;
 	if (list.error || !list.data) {
 		return (
 			<LoadError
@@ -290,12 +318,17 @@ export function ExperimentBoard() {
 	}
 	if (everything.length === 0) {
 		return (
-			<EmptyState
-				icon={FlaskConical}
-				message={tb("experiments.list.empty")}
-				action={{ label: tb("experiments.list.getStarted"), to: "/quickstart" }}
-				testId="experiment-list-empty"
-			/>
+			<div className="flex flex-col items-center gap-2">
+				<EmptyState
+					icon={FlaskConical}
+					message={tb("experiments.list.empty")}
+					action={{ label: tu("list.compareVersions"), to: "/evaluate?mode=versions" }}
+					testId="experiment-list-empty"
+				/>
+				<Link to="/quickstart" className="text-primary text-sm hover:underline" data-testid="experiment-list-empty-cli">
+					{tu("list.useCommandLine")}
+				</Link>
+			</div>
 		);
 	}
 
@@ -305,7 +338,7 @@ export function ExperimentBoard() {
 				<div className="flex flex-wrap items-center gap-2" role="toolbar" data-testid="experiment-toolbar">
 					<ToolbarSearch
 						value={filters.q ?? ""}
-						onChange={(v) => void setFilters({ q: v || null })}
+						onChange={(v) => setFilter({ q: v || null })}
 						placeholder={t("searchPlaceholder")}
 						label={tb("experiments.list.search")}
 						testId="experiment-search"
@@ -315,7 +348,7 @@ export function ExperimentBoard() {
 						allLabel={t("chips.all")}
 						options={STATUSES.map((c) => ({ value: c.states[0], label: `${t(`chips.${c.key}`)} (${statusCounts.get(c.key) ?? 0})` }))}
 						value={filters.state}
-						onChange={(v) => void setFilters({ state: v })}
+						onChange={(v) => setFilter({ state: v })}
 						testId="experiment-filter-status"
 					/>
 					{(suites.length > 1 || filters.suite) && (
@@ -324,23 +357,55 @@ export function ExperimentBoard() {
 							allLabel={t("chips.all")}
 							options={suites.map((s) => ({ value: s, label: suiteName(s) }))}
 							value={filters.suite}
-							onChange={(v) => void setFilters({ suite: v })}
+							onChange={(v) => setFilter({ suite: v })}
 							testId="experiment-filter-suite"
 						/>
 					)}
+					{(agents.length > 1 || filters.agent) && (
+						<FilterSelect
+							label={tu("list.agent")}
+							allLabel={t("chips.all")}
+							options={agents.map((a) => ({ value: a, label: a }))}
+							value={filters.agent}
+							onChange={(v) => setFilter({ agent: v })}
+							testId="experiment-filter-agent"
+						/>
+					)}
+					{(models.length > 1 || filters.model) && (
+						<FilterSelect
+							label={tu("list.model")}
+							allLabel={t("chips.all")}
+							options={models.map((m) => ({ value: m, label: m }))}
+							value={filters.model}
+							onChange={(v) => setFilter({ model: v })}
+							testId="experiment-filter-model"
+						/>
+					)}
+					<FilterSelect
+						label={t("col.verdict")}
+						allLabel={t("chips.all")}
+						options={RESULT_KEYS.map((k) => ({ value: k, label: t(`verdict.${k}`) }))}
+						value={filters.result}
+						onChange={(v) => setFilter({ result: v })}
+						testId="experiment-filter-result"
+					/>
 					{systemCount > 0 && (
-						<label className="text-muted-foreground ml-auto inline-flex items-center gap-2 text-xs" title={t("system.toggleHint")}>
+						<label className="text-muted-foreground ml-auto inline-flex min-h-6 items-center gap-2 text-sm" title={t("system.toggleHint")}>
+							{/* M4-75: a switch, not a 14 px checkbox. */}
 							<input
 								type="checkbox"
+								role="switch"
+								aria-checked={showSystem}
 								checked={showSystem}
-								onChange={(ev) => void setFilters({ all: ev.target.checked ? "1" : null })}
-								className="accent-primary size-3.5"
+								onChange={(ev) => setFilter({ all: ev.target.checked ? "1" : null })}
+								className="bg-muted checked:bg-primary before:bg-background relative h-5 w-9 shrink-0 cursor-pointer appearance-none rounded-full border transition-colors before:absolute before:top-0.5 before:left-0.5 before:size-3.5 before:rounded-full before:shadow-sm before:transition-transform checked:before:translate-x-4"
 								data-testid="experiment-show-system"
 							/>
 							{t("system.toggle", { count: systemCount })}
 						</label>
 					)}
 				</div>
+				<ShowTestsChip count={hiddenTests} on={showTests} onChange={(on) => setFilter({ tests: on ? "1" : null })} testId="experiment-show-tests" />
 				<FilterTokens tokens={tokens} onClear={clear} testId="experiment-tokens" />
 			</div>
 
@@ -354,7 +419,7 @@ export function ExperimentBoard() {
 					<button
 						type="button"
 						className="text-primary font-medium hover:underline"
-						onClick={() => void setFilters({ all: "1" })}
+						onClick={() => setFilter({ all: "1" })}
 						data-testid="experiment-show-hidden-matches"
 					>
 						{t("showHiddenMatches")}
@@ -383,8 +448,7 @@ export function ExperimentBoard() {
 						<span className="text-right">{t("col.when")}</span>
 					</div>
 					<ul className="divide-y" data-testid="experiment-table" aria-label={tb("experiments.list.tableLabel")}>
-						{shown.map((e) => {
-							const Icon = suiteIcon(e.suite);
+						{slice.rows.map((e) => {
 							const when = e.started_at ?? e.frozen_at;
 							const title = named.get(e.exp_id) ?? e.exp_id;
 							const kind = experimentKind(e);
@@ -395,9 +459,6 @@ export function ExperimentBoard() {
 									data-testid={`experiment-row-${e.exp_id}`}
 								>
 									<span className="flex min-w-0 items-center gap-3">
-										<span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg">
-											<Icon className="size-4" aria-hidden="true" />
-										</span>
 										<span className="flex min-w-0 flex-col">
 											<EntityLink
 												kind="experiment"
@@ -414,9 +475,8 @@ export function ExperimentBoard() {
 												) : isDebugExperiment(e) ? (
 													<span> · {t("debug.tag")}</span>
 												) : (
-													e.arms && e.arms.length > 0 && <span className="font-mono"> · {e.arms.join(" vs ")}</span>
+													setupsLine(e) && <span data-testid={`experiment-row-${e.exp_id}-setups`}> · {setupsLine(e)}</span>
 												)}
-												<span className="font-mono text-[10px] opacity-50"> · {e.exp_id}</span>
 											</span>
 										</span>
 									</span>
@@ -424,7 +484,7 @@ export function ExperimentBoard() {
 										<span>
 											{/* The results index counts only scored runs, so a debug run reads "created, 0 runs" there (N247): its kind says enough. */}
 											{!(kind === "debug" && e.state === "created") && (
-												<StatePill state={e.state} testId={`experiment-row-${e.exp_id}-state`} />
+												<StatusPill raw={e.state} testId={`experiment-row-${e.exp_id}-state`} />
 											)}
 										</span>
 										<span>
@@ -440,7 +500,21 @@ export function ExperimentBoard() {
 										</span>
 										<span className="ml-auto md:ml-0 md:flex md:justify-end">{kind !== "debug" && <RunsProgress e={e} />}</span>
 										<span className="text-right text-sm">
-											<ValueCell value={e.spent_usd} kind="usd" />
+											{e.spent_usd?.state === "observed" ? (
+												<>
+													<span className="text-muted-foreground mr-1 text-xs md:hidden">{tu("list.cost")}</span>
+													<ValueCell value={e.spent_usd} kind="usd" />
+												</>
+											) : (
+												// M4-71: an unknown cost is words with a pointer to the price list, not a hatched stripe.
+												<span
+													className="text-muted-foreground text-xs"
+													title={tu("list.notPricedHint")}
+													data-testid={`experiment-row-${e.exp_id}-not-priced`}
+												>
+													{tu("list.notPriced")}
+												</span>
+											)}
 										</span>
 										<span
 											className="text-muted-foreground text-right text-xs whitespace-nowrap tabular-nums"

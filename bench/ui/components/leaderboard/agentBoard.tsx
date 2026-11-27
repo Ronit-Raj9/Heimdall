@@ -1,4 +1,4 @@
-import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
+import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,7 +12,21 @@ import { useNavigate } from "@tanstack/react-router";
 import { parseAsString, useQueryState } from "nuqs";
 import { useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ALL, DEFAULT_MIN_RUNS, DEFAULT_MIN_TASKS, filterParam, formatShare, reportCardSearch, rowCost, rowKey } from "./agentBoard.utils";
+import {
+	ALL,
+	boardRanks,
+	DEFAULT_MIN_RUNS,
+	DEFAULT_MIN_TASKS,
+	filterParam,
+	formatCostPerRun,
+	formatShare,
+	reportCardSearch,
+	rowCost,
+	rowKey,
+	sameAgent,
+	scoreState,
+	showRange,
+} from "./agentBoard.utils";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
@@ -77,7 +91,11 @@ export function AgentBoardTab() {
 		void setModel(null);
 	};
 	const open = (row: AgentLeaderboardRow) =>
-		void navigate({ to: "/agents/$agentId", params: { agentId: row.agent }, search: reportCardSearch(row) as never });
+		void navigate({
+			to: "/agents/$agentId",
+			params: { agentId: row.agent },
+			search: reportCardSearch(row) as never,
+		});
 
 	// The filter lists come from the unfiltered columns the server reports; a URL value they lack still shows.
 	const capOptions = useMemo(() => {
@@ -103,33 +121,35 @@ export function AgentBoardTab() {
 				onReset={hasFilters ? reset : undefined}
 				disabled={board.isLoading}
 			/>
-			{board.isLoading ? (
-				<BlockSkeleton className="h-64" testId="agent-board-loading" />
-			) : board.isError || !data ? (
-				<LoadError title={t("loadError")} error={board.error} onRetry={() => void board.refetch()} testId="agent-board-error" />
-			) : (
-				<Section
-					title={t("title")}
-					description={t("description", { runs: data.min_runs ?? DEFAULT_MIN_RUNS, tasks: data.min_tasks ?? DEFAULT_MIN_TASKS })}
-					testId="agent-board-ranking"
-				>
-					{data.rows.length === 0 ? (
-						<EmptyNote testId="agent-board-empty">{hasFilters ? t("emptyFiltered") : t("empty")}</EmptyNote>
-					) : (
-						<div className={cn("bg-card min-w-0 overflow-x-auto rounded-xl border transition-opacity", board.isFetching && "opacity-60")}>
-							<AgentBoardTable
-								rows={sorted.rows}
-								head={sorted.head}
-								capabilities={data.capabilities}
-								rankBy={params.capability}
-								minRuns={data.min_runs}
-								minTasks={data.min_tasks}
-								onOpen={open}
-							/>
-						</div>
-					)}
-				</Section>
-			)}
+			{/* The tab already says "Agents": the heading is for screen readers only, and the column definitions stay visible while the board loads. */}
+			<section className="flex flex-col gap-3" data-testid="agent-board-ranking">
+				<h2 className="sr-only">{t("title")}</h2>
+				<p className="text-muted-foreground max-w-prose text-sm" data-testid="agent-board-description">
+					{t("description", {
+						runs: data?.min_runs ?? DEFAULT_MIN_RUNS,
+						tasks: data?.min_tasks ?? DEFAULT_MIN_TASKS,
+					})}
+				</p>
+				{board.isLoading ? (
+					<BlockSkeleton className="h-64" testId="agent-board-loading" />
+				) : board.isError || !data ? (
+					<LoadError title={t("loadError")} error={board.error} onRetry={() => void board.refetch()} testId="agent-board-error" />
+				) : data.rows.length === 0 ? (
+					<EmptyNote testId="agent-board-empty">{hasFilters ? t("emptyFiltered") : t("empty")}</EmptyNote>
+				) : (
+					<div className={cn("bg-card min-w-0 overflow-x-auto rounded-xl border transition-opacity", board.isFetching && "opacity-60")}>
+						<AgentBoardTable
+							rows={sorted.rows}
+							head={sorted.head}
+							capabilities={data.capabilities}
+							rankBy={params.capability}
+							minRuns={data.min_runs}
+							minTasks={data.min_tasks}
+							onOpen={open}
+						/>
+					</div>
+				)}
+			</section>
 		</section>
 	);
 }
@@ -231,7 +251,7 @@ export interface AgentBoardTableProps {
 	/** Capability columns, in display order. */
 	capabilities: readonly string[];
 	onOpen: (row: AgentLeaderboardRow) => void;
-	/** The capability rows are ranked by (the capability filter); a rank column shows only then. */
+	/** The capability rows are ranked by (the capability filter); without it rows rank by the All score. */
 	rankBy?: string;
 	minRuns?: number;
 	minTasks?: number;
@@ -247,12 +267,18 @@ export interface AgentBoardTableProps {
 export function AgentBoardTable({ rows, capabilities, onOpen, rankBy, minRuns, minTasks, head }: AgentBoardTableProps) {
 	const { t } = useTranslation("agentBoard");
 	const capLabel = useCapabilityLabel();
-	const mins = { minRuns: minRuns ?? DEFAULT_MIN_RUNS, minTasks: minTasks ?? DEFAULT_MIN_TASKS };
-	const column = (key: string, label: string, testId: string, align: "left" | "right" = "left") =>
+	const mins = {
+		minRuns: minRuns ?? DEFAULT_MIN_RUNS,
+		minTasks: minTasks ?? DEFAULT_MIN_TASKS,
+	};
+	// Every row gets a place: by the filtered capability, else by the All score.
+	const ranks = useMemo(() => boardRanks(rows, rankBy), [rows, rankBy]);
+	const modelFirst = sameAgent(rows);
+	const column = (key: string, label: string, testId: string, align: "left" | "right" = "left", className?: string, title?: string) =>
 		head ? (
-			<SortableHead key={key} label={label} align={align} testId={testId} {...head(key)} />
+			<SortableHead key={key} label={label} align={align} testId={testId} className={className} hint={title} {...head(key)} />
 		) : (
-			<TableHead key={key} className={cn(align === "right" && "text-right")} data-testid={testId}>
+			<TableHead key={key} className={cn(align === "right" && "text-right", className)} title={title} data-testid={testId}>
 				{label}
 			</TableHead>
 		);
@@ -260,97 +286,158 @@ export function AgentBoardTable({ rows, capabilities, onOpen, rankBy, minRuns, m
 		<Table data-testid="agent-board-table">
 			<TableHeader>
 				<TableRow>
-					{rankBy && <TableHead className="w-12 text-right">{t("columns.rank")}</TableHead>}
-					{column("agent", t("columns.agent"), "agent-board-col-agent")}
-					{column("version", t("columns.version"), "agent-board-col-version")}
-					{column("model", t("columns.model"), "agent-board-col-model")}
-					{capabilities.map((c) => column(scoreKey(c), capLabel(c), `agent-board-col-${c}`, "right"))}
-					{column("cost", t("columns.cost"), "agent-board-col-cost", "right")}
+					<TableHead className="w-12 text-right" title={rankBy ? undefined : t("rankAllHint")}>
+						{t("columns.rank")}
+					</TableHead>
+					{column("agent", modelFirst ? t("columns.model") : t("columns.agent"), "agent-board-col-agent")}
+					{column("version", t("columns.version"), "agent-board-col-version", "left", "hidden sm:table-cell")}
+					{!modelFirst && column("model", t("columns.model"), "agent-board-col-model", "left", "hidden sm:table-cell")}
+					{capabilities.map((c) =>
+						column(scoreKey(c), t("scoreHeader", { capability: capLabel(c) }), `agent-board-col-${c}`, "right", undefined, t("scoreHint")),
+					)}
+					{column("cost", t("columns.cost"), "agent-board-col-cost", "right", "hidden sm:table-cell")}
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{rows.map((row) => (
-					<TableRow
-						key={rowKey(row)}
-						tabIndex={0}
-						role="link"
-						aria-label={t("openReportCard", { agent: row.agent })}
-						className="hover:bg-muted/50 focus-visible:bg-muted/50 cursor-pointer focus-visible:outline-none"
-						onClick={() => onOpen(row)}
-						onKeyDown={(e) => {
-							if (e.key === "Enter" || e.key === " ") {
-								e.preventDefault();
-								onOpen(row);
-							}
-						}}
-						data-testid={`agent-board-row-${row.agent}`}
-					>
-						{rankBy && (
-							<TableCell className="text-right tabular-nums" data-testid="agent-board-rank">
-								{row.rank ? row.rank : <span className="text-muted-foreground">-</span>}
+				{rows.map((row) => {
+					const place = ranks.get(rowKey(row));
+					const version = row.version > 0 ? `v${row.version}` : t("noVersion");
+					return (
+						<TableRow
+							key={rowKey(row)}
+							tabIndex={0}
+							role="link"
+							aria-label={t("openReportCard", { agent: row.agent })}
+							className="hover:bg-muted/50 focus-visible:bg-muted/50 cursor-pointer focus-visible:outline-none"
+							onClick={() => onOpen(row)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" || e.key === " ") {
+									e.preventDefault();
+									onOpen(row);
+								}
+							}}
+							data-testid={`agent-board-row-${row.agent}`}
+						>
+							<TableCell className="text-right tabular-nums" data-testid="agent-board-rank" title={place?.tied ? t("tieHint") : undefined}>
+								{place ? `${place.tied ? "=" : ""}${place.rank}` : <span className="text-muted-foreground">-</span>}
 							</TableCell>
-						)}
-						<TableCell>
-							<div className="flex items-center gap-2">
-								<span className="font-medium">{row.agent}</span>
-								{row.baseline && (
-									<Badge variant="neutral" title={t("baselineHint")} data-testid="agent-board-baseline">
-										{t("baseline")}
-									</Badge>
-								)}
-								{row.customer && (
-									<Badge
-										variant="neutral"
-										title={t("simulatedCustomerHint", { simulator: row.simulator ?? "" })}
-										data-testid="agent-board-simulated-customer"
-									>
-										{t("simulatedCustomer")}
-									</Badge>
-								)}
-							</div>
-						</TableCell>
-						<TableCell className="font-mono text-xs" title={row.version > 0 ? undefined : t("noVersionHint")}>
-							{row.version > 0 ? `v${row.version}` : t("noVersion")}
-						</TableCell>
-						<TableCell className="font-mono text-xs">{row.model || "-"}</TableCell>
-						{capabilities.map((c) => {
-							const s = row.capabilities[c];
-							return (
-								<TableCell key={c} className="text-right tabular-nums" data-testid={`agent-board-score-${c}`}>
-									{s ? (
-										<span
-											className="inline-flex flex-col items-end leading-tight"
-											title={
-												s.ranked === false
-													? t("notEnoughHint", { runs: s.runs, tasks: s.tasks ?? 0, ...mins })
-													: t("range", { low: formatShare(s.ci_low), high: formatShare(s.ci_high), runs: s.runs, tasks: s.tasks ?? 0 })
-											}
-										>
-											<span className={cn("font-medium", s.ranked === false && "text-muted-foreground")}>{formatShare(s.score)}</span>
-											<span className="text-muted-foreground text-[11px]">
-												{formatShare(s.ci_low)} to {formatShare(s.ci_high)}
-											</span>
-											<span className="text-muted-foreground text-[11px]">
-												{s.ranked === false ? (
-													<span data-testid="agent-board-not-enough">{t("notEnough")}</span>
-												) : (
-													t("sample", { runs: s.runs, tasks: s.tasks ?? 0 })
-												)}
-											</span>
+							<TableCell>
+								<div className="flex flex-col gap-0.5">
+									<div className="flex flex-wrap items-center gap-2">
+										<span className="font-medium">{modelFirst ? row.model || "-" : row.agent}</span>
+										{place?.best && (
+											<Badge variant="success" data-testid="agent-board-best">
+												{t("best")}
+											</Badge>
+										)}
+										{!modelFirst && row.baseline && (
+											<Badge variant="neutral" title={t("baselineHint")} data-testid="agent-board-baseline">
+												{t("baseline")}
+											</Badge>
+										)}
+										{row.customer && (
+											<Badge
+												variant="neutral"
+												title={t("simulatedCustomerHint", {
+													simulator: row.simulator ?? "",
+												})}
+												data-testid="agent-board-simulated-customer"
+											>
+												{t("simulatedCustomer")}
+											</Badge>
+										)}
+									</div>
+									{modelFirst ? (
+										<span className="text-muted-foreground text-xs" data-testid="agent-board-agent-line">
+											{row.agent} {version}
+											{row.baseline && <span title={t("baselineHint")}> ({t("baseline")})</span>}
 										</span>
 									) : (
-										<span className="text-muted-foreground text-xs">{t("noScore")}</span>
+										<span className="text-muted-foreground text-xs sm:hidden" data-testid="agent-board-mobile-line">
+											{version}, <span className="font-mono">{row.model || "-"}</span>
+										</span>
 									)}
+								</div>
+							</TableCell>
+							<TableCell className="hidden font-mono text-xs sm:table-cell" title={row.version > 0 ? undefined : t("noVersionHint")}>
+								{version}
+							</TableCell>
+							{!modelFirst && <TableCell className="hidden font-mono text-xs sm:table-cell">{row.model || "-"}</TableCell>}
+							{capabilities.map((c) => (
+								<TableCell key={c} className="text-right tabular-nums" data-testid={`agent-board-score-${c}`}>
+									<ScoreCell s={row.capabilities[c]} mins={mins} />
 								</TableCell>
-							);
-						})}
-						<TableCell className="text-right font-mono text-xs tabular-nums">
-							<CostCell row={row} />
-						</TableCell>
-					</TableRow>
-				))}
+							))}
+							<TableCell className="hidden text-right text-xs tabular-nums sm:table-cell">
+								<CostCell row={row} />
+							</TableCell>
+						</TableRow>
+					);
+				})}
 			</TableBody>
 		</Table>
+	);
+}
+
+/**
+ * One capability score. No runs: "not measured". Under the minimum sample: "Too few runs (n)" in
+ * muted text with the reason in the tooltip, never a percent or a range. Ranked: the share, a thin
+ * bar with the 95% range as a lighter band, and the range only when its ends differ.
+ */
+function ScoreCell({
+	s,
+	mins,
+}: {
+	s: AgentLeaderboardRow["capabilities"][string] | undefined;
+	mins: { minRuns: number; minTasks: number };
+}) {
+	const { t } = useTranslation("agentBoard");
+	const state = scoreState(s);
+	if (!s || state === "notMeasured") {
+		return (
+			<span className="text-muted-foreground text-xs" title={t("notMeasuredHint")} data-testid="agent-board-not-measured">
+				{t("noScore")}
+			</span>
+		);
+	}
+	if (state === "tooFew") {
+		return (
+			<span
+				className="text-muted-foreground text-xs"
+				title={t("notEnoughHint", {
+					runs: s.runs,
+					tasks: s.tasks ?? 0,
+					...mins,
+				})}
+				data-testid="agent-board-not-enough"
+			>
+				{t("tooFew", { runs: s.runs })}
+			</span>
+		);
+	}
+	const pct = (v: number) => `${Math.max(0, Math.min(100, v * 100))}%`;
+	return (
+		<span
+			className="inline-flex min-w-20 flex-col items-end gap-0.5 leading-tight"
+			title={t("range", {
+				low: formatShare(s.ci_low),
+				high: formatShare(s.ci_high),
+				runs: s.runs,
+				tasks: s.tasks ?? 0,
+			})}
+		>
+			<span className="font-medium">{formatShare(s.score)}</span>
+			<span className="bg-muted relative h-1 w-full overflow-hidden rounded" aria-hidden data-testid="agent-board-bar">
+				<span className="bg-primary/30 absolute inset-y-0" style={{ left: pct(s.ci_low), width: pct(s.ci_high - s.ci_low) }} />
+				<span className="bg-primary absolute inset-y-0 left-0 rounded" style={{ width: pct(s.score) }} />
+			</span>
+			{showRange(s.ci_low, s.ci_high) && (
+				<span className="text-muted-foreground text-xs">
+					{formatShare(s.ci_low)} to {formatShare(s.ci_high)}
+				</span>
+			)}
+			<span className="text-muted-foreground text-xs">{t("sample", { runs: s.runs, tasks: s.tasks ?? 0 })}</span>
+		</span>
 	);
 }
 
@@ -358,7 +445,7 @@ export function AgentBoardTable({ rows, capabilities, onOpen, rankBy, minRuns, m
 function CostCell({ row }: { row: AgentLeaderboardRow }) {
 	const { t } = useTranslation("agentBoard");
 	const c = rowCost(row);
-	if (c.known) return <>{c.text}</>;
+	if (c.known) return <>{t("perRun", { cost: formatCostPerRun(row.cost_usd) })}</>;
 	const detail = t("costUnpriced", { count: c.unpriced, runs: c.runs });
 	return (
 		<span
@@ -366,8 +453,8 @@ function CostCell({ row }: { row: AgentLeaderboardRow }) {
 			title={c.note ? `${detail}: ${c.note}` : detail}
 			className="inline-flex flex-col items-end leading-tight"
 		>
-			<span className="text-muted-foreground font-sans">{t("costNotKnown")}</span>
-			{c.runs > 0 && <span className="text-muted-foreground font-sans text-[11px]">{detail}</span>}
+			<span className="text-muted-foreground">{t("costNotKnown")}</span>
+			{c.runs > 0 && <span className="text-muted-foreground text-xs">{detail}</span>}
 		</span>
 	);
 }
