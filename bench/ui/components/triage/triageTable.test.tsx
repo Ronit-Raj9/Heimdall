@@ -50,6 +50,6 @@ describe("TriageBanner", () => {
 	it("says patterns are observed, not root causes", () => {
 		const html = renderToStaticMarkup(<TriageBanner />);
 		expect(html).toContain('data-testid="triage-banner"');
-		expect(html).toContain("These patterns show how runs failed, not why.");
+		expect(html).toContain("Patterns show how runs failed, not why.");
 	});
 });

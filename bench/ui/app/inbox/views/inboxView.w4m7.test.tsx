@@ -63,6 +63,6 @@ describe("InboxBody unknown item (wave 4, N76)", () => {
 		};
 		const html = renderToStaticMarkup(<InboxBody {...props} />);
 		expect(html).toContain('data-testid="unknown-link-failure"');
-		expect(html).toContain("No failure named bad was found. Showing all failures instead.");
+		expect(html).toContain("No failure named bad. Showing all failures.");
 	});
 });

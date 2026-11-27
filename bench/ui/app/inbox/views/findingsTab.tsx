@@ -60,7 +60,6 @@ export default function FindingsTab() {
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="findings-tab">
 			<div className="flex flex-wrap items-start justify-between gap-3">
-				<p className="text-muted-foreground max-w-3xl text-sm">{t("intro")}</p>
 				<ShowArchivedChip count={archivedCountOf(list.data)} on={showArchived} onChange={setShowArchived} testId="findings-show-archived" />
 			</div>
 			{list.isLoading ? (
@@ -77,7 +76,6 @@ export default function FindingsTab() {
 			) : bothEmpty ? (
 				<EmptyState
 					title={t("emptyTitle")}
-					body={t("emptyBody")}
 					action={investigating ? undefined : { label: t("investigations.findOutPaid", { cap: formatUsd(INVESTIGATION_START_CAP_USD) }), onClick: () => setInvestigating(true) }}
 					testId="findings-empty"
 				/>

@@ -8,6 +8,7 @@ import {
 	type StatusWithDebug,
 } from "@/components/experiments/experiments.utils";
 import { useDriftMonitorNames } from "@/components/experiments/useDriftMonitorNames";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useListEvaluationsLightQuery, type Evaluation } from "@/lib/store/apis/evaluationsApi";
 import type { ExperimentStatus } from "@/lib/types/bench";
@@ -99,41 +100,42 @@ export function ExperimentSelect({ picker, value, onChange, showHidden, onShowHi
 	const listed = !value || options.some((o) => o.id === value);
 	const current = value ? picker.all.find((o) => o.id === value) : undefined;
 	return (
-		<div className="flex w-full max-w-xl min-w-0 flex-col gap-1.5">
+		<div className="flex w-full max-w-3xl min-w-0 flex-col gap-1.5">
 			<label htmlFor={id} className="text-muted-foreground text-xs">
 				{t("triage.picker.label")}
 			</label>
-			<Select value={value ?? undefined} onValueChange={onChange} disabled={disabled}>
-				<SelectTrigger id={id} className="w-full min-w-0 sm:w-auto sm:min-w-80" data-testid={testId}>
-					<SelectValue placeholder={t("triage.picker.placeholder")}>{value ? (current?.label ?? value) : undefined}</SelectValue>
-				</SelectTrigger>
-				<SelectContent>
-					{!listed && value && (
-						<SelectItem value={value}>
-							<span>{current?.label ?? value}</span>
-							<span className="text-muted-foreground font-mono text-xs">{value}</span>
-						</SelectItem>
-					)}
-					{options.map((o) => (
-						<SelectItem key={o.id} value={o.id} data-testid={`${testId}-option-${o.id}`}>
-							<span>{o.label}</span>
-							<span className="text-muted-foreground font-mono text-xs">{o.secondary}</span>
-						</SelectItem>
-					))}
-				</SelectContent>
-			</Select>
-			{picker.hiddenCount > 0 && (
-				<label className="text-muted-foreground inline-flex min-h-6 items-center gap-2 text-sm" title={tx("picker.showHiddenHint")}>
-					<input
-						type="checkbox"
-						checked={showHidden}
-						onChange={(ev) => onShowHidden(ev.target.checked)}
-						className="accent-primary size-4"
-						data-testid={`${testId}-show-hidden`}
-					/>
-					{tx("picker.showHidden", { count: picker.hiddenCount })}
-				</label>
-			)}
+			<div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+				<Select value={value ?? undefined} onValueChange={onChange} disabled={disabled}>
+					<SelectTrigger id={id} className="w-full min-w-0 sm:w-auto sm:min-w-80" data-testid={testId}>
+						<SelectValue placeholder={t("triage.picker.placeholder")}>{value ? (current?.label ?? value) : undefined}</SelectValue>
+					</SelectTrigger>
+					<SelectContent>
+						{!listed && value && (
+							<SelectItem value={value}>
+								<span>{current?.label ?? value}</span>
+								<span className="text-muted-foreground font-mono text-xs">{value}</span>
+							</SelectItem>
+						)}
+						{options.map((o) => (
+							<SelectItem key={o.id} value={o.id} data-testid={`${testId}-option-${o.id}`}>
+								<span>{o.label}</span>
+								<span className="text-muted-foreground font-mono text-xs">{o.secondary}</span>
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+				{picker.hiddenCount > 0 && (
+					<span title={tx("picker.showHiddenHint")} className="sm:self-center">
+						<Checkbox
+							checked={showHidden}
+							onChange={onShowHidden}
+							label={tx("picker.showHidden", { count: picker.hiddenCount })}
+							className="text-muted-foreground"
+							testId={`${testId}-show-hidden`}
+						/>
+					</span>
+				)}
+			</div>
 		</div>
 	);
 }

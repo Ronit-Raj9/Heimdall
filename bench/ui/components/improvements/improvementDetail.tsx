@@ -49,10 +49,10 @@ export function ImprovementDetailBody({ data, onApprove, approving, onContinue }
 			<Section title={t("curve.title")} description={t("curve.description")} testId="improvement-curve-section">
 				<ImprovementCurve curve={data.curve} band={data.control_band} rounds={data.spec.rounds} />
 			</Section>
-			<Section title={tw("explain.title")} description={tw("explain.description")} testId="improvement-explain-section">
+			<Section title={tw("explain.title")} testId="improvement-explain-section">
 				<VersionExplainSection id={data.id} versions={kept} rounds={data.round_views} />
 			</Section>
-			<Section title={t("cost.title")} description={t("cost.description")} testId="improvement-cost">
+			<Section title={t("cost.title")} testId="improvement-cost">
 				<CostTable data={data} />
 			</Section>
 			<Section title={t("round.title")} testId="improvement-rounds">

@@ -16,7 +16,7 @@ export interface InboxStateFilterProps {
 export function InboxStateFilter({ counts, value, onChange }: InboxStateFilterProps) {
 	const { t } = useTranslation("bench");
 	return (
-		<div role="group" aria-label={t("inbox.filters.label")} className="flex flex-wrap gap-2" data-testid="inbox-state-filter">
+		<div role="group" aria-label={t("inbox.filters.label")} className="flex flex-wrap gap-1.5" data-testid="inbox-state-filter">
 			{INBOX_FILTERS.map((filter) => {
 				const active = filter === value;
 				const count = inboxCount(counts, filter);
@@ -27,7 +27,7 @@ export function InboxStateFilter({ counts, value, onChange }: InboxStateFilterPr
 						aria-pressed={active}
 						onClick={() => onChange(filter)}
 						className={cn(
-							"focus-visible:ring-ring/50 inline-flex h-8 items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
+							"focus-visible:ring-ring/50 inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-sm font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
 							active ? "border-primary bg-primary/10 text-primary" : "bg-card text-foreground hover:bg-accent",
 						)}
 						data-testid={`inbox-state-${filter}`}

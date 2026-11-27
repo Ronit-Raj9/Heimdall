@@ -71,7 +71,6 @@ export function ClusterDetailPanel({ detail, onClose, onOpen, renderRunLink }: C
 			<div className="flex flex-col gap-2">
 				<div className="flex flex-col gap-0.5">
 					<h3 className="text-foreground text-sm font-medium">{t("clusters.detail.runs")}</h3>
-					<p className="text-muted-foreground text-xs">{t("clusters.detail.runsHint")}</p>
 				</div>
 				{runs.length === 0 ? (
 					<EmptyNote testId="cluster-runs-empty">{t("clusters.detail.noRuns")}</EmptyNote>
@@ -157,7 +156,6 @@ export function ErrorText({ text, testId }: { text: string; testId: string }) {
 		<div className="flex min-w-0 flex-col gap-1">
 			<div className="flex flex-col gap-0.5">
 				<h3 className="text-foreground text-sm font-medium">{t("clusters.detail.errorText")}</h3>
-				<p className="text-muted-foreground text-xs">{t("clusters.detail.errorTextHint")}</p>
 			</div>
 			<pre
 				className="bg-muted/40 max-h-64 overflow-auto rounded-sm border px-3 py-2 text-xs leading-relaxed break-all whitespace-pre-wrap"

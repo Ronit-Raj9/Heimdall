@@ -33,7 +33,6 @@ export default function FailuresView() {
 		<section className={cn(pageWidthClass("wide"), "flex flex-col gap-6")} data-page-width="wide" data-testid="failures-page">
 			<PageHeader
 				title={t("failures.title")}
-				subtitle={t("failures.subtitle")}
 				actions={
 					<>
 						<MaximFailuresLink />

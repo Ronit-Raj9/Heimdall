@@ -8,7 +8,7 @@ import { InboxIngestOffNote } from "./inboxSources";
 describe("ingest off note", () => {
 	it("says how failures arrive without a command line", () => {
 		const html = renderToStaticMarkup(<InboxIngestOffNote />);
-		expect(html).toContain("they arrive only when Heimdall pulls them: press Pull now on a connected tool.");
+		expect(html).toContain("Press Pull now on a connected tool.");
 		expect(html).not.toMatch(/heimdall inbox|bifrost-bench/);
 	});
 });

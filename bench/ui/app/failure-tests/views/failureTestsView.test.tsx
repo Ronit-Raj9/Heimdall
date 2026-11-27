@@ -131,7 +131,7 @@ describe("failure test budget", () => {
 		const html = view();
 		expect(html).toContain('data-testid="ft-budget"');
 		expect(html).toContain("Budget (USD)");
-		expect(html).toContain("Empty: each benchmark may spend up to $5.");
+		expect(html).toContain("Empty means up to $5 per benchmark.");
 	});
 });
 

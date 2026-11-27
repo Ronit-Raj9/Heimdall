@@ -40,7 +40,7 @@ describe("ImprovementsTable", () => {
 	it("explains how to start when there are none, the command line inside a disclosure with Copy", () => {
 		const html = renderToStaticMarkup(<ImprovementsTable rows={[]} admin />);
 		expect(html).toContain('data-testid="improvements-empty"');
-		expect(html).toContain("the improver keeps only changes that win on unseen tasks");
+		expect(html).toContain("Each round costs model calls.");
 		expect(html).toContain("Use the command line instead");
 		expect(html).toContain("heimdall improve create");
 		expect(html).toContain('data-testid="improvements-cli-copy"');
@@ -66,7 +66,7 @@ describe("ImprovementsView", () => {
 	it("tells a member why only admins can start one", () => {
 		const html = render(<ImprovementsView />, hostedSession("member"));
 		expect(html).not.toContain('data-testid="improvements-new"');
-		expect(html).toContain("Only organization admins can start an improvement run, because it spends the organization&#x27;s model keys.");
+		expect(html).toContain("Only organization admins can start this. It spends model keys.");
 	});
 });
 
@@ -82,7 +82,7 @@ describe("NewImprovementForm", () => {
 	it("offers standing instructions when the agent has no files, so Create is not blocked by them", () => {
 		const html = render(<NewImprovementForm {...props} form={filled} agentFiles={[]} estimate={ESTIMATE_FIXTURE} />);
 		expect(html).not.toContain("This agent has no files Heimdall can change (its settings have no files section).");
-		expect(html).toContain("Standing instructions (added before every task)");
+		expect(html).toContain("Standing instructions");
 		expect(html).not.toMatch(
 			/<button[^>]*disabled=""[^>]*data-testid="new-improvement-submit"|<button[^>]*data-testid="new-improvement-submit"[^>]*disabled=""/,
 		);

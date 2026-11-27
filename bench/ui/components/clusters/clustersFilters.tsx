@@ -1,3 +1,5 @@
+import { DropdownMenu } from "@/components/ui/dropdownMenu";
+import { ChevronDown } from "lucide-react";
 import { NativeSelect } from "@/components/ui/select";
 import { fieldStackClass } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -149,7 +151,7 @@ export function ClustersFilters(props: ClustersFiltersProps) {
 					value={props.synthetic}
 					options={[
 						{ value: "exclude", label: t("clusters.filters.syntheticExclude"), hint: t("clusters.filters.syntheticExcludeHint") },
-						{ value: "include", label: t("clusters.filters.syntheticInclude"), hint: t("clusters.filters.syntheticIncludeHint") },
+						{ value: "include", label: t("clusters.filters.syntheticInclude") },
 						{ value: "only", label: t("clusters.filters.syntheticOnly"), hint: t("clusters.filters.syntheticOnlyHint") },
 					]}
 					onChange={props.onSynthetic}
@@ -273,40 +275,72 @@ function ExpPicker({
 			<span id={id} className="text-muted-foreground text-sm">
 				{label}
 			</span>
-			<details className="relative" data-testid={testId}>
-				<summary
-					aria-labelledby={id}
-					aria-disabled={disabled || undefined}
-					className="border-input bg-card dark:bg-input/20 flex h-(--control-h) w-full cursor-pointer list-none items-center rounded-md border px-2 text-sm shadow-xs sm:w-56"
-					data-testid={`${testId}-summary`}
-				>
-					{picked.length === 0 ? allLabel : pickedLabel(picked.length)}
-				</summary>
-				<fieldset
-					aria-labelledby={id}
-					disabled={disabled}
-					className="bg-popover absolute z-20 mt-1 flex max-h-72 w-full min-w-56 flex-col gap-0.5 overflow-y-auto rounded-md border p-2 shadow-md sm:w-72"
-				>
-					{list.map((o) => (
-						<label key={o} className="hover:bg-accent flex min-h-6 cursor-pointer items-center gap-2 rounded-sm px-1 font-mono text-sm break-all">
-							<input
-								type="checkbox"
-								className="accent-primary size-4 shrink-0"
-								checked={picked.includes(o)}
-								onChange={() => onCommit(toggleExp(value, o, options))}
-								data-testid={`${testId}-option-${o}`}
-							/>
-							{o}
-						</label>
-					))}
-					{picked.length > 0 && (
-						<button type="button" className="text-primary mt-1 self-start text-sm underline-offset-2 hover:underline" onClick={() => onCommit("")}>
-							{clearLabel}
-						</button>
-					)}
-				</fieldset>
-			</details>
+			<DropdownMenu
+				label={label}
+				align="start"
+				items={[]}
+				testId={testId}
+				contentClassName="w-[calc(100vw-2rem)] max-w-96 sm:w-96"
+				trigger={(p) => (
+					<button
+						{...p}
+						aria-labelledby={id}
+						disabled={disabled}
+						className="border-input bg-card dark:bg-input/20 flex h-(--control-h) w-full cursor-pointer items-center justify-between gap-2 rounded-md border px-2 text-left text-sm shadow-xs disabled:cursor-not-allowed disabled:opacity-60 sm:w-56"
+						data-testid={`${testId}-summary`}
+					>
+						<span className="truncate">{picked.length === 0 ? allLabel : pickedLabel(picked.length)}</span>
+						<ChevronDown className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+					</button>
+				)}
+				content={
+					<ExpPickerList list={list} picked={picked} value={value} options={options} clearLabel={clearLabel} onCommit={onCommit} labelledBy={id} testId={testId} />
+				}
+			/>
 		</div>
+	);
+}
+
+/** The ticked list inside the comparisons menu. Exported for tests. */
+export function ExpPickerList({
+	list,
+	picked,
+	value,
+	options,
+	clearLabel,
+	onCommit,
+	labelledBy,
+	testId,
+}: {
+	list: readonly string[];
+	picked: readonly string[];
+	value: string;
+	options: readonly string[];
+	clearLabel: string;
+	onCommit: (value: string) => void;
+	labelledBy?: string;
+	testId: string;
+}) {
+	return (
+		<fieldset aria-labelledby={labelledBy} className="flex max-h-72 flex-col gap-0.5 overflow-y-auto p-1">
+			{list.map((o) => (
+				<label key={o} title={o} className="hover:bg-muted flex min-h-(--control-h) min-w-0 cursor-pointer items-center gap-2 rounded-md px-1.5 font-mono text-sm">
+					<input
+						type="checkbox"
+						className="accent-primary size-4 shrink-0"
+						checked={picked.includes(o)}
+						onChange={() => onCommit(toggleExp(value, o, options))}
+						data-testid={`${testId}-option-${o}`}
+					/>
+					<span className="min-w-0 truncate">{o}</span>
+				</label>
+			))}
+			{picked.length > 0 && (
+				<button type="button" className="text-primary mt-1 self-start px-1.5 text-sm underline-offset-2 hover:underline" onClick={() => onCommit("")}>
+					{clearLabel}
+				</button>
+			)}
+		</fieldset>
 	);
 }
 
@@ -358,7 +392,7 @@ function SelectField({
 interface SegmentedProps<T extends string> {
 	label: string;
 	value: T;
-	options: readonly { value: T; label: string; hint: string }[];
+	options: readonly { value: T; label: string; hint?: string }[];
 	onChange: (value: T) => void;
 	disabled?: boolean;
 	testId: string;

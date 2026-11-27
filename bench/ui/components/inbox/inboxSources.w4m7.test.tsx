@@ -45,7 +45,7 @@ describe("InboxSourcesTable (wave 4, p13-2)", () => {
 
 	it("says nothing is connected without naming a terminal command", () => {
 		const html = renderToStaticMarkup(<InboxSourcesTable sources={[]} />);
-		expect(html).toContain("Nothing connected yet. Add a tool with Pull failures from your tools below, then press Pull now.");
+		expect(html).toContain("Nothing connected yet.");
 		expect(html).not.toContain("heimdall");
 	});
 });

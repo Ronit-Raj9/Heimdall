@@ -89,7 +89,7 @@ describe("Findings tab", () => {
 
 	it("shows model text only as a hypothesis, with quotes that open the run at the step", () => {
 		const html = renderToStaticMarkup(<FindingDetail finding={base} onClose={() => undefined} />);
-		expect(html).toContain("Hypothesis written by a model. Quotes were checked against the recorded steps.");
+		expect(html).toContain("Written by a model. Quotes checked against steps.");
 		expect(html).toContain("It never ran the tests");
 		expect(html).toContain('href="/runs/r_t01_A#step-4"');
 		expect(html).toContain("Check the fix");
@@ -118,7 +118,7 @@ describe("Findings tab", () => {
 			},
 		};
 		expect(renderToStaticMarkup(<FindingDetail finding={fixed} onClose={() => undefined} />)).toContain(
-			"Fixed: the fixed agent passed 3 of 3 runs; the old agent passed 1 of 3.",
+			"Fixed: new agent passed 3 of 3, old passed 1 of 3.",
 		);
 		const reopened: Finding = {
 			...base,
@@ -150,7 +150,7 @@ describe("Findings tab", () => {
 		const html = renderToStaticMarkup(<FindingsTab />);
 		state.experiments = [];
 		expect(html).toContain("No tracked failures yet");
-		expect(html).toContain("Find out why (paid, up to $1.00 by default)");
+		expect(html).toContain("Find out why, up to $1.00");
 	});
 
 	it("lists findings with their state badge, and says so when there are none", () => {

@@ -91,7 +91,8 @@ describe("InboxTokensView (hosted)", () => {
 			<InboxTokensView list={{ ...list, tokens: [] }} envName="X" isAdmin created={null} onCreate={noop} onRevoke={noop} />,
 		);
 		expect(html).toContain('data-testid="inbox-tokens-empty"');
-		expect(html).toContain("Create one");
+		expect(html).toContain("No inbox tokens yet.");
+		expect(html).toContain('data-testid="inbox-webhook-generate"');
 	});
 });
 

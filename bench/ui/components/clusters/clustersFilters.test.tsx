@@ -2,7 +2,7 @@ import "@/lib/i18n";
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ClustersFilters, type ClustersFiltersProps } from "./clustersFilters";
+import { ClustersFilters, ExpPickerList, type ClustersFiltersProps } from "./clustersFilters";
 
 const noop = () => undefined;
 const props: ClustersFiltersProps = {
@@ -31,9 +31,15 @@ describe("ClustersFilters", () => {
 
 	it("shows the URL values in the fields", () => {
 		expect(html).toContain('data-testid="clusters-filter-suite" value="coding-core"');
-		// The comparisons are a pick list now (M7-38): both URL ids are ticked and the summary counts them.
-		expect(html).toMatch(/data-testid="clusters-filter-exp-option-e_1" checked=""/);
-		expect(html).toMatch(/data-testid="clusters-filter-exp-option-e_2" checked=""/);
+		// The comparisons are a menu of check boxes (M7-38): the summary counts the URL ids, and the
+		// list (rendered only while the menu is open) ticks both.
+		const list = renderToStaticMarkup(
+			<ExpPickerList list={["e_1", "e_2", "e_3"]} picked={["e_1", "e_2"]} value="e_1,e_2" options={["e_1", "e_2", "e_3"]} clearLabel="Clear" onCommit={noop} testId="clusters-filter-exp" />,
+		);
+		expect(list).toMatch(/data-testid="clusters-filter-exp-option-e_1" checked=""/);
+		expect(list).toMatch(/data-testid="clusters-filter-exp-option-e_2" checked=""/);
+		expect(list).not.toMatch(/data-testid="clusters-filter-exp-option-e_3" checked=""/);
+		expect(html).toMatch(/aria-haspopup="menu"[^>]*data-testid="clusters-filter-exp-summary"/);
 		expect(html).toContain(">2 comparisons<");
 		expect(html).toMatch(/type="number"[^>]*data-testid="clusters-filter-min" value="2"/);
 	});
@@ -46,7 +52,7 @@ describe("ClustersFilters", () => {
 
 	it("suggests agents and experiments from the list", () => {
 		expect(html).toContain('<option value="codex-default">');
-		expect(html).toContain('data-testid="clusters-filter-exp-option-e_2"');
+		expect(html).toContain('data-testid="clusters-filter-exp-summary"');
 		// With no experiment list the comparisons stay a text field with suggestions.
 		const text = renderToStaticMarkup(<ClustersFilters {...props} experimentOptions={[]} />);
 		expect(text).toContain('data-testid="clusters-filter-exp" value="e_1,e_2"');
