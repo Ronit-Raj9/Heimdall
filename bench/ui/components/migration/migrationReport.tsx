@@ -72,6 +72,9 @@ export function MigrationReportView({
 				})}{" "}
 				{report.policy ? t("migration.policy", { name: report.policy }) : t("migration.noPolicy")}
 			</p>
+			<p className="text-sm" data-testid="migration-lead">
+				{t("migration.switchLead")}
+			</p>
 			<ul className="flex flex-col gap-2" data-testid="migration-recommendations">
 				{report.pairs.map((p) => (
 					<li key={p.to.arm} data-testid={`migration-recommendation-${p.to.arm}`} data-action={p.recommendation.action}>
@@ -167,6 +170,9 @@ function PairSection({ pair, expId }: { pair: MigrationPair; expId: string }) {
 					<li key={c}>{c}</li>
 				))}
 			</ul>
+			{/* M4-29: the stratum table with its p values is for statisticians. */}
+			<details className="group" data-testid="migration-strata-statistics">
+				<summary className="text-primary w-fit cursor-pointer text-sm font-medium">{tf("verdict.forStatisticians")}</summary>
 			<FadeScroll>
 				<table className="w-full min-w-[560px] text-sm" data-testid="migration-strata">
 					<caption className="text-muted-foreground pb-1 text-left text-xs">
@@ -200,6 +206,7 @@ function PairSection({ pair, expId }: { pair: MigrationPair; expId: string }) {
 					</tbody>
 				</table>
 			</FadeScroll>
+			</details>
 			<div className="flex flex-col gap-1 text-sm" data-testid="migration-behaviour">
 				<h3 className="text-foreground font-medium">{t("migration.behaviour.title")}</h3>
 				<ul className="text-muted-foreground list-disc pl-5">

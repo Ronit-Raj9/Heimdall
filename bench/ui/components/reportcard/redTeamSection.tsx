@@ -102,7 +102,7 @@ export function RedTeamSection({ report }: { report: Report }) {
 		<div className="flex flex-col gap-6" data-testid="report-red-team">
 			{Object.entries(arms).map(([label, arm]) => (
 				<div key={label} className="flex flex-col gap-2">
-					{ab && <h3 className="text-sm font-semibold">Agent {label}</h3>}
+					{ab && <h4 className="text-sm font-semibold">Agent {label}</h4>}
 					<ArmBlock name={label} arm={arm} />
 				</div>
 			))}

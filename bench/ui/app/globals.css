@@ -660,6 +660,10 @@
 		content: " (" attr(href) ")";
 		font-size: 0.8em;
 	}
+	/* Print this release (M7-83): only the one release card, without the page header. */
+	html[data-print-release] header[data-testid="page-header"] {
+		display: none !important;
+	}
 	/* Evaluation, comparison and shared pages print as a clean report (M8-73). */
 	@page {
 		margin: 14mm;

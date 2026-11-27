@@ -87,6 +87,7 @@ export function ReportSlices({ report, onShowOnly }: ReportSlicesProps) {
 	const filtered = report.where ?? {};
 	return (
 		<Section
+			as="h3"
 			title="By segment"
 			description="Tasks grouped by their metadata. Score is the share of runs solved, with the 95% confidence range. Segments with fewer than 3 tasks are shown but never ranked."
 		>

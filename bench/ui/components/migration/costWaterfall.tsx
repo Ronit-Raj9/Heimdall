@@ -3,13 +3,19 @@ import "./w4b06I18n";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { getLocale } from "@/lib/i18n";
 import { useGetCostExplainQuery } from "@/lib/store/apis/migrationApi";
-import type { CostArm, CostExplanation, CostWaterfall as Waterfall, Value } from "@/lib/types/bench";
+import type { CostApart, CostArm, CostExplanation, CostWaterfall as Waterfall, Value } from "@/lib/types/bench";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { FadeScroll } from "./fadeScroll";
 import "@/components/verdict/uf4aI18n";
 import { costText, formatShare, observed, signedUsd, waterfallBars } from "./pareto.utils";
 import { formatUsd2, observedNumber } from "@/components/verdict/armCost";
+
+/** The measuring costs (judge, user simulator) to list: rows that are zero or unknown for both setups are left out (M4-24). Pure. */
+export function measuredApart(apart: readonly CostApart[]): CostApart[] {
+	const nothing = (v: CostApart["a"]) => (observed(v) ?? 0) === 0 && !v?.bounds;
+	return apart.filter((x) => !(nothing(x.a) && nothing(x.b)));
+}
 
 /**
  * Why arm B cost more than arm A (docs/cost-explain.md): the two arms side by side, then the
@@ -80,6 +86,9 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 					{t("migration.synthetic")}
 				</p>
 			)}
+			<p className="text-sm" data-testid="cost-lead">
+				{t("migration.cost.lead")}
+			</p>
 			<FadeScroll pinStart>
 				<table className="w-full min-w-[420px] text-sm" data-testid="cost-arms">
 					<thead>
@@ -114,16 +123,27 @@ export function CostExplanationView({ explanation }: { explanation: CostExplanat
 			</FadeScroll>
 			<WaterfallView title={t("migration.cost.perRun")} waterfall={explanation.per_run} testId="cost-waterfall-run" />
 			<WaterfallView title={t("migration.cost.perSuccess")} waterfall={explanation.per_success} testId="cost-waterfall-success" />
+			{/* M4-24: the Shapley note is for statisticians. */}
+			<details className="group" data-testid="cost-statistics">
+				<summary className="text-primary w-fit cursor-pointer text-sm font-medium">{tu("verdict.forStatisticians")}</summary>
+				<p className="text-muted-foreground mt-2 text-sm">{t("migration.cost.shapley")}</p>
+			</details>
+			{measuredApart(explanation.apart).length === 0 ? (
+				<p className="text-muted-foreground text-sm" data-testid="cost-no-measuring">
+					{t("migration.cost.noMeasuring")}
+				</p>
+			) : (
 			<div className="flex flex-col gap-1 text-sm" data-testid="cost-apart">
 				<h4 className="text-foreground font-medium">{t("migration.cost.apart")}</h4>
 				<ul className="text-muted-foreground list-disc pl-5">
-					{explanation.apart.map((x) => (
+					{measuredApart(explanation.apart).map((x) => (
 						<li key={x.id}>
 							{x.label}: {costText(x.a, locale) ?? valueReason(x.a, unknown)} / {costText(x.b, locale) ?? valueReason(x.b, unknown)}
 						</li>
 					))}
 				</ul>
 			</div>
+			)}
 			<div className="flex flex-col gap-1 text-sm" data-testid="cost-cache">
 				<h4 className="text-foreground font-medium">{t("migration.cost.cache")}</h4>
 				{explanation.cache.length === 0 ? (

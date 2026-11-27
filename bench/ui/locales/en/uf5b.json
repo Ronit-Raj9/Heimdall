@@ -48,7 +48,7 @@
 		"statusOn": "Shadow replay: On",
 		"turnOn": "Turn on",
 		"turnOff": "Turn off",
-		"noSources": "No recorded sessions yet. Connect Bifrost in the Failure inbox",
+		"noSources": "No recorded sessions yet. Connect Bifrost in Production failures",
 		"connect": "Connect Bifrost",
 		"why": "To start: {{list}}.",
 		"needOn": "turn shadow replay on",

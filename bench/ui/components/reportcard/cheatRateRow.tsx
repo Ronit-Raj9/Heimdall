@@ -54,7 +54,7 @@ function CheatRateSection({ report, cc }: { report: Report; cc: CheatCheck }) {
 	const arms = report.arms.filter((a) => cc.per_arm?.[a.label]);
 	const few = arms.some((a) => (cc.per_arm?.[a.label]?.runs ?? 0) < FEW_CHEAT_RUNS);
 	return (
-		<Section title={t("cheat.title")} description={t("cheat.description")}>
+		<Section as="h3" title={t("cheat.title")} description={t("cheat.description")}>
 			<div data-testid="report-cheat-rate" className="flex flex-col gap-2 text-sm">
 				{cc.state === "measured" &&
 					arms.map((a) => {

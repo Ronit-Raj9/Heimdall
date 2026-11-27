@@ -50,7 +50,7 @@ describe("shadow replay source picker", () => {
 
 	it("says how to add a source when the inbox has none", () => {
 		const html = renderToStaticMarkup(<ReplayFormFields form={form} onChange={() => undefined} sources={[]} />);
-		expect(html).toContain("No recorded sessions yet. Connect Bifrost in the Failure inbox");
+		expect(html).toContain("No recorded sessions yet. Connect Bifrost in Production failures");
 		expect(html).toContain('href="/inbox?tab=connect"');
 		expect(html).toMatch(/<select[^>]*disabled=""/);
 	});
