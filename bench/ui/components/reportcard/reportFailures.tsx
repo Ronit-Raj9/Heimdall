@@ -148,8 +148,8 @@ export function ReportFailures({ report, agent }: { report: Report; agent?: stri
 					</div>
 				)}
 				<Link
-					to={"/why-agents-fail" as never}
-					search={(agent ? { agent } : {}) as never}
+					to={"/failures" as never}
+					search={(agent ? { tab: "agents", agent } : { tab: "agents" }) as never}
 					className="text-primary inline-flex w-fit items-center gap-1 text-sm font-medium underline-offset-4 hover:underline"
 					data-testid="report-failures-more"
 				>

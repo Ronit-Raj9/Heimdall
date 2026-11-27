@@ -164,7 +164,7 @@ function WhatChanged({ look }: { look: CanaryRecord }) {
 						{ch.new_clusters.map((c) => (
 							<li key={c.signature}>
 								<Link
-									to="/inbox"
+									to="/failures"
 									search={{ tab: "clusters", sig: c.signature } as never}
 									className="font-mono underline-offset-2 hover:underline"
 									data-testid={`canary-cluster-${c.signature}`}

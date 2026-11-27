@@ -39,14 +39,50 @@ export function trendsRedirect(search: RouteSearch): RedirectTarget {
 	return asTab("/leaderboard", "trends", search);
 }
 
-/** /clusters?... becomes the Clusters tab of /inbox. */
-export function clustersRedirect(search: RouteSearch): RedirectTarget {
-	return asTab("/inbox", "clusters", search);
+/**
+ * The tabs of /failures (M7-1): production failures (the old /inbox list), findings, failure
+ * groups (the old /clusters), failure patterns per comparison (the old /triage) and failure
+ * patterns per agent version (the old /why-agents-fail).
+ */
+export const FAILURES_TABS = ["production", "findings", "groups", "patterns", "agents"] as const;
+export type FailuresTab = (typeof FAILURES_TABS)[number];
+
+/** Old /inbox tab ids to the /failures tab that holds them; a missing or unknown tab gives production. */
+const INBOX_TAB_MAP: Readonly<Record<string, FailuresTab>> = {
+	inbox: "production",
+	production: "production",
+	findings: "findings",
+	clusters: "groups",
+	groups: "groups",
+	triage: "patterns",
+	patterns: "patterns",
+	agents: "agents",
+};
+
+/** Old /why-agents-fail tab ids; a missing or unknown tab gives the per-agent view. */
+const WHY_TAB_MAP: Readonly<Record<string, FailuresTab>> = {
+	patterns: "agents",
+	groups: "groups",
+};
+
+/** /inbox?tab=&state=&source=&item=&q=&finding=... becomes /failures with the matching tab, every other key kept. */
+export function inboxRedirect(search: RouteSearch): RedirectTarget {
+	return asTab("/failures", INBOX_TAB_MAP[text(search.tab) ?? ""] ?? "production", search);
 }
 
-/** /triage?exp=&pattern= becomes the Triage tab of /inbox. */
+/** /why-agents-fail?tab=&agent=&version=&benchmark=&practice=... becomes /failures with the matching tab. */
+export function whyAgentsFailRedirect(search: RouteSearch): RedirectTarget {
+	return asTab("/failures", WHY_TAB_MAP[text(search.tab) ?? ""] ?? "agents", search);
+}
+
+/** /clusters?... becomes the Failure groups tab of /failures (one hop). */
+export function clustersRedirect(search: RouteSearch): RedirectTarget {
+	return asTab("/failures", "groups", search);
+}
+
+/** /triage?exp=&pattern= becomes the Failure patterns tab of /failures (one hop). */
 export function triageRedirect(search: RouteSearch): RedirectTarget {
-	return asTab("/inbox", "triage", search);
+	return asTab("/failures", "patterns", search);
 }
 
 /** /imports is the Import tab of Benchmarks (agent-first nav, X09). */

@@ -267,7 +267,7 @@ function EndpointSection({
 							</span>
 						)}
 						{token && (
-							<a href="/inbox" className="text-primary text-xs underline-offset-4 hover:underline" data-testid="from-traces-ingest-note">
+							<a href="/failures" className="text-primary text-xs underline-offset-4 hover:underline" data-testid="from-traces-ingest-note">
 								{tm("tokens.ingestPanel")}
 							</a>
 						)}
@@ -371,7 +371,7 @@ function WaitingSection({
 				{stale && (
 					<p className="text-chart-warning-ink text-sm" role="status" data-testid="from-traces-stale">
 						{tu("traces.stale")}{" "}
-						<Link to="/inbox" className="text-primary underline underline-offset-2">
+						<Link to="/failures" className="text-primary underline underline-offset-2">
 							{tu("traces.staleLink")}
 						</Link>
 					</p>

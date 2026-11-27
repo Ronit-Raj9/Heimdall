@@ -6,7 +6,7 @@ import { activeNavItem, pageTitle } from "./navigation";
 describe("page title", () => {
 	// Spec 1: /maxim is the Production failures list filtered to one source.
 	it("names the Maxim failures page as Production failures, under its entry", () => {
-		expect(activeNavItem("/maxim")?.to).toBe("/inbox");
+		expect(activeNavItem("/maxim")?.to).toBe("/failures");
 		expect(pageTitle("/maxim")).toBe("Production failures · Heimdall");
 		expect(pageTitle("/maxim/")).toBe("Production failures · Heimdall");
 	});

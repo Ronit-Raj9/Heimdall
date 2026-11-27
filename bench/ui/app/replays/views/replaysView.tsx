@@ -310,7 +310,7 @@ export function ReplayFormFields({
 					// No source yet: say where one comes from, with the way there (M5-55).
 					<p className="text-muted-foreground text-xs" data-testid="replays-no-sources">
 						{t5("replays.noSources")}:{" "}
-						<Link to={"/inbox" as never} search={{ tab: "connect" } as never} className="text-primary underline-offset-4 hover:underline">
+						<Link to={"/failures" as never} search={{ tab: "connect" } as never} className="text-primary underline-offset-4 hover:underline">
 							{t5("replays.connect")}
 						</Link>
 					</p>

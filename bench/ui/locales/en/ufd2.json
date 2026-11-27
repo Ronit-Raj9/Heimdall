@@ -1,0 +1,14 @@
+{
+	"failures": {
+		"title": "Failures",
+		"subtitle": "Failures from production and from your test runs, grouped, and tracked until a rerun proves them fixed.",
+		"tabs": {
+			"label": "Ways to look at failures",
+			"production": "Production failures",
+			"findings": "Findings",
+			"groups": "Failure groups",
+			"patterns": "Failure patterns",
+			"agents": "By agent version"
+		}
+	}
+}

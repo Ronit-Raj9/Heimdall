@@ -7,7 +7,6 @@ import {
 	CirclePlay,
 	FlaskConical,
 	House,
-	Inbox,
 	ListOrdered,
 	Network,
 	PackageCheck,
@@ -23,6 +22,7 @@ import {
 } from "lucide-react";
 import i18n from "@/lib/i18n";
 import { pageTitleOverride } from "@/lib/routing/pageTitle";
+import "@/app/failures/views/ufd2I18n";
 
 export type BenchNavGroupId = "home" | "test" | "results" | "benchmarks" | "production" | "bottom";
 
@@ -40,8 +40,7 @@ export interface BenchNavItem {
 		| "/runs"
 		| "/suites"
 		| "/annotation"
-		| "/why-agents-fail"
-		| "/inbox"
+		| "/failures"
 		| "/scheduled-checks"
 		| "/live"
 		| "/gateway"
@@ -125,11 +124,12 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 		items: [
 			{ to: "/runs", labelKey: "shell.nav.runs", icon: CirclePlay, testId: "nav-link-runs", also: ["/compare"] },
 			{
-				to: "/why-agents-fail",
+				// One page for every failure view (M7-1); the old routes redirect to its tabs.
+				to: "/failures",
 				labelKey: "shell.nav.whyAgentsFail",
 				icon: SearchX,
-				testId: "nav-link-why-agents-fail",
-				also: ["/clusters", "/triage"],
+				testId: "nav-link-failures",
+				also: ["/inbox", "/why-agents-fail", "/clusters", "/triage", "/maxim"],
 			},
 			{ to: "/leaderboard", labelKey: "shell.nav.leaderboard", icon: ListOrdered, testId: "nav-link-leaderboard", also: ["/trends"] },
 			{
@@ -159,7 +159,6 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 		id: "production",
 		labelKey: "shell.groups.production",
 		items: [
-			{ to: "/inbox", labelKey: "shell.nav.inbox", icon: Inbox, testId: "nav-link-inbox", also: ["/maxim"] },
 			{ to: "/live", labelKey: "shell.nav.live", icon: Radio, testId: "nav-link-live" },
 			{
 				to: "/scheduled-checks",
@@ -249,11 +248,13 @@ const PAGE_TITLES: Readonly<
 	"/gateway": "titles.gateway",
 	"/validity": "titles.validity",
 	"/replays": "titles.replays",
-	"/inbox": "titles.inbox",
 	"/maxim": "titles.inbox",
 	"/evaluate": "titles.evaluate",
 	"/quickstart": "titles.quickstart",
 };
+
+/** Old tab ids /failures still opens (its RouteTabs aliases), for the tab title. */
+const FAILURES_TAB_ALIASES: Readonly<Record<string, string>> = { inbox: "production", tracked: "findings", clusters: "groups", triage: "patterns" };
 
 /** Path prefixes with their own title, checked in order after the exact paths: an object page below a list. */
 const PAGE_TITLE_PREFIXES: readonly (readonly [string, "titles.job"])[] = [["/jobs/", "titles.job"]];
@@ -291,6 +292,14 @@ export function pageTitle(pathname: string, search?: Readonly<Record<string, unk
 	if (override) return override;
 	const app = i18n.t("app.name", { ns: "bench" });
 	const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+	if (path === "/failures") {
+		// "<tab> · Failures": the page names its tab like Settings does (M7-1).
+		const failures = i18n.t("failures.title", { ns: "ufd2" });
+		const tab = typeof search?.tab === "string" ? search.tab : "production";
+		const key = `failures.tabs.${FAILURES_TAB_ALIASES[tab] ?? tab}`;
+		const label = tab !== "label" && i18n.exists(key, { ns: "ufd2" }) ? i18n.t(key as never, { ns: "ufd2" }) : null;
+		return label ? `${label} · ${failures} · ${app}` : `${failures} · ${app}`;
+	}
 	if (path === "/settings") {
 		const settings = i18n.t("shell.nav.settings", { ns: "bench" });
 		const tab = typeof search?.tab === "string" ? search.tab : "keys";

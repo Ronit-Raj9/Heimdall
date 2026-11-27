@@ -137,8 +137,8 @@ export default function AgentDetailView() {
 		},
 		{
 			label: t("detail.menu.whyFail"),
-			to: "/why-agents-fail",
-			search: { agent: agentId },
+			to: "/failures",
+			search: { tab: "agents", agent: agentId },
 			icon: Bug,
 			testId: "agent-detail-why-fail",
 		},

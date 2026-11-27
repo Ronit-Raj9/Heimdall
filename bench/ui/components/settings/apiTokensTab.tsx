@@ -28,7 +28,7 @@ export function IngestTokensNote() {
 	const { t } = useTranslation("w4m1");
 	return (
 		<p className="text-muted-foreground text-xs" data-testid="tokens-ingest-note">
-			<a href="/inbox" className="text-primary underline-offset-4 hover:underline">
+			<a href="/failures" className="text-primary underline-offset-4 hover:underline">
 				{t("tokens.ingestAccess")}
 			</a>
 		</p>

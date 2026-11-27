@@ -1,10 +1,8 @@
-import ClustersTab from "@/app/inbox/views/clustersTab";
 import { AgentPicker } from "@/components/agents/agentPicker";
-import { ShadowReplayLink } from "@/components/replays/shadowReplayLink";
 import { PatternList } from "@/components/reportcard/reportFailures";
 import { pct } from "@/components/reportcard/reportCard.utils";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
-import { EmptyState, PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
+import { EmptyState } from "@/components/shell";
 import { latestRunAgent } from "@/app/inbox/views/patternDefaults";
 import "@/app/inbox/views/uf7aI18n";
 import { Button } from "@/components/ui/button";
@@ -156,36 +154,11 @@ export function MaximFailuresLink() {
 }
 
 /**
- * Why agents fail (/why-agents-fail?agent=&tab=): per agent version, how often it loops, claims
- * done without checking, or ignores an error, with example runs; and the failure groups across
- * every benchmark run (the clusters view).
+ * Failure patterns per agent version (/failures?tab=agents&agent=&version=&benchmark=&practice=):
+ * how often each version loops, claims done without checking, or ignores an error, with example
+ * runs. The old /why-agents-fail page redirects here (M7-1).
  */
-export default function WhyAgentsFailView() {
-	const { t } = useTranslation("agentFirst");
-	const tabs: RouteTab[] = [
-		{ id: "patterns", label: t("why.tabs.patterns") },
-		{ id: "groups", label: t("why.tabs.groups") },
-	];
-	return (
-		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="why-agents-fail-screen">
-			<PageHeader
-				title={t("why.title")}
-				subtitle={t("why.subtitle")}
-				actions={
-					<>
-						<MaximFailuresLink />
-						<ShadowReplayLink />
-					</>
-				}
-			/>
-			<RouteTabs tabs={tabs} defaultTab="patterns" label={t("why.tabs.label")} testId="why-tabs">
-				{(active) => (active === "groups" ? <ClustersTab /> : <PatternsTab />)}
-			</RouteTabs>
-		</section>
-	);
-}
-
-function PatternsTab() {
+export function PatternsTab() {
 	const { t } = useTranslation("agentFirst");
 	const locale = getLocale();
 	const { t: tb } = useTranslation("agentBoard");

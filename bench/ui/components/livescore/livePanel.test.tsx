@@ -53,7 +53,7 @@ describe("LiveBody", () => {
 		const html = renderToStaticMarkup(<WorstSection worst={LIVE_STATUS_FIXTURE.worst} />);
 		const first = LIVE_STATUS_FIXTURE.worst[0];
 		expect(first.inbox_item).toMatch(/^inc-[0-9a-f]{12}$/);
-		expect(html).toContain(`href="/inbox?item=${first.inbox_item}"`);
+		expect(html).toContain(`href="/failures?tab=production&amp;item=${first.inbox_item}"`);
 		expect(html).toContain("abandoned");
 	});
 

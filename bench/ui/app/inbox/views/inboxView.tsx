@@ -4,7 +4,6 @@ import { InboxStateFilter } from "@/components/inbox/inboxStateFilter";
 import { SessionImport } from "@/components/inbox/sessionImport";
 import { InboxTable } from "@/components/inbox/inboxTable";
 import { formatInboxTime } from "@/components/inbox/inboxBadges";
-import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { useGetInboxQuery } from "@/lib/store/apis/inboxApi";
 import type { InboxItem, InboxListResponse, InboxSourceStatus } from "@/lib/types/bench";
@@ -12,12 +11,9 @@ import { Link } from "@tanstack/react-router";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import ClustersTab from "./clustersTab";
-import FindingsTab from "./findingsTab";
 import { InboxPullButton, InboxPullSetup, InboxWebhook } from "./inboxConnect";
 import { useGetInboxWebhookQuery, useGetPullReadinessQuery } from "@/lib/store/apis/liveinboxApi";
 import { InboxItemPanel } from "./inboxItemPanel";
-import TriageTab from "./triageTab";
 import { Collapsible } from "@/components/inbox/featureHero";
 import { InboxBulkAccept } from "@/components/inbox/inboxBulkAccept";
 import { ListChecks, Plug } from "lucide-react";
@@ -31,40 +27,7 @@ import "./uf7aI18n";
 const DEFAULT_FILTER: InboxFilter = "new";
 
 /**
- * Failure inbox: /inbox?tab=. Inbox (default), Clusters (the old /clusters) and Triage (the old
- * /triage): production failures, failed benchmark runs grouped by signature, and failure patterns
- * per arm of one experiment.
- */
-export default function InboxView() {
-	const { t } = useTranslation("bench");
-	const tabs: RouteTab[] = [
-		{ id: "inbox", label: t("inbox.tabs.inbox") },
-		{ id: "clusters", label: t("inbox.tabs.clusters") },
-		{ id: "triage", label: t("inbox.tabs.triage") },
-		{ id: "findings", label: t("tabs.findings", { ns: "w443" }) },
-	];
-	return (
-		<section className="flex min-w-0 flex-col gap-6" data-testid="inbox-page">
-			<PageHeader title={t("inbox.title")} subtitle={t("inbox.pageSubtitle")} />
-			<RouteTabs tabs={tabs} defaultTab="inbox" label={t("inbox.tabs.label")} testId="inbox-tabs">
-				{(active) =>
-					active === "clusters" ? (
-						<ClustersTab />
-					) : active === "triage" ? (
-						<TriageTab />
-					) : active === "findings" ? (
-						<FindingsTab />
-					) : (
-						<InboxTab />
-					)
-				}
-			</RouteTabs>
-		</section>
-	);
-}
-
-/**
- * The Inbox tab: ?state=&source=&item=. Production failures pulled from trace sources,
+ * The Production failures tab of /failures: ?state=&source=&item=. Production failures pulled from trace sources,
  * one row per signature. state and source go to the server; item opens one item beside the table,
  * where it can be accepted into a suite as a draft regression task, rejected or snoozed
  * (docs/failure-inbox.md).

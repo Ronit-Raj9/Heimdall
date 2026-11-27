@@ -47,6 +47,6 @@ describe("live utils", () => {
 			url: "/livescore/pull",
 			method: "POST",
 		});
-		expect(inboxLink("inc-0123456789ab")).toBe("/inbox?item=inc-0123456789ab");
+		expect(inboxLink("inc-0123456789ab")).toBe("/failures?tab=production&item=inc-0123456789ab");
 	});
 });
